@@ -420,8 +420,11 @@ Start the server:
 vrt api serve --port 3456
 ```
 
+The shared Hono app also exposes a Cloudflare Workers entry point at `worker/index.ts`.
+
 Available endpoints:
 
+- `GET /api/openapi.json` — OpenAPI 3.1 spec for the current HTTP surface
 - `GET /api/status` — server version, backends, and capabilities
 - `POST /api/compare` — compare baseline/current HTML or URLs across viewports
 - `POST /api/compare-renderers` — compare Chromium vs Crater rendering
