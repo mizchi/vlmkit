@@ -137,6 +137,60 @@ local migrationShadcn = new Task {
   inputs { "src/experiments/migration/migration-compare.ts"; "fixtures/migration/shadcn-to-luna/**" }
 }
 
+local migrationSubagentPrepare = new Task {
+  name = "migration-subagent-prepare"
+  cmd = "node src/experiments/migration/migration-subagent.ts prepare"
+  inputs { "src/experiments/migration/migration-subagent.ts"; "src/experiments/migration/migration-fix-loop-core.ts" }
+}
+
+local migrationSubagentEvaluate = new Task {
+  name = "migration-subagent-evaluate"
+  cmd = "node src/experiments/migration/migration-subagent.ts evaluate"
+  inputs { "src/experiments/migration/migration-subagent.ts" }
+}
+
+local migrationBlindList = new Task {
+  name = "migration-blind-list"
+  cmd = "node src/experiments/migration/migration-blind.ts fixtures/migration/blind-scenarios.json list"
+  inputs { "src/experiments/migration/migration-blind.ts"; "fixtures/migration/blind-scenarios.json" }
+}
+
+local migrationBlindShow = new Task {
+  name = "migration-blind-show"
+  params {
+    new { name = "scenario"; type = "string" }
+  }
+  cmd = "node src/experiments/migration/migration-blind.ts fixtures/migration/blind-scenarios.json show $SCENARIO"
+  inputs { "src/experiments/migration/migration-blind.ts"; "fixtures/migration/blind-scenarios.json" }
+}
+
+local migrationBlindPrepare = new Task {
+  name = "migration-blind-prepare"
+  params {
+    new { name = "scenario"; type = "string" }
+  }
+  cmd = "node src/experiments/migration/migration-blind.ts fixtures/migration/blind-scenarios.json prepare $SCENARIO"
+  inputs { "src/experiments/migration/migration-blind.ts"; "fixtures/migration/blind-scenarios.json"; "fixtures/migration/**" }
+}
+
+local migrationBlindSolo = new Task {
+  name = "migration-blind-solo"
+  params {
+    new { name = "scenario"; type = "string" }
+  }
+  cmd = "node src/experiments/migration/migration-blind.ts fixtures/migration/blind-scenarios.json solo $SCENARIO"
+  inputs { "src/experiments/migration/migration-blind.ts"; "fixtures/migration/blind-scenarios.json"; "fixtures/migration/**" }
+}
+
+local migrationBlindEvaluate = new Task {
+  name = "migration-blind-evaluate"
+  params {
+    new { name = "scenario"; type = "string" }
+  }
+  cmd = "node src/experiments/migration/migration-blind.ts fixtures/migration/blind-scenarios.json evaluate $SCENARIO"
+  inputs { "src/experiments/migration/migration-blind.ts"; "fixtures/migration/blind-scenarios.json" }
+}
+
 local flakerVrtAdapt = new Task {
   name = "flaker-vrt-adapt"
   cmd = "node src/experiments/flaker/flaker-vrt-report-adapter.ts"
@@ -307,6 +361,13 @@ tasks {
   migrationReset
   migrationTailwind
   migrationShadcn
+  migrationSubagentPrepare
+  migrationSubagentEvaluate
+  migrationBlindList
+  migrationBlindShow
+  migrationBlindPrepare
+  migrationBlindSolo
+  migrationBlindEvaluate
   flakerVrtAdapt
   fixLoop
   vlmBench
