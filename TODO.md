@@ -111,9 +111,9 @@ Use vrt on real projects to verify practicality.
 - [x] `snapshot` 系の baseline approve を first-class にする
   - sample では `scripts/vrt-approve.mjs` で `*-current.png` を `*-baseline.png` にコピーしている
   - `vrt snapshot approve` もしくは `vrt snapshot --approve` が欲しい
-- [ ] 外部プロジェクト向けに `workflow` の route/spec coupling を外す
-  - 現状の `e2e/vrt-capture.spec.ts` は vrt 自身の route 一覧を内包しており、そのままでは sample app に流用できない
-  - config file か custom capture entrypoint を差し込めるようにしたい
+- [x] 外部プロジェクト向けに `workflow` の route/spec coupling を外す
+  - `e2e/vrt-capture.spec.ts` が `vrt.config.json` (`capture.routes`) / `VRT_CONFIG_PATH` / `VRT_CAPTURE_ROUTES` から routes を読むようになった
+  - `vrt workflow init|capture --config <path> --base-url <url>` で外部プロジェクトから差し込み可能
 - [x] `vrt snapshot` の config file を公式サポートする
   - sample では `vrt.config.json` に `baseUrl`, `routes`, `outputDir`, `threshold` を寄せて wrapper で解釈している
   - JSON/TOML の config を直接読めると導入がかなり軽くなる

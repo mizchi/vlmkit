@@ -73,8 +73,10 @@ export function formatWorkflowUsage(): string {
   return `vrt workflow <command>
 
 Commands:
-  init         Create baseline screenshots + a11y trees
-  capture      Take current snapshots
+  init [--config <path>] [--base-url <url>]
+               Create baseline screenshots + a11y trees
+  capture [--config <path>] [--base-url <url>]
+               Take current snapshots
   verify       Compare snapshots against baselines
   approve      Promote current snapshots to new baselines
   report       Show the latest verification report
@@ -82,7 +84,23 @@ Commands:
   affected     Show components affected by current changes
   introspect   Generate spec.json from current a11y snapshots
   spec-verify  Verify spec.json invariants against current state
-  expect       Auto-generate expectation.json from baseline vs snapshot diff`;
+  expect       Auto-generate expectation.json from baseline vs snapshot diff
+
+Capture config (vrt.config.json):
+  {
+    "baseUrl": "http://localhost:3000",
+    "capture": {
+      "routes": [
+        { "name": "home", "path": "/", "waitFor": "main" },
+        { "name": "about", "path": "/about" }
+      ]
+    }
+  }
+
+Routes can also be supplied via env vars:
+  VRT_CONFIG_PATH   Path to capture config file
+  VRT_BASE_URL      Override the base URL
+  VRT_CAPTURE_ROUTES JSON-encoded array of routes`;
 }
 
 export function formatRootUsage(): string {
