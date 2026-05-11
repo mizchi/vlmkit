@@ -1,0 +1,113 @@
+{
+  "generated": "2026-05-11",
+  "fixtures": [
+    {
+      "fixture": "admin-panel",
+      "trials": 10,
+      "visualDetected": 8,
+      "a11yDetected": 3,
+      "eitherDetected": 9,
+      "neitherDetected": 1,
+      "rate": 0.9
+    },
+    {
+      "fixture": "blog-magazine",
+      "trials": 10,
+      "visualDetected": 10,
+      "a11yDetected": 5,
+      "eitherDetected": 10,
+      "neitherDetected": 0,
+      "rate": 1
+    },
+    {
+      "fixture": "dashboard",
+      "trials": 10,
+      "visualDetected": 9,
+      "a11yDetected": 3,
+      "eitherDetected": 10,
+      "neitherDetected": 0,
+      "rate": 1
+    },
+    {
+      "fixture": "ecommerce-catalog",
+      "trials": 10,
+      "visualDetected": 9,
+      "a11yDetected": 4,
+      "eitherDetected": 10,
+      "neitherDetected": 0,
+      "rate": 1
+    },
+    {
+      "fixture": "form-app",
+      "trials": 10,
+      "visualDetected": 8,
+      "a11yDetected": 4,
+      "eitherDetected": 9,
+      "neitherDetected": 1,
+      "rate": 0.9
+    },
+    {
+      "fixture": "grid-complex",
+      "trials": 10,
+      "visualDetected": 7,
+      "a11yDetected": 3,
+      "eitherDetected": 10,
+      "neitherDetected": 0,
+      "rate": 1
+    },
+    {
+      "fixture": "landing-product",
+      "trials": 10,
+      "visualDetected": 8,
+      "a11yDetected": 5,
+      "eitherDetected": 9,
+      "neitherDetected": 1,
+      "rate": 0.9
+    },
+    {
+      "fixture": "page",
+      "trials": 10,
+      "visualDetected": 10,
+      "a11yDetected": 6,
+      "eitherDetected": 10,
+      "neitherDetected": 0,
+      "rate": 1
+    },
+    {
+      "fixture": "stacking-context",
+      "trials": 10,
+      "visualDetected": 7,
+      "a11yDetected": 6,
+      "eitherDetected": 10,
+      "neitherDetected": 0,
+      "rate": 1
+    }
+  ],
+  "totals": {
+    "trials": 90,
+    "visualDet": 76,
+    "a11yDet": 39,
+    "eitherDet": 87,
+    "silent": 3
+  },
+  "silent": [
+    {
+      "fixture": "admin-panel",
+      "selector": ".form-row input:focus, .form-row select:focus, .form-row textarea:focus",
+      "property": "outline",
+      "reason": "hover-only"
+    },
+    {
+      "fixture": "form-app",
+      "selector": ".alert-success",
+      "property": "background",
+      "reason": "dead-code"
+    },
+    {
+      "fixture": "landing-product",
+      "selector": ".pricing-card .btn-secondary:hover",
+      "property": "background",
+      "reason": "hover-only"
+    }
+  ]
+}
