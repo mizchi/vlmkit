@@ -134,7 +134,10 @@ Measure detection rate improvement after crater-side fixes (#18-22).
 Reproduce the Tailwind blind test with different fixtures/scenarios to confirm reproducibility.
 
 - [ ] Blind test with shadcn → luna
-- [ ] Blind test with Reset CSS switch
+  - Fixture scaffolding done: `after-reference.html` archived, `after-blank.html` provides minimal reset starting point.
+  - Baseline diff measured at 19.6%–58.4% across 10 viewports (35 layout-shift, 19 color-change, 4 typography).
+  - Loop run itself requires an LLM API key — see `docs/reports/2026-05-11-e3-shadcn-luna-blind-scaffold.md`.
+- [x] Blind test with Reset CSS switch — see `docs/reports/2026-04-04-e3-reset-css-blind-test.md` (0.0% in 1 round)
 - [ ] Success criteria: diff < 1% within 3 rounds
 
 ---
