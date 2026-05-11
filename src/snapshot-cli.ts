@@ -33,7 +33,7 @@ export interface SnapshotConfig {
 }
 
 export interface ParsedSnapshotCliOptions {
-  mode: "capture" | "approve";
+  mode: "capture" | "approve" | "fix-prompt";
   urls: string[];
   labels: string[];
   outputDir: string;
@@ -42,6 +42,12 @@ export interface ParsedSnapshotCliOptions {
   failOnNewBaseline: boolean;
   maxDiffRatio?: number;
   maskSelectors: string[];
+  fixPrompt?: {
+    format: "markdown" | "json";
+    limit?: number;
+    minDiffRatio: number;
+    outPath?: string;
+  };
 }
 
 function sanitizeLabelPart(value: string): string {
@@ -145,6 +151,10 @@ export function parseSnapshotCliArgs(
   let failOnDiff = config.failOnDiff ?? false;
   let failOnNewBaseline = config.failOnNewBaseline ?? false;
   let maxDiffRatio = config.maxDiffRatio;
+  let fixFormat: "markdown" | "json" = "markdown";
+  let fixLimit: number | undefined;
+  let fixMinDiffRatio = 0;
+  let fixOutPath: string | undefined;
 
   for (let i = 0; i < cliArgs.length; i++) {
     const arg = cliArgs[i]!;
@@ -191,6 +201,34 @@ export function parseSnapshotCliArgs(
         i++;
         break;
       }
+      case "--format": {
+        const value = cliArgs[++i];
+        if (value !== "markdown" && value !== "json") {
+          throw new Error("--format must be either 'markdown' or 'json'");
+        }
+        fixFormat = value;
+        break;
+      }
+      case "--limit": {
+        const value = cliArgs[++i];
+        const parsedLimit = value == null ? NaN : Number(value);
+        if (!Number.isFinite(parsedLimit) || parsedLimit <= 0 || !Number.isInteger(parsedLimit)) {
+          throw new Error("--limit must be a positive integer");
+        }
+        fixLimit = parsedLimit;
+        break;
+      }
+      case "--min-diff": {
+        const value = cliArgs[++i];
+        fixMinDiffRatio = parseRatio(value == null ? value : Number(value), "Invalid --min-diff value");
+        break;
+      }
+      case "--out": {
+        const value = cliArgs[++i];
+        if (!value) throw new Error("Missing value for --out");
+        fixOutPath = value;
+        break;
+      }
       case "--help":
       case "-h":
         break;
@@ -217,6 +255,29 @@ export function parseSnapshotCliArgs(
       failOnNewBaseline,
       maxDiffRatio,
       maskSelectors: maskSelectors.length > 0 ? maskSelectors : (config.mask ?? []),
+    };
+  }
+
+  if (positional[0] === "fix-prompt") {
+    if (positional.length > 1) {
+      throw new Error("`vrt snapshot fix-prompt` does not accept positional URLs");
+    }
+    return {
+      mode: "fix-prompt",
+      urls: [],
+      labels: explicitLabels,
+      outputDir,
+      threshold,
+      failOnDiff,
+      failOnNewBaseline,
+      maxDiffRatio,
+      maskSelectors: maskSelectors.length > 0 ? maskSelectors : (config.mask ?? []),
+      fixPrompt: {
+        format: fixFormat,
+        limit: fixLimit,
+        minDiffRatio: fixMinDiffRatio,
+        outPath: fixOutPath,
+      },
     };
   }
 

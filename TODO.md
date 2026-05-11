@@ -119,6 +119,8 @@ Use vrt on real projects to verify practicality.
   - JSON/TOML の config を直接読めると導入がかなり軽くなる
 - [ ] Run VRT in CI per PR, measure false positive rate
 - [ ] Pass diff report to subagent for fix code generation, measure success rate
+  - `vrt snapshot fix-prompt` ships a markdown / JSON task descriptor (URL, viewport, diff ratio with shift compensation, baseline/current/heatmap/HTML paths) ready to feed to a subagent.
+  - Success-rate measurement on real PRs still pending (needs LLM API key + repeated runs).
 
 ### E2. Crater prescanner tracking
 

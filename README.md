@@ -80,6 +80,7 @@ vrt compare <before.html> <after.html>      # Migration VRT for files or URLs
 vrt png-diff <baseline.png> <current.png>   # Direct PNG pixel diff + heatmap
 vrt snapshot <url1> [url2] ...              # Multi-viewport snapshot + diff
 vrt snapshot approve                        # Promote *-current.png to *-baseline.png
+vrt snapshot fix-prompt                     # Emit a subagent-ready prompt from snapshot-report.json
 vrt elements [options]                      # Element-level diff with shift isolation
 vrt smoke <file-or-url>                     # A11y-driven random interaction test
 vrt discover <html-file>                    # Breakpoint discovery from HTML/CSS
@@ -108,6 +109,23 @@ Minimal `vrt.config.json`:
 ```
 
 When `vrt.config.json` exists in the current directory, `vrt snapshot` loads it automatically. Use `--config <path>` to point at another file, and pass URLs or flags directly when you want CLI values to override config defaults.
+
+#### Subagent-ready fix prompt
+
+`vrt snapshot fix-prompt` reads the last `snapshot-report.json` and emits a structured task list that a coding agent can act on:
+
+```bash
+# Markdown prompt to stdout (default)
+vrt snapshot fix-prompt --output test-results/snapshots
+
+# Limit to the 5 worst diffs, write to a file
+vrt snapshot fix-prompt --output test-results/snapshots --limit 5 --out fix-prompt.md
+
+# Filter by label, minimum diff ratio, and emit JSON for programmatic use
+vrt snapshot fix-prompt --label home --min-diff 0.01 --format json
+```
+
+The prompt includes per-task URL, viewport, diff ratio (with shift compensation), and relative paths to the baseline / current / heatmap PNGs plus the captured HTML, so a subagent can map the visual regression back to source code.
 
 ### Workflow Commands
 

@@ -15,6 +15,12 @@ import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "./terminal-color
 import { applyMask } from "./mask.ts";
 import { approveSnapshotsFromReport } from "./snapshot-approve.ts";
 import { determineSnapshotExitCode, parseSnapshotCliArgs, parseSnapshotConfig, type SnapshotConfig } from "./snapshot-cli.ts";
+import {
+  extractSnapshotFixTasks,
+  formatSnapshotFixPromptJson,
+  formatSnapshotFixPromptMarkdown,
+  type SnapshotReport,
+} from "./snapshot-fix-prompt.ts";
 import type { VrtSnapshot } from "./types.ts";
 
 const DEFAULT_SNAPSHOT_CONFIG_FILE = "vrt.config.json";
@@ -41,6 +47,7 @@ function formatSnapshotUsage(): string {
     "Usage:",
     "  vrt snapshot <url1> [url2] ... [--output dir] [--label name] [--threshold 0.1] [--fail-on-diff] [--fail-on-new-baseline] [--max-diff-ratio n] [--config vrt.config.json]",
     "  vrt snapshot approve [--output dir] [--label name] [--config vrt.config.json]",
+    "  vrt snapshot fix-prompt [--output dir] [--label name] [--format markdown|json] [--limit n] [--min-diff 0.01] [--out path] [--config vrt.config.json]",
   ].join("\n");
 }
 
@@ -111,6 +118,55 @@ async function approve(options: {
   console.log();
 }
 
+async function runFixPrompt(options: {
+  outputDir: string;
+  labels: string[];
+  fixPrompt: { format: "markdown" | "json"; limit?: number; minDiffRatio: number; outPath?: string };
+  configPath?: string;
+}) {
+  const reportPath = join(options.outputDir, "snapshot-report.json");
+  let raw: string;
+  try {
+    raw = await readFile(reportPath, "utf-8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new Error(`No snapshot report found at ${reportPath}. Run \`vrt snapshot <url...>\` first.`);
+    }
+    throw error;
+  }
+
+  const report = JSON.parse(raw) as SnapshotReport;
+  const tasks = extractSnapshotFixTasks(report, {
+    labels: options.labels,
+    minDiffRatio: options.fixPrompt.minDiffRatio,
+    outputDir: options.outputDir,
+  });
+
+  const output = options.fixPrompt.format === "json"
+    ? formatSnapshotFixPromptJson(tasks)
+    : formatSnapshotFixPromptMarkdown(tasks, {
+        relativeTo: options.outputDir,
+        limit: options.fixPrompt.limit,
+      });
+
+  if (options.fixPrompt.outPath) {
+    const outPath = resolve(options.fixPrompt.outPath);
+    await mkdir(dirname(outPath), { recursive: true });
+    await writeFile(outPath, output);
+    console.log();
+    console.log(`${BOLD}${CYAN}Snapshot Fix Prompt${RESET}`);
+    console.log(`  ${DIM}Tasks: ${tasks.length}${RESET}`);
+    console.log(`  ${DIM}Output: ${outPath}${RESET}`);
+    if (options.configPath) {
+      console.log(`  ${DIM}Config: ${options.configPath}${RESET}`);
+    }
+    console.log();
+  } else {
+    process.stdout.write(output);
+    if (!output.endsWith("\n")) process.stdout.write("\n");
+  }
+}
+
 async function main() {
   const cliArgs = process.argv.slice(2);
   if (cliArgs.length === 0 || cliArgs.includes("--help") || cliArgs.includes("-h") || cliArgs.includes("help")) {
@@ -125,6 +181,16 @@ async function main() {
 
   if (parsed.mode === "approve") {
     await approve({ outputDir, labels: parsed.labels, configPath });
+    return;
+  }
+
+  if (parsed.mode === "fix-prompt") {
+    await runFixPrompt({
+      outputDir,
+      labels: parsed.labels,
+      fixPrompt: parsed.fixPrompt!,
+      configPath,
+    });
     return;
   }
 
