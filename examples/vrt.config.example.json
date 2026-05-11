@@ -1,0 +1,19 @@
+{
+  "baseUrl": "http://localhost:3000",
+  "outputDir": "test-results/snapshots",
+  "threshold": 0.1,
+  "failOnDiff": true,
+  "maxDiffRatio": 0.01,
+  "mask": [".marquee-container", ".hero-badge"],
+  "routes": [
+    "/",
+    { "path": "/issues?severity=critical", "label": "critical-issues" }
+  ],
+  "capture": {
+    "routes": [
+      { "name": "home", "path": "/", "waitFor": "main" },
+      { "name": "about", "path": "/about", "waitFor": "h1" },
+      { "name": "contact", "path": "/contact" }
+    ]
+  }
+}

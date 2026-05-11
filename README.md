@@ -137,6 +137,40 @@ Workflow aliases are kept for ergonomics where they do not collide:
 
 `vrt report` remains the detection pattern report, so verification output lives under `vrt workflow report`.
 
+#### Capture routes for external projects
+
+`vrt workflow init|capture` runs `e2e/vrt-capture.spec.ts`, which now resolves
+its route list from your project rather than hard-coding vrt's own pages.
+Drop a `vrt.config.json` next to your app with a `capture` block:
+
+```json
+{
+  "baseUrl": "http://localhost:3000",
+  "capture": {
+    "routes": [
+      { "name": "home", "path": "/", "waitFor": "main" },
+      { "name": "about", "path": "/about" },
+      "/contact"
+    ]
+  }
+}
+```
+
+Each route accepts `name` (defaults to a sanitized form of `path`), `path`, and
+an optional `waitFor` CSS selector. Resolution order:
+
+1. `VRT_CAPTURE_ROUTES` env var (JSON-encoded array)
+2. `--config <path>` flag or `VRT_CONFIG_PATH` env var
+3. `vrt.config.json` auto-discovered in the working directory
+4. Built-in defaults (vrt's own UI — useful only when developing vrt itself)
+
+```bash
+# External project usage
+vrt workflow init --config ./vrt.config.json --base-url http://localhost:5173
+vrt workflow capture --config ./vrt.config.json
+vrt workflow verify
+```
+
 ### API Commands
 
 ```bash
