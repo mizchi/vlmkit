@@ -9,7 +9,6 @@
 import { existsSync } from "node:fs";
 import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { chromium } from "playwright";
 import { compareScreenshots, generateDiffReport } from "./heatmap.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "./terminal-colors.ts";
 import { applyMask } from "./mask.ts";
@@ -26,6 +25,7 @@ import {
   formatStabilitySummary,
   type StabilityIterationResult,
 } from "./snapshot-stability.ts";
+import { resolveCaptureBackend, type CaptureBackend } from "./capturer.ts";
 import type { VrtSnapshot } from "./types.ts";
 
 const DEFAULT_SNAPSHOT_CONFIG_FILE = "vrt.config.json";
@@ -50,7 +50,7 @@ interface SnapshotResult {
 function formatSnapshotUsage(): string {
   return [
     "Usage:",
-    "  vrt snapshot <url1> [url2] ... [--output dir] [--label name] [--threshold 0.1] [--fail-on-diff] [--fail-on-new-baseline] [--max-diff-ratio n] [--config vrt.config.json]",
+    "  vrt snapshot <url1> [url2] ... [--output dir] [--label name] [--threshold 0.1] [--fail-on-diff] [--fail-on-new-baseline] [--max-diff-ratio n] [--backend local|cloudflare] [--config vrt.config.json]",
     "  vrt snapshot approve [--output dir] [--label name] [--config vrt.config.json]",
     "  vrt snapshot fix-prompt [--output dir] [--label name] [--format markdown|json] [--limit n] [--min-diff 0.01] [--out path] [--config vrt.config.json]",
     "  vrt snapshot stability <url1> [url2]... [--iterations 3] [--output dir] [--threshold 0.1] [--fp-threshold 0] [--fail-above-rate 0.05] [--config vrt.config.json]",
@@ -183,6 +183,7 @@ async function runStability(options: {
   failAboveRate?: number;
   fpThreshold: number;
   configPath?: string;
+  backend: CaptureBackend;
 }) {
   if (options.urls.length === 0) {
     throw new Error("No URLs provided for stability run. Pass URLs directly or configure routes in vrt.config.json.");
@@ -193,7 +194,7 @@ async function runStability(options: {
   console.log();
   console.log(`${BOLD}${CYAN}Snapshot Stability${RESET}`);
   console.log(`  ${DIM}URLs: ${options.urls.length} | Iterations: ${options.iterations} | Output: ${options.outputDir}${RESET}`);
-  console.log(`  ${DIM}Threshold: ${options.threshold}${RESET}`);
+  console.log(`  ${DIM}Threshold: ${options.threshold} | Backend: ${options.backend.label}${RESET}`);
   if (options.configPath) {
     console.log(`  ${DIM}Config: ${options.configPath}${RESET}`);
   }
@@ -202,7 +203,7 @@ async function runStability(options: {
   }
   console.log();
 
-  const browser = await chromium.launch();
+  const browser = await options.backend.launch();
   const iterations: StabilityIterationResult[] = [];
 
   try {
@@ -272,7 +273,7 @@ async function runStability(options: {
       }
     }
   } finally {
-    await browser.close();
+    await options.backend.close(browser);
   }
 
   const report = buildStabilityReport({
@@ -327,6 +328,10 @@ async function main() {
     return;
   }
 
+  const { backend: captureBackend, source: backendSource } = resolveCaptureBackend({
+    backendFlag: parsed.backend,
+  });
+
   if (parsed.mode === "stability") {
     await runStability({
       urls: parsed.urls,
@@ -338,6 +343,7 @@ async function main() {
       failAboveRate: parsed.stability!.failAboveRate,
       fpThreshold: parsed.stability!.fpThreshold,
       configPath,
+      backend: captureBackend,
     });
     return;
   }
@@ -356,7 +362,7 @@ async function main() {
   console.log(`${BOLD}${CYAN}║  VRT Snapshot                                                        ║${RESET}`);
   console.log(`${BOLD}${CYAN}╚════════════════════════════════════════════════════════════════════════╝${RESET}`);
   console.log(`  ${DIM}URLs: ${urls.length} | Viewports: ${VIEWPORTS.map((v) => v.label).join(", ")} | Output: ${outputDir}${RESET}`);
-  console.log(`  ${DIM}Threshold: ${parsed.threshold}${RESET}`);
+  console.log(`  ${DIM}Threshold: ${parsed.threshold} | Backend: ${captureBackend.label}${backendSource === "default" ? "" : ` (${backendSource})`}${RESET}`);
   if (configPath) {
     console.log(`  ${DIM}Config: ${configPath}${RESET}`);
   }
@@ -365,7 +371,7 @@ async function main() {
   }
   console.log();
 
-  const browser = await chromium.launch();
+  const browser = await captureBackend.launch();
   const results: SnapshotResult[] = [];
 
   try {
@@ -443,7 +449,7 @@ async function main() {
       }
     }
   } finally {
-    await browser.close();
+    await captureBackend.close(browser);
   }
 
   // Summary

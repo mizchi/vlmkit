@@ -1,0 +1,66 @@
+# Example GitHub Actions workflow that runs `vrt snapshot` against Cloudflare
+# Browser Run. Compared to the local-Chromium template, this skips the
+# `playwright install` step entirely and offloads concurrency to Cloudflare.
+#
+# Required GitHub secrets:
+#   CLOUDFLARE_ACCOUNT_ID   — your Cloudflare account id
+#   CLOUDFLARE_API_TOKEN    — token with Browser Rendering permissions
+#
+# Optional:
+#   CLOUDFLARE_BROWSER_RUN_ENDPOINT — override the WS endpoint (private deploys)
+
+name: VRT Snapshot (Cloudflare Browser Run)
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "public/**"
+      - "vrt.config.json"
+      - ".github/workflows/vrt-snapshot-cloudflare.yml"
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # No `playwright install` needed: Cloudflare hosts the browser.
+
+      - name: Build & start app
+        run: |
+          pnpm build
+          pnpm start &
+          npx wait-on http://localhost:3000 --timeout 60000
+
+      - name: Run VRT snapshot against Cloudflare Browser Run
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          npx vrt snapshot \
+            --backend cloudflare \
+            --config vrt.config.json
+
+      - name: Upload diff artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vrt-snapshot
+          path: |
+            test-results/snapshots/**/*.png
+            test-results/snapshots/**/snapshot-report.json
+          if-no-files-found: warn

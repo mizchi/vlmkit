@@ -153,6 +153,35 @@ The run writes `stability-report.json` to the output directory with per-URL +
 per-viewport FP rate, mean / max diff ratios, and shift-compensated max — well
 suited to artifact upload + over-time tracking.
 
+#### Capture backend (`--backend`)
+
+By default `vrt snapshot` launches a local Chromium via Playwright. To offload
+capture to [Cloudflare Browser Run](https://blog.cloudflare.com/browser-run-for-ai-agents/)
+without installing Playwright browsers in CI, switch the backend:
+
+```bash
+# Connect via CDP WebSocket; credentials come from env vars
+CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=... \
+  vrt snapshot --backend cloudflare http://localhost:3000/
+```
+
+Resolution order for the backend selector:
+
+1. `--backend <local|cloudflare>` CLI flag
+2. `VRT_CAPTURE_BACKEND` env var
+3. Default `local`
+
+For the Cloudflare backend, additional env vars are required:
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `CLOUDFLARE_ACCOUNT_ID` | yes | Account id for the CDP URL |
+| `CLOUDFLARE_API_TOKEN` | yes | Token with Browser Rendering permissions |
+| `CLOUDFLARE_BROWSER_RUN_ENDPOINT` | no | Override the default WS endpoint |
+
+See `examples/vrt-snapshot-cloudflare.workflow.yml` for a complete GitHub
+Actions template that skips the local Playwright install step.
+
 ### Workflow Commands
 
 These commands manage state under `baselines/`, `snapshots/`, `output/`, `vrt-report.json`, `expectation.json`, and `spec.json`.

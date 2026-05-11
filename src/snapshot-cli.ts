@@ -42,6 +42,7 @@ export interface ParsedSnapshotCliOptions {
   failOnNewBaseline: boolean;
   maxDiffRatio?: number;
   maskSelectors: string[];
+  backend?: string;
   fixPrompt?: {
     format: "markdown" | "json";
     limit?: number;
@@ -163,6 +164,7 @@ export function parseSnapshotCliArgs(
   let stabilityIterations = 3;
   let stabilityFailAboveRate: number | undefined;
   let stabilityFpThreshold = 0;
+  let backend: string | undefined;
 
   for (let i = 0; i < cliArgs.length; i++) {
     const arg = cliArgs[i]!;
@@ -262,6 +264,12 @@ export function parseSnapshotCliArgs(
         );
         break;
       }
+      case "--backend": {
+        const value = cliArgs[++i];
+        if (!value) throw new Error("Missing value for --backend");
+        backend = value;
+        break;
+      }
       case "--help":
       case "-h":
         break;
@@ -288,6 +296,7 @@ export function parseSnapshotCliArgs(
       failOnNewBaseline,
       maxDiffRatio,
       maskSelectors: maskSelectors.length > 0 ? maskSelectors : (config.mask ?? []),
+      backend,
     };
   }
 
@@ -317,6 +326,7 @@ export function parseSnapshotCliArgs(
         failAboveRate: stabilityFailAboveRate,
         fpThreshold: stabilityFpThreshold,
       },
+      backend,
     };
   }
 
@@ -365,6 +375,7 @@ export function parseSnapshotCliArgs(
     failOnNewBaseline,
     maxDiffRatio,
     maskSelectors: maskSelectors.length > 0 ? maskSelectors : (config.mask ?? []),
+    backend,
   };
 }
 

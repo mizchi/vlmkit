@@ -150,7 +150,9 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 ## Backlog (prioritize after evaluation)
 
 ### Infrastructure / Deploy
-- [ ] Cloudflare Workers entry point (`worker/`)
+- [x] Cloudflare Browser Run CDP backend (`vrt snapshot --backend cloudflare`) — connects via `chromium.connectOverCDP` to `wss://api.cloudflare.com/.../browser-rendering/devtools/browser`. See `examples/vrt-snapshot-cloudflare.workflow.yml`.
+- [ ] Cloudflare Workers entry point (`worker/`) — waiting on stable `env.BROWSER` binding
+- [ ] Cloudflare Quick Actions REST backend (`/screenshot`, `/crawl` for route discovery)
 - [ ] crater WASM backend (layout only — paint is future)
 - [ ] Cloudflare R2 / KV / D1 storage
 - [ ] npm package (`@mizchi/vrt-client`)
