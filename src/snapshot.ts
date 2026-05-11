@@ -21,6 +21,11 @@ import {
   formatSnapshotFixPromptMarkdown,
   type SnapshotReport,
 } from "./snapshot-fix-prompt.ts";
+import {
+  buildStabilityReport,
+  formatStabilitySummary,
+  type StabilityIterationResult,
+} from "./snapshot-stability.ts";
 import type { VrtSnapshot } from "./types.ts";
 
 const DEFAULT_SNAPSHOT_CONFIG_FILE = "vrt.config.json";
@@ -48,6 +53,7 @@ function formatSnapshotUsage(): string {
     "  vrt snapshot <url1> [url2] ... [--output dir] [--label name] [--threshold 0.1] [--fail-on-diff] [--fail-on-new-baseline] [--max-diff-ratio n] [--config vrt.config.json]",
     "  vrt snapshot approve [--output dir] [--label name] [--config vrt.config.json]",
     "  vrt snapshot fix-prompt [--output dir] [--label name] [--format markdown|json] [--limit n] [--min-diff 0.01] [--out path] [--config vrt.config.json]",
+    "  vrt snapshot stability <url1> [url2]... [--iterations 3] [--output dir] [--threshold 0.1] [--fp-threshold 0] [--fail-above-rate 0.05] [--config vrt.config.json]",
   ].join("\n");
 }
 
@@ -167,6 +173,133 @@ async function runFixPrompt(options: {
   }
 }
 
+async function runStability(options: {
+  urls: string[];
+  labels: string[];
+  outputDir: string;
+  threshold: number;
+  maskSelectors: string[];
+  iterations: number;
+  failAboveRate?: number;
+  fpThreshold: number;
+  configPath?: string;
+}) {
+  if (options.urls.length === 0) {
+    throw new Error("No URLs provided for stability run. Pass URLs directly or configure routes in vrt.config.json.");
+  }
+
+  await mkdir(options.outputDir, { recursive: true });
+
+  console.log();
+  console.log(`${BOLD}${CYAN}Snapshot Stability${RESET}`);
+  console.log(`  ${DIM}URLs: ${options.urls.length} | Iterations: ${options.iterations} | Output: ${options.outputDir}${RESET}`);
+  console.log(`  ${DIM}Threshold: ${options.threshold}${RESET}`);
+  if (options.configPath) {
+    console.log(`  ${DIM}Config: ${options.configPath}${RESET}`);
+  }
+  if (options.maskSelectors.length > 0) {
+    console.log(`  ${DIM}Mask: ${options.maskSelectors.join(", ")}${RESET}`);
+  }
+  console.log();
+
+  const browser = await chromium.launch();
+  const iterations: StabilityIterationResult[] = [];
+
+  try {
+    for (let iter = 0; iter < options.iterations; iter++) {
+      console.log(`  ${BOLD}Iteration ${iter + 1}/${options.iterations}${RESET}`);
+
+      for (const [index, url] of options.urls.entries()) {
+        const label = options.labels[index]!;
+
+        for (const vp of VIEWPORTS) {
+          const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
+          await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+          await applyMask(page, options.maskSelectors);
+
+          const currentPath = iter === 0
+            ? join(options.outputDir, `${label}-${vp.label}-baseline.png`)
+            : join(options.outputDir, `${label}-${vp.label}-iter${iter}.png`);
+          await page.screenshot({ path: currentPath, fullPage: true });
+          await page.close();
+
+          if (iter === 0) {
+            iterations.push({
+              iteration: 0,
+              url,
+              label,
+              viewport: vp.label,
+              diffRatio: 0,
+            });
+            continue;
+          }
+
+          const baselinePath = join(options.outputDir, `${label}-${vp.label}-baseline.png`);
+          const snap: VrtSnapshot = {
+            testId: `${label}-${vp.label}-iter${iter}`,
+            testTitle: `${label} ${vp.label} iter ${iter}`,
+            projectName: "stability",
+            screenshotPath: currentPath,
+            baselinePath,
+            status: "changed",
+          };
+          const diff = await compareScreenshots(snap, { outputDir: options.outputDir, threshold: options.threshold });
+          const diffRatio = diff?.diffRatio ?? 0;
+          const report = diffRatio > 0
+            ? await generateDiffReport(snap, { outputDir: options.outputDir, detectShift: true, threshold: options.threshold })
+            : null;
+          const globalShift = report?.globalShift ?? 0;
+          const compensatedDiffRatio = report
+            ? report.compensatedDiffCount / report.totalPixels
+            : diffRatio;
+
+          const color = diffRatio === 0 ? GREEN : diffRatio < 0.01 ? YELLOW : RED;
+          const pct = (diffRatio * 100).toFixed(2);
+          console.log(`    ${label}/${vp.label}: ${color}${pct}%${RESET}` +
+            (globalShift !== 0 ? ` ${DIM}(shift ${globalShift > 0 ? "+" : ""}${globalShift}px)${RESET}` : ""));
+
+          iterations.push({
+            iteration: iter,
+            url,
+            label,
+            viewport: vp.label,
+            diffRatio,
+            compensatedDiffRatio,
+            globalShift,
+            shiftOnly: report?.shiftOnly ?? false,
+          });
+        }
+      }
+    }
+  } finally {
+    await browser.close();
+  }
+
+  const report = buildStabilityReport({
+    iterations: options.iterations,
+    urls: options.urls,
+    threshold: options.fpThreshold,
+    results: iterations,
+  });
+
+  console.log();
+  hr();
+  console.log();
+  console.log(formatStabilitySummary(report));
+  console.log();
+
+  const reportPath = join(options.outputDir, "stability-report.json");
+  await writeFile(reportPath, JSON.stringify(report, null, 2));
+  console.log(`  ${DIM}Report: ${reportPath}${RESET}`);
+  console.log();
+
+  if (options.failAboveRate !== undefined && report.overallFalsePositiveRate > options.failAboveRate) {
+    console.log(`  ${RED}FP rate ${(report.overallFalsePositiveRate * 100).toFixed(2)}% exceeds --fail-above-rate ${(options.failAboveRate * 100).toFixed(2)}%${RESET}`);
+    console.log();
+    process.exitCode = 1;
+  }
+}
+
 async function main() {
   const cliArgs = process.argv.slice(2);
   if (cliArgs.length === 0 || cliArgs.includes("--help") || cliArgs.includes("-h") || cliArgs.includes("help")) {
@@ -189,6 +322,21 @@ async function main() {
       outputDir,
       labels: parsed.labels,
       fixPrompt: parsed.fixPrompt!,
+      configPath,
+    });
+    return;
+  }
+
+  if (parsed.mode === "stability") {
+    await runStability({
+      urls: parsed.urls,
+      labels: parsed.labels,
+      outputDir,
+      threshold: parsed.threshold,
+      maskSelectors: parsed.maskSelectors,
+      iterations: parsed.stability!.iterations,
+      failAboveRate: parsed.stability!.failAboveRate,
+      fpThreshold: parsed.stability!.fpThreshold,
       configPath,
     });
     return;

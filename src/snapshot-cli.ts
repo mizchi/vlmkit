@@ -33,7 +33,7 @@ export interface SnapshotConfig {
 }
 
 export interface ParsedSnapshotCliOptions {
-  mode: "capture" | "approve" | "fix-prompt";
+  mode: "capture" | "approve" | "fix-prompt" | "stability";
   urls: string[];
   labels: string[];
   outputDir: string;
@@ -47,6 +47,11 @@ export interface ParsedSnapshotCliOptions {
     limit?: number;
     minDiffRatio: number;
     outPath?: string;
+  };
+  stability?: {
+    iterations: number;
+    failAboveRate?: number;
+    fpThreshold: number;
   };
 }
 
@@ -155,6 +160,9 @@ export function parseSnapshotCliArgs(
   let fixLimit: number | undefined;
   let fixMinDiffRatio = 0;
   let fixOutPath: string | undefined;
+  let stabilityIterations = 3;
+  let stabilityFailAboveRate: number | undefined;
+  let stabilityFpThreshold = 0;
 
   for (let i = 0; i < cliArgs.length; i++) {
     const arg = cliArgs[i]!;
@@ -229,6 +237,31 @@ export function parseSnapshotCliArgs(
         fixOutPath = value;
         break;
       }
+      case "--iterations": {
+        const value = cliArgs[++i];
+        const parsedIter = value == null ? NaN : Number(value);
+        if (!Number.isFinite(parsedIter) || parsedIter < 2 || !Number.isInteger(parsedIter)) {
+          throw new Error("--iterations must be an integer >= 2");
+        }
+        stabilityIterations = parsedIter;
+        break;
+      }
+      case "--fail-above-rate": {
+        const value = cliArgs[++i];
+        stabilityFailAboveRate = parseRatio(
+          value == null ? value : Number(value),
+          "Invalid --fail-above-rate value (must be between 0 and 1)",
+        );
+        break;
+      }
+      case "--fp-threshold": {
+        const value = cliArgs[++i];
+        stabilityFpThreshold = parseRatio(
+          value == null ? value : Number(value),
+          "Invalid --fp-threshold value (must be between 0 and 1)",
+        );
+        break;
+      }
       case "--help":
       case "-h":
         break;
@@ -255,6 +288,35 @@ export function parseSnapshotCliArgs(
       failOnNewBaseline,
       maxDiffRatio,
       maskSelectors: maskSelectors.length > 0 ? maskSelectors : (config.mask ?? []),
+    };
+  }
+
+  if (positional[0] === "stability") {
+    const stabilityUrls = positional.slice(1);
+    const configuredStabilityUrls = stabilityUrls.length > 0
+      ? stabilityUrls
+      : resolveSnapshotConfigUrls(config);
+    const stabilityLabels = explicitLabels.length > 0
+      ? resolveSnapshotLabels(configuredStabilityUrls, explicitLabels)
+      : configuredStabilityUrls.map((url, index) =>
+          (stabilityUrls.length === 0 ? (config.routes ?? [])[index]?.label : undefined)
+            ?? urlToSnapshotLabel(url));
+
+    return {
+      mode: "stability",
+      urls: configuredStabilityUrls,
+      labels: stabilityLabels,
+      outputDir,
+      threshold,
+      failOnDiff,
+      failOnNewBaseline,
+      maxDiffRatio,
+      maskSelectors: maskSelectors.length > 0 ? maskSelectors : (config.mask ?? []),
+      stability: {
+        iterations: stabilityIterations,
+        failAboveRate: stabilityFailAboveRate,
+        fpThreshold: stabilityFpThreshold,
+      },
     };
   }
 

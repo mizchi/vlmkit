@@ -81,6 +81,7 @@ vrt png-diff <baseline.png> <current.png>   # Direct PNG pixel diff + heatmap
 vrt snapshot <url1> [url2] ...              # Multi-viewport snapshot + diff
 vrt snapshot approve                        # Promote *-current.png to *-baseline.png
 vrt snapshot fix-prompt                     # Emit a subagent-ready prompt from snapshot-report.json
+vrt snapshot stability <url...>             # Run N iterations and report false-positive rate
 vrt elements [options]                      # Element-level diff with shift isolation
 vrt smoke <file-or-url>                     # A11y-driven random interaction test
 vrt discover <html-file>                    # Breakpoint discovery from HTML/CSS
@@ -126,6 +127,31 @@ vrt snapshot fix-prompt --label home --min-diff 0.01 --format json
 ```
 
 The prompt includes per-task URL, viewport, diff ratio (with shift compensation), and relative paths to the baseline / current / heatmap PNGs plus the captured HTML, so a subagent can map the visual regression back to source code.
+
+#### Measuring false-positive rate
+
+`vrt snapshot stability` captures the same URLs across N iterations against a
+baseline locked in on iteration 0, then reports how often comparisons showed a
+non-zero diff. Useful for tracking renderer noise, animation leakage, or mask
+gaps before turning on `--fail-on-diff` in CI:
+
+```bash
+# 3 iterations (default), any non-zero diff counts as a positive
+vrt snapshot stability http://localhost:3000/ http://localhost:3000/about/
+
+# Fail CI if the overall FP rate exceeds 5%
+vrt snapshot stability http://localhost:3000/ \
+  --iterations 5 \
+  --fail-above-rate 0.05 \
+  --output test-results/stability
+
+# Only count diffs above 1% as positives (filters out subpixel noise)
+vrt snapshot stability http://localhost:3000/ --fp-threshold 0.01
+```
+
+The run writes `stability-report.json` to the output directory with per-URL +
+per-viewport FP rate, mean / max diff ratios, and shift-compensated max — well
+suited to artifact upload + over-time tracking.
 
 ### Workflow Commands
 

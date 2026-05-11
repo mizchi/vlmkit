@@ -118,6 +118,9 @@ Use vrt on real projects to verify practicality.
   - sample では `vrt.config.json` に `baseUrl`, `routes`, `outputDir`, `threshold` を寄せて wrapper で解釈している
   - JSON/TOML の config を直接読めると導入がかなり軽くなる
 - [ ] Run VRT in CI per PR, measure false positive rate
+  - `vrt snapshot stability <urls> --iterations N --fail-above-rate R` measures the FP rate by capturing N times against a locked baseline.
+  - `.github/workflows/vrt-stability.yml` runs the measurement nightly on the migration fixtures and uploads `stability-report.json` as an artifact.
+  - Per-PR rollout in real downstream projects still pending — needs aggregation of multiple runs over time.
 - [ ] Pass diff report to subagent for fix code generation, measure success rate
   - `vrt snapshot fix-prompt` ships a markdown / JSON task descriptor (URL, viewport, diff ratio with shift compensation, baseline/current/heatmap/HTML paths) ready to feed to a subagent.
   - Success-rate measurement on real PRs still pending (needs LLM API key + repeated runs).
