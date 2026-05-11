@@ -60,17 +60,24 @@ runs missed.
 | after.html | 31.06% | 27.56% | 26.71% | 4.90% | 4.78% | 4.26% | 4.35% | 4.19% | 3.53% | 2.47% | 1.99% | 1.79% | 1.78% |
 | after-blank.html | 31.06% | 27.56% | 26.71% | 4.90% | 4.78% | 4.26% | 4.35% | 4.19% | 3.53% | 2.47% | 1.99% | 1.79% | 1.78% |
 
-**Note.** `after.html` and `after-blank.html` produce byte-identical
-screenshots (`md5sum` matches across every viewport); the two source
-files diverge syntactically but render the same final layout. The
-2026-04 blind-test report claimed "0.0% pixel-perfect across all 7
-viewports" — that claim only holds for the four viewports tested at
-the time. The current breakpoint discovery surfaces below-640 layouts
-where the vanilla port still drifts from the Tailwind CDN baseline by
-27–31% (dominant category: `layout-shift`). This is a real regression
-hint for any future iteration of the Tailwind blind test.
+**Update (later the same day):** the 27–31% mobile drift turned out to
+be infrastructure noise — the sandbox blocks `cdn.tailwindcss.com`
+TLS, so `before.html` was rendering unstyled. After baking the
+Tailwind CDN output into a new `before-inlined.html` fixture, the
+re-measurement returns to **0.00% across all 13 viewports**:
 
-Dominant fix candidates: `.col-hidden-mobile { display }`,
+| Variant vs `before-inlined.html` | All 13 viewports |
+|---|---|
+| after.html | **0.00%** |
+
+Full diagnosis + fix: `docs/reports/2026-05-11-tailwind-fixture-reproducibility.md`.
+The 2026-04-01 "0.0% pixel-perfect" claim is therefore reproducible —
+the agent's hand-written vanilla CSS still matches Tailwind output at
+every newly-discovered breakpoint, not just the four originally
+tested.
+
+Dominant fix candidates (against the broken CDN baseline, retained for
+reference): `.col-hidden-mobile { display }`,
 `.stats-grid { grid-template-columns }`, `.nav { display }`.
 
 Raw report: `test-results/data-collection/migration-tailwind/migration-report.json`
@@ -148,7 +155,7 @@ Raw reports: `test-results/css-bench/<fixture>/bench-report.json`
 |---|---|---|
 | Stability FP rate (Chromium headless, static pages) | 0.00% (0/32) | §1 |
 | Migration: shadcn→luna pixel-perfect viewports | 10/10 (100%) | §2.3 |
-| Migration: tailwind→vanilla pixel-perfect viewports | 0/13 (regression discovered) | §2.2 |
+| Migration: tailwind→vanilla pixel-perfect viewports (`before-inlined.html`) | **13/13 (100%)** | §2.1 |
 | Reset CSS migration: normalize↔modern-normalize | 1.12–2.62% diff | §2.2 |
 | CSS Challenge cross-fixture detection rate | 96.7% (87/90) | §3 |
 | CSS Challenge visual-only detection rate | 84.4% (76/90) | §3 |
