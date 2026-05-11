@@ -109,7 +109,17 @@ discovery system finds today, not just the four tested in 2026-04.
    a "baseline rendered with default browser fonts only" sanity check
    (e.g. computed `body.fontFamily` ≠ Times New Roman when the source
    declares one) would catch CDN-failed baselines before they pollute
-   diff numbers. Backlog item.
+   diff numbers. **Implemented same day** as `src/render-sanity.ts` +
+   `migration-compare --strict-baseline-sanity`. Re-running the broken
+   fixture now surfaces:
+   ```
+   Baseline render sanity warnings:
+     - [failed-resource-load] External asset failed to load:
+       https://cdn.tailwindcss.com/ (net::ERR_CERT_AUTHORITY_INVALID)
+     - [default-font-with-classes] body font-family is browser default
+       ("Times New Roman") but the HTML declares external scripts and
+       class attributes — the styling pipeline likely failed to apply.
+   ```
 
 ## Files touched
 

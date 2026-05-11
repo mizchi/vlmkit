@@ -56,6 +56,13 @@ import { formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from
 import type { VrtSnapshot } from "./types.ts";
 import { applyMask, parseMaskSelectors } from "./mask.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr as _hr } from "./terminal-colors.ts";
+import {
+  evaluateRenderSanity,
+  probeSourceHtml,
+  RENDER_PROBE_BROWSER_SCRIPT,
+  type FailedRequest,
+  type RenderSanityResult,
+} from "./render-sanity.ts";
 
 // ---- Config ----
 
@@ -104,6 +111,10 @@ export interface MigrationCompareOptions {
   variantUrls?: string[];
   /** Selectors to mask (visibility: hidden) */
   maskSelectors?: string[];
+  /** Run baseline render-sanity heuristics (default true). */
+  baselineSanityCheck?: boolean;
+  /** Exit non-zero when sanity checks fail (default false → warn only). */
+  strictBaselineSanity?: boolean;
 }
 
 export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptions {
@@ -128,6 +139,8 @@ export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptio
     baselineUrl: baselineUrl || undefined,
     variantUrls: currentUrl ? [currentUrl] : (variantUrls.length > 0 ? variantUrls : undefined),
     maskSelectors: parseMaskSelectors(args),
+    baselineSanityCheck: !hasFlag(args, "no-baseline-sanity"),
+    strictBaselineSanity: hasFlag(args, "strict-baseline-sanity"),
   };
 }
 
@@ -234,6 +247,7 @@ export interface MigrationCompareReport {
   strict: boolean;
   approvalWarnings: Awaited<ReturnType<typeof collectApprovalWarnings>>;
   paintTree: PaintTreeStatus;
+  baselineSanity?: RenderSanityResult;
   results: MigrationCompareResult[];
   reportPath: string;
 }
@@ -406,8 +420,23 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     }
 
     // Capture baseline at all viewports
-    for (const vp of VIEWPORTS) {
+    let baselineSanity: RenderSanityResult | undefined;
+    for (const [vpIndex, vp] of VIEWPORTS.entries()) {
       const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
+
+      // Only probe sanity on the first viewport — the inputs are deterministic
+      // per fixture and there's no reason to repeat the check N times.
+      const sanityEnabled = options.baselineSanityCheck ?? true;
+      const shouldProbe = sanityEnabled && vpIndex === 0;
+      const failedRequests: FailedRequest[] = [];
+      const onFailed = (req: import("playwright").Request) => {
+        failedRequests.push({
+          url: req.url(),
+          errorText: req.failure()?.errorText ?? "unknown failure",
+        });
+      };
+      if (shouldProbe) page.on("requestfailed", onFailed);
+
       if (isUrlMode) {
         await page.goto(options.baselineUrl!, { waitUntil: "networkidle", timeout: 30000 });
         if (!baselineHtml) {
@@ -420,6 +449,35 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       const path = join(outputDir, `${baselineName}-${vp.label}.png`);
       await page.screenshot({ path, fullPage: true });
       baselineScreenshots.set(vp.label, path);
+
+      if (shouldProbe) {
+        try {
+          const browserProbe = await page.evaluate(RENDER_PROBE_BROWSER_SCRIPT) as {
+            bodyFontFamily: string;
+            styleSheetCount: number;
+            hasClassAttributes: boolean;
+          };
+          const sourceProbe = probeSourceHtml(baselineHtml);
+          baselineSanity = evaluateRenderSanity({
+            failedRequests,
+            probe: { ...browserProbe, ...sourceProbe },
+          });
+        } catch (error) {
+          // Probe failure should not block the run — record an empty result.
+          baselineSanity = { ok: true, warnings: [], failedRequests };
+          console.log(`  ${YELLOW}Baseline sanity probe error: ${String(error)}${RESET}`);
+        }
+        page.off("requestfailed", onFailed);
+
+        if (baselineSanity && !baselineSanity.ok) {
+          console.log();
+          console.log(`  ${YELLOW}Baseline render sanity warnings:${RESET}`);
+          for (const w of baselineSanity.warnings) {
+            console.log(`    ${YELLOW}- [${w.code}] ${w.message}${RESET}`);
+          }
+          console.log();
+        }
+      }
       await page.close();
 
       if (paintTreeClient) {
@@ -717,6 +775,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       strict,
       approvalWarnings,
       paintTree: paintTreeStatus,
+      baselineSanity,
       results,
       reportPath,
     };
@@ -729,6 +788,14 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     console.log();
     console.log(`  ${DIM}Report: ${reportPath}${RESET}`);
     console.log();
+
+    if (options.strictBaselineSanity && baselineSanity && !baselineSanity.ok) {
+      throw new Error(
+        `Baseline render sanity check failed (${baselineSanity.warnings.length} warning(s)). ` +
+        `See report at ${reportPath}.`,
+      );
+    }
+
     return report;
   } finally {
     await browser?.close();

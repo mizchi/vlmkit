@@ -64,6 +64,12 @@ vrt workflow verify
 # Mask dynamic content
 vrt snapshot http://localhost:3000/ --mask ".marquee-container,.hero-badge"
 
+# Detect broken baseline renders (e.g. CDN failed to load) — on by default
+vrt compare --dir fixtures/migration/tailwind-to-vanilla \
+  --baseline before.html --variants after.html
+# Add --strict-baseline-sanity to exit non-zero when warnings fire,
+# or --no-baseline-sanity to skip the check entirely.
+
 # CSS challenge benchmark
 just css-bench --fixture page --trials 30
 
@@ -77,6 +83,7 @@ just fix-loop --fixture page --seed 42
 
 ```bash
 vrt compare <before.html> <after.html>      # Migration VRT for files or URLs
+                                             # ([--strict-baseline-sanity] to fail on broken baseline renders)
 vrt png-diff <baseline.png> <current.png>   # Direct PNG pixel diff + heatmap
 vrt snapshot <url1> [url2] ...              # Multi-viewport snapshot + diff
 vrt snapshot approve                        # Promote *-current.png to *-baseline.png
