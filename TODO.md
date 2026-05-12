@@ -267,21 +267,30 @@ exposure to luna's spec values. These items are the gap.
   not the *cause*. Decompose: "the +99px shift in band Y is
   explained by upstream accumulated height delta: `.luna-metric`
   −9px × 4 + `.luna-panel-title` line-height −1.5px × 3 …".
-- [ ] **Class-rename map as a header summary table** at the top of
-  `vrt diff-for-agent`. Today the path pairs are scattered inline
-  in the entries table; a dedicated `baseline class ↔ variant
-  class` map (deduped per class-pair) is the most valuable
-  artifact C surfaced and deserves first billing.
+- [x] **Class-rename map as a header summary table** lands at the
+  top of each variant section in `vrt diff-for-agent`, before the
+  diff-by-viewport table. Aggregated from `domPositionDiff[Per
+  Viewport]` and de-duped per `(baseline-class, variant-class)`
+  pair. On the dogfood Pass B iter 1 fixture: 12 pairs (e.g.
+  `eyebrow → luna-pill` × 22 properties, `card → luna-panel` × 17,
+  `card-header → luna-panel-head` × 17). C called this "the
+  single most valuable artifact"; it's now first billing.
 - [ ] **De-dupe / re-cap `domPositionDiff.entries`.** The 200-tuple
   cap currently spends most of its budget on 4 repeats of each
   card / metric / button shape. Group by class-pair before
   truncating so unique deltas dominate.
-- [ ] **Fix-candidate scorer needs a "value actually differs" gate.**
-  Today candidates are scored by category bucket alone, so the
-  agent sees `.luna-action { align-items }` even when its computed
-  value matches the baseline. Add the computed-style or
-  DOM-position result as a gating signal — drop candidates whose
-  property is unchanged in either capture.
+- [x] **Fix-candidate scorer "value actually differs" gate.**
+  `diff-for-agent` now marks `Verified?` as ✓ only when the
+  candidate's `(selector, property)` appears in a real
+  computed-style / DOM-position delta — not just when the property
+  name appears anywhere. Verified pairs come from a new pre-built
+  `verifiedPairs: string[]` index serialized unconditionally in
+  `domPositionDiffPerViewport` (so the cap on `entries` /
+  `byPathProperty` no longer affects accuracy). Rows are sorted ✓
+  first. Dogfood Pass B iter 1: `.luna-{actions,field} gap`
+  candidates (real deltas) get ✓, while `display` /
+  `flex-direction` candidates whose computed values already match
+  baseline get ✗ — same fixture, opposite ranking from before.
 - [ ] **"Missing CSS rule" output.** Specced-vs-computed: "Baseline
   `.eyebrow` declares `text-transform: uppercase`; your variant has
   no rule producing that on `.luna-pill`." Today the tool emits

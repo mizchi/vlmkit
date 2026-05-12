@@ -76,6 +76,7 @@ export interface DfaDpPerViewportSummary {
   variantFile: string;
   result: {
     totalDiffs: number;
+    verifiedPairs?: string[];
     byViewport: Array<{ viewport: string; count: number }>;
     byPathProperty: Array<{
       path: string;
@@ -176,6 +177,130 @@ function formatPct(ratio: number): string {
   return `${(ratio * 100).toFixed(2)}%`;
 }
 
+/**
+ * Build a set of `selector::property` strings that represent *real* deltas,
+ * derived from both the computed-style diff (literal selector match) and
+ * the DOM-position diff (class-rename-aware). Fix candidates marked ✓ must
+ * match one of these exactly.
+ */
+function buildVerifiedPairSet(report: DfaReport, variantFile: string): Set<string> {
+  const out = new Set<string>();
+
+  // 1) computed-style — exact (selector, property) pairs.
+  const csd = (report.computedStyleDiff ?? []).find((c) => c.variantFile === variantFile);
+  if (csd) {
+    for (const e of csd.result.entries ?? []) {
+      out.add(`${e.selector}::${e.property}`);
+    }
+  }
+
+  // 2) DOM-position — prefer the pre-built `verifiedPairs` index (untruncated,
+  // accurate even when entries/byPathProperty are capped). Fall back to
+  // building from samples for back-compat with older reports.
+  const perVp = (report.domPositionDiffPerViewport ?? []).find((d) => d.variantFile === variantFile);
+  const single = (report.domPositionDiff ?? []).find((d) => d.variantFile === variantFile);
+
+  if (perVp?.result.verifiedPairs && perVp.result.verifiedPairs.length > 0) {
+    for (const key of perVp.result.verifiedPairs) out.add(key);
+  } else {
+    const collect = (variantClasses: string, property: string) => {
+      const tokens = variantClasses.split(/\s+/).filter(Boolean);
+      for (const cls of tokens) out.add(`.${cls}::${property}`);
+      out.add(`::${property}`);
+    };
+    if (perVp) {
+      for (const pp of perVp.result.byPathProperty) collect(pp.variantClasses, pp.property);
+    } else if (single) {
+      for (const e of single.result.entries ?? []) collect(e.variantClasses, e.property);
+    }
+  }
+
+  return out;
+}
+
+function candidateMatchesVerifiedPair(
+  selector: string,
+  property: string,
+  verifiedPairs: Set<string>,
+): boolean {
+  // Direct exact match.
+  if (verifiedPairs.has(`${selector}::${property}`)) return true;
+
+  // Compound selector like `.luna-actions > .luna-action` — try each token.
+  for (const token of selector.split(/[\s>+~,]/)) {
+    const trimmed = token.trim();
+    if (!trimmed) continue;
+    if (verifiedPairs.has(`${trimmed}::${property}`)) return true;
+  }
+  return false;
+}
+
+interface ClassRenamePair {
+  baselineClasses: string;
+  variantClasses: string;
+  pathCount: number;  // distinct DOM positions where this rename appears
+  diffCount: number;  // total property changes across those positions
+}
+
+function extractClassRenameMap(report: DfaReport, variantFile: string): ClassRenamePair[] {
+  // Prefer per-viewport data (richer); fall back to single-viewport DOM-position diff.
+  const perVp = (report.domPositionDiffPerViewport ?? []).find((d) => d.variantFile === variantFile);
+  const single = (report.domPositionDiff ?? []).find((d) => d.variantFile === variantFile);
+
+  type Source = { path: string; baselineClasses: string; variantClasses: string };
+  const positions: Source[] = [];
+
+  if (perVp) {
+    for (const pp of perVp.result.byPathProperty) {
+      positions.push({
+        path: pp.path,
+        baselineClasses: pp.baselineClasses,
+        variantClasses: pp.variantClasses,
+      });
+    }
+  } else if (single) {
+    for (const p of single.result.byPath) {
+      positions.push({
+        path: p.path,
+        baselineClasses: p.baselineClasses,
+        variantClasses: p.variantClasses,
+      });
+    }
+  }
+
+  if (positions.length === 0) return [];
+
+  // Aggregate by (baselineClasses, variantClasses) pair. Only keep pairs
+  // where the class actually changed (skip same-class entries).
+  const pairs = new Map<string, { baselineClasses: string; variantClasses: string; paths: Set<string>; diffCount: number }>();
+  for (const pos of positions) {
+    if (pos.baselineClasses === pos.variantClasses) continue;
+    const key = `${pos.baselineClasses} ${pos.variantClasses}`;
+    const cur = pairs.get(key) ?? {
+      baselineClasses: pos.baselineClasses,
+      variantClasses: pos.variantClasses,
+      paths: new Set<string>(),
+      diffCount: 0,
+    };
+    cur.paths.add(pos.path);
+    cur.diffCount += 1;
+    pairs.set(key, cur);
+  }
+
+  return [...pairs.values()]
+    .map((p) => ({
+      baselineClasses: p.baselineClasses,
+      variantClasses: p.variantClasses,
+      pathCount: p.paths.size,
+      diffCount: p.diffCount,
+    }))
+    .sort((a, b) =>
+      b.diffCount - a.diffCount
+      || b.pathCount - a.pathCount
+      || a.baselineClasses.localeCompare(b.baselineClasses),
+    );
+}
+
 function formatShiftBands(r: DfaResult): string {
   const bands = r.shiftRegions ?? [];
   if (bands.length === 0) {
@@ -235,6 +360,29 @@ export function formatMigrationReportForAgent(
       continue;
     }
 
+    // Class-rename map at the top — subagent C called this "the single
+    // most valuable artifact." Surface it before the diff tables.
+    const renameMapEntries = extractClassRenameMap(report, variantFile);
+    if (renameMapEntries.length > 0) {
+      lines.push("### Class-rename map");
+      lines.push("");
+      lines.push("Inferred from DOM positions where the same tag in baseline " +
+        "and variant carries different `class` attributes. Read this first — " +
+        "it's the rename glossary the rest of the report assumes.");
+      lines.push("");
+      lines.push("| Baseline class | Variant class | Element positions | Property changes |");
+      lines.push("|---|---|---|---|");
+      for (const e of renameMapEntries.slice(0, 25)) {
+        const bcls = e.baselineClasses || "_(none)_";
+        const vcls = e.variantClasses || "_(none)_";
+        lines.push(`| \`${bcls}\` | \`${vcls}\` | ${e.pathCount} | ${e.diffCount} |`);
+      }
+      if (renameMapEntries.length > 25) {
+        lines.push(`| _…${renameMapEntries.length - 25} more pairs_ | | | |`);
+      }
+      lines.push("");
+    }
+
     lines.push("### Diff by viewport (worst first)");
     lines.push("");
     lines.push("| Viewport | Diff | Dominant category | Categories | Shift bands |");
@@ -258,31 +406,47 @@ export function formatMigrationReportForAgent(
     }
 
     const csdSummary = (report.computedStyleDiff ?? []).find((c) => c.variantFile === variantFile);
-    const csdProps = csdSummary
-      ? new Set(csdSummary.result.byProperty.map((p) => p.property))
-      : undefined;
+    // Build a strict "(selector, property)" verification set instead of
+    // the looser "property name appears anywhere" check that previously
+    // marked unchanged-but-flagged candidates as ✓.
+    const verifiedPairs = buildVerifiedPairSet(report, variantFile);
+    const verificationAvailable = csdSummary !== undefined || verifiedPairs.size > 0;
 
     const fixCandidates = aggregateFixCandidates(results);
     if (fixCandidates.length > 0) {
-      lines.push(csdProps
-        ? "### Heuristic fix candidates (collapsed across viewports — ✓ verified by computed-style)"
+      lines.push(verificationAvailable
+        ? "### Heuristic fix candidates (collapsed across viewports — ✓ verified, ✗ value matches baseline)"
         : "### Heuristic fix candidates (collapsed across viewports)");
       lines.push("");
       lines.push("> The tool flags `selector { property }` pairs whose declaration " +
         "matches each viewport's dominant category. These are *hints*; trust your " +
         "eyes (or the verified computed-style section below) for the real delta.");
       lines.push("");
-      if (csdProps) {
+      if (verificationAvailable) {
         lines.push("| Selector | Property | Viewports | Verified? |");
         lines.push("|---|---|---|---|");
       } else {
         lines.push("| Selector | Property | Viewports |");
         lines.push("|---|---|---|");
       }
-      for (const fc of fixCandidates.slice(0, 12)) {
-        const verified = csdProps ? (csdProps.has(fc.property) ? "✓" : "—") : null;
-        if (verified !== null) {
-          lines.push(`| \`${fc.selector}\` | \`${fc.property}\` | ${fc.viewports.size} | ${verified} |`);
+      // Sort: verified ✓ first, then by viewport count desc.
+      const annotated = fixCandidates.map((fc) => ({
+        fc,
+        verified: verificationAvailable
+          ? candidateMatchesVerifiedPair(fc.selector, fc.property, verifiedPairs)
+          : null,
+      }));
+      annotated.sort((a, b) => {
+        if (a.verified !== b.verified) {
+          if (a.verified === true) return -1;
+          if (b.verified === true) return 1;
+        }
+        return b.fc.viewports.size - a.fc.viewports.size;
+      });
+      for (const { fc, verified } of annotated.slice(0, 12)) {
+        const marker = verified === true ? "✓" : verified === false ? "✗" : null;
+        if (marker !== null) {
+          lines.push(`| \`${fc.selector}\` | \`${fc.property}\` | ${fc.viewports.size} | ${marker} |`);
         } else {
           lines.push(`| \`${fc.selector}\` | \`${fc.property}\` | ${fc.viewports.size} |`);
         }

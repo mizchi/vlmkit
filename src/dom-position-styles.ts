@@ -198,6 +198,14 @@ export interface DpPerViewportResult {
   /** Total tuples across all viewports (before any caller-side cap). */
   totalDiffs: number;
   /**
+   * Compact verification index: `${variantClassToken}::${property}` strings
+   * for every real delta. Used by `diff-for-agent` to gate heuristic
+   * fix-candidate ✓/✗ marks. Stored unconditionally (cheap; tens of KB
+   * worst-case) so verification stays accurate even when `entries` and
+   * `byPathProperty` are capped for report-size reasons.
+   */
+  verifiedPairs: string[];
+  /**
    * (path, property) → viewport-list. Same property at same position can
    * differ on some viewports and not others (media-query-gated rules).
    * Sorted by number of viewports descending.
@@ -226,6 +234,7 @@ export interface DpPerViewportResult {
 const EMPTY_PV: DpPerViewportResult = {
   entries: [],
   totalDiffs: 0,
+  verifiedPairs: [],
   byPathProperty: [],
   byViewport: [],
   byProperty: [],
@@ -314,9 +323,22 @@ export function diffPositionStylesAcrossViewports(
     byPath.set(e.path, cur);
   }
 
+  // Compact verification set: `${variantClassToken}::${property}` plus a
+  // bare `::property` fallback used by tag-only candidates. Unbounded
+  // because each entry is short and downstream consumers gate on it for
+  // ✓/✗ accuracy even when entries/byPathProperty are capped.
+  const verifiedPairsSet = new Set<string>();
+  for (const e of entries) {
+    const tokens = e.variantClasses.split(/\s+/).filter(Boolean);
+    for (const cls of tokens) verifiedPairsSet.add(`.${cls}::${e.property}`);
+    verifiedPairsSet.add(`::${e.property}`);
+  }
+  const verifiedPairs = [...verifiedPairsSet].sort();
+
   return {
     entries,
     totalDiffs: entries.length,
+    verifiedPairs,
     byPathProperty,
     byViewport: [...byViewport.entries()].map(([viewport, count]) => ({ viewport, count }))
       .sort((a, b) => b.count - a.count || a.viewport.localeCompare(b.viewport)),
