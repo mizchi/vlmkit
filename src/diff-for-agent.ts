@@ -50,6 +50,28 @@ export interface DfaCsdSummary {
   };
 }
 
+export interface DfaDpEntry {
+  path: string;
+  tag: string;
+  baselineClasses: string;
+  variantClasses: string;
+  property: string;
+  baseline: string;
+  variant: string;
+}
+
+export interface DfaDpSummary {
+  variantFile: string;
+  result: {
+    totalDiffs: number;
+    pathsOnlyInBaseline: string[];
+    pathsOnlyInVariant: string[];
+    byProperty: Array<{ property: string; count: number }>;
+    byPath: Array<{ path: string; baselineClasses: string; variantClasses: string; count: number }>;
+    entries?: DfaDpEntry[];
+  };
+}
+
 export interface DfaReport {
   dir: string;
   baseline: string;
@@ -57,6 +79,7 @@ export interface DfaReport {
   viewports: Array<{ label: string; width: number; height?: number }>;
   results: DfaResult[];
   computedStyleDiff?: DfaCsdSummary[];
+  domPositionDiff?: DfaDpSummary[];
   /** Absolute path of the report file (used to resolve sibling PNGs). */
   reportPath?: string;
 }
@@ -261,6 +284,45 @@ export function formatMigrationReportForAgent(
       lines.push(`- Current : \`${paths.current}\``);
       lines.push(`- Heatmap : \`${paths.heatmap}\``);
       lines.push("");
+    }
+
+    const dpSummary = (report.domPositionDiff ?? []).find((d) => d.variantFile === variantFile);
+    if (dpSummary && dpSummary.result.totalDiffs > 0) {
+      lines.push("### Verified deltas by DOM position (class-rename-aware)");
+      lines.push("");
+      lines.push(`Total tuples: **${dpSummary.result.totalDiffs}** across ${dpSummary.result.byPath.length} ` +
+        "element position(s). Each row pairs the same tree position in baseline vs variant — " +
+        "robust to class renames (`.card` → `.luna-panel`).");
+      lines.push("");
+      const dpEntries = dpSummary.result.entries ?? [];
+      if (dpEntries.length > 0) {
+        lines.push("| Position | Baseline class | Variant class | Property | Baseline | Variant |");
+        lines.push("|---|---|---|---|---|---|");
+        for (const e of dpEntries.slice(0, 25)) {
+          const bcls = e.baselineClasses || "_(none)_";
+          const vcls = e.variantClasses || "_(none)_";
+          lines.push(`| \`${e.path}\` | \`${bcls}\` | \`${vcls}\` | \`${e.property}\` | \`${e.baseline}\` | \`${e.variant}\` |`);
+        }
+        if (dpEntries.length > 25) {
+          lines.push(`| _…${dpEntries.length - 25} more rows_ | | | | | |`);
+        }
+        lines.push("");
+      }
+      const topPaths = dpSummary.result.byPath.slice(0, 8);
+      if (topPaths.length > 0) {
+        lines.push("Top positions (most divergent elements):");
+        for (const p of topPaths) {
+          const bcls = p.baselineClasses || "(none)";
+          const vcls = p.variantClasses || "(none)";
+          lines.push(`- \`${p.path}\` — baseline \`${bcls}\` vs variant \`${vcls}\` — ${p.count} property change(s)`);
+        }
+        lines.push("");
+      }
+      if (dpSummary.result.pathsOnlyInBaseline.length > 0 || dpSummary.result.pathsOnlyInVariant.length > 0) {
+        lines.push(`_Structural drift_: ${dpSummary.result.pathsOnlyInBaseline.length} path(s) only in baseline, ` +
+          `${dpSummary.result.pathsOnlyInVariant.length} only in variant.`);
+        lines.push("");
+      }
     }
 
     if (csdSummary && csdSummary.result.totalDiffs > 0) {

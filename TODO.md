@@ -232,13 +232,19 @@ zero-context subagents (one with the new tooling, one without)
 fixture. The original Pass A/B/C numbers were inflated by my prior
 exposure to luna's spec values. These items are the gap.
 
-- [ ] **DOM-position-based selector alignment** in
-  `diffComputedStyles`. Today selectors are matched by literal
-  string, so a class rename (`.card` → `.luna-panel`) produces
-  zero verified entries — the *exact* migration-VRT scenario. Pair
-  selectors that share DOM coordinates + child structure when
-  literal-string match fails. Without this, `--computed-style`
-  has near-zero value on rename migrations.
+- [x] **DOM-position-based selector alignment** in a new
+  `src/dom-position-styles.ts`. `migration-compare --dom-position-diff`
+  captures per-element `(path, tag, classes, styles)` for every
+  element with a `class` attribute or semantic tag, then matches
+  baseline ↔ variant by tree position (`main[0]>section[0]>span[0]`),
+  which is invariant under class renames. Surfaced as a new
+  "Verified deltas by DOM position (class-rename-aware)" section in
+  `vrt diff-for-agent`. Verified on the dogfood Pass B iter 1
+  fixture: produces 872 property tuples across 60 element
+  positions, naming both class names per row (e.g. baseline
+  `eyebrow` ↔ variant `luna-pill`, baseline `dialog-card` ↔
+  variant `luna-modal`). The exact gap subagent A flagged is now
+  closed.
 - [ ] **Per-element / per-section diffRatio**. Today granularity
   bottoms out at the viewport. "Hero 0.4%, Panel 1.2%, Modal 4.0%"
   would let the agent target the worst offender. Both subagents

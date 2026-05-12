@@ -71,6 +71,13 @@ import {
 } from "./dom-equivalence.ts";
 import { buildComputedStyleCaptureJsonExpression, parseComputedStyleSnapshot } from "./computed-style-capture.ts";
 import { diffComputedStyles, type CsdResult, type ComputedStyleSnapshot } from "./computed-style-diff.ts";
+import {
+  diffDomPositionStyles,
+  DOM_POSITION_STYLES_BROWSER_SCRIPT,
+  parseDomPositionStyles,
+  type DpResult,
+  type PositionedElement,
+} from "./dom-position-styles.ts";
 
 // ---- Config ----
 
@@ -129,6 +136,8 @@ export interface MigrationCompareOptions {
   strictDomEquivalence?: boolean;
   /** Capture computed-style snapshot for baseline + variants and diff (opt-in, default false). */
   computedStyleDiff?: boolean;
+  /** Capture DOM-position-aligned computed styles (handles class renames, opt-in). */
+  domPositionDiff?: boolean;
 }
 
 export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptions {
@@ -158,6 +167,7 @@ export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptio
     domEquivalenceCheck: !hasFlag(args, "no-dom-equivalence"),
     strictDomEquivalence: hasFlag(args, "strict-dom-equivalence"),
     computedStyleDiff: hasFlag(args, "computed-style"),
+    domPositionDiff: hasFlag(args, "dom-position-diff") || hasFlag(args, "position-diff"),
   };
 }
 
@@ -276,6 +286,10 @@ export interface MigrationCompareReport {
   computedStyleDiff?: Array<{
     variantFile: string;
     result: CsdResult;
+  }>;
+  domPositionDiff?: Array<{
+    variantFile: string;
+    result: DpResult;
   }>;
   results: MigrationCompareResult[];
   reportPath: string;
@@ -452,8 +466,10 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     let baselineSanity: RenderSanityResult | undefined;
     let baselineDomFingerprint: DomFingerprint | undefined;
     let baselineComputedStyles: ComputedStyleSnapshot | undefined;
+    let baselineDomPositionStyles: PositionedElement[] | undefined;
     const domEnabled = options.domEquivalenceCheck ?? true;
     const csdEnabled = options.computedStyleDiff ?? false;
+    const dpEnabled = options.domPositionDiff ?? false;
     for (const [vpIndex, vp] of VIEWPORTS.entries()) {
       const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
 
@@ -531,6 +547,16 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         }
       }
 
+      // Capture baseline DOM-position styles (handles class renames).
+      if (dpEnabled && vpIndex === 0) {
+        try {
+          const raw = await page.evaluate(DOM_POSITION_STYLES_BROWSER_SCRIPT);
+          baselineDomPositionStyles = parseDomPositionStyles(raw);
+        } catch (error) {
+          console.log(`  ${YELLOW}Baseline DOM-position capture error: ${String(error)}${RESET}`);
+        }
+      }
+
       await page.close();
 
       if (paintTreeClient) {
@@ -588,6 +614,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
 
     const domEquivalenceReports: Array<{ variantFile: string; result: DomEquivalenceResult }> = [];
     const computedStyleDiffReports: Array<{ variantFile: string; result: CsdResult }> = [];
+    const domPositionDiffReports: Array<{ variantFile: string; result: DpResult }> = [];
     for (const variant of variantSources) {
       let variantHtml: string;
       const variantName = variant.label;
@@ -603,6 +630,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
 
       let variantDomFingerprint: DomFingerprint | undefined;
       let variantComputedStyles: ComputedStyleSnapshot | undefined;
+      let variantDomPositionStyles: PositionedElement[] | undefined;
       for (const [vpIndex, vp] of VIEWPORTS.entries()) {
         const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
         if (variant.url) {
@@ -626,6 +654,14 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             variantComputedStyles = parseComputedStyleSnapshot(raw) as ComputedStyleSnapshot;
           } catch (error) {
             console.log(`  ${YELLOW}Variant computed-style capture error (${variantName}): ${String(error)}${RESET}`);
+          }
+        }
+        if (dpEnabled && vpIndex === 0 && !variantDomPositionStyles) {
+          try {
+            const raw = await page.evaluate(DOM_POSITION_STYLES_BROWSER_SCRIPT);
+            variantDomPositionStyles = parseDomPositionStyles(raw);
+          } catch (error) {
+            console.log(`  ${YELLOW}Variant DOM-position capture error (${variantName}): ${String(error)}${RESET}`);
           }
         }
 
@@ -793,6 +829,21 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         }
       }
 
+      // DOM-position-aligned diff (opt-in via --dom-position-diff)
+      if (dpEnabled && baselineDomPositionStyles && variantDomPositionStyles) {
+        const variantFileLabel = variant.url || variant.file;
+        const result = diffDomPositionStyles(baselineDomPositionStyles, variantDomPositionStyles);
+        const trimmedResult = { ...result, entries: result.entries.slice(0, 200) };
+        domPositionDiffReports.push({ variantFile: variantFileLabel, result: trimmedResult });
+        if (result.totalDiffs > 0) {
+          const topProps = result.byProperty.slice(0, 5)
+            .map((p) => `${p.property}(${p.count})`)
+            .join(", ");
+          console.log(`  ${DIM}DOM-position diff: ${result.totalDiffs} tuples across ${result.byPath.length} paths. ` +
+            `Top properties: ${topProps}${RESET}`);
+        }
+      }
+
       // Computed-style diff (opt-in via --computed-style)
       if (csdEnabled && baselineComputedStyles && variantComputedStyles) {
         const variantFileLabel = variant.url || variant.file;
@@ -892,6 +943,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       baselineSanity,
       domEquivalence: domEquivalenceReports.length > 0 ? domEquivalenceReports : undefined,
       computedStyleDiff: computedStyleDiffReports.length > 0 ? computedStyleDiffReports : undefined,
+      domPositionDiff: domPositionDiffReports.length > 0 ? domPositionDiffReports : undefined,
       results,
       reportPath,
     };
