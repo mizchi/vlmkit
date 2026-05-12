@@ -193,9 +193,13 @@ small wrapper around already-built primitives, not a new subsystem.
   absolute paths to baseline/current/heatmap PNGs for the worst N
   viewports. Verified on the 2026-05-12 dogfood Pass B data
   (reproduces the table + 5 fix candidates the terminal truncated to 3).
-- [ ] DOM / a11y-tree equivalence pre-flight in `migration-compare`.
-  Catch "you accidentally changed the HTML" failures (which currently
-  show up as opaque layout-shift) before screenshots are taken.
+- [x] DOM equivalence pre-flight in `migration-compare`. Captures
+  heading texts, button texts, input values, and total element count
+  on the first viewport of baseline + variant; emits warnings under
+  `domEquivalence` when they drift. CLI: `--no-dom-equivalence` to
+  skip, `--strict-dom-equivalence` to fail on warnings. Verified on
+  the 2026-05-12 dogfood invented-DOM scenario (3 warnings fire
+  correctly; clean DOM stays silent).
 - [ ] Per-region shift detection — extend the existing `globalShift`
   (single pixel offset for the whole frame) to per-element bounding
   boxes so heatmap red-smears can be localized as

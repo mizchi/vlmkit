@@ -63,6 +63,12 @@ import {
   type FailedRequest,
   type RenderSanityResult,
 } from "./render-sanity.ts";
+import {
+  evaluateDomEquivalence,
+  DOM_FINGERPRINT_BROWSER_SCRIPT,
+  type DomFingerprint,
+  type DomEquivalenceResult,
+} from "./dom-equivalence.ts";
 
 // ---- Config ----
 
@@ -115,6 +121,10 @@ export interface MigrationCompareOptions {
   baselineSanityCheck?: boolean;
   /** Exit non-zero when sanity checks fail (default false → warn only). */
   strictBaselineSanity?: boolean;
+  /** Run DOM-equivalence preflight (default true). */
+  domEquivalenceCheck?: boolean;
+  /** Exit non-zero when DOM equivalence checks fail (default false → warn only). */
+  strictDomEquivalence?: boolean;
 }
 
 export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptions {
@@ -141,6 +151,8 @@ export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptio
     maskSelectors: parseMaskSelectors(args),
     baselineSanityCheck: !hasFlag(args, "no-baseline-sanity"),
     strictBaselineSanity: hasFlag(args, "strict-baseline-sanity"),
+    domEquivalenceCheck: !hasFlag(args, "no-dom-equivalence"),
+    strictDomEquivalence: hasFlag(args, "strict-dom-equivalence"),
   };
 }
 
@@ -248,6 +260,10 @@ export interface MigrationCompareReport {
   approvalWarnings: Awaited<ReturnType<typeof collectApprovalWarnings>>;
   paintTree: PaintTreeStatus;
   baselineSanity?: RenderSanityResult;
+  domEquivalence?: Array<{
+    variantFile: string;
+    result: DomEquivalenceResult;
+  }>;
   results: MigrationCompareResult[];
   reportPath: string;
 }
@@ -421,6 +437,8 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
 
     // Capture baseline at all viewports
     let baselineSanity: RenderSanityResult | undefined;
+    let baselineDomFingerprint: DomFingerprint | undefined;
+    const domEnabled = options.domEquivalenceCheck ?? true;
     for (const [vpIndex, vp] of VIEWPORTS.entries()) {
       const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
 
@@ -478,6 +496,16 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           console.log();
         }
       }
+
+      // Capture baseline DOM fingerprint once (first viewport).
+      if (domEnabled && vpIndex === 0) {
+        try {
+          baselineDomFingerprint = await page.evaluate(DOM_FINGERPRINT_BROWSER_SCRIPT) as DomFingerprint;
+        } catch (error) {
+          console.log(`  ${YELLOW}Baseline DOM fingerprint error: ${String(error)}${RESET}`);
+        }
+      }
+
       await page.close();
 
       if (paintTreeClient) {
@@ -531,6 +559,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       ? (options.variantUrls ?? []).map((url) => ({ label: urlToLabel(url), url, file: "" }))
       : variants.map((f) => ({ label: basename(f, ".html"), url: "", file: f }));
 
+    const domEquivalenceReports: Array<{ variantFile: string; result: DomEquivalenceResult }> = [];
     for (const variant of variantSources) {
       let variantHtml: string;
       const variantName = variant.label;
@@ -544,7 +573,8 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
 
       console.log(`  ${BOLD}${variantName}${RESET} vs ${baselineName}`);
 
-      for (const vp of VIEWPORTS) {
+      let variantDomFingerprint: DomFingerprint | undefined;
+      for (const [vpIndex, vp] of VIEWPORTS.entries()) {
         const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
         if (variant.url) {
           await page.goto(variant.url, { waitUntil: "networkidle", timeout: 30000 });
@@ -553,6 +583,15 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           await page.setContent(variantHtml, { waitUntil: "networkidle" });
         }
         if (options.maskSelectors?.length) await applyMask(page, options.maskSelectors);
+
+        if (domEnabled && vpIndex === 0 && !variantDomFingerprint) {
+          try {
+            variantDomFingerprint = await page.evaluate(DOM_FINGERPRINT_BROWSER_SCRIPT) as DomFingerprint;
+          } catch (error) {
+            console.log(`  ${YELLOW}Variant DOM fingerprint error (${variantName}): ${String(error)}${RESET}`);
+          }
+        }
+
         const variantScreenshotPath = join(outputDir, `${variantName}-${vp.label}.png`);
         await page.screenshot({ path: variantScreenshotPath, fullPage: true });
         await page.close();
@@ -696,6 +735,21 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         }
         console.log();
       }
+
+      // DOM-equivalence preflight comparison (variant-side completion)
+      if (domEnabled && baselineDomFingerprint && variantDomFingerprint) {
+        const variantFileLabel = variant.url || variant.file;
+        const result = evaluateDomEquivalence(baselineDomFingerprint, variantDomFingerprint);
+        domEquivalenceReports.push({ variantFile: variantFileLabel, result });
+        if (!result.ok) {
+          console.log(`  ${YELLOW}DOM equivalence warnings for ${variantName}:${RESET}`);
+          for (const w of result.warnings) {
+            console.log(`    ${YELLOW}- [${w.code}] ${w.message}${RESET}`);
+          }
+          console.log();
+        }
+      }
+
       console.log();
     }
 
@@ -776,6 +830,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       approvalWarnings,
       paintTree: paintTreeStatus,
       baselineSanity,
+      domEquivalence: domEquivalenceReports.length > 0 ? domEquivalenceReports : undefined,
       results,
       reportPath,
     };
@@ -788,6 +843,17 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     console.log();
     console.log(`  ${DIM}Report: ${reportPath}${RESET}`);
     console.log();
+
+    if (options.strictDomEquivalence) {
+      const failing = domEquivalenceReports.filter((d) => !d.result.ok);
+      if (failing.length > 0) {
+        const total = failing.reduce((s, d) => s + d.result.warnings.length, 0);
+        throw new Error(
+          `DOM equivalence check failed (${total} warning(s) across ${failing.length} variant(s)). ` +
+          `See report at ${reportPath}.`,
+        );
+      }
+    }
 
     if (options.strictBaselineSanity && baselineSanity && !baselineSanity.ok) {
       throw new Error(
