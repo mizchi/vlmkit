@@ -224,11 +224,19 @@ small wrapper around already-built primitives, not a new subsystem.
   tuples (border colors, radius, font-family, font-size on
   `#notes/#owner/#title`) that pixel diff alone surfaced only as
   generic `layout-shift`.
-- [ ] Stricter fix-candidate ranking. Today
-  `10× .luna-actions { display }` is emitted even when the agent's
-  CSS already has the right `display:` and the actual delta is
-  `gap`/`flex-wrap`. Collapse the candidate label to the *changed*
-  property, not the most-mentioned selector.
+- [x] Heuristic fix-candidate ranking now reconciles with computed-style.
+  `vrt diff-for-agent` renames the heuristic table to "Heuristic fix
+  candidates" with a per-row `Verified?` column (✓ when the
+  property appears in the computed-style diff, — when it doesn't),
+  and exposes the new authoritative "Verified deltas (computed-style)"
+  table listing `(selector, property, baseline, variant)` tuples.
+  On the dogfood data, all 5 heuristic candidates (`.luna-actions`
+  `{display | gap}`, `.luna-field {display | flex-direction | gap}`)
+  are correctly marked unverified, while the verified table surfaces
+  the real deltas — `border-radius 12px→4px`, `font-family
+  Inter→Arial`, `font-size 16px→13.33px`, `padding 11px 13px→8px`,
+  `color rgb(15,23,42)→rgb(0,0,0)` — that the agent actually needed
+  to fix.
 
 ### Playwright Integration
 - [ ] `nlAssert()` with Vision LLM

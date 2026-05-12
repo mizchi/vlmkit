@@ -33,12 +33,20 @@ export interface DfaResult {
   globalShift?: number;
 }
 
+export interface DfaCsdEntry {
+  selector: string;
+  property: string;
+  baseline: string;
+  variant: string;
+}
+
 export interface DfaCsdSummary {
   variantFile: string;
   result: {
     totalDiffs: number;
     byProperty: Array<{ property: string; count: number }>;
     bySelector: Array<{ selector: string; count: number }>;
+    entries?: DfaCsdEntry[];
   };
 }
 
@@ -209,18 +217,35 @@ export function formatMigrationReportForAgent(
       lines.push("");
     }
 
+    const csdSummary = (report.computedStyleDiff ?? []).find((c) => c.variantFile === variantFile);
+    const csdProps = csdSummary
+      ? new Set(csdSummary.result.byProperty.map((p) => p.property))
+      : undefined;
+
     const fixCandidates = aggregateFixCandidates(results);
     if (fixCandidates.length > 0) {
-      lines.push("### Fix candidates (collapsed across viewports)");
+      lines.push(csdProps
+        ? "### Heuristic fix candidates (collapsed across viewports — ✓ verified by computed-style)"
+        : "### Heuristic fix candidates (collapsed across viewports)");
       lines.push("");
-      lines.push("> The tool flags the most-mentioned `selector { property }` per " +
-        "viewport. Treat these as *hints*, not authoritative diffs — verify against " +
-        "the baseline/current PNGs below.");
+      lines.push("> The tool flags `selector { property }` pairs whose declaration " +
+        "matches each viewport's dominant category. These are *hints*; trust your " +
+        "eyes (or the verified computed-style section below) for the real delta.");
       lines.push("");
-      lines.push("| Selector | Property | Viewports |");
-      lines.push("|---|---|---|");
+      if (csdProps) {
+        lines.push("| Selector | Property | Viewports | Verified? |");
+        lines.push("|---|---|---|---|");
+      } else {
+        lines.push("| Selector | Property | Viewports |");
+        lines.push("|---|---|---|");
+      }
       for (const fc of fixCandidates.slice(0, 12)) {
-        lines.push(`| \`${fc.selector}\` | \`${fc.property}\` | ${fc.viewports.size} |`);
+        const verified = csdProps ? (csdProps.has(fc.property) ? "✓" : "—") : null;
+        if (verified !== null) {
+          lines.push(`| \`${fc.selector}\` | \`${fc.property}\` | ${fc.viewports.size} | ${verified} |`);
+        } else {
+          lines.push(`| \`${fc.selector}\` | \`${fc.property}\` | ${fc.viewports.size} |`);
+        }
       }
       lines.push("");
     }
@@ -238,12 +263,25 @@ export function formatMigrationReportForAgent(
       lines.push("");
     }
 
-    const csdSummary = (report.computedStyleDiff ?? []).find((c) => c.variantFile === variantFile);
     if (csdSummary && csdSummary.result.totalDiffs > 0) {
-      lines.push("### Computed-style diff");
+      lines.push("### Verified deltas (computed-style)");
       lines.push("");
-      lines.push(`Total differing (selector, property) tuples: **${csdSummary.result.totalDiffs}**.`);
+      lines.push(`Total differing (selector, property) tuples: **${csdSummary.result.totalDiffs}**. ` +
+        "Each row is a real computed-style mismatch (the baseline rendered with one value, " +
+        "the variant with another) — trust this section over the heuristic candidates above.");
       lines.push("");
+      const entries = csdSummary.result.entries ?? [];
+      if (entries.length > 0) {
+        lines.push("| Selector | Property | Baseline | Variant |");
+        lines.push("|---|---|---|---|");
+        for (const e of entries.slice(0, 15)) {
+          lines.push(`| \`${e.selector}\` | \`${e.property}\` | \`${e.baseline}\` | \`${e.variant}\` |`);
+        }
+        if (entries.length > 15) {
+          lines.push(`| _…${entries.length - 15} more rows_ | | | |`);
+        }
+        lines.push("");
+      }
       const topProps = csdSummary.result.byProperty.slice(0, 8);
       if (topProps.length > 0) {
         lines.push("Top properties:");

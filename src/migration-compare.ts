@@ -797,7 +797,10 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       if (csdEnabled && baselineComputedStyles && variantComputedStyles) {
         const variantFileLabel = variant.url || variant.file;
         const result = diffComputedStyles(baselineComputedStyles, variantComputedStyles);
-        computedStyleDiffReports.push({ variantFile: variantFileLabel, result });
+        // Trim entries to keep migration-report.json size sane while still
+      // surfacing the top diffs to diff-for-agent.
+      const trimmedResult = { ...result, entries: result.entries.slice(0, 100) };
+      computedStyleDiffReports.push({ variantFile: variantFileLabel, result: trimmedResult });
         if (result.totalDiffs > 0) {
           const topProps = result.byProperty.slice(0, 5)
             .map((p) => `${p.property}(${p.count})`)
