@@ -121,10 +121,18 @@ discovery system finds today, not just the four tested in 2026-04.
        class attributes — the styling pipeline likely failed to apply.
    ```
 
+## Visual flipbook
+
+`docs/reports/data/2026-05-11/flipbooks/01-tailwind-diagnosis.html`
+walks through the three rendered states in order (broken → inlined →
+matching answer) — open in any browser to see the failure mode and
+the fix side-by-side.
+
 ## Files touched
 
 - `fixtures/migration/tailwind-to-vanilla/before-inlined.html` (new, 14 KB)
 - `docs/reports/2026-05-11-tailwind-fixture-reproducibility.md` (this file)
 - `docs/reports/2026-05-11-data-collection.md` will reference this report
+- `docs/reports/data/2026-05-11/flipbooks/01-tailwind-diagnosis.html` (new, 192 KB)
 - `test-results/data-collection/migration-tailwind-inlined/migration-report.json`
   (raw output — not committed)

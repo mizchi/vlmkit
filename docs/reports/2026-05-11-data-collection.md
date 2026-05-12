@@ -176,6 +176,20 @@ diffs, etc.) live under `test-results/data-collection/` and
 `test-results/css-bench/<fixture>/` but are not checked in to keep
 the diff small.
 
+### Self-contained HTML flipbooks
+
+Generated with `vrt flipbook` + `vrt snapshot flipbook` for visual
+review without needing to open separate PNG pairs. Each file is one
+self-contained HTML with PNGs embedded as base64 + a tiny vanilla-JS
+player (← / → / space for navigation).
+
+| Flipbook | Frames | What it shows |
+|---|---|---|
+| `flipbooks/01-tailwind-diagnosis.html` | 3 | The broken `before.html` (Tailwind CDN blocked → Times New Roman) → the `before-inlined.html` fixture → the matching `after.html`. Walks through today's diagnosis chain. |
+| `flipbooks/02-shadcn-luna-progression.html` | 3 | shadcn baseline → luna `after-blank.html` (58.4% diff start) → luna `after.html` (0.0% pixel-perfect). The intended blind-test trajectory. |
+| `flipbooks/03-shadcn-blank-diff-three-frame.html` | 3 | Standard baseline ↔ current ↔ heatmap for shadcn-to-luna / after-blank / mobile (largest-diff entry in the fixture). |
+| `flipbooks/04-reset-destyle-diff-three-frame.html` | 3 | Same three-frame pattern for reset-css normalize → destyle / mobile (12.71% diff, the most distinct reset variant). |
+
 ## 6. Notes for future runs
 
 1. The `tailwind-to-vanilla` blind-test "answer" no longer holds at the
