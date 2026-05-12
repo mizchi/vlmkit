@@ -33,12 +33,22 @@ export interface DfaResult {
   globalShift?: number;
 }
 
+export interface DfaCsdSummary {
+  variantFile: string;
+  result: {
+    totalDiffs: number;
+    byProperty: Array<{ property: string; count: number }>;
+    bySelector: Array<{ selector: string; count: number }>;
+  };
+}
+
 export interface DfaReport {
   dir: string;
   baseline: string;
   variants: Array<string | { file?: string }>;
   viewports: Array<{ label: string; width: number; height?: number }>;
   results: DfaResult[];
+  computedStyleDiff?: DfaCsdSummary[];
   /** Absolute path of the report file (used to resolve sibling PNGs). */
   reportPath?: string;
 }
@@ -226,6 +236,30 @@ export function formatMigrationReportForAgent(
       lines.push(`- Current : \`${paths.current}\``);
       lines.push(`- Heatmap : \`${paths.heatmap}\``);
       lines.push("");
+    }
+
+    const csdSummary = (report.computedStyleDiff ?? []).find((c) => c.variantFile === variantFile);
+    if (csdSummary && csdSummary.result.totalDiffs > 0) {
+      lines.push("### Computed-style diff");
+      lines.push("");
+      lines.push(`Total differing (selector, property) tuples: **${csdSummary.result.totalDiffs}**.`);
+      lines.push("");
+      const topProps = csdSummary.result.byProperty.slice(0, 8);
+      if (topProps.length > 0) {
+        lines.push("Top properties:");
+        for (const p of topProps) {
+          lines.push(`- \`${p.property}\` — ${p.count} selector(s)`);
+        }
+        lines.push("");
+      }
+      const topSelectors = csdSummary.result.bySelector.slice(0, 8);
+      if (topSelectors.length > 0) {
+        lines.push("Top selectors:");
+        for (const s of topSelectors) {
+          lines.push(`- \`${s.selector}\` — ${s.count} property change(s)`);
+        }
+        lines.push("");
+      }
     }
 
     lines.push("### Suggested next step");

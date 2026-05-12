@@ -69,6 +69,8 @@ import {
   type DomFingerprint,
   type DomEquivalenceResult,
 } from "./dom-equivalence.ts";
+import { buildComputedStyleCaptureJsonExpression, parseComputedStyleSnapshot } from "./computed-style-capture.ts";
+import { diffComputedStyles, type CsdResult, type ComputedStyleSnapshot } from "./computed-style-diff.ts";
 
 // ---- Config ----
 
@@ -125,6 +127,8 @@ export interface MigrationCompareOptions {
   domEquivalenceCheck?: boolean;
   /** Exit non-zero when DOM equivalence checks fail (default false → warn only). */
   strictDomEquivalence?: boolean;
+  /** Capture computed-style snapshot for baseline + variants and diff (opt-in, default false). */
+  computedStyleDiff?: boolean;
 }
 
 export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptions {
@@ -153,6 +157,7 @@ export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptio
     strictBaselineSanity: hasFlag(args, "strict-baseline-sanity"),
     domEquivalenceCheck: !hasFlag(args, "no-dom-equivalence"),
     strictDomEquivalence: hasFlag(args, "strict-dom-equivalence"),
+    computedStyleDiff: hasFlag(args, "computed-style"),
   };
 }
 
@@ -267,6 +272,10 @@ export interface MigrationCompareReport {
   domEquivalence?: Array<{
     variantFile: string;
     result: DomEquivalenceResult;
+  }>;
+  computedStyleDiff?: Array<{
+    variantFile: string;
+    result: CsdResult;
   }>;
   results: MigrationCompareResult[];
   reportPath: string;
@@ -442,7 +451,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     // Capture baseline at all viewports
     let baselineSanity: RenderSanityResult | undefined;
     let baselineDomFingerprint: DomFingerprint | undefined;
+    let baselineComputedStyles: ComputedStyleSnapshot | undefined;
     const domEnabled = options.domEquivalenceCheck ?? true;
+    const csdEnabled = options.computedStyleDiff ?? false;
     for (const [vpIndex, vp] of VIEWPORTS.entries()) {
       const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
 
@@ -510,6 +521,16 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         }
       }
 
+      // Capture baseline computed-style snapshot once (first viewport).
+      if (csdEnabled && vpIndex === 0) {
+        try {
+          const raw = await page.evaluate(buildComputedStyleCaptureJsonExpression());
+          baselineComputedStyles = parseComputedStyleSnapshot(raw) as ComputedStyleSnapshot;
+        } catch (error) {
+          console.log(`  ${YELLOW}Baseline computed-style capture error: ${String(error)}${RESET}`);
+        }
+      }
+
       await page.close();
 
       if (paintTreeClient) {
@@ -566,6 +587,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       : variants.map((f) => ({ label: basename(f, ".html"), url: "", file: f }));
 
     const domEquivalenceReports: Array<{ variantFile: string; result: DomEquivalenceResult }> = [];
+    const computedStyleDiffReports: Array<{ variantFile: string; result: CsdResult }> = [];
     for (const variant of variantSources) {
       let variantHtml: string;
       const variantName = variant.label;
@@ -580,6 +602,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       console.log(`  ${BOLD}${variantName}${RESET} vs ${baselineName}`);
 
       let variantDomFingerprint: DomFingerprint | undefined;
+      let variantComputedStyles: ComputedStyleSnapshot | undefined;
       for (const [vpIndex, vp] of VIEWPORTS.entries()) {
         const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
         if (variant.url) {
@@ -595,6 +618,14 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             variantDomFingerprint = await page.evaluate(DOM_FINGERPRINT_BROWSER_SCRIPT) as DomFingerprint;
           } catch (error) {
             console.log(`  ${YELLOW}Variant DOM fingerprint error (${variantName}): ${String(error)}${RESET}`);
+          }
+        }
+        if (csdEnabled && vpIndex === 0 && !variantComputedStyles) {
+          try {
+            const raw = await page.evaluate(buildComputedStyleCaptureJsonExpression());
+            variantComputedStyles = parseComputedStyleSnapshot(raw) as ComputedStyleSnapshot;
+          } catch (error) {
+            console.log(`  ${YELLOW}Variant computed-style capture error (${variantName}): ${String(error)}${RESET}`);
           }
         }
 
@@ -762,6 +793,20 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         }
       }
 
+      // Computed-style diff (opt-in via --computed-style)
+      if (csdEnabled && baselineComputedStyles && variantComputedStyles) {
+        const variantFileLabel = variant.url || variant.file;
+        const result = diffComputedStyles(baselineComputedStyles, variantComputedStyles);
+        computedStyleDiffReports.push({ variantFile: variantFileLabel, result });
+        if (result.totalDiffs > 0) {
+          const topProps = result.byProperty.slice(0, 5)
+            .map((p) => `${p.property}(${p.count})`)
+            .join(", ");
+          console.log(`  ${DIM}Computed-style diff: ${result.totalDiffs} (selector, prop) ` +
+            `tuples. Top properties: ${topProps}${RESET}`);
+        }
+      }
+
       console.log();
     }
 
@@ -843,6 +888,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       paintTree: paintTreeStatus,
       baselineSanity,
       domEquivalence: domEquivalenceReports.length > 0 ? domEquivalenceReports : undefined,
+      computedStyleDiff: computedStyleDiffReports.length > 0 ? computedStyleDiffReports : undefined,
       results,
       reportPath,
     };

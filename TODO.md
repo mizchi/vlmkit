@@ -214,10 +214,16 @@ small wrapper around already-built primitives, not a new subsystem.
   after" column. Verified on the 2026-05-12 dogfood data: shows
   10/10 viewports IMPROVED, net Δ -249.85%, every "1 layout-shift →
   no changes" transition recorded.
-- [ ] Computed-style channel in `migration-compare`. Already exists in
-  `css-challenge-bench`; lifting it surfaces semantically-different
-  CSS that pixel-matches (e.g. `> * + * { margin-top }` vs `flex
-  column + gap`).
+- [x] Computed-style channel in `migration-compare` (opt-in via
+  `--computed-style`). Reuses the existing capture script; per-fixture
+  baseline + variant snapshot are diffed into a `(selector, property,
+  before, after)` list plus by-property + by-selector aggregates.
+  Surfaced in `migration-report.json` under `computedStyleDiff` and
+  rendered as a "Top properties / Top selectors" section in
+  `vrt diff-for-agent`. Verified on dogfood Pass B iter 1: catches 46
+  tuples (border colors, radius, font-family, font-size on
+  `#notes/#owner/#title`) that pixel diff alone surfaced only as
+  generic `layout-shift`.
 - [ ] Stricter fix-candidate ranking. Today
   `10× .luna-actions { display }` is emitted even when the agent's
   CSS already has the right `display:` and the actual delta is
