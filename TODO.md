@@ -182,6 +182,39 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 - [ ] Animation detection (animation-play-state: paused / CSSOM diff)
 - [ ] External stylesheet breakpoint discovery
 
+### Agent-loop UX (from 2026-05-12 dogfood)
+
+From `docs/reports/2026-05-12-dogfood-shadcn-luna.md`. Each item is a
+small wrapper around already-built primitives, not a new subsystem.
+
+- [x] `vrt diff-for-agent <migration-report.json>` — one-context-window
+  Markdown summary combining diff %, dominant categories, fix candidates
+  aggregated by `(selector, property)` with viewport coverage, and
+  absolute paths to baseline/current/heatmap PNGs for the worst N
+  viewports. Verified on the 2026-05-12 dogfood Pass B data
+  (reproduces the table + 5 fix candidates the terminal truncated to 3).
+- [ ] DOM / a11y-tree equivalence pre-flight in `migration-compare`.
+  Catch "you accidentally changed the HTML" failures (which currently
+  show up as opaque layout-shift) before screenshots are taken.
+- [ ] Per-region shift detection — extend the existing `globalShift`
+  (single pixel offset for the whole frame) to per-element bounding
+  boxes so heatmap red-smears can be localized as
+  "`.luna-panel-head padding too small, shifts following 4 elements
+  down by 12px"`.
+- [ ] `vrt compare-runs <a.json> <b.json>` — pairwise migration-report
+  diff. "Viewport X went from 41% → 0%, dominant category
+  layout-shift → none" validates that the patch did what the agent
+  expected.
+- [ ] Computed-style channel in `migration-compare`. Already exists in
+  `css-challenge-bench`; lifting it surfaces semantically-different
+  CSS that pixel-matches (e.g. `> * + * { margin-top }` vs `flex
+  column + gap`).
+- [ ] Stricter fix-candidate ranking. Today
+  `10× .luna-actions { display }` is emitted even when the agent's
+  CSS already has the right `display:` and the actual delta is
+  `gap`/`flex-wrap`. Collapse the candidate label to the *changed*
+  property, not the most-mentioned selector.
+
 ### Playwright Integration
 - [ ] `nlAssert()` with Vision LLM
 - [ ] `onlyOnFailure` pattern

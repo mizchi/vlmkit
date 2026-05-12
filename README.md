@@ -84,6 +84,7 @@ just fix-loop --fixture page --seed 42
 ```bash
 vrt compare <before.html> <after.html>      # Migration VRT for files or URLs
                                              # ([--strict-baseline-sanity] to fail on broken baseline renders)
+vrt diff-for-agent <migration-report.json>  # Agent-friendly Markdown summary of a compare report
 vrt png-diff <baseline.png> <current.png>   # Direct PNG pixel diff + heatmap
 vrt snapshot <url1> [url2] ...              # Multi-viewport snapshot + diff
 vrt snapshot approve                        # Promote *-current.png to *-baseline.png
@@ -221,6 +222,27 @@ vrt smoke --url http://localhost:3000/ --max-actions 20 --record-video videos/
 
 Common flags: `--delay <ms>` controls per-frame duration (default 700),
 `--no-loop` stops at the last frame, `--no-autoplay` opens paused.
+
+#### Agent-friendly diff summary
+
+When a coding agent is iterating with `vrt compare`, the natural workflow
+(see [`docs/reports/2026-05-12-dogfood-shadcn-luna.md`](docs/reports/2026-05-12-dogfood-shadcn-luna.md))
+is: read the worst-viewport PNGs side-by-side, then write a CSS patch.
+`vrt diff-for-agent` collapses the inputs the agent needs into a single
+Markdown blob:
+
+```bash
+vrt compare --dir fixtures/migration/shadcn-to-luna \
+  --baseline before.html --variants working.html \
+  --output-dir test-results/iter1
+vrt diff-for-agent test-results/iter1/migration-report.json --max-viewports 2
+```
+
+The output contains: a worst-first diff table, category totals across
+viewports, fix candidates aggregated by `(selector, property)` with the
+number of viewports each is flagged on, and absolute paths to the
+baseline / current / heatmap PNGs for the worst N viewports — all in
+one context window.
 
 ### Workflow Commands
 
