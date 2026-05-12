@@ -208,10 +208,12 @@ small wrapper around already-built primitives, not a new subsystem.
   `[480–720]:+22px [720–960]:-94px [960–1348]:+32px`, replacing the
   single-line global average with localized per-section offsets.
   Verified on the 2026-05-12 dogfood Pass B iter 1 data.
-- [ ] `vrt compare-runs <a.json> <b.json>` — pairwise migration-report
-  diff. "Viewport X went from 41% → 0%, dominant category
-  layout-shift → none" validates that the patch did what the agent
-  expected.
+- [x] `vrt compare-runs <a.json> <b.json>` — pairwise migration-report
+  diff sorted by absolute movement, with IMPROVED/REGRESSED/UNCHANGED/
+  ADDED/REMOVED status per viewport and a category-summary "before →
+  after" column. Verified on the 2026-05-12 dogfood data: shows
+  10/10 viewports IMPROVED, net Δ -249.85%, every "1 layout-shift →
+  no changes" transition recorded.
 - [ ] Computed-style channel in `migration-compare`. Already exists in
   `css-challenge-bench`; lifting it surfaces semantically-different
   CSS that pixel-matches (e.g. `> * + * { margin-top }` vs `flex
