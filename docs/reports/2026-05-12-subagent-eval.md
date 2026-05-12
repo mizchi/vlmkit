@@ -302,13 +302,129 @@ of "the tool can't see my classes." The next wish-list pass
 (per-viewport capture + accumulation breakdown + scorer gate) is
 where the convergence threshold gets crossed.
 
-## Artifacts
+## Subagent D — addendum (after per-viewport DOM-position + rename map + strict gate)
 
-- `test-results/eval-subagent/A/working.html` — Subagent A's final CSS
-- `test-results/eval-subagent/A-iter1..A-final/` — A's intermediate reports
-- `test-results/eval-subagent/B/working.html` — Subagent B's final CSS
-- `test-results/eval-subagent/B-iter1..B-iter-final/` — B's intermediate reports
-- `test-results/eval-subagent/C/working.html` — Subagent C's final CSS
-- `test-results/eval-subagent/C-iter1..C-final/` — C's intermediate reports
+After Subagent C, three more tool changes landed:
 
-All three subagent transcripts are recorded in the SDK output files.
+- **Per-viewport DOM-position capture** — `--dom-position-diff` now
+  captures on every discovered viewport and splits the agent-report
+  section into "Universal deltas" (every viewport) vs
+  "Breakpoint-gated deltas" (only a subset → media-query mismatches).
+- **Class-rename map header summary** — every variant section opens
+  with a `(baseline class, variant class, positions, property
+  changes)` table.
+- **Tightened `Verified?` gate on heuristic fix candidates** — ✓
+  only when the exact `(selector, property)` pair appears in a real
+  delta; ✗ when the value already matches baseline. Backed by a new
+  `verifiedPairs` index serialized unconditionally so the entry caps
+  don't degrade accuracy.
+
+Fresh Subagent D, same forbidden-files list / 5-iter goal as A/B/C
+(D was allowed to run past 5 since it kept making progress).
+
+### Headline result
+
+| Subagent | Tooling | Worst | Best | Iters | Wall time | Clean (<1%) |
+|---|---|---|---|---|---|---|
+| A | new tooling, no DOM-position | 23.9% | 8.8% | 5 | ~12 min | 0/10 |
+| B | control, PNGs only | 13.3% | 8.0% | 5 | ~35–40 min | 0/15 |
+| C | A's + DOM-position (single viewport) | 17.33% | 7.12% | 5 | ~5–6 min | 0/10 |
+| **D** | **C's + per-viewport + rename map + strict gate** | **3.52%** | **0.11%** | **9** | **~12–15 min** | **6/10** |
+
+**First convergence in the eval series.** 6 of 10 viewports below
+1% (mobile, sample-546, below-768, at-768, sample-813, below-1024
+all under 0.21%). The 4 wide viewports remain at 2.67%–3.52%
+because a single +152px / +239px universal shift band at ≥ 1024 has
+no DOM-position delta explaining it.
+
+D ran 9 iterations instead of 5; A/B/C stopped at the cap because
+regressions piled up. D's 9-iter run is wall-time-equivalent to A's
+5-iter run (~12 min) since per-iteration analysis was cheaper with
+the richer report.
+
+### PNG reads compared to C
+
+C made heavy use of PNG inspection across the loop. D used PNG
+reads **only twice** (iter 1 to learn the visual intent + iter 5/6
+to chase the shift band). The other 6 iterations used the agent
+report JSON alone — exactly the workflow the tooling was built for.
+
+### What the new pipeline surfaced (D's narrative)
+
+- **Class-rename map at the top** "instantly told me 23 class
+  pairs. Without it I would have spent iter 2 cross-referencing
+  element positions to learn which luna-* class corresponded to
+  which shadcn class."
+- **Universal-vs-breakpoint-gated split** "immediately classified
+  `padding-left/right` on luna-page as a `@media (min-width:768px)`
+  issue rather than a base rule. Saved me at least one wrong patch."
+- **Per-viewport DOM-position diff** caught the desktop-only
+  metric-grid issue. "At only-desktop viewports the metric-grid
+  `grid-template-columns` was wrong, but at mobile it was right.
+  The '33 deltas appear only on a subset of viewports' line in
+  iter 2 directly pointed at the 4-column-vs-2-column metric grid."
+- **Strict `Verified?` column** "saved noise. The candidates
+  `*, *::before, *::after { margin }` showed ✗ because my reset
+  already zeroed them. I ignored them confidently instead of
+  repeatedly investigating."
+
+### The remaining floor — next unblock target
+
+The 4 wide viewports stuck at 2.67%–3.52% are explained by a single
+`+152px` (sometimes `+239px`) shift band at y ≥ 1024 that **no
+DOM-position delta explains**. D's diagnosis:
+
+> Universal deltas all relate to small (1–2px) widths from the grid
+> ratio. There's a 152–239px content shift happening but the report
+> attributes nothing to it. I suspect a missing `@media
+> (min-width:1024px)` rule changing some panel layout, but the
+> agent report doesn't surface it because the deltas at those
+> viewports are tiny per-element.
+
+This is the next concrete wish-list item: **vertical-shift origin
+diagnostic** — when a band reports `[y_start..y_end]: +N px`, name
+the first element whose computed `y` coordinate (or accumulated
+`top + height`) diverges between baseline and variant. With that
+hint, D estimated iter 7 (the metric-grid fix that took it from
+15→5%) would have happened in iter 5, and the 4 remaining wide
+viewports might converge in 1–2 more rounds.
+
+### Other gaps D surfaced
+
+- **Heuristic candidates marked ✗ should be dropped from output.**
+  Once unverified, the agent has no reason to look at them. Filter
+  out (or hide behind `--show-unverified`).
+- **Grid `fr` ratio inference.** When baseline shows `393.172px /
+  298.812px` between two grid children, the tool could suggest
+  `1.316fr 1fr` or back-solve to `7fr 5fr`.
+- **`display` for flex items is confusing.** A pill with
+  `display: inline-flex` may compute as `flex` because the parent
+  is a flex container; report just shows the raw computed value.
+- **Unit normalization.** `letter-spacing` in px scales with
+  font-size; the same `-0.03em` rule shows up as different px
+  values at different element sizes.
+- **Class-rename map "property changes" should dedupe by class.**
+  Today it counts per-element occurrence so a class with 4
+  instances on the page inflates the number 4×.
+
+### Honest takeaway after Subagent D
+
+The tooling has crossed a threshold. Of the 8 wish-list items
+shipped between A and D, D used 5 of them as primary signal in 6
+different iterations and reached 6/10 convergence without prior
+fixture exposure.
+
+The remaining gap (4 wide viewports plateaued at ~3%) is
+specifically about *what to fix when the DOM-position diff is
+already clean* — a different problem than "the tool can't see my
+classes." Vertical-shift origin diagnostic is the obvious next
+deliverable.
+
+## Artifacts (running list)
+
+- Subagent A: `test-results/eval-subagent/A/working.html` + `A-iter*/`
+- Subagent B: `test-results/eval-subagent/B/working.html` + `B-iter*/`
+- Subagent C: `test-results/eval-subagent/C/working.html` + `C-iter*/`
+- Subagent D: `test-results/eval-subagent/D/working.html` + `D-iter*/`
+
+All four subagent transcripts are recorded in the SDK output files.

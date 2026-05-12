@@ -226,11 +226,38 @@ small wrapper around already-built primitives, not a new subsystem.
   generic `layout-shift`.
 ### Agent-loop UX (from 2026-05-12 subagent eval)
 
-From `docs/reports/2026-05-12-subagent-eval.md`. Two fresh
-zero-context subagents (one with the new tooling, one without)
-*both* failed to converge after 5 iterations on the shadcn → luna
-fixture. The original Pass A/B/C numbers were inflated by my prior
-exposure to luna's spec values. These items are the gap.
+From `docs/reports/2026-05-12-subagent-eval.md`. After items
+1–4 below shipped, Subagent D reached **6/10 viewports converged
+under 1%** — the first `clean` result from any subagent in this
+fixture series. The remaining 4-viewport floor at 2.67–3.52%
+comes from a single unexplained +152px / +239px universal shift
+band at viewports ≥ 1024.
+
+- [ ] **Vertical-shift origin diagnostic.** Subagent D's exact
+  next-unblock request. When a band reports `[y_start..y_end]: +N
+  px`, name the first element whose computed `y` coordinate (or
+  accumulated `top + height`) diverges between baseline and
+  variant. Requires per-element bounding-box capture (browser-side)
+  and a tree-walking accumulator. With this hint, D estimated the
+  metric-grid fix it found in iter 7 would have happened in iter 5
+  and the 4 remaining wide viewports might converge in 1–2 more
+  rounds.
+- [ ] **Drop ✗ heuristic candidates from `vrt diff-for-agent`.**
+  Once a candidate is marked unverified, the agent has no reason
+  to look at it. Filter out by default; hide behind
+  `--show-unverified` for debugging.
+- [ ] **Grid `fr`-ratio inference.** When baseline shows children
+  at `393.172px / 298.812px` inside a grid container, suggest
+  `grid-template-columns: 1.316fr 1fr` (or `7fr 5fr` etc).
+- [ ] **`display` context note for flex items.** A pill with
+  `display: inline-flex` computes as `flex` when its parent is a
+  flex container. Annotate so agents don't chase a delta that
+  isn't a rule change.
+- [ ] **Unit-normalized property reporting.** `letter-spacing` etc.
+  surface in px even when the rule is in `em`; normalize so one
+  `em` rule doesn't read as N independent px values across sizes.
+- [ ] **De-dupe `property changes` in class-rename map by class.**
+  A class with 4 instances on the page inflates the count 4×.
 
 - [x] **DOM-position-based selector alignment** in a new
   `src/dom-position-styles.ts`. `migration-compare --dom-position-diff`
