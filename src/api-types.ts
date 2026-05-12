@@ -323,6 +323,8 @@ export interface SmokeTestRequest {
   blockExternalNavigation?: boolean;
   /** LLM provider (reasoning mode) */
   llmProvider?: string;
+  /** Record the session as WebM (Playwright recordVideo). Absolute or relative dir. */
+  recordVideo?: { dir: string; widthHint?: number; heightHint?: number };
 }
 
 export interface SmokeTestResponse {
@@ -381,6 +383,8 @@ export interface SmokeTestMeta {
   elapsedMs: number;
   seed?: number;
   mode: "random" | "reasoning";
+  /** Path to the recorded WebM, if --record-video was enabled. */
+  videoPath?: string;
 }
 
 // ---- Report API ----

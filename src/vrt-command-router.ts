@@ -55,6 +55,7 @@ const ROOT_MODULE_COMMANDS: Record<string, string> = {
   snapshot: "./snapshot.ts",
   elements: "./element-compare.ts",
   smoke: "./smoke-runner.ts",
+  flipbook: "./flipbook-cli.ts",
 };
 
 const WORKFLOW_ALIAS_COMMANDS = new Set<WorkflowCommand>([

@@ -26,6 +26,7 @@ import {
   type StabilityIterationResult,
 } from "./snapshot-stability.ts";
 import { resolveCaptureBackend, type CaptureBackend } from "./capturer.ts";
+import { writeFlipbook, type FlipbookFrame } from "./flipbook.ts";
 import type { VrtSnapshot } from "./types.ts";
 
 const DEFAULT_SNAPSHOT_CONFIG_FILE = "vrt.config.json";
@@ -184,6 +185,8 @@ async function runStability(options: {
   fpThreshold: number;
   configPath?: string;
   backend: CaptureBackend;
+  flipbook?: boolean;
+  flipbookDelayMs?: number;
 }) {
   if (options.urls.length === 0) {
     throw new Error("No URLs provided for stability run. Pass URLs directly or configure routes in vrt.config.json.");
@@ -292,6 +295,44 @@ async function runStability(options: {
   const reportPath = join(options.outputDir, "stability-report.json");
   await writeFile(reportPath, JSON.stringify(report, null, 2));
   console.log(`  ${DIM}Report: ${reportPath}${RESET}`);
+
+  if (options.flipbook) {
+    const flipDir = join(options.outputDir, "flipbooks");
+    await mkdir(flipDir, { recursive: true });
+    const delayMs = options.flipbookDelayMs ?? 700;
+    const generated: string[] = [];
+    // Group iterations by (label, viewport). iteration 0 → baseline.png.
+    const groups = new Map<string, FlipbookFrame[]>();
+    for (const r of iterations) {
+      const key = `${r.label}::${r.viewport}`;
+      const frame: FlipbookFrame = r.iteration === 0
+        ? {
+            path: join(options.outputDir, `${r.label}-${r.viewport}-baseline.png`),
+            label: "iter 0",
+            sublabel: "baseline",
+          }
+        : {
+            path: join(options.outputDir, `${r.label}-${r.viewport}-iter${r.iteration}.png`),
+            label: `iter ${r.iteration}`,
+            sublabel: `${(r.diffRatio * 100).toFixed(2)}% diff`,
+          };
+      const list = groups.get(key);
+      if (list) list.push(frame); else groups.set(key, [frame]);
+    }
+    for (const [key, frames] of groups) {
+      const [label, viewport] = key.split("::") as [string, string];
+      const safe = `${label}-${viewport}-stability`.replace(/[/\\:]/g, "_");
+      const outPath = join(flipDir, `${safe}.html`);
+      await writeFlipbook(outPath, frames, {
+        title: `${label} / ${viewport} (${options.iterations} iterations)`,
+        delayMs,
+        autoplay: true,
+        loop: true,
+      });
+      generated.push(outPath);
+    }
+    console.log(`  ${DIM}Flipbooks: ${generated.length} written to ${flipDir}${RESET}`);
+  }
   console.log();
 
   if (options.failAboveRate !== undefined && report.overallFalsePositiveRate > options.failAboveRate) {
@@ -299,6 +340,74 @@ async function runStability(options: {
     console.log();
     process.exitCode = 1;
   }
+}
+
+async function runDiffFlipbook(options: {
+  outputDir: string;
+  labels: string[];
+  delayMs: number;
+  flipbookOutDir?: string;
+  configPath?: string;
+}) {
+  const reportPath = join(options.outputDir, "snapshot-report.json");
+  let raw: string;
+  try {
+    raw = await readFile(reportPath, "utf-8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new Error(`No snapshot report found at ${reportPath}. Run \`vrt snapshot <url...>\` first.`);
+    }
+    throw error;
+  }
+
+  const report = JSON.parse(raw) as { results: Array<{
+    label: string; viewport: string; screenshotPath: string;
+    baselinePath?: string; diffRatio?: number; isNew?: boolean;
+  }> };
+
+  const filter = options.labels.length > 0 ? new Set(options.labels) : undefined;
+  const baseOut = resolve(options.flipbookOutDir ?? join(options.outputDir, "flipbooks"));
+  await mkdir(baseOut, { recursive: true });
+
+  const generated: string[] = [];
+  for (const entry of report.results) {
+    if (entry.isNew) continue;
+    if ((entry.diffRatio ?? 0) === 0) continue;
+    if (filter && !filter.has(entry.label)) continue;
+
+    const baselinePath = entry.baselinePath ?? entry.screenshotPath.replace(/-current\.png$/, "-baseline.png");
+    const currentPath = entry.screenshotPath;
+    const safeName = `${entry.label}-${entry.viewport}`.replace(/[/\\:]/g, "_");
+    const heatmapPath = join(options.outputDir, `${safeName}_heatmap.png`);
+
+    const frames: FlipbookFrame[] = [
+      { path: baselinePath, label: "baseline", sublabel: "saved baseline" },
+      { path: currentPath, label: "current", sublabel: `${((entry.diffRatio ?? 0) * 100).toFixed(2)}% diff` },
+    ];
+    if (existsSync(heatmapPath)) {
+      frames.push({ path: heatmapPath, label: "heatmap", sublabel: "pixel diff overlay" });
+    }
+
+    const outPath = join(baseOut, `${safeName}.html`);
+    await writeFlipbook(outPath, frames, {
+      title: `${entry.label} / ${entry.viewport}`,
+      delayMs: options.delayMs,
+      autoplay: true,
+      loop: true,
+    });
+    generated.push(outPath);
+  }
+
+  console.log();
+  console.log(`${BOLD}${CYAN}Snapshot Diff Flipbooks${RESET}`);
+  console.log(`  ${DIM}Output: ${baseOut}${RESET}`);
+  console.log(`  ${DIM}Generated: ${generated.length}${RESET}`);
+  if (options.configPath) console.log(`  ${DIM}Config: ${options.configPath}${RESET}`);
+  for (const g of generated) console.log(`  ${GREEN}${g}${RESET}`);
+  if (generated.length === 0) {
+    console.log(`  ${YELLOW}No entries with non-zero diff — nothing to render.${RESET}`);
+  }
+  console.log();
 }
 
 async function main() {
@@ -328,6 +437,17 @@ async function main() {
     return;
   }
 
+  if (parsed.mode === "flipbook") {
+    await runDiffFlipbook({
+      outputDir,
+      labels: parsed.labels,
+      delayMs: parsed.flipbook!.delayMs,
+      flipbookOutDir: parsed.flipbook!.outDir,
+      configPath,
+    });
+    return;
+  }
+
   const { backend: captureBackend, source: backendSource } = resolveCaptureBackend({
     backendFlag: parsed.backend,
   });
@@ -344,6 +464,7 @@ async function main() {
       fpThreshold: parsed.stability!.fpThreshold,
       configPath,
       backend: captureBackend,
+      flipbook: parsed.stability!.flipbook,
     });
     return;
   }

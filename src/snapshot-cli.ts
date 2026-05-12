@@ -33,7 +33,7 @@ export interface SnapshotConfig {
 }
 
 export interface ParsedSnapshotCliOptions {
-  mode: "capture" | "approve" | "fix-prompt" | "stability";
+  mode: "capture" | "approve" | "fix-prompt" | "stability" | "flipbook";
   urls: string[];
   labels: string[];
   outputDir: string;
@@ -53,6 +53,11 @@ export interface ParsedSnapshotCliOptions {
     iterations: number;
     failAboveRate?: number;
     fpThreshold: number;
+    flipbook?: boolean;
+  };
+  flipbook?: {
+    delayMs: number;
+    outDir?: string;
   };
 }
 
@@ -164,6 +169,9 @@ export function parseSnapshotCliArgs(
   let stabilityIterations = 3;
   let stabilityFailAboveRate: number | undefined;
   let stabilityFpThreshold = 0;
+  let stabilityFlipbook = false;
+  let flipbookDelayMs = 700;
+  let flipbookOutDir: string | undefined;
   let backend: string | undefined;
 
   for (let i = 0; i < cliArgs.length; i++) {
@@ -270,6 +278,22 @@ export function parseSnapshotCliArgs(
         backend = value;
         break;
       }
+      case "--flipbook":
+        stabilityFlipbook = true;
+        break;
+      case "--delay": {
+        const value = cliArgs[++i];
+        const n = value == null ? NaN : Number(value);
+        if (!Number.isFinite(n) || n < 50) throw new Error("Invalid --delay value (must be >= 50)");
+        flipbookDelayMs = n;
+        break;
+      }
+      case "--flipbook-out": {
+        const value = cliArgs[++i];
+        if (!value) throw new Error("Missing value for --flipbook-out");
+        flipbookOutDir = value;
+        break;
+      }
       case "--help":
       case "-h":
         break;
@@ -325,6 +349,29 @@ export function parseSnapshotCliArgs(
         iterations: stabilityIterations,
         failAboveRate: stabilityFailAboveRate,
         fpThreshold: stabilityFpThreshold,
+        flipbook: stabilityFlipbook,
+      },
+      backend,
+    };
+  }
+
+  if (positional[0] === "flipbook") {
+    if (positional.length > 1) {
+      throw new Error("`vrt snapshot flipbook` does not accept positional URLs");
+    }
+    return {
+      mode: "flipbook",
+      urls: [],
+      labels: explicitLabels,
+      outputDir,
+      threshold,
+      failOnDiff,
+      failOnNewBaseline,
+      maxDiffRatio,
+      maskSelectors: maskSelectors.length > 0 ? maskSelectors : (config.mask ?? []),
+      flipbook: {
+        delayMs: flipbookDelayMs,
+        outDir: flipbookOutDir,
       },
       backend,
     };

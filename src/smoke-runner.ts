@@ -10,7 +10,7 @@
  *   node src/smoke-runner.ts --url https://example.com --max-actions 20
  *   node src/smoke-runner.ts --file fixtures/css-challenge/page.html --seed 42
  */
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { chromium, type Page, type Browser } from "playwright";
 import type {
   SmokeTestRequest, SmokeTestResponse, SmokeAction, SmokeError,
@@ -27,6 +27,7 @@ const FILE_ARG = getArg("file", args[0] && !args[0].startsWith("--") ? args[0] :
 const MAX_ACTIONS = parseInt(getArg("max-actions", "30"), 10);
 const SEED = parseInt(getArg("seed", String(Date.now())), 10);
 const MODE = getArg("mode", "random") as "random" | "reasoning";
+const RECORD_VIDEO_DIR = getArg("record-video", "");
 const VIEWPORT = { width: 1280, height: 900 };
 
 // ---- Random ----
@@ -178,7 +179,24 @@ export async function runSmokeTest(
     };
   }
 
-  const page = await browser.newPage({ viewport: VIEWPORT });
+  // recordVideo only works when configured on the context (not directly on a Page).
+  const recordingDir = request.recordVideo?.dir;
+  if (recordingDir) {
+    await mkdir(recordingDir, { recursive: true });
+  }
+  const context = await browser.newContext({
+    viewport: VIEWPORT,
+    recordVideo: recordingDir
+      ? {
+          dir: recordingDir,
+          size: {
+            width: request.recordVideo?.widthHint ?? VIEWPORT.width,
+            height: request.recordVideo?.heightHint ?? VIEWPORT.height,
+          },
+        }
+      : undefined,
+  });
+  const page = await context.newPage();
 
   // Block external navigation
   if (request.blockExternalNavigation !== false) {
@@ -376,6 +394,21 @@ ACTION: click ROLE: button NAME: Submit`;
   const finalSnap = await buildA11ySnapshot(page, actions.length);
   if (finalSnap) snapshots.push(finalSnap);
 
+  // Capture the recording path before closing the context (close finalizes the WebM).
+  let videoPath: string | undefined;
+  if (recordingDir) {
+    try {
+      const v = page.video();
+      if (v) {
+        await page.close();
+        await context.close();
+        videoPath = await v.path();
+      }
+    } catch {
+      // ignore — best-effort recording
+    }
+  }
+
   await browser.close();
 
   const hasCrash = errors.some((e) => e.type === "crash");
@@ -392,6 +425,7 @@ ACTION: click ROLE: button NAME: Submit`;
       elapsedMs: Date.now() - startTime,
       seed: request.seed,
       mode: request.mode,
+      videoPath,
     },
   };
 }
@@ -427,6 +461,7 @@ async function main() {
     maxActions: MAX_ACTIONS,
     seed: SEED,
     blockExternalNavigation: true,
+    recordVideo: RECORD_VIDEO_DIR ? { dir: RECORD_VIDEO_DIR } : undefined,
   });
 
   // Print actions
@@ -452,6 +487,9 @@ async function main() {
   console.log();
   console.log(`  ${BOLD}Result: ${result.status === "pass" ? GREEN : RED}${result.status.toUpperCase()}${RESET}`);
   console.log(`  ${DIM}Actions: ${result.meta.totalActions} | Errors: ${result.meta.totalErrors} | Time: ${result.meta.elapsedMs}ms${RESET}`);
+  if (result.meta.videoPath) {
+    console.log(`  ${DIM}Video: ${GREEN}${result.meta.videoPath}${RESET}`);
+  }
   console.log();
 
   process.exit(result.status === "pass" ? 0 : 1);

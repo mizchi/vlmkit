@@ -89,6 +89,9 @@ vrt snapshot <url1> [url2] ...              # Multi-viewport snapshot + diff
 vrt snapshot approve                        # Promote *-current.png to *-baseline.png
 vrt snapshot fix-prompt                     # Emit a subagent-ready prompt from snapshot-report.json
 vrt snapshot stability <url...>             # Run N iterations and report false-positive rate
+vrt snapshot flipbook                       # Diff three-frame (baseline ↔ current ↔ heatmap) HTML flipbooks
+vrt flipbook <frame1.png> ...               # Assemble arbitrary PNG sequence into a single-file HTML flipbook
+vrt smoke --record-video <dir>              # Capture a WebM video of the smoke-test session (Playwright recordVideo)
 vrt elements [options]                      # Element-level diff with shift isolation
 vrt smoke <file-or-url>                     # A11y-driven random interaction test
 vrt discover <html-file>                    # Breakpoint discovery from HTML/CSS
@@ -188,6 +191,36 @@ For the Cloudflare backend, additional env vars are required:
 
 See `examples/vrt-snapshot-cloudflare.workflow.yml` for a complete GitHub
 Actions template that skips the local Playwright install step.
+
+#### Visualizing the VRT process — flipbooks + video
+
+The VRT process can be saved as a self-contained HTML "flipbook" (PNGs
+embedded as base64, vanilla-JS play/pause/scrub controls). One file
+per scenario, no external assets, opens in any browser, attachable to
+PRs:
+
+```bash
+# 1. Fix-loop convergence (or any ordered PNG sequence)
+vrt flipbook round-0.png round-1.png round-2.png \
+  --label "round 0" --label "round 1" --label "round 2" \
+  --title "Fix-loop convergence" --out fix-loop.html
+
+# 2. Diff three-frame (baseline ↔ current ↔ heatmap) for every regressed entry
+vrt snapshot flipbook --output test-results/snapshots
+# → test-results/snapshots/flipbooks/<label>-<viewport>.html
+
+# 3. Stability iterations as flipbook per (URL, viewport)
+vrt snapshot stability http://localhost:3000/ \
+  --iterations 5 --flipbook --output test-results/stability
+# → test-results/stability/flipbooks/<label>-<viewport>-stability.html
+
+# 4. WebM recording of a smoke-test session (Playwright recordVideo)
+vrt smoke --url http://localhost:3000/ --max-actions 20 --record-video videos/
+# → videos/<hash>.webm
+```
+
+Common flags: `--delay <ms>` controls per-frame duration (default 700),
+`--no-loop` stops at the last frame, `--no-autoplay` opens paused.
 
 ### Workflow Commands
 
