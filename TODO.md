@@ -224,6 +224,45 @@ small wrapper around already-built primitives, not a new subsystem.
   tuples (border colors, radius, font-family, font-size on
   `#notes/#owner/#title`) that pixel diff alone surfaced only as
   generic `layout-shift`.
+### Agent-loop UX (from 2026-05-12 subagent eval)
+
+From `docs/reports/2026-05-12-subagent-eval.md`. Two fresh
+zero-context subagents (one with the new tooling, one without)
+*both* failed to converge after 5 iterations on the shadcn → luna
+fixture. The original Pass A/B/C numbers were inflated by my prior
+exposure to luna's spec values. These items are the gap.
+
+- [ ] **DOM-position-based selector alignment** in
+  `diffComputedStyles`. Today selectors are matched by literal
+  string, so a class rename (`.card` → `.luna-panel`) produces
+  zero verified entries — the *exact* migration-VRT scenario. Pair
+  selectors that share DOM coordinates + child structure when
+  literal-string match fails. Without this, `--computed-style`
+  has near-zero value on rename migrations.
+- [ ] **Per-element / per-section diffRatio**. Today granularity
+  bottoms out at the viewport. "Hero 0.4%, Panel 1.2%, Modal 4.0%"
+  would let the agent target the worst offender. Both subagents
+  independently asked for this.
+- [ ] **Element bounding-box diff** that names the responsible
+  CSS axis. "Your `.luna-panel:nth-of-type(1)` is 50px taller
+  than baseline; candidate properties affecting height:
+  `padding`, `line-height`, `font-size`."
+- [ ] **Color samples on color-change category**. Today "1
+  color-change" is recorded without naming the colors. Surface
+  hex pairs (e.g. `(80,1040) was #6b7280, baseline is #8c9099`).
+- [ ] **Regression alarm + auto-revert offer.** When net Δ is
+  positive across most viewports after a patch, surface loudly.
+  Both subagents wasted an iteration on a regression that needed
+  manual reverting.
+- [ ] **Per-viewport computed-style capture + label.** CSD today
+  is a single global sample with no viewport tag. Capture per
+  viewport and surface which width produced each tuple — both
+  subagents struggled to know which.
+- [ ] **Widen computed-style selector coverage** to include class
+  selectors declared in the variant's CSS. (Prerequisite for
+  item #1 above.) Already on the wish-list from Pass C; the
+  subagent eval reinforces its priority.
+
 - [x] Heuristic fix-candidate ranking now reconciles with computed-style.
   `vrt diff-for-agent` renames the heuristic table to "Heuristic fix
   candidates" with a per-row `Verified?` column (✓ when the
