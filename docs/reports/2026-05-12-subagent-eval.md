@@ -180,11 +180,135 @@ combined list — DOM-position-based selector alignment so the
 computed-style channel actually captures the class-renamed
 selectors that make up the bulk of the migration.
 
+## Subagent C — addendum (same day, after shipping `--dom-position-diff`)
+
+After A's eval, I shipped `src/dom-position-styles.ts` plus the
+`migration-compare --dom-position-diff` flag — the wish-list #1 item
+that closes the "class-rename blind spot" both subagents flagged.
+The new "Verified deltas by DOM position (class-rename-aware)"
+section in `vrt diff-for-agent` lists tuples like
+`body[0]>main[0]>section[0]>span[0] eyebrow → luna-pill
+text-transform none → uppercase`, matched by DOM tree position
+rather than literal selector string.
+
+Re-ran a fresh subagent with the same constraints as A (forbidden
+files, 5-iter cap, no peeking at answers) but with
+`--dom-position-diff` enabled.
+
+### Result
+
+| Subagent | Tooling | Final worst | Final best | Iters | Wall time |
+|---|---|---|---|---|---|
+| A | new tooling, no DOM-position | 23.9% (mobile) | 8.8% | 5 | ~12 min |
+| B | control, PNGs only | 13.3% (sample-481) | 8.0% | 5 | ~35–40 min |
+| **C** | **A's tooling + `--dom-position-diff`** | **17.33% (sample-1162)** | **7.12% (below-768)** | **5** | **~5–6 min** |
+
+C did **not** reach `clean (10/10)` either, but the wall time is
+half of A's and a quarter of B's, on the same fixture with the same
+constraints. The remaining gaps are explainable and concrete.
+
+### What `--dom-position-diff` unlocked (C's words)
+
+> The class-rename diff was almost every property except
+> `#title/#owner/#notes`. The `--computed-style` diff was only 31
+> tuples (all input fields). It found zero deltas on
+> `.luna-pill / .luna-panel / .luna-action / .luna-metric` etc.
+> because the baseline classes don't exist as selectors in my
+> variant — the string-match selector diff has no way to align them.
+>
+> The class-rename map itself: `eyebrow → luna-pill`,
+> `card → luna-panel`, `card-header → luna-panel-head`,
+> `metric → luna-metric`, `dialog-shell → luna-overlay`,
+> `dialog-card → luna-modal`, `button-row → luna-actions`,
+> `button button-outline → luna-action luna-action-ghost`, etc.
+> This map was the single most valuable artifact — it gave me the
+> entire luna→shadcn mental model in one table.
+
+Iter 1 alone moved the variant from 10–37% diff (the after-blank
+starting point) to 4–37% with a single patch applied wholesale
+from the DOM-position dump. By iter 3 the DOM-position diff was
+"very short now (~16 unique pairs)" — i.e. the agent had captured
+most class-level deltas in two rounds.
+
+### Why C plateaued at 7–17% (the next concrete gaps)
+
+1. **DOM-position diff is captured at a single viewport (mobile).**
+   `max-width`, `grid-template-columns`, and media-query-gated
+   properties surface at the mobile resolved value only. C
+   explicitly: "Two of my five iterations were wasted [guessing the
+   desktop-side breakpoint behavior]." This is the #1 unblocker.
+2. **Layout shifts have no root-cause decomposition.** After iter
+   4 the DOM-position diff was nearly clean but a stubborn
+   `[720-1047]:+99px` band remained. C: "the right column's
+   vertical position was off, but the tool couldn't say 'this is
+   because left column accumulated 18px×N from metric/panel-body
+   heights'." Height residuals are downstream effects of upstream
+   font/line-height mismatches; a vertical-accumulation breakdown
+   would shorten the loop substantially.
+3. **Fix Candidates remain misleading.** "10x `.luna-action {
+   align-items }`" was flagged but C's iter 2 already had
+   `display: flex; align-items: center` correct. The heuristic
+   keeps surfacing rules whose computed value matches the baseline,
+   because the candidate scorer looks at "declarations in the
+   dominant-category bucket" not "declarations that actually
+   differ."
+4. **200-entry truncation hides per-instance values.** The 200-row
+   cap on `entries` repeats the same 4 cards / 4 metrics / 4
+   buttons in slightly-different positions, leaving only ~23 unique
+   paths visible. Bumping the cap or de-duping by class-pair would
+   help.
+
+### New wish-list (added to TODO from C's findings)
+
+The original 7 items from the A+B eval are still all relevant.
+C adds:
+
+- **Per-viewport DOM-position capture** (`--dom-position-diff
+  --capture-viewports mobile,desktop` or all). Single-viewport
+  capture is the #1 remaining blocker by C's count.
+- **Vertical accumulation breakdown for shift bands.** "+99px at
+  band y=720-1047 in right column" → "left column accumulated
+  height: -9px × 4 metrics, -1.5px × 3 panel-title lh, …"
+- **Class-rename map as header summary.** Surface the 23 path
+  pairs as a header table at the top of `diff-for-agent` output
+  rather than scattered inline.
+- **De-dupe / cap-tuning of `domPositionDiff.entries`** so the
+  200-tuple budget doesn't get spent on 4 copies of the same
+  card-shape.
+- **Fix-candidate scorer needs a "value actually differs" gate.**
+  Today the score is "declaration X matches dominant category Y";
+  it should also be "and X's computed value differs in the
+  baseline-vs-variant capture." We have that data — the gate just
+  isn't wired in.
+- **"Missing CSS rule" output.** "Baseline `.eyebrow` declares
+  `text-transform: uppercase`; your variant has no rule producing
+  that on `.luna-pill`." Specced-vs-computed, not just
+  computed-vs-computed.
+
+### Honest takeaway after Subagent C
+
+`--dom-position-diff` is doing exactly what it was meant to: it
+closes the class-rename gap that made A's report dominated by
+"unverifiable heuristic candidates." C converged toward the
+fixture's spec **in half the wall time of A**, on the same fixture
+with worse signal access (A could read the prior `--computed-style`
+table for `#title/#owner/#notes`; C had to rely entirely on the
+new section).
+
+But neither A nor C hit `clean (10/10)`. The 7–17% floor C
+reached is real — and the reasons are now concrete (single-viewport
+capture, accumulated-height residuals, fix-candidate noise) instead
+of "the tool can't see my classes." The next wish-list pass
+(per-viewport capture + accumulation breakdown + scorer gate) is
+where the convergence threshold gets crossed.
+
 ## Artifacts
 
 - `test-results/eval-subagent/A/working.html` — Subagent A's final CSS
 - `test-results/eval-subagent/A-iter1..A-final/` — A's intermediate reports
 - `test-results/eval-subagent/B/working.html` — Subagent B's final CSS
 - `test-results/eval-subagent/B-iter1..B-iter-final/` — B's intermediate reports
+- `test-results/eval-subagent/C/working.html` — Subagent C's final CSS
+- `test-results/eval-subagent/C-iter1..C-final/` — C's intermediate reports
 
-Both subagent transcripts are recorded in the SDK output files.
+All three subagent transcripts are recorded in the SDK output files.

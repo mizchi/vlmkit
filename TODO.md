@@ -245,6 +245,40 @@ exposure to luna's spec values. These items are the gap.
   `eyebrow` ↔ variant `luna-pill`, baseline `dialog-card` ↔
   variant `luna-modal`). The exact gap subagent A flagged is now
   closed.
+- [ ] **Per-viewport DOM-position capture.** Subagent C's words: "the
+  single biggest gap." Today `--dom-position-diff` captures on the
+  first viewport only (mobile), so `max-width`,
+  `grid-template-columns`, and media-query-gated values surface
+  only at that width. Capture per discovered viewport (or accept a
+  `--capture-viewports` flag) and label each tuple with the
+  viewport it came from.
+- [ ] **Vertical-accumulation breakdown for layout-shift bands.**
+  After C's iter 4 the DOM-position diff was nearly clean but
+  `[720-1047]:+99px` persisted. Today the band reports the *shift*,
+  not the *cause*. Decompose: "the +99px shift in band Y is
+  explained by upstream accumulated height delta: `.luna-metric`
+  −9px × 4 + `.luna-panel-title` line-height −1.5px × 3 …".
+- [ ] **Class-rename map as a header summary table** at the top of
+  `vrt diff-for-agent`. Today the path pairs are scattered inline
+  in the entries table; a dedicated `baseline class ↔ variant
+  class` map (deduped per class-pair) is the most valuable
+  artifact C surfaced and deserves first billing.
+- [ ] **De-dupe / re-cap `domPositionDiff.entries`.** The 200-tuple
+  cap currently spends most of its budget on 4 repeats of each
+  card / metric / button shape. Group by class-pair before
+  truncating so unique deltas dominate.
+- [ ] **Fix-candidate scorer needs a "value actually differs" gate.**
+  Today candidates are scored by category bucket alone, so the
+  agent sees `.luna-action { align-items }` even when its computed
+  value matches the baseline. Add the computed-style or
+  DOM-position result as a gating signal — drop candidates whose
+  property is unchanged in either capture.
+- [ ] **"Missing CSS rule" output.** Specced-vs-computed: "Baseline
+  `.eyebrow` declares `text-transform: uppercase`; your variant has
+  no rule producing that on `.luna-pill`." Today the tool emits
+  computed-vs-computed but doesn't tell the agent which baseline
+  selector is missing on the variant side.
+
 - [ ] **Per-element / per-section diffRatio**. Today granularity
   bottoms out at the viewport. "Hero 0.4%, Panel 1.2%, Modal 4.0%"
   would let the agent target the worst offender. Both subagents
