@@ -72,6 +72,22 @@ export interface DfaDpSummary {
   };
 }
 
+export interface DfaDpPerViewportSummary {
+  variantFile: string;
+  result: {
+    totalDiffs: number;
+    byViewport: Array<{ viewport: string; count: number }>;
+    byPathProperty: Array<{
+      path: string;
+      property: string;
+      baselineClasses: string;
+      variantClasses: string;
+      viewports: string[];
+      samples: Array<{ viewport: string; baseline: string; variant: string }>;
+    }>;
+  };
+}
+
 export interface DfaReport {
   dir: string;
   baseline: string;
@@ -80,6 +96,7 @@ export interface DfaReport {
   results: DfaResult[];
   computedStyleDiff?: DfaCsdSummary[];
   domPositionDiff?: DfaDpSummary[];
+  domPositionDiffPerViewport?: DfaDpPerViewportSummary[];
   /** Absolute path of the report file (used to resolve sibling PNGs). */
   reportPath?: string;
 }
@@ -284,6 +301,62 @@ export function formatMigrationReportForAgent(
       lines.push(`- Current : \`${paths.current}\``);
       lines.push(`- Heatmap : \`${paths.heatmap}\``);
       lines.push("");
+    }
+
+    const dpPvSummary = (report.domPositionDiffPerViewport ?? []).find((d) => d.variantFile === variantFile);
+    if (dpPvSummary && dpPvSummary.result.totalDiffs > 0) {
+      lines.push("### Verified deltas by DOM position × viewport (catches media-query gaps)");
+      lines.push("");
+      const viewportCount = dpPvSummary.result.byViewport.length;
+      const pairs = dpPvSummary.result.byPathProperty;
+      const universal = pairs.filter((p) => p.viewports.length === viewportCount).length;
+      const gated = pairs.length - universal;
+      lines.push(`Total: **${dpPvSummary.result.totalDiffs}** tuples across **${viewportCount}** viewport(s).` +
+        ` ${universal} (path, property) pair(s) differ on *every* viewport (most likely a base CSS rule);` +
+        ` **${gated}** differ on only a subset (likely media-query-gated).`);
+      lines.push("");
+
+      lines.push("#### Universal deltas (apply on every viewport — fix the base rule)");
+      lines.push("");
+      const universalPairs = pairs.filter((p) => p.viewports.length === viewportCount).slice(0, 20);
+      if (universalPairs.length > 0) {
+        lines.push("| Position | Baseline class | Variant class | Property | Baseline | Variant |");
+        lines.push("|---|---|---|---|---|---|");
+        for (const pp of universalPairs) {
+          const sample = pp.samples[0]!;
+          const bcls = pp.baselineClasses || "_(none)_";
+          const vcls = pp.variantClasses || "_(none)_";
+          lines.push(`| \`${pp.path}\` | \`${bcls}\` | \`${vcls}\` | \`${pp.property}\` | \`${sample.baseline}\` | \`${sample.variant}\` |`);
+        }
+      } else {
+        lines.push("_(none)_");
+      }
+      lines.push("");
+
+      if (gated > 0) {
+        lines.push("#### Breakpoint-gated deltas (likely a missing / wrong `@media` rule)");
+        lines.push("");
+        const gatedPairs = pairs.filter((p) => p.viewports.length < viewportCount).slice(0, 20);
+        lines.push("| Position | Baseline class | Variant class | Property | Affected viewports | Sample baseline → variant |");
+        lines.push("|---|---|---|---|---|---|");
+        for (const pp of gatedPairs) {
+          const bcls = pp.baselineClasses || "_(none)_";
+          const vcls = pp.variantClasses || "_(none)_";
+          const vps = pp.viewports.join(", ");
+          // Show the first sample's values; samples may differ across viewports.
+          const sample = pp.samples[0]!;
+          lines.push(`| \`${pp.path}\` | \`${bcls}\` | \`${vcls}\` | \`${pp.property}\` | ${vps} | \`${sample.baseline}\` → \`${sample.variant}\` |`);
+        }
+        lines.push("");
+      }
+
+      if (dpPvSummary.result.byViewport.length > 0) {
+        lines.push("Per-viewport totals (worst first):");
+        for (const v of dpPvSummary.result.byViewport.slice(0, 8)) {
+          lines.push(`- \`${v.viewport}\` — ${v.count} tuple(s)`);
+        }
+        lines.push("");
+      }
     }
 
     const dpSummary = (report.domPositionDiff ?? []).find((d) => d.variantFile === variantFile);

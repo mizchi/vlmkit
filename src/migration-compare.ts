@@ -73,9 +73,11 @@ import { buildComputedStyleCaptureJsonExpression, parseComputedStyleSnapshot } f
 import { diffComputedStyles, type CsdResult, type ComputedStyleSnapshot } from "./computed-style-diff.ts";
 import {
   diffDomPositionStyles,
+  diffPositionStylesAcrossViewports,
   DOM_POSITION_STYLES_BROWSER_SCRIPT,
   parseDomPositionStyles,
   type DpResult,
+  type DpPerViewportResult,
   type PositionedElement,
 } from "./dom-position-styles.ts";
 
@@ -291,6 +293,11 @@ export interface MigrationCompareReport {
     variantFile: string;
     result: DpResult;
   }>;
+  /** Cross-viewport DOM-position diff: surfaces media-query-gated deltas. */
+  domPositionDiffPerViewport?: Array<{
+    variantFile: string;
+    result: DpPerViewportResult;
+  }>;
   results: MigrationCompareResult[];
   reportPath: string;
 }
@@ -467,6 +474,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     let baselineDomFingerprint: DomFingerprint | undefined;
     let baselineComputedStyles: ComputedStyleSnapshot | undefined;
     let baselineDomPositionStyles: PositionedElement[] | undefined;
+    const baselineDomPositionByVp = new Map<string, PositionedElement[]>();
     const domEnabled = options.domEquivalenceCheck ?? true;
     const csdEnabled = options.computedStyleDiff ?? false;
     const dpEnabled = options.domPositionDiff ?? false;
@@ -547,13 +555,16 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         }
       }
 
-      // Capture baseline DOM-position styles (handles class renames).
-      if (dpEnabled && vpIndex === 0) {
+      // Capture baseline DOM-position styles per viewport.
+      if (dpEnabled) {
         try {
           const raw = await page.evaluate(DOM_POSITION_STYLES_BROWSER_SCRIPT);
-          baselineDomPositionStyles = parseDomPositionStyles(raw);
+          const captured = parseDomPositionStyles(raw);
+          baselineDomPositionByVp.set(vp.label, captured);
+          // Preserve the single-viewport snapshot for the legacy `domPositionDiff` field.
+          if (vpIndex === 0) baselineDomPositionStyles = captured;
         } catch (error) {
-          console.log(`  ${YELLOW}Baseline DOM-position capture error: ${String(error)}${RESET}`);
+          console.log(`  ${YELLOW}Baseline DOM-position capture error (${vp.label}): ${String(error)}${RESET}`);
         }
       }
 
@@ -615,6 +626,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     const domEquivalenceReports: Array<{ variantFile: string; result: DomEquivalenceResult }> = [];
     const computedStyleDiffReports: Array<{ variantFile: string; result: CsdResult }> = [];
     const domPositionDiffReports: Array<{ variantFile: string; result: DpResult }> = [];
+    const domPositionDiffPerViewportReports: Array<{ variantFile: string; result: DpPerViewportResult }> = [];
     for (const variant of variantSources) {
       let variantHtml: string;
       const variantName = variant.label;
@@ -631,6 +643,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       let variantDomFingerprint: DomFingerprint | undefined;
       let variantComputedStyles: ComputedStyleSnapshot | undefined;
       let variantDomPositionStyles: PositionedElement[] | undefined;
+      const variantDomPositionByVp = new Map<string, PositionedElement[]>();
       for (const [vpIndex, vp] of VIEWPORTS.entries()) {
         const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
         if (variant.url) {
@@ -656,12 +669,14 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             console.log(`  ${YELLOW}Variant computed-style capture error (${variantName}): ${String(error)}${RESET}`);
           }
         }
-        if (dpEnabled && vpIndex === 0 && !variantDomPositionStyles) {
+        if (dpEnabled) {
           try {
             const raw = await page.evaluate(DOM_POSITION_STYLES_BROWSER_SCRIPT);
-            variantDomPositionStyles = parseDomPositionStyles(raw);
+            const captured = parseDomPositionStyles(raw);
+            variantDomPositionByVp.set(vp.label, captured);
+            if (vpIndex === 0) variantDomPositionStyles = captured;
           } catch (error) {
-            console.log(`  ${YELLOW}Variant DOM-position capture error (${variantName}): ${String(error)}${RESET}`);
+            console.log(`  ${YELLOW}Variant DOM-position capture error (${variantName} / ${vp.label}): ${String(error)}${RESET}`);
           }
         }
 
@@ -844,6 +859,28 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         }
       }
 
+      // Per-viewport DOM-position diff (surfaces media-query-gated deltas)
+      if (dpEnabled && baselineDomPositionByVp.size > 0 && variantDomPositionByVp.size > 0) {
+        const variantFileLabel = variant.url || variant.file;
+        const perVp = diffPositionStylesAcrossViewports(baselineDomPositionByVp, variantDomPositionByVp);
+        // Cap entries (used as a rolled-up backup) and byPathProperty
+        // (the actual signal source for diff-for-agent) so
+        // migration-report.json stays under ~1 MB even with many
+        // viewports.
+        const trimmedPerVp = {
+          ...perVp,
+          entries: perVp.entries.slice(0, 200),
+          byPathProperty: perVp.byPathProperty.slice(0, 200),
+        };
+        domPositionDiffPerViewportReports.push({ variantFile: variantFileLabel, result: trimmedPerVp });
+        if (perVp.totalDiffs > 0) {
+          const breakpointGated = perVp.byPathProperty.filter((pp) => pp.viewports.length < baselineDomPositionByVp.size).length;
+          console.log(`  ${DIM}Per-viewport DOM-position diff: ${perVp.totalDiffs} tuples, ` +
+            `${perVp.byPathProperty.length} unique (path, property) pairs, ` +
+            `${breakpointGated} appear only on a subset of viewports (media-query-gated)${RESET}`);
+        }
+      }
+
       // Computed-style diff (opt-in via --computed-style)
       if (csdEnabled && baselineComputedStyles && variantComputedStyles) {
         const variantFileLabel = variant.url || variant.file;
@@ -944,6 +981,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       domEquivalence: domEquivalenceReports.length > 0 ? domEquivalenceReports : undefined,
       computedStyleDiff: computedStyleDiffReports.length > 0 ? computedStyleDiffReports : undefined,
       domPositionDiff: domPositionDiffReports.length > 0 ? domPositionDiffReports : undefined,
+      domPositionDiffPerViewport: domPositionDiffPerViewportReports.length > 0
+        ? domPositionDiffPerViewportReports
+        : undefined,
       results,
       reportPath,
     };

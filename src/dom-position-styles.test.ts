@@ -110,3 +110,81 @@ describe("parseDomPositionStyles", () => {
     assert.deepEqual(parseDomPositionStyles(123), []);
   });
 });
+
+import { diffPositionStylesAcrossViewports } from "./dom-position-styles.ts";
+
+describe("diffPositionStylesAcrossViewports", () => {
+  it("merges per-viewport diffs and tags each entry with its viewport", () => {
+    const baseline = new Map([
+      ["mobile", [el({ path: "p1", tag: "div", classes: "a", styles: { padding: "10px" } })]],
+      ["desktop", [el({ path: "p1", tag: "div", classes: "a", styles: { padding: "20px" } })]],
+    ]);
+    const variant = new Map([
+      ["mobile", [el({ path: "p1", tag: "div", classes: "b", styles: { padding: "5px" } })]],
+      ["desktop", [el({ path: "p1", tag: "div", classes: "b", styles: { padding: "5px" } })]],
+    ]);
+    const r = diffPositionStylesAcrossViewports(baseline, variant);
+    assert.equal(r.totalDiffs, 2);
+    const viewports = r.entries.map((e) => e.viewport).sort();
+    assert.deepEqual(viewports, ["desktop", "mobile"]);
+  });
+
+  it("aggregates (path, property) across viewports — picks up media-query-gated deltas", () => {
+    const baseline = new Map([
+      ["mobile", [el({ path: "p1", tag: "div", classes: "a", styles: { "max-width": "100%" } })]],
+      ["desktop", [el({ path: "p1", tag: "div", classes: "a", styles: { "max-width": "1180px" } })]],
+    ]);
+    const variant = new Map([
+      // mobile matches the baseline → no delta
+      ["mobile", [el({ path: "p1", tag: "div", classes: "b", styles: { "max-width": "100%" } })]],
+      // desktop differs → 1 delta only at desktop
+      ["desktop", [el({ path: "p1", tag: "div", classes: "b", styles: { "max-width": "1200px" } })]],
+    ]);
+    const r = diffPositionStylesAcrossViewports(baseline, variant);
+    assert.equal(r.totalDiffs, 1);
+    assert.equal(r.byPathProperty.length, 1);
+    assert.deepEqual(r.byPathProperty[0]!.viewports, ["desktop"]);
+    assert.equal(r.byPathProperty[0]!.samples[0]!.variant, "1200px");
+  });
+
+  it("ranks (path, property) entries by number of viewports they appear in", () => {
+    const baseline = new Map([
+      ["a", [el({ path: "p", tag: "div", styles: { color: "red", padding: "5px" } })]],
+      ["b", [el({ path: "p", tag: "div", styles: { color: "red", padding: "5px" } })]],
+      ["c", [el({ path: "p", tag: "div", styles: { color: "red", padding: "5px" } })]],
+    ]);
+    const variant = new Map([
+      // color differs on all three viewports
+      ["a", [el({ path: "p", tag: "div", styles: { color: "blue", padding: "5px" } })]],
+      ["b", [el({ path: "p", tag: "div", styles: { color: "blue", padding: "5px" } })]],
+      // padding differs only on viewport "c"
+      ["c", [el({ path: "p", tag: "div", styles: { color: "blue", padding: "10px" } })]],
+    ]);
+    const r = diffPositionStylesAcrossViewports(baseline, variant);
+    assert.equal(r.byPathProperty[0]!.property, "color");
+    assert.equal(r.byPathProperty[0]!.viewports.length, 3);
+    assert.equal(r.byPathProperty[1]!.property, "padding");
+    assert.equal(r.byPathProperty[1]!.viewports.length, 1);
+  });
+
+  it("returns empty result when either input is empty", () => {
+    assert.equal(diffPositionStylesAcrossViewports(new Map(), new Map()).totalDiffs, 0);
+    assert.equal(
+      diffPositionStylesAcrossViewports({ mobile: [] }, { mobile: [] }).totalDiffs,
+      0,
+    );
+  });
+
+  it("ignores viewports present in only one capture", () => {
+    const baseline = new Map([
+      ["mobile", [el({ path: "p", tag: "div", styles: { color: "red" } })]],
+      ["wide", [el({ path: "p", tag: "div", styles: { color: "red" } })]],
+    ]);
+    const variant = new Map([
+      ["mobile", [el({ path: "p", tag: "div", styles: { color: "blue" } })]],
+    ]);
+    const r = diffPositionStylesAcrossViewports(baseline, variant);
+    assert.equal(r.totalDiffs, 1);
+    assert.deepEqual(r.byViewport.map((v) => v.viewport), ["mobile"]);
+  });
+});

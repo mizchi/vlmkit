@@ -183,3 +183,146 @@ export function parseDomPositionStyles(value: unknown): PositionedElement[] {
     return [];
   }
 }
+
+// ----------------------------------------------------------------------
+// Per-viewport variant
+// ----------------------------------------------------------------------
+
+export interface DpEntryWithViewport extends DpEntry {
+  viewport: string;
+}
+
+export interface DpPerViewportResult {
+  /** All per-viewport diff tuples (entries[i] carries its viewport). */
+  entries: DpEntryWithViewport[];
+  /** Total tuples across all viewports (before any caller-side cap). */
+  totalDiffs: number;
+  /**
+   * (path, property) → viewport-list. Same property at same position can
+   * differ on some viewports and not others (media-query-gated rules).
+   * Sorted by number of viewports descending.
+   */
+  byPathProperty: Array<{
+    path: string;
+    property: string;
+    baselineClasses: string;
+    variantClasses: string;
+    viewports: string[];
+    samples: Array<{ viewport: string; baseline: string; variant: string }>;
+  }>;
+  /** Per-viewport tally so the caller can see which viewport is worst. */
+  byViewport: Array<{ viewport: string; count: number }>;
+  /** Property → total viewport-occurrences, sorted desc. */
+  byProperty: Array<{ property: string; count: number }>;
+  /** Path → total viewport-occurrences + class names, sorted desc. */
+  byPath: Array<{
+    path: string;
+    baselineClasses: string;
+    variantClasses: string;
+    count: number;
+  }>;
+}
+
+const EMPTY_PV: DpPerViewportResult = {
+  entries: [],
+  totalDiffs: 0,
+  byPathProperty: [],
+  byViewport: [],
+  byProperty: [],
+  byPath: [],
+};
+
+/**
+ * Diff DOM-position style captures across N viewports.
+ *
+ * Inputs are maps of viewport-label → captured element list. Each viewport
+ * is diffed independently (same `diffDomPositionStyles` per-viewport
+ * semantics), then results are merged with a viewport label per tuple and
+ * a (path, property) cross-viewport aggregate so the agent can spot
+ * "this delta appears at every viewport" vs "this delta only appears at
+ * mobile" (the latter usually means a missing or wrong media query).
+ */
+export function diffPositionStylesAcrossViewports(
+  baselineByVp: Map<string, PositionedElement[]> | Record<string, PositionedElement[]>,
+  variantByVp: Map<string, PositionedElement[]> | Record<string, PositionedElement[]>,
+): DpPerViewportResult {
+  const baselineMap = baselineByVp instanceof Map ? baselineByVp : new Map(Object.entries(baselineByVp));
+  const variantMap = variantByVp instanceof Map ? variantByVp : new Map(Object.entries(variantByVp));
+  if (baselineMap.size === 0 || variantMap.size === 0) return EMPTY_PV;
+
+  const entries: DpEntryWithViewport[] = [];
+  const byViewport = new Map<string, number>();
+
+  for (const [viewport, baselineList] of baselineMap) {
+    const variantList = variantMap.get(viewport);
+    if (!variantList) continue;
+    const perVp = diffDomPositionStyles(baselineList, variantList);
+    for (const e of perVp.entries) entries.push({ ...e, viewport });
+    byViewport.set(viewport, (byViewport.get(viewport) ?? 0) + perVp.entries.length);
+  }
+
+  // Aggregate per (path, property) — same delta on multiple viewports is
+  // typically one source rule; differing-viewport deltas are media-query
+  // gated.
+  const ppKey = (path: string, property: string) => `${path} ${property}`;
+  const aggregated = new Map<string, {
+    path: string;
+    property: string;
+    baselineClasses: string;
+    variantClasses: string;
+    viewports: string[];
+    samples: Array<{ viewport: string; baseline: string; variant: string }>;
+  }>();
+  for (const e of entries) {
+    const k = ppKey(e.path, e.property);
+    const existing = aggregated.get(k);
+    if (existing) {
+      existing.viewports.push(e.viewport);
+      // De-dupe samples by (baseline, variant) — most deltas are identical
+      // across affected viewports (e.g. `height: 48px → 33px` everywhere it
+      // applies). Keep at most one sample per unique value-pair so the
+      // report stays compact when shipped as JSON.
+      const alreadySeen = existing.samples.some(
+        (s) => s.baseline === e.baseline && s.variant === e.variant,
+      );
+      if (!alreadySeen) {
+        existing.samples.push({ viewport: e.viewport, baseline: e.baseline, variant: e.variant });
+      }
+    } else {
+      aggregated.set(k, {
+        path: e.path,
+        property: e.property,
+        baselineClasses: e.baselineClasses,
+        variantClasses: e.variantClasses,
+        viewports: [e.viewport],
+        samples: [{ viewport: e.viewport, baseline: e.baseline, variant: e.variant }],
+      });
+    }
+  }
+  const byPathProperty = [...aggregated.values()].sort((a, b) =>
+    b.viewports.length - a.viewports.length
+    || a.path.localeCompare(b.path)
+    || a.property.localeCompare(b.property),
+  );
+
+  const byProperty = new Map<string, number>();
+  for (const e of entries) byProperty.set(e.property, (byProperty.get(e.property) ?? 0) + 1);
+  const byPath = new Map<string, { baselineClasses: string; variantClasses: string; count: number }>();
+  for (const e of entries) {
+    const cur = byPath.get(e.path) ?? { baselineClasses: e.baselineClasses, variantClasses: e.variantClasses, count: 0 };
+    cur.count += 1;
+    byPath.set(e.path, cur);
+  }
+
+  return {
+    entries,
+    totalDiffs: entries.length,
+    byPathProperty,
+    byViewport: [...byViewport.entries()].map(([viewport, count]) => ({ viewport, count }))
+      .sort((a, b) => b.count - a.count || a.viewport.localeCompare(b.viewport)),
+    byProperty: [...byProperty.entries()].map(([property, count]) => ({ property, count }))
+      .sort((a, b) => b.count - a.count || a.property.localeCompare(b.property)),
+    byPath: [...byPath.entries()].map(([path, v]) => ({ path, baselineClasses: v.baselineClasses, variantClasses: v.variantClasses, count: v.count }))
+      .sort((a, b) => b.count - a.count || a.path.localeCompare(b.path)),
+  };
+}

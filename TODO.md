@@ -245,13 +245,22 @@ exposure to luna's spec values. These items are the gap.
   `eyebrow` ↔ variant `luna-pill`, baseline `dialog-card` ↔
   variant `luna-modal`). The exact gap subagent A flagged is now
   closed.
-- [ ] **Per-viewport DOM-position capture.** Subagent C's words: "the
-  single biggest gap." Today `--dom-position-diff` captures on the
-  first viewport only (mobile), so `max-width`,
-  `grid-template-columns`, and media-query-gated values surface
-  only at that width. Capture per discovered viewport (or accept a
-  `--capture-viewports` flag) and label each tuple with the
-  viewport it came from.
+- [x] **Per-viewport DOM-position capture.** `--dom-position-diff`
+  now captures the DOM-position styles at *every* discovered
+  viewport (not just the first) and surfaces a new "Verified
+  deltas by DOM position × viewport (catches media-query gaps)"
+  section in `vrt diff-for-agent`. Output splits into:
+    - **Universal deltas** — `(path, property)` pairs that differ
+      on every viewport (a base CSS rule).
+    - **Breakpoint-gated deltas** — pairs that differ on only a
+      subset (a `@media` rule is wrong or missing).
+  Verified on the dogfood Pass B iter 1 fixture: 871 universal
+  pairs + 7 breakpoint-gated pairs across 10 viewports. The gated
+  set correctly fingers `.luna-action` `height` (differs everywhere
+  except mobile → variant lacks the breakpoint button-height rule)
+  and `.luna-page` `width / margin` (differs only at desktop/wide
+  → max-width value mismatch). Sample de-dupe + 200-entry cap
+  keeps `migration-report.json` at ~360 KB.
 - [ ] **Vertical-accumulation breakdown for layout-shift bands.**
   After C's iter 4 the DOM-position diff was nearly clean but
   `[720-1047]:+99px` persisted. Today the band reports the *shift*,
