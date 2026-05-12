@@ -53,7 +53,7 @@ import {
   type ViewportSpec,
 } from "./viewport-discovery.ts";
 import { formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "./playwright-launch-error.ts";
-import type { VrtSnapshot } from "./types.ts";
+import type { ShiftRegion, VrtSnapshot } from "./types.ts";
 import { applyMask, parseMaskSelectors } from "./mask.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr as _hr } from "./terminal-colors.ts";
 import {
@@ -80,6 +80,13 @@ import {
   type DpPerViewportResult,
   type PositionedElement,
 } from "./dom-position-styles.ts";
+import {
+  findShiftOrigins,
+  DOM_BBOX_BROWSER_SCRIPT,
+  parseBboxes,
+  type BboxElement,
+  type ShiftOrigin,
+} from "./shift-origin.ts";
 
 // ---- Config ----
 
@@ -298,6 +305,11 @@ export interface MigrationCompareReport {
     variantFile: string;
     result: DpPerViewportResult;
   }>;
+  /** Per-viewport shift-origin diagnostics (which element causes each band's shift). */
+  shiftOrigins?: Array<{
+    variantFile: string;
+    perViewport: Array<{ viewport: string; origins: ShiftOrigin[] }>;
+  }>;
   results: MigrationCompareResult[];
   reportPath: string;
 }
@@ -475,6 +487,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     let baselineComputedStyles: ComputedStyleSnapshot | undefined;
     let baselineDomPositionStyles: PositionedElement[] | undefined;
     const baselineDomPositionByVp = new Map<string, PositionedElement[]>();
+    const baselineBboxesByVp = new Map<string, BboxElement[]>();
     const domEnabled = options.domEquivalenceCheck ?? true;
     const csdEnabled = options.computedStyleDiff ?? false;
     const dpEnabled = options.domPositionDiff ?? false;
@@ -566,6 +579,12 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         } catch (error) {
           console.log(`  ${YELLOW}Baseline DOM-position capture error (${vp.label}): ${String(error)}${RESET}`);
         }
+        try {
+          const rawBbox = await page.evaluate(DOM_BBOX_BROWSER_SCRIPT);
+          baselineBboxesByVp.set(vp.label, parseBboxes(rawBbox));
+        } catch (error) {
+          console.log(`  ${YELLOW}Baseline bbox capture error (${vp.label}): ${String(error)}${RESET}`);
+        }
       }
 
       await page.close();
@@ -627,6 +646,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     const computedStyleDiffReports: Array<{ variantFile: string; result: CsdResult }> = [];
     const domPositionDiffReports: Array<{ variantFile: string; result: DpResult }> = [];
     const domPositionDiffPerViewportReports: Array<{ variantFile: string; result: DpPerViewportResult }> = [];
+    const shiftOriginsReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; origins: ShiftOrigin[] }> }> = [];
     for (const variant of variantSources) {
       let variantHtml: string;
       const variantName = variant.label;
@@ -644,6 +664,8 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       let variantComputedStyles: ComputedStyleSnapshot | undefined;
       let variantDomPositionStyles: PositionedElement[] | undefined;
       const variantDomPositionByVp = new Map<string, PositionedElement[]>();
+      const variantBboxesByVp = new Map<string, BboxElement[]>();
+      const shiftRegionsByVp = new Map<string, ShiftRegion[]>();
       for (const [vpIndex, vp] of VIEWPORTS.entries()) {
         const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
         if (variant.url) {
@@ -677,6 +699,12 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             if (vpIndex === 0) variantDomPositionStyles = captured;
           } catch (error) {
             console.log(`  ${YELLOW}Variant DOM-position capture error (${variantName} / ${vp.label}): ${String(error)}${RESET}`);
+          }
+          try {
+            const rawBbox = await page.evaluate(DOM_BBOX_BROWSER_SCRIPT);
+            variantBboxesByVp.set(vp.label, parseBboxes(rawBbox));
+          } catch (error) {
+            console.log(`  ${YELLOW}Variant bbox capture error (${variantName} / ${vp.label}): ${String(error)}${RESET}`);
           }
         }
 
@@ -791,6 +819,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             ? diffReport.globalShift
             : undefined,
         });
+        if (diffReport?.shiftRegions && diffReport.shiftRegions.length > 0) {
+          shiftRegionsByVp.set(vp.label, diffReport.shiftRegions);
+        }
 
         const pct = (diffRatio * 100).toFixed(1);
         const icon = approved?.approved
@@ -873,6 +904,25 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           byPathProperty: perVp.byPathProperty.slice(0, 200),
         };
         domPositionDiffPerViewportReports.push({ variantFile: variantFileLabel, result: trimmedPerVp });
+        // Shift-origin diagnostics: which element causes each band's shift?
+        if (baselineBboxesByVp.size > 0 && variantBboxesByVp.size > 0 && shiftRegionsByVp.size > 0) {
+          const perViewport: Array<{ viewport: string; origins: ShiftOrigin[] }> = [];
+          for (const [vpLabel, bands] of shiftRegionsByVp) {
+            const baselineBboxes = baselineBboxesByVp.get(vpLabel);
+            const variantBboxes = variantBboxesByVp.get(vpLabel);
+            if (!baselineBboxes || !variantBboxes) continue;
+            const origins = findShiftOrigins(baselineBboxes, variantBboxes, bands, { perBandLimit: 2 });
+            if (origins.length > 0) {
+              perViewport.push({ viewport: vpLabel, origins });
+            }
+          }
+          if (perViewport.length > 0) {
+            shiftOriginsReports.push({ variantFile: variantFileLabel, perViewport });
+            const totalOrigins = perViewport.reduce((s, v) => s + v.origins.length, 0);
+            console.log(`  ${DIM}Shift origins: ${totalOrigins} explanation(s) across ${perViewport.length} viewport(s)${RESET}`);
+          }
+        }
+
         if (perVp.totalDiffs > 0) {
           const breakpointGated = perVp.byPathProperty.filter((pp) => pp.viewports.length < baselineDomPositionByVp.size).length;
           console.log(`  ${DIM}Per-viewport DOM-position diff: ${perVp.totalDiffs} tuples, ` +
@@ -984,6 +1034,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       domPositionDiffPerViewport: domPositionDiffPerViewportReports.length > 0
         ? domPositionDiffPerViewportReports
         : undefined,
+      shiftOrigins: shiftOriginsReports.length > 0 ? shiftOriginsReports : undefined,
       results,
       reportPath,
     };

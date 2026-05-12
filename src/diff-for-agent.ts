@@ -89,6 +89,25 @@ export interface DfaDpPerViewportSummary {
   };
 }
 
+export interface DfaShiftOrigin {
+  bandStart: number;
+  bandEnd: number;
+  bandShift: number;
+  originPath: string;
+  originTag: string;
+  originBaselineTop: number;
+  originVariantTop: number;
+  originDeltaY: number;
+  originBaselineClasses: string;
+  originVariantClasses: string;
+  suspectedAxis?: "height" | "margin/padding-above" | "y-position" | "unknown";
+}
+
+export interface DfaShiftOriginsSummary {
+  variantFile: string;
+  perViewport: Array<{ viewport: string; origins: DfaShiftOrigin[] }>;
+}
+
 export interface DfaReport {
   dir: string;
   baseline: string;
@@ -98,6 +117,7 @@ export interface DfaReport {
   computedStyleDiff?: DfaCsdSummary[];
   domPositionDiff?: DfaDpSummary[];
   domPositionDiffPerViewport?: DfaDpPerViewportSummary[];
+  shiftOrigins?: DfaShiftOriginsSummary[];
   /** Absolute path of the report file (used to resolve sibling PNGs). */
   reportPath?: string;
 }
@@ -394,6 +414,38 @@ export function formatMigrationReportForAgent(
       lines.push(`| \`${r.viewport}\` | ${formatPct(r.diffRatio)} | ${cat} | ${summary} | ${bands} |`);
     }
     lines.push("");
+
+    const shiftOriginsSummary = (report.shiftOrigins ?? []).find((s) => s.variantFile === variantFile);
+    if (shiftOriginsSummary && shiftOriginsSummary.perViewport.length > 0) {
+      lines.push("### Shift-origin diagnostics (what's causing the per-band Δy)");
+      lines.push("");
+      lines.push("For each per-band Δy reported in the diff table above, the " +
+        "*first element whose y-coordinate diverges* between baseline and " +
+        "variant — i.e. the local origin of the shift. Subsequent elements " +
+        "below this one inherit the same Δy.");
+      lines.push("");
+      lines.push("| Viewport | Band (y) | Δy | Origin position | Baseline class | Variant class | Origin Δtop | Suspect |");
+      lines.push("|---|---|---|---|---|---|---|---|");
+      for (const vp of shiftOriginsSummary.perViewport) {
+        for (const o of vp.origins) {
+          const bcls = o.originBaselineClasses || "_(none)_";
+          const vcls = o.originVariantClasses || "_(none)_";
+          const signedShift = o.bandShift > 0 ? `+${o.bandShift}` : `${o.bandShift}`;
+          const signedDelta = o.originDeltaY > 0 ? `+${o.originDeltaY}` : `${o.originDeltaY}`;
+          lines.push(
+            `| \`${vp.viewport}\` | ${o.bandStart}–${o.bandEnd} | ${signedShift}px | ` +
+            `\`${o.originPath}\` | \`${bcls}\` | \`${vcls}\` | ${signedDelta}px | ${o.suspectedAxis ?? "?"} |`,
+          );
+        }
+      }
+      lines.push("");
+      lines.push("Suspect column: `height` = the origin element's own height " +
+        "differs (its `padding`, `line-height`, or content sizing is the " +
+        "root cause); `margin/padding-above` = same height but its top " +
+        "moved (a parent's padding or a previous sibling's height/margin " +
+        "is responsible).");
+      lines.push("");
+    }
 
     const categoryAgg = aggregateCategoryCounts(results);
     if (categoryAgg.length > 0) {

@@ -233,15 +233,24 @@ fixture series. The remaining 4-viewport floor at 2.67–3.52%
 comes from a single unexplained +152px / +239px universal shift
 band at viewports ≥ 1024.
 
-- [ ] **Vertical-shift origin diagnostic.** Subagent D's exact
-  next-unblock request. When a band reports `[y_start..y_end]: +N
-  px`, name the first element whose computed `y` coordinate (or
-  accumulated `top + height`) diverges between baseline and
-  variant. Requires per-element bounding-box capture (browser-side)
-  and a tree-walking accumulator. With this hint, D estimated the
-  metric-grid fix it found in iter 7 would have happened in iter 5
-  and the 4 remaining wide viewports might converge in 1–2 more
-  rounds.
+- [x] **Vertical-shift origin diagnostic.** `src/shift-origin.ts`
+  captures per-element bounding boxes via a new
+  `DOM_BBOX_BROWSER_SCRIPT`, then matches by DOM path against the
+  per-band shifts already produced by `detectBandShifts`.
+  `findShiftOrigins` walks baseline elements in document order,
+  finds the first whose Δy points in the band's direction with
+  magnitude comparable to the band's shift, and emits the
+  responsible element (path, baseline / variant class, Δtop,
+  suspect axis: `height` / `margin/padding-above` / `y-position`).
+  Surfaced as a new "Shift-origin diagnostics" table in
+  `vrt diff-for-agent`, populated automatically when
+  `--dom-position-diff` is on. Verified on dogfood Pass B iter 1:
+  42 origin rows across 10 viewports — e.g. mobile `[720-960]
+  Δ-94px → card-header / luna-panel-head, suspect: height`,
+  below-1024 `[480-720] Δ+112px → button-row / luna-actions,
+  suspect: height`. The exact symptom Subagent D plateaued on
+  (`+152px shift band with no DOM-position delta`) now has a named
+  origin. 9 unit tests cover the algorithm.
 - [ ] **Drop ✗ heuristic candidates from `vrt diff-for-agent`.**
   Once a candidate is marked unverified, the agent has no reason
   to look at it. Filter out by default; hide behind
