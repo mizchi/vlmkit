@@ -84,6 +84,8 @@ export interface ShiftRegion {
   yStart: number;
   yEnd: number;
   shift: number;
+  /** Correlation strength of the chosen offset (0..1). Higher = more confident. */
+  confidence?: number;
 }
 
 export interface DiffReport {

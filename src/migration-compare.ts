@@ -247,6 +247,10 @@ export interface MigrationCompareResult {
   approvedPaintTreeCount: number;
   approvedPaintTreeReasons: string[];
   fixCandidates: MigrationFixCandidate[];
+  /** Per-band vertical shift offsets (null if no shift detected). */
+  shiftRegions?: Array<{ yStart: number; yEnd: number; shift: number; confidence?: number }>;
+  /** Global vertical shift in pixels (0 if no shift). */
+  globalShift?: number;
 }
 
 export interface MigrationCompareReport {
@@ -553,6 +557,8 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       approvedPaintTreeCount: number;
       approvedPaintTreeReasons: string[];
       fixCandidates: MigrationFixCandidate[];
+      shiftRegions?: Array<{ yStart: number; yEnd: number; shift: number; confidence?: number }>;
+      globalShift?: number;
     }> = [];
 
     const variantSources = isUrlMode
@@ -696,6 +702,12 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           approvedPaintTreeCount,
           approvedPaintTreeReasons,
           fixCandidates,
+          shiftRegions: diffReport?.shiftRegions && diffReport.shiftRegions.length > 0
+            ? diffReport.shiftRegions
+            : undefined,
+          globalShift: diffReport?.globalShift && diffReport.globalShift !== 0
+            ? diffReport.globalShift
+            : undefined,
         });
 
         const pct = (diffRatio * 100).toFixed(1);

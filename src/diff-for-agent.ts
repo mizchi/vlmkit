@@ -29,6 +29,8 @@ export interface DfaResult {
   categorySummary?: string;
   categoryCounts?: Record<string, number>;
   fixCandidates?: Array<{ selector?: string; property?: string }>;
+  shiftRegions?: Array<{ yStart: number; yEnd: number; shift: number; confidence?: number }>;
+  globalShift?: number;
 }
 
 export interface DfaReport {
@@ -116,6 +118,19 @@ function formatPct(ratio: number): string {
   return `${(ratio * 100).toFixed(2)}%`;
 }
 
+function formatShiftBands(r: DfaResult): string {
+  const bands = r.shiftRegions ?? [];
+  if (bands.length === 0) {
+    return r.globalShift && r.globalShift !== 0
+      ? `global ${r.globalShift > 0 ? "+" : ""}${r.globalShift}px`
+      : "-";
+  }
+  // Compact form: "[0–240]:+8 [240–600]:+20"
+  return bands
+    .map((b) => `[${b.yStart}–${b.yEnd}]:${b.shift > 0 ? "+" : ""}${b.shift}px`)
+    .join(" ");
+}
+
 export function formatMigrationReportForAgent(
   report: DfaReport,
   options: DfaOptions = {},
@@ -164,12 +179,13 @@ export function formatMigrationReportForAgent(
 
     lines.push("### Diff by viewport (worst first)");
     lines.push("");
-    lines.push("| Viewport | Diff | Dominant category | Categories |");
-    lines.push("|---|---|---|---|");
+    lines.push("| Viewport | Diff | Dominant category | Categories | Shift bands |");
+    lines.push("|---|---|---|---|---|");
     for (const r of sorted) {
       const cat = r.dominantCategory ?? "-";
       const summary = r.categorySummary ?? "-";
-      lines.push(`| \`${r.viewport}\` | ${formatPct(r.diffRatio)} | ${cat} | ${summary} |`);
+      const bands = formatShiftBands(r);
+      lines.push(`| \`${r.viewport}\` | ${formatPct(r.diffRatio)} | ${cat} | ${summary} | ${bands} |`);
     }
     lines.push("");
 

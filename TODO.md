@@ -200,11 +200,14 @@ small wrapper around already-built primitives, not a new subsystem.
   skip, `--strict-dom-equivalence` to fail on warnings. Verified on
   the 2026-05-12 dogfood invented-DOM scenario (3 warnings fire
   correctly; clean DOM stays silent).
-- [ ] Per-region shift detection — extend the existing `globalShift`
-  (single pixel offset for the whole frame) to per-element bounding
-  boxes so heatmap red-smears can be localized as
-  "`.luna-panel-head padding too small, shifts following 4 elements
-  down by 12px"`.
+- [x] Per-band shift detection. `detectBandShifts` splits the diff
+  image into ~240px-tall horizontal bands and runs mean-subtracted
+  cross-correlation per band, gated by a peak-sharpness confidence
+  metric. Surfaced in `MigrationCompareResult.shiftRegions` and
+  printed by `vrt diff-for-agent` as e.g.
+  `[480–720]:+22px [720–960]:-94px [960–1348]:+32px`, replacing the
+  single-line global average with localized per-section offsets.
+  Verified on the 2026-05-12 dogfood Pass B iter 1 data.
 - [ ] `vrt compare-runs <a.json> <b.json>` — pairwise migration-report
   diff. "Viewport X went from 41% → 0%, dominant category
   layout-shift → none" validates that the patch did what the agent

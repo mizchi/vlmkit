@@ -243,6 +243,96 @@ function detectGlobalShift(
 }
 
 /**
+ * Per-band shift detection — split the image into horizontal bands and run
+ * the same cross-correlation per band. Lets us report "section A shifted
+ * +8px, section B shifted +20px" instead of a single global average that
+ * loses localization.
+ *
+ * Bands with low luminance variance (e.g. a flat white footer) are dropped
+ * because cross-correlation can't lock onto them and the result is noise.
+ *
+ * Exported for unit testing.
+ */
+export function detectBandShifts(
+  baseline: { data: Uint8Array; width: number; height: number },
+  current: { data: Uint8Array; width: number; height: number },
+  options: { bandHeight?: number; minConfidence?: number; maxShift?: number } = {},
+): ShiftRegion[] {
+  const height = Math.min(baseline.height, current.height);
+  const width = Math.min(baseline.width, current.width);
+  const bandHeight = Math.max(50, options.bandHeight ?? 240);
+  const minConfidence = options.minConfidence ?? 0.02;
+  const limit = options.maxShift ?? Math.min(Math.floor(bandHeight / 2), 400);
+
+  if (height < bandHeight * 2) return [];
+
+  const profile1 = luminanceProfile(baseline.data, width, height);
+  const profile2 = luminanceProfile(current.data, width, height);
+
+  const regions: ShiftRegion[] = [];
+  const bandCount = Math.floor(height / bandHeight);
+  for (let b = 0; b < bandCount; b++) {
+    const yStart = b * bandHeight;
+    const yEnd = b === bandCount - 1 ? height : yStart + bandHeight;
+
+    // Variance check — flat bands have no signal.
+    let mean = 0;
+    for (let y = yStart; y < yEnd; y++) mean += profile1[y]!;
+    mean /= (yEnd - yStart);
+    let variance = 0;
+    for (let y = yStart; y < yEnd; y++) {
+      const d = profile1[y]! - mean;
+      variance += d * d;
+    }
+    variance /= (yEnd - yStart);
+    if (variance < 5) continue; // empirically: flat background
+
+    // Mean-subtract both profiles so the cross-correlation magnitude scales
+    // with actual structure rather than background brightness.
+    let mean2 = 0;
+    for (let y = yStart; y < yEnd; y++) mean2 += profile2[y]!;
+    mean2 /= (yEnd - yStart);
+
+    let bestOffset = 0;
+    let bestCorr = -Infinity;
+    let secondBestCorr = -Infinity;
+    let zeroOffsetCorr = 0;
+    for (let offset = -limit; offset <= limit; offset++) {
+      let sum = 0;
+      let count = 0;
+      for (let y = yStart; y < yEnd; y++) {
+        const y2 = y + offset;
+        if (y2 >= 0 && y2 < height) {
+          sum += (profile1[y]! - mean) * (profile2[y2]! - mean2);
+          count++;
+        }
+      }
+      const corr = count > 0 ? sum / count : 0;
+      if (offset === 0) zeroOffsetCorr = corr;
+      if (corr > bestCorr) {
+        secondBestCorr = bestCorr;
+        bestCorr = corr;
+        bestOffset = offset;
+      } else if (corr > secondBestCorr) {
+        secondBestCorr = corr;
+      }
+    }
+
+    // Confidence = peak sharpness relative to the second-best alignment.
+    // A clean shift has best ≫ second-best; noise has best ≈ second-best.
+    const confidence = bestCorr > 0 && secondBestCorr > 0
+      ? Math.min(1, Math.max(0, (bestCorr - secondBestCorr) / bestCorr))
+      : 0;
+
+    if (bestOffset !== 0 && bestCorr > zeroOffsetCorr && confidence >= minConfidence) {
+      regions.push({ yStart, yEnd, shift: bestOffset, confidence: Number(confidence.toFixed(3)) });
+    }
+  }
+
+  return regions;
+}
+
+/**
  * Count diff pixels after compensating for vertical shift.
  */
 function compensatedDiffCount(
@@ -344,7 +434,12 @@ export async function generateDiffReport(
         r.resizedBaseline.data, r.resizedCurrent.data,
         r.width, r.height, globalShift, r.threshold,
       );
-      shiftRegions = [{ yStart: 0, yEnd: r.height, shift: globalShift }];
+      // Prefer per-band shifts when they reveal locally-varying offsets.
+      // Falls back to the global single-band region if no band locks on.
+      const bands = detectBandShifts(r.resizedBaseline, r.resizedCurrent);
+      shiftRegions = bands.length > 0
+        ? bands
+        : [{ yStart: 0, yEnd: r.height, shift: globalShift }];
     }
   }
 
