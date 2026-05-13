@@ -409,6 +409,46 @@ be CSS transitions, not the threshold. Fixes applied:
   side. ≤ 30 annotated as _(near, likely AA)_; > 60 is a real
   palette gap. Lets the agent dismiss persistent low-diff noise.
 
+### Remaining-issue close-out (2026-05-13)
+
+Three concerns left open after the re-dogfood, all addressed:
+
+- [x] **Sub-pixel vertical spacing hints.** Subagent G v3:
+  "the remaining ~1.7% diff is text baseline Δy in the 2-19px
+  range, and the report doesn't yet suggest which CSS knob to
+  turn." `computeRowGapDeltas(baseline, variant)` derives the
+  per-pair gap between consecutive text rows for both sides and
+  reports the delta. component-from-image renders a new
+  "Spacing fixes" sub-table inside the Text-row Δy section: for
+  each (rowA, rowB) pair, shows target gap / current gap / Δ /
+  the suggested action ("reduce preceding element's bottom
+  space by Xpx" / "add Xpx").
+
+- [x] **UA-default focus ring discrimination.** Subagent H:
+  "`:focus-visible` registered 1.10% before I added any focus
+  CSS — the browser's default outline cleared the suspect flag."
+  `applyForcedPseudoState` now returns the per-element bboxes
+  alongside fingerprints; component-from-image classifies each
+  state-induced diff pixel as edge (within 4px of any bbox
+  perimeter) or interior. New `Edge %` column + `ua-likely` note:
+  fires when edge > 85% and interior pixels < 50 (= only the
+  perimeter changed, no fill/text touched). Verified:
+  missing-hover with no author `:focus-visible` rule → Edge 100%
+  + `ua-likely` flag; author-styled `:focus-visible` with
+  background change → Edge 34%, no flag.
+
+- [x] **Wrong-direction hover detection.** Subagent H:
+  "`:hover { background: #ffffff }` on a dark button would clear
+  suspect with a huge raw %, but be semantically wrong." Added
+  `meanInteriorLuma(path, bboxes)` to compute mean Rec.601
+  luminance over the interior of forced bboxes. New `ΔLuma`
+  column in the forced-state table + `direction?` note that
+  fires when `:hover`/`:active` lightens the elements by > 15
+  luma units. Verified: correct hover `#2563eb → #1d4ed8` shows
+  ΔLuma ≈ −5 with no flag; wrong-direction `#2563eb → #93c5fd`
+  shows ΔLuma +49.4 → "**direction?** `:hover` lightened by 49
+  luma; verify this matches the intended hover direction."
+
 ### Tier 3 + CLI unification + re-dogfood (2026-05-13)
 
 - [x] **A11y contrast scan** (`vrt a11y-contrast`). Renders the

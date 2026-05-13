@@ -59,6 +59,15 @@ export interface AppliedForcedState {
   skippedCount: number;
   /** Tag-and-class fingerprints of the forced elements (truncated). */
   affectedElements: string[];
+  /**
+   * Bounding boxes of the forced elements in viewport coordinates.
+   * Used by callers to classify state-induced diff pixels as
+   * "edge" (within a few px of any bbox perimeter — likely UA
+   * default outline) vs "interior" (inside, away from perimeter
+   * — likely author background / color rule). Lets the consumer
+   * distinguish UA-only changes from real author-styled states.
+   */
+  bboxes: Array<{ x: number; y: number; width: number; height: number }>;
 }
 
 /**
@@ -89,6 +98,7 @@ export async function applyForcedPseudoState(
       // ordering inside CDP (browser quirks). The marker is removed
       // after the screenshot.
       const fingerprints: string[] = [];
+      const bboxes: Array<{ x: number; y: number; width: number; height: number }> = [];
       for (let i = 0; i < capped.length; i++) {
         const el = capped[i] as HTMLElement;
         el.setAttribute("data-vrt-state-marker", String(i));
@@ -97,8 +107,10 @@ export async function applyForcedPseudoState(
           ? `.${el.className.trim().split(/\s+/).slice(0, 3).join(".")}`
           : "";
         fingerprints.push(`${tag}${cls}`);
+        const r = el.getBoundingClientRect();
+        bboxes.push({ x: r.x, y: r.y, width: r.width, height: r.height });
       }
-      return { fingerprints, total: all.length };
+      return { fingerprints, bboxes, total: all.length };
     },
     { selectorList: [...selectors], cap: maxElements },
   );
@@ -148,6 +160,7 @@ export async function applyForcedPseudoState(
     forcedCount,
     skippedCount: Math.max(0, matched.total - matched.fingerprints.length),
     affectedElements: matched.fingerprints.slice(0, 12),
+    bboxes: matched.bboxes,
   };
 }
 

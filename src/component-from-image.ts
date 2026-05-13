@@ -36,7 +36,7 @@ import {
   type MatchedBbox,
 } from "./component-bbox.ts";
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "./heatmap-regions.ts";
-import { extractTextRowsFromFile, matchTextRows, type MatchedTextRow } from "./text-rows.ts";
+import { extractTextRowsFromFile, matchTextRows, computeRowGapDeltas, type MatchedTextRow, type RowGapDelta } from "./text-rows.ts";
 import { extractPaletteFromFile, findDominantBackgroundsFromFile, type PaletteColor, type DominantBackgrounds } from "./palette-extract.ts";
 import { diffPalettes, type PaletteDiff } from "./palette-diff.ts";
 import {
@@ -71,6 +71,7 @@ export interface ComponentFromImageReport {
   bboxMatches: MatchedBbox[];
   heatmapRegions: HeatmapRegion[];
   textRowMatches: MatchedTextRow[];
+  rowGapDeltas: RowGapDelta[];
   baselineRowCount: number;
   variantRowCount: number;
   paletteDiff: PaletteDiff & { baseline: PaletteColor[]; variant: PaletteColor[] };
@@ -80,6 +81,12 @@ export interface ComponentFromImageReport {
     inducedDiffRatio: number;
     /** Pixels with any RGB channel delta ≥ 4 (no perceptual filter). */
     rawInducedDiffRatio: number;
+    /** Fraction of diff pixels within 4px of any forced-element bbox perimeter. */
+    edgeFraction: number;
+    /** Count of diff pixels well inside (not on perimeter of) any forced bbox. */
+    interiorPixels: number;
+    /** Mean luma at state minus mean luma at default, averaged over forced bbox interiors. Null if no bboxes. Negative = darker on state. */
+    lumaDelta: number | null;
   }>;
   reportPath: string;
 }
@@ -179,6 +186,7 @@ export async function runComponentFromImage(
       extractTextRowsFromFile(currentPath).catch(() => []),
     ]);
     const textRowMatches = matchTextRows(targetRows, currentRows);
+    const rowGapDeltas = computeRowGapDeltas(targetRows, currentRows);
 
     const [targetPalette, currentPalette] = await Promise.all([
       extractPaletteFromFile(targetCopyPath).catch(() => []),
@@ -218,6 +226,107 @@ export async function runComponentFromImage(
       return { ratio: count / total, pixels: count, total };
     }
 
+    /**
+     * Classify the state-induced diff pixels by their position
+     * relative to the forced-element bboxes. Returns the fraction of
+     * diff pixels that lie within `edgeWidth` (px) of any bbox
+     * perimeter (= "edge", typically the UA default outline) vs
+     * inside the bboxes away from the perimeter (= "interior",
+     * typically author background/text/border changes).
+     *
+     * Subagent H concern: UA-default `:focus-visible` outline alone
+     * clears the suspect flag, masking missing author CSS. When
+     * edge >> interior, the state is likely UA-only — flag as such.
+     */
+    /**
+     * Mean interior luminance over all forced bboxes, sampled from a
+     * given image. Used to detect "wrong-direction" hover: if the
+     * variant's hover *lightens* a vibrant button instead of darkening
+     * it, the shift goes in a typically-incorrect direction. Subagent
+     * H concern: "hover that shifts the wrong way (lighter on light bg)
+     * reads as fine because we have no reference for hover state."
+     * Surface the direction so the agent can verify visually.
+     */
+    async function meanInteriorLuma(
+      path: string,
+      bboxes: Array<{ x: number; y: number; width: number; height: number }>,
+    ): Promise<number | null> {
+      const buf = await readFile(path);
+      const png = PNG.sync.read(buf);
+      const w = png.width, h = png.height;
+      let sum = 0, n = 0;
+      const inset = 4;
+      for (const b of bboxes) {
+        const x0 = Math.max(0, Math.floor(b.x + inset));
+        const x1 = Math.min(w, Math.floor(b.x + b.width - inset));
+        const y0 = Math.max(0, Math.floor(b.y + inset));
+        const y1 = Math.min(h, Math.floor(b.y + b.height - inset));
+        if (x1 <= x0 || y1 <= y0) continue;
+        const stepX = Math.max(1, Math.floor((x1 - x0) / 6));
+        const stepY = Math.max(1, Math.floor((y1 - y0) / 6));
+        for (let y = y0; y < y1; y += stepY) {
+          for (let x = x0; x < x1; x += stepX) {
+            const i = (y * w + x) * 4;
+            if (png.data[i + 3]! === 0) continue;
+            sum += 0.299 * png.data[i]! + 0.587 * png.data[i + 1]! + 0.114 * png.data[i + 2]!;
+            n++;
+          }
+        }
+      }
+      return n > 0 ? sum / n : null;
+    }
+
+    async function classifyEdgeVsInterior(
+      pathA: string,
+      pathB: string,
+      bboxes: Array<{ x: number; y: number; width: number; height: number }>,
+      edgeWidth = 4,
+    ): Promise<{ edgePixels: number; interiorPixels: number; outsidePixels: number; edgeFraction: number }> {
+      const [bufA, bufB] = await Promise.all([readFile(pathA), readFile(pathB)]);
+      const pA = PNG.sync.read(bufA);
+      const pB = PNG.sync.read(bufB);
+      if (pA.data.length !== pB.data.length) {
+        return { edgePixels: 0, interiorPixels: 0, outsidePixels: 0, edgeFraction: 0 };
+      }
+      // For each forced bbox, classify a pixel (x,y) as edge if it
+      // falls in the band of width `edgeWidth` around the perimeter,
+      // interior if it falls deeper inside, outside otherwise.
+      // A pixel that is "edge" for one bbox and "interior" for
+      // another counts as interior (the stronger signal wins).
+      const w = pA.width;
+      let edge = 0, interior = 0, outside = 0;
+      const dpr = 1;  // assume CSS-px = device-px for screenshots
+      for (let i = 0; i < pA.data.length; i += 4) {
+        const dr = Math.abs(pA.data[i]! - pB.data[i]!);
+        const dg = Math.abs(pA.data[i + 1]! - pB.data[i + 1]!);
+        const db = Math.abs(pA.data[i + 2]! - pB.data[i + 2]!);
+        if (dr < 4 && dg < 4 && db < 4) continue;
+        const px = (i / 4) | 0;
+        const x = px % w, y = (px / w) | 0;
+        let isInterior = false, isEdge = false;
+        for (const b of bboxes) {
+          const bx = b.x * dpr, by = b.y * dpr, bw = b.width * dpr, bh = b.height * dpr;
+          const insideOuter = x >= bx - edgeWidth && x <= bx + bw + edgeWidth
+            && y >= by - edgeWidth && y <= by + bh + edgeWidth;
+          if (!insideOuter) continue;
+          const insideInner = x >= bx + edgeWidth && x <= bx + bw - edgeWidth
+            && y >= by + edgeWidth && y <= by + bh - edgeWidth;
+          if (insideInner) { isInterior = true; break; }
+          isEdge = true;
+        }
+        if (isInterior) interior++;
+        else if (isEdge) edge++;
+        else outside++;
+      }
+      const total = edge + interior;
+      return {
+        edgePixels: edge,
+        interiorPixels: interior,
+        outsidePixels: outside,
+        edgeFraction: total > 0 ? edge / total : 0,
+      };
+    }
+
     const stateResults: ComponentFromImageReport["states"] = [];
     if (options.states && options.states.length > 0) {
       // Baseline screenshot is the target PNG (already captured). For
@@ -247,11 +356,24 @@ export async function runComponentFromImage(
           skipHeatmap: true,
         });
         const raw = await countRawDiff(currentPath, stateShotPath).catch(() => ({ ratio: 0, pixels: 0, total: 0 }));
+        const edgeClass = applied.bboxes.length > 0
+          ? await classifyEdgeVsInterior(currentPath, stateShotPath, applied.bboxes).catch(() => ({ edgePixels: 0, interiorPixels: 0, outsidePixels: 0, edgeFraction: 0 }))
+          : { edgePixels: 0, interiorPixels: 0, outsidePixels: 0, edgeFraction: 0 };
+        const [defaultLuma, stateLuma] = applied.bboxes.length > 0
+          ? await Promise.all([
+            meanInteriorLuma(currentPath, applied.bboxes),
+            meanInteriorLuma(stateShotPath, applied.bboxes),
+          ])
+          : [null, null];
+        const lumaDelta = (defaultLuma !== null && stateLuma !== null) ? stateLuma - defaultLuma : null;
         stateResults.push({
           state,
           forcedCount: applied.forcedCount,
           inducedDiffRatio: stateDiff?.diffRatio ?? 0,
           rawInducedDiffRatio: raw.ratio,
+          edgeFraction: edgeClass.edgeFraction,
+          interiorPixels: edgeClass.interiorPixels,
+          lumaDelta,
         });
       }
     }
@@ -269,6 +391,7 @@ export async function runComponentFromImage(
       bboxMatches,
       heatmapRegions,
       textRowMatches,
+      rowGapDeltas,
       baselineRowCount: targetRows.length,
       variantRowCount: currentRows.length,
       paletteDiff,
@@ -297,6 +420,7 @@ export async function runComponentFromImage(
       bboxMatches,
       heatmapRegions,
       textRowMatches,
+      rowGapDeltas,
       baselineRowCount: targetRows.length,
       variantRowCount: currentRows.length,
       paletteDiff: { ...paletteDiff, baseline: targetPalette, variant: currentPalette },
@@ -320,6 +444,7 @@ interface RenderInput {
   bboxMatches: MatchedBbox[];
   heatmapRegions: HeatmapRegion[];
   textRowMatches: MatchedTextRow[];
+  rowGapDeltas: RowGapDelta[];
   baselineRowCount: number;
   variantRowCount: number;
   paletteDiff: PaletteDiff;
@@ -400,6 +525,22 @@ export function renderReportMarkdown(r: RenderInput): string {
         lines.push(`| #${m.rank} | ${m.baseline.yCenter} | ${m.variant.yCenter} | ${signed}px |`);
       }
     }
+    if (r.rowGapDeltas.length > 0) {
+      lines.push("");
+      lines.push("**Spacing fixes** — per-gap delta between consecutive text rows. " +
+        "The fix is on the *preceding* element: if the gap above row #N is +6px, " +
+        "reduce that element's `margin-bottom` (or its container's `gap` value) by ~6px.");
+      lines.push("");
+      lines.push("| Above → Below | Target gap | Current gap | Δgap | Suggested fix |");
+      lines.push("|---|---|---|---|---|");
+      for (const g of r.rowGapDeltas.slice(0, 12)) {
+        const signed = g.delta > 0 ? `+${g.delta}` : `${g.delta}`;
+        const fix = g.delta > 0
+          ? `reduce preceding element's bottom space by ${g.delta}px`
+          : `add ${Math.abs(g.delta)}px to preceding element's bottom space`;
+        lines.push(`| #${g.aboveRank} → #${g.belowRank} | ${g.baselineGap}px | ${g.variantGap}px | ${signed}px | ${fix} |`);
+      }
+    }
     lines.push("");
   }
 
@@ -459,20 +600,48 @@ export function renderReportMarkdown(r: RenderInput): string {
     lines.push("- **Raw %**: any pixel where any RGB channel changed by ≥ 4. " +
       "Catches subtle hover effects (Δ10/channel shifts) that the perceptual " +
       "filter swallows.");
-    lines.push("- **Note**: `suspect` when both metrics are essentially zero — " +
-      "the state likely has no author CSS wired up.");
+    lines.push("- **Edge %**: of all diff pixels, fraction within 4px of any " +
+      "forced bbox perimeter. High = outline-only change (likely UA default focus " +
+      "ring); low = interior fill/text changed (author CSS).");
+    lines.push("- **ΔLuma**: change in mean interior luminance of the forced " +
+      "elements (state minus default). Negative = elements got darker; positive = " +
+      "lighter. Typical `:hover` darkens (−5 to −30); a *large positive ΔLuma* on " +
+      "an already-light state is a wrong-direction-shift suspect.");
+    lines.push("- **Note**: `suspect` when both diff metrics are essentially zero. " +
+      "`ua-likely` when only the outline changed and the interior is untouched " +
+      "(catches missing author `:focus-visible` rules that the UA default hides). " +
+      "`direction?` when ΔLuma > +15 on a state that conventionally darkens.");
     lines.push("");
-    lines.push("| State | Perceptual % | Raw % | Forced elements | Note |");
-    lines.push("|---|---|---|---|---|");
+    lines.push("| State | Perceptual % | Raw % | Edge % | ΔLuma | Forced | Note |");
+    lines.push("|---|---|---|---|---|---|---|");
     for (const s of r.stateResults) {
       const perceptZero = s.inducedDiffRatio < 0.0005;
       const rawZero = s.rawInducedDiffRatio < 0.0005;
+      const uaLikely = s.forcedCount > 0 && !rawZero
+        && s.edgeFraction > 0.85 && s.interiorPixels < 50;
+      // Wrong-direction heuristic: hover/active are conventionally
+      // darkening states. If they lighten by > 15 luma units on a
+      // styled state (rawZero false), flag for verification. focus
+      // and focus-visible may legitimately lighten via outline, so
+      // skip them.
+      const wrongDir = !rawZero
+        && !uaLikely
+        && (s.state === "hover" || s.state === "active")
+        && s.lumaDelta !== null && s.lumaDelta > 15;
       const note = s.forcedCount > 0 && perceptZero && rawZero
         ? "**suspect** — state did not change rendering"
         : s.forcedCount > 0 && perceptZero && !rawZero
           ? "_subtle_ — only raw-pixel diff registers (check below the perceptual threshold)"
-          : "";
-      lines.push(`| \`:${s.state}\` | ${(s.inducedDiffRatio * 100).toFixed(2)}% | ${(s.rawInducedDiffRatio * 100).toFixed(2)}% | ${s.forcedCount} | ${note} |`);
+          : uaLikely
+            ? "**ua-likely** — only the perimeter changed; author rule likely missing"
+            : wrongDir
+              ? `**direction?** — \`:${s.state}\` lightened by ${s.lumaDelta!.toFixed(0)} luma; verify this matches the intended hover direction`
+              : "";
+      const edgePct = s.edgeFraction > 0 ? (s.edgeFraction * 100).toFixed(0) + "%" : "—";
+      const luma = s.lumaDelta === null
+        ? "—"
+        : (s.lumaDelta > 0 ? `+${s.lumaDelta.toFixed(1)}` : s.lumaDelta.toFixed(1));
+      lines.push(`| \`:${s.state}\` | ${(s.inducedDiffRatio * 100).toFixed(2)}% | ${(s.rawInducedDiffRatio * 100).toFixed(2)}% | ${edgePct} | ${luma} | ${s.forcedCount} | ${note} |`);
     }
     lines.push("");
   }

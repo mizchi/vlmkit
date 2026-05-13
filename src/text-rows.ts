@@ -42,6 +42,19 @@ export interface MatchedTextRow {
   deltaY: number;
 }
 
+export interface RowGapDelta {
+  /** Rank of the row above the gap. */
+  aboveRank: number;
+  /** Rank of the row below the gap. */
+  belowRank: number;
+  /** Baseline gap (yCenter[below] − yCenter[above]). */
+  baselineGap: number;
+  /** Variant gap. */
+  variantGap: number;
+  /** variantGap − baselineGap; positive means the gap grew. */
+  delta: number;
+}
+
 export interface ExtractTextRowsOptions {
   /**
    * Minimum dip in mean luminance (vs. the median row luminance) for a
@@ -196,6 +209,43 @@ export function matchTextRows(
         baseline: baseline[i]!,
         variant: variant[i]!,
         deltaY: dy,
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Compute per-pair gap deltas from baseline ↔ variant row matches.
+ * The gap above row N+1 = `row[N+1].yCenter − row[N].yCenter` — the
+ * vertical distance between consecutive text bands. If the gap
+ * differs between baseline and variant, the spacing between those
+ * two pieces of content is wrong, and the fix is on the preceding
+ * element's `margin-bottom` / `padding-bottom`.
+ *
+ * Subagent G v3 dogfood: "once IoU > 0.98, the remaining ~1.7%
+ * diff is text baseline Δy in the 2-19px range, and the report
+ * doesn't yet suggest which CSS knob to turn." Gap deltas tell
+ * the agent exactly which margin to adjust.
+ */
+export function computeRowGapDeltas(
+  baseline: TextRow[],
+  variant: TextRow[],
+  minAbsoluteDelta = 2,
+): RowGapDelta[] {
+  const n = Math.min(baseline.length, variant.length);
+  const out: RowGapDelta[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    const baseGap = baseline[i + 1]!.yCenter - baseline[i]!.yCenter;
+    const varGap = variant[i + 1]!.yCenter - variant[i]!.yCenter;
+    const delta = varGap - baseGap;
+    if (Math.abs(delta) >= minAbsoluteDelta) {
+      out.push({
+        aboveRank: i,
+        belowRank: i + 1,
+        baselineGap: baseGap,
+        variantGap: varGap,
+        delta,
       });
     }
   }
