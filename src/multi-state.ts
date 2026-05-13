@@ -103,6 +103,22 @@ export async function applyForcedPseudoState(
     { selectorList: [...selectors], cap: maxElements },
   );
 
+  // Disable CSS transitions and animations *before* forcing the
+  // pseudo-state. Without this, a `transition: background 0.15s` on
+  // the target element means the state-screenshot catches the button
+  // mid-animation — typically registering only ~10% of the intended
+  // color change. The end-state colors then look ~identical to the
+  // default render and the suspect flag fires falsely. Subagent H
+  // dogfood: this masked a correctly-wired `:hover` rule and made
+  // the suspect signal unreliable. Injected at !important to override
+  // any author rule.
+  await page.addStyleTag({
+    content: `*, *::before, *::after {
+      transition: none !important;
+      animation: none !important;
+    }`,
+  });
+
   // IMPORTANT: do NOT detach the CDP session here. Detaching clears
   // session-scoped `CSS.forcePseudoState` overrides, so the screenshot
   // taken by the caller would lose the forced state. The session is

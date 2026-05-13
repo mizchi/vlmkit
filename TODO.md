@@ -333,6 +333,55 @@ evaluated incrementally.
   row, current has 0; missing `#2464ec` etc.) and hover-button
   fixture (0% pixel diff, but `:hover` flagged suspect because no
   hover rule is wired up).
+### Subagent dogfood follow-ups (2026-05-13)
+
+Two parallel subagents (G v1+v2 on component-from-image, H on
+multi-state) ran the new Tier 1 tools and reported back. G converged
+the wireframe pricing-card to **1.34% / 1.49% in 3-5 rounds** —
+palette + bbox-Δ + heatmap signals carried the agent most of the
+way. H surfaced the suspect-flag false-positive that turned out to
+be CSS transitions, not the threshold. Fixes applied:
+
+- [x] **Text-row detector under-counts on real fixtures.** Was
+  finding 1 row on the pricing-card target (CTA button); now finds
+  8 (badge, heading, price, 4 features, button). Root cause: used
+  per-row mean luma only, dominated by white background. Added a
+  per-row `max − min` range condition: a row is "content" if its
+  range ≥ 80 (text on bg) OR mean dips below median (solid band).
+- [x] **Bbox matcher false-pairs across wildly different areas.**
+  When variant lacks a region, area-rank-only pairing matched
+  target's full card against variant's button and reported
+  nonsense `Δ -329px height`. Added `maxAreaRatio` (default 4):
+  skip pairs whose `max/min > 4×`. Both rank positions stay
+  unmatched, which is honest.
+- [x] **Giant image-wide heatmap region was noise on round 1.**
+  CC pass produced one region covering 0,0 → W,H whenever pages
+  diverged badly. Added `maxRegionFraction` (default 0.8): drop
+  regions covering ≥80% of the image.
+- [x] **Multi-state suspect false-positive from CSS transitions.**
+  Subagent H added a correct `:hover { background: #1d4ed8 }` rule
+  but the suspect flag stayed on. Root cause was `transition:
+  background 0.15s` — the screenshot caught the button
+  mid-animation, registering ~3% of the color change. Fix:
+  `applyForcedPseudoState` now injects
+  `* { transition: none !important; animation: none !important; }`
+  before forcing the state. Repro went from 0.00% induced (false
+  suspect) to 8.31% induced (cleared).
+- [x] **Palette "missing" persists at low diff due to AA jitter.**
+  Subagent G v1 noted that `#f4f4f4` showed as "missing" even
+  after being in the CSS. Added a `Nearest` column to the palette
+  diff: Euclidean RGB distance to the closest color on the other
+  side. ≤ 30 annotated as _(near, likely AA)_; > 60 is a real
+  palette gap. Lets the agent dismiss persistent low-diff noise.
+
+Tier B (deferred, not yet shipped):
+
+- [ ] Multi-rank bbox surface (top-N matched, not just top-1).
+- [ ] Explicit dominant-outer/inner background-color row in the
+  report (not buried in palette "missing").
+- [ ] Per-heatmap-region dominant color annotation
+  ("region 485,478 310×38 dominant fill: #2464ec").
+
 - [x] **Multi-page consistency** — same component on N pages must
   render identically. Cross-page bbox / computed-style diff.
   `src/multi-page-consistency.ts` renders N URLs (or HTML files)

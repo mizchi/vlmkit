@@ -59,19 +59,29 @@ const DEFAULT_MIN_LUMA_DIP = 12;
 const DEFAULT_MIN_BAND_HEIGHT = 4;
 const DEFAULT_MAX_BANDS = 64;
 
-function rowMeanLuma(data: Uint8Array, width: number, height: number): Float32Array {
-  const rowMeans = new Float32Array(height);
+interface RowStats {
+  mean: Float32Array;
+  range: Float32Array;  // max − min per row; high for text rows (dark on light bg).
+}
+
+function rowStats(data: Uint8Array, width: number, height: number): RowStats {
+  const mean = new Float32Array(height);
+  const range = new Float32Array(height);
   for (let y = 0; y < height; y++) {
-    let sum = 0;
+    let sum = 0, mn = 255, mx = 0;
     const rowStart = y * width * 4;
     for (let x = 0; x < width; x++) {
       const idx = rowStart + x * 4;
-      // Rec.601 luma. Slightly faster than Rec.709, equally adequate here.
-      sum += 0.299 * data[idx]! + 0.587 * data[idx + 1]! + 0.114 * data[idx + 2]!;
+      // Rec.601 luma.
+      const L = 0.299 * data[idx]! + 0.587 * data[idx + 1]! + 0.114 * data[idx + 2]!;
+      sum += L;
+      if (L < mn) mn = L;
+      if (L > mx) mx = L;
     }
-    rowMeans[y] = sum / width;
+    mean[y] = sum / width;
+    range[y] = mx - mn;
   }
-  return rowMeans;
+  return { mean, range };
 }
 
 function median(values: Float32Array): number {
@@ -92,17 +102,34 @@ export function extractTextRowsFromRgba(
   const minDip = options.minLumaDip ?? DEFAULT_MIN_LUMA_DIP;
   const minBandH = options.minBandHeight ?? DEFAULT_MIN_BAND_HEIGHT;
   const maxBands = options.maxBands ?? DEFAULT_MAX_BANDS;
+  // Minimum max-min range for a row to count as "ink-bearing". Text on
+  // a light bg has a row range of ≥ ~150 even when the text covers a
+  // small horizontal slice (the row contains both bg-luma ≈ 245 pixels
+  // and text-luma ≈ 30 pixels). Solid backgrounds have near-zero range.
+  // Set conservatively to skip subpixel AA noise (range < 30 happens
+  // on bands with thin horizontal lines).
+  const MIN_INK_RANGE = 80;
 
-  const rowMeans = rowMeanLuma(data, width, height);
+  const { mean: rowMeans, range: rowRanges } = rowStats(data, width, height);
   const med = median(rowMeans);
-  // Dark band ⇔ row mean is at least `minDip` below the median row mean.
-  // (Dark-on-light page: text rows pull the mean down.)
+  // A row is content if EITHER:
+  //   (a) the row mean drops at least `minDip` below the median row
+  //       mean — catches solid-fill bands (buttons, banners) that span
+  //       the full width and pull the average down.
+  //   (b) the row's max-min range exceeds `MIN_INK_RANGE` — catches
+  //       thin text-on-bg bands where bg luma dominates the mean but
+  //       a few dark text pixels pull the row min way down.
+  // Subagent G dogfood: prior version used (a) only and missed
+  // heading / price / feature rows on pricing-card targets because
+  // they don't pull the full-width mean below threshold.
   const bands: TextRow[] = [];
   let runStart = -1;
   let runSum = 0;
   for (let y = 0; y < height; y++) {
-    const isDark = med - rowMeans[y]! >= minDip;
-    if (isDark) {
+    const meanDip = med - rowMeans[y]! >= minDip;
+    const hasInk = rowRanges[y]! >= MIN_INK_RANGE;
+    const isContent = meanDip || hasInk;
+    if (isContent) {
       if (runStart < 0) {
         runStart = y;
         runSum = 0;

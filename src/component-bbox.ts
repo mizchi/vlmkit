@@ -250,15 +250,40 @@ function iouOf(a: ComponentBbox, b: ComponentBbox): number {
  * DOM rewrite: the largest component is "the card", the second
  * largest is "the button row", etc.
  */
+export interface MatchComponentsOptions {
+  /**
+   * Maximum allowed area ratio for a same-rank pairing to be emitted.
+   * If `max(b.area, v.area) / min(b.area, v.area)` exceeds this, the
+   * pair is skipped — both rank positions are likely measuring
+   * different things (e.g. the variant is missing the big card so its
+   * rank-0 is just a button, paired against the target's rank-0 card).
+   * Default 4 — accepts components that differ by up to 4× in area,
+   * rejects wildly mismatched pairs. From Subagent G v2 dogfood:
+   * "variant has only the button, target has the whole card → matcher
+   * pairs them and reports nonsensical `Δ -329px` height".
+   */
+  maxAreaRatio?: number;
+}
+
+const DEFAULT_MAX_AREA_RATIO = 4;
+
 export function matchComponents(
   baseline: ComponentBbox[],
   variant: ComponentBbox[],
+  options: MatchComponentsOptions = {},
 ): MatchedBbox[] {
+  const maxAreaRatio = options.maxAreaRatio ?? DEFAULT_MAX_AREA_RATIO;
   const n = Math.min(baseline.length, variant.length);
   const out: MatchedBbox[] = [];
   for (let i = 0; i < n; i++) {
     const b = baseline[i]!;
     const v = variant[i]!;
+    // Skip the pairing if the area ratio is extreme. This avoids the
+    // false-pair "variant has only the button, target has the whole
+    // card" failure mode surfaced by subagent dogfood eval — the
+    // resulting Δ values would mislead the agent more than help.
+    const ratio = Math.max(b.area, v.area) / Math.max(1, Math.min(b.area, v.area));
+    if (ratio > maxAreaRatio) continue;
     out.push({
       rank: i,
       baseline: b,

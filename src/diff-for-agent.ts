@@ -212,8 +212,8 @@ export interface DfaReport {
       variant: Array<{ hex: string; share: number; r: number; g: number; b: number }>;
       diff: {
         matched: Array<{ baseline: { hex: string; share: number }; variant: { hex: string; share: number }; distance: number }>;
-        onlyInBaseline: Array<{ hex: string; share: number }>;
-        onlyInVariant: Array<{ hex: string; share: number }>;
+        onlyInBaseline: Array<{ hex: string; share: number; nearestNeighborDistance: number }>;
+        onlyInVariant: Array<{ hex: string; share: number; nearestNeighborDistance: number }>;
       };
     }>;
   }>;
@@ -310,6 +310,14 @@ function viewportImagePaths(
     current: resolve(outputDir, `${variantName}-${viewport}.png`),
     heatmap: resolve(outputDir, `${variantName}-${viewport}_heatmap.png`),
   };
+}
+
+function nearestAnnotation(distance: number): string {
+  if (!Number.isFinite(distance)) return "—";
+  const d = distance.toFixed(0);
+  if (distance <= 30) return `${d} _(near, likely AA)_`;
+  if (distance <= 60) return `${d} _(close)_`;
+  return `${d}`;
 }
 
 function formatPct(ratio: number): string {
@@ -718,16 +726,22 @@ export function formatMigrationReportForAgent(
         "not the target (agent used a hard-coded literal instead of the token). " +
         "Near-neighbor matches (RGB distance ≤ 12) are treated as the same color.");
       lines.push("");
-      lines.push("| Viewport | Side | Color | Share |");
-      lines.push("|---|---|---|---|");
+      lines.push("| Viewport | Side | Color | Share | Nearest |");
+      lines.push("|---|---|---|---|---|");
       for (const vp of paletteSummary.perViewport) {
         for (const c of vp.diff.onlyInBaseline.slice(0, 6)) {
           const pct = (c.share * 100).toFixed(1);
-          lines.push(`| \`${vp.viewport}\` | missing | \`${c.hex}\` | ${pct}% |`);
+          // Surface near-neighbor distance — a "near miss" with
+          // distance ≈ 12-30 is usually an AA / quantization artifact,
+          // not a real palette gap. Helps the agent dismiss noise once
+          // overall diff is low.
+          const near = nearestAnnotation(c.nearestNeighborDistance);
+          lines.push(`| \`${vp.viewport}\` | missing | \`${c.hex}\` | ${pct}% | ${near} |`);
         }
         for (const c of vp.diff.onlyInVariant.slice(0, 6)) {
           const pct = (c.share * 100).toFixed(1);
-          lines.push(`| \`${vp.viewport}\` | extra | \`${c.hex}\` | ${pct}% |`);
+          const near = nearestAnnotation(c.nearestNeighborDistance);
+          lines.push(`| \`${vp.viewport}\` | extra | \`${c.hex}\` | ${pct}% | ${near} |`);
         }
       }
       lines.push("");

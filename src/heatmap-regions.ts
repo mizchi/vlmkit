@@ -35,11 +35,22 @@ export interface FindHeatmapRegionsOptions {
   topN?: number;
   /** Hot-pixel threshold: red − max(green, blue) >= this. Default 60. */
   redOverGreenBlue?: number;
+  /**
+   * Skip regions whose bbox covers ≥ this fraction of the image. When
+   * baseline and variant are almost entirely different (e.g. blank
+   * page vs full target), the CC pass produces one giant region
+   * spanning 0,0 → W,H. That region is uninformative ("the whole
+   * page differs" is already obvious from diff %) and wastes
+   * iteration. Default 0.8 — drop regions covering ≥80% of the image.
+   * From subagent dogfood eval.
+   */
+  maxRegionFraction?: number;
 }
 
 const DEFAULT_MIN_AREA = 80;
 const DEFAULT_TOP_N = 8;
 const DEFAULT_RED_OVER = 60;
+const DEFAULT_MAX_REGION_FRACTION = 0.8;
 
 function buildHotMask(
   data: Uint8Array,
@@ -137,11 +148,14 @@ export function findHeatmapRegionsFromRgba(
   const minArea = options.minArea ?? DEFAULT_MIN_AREA;
   const topN = options.topN ?? DEFAULT_TOP_N;
   const redOver = options.redOverGreenBlue ?? DEFAULT_RED_OVER;
+  const maxFraction = options.maxRegionFraction ?? DEFAULT_MAX_REGION_FRACTION;
 
   if (width <= 0 || height <= 0) return [];
   const mask = buildHotMask(data, width, height, redOver);
+  const imageArea = width * height;
   return labelComponents(mask, width, height)
     .filter((r) => r.area >= minArea)
+    .filter((r) => (r.width * r.height) / imageArea < maxFraction)
     .sort((a, b) => b.area - a.area)
     .slice(0, topN);
 }

@@ -360,13 +360,23 @@ export function renderReportMarkdown(r: RenderInput): string {
   if (r.paletteDiff.onlyInBaseline.length > 0 || r.paletteDiff.onlyInVariant.length > 0) {
     lines.push("## Palette diff");
     lines.push("");
-    lines.push("| Side | Color | Share |");
-    lines.push("|---|---|---|");
+    lines.push("`Nearest` column: Euclidean RGB distance to the closest color on " +
+      "the other side. ≤ 30 = likely AA / quantization noise; > 60 = real palette gap.");
+    lines.push("");
+    lines.push("| Side | Color | Share | Nearest |");
+    lines.push("|---|---|---|---|");
+    const fmtNear = (d: number) => {
+      if (!Number.isFinite(d)) return "—";
+      const v = d.toFixed(0);
+      if (d <= 30) return `${v} (near, likely AA)`;
+      if (d <= 60) return `${v} (close)`;
+      return v;
+    };
     for (const c of r.paletteDiff.onlyInBaseline.slice(0, 8)) {
-      lines.push(`| missing | \`${c.hex}\` | ${(c.share * 100).toFixed(1)}% |`);
+      lines.push(`| missing | \`${c.hex}\` | ${(c.share * 100).toFixed(1)}% | ${fmtNear(c.nearestNeighborDistance)} |`);
     }
     for (const c of r.paletteDiff.onlyInVariant.slice(0, 8)) {
-      lines.push(`| extra | \`${c.hex}\` | ${(c.share * 100).toFixed(1)}% |`);
+      lines.push(`| extra | \`${c.hex}\` | ${(c.share * 100).toFixed(1)}% | ${fmtNear(c.nearestNeighborDistance)} |`);
     }
     lines.push("");
   }

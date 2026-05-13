@@ -15,12 +15,26 @@ export interface PaletteMatch {
   distance: number;
 }
 
+export interface UnmatchedPaletteColor extends PaletteColor {
+  /**
+   * Euclidean RGB distance to the closest color on the *other* side
+   * (any side, no consumption). Helps the agent distinguish:
+   *   - "real miss" (nearest > 50): no nearby variant color at all.
+   *   - "near miss" (12 < nearest ≤ 30): plausibly an AA / subpixel
+   *     artifact — the variant has a similar but not identical color.
+   *     Subagent G v1 dogfood: at <2% diff, `#f4f4f4` kept appearing
+   *     as "missing" because the rendered bg landed in a neighbor
+   *     bucket — this annotation flags that case.
+   */
+  nearestNeighborDistance: number;
+}
+
 export interface PaletteDiff {
   matched: PaletteMatch[];
   /** Colors in baseline with no near-neighbor in variant. */
-  onlyInBaseline: PaletteColor[];
+  onlyInBaseline: UnmatchedPaletteColor[];
   /** Colors in variant with no near-neighbor in baseline. */
-  onlyInVariant: PaletteColor[];
+  onlyInVariant: UnmatchedPaletteColor[];
   /** Total share of baseline colors that had a match in variant. */
   baselineMatchedShare: number;
   /** Total share of variant colors that had a match in baseline. */
@@ -54,15 +68,17 @@ export function diffPalettes(
   // a single variant color can't satisfy two baseline colors.
   const variantUsed = new Set<number>();
   const matched: PaletteMatch[] = [];
-  const onlyInBaseline: PaletteColor[] = [];
+  const onlyInBaseline: UnmatchedPaletteColor[] = [];
   let baselineMatchedShare = 0;
 
   for (const b of baseline) {
     let bestIdx = -1;
     let bestDist = Infinity;
+    let bestUnconsumed = Infinity;
     for (let i = 0; i < variant.length; i++) {
-      if (variantUsed.has(i)) continue;
       const d = dist(b, variant[i]!);
+      if (d < bestUnconsumed) bestUnconsumed = d;
+      if (variantUsed.has(i)) continue;
       if (d < bestDist) {
         bestDist = d;
         bestIdx = i;
@@ -73,17 +89,24 @@ export function diffPalettes(
       matched.push({ baseline: b, variant: variant[bestIdx]!, distance: bestDist });
       baselineMatchedShare += b.share;
     } else if (b.share >= minReportShare) {
-      onlyInBaseline.push(b);
+      onlyInBaseline.push({ ...b, nearestNeighborDistance: bestUnconsumed });
     }
   }
 
-  const onlyInVariant: PaletteColor[] = [];
+  const onlyInVariant: UnmatchedPaletteColor[] = [];
   let variantMatchedShare = 0;
   for (let i = 0; i < variant.length; i++) {
     if (variantUsed.has(i)) {
       variantMatchedShare += variant[i]!.share;
-    } else if (variant[i]!.share >= minReportShare) {
-      onlyInVariant.push(variant[i]!);
+      continue;
+    }
+    if (variant[i]!.share >= minReportShare) {
+      let nearest = Infinity;
+      for (const b of baseline) {
+        const d = dist(b, variant[i]!);
+        if (d < nearest) nearest = d;
+      }
+      onlyInVariant.push({ ...variant[i]!, nearestNeighborDistance: nearest });
     }
   }
 
