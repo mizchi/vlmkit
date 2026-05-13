@@ -58,6 +58,13 @@ const ROOT_MODULE_COMMANDS: Record<string, string> = {
   flipbook: "./flipbook-cli.ts",
   "diff-for-agent": "./diff-for-agent-cli.ts",
   "compare-runs": "./compare-runs-cli.ts",
+  // Markup-assistance scenarios (2026-05-13).
+  "component-from-image": "./component-from-image.ts",
+  "multi-page-consistency": "./multi-page-consistency.ts",
+  "component-consistency": "./component-consistency.ts",
+  "theme-parity": "./theme-parity.ts",
+  "i18n-stress": "./i18n-stress.ts",
+  "a11y-contrast": "./a11y-contrast.ts",
 };
 
 const WORKFLOW_ALIAS_COMMANDS = new Set<WorkflowCommand>([
@@ -120,6 +127,19 @@ Core Commands:
   discover <file>             Discover responsive breakpoints from HTML/CSS
   bench [options]             CSS challenge benchmark
   report                      Detection pattern report
+
+Markup-Assistance Commands:
+  component-from-image <target.png> <current.html>
+                              Build a component from a target screenshot
+  multi-page-consistency --selector <sel> --urls/--files ...
+                              Drift check: same component across N pages
+  component-consistency <html> --selector <sel>
+                              Drift check: N instances of selector on one page
+  theme-parity <html>         Detect hard-coded colors that don't respond
+                              to prefers-color-scheme dark
+  i18n-stress <html> [--inflate 1.4]
+                              Inflate text content; detect overflow / wrap bugs
+  a11y-contrast <html>        WCAG AA contrast scan on rendered text
 
 Workflow Commands:
   workflow <command>          Stateful baseline/snapshot verification workflow

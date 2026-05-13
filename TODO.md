@@ -409,6 +409,54 @@ be CSS transitions, not the threshold. Fixes applied:
   side. ≤ 30 annotated as _(near, likely AA)_; > 60 is a real
   palette gap. Lets the agent dismiss persistent low-diff noise.
 
+### Tier 3 + CLI unification + re-dogfood (2026-05-13)
+
+- [x] **A11y contrast scan** (`vrt a11y-contrast`). Renders the
+  HTML in Playwright, walks every visible text node via an
+  in-browser `TreeWalker`, samples computed-style foreground +
+  effective ancestor background, classifies font size for the
+  "large text" 3:1 vs normal text 4.5:1 WCAG AA threshold.
+  Worst-ratio-first findings table with hex / ratio /
+  required-AA columns. Fixture
+  fixtures/a11y-contrast/low-contrast: 4 failures cleanly
+  detected (1.47:1 `#d1d5db` on white, 1.80:1 `#93c5fd` on
+  white, 2.54:1 `#9ca3af` on white as both body and large
+  text); the body-grade `#4b5563` and the button pass.
+
+- [x] **CLI unification.** All six markup-assistance CLIs +
+  `diff-for-agent` + `flipbook` + `compare-runs` now registered
+  under the unified `vrt` dispatcher
+  (src/vrt-command-router.ts + src/vrt.ts). Fixed a
+  long-standing bug in the dispatcher: `process.argv[1]` was
+  being set to a *relative* module path
+  (`./migration-compare.ts`) which made each module's
+  `isCliEntry` strict check
+  (`resolve(argv[1]) === fileURLToPath(import.meta.url)`)
+  silently fail in dev mode. Now resolved to absolute via
+  `fileURLToPath(new URL(modulePath, import.meta.url))` —
+  every command runs correctly from `node src/vrt.ts <cmd>`
+  AND from the built `dist/vrt.mjs`.
+
+- [x] **Re-dogfood — component-from-image v2.** Blank pricing-card →
+  target ran with the new Backgrounds + heatmap Fill + raw/perceptual
+  signals. Round 1 → 2: **87.36% → 2.48%** (vs prior v1/v2 which hit
+  4.13% / 1.80%). Final 1.71% in 4 rounds. Subagent verdict:
+  "Backgrounds row was the single biggest win" — first write set
+  `body { background: #f6f7fb }` correctly with zero palette guessing.
+  "Heatmap Fill column gave me the button color (`#2563eb`) and badge
+  background (`#dbeafe`) before I'd written a single line of CSS."
+  All prior bugs (text-row undercount, giant heatmap, false-pair,
+  palette persistent missing) confirmed NOT hit. Remaining blocker:
+  sub-pixel vertical spacing — needs per-row spacing-delta hints
+  ("row #3 is 4px low, adjust the preceding margin-bottom").
+
+- [x] **Re-dogfood — multi-state v2.** missing-hover.html → cleared:
+  **2 rounds** (vs 3 before). Transition fix confirmed working.
+  Subagent verdict: trustworthy in real workflows now. Two open
+  concerns documented for future work: (1) UA-default focus ring
+  clears the suspect flag even without author CSS, (2) wrong-direction
+  hover (light bg on dark button) not detected.
+
 ### Tier B follow-up + A4 polish (2026-05-13)
 
 - [x] **Per-heatmap-region dominant color annotation.**

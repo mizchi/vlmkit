@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Low contrast bugs</title>
+<style>
+  body { font-family: system-ui; margin: 0; padding: 40px; background: white; color: #111827; }
+  h1 { font-size: 24px; }
+  /* PASS: body text on white at 4.92:1 */
+  .ok-body { color: #4b5563; font-size: 14px; }
+  /* FAIL: muted-on-white at 2.85:1 — common bug */
+  .too-muted { color: #9ca3af; font-size: 14px; }
+  /* FAIL: light blue on white at 2.5:1 */
+  .light-link { color: #93c5fd; font-size: 14px; }
+  /* PASS-large: 18px large text at 3:1 minimum */
+  .large-pale { color: #9ca3af; font-size: 22px; }
+  /* FAIL: 14px not bold treated as normal, fails */
+  .small-pale { color: #d1d5db; font-size: 14px; }
+  /* PASS: button with sufficient contrast */
+  .btn { display: inline-block; padding: 8px 16px; background: #2563eb; color: white; border-radius: 4px; font-size: 14px; font-weight: 600; }
+</style>
+</head>
+<body>
+  <h1>Account settings</h1>
+  <p class="ok-body">This text has fine contrast against the white background.</p>
+  <p class="too-muted">This subtitle is too muted to read comfortably.</p>
+  <p><a class="light-link" href="#">Read documentation</a></p>
+  <p class="large-pale">Large pale text passes at 3:1 because of font size.</p>
+  <p class="small-pale">Small pale text fails at 1.6:1.</p>
+  <button class="btn">Save changes</button>
+</body>
+</html>
