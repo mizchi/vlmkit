@@ -58,6 +58,11 @@ export interface DfaDpEntry {
   property: string;
   baseline: string;
   variant: string;
+  parentDisplayContext?: {
+    baselineParent: string;
+    variantParent: string;
+    isFlexOrGridItem: boolean;
+  };
 }
 
 export interface DfaDpSummary {
@@ -85,6 +90,11 @@ export interface DfaDpPerViewportSummary {
       variantClasses: string;
       viewports: string[];
       samples: Array<{ viewport: string; baseline: string; variant: string; baselineEm?: number; variantEm?: number }>;
+      parentDisplayContext?: {
+        baselineParent: string;
+        variantParent: string;
+        isFlexOrGridItem: boolean;
+      };
     }>;
   };
 }
@@ -235,6 +245,23 @@ function formatPct(ratio: number): string {
 function formatValueWithEm(value: string, em: number | undefined): string {
   if (em === undefined) return `\`${value}\``;
   return `\`${value}\` _(${em}em)_`;
+}
+
+/**
+ * Append a flex/grid coercion suffix when a `display`-row's parent is a
+ * flex/grid container. CSS blockifies inline children of flex/grid
+ * containers, so an `inline-flex` rule can compute as `flex` and look
+ * like a delta when it isn't — D's exact complaint.
+ */
+function displayCoercionSuffix(
+  property: string,
+  ctx?: { baselineParent: string; variantParent: string; isFlexOrGridItem: boolean },
+): string {
+  if (property !== "display" || !ctx || !ctx.isFlexOrGridItem) return "";
+  const sameParent = ctx.baselineParent === ctx.variantParent;
+  return sameParent
+    ? ` _(flex/grid item — parent is ${ctx.baselineParent})_`
+    : ` _(flex/grid item — baseline parent ${ctx.baselineParent}, variant parent ${ctx.variantParent})_`;
 }
 
 /**
@@ -674,8 +701,9 @@ export function formatMigrationReportForAgent(
           const sample = pp.samples[0]!;
           const bcls = pp.baselineClasses || "_(none)_";
           const vcls = pp.variantClasses || "_(none)_";
+          const ctxSuffix = displayCoercionSuffix(pp.property, pp.parentDisplayContext);
           const baselineLabel = formatValueWithEm(sample.baseline, sample.baselineEm);
-          const variantLabel = formatValueWithEm(sample.variant, sample.variantEm);
+          const variantLabel = formatValueWithEm(sample.variant, sample.variantEm) + ctxSuffix;
           lines.push(`| \`${pp.path}\` | \`${bcls}\` | \`${vcls}\` | \`${pp.property}\` | ${baselineLabel} | ${variantLabel} |`);
         }
       } else {
@@ -726,9 +754,10 @@ export function formatMigrationReportForAgent(
           const vps = pp.viewports.join(", ");
           // Show the first sample's values; samples may differ across viewports.
           const sample = pp.samples[0]!;
+          const ctxSuffix = displayCoercionSuffix(pp.property, pp.parentDisplayContext);
           const baselineLabel = formatValueWithEm(sample.baseline, sample.baselineEm);
           const variantLabel = formatValueWithEm(sample.variant, sample.variantEm);
-          lines.push(`| \`${pp.path}\` | \`${bcls}\` | \`${vcls}\` | \`${pp.property}\` | ${vps} | ${baselineLabel} → ${variantLabel} |`);
+          lines.push(`| \`${pp.path}\` | \`${bcls}\` | \`${vcls}\` | \`${pp.property}\` | ${vps} | ${baselineLabel} → ${variantLabel}${ctxSuffix} |`);
         }
         lines.push("");
       }
@@ -757,7 +786,8 @@ export function formatMigrationReportForAgent(
         for (const e of dpEntries.slice(0, 25)) {
           const bcls = e.baselineClasses || "_(none)_";
           const vcls = e.variantClasses || "_(none)_";
-          lines.push(`| \`${e.path}\` | \`${bcls}\` | \`${vcls}\` | \`${e.property}\` | \`${e.baseline}\` | \`${e.variant}\` |`);
+          const ctxSuffix = displayCoercionSuffix(e.property, e.parentDisplayContext);
+          lines.push(`| \`${e.path}\` | \`${bcls}\` | \`${vcls}\` | \`${e.property}\` | \`${e.baseline}\` | \`${e.variant}\`${ctxSuffix} |`);
         }
         if (dpEntries.length > 25) {
           lines.push(`| _…${dpEntries.length - 25} more rows_ | | | | | |`);

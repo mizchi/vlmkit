@@ -158,6 +158,51 @@ describe("em normalization in diffDomPositionStyles", () => {
   });
 });
 
+describe("display flex/grid-item context annotation", () => {
+  it("marks `display`-rows with parentDisplayContext when the parent is flex", () => {
+    const baseline = [
+      el({
+        path: "p1",
+        tag: "span",
+        classes: "pill",
+        parentDisplay: "flex",
+        styles: { display: "inline-flex" },
+      }),
+    ];
+    const variant = [
+      el({
+        path: "p1",
+        tag: "span",
+        classes: "luna-pill",
+        parentDisplay: "flex",
+        styles: { display: "inline-block" },
+      }),
+    ];
+    const r = diffSingle(baseline, variant);
+    const row = r.entries.find((e) => e.property === "display")!;
+    assert.ok(row.parentDisplayContext);
+    assert.equal(row.parentDisplayContext!.baselineParent, "flex");
+    assert.equal(row.parentDisplayContext!.variantParent, "flex");
+    assert.equal(row.parentDisplayContext!.isFlexOrGridItem, true);
+  });
+
+  it("does not flag isFlexOrGridItem when both parents are block", () => {
+    const baseline = [el({ path: "p", parentDisplay: "block", styles: { display: "block" } })];
+    const variant = [el({ path: "p", parentDisplay: "block", styles: { display: "inline" } })];
+    const r = diffSingle(baseline, variant);
+    const row = r.entries.find((e) => e.property === "display")!;
+    assert.equal(row.parentDisplayContext!.isFlexOrGridItem, false);
+  });
+
+  it("does not emit parentDisplayContext for non-display properties", () => {
+    const baseline = [el({ path: "p", parentDisplay: "flex", styles: { color: "red" } })];
+    const variant = [el({ path: "p", parentDisplay: "flex", styles: { color: "blue" } })];
+    const r = diffSingle(baseline, variant);
+    const row = r.entries.find((e) => e.property === "color")!;
+    assert.equal(row.parentDisplayContext, undefined);
+  });
+});
+
 describe("parseDomPositionStyles", () => {
   it("parses a JSON string", () => {
     const json = JSON.stringify([{ path: "p", tag: "div", classes: "", styles: {} }]);

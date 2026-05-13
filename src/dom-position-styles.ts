@@ -30,6 +30,12 @@ export interface PositionedElement {
   classes: string;
   /** Tracked computed-style values. */
   styles: Record<string, string>;
+  /**
+   * Parent element's computed `display`. Used to annotate `display`-property
+   * diffs where the value looks different but is actually flex/grid-item
+   * coercion (CSS blockifies inline children of flex/grid containers).
+   */
+  parentDisplay?: string;
 }
 
 export interface DpEntry {
@@ -48,6 +54,18 @@ export interface DpEntry {
    */
   baselineEm?: number;
   variantEm?: number;
+  /**
+   * Set on `display`-property rows when the parent on either side is a
+   * flex/grid container. Helps the agent realize the difference may be
+   * flex-item coercion (`inline-flex` → `flex`) rather than a real
+   * source-CSS mismatch.
+   */
+  parentDisplayContext?: {
+    baselineParent: string;
+    variantParent: string;
+    /** True when at least one parent is flex/grid/inline-flex/inline-grid. */
+    isFlexOrGridItem: boolean;
+  };
 }
 
 /** Properties for which em-normalization is informative. */
@@ -55,6 +73,14 @@ const EM_RELATIVE = new Set([
   "letter-spacing",
   "word-spacing",
   "line-height",
+]);
+
+/** Parent `display` values that coerce inline children to block-ish layouts. */
+const FLEX_OR_GRID_DISPLAYS = new Set([
+  "flex",
+  "inline-flex",
+  "grid",
+  "inline-grid",
 ]);
 
 function emEquivalent(value: string, fontSizePx: number): number | undefined {
@@ -140,6 +166,17 @@ export function diffDomPositionStyles(
         if (baselineEm !== undefined) diffEntry.baselineEm = Math.round(baselineEm * 10000) / 10000;
         if (variantEm !== undefined) diffEntry.variantEm = Math.round(variantEm * 10000) / 10000;
       }
+      if (property === "display") {
+        const bp = b.parentDisplay ?? "";
+        const vp = v.parentDisplay ?? "";
+        if (bp || vp) {
+          diffEntry.parentDisplayContext = {
+            baselineParent: bp,
+            variantParent: vp,
+            isFlexOrGridItem: FLEX_OR_GRID_DISPLAYS.has(bp) || FLEX_OR_GRID_DISPLAYS.has(vp),
+          };
+        }
+      }
       entries.push(diffEntry);
       byProperty.set(property, (byProperty.get(property) ?? 0) + 1);
       const entry = byPath.get(path) ?? { baselineClasses: b.classes, variantClasses: v.classes, count: 0 };
@@ -197,11 +234,17 @@ export const DOM_POSITION_STYLES_BROWSER_SCRIPT = `JSON.stringify((function(){
         var p = TRACKED[i];
         styles[p] = cs.getPropertyValue(p);
       }
+      // Capture parent display so the diff layer can flag flex/grid-item coercion.
+      var parentDisplay = "";
+      if (el.parentElement) {
+        try { parentDisplay = getComputedStyle(el.parentElement).getPropertyValue("display"); } catch (e) { parentDisplay = ""; }
+      }
       out.push({
         path: path,
         tag: tag,
         classes: (el.getAttribute("class") || "").trim(),
-        styles: styles
+        styles: styles,
+        parentDisplay: parentDisplay
       });
     }
     var children = el.children;
@@ -266,6 +309,12 @@ export interface DpPerViewportResult {
     variantClasses: string;
     viewports: string[];
     samples: DpSample[];
+    /** Set on `display`-property pairs when at least one parent is flex/grid. */
+    parentDisplayContext?: {
+      baselineParent: string;
+      variantParent: string;
+      isFlexOrGridItem: boolean;
+    };
   }>;
   /** Per-viewport tally so the caller can see which viewport is worst. */
   byViewport: Array<{ viewport: string; count: number }>;
@@ -322,7 +371,7 @@ export function diffPositionStylesAcrossViewports(
   // Aggregate per (path, property) — same delta on multiple viewports is
   // typically one source rule; differing-viewport deltas are media-query
   // gated.
-  const ppKey = (path: string, property: string) => `${path} ${property}`;
+  const ppKey = (path: string, property: string) => `${path} ${property}`;
   const aggregated = new Map<string, {
     path: string;
     property: string;
@@ -330,6 +379,7 @@ export function diffPositionStylesAcrossViewports(
     variantClasses: string;
     viewports: string[];
     samples: DpSample[];
+    parentDisplayContext?: { baselineParent: string; variantParent: string; isFlexOrGridItem: boolean };
   }>();
   for (const e of entries) {
     const k = ppKey(e.path, e.property);
@@ -361,6 +411,7 @@ export function diffPositionStylesAcrossViewports(
         variantClasses: e.variantClasses,
         viewports: [e.viewport],
         samples: [sample],
+        parentDisplayContext: e.parentDisplayContext,
       });
     }
   }
