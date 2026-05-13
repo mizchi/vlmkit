@@ -319,9 +319,20 @@ evaluated incrementally.
   exact pattern of "agent forgot to wire up :hover". Verified
   on a synthetic hover-button fixture: default 0% on all 3 vps,
   hover +0.37%/+0.42%/0.00%, focus-visible +0.26%/+0.29%/+1.11%.
-- [ ] **Component-from-screenshot** — single-component subset of
+- [x] **Component-from-screenshot** — single-component subset of
   wireframe mode: small viewport, one bbox, multi-state. New CLI
-  subcommand.
+  subcommand. `src/component-from-image.ts` takes a target PNG +
+  current HTML, renders the HTML at the PNG's exact dimensions,
+  pixel-diffs, and runs every image-only signal (bbox, heatmap,
+  text-row, palette) plus an optional `--states` pass. Emits a
+  self-contained markdown report. Multi-state in this mode compares
+  state-vs-default *within the current HTML* (since the target is
+  a static PNG) and flags `:hover induced 0%` on interactive
+  elements as **suspect — state did not change rendering**.
+  Verified on wireframe pricing-card (87% diff, target has 1 text
+  row, current has 0; missing `#2464ec` etc.) and hover-button
+  fixture (0% pixel diff, but `:hover` flagged suspect because no
+  hover rule is wired up).
 - [ ] **Multi-page consistency** — same component on N pages must
   render identically. Cross-page bbox / computed-style diff.
 

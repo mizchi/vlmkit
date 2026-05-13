@@ -1,0 +1,439 @@
+#!/usr/bin/env node
+/**
+ * Component-from-screenshot mode.
+ *
+ * Workflow:
+ *   1. Designer / user provides a target PNG (e.g., from Figma export).
+ *   2. Agent provides an HTML file (possibly empty scaffold).
+ *   3. Tool renders the HTML at the target's viewport dimensions,
+ *      pixel-diffs the rendered output against the target, and
+ *      surfaces all image-only signals (bbox, palette, heatmap,
+ *      text-row) plus an optional multi-state pass.
+ *   4. Agent iterates the HTML until the diff converges.
+ *
+ * Unlike `vrt compare` (migration mode), this scenario:
+ *   - has no DOM correspondence — the target is a static PNG.
+ *   - runs at a single viewport sized to the target image.
+ *   - skips paint-tree, DOM-equivalence, breakpoint-discovery, etc.
+ *     — none of them apply when the baseline isn't HTML.
+ *   - emits a slim markdown report directly (no separate
+ *     diff-for-agent pass needed).
+ *
+ * Usage:
+ *   vrt component-from-image <target.png> <current.html>
+ *   vrt component-from-image <target.png> <current.html> --output report.md
+ *   vrt component-from-image <target.png> <current.html> --states hover focus-visible
+ */
+import { readFile, writeFile, mkdir, copyFile } from "node:fs/promises";
+import { basename, dirname, extname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { PNG } from "pngjs";
+import { chromium } from "playwright";
+import { compareScreenshots } from "./heatmap.ts";
+import {
+  extractComponentsFromFile,
+  matchComponents,
+  type MatchedBbox,
+} from "./component-bbox.ts";
+import { findHeatmapRegionsFromFile, type HeatmapRegion } from "./heatmap-regions.ts";
+import { extractTextRowsFromFile, matchTextRows, type MatchedTextRow } from "./text-rows.ts";
+import { extractPaletteFromFile, type PaletteColor } from "./palette-extract.ts";
+import { diffPalettes, type PaletteDiff } from "./palette-diff.ts";
+import {
+  applyForcedPseudoState,
+  clearStateMarkers,
+  type ForcedPseudoState,
+} from "./multi-state.ts";
+import type { VrtSnapshot } from "./types.ts";
+import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "./terminal-colors.ts";
+
+export interface ComponentFromImageOptions {
+  targetImagePath: string;
+  currentHtmlPath: string;
+  outputDir: string;
+  /** Markdown report path. Default: `${outputDir}/report.md`. */
+  reportPath?: string;
+  /** Pseudo-states to additionally capture. Empty = none. */
+  states?: ForcedPseudoState[];
+  /** Pixel-diff threshold (0..1). Default 0.03 (stricter than VRT default). */
+  threshold?: number;
+}
+
+export interface ComponentFromImageReport {
+  targetImage: string;
+  currentHtml: string;
+  viewport: { width: number; height: number };
+  diff: {
+    diffPixels: number;
+    totalPixels: number;
+    diffRatio: number;
+  };
+  bboxMatches: MatchedBbox[];
+  heatmapRegions: HeatmapRegion[];
+  textRowMatches: MatchedTextRow[];
+  baselineRowCount: number;
+  variantRowCount: number;
+  paletteDiff: PaletteDiff & { baseline: PaletteColor[]; variant: PaletteColor[] };
+  states?: Array<{
+    state: ForcedPseudoState;
+    forcedCount: number;
+    inducedDiffRatio: number;
+  }>;
+  reportPath: string;
+}
+
+function parseArgs(argv: string[]) {
+  const positional: string[] = [];
+  const states: ForcedPseudoState[] = [];
+  let outputDir = "";
+  let report = "";
+  let threshold = 0.03;
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--output-dir") outputDir = argv[++i];
+    else if (a === "--report") report = argv[++i];
+    else if (a === "--threshold") threshold = parseFloat(argv[++i] ?? "0.03");
+    else if (a === "--states") {
+      while (i + 1 < argv.length && !argv[i + 1].startsWith("--")) {
+        const v = argv[++i];
+        if (v === "hover" || v === "focus" || v === "active" || v === "focus-visible") {
+          states.push(v);
+        }
+      }
+    } else {
+      positional.push(a);
+    }
+  }
+  return { positional, outputDir, report, threshold, states };
+}
+
+export async function runComponentFromImage(
+  options: ComponentFromImageOptions,
+): Promise<ComponentFromImageReport> {
+  const outputDir = resolve(options.outputDir);
+  await mkdir(outputDir, { recursive: true });
+
+  const targetPath = resolve(options.targetImagePath);
+  const targetPng = PNG.sync.read(await readFile(targetPath));
+  const viewport = { width: targetPng.width, height: targetPng.height };
+
+  // Copy the target PNG into outputDir so the report's relative-path
+  // references all resolve from one place.
+  const targetCopyPath = join(outputDir, `target${extname(targetPath)}`);
+  await copyFile(targetPath, targetCopyPath);
+
+  const htmlPath = resolve(options.currentHtmlPath);
+  const html = await readFile(htmlPath, "utf-8");
+
+  console.log(`  ${BOLD}${CYAN}vrt component-from-image${RESET}`);
+  console.log(`  ${DIM}target:  ${targetPath} (${viewport.width}×${viewport.height})${RESET}`);
+  console.log(`  ${DIM}current: ${htmlPath}${RESET}`);
+
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({ viewport });
+    await page.setContent(html, { waitUntil: "networkidle" });
+    const currentPath = join(outputDir, "current.png");
+    await page.screenshot({ path: currentPath, fullPage: false });
+    await page.close();
+
+    // Pixel diff against the target.
+    const snap: VrtSnapshot = {
+      testId: "component",
+      testTitle: "component-from-image",
+      projectName: "component-from-image",
+      screenshotPath: currentPath,
+      baselinePath: targetCopyPath,
+      status: "changed",
+    };
+    const diff = await compareScreenshots(snap, {
+      outputDir,
+      threshold: options.threshold ?? 0.03,
+    });
+    const diffRatio = diff?.diffRatio ?? 0;
+    const diffPixels = diff?.diffPixels ?? 0;
+    const totalPixels = diff?.totalPixels ?? (viewport.width * viewport.height);
+    const heatmapPath = join(outputDir, "component_heatmap.png");
+
+    // All image-only signals run identically on both files.
+    const [bboxBaseline, bboxVariant] = await Promise.all([
+      extractComponentsFromFile(targetCopyPath).catch(() => []),
+      extractComponentsFromFile(currentPath).catch(() => []),
+    ]);
+    const bboxMatches = matchComponents(bboxBaseline, bboxVariant);
+
+    let heatmapRegions: HeatmapRegion[] = [];
+    try {
+      heatmapRegions = await findHeatmapRegionsFromFile(heatmapPath);
+    } catch {
+      // Heatmap may be absent when diff is zero.
+    }
+
+    const [targetRows, currentRows] = await Promise.all([
+      extractTextRowsFromFile(targetCopyPath).catch(() => []),
+      extractTextRowsFromFile(currentPath).catch(() => []),
+    ]);
+    const textRowMatches = matchTextRows(targetRows, currentRows);
+
+    const [targetPalette, currentPalette] = await Promise.all([
+      extractPaletteFromFile(targetCopyPath).catch(() => []),
+      extractPaletteFromFile(currentPath).catch(() => []),
+    ]);
+    const paletteDiff = diffPalettes(targetPalette, currentPalette);
+
+    // Optional multi-state pass (current side only — we have no
+    // baseline HTML to force states on).
+    const stateResults: ComponentFromImageReport["states"] = [];
+    if (options.states && options.states.length > 0) {
+      // Baseline screenshot is the target PNG (already captured). For
+      // each state, render the current HTML with the state forced and
+      // diff against the *default* current screenshot — surfaces "what
+      // the state does to the variant" alongside the default delta.
+      for (const state of options.states) {
+        const statePage = await browser.newPage({ viewport });
+        await statePage.setContent(html, { waitUntil: "networkidle" });
+        const applied = await applyForcedPseudoState(statePage, { state });
+        const stateShotPath = join(outputDir, `current-${state}.png`);
+        await statePage.screenshot({ path: stateShotPath, fullPage: false });
+        await clearStateMarkers(statePage).catch(() => {});
+        await statePage.close();
+
+        const stateSnap: VrtSnapshot = {
+          testId: `component-${state}`,
+          testTitle: `component :${state}`,
+          projectName: "component-from-image",
+          screenshotPath: stateShotPath,
+          baselinePath: currentPath,
+          status: "changed",
+        };
+        const stateDiff = await compareScreenshots(stateSnap, {
+          outputDir,
+          threshold: options.threshold ?? 0.03,
+          skipHeatmap: true,
+        });
+        stateResults.push({
+          state,
+          forcedCount: applied.forcedCount,
+          inducedDiffRatio: stateDiff?.diffRatio ?? 0,
+        });
+      }
+    }
+
+    const reportPath = options.reportPath ?? join(outputDir, "report.md");
+    const markdown = renderReportMarkdown({
+      targetImage: targetPath,
+      currentHtml: htmlPath,
+      viewport,
+      diffPixels,
+      totalPixels,
+      diffRatio,
+      heatmapPath: diffPixels > 0 ? heatmapPath : undefined,
+      currentPath,
+      bboxMatches,
+      heatmapRegions,
+      textRowMatches,
+      baselineRowCount: targetRows.length,
+      variantRowCount: currentRows.length,
+      paletteDiff,
+      stateResults,
+    });
+    await writeFile(reportPath, markdown);
+
+    const pct = (diffRatio * 100).toFixed(2);
+    const icon = diffRatio === 0 ? `${GREEN}✓${RESET}` : diffRatio < 0.01 ? `${YELLOW}~${RESET}` : `${RED}✗${RESET}`;
+    console.log(`  ${icon} diff: ${pct}% (${diffPixels} px)`);
+    console.log(`  ${DIM}bbox: ${bboxMatches.length}, heatmap: ${heatmapRegions.length}, text-rows ${targetRows.length}/${currentRows.length}, palette missing: ${paletteDiff.onlyInBaseline.length}${RESET}`);
+    if (stateResults.length > 0) {
+      for (const s of stateResults) {
+        console.log(`  ${DIM}:${s.state} induced ${(s.inducedDiffRatio * 100).toFixed(2)}% (${s.forcedCount} forced)${RESET}`);
+      }
+    }
+    console.log(`  ${DIM}report: ${reportPath}${RESET}`);
+
+    return {
+      targetImage: targetPath,
+      currentHtml: htmlPath,
+      viewport,
+      diff: { diffPixels, totalPixels, diffRatio },
+      bboxMatches,
+      heatmapRegions,
+      textRowMatches,
+      baselineRowCount: targetRows.length,
+      variantRowCount: currentRows.length,
+      paletteDiff: { ...paletteDiff, baseline: targetPalette, variant: currentPalette },
+      states: stateResults,
+      reportPath,
+    };
+  } finally {
+    await browser.close();
+  }
+}
+
+interface RenderInput {
+  targetImage: string;
+  currentHtml: string;
+  viewport: { width: number; height: number };
+  diffPixels: number;
+  totalPixels: number;
+  diffRatio: number;
+  heatmapPath?: string;
+  currentPath: string;
+  bboxMatches: MatchedBbox[];
+  heatmapRegions: HeatmapRegion[];
+  textRowMatches: MatchedTextRow[];
+  baselineRowCount: number;
+  variantRowCount: number;
+  paletteDiff: PaletteDiff;
+  stateResults: NonNullable<ComponentFromImageReport["states"]>;
+}
+
+export function renderReportMarkdown(r: RenderInput): string {
+  const lines: string[] = [];
+  lines.push("# Component-from-image report");
+  lines.push("");
+  lines.push(`Target:  \`${r.targetImage}\` (${r.viewport.width}×${r.viewport.height})`);
+  lines.push(`Current: \`${r.currentHtml}\``);
+  lines.push("");
+  const pct = (r.diffRatio * 100).toFixed(2);
+  lines.push(`**Pixel diff**: ${pct}% (${r.diffPixels} of ${r.totalPixels} pixels)`);
+  lines.push("");
+  if (r.heatmapPath) {
+    lines.push("- Target:   `" + r.targetImage + "`");
+    lines.push("- Current:  `" + r.currentPath + "`");
+    lines.push("- Heatmap:  `" + r.heatmapPath + "`");
+    lines.push("");
+  }
+
+  const meaningfulBboxes = r.bboxMatches.filter((m) =>
+    Math.abs(m.deltaTop) > 1 || Math.abs(m.deltaLeft) > 1
+    || Math.abs(m.deltaWidth) > 1 || Math.abs(m.deltaHeight) > 1,
+  );
+  if (meaningfulBboxes.length > 0) {
+    lines.push("## Component bbox diff");
+    lines.push("");
+    lines.push("Largest non-background regions, matched by area-rank between " +
+      "target and current. Δ shows position / size differences.");
+    lines.push("");
+    lines.push("| Rank | Target bbox | Current bbox | Δ top / left / W / H | IoU |");
+    lines.push("|---|---|---|---|---|");
+    for (const m of meaningfulBboxes.slice(0, 8)) {
+      const t = `${m.baseline.left},${m.baseline.top} ${m.baseline.width}×${m.baseline.height}`;
+      const c = `${m.variant.left},${m.variant.top} ${m.variant.width}×${m.variant.height}`;
+      const sign = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+      lines.push(`| #${m.rank} | ${t} | ${c} | ${sign(m.deltaTop)} / ${sign(m.deltaLeft)} / ${sign(m.deltaWidth)} / ${sign(m.deltaHeight)} | ${m.iou} |`);
+    }
+    lines.push("");
+  }
+
+  if (r.heatmapRegions.length > 0) {
+    lines.push("## Heatmap region clusters");
+    lines.push("");
+    lines.push("| Top-Left | Size | Hot pixels |");
+    lines.push("|---|---|---|");
+    for (const reg of r.heatmapRegions.slice(0, 8)) {
+      lines.push(`| ${reg.left},${reg.top} | ${reg.width}×${reg.height} | ${reg.area} |`);
+    }
+    lines.push("");
+  }
+
+  if (r.baselineRowCount !== r.variantRowCount || r.textRowMatches.length > 0) {
+    lines.push("## Text-row Δy");
+    lines.push("");
+    lines.push(`Target has ${r.baselineRowCount} text rows; current has ${r.variantRowCount}.`);
+    if (r.baselineRowCount !== r.variantRowCount) {
+      lines.push("");
+      lines.push("**Count mismatch** — current is missing rows of content " +
+        "(or has spurious extras). Add the missing elements before tweaking CSS.");
+    }
+    if (r.textRowMatches.length > 0) {
+      lines.push("");
+      lines.push("| Rank | Target y | Current y | Δy |");
+      lines.push("|---|---|---|---|");
+      for (const m of r.textRowMatches.slice(0, 12)) {
+        const signed = m.deltaY > 0 ? `+${m.deltaY}` : `${m.deltaY}`;
+        lines.push(`| #${m.rank} | ${m.baseline.yCenter} | ${m.variant.yCenter} | ${signed}px |`);
+      }
+    }
+    lines.push("");
+  }
+
+  if (r.paletteDiff.onlyInBaseline.length > 0 || r.paletteDiff.onlyInVariant.length > 0) {
+    lines.push("## Palette diff");
+    lines.push("");
+    lines.push("| Side | Color | Share |");
+    lines.push("|---|---|---|");
+    for (const c of r.paletteDiff.onlyInBaseline.slice(0, 8)) {
+      lines.push(`| missing | \`${c.hex}\` | ${(c.share * 100).toFixed(1)}% |`);
+    }
+    for (const c of r.paletteDiff.onlyInVariant.slice(0, 8)) {
+      lines.push(`| extra | \`${c.hex}\` | ${(c.share * 100).toFixed(1)}% |`);
+    }
+    lines.push("");
+  }
+
+  if (r.stateResults.length > 0) {
+    lines.push("## Forced-state diff");
+    lines.push("");
+    lines.push("Each row: current HTML rendered with the named pseudo-class " +
+      "forced on all interactive elements, diffed against the default render. " +
+      "When the induced delta is 0% on interactive elements, the variant " +
+      "probably forgot to wire up the corresponding state styles.");
+    lines.push("");
+    lines.push("| State | Induced delta | Forced elements | Note |");
+    lines.push("|---|---|---|---|");
+    for (const s of r.stateResults) {
+      const note = s.forcedCount > 0 && s.inducedDiffRatio === 0
+        ? "**suspect** — state did not change rendering"
+        : "";
+      lines.push(`| \`:${s.state}\` | ${(s.inducedDiffRatio * 100).toFixed(2)}% | ${s.forcedCount} | ${note} |`);
+    }
+    lines.push("");
+  }
+
+  lines.push("## Suggested next step");
+  lines.push("");
+  if (r.baselineRowCount > r.variantRowCount) {
+    lines.push("1. The current rendering is missing text rows — add the missing " +
+      "HTML elements first. Bbox / palette tables tell you what styling they need.");
+  } else {
+    lines.push("1. Open the target and current PNGs side-by-side. Use the heatmap " +
+      "region table to localize diff areas.");
+  }
+  lines.push("2. Cross-check the palette table — missing colors are the design tokens " +
+    "the current rendering doesn't have (paste the hex values into your CSS).");
+  lines.push("3. If bbox deltas are large, the current element's dimensions don't " +
+    "match the target — adjust `width` / `padding` / `font-size` until they converge.");
+  lines.push("4. Re-run `vrt component-from-image` and check that diff %, bbox " +
+    "deltas, heatmap regions, palette deltas all shrink toward zero.");
+  lines.push("");
+  return lines.join("\n");
+}
+
+async function main(argv = process.argv.slice(2)) {
+  const { positional, outputDir, report, threshold, states } = parseArgs(argv);
+  if (positional.length < 2) {
+    console.log("Usage: vrt component-from-image <target.png> <current.html> [options]");
+    console.log("Options:");
+    console.log("  --output-dir <dir>              Output directory (default: ./test-results/component)");
+    console.log("  --report <path>                 Markdown report path (default: <output-dir>/report.md)");
+    console.log("  --threshold <0..1>              Pixel diff threshold (default: 0.03)");
+    console.log("  --states hover focus-visible …  Capture additional pseudo-state diffs");
+    process.exit(1);
+  }
+  await runComponentFromImage({
+    targetImagePath: positional[0]!,
+    currentHtmlPath: positional[1]!,
+    outputDir: outputDir || join(process.cwd(), "test-results", "component"),
+    reportPath: report || undefined,
+    threshold,
+    states: states.length > 0 ? states : undefined,
+  });
+}
+
+const isCliEntry = process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false;
+if (isCliEntry) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}
