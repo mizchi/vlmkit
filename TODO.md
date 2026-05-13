@@ -333,8 +333,19 @@ evaluated incrementally.
   row, current has 0; missing `#2464ec` etc.) and hover-button
   fixture (0% pixel diff, but `:hover` flagged suspect because no
   hover rule is wired up).
-- [ ] **Multi-page consistency** — same component on N pages must
+- [x] **Multi-page consistency** — same component on N pages must
   render identically. Cross-page bbox / computed-style diff.
+  `src/multi-page-consistency.ts` renders N URLs (or HTML files)
+  in Playwright, screenshots each `--selector` match via
+  `locator.screenshot()` (auto-crops to the element's bbox), and
+  compares all candidates against the first one (the reference).
+  Surfaces pixel diff, page-level bbox Δ (W/H of the live element,
+  not the cropped image), palette missing/extra counts, heatmap
+  cluster count per candidate. Verified on a synthetic footer-drift
+  fixture (3 pages with shared `.footer` styles; one page has a
+  scoped `body .footer { padding: 48px; background: #111827 }`
+  override): blog 0.00% drift, pricing 97.80% drift + Δ height
+  +34px + 1 missing + 1 extra color — exact catch of the bug.
 
 ### Agent-loop UX (from 2026-05-12 subagent eval)
 

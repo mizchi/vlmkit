@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pricing</title>
+<style>
+  body { font-family: system-ui; margin: 0; }
+  .footer {
+    background: #1f2937;
+    color: #f9fafb;
+    padding: 32px 48px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .footer-brand { font-weight: 700; font-size: 16px; }
+  .footer-links a { color: #9ca3af; margin-left: 24px; text-decoration: none; }
+
+  /* DRIFT: pricing page has a scoped override that bumps the footer
+     padding and changes the brand color. The other pages don't. */
+  body .footer { padding: 48px 48px; background: #111827; }
+  body .footer-brand { color: #60a5fa; font-size: 18px; }
+</style>
+</head>
+<body>
+  <main style="padding: 40px;">
+    <h1>Pricing</h1>
+    <p>$0 / $99 / $499.</p>
+  </main>
+  <footer class="footer">
+    <span class="footer-brand">Acme Inc.</span>
+    <nav class="footer-links">
+      <a href="#">Privacy</a>
+      <a href="#">Terms</a>
+      <a href="#">Contact</a>
+    </nav>
+  </footer>
+</body>
+</html>
