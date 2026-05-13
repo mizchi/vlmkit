@@ -167,6 +167,29 @@ export interface DfaReport {
       }>;
     }>;
   }>;
+  componentGeometryProfiles?: Array<{
+    variantFile: string;
+    profiles: Array<{
+      rank: number;
+      baselineByViewport: Array<{ viewport: string; width: number; height: number; top: number; left: number }>;
+      variantByViewport: Array<{ viewport: string; width: number; height: number; top: number; left: number }>;
+      baselineSpread: { width: number; height: number };
+      variantSpread: { width: number; height: number };
+      responsiveMismatch?: {
+        axis: "width" | "height";
+        baselineSpread: number;
+        variantSpread: number;
+        interpretation: string;
+      };
+    }>;
+  }>;
+  heatmapRegions?: Array<{
+    variantFile: string;
+    perViewport: Array<{
+      viewport: string;
+      regions: Array<{ top: number; left: number; width: number; height: number; area: number }>;
+    }>;
+  }>;
   /** Absolute path of the report file (used to resolve sibling PNGs). */
   reportPath?: string;
 }
@@ -528,6 +551,45 @@ export function formatMigrationReportForAgent(
           const sign = (n: number) => (n > 0 ? `+${n}` : `${n}`);
           const delta = `${sign(m.deltaTop)} / ${sign(m.deltaLeft)} / ${sign(m.deltaWidth)} / ${sign(m.deltaHeight)}`;
           lines.push(`| \`${vp.viewport}\` | #${m.rank} | ${b} | ${v} | ${delta} | ${m.iou} |`);
+        }
+      }
+      lines.push("");
+    }
+
+    const geometrySummary = (report.componentGeometryProfiles ?? []).find((g) => g.variantFile === variantFile);
+    if (geometrySummary && geometrySummary.profiles.length > 0) {
+      lines.push("### Cross-viewport geometry profile (responsive mismatch)");
+      lines.push("");
+      lines.push("For each matched component (by area-rank), this is how its width / " +
+        "height moves across viewports on the baseline vs. on the variant. A " +
+        "large spread on one side and ~0 on the other means one side adapts " +
+        "to viewport width and the other doesn't — typical CSS bugs are " +
+        "missing `max-width`, missing `@media` rule, or a hard-coded pixel " +
+        "size where the baseline uses fluid units.");
+      lines.push("");
+      lines.push("| Rank | Baseline width spread | Variant width spread | Baseline height spread | Variant height spread | Interpretation |");
+      lines.push("|---|---|---|---|---|---|");
+      for (const p of geometrySummary.profiles) {
+        const interp = p.responsiveMismatch?.interpretation ?? "-";
+        lines.push(`| #${p.rank} | ${p.baselineSpread.width}px | ${p.variantSpread.width}px | ${p.baselineSpread.height}px | ${p.variantSpread.height}px | ${interp} |`);
+      }
+      lines.push("");
+    }
+
+    const heatmapSummary = (report.heatmapRegions ?? []).find((h) => h.variantFile === variantFile);
+    if (heatmapSummary && heatmapSummary.perViewport.length > 0) {
+      lines.push("### Heatmap region clusters (where the diff actually is)");
+      lines.push("");
+      lines.push("Connected hot-pixel clusters in `*_heatmap.png`. Each row is a " +
+        "rectangular bounding box around one cluster of pixelmatch-flagged " +
+        "pixels, sorted by hot-pixel count. Use these to localize diffs " +
+        "horizontally (per-band shift only gives vertical bands).");
+      lines.push("");
+      lines.push("| Viewport | Top-Left | Size | Hot pixels |");
+      lines.push("|---|---|---|---|");
+      for (const vp of heatmapSummary.perViewport) {
+        for (const r of vp.regions.slice(0, 5)) {
+          lines.push(`| \`${vp.viewport}\` | ${r.left},${r.top} | ${r.width}×${r.height} | ${r.area} |`);
         }
       }
       lines.push("");

@@ -93,6 +93,8 @@ import {
   matchComponents,
   type MatchedBbox,
 } from "./component-bbox.ts";
+import { buildGeometryProfiles, type PerRankGeometry } from "./component-geometry.ts";
+import { findHeatmapRegionsFromFile, type HeatmapRegion } from "./heatmap-regions.ts";
 
 // ---- Config ----
 
@@ -343,6 +345,24 @@ export interface MigrationCompareReport {
   componentBboxDiffs?: Array<{
     variantFile: string;
     perViewport: Array<{ viewport: string; matches: MatchedBbox[] }>;
+  }>;
+  /**
+   * Cross-viewport geometry profiles derived from componentBboxDiffs.
+   * Surfaces responsive-mismatch flags ("baseline width spreads 837px
+   * across viewports; variant 0px → variant missing responsive rule").
+   */
+  componentGeometryProfiles?: Array<{
+    variantFile: string;
+    profiles: PerRankGeometry[];
+  }>;
+  /**
+   * Per-viewport connected-component clusters of pixelmatch hot pixels in
+   * `*_heatmap.png`. Localizes "where in the image the diff actually is"
+   * even when baseline and variant share no DOM.
+   */
+  heatmapRegions?: Array<{
+    variantFile: string;
+    perViewport: Array<{ viewport: string; regions: HeatmapRegion[] }>;
   }>;
   results: MigrationCompareResult[];
   reportPath: string;
@@ -683,6 +703,8 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     const shiftOriginsReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; origins: ShiftOrigin[]; unexplainedBands?: ShiftRegion[] }> }> = [];
     const gridSuggestionsReports: Array<{ variantFile: string; suggestions: GridSuggestion[] }> = [];
     const componentBboxReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; matches: MatchedBbox[] }> }> = [];
+    const componentGeometryReports: Array<{ variantFile: string; profiles: PerRankGeometry[] }> = [];
+    const heatmapRegionsReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; regions: HeatmapRegion[] }> }> = [];
     for (const variant of variantSources) {
       let variantHtml: string;
       const variantName = variant.label;
@@ -1028,6 +1050,14 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       if (options.componentBboxDiff !== false) {
         const variantFileLabel = variant.url || variant.file;
         const perViewport: Array<{ viewport: string; matches: MatchedBbox[] }> = [];
+        // Full (unfiltered) per-viewport matches used to build
+        // cross-viewport geometry profiles below. We can't use the
+        // filtered `perViewport` list because geometry analysis cares
+        // about the shared baseline+variant geometry of *every* matched
+        // component (including ones with zero delta on a given viewport
+        // but differing on another).
+        const perViewportFull: Array<{ viewport: string; matches: MatchedBbox[] }> = [];
+        const perViewportHeatmap: Array<{ viewport: string; regions: HeatmapRegion[] }> = [];
         for (const vp of VIEWPORTS) {
           const baselinePngPath = join(outputDir, `${baselineName}-${vp.label}.png`);
           const variantPngPath = join(outputDir, `${variantName}-${vp.label}.png`);
@@ -1037,6 +1067,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
               extractComponentsFromFile(variantPngPath),
             ]);
             const matches = matchComponents(baselineComps, variantComps);
+            perViewportFull.push({ viewport: vp.label, matches });
             // Only keep matches where at least one axis differs by > 1px
             // (anything smaller is subpixel rounding, not actionable).
             const meaningful = matches.filter((m) =>
@@ -1049,11 +1080,44 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           } catch {
             // PNG missing / decode failure — skip silently.
           }
+
+          // Heatmap region clustering (CC labelling on pixelmatch
+          // hot-red pixels). Falls through silently when the heatmap
+          // PNG doesn't exist (zero-diff viewport or skipHeatmap=true).
+          const heatmapPath = join(outputDir, `${variantName}-${vp.label}_heatmap.png`);
+          try {
+            const regions = await findHeatmapRegionsFromFile(heatmapPath);
+            if (regions.length > 0) {
+              perViewportHeatmap.push({ viewport: vp.label, regions });
+            }
+          } catch {
+            // No heatmap (viewport had zero diff) or decode failure — skip.
+          }
         }
         if (perViewport.length > 0) {
           componentBboxReports.push({ variantFile: variantFileLabel, perViewport });
           const total = perViewport.reduce((s, v) => s + v.matches.length, 0);
           console.log(`  ${DIM}Component bbox diff: ${total} component delta(s) across ${perViewport.length} viewport(s)${RESET}`);
+        }
+        // Cross-viewport geometry profiles (wireframe-mode: detect
+        // responsive mismatches like "baseline card shrinks 18px on
+        // mobile but variant doesn't"). Requires at least two viewports
+        // to have anything meaningful to say.
+        if (perViewportFull.length >= 2) {
+          const profiles = buildGeometryProfiles(perViewportFull);
+          const flagged = profiles.filter((p) => p.responsiveMismatch !== undefined);
+          if (flagged.length > 0) {
+            componentGeometryReports.push({
+              variantFile: variantFileLabel,
+              profiles: flagged.slice(0, 8),
+            });
+            console.log(`  ${DIM}Responsive geometry mismatch: ${flagged.length} component(s) flagged${RESET}`);
+          }
+        }
+        if (perViewportHeatmap.length > 0) {
+          heatmapRegionsReports.push({ variantFile: variantFileLabel, perViewport: perViewportHeatmap });
+          const total = perViewportHeatmap.reduce((s, v) => s + v.regions.length, 0);
+          console.log(`  ${DIM}Heatmap regions: ${total} cluster(s) across ${perViewportHeatmap.length} viewport(s)${RESET}`);
         }
       }
 
@@ -1146,6 +1210,8 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       shiftOrigins: shiftOriginsReports.length > 0 ? shiftOriginsReports : undefined,
       gridSuggestions: gridSuggestionsReports.length > 0 ? gridSuggestionsReports : undefined,
       componentBboxDiffs: componentBboxReports.length > 0 ? componentBboxReports : undefined,
+      componentGeometryProfiles: componentGeometryReports.length > 0 ? componentGeometryReports : undefined,
+      heatmapRegions: heatmapRegionsReports.length > 0 ? heatmapRegionsReports : undefined,
       results,
       reportPath,
     };

@@ -248,14 +248,25 @@ The wireframe mode needs visual-only diagnostics:
   both wireframe (Subagent F's exact scenario: baseline 343×370,
   variant 311×243, Δ -32W / -127H reported on one row) and
   migration (Pass B iter 1: 50 component deltas surfaced).
-- [ ] **Per-viewport geometry diff** without DOM access — "baseline
+- [x] **Per-viewport geometry diff** without DOM access — "baseline
   card shrinks 18px between desktop and mobile but variant
   doesn't" inferred purely from screenshot dimensions.
-- [ ] **Heatmap region clustering** — group connected hot pixels
+  `src/component-geometry.ts` composes on top of `MatchedBbox[]`
+  and flags `responsiveMismatch` when one side's per-axis spread
+  exceeds the other's by ≥30px. Rendered as "Cross-viewport
+  geometry profile" in `vrt diff-for-agent`. 5 unit tests +
+  verified on shadcn→blank (8 responsive-mismatch flags
+  surfaced).
+- [x] **Heatmap region clustering** — group connected hot pixels
   in `*_heatmap.png` into named regions and report per-region
   shift instead of horizontal bands. Bands of bands lose
   resolution; region clusters preserve "this text run shifted up
-  4px" granularity.
+  4px" granularity. `src/heatmap-regions.ts` reuses the
+  union-find CC labeller from `component-bbox.ts` against a
+  hot-red mask (red − max(g,b) ≥ 60). 5 unit tests + verified on
+  shadcn→blank (24 region clusters) and wireframe pricing-card
+  (18 clusters — *still works when component bbox matching
+  fails*, the F-overfit case).
 - [ ] **Text-row y-position extraction** from rendered PNGs via
   luminance-profile peak detection — exposes "the `$24` text row
   is 4px higher in the variant" without needing DOM correspondence.
