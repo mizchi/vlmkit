@@ -88,6 +88,11 @@ import {
   type ShiftOrigin,
 } from "./shift-origin.ts";
 import { findGridSuggestions, type GridSuggestion } from "./grid-ratio.ts";
+import {
+  extractComponentsFromFile,
+  matchComponents,
+  type MatchedBbox,
+} from "./component-bbox.ts";
 
 // ---- Config ----
 
@@ -148,6 +153,12 @@ export interface MigrationCompareOptions {
   computedStyleDiff?: boolean;
   /** Capture DOM-position-aligned computed styles (handles class renames, opt-in). */
   domPositionDiff?: boolean;
+  /**
+   * Extract component bounding boxes from captured screenshots and diff
+   * them (image-only, no DOM required — see `src/component-bbox.ts`).
+   * Default true; pass `--no-component-bbox` to disable.
+   */
+  componentBboxDiff?: boolean;
 }
 
 export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptions {
@@ -178,6 +189,7 @@ export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptio
     strictDomEquivalence: hasFlag(args, "strict-dom-equivalence"),
     computedStyleDiff: hasFlag(args, "computed-style"),
     domPositionDiff: hasFlag(args, "dom-position-diff") || hasFlag(args, "position-diff"),
+    componentBboxDiff: !hasFlag(args, "no-component-bbox"),
   };
 }
 
@@ -321,6 +333,16 @@ export interface MigrationCompareReport {
   gridSuggestions?: Array<{
     variantFile: string;
     suggestions: GridSuggestion[];
+  }>;
+  /**
+   * Per-viewport component bbox diff — pure image analysis of the
+   * captured screenshots (no DOM correspondence required). Useful for
+   * wireframe / from-screenshot scenarios where baseline and variant
+   * may not share DOM tree shape.
+   */
+  componentBboxDiffs?: Array<{
+    variantFile: string;
+    perViewport: Array<{ viewport: string; matches: MatchedBbox[] }>;
   }>;
   results: MigrationCompareResult[];
   reportPath: string;
@@ -660,6 +682,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     const domPositionDiffPerViewportReports: Array<{ variantFile: string; result: DpPerViewportResult }> = [];
     const shiftOriginsReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; origins: ShiftOrigin[]; unexplainedBands?: ShiftRegion[] }> }> = [];
     const gridSuggestionsReports: Array<{ variantFile: string; suggestions: GridSuggestion[] }> = [];
+    const componentBboxReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; matches: MatchedBbox[] }> }> = [];
     for (const variant of variantSources) {
       let variantHtml: string;
       const variantName = variant.label;
@@ -997,6 +1020,43 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         }
       }
 
+      // Image-only component bbox diff. Doesn't depend on DOM
+      // correspondence — works on the rendered PNGs directly. Wireframe
+      // / from-screenshot scenario (see Subagent F): when the agent's
+      // DOM differs from the reference, the bbox of "the card" /
+      // "the button row" remains comparable across pages.
+      if (options.componentBboxDiff !== false) {
+        const variantFileLabel = variant.url || variant.file;
+        const perViewport: Array<{ viewport: string; matches: MatchedBbox[] }> = [];
+        for (const vp of VIEWPORTS) {
+          const baselinePngPath = join(outputDir, `${baselineName}-${vp.label}.png`);
+          const variantPngPath = join(outputDir, `${variantName}-${vp.label}.png`);
+          try {
+            const [baselineComps, variantComps] = await Promise.all([
+              extractComponentsFromFile(baselinePngPath),
+              extractComponentsFromFile(variantPngPath),
+            ]);
+            const matches = matchComponents(baselineComps, variantComps);
+            // Only keep matches where at least one axis differs by > 1px
+            // (anything smaller is subpixel rounding, not actionable).
+            const meaningful = matches.filter((m) =>
+              Math.abs(m.deltaTop) > 1 || Math.abs(m.deltaLeft) > 1
+              || Math.abs(m.deltaWidth) > 1 || Math.abs(m.deltaHeight) > 1,
+            );
+            if (meaningful.length > 0) {
+              perViewport.push({ viewport: vp.label, matches: meaningful.slice(0, 5) });
+            }
+          } catch {
+            // PNG missing / decode failure — skip silently.
+          }
+        }
+        if (perViewport.length > 0) {
+          componentBboxReports.push({ variantFile: variantFileLabel, perViewport });
+          const total = perViewport.reduce((s, v) => s + v.matches.length, 0);
+          console.log(`  ${DIM}Component bbox diff: ${total} component delta(s) across ${perViewport.length} viewport(s)${RESET}`);
+        }
+      }
+
       console.log();
     }
 
@@ -1085,6 +1145,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         : undefined,
       shiftOrigins: shiftOriginsReports.length > 0 ? shiftOriginsReports : undefined,
       gridSuggestions: gridSuggestionsReports.length > 0 ? gridSuggestionsReports : undefined,
+      componentBboxDiffs: componentBboxReports.length > 0 ? componentBboxReports : undefined,
       results,
       reportPath,
     };

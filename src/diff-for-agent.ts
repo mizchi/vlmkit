@@ -151,6 +151,22 @@ export interface DfaReport {
   domPositionDiffPerViewport?: DfaDpPerViewportSummary[];
   shiftOrigins?: DfaShiftOriginsSummary[];
   gridSuggestions?: DfaGridSuggestionsSummary[];
+  componentBboxDiffs?: Array<{
+    variantFile: string;
+    perViewport: Array<{
+      viewport: string;
+      matches: Array<{
+        rank: number;
+        baseline: { top: number; left: number; width: number; height: number; area: number; fillColor: string };
+        variant: { top: number; left: number; width: number; height: number; area: number; fillColor: string };
+        deltaTop: number;
+        deltaLeft: number;
+        deltaWidth: number;
+        deltaHeight: number;
+        iou: number;
+      }>;
+    }>;
+  }>;
   /** Absolute path of the report file (used to resolve sibling PNGs). */
   reportPath?: string;
 }
@@ -492,6 +508,30 @@ export function formatMigrationReportForAgent(
       lines.push(`| \`${r.viewport}\` | ${formatPct(r.diffRatio)} | ${cat} | ${summary} | ${bands} |`);
     }
     lines.push("");
+
+    const bboxSummary = (report.componentBboxDiffs ?? []).find((c) => c.variantFile === variantFile);
+    if (bboxSummary && bboxSummary.perViewport.length > 0) {
+      lines.push("### Component bbox diff (image-only — works without DOM correspondence)");
+      lines.push("");
+      lines.push("Largest non-background regions in each viewport's screenshot, " +
+        "matched by rank-after-sort-by-area between baseline and variant. " +
+        "Survives DOM rewrites — useful when the agent invented a different " +
+        "tag tree than the reference. `iou` is intersection-over-union ∈ [0,1] " +
+        "(higher = more overlap).");
+      lines.push("");
+      lines.push("| Viewport | Rank | Baseline bbox | Variant bbox | Δ top / left / W / H | IoU |");
+      lines.push("|---|---|---|---|---|---|");
+      for (const vp of bboxSummary.perViewport) {
+        for (const m of vp.matches) {
+          const b = `${m.baseline.left},${m.baseline.top} ${m.baseline.width}×${m.baseline.height}`;
+          const v = `${m.variant.left},${m.variant.top} ${m.variant.width}×${m.variant.height}`;
+          const sign = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+          const delta = `${sign(m.deltaTop)} / ${sign(m.deltaLeft)} / ${sign(m.deltaWidth)} / ${sign(m.deltaHeight)}`;
+          lines.push(`| \`${vp.viewport}\` | #${m.rank} | ${b} | ${v} | ${delta} | ${m.iou} |`);
+        }
+      }
+      lines.push("");
+    }
 
     const shiftOriginsSummary = (report.shiftOrigins ?? []).find((s) => s.variantFile === variantFile);
     if (shiftOriginsSummary && shiftOriginsSummary.perViewport.length > 0) {

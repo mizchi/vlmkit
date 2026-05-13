@@ -235,10 +235,19 @@ verified-pair gate) gave zero signal on this scenario.
 
 The wireframe mode needs visual-only diagnostics:
 
-- [ ] **Component bbox extraction** — find largest connected
-  non-background regions in baseline + variant screenshots, report
-  the bbox (top/left/width/height) per region. F flagged this as
-  the single biggest gap: "iter3→iter5 collapsed into one step."
+- [x] **Component bbox extraction.** `src/component-bbox.ts` runs
+  on the captured PNGs (no DOM required): detect background via
+  edge-pixel mode, build foreground mask, label connected
+  components (two-pass union-find, 4-connectivity), filter
+  `minArea`, sort by area desc. `matchComponents` pairs baseline
+  ↔ variant by rank-after-sort and reports per-axis Δ + IoU.
+  Wired into `migration-compare` (always on; `--no-component-bbox`
+  to disable) — surfaces a "Component bbox diff" section in
+  `vrt diff-for-agent`. 10 unit tests cover synthetic backgrounds
+  + multi-component sorting + min-area filtering. Verified on
+  both wireframe (Subagent F's exact scenario: baseline 343×370,
+  variant 311×243, Δ -32W / -127H reported on one row) and
+  migration (Pass B iter 1: 50 component deltas surfaced).
 - [ ] **Per-viewport geometry diff** without DOM access — "baseline
   card shrinks 18px between desktop and mobile but variant
   doesn't" inferred purely from screenshot dimensions.
