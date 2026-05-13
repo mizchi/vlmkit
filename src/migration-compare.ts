@@ -95,6 +95,11 @@ import {
 } from "./component-bbox.ts";
 import { buildGeometryProfiles, type PerRankGeometry } from "./component-geometry.ts";
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "./heatmap-regions.ts";
+import {
+  extractTextRowsFromFile,
+  matchTextRows,
+  type MatchedTextRow,
+} from "./text-rows.ts";
 
 // ---- Config ----
 
@@ -363,6 +368,22 @@ export interface MigrationCompareReport {
   heatmapRegions?: Array<{
     variantFile: string;
     perViewport: Array<{ viewport: string; regions: HeatmapRegion[] }>;
+  }>;
+  /**
+   * Per-viewport text-row Δy. Pairs dark luminance bands by order
+   * (top-to-bottom) between baseline and variant; surfaces rows whose
+   * y-coordinate shifted. Works without DOM correspondence — useful
+   * for the wireframe scenario where bbox matching fails on
+   * structurally-divergent pages.
+   */
+  textRowShifts?: Array<{
+    variantFile: string;
+    perViewport: Array<{
+      viewport: string;
+      matches: MatchedTextRow[];
+      baselineRowCount: number;
+      variantRowCount: number;
+    }>;
   }>;
   results: MigrationCompareResult[];
   reportPath: string;
@@ -705,6 +726,10 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     const componentBboxReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; matches: MatchedBbox[] }> }> = [];
     const componentGeometryReports: Array<{ variantFile: string; profiles: PerRankGeometry[] }> = [];
     const heatmapRegionsReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; regions: HeatmapRegion[] }> }> = [];
+    const textRowShiftsReports: Array<{
+      variantFile: string;
+      perViewport: Array<{ viewport: string; matches: MatchedTextRow[]; baselineRowCount: number; variantRowCount: number }>;
+    }> = [];
     for (const variant of variantSources) {
       let variantHtml: string;
       const variantName = variant.label;
@@ -1058,6 +1083,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         // but differing on another).
         const perViewportFull: Array<{ viewport: string; matches: MatchedBbox[] }> = [];
         const perViewportHeatmap: Array<{ viewport: string; regions: HeatmapRegion[] }> = [];
+        const perViewportTextRows: Array<{
+          viewport: string; matches: MatchedTextRow[]; baselineRowCount: number; variantRowCount: number;
+        }> = [];
         for (const vp of VIEWPORTS) {
           const baselinePngPath = join(outputDir, `${baselineName}-${vp.label}.png`);
           const variantPngPath = join(outputDir, `${variantName}-${vp.label}.png`);
@@ -1093,6 +1121,30 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           } catch {
             // No heatmap (viewport had zero diff) or decode failure — skip.
           }
+
+          // Text-row y-position extraction. Pairs dark luminance bands
+          // by ordered index between baseline and variant — works
+          // without DOM correspondence, useful when component bbox
+          // matching fails (the wireframe-with-divergent-DOM case).
+          try {
+            const [baselineRows, variantRows] = await Promise.all([
+              extractTextRowsFromFile(baselinePngPath),
+              extractTextRowsFromFile(variantPngPath),
+            ]);
+            const matches = matchTextRows(baselineRows, variantRows);
+            const countMismatch = baselineRows.length !== variantRows.length
+              && (baselineRows.length > 0 || variantRows.length > 0);
+            if (matches.length > 0 || countMismatch) {
+              perViewportTextRows.push({
+                viewport: vp.label,
+                matches: matches.slice(0, 12),
+                baselineRowCount: baselineRows.length,
+                variantRowCount: variantRows.length,
+              });
+            }
+          } catch {
+            // PNG missing or decode failure — skip silently.
+          }
         }
         if (perViewport.length > 0) {
           componentBboxReports.push({ variantFile: variantFileLabel, perViewport });
@@ -1118,6 +1170,11 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           heatmapRegionsReports.push({ variantFile: variantFileLabel, perViewport: perViewportHeatmap });
           const total = perViewportHeatmap.reduce((s, v) => s + v.regions.length, 0);
           console.log(`  ${DIM}Heatmap regions: ${total} cluster(s) across ${perViewportHeatmap.length} viewport(s)${RESET}`);
+        }
+        if (perViewportTextRows.length > 0) {
+          textRowShiftsReports.push({ variantFile: variantFileLabel, perViewport: perViewportTextRows });
+          const total = perViewportTextRows.reduce((s, v) => s + v.matches.length, 0);
+          console.log(`  ${DIM}Text-row shifts: ${total} row(s) with Δy across ${perViewportTextRows.length} viewport(s)${RESET}`);
         }
       }
 
@@ -1212,6 +1269,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       componentBboxDiffs: componentBboxReports.length > 0 ? componentBboxReports : undefined,
       componentGeometryProfiles: componentGeometryReports.length > 0 ? componentGeometryReports : undefined,
       heatmapRegions: heatmapRegionsReports.length > 0 ? heatmapRegionsReports : undefined,
+      textRowShifts: textRowShiftsReports.length > 0 ? textRowShiftsReports : undefined,
       results,
       reportPath,
     };

@@ -190,6 +190,20 @@ export interface DfaReport {
       regions: Array<{ top: number; left: number; width: number; height: number; area: number }>;
     }>;
   }>;
+  textRowShifts?: Array<{
+    variantFile: string;
+    perViewport: Array<{
+      viewport: string;
+      baselineRowCount: number;
+      variantRowCount: number;
+      matches: Array<{
+        rank: number;
+        baseline: { yCenter: number; yStart: number; yEnd: number; height: number };
+        variant: { yCenter: number; yStart: number; yEnd: number; height: number };
+        deltaY: number;
+      }>;
+    }>;
+  }>;
   /** Absolute path of the report file (used to resolve sibling PNGs). */
   reportPath?: string;
 }
@@ -576,6 +590,34 @@ export function formatMigrationReportForAgent(
       lines.push("");
     }
 
+    const textRowsSummary = (report.textRowShifts ?? []).find((t) => t.variantFile === variantFile);
+    if (textRowsSummary && textRowsSummary.perViewport.length > 0) {
+      lines.push("### Text-row Δy (luminance-band peaks paired by order)");
+      lines.push("");
+      lines.push("Dark horizontal bands in the rendered PNG, paired top-to-bottom " +
+        "with the variant's bands. When the *count* matches but y-positions don't, " +
+        "the variant has the right content but wrong vertical spacing somewhere " +
+        "above. When the count differs, the variant is missing (or has extra) " +
+        "rows of content. No DOM correspondence required.");
+      lines.push("");
+      lines.push("| Viewport | Bands B / V | Rank | Baseline y | Variant y | Δy |");
+      lines.push("|---|---|---|---|---|---|");
+      for (const vp of textRowsSummary.perViewport) {
+        const countCol = `${vp.baselineRowCount} / ${vp.variantRowCount}`;
+        if (vp.matches.length === 0) {
+          // Count mismatch but no rank-aligned matches survived (often
+          // because one side has 0 rows). Emit a single summary row.
+          lines.push(`| \`${vp.viewport}\` | ${countCol} | _(count mismatch — no paired rows)_ | — | — | — |`);
+          continue;
+        }
+        for (const m of vp.matches) {
+          const signed = m.deltaY > 0 ? `+${m.deltaY}` : `${m.deltaY}`;
+          lines.push(`| \`${vp.viewport}\` | ${countCol} | #${m.rank} | ${m.baseline.yCenter} | ${m.variant.yCenter} | ${signed}px |`);
+        }
+      }
+      lines.push("");
+    }
+
     const heatmapSummary = (report.heatmapRegions ?? []).find((h) => h.variantFile === variantFile);
     if (heatmapSummary && heatmapSummary.perViewport.length > 0) {
       lines.push("### Heatmap region clusters (where the diff actually is)");
@@ -950,15 +992,57 @@ export function formatMigrationReportForAgent(
       }
     }
 
+    // Scenario detector. The current "Suggested next step" wording
+    // assumes the migration scenario (read PNGs → cross-check fix
+    // candidates → write CSS patch). Subagent F's eval showed that
+    // when DOM trees diverge — the wireframe / from-screenshot case —
+    // those steps yield empty results and the agent regresses to ad-hoc
+    // pngjs probes. Detect which signal family is non-empty and pick
+    // the corresponding playbook.
+    const hasDomSignal =
+      (dpSummary?.result.totalDiffs ?? 0) > 0 ||
+      (csdSummary?.result.totalDiffs ?? 0) > 0 ||
+      fixCandidates.length > 0;
+    const hasWireframeSignal =
+      (bboxSummary?.perViewport.length ?? 0) > 0 ||
+      (geometrySummary?.profiles.length ?? 0) > 0 ||
+      (heatmapSummary?.perViewport.length ?? 0) > 0 ||
+      (textRowsSummary?.perViewport.length ?? 0) > 0;
+    const wireframeMode = !hasDomSignal && hasWireframeSignal;
+
     lines.push("### Suggested next step");
     lines.push("");
-    lines.push("1. Read baseline + current PNGs side-by-side and enumerate visible deltas " +
-      "(font / colors / spacing / radius / shadow / gradient / typography).");
-    lines.push("2. Cross-check against the fix-candidate table — it identifies *which* " +
-      "selectors differ but may name the wrong property; trust your eyes for the " +
-      "actual property.");
-    lines.push("3. Write one CSS patch covering the deltas, re-run `vrt compare`, " +
-      "and check that the dominant category count drops to zero on every viewport.");
+    if (wireframeMode) {
+      lines.push("_Wireframe / from-screenshot mode detected: no DOM correspondence " +
+        "between baseline and variant — DOM-position-diff, computed-style-diff, " +
+        "and fix-candidate sections are empty. Use the image-only signals._");
+      lines.push("");
+      lines.push("1. Open the heatmap PNG and locate each region cluster from the " +
+        "table above — these are the *only* areas the variant differs from the " +
+        "target. Diffs outside those rectangles can be ignored.");
+      lines.push("2. For each cluster, match it to a baseline component bbox " +
+        "(top/left/size). The Δ column tells you whether the variant element is " +
+        "too small / too big / displaced.");
+      lines.push("3. Cross-check the cross-viewport geometry table: if a row has " +
+        "large baseline spread and ~0 variant spread, you're missing a responsive " +
+        "rule (typically `max-width`, `width: 100%`, or an `@media` block) — " +
+        "not a fixed-pixel correction.");
+      lines.push("4. If the text-row table shows a count mismatch (e.g. baseline " +
+        "has 6 bands, variant has 4), you're missing rows of content — add the " +
+        "missing HTML elements before tweaking CSS.");
+      lines.push("5. Write the missing HTML elements first (the bbox table tells " +
+        "you their target dimensions), then the CSS rules. Re-run `vrt compare` " +
+        "and check that bbox deltas + heatmap regions + text-row Δy all shrink " +
+        "toward zero.");
+    } else {
+      lines.push("1. Read baseline + current PNGs side-by-side and enumerate visible deltas " +
+        "(font / colors / spacing / radius / shadow / gradient / typography).");
+      lines.push("2. Cross-check against the fix-candidate table — it identifies *which* " +
+        "selectors differ but may name the wrong property; trust your eyes for the " +
+        "actual property.");
+      lines.push("3. Write one CSS patch covering the deltas, re-run `vrt compare`, " +
+        "and check that the dominant category count drops to zero on every viewport.");
+    }
     lines.push("");
   }
 

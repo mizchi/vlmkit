@@ -267,14 +267,25 @@ The wireframe mode needs visual-only diagnostics:
   shadcn→blank (24 region clusters) and wireframe pricing-card
   (18 clusters — *still works when component bbox matching
   fails*, the F-overfit case).
-- [ ] **Text-row y-position extraction** from rendered PNGs via
+- [x] **Text-row y-position extraction** from rendered PNGs via
   luminance-profile peak detection — exposes "the `$24` text row
   is 4px higher in the variant" without needing DOM correspondence.
-- [ ] **Scenario-aware Suggested-next-step**. F's report
+  `src/text-rows.ts` computes per-row mean luminance, treats rows
+  ≥12 below the median as dark, and groups runs into bands.
+  `matchTextRows` pairs by ordered index and emits Δy. Surfaces
+  "Bands B / V" count mismatches even when no rows can be paired
+  (variant body empty case). 8 unit tests + verified on shadcn
+  (14/14 bands paired, Δy −45px..−421px across the page) and
+  wireframe pricing-card (1/0, 1/0, 8/0 — exactly "agent's blank
+  variant has 0 bands; target has 8" signal).
+- [x] **Scenario-aware Suggested-next-step**. F's report
   highlighted that the current "Suggested next step" wording
   assumes the migration scenario. When DOM-position is empty,
   pivot to "inspect heatmap → measure bbox → compare per-viewport
-  geometry."
+  geometry." `diff-for-agent` now detects wireframe mode (no
+  dom-position-diff, no computed-style-diff, no fix-candidates but
+  bbox/geometry/heatmap/text-rows present) and emits a 5-step
+  image-only playbook instead.
 
 ### Agent-loop UX (from 2026-05-12 subagent eval)
 
