@@ -409,13 +409,42 @@ be CSS transitions, not the threshold. Fixes applied:
   side. ≤ 30 annotated as _(near, likely AA)_; > 60 is a real
   palette gap. Lets the agent dismiss persistent low-diff noise.
 
-Tier B (deferred, not yet shipped):
+### Tier B follow-up + A4 polish (2026-05-13)
 
-- [ ] Multi-rank bbox surface (top-N matched, not just top-1).
-- [ ] Explicit dominant-outer/inner background-color row in the
-  report (not buried in palette "missing").
-- [ ] Per-heatmap-region dominant color annotation
-  ("region 485,478 310×38 dominant fill: #2464ec").
+- [x] **Per-heatmap-region dominant color annotation.**
+  `findHeatmapRegionsFromFile` now optionally takes a source image
+  path; samples each region's interior via per-channel median and
+  attaches `dominantColor: { hex, r, g, b }`. component-from-image
+  passes the target PNG, so the heatmap table shows "region 485,478
+  310×38 fill `#2563eb`" — closes the loop between "this region
+  differs" and "paint this color there."
+- [x] **Explicit dominant backgrounds row.** New
+  `findDominantBackgrounds(rgba, width, height)` samples the image
+  perimeter (page bg) and a central 30×30% rectangle (content bg)
+  via per-channel median, returns both + a `same` flag for solid
+  pages. Median replaces an earlier 4-bit mode-finder that collapsed
+  `#ffffff` and `#f6f7fb` into the same bucket. component-from-image
+  renders a "Backgrounds" section before the palette diff: target
+  outer `#f6f7fb` / inner `#ffffff` vs current outer/inner —
+  no longer buried in the "missing palette" list.
+- [x] **Multi-rank bbox** — not a code change. Investigation showed
+  the existing tools already render top-8 bbox ranks; the subagent
+  hit "rank 0 only" because A2's area-ratio filter correctly
+  skipped pairs when the variant lacked components. Once the agent
+  has content, multiple ranks appear naturally.
+- [x] **A4 follow-up — raw vs perceptual state diff.** Subagent H
+  noted the binary suspect flag (`induced === 0`) is too coarse:
+  it can't distinguish "no rule at all" from "rule whose effect is
+  below pixelmatch's 0.03 perceptual threshold." Added a raw-pixel
+  diff (any RGB channel Δ ≥ 4, no AA filter) alongside the
+  perceptual %. Three states now:
+    - `suspect` (both ≈ 0 → no author CSS)
+    - `_subtle_` (perceptual ≈ 0 but raw fires → real change below
+      perceptual threshold; e.g., `#2563eb → #2462ea`)
+    - cleared (both register → unambiguous state)
+  Verified: subtle hover Δ ~2/channel reports Perceptual 0.00% /
+  Raw 4.29% → `_subtle_`; missing-hover reports 0.00% / 0.00% →
+  `suspect`; normal hover (Δ ~5-30/channel) reports both non-zero.
 
 - [x] **Multi-page consistency** — same component on N pages must
   render identically. Cross-page bbox / computed-style diff.

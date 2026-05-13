@@ -37,7 +37,7 @@ import {
 } from "./component-bbox.ts";
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "./heatmap-regions.ts";
 import { extractTextRowsFromFile, matchTextRows, type MatchedTextRow } from "./text-rows.ts";
-import { extractPaletteFromFile, type PaletteColor } from "./palette-extract.ts";
+import { extractPaletteFromFile, findDominantBackgroundsFromFile, type PaletteColor, type DominantBackgrounds } from "./palette-extract.ts";
 import { diffPalettes, type PaletteDiff } from "./palette-diff.ts";
 import {
   applyForcedPseudoState,
@@ -78,6 +78,8 @@ export interface ComponentFromImageReport {
     state: ForcedPseudoState;
     forcedCount: number;
     inducedDiffRatio: number;
+    /** Pixels with any RGB channel delta ≥ 4 (no perceptual filter). */
+    rawInducedDiffRatio: number;
   }>;
   reportPath: string;
 }
@@ -164,7 +166,10 @@ export async function runComponentFromImage(
 
     let heatmapRegions: HeatmapRegion[] = [];
     try {
-      heatmapRegions = await findHeatmapRegionsFromFile(heatmapPath);
+      // Pass the target image so each region gets its dominant color
+      // annotated — closes the loop between "this region differs" and
+      // "fill it with this color".
+      heatmapRegions = await findHeatmapRegionsFromFile(heatmapPath, {}, targetCopyPath);
     } catch {
       // Heatmap may be absent when diff is zero.
     }
@@ -181,8 +186,38 @@ export async function runComponentFromImage(
     ]);
     const paletteDiff = diffPalettes(targetPalette, currentPalette);
 
+    // Explicit outer/inner background pair — subagent dogfood noted
+    // this was buried in the "missing palette" list.
+    const [targetBg, currentBg] = await Promise.all([
+      findDominantBackgroundsFromFile(targetCopyPath).catch(() => undefined),
+      findDominantBackgroundsFromFile(currentPath).catch(() => undefined),
+    ]);
+
     // Optional multi-state pass (current side only — we have no
     // baseline HTML to force states on).
+    // Raw RGB diff helper — counts any pixel where any channel differs
+    // by ≥ minChannelDelta. Bypasses pixelmatch's perceptual/AA filter
+    // so we surface the "did anything at all change?" signal that the
+    // 0.03 threshold can swallow on subtle hovers. From subagent H
+    // dogfood: even with transitions disabled, a clear `:hover` rule
+    // can register low under the perceptual threshold; raw diff shows
+    // unambiguously when something changed.
+    async function countRawDiff(pathA: string, pathB: string, minChannelDelta = 4): Promise<{ ratio: number; pixels: number; total: number }> {
+      const [bufA, bufB] = await Promise.all([readFile(pathA), readFile(pathB)]);
+      const pA = PNG.sync.read(bufA);
+      const pB = PNG.sync.read(bufB);
+      const total = (pA.width * pA.height);
+      if (pA.data.length !== pB.data.length) return { ratio: 0, pixels: 0, total };
+      let count = 0;
+      for (let i = 0; i < pA.data.length; i += 4) {
+        const dr = Math.abs(pA.data[i]! - pB.data[i]!);
+        const dg = Math.abs(pA.data[i + 1]! - pB.data[i + 1]!);
+        const db = Math.abs(pA.data[i + 2]! - pB.data[i + 2]!);
+        if (dr >= minChannelDelta || dg >= minChannelDelta || db >= minChannelDelta) count++;
+      }
+      return { ratio: count / total, pixels: count, total };
+    }
+
     const stateResults: ComponentFromImageReport["states"] = [];
     if (options.states && options.states.length > 0) {
       // Baseline screenshot is the target PNG (already captured). For
@@ -211,10 +246,12 @@ export async function runComponentFromImage(
           threshold: options.threshold ?? 0.03,
           skipHeatmap: true,
         });
+        const raw = await countRawDiff(currentPath, stateShotPath).catch(() => ({ ratio: 0, pixels: 0, total: 0 }));
         stateResults.push({
           state,
           forcedCount: applied.forcedCount,
           inducedDiffRatio: stateDiff?.diffRatio ?? 0,
+          rawInducedDiffRatio: raw.ratio,
         });
       }
     }
@@ -235,6 +272,8 @@ export async function runComponentFromImage(
       baselineRowCount: targetRows.length,
       variantRowCount: currentRows.length,
       paletteDiff,
+      targetBg,
+      currentBg,
       stateResults,
     });
     await writeFile(reportPath, markdown);
@@ -284,6 +323,8 @@ interface RenderInput {
   baselineRowCount: number;
   variantRowCount: number;
   paletteDiff: PaletteDiff;
+  targetBg?: DominantBackgrounds;
+  currentBg?: DominantBackgrounds;
   stateResults: NonNullable<ComponentFromImageReport["states"]>;
 }
 
@@ -328,10 +369,15 @@ export function renderReportMarkdown(r: RenderInput): string {
   if (r.heatmapRegions.length > 0) {
     lines.push("## Heatmap region clusters");
     lines.push("");
-    lines.push("| Top-Left | Size | Hot pixels |");
-    lines.push("|---|---|---|");
+    lines.push("Each cluster is a contiguous run of differing pixels. `Fill` is " +
+      "the dominant color *inside the region* sampled from the target — i.e. " +
+      "the color you need to paint in.");
+    lines.push("");
+    lines.push("| Top-Left | Size | Hot pixels | Fill |");
+    lines.push("|---|---|---|---|");
     for (const reg of r.heatmapRegions.slice(0, 8)) {
-      lines.push(`| ${reg.left},${reg.top} | ${reg.width}×${reg.height} | ${reg.area} |`);
+      const fill = reg.dominantColor ? `\`${reg.dominantColor.hex}\`` : "—";
+      lines.push(`| ${reg.left},${reg.top} | ${reg.width}×${reg.height} | ${reg.area} | ${fill} |`);
     }
     lines.push("");
   }
@@ -353,6 +399,27 @@ export function renderReportMarkdown(r: RenderInput): string {
         const signed = m.deltaY > 0 ? `+${m.deltaY}` : `${m.deltaY}`;
         lines.push(`| #${m.rank} | ${m.baseline.yCenter} | ${m.variant.yCenter} | ${signed}px |`);
       }
+    }
+    lines.push("");
+  }
+
+  if (r.targetBg) {
+    lines.push("## Backgrounds");
+    lines.push("");
+    lines.push("Direct samples of the page bg (image perimeter) and inner bg " +
+      "(central rectangle) — start here when setting `body` and content " +
+      "container background colors.");
+    lines.push("");
+    lines.push("| Layer | Target | Current |");
+    lines.push("|---|---|---|");
+    const currOuter = r.currentBg ? `\`${r.currentBg.outer.hex}\`` : "—";
+    const currInner = r.currentBg ? `\`${r.currentBg.inner.hex}\`` : "—";
+    lines.push(`| outer (page) | \`${r.targetBg.outer.hex}\` | ${currOuter} |`);
+    if (!r.targetBg.same) {
+      lines.push(`| inner (content) | \`${r.targetBg.inner.hex}\` | ${currInner} |`);
+    } else {
+      lines.push("");
+      lines.push("_(target outer and inner are the same; page is a single solid background.)_");
     }
     lines.push("");
   }
@@ -385,17 +452,27 @@ export function renderReportMarkdown(r: RenderInput): string {
     lines.push("## Forced-state diff");
     lines.push("");
     lines.push("Each row: current HTML rendered with the named pseudo-class " +
-      "forced on all interactive elements, diffed against the default render. " +
-      "When the induced delta is 0% on interactive elements, the variant " +
-      "probably forgot to wire up the corresponding state styles.");
+      "forced on all interactive elements, diffed against the default render.");
     lines.push("");
-    lines.push("| State | Induced delta | Forced elements | Note |");
-    lines.push("|---|---|---|---|");
+    lines.push("- **Perceptual %**: pixelmatch at threshold 0.03 — what the eye " +
+      "would notice. Filters anti-aliasing and subpixel jitter.");
+    lines.push("- **Raw %**: any pixel where any RGB channel changed by ≥ 4. " +
+      "Catches subtle hover effects (Δ10/channel shifts) that the perceptual " +
+      "filter swallows.");
+    lines.push("- **Note**: `suspect` when both metrics are essentially zero — " +
+      "the state likely has no author CSS wired up.");
+    lines.push("");
+    lines.push("| State | Perceptual % | Raw % | Forced elements | Note |");
+    lines.push("|---|---|---|---|---|");
     for (const s of r.stateResults) {
-      const note = s.forcedCount > 0 && s.inducedDiffRatio === 0
+      const perceptZero = s.inducedDiffRatio < 0.0005;
+      const rawZero = s.rawInducedDiffRatio < 0.0005;
+      const note = s.forcedCount > 0 && perceptZero && rawZero
         ? "**suspect** — state did not change rendering"
-        : "";
-      lines.push(`| \`:${s.state}\` | ${(s.inducedDiffRatio * 100).toFixed(2)}% | ${s.forcedCount} | ${note} |`);
+        : s.forcedCount > 0 && perceptZero && !rawZero
+          ? "_subtle_ — only raw-pixel diff registers (check below the perceptual threshold)"
+          : "";
+      lines.push(`| \`:${s.state}\` | ${(s.inducedDiffRatio * 100).toFixed(2)}% | ${(s.rawInducedDiffRatio * 100).toFixed(2)}% | ${s.forcedCount} | ${note} |`);
     }
     lines.push("");
   }

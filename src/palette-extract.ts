@@ -113,3 +113,90 @@ export async function extractPaletteFromFile(
   const png = PNG.sync.read(buf);
   return extractPaletteFromRgba(png.data, png.width, png.height, options);
 }
+
+export interface DominantBackgrounds {
+  /** Color sampled from the image perimeter — the "page" background. */
+  outer: { r: number; g: number; b: number; hex: string };
+  /** Color sampled from a central rectangle — the "content" background. */
+  inner: { r: number; g: number; b: number; hex: string };
+  /** True when outer and inner are within `mergeDistance` — page is a single solid color. */
+  same: boolean;
+}
+
+function toHex2(r: number, g: number, b: number): string {
+  const c = (n: number) => n.toString(16).padStart(2, "0");
+  return `#${c(r)}${c(g)}${c(b)}`;
+}
+
+function medianColor(data: Uint8Array, samples: number[][]): { r: number; g: number; b: number; hex: string } {
+  // Per-channel median across sampled pixels. Median is robust against
+  // sparse outliers (a text pixel doesn't shift the result) and avoids
+  // the quantization-bucket collisions of mode-finding (e.g. #ffffff
+  // and #f6f7fb both land in the same coarse bucket).
+  const rs: number[] = [], gs: number[] = [], bs: number[] = [];
+  for (const [x, y, width] of samples) {
+    const i = (y * width + x) * 4;
+    if (data[i + 3]! === 0) continue;
+    rs.push(data[i]!); gs.push(data[i + 1]!); bs.push(data[i + 2]!);
+  }
+  if (rs.length === 0) return { r: 255, g: 255, b: 255, hex: "#ffffff" };
+  rs.sort((a, b) => a - b); gs.sort((a, b) => a - b); bs.sort((a, b) => a - b);
+  const mid = rs.length >> 1;
+  const r = rs[mid]!, g = gs[mid]!, b = bs[mid]!;
+  return { r, g, b, hex: toHex2(r, g, b) };
+}
+
+/**
+ * Sample the dominant outer (perimeter) and inner (center) background
+ * colors. Surfaces "page bg = #f4f4f4 / card bg = #ffffff" as a
+ * first-class signal — historically the agent had to deduce this
+ * from the palette "missing" rows. From dogfood eval.
+ */
+export function findDominantBackgrounds(
+  data: Uint8Array,
+  width: number,
+  height: number,
+): DominantBackgrounds {
+  // Outer = pixels along a 4-px-thick frame around the edge.
+  // Stride-sampled so the cost is independent of image size.
+  const outerSamples: number[][] = [];
+  const stride = Math.max(2, Math.floor(Math.min(width, height) / 80));
+  const edge = 3;
+  for (let x = 0; x < width; x += stride) {
+    for (let dy = 0; dy < edge; dy++) {
+      if (dy < height) outerSamples.push([x, dy, width]);
+      if (height - 1 - dy >= 0) outerSamples.push([x, height - 1 - dy, width]);
+    }
+  }
+  for (let y = 0; y < height; y += stride) {
+    for (let dx = 0; dx < edge; dx++) {
+      if (dx < width) outerSamples.push([dx, y, width]);
+      if (width - 1 - dx >= 0) outerSamples.push([width - 1 - dx, y, width]);
+    }
+  }
+  const outer = medianColor(data, outerSamples);
+
+  // Inner = pixels in the central 30% × 30% rectangle.
+  const innerSamples: number[][] = [];
+  const cx0 = Math.floor(width * 0.35), cx1 = Math.floor(width * 0.65);
+  const cy0 = Math.floor(height * 0.35), cy1 = Math.floor(height * 0.65);
+  for (let y = cy0; y < cy1; y += stride) {
+    for (let x = cx0; x < cx1; x += stride) {
+      innerSamples.push([x, y, width]);
+    }
+  }
+  const inner = innerSamples.length > 0 ? medianColor(data, innerSamples) : outer;
+
+  const dr = outer.r - inner.r, dg = outer.g - inner.g, db = outer.b - inner.b;
+  // Distance < 6 means visually indistinguishable backgrounds (page
+  // is one solid color). 6-15 means subtle layering (e.g. card on
+  // light gray bg with white card center) — we still report both.
+  const same = Math.sqrt(dr * dr + dg * dg + db * db) < 6;
+  return { outer, inner, same };
+}
+
+export async function findDominantBackgroundsFromFile(path: string): Promise<DominantBackgrounds> {
+  const buf = await readFile(path);
+  const png = PNG.sync.read(buf);
+  return findDominantBackgrounds(png.data, png.width, png.height);
+}

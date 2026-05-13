@@ -26,6 +26,16 @@ export interface HeatmapRegion {
   height: number;
   /** Hot-pixel count inside the bbox. */
   area: number;
+  /**
+   * Dominant color of the region as sampled from a *source* image
+   * (the baseline / target PNG that the heatmap was generated against).
+   * Only populated when `findHeatmapRegionsFromFile` was called with a
+   * `sourceImagePath`. Lets the agent close the loop between
+   * "this region differs" and "fill it with this color".
+   * From subagent dogfood eval: "you tell me #2464ec is missing, but
+   * not which heatmap region is that color."
+   */
+  dominantColor?: { r: number; g: number; b: number; hex: string };
 }
 
 export interface FindHeatmapRegionsOptions {
@@ -160,11 +170,65 @@ export function findHeatmapRegionsFromRgba(
     .slice(0, topN);
 }
 
+function toHex(r: number, g: number, b: number): string {
+  const c = (n: number) => n.toString(16).padStart(2, "0");
+  return `#${c(r)}${c(g)}${c(b)}`;
+}
+
+/** Sample the dominant color inside `region` from the source image data. */
+function sampleRegionColor(
+  sourceData: Uint8Array,
+  sourceWidth: number,
+  sourceHeight: number,
+  region: HeatmapRegion,
+): { r: number; g: number; b: number; hex: string } | undefined {
+  // Sample on a 5×5 grid inside the region. Skip transparent pixels.
+  // Use the median per-channel rather than mean — robust against
+  // boundary pixels that might pick up surrounding bg color.
+  const inset = 2;
+  const x0 = Math.max(0, region.left + inset);
+  const x1 = Math.min(sourceWidth, region.left + region.width - inset);
+  const y0 = Math.max(0, region.top + inset);
+  const y1 = Math.min(sourceHeight, region.top + region.height - inset);
+  if (x1 <= x0 || y1 <= y0) return undefined;
+  const stepX = Math.max(1, Math.floor((x1 - x0) / 5));
+  const stepY = Math.max(1, Math.floor((y1 - y0) / 5));
+  const rs: number[] = [], gs: number[] = [], bs: number[] = [];
+  for (let y = y0; y < y1; y += stepY) {
+    for (let x = x0; x < x1; x += stepX) {
+      const i = (y * sourceWidth + x) * 4;
+      if (sourceData[i + 3]! === 0) continue;
+      rs.push(sourceData[i]!);
+      gs.push(sourceData[i + 1]!);
+      bs.push(sourceData[i + 2]!);
+    }
+  }
+  if (rs.length === 0) return undefined;
+  rs.sort((a, b) => a - b); gs.sort((a, b) => a - b); bs.sort((a, b) => a - b);
+  const mid = rs.length >> 1;
+  const r = rs[mid]!, g = gs[mid]!, b = bs[mid]!;
+  return { r, g, b, hex: toHex(r, g, b) };
+}
+
 export async function findHeatmapRegionsFromFile(
   path: string,
   options: FindHeatmapRegionsOptions = {},
+  sourceImagePath?: string,
 ): Promise<HeatmapRegion[]> {
   const buf = await readFile(path);
   const png = PNG.sync.read(buf);
-  return findHeatmapRegionsFromRgba(png.data, png.width, png.height, options);
+  const regions = findHeatmapRegionsFromRgba(png.data, png.width, png.height, options);
+  if (sourceImagePath) {
+    try {
+      const sourceBuf = await readFile(sourceImagePath);
+      const sourcePng = PNG.sync.read(sourceBuf);
+      for (const region of regions) {
+        const color = sampleRegionColor(sourcePng.data, sourcePng.width, sourcePng.height, region);
+        if (color) region.dominantColor = color;
+      }
+    } catch {
+      // Source image unavailable — leave regions without dominant color.
+    }
+  }
+  return regions;
 }
