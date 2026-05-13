@@ -308,7 +308,13 @@ export interface MigrationCompareReport {
   /** Per-viewport shift-origin diagnostics (which element causes each band's shift). */
   shiftOrigins?: Array<{
     variantFile: string;
-    perViewport: Array<{ viewport: string; origins: ShiftOrigin[] }>;
+    perViewport: Array<{
+      viewport: string;
+      origins: ShiftOrigin[];
+      /** Bands the pixel-shift detector reported but for which no DOM-level Δy was found.
+       *  Usually a pixelmatch cross-correlation artifact (phantom shift). */
+      unexplainedBands?: ShiftRegion[];
+    }>;
   }>;
   results: MigrationCompareResult[];
   reportPath: string;
@@ -646,7 +652,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     const computedStyleDiffReports: Array<{ variantFile: string; result: CsdResult }> = [];
     const domPositionDiffReports: Array<{ variantFile: string; result: DpResult }> = [];
     const domPositionDiffPerViewportReports: Array<{ variantFile: string; result: DpPerViewportResult }> = [];
-    const shiftOriginsReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; origins: ShiftOrigin[] }> }> = [];
+    const shiftOriginsReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; origins: ShiftOrigin[]; unexplainedBands?: ShiftRegion[] }> }> = [];
     for (const variant of variantSources) {
       let variantHtml: string;
       const variantName = variant.label;
@@ -906,14 +912,22 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         domPositionDiffPerViewportReports.push({ variantFile: variantFileLabel, result: trimmedPerVp });
         // Shift-origin diagnostics: which element causes each band's shift?
         if (baselineBboxesByVp.size > 0 && variantBboxesByVp.size > 0 && shiftRegionsByVp.size > 0) {
-          const perViewport: Array<{ viewport: string; origins: ShiftOrigin[] }> = [];
+          const perViewport: Array<{ viewport: string; origins: ShiftOrigin[]; unexplainedBands?: ShiftRegion[] }> = [];
           for (const [vpLabel, bands] of shiftRegionsByVp) {
             const baselineBboxes = baselineBboxesByVp.get(vpLabel);
             const variantBboxes = variantBboxesByVp.get(vpLabel);
             if (!baselineBboxes || !variantBboxes) continue;
             const origins = findShiftOrigins(baselineBboxes, variantBboxes, bands, { perBandLimit: 2 });
-            if (origins.length > 0) {
-              perViewport.push({ viewport: vpLabel, origins });
+            const explainedBandKeys = new Set(origins.map((o) => `${o.bandStart}-${o.bandEnd}-${o.bandShift}`));
+            const unexplainedBands = bands.filter(
+              (b) => !explainedBandKeys.has(`${b.yStart}-${b.yEnd}-${b.shift}`),
+            );
+            if (origins.length > 0 || unexplainedBands.length > 0) {
+              perViewport.push({
+                viewport: vpLabel,
+                origins,
+                unexplainedBands: unexplainedBands.length > 0 ? unexplainedBands : undefined,
+              });
             }
           }
           if (perViewport.length > 0) {

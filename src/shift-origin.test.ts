@@ -49,12 +49,15 @@ describe("findShiftOrigins", () => {
     assert.equal(origins.length, 0);
   });
 
-  it("ignores elements whose Δy disagrees with the band direction", () => {
+  it("does NOT require Δy direction to match band-shift sign", () => {
+    // Pixelmatch's cross-correlation can report a sign opposite to bbox Δy
+    // when the variant has differently-distributed content. We surface the
+    // element regardless of sign so the agent can interpret it.
     const baseline = [bbox({ path: "p1", top: 100 })];
-    // Variant shifted UP, but band says +50 (down) — should be filtered.
     const variant = [bbox({ path: "p1", top: 50 })];
     const origins = findShiftOrigins(baseline, variant, [{ yStart: 50, yEnd: 200, shift: 50 }]);
-    assert.equal(origins.length, 0);
+    assert.equal(origins.length, 1);
+    assert.equal(origins[0]!.originDeltaY, -50);
   });
 
   it("ignores subpixel Δy below threshold", () => {

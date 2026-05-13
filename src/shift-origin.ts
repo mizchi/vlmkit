@@ -119,8 +119,11 @@ export function findShiftOrigins(
       if (!v) continue;
       const deltaY = v.top - b.top;
       if (Math.abs(deltaY) < minDelta) continue;
-      // Only count elements whose Δy points in the same direction as the band shift.
-      if (Math.sign(deltaY) !== Math.sign(bandShift)) continue;
+      // Note: do NOT require Math.sign(deltaY) === Math.sign(bandShift).
+      // The pixelmatch-derived band shift uses cross-correlation which can
+      // report a sign opposite to the bbox Δy when the variant has *less*
+      // content than the baseline (or vice versa). We still want to flag
+      // the element so the agent can interpret the direction itself.
 
       candidates.push({
         bandStart: band.yStart,
@@ -137,8 +140,8 @@ export function findShiftOrigins(
       });
     }
 
-    // Rank: closer to bandShift first (best explanatory match), then smallest
-    // baseline.top (earliest divergence wins ties).
+    // Rank: closer to |bandShift| first (best explanatory match), then
+    // smallest baseline.top (earliest divergence wins ties).
     candidates.sort((a, b) =>
       Math.abs(Math.abs(a.originDeltaY) - Math.abs(bandShift)) -
       Math.abs(Math.abs(b.originDeltaY) - Math.abs(bandShift))

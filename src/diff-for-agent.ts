@@ -105,7 +105,11 @@ export interface DfaShiftOrigin {
 
 export interface DfaShiftOriginsSummary {
   variantFile: string;
-  perViewport: Array<{ viewport: string; origins: DfaShiftOrigin[] }>;
+  perViewport: Array<{
+    viewport: string;
+    origins: DfaShiftOrigin[];
+    unexplainedBands?: Array<{ yStart: number; yEnd: number; shift: number }>;
+  }>;
 }
 
 export interface DfaReport {
@@ -295,7 +299,7 @@ function extractClassRenameMap(report: DfaReport, variantFile: string): ClassRen
   const pairs = new Map<string, { baselineClasses: string; variantClasses: string; paths: Set<string>; diffCount: number }>();
   for (const pos of positions) {
     if (pos.baselineClasses === pos.variantClasses) continue;
-    const key = `${pos.baselineClasses} ${pos.variantClasses}`;
+    const key = `${pos.baselineClasses} ${pos.variantClasses}`;
     const cur = pairs.get(key) ?? {
       baselineClasses: pos.baselineClasses,
       variantClasses: pos.variantClasses,
@@ -424,27 +428,55 @@ export function formatMigrationReportForAgent(
         "variant — i.e. the local origin of the shift. Subsequent elements " +
         "below this one inherit the same Δy.");
       lines.push("");
-      lines.push("| Viewport | Band (y) | Δy | Origin position | Baseline class | Variant class | Origin Δtop | Suspect |");
-      lines.push("|---|---|---|---|---|---|---|---|");
+      const hasOrigins = shiftOriginsSummary.perViewport.some((v) => v.origins.length > 0);
+      if (hasOrigins) {
+        lines.push("| Viewport | Band (y) | Δy | Origin position | Baseline class | Variant class | Origin Δtop | Suspect |");
+        lines.push("|---|---|---|---|---|---|---|---|");
+        for (const vp of shiftOriginsSummary.perViewport) {
+          for (const o of vp.origins) {
+            const bcls = o.originBaselineClasses || "_(none)_";
+            const vcls = o.originVariantClasses || "_(none)_";
+            const signedShift = o.bandShift > 0 ? `+${o.bandShift}` : `${o.bandShift}`;
+            const signedDelta = o.originDeltaY > 0 ? `+${o.originDeltaY}` : `${o.originDeltaY}`;
+            lines.push(
+              `| \`${vp.viewport}\` | ${o.bandStart}–${o.bandEnd} | ${signedShift}px | ` +
+              `\`${o.originPath}\` | \`${bcls}\` | \`${vcls}\` | ${signedDelta}px | ${o.suspectedAxis ?? "?"} |`,
+            );
+          }
+        }
+        lines.push("");
+        lines.push("Suspect column: `height` = the origin element's own height " +
+          "differs (its `padding`, `line-height`, or content sizing is the " +
+          "root cause); `margin/padding-above` = same height but its top " +
+          "moved (a parent's padding or a previous sibling's height/margin " +
+          "is responsible).");
+        lines.push("");
+      }
+
+      // Bands that pixelmatch reported but no element-level Δy explains.
+      // Almost always a cross-correlation artifact (repeated patterns,
+      // subpixel font-metric differences, etc.) — not an actual layout shift.
+      const phantomBands: Array<{ viewport: string; band: { yStart: number; yEnd: number; shift: number } }> = [];
       for (const vp of shiftOriginsSummary.perViewport) {
-        for (const o of vp.origins) {
-          const bcls = o.originBaselineClasses || "_(none)_";
-          const vcls = o.originVariantClasses || "_(none)_";
-          const signedShift = o.bandShift > 0 ? `+${o.bandShift}` : `${o.bandShift}`;
-          const signedDelta = o.originDeltaY > 0 ? `+${o.originDeltaY}` : `${o.originDeltaY}`;
-          lines.push(
-            `| \`${vp.viewport}\` | ${o.bandStart}–${o.bandEnd} | ${signedShift}px | ` +
-            `\`${o.originPath}\` | \`${bcls}\` | \`${vcls}\` | ${signedDelta}px | ${o.suspectedAxis ?? "?"} |`,
-          );
+        for (const b of vp.unexplainedBands ?? []) {
+          phantomBands.push({ viewport: vp.viewport, band: b });
         }
       }
-      lines.push("");
-      lines.push("Suspect column: `height` = the origin element's own height " +
-        "differs (its `padding`, `line-height`, or content sizing is the " +
-        "root cause); `margin/padding-above` = same height but its top " +
-        "moved (a parent's padding or a previous sibling's height/margin " +
-        "is responsible).");
-      lines.push("");
+      if (phantomBands.length > 0) {
+        lines.push(`> **Phantom shifts**: ${phantomBands.length} band(s) reported by the pixel-shift detector ` +
+          "have no DOM-level Δy explanation. These are almost always pixelmatch " +
+          "cross-correlation artifacts (repeated patterns, subpixel font-metric " +
+          "differences) — *not* a real layout shift. Treat as noise unless the " +
+          "viewport's overall diff % is also high.");
+        lines.push("");
+        lines.push("| Viewport | Band (y) | Reported shift |");
+        lines.push("|---|---|---|");
+        for (const p of phantomBands) {
+          const signed = p.band.shift > 0 ? `+${p.band.shift}` : `${p.band.shift}`;
+          lines.push(`| \`${p.viewport}\` | ${p.band.yStart}–${p.band.yEnd} | ${signed}px |`);
+        }
+        lines.push("");
+      }
     }
 
     const categoryAgg = aggregateCategoryCounts(results);

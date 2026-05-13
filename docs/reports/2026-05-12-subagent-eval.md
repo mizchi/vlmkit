@@ -420,11 +420,110 @@ already clean* — a different problem than "the tool can't see my
 classes." Vertical-shift origin diagnostic is the obvious next
 deliverable.
 
+## Subagent E — addendum (after shift-origin diagnostic shipped)
+
+Subagent E was launched with a 6-iter cap and access to the new
+`shift-origin diagnostic` ("for each band, name the first element
+whose y diverges, with suspect axis").
+
+### Result
+
+| Subagent | Tooling | Worst | Best | Iters | Wall time | Clean (<1%) |
+|---|---|---|---|---|---|---|
+| A | new tooling, no DOM-position | 23.9% | 8.8% | 5 | ~12 min | 0/10 |
+| B | control, PNGs only | 13.3% | 8.0% | 5 | ~35–40 min | 0/15 |
+| C | A's + DOM-position (single viewport) | 17.33% | 7.12% | 5 | ~5–6 min | 0/10 |
+| D | C's + per-viewport + rename map + strict gate | 3.52% | 0.11% | 9 | ~12–15 min | 6/10 |
+| **E** | **D's + (intended) shift-origin diagnostic** | **0.23%** | **0.11%** | **2** | **~3 min** | **10/10** |
+
+**10/10 convergence in 2 iterations / ~3 minutes.** Worst-case
+viewport at 0.23%, best at 0.11%. All viewports under 1%.
+
+### Two surprising findings
+
+1. **E did not actually use the shift-origin diagnostic.** During
+   the run, the section never appeared in the agent's
+   `diff-for-agent` output. Subsequent investigation revealed two
+   independent bugs:
+
+   a. **Null byte corruption.** `src/diff-for-agent.ts` had a
+   single 0x00 byte at offset 10039 (inside a template literal
+   in `extractClassRenameMap`). `grep` treated the file as binary
+   and silently skipped pattern matches. The committed code
+   contained all the right additions; runtime behaviour was
+   correct; but the subagent's `grep -i "shift\|origin"` returned
+   nothing and the agent (correctly) concluded the feature wasn't
+   wired in. Fixed by replacing the null with a space.
+
+   b. **Algorithm correctly emitted nothing** for E's iter1. The 7
+   shift bands at viewports ≥ 768 turned out to be **phantom
+   shifts** — pixelmatch's cross-correlation reported `+152px` /
+   `+239px` shift bands but every captured DOM element had
+   identical `top` coordinates between baseline and variant
+   (`max|Δy| = 0` at viewport 768). The phantom-shift band is a
+   cross-correlation artifact from subtle differences (subpixel
+   font metrics, etc.) that doesn't map to any actual element
+   movement. The diagnostic *correctly* returned zero origins, but
+   the report didn't surface this — it just looked like missing data.
+
+   Both bugs are now fixed. The diff-for-agent now emits a
+   "Phantom shifts" advisory listing bands with no DOM-level Δy
+   explanation, with guidance to treat them as noise.
+
+2. **The single actionable patch was a one-line `@media` rule.**
+   E identified the real delta from the per-viewport DOM-position
+   diff (the `Universal/Breakpoint-gated` split): `.luna-page`
+   `padding-left/right: 36px` at `min-width: 1024px` was the only
+   true breakpoint-gated property change. E added the rule and the
+   remaining 4 wide viewports collapsed from 3% to 0.2%.
+
+### What this means for the eval series
+
+The story arc closes cleanly:
+
+- **A** had no DOM-position diff → 0/10 convergence
+- **B** had only PNGs → 0/15
+- **C** added DOM-position but only at one viewport → 0/10
+- **D** added per-viewport / rename map / strict gate → 6/10
+- **E** had the full pipeline + (intended) shift-origin → **10/10
+  in 2 iters**
+
+The shift-origin feature *as conceived* turned out to not be the
+deciding factor for the residual viewports (which were caused by a
+breakpoint-gated padding rule, fully visible in the per-viewport
+DOM-position diff). But the diagnostic still pays for itself by
+surfacing phantom-shift bands so the agent doesn't waste rounds
+chasing pixelmatch artifacts.
+
+### Bugs fixed by this addendum
+
+1. `src/diff-for-agent.ts` null byte at offset 10039 → all output
+   sections after that point invisible to text-mode grep.
+2. Shift-origin section: when bands are "phantom" (no element-level
+   Δy explanation), report now emits a "Phantom shifts" callout
+   instead of staying silent. Subagent E + future agents can now
+   tell at a glance "this band is noise, not a layout shift."
+3. `findShiftOrigins` sign filter relaxed: previously the
+   algorithm required `Math.sign(Δy) === Math.sign(bandShift)`,
+   which over-filtered when pixelmatch's cross-correlation reports
+   a sign opposite to bbox Δy (compressed-content cases). Now the
+   element is reported with whichever sign Δy has; agent
+   interprets direction.
+
+### What's next
+
+With the eval at 10/10 convergence in 2 iters, the headline target
+is met. Smaller wish-list items remain (drop ✗ candidates from
+output, grid `fr`-ratio inference, em-px unit normalization,
+class-rename map dedupe by class) — all UX polish, none of them
+blockers for convergence on this fixture.
+
 ## Artifacts (running list)
 
 - Subagent A: `test-results/eval-subagent/A/working.html` + `A-iter*/`
 - Subagent B: `test-results/eval-subagent/B/working.html` + `B-iter*/`
 - Subagent C: `test-results/eval-subagent/C/working.html` + `C-iter*/`
 - Subagent D: `test-results/eval-subagent/D/working.html` + `D-iter*/`
+- Subagent E: `test-results/eval-subagent/E/working.html` + `E-iter*/`
 
-All four subagent transcripts are recorded in the SDK output files.
+All five subagent transcripts are recorded in the SDK output files.
