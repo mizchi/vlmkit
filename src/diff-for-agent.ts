@@ -112,6 +112,24 @@ export interface DfaShiftOriginsSummary {
   }>;
 }
 
+export interface DfaGridSuggestion {
+  parentPath: string;
+  parentTag: string;
+  baselineClasses: string;
+  variantClasses: string;
+  viewport: string;
+  baselineWidths: number[];
+  variantWidths: number[];
+  baselineRatioDecimal: string;
+  variantRatioDecimal: string;
+  baselineFrSuggestion: string;
+}
+
+export interface DfaGridSuggestionsSummary {
+  variantFile: string;
+  suggestions: DfaGridSuggestion[];
+}
+
 export interface DfaReport {
   dir: string;
   baseline: string;
@@ -122,6 +140,7 @@ export interface DfaReport {
   domPositionDiff?: DfaDpSummary[];
   domPositionDiffPerViewport?: DfaDpPerViewportSummary[];
   shiftOrigins?: DfaShiftOriginsSummary[];
+  gridSuggestions?: DfaGridSuggestionsSummary[];
   /** Absolute path of the report file (used to resolve sibling PNGs). */
   reportPath?: string;
 }
@@ -494,6 +513,32 @@ export function formatMigrationReportForAgent(
         }
         lines.push("");
       }
+    }
+
+    const gridSummary = (report.gridSuggestions ?? []).find((g) => g.variantFile === variantFile);
+    if (gridSummary && gridSummary.suggestions.length > 0) {
+      lines.push("### Grid `fr`-ratio suggestions");
+      lines.push("");
+      lines.push("Container elements whose direct children have a non-uniform width " +
+        "distribution that differs between baseline and variant. The baseline " +
+        "ratio is shown alongside an integer `fr` approximation — paste straight " +
+        "into `grid-template-columns:`.");
+      lines.push("");
+      lines.push("| Parent | Viewport | Baseline widths (px) | Variant widths (px) | Baseline ratio | Suggested `grid-template-columns` |");
+      lines.push("|---|---|---|---|---|---|");
+      for (const s of gridSummary.suggestions.slice(0, 15)) {
+        const bcls = s.baselineClasses || "_(none)_";
+        const vcls = s.variantClasses || "_(none)_";
+        const baselineW = s.baselineWidths.map((w) => Math.round(w)).join(" / ");
+        const variantW = s.variantWidths.map((w) => Math.round(w)).join(" / ");
+        lines.push(
+          `| \`${bcls}\` → \`${vcls}\` (\`${s.parentPath}\`) | \`${s.viewport}\` | ${baselineW} | ${variantW} | ${s.baselineRatioDecimal} | \`${s.baselineFrSuggestion}\` |`,
+        );
+      }
+      if (gridSummary.suggestions.length > 15) {
+        lines.push(`| _…${gridSummary.suggestions.length - 15} more containers_ | | | | | |`);
+      }
+      lines.push("");
     }
 
     const categoryAgg = aggregateCategoryCounts(results);

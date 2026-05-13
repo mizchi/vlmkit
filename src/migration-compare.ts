@@ -87,6 +87,7 @@ import {
   type BboxElement,
   type ShiftOrigin,
 } from "./shift-origin.ts";
+import { findGridSuggestions, type GridSuggestion } from "./grid-ratio.ts";
 
 // ---- Config ----
 
@@ -315,6 +316,11 @@ export interface MigrationCompareReport {
        *  Usually a pixelmatch cross-correlation artifact (phantom shift). */
       unexplainedBands?: ShiftRegion[];
     }>;
+  }>;
+  /** Per-viewport grid-template-columns suggestions (children widths differ). */
+  gridSuggestions?: Array<{
+    variantFile: string;
+    suggestions: GridSuggestion[];
   }>;
   results: MigrationCompareResult[];
   reportPath: string;
@@ -653,6 +659,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     const domPositionDiffReports: Array<{ variantFile: string; result: DpResult }> = [];
     const domPositionDiffPerViewportReports: Array<{ variantFile: string; result: DpPerViewportResult }> = [];
     const shiftOriginsReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; origins: ShiftOrigin[]; unexplainedBands?: ShiftRegion[] }> }> = [];
+    const gridSuggestionsReports: Array<{ variantFile: string; suggestions: GridSuggestion[] }> = [];
     for (const variant of variantSources) {
       let variantHtml: string;
       const variantName = variant.label;
@@ -935,6 +942,34 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             const totalOrigins = perViewport.reduce((s, v) => s + v.origins.length, 0);
             console.log(`  ${DIM}Shift origins: ${totalOrigins} explanation(s) across ${perViewport.length} viewport(s)${RESET}`);
           }
+
+          // Grid `fr`-ratio suggestions (one set per viewport, then merged
+          // and capped). Subagent D's exact wish-list complaint: "I had
+          // to compute the implied fr ratio by hand."
+          const gridSuggestions: GridSuggestion[] = [];
+          for (const [vpLabel, baselineBboxes] of baselineBboxesByVp) {
+            const variantBboxes = variantBboxesByVp.get(vpLabel);
+            if (!variantBboxes) continue;
+            gridSuggestions.push(...findGridSuggestions(baselineBboxes, variantBboxes, vpLabel));
+          }
+          if (gridSuggestions.length > 0) {
+            // Dedupe identical suggestions across viewports (same parent +
+            // same widths => same suggestion). Keep the largest-gap row
+            // per (parentPath, viewport) pair.
+            const seen = new Set<string>();
+            const deduped: GridSuggestion[] = [];
+            for (const g of gridSuggestions) {
+              const key = `${g.parentPath}::${g.viewport}`;
+              if (seen.has(key)) continue;
+              seen.add(key);
+              deduped.push(g);
+            }
+            gridSuggestionsReports.push({
+              variantFile: variantFileLabel,
+              suggestions: deduped.slice(0, 30),
+            });
+            console.log(`  ${DIM}Grid suggestions: ${deduped.length} container(s) with non-uniform child widths${RESET}`);
+          }
         }
 
         if (perVp.totalDiffs > 0) {
@@ -1049,6 +1084,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         ? domPositionDiffPerViewportReports
         : undefined,
       shiftOrigins: shiftOriginsReports.length > 0 ? shiftOriginsReports : undefined,
+      gridSuggestions: gridSuggestionsReports.length > 0 ? gridSuggestionsReports : undefined,
       results,
       reportPath,
     };

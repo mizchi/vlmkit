@@ -257,9 +257,19 @@ band at viewports ≥ 1024.
   baseline; replaced with `_N unverified candidate(s) hidden_`
   note so the agent knows what was suppressed. Dogfood Pass B
   iter 1: table shrunk from 5 rows (2 ✓ + 3 ✗) to just 2 ✓.
-- [ ] **Grid `fr`-ratio inference.** When baseline shows children
-  at `393.172px / 298.812px` inside a grid container, suggest
-  `grid-template-columns: 1.316fr 1fr` (or `7fr 5fr` etc).
+- [x] **Grid `fr`-ratio inference.** `src/grid-ratio.ts` walks per-
+  viewport bboxes, finds containers whose direct children have a
+  non-uniform width distribution differing between baseline and
+  variant, then suggests both a decimal ratio and a low-integer
+  `fr` form (denominators 1..12). Two filters keep output sharp:
+  `minRatioSpread` (default 1.15) drops flexbox subpixel-rendering
+  noise (3 ~equal buttons coming out 130/140/143); `maxSumOverParent`
+  (default 1.3) drops column-stacked containers where children fill
+  100% width and per-child widths are content-driven (not a grid
+  ratio). Surfaced as a new "Grid `fr`-ratio suggestions" section
+  in `vrt diff-for-agent`. Dogfood Pass B iter 1: the workspace at
+  768px reports `393/299 → 1.316 : 1.000 → 13fr 10fr` — the exact
+  case Subagent D guessed manually as "1.316fr 1fr".
 - [ ] **`display` context note for flex items.** A pill with
   `display: inline-flex` computes as `flex` when its parent is a
   flex container. Annotate so agents don't chase a delta that
