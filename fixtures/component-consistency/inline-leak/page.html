@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Cards grid</title>
+<style>
+  body { font-family: system-ui; margin: 0; padding: 40px; background: #f3f4f6; }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; max-width: 720px; margin: 0 auto; }
+  .card {
+    background: white;
+    padding: 20px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+  }
+  .card h3 { margin: 0 0 6px; font-size: 16px; color: #111827; }
+  .card p { margin: 0; font-size: 13px; color: #6b7280; }
+
+  /* BUG: one .card has been inlined separately with stale styles. */
+  .card.legacy {
+    padding: 12px;
+    border: 2px dashed #d1d5db;
+  }
+</style>
+</head>
+<body>
+  <div class="grid">
+    <div class="card">
+      <h3>Plan A</h3>
+      <p>Standard tier</p>
+    </div>
+    <div class="card">
+      <h3>Plan B</h3>
+      <p>Standard tier</p>
+    </div>
+    <div class="card legacy">
+      <h3>Plan C</h3>
+      <p>Standard tier</p>
+    </div>
+    <div class="card">
+      <h3>Plan D</h3>
+      <p>Standard tier</p>
+    </div>
+  </div>
+</body>
+</html>

@@ -287,7 +287,42 @@ The wireframe mode needs visual-only diagnostics:
   bbox/geometry/heatmap/text-rows present) and emits a 5-step
   image-only playbook instead.
 
-### Markup-assistance scenarios (Tier 1, 2026-05-13)
+### Markup-assistance Tier 2 (2026-05-13)
+
+Three more scenarios, each as a dedicated CLI to keep
+migration-compare lean.
+
+- [x] **Theme parity** (`vrt theme-parity`). Renders the same HTML
+  twice via Playwright's `emulateMedia({ colorScheme: light/dark })`,
+  extracts component bboxes, samples each bbox's dominant fill in
+  both renders, and flags components whose fill is identical across
+  themes (RGB distance < 16) as **unthemed** — hard-coded colors
+  that don't reference a theme variable. Evaluated on a card with
+  a deliberately unthemed alert banner (warm `#fef3c7` bg
+  hard-coded) — surfaced 1 of 8 unthemed, exact bbox 370,280
+  540×43 matching the buggy `.alert`. Theme pixel delta 97.9%
+  (page does respond broadly).
+
+- [x] **i18n / variable-length text stress** (`vrt i18n-stress`).
+  Inflates every text node by a configurable factor (default 1.4×
+  ≈ German), then samples per-element layout before vs after.
+  Classifies overflow as `horizontal-overflow` (scrollWidth >
+  clientWidth), `extends-beyond-parent` (right edge past parent),
+  or `vertical-wrap` (height grew significantly). Dedupes
+  ancestor reports so only the innermost broken element is
+  surfaced. Evaluated on a fixture with `width: 200px` heading
+  and `width: 120px` button: caught both overflows + classified
+  the paragraph wrap as the harmless `vertical-wrap` case.
+
+- [x] **Inline → componentized refactor** (`vrt component-consistency`).
+  Single-page-multi-instance sibling of `multi-page-consistency`:
+  captures every selector match on one page via
+  `locator.screenshot()`, compares each to instance #0 (or
+  `--reference-index N`). Catches "you converted 4 of 5 cards to
+  `<Card />` but missed the 5th and it's drifted." Evaluated on a
+  4-card grid where one has a `.legacy` modifier (smaller padding,
+  dashed border): cleanly surfaced **instance #2 at 7.48% drift**;
+  #1/#3 stayed below 0.3% (subpixel noise).
 
 Beyond the migration / wireframe scenarios, the tool can serve
 adjacent markup-authoring workflows. Each scenario is built and

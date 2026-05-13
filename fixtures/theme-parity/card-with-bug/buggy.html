@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dark mode regression</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #111827;
+    --card-bg: #f9fafb;
+    --card-fg: #1f2937;
+    --accent: #2563eb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f172a;
+      --fg: #f9fafb;
+      --card-bg: #1e293b;
+      --card-fg: #f1f5f9;
+      --accent: #60a5fa;
+    }
+  }
+  body {
+    font-family: system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    margin: 0;
+    padding: 40px;
+  }
+  h1 { color: var(--fg); }
+  .card {
+    max-width: 540px;
+    margin: 24px auto;
+    padding: 32px;
+    background: var(--card-bg);
+    color: var(--card-fg);
+    border-radius: 12px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 4px 10px;
+    background: var(--accent);
+    color: white;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  /* BUG: agent forgot to theme the alert banner — hard-coded warm colors. */
+  .alert {
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: #fef3c7;
+    color: #92400e;
+    border-left: 4px solid #f59e0b;
+    border-radius: 4px;
+  }
+  .btn {
+    display: inline-block;
+    margin-top: 16px;
+    padding: 10px 18px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+  <h1>Account</h1>
+  <div class="card">
+    <span class="badge">PRO</span>
+    <h2>Premium plan</h2>
+    <p>You have access to all features.</p>
+    <div class="alert">Your trial ends in 3 days.</div>
+    <button class="btn">Manage subscription</button>
+  </div>
+</body>
+</html>
