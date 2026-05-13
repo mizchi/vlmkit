@@ -40,6 +40,37 @@ export interface DpEntry {
   property: string;
   baseline: string;
   variant: string;
+  /**
+   * For em-relative properties (`letter-spacing`, `line-height` etc.),
+   * the value divided by the element's own font-size — exposes when a
+   * single `em` rule produces several different px values across
+   * elements with different font sizes.
+   */
+  baselineEm?: number;
+  variantEm?: number;
+}
+
+/** Properties for which em-normalization is informative. */
+const EM_RELATIVE = new Set([
+  "letter-spacing",
+  "word-spacing",
+  "line-height",
+]);
+
+function emEquivalent(value: string, fontSizePx: number): number | undefined {
+  if (!value || value === "normal" || value === "auto" || fontSizePx <= 0) return undefined;
+  // Already em? Trust the source.
+  const emMatch = value.match(/^(-?\d+(?:\.\d+)?)em$/);
+  if (emMatch) return Number(emMatch[1]);
+  const pxMatch = value.match(/^(-?\d+(?:\.\d+)?)px$/);
+  if (!pxMatch) return undefined;
+  return Number(pxMatch[1]) / fontSizePx;
+}
+
+function parseFontSizePx(value: string | undefined): number {
+  if (!value) return 0;
+  const m = value.match(/^(\d+(?:\.\d+)?)px$/);
+  return m ? Number(m[1]) : 0;
 }
 
 export interface DpResult {
@@ -88,11 +119,13 @@ export function diffDomPositionStyles(
     if (b.tag !== v.tag) continue; // structural mismatch — skip
 
     const props = new Set<string>([...Object.keys(b.styles), ...Object.keys(v.styles)]);
+    const bFontSize = parseFontSizePx(b.styles["font-size"]);
+    const vFontSize = parseFontSizePx(v.styles["font-size"]);
     for (const property of props) {
       const bv = b.styles[property] ?? "";
       const vv = v.styles[property] ?? "";
       if (bv === vv) continue;
-      entries.push({
+      const diffEntry: DpEntry = {
         path,
         tag: b.tag,
         baselineClasses: b.classes,
@@ -100,7 +133,14 @@ export function diffDomPositionStyles(
         property,
         baseline: bv,
         variant: vv,
-      });
+      };
+      if (EM_RELATIVE.has(property)) {
+        const baselineEm = emEquivalent(bv, bFontSize);
+        const variantEm = emEquivalent(vv, vFontSize);
+        if (baselineEm !== undefined) diffEntry.baselineEm = Math.round(baselineEm * 10000) / 10000;
+        if (variantEm !== undefined) diffEntry.variantEm = Math.round(variantEm * 10000) / 10000;
+      }
+      entries.push(diffEntry);
       byProperty.set(property, (byProperty.get(property) ?? 0) + 1);
       const entry = byPath.get(path) ?? { baselineClasses: b.classes, variantClasses: v.classes, count: 0 };
       entry.count += 1;
@@ -192,6 +232,15 @@ export interface DpEntryWithViewport extends DpEntry {
   viewport: string;
 }
 
+export interface DpSample {
+  viewport: string;
+  baseline: string;
+  variant: string;
+  /** Em-normalized values when the property is em-relative. */
+  baselineEm?: number;
+  variantEm?: number;
+}
+
 export interface DpPerViewportResult {
   /** All per-viewport diff tuples (entries[i] carries its viewport). */
   entries: DpEntryWithViewport[];
@@ -216,7 +265,7 @@ export interface DpPerViewportResult {
     baselineClasses: string;
     variantClasses: string;
     viewports: string[];
-    samples: Array<{ viewport: string; baseline: string; variant: string }>;
+    samples: DpSample[];
   }>;
   /** Per-viewport tally so the caller can see which viewport is worst. */
   byViewport: Array<{ viewport: string; count: number }>;
@@ -280,10 +329,17 @@ export function diffPositionStylesAcrossViewports(
     baselineClasses: string;
     variantClasses: string;
     viewports: string[];
-    samples: Array<{ viewport: string; baseline: string; variant: string }>;
+    samples: DpSample[];
   }>();
   for (const e of entries) {
     const k = ppKey(e.path, e.property);
+    const sample: DpSample = {
+      viewport: e.viewport,
+      baseline: e.baseline,
+      variant: e.variant,
+    };
+    if (e.baselineEm !== undefined) sample.baselineEm = e.baselineEm;
+    if (e.variantEm !== undefined) sample.variantEm = e.variantEm;
     const existing = aggregated.get(k);
     if (existing) {
       existing.viewports.push(e.viewport);
@@ -295,7 +351,7 @@ export function diffPositionStylesAcrossViewports(
         (s) => s.baseline === e.baseline && s.variant === e.variant,
       );
       if (!alreadySeen) {
-        existing.samples.push({ viewport: e.viewport, baseline: e.baseline, variant: e.variant });
+        existing.samples.push(sample);
       }
     } else {
       aggregated.set(k, {
@@ -304,7 +360,7 @@ export function diffPositionStylesAcrossViewports(
         baselineClasses: e.baselineClasses,
         variantClasses: e.variantClasses,
         viewports: [e.viewport],
-        samples: [{ viewport: e.viewport, baseline: e.baseline, variant: e.variant }],
+        samples: [sample],
       });
     }
   }

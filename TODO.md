@@ -274,9 +274,16 @@ band at viewports ≥ 1024.
   `display: inline-flex` computes as `flex` when its parent is a
   flex container. Annotate so agents don't chase a delta that
   isn't a rule change.
-- [ ] **Unit-normalized property reporting.** `letter-spacing` etc.
-  surface in px even when the rule is in `em`; normalize so one
-  `em` rule doesn't read as N independent px values across sizes.
+- [x] **Unit-normalized property reporting.** `DpEntry` now carries
+  `baselineEm` / `variantEm` for `letter-spacing`, `word-spacing`,
+  `line-height` — values divided by the element's own font-size.
+  `vrt diff-for-agent` renders a dedicated "Em-relative properties"
+  sub-section in the per-viewport DOM-position table that exposes
+  cases like "5 elements show `line-height` 18/21/24/28.5/40px but
+  all five normalize to `1.5em`" — one rule, not five different
+  values. D's exact complaint addressed. 4 new unit tests cover
+  letter-spacing in px, line-height in px, non-em-relative
+  properties not annotated, and `normal`/`auto` fallback.
 - [x] **De-dupe `property changes` in class-rename map by class.**
   Column renamed `Property changes` → `Unique properties differ`
   and counts the unique property set per `(baseline-class,

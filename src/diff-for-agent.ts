@@ -84,7 +84,7 @@ export interface DfaDpPerViewportSummary {
       baselineClasses: string;
       variantClasses: string;
       viewports: string[];
-      samples: Array<{ viewport: string; baseline: string; variant: string }>;
+      samples: Array<{ viewport: string; baseline: string; variant: string; baselineEm?: number; variantEm?: number }>;
     }>;
   };
 }
@@ -224,6 +224,17 @@ function viewportImagePaths(
 
 function formatPct(ratio: number): string {
   return `${(ratio * 100).toFixed(2)}%`;
+}
+
+/**
+ * Render a property value alongside its em-equivalent when the property
+ * is em-relative. This exposes the case Subagent D flagged: a single
+ * `-0.03em` rule applied to N elements with different font-sizes shows
+ * up as N different px values; the em column reveals they're one rule.
+ */
+function formatValueWithEm(value: string, em: number | undefined): string {
+  if (em === undefined) return `\`${value}\``;
+  return `\`${value}\` _(${em}em)_`;
 }
 
 /**
@@ -649,7 +660,13 @@ export function formatMigrationReportForAgent(
 
       lines.push("#### Universal deltas (apply on every viewport — fix the base rule)");
       lines.push("");
-      const universalPairs = pairs.filter((p) => p.viewports.length === viewportCount).slice(0, 20);
+      // Cap at 30 (was 20) — increases the chance that interesting
+      // properties like letter-spacing / line-height (with em annotations)
+      // appear in the rendered table instead of being pushed past the cap
+      // by the more numerous border-color / padding rows.
+      const universalAll = pairs.filter((p) => p.viewports.length === viewportCount);
+      const universalPairs = universalAll.slice(0, 30);
+      const hiddenUniversal = universalAll.length - universalPairs.length;
       if (universalPairs.length > 0) {
         lines.push("| Position | Baseline class | Variant class | Property | Baseline | Variant |");
         lines.push("|---|---|---|---|---|---|");
@@ -657,12 +674,45 @@ export function formatMigrationReportForAgent(
           const sample = pp.samples[0]!;
           const bcls = pp.baselineClasses || "_(none)_";
           const vcls = pp.variantClasses || "_(none)_";
-          lines.push(`| \`${pp.path}\` | \`${bcls}\` | \`${vcls}\` | \`${pp.property}\` | \`${sample.baseline}\` | \`${sample.variant}\` |`);
+          const baselineLabel = formatValueWithEm(sample.baseline, sample.baselineEm);
+          const variantLabel = formatValueWithEm(sample.variant, sample.variantEm);
+          lines.push(`| \`${pp.path}\` | \`${bcls}\` | \`${vcls}\` | \`${pp.property}\` | ${baselineLabel} | ${variantLabel} |`);
         }
       } else {
         lines.push("_(none)_");
       }
+      if (hiddenUniversal > 0) {
+        lines.push("");
+        lines.push(`_…${hiddenUniversal} more universal pair(s) below the top 30. See ` +
+          "`domPositionDiffPerViewport.byPathProperty` in the JSON report._");
+      }
       lines.push("");
+
+      // Em-relative properties get a dedicated sub-section — they're
+      // important (one `em` rule manifests as N different px values across
+      // elements with different font-sizes) but tend to sort below the
+      // top-30 universal cap, dominated by border/padding rows.
+      const EM_PROPS = new Set(["letter-spacing", "word-spacing", "line-height"]);
+      const emPairs = pairs.filter((p) => EM_PROPS.has(p.property)).slice(0, 15);
+      if (emPairs.length > 0) {
+        lines.push("#### Em-relative properties (one `em` rule may produce different px values per element)");
+        lines.push("");
+        lines.push("Check whether the px values, normalized to em via each " +
+          "element's own font-size, all agree — if they do, the source is a " +
+          "single em-form rule covering multiple elements.");
+        lines.push("");
+        lines.push("| Position | Class (baseline → variant) | Property | Baseline | Variant |");
+        lines.push("|---|---|---|---|---|");
+        for (const pp of emPairs) {
+          const sample = pp.samples[0]!;
+          const bcls = pp.baselineClasses || "_(none)_";
+          const vcls = pp.variantClasses || "_(none)_";
+          const baselineLabel = formatValueWithEm(sample.baseline, sample.baselineEm);
+          const variantLabel = formatValueWithEm(sample.variant, sample.variantEm);
+          lines.push(`| \`${pp.path}\` | \`${bcls}\` → \`${vcls}\` | \`${pp.property}\` | ${baselineLabel} | ${variantLabel} |`);
+        }
+        lines.push("");
+      }
 
       if (gated > 0) {
         lines.push("#### Breakpoint-gated deltas (likely a missing / wrong `@media` rule)");
@@ -676,7 +726,9 @@ export function formatMigrationReportForAgent(
           const vps = pp.viewports.join(", ");
           // Show the first sample's values; samples may differ across viewports.
           const sample = pp.samples[0]!;
-          lines.push(`| \`${pp.path}\` | \`${bcls}\` | \`${vcls}\` | \`${pp.property}\` | ${vps} | \`${sample.baseline}\` → \`${sample.variant}\` |`);
+          const baselineLabel = formatValueWithEm(sample.baseline, sample.baselineEm);
+          const variantLabel = formatValueWithEm(sample.variant, sample.variantEm);
+          lines.push(`| \`${pp.path}\` | \`${bcls}\` | \`${vcls}\` | \`${pp.property}\` | ${vps} | ${baselineLabel} → ${variantLabel} |`);
         }
         lines.push("");
       }

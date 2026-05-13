@@ -97,6 +97,67 @@ describe("diffDomPositionStyles", () => {
   });
 });
 
+import { diffDomPositionStyles as diffSingle } from "./dom-position-styles.ts";
+
+describe("em normalization in diffDomPositionStyles", () => {
+  it("emits baselineEm / variantEm for letter-spacing using element's font-size", () => {
+    const baseline = [
+      el({
+        path: "h2[0]",
+        tag: "h2",
+        classes: "card-title",
+        styles: { "font-size": "19px", "letter-spacing": "-0.57px" },
+      }),
+    ];
+    const variant = [
+      el({
+        path: "h2[0]",
+        tag: "h2",
+        classes: "luna-panel-title",
+        styles: { "font-size": "19px", "letter-spacing": "0px" },
+      }),
+    ];
+    const r = diffSingle(baseline, variant);
+    const ls = r.entries.find((e) => e.property === "letter-spacing")!;
+    assert.ok(ls);
+    // -0.57 / 19 = -0.03 em
+    assert.equal(ls.baselineEm, -0.03);
+    assert.equal(ls.variantEm, 0);
+  });
+
+  it("emits em for line-height in px form", () => {
+    const baseline = [
+      el({ path: "p[0]", tag: "p", styles: { "font-size": "16px", "line-height": "24px" } }),
+    ];
+    const variant = [
+      el({ path: "p[0]", tag: "p", styles: { "font-size": "16px", "line-height": "20px" } }),
+    ];
+    const r = diffSingle(baseline, variant);
+    const lh = r.entries.find((e) => e.property === "line-height")!;
+    // 24/16 = 1.5, 20/16 = 1.25
+    assert.equal(lh.baselineEm, 1.5);
+    assert.equal(lh.variantEm, 1.25);
+  });
+
+  it("does not emit em for non-em-relative properties (padding etc.)", () => {
+    const baseline = [el({ path: "p", styles: { "font-size": "16px", padding: "10px" } })];
+    const variant = [el({ path: "p", styles: { "font-size": "16px", padding: "20px" } })];
+    const r = diffSingle(baseline, variant);
+    const pad = r.entries.find((e) => e.property === "padding")!;
+    assert.equal(pad.baselineEm, undefined);
+    assert.equal(pad.variantEm, undefined);
+  });
+
+  it("skips em for `normal` / `auto` values gracefully", () => {
+    const baseline = [el({ path: "p", styles: { "font-size": "16px", "line-height": "normal" } })];
+    const variant = [el({ path: "p", styles: { "font-size": "16px", "line-height": "24px" } })];
+    const r = diffSingle(baseline, variant);
+    const lh = r.entries.find((e) => e.property === "line-height")!;
+    assert.equal(lh.baselineEm, undefined);
+    assert.equal(lh.variantEm, 1.5);
+  });
+});
+
 describe("parseDomPositionStyles", () => {
   it("parses a JSON string", () => {
     const json = JSON.stringify([{ path: "p", tag: "div", classes: "", styles: {} }]);
