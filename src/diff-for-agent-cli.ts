@@ -16,10 +16,13 @@ import { formatMigrationReportForAgent, type DfaReport } from "./diff-for-agent.
 function usage(): string {
   return [
     "Usage:",
-    "  vrt diff-for-agent <migration-report.json> [--out path] [--max-viewports 1] [--variant working.html]",
+    "  vrt diff-for-agent <migration-report.json> [--out path] [--max-viewports 1] [--variant working.html] [--show-unverified]",
     "",
     "Reads an existing migration-compare report (the report.json written by",
     "`vrt compare`) and prints a Markdown summary tailored for coding agents.",
+    "",
+    "By default, heuristic fix-candidate rows marked ✗ (value already matches",
+    "baseline) are hidden — pass --show-unverified to include them.",
   ].join("\n");
 }
 
@@ -28,6 +31,7 @@ interface Args {
   outPath?: string;
   maxViewports: number;
   variant?: string;
+  showUnverified: boolean;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -35,6 +39,7 @@ function parseArgs(argv: string[]): Args {
   let outPath: string | undefined;
   let maxViewports = 1;
   let variant: string | undefined;
+  let showUnverified = false;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
@@ -61,6 +66,9 @@ function parseArgs(argv: string[]): Args {
         variant = v;
         break;
       }
+      case "--show-unverified":
+        showUnverified = true;
+        break;
       case "--help":
       case "-h":
         console.log(usage());
@@ -74,7 +82,7 @@ function parseArgs(argv: string[]): Args {
   if (positional.length !== 1) {
     throw new Error("Pass exactly one migration-report.json path");
   }
-  return { reportPath: positional[0]!, outPath, maxViewports, variant };
+  return { reportPath: positional[0]!, outPath, maxViewports, variant, showUnverified };
 }
 
 async function main() {
@@ -97,6 +105,7 @@ async function main() {
   const md = formatMigrationReportForAgent(report, {
     maxViewports: parsed.maxViewports,
     variant: parsed.variant,
+    showUnverified: parsed.showUnverified,
   });
 
   if (parsed.outPath) {

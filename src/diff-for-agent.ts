@@ -139,6 +139,12 @@ export interface DfaOptions {
   outputDir?: string;
   /** Filter to a single variant by file name (useful when the report has multiple). */
   variant?: string;
+  /**
+   * If true, include heuristic fix candidates marked ✗ (value already
+   * matches baseline). Default false — the agent has no reason to look
+   * at unverified rows. Subagent eval surfaced this as noise.
+   */
+  showUnverified?: boolean;
 }
 
 interface FixCandidateAggregate {
@@ -263,7 +269,7 @@ interface ClassRenamePair {
   baselineClasses: string;
   variantClasses: string;
   pathCount: number;  // distinct DOM positions where this rename appears
-  diffCount: number;  // total property changes across those positions
+  uniqueProperties: number;  // unique properties that differ for this class pair
 }
 
 function extractClassRenameMap(report: DfaReport, variantFile: string): ClassRenamePair[] {
@@ -271,32 +277,43 @@ function extractClassRenameMap(report: DfaReport, variantFile: string): ClassRen
   const perVp = (report.domPositionDiffPerViewport ?? []).find((d) => d.variantFile === variantFile);
   const single = (report.domPositionDiff ?? []).find((d) => d.variantFile === variantFile);
 
-  type Source = { path: string; baselineClasses: string; variantClasses: string };
+  type Source = { path: string; property: string; baselineClasses: string; variantClasses: string };
   const positions: Source[] = [];
 
   if (perVp) {
     for (const pp of perVp.result.byPathProperty) {
       positions.push({
         path: pp.path,
+        property: pp.property,
         baselineClasses: pp.baselineClasses,
         variantClasses: pp.variantClasses,
       });
     }
   } else if (single) {
-    for (const p of single.result.byPath) {
+    for (const e of single.result.entries ?? []) {
       positions.push({
-        path: p.path,
-        baselineClasses: p.baselineClasses,
-        variantClasses: p.variantClasses,
+        path: e.path,
+        property: e.property,
+        baselineClasses: e.baselineClasses,
+        variantClasses: e.variantClasses,
       });
     }
   }
 
   if (positions.length === 0) return [];
 
-  // Aggregate by (baselineClasses, variantClasses) pair. Only keep pairs
-  // where the class actually changed (skip same-class entries).
-  const pairs = new Map<string, { baselineClasses: string; variantClasses: string; paths: Set<string>; diffCount: number }>();
+  // Aggregate by (baselineClasses, variantClasses) pair. Subagent D
+  // pointed out the previous count inflated by `#instances × #properties`
+  // — a class with 4 cards on the page contributed each property 4×.
+  // Now we count **unique properties** that differ for this class pair
+  // (`uniqueProperties`) alongside the distinct element positions
+  // (`pathCount`). Same-class-name entries are skipped.
+  const pairs = new Map<string, {
+    baselineClasses: string;
+    variantClasses: string;
+    paths: Set<string>;
+    properties: Set<string>;
+  }>();
   for (const pos of positions) {
     if (pos.baselineClasses === pos.variantClasses) continue;
     const key = `${pos.baselineClasses} ${pos.variantClasses}`;
@@ -304,10 +321,10 @@ function extractClassRenameMap(report: DfaReport, variantFile: string): ClassRen
       baselineClasses: pos.baselineClasses,
       variantClasses: pos.variantClasses,
       paths: new Set<string>(),
-      diffCount: 0,
+      properties: new Set<string>(),
     };
     cur.paths.add(pos.path);
-    cur.diffCount += 1;
+    cur.properties.add(pos.property);
     pairs.set(key, cur);
   }
 
@@ -316,10 +333,10 @@ function extractClassRenameMap(report: DfaReport, variantFile: string): ClassRen
       baselineClasses: p.baselineClasses,
       variantClasses: p.variantClasses,
       pathCount: p.paths.size,
-      diffCount: p.diffCount,
+      uniqueProperties: p.properties.size,
     }))
     .sort((a, b) =>
-      b.diffCount - a.diffCount
+      b.uniqueProperties - a.uniqueProperties
       || b.pathCount - a.pathCount
       || a.baselineClasses.localeCompare(b.baselineClasses),
     );
@@ -394,12 +411,12 @@ export function formatMigrationReportForAgent(
         "and variant carries different `class` attributes. Read this first — " +
         "it's the rename glossary the rest of the report assumes.");
       lines.push("");
-      lines.push("| Baseline class | Variant class | Element positions | Property changes |");
+      lines.push("| Baseline class | Variant class | Element positions | Unique properties differ |");
       lines.push("|---|---|---|---|");
       for (const e of renameMapEntries.slice(0, 25)) {
         const bcls = e.baselineClasses || "_(none)_";
         const vcls = e.variantClasses || "_(none)_";
-        lines.push(`| \`${bcls}\` | \`${vcls}\` | ${e.pathCount} | ${e.diffCount} |`);
+        lines.push(`| \`${bcls}\` | \`${vcls}\` | ${e.pathCount} | ${e.uniqueProperties} |`);
       }
       if (renameMapEntries.length > 25) {
         lines.push(`| _…${renameMapEntries.length - 25} more pairs_ | | | |`);
@@ -497,22 +514,8 @@ export function formatMigrationReportForAgent(
     const verificationAvailable = csdSummary !== undefined || verifiedPairs.size > 0;
 
     const fixCandidates = aggregateFixCandidates(results);
+    const showUnverified = options.showUnverified ?? false;
     if (fixCandidates.length > 0) {
-      lines.push(verificationAvailable
-        ? "### Heuristic fix candidates (collapsed across viewports — ✓ verified, ✗ value matches baseline)"
-        : "### Heuristic fix candidates (collapsed across viewports)");
-      lines.push("");
-      lines.push("> The tool flags `selector { property }` pairs whose declaration " +
-        "matches each viewport's dominant category. These are *hints*; trust your " +
-        "eyes (or the verified computed-style section below) for the real delta.");
-      lines.push("");
-      if (verificationAvailable) {
-        lines.push("| Selector | Property | Viewports | Verified? |");
-        lines.push("|---|---|---|---|");
-      } else {
-        lines.push("| Selector | Property | Viewports |");
-        lines.push("|---|---|---|");
-      }
       // Sort: verified ✓ first, then by viewport count desc.
       const annotated = fixCandidates.map((fc) => ({
         fc,
@@ -527,15 +530,50 @@ export function formatMigrationReportForAgent(
         }
         return b.fc.viewports.size - a.fc.viewports.size;
       });
-      for (const { fc, verified } of annotated.slice(0, 12)) {
-        const marker = verified === true ? "✓" : verified === false ? "✗" : null;
-        if (marker !== null) {
-          lines.push(`| \`${fc.selector}\` | \`${fc.property}\` | ${fc.viewports.size} | ${marker} |`);
+      // When verification data is available, drop ✗ rows by default —
+      // they're rules whose computed value already matches baseline, so
+      // the agent has no reason to look at them. `--show-unverified`
+      // restores them for debugging.
+      const displayed = verificationAvailable && !showUnverified
+        ? annotated.filter((a) => a.verified === true)
+        : annotated;
+      const hiddenCount = annotated.length - displayed.length;
+
+      if (displayed.length > 0) {
+        lines.push(verificationAvailable
+          ? "### Heuristic fix candidates (collapsed across viewports — ✓ verified)"
+          : "### Heuristic fix candidates (collapsed across viewports)");
+        lines.push("");
+        lines.push("> The tool flags `selector { property }` pairs whose declaration " +
+          "matches each viewport's dominant category. These are *hints*; trust your " +
+          "eyes (or the verified computed-style section below) for the real delta.");
+        lines.push("");
+        if (verificationAvailable) {
+          lines.push("| Selector | Property | Viewports | Verified? |");
+          lines.push("|---|---|---|---|");
         } else {
-          lines.push(`| \`${fc.selector}\` | \`${fc.property}\` | ${fc.viewports.size} |`);
+          lines.push("| Selector | Property | Viewports |");
+          lines.push("|---|---|---|");
         }
+        for (const { fc, verified } of displayed.slice(0, 12)) {
+          const marker = verified === true ? "✓" : verified === false ? "✗" : null;
+          if (marker !== null) {
+            lines.push(`| \`${fc.selector}\` | \`${fc.property}\` | ${fc.viewports.size} | ${marker} |`);
+          } else {
+            lines.push(`| \`${fc.selector}\` | \`${fc.property}\` | ${fc.viewports.size} |`);
+          }
+        }
+        if (verificationAvailable && !showUnverified && hiddenCount > 0) {
+          lines.push("");
+          lines.push(`_${hiddenCount} unverified candidate(s) hidden. Pass \`--show-unverified\` to see them._`);
+        }
+        lines.push("");
+      } else if (verificationAvailable && !showUnverified && annotated.length > 0) {
+        lines.push("### Heuristic fix candidates");
+        lines.push("");
+        lines.push(`_All ${annotated.length} heuristic candidate(s) for this run are unverified (computed value matches baseline). The diff is elsewhere — see the verified-deltas sections below. Pass \`--show-unverified\` to see the unverified rows anyway._`);
+        lines.push("");
       }
-      lines.push("");
     }
 
     lines.push(`### Worst-diff viewport${maxViewports === 1 ? "" : "s"} (open these PNGs side-by-side)`);

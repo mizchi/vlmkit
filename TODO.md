@@ -251,10 +251,12 @@ band at viewports ≥ 1024.
   suspect: height`. The exact symptom Subagent D plateaued on
   (`+152px shift band with no DOM-position delta`) now has a named
   origin. 9 unit tests cover the algorithm.
-- [ ] **Drop ✗ heuristic candidates from `vrt diff-for-agent`.**
-  Once a candidate is marked unverified, the agent has no reason
-  to look at it. Filter out by default; hide behind
-  `--show-unverified` for debugging.
+- [x] **Drop ✗ heuristic candidates from `vrt diff-for-agent`.**
+  `--show-unverified` (default off) controls the visibility.
+  Default output now drops rows whose computed value matches
+  baseline; replaced with `_N unverified candidate(s) hidden_`
+  note so the agent knows what was suppressed. Dogfood Pass B
+  iter 1: table shrunk from 5 rows (2 ✓ + 3 ✗) to just 2 ✓.
 - [ ] **Grid `fr`-ratio inference.** When baseline shows children
   at `393.172px / 298.812px` inside a grid container, suggest
   `grid-template-columns: 1.316fr 1fr` (or `7fr 5fr` etc).
@@ -265,8 +267,15 @@ band at viewports ≥ 1024.
 - [ ] **Unit-normalized property reporting.** `letter-spacing` etc.
   surface in px even when the rule is in `em`; normalize so one
   `em` rule doesn't read as N independent px values across sizes.
-- [ ] **De-dupe `property changes` in class-rename map by class.**
-  A class with 4 instances on the page inflates the count 4×.
+- [x] **De-dupe `property changes` in class-rename map by class.**
+  Column renamed `Property changes` → `Unique properties differ`
+  and counts the unique property set per `(baseline-class,
+  variant-class)` pair rather than summing per-element
+  occurrences. Dogfood Pass B iter 1 numbers stay reasonable
+  (eyebrow→luna-pill: 22, card→luna-panel: 17) because the
+  fixture has 1 instance per class; on fixtures with N repeats
+  of each card/metric/button the value will no longer inflate
+  by N.
 
 - [x] **DOM-position-based selector alignment** in a new
   `src/dom-position-styles.ts`. `migration-compare --dom-position-diff`
