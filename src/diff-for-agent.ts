@@ -217,6 +217,20 @@ export interface DfaReport {
       };
     }>;
   }>;
+  stateDiffs?: Array<{
+    variantFile: string;
+    perState: Array<{
+      state: string;
+      forcedCount: number;
+      affectedElements: string[];
+      perViewport: Array<{
+        viewport: string;
+        defaultDiffRatio: number;
+        stateDiffRatio: number;
+        hoverInducedDelta: number;
+      }>;
+    }>;
+  }>;
   /** Absolute path of the report file (used to resolve sibling PNGs). */
   reportPath?: string;
 }
@@ -518,10 +532,25 @@ export function formatMigrationReportForAgent(
     lines.push(`## ${variantFile}`);
     lines.push("");
 
-    if (allZero) {
+    // Check if any non-default-state signal has data — these fire
+    // even when the default screenshot diff is 0% (e.g. broken hover
+    // styles render identically by default but diverge under
+    // interaction). Don't early-exit in that case.
+    const hasStateSignal = (report.stateDiffs ?? [])
+      .find((s) => s.variantFile === variantFile)?.perState
+      .some((ps) => ps.perViewport.some((vp) => Math.abs(vp.hoverInducedDelta) > 0.001)) ?? false;
+
+    if (allZero && !hasStateSignal) {
       lines.push("**PASS** — 0.00% diff on every viewport. Nothing to fix.");
       lines.push("");
       continue;
+    }
+    if (allZero && hasStateSignal) {
+      lines.push("Default-state diff is **0.00%** on every viewport, but " +
+        "forced-state (`:hover` / `:focus` etc.) diff is non-zero — see the " +
+        "**Forced-state diff** section below. This pattern usually means the " +
+        "variant forgot to wire up interaction-state styles.");
+      lines.push("");
     }
 
     // Class-rename map at the top — subagent C called this "the single
@@ -648,6 +677,34 @@ export function formatMigrationReportForAgent(
         }
       }
       lines.push("");
+    }
+
+    const stateSummary = (report.stateDiffs ?? []).find((s) => s.variantFile === variantFile);
+    if (stateSummary && stateSummary.perState.length > 0) {
+      lines.push("### Forced-state diff (`:hover` / `:focus` etc.)");
+      lines.push("");
+      lines.push("Each interactive element on the page is forced into the named " +
+        "pseudo-state via CDP `CSS.forcePseudoState` and the page is " +
+        "re-screenshot. Compare to the *default-state* diff: if the **induced " +
+        "delta** is large, the variant renders identically by default but the " +
+        "two diverge under interaction — usually means the agent forgot to " +
+        "wire up `:hover` / `:focus-visible` / etc. rules.");
+      lines.push("");
+      lines.push("| State | Viewport | Default diff | State diff | Induced delta | Forced elements |");
+      lines.push("|---|---|---|---|---|---|");
+      for (const s of stateSummary.perState) {
+        for (const vp of s.perViewport) {
+          const induced = (vp.hoverInducedDelta * 100).toFixed(2);
+          const inducedSigned = vp.hoverInducedDelta > 0 ? `+${induced}%` : `${induced}%`;
+          lines.push(`| \`:${s.state}\` | \`${vp.viewport}\` | ${(vp.defaultDiffRatio * 100).toFixed(2)}% | ${(vp.stateDiffRatio * 100).toFixed(2)}% | ${inducedSigned} | ${s.forcedCount} |`);
+        }
+      }
+      lines.push("");
+      const sampleAffected = stateSummary.perState[0]?.affectedElements ?? [];
+      if (sampleAffected.length > 0) {
+        lines.push(`Sample of forced elements: ${sampleAffected.map((s) => `\`${s}\``).join(", ")}.`);
+        lines.push("");
+      }
     }
 
     const paletteSummary = (report.paletteDiffs ?? []).find((p) => p.variantFile === variantFile);

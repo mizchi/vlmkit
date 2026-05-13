@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hover Button — Reference</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 40px; background: #f6f8fa; }
+  .btn {
+    display: inline-block;
+    padding: 12px 24px;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn:hover { background: #1d4ed8; }
+  .btn:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+  .btn-secondary { background: #e5e7eb; color: #111827; margin-left: 12px; }
+  .btn-secondary:hover { background: #d1d5db; }
+</style>
+</head>
+<body>
+  <button class="btn">Get started</button>
+  <button class="btn btn-secondary">Learn more</button>
+</body>
+</html>

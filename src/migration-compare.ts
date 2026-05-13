@@ -102,6 +102,12 @@ import {
 } from "./text-rows.ts";
 import { extractPaletteFromFile, type PaletteColor } from "./palette-extract.ts";
 import { diffPalettes, type PaletteDiff } from "./palette-diff.ts";
+import {
+  applyForcedPseudoState,
+  clearStateMarkers,
+  type ForcedPseudoState,
+  type AppliedForcedState,
+} from "./multi-state.ts";
 
 // ---- Config ----
 
@@ -168,6 +174,12 @@ export interface MigrationCompareOptions {
    * Default true; pass `--no-component-bbox` to disable.
    */
   componentBboxDiff?: boolean;
+  /**
+   * Capture additional screenshots with CSS pseudo-classes forced on
+   * (`hover`, `focus`, `focus-visible`, `active`). Per-state diff is
+   * surfaced alongside the default-state diff. Opt-in via `--states`.
+   */
+  states?: ForcedPseudoState[];
 }
 
 export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptions {
@@ -199,7 +211,22 @@ export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptio
     computedStyleDiff: hasFlag(args, "computed-style"),
     domPositionDiff: hasFlag(args, "dom-position-diff") || hasFlag(args, "position-diff"),
     componentBboxDiff: !hasFlag(args, "no-component-bbox"),
+    states: parseStatesArg(args),
   };
+}
+
+function parseStatesArg(args: string[]): ForcedPseudoState[] | undefined {
+  const raw = getArgList(args, "states");
+  if (raw.length === 0) return undefined;
+  const valid: ForcedPseudoState[] = [];
+  for (const s of raw) {
+    if (s === "hover" || s === "focus" || s === "active" || s === "focus-visible") {
+      valid.push(s);
+    } else {
+      console.log(`  ${YELLOW}! ignoring unknown --states value: ${s}${RESET}`);
+    }
+  }
+  return valid.length > 0 ? valid : undefined;
 }
 
 // Fallback viewports (used when --no-discover)
@@ -400,6 +427,31 @@ export interface MigrationCompareReport {
       baseline: PaletteColor[];
       variant: PaletteColor[];
       diff: PaletteDiff;
+    }>;
+  }>;
+  /**
+   * Per-state (`:hover`, `:focus`, ...) diff between baseline and
+   * variant. Captures the page with each pseudo-class forced on all
+   * interactive elements via CDP `CSS.forcePseudoState`, then runs
+   * the standard pixelmatch comparison.
+   *
+   * Catches "agent forgot to wire up :hover styles" — a class of bug
+   * the default-state VRT can't see because both sides render
+   * identically when no interactions happen.
+   */
+  stateDiffs?: Array<{
+    variantFile: string;
+    perState: Array<{
+      state: ForcedPseudoState;
+      forcedCount: number;
+      affectedElements: string[];
+      perViewport: Array<{
+        viewport: string;
+        defaultDiffRatio: number;
+        stateDiffRatio: number;
+        /** stateDiffRatio − defaultDiffRatio (how much *worse* the diff gets in this state). */
+        hoverInducedDelta: number;
+      }>;
     }>;
   }>;
   results: MigrationCompareResult[];
@@ -750,6 +802,15 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     const paletteDiffsReports: Array<{
       variantFile: string;
       perViewport: Array<{ viewport: string; baseline: PaletteColor[]; variant: PaletteColor[]; diff: PaletteDiff }>;
+    }> = [];
+    const stateDiffsReports: Array<{
+      variantFile: string;
+      perState: Array<{
+        state: ForcedPseudoState;
+        forcedCount: number;
+        affectedElements: string[];
+        perViewport: Array<{ viewport: string; defaultDiffRatio: number; stateDiffRatio: number; hoverInducedDelta: number }>;
+      }>;
     }> = [];
     for (const variant of variantSources) {
       let variantHtml: string;
@@ -1230,6 +1291,117 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         }
       }
 
+      // Multi-state capture (opt-in via --states hover focus ...).
+      // For each requested pseudo-class, re-render baseline + variant
+      // with that state forced on all interactive elements, then diff.
+      // Surfaces "agent forgot to wire up :hover styles" — a class of
+      // bug the default-state VRT can't catch because both sides look
+      // identical without an interaction.
+      if (options.states && options.states.length > 0) {
+        const variantFileLabel = variant.url || variant.file;
+        const perState: Array<{
+          state: ForcedPseudoState;
+          forcedCount: number;
+          affectedElements: string[];
+          perViewport: Array<{ viewport: string; defaultDiffRatio: number; stateDiffRatio: number; hoverInducedDelta: number }>;
+        }> = [];
+
+        for (const state of options.states) {
+          const perViewport: Array<{ viewport: string; defaultDiffRatio: number; stateDiffRatio: number; hoverInducedDelta: number }> = [];
+          let aggregateForcedCount = 0;
+          let aggregateAffected: string[] = [];
+
+          for (const vp of VIEWPORTS) {
+            // Baseline page in forced state.
+            const baselinePage = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
+            if (isUrlMode) {
+              await baselinePage.goto(options.baselineUrl!, { waitUntil: "networkidle", timeout: 30000 });
+            } else {
+              await baselinePage.setContent(baselineHtml, { waitUntil: "networkidle" });
+            }
+            if (options.maskSelectors?.length) await applyMask(baselinePage, options.maskSelectors);
+            let baselineApplied: AppliedForcedState;
+            try {
+              baselineApplied = await applyForcedPseudoState(baselinePage, { state });
+            } catch (error) {
+              console.log(`  ${YELLOW}State capture failed (baseline / ${state} / ${vp.label}): ${String(error)}${RESET}`);
+              await baselinePage.close();
+              continue;
+            }
+            const baselineStatePath = join(outputDir, `${baselineName}-${vp.label}-${state}.png`);
+            await baselinePage.screenshot({ path: baselineStatePath, fullPage: true });
+            await clearStateMarkers(baselinePage).catch(() => {});
+            await baselinePage.close();
+
+            // Variant page in forced state.
+            const variantPage = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
+            if (variant.url) {
+              await variantPage.goto(variant.url, { waitUntil: "networkidle", timeout: 30000 });
+            } else {
+              await variantPage.setContent(variantHtml, { waitUntil: "networkidle" });
+            }
+            if (options.maskSelectors?.length) await applyMask(variantPage, options.maskSelectors);
+            let variantApplied: AppliedForcedState;
+            try {
+              variantApplied = await applyForcedPseudoState(variantPage, { state });
+            } catch (error) {
+              console.log(`  ${YELLOW}State capture failed (variant / ${state} / ${vp.label}): ${String(error)}${RESET}`);
+              await variantPage.close();
+              continue;
+            }
+            const variantStatePath = join(outputDir, `${variantName}-${vp.label}-${state}.png`);
+            await variantPage.screenshot({ path: variantStatePath, fullPage: true });
+            await clearStateMarkers(variantPage).catch(() => {});
+            await variantPage.close();
+
+            aggregateForcedCount = Math.max(aggregateForcedCount, baselineApplied.forcedCount);
+            if (aggregateAffected.length === 0) aggregateAffected = baselineApplied.affectedElements;
+
+            // Diff the forced-state pair.
+            const stateSnap: VrtSnapshot = {
+              testId: `${variantName}-${vp.label}-${state}`,
+              testTitle: `${variantName} ${vp.label} :${state}`,
+              projectName: "migration-state",
+              screenshotPath: variantStatePath,
+              baselinePath: baselineStatePath,
+              status: "changed",
+            };
+            // Use a stricter threshold than the default (0.1). Hover/
+            // focus color changes are subtle (Δ ~10-30 per channel on
+            // the dark/light-blue dimming pair); the 0.1 luminance
+            // threshold filters them out entirely. 0.03 picks up real
+            // pseudo-state effects while still rejecting subpixel AA.
+            const stateDiff = await compareScreenshots(stateSnap, { outputDir, skipHeatmap: true, threshold: 0.03 } as Parameters<typeof compareScreenshots>[1]);
+            const stateRatio = stateDiff?.diffRatio ?? 0;
+            // Pull the default-state ratio out of the results array.
+            const defaultResult = results.find((r) => r.variant === variantName && r.viewport === vp.label);
+            const defaultRatio = defaultResult?.diffRatio ?? 0;
+            perViewport.push({
+              viewport: vp.label,
+              defaultDiffRatio: defaultRatio,
+              stateDiffRatio: stateRatio,
+              hoverInducedDelta: stateRatio - defaultRatio,
+            });
+          }
+
+          if (perViewport.length > 0) {
+            perState.push({
+              state,
+              forcedCount: aggregateForcedCount,
+              affectedElements: aggregateAffected,
+              perViewport,
+            });
+            const inducedMax = Math.max(...perViewport.map((p) => p.hoverInducedDelta));
+            const inducedDisplay = (inducedMax * 100).toFixed(2);
+            console.log(`  ${DIM}:${state} state diff: max ${inducedDisplay}% induced delta across ${perViewport.length} viewport(s) (${aggregateForcedCount} forced element(s))${RESET}`);
+          }
+        }
+
+        if (perState.length > 0) {
+          stateDiffsReports.push({ variantFile: variantFileLabel, perState });
+        }
+      }
+
       console.log();
     }
 
@@ -1323,6 +1495,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       heatmapRegions: heatmapRegionsReports.length > 0 ? heatmapRegionsReports : undefined,
       textRowShifts: textRowShiftsReports.length > 0 ? textRowShiftsReports : undefined,
       paletteDiffs: paletteDiffsReports.length > 0 ? paletteDiffsReports : undefined,
+      stateDiffs: stateDiffsReports.length > 0 ? stateDiffsReports : undefined,
       results,
       reportPath,
     };

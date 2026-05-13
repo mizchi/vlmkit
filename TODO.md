@@ -304,10 +304,21 @@ evaluated incrementally.
   extra default-browser colors) and wireframe pricing-card (13
   missing colors including `#2464ec` — the literal target button
   color, surfaced as a single hex the agent can paste).
-- [ ] **Multi-state capture** — capture `:hover` / `:focus` /
-  `:disabled` / `[aria-expanded]` etc. via Playwright triggers,
-  diff per state. Catches "the button color changes on hover in
-  the target but not in your variant."
+- [x] **Multi-state capture** — capture `:hover` / `:focus` /
+  `:focus-visible` / `:active` via CDP `CSS.forcePseudoState`,
+  diff per state. `src/multi-state.ts` marks all interactive
+  elements (`button`, `a[href]`, `[role=button]`, form controls)
+  with a `data-vrt-state-marker` attribute, opens a CDP session,
+  and calls `forcePseudoState` for each matched node. Pixelmatch
+  threshold lowered to 0.03 for state diffs (the default 0.1
+  filters hover's typical Δ10-30/channel color shifts). Opt-in
+  via `--states hover focus-visible …`. diff-for-agent surfaces
+  a "Forced-state diff" section showing default vs state vs
+  induced-delta per viewport, and *defeats* the early "PASS"
+  exit when default is 0% but state-diff is non-zero — the
+  exact pattern of "agent forgot to wire up :hover". Verified
+  on a synthetic hover-button fixture: default 0% on all 3 vps,
+  hover +0.37%/+0.42%/0.00%, focus-visible +0.26%/+0.29%/+1.11%.
 - [ ] **Component-from-screenshot** — single-component subset of
   wireframe mode: small viewport, one bbox, multi-state. New CLI
   subcommand.
