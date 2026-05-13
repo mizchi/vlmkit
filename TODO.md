@@ -224,6 +224,38 @@ small wrapper around already-built primitives, not a new subsystem.
   tuples (border colors, radius, font-family, font-size on
   `#notes/#owner/#title`) that pixel diff alone surfaced only as
   generic `layout-shift`.
+### Wireframe / from-screenshot mode (from 2026-05-12 Subagent F)
+
+Subagent F (the first non-migration eval) reached 2/3 viewports
+clean on a "recreate from screenshots" task — but had to write
+manual pngjs probes because the existing diagnostics all assume
+shared DOM tree shape. The migration-mode polish items below
+(DOM-position, class-rename map, universal-vs-breakpoint-gated,
+verified-pair gate) gave zero signal on this scenario.
+
+The wireframe mode needs visual-only diagnostics:
+
+- [ ] **Component bbox extraction** — find largest connected
+  non-background regions in baseline + variant screenshots, report
+  the bbox (top/left/width/height) per region. F flagged this as
+  the single biggest gap: "iter3→iter5 collapsed into one step."
+- [ ] **Per-viewport geometry diff** without DOM access — "baseline
+  card shrinks 18px between desktop and mobile but variant
+  doesn't" inferred purely from screenshot dimensions.
+- [ ] **Heatmap region clustering** — group connected hot pixels
+  in `*_heatmap.png` into named regions and report per-region
+  shift instead of horizontal bands. Bands of bands lose
+  resolution; region clusters preserve "this text run shifted up
+  4px" granularity.
+- [ ] **Text-row y-position extraction** from rendered PNGs via
+  luminance-profile peak detection — exposes "the `$24` text row
+  is 4px higher in the variant" without needing DOM correspondence.
+- [ ] **Scenario-aware Suggested-next-step**. F's report
+  highlighted that the current "Suggested next step" wording
+  assumes the migration scenario. When DOM-position is empty,
+  pivot to "inspect heatmap → measure bbox → compare per-viewport
+  geometry."
+
 ### Agent-loop UX (from 2026-05-12 subagent eval)
 
 From `docs/reports/2026-05-12-subagent-eval.md`. After items

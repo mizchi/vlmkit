@@ -518,6 +518,123 @@ output, grid `fr`-ratio inference, em-px unit normalization,
 class-rename map dedupe by class) — all UX polish, none of them
 blockers for convergence on this fixture.
 
+## Subagent F — addendum (wireframe-from-screenshot, generalization test)
+
+The previous 5 subagents (A–E) all worked on the *same* shadcn → luna
+fixture, where the variant inherits the baseline's DOM tree and only
+class names differ. That made every polish item between A and E
+implicitly assume "baseline and variant share tree shape." A fair
+question: do they generalize?
+
+Subagent F was given a new fixture type — **invent HTML + CSS from
+two pre-rendered screenshots, no source HTML, no class hints**
+(`fixtures/wireframe/pricing-card/`). The agent must use *only*
+target PNGs + heatmaps + the diff-for-agent report.
+
+### Result
+
+| Viewport | Diff | Clean (<1%) |
+|---|---|---|
+| mobile (375) | 1.85% | No |
+| desktop (1280) | 0.54% | Yes |
+| wide (1440) | 0.48% | Yes |
+
+**2/3 viewports clean** in 8 iterations / ~6–8 min. Mobile didn't
+quite break the 1% floor — F estimated the residual is subpixel
+font-rendering rather than a CSS-fixable delta.
+
+### What worked vs what didn't
+
+**Useful signals:**
+
+- **Target screenshot reads** (Read tool inlining) — F's primary
+  signal source. Could not have started without them.
+- **Heatmap PNGs** — localized "where the diff is" cleanly. Showed
+  card-height drift, then text-row misalignments after gross
+  geometry matched.
+- **Per-band shift bands** (`[0–900]: +13px`) — pinpointed uniform
+  translation. F traced the +13px to a card-height mismatch.
+
+**Migration-specific tooling that did not help:**
+
+- **DOM-position diff** — F's `<div class="card">` vs reference's
+  `<article>` produced `entries: []`. Every path became
+  "only-in-baseline" or "only-in-variant." Zero actionable signal.
+- **Class-rename map** — empty (no shared DOM positions to derive
+  pairs from).
+- **Heuristic fix candidates** — surfaced only generic `html, body
+  { margin / padding }` red herrings (rules that already match).
+  The verified-pair gate (which depends on DOM-position data) had
+  nothing to verify against.
+- **Universal-vs-breakpoint-gated split** — same root cause: built
+  on DOM-position, useless when alignment fails.
+
+### F's regression to the pre-A workflow
+
+The most telling part of F's narrative: **F wrote its own
+pngjs-based pixel probe** to extract the white-card bounding box
+because no built-in diagnostic exposed "card width per viewport."
+This is exactly what Subagent B (the pre-tooling control) did
+months ago. The new diagnostics offered nothing for from-screenshot
+work — F regressed to manual measurement.
+
+> F verbatim: "I had to write ad-hoc pngjs scripts to extract the
+> white-card bounding box. A built-in `vrt extract
+> --component-bbox` or 'biggest rectangular region of color X'
+> diagnostic would have collapsed iter3→iter5 into one step."
+
+### Honest takeaway
+
+The user's intuition was right: the polish items A–E are partly
+overfit. They sharply optimize migration scenarios where baseline
+and variant share DOM tree shape but diverge in class names —
+which is *one* slice of real work, not the whole job.
+
+For from-screenshot / wireframe / design-handoff workflows the
+tools need a different family of diagnostics:
+
+- **Visual-only bbox extraction** — find component edges from
+  rendered pixels (largest connected non-bg region, biggest text
+  run, dominant card outline).
+- **Per-viewport image-only deltas** — "baseline card shrinks by
+  18px between desktop and mobile but variant doesn't" without
+  asking the DOM.
+- **Heatmap region clustering** — group connected hot pixels into
+  named regions ("text run starting at y=420"), so per-band shifts
+  decompose into per-region info instead of bands of bands.
+- **Text-row y-position extraction** — OCR-lite or just luminance-
+  profile peak-finding to expose "the `$24` text row is 4px
+  higher in the variant" without DOM access.
+- **Suggested-next-step adaptation** — F flagged that the "Suggested
+  next step" wording assumes the migration scenario. When DOM-
+  position is empty, the tool should pivot to a visual workflow:
+  "Inspect heatmap → measure component bbox → compare per-viewport
+  geometry."
+
+The combined "migration mode" (A–E) and "wireframe mode" (F)
+gap is now explicit in the wish-list. Future work should explicitly
+label which scenario class each diagnostic targets.
+
+### Snapshot of polish items by scenario
+
+| Item | Migration (A–E) | Wireframe (F) |
+|---|---|---|
+| Class-rename map | ★ killer feature | empty |
+| DOM-position diff (per-viewport) | ★ closes residual deltas | empty |
+| Universal-vs-breakpoint-gated split | ★ catches `@media` issues | empty |
+| Strict verified-pair gate | ★ filters noise | nothing to filter |
+| Shift-origin (bbox) | small win | small win |
+| Phantom-shift annotation | small win | small win |
+| Grid `fr`-ratio inference | useful | not exercised |
+| Em-normalization | useful | not exercised |
+| Display flex-item context | useful | not exercised |
+| Heatmaps + shift bands | useful | ★ primary signal |
+| Target-screenshot Read | n/a | ★ primary signal |
+
+The first four rows are the most powerful items shipped today and
+also the most migration-specific. The wireframe scenario needs
+its own set; that's the next concrete unblock target.
+
 ## Artifacts (running list)
 
 - Subagent A: `test-results/eval-subagent/A/working.html` + `A-iter*/`
@@ -525,5 +642,8 @@ blockers for convergence on this fixture.
 - Subagent C: `test-results/eval-subagent/C/working.html` + `C-iter*/`
 - Subagent D: `test-results/eval-subagent/D/working.html` + `D-iter*/`
 - Subagent E: `test-results/eval-subagent/E/working.html` + `E-iter*/`
+- Subagent F: `test-results/eval-subagent/F/working.html` + `F-iter*/`
+  + fixture at `fixtures/wireframe/pricing-card/` (`reference.html`,
+  `target-mobile.png`, `target-desktop.png`, `blank.html`, `README.md`)
 
-All five subagent transcripts are recorded in the SDK output files.
+All six subagent transcripts are recorded in the SDK output files.
