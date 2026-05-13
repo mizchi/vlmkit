@@ -204,6 +204,19 @@ export interface DfaReport {
       }>;
     }>;
   }>;
+  paletteDiffs?: Array<{
+    variantFile: string;
+    perViewport: Array<{
+      viewport: string;
+      baseline: Array<{ hex: string; share: number; r: number; g: number; b: number }>;
+      variant: Array<{ hex: string; share: number; r: number; g: number; b: number }>;
+      diff: {
+        matched: Array<{ baseline: { hex: string; share: number }; variant: { hex: string; share: number }; distance: number }>;
+        onlyInBaseline: Array<{ hex: string; share: number }>;
+        onlyInVariant: Array<{ hex: string; share: number }>;
+      };
+    }>;
+  }>;
   /** Absolute path of the report file (used to resolve sibling PNGs). */
   reportPath?: string;
 }
@@ -637,6 +650,32 @@ export function formatMigrationReportForAgent(
       lines.push("");
     }
 
+    const paletteSummary = (report.paletteDiffs ?? []).find((p) => p.variantFile === variantFile);
+    if (paletteSummary && paletteSummary.perViewport.length > 0) {
+      lines.push("### Palette diff (design-token compliance)");
+      lines.push("");
+      lines.push("Dominant colors extracted from each viewport's rendered PNG, " +
+        "stride-sampled and quantized to 5-bit-per-channel buckets. " +
+        "*Missing* = colors visible in the baseline target but not the variant " +
+        "(agent forgot a color); *Extra* = colors present in the variant but " +
+        "not the target (agent used a hard-coded literal instead of the token). " +
+        "Near-neighbor matches (RGB distance ≤ 12) are treated as the same color.");
+      lines.push("");
+      lines.push("| Viewport | Side | Color | Share |");
+      lines.push("|---|---|---|---|");
+      for (const vp of paletteSummary.perViewport) {
+        for (const c of vp.diff.onlyInBaseline.slice(0, 6)) {
+          const pct = (c.share * 100).toFixed(1);
+          lines.push(`| \`${vp.viewport}\` | missing | \`${c.hex}\` | ${pct}% |`);
+        }
+        for (const c of vp.diff.onlyInVariant.slice(0, 6)) {
+          const pct = (c.share * 100).toFixed(1);
+          lines.push(`| \`${vp.viewport}\` | extra | \`${c.hex}\` | ${pct}% |`);
+        }
+      }
+      lines.push("");
+    }
+
     const shiftOriginsSummary = (report.shiftOrigins ?? []).find((s) => s.variantFile === variantFile);
     if (shiftOriginsSummary && shiftOriginsSummary.perViewport.length > 0) {
       lines.push("### Shift-origin diagnostics (what's causing the per-band Δy)");
@@ -1007,7 +1046,8 @@ export function formatMigrationReportForAgent(
       (bboxSummary?.perViewport.length ?? 0) > 0 ||
       (geometrySummary?.profiles.length ?? 0) > 0 ||
       (heatmapSummary?.perViewport.length ?? 0) > 0 ||
-      (textRowsSummary?.perViewport.length ?? 0) > 0;
+      (textRowsSummary?.perViewport.length ?? 0) > 0 ||
+      (paletteSummary?.perViewport.length ?? 0) > 0;
     const wireframeMode = !hasDomSignal && hasWireframeSignal;
 
     lines.push("### Suggested next step");

@@ -100,6 +100,8 @@ import {
   matchTextRows,
   type MatchedTextRow,
 } from "./text-rows.ts";
+import { extractPaletteFromFile, type PaletteColor } from "./palette-extract.ts";
+import { diffPalettes, type PaletteDiff } from "./palette-diff.ts";
 
 // ---- Config ----
 
@@ -383,6 +385,21 @@ export interface MigrationCompareReport {
       matches: MatchedTextRow[];
       baselineRowCount: number;
       variantRowCount: number;
+    }>;
+  }>;
+  /**
+   * Per-viewport palette diff. Surfaces "the agent used #3B82F6 where
+   * design tokens say #2563EB" — hard-coded literals slipping into a
+   * tokenized design system. Worst case: 16-color top-K × N viewports
+   * per variant, kept small enough not to bloat the report.
+   */
+  paletteDiffs?: Array<{
+    variantFile: string;
+    perViewport: Array<{
+      viewport: string;
+      baseline: PaletteColor[];
+      variant: PaletteColor[];
+      diff: PaletteDiff;
     }>;
   }>;
   results: MigrationCompareResult[];
@@ -729,6 +746,10 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     const textRowShiftsReports: Array<{
       variantFile: string;
       perViewport: Array<{ viewport: string; matches: MatchedTextRow[]; baselineRowCount: number; variantRowCount: number }>;
+    }> = [];
+    const paletteDiffsReports: Array<{
+      variantFile: string;
+      perViewport: Array<{ viewport: string; baseline: PaletteColor[]; variant: PaletteColor[]; diff: PaletteDiff }>;
     }> = [];
     for (const variant of variantSources) {
       let variantHtml: string;
@@ -1086,6 +1107,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         const perViewportTextRows: Array<{
           viewport: string; matches: MatchedTextRow[]; baselineRowCount: number; variantRowCount: number;
         }> = [];
+        const perViewportPalette: Array<{
+          viewport: string; baseline: PaletteColor[]; variant: PaletteColor[]; diff: PaletteDiff;
+        }> = [];
         for (const vp of VIEWPORTS) {
           const baselinePngPath = join(outputDir, `${baselineName}-${vp.label}.png`);
           const variantPngPath = join(outputDir, `${variantName}-${vp.label}.png`);
@@ -1145,6 +1169,28 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           } catch {
             // PNG missing or decode failure — skip silently.
           }
+
+          // Palette extraction + diff. Surfaces hard-coded color
+          // literals slipping past tokenized design systems. Only
+          // record when the diff has actionable rows (something
+          // only-in-baseline or only-in-variant).
+          try {
+            const [baselinePalette, variantPalette] = await Promise.all([
+              extractPaletteFromFile(baselinePngPath),
+              extractPaletteFromFile(variantPngPath),
+            ]);
+            const paletteDiff = diffPalettes(baselinePalette, variantPalette);
+            if (paletteDiff.onlyInBaseline.length > 0 || paletteDiff.onlyInVariant.length > 0) {
+              perViewportPalette.push({
+                viewport: vp.label,
+                baseline: baselinePalette,
+                variant: variantPalette,
+                diff: paletteDiff,
+              });
+            }
+          } catch {
+            // PNG missing or decode failure — skip silently.
+          }
         }
         if (perViewport.length > 0) {
           componentBboxReports.push({ variantFile: variantFileLabel, perViewport });
@@ -1175,6 +1221,12 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           textRowShiftsReports.push({ variantFile: variantFileLabel, perViewport: perViewportTextRows });
           const total = perViewportTextRows.reduce((s, v) => s + v.matches.length, 0);
           console.log(`  ${DIM}Text-row shifts: ${total} row(s) with Δy across ${perViewportTextRows.length} viewport(s)${RESET}`);
+        }
+        if (perViewportPalette.length > 0) {
+          paletteDiffsReports.push({ variantFile: variantFileLabel, perViewport: perViewportPalette });
+          const totalMissing = perViewportPalette.reduce((s, v) => s + v.diff.onlyInBaseline.length, 0);
+          const totalExtra = perViewportPalette.reduce((s, v) => s + v.diff.onlyInVariant.length, 0);
+          console.log(`  ${DIM}Palette diff: ${totalMissing} missing color(s), ${totalExtra} extra color(s) across ${perViewportPalette.length} viewport(s)${RESET}`);
         }
       }
 
@@ -1270,6 +1322,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       componentGeometryProfiles: componentGeometryReports.length > 0 ? componentGeometryReports : undefined,
       heatmapRegions: heatmapRegionsReports.length > 0 ? heatmapRegionsReports : undefined,
       textRowShifts: textRowShiftsReports.length > 0 ? textRowShiftsReports : undefined,
+      paletteDiffs: paletteDiffsReports.length > 0 ? paletteDiffsReports : undefined,
       results,
       reportPath,
     };

@@ -287,6 +287,33 @@ The wireframe mode needs visual-only diagnostics:
   bbox/geometry/heatmap/text-rows present) and emits a 5-step
   image-only playbook instead.
 
+### Markup-assistance scenarios (Tier 1, 2026-05-13)
+
+Beyond the migration / wireframe scenarios, the tool can serve
+adjacent markup-authoring workflows. Each scenario is built and
+evaluated incrementally.
+
+- [x] **Design token / palette compliance.** `src/palette-extract.ts`
+  stride-samples the rendered PNG into a 5-bit-per-channel histogram
+  and returns the top-K dominant colors. `src/palette-diff.ts`
+  greedy-matches baseline vs variant by RGB-Euclidean distance
+  (≤12 → match) and surfaces *missing* (in baseline target but
+  not the variant — agent forgot a token) and *extra* (in variant
+  but not target — agent slipped in a hard-coded literal). 6 unit
+  tests + evaluated on shadcn→blank (19 missing brand colors, 4
+  extra default-browser colors) and wireframe pricing-card (13
+  missing colors including `#2464ec` — the literal target button
+  color, surfaced as a single hex the agent can paste).
+- [ ] **Multi-state capture** — capture `:hover` / `:focus` /
+  `:disabled` / `[aria-expanded]` etc. via Playwright triggers,
+  diff per state. Catches "the button color changes on hover in
+  the target but not in your variant."
+- [ ] **Component-from-screenshot** — single-component subset of
+  wireframe mode: small viewport, one bbox, multi-state. New CLI
+  subcommand.
+- [ ] **Multi-page consistency** — same component on N pages must
+  render identically. Cross-page bbox / computed-style diff.
+
 ### Agent-loop UX (from 2026-05-12 subagent eval)
 
 From `docs/reports/2026-05-12-subagent-eval.md`. After items
