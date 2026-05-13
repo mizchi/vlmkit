@@ -10,6 +10,9 @@ playwright-report/
 .playwright-mcp/
 data/*.jsonl
 
+# subagent worktrees created by the Agent harness for parallel dogfood runs
+.claude/worktrees/
+
 # transient working file used by dogfood / eval-subagent runs;
 # always copied + removed around a single migration-compare invocation
 fixtures/migration/shadcn-to-luna/working.html
