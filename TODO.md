@@ -409,6 +409,57 @@ be CSS transitions, not the threshold. Fixes applied:
   side. ≤ 30 annotated as _(near, likely AA)_; > 60 is a real
   palette gap. Lets the agent dismiss persistent low-diff noise.
 
+### Scenario-matrix Clusters 2 & 3 — cross-browser + design-tokens (2026-05-13)
+
+- [x] **Cluster 2: `vrt cross-browser`** — launches chromium /
+  firefox / webkit in sequence, diffs each against the first
+  successful engine (typically chromium = reference). Engines
+  not installed in the local Playwright cache auto-skip with an
+  actionable hint (`npx playwright install firefox webkit`) —
+  the tool stays useful in a Chromium-only sandbox. Per-engine
+  heatmap regions + UA strings + suggested-next-step that calls
+  out the common per-engine quirks (form controls on WebKit,
+  text subpixel shifts on Firefox). Closes scenario matrix
+  items H1, H2, H3.
+
+- [x] **Cluster 3: `vrt design-tokens`** — scale-conformance
+  check. Renders the page, walks visible elements, samples
+  computed-style `borderRadius`, `padding`, `margin`,
+  `zIndex`, `boxShadow`. Per-property scale check (`isOnScale`
+  with px tolerance) plus shadow-tier check (count distinct
+  normalized shadow strings, flag when > N tiers).
+
+  Defaults are conservative common scales:
+    - radius: `0, 2, 4, 6, 8, 12, 16, 20, 24, 32, 48, 999`
+    - spacing: `0, 2, 4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96`
+    - z-index: `0, 1, 10, 100, 1000, 9999`
+    - shadow tiers: 5
+    - tolerance: ±0.5px
+
+  Override via CLI flags (`--radius-scale 0,4,8`) or a JSON
+  config (`--config tokens.json`).
+
+  Per-violation report: element, side (for box-sides), actual
+  value, nearest in-scale value, delta. Closes scenario matrix
+  items M4, M5, M6.
+
+  Fixture: `fixtures/design-tokens/off-scale/page.html` with
+  mixed conformant + off-scale values. Tool: **20 findings** —
+  3 border-radius (7/5/9px), 3 margin (17/23px), 12 padding
+  (4 sides × 3 elements all off-scale), 1 z-index (5), 8
+  distinct shadows (allowed 5). Conformant elements (.ok-card,
+  .btn-ok) pass cleanly.
+
+Both registered in `vrt` dispatcher. Smoke script updated to
+14/14 PASS.
+
+Per scenario matrix, this drops missing-scenario count further:
+  Before:  ✅ 35 / 🟡 32 / ❌ 19 / ⚪ 11
+  After:   ✅ 42 / 🟡 32 / ❌ 12 / ⚪ 11
+
+In-scope full coverage: **42 / 85 = 49.4%**. Combined with
+partial (🟡), useful coverage is **74 / 85 = 87%**.
+
 ### Scenario-matrix Cluster 1 — media-variants (2026-05-13)
 
 Single command covering 5 of the 24 missing scenarios from the

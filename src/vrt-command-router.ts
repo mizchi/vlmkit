@@ -68,6 +68,8 @@ const ROOT_MODULE_COMMANDS: Record<string, string> = {
   "a11y-touch": "./a11y-touch.ts",
   "interact": "./interact.ts",
   "media-variants": "./media-variants.ts",
+  "cross-browser": "./cross-browser.ts",
+  "design-tokens": "./design-tokens.ts",
 };
 
 const WORKFLOW_ALIAS_COMMANDS = new Set<WorkflowCommand>([
@@ -151,6 +153,12 @@ Markup-Assistance Commands:
   media-variants <html|url> [--variants ...]
                               Verify forced-colors / reduced-motion / print /
                               RTL / 200%-zoom adaptations
+  cross-browser <html|url> [--engines ...]
+                              Render in chromium / firefox / webkit and
+                              diff (engines auto-skip if not installed)
+  design-tokens <html|url> [--radius-scale ...]
+                              Scale-conformance check for radius, spacing,
+                              z-index, box-shadow tiers
 
 Workflow Commands:
   workflow <command>          Stateful baseline/snapshot verification workflow

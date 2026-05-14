@@ -25,6 +25,8 @@ const MODULE_LOADERS = {
   "./a11y-touch.ts": () => import("./a11y-touch.ts"),
   "./interact.ts": () => import("./interact.ts"),
   "./media-variants.ts": () => import("./media-variants.ts"),
+  "./cross-browser.ts": () => import("./cross-browser.ts"),
+  "./design-tokens.ts": () => import("./design-tokens.ts"),
 } as const;
 
 async function main() {

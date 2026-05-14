@@ -83,6 +83,16 @@ run "media-variants" "report.md" \
     fixtures/media-variants/card/hostile.html \
     --output-dir "$OUT_BASE/media-variants"
 
+run "cross-browser" "report.md" \
+  node --experimental-strip-types src/vrt.ts cross-browser \
+    fixtures/wireframe/pricing-card/reference.html \
+    --output-dir "$OUT_BASE/cross-browser"
+
+run "design-tokens" "report.md" \
+  node --experimental-strip-types src/vrt.ts design-tokens \
+    fixtures/design-tokens/off-scale/page.html \
+    --output-dir "$OUT_BASE/design-tokens"
+
 # Migration mode (existing) — uses the shadcn fixture
 run "compare" "migration-report.json" \
   node --experimental-strip-types src/vrt.ts compare \
