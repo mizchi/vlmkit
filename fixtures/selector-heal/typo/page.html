@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Selector heal test</title>
+<style>
+  body { font-family: system-ui; margin: 0; padding: 40px; }
+  .navigation-toggle {
+    padding: 10px 16px; background: #2563eb; color: white;
+    border: none; border-radius: 6px; font-size: 14px;
+  }
+  .panel { display: none; padding: 16px; background: #f3f4f6; margin-top: 12px; }
+  .panel.open { display: block; }
+</style>
+</head>
+<body>
+  <button class="navigation-toggle">Toggle navigation</button>
+  <div class="panel">Panel content</div>
+  <script>
+    document.querySelector('.navigation-toggle').addEventListener('click', () => {
+      document.querySelector('.panel').classList.toggle('open');
+    });
+  </script>
+</body>
+</html>

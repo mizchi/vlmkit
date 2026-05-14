@@ -29,6 +29,8 @@ const MODULE_LOADERS = {
   "./cross-browser.ts": () => import("./cross-browser.ts"),
   "./design-tokens.ts": () => import("./design-tokens.ts"),
   "./perf.ts": () => import("./perf.ts"),
+  "./explore.ts": () => import("./explore.ts"),
+  "./skill.ts": () => import("./skill.ts"),
 } as const;
 
 async function main() {

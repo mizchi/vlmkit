@@ -38,6 +38,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, type Page } from "playwright";
 import { compareScreenshots } from "./heatmap.ts";
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "./heatmap-regions.ts";
+import { healSelector } from "./selector-heal.ts";
 import type { VrtSnapshot } from "./types.ts";
 import { handleCliError } from "./cli-error.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "./terminal-colors.ts";
@@ -216,7 +217,26 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
         try {
           await executeStep(page, step);
         } catch (error) {
-          console.log(`  ${YELLOW}step failed (${summarizeAction(step)}): ${String(error)}${RESET}`);
+          const msg = String(error instanceof Error ? error.message : error);
+          console.log(`  ${YELLOW}step failed (${summarizeAction(step)}): ${msg.split("\n")[0]}${RESET}`);
+          // Self-healing: when the failure is a selector miss, ask
+          // the healer for plausible alternatives. From the
+          // browser-harness pattern + WebMCP extract — tell the
+          // agent what to fix, don't just fail silently.
+          const failedSelector = (step as { selector?: string }).selector;
+          const isSelectorMiss = failedSelector
+            && (/Timeout.*exceeded/i.test(msg) || /no element matched/i.test(msg) || /strict mode violation/i.test(msg));
+          if (isSelectorMiss) {
+            try {
+              const candidates = await healSelector(page, failedSelector, { maxCandidates: 3 });
+              if (candidates.length > 0) {
+                console.log(`    ${DIM}suggestions for \`${failedSelector}\`:${RESET}`);
+                for (const c of candidates) {
+                  console.log(`      ${DIM}${(c.confidence * 100).toFixed(0).padStart(3)}%  \`${c.selector}\`  ${c.text ? `"${c.text}"` : ""}${RESET}`);
+                }
+              }
+            } catch { /* healer failure is non-fatal */ }
+          }
         }
         pendingActions.push(step);
       }

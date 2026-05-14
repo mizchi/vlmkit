@@ -104,6 +104,19 @@ run "perf" "report.md" \
     fixtures/perf/cls-bug/page.html \
     --output-dir "$OUT_BASE/perf"
 
+run "explore" "report.md" \
+  node --experimental-strip-types src/vrt.ts explore \
+    fixtures/explore/declarative/page.html \
+    --output-dir "$OUT_BASE/explore"
+
+# skill writes to <output-dir>/skill-<name>/. Adjust assertion:
+# pass --output-dir = OUT_BASE, then the resulting report lives at
+# $OUT_BASE/skill-pricing-card/report.md — assert with that label.
+run "skill-pricing-card" "report.md" \
+  node --experimental-strip-types src/vrt.ts skill run pricing-card \
+    --against fixtures/wireframe/pricing-card/reference.html \
+    --output-dir "$OUT_BASE"
+
 # Migration mode (existing) — uses the shadcn fixture
 run "compare" "migration-report.json" \
   node --experimental-strip-types src/vrt.ts compare \

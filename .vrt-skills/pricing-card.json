@@ -1,0 +1,10 @@
+{
+  "name": "pricing-card",
+  "description": "Verify a pricing card against the full markup-assistance gate",
+  "selector": ".pricing-card",
+  "checks": [
+    { "tool": "a11y-contrast" },
+    { "tool": "a11y-touch", "level": "AAA" },
+    { "tool": "theme-parity" }
+  ]
+}

@@ -72,6 +72,8 @@ const ROOT_MODULE_COMMANDS: Record<string, string> = {
   "cross-browser": "./cross-browser.ts",
   "design-tokens": "./design-tokens.ts",
   "perf": "./perf.ts",
+  "explore": "./explore.ts",
+  "skill": "./skill.ts",
 };
 
 const WORKFLOW_ALIAS_COMMANDS = new Set<WorkflowCommand>([
@@ -166,6 +168,12 @@ Markup-Assistance Commands:
                               z-index, box-shadow tiers
   perf <html|url>             Web Vitals (CLS / LCP / FCP) via in-page
                               PerformanceObserver — Lighthouse-light
+  explore <html|url>          Auto-discover declared actions
+                              (window.__vrtActions / data-vrt-action)
+                              and diff each transition
+  skill <list|show|init|run>  Per-project skill playbooks under
+                              .vrt-skills/ — bundle of checks per
+                              target (selector, viewport, tools)
 
 Workflow Commands:
   workflow <command>          Stateful baseline/snapshot verification workflow
