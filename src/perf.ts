@@ -392,6 +392,7 @@ function renderReport(r: Omit<PerfReport, "reportPath">): string {
 }
 
 async function main(argv = process.argv.slice(2)) {
+  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, outputDir, report, observeMs, strict } = parseArgs(argv);
   if (positional.length === 0) {
     console.log("Usage: vrt perf <html-or-url> [options]");

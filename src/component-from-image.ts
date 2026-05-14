@@ -769,6 +769,7 @@ export function renderReportMarkdown(r: RenderInput): string {
 }
 
 async function main(argv = process.argv.slice(2)) {
+  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, outputDir, report, threshold, states, deviceScaleFactor } = parseArgs(argv);
   if (positional.length < 2) {
     console.log("Usage: vrt component-from-image <target.png> <current.html> [options]");

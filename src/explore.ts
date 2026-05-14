@@ -327,7 +327,7 @@ function renderReport(r: Omit<ExploreReport, "reportPath">): string {
   lines.push("|---|---|---|---|---|");
   for (const f of r.findings) {
     const status = !f.executed ? `**failed** — ${f.error}`
-      : f.diffRatio < 0.001 ? "_dead — no visible effect_"
+      : f.diffRatio < 0.001 ? "_no pixel delta — action may be wired but timing-missed, or genuinely no-op_"
       : "ok";
     const pct = f.executed ? `${(f.diffRatio * 100).toFixed(2)}%` : "—";
     lines.push(`| \`${f.action.name}\` | ${f.action.origin} | ${status} | ${pct} | ${f.heatmapRegions.length} |`);
@@ -353,20 +353,28 @@ function renderReport(r: Omit<ExploreReport, "reportPath">): string {
   return lines.join("\n");
 }
 
+function printUsage(): void {
+  console.log("Usage: vrt explore <html-or-url> [options]");
+  console.log("Options:");
+  console.log("  --wait <ms>          Delay after each action before snapshot (default: 200)");
+  console.log("  --threshold <0..1>   Pixel diff threshold (default: 0.03)");
+  console.log("  --strict             Exit non-zero on dead or failed actions");
+  console.log("  --output-dir <dir>   Default: ./test-results/explore");
+  console.log("  --report <path>      Markdown report path");
+  console.log("");
+  console.log("Pages opt-in to auto-exploration via:");
+  console.log('  <button data-vrt-action="open-menu">...</button>');
+  console.log("  window.__vrtActions = [{ name: 'open-menu', run: () => ... }]");
+}
+
 async function main(argv = process.argv.slice(2)) {
+  if (argv.includes("--help") || argv.includes("-h")) {
+    printUsage();
+    return;
+  }
   const { positional, outputDir, report, threshold, waitAfter, strict } = parseArgs(argv);
   if (positional.length === 0) {
-    console.log("Usage: vrt explore <html-or-url> [options]");
-    console.log("Options:");
-    console.log("  --wait <ms>          Delay after each action before snapshot (default: 200)");
-    console.log("  --threshold <0..1>   Pixel diff threshold (default: 0.03)");
-    console.log("  --strict             Exit non-zero on dead or failed actions");
-    console.log("  --output-dir <dir>   Default: ./test-results/explore");
-    console.log("  --report <path>      Markdown report path");
-    console.log("");
-    console.log("Pages opt-in to auto-exploration via:");
-    console.log('  <button data-vrt-action="open-menu">...</button>');
-    console.log("  window.__vrtActions = [{ name: 'open-menu', run: () => ... }]");
+    printUsage();
     process.exit(1);
   }
   await runExplore({

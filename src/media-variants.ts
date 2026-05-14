@@ -431,6 +431,7 @@ function renderReport(r: Omit<MediaVariantsReport, "reportPath">): string {
 }
 
 async function main(argv = process.argv.slice(2)) {
+  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, outputDir, report, variants, threshold } = parseArgs(argv);
   if (positional.length === 0) {
     console.log("Usage: vrt media-variants <html-or-url> [options]");

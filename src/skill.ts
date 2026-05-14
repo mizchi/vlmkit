@@ -277,6 +277,7 @@ async function commandInit(name: string) {
 }
 
 async function main(argv = process.argv.slice(2)) {
+  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const sub = argv[0];
   const rest = argv.slice(1);
   if (!sub || sub === "--help" || sub === "-h") {

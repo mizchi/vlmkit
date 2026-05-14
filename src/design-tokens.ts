@@ -408,6 +408,7 @@ async function loadConfig(path: string | undefined): Promise<DesignTokenConfig |
 }
 
 async function main(argv = process.argv.slice(2)) {
+  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, outputDir, report, configPath, strict, flagConfig } = parseArgs(argv);
   if (positional.length === 0) {
     console.log("Usage: vrt design-tokens <html-or-url> [options]");

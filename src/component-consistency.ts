@@ -241,6 +241,7 @@ function renderReport(
 }
 
 async function main(argv = process.argv.slice(2)) {
+  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, selector, outputDir, report, threshold, referenceIndex } = parseArgs(argv);
   if (positional.length === 0 || !selector) {
     console.log("Usage: vrt component-consistency <html> --selector <sel>");

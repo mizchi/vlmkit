@@ -289,6 +289,7 @@ function renderReport(r: Omit<ThemeParityReport, "reportPath">): string {
 }
 
 async function main(argv = process.argv.slice(2)) {
+  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, outputDir, report, threshold } = parseArgs(argv);
   if (positional.length === 0) {
     console.log("Usage: vrt theme-parity <html> [--output-dir dir]");

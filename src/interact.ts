@@ -389,6 +389,7 @@ function renderReport(r: Omit<InteractReport, "reportPath">): string {
 }
 
 async function main(argv = process.argv.slice(2)) {
+  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, sequence, outputDir, report, threshold } = parseArgs(argv);
   if (positional.length === 0 || !sequence) {
     console.log("Usage: vrt interact <html-or-url> --sequence <path.json> [options]");

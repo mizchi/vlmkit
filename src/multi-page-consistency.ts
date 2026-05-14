@@ -315,6 +315,7 @@ function renderReport(selector: string, reference: PageEntry, pages: PageEntry[]
 }
 
 async function main(argv = process.argv.slice(2)) {
+  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { selector, urls, files, outputDir, report, threshold } = parseArgs(argv);
   if (!selector || (urls.length === 0 && files.length === 0)) {
     console.log("Usage: vrt multi-page-consistency --selector <sel> --urls URL1 URL2 ...");
