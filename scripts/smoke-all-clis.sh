@@ -66,6 +66,12 @@ run "a11y-touch" "report.md" \
     fixtures/a11y-touch/small-targets/page.html \
     --output-dir "$OUT_BASE/a11y-touch"
 
+run "component-from-image-typo" "report.md" \
+  node --experimental-strip-types src/vrt.ts component-from-image \
+    fixtures/typography/wrong-size-weight/target.png \
+    fixtures/typography/wrong-size-weight/buggy.html \
+    --output-dir "$OUT_BASE/component-from-image-typo"
+
 run "interact" "report.md" \
   node --experimental-strip-types src/vrt.ts interact \
     fixtures/interact/dropdown-form/page.html \

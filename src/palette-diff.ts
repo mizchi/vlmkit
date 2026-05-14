@@ -88,7 +88,12 @@ export function diffPalettes(
       variantUsed.add(bestIdx);
       matched.push({ baseline: b, variant: variant[bestIdx]!, distance: bestDist });
       baselineMatchedShare += b.share;
-    } else if (b.share >= minReportShare) {
+    } else if (b.share >= minReportShare && bestUnconsumed >= 12) {
+      // Drop entries whose nearest unconsumed neighbor is within 12 RGB
+      // units: those are bucket-boundary jitter (the same color in a
+      // different histogram bin), not real palette gaps. Subagent
+      // dogfood: "missing entries flagged as nearest=8 are noise — the
+      // tool knows yet still surfaces them."
       onlyInBaseline.push({ ...b, nearestNeighborDistance: bestUnconsumed });
     }
   }
@@ -106,7 +111,9 @@ export function diffPalettes(
         const d = dist(b, variant[i]!);
         if (d < nearest) nearest = d;
       }
-      onlyInVariant.push({ ...variant[i]!, nearestNeighborDistance: nearest });
+      if (nearest >= 12) {
+        onlyInVariant.push({ ...variant[i]!, nearestNeighborDistance: nearest });
+      }
     }
   }
 

@@ -45,6 +45,9 @@ export type SequenceAction =
   | { action: "snapshot"; name: string }
   | { action: "click"; selector: string }
   | { action: "hover"; selector: string }
+  | { action: "focus"; selector: string }
+  | { action: "blur"; selector: string }
+  | { action: "press"; selector?: string; key: string }
   | { action: "type"; selector: string; text: string }
   | { action: "fill"; selector: string; value: string }
   | { action: "select"; selector: string; value: string }
@@ -116,6 +119,11 @@ function summarizeAction(a: SequenceAction): string {
     case "snapshot": return `snapshot "${a.name}"`;
     case "click": return `click \`${a.selector}\``;
     case "hover": return `hover \`${a.selector}\``;
+    case "focus": return `focus \`${a.selector}\``;
+    case "blur": return `blur \`${a.selector}\``;
+    case "press": return a.selector
+      ? `press "${a.key}" on \`${a.selector}\``
+      : `press "${a.key}"`;
     case "type": return `type "${a.text}" into \`${a.selector}\``;
     case "fill": return `fill \`${a.selector}\` = "${a.value}"`;
     case "select": return `select \`${a.selector}\` → "${a.value}"`;
@@ -132,6 +140,17 @@ async function executeStep(page: Page, step: SequenceAction): Promise<void> {
     case "snapshot": return;  // handled by caller
     case "click": await page.click(step.selector, { timeout: 5000 }); return;
     case "hover": await page.hover(step.selector, { timeout: 5000 }); return;
+    case "focus": await page.focus(step.selector, { timeout: 5000 }); return;
+    case "blur":
+      await page.locator(step.selector).first().evaluate((el) => (el as HTMLElement).blur());
+      return;
+    case "press":
+      if (step.selector) {
+        await page.press(step.selector, step.key, { timeout: 5000 });
+      } else {
+        await page.keyboard.press(step.key);
+      }
+      return;
     case "type": await page.type(step.selector, step.text, { timeout: 5000 }); return;
     case "fill": await page.fill(step.selector, step.value, { timeout: 5000 }); return;
     case "select": await page.selectOption(step.selector, step.value, { timeout: 5000 }); return;
@@ -287,13 +306,22 @@ function renderReport(r: Omit<InteractReport, "reportPath">): string {
       "no visible effect — usually a sign the selector didn't match, or the " +
       "click hit a no-op.");
     lines.push("");
-    lines.push("| From → To | Actions | Pixel diff | Region count |");
-    lines.push("|---|---|---|---|");
+    lines.push("| From → To | Actions | Pixel diff | Regions | Note |");
+    lines.push("|---|---|---|---|---|");
     for (const t of r.transitions) {
       const acts = t.actions.length === 0
         ? "_(nothing)_"
         : t.actions.map((a) => `\`${summarizeAction(a).replace(/\|/g, "\\|")}\``).join("<br>");
-      lines.push(`| **${t.from}** → **${t.to}** | ${acts} | ${(t.diffRatio * 100).toFixed(2)}% (${t.diffPixels} px) | ${t.heatmapRegions.length} |`);
+      // "dead" = non-snapshot actions executed but no visible change.
+      // Subagent dogfood: "0% on hover caught a real bug — surface it
+      // prominently per-row, not only in the next-step section."
+      const nonSnapshotActions = t.actions.filter((a) =>
+        a.action !== "wait" && a.action !== "waitForSelector" && a.action !== "snapshot");
+      const dead = nonSnapshotActions.length > 0 && t.diffRatio < 0.001;
+      const note = dead
+        ? "**dead** — actions had no visible effect (selector miss? no-op?)"
+        : "";
+      lines.push(`| **${t.from}** → **${t.to}** | ${acts} | ${(t.diffRatio * 100).toFixed(2)}% (${t.diffPixels} px) | ${t.heatmapRegions.length} | ${note} |`);
     }
     lines.push("");
 
@@ -356,7 +384,19 @@ async function main(argv = process.argv.slice(2)) {
     console.log('      { "action": "click", "selector": ".btn" },');
     console.log('      { "action": "snapshot", "name": "after-click" } ] }');
     console.log("");
-    console.log("Actions: snapshot | click | hover | type | fill | select | scroll | wait | waitForSelector");
+    console.log("Actions: snapshot | click | hover | focus | blur | press | type | fill | select | scroll | wait | waitForSelector");
+    console.log("");
+    console.log("Action arguments:");
+    console.log('  snapshot         { name: string }');
+    console.log('  click | hover    { selector: string }');
+    console.log('  focus | blur     { selector: string }');
+    console.log('  press            { selector?: string, key: string }   // e.g. "Enter", "Escape", "Tab"');
+    console.log('  type             { selector: string, text: string }   // appends text');
+    console.log('  fill             { selector: string, value: string }  // replaces value');
+    console.log('  select           { selector: string, value: string }  // <select>');
+    console.log('  scroll           { selector?: string, x?: number, y?: number }');
+    console.log('  wait             { ms: number }');
+    console.log('  waitForSelector  { selector: string }');
     process.exit(1);
   }
   await runInteract({
