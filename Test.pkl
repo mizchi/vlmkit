@@ -21,6 +21,7 @@ tests {
     description = "Rebuild a card from a blank starter against a target PNG."
     specRef { "FIDELITY-001"; "SMOKE" }
     cmd = "\(vrt) component-from-image fixtures/wireframe/pricing-card/target-desktop.png fixtures/wireframe/pricing-card/blank.html --output-dir \(outDir)/component-from-image"
+    expectStdoutContains { "vrt component-from-image"; "report:" }
     timeoutSec = 120
   }
   new {
@@ -28,6 +29,7 @@ tests {
     description = "Same CLI on a fixture with wrong-size/weight typography."
     specRef { "FIDELITY-001"; "SMOKE" }
     cmd = "\(vrt) component-from-image fixtures/typography/wrong-size-weight/target.png fixtures/typography/wrong-size-weight/buggy.html --output-dir \(outDir)/component-from-image-typo"
+    expectStdoutContains { "vrt component-from-image"; "report:" }
     timeoutSec = 120
   }
   new {
@@ -35,6 +37,7 @@ tests {
     description = "Crop a single component from a page screenshot."
     specRef { "A8"; "SMOKE" }
     cmd = "\(vrt) component-extract fixtures/wireframe/pricing-card/target-desktop.png --crop 0 --output-dir \(outDir)/component-extract"
+    expectStdoutContains { "vrt component-extract"; "report:" }
     timeoutSec = 60
   }
 
@@ -44,6 +47,7 @@ tests {
     description = "WCAG AA text contrast scan on low-contrast fixture."
     specRef { "F1"; "SMOKE" }
     cmd = "\(vrt) a11y-contrast fixtures/a11y-contrast/low-contrast/page.html --output-dir \(outDir)/a11y-contrast"
+    expectStdoutContains { "vrt a11y-contrast"; "report:" }
     timeoutSec = 60
   }
   new {
@@ -51,6 +55,7 @@ tests {
     description = "Touch-target size scan, WCAG 2.5.5 and 2.5.8."
     specRef { "F2"; "SMOKE" }
     cmd = "\(vrt) a11y-touch fixtures/a11y-touch/small-targets/page.html --output-dir \(outDir)/a11y-touch"
+    expectStdoutContains { "vrt a11y-touch"; "report:" }
     timeoutSec = 60
   }
   new {
@@ -58,6 +63,7 @@ tests {
     description = "Tab order matches visual reading order."
     specRef { "F3"; "SMOKE" }
     cmd = "\(vrt) a11y-focus-order fixtures/a11y-focus-order/reversed/page.html --output-dir \(outDir)/a11y-focus-order"
+    expectStdoutContains { "vrt a11y-focus-order"; "report:" }
     timeoutSec = 60
   }
 
@@ -67,6 +73,7 @@ tests {
     description = "Radius / spacing / z-index / shadow-tier conformance."
     specRef { "M1"; "M4-M6"; "SMOKE" }
     cmd = "\(vrt) design-tokens fixtures/design-tokens/off-scale/page.html --output-dir \(outDir)/design-tokens"
+    expectStdoutContains { "vrt design-tokens"; "report:" }
     timeoutSec = 60
   }
   new {
@@ -74,6 +81,7 @@ tests {
     description = "Inline-vs-component drift on a single page."
     specRef { "J2"; "SMOKE" }
     cmd = "\(vrt) component-consistency fixtures/component-consistency/inline-leak/page.html --selector .card --output-dir \(outDir)/component-consistency"
+    expectStdoutContains { "vrt component-consistency"; "report:" }
     timeoutSec = 60
   }
   new {
@@ -81,6 +89,7 @@ tests {
     description = "Same selector across pages should render identically."
     specRef { "J2"; "SMOKE" }
     cmd = "\(vrt) multi-page-consistency --selector .footer --files fixtures/multi-page/footer-drift/about.html fixtures/multi-page/footer-drift/blog.html fixtures/multi-page/footer-drift/pricing.html --output-dir \(outDir)/multi-page-consistency"
+    expectStdoutContains { "vrt multi-page-consistency"; "report:" }
     timeoutSec = 90
   }
 
@@ -90,6 +99,7 @@ tests {
     description = "Dark-mode parity: every component responds to color-scheme."
     specRef { "C1"; "SMOKE" }
     cmd = "\(vrt) theme-parity fixtures/theme-parity/card-with-bug/buggy.html --output-dir \(outDir)/theme-parity"
+    expectStdoutContains { "vrt theme-parity"; "report:" }
     timeoutSec = 60
   }
   new {
@@ -97,6 +107,7 @@ tests {
     description = "forced-colors / reduced-motion / print / RTL / zoom-200 sweep."
     specRef { "C2-C6"; "SMOKE" }
     cmd = "\(vrt) media-variants fixtures/media-variants/card/hostile.html --output-dir \(outDir)/media-variants"
+    expectStdoutContains { "vrt media-variants"; "report:" }
     timeoutSec = 120
   }
   new {
@@ -104,6 +115,7 @@ tests {
     description = "Chromium / Firefox / WebKit parity."
     specRef { "H1"; "SMOKE" }
     cmd = "\(vrt) cross-browser fixtures/wireframe/pricing-card/reference.html --allow-skipped --output-dir \(outDir)/cross-browser"
+    expectStdoutContains { "vrt cross-browser"; "report:" }
     timeoutSec = 120
   }
   new {
@@ -111,6 +123,7 @@ tests {
     description = "1.4x word inflation should not overflow or wrap."
     specRef { "I1"; "SMOKE" }
     cmd = "\(vrt) i18n-stress fixtures/i18n-stress/button-overflow/page.html --output-dir \(outDir)/i18n-stress"
+    expectStdoutContains { "vrt i18n-stress"; "report:" }
     timeoutSec = 60
   }
   new {
@@ -118,6 +131,7 @@ tests {
     description = "CLS detection via in-page PerformanceObserver."
     specRef { "K5"; "SMOKE" }
     cmd = "\(vrt) perf fixtures/perf/cls-bug/page.html --output-dir \(outDir)/perf"
+    expectStdoutContains { "vrt perf"; "report:" }
     timeoutSec = 60
   }
 
@@ -127,6 +141,7 @@ tests {
     description = "Drive a click/type sequence and diff each transition."
     specRef { "O2"; "SMOKE" }
     cmd = "\(vrt) interact fixtures/interact/dropdown-form/page.html --sequence fixtures/interact/dropdown-form/sequence.json --output-dir \(outDir)/interact"
+    expectStdoutContains { "vrt interact"; "report:" }
     timeoutSec = 90
   }
   new {
@@ -143,6 +158,7 @@ tests {
     description = "Page advertises actions via __vrtActions / data-vrt-action."
     specRef { "O1"; "SMOKE" }
     cmd = "\(vrt) explore fixtures/explore/declarative/page.html --output-dir \(outDir)/explore"
+    expectStdoutContains { "vrt explore"; "report:" }
     timeoutSec = 60
   }
   new {
@@ -150,6 +166,7 @@ tests {
     description = "Skill playbook fans out N checks over one target."
     specRef { "O3-O5"; "SMOKE" }
     cmd = "\(vrt) skill run pricing-card --against fixtures/wireframe/pricing-card/reference.html --output-dir \(outDir)"
+    expectStdoutContains { "vrt skill run pricing-card"; "report:" }
     timeoutSec = 180
   }
 
@@ -159,6 +176,7 @@ tests {
     description = "Migration compare (existing tool), shadcn fixture."
     specRef { "MIG-001"; "CORE-002"; "CORE-003"; "SMOKE" }
     cmd = "\(vrt) compare --dir fixtures/migration/shadcn-to-luna --baseline before.html --variants after-blank.html --output-dir \(outDir)/compare --no-paint-tree --no-discover"
+    expectStdoutContains { "Migration VRT Compare"; "Report:" }
     timeoutSec = 60
   }
   new {
@@ -166,6 +184,7 @@ tests {
     description = "Existing PNG diff utility, identity check (0% diff)."
     specRef { "CORE-001"; "SMOKE" }
     cmd = "\(vrt) png-diff fixtures/wireframe/pricing-card/target-desktop.png fixtures/wireframe/pricing-card/target-desktop.png --output-dir \(outDir)/png-diff"
+    expectStdoutContains { "PNG Diff"; "diff:" }
     timeoutSec = 30
   }
 }
