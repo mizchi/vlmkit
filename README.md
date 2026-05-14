@@ -82,8 +82,8 @@ pkf run fix-loop --fixture page --seed 42
 
 ### Task runner & spec gates (pkfire / pkspec)
 
-Tasks live in `Taskfile.pkl` (typed; replaces `justfile` — old recipes
-preserved in `justfile.legacy` during transition). Specs live in
+Tasks live in `Taskfile.pkl` (typed; replaces the previous bash
+justfile). Specs live in
 `Spec.pkl` (Goals + Scenarios) and `Test.pkl` (smoke implementations).
 
 ```bash

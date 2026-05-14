@@ -1,7 +1,7 @@
 /// vrt task definitions for pkfire.
 ///
-/// Replaces justfile (kept as justfile.legacy during transition).
-/// Each task is a typed `Task` with declared inputs so pkfire can
+/// Replaces the previous bash justfile. Each task is a typed `Task`
+/// with declared inputs so pkfire can
 /// skip re-runs when sources haven't changed.
 ///
 /// Usage:
