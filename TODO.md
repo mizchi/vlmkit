@@ -409,6 +409,49 @@ be CSS transitions, not the threshold. Fixes applied:
   side. ≤ 30 annotated as _(near, likely AA)_; > 60 is a real
   palette gap. Lets the agent dismiss persistent low-diff noise.
 
+### Scenario-matrix small misses — F3 + D4 (2026-05-13)
+
+Two remaining single-item gaps from the scenario matrix:
+
+- [x] **F3 — `vrt a11y-focus-order`**. Drives `Tab` through the
+  page via `page.keyboard.press`, captures `document.activeElement`
+  after each press, builds an ordered sequence of focus steps.
+  Detects three classes of bug:
+    - **reverse** — focus moved left within the same row (Δx <
+      −40px, Δy ≤ 16px), or up the page (Δy < −24px). Tab order
+      doesn't match T-to-B / L-to-R visual order.
+    - **trap** — same element (path + bbox) focused twice in a row.
+    - **skip-row** — focus jumped > 200px vertically; heuristic
+      warning to verify nothing was skipped between.
+  Cycle-detection by tracking the first focused element's path and
+  stopping when it reappears. Path-collision sibling detection
+  (same path but different bbox) avoids trap false-positives on
+  identical-class sibling elements.
+
+  Fixture `fixtures/a11y-focus-order/reversed/`: a flexbox toolbar
+  using `order:` to visually reverse three buttons while keeping
+  DOM order. Tool finds 2 reverse findings (Cut → Copy moves left,
+  Copy → Paste moves left). The control case (a normally-ordered
+  page) produces zero findings.
+
+- [x] **D4 — `--device-scale-factor` (`--dpr`) flag on
+  `component-from-image`**. Passes Playwright's
+  `deviceScaleFactor` to `newPage`. CSS viewport is derived from
+  the target image's pixel dimensions divided by dpr, so the page
+  lays out at the *intended* CSS dimensions and renders at the
+  higher DPR. Useful for retina simulation: capture target at 2×
+  in Figma / Chrome devtools, then run with `--dpr 2` to verify
+  the live render holds up.
+
+Both registered in the unified `vrt` dispatcher. Smoke 15/15 PASS.
+
+Scenario-matrix progress (HEAD → after this commit):
+  ✅ 42 → 44 (+2: F3, D4)
+  ❌ 12 → 10
+
+In-scope full coverage now **44 / 85 = 52%**; full + partial =
+**76 / 85 = 89%**.
+
 ### Scenario-matrix Clusters 2 & 3 — cross-browser + design-tokens (2026-05-13)
 
 - [x] **Cluster 2: `vrt cross-browser`** — launches chromium /

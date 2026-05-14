@@ -57,6 +57,13 @@ export interface ComponentFromImageOptions {
   states?: ForcedPseudoState[];
   /** Pixel-diff threshold (0..1). Default 0.03 (stricter than VRT default). */
   threshold?: number;
+  /**
+   * Device pixel ratio for capture. Default 1. Use 2 to simulate
+   * retina rendering — catches blurry low-res image assets that
+   * stretch on high-DPI displays. The target PNG should be captured
+   * at the same DPR for the diff to be meaningful.
+   */
+  deviceScaleFactor?: number;
 }
 
 export interface ComponentFromImageReport {
@@ -98,11 +105,15 @@ function parseArgs(argv: string[]) {
   let outputDir = "";
   let report = "";
   let threshold = 0.03;
+  let deviceScaleFactor: number | undefined;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--output-dir") outputDir = argv[++i];
     else if (a === "--report") report = argv[++i];
     else if (a === "--threshold") threshold = parseFloat(argv[++i] ?? "0.03");
+    else if (a === "--device-scale-factor" || a === "--dpr") {
+      deviceScaleFactor = parseFloat(argv[++i] ?? "1");
+    }
     else if (a === "--states") {
       while (i + 1 < argv.length && !argv[i + 1].startsWith("--")) {
         const v = argv[++i];
@@ -114,7 +125,7 @@ function parseArgs(argv: string[]) {
       positional.push(a);
     }
   }
-  return { positional, outputDir, report, threshold, states };
+  return { positional, outputDir, report, threshold, states, deviceScaleFactor };
 }
 
 export async function runComponentFromImage(
@@ -139,9 +150,22 @@ export async function runComponentFromImage(
   console.log(`  ${DIM}target:  ${targetPath} (${viewport.width}×${viewport.height})${RESET}`);
   console.log(`  ${DIM}current: ${htmlPath}${RESET}`);
 
+  // When --device-scale-factor is set, the target image dimensions
+  // already include the scale (e.g. a 2× target at 1280px wide
+  // CSS-px is 2560px wide pixels). Pass the CSS-px viewport so the
+  // page lays out at the *intended* dimensions, but render at the
+  // higher dpr.
+  const dpr = options.deviceScaleFactor ?? 1;
+  const cssViewport = dpr > 1
+    ? { width: Math.round(viewport.width / dpr), height: Math.round(viewport.height / dpr) }
+    : viewport;
+
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({ viewport });
+    const page = await browser.newPage({
+      viewport: cssViewport,
+      deviceScaleFactor: dpr,
+    });
     await page.setContent(html, { waitUntil: "networkidle" });
     const currentPath = join(outputDir, "current.png");
     await page.screenshot({ path: currentPath, fullPage: false });
@@ -745,7 +769,7 @@ export function renderReportMarkdown(r: RenderInput): string {
 }
 
 async function main(argv = process.argv.slice(2)) {
-  const { positional, outputDir, report, threshold, states } = parseArgs(argv);
+  const { positional, outputDir, report, threshold, states, deviceScaleFactor } = parseArgs(argv);
   if (positional.length < 2) {
     console.log("Usage: vrt component-from-image <target.png> <current.html> [options]");
     console.log("Options:");
@@ -753,6 +777,8 @@ async function main(argv = process.argv.slice(2)) {
     console.log("  --report <path>                 Markdown report path (default: <output-dir>/report.md)");
     console.log("  --threshold <0..1>              Pixel diff threshold (default: 0.03)");
     console.log("  --states hover focus-visible …  Capture additional pseudo-state diffs");
+    console.log("  --device-scale-factor <n>       Render at higher DPR (e.g. 2 for retina simulation)");
+    console.log("                                  Target PNG must be captured at the same DPR.");
     process.exit(1);
   }
   await runComponentFromImage({
@@ -762,6 +788,7 @@ async function main(argv = process.argv.slice(2)) {
     reportPath: report || undefined,
     threshold,
     states: states.length > 0 ? states : undefined,
+    deviceScaleFactor,
   });
 }
 

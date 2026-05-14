@@ -66,6 +66,7 @@ const ROOT_MODULE_COMMANDS: Record<string, string> = {
   "i18n-stress": "./i18n-stress.ts",
   "a11y-contrast": "./a11y-contrast.ts",
   "a11y-touch": "./a11y-touch.ts",
+  "a11y-focus-order": "./a11y-focus-order.ts",
   "interact": "./interact.ts",
   "media-variants": "./media-variants.ts",
   "cross-browser": "./cross-browser.ts",
@@ -147,6 +148,9 @@ Markup-Assistance Commands:
   a11y-contrast <html>        WCAG AA contrast scan on rendered text
   a11y-touch <html|url> [--level AAA|AA]
                               Touch-target size check (44×44 / 24×24)
+  a11y-focus-order <html|url>
+                              Tab through page, surface visual-order
+                              mismatches and focus traps
   interact <html|url> --sequence <path.json>
                               Scripted UI interaction sequence
                               (click / hover / type / scroll + per-step diff)

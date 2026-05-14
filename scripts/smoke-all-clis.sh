@@ -66,6 +66,11 @@ run "a11y-touch" "report.md" \
     fixtures/a11y-touch/small-targets/page.html \
     --output-dir "$OUT_BASE/a11y-touch"
 
+run "a11y-focus-order" "report.md" \
+  node --experimental-strip-types src/vrt.ts a11y-focus-order \
+    fixtures/a11y-focus-order/reversed/page.html \
+    --output-dir "$OUT_BASE/a11y-focus-order"
+
 run "component-from-image-typo" "report.md" \
   node --experimental-strip-types src/vrt.ts component-from-image \
     fixtures/typography/wrong-size-weight/target.png \

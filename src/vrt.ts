@@ -23,6 +23,7 @@ const MODULE_LOADERS = {
   "./i18n-stress.ts": () => import("./i18n-stress.ts"),
   "./a11y-contrast.ts": () => import("./a11y-contrast.ts"),
   "./a11y-touch.ts": () => import("./a11y-touch.ts"),
+  "./a11y-focus-order.ts": () => import("./a11y-focus-order.ts"),
   "./interact.ts": () => import("./interact.ts"),
   "./media-variants.ts": () => import("./media-variants.ts"),
   "./cross-browser.ts": () => import("./cross-browser.ts"),
