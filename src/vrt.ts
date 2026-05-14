@@ -23,6 +23,7 @@ const MODULE_LOADERS = {
   "./i18n-stress.ts": () => import("./i18n-stress.ts"),
   "./a11y-contrast.ts": () => import("./a11y-contrast.ts"),
   "./a11y-touch.ts": () => import("./a11y-touch.ts"),
+  "./interact.ts": () => import("./interact.ts"),
 } as const;
 
 async function main() {

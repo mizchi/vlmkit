@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 40px; background: #f3f4f6; color: #111827; }
+  h1 { font-size: 22px; margin: 0 0 16px; }
+  .dropdown { position: relative; display: inline-block; margin-bottom: 16px; }
+  .dropdown-trigger {
+    padding: 10px 16px; background: white; border: 1px solid #d1d5db; border-radius: 6px;
+    cursor: pointer; font-size: 14px; min-width: 200px; text-align: left;
+  }
+  .dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%; left: 0; margin-top: 4px;
+    background: white; border: 1px solid #d1d5db; border-radius: 6px;
+    min-width: 200px; padding: 4px 0; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  }
+  .dropdown.open .dropdown-menu { display: block; }
+  .dropdown-item { padding: 8px 16px; cursor: pointer; font-size: 14px; }
+  .dropdown-item:hover { background: #f3f4f6; }
+  form { margin-top: 16px; }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #374151; }
+  input[type=email] {
+    padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px;
+    font-size: 14px; width: 320px;
+  }
+  input[type=email]:invalid:not(:placeholder-shown) { border-color: #ef4444; }
+  .submit-btn {
+    margin-top: 16px; padding: 10px 20px; background: #2563eb; color: white;
+    border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .filler { height: 800px; background: linear-gradient(180deg, #ffffff 0%, #f3f4f6 100%); margin-top: 24px; }
+  .footer { padding: 16px; background: #1f2937; color: white; font-size: 14px; text-align: center; }
+</style>
+</head>
+<body>
+  <h1>Account settings</h1>
+  <div class="dropdown" id="region">
+    <button class="dropdown-trigger">Region: United States ▾</button>
+    <div class="dropdown-menu">
+      <div class="dropdown-item">United States</div>
+      <div class="dropdown-item">Germany</div>
+      <div class="dropdown-item">Japan</div>
+    </div>
+  </div>
+  <form>
+    <label for="email">Email address</label>
+    <input id="email" type="email" placeholder="you@example.com" required>
+    <button class="submit-btn" type="button">Save</button>
+  </form>
+  <div class="filler"></div>
+  <div class="footer">© 2026 Acme Inc.</div>
+  <script>
+    document.querySelector('.dropdown-trigger').addEventListener('click', (e) => {
+      e.currentTarget.parentElement.classList.toggle('open');
+    });
+  </script>
+</body>
+</html>

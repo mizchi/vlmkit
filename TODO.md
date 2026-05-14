@@ -409,6 +409,36 @@ be CSS transitions, not the threshold. Fixes applied:
   side. ≤ 30 annotated as _(near, likely AA)_; > 60 is a real
   palette gap. Lets the agent dismiss persistent low-diff noise.
 
+### Survey Tier D — real-interaction sequences (2026-05-13)
+
+- [x] **`vrt interact`** — declarative scripted-sequence VRT. The
+  agent describes a sequence of Playwright actions in JSON; the
+  tool drives the page through them and pixel-diffs each transition.
+  Closes the "we can't see UI bugs hidden behind clicks / forms /
+  scroll" gap from the capability survey.
+
+  Action vocabulary: `snapshot`, `click`, `hover`, `type`, `fill`,
+  `select`, `scroll`, `wait`, `waitForSelector`. Each `snapshot`
+  saves a PNG; consecutive snapshots are pixel-diffed (threshold
+  0.03) and the diff regions are CC-clustered with kind + fill
+  annotations from the existing heatmap pipeline.
+
+  Output: markdown report with:
+    - Snapshot list (named PNGs)
+    - Transition table (from → to, actions, diff %, region count)
+    - Per-transition heatmap region tables (Top-Left, Size, Hot pixels, Fill, Kind)
+    - Suggested next step that flags zero-delta transitions ("selector miss?")
+
+  Fixture `fixtures/interact/dropdown-form/`:
+  page.html has a dropdown trigger + email form + scrollable filler.
+  sequence.json drives 5 snapshots through: default → dropdown-open
+  → invalid-email → valid-email → scrolled. Results: 1.70% / 1.79%
+  / 0.07% / 14.02% — each transition's induced change clearly
+  surfaced, including the subtle 0.07% border-color shift on email
+  validation.
+
+  Registered under the unified `vrt` dispatcher.
+
 ### Survey Tier B / C / F follow-ups (2026-05-13)
 
 Three of the ROI-ranked items from `docs/reports/2026-05-13-

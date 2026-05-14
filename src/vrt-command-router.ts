@@ -66,6 +66,7 @@ const ROOT_MODULE_COMMANDS: Record<string, string> = {
   "i18n-stress": "./i18n-stress.ts",
   "a11y-contrast": "./a11y-contrast.ts",
   "a11y-touch": "./a11y-touch.ts",
+  "interact": "./interact.ts",
 };
 
 const WORKFLOW_ALIAS_COMMANDS = new Set<WorkflowCommand>([
@@ -143,6 +144,9 @@ Markup-Assistance Commands:
   a11y-contrast <html>        WCAG AA contrast scan on rendered text
   a11y-touch <html|url> [--level AAA|AA]
                               Touch-target size check (44×44 / 24×24)
+  interact <html|url> --sequence <path.json>
+                              Scripted UI interaction sequence
+                              (click / hover / type / scroll + per-step diff)
 
 Workflow Commands:
   workflow <command>          Stateful baseline/snapshot verification workflow
