@@ -24,6 +24,7 @@ const MODULE_LOADERS = {
   "./a11y-contrast.ts": () => import("./a11y-contrast.ts"),
   "./a11y-touch.ts": () => import("./a11y-touch.ts"),
   "./interact.ts": () => import("./interact.ts"),
+  "./media-variants.ts": () => import("./media-variants.ts"),
 } as const;
 
 async function main() {

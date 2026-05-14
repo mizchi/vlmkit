@@ -78,6 +78,11 @@ run "interact" "report.md" \
     --sequence fixtures/interact/dropdown-form/sequence.json \
     --output-dir "$OUT_BASE/interact"
 
+run "media-variants" "report.md" \
+  node --experimental-strip-types src/vrt.ts media-variants \
+    fixtures/media-variants/card/hostile.html \
+    --output-dir "$OUT_BASE/media-variants"
+
 # Migration mode (existing) — uses the shadcn fixture
 run "compare" "migration-report.json" \
   node --experimental-strip-types src/vrt.ts compare \

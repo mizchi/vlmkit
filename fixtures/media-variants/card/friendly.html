@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Friendly card</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #111827; --accent: #2563eb;
+    --card-bg: #f9fafb;
+  }
+  body {
+    font-family: system-ui, sans-serif;
+    background: var(--bg); color: var(--fg);
+    margin: 0; padding: 40px;
+  }
+  h1 { font-size: 22px; margin: 0 0 12px; }
+  .card {
+    max-width: 360px; padding: 20px;
+    background: var(--card-bg);
+    border: 1px solid CanvasText;  /* responds to forced-colors */
+    border-radius: 8px;
+    margin-block-end: 16px;        /* logical property */
+    padding-inline-start: 32px;    /* logical property */
+  }
+  .btn {
+    display: inline-block; padding: 10px 16px;
+    background: var(--accent); color: white;
+    border: none; border-radius: 6px;
+    font-size: 14px; font-weight: 600;
+    margin-inline-end: 8px;         /* logical property */
+    animation: pulse 2s infinite;   /* will be suppressed by reduced-motion */
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+  /* Reduced-motion accommodation */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
+  /* Print stylesheet */
+  @media print {
+    body { padding: 0; }
+    .btn { display: none; }
+    .card { border: 1px solid #000; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+  <h1>Welcome back</h1>
+  <div class="card">
+    <p>Your subscription renews on December 31.</p>
+    <button class="btn">Manage plan</button>
+    <button class="btn">Cancel</button>
+  </div>
+</body>
+</html>

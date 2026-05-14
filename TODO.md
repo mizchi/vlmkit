@@ -409,6 +409,48 @@ be CSS transitions, not the threshold. Fixes applied:
   side. ≤ 30 annotated as _(near, likely AA)_; > 60 is a real
   palette gap. Lets the agent dismiss persistent low-diff noise.
 
+### Scenario-matrix Cluster 1 — media-variants (2026-05-13)
+
+Single command covering 5 of the 24 missing scenarios from the
+scenario-coverage matrix (`docs/reports/2026-05-13-scenario-matrix.
+md`): forced-colors, reduced-motion, print, RTL, 200%-zoom.
+
+- [x] **`vrt media-variants`** — renders an HTML / URL under each
+  variant emulation and pixel-diffs against the default. Five
+  emulations (Playwright primitives + small overrides):
+    - `forced-colors` via `emulateMedia({ forcedColors: 'active' })`
+    - `reduced-motion` via `emulateMedia({ reducedMotion: 'reduce' })`
+    - `print` via `emulateMedia({ media: 'print' })`
+    - `rtl` via `document.documentElement.dir = 'rtl'` injection
+    - `zoom-200` via `html { zoom: 2 }` + halved viewport
+
+  Per-variant heuristic verdict combines pixel delta + a static
+  stylesheet-text check (more reliable on small pages where motion
+  / forced-color responses are subtle):
+
+    - `forced-colors`: `forced-color-adjust: none` declaration →
+      explicit opt-out (suspect); else delta-based.
+    - `reduced-motion`: `@media (prefers-reduced-motion: reduce)`
+      rule present → ok; animation/@keyframes/transition present
+      without that rule → suspect; neither present → ok.
+    - `print`: `@media print` rule present → ok; absent → warn.
+    - `rtl`: physical-property smell count (`margin-left`,
+      `padding-right`, `text-align: left|right`); ≥2 → suspect,
+      1 → warn, 0 → ok.
+    - `zoom-200`: pixel-delta based.
+
+  Verdict categories: `ok` / `warn` / `suspect` / `skip` (on error).
+
+  Fixtures: `fixtures/media-variants/card/`
+    - `friendly.html` (system colors, logical props, `@media`
+      reduce/print rules, no opt-outs) → **5 ✓**
+    - `hostile.html` (`forced-color-adjust: none`, no reduce rule
+      despite animation, no print rule, physical props) → **3 ✗ +
+      1 ⚠ + 1 ✓** (zoom-200 still reflows fine)
+
+  Registered under `vrt` dispatcher; added to
+  scripts/smoke-all-clis.sh (12/12 PASS).
+
 ### Survey Tier D — real-interaction sequences (2026-05-13)
 
 - [x] **`vrt interact`** — declarative scripted-sequence VRT. The

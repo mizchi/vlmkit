@@ -67,6 +67,7 @@ const ROOT_MODULE_COMMANDS: Record<string, string> = {
   "a11y-contrast": "./a11y-contrast.ts",
   "a11y-touch": "./a11y-touch.ts",
   "interact": "./interact.ts",
+  "media-variants": "./media-variants.ts",
 };
 
 const WORKFLOW_ALIAS_COMMANDS = new Set<WorkflowCommand>([
@@ -147,6 +148,9 @@ Markup-Assistance Commands:
   interact <html|url> --sequence <path.json>
                               Scripted UI interaction sequence
                               (click / hover / type / scroll + per-step diff)
+  media-variants <html|url> [--variants ...]
+                              Verify forced-colors / reduced-motion / print /
+                              RTL / 200%-zoom adaptations
 
 Workflow Commands:
   workflow <command>          Stateful baseline/snapshot verification workflow

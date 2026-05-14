@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hostile card</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: white; color: #111827; margin: 0; padding: 40px; }
+  h1 { font-size: 22px; margin: 0 0 12px; }
+  .card {
+    max-width: 360px; padding: 20px;
+    background: #f9fafb;
+    /* BUG: hard-coded colors with forced-color-adjust: none */
+    border: 1px solid #e5e7eb;
+    forced-color-adjust: none;
+    border-radius: 8px;
+    /* BUG: physical properties only */
+    margin-left: 32px;
+    margin-bottom: 16px;
+    padding-left: 32px;
+  }
+  .btn {
+    display: inline-block; padding: 10px 16px;
+    background: #2563eb; color: white;
+    border: none; border-radius: 6px;
+    font-size: 14px; font-weight: 600;
+    /* BUG: physical property */
+    margin-right: 8px;
+    /* BUG: animation with no reduced-motion guard */
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+  /* BUG: no @media (prefers-reduced-motion) */
+  /* BUG: no @media print */
+</style>
+</head>
+<body>
+  <h1>Welcome back</h1>
+  <div class="card">
+    <p>Your subscription renews on December 31.</p>
+    <button class="btn">Manage plan</button>
+    <button class="btn">Cancel</button>
+  </div>
+</body>
+</html>
