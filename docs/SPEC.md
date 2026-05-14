@@ -400,7 +400,7 @@
 - **CORE-005** — Paint tree diff via Crater BiDi backend
   - code: `src/migration-paint-tree.ts`
 - **E5** — Form validation state diff from invalid to valid
-  - _No active implementation._
+  - test: `Test.pkl` — form-validation-diff
 - **F1** — WCAG AA text contrast scan
   - test: `Test.pkl` — a11y-contrast
 - **F2** — Touch target size meets WCAG 2.5.5 AAA / 2.5.8 AA
@@ -449,6 +449,7 @@
   - test: `Test.pkl` — cross-browser
   - test: `Test.pkl` — design-tokens
   - test: `Test.pkl` — explore
+  - test: `Test.pkl` — form-validation-diff
   - test: `Test.pkl` — i18n-stress
   - test: `Test.pkl` — interact
   - test: `Test.pkl` — media-variants
