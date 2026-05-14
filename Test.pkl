@@ -1,0 +1,171 @@
+/// vrt smoke tests, Pkl-typed mirror of `scripts/smoke-all-clis.sh`.
+///
+/// Each Test runs one markup-assistance CLI on its canonical fixture
+/// and asserts exit 0. `specRef` links the test back to one or more
+/// Scenario IDs from `Spec.pkl` so `pkspec check` can verify every
+/// approved Scenario has an implementing test. The bash script
+/// remains the single source of truth for fixture wiring; this file
+/// adds the Pkl-typed gate.
+///
+/// Run:  pkspec exec -f Test.pkl
+/// Gate: pkspec check Spec.pkl Test.pkl
+amends "pkspec/Test.pkl"
+
+local vrt = "node --experimental-strip-types src/vrt.ts"
+local outDir = "test-results/smoke-pkspec"
+
+tests {
+  // ── Build / fidelity ──────────────────────────────────────────
+  new {
+    name = "component-from-image"
+    description = "Rebuild a card from a blank starter against a target PNG."
+    specRef { "FIDELITY-001"; "SMOKE" }
+    cmd = "\(vrt) component-from-image fixtures/wireframe/pricing-card/target-desktop.png fixtures/wireframe/pricing-card/blank.html --output-dir \(outDir)/component-from-image"
+    timeoutSec = 120
+  }
+  new {
+    name = "component-from-image-typo"
+    description = "Same CLI on a fixture with wrong-size/weight typography."
+    specRef { "FIDELITY-001"; "SMOKE" }
+    cmd = "\(vrt) component-from-image fixtures/typography/wrong-size-weight/target.png fixtures/typography/wrong-size-weight/buggy.html --output-dir \(outDir)/component-from-image-typo"
+    timeoutSec = 120
+  }
+  new {
+    name = "component-extract"
+    description = "Crop a single component from a page screenshot."
+    specRef { "A8"; "SMOKE" }
+    cmd = "\(vrt) component-extract fixtures/wireframe/pricing-card/target-desktop.png --crop 0 --output-dir \(outDir)/component-extract"
+    timeoutSec = 60
+  }
+
+  // ── A11y ──────────────────────────────────────────────────────
+  new {
+    name = "a11y-contrast"
+    description = "WCAG AA text contrast scan on low-contrast fixture."
+    specRef { "F1"; "SMOKE" }
+    cmd = "\(vrt) a11y-contrast fixtures/a11y-contrast/low-contrast/page.html --output-dir \(outDir)/a11y-contrast"
+    timeoutSec = 60
+  }
+  new {
+    name = "a11y-touch"
+    description = "Touch-target size scan, WCAG 2.5.5 and 2.5.8."
+    specRef { "F2"; "SMOKE" }
+    cmd = "\(vrt) a11y-touch fixtures/a11y-touch/small-targets/page.html --output-dir \(outDir)/a11y-touch"
+    timeoutSec = 60
+  }
+  new {
+    name = "a11y-focus-order"
+    description = "Tab order matches visual reading order."
+    specRef { "F3"; "SMOKE" }
+    cmd = "\(vrt) a11y-focus-order fixtures/a11y-focus-order/reversed/page.html --output-dir \(outDir)/a11y-focus-order"
+    timeoutSec = 60
+  }
+
+  // ── Design system ────────────────────────────────────────────
+  new {
+    name = "design-tokens"
+    description = "Radius / spacing / z-index / shadow-tier conformance."
+    specRef { "M1"; "M4-M6"; "SMOKE" }
+    cmd = "\(vrt) design-tokens fixtures/design-tokens/off-scale/page.html --output-dir \(outDir)/design-tokens"
+    timeoutSec = 60
+  }
+  new {
+    name = "component-consistency"
+    description = "Inline-vs-component drift on a single page."
+    specRef { "J2"; "SMOKE" }
+    cmd = "\(vrt) component-consistency fixtures/component-consistency/inline-leak/page.html --selector .card --output-dir \(outDir)/component-consistency"
+    timeoutSec = 60
+  }
+  new {
+    name = "multi-page-consistency"
+    description = "Same selector across pages should render identically."
+    specRef { "J2"; "SMOKE" }
+    cmd = "\(vrt) multi-page-consistency --selector .footer --files fixtures/multi-page/footer-drift/about.html fixtures/multi-page/footer-drift/blog.html fixtures/multi-page/footer-drift/pricing.html --output-dir \(outDir)/multi-page-consistency"
+    timeoutSec = 90
+  }
+
+  // ── Variant resilience ──────────────────────────────────────
+  new {
+    name = "theme-parity"
+    description = "Dark-mode parity: every component responds to color-scheme."
+    specRef { "C1"; "SMOKE" }
+    cmd = "\(vrt) theme-parity fixtures/theme-parity/card-with-bug/buggy.html --output-dir \(outDir)/theme-parity"
+    timeoutSec = 60
+  }
+  new {
+    name = "media-variants"
+    description = "forced-colors / reduced-motion / print / RTL / zoom-200 sweep."
+    specRef { "C2-C6"; "SMOKE" }
+    cmd = "\(vrt) media-variants fixtures/media-variants/card/hostile.html --output-dir \(outDir)/media-variants"
+    timeoutSec = 120
+  }
+  new {
+    name = "cross-browser"
+    description = "Chromium / Firefox / WebKit parity."
+    specRef { "H1"; "SMOKE" }
+    cmd = "\(vrt) cross-browser fixtures/wireframe/pricing-card/reference.html --allow-skipped --output-dir \(outDir)/cross-browser"
+    timeoutSec = 120
+  }
+  new {
+    name = "i18n-stress"
+    description = "1.4x word inflation should not overflow or wrap."
+    specRef { "I1"; "SMOKE" }
+    cmd = "\(vrt) i18n-stress fixtures/i18n-stress/button-overflow/page.html --output-dir \(outDir)/i18n-stress"
+    timeoutSec = 60
+  }
+  new {
+    name = "perf"
+    description = "CLS detection via in-page PerformanceObserver."
+    specRef { "K5"; "SMOKE" }
+    cmd = "\(vrt) perf fixtures/perf/cls-bug/page.html --output-dir \(outDir)/perf"
+    timeoutSec = 60
+  }
+
+  // ── Interaction ─────────────────────────────────────────────
+  new {
+    name = "interact"
+    description = "Drive a click/type sequence and diff each transition."
+    specRef { "O2"; "SMOKE" }
+    cmd = "\(vrt) interact fixtures/interact/dropdown-form/page.html --sequence fixtures/interact/dropdown-form/sequence.json --output-dir \(outDir)/interact"
+    timeoutSec = 90
+  }
+  new {
+    name = "form-validation-diff"
+    description = "Form validation state diff from invalid to valid. Pending: no canonical fixture yet; interact covers the underlying engine."
+    specRef { "E5" }
+    tags { "spec" }
+    pending = true
+  }
+
+  // ── Agent ergonomics ────────────────────────────────────────
+  new {
+    name = "explore"
+    description = "Page advertises actions via __vrtActions / data-vrt-action."
+    specRef { "O1"; "SMOKE" }
+    cmd = "\(vrt) explore fixtures/explore/declarative/page.html --output-dir \(outDir)/explore"
+    timeoutSec = 60
+  }
+  new {
+    name = "skill-pricing-card"
+    description = "Skill playbook fans out N checks over one target."
+    specRef { "O3-O5"; "SMOKE" }
+    cmd = "\(vrt) skill run pricing-card --against fixtures/wireframe/pricing-card/reference.html --output-dir \(outDir)"
+    timeoutSec = 180
+  }
+
+  // ── Existing tools (smoke gate only) ────────────────────────
+  new {
+    name = "compare"
+    description = "Migration compare (existing tool), shadcn fixture."
+    specRef { "SMOKE" }
+    cmd = "\(vrt) compare --dir fixtures/migration/shadcn-to-luna --baseline before.html --variants after-blank.html --output-dir \(outDir)/compare --no-paint-tree --no-discover"
+    timeoutSec = 60
+  }
+  new {
+    name = "png-diff"
+    description = "Existing PNG diff utility, identity check (0% diff)."
+    specRef { "SMOKE" }
+    cmd = "\(vrt) png-diff fixtures/wireframe/pricing-card/target-desktop.png fixtures/wireframe/pricing-card/target-desktop.png --output-dir \(outDir)/png-diff"
+    timeoutSec = 30
+  }
+}

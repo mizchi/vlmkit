@@ -1,0 +1,250 @@
+/// vrt markup-assistance specifications.
+///
+/// 5 Goals + 18 representative Scenarios drawn from
+/// `docs/reports/2026-05-13-scenario-matrix-v2.md` (the full matrix
+/// has 102 scenarios; this file picks the ones that anchor the
+/// markup-assistance subset of the toolkit). Each Scenario points
+/// at a concrete Test in `Test.pkl` via `specRef`, and `pkspec check`
+/// gates that every approved Scenario has an implementation.
+///
+/// Authoring conventions:
+///   - Scenario IDs match the v2 matrix prefix (A8, B1, C1, …) so
+///     the link back to the matrix doc stays obvious.
+///   - severity = critical for items in the smoke gate; major for
+///     supplementary verification; minor for nice-to-have.
+///   - reviewStatus = approved on everything we ship; pkspec check
+///     will fail loudly if any approved entry loses its test.
+amends "pkspec/Spec.pkl"
+
+goals {
+  new {
+    id = "GOAL-MARKUP-FIDELITY"
+    name = "Agent rebuilds a component to match a target image"
+    priority = 90
+    reviewStatus = "approved"
+    rationale = #"""
+      The wireframe-mode loop — take a target PNG, write HTML, iterate
+      until pixel diff is low — is the highest-leverage scenario for an
+      LLM markup agent. Fidelity tooling (component-from-image,
+      component-extract, typography hints, bbox/heatmap signals)
+      collapses what would otherwise be many manual rounds.
+    """#
+  }
+  new {
+    id = "GOAL-A11Y-COMPLIANCE"
+    name = "Rendered page passes WCAG AA contrast / size / order checks"
+    priority = 85
+    reviewStatus = "approved"
+    rationale = #"""
+      Three independent checks (contrast, touch target, focus order)
+      gate the page before ship. None require source-code analysis —
+      every check works against the rendered output.
+    """#
+  }
+  new {
+    id = "GOAL-DESIGN-SYSTEM"
+    name = "Rendered values conform to declared design scales"
+    priority = 70
+    reviewStatus = "approved"
+    rationale = #"""
+      Border-radius / spacing / z-index / shadow-tier conformance is
+      verified against a configurable scale. Catches "agent invented a
+      new 7px radius" before it leaks into a token catalog.
+    """#
+  }
+  new {
+    id = "GOAL-VARIANT-RESILIENCE"
+    name = "Page survives theme / print / RTL / zoom / i18n variants"
+    priority = 80
+    reviewStatus = "approved"
+    rationale = #"""
+      One command sweeps five user-preference variants (theme-parity,
+      media-variants forced-colors / reduced-motion / print / rtl /
+      zoom-200) plus i18n text-inflation, plus cross-browser parity.
+    """#
+  }
+  new {
+    id = "GOAL-AGENT-ERGONOMICS"
+    name = "Toolkit surfaces what to do, not just what's wrong"
+    priority = 75
+    reviewStatus = "approved"
+    rationale = #"""
+      Findings include hex / px / suggested CSS the agent can paste.
+      Failures include healed-selector suggestions. Declarative
+      discovery (vrt explore) lets the page advertise its own
+      testable surface (WebMCP-shaped). Skill playbooks let one
+      command run a target's full check suite.
+    """#
+  }
+}
+
+scenarios {
+  // ── Build / fidelity ──────────────────────────────────────────
+  new {
+    id = "A8"
+    name = "Extract a single component from a page screenshot"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = #"""
+      Given a full-page PNG, `vrt component-extract` finds the major
+      non-background components, classifies each (text / filled-rect /
+      icon / image), and crops the chosen rank to a standalone PNG
+      suitable for use as a target in `vrt component-from-image`.
+    """#
+  }
+  new {
+    id = "FIDELITY-001"
+    name = "Build a card from a blank starter until diff under 3 percent"
+    severity = "critical"
+    reviewStatus = "approved"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = #"""
+      `vrt component-from-image` against the pricing-card target
+      reports bbox / heatmap / palette / typography signals; iteration
+      converges the diff under 3% in <5 rounds on a representative
+      fixture.
+    """#
+  }
+
+  // ── A11y ─────────────────────────────────────────────────────
+  new {
+    id = "F1"
+    name = "WCAG AA text contrast scan"
+    severity = "critical"
+    reviewStatus = "approved"
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+  }
+  new {
+    id = "F2"
+    name = "Touch target size meets WCAG 2.5.5 AAA / 2.5.8 AA"
+    severity = "critical"
+    reviewStatus = "approved"
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+  }
+  new {
+    id = "F3"
+    name = "Tab order matches visual reading order"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+  }
+
+  // ── Design system ────────────────────────────────────────────
+  new {
+    id = "M1"
+    name = "Color tokens conform to declared palette"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-DESIGN-SYSTEM" }
+  }
+  new {
+    id = "M4-M6"
+    name = "Radius / spacing / z-index / shadow-tier conformance"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-DESIGN-SYSTEM" }
+  }
+
+  // ── Variant resilience ──────────────────────────────────────
+  new {
+    id = "C1"
+    name = "Dark mode parity: every component responds to color-scheme"
+    severity = "critical"
+    reviewStatus = "approved"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+  }
+  new {
+    id = "C2-C6"
+    name = "Media variants: forced-colors / reduced-motion / print / RTL / zoom-200"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+  }
+  new {
+    id = "H1"
+    name = "Cross-browser parity across Chromium / Firefox / WebKit"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+  }
+  new {
+    id = "I1"
+    name = "i18n text inflation: no overflow or wrap at 1.4x word length"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+  }
+
+  // ── Bug-finding / QA ────────────────────────────────────────
+  new {
+    id = "J2"
+    name = "Inline-vs-component drift on a single page"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-DESIGN-SYSTEM" }
+  }
+  new {
+    id = "K5"
+    name = "CLS detection via in-page PerformanceObserver"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+  }
+
+  // ── Interaction ─────────────────────────────────────────────
+  new {
+    id = "E5"
+    name = "Form validation state diff from invalid to valid"
+    severity = "major"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = #"""
+      Draft — no canonical fixture yet. The underlying engine
+      (`vrt interact`) is already shipped; once we have a fixture
+      with deliberate validation states this scenario gets promoted
+      to approved and Test.pkl drops the `pending = true` marker.
+    """#
+  }
+
+  // ── Agent ergonomics ────────────────────────────────────────
+  new {
+    id = "O1"
+    name = "Page declares actions via window.__vrtActions / data-vrt-action"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-AGENT-ERGONOMICS" }
+    description = #"""
+      `vrt explore` auto-discovers actions the page advertises and
+      diffs each transition. Shaped like the WebMCP proposal but
+      doesn't depend on the unfinished spec.
+    """#
+  }
+  new {
+    id = "O2"
+    name = "Selector miss in vrt interact triggers healer correction"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-AGENT-ERGONOMICS" }
+  }
+  new {
+    id = "O3-O5"
+    name = "Skill playbook fans out N checks over one target"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-AGENT-ERGONOMICS" }
+  }
+  new {
+    id = "SMOKE"
+    name = "Mechanical smoke covers every markup-assistance CLI"
+    severity = "critical"
+    reviewStatus = "approved"
+    contributes { "GOAL-AGENT-ERGONOMICS" }
+    description = #"""
+      `scripts/smoke-all-clis.sh` runs every markup-assistance CLI on
+      its canonical fixture and asserts exit 0 + expected output. The
+      pkspec Test.pkl mirror provides the same gate with the added
+      Pkl-typed expectations.
+    """#
+  }
+}
