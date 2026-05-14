@@ -18,6 +18,7 @@
  */
 import { PNG } from "pngjs";
 import { readFile } from "node:fs/promises";
+import { classifyRegion } from "./region-classify.ts";
 
 export interface HeatmapRegion {
   top: number;
@@ -32,10 +33,18 @@ export interface HeatmapRegion {
    * Only populated when `findHeatmapRegionsFromFile` was called with a
    * `sourceImagePath`. Lets the agent close the loop between
    * "this region differs" and "fill it with this color".
-   * From subagent dogfood eval: "you tell me #2464ec is missing, but
-   * not which heatmap region is that color."
    */
   dominantColor?: { r: number; g: number; b: number; hex: string };
+  /**
+   * Content classification of the region inside the source image —
+   * `text` / `filled-rect` / `icon` / `image` / `unknown`. Helps the
+   * agent decide whether to paint a flat background, write a text
+   * run, or place an icon. Only populated when `sourceImagePath` is
+   * provided.
+   */
+  kind?: "text" | "filled-rect" | "icon" | "image" | "unknown";
+  /** Classifier confidence ∈ [0, 1]. */
+  kindConfidence?: number;
 }
 
 export interface FindHeatmapRegionsOptions {
@@ -225,9 +234,12 @@ export async function findHeatmapRegionsFromFile(
       for (const region of regions) {
         const color = sampleRegionColor(sourcePng.data, sourcePng.width, sourcePng.height, region);
         if (color) region.dominantColor = color;
+        const cls = classifyRegion(sourcePng.data, sourcePng.width, sourcePng.height, region);
+        region.kind = cls.kind;
+        region.kindConfidence = Number(cls.confidence.toFixed(2));
       }
     } catch {
-      // Source image unavailable — leave regions without dominant color.
+      // Source image unavailable — leave regions without annotations.
     }
   }
   return regions;

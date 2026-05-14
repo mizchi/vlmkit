@@ -409,6 +409,55 @@ be CSS transitions, not the threshold. Fixes applied:
   side. ≤ 30 annotated as _(near, likely AA)_; > 60 is a real
   palette gap. Lets the agent dismiss persistent low-diff noise.
 
+### Survey Tier B / C / F follow-ups (2026-05-13)
+
+Three of the ROI-ranked items from `docs/reports/2026-05-13-
+capability-survey.md`, shipped together.
+
+- [x] **B. Region content-type classifier.** `src/region-classify.ts`:
+  `classifyRegion(rgba, w, h, bbox)` returns one of `text` /
+  `filled-rect` / `icon` / `image` / `unknown` with a confidence
+  score. Features: quantized color count, luma std dev, horizontal
+  stripe-row count, aspect, area. Rules:
+    - tiny + square → icon
+    - ≥ 2 dark stripes → text
+    - colorCount ≤ 8 and lumaStd < 12 → uniform fill
+    - colorCount ≤ 120 and lumaStd < 45 → button/badge (filled-rect)
+    - single stripe → text
+    - colorCount > 200 → image
+  Wired into `findHeatmapRegionsFromFile` — each region now gets
+  `kind` + `kindConfidence`. component-from-image renders the
+  `Kind` column on the Heatmap region clusters table. Verified on
+  pricing-card: CTA button → `filled-rect`, price digits → `icon`,
+  small check icons → `text` (single-stripe). 4 unit tests.
+
+- [x] **C. CSS suggestion synthesizer.** component-from-image now
+  emits a `## Suggested CSS patch` section aggregating every
+  actionable signal into a single paste-ready code block:
+    - Backgrounds row → `body { background: <hex>; }` declaration
+      when target/current outer hexes differ
+    - Inner bg mismatch → `/* content container should use ... */`
+    - Text-row count mismatch → `/* HTML: add N row(s) ... */`
+    - Typography mismatches → `/* row #N: font-size: Xpx; font-weight: Y */`
+    - Spacing gap deltas → `/* row #N: reduce margin-bottom by Xpx */`
+    - Heatmap regions × kind → `background: <hex>` (filled-rect),
+      `color: <hex>` (text), `fill: <hex>` (icon)
+  Selectors are intentionally omitted (the tool can't see the DOM);
+  the agent maps each comment back to whichever element matches the
+  described region or row.
+
+- [x] **F. Touch-target size check** (`vrt a11y-touch`). New CLI
+  that scans visible interactive elements (`button`, `a[href]`,
+  form controls, `[role=button]`, `[tabindex≥0]`, `summary`) and
+  reports those whose bbox `min(w, h)` is below the WCAG threshold
+  (44×44 AAA default, 24×24 AA via `--level AA`). Per-finding
+  `cluster` flag fires when another interactive element is within
+  24 px (forfeits AA's "with spacing" leniency). Fixture
+  `fixtures/a11y-touch/small-targets`: 6 interactive elements, 5
+  failing AAA (incl. inline-link 27×14, close-btn 16×16, cluster
+  buttons 20×20), 3 failing AA. Registered in
+  `vrt-command-router` + `vrt.ts`.
+
 ### Typography hints (2026-05-13)
 
 The single largest gap from the capability survey (`docs/reports/

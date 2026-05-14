@@ -65,6 +65,7 @@ const ROOT_MODULE_COMMANDS: Record<string, string> = {
   "theme-parity": "./theme-parity.ts",
   "i18n-stress": "./i18n-stress.ts",
   "a11y-contrast": "./a11y-contrast.ts",
+  "a11y-touch": "./a11y-touch.ts",
 };
 
 const WORKFLOW_ALIAS_COMMANDS = new Set<WorkflowCommand>([
@@ -140,6 +141,8 @@ Markup-Assistance Commands:
   i18n-stress <html> [--inflate 1.4]
                               Inflate text content; detect overflow / wrap bugs
   a11y-contrast <html>        WCAG AA contrast scan on rendered text
+  a11y-touch <html|url> [--level AAA|AA]
+                              Touch-target size check (44×44 / 24×24)
 
 Workflow Commands:
   workflow <command>          Stateful baseline/snapshot verification workflow

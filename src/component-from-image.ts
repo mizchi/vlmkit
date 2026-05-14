@@ -500,14 +500,15 @@ export function renderReportMarkdown(r: RenderInput): string {
     lines.push("## Heatmap region clusters");
     lines.push("");
     lines.push("Each cluster is a contiguous run of differing pixels. `Fill` is " +
-      "the dominant color *inside the region* sampled from the target — i.e. " +
-      "the color you need to paint in.");
+      "the dominant color sampled from the target inside the region. `Kind` " +
+      "is a pixel-only content-type guess (text / filled-rect / icon / image).");
     lines.push("");
-    lines.push("| Top-Left | Size | Hot pixels | Fill |");
-    lines.push("|---|---|---|---|");
+    lines.push("| Top-Left | Size | Hot pixels | Fill | Kind |");
+    lines.push("|---|---|---|---|---|");
     for (const reg of r.heatmapRegions.slice(0, 8)) {
       const fill = reg.dominantColor ? `\`${reg.dominantColor.hex}\`` : "—";
-      lines.push(`| ${reg.left},${reg.top} | ${reg.width}×${reg.height} | ${reg.area} | ${fill} |`);
+      const kind = reg.kind ? `\`${reg.kind}\`${reg.kindConfidence !== undefined && reg.kindConfidence < 0.6 ? "?" : ""}` : "—";
+      lines.push(`| ${reg.left},${reg.top} | ${reg.width}×${reg.height} | ${reg.area} | ${fill} | ${kind} |`);
     }
     lines.push("");
   }
@@ -663,6 +664,64 @@ export function renderReportMarkdown(r: RenderInput): string {
         : (s.lumaDelta > 0 ? `+${s.lumaDelta.toFixed(1)}` : s.lumaDelta.toFixed(1));
       lines.push(`| \`:${s.state}\` | ${(s.inducedDiffRatio * 100).toFixed(2)}% | ${(s.rawInducedDiffRatio * 100).toFixed(2)}% | ${edgePct} | ${luma} | ${s.forcedCount} | ${note} |`);
     }
+    lines.push("");
+  }
+
+  // Suggested CSS patch — aggregates all actionable signals into one
+  // paste-ready code block. Each line is either a hint comment or a
+  // ready-to-paste declaration; the agent reads top-down.
+  const cssHints: string[] = [];
+  if (r.targetBg && r.currentBg) {
+    if (r.targetBg.outer.hex.toLowerCase() !== r.currentBg.outer.hex.toLowerCase()) {
+      cssHints.push(`body { background: ${r.targetBg.outer.hex}; }`);
+    }
+    if (!r.targetBg.same && r.targetBg.inner.hex.toLowerCase() !== r.currentBg.inner.hex.toLowerCase()) {
+      cssHints.push(`/* content container should use background: ${r.targetBg.inner.hex} */`);
+    }
+  }
+  if (r.baselineRowCount !== r.variantRowCount) {
+    const diff = r.baselineRowCount - r.variantRowCount;
+    cssHints.push(`/* HTML: ${diff > 0 ? "add" : "remove"} ${Math.abs(diff)} row(s) of content — target has ${r.baselineRowCount}, current has ${r.variantRowCount} */`);
+  }
+  for (const m of r.typographyMismatches.slice(0, 6)) {
+    const props: string[] = [];
+    if (m.baselineFontSize !== m.variantFontSize) props.push(`font-size: ${m.baselineFontSize}px`);
+    if (m.baselineWeight !== m.variantWeight) {
+      const weightMap: Record<string, string> = { light: "300", regular: "400", medium: "500", bold: "700" };
+      const v = weightMap[m.baselineWeight ?? "regular"] ?? "400";
+      props.push(`font-weight: ${v}`);
+    }
+    if (props.length > 0) {
+      cssHints.push(`/* row #${m.rank}: ${props.join("; ")}; */`);
+    }
+  }
+  for (const g of r.rowGapDeltas.slice(0, 6)) {
+    const dir = g.delta > 0 ? "reduce" : "add";
+    const amt = Math.abs(g.delta);
+    cssHints.push(`/* row #${g.aboveRank}: ${dir} margin-bottom by ~${amt}px (target gap ${g.baselineGap}, current ${g.variantGap}) */`);
+  }
+  for (const reg of r.heatmapRegions.slice(0, 6)) {
+    if (!reg.dominantColor || !reg.kind) continue;
+    if (reg.kind === "filled-rect") {
+      cssHints.push(`/* region ${reg.left},${reg.top} ${reg.width}×${reg.height}: background: ${reg.dominantColor.hex} */`);
+    } else if (reg.kind === "text") {
+      cssHints.push(`/* region ${reg.left},${reg.top} ${reg.width}×${reg.height}: color: ${reg.dominantColor.hex} (text) */`);
+    } else if (reg.kind === "icon") {
+      cssHints.push(`/* region ${reg.left},${reg.top} ${reg.width}×${reg.height}: icon — fill: ${reg.dominantColor.hex} */`);
+    }
+  }
+  if (cssHints.length > 0) {
+    lines.push("## Suggested CSS patch");
+    lines.push("");
+    lines.push("Aggregated from every actionable signal above. Each line is " +
+      "either a paste-ready declaration or a `/* hint */` describing the " +
+      "delta. Selectors are intentionally omitted (the tool can't see your " +
+      "DOM); apply each declaration to whichever element matches the " +
+      "described region or row.");
+    lines.push("");
+    lines.push("```css");
+    for (const h of cssHints) lines.push(h);
+    lines.push("```");
     lines.push("");
   }
 
