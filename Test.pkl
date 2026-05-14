@@ -157,14 +157,14 @@ tests {
   new {
     name = "compare"
     description = "Migration compare (existing tool), shadcn fixture."
-    specRef { "SMOKE" }
+    specRef { "MIG-001"; "CORE-002"; "CORE-003"; "SMOKE" }
     cmd = "\(vrt) compare --dir fixtures/migration/shadcn-to-luna --baseline before.html --variants after-blank.html --output-dir \(outDir)/compare --no-paint-tree --no-discover"
     timeoutSec = 60
   }
   new {
     name = "png-diff"
     description = "Existing PNG diff utility, identity check (0% diff)."
-    specRef { "SMOKE" }
+    specRef { "CORE-001"; "SMOKE" }
     cmd = "\(vrt) png-diff fixtures/wireframe/pricing-card/target-desktop.png fixtures/wireframe/pricing-card/target-desktop.png --output-dir \(outDir)/png-diff"
     timeoutSec = 30
   }

@@ -1,22 +1,34 @@
-/// vrt markup-assistance specifications.
+/// vrt project specifications.
 ///
-/// 5 Goals + 18 representative Scenarios drawn from
-/// `docs/reports/2026-05-13-scenario-matrix-v2.md` (the full matrix
-/// has 102 scenarios; this file picks the ones that anchor the
-/// markup-assistance subset of the toolkit). Each Scenario points
-/// at a concrete Test in `Test.pkl` via `specRef`, and `pkspec check`
-/// gates that every approved Scenario has an implementation.
+/// Two layers of goals + scenarios:
+///
+///   1. **Markup-assistance** (5 goals / 18 scenarios) drawn from
+///      `docs/reports/2026-05-13-scenario-matrix-v2.md`. Each
+///      scenario maps to a smoke test in `Test.pkl` via `specRef`.
+///
+///   2. **Core toolkit** (6 goals / 25 scenarios) documenting every
+///      shipped capability outside the markup-assistance loop —
+///      pixel/style/a11y diff primitives, snapshot workflow,
+///      migration / refactor verification, CSS-challenge benchmark,
+///      AI-assisted fix loop, and the HTTP API surface. These
+///      scenarios are gated by `implementedBy = "code"` + a
+///      `implementedAt` pointer rather than a Test.pkl smoke, so
+///      `pkspec check` confirms the source file exists without
+///      mandating a bash-level mirror for every primitive.
 ///
 /// Authoring conventions:
-///   - Scenario IDs match the v2 matrix prefix (A8, B1, C1, …) so
-///     the link back to the matrix doc stays obvious.
-///   - severity = critical for items in the smoke gate; major for
-///     supplementary verification; minor for nice-to-have.
+///   - Markup-assistance scenario IDs match the v2 matrix prefix
+///     (A8, B1, C1, …) so the link back to the matrix doc stays obvious.
+///   - Core-toolkit scenario IDs use domain prefixes: CORE-, SNAP-,
+///     MIG-, BENCH-, AIFIX-, API-, WORKFLOW-.
+///   - severity = critical for items the smoke gate must enforce;
+///     major for supplementary verification; minor for nice-to-have.
 ///   - reviewStatus = approved on everything we ship; pkspec check
-///     will fail loudly if any approved entry loses its test.
+///     will fail loudly if any approved entry loses its impl pointer.
 amends "pkspec/Spec.pkl"
 
 goals {
+  // ── Markup-assistance loop ────────────────────────────────────
   new {
     id = "GOAL-MARKUP-FIDELITY"
     name = "Agent rebuilds a component to match a target image"
@@ -76,9 +88,91 @@ goals {
       command run a target's full check suite.
     """#
   }
+
+  // ── Core toolkit (predates the markup-assistance suite) ───────
+  new {
+    id = "GOAL-CORE-DIFF"
+    name = "Reliable pixel / style / a11y diff primitives"
+    priority = 95
+    reviewStatus = "approved"
+    rationale = #"""
+      Every higher-level command sits on top of three primitives:
+      pixelmatch-based PNG diff with heatmap, computed-style diff
+      (per-property, per-state), and a11y-tree diff. They have to
+      be correct in isolation before any compound workflow can be
+      trusted.
+    """#
+  }
+  new {
+    id = "GOAL-SNAPSHOT-WORKFLOW"
+    name = "Multi-viewport snapshot baseline / approve loop"
+    priority = 85
+    reviewStatus = "approved"
+    rationale = #"""
+      `vrt snapshot` captures a URL across viewports, diffs against
+      the committed baseline, and surfaces a flipbook + fix-prompt
+      so an agent can act on the report. `vrt workflow` is the
+      stateful sibling for component-graph driven verification.
+    """#
+  }
+  new {
+    id = "GOAL-MIGRATION-VERIFICATION"
+    name = "Refactor / migration confidence across two pages"
+    priority = 80
+    reviewStatus = "approved"
+    rationale = #"""
+      `vrt compare` was the original entry point — given two HTMLs
+      or URLs (Tailwind → vanilla, shadcn → Luna, normalize.css →
+      modern-normalize.css), it reports per-viewport pixel diff +
+      paint-tree diff and an agent-friendly Markdown summary.
+    """#
+  }
+  new {
+    id = "GOAL-CSS-CHALLENGE"
+    name = "Benchmark detection rate of CSS regressions"
+    priority = 60
+    reviewStatus = "approved"
+    rationale = #"""
+      The CSS challenge bench deletes a single property or selector
+      block at random and measures whether vrt detects the change.
+      96.7% detection rate at last measurement (see
+      docs/knowledge.md). The bench drives backend evaluation
+      (pixelmatch / Crater BiDi / Prescanner) and feeds the
+      `detection-report` aggregator.
+    """#
+  }
+  new {
+    id = "GOAL-AI-FIX-LOOP"
+    name = "VLM + LLM driven CSS fix synthesis"
+    priority = 70
+    reviewStatus = "approved"
+    rationale = #"""
+      The 2-stage pipeline (VLM for structured diff extraction,
+      LLM for CSS fix synthesis) closes the auto-repair loop:
+      detect → analyse → patch → re-verify. `vlm-bench` keeps the
+      model choice honest by tracking cost / latency / detection
+      count across providers.
+    """#
+  }
+  new {
+    id = "GOAL-API"
+    name = "HTTP API exposes the toolkit to non-CLI consumers"
+    priority = 50
+    reviewStatus = "approved"
+    rationale = #"""
+      `vrt api serve` exposes /compare, /compare-renderers, /reason,
+      /smoke-test, /status. The TypeScript `VrtClient` covers the
+      same surface for in-process callers. Lets a browser extension
+      or editor plugin drive vrt without spawning Node per call.
+    """#
+  }
 }
 
 scenarios {
+  // ╔═══════════════════════════════════════════════════════════════
+  // ║  PART 1 — markup-assistance suite (smoke-test gated)
+  // ╚═══════════════════════════════════════════════════════════════
+
   // ── Build / fidelity ──────────────────────────────────────────
   new {
     id = "A8"
@@ -245,6 +339,338 @@ scenarios {
       its canonical fixture and asserts exit 0 + expected output. The
       pkspec Test.pkl mirror provides the same gate with the added
       Pkl-typed expectations.
+    """#
+  }
+
+  // ╔═══════════════════════════════════════════════════════════════
+  // ║  PART 2 — core toolkit (source-anchored via implementedAt)
+  // ╚═══════════════════════════════════════════════════════════════
+
+  // ── Core diff primitives ─────────────────────────────────────
+  new {
+    id = "CORE-001"
+    name = "PNG pixel diff with heatmap overlay"
+    severity = "critical"
+    reviewStatus = "approved"
+    contributes { "GOAL-CORE-DIFF" }
+    implementedBy = "test"
+    description = #"""
+      `vrt png-diff <baseline> <current>` uses pixelmatch v7 plus a
+      heatmap renderer to report per-region intensity. Smoke test
+      `png-diff` in Test.pkl exercises the identity (0%) path.
+    """#
+  }
+  new {
+    id = "CORE-002"
+    name = "Computed style diff across hover and focus states"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-CORE-DIFF" }
+    implementedBy = "code"
+    implementedAt = "src/migration-compare.ts"
+    description = #"""
+      `getComputedStyle` capture for both rest and pseudo-states
+      (`:hover`, `:focus`) plus per-property delta surfacing.
+      Embedded inside `vrt compare` rather than exposed as its own
+      CLI; the report.md groups deltas by selector + property.
+    """#
+  }
+  new {
+    id = "CORE-003"
+    name = "A11y tree diff between two renders"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-CORE-DIFF" }
+    implementedBy = "code"
+    implementedAt = "src/migration-compare.ts"
+    description = #"""
+      Capture Playwright's accessibility snapshot for each side of
+      the compare and surface structural changes — role / name /
+      level diffs that pure pixel diff misses.
+    """#
+  }
+  new {
+    id = "CORE-004"
+    name = "Element-level shift-isolated diff"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-CORE-DIFF" }
+    implementedBy = "code"
+    implementedAt = "src/element-compare.ts"
+    description = #"""
+      `vrt elements` diffs per-element bounding boxes after isolating
+      cascading layout shift; useful when a single element moves and
+      pixel diff would otherwise blame everything downstream.
+    """#
+  }
+  new {
+    id = "CORE-005"
+    name = "Paint tree diff via Crater BiDi backend"
+    severity = "minor"
+    reviewStatus = "approved"
+    contributes { "GOAL-CORE-DIFF"; "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/migration-paint-tree.ts"
+    description = #"""
+      Optional Crater-backed paint-tree comparison; ~1.66x speedup
+      vs pixelmatch on the dogfood corpus with 0% false positive.
+      Off by default (`--no-paint-tree`).
+    """#
+  }
+
+  // ── Snapshot workflow ────────────────────────────────────────
+  new {
+    id = "SNAP-001"
+    name = "Multi-viewport snapshot baseline capture"
+    severity = "critical"
+    reviewStatus = "approved"
+    contributes { "GOAL-SNAPSHOT-WORKFLOW" }
+    implementedBy = "code"
+    implementedAt = "src/snapshot.ts"
+    description = #"""
+      `vrt snapshot <url1> [url2]` captures every URL across the
+      configured viewport set on first run; subsequent runs diff
+      against the baseline. Masks via `--mask <selector,...>`
+      exclude animated regions.
+    """#
+  }
+  new {
+    id = "SNAP-002"
+    name = "Snapshot approve workflow promotes current to baseline"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-SNAPSHOT-WORKFLOW" }
+    implementedBy = "code"
+    implementedAt = "src/snapshot-approve.ts"
+    description = #"""
+      `vrt snapshot approve` renames every `*-current.png` to
+      `*-baseline.png`. Used after an intentional UI change is
+      reviewed.
+    """#
+  }
+  new {
+    id = "SNAP-003"
+    name = "Snapshot fix-prompt generates subagent-ready Markdown"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-SNAPSHOT-WORKFLOW"; "GOAL-AGENT-ERGONOMICS" }
+    implementedBy = "code"
+    implementedAt = "src/snapshot-fix-prompt.ts"
+    description = #"""
+      Reads `snapshot-report.json` and renders a worst-first task
+      list suitable for piping into a subagent / inline LLM. Honors
+      `--limit N` so the prompt stays focused.
+    """#
+  }
+  new {
+    id = "SNAP-004"
+    name = "Snapshot stability measures false-positive rate"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-SNAPSHOT-WORKFLOW" }
+    implementedBy = "code"
+    implementedAt = "src/snapshot-stability.ts"
+    description = #"""
+      `vrt snapshot stability` re-runs the same snapshot N times
+      against a single URL and reports the per-frame diff. Drives
+      the mask-coverage tuning loop for sites with carousels or
+      counters.
+    """#
+  }
+  new {
+    id = "WORKFLOW-001"
+    name = "Workflow init / capture / verify / approve loop"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-SNAPSHOT-WORKFLOW" }
+    implementedBy = "code"
+    implementedAt = "src/vrt-command-router.ts:WORKFLOW_ALIAS_COMMANDS"
+    description = #"""
+      Stateful component-graph driven workflow: init writes
+      baselines, capture takes current, verify diffs, approve
+      promotes. Companion commands: `graph`, `affected`,
+      `introspect`, `spec-verify`, `expect`.
+    """#
+  }
+
+  // ── Migration / refactor verification ────────────────────────
+  new {
+    id = "MIG-001"
+    name = "Migration compare across viewports"
+    severity = "critical"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "test"
+    description = #"""
+      `vrt compare <before> <after>` (or `--dir + --baseline +
+      --variants`) sweeps every viewport, emits report.md, .json
+      and per-viewport heatmaps. Smoke-tested via the
+      `compare` entry in Test.pkl.
+    """#
+  }
+  new {
+    id = "MIG-002"
+    name = "Agent-friendly diff Markdown summary"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION"; "GOAL-AGENT-ERGONOMICS" }
+    implementedBy = "code"
+    implementedAt = "src/diff-for-agent-cli.ts"
+    description = #"""
+      `vrt diff-for-agent <migration-report.json>` collapses a
+      compare report into a worst-first table with selector +
+      property aggregation. Default consumer is a subagent fix
+      pass.
+    """#
+  }
+  new {
+    id = "MIG-003"
+    name = "Reset CSS comparison: normalize vs modern-normalize vs destyle"
+    severity = "minor"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "doc"
+    implementedAt = "docs/reset-css-comparison.md"
+    description = #"""
+      Canonical fixture set (`fixtures/migration/reset-css`) +
+      `pkf run migration-reset` task that diffs three reset CSSes
+      against `no-reset.html`. Provides the domain reference for
+      reset-CSS selection.
+    """#
+  }
+  new {
+    id = "MIG-004"
+    name = "Compare-runs aggregates multiple VRT runs"
+    severity = "minor"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION"; "GOAL-AGENT-ERGONOMICS" }
+    implementedBy = "code"
+    implementedAt = "src/compare-runs-cli.ts"
+    description = #"""
+      `vrt compare-runs` diffs two prior vrt runs against each other
+      (e.g. iter 0 vs iter 1 of a fix loop) so progress per round is
+      visible at a glance.
+    """#
+  }
+
+  // ── CSS challenge benchmark ─────────────────────────────────
+  new {
+    id = "BENCH-001"
+    name = "CSS challenge bench delete-and-detect"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-CSS-CHALLENGE" }
+    implementedBy = "code"
+    implementedAt = "src/css-challenge-bench.ts"
+    description = #"""
+      `vrt bench` (alias `pkf run css-bench`) randomly deletes a
+      CSS property or selector block, runs the chosen detection
+      backend, and accumulates a per-trial pass/fail record into
+      `data/*.jsonl`.
+    """#
+  }
+  new {
+    id = "BENCH-002"
+    name = "Detection report aggregates accumulated bench runs"
+    severity = "minor"
+    reviewStatus = "approved"
+    contributes { "GOAL-CSS-CHALLENGE" }
+    implementedBy = "code"
+    implementedAt = "src/detection-report.ts"
+    description = #"""
+      `vrt report` reads the jsonl history and emits per-fixture +
+      per-backend detection-rate tables. Last measured: 96.7% on
+      the canonical fixture set (docs/knowledge.md).
+    """#
+  }
+  new {
+    id = "BENCH-003"
+    name = "Alternate bench backends: Crater BiDi and Prescanner"
+    severity = "minor"
+    reviewStatus = "approved"
+    contributes { "GOAL-CSS-CHALLENGE" }
+    implementedBy = "code"
+    implementedAt = "src/css-challenge-bench.ts"
+    description = #"""
+      `--backend crater` and `--backend prescanner` route the bench
+      through alternative renderers. Crater requires a running
+      `crater bidi` server; Prescanner is in-process.
+    """#
+  }
+
+  // ── AI-assisted fix loop ────────────────────────────────────
+  new {
+    id = "AIFIX-001"
+    name = "VLM-extracted structured diff from before/after PNG"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-AI-FIX-LOOP" }
+    implementedBy = "code"
+    implementedAt = "src/vrt-reasoning-pipeline.ts"
+    description = #"""
+      Stage 1 of the 2-stage pipeline: a vision-language model is
+      shown the diff image and returns a structured list of
+      CHANGE entries (selector + property + delta). Default
+      VLM is meta-llama/llama-4-scout (docs/knowledge.md).
+    """#
+  }
+  new {
+    id = "AIFIX-002"
+    name = "LLM-synthesised CSS patch from structured diff"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-AI-FIX-LOOP" }
+    implementedBy = "code"
+    implementedAt = "src/fix-loop.ts"
+    description = #"""
+      Stage 2: the structured diff is fed to an LLM that returns a
+      CSS patch; the patch is applied and re-verified against the
+      target. Loop bails when diff < threshold or max-rounds hits.
+    """#
+  }
+  new {
+    id = "AIFIX-003"
+    name = "VLM benchmarking: cost / latency / CHANGE count per model"
+    severity = "minor"
+    reviewStatus = "approved"
+    contributes { "GOAL-AI-FIX-LOOP" }
+    implementedBy = "code"
+    implementedAt = "src/vlm-bench.ts"
+    description = #"""
+      `vrt vlm-bench` queries OpenRouter for candidate VLMs and
+      runs each against the fix-loop hard case (seed 11). Outputs
+      a Markdown comparison table used to choose the default model.
+    """#
+  }
+
+  // ── HTTP API ────────────────────────────────────────────────
+  new {
+    id = "API-001"
+    name = "HTTP API server exposes compare / reason / smoke endpoints"
+    severity = "minor"
+    reviewStatus = "approved"
+    contributes { "GOAL-API" }
+    implementedBy = "code"
+    implementedAt = "src/api-server.ts"
+    description = #"""
+      `vrt api serve [--port N]` starts a Hono server with
+      /api/compare, /api/compare-renderers, /api/reason,
+      /api/smoke-test, /api/status. Lets a browser extension or
+      editor plugin drive vrt without spawning a Node child.
+    """#
+  }
+  new {
+    id = "API-002"
+    name = "TypeScript client mirrors the HTTP surface"
+    severity = "minor"
+    reviewStatus = "approved"
+    contributes { "GOAL-API" }
+    implementedBy = "code"
+    implementedAt = "src/vrt-client.ts"
+    description = #"""
+      `VrtClient` in `src/vrt-client.ts` is the typed in-process
+      client; one method per HTTP endpoint with shared input/output
+      types from `src/api-types.ts`.
     """#
   }
 }
