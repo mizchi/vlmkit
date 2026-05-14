@@ -265,8 +265,8 @@ local specCheck = new Task {
 
 local specRender = new Task {
   name = "spec-render"
-  cmd = "pkspec spec Spec.pkl -o docs/SPEC.md"
-  inputs { "Spec.pkl"; "pkspec/**" }
+  cmd = "pkspec spec --output docs/SPEC.md Spec.pkl Test.pkl"
+  inputs { "Spec.pkl"; "Test.pkl"; "pkspec/**" }
   outputs { "docs/SPEC.md" }
 }
 
