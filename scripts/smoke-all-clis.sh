@@ -83,6 +83,12 @@ run "interact" "report.md" \
     --sequence fixtures/interact/dropdown-form/sequence.json \
     --output-dir "$OUT_BASE/interact"
 
+run "form-validation-diff" "report.md" \
+  node --experimental-strip-types src/vrt.ts interact \
+    fixtures/interact/form-validation/page.html \
+    --sequence fixtures/interact/form-validation/sequence.json \
+    --output-dir "$OUT_BASE/form-validation-diff"
+
 run "media-variants" "report.md" \
   node --experimental-strip-types src/vrt.ts media-variants \
     fixtures/media-variants/card/hostile.html \

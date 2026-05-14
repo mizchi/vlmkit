@@ -146,10 +146,11 @@ tests {
   }
   new {
     name = "form-validation-diff"
-    description = "Form validation state diff from invalid to valid. Pending: no canonical fixture yet; interact covers the underlying engine."
-    specRef { "E5" }
-    tags { "spec" }
-    pending = true
+    description = "Drive a signup form through invalid → valid states and diff each transition."
+    specRef { "E5"; "SMOKE" }
+    cmd = "\(vrt) interact fixtures/interact/form-validation/page.html --sequence fixtures/interact/form-validation/sequence.json --output-dir \(outDir)/form-validation-diff"
+    expectStdoutContains { "vrt interact"; "report:" }
+    timeoutSec = 90
   }
 
   // ── Agent ergonomics ────────────────────────────────────────

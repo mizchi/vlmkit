@@ -1,0 +1,18 @@
+{
+  "viewport": { "width": 720, "height": 640 },
+  "steps": [
+    { "action": "snapshot", "name": "empty" },
+    { "action": "type", "selector": "#email", "text": "not-an-email" },
+    { "action": "press", "selector": "#email", "key": "Tab" },
+    { "action": "snapshot", "name": "email-invalid" },
+    { "action": "type", "selector": "#password", "text": "short" },
+    { "action": "press", "selector": "#password", "key": "Tab" },
+    { "action": "snapshot", "name": "both-invalid" },
+    { "action": "fill", "selector": "#email", "value": "user@example.com" },
+    { "action": "press", "selector": "#email", "key": "Tab" },
+    { "action": "snapshot", "name": "email-valid-password-invalid" },
+    { "action": "fill", "selector": "#password", "value": "correct-horse-battery" },
+    { "action": "press", "selector": "#password", "key": "Tab" },
+    { "action": "snapshot", "name": "all-valid" }
+  ]
+}

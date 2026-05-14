@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sign up</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 40px; background: #f3f4f6; color: #111827; }
+  h1 { font-size: 22px; margin: 0 0 16px; }
+  form { background: white; padding: 24px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); max-width: 360px; }
+  .field { margin-bottom: 16px; }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #374151; }
+  input { display: block; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; width: 100%; box-sizing: border-box; }
+  input:focus { outline: 2px solid #2563eb; outline-offset: -1px; border-color: #2563eb; }
+  .field.invalid input { border-color: #ef4444; background: #fef2f2; }
+  .field.valid input { border-color: #10b981; background: #f0fdf4; }
+  .error-msg { display: none; color: #b91c1c; font-size: 12px; margin-top: 4px; }
+  .field.invalid .error-msg { display: block; }
+  .submit-btn {
+    margin-top: 8px; padding: 10px 20px; background: #9ca3af; color: white;
+    border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: not-allowed; width: 100%;
+  }
+  .submit-btn.enabled { background: #2563eb; cursor: pointer; }
+  .footer { margin-top: 24px; font-size: 12px; color: #6b7280; }
+</style>
+</head>
+<body>
+  <h1>Create your account</h1>
+  <form id="signup" novalidate>
+    <div class="field" id="email-field">
+      <label for="email">Email address</label>
+      <input id="email" name="email" type="email" placeholder="you@example.com" required>
+      <div class="error-msg">Please enter a valid email address.</div>
+    </div>
+    <div class="field" id="password-field">
+      <label for="password">Password (min 8 chars)</label>
+      <input id="password" name="password" type="password" minlength="8" required>
+      <div class="error-msg">Password must be at least 8 characters.</div>
+    </div>
+    <button id="submit" class="submit-btn" type="submit" disabled>Create account</button>
+    <div class="footer">By signing up you agree to the terms.</div>
+  </form>
+  <script>
+    const email = document.getElementById('email');
+    const password = document.getElementById('password');
+    const emailField = document.getElementById('email-field');
+    const passwordField = document.getElementById('password-field');
+    const submit = document.getElementById('submit');
+
+    function validateEmail() {
+      if (email.value === '') {
+        emailField.classList.remove('invalid', 'valid');
+        return false;
+      }
+      const ok = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value);
+      emailField.classList.toggle('invalid', !ok);
+      emailField.classList.toggle('valid', ok);
+      return ok;
+    }
+    function validatePassword() {
+      if (password.value === '') {
+        passwordField.classList.remove('invalid', 'valid');
+        return false;
+      }
+      const ok = password.value.length >= 8;
+      passwordField.classList.toggle('invalid', !ok);
+      passwordField.classList.toggle('valid', ok);
+      return ok;
+    }
+    function refresh() {
+      const ok = validateEmail() && validatePassword();
+      submit.disabled = !ok;
+      submit.classList.toggle('enabled', ok);
+    }
+    email.addEventListener('input', refresh);
+    password.addEventListener('input', refresh);
+  </script>
+</body>
+</html>

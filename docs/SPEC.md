@@ -1,6 +1,6 @@
 # Test SPEC
 
-60 tests across 2 module(s) — 41 pending, 19 active
+60 tests across 2 module(s) — 40 pending, 20 active
 
 ## `./`
 
@@ -104,11 +104,12 @@
   - contributes to: GOAL-MARKUP-FIDELITY
   - body: _not yet implemented_
 
-- [ ] **Form validation state diff from invalid to valid** [draft] — verifies: E5
-  >   Draft — no canonical fixture yet. The underlying engine
-  >   (`vrt interact`) is already shipped; once we have a fixture
-  >   with deliberate validation states this scenario gets promoted
-  >   to approved and Test.pkl drops the `pending = true` marker.
+- [ ] **Form validation state diff from invalid to valid** — verifies: E5
+  >   `vrt interact` drives a form sequence through deliberate
+  >   invalid → valid transitions (bad email, short password, then
+  >   corrections) and pixel-diffs each transition so reviewers can
+  >   see the validation-state visuals (red borders, error messages,
+  >   enabled submit button) actually change as expected.
   - contributes to: GOAL-MARKUP-FIDELITY
   - body: _not yet implemented_
 
@@ -326,9 +327,9 @@
   > Page advertises actions via __vrtActions / data-vrt-action.
   - body: `cmd` (exit 0 expected)
 
-- [ ] **form-validation-diff** — verifies: E5 — tags: spec
-  > Form validation state diff from invalid to valid. Pending: no canonical fixture yet; interact covers the underlying engine.
-  - body: _not yet implemented_
+- [x] **form-validation-diff** — verifies: E5, SMOKE
+  > Drive a signup form through invalid → valid states and diff each transition.
+  - body: `cmd` (exit 0 expected)
 
 - [x] **i18n-stress** — verifies: I1, SMOKE
   > 1.4x word inflation should not overflow or wrap.

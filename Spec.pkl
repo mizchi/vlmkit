@@ -326,13 +326,14 @@ scenarios {
     id = "E5"
     name = "Form validation state diff from invalid to valid"
     severity = "major"
-    reviewStatus = "draft"
+    reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     description = #"""
-      Draft — no canonical fixture yet. The underlying engine
-      (`vrt interact`) is already shipped; once we have a fixture
-      with deliberate validation states this scenario gets promoted
-      to approved and Test.pkl drops the `pending = true` marker.
+      `vrt interact` drives a form sequence through deliberate
+      invalid → valid transitions (bad email, short password, then
+      corrections) and pixel-diffs each transition so reviewers can
+      see the validation-state visuals (red borders, error messages,
+      enabled submit button) actually change as expected.
     """#
   }
 
