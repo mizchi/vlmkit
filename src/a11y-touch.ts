@@ -22,6 +22,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, type Page } from "playwright";
+import { handleCliError } from "./cli-error.ts";
 import { DIM, RESET, GREEN, RED, BOLD, CYAN } from "./terminal-colors.ts";
 
 export type WcagTouchLevel = "AAA" | "AA";
@@ -293,5 +294,5 @@ async function main(argv = process.argv.slice(2)) {
 
 const isCliEntry = process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false;
 if (isCliEntry) {
-  main().catch((e) => { console.error(e); process.exit(1); });
+  main().catch(handleCliError);
 }

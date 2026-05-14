@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CLS bug</title>
+<style>
+  body { font-family: system-ui; margin: 0; padding: 40px; }
+  h1 { font-size: 24px; }
+  .banner { padding: 16px; background: #fde047; }
+  /* BUG: image with no explicit width/height — causes layout shift when it loads */
+  .hero img { max-width: 100%; }
+  .content { padding: 16px; }
+</style>
+</head>
+<body>
+  <h1>News article</h1>
+  <p>Some text above the hero image.</p>
+  <div class="hero">
+    <!-- 600×400 SVG that "renders late" via a small JS delay -->
+    <img id="hero-img" alt="hero">
+  </div>
+  <div class="content">
+    <p>Continuation of the article. Notice that this paragraph jumps
+       down once the image above loads, causing layout shift.</p>
+  </div>
+  <script>
+    // Simulate a slow-loading image — inject the src after a small delay,
+    // which forces a layout shift after first paint.
+    setTimeout(() => {
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='600' height='300'><rect width='600' height='300' fill='%23bfdbfe'/></svg>`;
+      document.getElementById('hero-img').src = 'data:image/svg+xml;utf8,' + svg;
+    }, 200);
+    // Also inject a yellow banner late.
+    setTimeout(() => {
+      const banner = document.createElement('div');
+      banner.className = 'banner';
+      banner.textContent = 'Late notification banner';
+      document.body.insertBefore(banner, document.body.firstChild);
+    }, 400);
+  </script>
+</body>
+</html>

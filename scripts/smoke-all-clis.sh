@@ -98,6 +98,11 @@ run "design-tokens" "report.md" \
     fixtures/design-tokens/off-scale/page.html \
     --output-dir "$OUT_BASE/design-tokens"
 
+run "perf" "report.md" \
+  node --experimental-strip-types src/vrt.ts perf \
+    fixtures/perf/cls-bug/page.html \
+    --output-dir "$OUT_BASE/perf"
+
 # Migration mode (existing) — uses the shadcn fixture
 run "compare" "migration-report.json" \
   node --experimental-strip-types src/vrt.ts compare \

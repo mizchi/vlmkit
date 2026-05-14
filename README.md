@@ -21,6 +21,9 @@ The public surface is organized into three layers:
 - **Snapshot** — URL-based multi-viewport capture with baseline diff
 - **Mask** — selector-based masking for dynamic content (animations, counters)
 - **Crater integration** — lightweight prescanner via BiDi (1.66x speedup, 0% false positive)
+- **Markup-assistance toolkit** (10+ commands): build from screenshot, theme-parity,
+  i18n stress, a11y contrast / touch / focus-order, media-variant adaptations,
+  cross-browser parity, design-token conformance, interaction sequences.
 
 ## Quick Start
 
@@ -99,6 +102,41 @@ vrt discover <html-file>                    # Breakpoint discovery from HTML/CSS
 vrt bench [options]                         # CSS challenge benchmark
 vrt report                                  # Detection pattern report
 ```
+
+### Markup-Assistance Commands
+
+Built on the same Playwright + pixel-diff foundation, these commands cover the
+LLM-agent markup-authoring loop: build from a screenshot, verify the result,
+catch a11y / theme / i18n / cross-browser regressions before they ship.
+
+```bash
+# Build component from a target screenshot, iterate until close.
+vrt component-from-image <target.png> <current.html>
+  # signals: bbox + heatmap regions + dominant fill + typography hints
+  # + spacing-fix table + palette diff + multi-state suspect flags.
+
+# Verify a fully-built page.
+vrt theme-parity      <html>            # prefers-color-scheme dark / unthemed components
+vrt media-variants    <html>            # forced-colors, reduced-motion, print, RTL, 200% zoom
+vrt cross-browser     <html|url>        # chromium / firefox / webkit parity
+vrt i18n-stress       <html>            # text-node inflation overflow detection
+vrt design-tokens     <html>            # radius/spacing/z-index/shadow scale conformance
+vrt a11y-contrast     <html>            # WCAG AA contrast scan
+vrt a11y-touch        <html|url>        # touch target size (WCAG 2.5.5 / 2.5.8)
+vrt a11y-focus-order  <html|url>        # Tab order vs visual order
+
+# Drift checks.
+vrt multi-page-consistency --selector .footer --files A.html B.html C.html
+vrt component-consistency  <html> --selector .card
+
+# Scripted UI interactions (dropdowns, forms, scroll, multi-step flows).
+vrt interact <html|url> --sequence <path.json>
+```
+
+All emit a self-contained Markdown report under `--output-dir`. Each
+finding includes pasteable hex / px values + a heuristic remediation
+hint. See `docs/reports/2026-05-13-capability-survey.md` for the full
+scenario × coverage matrix.
 
 Snapshot labels are query-aware by default, so `/issues` and `/issues?severity=critical` no longer share the same baseline name.
 Use repeated `--label` flags to override labels explicitly when needed.

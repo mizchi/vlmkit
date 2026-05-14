@@ -28,6 +28,7 @@ const MODULE_LOADERS = {
   "./media-variants.ts": () => import("./media-variants.ts"),
   "./cross-browser.ts": () => import("./cross-browser.ts"),
   "./design-tokens.ts": () => import("./design-tokens.ts"),
+  "./perf.ts": () => import("./perf.ts"),
 } as const;
 
 async function main() {

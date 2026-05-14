@@ -71,6 +71,7 @@ const ROOT_MODULE_COMMANDS: Record<string, string> = {
   "media-variants": "./media-variants.ts",
   "cross-browser": "./cross-browser.ts",
   "design-tokens": "./design-tokens.ts",
+  "perf": "./perf.ts",
 };
 
 const WORKFLOW_ALIAS_COMMANDS = new Set<WorkflowCommand>([
@@ -163,6 +164,8 @@ Markup-Assistance Commands:
   design-tokens <html|url> [--radius-scale ...]
                               Scale-conformance check for radius, spacing,
                               z-index, box-shadow tiers
+  perf <html|url>             Web Vitals (CLS / LCP / FCP) via in-page
+                              PerformanceObserver — Lighthouse-light
 
 Workflow Commands:
   workflow <command>          Stateful baseline/snapshot verification workflow

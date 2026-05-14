@@ -27,6 +27,7 @@ import { chromium, firefox, webkit, type Browser, type BrowserType } from "playw
 import { compareScreenshots } from "./heatmap.ts";
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "./heatmap-regions.ts";
 import type { VrtSnapshot } from "./types.ts";
+import { handleCliError } from "./cli-error.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "./terminal-colors.ts";
 
 export type EngineName = "chromium" | "firefox" | "webkit";
@@ -220,10 +221,16 @@ export async function runCrossBrowser(
   });
   await writeFile(reportPath, md);
 
+  const usable = engineResults.filter((r) => r.status === "ok").length;
+  const skipped = engineResults.filter((r) => r.status === "skipped").length;
+
   console.log(`  ${BOLD}${CYAN}vrt cross-browser${RESET}`);
   console.log(`  ${DIM}source: ${options.source}${RESET}`);
   if (reference) {
     console.log(`  ${DIM}reference: ${reference}${RESET}`);
+  }
+  if (usable < 2) {
+    console.log(`  ${YELLOW}!${RESET} Only ${usable} engine(s) usable — no cross-engine comparison performed. Install missing engines with \`npx playwright install firefox webkit\`.`);
   }
   for (const r of engineResults) {
     if (r.status === "skipped") {
@@ -261,6 +268,11 @@ function renderReport(r: Omit<CrossBrowserReport, "reportPath">): string {
   const skipped = r.engines.filter((e) => e.status === "skipped");
   if (skipped.length > 0) {
     lines.push(`⚠ **${skipped.length} engine(s) skipped** — install with \`npx playwright install ${skipped.map((s) => s.engine).join(" ")}\` to get full parity coverage.`);
+    lines.push("");
+  }
+  const usable = r.engines.filter((e) => e.status === "ok").length;
+  if (usable < 2) {
+    lines.push(`⚠ **No cross-engine comparison was performed** — only ${usable} engine(s) usable. The report below confirms render success on those engines but cannot detect parity bugs across browsers.`);
     lines.push("");
   }
 
@@ -353,5 +365,5 @@ async function main(argv = process.argv.slice(2)) {
 
 const isCliEntry = process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false;
 if (isCliEntry) {
-  main().catch((e) => { console.error(e); process.exit(1); });
+  main().catch(handleCliError);
 }

@@ -36,6 +36,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, type Page } from "playwright";
 import { compareScreenshots } from "./heatmap.ts";
 import type { VrtSnapshot } from "./types.ts";
+import { handleCliError } from "./cli-error.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "./terminal-colors.ts";
 
 export type MediaVariant = "forced-colors" | "reduced-motion" | "print" | "rtl" | "zoom-200";
@@ -163,6 +164,8 @@ export async function runMediaVariants(
           ? { width: viewport.width / 2, height: viewport.height / 2 }
           : viewport,
       });
+      // Hoisted so the per-variant verdict switch can see it below.
+      let zoomOverflow: { scrollWidth: number; clientWidth: number } | undefined;
       try {
         // Apply variant emulation BEFORE loading content where the
         // setting affects how CSS is matched. For RTL the dir is set
@@ -183,6 +186,13 @@ export async function runMediaVariants(
           // browser zoom that doesn't require CDP setPageScaleFactor.
           // Applied after load so author CSS doesn't override.
           await page.addStyleTag({ content: `html { zoom: 2; }` });
+        }
+        // Capture horizontal-scroll telemetry for zoom-200 verdict.
+        if (variant === "zoom-200") {
+          zoomOverflow = await page.evaluate(() => ({
+            scrollWidth: document.documentElement.scrollWidth,
+            clientWidth: document.documentElement.clientWidth,
+          }));
         }
         await page.screenshot({ path: screenshotPath, fullPage: false });
       } catch (error) {
@@ -306,16 +316,17 @@ export async function runMediaVariants(
           break;
         }
         case "zoom-200": {
-          // At 200% zoom the effective viewport halves; layouts that
-          // don't reflow gracefully will overflow horizontally.
-          // Detected via document.scrollWidth > viewport.width on the
-          // zoomed page. For first cut, just surface the delta; a
-          // future iteration could check scrollWidth.
-          if (deltaRatio < 0.20) {
-            verdict = "warn";
-            note = `Page rendered at 200% zoom with Δ ${(deltaRatio * 100).toFixed(1)}% — verify text reflows without horizontal scroll (WCAG 1.4.10).`;
+          // WCAG 1.4.10 (Reflow) requires content to fit without
+          // horizontal scrolling at 200% zoom. Check
+          // scrollWidth > clientWidth on the zoomed page — that's the
+          // exact criterion for "needs horizontal scroll." Pixel delta
+          // alone is misleading (a perfectly-reflowing page can have
+          // 70%+ delta because layout rewrapped).
+          if (zoomOverflow && zoomOverflow.scrollWidth > zoomOverflow.clientWidth + 4) {
+            verdict = "suspect";
+            note = `Horizontal scroll required at 200% zoom (scrollWidth ${zoomOverflow.scrollWidth} > clientWidth ${zoomOverflow.clientWidth}) — WCAG 1.4.10 violation.`;
           } else {
-            note = `Page reflowed under 200% zoom (Δ ${(deltaRatio * 100).toFixed(1)}%).`;
+            note = `Reflowed at 200% zoom without horizontal scroll (Δ ${(deltaRatio * 100).toFixed(1)}%).`;
           }
           break;
         }
@@ -442,5 +453,5 @@ async function main(argv = process.argv.slice(2)) {
 
 const isCliEntry = process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false;
 if (isCliEntry) {
-  main().catch((e) => { console.error(e); process.exit(1); });
+  main().catch(handleCliError);
 }
