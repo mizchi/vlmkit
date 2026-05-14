@@ -34,9 +34,12 @@
   >   converges the diff under 3% in <5 rounds on a representative
   >   fixture.
   - contributes to: GOAL-MARKUP-FIDELITY
+  - depends on: CORE-001
+  - decisions: 1 entry(ies)
   - body: _not yet implemented_
 
 - [ ] **CLS detection via in-page PerformanceObserver** — verifies: K5
+  > `vrt perf` wires up a PerformanceObserver inside the page and reports CLS / LCP / FCP without depending on Lighthouse.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
@@ -49,6 +52,7 @@
   - body: _not yet implemented_
 
 - [ ] **Color tokens conform to declared palette** — verifies: M1
+  > `vrt design-tokens` flags rendered colors that fall outside the declared palette — catches off-scale hex values before they leak into the token catalog.
   - contributes to: GOAL-DESIGN-SYSTEM
   - body: _not yet implemented_
 
@@ -68,10 +72,12 @@
   - body: _not yet implemented_
 
 - [ ] **Cross-browser parity across Chromium / Firefox / WebKit** — verifies: H1
+  > `vrt cross-browser` renders the same HTML in all three engines and reports per-engine pixel diff against Chromium. `--allow-skipped` keeps CI green when WebKit isn't installed.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
 - [ ] **Dark mode parity: every component responds to color-scheme** (critical) — verifies: C1
+  > `vrt theme-parity` flips `prefers-color-scheme`, diffs every component, and surfaces ones that didn't update (forgot a `--var` or hard-coded a hex).
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
@@ -80,6 +86,7 @@
   >   per-backend detection-rate tables. Last measured: 96.7% on
   >   the canonical fixture set (docs/knowledge.md).
   - contributes to: GOAL-CSS-CHALLENGE
+  - depends on: BENCH-001
   - body: _not yet implemented_
 
 - [ ] **Element-level shift-isolated diff** — verifies: CORE-004
@@ -114,6 +121,7 @@
   - body: _not yet implemented_
 
 - [ ] **Inline-vs-component drift on a single page** — verifies: J2
+  > `vrt component-consistency` screenshots every selector match on the page and diffs each against the reference — catches the still-inline call site after a botched extract-to-component refactor.
   - contributes to: GOAL-DESIGN-SYSTEM
   - body: _not yet implemented_
 
@@ -122,6 +130,7 @@
   >   CSS patch; the patch is applied and re-verified against the
   >   target. Loop bails when diff < threshold or max-rounds hits.
   - contributes to: GOAL-AI-FIX-LOOP
+  - depends on: AIFIX-001, CORE-001
   - body: _not yet implemented_
 
 - [ ] **Mechanical smoke covers every markup-assistance CLI** (critical) — verifies: SMOKE
@@ -130,9 +139,11 @@
   >   pkspec Test.pkl mirror provides the same gate with the added
   >   Pkl-typed expectations.
   - contributes to: GOAL-AGENT-ERGONOMICS
+  - decisions: 1 entry(ies)
   - body: _not yet implemented_
 
 - [ ] **Media variants: forced-colors / reduced-motion / print / RTL / zoom-200** — verifies: C2-C6
+  > `vrt media-variants` sweeps the five hostile-user-preference media queries in one command and reports per-variant diffs.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
@@ -174,6 +185,7 @@
   - body: _not yet implemented_
 
 - [ ] **Radius / spacing / z-index / shadow-tier conformance** — verifies: M4-M6
+  > Same `design-tokens` CLI covers radius / spacing / z-index / shadow tiers via per-bucket configurable scales.
   - contributes to: GOAL-DESIGN-SYSTEM
   - body: _not yet implemented_
 
@@ -186,10 +198,12 @@
   - body: _not yet implemented_
 
 - [ ] **Selector miss in vrt interact triggers healer correction** — verifies: O2
+  > When a step selector fails to match, the healer scans the DOM for near-misses and prints `did you mean <selector>?` with confidence scores instead of a bare timeout.
   - contributes to: GOAL-AGENT-ERGONOMICS
   - body: _not yet implemented_
 
 - [ ] **Skill playbook fans out N checks over one target** — verifies: O3-O5
+  > `vrt skill run <name> --against <html|url>` reads `.vrt-skills/<name>.json` and runs every check in the playbook against the target, aggregating into one report.
   - contributes to: GOAL-AGENT-ERGONOMICS
   - body: _not yet implemented_
 
@@ -198,6 +212,7 @@
   >   `*-baseline.png`. Used after an intentional UI change is
   >   reviewed.
   - contributes to: GOAL-SNAPSHOT-WORKFLOW
+  - depends on: SNAP-001
   - body: _not yet implemented_
 
 - [ ] **Snapshot fix-prompt generates subagent-ready Markdown** — verifies: SNAP-003
@@ -216,10 +231,12 @@
   - body: _not yet implemented_
 
 - [ ] **Tab order matches visual reading order** — verifies: F3
+  > `vrt a11y-focus-order` walks Tab traversal and compares against the bbox-sorted visual order.
   - contributes to: GOAL-A11Y-COMPLIANCE
   - body: _not yet implemented_
 
 - [ ] **Touch target size meets WCAG 2.5.5 AAA / 2.5.8 AA** (critical) — verifies: F2
+  > `vrt a11y-touch` flags interactive elements below the 24px AA / 44px AAA minimum hit area.
   - contributes to: GOAL-A11Y-COMPLIANCE
   - body: _not yet implemented_
 
@@ -246,6 +263,7 @@
   - body: _not yet implemented_
 
 - [ ] **WCAG AA text contrast scan** (critical) — verifies: F1
+  > `vrt a11y-contrast` reports every text/background pair under the AA threshold, with the hex pair the agent can paste into a fix.
   - contributes to: GOAL-A11Y-COMPLIANCE
   - body: _not yet implemented_
 
@@ -258,6 +276,7 @@
   - body: _not yet implemented_
 
 - [ ] **i18n text inflation: no overflow or wrap at 1.4x word length** — verifies: I1
+  > `vrt i18n-stress` substitutes button / link text with 1.4× longer strings and flags overflow or wrap-to-second-line.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 

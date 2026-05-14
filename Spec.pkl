@@ -32,6 +32,7 @@ goals {
   new {
     id = "GOAL-MARKUP-FIDELITY"
     name = "Agent rebuilds a component to match a target image"
+    description = "Wireframe-mode loop: target PNG in, HTML out, iterate until pixel diff is low."
     priority = 90
     reviewStatus = "approved"
     rationale = #"""
@@ -45,6 +46,7 @@ goals {
   new {
     id = "GOAL-A11Y-COMPLIANCE"
     name = "Rendered page passes WCAG AA contrast / size / order checks"
+    description = "Contrast, touch target, focus order against the rendered DOM."
     priority = 85
     reviewStatus = "approved"
     rationale = #"""
@@ -56,6 +58,7 @@ goals {
   new {
     id = "GOAL-DESIGN-SYSTEM"
     name = "Rendered values conform to declared design scales"
+    description = "Radius / spacing / z-index / shadow / color-token conformance vs configurable scales."
     priority = 70
     reviewStatus = "approved"
     rationale = #"""
@@ -67,6 +70,7 @@ goals {
   new {
     id = "GOAL-VARIANT-RESILIENCE"
     name = "Page survives theme / print / RTL / zoom / i18n variants"
+    description = "User-preference + locale + browser variant sweep, no manual matrix."
     priority = 80
     reviewStatus = "approved"
     rationale = #"""
@@ -78,6 +82,7 @@ goals {
   new {
     id = "GOAL-AGENT-ERGONOMICS"
     name = "Toolkit surfaces what to do, not just what's wrong"
+    description = "Findings include actionable hex / px / CSS suggestions; selector healing on failure."
     priority = 75
     reviewStatus = "approved"
     rationale = #"""
@@ -93,6 +98,7 @@ goals {
   new {
     id = "GOAL-CORE-DIFF"
     name = "Reliable pixel / style / a11y diff primitives"
+    description = "Pixelmatch + computed-style + a11y-tree diff; every other command sits on these."
     priority = 95
     reviewStatus = "approved"
     rationale = #"""
@@ -106,6 +112,7 @@ goals {
   new {
     id = "GOAL-SNAPSHOT-WORKFLOW"
     name = "Multi-viewport snapshot baseline / approve loop"
+    description = "Capture per-viewport snapshots, diff vs baseline, approve to promote."
     priority = 85
     reviewStatus = "approved"
     rationale = #"""
@@ -118,6 +125,7 @@ goals {
   new {
     id = "GOAL-MIGRATION-VERIFICATION"
     name = "Refactor / migration confidence across two pages"
+    description = "before.html vs after.html sweep with multi-viewport pixel + paint-tree diff."
     priority = 80
     reviewStatus = "approved"
     rationale = #"""
@@ -130,6 +138,7 @@ goals {
   new {
     id = "GOAL-CSS-CHALLENGE"
     name = "Benchmark detection rate of CSS regressions"
+    description = "Random property/selector deletion + detection backend evaluation, 96.7% last measured."
     priority = 60
     reviewStatus = "approved"
     rationale = #"""
@@ -144,6 +153,7 @@ goals {
   new {
     id = "GOAL-AI-FIX-LOOP"
     name = "VLM + LLM driven CSS fix synthesis"
+    description = "Two-stage pipeline: VLM extracts structured diff, LLM emits CSS patch, re-verify."
     priority = 70
     reviewStatus = "approved"
     rationale = #"""
@@ -157,6 +167,7 @@ goals {
   new {
     id = "GOAL-API"
     name = "HTTP API exposes the toolkit to non-CLI consumers"
+    description = "Hono server + typed VrtClient for browser extension / editor plugin use."
     priority = 50
     reviewStatus = "approved"
     rationale = #"""
@@ -193,12 +204,25 @@ scenarios {
     severity = "critical"
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
+    dependsOn { "CORE-001" }
     description = #"""
       `vrt component-from-image` against the pricing-card target
       reports bbox / heatmap / palette / typography signals; iteration
       converges the diff under 3% in <5 rounds on a representative
       fixture.
     """#
+    decisions {
+      new {
+        date = "2026-05-13"
+        summary = "Component-extract added so target PNGs can come from a full page"
+        rationale = #"""
+          Originally the wireframe loop required the user to crop the
+          target by hand. Component-extract removed that step by
+          finding non-background components, classifying each, and
+          cropping a chosen rank.
+        """#
+      }
+    }
   }
 
   // ── A11y ─────────────────────────────────────────────────────
@@ -208,6 +232,7 @@ scenarios {
     severity = "critical"
     reviewStatus = "approved"
     contributes { "GOAL-A11Y-COMPLIANCE" }
+    description = "`vrt a11y-contrast` reports every text/background pair under the AA threshold, with the hex pair the agent can paste into a fix."
   }
   new {
     id = "F2"
@@ -215,6 +240,7 @@ scenarios {
     severity = "critical"
     reviewStatus = "approved"
     contributes { "GOAL-A11Y-COMPLIANCE" }
+    description = "`vrt a11y-touch` flags interactive elements below the 24px AA / 44px AAA minimum hit area."
   }
   new {
     id = "F3"
@@ -222,6 +248,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-A11Y-COMPLIANCE" }
+    description = "`vrt a11y-focus-order` walks Tab traversal and compares against the bbox-sorted visual order."
   }
 
   // ── Design system ────────────────────────────────────────────
@@ -231,6 +258,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-DESIGN-SYSTEM" }
+    description = "`vrt design-tokens` flags rendered colors that fall outside the declared palette — catches off-scale hex values before they leak into the token catalog."
   }
   new {
     id = "M4-M6"
@@ -238,6 +266,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-DESIGN-SYSTEM" }
+    description = "Same `design-tokens` CLI covers radius / spacing / z-index / shadow tiers via per-bucket configurable scales."
   }
 
   // ── Variant resilience ──────────────────────────────────────
@@ -247,6 +276,7 @@ scenarios {
     severity = "critical"
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "`vrt theme-parity` flips `prefers-color-scheme`, diffs every component, and surfaces ones that didn't update (forgot a `--var` or hard-coded a hex)."
   }
   new {
     id = "C2-C6"
@@ -254,6 +284,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "`vrt media-variants` sweeps the five hostile-user-preference media queries in one command and reports per-variant diffs."
   }
   new {
     id = "H1"
@@ -261,6 +292,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "`vrt cross-browser` renders the same HTML in all three engines and reports per-engine pixel diff against Chromium. `--allow-skipped` keeps CI green when WebKit isn't installed."
   }
   new {
     id = "I1"
@@ -268,6 +300,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "`vrt i18n-stress` substitutes button / link text with 1.4× longer strings and flags overflow or wrap-to-second-line."
   }
 
   // ── Bug-finding / QA ────────────────────────────────────────
@@ -277,6 +310,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-DESIGN-SYSTEM" }
+    description = "`vrt component-consistency` screenshots every selector match on the page and diffs each against the reference — catches the still-inline call site after a botched extract-to-component refactor."
   }
   new {
     id = "K5"
@@ -284,6 +318,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "`vrt perf` wires up a PerformanceObserver inside the page and reports CLS / LCP / FCP without depending on Lighthouse."
   }
 
   // ── Interaction ─────────────────────────────────────────────
@@ -320,6 +355,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-AGENT-ERGONOMICS" }
+    description = "When a step selector fails to match, the healer scans the DOM for near-misses and prints `did you mean <selector>?` with confidence scores instead of a bare timeout."
   }
   new {
     id = "O3-O5"
@@ -327,6 +363,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-AGENT-ERGONOMICS" }
+    description = "`vrt skill run <name> --against <html|url>` reads `.vrt-skills/<name>.json` and runs every check in the playbook against the target, aggregating into one report."
   }
   new {
     id = "SMOKE"
@@ -340,6 +377,17 @@ scenarios {
       pkspec Test.pkl mirror provides the same gate with the added
       Pkl-typed expectations.
     """#
+    decisions {
+      new {
+        date = "2026-05-13"
+        summary = "Pkl-typed Test.pkl added alongside the bash smoke script"
+        rationale = #"""
+          Bash script stays the single source of truth for fixture
+          wiring; Test.pkl mirrors it so `pkspec check` can gate on
+          specRef coverage without re-implementing fixture lookup.
+        """#
+      }
+    }
   }
 
   // ╔═══════════════════════════════════════════════════════════════
@@ -440,6 +488,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-SNAPSHOT-WORKFLOW" }
+    dependsOn { "SNAP-001" }
     implementedBy = "code"
     implementedAt = "src/snapshot-approve.ts"
     description = #"""
@@ -575,6 +624,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "approved"
     contributes { "GOAL-CSS-CHALLENGE" }
+    dependsOn { "BENCH-001" }
     implementedBy = "code"
     implementedAt = "src/detection-report.ts"
     description = #"""
@@ -620,6 +670,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-AI-FIX-LOOP" }
+    dependsOn { "AIFIX-001"; "CORE-001" }
     implementedBy = "code"
     implementedAt = "src/fix-loop.ts"
     description = #"""
@@ -672,5 +723,61 @@ scenarios {
       client; one method per HTTP endpoint with shared input/output
       types from `src/api-types.ts`.
     """#
+  }
+}
+
+milestones {
+  new {
+    id = "MS-CORE"
+    name = "Core diff toolkit"
+    description = #"""
+      Pre-markup-assistance baseline — pixel / style / a11y diff
+      primitives plus the migration `compare` entry point and the
+      snapshot baseline / approve workflow. Already shipped.
+    """#
+    reviewStatus = "approved"
+    goals { "GOAL-CORE-DIFF"; "GOAL-MIGRATION-VERIFICATION"; "GOAL-SNAPSHOT-WORKFLOW" }
+  }
+  new {
+    id = "MS-AI-LOOP"
+    name = "AI-assisted CSS fix loop"
+    description = #"""
+      Two-stage VLM + LLM pipeline that closes the auto-repair loop
+      and the supporting CSS-challenge bench / detection-rate
+      tracker that justifies model choice. Already shipped.
+    """#
+    reviewStatus = "approved"
+    goals { "GOAL-AI-FIX-LOOP"; "GOAL-CSS-CHALLENGE" }
+  }
+  new {
+    id = "MS-MARKUP-ASSISTANCE"
+    name = "Markup-assistance suite (2026-05-13 release)"
+    description = #"""
+      Anchor milestone for the 15 markup-assistance CLIs added in
+      PR #5: fidelity (component-from-image / -extract), a11y
+      (contrast / touch / focus-order), design-system (tokens),
+      variant resilience (theme-parity / media-variants /
+      cross-browser / i18n-stress / perf), and the explore /
+      interact / skill agent ergonomics layer.
+    """#
+    reviewStatus = "approved"
+    targetDate = "2026-05-13"
+    goals {
+      "GOAL-MARKUP-FIDELITY"
+      "GOAL-A11Y-COMPLIANCE"
+      "GOAL-DESIGN-SYSTEM"
+      "GOAL-VARIANT-RESILIENCE"
+      "GOAL-AGENT-ERGONOMICS"
+    }
+  }
+  new {
+    id = "MS-API"
+    name = "HTTP / non-CLI surface"
+    description = #"""
+      Hono-backed `vrt api serve` + typed `VrtClient`. Lower
+      priority than the CLI work but already shipped.
+    """#
+    reviewStatus = "approved"
+    goals { "GOAL-API" }
   }
 }
