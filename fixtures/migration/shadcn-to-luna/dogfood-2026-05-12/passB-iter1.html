@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Command Center (Luna)</title>
+<style id="target-css">/* Pass B iter 1: intentionally wrong CSS — generic placeholder values derived only from luna class names (no peeking at before.html style block). */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; line-height: 1.5; color: #222; background: #fafafa; }
+
+.luna-page { max-width: 1200px; margin: 0 auto; padding: 24px 16px; }
+.luna-hero { margin-bottom: 24px; }
+.luna-pill { display: inline-block; padding: 4px 8px; background: #eee; color: #333; font-size: 11px; border-radius: 4px; }
+.luna-hero h1 { font-size: 32px; margin-top: 8px; }
+.luna-hero p { color: #666; margin-top: 8px; }
+
+.luna-layout { display: block; }
+.luna-stack > * + * { margin-top: 16px; }
+.luna-panel { background: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+.luna-panel-head { display: flex; justify-content: space-between; margin-bottom: 12px; }
+.luna-panel-title { font-size: 18px; font-weight: 600; }
+.luna-panel-note { color: #888; font-size: 13px; }
+.luna-panel-body { display: block; }
+
+.luna-actions { display: flex; gap: 8px; margin-top: 8px; }
+.luna-action { padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
+.luna-action-primary { background: #333; color: #fff; }
+.luna-action-soft { background: #eee; }
+.luna-action-ghost { background: transparent; }
+
+.luna-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.luna-metric { background: #f5f5f5; padding: 12px; border-radius: 6px; }
+.luna-metric strong { font-size: 24px; display: block; }
+
+.luna-field { display: flex; flex-direction: column; gap: 4px; }
+.luna-input, .luna-textarea { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+.luna-textarea { min-height: 80px; }
+
+.luna-overlay { background: rgba(0,0,0,0.5); padding: 12px; border-radius: 8px; }
+.luna-modal { background: #fff; padding: 12px; border-radius: 8px; }
+.luna-modal-copy { color: #666; }
+.luna-modal-actions { display: flex; justify-content: end; gap: 8px; }</style>
+</head>
+<body>
+<main class="luna-page">
+  <section class="luna-hero">
+    <span class="luna-pill">Operations</span>
+    <h1>Command Center</h1>
+    <p>Review live queue health, adjust response templates, and prepare a release note before the next support wave begins.</p>
+  </section>
+
+  <section class="luna-layout">
+    <div class="luna-stack">
+      <article class="luna-panel">
+        <div class="luna-panel-head">
+          <div>
+            <h2 class="luna-panel-title">Response controls</h2>
+            <p class="luna-panel-note">Primary, secondary, and outline actions.</p>
+          </div>
+        </div>
+        <div class="luna-panel-body">
+          <div class="luna-actions">
+            <button class="luna-action luna-action-primary" type="button">Ship update</button>
+            <button class="luna-action luna-action-soft" type="button">Preview draft</button>
+            <button class="luna-action luna-action-ghost" type="button">Archive notes</button>
+          </div>
+        </div>
+      </article>
+
+      <article class="luna-panel">
+        <div class="luna-panel-head">
+          <div>
+            <h2 class="luna-panel-title">Daily snapshot</h2>
+            <p class="luna-panel-note">Card primitives and headline metrics.</p>
+          </div>
+        </div>
+        <div class="luna-panel-body">
+          <div class="luna-metrics">
+            <div class="luna-metric"><span>Open issues</span><strong>42</strong></div>
+            <div class="luna-metric"><span>Median reply</span><strong>11m</strong></div>
+            <div class="luna-metric"><span>Escalations</span><strong>7</strong></div>
+            <div class="luna-metric"><span>CSAT</span><strong>96%</strong></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="luna-panel">
+        <div class="luna-panel-head">
+          <div>
+            <h2 class="luna-panel-title">Review dialog</h2>
+            <p class="luna-panel-note">Static dialog preview for approval flows.</p>
+          </div>
+        </div>
+        <div class="luna-panel-body">
+          <div class="luna-overlay">
+            <div class="luna-modal" role="dialog" aria-label="Review dialog">
+              <h3 class="luna-panel-title" style="font-size:18px">Confirm release note</h3>
+              <p class="luna-modal-copy">This update will be published to support, success, and status page subscribers immediately.</p>
+              <div class="luna-modal-actions">
+                <button class="luna-action luna-action-ghost" type="button">Cancel</button>
+                <button class="luna-action luna-action-primary" type="button">Publish now</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+    </div>
+
+    <aside class="luna-stack">
+      <article class="luna-panel">
+        <div class="luna-panel-head">
+          <div>
+            <h2 class="luna-panel-title">Escalation draft</h2>
+            <p class="luna-panel-note">Form fields used in the operator handoff.</p>
+          </div>
+        </div>
+        <div class="luna-panel-body">
+          <div class="luna-field">
+            <label for="title">Title</label>
+            <input class="luna-input" id="title" type="text" value="Billing export stalls for enterprise accounts">
+          </div>
+          <div class="luna-field">
+            <label for="owner">Owner</label>
+            <input class="luna-input" id="owner" type="text" value="EU daytime shift">
+          </div>
+          <div class="luna-field">
+            <label for="notes">Notes</label>
+            <textarea class="luna-textarea" id="notes">Finance approved customer messaging. Waiting for infra confirmation before the next send.</textarea>
+          </div>
+          <div class="luna-actions">
+            <button class="luna-action luna-action-primary" type="button">Save draft</button>
+            <button class="luna-action luna-action-ghost" type="button">Share preview</button>
+          </div>
+        </div>
+      </article>
+    </aside>
+  </section>
+</main>
+</body>
+</html>

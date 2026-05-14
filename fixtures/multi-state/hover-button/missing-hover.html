@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hover Button — Missing Hover State</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 40px; background: #f6f8fa; }
+  .btn {
+    display: inline-block;
+    padding: 12px 24px;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  /* Bug: agent forgot to copy over the :hover and :focus-visible rules.
+     Default state still matches the reference, so a single-state VRT
+     would miss this regression entirely. */
+  .btn-secondary { background: #e5e7eb; color: #111827; margin-left: 12px; }
+</style>
+</head>
+<body>
+  <button class="btn">Get started</button>
+  <button class="btn btn-secondary">Learn more</button>
+</body>
+</html>

@@ -9,12 +9,24 @@
 import { existsSync } from "node:fs";
 import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { chromium } from "playwright";
 import { compareScreenshots, generateDiffReport } from "./heatmap.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "./terminal-colors.ts";
 import { applyMask } from "./mask.ts";
 import { approveSnapshotsFromReport } from "./snapshot-approve.ts";
 import { determineSnapshotExitCode, parseSnapshotCliArgs, parseSnapshotConfig, type SnapshotConfig } from "./snapshot-cli.ts";
+import {
+  extractSnapshotFixTasks,
+  formatSnapshotFixPromptJson,
+  formatSnapshotFixPromptMarkdown,
+  type SnapshotReport,
+} from "./snapshot-fix-prompt.ts";
+import {
+  buildStabilityReport,
+  formatStabilitySummary,
+  type StabilityIterationResult,
+} from "./snapshot-stability.ts";
+import { resolveCaptureBackend, type CaptureBackend } from "./capturer.ts";
+import { writeFlipbook, type FlipbookFrame } from "./flipbook.ts";
 import type { VrtSnapshot } from "./types.ts";
 
 const DEFAULT_SNAPSHOT_CONFIG_FILE = "vrt.config.json";
@@ -39,8 +51,10 @@ interface SnapshotResult {
 function formatSnapshotUsage(): string {
   return [
     "Usage:",
-    "  vrt snapshot <url1> [url2] ... [--output dir] [--label name] [--threshold 0.1] [--fail-on-diff] [--fail-on-new-baseline] [--max-diff-ratio n] [--config vrt.config.json]",
+    "  vrt snapshot <url1> [url2] ... [--output dir] [--label name] [--threshold 0.1] [--fail-on-diff] [--fail-on-new-baseline] [--max-diff-ratio n] [--backend local|cloudflare] [--config vrt.config.json]",
     "  vrt snapshot approve [--output dir] [--label name] [--config vrt.config.json]",
+    "  vrt snapshot fix-prompt [--output dir] [--label name] [--format markdown|json] [--limit n] [--min-diff 0.01] [--out path] [--config vrt.config.json]",
+    "  vrt snapshot stability <url1> [url2]... [--iterations 3] [--output dir] [--threshold 0.1] [--fp-threshold 0] [--fail-above-rate 0.05] [--config vrt.config.json]",
   ].join("\n");
 }
 
@@ -111,6 +125,291 @@ async function approve(options: {
   console.log();
 }
 
+async function runFixPrompt(options: {
+  outputDir: string;
+  labels: string[];
+  fixPrompt: { format: "markdown" | "json"; limit?: number; minDiffRatio: number; outPath?: string };
+  configPath?: string;
+}) {
+  const reportPath = join(options.outputDir, "snapshot-report.json");
+  let raw: string;
+  try {
+    raw = await readFile(reportPath, "utf-8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new Error(`No snapshot report found at ${reportPath}. Run \`vrt snapshot <url...>\` first.`);
+    }
+    throw error;
+  }
+
+  const report = JSON.parse(raw) as SnapshotReport;
+  const tasks = extractSnapshotFixTasks(report, {
+    labels: options.labels,
+    minDiffRatio: options.fixPrompt.minDiffRatio,
+    outputDir: options.outputDir,
+  });
+
+  const output = options.fixPrompt.format === "json"
+    ? formatSnapshotFixPromptJson(tasks)
+    : formatSnapshotFixPromptMarkdown(tasks, {
+        relativeTo: options.outputDir,
+        limit: options.fixPrompt.limit,
+      });
+
+  if (options.fixPrompt.outPath) {
+    const outPath = resolve(options.fixPrompt.outPath);
+    await mkdir(dirname(outPath), { recursive: true });
+    await writeFile(outPath, output);
+    console.log();
+    console.log(`${BOLD}${CYAN}Snapshot Fix Prompt${RESET}`);
+    console.log(`  ${DIM}Tasks: ${tasks.length}${RESET}`);
+    console.log(`  ${DIM}Output: ${outPath}${RESET}`);
+    if (options.configPath) {
+      console.log(`  ${DIM}Config: ${options.configPath}${RESET}`);
+    }
+    console.log();
+  } else {
+    process.stdout.write(output);
+    if (!output.endsWith("\n")) process.stdout.write("\n");
+  }
+}
+
+async function runStability(options: {
+  urls: string[];
+  labels: string[];
+  outputDir: string;
+  threshold: number;
+  maskSelectors: string[];
+  iterations: number;
+  failAboveRate?: number;
+  fpThreshold: number;
+  configPath?: string;
+  backend: CaptureBackend;
+  flipbook?: boolean;
+  flipbookDelayMs?: number;
+}) {
+  if (options.urls.length === 0) {
+    throw new Error("No URLs provided for stability run. Pass URLs directly or configure routes in vrt.config.json.");
+  }
+
+  await mkdir(options.outputDir, { recursive: true });
+
+  console.log();
+  console.log(`${BOLD}${CYAN}Snapshot Stability${RESET}`);
+  console.log(`  ${DIM}URLs: ${options.urls.length} | Iterations: ${options.iterations} | Output: ${options.outputDir}${RESET}`);
+  console.log(`  ${DIM}Threshold: ${options.threshold} | Backend: ${options.backend.label}${RESET}`);
+  if (options.configPath) {
+    console.log(`  ${DIM}Config: ${options.configPath}${RESET}`);
+  }
+  if (options.maskSelectors.length > 0) {
+    console.log(`  ${DIM}Mask: ${options.maskSelectors.join(", ")}${RESET}`);
+  }
+  console.log();
+
+  const browser = await options.backend.launch();
+  const iterations: StabilityIterationResult[] = [];
+
+  try {
+    for (let iter = 0; iter < options.iterations; iter++) {
+      console.log(`  ${BOLD}Iteration ${iter + 1}/${options.iterations}${RESET}`);
+
+      for (const [index, url] of options.urls.entries()) {
+        const label = options.labels[index]!;
+
+        for (const vp of VIEWPORTS) {
+          const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
+          await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+          await applyMask(page, options.maskSelectors);
+
+          const currentPath = iter === 0
+            ? join(options.outputDir, `${label}-${vp.label}-baseline.png`)
+            : join(options.outputDir, `${label}-${vp.label}-iter${iter}.png`);
+          await page.screenshot({ path: currentPath, fullPage: true });
+          await page.close();
+
+          if (iter === 0) {
+            iterations.push({
+              iteration: 0,
+              url,
+              label,
+              viewport: vp.label,
+              diffRatio: 0,
+            });
+            continue;
+          }
+
+          const baselinePath = join(options.outputDir, `${label}-${vp.label}-baseline.png`);
+          const snap: VrtSnapshot = {
+            testId: `${label}-${vp.label}-iter${iter}`,
+            testTitle: `${label} ${vp.label} iter ${iter}`,
+            projectName: "stability",
+            screenshotPath: currentPath,
+            baselinePath,
+            status: "changed",
+          };
+          const diff = await compareScreenshots(snap, { outputDir: options.outputDir, threshold: options.threshold });
+          const diffRatio = diff?.diffRatio ?? 0;
+          const report = diffRatio > 0
+            ? await generateDiffReport(snap, { outputDir: options.outputDir, detectShift: true, threshold: options.threshold })
+            : null;
+          const globalShift = report?.globalShift ?? 0;
+          const compensatedDiffRatio = report
+            ? report.compensatedDiffCount / report.totalPixels
+            : diffRatio;
+
+          const color = diffRatio === 0 ? GREEN : diffRatio < 0.01 ? YELLOW : RED;
+          const pct = (diffRatio * 100).toFixed(2);
+          console.log(`    ${label}/${vp.label}: ${color}${pct}%${RESET}` +
+            (globalShift !== 0 ? ` ${DIM}(shift ${globalShift > 0 ? "+" : ""}${globalShift}px)${RESET}` : ""));
+
+          iterations.push({
+            iteration: iter,
+            url,
+            label,
+            viewport: vp.label,
+            diffRatio,
+            compensatedDiffRatio,
+            globalShift,
+            shiftOnly: report?.shiftOnly ?? false,
+          });
+        }
+      }
+    }
+  } finally {
+    await options.backend.close(browser);
+  }
+
+  const report = buildStabilityReport({
+    iterations: options.iterations,
+    urls: options.urls,
+    threshold: options.fpThreshold,
+    results: iterations,
+  });
+
+  console.log();
+  hr();
+  console.log();
+  console.log(formatStabilitySummary(report));
+  console.log();
+
+  const reportPath = join(options.outputDir, "stability-report.json");
+  await writeFile(reportPath, JSON.stringify(report, null, 2));
+  console.log(`  ${DIM}Report: ${reportPath}${RESET}`);
+
+  if (options.flipbook) {
+    const flipDir = join(options.outputDir, "flipbooks");
+    await mkdir(flipDir, { recursive: true });
+    const delayMs = options.flipbookDelayMs ?? 700;
+    const generated: string[] = [];
+    // Group iterations by (label, viewport). iteration 0 → baseline.png.
+    const groups = new Map<string, FlipbookFrame[]>();
+    for (const r of iterations) {
+      const key = `${r.label}::${r.viewport}`;
+      const frame: FlipbookFrame = r.iteration === 0
+        ? {
+            path: join(options.outputDir, `${r.label}-${r.viewport}-baseline.png`),
+            label: "iter 0",
+            sublabel: "baseline",
+          }
+        : {
+            path: join(options.outputDir, `${r.label}-${r.viewport}-iter${r.iteration}.png`),
+            label: `iter ${r.iteration}`,
+            sublabel: `${(r.diffRatio * 100).toFixed(2)}% diff`,
+          };
+      const list = groups.get(key);
+      if (list) list.push(frame); else groups.set(key, [frame]);
+    }
+    for (const [key, frames] of groups) {
+      const [label, viewport] = key.split("::") as [string, string];
+      const safe = `${label}-${viewport}-stability`.replace(/[/\\:]/g, "_");
+      const outPath = join(flipDir, `${safe}.html`);
+      await writeFlipbook(outPath, frames, {
+        title: `${label} / ${viewport} (${options.iterations} iterations)`,
+        delayMs,
+        autoplay: true,
+        loop: true,
+      });
+      generated.push(outPath);
+    }
+    console.log(`  ${DIM}Flipbooks: ${generated.length} written to ${flipDir}${RESET}`);
+  }
+  console.log();
+
+  if (options.failAboveRate !== undefined && report.overallFalsePositiveRate > options.failAboveRate) {
+    console.log(`  ${RED}FP rate ${(report.overallFalsePositiveRate * 100).toFixed(2)}% exceeds --fail-above-rate ${(options.failAboveRate * 100).toFixed(2)}%${RESET}`);
+    console.log();
+    process.exitCode = 1;
+  }
+}
+
+async function runDiffFlipbook(options: {
+  outputDir: string;
+  labels: string[];
+  delayMs: number;
+  flipbookOutDir?: string;
+  configPath?: string;
+}) {
+  const reportPath = join(options.outputDir, "snapshot-report.json");
+  let raw: string;
+  try {
+    raw = await readFile(reportPath, "utf-8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new Error(`No snapshot report found at ${reportPath}. Run \`vrt snapshot <url...>\` first.`);
+    }
+    throw error;
+  }
+
+  const report = JSON.parse(raw) as { results: Array<{
+    label: string; viewport: string; screenshotPath: string;
+    baselinePath?: string; diffRatio?: number; isNew?: boolean;
+  }> };
+
+  const filter = options.labels.length > 0 ? new Set(options.labels) : undefined;
+  const baseOut = resolve(options.flipbookOutDir ?? join(options.outputDir, "flipbooks"));
+  await mkdir(baseOut, { recursive: true });
+
+  const generated: string[] = [];
+  for (const entry of report.results) {
+    if (entry.isNew) continue;
+    if ((entry.diffRatio ?? 0) === 0) continue;
+    if (filter && !filter.has(entry.label)) continue;
+
+    const baselinePath = entry.baselinePath ?? entry.screenshotPath.replace(/-current\.png$/, "-baseline.png");
+    const currentPath = entry.screenshotPath;
+    const safeName = `${entry.label}-${entry.viewport}`.replace(/[/\\:]/g, "_");
+    const heatmapPath = join(options.outputDir, `${safeName}_heatmap.png`);
+
+    const frames: FlipbookFrame[] = [
+      { path: baselinePath, label: "baseline", sublabel: "saved baseline" },
+      { path: currentPath, label: "current", sublabel: `${((entry.diffRatio ?? 0) * 100).toFixed(2)}% diff` },
+    ];
+    if (existsSync(heatmapPath)) {
+      frames.push({ path: heatmapPath, label: "heatmap", sublabel: "pixel diff overlay" });
+    }
+
+    const outPath = join(baseOut, `${safeName}.html`);
+    await writeFlipbook(outPath, frames, {
+      title: `${entry.label} / ${entry.viewport}`,
+      delayMs: options.delayMs,
+      autoplay: true,
+      loop: true,
+    });
+    generated.push(outPath);
+  }
+
+  console.log();
+  console.log(`${BOLD}${CYAN}Snapshot Diff Flipbooks${RESET}`);
+  console.log(`  ${DIM}Output: ${baseOut}${RESET}`);
+  console.log(`  ${DIM}Generated: ${generated.length}${RESET}`);
+  if (options.configPath) console.log(`  ${DIM}Config: ${options.configPath}${RESET}`);
+  for (const g of generated) console.log(`  ${GREEN}${g}${RESET}`);
+  if (generated.length === 0) {
+    console.log(`  ${YELLOW}No entries with non-zero diff — nothing to render.${RESET}`);
+  }
+  console.log();
+}
+
 async function main() {
   const cliArgs = process.argv.slice(2);
   if (cliArgs.length === 0 || cliArgs.includes("--help") || cliArgs.includes("-h") || cliArgs.includes("help")) {
@@ -128,6 +427,48 @@ async function main() {
     return;
   }
 
+  if (parsed.mode === "fix-prompt") {
+    await runFixPrompt({
+      outputDir,
+      labels: parsed.labels,
+      fixPrompt: parsed.fixPrompt!,
+      configPath,
+    });
+    return;
+  }
+
+  if (parsed.mode === "flipbook") {
+    await runDiffFlipbook({
+      outputDir,
+      labels: parsed.labels,
+      delayMs: parsed.flipbook!.delayMs,
+      flipbookOutDir: parsed.flipbook!.outDir,
+      configPath,
+    });
+    return;
+  }
+
+  const { backend: captureBackend, source: backendSource } = resolveCaptureBackend({
+    backendFlag: parsed.backend,
+  });
+
+  if (parsed.mode === "stability") {
+    await runStability({
+      urls: parsed.urls,
+      labels: parsed.labels,
+      outputDir,
+      threshold: parsed.threshold,
+      maskSelectors: parsed.maskSelectors,
+      iterations: parsed.stability!.iterations,
+      failAboveRate: parsed.stability!.failAboveRate,
+      fpThreshold: parsed.stability!.fpThreshold,
+      configPath,
+      backend: captureBackend,
+      flipbook: parsed.stability!.flipbook,
+    });
+    return;
+  }
+
   const urls = parsed.urls;
   if (urls.length === 0) {
     console.log(formatSnapshotUsage());
@@ -142,7 +483,7 @@ async function main() {
   console.log(`${BOLD}${CYAN}║  VRT Snapshot                                                        ║${RESET}`);
   console.log(`${BOLD}${CYAN}╚════════════════════════════════════════════════════════════════════════╝${RESET}`);
   console.log(`  ${DIM}URLs: ${urls.length} | Viewports: ${VIEWPORTS.map((v) => v.label).join(", ")} | Output: ${outputDir}${RESET}`);
-  console.log(`  ${DIM}Threshold: ${parsed.threshold}${RESET}`);
+  console.log(`  ${DIM}Threshold: ${parsed.threshold} | Backend: ${captureBackend.label}${backendSource === "default" ? "" : ` (${backendSource})`}${RESET}`);
   if (configPath) {
     console.log(`  ${DIM}Config: ${configPath}${RESET}`);
   }
@@ -151,7 +492,7 @@ async function main() {
   }
   console.log();
 
-  const browser = await chromium.launch();
+  const browser = await captureBackend.launch();
   const results: SnapshotResult[] = [];
 
   try {
@@ -229,7 +570,7 @@ async function main() {
       }
     }
   } finally {
-    await browser.close();
+    await captureBackend.close(browser);
   }
 
   // Summary

@@ -31,6 +31,7 @@ import { diffA11yTrees, parsePlaywrightA11ySnapshot } from "./a11y-semantic.ts";
 import { introspect, introspectToSpec, verifySpec } from "./introspect.ts";
 import { formatWorkflowUsage } from "./vrt-command-router.ts";
 import { runVerifyPipeline, type VerifyPaths } from "./vrt-verify.ts";
+import { resolveCaptureRoutes } from "./capture-config.ts";
 import type { UnifiedAgentContext, UiSpec, A11yNode } from "./types.ts";
 
 // ---- Paths ----
@@ -55,6 +56,32 @@ const EXEC_OPTS: ExecSyncOptions = {
   },
 };
 
+interface WorkflowCaptureOptions {
+  configPath?: string;
+  baseUrl?: string;
+}
+
+function parseCaptureOptions(argv: string[]): WorkflowCaptureOptions {
+  const options: WorkflowCaptureOptions = {};
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === "--config") {
+      const value = argv[++i];
+      if (!value) throw new Error("Missing value for --config");
+      options.configPath = value;
+    } else if (arg === "--base-url") {
+      const value = argv[++i];
+      if (!value) throw new Error("Missing value for --base-url");
+      options.baseUrl = value;
+    } else if (arg === "--help" || arg === "-h") {
+      // ignored here; handled by caller
+    } else {
+      throw new Error(`Unknown workflow option: ${arg}`);
+    }
+  }
+  return options;
+}
+
 function resolveCaptureSpecPath(): string {
   const candidates = [
     join(VRT_ROOT, "dist", "e2e", "vrt-capture.spec.mjs"),
@@ -67,27 +94,55 @@ function resolveCaptureSpecPath(): string {
   return found;
 }
 
-function runCaptureSpec(mode: "baseline" | "capture") {
+function buildCaptureEnv(mode: "baseline" | "capture", options: WorkflowCaptureOptions) {
+  const env: NodeJS.ProcessEnv = { ...EXEC_OPTS.env, VRT_MODE: mode };
+
+  // Resolve config + routes against PROJECT_ROOT (user's working directory),
+  // so external projects can drop a vrt.config.json next to their app.
+  const routeSet = resolveCaptureRoutes({
+    cwd: PROJECT_ROOT,
+    configPath: options.configPath,
+    envConfigPath: process.env.VRT_CONFIG_PATH,
+    envBaseUrl: options.baseUrl ?? process.env.VRT_BASE_URL,
+  });
+
+  if (routeSet.configPath) {
+    env.VRT_CONFIG_PATH = routeSet.configPath;
+  }
+  env.VRT_BASE_URL = routeSet.baseUrl;
+  env.VRT_PROJECT_ROOT = PROJECT_ROOT;
+
+  if (routeSet.source === "config" && routeSet.configPath) {
+    console.log(`  (using capture config: ${routeSet.configPath})`);
+    console.log(`  (routes: ${routeSet.routes.map((r) => r.path).join(", ")})`);
+  } else if (routeSet.source === "default") {
+    console.log(`  (using default vrt routes — pass --config or create vrt.config.json to customize)`);
+  }
+
+  return env;
+}
+
+function runCaptureSpec(mode: "baseline" | "capture", options: WorkflowCaptureOptions) {
   execFileSync(
     NPX_COMMAND,
     ["playwright", "test", resolveCaptureSpecPath(), "--reporter=list"],
     {
       ...EXEC_OPTS,
-      env: { ...EXEC_OPTS.env, VRT_MODE: mode },
+      env: buildCaptureEnv(mode, options),
     }
   );
 }
 
 // ---- Commands ----
 
-async function init() {
+async function init(options: WorkflowCaptureOptions = {}) {
   console.log("=== VRT Init: Creating baselines ===\n");
 
   await mkdir(BASELINES_DIR, { recursive: true });
 
   console.log("Running Playwright to capture baseline screenshots + a11y...");
   try {
-    runCaptureSpec("baseline");
+    runCaptureSpec("baseline", options);
   } catch (e) {
     // Some tests may fail (e.g. title check) but captures still succeed
     const captured = await listFiles(BASELINES_DIR, ".png");
@@ -105,7 +160,7 @@ async function init() {
   console.log(`Stored in: ${BASELINES_DIR}`);
 }
 
-async function capture() {
+async function capture(options: WorkflowCaptureOptions = {}) {
   console.log("=== VRT Capture: Taking snapshots ===\n");
 
   // Clean previous snapshots
@@ -116,7 +171,7 @@ async function capture() {
 
   console.log("Running Playwright to capture current state...");
   try {
-    runCaptureSpec("capture");
+    runCaptureSpec("capture", options);
   } catch (e) {
     const captured = await listFiles(SNAPSHOTS_DIR, ".png");
     if (captured.length === 0) {
@@ -479,17 +534,17 @@ async function listFiles(dir: string, suffix: string): Promise<string[]> {
 
 // ---- Main ----
 
-const commands: Record<string, () => Promise<void>> = {
-  init,
-  capture,
-  verify,
-  approve,
-  report,
-  graph,
-  affected: affectedCmd,
-  introspect: introspectCmd,
-  "spec-verify": specVerifyCmd,
-  expect: expectCmd,
+const commands: Record<string, (argv: string[]) => Promise<void>> = {
+  init: (argv) => init(parseCaptureOptions(argv)),
+  capture: (argv) => capture(parseCaptureOptions(argv)),
+  verify: () => verify(),
+  approve: () => approve(),
+  report: () => report(),
+  graph: () => graph(),
+  affected: () => affectedCmd(),
+  introspect: () => introspectCmd(),
+  "spec-verify": () => specVerifyCmd(),
+  expect: () => expectCmd(),
 };
 
 export async function runWorkflowCli(argv = process.argv.slice(2)) {
@@ -506,7 +561,7 @@ export async function runWorkflowCli(argv = process.argv.slice(2)) {
     process.exit(1);
   }
 
-  await handler();
+  await handler(argv.slice(1));
 }
 
 if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) {

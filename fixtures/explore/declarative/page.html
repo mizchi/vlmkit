@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Declarative interactions</title>
+<style>
+  body { font-family: system-ui; margin: 0; padding: 40px; background: #f3f4f6; }
+  h1 { font-size: 22px; }
+  .dropdown { position: relative; display: inline-block; margin-bottom: 16px; }
+  .dropdown-trigger {
+    padding: 10px 16px; background: white; border: 1px solid #d1d5db; border-radius: 6px;
+    cursor: pointer; font-size: 14px;
+  }
+  .dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%; left: 0; margin-top: 4px;
+    background: white; border: 1px solid #d1d5db; border-radius: 6px;
+    min-width: 200px; padding: 4px 0;
+  }
+  .dropdown.open .dropdown-menu { display: block; }
+  .dropdown-item { padding: 8px 16px; font-size: 14px; }
+  .btn-cta {
+    margin-top: 24px;
+    padding: 10px 20px;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  .pulse { padding: 12px; background: white; margin-top: 16px; border-radius: 8px; }
+  .pulse.active { background: #fde047; }
+</style>
+</head>
+<body>
+  <h1>Account settings</h1>
+
+  <!-- 1. Attribute-driven: clicking triggers built-in click handler -->
+  <div class="dropdown" id="region">
+    <button class="dropdown-trigger" data-vrt-action="open-region-menu">Region ▾</button>
+    <div class="dropdown-menu">
+      <div class="dropdown-item">United States</div>
+      <div class="dropdown-item">Germany</div>
+      <div class="dropdown-item">Japan</div>
+    </div>
+  </div>
+
+  <!-- 2. Another attribute-driven action: a noop element to test "dead" -->
+  <p>
+    Click <button data-vrt-action="noop-action" style="background:none;border:none;color:#2563eb;cursor:pointer;">here</button>
+    to do nothing visible.
+  </p>
+
+  <div class="pulse" id="pulse">Static content</div>
+  <button class="btn-cta">CTA (not auto-explored)</button>
+
+  <script>
+    // Dropdown toggle
+    document.querySelectorAll('.dropdown-trigger').forEach(el => {
+      el.addEventListener('click', () => el.closest('.dropdown').classList.toggle('open'));
+    });
+
+    // 3. JS-driven actions
+    window.__vrtActions = [
+      {
+        name: "activate-pulse",
+        run: () => {
+          document.getElementById('pulse').classList.add('active');
+        },
+      },
+      {
+        name: "inject-banner",
+        run: () => {
+          const b = document.createElement('div');
+          b.style.padding = '16px';
+          b.style.background = '#dc2626';
+          b.style.color = 'white';
+          b.textContent = 'Injected banner';
+          document.body.insertBefore(b, document.body.firstChild);
+        },
+      },
+    ];
+  </script>
+</body>
+</html>

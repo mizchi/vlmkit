@@ -1,0 +1,104 @@
+{
+  "timestamp": "2026-05-11T16:15:40.501Z",
+  "iterations": 5,
+  "urls": [
+    "http://127.0.0.1:45333/migration/tailwind-to-vanilla/after.html",
+    "http://127.0.0.1:45333/migration/reset-css/normalize.html",
+    "http://127.0.0.1:45333/migration/reset-css/modern-normalize.html",
+    "http://127.0.0.1:45333/migration/shadcn-to-luna/after.html"
+  ],
+  "threshold": 0,
+  "entries": [
+    {
+      "url": "http://127.0.0.1:45333/migration/reset-css/modern-normalize.html",
+      "label": "127_0_0_1_45333_migration_reset_css_modern_normalize",
+      "viewport": "desktop",
+      "comparisons": 4,
+      "positives": 0,
+      "falsePositiveRate": 0,
+      "maxDiffRatio": 0,
+      "meanDiffRatio": 0,
+      "maxCompensatedDiffRatio": 0
+    },
+    {
+      "url": "http://127.0.0.1:45333/migration/reset-css/modern-normalize.html",
+      "label": "127_0_0_1_45333_migration_reset_css_modern_normalize",
+      "viewport": "mobile",
+      "comparisons": 4,
+      "positives": 0,
+      "falsePositiveRate": 0,
+      "maxDiffRatio": 0,
+      "meanDiffRatio": 0,
+      "maxCompensatedDiffRatio": 0
+    },
+    {
+      "url": "http://127.0.0.1:45333/migration/reset-css/normalize.html",
+      "label": "127_0_0_1_45333_migration_reset_css_normalize",
+      "viewport": "desktop",
+      "comparisons": 4,
+      "positives": 0,
+      "falsePositiveRate": 0,
+      "maxDiffRatio": 0,
+      "meanDiffRatio": 0,
+      "maxCompensatedDiffRatio": 0
+    },
+    {
+      "url": "http://127.0.0.1:45333/migration/reset-css/normalize.html",
+      "label": "127_0_0_1_45333_migration_reset_css_normalize",
+      "viewport": "mobile",
+      "comparisons": 4,
+      "positives": 0,
+      "falsePositiveRate": 0,
+      "maxDiffRatio": 0,
+      "meanDiffRatio": 0,
+      "maxCompensatedDiffRatio": 0
+    },
+    {
+      "url": "http://127.0.0.1:45333/migration/shadcn-to-luna/after.html",
+      "label": "127_0_0_1_45333_migration_shadcn_to_luna_after",
+      "viewport": "desktop",
+      "comparisons": 4,
+      "positives": 0,
+      "falsePositiveRate": 0,
+      "maxDiffRatio": 0,
+      "meanDiffRatio": 0,
+      "maxCompensatedDiffRatio": 0
+    },
+    {
+      "url": "http://127.0.0.1:45333/migration/shadcn-to-luna/after.html",
+      "label": "127_0_0_1_45333_migration_shadcn_to_luna_after",
+      "viewport": "mobile",
+      "comparisons": 4,
+      "positives": 0,
+      "falsePositiveRate": 0,
+      "maxDiffRatio": 0,
+      "meanDiffRatio": 0,
+      "maxCompensatedDiffRatio": 0
+    },
+    {
+      "url": "http://127.0.0.1:45333/migration/tailwind-to-vanilla/after.html",
+      "label": "127_0_0_1_45333_migration_tailwind_to_vanilla_after",
+      "viewport": "desktop",
+      "comparisons": 4,
+      "positives": 0,
+      "falsePositiveRate": 0,
+      "maxDiffRatio": 0,
+      "meanDiffRatio": 0,
+      "maxCompensatedDiffRatio": 0
+    },
+    {
+      "url": "http://127.0.0.1:45333/migration/tailwind-to-vanilla/after.html",
+      "label": "127_0_0_1_45333_migration_tailwind_to_vanilla_after",
+      "viewport": "mobile",
+      "comparisons": 4,
+      "positives": 0,
+      "falsePositiveRate": 0,
+      "maxDiffRatio": 0,
+      "meanDiffRatio": 0,
+      "maxCompensatedDiffRatio": 0
+    }
+  ],
+  "totalComparisons": 32,
+  "totalPositives": 0,
+  "overallFalsePositiveRate": 0
+}

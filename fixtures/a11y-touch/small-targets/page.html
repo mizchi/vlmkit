@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Small touch targets</title>
+<style>
+  body { font-family: system-ui; margin: 0; padding: 40px; background: white; }
+  h1 { font-size: 22px; }
+  .ok-btn { display: inline-block; padding: 12px 20px; background: #2563eb; color: white; border: none; border-radius: 4px; font-size: 14px; font-weight: 600; }
+  /* FAIL: icon-only button too small (24×24 — passes AA but fails AAA) */
+  .icon-btn-aa { display: inline-block; width: 24px; height: 24px; background: #e5e7eb; border: none; border-radius: 4px; margin-left: 8px; }
+  /* FAIL: tiny close button (16×16 — fails both AA and AAA) */
+  .close-btn { display: inline-block; width: 16px; height: 16px; background: transparent; color: #6b7280; border: none; padding: 0; font-size: 14px; }
+  /* FAIL: inline link too narrow vertically */
+  .inline-link { font-size: 12px; color: #2563eb; text-decoration: underline; }
+  /* PASS: large enough */
+  .big-btn { display: inline-block; padding: 14px 24px; background: #10b981; color: white; border: none; border-radius: 8px; font-size: 16px; }
+  /* Clustered failure: 3 small icon buttons in a row */
+  .cluster button { width: 20px; height: 20px; background: #d1d5db; border: none; margin-right: 2px; }
+</style>
+</head>
+<body>
+  <h1>Settings</h1>
+  <p>Click <a class="inline-link" href="#">here</a> to learn more, or use the buttons below.</p>
+  <button class="ok-btn">Save changes</button>
+  <button class="icon-btn-aa" aria-label="Help"></button>
+  <button class="close-btn" aria-label="Close">×</button>
+  <button class="big-btn">Continue</button>
+  <div class="cluster">
+    <button aria-label="Bold">B</button>
+    <button aria-label="Italic">I</button>
+    <button aria-label="Underline">U</button>
+  </div>
+</body>
+</html>

@@ -1,0 +1,979 @@
+{
+  "dir": "fixtures/migration/reset-css",
+  "baseline": "normalize.html",
+  "variants": [
+    "modern-normalize.html",
+    "destyle.html",
+    "no-reset.html"
+  ],
+  "viewports": [
+    {
+      "width": 375,
+      "height": 900,
+      "label": "mobile",
+      "reason": "standard"
+    },
+    {
+      "width": 481,
+      "height": 900,
+      "label": "sample-481",
+      "reason": "random sample in [320, 639]"
+    },
+    {
+      "width": 640,
+      "height": 900,
+      "label": "at-640",
+      "reason": "(max-width: 640px) boundary-at"
+    },
+    {
+      "width": 641,
+      "height": 900,
+      "label": "above-640",
+      "reason": "(max-width: 640px) boundary-above"
+    },
+    {
+      "width": 866,
+      "height": 900,
+      "label": "sample-866",
+      "reason": "random sample in [640, 1920]"
+    },
+    {
+      "width": 1280,
+      "height": 900,
+      "label": "desktop",
+      "reason": "standard"
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "label": "wide",
+      "reason": "standard"
+    }
+  ],
+  "results": [
+    {
+      "variantFile": "modern-normalize.html",
+      "viewport": "mobile",
+      "diffRatio": 0.026220141956182566,
+      "diffPixels": 23864,
+      "totalPixels": 910140,
+      "category": "color-change",
+      "categoryCounts": {
+        "layout-shift": 0,
+        "color-change": 1,
+        "spacing": 0,
+        "typography": 0,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "a",
+          "property": "color",
+          "value": "#2563eb",
+          "category": "visual",
+          "mediaCondition": null,
+          "score": 6,
+          "reasoning": "color-change mismatch"
+        },
+        {
+          "selector": "article",
+          "property": "border-bottom",
+          "value": "1px solid #f1f5f9",
+          "category": "visual",
+          "mediaCondition": null,
+          "score": 6,
+          "reasoning": "color-change mismatch"
+        },
+        {
+          "selector": "blockquote",
+          "property": "border-left",
+          "value": "3px solid #cbd5e1",
+          "category": "visual",
+          "mediaCondition": null,
+          "score": 6,
+          "reasoning": "color-change mismatch"
+        }
+      ]
+    },
+    {
+      "variantFile": "modern-normalize.html",
+      "viewport": "sample-481",
+      "diffRatio": 0.020566969776038658,
+      "diffPixels": 23095,
+      "totalPixels": 1122917,
+      "category": "color-change",
+      "categoryCounts": {
+        "layout-shift": 0,
+        "color-change": 1,
+        "spacing": 0,
+        "typography": 0,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "a",
+          "property": "color",
+          "value": "#2563eb",
+          "category": "visual",
+          "mediaCondition": null,
+          "score": 6,
+          "reasoning": "color-change mismatch"
+        },
+        {
+          "selector": "article",
+          "property": "border-bottom",
+          "value": "1px solid #f1f5f9",
+          "category": "visual",
+          "mediaCondition": null,
+          "score": 6,
+          "reasoning": "color-change mismatch"
+        },
+        {
+          "selector": "blockquote",
+          "property": "border-left",
+          "value": "3px solid #cbd5e1",
+          "category": "visual",
+          "mediaCondition": null,
+          "score": 6,
+          "reasoning": "color-change mismatch"
+        }
+      ]
+    },
+    {
+      "variantFile": "modern-normalize.html",
+      "viewport": "at-640",
+      "diffRatio": 0.015537645378494185,
+      "diffPixels": 22845,
+      "totalPixels": 1470300,
+      "category": "color-change",
+      "categoryCounts": {
+        "layout-shift": 0,
+        "color-change": 2,
+        "spacing": 0,
+        "typography": 0,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "a",
+          "property": "color",
+          "value": "#2563eb",
+          "category": "visual",
+          "mediaCondition": null,
+          "score": 6,
+          "reasoning": "color-change mismatch"
+        },
+        {
+          "selector": "article",
+          "property": "border-bottom",
+          "value": "1px solid #f1f5f9",
+          "category": "visual",
+          "mediaCondition": null,
+          "score": 6,
+          "reasoning": "color-change mismatch"
+        },
+        {
+          "selector": "blockquote",
+          "property": "border-left",
+          "value": "3px solid #cbd5e1",
+          "category": "visual",
+          "mediaCondition": null,
+          "score": 6,
+          "reasoning": "color-change mismatch"
+        }
+      ]
+    },
+    {
+      "variantFile": "modern-normalize.html",
+      "viewport": "above-640",
+      "diffRatio": 0.015510814012770102,
+      "diffPixels": 23396,
+      "totalPixels": 1508367,
+      "category": "color-change",
+      "categoryCounts": {
+        "layout-shift": 0,
+        "color-change": 2,
+        "spacing": 0,
+        "typography": 0,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "a",
+          "property": "color",
+          "value": "#2563eb",
+          "category": "visual",
+          "mediaCondition": null,
+          "score": 6,
+          "reasoning": "color-change mismatch"
+        },
+        {
+          "selector": "article",
+          "property": "border-bottom",
+          "value": "1px solid #f1f5f9",
+          "category": "visual",
+          "mediaCondition": null,
+          "score": 6,
+          "reasoning": "color-change mismatch"
+        },
+        {
+          "selector": "blockquote",
+          "property": "border-left",
+          "value": "3px solid #cbd5e1",
+          "category": "visual",
+          "mediaCondition": null,
+          "score": 6,
+          "reasoning": "color-change mismatch"
+        }
+      ]
+    },
+    {
+      "variantFile": "modern-normalize.html",
+      "viewport": "sample-866",
+      "diffRatio": 0.018585077526409765,
+      "diffPixels": 36889,
+      "totalPixels": 1984872,
+      "category": "layout-shift",
+      "categoryCounts": {
+        "layout-shift": 11,
+        "color-change": 0,
+        "spacing": 0,
+        "typography": 5,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "header nav",
+          "property": "display",
+          "value": "flex",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "header nav",
+          "property": "gap",
+          "value": "16px",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "label",
+          "property": "display",
+          "value": "block",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        }
+      ]
+    },
+    {
+      "variantFile": "modern-normalize.html",
+      "viewport": "desktop",
+      "diffRatio": 0.012573966513961605,
+      "diffPixels": 36889,
+      "totalPixels": 2933760,
+      "category": "layout-shift",
+      "categoryCounts": {
+        "layout-shift": 10,
+        "color-change": 0,
+        "spacing": 0,
+        "typography": 6,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "header nav",
+          "property": "display",
+          "value": "flex",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "header nav",
+          "property": "gap",
+          "value": "16px",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "label",
+          "property": "display",
+          "value": "block",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        }
+      ]
+    },
+    {
+      "variantFile": "modern-normalize.html",
+      "viewport": "wide",
+      "diffRatio": 0.011176859123521427,
+      "diffPixels": 36889,
+      "totalPixels": 3300480,
+      "category": "layout-shift",
+      "categoryCounts": {
+        "layout-shift": 11,
+        "color-change": 0,
+        "spacing": 0,
+        "typography": 5,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "header nav",
+          "property": "display",
+          "value": "flex",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "header nav",
+          "property": "gap",
+          "value": "16px",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "label",
+          "property": "display",
+          "value": "block",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        }
+      ]
+    },
+    {
+      "variantFile": "destyle.html",
+      "viewport": "mobile",
+      "diffRatio": 0.1271189047838794,
+      "diffPixels": 115696,
+      "totalPixels": 910140,
+      "category": "layout-shift",
+      "categoryCounts": {
+        "layout-shift": 4,
+        "color-change": 0,
+        "spacing": 0,
+        "typography": 2,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "header nav",
+          "property": "flex-wrap",
+          "value": "wrap",
+          "category": "layout",
+          "mediaCondition": "(max-width: 640px)",
+          "score": 7.936,
+          "reasoning": "layout-shift mismatch; active media (max-width: 640px)"
+        },
+        {
+          "selector": "header nav",
+          "property": "gap",
+          "value": "8px",
+          "category": "layout",
+          "mediaCondition": "(max-width: 640px)",
+          "score": 7.936,
+          "reasoning": "layout-shift mismatch; active media (max-width: 640px)"
+        },
+        {
+          "selector": "body",
+          "property": "padding",
+          "value": "16px",
+          "category": "spacing",
+          "mediaCondition": "(max-width: 640px)",
+          "score": 5.936,
+          "reasoning": "layout-shift mismatch; active media (max-width: 640px)"
+        }
+      ]
+    },
+    {
+      "variantFile": "destyle.html",
+      "viewport": "sample-481",
+      "diffRatio": 0.1145293908632606,
+      "diffPixels": 128607,
+      "totalPixels": 1122917,
+      "category": "layout-shift",
+      "categoryCounts": {
+        "layout-shift": 3,
+        "color-change": 0,
+        "spacing": 0,
+        "typography": 2,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "header nav",
+          "property": "flex-wrap",
+          "value": "wrap",
+          "category": "layout",
+          "mediaCondition": "(max-width: 640px)",
+          "score": 7.936,
+          "reasoning": "layout-shift mismatch; active media (max-width: 640px)"
+        },
+        {
+          "selector": "header nav",
+          "property": "gap",
+          "value": "8px",
+          "category": "layout",
+          "mediaCondition": "(max-width: 640px)",
+          "score": 7.936,
+          "reasoning": "layout-shift mismatch; active media (max-width: 640px)"
+        },
+        {
+          "selector": "body",
+          "property": "padding",
+          "value": "16px",
+          "category": "spacing",
+          "mediaCondition": "(max-width: 640px)",
+          "score": 5.936,
+          "reasoning": "layout-shift mismatch; active media (max-width: 640px)"
+        }
+      ]
+    },
+    {
+      "variantFile": "destyle.html",
+      "viewport": "at-640",
+      "diffRatio": 0.10116166768686663,
+      "diffPixels": 148738,
+      "totalPixels": 1470300,
+      "category": "layout-shift",
+      "categoryCounts": {
+        "layout-shift": 4,
+        "color-change": 0,
+        "spacing": 0,
+        "typography": 1,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "header nav",
+          "property": "flex-wrap",
+          "value": "wrap",
+          "category": "layout",
+          "mediaCondition": "(max-width: 640px)",
+          "score": 7.936,
+          "reasoning": "layout-shift mismatch; active media (max-width: 640px)"
+        },
+        {
+          "selector": "header nav",
+          "property": "gap",
+          "value": "8px",
+          "category": "layout",
+          "mediaCondition": "(max-width: 640px)",
+          "score": 7.936,
+          "reasoning": "layout-shift mismatch; active media (max-width: 640px)"
+        },
+        {
+          "selector": "body",
+          "property": "padding",
+          "value": "16px",
+          "category": "spacing",
+          "mediaCondition": "(max-width: 640px)",
+          "score": 5.936,
+          "reasoning": "layout-shift mismatch; active media (max-width: 640px)"
+        }
+      ]
+    },
+    {
+      "variantFile": "destyle.html",
+      "viewport": "above-640",
+      "diffRatio": 0.10139044410279462,
+      "diffPixels": 152934,
+      "totalPixels": 1508367,
+      "category": "layout-shift",
+      "categoryCounts": {
+        "layout-shift": 3,
+        "color-change": 0,
+        "spacing": 0,
+        "typography": 2,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "header nav",
+          "property": "display",
+          "value": "flex",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "header nav",
+          "property": "gap",
+          "value": "16px",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "label",
+          "property": "display",
+          "value": "block",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        }
+      ]
+    },
+    {
+      "variantFile": "destyle.html",
+      "viewport": "sample-866",
+      "diffRatio": 0.07956734741585351,
+      "diffPixels": 157931,
+      "totalPixels": 1984872,
+      "category": "layout-shift",
+      "categoryCounts": {
+        "layout-shift": 5,
+        "color-change": 0,
+        "spacing": 0,
+        "typography": 3,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "header nav",
+          "property": "display",
+          "value": "flex",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "header nav",
+          "property": "gap",
+          "value": "16px",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "label",
+          "property": "display",
+          "value": "block",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        }
+      ]
+    },
+    {
+      "variantFile": "destyle.html",
+      "viewport": "desktop",
+      "diffRatio": 0.0703428364965096,
+      "diffPixels": 206369,
+      "totalPixels": 2933760,
+      "category": "layout-shift",
+      "categoryCounts": {
+        "layout-shift": 3,
+        "color-change": 0,
+        "spacing": 0,
+        "typography": 3,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "header nav",
+          "property": "display",
+          "value": "flex",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "header nav",
+          "property": "gap",
+          "value": "16px",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "label",
+          "property": "display",
+          "value": "block",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        }
+      ]
+    },
+    {
+      "variantFile": "destyle.html",
+      "viewport": "wide",
+      "diffRatio": 0.06819886804343611,
+      "diffPixels": 225089,
+      "totalPixels": 3300480,
+      "category": "layout-shift",
+      "categoryCounts": {
+        "layout-shift": 5,
+        "color-change": 0,
+        "spacing": 0,
+        "typography": 3,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "header nav",
+          "property": "display",
+          "value": "flex",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "header nav",
+          "property": "gap",
+          "value": "16px",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "label",
+          "property": "display",
+          "value": "block",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        }
+      ]
+    },
+    {
+      "variantFile": "no-reset.html",
+      "viewport": "mobile",
+      "diffRatio": 0.04017403915881073,
+      "diffPixels": 36564,
+      "totalPixels": 910140,
+      "category": "layout-shift",
+      "categoryCounts": {
+        "layout-shift": 8,
+        "color-change": 0,
+        "spacing": 0,
+        "typography": 2,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "header nav",
+          "property": "flex-wrap",
+          "value": "wrap",
+          "category": "layout",
+          "mediaCondition": "(max-width: 640px)",
+          "score": 7.936,
+          "reasoning": "layout-shift mismatch; active media (max-width: 640px)"
+        },
+        {
+          "selector": "header nav",
+          "property": "gap",
+          "value": "8px",
+          "category": "layout",
+          "mediaCondition": "(max-width: 640px)",
+          "score": 7.936,
+          "reasoning": "layout-shift mismatch; active media (max-width: 640px)"
+        },
+        {
+          "selector": "body",
+          "property": "padding",
+          "value": "16px",
+          "category": "spacing",
+          "mediaCondition": "(max-width: 640px)",
+          "score": 5.936,
+          "reasoning": "layout-shift mismatch; active media (max-width: 640px)"
+        }
+      ]
+    },
+    {
+      "variantFile": "no-reset.html",
+      "viewport": "sample-481",
+      "diffRatio": 0.034750564823580014,
+      "diffPixels": 39022,
+      "totalPixels": 1122917,
+      "category": "layout-shift",
+      "categoryCounts": {
+        "layout-shift": 10,
+        "color-change": 0,
+        "spacing": 0,
+        "typography": 1,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "header nav",
+          "property": "flex-wrap",
+          "value": "wrap",
+          "category": "layout",
+          "mediaCondition": "(max-width: 640px)",
+          "score": 7.936,
+          "reasoning": "layout-shift mismatch; active media (max-width: 640px)"
+        },
+        {
+          "selector": "header nav",
+          "property": "gap",
+          "value": "8px",
+          "category": "layout",
+          "mediaCondition": "(max-width: 640px)",
+          "score": 7.936,
+          "reasoning": "layout-shift mismatch; active media (max-width: 640px)"
+        },
+        {
+          "selector": "body",
+          "property": "padding",
+          "value": "16px",
+          "category": "spacing",
+          "mediaCondition": "(max-width: 640px)",
+          "score": 5.936,
+          "reasoning": "layout-shift mismatch; active media (max-width: 640px)"
+        }
+      ]
+    },
+    {
+      "variantFile": "no-reset.html",
+      "viewport": "at-640",
+      "diffRatio": 0.029924505203019792,
+      "diffPixels": 43998,
+      "totalPixels": 1470300,
+      "category": "layout-shift",
+      "categoryCounts": {
+        "layout-shift": 10,
+        "color-change": 0,
+        "spacing": 0,
+        "typography": 1,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "header nav",
+          "property": "flex-wrap",
+          "value": "wrap",
+          "category": "layout",
+          "mediaCondition": "(max-width: 640px)",
+          "score": 7.936,
+          "reasoning": "layout-shift mismatch; active media (max-width: 640px)"
+        },
+        {
+          "selector": "header nav",
+          "property": "gap",
+          "value": "8px",
+          "category": "layout",
+          "mediaCondition": "(max-width: 640px)",
+          "score": 7.936,
+          "reasoning": "layout-shift mismatch; active media (max-width: 640px)"
+        },
+        {
+          "selector": "body",
+          "property": "padding",
+          "value": "16px",
+          "category": "spacing",
+          "mediaCondition": "(max-width: 640px)",
+          "score": 5.936,
+          "reasoning": "layout-shift mismatch; active media (max-width: 640px)"
+        }
+      ]
+    },
+    {
+      "variantFile": "no-reset.html",
+      "viewport": "above-640",
+      "diffRatio": 0.02955978220154644,
+      "diffPixels": 44587,
+      "totalPixels": 1508367,
+      "category": "layout-shift",
+      "categoryCounts": {
+        "layout-shift": 8,
+        "color-change": 0,
+        "spacing": 0,
+        "typography": 2,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "header nav",
+          "property": "display",
+          "value": "flex",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "header nav",
+          "property": "gap",
+          "value": "16px",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "label",
+          "property": "display",
+          "value": "block",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        }
+      ]
+    },
+    {
+      "variantFile": "no-reset.html",
+      "viewport": "sample-866",
+      "diffRatio": 0.024975414031736053,
+      "diffPixels": 49573,
+      "totalPixels": 1984872,
+      "category": "layout-shift",
+      "categoryCounts": {
+        "layout-shift": 9,
+        "color-change": 0,
+        "spacing": 0,
+        "typography": 2,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "header nav",
+          "property": "display",
+          "value": "flex",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "header nav",
+          "property": "gap",
+          "value": "16px",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "label",
+          "property": "display",
+          "value": "block",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        }
+      ]
+    },
+    {
+      "variantFile": "no-reset.html",
+      "viewport": "desktop",
+      "diffRatio": 0.018590818608202442,
+      "diffPixels": 54541,
+      "totalPixels": 2933760,
+      "category": "layout-shift",
+      "categoryCounts": {
+        "layout-shift": 9,
+        "color-change": 0,
+        "spacing": 0,
+        "typography": 2,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "header nav",
+          "property": "display",
+          "value": "flex",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "header nav",
+          "property": "gap",
+          "value": "16px",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "label",
+          "property": "display",
+          "value": "block",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        }
+      ]
+    },
+    {
+      "variantFile": "no-reset.html",
+      "viewport": "wide",
+      "diffRatio": 0.017106905662206708,
+      "diffPixels": 56461,
+      "totalPixels": 3300480,
+      "category": "layout-shift",
+      "categoryCounts": {
+        "layout-shift": 9,
+        "color-change": 0,
+        "spacing": 0,
+        "typography": 2,
+        "other": 0
+      },
+      "fixCandidates": [
+        {
+          "selector": "header nav",
+          "property": "display",
+          "value": "flex",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "header nav",
+          "property": "gap",
+          "value": "16px",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        },
+        {
+          "selector": "label",
+          "property": "display",
+          "value": "block",
+          "category": "layout",
+          "mediaCondition": null,
+          "score": 5,
+          "reasoning": "layout-shift mismatch"
+        }
+      ]
+    }
+  ]
+}

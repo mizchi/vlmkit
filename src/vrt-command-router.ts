@@ -55,6 +55,26 @@ const ROOT_MODULE_COMMANDS: Record<string, string> = {
   snapshot: "./snapshot.ts",
   elements: "./element-compare.ts",
   smoke: "./smoke-runner.ts",
+  flipbook: "./flipbook-cli.ts",
+  "diff-for-agent": "./diff-for-agent-cli.ts",
+  "compare-runs": "./compare-runs-cli.ts",
+  // Markup-assistance scenarios (2026-05-13).
+  "component-from-image": "./component-from-image.ts",
+  "multi-page-consistency": "./multi-page-consistency.ts",
+  "component-consistency": "./component-consistency.ts",
+  "theme-parity": "./theme-parity.ts",
+  "i18n-stress": "./i18n-stress.ts",
+  "a11y-contrast": "./a11y-contrast.ts",
+  "a11y-touch": "./a11y-touch.ts",
+  "a11y-focus-order": "./a11y-focus-order.ts",
+  "interact": "./interact.ts",
+  "media-variants": "./media-variants.ts",
+  "cross-browser": "./cross-browser.ts",
+  "design-tokens": "./design-tokens.ts",
+  "perf": "./perf.ts",
+  "explore": "./explore.ts",
+  "skill": "./skill.ts",
+  "component-extract": "./component-extract.ts",
 };
 
 const WORKFLOW_ALIAS_COMMANDS = new Set<WorkflowCommand>([
@@ -73,8 +93,10 @@ export function formatWorkflowUsage(): string {
   return `vrt workflow <command>
 
 Commands:
-  init         Create baseline screenshots + a11y trees
-  capture      Take current snapshots
+  init [--config <path>] [--base-url <url>]
+               Create baseline screenshots + a11y trees
+  capture [--config <path>] [--base-url <url>]
+               Take current snapshots
   verify       Compare snapshots against baselines
   approve      Promote current snapshots to new baselines
   report       Show the latest verification report
@@ -82,7 +104,23 @@ Commands:
   affected     Show components affected by current changes
   introspect   Generate spec.json from current a11y snapshots
   spec-verify  Verify spec.json invariants against current state
-  expect       Auto-generate expectation.json from baseline vs snapshot diff`;
+  expect       Auto-generate expectation.json from baseline vs snapshot diff
+
+Capture config (vrt.config.json):
+  {
+    "baseUrl": "http://localhost:3000",
+    "capture": {
+      "routes": [
+        { "name": "home", "path": "/", "waitFor": "main" },
+        { "name": "about", "path": "/about" }
+      ]
+    }
+  }
+
+Routes can also be supplied via env vars:
+  VRT_CONFIG_PATH   Path to capture config file
+  VRT_BASE_URL      Override the base URL
+  VRT_CAPTURE_ROUTES JSON-encoded array of routes`;
 }
 
 export function formatRootUsage(): string {
@@ -99,6 +137,48 @@ Core Commands:
   discover <file>             Discover responsive breakpoints from HTML/CSS
   bench [options]             CSS challenge benchmark
   report                      Detection pattern report
+
+Markup-Assistance Commands:
+  component-from-image <target.png> <current.html>
+                              Build a component from a target screenshot
+  multi-page-consistency --selector <sel> --urls/--files ...
+                              Drift check: same component across N pages
+  component-consistency <html> --selector <sel>
+                              Drift check: N instances of selector on one page
+  theme-parity <html>         Detect hard-coded colors that don't respond
+                              to prefers-color-scheme dark
+  i18n-stress <html> [--inflate 1.4]
+                              Inflate text content; detect overflow / wrap bugs
+  a11y-contrast <html>        WCAG AA contrast scan on rendered text
+  a11y-touch <html|url> [--level AAA|AA]
+                              Touch-target size check (44×44 / 24×24)
+  a11y-focus-order <html|url>
+                              Tab through page, surface visual-order
+                              mismatches and focus traps
+  interact <html|url> --sequence <path.json>
+                              Scripted UI interaction sequence
+                              (click / hover / type / scroll + per-step diff)
+  media-variants <html|url> [--variants ...]
+                              Verify forced-colors / reduced-motion / print /
+                              RTL / 200%-zoom adaptations
+  cross-browser <html|url> [--engines ...]
+                              Render in chromium / firefox / webkit and
+                              diff (engines auto-skip if not installed)
+  design-tokens <html|url> [--radius-scale ...]
+                              Scale-conformance check for radius, spacing,
+                              z-index, box-shadow tiers
+  perf <html|url>             Web Vitals (CLS / LCP / FCP) via in-page
+                              PerformanceObserver — Lighthouse-light
+  explore <html|url>          Auto-discover declared actions
+                              (window.__vrtActions / data-vrt-action)
+                              and diff each transition
+  skill <list|show|init|run>  Per-project skill playbooks under
+                              .vrt-skills/ — bundle of checks per
+                              target (selector, viewport, tools)
+  component-extract <png> [--crop N | --at x,y | --crop-all]
+                              Detect components in a page screenshot
+                              and crop them to standalone PNGs
+                              (= targets for component-from-image)
 
 Workflow Commands:
   workflow <command>          Stateful baseline/snapshot verification workflow

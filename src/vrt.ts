@@ -13,6 +13,25 @@ const MODULE_LOADERS = {
   "./png-diff.ts": () => import("./png-diff.ts"),
   "./smoke-runner.ts": () => import("./smoke-runner.ts"),
   "./snapshot.ts": () => import("./snapshot.ts"),
+  "./flipbook-cli.ts": () => import("./flipbook-cli.ts"),
+  "./diff-for-agent-cli.ts": () => import("./diff-for-agent-cli.ts"),
+  "./compare-runs-cli.ts": () => import("./compare-runs-cli.ts"),
+  "./component-from-image.ts": () => import("./component-from-image.ts"),
+  "./multi-page-consistency.ts": () => import("./multi-page-consistency.ts"),
+  "./component-consistency.ts": () => import("./component-consistency.ts"),
+  "./theme-parity.ts": () => import("./theme-parity.ts"),
+  "./i18n-stress.ts": () => import("./i18n-stress.ts"),
+  "./a11y-contrast.ts": () => import("./a11y-contrast.ts"),
+  "./a11y-touch.ts": () => import("./a11y-touch.ts"),
+  "./a11y-focus-order.ts": () => import("./a11y-focus-order.ts"),
+  "./interact.ts": () => import("./interact.ts"),
+  "./media-variants.ts": () => import("./media-variants.ts"),
+  "./cross-browser.ts": () => import("./cross-browser.ts"),
+  "./design-tokens.ts": () => import("./design-tokens.ts"),
+  "./perf.ts": () => import("./perf.ts"),
+  "./explore.ts": () => import("./explore.ts"),
+  "./skill.ts": () => import("./skill.ts"),
+  "./component-extract.ts": () => import("./component-extract.ts"),
 } as const;
 
 async function main() {
@@ -51,7 +70,12 @@ async function runModuleCommand(modulePath: string, argv: string[]) {
   if (!load) {
     throw new Error(`Unsupported module command: ${modulePath}`);
   }
-  process.argv = [process.argv[0], modulePath, ...argv];
+  // Resolve to absolute path so each module's `isCliEntry` check
+  // (`resolve(process.argv[1]) === fileURLToPath(import.meta.url)`)
+  // matches in both dev (running src/*.ts) and prod (built bundle).
+  const { fileURLToPath } = await import("node:url");
+  const absoluteModulePath = fileURLToPath(new URL(modulePath, import.meta.url));
+  process.argv = [process.argv[0], absoluteModulePath, ...argv];
   await load();
 }
 

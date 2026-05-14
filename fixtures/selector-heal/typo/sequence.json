@@ -1,0 +1,8 @@
+{
+  "viewport": { "width": 1280, "height": 720 },
+  "steps": [
+    { "action": "snapshot", "name": "default" },
+    { "action": "click", "selector": ".nav-toggle" },
+    { "action": "snapshot", "name": "after-click" }
+  ]
+}

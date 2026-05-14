@@ -1,0 +1,55 @@
+name: VRT Stability
+
+on:
+  schedule:
+    # Nightly run to measure baseline FP rate
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      iterations:
+        description: "Number of capture iterations"
+        required: false
+        default: "5"
+
+jobs:
+  stability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - name: Serve fixtures
+        run: |
+          npx --yes http-server fixtures -p 4500 --silent &
+          npx --yes wait-on http://127.0.0.1:4500 --timeout 30000
+
+      - name: Run stability measurement
+        run: |
+          ITERATIONS="${{ github.event.inputs.iterations || '5' }}"
+          node --experimental-strip-types src/vrt.ts snapshot stability \
+            http://127.0.0.1:4500/migration/tailwind-to-vanilla/after.html \
+            http://127.0.0.1:4500/migration/reset-css/normalize.html \
+            --iterations "$ITERATIONS" \
+            --output test-results/stability \
+            --fail-above-rate 0.05
+
+      - name: Upload stability report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vrt-stability
+          path: test-results/stability/stability-report.json
+          if-no-files-found: error

@@ -21,6 +21,9 @@ The public surface is organized into three layers:
 - **Snapshot** — URL-based multi-viewport capture with baseline diff
 - **Mask** — selector-based masking for dynamic content (animations, counters)
 - **Crater integration** — lightweight prescanner via BiDi (1.66x speedup, 0% false positive)
+- **Markup-assistance toolkit** (10+ commands): build from screenshot, theme-parity,
+  i18n stress, a11y contrast / touch / focus-order, media-variant adaptations,
+  cross-browser parity, design-token conformance, interaction sequences.
 
 ## Quick Start
 
@@ -64,6 +67,12 @@ vrt workflow verify
 # Mask dynamic content
 vrt snapshot http://localhost:3000/ --mask ".marquee-container,.hero-badge"
 
+# Detect broken baseline renders (e.g. CDN failed to load) — on by default
+vrt compare --dir fixtures/migration/tailwind-to-vanilla \
+  --baseline before.html --variants after.html
+# Add --strict-baseline-sanity to exit non-zero when warnings fire,
+# or --no-baseline-sanity to skip the check entirely.
+
 # CSS challenge benchmark
 just css-bench --fixture page --trials 30
 
@@ -77,15 +86,57 @@ just fix-loop --fixture page --seed 42
 
 ```bash
 vrt compare <before.html> <after.html>      # Migration VRT for files or URLs
+                                             # ([--strict-baseline-sanity] to fail on broken baseline renders)
+vrt diff-for-agent <migration-report.json>  # Agent-friendly Markdown summary of a compare report
 vrt png-diff <baseline.png> <current.png>   # Direct PNG pixel diff + heatmap
 vrt snapshot <url1> [url2] ...              # Multi-viewport snapshot + diff
 vrt snapshot approve                        # Promote *-current.png to *-baseline.png
+vrt snapshot fix-prompt                     # Emit a subagent-ready prompt from snapshot-report.json
+vrt snapshot stability <url...>             # Run N iterations and report false-positive rate
+vrt snapshot flipbook                       # Diff three-frame (baseline ↔ current ↔ heatmap) HTML flipbooks
+vrt flipbook <frame1.png> ...               # Assemble arbitrary PNG sequence into a single-file HTML flipbook
+vrt smoke --record-video <dir>              # Capture a WebM video of the smoke-test session (Playwright recordVideo)
 vrt elements [options]                      # Element-level diff with shift isolation
 vrt smoke <file-or-url>                     # A11y-driven random interaction test
 vrt discover <html-file>                    # Breakpoint discovery from HTML/CSS
 vrt bench [options]                         # CSS challenge benchmark
 vrt report                                  # Detection pattern report
 ```
+
+### Markup-Assistance Commands
+
+Built on the same Playwright + pixel-diff foundation, these commands cover the
+LLM-agent markup-authoring loop: build from a screenshot, verify the result,
+catch a11y / theme / i18n / cross-browser regressions before they ship.
+
+```bash
+# Build component from a target screenshot, iterate until close.
+vrt component-from-image <target.png> <current.html>
+  # signals: bbox + heatmap regions + dominant fill + typography hints
+  # + spacing-fix table + palette diff + multi-state suspect flags.
+
+# Verify a fully-built page.
+vrt theme-parity      <html>            # prefers-color-scheme dark / unthemed components
+vrt media-variants    <html>            # forced-colors, reduced-motion, print, RTL, 200% zoom
+vrt cross-browser     <html|url>        # chromium / firefox / webkit parity
+vrt i18n-stress       <html>            # text-node inflation overflow detection
+vrt design-tokens     <html>            # radius/spacing/z-index/shadow scale conformance
+vrt a11y-contrast     <html>            # WCAG AA contrast scan
+vrt a11y-touch        <html|url>        # touch target size (WCAG 2.5.5 / 2.5.8)
+vrt a11y-focus-order  <html|url>        # Tab order vs visual order
+
+# Drift checks.
+vrt multi-page-consistency --selector .footer --files A.html B.html C.html
+vrt component-consistency  <html> --selector .card
+
+# Scripted UI interactions (dropdowns, forms, scroll, multi-step flows).
+vrt interact <html|url> --sequence <path.json>
+```
+
+All emit a self-contained Markdown report under `--output-dir`. Each
+finding includes pasteable hex / px values + a heuristic remediation
+hint. See `docs/reports/2026-05-13-capability-survey.md` for the full
+scenario × coverage matrix.
 
 Snapshot labels are query-aware by default, so `/issues` and `/issues?severity=critical` no longer share the same baseline name.
 Use repeated `--label` flags to override labels explicitly when needed.
@@ -108,6 +159,128 @@ Minimal `vrt.config.json`:
 ```
 
 When `vrt.config.json` exists in the current directory, `vrt snapshot` loads it automatically. Use `--config <path>` to point at another file, and pass URLs or flags directly when you want CLI values to override config defaults.
+
+#### Subagent-ready fix prompt
+
+`vrt snapshot fix-prompt` reads the last `snapshot-report.json` and emits a structured task list that a coding agent can act on:
+
+```bash
+# Markdown prompt to stdout (default)
+vrt snapshot fix-prompt --output test-results/snapshots
+
+# Limit to the 5 worst diffs, write to a file
+vrt snapshot fix-prompt --output test-results/snapshots --limit 5 --out fix-prompt.md
+
+# Filter by label, minimum diff ratio, and emit JSON for programmatic use
+vrt snapshot fix-prompt --label home --min-diff 0.01 --format json
+```
+
+The prompt includes per-task URL, viewport, diff ratio (with shift compensation), and relative paths to the baseline / current / heatmap PNGs plus the captured HTML, so a subagent can map the visual regression back to source code.
+
+#### Measuring false-positive rate
+
+`vrt snapshot stability` captures the same URLs across N iterations against a
+baseline locked in on iteration 0, then reports how often comparisons showed a
+non-zero diff. Useful for tracking renderer noise, animation leakage, or mask
+gaps before turning on `--fail-on-diff` in CI:
+
+```bash
+# 3 iterations (default), any non-zero diff counts as a positive
+vrt snapshot stability http://localhost:3000/ http://localhost:3000/about/
+
+# Fail CI if the overall FP rate exceeds 5%
+vrt snapshot stability http://localhost:3000/ \
+  --iterations 5 \
+  --fail-above-rate 0.05 \
+  --output test-results/stability
+
+# Only count diffs above 1% as positives (filters out subpixel noise)
+vrt snapshot stability http://localhost:3000/ --fp-threshold 0.01
+```
+
+The run writes `stability-report.json` to the output directory with per-URL +
+per-viewport FP rate, mean / max diff ratios, and shift-compensated max — well
+suited to artifact upload + over-time tracking.
+
+#### Capture backend (`--backend`)
+
+By default `vrt snapshot` launches a local Chromium via Playwright. To offload
+capture to [Cloudflare Browser Run](https://blog.cloudflare.com/browser-run-for-ai-agents/)
+without installing Playwright browsers in CI, switch the backend:
+
+```bash
+# Connect via CDP WebSocket; credentials come from env vars
+CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=... \
+  vrt snapshot --backend cloudflare http://localhost:3000/
+```
+
+Resolution order for the backend selector:
+
+1. `--backend <local|cloudflare>` CLI flag
+2. `VRT_CAPTURE_BACKEND` env var
+3. Default `local`
+
+For the Cloudflare backend, additional env vars are required:
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `CLOUDFLARE_ACCOUNT_ID` | yes | Account id for the CDP URL |
+| `CLOUDFLARE_API_TOKEN` | yes | Token with Browser Rendering permissions |
+| `CLOUDFLARE_BROWSER_RUN_ENDPOINT` | no | Override the default WS endpoint |
+
+See `examples/vrt-snapshot-cloudflare.workflow.yml` for a complete GitHub
+Actions template that skips the local Playwright install step.
+
+#### Visualizing the VRT process — flipbooks + video
+
+The VRT process can be saved as a self-contained HTML "flipbook" (PNGs
+embedded as base64, vanilla-JS play/pause/scrub controls). One file
+per scenario, no external assets, opens in any browser, attachable to
+PRs:
+
+```bash
+# 1. Fix-loop convergence (or any ordered PNG sequence)
+vrt flipbook round-0.png round-1.png round-2.png \
+  --label "round 0" --label "round 1" --label "round 2" \
+  --title "Fix-loop convergence" --out fix-loop.html
+
+# 2. Diff three-frame (baseline ↔ current ↔ heatmap) for every regressed entry
+vrt snapshot flipbook --output test-results/snapshots
+# → test-results/snapshots/flipbooks/<label>-<viewport>.html
+
+# 3. Stability iterations as flipbook per (URL, viewport)
+vrt snapshot stability http://localhost:3000/ \
+  --iterations 5 --flipbook --output test-results/stability
+# → test-results/stability/flipbooks/<label>-<viewport>-stability.html
+
+# 4. WebM recording of a smoke-test session (Playwright recordVideo)
+vrt smoke --url http://localhost:3000/ --max-actions 20 --record-video videos/
+# → videos/<hash>.webm
+```
+
+Common flags: `--delay <ms>` controls per-frame duration (default 700),
+`--no-loop` stops at the last frame, `--no-autoplay` opens paused.
+
+#### Agent-friendly diff summary
+
+When a coding agent is iterating with `vrt compare`, the natural workflow
+(see [`docs/reports/2026-05-12-dogfood-shadcn-luna.md`](docs/reports/2026-05-12-dogfood-shadcn-luna.md))
+is: read the worst-viewport PNGs side-by-side, then write a CSS patch.
+`vrt diff-for-agent` collapses the inputs the agent needs into a single
+Markdown blob:
+
+```bash
+vrt compare --dir fixtures/migration/shadcn-to-luna \
+  --baseline before.html --variants working.html \
+  --output-dir test-results/iter1
+vrt diff-for-agent test-results/iter1/migration-report.json --max-viewports 2
+```
+
+The output contains: a worst-first diff table, category totals across
+viewports, fix candidates aggregated by `(selector, property)` with the
+number of viewports each is flagged on, and absolute paths to the
+baseline / current / heatmap PNGs for the worst N viewports — all in
+one context window.
 
 ### Workflow Commands
 
@@ -136,6 +309,40 @@ Workflow aliases are kept for ergonomics where they do not collide:
 - `vrt graph`, `vrt affected`, `vrt introspect`, `vrt spec-verify`, `vrt expect`
 
 `vrt report` remains the detection pattern report, so verification output lives under `vrt workflow report`.
+
+#### Capture routes for external projects
+
+`vrt workflow init|capture` runs `e2e/vrt-capture.spec.ts`, which now resolves
+its route list from your project rather than hard-coding vrt's own pages.
+Drop a `vrt.config.json` next to your app with a `capture` block:
+
+```json
+{
+  "baseUrl": "http://localhost:3000",
+  "capture": {
+    "routes": [
+      { "name": "home", "path": "/", "waitFor": "main" },
+      { "name": "about", "path": "/about" },
+      "/contact"
+    ]
+  }
+}
+```
+
+Each route accepts `name` (defaults to a sanitized form of `path`), `path`, and
+an optional `waitFor` CSS selector. Resolution order:
+
+1. `VRT_CAPTURE_ROUTES` env var (JSON-encoded array)
+2. `--config <path>` flag or `VRT_CONFIG_PATH` env var
+3. `vrt.config.json` auto-discovered in the working directory
+4. Built-in defaults (vrt's own UI — useful only when developing vrt itself)
+
+```bash
+# External project usage
+vrt workflow init --config ./vrt.config.json --base-url http://localhost:5173
+vrt workflow capture --config ./vrt.config.json
+vrt workflow verify
+```
 
 ### API Commands
 

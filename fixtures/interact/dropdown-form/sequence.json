@@ -1,0 +1,15 @@
+{
+  "viewport": { "width": 1280, "height": 720 },
+  "steps": [
+    { "action": "snapshot", "name": "default" },
+    { "action": "click", "selector": ".dropdown-trigger" },
+    { "action": "snapshot", "name": "dropdown-open" },
+    { "action": "click", "selector": ".dropdown-trigger" },
+    { "action": "type", "selector": "#email", "text": "not-an-email" },
+    { "action": "snapshot", "name": "invalid-email" },
+    { "action": "fill", "selector": "#email", "value": "user@example.com" },
+    { "action": "snapshot", "name": "valid-email" },
+    { "action": "scroll", "y": 500 },
+    { "action": "snapshot", "name": "scrolled" }
+  ]
+}

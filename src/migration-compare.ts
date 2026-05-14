@@ -53,9 +53,61 @@ import {
   type ViewportSpec,
 } from "./viewport-discovery.ts";
 import { formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "./playwright-launch-error.ts";
-import type { VrtSnapshot } from "./types.ts";
+import type { ShiftRegion, VrtSnapshot } from "./types.ts";
 import { applyMask, parseMaskSelectors } from "./mask.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr as _hr } from "./terminal-colors.ts";
+import {
+  evaluateRenderSanity,
+  probeSourceHtml,
+  RENDER_PROBE_BROWSER_SCRIPT,
+  type FailedRequest,
+  type RenderSanityResult,
+} from "./render-sanity.ts";
+import {
+  evaluateDomEquivalence,
+  DOM_FINGERPRINT_BROWSER_SCRIPT,
+  type DomFingerprint,
+  type DomEquivalenceResult,
+} from "./dom-equivalence.ts";
+import { buildComputedStyleCaptureJsonExpression, parseComputedStyleSnapshot } from "./computed-style-capture.ts";
+import { diffComputedStyles, type CsdResult, type ComputedStyleSnapshot } from "./computed-style-diff.ts";
+import {
+  diffDomPositionStyles,
+  diffPositionStylesAcrossViewports,
+  DOM_POSITION_STYLES_BROWSER_SCRIPT,
+  parseDomPositionStyles,
+  type DpResult,
+  type DpPerViewportResult,
+  type PositionedElement,
+} from "./dom-position-styles.ts";
+import {
+  findShiftOrigins,
+  DOM_BBOX_BROWSER_SCRIPT,
+  parseBboxes,
+  type BboxElement,
+  type ShiftOrigin,
+} from "./shift-origin.ts";
+import { findGridSuggestions, type GridSuggestion } from "./grid-ratio.ts";
+import {
+  extractComponentsFromFile,
+  matchComponents,
+  type MatchedBbox,
+} from "./component-bbox.ts";
+import { buildGeometryProfiles, type PerRankGeometry } from "./component-geometry.ts";
+import { findHeatmapRegionsFromFile, type HeatmapRegion } from "./heatmap-regions.ts";
+import {
+  extractTextRowsFromFile,
+  matchTextRows,
+  type MatchedTextRow,
+} from "./text-rows.ts";
+import { extractPaletteFromFile, type PaletteColor } from "./palette-extract.ts";
+import { diffPalettes, type PaletteDiff } from "./palette-diff.ts";
+import {
+  applyForcedPseudoState,
+  clearStateMarkers,
+  type ForcedPseudoState,
+  type AppliedForcedState,
+} from "./multi-state.ts";
 
 // ---- Config ----
 
@@ -104,6 +156,30 @@ export interface MigrationCompareOptions {
   variantUrls?: string[];
   /** Selectors to mask (visibility: hidden) */
   maskSelectors?: string[];
+  /** Run baseline render-sanity heuristics (default true). */
+  baselineSanityCheck?: boolean;
+  /** Exit non-zero when sanity checks fail (default false → warn only). */
+  strictBaselineSanity?: boolean;
+  /** Run DOM-equivalence preflight (default true). */
+  domEquivalenceCheck?: boolean;
+  /** Exit non-zero when DOM equivalence checks fail (default false → warn only). */
+  strictDomEquivalence?: boolean;
+  /** Capture computed-style snapshot for baseline + variants and diff (opt-in, default false). */
+  computedStyleDiff?: boolean;
+  /** Capture DOM-position-aligned computed styles (handles class renames, opt-in). */
+  domPositionDiff?: boolean;
+  /**
+   * Extract component bounding boxes from captured screenshots and diff
+   * them (image-only, no DOM required — see `src/component-bbox.ts`).
+   * Default true; pass `--no-component-bbox` to disable.
+   */
+  componentBboxDiff?: boolean;
+  /**
+   * Capture additional screenshots with CSS pseudo-classes forced on
+   * (`hover`, `focus`, `focus-visible`, `active`). Per-state diff is
+   * surfaced alongside the default-state diff. Opt-in via `--states`.
+   */
+  states?: ForcedPseudoState[];
 }
 
 export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptions {
@@ -128,7 +204,29 @@ export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptio
     baselineUrl: baselineUrl || undefined,
     variantUrls: currentUrl ? [currentUrl] : (variantUrls.length > 0 ? variantUrls : undefined),
     maskSelectors: parseMaskSelectors(args),
+    baselineSanityCheck: !hasFlag(args, "no-baseline-sanity"),
+    strictBaselineSanity: hasFlag(args, "strict-baseline-sanity"),
+    domEquivalenceCheck: !hasFlag(args, "no-dom-equivalence"),
+    strictDomEquivalence: hasFlag(args, "strict-dom-equivalence"),
+    computedStyleDiff: hasFlag(args, "computed-style"),
+    domPositionDiff: hasFlag(args, "dom-position-diff") || hasFlag(args, "position-diff"),
+    componentBboxDiff: !hasFlag(args, "no-component-bbox"),
+    states: parseStatesArg(args),
   };
+}
+
+function parseStatesArg(args: string[]): ForcedPseudoState[] | undefined {
+  const raw = getArgList(args, "states");
+  if (raw.length === 0) return undefined;
+  const valid: ForcedPseudoState[] = [];
+  for (const s of raw) {
+    if (s === "hover" || s === "focus" || s === "active" || s === "focus-visible") {
+      valid.push(s);
+    } else {
+      console.log(`  ${YELLOW}! ignoring unknown --states value: ${s}${RESET}`);
+    }
+  }
+  return valid.length > 0 ? valid : undefined;
 }
 
 // Fallback viewports (used when --no-discover)
@@ -222,6 +320,10 @@ export interface MigrationCompareResult {
   approvedPaintTreeCount: number;
   approvedPaintTreeReasons: string[];
   fixCandidates: MigrationFixCandidate[];
+  /** Per-band vertical shift offsets (null if no shift detected). */
+  shiftRegions?: Array<{ yStart: number; yEnd: number; shift: number; confidence?: number }>;
+  /** Global vertical shift in pixels (0 if no shift). */
+  globalShift?: number;
 }
 
 export interface MigrationCompareReport {
@@ -234,6 +336,124 @@ export interface MigrationCompareReport {
   strict: boolean;
   approvalWarnings: Awaited<ReturnType<typeof collectApprovalWarnings>>;
   paintTree: PaintTreeStatus;
+  baselineSanity?: RenderSanityResult;
+  domEquivalence?: Array<{
+    variantFile: string;
+    result: DomEquivalenceResult;
+  }>;
+  computedStyleDiff?: Array<{
+    variantFile: string;
+    result: CsdResult;
+  }>;
+  domPositionDiff?: Array<{
+    variantFile: string;
+    result: DpResult;
+  }>;
+  /** Cross-viewport DOM-position diff: surfaces media-query-gated deltas. */
+  domPositionDiffPerViewport?: Array<{
+    variantFile: string;
+    result: DpPerViewportResult;
+  }>;
+  /** Per-viewport shift-origin diagnostics (which element causes each band's shift). */
+  shiftOrigins?: Array<{
+    variantFile: string;
+    perViewport: Array<{
+      viewport: string;
+      origins: ShiftOrigin[];
+      /** Bands the pixel-shift detector reported but for which no DOM-level Δy was found.
+       *  Usually a pixelmatch cross-correlation artifact (phantom shift). */
+      unexplainedBands?: ShiftRegion[];
+    }>;
+  }>;
+  /** Per-viewport grid-template-columns suggestions (children widths differ). */
+  gridSuggestions?: Array<{
+    variantFile: string;
+    suggestions: GridSuggestion[];
+  }>;
+  /**
+   * Per-viewport component bbox diff — pure image analysis of the
+   * captured screenshots (no DOM correspondence required). Useful for
+   * wireframe / from-screenshot scenarios where baseline and variant
+   * may not share DOM tree shape.
+   */
+  componentBboxDiffs?: Array<{
+    variantFile: string;
+    perViewport: Array<{ viewport: string; matches: MatchedBbox[] }>;
+  }>;
+  /**
+   * Cross-viewport geometry profiles derived from componentBboxDiffs.
+   * Surfaces responsive-mismatch flags ("baseline width spreads 837px
+   * across viewports; variant 0px → variant missing responsive rule").
+   */
+  componentGeometryProfiles?: Array<{
+    variantFile: string;
+    profiles: PerRankGeometry[];
+  }>;
+  /**
+   * Per-viewport connected-component clusters of pixelmatch hot pixels in
+   * `*_heatmap.png`. Localizes "where in the image the diff actually is"
+   * even when baseline and variant share no DOM.
+   */
+  heatmapRegions?: Array<{
+    variantFile: string;
+    perViewport: Array<{ viewport: string; regions: HeatmapRegion[] }>;
+  }>;
+  /**
+   * Per-viewport text-row Δy. Pairs dark luminance bands by order
+   * (top-to-bottom) between baseline and variant; surfaces rows whose
+   * y-coordinate shifted. Works without DOM correspondence — useful
+   * for the wireframe scenario where bbox matching fails on
+   * structurally-divergent pages.
+   */
+  textRowShifts?: Array<{
+    variantFile: string;
+    perViewport: Array<{
+      viewport: string;
+      matches: MatchedTextRow[];
+      baselineRowCount: number;
+      variantRowCount: number;
+    }>;
+  }>;
+  /**
+   * Per-viewport palette diff. Surfaces "the agent used #3B82F6 where
+   * design tokens say #2563EB" — hard-coded literals slipping into a
+   * tokenized design system. Worst case: 16-color top-K × N viewports
+   * per variant, kept small enough not to bloat the report.
+   */
+  paletteDiffs?: Array<{
+    variantFile: string;
+    perViewport: Array<{
+      viewport: string;
+      baseline: PaletteColor[];
+      variant: PaletteColor[];
+      diff: PaletteDiff;
+    }>;
+  }>;
+  /**
+   * Per-state (`:hover`, `:focus`, ...) diff between baseline and
+   * variant. Captures the page with each pseudo-class forced on all
+   * interactive elements via CDP `CSS.forcePseudoState`, then runs
+   * the standard pixelmatch comparison.
+   *
+   * Catches "agent forgot to wire up :hover styles" — a class of bug
+   * the default-state VRT can't see because both sides render
+   * identically when no interactions happen.
+   */
+  stateDiffs?: Array<{
+    variantFile: string;
+    perState: Array<{
+      state: ForcedPseudoState;
+      forcedCount: number;
+      affectedElements: string[];
+      perViewport: Array<{
+        viewport: string;
+        defaultDiffRatio: number;
+        stateDiffRatio: number;
+        /** stateDiffRatio − defaultDiffRatio (how much *worse* the diff gets in this state). */
+        hoverInducedDelta: number;
+      }>;
+    }>;
+  }>;
   results: MigrationCompareResult[];
   reportPath: string;
 }
@@ -406,8 +626,31 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     }
 
     // Capture baseline at all viewports
-    for (const vp of VIEWPORTS) {
+    let baselineSanity: RenderSanityResult | undefined;
+    let baselineDomFingerprint: DomFingerprint | undefined;
+    let baselineComputedStyles: ComputedStyleSnapshot | undefined;
+    let baselineDomPositionStyles: PositionedElement[] | undefined;
+    const baselineDomPositionByVp = new Map<string, PositionedElement[]>();
+    const baselineBboxesByVp = new Map<string, BboxElement[]>();
+    const domEnabled = options.domEquivalenceCheck ?? true;
+    const csdEnabled = options.computedStyleDiff ?? false;
+    const dpEnabled = options.domPositionDiff ?? false;
+    for (const [vpIndex, vp] of VIEWPORTS.entries()) {
       const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
+
+      // Only probe sanity on the first viewport — the inputs are deterministic
+      // per fixture and there's no reason to repeat the check N times.
+      const sanityEnabled = options.baselineSanityCheck ?? true;
+      const shouldProbe = sanityEnabled && vpIndex === 0;
+      const failedRequests: FailedRequest[] = [];
+      const onFailed = (req: import("playwright").Request) => {
+        failedRequests.push({
+          url: req.url(),
+          errorText: req.failure()?.errorText ?? "unknown failure",
+        });
+      };
+      if (shouldProbe) page.on("requestfailed", onFailed);
+
       if (isUrlMode) {
         await page.goto(options.baselineUrl!, { waitUntil: "networkidle", timeout: 30000 });
         if (!baselineHtml) {
@@ -420,6 +663,74 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       const path = join(outputDir, `${baselineName}-${vp.label}.png`);
       await page.screenshot({ path, fullPage: true });
       baselineScreenshots.set(vp.label, path);
+
+      if (shouldProbe) {
+        try {
+          const browserProbe = await page.evaluate(RENDER_PROBE_BROWSER_SCRIPT) as {
+            bodyFontFamily: string;
+            styleSheetCount: number;
+            hasClassAttributes: boolean;
+          };
+          const sourceProbe = probeSourceHtml(baselineHtml);
+          baselineSanity = evaluateRenderSanity({
+            failedRequests,
+            probe: { ...browserProbe, ...sourceProbe },
+          });
+        } catch (error) {
+          // Probe failure should not block the run — record an empty result.
+          baselineSanity = { ok: true, warnings: [], failedRequests };
+          console.log(`  ${YELLOW}Baseline sanity probe error: ${String(error)}${RESET}`);
+        }
+        page.off("requestfailed", onFailed);
+
+        if (baselineSanity && !baselineSanity.ok) {
+          console.log();
+          console.log(`  ${YELLOW}Baseline render sanity warnings:${RESET}`);
+          for (const w of baselineSanity.warnings) {
+            console.log(`    ${YELLOW}- [${w.code}] ${w.message}${RESET}`);
+          }
+          console.log();
+        }
+      }
+
+      // Capture baseline DOM fingerprint once (first viewport).
+      if (domEnabled && vpIndex === 0) {
+        try {
+          baselineDomFingerprint = await page.evaluate(DOM_FINGERPRINT_BROWSER_SCRIPT) as DomFingerprint;
+        } catch (error) {
+          console.log(`  ${YELLOW}Baseline DOM fingerprint error: ${String(error)}${RESET}`);
+        }
+      }
+
+      // Capture baseline computed-style snapshot once (first viewport).
+      if (csdEnabled && vpIndex === 0) {
+        try {
+          const raw = await page.evaluate(buildComputedStyleCaptureJsonExpression());
+          baselineComputedStyles = parseComputedStyleSnapshot(raw) as ComputedStyleSnapshot;
+        } catch (error) {
+          console.log(`  ${YELLOW}Baseline computed-style capture error: ${String(error)}${RESET}`);
+        }
+      }
+
+      // Capture baseline DOM-position styles per viewport.
+      if (dpEnabled) {
+        try {
+          const raw = await page.evaluate(DOM_POSITION_STYLES_BROWSER_SCRIPT);
+          const captured = parseDomPositionStyles(raw);
+          baselineDomPositionByVp.set(vp.label, captured);
+          // Preserve the single-viewport snapshot for the legacy `domPositionDiff` field.
+          if (vpIndex === 0) baselineDomPositionStyles = captured;
+        } catch (error) {
+          console.log(`  ${YELLOW}Baseline DOM-position capture error (${vp.label}): ${String(error)}${RESET}`);
+        }
+        try {
+          const rawBbox = await page.evaluate(DOM_BBOX_BROWSER_SCRIPT);
+          baselineBboxesByVp.set(vp.label, parseBboxes(rawBbox));
+        } catch (error) {
+          console.log(`  ${YELLOW}Baseline bbox capture error (${vp.label}): ${String(error)}${RESET}`);
+        }
+      }
+
       await page.close();
 
       if (paintTreeClient) {
@@ -467,12 +778,40 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       approvedPaintTreeCount: number;
       approvedPaintTreeReasons: string[];
       fixCandidates: MigrationFixCandidate[];
+      shiftRegions?: Array<{ yStart: number; yEnd: number; shift: number; confidence?: number }>;
+      globalShift?: number;
     }> = [];
 
     const variantSources = isUrlMode
       ? (options.variantUrls ?? []).map((url) => ({ label: urlToLabel(url), url, file: "" }))
       : variants.map((f) => ({ label: basename(f, ".html"), url: "", file: f }));
 
+    const domEquivalenceReports: Array<{ variantFile: string; result: DomEquivalenceResult }> = [];
+    const computedStyleDiffReports: Array<{ variantFile: string; result: CsdResult }> = [];
+    const domPositionDiffReports: Array<{ variantFile: string; result: DpResult }> = [];
+    const domPositionDiffPerViewportReports: Array<{ variantFile: string; result: DpPerViewportResult }> = [];
+    const shiftOriginsReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; origins: ShiftOrigin[]; unexplainedBands?: ShiftRegion[] }> }> = [];
+    const gridSuggestionsReports: Array<{ variantFile: string; suggestions: GridSuggestion[] }> = [];
+    const componentBboxReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; matches: MatchedBbox[] }> }> = [];
+    const componentGeometryReports: Array<{ variantFile: string; profiles: PerRankGeometry[] }> = [];
+    const heatmapRegionsReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; regions: HeatmapRegion[] }> }> = [];
+    const textRowShiftsReports: Array<{
+      variantFile: string;
+      perViewport: Array<{ viewport: string; matches: MatchedTextRow[]; baselineRowCount: number; variantRowCount: number }>;
+    }> = [];
+    const paletteDiffsReports: Array<{
+      variantFile: string;
+      perViewport: Array<{ viewport: string; baseline: PaletteColor[]; variant: PaletteColor[]; diff: PaletteDiff }>;
+    }> = [];
+    const stateDiffsReports: Array<{
+      variantFile: string;
+      perState: Array<{
+        state: ForcedPseudoState;
+        forcedCount: number;
+        affectedElements: string[];
+        perViewport: Array<{ viewport: string; defaultDiffRatio: number; stateDiffRatio: number; hoverInducedDelta: number }>;
+      }>;
+    }> = [];
     for (const variant of variantSources) {
       let variantHtml: string;
       const variantName = variant.label;
@@ -486,7 +825,13 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
 
       console.log(`  ${BOLD}${variantName}${RESET} vs ${baselineName}`);
 
-      for (const vp of VIEWPORTS) {
+      let variantDomFingerprint: DomFingerprint | undefined;
+      let variantComputedStyles: ComputedStyleSnapshot | undefined;
+      let variantDomPositionStyles: PositionedElement[] | undefined;
+      const variantDomPositionByVp = new Map<string, PositionedElement[]>();
+      const variantBboxesByVp = new Map<string, BboxElement[]>();
+      const shiftRegionsByVp = new Map<string, ShiftRegion[]>();
+      for (const [vpIndex, vp] of VIEWPORTS.entries()) {
         const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
         if (variant.url) {
           await page.goto(variant.url, { waitUntil: "networkidle", timeout: 30000 });
@@ -495,6 +840,39 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           await page.setContent(variantHtml, { waitUntil: "networkidle" });
         }
         if (options.maskSelectors?.length) await applyMask(page, options.maskSelectors);
+
+        if (domEnabled && vpIndex === 0 && !variantDomFingerprint) {
+          try {
+            variantDomFingerprint = await page.evaluate(DOM_FINGERPRINT_BROWSER_SCRIPT) as DomFingerprint;
+          } catch (error) {
+            console.log(`  ${YELLOW}Variant DOM fingerprint error (${variantName}): ${String(error)}${RESET}`);
+          }
+        }
+        if (csdEnabled && vpIndex === 0 && !variantComputedStyles) {
+          try {
+            const raw = await page.evaluate(buildComputedStyleCaptureJsonExpression());
+            variantComputedStyles = parseComputedStyleSnapshot(raw) as ComputedStyleSnapshot;
+          } catch (error) {
+            console.log(`  ${YELLOW}Variant computed-style capture error (${variantName}): ${String(error)}${RESET}`);
+          }
+        }
+        if (dpEnabled) {
+          try {
+            const raw = await page.evaluate(DOM_POSITION_STYLES_BROWSER_SCRIPT);
+            const captured = parseDomPositionStyles(raw);
+            variantDomPositionByVp.set(vp.label, captured);
+            if (vpIndex === 0) variantDomPositionStyles = captured;
+          } catch (error) {
+            console.log(`  ${YELLOW}Variant DOM-position capture error (${variantName} / ${vp.label}): ${String(error)}${RESET}`);
+          }
+          try {
+            const rawBbox = await page.evaluate(DOM_BBOX_BROWSER_SCRIPT);
+            variantBboxesByVp.set(vp.label, parseBboxes(rawBbox));
+          } catch (error) {
+            console.log(`  ${YELLOW}Variant bbox capture error (${variantName} / ${vp.label}): ${String(error)}${RESET}`);
+          }
+        }
+
         const variantScreenshotPath = join(outputDir, `${variantName}-${vp.label}.png`);
         await page.screenshot({ path: variantScreenshotPath, fullPage: true });
         await page.close();
@@ -599,7 +977,16 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           approvedPaintTreeCount,
           approvedPaintTreeReasons,
           fixCandidates,
+          shiftRegions: diffReport?.shiftRegions && diffReport.shiftRegions.length > 0
+            ? diffReport.shiftRegions
+            : undefined,
+          globalShift: diffReport?.globalShift && diffReport.globalShift !== 0
+            ? diffReport.globalShift
+            : undefined,
         });
+        if (diffReport?.shiftRegions && diffReport.shiftRegions.length > 0) {
+          shiftRegionsByVp.set(vp.label, diffReport.shiftRegions);
+        }
 
         const pct = (diffRatio * 100).toFixed(1);
         const icon = approved?.approved
@@ -638,6 +1025,383 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         }
         console.log();
       }
+
+      // DOM-equivalence preflight comparison (variant-side completion)
+      if (domEnabled && baselineDomFingerprint && variantDomFingerprint) {
+        const variantFileLabel = variant.url || variant.file;
+        const result = evaluateDomEquivalence(baselineDomFingerprint, variantDomFingerprint);
+        domEquivalenceReports.push({ variantFile: variantFileLabel, result });
+        if (!result.ok) {
+          console.log(`  ${YELLOW}DOM equivalence warnings for ${variantName}:${RESET}`);
+          for (const w of result.warnings) {
+            console.log(`    ${YELLOW}- [${w.code}] ${w.message}${RESET}`);
+          }
+          console.log();
+        }
+      }
+
+      // DOM-position-aligned diff (opt-in via --dom-position-diff)
+      if (dpEnabled && baselineDomPositionStyles && variantDomPositionStyles) {
+        const variantFileLabel = variant.url || variant.file;
+        const result = diffDomPositionStyles(baselineDomPositionStyles, variantDomPositionStyles);
+        const trimmedResult = { ...result, entries: result.entries.slice(0, 200) };
+        domPositionDiffReports.push({ variantFile: variantFileLabel, result: trimmedResult });
+        if (result.totalDiffs > 0) {
+          const topProps = result.byProperty.slice(0, 5)
+            .map((p) => `${p.property}(${p.count})`)
+            .join(", ");
+          console.log(`  ${DIM}DOM-position diff: ${result.totalDiffs} tuples across ${result.byPath.length} paths. ` +
+            `Top properties: ${topProps}${RESET}`);
+        }
+      }
+
+      // Per-viewport DOM-position diff (surfaces media-query-gated deltas)
+      if (dpEnabled && baselineDomPositionByVp.size > 0 && variantDomPositionByVp.size > 0) {
+        const variantFileLabel = variant.url || variant.file;
+        const perVp = diffPositionStylesAcrossViewports(baselineDomPositionByVp, variantDomPositionByVp);
+        // Cap entries (used as a rolled-up backup) and byPathProperty
+        // (the actual signal source for diff-for-agent) so
+        // migration-report.json stays under ~1 MB even with many
+        // viewports.
+        const trimmedPerVp = {
+          ...perVp,
+          entries: perVp.entries.slice(0, 200),
+          byPathProperty: perVp.byPathProperty.slice(0, 200),
+        };
+        domPositionDiffPerViewportReports.push({ variantFile: variantFileLabel, result: trimmedPerVp });
+        // Shift-origin diagnostics: which element causes each band's shift?
+        if (baselineBboxesByVp.size > 0 && variantBboxesByVp.size > 0 && shiftRegionsByVp.size > 0) {
+          const perViewport: Array<{ viewport: string; origins: ShiftOrigin[]; unexplainedBands?: ShiftRegion[] }> = [];
+          for (const [vpLabel, bands] of shiftRegionsByVp) {
+            const baselineBboxes = baselineBboxesByVp.get(vpLabel);
+            const variantBboxes = variantBboxesByVp.get(vpLabel);
+            if (!baselineBboxes || !variantBboxes) continue;
+            const origins = findShiftOrigins(baselineBboxes, variantBboxes, bands, { perBandLimit: 2 });
+            const explainedBandKeys = new Set(origins.map((o) => `${o.bandStart}-${o.bandEnd}-${o.bandShift}`));
+            const unexplainedBands = bands.filter(
+              (b) => !explainedBandKeys.has(`${b.yStart}-${b.yEnd}-${b.shift}`),
+            );
+            if (origins.length > 0 || unexplainedBands.length > 0) {
+              perViewport.push({
+                viewport: vpLabel,
+                origins,
+                unexplainedBands: unexplainedBands.length > 0 ? unexplainedBands : undefined,
+              });
+            }
+          }
+          if (perViewport.length > 0) {
+            shiftOriginsReports.push({ variantFile: variantFileLabel, perViewport });
+            const totalOrigins = perViewport.reduce((s, v) => s + v.origins.length, 0);
+            console.log(`  ${DIM}Shift origins: ${totalOrigins} explanation(s) across ${perViewport.length} viewport(s)${RESET}`);
+          }
+
+          // Grid `fr`-ratio suggestions (one set per viewport, then merged
+          // and capped). Subagent D's exact wish-list complaint: "I had
+          // to compute the implied fr ratio by hand."
+          const gridSuggestions: GridSuggestion[] = [];
+          for (const [vpLabel, baselineBboxes] of baselineBboxesByVp) {
+            const variantBboxes = variantBboxesByVp.get(vpLabel);
+            if (!variantBboxes) continue;
+            gridSuggestions.push(...findGridSuggestions(baselineBboxes, variantBboxes, vpLabel));
+          }
+          if (gridSuggestions.length > 0) {
+            // Dedupe identical suggestions across viewports (same parent +
+            // same widths => same suggestion). Keep the largest-gap row
+            // per (parentPath, viewport) pair.
+            const seen = new Set<string>();
+            const deduped: GridSuggestion[] = [];
+            for (const g of gridSuggestions) {
+              const key = `${g.parentPath}::${g.viewport}`;
+              if (seen.has(key)) continue;
+              seen.add(key);
+              deduped.push(g);
+            }
+            gridSuggestionsReports.push({
+              variantFile: variantFileLabel,
+              suggestions: deduped.slice(0, 30),
+            });
+            console.log(`  ${DIM}Grid suggestions: ${deduped.length} container(s) with non-uniform child widths${RESET}`);
+          }
+        }
+
+        if (perVp.totalDiffs > 0) {
+          const breakpointGated = perVp.byPathProperty.filter((pp) => pp.viewports.length < baselineDomPositionByVp.size).length;
+          console.log(`  ${DIM}Per-viewport DOM-position diff: ${perVp.totalDiffs} tuples, ` +
+            `${perVp.byPathProperty.length} unique (path, property) pairs, ` +
+            `${breakpointGated} appear only on a subset of viewports (media-query-gated)${RESET}`);
+        }
+      }
+
+      // Computed-style diff (opt-in via --computed-style)
+      if (csdEnabled && baselineComputedStyles && variantComputedStyles) {
+        const variantFileLabel = variant.url || variant.file;
+        const result = diffComputedStyles(baselineComputedStyles, variantComputedStyles);
+        // Trim entries to keep migration-report.json size sane while still
+      // surfacing the top diffs to diff-for-agent.
+      const trimmedResult = { ...result, entries: result.entries.slice(0, 100) };
+      computedStyleDiffReports.push({ variantFile: variantFileLabel, result: trimmedResult });
+        if (result.totalDiffs > 0) {
+          const topProps = result.byProperty.slice(0, 5)
+            .map((p) => `${p.property}(${p.count})`)
+            .join(", ");
+          console.log(`  ${DIM}Computed-style diff: ${result.totalDiffs} (selector, prop) ` +
+            `tuples. Top properties: ${topProps}${RESET}`);
+        }
+      }
+
+      // Image-only component bbox diff. Doesn't depend on DOM
+      // correspondence — works on the rendered PNGs directly. Wireframe
+      // / from-screenshot scenario (see Subagent F): when the agent's
+      // DOM differs from the reference, the bbox of "the card" /
+      // "the button row" remains comparable across pages.
+      if (options.componentBboxDiff !== false) {
+        const variantFileLabel = variant.url || variant.file;
+        const perViewport: Array<{ viewport: string; matches: MatchedBbox[] }> = [];
+        // Full (unfiltered) per-viewport matches used to build
+        // cross-viewport geometry profiles below. We can't use the
+        // filtered `perViewport` list because geometry analysis cares
+        // about the shared baseline+variant geometry of *every* matched
+        // component (including ones with zero delta on a given viewport
+        // but differing on another).
+        const perViewportFull: Array<{ viewport: string; matches: MatchedBbox[] }> = [];
+        const perViewportHeatmap: Array<{ viewport: string; regions: HeatmapRegion[] }> = [];
+        const perViewportTextRows: Array<{
+          viewport: string; matches: MatchedTextRow[]; baselineRowCount: number; variantRowCount: number;
+        }> = [];
+        const perViewportPalette: Array<{
+          viewport: string; baseline: PaletteColor[]; variant: PaletteColor[]; diff: PaletteDiff;
+        }> = [];
+        for (const vp of VIEWPORTS) {
+          const baselinePngPath = join(outputDir, `${baselineName}-${vp.label}.png`);
+          const variantPngPath = join(outputDir, `${variantName}-${vp.label}.png`);
+          try {
+            const [baselineComps, variantComps] = await Promise.all([
+              extractComponentsFromFile(baselinePngPath),
+              extractComponentsFromFile(variantPngPath),
+            ]);
+            const matches = matchComponents(baselineComps, variantComps);
+            perViewportFull.push({ viewport: vp.label, matches });
+            // Only keep matches where at least one axis differs by > 1px
+            // (anything smaller is subpixel rounding, not actionable).
+            const meaningful = matches.filter((m) =>
+              Math.abs(m.deltaTop) > 1 || Math.abs(m.deltaLeft) > 1
+              || Math.abs(m.deltaWidth) > 1 || Math.abs(m.deltaHeight) > 1,
+            );
+            if (meaningful.length > 0) {
+              perViewport.push({ viewport: vp.label, matches: meaningful.slice(0, 5) });
+            }
+          } catch {
+            // PNG missing / decode failure — skip silently.
+          }
+
+          // Heatmap region clustering (CC labelling on pixelmatch
+          // hot-red pixels). Falls through silently when the heatmap
+          // PNG doesn't exist (zero-diff viewport or skipHeatmap=true).
+          const heatmapPath = join(outputDir, `${variantName}-${vp.label}_heatmap.png`);
+          try {
+            const regions = await findHeatmapRegionsFromFile(heatmapPath);
+            if (regions.length > 0) {
+              perViewportHeatmap.push({ viewport: vp.label, regions });
+            }
+          } catch {
+            // No heatmap (viewport had zero diff) or decode failure — skip.
+          }
+
+          // Text-row y-position extraction. Pairs dark luminance bands
+          // by ordered index between baseline and variant — works
+          // without DOM correspondence, useful when component bbox
+          // matching fails (the wireframe-with-divergent-DOM case).
+          try {
+            const [baselineRows, variantRows] = await Promise.all([
+              extractTextRowsFromFile(baselinePngPath),
+              extractTextRowsFromFile(variantPngPath),
+            ]);
+            const matches = matchTextRows(baselineRows, variantRows);
+            const countMismatch = baselineRows.length !== variantRows.length
+              && (baselineRows.length > 0 || variantRows.length > 0);
+            if (matches.length > 0 || countMismatch) {
+              perViewportTextRows.push({
+                viewport: vp.label,
+                matches: matches.slice(0, 12),
+                baselineRowCount: baselineRows.length,
+                variantRowCount: variantRows.length,
+              });
+            }
+          } catch {
+            // PNG missing or decode failure — skip silently.
+          }
+
+          // Palette extraction + diff. Surfaces hard-coded color
+          // literals slipping past tokenized design systems. Only
+          // record when the diff has actionable rows (something
+          // only-in-baseline or only-in-variant).
+          try {
+            const [baselinePalette, variantPalette] = await Promise.all([
+              extractPaletteFromFile(baselinePngPath),
+              extractPaletteFromFile(variantPngPath),
+            ]);
+            const paletteDiff = diffPalettes(baselinePalette, variantPalette);
+            if (paletteDiff.onlyInBaseline.length > 0 || paletteDiff.onlyInVariant.length > 0) {
+              perViewportPalette.push({
+                viewport: vp.label,
+                baseline: baselinePalette,
+                variant: variantPalette,
+                diff: paletteDiff,
+              });
+            }
+          } catch {
+            // PNG missing or decode failure — skip silently.
+          }
+        }
+        if (perViewport.length > 0) {
+          componentBboxReports.push({ variantFile: variantFileLabel, perViewport });
+          const total = perViewport.reduce((s, v) => s + v.matches.length, 0);
+          console.log(`  ${DIM}Component bbox diff: ${total} component delta(s) across ${perViewport.length} viewport(s)${RESET}`);
+        }
+        // Cross-viewport geometry profiles (wireframe-mode: detect
+        // responsive mismatches like "baseline card shrinks 18px on
+        // mobile but variant doesn't"). Requires at least two viewports
+        // to have anything meaningful to say.
+        if (perViewportFull.length >= 2) {
+          const profiles = buildGeometryProfiles(perViewportFull);
+          const flagged = profiles.filter((p) => p.responsiveMismatch !== undefined);
+          if (flagged.length > 0) {
+            componentGeometryReports.push({
+              variantFile: variantFileLabel,
+              profiles: flagged.slice(0, 8),
+            });
+            console.log(`  ${DIM}Responsive geometry mismatch: ${flagged.length} component(s) flagged${RESET}`);
+          }
+        }
+        if (perViewportHeatmap.length > 0) {
+          heatmapRegionsReports.push({ variantFile: variantFileLabel, perViewport: perViewportHeatmap });
+          const total = perViewportHeatmap.reduce((s, v) => s + v.regions.length, 0);
+          console.log(`  ${DIM}Heatmap regions: ${total} cluster(s) across ${perViewportHeatmap.length} viewport(s)${RESET}`);
+        }
+        if (perViewportTextRows.length > 0) {
+          textRowShiftsReports.push({ variantFile: variantFileLabel, perViewport: perViewportTextRows });
+          const total = perViewportTextRows.reduce((s, v) => s + v.matches.length, 0);
+          console.log(`  ${DIM}Text-row shifts: ${total} row(s) with Δy across ${perViewportTextRows.length} viewport(s)${RESET}`);
+        }
+        if (perViewportPalette.length > 0) {
+          paletteDiffsReports.push({ variantFile: variantFileLabel, perViewport: perViewportPalette });
+          const totalMissing = perViewportPalette.reduce((s, v) => s + v.diff.onlyInBaseline.length, 0);
+          const totalExtra = perViewportPalette.reduce((s, v) => s + v.diff.onlyInVariant.length, 0);
+          console.log(`  ${DIM}Palette diff: ${totalMissing} missing color(s), ${totalExtra} extra color(s) across ${perViewportPalette.length} viewport(s)${RESET}`);
+        }
+      }
+
+      // Multi-state capture (opt-in via --states hover focus ...).
+      // For each requested pseudo-class, re-render baseline + variant
+      // with that state forced on all interactive elements, then diff.
+      // Surfaces "agent forgot to wire up :hover styles" — a class of
+      // bug the default-state VRT can't catch because both sides look
+      // identical without an interaction.
+      if (options.states && options.states.length > 0) {
+        const variantFileLabel = variant.url || variant.file;
+        const perState: Array<{
+          state: ForcedPseudoState;
+          forcedCount: number;
+          affectedElements: string[];
+          perViewport: Array<{ viewport: string; defaultDiffRatio: number; stateDiffRatio: number; hoverInducedDelta: number }>;
+        }> = [];
+
+        for (const state of options.states) {
+          const perViewport: Array<{ viewport: string; defaultDiffRatio: number; stateDiffRatio: number; hoverInducedDelta: number }> = [];
+          let aggregateForcedCount = 0;
+          let aggregateAffected: string[] = [];
+
+          for (const vp of VIEWPORTS) {
+            // Baseline page in forced state.
+            const baselinePage = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
+            if (isUrlMode) {
+              await baselinePage.goto(options.baselineUrl!, { waitUntil: "networkidle", timeout: 30000 });
+            } else {
+              await baselinePage.setContent(baselineHtml, { waitUntil: "networkidle" });
+            }
+            if (options.maskSelectors?.length) await applyMask(baselinePage, options.maskSelectors);
+            let baselineApplied: AppliedForcedState;
+            try {
+              baselineApplied = await applyForcedPseudoState(baselinePage, { state });
+            } catch (error) {
+              console.log(`  ${YELLOW}State capture failed (baseline / ${state} / ${vp.label}): ${String(error)}${RESET}`);
+              await baselinePage.close();
+              continue;
+            }
+            const baselineStatePath = join(outputDir, `${baselineName}-${vp.label}-${state}.png`);
+            await baselinePage.screenshot({ path: baselineStatePath, fullPage: true });
+            await clearStateMarkers(baselinePage).catch(() => {});
+            await baselinePage.close();
+
+            // Variant page in forced state.
+            const variantPage = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
+            if (variant.url) {
+              await variantPage.goto(variant.url, { waitUntil: "networkidle", timeout: 30000 });
+            } else {
+              await variantPage.setContent(variantHtml, { waitUntil: "networkidle" });
+            }
+            if (options.maskSelectors?.length) await applyMask(variantPage, options.maskSelectors);
+            let variantApplied: AppliedForcedState;
+            try {
+              variantApplied = await applyForcedPseudoState(variantPage, { state });
+            } catch (error) {
+              console.log(`  ${YELLOW}State capture failed (variant / ${state} / ${vp.label}): ${String(error)}${RESET}`);
+              await variantPage.close();
+              continue;
+            }
+            const variantStatePath = join(outputDir, `${variantName}-${vp.label}-${state}.png`);
+            await variantPage.screenshot({ path: variantStatePath, fullPage: true });
+            await clearStateMarkers(variantPage).catch(() => {});
+            await variantPage.close();
+
+            aggregateForcedCount = Math.max(aggregateForcedCount, baselineApplied.forcedCount);
+            if (aggregateAffected.length === 0) aggregateAffected = baselineApplied.affectedElements;
+
+            // Diff the forced-state pair.
+            const stateSnap: VrtSnapshot = {
+              testId: `${variantName}-${vp.label}-${state}`,
+              testTitle: `${variantName} ${vp.label} :${state}`,
+              projectName: "migration-state",
+              screenshotPath: variantStatePath,
+              baselinePath: baselineStatePath,
+              status: "changed",
+            };
+            // Use a stricter threshold than the default (0.1). Hover/
+            // focus color changes are subtle (Δ ~10-30 per channel on
+            // the dark/light-blue dimming pair); the 0.1 luminance
+            // threshold filters them out entirely. 0.03 picks up real
+            // pseudo-state effects while still rejecting subpixel AA.
+            const stateDiff = await compareScreenshots(stateSnap, { outputDir, skipHeatmap: true, threshold: 0.03 } as Parameters<typeof compareScreenshots>[1]);
+            const stateRatio = stateDiff?.diffRatio ?? 0;
+            // Pull the default-state ratio out of the results array.
+            const defaultResult = results.find((r) => r.variant === variantName && r.viewport === vp.label);
+            const defaultRatio = defaultResult?.diffRatio ?? 0;
+            perViewport.push({
+              viewport: vp.label,
+              defaultDiffRatio: defaultRatio,
+              stateDiffRatio: stateRatio,
+              hoverInducedDelta: stateRatio - defaultRatio,
+            });
+          }
+
+          if (perViewport.length > 0) {
+            perState.push({
+              state,
+              forcedCount: aggregateForcedCount,
+              affectedElements: aggregateAffected,
+              perViewport,
+            });
+            const inducedMax = Math.max(...perViewport.map((p) => p.hoverInducedDelta));
+            const inducedDisplay = (inducedMax * 100).toFixed(2);
+            console.log(`  ${DIM}:${state} state diff: max ${inducedDisplay}% induced delta across ${perViewport.length} viewport(s) (${aggregateForcedCount} forced element(s))${RESET}`);
+          }
+        }
+
+        if (perState.length > 0) {
+          stateDiffsReports.push({ variantFile: variantFileLabel, perState });
+        }
+      }
+
       console.log();
     }
 
@@ -717,6 +1481,21 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       strict,
       approvalWarnings,
       paintTree: paintTreeStatus,
+      baselineSanity,
+      domEquivalence: domEquivalenceReports.length > 0 ? domEquivalenceReports : undefined,
+      computedStyleDiff: computedStyleDiffReports.length > 0 ? computedStyleDiffReports : undefined,
+      domPositionDiff: domPositionDiffReports.length > 0 ? domPositionDiffReports : undefined,
+      domPositionDiffPerViewport: domPositionDiffPerViewportReports.length > 0
+        ? domPositionDiffPerViewportReports
+        : undefined,
+      shiftOrigins: shiftOriginsReports.length > 0 ? shiftOriginsReports : undefined,
+      gridSuggestions: gridSuggestionsReports.length > 0 ? gridSuggestionsReports : undefined,
+      componentBboxDiffs: componentBboxReports.length > 0 ? componentBboxReports : undefined,
+      componentGeometryProfiles: componentGeometryReports.length > 0 ? componentGeometryReports : undefined,
+      heatmapRegions: heatmapRegionsReports.length > 0 ? heatmapRegionsReports : undefined,
+      textRowShifts: textRowShiftsReports.length > 0 ? textRowShiftsReports : undefined,
+      paletteDiffs: paletteDiffsReports.length > 0 ? paletteDiffsReports : undefined,
+      stateDiffs: stateDiffsReports.length > 0 ? stateDiffsReports : undefined,
       results,
       reportPath,
     };
@@ -729,6 +1508,25 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     console.log();
     console.log(`  ${DIM}Report: ${reportPath}${RESET}`);
     console.log();
+
+    if (options.strictDomEquivalence) {
+      const failing = domEquivalenceReports.filter((d) => !d.result.ok);
+      if (failing.length > 0) {
+        const total = failing.reduce((s, d) => s + d.result.warnings.length, 0);
+        throw new Error(
+          `DOM equivalence check failed (${total} warning(s) across ${failing.length} variant(s)). ` +
+          `See report at ${reportPath}.`,
+        );
+      }
+    }
+
+    if (options.strictBaselineSanity && baselineSanity && !baselineSanity.ok) {
+      throw new Error(
+        `Baseline render sanity check failed (${baselineSanity.warnings.length} warning(s)). ` +
+        `See report at ${reportPath}.`,
+      );
+    }
+
     return report;
   } finally {
     await browser?.close();

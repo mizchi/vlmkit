@@ -33,7 +33,7 @@ export interface SnapshotConfig {
 }
 
 export interface ParsedSnapshotCliOptions {
-  mode: "capture" | "approve";
+  mode: "capture" | "approve" | "fix-prompt" | "stability" | "flipbook";
   urls: string[];
   labels: string[];
   outputDir: string;
@@ -42,6 +42,23 @@ export interface ParsedSnapshotCliOptions {
   failOnNewBaseline: boolean;
   maxDiffRatio?: number;
   maskSelectors: string[];
+  backend?: string;
+  fixPrompt?: {
+    format: "markdown" | "json";
+    limit?: number;
+    minDiffRatio: number;
+    outPath?: string;
+  };
+  stability?: {
+    iterations: number;
+    failAboveRate?: number;
+    fpThreshold: number;
+    flipbook?: boolean;
+  };
+  flipbook?: {
+    delayMs: number;
+    outDir?: string;
+  };
 }
 
 function sanitizeLabelPart(value: string): string {
@@ -145,6 +162,17 @@ export function parseSnapshotCliArgs(
   let failOnDiff = config.failOnDiff ?? false;
   let failOnNewBaseline = config.failOnNewBaseline ?? false;
   let maxDiffRatio = config.maxDiffRatio;
+  let fixFormat: "markdown" | "json" = "markdown";
+  let fixLimit: number | undefined;
+  let fixMinDiffRatio = 0;
+  let fixOutPath: string | undefined;
+  let stabilityIterations = 3;
+  let stabilityFailAboveRate: number | undefined;
+  let stabilityFpThreshold = 0;
+  let stabilityFlipbook = false;
+  let flipbookDelayMs = 700;
+  let flipbookOutDir: string | undefined;
+  let backend: string | undefined;
 
   for (let i = 0; i < cliArgs.length; i++) {
     const arg = cliArgs[i]!;
@@ -191,6 +219,81 @@ export function parseSnapshotCliArgs(
         i++;
         break;
       }
+      case "--format": {
+        const value = cliArgs[++i];
+        if (value !== "markdown" && value !== "json") {
+          throw new Error("--format must be either 'markdown' or 'json'");
+        }
+        fixFormat = value;
+        break;
+      }
+      case "--limit": {
+        const value = cliArgs[++i];
+        const parsedLimit = value == null ? NaN : Number(value);
+        if (!Number.isFinite(parsedLimit) || parsedLimit <= 0 || !Number.isInteger(parsedLimit)) {
+          throw new Error("--limit must be a positive integer");
+        }
+        fixLimit = parsedLimit;
+        break;
+      }
+      case "--min-diff": {
+        const value = cliArgs[++i];
+        fixMinDiffRatio = parseRatio(value == null ? value : Number(value), "Invalid --min-diff value");
+        break;
+      }
+      case "--out": {
+        const value = cliArgs[++i];
+        if (!value) throw new Error("Missing value for --out");
+        fixOutPath = value;
+        break;
+      }
+      case "--iterations": {
+        const value = cliArgs[++i];
+        const parsedIter = value == null ? NaN : Number(value);
+        if (!Number.isFinite(parsedIter) || parsedIter < 2 || !Number.isInteger(parsedIter)) {
+          throw new Error("--iterations must be an integer >= 2");
+        }
+        stabilityIterations = parsedIter;
+        break;
+      }
+      case "--fail-above-rate": {
+        const value = cliArgs[++i];
+        stabilityFailAboveRate = parseRatio(
+          value == null ? value : Number(value),
+          "Invalid --fail-above-rate value (must be between 0 and 1)",
+        );
+        break;
+      }
+      case "--fp-threshold": {
+        const value = cliArgs[++i];
+        stabilityFpThreshold = parseRatio(
+          value == null ? value : Number(value),
+          "Invalid --fp-threshold value (must be between 0 and 1)",
+        );
+        break;
+      }
+      case "--backend": {
+        const value = cliArgs[++i];
+        if (!value) throw new Error("Missing value for --backend");
+        backend = value;
+        break;
+      }
+      case "--flipbook":
+        stabilityFlipbook = true;
+        break;
+      case "--delay": {
+        const value = cliArgs[++i];
+        const n = value == null ? NaN : Number(value);
+        if (!Number.isFinite(n) || n < 50) throw new Error("Invalid --delay value (must be >= 50)");
+        flipbookDelayMs = n;
+        break;
+      }
+      case "--flipbook-out": {
+        const value = cliArgs[++i];
+        if (!value) throw new Error("Missing value for --flipbook-out");
+        flipbookOutDir = value;
+        break;
+      }
       case "--help":
       case "-h":
         break;
@@ -217,6 +320,83 @@ export function parseSnapshotCliArgs(
       failOnNewBaseline,
       maxDiffRatio,
       maskSelectors: maskSelectors.length > 0 ? maskSelectors : (config.mask ?? []),
+      backend,
+    };
+  }
+
+  if (positional[0] === "stability") {
+    const stabilityUrls = positional.slice(1);
+    const configuredStabilityUrls = stabilityUrls.length > 0
+      ? stabilityUrls
+      : resolveSnapshotConfigUrls(config);
+    const stabilityLabels = explicitLabels.length > 0
+      ? resolveSnapshotLabels(configuredStabilityUrls, explicitLabels)
+      : configuredStabilityUrls.map((url, index) =>
+          (stabilityUrls.length === 0 ? (config.routes ?? [])[index]?.label : undefined)
+            ?? urlToSnapshotLabel(url));
+
+    return {
+      mode: "stability",
+      urls: configuredStabilityUrls,
+      labels: stabilityLabels,
+      outputDir,
+      threshold,
+      failOnDiff,
+      failOnNewBaseline,
+      maxDiffRatio,
+      maskSelectors: maskSelectors.length > 0 ? maskSelectors : (config.mask ?? []),
+      stability: {
+        iterations: stabilityIterations,
+        failAboveRate: stabilityFailAboveRate,
+        fpThreshold: stabilityFpThreshold,
+        flipbook: stabilityFlipbook,
+      },
+      backend,
+    };
+  }
+
+  if (positional[0] === "flipbook") {
+    if (positional.length > 1) {
+      throw new Error("`vrt snapshot flipbook` does not accept positional URLs");
+    }
+    return {
+      mode: "flipbook",
+      urls: [],
+      labels: explicitLabels,
+      outputDir,
+      threshold,
+      failOnDiff,
+      failOnNewBaseline,
+      maxDiffRatio,
+      maskSelectors: maskSelectors.length > 0 ? maskSelectors : (config.mask ?? []),
+      flipbook: {
+        delayMs: flipbookDelayMs,
+        outDir: flipbookOutDir,
+      },
+      backend,
+    };
+  }
+
+  if (positional[0] === "fix-prompt") {
+    if (positional.length > 1) {
+      throw new Error("`vrt snapshot fix-prompt` does not accept positional URLs");
+    }
+    return {
+      mode: "fix-prompt",
+      urls: [],
+      labels: explicitLabels,
+      outputDir,
+      threshold,
+      failOnDiff,
+      failOnNewBaseline,
+      maxDiffRatio,
+      maskSelectors: maskSelectors.length > 0 ? maskSelectors : (config.mask ?? []),
+      fixPrompt: {
+        format: fixFormat,
+        limit: fixLimit,
+        minDiffRatio: fixMinDiffRatio,
+        outPath: fixOutPath,
+      },
     };
   }
 
@@ -242,6 +422,7 @@ export function parseSnapshotCliArgs(
     failOnNewBaseline,
     maxDiffRatio,
     maskSelectors: maskSelectors.length > 0 ? maskSelectors : (config.mask ?? []),
+    backend,
   };
 }
 

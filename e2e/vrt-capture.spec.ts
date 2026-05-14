@@ -7,25 +7,22 @@
 import { test, expect } from "@playwright/test";
 import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { resolveCaptureRoutes, type CaptureRoute } from "../src/capture-config.ts";
 
-const BASE_URL = process.env.VRT_BASE_URL ?? "http://127.0.0.1:4174";
+const routeSet = resolveCaptureRoutes({
+  cwd: process.env.VRT_PROJECT_ROOT ?? process.cwd(),
+  configPath: process.env.VRT_CONFIG_PATH,
+  envConfigPath: process.env.VRT_CONFIG_PATH,
+  envRoutes: process.env.VRT_CAPTURE_ROUTES,
+  envBaseUrl: process.env.VRT_BASE_URL,
+});
+
+const BASE_URL = routeSet.baseUrl;
 // CLI passes this env var; defaults to vrt/ root (not test-results/)
 const OUTPUT_DIR = process.env.VRT_OUTPUT_DIR ?? process.cwd();
 const MODE = process.env.VRT_MODE ?? "capture"; // "capture" | "baseline"
 
-interface Route {
-  name: string;
-  path: string;
-  waitFor?: string;
-}
-
-const routes: Route[] = [
-  { name: "home", path: "/", waitFor: "main" },
-  { name: "readme", path: "/readme", waitFor: "article" },
-  { name: "files", path: "/files", waitFor: "main" },
-  { name: "issues", path: "/issues", waitFor: "main" },
-  { name: "pulls", path: "/pulls", waitFor: "main" },
-];
+const routes: CaptureRoute[] = routeSet.routes;
 
 test.describe("VRT Capture", () => {
   for (const route of routes) {
