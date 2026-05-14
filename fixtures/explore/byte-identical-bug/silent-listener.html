@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+  Repro: a wired-but-no-op click handler combined with strong CSS
+  reset (explicit background + outline:none on every button state)
+  produces byte-identical before/after PNGs. vrt explore reports
+  Δ 0.00%, but the action is silently broken. interact + a snapshot
+  pair would catch this — explore alone does not.
+
+  Without the strong CSS reset Chrome paints a faint focus background
+  on the active button and the diff is ~0.2%, which still triggers
+  the heatmap section but is below the 1% mental threshold most
+  reviewers use. The dogfood reporter saw the strong-reset variant.
+-->
+<head>
+<meta charset="utf-8">
+<title>Silent listener (byte-identical)</title>
+<style>
+  body { font-family: system-ui; padding: 40px; background: #ffffff; }
+  button#toggle,
+  button#toggle:hover,
+  button#toggle:focus,
+  button#toggle:focus-visible,
+  button#toggle:active {
+    background: #1f2937;
+    color: white;
+    border: 1px solid #1f2937;
+    outline: none !important;
+    padding: 8px 16px;
+    box-shadow: none;
+  }
+  .menu { display: none; }
+</style>
+</head>
+<body>
+  <button data-vrt-action="toggle-menu" id="toggle">Toggle</button>
+  <div class="menu" id="menu">Should appear but won't.</div>
+  <script>
+    document.getElementById('toggle').addEventListener('click', () => {
+      console.log('clicked but doing nothing visible');
+    });
+  </script>
+</body>
+</html>
