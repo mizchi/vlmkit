@@ -31,6 +31,29 @@ export interface TextRow {
   meanLuma: number;
   /** Approximate height in pixels. */
   height: number;
+  /**
+   * Estimated font-size in px, derived from band height. Typical UI
+   * fonts have a band height ≈ 0.75 × fontSize (the band spans
+   * baseline to ascender; descenders push it a bit further). Rounded
+   * to the nearest common UI size (12, 14, 16, 18, 20, 24, …, 72).
+   */
+  estimatedFontSize?: number;
+  /**
+   * Ink density inside the text's horizontal bounding box. Computed
+   * as (dark pixels with luma < 100) / (pixels in text-bbox). Larger
+   * values = thicker strokes = bolder weight. Empirical buckets:
+   *   - < 0.10  → regular / light
+   *   - 0.10-0.16 → medium / semibold
+   *   - > 0.16  → bold / heavy
+   * Noisy on short text — compare same-content baseline vs variant
+   * for high-confidence weight-mismatch detection.
+   */
+  inkDensity?: number;
+  /** Bucketed weight class — heuristic, see `inkDensity` doc. */
+  weightBucket?: "light" | "regular" | "medium" | "bold";
+  /** Horizontal extent of ink within the band (px from left edge of image). */
+  inkLeft?: number;
+  inkRight?: number;
 }
 
 export interface MatchedTextRow {
@@ -104,6 +127,83 @@ function median(values: Float32Array): number {
   return sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
 }
 
+/** Snap a raw px height to the nearest common UI font-size bucket. */
+function snapFontSize(rawPx: number): number {
+  const buckets = [10, 11, 12, 13, 14, 16, 18, 20, 22, 24, 28, 32, 36, 40, 48, 56, 64, 72];
+  let best = buckets[0]!;
+  let bestDist = Math.abs(rawPx - best);
+  for (const b of buckets) {
+    const d = Math.abs(rawPx - b);
+    if (d < bestDist) { best = b; bestDist = d; }
+  }
+  return best;
+}
+
+function bucketWeight(density: number): TextRow["weightBucket"] {
+  // Empirical calibration against system-ui at 12-48 px:
+  //   regular text: density 0.15-0.25
+  //   medium (500-600): 0.25-0.35
+  //   bold (700+): > 0.35
+  // Small text has slightly elevated density due to proportional AA
+  // blur — the buckets accept that noise.
+  if (density < 0.15) return "light";
+  if (density < 0.27) return "regular";
+  if (density < 0.36) return "medium";
+  return "bold";
+}
+
+/**
+ * Compute typography hints (font-size estimate, ink density, weight
+ * bucket) for a band by sampling its pixels. Mutates the band in
+ * place. From subagent G v3 dogfood: "next blocker is sub-pixel
+ * vertical spacing tuning — and a font-size / weight estimate per
+ * heatmap region would push this to < 1% in one more round."
+ */
+function annotateTypography(
+  band: TextRow,
+  data: Uint8Array,
+  width: number,
+  height: number,
+): void {
+  // 1. Find the horizontal extent of ink within the band. Use an
+  //    *adaptive* threshold so muted-gray text (e.g. #9ca3af on white,
+  //    luma ≈ 165) is still detected. A pixel is "ink" if its luma is
+  //    at least 50 below the band's background luma — `meanLuma` is a
+  //    good proxy for the band's background since text occupies a
+  //    small fraction of the band's area.
+  const inkThreshold = Math.max(40, band.meanLuma - 50);
+  let inkLeft = width, inkRight = -1;
+  let inkPixels = 0;
+  for (let y = band.yStart; y <= band.yEnd && y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const L = 0.299 * data[i]! + 0.587 * data[i + 1]! + 0.114 * data[i + 2]!;
+      if (L < inkThreshold) {
+        if (x < inkLeft) inkLeft = x;
+        if (x > inkRight) inkRight = x;
+        inkPixels++;
+      }
+    }
+  }
+  if (inkRight < inkLeft) return;
+
+  // 2. Ink density = ink pixels / area of the text bbox.
+  const inkWidth = inkRight - inkLeft + 1;
+  const inkArea = inkWidth * (band.yEnd - band.yStart + 1);
+  const density = inkArea > 0 ? inkPixels / inkArea : 0;
+
+  // 3. Estimate font-size from band height. Calibrated empirically
+  //    against system-ui at 12-48px: band height ≈ 0.92× fontSize
+  //    (includes ascender + descender + AA blur). Divide to recover.
+  const bandH = band.height;
+  const rawFontSize = bandH / 0.92;
+  band.estimatedFontSize = snapFontSize(rawFontSize);
+  band.inkDensity = density;
+  band.weightBucket = bucketWeight(density);
+  band.inkLeft = inkLeft;
+  band.inkRight = inkRight;
+}
+
 export function extractTextRowsFromRgba(
   data: Uint8Array,
   width: number,
@@ -174,7 +274,9 @@ export function extractTextRowsFromRgba(
       });
     }
   }
-  return bands.slice(0, maxBands);
+  const capped = bands.slice(0, maxBands);
+  for (const band of capped) annotateTypography(band, data, width, height);
+  return capped;
 }
 
 export async function extractTextRowsFromFile(
@@ -228,6 +330,61 @@ export function matchTextRows(
  * doesn't yet suggest which CSS knob to turn." Gap deltas tell
  * the agent exactly which margin to adjust.
  */
+export interface TypographyMismatch {
+  rank: number;
+  baselineFontSize?: number;
+  variantFontSize?: number;
+  baselineWeight?: TextRow["weightBucket"];
+  variantWeight?: TextRow["weightBucket"];
+  baselineDensity?: number;
+  variantDensity?: number;
+  /** "size" | "weight" | "both" */
+  kind: "size" | "weight" | "both";
+}
+
+/**
+ * Compare typography hints across ordered baseline ↔ variant pairs.
+ * Reports rows where:
+ *   - estimated font-size buckets differ (different snapped px), OR
+ *   - weight buckets differ ("regular" vs "bold").
+ *
+ * Same-content assumption: when baseline and variant render the same
+ * text content, ink density is directly comparable. When content
+ * differs, density can vary by character makeup ("iii" vs "WWW")
+ * and the comparison is noisier — only large bucket jumps are
+ * surfaced.
+ */
+export function compareRowTypography(
+  baseline: TextRow[],
+  variant: TextRow[],
+  minDensityDelta = 0.04,
+): TypographyMismatch[] {
+  const n = Math.min(baseline.length, variant.length);
+  const out: TypographyMismatch[] = [];
+  for (let i = 0; i < n; i++) {
+    const b = baseline[i]!, v = variant[i]!;
+    if (b.estimatedFontSize === undefined || v.estimatedFontSize === undefined) continue;
+    const sizeDiffers = b.estimatedFontSize !== v.estimatedFontSize;
+    // Weight differs if buckets differ AND the underlying density
+    // delta is larger than the threshold (avoids flagging
+    // "regular vs medium" on a marginal-density pair).
+    const densityDelta = Math.abs((b.inkDensity ?? 0) - (v.inkDensity ?? 0));
+    const weightDiffers = b.weightBucket !== v.weightBucket && densityDelta >= minDensityDelta;
+    if (!sizeDiffers && !weightDiffers) continue;
+    out.push({
+      rank: i,
+      baselineFontSize: b.estimatedFontSize,
+      variantFontSize: v.estimatedFontSize,
+      baselineWeight: b.weightBucket,
+      variantWeight: v.weightBucket,
+      baselineDensity: b.inkDensity,
+      variantDensity: v.inkDensity,
+      kind: sizeDiffers && weightDiffers ? "both" : sizeDiffers ? "size" : "weight",
+    });
+  }
+  return out;
+}
+
 export function computeRowGapDeltas(
   baseline: TextRow[],
   variant: TextRow[],

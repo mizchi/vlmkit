@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { extractTextRowsFromRgba, matchTextRows, type TextRow } from "./text-rows.ts";
+import { extractTextRowsFromRgba, matchTextRows, compareRowTypography, type TextRow } from "./text-rows.ts";
 
 /** Synthesize an RGBA buffer: white background with dark horizontal text bands. */
 function synth(
@@ -96,5 +96,93 @@ describe("matchTextRows", () => {
 
   it("returns empty array when both inputs are empty", () => {
     assert.deepEqual(matchTextRows([], []), []);
+  });
+});
+
+describe("annotateTypography (via extractTextRowsFromRgba)", () => {
+  // Synthesize a band of vertical stripes — alternating ink + bg
+  // columns. Stripe spacing controls density: spacing 3 = 1 ink + 2 bg
+  // = density 0.33, spacing 2 = density 0.5, spacing 4 = density 0.25.
+  function stripedBand(
+    width: number,
+    height: number,
+    band: { y: number; h: number; spacing: number; coverageX?: number; luma?: number },
+  ): Uint8Array {
+    const data = new Uint8Array(width * height * 4);
+    data.fill(255);
+    const inkWidth = Math.floor(width * (band.coverageX ?? 0.4));
+    const inkStart = Math.floor((width - inkWidth) / 2);
+    const v = band.luma ?? 30;
+    for (let y = band.y; y < band.y + band.h; y++) {
+      for (let x = inkStart; x < inkStart + inkWidth; x += band.spacing) {
+        const i = (y * width + x) * 4;
+        data[i] = v; data[i + 1] = v; data[i + 2] = v;
+      }
+    }
+    return data;
+  }
+
+  it("estimates font size from band height", () => {
+    const data = stripedBand(300, 100, { y: 30, h: 22, spacing: 3 });
+    const rows = extractTextRowsFromRgba(data, 300, 100);
+    assert.equal(rows.length, 1);
+    // Band height 22 → fontSize ≈ 22/0.92 = 23.9 → snaps to 24.
+    assert.equal(rows[0]!.estimatedFontSize, 24);
+  });
+
+  it("orders weight buckets by ink density", () => {
+    // Sparser stripes → lower density → lighter weight.
+    const sparse = extractTextRowsFromRgba(stripedBand(300, 100, { y: 30, h: 16, spacing: 5 }), 300, 100);
+    const dense = extractTextRowsFromRgba(stripedBand(300, 100, { y: 30, h: 16, spacing: 2 }), 300, 100);
+    assert.ok((dense[0]!.inkDensity ?? 0) > (sparse[0]!.inkDensity ?? 0));
+    const order: Array<TextRow["weightBucket"]> = ["light", "regular", "medium", "bold"];
+    assert.ok(order.indexOf(dense[0]!.weightBucket!) >= order.indexOf(sparse[0]!.weightBucket!));
+  });
+});
+
+describe("compareRowTypography", () => {
+  function row(yCenter: number, fontSize: number, weight: TextRow["weightBucket"], density: number): TextRow {
+    return {
+      yStart: yCenter - 5, yEnd: yCenter + 5, yCenter, height: 11, meanLuma: 200,
+      estimatedFontSize: fontSize, weightBucket: weight, inkDensity: density,
+    };
+  }
+
+  it("flags size mismatches", () => {
+    const mismatches = compareRowTypography(
+      [row(50, 24, "bold", 0.4)],
+      [row(50, 16, "bold", 0.4)],
+    );
+    assert.equal(mismatches.length, 1);
+    assert.equal(mismatches[0]!.kind, "size");
+    assert.equal(mismatches[0]!.baselineFontSize, 24);
+    assert.equal(mismatches[0]!.variantFontSize, 16);
+  });
+
+  it("flags weight mismatches when density delta exceeds threshold", () => {
+    const mismatches = compareRowTypography(
+      [row(50, 24, "bold", 0.4)],
+      [row(50, 24, "regular", 0.2)],
+    );
+    assert.equal(mismatches.length, 1);
+    assert.equal(mismatches[0]!.kind, "weight");
+  });
+
+  it("does NOT flag weight when density delta is below threshold", () => {
+    // Buckets differ ("regular" vs "medium") but density delta only 0.02.
+    const mismatches = compareRowTypography(
+      [row(50, 24, "medium", 0.28)],
+      [row(50, 24, "regular", 0.26)],
+    );
+    assert.equal(mismatches.length, 0);
+  });
+
+  it("classifies kind=both when size and weight both differ", () => {
+    const mismatches = compareRowTypography(
+      [row(50, 24, "bold", 0.4)],
+      [row(50, 14, "regular", 0.2)],
+    );
+    assert.equal(mismatches.length, 1);
+    assert.equal(mismatches[0]!.kind, "both");
   });
 });

@@ -409,6 +409,52 @@ be CSS transitions, not the threshold. Fixes applied:
   side. ≤ 30 annotated as _(near, likely AA)_; > 60 is a real
   palette gap. Lets the agent dismiss persistent low-diff noise.
 
+### Typography hints (2026-05-13)
+
+The single largest gap from the capability survey (`docs/reports/
+2026-05-13-capability-survey.md`) — subagent G v3 explicitly cited
+typography as "the next blocker." Now closed for size + weight.
+
+- [x] **Font-size estimation from band height.** `text-rows.ts`
+  computes `estimatedFontSize` per band, derived from `bandHeight /
+  0.92` snapped to a common UI bucket (12, 14, 16, 18, 20, 22, 24,
+  28, 32, 36, 40, 48, 56, 64, 72). Calibrated against system-ui
+  rendered at 12-48px. Absolute accuracy ≈ ±1 bucket; relative
+  direction (target larger / smaller than current) is reliable.
+
+- [x] **Font-weight bucketing from ink density.** New per-band
+  `inkDensity` (dark pixels / inkBbox area, with adaptive threshold
+  `meanLuma − 50` so muted-gray text is still detected) and
+  `weightBucket` ∈ {light, regular, medium, bold}. Buckets
+  empirically calibrated against system-ui at common weights.
+
+- [x] **Per-row mismatch comparison** (`compareRowTypography`).
+  Walks ordered baseline ↔ variant pairs, flags rows where snapped
+  size differs OR weight bucket differs (with density-delta gate of
+  0.04 to avoid noise). Returns `TypographyMismatch[]` with kind ∈
+  {size, weight, both}. Surfaced as a sub-table inside the Text-row
+  Δy section of component-from-image's report.
+
+- [x] **Fixture + verification.** `fixtures/typography/wrong-size-
+  weight/`: reference (`heading: 24px bold`, `price: 40px bold`,
+  body 14px regular) vs buggy (`heading: 18px medium`, `price:
+  24px medium`). Tool detection:
+  - Row #0: target `28px bold` / current `20px regular` / kind=both
+  - Row #1: target `40px bold` / current `24px bold` / kind=size
+  Both real bugs caught; estimates off by ≤1 bucket but direction
+  always correct.
+
+- [x] **6 new unit tests** in `text-rows.test.ts`: font-size from
+  band height, weight bucket ordering from density, and four
+  compareRowTypography cases (size mismatch, weight mismatch, below-
+  density-threshold no-op, kind=both classification).
+
+Open future work for typography (deferred):
+- Font-family bucket (serif vs sans, mono vs proportional) via
+  character-shape histogram
+- Range estimate ("24-28px") instead of single snapped value when
+  the band height lands between buckets
+
 ### Remaining-issue close-out (2026-05-13)
 
 Three concerns left open after the re-dogfood, all addressed:

@@ -36,7 +36,7 @@ import {
   type MatchedBbox,
 } from "./component-bbox.ts";
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "./heatmap-regions.ts";
-import { extractTextRowsFromFile, matchTextRows, computeRowGapDeltas, type MatchedTextRow, type RowGapDelta } from "./text-rows.ts";
+import { extractTextRowsFromFile, matchTextRows, computeRowGapDeltas, compareRowTypography, type MatchedTextRow, type RowGapDelta, type TypographyMismatch } from "./text-rows.ts";
 import { extractPaletteFromFile, findDominantBackgroundsFromFile, type PaletteColor, type DominantBackgrounds } from "./palette-extract.ts";
 import { diffPalettes, type PaletteDiff } from "./palette-diff.ts";
 import {
@@ -72,6 +72,7 @@ export interface ComponentFromImageReport {
   heatmapRegions: HeatmapRegion[];
   textRowMatches: MatchedTextRow[];
   rowGapDeltas: RowGapDelta[];
+  typographyMismatches: TypographyMismatch[];
   baselineRowCount: number;
   variantRowCount: number;
   paletteDiff: PaletteDiff & { baseline: PaletteColor[]; variant: PaletteColor[] };
@@ -187,6 +188,7 @@ export async function runComponentFromImage(
     ]);
     const textRowMatches = matchTextRows(targetRows, currentRows);
     const rowGapDeltas = computeRowGapDeltas(targetRows, currentRows);
+    const typographyMismatches = compareRowTypography(targetRows, currentRows);
 
     const [targetPalette, currentPalette] = await Promise.all([
       extractPaletteFromFile(targetCopyPath).catch(() => []),
@@ -392,6 +394,7 @@ export async function runComponentFromImage(
       heatmapRegions,
       textRowMatches,
       rowGapDeltas,
+      typographyMismatches,
       baselineRowCount: targetRows.length,
       variantRowCount: currentRows.length,
       paletteDiff,
@@ -421,6 +424,7 @@ export async function runComponentFromImage(
       heatmapRegions,
       textRowMatches,
       rowGapDeltas,
+      typographyMismatches,
       baselineRowCount: targetRows.length,
       variantRowCount: currentRows.length,
       paletteDiff: { ...paletteDiff, baseline: targetPalette, variant: currentPalette },
@@ -445,6 +449,7 @@ interface RenderInput {
   heatmapRegions: HeatmapRegion[];
   textRowMatches: MatchedTextRow[];
   rowGapDeltas: RowGapDelta[];
+  typographyMismatches: TypographyMismatch[];
   baselineRowCount: number;
   variantRowCount: number;
   paletteDiff: PaletteDiff;
@@ -523,6 +528,21 @@ export function renderReportMarkdown(r: RenderInput): string {
       for (const m of r.textRowMatches.slice(0, 12)) {
         const signed = m.deltaY > 0 ? `+${m.deltaY}` : `${m.deltaY}`;
         lines.push(`| #${m.rank} | ${m.baseline.yCenter} | ${m.variant.yCenter} | ${signed}px |`);
+      }
+    }
+    if (r.typographyMismatches.length > 0) {
+      lines.push("");
+      lines.push("**Typography mismatches** — per-row font-size / weight " +
+        "estimated from band height and ink density. Estimates are " +
+        "heuristic (snapped to nearest UI bucket); large jumps " +
+        "(e.g. 16px → 24px, regular → bold) are reliable.");
+      lines.push("");
+      lines.push("| Rank | Target | Current | Kind |");
+      lines.push("|---|---|---|---|");
+      for (const m of r.typographyMismatches.slice(0, 12)) {
+        const tgt = `${m.baselineFontSize ?? "?"}px ${m.baselineWeight ?? "?"}`;
+        const cur = `${m.variantFontSize ?? "?"}px ${m.variantWeight ?? "?"}`;
+        lines.push(`| #${m.rank} | ${tgt} | ${cur} | ${m.kind} |`);
       }
     }
     if (r.rowGapDeltas.length > 0) {
