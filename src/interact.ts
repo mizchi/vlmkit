@@ -69,6 +69,14 @@ export interface InteractOptions {
   reportPath?: string;
   /** Pixel diff threshold. Default 0.03. */
   threshold?: number;
+  /**
+   * Run the healer probe on every step with a selector — not only on
+   * failures. Catches the typo-matched-the-wrong-element case where a
+   * step technically succeeds but acts on the wrong target. Adds one
+   * healer DOM scan (~50-200ms) per selector step; expect a 1.5-3×
+   * wall-time increase on selector-heavy sequences. Default off.
+   */
+  healAll?: boolean;
 }
 
 export interface SnapshotEntry {
@@ -89,12 +97,31 @@ export interface TransitionDelta {
   heatmapRegions: HeatmapRegion[];
 }
 
+/**
+ * A "did you mean..." finding from --heal-all on a step that
+ * technically succeeded. The originalSelector matched something, but
+ * the healer found a higher-confidence sibling that may be what the
+ * sequence author actually intended.
+ */
+export interface HealAllFinding {
+  /** Step index in the sequence. */
+  stepIndex: number;
+  action: SequenceAction;
+  originalSelector: string;
+  suggestion: {
+    selector: string;
+    confidence: number;
+    text: string;
+  };
+}
+
 export interface InteractReport {
   source: string;
   viewport: { width: number; height: number };
   snapshots: SnapshotEntry[];
   transitions: TransitionDelta[];
   reportPath: string;
+  healAllFindings?: HealAllFinding[];
 }
 
 function parseArgs(argv: string[]) {
@@ -102,6 +129,7 @@ function parseArgs(argv: string[]) {
   let outputDir = "";
   let report = "";
   let threshold = 0.03;
+  let healAll = false;
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -109,9 +137,10 @@ function parseArgs(argv: string[]) {
     else if (a === "--output-dir") outputDir = argv[++i];
     else if (a === "--report") report = argv[++i];
     else if (a === "--threshold") threshold = parseFloat(argv[++i] ?? "0.03");
+    else if (a === "--heal-all") healAll = true;
     else positional.push(a);
   }
-  return { positional, sequence, outputDir, report, threshold };
+  return { positional, sequence, outputDir, report, threshold, healAll };
 }
 
 function isUrl(s: string): boolean { return /^https?:\/\//.test(s); }
@@ -189,6 +218,7 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
 
   const browser = await chromium.launch();
   const snapshots: SnapshotEntry[] = [];
+  const healAllFindings: HealAllFinding[] = [];
   let pendingActions: SequenceAction[] = [];
   try {
     const page = await browser.newPage({ viewport });
@@ -202,7 +232,8 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });
 
-    for (const step of sequence.steps) {
+    for (let stepIndex = 0; stepIndex < sequence.steps.length; stepIndex++) {
+      const step = sequence.steps[stepIndex]!;
       if (step.action === "snapshot") {
         const safeName = step.name.replace(/[^a-z0-9._-]+/gi, "_");
         const screenshotPath = join(outputDir, `${safeName}.png`);
@@ -214,9 +245,11 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
         });
         pendingActions = [];
       } else {
+        let stepFailed = false;
         try {
           await executeStep(page, step);
         } catch (error) {
+          stepFailed = true;
           const msg = String(error instanceof Error ? error.message : error);
           console.log(`  ${YELLOW}step failed (${summarizeAction(step)}): ${msg.split("\n")[0]}${RESET}`);
           // Self-healing: when the failure is a selector miss, ask
@@ -237,6 +270,34 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
               }
             } catch { /* healer failure is non-fatal */ }
           }
+        }
+        // --heal-all: probe successful selector steps for higher-
+        // confidence siblings. Catches the typo-but-still-matches case
+        // (e.g. `.btn-primary` was typed when the prose meant
+        // `.btn-secondary`) that the failure-only healer can't see.
+        const successSelector = !stepFailed ? (step as { selector?: string }).selector : undefined;
+        if (options.healAll && successSelector) {
+          try {
+            const candidates = await healSelector(page, successSelector, {
+              maxCandidates: 1,
+              exclude: successSelector,
+            });
+            // 0.1 catches the canonical "btn-primary vs btn-secondary"
+            // pair (≈0.125 once the candidate's text content dilutes
+            // jaccard) without dumping every visible button on the page.
+            // The healer's internal floor is 0.05; anything between
+            // 0.05-0.1 is mostly cross-tag noise.
+            const top = candidates[0];
+            if (top && top.confidence >= 0.1) {
+              healAllFindings.push({
+                stepIndex,
+                action: step,
+                originalSelector: successSelector,
+                suggestion: { selector: top.selector, confidence: top.confidence, text: top.text },
+              });
+              console.log(`    ${YELLOW}did you mean${RESET} ${DIM}\`${top.selector}\`${RESET} ${DIM}(${(top.confidence * 100).toFixed(0)}% confidence${top.text ? `, "${top.text}"` : ""})${RESET}`);
+            }
+          } catch { /* healer failure is non-fatal */ }
         }
         pendingActions.push(step);
       }
@@ -286,6 +347,7 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
     viewport,
     snapshots,
     transitions,
+    healAllFindings: options.healAll ? healAllFindings : undefined,
   });
   await writeFile(reportPath, md);
 
@@ -298,9 +360,19 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
     const summary = t.actions.map(summarizeAction).join(", ");
     console.log(`  ${icon} ${t.from} → ${t.to}  ${pct.padStart(6)}%  ${DIM}${summary}${RESET}`);
   }
+  if (options.healAll) {
+    console.log(`  ${DIM}heal-all: ${healAllFindings.length} did-you-mean suggestion(s) across ${sequence.steps.filter((s) => "selector" in s && s.selector).length} selector step(s)${RESET}`);
+  }
   console.log(`  ${DIM}report: ${reportPath}${RESET}`);
 
-  return { source: options.source, viewport, snapshots, transitions, reportPath };
+  return {
+    source: options.source,
+    viewport,
+    snapshots,
+    transitions,
+    reportPath,
+    healAllFindings: options.healAll ? healAllFindings : undefined,
+  };
 }
 
 function renderReport(r: Omit<InteractReport, "reportPath">): string {
@@ -366,6 +438,25 @@ function renderReport(r: Omit<InteractReport, "reportPath">): string {
     }
   }
 
+  if (r.healAllFindings !== undefined) {
+    lines.push("## Heal-all: did-you-mean suggestions");
+    lines.push("");
+    if (r.healAllFindings.length === 0) {
+      lines.push("`--heal-all` enabled. No higher-confidence sibling found for any successful selector step — the selectors look unambiguous.");
+    } else {
+      lines.push("`--heal-all` enabled. Each step below succeeded technically, but the healer found a sibling element with comparable or higher confidence. Worth a quick eyeball to confirm the typed selector matches the *intended* target, not just *a* target.");
+      lines.push("");
+      lines.push("| Step | Action | Used selector | Did you mean? | Confidence |");
+      lines.push("|---|---|---|---|---|");
+      for (const f of r.healAllFindings) {
+        const summary = summarizeAction(f.action).replace(/\|/g, "\\|");
+        const text = f.suggestion.text ? ` _(${f.suggestion.text.replace(/\|/g, "\\|")})_` : "";
+        lines.push(`| ${f.stepIndex} | \`${summary}\` | \`${f.originalSelector}\` | \`${f.suggestion.selector}\`${text} | ${(f.suggestion.confidence * 100).toFixed(0)}% |`);
+      }
+    }
+    lines.push("");
+  }
+
   lines.push("## Suggested next step");
   lines.push("");
   const zeroDeltas = r.transitions.filter((t) => t.diffRatio < 0.001 && t.actions.length > 0);
@@ -390,7 +481,7 @@ function renderReport(r: Omit<InteractReport, "reportPath">): string {
 
 async function main(argv = process.argv.slice(2)) {
   if (argv[0] === "--help" || argv[0] === "-h") argv = [];
-  const { positional, sequence, outputDir, report, threshold } = parseArgs(argv);
+  const { positional, sequence, outputDir, report, threshold, healAll } = parseArgs(argv);
   if (positional.length === 0 || !sequence) {
     console.log("Usage: vrt interact <html-or-url> --sequence <path.json> [options]");
     console.log("Options:");
@@ -398,6 +489,12 @@ async function main(argv = process.argv.slice(2)) {
     console.log("  --output-dir <dir>  Default: ./test-results/interact");
     console.log("  --report <path>     Markdown report path");
     console.log("  --threshold <0..1>  Pixel diff threshold (default: 0.03)");
+    console.log("  --heal-all          Run the healer probe on every selector step,");
+    console.log("                      not only on failures. Surfaces \"did you mean?\"");
+    console.log("                      siblings for steps that technically succeed —");
+    console.log("                      catches the typo-matched-the-wrong-element case.");
+    console.log("                      Adds one DOM scan per selector step (expect a");
+    console.log("                      1.5-3x wall-time increase on selector-heavy seqs).");
     console.log("");
     console.log("Sequence schema:");
     console.log('  { "viewport": { "width": 1280, "height": 720 },');
@@ -427,6 +524,7 @@ async function main(argv = process.argv.slice(2)) {
     outputDir: outputDir || join(process.cwd(), "test-results", "interact"),
     reportPath: report || undefined,
     threshold,
+    healAll,
   });
 }
 

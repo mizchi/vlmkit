@@ -1,0 +1,8 @@
+{
+  "viewport": { "width": 640, "height": 480 },
+  "steps": [
+    { "action": "snapshot", "name": "default" },
+    { "action": "click", "selector": ".btn-secondary" },
+    { "action": "snapshot", "name": "after-click" }
+  ]
+}
