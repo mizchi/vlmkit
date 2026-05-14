@@ -91,6 +91,7 @@ run "media-variants" "report.md" \
 run "cross-browser" "report.md" \
   node --experimental-strip-types src/vrt.ts cross-browser \
     fixtures/wireframe/pricing-card/reference.html \
+    --allow-skipped \
     --output-dir "$OUT_BASE/cross-browser"
 
 run "design-tokens" "report.md" \

@@ -26,17 +26,28 @@
   <script>
     // Simulate a slow-loading image — inject the src after a small delay,
     // which forces a layout shift after first paint.
+    // Delays > networkidle's 500 ms settle window so the shifts
+    // happen during the observation phase (not during page load).
+    // Without this, Playwright waits past the shifts and the
+    // PerformanceObserver records 0 CLS.
     setTimeout(() => {
-      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='600' height='300'><rect width='600' height='300' fill='%23bfdbfe'/></svg>`;
+      const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='600' height='600'><rect width='600' height='600' fill='%23bfdbfe'/></svg>`;
       document.getElementById('hero-img').src = 'data:image/svg+xml;utf8,' + svg;
-    }, 200);
-    // Also inject a yellow banner late.
+    }, 1200);
     setTimeout(() => {
       const banner = document.createElement('div');
       banner.className = 'banner';
+      banner.style.padding = '64px';
       banner.textContent = 'Late notification banner';
       document.body.insertBefore(banner, document.body.firstChild);
-    }, 400);
+    }, 1500);
+    setTimeout(() => {
+      const note = document.createElement('div');
+      note.style.padding = '32px';
+      note.style.background = '#fecaca';
+      note.textContent = 'Even-later note';
+      document.body.insertBefore(note, document.body.firstChild);
+    }, 1800);
   </script>
 </body>
 </html>

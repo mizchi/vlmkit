@@ -75,15 +75,17 @@ function parseArgs(argv: string[]) {
   let outputDir = "";
   let report = "";
   let observeMs = 3000;
+  let strict = false;
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--output-dir") outputDir = argv[++i];
     else if (a === "--report") report = argv[++i];
     else if (a === "--observe") observeMs = parseInt(argv[++i] ?? "3000", 10);
+    else if (a === "--strict") strict = true;
     else positional.push(a);
   }
-  return { positional, outputDir, report, observeMs };
+  return { positional, outputDir, report, observeMs, strict };
 }
 
 // Browser-side instrumentation. Installs three PerformanceObservers
@@ -390,21 +392,30 @@ function renderReport(r: Omit<PerfReport, "reportPath">): string {
 }
 
 async function main(argv = process.argv.slice(2)) {
-  const { positional, outputDir, report, observeMs } = parseArgs(argv);
+  const { positional, outputDir, report, observeMs, strict } = parseArgs(argv);
   if (positional.length === 0) {
     console.log("Usage: vrt perf <html-or-url> [options]");
     console.log("Options:");
     console.log("  --observe <ms>      Observation window after networkidle (default: 3000)");
+    console.log("  --strict            Exit non-zero on any non-good verdict (CI gate mode)");
     console.log("  --output-dir <dir>  Default: ./test-results/perf");
     console.log("  --report <path>     Markdown report path");
     process.exit(1);
   }
-  await runPerf({
+  const result = await runPerf({
     source: positional[0]!,
     outputDir: outputDir || join(process.cwd(), "test-results", "perf"),
     reportPath: report || undefined,
     observeMs,
   });
+  // CI gating: when --strict, exit non-zero if any verdict isn't
+  // "good". Use 1 for "poor" (hard fail), 2 for "needs-improvement"
+  // (warning — page works but a metric is borderline).
+  if (strict) {
+    const verdicts = [result.verdicts.cls, result.verdicts.lcp, result.verdicts.fcp];
+    if (verdicts.includes("poor")) process.exitCode = 1;
+    else if (verdicts.includes("needs-improvement")) process.exitCode = 2;
+  }
 }
 
 const isCliEntry = process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false;

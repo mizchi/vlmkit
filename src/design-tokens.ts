@@ -156,6 +156,7 @@ function parseArgs(argv: string[]) {
   let outputDir = "";
   let report = "";
   let configPath = "";
+  let strict = false;
   const flagConfig: DesignTokenConfig = {};
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
@@ -163,6 +164,7 @@ function parseArgs(argv: string[]) {
     if (a === "--output-dir") outputDir = argv[++i];
     else if (a === "--report") report = argv[++i];
     else if (a === "--config") configPath = argv[++i];
+    else if (a === "--strict") strict = true;
     else if (a === "--radius-scale") flagConfig.radius = parseScale(argv[++i]);
     else if (a === "--spacing-scale") flagConfig.spacing = parseScale(argv[++i]);
     else if (a === "--z-scale") flagConfig.zIndex = parseScale(argv[++i]);
@@ -170,7 +172,7 @@ function parseArgs(argv: string[]) {
     else if (a === "--tolerance") flagConfig.tolerance = parseFloat(argv[++i] ?? "0.5");
     else positional.push(a);
   }
-  return { positional, outputDir, report, configPath, flagConfig };
+  return { positional, outputDir, report, configPath, strict, flagConfig };
 }
 
 function parseScale(s: string | undefined): number[] {
@@ -406,7 +408,7 @@ async function loadConfig(path: string | undefined): Promise<DesignTokenConfig |
 }
 
 async function main(argv = process.argv.slice(2)) {
-  const { positional, outputDir, report, configPath, flagConfig } = parseArgs(argv);
+  const { positional, outputDir, report, configPath, strict, flagConfig } = parseArgs(argv);
   if (positional.length === 0) {
     console.log("Usage: vrt design-tokens <html-or-url> [options]");
     console.log("Options:");
@@ -416,17 +418,22 @@ async function main(argv = process.argv.slice(2)) {
     console.log("  --z-scale ...             Allowed z-index values (default: 0,1,10,100,1000,9999)");
     console.log("  --shadow-tiers N          Max distinct box-shadow values (default: 5)");
     console.log("  --tolerance px            Snap tolerance in px (default: 0.5)");
+    console.log("  --strict                  Exit non-zero if any violations or shadow-tier excess");
     console.log("  --output-dir <dir>        Default: ./test-results/design-tokens");
     console.log("  --report <path>           Markdown report path");
     process.exit(1);
   }
   const fileConfig = await loadConfig(configPath);
-  await runDesignTokens({
+  const result = await runDesignTokens({
     source: positional[0]!,
     outputDir: outputDir || join(process.cwd(), "test-results", "design-tokens"),
     reportPath: report || undefined,
     config: { ...fileConfig, ...flagConfig },
   });
+  if (strict) {
+    const shadowOver = result.shadow.distinctShadows.length > result.shadow.allowedTiers;
+    if (result.violations.length > 0 || shadowOver) process.exitCode = 1;
+  }
 }
 
 const isCliEntry = process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false;

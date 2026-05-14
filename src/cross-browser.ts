@@ -45,6 +45,8 @@ export interface CrossBrowserOptions {
   viewport?: { width: number; height: number };
   engines?: EngineName[];
   threshold?: number;
+  /** When true, don't set a warning exit code if engines auto-skip. */
+  allowSkipped?: boolean;
 }
 
 export interface EngineResult {
@@ -78,18 +80,20 @@ function parseArgs(argv: string[]) {
   let report = "";
   let engines: EngineName[] | undefined;
   let threshold = 0.03;
+  let allowSkipped = false;
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--output-dir") outputDir = argv[++i];
     else if (a === "--report") report = argv[++i];
     else if (a === "--threshold") threshold = parseFloat(argv[++i] ?? "0.03");
+    else if (a === "--allow-skipped") allowSkipped = true;
     else if (a === "--engines") {
       engines = (argv[++i] ?? "").split(",").map((v) => v.trim()).filter((v) =>
         ALL_ENGINES.includes(v as EngineName)) as EngineName[];
     } else positional.push(a);
   }
-  return { positional, outputDir, report, engines, threshold };
+  return { positional, outputDir, report, engines, threshold, allowSkipped };
 }
 
 async function captureWithEngine(
@@ -231,6 +235,11 @@ export async function runCrossBrowser(
   }
   if (usable < 2) {
     console.log(`  ${YELLOW}!${RESET} Only ${usable} engine(s) usable — no cross-engine comparison performed. Install missing engines with \`npx playwright install firefox webkit\`.`);
+    // Set a warning exit code so CI matrices using cross-browser as a
+    // gate don't silently pass on an under-configured runner. Use 2
+    // (warning) not 1 (hard fail) — the run *did* succeed, just on
+    // fewer engines than intended. Override with --allow-skipped.
+    if (!options.allowSkipped) process.exitCode = 2;
   }
   for (const r of engineResults) {
     if (r.status === "skipped") {
@@ -344,7 +353,7 @@ function renderReport(r: Omit<CrossBrowserReport, "reportPath">): string {
 }
 
 async function main(argv = process.argv.slice(2)) {
-  const { positional, outputDir, report, engines, threshold } = parseArgs(argv);
+  const { positional, outputDir, report, engines, threshold, allowSkipped } = parseArgs(argv);
   if (positional.length === 0) {
     console.log("Usage: vrt cross-browser <html-or-url> [options]");
     console.log("Options:");
@@ -352,6 +361,7 @@ async function main(argv = process.argv.slice(2)) {
     console.log("  --output-dir <dir>  Default: ./test-results/cross-browser");
     console.log("  --report <path>     Markdown report path");
     console.log("  --threshold <0..1>  Pixel diff threshold (default: 0.03)");
+    console.log("  --allow-skipped     Exit 0 even when missing engines skipped the comparison");
     process.exit(1);
   }
   await runCrossBrowser({
@@ -359,6 +369,7 @@ async function main(argv = process.argv.slice(2)) {
     outputDir: outputDir || join(process.cwd(), "test-results", "cross-browser"),
     reportPath: report || undefined,
     engines,
+    allowSkipped,
     threshold,
   });
 }
