@@ -74,6 +74,7 @@ const ROOT_MODULE_COMMANDS: Record<string, string> = {
   "perf": "./perf.ts",
   "explore": "./explore.ts",
   "skill": "./skill.ts",
+  "component-extract": "./component-extract.ts",
 };
 
 const WORKFLOW_ALIAS_COMMANDS = new Set<WorkflowCommand>([
@@ -174,6 +175,10 @@ Markup-Assistance Commands:
   skill <list|show|init|run>  Per-project skill playbooks under
                               .vrt-skills/ — bundle of checks per
                               target (selector, viewport, tools)
+  component-extract <png> [--crop N | --at x,y | --crop-all]
+                              Detect components in a page screenshot
+                              and crop them to standalone PNGs
+                              (= targets for component-from-image)
 
 Workflow Commands:
   workflow <command>          Stateful baseline/snapshot verification workflow

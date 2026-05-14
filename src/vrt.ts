@@ -31,6 +31,7 @@ const MODULE_LOADERS = {
   "./perf.ts": () => import("./perf.ts"),
   "./explore.ts": () => import("./explore.ts"),
   "./skill.ts": () => import("./skill.ts"),
+  "./component-extract.ts": () => import("./component-extract.ts"),
 } as const;
 
 async function main() {

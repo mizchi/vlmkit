@@ -109,6 +109,12 @@ run "explore" "report.md" \
     fixtures/explore/declarative/page.html \
     --output-dir "$OUT_BASE/explore"
 
+run "component-extract" "report.md" \
+  node --experimental-strip-types src/vrt.ts component-extract \
+    fixtures/wireframe/pricing-card/target-desktop.png \
+    --crop 0 \
+    --output-dir "$OUT_BASE/component-extract"
+
 # skill writes to <output-dir>/skill-<name>/. Adjust assertion:
 # pass --output-dir = OUT_BASE, then the resulting report lives at
 # $OUT_BASE/skill-pricing-card/report.md — assert with that label.
