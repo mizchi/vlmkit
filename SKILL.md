@@ -153,7 +153,8 @@ semantics are likely broken.
 
 ```
 ├── SKILL.md                   ← This file
-├── justfile                   # Task runner
+├── Taskfile.pkl               # Task runner (pkfire)
+├── Spec.pkl / Test.pkl        # Specs + smoke gate (pkspec)
 ├── package.json
 ├── playwright.config.ts       # Playwright config for VRT
 ├── e2e/

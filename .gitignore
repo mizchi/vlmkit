@@ -18,3 +18,5 @@ data/*.jsonl
 fixtures/migration/shadcn-to-luna/working.html
 dogfood-*-attempt.html
 attempt.html
+/.pkl-vendor/
+/.pkspec/

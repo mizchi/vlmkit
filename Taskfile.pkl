@@ -1,0 +1,316 @@
+/// vrt task definitions for pkfire.
+///
+/// Replaces the previous bash justfile. Each task is a typed `Task`
+/// with declared inputs so pkfire can
+/// skip re-runs when sources haven't changed.
+///
+/// Usage:
+///   pkf list                  # show all tasks
+///   pkf run vrt-test          # run a task
+///   pkf run smoke-all         # full smoke
+///   pkf run --watch vrt-test  # re-run on src changes
+///
+/// Cache directory: $PKFIRE_CACHE_DIR or ~/.cache/pkfire.
+amends "package://pkg.pkl-lang.org/github.com/mizchi/pkfire/pkfire@0.10.0#/Taskfile.pkl"
+
+// ---- Core ----
+
+local vrtTest = new Task {
+  name = "vrt-test"
+  cmd = "node --test src/**/*.test.ts"
+  inputs { "src/**/*.ts" }
+}
+
+local bench = new Task {
+  name = "bench"
+  cmd = "node src/benchmark.ts"
+  inputs { "src/benchmark.ts"; "src/heatmap.ts"; "src/pixelmatch*.ts" }
+}
+
+// ---- Demos ----
+
+local vrtDemo = new Task {
+  name = "vrt-demo"
+  cmd = "node src/demo.ts"
+  inputs { "src/demo.ts" }
+}
+local vrtDemoFix = new Task {
+  name = "vrt-demo-fix"
+  cmd = "node src/demo-fix-loop.ts"
+  inputs { "src/demo-fix-loop.ts" }
+}
+local vrtDemoMulti = new Task {
+  name = "vrt-demo-multi"
+  cmd = "node src/demo-scenarios.ts"
+  inputs { "src/demo-scenarios.ts" }
+}
+local vrtDemoMultistep = new Task {
+  name = "vrt-demo-multistep"
+  cmd = "node src/demo-multistep.ts"
+  inputs { "src/demo-multistep.ts" }
+}
+
+// ---- CSS challenge bench ----
+
+local cssBench = new Task {
+  name = "css-bench"
+  cmd = "NO_IMAGES=1 node src/css-challenge-bench.ts"
+  inputs { "src/css-challenge*.ts"; "fixtures/css-challenge/**" }
+}
+local cssBenchSelector = new Task {
+  name = "css-bench-selector"
+  cmd = "NO_IMAGES=1 node src/css-challenge-bench.ts --mode selector"
+  inputs { "src/css-challenge*.ts"; "fixtures/css-challenge/**" }
+}
+local cssBenchAll = new Task {
+  name = "css-bench-all"
+  params {
+    new { name = "trials"; type = "int"; default = "30" }
+  }
+  cmd = "NO_IMAGES=1 node src/css-challenge-bench.ts --trials $TRIALS --fixture all"
+  inputs { "src/css-challenge*.ts"; "fixtures/css-challenge/**" }
+}
+local cssBenchCrater = new Task {
+  name = "css-bench-crater"
+  cmd = "NO_IMAGES=1 node src/css-challenge-bench.ts --backend crater"
+  inputs { "src/css-challenge*.ts"; "fixtures/css-challenge/**" }
+}
+local cssBenchPrescanner = new Task {
+  name = "css-bench-prescanner"
+  cmd = "NO_IMAGES=1 node src/css-challenge-bench.ts --backend prescanner"
+  inputs { "src/css-challenge*.ts"; "fixtures/css-challenge/**" }
+}
+local cssReport = new Task {
+  name = "css-report"
+  cmd = "node src/detection-report.ts"
+  inputs { "src/detection-report.ts"; "src/detection-db.ts" }
+}
+
+// ---- VRT approve / migration ----
+
+local vrtApprove = new Task {
+  name = "vrt-approve"
+  cmd = "node src/vrt-approve.ts"
+  inputs { "src/vrt-approve.ts"; "src/approval*.ts" }
+}
+
+local migrationCompare = new Task {
+  name = "migration-compare"
+  cmd = "node src/migration-compare.ts"
+  inputs { "src/migration-compare.ts"; "src/migration-*.ts" }
+}
+
+local migrationFixLoop = new Task {
+  name = "migration-fix-loop"
+  cmd = "node src/migration-fix-loop.ts"
+  inputs { "src/migration-fix-loop*.ts" }
+}
+
+local migrationReset = new Task {
+  name = "migration-reset"
+  cmd = #"""
+    node src/migration-compare.ts \
+      --dir fixtures/migration/reset-css \
+      --baseline normalize.html \
+      --variants modern-normalize.html destyle.html no-reset.html
+  """#
+  inputs { "src/migration-compare.ts"; "fixtures/migration/reset-css/**" }
+}
+
+local migrationTailwind = new Task {
+  name = "migration-tailwind"
+  cmd = #"""
+    node src/migration-compare.ts \
+      fixtures/migration/tailwind-to-vanilla/before.html \
+      fixtures/migration/tailwind-to-vanilla/after.html
+  """#
+  inputs { "src/migration-compare.ts"; "fixtures/migration/tailwind-to-vanilla/**" }
+}
+
+local migrationShadcn = new Task {
+  name = "migration-shadcn"
+  cmd = #"""
+    node src/migration-compare.ts \
+      --dir fixtures/migration/shadcn-to-luna \
+      --baseline before.html --variants after.html
+  """#
+  inputs { "src/migration-compare.ts"; "fixtures/migration/shadcn-to-luna/**" }
+}
+
+local flakerVrtAdapt = new Task {
+  name = "flaker-vrt-adapt"
+  cmd = "node src/flaker-vrt-report-adapter.ts"
+  inputs { "src/flaker-vrt-report-adapter.ts" }
+}
+
+// ---- Fix / VLM ----
+
+local fixLoop = new Task {
+  name = "fix-loop"
+  cmd = "node src/fix-loop.ts"
+  inputs { "src/fix-loop.ts"; "src/vlm-client.ts"; "src/llm-client.ts" }
+}
+
+local vlmBench = new Task {
+  name = "vlm-bench"
+  cmd = "node src/vlm-bench.ts"
+  inputs { "src/vlm-bench.ts" }
+}
+
+// ---- API / smoke / snapshot ----
+
+local apiServer = new Task {
+  name = "api-server"
+  cmd = "node src/api-server.ts"
+  inputs { "src/api-server.ts"; "src/api-types.ts" }
+}
+
+local smokeTest = new Task {
+  name = "smoke-test"
+  cmd = "node src/smoke-runner.ts"
+  inputs { "src/smoke-runner.ts" }
+}
+
+local snapshot = new Task {
+  name = "snapshot"
+  cmd = "node src/snapshot.ts"
+  inputs { "src/snapshot.ts"; "src/snapshot-*.ts" }
+}
+
+// ---- Dogfood ----
+
+local dogfoodLuna = new Task {
+  name = "dogfood-luna"
+  cmd = #"""
+    node src/snapshot.ts \
+      http://localhost:4200/src/examples/todomvc/ \
+      http://localhost:4200/src/examples/spa/ \
+      http://localhost:4200/src/examples/wc/ \
+      http://localhost:4200/src/examples/apg-playground/ \
+      http://localhost:4200/src/examples/browser_router/ \
+      http://localhost:4200/src/examples/css_split_test/ \
+      --output test-results/snapshots/luna
+  """#
+}
+
+local dogfoodSol = new Task {
+  name = "dogfood-sol"
+  cmd = #"""
+    node src/snapshot.ts \
+      http://localhost:3000/ \
+      http://localhost:3000/luna/ \
+      http://localhost:3000/luna/tutorial-js/islands/ \
+      http://localhost:3000/sol/ \
+      http://localhost:3000/benchmark/ \
+      --output test-results/snapshots/sol \
+      --mask ".marquee-container,.hero-badge"
+  """#
+}
+
+local falsePositive = new Task {
+  name = "false-positive"
+  params {
+    new { name = "url"; type = "string" }
+  }
+  cmd = #"""
+    node src/migration-compare.ts \
+      --url $URL --current-url $URL \
+      --output-dir test-results/false-positive --no-paint-tree
+  """#
+}
+
+// ---- Playwright ----
+
+local vrtPlaywright = new Task {
+  name = "vrt"
+  cmd = "playwright test"
+}
+local vrtUpdate = new Task {
+  name = "vrt-update"
+  cmd = "playwright test --update-snapshots"
+}
+
+// ---- Markup-assistance suite (new this PR) ----
+//
+// The 19 markup-assistance CLIs registered under `vrt <command>`.
+// `smoke-all` runs the existing bash script (single source of truth
+// for fixture wiring); individual CLI verifies are covered by
+// pkspec/Test.pkl so we don't duplicate them here.
+
+local smokeAll = new Task {
+  name = "smoke-all"
+  cmd = "bash scripts/smoke-all-clis.sh"
+  inputs {
+    "scripts/smoke-all-clis.sh"
+    "src/**/*.ts"
+    "fixtures/**/*.html"
+    "fixtures/**/*.png"
+    "fixtures/**/*.json"
+  }
+}
+
+local vrtHelp = new Task {
+  name = "vrt-help"
+  cmd = "node --experimental-strip-types src/vrt.ts help"
+  inputs { "src/vrt.ts"; "src/vrt-command-router.ts" }
+}
+
+// ---- Spec gates (pkspec) ----
+
+local specCheck = new Task {
+  name = "spec-check"
+  cmd = "pkspec check Spec.pkl Test.pkl"
+  inputs { "Spec.pkl"; "Test.pkl"; "pkspec/**" }
+}
+
+local specRender = new Task {
+  name = "spec-render"
+  cmd = "pkspec spec --output docs/SPEC.md Spec.pkl Test.pkl"
+  inputs { "Spec.pkl"; "Test.pkl"; "pkspec/**" }
+  outputs { "docs/SPEC.md" }
+}
+
+local specRun = new Task {
+  name = "spec-run"
+  cmd = "pkspec exec -f Test.pkl"
+  inputs { "Test.pkl"; "src/**/*.ts"; "fixtures/**" }
+}
+
+// ---- Aggregate ----
+
+tasks {
+  vrtTest
+  bench
+  vrtDemo
+  vrtDemoFix
+  vrtDemoMulti
+  vrtDemoMultistep
+  cssBench
+  cssBenchSelector
+  cssBenchAll
+  cssBenchCrater
+  cssBenchPrescanner
+  cssReport
+  vrtApprove
+  migrationCompare
+  migrationFixLoop
+  migrationReset
+  migrationTailwind
+  migrationShadcn
+  flakerVrtAdapt
+  fixLoop
+  vlmBench
+  apiServer
+  smokeTest
+  snapshot
+  dogfoodLuna
+  dogfoodSol
+  falsePositive
+  vrtPlaywright
+  vrtUpdate
+  smokeAll
+  vrtHelp
+  specCheck
+  specRender
+  specRun
+}

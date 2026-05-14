@@ -74,10 +74,37 @@ vrt compare --dir fixtures/migration/tailwind-to-vanilla \
 # or --no-baseline-sanity to skip the check entirely.
 
 # CSS challenge benchmark
-just css-bench --fixture page --trials 30
+pkf run css-bench --fixture page --trials 30
 
 # Fix loop (break CSS → VLM analyze → LLM fix → verify)
-just fix-loop --fixture page --seed 42
+pkf run fix-loop --fixture page --seed 42
+```
+
+### Task runner & spec gates (pkfire / pkspec)
+
+Tasks live in `Taskfile.pkl` (typed; replaces the previous bash
+justfile). Specs live in
+`Spec.pkl` (Goals + Scenarios) and `Test.pkl` (smoke implementations).
+
+```bash
+# List every available task
+pkf list
+
+# Run a task (mirrors any old `just <name>` invocation)
+pkf run smoke-all
+pkf run vrt-test
+
+# Spec gates
+pkf run spec-check    # pkspec check Spec.pkl Test.pkl
+pkf run spec-render   # render Spec.pkl → docs/SPEC.md
+pkf run spec-run      # execute every Test.pkl test
+```
+
+Install `pkf` / `pkspec` via nix flake:
+
+```bash
+nix run git+https://github.com/mizchi/pkfire -- list
+nix run git+https://github.com/mizchi/pkspec  -- check Spec.pkl Test.pkl
 ```
 
 ## CLI Surface
