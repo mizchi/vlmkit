@@ -30,6 +30,8 @@ import {
 } from "./crater-client.ts";
 import { compareScreenshots, generateDiffReport } from "./heatmap.ts";
 import { composeTriptych } from "./triptych.ts";
+import { loadDesignTokens, type DesignTokens } from "./design-md-tokens.ts";
+import { generateWireframeFixCandidates, type WireframeFixSuggestion } from "./wireframe-fix-candidates.ts";
 import {
   buildMigrationRegionApprovalContexts,
   classifyMigrationDiff,
@@ -188,6 +190,14 @@ export interface MigrationCompareOptions {
    * `--no-triptych` to disable.
    */
   triptych?: boolean;
+  /**
+   * Path to a DESIGN.md (or design-tokens.json) whose front-matter
+   * tokens (spacing, colors) are used to snap diff deltas to named
+   * tokens — "swap surface-variant → surface-container-high"
+   * instead of bare hex pairs. Optional; falls back to raw values
+   * when not provided.
+   */
+  tokensPath?: string;
 }
 
 export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptions {
@@ -227,6 +237,7 @@ export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptio
     componentBboxDiff: !hasFlag(args, "no-component-bbox"),
     states: parseStatesArg(args),
     triptych: !hasFlag(args, "no-triptych"),
+    tokensPath: getArg(args, "tokens", "") || undefined,
   };
 }
 
@@ -538,6 +549,20 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
   } = options;
 
   await mkdir(outputDir, { recursive: true });
+
+  // Optional DESIGN.md token source. Loaded once; fed to the
+  // wireframe-mode fix-candidate generator and (later) palette diff
+  // reverse-lookup. Failure to load is non-fatal — we just skip the
+  // token-snapping and surface a single warning.
+  let designTokens: DesignTokens | undefined;
+  if (options.tokensPath) {
+    try {
+      designTokens = await loadDesignTokens(options.tokensPath);
+      console.log(`  ${DIM}Tokens: ${designTokens.colors.size} colors, ${designTokens.spacing.length} spacing, ${designTokens.rounded.size} rounded loaded from ${options.tokensPath}${RESET}`);
+    } catch (error) {
+      console.log(`  ${YELLOW}Failed to load --tokens ${options.tokensPath}: ${String(error)}${RESET}`);
+    }
+  }
 
   const isUrlMode = !!options.baselineUrl;
   let baselineHtml: string;
@@ -1420,6 +1445,26 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           const totalMissing = perViewportPalette.reduce((s, v) => s + v.diff.onlyInBaseline.length, 0);
           const totalExtra = perViewportPalette.reduce((s, v) => s + v.diff.onlyInVariant.length, 0);
           console.log(`  ${DIM}Palette diff: ${totalMissing} missing color(s), ${totalExtra} extra color(s) across ${perViewportPalette.length} viewport(s)${RESET}`);
+        }
+
+        // Wireframe-mode fix candidates: synthesize "try N px (token X)"
+        // suggestions from image-only signals (bbox + text-row deltas)
+        // when DOM correspondence is missing. The existing CSS-declaration
+        // candidate generator returns empty in this mode (it expected an
+        // inline <style id="target-css"> block and a hot paint-tree).
+        const wireframeSuggestions: WireframeFixSuggestion[] = generateWireframeFixCandidates({
+          bboxByViewport: perViewport,
+          textRowsByViewport: perViewportTextRows.map((r) => ({ viewport: r.viewport, matches: r.matches })),
+          tokens: designTokens,
+        });
+        if (wireframeSuggestions.length > 0) {
+          const top = wireframeSuggestions.slice(0, 5);
+          console.log(`  ${CYAN}Wireframe fix suggestions (${wireframeSuggestions.length}, top ${top.length}):${RESET}`);
+          for (const s of top) {
+            const conf = s.confidence === "high" ? GREEN : s.confidence === "medium" ? YELLOW : DIM;
+            console.log(`    ${conf}[${s.confidence}]${RESET} ${s.evidence}`);
+            console.log(`      ${DIM}→ ${s.suggestion}${RESET}`);
+          }
         }
       }
 
