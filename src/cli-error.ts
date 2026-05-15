@@ -7,14 +7,36 @@
  * Use:
  *   main().catch(handleCliError);
  */
+import { statSync } from "node:fs";
+
 export function handleCliError(e: unknown): never {
-  const err = e as { code?: string; message?: string; name?: string };
+  // Node fs errors carry the offending path on `.path`; that's more
+  // reliable than parsing it out of `.message` (which sometimes
+  // doesn't include the path at all, e.g. EISDIR from readFile).
+  const err = e as { code?: string; message?: string; name?: string; path?: string };
   const msg = String(err?.message ?? e);
 
   // ENOENT — missing local file path.
   if (err?.code === "ENOENT") {
-    const path = msg.match(/ENOENT: no such file or directory[^']*'([^']+)'/)?.[1] ?? "?";
+    const path = err.path ?? msg.match(/ENOENT: no such file or directory[^']*'([^']+)'/)?.[1] ?? "?";
     process.stderr.write(`error: file not found: ${path}\n`);
+    process.exit(1);
+  }
+  // EISDIR — caller passed a directory where an HTML file (or other
+  // single-file artifact) was expected. Surfaced repeatedly in
+  // back-to-back cold-start dogfoods (2026-05-15) as the worst raw-
+  // stack-trace first impression in the toolkit. Almost every vrt
+  // subcommand accepts `<html-or-url>` as its first positional, so
+  // catching the directory case here covers all of them at once.
+  // Node's fsPromises.readFile drops `err.path`, so we fall back to
+  // scanning argv for any positional that exists as a directory.
+  if (err?.code === "EISDIR") {
+    const argvDir = findDirectoryArg();
+    const path = err.path ?? msg.match(/EISDIR:[^']*'([^']+)'/)?.[1] ?? argvDir ?? "?";
+    const hint = path === "?"
+      ? "       hint: pass the path to a specific .html file."
+      : `       hint: pass the path to a specific .html file inside it (e.g. ${path}/page.html).`;
+    process.stderr.write(`error: expected an HTML file, got a directory: ${path}\n${hint}\n`);
     process.exit(1);
   }
   // Playwright navigation failure (DNS / connection refused / SSL).
@@ -41,4 +63,23 @@ export function handleCliError(e: unknown): never {
   // Default: full error for the developer.
   console.error(e);
   process.exit(1);
+}
+
+/**
+ * EISDIR fallback: Node's `fsPromises.readFile` doesn't attach `.path`
+ * to the error, and the message string doesn't include the path
+ * either. Scan argv for the first positional that exists as a
+ * directory — close enough since most vrt subcommands take exactly
+ * one path argument and the failure happens during the initial read.
+ */
+function findDirectoryArg(): string | undefined {
+  for (const arg of process.argv.slice(2)) {
+    if (arg.startsWith("-")) continue;
+    try {
+      if (statSync(arg).isDirectory()) return arg;
+    } catch {
+      // arg doesn't exist as a path; keep scanning.
+    }
+  }
+  return undefined;
 }

@@ -68,6 +68,7 @@ import {
 } from "./prescanner.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "./terminal-colors.ts";
 import { args } from "./cli-args.ts";
+import { handleCliError } from "./cli-error.ts";
 
 // ---- Config ----
 
@@ -839,9 +840,8 @@ if (import.meta.main) {
   main().catch((error) => {
     if (isPlaywrightSandboxRestrictionError(error)) {
       console.error(formatPlaywrightLaunchError(error, { commandHint: "in your local terminal or in CI" }));
-    } else {
-      console.error(error);
+      process.exit(1);
     }
-    process.exit(1);
+    handleCliError(error);
   });
 }

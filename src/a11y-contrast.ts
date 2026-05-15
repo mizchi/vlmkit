@@ -28,6 +28,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "./terminal-colors.ts";
+import { handleCliError } from "./cli-error.ts";
 
 export interface A11yContrastOptions {
   htmlPath: string;
@@ -349,8 +350,5 @@ async function main(argv = process.argv.slice(2)) {
 
 const isCliEntry = process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false;
 if (isCliEntry) {
-  main().catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
+  main().catch(handleCliError);
 }

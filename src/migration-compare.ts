@@ -102,6 +102,7 @@ import {
 } from "./text-rows.ts";
 import { extractPaletteFromFile, type PaletteColor } from "./palette-extract.ts";
 import { diffPalettes, type PaletteDiff } from "./palette-diff.ts";
+import { handleCliError } from "./cli-error.ts";
 import {
   applyForcedPseudoState,
   clearStateMarkers,
@@ -1751,9 +1752,8 @@ if (isCliEntry) {
   main().catch((error) => {
     if (isPlaywrightSandboxRestrictionError(error)) {
       console.error(formatPlaywrightLaunchError(error, { commandHint: "in your local terminal or in CI" }));
-    } else {
-      console.error(error);
+      process.exit(1);
     }
-    process.exit(1);
+    handleCliError(error);
   });
 }
