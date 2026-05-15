@@ -10,8 +10,8 @@
  *   npx tsx src/migration-compare.ts --dir fixtures/migration/reset-css --baseline normalize.html --variants modern-normalize.html destyle.html no-reset.html
  */
 import { readFile, writeFile, mkdir, access } from "node:fs/promises";
-import { basename, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { chromium, type Browser } from "playwright";
 import {
   collectApprovalWarnings,
@@ -193,7 +193,9 @@ export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptio
     dir: getArg(args, "dir", "."),
     baseline: getArg(args, "baseline", baselineUrl ? "" : (args[0] ?? "")),
     variants: variants.length > 0 ? variants : (currentUrl ? [] : (args[1] ? [args[1]] : [])),
-    outputDir: resolve(getArg(args, "output-dir", join(process.cwd(), "test-results", "migration"))),
+    // Accept `--output` as an alias for `--output-dir`. Agents reach for
+    // `--output` first; the typo'd flag was silently swallowed before.
+    outputDir: resolve(getArg(args, "output-dir", getArg(args, "output", join(process.cwd(), "test-results", "migration")))),
     autoDiscover: !hasFlag(args, "no-discover"),
     discoverBackend: parseDiscoveryBackend(args),
     maxViewports: parseInt(getArg(args, "max-viewports", "15"), 10),
@@ -499,6 +501,10 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
   const isUrlMode = !!options.baselineUrl;
   let baselineHtml: string;
   let baselineName: string;
+  // File-mode: rendering goes through `page.goto(file://...)` so that
+  // relative `<link>` / `<script>` hrefs resolve. `setContent` had no base
+  // URL, which caused unstyled renders on both sides and a false 0% diff.
+  let baselineFileUrl: string | undefined;
 
   if (isUrlMode) {
     // URL mode: defer HTML capture to after browser launch
@@ -508,6 +514,35 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     const baselinePath = resolve(dir, baseline);
     baselineHtml = await readFile(baselinePath, "utf-8");
     baselineName = basename(baseline, ".html");
+    baselineFileUrl = pathToFileURL(baselinePath).href;
+  }
+
+  // Build variant sources + disambiguate basename collisions BEFORE the
+  // baseline rendering loop so that on-disk screenshot paths use the
+  // disambiguated names. Otherwise baseline screenshots get written under
+  // the colliding name first, then the variant overwrites them — producing
+  // a false 0% diff of the variant against itself.
+  const variantSources: Array<{ label: string; url: string; file: string; fileUrl?: string }> = isUrlMode
+    ? (options.variantUrls ?? []).map((url) => ({ label: urlToLabel(url), url, file: "" }))
+    : variants.map((f) => {
+        const p = resolve(dir, f);
+        return { label: basename(f, ".html"), url: "", file: f, fileUrl: pathToFileURL(p).href };
+      });
+
+  if (!isUrlMode) {
+    const labelCount = new Map<string, number>();
+    const bump = (k: string) => labelCount.set(k, (labelCount.get(k) ?? 0) + 1);
+    bump(baselineName);
+    for (const v of variantSources) bump(v.label);
+    const parentTag = (p: string) => basename(dirname(resolve(dir, p))) || "root";
+    if ((labelCount.get(baselineName) ?? 0) > 1) {
+      baselineName = `${parentTag(baseline)}__${baselineName}`;
+    }
+    const seen = new Set<string>([baselineName]);
+    for (const v of variantSources) {
+      if (seen.has(v.label)) v.label = `${parentTag(v.file)}__${v.label}`;
+      seen.add(v.label);
+    }
   }
   const resolvedApprovalPath = await resolveApprovalPath(dir, approvalPath);
   const approvalManifest = resolvedApprovalPath ? await loadApprovalManifest(resolvedApprovalPath) : null;
@@ -657,6 +692,8 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         if (!baselineHtml) {
           baselineHtml = await page.content();
         }
+      } else if (baselineFileUrl) {
+        await page.goto(baselineFileUrl, { waitUntil: "networkidle", timeout: 30000 });
       } else {
         await page.setContent(baselineHtml, { waitUntil: "networkidle" });
       }
@@ -783,10 +820,6 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       globalShift?: number;
     }> = [];
 
-    const variantSources = isUrlMode
-      ? (options.variantUrls ?? []).map((url) => ({ label: urlToLabel(url), url, file: "" }))
-      : variants.map((f) => ({ label: basename(f, ".html"), url: "", file: f }));
-
     const domEquivalenceReports: Array<{ variantFile: string; result: DomEquivalenceResult }> = [];
     const computedStyleDiffReports: Array<{ variantFile: string; result: CsdResult }> = [];
     const domPositionDiffReports: Array<{ variantFile: string; result: DpResult }> = [];
@@ -837,6 +870,8 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         if (variant.url) {
           await page.goto(variant.url, { waitUntil: "networkidle", timeout: 30000 });
           if (!variantHtml) variantHtml = await page.content();
+        } else if (variant.fileUrl) {
+          await page.goto(variant.fileUrl, { waitUntil: "networkidle", timeout: 30000 });
         } else {
           await page.setContent(variantHtml, { waitUntil: "networkidle" });
         }
@@ -1317,6 +1352,8 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             const baselinePage = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
             if (isUrlMode) {
               await baselinePage.goto(options.baselineUrl!, { waitUntil: "networkidle", timeout: 30000 });
+            } else if (baselineFileUrl) {
+              await baselinePage.goto(baselineFileUrl, { waitUntil: "networkidle", timeout: 30000 });
             } else {
               await baselinePage.setContent(baselineHtml, { waitUntil: "networkidle" });
             }
@@ -1338,6 +1375,8 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             const variantPage = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
             if (variant.url) {
               await variantPage.goto(variant.url, { waitUntil: "networkidle", timeout: 30000 });
+            } else if (variant.fileUrl) {
+              await variantPage.goto(variant.fileUrl, { waitUntil: "networkidle", timeout: 30000 });
             } else {
               await variantPage.setContent(variantHtml, { waitUntil: "networkidle" });
             }

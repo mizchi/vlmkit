@@ -70,4 +70,25 @@ describe("parseMigrationCompareArgs", () => {
       /invalid --discover-backend/i,
     );
   });
+
+  it("should accept --output as alias for --output-dir", () => {
+    // Agents typed `--output` first; the typo'd flag was silently swallowed
+    // and reports always landed at the default location. See #22.
+    const options = parseMigrationCompareArgs([
+      "--output", "/tmp/agent-output",
+      "before.html",
+      "after.html",
+    ]);
+    assert.equal(options.outputDir, resolve("/tmp/agent-output"));
+  });
+
+  it("should prefer --output-dir over --output when both passed", () => {
+    const options = parseMigrationCompareArgs([
+      "--output", "/tmp/alias",
+      "--output-dir", "/tmp/explicit",
+      "before.html",
+      "after.html",
+    ]);
+    assert.equal(options.outputDir, resolve("/tmp/explicit"));
+  });
 });
