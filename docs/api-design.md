@@ -300,6 +300,59 @@ Manifest entries are consumed by the existing `vrt compare`
 `approvalManifest` plumbing — they're subtracted from the
 reported diff before the threshold gate fires.
 
+### A11y gate (folded into `vrt diff-pr`)
+
+```json
+{
+  "a11y": {
+    "level": "AA",                  // AA → 24×24 / 4.5:1; AAA → 44×44 / 7:1
+    "maxContrastFailures": 0,
+    "maxTouchFailures": 0,
+    "maxFocusOrderFailures": 0,
+    "contrast": true,               // toggle individual checks
+    "touch": true,
+    "focusOrder": false             // off by default — slower; opt in
+  }
+}
+```
+
+Three checks share one config + one summary + one exit code:
+
+- **contrast** (`a11y-contrast`): every visible text element's
+  rendered foreground vs effective background, WCAG 2.1 contrast
+  ratio against AA / AAA thresholds.
+- **touch** (`a11y-touch`): every focusable element's
+  `min(width, height)` against 24×24 (AA) / 44×44 (AAA).
+- **focus-order** (`a11y-focus-order`): Tab cycle on the live
+  page; surfaces `trap` / `reverse` / `skip-row` findings.
+
+Per-check thresholds and per-route overrides resolve the same way
+as the visual threshold (route value wins; project default fills
+the rest).
+
+Findings can be suppressed via `vrt manifest add --a11y-{contrast,
+touch,focus-order} --selector <substring> --reason "..." --expires
+<date>`. The substring matches the finding's `path` (or, for
+focus-order, the message text). Expired rules surface in
+`vrt manifest check` so the gate doesn't silently approve forever.
+
+Output (terminal):
+
+```
+good   pass  mobile=0.00% [a11y c=0/t=0/f=0]  ...
+focus  FAIL  mobile=0.00% [a11y c=0/t=0/f=1]  ...
+```
+
+Output (summary.md):
+
+```
+| route   | viewport | diff% | threshold | a11y (contrast / touch / focus) | status |
+| `focus` | mobile   | 0.00% | 50.00%    | 0/0 · 0/0 · 1/0                  | ❌      |
+
+## A11y failures
+- `focus` / mobile — **focus-order** 1 > 0: reverse (step 1→2)
+```
+
 ### CI gate: `vrt diff-pr`
 
 ```

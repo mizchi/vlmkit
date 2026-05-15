@@ -14,7 +14,15 @@ function cli(cwd: string, ...argv: string[]): { stdout: string; stderr: string; 
     ["--experimental-strip-types", CLI_PATH, "diff-pr", ...argv],
     { encoding: "utf-8", cwd },
   );
-  return { stdout: r.stdout ?? "", stderr: r.stderr ?? "", status: r.status ?? 0 };
+  // Strip ANSI so regex assertions can match content without
+  // accounting for color codes between meaningful tokens.
+  // eslint-disable-next-line no-control-regex
+  const ANSI = /\x1B\[[0-9;]*m/g;
+  return {
+    stdout: (r.stdout ?? "").replace(ANSI, ""),
+    stderr: (r.stderr ?? "").replace(ANSI, ""),
+    status: r.status ?? 0,
+  };
 }
 
 const config = parseDiffPrConfig(JSON.stringify({
@@ -170,6 +178,102 @@ describe("vrt diff-pr pin <route>...", () => {
     assert.match(r.stderr, /Known routes: home, about/);
     const aboutAfter = await readFile(join(cwd, ".vrt/baselines/about/mobile.png"));
     assert.ok(aboutBefore.equals(aboutAfter));
+  });
+});
+
+describe("vrt diff-pr a11y gate", () => {
+  let cwd: string;
+
+  before(async () => {
+    cwd = await mkdtemp(join(tmpdir(), "vrt-diff-pr-a11y-"));
+    await mkdir(join(cwd, "pages"), { recursive: true });
+    // Good: high contrast + big buttons + DOM-order Tab.
+    await writeFile(join(cwd, "pages", "good.html"),
+      `<!doctype html><html><head><style>
+        body { margin: 0; padding: 24px; background: #fff; color: #111; font: 16px sans-serif; }
+        button { background: #1a73e8; color: #fff; font: 700 16px sans-serif;
+          padding: 16px 28px; min-width: 64px; min-height: 44px;
+          border: none; border-radius: 8px; margin: 8px; }
+      </style></head><body>
+      <h1>Accessible page</h1><p>Body text reads cleanly.</p>
+      <button>One</button><button>Two</button>
+      </body></html>`);
+    // Bad: muted text, tiny button.
+    await writeFile(join(cwd, "pages", "bad.html"),
+      `<!doctype html><html><head><style>
+        body { margin: 0; padding: 24px; background: #fff; color: #999; font: 14px sans-serif; }
+        button { background: #ccc; color: #999; font: 11px sans-serif;
+          padding: 1px 4px; min-width: 0; border: none; }
+      </style></head><body>
+      <h1>Low contrast heading</h1>
+      <p>Muted body text.</p>
+      <button>x</button>
+      </body></html>`);
+    const cfg = {
+      thresholds: { mobile: 0.5, desktop: 0.5, wide: 0.5 },
+      baselineDir: ".vrt/baselines",
+      approvalPath: "./approval.json",
+      a11y: {
+        level: "AA",
+        maxContrastFailures: 0,
+        maxTouchFailures: 0,
+        maxFocusOrderFailures: 0,
+      },
+      routes: [
+        { name: "good", url: `file://${join(cwd, "pages", "good.html")}` },
+        { name: "bad", url: `file://${join(cwd, "pages", "bad.html")}` },
+      ],
+    };
+    await writeFile(join(cwd, "vrt.config.json"), JSON.stringify(cfg, null, 2));
+    const r = cli(cwd, "pin");
+    assert.equal(r.status, 0, `pin failed: ${r.stderr}`);
+  });
+
+  after(async () => {
+    await rm(cwd, { recursive: true, force: true });
+  });
+
+  it("fails on a11y violations that exceed the per-check budget", () => {
+    const r = cli(cwd);
+    assert.equal(r.status, 1);
+    assert.match(r.stdout, /good\s+pass.*\[a11y c=0\/t=0/);
+    assert.match(r.stdout, /bad\s+FAIL.*\[a11y c=3\/t=1/);
+    assert.match(r.stdout, /FAIL — at least one route over threshold/);
+  });
+
+  it("approval-manifest suppression flips bad route to pass", async () => {
+    const manifestPath = join(cwd, "approval.json");
+    await writeFile(manifestPath, JSON.stringify({
+      rules: [
+        { kind: "a11y-contrast", selector: "button", reason: "decorative button" },
+        { kind: "a11y-contrast", selector: "h1", reason: "branded muted heading" },
+        { kind: "a11y-contrast", selector: "p", reason: "secondary body text" },
+        { kind: "a11y-touch", selector: "button", reason: "tiny dismiss" },
+      ],
+    }, null, 2));
+    const r = cli(cwd);
+    assert.equal(r.status, 0, `expected pass with suppression: ${r.stdout}\n${r.stderr}`);
+    assert.match(r.stdout, /good\s+pass.*\[a11y c=0\/t=0/);
+    assert.match(r.stdout, /bad\s+pass.*\[a11y c=0\/t=0/);
+  });
+
+  it("expired manifest rules don't suppress findings", async () => {
+    const manifestPath = join(cwd, "approval.json");
+    await writeFile(manifestPath, JSON.stringify({
+      rules: [
+        { kind: "a11y-contrast", selector: "button",
+          reason: "decorative", expires: "2020-01-01" },
+        { kind: "a11y-contrast", selector: "h1",
+          reason: "branded", expires: "2020-01-01" },
+        { kind: "a11y-contrast", selector: "p",
+          reason: "secondary", expires: "2020-01-01" },
+        { kind: "a11y-touch", selector: "button",
+          reason: "tiny", expires: "2020-01-01" },
+      ],
+    }, null, 2));
+    const r = cli(cwd);
+    assert.equal(r.status, 1, `expected fail with expired rules: ${r.stdout}\n${r.stderr}`);
+    assert.match(r.stdout, /bad\s+FAIL/);
   });
 });
 
