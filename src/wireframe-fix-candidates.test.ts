@@ -356,6 +356,121 @@ describe("generateWireframeFixCandidates", () => {
     assert.equal(high.length, 0, "20 and 24 are within 1.5× — no winner");
   });
 
+  it("marks size-cascading candidates with cascades=true (F2)", () => {
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 24)] },
+        { viewport: "desktop", matches: [bbox(0, 24)] },
+        { viewport: "wide", matches: [bbox(0, 24)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+      domPositionEntries: [
+        // height change — should cascade
+        {
+          path: "body[0]>main[0]>section[1]",
+          tag: "section", baselineClasses: "profile", variantClasses: "profile",
+          property: "height", baseline: "100px", variant: "76px", viewport: "mobile",
+        },
+        // margin-top — does NOT cascade (changes the element's own offset, not siblings')
+        {
+          path: "body[0]>main[0]>div[2]",
+          tag: "div", baselineClasses: "stats", variantClasses: "stats",
+          property: "margin-top", baseline: "24px", variant: "0px", viewport: "mobile",
+        },
+      ],
+    });
+    const cs = out[0].candidates;
+    assert.ok(cs);
+    const height = cs!.find((c) => c.property === "height");
+    const marginTop = cs!.find((c) => c.property === "margin-top");
+    assert.equal(height?.cascades, true, "height should be flagged as cascading");
+    assert.equal(marginTop?.cascades, false, "margin-top should NOT cascade");
+  });
+
+  it("MAG-DIVERGENT emits an overshoot prediction (F3)", () => {
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        // 24 on mobile, 40 on desktop — same sign, spread = 16 ≥ 8.
+        { viewport: "mobile", matches: [bbox(0, -24)] },
+        { viewport: "desktop", matches: [bbox(0, -40)] },
+        { viewport: "wide", matches: [bbox(0, -40)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+    });
+    const md = out.find((s) => s.scope === "magnitude-divergent");
+    assert.ok(md);
+    // Applying 40px globally overshoots mobile by 16px (40 - 24).
+    assert.match(md!.suggestion, /applying 40px globally would overshoot mobile by 16px/);
+  });
+
+  it("emits a STRUCTURAL meta-suggestion when 3+ candidates share a parent path (F1)", () => {
+    const sharedParent = "body[0]>main[0]>section.profile";
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 24), bbox(1, 24), bbox(2, 24)] },
+        { viewport: "desktop", matches: [bbox(0, 24), bbox(1, 24), bbox(2, 24)] },
+        { viewport: "wide", matches: [bbox(0, 24), bbox(1, 24), bbox(2, 24)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+      domPositionEntries: [
+        // Three children of the same parent; each carries a
+        // matching 24px delta.
+        {
+          path: `${sharedParent}>h2.name`,
+          tag: "h2", baselineClasses: "name", variantClasses: "name",
+          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+        },
+        {
+          path: `${sharedParent}>p.meta`,
+          tag: "p", baselineClasses: "meta", variantClasses: "meta",
+          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+        },
+        {
+          path: `${sharedParent}>span.badge`,
+          tag: "span", baselineClasses: "badge", variantClasses: "badge",
+          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+        },
+      ],
+    });
+    const structural = out.filter((s) => s.scope === "structural");
+    assert.equal(structural.length, 1);
+    assert.match(structural[0].evidence, /3 suggestions all blame children of/);
+    assert.match(structural[0].evidence, /section\.profile/);
+    assert.match(structural[0].suggestion, /restructuring/);
+    // Structural row leads the output.
+    assert.equal(out[0], structural[0]);
+  });
+
+  it("does NOT emit STRUCTURAL when only 2 candidates share a parent (threshold = 3)", () => {
+    const sharedParent = "body[0]>main[0]>section.profile";
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 24), bbox(1, 24)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+      domPositionEntries: [
+        {
+          path: `${sharedParent}>h2.name`,
+          tag: "h2", baselineClasses: "name", variantClasses: "name",
+          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+        },
+        {
+          path: `${sharedParent}>p.meta`,
+          tag: "p", baselineClasses: "meta", variantClasses: "meta",
+          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+        },
+      ],
+    });
+    assert.equal(out.filter((s) => s.scope === "structural").length, 0);
+  });
+
   it("does NOT mark HIGH-IMPACT when the leading magnitude is too small (< 12px)", () => {
     // 8 vs 4 — 2× ratio but the leading magnitude is only 8px,
     // not enough to be worth a HIGH-IMPACT badge on its own.

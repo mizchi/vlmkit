@@ -73,7 +73,7 @@ export interface WireframeFixSuggestion {
    *                           one viewport while under- or over-correcting
    *                           the others.
    */
-  scope: "all" | "subset" | "divergent" | "magnitude-divergent";
+  scope: "all" | "subset" | "divergent" | "magnitude-divergent" | "structural";
   /**
    * Per-viewport breakdown. Always populated; for non-divergent rows
    * every entry has the same sign.
@@ -100,6 +100,23 @@ export interface WireframeFixSuggestion {
     current: string;
     target: string;
     viewport: string;
+    /**
+     * The DOM path the candidate was sourced from
+     * (e.g. `body[0]>main[0]>section[1]`). Used to detect
+     * shared-parent clusters for the structural suggestion (F1) —
+     * not surfaced in the renderer, but kept on the JSON so
+     * downstream tooling can group candidates.
+     */
+    path?: string;
+    /**
+     * Set when the candidate's property mutates an element's box
+     * size and therefore pushes its later siblings around — height,
+     * min-height, max-height, padding-bottom, margin-bottom.
+     * Renderer adds a `[cascade]` hint so agents understand why a
+     * fix on this element resolves a positional delta on a
+     * different (downstream) component. Closes F2.
+     */
+    cascades?: boolean;
   }>;
 }
 
@@ -150,6 +167,20 @@ const VERTICAL_SHIFT_PROPERTIES = new Set([
   "bottom",
 ]);
 
+/**
+ * Properties whose change physically pushes later siblings — a fix
+ * on element X cascades to fix a positional delta on a downstream
+ * element Y. Surfaced to the renderer as `[cascade]` so agents see
+ * why a candidate on a different selector resolves the suggestion.
+ */
+const CASCADING_PROPERTIES = new Set([
+  "height",
+  "min-height",
+  "max-height",
+  "margin-bottom",
+  "padding-bottom",
+]);
+
 const CANDIDATE_PX_TOLERANCE = 2;
 
 function selectorFromDpEntry(entry: DpEntryWithViewport): string {
@@ -190,6 +221,8 @@ function matchCandidatesForDelta(
       current: e.variant,
       target: e.baseline,
       viewport: e.viewport,
+      path: e.path,
+      cascades: CASCADING_PROPERTIES.has(e.property),
     });
     if (out.length >= 4) break; // Cap per suggestion — too many candidates is noise.
   }
@@ -276,11 +309,29 @@ export function generateWireframeFixCandidates(
       const candidates = input.domPositionEntries
         ? matchCandidatesForDelta(maxMag, viewportList, input.domPositionEntries)
         : undefined;
+      // F3: predictive overshoot. If the agent applies the LARGEST
+      // magnitude globally (a common mistake when reading
+      // MAG-DIVERGENT), what overshoot would the other viewports
+      // suffer? Surface that explicitly on the same line so the
+      // agent doesn't have to compute it. Deterministic, no agent-
+      // intent modeling — just "if you took X globally, here's the
+      // damage on Y".
+      const dominantMag = Math.max(...perVpDeltas.map((p) => Math.abs(p.deltaPx)));
+      const overshoots = perVpDeltas
+        .filter((p) => Math.abs(p.deltaPx) < dominantMag - 2) // 2px tol
+        .map((p) => ({
+          viewport: p.viewport,
+          residual: dominantMag - Math.abs(p.deltaPx),
+        }));
+      const overshootHint = overshoots.length > 0
+        ? ` ⚠ applying ${dominantMag}px globally would overshoot ${overshoots
+            .map((o) => `${o.viewport} by ${o.residual}px`).join(", ")}`
+        : "";
       out.push({
         evidence: `component rank=${rank} (bbox ${dims}): magnitude-divergent Δtop across viewports (${summary})`,
         hypothesis: "baseline uses distinct per-viewport spacing values; variant uses one value everywhere — a global edit will over- or under-correct depending on viewport",
         suggestion: `use distinct per-viewport spacing values: ${perVpSnap
-          .map((p) => `${direction} ${Math.abs(p.deltaPx)}px on ${p.viewport} (token: ${p.tokenHint})`).join("; ")}`,
+          .map((p) => `${direction} ${Math.abs(p.deltaPx)}px on ${p.viewport} (token: ${p.tokenHint})`).join("; ")}${overshootHint}`,
         viewports: viewportList,
         confidence: "high",
         deltaPx: maxMag,
@@ -438,6 +489,46 @@ export function generateWireframeFixCandidates(
     return b.viewports.length - a.viewports.length;
   });
 
+  // F1: structural-mismatch detection. When 3+ suggestions all
+  // blame children of the same DOM parent, that's a strong signal
+  // the parent's layout is structurally wrong (flex + per-child
+  // margins vs display: grid + gap, etc.) and the local-minima
+  // patches the suggestion engine is recommending will compound
+  // rather than resolve. Emit a single meta-suggestion at the
+  // TOP so agents see it before they start typing per-rank fixes.
+  // Agent-f v6: "the MAG-DIVERGENT suggestions were treating
+  // symptoms ... per-viewport margin patches instead of the actual
+  // fix (grid structure)."
+  const parentCounts = new Map<string, Set<number>>();
+  for (let i = 0; i < out.length; i++) {
+    const seenParents = new Set<string>();
+    for (const c of out[i].candidates ?? []) {
+      if (!c.path) continue;
+      const par = parentPath(c.path);
+      if (!par || seenParents.has(par)) continue;
+      seenParents.add(par);
+      if (!parentCounts.has(par)) parentCounts.set(par, new Set());
+      parentCounts.get(par)!.add(i);
+    }
+  }
+  let structuralRow: WireframeFixSuggestion | undefined;
+  for (const [par, sugIdxs] of parentCounts) {
+    if (sugIdxs.size < 3) continue;
+    const affectedVps = new Set<string>();
+    for (const i of sugIdxs) for (const v of out[i].viewports) affectedVps.add(v);
+    structuralRow = {
+      evidence: `${sugIdxs.size} suggestions all blame children of \`${par}\` — likely a parent-layout mismatch (flex+margins vs grid+gap, etc.)`,
+      hypothesis: "patching each child is a local-minima trap; the parent's layout strategy is the actual delta",
+      suggestion: `consider restructuring \`${par}\` itself (e.g. switch flex-with-per-child-margins → display: grid + row-gap, or change align-items / justify-content) so the children fall into place together`,
+      viewports: [...affectedVps],
+      confidence: "medium",
+      deltaPx: 0,
+      scope: "structural",
+    };
+    break; // at most one structural row per run
+  }
+  if (structuralRow) out.unshift(structuralRow);
+
   // High-impact detection (closes G2 / agent-e v5 attention-bias):
   // when one suggestion's magnitude dominates the rest, flag it so
   // the renderer can pull it above the [DIVERGENT] / [SUBSET] noise.
@@ -459,6 +550,17 @@ export function generateWireframeFixCandidates(
 
 function signed(n: number): string {
   return n >= 0 ? `+${n}px` : `${n}px`;
+}
+
+/**
+ * Drop the trailing segment of a DOM path so we can group siblings
+ * by their immediate parent. Empty string when the path has no
+ * parent (e.g. `body[0]`).
+ */
+function parentPath(p: string): string {
+  const segs = p.split(">");
+  if (segs.length <= 1) return "";
+  return segs.slice(0, -1).join(">");
 }
 
 function confidenceFor(input: {

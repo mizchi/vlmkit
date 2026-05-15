@@ -1652,9 +1652,15 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           // rows of smaller magnitudes). Then scope priority,
           // then magnitude.
           const sorted = [...wireframeSuggestions].sort((a, b) => {
+            // STRUCTURAL leads everything — it diagnoses the
+            // local-minima trap before agents start typing.
+            if ((b.scope === "structural") !== (a.scope === "structural")) {
+              return a.scope === "structural" ? -1 : 1;
+            }
             if (!!b.isHighImpact !== !!a.isHighImpact) return (b.isHighImpact ? 1 : 0) - (a.isHighImpact ? 1 : 0);
             const scopeRank = (s: typeof a.scope) =>
-              s === "divergent" ? 0
+              s === "structural" ? -1
+              : s === "divergent" ? 0
               : s === "magnitude-divergent" ? 1
               : s === "subset" ? 2
               : 3;
@@ -1667,13 +1673,15 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             const conf = s.confidence === "high" ? GREEN : s.confidence === "medium" ? YELLOW : DIM;
             // Divergent suggestions get a magenta "DIVERGENT" prefix so
             // they can't be missed; subset gets a subtle "SUBSET" tag.
-            const scopeTag = s.scope === "divergent"
-              ? ` ${BOLD}${RED}[DIVERGENT]${RESET}`
-              : s.scope === "magnitude-divergent"
-                ? ` ${BOLD}${CYAN}[MAG-DIVERGENT]${RESET}`
-                : s.scope === "subset"
-                  ? ` ${YELLOW}[SUBSET]${RESET}`
-                  : "";
+            const scopeTag = s.scope === "structural"
+              ? ` ${BOLD}\x1b[35m[STRUCTURAL]${RESET}`
+              : s.scope === "divergent"
+                ? ` ${BOLD}${RED}[DIVERGENT]${RESET}`
+                : s.scope === "magnitude-divergent"
+                  ? ` ${BOLD}${CYAN}[MAG-DIVERGENT]${RESET}`
+                  : s.scope === "subset"
+                    ? ` ${YELLOW}[SUBSET]${RESET}`
+                    : "";
             const impactTag = s.isHighImpact
               ? ` ${BOLD}${GREEN}[HIGH-IMPACT]${RESET}`
               : "";
@@ -1692,8 +1700,15 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
                 // Arrow direction is "current → target" — the agent
                 // edits FROM what they have TO what the baseline has.
                 // Backwards rendering misled agent-e (v5).
+                const anyCascades = rows.some((r) => r.cascades);
                 const propList = [...new Set(rows.map((r) => `${r.property}: ${r.current} (now) → ${r.target} (target)`))].join("; ");
-                console.log(`      ${CYAN}candidate:${RESET} ${BOLD}${sel}${RESET} ${DIM}(${propList})${RESET}`);
+                // F2: cascade hint — when the property is a box-size
+                // property (height / margin-bottom / etc.), changing
+                // it pushes downstream siblings. Without this hint
+                // agent-f thought the candidate was a "non-sequitur"
+                // — connected to a different rank's suggestion.
+                const cascadeHint = anyCascades ? ` ${YELLOW}[cascades to siblings]${RESET}` : "";
+                console.log(`      ${CYAN}candidate:${RESET} ${BOLD}${sel}${RESET} ${DIM}(${propList})${RESET}${cascadeHint}`);
               }
             }
           }
