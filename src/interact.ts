@@ -108,6 +108,14 @@ export interface HealAllFinding {
   stepIndex: number;
   action: SequenceAction;
   originalSelector: string;
+  /**
+   * Confidence tier. "strong" (≥0.3) is the actionable case — the
+   * sibling shares enough class-token signal that the typed selector
+   * is likely the wrong one. "weak" (0.1-0.3) is informational only;
+   * it's the typical sibling-button overlap that the dogfood
+   * (2026-05-15) flagged as noise when labelled "did you mean".
+   */
+  tier: "strong" | "weak";
   suggestion: {
     selector: string;
     confidence: number;
@@ -282,20 +290,24 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
               maxCandidates: 1,
               exclude: successSelector,
             });
-            // 0.1 catches the canonical "btn-primary vs btn-secondary"
-            // pair (≈0.125 once the candidate's text content dilutes
-            // jaccard) without dumping every visible button on the page.
-            // The healer's internal floor is 0.05; anything between
-            // 0.05-0.1 is mostly cross-tag noise.
+            // Tiering: 0.3+ is "did you mean" (strong, actionable);
+            // 0.1-0.3 is "weak match" (sibling-button-style overlap
+            // that's worth eyeballing but not an obvious typo).
+            // Dogfood (2026-05-15) flagged 13% as noise when labelled
+            // "did you mean", hence the split. Healer's internal
+            // floor stays at 0.05; we ignore the 0.05-0.1 band here.
             const top = candidates[0];
             if (top && top.confidence >= 0.1) {
+              const tier: "strong" | "weak" = top.confidence >= 0.3 ? "strong" : "weak";
               healAllFindings.push({
                 stepIndex,
                 action: step,
                 originalSelector: successSelector,
+                tier,
                 suggestion: { selector: top.selector, confidence: top.confidence, text: top.text },
               });
-              console.log(`    ${YELLOW}did you mean${RESET} ${DIM}\`${top.selector}\`${RESET} ${DIM}(${(top.confidence * 100).toFixed(0)}% confidence${top.text ? `, "${top.text}"` : ""})${RESET}`);
+              const label = tier === "strong" ? `${YELLOW}did you mean${RESET}` : `${DIM}weak match${RESET}`;
+              console.log(`    ${label} ${DIM}\`${top.selector}\`${RESET} ${DIM}(${(top.confidence * 100).toFixed(0)}% confidence${top.text ? `, "${top.text}"` : ""})${RESET}`);
             }
           } catch { /* healer failure is non-fatal */ }
         }
@@ -361,7 +373,10 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
     console.log(`  ${icon} ${t.from} → ${t.to}  ${pct.padStart(6)}%  ${DIM}${summary}${RESET}`);
   }
   if (options.healAll) {
-    console.log(`  ${DIM}heal-all: ${healAllFindings.length} did-you-mean suggestion(s) across ${sequence.steps.filter((s) => "selector" in s && s.selector).length} selector step(s)${RESET}`);
+    const strongCount = healAllFindings.filter((f) => f.tier === "strong").length;
+    const weakCount = healAllFindings.length - strongCount;
+    const selectorStepCount = sequence.steps.filter((s) => "selector" in s && s.selector).length;
+    console.log(`  ${DIM}heal-all: ${strongCount} strong + ${weakCount} weak suggestion(s) across ${selectorStepCount} selector step(s)${RESET}`);
   }
   console.log(`  ${DIM}report: ${reportPath}${RESET}`);
 
@@ -444,15 +459,24 @@ function renderReport(r: Omit<InteractReport, "reportPath">): string {
     if (r.healAllFindings.length === 0) {
       lines.push("`--heal-all` enabled. No higher-confidence sibling found for any successful selector step — the selectors look unambiguous.");
     } else {
-      lines.push("`--heal-all` enabled. Each step below succeeded technically, but the healer found a sibling element with comparable or higher confidence. Worth a quick eyeball to confirm the typed selector matches the *intended* target, not just *a* target.");
+      const strongCount = r.healAllFindings.filter((f) => f.tier === "strong").length;
+      const weakCount = r.healAllFindings.length - strongCount;
+      lines.push(`\`--heal-all\` enabled. ${strongCount} strong + ${weakCount} weak suggestion(s). ` +
+        "Each step below succeeded technically, but the healer found a sibling element with overlapping class-token signal. " +
+        "**Strong** tier (≥30% confidence) is the typo-the-wrong-element case worth investigating; " +
+        "**weak** tier (10-30%) is the sibling-button-style overlap that's mostly informational.");
       lines.push("");
-      lines.push("| Step | Action | Used selector | Did you mean? | Confidence |");
-      lines.push("|---|---|---|---|---|");
+      lines.push("| Step | Tier | Action | Used selector | Did you mean? | Confidence |");
+      lines.push("|---|---|---|---|---|---|");
       for (const f of r.healAllFindings) {
         const summary = summarizeAction(f.action).replace(/\|/g, "\\|");
         const text = f.suggestion.text ? ` _(${f.suggestion.text.replace(/\|/g, "\\|")})_` : "";
-        lines.push(`| ${f.stepIndex} | \`${summary}\` | \`${f.originalSelector}\` | \`${f.suggestion.selector}\`${text} | ${(f.suggestion.confidence * 100).toFixed(0)}% |`);
+        const tierCell = f.tier === "strong" ? "**strong**" : "_weak_";
+        lines.push(`| ${f.stepIndex} | ${tierCell} | \`${summary}\` | \`${f.originalSelector}\` | \`${f.suggestion.selector}\`${text} | ${(f.suggestion.confidence * 100).toFixed(0)}% |`);
       }
+      lines.push("");
+      lines.push("**Remediation**: if a strong suggestion is correct, edit the step in your sequence JSON to use the suggested selector. " +
+        "If all suggestions are false positives, re-run without `--heal-all` to silence them (default behavior is failure-only healing).");
     }
     lines.push("");
   }

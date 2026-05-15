@@ -100,6 +100,15 @@ export interface ExploreReport {
   actions: DiscoveredAction[];
   findings: ExploreFinding[];
   reportPath: string;
+  /**
+   * The pixel-delta cutoff used for dead-action / silent-handler
+   * classification. Defaults to max(threshold, 0.001) so callers who
+   * raise --threshold see the dead-action gate move with them
+   * instead of being pinned at the historical 0.001 floor.
+   */
+  silentFloor: number;
+  /** Whether --strict-timing was on; controls the report's Mut. column. */
+  strictTiming: boolean;
 }
 
 function isUrl(s: string): boolean { return /^https?:\/\//.test(s); }
@@ -178,6 +187,14 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
   await mkdir(outputDir, { recursive: true });
   const viewport = options.viewport ?? { width: 1280, height: 720 };
   const threshold = options.threshold ?? 0.03;
+  // The dead-action / silent-handler classification uses the larger of
+  // the user's --threshold and a 0.001 absolute floor. Earlier versions
+  // hardcoded 0.001 here, which surprised callers who raised
+  // --threshold and expected the dead-action gate to move with it
+  // (cold-start dogfood 2026-05-15 #A). The floor stays at 0.001 so
+  // pathologically-low --threshold values don't silently treat real
+  // visible changes as dead.
+  const silentFloor = Math.max(threshold, 0.001);
   const waitAfter = options.waitAfterAction ?? 200;
   const html = isUrl(options.source) ? null : await readFile(resolve(options.source), "utf-8");
 
@@ -321,6 +338,7 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
   const reportPath = options.reportPath ?? join(outputDir, "report.md");
   const md = renderReport({
     source: options.source, viewport, actions, findings,
+    silentFloor, strictTiming: !!options.strictTiming,
   });
   await writeFile(reportPath, md);
 
@@ -331,10 +349,10 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
   let silentHandlerCount = 0;
   for (const f of findings) {
     const isSilent = options.strictTiming && f.executed
-      && f.diffRatio < 0.001 && f.mutationCount === 0;
+      && f.diffRatio < silentFloor && f.mutationCount === 0;
     const icon = !f.executed ? `${RED}✗${RESET}`
       : isSilent ? `${RED}!${RESET}`
-      : f.diffRatio < 0.001 ? `${YELLOW}~${RESET}`
+      : f.diffRatio < silentFloor ? `${YELLOW}~${RESET}`
       : `${GREEN}✓${RESET}`;
     const pct = (f.diffRatio * 100).toFixed(2);
     const mut = f.mutationCount !== undefined ? `, ${f.mutationCount} mut` : "";
@@ -342,7 +360,7 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
       : isSilent ? `Δ ${pct}% — silent handler (0 DOM mutations)`
       : `Δ ${pct}%${mut}`;
     console.log(`  ${icon} ${f.action.name.padEnd(24)} ${DIM}${detail}${RESET}`);
-    if (f.executed && f.diffRatio < 0.001) deadCount++;
+    if (f.executed && f.diffRatio < silentFloor) deadCount++;
     if (isSilent) silentHandlerCount++;
   }
   console.log(`  ${DIM}report: ${reportPath}${RESET}`);
@@ -354,7 +372,10 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
     process.exitCode = 1;
   }
 
-  return { source: options.source, viewport, actions, findings, reportPath };
+  return {
+    source: options.source, viewport, actions, findings, reportPath,
+    silentFloor, strictTiming: !!options.strictTiming,
+  };
 }
 
 function renderReport(r: Omit<ExploreReport, "reportPath">): string {
@@ -399,13 +420,25 @@ function renderReport(r: Omit<ExploreReport, "reportPath">): string {
     "the declared selector / function had no visible side effect — verify " +
     "the declaration matches a real interaction.");
   lines.push("");
-  lines.push("| Action | Origin | Status | Δ | Regions |");
-  lines.push("|---|---|---|---|---|");
+  // Add a Mut. column only when --strict-timing was on; otherwise the
+  // column would be all em-dashes and just clutter the report.
+  const showMut = r.strictTiming;
+  if (showMut) {
+    lines.push(`Silent / dead cutoff: Δ < ${(r.silentFloor * 100).toFixed(2)}% ` +
+      `(max of \`--threshold\` and the 0.001 absolute floor).`);
+    lines.push("");
+  }
+  const header = showMut
+    ? "| Action | Origin | Status | Δ | Mut. | Regions |"
+    : "| Action | Origin | Status | Δ | Regions |";
+  const sep = showMut ? "|---|---|---|---|---|---|" : "|---|---|---|---|---|";
+  lines.push(header);
+  lines.push(sep);
   for (const f of r.findings) {
     let status: string;
     if (!f.executed) {
       status = `**failed** — ${f.error}`;
-    } else if (f.diffRatio < 0.001) {
+    } else if (f.diffRatio < r.silentFloor) {
       // --strict-timing populates mutationCount and disambiguates the
       // Δ-0 case: 0 mutations means the handler did nothing (silent
       // no-op or unwired); > 0 means DOM changed but didn't paint.
@@ -420,7 +453,11 @@ function renderReport(r: Omit<ExploreReport, "reportPath">): string {
       status = "ok";
     }
     const pct = f.executed ? `${(f.diffRatio * 100).toFixed(2)}%` : "—";
-    lines.push(`| \`${f.action.name}\` | ${f.action.origin} | ${status} | ${pct} | ${f.heatmapRegions.length} |`);
+    const mutCell = f.mutationCount === undefined ? "—" : String(f.mutationCount);
+    const row = showMut
+      ? `| \`${f.action.name}\` | ${f.action.origin} | ${status} | ${pct} | ${mutCell} | ${f.heatmapRegions.length} |`
+      : `| \`${f.action.name}\` | ${f.action.origin} | ${status} | ${pct} | ${f.heatmapRegions.length} |`;
+    lines.push(row);
   }
   lines.push("");
   const surfaced = r.findings.filter((f) => f.heatmapRegions.length > 0);

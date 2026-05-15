@@ -184,7 +184,11 @@ tests {
     // confidence) so the report row surfaces the ambiguity even
     // though the step technically succeeded.
     cmd = "\(vrt) interact fixtures/interact/heal-all-demo/page.html --sequence fixtures/interact/heal-all-demo/sequence.json --output-dir \(outDir)/interact-heal-all --heal-all"
-    expectStdoutContains { "did you mean"; "button.btn-primary" }
+    // 13% confidence falls in the "weak" tier (10-30%); the 2026-05-15
+    // dogfood reset the "did you mean" label to "weak match" at this
+    // confidence band, so the assertion targets the candidate selector
+    // plus the tier-summary string instead of the old wording.
+    expectStdoutContains { "weak match"; "button.btn-primary"; "weak suggestion" }
     timeoutSec = 60
   }
   new {
