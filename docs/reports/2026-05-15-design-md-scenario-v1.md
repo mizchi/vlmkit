@@ -106,13 +106,13 @@ These are the load-bearing parts of `vrt`'s agent-facing output today. Everythin
 
 Issues filed from this report:
 
-- false PASS in `vrt compare` file-mode (F1 → issue link TBD)
-- Token-aware fix candidates in wireframe mode (F2)
-- Variant render saved alongside heatmap / triptych output (F3)
-- Computed-style diff exposed without requiring Crater BiDi (F4)
-- Reverse hex → DESIGN.md token lookup (F5)
-- Render-sanity warnings promoted to banner + non-zero exit (F6)
-- `migration-report.json` state-leak (B1)
+- F1 false PASS in `vrt compare` file-mode — **#22** (`critical`)
+- F2 Token-aware fix candidates in wireframe mode — **#23**
+- F3 Variant render saved alongside heatmap / triptych output — **#24**
+- F4 Computed-style diff exposed without requiring Crater BiDi — **#25**
+- F5 Reverse hex → DESIGN.md token lookup — **#26**
+- F6 Render-sanity warnings promoted to banner + non-zero exit — **#27**
+- B1 `migration-report.json` state-leak — **#28**
 
 ## Reproducing
 
