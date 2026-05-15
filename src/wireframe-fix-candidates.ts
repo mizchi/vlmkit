@@ -39,6 +39,19 @@ export interface WireframeFixSuggestion {
   /** Magnitude in px (positive for the canonical direction described). */
   deltaPx: number;
   /**
+   * Set when this suggestion's magnitude dominates the rest of the
+   * suggestion set — i.e. closing this one delta would account for
+   * most of the visual diff. Lets the renderer pull it above the
+   * [DIVERGENT] / [SUBSET] noise so agents act on the biggest win
+   * first.
+   *
+   * Heuristic: |deltaPx| ≥ 12 (large enough to matter) AND
+   * ≥ 1.5× the next-largest |deltaPx| in the set. Computed in a
+   * single pass after the per-rank generation completes; at most
+   * one suggestion per run carries the flag.
+   */
+  isHighImpact?: boolean;
+  /**
    * How this delta relates to the full viewport set:
    *   - "all"               : observation covers every viewport with the same
    *                           sign+magnitude. Suggestion is safe to apply
@@ -424,6 +437,23 @@ export function generateWireframeFixCandidates(
     if (Math.abs(b.deltaPx) !== Math.abs(a.deltaPx)) return Math.abs(b.deltaPx) - Math.abs(a.deltaPx);
     return b.viewports.length - a.viewports.length;
   });
+
+  // High-impact detection (closes G2 / agent-e v5 attention-bias):
+  // when one suggestion's magnitude dominates the rest, flag it so
+  // the renderer can pull it above the [DIVERGENT] / [SUBSET] noise.
+  // Only one row carries the flag — at-most-one keeps the badge
+  // meaningful (everything-highlighted = nothing-highlighted).
+  if (out.length >= 2) {
+    const sortedByMag = [...out].sort((a, b) => Math.abs(b.deltaPx) - Math.abs(a.deltaPx));
+    const top = sortedByMag[0];
+    const next = sortedByMag[1];
+    const topAbs = Math.abs(top.deltaPx);
+    const nextAbs = Math.abs(next.deltaPx);
+    if (topAbs >= 12 && topAbs >= nextAbs * 1.5) {
+      top.isHighImpact = true;
+    }
+  }
+
   return out;
 }
 

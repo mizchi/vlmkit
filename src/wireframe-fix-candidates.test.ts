@@ -323,6 +323,55 @@ describe("generateWireframeFixCandidates", () => {
     assert.ok(out.every((s) => s.scope !== "magnitude-divergent"));
   });
 
+  it("marks one suggestion HIGH-IMPACT when its magnitude dominates (G2)", () => {
+    // One 40px shift + several 12px shifts → the 40px row dominates.
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        // rank 0: huge mobile-only shift (40px)
+        { viewport: "mobile", matches: [bbox(0, 40)] },
+        // rank 2, 3, 4: small shifts (12px) across multiple viewports
+        { viewport: "desktop", matches: [bbox(2, 12), bbox(3, 12), bbox(4, 12)] },
+        { viewport: "wide", matches: [bbox(2, 12), bbox(3, 12), bbox(4, 12)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+    });
+    const high = out.filter((s) => s.isHighImpact);
+    assert.equal(high.length, 1, "exactly one suggestion should be HIGH-IMPACT");
+    assert.equal(high[0].deltaPx, 40);
+  });
+
+  it("does NOT mark HIGH-IMPACT when magnitudes are similar", () => {
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 24), bbox(1, 20)] },
+        { viewport: "desktop", matches: [bbox(0, 24), bbox(1, 20)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+    });
+    const high = out.filter((s) => s.isHighImpact);
+    assert.equal(high.length, 0, "20 and 24 are within 1.5× — no winner");
+  });
+
+  it("does NOT mark HIGH-IMPACT when the leading magnitude is too small (< 12px)", () => {
+    // 8 vs 4 — 2× ratio but the leading magnitude is only 8px,
+    // not enough to be worth a HIGH-IMPACT badge on its own.
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 8)] },
+        { viewport: "desktop", matches: [bbox(0, 8)] },
+        { viewport: "wide", matches: [bbox(1, 4)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+    });
+    assert.equal(out.filter((s) => s.isHighImpact).length, 0);
+  });
+
   it("tolerates ±2px between bbox magnitude and DP entry magnitude", () => {
     const out = generateWireframeFixCandidates({
       bboxByViewport: [

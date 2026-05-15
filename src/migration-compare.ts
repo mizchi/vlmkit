@@ -198,6 +198,15 @@ export interface MigrationCompareOptions {
    * when not provided.
    */
   tokensPath?: string;
+  /**
+   * Path to a previous run's output dir (or migration-report.json
+   * directly). When provided, after the main compare a "Since
+   * previous run:" section shows per-viewport diff% delta and
+   * cross-round sign-flips so an agent on a tight budget can tell
+   * whether their last edit moved the loop forward, regressed, or
+   * overshot zero.
+   */
+  againstPreviousPath?: string;
 }
 
 export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptions {
@@ -238,6 +247,7 @@ export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptio
     states: parseStatesArg(args),
     triptych: !hasFlag(args, "no-triptych"),
     tokensPath: getArg(args, "tokens", "") || undefined,
+    againstPreviousPath: getArg(args, "against-previous", "") || undefined,
   };
 }
 
@@ -1630,9 +1640,12 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         });
         if (wireframeSuggestions.length > 0) {
           wireframeFixReports.push({ variantFile: variantFileLabel, suggestions: wireframeSuggestions });
-          // Sort highest-impact scope first so the "don't go global"
-          // signals land before any borderline global edits.
+          // Sort: isHighImpact first (agent-e v5: the single
+          // biggest-win row was getting buried under DIVERGENT
+          // rows of smaller magnitudes). Then scope priority,
+          // then magnitude.
           const sorted = [...wireframeSuggestions].sort((a, b) => {
+            if (!!b.isHighImpact !== !!a.isHighImpact) return (b.isHighImpact ? 1 : 0) - (a.isHighImpact ? 1 : 0);
             const scopeRank = (s: typeof a.scope) =>
               s === "divergent" ? 0
               : s === "magnitude-divergent" ? 1
@@ -1654,7 +1667,10 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
                 : s.scope === "subset"
                   ? ` ${YELLOW}[SUBSET]${RESET}`
                   : "";
-            console.log(`    ${conf}[${s.confidence}]${RESET}${scopeTag} ${s.evidence}`);
+            const impactTag = s.isHighImpact
+              ? ` ${BOLD}${GREEN}[HIGH-IMPACT]${RESET}`
+              : "";
+            console.log(`    ${conf}[${s.confidence}]${RESET}${impactTag}${scopeTag} ${s.evidence}`);
             console.log(`      ${DIM}→ ${s.suggestion}${RESET}`);
             if (s.candidates && s.candidates.length > 0) {
               // Group candidates by selector so the agent sees the rule
@@ -1903,6 +1919,30 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     console.log();
     console.log(`  ${DIM}Report: ${reportPath}${RESET}`);
     console.log();
+
+    // --against-previous <dir-or-json>: surface a "since previous
+    // run" section so an agent on a tight budget can tell whether
+    // the last edit moved forward, regressed, or overshot zero
+    // (G1 from the agent-e v5 validation). Reuses watch.ts's
+    // diffWatchRuns + zero-crossing detector.
+    if (options.againstPreviousPath) {
+      try {
+        const { diffWatchRuns, formatWatchDelta, summarizeReport } = await import("./watch.ts");
+        const prevPath = options.againstPreviousPath.endsWith(".json")
+          ? options.againstPreviousPath
+          : join(options.againstPreviousPath, "migration-report.json");
+        const prevRaw = await readFile(prevPath, "utf-8");
+        const prevReport = JSON.parse(prevRaw) as MigrationCompareReport;
+        const prev = summarizeReport(prevReport);
+        const curr = summarizeReport(report);
+        const delta = diffWatchRuns(prev, curr);
+        console.log(formatWatchDelta(delta, false));
+        console.log();
+      } catch (err) {
+        console.log(`  ${YELLOW}--against-previous failed: ${String(err)}${RESET}`);
+        console.log();
+      }
+    }
 
     if (options.strictDomEquivalence) {
       const failing = domEquivalenceReports.filter((d) => !d.result.ok);

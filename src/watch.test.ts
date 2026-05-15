@@ -1,16 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { diffWatchRuns, formatWatchDelta } from "./watch.ts";
+import { detectZeroCrossings, diffWatchRuns, formatWatchDelta } from "./watch.ts";
 import type { WireframeFixSuggestion } from "./wireframe-fix-candidates.ts";
 
-function sug(over: Partial<WireframeFixSuggestion> & { deltaPx: number; viewports: string[]; rank?: number }): WireframeFixSuggestion {
+function sug(over: Partial<WireframeFixSuggestion> & { deltaPx: number; viewports: string[]; rank?: number; bboxDims?: string }): WireframeFixSuggestion {
   // Real wireframe evidence strings put the magnitude AFTER a colon
   // (`rank=N (bbox WxH): Δtop +24px on …`). The watcher's suggestion
   // key only uses the pre-colon prefix to stay stable across small
   // numeric drift between rounds; mirror that shape here so the
   // tests exercise the same key derivation.
   return {
-    evidence: over.evidence ?? `component rank=${over.rank ?? 0}: Δtop ${over.deltaPx >= 0 ? "+" : ""}${over.deltaPx}px`,
+    evidence: over.evidence ?? `component rank=${over.rank ?? 0} (bbox ${over.bboxDims ?? "200x100"}): Δtop ${over.deltaPx >= 0 ? "+" : ""}${over.deltaPx}px`,
     hypothesis: "...",
     suggestion: "...",
     viewports: over.viewports,
@@ -104,10 +104,88 @@ describe("diffWatchRuns", () => {
   });
 });
 
+describe("detectZeroCrossings", () => {
+  it("flags a component whose Δtop flipped sign between rounds (G1)", () => {
+    const prev = {
+      timestamp: "t0",
+      diffByViewport: { mobile: 0.1 },
+      suggestions: [sug({ rank: 0, deltaPx: 24, viewports: ["mobile"] })],
+    };
+    const curr = {
+      timestamp: "t1",
+      diffByViewport: { mobile: 0.05 },
+      suggestions: [sug({ rank: 0, deltaPx: -16, viewports: ["mobile"] })],
+    };
+    const z = detectZeroCrossings(prev, curr);
+    assert.equal(z.length, 1);
+    assert.equal(z[0].prev.deltaPx, 24);
+    assert.equal(z[0].curr.deltaPx, -16);
+    // Damping: half the prev magnitude, sign reversed → -12 to walk back.
+    assert.equal(z[0].dampedTargetPx, -12);
+    assert.match(z[0].message, /overshot|added too much|removed too much/i);
+    assert.match(z[0].message, /try damping ~50%/);
+  });
+
+  it("does NOT flag when magnitudes are below the significance floor (6px)", () => {
+    const prev = {
+      timestamp: "t0", diffByViewport: {},
+      suggestions: [sug({ rank: 0, deltaPx: 4, viewports: ["mobile"] })],
+    };
+    const curr = {
+      timestamp: "t1", diffByViewport: {},
+      suggestions: [sug({ rank: 0, deltaPx: -4, viewports: ["mobile"] })],
+    };
+    assert.equal(detectZeroCrossings(prev, curr).length, 0);
+  });
+
+  it("does NOT flag same-sign rounds (no zero crossing)", () => {
+    const prev = {
+      timestamp: "t0", diffByViewport: {},
+      suggestions: [sug({ rank: 0, deltaPx: 24, viewports: ["mobile"] })],
+    };
+    const curr = {
+      timestamp: "t1", diffByViewport: {},
+      suggestions: [sug({ rank: 0, deltaPx: 8, viewports: ["mobile"] })],
+    };
+    assert.equal(detectZeroCrossings(prev, curr).length, 0);
+  });
+
+  it("skips text-row suggestions (they lack stable component identity)", () => {
+    const prev = {
+      timestamp: "t0", diffByViewport: {},
+      suggestions: [{
+        ...sug({ deltaPx: 16, viewports: ["mobile"] }),
+        evidence: '7 text-row(s) shifted Δy +16px on mobile (e.g. "Hello")',
+      }],
+    };
+    const curr = {
+      timestamp: "t1", diffByViewport: {},
+      suggestions: [{
+        ...sug({ deltaPx: -8, viewports: ["mobile"] }),
+        evidence: '7 text-row(s) shifted Δy -8px on mobile (e.g. "Hello")',
+      }],
+    };
+    assert.equal(detectZeroCrossings(prev, curr).length, 0);
+  });
+
+  it("diffWatchRuns now surfaces zeroCrossings on its result", () => {
+    const prev = {
+      timestamp: "t0", diffByViewport: { mobile: 0.1 },
+      suggestions: [sug({ rank: 1, deltaPx: 24, viewports: ["mobile"] })],
+    };
+    const curr = {
+      timestamp: "t1", diffByViewport: { mobile: 0.05 },
+      suggestions: [sug({ rank: 1, deltaPx: -16, viewports: ["mobile"] })],
+    };
+    const delta = diffWatchRuns(prev, curr);
+    assert.equal(delta.zeroCrossings.length, 1);
+  });
+});
+
 describe("formatWatchDelta", () => {
   it("first-run mode labels the output", () => {
     const out = formatWatchDelta(
-      { diffDelta: { mobile: { prev: 0.1, curr: 0.1, delta: 0 } }, resolved: [], persisted: [], newlyIntroduced: [] },
+      { diffDelta: { mobile: { prev: 0.1, curr: 0.1, delta: 0 } }, resolved: [], persisted: [], newlyIntroduced: [], zeroCrossings: [] },
       true,
     );
     assert.match(out, /first run/);
@@ -120,6 +198,7 @@ describe("formatWatchDelta", () => {
         resolved: [],
         persisted: [],
         newlyIntroduced: [sug({ deltaPx: 24, viewports: ["mobile"] })],
+        zeroCrossings: [],
       },
       false,
     );
@@ -134,6 +213,7 @@ describe("formatWatchDelta", () => {
         resolved: [sug({ deltaPx: 24, viewports: ["mobile"] })],
         persisted: [],
         newlyIntroduced: [],
+        zeroCrossings: [],
       },
       false,
     );
@@ -141,9 +221,29 @@ describe("formatWatchDelta", () => {
     assert.match(out, /cleared by your last edit/);
   });
 
+  it("zeroCrossings rendered loudly with damping advice", () => {
+    const out = formatWatchDelta(
+      {
+        diffDelta: {},
+        resolved: [], persisted: [], newlyIntroduced: [],
+        zeroCrossings: [{
+          componentPrefix: "component rank=0 (bbox 200x100)",
+          prev: { deltaPx: 24, viewports: ["mobile"] },
+          curr: { deltaPx: -16, viewports: ["mobile"] },
+          dampedTargetPx: -12,
+          message: "component rank=0 (bbox 200x100) flipped sign (+24px → -16px). Your last edit added too much; try damping ~50% (next edit ≈ -12px).",
+        }],
+      },
+      false,
+    );
+    assert.match(out, /zero-crossing/);
+    assert.match(out, /overshot/);
+    assert.match(out, /damping ~50%/);
+  });
+
   it("clean state when nothing outstanding", () => {
     const out = formatWatchDelta(
-      { diffDelta: {}, resolved: [], persisted: [], newlyIntroduced: [] },
+      { diffDelta: {}, resolved: [], persisted: [], newlyIntroduced: [], zeroCrossings: [] },
       false,
     );
     assert.match(out, /clean/);

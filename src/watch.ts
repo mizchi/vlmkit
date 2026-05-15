@@ -36,7 +36,7 @@ import type { WireframeFixSuggestion } from "./wireframe-fix-candidates.ts";
 const DEBOUNCE_MS = 150;
 const WATCH_OUTPUT_DIR_DEFAULT = ".vrt/runs";
 
-interface RoundSummary {
+export interface RoundSummary {
   timestamp: string;
   diffByViewport: Record<string, number>;
   suggestions: WireframeFixSuggestion[];
@@ -61,6 +61,74 @@ export interface WatchRunDelta {
   resolved: WireframeFixSuggestion[];
   persisted: WireframeFixSuggestion[];
   newlyIntroduced: WireframeFixSuggestion[];
+  /**
+   * Component-level sign flips: a suggestion's prefix (e.g.
+   * "component rank=0 (bbox 343×112)") appeared with one sign in
+   * prev and the opposite sign in curr. Signals the last edit
+   * overshot zero — the agent should damp, not push further.
+   */
+  zeroCrossings: ZeroCrossing[];
+}
+
+export interface ZeroCrossing {
+  /** Component-identity prefix (e.g. "component rank=0 (bbox 343×112)"). */
+  componentPrefix: string;
+  prev: { deltaPx: number; viewports: string[] };
+  curr: { deltaPx: number; viewports: string[] };
+  /** Suggested damping: half the prev magnitude, sign of curr. */
+  dampedTargetPx: number;
+  message: string;
+}
+
+const SIGNIFICANT_MAGNITUDE = 6;
+
+export function detectZeroCrossings(prev: RoundSummary, curr: RoundSummary): ZeroCrossing[] {
+  // Index suggestions by component-identity prefix (everything before
+  // the first colon in `evidence`). Bbox suggestions encode rank +
+  // bbox dims there, which is stable across rounds; text-row prefixes
+  // don't carry component identity so they're skipped.
+  const indexByPrefix = (sugs: WireframeFixSuggestion[]) => {
+    const out = new Map<string, WireframeFixSuggestion>();
+    for (const s of sugs) {
+      const prefix = s.evidence.split(":")[0].trim();
+      // Only track bbox-rank-keyed suggestions (skip text-rows).
+      if (!prefix.startsWith("component rank=")) continue;
+      // Keep the last entry with this prefix; in practice the
+      // generator emits exactly one row per component identity in a
+      // run.
+      out.set(prefix, s);
+    }
+    return out;
+  };
+  const prevMap = indexByPrefix(prev.suggestions);
+  const currMap = indexByPrefix(curr.suggestions);
+
+  const out: ZeroCrossing[] = [];
+  for (const [prefix, prevSug] of prevMap) {
+    const currSug = currMap.get(prefix);
+    if (!currSug) continue;
+    const ps = Math.sign(prevSug.deltaPx);
+    const cs = Math.sign(currSug.deltaPx);
+    if (ps === 0 || cs === 0 || ps === cs) continue;
+    if (Math.abs(prevSug.deltaPx) < SIGNIFICANT_MAGNITUDE) continue;
+    if (Math.abs(currSug.deltaPx) < SIGNIFICANT_MAGNITUDE) continue;
+    const damped = Math.round((prevSug.deltaPx / 2) * -1); // toward middle
+    const direction = cs > 0 ? "added too much" : "removed too much";
+    out.push({
+      componentPrefix: prefix,
+      prev: {
+        deltaPx: prevSug.deltaPx,
+        viewports: [...prevSug.viewports],
+      },
+      curr: {
+        deltaPx: currSug.deltaPx,
+        viewports: [...currSug.viewports],
+      },
+      dampedTargetPx: damped,
+      message: `${prefix} flipped sign (${prevSug.deltaPx >= 0 ? "+" : ""}${prevSug.deltaPx}px → ${currSug.deltaPx >= 0 ? "+" : ""}${currSug.deltaPx}px). Your last edit ${direction}; try damping ~50% (next edit ≈ ${damped >= 0 ? "+" : ""}${damped}px).`,
+    });
+  }
+  return out;
 }
 
 export function diffWatchRuns(prev: RoundSummary | null, curr: RoundSummary): WatchRunDelta {
@@ -76,6 +144,7 @@ export function diffWatchRuns(prev: RoundSummary | null, curr: RoundSummary): Wa
       resolved: [],
       persisted: [],
       newlyIntroduced: curr.suggestions,
+      zeroCrossings: [],
     };
   }
 
@@ -91,10 +160,11 @@ export function diffWatchRuns(prev: RoundSummary | null, curr: RoundSummary): Wa
   for (const [k, s] of currKeys) {
     if (!prevKeys.has(k)) newlyIntroduced.push(s);
   }
-  return { diffDelta, resolved, persisted, newlyIntroduced };
+  const zeroCrossings = detectZeroCrossings(prev, curr);
+  return { diffDelta, resolved, persisted, newlyIntroduced, zeroCrossings };
 }
 
-function summarizeReport(report: MigrationCompareReport): RoundSummary {
+export function summarizeReport(report: MigrationCompareReport): RoundSummary {
   const diffByViewport: Record<string, number> = {};
   for (const r of report.results) {
     diffByViewport[r.viewport] = r.diffRatio;
@@ -122,6 +192,13 @@ export function formatWatchDelta(delta: WatchRunDelta, isFirst: boolean): string
     const pct = (n: number) => `${(n * 100).toFixed(2)}%`;
     const deltaPct = (n: number) => `${n >= 0 ? "+" : ""}${(n * 100).toFixed(2)}pp`;
     lines.push(`  ${vp.padEnd(8)} ${pct(d.curr).padStart(7)} ${arrow} ${DIM}${pct(d.prev)} (${deltaPct(d.delta)})${RESET}`);
+  }
+  if (delta.zeroCrossings.length > 0) {
+    lines.push("");
+    lines.push(`  ${RED}${BOLD}zero-crossing${RESET} ${DIM}(your last edit overshot — damp before pushing further)${RESET}`);
+    for (const z of delta.zeroCrossings.slice(0, 3)) {
+      lines.push(`    ${RED}~${RESET} ${z.message}`);
+    }
   }
   if (delta.newlyIntroduced.length > 0) {
     lines.push("");
