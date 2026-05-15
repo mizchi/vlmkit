@@ -241,6 +241,35 @@ const STATIC_VIEWPORTS: ViewportSpec[] = [
 
 function hr() { _hr(76); }
 
+/**
+ * Render-sanity warnings (failed stylesheet loads, fallback fonts, etc.)
+ * mean the pixel diff downstream is suspect. Print them as a loud banner
+ * so an agent scanning top-down sees the cause before it sees the
+ * (now meaningless) diff numbers.
+ *
+ * Buried yellow text was being missed by agents per the 2026-05-15
+ * design-md scenario report — promoted to a red bordered block here.
+ */
+function printRenderSanityBanner(side: "baseline" | "variant", sanity: RenderSanityResult): void {
+  console.log();
+  console.log(`  ${RED}${BOLD}┌─ render sanity (${side}) ─ ${sanity.warnings.length} warning(s) ─${"─".repeat(Math.max(0, 38 - side.length))}${RESET}`);
+  for (const w of sanity.warnings) {
+    console.log(`  ${RED}│${RESET}  [${w.code}] ${w.message}`);
+  }
+  if (sanity.failedRequests.length > 0) {
+    console.log(`  ${RED}│${RESET}  ${DIM}failed requests (${sanity.failedRequests.length}):${RESET}`);
+    for (const req of sanity.failedRequests.slice(0, 5)) {
+      console.log(`  ${RED}│${RESET}    ${DIM}- ${req.url} (${req.errorText})${RESET}`);
+    }
+    if (sanity.failedRequests.length > 5) {
+      console.log(`  ${RED}│${RESET}    ${DIM}... ${sanity.failedRequests.length - 5} more${RESET}`);
+    }
+  }
+  console.log(`  ${RED}│${RESET}  ${DIM}Downstream diff numbers may be meaningless until resolved.${RESET}`);
+  console.log(`  ${RED}└${"─".repeat(74)}${RESET}`);
+  console.log();
+}
+
 function urlToLabel(url: string): string {
   try {
     const u = new URL(url);
@@ -722,12 +751,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         page.off("requestfailed", onFailed);
 
         if (baselineSanity && !baselineSanity.ok) {
-          console.log();
-          console.log(`  ${YELLOW}Baseline render sanity warnings:${RESET}`);
-          for (const w of baselineSanity.warnings) {
-            console.log(`    ${YELLOW}- [${w.code}] ${w.message}${RESET}`);
-          }
-          console.log();
+          printRenderSanityBanner("baseline", baselineSanity);
         }
       }
 
@@ -865,8 +889,25 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       const variantDomPositionByVp = new Map<string, PositionedElement[]>();
       const variantBboxesByVp = new Map<string, BboxElement[]>();
       const shiftRegionsByVp = new Map<string, ShiftRegion[]>();
+      let variantSanity: RenderSanityResult | undefined;
       for (const [vpIndex, vp] of VIEWPORTS.entries()) {
         const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
+
+        // Variant render-sanity: register a failed-request listener on the
+        // first viewport so we can warn about variant-side stylesheet 404s
+        // and font fallbacks. Before this, only baseline was checked, which
+        // missed render-breakage on the variant side (e.g. webfont fallback
+        // on the variant that the baseline happened to load correctly).
+        const variantSanityEnabled = (options.baselineSanityCheck ?? true) && vpIndex === 0;
+        const variantFailedRequests: FailedRequest[] = [];
+        const onVariantFailed = (req: import("playwright").Request) => {
+          variantFailedRequests.push({
+            url: req.url(),
+            errorText: req.failure()?.errorText ?? "unknown failure",
+          });
+        };
+        if (variantSanityEnabled) page.on("requestfailed", onVariantFailed);
+
         if (variant.url) {
           await page.goto(variant.url, { waitUntil: "networkidle", timeout: 30000 });
           if (!variantHtml) variantHtml = await page.content();
@@ -876,6 +917,28 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           await page.setContent(variantHtml, { waitUntil: "networkidle" });
         }
         if (options.maskSelectors?.length) await applyMask(page, options.maskSelectors);
+
+        if (variantSanityEnabled) {
+          try {
+            const browserProbe = await page.evaluate(RENDER_PROBE_BROWSER_SCRIPT) as {
+              bodyFontFamily: string;
+              styleSheetCount: number;
+              hasClassAttributes: boolean;
+            };
+            const sourceProbe = probeSourceHtml(variantHtml);
+            variantSanity = evaluateRenderSanity({
+              failedRequests: variantFailedRequests,
+              probe: { ...browserProbe, ...sourceProbe },
+            });
+          } catch (error) {
+            variantSanity = { ok: true, warnings: [], failedRequests: variantFailedRequests };
+            console.log(`  ${YELLOW}Variant sanity probe error (${variantName}): ${String(error)}${RESET}`);
+          }
+          page.off("requestfailed", onVariantFailed);
+          if (variantSanity && !variantSanity.ok) {
+            printRenderSanityBanner("variant", variantSanity);
+          }
+        }
 
         if (domEnabled && vpIndex === 0 && !variantDomFingerprint) {
           try {
