@@ -435,6 +435,72 @@ scenarios {
     contributes { "GOAL-A11Y-COMPLIANCE" }
     description = "`vrt a11y-focus-order` walks Tab traversal and compares against the bbox-sorted visual order."
   }
+  new {
+    id = "F4"
+    name = "ARIA attribute correctness"
+    severity = "major"
+    reviewStatus = "draft"
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+    description = "Partial: `a11y-semantic` exists pre-v2 but has narrow rule coverage; full ARIA compliance is not yet a single-CLI check."
+  }
+  new {
+    id = "F5"
+    name = "Screen-reader-only content"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Out of scope per v2 matrix: requires assistive-technology integration; not a visual signal."
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+    description = "Preserved for matrix-row parity."
+  }
+  new {
+    id = "F6"
+    name = "Keyboard navigation Tab Esc Enter"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+    implementedBy = "code"
+    implementedAt = "src/interact.ts"
+    description = "`interact press` action drives keyboard sequences; `a11y-focus-order` verifies the resulting traversal."
+  }
+  new {
+    id = "F7"
+    name = "Color blindness simulation"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+    description = "Not implemented: could be added via a CSS-filter wrapper around `compare`."
+  }
+  new {
+    id = "F8"
+    name = "200 percent browser zoom usability"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+    implementedBy = "code"
+    implementedAt = "src/media-variants.ts"
+    description = "`media-variants --variants zoom-200` flags scrollWidth regressions at 2× zoom."
+  }
+  new {
+    id = "F9"
+    name = "Reduced motion compliance"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+    implementedBy = "code"
+    implementedAt = "src/media-variants.ts"
+    description = "`media-variants --variants reduced-motion` does the static-stylesheet sweep."
+  }
+  new {
+    id = "F10"
+    name = "Caption or alt-text presence"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Out of scope per v2 matrix: requires static-HTML analysis, not a visual signal. Use an HTML linter."
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+    description = "Preserved for matrix-row parity."
+  }
 
   // ── Design system ────────────────────────────────────────────
   new {
@@ -522,7 +588,91 @@ scenarios {
     description = "`vrt perf` wires up a PerformanceObserver inside the page and reports CLS / LCP / FCP without depending on Lighthouse."
   }
 
+  // ── Responsive / device ──────────────────────────────────────
+  new {
+    id = "D1"
+    name = "Mobile tablet desktop breakpoint sweep"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "`vrt compare` accepts per-viewport configs; `component-geometry` reports bbox shifts across breakpoints."
+  }
+  new {
+    id = "D2"
+    name = "Landscape orientation"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Partial: any viewport works; there is no explicit orientation switch CLI."
+  }
+  new {
+    id = "D3"
+    name = "Foldable or dual-screen rendering"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Marked out-of-scope per v2 matrix: edge-case device class with no install base justifying tooling investment."
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Preserved for matrix-row parity; no successor."
+  }
+  new {
+    id = "D4"
+    name = "Retina 2x DPI rendering"
+    severity = "minor"
+    reviewStatus = "approved"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    implementedBy = "code"
+    implementedAt = "src/component-from-image.ts"
+    description = "`vrt component-from-image --device-scale-factor 2` renders at 2× for retina parity."
+  }
+  new {
+    id = "D5"
+    name = "Touchscreen-on-desktop affordances"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+    description = "Partial: `a11y-touch` + `a11y-focus-order` cover the discoverable parts; no first-class CLI."
+  }
+
   // ── Interaction ─────────────────────────────────────────────
+  new {
+    id = "E1"
+    name = "Hover state diff"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    implementedBy = "code"
+    implementedAt = "src/component-from-image.ts"
+    description = "`component-from-image --states hover` plus `interact` cover hover-state diffs."
+  }
+  new {
+    id = "E2"
+    name = "Focus and focus-visible state"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+    implementedBy = "code"
+    implementedAt = "src/component-from-image.ts"
+    description = "`component-from-image --states focus-visible` plus `a11y-focus-order` verify focus visibility."
+  }
+  new {
+    id = "E3"
+    name = "Disabled state"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Scriptable via `interact` (set the attribute then snapshot); no first-class disabled-sweep CLI."
+  }
+  new {
+    id = "E4"
+    name = "Loading state"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Scriptable via `interact` (snapshot before resolve); no spinner / skeleton dedicated CLI."
+  }
   new {
     id = "E5"
     name = "Form validation state diff from invalid to valid"
@@ -536,6 +686,82 @@ scenarios {
       see the validation-state visuals (red borders, error messages,
       enabled submit button) actually change as expected.
     """#
+  }
+  new {
+    id = "E6"
+    name = "Empty state"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Scriptable via `interact` (set state then snapshot); no first-class empty-state CLI."
+  }
+  new {
+    id = "E7"
+    name = "Dropdown or menu open"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    implementedBy = "code"
+    implementedAt = "src/interact.ts"
+    description = "Trigger the toggle via `interact` or `explore`; both engines diff the open vs closed state."
+  }
+  new {
+    id = "E8"
+    name = "Modal or dialog open"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    implementedBy = "code"
+    implementedAt = "src/interact.ts"
+    description = "`interact` drives the open click + backdrop + close sequence."
+  }
+  new {
+    id = "E9"
+    name = "Carousel or slider transitions"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Out of scope per v2 matrix: transitions are intentionally disabled for determinism; mid-frame capture would require a separate animation-first toolkit."
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Preserved for matrix-row parity."
+  }
+  new {
+    id = "E10"
+    name = "Accordion expand or collapse"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    implementedBy = "code"
+    implementedAt = "src/interact.ts"
+    description = "`interact` drives the toggle and snapshots both states."
+  }
+  new {
+    id = "E11"
+    name = "Tooltip on hover with delay"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Partial: `interact` hover + wait does the job; no tooltip-specific helper yet."
+  }
+  new {
+    id = "E12"
+    name = "Toast notification fade in or out"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Out of scope per v2 matrix: transitions are disabled; the fade frames are unreachable."
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Preserved for matrix-row parity."
+  }
+  new {
+    id = "E13"
+    name = "Tab switch"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    implementedBy = "code"
+    implementedAt = "src/interact.ts"
+    description = "`interact` drives the tab-click sequence and pixel-diffs each panel state."
   }
 
   // ── Agent ergonomics ────────────────────────────────────────
