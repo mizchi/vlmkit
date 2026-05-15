@@ -211,8 +211,12 @@ export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptio
     strictBaselineSanity: hasFlag(args, "strict-baseline-sanity"),
     domEquivalenceCheck: !hasFlag(args, "no-dom-equivalence"),
     strictDomEquivalence: hasFlag(args, "strict-dom-equivalence"),
-    computedStyleDiff: hasFlag(args, "computed-style"),
-    domPositionDiff: hasFlag(args, "dom-position-diff") || hasFlag(args, "position-diff"),
+    // Both Playwright-driven; default on so agents get property-level
+    // signals (font-family, padding, gap, etc.) without having to know
+    // these flags exist. Opt out with `--no-computed-style` /
+    // `--no-dom-position-diff`. Neither depends on Crater BiDi.
+    computedStyleDiff: !hasFlag(args, "no-computed-style") && !hasFlag(args, "no-computed-style-diff"),
+    domPositionDiff: !hasFlag(args, "no-dom-position-diff") && !hasFlag(args, "no-position-diff"),
     componentBboxDiff: !hasFlag(args, "no-component-bbox"),
     states: parseStatesArg(args),
   };
@@ -640,7 +644,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
   if (!enablePaintTree) {
     console.log(`  ${DIM}Paint tree: disabled${RESET}`);
   } else if (paintTreeStatus.error) {
-    console.log(`  ${YELLOW}Paint tree: unavailable (${paintTreeStatus.error})${RESET}`);
+    console.log(`  ${DIM}Paint tree: unavailable (${paintTreeStatus.error}) — using Playwright computed-style + DOM-position fallback${RESET}`);
   }
   console.log();
   let browser: Browser | null = null;
@@ -686,7 +690,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       console.log(`  ${DIM}Paint tree: enabled via ${paintTreeUrl}${RESET}`);
       console.log();
     } else if (enablePaintTree && paintTreeStatus.error) {
-      console.log(`  ${YELLOW}Paint tree: unavailable (${paintTreeStatus.error})${RESET}`);
+      console.log(`  ${DIM}Paint tree: unavailable (${paintTreeStatus.error}) — using Playwright computed-style + DOM-position fallback${RESET}`);
       console.log();
     }
 

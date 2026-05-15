@@ -91,4 +91,25 @@ describe("parseMigrationCompareArgs", () => {
     ]);
     assert.equal(options.outputDir, resolve("/tmp/explicit"));
   });
+
+  it("should default computed-style and dom-position-diff to ON", () => {
+    // Playwright-driven, no Crater BiDi dependency. Agents need these
+    // property-level signals by default — they were being silently
+    // skipped before, leaving font-family / padding / gap deltas
+    // invisible. See #25.
+    const options = parseMigrationCompareArgs(["before.html", "after.html"]);
+    assert.equal(options.computedStyleDiff, true);
+    assert.equal(options.domPositionDiff, true);
+  });
+
+  it("should respect --no-computed-style / --no-dom-position-diff opt-outs", () => {
+    const options = parseMigrationCompareArgs([
+      "--no-computed-style",
+      "--no-dom-position-diff",
+      "before.html",
+      "after.html",
+    ]);
+    assert.equal(options.computedStyleDiff, false);
+    assert.equal(options.domPositionDiff, false);
+  });
 });
