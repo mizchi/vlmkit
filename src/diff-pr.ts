@@ -24,8 +24,9 @@
  * development loop; this is the policy gate.
  */
 
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { chromium, type Browser } from "playwright";
 import {
@@ -37,7 +38,7 @@ import {
   type DiffPrRoute,
 } from "./diff-pr-config.ts";
 import { compareScreenshots } from "./heatmap.ts";
-import { BOLD, CYAN, DIM, GREEN, RED, RESET } from "./terminal-colors.ts";
+import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "./terminal-colors.ts";
 import type { VrtSnapshot } from "./types.ts";
 
 // Same defaults as migration-compare's STATIC_VIEWPORTS so a baseline
@@ -120,18 +121,45 @@ async function cmdPin(args: string[]): Promise<void> {
     process.exit(1);
   }
   const config = loadDiffPrConfig(configPath);
+
+  // Filter to specific routes if any positional arguments were given.
+  // Unknown route names are an error so a typo doesn't silently
+  // refresh nothing.
+  const requested = args.filter((a) => !a.startsWith("--"));
+  // Strip --flag value pairs from `requested`.
+  const flaggedValues = new Set<string>();
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith("--") && i + 1 < args.length && !args[i + 1].startsWith("--")) {
+      flaggedValues.add(args[i + 1]);
+    }
+  }
+  const requestedRouteNames = requested.filter((r) => !flaggedValues.has(r));
+  let routesToPin = config.routes;
+  if (requestedRouteNames.length > 0) {
+    const unknown = requestedRouteNames.filter((n) => !config.routes.some((r) => r.name === n));
+    if (unknown.length > 0) {
+      console.error(`${RED}error:${RESET} unknown route(s): ${unknown.join(", ")}`);
+      console.error(`Known routes: ${config.routes.map((r) => r.name).join(", ")}`);
+      process.exit(1);
+    }
+    routesToPin = config.routes.filter((r) => requestedRouteNames.includes(r.name));
+  }
+
   console.log(`${BOLD}${CYAN}vrt diff-pr pin${RESET}  ${DIM}${configPath}${RESET}`);
-  console.log(`${DIM}  pinning ${config.routes.length} route(s) into ${config.baselineDir}/${RESET}`);
+  const scopeNote = routesToPin.length === config.routes.length
+    ? `pinning ${routesToPin.length} route(s)`
+    : `pinning ${routesToPin.length} of ${config.routes.length} route(s) (${routesToPin.map((r) => r.name).join(", ")}); other baselines untouched`;
+  console.log(`${DIM}  ${scopeNote} into ${config.baselineDir}/${RESET}`);
   console.log();
 
   const viewports = viewportSpecsFor(config);
   const browser = await chromium.launch();
   try {
-    for (const route of config.routes) {
+    for (const route of routesToPin) {
       process.stdout.write(`  ${route.name.padEnd(20)} ${DIM}${route.url}${RESET} ...`);
       const dir = baselineDirForRoute(config, route);
-      // Clean the dir so stale PNGs from a previous pin (different
-      // viewport set) don't linger as baselines we never run against.
+      // Clean only this route's dir so other routes' baselines stay
+      // untouched (the partial-pin use case).
       if (existsSync(dir)) await rm(dir, { recursive: true });
       await mkdir(dir, { recursive: true });
       let success = 0;
@@ -303,13 +331,100 @@ export function buildMarkdownSummary(config: DiffPrConfig, results: PerRouteResu
   return lines.join("\n");
 }
 
+function ghAvailable(): boolean {
+  const r = spawnSync("gh", ["--version"], { stdio: "ignore" });
+  return r.status === 0;
+}
+
+interface PostPrOptions {
+  prRef: string;
+  summaryPath: string;
+  marker: string;
+}
+
+/**
+ * Post the markdown summary as a PR comment. Strategy:
+ *   1. If `gh` CLI is on PATH, use `gh pr comment <ref> --body-file
+ *      <summary>` (overwrites any prior vrt-marked comment via the
+ *      `marker` HTML comment).
+ *   2. Otherwise print the markdown with copy-paste instructions
+ *      so the operator can post it manually. Returns the exit code
+ *      from gh on success, 0 when we successfully printed the
+ *      fallback, or 1 on a hard error.
+ */
+async function postPrComment(opts: PostPrOptions): Promise<number> {
+  if (!existsSync(opts.summaryPath)) {
+    console.error(`${RED}error:${RESET} no summary at ${opts.summaryPath}`);
+    console.error(`Run \`vrt diff-pr\` first to produce the summary, or pass --summary <path>.`);
+    return 1;
+  }
+  const summary = await readFile(opts.summaryPath, "utf-8");
+  // Tag the comment so we (or the operator) can find it later for an
+  // overwrite. `gh pr comment` doesn't natively support edit-in-place,
+  // but the marker at least makes the comment recognizable.
+  const body = `<!-- ${opts.marker} -->\n${summary}`;
+  const decoratedPath = `${opts.summaryPath}.posted.md`;
+  await writeFile(decoratedPath, body);
+
+  if (!ghAvailable()) {
+    console.log(`${YELLOW}gh CLI not available — printing markdown for manual posting.${RESET}`);
+    console.log(`${DIM}Target PR: ${opts.prRef}${RESET}`);
+    console.log(`${DIM}Marker:    ${opts.marker} (use to locate / overwrite later)${RESET}`);
+    console.log(`${DIM}File:      ${decoratedPath}${RESET}`);
+    console.log();
+    console.log(`Once gh is installed (or pasted by hand):`);
+    console.log(`  gh pr comment ${opts.prRef} --body-file ${decoratedPath}`);
+    console.log();
+    console.log(`Or paste the contents below:`);
+    console.log(`${DIM}─────────────────────────────────────────────────────${RESET}`);
+    process.stdout.write(body);
+    console.log(`${DIM}─────────────────────────────────────────────────────${RESET}`);
+    return 0;
+  }
+
+  const result = spawnSync(
+    "gh",
+    ["pr", "comment", opts.prRef, "--body-file", decoratedPath],
+    { stdio: "inherit" },
+  );
+  if (result.status !== 0) {
+    console.error(`${RED}gh pr comment failed (exit ${result.status}).${RESET}`);
+    console.error(`Body left at ${decoratedPath} for manual retry.`);
+    return result.status ?? 1;
+  }
+  console.log(`${GREEN}✓${RESET} posted summary to PR ${opts.prRef}`);
+  return 0;
+}
+
+async function cmdPost(args: string[]): Promise<number> {
+  const prRef = getArg(args, "pr");
+  if (!prRef) {
+    console.error(`${RED}error:${RESET} --pr <ref> is required (e.g. owner/repo#123 or 123 inside the repo)`);
+    return 1;
+  }
+  const cwd = process.cwd();
+  const summaryFlag = getArg(args, "summary");
+  const summaryPath = summaryFlag
+    ? resolve(cwd, summaryFlag)
+    : resolve(cwd, ".vrt/runs/diff-pr/summary.md");
+  const marker = getArg(args, "marker") ?? "vrt-diff-pr-summary";
+  return postPrComment({ prRef, summaryPath, marker });
+}
+
 function formatUsage(): string {
   return `vrt diff-pr <command>
 
 Subcommands:
-  pin    [--config vrt.config.json]
-                              Capture baseline PNGs for every declared
-                              route into <baselineDir>/<route>/<vp>.png
+  pin    [route...] [--config vrt.config.json]
+                              Capture baseline PNGs for declared routes.
+                              No positional args → pin every route.
+                              Positional names → pin only those, leave
+                              the rest untouched (partial refresh).
+  post   --pr <ref> [--summary <path>] [--marker <id>]
+                              Post the most recent summary.md to a PR
+                              via gh CLI. Falls back to printing the
+                              markdown with copy-paste instructions
+                              when gh is not on PATH.
   (none) [--config vrt.config.json] [--output <dir>]
                               Diff every route's current rendering
                               against its pinned baseline; apply
@@ -337,6 +452,11 @@ async function main(argv = process.argv.slice(2)) {
   }
   if (command === "pin") {
     await cmdPin(argv.slice(1));
+    return;
+  }
+  if (command === "post") {
+    const code = await cmdPost(argv.slice(1));
+    if (code !== 0) process.exit(code);
     return;
   }
   // No subcommand or any other flags → diff run.

@@ -350,8 +350,52 @@ code is 0 on full pass / 1 on any uncovered breach.
                                  summary.md  →  PR comment
 ```
 
-Open follow-ups (drafted under `docs/issues-drafts/`):
+### `vrt diff-pr` vs `vrt workflow` — when to use which
 
-- per-route `vrt diff-pr pin <route>` (refresh just one baseline)
-- GitHub PR comment integration (`gh pr comment --body-file summary.md`)
-- unify with the existing `vrt workflow init/capture/approve` paths
+Two baseline workflows coexist intentionally; they serve different
+needs:
+
+| | `vrt diff-pr` | `vrt workflow` |
+|---|---|---|
+| audience | external project's CI gate | vrt's own dogfooding e2e harness |
+| capture | direct `chromium.launch()` + `page.goto()` per route | Playwright spec at `e2e/vrt-capture.spec.ts` |
+| baseline layout | `<baselineDir>/<route>/<viewport>.png` | flat `baselines/*.png` keyed by spec testId |
+| approval | per-rule manifest (`vrt manifest add`) + per-viewport threshold | bulk `cp snapshots → baselines` |
+| partial refresh | `vrt diff-pr pin <route>` (this commit) | not supported |
+| primary output | `summary.md` + per-route diff% | `output/report.json` with a11y deltas |
+
+Rule of thumb:
+
+- Pulling vrt into a new project: use **`vrt diff-pr`** with a
+  `vrt.config.json`. Pin on main, gate per PR. Author exceptions via
+  `vrt manifest`.
+- Working inside the vrt repo (this codebase) or extending its
+  test harness: use **`vrt workflow`**. It owns the e2e Playwright
+  spec and the a11y semantic check that `vrt diff-pr` doesn't.
+
+Unification under a single command surface is a future cleanup once
+both paths have settled. For now they share the same low-level
+pipeline (`migration-compare.ts`, `heatmap.ts`) and the same
+approval-manifest contract.
+
+### PR comment glue
+
+```
+vrt diff-pr post --pr <ref> [--summary <path>] [--marker <id>]
+```
+
+After running `vrt diff-pr`, post the generated `summary.md` to a
+PR via `gh pr comment`. If `gh` isn't on PATH the command prints
+the markdown with copy-paste instructions instead — useful for
+operators inspecting the gate output before committing to a
+public post.
+
+The body is tagged with an HTML-comment marker
+(`<!-- vrt-diff-pr-summary -->`) so a later iteration can find /
+overwrite the comment in place.
+
+Open follow-ups:
+
+- Edit-in-place for the PR comment (gh CLI doesn't natively
+  support it; needs the GitHub REST API)
+- Auto-derive the PR ref from the current branch when omitted
