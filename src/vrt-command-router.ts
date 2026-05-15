@@ -76,6 +76,7 @@ const ROOT_MODULE_COMMANDS: Record<string, string> = {
   "skill": "./skill.ts",
   "component-extract": "./component-extract.ts",
   "manifest": "./manifest-cli.ts",
+  "watch": "./watch.ts",
 };
 
 const WORKFLOW_ALIAS_COMMANDS = new Set<WorkflowCommand>([
@@ -135,6 +136,8 @@ Core Commands:
   snapshot approve            Promote accepted snapshot diffs to baselines
   manifest <command>          Author / inspect the approval manifest
                               (add | list | rm | check)
+  watch <before> <after>      Re-run compare on save + show round-vs-round
+                              suggestion deltas (newly introduced / resolved)
   elements [options]          Element-level comparison with shift isolation
   smoke <file-or-url>         A11y-driven smoke test
   discover <file>             Discover responsive breakpoints from HTML/CSS

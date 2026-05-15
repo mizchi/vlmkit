@@ -509,6 +509,16 @@ export interface MigrationCompareReport {
       }>;
     }>;
   }>;
+  /**
+   * Wireframe-mode fix suggestions emitted by
+   * `generateWireframeFixCandidates`. Persisted to the JSON report so
+   * `vrt watch` can compute "newly introduced vs resolved" deltas
+   * between rounds without re-deriving them.
+   */
+  wireframeFixSuggestions?: Array<{
+    variantFile: string;
+    suggestions: WireframeFixSuggestion[];
+  }>;
   results: MigrationCompareResult[];
   reportPath: string;
 }
@@ -898,6 +908,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       variantFile: string;
       perViewport: Array<{ viewport: string; baseline: PaletteColor[]; variant: PaletteColor[]; diff: PaletteDiff }>;
     }> = [];
+    const wireframeFixReports: Array<{ variantFile: string; suggestions: WireframeFixSuggestion[] }> = [];
     const stateDiffsReports: Array<{
       variantFile: string;
       perState: Array<{
@@ -1543,6 +1554,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           allViewports: VIEWPORTS.map((vp) => vp.label),
         });
         if (wireframeSuggestions.length > 0) {
+          wireframeFixReports.push({ variantFile: variantFileLabel, suggestions: wireframeSuggestions });
           // Sort divergent suggestions first — they're the highest-impact
           // "don't go global" signal an agent needs to see before acting.
           const sorted = [...wireframeSuggestions].sort((a, b) => {
@@ -1780,6 +1792,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       textRowShifts: textRowShiftsReports.length > 0 ? textRowShiftsReports : undefined,
       paletteDiffs: paletteDiffsReports.length > 0 ? paletteDiffsReports : undefined,
       stateDiffs: stateDiffsReports.length > 0 ? stateDiffsReports : undefined,
+      wireframeFixSuggestions: wireframeFixReports.length > 0 ? wireframeFixReports : undefined,
       results,
       reportPath,
     };
