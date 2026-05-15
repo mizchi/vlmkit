@@ -66,7 +66,7 @@ export interface A11yContrastReport {
   reportPath: string;
 }
 
-const SAMPLE_SCRIPT = `
+export const A11Y_CONTRAST_SAMPLE_SCRIPT = `
 (function a11ySample(minLen) {
   function parseColor(s) {
     if (!s) return null;
@@ -137,7 +137,7 @@ const SAMPLE_SCRIPT = `
 })
 `;
 
-interface RawSample {
+export interface A11yContrastRawSample {
   path: string;
   tag: string;
   text: string;
@@ -168,6 +168,39 @@ function contrastRatio(a: { r: number; g: number; b: number }, b: { r: number; g
 function toHex(c: { r: number; g: number; b: number }): string {
   const h = (n: number) => n.toString(16).padStart(2, "0");
   return `#${h(c.r)}${h(c.g)}${h(c.b)}`;
+}
+
+/**
+ * Build the list of contrast failures from raw samples (post-process
+ * step extracted from `runA11yContrast`). Pure — no I/O — so it can
+ * be invoked over Playwright pages owned by other modules (e.g. the
+ * `vrt diff-pr` CI gate calls this without spinning up a second
+ * browser instance per route).
+ */
+export function analyzeA11yContrastSamples(samples: A11yContrastRawSample[]): ContrastFinding[] {
+  const byPath = new Map<string, A11yContrastRawSample>();
+  for (const s of samples) if (!byPath.has(s.path)) byPath.set(s.path, s);
+  const findings: ContrastFinding[] = [];
+  for (const s of byPath.values()) {
+    const ratio = contrastRatio(s.foreground, s.background);
+    const { requiredAA, level } = classify(ratio, s.fontSize, s.fontWeight);
+    if (level !== "fail") continue;
+    findings.push({
+      path: s.path,
+      tag: s.tag,
+      text: s.text,
+      fontSize: s.fontSize,
+      fontWeight: s.fontWeight,
+      bbox: s.bbox,
+      foreground: { ...s.foreground, hex: toHex(s.foreground) },
+      background: { ...s.background, hex: toHex(s.background) },
+      ratio: Number(ratio.toFixed(2)),
+      requiredAA,
+      level,
+    });
+  }
+  findings.sort((a, b) => a.ratio - b.ratio);
+  return findings;
 }
 
 function classify(ratio: number, fontSize: number, fontWeight: number): { requiredAA: number; level: WcagLevel } {
@@ -205,7 +238,7 @@ export async function runA11yContrast(
   const minLen = options.minTextLength ?? 1;
 
   const browser = await chromium.launch();
-  let samples: RawSample[];
+  let samples: A11yContrastRawSample[];
   let screenshotPath: string;
   try {
     const page = await browser.newPage({ viewport });
@@ -213,7 +246,7 @@ export async function runA11yContrast(
     await page.addStyleTag({
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });
-    samples = await page.evaluate(`(${SAMPLE_SCRIPT})(${minLen})`) as RawSample[];
+    samples = await page.evaluate(`(${A11Y_CONTRAST_SAMPLE_SCRIPT})(${minLen})`) as A11yContrastRawSample[];
     screenshotPath = join(outputDir, "page.png");
     await page.screenshot({ path: screenshotPath, fullPage: false });
     await page.close();
@@ -223,7 +256,7 @@ export async function runA11yContrast(
 
   // Dedupe by path — many text nodes from the same element produce
   // identical findings.
-  const byPath = new Map<string, RawSample>();
+  const byPath = new Map<string, A11yContrastRawSample>();
   for (const s of samples) {
     if (!byPath.has(s.path)) byPath.set(s.path, s);
   }

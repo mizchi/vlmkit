@@ -33,13 +33,17 @@ import {
   configBaseDir,
   findConfigPath,
   loadDiffPrConfig,
+  resolveA11yPolicy,
   resolveThreshold,
   type DiffPrConfig,
   type DiffPrRoute,
 } from "./diff-pr-config.ts";
 import { compareScreenshots } from "./heatmap.ts";
+import { runA11yOnPage } from "./a11y-on-page.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "./terminal-colors.ts";
 import type { VrtSnapshot } from "./types.ts";
+import type { ContrastFinding } from "./a11y-contrast.ts";
+import type { TouchTargetFinding } from "./a11y-touch.ts";
 
 // Same defaults as migration-compare's STATIC_VIEWPORTS so a baseline
 // pinned with one CLI is comparable with the other.
@@ -59,6 +63,18 @@ interface PerViewportResult {
   baselinePath?: string;
   variantPath?: string;
   heatmapPath?: string;
+  /**
+   * Populated when the project's vrt.config declares an `a11y` block
+   * (or the route overrides). Undefined for visual-only gating.
+   */
+  a11y?: {
+    contrastFailures: ContrastFinding[];
+    touchFailures: TouchTargetFinding[];
+    maxContrast: number;
+    maxTouch: number;
+    contrastPass: boolean;
+    touchPass: boolean;
+  };
 }
 
 interface PerRouteResult {
@@ -93,6 +109,11 @@ function viewportSpecsFor(config: DiffPrConfig): Array<{ label: string; width: n
   return out.length > 0 ? out : DEFAULT_VIEWPORTS;
 }
 
+interface RenderResult {
+  contrastFailures: ContrastFinding[];
+  touchFailures: TouchTargetFinding[];
+}
+
 async function renderViewport(
   browser: Browser,
   url: string,
@@ -100,7 +121,8 @@ async function renderViewport(
   height: number,
   outputPath: string,
   waitFor?: string,
-): Promise<void> {
+  a11y?: ReturnType<typeof resolveA11yPolicy>,
+): Promise<RenderResult> {
   const page = await browser.newPage({ viewport: { width, height } });
   try {
     await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
@@ -108,6 +130,15 @@ async function renderViewport(
       await page.locator(waitFor).first().waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
     }
     await page.screenshot({ path: outputPath, fullPage: true });
+    if (a11y) {
+      const r = await runA11yOnPage(page, {
+        contrast: a11y.contrast,
+        touch: a11y.touch,
+        touchLevel: a11y.level === "AAA" ? "AAA" : "AA",
+      });
+      return r;
+    }
+    return { contrastFailures: [], touchFailures: [] };
   } finally {
     await page.close();
   }
@@ -165,6 +196,9 @@ async function cmdPin(args: string[]): Promise<void> {
       let success = 0;
       for (const vp of viewports) {
         try {
+          // a11y is intentionally NOT computed during `pin` — the
+          // baseline PNG is what we care about. CI's `vrt diff-pr`
+          // (no pin) runs the a11y checks against the live render.
           await renderViewport(browser, route.url, vp.width, vp.height, join(dir, `${vp.label}.png`), route.waitFor);
           success++;
         } catch (err) {
@@ -217,13 +251,18 @@ async function cmdRun(args: string[]): Promise<number> {
       const routeOut = resolve(outputDir, route.name);
       await mkdir(routeOut, { recursive: true });
 
+      const a11yPolicy = resolveA11yPolicy(config, route);
       const perVp: PerViewportResult[] = [];
       for (const vp of viewports) {
         const baselinePath = join(baselineDir, `${vp.label}.png`);
         if (!existsSync(baselinePath)) continue;
         const variantPath = join(routeOut, `${vp.label}.png`);
+        let renderRes: RenderResult;
         try {
-          await renderViewport(browser, route.url, vp.width, vp.height, variantPath, route.waitFor);
+          renderRes = await renderViewport(
+            browser, route.url, vp.width, vp.height,
+            variantPath, route.waitFor, a11yPolicy,
+          );
         } catch (err) {
           perVp.push({
             viewport: vp.label,
@@ -249,16 +288,35 @@ async function cmdRun(args: string[]): Promise<number> {
         const diffPixels = diff?.diffPixels ?? 0;
         const totalPixels = diff?.totalPixels ?? 0;
         const threshold = resolveThreshold(config, route, vp.label);
+        const visualPass = diffRatio <= threshold;
+        let a11y: PerViewportResult["a11y"];
+        let a11yPass = true;
+        if (a11yPolicy) {
+          const maxContrast = a11yPolicy.maxContrastFailures ?? 0;
+          const maxTouch = a11yPolicy.maxTouchFailures ?? 0;
+          const contrastPass = renderRes.contrastFailures.length <= maxContrast;
+          const touchPass = renderRes.touchFailures.length <= maxTouch;
+          a11y = {
+            contrastFailures: renderRes.contrastFailures,
+            touchFailures: renderRes.touchFailures,
+            maxContrast,
+            maxTouch,
+            contrastPass,
+            touchPass,
+          };
+          a11yPass = contrastPass && touchPass;
+        }
         perVp.push({
           viewport: vp.label,
           diffRatio,
           diffPixels,
           totalPixels,
           threshold,
-          pass: diffRatio <= threshold,
+          pass: visualPass && a11yPass,
           baselinePath,
           variantPath,
           heatmapPath: diff?.heatmapPath,
+          a11y,
         });
       }
 
@@ -266,7 +324,10 @@ async function cmdRun(args: string[]): Promise<number> {
       const status = failed ? `${RED}FAIL${RESET}` : `${GREEN}pass${RESET}`;
       const breakdown = perVp.map((v) => {
         const tag = v.pass ? GREEN : RED;
-        return `${tag}${v.viewport}=${pctStr(v.diffRatio)}${RESET}`;
+        const a11ySuffix = v.a11y
+          ? ` ${DIM}[a11y c=${v.a11y.contrastFailures.length}/t=${v.a11y.touchFailures.length}]${RESET}`
+          : "";
+        return `${tag}${v.viewport}=${pctStr(v.diffRatio)}${RESET}${a11ySuffix}`;
       }).join(" ");
       console.log(`  ${route.name.padEnd(20)} ${status}  ${breakdown}`);
       results.push({ route, viewports: perVp, failed });
@@ -300,21 +361,37 @@ export function buildMarkdownSummary(config: DiffPrConfig, results: PerRouteResu
   lines.push(`Status: ${overall}`);
   if (config.configPath) lines.push(`Config: \`${config.configPath}\``);
   lines.push("");
-  lines.push("| route | viewport | diff% | threshold | status |");
-  lines.push("|---|---|---|---|---|");
+  const anyA11y = results.some((r) => r.viewports.some((v) => v.a11y));
+  if (anyA11y) {
+    lines.push("| route | viewport | diff% | threshold | a11y (contrast / touch) | status |");
+    lines.push("|---|---|---|---|---|---|");
+  } else {
+    lines.push("| route | viewport | diff% | threshold | status |");
+    lines.push("|---|---|---|---|---|");
+  }
   for (const r of results) {
     if (r.viewports.length === 0) {
-      lines.push(`| \`${r.route.name}\` | — | — | — | ❌ ${r.error ?? "no result"} |`);
+      const filler = anyA11y ? " | —" : "";
+      lines.push(`| \`${r.route.name}\` | — | — | —${filler} | ❌ ${r.error ?? "no result"} |`);
       continue;
     }
     for (const vp of r.viewports) {
       const icon = vp.pass ? "✅" : "❌";
-      lines.push(`| \`${r.route.name}\` | ${vp.viewport} | ${pctStr(vp.diffRatio)} | ${pctStr(vp.threshold)} | ${icon} |`);
+      if (anyA11y) {
+        const a11yCell = vp.a11y
+          ? `${vp.a11y.contrastFailures.length}/${vp.a11y.maxContrast} · ${vp.a11y.touchFailures.length}/${vp.a11y.maxTouch}`
+          : "—";
+        lines.push(`| \`${r.route.name}\` | ${vp.viewport} | ${pctStr(vp.diffRatio)} | ${pctStr(vp.threshold)} | ${a11yCell} | ${icon} |`);
+      } else {
+        lines.push(`| \`${r.route.name}\` | ${vp.viewport} | ${pctStr(vp.diffRatio)} | ${pctStr(vp.threshold)} | ${icon} |`);
+      }
     }
   }
-  // Surface the worst offenders for quick eyeballing.
+  // Surface the worst visual offenders for quick eyeballing.
   const overThreshold = results
-    .flatMap((r) => r.viewports.filter((v) => !v.pass).map((v) => ({ route: r.route.name, vp: v })))
+    .flatMap((r) => r.viewports
+      .filter((v) => v.diffRatio > v.threshold)
+      .map((v) => ({ route: r.route.name, vp: v })))
     .sort((a, b) => (b.vp.diffRatio - b.vp.threshold) - (a.vp.diffRatio - a.vp.threshold))
     .slice(0, 5);
   if (overThreshold.length > 0) {
@@ -327,6 +404,36 @@ export function buildMarkdownSummary(config: DiffPrConfig, results: PerRouteResu
         `(${over.toFixed(2)}pp over threshold ${pctStr(o.vp.threshold)})`);
     }
   }
+
+  // A11y findings — list contrast / touch failures when the gate fired.
+  const a11yFailRows: Array<{ route: string; vp: PerViewportResult }> = [];
+  for (const r of results) {
+    for (const v of r.viewports) {
+      if (v.a11y && (!v.a11y.contrastPass || !v.a11y.touchPass)) {
+        a11yFailRows.push({ route: r.route.name, vp: v });
+      }
+    }
+  }
+  if (a11yFailRows.length > 0) {
+    lines.push("");
+    lines.push("## A11y failures");
+    lines.push("");
+    for (const { route, vp } of a11yFailRows.slice(0, 5)) {
+      if (vp.a11y && !vp.a11y.contrastPass) {
+        const top = vp.a11y.contrastFailures.slice(0, 3)
+          .map((f) => `\`${f.path}\` ${f.ratio.toFixed(2)}:1 (need ${f.requiredAA})`)
+          .join("; ");
+        lines.push(`- \`${route}\` / ${vp.viewport} — **contrast** ${vp.a11y.contrastFailures.length} > ${vp.a11y.maxContrast}: ${top}`);
+      }
+      if (vp.a11y && !vp.a11y.touchPass) {
+        const top = vp.a11y.touchFailures.slice(0, 3)
+          .map((f) => `\`${f.path}\` ${f.minSide}px < ${f.required}px`)
+          .join("; ");
+        lines.push(`- \`${route}\` / ${vp.viewport} — **touch** ${vp.a11y.touchFailures.length} > ${vp.a11y.maxTouch}: ${top}`);
+      }
+    }
+  }
+
   lines.push("");
   return lines.join("\n");
 }

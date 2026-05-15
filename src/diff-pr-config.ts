@@ -24,6 +24,20 @@ export interface DiffPrRoute {
   thresholds?: Record<string, number>;
   /** Optional waitFor selector (parity with capture config). */
   waitFor?: string;
+  /** Per-route override of the project-level a11y policy. */
+  a11y?: A11yPolicy;
+}
+
+export interface A11yPolicy {
+  /** "AA" → 24×24 touch targets / 4.5:1 contrast; "AAA" → 44×44 / 7:1. */
+  level?: "AA" | "AAA";
+  /** Max contrast failures allowed per route+viewport. Default 0. */
+  maxContrastFailures?: number;
+  /** Max touch-target failures allowed per route+viewport. Default 0. */
+  maxTouchFailures?: number;
+  /** Toggle individual checks. Both default on when `a11y` is declared. */
+  contrast?: boolean;
+  touch?: boolean;
 }
 
 export interface DiffPrConfig {
@@ -34,6 +48,12 @@ export interface DiffPrConfig {
   tokens?: string;
   approvalPath?: string;
   baselineDir: string;
+  /**
+   * When present, `vrt diff-pr` runs the contrast + touch a11y
+   * checks per route+viewport and fails on threshold breach. Omit
+   * to skip a11y entirely (purely visual gate).
+   */
+  a11y?: A11yPolicy;
   /** Resolved path of the file the config was loaded from (diag only). */
   configPath?: string;
 }
@@ -85,7 +105,51 @@ export function parseDiffPrConfig(raw: string, configPath?: string): DiffPrConfi
     tokens,
     approvalPath,
     baselineDir,
+    a11y: parseA11yPolicy(obj.a11y, "a11y"),
     configPath,
+  };
+}
+
+function parseA11yPolicy(value: unknown, label: string): A11yPolicy | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${label} must be an object`);
+  }
+  const r = value as Record<string, unknown>;
+  const level = asOptionalString(r.level, `${label}.level`);
+  if (level !== undefined && level !== "AA" && level !== "AAA") {
+    throw new Error(`${label}.level must be "AA" or "AAA"`);
+  }
+  const num = (v: unknown, k: string) => {
+    if (v === undefined || v === null) return undefined;
+    if (typeof v !== "number" || Number.isNaN(v) || v < 0) {
+      throw new Error(`${label}.${k} must be a non-negative number`);
+    }
+    return v;
+  };
+  const bool = (v: unknown, k: string) => {
+    if (v === undefined || v === null) return undefined;
+    if (typeof v !== "boolean") throw new Error(`${label}.${k} must be boolean`);
+    return v;
+  };
+  return {
+    level: level as A11yPolicy["level"],
+    maxContrastFailures: num(r.maxContrastFailures, "maxContrastFailures"),
+    maxTouchFailures: num(r.maxTouchFailures, "maxTouchFailures"),
+    contrast: bool(r.contrast, "contrast"),
+    touch: bool(r.touch, "touch"),
+  };
+}
+
+/** Resolve effective a11y policy for a route by merging route over project. */
+export function resolveA11yPolicy(config: DiffPrConfig, route: DiffPrRoute): A11yPolicy | undefined {
+  if (!config.a11y && !route.a11y) return undefined;
+  return {
+    level: route.a11y?.level ?? config.a11y?.level ?? "AA",
+    maxContrastFailures: route.a11y?.maxContrastFailures ?? config.a11y?.maxContrastFailures ?? 0,
+    maxTouchFailures: route.a11y?.maxTouchFailures ?? config.a11y?.maxTouchFailures ?? 0,
+    contrast: route.a11y?.contrast ?? config.a11y?.contrast ?? true,
+    touch: route.a11y?.touch ?? config.a11y?.touch ?? true,
   };
 }
 
@@ -122,11 +186,13 @@ function parseRoute(value: unknown, index: number, baseUrl: string | undefined):
   const name = asOptionalString(r.name, `routes[${index}].name`) ?? routeNameFromUrl(fullUrl);
   const waitFor = asOptionalString(r.waitFor ?? r.wait_for, `routes[${index}].waitFor`);
   const thresholds = parseThresholds(r.thresholds);
+  const a11y = parseA11yPolicy(r.a11y, `routes[${index}].a11y`);
   return {
     name,
     url: fullUrl,
     waitFor,
     thresholds: Object.keys(thresholds).length > 0 ? thresholds : undefined,
+    a11y,
   };
 }
 
