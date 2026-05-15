@@ -46,6 +46,7 @@ import type { VrtSnapshot } from "./types.ts";
 import type { ContrastFinding } from "./a11y-contrast.ts";
 import type { TouchTargetFinding } from "./a11y-touch.ts";
 import type { FocusOrderFinding } from "./a11y-focus-order.ts";
+import type { SemanticFinding } from "./a11y-semantic-checks.ts";
 
 // Same defaults as migration-compare's STATIC_VIEWPORTS so a baseline
 // pinned with one CLI is comparable with the other.
@@ -73,12 +74,15 @@ interface PerViewportResult {
     contrastFailures: ContrastFinding[];
     touchFailures: TouchTargetFinding[];
     focusOrderFailures: FocusOrderFinding[];
+    semanticFailures: SemanticFinding[];
     maxContrast: number;
     maxTouch: number;
     maxFocusOrder: number;
+    maxSemantic: number;
     contrastPass: boolean;
     touchPass: boolean;
     focusOrderPass: boolean;
+    semanticPass: boolean;
   };
 }
 
@@ -118,6 +122,7 @@ interface RenderResult {
   contrastFailures: ContrastFinding[];
   touchFailures: TouchTargetFinding[];
   focusOrderFailures: FocusOrderFinding[];
+  semanticFailures: SemanticFinding[];
 }
 
 async function renderViewport(
@@ -141,11 +146,12 @@ async function renderViewport(
         contrast: a11y.contrast,
         touch: a11y.touch,
         focusOrder: a11y.focusOrder,
+        semantic: a11y.semantic,
         touchLevel: a11y.level === "AAA" ? "AAA" : "AA",
       });
       return r;
     }
-    return { contrastFailures: [], touchFailures: [], focusOrderFailures: [] };
+    return { contrastFailures: [], touchFailures: [], focusOrderFailures: [], semanticFailures: [] };
   } finally {
     await page.close();
   }
@@ -328,24 +334,28 @@ async function cmdRun(args: string[]): Promise<number> {
             path: f.message,
           }));
           const focusOrderSet = filterA11yFindings(focusOrderForFilter, manifest, "a11y-focus-order");
-          // Unwrap to original FocusOrderFinding shape (drop the
-          // synthesized `path`).
           const focusOrderKept = focusOrderSet.kept.map(({ path: _, ...rest }) => rest as FocusOrderFinding);
+          const semanticSet = filterA11yFindings(renderRes.semanticFailures, manifest, "a11y-semantic");
+          const maxSemantic = a11yPolicy.maxSemanticFailures ?? 0;
           const contrastPass = contrastSet.kept.length <= maxContrast;
           const touchPass = touchSet.kept.length <= maxTouch;
           const focusOrderPass = focusOrderKept.length <= maxFocusOrder;
+          const semanticPass = semanticSet.kept.length <= maxSemantic;
           a11y = {
             contrastFailures: contrastSet.kept,
             touchFailures: touchSet.kept,
             focusOrderFailures: focusOrderKept,
+            semanticFailures: semanticSet.kept,
             maxContrast,
             maxTouch,
             maxFocusOrder,
+            maxSemantic,
             contrastPass,
             touchPass,
             focusOrderPass,
+            semanticPass,
           };
-          a11yPass = contrastPass && touchPass && focusOrderPass;
+          a11yPass = contrastPass && touchPass && focusOrderPass && semanticPass;
         }
         perVp.push({
           viewport: vp.label,
@@ -366,7 +376,7 @@ async function cmdRun(args: string[]): Promise<number> {
       const breakdown = perVp.map((v) => {
         const tag = v.pass ? GREEN : RED;
         const a11ySuffix = v.a11y
-          ? ` ${DIM}[a11y c=${v.a11y.contrastFailures.length}/t=${v.a11y.touchFailures.length}/f=${v.a11y.focusOrderFailures.length}]${RESET}`
+          ? ` ${DIM}[a11y c=${v.a11y.contrastFailures.length}/t=${v.a11y.touchFailures.length}/f=${v.a11y.focusOrderFailures.length}/s=${v.a11y.semanticFailures.length}]${RESET}`
           : "";
         return `${tag}${v.viewport}=${pctStr(v.diffRatio)}${RESET}${a11ySuffix}`;
       }).join(" ");
@@ -404,7 +414,7 @@ export function buildMarkdownSummary(config: DiffPrConfig, results: PerRouteResu
   lines.push("");
   const anyA11y = results.some((r) => r.viewports.some((v) => v.a11y));
   if (anyA11y) {
-    lines.push("| route | viewport | diff% | threshold | a11y (contrast / touch / focus) | status |");
+    lines.push("| route | viewport | diff% | threshold | a11y (contrast / touch / focus / semantic) | status |");
     lines.push("|---|---|---|---|---|---|");
   } else {
     lines.push("| route | viewport | diff% | threshold | status |");
@@ -420,7 +430,7 @@ export function buildMarkdownSummary(config: DiffPrConfig, results: PerRouteResu
       const icon = vp.pass ? "✅" : "❌";
       if (anyA11y) {
         const a11yCell = vp.a11y
-          ? `${vp.a11y.contrastFailures.length}/${vp.a11y.maxContrast} · ${vp.a11y.touchFailures.length}/${vp.a11y.maxTouch} · ${vp.a11y.focusOrderFailures.length}/${vp.a11y.maxFocusOrder}`
+          ? `${vp.a11y.contrastFailures.length}/${vp.a11y.maxContrast} · ${vp.a11y.touchFailures.length}/${vp.a11y.maxTouch} · ${vp.a11y.focusOrderFailures.length}/${vp.a11y.maxFocusOrder} · ${vp.a11y.semanticFailures.length}/${vp.a11y.maxSemantic}`
           : "—";
         lines.push(`| \`${r.route.name}\` | ${vp.viewport} | ${pctStr(vp.diffRatio)} | ${pctStr(vp.threshold)} | ${a11yCell} | ${icon} |`);
       } else {
@@ -450,7 +460,7 @@ export function buildMarkdownSummary(config: DiffPrConfig, results: PerRouteResu
   const a11yFailRows: Array<{ route: string; vp: PerViewportResult }> = [];
   for (const r of results) {
     for (const v of r.viewports) {
-      if (v.a11y && (!v.a11y.contrastPass || !v.a11y.touchPass || !v.a11y.focusOrderPass)) {
+      if (v.a11y && (!v.a11y.contrastPass || !v.a11y.touchPass || !v.a11y.focusOrderPass || !v.a11y.semanticPass)) {
         a11yFailRows.push({ route: r.route.name, vp: v });
       }
     }
@@ -477,6 +487,12 @@ export function buildMarkdownSummary(config: DiffPrConfig, results: PerRouteResu
           .map((f) => `${f.kind} (step ${f.fromIndex}→${f.toIndex})`)
           .join("; ");
         lines.push(`- \`${route}\` / ${vp.viewport} — **focus-order** ${vp.a11y.focusOrderFailures.length} > ${vp.a11y.maxFocusOrder}: ${top}`);
+      }
+      if (vp.a11y && !vp.a11y.semanticPass) {
+        const top = vp.a11y.semanticFailures.slice(0, 3)
+          .map((f) => `[${f.kind}] \`${f.path}\``)
+          .join("; ");
+        lines.push(`- \`${route}\` / ${vp.viewport} — **semantic** ${vp.a11y.semanticFailures.length} > ${vp.a11y.maxSemantic}: ${top}`);
       }
     }
   }

@@ -27,6 +27,12 @@ import {
   collectFocusStepsOnPage,
   type FocusOrderFinding,
 } from "./a11y-focus-order.ts";
+import {
+  A11Y_SEMANTIC_SAMPLE_SCRIPT,
+  analyzeA11ySemanticSamples,
+  type A11ySemanticRawSample,
+  type SemanticFinding,
+} from "./a11y-semantic-checks.ts";
 
 export interface OnPageA11yOptions {
   minTextLength?: number;
@@ -39,12 +45,19 @@ export interface OnPageA11yOptions {
   touch?: boolean;
   focusOrder?: boolean;
   focusOrderMaxSteps?: number;
+  /**
+   * Heading-hierarchy + form-label + image-alt static checks.
+   * Cheap (one extra page.evaluate) — safe to default on once a
+   * project opts into the a11y gate.
+   */
+  semantic?: boolean;
 }
 
 export interface OnPageA11yResult {
   contrastFailures: ContrastFinding[];
   touchFailures: TouchTargetFinding[];
   focusOrderFailures: FocusOrderFinding[];
+  semanticFailures: SemanticFinding[];
 }
 
 const NEUTRALIZE_ANIMATIONS = `*, *::before, *::after {
@@ -75,6 +88,7 @@ export async function runA11yOnPage(
   let contrastFailures: ContrastFinding[] = [];
   let touchFailures: TouchTargetFinding[] = [];
   let focusOrderFailures: FocusOrderFinding[] = [];
+  let semanticFailures: SemanticFinding[] = [];
 
   if (runContrast) {
     const samples = await page.evaluate(
@@ -86,6 +100,12 @@ export async function runA11yOnPage(
     const samples = await page.evaluate(A11Y_TOUCH_SAMPLE_SCRIPT) as A11yTouchRawSample[];
     touchFailures = analyzeA11yTouchSamples(samples, touchLevel);
   }
+  // Semantic check runs before focus-order so we don't snapshot a
+  // page mid-Tab. Cheap one-shot evaluate.
+  if (options.semantic ?? true) {
+    const sample = await page.evaluate(A11Y_SEMANTIC_SAMPLE_SCRIPT) as A11ySemanticRawSample;
+    semanticFailures = analyzeA11ySemanticSamples(sample);
+  }
   // Focus order is intentionally run LAST — it mutates the page's
   // focus state via Tab presses, which would invalidate subsequent
   // computed-style / bbox sampling. Caller pages downstream of this
@@ -95,5 +115,5 @@ export async function runA11yOnPage(
     const steps = await collectFocusStepsOnPage(page, maxSteps);
     focusOrderFailures = analyzeFocusOrderSteps(steps);
   }
-  return { contrastFailures, touchFailures, focusOrderFailures };
+  return { contrastFailures, touchFailures, focusOrderFailures, semanticFailures };
 }

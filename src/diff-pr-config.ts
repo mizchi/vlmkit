@@ -37,6 +37,8 @@ export interface A11yPolicy {
   maxTouchFailures?: number;
   /** Max focus-order findings (trap / reverse / skip-row) per route+viewport. Default 0. */
   maxFocusOrderFailures?: number;
+  /** Max semantic findings (heading-hierarchy / form-label / image-alt). Default 0. */
+  maxSemanticFailures?: number;
   /** Toggle individual checks. All default on when `a11y` is declared. */
   contrast?: boolean;
   touch?: boolean;
@@ -47,6 +49,11 @@ export interface A11yPolicy {
    * pixel screenshot capture.
    */
   focusOrder?: boolean;
+  /**
+   * Heading-hierarchy / form-label / image-alt static DOM checks.
+   * Cheap; default ON.
+   */
+  semantic?: boolean;
 }
 
 export interface DiffPrConfig {
@@ -146,9 +153,11 @@ function parseA11yPolicy(value: unknown, label: string): A11yPolicy | undefined 
     maxContrastFailures: num(r.maxContrastFailures, "maxContrastFailures"),
     maxTouchFailures: num(r.maxTouchFailures, "maxTouchFailures"),
     maxFocusOrderFailures: num(r.maxFocusOrderFailures, "maxFocusOrderFailures"),
+    maxSemanticFailures: num(r.maxSemanticFailures, "maxSemanticFailures"),
     contrast: bool(r.contrast, "contrast"),
     touch: bool(r.touch, "touch"),
     focusOrder: bool(r.focusOrder, "focusOrder"),
+    semantic: bool(r.semantic, "semantic"),
   };
 }
 
@@ -160,9 +169,11 @@ export function resolveA11yPolicy(config: DiffPrConfig, route: DiffPrRoute): A11
     maxContrastFailures: route.a11y?.maxContrastFailures ?? config.a11y?.maxContrastFailures ?? 0,
     maxTouchFailures: route.a11y?.maxTouchFailures ?? config.a11y?.maxTouchFailures ?? 0,
     maxFocusOrderFailures: route.a11y?.maxFocusOrderFailures ?? config.a11y?.maxFocusOrderFailures ?? 0,
+    maxSemanticFailures: route.a11y?.maxSemanticFailures ?? config.a11y?.maxSemanticFailures ?? 0,
     contrast: route.a11y?.contrast ?? config.a11y?.contrast ?? true,
     touch: route.a11y?.touch ?? config.a11y?.touch ?? true,
     focusOrder: route.a11y?.focusOrder ?? config.a11y?.focusOrder ?? false,
+    semantic: route.a11y?.semantic ?? config.a11y?.semantic ?? true,
   };
 }
 
