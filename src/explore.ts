@@ -187,14 +187,16 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
   await mkdir(outputDir, { recursive: true });
   const viewport = options.viewport ?? { width: 1280, height: 720 };
   const threshold = options.threshold ?? 0.03;
-  // The dead-action / silent-handler classification uses the larger of
-  // the user's --threshold and a 0.001 absolute floor. Earlier versions
-  // hardcoded 0.001 here, which surprised callers who raised
-  // --threshold and expected the dead-action gate to move with it
-  // (cold-start dogfood 2026-05-15 #A). The floor stays at 0.001 so
-  // pathologically-low --threshold values don't silently treat real
-  // visible changes as dead.
-  const silentFloor = Math.max(threshold, 0.001);
+  // The dead-action / silent-handler cutoff is intentionally NOT
+  // `--threshold`. --threshold is the pixelmatch noise floor used by
+  // compareScreenshots; the silent cutoff is a stricter "essentially
+  // zero" floor that distinguishes "the click did nothing visible"
+  // from "the click produced a legitimate small change like a focus
+  // ring." If we honored --threshold here, a 1-2% focus paint with
+  // default --threshold 0.03 would be misclassified as dead and flip
+  // --strict / --strict-timing to non-zero exit — exactly the
+  // regression PR #13 review (Codex) flagged. Kept as a constant.
+  const silentFloor = 0.001;
   const waitAfter = options.waitAfterAction ?? 200;
   const html = isUrl(options.source) ? null : await readFile(resolve(options.source), "utf-8");
 
@@ -424,8 +426,12 @@ function renderReport(r: Omit<ExploreReport, "reportPath">): string {
   // column would be all em-dashes and just clutter the report.
   const showMut = r.strictTiming;
   if (showMut) {
+    // The silent cutoff is independent of --threshold; --threshold is
+    // the pixelmatch noise floor used for the diff itself, while this
+    // 0.001 cutoff is "did anything happen at all". Spelled out in the
+    // preamble so the value is auditable without reading source.
     lines.push(`Silent / dead cutoff: Δ < ${(r.silentFloor * 100).toFixed(2)}% ` +
-      `(max of \`--threshold\` and the 0.001 absolute floor).`);
+      `(constant; independent of \`--threshold\`).`);
     lines.push("");
   }
   const header = showMut
@@ -491,6 +497,9 @@ function printUsage(): void {
   console.log("                       flagged distinctly from an off-screen change");
   console.log("                       (mutations > 0 + 0 px delta). Adds ~5ms/action");
   console.log("                       and exits non-zero on any silent handler.");
+  console.log("                       The Δ-0 cutoff is 0.001 (constant — NOT");
+  console.log("                       --threshold, which is the pixelmatch noise floor");
+  console.log("                       used for the diff itself).");
   console.log("  --output-dir <dir>   Default: ./test-results/explore");
   console.log("  --report <path>      Markdown report path");
   console.log("");
