@@ -85,7 +85,7 @@ function parseArgs(argv: string[]) {
   return { positional, outputDir, report, maxSteps };
 }
 
-const SAMPLE_FOCUSED_SCRIPT = `
+export const A11Y_FOCUS_ORDER_SAMPLE_SCRIPT = `
 (function focused() {
   const el = document.activeElement;
   if (!el || el === document.body || el === document.documentElement) return null;
@@ -115,6 +115,84 @@ const SAMPLE_FOCUSED_SCRIPT = `
   };
 })()
 `;
+
+/**
+ * Walk Tab focus on an already-navigated Playwright Page and return
+ * the focus sequence. Pulled out of `runFocusOrder` so `vrt diff-pr`
+ * can reuse it without launching a second browser. The page is left
+ * in whatever focus state Tab ended in — callers that need the
+ * pristine page should clone it first.
+ */
+export async function collectFocusStepsOnPage(
+  page: Page,
+  maxSteps = 64,
+): Promise<FocusStep[]> {
+  const steps: FocusStep[] = [];
+  let firstFingerprint: string | null = null;
+  for (let i = 0; i < maxSteps; i++) {
+    await page.keyboard.press("Tab");
+    const sample = await page.evaluate(A11Y_FOCUS_ORDER_SAMPLE_SCRIPT) as Omit<FocusStep, "tabIndex"> | null;
+    if (!sample) break;
+    // Cycle detection: path + bbox together. Path alone aliases
+    // sibling elements (3 buttons all serialize to "button"), which
+    // would false-cycle on the first sibling jump. Bbox makes the
+    // fingerprint position-aware.
+    const fp = `${sample.path}@${sample.bbox.x.toFixed(0)},${sample.bbox.y.toFixed(0)}`;
+    if (firstFingerprint === null) firstFingerprint = fp;
+    else if (fp === firstFingerprint && i > 0) break;
+    steps.push({ tabIndex: i, ...sample });
+  }
+  return steps;
+}
+
+/**
+ * Detect focus-order findings from a captured step sequence. Pure
+ * post-process — extracted from `runFocusOrder`. Heuristics are
+ * deliberately conservative (24 px / 40 px / 16 px thresholds) to
+ * avoid false positives on normal layouts. See the comments inside
+ * `runFocusOrder` for the rationale.
+ */
+export function analyzeFocusOrderSteps(steps: FocusStep[]): FocusOrderFinding[] {
+  const findings: FocusOrderFinding[] = [];
+  for (let i = 1; i < steps.length; i++) {
+    const prev = steps[i - 1]!;
+    const cur = steps[i]!;
+    const samePath = prev.path === cur.path;
+    const sameBbox = Math.abs(prev.bbox.x - cur.bbox.x) < 4
+      && Math.abs(prev.bbox.y - cur.bbox.y) < 4;
+    if (samePath && sameBbox) {
+      findings.push({
+        kind: "trap",
+        fromIndex: i - 1, toIndex: i,
+        message: `Focus stayed on the same element (\`${cur.path}\`) across two Tab presses.`,
+      });
+      continue;
+    }
+    const dy = cur.bbox.y - prev.bbox.y;
+    const dx = cur.bbox.x - prev.bbox.x;
+    const sameRow = Math.abs(dy) <= 16;
+    if (sameRow && dx < -40) {
+      findings.push({
+        kind: "reverse",
+        fromIndex: i - 1, toIndex: i,
+        message: `Focus moved left within the same row (from \`${prev.path}\` at x=${prev.bbox.x.toFixed(0)} to \`${cur.path}\` at x=${cur.bbox.x.toFixed(0)}). Visual order is L-to-R; check \`tabindex\` or DOM order.`,
+      });
+    } else if (dy < -24) {
+      findings.push({
+        kind: "reverse",
+        fromIndex: i - 1, toIndex: i,
+        message: `Focus moved up by ${(-dy).toFixed(0)}px (from \`${prev.path}\` at y=${prev.bbox.y.toFixed(0)} to \`${cur.path}\` at y=${cur.bbox.y.toFixed(0)}). Visual order is top-to-bottom; check \`tabindex\` or DOM order.`,
+      });
+    } else if (dy > 200) {
+      findings.push({
+        kind: "skip-row",
+        fromIndex: i - 1, toIndex: i,
+        message: `Focus jumped down by ${dy.toFixed(0)}px (from \`${prev.path}\` to \`${cur.path}\`). Confirm no focusable element was unintentionally skipped.`,
+      });
+    }
+  }
+  return findings;
+}
 
 export async function runFocusOrder(
   options: FocusOrderOptions,
@@ -148,7 +226,7 @@ export async function runFocusOrder(
     let firstPath: string | null = null;
     for (let i = 0; i < maxSteps; i++) {
       await page.keyboard.press("Tab");
-      const sample = await page.evaluate(SAMPLE_FOCUSED_SCRIPT) as Omit<FocusStep, "tabIndex"> | null;
+      const sample = await page.evaluate(A11Y_FOCUS_ORDER_SAMPLE_SCRIPT) as Omit<FocusStep, "tabIndex"> | null;
       if (!sample) break;
       if (firstPath === null) firstPath = sample.path;
       else if (sample.path === firstPath && i > 0) break;  // cycled

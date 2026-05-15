@@ -138,14 +138,17 @@ async function cmdAdd(args: string[]): Promise<void> {
   // A11y short-hand: --a11y-contrast / --a11y-touch sets `kind` so
   // the rule suppresses a11y findings instead of pixel/paint diffs.
   // These flags require a --selector (the path-substring matcher).
-  let kind: "visual" | "a11y-contrast" | "a11y-touch" | undefined;
-  if (hasFlag(args, "a11y-contrast") && hasFlag(args, "a11y-touch")) {
-    console.error(`${RED}error:${RESET} cannot specify both --a11y-contrast and --a11y-touch`);
+  let kind: "visual" | "a11y-contrast" | "a11y-touch" | "a11y-focus-order" | undefined;
+  const a11yFlags = [
+    hasFlag(args, "a11y-contrast") ? "a11y-contrast" : null,
+    hasFlag(args, "a11y-touch") ? "a11y-touch" : null,
+    hasFlag(args, "a11y-focus-order") ? "a11y-focus-order" : null,
+  ].filter(Boolean) as Array<"a11y-contrast" | "a11y-touch" | "a11y-focus-order">;
+  if (a11yFlags.length > 1) {
+    console.error(`${RED}error:${RESET} only one of --a11y-contrast / --a11y-touch / --a11y-focus-order at a time`);
     process.exit(1);
-  } else if (hasFlag(args, "a11y-contrast")) {
-    kind = "a11y-contrast";
-  } else if (hasFlag(args, "a11y-touch")) {
-    kind = "a11y-touch";
+  } else if (a11yFlags.length === 1) {
+    kind = a11yFlags[0];
   }
   if (kind && !selector) {
     console.error(`${RED}error:${RESET} ${kind} rules require --selector (path-substring matcher)`);

@@ -35,9 +35,18 @@ export interface A11yPolicy {
   maxContrastFailures?: number;
   /** Max touch-target failures allowed per route+viewport. Default 0. */
   maxTouchFailures?: number;
-  /** Toggle individual checks. Both default on when `a11y` is declared. */
+  /** Max focus-order findings (trap / reverse / skip-row) per route+viewport. Default 0. */
+  maxFocusOrderFailures?: number;
+  /** Toggle individual checks. All default on when `a11y` is declared. */
   contrast?: boolean;
   touch?: boolean;
+  /**
+   * Focus-order check runs Tab cycling and is slower (~1-2s per route+
+   * viewport). Default OFF to keep CI fast; opt in with `"focusOrder":
+   * true`. The check mutates page focus state, so it runs after the
+   * pixel screenshot capture.
+   */
+  focusOrder?: boolean;
 }
 
 export interface DiffPrConfig {
@@ -136,8 +145,10 @@ function parseA11yPolicy(value: unknown, label: string): A11yPolicy | undefined 
     level: level as A11yPolicy["level"],
     maxContrastFailures: num(r.maxContrastFailures, "maxContrastFailures"),
     maxTouchFailures: num(r.maxTouchFailures, "maxTouchFailures"),
+    maxFocusOrderFailures: num(r.maxFocusOrderFailures, "maxFocusOrderFailures"),
     contrast: bool(r.contrast, "contrast"),
     touch: bool(r.touch, "touch"),
+    focusOrder: bool(r.focusOrder, "focusOrder"),
   };
 }
 
@@ -148,8 +159,10 @@ export function resolveA11yPolicy(config: DiffPrConfig, route: DiffPrRoute): A11
     level: route.a11y?.level ?? config.a11y?.level ?? "AA",
     maxContrastFailures: route.a11y?.maxContrastFailures ?? config.a11y?.maxContrastFailures ?? 0,
     maxTouchFailures: route.a11y?.maxTouchFailures ?? config.a11y?.maxTouchFailures ?? 0,
+    maxFocusOrderFailures: route.a11y?.maxFocusOrderFailures ?? config.a11y?.maxFocusOrderFailures ?? 0,
     contrast: route.a11y?.contrast ?? config.a11y?.contrast ?? true,
     touch: route.a11y?.touch ?? config.a11y?.touch ?? true,
+    focusOrder: route.a11y?.focusOrder ?? config.a11y?.focusOrder ?? false,
   };
 }
 

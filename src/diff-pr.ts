@@ -45,6 +45,7 @@ import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "./terminal-colors.ts
 import type { VrtSnapshot } from "./types.ts";
 import type { ContrastFinding } from "./a11y-contrast.ts";
 import type { TouchTargetFinding } from "./a11y-touch.ts";
+import type { FocusOrderFinding } from "./a11y-focus-order.ts";
 
 // Same defaults as migration-compare's STATIC_VIEWPORTS so a baseline
 // pinned with one CLI is comparable with the other.
@@ -71,10 +72,13 @@ interface PerViewportResult {
   a11y?: {
     contrastFailures: ContrastFinding[];
     touchFailures: TouchTargetFinding[];
+    focusOrderFailures: FocusOrderFinding[];
     maxContrast: number;
     maxTouch: number;
+    maxFocusOrder: number;
     contrastPass: boolean;
     touchPass: boolean;
+    focusOrderPass: boolean;
   };
 }
 
@@ -113,6 +117,7 @@ function viewportSpecsFor(config: DiffPrConfig): Array<{ label: string; width: n
 interface RenderResult {
   contrastFailures: ContrastFinding[];
   touchFailures: TouchTargetFinding[];
+  focusOrderFailures: FocusOrderFinding[];
 }
 
 async function renderViewport(
@@ -135,11 +140,12 @@ async function renderViewport(
       const r = await runA11yOnPage(page, {
         contrast: a11y.contrast,
         touch: a11y.touch,
+        focusOrder: a11y.focusOrder,
         touchLevel: a11y.level === "AAA" ? "AAA" : "AA",
       });
       return r;
     }
-    return { contrastFailures: [], touchFailures: [] };
+    return { contrastFailures: [], touchFailures: [], focusOrderFailures: [] };
   } finally {
     await page.close();
   }
@@ -309,24 +315,37 @@ async function cmdRun(args: string[]): Promise<number> {
         if (a11yPolicy) {
           const maxContrast = a11yPolicy.maxContrastFailures ?? 0;
           const maxTouch = a11yPolicy.maxTouchFailures ?? 0;
-          // Subtract approval-manifest a11y suppressions before
-          // applying the policy. A rule with kind: "a11y-contrast"
-          // whose selector substring matches a finding's `path` drops
-          // that finding from the gate (but it still appears in the
-          // optional verbose output for transparency).
+          const maxFocusOrder = a11yPolicy.maxFocusOrderFailures ?? 0;
           const contrastSet = filterA11yFindings(renderRes.contrastFailures, manifest, "a11y-contrast");
           const touchSet = filterA11yFindings(renderRes.touchFailures, manifest, "a11y-touch");
+          // Focus-order findings use `from`/`to` indices, not a
+          // `path` — filterA11yFindings expects a `path` shape. We
+          // synthesize a path-like message field for filtering.
+          const focusOrderForFilter = renderRes.focusOrderFailures.map((f) => ({
+            ...f,
+            // Manifest matchers run substring against `path`; use the
+            // message which contains the affected selector(s).
+            path: f.message,
+          }));
+          const focusOrderSet = filterA11yFindings(focusOrderForFilter, manifest, "a11y-focus-order");
+          // Unwrap to original FocusOrderFinding shape (drop the
+          // synthesized `path`).
+          const focusOrderKept = focusOrderSet.kept.map(({ path: _, ...rest }) => rest as FocusOrderFinding);
           const contrastPass = contrastSet.kept.length <= maxContrast;
           const touchPass = touchSet.kept.length <= maxTouch;
+          const focusOrderPass = focusOrderKept.length <= maxFocusOrder;
           a11y = {
             contrastFailures: contrastSet.kept,
             touchFailures: touchSet.kept,
+            focusOrderFailures: focusOrderKept,
             maxContrast,
             maxTouch,
+            maxFocusOrder,
             contrastPass,
             touchPass,
+            focusOrderPass,
           };
-          a11yPass = contrastPass && touchPass;
+          a11yPass = contrastPass && touchPass && focusOrderPass;
         }
         perVp.push({
           viewport: vp.label,
@@ -347,7 +366,7 @@ async function cmdRun(args: string[]): Promise<number> {
       const breakdown = perVp.map((v) => {
         const tag = v.pass ? GREEN : RED;
         const a11ySuffix = v.a11y
-          ? ` ${DIM}[a11y c=${v.a11y.contrastFailures.length}/t=${v.a11y.touchFailures.length}]${RESET}`
+          ? ` ${DIM}[a11y c=${v.a11y.contrastFailures.length}/t=${v.a11y.touchFailures.length}/f=${v.a11y.focusOrderFailures.length}]${RESET}`
           : "";
         return `${tag}${v.viewport}=${pctStr(v.diffRatio)}${RESET}${a11ySuffix}`;
       }).join(" ");
@@ -385,7 +404,7 @@ export function buildMarkdownSummary(config: DiffPrConfig, results: PerRouteResu
   lines.push("");
   const anyA11y = results.some((r) => r.viewports.some((v) => v.a11y));
   if (anyA11y) {
-    lines.push("| route | viewport | diff% | threshold | a11y (contrast / touch) | status |");
+    lines.push("| route | viewport | diff% | threshold | a11y (contrast / touch / focus) | status |");
     lines.push("|---|---|---|---|---|---|");
   } else {
     lines.push("| route | viewport | diff% | threshold | status |");
@@ -401,7 +420,7 @@ export function buildMarkdownSummary(config: DiffPrConfig, results: PerRouteResu
       const icon = vp.pass ? "✅" : "❌";
       if (anyA11y) {
         const a11yCell = vp.a11y
-          ? `${vp.a11y.contrastFailures.length}/${vp.a11y.maxContrast} · ${vp.a11y.touchFailures.length}/${vp.a11y.maxTouch}`
+          ? `${vp.a11y.contrastFailures.length}/${vp.a11y.maxContrast} · ${vp.a11y.touchFailures.length}/${vp.a11y.maxTouch} · ${vp.a11y.focusOrderFailures.length}/${vp.a11y.maxFocusOrder}`
           : "—";
         lines.push(`| \`${r.route.name}\` | ${vp.viewport} | ${pctStr(vp.diffRatio)} | ${pctStr(vp.threshold)} | ${a11yCell} | ${icon} |`);
       } else {
@@ -431,7 +450,7 @@ export function buildMarkdownSummary(config: DiffPrConfig, results: PerRouteResu
   const a11yFailRows: Array<{ route: string; vp: PerViewportResult }> = [];
   for (const r of results) {
     for (const v of r.viewports) {
-      if (v.a11y && (!v.a11y.contrastPass || !v.a11y.touchPass)) {
+      if (v.a11y && (!v.a11y.contrastPass || !v.a11y.touchPass || !v.a11y.focusOrderPass)) {
         a11yFailRows.push({ route: r.route.name, vp: v });
       }
     }
@@ -452,6 +471,12 @@ export function buildMarkdownSummary(config: DiffPrConfig, results: PerRouteResu
           .map((f) => `\`${f.path}\` ${f.minSide}px < ${f.required}px`)
           .join("; ");
         lines.push(`- \`${route}\` / ${vp.viewport} — **touch** ${vp.a11y.touchFailures.length} > ${vp.a11y.maxTouch}: ${top}`);
+      }
+      if (vp.a11y && !vp.a11y.focusOrderPass) {
+        const top = vp.a11y.focusOrderFailures.slice(0, 3)
+          .map((f) => `${f.kind} (step ${f.fromIndex}→${f.toIndex})`)
+          .join("; ");
+        lines.push(`- \`${route}\` / ${vp.viewport} — **focus-order** ${vp.a11y.focusOrderFailures.length} > ${vp.a11y.maxFocusOrder}: ${top}`);
       }
     }
   }

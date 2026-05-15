@@ -8,7 +8,7 @@ export interface ApprovalManifest {
   rules: ApprovalRule[];
 }
 
-export type ApprovalRuleKind = "visual" | "a11y-contrast" | "a11y-touch";
+export type ApprovalRuleKind = "visual" | "a11y-contrast" | "a11y-touch" | "a11y-focus-order";
 
 export interface ApprovalRule {
   /**
@@ -357,8 +357,14 @@ function validateApprovalRule(value: unknown, index: number): ApprovalRule {
   const expires = asOptionalString(rule.expires, `approval.rules[${index}].expires`);
   if (expires) parseExpiry(expires);
   const kindRaw = asOptionalString(rule.kind, `approval.rules[${index}].kind`);
-  if (kindRaw !== undefined && kindRaw !== "visual" && kindRaw !== "a11y-contrast" && kindRaw !== "a11y-touch") {
-    throw new Error(`approval.rules[${index}].kind must be "visual", "a11y-contrast", or "a11y-touch"`);
+  if (
+    kindRaw !== undefined
+    && kindRaw !== "visual"
+    && kindRaw !== "a11y-contrast"
+    && kindRaw !== "a11y-touch"
+    && kindRaw !== "a11y-focus-order"
+  ) {
+    throw new Error(`approval.rules[${index}].kind must be one of: visual, a11y-contrast, a11y-touch, a11y-focus-order`);
   }
   const kind = kindRaw as ApprovalRuleKind | undefined;
 
@@ -387,7 +393,7 @@ function validateApprovalRule(value: unknown, index: number): ApprovalRule {
 export function filterA11yFindings<T extends { path: string }>(
   findings: T[],
   manifest: ApprovalManifest | null | undefined,
-  kind: "a11y-contrast" | "a11y-touch",
+  kind: "a11y-contrast" | "a11y-touch" | "a11y-focus-order",
 ): { kept: T[]; suppressed: Array<{ finding: T; rule: ApprovalRule }> } {
   if (!manifest) return { kept: findings, suppressed: [] };
   const now = new Date();

@@ -22,6 +22,11 @@ import {
   type TouchTargetFinding,
   type WcagTouchLevel,
 } from "./a11y-touch.ts";
+import {
+  analyzeFocusOrderSteps,
+  collectFocusStepsOnPage,
+  type FocusOrderFinding,
+} from "./a11y-focus-order.ts";
 
 export interface OnPageA11yOptions {
   minTextLength?: number;
@@ -32,11 +37,14 @@ export interface OnPageA11yOptions {
    */
   contrast?: boolean;
   touch?: boolean;
+  focusOrder?: boolean;
+  focusOrderMaxSteps?: number;
 }
 
 export interface OnPageA11yResult {
   contrastFailures: ContrastFinding[];
   touchFailures: TouchTargetFinding[];
+  focusOrderFailures: FocusOrderFinding[];
 }
 
 const NEUTRALIZE_ANIMATIONS = `*, *::before, *::after {
@@ -66,6 +74,7 @@ export async function runA11yOnPage(
 
   let contrastFailures: ContrastFinding[] = [];
   let touchFailures: TouchTargetFinding[] = [];
+  let focusOrderFailures: FocusOrderFinding[] = [];
 
   if (runContrast) {
     const samples = await page.evaluate(
@@ -77,5 +86,14 @@ export async function runA11yOnPage(
     const samples = await page.evaluate(A11Y_TOUCH_SAMPLE_SCRIPT) as A11yTouchRawSample[];
     touchFailures = analyzeA11yTouchSamples(samples, touchLevel);
   }
-  return { contrastFailures, touchFailures };
+  // Focus order is intentionally run LAST — it mutates the page's
+  // focus state via Tab presses, which would invalidate subsequent
+  // computed-style / bbox sampling. Caller pages downstream of this
+  // (e.g. screenshots) should be aware that focus is non-null.
+  if (options.focusOrder ?? false) {
+    const maxSteps = options.focusOrderMaxSteps ?? 64;
+    const steps = await collectFocusStepsOnPage(page, maxSteps);
+    focusOrderFailures = analyzeFocusOrderSteps(steps);
+  }
+  return { contrastFailures, touchFailures, focusOrderFailures };
 }
