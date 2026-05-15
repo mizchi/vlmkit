@@ -251,3 +251,107 @@ Refactoring is deferred. First:
 2. Add new features following the new structure
 3. Leave existing code as-is since it works
 4. Batch refactor when packaging as npm
+
+## Design-md Scenario Loop (added 2026-05-15)
+
+Three subcommands now cover the full UI-implementation lifecycle.
+
+### Dev inner loop: `vrt compare` + `vrt watch`
+
+```
+vrt compare <baseline> <variant> [--tokens DESIGN.md]
+vrt watch   <baseline> <variant> [--tokens DESIGN.md]
+```
+
+`vrt compare` does a one-shot diff and prints:
+
+- per-viewport diff %
+- **wireframe fix suggestions** with scope tags:
+  - `[DIVERGENT]` — opposite-sign deltas across viewports → media query needed
+  - `[MAG-DIVERGENT]` — same-sign but materially different magnitudes → per-viewport values
+  - `[SUBSET]` — only some viewports affected → media query
+  - (no tag) — `all` scope, safe global edit
+- candidate CSS rule per suggestion (from DOM-position-diff layer)
+- triptych PNG per viewport (`baseline | variant | heatmap`)
+- token-snapped values when `--tokens` points at a DESIGN.md
+
+`vrt watch` wraps that in a file-watcher with debounce + a
+**round-vs-round delta**: when the developer or agent saves a file,
+the next run lists which suggestions became newly-introduced (= your
+last edit regressed something), resolved, or persisted.
+
+### Approval authoring: `vrt manifest`
+
+```
+vrt manifest add    --reason "..." --selector .foo [--max-px 2] [--expires DATE]
+vrt manifest add    --from-run <output-dir> [--auto-tiny | --top N | --all]
+vrt manifest list   [--path approval.json]
+vrt manifest rm     <index | selector>
+vrt manifest check  # CI hook — exit non-zero on expired rules
+```
+
+`add --from-run` synthesizes rules from a recent compare run's
+wireframe-fix suggestions: each rule names a real selector lifted
+from the suggestion's `candidates[0]`. Default filter is
+low-confidence ∧ |Δ|≤2px (sub-pixel AA jitter); use `--top N` to
+broaden.
+
+Manifest entries are consumed by the existing `vrt compare`
+`approvalManifest` plumbing — they're subtracted from the
+reported diff before the threshold gate fires.
+
+### CI gate: `vrt diff-pr`
+
+```
+vrt diff-pr pin       # on main: capture baselines for every route
+vrt diff-pr           # in PR build: diff each route against pinned baseline
+```
+
+Reads `vrt.config.json`:
+
+```json
+{
+  "baseUrl": "http://localhost:3000",
+  "thresholds": { "mobile": 0.01, "desktop": 0.005, "wide": 0.005 },
+  "tokens": "./DESIGN.md",
+  "approvalPath": "./approval.json",
+  "baselineDir": ".vrt/baselines",
+  "routes": [
+    "/",
+    { "name": "admin", "path": "/admin",
+      "thresholds": { "mobile": 0.03 } }
+  ]
+}
+```
+
+Per-route threshold overrides the top-level threshold; both default
+to mobile=1% / desktop=wide=0.5%. Routes accept bare paths (joined
+to `baseUrl`) or full URLs (including `file://`).
+
+Output: per-route per-viewport diff% in the terminal, plus
+`<output>/summary.md` suitable for pasting into a PR comment. Exit
+code is 0 on full pass / 1 on any uncovered breach.
+
+### Loop tying
+
+```
+     dev time                       CI time
+     ──────────                     ────────
+   vrt compare ──────┐
+     (rich signals)   │
+                      │   on main:
+   vrt watch ─────────┤         vrt diff-pr pin
+     (round delta)    │              (seed baselines)
+                      │
+   vrt manifest add ──┤   in PR:
+     (acknowledge)    │         vrt diff-pr
+                      └→        (gate vs pinned)
+                                    ↓
+                                 summary.md  →  PR comment
+```
+
+Open follow-ups (drafted under `docs/issues-drafts/`):
+
+- per-route `vrt diff-pr pin <route>` (refresh just one baseline)
+- GitHub PR comment integration (`gh pr comment --body-file summary.md`)
+- unify with the existing `vrt workflow init/capture/approve` paths
