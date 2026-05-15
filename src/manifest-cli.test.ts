@@ -146,3 +146,108 @@ describe("vrt manifest CLI", () => {
     assert.match(r.stderr, /Unknown manifest subcommand/);
   });
 });
+
+const FAKE_REPORT = {
+  wireframeFixSuggestions: [
+    {
+      variantFile: "v.html",
+      suggestions: [
+        {
+          evidence: "component rank=0: Δtop +1px on mobile",
+          suggestion: "...",
+          viewports: ["mobile"],
+          confidence: "low",
+          deltaPx: 1,
+          scope: "subset",
+          candidates: [
+            { selector: ".hero__body", property: "padding-top",
+              baselineValue: "24px", variantValue: "25px", viewport: "mobile" },
+          ],
+        },
+        {
+          evidence: "component rank=1: Δtop +24px on desktop",
+          suggestion: "...",
+          viewports: ["desktop"],
+          confidence: "high",
+          deltaPx: 24,
+          scope: "subset",
+          candidates: [
+            { selector: ".profile", property: "margin-top",
+              baselineValue: "0px", variantValue: "24px", viewport: "desktop" },
+          ],
+        },
+        {
+          evidence: "component rank=2: Δtop +1px on mobile (no DP candidate)",
+          suggestion: "...",
+          viewports: ["mobile"],
+          confidence: "low",
+          deltaPx: 1,
+          scope: "subset",
+          candidates: [],
+        },
+      ],
+    },
+  ],
+};
+
+describe("vrt manifest add --from-run", () => {
+  let runDir: string;
+  let manifestPathFromRun: string;
+
+  before(async () => {
+    runDir = await mkdtemp(join(tmpdir(), "vrt-manifest-fromrun-"));
+    await writeFile(join(runDir, "migration-report.json"), JSON.stringify(FAKE_REPORT, null, 2));
+    manifestPathFromRun = join(runDir, "manifest.json");
+  });
+
+  after(async () => {
+    await rm(runDir, { recursive: true, force: true });
+  });
+
+  it("default filter (low ∧ |Δ|≤2) auto-acknowledges sub-pixel suggestions with candidates", async () => {
+    const r = cli("add", "--from-run", runDir, "--reason", "AA jitter",
+      "--expires", "2026-08-15", "--path", manifestPathFromRun);
+    assert.equal(r.status, 0);
+    const m = JSON.parse(await readFile(manifestPathFromRun, "utf-8"));
+    // suggestion 1: low + 1px + has candidate → added
+    // suggestion 2: high + 24px → filtered out by default
+    // suggestion 3: low + 1px + no candidate → skipped
+    assert.equal(m.rules.length, 1);
+    assert.equal(m.rules[0].selector, ".hero__body");
+    assert.equal(m.rules[0].property, "padding-top");
+    assert.equal(m.rules[0].tolerance.pixels, 2);
+    assert.equal(m.rules[0].expires, "2026-08-15");
+    assert.match(m.rules[0].reason, /AA jitter/);
+    assert.match(r.stdout, /Skipped 1/);
+  });
+
+  it("--top N broadens to the first N suggestions regardless of confidence", async () => {
+    const fresh = join(runDir, "top.json");
+    const r = cli("add", "--from-run", runDir, "--top", "2",
+      "--reason", "acknowledged", "--path", fresh);
+    assert.equal(r.status, 0);
+    const m = JSON.parse(await readFile(fresh, "utf-8"));
+    assert.equal(m.rules.length, 2);
+    assert.ok(m.rules.find((r: { selector: string }) => r.selector === ".profile"));
+  });
+
+  it("--dry-run does not write the manifest", async () => {
+    const fresh = join(runDir, "dry.json");
+    const r = cli("add", "--from-run", runDir, "--top", "1", "--dry-run",
+      "--reason", "noop", "--path", fresh);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /dry-run/);
+    assert.throws(() => readFileSyncOrEmpty(fresh));
+  });
+
+  it("errors when migration-report.json is missing", () => {
+    const r = cli("add", "--from-run", "/nonexistent/path",
+      "--path", manifestPathFromRun);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /no migration-report\.json/);
+  });
+});
+
+function readFileSyncOrEmpty(path: string): string {
+  return require("node:fs").readFileSync(path, "utf-8");
+}

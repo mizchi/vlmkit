@@ -117,6 +117,11 @@ async function cmdList(args: string[]): Promise<void> {
 async function cmdAdd(args: string[]): Promise<void> {
   const path = resolve(getArg(args, "path") ?? DEFAULT_MANIFEST_PATH);
 
+  const fromRun = getArg(args, "from-run");
+  if (fromRun) {
+    return cmdAddFromRun(args, fromRun, path);
+  }
+
   const reason = getArg(args, "reason");
   if (!reason) {
     console.error(`${RED}error:${RESET} --reason is required`);
@@ -172,6 +177,130 @@ async function cmdAdd(args: string[]): Promise<void> {
   console.log(`  ${describeMatcher(rule)}`);
   console.log(`  reason: ${reason}`);
   if (expires) console.log(`  ${DIM}expires: ${expires}${RESET}`);
+}
+
+interface RunWireframeSuggestion {
+  evidence: string;
+  suggestion: string;
+  viewports: string[];
+  confidence: "low" | "medium" | "high";
+  deltaPx: number;
+  scope: "all" | "subset" | "divergent" | "magnitude-divergent";
+  candidates?: Array<{
+    selector: string;
+    property: string;
+    baselineValue: string;
+    variantValue: string;
+    viewport: string;
+  }>;
+}
+
+interface MigrationReport {
+  wireframeFixSuggestions?: Array<{
+    variantFile: string;
+    suggestions: RunWireframeSuggestion[];
+  }>;
+}
+
+async function cmdAddFromRun(args: string[], runDir: string, manifestPath: string): Promise<void> {
+  // Locate the migration-report.json — accept either the file or
+  // the dir that contains it.
+  const reportPath = runDir.endsWith(".json")
+    ? resolve(runDir)
+    : resolve(runDir, "migration-report.json");
+  if (!existsSync(reportPath)) {
+    console.error(`${RED}error:${RESET} no migration-report.json at ${reportPath}`);
+    process.exit(1);
+  }
+  const report = JSON.parse(await readFile(reportPath, "utf-8")) as MigrationReport;
+  const suggestions = (report.wireframeFixSuggestions ?? [])
+    .flatMap((g) => g.suggestions);
+  if (suggestions.length === 0) {
+    console.log(`${DIM}No wireframe-fix suggestions in ${reportPath} — nothing to add.${RESET}`);
+    return;
+  }
+
+  // Filter mode (default: only [low]-confidence tiny deltas, i.e. AA jitter)
+  const autoTiny = hasFlag(args, "auto-tiny");
+  const top = getArg(args, "top");
+  const topN = top ? Math.max(1, parseInt(top, 10)) : 0;
+  const allFlag = hasFlag(args, "all");
+  const filteredSuggestions = (() => {
+    if (allFlag) return suggestions;
+    if (topN > 0) return suggestions.slice(0, topN);
+    if (autoTiny) return suggestions.filter((s) => s.confidence === "low" && Math.abs(s.deltaPx) <= 2);
+    // Default: low-confidence + tiny — the safest auto-acknowledgement.
+    return suggestions.filter((s) => s.confidence === "low" && Math.abs(s.deltaPx) <= 2);
+  })();
+
+  if (filteredSuggestions.length === 0) {
+    console.log(`${DIM}No suggestions matched the filter (default: low confidence ∧ |Δ|≤2px).${RESET}`);
+    console.log(`${DIM}Hint: --top N or --all to broaden, --auto-tiny to be explicit.${RESET}`);
+    return;
+  }
+
+  const baseReason = getArg(args, "reason") ?? "auto-acknowledged from vrt diff (rule needs a human-readable reason on next edit)";
+  const expires = getArg(args, "expires");
+  const maxPx = getArg(args, "max-px");
+  const tolerancePixels = maxPx ? Number(maxPx) : 2;
+
+  // For each suggestion, pick a candidate selector — first preference,
+  // then synthesize from the evidence string if no candidates were
+  // resolved (image-only suggestions sometimes have no DP match).
+  const newRules: ApprovalRule[] = [];
+  const skipped: Array<{ suggestion: RunWireframeSuggestion; why: string }> = [];
+  for (const s of filteredSuggestions) {
+    const cand = s.candidates?.[0];
+    if (!cand) {
+      skipped.push({ suggestion: s, why: "no candidate selector (image-only signal)" });
+      continue;
+    }
+    const reason = `${baseReason} [from-run: ${s.confidence} ${s.scope} Δ${s.deltaPx}px on ${s.viewports.join(",")}]`;
+    const rule: ApprovalRule = {
+      selector: cand.selector,
+      property: cand.property,
+      tolerance: { pixels: tolerancePixels },
+      reason,
+    };
+    if (expires) rule.expires = expires;
+    newRules.push(rule);
+  }
+
+  if (newRules.length === 0) {
+    console.log(`${YELLOW}No rules synthesized — all filtered suggestions lacked a candidate selector.${RESET}`);
+    if (skipped.length > 0) {
+      console.log(`${DIM}Skipped ${skipped.length}:${RESET}`);
+      for (const { suggestion, why } of skipped.slice(0, 3)) {
+        console.log(`  ${DIM}- ${suggestion.evidence.slice(0, 80)} (${why})${RESET}`);
+      }
+    }
+    return;
+  }
+
+  if (hasFlag(args, "dry-run")) {
+    console.log(`${DIM}--dry-run: would add ${newRules.length} rule(s) to ${manifestPath}:${RESET}`);
+    for (const rule of newRules) {
+      console.log(`  ${describeMatcher(rule)}`);
+      console.log(`    ${DIM}${rule.reason}${RESET}`);
+    }
+    return;
+  }
+
+  const existing = await loadManifestOrEmpty(manifestPath);
+  const merged = mergeApprovalManifest(existing, newRules);
+  await writeManifest(manifestPath, merged);
+  console.log(`${GREEN}✓${RESET} added ${newRules.length} rule(s) to ${manifestPath} ` +
+    `${DIM}(${merged.rules.length} total)${RESET}`);
+  for (const rule of newRules.slice(0, 5)) {
+    console.log(`  ${describeMatcher(rule)}`);
+  }
+  if (newRules.length > 5) console.log(`  ${DIM}... ${newRules.length - 5} more${RESET}`);
+  if (skipped.length > 0) {
+    console.log(`${DIM}Skipped ${skipped.length} (no candidate selector):${RESET}`);
+    for (const { suggestion, why } of skipped.slice(0, 3)) {
+      console.log(`  ${DIM}- ${suggestion.evidence.slice(0, 80)} (${why})${RESET}`);
+    }
+  }
 }
 
 async function cmdRm(args: string[]): Promise<void> {
@@ -263,6 +392,14 @@ Subcommands:
          [--expires YYYY-MM-DD] [--issue <url>] [--path approval.json]
          [--dry-run]
                               Author an approval rule
+  add    --from-run <dir-or-json> [--auto-tiny | --top N | --all]
+         [--reason "..."] [--expires YYYY-MM-DD] [--max-px N]
+         [--path approval.json] [--dry-run]
+                              Synthesize rules from a recent compare run's
+                              wireframe-fix suggestions (uses each
+                              suggestion's candidate selector). Default
+                              filter: [low]-confidence ∧ |Δ|≤2px (AA
+                              jitter — safe auto-acknowledgement).
   rm     <index | selector> [--path approval.json] [--dry-run]
                               Remove a rule
   check  [--path approval.json]
