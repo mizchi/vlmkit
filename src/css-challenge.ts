@@ -24,6 +24,7 @@ import { createLLMProvider } from "./llm-client.ts";
 import type { A11yNode, VrtSnapshot } from "./types.ts";
 import { getArg, hasFlag } from "./cli-args.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "./terminal-colors.ts";
+import { handleCliError } from "./cli-error.ts";
 
 // ---- Config ----
 
@@ -543,8 +544,7 @@ async function cleanup() {
 main().catch((error) => {
   if (isPlaywrightSandboxRestrictionError(error)) {
     console.error(formatPlaywrightLaunchError(error, { commandHint: "in your local terminal or in CI" }));
-  } else {
-    console.error(error);
+    process.exit(1);
   }
-  process.exit(1);
+  handleCliError(error);
 });

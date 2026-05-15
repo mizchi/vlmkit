@@ -20,6 +20,7 @@ import {
 import { getCssBenchApprovalSuggestionsPath } from "./css-challenge-fixtures.ts";
 import { getArg, hasFlag } from "./cli-args.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD } from "./terminal-colors.ts";
+import { handleCliError } from "./cli-error.ts";
 
 const FIXTURE = getArg("fixture", "page");
 const INPUT_PATH = getArg("input", getCssBenchApprovalSuggestionsPath(FIXTURE));
@@ -184,7 +185,4 @@ function formatRule(rule: ApprovalRule): string {
   return parts.join(" ");
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+main().catch(handleCliError);

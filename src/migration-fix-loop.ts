@@ -17,6 +17,7 @@ import {
   type SelectedMigrationFixTarget,
 } from "./migration-fix-loop-core.ts";
 import { getArg, hasFlag } from "./cli-args.ts";
+import { handleCliError } from "./cli-error.ts";
 
 const REPORT_PATH = resolve(getArg("report", join(process.cwd(), "test-results", "migration", "migration-report.json")));
 const VARIANT_FILTER = getArg("variant");
@@ -192,7 +193,4 @@ function buildRerunOptions(
   };
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+main().catch(handleCliError);

@@ -46,6 +46,7 @@ import {
 } from "./multi-state.ts";
 import type { VrtSnapshot } from "./types.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "./terminal-colors.ts";
+import { handleCliError } from "./cli-error.ts";
 
 export interface ComponentFromImageOptions {
   targetImagePath: string;
@@ -795,8 +796,5 @@ async function main(argv = process.argv.slice(2)) {
 
 const isCliEntry = process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false;
 if (isCliEntry) {
-  main().catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
+  main().catch(handleCliError);
 }
