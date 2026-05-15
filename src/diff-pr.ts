@@ -40,6 +40,7 @@ import {
 } from "./diff-pr-config.ts";
 import { compareScreenshots } from "./heatmap.ts";
 import { runA11yOnPage } from "./a11y-on-page.ts";
+import { filterA11yFindings, loadApprovalManifest, type ApprovalManifest } from "./approval.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "./terminal-colors.ts";
 import type { VrtSnapshot } from "./types.ts";
 import type { ContrastFinding } from "./a11y-contrast.ts";
@@ -225,8 +226,22 @@ async function cmdRun(args: string[]): Promise<number> {
   const outputDir = resolve(cwd, getArg(args, "output") ?? ".vrt/runs/diff-pr");
   await mkdir(outputDir, { recursive: true });
 
+  // Optional approval manifest — suppresses both visual (existing
+  // tolerance contract) and a11y findings (rules with
+  // kind: "a11y-contrast" / "a11y-touch", added by this commit).
+  let manifest: ApprovalManifest | null = null;
+  if (config.approvalPath) {
+    const manifestPath = resolve(configBaseDir(config), config.approvalPath);
+    if (existsSync(manifestPath)) {
+      try { manifest = await loadApprovalManifest(manifestPath); } catch (err) {
+        console.log(`${YELLOW}warn: approval manifest at ${manifestPath} failed to load: ${String(err)}${RESET}`);
+      }
+    }
+  }
+
   console.log(`${BOLD}${CYAN}vrt diff-pr${RESET}  ${DIM}${configPath}${RESET}`);
   console.log(`${DIM}  ${config.routes.length} route(s); thresholds ${JSON.stringify(config.thresholds)}${RESET}`);
+  if (manifest) console.log(`${DIM}  approval manifest: ${manifest.rules.length} rule(s)${RESET}`);
   console.log();
 
   const viewports = viewportSpecsFor(config);
@@ -294,11 +309,18 @@ async function cmdRun(args: string[]): Promise<number> {
         if (a11yPolicy) {
           const maxContrast = a11yPolicy.maxContrastFailures ?? 0;
           const maxTouch = a11yPolicy.maxTouchFailures ?? 0;
-          const contrastPass = renderRes.contrastFailures.length <= maxContrast;
-          const touchPass = renderRes.touchFailures.length <= maxTouch;
+          // Subtract approval-manifest a11y suppressions before
+          // applying the policy. A rule with kind: "a11y-contrast"
+          // whose selector substring matches a finding's `path` drops
+          // that finding from the gate (but it still appears in the
+          // optional verbose output for transparency).
+          const contrastSet = filterA11yFindings(renderRes.contrastFailures, manifest, "a11y-contrast");
+          const touchSet = filterA11yFindings(renderRes.touchFailures, manifest, "a11y-touch");
+          const contrastPass = contrastSet.kept.length <= maxContrast;
+          const touchPass = touchSet.kept.length <= maxTouch;
           a11y = {
-            contrastFailures: renderRes.contrastFailures,
-            touchFailures: renderRes.touchFailures,
+            contrastFailures: contrastSet.kept,
+            touchFailures: touchSet.kept,
             maxContrast,
             maxTouch,
             contrastPass,

@@ -66,6 +66,7 @@ function isExpired(rule: ApprovalRule, now: Date = new Date()): boolean {
 
 function describeMatcher(rule: ApprovalRule): string {
   const parts: string[] = [];
+  if (rule.kind && rule.kind !== "visual") parts.push(`kind=${rule.kind}`);
   if (rule.selector) parts.push(`selector="${rule.selector}"`);
   if (rule.property) parts.push(`property="${rule.property}"`);
   if (rule.category) parts.push(`category=${rule.category}`);
@@ -134,6 +135,23 @@ async function cmdAdd(args: string[]): Promise<void> {
   const category = getArg(args, "category");
   const changeType = getArg(args, "change-type");
 
+  // A11y short-hand: --a11y-contrast / --a11y-touch sets `kind` so
+  // the rule suppresses a11y findings instead of pixel/paint diffs.
+  // These flags require a --selector (the path-substring matcher).
+  let kind: "visual" | "a11y-contrast" | "a11y-touch" | undefined;
+  if (hasFlag(args, "a11y-contrast") && hasFlag(args, "a11y-touch")) {
+    console.error(`${RED}error:${RESET} cannot specify both --a11y-contrast and --a11y-touch`);
+    process.exit(1);
+  } else if (hasFlag(args, "a11y-contrast")) {
+    kind = "a11y-contrast";
+  } else if (hasFlag(args, "a11y-touch")) {
+    kind = "a11y-touch";
+  }
+  if (kind && !selector) {
+    console.error(`${RED}error:${RESET} ${kind} rules require --selector (path-substring matcher)`);
+    process.exit(1);
+  }
+
   const tolerance: ApprovalTolerance = {};
   const maxPx = getArg(args, "max-px");
   if (maxPx) tolerance.pixels = Number(maxPx);
@@ -148,6 +166,7 @@ async function cmdAdd(args: string[]): Promise<void> {
   const issue = getArg(args, "issue");
 
   const rule: ApprovalRule = { reason };
+  if (kind) rule.kind = kind;
   if (selector) rule.selector = selector;
   if (property) rule.property = property;
   if (category) rule.category = category as ApprovalRule["category"];
@@ -156,9 +175,9 @@ async function cmdAdd(args: string[]): Promise<void> {
   if (expires) rule.expires = expires;
   if (issue) rule.issue = issue;
 
-  if (!selector && !property && !category && !changeType) {
+  if (!selector && !property && !category && !changeType && !kind) {
     console.error(`${RED}error:${RESET} at least one matcher is required ` +
-      `(--selector, --property, --category, --change-type)`);
+      `(--selector, --property, --category, --change-type, --a11y-contrast, --a11y-touch)`);
     console.error(`A rule with no matcher would approve every diff — refusing.`);
     process.exit(1);
   }
@@ -388,10 +407,15 @@ Subcommands:
                               List rules with status (active / expired)
   add    --reason "..." [--selector <sel>] [--property <p>]
          [--category <c>] [--change-type <t>]
+         [--a11y-contrast | --a11y-touch]
          [--max-px N] [--max-ratio N] [--geometry-delta N] [--color-delta N]
          [--expires YYYY-MM-DD] [--issue <url>] [--path approval.json]
          [--dry-run]
-                              Author an approval rule
+                              Author an approval rule.
+                              --a11y-contrast / --a11y-touch suppress
+                              findings from the vrt diff-pr a11y gate
+                              instead of pixel/paint diffs. Both
+                              require --selector (path substring matcher).
   add    --from-run <dir-or-json> [--auto-tiny | --top N | --all]
          [--reason "..."] [--expires YYYY-MM-DD] [--max-px N]
          [--path approval.json] [--dry-run]

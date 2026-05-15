@@ -8,7 +8,17 @@ export interface ApprovalManifest {
   rules: ApprovalRule[];
 }
 
+export type ApprovalRuleKind = "visual" | "a11y-contrast" | "a11y-touch";
+
 export interface ApprovalRule {
+  /**
+   * Sub-categorizes the rule. Default ("visual") suppresses pixel /
+   * paint diffs as before. "a11y-contrast" / "a11y-touch" suppress
+   * findings from the matching a11y checker (see `vrt diff-pr`'s
+   * a11y gate). The default keeps the schema backward-compatible —
+   * existing manifests don't carry `kind`.
+   */
+  kind?: ApprovalRuleKind;
   selector?: string;
   property?: string;
   category?: PropertyCategory;
@@ -346,8 +356,14 @@ function validateApprovalRule(value: unknown, index: number): ApprovalRule {
   const issue = asOptionalString(rule.issue, `approval.rules[${index}].issue`);
   const expires = asOptionalString(rule.expires, `approval.rules[${index}].expires`);
   if (expires) parseExpiry(expires);
+  const kindRaw = asOptionalString(rule.kind, `approval.rules[${index}].kind`);
+  if (kindRaw !== undefined && kindRaw !== "visual" && kindRaw !== "a11y-contrast" && kindRaw !== "a11y-touch") {
+    throw new Error(`approval.rules[${index}].kind must be "visual", "a11y-contrast", or "a11y-touch"`);
+  }
+  const kind = kindRaw as ApprovalRuleKind | undefined;
 
   return {
+    kind,
     selector,
     property,
     category,
@@ -358,6 +374,37 @@ function validateApprovalRule(value: unknown, index: number): ApprovalRule {
     expires,
   };
 }
+
+/**
+ * Filter a list of a11y findings (paths) against the approval
+ * manifest. A finding is suppressed when at least one non-expired
+ * rule with the matching `kind` carries a `selector` substring that
+ * appears in the finding's path. `selector` is matched as a literal
+ * substring — not parsed as a CSS selector — so authors can match
+ * either a class name (e.g. ".profile__avatar") or a full bracket
+ * path. Out-of-scope: parsing the selector with a real engine.
+ */
+export function filterA11yFindings<T extends { path: string }>(
+  findings: T[],
+  manifest: ApprovalManifest | null | undefined,
+  kind: "a11y-contrast" | "a11y-touch",
+): { kept: T[]; suppressed: Array<{ finding: T; rule: ApprovalRule }> } {
+  if (!manifest) return { kept: findings, suppressed: [] };
+  const now = new Date();
+  const rules = manifest.rules.filter((r) =>
+    r.kind === kind && !!r.selector && !isApprovalRuleExpired(r, now),
+  );
+  if (rules.length === 0) return { kept: findings, suppressed: [] };
+  const kept: T[] = [];
+  const suppressed: Array<{ finding: T; rule: ApprovalRule }> = [];
+  for (const finding of findings) {
+    const match = rules.find((r) => finding.path.includes(r.selector!));
+    if (match) suppressed.push({ finding, rule: match });
+    else kept.push(finding);
+  }
+  return { kept, suppressed };
+}
+
 
 function validateTolerance(value: unknown, index: number): ApprovalTolerance | undefined {
   if (value === undefined) return undefined;
@@ -511,7 +558,13 @@ function dedupeApprovalRules(rules: ApprovalRule[]): ApprovalRule[] {
 }
 
 function isSameApprovalIdentity(a: ApprovalRule, b: ApprovalRule): boolean {
-  return a.selector === b.selector &&
+  // Treat absent kind as "visual" so existing manifests without a
+  // kind field don't collide with newly-added a11y rules that share
+  // a selector with a pre-existing visual rule.
+  const ka = a.kind ?? "visual";
+  const kb = b.kind ?? "visual";
+  return ka === kb &&
+    a.selector === b.selector &&
     a.property === b.property &&
     a.category === b.category &&
     a.changeType === b.changeType;
