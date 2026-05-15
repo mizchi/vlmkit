@@ -1,0 +1,115 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import {
+  parseDiffPrConfig,
+  resolveThreshold,
+} from "./diff-pr-config.ts";
+
+describe("parseDiffPrConfig", () => {
+  it("accepts the minimal shape", () => {
+    const cfg = parseDiffPrConfig(JSON.stringify({
+      baseUrl: "http://localhost:3000",
+      routes: [{ name: "home", path: "/" }],
+    }));
+    assert.equal(cfg.routes.length, 1);
+    assert.equal(cfg.routes[0].name, "home");
+    assert.equal(cfg.routes[0].url, "http://localhost:3000/");
+    assert.equal(cfg.baselineDir, ".vrt/baselines");
+  });
+
+  it("honors thresholds at top level and per-route overrides", () => {
+    const cfg = parseDiffPrConfig(JSON.stringify({
+      baseUrl: "http://localhost:3000",
+      thresholds: { mobile: 0.01, desktop: 0.005, wide: 0.005 },
+      routes: [
+        { name: "home", path: "/" },
+        { name: "admin", path: "/admin", thresholds: { mobile: 0.03, desktop: 0.02, wide: 0.02 } },
+      ],
+    }));
+    assert.equal(resolveThreshold(cfg, cfg.routes[0], "mobile"), 0.01);
+    assert.equal(resolveThreshold(cfg, cfg.routes[1], "mobile"), 0.03);
+    assert.equal(resolveThreshold(cfg, cfg.routes[1], "desktop"), 0.02);
+  });
+
+  it("accepts routes under `capture.routes` (workflow-config parity)", () => {
+    const cfg = parseDiffPrConfig(JSON.stringify({
+      baseUrl: "http://localhost:3000",
+      capture: { routes: [{ name: "home", path: "/" }] },
+    }));
+    assert.equal(cfg.routes.length, 1);
+  });
+
+  it("accepts a bare string route and derives the name", () => {
+    const cfg = parseDiffPrConfig(JSON.stringify({
+      baseUrl: "http://localhost:3000",
+      routes: ["/about-us"],
+    }));
+    assert.equal(cfg.routes[0].name, "about_us");
+    assert.equal(cfg.routes[0].url, "http://localhost:3000/about-us");
+  });
+
+  it("preserves absolute URLs without joining to baseUrl", () => {
+    const cfg = parseDiffPrConfig(JSON.stringify({
+      baseUrl: "http://localhost:3000",
+      routes: [{ name: "external", url: "https://example.com/" }],
+    }));
+    assert.equal(cfg.routes[0].url, "https://example.com/");
+  });
+
+  it("rejects an empty routes array", () => {
+    assert.throws(
+      () => parseDiffPrConfig(JSON.stringify({ routes: [] })),
+      /at least one route/,
+    );
+  });
+
+  it("rejects a missing routes field", () => {
+    assert.throws(
+      () => parseDiffPrConfig(JSON.stringify({ baseUrl: "x" })),
+      /routes/i,
+    );
+  });
+
+  it("rejects malformed thresholds", () => {
+    assert.throws(
+      () => parseDiffPrConfig(JSON.stringify({
+        baseUrl: "x",
+        thresholds: { mobile: "not-a-number" },
+        routes: ["/"],
+      })),
+      /thresholds\.mobile/,
+    );
+  });
+
+  it("merges built-in default thresholds when none are declared", () => {
+    const cfg = parseDiffPrConfig(JSON.stringify({
+      baseUrl: "http://localhost:3000",
+      routes: ["/"],
+    }));
+    assert.equal(cfg.thresholds.mobile, 0.01);
+    assert.equal(cfg.thresholds.desktop, 0.005);
+    assert.equal(cfg.thresholds.wide, 0.005);
+  });
+
+  it("falls back to a sensible threshold when neither route nor project declares one", () => {
+    const cfg = parseDiffPrConfig(JSON.stringify({
+      baseUrl: "x",
+      routes: ["/"],
+    }));
+    // Unrecognized viewport name → fallback 0.01 (per resolveThreshold).
+    assert.equal(resolveThreshold(cfg, cfg.routes[0], "ultrawide"), 0.01);
+  });
+
+  it("captures tokens, approvalPath, baselineDir overrides", () => {
+    const cfg = parseDiffPrConfig(JSON.stringify({
+      baseUrl: "x",
+      routes: ["/"],
+      tokens: "./DESIGN.md",
+      approvalPath: "./manifest.json",
+      baselineDir: "ci-baselines",
+    }));
+    assert.equal(cfg.tokens, "./DESIGN.md");
+    assert.equal(cfg.approvalPath, "./manifest.json");
+    assert.equal(cfg.baselineDir, "ci-baselines");
+  });
+});

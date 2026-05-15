@@ -1,0 +1,25 @@
+{
+  "baseUrl": "http://localhost:3000",
+  "thresholds": {
+    "mobile": 0.01,
+    "desktop": 0.005,
+    "wide": 0.005
+  },
+  "tokens": "./DESIGN.md",
+  "approvalPath": "./approval.json",
+  "baselineDir": ".vrt/baselines",
+  "routes": [
+    "/",
+    "/about",
+    {
+      "name": "admin",
+      "path": "/admin",
+      "waitFor": "main",
+      "thresholds": {
+        "mobile": 0.03,
+        "desktop": 0.02,
+        "wide": 0.02
+      }
+    }
+  ]
+}

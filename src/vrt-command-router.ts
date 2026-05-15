@@ -77,6 +77,7 @@ const ROOT_MODULE_COMMANDS: Record<string, string> = {
   "component-extract": "./component-extract.ts",
   "manifest": "./manifest-cli.ts",
   "watch": "./watch.ts",
+  "diff-pr": "./diff-pr.ts",
 };
 
 const WORKFLOW_ALIAS_COMMANDS = new Set<WorkflowCommand>([
@@ -138,6 +139,9 @@ Core Commands:
                               (add | list | rm | check)
   watch <before> <after>      Re-run compare on save + show round-vs-round
                               suggestion deltas (newly introduced / resolved)
+  diff-pr <pin | (none)>      CI gate: pin baselines on main, then per-PR
+                              diff against pinned PNGs with per-route
+                              thresholds. Reads vrt.config.json.
   elements [options]          Element-level comparison with shift isolation
   smoke <file-or-url>         A11y-driven smoke test
   discover <file>             Discover responsive breakpoints from HTML/CSS
