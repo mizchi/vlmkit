@@ -75,6 +75,7 @@ const ROOT_MODULE_COMMANDS: Record<string, string> = {
   "explore": "./explore.ts",
   "skill": "./skill.ts",
   "component-extract": "./component-extract.ts",
+  "manifest": "./manifest-cli.ts",
 };
 
 const WORKFLOW_ALIAS_COMMANDS = new Set<WorkflowCommand>([
@@ -132,6 +133,8 @@ Core Commands:
                               Compare existing PNG screenshots directly
   snapshot <url...>           Capture multi-viewport snapshots with baseline diff
   snapshot approve            Promote accepted snapshot diffs to baselines
+  manifest <command>          Author / inspect the approval manifest
+                              (add | list | rm | check)
   elements [options]          Element-level comparison with shift isolation
   smoke <file-or-url>         A11y-driven smoke test
   discover <file>             Discover responsive breakpoints from HTML/CSS

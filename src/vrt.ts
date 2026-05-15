@@ -32,6 +32,7 @@ const MODULE_LOADERS = {
   "./explore.ts": () => import("./explore.ts"),
   "./skill.ts": () => import("./skill.ts"),
   "./component-extract.ts": () => import("./component-extract.ts"),
+  "./manifest-cli.ts": () => import("./manifest-cli.ts"),
 } as const;
 
 async function main() {
