@@ -39,7 +39,12 @@ jobs:
         run: nix run git+https://github.com/mizchi/pkspec -- check Spec.pkl Test.pkl
 
       - name: pkspec lint
-        run: nix run git+https://github.com/mizchi/pkspec -- lint Spec.pkl Test.pkl
+        # The deprecated-without-replacedBy rule emits info for every
+        # terminal-deprecated scenario (out-of-scope matrix rows where
+        # no successor exists by design — see Spec.pkl A6, D3, E9, …).
+        # The deprecatedReason captures the rationale; the lint rule
+        # would force noise without a real signal.
+        run: nix run git+https://github.com/mizchi/pkspec -- lint --lint-disable lint.deprecated-without-replacedBy Spec.pkl Test.pkl
 
       - name: pkf doctor
         run: nix run git+https://github.com/mizchi/pkfire -- doctor
