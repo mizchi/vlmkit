@@ -186,6 +186,70 @@ scenarios {
 
   // ── Build / fidelity ──────────────────────────────────────────
   new {
+    id = "A1"
+    name = "Build component from PNG screenshot"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    implementedBy = "code"
+    implementedAt = "src/component-from-image.ts"
+    description = "`vrt component-from-image` accepts a PNG target and renders the agent's HTML for pixel-diff iteration. Same engine drives A1-A4."
+  }
+  new {
+    id = "A2"
+    name = "Build component from Figma export"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    implementedBy = "code"
+    implementedAt = "src/component-from-image.ts"
+    description = "Same engine as A1; `--device-scale-factor 2` handles retina Figma exports."
+  }
+  new {
+    id = "A3"
+    name = "Build component from hand-drawn wireframe"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Partial: the text-row detector currently assumes typeset text. Hand-drawn glyphs need a sketch-tolerant text classifier — not yet implemented."
+  }
+  new {
+    id = "A4"
+    name = "Build component from competitor visual reference"
+    severity = "minor"
+    reviewStatus = "approved"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    implementedBy = "code"
+    implementedAt = "src/component-from-image.ts"
+    description = "Same engine as A1; treats any PNG as a reference target regardless of provenance."
+  }
+  new {
+    id = "A5"
+    name = "Build full page from design-spec document"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Partial: per-component fidelity works; there is no multi-component composition / layout-stitch CLI yet."
+  }
+  new {
+    id = "A6"
+    name = "Build from natural-language description"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Out of scope per v2 matrix: no reference image means no vrt signal applies. The scenario stays here only so the matrix-row link is mechanical; no successor."
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Marked out-of-scope in v2 matrix; preserved here for one-to-one matrix mapping."
+  }
+  new {
+    id = "A7"
+    name = "Build landing page matching a visual reference"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Partial: works when X is a screenshot (A1 flow); no first-class 'inspired by URL' command yet."
+  }
+  new {
     id = "A8"
     name = "Extract a single component from a page screenshot"
     severity = "major"
@@ -223,6 +287,127 @@ scenarios {
         """#
       }
     }
+  }
+
+  // ── Migration scenarios B1-B12 ───────────────────────────────
+  // Every B-row is the same engine (`vrt compare` migration mode +
+  // DOM-position-diff + class-rename map). One Scenario per row keeps
+  // the matrix bookkeeping mechanical without inflating the spec.
+  new {
+    id = "B1"
+    name = "Migration: Tailwind to vanilla CSS"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "`vrt compare` migration mode handles utility-first → vanilla CSS by ignoring class-name churn."
+  }
+  new {
+    id = "B2"
+    name = "Migration: CSS-in-JS to CSS modules"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "Same `vrt compare` engine; class-rename map maps auto-generated to semantic class names."
+  }
+  new {
+    id = "B3"
+    name = "Migration: Bootstrap to Tailwind"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "Same engine as B1 / B2."
+  }
+  new {
+    id = "B4"
+    name = "Migration: shadcn to custom design system"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "Validated on the `shadcn-to-luna` fixture."
+  }
+  new {
+    id = "B5"
+    name = "Migration: inline styles to CSS classes"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "Same `vrt compare` engine."
+  }
+  new {
+    id = "B6"
+    name = "Migration: float-based to Flex or Grid layout"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    description = "Partial: `compare` catches result; `grid-ratio` infers fr units but doesn't suggest the float-vs-flex decision itself."
+  }
+  new {
+    id = "B7"
+    name = "Migration: custom to standardized component library"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "`vrt compare` plus `component-consistency` catches missed instances."
+  }
+  new {
+    id = "B8"
+    name = "Migration: BEM to utility-first"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "Same `vrt compare` engine with class-rename map."
+  }
+  new {
+    id = "B9"
+    name = "Migration: SASS to vanilla CSS"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "Operates on compiled CSS output, not source."
+  }
+  new {
+    id = "B10"
+    name = "Migration: removing browser prefixes"
+    severity = "minor"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "Same engine."
+  }
+  new {
+    id = "B11"
+    name = "Migration: class-name rename"
+    severity = "minor"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "DOM-position-diff carries the rename across the page graph."
+  }
+  new {
+    id = "B12"
+    name = "Migration: floats or clearfix to Grid"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    description = "Partial: result is caught; the float-to-grid transformation itself isn't suggested by tooling."
   }
 
   // ── A11y ─────────────────────────────────────────────────────
@@ -285,6 +470,22 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
     description = "`vrt media-variants` sweeps the five hostile-user-preference media queries in one command and reports per-variant diffs."
+  }
+  new {
+    id = "C5"
+    name = "White-label theming: brand color swap"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Partial: `theme-parity` + `palette-diff` together catch brand-token drift; no dedicated white-label CLI."
+  }
+  new {
+    id = "C7"
+    name = "Locale-specific styling: CJK font fallback"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Font-family detection is not yet implemented; cannot identify whether the right CJK fallback fired."
   }
   new {
     id = "H1"
