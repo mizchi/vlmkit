@@ -490,34 +490,53 @@ export function generateWireframeFixCandidates(
   });
 
   // F1: structural-mismatch detection. When 3+ suggestions all
-  // blame children of the same DOM parent, that's a strong signal
-  // the parent's layout is structurally wrong (flex + per-child
-  // margins vs display: grid + gap, etc.) and the local-minima
-  // patches the suggestion engine is recommending will compound
-  // rather than resolve. Emit a single meta-suggestion at the
-  // TOP so agents see it before they start typing per-rank fixes.
-  // Agent-f v6: "the MAG-DIVERGENT suggestions were treating
-  // symptoms ... per-viewport margin patches instead of the actual
-  // fix (grid structure)."
-  const parentCounts = new Map<string, Set<number>>();
+  // blame children of the same DOM parent — AND those children have
+  // genuinely heterogeneous deltas (different magnitudes or
+  // divergent signs) — that's a strong signal the parent's layout
+  // is wrong rather than just needing per-child tuning.
+  //
+  // Agent-g v7 hit a false-positive when STRUCTURAL fired at
+  // `body[0]` and at `body[0]>main[0]` (the document root and its
+  // sole child). Their container was *already* display: grid + gap,
+  // so the suggestion to "restructure" was useless. Two guards now
+  // suppress that noise:
+  //
+  //   (a) parent path must have ≥ 2 segments — root and its sole
+  //       child don't qualify as a meaningful "parent layout choice"
+  //       location.
+  //   (b) the candidate magnitudes under that parent must be
+  //       heterogeneous (range ≥ 12px OR mix of signs) — if every
+  //       child needs the same +24px the right answer IS per-child
+  //       tuning, not restructuring.
+  const MIN_PARENT_DEPTH = 2;
+  const HETEROGENEITY_RANGE = 12;
+  const parentCounts = new Map<string, { sugs: Set<number>; magnitudes: number[] }>();
   for (let i = 0; i < out.length; i++) {
     const seenParents = new Set<string>();
     for (const c of out[i].candidates ?? []) {
       if (!c.path) continue;
       const par = parentPath(c.path);
       if (!par || seenParents.has(par)) continue;
+      if (par.split(">").length < MIN_PARENT_DEPTH) continue;
       seenParents.add(par);
-      if (!parentCounts.has(par)) parentCounts.set(par, new Set());
-      parentCounts.get(par)!.add(i);
+      const entry = parentCounts.get(par) ?? { sugs: new Set(), magnitudes: [] };
+      entry.sugs.add(i);
+      entry.magnitudes.push(out[i].deltaPx);
+      parentCounts.set(par, entry);
     }
   }
   let structuralRow: WireframeFixSuggestion | undefined;
-  for (const [par, sugIdxs] of parentCounts) {
-    if (sugIdxs.size < 3) continue;
+  for (const [par, { sugs, magnitudes }] of parentCounts) {
+    if (sugs.size < 3) continue;
+    const signs = new Set(magnitudes.map((m) => Math.sign(m)).filter((s) => s !== 0));
+    const absMags = magnitudes.map(Math.abs);
+    const range = Math.max(...absMags) - Math.min(...absMags);
+    const heterogeneous = signs.size > 1 || range >= HETEROGENEITY_RANGE;
+    if (!heterogeneous) continue;
     const affectedVps = new Set<string>();
-    for (const i of sugIdxs) for (const v of out[i].viewports) affectedVps.add(v);
+    for (const i of sugs) for (const v of out[i].viewports) affectedVps.add(v);
     structuralRow = {
-      evidence: `${sugIdxs.size} suggestions all blame children of \`${par}\` — likely a parent-layout mismatch (flex+margins vs grid+gap, etc.)`,
+      evidence: `${sugs.size} suggestions all blame children of \`${par}\` with heterogeneous deltas (range ${range}px, ${signs.size > 1 ? "mixed signs" : "same sign"}) — likely a parent-layout mismatch (flex+margins vs grid+gap, etc.)`,
       hypothesis: "patching each child is a local-minima trap; the parent's layout strategy is the actual delta",
       suggestion: `consider restructuring \`${par}\` itself (e.g. switch flex-with-per-child-margins → display: grid + row-gap, or change align-items / justify-content) so the children fall into place together`,
       viewports: [...affectedVps],

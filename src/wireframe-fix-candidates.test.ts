@@ -410,6 +410,49 @@ describe("generateWireframeFixCandidates", () => {
     const sharedParent = "body[0]>main[0]>section.profile";
     const out = generateWireframeFixCandidates({
       bboxByViewport: [
+        // Heterogeneous magnitudes (24, 40, 48) → fires STRUCTURAL.
+        { viewport: "mobile", matches: [bbox(0, 24), bbox(1, 40), bbox(2, 48)] },
+        { viewport: "desktop", matches: [bbox(0, 24), bbox(1, 40), bbox(2, 48)] },
+        { viewport: "wide", matches: [bbox(0, 24), bbox(1, 40), bbox(2, 48)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+      domPositionEntries: [
+        {
+          path: `${sharedParent}>h2.name`,
+          tag: "h2", baselineClasses: "name", variantClasses: "name",
+          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+        },
+        {
+          path: `${sharedParent}>p.meta`,
+          tag: "p", baselineClasses: "meta", variantClasses: "meta",
+          property: "margin-top", baseline: "0px", variant: "40px", viewport: "mobile",
+        },
+        {
+          path: `${sharedParent}>span.badge`,
+          tag: "span", baselineClasses: "badge", variantClasses: "badge",
+          property: "margin-top", baseline: "0px", variant: "48px", viewport: "mobile",
+        },
+      ],
+    });
+    const structural = out.filter((s) => s.scope === "structural");
+    assert.equal(structural.length, 1);
+    assert.match(structural[0].evidence, /3 suggestions all blame children of/);
+    assert.match(structural[0].evidence, /section\.profile/);
+    assert.match(structural[0].evidence, /range/);
+    assert.match(structural[0].suggestion, /restructuring/);
+    // Structural row leads the output.
+    assert.equal(out[0], structural[0]);
+  });
+
+  it("does NOT emit STRUCTURAL when child magnitudes are homogeneous (agent-g v7 false-positive)", () => {
+    // Three children of the same parent, all needing the same +24px
+    // — the right answer is per-child tuning, not restructuring.
+    // Pre-fix this would have fired STRUCTURAL erroneously.
+    const sharedParent = "body[0]>main[0]>section.profile";
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
         { viewport: "mobile", matches: [bbox(0, 24), bbox(1, 24), bbox(2, 24)] },
         { viewport: "desktop", matches: [bbox(0, 24), bbox(1, 24), bbox(2, 24)] },
         { viewport: "wide", matches: [bbox(0, 24), bbox(1, 24), bbox(2, 24)] },
@@ -418,8 +461,6 @@ describe("generateWireframeFixCandidates", () => {
       tokens: PAWS,
       allViewports: ["mobile", "desktop", "wide"],
       domPositionEntries: [
-        // Three children of the same parent; each carries a
-        // matching 24px delta.
         {
           path: `${sharedParent}>h2.name`,
           tag: "h2", baselineClasses: "name", variantClasses: "name",
@@ -437,13 +478,39 @@ describe("generateWireframeFixCandidates", () => {
         },
       ],
     });
-    const structural = out.filter((s) => s.scope === "structural");
-    assert.equal(structural.length, 1);
-    assert.match(structural[0].evidence, /3 suggestions all blame children of/);
-    assert.match(structural[0].evidence, /section\.profile/);
-    assert.match(structural[0].suggestion, /restructuring/);
-    // Structural row leads the output.
-    assert.equal(out[0], structural[0]);
+    assert.equal(out.filter((s) => s.scope === "structural").length, 0);
+  });
+
+  it("does NOT emit STRUCTURAL when the parent is the document root (agent-g v7 false-positive)", () => {
+    // Children of `body[0]` (single-segment parent) — too generic
+    // to claim a layout-strategy mismatch.
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 24), bbox(1, 40), bbox(2, 60)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+      domPositionEntries: [
+        {
+          path: "body[0]>header",
+          tag: "header", baselineClasses: "", variantClasses: "",
+          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+        },
+        {
+          path: "body[0]>main",
+          tag: "main", baselineClasses: "", variantClasses: "",
+          property: "margin-top", baseline: "0px", variant: "40px", viewport: "mobile",
+        },
+        {
+          path: "body[0]>footer",
+          tag: "footer", baselineClasses: "", variantClasses: "",
+          property: "margin-top", baseline: "0px", variant: "60px", viewport: "mobile",
+        },
+      ],
+    });
+    assert.equal(out.filter((s) => s.scope === "structural").length, 0,
+      "body-rooted clusters are too generic to claim layout-strategy mismatch");
   });
 
   it("does NOT emit STRUCTURAL when only 2 candidates share a parent (threshold = 3)", () => {
