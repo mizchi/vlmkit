@@ -293,6 +293,57 @@ function printRenderSanityBanner(side: "baseline" | "variant", sanity: RenderSan
   console.log();
 }
 
+/**
+ * Detect whether two render-sanity results describe the *same* failure
+ * on both sides. Symmetric failures (e.g. Google Fonts 404 against
+ * baseline + variant in a sandbox) don't actually affect diff
+ * comparability — they cancel out — so the red boxed banner is
+ * misleading noise. Asymmetric failures still warrant the full
+ * banner because the diff numbers are genuinely tainted.
+ *
+ * Symmetric ⇔ same set of warning codes AND same set of (url,
+ * errorText) failed-request pairs.
+ */
+function isSymmetricSanity(
+  baseline: RenderSanityResult | undefined,
+  variant: RenderSanityResult | undefined,
+): boolean {
+  if (!baseline || !variant) return false;
+  if (baseline.ok && variant.ok) return false;
+  const bWarn = new Set(baseline.warnings.map((w) => w.code));
+  const vWarn = new Set(variant.warnings.map((w) => w.code));
+  if (bWarn.size !== vWarn.size) return false;
+  for (const code of bWarn) if (!vWarn.has(code)) return false;
+  const bReq = new Set(baseline.failedRequests.map((r) => `${r.url}::${r.errorText}`));
+  const vReq = new Set(variant.failedRequests.map((r) => `${r.url}::${r.errorText}`));
+  if (bReq.size !== vReq.size) return false;
+  for (const k of bReq) if (!vReq.has(k)) return false;
+  return true;
+}
+
+/**
+ * Single dimmed-yellow line variant of the sanity banner used when
+ * baseline + variant warnings are byte-identical. Diff numbers are
+ * still affected (text geometry differs from what the spec intended)
+ * but they're *consistent* — so an agent can still act on the diff.
+ */
+function printSymmetricSanityLine(sanity: RenderSanityResult): void {
+  console.log();
+  const codes = [...new Set(sanity.warnings.map((w) => w.code))].join(", ");
+  const reqCount = sanity.failedRequests.length;
+  const head = `  ${YELLOW}~ render sanity:${RESET} symmetric ${codes} on both baseline and variant ${DIM}(${reqCount} failed request${reqCount === 1 ? "" : "s"})${RESET}`;
+  console.log(head);
+  // Show up to 2 representative URLs.
+  for (const req of sanity.failedRequests.slice(0, 2)) {
+    console.log(`    ${DIM}- ${req.url} (${req.errorText})${RESET}`);
+  }
+  if (sanity.failedRequests.length > 2) {
+    console.log(`    ${DIM}... ${sanity.failedRequests.length - 2} more (symmetric)${RESET}`);
+  }
+  console.log(`    ${DIM}symmetric failures cancel out in the diff; numbers remain comparable.${RESET}`);
+  console.log();
+}
+
 function urlToLabel(url: string): string {
   try {
     const u = new URL(url);
@@ -797,9 +848,11 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         }
         page.off("requestfailed", onFailed);
 
-        if (baselineSanity && !baselineSanity.ok) {
-          printRenderSanityBanner("baseline", baselineSanity);
-        }
+        // Baseline banner is now deferred to the per-variant loop so
+        // we can detect symmetric-with-variant failures and downgrade
+        // the boxed red banner to a single dimmed line. Asymmetric
+        // and one-sided baseline failures still get the full banner
+        // from the variant-loop branch.
       }
 
       // Capture baseline DOM fingerprint once (first viewport).
@@ -984,8 +1037,20 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             console.log(`  ${YELLOW}Variant sanity probe error (${variantName}): ${String(error)}${RESET}`);
           }
           page.off("requestfailed", onVariantFailed);
-          if (variantSanity && !variantSanity.ok) {
-            printRenderSanityBanner("variant", variantSanity);
+
+          // Combined sanity rendering: symmetric failures fold into
+          // a single dimmed-yellow line; asymmetric ones each get
+          // their own red banner. Closes #32 — agent-d called out
+          // that the boxed banner for the Google-Fonts-404-on-both-
+          // sides case was misleading noise because the diff stays
+          // comparable when both sides fall back identically.
+          const baselineBad = !!(baselineSanity && !baselineSanity.ok);
+          const variantBad = !!(variantSanity && !variantSanity.ok);
+          if (baselineBad && variantBad && isSymmetricSanity(baselineSanity, variantSanity)) {
+            printSymmetricSanityLine(baselineSanity!);
+          } else {
+            if (baselineBad) printRenderSanityBanner("baseline", baselineSanity!);
+            if (variantBad) printRenderSanityBanner("variant", variantSanity!);
           }
         }
 
