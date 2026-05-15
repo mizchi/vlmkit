@@ -257,14 +257,24 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
       }
       let mutationCount: number | undefined;
       if (options.strictTiming) {
-        mutationCount = await page.evaluate(() => {
-          const w = window as unknown as {
-            __vrtMutationCount?: number;
-            __vrtMutationObs?: MutationObserver;
-          };
-          w.__vrtMutationObs?.disconnect();
-          return w.__vrtMutationCount ?? 0;
-        });
+        // Navigation-capable actions (link clicks, form submits)
+        // destroy the execution context the observer lived in, so
+        // page.evaluate throws after invokeAction already succeeded.
+        // Swallow the readback failure so a single navigating action
+        // doesn't abort the whole explore run — leave mutationCount
+        // undefined so the report shows the no-data state honestly.
+        try {
+          mutationCount = await page.evaluate(() => {
+            const w = window as unknown as {
+              __vrtMutationCount?: number;
+              __vrtMutationObs?: MutationObserver;
+            };
+            w.__vrtMutationObs?.disconnect();
+            return w.__vrtMutationCount ?? 0;
+          });
+        } catch {
+          mutationCount = undefined;
+        }
       }
       await page.screenshot({ path: afterShot, fullPage: false });
 
