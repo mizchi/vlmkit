@@ -157,6 +157,26 @@ describe("generateWireframeFixCandidates", () => {
     assert.match(out[0].evidence, /not seen on desktop, wide/);
   });
 
+  it("trusts allViewports input over observation-derived universe (agent-d round-3 regression)", () => {
+    // When desktop/wide produce zero meaningful deltas, they won't
+    // appear in bboxByViewport. Without an explicit allViewports
+    // input the generator would derive the universe as just {mobile}
+    // → mobile-only suggestion would be tagged "all" (safe-to-go-
+    // global), which is exactly wrong.
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 12)] },
+        // desktop / wide omitted — fully converged on those viewports
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+    });
+    assert.equal(out.length, 1);
+    assert.equal(out[0].scope, "subset", "mobile-only delta must be tagged subset, not all");
+    assert.match(out[0].evidence, /not seen on desktop, wide/);
+  });
+
   it("uses scope=all when every viewport agrees", () => {
     const out = generateWireframeFixCandidates({
       bboxByViewport: [

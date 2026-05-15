@@ -1533,6 +1533,14 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           bboxByViewport: perViewport,
           textRowsByViewport: perViewportTextRows.map((r) => ({ viewport: r.viewport, matches: r.matches })),
           tokens: designTokens,
+          // Authoritative viewport set so subset detection works even
+          // when a viewport had zero meaningful bbox/text-row deltas
+          // (e.g. desktop/wide at <0.5% diff produce no perViewport
+          // entries; mobile-only deltas would otherwise look "scope:
+          // all" rather than "subset"). Closes the agent-d round-3
+          // bug where [SUBSET] tags silently disappeared as desktop
+          // converged.
+          allViewports: VIEWPORTS.map((vp) => vp.label),
         });
         if (wireframeSuggestions.length > 0) {
           // Sort divergent suggestions first — they're the highest-impact

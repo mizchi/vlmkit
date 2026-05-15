@@ -61,6 +61,16 @@ export interface WireframeFixInput {
   bboxByViewport: Array<{ viewport: string; matches: MatchedBbox[] }>;
   textRowsByViewport: Array<{ viewport: string; matches: MatchedTextRow[] }>;
   tokens?: DesignTokens;
+  /**
+   * Full viewport set the compare ran on (e.g. ["mobile", "desktop", "wide"]).
+   * Required for correct scope detection: when a viewport had zero
+   * meaningful bbox or text-row deltas it won't appear in
+   * `bboxByViewport` / `textRowsByViewport`, so deriving the universe
+   * from those alone produces false "scope: all" tags. Pass the
+   * authoritative list here. Falls back to the input-derived set if
+   * omitted (preserves test compatibility).
+   */
+  allViewports?: string[];
 }
 
 /** Threshold below which a delta is considered subpixel / not actionable. */
@@ -84,7 +94,11 @@ export function generateWireframeFixCandidates(
   //     wide only" so the agent knows it isn't global.
   //   - all: every viewport in the input agrees on sign + magnitude
   //     → safe to apply globally.
-  const allViewports = new Set(input.bboxByViewport.map((v) => v.viewport));
+  const allViewports = new Set(
+    input.allViewports && input.allViewports.length > 0
+      ? input.allViewports
+      : input.bboxByViewport.map((v) => v.viewport),
+  );
   const bboxByRank = new Map<number, Array<{ viewport: string; m: MatchedBbox }>>();
   for (const v of input.bboxByViewport) {
     for (const m of v.matches) {
@@ -195,7 +209,11 @@ export function generateWireframeFixCandidates(
       rowByBucket.set(bucket, arr);
     }
   }
-  const allTextViewports = new Set(input.textRowsByViewport.map((v) => v.viewport));
+  const allTextViewports = new Set(
+    input.allViewports && input.allViewports.length > 0
+      ? input.allViewports
+      : input.textRowsByViewport.map((v) => v.viewport),
+  );
   for (const [bucket, obs] of rowByBucket) {
     // Only report buckets that appear on ≥2 rows (consistent shift) or
     // on ≥2 viewports — otherwise it's noise.
