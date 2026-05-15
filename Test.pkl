@@ -176,6 +176,18 @@ tests {
     timeoutSec = 60
   }
   new {
+    name = "interact-heal-all"
+    description = "--heal-all probes the healer on every successful selector step (#11)."
+    specRef { "O2" }
+    // Fixture clicks `.btn-secondary`; the healer flags the sibling
+    // `.btn-primary` (Save) as a "did you mean" candidate (~13%
+    // confidence) so the report row surfaces the ambiguity even
+    // though the step technically succeeded.
+    cmd = "\(vrt) interact fixtures/interact/heal-all-demo/page.html --sequence fixtures/interact/heal-all-demo/sequence.json --output-dir \(outDir)/interact-heal-all --heal-all"
+    expectStdoutContains { "did you mean"; "button.btn-primary" }
+    timeoutSec = 60
+  }
+  new {
     name = "skill-pricing-card"
     description = "Skill playbook fans out N checks over one target."
     specRef { "O3-O5"; "SMOKE" }
