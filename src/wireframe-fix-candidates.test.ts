@@ -106,4 +106,69 @@ describe("generateWireframeFixCandidates", () => {
     assert.ok(out.length >= 2);
     assert.equal(out[0].deltaPx, 24); // Larger delta surfaces first
   });
+
+  it("flags opposite-sign deltas across viewports as a single divergent row (#29)", () => {
+    // agent-c's round-3 scenario: rank 0 had +12 on mobile, -12 on
+    // desktop/wide. Previously emitted as two independent global
+    // suggestions; now emits ONE divergent row.
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 12)] },
+        { viewport: "desktop", matches: [bbox(0, -12)] },
+        { viewport: "wide", matches: [bbox(0, -12)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+    });
+    const divergent = out.filter((s) => s.scope === "divergent");
+    assert.equal(divergent.length, 1, "exactly one divergent row for rank 0");
+    assert.match(divergent[0].evidence, /divergent/);
+    assert.match(divergent[0].evidence, /mobile: \+12px/);
+    assert.match(divergent[0].evidence, /desktop: -12px/);
+    assert.match(divergent[0].suggestion, /media query/);
+    assert.deepEqual(
+      divergent[0].perViewport,
+      [
+        { viewport: "mobile", deltaPx: 12 },
+        { viewport: "desktop", deltaPx: -12 },
+        { viewport: "wide", deltaPx: -12 },
+      ],
+    );
+    // No standalone +12 or -12 row for this rank — divergent replaces both.
+    const nonDivergentRank0 = out.filter((s) => !s.evidence.includes("divergent") && s.evidence.includes("rank=0"));
+    assert.equal(nonDivergentRank0.length, 0);
+  });
+
+  it("tags subset-coverage suggestions explicitly (#29)", () => {
+    // rank 0 only seen on mobile out of 3 viewports — should be tagged
+    // SUBSET so the agent knows not to apply globally.
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 16)] },
+        { viewport: "desktop", matches: [] },
+        { viewport: "wide", matches: [] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+    });
+    assert.equal(out.length, 1);
+    assert.equal(out[0].scope, "subset");
+    assert.match(out[0].evidence, /subset/);
+    assert.match(out[0].evidence, /not seen on desktop, wide/);
+  });
+
+  it("uses scope=all when every viewport agrees", () => {
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 24)] },
+        { viewport: "desktop", matches: [bbox(0, 24)] },
+        { viewport: "wide", matches: [bbox(0, 24)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+    });
+    assert.equal(out.length, 1);
+    assert.equal(out[0].scope, "all");
+    assert.doesNotMatch(out[0].evidence, /subset|divergent/);
+  });
 });

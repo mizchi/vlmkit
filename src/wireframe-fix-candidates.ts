@@ -37,6 +37,24 @@ export interface WireframeFixSuggestion {
   confidence: "low" | "medium" | "high";
   /** Magnitude in px (positive for the canonical direction described). */
   deltaPx: number;
+  /**
+   * How this delta relates to the full viewport set:
+   *   - "all"       : observation covers every viewport with the same sign+magnitude.
+   *                   Suggestion is safe to apply globally.
+   *   - "subset"    : observation only covers a subset of viewports. The agent
+   *                   should gate the change with a media query so the
+   *                   uncovered viewports aren't affected.
+   *   - "divergent" : the same component has observations with opposite signs
+   *                   on different viewports. A global edit cannot satisfy
+   *                   both — the underlying CSS rule is responsive and the
+   *                   per-viewport values need separate handling.
+   */
+  scope: "all" | "subset" | "divergent";
+  /**
+   * Per-viewport breakdown. Always populated; for non-divergent rows
+   * every entry has the same sign.
+   */
+  perViewport?: Array<{ viewport: string; deltaPx: number }>;
 }
 
 export interface WireframeFixInput {
@@ -54,10 +72,19 @@ export function generateWireframeFixCandidates(
   const out: WireframeFixSuggestion[] = [];
 
   // ---- Bbox vertical shifts ----
-  // For each component rank, collect Δtop across viewports. If the
-  // shift is consistent (same sign + similar magnitude) on 2+
-  // viewports, it's a top-level spacing issue. If it's single-viewport,
-  // it's likely media-query-gated.
+  // For each component rank, collect Δtop across viewports. The
+  // generator emits one of three shapes per rank:
+  //   - divergent: opposite signs across viewports → one row that
+  //     names the responsive divergence and tells the agent to gate
+  //     with a media query. (Closes #29: agent-c saw +12 mobile / -12
+  //     desktop as two separate global suggestions and broke desktop
+  //     trying to satisfy both.)
+  //   - subset: same sign everywhere but only covers some viewports
+  //     → the suggestion explicitly says "mobile only" / "desktop,
+  //     wide only" so the agent knows it isn't global.
+  //   - all: every viewport in the input agrees on sign + magnitude
+  //     → safe to apply globally.
+  const allViewports = new Set(input.bboxByViewport.map((v) => v.viewport));
   const bboxByRank = new Map<number, Array<{ viewport: string; m: MatchedBbox }>>();
   for (const v of input.bboxByViewport) {
     for (const m of v.matches) {
@@ -69,27 +96,76 @@ export function generateWireframeFixCandidates(
   }
 
   for (const [rank, observations] of bboxByRank) {
-    // Group by sign + rounded magnitude bucket so e.g. +24 and +25
-    // collapse but +24 and -24 don't.
-    const buckets = new Map<string, Array<{ viewport: string; m: MatchedBbox }>>();
+    // Per-viewport median deltaTop for this rank.
+    const byVp = new Map<string, MatchedBbox[]>();
     for (const obs of observations) {
-      const bucket = `${Math.sign(obs.m.deltaTop)}:${Math.round(obs.m.deltaTop / 4) * 4}`;
-      const arr = buckets.get(bucket) ?? [];
-      arr.push(obs);
-      buckets.set(bucket, arr);
+      const arr = byVp.get(obs.viewport) ?? [];
+      arr.push(obs.m);
+      byVp.set(obs.viewport, arr);
     }
-    for (const [, obs] of buckets) {
-      const median = obs.map((o) => o.m.deltaTop).sort((a, b) => a - b)[Math.floor(obs.length / 2)];
+    const perVpDeltas: Array<{ viewport: string; deltaPx: number; m: MatchedBbox }> = [];
+    for (const [viewport, ms] of byVp) {
+      const sorted = ms.map((m) => m.deltaTop).sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
+      perVpDeltas.push({ viewport, deltaPx: median, m: ms[0] });
+    }
+    const signs = new Set(perVpDeltas.map((p) => Math.sign(p.deltaPx)).filter((s) => s !== 0));
+    const example = perVpDeltas[0].m;
+    const dims = `${example.baseline.width}×${example.baseline.height}`;
+
+    if (signs.size > 1) {
+      // Divergent: this component has opposite-sign deltas across
+      // viewports. A single global edit cannot satisfy both — the
+      // agent needs a media-query-gated change.
+      const summary = perVpDeltas
+        .map((p) => `${p.viewport}: ${signed(p.deltaPx)}`)
+        .join(", ");
+      const maxAbs = Math.max(...perVpDeltas.map((p) => Math.abs(p.deltaPx)));
+      const positiveSide = perVpDeltas.filter((p) => p.deltaPx > 0).map((p) => p.viewport);
+      const negativeSide = perVpDeltas.filter((p) => p.deltaPx < 0).map((p) => p.viewport);
+      const snap = input.tokens ? snapSpacing(input.tokens, maxAbs) : null;
+      const tokenHint = snap ? `nearest token: ${snap.token.name} (${snap.token.raw})` : `magnitude ≈ ${maxAbs}px`;
+      out.push({
+        evidence: `component rank=${rank} (bbox ${dims}): divergent Δtop across viewports (${summary})`,
+        hypothesis: "the same component has opposite-sign deltas on different viewports — a global edit will fix one side while breaking the other",
+        suggestion: `gate the spacing change with a media query: ${positiveSide.length > 0 ? `add ${maxAbs}px on ${positiveSide.join(", ")}` : ""}${positiveSide.length > 0 && negativeSide.length > 0 ? "; " : ""}${negativeSide.length > 0 ? `remove ${maxAbs}px on ${negativeSide.join(", ")}` : ""} (${tokenHint})`,
+        viewports: perVpDeltas.map((p) => p.viewport),
+        confidence: "high",
+        deltaPx: maxAbs,
+        scope: "divergent",
+        perViewport: perVpDeltas.map((p) => ({ viewport: p.viewport, deltaPx: p.deltaPx })),
+      });
+      continue;
+    }
+
+    // Same-sign across all covered viewports. Bucket by magnitude so
+    // +24 and +25 collapse but +24 and +48 stay separate.
+    const buckets = new Map<string, Array<{ viewport: string; deltaPx: number; m: MatchedBbox }>>();
+    for (const p of perVpDeltas) {
+      const key = `${Math.round(p.deltaPx / 4) * 4}`;
+      const arr = buckets.get(key) ?? [];
+      arr.push(p);
+      buckets.set(key, arr);
+    }
+    for (const obs of buckets.values()) {
+      const sorted = obs.map((o) => o.deltaPx).sort((a, b) => a - b);
+      const median = sorted[Math.floor(sorted.length / 2)];
       const deltaPx = median;
       const viewports = obs.map((o) => o.viewport);
-      const example = obs[0].m;
-      const direction = deltaPx > 0 ? "shifted down" : "shifted up";
+      const covered = new Set(viewports);
+      const scope: "all" | "subset" = covered.size === allViewports.size && [...allViewports].every((v) => covered.has(v))
+        ? "all"
+        : "subset";
+      const uncovered = [...allViewports].filter((v) => !covered.has(v));
       const snap = input.tokens ? snapSpacing(input.tokens, Math.abs(deltaPx)) : null;
       const tokenHint = snap
         ? `token: ${snap.token.name} (${snap.token.raw}${snap.delta > 0 ? `, ±${snap.delta.toFixed(1)}px` : ""})`
         : `≈ ${Math.abs(deltaPx)}px`;
+      const scopeNote = scope === "subset"
+        ? ` (subset — gate with media query; not seen on ${uncovered.join(", ")})`
+        : "";
       out.push({
-        evidence: `component rank=${rank} (bbox ${example.baseline.width}×${example.baseline.height}): Δtop ${signed(deltaPx)} on ${viewports.join(", ")}`,
+        evidence: `component rank=${rank} (bbox ${dims}): Δtop ${signed(deltaPx)} on ${viewports.join(", ")}${scopeNote}`,
         hypothesis: deltaPx > 0
           ? "container above is taller than baseline (extra margin/padding/gap)"
           : "container above is shorter than baseline (missing margin/padding/gap)",
@@ -97,6 +173,8 @@ export function generateWireframeFixCandidates(
         viewports,
         confidence: confidenceFor({ viewportCount: viewports.length, deltaPx, snapped: !!snap }),
         deltaPx,
+        scope,
+        perViewport: obs.map((o) => ({ viewport: o.viewport, deltaPx: o.deltaPx })),
       });
     }
   }
@@ -117,6 +195,7 @@ export function generateWireframeFixCandidates(
       rowByBucket.set(bucket, arr);
     }
   }
+  const allTextViewports = new Set(input.textRowsByViewport.map((v) => v.viewport));
   for (const [bucket, obs] of rowByBucket) {
     // Only report buckets that appear on ≥2 rows (consistent shift) or
     // on ≥2 viewports — otherwise it's noise.
@@ -128,8 +207,17 @@ export function generateWireframeFixCandidates(
     const tokenHint = snap
       ? `token: ${snap.token.name} (${snap.token.raw})`
       : `≈ ${Math.abs(median)}px`;
+    const covered = new Set(viewports);
+    const scope: "all" | "subset" = covered.size === allTextViewports.size
+      && [...allTextViewports].every((v) => covered.has(v))
+      ? "all"
+      : "subset";
+    const uncovered = [...allTextViewports].filter((v) => !covered.has(v));
+    const scopeNote = scope === "subset"
+      ? ` (subset — gate with media query; not seen on ${uncovered.join(", ")})`
+      : "";
     out.push({
-      evidence: `${obs.length} text-row(s) shifted Δy ${signed(median)} on ${viewports.join(", ")} (e.g. "${sampleText}")`,
+      evidence: `${obs.length} text-row(s) shifted Δy ${signed(median)} on ${viewports.join(", ")}${scopeNote} (e.g. "${sampleText}")`,
       hypothesis: median > 0
         ? "vertical rhythm above this row added space"
         : "vertical rhythm above this row removed space",
@@ -137,6 +225,13 @@ export function generateWireframeFixCandidates(
       viewports,
       confidence: confidenceFor({ viewportCount: viewports.length, deltaPx: median, snapped: !!snap }),
       deltaPx: median,
+      scope,
+      perViewport: viewports.map((vp) => ({
+        viewport: vp,
+        deltaPx: obs.filter((o) => o.viewport === vp)
+          .map((o) => o.m.deltaY)
+          .sort((a, b) => a - b)[0] ?? median,
+      })),
     });
     void bucket;
   }

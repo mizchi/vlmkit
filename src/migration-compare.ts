@@ -1535,11 +1535,25 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           tokens: designTokens,
         });
         if (wireframeSuggestions.length > 0) {
-          const top = wireframeSuggestions.slice(0, 5);
+          // Sort divergent suggestions first — they're the highest-impact
+          // "don't go global" signal an agent needs to see before acting.
+          const sorted = [...wireframeSuggestions].sort((a, b) => {
+            const scopeRank = (s: typeof a.scope) => s === "divergent" ? 0 : s === "subset" ? 1 : 2;
+            if (scopeRank(a.scope) !== scopeRank(b.scope)) return scopeRank(a.scope) - scopeRank(b.scope);
+            return 0;
+          });
+          const top = sorted.slice(0, 5);
           console.log(`  ${CYAN}Wireframe fix suggestions (${wireframeSuggestions.length}, top ${top.length}):${RESET}`);
           for (const s of top) {
             const conf = s.confidence === "high" ? GREEN : s.confidence === "medium" ? YELLOW : DIM;
-            console.log(`    ${conf}[${s.confidence}]${RESET} ${s.evidence}`);
+            // Divergent suggestions get a magenta "DIVERGENT" prefix so
+            // they can't be missed; subset gets a subtle "SUBSET" tag.
+            const scopeTag = s.scope === "divergent"
+              ? ` ${BOLD}${RED}[DIVERGENT]${RESET}`
+              : s.scope === "subset"
+                ? ` ${YELLOW}[SUBSET]${RESET}`
+                : "";
+            console.log(`    ${conf}[${s.confidence}]${RESET}${scopeTag} ${s.evidence}`);
             console.log(`      ${DIM}→ ${s.suggestion}${RESET}`);
           }
         }
