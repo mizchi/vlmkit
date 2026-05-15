@@ -562,6 +562,76 @@ scenarios {
     description = "`vrt cross-browser` renders the same HTML in all three engines and reports per-engine pixel diff against Chromium. `--allow-skipped` keeps CI green when WebKit isn't installed."
   }
   new {
+    id = "H2"
+    name = "iOS Safari vs Android Chrome parity"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Partial via `cross-browser webkit`; no mobile-emulation profile bundling."
+  }
+  new {
+    id = "H3"
+    name = "OS-specific font rendering"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Partial: rolled into the H1 cross-browser diff; no dedicated font-rendering harness."
+  }
+  new {
+    id = "H4"
+    name = "Network-throttled rendering"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "No throttle flag today; Playwright supports it but no vrt CLI surface yet."
+  }
+  new {
+    id = "G1"
+    name = "Cumulative Layout Shift measurement"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    implementedBy = "code"
+    implementedAt = "src/perf.ts"
+    description = "`vrt perf` reads CLS from an in-page PerformanceObserver."
+  }
+  new {
+    id = "G2"
+    name = "LCP and FCP measurement"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    implementedBy = "code"
+    implementedAt = "src/perf.ts"
+    description = "`vrt perf` reports both core paint timings from the same observer wiring as G1."
+  }
+  new {
+    id = "G3"
+    name = "Bundle size analysis"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Out of scope per v2 matrix: bundle analyzers and Lighthouse cover this lane; vrt has no asset-pipeline integration."
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Preserved for matrix-row parity."
+  }
+  new {
+    id = "G4"
+    name = "FOUC detection"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Partial: LCP element identity from `perf` hints at FOUC; no dedicated unstyled-paint window detector."
+  }
+  new {
+    id = "G5"
+    name = "Image lazy-loading correctness"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "No scroll-driven test today; would need viewport-window snapshots tied to scroll events."
+  }
+  new {
     id = "I1"
     name = "i18n text inflation: no overflow or wrap at 1.4x word length"
     severity = "major"
@@ -569,8 +639,60 @@ scenarios {
     contributes { "GOAL-VARIANT-RESILIENCE" }
     description = "`vrt i18n-stress` substitutes button / link text with 1.4× longer strings and flags overflow or wrap-to-second-line."
   }
+  new {
+    id = "I2"
+    name = "Short or empty content"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Scriptable via `interact` (set content then snapshot); no first-class CLI."
+  }
+  new {
+    id = "I3"
+    name = "Special chars and emoji rendering"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Partial: `compare` plus `i18n-stress` can drive this but no emoji-specific assertion."
+  }
+  new {
+    id = "I4"
+    name = "Different image aspect ratios"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Per-fixture today; no aspect-ratio sweep CLI."
+  }
+  new {
+    id = "I5"
+    name = "XSS-safe rendering of user-generated content"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Out of scope per v2 matrix: security check, not a visual signal. Use an XSS scanner."
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Preserved for matrix-row parity."
+  }
+  new {
+    id = "I6"
+    name = "Pluralization 1 item vs N items"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Scriptable via `interact`; no first-class pluralization-sweep command."
+  }
 
   // ── Bug-finding / QA ────────────────────────────────────────
+  new {
+    id = "J1"
+    name = "Cross-page component drift"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-DESIGN-SYSTEM" }
+    implementedBy = "code"
+    implementedAt = "src/multi-page-consistency.ts"
+    description = "`vrt multi-page-consistency` diffs the same component selector across N pages and surfaces the outlier."
+  }
   new {
     id = "J2"
     name = "Inline-vs-component drift on a single page"
@@ -578,6 +700,32 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-DESIGN-SYSTEM" }
     description = "`vrt component-consistency` screenshots every selector match on the page and diffs each against the reference — catches the still-inline call site after a botched extract-to-component refactor."
+  }
+  new {
+    id = "J3"
+    name = "Variant rendering across props"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-DESIGN-SYSTEM" }
+    description = "Partial: combine `interact` (drive prop changes) with `component-consistency` (diff each variant) — no first-class props-matrix CLI."
+  }
+  new {
+    id = "J4"
+    name = "Storybook story diff"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Out of scope per v2 matrix: Chromatic and Loki cover this lane with Storybook-native integration vrt doesn't have."
+    contributes { "GOAL-DESIGN-SYSTEM" }
+    description = "Preserved for matrix-row parity."
+  }
+  new {
+    id = "J5"
+    name = "Slot composition"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-DESIGN-SYSTEM" }
+    description = "Partial: `interact` plus `compare` can drive each slot fill; no slot-aware CLI."
   }
   new {
     id = "K5"
