@@ -1,0 +1,194 @@
+:root {
+  /* colors */
+  --surface: #f9f9ff;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f0f3ff;
+  --surface-container: #e7eefe;
+  --surface-container-high: #e2e8f8;
+  --surface-container-highest: #dce2f3;
+  --on-surface: #151c27;
+  --on-surface-variant: #534434;
+  --primary: #855300;
+  --on-primary: #ffffff;
+  --primary-container: #f59e0b;
+  --on-primary-container: #613b00;
+  --secondary: #0058be;
+  --on-secondary: #ffffff;
+  --secondary-container: #2170e4;
+  --on-secondary-container: #fefcff;
+  --tertiary-container: #1abdff;
+  --on-tertiary-container: #004966;
+  --background: #f9f9ff;
+  /* spacing */
+  --s-xs: 4px;
+  --s-base: 8px;
+  --s-sm: 12px;
+  --s-md: 24px;
+  --s-lg: 40px;
+  --s-xl: 64px;
+  --gutter: 16px;
+  --margin: 24px;
+  /* radii */
+  --r-sm: 0.25rem;
+  --r-default: 0.5rem;
+  --r-md: 0.75rem;
+  --r-lg: 1rem;
+  --r-xl: 1.5rem;
+  --r-full: 9999px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--background);
+  color: var(--on-surface);
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+}
+
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--s-lg) var(--margin);
+}
+
+/* HERO */
+.hero { margin-bottom: var(--s-lg); }
+.eyebrow {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: 0.01em;
+  color: var(--primary);
+  text-transform: uppercase;
+  margin-bottom: var(--s-sm);
+}
+.display {
+  font-size: 44px;
+  font-weight: 800;
+  line-height: 52px;
+  letter-spacing: -0.02em;
+  color: var(--on-surface);
+  margin: 0 0 var(--s-md) 0;
+}
+.body-lg {
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 28px;
+  color: var(--on-surface);
+  margin: 0 0 var(--s-md) 0;
+}
+.cta-row {
+  display: flex;
+  gap: var(--gutter);
+}
+.btn {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: 0.01em;
+  border-radius: var(--r-lg);
+  padding: var(--s-md);
+  border: none;
+  cursor: pointer;
+}
+.btn-primary {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.btn-secondary {
+  background: var(--secondary);
+  color: var(--on-secondary);
+}
+
+/* PROFILE CARD */
+.profile-card {
+  background: var(--surface-container-lowest);
+  border-radius: var(--r-xl);
+  padding: var(--s-md);
+  margin-bottom: var(--s-lg);
+  box-shadow: 0 8px 24px rgba(133, 83, 0, 0.06);
+}
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s-md);
+}
+.profile-name { margin: 0; }
+.badge-mobile { display: none; }
+.avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--r-full);
+  background: var(--primary-container);
+  flex-shrink: 0;
+}
+.profile-text {
+  flex: 1;
+  min-width: 0;
+}
+.profile-name {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 28px;
+  color: var(--on-surface);
+}
+.profile-sub {
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 24px;
+  color: var(--on-surface-variant);
+}
+.badge {
+  display: inline-block;
+  background: var(--tertiary-container);
+  color: var(--on-tertiary-container);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  letter-spacing: 0.01em;
+  border-radius: var(--r-full);
+  padding: var(--s-xs) var(--s-sm);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* STATS */
+.stats {
+  display: flex;
+  gap: var(--gutter);
+}
+.stat-card {
+  flex: 1;
+  background: var(--surface-container-high);
+  color: var(--on-surface);
+  border-radius: var(--r-md);
+  padding: var(--s-sm);
+}
+.stat-num {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 40px;
+  letter-spacing: -0.01em;
+  color: var(--primary);
+}
+.stat-label {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: 0.01em;
+  color: var(--on-surface);
+  margin-top: var(--s-xs);
+}
+
+@media (max-width: 640px) {
+  .container { max-width: none; padding: var(--s-lg) var(--gutter); }
+  .badge-desktop { display: none; }
+  .badge-mobile { display: inline-block; margin-top: var(--s-md); }
+  .stats { flex-direction: column; }
+}
