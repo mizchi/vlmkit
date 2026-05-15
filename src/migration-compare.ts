@@ -1666,7 +1666,10 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
                 bySel.set(c.selector, arr);
               }
               for (const [sel, rows] of bySel) {
-                const propList = [...new Set(rows.map((r) => `${r.property}: ${r.baselineValue}→${r.variantValue}`))].join("; ");
+                // Arrow direction is "current → target" — the agent
+                // edits FROM what they have TO what the baseline has.
+                // Backwards rendering misled agent-e (v5).
+                const propList = [...new Set(rows.map((r) => `${r.property}: ${r.current} (now) → ${r.target} (target)`))].join("; ");
                 console.log(`      ${CYAN}candidate:${RESET} ${BOLD}${sel}${RESET} ${DIM}(${propList})${RESET}`);
               }
             }

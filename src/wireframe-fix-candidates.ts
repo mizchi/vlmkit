@@ -72,12 +72,20 @@ export interface WireframeFixSuggestion {
    * Sourced from `domPositionDiff.entries`. Empty when no DOM
    * correspondence is available or no entry matched — agents should
    * then fall back to their own structural search.
+   *
+   * The shape is deliberately action-oriented: `current` is what the
+   * variant has now, `target` is what the baseline has. Reading
+   * "current → target" matches the natural agent action ("change
+   * from current to target"). An earlier version used
+   * `{baselineValue, variantValue}` rendered as `B→V`, which agent-e
+   * (v5 validation) misread as "go from B to V" and applied the
+   * change in the wrong direction.
    */
   candidates?: Array<{
     selector: string;
     property: string;
-    baselineValue: string;
-    variantValue: string;
+    current: string;
+    target: string;
     viewport: string;
   }>;
 }
@@ -164,8 +172,10 @@ function matchCandidatesForDelta(
     out.push({
       selector: sel,
       property: e.property,
-      baselineValue: e.baseline,
-      variantValue: e.variant,
+      // Variant = what the agent currently has; baseline = target.
+      // Order matches "change FROM current TO target" semantics.
+      current: e.variant,
+      target: e.baseline,
       viewport: e.viewport,
     });
     if (out.length >= 4) break; // Cap per suggestion — too many candidates is noise.

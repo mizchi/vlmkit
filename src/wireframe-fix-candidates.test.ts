@@ -230,8 +230,12 @@ describe("generateWireframeFixCandidates", () => {
     assert.ok(out[0].candidates && out[0].candidates.length === 1);
     assert.equal(out[0].candidates[0].selector, ".profile");
     assert.equal(out[0].candidates[0].property, "padding-top");
-    assert.equal(out[0].candidates[0].baselineValue, "0px");
-    assert.equal(out[0].candidates[0].variantValue, "24px");
+    // Direction: "current → target" — what the agent has vs what the
+    // baseline has. Reading the arrow left-to-right matches the agent
+    // action ("change from 24px to 0px"). See agent-e v5 report for
+    // the bug this notation replaces.
+    assert.equal(out[0].candidates[0].current, "24px");
+    assert.equal(out[0].candidates[0].target, "0px");
   });
 
   it("does not crash when DOM-position-diff input is missing", () => {
