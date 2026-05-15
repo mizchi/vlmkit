@@ -51,6 +51,17 @@ export interface ExploreOptions {
   waitAfterAction?: number;
   /** Exit non-zero when any declared action induced 0 diff (dead action). */
   strict?: boolean;
+  /**
+   * Disambiguate the Δ-0% case by also counting DOM mutations between
+   * the click and the after-screenshot. When 0 mutations *and* 0
+   * pixel delta, the handler is almost certainly a silent no-op (the
+   * dogfood byte-identical-PNG case). When mutations > 0 but pixel
+   * delta = 0, the change was off-screen or invisible.
+   * Costs one extra `page.evaluate` per action (~5ms) — cheap to keep
+   * default-on, but kept opt-in to preserve the existing report
+   * contract.
+   */
+  strictTiming?: boolean;
 }
 
 export interface DiscoveredAction {
@@ -73,6 +84,14 @@ export interface ExploreFinding {
   executed: boolean;
   /** Error if execution threw. */
   error?: string;
+  /**
+   * DOM mutation count observed between action invocation and the
+   * after-screenshot. Only populated when --strict-timing was set.
+   * Distinguishes "no pixel delta because the handler did nothing"
+   * (0 mutations) from "no pixel delta but DOM changed off-screen"
+   * (> 0 mutations).
+   */
+  mutationCount?: number;
 }
 
 export interface ExploreReport {
@@ -91,6 +110,7 @@ function parseArgs(argv: string[]) {
   let threshold = 0.03;
   let waitAfter = 200;
   let strict = false;
+  let strictTiming = false;
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -99,9 +119,10 @@ function parseArgs(argv: string[]) {
     else if (a === "--threshold") threshold = parseFloat(argv[++i] ?? "0.03");
     else if (a === "--wait") waitAfter = parseInt(argv[++i] ?? "200", 10);
     else if (a === "--strict") strict = true;
+    else if (a === "--strict-timing") strictTiming = true;
     else positional.push(a);
   }
-  return { positional, outputDir, report, threshold, waitAfter, strict };
+  return { positional, outputDir, report, threshold, waitAfter, strict, strictTiming };
 }
 
 // Browser-side discovery. Returns the declared actions; the runner
@@ -203,6 +224,28 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
       const afterShot = join(outputDir, `${safe}-after.png`);
       await page.screenshot({ path: baselineShot, fullPage: false });
 
+      // Mutation observer: counts DOM changes between click and the
+      // after-screenshot. Lets the report distinguish "silent handler"
+      // (0 mutations, 0 pixel delta) from "off-screen DOM change"
+      // (> 0 mutations, 0 pixel delta). Only installed under
+      // --strict-timing because every page.evaluate has wire cost.
+      if (options.strictTiming) {
+        await page.evaluate(() => {
+          const w = window as unknown as {
+            __vrtMutationCount?: number;
+            __vrtMutationObs?: MutationObserver;
+          };
+          w.__vrtMutationCount = 0;
+          const obs = new MutationObserver((muts) => {
+            w.__vrtMutationCount = (w.__vrtMutationCount ?? 0) + muts.length;
+          });
+          obs.observe(document.documentElement, {
+            childList: true, attributes: true, characterData: true, subtree: true,
+          });
+          w.__vrtMutationObs = obs;
+        });
+      }
+
       let executed = false;
       let error: string | undefined;
       try {
@@ -211,6 +254,27 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
         executed = true;
       } catch (e) {
         error = String(e instanceof Error ? e.message : e);
+      }
+      let mutationCount: number | undefined;
+      if (options.strictTiming) {
+        // Navigation-capable actions (link clicks, form submits)
+        // destroy the execution context the observer lived in, so
+        // page.evaluate throws after invokeAction already succeeded.
+        // Swallow the readback failure so a single navigating action
+        // doesn't abort the whole explore run — leave mutationCount
+        // undefined so the report shows the no-data state honestly.
+        try {
+          mutationCount = await page.evaluate(() => {
+            const w = window as unknown as {
+              __vrtMutationCount?: number;
+              __vrtMutationObs?: MutationObserver;
+            };
+            w.__vrtMutationObs?.disconnect();
+            return w.__vrtMutationCount ?? 0;
+          });
+        } catch {
+          mutationCount = undefined;
+        }
       }
       await page.screenshot({ path: afterShot, fullPage: false });
 
@@ -246,6 +310,7 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
         heatmapRegions,
         executed,
         error,
+        mutationCount,
       });
     }
     await page.close();
@@ -263,18 +328,29 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
   console.log(`  ${DIM}source: ${options.source}${RESET}`);
   console.log(`  ${DIM}discovered ${actions.length} action(s)${RESET}`);
   let deadCount = 0;
+  let silentHandlerCount = 0;
   for (const f of findings) {
+    const isSilent = options.strictTiming && f.executed
+      && f.diffRatio < 0.001 && f.mutationCount === 0;
     const icon = !f.executed ? `${RED}✗${RESET}`
+      : isSilent ? `${RED}!${RESET}`
       : f.diffRatio < 0.001 ? `${YELLOW}~${RESET}`
       : `${GREEN}✓${RESET}`;
     const pct = (f.diffRatio * 100).toFixed(2);
-    const detail = !f.executed ? `failed: ${f.error}` : `Δ ${pct}%`;
+    const mut = f.mutationCount !== undefined ? `, ${f.mutationCount} mut` : "";
+    const detail = !f.executed ? `failed: ${f.error}`
+      : isSilent ? `Δ ${pct}% — silent handler (0 DOM mutations)`
+      : `Δ ${pct}%${mut}`;
     console.log(`  ${icon} ${f.action.name.padEnd(24)} ${DIM}${detail}${RESET}`);
     if (f.executed && f.diffRatio < 0.001) deadCount++;
+    if (isSilent) silentHandlerCount++;
   }
   console.log(`  ${DIM}report: ${reportPath}${RESET}`);
 
   if (options.strict && (deadCount > 0 || findings.some((f) => !f.executed))) {
+    process.exitCode = 1;
+  }
+  if (options.strictTiming && silentHandlerCount > 0) {
     process.exitCode = 1;
   }
 
@@ -326,9 +402,23 @@ function renderReport(r: Omit<ExploreReport, "reportPath">): string {
   lines.push("| Action | Origin | Status | Δ | Regions |");
   lines.push("|---|---|---|---|---|");
   for (const f of r.findings) {
-    const status = !f.executed ? `**failed** — ${f.error}`
-      : f.diffRatio < 0.001 ? "_no pixel delta — action may be wired but timing-missed, or genuinely no-op_"
-      : "ok";
+    let status: string;
+    if (!f.executed) {
+      status = `**failed** — ${f.error}`;
+    } else if (f.diffRatio < 0.001) {
+      // --strict-timing populates mutationCount and disambiguates the
+      // Δ-0 case: 0 mutations means the handler did nothing (silent
+      // no-op or unwired); > 0 means DOM changed but didn't paint.
+      if (f.mutationCount === 0) {
+        status = "**silent** — 0 DOM mutations and 0 pixel delta; handler is a no-op or unwired";
+      } else if (f.mutationCount !== undefined && f.mutationCount > 0) {
+        status = `_DOM mutated (${f.mutationCount}) but 0 pixel delta — change was off-screen, invisible, or below the dirty-rect threshold_`;
+      } else {
+        status = "_no pixel delta — action may be wired but timing-missed, or genuinely no-op_";
+      }
+    } else {
+      status = "ok";
+    }
     const pct = f.executed ? `${(f.diffRatio * 100).toFixed(2)}%` : "—";
     lines.push(`| \`${f.action.name}\` | ${f.action.origin} | ${status} | ${pct} | ${f.heatmapRegions.length} |`);
   }
@@ -359,6 +449,11 @@ function printUsage(): void {
   console.log("  --wait <ms>          Delay after each action before snapshot (default: 200)");
   console.log("  --threshold <0..1>   Pixel diff threshold (default: 0.03)");
   console.log("  --strict             Exit non-zero on dead or failed actions");
+  console.log("  --strict-timing      Disambiguate Δ-0% via DOM-mutation count:");
+  console.log("                       a silent handler (0 mutations + 0 px delta) is");
+  console.log("                       flagged distinctly from an off-screen change");
+  console.log("                       (mutations > 0 + 0 px delta). Adds ~5ms/action");
+  console.log("                       and exits non-zero on any silent handler.");
   console.log("  --output-dir <dir>   Default: ./test-results/explore");
   console.log("  --report <path>      Markdown report path");
   console.log("");
@@ -372,7 +467,7 @@ async function main(argv = process.argv.slice(2)) {
     printUsage();
     return;
   }
-  const { positional, outputDir, report, threshold, waitAfter, strict } = parseArgs(argv);
+  const { positional, outputDir, report, threshold, waitAfter, strict, strictTiming } = parseArgs(argv);
   if (positional.length === 0) {
     printUsage();
     process.exit(1);
@@ -384,6 +479,7 @@ async function main(argv = process.argv.slice(2)) {
     threshold,
     waitAfterAction: waitAfter,
     strict,
+    strictTiming,
   });
 }
 

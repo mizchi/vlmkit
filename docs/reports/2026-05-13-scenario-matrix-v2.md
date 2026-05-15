@@ -25,6 +25,23 @@ Legend:
 - ❌ — not covered today; would need new work
 - ⚪ — out of scope (vrt isn't the right tool)
 
+**Scenario.id mapping** (added 2026-05-15 by #10 backfill): the row
+prefix in the `#` column IS the `Scenario.id` in `Spec.pkl`. Most
+rows have a one-to-one mapping. Three rows are grouped under shared
+Spec scenarios because their implementation truly is shared:
+
+- `C2`, `C3`, `C4`, `C5`, `C6` → `Spec.pkl#C2-C6` (`media-variants`)
+- `M4`, `M5`, `M6` → `Spec.pkl#M4-M6` (`design-tokens`)
+- `O3`, `O4`, `O5` → `Spec.pkl#O3-O5` (`skill run`)
+
+Rows marked ⚪ in this matrix appear in `Spec.pkl` as
+`deprecated = true` with a `deprecatedReason` explaining the
+out-of-scope rationale; readers should not expect an implementation
+pointer. Rows marked 🟡 or ❌ appear as `reviewStatus = "draft"`
+with the caveat in the description; rows marked ✅ are
+`reviewStatus = "approved"` with `implementedBy = "code"` plus an
+`implementedAt` pointer.
+
 ## A. Build / create
 
 | # | Scenario | Coverage | Tool |

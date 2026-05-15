@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Heal-all demo</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 0; padding: 40px; background: #f3f4f6; }
+  .toolbar { display: flex; gap: 8px; margin-bottom: 16px; }
+  button { padding: 10px 20px; border: 0; border-radius: 6px; font-size: 14px; cursor: pointer; }
+  .btn-primary { background: #2563eb; color: white; }
+  .btn-secondary { background: #e5e7eb; color: #111827; }
+  .panel { background: white; padding: 16px; border-radius: 8px; }
+  .panel.danger { display: none; background: #fef2f2; color: #b91c1c; }
+  .panel.danger.open { display: block; }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <button class="btn-primary">Save</button>
+    <button class="btn-secondary">Cancel</button>
+  </div>
+  <div class="panel">No action yet.</div>
+  <div class="panel danger" id="danger">Are you sure? This will discard your changes.</div>
+  <script>
+    document.querySelector('.btn-secondary').addEventListener('click', () => {
+      document.getElementById('danger').classList.add('open');
+    });
+  </script>
+</body>
+</html>

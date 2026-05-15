@@ -83,6 +83,12 @@ run "interact" "report.md" \
     --sequence fixtures/interact/dropdown-form/sequence.json \
     --output-dir "$OUT_BASE/interact"
 
+run "form-validation-diff" "report.md" \
+  node --experimental-strip-types src/vrt.ts interact \
+    fixtures/interact/form-validation/page.html \
+    --sequence fixtures/interact/form-validation/sequence.json \
+    --output-dir "$OUT_BASE/form-validation-diff"
+
 run "media-variants" "report.md" \
   node --experimental-strip-types src/vrt.ts media-variants \
     fixtures/media-variants/card/hostile.html \
@@ -108,6 +114,27 @@ run "explore" "report.md" \
   node --experimental-strip-types src/vrt.ts explore \
     fixtures/explore/declarative/page.html \
     --output-dir "$OUT_BASE/explore"
+
+# --strict-timing flags the byte-identical-PNG silent-handler case
+# (#8). The fixture deliberately triggers a silent handler so the
+# exit code is 1 — wrap with `|| true` so the smoke survives. The
+# log assertion stays on `report.md` being emitted.
+run "explore-strict-timing" "report.md" \
+  bash -c "node --experimental-strip-types src/vrt.ts explore \
+    fixtures/explore/byte-identical-bug/silent-listener.html \
+    --output-dir '$OUT_BASE/explore-strict-timing' \
+    --strict-timing || true"
+
+# --heal-all probes the selector healer on every successful selector
+# step in an `interact` sequence, surfacing "did you mean" siblings
+# (#11). Fixture has a btn-primary / btn-secondary pair that fires
+# the healer with confidence ~13%.
+run "interact-heal-all" "report.md" \
+  node --experimental-strip-types src/vrt.ts interact \
+    fixtures/interact/heal-all-demo/page.html \
+    --sequence fixtures/interact/heal-all-demo/sequence.json \
+    --output-dir "$OUT_BASE/interact-heal-all" \
+    --heal-all
 
 run "component-extract" "report.md" \
   node --experimental-strip-types src/vrt.ts component-extract \

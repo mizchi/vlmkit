@@ -263,6 +263,16 @@ local specCheck = new Task {
   inputs { "Spec.pkl"; "Test.pkl"; "pkspec/**" }
 }
 
+local specLint = new Task {
+  name = "spec-lint"
+  // Mirror of the CI invocation in .github/workflows/spec-gate.yml.
+  // deprecated-without-replacedBy is suppressed because the matrix
+  // backfill (#10) deliberately marks out-of-scope rows terminal —
+  // no successor scenario exists for them.
+  cmd = "pkspec lint --lint-disable lint.deprecated-without-replacedBy Spec.pkl Test.pkl"
+  inputs { "Spec.pkl"; "Test.pkl"; "pkspec/**" }
+}
+
 local specRender = new Task {
   name = "spec-render"
   cmd = "pkspec spec --output docs/SPEC.md Spec.pkl Test.pkl"
@@ -311,6 +321,7 @@ tasks {
   smokeAll
   vrtHelp
   specCheck
+  specLint
   specRender
   specRun
 }

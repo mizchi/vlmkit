@@ -146,10 +146,11 @@ tests {
   }
   new {
     name = "form-validation-diff"
-    description = "Form validation state diff from invalid to valid. Pending: no canonical fixture yet; interact covers the underlying engine."
-    specRef { "E5" }
-    tags { "spec" }
-    pending = true
+    description = "Drive a signup form through invalid → valid states and diff each transition."
+    specRef { "E5"; "SMOKE" }
+    cmd = "\(vrt) interact fixtures/interact/form-validation/page.html --sequence fixtures/interact/form-validation/sequence.json --output-dir \(outDir)/form-validation-diff"
+    expectStdoutContains { "vrt interact"; "report:" }
+    timeoutSec = 90
   }
 
   // ── Agent ergonomics ────────────────────────────────────────
@@ -159,6 +160,31 @@ tests {
     specRef { "O1"; "SMOKE" }
     cmd = "\(vrt) explore fixtures/explore/declarative/page.html --output-dir \(outDir)/explore"
     expectStdoutContains { "vrt explore"; "report:" }
+    timeoutSec = 60
+  }
+  new {
+    name = "explore-strict-timing-silent-handler"
+    description = "--strict-timing flags silent-handler / byte-identical-PNG case (#8)."
+    specRef { "O1" }
+    // The fixture wires a no-op click handler whose CSS reset
+    // suppresses every focus indicator, so the before/after PNGs
+    // are byte-identical. Without --strict-timing this would
+    // report a misleading Δ 0.00% pass; with the flag it exits
+    // non-zero and the report row reads "silent — 0 DOM mutations".
+    cmd = "\(vrt) explore fixtures/explore/byte-identical-bug/silent-listener.html --output-dir \(outDir)/explore-strict-timing --strict-timing || true"
+    expectStdoutContains { "silent handler"; "0 DOM mutations" }
+    timeoutSec = 60
+  }
+  new {
+    name = "interact-heal-all"
+    description = "--heal-all probes the healer on every successful selector step (#11)."
+    specRef { "O2" }
+    // Fixture clicks `.btn-secondary`; the healer flags the sibling
+    // `.btn-primary` (Save) as a "did you mean" candidate (~13%
+    // confidence) so the report row surfaces the ambiguity even
+    // though the step technically succeeded.
+    cmd = "\(vrt) interact fixtures/interact/heal-all-demo/page.html --sequence fixtures/interact/heal-all-demo/sequence.json --output-dir \(outDir)/interact-heal-all --heal-all"
+    expectStdoutContains { "did you mean"; "button.btn-primary" }
     timeoutSec = 60
   }
   new {

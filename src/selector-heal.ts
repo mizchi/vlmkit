@@ -35,12 +35,13 @@ export interface HealCandidate {
 export async function healSelector(
   page: Page,
   brokenSelector: string,
-  options: { maxCandidates?: number } = {},
+  options: { maxCandidates?: number; exclude?: string } = {},
 ): Promise<HealCandidate[]> {
   const maxCandidates = options.maxCandidates ?? 5;
+  const exclude = options.exclude ?? "";
   const parsed = parseSelector(brokenSelector);
   return await page.evaluate(
-    ({ parsed, maxCandidates }) => {
+    ({ parsed, maxCandidates, exclude }) => {
       function tokenize(s: string): string[] {
         return s.toLowerCase().split(/[^a-z0-9]+/i).filter((t) => t.length > 1);
       }
@@ -77,10 +78,20 @@ export async function healSelector(
       if (targetTag) {
         for (const el of document.querySelectorAll(targetTag)) elements.add(el);
       }
+      // Used by --heal-all in interact: skip the elements the broken
+      // selector actually matched, so we only surface "did you mean"
+      // candidates that are siblings of the matched element.
+      const excluded = new Set<Element>();
+      if (exclude) {
+        try {
+          for (const el of document.querySelectorAll(exclude)) excluded.add(el);
+        } catch { /* invalid selector — ignore */ }
+      }
 
       for (const el of elements) {
         if (seen.has(el)) continue;
         seen.add(el);
+        if (excluded.has(el)) continue;
         const cs = getComputedStyle(el);
         if (cs.display === "none" || cs.visibility === "hidden" || parseFloat(cs.opacity) < 0.1) continue;
         const r = el.getBoundingClientRect();
@@ -133,7 +144,7 @@ export async function healSelector(
       candidates.sort((a, b) => b.confidence - a.confidence);
       return candidates.slice(0, maxCandidates);
     },
-    { parsed, maxCandidates },
+    { parsed, maxCandidates, exclude },
   );
 }
 

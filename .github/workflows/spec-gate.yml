@@ -1,0 +1,50 @@
+name: Spec gate
+
+# Runs the cheap, deterministic spec gates on every PR:
+#   - pkspec check Spec.pkl Test.pkl   (every approved Scenario has impl)
+#   - pkspec lint  Spec.pkl Test.pkl   (descriptions, dead specRefs)
+#   - pkf doctor                        (Taskfile.pkl is well-formed)
+#
+# No Playwright, no fixtures — these gates are spec-only and complete
+# in seconds. The full bash smoke is intentionally NOT wired here; if
+# we want a Playwright smoke per-PR it should live in a separate
+# workflow gated on src/** + fixtures/** changes.
+
+on:
+  pull_request:
+    paths:
+      - "Spec.pkl"
+      - "Test.pkl"
+      - "Taskfile.pkl"
+      - "pkspec/**"
+      - ".github/workflows/spec-gate.yml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  spec-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: pkspec check
+        run: nix run git+https://github.com/mizchi/pkspec -- check Spec.pkl Test.pkl
+
+      - name: pkspec lint
+        # The deprecated-without-replacedBy rule emits info for every
+        # terminal-deprecated scenario (out-of-scope matrix rows where
+        # no successor exists by design — see Spec.pkl A6, D3, E9, …).
+        # The deprecatedReason captures the rationale; the lint rule
+        # would force noise without a real signal.
+        run: nix run git+https://github.com/mizchi/pkspec -- lint --lint-disable lint.deprecated-without-replacedBy Spec.pkl Test.pkl
+
+      - name: pkf doctor
+        run: nix run git+https://github.com/mizchi/pkfire -- doctor

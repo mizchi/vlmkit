@@ -186,6 +186,70 @@ scenarios {
 
   // ── Build / fidelity ──────────────────────────────────────────
   new {
+    id = "A1"
+    name = "Build component from PNG screenshot"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    implementedBy = "code"
+    implementedAt = "src/component-from-image.ts"
+    description = "`vrt component-from-image` accepts a PNG target and renders the agent's HTML for pixel-diff iteration. Same engine drives A1-A4."
+  }
+  new {
+    id = "A2"
+    name = "Build component from Figma export"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    implementedBy = "code"
+    implementedAt = "src/component-from-image.ts"
+    description = "Same engine as A1; `--device-scale-factor 2` handles retina Figma exports."
+  }
+  new {
+    id = "A3"
+    name = "Build component from hand-drawn wireframe"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Partial: the text-row detector currently assumes typeset text. Hand-drawn glyphs need a sketch-tolerant text classifier — not yet implemented."
+  }
+  new {
+    id = "A4"
+    name = "Build component from competitor visual reference"
+    severity = "minor"
+    reviewStatus = "approved"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    implementedBy = "code"
+    implementedAt = "src/component-from-image.ts"
+    description = "Same engine as A1; treats any PNG as a reference target regardless of provenance."
+  }
+  new {
+    id = "A5"
+    name = "Build full page from design-spec document"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Partial: per-component fidelity works; there is no multi-component composition / layout-stitch CLI yet."
+  }
+  new {
+    id = "A6"
+    name = "Build from natural-language description"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Out of scope per v2 matrix: no reference image means no vrt signal applies. The scenario stays here only so the matrix-row link is mechanical; no successor."
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Marked out-of-scope in v2 matrix; preserved here for one-to-one matrix mapping."
+  }
+  new {
+    id = "A7"
+    name = "Build landing page matching a visual reference"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Partial: works when X is a screenshot (A1 flow); no first-class 'inspired by URL' command yet."
+  }
+  new {
     id = "A8"
     name = "Extract a single component from a page screenshot"
     severity = "major"
@@ -225,6 +289,127 @@ scenarios {
     }
   }
 
+  // ── Migration scenarios B1-B12 ───────────────────────────────
+  // Every B-row is the same engine (`vrt compare` migration mode +
+  // DOM-position-diff + class-rename map). One Scenario per row keeps
+  // the matrix bookkeeping mechanical without inflating the spec.
+  new {
+    id = "B1"
+    name = "Migration: Tailwind to vanilla CSS"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "`vrt compare` migration mode handles utility-first → vanilla CSS by ignoring class-name churn."
+  }
+  new {
+    id = "B2"
+    name = "Migration: CSS-in-JS to CSS modules"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "Same `vrt compare` engine; class-rename map maps auto-generated to semantic class names."
+  }
+  new {
+    id = "B3"
+    name = "Migration: Bootstrap to Tailwind"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "Same engine as B1 / B2."
+  }
+  new {
+    id = "B4"
+    name = "Migration: shadcn to custom design system"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "Validated on the `shadcn-to-luna` fixture."
+  }
+  new {
+    id = "B5"
+    name = "Migration: inline styles to CSS classes"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "Same `vrt compare` engine."
+  }
+  new {
+    id = "B6"
+    name = "Migration: float-based to Flex or Grid layout"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    description = "Partial: `compare` catches result; `grid-ratio` infers fr units but doesn't suggest the float-vs-flex decision itself."
+  }
+  new {
+    id = "B7"
+    name = "Migration: custom to standardized component library"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "`vrt compare` plus `component-consistency` catches missed instances."
+  }
+  new {
+    id = "B8"
+    name = "Migration: BEM to utility-first"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "Same `vrt compare` engine with class-rename map."
+  }
+  new {
+    id = "B9"
+    name = "Migration: SASS to vanilla CSS"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "Operates on compiled CSS output, not source."
+  }
+  new {
+    id = "B10"
+    name = "Migration: removing browser prefixes"
+    severity = "minor"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "Same engine."
+  }
+  new {
+    id = "B11"
+    name = "Migration: class-name rename"
+    severity = "minor"
+    reviewStatus = "approved"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "DOM-position-diff carries the rename across the page graph."
+  }
+  new {
+    id = "B12"
+    name = "Migration: floats or clearfix to Grid"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MIGRATION-VERIFICATION" }
+    description = "Partial: result is caught; the float-to-grid transformation itself isn't suggested by tooling."
+  }
+
   // ── A11y ─────────────────────────────────────────────────────
   new {
     id = "F1"
@@ -250,6 +435,72 @@ scenarios {
     contributes { "GOAL-A11Y-COMPLIANCE" }
     description = "`vrt a11y-focus-order` walks Tab traversal and compares against the bbox-sorted visual order."
   }
+  new {
+    id = "F4"
+    name = "ARIA attribute correctness"
+    severity = "major"
+    reviewStatus = "draft"
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+    description = "Partial: `a11y-semantic` exists pre-v2 but has narrow rule coverage; full ARIA compliance is not yet a single-CLI check."
+  }
+  new {
+    id = "F5"
+    name = "Screen-reader-only content"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Out of scope per v2 matrix: requires assistive-technology integration; not a visual signal."
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+    description = "Preserved for matrix-row parity."
+  }
+  new {
+    id = "F6"
+    name = "Keyboard navigation Tab Esc Enter"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+    implementedBy = "code"
+    implementedAt = "src/interact.ts"
+    description = "`interact press` action drives keyboard sequences; `a11y-focus-order` verifies the resulting traversal."
+  }
+  new {
+    id = "F7"
+    name = "Color blindness simulation"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+    description = "Not implemented: could be added via a CSS-filter wrapper around `compare`."
+  }
+  new {
+    id = "F8"
+    name = "200 percent browser zoom usability"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+    implementedBy = "code"
+    implementedAt = "src/media-variants.ts"
+    description = "`media-variants --variants zoom-200` flags scrollWidth regressions at 2× zoom."
+  }
+  new {
+    id = "F9"
+    name = "Reduced motion compliance"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+    implementedBy = "code"
+    implementedAt = "src/media-variants.ts"
+    description = "`media-variants --variants reduced-motion` does the static-stylesheet sweep."
+  }
+  new {
+    id = "F10"
+    name = "Caption or alt-text presence"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Out of scope per v2 matrix: requires static-HTML analysis, not a visual signal. Use an HTML linter."
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+    description = "Preserved for matrix-row parity."
+  }
 
   // ── Design system ────────────────────────────────────────────
   new {
@@ -261,12 +512,93 @@ scenarios {
     description = "`vrt design-tokens` flags rendered colors that fall outside the declared palette — catches off-scale hex values before they leak into the token catalog."
   }
   new {
+    id = "M2"
+    name = "Spacing scale conformance"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-DESIGN-SYSTEM" }
+    implementedBy = "code"
+    implementedAt = "src/design-tokens.ts"
+    description = "`vrt design-tokens --spacing-scale` flags margin and padding values that fall outside the declared scale, e.g. a stray 5px on a 4px grid."
+  }
+  new {
+    id = "M3"
+    name = "Typography scale compliance"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-DESIGN-SYSTEM" }
+    implementedBy = "code"
+    implementedAt = "src/typography-hints.ts"
+    description = "Typography hints surface the size and weight buckets observed; comparison against the declared scale catches off-scale glyphs."
+  }
+  new {
     id = "M4-M6"
     name = "Radius / spacing / z-index / shadow-tier conformance"
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-DESIGN-SYSTEM" }
     description = "Same `design-tokens` CLI covers radius / spacing / z-index / shadow tiers via per-bucket configurable scales."
+  }
+  // ── Specialty / edge ─────────────────────────────────────────
+  new {
+    id = "N1"
+    name = "Canvas or WebGL content"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Out of scope per v2 matrix: pixel-only diff cannot reason about render-target state inside Canvas / WebGL contexts."
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Preserved for matrix-row parity."
+  }
+  new {
+    id = "N2"
+    name = "SVG icon rendering"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Partial: pixel diff works; semantic structure of the SVG is not analyzed."
+  }
+  new {
+    id = "N3"
+    name = "Animation or transition correctness"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Out of scope per v2 matrix: transitions are intentionally disabled for determinism — mid-frame correctness is fundamentally incompatible."
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Preserved for matrix-row parity."
+  }
+  new {
+    id = "N4"
+    name = "Video player UI"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Partial: pixel-only; player chrome diffs work; playback state does not."
+  }
+  new {
+    id = "N5"
+    name = "Form autofill state"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Partial: `interact` plus scripted fill drives the values; the browser autofill UI itself is not capturable in headless."
+  }
+  new {
+    id = "N6"
+    name = "Sortable or sticky table"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Partial: `interact` drives sort clicks and scroll; no table-specific signal."
+  }
+  new {
+    id = "N7"
+    name = "Infinite scroll"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Partial: `interact` scroll plus repeated snapshots covers the visible work; no scroll-load timing harness."
   }
 
   // ── Variant resilience ──────────────────────────────────────
@@ -287,12 +619,98 @@ scenarios {
     description = "`vrt media-variants` sweeps the five hostile-user-preference media queries in one command and reports per-variant diffs."
   }
   new {
+    id = "C5"
+    name = "White-label theming: brand color swap"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Partial: `theme-parity` + `palette-diff` together catch brand-token drift; no dedicated white-label CLI."
+  }
+  new {
+    id = "C7"
+    name = "Locale-specific styling: CJK font fallback"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Font-family detection is not yet implemented; cannot identify whether the right CJK fallback fired."
+  }
+  new {
     id = "H1"
     name = "Cross-browser parity across Chromium / Firefox / WebKit"
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
     description = "`vrt cross-browser` renders the same HTML in all three engines and reports per-engine pixel diff against Chromium. `--allow-skipped` keeps CI green when WebKit isn't installed."
+  }
+  new {
+    id = "H2"
+    name = "iOS Safari vs Android Chrome parity"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Partial via `cross-browser webkit`; no mobile-emulation profile bundling."
+  }
+  new {
+    id = "H3"
+    name = "OS-specific font rendering"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Partial: rolled into the H1 cross-browser diff; no dedicated font-rendering harness."
+  }
+  new {
+    id = "H4"
+    name = "Network-throttled rendering"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "No throttle flag today; Playwright supports it but no vrt CLI surface yet."
+  }
+  new {
+    id = "G1"
+    name = "Cumulative Layout Shift measurement"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    implementedBy = "code"
+    implementedAt = "src/perf.ts"
+    description = "`vrt perf` reads CLS from an in-page PerformanceObserver."
+  }
+  new {
+    id = "G2"
+    name = "LCP and FCP measurement"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    implementedBy = "code"
+    implementedAt = "src/perf.ts"
+    description = "`vrt perf` reports both core paint timings from the same observer wiring as G1."
+  }
+  new {
+    id = "G3"
+    name = "Bundle size analysis"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Out of scope per v2 matrix: bundle analyzers and Lighthouse cover this lane; vrt has no asset-pipeline integration."
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Preserved for matrix-row parity."
+  }
+  new {
+    id = "G4"
+    name = "FOUC detection"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Partial: LCP element identity from `perf` hints at FOUC; no dedicated unstyled-paint window detector."
+  }
+  new {
+    id = "G5"
+    name = "Image lazy-loading correctness"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "No scroll-driven test today; would need viewport-window snapshots tied to scroll events."
   }
   new {
     id = "I1"
@@ -302,8 +720,60 @@ scenarios {
     contributes { "GOAL-VARIANT-RESILIENCE" }
     description = "`vrt i18n-stress` substitutes button / link text with 1.4× longer strings and flags overflow or wrap-to-second-line."
   }
+  new {
+    id = "I2"
+    name = "Short or empty content"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Scriptable via `interact` (set content then snapshot); no first-class CLI."
+  }
+  new {
+    id = "I3"
+    name = "Special chars and emoji rendering"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Partial: `compare` plus `i18n-stress` can drive this but no emoji-specific assertion."
+  }
+  new {
+    id = "I4"
+    name = "Different image aspect ratios"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Per-fixture today; no aspect-ratio sweep CLI."
+  }
+  new {
+    id = "I5"
+    name = "XSS-safe rendering of user-generated content"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Out of scope per v2 matrix: security check, not a visual signal. Use an XSS scanner."
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Preserved for matrix-row parity."
+  }
+  new {
+    id = "I6"
+    name = "Pluralization 1 item vs N items"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Scriptable via `interact`; no first-class pluralization-sweep command."
+  }
 
   // ── Bug-finding / QA ────────────────────────────────────────
+  new {
+    id = "J1"
+    name = "Cross-page component drift"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-DESIGN-SYSTEM" }
+    implementedBy = "code"
+    implementedAt = "src/multi-page-consistency.ts"
+    description = "`vrt multi-page-consistency` diffs the same component selector across N pages and surfaces the outlier."
+  }
   new {
     id = "J2"
     name = "Inline-vs-component drift on a single page"
@@ -313,6 +783,70 @@ scenarios {
     description = "`vrt component-consistency` screenshots every selector match on the page and diffs each against the reference — catches the still-inline call site after a botched extract-to-component refactor."
   }
   new {
+    id = "J3"
+    name = "Variant rendering across props"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-DESIGN-SYSTEM" }
+    description = "Partial: combine `interact` (drive prop changes) with `component-consistency` (diff each variant) — no first-class props-matrix CLI."
+  }
+  new {
+    id = "J4"
+    name = "Storybook story diff"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Out of scope per v2 matrix: Chromatic and Loki cover this lane with Storybook-native integration vrt doesn't have."
+    contributes { "GOAL-DESIGN-SYSTEM" }
+    description = "Preserved for matrix-row parity."
+  }
+  new {
+    id = "J5"
+    name = "Slot composition"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-DESIGN-SYSTEM" }
+    description = "Partial: `interact` plus `compare` can drive each slot fill; no slot-aware CLI."
+  }
+  new {
+    id = "K1"
+    name = "Reproduce user bug from screenshot"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    implementedBy = "code"
+    implementedAt = "src/component-extract.ts"
+    description = "`vrt component-extract` crops the bug region from the user-supplied screenshot; `vrt component-from-image` drives the rebuild loop."
+  }
+  new {
+    id = "K2"
+    name = "Off-by-one-pixel hunt"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "Bbox-Δ plus heatmap regions surface single-pixel drift; the report's worst-row table sorts these to the top."
+  }
+  new {
+    id = "K3"
+    name = "Overflow or clipping detection"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    implementedBy = "code"
+    implementedAt = "src/i18n-stress.ts"
+    description = "`vrt i18n-stress` flags overflow / wrap regressions; `compare` plus heatmap catches generic clipping."
+  }
+  new {
+    id = "K4"
+    name = "Z-index stacking issues"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-DESIGN-SYSTEM" }
+    description = "Partial: visible in pixel diff; not directly identified as a stacking problem by any current CLI."
+  }
+  new {
     id = "K5"
     name = "CLS detection via in-page PerformanceObserver"
     severity = "major"
@@ -320,20 +854,247 @@ scenarios {
     contributes { "GOAL-VARIANT-RESILIENCE" }
     description = "`vrt perf` wires up a PerformanceObserver inside the page and reports CLS / LCP / FCP without depending on Lighthouse."
   }
+  new {
+    id = "K6"
+    name = "Asset 404 or broken images"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Partial: `render-sanity` in `compare` flags pages with missing-image placeholders; no dedicated network-error gate."
+  }
+  new {
+    id = "K7"
+    name = "Subtle font-render regression"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Partial: typography hints catch size and weight buckets; pixel-level subpixel rendering drift slips through."
+  }
+
+  // ── Dev loop integration ─────────────────────────────────────
+  new {
+    id = "L1"
+    name = "Pre-commit visual check"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-SNAPSHOT-WORKFLOW" }
+    implementedBy = "code"
+    implementedAt = "src/workflow-cli.ts"
+    description = "`vrt compare` plus `vrt workflow approve` slot into a pre-commit hook for baseline-driven visual gating."
+  }
+  new {
+    id = "L2"
+    name = "PR visual diff"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-SNAPSHOT-WORKFLOW" }
+    description = "Partial: `vrt compare-runs` diffs two prior runs; no first-class PR-comment integration."
+  }
+  new {
+    id = "L3"
+    name = "Live monitoring of production regressions"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Out of scope per v2 matrix: commercial VRT vendors own this lane; vrt is build-time / dev-loop."
+    contributes { "GOAL-SNAPSHOT-WORKFLOW" }
+    description = "Preserved for matrix-row parity."
+  }
+  new {
+    id = "L4"
+    name = "Hot-reload validation"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Out of scope per v2 matrix: per-iteration browser launch is too slow for the inner dev loop."
+    contributes { "GOAL-SNAPSHOT-WORKFLOW" }
+    description = "Preserved for matrix-row parity."
+  }
+  new {
+    id = "L5"
+    name = "Bundled per-target check via skill run"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-AGENT-ERGONOMICS" }
+    implementedBy = "code"
+    implementedAt = "src/skill-cli.ts"
+    description = "`vrt skill run <name> --against <html|url>` aggregates all configured checks for the target into one report."
+  }
+
+  // ── Responsive / device ──────────────────────────────────────
+  new {
+    id = "D1"
+    name = "Mobile tablet desktop breakpoint sweep"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    implementedBy = "code"
+    implementedAt = "src/compare.ts"
+    description = "`vrt compare` accepts per-viewport configs; `component-geometry` reports bbox shifts across breakpoints."
+  }
+  new {
+    id = "D2"
+    name = "Landscape orientation"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Partial: any viewport works; there is no explicit orientation switch CLI."
+  }
+  new {
+    id = "D3"
+    name = "Foldable or dual-screen rendering"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Marked out-of-scope per v2 matrix: edge-case device class with no install base justifying tooling investment."
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    description = "Preserved for matrix-row parity; no successor."
+  }
+  new {
+    id = "D4"
+    name = "Retina 2x DPI rendering"
+    severity = "minor"
+    reviewStatus = "approved"
+    contributes { "GOAL-VARIANT-RESILIENCE" }
+    implementedBy = "code"
+    implementedAt = "src/component-from-image.ts"
+    description = "`vrt component-from-image --device-scale-factor 2` renders at 2× for retina parity."
+  }
+  new {
+    id = "D5"
+    name = "Touchscreen-on-desktop affordances"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+    description = "Partial: `a11y-touch` + `a11y-focus-order` cover the discoverable parts; no first-class CLI."
+  }
 
   // ── Interaction ─────────────────────────────────────────────
+  new {
+    id = "E1"
+    name = "Hover state diff"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    implementedBy = "code"
+    implementedAt = "src/component-from-image.ts"
+    description = "`component-from-image --states hover` plus `interact` cover hover-state diffs."
+  }
+  new {
+    id = "E2"
+    name = "Focus and focus-visible state"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-A11Y-COMPLIANCE" }
+    implementedBy = "code"
+    implementedAt = "src/component-from-image.ts"
+    description = "`component-from-image --states focus-visible` plus `a11y-focus-order` verify focus visibility."
+  }
+  new {
+    id = "E3"
+    name = "Disabled state"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Scriptable via `interact` (set the attribute then snapshot); no first-class disabled-sweep CLI."
+  }
+  new {
+    id = "E4"
+    name = "Loading state"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Scriptable via `interact` (snapshot before resolve); no spinner / skeleton dedicated CLI."
+  }
   new {
     id = "E5"
     name = "Form validation state diff from invalid to valid"
     severity = "major"
-    reviewStatus = "draft"
+    reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     description = #"""
-      Draft — no canonical fixture yet. The underlying engine
-      (`vrt interact`) is already shipped; once we have a fixture
-      with deliberate validation states this scenario gets promoted
-      to approved and Test.pkl drops the `pending = true` marker.
+      `vrt interact` drives a form sequence through deliberate
+      invalid → valid transitions (bad email, short password, then
+      corrections) and pixel-diffs each transition so reviewers can
+      see the validation-state visuals (red borders, error messages,
+      enabled submit button) actually change as expected.
     """#
+  }
+  new {
+    id = "E6"
+    name = "Empty state"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Scriptable via `interact` (set state then snapshot); no first-class empty-state CLI."
+  }
+  new {
+    id = "E7"
+    name = "Dropdown or menu open"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    implementedBy = "code"
+    implementedAt = "src/interact.ts"
+    description = "Trigger the toggle via `interact` or `explore`; both engines diff the open vs closed state."
+  }
+  new {
+    id = "E8"
+    name = "Modal or dialog open"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    implementedBy = "code"
+    implementedAt = "src/interact.ts"
+    description = "`interact` drives the open click + backdrop + close sequence."
+  }
+  new {
+    id = "E9"
+    name = "Carousel or slider transitions"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Out of scope per v2 matrix: transitions are intentionally disabled for determinism; mid-frame capture would require a separate animation-first toolkit."
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Preserved for matrix-row parity."
+  }
+  new {
+    id = "E10"
+    name = "Accordion expand or collapse"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    implementedBy = "code"
+    implementedAt = "src/interact.ts"
+    description = "`interact` drives the toggle and snapshots both states."
+  }
+  new {
+    id = "E11"
+    name = "Tooltip on hover with delay"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Partial: `interact` hover + wait does the job; no tooltip-specific helper yet."
+  }
+  new {
+    id = "E12"
+    name = "Toast notification fade in or out"
+    severity = "minor"
+    reviewStatus = "approved"
+    deprecated = true
+    deprecatedReason = "Out of scope per v2 matrix: transitions are disabled; the fade frames are unreachable."
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    description = "Preserved for matrix-row parity."
+  }
+  new {
+    id = "E13"
+    name = "Tab switch"
+    severity = "major"
+    reviewStatus = "approved"
+    contributes { "GOAL-MARKUP-FIDELITY" }
+    implementedBy = "code"
+    implementedAt = "src/interact.ts"
+    description = "`interact` drives the tab-click sequence and pixel-diffs each panel state."
   }
 
   // ── Agent ergonomics ────────────────────────────────────────
@@ -364,6 +1125,62 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-AGENT-ERGONOMICS" }
     description = "`vrt skill run <name> --against <html|url>` reads `.vrt-skills/<name>.json` and runs every check in the playbook against the target, aggregating into one report."
+  }
+  new {
+    id = "O6"
+    name = "Self-healing across multiple runs"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-AGENT-ERGONOMICS" }
+    description = "Partial: the healer is advisory only and does not persist fixes across runs. Accumulation would require a session log keyed to the source selector."
+  }
+  new {
+    id = "O7"
+    name = "Per-domain skill libraries"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-AGENT-ERGONOMICS" }
+    description = "Not implemented: no global skill registry. Each project carries its own `.vrt-skills/` today; cross-project reuse needs a publish path."
+  }
+  new {
+    id = "O8"
+    name = "WebMCP-native discovery when spec ships"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-AGENT-ERGONOMICS" }
+    description = "Partial: the discovery layer in `explore` abstracts the source, but the WebMCP wire format itself is not yet implemented."
+  }
+  new {
+    id = "O9"
+    name = "Agent-editable helpers layer"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-AGENT-ERGONOMICS" }
+    description = "Not implemented: no `.vrt-agent/` convention for agent-authored helpers separate from project source."
+  }
+  new {
+    id = "O10"
+    name = "Live snapshot of an agent session"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-AGENT-ERGONOMICS" }
+    description = "Not implemented: no session log of agent actions; record-replay would need a wrapper around the CLI surface."
+  }
+  new {
+    id = "O11"
+    name = "Bug-repro fixture auto-generation"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-AGENT-ERGONOMICS" }
+    description = "Not implemented: could combine `component-extract` with a `compare` baseline + delta, but no command stitches them today."
+  }
+  new {
+    id = "O12"
+    name = "LLM judgment on rendered output"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-AGENT-ERGONOMICS" }
+    description = "Not implemented as a CLI: `vlm-bench` exercises VLM judgment internally but there is no `vrt judge` user-facing surface."
   }
   new {
     id = "SMOKE"
