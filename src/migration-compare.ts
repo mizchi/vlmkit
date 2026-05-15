@@ -30,7 +30,7 @@ import {
 } from "./crater-client.ts";
 import { compareScreenshots, generateDiffReport } from "./heatmap.ts";
 import { composeTriptych } from "./triptych.ts";
-import { loadDesignTokens, type DesignTokens } from "./design-md-tokens.ts";
+import { loadDesignTokens, snapColor, type DesignTokens } from "./design-md-tokens.ts";
 import { generateWireframeFixCandidates, type WireframeFixSuggestion } from "./wireframe-fix-candidates.ts";
 import {
   buildMigrationRegionApprovalContexts,
@@ -1445,6 +1445,83 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           const totalMissing = perViewportPalette.reduce((s, v) => s + v.diff.onlyInBaseline.length, 0);
           const totalExtra = perViewportPalette.reduce((s, v) => s + v.diff.onlyInVariant.length, 0);
           console.log(`  ${DIM}Palette diff: ${totalMissing} missing color(s), ${totalExtra} extra color(s) across ${perViewportPalette.length} viewport(s)${RESET}`);
+
+          // Reverse-resolve each unmatched hex against the DESIGN.md
+          // color tokens so the agent sees "swap surface-variant →
+          // surface-container-high" instead of two bare hex strings.
+          if (designTokens && designTokens.colors.size > 0) {
+            const swapsByVp = new Map<string, Array<{ from?: string; to?: string; baselineHex: string; variantHex: string; deltaE: number }>>();
+            for (const vp of perViewportPalette) {
+              // Pair each missing baseline color with the closest
+              // remaining variant extra (same Euclidean RGB threshold
+              // as `diffPalettes`'s pairing pass would use). We just
+              // want a candidate rename surface here.
+              const extras = [...vp.diff.onlyInVariant];
+              const pairs: Array<{ from?: string; to?: string; baselineHex: string; variantHex: string; deltaE: number }> = [];
+              for (const miss of vp.diff.onlyInBaseline) {
+                let bestIdx = -1;
+                let bestDist = Infinity;
+                for (let i = 0; i < extras.length; i++) {
+                  const dr = miss.r - extras[i].r, dg = miss.g - extras[i].g, db = miss.b - extras[i].b;
+                  const d = Math.sqrt(dr * dr + dg * dg + db * db);
+                  if (d < bestDist) { bestDist = d; bestIdx = i; }
+                }
+                if (bestIdx < 0) continue;
+                const extra = extras.splice(bestIdx, 1)[0];
+                const fromTok = snapColor(designTokens, miss.hex);
+                const toTok = snapColor(designTokens, extra.hex);
+                if (!fromTok && !toTok) continue;
+                pairs.push({
+                  from: fromTok?.name,
+                  to: toTok?.name,
+                  baselineHex: miss.hex,
+                  variantHex: extra.hex,
+                  deltaE: bestDist,
+                });
+              }
+              if (pairs.length > 0) swapsByVp.set(vp.viewport, pairs);
+            }
+            for (const [vp, pairs] of swapsByVp) {
+              for (const p of pairs.slice(0, 4)) {
+                const from = p.from ?? `${p.baselineHex}`;
+                const to = p.to ?? `${p.variantHex}`;
+                if (p.from && p.to && p.from !== p.to) {
+                  console.log(`    ${CYAN}swap${RESET} ${from} → ${to} ${DIM}(${p.baselineHex} → ${p.variantHex}, ${vp})${RESET}`);
+                } else if (p.from || p.to) {
+                  console.log(`    ${DIM}near${RESET} ${from} ↔ ${to} ${DIM}(${p.baselineHex} ↔ ${p.variantHex}, ${vp})${RESET}`);
+                }
+              }
+            }
+
+            // Also surface lone unmatched colors with their nearest
+            // token, even when no pair was formed. Helps when a variant
+            // has an extra color the baseline never uses (e.g. an
+            // accidental fallback fill) — the agent gets "extra
+            // #f59e0b ≈ primary-container".
+            const paired = new Set<string>();
+            for (const pairs of swapsByVp.values()) {
+              for (const p of pairs) {
+                paired.add(`miss:${p.baselineHex}`);
+                paired.add(`extra:${p.variantHex}`);
+              }
+            }
+            for (const vp of perViewportPalette) {
+              for (const miss of vp.diff.onlyInBaseline) {
+                if (paired.has(`miss:${miss.hex}`)) continue;
+                const tok = snapColor(designTokens, miss.hex);
+                if (tok) {
+                  console.log(`    ${DIM}miss${RESET} ${miss.hex} ≈ ${tok.name} ${DIM}(ΔE ${tok.deltaE.toFixed(1)}, ${vp.viewport})${RESET}`);
+                }
+              }
+              for (const extra of vp.diff.onlyInVariant) {
+                if (paired.has(`extra:${extra.hex}`)) continue;
+                const tok = snapColor(designTokens, extra.hex);
+                if (tok) {
+                  console.log(`    ${DIM}extra${RESET} ${extra.hex} ≈ ${tok.name} ${DIM}(ΔE ${tok.deltaE.toFixed(1)}, ${vp.viewport})${RESET}`);
+                }
+              }
+            }
+          }
         }
 
         // Wireframe-mode fix candidates: synthesize "try N px (token X)"
