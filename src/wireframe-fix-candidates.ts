@@ -40,17 +40,27 @@ export interface WireframeFixSuggestion {
   deltaPx: number;
   /**
    * How this delta relates to the full viewport set:
-   *   - "all"       : observation covers every viewport with the same sign+magnitude.
-   *                   Suggestion is safe to apply globally.
-   *   - "subset"    : observation only covers a subset of viewports. The agent
-   *                   should gate the change with a media query so the
-   *                   uncovered viewports aren't affected.
-   *   - "divergent" : the same component has observations with opposite signs
-   *                   on different viewports. A global edit cannot satisfy
-   *                   both — the underlying CSS rule is responsive and the
-   *                   per-viewport values need separate handling.
+   *   - "all"               : observation covers every viewport with the same
+   *                           sign+magnitude. Suggestion is safe to apply
+   *                           globally.
+   *   - "subset"            : observation only covers a subset of viewports.
+   *                           The agent should gate the change with a media
+   *                           query so the uncovered viewports aren't
+   *                           affected.
+   *   - "divergent"         : the same component has observations with
+   *                           opposite signs on different viewports. A global
+   *                           edit cannot satisfy both — the underlying CSS
+   *                           rule is responsive and the per-viewport values
+   *                           need separate handling.
+   *   - "magnitude-divergent": same-sign but materially different magnitudes
+   *                           across viewports (e.g. -24px on mobile, -48px on
+   *                           desktop). Surfaces "the baseline uses distinct
+   *                           per-viewport values; the variant uses one
+   *                           value everywhere" — a global edit will fix
+   *                           one viewport while under- or over-correcting
+   *                           the others.
    */
-  scope: "all" | "subset" | "divergent";
+  scope: "all" | "subset" | "divergent" | "magnitude-divergent";
   /**
    * Per-viewport breakdown. Always populated; for non-divergent rows
    * every entry has the same sign.
@@ -217,6 +227,46 @@ export function generateWireframeFixCandidates(
     const example = perVpDeltas[0].m;
     const dims = `${example.baseline.width}×${example.baseline.height}`;
 
+    // Magnitudes per viewport for this rank.
+    const magnitudes = perVpDeltas.map((p) => Math.abs(p.deltaPx));
+    const maxMag = Math.max(...magnitudes);
+    const minMag = Math.min(...magnitudes);
+    // Magnitude-divergent: same sign across all viewports, but the
+    // smallest and largest deltas are clearly distinct (>= 8px apart).
+    // Distinct enough that one global value can't satisfy both ends.
+    const MIN_MAGNITUDE_SPREAD = 8;
+    if (signs.size === 1 && maxMag - minMag >= MIN_MAGNITUDE_SPREAD) {
+      const summary = perVpDeltas
+        .map((p) => `${p.viewport}: ${signed(p.deltaPx)}`)
+        .join(", ");
+      const direction = perVpDeltas[0].deltaPx > 0 ? "reducing" : "adding";
+      const viewportList = perVpDeltas.map((p) => p.viewport);
+      // Per-viewport token snapping for each magnitude.
+      const perVpSnap = perVpDeltas.map((p) => {
+        const snap = input.tokens ? snapSpacing(input.tokens, Math.abs(p.deltaPx)) : null;
+        return {
+          viewport: p.viewport,
+          deltaPx: p.deltaPx,
+          tokenHint: snap ? `${snap.token.name} (${snap.token.raw})` : `${Math.abs(p.deltaPx)}px`,
+        };
+      });
+      const candidates = input.domPositionEntries
+        ? matchCandidatesForDelta(maxMag, viewportList, input.domPositionEntries)
+        : undefined;
+      out.push({
+        evidence: `component rank=${rank} (bbox ${dims}): magnitude-divergent Δtop across viewports (${summary})`,
+        hypothesis: "baseline uses distinct per-viewport spacing values; variant uses one value everywhere — a global edit will over- or under-correct depending on viewport",
+        suggestion: `use distinct per-viewport spacing values: ${perVpSnap
+          .map((p) => `${direction} ${Math.abs(p.deltaPx)}px on ${p.viewport} (token: ${p.tokenHint})`).join("; ")}`,
+        viewports: viewportList,
+        confidence: "high",
+        deltaPx: maxMag,
+        scope: "magnitude-divergent",
+        perViewport: perVpDeltas.map((p) => ({ viewport: p.viewport, deltaPx: p.deltaPx })),
+        candidates,
+      });
+      continue;
+    }
     if (signs.size > 1) {
       // Divergent: this component has opposite-sign deltas across
       // viewports. A single global edit cannot satisfy both — the

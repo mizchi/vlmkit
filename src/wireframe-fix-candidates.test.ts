@@ -276,6 +276,49 @@ describe("generateWireframeFixCandidates", () => {
       "desktop entry should not be surfaced as a candidate for a mobile-only suggestion");
   });
 
+  it("flags same-sign-different-magnitude responsive divergence as MAG-DIVERGENT (#31)", () => {
+    // Mobile needs +24 (md token), desktop needs +40 (lg token).
+    // Same sign, spread = 16px ≥ threshold. Per-viewport snap finds
+    // a different token for each viewport — exactly the responsive
+    // case agent-d called out where a single global value can't
+    // satisfy both ends.
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, -24)] },
+        { viewport: "desktop", matches: [bbox(0, -40)] },
+        { viewport: "wide", matches: [bbox(0, -40)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+    });
+    const md = out.filter((s) => s.scope === "magnitude-divergent");
+    assert.equal(md.length, 1);
+    assert.match(md[0].evidence, /magnitude-divergent/);
+    assert.match(md[0].evidence, /mobile: -24px/);
+    assert.match(md[0].evidence, /desktop: -40px/);
+    assert.match(md[0].suggestion, /distinct per-viewport/);
+    assert.match(md[0].suggestion, /token: md \(24px\)/);
+    assert.match(md[0].suggestion, /token: lg \(40px\)/);
+    // No separate SUBSET rows for the same rank — merged into one.
+    const sameRankSubset = out.filter((s) => s.scope === "subset" && s.evidence.includes("rank=0"));
+    assert.equal(sameRankSubset.length, 0);
+  });
+
+  it("does NOT flag MAG-DIVERGENT when magnitudes are within tolerance (≤8px spread)", () => {
+    // 24 vs 28 — within the threshold; should fall through to subset/all.
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 24)] },
+        { viewport: "desktop", matches: [bbox(0, 28)] },
+        { viewport: "wide", matches: [bbox(0, 28)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+    });
+    // 24 and 28 round to the same magnitude bucket — should be one row.
+    assert.ok(out.every((s) => s.scope !== "magnitude-divergent"));
+  });
+
   it("tolerates ±2px between bbox magnitude and DP entry magnitude", () => {
     const out = generateWireframeFixCandidates({
       bboxByViewport: [

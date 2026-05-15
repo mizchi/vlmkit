@@ -1565,10 +1565,14 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         });
         if (wireframeSuggestions.length > 0) {
           wireframeFixReports.push({ variantFile: variantFileLabel, suggestions: wireframeSuggestions });
-          // Sort divergent suggestions first — they're the highest-impact
-          // "don't go global" signal an agent needs to see before acting.
+          // Sort highest-impact scope first so the "don't go global"
+          // signals land before any borderline global edits.
           const sorted = [...wireframeSuggestions].sort((a, b) => {
-            const scopeRank = (s: typeof a.scope) => s === "divergent" ? 0 : s === "subset" ? 1 : 2;
+            const scopeRank = (s: typeof a.scope) =>
+              s === "divergent" ? 0
+              : s === "magnitude-divergent" ? 1
+              : s === "subset" ? 2
+              : 3;
             if (scopeRank(a.scope) !== scopeRank(b.scope)) return scopeRank(a.scope) - scopeRank(b.scope);
             return 0;
           });
@@ -1580,9 +1584,11 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             // they can't be missed; subset gets a subtle "SUBSET" tag.
             const scopeTag = s.scope === "divergent"
               ? ` ${BOLD}${RED}[DIVERGENT]${RESET}`
-              : s.scope === "subset"
-                ? ` ${YELLOW}[SUBSET]${RESET}`
-                : "";
+              : s.scope === "magnitude-divergent"
+                ? ` ${BOLD}${CYAN}[MAG-DIVERGENT]${RESET}`
+                : s.scope === "subset"
+                  ? ` ${YELLOW}[SUBSET]${RESET}`
+                  : "";
             console.log(`    ${conf}[${s.confidence}]${RESET}${scopeTag} ${s.evidence}`);
             console.log(`      ${DIM}→ ${s.suggestion}${RESET}`);
             if (s.candidates && s.candidates.length > 0) {
