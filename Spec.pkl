@@ -1127,6 +1127,62 @@ scenarios {
     description = "`vrt skill run <name> --against <html|url>` reads `.vrt-skills/<name>.json` and runs every check in the playbook against the target, aggregating into one report."
   }
   new {
+    id = "O6"
+    name = "Self-healing across multiple runs"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-AGENT-ERGONOMICS" }
+    description = "Partial: the healer is advisory only and does not persist fixes across runs. Accumulation would require a session log keyed to the source selector."
+  }
+  new {
+    id = "O7"
+    name = "Per-domain skill libraries"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-AGENT-ERGONOMICS" }
+    description = "Not implemented: no global skill registry. Each project carries its own `.vrt-skills/` today; cross-project reuse needs a publish path."
+  }
+  new {
+    id = "O8"
+    name = "WebMCP-native discovery when spec ships"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-AGENT-ERGONOMICS" }
+    description = "Partial: the discovery layer in `explore` abstracts the source, but the WebMCP wire format itself is not yet implemented."
+  }
+  new {
+    id = "O9"
+    name = "Agent-editable helpers layer"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-AGENT-ERGONOMICS" }
+    description = "Not implemented: no `.vrt-agent/` convention for agent-authored helpers separate from project source."
+  }
+  new {
+    id = "O10"
+    name = "Live snapshot of an agent session"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-AGENT-ERGONOMICS" }
+    description = "Not implemented: no session log of agent actions; record-replay would need a wrapper around the CLI surface."
+  }
+  new {
+    id = "O11"
+    name = "Bug-repro fixture auto-generation"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-AGENT-ERGONOMICS" }
+    description = "Not implemented: could combine `component-extract` with a `compare` baseline + delta, but no command stitches them today."
+  }
+  new {
+    id = "O12"
+    name = "LLM judgment on rendered output"
+    severity = "minor"
+    reviewStatus = "draft"
+    contributes { "GOAL-AGENT-ERGONOMICS" }
+    description = "Not implemented as a CLI: `vlm-bench` exercises VLM judgment internally but there is no `vrt judge` user-facing surface."
+  }
+  new {
     id = "SMOKE"
     name = "Mechanical smoke covers every markup-assistance CLI"
     severity = "critical"
