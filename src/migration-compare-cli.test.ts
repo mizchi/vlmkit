@@ -112,4 +112,16 @@ describe("parseMigrationCompareArgs", () => {
     assert.equal(options.computedStyleDiff, false);
     assert.equal(options.domPositionDiff, false);
   });
+
+  it("should default triptych to ON and honor --no-triptych", () => {
+    const def = parseMigrationCompareArgs(["before.html", "after.html"]);
+    assert.equal(def.triptych, true);
+
+    const optOut = parseMigrationCompareArgs([
+      "--no-triptych",
+      "before.html",
+      "after.html",
+    ]);
+    assert.equal(optOut.triptych, false);
+  });
 });

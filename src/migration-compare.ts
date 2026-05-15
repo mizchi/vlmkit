@@ -29,6 +29,7 @@ import {
   type PaintTreeChange,
 } from "./crater-client.ts";
 import { compareScreenshots, generateDiffReport } from "./heatmap.ts";
+import { composeTriptych } from "./triptych.ts";
 import {
   buildMigrationRegionApprovalContexts,
   classifyMigrationDiff,
@@ -181,6 +182,12 @@ export interface MigrationCompareOptions {
    * surfaced alongside the default-state diff. Opt-in via `--states`.
    */
   states?: ForcedPseudoState[];
+  /**
+   * Emit a `baseline | variant | heatmap` triptych PNG per viewport
+   * alongside the existing screenshots. Default true; pass
+   * `--no-triptych` to disable.
+   */
+  triptych?: boolean;
 }
 
 export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptions {
@@ -219,6 +226,7 @@ export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptio
     domPositionDiff: !hasFlag(args, "no-dom-position-diff") && !hasFlag(args, "no-position-diff"),
     componentBboxDiff: !hasFlag(args, "no-component-bbox"),
     states: parseStatesArg(args),
+    triptych: !hasFlag(args, "no-triptych"),
   };
 }
 
@@ -893,6 +901,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       const variantDomPositionByVp = new Map<string, PositionedElement[]>();
       const variantBboxesByVp = new Map<string, BboxElement[]>();
       const shiftRegionsByVp = new Map<string, ShiftRegion[]>();
+      const triptychPaths = new Map<string, string>();
       let variantSanity: RenderSanityResult | undefined;
       for (const [vpIndex, vp] of VIEWPORTS.entries()) {
         const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
@@ -991,6 +1000,26 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         const diff = await compareScreenshots(snap, { outputDir });
         const rawDiffRatio = diff?.diffRatio ?? 0;
         const rawDiffPixels = diff?.diffPixels ?? 0;
+
+        // Emit `baseline | variant | heatmap` triptych so an agent can
+        // read all three panels in one file. No-op for zero-diff
+        // viewports (no heatmap → composeTriptych returns undefined).
+        if ((options.triptych ?? true) && rawDiffRatio > 0) {
+          const triptychPath = join(outputDir, `${variantName}-${vp.label}-triptych.png`);
+          const baselinePngPath = baselineScreenshots.get(vp.label)!;
+          const heatmapPngPath = join(outputDir, `${variantName}-${vp.label}_heatmap.png`);
+          try {
+            const written = await composeTriptych(browser, {
+              baselinePath: baselinePngPath,
+              variantPath: variantScreenshotPath,
+              heatmapPath: heatmapPngPath,
+              outputPath: triptychPath,
+            });
+            if (written) triptychPaths.set(`${variantName}-${vp.label}`, written);
+          } catch (error) {
+            console.log(`  ${YELLOW}Triptych compose error (${variantName} / ${vp.label}): ${String(error)}${RESET}`);
+          }
+        }
 
         // Shift detection
         const diffReport = rawDiffRatio > 0
@@ -1392,6 +1421,10 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           const totalExtra = perViewportPalette.reduce((s, v) => s + v.diff.onlyInVariant.length, 0);
           console.log(`  ${DIM}Palette diff: ${totalMissing} missing color(s), ${totalExtra} extra color(s) across ${perViewportPalette.length} viewport(s)${RESET}`);
         }
+      }
+
+      if (triptychPaths.size > 0) {
+        console.log(`  ${DIM}Triptych: ${triptychPaths.size} viewport(s) → ${outputDir}/${variantName}-<viewport>-triptych.png (baseline | variant | heatmap)${RESET}`);
       }
 
       // Multi-state capture (opt-in via --states hover focus ...).
