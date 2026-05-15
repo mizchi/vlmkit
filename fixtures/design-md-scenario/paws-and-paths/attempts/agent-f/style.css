@@ -1,0 +1,221 @@
+:root {
+  --surface: #f9f9ff;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f0f3ff;
+  --surface-container: #e7eefe;
+  --surface-container-high: #e2e8f8;
+  --surface-container-highest: #dce2f3;
+  --on-surface: #151c27;
+  --on-surface-variant: #534434;
+  --outline: #867461;
+  --primary: #855300;
+  --on-primary: #ffffff;
+  --primary-container: #f59e0b;
+  --on-primary-container: #613b00;
+  --secondary: #0058be;
+  --on-secondary: #ffffff;
+  --secondary-container: #2170e4;
+  --on-secondary-container: #fefcff;
+  --tertiary-container: #1abdff;
+  --on-tertiary-container: #004966;
+  --background: #f9f9ff;
+
+  --xs: 4px;
+  --sm: 12px;
+  --md: 24px;
+  --lg: 40px;
+  --xl: 64px;
+  --gutter: 16px;
+  --margin: 24px;
+
+  --r-sm: 0.25rem;
+  --r-default: 0.5rem;
+  --r-md: 0.75rem;
+  --r-lg: 1rem;
+  --r-xl: 1.5rem;
+  --r-full: 9999px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--background);
+  color: var(--on-surface);
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+}
+
+.container {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--lg) var(--gutter);
+  display: grid;
+  row-gap: var(--lg);
+}
+
+/* Hero */
+.hero {
+  display: grid;
+  row-gap: var(--sm);
+}
+.eyebrow {
+  margin: 0;
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+.display {
+  margin: 0;
+  font-size: 44px;
+  line-height: 52px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--on-surface);
+}
+.lede {
+  margin: 0;
+  font-size: 18px;
+  line-height: 28px;
+  font-weight: 400;
+  color: var(--on-surface);
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sm);
+  margin-top: var(--sm);
+}
+.btn {
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: 0.01em;
+  padding: var(--md);
+  border-radius: var(--r-lg);
+}
+.btn-primary {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.btn-secondary {
+  background: var(--secondary);
+  color: var(--on-secondary);
+}
+
+/* Profile card */
+.profile {
+  background: var(--surface-container-lowest);
+  border-radius: var(--r-xl);
+  padding: var(--md);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--md);
+  box-shadow: 0 8px 24px rgba(133, 83, 0, 0.06);
+}
+.avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--r-full);
+  background: var(--primary-container);
+  flex: 0 0 auto;
+}
+.profile-text { flex: 1 1 auto; min-width: 0; }
+.profile-name {
+  margin: 0;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+  color: var(--on-surface);
+}
+.profile-sub {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+  color: var(--on-surface-variant);
+}
+.badge {
+  background: var(--tertiary-container);
+  color: var(--on-tertiary-container);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding: var(--xs) var(--sm);
+  border-radius: var(--r-full);
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* Stats row */
+.stats {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--md);
+}
+.stat {
+  background: var(--surface-container-highest);
+  color: var(--on-surface);
+  border-radius: var(--r-md);
+  padding: var(--md);
+}
+.stat-number {
+  font-size: 32px;
+  line-height: 40px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--primary);
+}
+.stat-label {
+  margin-top: var(--xs);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--on-surface);
+}
+
+/* Mobile: avatar+text on row, badge wraps below */
+@media (max-width: 639px) {
+  .profile {
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    column-gap: var(--md);
+    row-gap: var(--sm);
+    align-items: start;
+  }
+  .avatar { grid-column: 1; grid-row: 1; }
+  .profile-text { grid-column: 2; grid-row: 1; }
+  .badge {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: start;
+  }
+  /* force sub-line to wrap by constraining its width */
+  .profile-sub { max-width: 14ch; }
+}
+
+/* Desktop & up: stats side-by-side, profile single row with badge right */
+@media (min-width: 640px) {
+  .container {
+    padding: var(--xl) var(--md);
+  }
+  .stats {
+    grid-template-columns: 1fr 1fr;
+  }
+  .profile .badge {
+    margin-left: auto;
+  }
+}

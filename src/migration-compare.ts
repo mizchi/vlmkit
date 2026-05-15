@@ -1569,12 +1569,19 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             }
             for (const [vp, pairs] of swapsByVp) {
               for (const p of pairs.slice(0, 4)) {
-                const from = p.from ?? `${p.baselineHex}`;
-                const to = p.to ?? `${p.variantHex}`;
+                // Aligned with the candidate-row convention
+                // (current → target): the variant's token is what
+                // the agent currently uses; the baseline's token is
+                // the target they should switch to. Agent-f v6:
+                // before this alignment the swap line read in the
+                // opposite direction from candidate rows, which
+                // was inconsistent.
+                const nowTok = p.to ?? `${p.variantHex}`;
+                const targetTok = p.from ?? `${p.baselineHex}`;
                 if (p.from && p.to && p.from !== p.to) {
-                  console.log(`    ${CYAN}swap${RESET} ${from} → ${to} ${DIM}(${p.baselineHex} → ${p.variantHex}, ${vp})${RESET}`);
+                  console.log(`    ${CYAN}swap${RESET} ${nowTok} (now) → ${targetTok} (target) ${DIM}(${p.variantHex} → ${p.baselineHex}, ${vp})${RESET}`);
                 } else if (p.from || p.to) {
-                  console.log(`    ${DIM}near${RESET} ${from} ↔ ${to} ${DIM}(${p.baselineHex} ↔ ${p.variantHex}, ${vp})${RESET}`);
+                  console.log(`    ${DIM}near${RESET} ${nowTok} (now) ↔ ${targetTok} (target) ${DIM}(${p.variantHex} ↔ ${p.baselineHex}, ${vp})${RESET}`);
                 }
               }
             }
