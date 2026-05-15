@@ -191,4 +191,114 @@ describe("generateWireframeFixCandidates", () => {
     assert.equal(out[0].scope, "all");
     assert.doesNotMatch(out[0].evidence, /subset|divergent/);
   });
+
+  it("names a candidate selector when DOM-position-diff matches the bbox magnitude (#30)", () => {
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 24)] },
+        { viewport: "desktop", matches: [bbox(0, 24)] },
+        { viewport: "wide", matches: [bbox(0, 24)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+      domPositionEntries: [
+        // A clean matching rule: .profile got an extra 24px of top padding.
+        {
+          path: "body[0]>main[0]>section[1]",
+          tag: "section",
+          baselineClasses: "profile",
+          variantClasses: "profile",
+          property: "padding-top",
+          baseline: "0px",
+          variant: "24px",
+          viewport: "mobile",
+        },
+        // Unrelated property (color) — should be ignored.
+        {
+          path: "body[0]>main[0]",
+          tag: "main",
+          baselineClasses: "page",
+          variantClasses: "page",
+          property: "color",
+          baseline: "rgb(0,0,0)",
+          variant: "rgb(0,0,0)",
+          viewport: "mobile",
+        },
+      ],
+    });
+    assert.ok(out[0].candidates && out[0].candidates.length === 1);
+    assert.equal(out[0].candidates[0].selector, ".profile");
+    assert.equal(out[0].candidates[0].property, "padding-top");
+    assert.equal(out[0].candidates[0].baselineValue, "0px");
+    assert.equal(out[0].candidates[0].variantValue, "24px");
+  });
+
+  it("does not crash when DOM-position-diff input is missing", () => {
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 24)] },
+        { viewport: "desktop", matches: [bbox(0, 24)] },
+        { viewport: "wide", matches: [bbox(0, 24)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+    });
+    assert.equal(out.length, 1);
+    assert.equal(out[0].candidates, undefined);
+  });
+
+  it("filters DP entries by viewport so candidates don't leak across breakpoints", () => {
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        // Mobile-only Δtop +24 → subset.
+        { viewport: "mobile", matches: [bbox(0, 24)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+      domPositionEntries: [
+        // Same magnitude on DESKTOP — must NOT show up as a mobile candidate.
+        {
+          path: "body[0]>section[0]",
+          tag: "section",
+          baselineClasses: "card",
+          variantClasses: "card",
+          property: "margin-top",
+          baseline: "0px",
+          variant: "24px",
+          viewport: "desktop",
+        },
+      ],
+    });
+    assert.equal(out[0].scope, "subset");
+    assert.equal(out[0].candidates, undefined,
+      "desktop entry should not be surfaced as a candidate for a mobile-only suggestion");
+  });
+
+  it("tolerates ±2px between bbox magnitude and DP entry magnitude", () => {
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 24)] },
+        { viewport: "desktop", matches: [bbox(0, 24)] },
+        { viewport: "wide", matches: [bbox(0, 24)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      domPositionEntries: [
+        {
+          path: "body[0]>section[1]",
+          tag: "section",
+          baselineClasses: "profile",
+          variantClasses: "profile",
+          property: "padding-top",
+          // 25 - 0 = 25, vs target 24 → within tolerance.
+          baseline: "0px",
+          variant: "25px",
+          viewport: "mobile",
+        },
+      ],
+    });
+    assert.ok(out[0].candidates && out[0].candidates.length === 1);
+  });
 });

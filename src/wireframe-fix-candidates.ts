@@ -21,7 +21,8 @@
 
 import type { MatchedBbox } from "./component-bbox.ts";
 import type { MatchedTextRow } from "./text-rows.ts";
-import { snapSpacing, type DesignTokens } from "./design-md-tokens.ts";
+import { snapSpacing, parseLengthToPx, type DesignTokens } from "./design-md-tokens.ts";
+import type { DpEntryWithViewport } from "./dom-position-styles.ts";
 
 export interface WireframeFixSuggestion {
   /** What we observed in the image diff. */
@@ -55,6 +56,20 @@ export interface WireframeFixSuggestion {
    * every entry has the same sign.
    */
   perViewport?: Array<{ viewport: string; deltaPx: number }>;
+  /**
+   * Candidate CSS rule(s) whose computed-style delta matches this
+   * suggestion's magnitude (within ±2px) on the affected viewports.
+   * Sourced from `domPositionDiff.entries`. Empty when no DOM
+   * correspondence is available or no entry matched — agents should
+   * then fall back to their own structural search.
+   */
+  candidates?: Array<{
+    selector: string;
+    property: string;
+    baselineValue: string;
+    variantValue: string;
+    viewport: string;
+  }>;
 }
 
 export interface WireframeFixInput {
@@ -71,6 +86,81 @@ export interface WireframeFixInput {
    * omitted (preserves test compatibility).
    */
   allViewports?: string[];
+  /**
+   * DOM-position-diff entries (one per (path, property, viewport)).
+   * When provided, each generated suggestion is annotated with the
+   * candidate CSS rule(s) whose computed-style delta matches its
+   * magnitude — agent-c lost two rounds because the magnitude was
+   * named but the *rule* wasn't. Empty / undefined for callers
+   * without DOM correspondence; the generator degrades gracefully.
+   */
+  domPositionEntries?: DpEntryWithViewport[];
+}
+
+/**
+ * CSS properties whose computed-style delta plausibly produces a
+ * vertical bbox / text-row shift. Used to filter `domPositionDiff`
+ * entries when annotating candidate selectors. Padding-bottom /
+ * margin-bottom belong here because *predecessor* elements push the
+ * element below them down; if their bottom-spacing changed it would
+ * show up on the next sibling's bbox Δtop.
+ */
+const VERTICAL_SHIFT_PROPERTIES = new Set([
+  "margin-top",
+  "padding-top",
+  "margin-bottom",
+  "padding-bottom",
+  "row-gap",
+  "gap",
+  "height",
+  "min-height",
+  "max-height",
+  "top",
+  "bottom",
+]);
+
+const CANDIDATE_PX_TOLERANCE = 2;
+
+function selectorFromDpEntry(entry: DpEntryWithViewport): string {
+  // Prefer the variant's class string (that's what the agent currently
+  // has in their CSS); fall back to baseline if variant has none.
+  const cls = entry.variantClasses || entry.baselineClasses;
+  if (cls) return `.${cls.split(/\s+/).filter(Boolean).join(".")}`;
+  // No class — name by tag + path.
+  return `${entry.tag} (${entry.path})`;
+}
+
+function matchCandidatesForDelta(
+  deltaPx: number,
+  viewports: string[],
+  entries: DpEntryWithViewport[],
+): WireframeFixSuggestion["candidates"] {
+  const viewportSet = new Set(viewports);
+  const target = Math.abs(deltaPx);
+  const out: NonNullable<WireframeFixSuggestion["candidates"]> = [];
+  const seen = new Set<string>();
+  for (const e of entries) {
+    if (!viewportSet.has(e.viewport)) continue;
+    if (!VERTICAL_SHIFT_PROPERTIES.has(e.property)) continue;
+    const bPx = parseLengthToPx(e.baseline);
+    const vPx = parseLengthToPx(e.variant);
+    if (bPx === null || vPx === null) continue;
+    const entryDelta = Math.abs(vPx - bPx);
+    if (Math.abs(entryDelta - target) > CANDIDATE_PX_TOLERANCE) continue;
+    const sel = selectorFromDpEntry(e);
+    const dedupeKey = `${sel}|${e.property}|${e.viewport}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    out.push({
+      selector: sel,
+      property: e.property,
+      baselineValue: e.baseline,
+      variantValue: e.variant,
+      viewport: e.viewport,
+    });
+    if (out.length >= 4) break; // Cap per suggestion — too many candidates is noise.
+  }
+  return out.length > 0 ? out : undefined;
 }
 
 /** Threshold below which a delta is considered subpixel / not actionable. */
@@ -139,15 +229,20 @@ export function generateWireframeFixCandidates(
       const negativeSide = perVpDeltas.filter((p) => p.deltaPx < 0).map((p) => p.viewport);
       const snap = input.tokens ? snapSpacing(input.tokens, maxAbs) : null;
       const tokenHint = snap ? `nearest token: ${snap.token.name} (${snap.token.raw})` : `magnitude ≈ ${maxAbs}px`;
+      const viewportList = perVpDeltas.map((p) => p.viewport);
+      const candidates = input.domPositionEntries
+        ? matchCandidatesForDelta(maxAbs, viewportList, input.domPositionEntries)
+        : undefined;
       out.push({
         evidence: `component rank=${rank} (bbox ${dims}): divergent Δtop across viewports (${summary})`,
         hypothesis: "the same component has opposite-sign deltas on different viewports — a global edit will fix one side while breaking the other",
         suggestion: `gate the spacing change with a media query: ${positiveSide.length > 0 ? `add ${maxAbs}px on ${positiveSide.join(", ")}` : ""}${positiveSide.length > 0 && negativeSide.length > 0 ? "; " : ""}${negativeSide.length > 0 ? `remove ${maxAbs}px on ${negativeSide.join(", ")}` : ""} (${tokenHint})`,
-        viewports: perVpDeltas.map((p) => p.viewport),
+        viewports: viewportList,
         confidence: "high",
         deltaPx: maxAbs,
         scope: "divergent",
         perViewport: perVpDeltas.map((p) => ({ viewport: p.viewport, deltaPx: p.deltaPx })),
+        candidates,
       });
       continue;
     }
@@ -178,6 +273,9 @@ export function generateWireframeFixCandidates(
       const scopeNote = scope === "subset"
         ? ` (subset — gate with media query; not seen on ${uncovered.join(", ")})`
         : "";
+      const candidates = input.domPositionEntries
+        ? matchCandidatesForDelta(Math.abs(deltaPx), viewports, input.domPositionEntries)
+        : undefined;
       out.push({
         evidence: `component rank=${rank} (bbox ${dims}): Δtop ${signed(deltaPx)} on ${viewports.join(", ")}${scopeNote}`,
         hypothesis: deltaPx > 0
@@ -189,6 +287,7 @@ export function generateWireframeFixCandidates(
         deltaPx,
         scope,
         perViewport: obs.map((o) => ({ viewport: o.viewport, deltaPx: o.deltaPx })),
+        candidates,
       });
     }
   }
@@ -234,6 +333,9 @@ export function generateWireframeFixCandidates(
     const scopeNote = scope === "subset"
       ? ` (subset — gate with media query; not seen on ${uncovered.join(", ")})`
       : "";
+    const candidates = input.domPositionEntries
+      ? matchCandidatesForDelta(Math.abs(median), viewports, input.domPositionEntries)
+      : undefined;
     out.push({
       evidence: `${obs.length} text-row(s) shifted Δy ${signed(median)} on ${viewports.join(", ")}${scopeNote} (e.g. "${sampleText}")`,
       hypothesis: median > 0
@@ -250,6 +352,7 @@ export function generateWireframeFixCandidates(
           .map((o) => o.m.deltaY)
           .sort((a, b) => a - b)[0] ?? median,
       })),
+      candidates,
     });
     void bucket;
   }

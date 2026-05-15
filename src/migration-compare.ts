@@ -1540,6 +1540,15 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         // when DOM correspondence is missing. The existing CSS-declaration
         // candidate generator returns empty in this mode (it expected an
         // inline <style id="target-css"> block and a hot paint-tree).
+        // Pull this variant's DOM-position-diff entries (when the
+        // capture succeeded) so the wireframe generator can name a
+        // candidate selector for each suggestion. Falls through
+        // silently when DOM correspondence is missing — the
+        // generator handles undefined.
+        const dpForVariant = domPositionDiffPerViewportReports
+          .find((r) => r.variantFile === variantFileLabel)
+          ?.result.entries;
+
         const wireframeSuggestions: WireframeFixSuggestion[] = generateWireframeFixCandidates({
           bboxByViewport: perViewport,
           textRowsByViewport: perViewportTextRows.map((r) => ({ viewport: r.viewport, matches: r.matches })),
@@ -1552,6 +1561,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           // bug where [SUBSET] tags silently disappeared as desktop
           // converged.
           allViewports: VIEWPORTS.map((vp) => vp.label),
+          domPositionEntries: dpForVariant,
         });
         if (wireframeSuggestions.length > 0) {
           wireframeFixReports.push({ variantFile: variantFileLabel, suggestions: wireframeSuggestions });
@@ -1575,6 +1585,20 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
                 : "";
             console.log(`    ${conf}[${s.confidence}]${RESET}${scopeTag} ${s.evidence}`);
             console.log(`      ${DIM}→ ${s.suggestion}${RESET}`);
+            if (s.candidates && s.candidates.length > 0) {
+              // Group candidates by selector so the agent sees the rule
+              // first and the per-property diff under it.
+              const bySel = new Map<string, typeof s.candidates>();
+              for (const c of s.candidates) {
+                const arr = bySel.get(c.selector) ?? [];
+                arr.push(c);
+                bySel.set(c.selector, arr);
+              }
+              for (const [sel, rows] of bySel) {
+                const propList = [...new Set(rows.map((r) => `${r.property}: ${r.baselineValue}→${r.variantValue}`))].join("; ");
+                console.log(`      ${CYAN}candidate:${RESET} ${BOLD}${sel}${RESET} ${DIM}(${propList})${RESET}`);
+              }
+            }
           }
         }
       }
