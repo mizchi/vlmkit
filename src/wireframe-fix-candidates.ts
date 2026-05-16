@@ -294,6 +294,17 @@ export function generateWireframeFixCandidates(
     const signs = new Set(perVpDeltas.map((p) => Math.sign(p.deltaPx)).filter((s) => s !== 0));
     const example = perVpDeltas[0].m;
     const dims = `${example.baseline.width}×${example.baseline.height}`;
+    // V9b: intrinsic-height hint. When the component itself is
+    // noticeably taller/shorter in baseline vs variant, the cause
+    // is likely the component's internal sizing (padding, font-size,
+    // min-height) — NOT spacing on/around it. Agent-i v9 chased a
+    // "missing 42px" as spacing when the cards were intrinsically
+    // shorter. Surface the bbox-height delta when material.
+    const INTRINSIC_HEIGHT_DELTA_PX = 8;
+    const heightDelta = example.variant.height - example.baseline.height;
+    const intrinsicHint = Math.abs(heightDelta) >= INTRINSIC_HEIGHT_DELTA_PX
+      ? ` ⚠ component height differs intrinsically: ${example.variant.height}px (now) → ${example.baseline.height}px (target). The shift may NOT be a spacing-token issue — check this component's own padding / min-height / font-size before adding margin upstream.`
+      : "";
 
     // Magnitudes per viewport for this rank.
     const magnitudes = perVpDeltas.map((p) => Math.abs(p.deltaPx));
@@ -399,7 +410,7 @@ export function generateWireframeFixCandidates(
         evidence: `component rank=${rank} (bbox ${dims}): magnitude-divergent Δtop across viewports (${summary})`,
         hypothesis: "baseline uses distinct per-viewport spacing values; variant uses one value everywhere — a global edit will over- or under-correct depending on viewport",
         suggestion: `use distinct per-viewport spacing values: ${perVpSnap
-          .map((p) => `${direction} ${Math.abs(p.deltaPx)}px on ${p.viewport} (token: ${p.tokenHint})`).join("; ")}${overshootHint}`,
+          .map((p) => `${direction} ${Math.abs(p.deltaPx)}px on ${p.viewport} (token: ${p.tokenHint})`).join("; ")}${overshootHint}${intrinsicHint}`,
         viewports: viewportList,
         confidence: "high",
         deltaPx: maxMag,
@@ -473,7 +484,7 @@ export function generateWireframeFixCandidates(
         hypothesis: deltaPx > 0
           ? "container above is taller than baseline (extra margin/padding/gap)"
           : "container above is shorter than baseline (missing margin/padding/gap)",
-        suggestion: `try ${deltaPx > 0 ? "reducing" : "adding"} top spacing by ${Math.abs(deltaPx)}px (${tokenHint})`,
+        suggestion: `try ${deltaPx > 0 ? "reducing" : "adding"} top spacing by ${Math.abs(deltaPx)}px (${tokenHint})${intrinsicHint}`,
         viewports,
         confidence: confidenceFor({ viewportCount: viewports.length, deltaPx, snapped: !!snap }),
         deltaPx,
@@ -699,8 +710,16 @@ export function generateWireframeFixCandidates(
     const layoutDetail = layoutDeltas.length > 0
       ? ` parent layout deltas: ${layoutDeltas.join("; ")}`
       : "";
+    // V9a: when introducing a parent `gap` rule, list any non-zero
+    // pre-existing child margins that will compound — agent-i v9
+    // applied a parent gap edit and the unrclear'd child margin-tops
+    // caused a +5pp mobile regression.
+    const conflicts = conflictingChildMargins(par, layoutDeltas, input.domPositionEntries);
+    const conflictTail = conflicts.length > 0
+      ? ` ⚠ ALSO clear non-zero child margins that will compound with the new gap: ${conflicts.join(", ")}.`
+      : "";
     const suggestion = layoutDeltas.length > 0
-      ? `change \`${par}\`'s layout to match: ${layoutDeltas.join("; ")}. Resolving these at the parent will fix the ${sugs.size} child suggestions together; per-child patches will compound.`
+      ? `change \`${par}\`'s layout to match: ${layoutDeltas.join("; ")}. Resolving these at the parent will fix the ${sugs.size} child suggestions together; per-child patches will compound.${conflictTail}`
       : `consider restructuring \`${par}\` itself (e.g. switch flex-with-per-child-margins → display: grid + row-gap, or change align-items / justify-content) so the children fall into place together. (Parent's layout properties match between baseline and variant — the mismatch must be in child-level properties.)`;
     structuralRow = {
       evidence: `${sugs.size} suggestions all blame children of \`${par}\` with heterogeneous deltas (range ${range}px, ${signs.size > 1 ? "mixed signs" : "same sign"})${layoutDetail}`,
@@ -783,6 +802,47 @@ function parentLayoutDeltas(
     seen.add(key);
     out.push(`${e.property}: ${e.variant} (now) → ${e.baseline} (target)`);
     if (out.length >= 5) break;
+  }
+  return out;
+}
+
+/**
+ * When STRUCTURAL fires with a non-zero parent `gap` delta (i.e. the
+ * baseline introduces a gap the variant lacks, or vice versa),
+ * surface the children's existing top/bottom margins from DP entries
+ * — those will compound with the new gap if not cleared. Closes V9a
+ * (agent-i v9: "parent edit alone caused +5pp mobile regression
+ * because pre-existing child margin-tops weren't cleared").
+ */
+function conflictingChildMargins(
+  parentPath: string,
+  parentDeltas: string[],
+  entries: DpEntryWithViewport[] | undefined,
+): string[] {
+  if (!entries) return [];
+  // Only warn when a gap-style property is in the parent deltas.
+  const introducingGap = parentDeltas.some((d) =>
+    d.startsWith("gap:") || d.startsWith("row-gap:") || d.startsWith("column-gap:")
+  );
+  if (!introducingGap) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const e of entries) {
+    // Direct children of the parent path only (one segment deeper).
+    if (!e.path.startsWith(parentPath + ">")) continue;
+    const tail = e.path.slice(parentPath.length + 1);
+    if (tail.includes(">")) continue;
+    if (e.property !== "margin-top" && e.property !== "margin-bottom") continue;
+    // Only flag NON-ZERO existing variant margins — those are the
+    // ones that compound with the introduced gap.
+    if (e.variant === "0px" || e.variant === "0") continue;
+    const sel = e.variantClasses || e.baselineClasses;
+    if (!sel) continue;
+    const key = `.${sel.split(/\s+/)[0]}|${e.property}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(`.${sel.split(/\s+/)[0]}.${e.property}: ${e.variant}`);
+    if (out.length >= 4) break;
   }
   return out;
 }

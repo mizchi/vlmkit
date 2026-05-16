@@ -852,6 +852,135 @@ describe("generateWireframeFixCandidates", () => {
     assert.match(withCross!.suggestion, /compounds/);
   });
 
+  it("STRUCTURAL with parent gap delta warns about non-zero pre-existing child margins (V9a)", () => {
+    // Agent-i v9: parent edit collided with still-present
+    // margin-top: spacing.lg on children → +5pp mobile regression.
+    // STRUCTURAL now annotates the conflicting child margins so the
+    // agent clears them at the same time.
+    const sharedParent = "body[0]>main[0]>section.profile";
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 24), bbox(1, 40), bbox(2, 60)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+      domPositionEntries: [
+        // Parent introduces a new gap.
+        {
+          path: sharedParent,
+          tag: "section", baselineClasses: "profile", variantClasses: "profile",
+          property: "gap", baseline: "16px", variant: "0px", viewport: "mobile",
+        },
+        // Child entries (so STRUCTURAL fires).
+        {
+          path: `${sharedParent}>div.card-1`,
+          tag: "div", baselineClasses: "card-1", variantClasses: "card-1",
+          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+        },
+        {
+          path: `${sharedParent}>div.card-2`,
+          tag: "div", baselineClasses: "card-2", variantClasses: "card-2",
+          property: "margin-top", baseline: "0px", variant: "40px", viewport: "mobile",
+        },
+        {
+          path: `${sharedParent}>div.card-3`,
+          tag: "div", baselineClasses: "card-3", variantClasses: "card-3",
+          property: "margin-top", baseline: "0px", variant: "60px", viewport: "mobile",
+        },
+      ],
+    });
+    const structural = out.find((s) => s.scope === "structural");
+    assert.ok(structural);
+    assert.match(structural!.suggestion, /ALSO clear non-zero child margins/);
+    assert.match(structural!.suggestion, /\.card-1\.margin-top: 24px/);
+    assert.match(structural!.suggestion, /\.card-2\.margin-top: 40px/);
+  });
+
+  it("STRUCTURAL with non-gap parent deltas does NOT warn about child margins (V9a)", () => {
+    // When the structural delta is display flip (not gap introduction),
+    // the child-margin warning shouldn't fire — the new display may
+    // legitimately want existing margins preserved.
+    const sharedParent = "body[0]>main[0]>section.profile";
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 24), bbox(1, 40), bbox(2, 60)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+      domPositionEntries: [
+        {
+          path: sharedParent,
+          tag: "section", baselineClasses: "profile", variantClasses: "profile",
+          property: "align-items", baseline: "center", variant: "stretch", viewport: "mobile",
+        },
+        {
+          path: `${sharedParent}>div.card-1`,
+          tag: "div", baselineClasses: "card-1", variantClasses: "card-1",
+          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+        },
+        {
+          path: `${sharedParent}>div.card-2`,
+          tag: "div", baselineClasses: "card-2", variantClasses: "card-2",
+          property: "margin-top", baseline: "0px", variant: "40px", viewport: "mobile",
+        },
+        {
+          path: `${sharedParent}>div.card-3`,
+          tag: "div", baselineClasses: "card-3", variantClasses: "card-3",
+          property: "margin-top", baseline: "0px", variant: "60px", viewport: "mobile",
+        },
+      ],
+    });
+    const structural = out.find((s) => s.scope === "structural");
+    assert.ok(structural);
+    assert.doesNotMatch(structural!.suggestion, /ALSO clear non-zero child margins/);
+  });
+
+  it("emits intrinsic-height warning when component bbox heights differ (V9b)", () => {
+    // Agent-i v9: cards visually shorter due to undersized internal
+    // padding, not missing margin. Bbox heightDelta surfaces this.
+    const heightSmall = (): MatchedBbox => {
+      const baseline = { rank: 0, top: 0, left: 0, width: 200, height: 100, area: 20000, fillColor: "rgb(0,0,0)" };
+      const variant = { ...baseline, top: 24, height: 60 }; // variant is 40px shorter
+      return { rank: 0, baseline, variant, deltaTop: 24, deltaLeft: 0, deltaWidth: 0, deltaHeight: -40, iou: 0.5 };
+    };
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [heightSmall()] },
+        { viewport: "desktop", matches: [heightSmall()] },
+        { viewport: "wide", matches: [heightSmall()] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+    });
+    // Suggestion text should hint at intrinsic height
+    const withHint = out.find((s) => s.suggestion.includes("component height differs intrinsically"));
+    assert.ok(withHint, "intrinsic-height hint should fire on |Δheight| ≥ 8px");
+    assert.match(withHint!.suggestion, /60px \(now\) → 100px \(target\)/);
+    assert.match(withHint!.suggestion, /check this component's own padding/);
+  });
+
+  it("does NOT mark intrinsic-height when |Δheight| < 8px (V9b)", () => {
+    const heightOK = (): MatchedBbox => {
+      const baseline = { rank: 0, top: 0, left: 0, width: 200, height: 100, area: 20000, fillColor: "rgb(0,0,0)" };
+      const variant = { ...baseline, top: 24, height: 98 }; // Δheight = -2 (subpixel)
+      return { rank: 0, baseline, variant, deltaTop: 24, deltaLeft: 0, deltaWidth: 0, deltaHeight: -2, iou: 0.95 };
+    };
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [heightOK()] },
+        { viewport: "desktop", matches: [heightOK()] },
+        { viewport: "wide", matches: [heightOK()] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+    });
+    assert.ok(!out.some((s) => s.suggestion.includes("component height differs intrinsically")));
+  });
+
   it("does NOT emit ⚠ cross-edit when only one cascading selector is present (#36)", () => {
     const out = generateWireframeFixCandidates({
       bboxByViewport: [
