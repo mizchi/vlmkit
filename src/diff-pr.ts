@@ -40,6 +40,7 @@ import {
 } from "./diff-pr-config.ts";
 import { compareScreenshots } from "./heatmap.ts";
 import { runA11yOnPage } from "./a11y-on-page.ts";
+import { runMediaVariants, type VariantResult, type MediaVariant } from "./media-variants.ts";
 import { filterA11yFindings, loadApprovalManifest, type ApprovalManifest } from "./approval.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "./terminal-colors.ts";
 import type { VrtSnapshot } from "./types.ts";
@@ -91,6 +92,18 @@ interface PerRouteResult {
   viewports: PerViewportResult[];
   failed: boolean;
   error?: string;
+  /**
+   * Media-variants emulation summary. Run once per route at the
+   * default viewport when `mediaVariants` is declared in config.
+   */
+  mediaVariants?: {
+    variants: VariantResult[];
+    suspectCount: number;
+    warnCount: number;
+    maxSuspects: number;
+    maxWarns: number;
+    pass: boolean;
+  };
 }
 
 function getArg(args: string[], name: string): string | undefined {
@@ -371,7 +384,41 @@ async function cmdRun(args: string[]): Promise<number> {
         });
       }
 
-      const failed = perVp.some((v) => !v.pass);
+      // Media variants — run ONCE per route at default desktop
+      // viewport when `mediaVariants` is declared. Each variant
+      // counts toward the route's pass/fail.
+      let mediaVariantsResult: PerRouteResult["mediaVariants"];
+      if (config.mediaVariants) {
+        const mvDir = resolve(routeOut, "media-variants");
+        const variants = config.mediaVariants.variants as MediaVariant[] | undefined;
+        const maxSuspects = config.mediaVariants.maxSuspects ?? 0;
+        const maxWarns = config.mediaVariants.maxWarns ?? 5;
+        try {
+          const mv = await runMediaVariants({
+            source: route.url,
+            outputDir: mvDir,
+            viewport: { width: 1280, height: 720 },
+            variants,
+            threshold: config.mediaVariants.threshold ?? 0.03,
+          });
+          const suspectCount = mv.variants.filter((v) => v.verdict === "suspect").length;
+          const warnCount = mv.variants.filter((v) => v.verdict === "warn").length;
+          mediaVariantsResult = {
+            variants: mv.variants,
+            suspectCount,
+            warnCount,
+            maxSuspects,
+            maxWarns,
+            pass: suspectCount <= maxSuspects && warnCount <= maxWarns,
+          };
+        } catch (err) {
+          console.log(`  ${YELLOW}media-variants error (${route.name}): ${String(err)}${RESET}`);
+        }
+      }
+
+      const visualFailed = perVp.some((v) => !v.pass);
+      const mvFailed = mediaVariantsResult ? !mediaVariantsResult.pass : false;
+      const failed = visualFailed || mvFailed;
       const status = failed ? `${RED}FAIL${RESET}` : `${GREEN}pass${RESET}`;
       const breakdown = perVp.map((v) => {
         const tag = v.pass ? GREEN : RED;
@@ -380,8 +427,11 @@ async function cmdRun(args: string[]): Promise<number> {
           : "";
         return `${tag}${v.viewport}=${pctStr(v.diffRatio)}${RESET}${a11ySuffix}`;
       }).join(" ");
-      console.log(`  ${route.name.padEnd(20)} ${status}  ${breakdown}`);
-      results.push({ route, viewports: perVp, failed });
+      const mvSuffix = mediaVariantsResult
+        ? ` ${DIM}[mv suspect=${mediaVariantsResult.suspectCount}/${mediaVariantsResult.maxSuspects} warn=${mediaVariantsResult.warnCount}/${mediaVariantsResult.maxWarns}]${RESET}`
+        : "";
+      console.log(`  ${route.name.padEnd(20)} ${status}  ${breakdown}${mvSuffix}`);
+      results.push({ route, viewports: perVp, failed, mediaVariants: mediaVariantsResult });
     }
   } finally {
     await browser.close();
@@ -493,6 +543,22 @@ export function buildMarkdownSummary(config: DiffPrConfig, results: PerRouteResu
           .map((f) => `[${f.kind}] \`${f.path}\``)
           .join("; ");
         lines.push(`- \`${route}\` / ${vp.viewport} — **semantic** ${vp.a11y.semanticFailures.length} > ${vp.a11y.maxSemantic}: ${top}`);
+      }
+    }
+  }
+
+  // Media-variants failures section.
+  const mvFailRows = results.filter((r) => r.mediaVariants && !r.mediaVariants.pass);
+  if (mvFailRows.length > 0) {
+    lines.push("");
+    lines.push("## Media-variant failures");
+    lines.push("");
+    for (const r of mvFailRows) {
+      const mv = r.mediaVariants!;
+      const offenders = mv.variants.filter((v) => v.verdict === "suspect" || v.verdict === "warn");
+      lines.push(`- \`${r.route.name}\` — suspect ${mv.suspectCount}/${mv.maxSuspects}, warn ${mv.warnCount}/${mv.maxWarns}`);
+      for (const v of offenders.slice(0, 5)) {
+        lines.push(`  - **${v.variant}** (${v.verdict}): ${v.note}`);
       }
     }
   }

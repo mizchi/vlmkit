@@ -56,6 +56,21 @@ export interface A11yPolicy {
   semantic?: boolean;
 }
 
+export interface MediaVariantsPolicy {
+  /**
+   * Which media-emulation variants to run per route. Omit for the
+   * default set (forced-colors / reduced-motion / print / rtl /
+   * zoom-200). Each variant adds ~1s per route to the CI run.
+   */
+  variants?: Array<"forced-colors" | "reduced-motion" | "print" | "rtl" | "zoom-200">;
+  /** Max "suspect" verdicts allowed per route. Default 0. */
+  maxSuspects?: number;
+  /** Max "warn" verdicts allowed per route. Default 5 (more permissive). */
+  maxWarns?: number;
+  /** Pixel-diff threshold passed through to runMediaVariants. Default 0.03. */
+  threshold?: number;
+}
+
 export interface DiffPrConfig {
   baseUrl?: string;
   routes: DiffPrRoute[];
@@ -64,12 +79,14 @@ export interface DiffPrConfig {
   tokens?: string;
   approvalPath?: string;
   baselineDir: string;
-  /**
-   * When present, `vrt diff-pr` runs the contrast + touch a11y
-   * checks per route+viewport and fails on threshold breach. Omit
-   * to skip a11y entirely (purely visual gate).
-   */
   a11y?: A11yPolicy;
+  /**
+   * When present, `vrt diff-pr` runs the media-variants emulation
+   * suite (forced-colors / reduced-motion / print / rtl / zoom-200)
+   * per route at the default viewport and gates on the per-route
+   * verdict counts. Omit to skip media variants entirely.
+   */
+  mediaVariants?: MediaVariantsPolicy;
   /** Resolved path of the file the config was loaded from (diag only). */
   configPath?: string;
 }
@@ -122,7 +139,41 @@ export function parseDiffPrConfig(raw: string, configPath?: string): DiffPrConfi
     approvalPath,
     baselineDir,
     a11y: parseA11yPolicy(obj.a11y, "a11y"),
+    mediaVariants: parseMediaVariantsPolicy(obj.mediaVariants, "mediaVariants"),
     configPath,
+  };
+}
+
+const VALID_MEDIA_VARIANTS = new Set(["forced-colors", "reduced-motion", "print", "rtl", "zoom-200"]);
+
+function parseMediaVariantsPolicy(value: unknown, label: string): MediaVariantsPolicy | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${label} must be an object`);
+  }
+  const r = value as Record<string, unknown>;
+  let variants: MediaVariantsPolicy["variants"] | undefined;
+  if (r.variants !== undefined && r.variants !== null) {
+    if (!Array.isArray(r.variants)) throw new Error(`${label}.variants must be an array`);
+    variants = r.variants.map((v, i) => {
+      if (typeof v !== "string" || !VALID_MEDIA_VARIANTS.has(v)) {
+        throw new Error(`${label}.variants[${i}] must be one of: ${[...VALID_MEDIA_VARIANTS].join(", ")}`);
+      }
+      return v as NonNullable<MediaVariantsPolicy["variants"]>[number];
+    });
+  }
+  const num = (v: unknown, k: string) => {
+    if (v === undefined || v === null) return undefined;
+    if (typeof v !== "number" || Number.isNaN(v) || v < 0) {
+      throw new Error(`${label}.${k} must be a non-negative number`);
+    }
+    return v;
+  };
+  return {
+    variants,
+    maxSuspects: num(r.maxSuspects, "maxSuspects"),
+    maxWarns: num(r.maxWarns, "maxWarns"),
+    threshold: num(r.threshold, "threshold"),
   };
 }
 

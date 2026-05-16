@@ -155,6 +155,60 @@ describe("parseDiffPrConfig", () => {
     );
   });
 
+  it("parses mediaVariants policy with explicit variants list", () => {
+    const cfg = parseDiffPrConfig(JSON.stringify({
+      baseUrl: "http://localhost:3000",
+      mediaVariants: {
+        variants: ["forced-colors", "reduced-motion", "rtl"],
+        maxSuspects: 0,
+        maxWarns: 3,
+        threshold: 0.05,
+      },
+      routes: ["/"],
+    }));
+    assert.deepEqual(cfg.mediaVariants?.variants, ["forced-colors", "reduced-motion", "rtl"]);
+    assert.equal(cfg.mediaVariants?.maxSuspects, 0);
+    assert.equal(cfg.mediaVariants?.maxWarns, 3);
+    assert.equal(cfg.mediaVariants?.threshold, 0.05);
+  });
+
+  it("accepts mediaVariants with no variants field (defaults to all)", () => {
+    const cfg = parseDiffPrConfig(JSON.stringify({
+      baseUrl: "x",
+      mediaVariants: { maxWarns: 5 },
+      routes: ["/"],
+    }));
+    assert.equal(cfg.mediaVariants?.variants, undefined);
+    assert.equal(cfg.mediaVariants?.maxWarns, 5);
+  });
+
+  it("rejects malformed mediaVariants values", () => {
+    assert.throws(
+      () => parseDiffPrConfig(JSON.stringify({
+        baseUrl: "x",
+        mediaVariants: { variants: ["forced-colors", "bogus"] },
+        routes: ["/"],
+      })),
+      /variants\[1\] must be one of/,
+    );
+    assert.throws(
+      () => parseDiffPrConfig(JSON.stringify({
+        baseUrl: "x",
+        mediaVariants: { maxSuspects: -1 },
+        routes: ["/"],
+      })),
+      /maxSuspects/,
+    );
+  });
+
+  it("returns undefined mediaVariants when not declared", () => {
+    const cfg = parseDiffPrConfig(JSON.stringify({
+      baseUrl: "x",
+      routes: ["/"],
+    }));
+    assert.equal(cfg.mediaVariants, undefined);
+  });
+
   it("captures tokens, approvalPath, baselineDir overrides", () => {
     const cfg = parseDiffPrConfig(JSON.stringify({
       baseUrl: "x",
