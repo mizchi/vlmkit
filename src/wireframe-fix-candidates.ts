@@ -300,15 +300,22 @@ export function generateWireframeFixCandidates(
     const maxMag = Math.max(...magnitudes);
     const minMag = Math.min(...magnitudes);
 
-    // REFLOW detection (closes #33 / agent-g v7): when one viewport's
-    // magnitude is ≥ 3× the others AND that viewport has more text
-    // rows than the baseline, the cause is almost certainly text
-    // wrapping pushing this component down — not a spacing-token
-    // issue. Spacing suggestions would mislead an agent into
-    // adjusting margins / padding when the real fix is upstream
-    // (max-width / font-size / text content).
+    // REFLOW / CASCADE detection (closes #33; broadened post-#33
+    // after agent-h v8 found the original row-count gate too
+    // strict). Fires when one viewport's magnitude is ≥ 3× the
+    // others AND EITHER:
+    //   (a) that viewport has more dark-band text rows than the
+    //       baseline → high-confidence typographic-wrap cascade
+    //   (b) the magnitude is large enough (≥ 60px) that it can't
+    //       plausibly be a single spacing token on this element →
+    //       likely an upstream-cascade victim regardless of cause
+    //
+    // Either way the agent shouldn't try to fix this with spacing
+    // tokens on this component — the magnitude originates upstream
+    // (text wrap, missing element, oversized neighbor).
     const REFLOW_ASYMMETRY = 3; // max-mag must be ≥ 3× min-mag
     const REFLOW_MIN_MAG_PX = 32; // ignore small-asymmetry noise
+    const LARGE_MAG_PX = 60; // mag ≥ this implies multi-line / cascade
     if (maxMag >= REFLOW_MIN_MAG_PX && minMag > 0 && maxMag / minMag >= REFLOW_ASYMMETRY) {
       const dominantVp = perVpDeltas.reduce((best, p) =>
         Math.abs(p.deltaPx) > Math.abs(best.deltaPx) ? p : best,
@@ -319,14 +326,25 @@ export function generateWireframeFixCandidates(
       const extraRows = baselineRows !== undefined && variantRows !== undefined
         ? variantRows - baselineRows
         : 0;
-      if (extraRows >= 1) {
+      const wrapConfirmed = extraRows >= 1;
+      const cascadeLikely = Math.abs(dominantVp.deltaPx) >= LARGE_MAG_PX;
+      if (wrapConfirmed || cascadeLikely) {
         const summary = perVpDeltas
           .map((p) => `${p.viewport}: ${signed(p.deltaPx)}`)
           .join(", ");
+        // Two flavors of suggestion text depending on which gate fired.
+        const evidenceTail = wrapConfirmed
+          ? `${dominantVp.viewport} variant has +${extraRows} text row${extraRows === 1 ? "" : "s"} above this component vs baseline`
+          : `${Math.abs(dominantVp.deltaPx)}px shift on ${dominantVp.viewport} is ≥ ${LARGE_MAG_PX}px — too large to plausibly be a spacing token on this component`;
+        const suggestionText = wrapConfirmed
+          ? `typography cascade on ${dominantVp.viewport}: inspect headline/paragraph max-width, font-size at that breakpoint, and text content length. NOT a spacing-token fix — adjusting margin/padding will just move other elements out of place.`
+          : `upstream cascade — the shift originates above this component on ${dominantVp.viewport}. Look at: previous siblings' heights / line-counts / max-widths at this breakpoint. Applying a ${Math.abs(dominantVp.deltaPx)}px spacing token to THIS element will not close the delta and will probably break other viewports.`;
         out.push({
-          evidence: `component rank=${rank} (bbox ${dims}): asymmetric Δtop (${summary}); ${dominantVp.viewport} variant has +${extraRows} text row${extraRows === 1 ? "" : "s"} above this component vs baseline`,
-          hypothesis: `text wrapping on ${dominantVp.viewport} pushed this component down by ~${extraRows} line-height(s). Spacing tokens won't close the delta; the fix is upstream of the wrap.`,
-          suggestion: `typography cascade on ${dominantVp.viewport}: inspect headline/paragraph max-width, font-size at that breakpoint, and text content length. NOT a spacing-token fix — adjusting margin/padding will just move other elements out of place.`,
+          evidence: `component rank=${rank} (bbox ${dims}): asymmetric Δtop (${summary}); ${evidenceTail}`,
+          hypothesis: wrapConfirmed
+            ? `text wrapping on ${dominantVp.viewport} pushed this component down by ~${extraRows} line-height(s). Spacing tokens won't close the delta; the fix is upstream of the wrap.`
+            : `this component is a cascade victim, not the source of the delta. Spacing tokens applied here will overshoot or break siblings.`,
+          suggestion: suggestionText,
           viewports: perVpDeltas.map((p) => p.viewport),
           confidence: "high",
           deltaPx: Math.abs(dominantVp.deltaPx),

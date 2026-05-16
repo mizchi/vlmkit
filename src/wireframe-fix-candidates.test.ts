@@ -568,7 +568,13 @@ describe("generateWireframeFixCandidates", () => {
     if (firstNonLead >= 0) assert.ok(idxOfReflow < firstNonLead, "reflow leads non-structural rows");
   });
 
-  it("does NOT emit REFLOW when row counts don't differ (asymmetry is real but cause isn't reflow)", () => {
+  it("emits a CASCADE-flavored REFLOW when row counts match but magnitude is ≥ 60px (agent-h v8)", () => {
+    // Agent-h's case: row counts identical (text-rows.ts detects
+    // page-level bands not line-level wraps) but the +132px mobile
+    // shift is way too big to be a spacing token on a 64×64
+    // component. The relaxed gate fires REFLOW with cascade-flavored
+    // suggestion text — telling the agent to look upstream rather
+    // than apply a 132px spacing fix to this element.
     const out = generateWireframeFixCandidates({
       bboxByViewport: [
         { viewport: "mobile", matches: [bbox(0, 132)] },
@@ -576,13 +582,37 @@ describe("generateWireframeFixCandidates", () => {
         { viewport: "wide", matches: [bbox(0, 20)] },
       ],
       textRowsByViewport: [
-        // Same row count on both sides → not a wrap.
+        // Same row count on both sides — wrap-confirmed gate fails.
+        { viewport: "mobile", matches: [], baselineRowCount: 8, variantRowCount: 8 },
+      ],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+    });
+    const reflow = out.filter((s) => s.scope === "reflow");
+    assert.equal(reflow.length, 1, "REFLOW should still fire via the cascade gate");
+    assert.match(reflow[0].evidence, /too large to plausibly be a spacing token/);
+    assert.match(reflow[0].suggestion, /upstream cascade/);
+    assert.match(reflow[0].suggestion, /NOT close the delta/i);
+  });
+
+  it("does NOT emit REFLOW when magnitude is small AND row counts match (both gates fail)", () => {
+    // 40 / 12 = 3.3× asymmetry, magnitude 40 < 60 floor, row counts equal.
+    // Should fall through to the existing MAG-DIVERGENT branch.
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 40)] },
+        { viewport: "desktop", matches: [bbox(0, 12)] },
+        { viewport: "wide", matches: [bbox(0, 12)] },
+      ],
+      textRowsByViewport: [
         { viewport: "mobile", matches: [], baselineRowCount: 8, variantRowCount: 8 },
       ],
       tokens: PAWS,
       allViewports: ["mobile", "desktop", "wide"],
     });
     assert.equal(out.filter((s) => s.scope === "reflow").length, 0);
+    // Should fall through to MAG-DIVERGENT.
+    assert.equal(out.filter((s) => s.scope === "magnitude-divergent").length, 1);
   });
 
   it("does NOT emit REFLOW when asymmetry is below the 3× threshold", () => {
@@ -602,7 +632,11 @@ describe("generateWireframeFixCandidates", () => {
     assert.equal(out.filter((s) => s.scope === "reflow").length, 0);
   });
 
-  it("does NOT emit REFLOW when row-count info is absent (caller didn't pass it)", () => {
+  it("falls back to CASCADE-flavored REFLOW when row-count info is absent but magnitude is large", () => {
+    // Without row-count data the wrap gate can't fire, but the
+    // large-magnitude gate (≥ 60px) catches the case anyway. The
+    // suggestion is the cascade flavor (look upstream) since we
+    // can't claim text wrap specifically.
     const out = generateWireframeFixCandidates({
       bboxByViewport: [
         { viewport: "mobile", matches: [bbox(0, 132)] },
@@ -615,8 +649,11 @@ describe("generateWireframeFixCandidates", () => {
       tokens: PAWS,
       allViewports: ["mobile", "desktop", "wide"],
     });
-    assert.equal(out.filter((s) => s.scope === "reflow").length, 0,
-      "no row-count data → can't claim reflow");
+    const reflow = out.filter((s) => s.scope === "reflow");
+    assert.equal(reflow.length, 1);
+    assert.match(reflow[0].suggestion, /upstream cascade/);
+    assert.doesNotMatch(reflow[0].suggestion, /typography cascade/,
+      "without row-count data we can't claim text wrap specifically");
   });
 
   it("appends a ⚠ converging warning when multiple suggestions blame the same selector (#34)", () => {
