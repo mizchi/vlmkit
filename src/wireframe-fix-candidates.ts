@@ -630,6 +630,22 @@ export function generateWireframeFixCandidates(
   }
   void emittedKey;
 
+  // #36: cross-edit interaction across DIFFERENT selectors. When a
+  // single suggestion's candidate list contains ≥ 2 distinct
+  // cascading selectors (height / margin-bottom / etc. on more than
+  // one element), applying both compounds — fixing the first moves
+  // geometry the second was trying to fix. #34 covers the
+  // same-selector case; this is the multi-selector counterpart.
+  // Agent-h v8: ".container padding AND .hero margin both affect
+  // rank=0 — applying both compounded to +24 desktop."
+  for (const s of out) {
+    const cascading = (s.candidates ?? []).filter((c) => c.cascades);
+    const distinctSelectors = new Set(cascading.map((c) => c.selector));
+    if (distinctSelectors.size < 2) continue;
+    const list = [...distinctSelectors].slice(0, 4).join(" + ");
+    s.suggestion += ` ⚠ cross-edit: ${list} all cascade-affect this component's geometry. Applying multiple cascading edits compounds — apply one, re-measure, then the next, rather than treating them as independent.`;
+  }
+
   // F1: structural-mismatch detection. When 3+ suggestions all
   // blame children of the same DOM parent — AND those children have
   // genuinely heterogeneous deltas (different magnitudes or
@@ -676,10 +692,20 @@ export function generateWireframeFixCandidates(
     if (!heterogeneous) continue;
     const affectedVps = new Set<string>();
     for (const i of sugs) for (const v of out[i].viewports) affectedVps.add(v);
+    // #35: surface the SPECIFIC layout-strategy mismatch at the
+    // parent. Agent-h v8: "STRUCTURAL named the parent but not
+    // the property — I still had to read the triptych."
+    const layoutDeltas = parentLayoutDeltas(par, input.domPositionEntries);
+    const layoutDetail = layoutDeltas.length > 0
+      ? ` parent layout deltas: ${layoutDeltas.join("; ")}`
+      : "";
+    const suggestion = layoutDeltas.length > 0
+      ? `change \`${par}\`'s layout to match: ${layoutDeltas.join("; ")}. Resolving these at the parent will fix the ${sugs.size} child suggestions together; per-child patches will compound.`
+      : `consider restructuring \`${par}\` itself (e.g. switch flex-with-per-child-margins → display: grid + row-gap, or change align-items / justify-content) so the children fall into place together. (Parent's layout properties match between baseline and variant — the mismatch must be in child-level properties.)`;
     structuralRow = {
-      evidence: `${sugs.size} suggestions all blame children of \`${par}\` with heterogeneous deltas (range ${range}px, ${signs.size > 1 ? "mixed signs" : "same sign"}) — likely a parent-layout mismatch (flex+margins vs grid+gap, etc.)`,
+      evidence: `${sugs.size} suggestions all blame children of \`${par}\` with heterogeneous deltas (range ${range}px, ${signs.size > 1 ? "mixed signs" : "same sign"})${layoutDetail}`,
       hypothesis: "patching each child is a local-minima trap; the parent's layout strategy is the actual delta",
-      suggestion: `consider restructuring \`${par}\` itself (e.g. switch flex-with-per-child-margins → display: grid + row-gap, or change align-items / justify-content) so the children fall into place together`,
+      suggestion,
       viewports: [...affectedVps],
       confidence: "medium",
       deltaPx: 0,
@@ -705,6 +731,59 @@ export function generateWireframeFixCandidates(
     }
   }
 
+  return out;
+}
+
+/**
+ * CSS properties on the PARENT element that drive its children's
+ * layout. When a STRUCTURAL row fires, baseline-vs-variant differences
+ * on these properties are the actionable layout-strategy mismatch
+ * — surface them so the agent doesn't have to inspect the triptych
+ * (agent-h v8: STRUCTURAL named the parent but not the property).
+ */
+const PARENT_LAYOUT_PROPERTIES = new Set([
+  "display",
+  "flex-direction",
+  "flex-wrap",
+  "flex-flow",
+  "align-items",
+  "align-content",
+  "justify-content",
+  "justify-items",
+  "gap",
+  "row-gap",
+  "column-gap",
+  "grid-template-rows",
+  "grid-template-columns",
+  "grid-template-areas",
+  "grid-auto-flow",
+  "grid-auto-rows",
+  "grid-auto-columns",
+]);
+
+/**
+ * Inspect the DP entries at the given parent path and surface any
+ * layout-strategy properties that differ between baseline and
+ * variant. Returns a list of human-readable diff lines like
+ * `display: flex → grid` (current → target convention from agent-e).
+ */
+function parentLayoutDeltas(
+  parentPath: string,
+  entries: DpEntryWithViewport[] | undefined,
+): string[] {
+  if (!entries) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const e of entries) {
+    if (e.path !== parentPath) continue;
+    if (!PARENT_LAYOUT_PROPERTIES.has(e.property)) continue;
+    if (e.baseline === e.variant) continue;
+    const key = `${e.property}|${e.viewport}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(`${e.property}: ${e.variant} (now) → ${e.baseline} (target)`);
+    if (out.length >= 5) break;
+  }
   return out;
 }
 

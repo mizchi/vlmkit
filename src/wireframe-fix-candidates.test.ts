@@ -736,6 +736,150 @@ describe("generateWireframeFixCandidates", () => {
     assert.ok(!out.some((s) => s.suggestion.includes("converge on")));
   });
 
+  it("STRUCTURAL names the specific parent layout-strategy mismatch (#35)", () => {
+    // 3 children of `body[0]>main[0]>section.profile` with
+    // heterogeneous deltas, AND the parent's `display` differs
+    // between baseline and variant. STRUCTURAL should now name the
+    // display delta in the suggestion text.
+    const sharedParent = "body[0]>main[0]>section.profile";
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 24), bbox(1, 40), bbox(2, 60)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+      domPositionEntries: [
+        // Child entries that drive the STRUCTURAL detection
+        {
+          path: `${sharedParent}>h2.name`,
+          tag: "h2", baselineClasses: "name", variantClasses: "name",
+          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+        },
+        {
+          path: `${sharedParent}>p.meta`,
+          tag: "p", baselineClasses: "meta", variantClasses: "meta",
+          property: "margin-top", baseline: "0px", variant: "40px", viewport: "mobile",
+        },
+        {
+          path: `${sharedParent}>span.badge`,
+          tag: "span", baselineClasses: "badge", variantClasses: "badge",
+          property: "margin-top", baseline: "0px", variant: "60px", viewport: "mobile",
+        },
+        // Parent-level entry that names the actual layout-strategy mismatch
+        {
+          path: sharedParent,
+          tag: "section", baselineClasses: "profile", variantClasses: "profile",
+          property: "display", baseline: "grid", variant: "flex", viewport: "mobile",
+        },
+        {
+          path: sharedParent,
+          tag: "section", baselineClasses: "profile", variantClasses: "profile",
+          property: "grid-template-columns", baseline: "64px 1fr", variant: "none", viewport: "mobile",
+        },
+      ],
+    });
+    const structural = out.find((s) => s.scope === "structural");
+    assert.ok(structural);
+    assert.match(structural!.evidence, /parent layout deltas: display: flex \(now\) → grid \(target\)/);
+    assert.match(structural!.evidence, /grid-template-columns: none \(now\) → 64px 1fr \(target\)/);
+    assert.match(structural!.suggestion, /change `.+`'s layout to match/);
+  });
+
+  it("STRUCTURAL falls back to generic suggestion when parent properties match (#35)", () => {
+    const sharedParent = "body[0]>main[0]>section.profile";
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 24), bbox(1, 40), bbox(2, 60)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+      domPositionEntries: [
+        // No parent-level entries → fall back to generic message
+        {
+          path: `${sharedParent}>h2.name`,
+          tag: "h2", baselineClasses: "name", variantClasses: "name",
+          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+        },
+        {
+          path: `${sharedParent}>p.meta`,
+          tag: "p", baselineClasses: "meta", variantClasses: "meta",
+          property: "margin-top", baseline: "0px", variant: "40px", viewport: "mobile",
+        },
+        {
+          path: `${sharedParent}>span.badge`,
+          tag: "span", baselineClasses: "badge", variantClasses: "badge",
+          property: "margin-top", baseline: "0px", variant: "60px", viewport: "mobile",
+        },
+      ],
+    });
+    const structural = out.find((s) => s.scope === "structural");
+    assert.ok(structural);
+    assert.doesNotMatch(structural!.evidence, /parent layout deltas/);
+    assert.match(structural!.suggestion, /Parent's layout properties match/);
+  });
+
+  it("emits ⚠ cross-edit when ≥ 2 distinct cascading selectors land on the same suggestion (#36)", () => {
+    // .container (padding-bottom — cascades) AND .hero (margin-bottom
+    // — cascades) both bound to a single suggestion. Applying both
+    // edits compounds.
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 24)] },
+        { viewport: "desktop", matches: [bbox(0, 24)] },
+        { viewport: "wide", matches: [bbox(0, 24)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+      domPositionEntries: [
+        {
+          path: "body[0]>main[0]>div.container",
+          tag: "div", baselineClasses: "container", variantClasses: "container",
+          property: "padding-bottom", baseline: "0px", variant: "24px", viewport: "mobile",
+        },
+        {
+          path: "body[0]>main[0]>div.container>section.hero",
+          tag: "section", baselineClasses: "hero", variantClasses: "hero",
+          property: "margin-bottom", baseline: "0px", variant: "24px", viewport: "mobile",
+        },
+      ],
+    });
+    const withCross = out.find((s) => s.suggestion.includes("cross-edit"));
+    assert.ok(withCross);
+    assert.match(withCross!.suggestion, /cross-edit:.*\.container.*\.hero.*cascade-affect/);
+    assert.match(withCross!.suggestion, /compounds/);
+  });
+
+  it("does NOT emit ⚠ cross-edit when only one cascading selector is present (#36)", () => {
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 24)] },
+        { viewport: "desktop", matches: [bbox(0, 24)] },
+        { viewport: "wide", matches: [bbox(0, 24)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+      domPositionEntries: [
+        // Single cascading candidate
+        {
+          path: "body[0]>main[0]>div.container",
+          tag: "div", baselineClasses: "container", variantClasses: "container",
+          property: "padding-bottom", baseline: "0px", variant: "24px", viewport: "mobile",
+        },
+        // Non-cascading (margin-top doesn't cascade siblings)
+        {
+          path: "body[0]>main[0]>section.hero",
+          tag: "section", baselineClasses: "hero", variantClasses: "hero",
+          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+        },
+      ],
+    });
+    assert.ok(!out.some((s) => s.suggestion.includes("cross-edit")));
+  });
+
   it("does NOT mark HIGH-IMPACT when the leading magnitude is too small (< 12px)", () => {
     // 8 vs 4 — 2× ratio but the leading magnitude is only 8px,
     // not enough to be worth a HIGH-IMPACT badge on its own.
