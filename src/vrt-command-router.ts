@@ -78,6 +78,7 @@ const ROOT_MODULE_COMMANDS: Record<string, string> = {
   "manifest": "./manifest-cli.ts",
   "watch": "./watch.ts",
   "diff-pr": "./diff-pr.ts",
+  "baseline": "./baseline-cli.ts",
 };
 
 const WORKFLOW_ALIAS_COMMANDS = new Set<WorkflowCommand>([
@@ -142,6 +143,12 @@ Core Commands:
   diff-pr <pin | (none)>      CI gate: pin baselines on main, then per-PR
                               diff against pinned PNGs with per-route
                               thresholds. Reads vrt.config.json.
+  baseline <pin|verify|post|list|rm>
+                              Unified surface over diff-pr. Same
+                              underlying flow with the mnemonic name
+                              external projects expect. Use this in
+                              new projects; diff-pr is the literal
+                              name for backwards compatibility.
   elements [options]          Element-level comparison with shift isolation
   smoke <file-or-url>         A11y-driven smoke test
   discover <file>             Discover responsive breakpoints from HTML/CSS

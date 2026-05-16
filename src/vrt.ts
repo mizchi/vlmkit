@@ -35,6 +35,7 @@ const MODULE_LOADERS = {
   "./manifest-cli.ts": () => import("./manifest-cli.ts"),
   "./watch.ts": () => import("./watch.ts"),
   "./diff-pr.ts": () => import("./diff-pr.ts"),
+  "./baseline-cli.ts": () => import("./baseline-cli.ts"),
 } as const;
 
 async function main() {

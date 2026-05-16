@@ -56,6 +56,22 @@ export interface A11yPolicy {
   semantic?: boolean;
 }
 
+export interface CrossBrowserPolicy {
+  /** Which engines to compare. Omit for all (chromium, firefox, webkit). */
+  engines?: Array<"chromium" | "firefox" | "webkit">;
+  /** Per-engine diff-ratio threshold (vs the reference engine). Default 0.03. */
+  threshold?: number;
+  /**
+   * Accept engines that fail to launch (often firefox/webkit on
+   * minimal CI runners). Default true — most CI environments don't
+   * have all three engines installed. Set to false to fail the run
+   * when an engine is missing.
+   */
+  allowSkipped?: boolean;
+  /** Max non-skipped engines that may exceed threshold. Default 0. */
+  maxOver?: number;
+}
+
 export interface MediaVariantsPolicy {
   /**
    * Which media-emulation variants to run per route. Omit for the
@@ -87,6 +103,12 @@ export interface DiffPrConfig {
    * verdict counts. Omit to skip media variants entirely.
    */
   mediaVariants?: MediaVariantsPolicy;
+  /**
+   * When present, `vrt diff-pr` renders each route in chromium /
+   * firefox / webkit and diffs the screenshots; engines that exceed
+   * the threshold count toward the route's pass/fail. Omit to skip.
+   */
+  crossBrowser?: CrossBrowserPolicy;
   /** Resolved path of the file the config was loaded from (diag only). */
   configPath?: string;
 }
@@ -140,7 +162,46 @@ export function parseDiffPrConfig(raw: string, configPath?: string): DiffPrConfi
     baselineDir,
     a11y: parseA11yPolicy(obj.a11y, "a11y"),
     mediaVariants: parseMediaVariantsPolicy(obj.mediaVariants, "mediaVariants"),
+    crossBrowser: parseCrossBrowserPolicy(obj.crossBrowser, "crossBrowser"),
     configPath,
+  };
+}
+
+const VALID_ENGINES = new Set(["chromium", "firefox", "webkit"]);
+
+function parseCrossBrowserPolicy(value: unknown, label: string): CrossBrowserPolicy | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${label} must be an object`);
+  }
+  const r = value as Record<string, unknown>;
+  let engines: CrossBrowserPolicy["engines"] | undefined;
+  if (r.engines !== undefined && r.engines !== null) {
+    if (!Array.isArray(r.engines)) throw new Error(`${label}.engines must be an array`);
+    engines = r.engines.map((e, i) => {
+      if (typeof e !== "string" || !VALID_ENGINES.has(e)) {
+        throw new Error(`${label}.engines[${i}] must be one of: ${[...VALID_ENGINES].join(", ")}`);
+      }
+      return e as NonNullable<CrossBrowserPolicy["engines"]>[number];
+    });
+  }
+  const num = (v: unknown, k: string) => {
+    if (v === undefined || v === null) return undefined;
+    if (typeof v !== "number" || Number.isNaN(v) || v < 0) {
+      throw new Error(`${label}.${k} must be a non-negative number`);
+    }
+    return v;
+  };
+  const bool = (v: unknown, k: string) => {
+    if (v === undefined || v === null) return undefined;
+    if (typeof v !== "boolean") throw new Error(`${label}.${k} must be boolean`);
+    return v;
+  };
+  return {
+    engines,
+    threshold: num(r.threshold, "threshold"),
+    allowSkipped: bool(r.allowSkipped, "allowSkipped"),
+    maxOver: num(r.maxOver, "maxOver"),
   };
 }
 

@@ -41,7 +41,8 @@ import {
 import { compareScreenshots } from "./heatmap.ts";
 import { runA11yOnPage } from "./a11y-on-page.ts";
 import { runMediaVariants, type VariantResult, type MediaVariant } from "./media-variants.ts";
-import { filterA11yFindings, loadApprovalManifest, type ApprovalManifest } from "./approval.ts";
+import { runCrossBrowser, type EngineName, type EngineResult } from "./cross-browser.ts";
+import { filterA11yFindings, filterCrossBrowserFindings, filterMediaVariantFindings, loadApprovalManifest, type ApprovalManifest } from "./approval.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "./terminal-colors.ts";
 import type { VrtSnapshot } from "./types.ts";
 import type { ContrastFinding } from "./a11y-contrast.ts";
@@ -102,6 +103,18 @@ interface PerRouteResult {
     warnCount: number;
     maxSuspects: number;
     maxWarns: number;
+    pass: boolean;
+  };
+  /**
+   * Cross-browser engine comparison summary. Runs once per route at
+   * the default viewport when `crossBrowser` is declared.
+   */
+  crossBrowser?: {
+    engines: EngineResult[];
+    threshold: number;
+    overCount: number;
+    skippedCount: number;
+    maxOver: number;
     pass: boolean;
   };
 }
@@ -401,10 +414,15 @@ async function cmdRun(args: string[]): Promise<number> {
             variants,
             threshold: config.mediaVariants.threshold ?? 0.03,
           });
-          const suspectCount = mv.variants.filter((v) => v.verdict === "suspect").length;
-          const warnCount = mv.variants.filter((v) => v.verdict === "warn").length;
+          // Apply manifest suppression on the variant verdicts.
+          // Rules with kind: "media-variant" + selector: <variant-name>
+          // demote the matching finding's verdict to "ok" so the
+          // gate doesn't count it.
+          const filtered = filterMediaVariantFindings(mv.variants, manifest);
+          const suspectCount = filtered.kept.filter((v) => v.verdict === "suspect").length;
+          const warnCount = filtered.kept.filter((v) => v.verdict === "warn").length;
           mediaVariantsResult = {
-            variants: mv.variants,
+            variants: filtered.kept,
             suspectCount,
             warnCount,
             maxSuspects,
@@ -416,9 +434,50 @@ async function cmdRun(args: string[]): Promise<number> {
         }
       }
 
+      // Cross-browser engine comparison. Once per route at default
+      // desktop viewport. Engines that fail to launch (often firefox
+      // /webkit on minimal CI runners) auto-skip; allowSkipped=true
+      // by default so missing engines don't fail the build.
+      let crossBrowserResult: PerRouteResult["crossBrowser"];
+      if (config.crossBrowser) {
+        const xbDir = resolve(routeOut, "cross-browser");
+        const threshold = config.crossBrowser.threshold ?? 0.03;
+        const maxOver = config.crossBrowser.maxOver ?? 0;
+        const allowSkipped = config.crossBrowser.allowSkipped ?? true;
+        try {
+          const xb = await runCrossBrowser({
+            source: route.url,
+            outputDir: xbDir,
+            viewport: { width: 1280, height: 720 },
+            engines: config.crossBrowser.engines as EngineName[] | undefined,
+            threshold,
+            allowSkipped,
+          });
+          // Manifest can suppress per-engine failures
+          // (kind: "cross-browser", selector: "firefox").
+          const filtered = filterCrossBrowserFindings(xb.engines, manifest);
+          const overCount = filtered.kept.filter(
+            (e) => e.status === "ok" && e.deltaRatio > threshold,
+          ).length;
+          const skippedCount = filtered.kept.filter((e) => e.status === "skipped").length;
+          const skipFails = !allowSkipped && skippedCount > 0;
+          crossBrowserResult = {
+            engines: filtered.kept,
+            threshold,
+            overCount,
+            skippedCount,
+            maxOver,
+            pass: overCount <= maxOver && !skipFails,
+          };
+        } catch (err) {
+          console.log(`  ${YELLOW}cross-browser error (${route.name}): ${String(err)}${RESET}`);
+        }
+      }
+
       const visualFailed = perVp.some((v) => !v.pass);
       const mvFailed = mediaVariantsResult ? !mediaVariantsResult.pass : false;
-      const failed = visualFailed || mvFailed;
+      const xbFailed = crossBrowserResult ? !crossBrowserResult.pass : false;
+      const failed = visualFailed || mvFailed || xbFailed;
       const status = failed ? `${RED}FAIL${RESET}` : `${GREEN}pass${RESET}`;
       const breakdown = perVp.map((v) => {
         const tag = v.pass ? GREEN : RED;
@@ -430,8 +489,15 @@ async function cmdRun(args: string[]): Promise<number> {
       const mvSuffix = mediaVariantsResult
         ? ` ${DIM}[mv suspect=${mediaVariantsResult.suspectCount}/${mediaVariantsResult.maxSuspects} warn=${mediaVariantsResult.warnCount}/${mediaVariantsResult.maxWarns}]${RESET}`
         : "";
-      console.log(`  ${route.name.padEnd(20)} ${status}  ${breakdown}${mvSuffix}`);
-      results.push({ route, viewports: perVp, failed, mediaVariants: mediaVariantsResult });
+      const xbSuffix = crossBrowserResult
+        ? ` ${DIM}[xb over=${crossBrowserResult.overCount}/${crossBrowserResult.maxOver} skip=${crossBrowserResult.skippedCount}]${RESET}`
+        : "";
+      console.log(`  ${route.name.padEnd(20)} ${status}  ${breakdown}${mvSuffix}${xbSuffix}`);
+      results.push({
+        route, viewports: perVp, failed,
+        mediaVariants: mediaVariantsResult,
+        crossBrowser: crossBrowserResult,
+      });
     }
   } finally {
     await browser.close();
@@ -543,6 +609,25 @@ export function buildMarkdownSummary(config: DiffPrConfig, results: PerRouteResu
           .map((f) => `[${f.kind}] \`${f.path}\``)
           .join("; ");
         lines.push(`- \`${route}\` / ${vp.viewport} — **semantic** ${vp.a11y.semanticFailures.length} > ${vp.a11y.maxSemantic}: ${top}`);
+      }
+    }
+  }
+
+  // Cross-browser failures section.
+  const xbFailRows = results.filter((r) => r.crossBrowser && !r.crossBrowser.pass);
+  if (xbFailRows.length > 0) {
+    lines.push("");
+    lines.push("## Cross-browser failures");
+    lines.push("");
+    for (const r of xbFailRows) {
+      const xb = r.crossBrowser!;
+      lines.push(`- \`${r.route.name}\` — over ${xb.overCount}/${xb.maxOver} (threshold ${pctStr(xb.threshold)})`);
+      for (const e of xb.engines.slice(0, 5)) {
+        if (e.status === "ok" && e.deltaRatio > xb.threshold) {
+          lines.push(`  - **${e.engine}** (${e.status}): Δ ${pctStr(e.deltaRatio)} > ${pctStr(xb.threshold)}`);
+        } else if (e.status === "failed") {
+          lines.push(`  - **${e.engine}** (${e.status}): ${e.error ?? "launch failed"}`);
+        }
       }
     }
   }

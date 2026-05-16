@@ -138,17 +138,22 @@ async function cmdAdd(args: string[]): Promise<void> {
   // A11y short-hand: --a11y-contrast / --a11y-touch sets `kind` so
   // the rule suppresses a11y findings instead of pixel/paint diffs.
   // These flags require a --selector (the path-substring matcher).
-  let kind: "visual" | "a11y-contrast" | "a11y-touch" | "a11y-focus-order" | "a11y-semantic" | undefined;
-  const a11yKinds = ["a11y-contrast", "a11y-touch", "a11y-focus-order", "a11y-semantic"] as const;
-  const a11yFlags = a11yKinds.filter((k) => hasFlag(args, k));
-  if (a11yFlags.length > 1) {
-    console.error(`${RED}error:${RESET} only one of --${a11yKinds.join(" / --")} at a time`);
+  let kind: "visual" | "a11y-contrast" | "a11y-touch" | "a11y-focus-order" | "a11y-semantic" | "media-variant" | "cross-browser" | undefined;
+  const kindFlags = ["a11y-contrast", "a11y-touch", "a11y-focus-order", "a11y-semantic", "media-variant", "cross-browser"] as const;
+  const flags = kindFlags.filter((k) => hasFlag(args, k));
+  if (flags.length > 1) {
+    console.error(`${RED}error:${RESET} only one of --${kindFlags.join(" / --")} at a time`);
     process.exit(1);
-  } else if (a11yFlags.length === 1) {
-    kind = a11yFlags[0];
+  } else if (flags.length === 1) {
+    kind = flags[0];
   }
   if (kind && !selector) {
-    console.error(`${RED}error:${RESET} ${kind} rules require --selector (path-substring matcher)`);
+    const hint = kind === "media-variant"
+      ? "(--selector is the variant name: forced-colors, reduced-motion, print, rtl, or zoom-200)"
+      : kind === "cross-browser"
+        ? "(--selector is the engine name: chromium, firefox, or webkit)"
+        : "(path-substring matcher)";
+    console.error(`${RED}error:${RESET} ${kind} rules require --selector ${hint}`);
     process.exit(1);
   }
 

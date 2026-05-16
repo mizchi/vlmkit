@@ -8,7 +8,14 @@ export interface ApprovalManifest {
   rules: ApprovalRule[];
 }
 
-export type ApprovalRuleKind = "visual" | "a11y-contrast" | "a11y-touch" | "a11y-focus-order" | "a11y-semantic";
+export type ApprovalRuleKind =
+  | "visual"
+  | "a11y-contrast"
+  | "a11y-touch"
+  | "a11y-focus-order"
+  | "a11y-semantic"
+  | "media-variant"
+  | "cross-browser";
 
 export interface ApprovalRule {
   /**
@@ -357,15 +364,12 @@ function validateApprovalRule(value: unknown, index: number): ApprovalRule {
   const expires = asOptionalString(rule.expires, `approval.rules[${index}].expires`);
   if (expires) parseExpiry(expires);
   const kindRaw = asOptionalString(rule.kind, `approval.rules[${index}].kind`);
-  if (
-    kindRaw !== undefined
-    && kindRaw !== "visual"
-    && kindRaw !== "a11y-contrast"
-    && kindRaw !== "a11y-touch"
-    && kindRaw !== "a11y-focus-order"
-    && kindRaw !== "a11y-semantic"
-  ) {
-    throw new Error(`approval.rules[${index}].kind must be one of: visual, a11y-contrast, a11y-touch, a11y-focus-order, a11y-semantic`);
+  const VALID_KINDS = new Set([
+    "visual", "a11y-contrast", "a11y-touch", "a11y-focus-order", "a11y-semantic",
+    "media-variant", "cross-browser",
+  ]);
+  if (kindRaw !== undefined && !VALID_KINDS.has(kindRaw)) {
+    throw new Error(`approval.rules[${index}].kind must be one of: ${[...VALID_KINDS].join(", ")}`);
   }
   const kind = kindRaw as ApprovalRuleKind | undefined;
 
@@ -408,6 +412,80 @@ export function filterA11yFindings<T extends { path: string }>(
     const match = rules.find((r) => finding.path.includes(r.selector!));
     if (match) suppressed.push({ finding, rule: match });
     else kept.push(finding);
+  }
+  return { kept, suppressed };
+}
+
+/**
+ * Filter cross-browser findings by manifest. A rule with
+ * `kind: "cross-browser"` and `selector: <engine-name>` suppresses
+ * findings on that engine by setting `deltaRatio = 0` and tagging
+ * the engine's error / note. The audit trail is preserved.
+ */
+export function filterCrossBrowserFindings<T extends {
+  engine: string;
+  status: "ok" | "skipped" | "failed";
+  deltaRatio: number;
+  error?: string;
+}>(
+  findings: T[],
+  manifest: ApprovalManifest | null | undefined,
+): { kept: T[]; suppressed: Array<{ finding: T; rule: ApprovalRule }> } {
+  if (!manifest) return { kept: findings, suppressed: [] };
+  const now = new Date();
+  const rules = manifest.rules.filter((r) =>
+    r.kind === "cross-browser" && !!r.selector && !isApprovalRuleExpired(r, now),
+  );
+  if (rules.length === 0) return { kept: findings, suppressed: [] };
+  const kept: T[] = [];
+  const suppressed: Array<{ finding: T; rule: ApprovalRule }> = [];
+  for (const finding of findings) {
+    const match = rules.find((r) => r.selector === finding.engine);
+    if (match) {
+      suppressed.push({ finding, rule: match });
+      kept.push({
+        ...finding,
+        deltaRatio: 0,
+        error: `${finding.error ?? ""} (suppressed by manifest rule: ${match.reason})`.trim(),
+      });
+    } else {
+      kept.push(finding);
+    }
+  }
+  return { kept, suppressed };
+}
+
+/**
+ * Filter media-variant findings by manifest. A rule with
+ * `kind: "media-variant"` and `selector: <variant-name>` suppresses
+ * findings of that variant by demoting their verdict to "ok"
+ * (audit trail preserved in the kept list; the gate counts what's
+ * left).
+ */
+export function filterMediaVariantFindings<T extends { variant: string; verdict: "ok" | "suspect" | "warn" | "skip"; note: string }>(
+  findings: T[],
+  manifest: ApprovalManifest | null | undefined,
+): { kept: T[]; suppressed: Array<{ finding: T; rule: ApprovalRule }> } {
+  if (!manifest) return { kept: findings, suppressed: [] };
+  const now = new Date();
+  const rules = manifest.rules.filter((r) =>
+    r.kind === "media-variant" && !!r.selector && !isApprovalRuleExpired(r, now),
+  );
+  if (rules.length === 0) return { kept: findings, suppressed: [] };
+  const kept: T[] = [];
+  const suppressed: Array<{ finding: T; rule: ApprovalRule }> = [];
+  for (const finding of findings) {
+    const match = rules.find((r) => r.selector === finding.variant);
+    if (match) {
+      suppressed.push({ finding, rule: match });
+      kept.push({
+        ...finding,
+        verdict: "ok",
+        note: `${finding.note} (suppressed by manifest rule: ${match.reason})`,
+      });
+    } else {
+      kept.push(finding);
+    }
   }
   return { kept, suppressed };
 }
