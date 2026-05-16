@@ -73,7 +73,7 @@ export interface WireframeFixSuggestion {
    *                           one viewport while under- or over-correcting
    *                           the others.
    */
-  scope: "all" | "subset" | "divergent" | "magnitude-divergent" | "structural";
+  scope: "all" | "subset" | "divergent" | "magnitude-divergent" | "structural" | "reflow";
   /**
    * Per-viewport breakdown. Always populated; for non-divergent rows
    * every entry has the same sign.
@@ -122,7 +122,19 @@ export interface WireframeFixSuggestion {
 
 export interface WireframeFixInput {
   bboxByViewport: Array<{ viewport: string; matches: MatchedBbox[] }>;
-  textRowsByViewport: Array<{ viewport: string; matches: MatchedTextRow[] }>;
+  textRowsByViewport: Array<{
+    viewport: string;
+    matches: MatchedTextRow[];
+    /**
+     * Total dark-band rows detected on each side, before pairing.
+     * Used by the [REFLOW] detector — when the variant has more
+     * rows than the baseline on the narrow viewport, text wrapped.
+     * Optional for backward compatibility; reflow detection
+     * silently skips when absent.
+     */
+    baselineRowCount?: number;
+    variantRowCount?: number;
+  }>;
   tokens?: DesignTokens;
   /**
    * Full viewport set the compare ran on (e.g. ["mobile", "desktop", "wide"]).
@@ -287,6 +299,44 @@ export function generateWireframeFixCandidates(
     const magnitudes = perVpDeltas.map((p) => Math.abs(p.deltaPx));
     const maxMag = Math.max(...magnitudes);
     const minMag = Math.min(...magnitudes);
+
+    // REFLOW detection (closes #33 / agent-g v7): when one viewport's
+    // magnitude is ≥ 3× the others AND that viewport has more text
+    // rows than the baseline, the cause is almost certainly text
+    // wrapping pushing this component down — not a spacing-token
+    // issue. Spacing suggestions would mislead an agent into
+    // adjusting margins / padding when the real fix is upstream
+    // (max-width / font-size / text content).
+    const REFLOW_ASYMMETRY = 3; // max-mag must be ≥ 3× min-mag
+    const REFLOW_MIN_MAG_PX = 32; // ignore small-asymmetry noise
+    if (maxMag >= REFLOW_MIN_MAG_PX && minMag > 0 && maxMag / minMag >= REFLOW_ASYMMETRY) {
+      const dominantVp = perVpDeltas.reduce((best, p) =>
+        Math.abs(p.deltaPx) > Math.abs(best.deltaPx) ? p : best,
+      perVpDeltas[0]);
+      const tr = input.textRowsByViewport.find((t) => t.viewport === dominantVp.viewport);
+      const baselineRows = tr?.baselineRowCount;
+      const variantRows = tr?.variantRowCount;
+      const extraRows = baselineRows !== undefined && variantRows !== undefined
+        ? variantRows - baselineRows
+        : 0;
+      if (extraRows >= 1) {
+        const summary = perVpDeltas
+          .map((p) => `${p.viewport}: ${signed(p.deltaPx)}`)
+          .join(", ");
+        out.push({
+          evidence: `component rank=${rank} (bbox ${dims}): asymmetric Δtop (${summary}); ${dominantVp.viewport} variant has +${extraRows} text row${extraRows === 1 ? "" : "s"} above this component vs baseline`,
+          hypothesis: `text wrapping on ${dominantVp.viewport} pushed this component down by ~${extraRows} line-height(s). Spacing tokens won't close the delta; the fix is upstream of the wrap.`,
+          suggestion: `typography cascade on ${dominantVp.viewport}: inspect headline/paragraph max-width, font-size at that breakpoint, and text content length. NOT a spacing-token fix — adjusting margin/padding will just move other elements out of place.`,
+          viewports: perVpDeltas.map((p) => p.viewport),
+          confidence: "high",
+          deltaPx: Math.abs(dominantVp.deltaPx),
+          scope: "reflow",
+          perViewport: perVpDeltas.map((p) => ({ viewport: p.viewport, deltaPx: p.deltaPx })),
+        });
+        continue;
+      }
+    }
+
     // Magnitude-divergent: same sign across all viewports, but the
     // smallest and largest deltas are clearly distinct (>= 8px apart).
     // Distinct enough that one global value can't satisfy both ends.
@@ -488,6 +538,79 @@ export function generateWireframeFixCandidates(
     if (Math.abs(b.deltaPx) !== Math.abs(a.deltaPx)) return Math.abs(b.deltaPx) - Math.abs(a.deltaPx);
     return b.viewports.length - a.viewports.length;
   });
+
+  // #34: cross-suggestion overshoot aggregation. When multiple
+  // suggestions all blame the same candidate selector, the agent
+  // following each individually still overshoots the cumulative
+  // magnitude. Detect and append a ⚠ warning to the lead
+  // suggestion's text so agents read it where they'll act.
+  //
+  // Heuristic:
+  //   - group candidates by (selector, viewport) across all
+  //     suggestions
+  //   - sum |magnitudes| from contributing suggestions
+  //   - if cumulative > max(single) + 8px AND group has ≥ 2
+  //     contributors, emit the warning
+  const selectorGroups = new Map<string, {
+    sugIdxs: Set<number>;
+    magnitudes: number[];
+    selector: string;
+    viewport: string;
+  }>();
+  for (let i = 0; i < out.length; i++) {
+    const seen = new Set<string>();
+    for (const c of out[i].candidates ?? []) {
+      const key = `${c.selector}|${c.viewport}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const entry = selectorGroups.get(key) ?? {
+        sugIdxs: new Set(),
+        magnitudes: [],
+        selector: c.selector,
+        viewport: c.viewport,
+      };
+      entry.sugIdxs.add(i);
+      entry.magnitudes.push(Math.abs(out[i].deltaPx));
+      selectorGroups.set(key, entry);
+    }
+  }
+  const CONVERGE_OVERAGE_PX = 8;
+  // Dedupe across viewports: when the same set of suggestion indices
+  // touches the same selector on multiple viewports (mobile / desktop /
+  // wide), one warning lists every affected viewport instead of three
+  // repetitions of the same text. Key by `(leadIdx, selector, sorted
+  // sugIdxs)`.
+  const emittedKey = new Set<string>();
+  // Group groups by their dedupe key first so we can collect viewports.
+  const collapsed = new Map<string, { leadIdx: number; selector: string; viewports: string[]; sugIdxs: Set<number>; magnitudes: number[]; cumulative: number }>();
+  for (const { sugIdxs, magnitudes, selector, viewport } of selectorGroups.values()) {
+    if (sugIdxs.size < 2) continue;
+    const cumulative = magnitudes.reduce((s, m) => s + m, 0);
+    const maxSingle = Math.max(...magnitudes);
+    if (cumulative <= maxSingle + CONVERGE_OVERAGE_PX) continue;
+    const leadIdx = Math.min(...sugIdxs);
+    const sortedIdxs = [...sugIdxs].sort((a, b) => a - b).join(",");
+    const key = `${leadIdx}|${selector}|${sortedIdxs}`;
+    const existing = collapsed.get(key);
+    if (existing) {
+      existing.viewports.push(viewport);
+    } else {
+      collapsed.set(key, {
+        leadIdx, selector,
+        viewports: [viewport],
+        sugIdxs,
+        magnitudes,
+        cumulative,
+      });
+    }
+  }
+  for (const entry of collapsed.values()) {
+    const list = entry.magnitudes.map((m) => `${m}px`).join(" + ");
+    const vpList = entry.viewports.join(", ");
+    out[entry.leadIdx].suggestion += ` ⚠ ${entry.sugIdxs.size} suggestions converge on ${entry.selector} (${vpList}): cumulative ${list} = ${entry.cumulative}px. Treat each individually and you risk compound overshoot — consolidate into one edit that resolves all together.`;
+    emittedKey.add(`${entry.leadIdx}|${entry.selector}`);
+  }
+  void emittedKey;
 
   // F1: structural-mismatch detection. When 3+ suggestions all
   // blame children of the same DOM parent — AND those children have

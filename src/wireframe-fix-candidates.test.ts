@@ -538,6 +538,167 @@ describe("generateWireframeFixCandidates", () => {
     assert.equal(out.filter((s) => s.scope === "structural").length, 0);
   });
 
+  it("emits a REFLOW row when mobile magnitude is ≥3× others AND mobile has extra text rows (#33)", () => {
+    // Agent-g v7 scenario: mobile avatar pushed +132px because
+    // the headline wrapped to 3 extra lines. Spacing-token
+    // suggestion would mislead — the fix is typography upstream.
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(4, 132)] },
+        { viewport: "desktop", matches: [bbox(4, 20)] },
+        { viewport: "wide", matches: [bbox(4, 20)] },
+      ],
+      textRowsByViewport: [
+        { viewport: "mobile", matches: [], baselineRowCount: 8, variantRowCount: 11 },
+        { viewport: "desktop", matches: [], baselineRowCount: 7, variantRowCount: 7 },
+        { viewport: "wide", matches: [], baselineRowCount: 7, variantRowCount: 7 },
+      ],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+    });
+    const reflow = out.filter((s) => s.scope === "reflow");
+    assert.equal(reflow.length, 1, "REFLOW should fire on rank=4");
+    assert.match(reflow[0].evidence, /asymmetric/);
+    assert.match(reflow[0].evidence, /mobile variant has \+3 text rows/);
+    assert.match(reflow[0].suggestion, /typography cascade/);
+    assert.match(reflow[0].suggestion, /max-width.*font-size/);
+    // Reflow row leads the output (alongside structural).
+    const idxOfReflow = out.findIndex((s) => s.scope === "reflow");
+    const firstNonLead = out.findIndex((s) => s.scope !== "reflow" && s.scope !== "structural");
+    if (firstNonLead >= 0) assert.ok(idxOfReflow < firstNonLead, "reflow leads non-structural rows");
+  });
+
+  it("does NOT emit REFLOW when row counts don't differ (asymmetry is real but cause isn't reflow)", () => {
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 132)] },
+        { viewport: "desktop", matches: [bbox(0, 20)] },
+        { viewport: "wide", matches: [bbox(0, 20)] },
+      ],
+      textRowsByViewport: [
+        // Same row count on both sides → not a wrap.
+        { viewport: "mobile", matches: [], baselineRowCount: 8, variantRowCount: 8 },
+      ],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+    });
+    assert.equal(out.filter((s) => s.scope === "reflow").length, 0);
+  });
+
+  it("does NOT emit REFLOW when asymmetry is below the 3× threshold", () => {
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        // 40 / 20 = 2× — below the 3× asymmetry guard.
+        { viewport: "mobile", matches: [bbox(0, 40)] },
+        { viewport: "desktop", matches: [bbox(0, 20)] },
+        { viewport: "wide", matches: [bbox(0, 20)] },
+      ],
+      textRowsByViewport: [
+        { viewport: "mobile", matches: [], baselineRowCount: 8, variantRowCount: 10 },
+      ],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+    });
+    assert.equal(out.filter((s) => s.scope === "reflow").length, 0);
+  });
+
+  it("does NOT emit REFLOW when row-count info is absent (caller didn't pass it)", () => {
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 132)] },
+        { viewport: "desktop", matches: [bbox(0, 20)] },
+        { viewport: "wide", matches: [bbox(0, 20)] },
+      ],
+      textRowsByViewport: [
+        { viewport: "mobile", matches: [] },
+      ],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+    });
+    assert.equal(out.filter((s) => s.scope === "reflow").length, 0,
+      "no row-count data → can't claim reflow");
+  });
+
+  it("appends a ⚠ converging warning when multiple suggestions blame the same selector (#34)", () => {
+    // Two distinct suggestions both name `.container` on mobile.
+    // Cumulative magnitude (24 + 16 = 40) exceeds the larger single
+    // magnitude (24) by 16px, which is over the 8px overage gate.
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 24), bbox(1, 16)] },
+        { viewport: "desktop", matches: [bbox(0, 24), bbox(1, 16)] },
+        { viewport: "wide", matches: [bbox(0, 24), bbox(1, 16)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+      domPositionEntries: [
+        {
+          path: "body[0]>main[0]>div.container",
+          tag: "div", baselineClasses: "container", variantClasses: "container",
+          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+        },
+        {
+          path: "body[0]>main[0]>div.container",
+          tag: "div", baselineClasses: "container", variantClasses: "container",
+          property: "padding-top", baseline: "0px", variant: "16px", viewport: "mobile",
+        },
+      ],
+    });
+    // Find the lead suggestion that carries the warning (the first
+    // among those touching `.container`).
+    const withWarning = out.find((s) => s.suggestion.includes("converge on .container"));
+    assert.ok(withWarning, "a converging warning should be appended");
+    assert.match(withWarning!.suggestion, /2 suggestions converge on .container.*mobile.*cumulative .*= 40px/);
+    assert.match(withWarning!.suggestion, /compound overshoot/);
+  });
+
+  it("does NOT warn when only one suggestion touches a selector", () => {
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 24)] },
+        { viewport: "desktop", matches: [bbox(0, 24)] },
+        { viewport: "wide", matches: [bbox(0, 24)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+      domPositionEntries: [
+        {
+          path: "body[0]>div.solo",
+          tag: "div", baselineClasses: "solo", variantClasses: "solo",
+          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+        },
+      ],
+    });
+    assert.ok(!out.some((s) => s.suggestion.includes("converge on")));
+  });
+
+  it("does NOT warn when cumulative is within tolerance of max single", () => {
+    // 24 + 4 = 28. max single = 24. overage = 4 ≤ 8 → no warning.
+    const out = generateWireframeFixCandidates({
+      bboxByViewport: [
+        { viewport: "mobile", matches: [bbox(0, 24), bbox(1, 4)] },
+      ],
+      textRowsByViewport: [],
+      tokens: PAWS,
+      allViewports: ["mobile", "desktop", "wide"],
+      domPositionEntries: [
+        {
+          path: "body[0]>div.x",
+          tag: "div", baselineClasses: "x", variantClasses: "x",
+          property: "margin-top", baseline: "0px", variant: "24px", viewport: "mobile",
+        },
+        {
+          path: "body[0]>div.x",
+          tag: "div", baselineClasses: "x", variantClasses: "x",
+          property: "padding-top", baseline: "0px", variant: "4px", viewport: "mobile",
+        },
+      ],
+    });
+    assert.ok(!out.some((s) => s.suggestion.includes("converge on")));
+  });
+
   it("does NOT mark HIGH-IMPACT when the leading magnitude is too small (< 12px)", () => {
     // 8 vs 4 — 2× ratio but the leading magnitude is only 8px,
     // not enough to be worth a HIGH-IMPACT badge on its own.

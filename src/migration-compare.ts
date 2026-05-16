@@ -1633,7 +1633,14 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
 
         const wireframeSuggestions: WireframeFixSuggestion[] = generateWireframeFixCandidates({
           bboxByViewport: perViewport,
-          textRowsByViewport: perViewportTextRows.map((r) => ({ viewport: r.viewport, matches: r.matches })),
+          textRowsByViewport: perViewportTextRows.map((r) => ({
+            viewport: r.viewport,
+            matches: r.matches,
+            // Pass total dark-band counts so the [REFLOW] detector
+            // can spot text-wrap on the narrow viewport.
+            baselineRowCount: r.baselineRowCount,
+            variantRowCount: r.variantRowCount,
+          })),
           tokens: designTokens,
           // Authoritative viewport set so subset detection works even
           // when a viewport had zero meaningful bbox/text-row deltas
@@ -1654,12 +1661,15 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           const sorted = [...wireframeSuggestions].sort((a, b) => {
             // STRUCTURAL leads everything — it diagnoses the
             // local-minima trap before agents start typing.
-            if ((b.scope === "structural") !== (a.scope === "structural")) {
-              return a.scope === "structural" ? -1 : 1;
-            }
+            // REFLOW also leads — it warns against spacing-fix
+            // attempts on a typographic-cascade problem.
+            const aLead = a.scope === "structural" || a.scope === "reflow";
+            const bLead = b.scope === "structural" || b.scope === "reflow";
+            if (aLead !== bLead) return aLead ? -1 : 1;
             if (!!b.isHighImpact !== !!a.isHighImpact) return (b.isHighImpact ? 1 : 0) - (a.isHighImpact ? 1 : 0);
             const scopeRank = (s: typeof a.scope) =>
-              s === "structural" ? -1
+              s === "structural" ? -2
+              : s === "reflow" ? -1
               : s === "divergent" ? 0
               : s === "magnitude-divergent" ? 1
               : s === "subset" ? 2
@@ -1675,13 +1685,15 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             // they can't be missed; subset gets a subtle "SUBSET" tag.
             const scopeTag = s.scope === "structural"
               ? ` ${BOLD}\x1b[35m[STRUCTURAL]${RESET}`
-              : s.scope === "divergent"
-                ? ` ${BOLD}${RED}[DIVERGENT]${RESET}`
-                : s.scope === "magnitude-divergent"
-                  ? ` ${BOLD}${CYAN}[MAG-DIVERGENT]${RESET}`
-                  : s.scope === "subset"
-                    ? ` ${YELLOW}[SUBSET]${RESET}`
-                    : "";
+              : s.scope === "reflow"
+                ? ` ${BOLD}\x1b[33m[REFLOW]${RESET}`
+                : s.scope === "divergent"
+                  ? ` ${BOLD}${RED}[DIVERGENT]${RESET}`
+                  : s.scope === "magnitude-divergent"
+                    ? ` ${BOLD}${CYAN}[MAG-DIVERGENT]${RESET}`
+                    : s.scope === "subset"
+                      ? ` ${YELLOW}[SUBSET]${RESET}`
+                      : "";
             const impactTag = s.isHighImpact
               ? ` ${BOLD}${GREEN}[HIGH-IMPACT]${RESET}`
               : "";
