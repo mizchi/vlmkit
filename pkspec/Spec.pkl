@@ -31,14 +31,31 @@ class SpecStep {
   impl: base.Step
 }
 
-/// How a Goal's achievement percentage is derived from its
-/// contributing scenarios.
-class GoalProgress {
-  /// `scenario-count` is the default: implemented scenarios divided
-  /// by all contributing scenarios. `severity-weighted` gives
-  /// critical / major / minor scenarios weights of 5 / 3 / 1 so
-  /// higher-impact scenarios dominate the percentage.
-  method: ("scenario-count" | "severity-weighted") = "scenario-count"
+/// One implementation pointer on a Scenario. The same Scenario can
+/// carry multiple `Implementation` entries — typical when one spec
+/// is enforced by a test + a code guard, or by code + a prose doc.
+///
+/// `kind = "test"` declares that a `Test.specRef = { id }` link in
+/// any Test.pkl module is sufficient; `at` is unused for this kind
+/// and pkspec lint flags it if set.
+///
+/// `kind = "code"` and `kind = "doc"` require `at` to point at the
+/// implementing artefact ("path:Symbol" / "path#anchor").
+/// `pkspec check --strict` verifies that the file portion exists
+/// on disk.
+///
+/// `kind = "task"` declares that a [pkfire](https://github.com/mizchi/pkfire)
+/// task is the implementation — typical for build / release /
+/// migration pipelines that live in `Taskfile.pkl` rather than
+/// application code. `at` uses the `path#name` convention:
+/// `at = "Taskfile.pkl#release"` for the `release` task in the
+/// repo-root Taskfile, or just `at = "release"` to default the path
+/// to `./Taskfile.pkl`. `pkspec check --strict` verifies the file
+/// exists; when `pkf` is on PATH it also confirms the named task
+/// is declared (via `pkf list --json`).
+class Implementation {
+  kind: ("test" | "code" | "doc" | "task")
+  at: String? = null
 }
 
 /// A user-facing Goal — a piece of value the system should
@@ -77,7 +94,11 @@ class Goal {
   rationale: String? = null
 
   /// Calculation used by `pkspec goals` and Milestone rollups.
-  progress: GoalProgress = new {}
+  /// `scenario-count` (default) is implemented scenarios divided
+  /// by all contributing scenarios. `severity-weighted` gives
+  /// critical / major / minor scenarios weights of 5 / 3 / 1 so
+  /// higher-impact scenarios dominate the percentage.
+  progressMethod: ("scenario-count" | "severity-weighted") = "scenario-count"
 }
 
 /// A Milestone groups Goals into a release / planning checkpoint.
@@ -174,14 +195,17 @@ class Scenario {
   /// tag-only projects.
   audience: Listing<String> = new {}
 
-  /// Reader-specific prose used by `pkspec docs --audience ...`.
-  /// When a field is unset, the docs renderer falls back to
-  /// `description` so existing specs remain useful without extra
-  /// authoring.
-  userDescription: String? = null
-  pmNotes: String? = null
-  operatorNotes: String? = null
-  apiNotes: String? = null
+  /// Reader-specific prose used by `pkspec docs --audience NAME`.
+  /// Keyed by audience name; the docs renderer looks up
+  /// `audienceNotes[NAME]` and falls back to `description` when no
+  /// entry is present.
+  ///
+  /// Conventional keys: "end-user" / "pm" / "operator" / "api"
+  /// (replacing the v0.1.x `userDescription` / `pmNotes` /
+  /// `operatorNotes` / `apiNotes` fields). Custom audience names
+  /// (e.g. "security", "sre") are accepted; they only need to
+  /// match the `--audience NAME` arg.
+  audienceNotes: Mapping<String, String> = new {}
 
   given: Listing<SpecStep> = new {}
   // `when` is a Pkl keyword (used by `when (cond) { ... }` constraint
@@ -213,6 +237,12 @@ class Scenario {
   /// Other `Scenario.id` values this spec depends on / assumes.
   /// `pkspec graph` renders these as graphviz edges so impact
   /// analysis ("if LOGIN-001 breaks, what else fails?") is mechanical.
+  ///
+  /// `dependsOn` is one of three free-form fields on Scenario; see
+  /// the `Vocabulary Note` table in
+  /// `docs/advanced/recipes/open-questions-policy.md` for how it
+  /// differs from `openQuestions` (unresolved ambiguities) and
+  /// `decisions` (append-only resolutions).
   dependsOn: Listing<String(matches(Regex(#"^[a-zA-Z0-9][a-zA-Z0-9_.\-/]*$"#)))> = new {}
 
   /// Other `Scenario.id` values that this spec replaces. The
@@ -264,38 +294,37 @@ class Scenario {
   /// `major` so most specs land in the middle bucket.
   severity: ("critical" | "major" | "minor") = "major"
 
-  /// How this scenario is verified.
-  ///   - "test" (default): a Test.pkl module declares
-  ///     `specRef { id }`. `pkspec check` requires the link.
-  ///   - "code": the guarantee lives in Go (or other) source
-  ///     that no Pkl Test can naturally reach. Set `implementedAt`
-  ///     to point at the file / function; `pkspec check` accepts it.
-  ///   - "doc": the guarantee is a prose claim. `pkspec check` accepts
-  ///     it when `implementedAt` is set (treat the doc as the
-  ///     reviewed artefact).
-  /// Used by framework-internal specs (the runner's own behaviour)
-  /// and by glue-by-prose claims that no test can reasonably
-  /// assert.
-  implementedBy: ("test" | "code" | "doc") = "test"
-
-  /// Free-form pointer to the implementing artefact when
-  /// `implementedBy` is "code" or "doc". Examples:
-  ///   "internal/executor/executor.go:Run"
-  ///   "docs/notes/timing-shard.md#total-timeout-semantics"
-  /// Required (non-null) for `pkspec check` to accept the scenario as
-  /// implemented when `implementedBy != "test"`.
-  implementedAt: String? = null
+  /// Implementation pointers (kind + path) declared for this
+  /// scenario. One Scenario can carry multiple entries (e.g. code
+  /// + doc + test). Empty list means "verified only by Test.specRef
+  /// links from Test.pkl modules" — the runner uses Test.specRef
+  /// matches to satisfy `pkspec check` when this list is empty.
+  ///
+  /// See `class Implementation` above for the kind/at contract.
+  implementations: Listing<Implementation> = new {}
 
   /// Outstanding ambiguities or open questions about this spec.
   /// `pkspec spec` renders these as a TODO list at the end of the
   /// SPEC.md so reviewers can answer them in one pass instead of
   /// hunting through descriptions.
+  ///
+  /// `openQuestions` is one of three free-form fields on Scenario;
+  /// each answers a different reviewer question. The
+  /// `Vocabulary Note` table in
+  /// `docs/advanced/recipes/open-questions-policy.md` is the
+  /// canonical guide for picking between `openQuestions`,
+  /// `decisions`, and `dependsOn`.
   openQuestions: Listing<String> = new {}
 
   /// Append-only decision log. Each entry records what changed,
   /// when, and (optionally) why. Don't edit past entries — add new
   /// ones. `pkspec decisions` renders these across the project
   /// for design-history review.
+  ///
+  /// `decisions` is one of three free-form fields on Scenario;
+  /// see the `Vocabulary Note` table in
+  /// `docs/advanced/recipes/open-questions-policy.md` for how it
+  /// differs from `openQuestions` and `dependsOn`.
   decisions: Listing<Decision> = new {}
 }
 
@@ -327,6 +356,19 @@ milestones: Listing<Milestone> = new {}
 /// Named `prelude` rather than `background` because `Scenario.background`
 /// already exists for long-running auxiliary processes.
 prelude: Listing<SpecStep> = new {}
+
+/// Optional allow-list of Scenario.id domain prefixes used in this
+/// module / project. When non-empty, `pkspec lint` reports any
+/// Scenario.id whose first dot-segment is not in this list as
+/// `lint.unknown-domain-prefix` at info level (advisory).
+///
+/// Leave empty to opt out — projects with their own naming
+/// convention (e.g. examples/ style `AUTH-001`) get no new lint
+/// output unless they declare their own allow-list.
+///
+/// Convention for pkspec's own SPEC.pkl: the 14 prefixes documented
+/// in `docs/notes/concepts.md` §2. Other projects pick their own.
+domains: Listing<String> = new {}
 
 local function tagStep(prefix: String, s: SpecStep, runAlways: Boolean): base.Step = new {
   name = "\(prefix) \(s.description)"
@@ -420,16 +462,18 @@ local function renderDecision(d: Decision): base.RenderedDecision = new {
   rationale = d.rationale
 }
 
+local function renderImplementation(i: Implementation): base.RenderedImplementation = new {
+  kind = i.kind
+  at = i.at
+}
+
 local function renderScenarioMeta(s: Scenario): base.RenderedScenario = new {
   name = s.name
   id = s.id
   description = s.description
   tags = s.tags
   audience = s.audience
-  userDescription = s.userDescription
-  pmNotes = s.pmNotes
-  operatorNotes = s.operatorNotes
-  apiNotes = s.apiNotes
+  audienceNotes = s.audienceNotes
   dependsOn = s.dependsOn
   supersedes = s.supersedes
   parent = s.parent
@@ -439,8 +483,9 @@ local function renderScenarioMeta(s: Scenario): base.RenderedScenario = new {
   deprecatedReason = s.deprecatedReason
   replacedBy = s.replacedBy
   severity = s.severity
-  implementedBy = s.implementedBy
-  implementedAt = s.implementedAt
+  implementations = new Listing<base.RenderedImplementation> {
+    for (i in s.implementations) { renderImplementation(i) }
+  }
   openQuestions = s.openQuestions
   decisions = new Listing<base.RenderedDecision> {
     for (d in s.decisions) { renderDecision(d) }
@@ -455,7 +500,7 @@ local function renderGoal(g: Goal): base.RenderedGoal = new {
   reviewStatus = g.reviewStatus
   deprecated = g.deprecated
   rationale = g.rationale
-  progressMethod = g.progress.method
+  progressMethod = g.progressMethod
 }
 
 local function renderMilestone(m: Milestone): base.RenderedMilestone = new {
@@ -500,3 +545,7 @@ renderedMilestones: Mapping<String, base.RenderedMilestone> = new {
     [m.id] = renderMilestone(m)
   }
 }
+
+/// Forward the module-level `domains` allow-list to the rendered
+/// Plan so `pkspec lint` can apply the unknown-prefix rule.
+renderedDomains: Listing<String> = domains

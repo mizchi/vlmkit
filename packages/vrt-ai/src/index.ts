@@ -1,0 +1,62 @@
+/**
+ * @mizchi/vrt-ai — VLM / LLM clients, reasoning pipeline, NLP helpers
+ *
+ * Curated public API. The `nlp` module (STOP_WORDS / SYNONYMS dictionaries)
+ * remains deep-importable but is not in the barrel — those are tuning
+ * tables, not user-facing primitives.
+ */
+
+// ---- LLM clients ----
+export {
+  createUnifiedLLMClient,
+  createLLMProvider,
+  type LLMClientOptions,
+  type LLMResponse,
+  type LLMProviderName,
+  type UnifiedLLMClient,
+  type MessageContent,
+  type TextContent,
+  type ImageContent,
+} from "./llm-client.ts";
+
+// ---- VLM clients ----
+export {
+  fetchVisionModels,
+  listModels,
+  resolveModel,
+  listGeminiModels,
+  resolveGeminiModel,
+  isGeminiDirectModel,
+  createVlmClient,
+  type VlmClient,
+  type VlmModel,
+  type VlmResponse,
+} from "./vlm-client.ts";
+
+// ---- Reasoning ----
+export {
+  createReasoningPipeline,
+  type ReasoningPipeline,
+  type PipelineConfig,
+  type AnalyzeOptions,
+  type StructuredDiffReport,
+  type VisualChange,
+  type CssFix,
+  type FixSuggestion,
+} from "./reasoning-pipeline.ts";
+export {
+  reasonAboutChanges,
+  type ReasoningChain,
+  type ActualChange,
+  type ExpectationMapping,
+} from "./reasoning.ts";
+
+// ---- Intent / diff extraction ----
+export {
+  buildIntent,
+  buildIntentWithLLM,
+  buildReasoningPrompt,
+  extractDiffSemantics,
+  parseDiff,
+  type LLMProvider,
+} from "./intent.ts";

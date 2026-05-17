@@ -1,6 +1,17 @@
 {
   "name": "vrt",
   "version": "0.4.0",
+  "description": "Visual Regression Testing harness: multi-viewport snapshot + diff + workflow CLI driven by VLM/LLM analysis.",
+  "license": "MIT",
+  "author": "mizchi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mizchi/vrt.git"
+  },
+  "homepage": "https://github.com/mizchi/vrt#readme",
+  "bugs": {
+    "url": "https://github.com/mizchi/vrt/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=24"
@@ -16,16 +27,17 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsdown",
     "prepack": "pnpm build",
-    "test": "node --test src/**/*.test.ts",
-    "demo": "node src/demo.ts",
-    "demo:fix": "node src/demo-fix-loop.ts",
-    "demo:multi": "node src/demo-scenarios.ts",
-    "demo:multistep": "node src/demo-multistep.ts",
+    "test": "node --test 'src/**/*.test.ts' 'packages/*/src/**/*.test.ts'",
+    "demo": "node src/demo/demo.ts",
+    "demo:fix": "node src/demo/demo-fix-loop.ts",
+    "demo:multi": "node src/demo/demo-scenarios.ts",
+    "demo:multistep": "node src/demo/demo-multistep.ts",
     "vrt": "playwright test",
     "vrt:update": "playwright test --update-snapshots"
   },
@@ -37,8 +49,11 @@
     "typescript": "^6.0.2"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@hono/node-server": "^1.19.12",
+    "@mizchi/vrt-ai": "workspace:*",
+    "@mizchi/vrt-capture": "workspace:*",
+    "@mizchi/vrt-core": "workspace:*",
+    "@mizchi/vrt-markup": "workspace:*",
     "@playwright/test": "^1.52.0",
     "hono": "^4.12.10",
     "pixelmatch": "^7.1.0",

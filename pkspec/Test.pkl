@@ -673,7 +673,7 @@ class Test {
   /// reproduces the exact xorshift32 stream that
   /// `pkl/QuickCheck.pkl` generates, so a failure reported by pkspec
   /// can be re-investigated inside `pkl test` with the same seed.
-  iterationSeed: Int = 1
+  iterationSeed: Int(this >= 0 && this <= 4294967295) = 1
 
   /// Enable seed-space shrinking after a property failure. When
   /// `iterations > 1` and the body fails at some seed S, the
@@ -1014,10 +1014,11 @@ class RenderedScenario {
   description: String?
   tags: Listing<String>
   audience: Listing<String>
-  userDescription: String?
-  pmNotes: String?
-  operatorNotes: String?
-  apiNotes: String?
+  /// Reader-specific prose, keyed by audience name. Conventional
+  /// keys: "end-user" / "pm" / "operator" / "api". Custom keys
+  /// (e.g. "security") are accepted; the docs renderer looks up
+  /// `audienceNotes[NAME]` for `--audience NAME`.
+  audienceNotes: Mapping<String, String>
   dependsOn: Listing<String>
   supersedes: Listing<String>
   /// `parent` is the id of the broader Scenario this one refines —
@@ -1035,19 +1036,20 @@ class RenderedScenario {
   deprecatedReason: String?
   replacedBy: String?
   severity: String            // "critical" | "major" | "minor"
-  /// How the scenario is verified — "test" (a Test.pkl with
-  /// matching specRef), "code" (framework-internal Go behaviour
-  /// pointed at by `implementedAt`), or "doc" (prose guarantee
-  /// pointed at by `implementedAt`). `pkspec check` accepts
-  /// `code` / `doc` entries whose `implementedAt` is non-null.
-  implementedBy: String       // "test" | "code" | "doc"
-  /// Free-form pointer to the implementing artefact —
-  /// "path/file.go:Symbol", "docs/x.md#anchor", etc. Used by
-  /// reviewers; the runner only validates that it is non-null
-  /// when `implementedBy != "test"`.
-  implementedAt: String?
+  /// Implementation pointers (kind + at). Empty list means
+  /// "verified only by matching Test.specRef links in Test.pkl
+  /// modules." `pkspec check --strict` verifies the file portion
+  /// of every `at` for kind="code" or kind="doc".
+  implementations: Listing<RenderedImplementation>
   openQuestions: Listing<String>
   decisions: Listing<RenderedDecision>
+}
+
+/// One implementation pointer rendered for the Go runner. See
+/// `class Implementation` in `Spec.pkl` for the authoring shape.
+class RenderedImplementation {
+  kind: String       // "test" | "code" | "doc"
+  at: String?
 }
 
 /// A Goal rendered for the Go runner. Goals carry no test
@@ -1101,6 +1103,12 @@ class Rendered {
   /// Milestones, keyed by `Milestone.id`. Populated by
   /// `Spec.pkl#milestones`; pure `Test.pkl` modules leave it empty.
   milestones: Mapping<String, RenderedMilestone>
+  /// Optional allow-list of Scenario.id domain prefixes. Populated
+  /// by `Spec.pkl#domains`; pure `Test.pkl` modules leave it empty.
+  /// When non-empty, `pkspec lint` reports any Scenario.id whose
+  /// first dot-segment is not in this list as
+  /// `lint.unknown-domain-prefix` at info level.
+  domains: Listing<String>
 }
 
 defaults: Defaults = new {}
@@ -1335,6 +1343,10 @@ renderedGoals: Mapping<String, RenderedGoal> = new {}
 /// `Test.pkl` modules leave this empty.
 renderedMilestones: Mapping<String, RenderedMilestone> = new {}
 
+/// Hook for `Spec.pkl` to inject the Scenario.id domain-prefix
+/// allow-list. Plain `Test.pkl` modules leave this empty.
+renderedDomains: Listing<String> = new {}
+
 output {
   value = new Rendered {
     defaults = module.defaults
@@ -1345,5 +1357,6 @@ output {
     scenarios = renderedScenarios
     goals = renderedGoals
     milestones = renderedMilestones
+    domains = renderedDomains
   }
 }

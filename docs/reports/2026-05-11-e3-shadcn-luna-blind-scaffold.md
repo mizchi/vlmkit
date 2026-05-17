@@ -63,13 +63,13 @@ missing layout CSS, indicating layout-shift is by far the dominant issue.
 
 ```bash
 # 1. Measure starting state
-node --experimental-strip-types src/migration-compare.ts \
+node --experimental-strip-types src/experiments/migration/migration-compare.ts \
   --dir fixtures/migration/shadcn-to-luna \
   --baseline before.html \
   --variants after-blank.html
 
 # 2. Iteratively apply LLM fixes (requires API key)
-ANTHROPIC_API_KEY=... node --experimental-strip-types src/migration-fix-loop.ts \
+ANTHROPIC_API_KEY=... node --experimental-strip-types src/experiments/migration/migration-fix-loop.ts \
   --report test-results/migration/migration-report.json \
   --variant after-blank.html \
   --in-place

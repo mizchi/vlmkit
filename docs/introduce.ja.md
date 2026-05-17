@@ -171,7 +171,7 @@ vrt status --url http://localhost:3456
 - `POST /api/smoke-test` — スモークテスト
 - `GET /api/status` — サーバーステータス
 
-TypeScript クライアント SDK (`src/vrt-client.ts`) も用意しています。
+TypeScript クライアント SDK (`src/api/client.ts`) も用意しています。
 
 ## Crater 連携
 

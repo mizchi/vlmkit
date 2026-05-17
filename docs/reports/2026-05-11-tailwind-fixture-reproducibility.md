@@ -109,7 +109,7 @@ discovery system finds today, not just the four tested in 2026-04.
    a "baseline rendered with default browser fonts only" sanity check
    (e.g. computed `body.fontFamily` ≠ Times New Roman when the source
    declares one) would catch CDN-failed baselines before they pollute
-   diff numbers. **Implemented same day** as `src/render-sanity.ts` +
+   diff numbers. **Implemented same day** as `src/vrt/compare/render-sanity.ts` +
    `migration-compare --strict-baseline-sanity`. Re-running the broken
    fixture now surfaces:
    ```

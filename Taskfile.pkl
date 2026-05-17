@@ -23,158 +23,158 @@ local vrtTest = new Task {
 
 local bench = new Task {
   name = "bench"
-  cmd = "node src/benchmark.ts"
-  inputs { "src/benchmark.ts"; "src/heatmap.ts"; "src/pixelmatch*.ts" }
+  cmd = "node src/experiments/benchmark/benchmark.ts"
+  inputs { "src/experiments/benchmark/benchmark.ts"; "packages/vrt-core/src/heatmap.ts" }
 }
 
 // ---- Demos ----
 
 local vrtDemo = new Task {
   name = "vrt-demo"
-  cmd = "node src/demo.ts"
-  inputs { "src/demo.ts" }
+  cmd = "node src/demo/demo.ts"
+  inputs { "src/demo/demo.ts" }
 }
 local vrtDemoFix = new Task {
   name = "vrt-demo-fix"
-  cmd = "node src/demo-fix-loop.ts"
-  inputs { "src/demo-fix-loop.ts" }
+  cmd = "node src/demo/demo-fix-loop.ts"
+  inputs { "src/demo/demo-fix-loop.ts" }
 }
 local vrtDemoMulti = new Task {
   name = "vrt-demo-multi"
-  cmd = "node src/demo-scenarios.ts"
-  inputs { "src/demo-scenarios.ts" }
+  cmd = "node src/demo/demo-scenarios.ts"
+  inputs { "src/demo/demo-scenarios.ts" }
 }
 local vrtDemoMultistep = new Task {
   name = "vrt-demo-multistep"
-  cmd = "node src/demo-multistep.ts"
-  inputs { "src/demo-multistep.ts" }
+  cmd = "node src/demo/demo-multistep.ts"
+  inputs { "src/demo/demo-multistep.ts" }
 }
 
 // ---- CSS challenge bench ----
 
 local cssBench = new Task {
   name = "css-bench"
-  cmd = "NO_IMAGES=1 node src/css-challenge-bench.ts"
-  inputs { "src/css-challenge*.ts"; "fixtures/css-challenge/**" }
+  cmd = "NO_IMAGES=1 node src/experiments/css-challenge/css-challenge-bench.ts"
+  inputs { "src/experiments/css-challenge/css-challenge*.ts"; "fixtures/css-challenge/**" }
 }
 local cssBenchSelector = new Task {
   name = "css-bench-selector"
-  cmd = "NO_IMAGES=1 node src/css-challenge-bench.ts --mode selector"
-  inputs { "src/css-challenge*.ts"; "fixtures/css-challenge/**" }
+  cmd = "NO_IMAGES=1 node src/experiments/css-challenge/css-challenge-bench.ts --mode selector"
+  inputs { "src/experiments/css-challenge/css-challenge*.ts"; "fixtures/css-challenge/**" }
 }
 local cssBenchAll = new Task {
   name = "css-bench-all"
   params {
     new { name = "trials"; type = "int"; default = "30" }
   }
-  cmd = "NO_IMAGES=1 node src/css-challenge-bench.ts --trials $TRIALS --fixture all"
-  inputs { "src/css-challenge*.ts"; "fixtures/css-challenge/**" }
+  cmd = "NO_IMAGES=1 node src/experiments/css-challenge/css-challenge-bench.ts --trials $TRIALS --fixture all"
+  inputs { "src/experiments/css-challenge/css-challenge*.ts"; "fixtures/css-challenge/**" }
 }
 local cssBenchCrater = new Task {
   name = "css-bench-crater"
-  cmd = "NO_IMAGES=1 node src/css-challenge-bench.ts --backend crater"
-  inputs { "src/css-challenge*.ts"; "fixtures/css-challenge/**" }
+  cmd = "NO_IMAGES=1 node src/experiments/css-challenge/css-challenge-bench.ts --backend crater"
+  inputs { "src/experiments/css-challenge/css-challenge*.ts"; "fixtures/css-challenge/**" }
 }
 local cssBenchPrescanner = new Task {
   name = "css-bench-prescanner"
-  cmd = "NO_IMAGES=1 node src/css-challenge-bench.ts --backend prescanner"
-  inputs { "src/css-challenge*.ts"; "fixtures/css-challenge/**" }
+  cmd = "NO_IMAGES=1 node src/experiments/css-challenge/css-challenge-bench.ts --backend prescanner"
+  inputs { "src/experiments/css-challenge/css-challenge*.ts"; "fixtures/css-challenge/**" }
 }
 local cssReport = new Task {
   name = "css-report"
-  cmd = "node src/detection-report.ts"
-  inputs { "src/detection-report.ts"; "src/detection-db.ts" }
+  cmd = "node src/experiments/detection/detection-report.ts"
+  inputs { "src/experiments/detection/detection-report.ts"; "src/experiments/detection/detection-db.ts" }
 }
 
-// ---- VRT approve / migration ----
+// ---- CSS bench approve / migration ----
 
-local vrtApprove = new Task {
-  name = "vrt-approve"
-  cmd = "node src/vrt-approve.ts"
-  inputs { "src/vrt-approve.ts"; "src/approval*.ts" }
+local benchApprove = new Task {
+  name = "bench-approve"
+  cmd = "node src/cli/workflow/bench-approve.ts"
+  inputs { "src/cli/workflow/bench-approve.ts"; "src/vrt/snapshot/approval*.ts" }
 }
 
 local migrationCompare = new Task {
   name = "migration-compare"
-  cmd = "node src/migration-compare.ts"
-  inputs { "src/migration-compare.ts"; "src/migration-*.ts" }
+  cmd = "node src/experiments/migration/migration-compare.ts"
+  inputs { "src/experiments/migration/migration-compare.ts"; "src/experiments/migration/migration-*.ts" }
 }
 
 local migrationFixLoop = new Task {
   name = "migration-fix-loop"
-  cmd = "node src/migration-fix-loop.ts"
-  inputs { "src/migration-fix-loop*.ts" }
+  cmd = "node src/experiments/migration/migration-fix-loop.ts"
+  inputs { "src/experiments/migration/migration-fix-loop*.ts" }
 }
 
 local migrationReset = new Task {
   name = "migration-reset"
   cmd = #"""
-    node src/migration-compare.ts \
+    node src/experiments/migration/migration-compare.ts \
       --dir fixtures/migration/reset-css \
       --baseline normalize.html \
       --variants modern-normalize.html destyle.html no-reset.html
   """#
-  inputs { "src/migration-compare.ts"; "fixtures/migration/reset-css/**" }
+  inputs { "src/experiments/migration/migration-compare.ts"; "fixtures/migration/reset-css/**" }
 }
 
 local migrationTailwind = new Task {
   name = "migration-tailwind"
   cmd = #"""
-    node src/migration-compare.ts \
+    node src/experiments/migration/migration-compare.ts \
       fixtures/migration/tailwind-to-vanilla/before.html \
       fixtures/migration/tailwind-to-vanilla/after.html
   """#
-  inputs { "src/migration-compare.ts"; "fixtures/migration/tailwind-to-vanilla/**" }
+  inputs { "src/experiments/migration/migration-compare.ts"; "fixtures/migration/tailwind-to-vanilla/**" }
 }
 
 local migrationShadcn = new Task {
   name = "migration-shadcn"
   cmd = #"""
-    node src/migration-compare.ts \
+    node src/experiments/migration/migration-compare.ts \
       --dir fixtures/migration/shadcn-to-luna \
       --baseline before.html --variants after.html
   """#
-  inputs { "src/migration-compare.ts"; "fixtures/migration/shadcn-to-luna/**" }
+  inputs { "src/experiments/migration/migration-compare.ts"; "fixtures/migration/shadcn-to-luna/**" }
 }
 
 local flakerVrtAdapt = new Task {
   name = "flaker-vrt-adapt"
-  cmd = "node src/flaker-vrt-report-adapter.ts"
-  inputs { "src/flaker-vrt-report-adapter.ts" }
+  cmd = "node src/experiments/flaker/flaker-vrt-report-adapter.ts"
+  inputs { "src/experiments/flaker/flaker-vrt-report-adapter.ts" }
 }
 
 // ---- Fix / VLM ----
 
 local fixLoop = new Task {
   name = "fix-loop"
-  cmd = "node src/fix-loop.ts"
-  inputs { "src/fix-loop.ts"; "src/vlm-client.ts"; "src/llm-client.ts" }
+  cmd = "node src/experiments/css-challenge/fix-loop.ts"
+  inputs { "src/experiments/css-challenge/fix-loop.ts"; "packages/vrt-ai/src/vlm-client.ts"; "packages/vrt-ai/src/llm-client.ts" }
 }
 
 local vlmBench = new Task {
   name = "vlm-bench"
-  cmd = "node src/vlm-bench.ts"
-  inputs { "src/vlm-bench.ts" }
+  cmd = "node src/experiments/benchmark/vlm-bench.ts"
+  inputs { "src/experiments/benchmark/vlm-bench.ts" }
 }
 
 // ---- API / smoke / snapshot ----
 
 local apiServer = new Task {
   name = "api-server"
-  cmd = "node src/api-server.ts"
-  inputs { "src/api-server.ts"; "src/api-types.ts" }
+  cmd = "node src/api/api-server.ts"
+  inputs { "src/api/api-server.ts"; "src/api/api-types.ts" }
 }
 
 local smokeTest = new Task {
   name = "smoke-test"
-  cmd = "node src/smoke-runner.ts"
-  inputs { "src/smoke-runner.ts" }
+  cmd = "node packages/vrt-markup/src/inspect/smoke-runner.ts"
+  inputs { "packages/vrt-markup/src/inspect/smoke-runner.ts" }
 }
 
 local snapshot = new Task {
   name = "snapshot"
-  cmd = "node src/snapshot.ts"
-  inputs { "src/snapshot.ts"; "src/snapshot-*.ts" }
+  cmd = "node src/cli/commands/snapshot.ts"
+  inputs { "src/cli/commands/snapshot.ts"; "src/vrt/snapshot/**.ts" }
 }
 
 // ---- Dogfood ----
@@ -182,7 +182,7 @@ local snapshot = new Task {
 local dogfoodLuna = new Task {
   name = "dogfood-luna"
   cmd = #"""
-    node src/snapshot.ts \
+    node src/cli/commands/snapshot.ts \
       http://localhost:4200/src/examples/todomvc/ \
       http://localhost:4200/src/examples/spa/ \
       http://localhost:4200/src/examples/wc/ \
@@ -196,7 +196,7 @@ local dogfoodLuna = new Task {
 local dogfoodSol = new Task {
   name = "dogfood-sol"
   cmd = #"""
-    node src/snapshot.ts \
+    node src/cli/commands/snapshot.ts \
       http://localhost:3000/ \
       http://localhost:3000/luna/ \
       http://localhost:3000/luna/tutorial-js/islands/ \
@@ -213,7 +213,7 @@ local falsePositive = new Task {
     new { name = "url"; type = "string" }
   }
   cmd = #"""
-    node src/migration-compare.ts \
+    node src/experiments/migration/migration-compare.ts \
       --url $URL --current-url $URL \
       --output-dir test-results/false-positive --no-paint-tree
   """#
@@ -251,8 +251,8 @@ local smokeAll = new Task {
 
 local vrtHelp = new Task {
   name = "vrt-help"
-  cmd = "node --experimental-strip-types src/vrt.ts help"
-  inputs { "src/vrt.ts"; "src/vrt-command-router.ts" }
+  cmd = "node --experimental-strip-types src/cli/vrt.ts help"
+  inputs { "src/cli/vrt.ts"; "src/cli/router.ts" }
 }
 
 // ---- Spec gates (pkspec) ----
@@ -301,7 +301,7 @@ tasks {
   cssBenchCrater
   cssBenchPrescanner
   cssReport
-  vrtApprove
+  benchApprove
   migrationCompare
   migrationFixLoop
   migrationReset
