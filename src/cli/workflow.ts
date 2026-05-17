@@ -31,7 +31,7 @@ import { runVerifyPipeline, type VerifyPaths } from "./workflow/verify.ts";
 import { runGraph, runAffected } from "./workflow/graph.ts";
 import { runIntrospect, runSpecVerify, runExpect, type SpecPaths } from "./workflow/spec.ts";
 import {
-  VRT_ROOT,
+  HARNESS_ROOT,
   PROJECT_ROOT,
   BASELINES_DIR,
   SNAPSHOTS_DIR,
@@ -46,11 +46,11 @@ import type { UnifiedAgentContext } from "@mizchi/vrt-core/types.ts";
 const NPX_COMMAND = process.platform === "win32" ? "npx.cmd" : "npx";
 
 const EXEC_OPTS: ExecSyncOptions = {
-  cwd: VRT_ROOT,
+  cwd: PROJECT_ROOT,
   stdio: "inherit",
   env: {
     ...process.env,
-    VRT_OUTPUT_DIR: VRT_ROOT,
+    VRT_OUTPUT_DIR: PROJECT_ROOT,
   },
 };
 
@@ -82,8 +82,8 @@ function parseCaptureOptions(argv: string[]): WorkflowCaptureOptions {
 
 function resolveCaptureSpecPath(): string {
   const candidates = [
-    join(VRT_ROOT, "dist", "e2e", "vrt-capture.spec.mjs"),
-    join(VRT_ROOT, "e2e", "vrt-capture.spec.ts"),
+    join(HARNESS_ROOT, "dist", "e2e", "vrt-capture.spec.mjs"),
+    join(HARNESS_ROOT, "e2e", "vrt-capture.spec.ts"),
   ];
   const found = candidates.find((candidate) => existsSync(candidate));
   if (!found) {

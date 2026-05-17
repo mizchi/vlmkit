@@ -47,7 +47,7 @@ jobs:
       - name: Run CSS bench
         run: |
           OUTPUT_ROOT="$RUNNER_TEMP/bench-report"
-          node --experimental-strip-types src/css-challenge-bench.ts \
+          node --experimental-strip-types src/experiments/css-challenge/css-challenge-bench.ts \
             --fixture "${{ inputs.fixture }}" \
             --trials "${{ inputs.trials }}" \
             --backend chromium \

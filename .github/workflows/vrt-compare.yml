@@ -47,15 +47,15 @@ jobs:
       - name: Run VRT Compare
         run: |
           if [ -n "${{ inputs.before }}" ] && [ -n "${{ inputs.after }}" ]; then
-            node --experimental-strip-types src/vrt.ts compare \
+            node --experimental-strip-types src/cli/vrt.ts compare \
               "${{ inputs.before }}" "${{ inputs.after }}"
           elif [ "${{ inputs.scenario }}" = "reset-css" ]; then
-            node --experimental-strip-types src/vrt.ts compare \
+            node --experimental-strip-types src/cli/vrt.ts compare \
               --dir fixtures/migration/reset-css \
               --baseline normalize.html \
               --variants modern-normalize.html destyle.html no-reset.html
           else
-            node --experimental-strip-types src/vrt.ts compare \
+            node --experimental-strip-types src/cli/vrt.ts compare \
               fixtures/migration/tailwind-to-vanilla/before.html \
               fixtures/migration/tailwind-to-vanilla/after.html
           fi
@@ -90,7 +90,7 @@ jobs:
         run: |
           for fixture in page dashboard form-app; do
             echo "=== Smoke test: $fixture ==="
-            node --experimental-strip-types src/vrt.ts smoke \
+            node --experimental-strip-types src/cli/vrt.ts smoke \
               "fixtures/css-challenge/$fixture.html" \
               --max-actions 15 --seed 42 || true
           done
@@ -115,7 +115,7 @@ jobs:
 
       - name: Run CSS benchmark
         run: |
-          node --experimental-strip-types src/vrt.ts bench \
+          node --experimental-strip-types src/cli/vrt.ts bench \
             --fixture page --trials 15 --no-db
 
       - name: Run unit tests

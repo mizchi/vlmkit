@@ -300,7 +300,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
     implementedBy = "code"
-    implementedAt = "src/compare.ts"
+    implementedAt = "src/experiments/migration/migration-compare.ts"
     description = "`vrt compare` migration mode handles utility-first → vanilla CSS by ignoring class-name churn."
   }
   new {
@@ -310,7 +310,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
     implementedBy = "code"
-    implementedAt = "src/compare.ts"
+    implementedAt = "src/experiments/migration/migration-compare.ts"
     description = "Same `vrt compare` engine; class-rename map maps auto-generated to semantic class names."
   }
   new {
@@ -320,7 +320,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
     implementedBy = "code"
-    implementedAt = "src/compare.ts"
+    implementedAt = "src/experiments/migration/migration-compare.ts"
     description = "Same engine as B1 / B2."
   }
   new {
@@ -330,7 +330,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
     implementedBy = "code"
-    implementedAt = "src/compare.ts"
+    implementedAt = "src/experiments/migration/migration-compare.ts"
     description = "Validated on the `shadcn-to-luna` fixture."
   }
   new {
@@ -340,7 +340,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
     implementedBy = "code"
-    implementedAt = "src/compare.ts"
+    implementedAt = "src/experiments/migration/migration-compare.ts"
     description = "Same `vrt compare` engine."
   }
   new {
@@ -358,7 +358,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
     implementedBy = "code"
-    implementedAt = "src/compare.ts"
+    implementedAt = "src/experiments/migration/migration-compare.ts"
     description = "`vrt compare` plus `component-consistency` catches missed instances."
   }
   new {
@@ -368,7 +368,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
     implementedBy = "code"
-    implementedAt = "src/compare.ts"
+    implementedAt = "src/experiments/migration/migration-compare.ts"
     description = "Same `vrt compare` engine with class-rename map."
   }
   new {
@@ -378,7 +378,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
     implementedBy = "code"
-    implementedAt = "src/compare.ts"
+    implementedAt = "src/experiments/migration/migration-compare.ts"
     description = "Operates on compiled CSS output, not source."
   }
   new {
@@ -388,7 +388,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
     implementedBy = "code"
-    implementedAt = "src/compare.ts"
+    implementedAt = "src/experiments/migration/migration-compare.ts"
     description = "Same engine."
   }
   new {
@@ -398,7 +398,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
     implementedBy = "code"
-    implementedAt = "src/compare.ts"
+    implementedAt = "src/experiments/migration/migration-compare.ts"
     description = "DOM-position-diff carries the rename across the page graph."
   }
   new {
@@ -525,11 +525,9 @@ scenarios {
     id = "M3"
     name = "Typography scale compliance"
     severity = "major"
-    reviewStatus = "approved"
+    reviewStatus = "draft"
     contributes { "GOAL-DESIGN-SYSTEM" }
-    implementedBy = "code"
-    implementedAt = "src/typography-hints.ts"
-    description = "Typography hints surface the size and weight buckets observed; comparison against the declared scale catches off-scale glyphs."
+    description = "Partial: design-tokens covers radius / spacing / z-index / shadow tiers (M4-M6). A dedicated typography-hints module (size/weight bucket surfacing) is not yet implemented — track via this entry."
   }
   new {
     id = "M4-M6"
@@ -825,7 +823,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
     implementedBy = "code"
-    implementedAt = "src/compare.ts"
+    implementedAt = "src/experiments/migration/migration-compare.ts"
     description = "Bbox-Δ plus heatmap regions surface single-pixel drift; the report's worst-row table sorts these to the top."
   }
   new {
@@ -879,7 +877,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-SNAPSHOT-WORKFLOW" }
     implementedBy = "code"
-    implementedAt = "src/workflow-cli.ts"
+    implementedAt = "src/cli/workflow.ts"
     description = "`vrt compare` plus `vrt workflow approve` slot into a pre-commit hook for baseline-driven visual gating."
   }
   new {
@@ -917,7 +915,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-AGENT-ERGONOMICS" }
     implementedBy = "code"
-    implementedAt = "src/skill-cli.ts"
+    implementedAt = "src/util/skill.ts"
     description = "`vrt skill run <name> --against <html|url>` aggregates all configured checks for the target into one report."
   }
 
@@ -929,7 +927,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
     implementedBy = "code"
-    implementedAt = "src/compare.ts"
+    implementedAt = "src/experiments/migration/migration-compare.ts"
     description = "`vrt compare` accepts per-viewport configs; `component-geometry` reports bbox shifts across breakpoints."
   }
   new {

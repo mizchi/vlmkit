@@ -15,7 +15,8 @@
  */
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Browser } from "playwright";
 import {
   collectApprovalWarnings,
@@ -836,7 +837,8 @@ function fmtRateCompact(count: number, total: number, inverse = false): string {
   return `${color}${pct}%${RESET}`;
 }
 
-if (import.meta.main) {
+const isCliEntry = process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false;
+if (isCliEntry) {
   main().catch((error) => {
     if (isPlaywrightSandboxRestrictionError(error)) {
       console.error(formatPlaywrightLaunchError(error, { commandHint: "in your local terminal or in CI" }));
