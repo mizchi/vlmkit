@@ -12,39 +12,37 @@
  *   report    -- show latest verification results
  *   graph     -- show dependency graph
  *   affected  -- show change impact scope
+ *   introspect / spec-verify -- ui-spec authoring & checking
+ *   expect    -- generate expectation.json from current diff
  */
 
-import { execFileSync, execSync, type ExecSyncOptions } from "node:child_process";
-import { resolve, join } from "node:path";
+import { execFileSync, type ExecSyncOptions } from "node:child_process";
+import { join } from "node:path";
 import {
   readFile,
-  writeFile,
   readdir,
   mkdir,
   cp,
   rm,
 } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { buildDepGraph, findAffectedComponents, graphStats } from "@mizchi/vrt-markup/inspect/dep-graph.ts";
-import { extractDiffSemantics } from "@mizchi/vrt-ai/intent.ts";
-import { diffA11yTrees, parsePlaywrightA11ySnapshot } from "@mizchi/vrt-core/a11y-semantic.ts";
-import { introspect, introspectToSpec, verifySpec } from "@mizchi/vrt-markup/inspect/introspect.ts";
 import { formatWorkflowUsage } from "./router.ts";
 import { runVerifyPipeline, type VerifyPaths } from "./workflow/verify.ts";
+import { runGraph, runAffected } from "./workflow/graph.ts";
+import { runIntrospect, runSpecVerify, runExpect, type SpecPaths } from "./workflow/spec.ts";
+import {
+  VRT_ROOT,
+  PROJECT_ROOT,
+  BASELINES_DIR,
+  SNAPSHOTS_DIR,
+  OUTPUT_DIR,
+  REPORT_PATH,
+  EXPECTATION_PATH,
+  SPEC_PATH,
+} from "./workflow/paths.ts";
 import { resolveCaptureRoutes } from "@mizchi/vrt-capture/capture-config.ts";
-import type { UnifiedAgentContext, UiSpec, A11yNode } from "@mizchi/vrt-core/types.ts";
+import type { UnifiedAgentContext } from "@mizchi/vrt-core/types.ts";
 
-// ---- Paths ----
-// baselines/ and snapshots/ are placed outside test-results/ (Playwright clears test-results)
-
-const VRT_ROOT = resolve(import.meta.dirname!, "..", "..");
-const PROJECT_ROOT = resolve(process.env.VRT_PROJECT_ROOT ?? process.cwd());
-const BASELINES_DIR = join(VRT_ROOT, "baselines");
-const SNAPSHOTS_DIR = join(VRT_ROOT, "snapshots");
-const OUTPUT_DIR = join(VRT_ROOT, "output");
-const REPORT_PATH = join(VRT_ROOT, "vrt-report.json");
-const EXPECTATION_PATH = join(VRT_ROOT, "expectation.json");
-const SPEC_PATH = join(VRT_ROOT, "spec.json");
 const NPX_COMMAND = process.platform === "win32" ? "npx.cmd" : "npx";
 
 const EXEC_OPTS: ExecSyncOptions = {
@@ -277,250 +275,6 @@ async function report() {
   }
 }
 
-async function graph() {
-  console.log("=== Dependency Graph ===\n");
-  const g = await buildDepGraph(PROJECT_ROOT, {
-    languages: ["typescript", "moonbit"],
-  });
-  const s = graphStats(g);
-  console.log(`Files: ${s.totalFiles}  Edges: ${s.totalEdges}  Components: ${s.components}`);
-  console.log(`Languages: ${JSON.stringify(s.byLanguage)}\n`);
-
-  console.log("Components:");
-  for (const node of g.nodes.values()) {
-    if (node.isComponent) {
-      console.log(`  ${node.id}`);
-    }
-  }
-}
-
-async function affectedCmd() {
-  console.log("=== Affected Components ===\n");
-  const g = await buildDepGraph(PROJECT_ROOT, {
-    languages: ["typescript", "moonbit"],
-  });
-
-  let changedFiles: string[];
-  try {
-    const diff = execSync("git diff --name-only HEAD", {
-      cwd: PROJECT_ROOT,
-      encoding: "utf-8",
-    });
-    changedFiles = diff.trim().split("\n").filter(Boolean);
-  } catch {
-    console.log("(no git changes)");
-    return;
-  }
-
-  console.log("Changed files:");
-  for (const f of changedFiles) console.log(`  ${f}`);
-  console.log();
-
-  const affected = findAffectedComponents(g, changedFiles);
-  if (affected.length === 0) {
-    console.log("No components affected.");
-    return;
-  }
-
-  console.log("Affected components:");
-  for (const a of affected) {
-    console.log(`  [depth=${a.depth}] ${a.node.id}`);
-    console.log(`    changed deps: ${a.changedDependencies.join(", ")}`);
-  }
-}
-
-async function introspectCmd() {
-  const dir = existsSync(SNAPSHOTS_DIR) ? SNAPSHOTS_DIR : BASELINES_DIR;
-  if (!existsSync(dir)) {
-    console.error("No snapshots or baselines found. Run `vrt workflow init` or `vrt workflow capture` first.");
-    process.exit(1);
-  }
-
-  console.log(`=== Introspect: ${dir} ===\n`);
-  const result = await introspect(dir);
-
-  for (const page of result.pages) {
-    console.log(`## ${page.testId}`);
-    console.log(`  ${page.description}`);
-    console.log(`  Landmarks: ${page.landmarks.map((l) => `${l.role}(${l.name || "-"})`).join(", ") || "none"}`);
-    console.log(`  Interactive: ${page.stats.interactiveCount} (${page.stats.unlabeledCount} unlabeled)`);
-    console.log(`  Invariants: ${page.suggestedInvariants.length}`);
-    console.log();
-  }
-
-  // Generate spec
-  const spec = introspectToSpec(result);
-  await writeFile(SPEC_PATH, JSON.stringify(spec, null, 2));
-  console.log(`Spec written to: ${SPEC_PATH}`);
-  console.log(`${spec.pages.length} page(s), ${spec.pages.reduce((s, p) => s + p.invariants.length, 0)} invariants`);
-}
-
-async function specVerifyCmd() {
-  if (!existsSync(SPEC_PATH)) {
-    console.error("No spec.json found. Run `vrt workflow introspect` first.");
-    process.exit(1);
-  }
-
-  const dir = existsSync(SNAPSHOTS_DIR) ? SNAPSHOTS_DIR : BASELINES_DIR;
-  if (!existsSync(dir)) {
-    console.error("No snapshots or baselines found.");
-    process.exit(1);
-  }
-
-  console.log("=== Spec Verify ===\n");
-  const spec: UiSpec = JSON.parse(await readFile(SPEC_PATH, "utf-8"));
-  console.log(`Spec: "${spec.description}"`);
-  console.log(`${spec.pages.length} page(s), ${spec.global?.length ?? 0} global invariant(s)\n`);
-
-  // Load a11y trees
-  const pageData = new Map<string, { a11yTree?: A11yNode; screenshotExists: boolean }>();
-  const a11yFiles = await listFiles(dir, ".a11y.json");
-  for (const file of a11yFiles) {
-    const testId = file.replace(/\.a11y\.json$/, "");
-    try {
-      const tree = JSON.parse(await readFile(join(dir, file), "utf-8"));
-      const png = join(dir, `${testId}.png`);
-      pageData.set(testId, { a11yTree: tree, screenshotExists: existsSync(png) });
-    } catch {
-      // skip
-    }
-  }
-
-  // Get changed files for dep graph skipping
-  let changedFiles: string[] | undefined;
-  try {
-    const diff = execSync("git diff --name-only HEAD", { cwd: PROJECT_ROOT, encoding: "utf-8" });
-    changedFiles = diff.trim().split("\n").filter(Boolean);
-  } catch {
-    // no git
-  }
-
-  const result = verifySpec(spec, pageData, changedFiles);
-
-  let totalPassed = 0;
-  let totalFailed = 0;
-  let totalSkipped = 0;
-
-  for (const page of result.results) {
-    const passed = page.checked.filter((c) => c.passed).length;
-    const failed = page.checked.filter((c) => !c.passed).length;
-    totalPassed += passed;
-    totalFailed += failed;
-    totalSkipped += page.skipped.length;
-
-    const icon = failed === 0 ? "OK" : "NG";
-    console.log(`[${icon}] ${page.testId}: ${passed} passed, ${failed} failed, ${page.skipped.length} skipped`);
-
-    for (const c of page.checked.filter((c) => !c.passed)) {
-      console.log(`  FAIL: ${c.invariant.description} — ${c.reasoning}`);
-    }
-    for (const s of page.skipped) {
-      console.log(`  SKIP: ${s.invariant.description} — ${s.reason}`);
-    }
-  }
-
-  console.log(`\nTotal: ${totalPassed} passed, ${totalFailed} failed, ${totalSkipped} skipped`);
-
-  if (totalFailed > 0) {
-    process.exit(1);
-  }
-}
-
-async function expectCmd() {
-  console.log("=== Generate expectation.json from current state ===\n");
-
-  if (!existsSync(BASELINES_DIR)) {
-    console.error("No baselines found. Run `vrt workflow init` first.");
-    process.exit(1);
-  }
-  if (!existsSync(SNAPSHOTS_DIR)) {
-    console.error("No snapshots found. Run `vrt workflow capture` first.");
-    process.exit(1);
-  }
-
-  // 1. Infer intent from git diff
-  let intentSummary = "unknown change";
-  let changeType: string = "unknown";
-  try {
-    const semantics = await extractDiffSemantics(PROJECT_ROOT);
-    intentSummary = semantics.intent.summary;
-    changeType = semantics.intent.changeType;
-    console.log(`Intent: ${intentSummary} (${changeType})`);
-  } catch {
-    console.log("(no git diff available)");
-  }
-
-  // 2. Compute a11y diff between baseline and snapshot
-  const baseA11yFiles = await listFiles(BASELINES_DIR, ".a11y.json");
-  const pages: Array<{
-    testId: string;
-    hasA11yDiff: boolean;
-    hasRegression: boolean;
-    changes: Array<{ type: string; description: string }>;
-  }> = [];
-
-  for (const file of baseA11yFiles) {
-    const testId = file.replace(/\.a11y\.json$/, "");
-    const snapFile = join(SNAPSHOTS_DIR, file);
-    if (!existsSync(snapFile)) continue;
-
-    try {
-      const baseRaw = JSON.parse(await readFile(join(BASELINES_DIR, file), "utf-8"));
-      const snapRaw = JSON.parse(await readFile(snapFile, "utf-8"));
-      if (!baseRaw || !snapRaw) continue;
-
-      const baseSnap = parsePlaywrightA11ySnapshot(testId, testId, baseRaw);
-      const snapSnap = parsePlaywrightA11ySnapshot(testId, testId, snapRaw);
-      const diff = diffA11yTrees(baseSnap, snapSnap);
-
-      pages.push({
-        testId,
-        hasA11yDiff: diff.changes.length > 0,
-        hasRegression: diff.hasRegression,
-        changes: diff.changes.map((c) => ({ type: c.type, description: c.description })),
-      });
-    } catch {
-      pages.push({ testId, hasA11yDiff: false, hasRegression: false, changes: [] });
-    }
-  }
-
-  // 3. Build expectation.json
-  const expectation: Record<string, unknown> = {
-    description: intentSummary,
-    intent: {
-      summary: intentSummary,
-      changeType,
-    },
-    pages: pages.map((p) => {
-      if (!p.hasA11yDiff) {
-        return { testId: p.testId, expect: "No changes" };
-      }
-
-      const expect = p.hasRegression
-        ? `A11y regression expected: ${p.changes.map((c) => c.description).join("; ")}`
-        : `A11y changes: ${p.changes.map((c) => c.description).join("; ")}`;
-
-      const a11y = p.hasRegression ? "regression-expected" : "changed";
-
-      return {
-        testId: p.testId,
-        expect,
-        a11y,
-        expectedA11yChanges: p.changes.map((c) => ({ description: c.description })),
-      };
-    }),
-  };
-
-  await writeFile(EXPECTATION_PATH, JSON.stringify(expectation, null, 2));
-
-  console.log(`\nGenerated ${EXPECTATION_PATH}:`);
-  for (const p of pages) {
-    const icon = !p.hasA11yDiff ? "  " : p.hasRegression ? "!!" : "~~";
-    console.log(`  [${icon}] ${p.testId}: ${p.changes.length} change(s)`);
-  }
-  console.log(`\nReview and edit as needed, then run: vrt workflow verify`);
-}
-
 // ---- Helpers ----
 
 async function listFiles(dir: string, suffix: string): Promise<string[]> {
@@ -534,17 +288,27 @@ async function listFiles(dir: string, suffix: string): Promise<string[]> {
 
 // ---- Main ----
 
+function specPaths(): SpecPaths {
+  return {
+    projectRoot: PROJECT_ROOT,
+    baselinesDir: BASELINES_DIR,
+    snapshotsDir: SNAPSHOTS_DIR,
+    specPath: SPEC_PATH,
+    expectationPath: EXPECTATION_PATH,
+  };
+}
+
 const commands: Record<string, (argv: string[]) => Promise<void>> = {
   init: (argv) => init(parseCaptureOptions(argv)),
   capture: (argv) => capture(parseCaptureOptions(argv)),
   verify: () => verify(),
   approve: () => approve(),
   report: () => report(),
-  graph: () => graph(),
-  affected: () => affectedCmd(),
-  introspect: () => introspectCmd(),
-  "spec-verify": () => specVerifyCmd(),
-  expect: () => expectCmd(),
+  graph: () => runGraph(PROJECT_ROOT),
+  affected: () => runAffected(PROJECT_ROOT),
+  introspect: () => runIntrospect(specPaths()),
+  "spec-verify": () => runSpecVerify(specPaths()),
+  expect: () => runExpect(specPaths()),
 };
 
 export async function runWorkflowCli(argv = process.argv.slice(2)) {
