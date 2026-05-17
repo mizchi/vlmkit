@@ -167,8 +167,8 @@ local apiServer = new Task {
 
 local smokeTest = new Task {
   name = "smoke-test"
-  cmd = "node src/cli/commands/smoke-runner.ts"
-  inputs { "src/cli/commands/smoke-runner.ts" }
+  cmd = "node packages/vrt-markup/src/inspect/smoke-runner.ts"
+  inputs { "packages/vrt-markup/src/inspect/smoke-runner.ts" }
 }
 
 local snapshot = new Task {

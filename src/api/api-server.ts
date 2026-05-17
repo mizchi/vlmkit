@@ -17,7 +17,7 @@ import type {
   ViewportResult, PixelDiffResult,
   HtmlSource,
 } from "./api-types.ts";
-import { runSmokeTest } from "../cli/commands/smoke-runner.ts";
+import { runSmokeTest } from "@mizchi/vrt-markup/inspect/smoke-runner.ts";
 import { isCraterAvailable, CraterClient } from "@mizchi/vrt-capture/crater-client.ts";
 
 // ---- Config ----

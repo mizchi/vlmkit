@@ -84,8 +84,8 @@ export const COMMANDS: Record<string, CommandSpec> = {
     load: () => import("@mizchi/vrt-core/element-compare.ts"),
   },
   smoke: {
-    specifier: "./commands/smoke-runner.ts",
-    load: () => import("./commands/smoke-runner.ts"),
+    specifier: "@mizchi/vrt-markup/inspect/smoke-runner.ts",
+    load: () => import("@mizchi/vrt-markup/inspect/smoke-runner.ts"),
   },
   flipbook: {
     specifier: "./commands/flipbook-cli.ts",

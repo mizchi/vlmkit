@@ -15,7 +15,7 @@ import { chromium, type Page, type Browser } from "playwright";
 import type {
   SmokeTestRequest, SmokeTestResponse, SmokeAction, SmokeError,
   A11ySnapshot, A11yNodeCompact,
-} from "../../api/api-types.ts";
+} from "./smoke-types.ts";
 
 import { getArg, args } from "@mizchi/vrt-core/cli-args.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD } from "@mizchi/vrt-core/terminal-colors.ts";
