@@ -13,9 +13,15 @@ export const WORKFLOW_COMMANDS = [
 
 export type WorkflowCommand = typeof WORKFLOW_COMMANDS[number];
 
+export type CommandSpec = {
+  specifier: string;
+  load: () => Promise<unknown>;
+};
+
 type ModuleRoute = {
   kind: "module";
-  modulePath: string;
+  specifier: string;
+  load: () => Promise<unknown>;
   argv: string[];
 };
 
@@ -47,34 +53,117 @@ export type RootCommandRoute =
   | DiscoverRoute
   | UsageRoute;
 
-const ROOT_MODULE_COMMANDS: Record<string, string> = {
-  compare: "../experiments/migration/migration-compare.ts",
-  "png-diff": "../vrt/core/png-diff.ts",
-  bench: "../experiments/css-challenge/css-challenge-bench.ts",
-  report: "../experiments/detection/detection-report.ts",
-  snapshot: "../vrt/snapshot/snapshot.ts",
-  elements: "../vrt/core/element-compare.ts",
-  smoke: "../markup/inspect/smoke-runner.ts",
-  flipbook: "./commands/flipbook-cli.ts",
-  "diff-for-agent": "./commands/diff-for-agent-cli.ts",
-  "compare-runs": "./commands/compare-runs-cli.ts",
+const API_SERVER: CommandSpec = {
+  specifier: "../api/api-server.ts",
+  load: () => import("../api/api-server.ts"),
+};
+
+export const COMMANDS: Record<string, CommandSpec> = {
+  compare: {
+    specifier: "../experiments/migration/migration-compare.ts",
+    load: () => import("../experiments/migration/migration-compare.ts"),
+  },
+  "png-diff": {
+    specifier: "@mizchi/vrt-core/png-diff.ts",
+    load: () => import("@mizchi/vrt-core/png-diff.ts"),
+  },
+  bench: {
+    specifier: "../experiments/css-challenge/css-challenge-bench.ts",
+    load: () => import("../experiments/css-challenge/css-challenge-bench.ts"),
+  },
+  report: {
+    specifier: "../experiments/detection/detection-report.ts",
+    load: () => import("../experiments/detection/detection-report.ts"),
+  },
+  snapshot: {
+    specifier: "../vrt/snapshot/snapshot.ts",
+    load: () => import("../vrt/snapshot/snapshot.ts"),
+  },
+  elements: {
+    specifier: "@mizchi/vrt-core/element-compare.ts",
+    load: () => import("@mizchi/vrt-core/element-compare.ts"),
+  },
+  smoke: {
+    specifier: "./commands/smoke-runner.ts",
+    load: () => import("./commands/smoke-runner.ts"),
+  },
+  flipbook: {
+    specifier: "./commands/flipbook-cli.ts",
+    load: () => import("./commands/flipbook-cli.ts"),
+  },
+  "diff-for-agent": {
+    specifier: "./commands/diff-for-agent-cli.ts",
+    load: () => import("./commands/diff-for-agent-cli.ts"),
+  },
+  "compare-runs": {
+    specifier: "./commands/compare-runs-cli.ts",
+    load: () => import("./commands/compare-runs-cli.ts"),
+  },
   // Markup-assistance scenarios (2026-05-13).
-  "component-from-image": "../markup/component/component-from-image.ts",
-  "multi-page-consistency": "../markup/stress/multi-page-consistency.ts",
-  "component-consistency": "../markup/component/component-consistency.ts",
-  "theme-parity": "../markup/style/theme-parity.ts",
-  "i18n-stress": "../markup/stress/i18n-stress.ts",
-  "a11y-contrast": "../a11y/a11y-contrast.ts",
-  "a11y-touch": "../a11y/a11y-touch.ts",
-  "a11y-focus-order": "../a11y/a11y-focus-order.ts",
-  "interact": "../markup/inspect/interact.ts",
-  "media-variants": "../markup/stress/media-variants.ts",
-  "cross-browser": "../markup/stress/cross-browser.ts",
-  "design-tokens": "../markup/style/design-tokens.ts",
-  "perf": "../util/perf.ts",
-  "explore": "../markup/inspect/explore.ts",
-  "skill": "../util/skill.ts",
-  "component-extract": "../markup/component/component-extract.ts",
+  "component-from-image": {
+    specifier: "@mizchi/vrt-markup/component/component-from-image.ts",
+    load: () => import("@mizchi/vrt-markup/component/component-from-image.ts"),
+  },
+  "multi-page-consistency": {
+    specifier: "@mizchi/vrt-markup/stress/multi-page-consistency.ts",
+    load: () => import("@mizchi/vrt-markup/stress/multi-page-consistency.ts"),
+  },
+  "component-consistency": {
+    specifier: "@mizchi/vrt-markup/component/component-consistency.ts",
+    load: () => import("@mizchi/vrt-markup/component/component-consistency.ts"),
+  },
+  "theme-parity": {
+    specifier: "@mizchi/vrt-markup/style/theme-parity.ts",
+    load: () => import("@mizchi/vrt-markup/style/theme-parity.ts"),
+  },
+  "i18n-stress": {
+    specifier: "@mizchi/vrt-markup/stress/i18n-stress.ts",
+    load: () => import("@mizchi/vrt-markup/stress/i18n-stress.ts"),
+  },
+  "a11y-contrast": {
+    specifier: "@mizchi/vrt-core/a11y-contrast.ts",
+    load: () => import("@mizchi/vrt-core/a11y-contrast.ts"),
+  },
+  "a11y-touch": {
+    specifier: "@mizchi/vrt-core/a11y-touch.ts",
+    load: () => import("@mizchi/vrt-core/a11y-touch.ts"),
+  },
+  "a11y-focus-order": {
+    specifier: "@mizchi/vrt-core/a11y-focus-order.ts",
+    load: () => import("@mizchi/vrt-core/a11y-focus-order.ts"),
+  },
+  "interact": {
+    specifier: "@mizchi/vrt-markup/inspect/interact.ts",
+    load: () => import("@mizchi/vrt-markup/inspect/interact.ts"),
+  },
+  "media-variants": {
+    specifier: "@mizchi/vrt-markup/stress/media-variants.ts",
+    load: () => import("@mizchi/vrt-markup/stress/media-variants.ts"),
+  },
+  "cross-browser": {
+    specifier: "@mizchi/vrt-markup/stress/cross-browser.ts",
+    load: () => import("@mizchi/vrt-markup/stress/cross-browser.ts"),
+  },
+  "design-tokens": {
+    specifier: "@mizchi/vrt-markup/style/design-tokens.ts",
+    load: () => import("@mizchi/vrt-markup/style/design-tokens.ts"),
+  },
+  "perf": {
+    specifier: "../util/perf.ts",
+    load: () => import("../util/perf.ts"),
+  },
+  "explore": {
+    specifier: "@mizchi/vrt-markup/inspect/explore.ts",
+    load: () => import("@mizchi/vrt-markup/inspect/explore.ts"),
+  },
+  "skill": {
+    specifier: "../util/skill.ts",
+    load: () => import("../util/skill.ts"),
+  },
+  "component-extract": {
+    specifier: "@mizchi/vrt-markup/component/component-extract.ts",
+    load: () => import("@mizchi/vrt-markup/component/component-extract.ts"),
+  },
 };
 
 const WORKFLOW_ALIAS_COMMANDS = new Set<WorkflowCommand>([
@@ -206,6 +295,10 @@ Examples:
   vrt api serve --port 3456`;
 }
 
+function moduleRoute(spec: CommandSpec, argv: string[]): ModuleRoute {
+  return { kind: "module", specifier: spec.specifier, load: spec.load, argv };
+}
+
 export function resolveRootCommand(args: string[]): RootCommandRoute {
   const [command, ...rest] = args;
 
@@ -213,12 +306,8 @@ export function resolveRootCommand(args: string[]): RootCommandRoute {
     return { kind: "usage", message: formatRootUsage(), exitCode: 0 };
   }
 
-  if (command in ROOT_MODULE_COMMANDS) {
-    return {
-      kind: "module",
-      modulePath: ROOT_MODULE_COMMANDS[command]!,
-      argv: rest,
-    };
+  if (command in COMMANDS) {
+    return moduleRoute(COMMANDS[command]!, rest);
   }
 
   if (command === "discover") {
@@ -247,7 +336,7 @@ export function resolveRootCommand(args: string[]): RootCommandRoute {
     }
 
     if (apiCommand === "serve") {
-      return { kind: "module", modulePath: "../api/api-server.ts", argv: apiRest };
+      return moduleRoute(API_SERVER, apiRest);
     }
     if (apiCommand === "status") {
       return { kind: "status", argv: apiRest };
@@ -261,7 +350,7 @@ export function resolveRootCommand(args: string[]): RootCommandRoute {
   }
 
   if (command === "serve") {
-    return { kind: "module", modulePath: "../api/api-server.ts", argv: rest };
+    return moduleRoute(API_SERVER, rest);
   }
   if (command === "status") {
     return { kind: "status", argv: rest };

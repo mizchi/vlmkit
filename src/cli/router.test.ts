@@ -20,7 +20,7 @@ describe("resolveRootCommand", () => {
     const workflow = resolveRootCommand(["workflow", "report"]);
 
     assert.equal(detection.kind, "module");
-    assert.equal(detection.modulePath, "../experiments/detection/detection-report.ts");
+    assert.equal(detection.specifier, "../experiments/detection/detection-report.ts");
     assert.equal(workflow.kind, "workflow");
     assert.deepEqual(workflow.argv, ["report"]);
   });
@@ -28,14 +28,14 @@ describe("resolveRootCommand", () => {
   it("routes raw PNG comparison as a core command", () => {
     const route = resolveRootCommand(["png-diff", "before.png", "after.png"]);
     assert.equal(route.kind, "module");
-    assert.equal(route.modulePath, "../vrt/core/png-diff.ts");
+    assert.equal(route.specifier, "@mizchi/vrt-core/png-diff.ts");
     assert.deepEqual(route.argv, ["before.png", "after.png"]);
   });
 
   it("routes api commands under the api namespace", () => {
     const route = resolveRootCommand(["api", "serve", "--port", "4567"]);
     assert.equal(route.kind, "module");
-    assert.equal(route.modulePath, "../api/api-server.ts");
+    assert.equal(route.specifier, "../api/api-server.ts");
     assert.deepEqual(route.argv, ["--port", "4567"]);
   });
 
@@ -44,7 +44,7 @@ describe("resolveRootCommand", () => {
     const status = resolveRootCommand(["status", "--url", "http://localhost:4567"]);
 
     assert.equal(serve.kind, "module");
-    assert.equal(serve.modulePath, "../api/api-server.ts");
+    assert.equal(serve.specifier, "../api/api-server.ts");
     assert.deepEqual(serve.argv, ["--port", "4567"]);
 
     assert.equal(status.kind, "status");
