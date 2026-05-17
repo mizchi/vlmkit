@@ -86,12 +86,12 @@ local cssReport = new Task {
   inputs { "src/experiments/detection/detection-report.ts"; "src/experiments/detection/detection-db.ts" }
 }
 
-// ---- VRT approve / migration ----
+// ---- CSS bench approve / migration ----
 
-local vrtApprove = new Task {
-  name = "vrt-approve"
-  cmd = "node src/cli/workflow/approve.ts"
-  inputs { "src/cli/workflow/approve.ts"; "src/approval*.ts" }
+local benchApprove = new Task {
+  name = "bench-approve"
+  cmd = "node src/cli/workflow/bench-approve.ts"
+  inputs { "src/cli/workflow/bench-approve.ts"; "src/approval*.ts" }
 }
 
 local migrationCompare = new Task {
@@ -301,7 +301,7 @@ tasks {
   cssBenchCrater
   cssBenchPrescanner
   cssReport
-  vrtApprove
+  benchApprove
   migrationCompare
   migrationFixLoop
   migrationReset

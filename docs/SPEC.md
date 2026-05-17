@@ -992,7 +992,7 @@
 - **SNAP-001** — Multi-viewport snapshot baseline capture
   - code: `src/cli/commands/snapshot.ts`
 - **SNAP-002** — Snapshot approve workflow promotes current to baseline
-  - code: `src/cli/workflow/approve.ts`
+  - code: `src/cli/commands/snapshot.ts`
 - **SNAP-003** — Snapshot fix-prompt generates subagent-ready Markdown
   - code: `packages/vrt-markup/src/heal/fix-prompt.ts`
 - **SNAP-004** — Snapshot stability measures false-positive rate

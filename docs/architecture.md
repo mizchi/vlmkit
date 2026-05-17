@@ -75,7 +75,7 @@ src/
 │
 ├── [Approval]
 │   ├── approval.ts             # Diff approval rules
-│   └── vrt-approve.ts          # Interactive approval CLI
+│   └── bench-approve.ts        # Interactive CSS-bench approval CLI
 │
 └── [flaker Integration]
     ├── flaker-vrt-runner.ts    # flaker custom runner protocol

@@ -1307,7 +1307,7 @@ scenarios {
     contributes { "GOAL-SNAPSHOT-WORKFLOW" }
     dependsOn { "SNAP-001" }
     implementedBy = "code"
-    implementedAt = "src/cli/workflow/approve.ts"
+    implementedAt = "src/cli/commands/snapshot.ts"
     description = #"""
       `vrt snapshot approve` renames every `*-current.png` to
       `*-baseline.png`. Used after an intentional UI change is
