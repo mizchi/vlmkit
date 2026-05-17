@@ -2,7 +2,7 @@
 
 ## CLI Command System
 
-Entry point: `src/vrt.ts`
+Entry point: `src/cli/vrt.ts`
 
 ```
 vrt compare <before> <after>           # HTML/URL VRT comparison

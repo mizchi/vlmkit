@@ -47,7 +47,7 @@ References: [docs/why-flaker.ja.md](/Users/mz/ghq/github.com/mizchi/metric-ci/do
 - Known diff filtering via approval
 - migration compare report and fix loop
 
-References: [migration-compare.ts](/Users/mz/ghq/github.com/mizchi/vrt/src/migration-compare.ts), [approval.ts](/Users/mz/ghq/github.com/mizchi/vrt/src/approval.ts), [migration-fix-loop-core.ts](/Users/mz/ghq/github.com/mizchi/vrt/src/migration-fix-loop-core.ts)
+References: [migration-compare.ts](/Users/mz/ghq/github.com/mizchi/vrt/src/experiments/migration/migration-compare.ts), [approval.ts](/Users/mz/ghq/github.com/mizchi/vrt/src/vrt/snapshot/approval.ts), [migration-fix-loop-core.ts](/Users/mz/ghq/github.com/mizchi/vrt/src/experiments/migration/migration-fix-loop-core.ts)
 
 ## Core Policy
 
@@ -77,7 +77,7 @@ Analyze existing `playwright test`-based `vrt` via `flaker import --adapter play
 
 Add adapters to directly feed `migration-report.json` and `bench-report.json` into `flaker`.
 
-As of 2026-04-02, built-in `vrt-migration` and `vrt-bench` adapters exist on the `metric-ci` side, handling `migration-report.json` and `bench-report.json` directly via `import / collect / report summarize`. The `vrt`-side `src/flaker-vrt-report-adapter.ts` remains for custom adapter paths and legacy report supplementation.
+As of 2026-04-02, built-in `vrt-migration` and `vrt-bench` adapters exist on the `metric-ci` side, handling `migration-report.json` and `bench-report.json` directly via `import / collect / report summarize`. The `vrt`-side `src/experiments/flaker/flaker-vrt-report-adapter.ts` remains for custom adapter paths and legacy report supplementation.
 The `vrt` side has `.github/workflows/migration-report.yml`, running 1 scenario via `workflow_dispatch` and producing artifact name `migration-report`. To avoid conflicts with `metric-ci collect` defaults, initial operation fixes 1 run = 1 scenario.
 Similarly, `.github/workflows/bench-report.yml` runs 1 fixture of `css-challenge-bench` with Chromium backend, producing artifact name `bench-report`. Since the `vrt-bench` adapter expects a single `bench-report.json` in the artifact, this also fixes 1 run = 1 fixture.
 
@@ -87,7 +87,7 @@ Similarly, `.github/workflows/bench-report.yml` runs 1 fixture of `css-challenge
 - `fixedViewports` can be passed, making it easy to run only the test subset specified by `flaker`
 - Convergence concepts of `clean / approved / remaining` already exist
 
-References: [migration-compare.ts](/Users/mz/ghq/github.com/mizchi/vrt/src/migration-compare.ts), [migration-fix-loop-core.ts](/Users/mz/ghq/github.com/mizchi/vrt/src/migration-fix-loop-core.ts)
+References: [migration-compare.ts](/Users/mz/ghq/github.com/mizchi/vrt/src/experiments/migration/migration-compare.ts), [migration-fix-loop-core.ts](/Users/mz/ghq/github.com/mizchi/vrt/src/experiments/migration/migration-fix-loop-core.ts)
 
 ## Stable Test Identity
 
@@ -219,7 +219,7 @@ Examples:
 - reset CSS diff
 - tiny spacing drift
 
-Reference: [approval.ts](/Users/mz/ghq/github.com/mizchi/vrt/src/approval.ts)
+Reference: [approval.ts](/Users/mz/ghq/github.com/mizchi/vrt/src/vrt/snapshot/approval.ts)
 
 ### quarantine
 
@@ -271,8 +271,8 @@ artifact_name = "migration-report"
 
 [runner]
 type = "custom"
-list = "node --experimental-strip-types ./src/flaker-vrt-runner.ts list --config ./examples/flaker.vrt.json"
-execute = "node --experimental-strip-types ./src/flaker-vrt-runner.ts execute --config ./examples/flaker.vrt.json"
+list = "node --experimental-strip-types ./src/experiments/flaker/flaker-vrt-runner.ts list --config ./examples/flaker.vrt.json"
+execute = "node --experimental-strip-types ./src/experiments/flaker/flaker-vrt-runner.ts execute --config ./examples/flaker.vrt.json"
 
 [affected]
 resolver = "simple"
@@ -290,9 +290,9 @@ When operating in the `vrt` standalone repository, the runner lives in this repo
 
 ### Phase 1: Minimum connection
 
-- `src/flaker-vrt-config.ts`
+- `src/experiments/flaker/flaker-vrt-config.ts`
   - Type definitions and parser for `flaker.vrt.json`
-- `src/flaker-vrt-runner.ts`
+- `src/experiments/flaker/flaker-vrt-runner.ts`
   - `list`
   - `execute`
   - `migration-compare` only
@@ -307,8 +307,8 @@ Completion criteria:
 
 - `examples/flaker.toml`
 - `examples/flaker.vrt.json`
-- `node --experimental-strip-types ./src/flaker-vrt-runner.ts list --config ./examples/flaker.vrt.json`
-- `node --experimental-strip-types ./src/flaker-vrt-runner.ts execute --config ./examples/flaker.vrt.json`
+- `node --experimental-strip-types ./src/experiments/flaker/flaker-vrt-runner.ts list --config ./examples/flaker.vrt.json`
+- `node --experimental-strip-types ./src/experiments/flaker/flaker-vrt-runner.ts execute --config ./examples/flaker.vrt.json`
 - `just flaker-vrt-adapt`
 
 Completion criteria:

@@ -59,4 +59,4 @@
 - **Recommended configuration**: Crater prescanner + qwen3-vl-8b → **$0.24/month**
 - Use Claude/Gemini at Stage 2 only when fixes are needed → +$0.60/month
 
-> Regenerate: `node --experimental-strip-types src/vlm-bench.ts --list` to check model prices
+> Regenerate: `node --experimental-strip-types src/ai/vlm-bench.ts --list` to check model prices

@@ -3,7 +3,7 @@ import { defineConfig } from "tsdown";
 export default defineConfig([
   {
     entry: {
-      vrt: "src/vrt.ts",
+      vrt: "src/cli/vrt.ts",
     },
     format: ["esm"],
     platform: "node",
@@ -12,7 +12,7 @@ export default defineConfig([
   },
   {
     entry: {
-      client: "src/vrt-client.ts",
+      client: "src/api/vrt-client.ts",
     },
     format: ["esm"],
     platform: "node",

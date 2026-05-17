@@ -114,7 +114,7 @@ Raw report: `test-results/data-collection/migration-shadcn/migration-report.json
 ## 3. CSS Challenge detection rate (selector mode, no LLM)
 
 ```bash
-NO_IMAGES=1 node --experimental-strip-types src/css-challenge-bench.ts \
+NO_IMAGES=1 node --experimental-strip-types src/experiments/css-challenge/css-challenge-bench.ts \
   --fixture all --mode selector --trials 10 --no-db
 ```
 

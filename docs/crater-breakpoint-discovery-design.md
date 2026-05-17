@@ -259,7 +259,7 @@ Since the current `SessionState` is thin and doesn't directly hold browser state
 
 ## vrt-side integration point
 
-`src/viewport-discovery.ts` has regex extraction and viewport generation tightly coupled.
+`src/vrt/capture/viewport-discovery.ts` has regex extraction and viewport generation tightly coupled.
 When introducing crater, make the generation logic the proper API and make the extraction source swappable.
 
 Expected:

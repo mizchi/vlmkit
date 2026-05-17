@@ -230,18 +230,18 @@ Mapping from current files to new structure:
 
 | Current | New Structure | Notes |
 |---------|--------------|-------|
-| `src/css-challenge-core.ts` | Split: `core/css-parser.ts` + `core/diff.ts` + `backend/chromium.ts` + `backend/crater.ts` | Largest refactoring target |
-| `src/detection-classify.ts` | `core/classify.ts` | Nearly as-is |
-| `src/detection-db.ts` | `core/db.ts` | Nearly as-is |
-| `src/viewport-discovery.ts` | `core/viewport.ts` | Nearly as-is |
-| `src/heatmap.ts` | `core/diff.ts` | Pixel diff portion |
-| `src/a11y-semantic.ts` | `core/a11y.ts` | Nearly as-is |
-| `src/crater-client.ts` | `backend/crater.ts` | PaintNode/diff moves to `core/diff.ts` |
-| `src/types.ts` | `core/types.ts` | Consolidate |
-| `src/css-challenge.ts` | `cli/challenge.ts` | CLI entry |
-| `src/css-challenge-bench.ts` | `cli/bench.ts` | CLI entry |
-| `src/detection-report.ts` | `cli/report.ts` | CLI entry |
-| `src/migration-compare.ts` | `cli/compare.ts` | CLI entry |
+| `src/experiments/css-challenge/css-challenge-core.ts` | Split: `core/css-parser.ts` + `core/diff.ts` + `backend/chromium.ts` + `backend/crater.ts` | Largest refactoring target |
+| `src/experiments/detection/detection-classify.ts` | `core/classify.ts` | Nearly as-is |
+| `src/experiments/detection/detection-db.ts` | `core/db.ts` | Nearly as-is |
+| `src/vrt/capture/viewport-discovery.ts` | `core/viewport.ts` | Nearly as-is |
+| `src/vrt/core/heatmap.ts` | `core/diff.ts` | Pixel diff portion |
+| `src/a11y/a11y-semantic.ts` | `core/a11y.ts` | Nearly as-is |
+| `src/vrt/capture/crater-client.ts` | `backend/crater.ts` | PaintNode/diff moves to `core/diff.ts` |
+| `src/util/types.ts` | `core/types.ts` | Consolidate |
+| `src/experiments/css-challenge/css-challenge.ts` | `cli/challenge.ts` | CLI entry |
+| `src/experiments/css-challenge/css-challenge-bench.ts` | `cli/bench.ts` | CLI entry |
+| `src/experiments/detection/detection-report.ts` | `cli/report.ts` | CLI entry |
+| `src/experiments/migration/migration-compare.ts` | `cli/compare.ts` | CLI entry |
 | `src/demo*.ts` | `cli/demo.ts` | Consolidate |
 
 ## For Now

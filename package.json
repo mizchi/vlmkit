@@ -21,11 +21,11 @@
   "scripts": {
     "build": "tsdown",
     "prepack": "pnpm build",
-    "test": "node --test src/**/*.test.ts",
-    "demo": "node src/demo.ts",
-    "demo:fix": "node src/demo-fix-loop.ts",
-    "demo:multi": "node src/demo-scenarios.ts",
-    "demo:multistep": "node src/demo-multistep.ts",
+    "test": "node --test 'src/**/*.test.ts'",
+    "demo": "node src/demo/demo.ts",
+    "demo:fix": "node src/demo/demo-fix-loop.ts",
+    "demo:multi": "node src/demo/demo-scenarios.ts",
+    "demo:multistep": "node src/demo/demo-multistep.ts",
     "vrt": "playwright test",
     "vrt:update": "playwright test --update-snapshots"
   },

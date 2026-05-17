@@ -14,7 +14,7 @@ just vlm-bench --list --max-cost 0.001 --limit 30
 
 2. **Run fix-loop with candidate models** (hard case: seed 11):
 ```bash
-VRT_VLM_MODEL="<model-id>" node --experimental-strip-types src/fix-loop.ts \
+VRT_VLM_MODEL="<model-id>" node --experimental-strip-types src/markup/heal/fix-loop.ts \
   --fixture page --seed 11 --mode selector --max-rounds 2
 ```
 
@@ -45,7 +45,7 @@ just vlm-bench <model1> <model2> <model3> --md
 
 ### Cross-fixture Matrix
 ```bash
-NO_IMAGES=1 node --experimental-strip-types src/css-challenge-bench.ts \
+NO_IMAGES=1 node --experimental-strip-types src/experiments/css-challenge/css-challenge-bench.ts \
   --fixture all --mode selector --trials 10 --no-db
 ```
 
