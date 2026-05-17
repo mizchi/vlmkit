@@ -17,8 +17,8 @@ import type {
   ViewportResult, PixelDiffResult,
   HtmlSource,
 } from "./api-types.ts";
-import { runSmokeTest } from "../markup/inspect/smoke-runner.ts";
-import { isCraterAvailable, CraterClient } from "../vrt/capture/crater-client.ts";
+import { runSmokeTest } from "../cli/commands/smoke-runner.ts";
+import { isCraterAvailable, CraterClient } from "@mizchi/vrt-capture/crater-client.ts";
 
 // ---- Config ----
 
@@ -83,8 +83,8 @@ app.post("/api/compare", async (c) => {
 
   // Lazy import heavy modules
   const { chromium } = await import("playwright");
-  const { compareScreenshots } = await import("../vrt/core/heatmap.ts");
-  const { discoverViewports } = await import("../vrt/capture/viewport-discovery.ts");
+  const { compareScreenshots } = await import("@mizchi/vrt-core/heatmap.ts");
+  const { discoverViewports } = await import("@mizchi/vrt-capture/viewport-discovery.ts");
   const { mkdir } = await import("node:fs/promises");
   const { join } = await import("node:path");
 
@@ -203,8 +203,8 @@ app.post("/api/compare-renderers", async (c) => {
   }
 
   const { chromium: pw } = await import("playwright");
-  const { compareScreenshots } = await import("../vrt/core/heatmap.ts");
-  const { discoverViewports } = await import("../vrt/capture/viewport-discovery.ts");
+  const { compareScreenshots } = await import("@mizchi/vrt-core/heatmap.ts");
+  const { discoverViewports } = await import("@mizchi/vrt-capture/viewport-discovery.ts");
   const { mkdir, rm } = await import("node:fs/promises");
   const { join } = await import("node:path");
   const tmpDir = join(process.cwd(), "test-results", "api", `renderers-${Date.now()}`);
@@ -303,7 +303,7 @@ app.post("/api/reason", async (c) => {
     return c.json({ error: "Need at least one of: heatmapBase64, currentBase64, textReport" }, 400);
   }
 
-  const { createReasoningPipeline } = await import("../ai/reasoning-pipeline.ts");
+  const { createReasoningPipeline } = await import("@mizchi/vrt-ai/reasoning-pipeline.ts");
   const pipeline = createReasoningPipeline({
     vlmModel: body.vlmModel,
     llmProvider: body.llmProvider,

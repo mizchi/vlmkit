@@ -25,14 +25,14 @@ import {
   rm,
 } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { buildDepGraph, findAffectedComponents, graphStats } from "../markup/inspect/dep-graph.ts";
-import { extractDiffSemantics } from "../ai/intent.ts";
-import { diffA11yTrees, parsePlaywrightA11ySnapshot } from "../a11y/a11y-semantic.ts";
-import { introspect, introspectToSpec, verifySpec } from "../markup/inspect/introspect.ts";
+import { buildDepGraph, findAffectedComponents, graphStats } from "@mizchi/vrt-markup/inspect/dep-graph.ts";
+import { extractDiffSemantics } from "@mizchi/vrt-ai/intent.ts";
+import { diffA11yTrees, parsePlaywrightA11ySnapshot } from "@mizchi/vrt-core/a11y-semantic.ts";
+import { introspect, introspectToSpec, verifySpec } from "@mizchi/vrt-markup/inspect/introspect.ts";
 import { formatWorkflowUsage } from "./router.ts";
 import { runVerifyPipeline, type VerifyPaths } from "./workflow/verify.ts";
-import { resolveCaptureRoutes } from "../vrt/capture/capture-config.ts";
-import type { UnifiedAgentContext, UiSpec, A11yNode } from "../util/types.ts";
+import { resolveCaptureRoutes } from "@mizchi/vrt-capture/capture-config.ts";
+import type { UnifiedAgentContext, UiSpec, A11yNode } from "@mizchi/vrt-core/types.ts";
 
 // ---- Paths ----
 // baselines/ and snapshots/ are placed outside test-results/ (Playwright clears test-results)

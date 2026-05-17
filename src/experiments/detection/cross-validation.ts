@@ -4,7 +4,7 @@ import type {
   A11yDiff,
   ChangeIntent,
   QualityCheckResult,
-} from "../../util/types.ts";
+} from "@mizchi/vrt-core/types.ts";
 
 /**
  * Cross-validate Visual Semantic Diff with A11y Semantic Diff,

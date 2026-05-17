@@ -18,14 +18,14 @@ import {
   type ApprovalWarning,
   type PaintTreeApprovalMatch,
 } from "../../vrt/snapshot/approval.ts";
-import { compareScreenshots } from "../../vrt/core/heatmap.ts";
-import { classifyVisualDiff } from "../../markup/inspect/visual-semantic.ts";
-import { diffA11yTrees, checkA11yTree, parsePlaywrightA11ySnapshot } from "../../a11y/a11y-semantic.ts";
-import { CraterClient, diffPaintTrees, type PaintNode, type PaintTreeChange } from "../../vrt/capture/crater-client.ts";
+import { compareScreenshots } from "@mizchi/vrt-core/heatmap.ts";
+import { classifyVisualDiff } from "@mizchi/vrt-core/visual-semantic.ts";
+import { diffA11yTrees, checkA11yTree, parsePlaywrightA11ySnapshot } from "@mizchi/vrt-core/a11y-semantic.ts";
+import { CraterClient, diffPaintTrees, type PaintNode, type PaintTreeChange } from "@mizchi/vrt-capture/crater-client.ts";
 import {
   filterComputedStyleDiffsByTargets,
   type ComputedStyleTarget,
-} from "../../markup/style/css-custom-properties.ts";
+} from "./css-custom-properties.ts";
 import {
   buildInteractionTargetPlans,
   captureEmulatedInteractionStyleSnapshotInDom,
@@ -42,9 +42,9 @@ import {
   TRACKED_PROPERTIES,
   type InteractionTargetPlan,
   waitForInteractionStylesInDom,
-} from "../../vrt/core/computed-style-capture.ts";
-import { formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "../../vrt/capture/playwright-launch-error.ts";
-import type { A11yNode, VrtSnapshot, VrtDiff, VisualSemanticDiff, A11yDiff } from "../../util/types.ts";
+} from "@mizchi/vrt-core/computed-style-capture.ts";
+import { formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vrt-capture/playwright-launch-error.ts";
+import type { A11yNode, VrtSnapshot, VrtDiff, VisualSemanticDiff, A11yDiff } from "@mizchi/vrt-core/types.ts";
 
 // ---- Types ----
 

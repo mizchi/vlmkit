@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { encodePng } from "../../vrt/core/png-utils.ts";
+import { encodePng } from "@mizchi/vrt-core/png-utils.ts";
 import { runVerifyPipeline } from "./verify.ts";
 
 const TMP = join(import.meta.dirname!, "..", "..", "..", "test-results", "vrt-verify-test");

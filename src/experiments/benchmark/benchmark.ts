@@ -10,7 +10,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { PNG } from "pngjs";
-import { DIM, RESET, CYAN, BOLD } from "../../util/terminal-colors.ts";
+import { DIM, RESET, CYAN, BOLD } from "@mizchi/vrt-core/terminal-colors.ts";
 import type { DetectionRecord } from "../detection/detection-db.ts";
 
 const TMP = join(import.meta.dirname!, "..", "..", "..", "test-results", "benchmark");
@@ -163,7 +163,7 @@ async function main() {
 
   // ---- Paint tree diff ----
   {
-    const { diffPaintTrees } = await import("../../vrt/capture/crater-client.ts");
+    const { diffPaintTrees } = await import("@mizchi/vrt-capture/crater-client.ts");
 
     function makeTree(depth: number, width: number): any {
       const children: any[] = [];
@@ -189,7 +189,7 @@ async function main() {
 
   // ---- Viewport discovery ----
   {
-    const { extractBreakpoints, generateViewports } = await import("../../vrt/capture/viewport-discovery.ts");
+    const { extractBreakpoints, generateViewports } = await import("@mizchi/vrt-capture/viewport-discovery.ts");
     const css = `
       @media (min-width: 480px) { .a {} }
       @media (min-width: 640px) { .b {} }
@@ -212,7 +212,7 @@ async function main() {
 
   // ---- A11y tree diff ----
   {
-    const { diffA11yTrees, checkA11yTree } = await import("../../a11y/a11y-semantic.ts");
+    const { diffA11yTrees, checkA11yTree } = await import("@mizchi/vrt-core/a11y-semantic.ts");
     const tree = JSON.parse(await readFile(join(import.meta.dirname!, "..", "..", "..", "fixtures", "github-repo", "baseline-desktop.a11y.json"), "utf-8"));
     const snap = (t: any) => ({ testId: "test", testTitle: "test", tree: t });
 
@@ -261,7 +261,7 @@ async function main() {
 
   // ---- Viewport discovery from real HTML ----
   {
-    const { discoverViewports } = await import("../../vrt/capture/viewport-discovery.ts");
+    const { discoverViewports } = await import("@mizchi/vrt-capture/viewport-discovery.ts");
     const html = await readFile(join(import.meta.dirname!, "..", "..", "..", "fixtures", "css-challenge", "grid-complex.html"), "utf-8");
 
     const r = await bench("discoverViewports (grid-complex)", () => {
@@ -306,7 +306,7 @@ async function main() {
 
   // ---- Image crop (heatmap size mismatch) ----
   {
-    const { compareScreenshots } = await import("../../vrt/core/heatmap.ts");
+    const { compareScreenshots } = await import("@mizchi/vrt-core/heatmap.ts");
     const img1 = createTestImage(1280, 900, 1);
     const img2 = createTestImage(1280, 920, 2); // different height
     const p1 = join(TMP, "crop-base.png");
@@ -333,7 +333,7 @@ async function main() {
 
   // ---- Full migration-compare pipeline (no browser) ----
   {
-    const { extractBreakpoints } = await import("../../vrt/capture/viewport-discovery.ts");
+    const { extractBreakpoints } = await import("@mizchi/vrt-capture/viewport-discovery.ts");
     const { parseCssDeclarations, extractCss } = await import("../css-challenge/css-challenge-core.ts");
     const html1 = await readFile(join(import.meta.dirname!, "..", "..", "..", "fixtures", "css-challenge", "page.html"), "utf-8");
     const html2 = await readFile(join(import.meta.dirname!, "..", "..", "..", "fixtures", "css-challenge", "dashboard.html"), "utf-8");
@@ -353,7 +353,7 @@ async function main() {
   {
     // Cold import is already done, measure hot re-import cost
     const r = await bench("import('./viewport-discovery.ts')", async () => {
-      await import("../../vrt/capture/viewport-discovery.ts");
+      await import("@mizchi/vrt-capture/viewport-discovery.ts");
     }, 100);
     results.push(r);
   }

@@ -1,12 +1,12 @@
 import type {
   ChangeIntent,
   PageExpectation,
-} from "./types.ts";
-import { diffA11yTrees, parsePlaywrightA11ySnapshot } from "../a11y/a11y-semantic.ts";
+} from "@mizchi/vrt-core/types.ts";
+import { diffA11yTrees, parsePlaywrightA11ySnapshot } from "@mizchi/vrt-core/a11y-semantic.ts";
 import { matchA11yExpectation } from "../vrt/snapshot/expectation.ts";
-import { reasonAboutChanges, type ReasoningChain } from "../ai/reasoning.ts";
-import { introspectToSpec, verifySpec, type SpecVerifyResult } from "../markup/inspect/introspect.ts";
-import type { A11yNode } from "./types.ts";
+import { reasonAboutChanges, type ReasoningChain } from "@mizchi/vrt-ai/reasoning.ts";
+import { introspectToSpec, verifySpec, type SpecVerifyResult } from "@mizchi/vrt-markup/inspect/introspect.ts";
+import type { A11yNode } from "@mizchi/vrt-core/types.ts";
 
 // ---- Goal & Step definitions ----
 

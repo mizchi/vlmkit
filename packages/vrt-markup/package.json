@@ -1,0 +1,16 @@
+{
+  "name": "@mizchi/vrt-markup",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*.ts": "./src/*.ts"
+  },
+  "dependencies": {
+    "@mizchi/vrt-core": "workspace:*",
+    "@mizchi/vrt-ai": "workspace:*",
+    "@mizchi/vrt-capture": "workspace:*",
+    "playwright": "^1.58.2",
+    "pngjs": "^7.0.0"
+  }
+}

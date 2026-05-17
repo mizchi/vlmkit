@@ -22,8 +22,8 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { handleCliError } from "../cli/cli-error.ts";
-import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "./terminal-colors.ts";
+import { handleCliError } from "@mizchi/vrt-core/cli-error.ts";
+import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vrt-core/terminal-colors.ts";
 
 export interface PerfOptions {
   source: string;

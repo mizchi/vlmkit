@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { runVerificationLoop, generateReport } from "./agent.ts";
-import type { VrtDiff, ChangeIntent, QualityCheckResult } from "./types.ts";
+import type { VrtDiff, ChangeIntent, QualityCheckResult } from "@mizchi/vrt-core/types.ts";
 
 function makeDiff(
   testId: string,

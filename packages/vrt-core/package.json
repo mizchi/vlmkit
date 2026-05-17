@@ -1,0 +1,14 @@
+{
+  "name": "@mizchi/vrt-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./*.ts": "./src/*.ts"
+  },
+  "dependencies": {
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0",
+    "playwright": "^1.58.2"
+  }
+}

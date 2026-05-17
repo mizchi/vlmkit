@@ -13,7 +13,7 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { framesFromPaths, writeFlipbook, type FlipbookFrame } from "../../vrt/compare/flipbook.ts";
-import { DIM, RESET, GREEN, CYAN, BOLD } from "../../util/terminal-colors.ts";
+import { DIM, RESET, GREEN, CYAN, BOLD } from "@mizchi/vrt-core/terminal-colors.ts";
 
 function usage(): string {
   return [

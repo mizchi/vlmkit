@@ -5,8 +5,8 @@ import {
   classifyMigrationDiff,
   classifyMigrationVisualChange,
 } from "./migration-diff.ts";
-import { classifyVisualDiff } from "../../markup/inspect/visual-semantic.ts";
-import type { DiffRegion, VrtDiff } from "../../util/types.ts";
+import { classifyVisualDiff } from "@mizchi/vrt-core/visual-semantic.ts";
+import type { DiffRegion, VrtDiff } from "@mizchi/vrt-core/types.ts";
 
 function makeDiff(regions: DiffRegion[], totalPixels = 1_000_000): VrtDiff {
   const diffPixels = regions.reduce((sum, region) => sum + region.diffPixelCount, 0);

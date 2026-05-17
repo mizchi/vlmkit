@@ -1,4 +1,4 @@
-import type { PaintTreeChange } from "../../vrt/capture/crater-client.ts";
+import type { PaintTreeChange } from "@mizchi/vrt-capture/crater-client.ts";
 import {
   categorizeProperty,
   extractCss,

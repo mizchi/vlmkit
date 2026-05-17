@@ -1,4 +1,4 @@
-import { diffPaintTrees, type PaintNode, type PaintTreeChange } from "../../vrt/capture/crater-client.ts";
+import { diffPaintTrees, type PaintNode, type PaintTreeChange } from "@mizchi/vrt-capture/crater-client.ts";
 
 export interface PaintTreeCaptureRuntime {
   setViewport(width: number, height: number): Promise<void>;

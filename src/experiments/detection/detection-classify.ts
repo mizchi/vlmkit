@@ -18,8 +18,8 @@ export type UndetectedReason =
   | "dead-code"         // overridden by another rule / target element missing
   | "unknown";
 
-export type { ViewportDetectionResult } from "../../vrt/capture/detection-types.ts";
-import type { ViewportDetectionResult } from "../../vrt/capture/detection-types.ts";
+export type { ViewportDetectionResult } from "@mizchi/vrt-capture/detection-types.ts";
+import type { ViewportDetectionResult } from "@mizchi/vrt-capture/detection-types.ts";
 
 export interface ClassifiedDeclaration {
   selectorType: SelectorType;

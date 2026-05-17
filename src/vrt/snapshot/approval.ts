@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
-import type { PaintTreeChange } from "../capture/crater-client.ts";
+import type { PaintTreeChange } from "@mizchi/vrt-capture/crater-client.ts";
 import type { PropertyCategory } from "../../experiments/css-challenge/css-challenge-core.ts";
-import type { DiffRegion, VrtDiff } from "../../util/types.ts";
-import { createScopedVrtDiff, normalizeVrtDiffRegions } from "../core/diff-regions.ts";
+import type { DiffRegion, VrtDiff } from "@mizchi/vrt-core/types.ts";
+import { createScopedVrtDiff, normalizeVrtDiffRegions } from "@mizchi/vrt-core/diff-regions.ts";
 
 export interface ApprovalManifest {
   rules: ApprovalRule[];

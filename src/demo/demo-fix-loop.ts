@@ -11,15 +11,15 @@
  */
 import { readFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { diffA11yTrees, parsePlaywrightA11ySnapshot, checkA11yTree } from "../a11y/a11y-semantic.ts";
-import { reasonAboutChanges, type ReasoningChain } from "../ai/reasoning.ts";
-import { introspectToSpec, verifySpec } from "../markup/inspect/introspect.ts";
-import { compareScreenshots } from "../vrt/core/heatmap.ts";
-import { encodePng } from "../vrt/core/png-utils.ts";
-import { classifyVisualDiff } from "../markup/inspect/visual-semantic.ts";
-import { createLLMProvider } from "../ai/llm-client.ts";
-import type { A11yNode, PageExpectation, ChangeIntent, VrtSnapshot } from "../util/types.ts";
-import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr as _hr } from "../util/terminal-colors.ts";
+import { diffA11yTrees, parsePlaywrightA11ySnapshot, checkA11yTree } from "@mizchi/vrt-core/a11y-semantic.ts";
+import { reasonAboutChanges, type ReasoningChain } from "@mizchi/vrt-ai/reasoning.ts";
+import { introspectToSpec, verifySpec } from "@mizchi/vrt-markup/inspect/introspect.ts";
+import { compareScreenshots } from "@mizchi/vrt-core/heatmap.ts";
+import { encodePng } from "@mizchi/vrt-core/png-utils.ts";
+import { classifyVisualDiff } from "@mizchi/vrt-core/visual-semantic.ts";
+import { createLLMProvider } from "@mizchi/vrt-ai/llm-client.ts";
+import type { A11yNode, PageExpectation, ChangeIntent, VrtSnapshot } from "@mizchi/vrt-core/types.ts";
+import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr as _hr } from "@mizchi/vrt-core/terminal-colors.ts";
 
 const FIXTURES = join(import.meta.dirname!, "..", "..", "fixtures", "react-sample");
 const TMP = join(import.meta.dirname!, "..", "..", "test-results", "demo-fix");

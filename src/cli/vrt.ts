@@ -8,30 +8,30 @@ const MODULE_LOADERS = {
   "../api/api-server.ts": () => import("../api/api-server.ts"),
   "../experiments/css-challenge/css-challenge-bench.ts": () => import("../experiments/css-challenge/css-challenge-bench.ts"),
   "../experiments/detection/detection-report.ts": () => import("../experiments/detection/detection-report.ts"),
-  "../vrt/core/element-compare.ts": () => import("../vrt/core/element-compare.ts"),
+  "../vrt/core/element-compare.ts": () => import("@mizchi/vrt-core/element-compare.ts"),
   "../experiments/migration/migration-compare.ts": () => import("../experiments/migration/migration-compare.ts"),
-  "../vrt/core/png-diff.ts": () => import("../vrt/core/png-diff.ts"),
-  "../markup/inspect/smoke-runner.ts": () => import("../markup/inspect/smoke-runner.ts"),
+  "../vrt/core/png-diff.ts": () => import("@mizchi/vrt-core/png-diff.ts"),
+  "../markup/inspect/smoke-runner.ts": () => import("./commands/smoke-runner.ts"),
   "../vrt/snapshot/snapshot.ts": () => import("../vrt/snapshot/snapshot.ts"),
   "./commands/flipbook-cli.ts": () => import("./commands/flipbook-cli.ts"),
   "./commands/diff-for-agent-cli.ts": () => import("./commands/diff-for-agent-cli.ts"),
   "./commands/compare-runs-cli.ts": () => import("./commands/compare-runs-cli.ts"),
-  "../markup/component/component-from-image.ts": () => import("../markup/component/component-from-image.ts"),
-  "../markup/stress/multi-page-consistency.ts": () => import("../markup/stress/multi-page-consistency.ts"),
-  "../markup/component/component-consistency.ts": () => import("../markup/component/component-consistency.ts"),
-  "../markup/style/theme-parity.ts": () => import("../markup/style/theme-parity.ts"),
-  "../markup/stress/i18n-stress.ts": () => import("../markup/stress/i18n-stress.ts"),
-  "../a11y/a11y-contrast.ts": () => import("../a11y/a11y-contrast.ts"),
-  "../a11y/a11y-touch.ts": () => import("../a11y/a11y-touch.ts"),
-  "../a11y/a11y-focus-order.ts": () => import("../a11y/a11y-focus-order.ts"),
-  "../markup/inspect/interact.ts": () => import("../markup/inspect/interact.ts"),
-  "../markup/stress/media-variants.ts": () => import("../markup/stress/media-variants.ts"),
-  "../markup/stress/cross-browser.ts": () => import("../markup/stress/cross-browser.ts"),
-  "../markup/style/design-tokens.ts": () => import("../markup/style/design-tokens.ts"),
+  "../markup/component/component-from-image.ts": () => import("@mizchi/vrt-markup/component/component-from-image.ts"),
+  "../markup/stress/multi-page-consistency.ts": () => import("@mizchi/vrt-markup/stress/multi-page-consistency.ts"),
+  "../markup/component/component-consistency.ts": () => import("@mizchi/vrt-markup/component/component-consistency.ts"),
+  "../markup/style/theme-parity.ts": () => import("@mizchi/vrt-markup/style/theme-parity.ts"),
+  "../markup/stress/i18n-stress.ts": () => import("@mizchi/vrt-markup/stress/i18n-stress.ts"),
+  "../a11y/a11y-contrast.ts": () => import("@mizchi/vrt-core/a11y-contrast.ts"),
+  "../a11y/a11y-touch.ts": () => import("@mizchi/vrt-core/a11y-touch.ts"),
+  "../a11y/a11y-focus-order.ts": () => import("@mizchi/vrt-core/a11y-focus-order.ts"),
+  "../markup/inspect/interact.ts": () => import("@mizchi/vrt-markup/inspect/interact.ts"),
+  "../markup/stress/media-variants.ts": () => import("@mizchi/vrt-markup/stress/media-variants.ts"),
+  "../markup/stress/cross-browser.ts": () => import("@mizchi/vrt-markup/stress/cross-browser.ts"),
+  "../markup/style/design-tokens.ts": () => import("@mizchi/vrt-markup/style/design-tokens.ts"),
   "../util/perf.ts": () => import("../util/perf.ts"),
-  "../markup/inspect/explore.ts": () => import("../markup/inspect/explore.ts"),
+  "../markup/inspect/explore.ts": () => import("@mizchi/vrt-markup/inspect/explore.ts"),
   "../util/skill.ts": () => import("../util/skill.ts"),
-  "../markup/component/component-extract.ts": () => import("../markup/component/component-extract.ts"),
+  "../markup/component/component-extract.ts": () => import("@mizchi/vrt-markup/component/component-extract.ts"),
 } as const;
 
 async function main() {
@@ -84,7 +84,7 @@ async function runDiscover(args: string[]) {
   if (!file) { console.error("Usage: vrt discover <html-file>"); process.exit(1); }
 
   const { readFile } = await import("node:fs/promises");
-  const { discoverViewports } = await import("../vrt/capture/viewport-discovery.ts");
+  const { discoverViewports } = await import("@mizchi/vrt-capture/viewport-discovery.ts");
   const html = await readFile(file, "utf-8");
   const result = discoverViewports(html, { randomSamples: 1, maxViewports: 15 });
 

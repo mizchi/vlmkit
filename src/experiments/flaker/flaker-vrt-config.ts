@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { DEFAULT_BIDI_URL } from "../../vrt/capture/crater-client.ts";
-import type { ViewportSpec } from "../../vrt/capture/viewport-discovery.ts";
+import { DEFAULT_BIDI_URL } from "@mizchi/vrt-capture/crater-client.ts";
+import type { ViewportSpec } from "@mizchi/vrt-capture/viewport-discovery.ts";
 
 export const DEFAULT_FLAKER_VRT_CONFIG_FILE = "flaker.vrt.json";
 

@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { STOP_WORDS, SYNONYMS } from "../../ai/nlp.ts";
+import { STOP_WORDS, SYNONYMS } from "@mizchi/vrt-ai/nlp.ts";
 import type {
   VrtExpectation,
   PageExpectation,
@@ -12,7 +12,7 @@ import type {
   LoopScore,
   ScoreDetail,
   UnifiedAgentContext,
-} from "../../util/types.ts";
+} from "@mizchi/vrt-core/types.ts";
 
 /**
  * Load expectation.json.

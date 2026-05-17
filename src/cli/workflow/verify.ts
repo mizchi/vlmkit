@@ -10,16 +10,16 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
-import { buildDepGraph, findAffectedComponents, graphStats } from "../../markup/inspect/dep-graph.ts";
-import { extractDiffSemantics } from "../../ai/intent.ts";
-import { compareScreenshots } from "../../vrt/core/heatmap.ts";
-import { classifyVisualDiff } from "../../markup/inspect/visual-semantic.ts";
-import { diffA11yTrees, parsePlaywrightA11ySnapshot, checkA11yTree } from "../../a11y/a11y-semantic.ts";
+import { buildDepGraph, findAffectedComponents, graphStats } from "@mizchi/vrt-markup/inspect/dep-graph.ts";
+import { extractDiffSemantics } from "@mizchi/vrt-ai/intent.ts";
+import { compareScreenshots } from "@mizchi/vrt-core/heatmap.ts";
+import { classifyVisualDiff } from "@mizchi/vrt-core/visual-semantic.ts";
+import { diffA11yTrees, parsePlaywrightA11ySnapshot, checkA11yTree } from "@mizchi/vrt-core/a11y-semantic.ts";
 import { crossValidate, crossValidationToQualityChecks } from "../../experiments/detection/cross-validation.ts";
 import { loadExpectation, crossValidateWithExpectation, scoreLoop } from "../../vrt/snapshot/expectation.ts";
-import { runQualityChecks } from "../../util/quality.ts";
+import { runQualityChecks } from "@mizchi/vrt-core/quality.ts";
 import { runVerificationLoop } from "../../util/agent.ts";
-import type { VrtDiff, A11yDiff, VisualSemanticDiff, UnifiedAgentContext, VrtExpectation, ChangeIntent } from "../../util/types.ts";
+import type { VrtDiff, A11yDiff, VisualSemanticDiff, UnifiedAgentContext, VrtExpectation, ChangeIntent } from "@mizchi/vrt-core/types.ts";
 
 export interface VerifyPaths {
   projectRoot: string;

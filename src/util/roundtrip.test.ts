@@ -11,9 +11,9 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { introspectToSpec, verifySpec } from "../markup/inspect/introspect.ts";
-import { checkA11yTree } from "../a11y/a11y-semantic.ts";
-import type { A11yNode, UiSpec } from "./types.ts";
+import { introspectToSpec, verifySpec } from "@mizchi/vrt-markup/inspect/introspect.ts";
+import { checkA11yTree } from "@mizchi/vrt-core/a11y-semantic.ts";
+import type { A11yNode, UiSpec } from "@mizchi/vrt-core/types.ts";
 
 const FIXTURES = join(import.meta.dirname!, "..", "..", "fixtures", "react-sample");
 

@@ -31,7 +31,7 @@ import {
   extractCss, replaceCss,
   type CssDeclaration, type CapturedState, type TrialResult, type RenderBackend, type VrtAnalysis,
 } from "./css-challenge-core.ts";
-import { isCraterAvailable, type CraterClient } from "../../vrt/capture/crater-client.ts";
+import { isCraterAvailable, type CraterClient } from "@mizchi/vrt-capture/crater-client.ts";
 import {
   classifyDeclaration,
   classifyUndetectedReason,
@@ -40,7 +40,7 @@ import {
   type ViewportDetectionResult,
 } from "../detection/detection-classify.ts";
 import { appendRecords, type DetectionRecord } from "../detection/detection-db.ts";
-import { createLLMProvider } from "../../ai/llm-client.ts";
+import { createLLMProvider } from "@mizchi/vrt-ai/llm-client.ts";
 import { appendBenchHistory, buildBenchHistoryRecord } from "../benchmark/bench-history.ts";
 import {
   CSS_BENCH_OUTPUT_ROOT,
@@ -56,19 +56,19 @@ import {
   findExpectedComputedStyleTargets,
   mergeComputedStyleProperties,
   type ComputedStyleTarget,
-} from "../../markup/style/css-custom-properties.ts";
-import { TRACKED_PROPERTIES } from "../../vrt/core/computed-style-capture.ts";
-import { formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "../../vrt/capture/playwright-launch-error.ts";
+} from "./css-custom-properties.ts";
+import { TRACKED_PROPERTIES } from "@mizchi/vrt-core/computed-style-capture.ts";
+import { formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vrt-capture/playwright-launch-error.ts";
 import {
   hasAnyDetectionSignal,
   hasCraterPrescanSignal,
   resolvePrescannerTrial,
   summarizePrescannerTrials,
   type PrescannerTrialResolution,
-} from "../../vrt/capture/prescanner.ts";
-import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "../../util/terminal-colors.ts";
-import { args } from "../../cli/cli-args.ts";
-import { handleCliError } from "../../cli/cli-error.ts";
+} from "@mizchi/vrt-capture/prescanner.ts";
+import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "@mizchi/vrt-core/terminal-colors.ts";
+import { args } from "@mizchi/vrt-core/cli-args.ts";
+import { handleCliError } from "@mizchi/vrt-core/cli-error.ts";
 
 // ---- Config ----
 
@@ -292,7 +292,7 @@ async function runFixtureBenchmark(fixture: string) {
   const customPropertyUsage = buildCustomPropertyUsageIndex(declarations);
 
   // Discover breakpoints and expand viewports
-  const { discoverViewports } = await import("../../vrt/capture/viewport-discovery.ts");
+  const { discoverViewports } = await import("@mizchi/vrt-capture/viewport-discovery.ts");
   const discovery = discoverViewports(htmlRaw, { maxViewports: 10, randomSamples: 0, includeStandard: false });
   const existingWidths = new Set(BASE_VIEWPORTS.map((v) => v.width));
   const extraViewports = discovery.viewports
@@ -537,7 +537,7 @@ async function runFixtureBenchmark(fixture: string) {
           await capturePageState(chromiumResources.browser, desktopVp, fixedHtml, fixedPath, {
             trackedProperties,
           });
-          const { compareScreenshots } = await import("../../vrt/core/heatmap.ts");
+          const { compareScreenshots } = await import("@mizchi/vrt-core/heatmap.ts");
           const fixedDiff = await compareScreenshots({
             testId: "page", testTitle: "page", projectName: "css-challenge",
             screenshotPath: fixedPath,

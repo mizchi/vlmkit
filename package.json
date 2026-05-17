@@ -21,7 +21,7 @@
   "scripts": {
     "build": "tsdown",
     "prepack": "pnpm build",
-    "test": "node --test 'src/**/*.test.ts'",
+    "test": "node --test 'src/**/*.test.ts' 'packages/*/src/**/*.test.ts'",
     "demo": "node src/demo/demo.ts",
     "demo:fix": "node src/demo/demo-fix-loop.ts",
     "demo:multi": "node src/demo/demo-scenarios.ts",
@@ -37,11 +37,13 @@
     "typescript": "^6.0.2"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@hono/node-server": "^1.19.12",
+    "@mizchi/vrt-ai": "workspace:*",
+    "@mizchi/vrt-capture": "workspace:*",
+    "@mizchi/vrt-core": "workspace:*",
+    "@mizchi/vrt-markup": "workspace:*",
     "@playwright/test": "^1.52.0",
     "hono": "^4.12.10",
-    "pixelmatch": "^7.1.0",
     "playwright": "^1.58.2",
     "pngjs": "^7.0.0",
     "ws": "^8.20.0"
