@@ -191,8 +191,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
-    implementedBy = "code"
-    implementedAt = "packages/vrt-markup/src/component/component-from-image.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "packages/vrt-markup/src/component/component-from-image.ts" }
+    }
     description = "`vrt component-from-image` accepts a PNG target and renders the agent's HTML for pixel-diff iteration. Same engine drives A1-A4."
   }
   new {
@@ -201,8 +202,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
-    implementedBy = "code"
-    implementedAt = "packages/vrt-markup/src/component/component-from-image.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "packages/vrt-markup/src/component/component-from-image.ts" }
+    }
     description = "Same engine as A1; `--device-scale-factor 2` handles retina Figma exports."
   }
   new {
@@ -219,8 +221,9 @@ scenarios {
     severity = "minor"
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
-    implementedBy = "code"
-    implementedAt = "packages/vrt-markup/src/component/component-from-image.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "packages/vrt-markup/src/component/component-from-image.ts" }
+    }
     description = "Same engine as A1; treats any PNG as a reference target regardless of provenance."
   }
   new {
@@ -299,8 +302,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
-    implementedBy = "code"
-    implementedAt = "src/experiments/migration/migration-compare.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
+    }
     description = "`vrt compare` migration mode handles utility-first → vanilla CSS by ignoring class-name churn."
   }
   new {
@@ -309,8 +313,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
-    implementedBy = "code"
-    implementedAt = "src/experiments/migration/migration-compare.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
+    }
     description = "Same `vrt compare` engine; class-rename map maps auto-generated to semantic class names."
   }
   new {
@@ -319,8 +324,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
-    implementedBy = "code"
-    implementedAt = "src/experiments/migration/migration-compare.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
+    }
     description = "Same engine as B1 / B2."
   }
   new {
@@ -329,8 +335,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
-    implementedBy = "code"
-    implementedAt = "src/experiments/migration/migration-compare.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
+    }
     description = "Validated on the `shadcn-to-luna` fixture."
   }
   new {
@@ -339,8 +346,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
-    implementedBy = "code"
-    implementedAt = "src/experiments/migration/migration-compare.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
+    }
     description = "Same `vrt compare` engine."
   }
   new {
@@ -357,8 +365,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
-    implementedBy = "code"
-    implementedAt = "src/experiments/migration/migration-compare.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
+    }
     description = "`vrt compare` plus `component-consistency` catches missed instances."
   }
   new {
@@ -367,8 +376,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
-    implementedBy = "code"
-    implementedAt = "src/experiments/migration/migration-compare.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
+    }
     description = "Same `vrt compare` engine with class-rename map."
   }
   new {
@@ -377,8 +387,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
-    implementedBy = "code"
-    implementedAt = "src/experiments/migration/migration-compare.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
+    }
     description = "Operates on compiled CSS output, not source."
   }
   new {
@@ -387,8 +398,9 @@ scenarios {
     severity = "minor"
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
-    implementedBy = "code"
-    implementedAt = "src/experiments/migration/migration-compare.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
+    }
     description = "Same engine."
   }
   new {
@@ -397,8 +409,9 @@ scenarios {
     severity = "minor"
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
-    implementedBy = "code"
-    implementedAt = "src/experiments/migration/migration-compare.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
+    }
     description = "DOM-position-diff carries the rename across the page graph."
   }
   new {
@@ -459,8 +472,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-A11Y-COMPLIANCE" }
-    implementedBy = "code"
-    implementedAt = "packages/vrt-markup/src/inspect/interact.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "packages/vrt-markup/src/inspect/interact.ts" }
+    }
     description = "`interact press` action drives keyboard sequences; `a11y-focus-order` verifies the resulting traversal."
   }
   new {
@@ -477,8 +491,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-A11Y-COMPLIANCE" }
-    implementedBy = "code"
-    implementedAt = "packages/vrt-markup/src/stress/media-variants.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "packages/vrt-markup/src/stress/media-variants.ts" }
+    }
     description = "`media-variants --variants zoom-200` flags scrollWidth regressions at 2× zoom."
   }
   new {
@@ -487,8 +502,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-A11Y-COMPLIANCE" }
-    implementedBy = "code"
-    implementedAt = "packages/vrt-markup/src/stress/media-variants.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "packages/vrt-markup/src/stress/media-variants.ts" }
+    }
     description = "`media-variants --variants reduced-motion` does the static-stylesheet sweep."
   }
   new {
@@ -517,8 +533,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-DESIGN-SYSTEM" }
-    implementedBy = "code"
-    implementedAt = "packages/vrt-markup/src/style/design-tokens.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "packages/vrt-markup/src/style/design-tokens.ts" }
+    }
     description = "`vrt design-tokens --spacing-scale` flags margin and padding values that fall outside the declared scale, e.g. a stray 5px on a 4px grid."
   }
   new {
@@ -670,8 +687,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
-    implementedBy = "code"
-    implementedAt = "src/util/perf.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/util/perf.ts" }
+    }
     description = "`vrt perf` reads CLS from an in-page PerformanceObserver."
   }
   new {
@@ -680,8 +698,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
-    implementedBy = "code"
-    implementedAt = "src/util/perf.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/util/perf.ts" }
+    }
     description = "`vrt perf` reports both core paint timings from the same observer wiring as G1."
   }
   new {
@@ -768,8 +787,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-DESIGN-SYSTEM" }
-    implementedBy = "code"
-    implementedAt = "packages/vrt-markup/src/stress/multi-page-consistency.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "packages/vrt-markup/src/stress/multi-page-consistency.ts" }
+    }
     description = "`vrt multi-page-consistency` diffs the same component selector across N pages and surfaces the outlier."
   }
   new {
@@ -812,8 +832,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
-    implementedBy = "code"
-    implementedAt = "packages/vrt-markup/src/component/component-extract.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "packages/vrt-markup/src/component/component-extract.ts" }
+    }
     description = "`vrt component-extract` crops the bug region from the user-supplied screenshot; `vrt component-from-image` drives the rebuild loop."
   }
   new {
@@ -822,8 +843,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
-    implementedBy = "code"
-    implementedAt = "src/experiments/migration/migration-compare.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
+    }
     description = "Bbox-Δ plus heatmap regions surface single-pixel drift; the report's worst-row table sorts these to the top."
   }
   new {
@@ -832,8 +854,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
-    implementedBy = "code"
-    implementedAt = "packages/vrt-markup/src/stress/i18n-stress.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "packages/vrt-markup/src/stress/i18n-stress.ts" }
+    }
     description = "`vrt i18n-stress` flags overflow / wrap regressions; `compare` plus heatmap catches generic clipping."
   }
   new {
@@ -876,8 +899,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-SNAPSHOT-WORKFLOW" }
-    implementedBy = "code"
-    implementedAt = "src/cli/workflow.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/cli/workflow.ts" }
+    }
     description = "`vrt compare` plus `vrt workflow approve` slot into a pre-commit hook for baseline-driven visual gating."
   }
   new {
@@ -914,8 +938,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-AGENT-ERGONOMICS" }
-    implementedBy = "code"
-    implementedAt = "src/util/skill.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/util/skill.ts" }
+    }
     description = "`vrt skill run <name> --against <html|url>` aggregates all configured checks for the target into one report."
   }
 
@@ -926,8 +951,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
-    implementedBy = "code"
-    implementedAt = "src/experiments/migration/migration-compare.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
+    }
     description = "`vrt compare` accepts per-viewport configs; `component-geometry` reports bbox shifts across breakpoints."
   }
   new {
@@ -954,8 +980,9 @@ scenarios {
     severity = "minor"
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
-    implementedBy = "code"
-    implementedAt = "packages/vrt-markup/src/component/component-from-image.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "packages/vrt-markup/src/component/component-from-image.ts" }
+    }
     description = "`vrt component-from-image --device-scale-factor 2` renders at 2× for retina parity."
   }
   new {
@@ -974,8 +1001,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
-    implementedBy = "code"
-    implementedAt = "packages/vrt-markup/src/component/component-from-image.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "packages/vrt-markup/src/component/component-from-image.ts" }
+    }
     description = "`component-from-image --states hover` plus `interact` cover hover-state diffs."
   }
   new {
@@ -984,8 +1012,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-A11Y-COMPLIANCE" }
-    implementedBy = "code"
-    implementedAt = "packages/vrt-markup/src/component/component-from-image.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "packages/vrt-markup/src/component/component-from-image.ts" }
+    }
     description = "`component-from-image --states focus-visible` plus `a11y-focus-order` verify focus visibility."
   }
   new {
@@ -1032,8 +1061,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
-    implementedBy = "code"
-    implementedAt = "packages/vrt-markup/src/inspect/interact.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "packages/vrt-markup/src/inspect/interact.ts" }
+    }
     description = "Trigger the toggle via `interact` or `explore`; both engines diff the open vs closed state."
   }
   new {
@@ -1042,8 +1072,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
-    implementedBy = "code"
-    implementedAt = "packages/vrt-markup/src/inspect/interact.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "packages/vrt-markup/src/inspect/interact.ts" }
+    }
     description = "`interact` drives the open click + backdrop + close sequence."
   }
   new {
@@ -1062,8 +1093,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
-    implementedBy = "code"
-    implementedAt = "packages/vrt-markup/src/inspect/interact.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "packages/vrt-markup/src/inspect/interact.ts" }
+    }
     description = "`interact` drives the toggle and snapshots both states."
   }
   new {
@@ -1090,8 +1122,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
-    implementedBy = "code"
-    implementedAt = "packages/vrt-markup/src/inspect/interact.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "packages/vrt-markup/src/inspect/interact.ts" }
+    }
     description = "`interact` drives the tab-click sequence and pixel-diffs each panel state."
   }
 
@@ -1216,7 +1249,6 @@ scenarios {
     severity = "critical"
     reviewStatus = "approved"
     contributes { "GOAL-CORE-DIFF" }
-    implementedBy = "test"
     description = #"""
       `vrt png-diff <baseline> <current>` uses pixelmatch v7 plus a
       heatmap renderer to report per-region intensity. Smoke test
@@ -1229,8 +1261,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-CORE-DIFF" }
-    implementedBy = "code"
-    implementedAt = "src/experiments/migration/migration-compare.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
+    }
     description = #"""
       `getComputedStyle` capture for both rest and pseudo-states
       (`:hover`, `:focus`) plus per-property delta surfacing.
@@ -1244,8 +1277,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-CORE-DIFF" }
-    implementedBy = "code"
-    implementedAt = "src/experiments/migration/migration-compare.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
+    }
     description = #"""
       Capture Playwright's accessibility snapshot for each side of
       the compare and surface structural changes — role / name /
@@ -1258,8 +1292,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-CORE-DIFF" }
-    implementedBy = "code"
-    implementedAt = "packages/vrt-core/src/element-compare.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "packages/vrt-core/src/element-compare.ts" }
+    }
     description = #"""
       `vrt elements` diffs per-element bounding boxes after isolating
       cascading layout shift; useful when a single element moves and
@@ -1272,8 +1307,9 @@ scenarios {
     severity = "minor"
     reviewStatus = "approved"
     contributes { "GOAL-CORE-DIFF"; "GOAL-MIGRATION-VERIFICATION" }
-    implementedBy = "code"
-    implementedAt = "src/experiments/migration/migration-paint-tree.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/experiments/migration/migration-paint-tree.ts" }
+    }
     description = #"""
       Optional Crater-backed paint-tree comparison; ~1.66x speedup
       vs pixelmatch on the dogfood corpus with 0% false positive.
@@ -1288,8 +1324,9 @@ scenarios {
     severity = "critical"
     reviewStatus = "approved"
     contributes { "GOAL-SNAPSHOT-WORKFLOW" }
-    implementedBy = "code"
-    implementedAt = "src/cli/commands/snapshot.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/cli/commands/snapshot.ts" }
+    }
     description = #"""
       `vrt snapshot <url1> [url2]` captures every URL across the
       configured viewport set on first run; subsequent runs diff
@@ -1304,8 +1341,9 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-SNAPSHOT-WORKFLOW" }
     dependsOn { "SNAP-001" }
-    implementedBy = "code"
-    implementedAt = "src/cli/commands/snapshot.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/cli/commands/snapshot.ts" }
+    }
     description = #"""
       `vrt snapshot approve` renames every `*-current.png` to
       `*-baseline.png`. Used after an intentional UI change is
@@ -1318,8 +1356,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-SNAPSHOT-WORKFLOW"; "GOAL-AGENT-ERGONOMICS" }
-    implementedBy = "code"
-    implementedAt = "packages/vrt-markup/src/heal/fix-prompt.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "packages/vrt-markup/src/heal/fix-prompt.ts" }
+    }
     description = #"""
       Reads `snapshot-report.json` and renders a worst-first task
       list suitable for piping into a subagent / inline LLM. Honors
@@ -1332,8 +1371,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-SNAPSHOT-WORKFLOW" }
-    implementedBy = "code"
-    implementedAt = "src/vrt/snapshot/stability.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/vrt/snapshot/stability.ts" }
+    }
     description = #"""
       `vrt snapshot stability` re-runs the same snapshot N times
       against a single URL and reports the per-frame diff. Drives
@@ -1347,8 +1387,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-SNAPSHOT-WORKFLOW" }
-    implementedBy = "code"
-    implementedAt = "src/cli/router.ts:WORKFLOW_ALIAS_COMMANDS"
+    implementations {
+      new Implementation { kind = "code"; at = "src/cli/router.ts:WORKFLOW_ALIAS_COMMANDS" }
+    }
     description = #"""
       Stateful component-graph driven workflow: init writes
       baselines, capture takes current, verify diffs, approve
@@ -1364,7 +1405,6 @@ scenarios {
     severity = "critical"
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
-    implementedBy = "test"
     description = #"""
       `vrt compare <before> <after>` (or `--dir + --baseline +
       --variants`) sweeps every viewport, emits report.md, .json
@@ -1378,8 +1418,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION"; "GOAL-AGENT-ERGONOMICS" }
-    implementedBy = "code"
-    implementedAt = "src/cli/commands/diff-for-agent-cli.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/cli/commands/diff-for-agent-cli.ts" }
+    }
     description = #"""
       `vrt diff-for-agent <migration-report.json>` collapses a
       compare report into a worst-first table with selector +
@@ -1393,8 +1434,9 @@ scenarios {
     severity = "minor"
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
-    implementedBy = "doc"
-    implementedAt = "docs/reset-css-comparison.md"
+    implementations {
+      new Implementation { kind = "doc"; at = "docs/reset-css-comparison.md" }
+    }
     description = #"""
       Canonical fixture set (`fixtures/migration/reset-css`) +
       `pkf run migration-reset` task that diffs three reset CSSes
@@ -1408,8 +1450,9 @@ scenarios {
     severity = "minor"
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION"; "GOAL-AGENT-ERGONOMICS" }
-    implementedBy = "code"
-    implementedAt = "src/cli/commands/compare-runs-cli.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/cli/commands/compare-runs-cli.ts" }
+    }
     description = #"""
       `vrt compare-runs` diffs two prior vrt runs against each other
       (e.g. iter 0 vs iter 1 of a fix loop) so progress per round is
@@ -1424,8 +1467,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-CSS-CHALLENGE" }
-    implementedBy = "code"
-    implementedAt = "src/experiments/css-challenge/css-challenge-bench.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/experiments/css-challenge/css-challenge-bench.ts" }
+    }
     description = #"""
       `vrt bench` (alias `pkf run css-bench`) randomly deletes a
       CSS property or selector block, runs the chosen detection
@@ -1440,8 +1484,9 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-CSS-CHALLENGE" }
     dependsOn { "BENCH-001" }
-    implementedBy = "code"
-    implementedAt = "src/experiments/detection/detection-report.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/experiments/detection/detection-report.ts" }
+    }
     description = #"""
       `vrt report` reads the jsonl history and emits per-fixture +
       per-backend detection-rate tables. Last measured: 96.7% on
@@ -1454,8 +1499,9 @@ scenarios {
     severity = "minor"
     reviewStatus = "approved"
     contributes { "GOAL-CSS-CHALLENGE" }
-    implementedBy = "code"
-    implementedAt = "src/experiments/css-challenge/css-challenge-bench.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/experiments/css-challenge/css-challenge-bench.ts" }
+    }
     description = #"""
       `--backend crater` and `--backend prescanner` route the bench
       through alternative renderers. Crater requires a running
@@ -1470,8 +1516,9 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-AI-FIX-LOOP" }
-    implementedBy = "code"
-    implementedAt = "packages/vrt-ai/src/reasoning-pipeline.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "packages/vrt-ai/src/reasoning-pipeline.ts" }
+    }
     description = #"""
       Stage 1 of the 2-stage pipeline: a vision-language model is
       shown the diff image and returns a structured list of
@@ -1486,8 +1533,9 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-AI-FIX-LOOP" }
     dependsOn { "AIFIX-001"; "CORE-001" }
-    implementedBy = "code"
-    implementedAt = "src/experiments/css-challenge/fix-loop.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/experiments/css-challenge/fix-loop.ts" }
+    }
     description = #"""
       Stage 2: the structured diff is fed to an LLM that returns a
       CSS patch; the patch is applied and re-verified against the
@@ -1500,8 +1548,9 @@ scenarios {
     severity = "minor"
     reviewStatus = "approved"
     contributes { "GOAL-AI-FIX-LOOP" }
-    implementedBy = "code"
-    implementedAt = "src/experiments/benchmark/vlm-bench.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/experiments/benchmark/vlm-bench.ts" }
+    }
     description = #"""
       `vrt vlm-bench` queries OpenRouter for candidate VLMs and
       runs each against the fix-loop hard case (seed 11). Outputs
@@ -1516,8 +1565,9 @@ scenarios {
     severity = "minor"
     reviewStatus = "approved"
     contributes { "GOAL-API" }
-    implementedBy = "code"
-    implementedAt = "src/api/api-server.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/api/api-server.ts" }
+    }
     description = #"""
       `vrt api serve [--port N]` starts a Hono server with
       /api/compare, /api/compare-renderers, /api/reason,
@@ -1531,8 +1581,9 @@ scenarios {
     severity = "minor"
     reviewStatus = "approved"
     contributes { "GOAL-API" }
-    implementedBy = "code"
-    implementedAt = "src/api/client.ts"
+    implementations {
+      new Implementation { kind = "code"; at = "src/api/client.ts" }
+    }
     description = #"""
       `VrtClient` in `src/api/client.ts` is the typed in-process
       client; one method per HTTP endpoint with shared input/output
