@@ -7,6 +7,7 @@
     "test": "node --test 'src/**/*.test.ts'"
   },
   "exports": {
+    ".": "./src/index.ts",
     "./*.ts": "./src/*.ts"
   },
   "dependencies": {

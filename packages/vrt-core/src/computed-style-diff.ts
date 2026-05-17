@@ -11,7 +11,8 @@
  * `gap`, 8 changed `padding`" at a glance.
  */
 
-export type ComputedStyleSnapshot = Record<string, Record<string, string>>;
+export type { ComputedStyleSnapshot } from "./computed-style-capture.ts";
+import type { ComputedStyleSnapshot } from "./computed-style-capture.ts";
 
 export interface CsdEntry {
   selector: string;
