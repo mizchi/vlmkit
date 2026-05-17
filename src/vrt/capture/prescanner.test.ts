@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import type { ViewportDetectionResult } from "../../experiments/detection/detection-classify.ts";
+import type { ViewportDetectionResult } from "./detection-types.ts";
 import {
   hasAnyDetectionSignal,
   hasCraterPrescanSignal,

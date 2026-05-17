@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { STOP_WORDS, SYNONYMS } from "../../ai/nlp.ts";
 import type {
   VrtExpectation,
   PageExpectation,
@@ -163,34 +164,6 @@ function matchesSingleA11yChange(exp: ExpectedA11yChange, actual: A11yChange): b
   // Description-only fuzzy match: keyword overlap
   return fuzzyDescriptionMatch(exp.description, actual);
 }
-
-/**
- * Fuzzy match via description keywords.
- * Can be replaced with LLM call in the future.
- */
-export const STOP_WORDS = new Set([
-  "gets", "from", "with", "that", "this", "should",
-  "have", "the", "for", "and", "all", "proper",
-]);
-
-export const SYNONYMS: Record<string, string[]> = {
-  input: ["textbox", "searchbox", "combobox"],
-  textbox: ["input", "searchbox"],
-  searchbox: ["input", "textbox", "search"],
-  label: ["name", "accessible"],
-  name: ["label"],
-  button: ["btn"],
-  nav: ["navigation"],
-  navigation: ["nav"],
-  search: ["searchbox"],
-  tab: ["tablist", "tabpanel"],
-  tablist: ["tab", "tabs"],
-  tabpanel: ["tab", "panel", "content"],
-  panel: ["tabpanel"],
-  table: ["grid"],
-  column: ["columnheader", "header"],
-  header: ["columnheader", "column"],
-};
 
 function fuzzyDescriptionMatch(description: string, actual: A11yChange): boolean {
   const rawKeywords = description

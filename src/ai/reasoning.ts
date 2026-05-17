@@ -5,7 +5,7 @@ import type {
   ExpectedA11yChange,
   PageExpectation,
 } from "../util/types.ts";
-import { STOP_WORDS, SYNONYMS } from "../vrt/snapshot/expectation.ts";
+import { STOP_WORDS, SYNONYMS } from "./nlp.ts";
 
 /**
  * Expectation -> change -> realization reasoning chain

@@ -1,4 +1,4 @@
-import type { ViewportDetectionResult } from "../../experiments/detection/detection-classify.ts";
+import type { ViewportDetectionResult } from "./detection-types.ts";
 
 export type PrescannerResolvedBy = "crater" | "chromium" | "none";
 

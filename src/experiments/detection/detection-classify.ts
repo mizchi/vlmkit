@@ -18,17 +18,8 @@ export type UndetectedReason =
   | "dead-code"         // overridden by another rule / target element missing
   | "unknown";
 
-export interface ViewportDetectionResult {
-  width: number;
-  height: number;
-  visualDiffDetected: boolean;
-  visualDiffRatio: number;
-  a11yDiffDetected: boolean;
-  a11yChangeCount: number;
-  computedStyleDiffCount: number;
-  hoverDiffDetected: boolean;
-  paintTreeDiffCount: number;
-}
+export type { ViewportDetectionResult } from "../../vrt/capture/detection-types.ts";
+import type { ViewportDetectionResult } from "../../vrt/capture/detection-types.ts";
 
 export interface ClassifiedDeclaration {
   selectorType: SelectorType;
