@@ -1,34 +1,102 @@
 /**
  * @mizchi/vrt-core — VRT diff engine + shared types
  *
- * This barrel re-exports the side-effect-free library API. Modules
- * that launch Playwright or define a CLI entry (a11y-contrast,
- * a11y-touch, a11y-focus-order, element-compare, mask) are NOT
- * re-exported here so consumers that only need types or pure utilities
- * don't pull Playwright into their bundle. Deep-import those directly
- * via `@mizchi/vrt-core/<module>.ts`.
+ * This barrel is the curated public API. Anything not re-exported here
+ * is internal — either a browser-context helper (designed to run inside
+ * `page.evaluate(...)`), a CLI helper, or a low-level parser. Those
+ * remain accessible via deep import (`@mizchi/vrt-core/<module>.ts`)
+ * but aren't part of the stable surface.
+ *
+ * Naming groups (informal):
+ *
+ *   - `compareScreenshots`, `runPngDiff`, `generateDiffReport`
+ *     → top-level diff entry points.
+ *   - `find{HeatmapRegions,ShiftOrigins,GridSuggestions}`,
+ *     `detect{BandShifts,Whiteout,EmptyContent}`
+ *     → detectors that return structured findings.
+ *   - `diff{A11yTrees,ComputedStyles,DomPositionStyles}`,
+ *     `classify{Region,VisualDiff}`, `evaluateDomEquivalence`
+ *     → structural comparisons.
+ *   - `extractTextRows*`, `matchTextRows`, `compareRowTypography`
+ *     → typography / text-row primitives.
+ *   - `{decode,encode,crop,resize}Png*`, `getImageDimensions`
+ *     → image-IO helpers.
+ *   - `INTERACTIVE_ROLES`, `LANDMARK_ROLES`, `RESOLUTION_PRESETS`,
+ *     `TRACKED_PROPERTIES` → public config constants.
+ *   - `runQualityChecks`
+ *     → end-to-end quality gate.
+ *
+ * Modules NOT in the barrel (deep import only):
+ *   - terminal-colors, cli-args, cli-error — CLI helpers
+ *   - element-compare, mask — require Playwright at module load
+ *   - a11y-contrast, a11y-touch, a11y-focus-order — CLI entries
+ *   - browser-script string constants & `*InDom` helpers
  */
+
+// ---- Types (open re-export — types don't pollute the value namespace) ----
 export * from "./types.ts";
-export * from "./terminal-colors.ts";
-export * from "./cli-args.ts";
-export * from "./cli-error.ts";
 
-export * from "./png-diff.ts";
-export * from "./png-utils.ts";
-export * from "./image-resize.ts";
-export * from "./heatmap.ts";
-export * from "./heatmap-regions.ts";
-export * from "./diff-regions.ts";
-export * from "./region-classify.ts";
-export * from "./shift-origin.ts";
-export * from "./text-rows.ts";
-export * from "./grid-ratio.ts";
+// ---- Image diff ----
+export {
+  compareScreenshots,
+  detectBandShifts,
+  generateDiffReport,
+  detectWhiteout,
+  detectEmptyContent,
+} from "./heatmap.ts";
+export { runPngDiff } from "./png-diff.ts";
+export { findHeatmapRegionsFromFile, findHeatmapRegionsFromRgba } from "./heatmap-regions.ts";
+export {
+  createScopedVrtDiff,
+  normalizeVrtDiffRegions,
+  normalizeVrtDiffRegionPixels,
+} from "./diff-regions.ts";
+export { classifyRegion } from "./region-classify.ts";
+export { findShiftOrigins } from "./shift-origin.ts";
 
-export * from "./dom-equivalence.ts";
-export * from "./dom-position-styles.ts";
-export * from "./computed-style-diff.ts";
-export * from "./computed-style-capture.ts";
+// ---- Layout / typography ----
+export {
+  extractTextRowsFromFile,
+  extractTextRowsFromRgba,
+  matchTextRows,
+  compareRowTypography,
+  computeRowGapDeltas,
+} from "./text-rows.ts";
+export { findGridSuggestions } from "./grid-ratio.ts";
 
-export * from "./a11y-semantic.ts";
-export * from "./visual-semantic.ts";
-export * from "./quality.ts";
+// ---- PNG IO ----
+export {
+  cropImage,
+  decodePng,
+  encodePng,
+} from "./png-utils.ts";
+export {
+  resizePngBuffer,
+  resolveResolutionForViewport,
+  getImageDimensions,
+} from "./image-resize.ts";
+
+// ---- DOM diff ----
+export { evaluateDomEquivalence } from "./dom-equivalence.ts";
+export {
+  diffDomPositionStyles,
+  diffPositionStylesAcrossViewports,
+} from "./dom-position-styles.ts";
+export { diffComputedStyles } from "./computed-style-diff.ts";
+
+// ---- A11y diff ----
+export {
+  diffA11yTrees,
+  parsePlaywrightA11ySnapshot,
+  checkA11yTree,
+  INTERACTIVE_ROLES,
+  LANDMARK_ROLES,
+} from "./a11y-semantic.ts";
+
+// ---- Semantic / quality ----
+export { classifyVisualDiff } from "./visual-semantic.ts";
+export { runQualityChecks } from "./quality.ts";
+
+// ---- Public config constants ----
+export { RESOLUTION_PRESETS } from "./image-resize.ts";
+export { TRACKED_PROPERTIES } from "./computed-style-capture.ts";
