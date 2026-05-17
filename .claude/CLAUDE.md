@@ -139,15 +139,15 @@ This repository is a pnpm workspace.
 | `packages/vrt-core/` | Image / CSS / DOM / a11y diff engine + shared types and CLI helpers. No Playwright or AI deps required to import core types. |
 | `packages/vrt-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
 | `packages/vrt-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
-| `packages/vrt-markup/` | VLM-driven markup tooling: component extract / from-image, design tokens, theme parity, i18n stress, palette, dep-graph, selector-heal. |
-| `src/cli/` | CLI entry + router + workflow commands. |
-| `src/api/` | HTTP API server. |
+| `packages/vrt-markup/` | VLM-driven markup tooling: component extract / from-image, design tokens, theme parity, i18n stress, palette, dep-graph, selector-heal, smoke-runner. |
+| `src/cli/` | CLI entry + router + workflow command implementations (split per-command under `cli/workflow/`). |
+| `src/api/` | HTTP API server (deep-imports vrt-markup smoke-runner + experiments/css-challenge). |
 | `src/experiments/` | migration, css-challenge, detection, benchmark, flaker. |
 | `src/demo/` | Demo scripts. |
 | `src/util/` | App-side helpers (agent, goal-runner, skill, perf, integration tests). |
 | `src/vrt/snapshot/`, `src/vrt/compare/` | Baseline / snapshot / flipbook workflow. |
 
-Cross-package imports use `@mizchi/vrt-<pkg>/<path>.ts`. Within a package, use relative imports.
+Cross-package imports use `@mizchi/vrt-<pkg>/<path>.ts` or the curated barrel `@mizchi/vrt-<pkg>`. Within a package, use relative imports. The barrel excludes Playwright-bound and CLI-entry modules — deep-import those.
 
 Run tests for a single package: `pnpm --filter @mizchi/vrt-core test`. From repo root, `pnpm test` runs all.
 
