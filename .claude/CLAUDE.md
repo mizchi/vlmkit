@@ -14,7 +14,7 @@ just vlm-bench --list --max-cost 0.001 --limit 30
 
 2. **Run fix-loop with candidate models** (hard case: seed 11):
 ```bash
-VRT_VLM_MODEL="<model-id>" node --experimental-strip-types src/markup/heal/fix-loop.ts \
+VRT_VLM_MODEL="<model-id>" node --experimental-strip-types src/experiments/css-challenge/fix-loop.ts \
   --fixture page --seed 11 --mode selector --max-rounds 2
 ```
 
@@ -129,6 +129,27 @@ VRT_VLM_MODEL="meta-llama/llama-4-scout" just fix-loop --fixture page --seed 11 
 | `GEMINI_API_KEY` | Google AI API key | — |
 | `ANTHROPIC_API_KEY` | Anthropic API key | — |
 | `DEBUG_VRT` | Enable debug logs | — |
+
+## Package Layout
+
+This repository is a pnpm workspace.
+
+| Path | Contents |
+|------|----------|
+| `packages/vrt-core/` | Image / CSS / DOM / a11y diff engine + shared types and CLI helpers. No Playwright or AI deps required to import core types. |
+| `packages/vrt-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
+| `packages/vrt-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
+| `packages/vrt-markup/` | VLM-driven markup tooling: component extract / from-image, design tokens, theme parity, i18n stress, palette, dep-graph, selector-heal. |
+| `src/cli/` | CLI entry + router + workflow commands. |
+| `src/api/` | HTTP API server. |
+| `src/experiments/` | migration, css-challenge, detection, benchmark, flaker. |
+| `src/demo/` | Demo scripts. |
+| `src/util/` | App-side helpers (agent, goal-runner, skill, perf, integration tests). |
+| `src/vrt/snapshot/`, `src/vrt/compare/` | Baseline / snapshot / flipbook workflow. |
+
+Cross-package imports use `@mizchi/vrt-<pkg>/<path>.ts`. Within a package, use relative imports.
+
+Run tests for a single package: `pnpm --filter @mizchi/vrt-core test`. From repo root, `pnpm test` runs all.
 
 ## Documentation Structure
 

@@ -182,7 +182,7 @@ selectors that make up the bulk of the migration.
 
 ## Subagent C — addendum (same day, after shipping `--dom-position-diff`)
 
-After A's eval, I shipped `src/vrt/core/dom-position-styles.ts` plus the
+After A's eval, I shipped `packages/vrt-core/src/dom-position-styles.ts` plus the
 `migration-compare --dom-position-diff` flag — the wish-list #1 item
 that closes the "class-rename blind spot" both subagents flagged.
 The new "Verified deltas by DOM position (class-rename-aware)"

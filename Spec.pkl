@@ -192,7 +192,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     implementedBy = "code"
-    implementedAt = "src/markup/component/component-from-image.ts"
+    implementedAt = "packages/vrt-markup/src/component/component-from-image.ts"
     description = "`vrt component-from-image` accepts a PNG target and renders the agent's HTML for pixel-diff iteration. Same engine drives A1-A4."
   }
   new {
@@ -202,7 +202,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     implementedBy = "code"
-    implementedAt = "src/markup/component/component-from-image.ts"
+    implementedAt = "packages/vrt-markup/src/component/component-from-image.ts"
     description = "Same engine as A1; `--device-scale-factor 2` handles retina Figma exports."
   }
   new {
@@ -220,7 +220,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     implementedBy = "code"
-    implementedAt = "src/markup/component/component-from-image.ts"
+    implementedAt = "packages/vrt-markup/src/component/component-from-image.ts"
     description = "Same engine as A1; treats any PNG as a reference target regardless of provenance."
   }
   new {
@@ -460,7 +460,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-A11Y-COMPLIANCE" }
     implementedBy = "code"
-    implementedAt = "src/markup/inspect/interact.ts"
+    implementedAt = "packages/vrt-markup/src/inspect/interact.ts"
     description = "`interact press` action drives keyboard sequences; `a11y-focus-order` verifies the resulting traversal."
   }
   new {
@@ -478,7 +478,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-A11Y-COMPLIANCE" }
     implementedBy = "code"
-    implementedAt = "src/markup/stress/media-variants.ts"
+    implementedAt = "packages/vrt-markup/src/stress/media-variants.ts"
     description = "`media-variants --variants zoom-200` flags scrollWidth regressions at 2× zoom."
   }
   new {
@@ -488,7 +488,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-A11Y-COMPLIANCE" }
     implementedBy = "code"
-    implementedAt = "src/markup/stress/media-variants.ts"
+    implementedAt = "packages/vrt-markup/src/stress/media-variants.ts"
     description = "`media-variants --variants reduced-motion` does the static-stylesheet sweep."
   }
   new {
@@ -518,7 +518,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-DESIGN-SYSTEM" }
     implementedBy = "code"
-    implementedAt = "src/markup/style/design-tokens.ts"
+    implementedAt = "packages/vrt-markup/src/style/design-tokens.ts"
     description = "`vrt design-tokens --spacing-scale` flags margin and padding values that fall outside the declared scale, e.g. a stray 5px on a 4px grid."
   }
   new {
@@ -771,7 +771,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-DESIGN-SYSTEM" }
     implementedBy = "code"
-    implementedAt = "src/markup/stress/multi-page-consistency.ts"
+    implementedAt = "packages/vrt-markup/src/stress/multi-page-consistency.ts"
     description = "`vrt multi-page-consistency` diffs the same component selector across N pages and surfaces the outlier."
   }
   new {
@@ -815,7 +815,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     implementedBy = "code"
-    implementedAt = "src/markup/component/component-extract.ts"
+    implementedAt = "packages/vrt-markup/src/component/component-extract.ts"
     description = "`vrt component-extract` crops the bug region from the user-supplied screenshot; `vrt component-from-image` drives the rebuild loop."
   }
   new {
@@ -835,7 +835,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
     implementedBy = "code"
-    implementedAt = "src/markup/stress/i18n-stress.ts"
+    implementedAt = "packages/vrt-markup/src/stress/i18n-stress.ts"
     description = "`vrt i18n-stress` flags overflow / wrap regressions; `compare` plus heatmap catches generic clipping."
   }
   new {
@@ -957,7 +957,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
     implementedBy = "code"
-    implementedAt = "src/markup/component/component-from-image.ts"
+    implementedAt = "packages/vrt-markup/src/component/component-from-image.ts"
     description = "`vrt component-from-image --device-scale-factor 2` renders at 2× for retina parity."
   }
   new {
@@ -977,7 +977,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     implementedBy = "code"
-    implementedAt = "src/markup/component/component-from-image.ts"
+    implementedAt = "packages/vrt-markup/src/component/component-from-image.ts"
     description = "`component-from-image --states hover` plus `interact` cover hover-state diffs."
   }
   new {
@@ -987,7 +987,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-A11Y-COMPLIANCE" }
     implementedBy = "code"
-    implementedAt = "src/markup/component/component-from-image.ts"
+    implementedAt = "packages/vrt-markup/src/component/component-from-image.ts"
     description = "`component-from-image --states focus-visible` plus `a11y-focus-order` verify focus visibility."
   }
   new {
@@ -1035,7 +1035,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     implementedBy = "code"
-    implementedAt = "src/markup/inspect/interact.ts"
+    implementedAt = "packages/vrt-markup/src/inspect/interact.ts"
     description = "Trigger the toggle via `interact` or `explore`; both engines diff the open vs closed state."
   }
   new {
@@ -1045,7 +1045,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     implementedBy = "code"
-    implementedAt = "src/markup/inspect/interact.ts"
+    implementedAt = "packages/vrt-markup/src/inspect/interact.ts"
     description = "`interact` drives the open click + backdrop + close sequence."
   }
   new {
@@ -1065,7 +1065,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     implementedBy = "code"
-    implementedAt = "src/markup/inspect/interact.ts"
+    implementedAt = "packages/vrt-markup/src/inspect/interact.ts"
     description = "`interact` drives the toggle and snapshots both states."
   }
   new {
@@ -1093,7 +1093,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     implementedBy = "code"
-    implementedAt = "src/markup/inspect/interact.ts"
+    implementedAt = "packages/vrt-markup/src/inspect/interact.ts"
     description = "`interact` drives the tab-click sequence and pixel-diffs each panel state."
   }
 
@@ -1261,7 +1261,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-CORE-DIFF" }
     implementedBy = "code"
-    implementedAt = "src/vrt/core/element-compare.ts"
+    implementedAt = "packages/vrt-core/src/element-compare.ts"
     description = #"""
       `vrt elements` diffs per-element bounding boxes after isolating
       cascading layout shift; useful when a single element moves and
@@ -1291,7 +1291,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-SNAPSHOT-WORKFLOW" }
     implementedBy = "code"
-    implementedAt = "src/vrt/snapshot/snapshot.ts"
+    implementedAt = "src/cli/commands/snapshot.ts"
     description = #"""
       `vrt snapshot <url1> [url2]` captures every URL across the
       configured viewport set on first run; subsequent runs diff
@@ -1307,7 +1307,7 @@ scenarios {
     contributes { "GOAL-SNAPSHOT-WORKFLOW" }
     dependsOn { "SNAP-001" }
     implementedBy = "code"
-    implementedAt = "src/vrt/snapshot/approve.ts"
+    implementedAt = "src/cli/workflow/approve.ts"
     description = #"""
       `vrt snapshot approve` renames every `*-current.png` to
       `*-baseline.png`. Used after an intentional UI change is
@@ -1321,7 +1321,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-SNAPSHOT-WORKFLOW"; "GOAL-AGENT-ERGONOMICS" }
     implementedBy = "code"
-    implementedAt = "src/markup/heal/fix-prompt.ts"
+    implementedAt = "packages/vrt-markup/src/heal/fix-prompt.ts"
     description = #"""
       Reads `snapshot-report.json` and renders a worst-first task
       list suitable for piping into a subagent / inline LLM. Honors
@@ -1473,7 +1473,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-AI-FIX-LOOP" }
     implementedBy = "code"
-    implementedAt = "src/ai/reasoning-pipeline.ts"
+    implementedAt = "packages/vrt-ai/src/reasoning-pipeline.ts"
     description = #"""
       Stage 1 of the 2-stage pipeline: a vision-language model is
       shown the diff image and returns a structured list of
@@ -1489,7 +1489,7 @@ scenarios {
     contributes { "GOAL-AI-FIX-LOOP" }
     dependsOn { "AIFIX-001"; "CORE-001" }
     implementedBy = "code"
-    implementedAt = "src/markup/heal/fix-loop.ts"
+    implementedAt = "src/experiments/css-challenge/fix-loop.ts"
     description = #"""
       Stage 2: the structured diff is fed to an LLM that returns a
       CSS patch; the patch is applied and re-verified against the
@@ -1503,7 +1503,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-AI-FIX-LOOP" }
     implementedBy = "code"
-    implementedAt = "src/ai/vlm-bench.ts"
+    implementedAt = "src/experiments/benchmark/vlm-bench.ts"
     description = #"""
       `vrt vlm-bench` queries OpenRouter for candidate VLMs and
       runs each against the fix-loop hard case (seed 11). Outputs

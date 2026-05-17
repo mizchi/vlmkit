@@ -742,13 +742,13 @@
 ## Spec implementation index
 
 - **A1** — Build component from PNG screenshot
-  - code: `src/markup/component/component-from-image.ts`
+  - code: `packages/vrt-markup/src/component/component-from-image.ts`
 - **A2** — Build component from Figma export
-  - code: `src/markup/component/component-from-image.ts`
+  - code: `packages/vrt-markup/src/component/component-from-image.ts`
 - **A3** — Build component from hand-drawn wireframe
   - _No active implementation._
 - **A4** — Build component from competitor visual reference
-  - code: `src/markup/component/component-from-image.ts`
+  - code: `packages/vrt-markup/src/component/component-from-image.ts`
 - **A5** — Build full page from design-spec document
   - _No active implementation._
 - **A6** — Build from natural-language description ⊘ deprecated
@@ -758,11 +758,11 @@
 - **A8** — Extract a single component from a page screenshot
   - _No active implementation._
 - **AIFIX-001** — VLM-extracted structured diff from before/after PNG
-  - code: `src/ai/reasoning-pipeline.ts`
+  - code: `packages/vrt-ai/src/reasoning-pipeline.ts`
 - **AIFIX-002** — LLM-synthesised CSS patch from structured diff
-  - code: `src/markup/heal/fix-loop.ts`
+  - code: `src/experiments/css-challenge/fix-loop.ts`
 - **AIFIX-003** — VLM benchmarking: cost / latency / CHANGE count per model
-  - code: `src/ai/vlm-bench.ts`
+  - code: `src/experiments/benchmark/vlm-bench.ts`
 - **API-001** — HTTP API server exposes compare / reason / smoke endpoints
   - code: `src/api/api-server.ts`
 - **API-002** — TypeScript client mirrors the HTTP surface
@@ -812,7 +812,7 @@
 - **CORE-003** — A11y tree diff between two renders
   - code: `src/experiments/migration/migration-compare.ts`
 - **CORE-004** — Element-level shift-isolated diff
-  - code: `src/vrt/core/element-compare.ts`
+  - code: `packages/vrt-core/src/element-compare.ts`
 - **CORE-005** — Paint tree diff via Crater BiDi backend
   - code: `src/experiments/migration/migration-paint-tree.ts`
 - **D1** — Mobile tablet desktop breakpoint sweep
@@ -822,21 +822,21 @@
 - **D3** — Foldable or dual-screen rendering ⊘ deprecated
   - _No active implementation._
 - **D4** — Retina 2x DPI rendering
-  - code: `src/markup/component/component-from-image.ts`
+  - code: `packages/vrt-markup/src/component/component-from-image.ts`
 - **D5** — Touchscreen-on-desktop affordances
   - _No active implementation._
 - **E1** — Hover state diff
-  - code: `src/markup/component/component-from-image.ts`
+  - code: `packages/vrt-markup/src/component/component-from-image.ts`
 - **E10** — Accordion expand or collapse
-  - code: `src/markup/inspect/interact.ts`
+  - code: `packages/vrt-markup/src/inspect/interact.ts`
 - **E11** — Tooltip on hover with delay
   - _No active implementation._
 - **E12** — Toast notification fade in or out ⊘ deprecated
   - _No active implementation._
 - **E13** — Tab switch
-  - code: `src/markup/inspect/interact.ts`
+  - code: `packages/vrt-markup/src/inspect/interact.ts`
 - **E2** — Focus and focus-visible state
-  - code: `src/markup/component/component-from-image.ts`
+  - code: `packages/vrt-markup/src/component/component-from-image.ts`
 - **E3** — Disabled state
   - _No active implementation._
 - **E4** — Loading state
@@ -846,9 +846,9 @@
 - **E6** — Empty state
   - _No active implementation._
 - **E7** — Dropdown or menu open
-  - code: `src/markup/inspect/interact.ts`
+  - code: `packages/vrt-markup/src/inspect/interact.ts`
 - **E8** — Modal or dialog open
-  - code: `src/markup/inspect/interact.ts`
+  - code: `packages/vrt-markup/src/inspect/interact.ts`
 - **E9** — Carousel or slider transitions ⊘ deprecated
   - _No active implementation._
 - **F1** — WCAG AA text contrast scan
@@ -864,13 +864,13 @@
 - **F5** — Screen-reader-only content ⊘ deprecated
   - _No active implementation._
 - **F6** — Keyboard navigation Tab Esc Enter
-  - code: `src/markup/inspect/interact.ts`
+  - code: `packages/vrt-markup/src/inspect/interact.ts`
 - **F7** — Color blindness simulation
   - _No active implementation._
 - **F8** — 200 percent browser zoom usability
-  - code: `src/markup/stress/media-variants.ts`
+  - code: `packages/vrt-markup/src/stress/media-variants.ts`
 - **F9** — Reduced motion compliance
-  - code: `src/markup/stress/media-variants.ts`
+  - code: `packages/vrt-markup/src/stress/media-variants.ts`
 - **FIDELITY-001** — Build a card from a blank starter until diff under 3 percent
   - _No active implementation._
 - **G1** — Cumulative Layout Shift measurement
@@ -904,7 +904,7 @@
 - **I6** — Pluralization 1 item vs N items
   - _No active implementation._
 - **J1** — Cross-page component drift
-  - code: `src/markup/stress/multi-page-consistency.ts`
+  - code: `packages/vrt-markup/src/stress/multi-page-consistency.ts`
 - **J2** — Inline-vs-component drift on a single page
   - _No active implementation._
 - **J3** — Variant rendering across props
@@ -914,11 +914,11 @@
 - **J5** — Slot composition
   - _No active implementation._
 - **K1** — Reproduce user bug from screenshot
-  - code: `src/markup/component/component-extract.ts`
+  - code: `packages/vrt-markup/src/component/component-extract.ts`
 - **K2** — Off-by-one-pixel hunt
   - code: `src/compare.ts`
 - **K3** — Overflow or clipping detection
-  - code: `src/markup/stress/i18n-stress.ts`
+  - code: `packages/vrt-markup/src/stress/i18n-stress.ts`
 - **K4** — Z-index stacking issues
   - _No active implementation._
 - **K5** — CLS detection via in-page PerformanceObserver
@@ -940,7 +940,7 @@
 - **M1** — Color tokens conform to declared palette
   - _No active implementation._
 - **M2** — Spacing scale conformance
-  - code: `src/markup/style/design-tokens.ts`
+  - code: `packages/vrt-markup/src/style/design-tokens.ts`
 - **M3** — Typography scale compliance
   - code: `src/typography-hints.ts`
 - **M4-M6** — Radius / spacing / z-index / shadow-tier conformance
@@ -990,11 +990,11 @@
 - **SMOKE** — Mechanical smoke covers every markup-assistance CLI
   - _No active implementation._
 - **SNAP-001** — Multi-viewport snapshot baseline capture
-  - code: `src/vrt/snapshot/snapshot.ts`
+  - code: `src/cli/commands/snapshot.ts`
 - **SNAP-002** — Snapshot approve workflow promotes current to baseline
-  - code: `src/vrt/snapshot/approve.ts`
+  - code: `src/cli/workflow/approve.ts`
 - **SNAP-003** — Snapshot fix-prompt generates subagent-ready Markdown
-  - code: `src/markup/heal/fix-prompt.ts`
+  - code: `packages/vrt-markup/src/heal/fix-prompt.ts`
 - **SNAP-004** — Snapshot stability measures false-positive rate
   - code: `src/vrt/snapshot/stability.ts`
 - **WORKFLOW-001** — Workflow init / capture / verify / approve loop

@@ -235,7 +235,7 @@ verified-pair gate) gave zero signal on this scenario.
 
 The wireframe mode needs visual-only diagnostics:
 
-- [x] **Component bbox extraction.** `src/markup/component/component-bbox.ts` runs
+- [x] **Component bbox extraction.** `packages/vrt-markup/src/component/component-bbox.ts` runs
   on the captured PNGs (no DOM required): detect background via
   edge-pixel mode, build foreground mask, label connected
   components (two-pass union-find, 4-connectivity), filter
@@ -251,7 +251,7 @@ The wireframe mode needs visual-only diagnostics:
 - [x] **Per-viewport geometry diff** without DOM access — "baseline
   card shrinks 18px between desktop and mobile but variant
   doesn't" inferred purely from screenshot dimensions.
-  `src/markup/component/component-geometry.ts` composes on top of `MatchedBbox[]`
+  `packages/vrt-markup/src/component/component-geometry.ts` composes on top of `MatchedBbox[]`
   and flags `responsiveMismatch` when one side's per-axis spread
   exceeds the other's by ≥30px. Rendered as "Cross-viewport
   geometry profile" in `vrt diff-for-agent`. 5 unit tests +
@@ -261,7 +261,7 @@ The wireframe mode needs visual-only diagnostics:
   in `*_heatmap.png` into named regions and report per-region
   shift instead of horizontal bands. Bands of bands lose
   resolution; region clusters preserve "this text run shifted up
-  4px" granularity. `src/vrt/core/heatmap-regions.ts` reuses the
+  4px" granularity. `packages/vrt-core/src/heatmap-regions.ts` reuses the
   union-find CC labeller from `component-bbox.ts` against a
   hot-red mask (red − max(g,b) ≥ 60). 5 unit tests + verified on
   shadcn→blank (24 region clusters) and wireframe pricing-card
@@ -270,7 +270,7 @@ The wireframe mode needs visual-only diagnostics:
 - [x] **Text-row y-position extraction** from rendered PNGs via
   luminance-profile peak detection — exposes "the `$24` text row
   is 4px higher in the variant" without needing DOM correspondence.
-  `src/util/text-rows.ts` computes per-row mean luminance, treats rows
+  `packages/vrt-core/src/text-rows.ts` computes per-row mean luminance, treats rows
   ≥12 below the median as dark, and groups runs into bands.
   `matchTextRows` pairs by ordered index and emits Δy. Surfaces
   "Bands B / V" count mismatches even when no rows can be paired
@@ -328,9 +328,9 @@ Beyond the migration / wireframe scenarios, the tool can serve
 adjacent markup-authoring workflows. Each scenario is built and
 evaluated incrementally.
 
-- [x] **Design token / palette compliance.** `src/markup/style/palette-extract.ts`
+- [x] **Design token / palette compliance.** `packages/vrt-markup/src/style/palette-extract.ts`
   stride-samples the rendered PNG into a 5-bit-per-channel histogram
-  and returns the top-K dominant colors. `src/markup/style/palette-diff.ts`
+  and returns the top-K dominant colors. `packages/vrt-markup/src/style/palette-diff.ts`
   greedy-matches baseline vs variant by RGB-Euclidean distance
   (≤12 → match) and surfaces *missing* (in baseline target but
   not the variant — agent forgot a token) and *extra* (in variant
@@ -341,7 +341,7 @@ evaluated incrementally.
   color, surfaced as a single hex the agent can paste).
 - [x] **Multi-state capture** — capture `:hover` / `:focus` /
   `:focus-visible` / `:active` via CDP `CSS.forcePseudoState`,
-  diff per state. `src/markup/stress/multi-state.ts` marks all interactive
+  diff per state. `packages/vrt-markup/src/stress/multi-state.ts` marks all interactive
   elements (`button`, `a[href]`, `[role=button]`, form controls)
   with a `data-vrt-state-marker` attribute, opens a CDP session,
   and calls `forcePseudoState` for each matched node. Pixelmatch
@@ -356,7 +356,7 @@ evaluated incrementally.
   hover +0.37%/+0.42%/0.00%, focus-visible +0.26%/+0.29%/+1.11%.
 - [x] **Component-from-screenshot** — single-component subset of
   wireframe mode: small viewport, one bbox, multi-state. New CLI
-  subcommand. `src/markup/component/component-from-image.ts` takes a target PNG +
+  subcommand. `packages/vrt-markup/src/component/component-from-image.ts` takes a target PNG +
   current HTML, renders the HTML at the PNG's exact dimensions,
   pixel-diffs, and runs every image-only signal (bbox, heatmap,
   text-row, palette) plus an optional `--states` pass. Emits a
@@ -580,7 +580,7 @@ md`): forced-colors, reduced-motion, print, RTL, 200%-zoom.
 Three of the ROI-ranked items from `docs/reports/2026-05-13-
 capability-survey.md`, shipped together.
 
-- [x] **B. Region content-type classifier.** `src/vrt/core/region-classify.ts`:
+- [x] **B. Region content-type classifier.** `packages/vrt-core/src/region-classify.ts`:
   `classifyRegion(rgba, w, h, bbox)` returns one of `text` /
   `filled-rect` / `icon` / `image` / `unknown` with a confidence
   score. Features: quantized color count, luma std dev, horizontal
@@ -797,7 +797,7 @@ Three concerns left open after the re-dogfood, all addressed:
 
 - [x] **Multi-page consistency** — same component on N pages must
   render identically. Cross-page bbox / computed-style diff.
-  `src/markup/stress/multi-page-consistency.ts` renders N URLs (or HTML files)
+  `packages/vrt-markup/src/stress/multi-page-consistency.ts` renders N URLs (or HTML files)
   in Playwright, screenshots each `--selector` match via
   `locator.screenshot()` (auto-crops to the element's bbox), and
   compares all candidates against the first one (the reference).
@@ -818,7 +818,7 @@ fixture series. The remaining 4-viewport floor at 2.67–3.52%
 comes from a single unexplained +152px / +239px universal shift
 band at viewports ≥ 1024.
 
-- [x] **Vertical-shift origin diagnostic.** `src/vrt/core/shift-origin.ts`
+- [x] **Vertical-shift origin diagnostic.** `packages/vrt-core/src/shift-origin.ts`
   captures per-element bounding boxes via a new
   `DOM_BBOX_BROWSER_SCRIPT`, then matches by DOM path against the
   per-band shifts already produced by `detectBandShifts`.
@@ -842,7 +842,7 @@ band at viewports ≥ 1024.
   baseline; replaced with `_N unverified candidate(s) hidden_`
   note so the agent knows what was suppressed. Dogfood Pass B
   iter 1: table shrunk from 5 rows (2 ✓ + 3 ✗) to just 2 ✓.
-- [x] **Grid `fr`-ratio inference.** `src/util/grid-ratio.ts` walks per-
+- [x] **Grid `fr`-ratio inference.** `packages/vrt-core/src/grid-ratio.ts` walks per-
   viewport bboxes, finds containers whose direct children have a
   non-uniform width distribution differing between baseline and
   variant, then suggests both a decimal ratio and a low-integer
@@ -880,7 +880,7 @@ band at viewports ≥ 1024.
   by N.
 
 - [x] **DOM-position-based selector alignment** in a new
-  `src/vrt/core/dom-position-styles.ts`. `migration-compare --dom-position-diff`
+  `packages/vrt-core/src/dom-position-styles.ts`. `migration-compare --dom-position-diff`
   captures per-element `(path, tag, classes, styles)` for every
   element with a `class` attribute or semantic tag, then matches
   baseline ↔ variant by tree position (`main[0]>section[0]>span[0]`),

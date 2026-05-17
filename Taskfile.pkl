@@ -24,7 +24,7 @@ local vrtTest = new Task {
 local bench = new Task {
   name = "bench"
   cmd = "node src/experiments/benchmark/benchmark.ts"
-  inputs { "src/experiments/benchmark/benchmark.ts"; "src/vrt/core/heatmap.ts"; "src/pixelmatch*.ts" }
+  inputs { "src/experiments/benchmark/benchmark.ts"; "packages/vrt-core/src/heatmap.ts"; "src/pixelmatch*.ts" }
 }
 
 // ---- Demos ----
@@ -147,14 +147,14 @@ local flakerVrtAdapt = new Task {
 
 local fixLoop = new Task {
   name = "fix-loop"
-  cmd = "node src/markup/heal/fix-loop.ts"
-  inputs { "src/markup/heal/fix-loop.ts"; "src/ai/vlm-client.ts"; "src/ai/llm-client.ts" }
+  cmd = "node src/experiments/css-challenge/fix-loop.ts"
+  inputs { "src/experiments/css-challenge/fix-loop.ts"; "packages/vrt-ai/src/vlm-client.ts"; "packages/vrt-ai/src/llm-client.ts" }
 }
 
 local vlmBench = new Task {
   name = "vlm-bench"
-  cmd = "node src/ai/vlm-bench.ts"
-  inputs { "src/ai/vlm-bench.ts" }
+  cmd = "node src/experiments/benchmark/vlm-bench.ts"
+  inputs { "src/experiments/benchmark/vlm-bench.ts" }
 }
 
 // ---- API / smoke / snapshot ----
@@ -167,14 +167,14 @@ local apiServer = new Task {
 
 local smokeTest = new Task {
   name = "smoke-test"
-  cmd = "node src/markup/inspect/smoke-runner.ts"
-  inputs { "src/markup/inspect/smoke-runner.ts" }
+  cmd = "node src/cli/commands/smoke-runner.ts"
+  inputs { "src/cli/commands/smoke-runner.ts" }
 }
 
 local snapshot = new Task {
   name = "snapshot"
-  cmd = "node src/vrt/snapshot/snapshot.ts"
-  inputs { "src/vrt/snapshot/snapshot.ts"; "src/snapshot-*.ts" }
+  cmd = "node src/cli/commands/snapshot.ts"
+  inputs { "src/cli/commands/snapshot.ts"; "src/snapshot-*.ts" }
 }
 
 // ---- Dogfood ----
@@ -182,7 +182,7 @@ local snapshot = new Task {
 local dogfoodLuna = new Task {
   name = "dogfood-luna"
   cmd = #"""
-    node src/vrt/snapshot/snapshot.ts \
+    node src/cli/commands/snapshot.ts \
       http://localhost:4200/src/examples/todomvc/ \
       http://localhost:4200/src/examples/spa/ \
       http://localhost:4200/src/examples/wc/ \
@@ -196,7 +196,7 @@ local dogfoodLuna = new Task {
 local dogfoodSol = new Task {
   name = "dogfood-sol"
   cmd = #"""
-    node src/vrt/snapshot/snapshot.ts \
+    node src/cli/commands/snapshot.ts \
       http://localhost:3000/ \
       http://localhost:3000/luna/ \
       http://localhost:3000/luna/tutorial-js/islands/ \
