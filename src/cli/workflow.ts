@@ -29,7 +29,7 @@ import { buildDepGraph, findAffectedComponents, graphStats } from "../markup/ins
 import { extractDiffSemantics } from "../ai/intent.ts";
 import { diffA11yTrees, parsePlaywrightA11ySnapshot } from "../a11y/a11y-semantic.ts";
 import { introspect, introspectToSpec, verifySpec } from "../markup/inspect/introspect.ts";
-import { formatWorkflowUsage } from "./vrt-command-router.ts";
+import { formatWorkflowUsage } from "./router.ts";
 import { runVerifyPipeline, type VerifyPaths } from "./workflow/verify.ts";
 import { resolveCaptureRoutes } from "../vrt/capture/capture-config.ts";
 import type { UnifiedAgentContext, UiSpec, A11yNode } from "../util/types.ts";

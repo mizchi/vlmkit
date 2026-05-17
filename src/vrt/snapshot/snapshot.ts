@@ -12,19 +12,19 @@ import { dirname, join, resolve } from "node:path";
 import { compareScreenshots, generateDiffReport } from "../core/heatmap.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "../../util/terminal-colors.ts";
 import { applyMask } from "../core/mask.ts";
-import { approveSnapshotsFromReport } from "./snapshot-approve.ts";
-import { determineSnapshotExitCode, parseSnapshotCliArgs, parseSnapshotConfig, type SnapshotConfig } from "../../cli/commands/snapshot-cli.ts";
+import { approveSnapshotsFromReport } from "./approve.ts";
+import { determineSnapshotExitCode, parseSnapshotCliArgs, parseSnapshotConfig, type SnapshotConfig } from "../../cli/commands/snapshot.ts";
 import {
   extractSnapshotFixTasks,
   formatSnapshotFixPromptJson,
   formatSnapshotFixPromptMarkdown,
   type SnapshotReport,
-} from "../../markup/heal/snapshot-fix-prompt.ts";
+} from "../../markup/heal/fix-prompt.ts";
 import {
   buildStabilityReport,
   formatStabilitySummary,
   type StabilityIterationResult,
-} from "./snapshot-stability.ts";
+} from "./stability.ts";
 import { resolveCaptureBackend, type CaptureBackend } from "../capture/capturer.ts";
 import { writeFlipbook, type FlipbookFrame } from "../compare/flipbook.ts";
 import type { VrtSnapshot } from "../../util/types.ts";

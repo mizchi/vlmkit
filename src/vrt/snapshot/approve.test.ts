@@ -3,7 +3,7 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, it } from "node:test";
-import { approveSnapshotsFromReport } from "./snapshot-approve.ts";
+import { approveSnapshotsFromReport } from "./approve.ts";
 
 describe("approveSnapshotsFromReport", () => {
   it("promotes all current screenshots to baseline paths from the report", async () => {

@@ -1307,7 +1307,7 @@ scenarios {
     contributes { "GOAL-SNAPSHOT-WORKFLOW" }
     dependsOn { "SNAP-001" }
     implementedBy = "code"
-    implementedAt = "src/vrt/snapshot/snapshot-approve.ts"
+    implementedAt = "src/vrt/snapshot/approve.ts"
     description = #"""
       `vrt snapshot approve` renames every `*-current.png` to
       `*-baseline.png`. Used after an intentional UI change is
@@ -1321,7 +1321,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-SNAPSHOT-WORKFLOW"; "GOAL-AGENT-ERGONOMICS" }
     implementedBy = "code"
-    implementedAt = "src/markup/heal/snapshot-fix-prompt.ts"
+    implementedAt = "src/markup/heal/fix-prompt.ts"
     description = #"""
       Reads `snapshot-report.json` and renders a worst-first task
       list suitable for piping into a subagent / inline LLM. Honors
@@ -1335,7 +1335,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-SNAPSHOT-WORKFLOW" }
     implementedBy = "code"
-    implementedAt = "src/vrt/snapshot/snapshot-stability.ts"
+    implementedAt = "src/vrt/snapshot/stability.ts"
     description = #"""
       `vrt snapshot stability` re-runs the same snapshot N times
       against a single URL and reports the per-frame diff. Drives
@@ -1350,7 +1350,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-SNAPSHOT-WORKFLOW" }
     implementedBy = "code"
-    implementedAt = "src/cli/vrt-command-router.ts:WORKFLOW_ALIAS_COMMANDS"
+    implementedAt = "src/cli/router.ts:WORKFLOW_ALIAS_COMMANDS"
     description = #"""
       Stateful component-graph driven workflow: init writes
       baselines, capture takes current, verify diffs, approve
@@ -1534,9 +1534,9 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-API" }
     implementedBy = "code"
-    implementedAt = "src/api/vrt-client.ts"
+    implementedAt = "src/api/client.ts"
     description = #"""
-      `VrtClient` in `src/api/vrt-client.ts` is the typed in-process
+      `VrtClient` in `src/api/client.ts` is the typed in-process
       client; one method per HTTP endpoint with shared input/output
       types from `src/api/api-types.ts`.
     """#

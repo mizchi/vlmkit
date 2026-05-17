@@ -5,7 +5,7 @@ import {
   buildStabilityReport,
   formatStabilitySummary,
   type StabilityIterationResult,
-} from "./snapshot-stability.ts";
+} from "./stability.ts";
 
 function r(
   iteration: number,

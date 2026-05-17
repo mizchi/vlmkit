@@ -5,7 +5,7 @@
  * Works in Node.js / Deno / browsers.
  *
  * Usage:
- *   import { VrtClient } from "./vrt-client.ts";
+ *   import { VrtClient } from "./client.ts";
  *   const client = new VrtClient("http://localhost:3456");
  *   const result = await client.compare({ baseline: { html: "..." }, current: { html: "..." } });
  */

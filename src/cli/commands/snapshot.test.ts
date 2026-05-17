@@ -6,7 +6,7 @@ import {
   determineSnapshotExitCode,
   resolveSnapshotLabels,
   urlToSnapshotLabel,
-} from "./snapshot-cli.ts";
+} from "./snapshot.ts";
 
 describe("urlToSnapshotLabel", () => {
   it("includes canonicalized query params in the default label", () => {

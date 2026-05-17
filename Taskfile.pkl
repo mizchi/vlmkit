@@ -252,7 +252,7 @@ local smokeAll = new Task {
 local vrtHelp = new Task {
   name = "vrt-help"
   cmd = "node --experimental-strip-types src/cli/vrt.ts help"
-  inputs { "src/cli/vrt.ts"; "src/cli/vrt-command-router.ts" }
+  inputs { "src/cli/vrt.ts"; "src/cli/router.ts" }
 }
 
 // ---- Spec gates (pkspec) ----

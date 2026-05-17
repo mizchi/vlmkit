@@ -2,7 +2,7 @@
 /**
  * vrt -- unified CLI entry point
  */
-import { resolveRootCommand } from "./vrt-command-router.ts";
+import { resolveRootCommand } from "./router.ts";
 
 const MODULE_LOADERS = {
   "../api/api-server.ts": () => import("../api/api-server.ts"),
@@ -48,7 +48,7 @@ async function main() {
       await runStatus(route.argv);
       return;
     case "workflow": {
-      const { runWorkflowCli } = await import("./vrt-cli.ts");
+      const { runWorkflowCli } = await import("./workflow.ts");
       await runWorkflowCli(route.argv);
       return;
     }

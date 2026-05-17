@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { formatRootUsage, resolveRootCommand } from "./vrt-command-router.ts";
+import { formatRootUsage, resolveRootCommand } from "./router.ts";
 
 describe("resolveRootCommand", () => {
   it("routes workflow commands under an explicit namespace", () => {

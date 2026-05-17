@@ -8,7 +8,7 @@ import {
   formatSnapshotFixPromptJson,
   formatSnapshotFixPromptMarkdown,
   type SnapshotReport,
-} from "./snapshot-fix-prompt.ts";
+} from "./fix-prompt.ts";
 
 function sampleReport(outputDir: string): SnapshotReport {
   return {

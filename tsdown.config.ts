@@ -12,7 +12,7 @@ export default defineConfig([
   },
   {
     entry: {
-      client: "src/api/vrt-client.ts",
+      client: "src/api/client.ts",
     },
     format: ["esm"],
     platform: "node",

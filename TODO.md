@@ -56,7 +56,7 @@ Runs on Cloudflare Workers with Crater. WebUI is in a separate repo.
 - [x] API type definitions (src/api/api-types.ts) — Compare, Smoke, Report, Status
 - [x] Hono API server (/api/compare, /api/compare-renderers, /api/smoke-test, /api/status)
 - [x] /api/compare computed style diff integration
-- [x] VrtClient SDK (src/api/vrt-client.ts)
+- [x] VrtClient SDK (src/api/client.ts)
 - [x] Unified CLI (src/cli/vrt.ts) — compare, bench, report, discover, smoke, serve, status
 - [x] GitHub Actions CI workflow (vrt-compare.yml)
 
@@ -727,7 +727,7 @@ Three concerns left open after the re-dogfood, all addressed:
 - [x] **CLI unification.** All six markup-assistance CLIs +
   `diff-for-agent` + `flipbook` + `compare-runs` now registered
   under the unified `vrt` dispatcher
-  (src/cli/vrt-command-router.ts + src/cli/vrt.ts). Fixed a
+  (src/cli/router.ts + src/cli/vrt.ts). Fixed a
   long-standing bug in the dispatcher: `process.argv[1]` was
   being set to a *relative* module path
   (`./migration-compare.ts`) which made each module's

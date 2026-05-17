@@ -659,7 +659,7 @@
   - body: _not yet implemented_
 
 - [ ] **TypeScript client mirrors the HTTP surface** (minor) — verifies: API-002
-  >   `VrtClient` in `src/api/vrt-client.ts` is the typed in-process
+  >   `VrtClient` in `src/api/client.ts` is the typed in-process
   >   client; one method per HTTP endpoint with shared input/output
   >   types from `src/api/api-types.ts`.
   - contributes to: GOAL-API
@@ -766,7 +766,7 @@
 - **API-001** — HTTP API server exposes compare / reason / smoke endpoints
   - code: `src/api/api-server.ts`
 - **API-002** — TypeScript client mirrors the HTTP surface
-  - code: `src/api/vrt-client.ts`
+  - code: `src/api/client.ts`
 - **B1** — Migration: Tailwind to vanilla CSS
   - code: `src/compare.ts`
 - **B10** — Migration: removing browser prefixes
@@ -992,10 +992,10 @@
 - **SNAP-001** — Multi-viewport snapshot baseline capture
   - code: `src/vrt/snapshot/snapshot.ts`
 - **SNAP-002** — Snapshot approve workflow promotes current to baseline
-  - code: `src/vrt/snapshot/snapshot-approve.ts`
+  - code: `src/vrt/snapshot/approve.ts`
 - **SNAP-003** — Snapshot fix-prompt generates subagent-ready Markdown
-  - code: `src/markup/heal/snapshot-fix-prompt.ts`
+  - code: `src/markup/heal/fix-prompt.ts`
 - **SNAP-004** — Snapshot stability measures false-positive rate
-  - code: `src/vrt/snapshot/snapshot-stability.ts`
+  - code: `src/vrt/snapshot/stability.ts`
 - **WORKFLOW-001** — Workflow init / capture / verify / approve loop
-  - code: `src/cli/vrt-command-router.ts:WORKFLOW_ALIAS_COMMANDS`
+  - code: `src/cli/router.ts:WORKFLOW_ALIAS_COMMANDS`
