@@ -1,8 +1,24 @@
 {
   "name": "@mizchi/vrt-capture",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.4.0",
+  "description": "Playwright + Crater capture infrastructure for VRT — viewport discovery, multi-route capture, prescanner.",
+  "license": "MIT",
+  "author": "mizchi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mizchi/vrt.git",
+    "directory": "packages/vrt-capture"
+  },
+  "homepage": "https://github.com/mizchi/vrt/tree/main/packages/vrt-capture#readme",
+  "bugs": {
+    "url": "https://github.com/mizchi/vrt/issues"
+  },
   "type": "module",
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "test": "node --test 'src/**/*.test.ts'"
   },

@@ -1,8 +1,24 @@
 {
   "name": "@mizchi/vrt-core",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.4.0",
+  "description": "VRT diff engine + shared types — pure image / DOM / a11y / visual comparison primitives.",
+  "license": "MIT",
+  "author": "mizchi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mizchi/vrt.git",
+    "directory": "packages/vrt-core"
+  },
+  "homepage": "https://github.com/mizchi/vrt/tree/main/packages/vrt-core#readme",
+  "bugs": {
+    "url": "https://github.com/mizchi/vrt/issues"
+  },
   "type": "module",
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "test": "node --test 'src/**/*.test.ts'"
   },

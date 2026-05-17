@@ -1,8 +1,24 @@
 {
   "name": "@mizchi/vrt-markup",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.4.0",
+  "description": "VLM-driven markup tooling for VRT: component extract, design-token / theme-parity / i18n-stress / palette checks, dep-graph, selector heal, smoke runner.",
+  "license": "MIT",
+  "author": "mizchi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mizchi/vrt.git",
+    "directory": "packages/vrt-markup"
+  },
+  "homepage": "https://github.com/mizchi/vrt/tree/main/packages/vrt-markup#readme",
+  "bugs": {
+    "url": "https://github.com/mizchi/vrt/issues"
+  },
   "type": "module",
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "test": "node --test 'src/**/*.test.ts'"
   },
