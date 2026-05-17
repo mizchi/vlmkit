@@ -6,14 +6,8 @@
  * `src/api/api-types.ts` re-exports these for HTTP API consumers.
  */
 
-export interface HtmlSource {
-  /** inline HTML */
-  html?: string;
-  /** URL (fetched server-side) */
-  url?: string;
-  /** Label (for reports) */
-  label?: string;
-}
+import type { HtmlSource } from "@mizchi/vrt-core/types.ts";
+export type { HtmlSource };
 
 export interface SmokeTestRequest {
   /** Test target */

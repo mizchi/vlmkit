@@ -450,3 +450,19 @@ export type QualityCheckType =
   | "a11y-coverage"
   | "landmark-missing"
   | "label-missing";
+
+// ---- Capture inputs ----
+
+/**
+ * A targetable HTML source: either an inline HTML string or a URL the
+ * server fetches on the client's behalf. Shared by both the HTTP API
+ * (`api-types`) and the smoke runner (`vrt-markup/inspect`).
+ */
+export interface HtmlSource {
+  /** Inline HTML */
+  html?: string;
+  /** URL (fetched server-side) */
+  url?: string;
+  /** Label (for reports) */
+  label?: string;
+}

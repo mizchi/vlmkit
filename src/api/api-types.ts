@@ -32,14 +32,8 @@ export interface CompareRequest {
   options?: CompareOptions;
 }
 
-export interface HtmlSource {
-  /** inline HTML */
-  html?: string;
-  /** URL (fetched server-side) */
-  url?: string;
-  /** Label (for reports) */
-  label?: string;
-}
+export type { HtmlSource } from "@mizchi/vrt-core/types.ts";
+import type { HtmlSource } from "@mizchi/vrt-core/types.ts";
 
 export interface DiscoverOptions {
   /** Breakpoint discovery backend */
