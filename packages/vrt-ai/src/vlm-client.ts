@@ -67,11 +67,12 @@ export async function fetchVisionModels(): Promise<VlmModel[]> {
   return _cachedModels;
 }
 
-export async function listModels(options?: { maxCost?: number; limit?: number; includeGemini?: boolean }): Promise<VlmModel[]> {
+export async function listModels(options?: { maxCost?: number; limit?: number; includeGemini?: boolean; includeClaude?: boolean }): Promise<VlmModel[]> {
   const openRouterModels = await fetchVisionModels();
-  const models = (options?.includeGemini !== false)
-    ? [...GOOGLE_MODELS, ...openRouterModels]
-    : openRouterModels;
+  const direct: VlmModel[] = [];
+  if (options?.includeGemini !== false) direct.push(...GOOGLE_MODELS);
+  if (options?.includeClaude !== false) direct.push(...CLAUDE_MODELS);
+  const models = [...direct, ...openRouterModels];
   // Sort by cost
   models.sort((a, b) => a.promptCostPer1k - b.promptCostPer1k);
   let filtered = models;
@@ -85,9 +86,12 @@ export async function listModels(options?: { maxCost?: number; limit?: number; i
 }
 
 export async function resolveModel(idOrIndex: string): Promise<VlmModel> {
-  // Check Gemini direct models first
+  // Check direct providers first
   const geminiModel = resolveGeminiModel(idOrIndex);
   if (geminiModel) return geminiModel;
+
+  const claudeModel = resolveClaudeModel(idOrIndex);
+  if (claudeModel) return claudeModel;
 
   const models = await fetchVisionModels();
 
@@ -139,6 +143,117 @@ export function resolveGeminiModel(id: string): VlmModel | undefined {
 
 export function listGeminiModels(): VlmModel[] {
   return [...GOOGLE_MODELS];
+}
+
+// ---- Anthropic (Claude direct) ----
+//
+// Per-token USD prices follow the OpenRouter convention used elsewhere
+// in this file (`promptCostPer1k` is actually "per token"; the runtime
+// cost expression `(tokens/1000) * promptCostPer1k` is consistent
+// within this tool's reporting and comparable across providers).
+//
+// 2026 Anthropic list pricing (input / output per million tokens):
+//   - Haiku 4.5: $1.00 / $5.00
+//   - Sonnet 4.6: $3.00 / $15.00
+//   - Opus 4.7:  $15.00 / $75.00
+
+const CLAUDE_MODELS: VlmModel[] = [
+  { id: "claude:claude-haiku-4-5-20251001", name: "Claude Haiku 4.5 (direct)", promptCostPer1k: 1e-6, completionCostPer1k: 5e-6, contextLength: 200000, modality: "text+image->text" },
+  { id: "claude:claude-sonnet-4-6", name: "Claude Sonnet 4.6 (direct)", promptCostPer1k: 3e-6, completionCostPer1k: 1.5e-5, contextLength: 200000, modality: "text+image->text" },
+  { id: "claude:claude-opus-4-7", name: "Claude Opus 4.7 (direct)", promptCostPer1k: 1.5e-5, completionCostPer1k: 7.5e-5, contextLength: 200000, modality: "text+image->text" },
+];
+
+export function isClaudeDirectModel(id: string): boolean {
+  return id.startsWith("claude:");
+}
+
+export function resolveClaudeModel(id: string): VlmModel | undefined {
+  return CLAUDE_MODELS.find((m) => m.id === id || m.id === `claude:${id}`);
+}
+
+export function listClaudeModels(): VlmModel[] {
+  return [...CLAUDE_MODELS];
+}
+
+async function createClaudeClient(model: VlmModel, apiKey: string): Promise<VlmClient> {
+  const claudeModelId = model.id.replace("claude:", "");
+
+  type ClaudeContentBlock =
+    | { type: "text"; text: string }
+    | { type: "image"; source: { type: "base64"; media_type: "image/png" | "image/jpeg" | "image/webp" | "image/gif"; data: string } };
+
+  async function callClaude(
+    content: ClaudeContentBlock[],
+    maxTokens: number,
+  ): Promise<VlmResponse> {
+    const start = Date.now();
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: claudeModelId,
+        max_tokens: maxTokens,
+        messages: [{ role: "user", content }],
+      }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Anthropic API error: ${res.status} ${text.slice(0, 200)}`);
+    }
+
+    const data = await res.json() as {
+      content: Array<{ type: string; text?: string }>;
+      usage?: { input_tokens: number; output_tokens: number };
+    };
+
+    const latencyMs = Date.now() - start;
+    const textOut = data.content
+      .filter((b) => b.type === "text" && typeof b.text === "string")
+      .map((b) => b.text as string)
+      .join("");
+    const usage = data.usage ?? { input_tokens: 0, output_tokens: 0 };
+    const costUsd = (usage.input_tokens / 1000) * model.promptCostPer1k +
+                    (usage.output_tokens / 1000) * model.completionCostPer1k;
+
+    return {
+      content: textOut,
+      model: model.id,
+      promptTokens: usage.input_tokens,
+      completionTokens: usage.output_tokens,
+      totalTokens: usage.input_tokens + usage.output_tokens,
+      costUsd,
+      latencyMs,
+    };
+  }
+
+  const client: VlmClient = {
+    model,
+    async analyzeImage(imageBase64, prompt, options) {
+      return callClaude([
+        { type: "image", source: { type: "base64", media_type: "image/png", data: imageBase64 } },
+        { type: "text", text: prompt },
+      ], options?.maxTokens ?? 1024);
+    },
+    async analyzeImageFile(imagePath, prompt, options) {
+      const buf = await readFile(imagePath);
+      return client.analyzeImage(buf.toString("base64"), prompt, options);
+    },
+    async analyzeDiff(baselineBase64, currentBase64, prompt, options) {
+      return callClaude([
+        { type: "text", text: "Baseline screenshot:" },
+        { type: "image", source: { type: "base64", media_type: "image/png", data: baselineBase64 } },
+        { type: "text", text: "Current screenshot:" },
+        { type: "image", source: { type: "base64", media_type: "image/png", data: currentBase64 } },
+        { type: "text", text: prompt },
+      ], options?.maxTokens ?? 1024);
+    },
+  };
+  return client;
 }
 
 async function createGeminiClient(model: VlmModel, apiKey: string): Promise<VlmClient> {
@@ -276,6 +391,21 @@ export async function createVlmClient(
       return null;
     }
     return createGeminiClient(model, key);
+  }
+
+  // Anthropic (Claude) direct
+  if (isClaudeDirectModel(model.id)) {
+    const key = options?.apiKey ?? process.env.ANTHROPIC_API_KEY;
+    if (!key) {
+      if (throwIfMissing) {
+        throw new VrtConfigError(
+          "MISSING_KEY",
+          `ANTHROPIC_API_KEY is required for ${model.id}`,
+        );
+      }
+      return null;
+    }
+    return createClaudeClient(model, key);
   }
 
   // OpenRouter
