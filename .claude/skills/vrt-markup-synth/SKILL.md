@@ -18,7 +18,7 @@ keys.
 |---|---|---|---|
 | `vrt build component <target.png> <current.html>` | Reference image + your current HTML | Markdown report: pixel diff + bbox + palette + heatmap + text-row signals | Playwright renders `current.html` at the target's viewport, pixel-diffs vs `target.png`, surfaces image-only signals. **No VLM.** Agent iterates `current.html`. |
 | `vrt scan component <screenshot>` | Full-page PNG | `components/*.png` + `manifest.json` (bbox + role guess) | Bbox detection + clustering on the image. **No VLM.** |
-| `vrt check tokens <html-or-url>` | Page | Markdown table: violation + nearest-token | Playwright + computed-style scan; snaps to allowed scale within tolerance. **No VLM.** Internal binary name: `vrt design-tokens` (same thing — the dispatcher routes both). |
+| `vrt check tokens <html-or-url>` | Page | Markdown table: violation + nearest-token | Playwright + computed-style scan; snaps to allowed scale within tolerance. **No VLM.** Internal binary name: `vrt design-tokens` — the dispatcher routes both, but **the CLI banner and the generated report still call it `vrt design-tokens`** (legacy). Both invocations work; don't get tripped up when the output names a command different from the one you typed. |
 | `vrt check theme <html>` | Page | Markdown report: "unthemed" bboxes (light/dark render same) | Playwright with `emulateMedia({ colorScheme: 'light' / 'dark' })`, per-bbox color sampling, identical-fill flag. **No VLM.** |
 | `vrt stress i18n <html>` | Page | Markdown report: selectors that overflow / wrap | Inflate every visible text node by a multiplier (synthetic `word → word + 'X'×k`), measure `scrollWidth > clientWidth` / height growth / right-edge overflow. **No VLM.** No translation dictionary. |
 
