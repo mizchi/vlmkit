@@ -69,16 +69,17 @@ A no-op re-run (same inputs both times) is guaranteed to produce
 wiring the workflow into CI.
 
 ```bash
+REPORT=reports/migration-report.json
+
 # First run: establishes baseline. No banner possible (no prior summary).
 vrt diff html before.html after.html --output reports/
-vrt diff agent reports/migration-report.json \
-  --persist-summary .vrt/baseline.json
+vrt diff agent "$REPORT" --persist-summary .vrt/baseline.json
 
 # Subsequent runs: same baseline file for read AND write
 # (local-rolling idiom — passing the same path to --previous and
 # --persist-summary means "compare against last run, then overwrite").
 vrt diff html before.html after.html --output reports/
-vrt diff agent reports/migration-report.json \
+vrt diff agent "$REPORT" \
   --previous .vrt/baseline.json \
   --persist-summary .vrt/baseline.json \
   --fail-on-regression
