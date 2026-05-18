@@ -77,7 +77,11 @@ export {
 } from "./image-resize.ts";
 
 // ---- DOM diff ----
-export { evaluateDomEquivalence } from "./dom-equivalence.ts";
+export {
+  verifyDomEquivalence,
+  /** @deprecated since 0.5.0 — use `verifyDomEquivalence`. */
+  evaluateDomEquivalence,
+} from "./dom-equivalence.ts";
 export {
   diffDomPositionStyles,
   diffPositionStylesAcrossViewports,
@@ -88,6 +92,8 @@ export { diffComputedStyles } from "./computed-style-diff.ts";
 export {
   diffA11yTrees,
   parsePlaywrightA11ySnapshot,
+  verifyA11yTree,
+  /** @deprecated since 0.5.0 — use `verifyA11yTree`. */
   checkA11yTree,
   INTERACTIVE_ROLES,
   LANDMARK_ROLES,

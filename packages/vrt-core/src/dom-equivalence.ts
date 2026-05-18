@@ -79,7 +79,12 @@ function makeMismatchMessage(
  */
 const ELEMENT_COUNT_DRIFT_THRESHOLD = 0.05;
 
-export function evaluateDomEquivalence(
+/**
+ * Verify structural DOM equivalence between two captured fingerprints.
+ *
+ * @since 0.5.0 — replaces `evaluateDomEquivalence`.
+ */
+export function verifyDomEquivalence(
   baseline: DomFingerprint,
   variant: DomFingerprint,
 ): DomEquivalenceResult {
@@ -146,3 +151,8 @@ export const DOM_FINGERPRINT_BROWSER_SCRIPT = `(() => {
   const elementCount = document.querySelectorAll("*").length;
   return { headingTexts, buttonTexts, inputValues, elementCount };
 })()`;
+
+/**
+ * @deprecated since 0.5.0 — use `verifyDomEquivalence` instead. Removed in 1.0.0.
+ */
+export const evaluateDomEquivalence = verifyDomEquivalence;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { evaluateDomEquivalence, type DomFingerprint } from "./dom-equivalence.ts";
+import { evaluateDomEquivalence, verifyDomEquivalence, type DomFingerprint } from "./dom-equivalence.ts";
 
 function fp(over: Partial<DomFingerprint> = {}): DomFingerprint {
   return {
@@ -12,9 +12,14 @@ function fp(over: Partial<DomFingerprint> = {}): DomFingerprint {
   };
 }
 
-describe("evaluateDomEquivalence", () => {
+describe("verifyDomEquivalence", () => {
+  it("`evaluateDomEquivalence` deprecation alias delegates to verifyDomEquivalence", () => {
+    assert.equal(evaluateDomEquivalence, verifyDomEquivalence);
+  });
+
+
   it("returns ok when fingerprints match exactly", () => {
-    const r = evaluateDomEquivalence(fp(), fp());
+    const r = verifyDomEquivalence(fp(), fp());
     assert.equal(r.ok, true);
     assert.equal(r.warnings.length, 0);
   });
@@ -24,7 +29,7 @@ describe("evaluateDomEquivalence", () => {
     const variant = fp({
       headingTexts: ["Command Center", "Response controls", "Queue metrics", "Pause confirmation"],
     });
-    const r = evaluateDomEquivalence(baseline, variant);
+    const r = verifyDomEquivalence(baseline, variant);
     assert.equal(r.ok, false);
     const headingWarning = r.warnings.find((w) => w.code === "heading-mismatch");
     assert.ok(headingWarning);
@@ -33,7 +38,7 @@ describe("evaluateDomEquivalence", () => {
   });
 
   it("flags renamed buttons", () => {
-    const r = evaluateDomEquivalence(
+    const r = verifyDomEquivalence(
       fp(),
       fp({ buttonTexts: ["Ship update", "Preview draft", "Discard", "Cancel", "Publish now"] }),
     );
@@ -44,7 +49,7 @@ describe("evaluateDomEquivalence", () => {
   });
 
   it("flags reordered content (same elements, different sequence)", () => {
-    const r = evaluateDomEquivalence(
+    const r = verifyDomEquivalence(
       fp(),
       fp({ headingTexts: ["Daily snapshot", "Command Center", "Response controls", "Review dialog"] }),
     );
@@ -54,20 +59,20 @@ describe("evaluateDomEquivalence", () => {
   });
 
   it("flags element-count drift above 5%", () => {
-    const r = evaluateDomEquivalence(fp({ elementCount: 100 }), fp({ elementCount: 120 }));
+    const r = verifyDomEquivalence(fp({ elementCount: 100 }), fp({ elementCount: 120 }));
     const w = r.warnings.find((w) => w.code === "element-count-mismatch");
     assert.ok(w);
     assert.match(w!.message, /20\.0%/);
   });
 
   it("does not flag element-count drift below threshold", () => {
-    const r = evaluateDomEquivalence(fp({ elementCount: 100 }), fp({ elementCount: 102 }));
+    const r = verifyDomEquivalence(fp({ elementCount: 100 }), fp({ elementCount: 102 }));
     const w = r.warnings.find((w) => w.code === "element-count-mismatch");
     assert.equal(w, undefined);
   });
 
   it("ignores whitespace differences in text content", () => {
-    const r = evaluateDomEquivalence(
+    const r = verifyDomEquivalence(
       fp(),
       fp({ headingTexts: ["Command   Center", "Response controls", "Daily snapshot", "Review dialog"] }),
     );
@@ -75,7 +80,7 @@ describe("evaluateDomEquivalence", () => {
   });
 
   it("flags input values changing", () => {
-    const r = evaluateDomEquivalence(
+    const r = verifyDomEquivalence(
       fp(),
       fp({ inputValues: ["Different input value", "EU daytime shift"] }),
     );
@@ -84,7 +89,7 @@ describe("evaluateDomEquivalence", () => {
   });
 
   it("handles empty fingerprints", () => {
-    const r = evaluateDomEquivalence(
+    const r = verifyDomEquivalence(
       { headingTexts: [], buttonTexts: [], inputValues: [], elementCount: 0 },
       { headingTexts: [], buttonTexts: [], inputValues: [], elementCount: 0 },
     );

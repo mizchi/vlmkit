@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { diffA11yTrees, checkA11yTree } from "./a11y-semantic.ts";
+import { diffA11yTrees, verifyA11yTree, checkA11yTree } from "./a11y-semantic.ts";
 import type { A11ySnapshot, A11yNode } from "./types.ts";
 
 function snap(tree: A11yNode): A11ySnapshot {
@@ -122,14 +122,14 @@ describe("diffA11yTrees", () => {
   });
 });
 
-describe("checkA11yTree", () => {
+describe("verifyA11yTree", () => {
   it("should flag button without name", () => {
     const tree: A11yNode = {
       role: "main",
       name: "",
       children: [{ role: "button", name: "" }],
     };
-    const issues = checkA11yTree(tree);
+    const issues = verifyA11yTree(tree);
     assert.ok(issues.some((i) => i.rule === "label-missing"));
   });
 
@@ -139,7 +139,7 @@ describe("checkA11yTree", () => {
       name: "",
       children: [{ role: "img", name: "" }],
     };
-    const issues = checkA11yTree(tree);
+    const issues = verifyA11yTree(tree);
     assert.ok(issues.some((i) => i.rule === "img-alt-missing"));
   });
 
@@ -153,7 +153,18 @@ describe("checkA11yTree", () => {
         { role: "img", name: "Logo" },
       ],
     };
-    const issues = checkA11yTree(tree);
+    const issues = verifyA11yTree(tree);
     assert.equal(issues.length, 0);
+  });
+
+  it("`checkA11yTree` deprecation alias delegates to verifyA11yTree", () => {
+    const tree: A11yNode = {
+      role: "main",
+      name: "",
+      children: [{ role: "button", name: "" }],
+    };
+    const viaAlias = checkA11yTree(tree);
+    const direct = verifyA11yTree(tree);
+    assert.deepEqual(viaAlias, direct);
   });
 });
