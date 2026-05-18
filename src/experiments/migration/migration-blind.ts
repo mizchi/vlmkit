@@ -403,11 +403,11 @@ async function main() {
 function formatUsage(): string {
   return [
     "Usage:",
-    "  node src/migration-blind.ts <manifest.json> list",
-    "  node src/migration-blind.ts <manifest.json> show <scenario-id>",
-    "  node src/migration-blind.ts <manifest.json> prepare <scenario-id> [--output-dir path] [--packet path] [--format markdown|json] [--paint-tree]",
-    "  node src/migration-blind.ts <manifest.json> evaluate <scenario-id> --before-report before.json --after-report after.json --rounds n [--output path] [--format markdown|json]",
-    "  node src/migration-blind.ts <manifest.json> solo <scenario-id> [--output path] [--report-output-dir path] [--format markdown|json] [--paint-tree]",
+    "  node src/experiments/migration/migration-blind.ts <manifest.json> list",
+    "  node src/experiments/migration/migration-blind.ts <manifest.json> show <scenario-id>",
+    "  node src/experiments/migration/migration-blind.ts <manifest.json> prepare <scenario-id> [--output-dir path] [--packet path] [--format markdown|json] [--paint-tree]",
+    "  node src/experiments/migration/migration-blind.ts <manifest.json> evaluate <scenario-id> --before-report before.json --after-report after.json --rounds n [--output path] [--format markdown|json]",
+    "  node src/experiments/migration/migration-blind.ts <manifest.json> solo <scenario-id> [--output path] [--report-output-dir path] [--format markdown|json] [--paint-tree]",
   ].join("\n");
 }
 
