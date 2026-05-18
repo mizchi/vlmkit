@@ -23,6 +23,16 @@ boxes and computed-style deltas to surface only the deltas that matter.
 Default to **compare**. Use blind / subagent when you're auditing the
 toolchain itself, not the migration.
 
+## Precondition (gate)
+
+**Before running, name the migration: `<from-stack> → <to-stack>`.**
+If you cannot fill in both sides (e.g. "Tailwind → vanilla CSS",
+"reset-css `eric-meyer` → `modern-normalize`", "Vite → Rspack
+pipeline"), this is the wrong skill — stop and use `vrt-visual-diff`
+instead. The Quickstart's `vrt migration compare baseline.html
+variant.html` command shape matches *any* two-file pair, so it's
+easy to fall into. The named-migration check is the gate.
+
 ## When to use
 
 - Tailwind → vanilla CSS (or vice versa) port.
