@@ -254,6 +254,115 @@ export interface DfaOptions {
    * at unverified rows. Subagent eval surfaced this as noise.
    */
   showUnverified?: boolean;
+  /**
+   * Previous run's per-viewport diffRatio (from
+   * `.vrt/last-diff-for-agent.json` or any callable source). When
+   * supplied, the report includes a regression banner if the majority
+   * of viewports got worse since the previous run.
+   */
+  previous?: PreviousRunSummary;
+  /**
+   * Tuning for the regression detector. Defaults are picked to ignore
+   * single-viewport noise (`minViewports >= 2`) and subpixel jitter
+   * (`epsilon = 0.005`).
+   */
+  regression?: {
+    epsilon?: number;
+    minViewports?: number;
+  };
+}
+
+/**
+ * Per-viewport diffRatio recorded at the end of one diff-for-agent run.
+ * The CLI persists this to `.vrt/last-diff-for-agent.json` and the next
+ * invocation passes it as `DfaOptions.previous` to drive the regression
+ * banner.
+ */
+export interface PreviousRunSummary {
+  /** ISO timestamp of the previous run, if known. */
+  timestamp?: string;
+  /** Absolute path of the previous migration-report.json. */
+  reportPath?: string;
+  /** variantFile → viewport label → diffRatio at the previous run. */
+  byVariant: Record<string, Record<string, number>>;
+}
+
+export interface RegressionFinding {
+  regressed: boolean;
+  worsenedViewports: Array<{ viewport: string; previous: number; current: number; delta: number }>;
+  totalViewports: number;
+  threshold: number;
+  previousTimestamp?: string;
+  previousReportPath?: string;
+}
+
+/**
+ * Decide whether the current per-viewport diff is a regression vs.
+ * the previous run.
+ *
+ * - "got worse" requires `current > previous + epsilon` (default 0.005
+ *   = 0.5% absolute). Filters out subpixel jitter, anti-aliasing
+ *   noise, etc.
+ * - "regression" requires worsened viewports >= threshold. Default
+ *   threshold = `max(2, ceil(total / 2))`. The 2-floor means a single
+ *   noisy viewport never triggers the alarm.
+ * - Returns `null` when there's no comparable previous data for the
+ *   variant — first-run, different variant set, etc.
+ */
+export function detectRegression(
+  results: ReadonlyArray<{ viewport: string; diffRatio: number }>,
+  previous: PreviousRunSummary,
+  variantFile: string,
+  options: { epsilon?: number; minViewports?: number } = {},
+): RegressionFinding | null {
+  const prevByViewport = previous.byVariant[variantFile];
+  if (!prevByViewport) return null;
+  const epsilon = options.epsilon ?? 0.005;
+  const totalViewports = results.length;
+  if (totalViewports === 0) return null;
+  const threshold = options.minViewports ?? Math.max(2, Math.ceil(totalViewports / 2));
+  const worsened = results
+    .filter((r) => {
+      const prev = prevByViewport[r.viewport];
+      return typeof prev === "number" && r.diffRatio > prev + epsilon;
+    })
+    .map((r) => {
+      const prev = prevByViewport[r.viewport]!;
+      return {
+        viewport: r.viewport,
+        previous: prev,
+        current: r.diffRatio,
+        delta: r.diffRatio - prev,
+      };
+    });
+  return {
+    regressed: worsened.length >= threshold,
+    worsenedViewports: worsened,
+    totalViewports,
+    threshold,
+    previousTimestamp: previous.timestamp,
+    previousReportPath: previous.reportPath,
+  };
+}
+
+/**
+ * Build the persistable summary for the *current* run. Pair with
+ * `detectRegression` on the next invocation.
+ */
+export function buildPreviousRunSummary(
+  report: DfaReport,
+  options: { timestamp?: string } = {},
+): PreviousRunSummary {
+  const byVariant: Record<string, Record<string, number>> = {};
+  for (const r of report.results) {
+    const variantBucket = byVariant[r.variantFile] ?? (byVariant[r.variantFile] = {});
+    variantBucket[r.viewport] = r.diffRatio;
+  }
+  return {
+    timestamp: options.timestamp ?? new Date().toISOString(),
+    reportPath: report.reportPath,
+    byVariant,
+  };
 }
 
 interface FixCandidateAggregate {
@@ -627,6 +736,33 @@ export function formatMigrationReportForAgent(
         "**Forced-state diff** section below. This pattern usually means the " +
         "variant forgot to wire up interaction-state styles.");
       lines.push("");
+    }
+
+    // Regression alarm — fires when the majority of viewports got
+    // worse since the previous run. See the 2026-05-12 subagent eval:
+    // both subagents wasted an iteration on a regression that needed
+    // manual reverting. The threshold floor of 2 viewports prevents a
+    // single noisy viewport from triggering the alarm.
+    if (options.previous) {
+      const finding = detectRegression(sorted, options.previous, variantFile, options.regression);
+      if (finding?.regressed) {
+        lines.push("### ⚠ REGRESSION");
+        lines.push("");
+        lines.push(`**${finding.worsenedViewports.length} of ${finding.totalViewports} viewports got worse since the previous run** ` +
+          `(threshold ≥ ${finding.threshold}). Consider reverting the last patch and re-running.`);
+        lines.push("");
+        lines.push("| Viewport | Previous | Current | Δ |");
+        lines.push("|---|---|---|---|");
+        for (const w of finding.worsenedViewports) {
+          const deltaPct = `+${(w.delta * 100).toFixed(2)}%`;
+          lines.push(`| \`${w.viewport}\` | ${(w.previous * 100).toFixed(2)}% | ${(w.current * 100).toFixed(2)}% | ${deltaPct} |`);
+        }
+        if (finding.previousReportPath) {
+          lines.push("");
+          lines.push(`Previous report: \`${finding.previousReportPath}\``);
+        }
+        lines.push("");
+      }
     }
 
     // Class-rename map at the top — subagent C called this "the single
