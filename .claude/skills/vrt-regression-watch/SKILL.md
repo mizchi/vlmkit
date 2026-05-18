@@ -60,14 +60,25 @@ from triggering false alarms.
 
 ## Quickstart
 
-```bash
-# First run: establishes baseline. No banner possible.
-vrt diff html before.html after.html --output reports/diff.json
-vrt diff agent reports/diff.json --persist-summary .vrt/baseline.json
+`--output <dir>` is a **directory** path; `vrt diff html` writes
+`<dir>/migration-report.json` into it. Pass that JSON file path —
+not the dir — to `vrt diff agent`.
 
-# Subsequent runs: compare against the persisted summary, fail if regressed
-vrt diff html before.html after.html --output reports/diff.json
-vrt diff agent reports/diff.json \
+A no-op re-run (same inputs both times) is guaranteed to produce
+**no** `⚠ REGRESSION` banner — use this as a sanity check when
+wiring the workflow into CI.
+
+```bash
+# First run: establishes baseline. No banner possible (no prior summary).
+vrt diff html before.html after.html --output reports/
+vrt diff agent reports/migration-report.json \
+  --persist-summary .vrt/baseline.json
+
+# Subsequent runs: same baseline file for read AND write
+# (local-rolling idiom — passing the same path to --previous and
+# --persist-summary means "compare against last run, then overwrite").
+vrt diff html before.html after.html --output reports/
+vrt diff agent reports/migration-report.json \
   --previous .vrt/baseline.json \
   --persist-summary .vrt/baseline.json \
   --fail-on-regression
@@ -107,10 +118,10 @@ Two retention strategies:
 
 - name: Render current PR + diff
   run: |
-    vrt diff html main.html pr.html --output reports/diff.json
-    vrt diff agent reports/diff.json \
+    vrt diff html main.html pr.html --output reports/
+    vrt diff agent reports/migration-report.json \
       --previous .vrt/baseline.json \
-      --no-history \
+      --persist-summary /tmp/pr-summary.json \
       --fail-on-regression \
       --out reports/diff.md
 
@@ -119,9 +130,12 @@ Two retention strategies:
   run: gh pr comment ${{ github.event.number }} --body-file reports/diff.md
 ```
 
-Why `--no-history`: in CI you don't want the PR-run's summary to
-clobber the cached main-summary; pass `--no-history` to skip writes,
-or override with `--persist-summary <pr-specific-path>`.
+Why a throwaway `--persist-summary` path: in CI you don't want the
+PR-run's summary to clobber the cached main-summary. Pointing
+`--persist-summary` at a PR-specific tmp path (or anywhere outside
+the cache key) keeps the main reference clean. `--no-history` is
+NOT a substitute here — it skips load too, so `--previous` would
+be ignored and no regression detection would happen.
 
 ## Flag reference
 
@@ -134,6 +148,18 @@ or override with `--persist-summary <pr-specific-path>`.
 
 Default behaviour (none of the above): auto-load and auto-persist
 `.vrt/last-diff-for-agent.json` — i.e. local-rolling.
+
+**`--no-history` is the master switch — it skips BOTH load and
+write.** Concretely: when `--no-history` is set, `--previous` and
+`--persist-summary` are ignored — no comparison happens, no
+summary is written. Pick one of these three modes per call:
+
+| Goal | Pass |
+|---|---|
+| Local-rolling (the default) | nothing |
+| Compare against fixed reference, then overwrite it | `--previous X --persist-summary X` (same path twice) |
+| Compare against fixed reference, leave it untouched | `--previous X --persist-summary <pr-specific-path>` |
+| One-shot, no state at all | `--no-history` |
 
 ## Reading the banner
 

@@ -63,20 +63,24 @@ the dist is stale — run `pnpm build` or use the source form. All
 
 ## Quickstart
 
+`--output <dir>` is a **directory** path; the engine writes
+`<dir>/migration-report.json` (+ per-viewport PNGs) into it. Pass
+that JSON file — not the dir — to `vrt diff agent`.
+
 ```bash
-# Two HTML files, side by side
+# Two HTML files, side by side → writes reports/migration-report.json
 vrt migration compare baseline.html variant.html \
-  --output reports/migration.json
+  --output reports/
 
 # Two URLs (different dev servers / preview deploys)
 vrt migration compare \
   --url http://localhost:3000/ \
   --current-url http://localhost:8080/ \
   --mask ".marquee-container,.hero-badge" \
-  --output reports/migration.json
+  --output reports/
 
 # Then format for the agent
-vrt diff agent reports/migration.json
+vrt diff agent reports/migration-report.json
 ```
 
 ## Computed-style diff is the load-bearing signal
