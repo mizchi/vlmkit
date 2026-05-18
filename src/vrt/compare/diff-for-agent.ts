@@ -50,6 +50,24 @@ export interface DfaCsdSummary {
   };
 }
 
+export interface DfaCsdPerViewportEntry {
+  selector: string;
+  property: string;
+  viewports: string[];
+  samples: Array<{ viewport: string; baseline: string; variant: string }>;
+}
+
+export interface DfaCsdPerViewportSummary {
+  variantFile: string;
+  result: {
+    totalDiffs: number;
+    byViewport: Array<{ viewport: string; count: number }>;
+    bySelectorProperty: DfaCsdPerViewportEntry[];
+    universalPairs: string[];
+    breakpointGatedPairs: string[];
+  };
+}
+
 export interface DfaDpEntry {
   path: string;
   tag: string;
@@ -147,6 +165,7 @@ export interface DfaReport {
   viewports: Array<{ label: string; width: number; height?: number }>;
   results: DfaResult[];
   computedStyleDiff?: DfaCsdSummary[];
+  computedStyleDiffPerViewport?: DfaCsdPerViewportSummary[];
   domPositionDiff?: DfaDpSummary[];
   domPositionDiffPerViewport?: DfaDpPerViewportSummary[];
   shiftOrigins?: DfaShiftOriginsSummary[];
@@ -1347,6 +1366,65 @@ export function formatMigrationReportForAgent(
       }
     }
 
+    const csdPerVpSummary = (report.computedStyleDiffPerViewport ?? []).find((c) => c.variantFile === variantFile);
+    if (csdPerVpSummary && csdPerVpSummary.result.totalDiffs > 0) {
+      lines.push("### Verified deltas (computed-style) × viewport (catches breakpoint-gated rules)");
+      lines.push("");
+      lines.push("Each (selector, property) is captured at every snapshot viewport. " +
+        "*Universal* pairs differ on every viewport — fix the base rule. " +
+        "*Breakpoint-gated* pairs differ only on a subset — almost always a missing " +
+        "or wrong `@media` rule. Without this split, mobile-only deltas were getting " +
+        "patched into the desktop rule and vice-versa.");
+      lines.push("");
+      lines.push(`Total: **${csdPerVpSummary.result.totalDiffs}** (selector, property, viewport) tuples ` +
+        `across ${csdPerVpSummary.result.byViewport.length} viewports ` +
+        `(${csdPerVpSummary.result.universalPairs.length} universal pair(s), ` +
+        `${csdPerVpSummary.result.breakpointGatedPairs.length} breakpoint-gated pair(s)).`);
+      lines.push("");
+
+      const universalRows = csdPerVpSummary.result.bySelectorProperty.filter(
+        (e) => e.viewports.length === csdPerVpSummary.result.byViewport.length,
+      );
+      if (universalRows.length > 0) {
+        lines.push("#### Universal pairs (every viewport — fix the base rule)");
+        lines.push("");
+        lines.push("| Selector | Property | Baseline | Variant |");
+        lines.push("|---|---|---|---|");
+        for (const row of universalRows.slice(0, 15)) {
+          // All viewports agree, so pick the first sample for the displayed value.
+          const sample = row.samples[0]!;
+          lines.push(`| \`${row.selector}\` | \`${row.property}\` | \`${sample.baseline}\` | \`${sample.variant}\` |`);
+        }
+        if (universalRows.length > 15) {
+          lines.push(`| _…${universalRows.length - 15} more universal pairs_ | | | |`);
+        }
+        lines.push("");
+      }
+
+      const gatedRows = csdPerVpSummary.result.bySelectorProperty.filter(
+        (e) => e.viewports.length < csdPerVpSummary.result.byViewport.length,
+      );
+      if (gatedRows.length > 0) {
+        lines.push("#### Breakpoint-gated pairs (missing or wrong `@media` rule)");
+        lines.push("");
+        lines.push("| Selector | Property | Affected viewports | Sample (viewport: baseline → variant) |");
+        lines.push("|---|---|---|---|");
+        for (const row of gatedRows.slice(0, 15)) {
+          const vps = row.viewports.join(", ");
+          const sampleText = row.samples
+            .slice(0, 3)
+            .map((s) => `\`${s.viewport}\`: \`${s.baseline}\` → \`${s.variant}\``)
+            .join("; ");
+          const moreSamples = row.samples.length > 3 ? ` (+${row.samples.length - 3} more)` : "";
+          lines.push(`| \`${row.selector}\` | \`${row.property}\` | ${vps} | ${sampleText}${moreSamples} |`);
+        }
+        if (gatedRows.length > 15) {
+          lines.push(`| _…${gatedRows.length - 15} more breakpoint-gated pairs_ | | | |`);
+        }
+        lines.push("");
+      }
+    }
+
     // Scenario detector. The current "Suggested next step" wording
     // assumes the migration scenario (read PNGs → cross-check fix
     // candidates → write CSS patch). Subagent F's eval showed that
@@ -1357,6 +1435,7 @@ export function formatMigrationReportForAgent(
     const hasDomSignal =
       (dpSummary?.result.totalDiffs ?? 0) > 0 ||
       (csdSummary?.result.totalDiffs ?? 0) > 0 ||
+      (csdPerVpSummary?.result.totalDiffs ?? 0) > 0 ||
       fixCandidates.length > 0;
     const hasWireframeSignal =
       (bboxSummary?.perViewport.length ?? 0) > 0 ||

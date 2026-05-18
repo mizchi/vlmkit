@@ -289,3 +289,62 @@ describe("detectRegression", () => {
     assert.equal(summary.byVariant["working.html"]?.desktop, 0.2398);
   });
 });
+
+describe("formatMigrationReportForAgent — per-viewport CSD", () => {
+  it("emits universal and breakpoint-gated tables with sample values per viewport", () => {
+    const md = formatMigrationReportForAgent(sampleReport({
+      computedStyleDiffPerViewport: [{
+        variantFile: "working.html",
+        result: {
+          totalDiffs: 3,
+          byViewport: [
+            { viewport: "mobile", count: 1 },
+            { viewport: "desktop", count: 2 },
+          ],
+          universalPairs: [".btn|padding"],
+          breakpointGatedPairs: [".card|gap"],
+          bySelectorProperty: [
+            {
+              selector: ".btn", property: "padding",
+              viewports: ["mobile", "desktop"],
+              samples: [
+                { viewport: "mobile", baseline: "10px", variant: "6px" },
+                { viewport: "desktop", baseline: "10px", variant: "6px" },
+              ],
+            },
+            {
+              selector: ".card", property: "gap",
+              viewports: ["desktop"],
+              samples: [
+                { viewport: "desktop", baseline: "12px", variant: "0px" },
+              ],
+            },
+          ],
+        },
+      }],
+    }));
+    assert.match(md, /Verified deltas \(computed-style\) × viewport/);
+    assert.match(md, /Universal pairs/);
+    assert.match(md, /Breakpoint-gated pairs/);
+    // Universal row shows the simple baseline → variant pair (no viewport column).
+    assert.match(md, /\| `\.btn` \| `padding` \| `10px` \| `6px` \|/);
+    // Breakpoint-gated row shows which viewports + sample with viewport label.
+    assert.match(md, /\| `\.card` \| `gap` \| desktop \| `desktop`: `12px` → `0px`/);
+  });
+
+  it("skips the per-viewport CSD section entirely when totalDiffs is 0", () => {
+    const md = formatMigrationReportForAgent(sampleReport({
+      computedStyleDiffPerViewport: [{
+        variantFile: "working.html",
+        result: {
+          totalDiffs: 0,
+          byViewport: [],
+          universalPairs: [],
+          breakpointGatedPairs: [],
+          bySelectorProperty: [],
+        },
+      }],
+    }));
+    assert.doesNotMatch(md, /Verified deltas \(computed-style\) × viewport/);
+  });
+});
