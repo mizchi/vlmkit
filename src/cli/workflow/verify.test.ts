@@ -1,12 +1,19 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { encodePng } from "@mizchi/vrt-core/png-utils.ts";
 import { runVerifyPipeline } from "./verify.ts";
 
-const TMP = join(import.meta.dirname!, "..", "..", "..", "test-results", "vrt-verify-test");
+// Use the OS tmp dir (outside the repo) so `git` invoked from the
+// verify pipeline can't walk up and find the project's `.git`, which
+// would otherwise pull the current branch's HEAD~1..HEAD diff into
+// the intent inference and make the cross-validation outcome depend
+// on whatever the latest commit message happens to contain (e.g.
+// any commit body with `css`/`theme`/`font` flips changeType to
+// `style`, which auto-approves visual-only diffs).
 
 function createPalettePng(
   width: number,
@@ -44,13 +51,13 @@ function createPalettePng(
 
 describe("runVerifyPipeline", () => {
   it("compares existing PNG snapshots without Playwright capture", async () => {
+    const TMP = await mkdtemp(join(tmpdir(), "vrt-verify-test-"));
     const baselinesDir = join(TMP, "baselines");
     const snapshotsDir = join(TMP, "snapshots");
     const outputDir = join(TMP, "output");
     const reportPath = join(TMP, "vrt-report.json");
     const expectationPath = join(TMP, "expectation.json");
 
-    await rm(TMP, { recursive: true, force: true });
     await mkdir(baselinesDir, { recursive: true });
     await mkdir(snapshotsDir, { recursive: true });
 
