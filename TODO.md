@@ -123,7 +123,7 @@ Use vrt on real projects to verify practicality.
   - Per-PR rollout in real downstream projects still pending — needs aggregation of multiple runs over time.
 - [ ] Pass diff report to subagent for fix code generation, measure success rate
   - `vrt snapshot fix-prompt` ships a markdown / JSON task descriptor (URL, viewport, diff ratio with shift compensation, baseline/current/heatmap/HTML paths) ready to feed to a subagent.
-  - `src/migration-subagent.ts` + `migration-subagent-prepare` task produce a subagent packet from `migration-report.json`; `migration-blind.ts` provides reproducible blind scenarios.
+  - `vrt migration subagent prepare` (and the `migration-subagent-prepare` task) produces a subagent packet from `migration-report.json`; `vrt migration blind` provides reproducible blind scenarios.
   - Success-rate measurement on real PRs still pending (needs LLM API key + repeated runs).
 
 ### E2. Crater prescanner tracking
