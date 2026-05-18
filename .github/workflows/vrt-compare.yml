@@ -103,15 +103,15 @@ jobs:
           exit 1
 
       - name: Create snapshot baselines
-        run: node src/snapshot.ts --config .github/vrt-snapshot-ci.config.json
+        run: node --experimental-strip-types src/cli/vrt.ts snapshot --config .github/vrt-snapshot-ci.config.json
 
       - name: Re-run snapshot to measure false positives
         continue-on-error: true
-        run: node src/snapshot.ts --config .github/vrt-snapshot-ci.config.json
+        run: node --experimental-strip-types src/cli/vrt.ts snapshot --config .github/vrt-snapshot-ci.config.json
 
       - name: Summarize snapshot false positive rate
         run: |
-          node src/snapshot-report.ts \
+          node --experimental-strip-types src/cli/vrt.ts snapshot report \
             test-results/snapshots/ci/snapshot-report.json \
             --max-false-positive-rate 0 \
             --max-diff-ratio 0.001 \
