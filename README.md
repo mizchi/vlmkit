@@ -534,6 +534,38 @@ docs/
   reports/                  # Dated experiment reports
 ```
 
+## Agent Skills (APM)
+
+vrt ships five coding-agent skills under `.claude/skills/`. They wrap
+the most common workflows as standalone, agent-readable playbooks.
+Other repos can install them via [APM](https://agentskills.io):
+
+```bash
+# Install a single skill into the current repo's .claude/skills/
+apm install mizchi/vrt/.claude/skills/vrt-visual-diff
+
+# Install all five
+apm install mizchi/vrt/.claude/skills/vrt-visual-diff \
+            mizchi/vrt/.claude/skills/vrt-migration-eval \
+            mizchi/vrt/.claude/skills/vrt-css-fix-loop \
+            mizchi/vrt/.claude/skills/vrt-markup-synth \
+            mizchi/vrt/.claude/skills/vrt-regression-watch
+```
+
+| Skill | Entry workflow | Use when |
+|---|---|---|
+| `vrt-visual-diff` | `vrt diff html` → `vrt diff agent` | One-shot "did this CSS edit visibly change something?" |
+| `vrt-migration-eval` | `vrt migration compare\|blind\|subagent` | Framework / CSS-lib / build-system swap audit |
+| `vrt-css-fix-loop` | `fix-loop.ts` (VLM-driven) | Closed-loop CSS auto-repair benchmark |
+| `vrt-markup-synth` | `vrt build\|scan\|check\|stress *` | Screenshot → HTML/CSS, token / theme / i18n audits |
+| `vrt-regression-watch` | `vrt diff agent --previous --fail-on-regression` | Per-PR or scheduled regression gate |
+
+Each skill assumes the `vrt` CLI is on `$PATH` (this repo published as
+a Node package, or built from source) and Node 24+. VLM-using skills
+(`fix-loop`, `markup-synth`, `migration subagent`) additionally need
+one of `OPENROUTER_API_KEY` / `GEMINI_API_KEY` / `ANTHROPIC_API_KEY`
+depending on the model selected via `VRT_VLM_MODEL`.
+
 ## License
 
 MIT
