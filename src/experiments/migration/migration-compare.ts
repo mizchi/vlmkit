@@ -73,7 +73,7 @@ import {
   type DomEquivalenceResult,
 } from "@mizchi/vrt-core/dom-equivalence.ts";
 import { buildComputedStyleCaptureJsonExpression, parseComputedStyleSnapshot } from "@mizchi/vrt-core/computed-style-capture.ts";
-import { diffComputedStyles, type CsdResult, type ComputedStyleSnapshot } from "@mizchi/vrt-core/computed-style-diff.ts";
+import { aggregateCsdByViewport, diffComputedStyles, type CsdPerViewportResult, type CsdResult, type ComputedStyleSnapshot } from "@mizchi/vrt-core/computed-style-diff.ts";
 import {
   diffDomPositionStyles,
   diffPositionStylesAcrossViewports,
@@ -461,6 +461,15 @@ export interface MigrationCompareReport {
     variantFile: string;
     result: CsdResult;
   }>;
+  /**
+   * Per-viewport CSD: each (selector, property) pair is rolled up with
+   * the viewports it differs on, plus universal vs. breakpoint-gated
+   * sets so consumers can split base rules from `@media`-gated ones.
+   */
+  computedStyleDiffPerViewport?: Array<{
+    variantFile: string;
+    result: CsdPerViewportResult;
+  }>;
   domPositionDiff?: Array<{
     variantFile: string;
     result: DpResult;
@@ -802,6 +811,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     let baselineSanity: RenderSanityResult | undefined;
     let baselineDomFingerprint: DomFingerprint | undefined;
     let baselineComputedStyles: ComputedStyleSnapshot | undefined;
+    const baselineComputedStylesByVp = new Map<string, ComputedStyleSnapshot>();
     let baselineDomPositionStyles: PositionedElement[] | undefined;
     const baselineDomPositionByVp = new Map<string, PositionedElement[]>();
     const baselineBboxesByVp = new Map<string, BboxElement[]>();
@@ -874,13 +884,20 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         }
       }
 
-      // Capture baseline computed-style snapshot once (first viewport).
-      if (csdEnabled && vpIndex === 0) {
+      // Capture baseline computed-style snapshot at every viewport so
+      // we can flag breakpoint-gated rules. Closes #21 — single-sample
+      // CSD without viewport tag made subagents apply mobile fixes to
+      // desktop and vice-versa. `baselineComputedStyles` (the legacy
+      // single-snapshot field) keeps pointing at the first-viewport
+      // capture for any consumer that only knows the old shape.
+      if (csdEnabled) {
         try {
           const raw = await page.evaluate(buildComputedStyleCaptureJsonExpression());
-          baselineComputedStyles = parseComputedStyleSnapshot(raw) as ComputedStyleSnapshot;
+          const snapshot = parseComputedStyleSnapshot(raw) as ComputedStyleSnapshot;
+          baselineComputedStylesByVp.set(vp.label, snapshot);
+          if (vpIndex === 0) baselineComputedStyles = snapshot;
         } catch (error) {
-          console.log(`  ${YELLOW}Baseline computed-style capture error: ${String(error)}${RESET}`);
+          console.log(`  ${YELLOW}Baseline computed-style capture error (${vp.label}): ${String(error)}${RESET}`);
         }
       }
 
@@ -956,6 +973,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
 
     const domEquivalenceReports: Array<{ variantFile: string; result: DomEquivalenceResult }> = [];
     const computedStyleDiffReports: Array<{ variantFile: string; result: CsdResult }> = [];
+    const computedStyleDiffPerViewportReports: Array<{ variantFile: string; result: CsdPerViewportResult }> = [];
     const domPositionDiffReports: Array<{ variantFile: string; result: DpResult }> = [];
     const domPositionDiffPerViewportReports: Array<{ variantFile: string; result: DpPerViewportResult }> = [];
     const shiftOriginsReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; origins: ShiftOrigin[]; unexplainedBands?: ShiftRegion[] }> }> = [];
@@ -996,6 +1014,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
 
       let variantDomFingerprint: DomFingerprint | undefined;
       let variantComputedStyles: ComputedStyleSnapshot | undefined;
+      const variantComputedStylesByVp = new Map<string, ComputedStyleSnapshot>();
       let variantDomPositionStyles: PositionedElement[] | undefined;
       const variantDomPositionByVp = new Map<string, PositionedElement[]>();
       const variantBboxesByVp = new Map<string, BboxElement[]>();
@@ -1071,12 +1090,14 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             console.log(`  ${YELLOW}Variant DOM fingerprint error (${variantName}): ${String(error)}${RESET}`);
           }
         }
-        if (csdEnabled && vpIndex === 0 && !variantComputedStyles) {
+        if (csdEnabled) {
           try {
             const raw = await page.evaluate(buildComputedStyleCaptureJsonExpression());
-            variantComputedStyles = parseComputedStyleSnapshot(raw) as ComputedStyleSnapshot;
+            const snapshot = parseComputedStyleSnapshot(raw) as ComputedStyleSnapshot;
+            variantComputedStylesByVp.set(vp.label, snapshot);
+            if (vpIndex === 0 && !variantComputedStyles) variantComputedStyles = snapshot;
           } catch (error) {
-            console.log(`  ${YELLOW}Variant computed-style capture error (${variantName}): ${String(error)}${RESET}`);
+            console.log(`  ${YELLOW}Variant computed-style capture error (${variantName} / ${vp.label}): ${String(error)}${RESET}`);
           }
         }
         if (dpEnabled) {
@@ -1389,6 +1410,42 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             .join(", ");
           console.log(`  ${DIM}Computed-style diff: ${result.totalDiffs} (selector, prop) ` +
             `tuples. Top properties: ${topProps}${RESET}`);
+        }
+
+        // Per-viewport CSD: diff each viewport pair, then aggregate to
+        // surface universal vs. breakpoint-gated (selector, property)
+        // pairs. Quiet when there are no per-viewport captures (e.g.
+        // first-run hiccup) — the legacy single-snapshot diff above
+        // still carries that case.
+        if (baselineComputedStylesByVp.size > 0 && variantComputedStylesByVp.size > 0) {
+          const perViewportDiffs: Array<{ viewport: string; result: CsdResult }> = [];
+          for (const vp of VIEWPORTS) {
+            const baselineSnap = baselineComputedStylesByVp.get(vp.label);
+            const variantSnap = variantComputedStylesByVp.get(vp.label);
+            if (!baselineSnap || !variantSnap) continue;
+            perViewportDiffs.push({
+              viewport: vp.label,
+              result: diffComputedStyles(baselineSnap, variantSnap),
+            });
+          }
+          if (perViewportDiffs.length > 0) {
+            const perViewportResult = aggregateCsdByViewport(perViewportDiffs);
+            // Cap bySelectorProperty to keep migration-report.json under
+            // budget on fixtures with many tiny per-element diffs.
+            const trimmedPerViewport: CsdPerViewportResult = {
+              ...perViewportResult,
+              bySelectorProperty: perViewportResult.bySelectorProperty.slice(0, 200),
+            };
+            computedStyleDiffPerViewportReports.push({
+              variantFile: variantFileLabel,
+              result: trimmedPerViewport,
+            });
+            if (perViewportResult.totalDiffs > 0) {
+              console.log(`  ${DIM}Per-viewport CSD: ${perViewportResult.bySelectorProperty.length} unique pairs ` +
+                `(${perViewportResult.universalPairs.length} universal, ` +
+                `${perViewportResult.breakpointGatedPairs.length} breakpoint-gated)${RESET}`);
+            }
+          }
         }
       }
 
@@ -1928,6 +1985,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       baselineSanity,
       domEquivalence: domEquivalenceReports.length > 0 ? domEquivalenceReports : undefined,
       computedStyleDiff: computedStyleDiffReports.length > 0 ? computedStyleDiffReports : undefined,
+      computedStyleDiffPerViewport: computedStyleDiffPerViewportReports.length > 0 ? computedStyleDiffPerViewportReports : undefined,
       domPositionDiff: domPositionDiffReports.length > 0 ? domPositionDiffReports : undefined,
       domPositionDiffPerViewport: domPositionDiffPerViewportReports.length > 0
         ? domPositionDiffPerViewportReports

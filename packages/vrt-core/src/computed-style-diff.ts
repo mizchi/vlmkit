@@ -35,6 +35,101 @@ export interface CsdResult {
   selectorsOnlyInVariant: string[];
 }
 
+export interface CsdPerViewportSample {
+  viewport: string;
+  baseline: string;
+  variant: string;
+}
+
+export interface CsdPerViewportEntry {
+  selector: string;
+  property: string;
+  /** Viewports on which this (selector, property) pair differs. */
+  viewports: string[];
+  samples: CsdPerViewportSample[];
+}
+
+export interface CsdPerViewportResult {
+  /** Total (selector, property, viewport) tuples — i.e. Σ per-viewport counts. */
+  totalDiffs: number;
+  byViewport: Array<{ viewport: string; count: number }>;
+  /**
+   * One row per unique (selector, property) pair, listing which viewports
+   * it differs on and the actual baseline/variant samples per viewport.
+   */
+  bySelectorProperty: CsdPerViewportEntry[];
+  /**
+   * "selector|property" tokens for pairs that differ on every viewport.
+   * A consumer rendering "fix the base rule" tables wants this subset.
+   */
+  universalPairs: string[];
+  /**
+   * "selector|property" tokens for pairs that differ on a strict subset
+   * of viewports. Almost always a `@media` rule is missing or wrong.
+   */
+  breakpointGatedPairs: string[];
+}
+
+/**
+ * Roll up N per-viewport CSD results into a single per-viewport report,
+ * surfacing which pairs apply universally vs. which are breakpoint-gated.
+ *
+ * Stable iteration order: results are taken in the input array's order,
+ * which is the same order migration-compare captures viewports (small →
+ * large or whatever the caller chose).
+ */
+export function aggregateCsdByViewport(
+  perViewport: ReadonlyArray<{ viewport: string; result: CsdResult }>,
+): CsdPerViewportResult {
+  const totalViewports = perViewport.length;
+  const pairToEntry = new Map<string, CsdPerViewportEntry>();
+  const byViewport: Array<{ viewport: string; count: number }> = [];
+
+  for (const { viewport, result } of perViewport) {
+    byViewport.push({ viewport, count: result.entries.length });
+    for (const entry of result.entries) {
+      const key = `${entry.selector}|${entry.property}`;
+      const existing = pairToEntry.get(key);
+      if (existing) {
+        existing.viewports.push(viewport);
+        existing.samples.push({ viewport, baseline: entry.baseline, variant: entry.variant });
+      } else {
+        pairToEntry.set(key, {
+          selector: entry.selector,
+          property: entry.property,
+          viewports: [viewport],
+          samples: [{ viewport, baseline: entry.baseline, variant: entry.variant }],
+        });
+      }
+    }
+  }
+
+  const bySelectorProperty = [...pairToEntry.values()].sort((a, b) => {
+    if (b.viewports.length !== a.viewports.length) return b.viewports.length - a.viewports.length;
+    if (a.selector !== b.selector) return a.selector.localeCompare(b.selector);
+    return a.property.localeCompare(b.property);
+  });
+
+  const universalPairs: string[] = [];
+  const breakpointGatedPairs: string[] = [];
+  for (const entry of bySelectorProperty) {
+    const token = `${entry.selector}|${entry.property}`;
+    if (totalViewports > 0 && entry.viewports.length === totalViewports) {
+      universalPairs.push(token);
+    } else {
+      breakpointGatedPairs.push(token);
+    }
+  }
+
+  return {
+    totalDiffs: byViewport.reduce((sum, e) => sum + e.count, 0),
+    byViewport,
+    bySelectorProperty,
+    universalPairs,
+    breakpointGatedPairs,
+  };
+}
+
 const EMPTY: CsdResult = {
   entries: [],
   totalDiffs: 0,
