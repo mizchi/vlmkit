@@ -1,24 +1,26 @@
 ---
 name: vrt-markup-synth
-description: Generate or extract HTML/CSS components from screenshots and rendered pages. Five sub-tools — build component (image → standalone component), scan component (screenshot → cropped component PNGs), check tokens (design-token conformance), check theme (theme parity audit), stress i18n (overflow / wrap stress test). Use when the agent needs to author markup from a visual reference, audit token usage across an existing UI, or stress-test the layout under longer content / locale changes. VLM-driven; requires API keys.
+description: Five DOM/pixel-based signal tools for markup work — turn a screenshot + HTML scaffold into a converging pixel diff (build component), crop a page screenshot into per-component PNGs (scan component), audit hard-coded values against a design-token scale (check tokens), verify theme parity (check theme — light vs dark render), and stress-test layout under inflated text (stress i18n). All five are pure DOM + Playwright + pixel processing — **no VLM / no API key required**. The agent supplies the markup reasoning; the tool surfaces the signal. Use when you've authored HTML/CSS and want signal back without paying VLM latency or cost.
 ---
 
 # vrt-markup-synth
 
-Markup tooling that uses a VLM to understand a target image or rendered
-DOM, then either reproduces it as standalone HTML+CSS or audits it
-against the design system. Five complementary commands; pick one per
-task.
+Despite the name, **these tools do not generate markup**. They give an
+agent *signal* — pixel diffs, bbox crops, computed-style violations,
+light/dark fill comparisons, overflow flags — that an agent uses to
+write or revise HTML/CSS itself. The agent is the VLM. Each tool is
+deterministic Playwright + image math; runs in ~1-5s; needs zero API
+keys.
 
 ## Sub-tools
 
-| Command | Input | Output | Purpose |
+| Command | Input | Output | What runs |
 |---|---|---|---|
-| `vrt build component <image>` | PNG/JPG screenshot | `component.html` + `component.css` | Reproduce a component from a reference image. VLM extracts structure + styling. |
-| `vrt scan component <screenshot>` | Full-page screenshot | `components/*.png` | Detect distinct components, crop each into its own PNG for piecewise inspection. |
-| `vrt check tokens <html-or-url>` | Page | Token-conformance report | Find hard-coded values that should reference design tokens (colors, spacing, font sizes). |
-| `vrt check theme <url>` | Live URL | Theme-parity report | Force dark mode (or `prefers-color-scheme`), report selectors still painting with hard-coded light-mode colors. |
-| `vrt stress i18n <url>` | Live URL | Layout stress report | Inflate text content (×2 length, multi-byte chars) and screenshot under each viewport; report overflow / wrap breakage. |
+| `vrt build component <target.png> <current.html>` | Reference image + your current HTML | Markdown report: pixel diff + bbox + palette + heatmap + text-row signals | Playwright renders `current.html` at the target's viewport, pixel-diffs vs `target.png`, surfaces image-only signals. **No VLM.** Agent iterates `current.html`. |
+| `vrt scan component <screenshot>` | Full-page PNG | `components/*.png` + `manifest.json` (bbox + role guess) | Bbox detection + clustering on the image. **No VLM.** |
+| `vrt check tokens <html-or-url>` | Page | Markdown table: violation + nearest-token | Playwright + computed-style scan; snaps to allowed scale within tolerance. **No VLM.** Internal binary name: `vrt design-tokens` (same thing — the dispatcher routes both). |
+| `vrt check theme <html>` | Page | Markdown report: "unthemed" bboxes (light/dark render same) | Playwright with `emulateMedia({ colorScheme: 'light' / 'dark' })`, per-bbox color sampling, identical-fill flag. **No VLM.** |
+| `vrt stress i18n <html>` | Page | Markdown report: selectors that overflow / wrap | Inflate every visible text node by a multiplier (synthetic `word → word + 'X'×k`), measure `scrollWidth > clientWidth` / height growth / right-edge overflow. **No VLM.** No translation dictionary. |
 
 ## Invocation
 
@@ -26,7 +28,7 @@ The `vrt` CLI in this repo is invoked **from source**:
 
 ```bash
 node --experimental-strip-types src/cli/vrt.ts <command...>
-# e.g. node --experimental-strip-types src/cli/vrt.ts build component design.png
+# e.g. node --experimental-strip-types src/cli/vrt.ts check tokens fixtures/element-compare/before.html
 ```
 
 The published binary (`./dist/vrt.mjs` or a globally installed `vrt`)
@@ -36,14 +38,15 @@ dist is stale — run `pnpm build` or use the source form. All
 
 ## When to use
 
-- **build component**: "here's a Figma export, give me the HTML/CSS"
-  workflow without manually transcribing.
-- **scan component**: "this dashboard has 8 components; extract each
-  so I can fix one at a time."
+- **build component**: "I'm reproducing this Figma export — give me
+  fast pixel signal each round so I converge without eyeballing."
+- **scan component**: "this dashboard has 8 components; I want each
+  cropped to its own PNG so I can pair-iterate with `build component`."
 - **check tokens**: drift audit before / during a design-system
-  rollout.
-- **check theme**: pre-launch sanity for a dark-mode rollout.
-- **stress i18n**: detect "DE / JP / AR will break the layout" *before*
+  rollout. Snap-to-scale lints, not subjective.
+- **check theme**: pre-launch sanity for a dark-mode rollout — finds
+  selectors that didn't migrate off hard-coded light colors.
+- **stress i18n**: detect "DE / JP / AR will break the layout" before
   the bug is filed.
 
 ## When NOT to use
@@ -55,126 +58,114 @@ dist is stale — run `pnpm build` or use the source form. All
 ## Quickstart
 
 ```bash
-# Image → component
-vrt build component design.png --output components/card.html
-# Writes components/card.html + components/card.css.
+# Image-driven build loop. You supply current.html; the tool returns
+# pixel signal each iteration. Agent (= you) edits current.html until
+# the diff converges.
+vrt build component design.png current.html --output report.md
 
 # Full screenshot → per-component crops
 vrt scan component dashboard.png --output components/
-# Writes components/<auto-name>.png for each detected component.
 
-# Token conformance
-vrt check tokens src/index.html --tokens design-tokens.json
+# Token conformance (default scales — no --tokens needed for first pass)
+vrt check tokens src/index.html
+#   ↑ uses default spacing/radius/z-index scales + 0.5px tolerance.
+#   Pass --tokens design-tokens.json to override.
 
-# Theme parity (dark mode)
-vrt check theme http://localhost:3000/ --mode dark
+# Theme parity (renders light + dark, flags identical fills)
+vrt check theme src/index.html --output-dir test-results/theme/
 
-# i18n / overflow stress
-vrt stress i18n http://localhost:3000/ \
-  --locales de,ja,ar \
-  --multiplier 2
+# i18n / overflow stress (synthetic inflate, default factor 1.4)
+vrt stress i18n src/index.html --inflate 1.4
 ```
 
-## Build component — what the VLM does
+## Build component — what the report contains
 
-`vrt build component` invokes the VLM with the reference image and a
-prompt that asks for:
+The output is a Markdown report (not an HTML/CSS file). Each section
+is a different image-only signal:
 
-1. Component-level structure (parent → children).
-2. Per-element semantic role (heading, button, input, etc.).
-3. CSS properties: layout (flex / grid), spacing, color, typography.
-4. Responsive intent if multiple viewport variants of the image are
-   provided.
+- **Bbox table** — IoU per rank-matched bbox; survives DOM rewrites.
+- **Palette** — dominant colors in target vs current; surfaces "you
+  used #2d2d2d but the target is #1e1e1e."
+- **Text-row Δy** — row-by-row vertical alignment shift.
+- **Heatmap** — concentrated regions of diff, prioritized.
+- **Per-state** (optional `--states hover focus-visible`) — re-renders
+  current.html under each interactive state and diffs each.
 
-Output is **standalone**: the generated HTML/CSS does not depend on
-any framework or external CSS reset. Combine with `vrt diff html`
-(see `vrt-visual-diff`) to verify the reproduction matches the
-target.
-
-## Scan component — what gets detected
-
-`vrt scan component` runs bbox detection on the screenshot, then
-clusters elements that look like a single component (e.g. card =
-image + title + body + actions). It outputs:
-
-- One PNG per detected component (cropped tightly).
-- A `manifest.json` listing each component's bbox + role guess.
-
-This is the right preprocessing step before running
-`vrt build component` on each piece.
+The agent iterates `current.html` between runs. There is no
+auto-fix — the tool is the eyes, the agent is the hands.
 
 ## Check tokens — what counts as a violation
 
-`vrt check tokens` flags computed-style values that are not present
-in the token set. Colours, spacing values, font sizes, and
-border-radius are checked by default. Pass `--tokens
-<path-to-tokens.json>` to override the token source. Output is a
-table:
+`vrt check tokens` flags computed-style values that aren't on the
+allowed scale within tolerance. The default scales:
+
+| Property kind | Default scale |
+|---|---|
+| `padding`, `margin`, `gap` | `0, 2, 4, 8, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96` |
+| `border-radius` | `0, 2, 4, 6, 8, 12, 16, 20, 24, 32, 48, 999` |
+| `z-index` | `0, 1, 10, 100, 1000, 9999` |
+| Tolerance | `0.5px` (snap to nearest within ±tolerance) |
+
+Output excerpt:
 
 ```
-selector       property        value         nearest-token   delta
-.card          padding-top     14px          space-3 (12px)  +2px
-.card-title    font-size       15px          fs-md (16px)    -1px
+selector             property        value     nearest-token   Δ
+main>div.sidebar     margin-top      10.00px   8               +2.00
+main>div.sidebar     padding         15.00px   16              -1.00
+footer               padding         15.00px   16              -1.00
 ```
 
-The "nearest-token" suggestion makes the fix obvious without a manual
-lookup.
-
-## Check theme — how dark-mode audit works
-
-The tool loads the URL twice (light + dark via
-`prefers-color-scheme` emulation), then surfaces:
-
-- Selectors whose `color` / `background-color` didn't change at all.
-- Selectors whose contrast ratio fails WCAG AA in dark mode.
-
-Useful as a CI gate before declaring "dark mode supported."
-
-## Stress i18n — what gets stressed
-
-For each locale × text-multiplier combination:
-
-1. Inflate every text node by the multiplier.
-2. Swap to locale-representative characters (long German, multi-byte
-   JP, RTL Arabic).
-3. Screenshot every viewport.
-4. Diff against the original; flag overflow (text spilling out of its
-   container).
-
-Report lists selectors that broke, with the worst-case screenshot
-inline.
+Override the scales with `--config <path>` (JSON: `{ radius, spacing,
+zIndex, shadowTiers, tolerance }`) or with the individual
+`--radius-scale a,b,c,...` / `--spacing-scale ...` / `--z-scale ...`
+flags.
 
 ## Environment
 
-| Variable | Required by |
-|---|---|
-| `VRT_VLM_MODEL` | All sub-tools (defaults to `bytedance/ui-tars-1.5-7b`) |
-| `OPENROUTER_API_KEY` | Unprefixed model id |
-| `GEMINI_API_KEY` | `gemini:` prefix |
-| `ANTHROPIC_API_KEY` | `claude:` prefix |
+**No API keys are required for any sub-tool in this skill.** The
+"VLM" / `VRT_VLM_MODEL` env vars listed in other VRT skills do not
+apply here.
 
-For high-quality markup synthesis (`build component`), prefer the
-`claude:claude-haiku-4-5-*` model — the cost is justified because the
-output is consumed directly. For audit tools (`check tokens` / `check
-theme`), the default ui-tars model is fine.
+The only prerequisite is Playwright with chromium installed
+(`npx playwright install chromium` if missing).
 
-## Costs
+## Cost
 
-| Tool | Typical calls | Approx cost (Haiku) |
-|---|---|---|
-| `build component` | 1-2 per component | ~$0.004 / component |
-| `scan component` | 1 per screenshot | ~$0.002 / page |
-| `check tokens` | 1 per page | ~$0.001 / page |
-| `check theme` | 2 per page (light + dark) | ~$0.004 / page |
-| `stress i18n` | locales × viewports per page | scales linearly |
+**$0 in API spend.** Each sub-tool is a deterministic Playwright +
+pixel-math run. Compute cost is whatever your local box (or CI runner)
+charges to launch chromium + render — typically 1-5s per invocation.
 
 ## Failure modes
 
-- VLM returns "image not available" → wrong model (some OpenRouter
-  models don't support image input). Switch to ui-tars-1.5-7b or
-  claude:haiku.
-- Generated HTML doesn't match image → the reference image has
-  multiple components; run `scan component` first to isolate.
-- `check theme` reports every selector as failing → dark mode isn't
-  actually enabled on the page (missing `[data-theme=dark]` toggle in
-  the URL). Pass `--theme-selector <selector>` to override.
+- "browser not found" → run `npx playwright install chromium`.
+- `build component` Δ stays > 50% across runs → the target image and
+  current.html are at different viewport sizes; the tool sizes the
+  viewport from the target image dimensions, so check the image is
+  the intended export resolution (mobile target rendered into desktop
+  HTML will never converge).
+- `check theme` reports every bbox as "unthemed" → the page didn't
+  actually respond to the `prefers-color-scheme` toggle (no
+  `[data-theme=dark]` switch in the markup). Verify by loading the
+  page with system dark mode on — if it stays light, the page has no
+  dark variant to audit.
+- `check tokens` shows zero violations even though the page clearly
+  uses ad-hoc values → you're outside the default tolerance (`0.5px`)
+  but inside the scale's snap zone. Tighten with `--tolerance 0` for a
+  strict pass.
+- `stress i18n` reports zero overflow even on a clearly fragile
+  layout → the inflate multiplier is too low; bump `--inflate 2.0` or
+  higher.
+
+## Pair with other skills
+
+After running these tools, the agent typically:
+
+1. Reads the Markdown report.
+2. Edits HTML/CSS.
+3. Re-runs the same sub-tool (`build component` loop especially).
+4. Optionally cross-validates with `vrt-visual-diff` after the markup
+   is in place.
+
+Nothing here calls a VLM — and that's intentional. Pixel diffs and
+overflow flags are cheaper, faster, and deterministic compared to
+asking a model "did this change look right?".
