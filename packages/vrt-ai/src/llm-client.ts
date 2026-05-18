@@ -9,6 +9,7 @@
  * Backwards-compatible with the existing LLMProvider interface.
  */
 import type { LLMProvider } from "./intent.ts";
+import { VrtConfigError } from "./errors.ts";
 
 // ---- Types ----
 
@@ -21,6 +22,11 @@ export interface LLMClientOptions {
   provider?: "anthropic" | "gemini" | "openrouter";
   /** Specific model */
   model?: string;
+  /**
+   * When `false`, factories return `null` instead of throwing
+   * `VrtConfigError` if the required API key is missing. Default: `true`.
+   */
+  throwIfMissing?: boolean;
 }
 
 export interface ImageContent {
@@ -288,20 +294,37 @@ function buildDiffContent(options: {
 
 export type LLMProviderName = "gemini" | "anthropic" | "openrouter";
 
+const VALID_PROVIDERS: ReadonlySet<LLMProviderName> = new Set([
+  "gemini",
+  "anthropic",
+  "openrouter",
+]);
+
 /**
  * Resolve provider and key from environment variables.
  *
  * VRT_LLM_PROVIDER: gemini (default) | anthropic | openrouter
  * VRT_LLM_MODEL: model ID (defaults to provider's default)
+ *
+ * Returns a config, or describes why no config was available. The
+ * factory decides whether to throw based on `throwIfMissing`.
  */
-function resolveProviderConfig(options?: LLMClientOptions): {
-  provider: LLMProviderName;
-  key: string;
-  model?: string;
-} | null {
-  const provider = (options?.provider
+function resolveProviderConfig(options?: LLMClientOptions):
+  | { ok: true; provider: LLMProviderName; key: string; model?: string }
+  | { ok: false; code: "INVALID_PROVIDER" | "MISSING_KEY"; message: string }
+{
+  const rawProvider = options?.provider
     ?? process.env.VRT_LLM_PROVIDER
-    ?? "gemini") as LLMProviderName;
+    ?? "gemini";
+
+  if (!VALID_PROVIDERS.has(rawProvider as LLMProviderName)) {
+    return {
+      ok: false,
+      code: "INVALID_PROVIDER",
+      message: `Unknown VRT_LLM_PROVIDER "${rawProvider}". Expected: gemini | anthropic | openrouter.`,
+    };
+  }
+  const provider = rawProvider as LLMProviderName;
 
   const model = options?.model ?? process.env.VRT_LLM_MODEL ?? undefined;
 
@@ -310,21 +333,43 @@ function resolveProviderConfig(options?: LLMClientOptions): {
     anthropic: process.env.ANTHROPIC_API_KEY,
     openrouter: process.env.OPENROUTER_API_KEY,
   };
+  const envVarName: Record<LLMProviderName, string> = {
+    gemini: "GEMINI_API_KEY (or GOOGLE_AI_API_KEY)",
+    anthropic: "ANTHROPIC_API_KEY",
+    openrouter: "OPENROUTER_API_KEY",
+  };
 
   const key = keyMap[provider];
-  if (!key) return null;
+  if (!key) {
+    return {
+      ok: false,
+      code: "MISSING_KEY",
+      message: `${envVarName[provider]} is required for provider "${provider}".`,
+    };
+  }
 
-  return { provider, key, model };
+  return { ok: true, provider, key, model };
 }
 
 /**
  * Create a unified LLM client.
  *
- * Provider is set via VRT_LLM_PROVIDER env var (default: gemini).
+ * Provider is set via `VRT_LLM_PROVIDER` env var (default: `gemini`).
+ *
+ * Throws `VrtConfigError` when the resolved provider has no API key
+ * (`code: "MISSING_KEY"`) or the provider value is unknown
+ * (`code: "INVALID_PROVIDER"`). Pass `{ throwIfMissing: false }` for
+ * legacy `T | null` return.
  */
 export function createUnifiedLLMClient(options?: LLMClientOptions): UnifiedLLMClient | null {
+  const throwIfMissing = options?.throwIfMissing ?? true;
   const config = resolveProviderConfig(options);
-  if (!config) return null;
+  if (!config.ok) {
+    if (throwIfMissing) {
+      throw new VrtConfigError(config.code, config.message);
+    }
+    return null;
+  }
 
   switch (config.provider) {
     case "anthropic":
@@ -336,21 +381,41 @@ export function createUnifiedLLMClient(options?: LLMClientOptions): UnifiedLLMCl
   }
 }
 
+export interface CreateLLMProviderOptions {
+  /**
+   * When `false`, returns `null` instead of throwing `VrtConfigError`
+   * if no provider has an API key. Default: `true`.
+   */
+  throwIfMissing?: boolean;
+}
+
 /**
- * Backwards-compatible: returns the existing LLMProvider interface.
- * Uses the provider specified by VRT_LLM_PROVIDER.
- * Falls back to other providers if key is missing.
+ * Backwards-compatible: returns the existing `LLMProvider` interface.
+ * Uses the provider specified by `VRT_LLM_PROVIDER`. Falls back to
+ * other providers if the requested key is missing.
+ *
+ * Throws `VrtConfigError` (`code: "NO_PROVIDER_AVAILABLE"`) when no
+ * provider in the fallback chain has an API key. Pass
+ * `{ throwIfMissing: false }` for the legacy `T | null` return.
  */
-export function createLLMProvider(): LLMProvider | null {
-  const client = createUnifiedLLMClient();
+export function createLLMProvider(options?: CreateLLMProviderOptions): LLMProvider | null {
+  const throwIfMissing = options?.throwIfMissing ?? true;
+  // Try requested/default provider first without throwing — we'll fall back.
+  const client = createUnifiedLLMClient({ throwIfMissing: false });
   if (client) return { complete: (prompt: string) => client.complete(prompt) };
 
   // Fallback: use any available key
   const fallbackOrder: LLMProviderName[] = ["gemini", "anthropic", "openrouter"];
   for (const provider of fallbackOrder) {
-    const fb = createUnifiedLLMClient({ provider });
+    const fb = createUnifiedLLMClient({ provider, throwIfMissing: false });
     if (fb) return { complete: (prompt: string) => fb.complete(prompt) };
   }
 
+  if (throwIfMissing) {
+    throw new VrtConfigError(
+      "NO_PROVIDER_AVAILABLE",
+      "No LLM provider available. Set one of: GEMINI_API_KEY, ANTHROPIC_API_KEY, OPENROUTER_API_KEY.",
+    );
+  }
   return null;
 }

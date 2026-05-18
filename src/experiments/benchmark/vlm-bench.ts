@@ -135,7 +135,7 @@ Be specific. One change per line. Format: "- [element] property: old → new (se
 
   for (const model of models) {
     process.stdout.write(`  ${model.id.padEnd(50)} `);
-    const client = await createVlmClient(model);
+    const client = await createVlmClient(model, { throwIfMissing: false });
     if (!client) { console.log(`${RED}no key${RESET}`); continue; }
 
     try {

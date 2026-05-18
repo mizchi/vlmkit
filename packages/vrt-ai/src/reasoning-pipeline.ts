@@ -11,6 +11,7 @@
  */
 import { createUnifiedLLMClient } from "./llm-client.ts";
 import { createVlmClient, resolveModel, type VlmClient } from "./vlm-client.ts";
+import { VrtConfigError } from "./errors.ts";
 import { resizeBase64Png, type ResolutionPreset } from "@mizchi/vrt-core/image-resize.ts";
 
 // ---- Types ----
@@ -62,6 +63,11 @@ export interface PipelineConfig {
   adaptiveResolution?: boolean;
   /** Escalation ceiling (default: high) */
   maxResolution?: ResolutionPreset;
+  /**
+   * When `false`, returns `null` instead of throwing `VrtConfigError`
+   * if neither VLM nor LLM credentials are available. Default: `true`.
+   */
+  throwIfMissing?: boolean;
 }
 
 export interface AnalyzeOptions {
@@ -235,36 +241,48 @@ function parseStage2Response(raw: string): { fixes: CssFix[]; explanation: strin
 // ---- Pipeline factory ----
 
 export function createReasoningPipeline(config?: PipelineConfig): ReasoningPipeline | null {
+  const throwIfMissing = config?.throwIfMissing ?? true;
   // Stage 1: VLM
   let vlmClient: VlmClient | null = null;
   let vlmModelId = config?.vlmModel ?? process.env.VRT_VLM_MODEL ?? "qwen/qwen3-vl-8b-instruct";
 
-  // Stage 2: LLM (try configured, then fallback)
+  // Stage 2: LLM (try configured, then fallback). Always non-throwing here
+  // — we synthesize a single ConfigError below if everything fails.
   let llmClient = createUnifiedLLMClient({
     provider: config?.llmProvider,
     model: config?.llmModel,
+    throwIfMissing: false,
   });
   if (!llmClient) {
     // Fallback: try each provider
     for (const provider of ["gemini", "anthropic", "openrouter"] as const) {
-      llmClient = createUnifiedLLMClient({ provider });
+      llmClient = createUnifiedLLMClient({ provider, throwIfMissing: false });
       if (llmClient) break;
     }
   }
 
   // Need at least VLM or LLM
-  if (!llmClient && !process.env.OPENROUTER_API_KEY) return null;
+  if (!llmClient && !process.env.OPENROUTER_API_KEY) {
+    if (throwIfMissing) {
+      throw new VrtConfigError(
+        "NO_PROVIDER_AVAILABLE",
+        "Reasoning pipeline needs an LLM (GEMINI/ANTHROPIC/OPENROUTER_API_KEY) or a VLM (OPENROUTER_API_KEY).",
+      );
+    }
+    return null;
+  }
 
   return {
     vlmModel: vlmModelId,
     llmModel: llmClient?.model ?? "none",
 
     async analyze(options) {
-      // Lazy init VLM client
+      // Lazy init VLM client — swallow config errors here so the pipeline
+      // can degrade to LLM-only mode (handled in the next branch).
       if (!vlmClient) {
         try {
           const model = await resolveModel(vlmModelId);
-          vlmClient = await createVlmClient(model);
+          vlmClient = await createVlmClient(model, { throwIfMissing: false });
         } catch {
           vlmClient = null;
         }

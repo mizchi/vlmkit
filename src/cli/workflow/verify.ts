@@ -14,7 +14,7 @@ import { buildDepGraph, findAffectedComponents, graphStats } from "@mizchi/vrt-m
 import { extractDiffSemantics } from "@mizchi/vrt-ai/intent.ts";
 import { compareScreenshots } from "@mizchi/vrt-core/heatmap.ts";
 import { classifyVisualDiff } from "@mizchi/vrt-core/visual-semantic.ts";
-import { diffA11yTrees, parsePlaywrightA11ySnapshot, checkA11yTree } from "@mizchi/vrt-core/a11y-semantic.ts";
+import { diffA11yTrees, parsePlaywrightA11ySnapshot, verifyA11yTree } from "@mizchi/vrt-core/a11y-semantic.ts";
 import { crossValidate, crossValidationToQualityChecks } from "../../experiments/detection/cross-validation.ts";
 import { loadExpectation, crossValidateWithExpectation, scoreLoop } from "../../vrt/snapshot/expectation.ts";
 import { runQualityChecks } from "@mizchi/vrt-core/quality.ts";
@@ -147,7 +147,7 @@ export async function runVerifyPipeline(paths: VerifyPaths): Promise<VerifyResul
       }
 
       // A11y quality check on current snapshot
-      const issues = checkA11yTree(snapSnap.tree);
+      const issues = verifyA11yTree(snapSnap.tree);
       if (issues.length > 0) {
         console.log(`  A11Y ISSUES in ${name}:`);
         for (const issue of issues) {

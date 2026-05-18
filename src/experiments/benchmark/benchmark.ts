@@ -212,7 +212,7 @@ async function main() {
 
   // ---- A11y tree diff ----
   {
-    const { diffA11yTrees, checkA11yTree } = await import("@mizchi/vrt-core/a11y-semantic.ts");
+    const { diffA11yTrees, verifyA11yTree } = await import("@mizchi/vrt-core/a11y-semantic.ts");
     const tree = JSON.parse(await readFile(join(import.meta.dirname!, "..", "..", "..", "fixtures", "github-repo", "baseline-desktop.a11y.json"), "utf-8"));
     const snap = (t: any) => ({ testId: "test", testTitle: "test", tree: t });
 
@@ -221,8 +221,8 @@ async function main() {
     }, 200);
     results.push(r1);
 
-    const r2 = await bench("checkA11yTree (github page)", () => {
-      checkA11yTree(tree);
+    const r2 = await bench("verifyA11yTree (github page)", () => {
+      verifyA11yTree(tree);
     }, 500);
     results.push(r2);
   }

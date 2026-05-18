@@ -11,7 +11,7 @@
  */
 import { readFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { diffA11yTrees, parsePlaywrightA11ySnapshot, checkA11yTree } from "@mizchi/vrt-core/a11y-semantic.ts";
+import { diffA11yTrees, parsePlaywrightA11ySnapshot, verifyA11yTree } from "@mizchi/vrt-core/a11y-semantic.ts";
 import { reasonAboutChanges, type ReasoningChain } from "@mizchi/vrt-ai/reasoning.ts";
 import { introspectToSpec, verifySpec } from "@mizchi/vrt-markup/inspect/introspect.ts";
 import { compareScreenshots } from "@mizchi/vrt-core/heatmap.ts";
@@ -119,7 +119,7 @@ function diffTrees(base: A11yNode, snap: A11yNode) {
 }
 
 function printA11yIssues(tree: A11yNode) {
-  const issues = checkA11yTree(tree);
+  const issues = verifyA11yTree(tree);
   if (issues.length === 0) {
     console.log(`  ${GREEN}✓ No a11y issues${RESET}`);
     return;
@@ -149,7 +149,7 @@ function printReasoning(chain: ReasoningChain) {
 
 function buildDiagnosisPrompt(
   a11yDiff: ReturnType<typeof diffTrees>,
-  issues: ReturnType<typeof checkA11yTree>,
+  issues: ReturnType<typeof verifyA11yTree>,
   specFailed: Array<{ invariant: { description: string }; reasoning: string }>,
   chain: ReasoningChain,
 ): string {
@@ -180,7 +180,7 @@ Based on the above, provide:
 Be concise. Focus on actionable fixes.`;
 }
 
-function generateFixPlan(chain: ReasoningChain, issues: ReturnType<typeof checkA11yTree>): string[] {
+function generateFixPlan(chain: ReasoningChain, issues: ReturnType<typeof verifyA11yTree>): string[] {
   const plan: string[] = [];
 
   // Extract fix items from unmatched reasoning
@@ -279,7 +279,7 @@ async function main() {
 
   // A11y quality check
   console.log(`\n  ${BOLD}A11y Quality:${RESET}`);
-  const brokenIssues = checkA11yTree(broken);
+  const brokenIssues = verifyA11yTree(broken);
   printA11yIssues(broken);
 
   // Spec verification
@@ -312,7 +312,7 @@ async function main() {
   // ============================================================
   banner("Phase 3: AI Diagnosis & Fix Plan");
 
-  const llm = createLLMProvider();
+  const llm = createLLMProvider({ throwIfMissing: false });
 
   if (llm) {
     console.log(`  ${DIM}Calling LLM for diagnosis...${RESET}\n`);
@@ -413,7 +413,7 @@ ${fixedDiff.changes.map((c) => `- [${c.type}] ${c.description}`).join("\n")}
 
 ## Verification Results
 - Spec violations: ${fixedSpecFailed.length}
-- A11y quality issues: ${checkA11yTree(fixed).length}
+- A11y quality issues: ${verifyA11yTree(fixed).length}
 - Reasoning verdict: ${fixChain.verdict}
 - All expected changes realized: ${fixChain.mappings.every((m) => m.realized)}
 

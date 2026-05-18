@@ -20,7 +20,7 @@ import {
 } from "../../vrt/snapshot/approval.ts";
 import { compareScreenshots } from "@mizchi/vrt-core/heatmap.ts";
 import { classifyVisualDiff } from "@mizchi/vrt-core/visual-semantic.ts";
-import { diffA11yTrees, checkA11yTree, parsePlaywrightA11ySnapshot } from "@mizchi/vrt-core/a11y-semantic.ts";
+import { diffA11yTrees, verifyA11yTree, parsePlaywrightA11ySnapshot } from "@mizchi/vrt-core/a11y-semantic.ts";
 import { CraterClient, diffPaintTrees, type PaintNode, type PaintTreeChange } from "@mizchi/vrt-capture/crater-client.ts";
 import {
   filterComputedStyleDiffsByTargets,
@@ -625,8 +625,8 @@ export async function analyzeVrtDiff(
     parsePlaywrightA11ySnapshot("page", "page", brokenState.a11yTree as any),
   );
 
-  const baselineIssueCount = checkA11yTree(baselineState.a11yTree).length;
-  const brokenIssueCount = checkA11yTree(brokenState.a11yTree).length;
+  const baselineIssueCount = verifyA11yTree(baselineState.a11yTree).length;
+  const brokenIssueCount = verifyA11yTree(brokenState.a11yTree).length;
 
   let a11yReport = "";
   if (a11yDiff.changes.length > 0) {
