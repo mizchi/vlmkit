@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { computeSectionDiffRows, formatMigrationReportForAgent, type DfaReport } from "./diff-for-agent.ts";
+import {
+  buildPreviousRunSummary,
+  computeSectionDiffRows,
+  detectRegression,
+  formatMigrationReportForAgent,
+  type DfaReport,
+  type PreviousRunSummary,
+} from "./diff-for-agent.ts";
 
 function sampleReport(over: Partial<DfaReport> = {}): DfaReport {
   return {
@@ -175,5 +182,110 @@ describe("formatMigrationReportForAgent", () => {
     assert.equal(rows[0].sectionRatio, 0.25);
     assert.equal(rows[1].rank, 2);
     assert.equal(rows[1].sectionRatio, 0.01);
+  });
+
+  it("fires the regression banner when the majority of viewports got worse", () => {
+    const previous: PreviousRunSummary = {
+      timestamp: "2026-05-18T00:00:00Z",
+      reportPath: "/work/fix/out/migration-report.prev.json",
+      byVariant: { "working.html": { mobile: 0.2, desktop: 0.1 } },
+    };
+    // Both viewports got worse: mobile 0.20 → 0.41, desktop 0.10 → 0.24
+    const md = formatMigrationReportForAgent(sampleReport(), { previous });
+    assert.match(md, /⚠ REGRESSION/);
+    assert.match(md, /2 of 2 viewports got worse/);
+    assert.match(md, /Previous report.*migration-report\.prev\.json/);
+  });
+
+  it("suppresses the regression banner when only a single viewport got worse (noise floor)", () => {
+    const previous: PreviousRunSummary = {
+      byVariant: { "working.html": { mobile: 0.2, desktop: 0.30 } },
+    };
+    // Only mobile got worse (desktop went from 0.30 → 0.24, an
+    // improvement). With totalViewports=2 the default threshold is 2,
+    // so the alarm should not fire on 1/2.
+    const md = formatMigrationReportForAgent(sampleReport(), { previous });
+    assert.doesNotMatch(md, /⚠ REGRESSION/);
+  });
+
+  it("ignores subpixel jitter under the epsilon threshold", () => {
+    const previous: PreviousRunSummary = {
+      // Just barely below current values — within the 0.005 epsilon.
+      byVariant: { "working.html": { mobile: 0.408, desktop: 0.237 } },
+    };
+    const md = formatMigrationReportForAgent(sampleReport(), { previous });
+    assert.doesNotMatch(md, /⚠ REGRESSION/);
+  });
+
+  it("does nothing when there's no comparable previous data for the variant", () => {
+    const previous: PreviousRunSummary = {
+      byVariant: { "other-variant.html": { mobile: 0.1 } },
+    };
+    const md = formatMigrationReportForAgent(sampleReport(), { previous });
+    assert.doesNotMatch(md, /⚠ REGRESSION/);
+  });
+});
+
+describe("detectRegression", () => {
+  const previous: PreviousRunSummary = {
+    timestamp: "2026-05-18T00:00:00Z",
+    byVariant: {
+      "v.html": { vp1: 0.1, vp2: 0.2, vp3: 0.3, vp4: 0.4, vp5: 0.5 },
+    },
+  };
+
+  it("threshold default is max(2, ceil(n/2)); 3 of 5 worsened fires the alarm", () => {
+    const finding = detectRegression(
+      [
+        { viewport: "vp1", diffRatio: 0.15 },  // +0.05  worse
+        { viewport: "vp2", diffRatio: 0.25 },  // +0.05  worse
+        { viewport: "vp3", diffRatio: 0.35 },  // +0.05  worse
+        { viewport: "vp4", diffRatio: 0.40 },  // ±0     unchanged
+        { viewport: "vp5", diffRatio: 0.50 },  // ±0     unchanged
+      ],
+      previous,
+      "v.html",
+    );
+    assert.ok(finding);
+    assert.equal(finding!.regressed, true);
+    assert.equal(finding!.worsenedViewports.length, 3);
+    assert.equal(finding!.threshold, 3);
+  });
+
+  it("2 of 5 worsened does NOT fire (below threshold)", () => {
+    const finding = detectRegression(
+      [
+        { viewport: "vp1", diffRatio: 0.15 },
+        { viewport: "vp2", diffRatio: 0.25 },
+        { viewport: "vp3", diffRatio: 0.30 },
+        { viewport: "vp4", diffRatio: 0.40 },
+        { viewport: "vp5", diffRatio: 0.50 },
+      ],
+      previous,
+      "v.html",
+    );
+    assert.ok(finding);
+    assert.equal(finding!.regressed, false);
+  });
+
+  it("1 worsened viewport never fires even when n=1 (floor of 2)", () => {
+    const prevOne: PreviousRunSummary = {
+      byVariant: { "v.html": { only: 0.1 } },
+    };
+    const finding = detectRegression(
+      [{ viewport: "only", diffRatio: 0.99 }],
+      prevOne,
+      "v.html",
+    );
+    assert.ok(finding);
+    assert.equal(finding!.regressed, false);
+    assert.equal(finding!.threshold, 2);
+  });
+
+  it("buildPreviousRunSummary round-trips per-variant per-viewport diff", () => {
+    const summary = buildPreviousRunSummary(sampleReport(), { timestamp: "fixed" });
+    assert.equal(summary.timestamp, "fixed");
+    assert.equal(summary.byVariant["working.html"]?.mobile, 0.4113);
+    assert.equal(summary.byVariant["working.html"]?.desktop, 0.2398);
   });
 });
