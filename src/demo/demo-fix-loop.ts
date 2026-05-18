@@ -312,7 +312,7 @@ async function main() {
   // ============================================================
   banner("Phase 3: AI Diagnosis & Fix Plan");
 
-  const llm = createLLMProvider();
+  const llm = createLLMProvider({ throwIfMissing: false });
 
   if (llm) {
     console.log(`  ${DIM}Calling LLM for diagnosis...${RESET}\n`);

@@ -152,7 +152,7 @@ async function resolveFix(input: {
     if (fix) return fix;
   }
 
-  const llm = createLLMProvider();
+  const llm = createLLMProvider({ throwIfMissing: false });
   if (!llm || DRY_RUN) return null;
   const response = await llm.complete(input.prompt);
   return parseMigrationFixResponse(response);

@@ -347,7 +347,7 @@ async function main() {
   console.log(`${B}${C}║  3 scenarios × AI reasoning × kitty graphics               ║${R}`);
   console.log(`${B}${C}╚════════════════════════════════════════════════════════════╝${R}`);
 
-  const llm = createLLMProvider();
+  const llm = createLLMProvider({ throwIfMissing: false });
   if (llm) {
     console.log(`\n  ${G}✓ ANTHROPIC_API_KEY detected — AI reasoning enabled${R}`);
   } else {

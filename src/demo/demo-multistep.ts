@@ -154,7 +154,7 @@ async function main() {
   console.log(`${B}${C}║  Multi-Step Goal Demo: Dashboard Rebuild (6 steps)           ║${R}`);
   console.log(`${B}${C}╚═══════════════════════════════════════════════════════════════╝${R}`);
 
-  const llm = createLLMProvider();
+  const llm = createLLMProvider({ throwIfMissing: false });
   if (llm) console.log(`\n  ${G}✓ AI reasoning enabled${R}`);
   else     console.log(`\n  ${Y}! AI skipped (set ANTHROPIC_API_KEY)${R}`);
 

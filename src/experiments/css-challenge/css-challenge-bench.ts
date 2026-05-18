@@ -307,7 +307,7 @@ async function runFixtureBenchmark(fixture: string) {
     TRACKED_PROPERTIES,
     collectComputedStyleTrackingProperties(declarations),
   );
-  const llm = createLLMProvider();
+  const llm = createLLMProvider({ throwIfMissing: false });
   const approvalManifest = APPROVAL_PATH ? await loadApprovalManifest(APPROVAL_PATH) : null;
   const approvalWarnings = approvalManifest ? collectApprovalWarnings(approvalManifest) : [];
 
