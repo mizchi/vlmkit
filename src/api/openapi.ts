@@ -140,12 +140,23 @@ function buildSchemas(): Record<string, OpenApiSchema> {
       },
       required: ["name", "available"],
     },
+    StorageStatus: {
+      type: "object",
+      properties: {
+        r2: { type: "boolean" },
+        kv: { type: "boolean" },
+        d1: { type: "boolean" },
+        available: { type: "boolean" },
+      },
+      required: ["r2", "kv", "d1", "available"],
+    },
     StatusResponse: {
       type: "object",
       properties: {
         version: { type: "string" },
         capabilities: arrayOf({ type: "string" }),
         backends: arrayOf(ref("BackendStatus")),
+        storage: ref("StorageStatus"),
       },
       required: ["version", "capabilities", "backends"],
     },

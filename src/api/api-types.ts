@@ -361,10 +361,18 @@ export interface StatusResponse {
   version: string;
   capabilities: string[];
   backends: BackendStatus[];
+  storage?: StorageStatus;
 }
 
 export interface BackendStatus {
   name: string;
   available: boolean;
   version?: string;
+}
+
+export interface StorageStatus {
+  r2: boolean;
+  kv: boolean;
+  d1: boolean;
+  available: boolean;
 }

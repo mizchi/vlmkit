@@ -4,6 +4,7 @@ import type {
   CompareResponse,
   HtmlSource,
   SmokeTestRequest,
+  StorageStatus,
   StatusResponse,
   ViewportResult,
   PixelDiffResult,
@@ -17,6 +18,7 @@ export interface CreateApiAppOptions {
   maxBodySize?: number;
   serverUrl?: string;
   resolveCraterAvailable?: () => Promise<boolean>;
+  resolveStorageStatus?: () => Promise<StorageStatus | undefined> | StorageStatus | undefined;
 }
 
 export function createApiApp(options: CreateApiAppOptions = {}) {
@@ -40,13 +42,25 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     const craterAvailable = options.resolveCraterAvailable
       ? await options.resolveCraterAvailable()
       : await loadCraterAvailability();
+    const storage = options.resolveStorageStatus
+      ? await options.resolveStorageStatus()
+      : undefined;
     const status: StatusResponse = {
       version: API_VERSION,
-      capabilities: ["compare", "compare-renderers", "smoke-test", "reason", "report", "openapi"],
+      capabilities: [
+        "compare",
+        "compare-renderers",
+        "smoke-test",
+        "reason",
+        "report",
+        "openapi",
+        ...(storage?.available ? ["storage"] : []),
+      ],
       backends: [
         { name: "chromium", available: true },
         { name: "crater", available: craterAvailable },
       ],
+      storage,
     };
     return c.json(status);
   });

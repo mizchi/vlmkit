@@ -431,6 +431,8 @@ Available endpoints:
 - `POST /api/reason` — VLM/LLM reasoning pipeline for diff analysis and fixes
 - `POST /api/smoke-test` — random or reasoning-guided a11y smoke test
 
+When running on Workers, `/api/status` also reports detected `R2` / `KV` / `D1` storage bindings.
+
 TypeScript client:
 
 ```ts
