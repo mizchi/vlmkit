@@ -64,7 +64,7 @@ import {
   type RenderSanityResult,
 } from "../../vrt/compare/render-sanity.ts";
 import {
-  evaluateDomEquivalence,
+  verifyDomEquivalence,
   DOM_FINGERPRINT_BROWSER_SCRIPT,
   type DomFingerprint,
   type DomEquivalenceResult,
@@ -1030,7 +1030,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       // DOM-equivalence preflight comparison (variant-side completion)
       if (domEnabled && baselineDomFingerprint && variantDomFingerprint) {
         const variantFileLabel = variant.url || variant.file;
-        const result = evaluateDomEquivalence(baselineDomFingerprint, variantDomFingerprint);
+        const result = verifyDomEquivalence(baselineDomFingerprint, variantDomFingerprint);
         domEquivalenceReports.push({ variantFile: variantFileLabel, result });
         if (!result.ok) {
           console.log(`  ${YELLOW}DOM equivalence warnings for ${variantName}:${RESET}`);

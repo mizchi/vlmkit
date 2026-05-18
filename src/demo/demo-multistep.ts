@@ -10,7 +10,7 @@
  */
 import { readFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { diffA11yTrees, parsePlaywrightA11ySnapshot, checkA11yTree } from "@mizchi/vrt-core/a11y-semantic.ts";
+import { diffA11yTrees, parsePlaywrightA11ySnapshot, verifyA11yTree } from "@mizchi/vrt-core/a11y-semantic.ts";
 import { reasonAboutChanges, type ReasoningChain } from "@mizchi/vrt-ai/reasoning.ts";
 import { encodePng } from "@mizchi/vrt-core/png-utils.ts";
 import { createLLMProvider } from "@mizchi/vrt-ai/llm-client.ts";
@@ -118,7 +118,7 @@ function printDiff(d: ReturnType<typeof diff>) {
 }
 
 function printIssues(tree: A11yNode): number {
-  const issues = checkA11yTree(tree);
+  const issues = verifyA11yTree(tree);
   if (issues.length === 0) { console.log(`    ${G}✓ A11y: clean${R}`); return 0; }
   for (const i of issues.slice(0, 5)) console.log(`    ${RE}✗${R} ${i.rule}: ${i.message}`);
   if (issues.length > 5) console.log(`    ${D}+${issues.length - 5} more${R}`);
@@ -301,7 +301,7 @@ Detected a11y changes:
 ${d.changes.map(c => `- [${c.type}] ${c.description}`).join("\n")}
 
 A11y quality issues: ${issueCount}
-${checkA11yTree(tree).map(i => `- ${i.rule}: ${i.message}`).join("\n")}
+${verifyA11yTree(tree).map(i => `- ${i.rule}: ${i.message}`).join("\n")}
 
 Expected but not realized:
 ${chain.mappings.filter(m => !m.realized).map(m => `- ${m.expected}`).join("\n")}
@@ -337,7 +337,7 @@ In 3-4 sentences: explain what went wrong and give the specific fix.`,
 
   // Final spec check
   const finalTree = await loadTree("dashboard-step5-complete.a11y.json");
-  const finalIssues = checkA11yTree(finalTree);
+  const finalIssues = verifyA11yTree(finalTree);
   console.log(`\n  ${B}Final a11y:${R} ${finalIssues.length === 0 ? `${BG_G}${B} CLEAN ${R}` : `${RE}${finalIssues.length} issues${R}`}`);
 
   console.log();

@@ -11,7 +11,7 @@
  */
 import { readFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { diffA11yTrees, parsePlaywrightA11ySnapshot, checkA11yTree } from "@mizchi/vrt-core/a11y-semantic.ts";
+import { diffA11yTrees, parsePlaywrightA11ySnapshot, verifyA11yTree } from "@mizchi/vrt-core/a11y-semantic.ts";
 import { reasonAboutChanges, type ReasoningChain } from "@mizchi/vrt-ai/reasoning.ts";
 import { introspectToSpec, verifySpec } from "@mizchi/vrt-markup/inspect/introspect.ts";
 import { encodePng } from "@mizchi/vrt-core/png-utils.ts";
@@ -109,7 +109,7 @@ function printDiff(diff: ReturnType<typeof diffTrees>) {
 }
 
 function printIssues(tree: A11yNode) {
-  const issues = checkA11yTree(tree);
+  const issues = verifyA11yTree(tree);
   if (issues.length === 0) { console.log(`    ${G}✓ No a11y issues${R}`); return issues; }
   for (const i of issues) console.log(`    ${RE}✗${R} ${i.rule}: ${i.message}`);
   return issues;
@@ -210,7 +210,7 @@ async function scenarioB(llm: LLMProvider | null, baseline: A11yNode) {
   console.log(`    ${B}A11y:${R} ${diff1.changes.length} changes`);
   printDiff(diff1);
 
-  const issues1 = checkA11yTree(noLabel);
+  const issues1 = verifyA11yTree(noLabel);
   const searchIssues = issues1.filter(i => i.path.includes("search"));
   console.log(`    ${B}A11y Quality:${R} ${RE}${searchIssues.length} issues in search${R}`);
   for (const i of searchIssues) console.log(`    ${RE}✗${R} ${i.message} (${i.path.split(" > ").pop()})`);
@@ -248,7 +248,7 @@ In 3-4 sentences: explain the a11y impact and give specific fixes (attribute nam
   const withLabelPath = await makePng("b-labeled.png", [...HDR, ...SEARCH_OK, ...HEAD, ...FORM({r:35,g:134,b:54})]);
   await showFile(withLabelPath, "Search with labels:");
 
-  const issues2 = checkA11yTree(withLabel);
+  const issues2 = verifyA11yTree(withLabel);
   const searchIssues2 = issues2.filter(i => i.path.includes("search"));
   console.log(`    Search a11y issues: ${searchIssues2.length === 0 ? `${G}0${R}` : `${RE}${searchIssues2.length}${R}`}`);
 

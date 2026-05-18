@@ -19,7 +19,7 @@ import { getCssChallengeFixturePath } from "./css-challenge-fixtures.ts";
 import { categorizeProperty, escapeRegex } from "./css-challenge-core.ts";
 import { compareScreenshots } from "@mizchi/vrt-core/heatmap.ts";
 import { classifyVisualDiff } from "@mizchi/vrt-core/visual-semantic.ts";
-import { diffA11yTrees, checkA11yTree, parsePlaywrightA11ySnapshot } from "@mizchi/vrt-core/a11y-semantic.ts";
+import { diffA11yTrees, verifyA11yTree, parsePlaywrightA11ySnapshot } from "@mizchi/vrt-core/a11y-semantic.ts";
 import { createLLMProvider } from "@mizchi/vrt-ai/llm-client.ts";
 import type { A11yNode, VrtSnapshot } from "@mizchi/vrt-core/types.ts";
 import { getArg, hasFlag } from "@mizchi/vrt-core/cli-args.ts";
@@ -310,7 +310,7 @@ async function main() {
   const baselineState = await capturePageState(htmlRaw, baselinePath);
   await showPng(baselinePath, "Baseline");
 
-  const baselineIssues = checkA11yTree(baselineState.a11yTree);
+  const baselineIssues = verifyA11yTree(baselineState.a11yTree);
   console.log(`  ${DIM}A11y issues: ${baselineIssues.length}${RESET}`);
 
   let nodeCount = 0;
@@ -404,7 +404,7 @@ async function main() {
     a11yReport = "No a11y tree changes detected.";
   }
 
-  const brokenIssues = checkA11yTree(brokenState.a11yTree);
+  const brokenIssues = verifyA11yTree(brokenState.a11yTree);
   if (brokenIssues.length > baselineIssues.length) {
     const newIssues = brokenIssues.length - baselineIssues.length;
     console.log(`  ${RED}New a11y issues: ${newIssues}${RESET}`);
