@@ -28,8 +28,8 @@ import {
   mergeApprovalManifest,
   parseApprovalManifest,
   validateApprovalManifest,
-} from "./approval.ts";
-import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "./terminal-colors.ts";
+} from "./vrt/snapshot/approval.ts";
+import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vrt-core/terminal-colors.ts";
 
 const DEFAULT_MANIFEST_PATH = "approval.json";
 

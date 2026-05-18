@@ -14,19 +14,19 @@ import {
   analyzeA11yContrastSamples,
   type A11yContrastRawSample,
   type ContrastFinding,
-} from "./a11y-contrast.ts";
+} from "@mizchi/vrt-core/a11y-contrast.ts";
 import {
   A11Y_TOUCH_SAMPLE_SCRIPT,
   analyzeA11yTouchSamples,
   type A11yTouchRawSample,
   type TouchTargetFinding,
   type WcagTouchLevel,
-} from "./a11y-touch.ts";
+} from "@mizchi/vrt-core/a11y-touch.ts";
 import {
   analyzeFocusOrderSteps,
   collectFocusStepsOnPage,
   type FocusOrderFinding,
-} from "./a11y-focus-order.ts";
+} from "@mizchi/vrt-core/a11y-focus-order.ts";
 import {
   A11Y_SEMANTIC_SAMPLE_SCRIPT,
   analyzeA11ySemanticSamples,

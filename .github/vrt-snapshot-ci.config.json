@@ -1,0 +1,11 @@
+{
+  "baseUrl": "http://127.0.0.1:4174",
+  "routes": [
+    { "path": "/page.html", "label": "page" },
+    { "path": "/dashboard.html", "label": "dashboard" },
+    { "path": "/form-app.html", "label": "form-app" },
+    { "path": "/landing-product.html", "label": "landing-product" }
+  ],
+  "outputDir": "../test-results/snapshots/ci",
+  "threshold": 0.1
+}

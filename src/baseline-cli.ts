@@ -54,7 +54,7 @@ import {
   loadDiffPrConfig,
   type DiffPrConfig,
 } from "./diff-pr-config.ts";
-import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "./terminal-colors.ts";
+import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vrt-core/terminal-colors.ts";
 
 function getArg(args: string[], name: string): string | undefined {
   const i = args.indexOf(`--${name}`);

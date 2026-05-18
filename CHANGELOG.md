@@ -217,7 +217,7 @@ capability survey at `docs/reports/2026-05-13-capability-survey.md`.
 ### Infrastructure
 
 - All new CLIs registered under the unified `vrt` dispatcher
-  (`src/vrt.ts` + `src/vrt-command-router.ts`). Fixed a long-standing
+  (`src/cli/vrt.ts` + `src/cli/router.ts`). Fixed a long-standing
   dispatcher bug where `process.argv[1]` was a relative path,
   silently breaking each module's `isCliEntry` check in dev mode.
 - Smoke test (`scripts/smoke-all-clis.sh`) — runs every

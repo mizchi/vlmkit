@@ -2,7 +2,7 @@
 
 ## CLI Command System
 
-Entry point: `src/vrt.ts`
+Entry point: `src/cli/vrt.ts`
 
 ```
 vrt compare <before> <after>           # HTML/URL VRT comparison
@@ -75,7 +75,7 @@ src/
 │
 ├── [Approval]
 │   ├── approval.ts             # Diff approval rules
-│   └── vrt-approve.ts          # Interactive approval CLI
+│   └── bench-approve.ts        # Interactive CSS-bench approval CLI
 │
 └── [flaker Integration]
     ├── flaker-vrt-runner.ts    # flaker custom runner protocol

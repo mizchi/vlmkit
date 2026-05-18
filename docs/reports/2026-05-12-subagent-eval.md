@@ -182,7 +182,7 @@ selectors that make up the bulk of the migration.
 
 ## Subagent C — addendum (same day, after shipping `--dom-position-diff`)
 
-After A's eval, I shipped `src/dom-position-styles.ts` plus the
+After A's eval, I shipped `packages/vrt-core/src/dom-position-styles.ts` plus the
 `migration-compare --dom-position-diff` flag — the wish-list #1 item
 that closes the "class-rename blind spot" both subagents flagged.
 The new "Verified deltas by DOM position (class-rename-aware)"
@@ -446,7 +446,7 @@ viewport at 0.23%, best at 0.11%. All viewports under 1%.
    `diff-for-agent` output. Subsequent investigation revealed two
    independent bugs:
 
-   a. **Null byte corruption.** `src/diff-for-agent.ts` had a
+   a. **Null byte corruption.** `src/vrt/compare/diff-for-agent.ts` had a
    single 0x00 byte at offset 10039 (inside a template literal
    in `extractClassRenameMap`). `grep` treated the file as binary
    and silently skipped pattern matches. The committed code
@@ -497,7 +497,7 @@ chasing pixelmatch artifacts.
 
 ### Bugs fixed by this addendum
 
-1. `src/diff-for-agent.ts` null byte at offset 10039 → all output
+1. `src/vrt/compare/diff-for-agent.ts` null byte at offset 10039 → all output
    sections after that point invisible to text-mode grep.
 2. Shift-origin section: when bands are "phantom" (no element-level
    Δy explanation), report now emits a "Phantom shifts" callout

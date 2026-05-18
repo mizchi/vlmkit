@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { detectZeroCrossings, diffWatchRuns, formatWatchDelta } from "./watch.ts";
-import type { WireframeFixSuggestion } from "./wireframe-fix-candidates.ts";
+import type { WireframeFixSuggestion } from "./experiments/migration/wireframe-fix-candidates.ts";
 
 function sug(over: Partial<WireframeFixSuggestion> & { deltaPx: number; viewports: string[]; rank?: number; bboxDims?: string }): WireframeFixSuggestion {
   // Real wireframe evidence strings put the magnitude AFTER a colon

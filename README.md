@@ -88,6 +88,23 @@ vrt workflow init
 vrt workflow capture
 vrt workflow verify
 
+# Workflow loop with external-project routes/config
+vrt workflow init --config ./vrt.config.json
+vrt workflow capture --config ./vrt.config.json
+
+# Prepare a migration diff packet for an external fixer
+just migration-subagent-prepare --report test-results/migration/migration-report.json --output test-results/migration/subagent-task.md
+
+# Measure success rate from before/after migration reports
+just migration-subagent-evaluate --before-report test-results/migration/migration-report.json --after-report test-results/migration/migration-report.after.json
+
+# Inspect blind migration scenarios
+just migration-blind-list
+just migration-blind-show shadcn-to-luna
+just migration-blind-prepare shadcn-to-luna --packet test-results/migration/blind/shadcn-to-luna/task.md
+just migration-blind-solo shadcn-to-luna --output test-results/migration/blind/shadcn-to-luna/solo/after-blind.html --report-output-dir test-results/migration/blind/shadcn-to-luna/solo-report
+just migration-blind-evaluate shadcn-to-luna --before-report test-results/migration/blind/shadcn-to-luna/migration-report.json --after-report test-results/migration/blind/shadcn-to-luna/solo-report/migration-report.json --rounds 1
+
 # Mask dynamic content
 vrt snapshot http://localhost:3000/ --mask ".marquee-container,.hero-badge"
 
@@ -205,11 +222,15 @@ Minimal `vrt.config.json`:
   "outputDir": "test-results/snapshots/sample-webapp-2026",
   "threshold": 0.1,
   "failOnDiff": true,
-  "maxDiffRatio": 0.01
+  "maxDiffRatio": 0.01,
+  "workflow": {
+    "captureSpec": "./e2e/vrt-capture.spec.ts"
+  }
 }
 ```
 
 When `vrt.config.json` exists in the current directory, `vrt snapshot` loads it automatically. Use `--config <path>` to point at another file, and pass URLs or flags directly when you want CLI values to override config defaults.
+`vrt workflow init` and `vrt workflow capture` also auto-load the same file, reuse `baseUrl`/`routes`, and accept `workflow.captureSpec` or `--capture-spec <path>` when you want a custom Playwright entrypoint.
 
 #### Subagent-ready fix prompt
 
@@ -335,7 +356,7 @@ one context window.
 
 ### Workflow Commands
 
-These commands manage state under `baselines/`, `snapshots/`, `output/`, `vrt-report.json`, `expectation.json`, and `spec.json`.
+These commands manage state under the current project root: `baselines/`, `snapshots/`, `output/`, `vrt-report.json`, `expectation.json`, and `spec.json`.
 
 Before running them, start the target app and point `VRT_BASE_URL` at it when needed.
 The built-in capture workflow defaults to `http://127.0.0.1:4174`.
@@ -353,6 +374,14 @@ vrt workflow introspect
 vrt workflow spec-verify
 vrt workflow expect
 ```
+
+If `vrt.config.json` defines `routes`, the built-in capture spec uses those routes instead of the repo-local defaults.
+
+The PR workflow also runs a deterministic snapshot false-positive check against `fixtures/css-challenge` using `.github/vrt-snapshot-ci.config.json`.
+It creates baselines once, re-runs the same URLs, and summarizes `test-results/snapshots/ci/snapshot-report.json` with `vrt snapshot report`.
+
+For migration workflows, `vrt migration subagent` packages the highest-impact diff per variant into a prompt for an external fixer, then compares before/after `migration-report.json` files to measure resolved/improved success rates.
+Blind migration scenarios are declared in `fixtures/migration/blind-scenarios.json`, including the existing reset-css blind target and a scaffolded `shadcn-to-luna/after-blind.html` target for reproducible E3 runs. `vrt migration blind` supports `list`, `show`, `prepare`, `solo`, and `evaluate` so the blind run can emit a fresh compare report, generate a fixer packet, run a deterministic reference-CSS repair, and check the `diff < 1% within 3 rounds` contract without hand-assembling paths.
 
 Workflow aliases are kept for ergonomics where they do not collide:
 
@@ -415,18 +444,23 @@ Start the server:
 vrt api serve --port 3456
 ```
 
+The shared Hono app also exposes a Cloudflare Workers entry point at `worker/index.ts`.
+
 Available endpoints:
 
+- `GET /api/openapi.json` — OpenAPI 3.1 spec for the current HTTP surface
 - `GET /api/status` — server version, backends, and capabilities
 - `POST /api/compare` — compare baseline/current HTML or URLs across viewports
 - `POST /api/compare-renderers` — compare Chromium vs Crater rendering
 - `POST /api/reason` — VLM/LLM reasoning pipeline for diff analysis and fixes
 - `POST /api/smoke-test` — random or reasoning-guided a11y smoke test
 
+When running on Workers, `/api/status` also reports detected `R2` / `KV` / `D1` storage bindings.
+
 TypeScript client:
 
 ```ts
-import { VrtClient } from "vrt/client";
+import { VrtClient } from "@mizchi/vrt/client";
 
 const client = new VrtClient("http://localhost:3456");
 const status = await client.status();
@@ -435,6 +469,8 @@ const result = await client.compareHtml(
   "<main><button class='primary'>After</button></main>",
 );
 ```
+
+Install: `pnpm add @mizchi/vrt`
 
 `compareUrls(...)` is intended for public HTTP(S) targets. The API server rejects localhost and private-network URLs.
 

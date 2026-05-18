@@ -21,7 +21,7 @@
 import { watch as fsWatch } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { runMigrationCompare, parseMigrationCompareArgs, type MigrationCompareReport } from "./migration-compare.ts";
+import { runMigrationCompare, parseMigrationCompareArgs, type MigrationCompareReport } from "./experiments/migration/migration-compare.ts";
 import {
   BOLD,
   CYAN,
@@ -30,8 +30,8 @@ import {
   RED,
   RESET,
   YELLOW,
-} from "./terminal-colors.ts";
-import type { WireframeFixSuggestion } from "./wireframe-fix-candidates.ts";
+} from "@mizchi/vrt-core/terminal-colors.ts";
+import type { WireframeFixSuggestion } from "./experiments/migration/wireframe-fix-candidates.ts";
 
 const DEBOUNCE_MS = 150;
 const WATCH_OUTPUT_DIR_DEFAULT = ".vrt/runs";

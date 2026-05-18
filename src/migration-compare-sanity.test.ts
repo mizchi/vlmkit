@@ -12,7 +12,7 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { RenderSanityResult } from "./render-sanity.ts";
+import type { RenderSanityResult } from "./vrt/compare/render-sanity.ts";
 
 function isSymmetric(b: RenderSanityResult | undefined, v: RenderSanityResult | undefined): boolean {
   if (!b || !v) return false;

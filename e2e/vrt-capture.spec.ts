@@ -7,7 +7,7 @@
 import { test, expect } from "@playwright/test";
 import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { resolveCaptureRoutes, type CaptureRoute } from "../src/capture-config.ts";
+import { resolveCaptureRoutes, type CaptureRoute } from "@mizchi/vrt-capture/capture-config.ts";
 
 const routeSet = resolveCaptureRoutes({
   cwd: process.env.VRT_PROJECT_ROOT ?? process.cwd(),
