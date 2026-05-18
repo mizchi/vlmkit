@@ -187,6 +187,17 @@ VLM's proposals aren't parseable, or the LLM's emitted fixes aren't
 structurally valid CSS. Set `DEBUG_VRT=1` to see both stages' raw
 output.
 
+At the end of the run, a summary table prints one row per round
+with columns:
+
+| Column | Meaning |
+|---|---|
+| `Round` | 1-indexed iteration number |
+| `Diff` | diffRatio after this round's edits applied |
+| `Changes` | rows in VLM's CHANGE list (Stage 1) |
+| `Fixes` | CSS edits emitted by LLM (Stage 2). Usually `Fixes ≥ Changes` |
+| `Escalated` | `false` if the default LLM tier handled it; `true` if the harness fell back to a higher-capability model. A run with `Escalated=true` cost more — relevant for cross-model benchmarks. |
+
 ## Adapting to a new repo
 
 The harness is fixture-bound — to run on a user repo:
