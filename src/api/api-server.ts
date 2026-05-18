@@ -307,6 +307,7 @@ app.post("/api/reason", async (c) => {
   const pipeline = createReasoningPipeline({
     vlmModel: body.vlmModel,
     llmProvider: body.llmProvider,
+    throwIfMissing: false,
   });
 
   if (!pipeline) {

@@ -6,10 +6,14 @@
  * tables, not user-facing primitives.
  */
 
+// ---- Errors ----
+export { VrtConfigError, type VrtConfigErrorCode } from "./errors.ts";
+
 // ---- LLM clients ----
 export {
   createUnifiedLLMClient,
   createLLMProvider,
+  type CreateLLMProviderOptions,
   type LLMClientOptions,
   type LLMResponse,
   type LLMProviderName,
@@ -28,6 +32,7 @@ export {
   resolveGeminiModel,
   isGeminiDirectModel,
   createVlmClient,
+  type CreateVlmClientOptions,
   type VlmClient,
   type VlmModel,
   type VlmResponse,

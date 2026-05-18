@@ -265,7 +265,7 @@ export async function runSmokeTest(
   let plannedActions: ActionCandidate[] | null = null;
   if (request.mode === "reasoning") {
     const { createLLMProvider } = await import("@mizchi/vrt-ai/llm-client.ts");
-    const llm = createLLMProvider();
+    const llm = createLLMProvider({ throwIfMissing: false });
     if (llm && initialSnap) {
       try {
         const candidates = await discoverActions(page);

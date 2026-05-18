@@ -69,6 +69,7 @@ async function main() {
 
   const pipeline = createReasoningPipeline({
     resolution: resolveResolutionForViewport(VIEWPORT.width) as any,
+    throwIfMissing: false,
   });
 
   console.log();

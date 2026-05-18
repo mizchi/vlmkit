@@ -419,7 +419,7 @@ async function main() {
   // ============================================================
   banner("Phase 4: AI Fix Attempt");
 
-  const llm = createLLMProvider();
+  const llm = createLLMProvider({ throwIfMissing: false });
   if (!llm) {
     console.log(`  ${YELLOW}ANTHROPIC_API_KEY not set — showing what the LLM would receive${RESET}\n`);
     hr();

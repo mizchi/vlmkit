@@ -8,6 +8,7 @@
  * Model list is fetched dynamically from the API.
  */
 import { readFile } from "node:fs/promises";
+import { VrtConfigError } from "./errors.ts";
 
 // ---- Types ----
 
@@ -104,14 +105,20 @@ export async function resolveModel(idOrIndex: string): Promise<VlmModel> {
     if (sorted[0].id.endsWith(idOrIndex) || sorted[0].id.includes(`/${idOrIndex}`)) {
       return sorted[0];
     }
-    throw new Error(`Ambiguous model "${idOrIndex}". Matches: ${partial.slice(0, 5).map((m) => m.id).join(", ")}\nTip: use more specific ID, e.g. "${partial[0].id}"`);
+    throw new VrtConfigError(
+      "MULTIPLE_MATCHES",
+      `Ambiguous model "${idOrIndex}". Matches: ${partial.slice(0, 5).map((m) => m.id).join(", ")}\nTip: use more specific ID, e.g. "${partial[0].id}"`,
+    );
   }
 
   // Numeric index
   const idx = parseInt(idOrIndex, 10);
   if (!isNaN(idx) && idx >= 0 && idx < models.length) return models[idx];
 
-  throw new Error(`Model not found: "${idOrIndex}". Use --list to see available models.`);
+  throw new VrtConfigError(
+    "INVALID_MODEL",
+    `Model not found: "${idOrIndex}". Use --list to see available models.`,
+  );
 }
 
 // ---- Google AI (Gemini direct) ----
@@ -136,7 +143,15 @@ export function listGeminiModels(): VlmModel[] {
 
 async function createGeminiClient(model: VlmModel, apiKey: string): Promise<VlmClient> {
   const geminiModelId = model.id.replace("gemini:", "");
-  const { GoogleGenerativeAI } = await import("@google/generative-ai");
+  let GoogleGenerativeAI: any;
+  try {
+    ({ GoogleGenerativeAI } = await import("@google/generative-ai"));
+  } catch (e) {
+    throw new VrtConfigError(
+      "MISSING_DEPENDENCY",
+      `@google/generative-ai is not installed. Run: pnpm add @google/generative-ai`,
+    );
+  }
   const genAI = new GoogleGenerativeAI(apiKey);
   const genModel = genAI.getGenerativeModel({ model: geminiModelId });
 
@@ -226,20 +241,54 @@ async function createGeminiClient(model: VlmModel, apiKey: string): Promise<VlmC
 
 // ---- Client factory ----
 
+export interface CreateVlmClientOptions {
+  /** Override `OPENROUTER_API_KEY` / `GEMINI_API_KEY` lookup. */
+  apiKey?: string;
+  /**
+   * When `false`, return `null` instead of throwing `VrtConfigError`
+   * if the required API key is missing. Default: `true`.
+   */
+  throwIfMissing?: boolean;
+}
+
+/**
+ * Construct a VLM client for the given model.
+ *
+ * Throws `VrtConfigError` (`code: "MISSING_KEY"`) when the model's
+ * required API key isn't set in the environment. Pass
+ * `{ throwIfMissing: false }` for the legacy `T | null` return.
+ */
 export async function createVlmClient(
   model: VlmModel,
-  apiKey?: string,
+  options?: CreateVlmClientOptions,
 ): Promise<VlmClient | null> {
+  const throwIfMissing = options?.throwIfMissing ?? true;
   // Gemini direct
   if (isGeminiDirectModel(model.id)) {
-    const key = apiKey ?? process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY;
-    if (!key) return null;
+    const key = options?.apiKey ?? process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY;
+    if (!key) {
+      if (throwIfMissing) {
+        throw new VrtConfigError(
+          "MISSING_KEY",
+          `GEMINI_API_KEY (or GOOGLE_AI_API_KEY) is required for ${model.id}`,
+        );
+      }
+      return null;
+    }
     return createGeminiClient(model, key);
   }
 
   // OpenRouter
-  const key = apiKey ?? process.env.OPENROUTER_API_KEY;
-  if (!key) return null;
+  const key = options?.apiKey ?? process.env.OPENROUTER_API_KEY;
+  if (!key) {
+    if (throwIfMissing) {
+      throw new VrtConfigError(
+        "MISSING_KEY",
+        `OPENROUTER_API_KEY is required for ${model.id}`,
+      );
+    }
+    return null;
+  }
 
   async function callOpenRouter(
     messages: Array<{ role: string; content: any }>,
