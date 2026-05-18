@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { handleCliError } from "@mizchi/vrt-core/cli-error.ts";
 import { loadFlakerVrtConfig, toViewportSpec, type FlakerVrtConfig, type FlakerVrtMigrationScenario } from "./flaker-vrt-config.ts";
 import {
   runMigrationCompare,
@@ -297,7 +298,14 @@ async function main() {
 
 const invokedPath = process.argv[1];
 if (invokedPath && import.meta.url === new URL(`file://${invokedPath}`).href) {
+  // Non-TTY stdout = runner-style invocation (flaker pipes stdout to
+  // parse the FlakerExecuteResult envelope). Preserve that shape.
+  // Interactive TTY = developer running directly; route through the
+  // shared CLI error prettifier instead of dumping a raw stack.
   main().catch((error) => {
+    if (process.stdout.isTTY) {
+      handleCliError(error);
+    }
     const message = error instanceof Error ? error.message : String(error);
     console.log(JSON.stringify({
       exitCode: 0,
