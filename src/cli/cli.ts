@@ -172,6 +172,7 @@ const DEPRECATED_TOP_LEVEL: Record<string, { newName: string; spec: string }> = 
   "media-variants": { newName: "stress media", spec: SPECS.mediaVariants },
   "component-extract": { newName: "scan component", spec: SPECS.componentExtract },
   "component-from-image": { newName: "build component", spec: SPECS.componentFromImage },
+  flipbook: { newName: "snapshot flipbook", spec: SPECS.flipbook },
 };
 const WORKFLOW_ALIASES = [
   "init", "capture", "verify", "approve",
@@ -272,7 +273,13 @@ Run \`vrt <command> --help\` for command-specific options.`);
       .allowUnknownOptions()
       .action(async () => {
         const groupArgs = passThrough(argv, [groupName]);
-        if (groupArgs.length === 0) {
+        // `vrt diff --help` (no leaf, just help) → group usage.
+        // passThrough rewrites --help/-h to HELP_SENTINEL so cac
+        // doesn't intercept; we restore the semantics here.
+        if (
+          groupArgs.length === 0 ||
+          (groupArgs.length === 1 && groupArgs[0] === HELP_SENTINEL)
+        ) {
           printGroupHelp(groupName);
           return;
         }
@@ -282,9 +289,18 @@ Run \`vrt <command> --help\` for command-specific options.`);
   }
 
   // Snapshot / workflow / bench / api / report / skill (single-token).
+  // `vrt snapshot flipbook ...` is special-cased to delegate directly
+  // to the flipbook CLI (snapshot.ts doesn't have a `flipbook` mode).
   cli.command("snapshot [...args]", "Multi-viewport snapshot baseline + diff")
     .allowUnknownOptions()
-    .action(async () => delegate(SPECS.snapshot, passThrough(argv, ["snapshot"])));
+    .action(async () => {
+      const rest = passThrough(argv, ["snapshot"]);
+      if (rest[0] === "flipbook") {
+        await delegate(SPECS.flipbook, rest.slice(1));
+        return;
+      }
+      await delegate(SPECS.snapshot, rest);
+    });
 
   cli.command("workflow [...args]", "Stateful baseline/snapshot workflow")
     .allowUnknownOptions()

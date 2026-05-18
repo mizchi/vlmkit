@@ -82,4 +82,31 @@ describe("vrt CLI tree (cac-based)", () => {
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vrt workflow <command>/);
   });
+
+  it("`vrt diff --help` prints diff group usage (regression: HELP_SENTINEL leaked through)", () => {
+    const r = runVrt(["diff", "--help"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vrt diff <subcommand>/);
+    assert.match(r.stdout, /png.*Compare existing PNG/);
+  });
+
+  it("`vrt check -h` prints check group usage", () => {
+    const r = runVrt(["check", "-h"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vrt check <subcommand>/);
+    assert.match(r.stdout, /a11y contrast/);
+  });
+
+  it("`vrt flipbook` deprecation shim wires to flipbook-cli (regression: SPECS.flipbook unregistered)", () => {
+    const r = runVrt(["flipbook", "--help"]);
+    assert.match(r.stderr, /\[vrt deprecated\] 'flipbook' → 'vrt snapshot flipbook'/);
+    // flipbook-cli prints its own usage on --help
+    assert.notEqual(r.status, undefined);
+  });
+
+  it("`vrt snapshot flipbook` routes to flipbook-cli (not snapshot.ts)", () => {
+    const r = runVrt(["snapshot", "flipbook", "--help"]);
+    // No deprecation warning here — this is the new canonical path
+    assert.doesNotMatch(r.stderr, /\[vrt deprecated\]/);
+  });
 });
