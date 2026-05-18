@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { formatMigrationReportForAgent, type DfaReport } from "./diff-for-agent.ts";
+import { computeSectionDiffRows, formatMigrationReportForAgent, type DfaReport } from "./diff-for-agent.ts";
 
 function sampleReport(over: Partial<DfaReport> = {}): DfaReport {
   return {
@@ -109,5 +109,71 @@ describe("formatMigrationReportForAgent", () => {
   it("handles empty reports gracefully", () => {
     const md = formatMigrationReportForAgent(sampleReport({ results: [] }));
     assert.match(md, /Empty report/);
+  });
+
+  it("renders per-section diffRatio when bbox + heatmap data are present", () => {
+    const md = formatMigrationReportForAgent(sampleReport({
+      componentBboxDiffs: [{
+        variantFile: "working.html",
+        perViewport: [{
+          viewport: "mobile",
+          matches: [
+            // Large hero section: 200×100 = 20000 area, fully covered by region → 100%.
+            {
+              rank: 1,
+              baseline: { top: 0, left: 0, width: 200, height: 100, area: 20000, fillColor: "#fff" },
+              variant: { top: 0, left: 0, width: 200, height: 100, area: 20000, fillColor: "#fff" },
+              deltaTop: 0, deltaLeft: 0, deltaWidth: 0, deltaHeight: 0, iou: 1,
+            },
+            // Smaller card: 50×50 = 2500 area, no heatmap intersection → 0%.
+            {
+              rank: 2,
+              baseline: { top: 200, left: 0, width: 50, height: 50, area: 2500, fillColor: "#fff" },
+              variant: { top: 200, left: 0, width: 50, height: 50, area: 2500, fillColor: "#fff" },
+              deltaTop: 0, deltaLeft: 0, deltaWidth: 0, deltaHeight: 0, iou: 1,
+            },
+          ],
+        }],
+      }],
+      heatmapRegions: [{
+        variantFile: "working.html",
+        perViewport: [{
+          viewport: "mobile",
+          regions: [{ top: 0, left: 0, width: 200, height: 100, area: 20000 }],
+        }],
+      }],
+    }));
+    assert.match(md, /Per-section diffRatio/);
+    // Hero is fully covered (200×100 region intersects 200×100 section).
+    assert.match(md, /\| 100\.00% \|/);
+    // Worst row should carry the ⚠ marker — that's the hero, not the card.
+    const heroLine = md.split("\n").find((l) => l.includes("200×100"));
+    assert.ok(heroLine, "hero line present");
+    assert.ok(heroLine!.includes("⚠"), "hero row marked worst");
+  });
+
+  it("computeSectionDiffRows: sorts by sectionRatio desc and skips zero-area sections", () => {
+    const rows = computeSectionDiffRows(
+      {
+        matches: [
+          { rank: 1, baseline: { top: 0, left: 0, width: 100, height: 100 } },
+          { rank: 2, baseline: { top: 200, left: 0, width: 100, height: 100 } },
+          // zero-area: ignored
+          { rank: 3, baseline: { top: 0, left: 0, width: 0, height: 0 } },
+        ],
+      } as any,
+      [
+        { top: 0, left: 0, width: 50, height: 50 },  // 2500px inside rank 1's bbox (10000px) → 25%
+        { top: 200, left: 0, width: 10, height: 10 }, // 100px inside rank 2's bbox (10000px) → 1%
+      ],
+      "mobile",
+      1_000_000,
+      5,
+    );
+    assert.equal(rows.length, 2);
+    assert.equal(rows[0].rank, 1);
+    assert.equal(rows[0].sectionRatio, 0.25);
+    assert.equal(rows[1].rank, 2);
+    assert.equal(rows[1].sectionRatio, 0.01);
   });
 });

@@ -500,6 +500,74 @@ function formatShiftBands(r: DfaResult): string {
     .join(" ");
 }
 
+interface SectionRect {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
+
+interface SectionDiffRow {
+  viewport: string;
+  section: SectionRect;
+  sectionRatio: number;
+  totalRatio: number;
+  rank: number;
+}
+
+function rectIntersectionArea(a: SectionRect, b: SectionRect): number {
+  const left = Math.max(a.left, b.left);
+  const top = Math.max(a.top, b.top);
+  const right = Math.min(a.left + a.width, b.left + b.width);
+  const bottom = Math.min(a.top + a.height, b.top + b.height);
+  if (right <= left || bottom <= top) return 0;
+  return (right - left) * (bottom - top);
+}
+
+/**
+ * Per-section diff intensity for one viewport.
+ *
+ * - Sections are the top-N component bboxes (by baseline area). They
+ *   come from `component-bbox`, so they survive DOM rewrites.
+ * - Diff is approximated as the sum of rectangle intersections between
+ *   each section and each heatmap region. This is conservative: it
+ *   overcounts when a region only partially fills its bbox, but the
+ *   ranking — which is what the agent uses — stays correct.
+ * - `sectionRatio` = section_diff_px / section_area_px
+ *   `totalRatio`   = section_diff_px / viewport_total_px
+ */
+export function computeSectionDiffRows(
+  bboxesForViewport: { matches: Array<{ baseline: SectionRect; rank: number }> },
+  regionsForViewport: ReadonlyArray<SectionRect>,
+  viewport: string,
+  viewportTotalPixels: number,
+  topN: number,
+): SectionDiffRow[] {
+  if (bboxesForViewport.matches.length === 0) return [];
+  const sortedSections = [...bboxesForViewport.matches]
+    .sort((a, b) => b.baseline.width * b.baseline.height - a.baseline.width * a.baseline.height)
+    .slice(0, topN);
+
+  const rows: SectionDiffRow[] = [];
+  for (const match of sortedSections) {
+    const section = match.baseline;
+    const sectionArea = section.width * section.height;
+    if (sectionArea === 0) continue;
+    let diffArea = 0;
+    for (const region of regionsForViewport) {
+      diffArea += rectIntersectionArea(section, region);
+    }
+    rows.push({
+      viewport,
+      section,
+      sectionRatio: diffArea / sectionArea,
+      totalRatio: viewportTotalPixels > 0 ? diffArea / viewportTotalPixels : 0,
+      rank: match.rank,
+    });
+  }
+  return rows.sort((a, b) => b.sectionRatio - a.sectionRatio);
+}
+
 export function formatMigrationReportForAgent(
   report: DfaReport,
   options: DfaOptions = {},
@@ -597,6 +665,47 @@ export function formatMigrationReportForAgent(
     lines.push("");
 
     const bboxSummary = (report.componentBboxDiffs ?? []).find((c) => c.variantFile === variantFile);
+    const sectionHeatmapSummary = (report.heatmapRegions ?? []).find((h) => h.variantFile === variantFile);
+    if (bboxSummary && sectionHeatmapSummary && bboxSummary.perViewport.length > 0) {
+      const sectionRows: SectionDiffRow[] = [];
+      for (const vp of bboxSummary.perViewport) {
+        const heatmapVp = sectionHeatmapSummary.perViewport.find((h) => h.viewport === vp.viewport);
+        if (!heatmapVp || heatmapVp.regions.length === 0) continue;
+        const viewportResult = results.find((r) => r.viewport === vp.viewport);
+        const viewportTotalPixels = viewportResult?.totalPixels ?? 0;
+        sectionRows.push(
+          ...computeSectionDiffRows(vp, heatmapVp.regions, vp.viewport, viewportTotalPixels, 5),
+        );
+      }
+      if (sectionRows.length > 0) {
+        lines.push("### Per-section diffRatio (heatmap × component-bbox)");
+        lines.push("");
+        lines.push("For each viewport, the top-5 component bboxes (by baseline area) are " +
+          "intersected with the heatmap regions. `Section %` is diff_area_inside_section / " +
+          "section_area (= how concentrated the change is within this section). " +
+          "`Total %` is diff_area_inside_section / viewport_total (= this section's " +
+          "contribution to the overall viewport diff). The single highest `Section %` " +
+          "row across all viewports is marked ⚠ — fix that one first.");
+        lines.push("");
+        lines.push("| Viewport | Rank | Section (top,left WxH) | Section % | Total % | Worst |");
+        lines.push("|---|---|---|---|---|---|");
+        const worst = sectionRows.reduce<SectionDiffRow | null>(
+          (acc, cur) => (acc === null || cur.sectionRatio > acc.sectionRatio ? cur : acc),
+          null,
+        );
+        for (const row of sectionRows) {
+          const s = row.section;
+          const sectionPct = `${(row.sectionRatio * 100).toFixed(2)}%`;
+          const totalPct = `${(row.totalRatio * 100).toFixed(3)}%`;
+          const badge = row === worst ? "⚠" : "";
+          lines.push(
+            `| \`${row.viewport}\` | #${row.rank} | ${s.left},${s.top} ${s.width}×${s.height} | ${sectionPct} | ${totalPct} | ${badge} |`,
+          );
+        }
+        lines.push("");
+      }
+    }
+
     if (bboxSummary && bboxSummary.perViewport.length > 0) {
       lines.push("### Component bbox diff (image-only — works without DOM correspondence)");
       lines.push("");
