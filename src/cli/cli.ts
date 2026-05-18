@@ -83,6 +83,9 @@ const SPECS = {
   cssBench: "../experiments/css-challenge/css-challenge-bench.ts",
   detectionReport: "../experiments/detection/detection-report.ts",
   snapshot: "../vrt/snapshot/snapshot.ts",
+  snapshotReport: "../vrt/snapshot/snapshot-report.ts",
+  migrationBlind: "../experiments/migration/migration-blind.ts",
+  migrationSubagent: "../experiments/migration/migration-subagent.ts",
   elementCompare: "@mizchi/vrt-core/element-compare.ts",
   smokeRunner: "@mizchi/vrt-markup/inspect/smoke-runner.ts",
   flipbook: "./commands/flipbook-cli.ts",
@@ -299,7 +302,28 @@ Run \`vrt <command> --help\` for command-specific options.`);
         await delegate(SPECS.flipbook, rest.slice(1));
         return;
       }
+      if (rest[0] === "report") {
+        await delegate(SPECS.snapshotReport, rest.slice(1));
+        return;
+      }
       await delegate(SPECS.snapshot, rest);
+    });
+
+  cli.command("migration [...args]", "Migration VRT (compare / blind / subagent)")
+    .allowUnknownOptions()
+    .action(async () => {
+      const rest = passThrough(argv, ["migration"]);
+      const sub = rest[0];
+      if (sub === "compare") {
+        await delegate(SPECS.migrationCompare, rest.slice(1));
+      } else if (sub === "blind") {
+        await delegate(SPECS.migrationBlind, rest.slice(1));
+      } else if (sub === "subagent") {
+        await delegate(SPECS.migrationSubagent, rest.slice(1));
+      } else {
+        console.log("vrt migration <compare|blind|subagent>");
+        if (sub) process.exitCode = 1;
+      }
     });
 
   cli.command("workflow [...args]", "Stateful baseline/snapshot workflow")

@@ -228,8 +228,8 @@ async function main() {
 function formatMigrationSubagentUsage(): string {
   return [
     "Usage:",
-    "  node src/experiments/migration/migration-subagent.ts prepare --report path/to/migration-report.json [--variant variant] [--output path] [--format markdown|json]",
-    "  node src/experiments/migration/migration-subagent.ts evaluate --before-report before.json --after-report after.json [--output path] [--format markdown|json] [--min-success-rate n] [--min-improvement-rate n]",
+    "  vrt migration subagent prepare --report path/to/migration-report.json [--variant variant] [--output path] [--format markdown|json]",
+    "  vrt migration subagent evaluate --before-report before.json --after-report after.json [--output path] [--format markdown|json] [--min-success-rate n] [--min-improvement-rate n]",
   ].join("\n");
 }
 

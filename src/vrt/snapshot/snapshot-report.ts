@@ -214,7 +214,7 @@ export function parseSnapshotReportCliArgs(args: string[]): ParsedSnapshotReport
 export function formatSnapshotReportUsage(exitCode = 1): string {
   const body = [
     "Usage:",
-    "  node src/snapshot-report.ts <snapshot-report.json> [--format markdown|json] [--max-false-positive-rate n] [--max-diff-ratio n] [--github-step-summary path]",
+    "  vrt snapshot report <snapshot-report.json> [--format markdown|json] [--max-false-positive-rate n] [--max-diff-ratio n] [--github-step-summary path]",
   ].join("\n");
   return exitCode === 0 ? body : `${body}\n`;
 }
