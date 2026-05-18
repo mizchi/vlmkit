@@ -26,3 +26,6 @@ attempt.html
 result
 result-*
 .pnpm/
+
+# Local-only env (loaded by direnv via .envrc; holds API keys)
+.env.local

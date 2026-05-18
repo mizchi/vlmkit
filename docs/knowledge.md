@@ -632,9 +632,27 @@ By fixture:
 - `width` 50% — dead-code when natural size equals CSS width
 - `background` 82% — same as parent color, `pre code` override, etc.
 
-## VLM Model Comparison (2026-04-04)
+## VLM Model Comparison (2026-05-18 — current)
 
-### Fix Loop Results (hard case: .readme-body pre 6 props, 4.1% diff)
+### Single-call latency / output bench (`just vlm-bench`, generated heatmap 1.7% diff, n=1)
+
+| Model | Latency | Tokens | Output | Notes |
+|-------|--------:|-------:|-------:|-------|
+| **bytedance/ui-tars-1.5-7b** | **1163ms** | 789 | 176ch / 3 CHANGEs | UI-domain-trained, brief but structured |
+| google/gemini-2.5-flash-lite | 1937ms | 1640 | 706ch | ⚠ hallucinates `red → red` uniformly |
+| **qwen/qwen3-vl-30b-a3b-instruct** | 1992ms | 810 | 533ch / 9 CHANGEs | **emits hex codes** (`#FF4500 → #FF0000`) |
+| amazon/nova-lite-v1 | 2381ms | 1911 | 371ch / 9 CHANGEs | stable baseline |
+| claude:claude-haiku-4-5-20251001 | 3510ms | 996 | 966ch / 12 CHANGEs | **structured + severity**, ~$0.002/call (~10000× OR cheap) |
+| nvidia/nemotron-nano-12b-v2-vl:free | 4594ms | 3584 | 630ch | narrative, no structure, FREE |
+| meta-llama/llama-4-scout | 6960ms | 1394 | 1169ch | ⚠ **regressed since 2026-04-04** (was 1.0s) |
+| meta-llama/llama-4-maverick | 26815ms | 1650 | 2395ch | ❌ "image not available" + methodology only |
+
+Full report: `docs/reports/2026-05-18-vlm-claude-vs-openrouter-vs-newcomers.md`.
+
+### Earlier reference: Fix Loop Results (2026-04-04, hard case: `.readme-body pre` 6 props, 4.1% diff)
+
+Stage-2 (LLM, CSS-diff aware) decides FIXED, so the VLM speed/output below is the
+only meaningful axis; FIXED rate was 1r ✅ for every entry except `gpt-4.1-nano`.
 
 | Model | Fix | Speed | Cost/call | Monthly (21K/day) | CHANGE count |
 |-------|-----|-------|-----------|-------------------|-------------|
@@ -648,6 +666,8 @@ By fixture:
 | openai/gpt-5-nano | ✅ 1r | 10.1s | $0.24e-7 | $0.15 | 0 |
 | google/gemma-4-31b-it | ✅ 1r | 40.5s | $0.10e-7 | $0.06 | — |
 | openai/gpt-4.1-nano | ❌ | 1.2s | — | — | — |
+
+> **Note**: The 2026-04-04 `llama-4-scout` 1.0s no longer reproduces (2026-05-18: 6.96s + conversational output). Either the model behind that OpenRouter ID changed, or its routing degraded. Treat the 04-04 table as historical.
 
 ### Image Resolution and Token Cost
 
