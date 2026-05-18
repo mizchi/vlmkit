@@ -354,10 +354,10 @@ vrt workflow expect
 If `vrt.config.json` defines `routes`, the built-in capture spec uses those routes instead of the repo-local defaults.
 
 The PR workflow also runs a deterministic snapshot false-positive check against `fixtures/css-challenge` using `.github/vrt-snapshot-ci.config.json`.
-It creates baselines once, re-runs the same URLs, and summarizes `test-results/snapshots/ci/snapshot-report.json` with `src/snapshot-report.ts`.
+It creates baselines once, re-runs the same URLs, and summarizes `test-results/snapshots/ci/snapshot-report.json` with `vrt snapshot report`.
 
-For migration workflows, `src/migration-subagent.ts` can package the highest-impact diff per variant into a prompt for an external fixer, then compare before/after `migration-report.json` files to measure resolved/improved success rates.
-Blind migration scenarios are declared in `fixtures/migration/blind-scenarios.json`, including the existing reset-css blind target and a scaffolded `shadcn-to-luna/after-blind.html` target for reproducible E3 runs. `src/migration-blind.ts` now supports `list`, `show`, `prepare`, `solo`, and `evaluate` so the blind run can emit a fresh compare report, generate a fixer packet, run a deterministic reference-CSS repair, and check the `diff < 1% within 3 rounds` contract without hand-assembling paths.
+For migration workflows, `vrt migration subagent` packages the highest-impact diff per variant into a prompt for an external fixer, then compares before/after `migration-report.json` files to measure resolved/improved success rates.
+Blind migration scenarios are declared in `fixtures/migration/blind-scenarios.json`, including the existing reset-css blind target and a scaffolded `shadcn-to-luna/after-blind.html` target for reproducible E3 runs. `vrt migration blind` supports `list`, `show`, `prepare`, `solo`, and `evaluate` so the blind run can emit a fresh compare report, generate a fixer packet, run a deterministic reference-CSS repair, and check the `diff < 1% within 3 rounds` contract without hand-assembling paths.
 
 Workflow aliases are kept for ergonomics where they do not collide:
 
