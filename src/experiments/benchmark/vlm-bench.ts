@@ -247,13 +247,13 @@ ${BOLD}Model selection:${RESET}
   Index:      0                            (from --list output)
 
 ${BOLD}Examples:${RESET}
-  vlm-bench gemma-3-27b:free llama-3.2-11b-vision qwen3-vl-8b
-  vlm-bench gemini:gemini-2.5-flash-preview-05-20 qwen3-vl-8b   # Gemini direct vs OpenRouter
-  vlm-bench --image test-results/migration/heatmap.png gemma-3-27b:free
+  vlm-bench ui-tars-1.5-7b nova-lite-v1 qwen3-vl-30b-a3b-instruct
+  vlm-bench claude:claude-haiku-4-5-20251001 ui-tars-1.5-7b   # Claude direct vs OpenRouter
+  vlm-bench --image test-results/migration/heatmap.png ui-tars-1.5-7b
   vlm-bench --list --max-cost 0.0001 --limit 10
 
 ${BOLD}Providers:${RESET}
-  OpenRouter:  model ID as-is (e.g. qwen/qwen3-vl-8b-instruct)
+  OpenRouter:  model ID as-is (e.g. bytedance/ui-tars-1.5-7b)
   Gemini:      gemini:<model-id> (e.g. gemini:gemini-2.5-flash-preview-05-20)
   Claude:      claude:<model-id> (e.g. claude:claude-haiku-4-5-20251001)
 

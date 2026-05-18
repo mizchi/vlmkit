@@ -36,10 +36,18 @@ just vlm-bench <model1> <model2> <model3> --md
 - Cost: /call (guideline: below $0.5e-7 is cheap)
 - CHANGE detection count: number of changes following structured format (7-15 is optimal)
 
-### Current Recommendations (2026-04-04)
-- **Default**: `meta-llama/llama-4-scout` (1.0s, $0.14e-7)
-- **Stable**: `amazon/nova-lite-v1` (2.3s, $0.14e-7)
-- **High quality**: `amazon/nova-2-lite-v1` (3.5s, $1.38e-7)
+### Current Recommendations (2026-05-18)
+- **Default**: `bytedance/ui-tars-1.5-7b` (1.16s, $0.1e-6/$0.2e-6) — UI-domain-trained, fastest of the structured outputs
+- **Stable / detailed**: `qwen/qwen3-vl-30b-a3b-instruct` (1.99s) — emits hex codes directly
+- **Baseline fallback**: `amazon/nova-lite-v1` (2.38s)
+- **High quality (agent-facing CHANGE list)**: `claude:claude-haiku-4-5-20251001` (3.51s, ~$0.002/call — only when VLM output is consumed directly, not via Stage-2 LLM)
+
+#### Avoid / re-evaluate
+- `meta-llama/llama-4-scout` — regressed since 2026-04-04 (was 1.0s, now ~7s with conversational output)
+- `meta-llama/llama-4-maverick` — claims "image not available" and returns methodology only
+- `google/gemini-2.5-flash-lite` — hallucinates uniform `red → red` deltas
+
+See `docs/reports/2026-05-18-vlm-claude-vs-openrouter-vs-newcomers.md` for the 8-way bench evidence.
 
 ## Running CSS Challenge Benchmarks
 
@@ -115,7 +123,7 @@ just fix-loop --fixture page --seed 42
 just fix-loop --fixture page --seed 11 --mode selector --max-rounds 3
 
 # Specify a VLM model
-VRT_VLM_MODEL="meta-llama/llama-4-scout" just fix-loop --fixture page --seed 11 --mode selector
+VRT_VLM_MODEL="bytedance/ui-tars-1.5-7b" just fix-loop --fixture page --seed 11 --mode selector
 ```
 
 ## Environment Variables
@@ -124,7 +132,7 @@ VRT_VLM_MODEL="meta-llama/llama-4-scout" just fix-loop --fixture page --seed 11 
 |------|------|----------|
 | `VRT_LLM_PROVIDER` | LLM provider | gemini |
 | `VRT_LLM_MODEL` | LLM model | Provider default |
-| `VRT_VLM_MODEL` | VLM model (OpenRouter) | qwen/qwen3-vl-8b-instruct |
+| `VRT_VLM_MODEL` | VLM model (OpenRouter / `gemini:` / `claude:`) | bytedance/ui-tars-1.5-7b |
 | `OPENROUTER_API_KEY` | OpenRouter API key | — |
 | `GEMINI_API_KEY` | Google AI API key | — |
 | `ANTHROPIC_API_KEY` | Anthropic API key | — |

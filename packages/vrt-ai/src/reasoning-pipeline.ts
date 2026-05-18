@@ -244,7 +244,7 @@ export function createReasoningPipeline(config?: PipelineConfig): ReasoningPipel
   const throwIfMissing = config?.throwIfMissing ?? true;
   // Stage 1: VLM
   let vlmClient: VlmClient | null = null;
-  let vlmModelId = config?.vlmModel ?? process.env.VRT_VLM_MODEL ?? "qwen/qwen3-vl-8b-instruct";
+  let vlmModelId = config?.vlmModel ?? process.env.VRT_VLM_MODEL ?? "bytedance/ui-tars-1.5-7b";
 
   // Stage 2: LLM (try configured, then fallback). Always non-throwing here
   // — we synthesize a single ConfigError below if everything fails.
