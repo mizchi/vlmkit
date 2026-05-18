@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { handleCliError } from "@mizchi/vrt-core/cli-error.ts";
 import type { MigrationCompareReport } from "../migration/migration-compare.ts";
 import {
   convertMigrationReportToFlakerResults,
@@ -71,9 +72,5 @@ function getArg(args: string[], name: string): string | undefined {
 
 const invokedPath = process.argv[1];
 if (invokedPath && import.meta.url === new URL(`file://${invokedPath}`).href) {
-  main().catch((error) => {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(message);
-    process.exitCode = 1;
-  });
+  main().catch(handleCliError);
 }
