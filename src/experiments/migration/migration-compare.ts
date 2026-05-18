@@ -10,8 +10,8 @@
  *   npx tsx src/migration-compare.ts --dir fixtures/migration/reset-css --baseline normalize.html --variants modern-normalize.html destyle.html no-reset.html
  */
 import { readFile, writeFile, mkdir, access } from "node:fs/promises";
-import { basename, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { chromium, type Browser } from "playwright";
 import {
   collectApprovalWarnings,
@@ -29,6 +29,9 @@ import {
   type PaintTreeChange,
 } from "@mizchi/vrt-capture/crater-client.ts";
 import { compareScreenshots, generateDiffReport } from "@mizchi/vrt-core/heatmap.ts";
+import { composeTriptych } from "./triptych.ts";
+import { loadDesignTokens, snapColor, type DesignTokens } from "./design-md-tokens.ts";
+import { generateWireframeFixCandidates, type WireframeFixSuggestion } from "./wireframe-fix-candidates.ts";
 import {
   buildMigrationRegionApprovalContexts,
   classifyMigrationDiff,
@@ -181,6 +184,29 @@ export interface MigrationCompareOptions {
    * surfaced alongside the default-state diff. Opt-in via `--states`.
    */
   states?: ForcedPseudoState[];
+  /**
+   * Emit a `baseline | variant | heatmap` triptych PNG per viewport
+   * alongside the existing screenshots. Default true; pass
+   * `--no-triptych` to disable.
+   */
+  triptych?: boolean;
+  /**
+   * Path to a DESIGN.md (or design-tokens.json) whose front-matter
+   * tokens (spacing, colors) are used to snap diff deltas to named
+   * tokens — "swap surface-variant → surface-container-high"
+   * instead of bare hex pairs. Optional; falls back to raw values
+   * when not provided.
+   */
+  tokensPath?: string;
+  /**
+   * Path to a previous run's output dir (or migration-report.json
+   * directly). When provided, after the main compare a "Since
+   * previous run:" section shows per-viewport diff% delta and
+   * cross-round sign-flips so an agent on a tight budget can tell
+   * whether their last edit moved the loop forward, regressed, or
+   * overshot zero.
+   */
+  againstPreviousPath?: string;
 }
 
 export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptions {
@@ -193,7 +219,9 @@ export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptio
     dir: getArg(args, "dir", "."),
     baseline: getArg(args, "baseline", baselineUrl ? "" : (args[0] ?? "")),
     variants: variants.length > 0 ? variants : (currentUrl ? [] : (args[1] ? [args[1]] : [])),
-    outputDir: resolve(getArg(args, "output-dir", join(process.cwd(), "test-results", "migration"))),
+    // Accept `--output` as an alias for `--output-dir`. Agents reach for
+    // `--output` first; the typo'd flag was silently swallowed before.
+    outputDir: resolve(getArg(args, "output-dir", getArg(args, "output", join(process.cwd(), "test-results", "migration")))),
     autoDiscover: !hasFlag(args, "no-discover"),
     discoverBackend: parseDiscoveryBackend(args),
     maxViewports: parseInt(getArg(args, "max-viewports", "15"), 10),
@@ -209,10 +237,17 @@ export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptio
     strictBaselineSanity: hasFlag(args, "strict-baseline-sanity"),
     domEquivalenceCheck: !hasFlag(args, "no-dom-equivalence"),
     strictDomEquivalence: hasFlag(args, "strict-dom-equivalence"),
-    computedStyleDiff: hasFlag(args, "computed-style"),
-    domPositionDiff: hasFlag(args, "dom-position-diff") || hasFlag(args, "position-diff"),
+    // Both Playwright-driven; default on so agents get property-level
+    // signals (font-family, padding, gap, etc.) without having to know
+    // these flags exist. Opt out with `--no-computed-style` /
+    // `--no-dom-position-diff`. Neither depends on Crater BiDi.
+    computedStyleDiff: !hasFlag(args, "no-computed-style") && !hasFlag(args, "no-computed-style-diff"),
+    domPositionDiff: !hasFlag(args, "no-dom-position-diff") && !hasFlag(args, "no-position-diff"),
     componentBboxDiff: !hasFlag(args, "no-component-bbox"),
     states: parseStatesArg(args),
+    triptych: !hasFlag(args, "no-triptych"),
+    tokensPath: getArg(args, "tokens", "") || undefined,
+    againstPreviousPath: getArg(args, "against-previous", "") || undefined,
   };
 }
 
@@ -238,6 +273,86 @@ const STATIC_VIEWPORTS: ViewportSpec[] = [
 ];
 
 function hr() { _hr(76); }
+
+/**
+ * Render-sanity warnings (failed stylesheet loads, fallback fonts, etc.)
+ * mean the pixel diff downstream is suspect. Print them as a loud banner
+ * so an agent scanning top-down sees the cause before it sees the
+ * (now meaningless) diff numbers.
+ *
+ * Buried yellow text was being missed by agents per the 2026-05-15
+ * design-md scenario report — promoted to a red bordered block here.
+ */
+function printRenderSanityBanner(side: "baseline" | "variant", sanity: RenderSanityResult): void {
+  console.log();
+  console.log(`  ${RED}${BOLD}┌─ render sanity (${side}) ─ ${sanity.warnings.length} warning(s) ─${"─".repeat(Math.max(0, 38 - side.length))}${RESET}`);
+  for (const w of sanity.warnings) {
+    console.log(`  ${RED}│${RESET}  [${w.code}] ${w.message}`);
+  }
+  if (sanity.failedRequests.length > 0) {
+    console.log(`  ${RED}│${RESET}  ${DIM}failed requests (${sanity.failedRequests.length}):${RESET}`);
+    for (const req of sanity.failedRequests.slice(0, 5)) {
+      console.log(`  ${RED}│${RESET}    ${DIM}- ${req.url} (${req.errorText})${RESET}`);
+    }
+    if (sanity.failedRequests.length > 5) {
+      console.log(`  ${RED}│${RESET}    ${DIM}... ${sanity.failedRequests.length - 5} more${RESET}`);
+    }
+  }
+  console.log(`  ${RED}│${RESET}  ${DIM}Downstream diff numbers may be meaningless until resolved.${RESET}`);
+  console.log(`  ${RED}└${"─".repeat(74)}${RESET}`);
+  console.log();
+}
+
+/**
+ * Detect whether two render-sanity results describe the *same* failure
+ * on both sides. Symmetric failures (e.g. Google Fonts 404 against
+ * baseline + variant in a sandbox) don't actually affect diff
+ * comparability — they cancel out — so the red boxed banner is
+ * misleading noise. Asymmetric failures still warrant the full
+ * banner because the diff numbers are genuinely tainted.
+ *
+ * Symmetric ⇔ same set of warning codes AND same set of (url,
+ * errorText) failed-request pairs.
+ */
+function isSymmetricSanity(
+  baseline: RenderSanityResult | undefined,
+  variant: RenderSanityResult | undefined,
+): boolean {
+  if (!baseline || !variant) return false;
+  if (baseline.ok && variant.ok) return false;
+  const bWarn = new Set(baseline.warnings.map((w) => w.code));
+  const vWarn = new Set(variant.warnings.map((w) => w.code));
+  if (bWarn.size !== vWarn.size) return false;
+  for (const code of bWarn) if (!vWarn.has(code)) return false;
+  const bReq = new Set(baseline.failedRequests.map((r) => `${r.url}::${r.errorText}`));
+  const vReq = new Set(variant.failedRequests.map((r) => `${r.url}::${r.errorText}`));
+  if (bReq.size !== vReq.size) return false;
+  for (const k of bReq) if (!vReq.has(k)) return false;
+  return true;
+}
+
+/**
+ * Single dimmed-yellow line variant of the sanity banner used when
+ * baseline + variant warnings are byte-identical. Diff numbers are
+ * still affected (text geometry differs from what the spec intended)
+ * but they're *consistent* — so an agent can still act on the diff.
+ */
+function printSymmetricSanityLine(sanity: RenderSanityResult): void {
+  console.log();
+  const codes = [...new Set(sanity.warnings.map((w) => w.code))].join(", ");
+  const reqCount = sanity.failedRequests.length;
+  const head = `  ${YELLOW}~ render sanity:${RESET} symmetric ${codes} on both baseline and variant ${DIM}(${reqCount} failed request${reqCount === 1 ? "" : "s"})${RESET}`;
+  console.log(head);
+  // Show up to 2 representative URLs.
+  for (const req of sanity.failedRequests.slice(0, 2)) {
+    console.log(`    ${DIM}- ${req.url} (${req.errorText})${RESET}`);
+  }
+  if (sanity.failedRequests.length > 2) {
+    console.log(`    ${DIM}... ${sanity.failedRequests.length - 2} more (symmetric)${RESET}`);
+  }
+  console.log(`    ${DIM}symmetric failures cancel out in the diff; numbers remain comparable.${RESET}`);
+  console.log();
+}
 
 function urlToLabel(url: string): string {
   try {
@@ -455,6 +570,16 @@ export interface MigrationCompareReport {
       }>;
     }>;
   }>;
+  /**
+   * Wireframe-mode fix suggestions emitted by
+   * `generateWireframeFixCandidates`. Persisted to the JSON report so
+   * `vrt watch` can compute "newly introduced vs resolved" deltas
+   * between rounds without re-deriving them.
+   */
+  wireframeFixSuggestions?: Array<{
+    variantFile: string;
+    suggestions: WireframeFixSuggestion[];
+  }>;
   results: MigrationCompareResult[];
   reportPath: string;
 }
@@ -496,9 +621,27 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
 
   await mkdir(outputDir, { recursive: true });
 
+  // Optional DESIGN.md token source. Loaded once; fed to the
+  // wireframe-mode fix-candidate generator and (later) palette diff
+  // reverse-lookup. Failure to load is non-fatal — we just skip the
+  // token-snapping and surface a single warning.
+  let designTokens: DesignTokens | undefined;
+  if (options.tokensPath) {
+    try {
+      designTokens = await loadDesignTokens(options.tokensPath);
+      console.log(`  ${DIM}Tokens: ${designTokens.colors.size} colors, ${designTokens.spacing.length} spacing, ${designTokens.rounded.size} rounded loaded from ${options.tokensPath}${RESET}`);
+    } catch (error) {
+      console.log(`  ${YELLOW}Failed to load --tokens ${options.tokensPath}: ${String(error)}${RESET}`);
+    }
+  }
+
   const isUrlMode = !!options.baselineUrl;
   let baselineHtml: string;
   let baselineName: string;
+  // File-mode: rendering goes through `page.goto(file://...)` so that
+  // relative `<link>` / `<script>` hrefs resolve. `setContent` had no base
+  // URL, which caused unstyled renders on both sides and a false 0% diff.
+  let baselineFileUrl: string | undefined;
 
   if (isUrlMode) {
     // URL mode: defer HTML capture to after browser launch
@@ -508,6 +651,35 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     const baselinePath = resolve(dir, baseline);
     baselineHtml = await readFile(baselinePath, "utf-8");
     baselineName = basename(baseline, ".html");
+    baselineFileUrl = pathToFileURL(baselinePath).href;
+  }
+
+  // Build variant sources + disambiguate basename collisions BEFORE the
+  // baseline rendering loop so that on-disk screenshot paths use the
+  // disambiguated names. Otherwise baseline screenshots get written under
+  // the colliding name first, then the variant overwrites them — producing
+  // a false 0% diff of the variant against itself.
+  const variantSources: Array<{ label: string; url: string; file: string; fileUrl?: string }> = isUrlMode
+    ? (options.variantUrls ?? []).map((url) => ({ label: urlToLabel(url), url, file: "" }))
+    : variants.map((f) => {
+        const p = resolve(dir, f);
+        return { label: basename(f, ".html"), url: "", file: f, fileUrl: pathToFileURL(p).href };
+      });
+
+  if (!isUrlMode) {
+    const labelCount = new Map<string, number>();
+    const bump = (k: string) => labelCount.set(k, (labelCount.get(k) ?? 0) + 1);
+    bump(baselineName);
+    for (const v of variantSources) bump(v.label);
+    const parentTag = (p: string) => basename(dirname(resolve(dir, p))) || "root";
+    if ((labelCount.get(baselineName) ?? 0) > 1) {
+      baselineName = `${parentTag(baseline)}__${baselineName}`;
+    }
+    const seen = new Set<string>([baselineName]);
+    for (const v of variantSources) {
+      if (seen.has(v.label)) v.label = `${parentTag(v.file)}__${v.label}`;
+      seen.add(v.label);
+    }
   }
   const resolvedApprovalPath = await resolveApprovalPath(dir, approvalPath);
   const approvalManifest = resolvedApprovalPath ? await loadApprovalManifest(resolvedApprovalPath) : null;
@@ -576,7 +748,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
   if (!enablePaintTree) {
     console.log(`  ${DIM}Paint tree: disabled${RESET}`);
   } else if (paintTreeStatus.error) {
-    console.log(`  ${YELLOW}Paint tree: unavailable (${paintTreeStatus.error})${RESET}`);
+    console.log(`  ${DIM}Paint tree: unavailable (${paintTreeStatus.error}) — using Playwright computed-style + DOM-position fallback${RESET}`);
   }
   console.log();
   let browser: Browser | null = null;
@@ -622,7 +794,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       console.log(`  ${DIM}Paint tree: enabled via ${paintTreeUrl}${RESET}`);
       console.log();
     } else if (enablePaintTree && paintTreeStatus.error) {
-      console.log(`  ${YELLOW}Paint tree: unavailable (${paintTreeStatus.error})${RESET}`);
+      console.log(`  ${DIM}Paint tree: unavailable (${paintTreeStatus.error}) — using Playwright computed-style + DOM-position fallback${RESET}`);
       console.log();
     }
 
@@ -657,6 +829,8 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         if (!baselineHtml) {
           baselineHtml = await page.content();
         }
+      } else if (baselineFileUrl) {
+        await page.goto(baselineFileUrl, { waitUntil: "networkidle", timeout: 30000 });
       } else {
         await page.setContent(baselineHtml, { waitUntil: "networkidle" });
       }
@@ -684,14 +858,11 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         }
         page.off("requestfailed", onFailed);
 
-        if (baselineSanity && !baselineSanity.ok) {
-          console.log();
-          console.log(`  ${YELLOW}Baseline render sanity warnings:${RESET}`);
-          for (const w of baselineSanity.warnings) {
-            console.log(`    ${YELLOW}- [${w.code}] ${w.message}${RESET}`);
-          }
-          console.log();
-        }
+        // Baseline banner is now deferred to the per-variant loop so
+        // we can detect symmetric-with-variant failures and downgrade
+        // the boxed red banner to a single dimmed line. Asymmetric
+        // and one-sided baseline failures still get the full banner
+        // from the variant-loop branch.
       }
 
       // Capture baseline DOM fingerprint once (first viewport).
@@ -783,10 +954,6 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       globalShift?: number;
     }> = [];
 
-    const variantSources = isUrlMode
-      ? (options.variantUrls ?? []).map((url) => ({ label: urlToLabel(url), url, file: "" }))
-      : variants.map((f) => ({ label: basename(f, ".html"), url: "", file: f }));
-
     const domEquivalenceReports: Array<{ variantFile: string; result: DomEquivalenceResult }> = [];
     const computedStyleDiffReports: Array<{ variantFile: string; result: CsdResult }> = [];
     const domPositionDiffReports: Array<{ variantFile: string; result: DpResult }> = [];
@@ -804,6 +971,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       variantFile: string;
       perViewport: Array<{ viewport: string; baseline: PaletteColor[]; variant: PaletteColor[]; diff: PaletteDiff }>;
     }> = [];
+    const wireframeFixReports: Array<{ variantFile: string; suggestions: WireframeFixSuggestion[] }> = [];
     const stateDiffsReports: Array<{
       variantFile: string;
       perState: Array<{
@@ -832,15 +1000,69 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       const variantDomPositionByVp = new Map<string, PositionedElement[]>();
       const variantBboxesByVp = new Map<string, BboxElement[]>();
       const shiftRegionsByVp = new Map<string, ShiftRegion[]>();
+      const triptychPaths = new Map<string, string>();
+      let variantSanity: RenderSanityResult | undefined;
       for (const [vpIndex, vp] of VIEWPORTS.entries()) {
         const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
+
+        // Variant render-sanity: register a failed-request listener on the
+        // first viewport so we can warn about variant-side stylesheet 404s
+        // and font fallbacks. Before this, only baseline was checked, which
+        // missed render-breakage on the variant side (e.g. webfont fallback
+        // on the variant that the baseline happened to load correctly).
+        const variantSanityEnabled = (options.baselineSanityCheck ?? true) && vpIndex === 0;
+        const variantFailedRequests: FailedRequest[] = [];
+        const onVariantFailed = (req: import("playwright").Request) => {
+          variantFailedRequests.push({
+            url: req.url(),
+            errorText: req.failure()?.errorText ?? "unknown failure",
+          });
+        };
+        if (variantSanityEnabled) page.on("requestfailed", onVariantFailed);
+
         if (variant.url) {
           await page.goto(variant.url, { waitUntil: "networkidle", timeout: 30000 });
           if (!variantHtml) variantHtml = await page.content();
+        } else if (variant.fileUrl) {
+          await page.goto(variant.fileUrl, { waitUntil: "networkidle", timeout: 30000 });
         } else {
           await page.setContent(variantHtml, { waitUntil: "networkidle" });
         }
         if (options.maskSelectors?.length) await applyMask(page, options.maskSelectors);
+
+        if (variantSanityEnabled) {
+          try {
+            const browserProbe = await page.evaluate(RENDER_PROBE_BROWSER_SCRIPT) as {
+              bodyFontFamily: string;
+              styleSheetCount: number;
+              hasClassAttributes: boolean;
+            };
+            const sourceProbe = probeSourceHtml(variantHtml);
+            variantSanity = evaluateRenderSanity({
+              failedRequests: variantFailedRequests,
+              probe: { ...browserProbe, ...sourceProbe },
+            });
+          } catch (error) {
+            variantSanity = { ok: true, warnings: [], failedRequests: variantFailedRequests };
+            console.log(`  ${YELLOW}Variant sanity probe error (${variantName}): ${String(error)}${RESET}`);
+          }
+          page.off("requestfailed", onVariantFailed);
+
+          // Combined sanity rendering: symmetric failures fold into
+          // a single dimmed-yellow line; asymmetric ones each get
+          // their own red banner. Closes #32 — agent-d called out
+          // that the boxed banner for the Google-Fonts-404-on-both-
+          // sides case was misleading noise because the diff stays
+          // comparable when both sides fall back identically.
+          const baselineBad = !!(baselineSanity && !baselineSanity.ok);
+          const variantBad = !!(variantSanity && !variantSanity.ok);
+          if (baselineBad && variantBad && isSymmetricSanity(baselineSanity, variantSanity)) {
+            printSymmetricSanityLine(baselineSanity!);
+          } else {
+            if (baselineBad) printRenderSanityBanner("baseline", baselineSanity!);
+            if (variantBad) printRenderSanityBanner("variant", variantSanity!);
+          }
+        }
 
         if (domEnabled && vpIndex === 0 && !variantDomFingerprint) {
           try {
@@ -889,6 +1111,26 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         const diff = await compareScreenshots(snap, { outputDir });
         const rawDiffRatio = diff?.diffRatio ?? 0;
         const rawDiffPixels = diff?.diffPixels ?? 0;
+
+        // Emit `baseline | variant | heatmap` triptych so an agent can
+        // read all three panels in one file. No-op for zero-diff
+        // viewports (no heatmap → composeTriptych returns undefined).
+        if ((options.triptych ?? true) && rawDiffRatio > 0) {
+          const triptychPath = join(outputDir, `${variantName}-${vp.label}-triptych.png`);
+          const baselinePngPath = baselineScreenshots.get(vp.label)!;
+          const heatmapPngPath = join(outputDir, `${variantName}-${vp.label}_heatmap.png`);
+          try {
+            const written = await composeTriptych(browser, {
+              baselinePath: baselinePngPath,
+              variantPath: variantScreenshotPath,
+              heatmapPath: heatmapPngPath,
+              outputPath: triptychPath,
+            });
+            if (written) triptychPaths.set(`${variantName}-${vp.label}`, written);
+          } catch (error) {
+            console.log(`  ${YELLOW}Triptych compose error (${variantName} / ${vp.label}): ${String(error)}${RESET}`);
+          }
+        }
 
         // Shift detection
         const diffReport = rawDiffRatio > 0
@@ -1289,7 +1531,204 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           const totalMissing = perViewportPalette.reduce((s, v) => s + v.diff.onlyInBaseline.length, 0);
           const totalExtra = perViewportPalette.reduce((s, v) => s + v.diff.onlyInVariant.length, 0);
           console.log(`  ${DIM}Palette diff: ${totalMissing} missing color(s), ${totalExtra} extra color(s) across ${perViewportPalette.length} viewport(s)${RESET}`);
+
+          // Reverse-resolve each unmatched hex against the DESIGN.md
+          // color tokens so the agent sees "swap surface-variant →
+          // surface-container-high" instead of two bare hex strings.
+          if (designTokens && designTokens.colors.size > 0) {
+            const swapsByVp = new Map<string, Array<{ from?: string; to?: string; baselineHex: string; variantHex: string; deltaE: number }>>();
+            for (const vp of perViewportPalette) {
+              // Pair each missing baseline color with the closest
+              // remaining variant extra (same Euclidean RGB threshold
+              // as `diffPalettes`'s pairing pass would use). We just
+              // want a candidate rename surface here.
+              const extras = [...vp.diff.onlyInVariant];
+              const pairs: Array<{ from?: string; to?: string; baselineHex: string; variantHex: string; deltaE: number }> = [];
+              for (const miss of vp.diff.onlyInBaseline) {
+                let bestIdx = -1;
+                let bestDist = Infinity;
+                for (let i = 0; i < extras.length; i++) {
+                  const dr = miss.r - extras[i].r, dg = miss.g - extras[i].g, db = miss.b - extras[i].b;
+                  const d = Math.sqrt(dr * dr + dg * dg + db * db);
+                  if (d < bestDist) { bestDist = d; bestIdx = i; }
+                }
+                if (bestIdx < 0) continue;
+                const extra = extras.splice(bestIdx, 1)[0];
+                const fromTok = snapColor(designTokens, miss.hex);
+                const toTok = snapColor(designTokens, extra.hex);
+                if (!fromTok && !toTok) continue;
+                pairs.push({
+                  from: fromTok?.name,
+                  to: toTok?.name,
+                  baselineHex: miss.hex,
+                  variantHex: extra.hex,
+                  deltaE: bestDist,
+                });
+              }
+              if (pairs.length > 0) swapsByVp.set(vp.viewport, pairs);
+            }
+            for (const [vp, pairs] of swapsByVp) {
+              for (const p of pairs.slice(0, 4)) {
+                // Aligned with the candidate-row convention
+                // (current → target): the variant's token is what
+                // the agent currently uses; the baseline's token is
+                // the target they should switch to. Agent-f v6:
+                // before this alignment the swap line read in the
+                // opposite direction from candidate rows, which
+                // was inconsistent.
+                const nowTok = p.to ?? `${p.variantHex}`;
+                const targetTok = p.from ?? `${p.baselineHex}`;
+                if (p.from && p.to && p.from !== p.to) {
+                  console.log(`    ${CYAN}swap${RESET} ${nowTok} (now) → ${targetTok} (target) ${DIM}(${p.variantHex} → ${p.baselineHex}, ${vp})${RESET}`);
+                } else if (p.from || p.to) {
+                  console.log(`    ${DIM}near${RESET} ${nowTok} (now) ↔ ${targetTok} (target) ${DIM}(${p.variantHex} ↔ ${p.baselineHex}, ${vp})${RESET}`);
+                }
+              }
+            }
+
+            // Also surface lone unmatched colors with their nearest
+            // token, even when no pair was formed. Helps when a variant
+            // has an extra color the baseline never uses (e.g. an
+            // accidental fallback fill) — the agent gets "extra
+            // #f59e0b ≈ primary-container".
+            const paired = new Set<string>();
+            for (const pairs of swapsByVp.values()) {
+              for (const p of pairs) {
+                paired.add(`miss:${p.baselineHex}`);
+                paired.add(`extra:${p.variantHex}`);
+              }
+            }
+            for (const vp of perViewportPalette) {
+              for (const miss of vp.diff.onlyInBaseline) {
+                if (paired.has(`miss:${miss.hex}`)) continue;
+                const tok = snapColor(designTokens, miss.hex);
+                if (tok) {
+                  console.log(`    ${DIM}miss${RESET} ${miss.hex} ≈ ${tok.name} ${DIM}(ΔE ${tok.deltaE.toFixed(1)}, ${vp.viewport})${RESET}`);
+                }
+              }
+              for (const extra of vp.diff.onlyInVariant) {
+                if (paired.has(`extra:${extra.hex}`)) continue;
+                const tok = snapColor(designTokens, extra.hex);
+                if (tok) {
+                  console.log(`    ${DIM}extra${RESET} ${extra.hex} ≈ ${tok.name} ${DIM}(ΔE ${tok.deltaE.toFixed(1)}, ${vp.viewport})${RESET}`);
+                }
+              }
+            }
+          }
         }
+
+        // Wireframe-mode fix candidates: synthesize "try N px (token X)"
+        // suggestions from image-only signals (bbox + text-row deltas)
+        // when DOM correspondence is missing. The existing CSS-declaration
+        // candidate generator returns empty in this mode (it expected an
+        // inline <style id="target-css"> block and a hot paint-tree).
+        // Pull this variant's DOM-position-diff entries (when the
+        // capture succeeded) so the wireframe generator can name a
+        // candidate selector for each suggestion. Falls through
+        // silently when DOM correspondence is missing — the
+        // generator handles undefined.
+        const dpForVariant = domPositionDiffPerViewportReports
+          .find((r) => r.variantFile === variantFileLabel)
+          ?.result.entries;
+
+        const wireframeSuggestions: WireframeFixSuggestion[] = generateWireframeFixCandidates({
+          bboxByViewport: perViewport,
+          textRowsByViewport: perViewportTextRows.map((r) => ({
+            viewport: r.viewport,
+            matches: r.matches,
+            // Pass total dark-band counts so the [REFLOW] detector
+            // can spot text-wrap on the narrow viewport.
+            baselineRowCount: r.baselineRowCount,
+            variantRowCount: r.variantRowCount,
+          })),
+          tokens: designTokens,
+          // Authoritative viewport set so subset detection works even
+          // when a viewport had zero meaningful bbox/text-row deltas
+          // (e.g. desktop/wide at <0.5% diff produce no perViewport
+          // entries; mobile-only deltas would otherwise look "scope:
+          // all" rather than "subset"). Closes the agent-d round-3
+          // bug where [SUBSET] tags silently disappeared as desktop
+          // converged.
+          allViewports: VIEWPORTS.map((vp) => vp.label),
+          domPositionEntries: dpForVariant,
+        });
+        if (wireframeSuggestions.length > 0) {
+          wireframeFixReports.push({ variantFile: variantFileLabel, suggestions: wireframeSuggestions });
+          // Sort: isHighImpact first (agent-e v5: the single
+          // biggest-win row was getting buried under DIVERGENT
+          // rows of smaller magnitudes). Then scope priority,
+          // then magnitude.
+          const sorted = [...wireframeSuggestions].sort((a, b) => {
+            // STRUCTURAL leads everything — it diagnoses the
+            // local-minima trap before agents start typing.
+            // REFLOW also leads — it warns against spacing-fix
+            // attempts on a typographic-cascade problem.
+            const aLead = a.scope === "structural" || a.scope === "reflow";
+            const bLead = b.scope === "structural" || b.scope === "reflow";
+            if (aLead !== bLead) return aLead ? -1 : 1;
+            if (!!b.isHighImpact !== !!a.isHighImpact) return (b.isHighImpact ? 1 : 0) - (a.isHighImpact ? 1 : 0);
+            const scopeRank = (s: typeof a.scope) =>
+              s === "structural" ? -2
+              : s === "reflow" ? -1
+              : s === "divergent" ? 0
+              : s === "magnitude-divergent" ? 1
+              : s === "subset" ? 2
+              : 3;
+            if (scopeRank(a.scope) !== scopeRank(b.scope)) return scopeRank(a.scope) - scopeRank(b.scope);
+            return 0;
+          });
+          const top = sorted.slice(0, 5);
+          console.log(`  ${CYAN}Wireframe fix suggestions (${wireframeSuggestions.length}, top ${top.length}):${RESET}`);
+          for (const s of top) {
+            const conf = s.confidence === "high" ? GREEN : s.confidence === "medium" ? YELLOW : DIM;
+            // Divergent suggestions get a magenta "DIVERGENT" prefix so
+            // they can't be missed; subset gets a subtle "SUBSET" tag.
+            const scopeTag = s.scope === "structural"
+              ? ` ${BOLD}\x1b[35m[STRUCTURAL]${RESET}`
+              : s.scope === "reflow"
+                ? ` ${BOLD}\x1b[33m[REFLOW]${RESET}`
+                : s.scope === "divergent"
+                  ? ` ${BOLD}${RED}[DIVERGENT]${RESET}`
+                  : s.scope === "magnitude-divergent"
+                    ? ` ${BOLD}${CYAN}[MAG-DIVERGENT]${RESET}`
+                    : s.scope === "subset"
+                      ? ` ${YELLOW}[SUBSET]${RESET}`
+                      : "";
+            const impactTag = s.isHighImpact
+              ? ` ${BOLD}${GREEN}[HIGH-IMPACT]${RESET}`
+              : "";
+            console.log(`    ${conf}[${s.confidence}]${RESET}${impactTag}${scopeTag} ${s.evidence}`);
+            console.log(`      ${DIM}→ ${s.suggestion}${RESET}`);
+            if (s.candidates && s.candidates.length > 0) {
+              // Group candidates by selector so the agent sees the rule
+              // first and the per-property diff under it.
+              const bySel = new Map<string, typeof s.candidates>();
+              for (const c of s.candidates) {
+                const arr = bySel.get(c.selector) ?? [];
+                arr.push(c);
+                bySel.set(c.selector, arr);
+              }
+              for (const [sel, rows] of bySel) {
+                // Arrow direction is "current → target" — the agent
+                // edits FROM what they have TO what the baseline has.
+                // Backwards rendering misled agent-e (v5).
+                const anyCascades = rows.some((r) => r.cascades);
+                const propList = [...new Set(rows.map((r) => `${r.property}: ${r.current} (now) → ${r.target} (target)`))].join("; ");
+                // F2: cascade hint — when the property is a box-size
+                // property (height / margin-bottom / etc.), changing
+                // it pushes downstream siblings. Without this hint
+                // agent-f thought the candidate was a "non-sequitur"
+                // — connected to a different rank's suggestion.
+                const cascadeHint = anyCascades ? ` ${YELLOW}[cascades to siblings]${RESET}` : "";
+                console.log(`      ${CYAN}candidate:${RESET} ${BOLD}${sel}${RESET} ${DIM}(${propList})${RESET}${cascadeHint}`);
+              }
+            }
+          }
+        }
+      }
+
+      if (triptychPaths.size > 0) {
+        console.log(`  ${DIM}Triptych: ${triptychPaths.size} viewport(s) → ${outputDir}/${variantName}-<viewport>-triptych.png (baseline | variant | heatmap)${RESET}`);
       }
 
       // Multi-state capture (opt-in via --states hover focus ...).
@@ -1317,6 +1756,8 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             const baselinePage = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
             if (isUrlMode) {
               await baselinePage.goto(options.baselineUrl!, { waitUntil: "networkidle", timeout: 30000 });
+            } else if (baselineFileUrl) {
+              await baselinePage.goto(baselineFileUrl, { waitUntil: "networkidle", timeout: 30000 });
             } else {
               await baselinePage.setContent(baselineHtml, { waitUntil: "networkidle" });
             }
@@ -1338,6 +1779,8 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             const variantPage = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
             if (variant.url) {
               await variantPage.goto(variant.url, { waitUntil: "networkidle", timeout: 30000 });
+            } else if (variant.fileUrl) {
+              await variantPage.goto(variant.fileUrl, { waitUntil: "networkidle", timeout: 30000 });
             } else {
               await variantPage.setContent(variantHtml, { waitUntil: "networkidle" });
             }
@@ -1497,6 +1940,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       textRowShifts: textRowShiftsReports.length > 0 ? textRowShiftsReports : undefined,
       paletteDiffs: paletteDiffsReports.length > 0 ? paletteDiffsReports : undefined,
       stateDiffs: stateDiffsReports.length > 0 ? stateDiffsReports : undefined,
+      wireframeFixSuggestions: wireframeFixReports.length > 0 ? wireframeFixReports : undefined,
       results,
       reportPath,
     };
@@ -1509,6 +1953,30 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     console.log();
     console.log(`  ${DIM}Report: ${reportPath}${RESET}`);
     console.log();
+
+    // --against-previous <dir-or-json>: surface a "since previous
+    // run" section so an agent on a tight budget can tell whether
+    // the last edit moved forward, regressed, or overshot zero
+    // (G1 from the agent-e v5 validation). Reuses watch.ts's
+    // diffWatchRuns + zero-crossing detector.
+    if (options.againstPreviousPath) {
+      try {
+        const { diffWatchRuns, formatWatchDelta, summarizeReport } = await import("./watch.ts");
+        const prevPath = options.againstPreviousPath.endsWith(".json")
+          ? options.againstPreviousPath
+          : join(options.againstPreviousPath, "migration-report.json");
+        const prevRaw = await readFile(prevPath, "utf-8");
+        const prevReport = JSON.parse(prevRaw) as MigrationCompareReport;
+        const prev = summarizeReport(prevReport);
+        const curr = summarizeReport(report);
+        const delta = diffWatchRuns(prev, curr);
+        console.log(formatWatchDelta(delta, false));
+        console.log();
+      } catch (err) {
+        console.log(`  ${YELLOW}--against-previous failed: ${String(err)}${RESET}`);
+        console.log();
+      }
+    }
 
     if (options.strictDomEquivalence) {
       const failing = domEquivalenceReports.filter((d) => !d.result.ok);

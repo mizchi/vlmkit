@@ -4,11 +4,20 @@ Visual Regression Testing toolkit — pixel diff, computed style diff, a11y tree
 
 Requires Node 24+.
 
-The public surface is organized into three layers:
+The public surface is organized into:
 
-- `vrt <command>` for one-shot analysis and comparison commands
-- `vrt workflow <command>` for baseline/snapshot verification loops
-- `vrt api <command>` for serving and probing the HTTP API
+- **Dev inner loop**: `vrt compare` (rich signal output), `vrt watch`
+  (file-watcher + round-vs-round delta), `vrt manifest` (approval
+  authoring).
+- **CI gate**: `vrt diff-pr {pin,verify,post}` — visual diff +
+  optional a11y / media-variants / cross-browser gates per route.
+  `vrt baseline` is the canonical alias.
+- **One-shot analysis**: `vrt compare`, `vrt png-diff`, `vrt snapshot`,
+  the 10+ markup-assistance commands.
+- **Legacy / internal**: `vrt workflow <command>` — vrt's own
+  dogfood harness; external projects should prefer `vrt baseline` /
+  `vrt diff-pr`.
+- **API**: `vrt api {serve,status}` for HTTP integrations.
 
 ## Features
 
@@ -59,7 +68,22 @@ vrt snapshot approve --output snapshots/
 # Load snapshot targets from vrt.config.json
 vrt snapshot
 
-# Workflow verification loop
+# Dev inner loop with rich signal output (token-aware + cross-round)
+vrt compare baseline.html variant.html --tokens DESIGN.md
+vrt watch baseline.html variant.html --tokens DESIGN.md
+
+# Author approval rules (sub-pixel deviations, intentional design exceptions, etc.)
+vrt manifest add --selector .hero__body --max-px 2 --reason "AA artifact" --expires 2026-08-15
+vrt manifest add --a11y-contrast --selector "button" --reason "decorative" --expires 2026-08-15
+vrt manifest add --from-run .vrt/runs/diff-pr/  # auto-acknowledge sub-pixel deltas
+vrt manifest list
+
+# CI gate — declare routes in vrt.config.json, pin baselines, gate per PR
+vrt baseline pin                                       # on main
+vrt baseline verify                                    # in PR
+vrt baseline post --pr owner/repo#123                  # send summary.md as PR comment
+
+# Legacy internal-dogfood verification loop (vrt's own e2e suite)
 vrt workflow init
 vrt workflow capture
 vrt workflow verify

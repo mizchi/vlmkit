@@ -70,4 +70,58 @@ describe("parseMigrationCompareArgs", () => {
       /invalid --discover-backend/i,
     );
   });
+
+  it("should accept --output as alias for --output-dir", () => {
+    // Agents typed `--output` first; the typo'd flag was silently swallowed
+    // and reports always landed at the default location. See #22.
+    const options = parseMigrationCompareArgs([
+      "--output", "/tmp/agent-output",
+      "before.html",
+      "after.html",
+    ]);
+    assert.equal(options.outputDir, resolve("/tmp/agent-output"));
+  });
+
+  it("should prefer --output-dir over --output when both passed", () => {
+    const options = parseMigrationCompareArgs([
+      "--output", "/tmp/alias",
+      "--output-dir", "/tmp/explicit",
+      "before.html",
+      "after.html",
+    ]);
+    assert.equal(options.outputDir, resolve("/tmp/explicit"));
+  });
+
+  it("should default computed-style and dom-position-diff to ON", () => {
+    // Playwright-driven, no Crater BiDi dependency. Agents need these
+    // property-level signals by default — they were being silently
+    // skipped before, leaving font-family / padding / gap deltas
+    // invisible. See #25.
+    const options = parseMigrationCompareArgs(["before.html", "after.html"]);
+    assert.equal(options.computedStyleDiff, true);
+    assert.equal(options.domPositionDiff, true);
+  });
+
+  it("should respect --no-computed-style / --no-dom-position-diff opt-outs", () => {
+    const options = parseMigrationCompareArgs([
+      "--no-computed-style",
+      "--no-dom-position-diff",
+      "before.html",
+      "after.html",
+    ]);
+    assert.equal(options.computedStyleDiff, false);
+    assert.equal(options.domPositionDiff, false);
+  });
+
+  it("should default triptych to ON and honor --no-triptych", () => {
+    const def = parseMigrationCompareArgs(["before.html", "after.html"]);
+    assert.equal(def.triptych, true);
+
+    const optOut = parseMigrationCompareArgs([
+      "--no-triptych",
+      "before.html",
+      "after.html",
+    ]);
+    assert.equal(optOut.triptych, false);
+  });
 });

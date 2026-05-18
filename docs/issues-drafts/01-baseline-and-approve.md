@@ -1,0 +1,106 @@
+# Baseline lifecycle: `vrt baseline` (pin / update) + `vrt approve` (ergonomic manifest authoring)
+
+## Context
+
+The 2026-05-15 design-md scenario (v1–v3) and its closed-loop validation
+runs showed that vrt's signal layer is good enough for fresh agents to
+reach near-pixel-perfect convergence on a new implementation. The piece
+that's missing for vrt to scale from "single-shot tool" to "real
+project's regression net" is the **baseline lifecycle**:
+
+- Today's "golden" PNGs are scattered under `test-results/` or committed
+  alongside fixtures. There's no concept of "the approved baseline for
+  route X on branch Y, last updated date Z".
+- The approval-manifest mechanism (`approval.json`) already exists and
+  is honored by `runMigrationCompare`, but there's no CLI to author it.
+  Agent-d explicitly identified `max-width: 641.32px` as a 1.32px sub-
+  pixel deviation they couldn't act on — that's exactly the case
+  approval should handle, but the only way to record it today is to
+  hand-edit JSON.
+- Without these two pieces, a team can't onboard vrt to a real codebase
+  without ad-hoc tooling: who runs which command to update goldens?
+  Where do PNGs live? How does a designer say "yes, that's the new
+  intended look, accept it"?
+
+## What's needed
+
+### `vrt baseline` subcommand
+
+```
+vrt baseline pin <route-or-file> --as <name>
+vrt baseline list
+vrt baseline update <name>
+vrt baseline diff <name>     # current render vs stored baseline
+vrt baseline rm <name>
+```
+
+- `pin`: captures baseline PNG(s) across the declared viewport set,
+  writes to `.vrt/baselines/<name>/<viewport>.png`, records metadata
+  in `.vrt/baselines.json`: `{name, source, viewports, capturedAt,
+  capturedFrom: branch/commit/url}`.
+- `list`: tabular output — name, source, viewports, last-updated,
+  staleness (was source modified since last pin?).
+- `update`: re-snapshot, archive previous PNGs under
+  `.vrt/baselines/<name>/_history/<timestamp>/` (so the human change
+  is reversible).
+- Storage: large PNGs should live outside git proper — `.vrt/`
+  defaults to gitignored; users opt in to LFS (suggest `git lfs track
+  ".vrt/baselines/**"`) or external S3-style storage via a pluggable
+  backend (out of scope for the first cut; document the seam).
+
+### `vrt approve` subcommand
+
+Ergonomic manifest authoring. Reads a `--run-id` (which is just the
+output dir of a recent `vrt compare`) and lets the operator approve
+regions or selectors:
+
+```
+vrt approve <run-id> --selector .hero__body --reason "sub-pixel AA" \
+  --max-px 2 --expires 2026-08-15
+
+vrt approve <run-id> --region "x=120,y=80,w=200,h=40,viewport=mobile" \
+  --reason "marquee animation; intentionally dynamic"
+
+vrt approve <run-id> --all-under 0.5pp --reason "minor AA drift"
+```
+
+- Appends entries to the project's `approval.json` (or path declared
+  in `vrt.config`).
+- Optional `--expires <date>`: rule auto-warns past the date, hard-
+  fails after a grace period. Forces deliberate re-approval after the
+  next design token shift.
+- Optional `--acknowledged-by <name>` for audit trails.
+- `--dry-run` to preview the manifest change without writing.
+
+Manifest schema additions if needed: `expires`, `acknowledgedBy`,
+`createdAt`. The existing region matchers (`src/approval.ts`) already
+support most of this; the gap is the CLI.
+
+## Done when
+
+- [ ] `vrt baseline {pin,list,update,diff,rm}` work as described.
+- [ ] `vrt approve` writes JSON the existing approval pipeline already
+      reads. Existing strict / non-strict behavior preserved.
+- [ ] Tests cover manifest authoring, expiry (warn / fail), region
+      matching round-tripped through CLI ↔ JSON.
+- [ ] Documentation updated in `docs/api-design.md` with the new
+      subcommands.
+- [ ] `.vrt/` dir convention documented + `.gitignore` recommendation.
+
+## Out of scope
+
+- LFS / S3 plug-in backends. Document the seam, ship a local-disk
+  backend first.
+- Multi-tenant / cloud baseline storage.
+- PR-comment integration (separate ticket: see CI-gate draft).
+
+## Severity
+
+`major` — operational scaling blocker. Without baseline lifecycle, vrt
+is a personal-developer tool, not a team-owned regression net.
+
+## References
+
+- `docs/reports/2026-05-15-design-md-scenario-v{1,2,3}.md`
+- `src/approval.ts` (existing region/manifest matcher)
+- agent-d's "641.32px sub-pixel artifact" comment (v3 report)

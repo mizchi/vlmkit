@@ -8,7 +8,24 @@ export interface ApprovalManifest {
   rules: ApprovalRule[];
 }
 
+export type ApprovalRuleKind =
+  | "visual"
+  | "a11y-contrast"
+  | "a11y-touch"
+  | "a11y-focus-order"
+  | "a11y-semantic"
+  | "media-variant"
+  | "cross-browser";
+
 export interface ApprovalRule {
+  /**
+   * Sub-categorizes the rule. Default ("visual") suppresses pixel /
+   * paint diffs as before. "a11y-contrast" / "a11y-touch" suppress
+   * findings from the matching a11y checker (see `vrt diff-pr`'s
+   * a11y gate). The default keeps the schema backward-compatible —
+   * existing manifests don't carry `kind`.
+   */
+  kind?: ApprovalRuleKind;
   selector?: string;
   property?: string;
   category?: PropertyCategory;
@@ -346,8 +363,18 @@ function validateApprovalRule(value: unknown, index: number): ApprovalRule {
   const issue = asOptionalString(rule.issue, `approval.rules[${index}].issue`);
   const expires = asOptionalString(rule.expires, `approval.rules[${index}].expires`);
   if (expires) parseExpiry(expires);
+  const kindRaw = asOptionalString(rule.kind, `approval.rules[${index}].kind`);
+  const VALID_KINDS = new Set([
+    "visual", "a11y-contrast", "a11y-touch", "a11y-focus-order", "a11y-semantic",
+    "media-variant", "cross-browser",
+  ]);
+  if (kindRaw !== undefined && !VALID_KINDS.has(kindRaw)) {
+    throw new Error(`approval.rules[${index}].kind must be one of: ${[...VALID_KINDS].join(", ")}`);
+  }
+  const kind = kindRaw as ApprovalRuleKind | undefined;
 
   return {
+    kind,
     selector,
     property,
     category,
@@ -358,6 +385,111 @@ function validateApprovalRule(value: unknown, index: number): ApprovalRule {
     expires,
   };
 }
+
+/**
+ * Filter a list of a11y findings (paths) against the approval
+ * manifest. A finding is suppressed when at least one non-expired
+ * rule with the matching `kind` carries a `selector` substring that
+ * appears in the finding's path. `selector` is matched as a literal
+ * substring — not parsed as a CSS selector — so authors can match
+ * either a class name (e.g. ".profile__avatar") or a full bracket
+ * path. Out-of-scope: parsing the selector with a real engine.
+ */
+export function filterA11yFindings<T extends { path: string }>(
+  findings: T[],
+  manifest: ApprovalManifest | null | undefined,
+  kind: "a11y-contrast" | "a11y-touch" | "a11y-focus-order" | "a11y-semantic",
+): { kept: T[]; suppressed: Array<{ finding: T; rule: ApprovalRule }> } {
+  if (!manifest) return { kept: findings, suppressed: [] };
+  const now = new Date();
+  const rules = manifest.rules.filter((r) =>
+    r.kind === kind && !!r.selector && !isApprovalRuleExpired(r, now),
+  );
+  if (rules.length === 0) return { kept: findings, suppressed: [] };
+  const kept: T[] = [];
+  const suppressed: Array<{ finding: T; rule: ApprovalRule }> = [];
+  for (const finding of findings) {
+    const match = rules.find((r) => finding.path.includes(r.selector!));
+    if (match) suppressed.push({ finding, rule: match });
+    else kept.push(finding);
+  }
+  return { kept, suppressed };
+}
+
+/**
+ * Filter cross-browser findings by manifest. A rule with
+ * `kind: "cross-browser"` and `selector: <engine-name>` suppresses
+ * findings on that engine by setting `deltaRatio = 0` and tagging
+ * the engine's error / note. The audit trail is preserved.
+ */
+export function filterCrossBrowserFindings<T extends {
+  engine: string;
+  status: "ok" | "skipped" | "failed";
+  deltaRatio: number;
+  error?: string;
+}>(
+  findings: T[],
+  manifest: ApprovalManifest | null | undefined,
+): { kept: T[]; suppressed: Array<{ finding: T; rule: ApprovalRule }> } {
+  if (!manifest) return { kept: findings, suppressed: [] };
+  const now = new Date();
+  const rules = manifest.rules.filter((r) =>
+    r.kind === "cross-browser" && !!r.selector && !isApprovalRuleExpired(r, now),
+  );
+  if (rules.length === 0) return { kept: findings, suppressed: [] };
+  const kept: T[] = [];
+  const suppressed: Array<{ finding: T; rule: ApprovalRule }> = [];
+  for (const finding of findings) {
+    const match = rules.find((r) => r.selector === finding.engine);
+    if (match) {
+      suppressed.push({ finding, rule: match });
+      kept.push({
+        ...finding,
+        deltaRatio: 0,
+        error: `${finding.error ?? ""} (suppressed by manifest rule: ${match.reason})`.trim(),
+      });
+    } else {
+      kept.push(finding);
+    }
+  }
+  return { kept, suppressed };
+}
+
+/**
+ * Filter media-variant findings by manifest. A rule with
+ * `kind: "media-variant"` and `selector: <variant-name>` suppresses
+ * findings of that variant by demoting their verdict to "ok"
+ * (audit trail preserved in the kept list; the gate counts what's
+ * left).
+ */
+export function filterMediaVariantFindings<T extends { variant: string; verdict: "ok" | "suspect" | "warn" | "skip"; note: string }>(
+  findings: T[],
+  manifest: ApprovalManifest | null | undefined,
+): { kept: T[]; suppressed: Array<{ finding: T; rule: ApprovalRule }> } {
+  if (!manifest) return { kept: findings, suppressed: [] };
+  const now = new Date();
+  const rules = manifest.rules.filter((r) =>
+    r.kind === "media-variant" && !!r.selector && !isApprovalRuleExpired(r, now),
+  );
+  if (rules.length === 0) return { kept: findings, suppressed: [] };
+  const kept: T[] = [];
+  const suppressed: Array<{ finding: T; rule: ApprovalRule }> = [];
+  for (const finding of findings) {
+    const match = rules.find((r) => r.selector === finding.variant);
+    if (match) {
+      suppressed.push({ finding, rule: match });
+      kept.push({
+        ...finding,
+        verdict: "ok",
+        note: `${finding.note} (suppressed by manifest rule: ${match.reason})`,
+      });
+    } else {
+      kept.push(finding);
+    }
+  }
+  return { kept, suppressed };
+}
+
 
 function validateTolerance(value: unknown, index: number): ApprovalTolerance | undefined {
   if (value === undefined) return undefined;
@@ -511,7 +643,13 @@ function dedupeApprovalRules(rules: ApprovalRule[]): ApprovalRule[] {
 }
 
 function isSameApprovalIdentity(a: ApprovalRule, b: ApprovalRule): boolean {
-  return a.selector === b.selector &&
+  // Treat absent kind as "visual" so existing manifests without a
+  // kind field don't collide with newly-added a11y rules that share
+  // a selector with a pre-existing visual rule.
+  const ka = a.kind ?? "visual";
+  const kb = b.kind ?? "visual";
+  return ka === kb &&
+    a.selector === b.selector &&
     a.property === b.property &&
     a.category === b.category &&
     a.changeType === b.changeType;

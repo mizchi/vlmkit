@@ -20,6 +20,7 @@ dogfood-*-attempt.html
 attempt.html
 /.pkl-vendor/
 /.pkspec/
+.vrt/
 
 # Nix
 .direnv/

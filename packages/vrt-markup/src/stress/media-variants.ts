@@ -77,7 +77,7 @@ export interface MediaVariantsReport {
   reportPath: string;
 }
 
-function isUrl(s: string): boolean { return /^https?:\/\//.test(s); }
+function isUrl(s: string): boolean { return /^(https?|file):\/\//.test(s); }
 
 function parseArgs(argv: string[]) {
   let outputDir = "";

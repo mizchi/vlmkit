@@ -1,0 +1,246 @@
+/* Tokens — copied verbatim from DESIGN.md.
+   No values are invented outside the spec. */
+:root {
+  /* colors */
+  --c-surface: #f9f9ff;
+  --c-surface-container-lowest: #ffffff;
+  --c-surface-container-low: #f0f3ff;
+  --c-surface-container-high: #e2e8f8;
+  --c-on-surface: #151c27;
+  --c-on-surface-variant: #534434;
+  --c-outline-variant: #d8c3ad;
+  --c-primary: #855300;
+  --c-on-primary: #ffffff;
+  --c-primary-container: #f59e0b;
+  --c-secondary: #0058be;
+  --c-on-secondary: #ffffff;
+  --c-tertiary-container: #1abdff;
+  --c-on-tertiary-container: #004966;
+  --c-background: #f9f9ff;
+  --c-on-background: #151c27;
+
+  /* typography */
+  --ff: "Plus Jakarta Sans", system-ui, sans-serif;
+  /* display */
+  --fs-display: 44px;
+  --fw-display: 800;
+  --lh-display: 52px;
+  --ls-display: -0.02em;
+  /* headline-lg */
+  --fs-headline-lg: 32px;
+  --fw-headline-lg: 700;
+  --lh-headline-lg: 40px;
+  --ls-headline-lg: -0.01em;
+  /* title-lg */
+  --fs-title-lg: 20px;
+  --fw-title-lg: 600;
+  --lh-title-lg: 28px;
+  /* body-lg */
+  --fs-body-lg: 18px;
+  --fw-body-lg: 400;
+  --lh-body-lg: 28px;
+  /* body-md */
+  --fs-body-md: 16px;
+  --fw-body-md: 400;
+  --lh-body-md: 24px;
+  /* label-md */
+  --fs-label-md: 14px;
+  --fw-label-md: 600;
+  --lh-label-md: 20px;
+  --ls-label-md: 0.01em;
+  /* label-sm */
+  --fs-label-sm: 12px;
+  --fw-label-sm: 500;
+  --lh-label-sm: 16px;
+
+  /* rounded */
+  --r-sm: 0.25rem;
+  --r-default: 0.5rem;
+  --r-md: 0.75rem;
+  --r-lg: 1rem;
+  --r-xl: 1.5rem;
+  --r-full: 9999px;
+
+  /* spacing */
+  --s-xs: 4px;
+  --s-sm: 12px;
+  --s-md: 24px;
+  --s-lg: 40px;
+  --s-xl: 64px;
+  --s-gutter: 16px;
+  --s-margin: 24px;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+body {
+  background: var(--c-background);
+  color: var(--c-on-background);
+  font-family: var(--ff);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Page container — Layout & Spacing § "max-width on larger screens" */
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--s-xl) var(--s-margin);
+  display: grid;
+  gap: var(--s-lg);
+}
+
+/* ── Hero ────────────────────────────────────────────────── */
+.hero { display: grid; gap: var(--s-sm); }
+
+.hero__eyebrow {
+  margin: 0;
+  font-size: var(--fs-label-md);
+  font-weight: var(--fw-label-md);
+  line-height: var(--lh-label-md);
+  letter-spacing: var(--ls-label-md);
+  color: var(--c-primary);
+  text-transform: uppercase;
+}
+
+.hero__headline {
+  margin: 0;
+  font-size: var(--fs-display);
+  font-weight: var(--fw-display);
+  line-height: var(--lh-display);
+  letter-spacing: var(--ls-display);
+  color: var(--c-on-surface);
+}
+
+.hero__body {
+  margin: 0;
+  max-width: 56ch;
+  font-size: var(--fs-body-lg);
+  font-weight: var(--fw-body-lg);
+  line-height: var(--lh-body-lg);
+  color: var(--c-on-surface-variant);
+}
+
+.hero__actions {
+  display: flex;
+  gap: var(--s-sm);
+  margin-top: var(--s-sm);
+  flex-wrap: wrap;
+}
+
+/* Component: button-primary / button-secondary
+   (rounded.lg + spacing.md padding + label-md typography) */
+.btn {
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--ff);
+  font-size: var(--fs-label-md);
+  font-weight: var(--fw-label-md);
+  line-height: var(--lh-label-md);
+  letter-spacing: var(--ls-label-md);
+  padding: var(--s-md);
+  border-radius: var(--r-lg);
+}
+.btn--primary {
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+}
+.btn--secondary {
+  background: var(--c-secondary);
+  color: var(--c-on-secondary);
+}
+
+/* ── Profile card ────────────────────────────────────────── */
+/* Component: card-profile
+   (surface-container-lowest + rounded.xl + spacing.md padding) */
+.profile {
+  background: var(--c-surface-container-lowest);
+  border-radius: var(--r-xl);
+  padding: var(--s-md);
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  align-items: center;
+  gap: var(--s-md);
+}
+.profile__avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--r-full);
+  background: var(--c-primary-container);
+}
+.profile__body { display: grid; gap: var(--s-xs); }
+.profile__name {
+  margin: 0;
+  font-size: var(--fs-title-lg);
+  font-weight: var(--fw-title-lg);
+  line-height: var(--lh-title-lg);
+  color: var(--c-on-surface);
+}
+.profile__meta {
+  margin: 0;
+  font-size: var(--fs-body-md);
+  font-weight: var(--fw-body-md);
+  line-height: var(--lh-body-md);
+  color: var(--c-on-surface-variant);
+}
+
+/* Component: badge-status
+   (tertiary-container + rounded.full + label-sm + spacing.xs padding) */
+.badge {
+  background: var(--c-tertiary-container);
+  color: var(--c-on-tertiary-container);
+  font-size: var(--fs-label-sm);
+  font-weight: var(--fw-label-sm);
+  line-height: var(--lh-label-sm);
+  padding: var(--s-xs) var(--s-sm);
+  border-radius: var(--r-full);
+  white-space: nowrap;
+}
+
+/* ── Stats row ───────────────────────────────────────────── */
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s-sm);
+}
+
+/* Component: card-walk-stat
+   (secondary-container + on-secondary-container + rounded.md + spacing.sm padding) */
+.stat-card {
+  background: var(--c-surface-container-high);
+  color: var(--c-on-surface);
+  border-radius: var(--r-md);
+  padding: var(--s-md);
+  display: grid;
+  gap: var(--s-xs);
+}
+.stat-card__number {
+  margin: 0;
+  font-size: var(--fs-headline-lg);
+  font-weight: var(--fw-headline-lg);
+  line-height: var(--lh-headline-lg);
+  letter-spacing: var(--ls-headline-lg);
+  color: var(--c-primary);
+}
+.stat-card__label {
+  margin: 0;
+  font-size: var(--fs-label-md);
+  font-weight: var(--fw-label-md);
+  line-height: var(--lh-label-md);
+  letter-spacing: var(--ls-label-md);
+  color: var(--c-on-surface-variant);
+}
+
+/* Mobile: full-bleed below 640px */
+@media (max-width: 640px) {
+  .page { padding: var(--s-lg) var(--s-gutter); }
+  .stats { grid-template-columns: 1fr; }
+  .profile {
+    grid-template-columns: 64px 1fr;
+    grid-template-areas: "avatar body" "badge badge";
+  }
+  .profile__avatar { grid-area: avatar; }
+  .profile__body { grid-area: body; }
+  .badge { grid-area: badge; justify-self: start; }
+}

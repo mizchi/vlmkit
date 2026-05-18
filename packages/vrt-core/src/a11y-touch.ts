@@ -59,7 +59,7 @@ export interface TouchReport {
   reportPath: string;
 }
 
-const SAMPLE_SCRIPT = `
+export const A11Y_TOUCH_SAMPLE_SCRIPT = `
 (function a11yTouch() {
   function shortPath(el) {
     const parts = [];
@@ -110,11 +110,52 @@ const SAMPLE_SCRIPT = `
 })()
 `;
 
-interface RawSample {
+export interface A11yTouchRawSample {
   path: string;
   tag: string;
   text: string;
   bbox: { x: number; y: number; width: number; height: number };
+}
+
+/**
+ * Build the list of touch-target failures from raw samples. Pure
+ * post-process so the `vrt diff-pr` CI gate can reuse it on its
+ * own Playwright page without spinning up a new browser.
+ */
+export function analyzeA11yTouchSamples(
+  samples: A11yTouchRawSample[],
+  level: WcagTouchLevel = "AAA",
+): TouchTargetFinding[] {
+  const required = level === "AAA" ? 44 : 24;
+  const byPath = new Map<string, A11yTouchRawSample>();
+  for (const s of samples) if (!byPath.has(s.path)) byPath.set(s.path, s);
+  const findings: TouchTargetFinding[] = [];
+  const elements = [...byPath.values()];
+  for (let i = 0; i < elements.length; i++) {
+    const e = elements[i]!;
+    const minSide = Math.min(e.bbox.width, e.bbox.height);
+    if (minSide >= required) continue;
+    let cluster = false;
+    for (let j = 0; j < elements.length; j++) {
+      if (i === j) continue;
+      const o = elements[j]!;
+      const cx1 = e.bbox.x + e.bbox.width / 2, cy1 = e.bbox.y + e.bbox.height / 2;
+      const cx2 = o.bbox.x + o.bbox.width / 2, cy2 = o.bbox.y + o.bbox.height / 2;
+      const dx = cx2 - cx1, dy = cy2 - cy1;
+      if (Math.sqrt(dx * dx + dy * dy) < 24) { cluster = true; break; }
+    }
+    findings.push({
+      path: e.path,
+      tag: e.tag,
+      text: e.text,
+      bbox: e.bbox,
+      minSide: Math.round(minSide),
+      required,
+      cluster,
+    });
+  }
+  findings.sort((a, b) => a.minSide - b.minSide);
+  return findings;
 }
 
 function parseArgs(argv: string[]) {
@@ -146,7 +187,7 @@ export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchRep
   const required = level === "AAA" ? 44 : 24;
 
   const browser = await chromium.launch();
-  let samples: RawSample[];
+  let samples: A11yTouchRawSample[];
   let screenshotPath: string;
   try {
     const page = await browser.newPage({ viewport });
@@ -159,7 +200,7 @@ export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchRep
     await page.addStyleTag({
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });
-    samples = await page.evaluate(SAMPLE_SCRIPT) as RawSample[];
+    samples = await page.evaluate(A11Y_TOUCH_SAMPLE_SCRIPT) as A11yTouchRawSample[];
     screenshotPath = join(outputDir, "page.png");
     await page.screenshot({ path: screenshotPath, fullPage: false });
     await page.close();
@@ -168,7 +209,7 @@ export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchRep
   }
 
   // Dedupe by path.
-  const byPath = new Map<string, RawSample>();
+  const byPath = new Map<string, A11yTouchRawSample>();
   for (const s of samples) if (!byPath.has(s.path)) byPath.set(s.path, s);
 
   // Cluster detection: if two below-threshold targets are within

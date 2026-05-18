@@ -108,6 +108,10 @@ const SPECS = {
   skill: "../util/skill.ts",
   componentExtract: "@mizchi/vrt-markup/component/component-extract.ts",
   apiServer: "../api/api-server.ts",
+  manifest: "../manifest-cli.ts",
+  watch: "../watch.ts",
+  diffPr: "../diff-pr.ts",
+  baseline: "../baseline-cli.ts",
 } as const;
 
 const GROUPS: Record<string, Record<string, { spec?: string; run?: (args: string[]) => Promise<void>; desc: string }>> = {
@@ -356,6 +360,22 @@ Run \`vrt <command> --help\` for command-specific options.`);
         if (sub) process.exitCode = 1;
       }
     });
+
+  cli.command("manifest [...args]", "Author / edit approval.json manifests")
+    .allowUnknownOptions()
+    .action(async () => delegate(SPECS.manifest, passThrough(argv, ["manifest"])));
+
+  cli.command("watch [...args]", "File-watcher inner loop with round-vs-round delta")
+    .allowUnknownOptions()
+    .action(async () => delegate(SPECS.watch, passThrough(argv, ["watch"])));
+
+  cli.command("diff-pr [...args]", "PR CI gate: per-route thresholds + markdown summary")
+    .allowUnknownOptions()
+    .action(async () => delegate(SPECS.diffPr, passThrough(argv, ["diff-pr"])));
+
+  cli.command("baseline [...args]", "Approve / inspect snapshot baselines")
+    .allowUnknownOptions()
+    .action(async () => delegate(SPECS.baseline, passThrough(argv, ["baseline"])));
 
   // Deprecated top-level command shims.
   for (const [oldName, { newName, spec }] of Object.entries(DEPRECATED_TOP_LEVEL)) {

@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Paws &amp; Paths — Meet your walker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <!--
+      style.css is the canonical stylesheet (see file alongside this page).
+      It is also inlined below because vrt compare uses page.setContent without
+      a base URL, so relative <link href="style.css"> cannot resolve.
+    -->
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      :root {
+        --color-surface: #f9f9ff;
+        --color-surface-container-lowest: #ffffff;
+        --color-surface-container-low: #f0f3ff;
+        --color-surface-container: #e7eefe;
+        --color-surface-container-high: #e2e8f8;
+        --color-surface-container-highest: #dce2f3;
+        --color-on-surface: #151c27;
+        --color-on-surface-variant: #534434;
+        --color-outline: #867461;
+        --color-outline-variant: #d8c3ad;
+        --color-primary: #855300;
+        --color-on-primary: #ffffff;
+        --color-primary-container: #f59e0b;
+        --color-on-primary-container: #613b00;
+        --color-secondary: #0058be;
+        --color-on-secondary: #ffffff;
+        --color-secondary-container: #2170e4;
+        --color-on-secondary-container: #fefcff;
+        --color-tertiary-container: #1abdff;
+        --color-on-tertiary-container: #004966;
+        --color-background: #f9f9ff;
+        --color-on-background: #151c27;
+
+        --space-xs: 4px;
+        --space-sm: 12px;
+        --space-base: 8px;
+        --space-md: 24px;
+        --space-lg: 40px;
+        --space-xl: 64px;
+        --space-gutter: 16px;
+        --space-margin: 24px;
+
+        --rounded-sm: 0.25rem;
+        --rounded-default: 0.5rem;
+        --rounded-md: 0.75rem;
+        --rounded-lg: 1rem;
+        --rounded-xl: 1.5rem;
+        --rounded-full: 9999px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      html,
+      body,
+      h1,
+      h2,
+      h3,
+      h4,
+      p,
+      span,
+      div,
+      button {
+        font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+      }
+      body {
+        background-color: var(--color-background);
+        color: var(--color-on-background);
+        font-size: 16px;
+        line-height: normal;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      .container {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: var(--space-xl) var(--space-margin);
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-lg);
+      }
+      @media (max-width: 640px) {
+        .container {
+          max-width: 100%;
+          padding: var(--space-lg) var(--space-gutter);
+          /* spacing.lg = 40px; the heatmap showed -16px shift in round 2,
+             but going xl(64) overshot to +32px. Keeping lg + adjusting
+             section gap below. */
+          gap: var(--space-lg);
+        }
+      }
+
+      .hero {
+        display: grid;
+        gap: var(--space-sm);
+      }
+      .eyebrow {
+        font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 20px;
+        letter-spacing: 0.01em;
+        color: var(--color-primary);
+        margin: 0;
+        text-transform: uppercase;
+      }
+      .display {
+        font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+        font-size: 44px;
+        font-weight: 800;
+        line-height: 52px;
+        letter-spacing: -0.02em;
+        color: var(--color-on-surface);
+        margin: 0;
+        text-wrap: balance;
+      }
+      .body-lg {
+        font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+        font-size: 18px;
+        font-weight: 400;
+        line-height: 28px;
+        color: var(--color-on-surface);
+        margin: 0;
+      }
+      .hero-actions {
+        display: flex;
+        gap: var(--space-sm);
+        /* hero is a 12px grid; margin-top here adds 12 more before
+           buttons to match golden's body→buttons spacing (24px). */
+        margin-top: var(--space-sm);
+      }
+
+      .btn {
+        font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 20px;
+        letter-spacing: 0.01em;
+        border: none;
+        cursor: pointer;
+        border-radius: var(--rounded-lg);
+        padding: var(--space-md);
+        transition: background-color 150ms ease-in-out;
+      }
+      .btn-primary {
+        background-color: var(--color-primary);
+        color: var(--color-on-primary);
+      }
+      .btn-secondary {
+        background-color: var(--color-secondary);
+        color: var(--color-on-secondary);
+      }
+
+      .card-profile {
+        background-color: var(--color-surface-container-lowest);
+        border-radius: var(--rounded-xl);
+        padding: var(--space-md);
+        display: flex;
+        align-items: center;
+        gap: var(--space-md);
+        box-shadow:
+          0 4px 20px rgba(133, 83, 0, 0.06),
+          0 1px 3px rgba(0, 88, 190, 0.04);
+      }
+      .avatar {
+        width: 64px;
+        height: 64px;
+        border-radius: var(--rounded-full);
+        background-color: var(--color-primary-container);
+        flex-shrink: 0;
+      }
+      .profile-info {
+        flex: 1;
+        min-width: 0;
+      }
+      .profile-name {
+        font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+        font-size: 20px;
+        font-weight: 600;
+        line-height: 28px;
+        color: var(--color-on-surface);
+        margin: 0;
+      }
+      .profile-sub {
+        font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+        font-size: 16px;
+        font-weight: 400;
+        line-height: 24px;
+        color: var(--color-on-surface-variant);
+        margin: 0;
+      }
+      .badge-status {
+        display: inline-block;
+        background-color: var(--color-tertiary-container);
+        color: var(--color-on-tertiary-container);
+        font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 16px;
+        letter-spacing: 0.01em;
+        padding: var(--space-xs) var(--space-sm);
+        border-radius: var(--rounded-full);
+        white-space: nowrap;
+      }
+      @media (max-width: 640px) {
+        .card-profile {
+          flex-wrap: wrap;
+          align-items: flex-start;
+        }
+        .card-profile .badge-status {
+          flex: 0 0 auto;
+          align-self: flex-start;
+          width: auto;
+        }
+        .profile-info {
+          /* Card 100% inside content-box is 295px on a 375 viewport
+             (375 - 16gutter*2 page - 24md*2 card = 295). Subtract avatar
+             64px + gap 24px → 207px text column, matches golden. */
+          flex: 1 1 auto;
+          min-width: 0;
+          max-width: calc(100% - 64px - var(--space-md));
+        }
+      }
+
+      .stats-section {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--space-sm);
+      }
+      @media (max-width: 640px) {
+        .stats-section {
+          grid-template-columns: 1fr;
+        }
+      }
+      .card-walk-stat {
+        background-color: var(--color-surface-container-high);
+        color: var(--color-on-surface);
+        border-radius: var(--rounded-md);
+        padding: var(--space-md);
+      }
+      .stat-number {
+        font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+        font-size: 32px;
+        font-weight: 700;
+        line-height: 40px;
+        letter-spacing: -0.01em;
+        color: var(--color-primary);
+        margin: 0 0 var(--space-xs) 0;
+      }
+      .stat-label {
+        font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 20px;
+        letter-spacing: 0.01em;
+        color: var(--color-on-surface);
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="container">
+      <section class="hero">
+        <p class="eyebrow">TRUSTED PET CARE</p>
+        <h1 class="display">Walks that wag tails.</h1>
+        <p class="body-lg">
+          Book a vetted local walker in under a minute. Live GPS, photo updates,
+          and a dog who comes home tired and happy.
+        </p>
+        <div class="hero-actions">
+          <button class="btn btn-primary" type="button">Find a walker</button>
+          <button class="btn btn-secondary" type="button">How it works</button>
+        </div>
+      </section>
+
+      <section class="profile-section">
+        <article class="card-profile">
+          <div class="avatar" aria-hidden="true"></div>
+          <div class="profile-info">
+            <h2 class="profile-name">Mia Carter</h2>
+            <p class="profile-sub">Certified walker · Berkeley</p>
+          </div>
+          <span class="badge-status">Available today</span>
+        </article>
+      </section>
+
+      <section class="stats-section">
+        <article class="card-walk-stat">
+          <p class="stat-number">247</p>
+          <p class="stat-label">Walks completed</p>
+        </article>
+        <article class="card-walk-stat">
+          <p class="stat-number">4.97</p>
+          <p class="stat-label">Average rating</p>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,4 @@
+# Subagent work products land here mid-run. Add finalized attempts
+# explicitly with `git add -f attempts/agent-X/` once the run is done.
+*
+!.gitignore
