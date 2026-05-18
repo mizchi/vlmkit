@@ -11,6 +11,21 @@ The same `vrt diff agent` CLI exposes regression flags
 recurring loop, what state lives where, and what counts as a
 regression.
 
+## Invocation
+
+The `vrt` CLI in this repo is invoked **from source**:
+
+```bash
+node --experimental-strip-types src/cli/vrt.ts <command...>
+# e.g. node --experimental-strip-types src/cli/vrt.ts diff agent report.json --previous prior.json
+```
+
+The published binary (`./dist/vrt.mjs` or a globally installed `vrt`)
+may lag the source. If it rejects subcommands with
+`Unknown command: diff`, the dist is stale — run `pnpm build` or use
+the source form. All `vrt ...` invocations below assume one of
+these two forms.
+
 ## When to use
 
 - CI gate on every PR: "if this PR's diff is worse than main's

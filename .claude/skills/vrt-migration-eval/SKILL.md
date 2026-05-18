@@ -33,6 +33,20 @@ instead. The Quickstart's `vrt migration compare baseline.html
 variant.html` command shape matches *any* two-file pair, so it's
 easy to fall into. The named-migration check is the gate.
 
+## Invocation
+
+The `vrt` CLI in this repo is invoked **from source**:
+
+```bash
+node --experimental-strip-types src/cli/vrt.ts <command...>
+# e.g. node --experimental-strip-types src/cli/vrt.ts migration compare baseline.html variant.html
+```
+
+The published binary (`./dist/vrt.mjs` or a globally installed `vrt`)
+may lag the source. If it errors with `Unknown command: migration`,
+the dist is stale — run `pnpm build` or use the source form. All
+`vrt ...` invocations below assume one of these two forms.
+
 ## When to use
 
 - Tailwind → vanilla CSS (or vice versa) port.

@@ -20,6 +20,17 @@ Each round:
 5. Re-run; stop when diffRatio falls below threshold (= FIXED) or
    `--max-rounds` is exhausted.
 
+## Invocation
+
+`fix-loop` is run directly from source (not via the `vrt` CLI):
+
+```bash
+node --experimental-strip-types src/experiments/css-challenge/fix-loop.ts <flags>
+```
+
+It does not ship in `./dist/vrt.mjs`. The source form above is the
+only supported entry point.
+
 ## When to use
 
 - Evaluating a new VLM model on UI-domain understanding.

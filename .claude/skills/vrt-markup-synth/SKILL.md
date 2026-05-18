@@ -20,6 +20,20 @@ task.
 | `vrt check theme <url>` | Live URL | Theme-parity report | Force dark mode (or `prefers-color-scheme`), report selectors still painting with hard-coded light-mode colors. |
 | `vrt stress i18n <url>` | Live URL | Layout stress report | Inflate text content (×2 length, multi-byte chars) and screenshot under each viewport; report overflow / wrap breakage. |
 
+## Invocation
+
+The `vrt` CLI in this repo is invoked **from source**:
+
+```bash
+node --experimental-strip-types src/cli/vrt.ts <command...>
+# e.g. node --experimental-strip-types src/cli/vrt.ts build component design.png
+```
+
+The published binary (`./dist/vrt.mjs` or a globally installed `vrt`)
+may lag the source. If it errors with `Unknown command: build`, the
+dist is stale — run `pnpm build` or use the source form. All
+`vrt ...` invocations below assume one of these two forms.
+
 ## When to use
 
 - **build component**: "here's a Figma export, give me the HTML/CSS"
