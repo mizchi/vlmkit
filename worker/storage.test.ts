@@ -8,7 +8,7 @@ import {
   type WorkerD1Like,
   type WorkerKVNamespaceLike,
   type WorkerR2BucketLike,
-} from "../worker/storage.ts";
+} from "./storage.ts";
 
 class FakeR2Bucket implements WorkerR2BucketLike {
   puts: Array<{ key: string; value: string; options?: { httpMetadata?: { contentType?: string }; customMetadata?: Record<string, string> } }> = [];

@@ -40,7 +40,7 @@
   "scripts": {
     "build": "tsdown",
     "prepack": "pnpm build",
-    "test": "node --test 'src/**/*.test.ts' 'packages/*/src/**/*.test.ts'",
+    "test": "node --test 'src/**/*.test.ts' 'packages/*/src/**/*.test.ts' 'worker/**/*.test.ts'",
     "demo": "node src/demo/demo.ts",
     "demo:fix": "node src/demo/demo-fix-loop.ts",
     "demo:multi": "node src/demo/demo-scenarios.ts",
