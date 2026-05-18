@@ -3,6 +3,8 @@ name: VRT Compare
 on:
   pull_request:
     paths:
+      - ".github/workflows/**"
+      - ".github/vrt-snapshot-ci.config.json"
       - "fixtures/**"
       - "src/**"
       - "package.json"
@@ -66,6 +68,63 @@ jobs:
         with:
           name: vrt-compare-report
           path: test-results/migration/migration-report.json
+          if-no-files-found: warn
+
+  snapshot-false-positive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - name: Start static fixture server
+        shell: bash
+        run: |
+          python3 -m http.server 4174 --directory fixtures/css-challenge >"$RUNNER_TEMP/vrt-fixture-server.log" 2>&1 &
+          for _ in $(seq 1 20); do
+            if curl -fsS http://127.0.0.1:4174/page.html >/dev/null; then
+              exit 0
+            fi
+            sleep 0.5
+          done
+          echo "Fixture server failed to start" >&2
+          cat "$RUNNER_TEMP/vrt-fixture-server.log" >&2 || true
+          exit 1
+
+      - name: Create snapshot baselines
+        run: node --experimental-strip-types src/cli/vrt.ts snapshot --config .github/vrt-snapshot-ci.config.json
+
+      - name: Re-run snapshot to measure false positives
+        continue-on-error: true
+        run: node --experimental-strip-types src/cli/vrt.ts snapshot --config .github/vrt-snapshot-ci.config.json
+
+      - name: Summarize snapshot false positive rate
+        run: |
+          node --experimental-strip-types src/cli/vrt.ts snapshot report \
+            test-results/snapshots/ci/snapshot-report.json \
+            --max-false-positive-rate 0 \
+            --max-diff-ratio 0.001 \
+            --github-step-summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload snapshot report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vrt-snapshot-false-positive-report
+          path: |
+            test-results/snapshots/ci/snapshot-report.json
+            test-results/snapshots/ci/*.png
           if-no-files-found: warn
 
   smoke-test:

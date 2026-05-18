@@ -10,6 +10,11 @@ async function readPackageJson() {
 }
 
 describe("package manifest for publishable CLI", () => {
+  it("uses the scoped npm package name for the published client", async () => {
+    const pkg = await readPackageJson();
+    assert.equal(pkg.name, "@mizchi/vrt");
+  });
+
   it("points the CLI bin to built JavaScript", async () => {
     const pkg = await readPackageJson();
     assert.deepEqual(pkg.bin, { vrt: "./dist/vrt.mjs" });
@@ -38,10 +43,21 @@ describe("package manifest for publishable CLI", () => {
   it("exports the published client entrypoint", async () => {
     const pkg = await readPackageJson();
     assert.deepEqual(pkg.exports, {
+      ".": {
+        types: "./dist/client.d.mts",
+        import: "./dist/client.mjs",
+      },
       "./client": {
         types: "./dist/client.d.mts",
         import: "./dist/client.mjs",
       },
+    });
+  });
+
+  it("declares public publish metadata for npm", async () => {
+    const pkg = await readPackageJson();
+    assert.deepEqual(pkg.publishConfig, {
+      access: "public",
     });
   });
 

@@ -37,7 +37,7 @@ async function runList() {
   const models = await listModels({ maxCost, limit, includeGemini: true });
 
   console.log();
-  console.log(`${BOLD}${CYAN}Vision-capable models${RESET}  ${DIM}(${models.length} shown, OpenRouter + Gemini direct)${RESET}`);
+  console.log(`${BOLD}${CYAN}Vision-capable models${RESET}  ${DIM}(${models.length} shown, OpenRouter + Gemini + Claude direct)${RESET}`);
   console.log();
   console.log(`  ${"#".padStart(3)} ${"Model ID".padEnd(52)} ${"Prompt/1K".padStart(12)} ${"Compl/1K".padStart(12)} ${"Context".padStart(9)}`);
   console.log(`  ${"─".repeat(3)} ${"─".repeat(52)} ${"─".repeat(12)} ${"─".repeat(12)} ${"─".repeat(9)}`);
@@ -59,8 +59,11 @@ async function runList() {
 // ---- Bench command ----
 
 async function runBench(modelIds: string[]) {
-  if (!process.env.OPENROUTER_API_KEY) {
-    console.log(`\n  ${YELLOW}OPENROUTER_API_KEY not set.${RESET}\n`);
+  // Per-model key checks happen via createVlmClient({ throwIfMissing: false })
+  // below — that lets a `claude:` / `gemini:` only run work without
+  // OPENROUTER_API_KEY (and vice-versa).
+  if (!process.env.OPENROUTER_API_KEY && !process.env.GEMINI_API_KEY && !process.env.GOOGLE_AI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
+    console.log(`\n  ${YELLOW}No provider API key set (OPENROUTER_API_KEY / GEMINI_API_KEY / ANTHROPIC_API_KEY).${RESET}\n`);
     process.exit(1);
   }
 
@@ -252,10 +255,12 @@ ${BOLD}Examples:${RESET}
 ${BOLD}Providers:${RESET}
   OpenRouter:  model ID as-is (e.g. qwen/qwen3-vl-8b-instruct)
   Gemini:      gemini:<model-id> (e.g. gemini:gemini-2.5-flash-preview-05-20)
+  Claude:      claude:<model-id> (e.g. claude:claude-haiku-4-5-20251001)
 
 ${BOLD}Environment:${RESET}
   OPENROUTER_API_KEY    Required for OpenRouter models
   GEMINI_API_KEY        Required for Gemini direct models (or GOOGLE_AI_API_KEY)
+  ANTHROPIC_API_KEY     Required for Claude direct models
 `);
   } else {
     await runBench(modelArgs);

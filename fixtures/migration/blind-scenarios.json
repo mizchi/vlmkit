@@ -1,0 +1,28 @@
+{
+  "scenarios": [
+    {
+      "id": "reset-css-modern-normalize",
+      "title": "Reset CSS switch",
+      "dir": "fixtures/migration/reset-css",
+      "baseline": "normalize.html",
+      "blindTarget": "modern-normalize-blind.html",
+      "reference": "modern-normalize.html",
+      "successCriteria": {
+        "maxDiffRatio": 0.01,
+        "maxRounds": 3
+      }
+    },
+    {
+      "id": "shadcn-to-luna",
+      "title": "shadcn/ui -> luna",
+      "dir": "fixtures/migration/shadcn-to-luna",
+      "baseline": "before.html",
+      "blindTarget": "after-blind.html",
+      "reference": "after.html",
+      "successCriteria": {
+        "maxDiffRatio": 0.01,
+        "maxRounds": 3
+      }
+    }
+  ]
+}

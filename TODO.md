@@ -123,6 +123,7 @@ Use vrt on real projects to verify practicality.
   - Per-PR rollout in real downstream projects still pending — needs aggregation of multiple runs over time.
 - [ ] Pass diff report to subagent for fix code generation, measure success rate
   - `vrt snapshot fix-prompt` ships a markdown / JSON task descriptor (URL, viewport, diff ratio with shift compensation, baseline/current/heatmap/HTML paths) ready to feed to a subagent.
+  - `vrt migration subagent prepare` (and the `migration-subagent-prepare` task) produces a subagent packet from `migration-report.json`; `vrt migration blind` provides reproducible blind scenarios.
   - Success-rate measurement on real PRs still pending (needs LLM API key + repeated runs).
 
 ### E2. Crater prescanner tracking
@@ -141,6 +142,7 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 - [ ] Blind test with shadcn → luna
   - Fixture scaffolding done: `after-reference.html` archived, `after-blank.html` provides minimal reset starting point.
   - Baseline diff measured at 19.6%–58.4% across 10 viewports (35 layout-shift, 19 color-change, 4 typography).
+  - `fixtures/migration/blind-scenarios.json` + `migration-blind.ts` (`prepare` / `solo` / `evaluate`) now reproduce + score the shadcn→luna scenario deterministically.
   - Loop run itself requires an LLM API key — see `docs/reports/2026-05-11-e3-shadcn-luna-blind-scaffold.md`.
 - [x] Blind test with Reset CSS switch — see `docs/reports/2026-04-04-e3-reset-css-blind-test.md` (0.0% in 1 round)
 - [ ] Success criteria: diff < 1% within 3 rounds
@@ -151,12 +153,12 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 
 ### Infrastructure / Deploy
 - [x] Cloudflare Browser Run CDP backend (`vrt snapshot --backend cloudflare`) — connects via `chromium.connectOverCDP` to `wss://api.cloudflare.com/.../browser-rendering/devtools/browser`. See `examples/vrt-snapshot-cloudflare.workflow.yml`.
-- [ ] Cloudflare Workers entry point (`worker/`) — waiting on stable `env.BROWSER` binding
+- [x] Cloudflare Workers entry point (`worker/`) — `worker/index.ts` re-exports `createApiApp()` from `src/api/api-app.ts`. `env.BROWSER` wiring still pending.
 - [ ] Cloudflare Quick Actions REST backend (`/screenshot`, `/crawl` for route discovery)
 - [ ] crater WASM backend (layout only — paint is future)
-- [ ] Cloudflare R2 / KV / D1 storage
-- [ ] npm package (`@mizchi/vrt-client`)
-- [ ] OpenAPI spec
+- [x] Cloudflare R2 / KV / D1 storage — `worker/storage.ts` detects bindings; `/api/status` exposes `r2`/`kv`/`d1` availability via `StorageStatus`. Read/write wiring still pending.
+- [x] npm package (`@mizchi/vrt`) — `pnpm add @mizchi/vrt`; exports both root and `/client`.
+- [x] OpenAPI spec
 
 ### Crater side (mizchi/crater)
 
