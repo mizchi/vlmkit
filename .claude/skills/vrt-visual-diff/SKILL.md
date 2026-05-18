@@ -126,9 +126,28 @@ Variants: `after.html`
 #### Breakpoint-gated pairs ← fix or add @media rule
 ```
 
-**Triage order**: universal pairs > breakpoint-gated > per-section >
-raw per-viewport. The first non-empty row is almost always the actual
-change to inspect.
+**Where `Universal pairs` actually sits in the output**: near the
+**bottom** of the Markdown (after the per-viewport / per-section /
+component-bbox / shift-band / heatmap tables — typically section
+~13 of ~16). The intermediate sections describe the *effect*; the
+Universal pairs table names the *cause*. Resist top-down reading on
+first pass.
+
+**Triage order — scroll to in this order:**
+
+1. **Verified deltas → Universal pairs** (near bottom) — fix-the-base-rule list.
+2. **Verified deltas → Breakpoint-gated pairs** (just above #1) — missing/wrong `@media` rule.
+3. **Per-section diffRatio** — which component contains the change.
+4. **Diff by viewport** — sanity check the magnitude.
+
+**Glossary for the viewport table**:
+
+- `Shift bands` `[a–b]:±Npx` = a horizontal band of y-pixels `[a, b]`
+  on the screenshot shifted by `±N` pixels vertically. `[240–480]:+113px`
+  means everything between y=240 and y=480 moved down 113 pixels —
+  typically downstream of a grown element above.
+- `Dominant category` = top of `layout-shift / spacing / typography /
+  color` by pixel coverage.
 
 ## Masking is load-bearing
 
