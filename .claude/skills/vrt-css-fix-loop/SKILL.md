@@ -9,16 +9,29 @@ description: Closed-loop CSS auto-repair. Given a fixture with a known regressio
 (`docs/reports/2026-05-18-vlm-claude-vs-openrouter-vs-newcomers.md`
 etc.). It takes a fixture, deliberately mutates the CSS (`property`
 mode deletes one property; `selector` mode deletes one selector
-block), then asks a VLM to propose the fix from the rendered diff.
-Each round:
+block), then runs a **two-stage** AI pipeline to propose a fix from
+the rendered diff.
+
+**The pipeline is VLM → LLM, not VLM alone:**
 
 1. Apply current candidate CSS to the variant page.
 2. Render baseline + variant; compute pixel diff.
-3. Send the diff overlay to the VLM with a structured "list the
-   changes" prompt.
-4. Parse the VLM's CHANGE list; apply the top candidate.
+3. **Stage 1 (VLM)**: send the diff overlay to the VLM with a
+   structured "list the changes" prompt; parse a CHANGE list
+   (`selector { prop: from → to }` rows).
+4. **Stage 2 (LLM)**: hand the CHANGE list + current CSS to an LLM
+   (default `claude-sonnet-*`); LLM emits the actual CSS edits to
+   apply. The LLM compensates for VLM imprecision — it may rewrite,
+   merge, or discard VLM proposals based on the CSS context.
 5. Re-run; stop when diffRatio falls below threshold (= FIXED) or
    `--max-rounds` is exhausted.
+
+**FIXED means "the pipeline converged," not "the VLM understood the
+diff."** It's common to see VLM propose selectors unrelated to the
+deleted block while the LLM still emits a working fix. When using
+this harness to *benchmark a VLM model*, compare CHANGE-list quality
+between models — don't read FIXED as a VLM verdict on its own. The
+banner line `VLM=<id> | LLM=<id>` makes the two stages explicit.
 
 ## Invocation
 
@@ -49,8 +62,13 @@ only supported entry point.
 
 ## Quickstart
 
+This repo uses direnv; `.envrc` auto-loads `.env.local` (where
+`OPENROUTER_API_KEY` / `ANTHROPIC_API_KEY` live). If you're shelling
+outside the direnv context, run
+`set -a; source .env.local; set +a` first.
+
 ```bash
-# Property mode (default): delete one CSS property; VLM proposes restoration
+# Property mode (default): delete one CSS property; pipeline proposes restoration
 node --experimental-strip-types src/experiments/css-challenge/fix-loop.ts \
   --fixture page --seed 42
 
@@ -58,7 +76,9 @@ node --experimental-strip-types src/experiments/css-challenge/fix-loop.ts \
 node --experimental-strip-types src/experiments/css-challenge/fix-loop.ts \
   --fixture page --seed 11 --mode selector --max-rounds 3
 
-# Run with a specific VLM model (any OpenRouter id, `gemini:*`, or `claude:*`)
+# Run with a specific VLM model (any OpenRouter id, `gemini:*`, or `claude:*`).
+# The Stage-2 LLM is held constant across VLM swaps so VLM quality
+# can be compared apples-to-apples.
 VRT_VLM_MODEL="bytedance/ui-tars-1.5-7b" \
   node --experimental-strip-types src/experiments/css-challenge/fix-loop.ts \
   --fixture page --seed 11 --mode selector
@@ -127,15 +147,44 @@ for the 8-way bench.
 
 ## Reading the output
 
+Real banner + first round of a real run on seed 11 selector mode:
+
 ```
-Round 1: diff=4.12%  → VLM proposed `padding: 12px` on `.foo`
-Round 2: diff=1.84%  → VLM proposed `font-size: 14px` on `.bar`
-Round 3: diff=0.08%  → FIXED ✓
+VLM=bytedance/ui-tars-1.5-7b | LLM=claude-sonnet-4-20250514
+Removed block: .readme-body pre { 6 props }
+
+Round 1:
+  VLM: 5 changes (3383ms)
+    .main         { padding: 16px → 24px }
+    .sidebar      { width: 100% → 296px }
+    .header-nav   { display: none → flex }
+    .header-search{ max-width: none → 320px }
+    .tabs         { padding: 0 16px → 0 24px }
+  LLM: 6 fixes proposed
+  diff: 4.12% → 0.00% (FIXED ✓)
 ```
 
+Things to read:
+
+- `VLM=<id> | LLM=<id>` — confirms which two models drove the
+  pipeline.
+- **`VLM: N changes (Tms)`** — VLM stage's wall-clock + the CHANGE
+  list. Per-row format `selector { prop: from → to }`.
+- **`LLM: M fixes proposed`** — Stage-2 emitted M CSS edits; usually
+  M ≥ N (LLM expands / corrects).
+- `diff: x% → y%` — diffRatio before this round's edits vs after.
+- `FIXED ✓` when `y` falls below `--threshold` (default `0.001`).
+
+**Pipeline divergence warning**: if `Removed block:` names something
+the VLM never mentions in its CHANGE list, *but the pipeline still
+hits FIXED*, the LLM compensated. Treat that run as a **win for the
+pipeline**, not for the VLM. To grade the VLM in isolation, score the
+CHANGE list against the known-removed block (e.g. selector
+recall, property recall).
+
 A "stalled" run shows diffRatio holding steady across rounds — the
-VLM's proposals aren't being applied (likely a parser failure) or
-aren't structurally valid. Set `DEBUG_VRT=1` to see the raw VLM
+VLM's proposals aren't parseable, or the LLM's emitted fixes aren't
+structurally valid CSS. Set `DEBUG_VRT=1` to see both stages' raw
 output.
 
 ## Adapting to a new repo
