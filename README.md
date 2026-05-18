@@ -436,7 +436,7 @@ When running on Workers, `/api/status` also reports detected `R2` / `KV` / `D1` 
 TypeScript client:
 
 ```ts
-import { VrtClient } from "vrt/client";
+import { VrtClient } from "@mizchi/vrt/client";
 
 const client = new VrtClient("http://localhost:3456");
 const status = await client.status();
@@ -445,6 +445,8 @@ const result = await client.compareHtml(
   "<main><button class='primary'>After</button></main>",
 );
 ```
+
+Install: `pnpm add @mizchi/vrt`
 
 `compareUrls(...)` is intended for public HTTP(S) targets. The API server rejects localhost and private-network URLs.
 

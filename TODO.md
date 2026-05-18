@@ -157,7 +157,7 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 - [ ] Cloudflare Quick Actions REST backend (`/screenshot`, `/crawl` for route discovery)
 - [ ] crater WASM backend (layout only — paint is future)
 - [x] Cloudflare R2 / KV / D1 storage — `worker/storage.ts` detects bindings; `/api/status` exposes `r2`/`kv`/`d1` availability via `StorageStatus`. Read/write wiring still pending.
-- [ ] npm package (`@mizchi/vrt-client`)
+- [x] npm package (`@mizchi/vrt`) — `pnpm add @mizchi/vrt`; exports both root and `/client`.
 - [x] OpenAPI spec
 
 ### Crater side (mizchi/crater)
