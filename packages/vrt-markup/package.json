@@ -1,6 +1,6 @@
 {
   "name": "@mizchi/vrt-markup",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "VLM-driven markup tooling for VRT: component extract, design-token / theme-parity / i18n-stress / palette checks, dep-graph, selector heal, smoke runner.",
   "license": "MIT",
   "author": "mizchi",
@@ -15,7 +15,8 @@
   },
   "type": "module",
   "files": [
-    "src",
+    "src/**/*.ts",
+    "!src/**/*.test.ts",
     "README.md",
     "LICENSE"
   ],

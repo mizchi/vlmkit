@@ -4,8 +4,8 @@ VLM-driven markup-assistance tooling — component extraction, design-token
 conformance, theme parity, i18n stress, palette diff, dep-graph, selector heal.
 
 Part of the [`vrt`](https://github.com/mizchi/vrt) monorepo. Most modules
-double as CLI commands routed by the `vrt` CLI (`vrt component-extract`,
-`vrt theme-parity`, …).
+double as CLI commands routed by the `vrt` CLI (`vrt scan component`,
+`vrt check theme`, `vrt check tokens`, `vrt stress i18n|media`, …).
 
 ## Install
 
