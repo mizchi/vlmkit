@@ -68,6 +68,12 @@ skill assume one of these two forms.
 `<dir>/migration-report.json` (+ per-viewport PNGs) into it. Feed
 that JSON path — not the dir — to `vrt diff agent`.
 
+The filename is `migration-report.json` even on this non-migration
+path because the writer is shared with `vrt migration compare`. The
+name is legacy — treat it as "the diff report" regardless of whether
+you came here via `diff html` or `migration compare`. (Tracked for
+rename in #50.)
+
 ```bash
 # Local HTML pair → writes reports/migration-report.json
 vrt diff html before.html after.html --output reports/

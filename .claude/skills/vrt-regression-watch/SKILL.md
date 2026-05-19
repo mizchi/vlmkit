@@ -64,6 +64,11 @@ from triggering false alarms.
 `<dir>/migration-report.json` into it. Pass that JSON file path —
 not the dir — to `vrt diff agent`.
 
+The filename is `migration-report.json` even when there's no migration
+involved because the writer is shared with `vrt migration compare`.
+Legacy name; tracked for rename in #50. Treat it as "the diff
+report" regardless of how you produced it.
+
 A no-op re-run (same inputs both times) is guaranteed to produce
 **no** `⚠ REGRESSION` banner — use this as a sanity check when
 wiring the workflow into CI.
