@@ -36,18 +36,19 @@ pkf run vlm-bench -- <model1> <model2> <model3> --md
 - Cost: /call (guideline: below $0.5e-7 is cheap)
 - CHANGE detection count: number of changes following structured format (7-15 is optimal)
 
-### Current Recommendations (2026-05-18)
-- **Default**: `bytedance/ui-tars-1.5-7b` (1.16s, $0.1e-6/$0.2e-6) — UI-domain-trained, fastest of the structured outputs
-- **Stable / detailed**: `qwen/qwen3-vl-30b-a3b-instruct` (1.99s) — emits hex codes directly
-- **Baseline fallback**: `amazon/nova-lite-v1` (2.38s)
-- **High quality (agent-facing CHANGE list)**: `claude:claude-haiku-4-5-20251001` (3.51s, ~$0.002/call — only when VLM output is consumed directly, not via Stage-2 LLM)
+### Current Recommendations (2026-05-19)
+- **Default**: `bytedance/ui-tars-1.5-7b` (~1.35s, ~$0/call) — UI-domain-trained, fastest of the structured outputs. Verified FIXED in round 1 on seed 11 (.readme-body pre, 4.1% diff).
+- **Stable / detailed**: `qwen/qwen3-vl-30b-a3b-instruct` (~2.0s) — emits hex codes directly.
+- **Baseline fallback**: `amazon/nova-lite-v1` (~2.4s).
+- **High coverage + prose root-cause**: `claude:claude-haiku-4-5-20251001` (~4.2s, ~$2e-6/call). Also FIXED in round 1 on seed 11 — works as Stage-1 VLM in the 2-stage pipeline despite format divergence; Stage-2 LLM handles it. The earlier "only when VLM is consumed directly" caveat was too conservative.
 
 #### Avoid / re-evaluate
 - `meta-llama/llama-4-scout` — regressed since 2026-04-04 (was 1.0s, now ~7s with conversational output)
 - `meta-llama/llama-4-maverick` — claims "image not available" and returns methodology only
 - `google/gemini-2.5-flash-lite` — hallucinates uniform `red → red` deltas
 
-See `docs/reports/2026-05-18-vlm-claude-vs-openrouter-vs-newcomers.md` for the 8-way bench evidence.
+See `docs/reports/2026-05-19-vlm-haiku-vs-uitars.md` for today's 2-way re-bench (haiku + UI-TARS, both FIXED r1);
+`docs/reports/2026-05-18-vlm-claude-vs-openrouter-vs-newcomers.md` for the 8-way bench from the prior week.
 
 ## Running CSS Challenge Benchmarks
 

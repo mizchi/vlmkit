@@ -632,7 +632,31 @@ By fixture:
 - `width` 50% — dead-code when natural size equals CSS width
 - `background` 82% — same as parent color, `pre code` override, etc.
 
-## VLM Model Comparison (2026-05-18 — current)
+## VLM Model Comparison
+
+### 2026-05-19 — haiku vs UI-TARS re-bench (post-0.5.0 release)
+
+Single-pair re-bench against the canonical hard case after the 0.5.0
+release. Both models **FIXED in round 1** on `seed 11 (.readme-body pre
+{6 props})`.
+
+| Model | bench latency | bench CHANGEs | fix-loop VLM | fix-loop CHANGEs | LLM | Fixes | Round to FIXED |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `bytedance/ui-tars-1.5-7b` | 1352ms | 3 | 2765ms | 5 | 5002ms | 6/6 | **1** |
+| `claude:claude-haiku-4-5-20251001` | 4180ms | 10 | 2562ms | 11 | 5772ms | 6/6 | **1** |
+
+Stage-2 LLM (fixed): `claude-sonnet-4-20250514`. Initial diff 4.1% →
+0.0% in both runs.
+
+**Insight**: Haiku works fine **as a Stage-1 VLM** even though its
+format diverges from the canonical CHANGE shape. The previous "use
+only when VLM output isn't consumed by Stage-2 LLM" caveat (from
+2026-04-04) was too conservative. UI-TARS-with-5-CHANGEs also passes,
+below the 7-15 guideline.
+
+Full report: `docs/reports/2026-05-19-vlm-haiku-vs-uitars.md`.
+
+### 2026-05-18 — 8-way bench (prior baseline)
 
 ### Single-call latency / output bench (`pkf run vlm-bench`, generated heatmap 1.7% diff, n=1)
 

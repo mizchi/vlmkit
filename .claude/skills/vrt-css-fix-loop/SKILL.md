@@ -111,18 +111,26 @@ The harness honours `VRT_VLM_MODEL`. Prefix selects the provider:
 
 Current recommendations (from `.claude/CLAUDE.md`):
 
-- **Default**: `bytedance/ui-tars-1.5-7b` (UI-domain-trained, ~1.2s).
-- **Stable / detailed**: `qwen/qwen3-vl-30b-a3b-instruct`.
+- **Default**: `bytedance/ui-tars-1.5-7b` (UI-domain-trained, ~1.4s
+  single-call, $0/call). Verified FIXED in round 1 on the canonical
+  hard case (seed 11, .readme-body pre {6 props}, 4.1% diff →
+  0.0%).
+- **Stable / detailed**: `qwen/qwen3-vl-30b-a3b-instruct` (emits hex
+  codes directly).
 - **Baseline fallback**: `amazon/nova-lite-v1`.
-- **High quality** (only when VLM output isn't consumed by Stage-2
-  LLM): `claude:claude-haiku-4-5-20251001`.
+- **High coverage + prose root-cause**:
+  `claude:claude-haiku-4-5-20251001` (~4.2s single-call, ~$2e-6/call;
+  also FIXED in round 1 on seed 11 — works as Stage-1 VLM despite
+  format divergence, Stage-2 LLM handles it).
 
 Avoid: `meta-llama/llama-4-scout` (regressed; verbose),
 `meta-llama/llama-4-maverick` (returns "image not available"),
 `google/gemini-2.5-flash-lite` (hallucinates uniform deltas).
 
-See `docs/reports/2026-05-18-vlm-claude-vs-openrouter-vs-newcomers.md`
-for the 8-way bench.
+See `docs/reports/2026-05-19-vlm-haiku-vs-uitars.md` for the latest
+2-way re-bench;
+`docs/reports/2026-05-18-vlm-claude-vs-openrouter-vs-newcomers.md`
+for the 8-way bench from the prior week.
 
 ## Flags
 
