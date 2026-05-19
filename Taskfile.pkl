@@ -227,8 +227,8 @@ local smokeTest = new Task {
 
 local snapshot = new Task {
   name = "snapshot"
-  cmd = "node src/cli/commands/snapshot.ts"
-  inputs { "src/cli/commands/snapshot.ts"; "src/vrt/snapshot/**.ts" }
+  cmd = "node --experimental-strip-types src/cli/vrt.ts snapshot"
+  inputs { "src/cli/vrt.ts"; "src/cli/commands/snapshot.ts"; "src/vrt/snapshot/**.ts" }
 }
 
 // ---- Dogfood ----
@@ -236,7 +236,7 @@ local snapshot = new Task {
 local dogfoodLuna = new Task {
   name = "dogfood-luna"
   cmd = #"""
-    node src/cli/commands/snapshot.ts \
+    node --experimental-strip-types src/cli/vrt.ts snapshot \
       http://localhost:4200/src/examples/todomvc/ \
       http://localhost:4200/src/examples/spa/ \
       http://localhost:4200/src/examples/wc/ \
@@ -250,10 +250,9 @@ local dogfoodLuna = new Task {
 local dogfoodSol = new Task {
   name = "dogfood-sol"
   cmd = #"""
-    node src/cli/commands/snapshot.ts \
+    node --experimental-strip-types src/cli/vrt.ts snapshot \
       http://localhost:3000/ \
       http://localhost:3000/luna/ \
-      http://localhost:3000/luna/tutorial-js/islands/ \
       http://localhost:3000/sol/ \
       http://localhost:3000/benchmark/ \
       --output test-results/snapshots/sol \
