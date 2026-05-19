@@ -128,19 +128,25 @@ Variants: `after.html`
 #### Breakpoint-gated pairs ← fix or add @media rule
 ```
 
-**Where `Universal pairs` actually sits in the output**: near the
-**bottom** of the Markdown (after the per-viewport / per-section /
-component-bbox / shift-band / heatmap tables — typically section
-~13 of ~16). The intermediate sections describe the *effect*; the
-Universal pairs table names the *cause*. Resist top-down reading on
-first pass.
+**Where `Universal pairs` sits in the output**: **early** — the
+`Verified deltas (computed-style) × viewport` section is hoisted to
+position #2, right after `Diff by viewport`. Top-down reading
+works; the cause appears before the per-section / component-bbox /
+heatmap detail tables.
 
-**Triage order — scroll to in this order:**
+**Triage order — read in this order:**
 
-1. **Verified deltas → Universal pairs** (near bottom) — fix-the-base-rule list.
-2. **Verified deltas → Breakpoint-gated pairs** (just above #1) — missing/wrong `@media` rule.
-3. **Per-section diffRatio** — which component contains the change.
-4. **Diff by viewport** — sanity check the magnitude.
+1. **Diff by viewport** — sanity check the magnitude.
+2. **Verified deltas → Universal pairs** — fix-the-base-rule list.
+3. **Verified deltas → Breakpoint-gated pairs** (same section) — missing/wrong `@media` rule.
+4. **Per-section diffRatio** — which component contains the change.
+
+Three more `Verified deltas …` tables emit further down (DOM-position
+collapsed / DOM-position × viewport / computed-style collapsed).
+They overlap with the hoisted one in simple cases; on
+class-renaming or large breakpoint-gated diffs they each surface
+distinct signal. Read them only when the hoisted table is empty or
+ambiguous.
 
 **Glossary for the viewport table**:
 

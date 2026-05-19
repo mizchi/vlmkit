@@ -819,6 +819,69 @@ export function formatMigrationReportForAgent(
     }
     lines.push("");
 
+    // Hoisted to triage position (right after the viewport summary) so
+    // an agent reading top-down sees the highest-signal table first.
+    // The vrt-visual-diff skill names this as the canonical
+    // start-here triage table.
+    const csdPerVpSummary = (report.computedStyleDiffPerViewport ?? []).find((c) => c.variantFile === variantFile);
+    if (csdPerVpSummary && csdPerVpSummary.result.totalDiffs > 0) {
+      lines.push("### Verified deltas (computed-style) × viewport (catches breakpoint-gated rules)");
+      lines.push("");
+      lines.push("Each (selector, property) is captured at every snapshot viewport. " +
+        "*Universal* pairs differ on every viewport — fix the base rule. " +
+        "*Breakpoint-gated* pairs differ only on a subset — almost always a missing " +
+        "or wrong `@media` rule. Without this split, mobile-only deltas were getting " +
+        "patched into the desktop rule and vice-versa.");
+      lines.push("");
+      lines.push(`Total: **${csdPerVpSummary.result.totalDiffs}** (selector, property, viewport) tuples ` +
+        `across ${csdPerVpSummary.result.byViewport.length} viewports ` +
+        `(${csdPerVpSummary.result.universalPairs.length} universal pair(s), ` +
+        `${csdPerVpSummary.result.breakpointGatedPairs.length} breakpoint-gated pair(s)).`);
+      lines.push("");
+
+      const universalRows = csdPerVpSummary.result.bySelectorProperty.filter(
+        (e) => e.viewports.length === csdPerVpSummary.result.byViewport.length,
+      );
+      if (universalRows.length > 0) {
+        lines.push("#### Universal pairs (every viewport — fix the base rule)");
+        lines.push("");
+        lines.push("| Selector | Property | Baseline | Variant |");
+        lines.push("|---|---|---|---|");
+        for (const row of universalRows.slice(0, 15)) {
+          // All viewports agree, so pick the first sample for the displayed value.
+          const sample = row.samples[0]!;
+          lines.push(`| \`${row.selector}\` | \`${row.property}\` | \`${sample.baseline}\` | \`${sample.variant}\` |`);
+        }
+        if (universalRows.length > 15) {
+          lines.push(`| _…${universalRows.length - 15} more universal pairs_ | | | |`);
+        }
+        lines.push("");
+      }
+
+      const gatedRows = csdPerVpSummary.result.bySelectorProperty.filter(
+        (e) => e.viewports.length < csdPerVpSummary.result.byViewport.length,
+      );
+      if (gatedRows.length > 0) {
+        lines.push("#### Breakpoint-gated pairs (missing or wrong `@media` rule)");
+        lines.push("");
+        lines.push("| Selector | Property | Affected viewports | Sample (viewport: baseline → variant) |");
+        lines.push("|---|---|---|---|");
+        for (const row of gatedRows.slice(0, 15)) {
+          const vps = row.viewports.join(", ");
+          const sampleText = row.samples
+            .slice(0, 3)
+            .map((s) => `\`${s.viewport}\`: \`${s.baseline}\` → \`${s.variant}\``)
+            .join("; ");
+          const moreSamples = row.samples.length > 3 ? ` (+${row.samples.length - 3} more)` : "";
+          lines.push(`| \`${row.selector}\` | \`${row.property}\` | ${vps} | ${sampleText}${moreSamples} |`);
+        }
+        if (gatedRows.length > 15) {
+          lines.push(`| _…${gatedRows.length - 15} more breakpoint-gated pairs_ | | | |`);
+        }
+        lines.push("");
+      }
+    }
+
     const bboxSummary = (report.componentBboxDiffs ?? []).find((c) => c.variantFile === variantFile);
     const sectionHeatmapSummary = (report.heatmapRegions ?? []).find((h) => h.variantFile === variantFile);
     if (bboxSummary && sectionHeatmapSummary && bboxSummary.perViewport.length > 0) {
@@ -1361,65 +1424,6 @@ export function formatMigrationReportForAgent(
         lines.push("Top selectors:");
         for (const s of topSelectors) {
           lines.push(`- \`${s.selector}\` — ${s.count} property change(s)`);
-        }
-        lines.push("");
-      }
-    }
-
-    const csdPerVpSummary = (report.computedStyleDiffPerViewport ?? []).find((c) => c.variantFile === variantFile);
-    if (csdPerVpSummary && csdPerVpSummary.result.totalDiffs > 0) {
-      lines.push("### Verified deltas (computed-style) × viewport (catches breakpoint-gated rules)");
-      lines.push("");
-      lines.push("Each (selector, property) is captured at every snapshot viewport. " +
-        "*Universal* pairs differ on every viewport — fix the base rule. " +
-        "*Breakpoint-gated* pairs differ only on a subset — almost always a missing " +
-        "or wrong `@media` rule. Without this split, mobile-only deltas were getting " +
-        "patched into the desktop rule and vice-versa.");
-      lines.push("");
-      lines.push(`Total: **${csdPerVpSummary.result.totalDiffs}** (selector, property, viewport) tuples ` +
-        `across ${csdPerVpSummary.result.byViewport.length} viewports ` +
-        `(${csdPerVpSummary.result.universalPairs.length} universal pair(s), ` +
-        `${csdPerVpSummary.result.breakpointGatedPairs.length} breakpoint-gated pair(s)).`);
-      lines.push("");
-
-      const universalRows = csdPerVpSummary.result.bySelectorProperty.filter(
-        (e) => e.viewports.length === csdPerVpSummary.result.byViewport.length,
-      );
-      if (universalRows.length > 0) {
-        lines.push("#### Universal pairs (every viewport — fix the base rule)");
-        lines.push("");
-        lines.push("| Selector | Property | Baseline | Variant |");
-        lines.push("|---|---|---|---|");
-        for (const row of universalRows.slice(0, 15)) {
-          // All viewports agree, so pick the first sample for the displayed value.
-          const sample = row.samples[0]!;
-          lines.push(`| \`${row.selector}\` | \`${row.property}\` | \`${sample.baseline}\` | \`${sample.variant}\` |`);
-        }
-        if (universalRows.length > 15) {
-          lines.push(`| _…${universalRows.length - 15} more universal pairs_ | | | |`);
-        }
-        lines.push("");
-      }
-
-      const gatedRows = csdPerVpSummary.result.bySelectorProperty.filter(
-        (e) => e.viewports.length < csdPerVpSummary.result.byViewport.length,
-      );
-      if (gatedRows.length > 0) {
-        lines.push("#### Breakpoint-gated pairs (missing or wrong `@media` rule)");
-        lines.push("");
-        lines.push("| Selector | Property | Affected viewports | Sample (viewport: baseline → variant) |");
-        lines.push("|---|---|---|---|");
-        for (const row of gatedRows.slice(0, 15)) {
-          const vps = row.viewports.join(", ");
-          const sampleText = row.samples
-            .slice(0, 3)
-            .map((s) => `\`${s.viewport}\`: \`${s.baseline}\` → \`${s.variant}\``)
-            .join("; ");
-          const moreSamples = row.samples.length > 3 ? ` (+${row.samples.length - 3} more)` : "";
-          lines.push(`| \`${row.selector}\` | \`${row.property}\` | ${vps} | ${sampleText}${moreSamples} |`);
-        }
-        if (gatedRows.length > 15) {
-          lines.push(`| _…${gatedRows.length - 15} more breakpoint-gated pairs_ | | | |`);
         }
         lines.push("");
       }
