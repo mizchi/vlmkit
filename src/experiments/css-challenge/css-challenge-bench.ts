@@ -837,7 +837,7 @@ function fmtRateCompact(count: number, total: number, inverse = false): string {
   return `${color}${pct}%${RESET}`;
 }
 
-const isCliEntry = process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false;
+const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "css-challenge-bench" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch((error) => {
     if (isPlaywrightSandboxRestrictionError(error)) {

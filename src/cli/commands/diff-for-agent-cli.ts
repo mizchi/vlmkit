@@ -220,7 +220,7 @@ async function main() {
   }
 }
 
-if (process.argv[1] && (process.argv[1].endsWith("diff-for-agent-cli.ts") || process.argv[1].endsWith("diff-for-agent-cli.mjs"))) {
+if (process.env.__VRT_DISPATCHER_LEAF__ === "diff-for-agent-cli" || (process.argv[1] && (process.argv[1].endsWith("diff-for-agent-cli.ts") || process.argv[1].endsWith("diff-for-agent-cli.mjs")))) {
   main().catch((err) => {
     console.error(String(err?.message ?? err));
     process.exit(1);

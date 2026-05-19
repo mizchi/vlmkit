@@ -15,25 +15,50 @@
  */
 
 import { cac } from "cac";
-import { fileURLToPath } from "node:url";
 import { reportDeprecation } from "./deprecation.ts";
 
 const HELP_SENTINEL = "__VRT_HELP_PASSTHROUGH__";
 
 /**
- * Resolve a specifier (relative path or package export), swap
- * `process.argv` so the target module's `isCliEntry` check passes,
- * then import it.
+ * Each leaf is referenced as `{ name, loader }`. The loader is a
+ * closure that returns the dynamic import — keeping the path as a
+ * literal at the `import()` call site lets tsdown statically
+ * discover the leaf and code-split it into a chunk that ships with
+ * `dist/vrt.mjs`.
+ *
+ * The `name` is a per-leaf identifier set into `__VRT_DISPATCHER_LEAF__`
+ * around the await. Each leaf's CLI-entry guard checks that the env
+ * var matches *its* name, so static cross-leaf imports (e.g.
+ * `diff-pr.ts` importing `cross-browser.ts` for shared types) do not
+ * accidentally fire the imported leaf's `main()`.
  */
-async function delegate(specifier: string, args: string[]): Promise<void> {
-  const resolvedUrl = import.meta.resolve(specifier);
-  const absoluteModulePath = fileURLToPath(resolvedUrl);
+type SpecLoader = () => Promise<unknown>;
+interface Spec {
+  name: string;
+  loader: SpecLoader;
+}
+
+function spec(name: string, loader: SpecLoader): Spec {
+  return { name, loader };
+}
+
+async function delegate(s: Spec, args: string[]): Promise<void> {
   process.argv = [
     process.argv[0],
-    absoluteModulePath,
+    "(vrt-dispatcher)",
     ...args.map((a) => (a === HELP_SENTINEL ? "--help" : a)),
   ];
-  await import(resolvedUrl);
+  const prev = process.env.__VRT_DISPATCHER_LEAF__;
+  process.env.__VRT_DISPATCHER_LEAF__ = s.name;
+  try {
+    await s.loader();
+  } finally {
+    if (prev === undefined) {
+      delete process.env.__VRT_DISPATCHER_LEAF__;
+    } else {
+      process.env.__VRT_DISPATCHER_LEAF__ = prev;
+    }
+  }
 }
 
 async function runDiscover(args: string[]): Promise<void> {
@@ -77,44 +102,44 @@ async function runWorkflow(args: string[]): Promise<void> {
   await runWorkflowCli(args.map((a) => (a === HELP_SENTINEL ? "--help" : a)));
 }
 
-const SPECS = {
-  migrationCompare: "../experiments/migration/migration-compare.ts",
-  pngDiff: "@mizchi/vrt-core/png-diff.ts",
-  cssBench: "../experiments/css-challenge/css-challenge-bench.ts",
-  detectionReport: "../experiments/detection/detection-report.ts",
-  snapshot: "../vrt/snapshot/snapshot.ts",
-  snapshotReport: "../vrt/snapshot/snapshot-report.ts",
-  migrationBlind: "../experiments/migration/migration-blind.ts",
-  migrationSubagent: "../experiments/migration/migration-subagent.ts",
-  elementCompare: "@mizchi/vrt-core/element-compare.ts",
-  smokeRunner: "@mizchi/vrt-markup/inspect/smoke-runner.ts",
-  flipbook: "./commands/flipbook-cli.ts",
-  diffForAgent: "./commands/diff-for-agent-cli.ts",
-  compareRuns: "./commands/compare-runs-cli.ts",
-  componentFromImage: "@mizchi/vrt-markup/component/component-from-image.ts",
-  multiPageConsistency: "@mizchi/vrt-markup/stress/multi-page-consistency.ts",
-  componentConsistency: "@mizchi/vrt-markup/component/component-consistency.ts",
-  themeParity: "@mizchi/vrt-markup/style/theme-parity.ts",
-  i18nStress: "@mizchi/vrt-markup/stress/i18n-stress.ts",
-  a11yContrast: "@mizchi/vrt-core/a11y-contrast.ts",
-  a11yTouch: "@mizchi/vrt-core/a11y-touch.ts",
-  a11yFocusOrder: "@mizchi/vrt-core/a11y-focus-order.ts",
-  interact: "@mizchi/vrt-markup/inspect/interact.ts",
-  mediaVariants: "@mizchi/vrt-markup/stress/media-variants.ts",
-  crossBrowser: "@mizchi/vrt-markup/stress/cross-browser.ts",
-  designTokens: "@mizchi/vrt-markup/style/design-tokens.ts",
-  perf: "../util/perf.ts",
-  explore: "@mizchi/vrt-markup/inspect/explore.ts",
-  skill: "../util/skill.ts",
-  componentExtract: "@mizchi/vrt-markup/component/component-extract.ts",
-  apiServer: "../api/api-server.ts",
-  manifest: "../manifest-cli.ts",
-  watch: "../watch.ts",
-  diffPr: "../diff-pr.ts",
-  baseline: "../baseline-cli.ts",
-} as const;
+const SPECS: Record<string, Spec> = {
+  migrationCompare: spec("migration-compare", () => import("../experiments/migration/migration-compare.ts")),
+  pngDiff: spec("png-diff", () => import("@mizchi/vrt-core/png-diff.ts")),
+  cssBench: spec("css-challenge-bench", () => import("../experiments/css-challenge/css-challenge-bench.ts")),
+  detectionReport: spec("detection-report", () => import("../experiments/detection/detection-report.ts")),
+  snapshot: spec("snapshot", () => import("../vrt/snapshot/snapshot.ts")),
+  snapshotReport: spec("snapshot-report", () => import("../vrt/snapshot/snapshot-report.ts")),
+  migrationBlind: spec("migration-blind", () => import("../experiments/migration/migration-blind.ts")),
+  migrationSubagent: spec("migration-subagent", () => import("../experiments/migration/migration-subagent.ts")),
+  elementCompare: spec("element-compare", () => import("@mizchi/vrt-core/element-compare.ts")),
+  smokeRunner: spec("smoke-runner", () => import("@mizchi/vrt-markup/inspect/smoke-runner.ts")),
+  flipbook: spec("flipbook-cli", () => import("./commands/flipbook-cli.ts")),
+  diffForAgent: spec("diff-for-agent-cli", () => import("./commands/diff-for-agent-cli.ts")),
+  compareRuns: spec("compare-runs-cli", () => import("./commands/compare-runs-cli.ts")),
+  componentFromImage: spec("component-from-image", () => import("@mizchi/vrt-markup/component/component-from-image.ts")),
+  multiPageConsistency: spec("multi-page-consistency", () => import("@mizchi/vrt-markup/stress/multi-page-consistency.ts")),
+  componentConsistency: spec("component-consistency", () => import("@mizchi/vrt-markup/component/component-consistency.ts")),
+  themeParity: spec("theme-parity", () => import("@mizchi/vrt-markup/style/theme-parity.ts")),
+  i18nStress: spec("i18n-stress", () => import("@mizchi/vrt-markup/stress/i18n-stress.ts")),
+  a11yContrast: spec("a11y-contrast", () => import("@mizchi/vrt-core/a11y-contrast.ts")),
+  a11yTouch: spec("a11y-touch", () => import("@mizchi/vrt-core/a11y-touch.ts")),
+  a11yFocusOrder: spec("a11y-focus-order", () => import("@mizchi/vrt-core/a11y-focus-order.ts")),
+  interact: spec("interact", () => import("@mizchi/vrt-markup/inspect/interact.ts")),
+  mediaVariants: spec("media-variants", () => import("@mizchi/vrt-markup/stress/media-variants.ts")),
+  crossBrowser: spec("cross-browser", () => import("@mizchi/vrt-markup/stress/cross-browser.ts")),
+  designTokens: spec("design-tokens", () => import("@mizchi/vrt-markup/style/design-tokens.ts")),
+  perf: spec("perf", () => import("../util/perf.ts")),
+  explore: spec("explore", () => import("@mizchi/vrt-markup/inspect/explore.ts")),
+  skill: spec("skill", () => import("../util/skill.ts")),
+  componentExtract: spec("component-extract", () => import("@mizchi/vrt-markup/component/component-extract.ts")),
+  apiServer: spec("api-server", () => import("../api/api-server.ts")),
+  manifest: spec("manifest-cli", () => import("../manifest-cli.ts")),
+  watch: spec("watch", () => import("../watch.ts")),
+  diffPr: spec("diff-pr", () => import("../diff-pr.ts")),
+  baseline: spec("baseline-cli", () => import("../baseline-cli.ts")),
+};
 
-const GROUPS: Record<string, Record<string, { spec?: string; run?: (args: string[]) => Promise<void>; desc: string }>> = {
+const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]) => Promise<void>; desc: string }>> = {
   diff: {
     html: { spec: SPECS.migrationCompare, desc: "Compare two HTML files / URLs across viewports" },
     png: { spec: SPECS.pngDiff, desc: "Compare existing PNG screenshots directly" },
@@ -147,17 +172,17 @@ const GROUPS: Record<string, Record<string, { spec?: string; run?: (args: string
 };
 
 // Two-segment subcommands inside `check` (a11y, drift).
-const CHECK_A11Y: Record<string, { spec: string; desc: string }> = {
+const CHECK_A11Y: Record<string, { spec: Spec; desc: string }> = {
   contrast: { spec: SPECS.a11yContrast, desc: "WCAG AA contrast scan" },
   touch: { spec: SPECS.a11yTouch, desc: "Touch-target size check" },
   focus: { spec: SPECS.a11yFocusOrder, desc: "Focus order / trap check" },
 };
-const CHECK_DRIFT: Record<string, { spec: string; desc: string }> = {
+const CHECK_DRIFT: Record<string, { spec: Spec; desc: string }> = {
   component: { spec: SPECS.componentConsistency, desc: "Drift across N selector instances on one page" },
   pages: { spec: SPECS.multiPageConsistency, desc: "Drift of one selector across N pages" },
 };
 
-const DEPRECATED_TOP_LEVEL: Record<string, { newName: string; spec: string }> = {
+const DEPRECATED_TOP_LEVEL: Record<string, { newName: string; spec: Spec }> = {
   compare: { newName: "diff html", spec: SPECS.migrationCompare },
   "png-diff": { newName: "diff png", spec: SPECS.pngDiff },
   elements: { newName: "diff elements", spec: SPECS.elementCompare },

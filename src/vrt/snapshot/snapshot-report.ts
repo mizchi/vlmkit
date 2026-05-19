@@ -272,7 +272,7 @@ function parseRatioLike(value: string | undefined, message: string): number {
   return parsed;
 }
 
-if (process.argv[1]?.endsWith("snapshot-report.ts")) {
+if (process.env.__VRT_DISPATCHER_LEAF__ === "snapshot-report" || process.argv[1]?.endsWith("snapshot-report.ts")) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
