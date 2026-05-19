@@ -319,12 +319,15 @@ baseline として守る。
 - grid / scrollport / min-max 制約の不足
 - pattern 分類の迷い
 - pixel diff ではなく source of truth にすべき signal
+- state / content / decoration / asset / canvas hook の不足
 
 役立っている運用:
 
 - `design-runs/*/reports/dogfood.md` に round ごとの判断を残す。
 - `docs/design-pattern-feasibility.md` に pattern 固有の contract を戻す。
 - `docs/landmark-drilldown-design.md` に layout / decoration の general rule を戻す。
+- `ui.contract.json` に pattern / goal / marker / state / decoration / content /
+  asset / canvas metadata を戻す。
 - empirical prompt tuning で fresh executor に再読させ、曖昧さを潰す。
 
 ## 実装に効いている機能の優先順位
@@ -347,9 +350,10 @@ baseline として守る。
 - `vlmkit design prompt`: 実装しやすい mock prompt を pattern 別に生成する。
 - report JSON: Landmark drilldown / goal evidence / scrollport / canvas evidence を
   agent が markdown scraping せず読めるようにする。
-- UI Contract IR: 編集時 metadata として layout / decoration / state / marker を
-  保持する。
-- Existing implementation introspection: 既存 DOM/CSS から IR と marker gap を
-  推定する。
+- UI Contract compiler: contract から HTML/CSS skeleton を生成する。
+- UI Contract simulator: contract の layout を Chromium / Crater / layout
+  backend で比較する。
+- Existing implementation introspection: 既存 DOM/CSS から state / content /
+  decoration intent まで推定する。
 - Browserless renderer: MoonBit / Crater / layout renderer で高速に layout を
   simulation する。

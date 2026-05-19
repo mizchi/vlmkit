@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import {
+  summarizeUiContractScreen,
   summarizeUiContractLandmark,
   validateUiContract,
   type UiContract,
@@ -23,7 +24,7 @@ async function main(argv = process.argv.slice(2)) {
   const contract = JSON.parse(await readFile(input, "utf-8")) as UiContract;
   const issues = validateUiContract(contract);
   for (const screen of contract.screens ?? []) {
-    console.log(`Screen: ${screen.id}`);
+    console.log(`Screen: ${summarizeUiContractScreen(screen)}`);
     for (const landmark of screen.landmarks ?? []) {
       console.log(`  - ${summarizeUiContractLandmark(landmark)}`);
     }

@@ -77,3 +77,29 @@ test("landmarkRegionsToUiContract builds draft contract from captured landmarks"
   assert.equal(contract.screens[0]!.landmarks.length, 2);
   assert.equal(contract.screens[0]!.landmarks[1]!.id, "complementary-topics");
 });
+
+test("landmarkRegionsToUiContract preserves pattern, goal, and DOM hints", () => {
+  const contract = landmarkRegionsToUiContract({
+    screenId: "landing-home",
+    pattern: "landing",
+    goal: "landing",
+    viewports: [{ label: "desktop", width: 1440, height: 900 }],
+    captures: [{ viewport: "desktop", landmarks: [region({ role: "main", name: "Home" })] }],
+    hints: {
+      markers: [
+        { kind: "primary-cta", selector: "[data-primary-cta]", required: true },
+        { kind: "media-slot", selector: "[data-media-slot]", required: true },
+        { kind: "next-section", selector: "[data-next-section]", required: true },
+      ],
+      states: [{ id: "selected-plan", kind: "selected", selector: "[data-selected=\"true\"]" }],
+      assets: [{ id: "hero-media", kind: "image", policy: "replaceable", slot: "hero" }],
+    },
+  });
+
+  const screen = contract.screens[0]!;
+  assert.equal(screen.pattern, "landing");
+  assert.equal(screen.goal, "landing");
+  assert.equal(screen.markers?.length, 3);
+  assert.equal(screen.states?.[0]?.kind, "selected");
+  assert.equal(screen.assets?.[0]?.policy, "replaceable");
+});

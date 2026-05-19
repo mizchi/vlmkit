@@ -1,5 +1,28 @@
 export type UiContractVersion = 1;
 
+export const UI_CONTRACT_PATTERNS = [
+  "editorial",
+  "landing",
+  "app-shell",
+  "dashboard",
+  "canvas",
+  "mixed",
+] as const;
+
+export type UiContractPattern = typeof UI_CONTRACT_PATTERNS[number];
+
+export const UI_CONTRACT_GOALS = [
+  "app",
+  "layout",
+  "pixel",
+  "draft",
+  "app-shell",
+  "landing",
+  "canvas",
+] as const;
+
+export type UiContractGoal = typeof UI_CONTRACT_GOALS[number];
+
 export type LandmarkRole =
   | "banner"
   | "navigation"
@@ -17,7 +40,16 @@ export interface UiContract {
 
 export interface UiContractScreen {
   id: string;
+  pattern?: UiContractPattern;
+  goal?: UiContractGoal;
+  sourceOfTruth?: UiSourceOfTruth;
   viewports: UiContractViewport[];
+  markers?: UiMarkerContract[];
+  states?: UiStateContract[];
+  content?: UiContentContract;
+  decoration?: UiDecorationContract;
+  assets?: UiAssetContract[];
+  canvas?: UiCanvasContract;
   landmarks: UiContractLandmark[];
 }
 
@@ -32,8 +64,214 @@ export interface UiContractLandmark {
   id: string;
   role: LandmarkRole;
   name: string;
+  parentId?: string;
+  gridArea?: string;
+  slots?: UiSlotContract[];
+  repeat?: UiRepeatContract;
+  markers?: UiMarkerContract[];
+  states?: UiStateContract[];
+  content?: UiContentContract;
+  decoration?: UiDecorationContract;
+  assets?: UiAssetContract[];
   layout: UiLayoutContract;
   responsive?: UiResponsiveRule[];
+}
+
+export type UiSourceOfTruth =
+  | "semantic-dom"
+  | "landmarks"
+  | "viewport-shell"
+  | "data-hierarchy"
+  | "scene-graph"
+  | "mixed";
+
+const UI_SOURCE_OF_TRUTHS: readonly UiSourceOfTruth[] = [
+  "semantic-dom",
+  "landmarks",
+  "viewport-shell",
+  "data-hierarchy",
+  "scene-graph",
+  "mixed",
+];
+
+export type UiMarkerKind =
+  | "primary-cta"
+  | "next-section"
+  | "media-slot"
+  | "hero-title"
+  | "scrollport"
+  | "selected"
+  | "unread"
+  | "game-state"
+  | "custom";
+
+const UI_MARKER_KINDS: readonly UiMarkerKind[] = [
+  "primary-cta",
+  "next-section",
+  "media-slot",
+  "hero-title",
+  "scrollport",
+  "selected",
+  "unread",
+  "game-state",
+  "custom",
+];
+
+export interface UiMarkerContract {
+  id?: string;
+  kind: UiMarkerKind;
+  name?: string;
+  selector?: string;
+  attribute?: string;
+  value?: string;
+  required?: boolean;
+  target?: string;
+  notes?: string;
+}
+
+export type UiStateKind =
+  | "hover"
+  | "focus-visible"
+  | "selected"
+  | "scrolled"
+  | "empty"
+  | "loading"
+  | "error"
+  | "playing"
+  | "paused"
+  | "result";
+
+const UI_STATE_KINDS: readonly UiStateKind[] = [
+  "hover",
+  "focus-visible",
+  "selected",
+  "scrolled",
+  "empty",
+  "loading",
+  "error",
+  "playing",
+  "paused",
+  "result",
+];
+
+export interface UiStateContract {
+  id: string;
+  kind: UiStateKind;
+  selector?: string;
+  trigger?: string;
+  viewport?: string;
+  required?: boolean;
+}
+
+export type UiSlotKind =
+  | "content"
+  | "media"
+  | "control"
+  | "list"
+  | "canvas"
+  | "adornment";
+
+export interface UiSlotContract {
+  id: string;
+  kind: UiSlotKind;
+  name?: string;
+  marker?: UiMarkerKind;
+  gridArea?: string;
+  required?: boolean;
+}
+
+export interface UiRepeatContract {
+  kind: "list" | "grid" | "table" | "feed";
+  itemName?: string;
+  minItems?: number;
+  maxItems?: number;
+}
+
+export type UiContentKind = "static" | "list" | "table" | "chart" | "form" | "canvas" | "generated";
+export type UiDensity = "sparse" | "normal" | "dense";
+
+export interface UiContentContract {
+  kind: UiContentKind;
+  density?: UiDensity;
+  items?: {
+    exact?: number;
+    min?: number;
+    max?: number;
+  };
+  text?: {
+    minLength?: number;
+    maxLength?: number;
+    rowCount?: number;
+  };
+}
+
+export interface UiDecorationContract {
+  tokens?: UiTokenRef[];
+  typography?: UiTypographyContract[];
+  palette?: UiColorContract[];
+  radius?: UiTokenRef[];
+  shadow?: UiTokenRef[];
+  media?: UiMediaTreatment[];
+}
+
+export interface UiTokenRef {
+  role: string;
+  token?: string;
+  value?: string | number;
+}
+
+export interface UiTypographyContract {
+  role: string;
+  family?: string;
+  size?: number;
+  lineHeight?: number;
+  weight?: number | string;
+  maxLines?: number;
+}
+
+export interface UiColorContract {
+  role: string;
+  token?: string;
+  value?: string;
+}
+
+export interface UiMediaTreatment {
+  slot: string;
+  crop?: "contain" | "cover" | "fill" | "none";
+  aspectRatio?: string;
+  policy?: "replaceable" | "literal" | "generated";
+}
+
+export type UiAssetKind = "image" | "svg" | "icon" | "canvas-sprite" | "tilemap" | "procedural" | "video";
+export type UiAssetPolicy = "replaceable" | "literal" | "generated" | "procedural";
+
+export interface UiAssetContract {
+  id: string;
+  kind: UiAssetKind;
+  slot?: string;
+  policy?: UiAssetPolicy;
+  required?: boolean;
+}
+
+export interface UiCanvasContract {
+  stateHook?: string;
+  requiredStateFields?: string[];
+  frameDelta?: boolean;
+  inputs?: UiCanvasInputContract[];
+  hud?: UiCanvasHudContract[];
+}
+
+export interface UiCanvasInputContract {
+  kind: "keyboard" | "pointer" | "touch" | "gamepad";
+  action: string;
+  changes?: string[];
+}
+
+export interface UiCanvasHudContract {
+  id: string;
+  text?: string;
+  readable?: boolean;
+  avoidOverlap?: boolean;
 }
 
 export interface UiLayoutContract {
@@ -92,6 +330,21 @@ export function validateUiContract(contract: UiContract): UiContractIssue[] {
     const screen = contract.screens[si]!;
     const screenPath = `screens[${si}]`;
     if (!screen.id) issues.push({ path: `${screenPath}.id`, message: "screen id is required" });
+    if (screen.pattern && !includesString(UI_CONTRACT_PATTERNS, screen.pattern)) {
+      issues.push({ path: `${screenPath}.pattern`, message: "unknown UI contract pattern" });
+    }
+    if (screen.goal && !includesString(UI_CONTRACT_GOALS, screen.goal)) {
+      issues.push({ path: `${screenPath}.goal`, message: "unknown UI contract goal" });
+    }
+    if (screen.sourceOfTruth && !includesString(UI_SOURCE_OF_TRUTHS, screen.sourceOfTruth)) {
+      issues.push({ path: `${screenPath}.sourceOfTruth`, message: "unknown source of truth" });
+    }
+    validateMarkers(screen.markers, `${screenPath}.markers`, issues);
+    validateStates(screen.states, `${screenPath}.states`, issues);
+    validateContent(screen.content, `${screenPath}.content`, issues);
+    validateDecoration(screen.decoration, `${screenPath}.decoration`, issues);
+    validateAssets(screen.assets, `${screenPath}.assets`, issues);
+    validateCanvas(screen.canvas, `${screenPath}.canvas`, issues);
     const viewportLabels = new Set<string>();
     for (let vi = 0; vi < screen.viewports.length; vi++) {
       const vp = screen.viewports[vi]!;
@@ -116,6 +369,16 @@ export function validateUiContract(contract: UiContract): UiContractIssue[] {
       if ((lm.role === "region" || lm.role === "form") && !lm.name.trim()) {
         issues.push({ path: `${lmPath}.name`, message: `${lm.role} landmarks require an accessible name` });
       }
+      if (lm.parentId && !screen.landmarks.some((candidate) => candidate.id === lm.parentId)) {
+        issues.push({ path: `${lmPath}.parentId`, message: "unknown parentId landmark" });
+      }
+      validateSlots(lm.slots, `${lmPath}.slots`, issues);
+      validateRepeat(lm.repeat, `${lmPath}.repeat`, issues);
+      validateMarkers(lm.markers, `${lmPath}.markers`, issues);
+      validateStates(lm.states, `${lmPath}.states`, issues);
+      validateContent(lm.content, `${lmPath}.content`, issues);
+      validateDecoration(lm.decoration, `${lmPath}.decoration`, issues);
+      validateAssets(lm.assets, `${lmPath}.assets`, issues);
       validateWidthPolicy(lm.layout.width, `${lmPath}.layout.width`, issues);
       validateHeightPolicy(lm.layout.height, `${lmPath}.layout.height`, issues);
       validateDisplayPolicy(lm.layout.display, `${lmPath}.layout.display`, issues);
@@ -130,8 +393,197 @@ export function validateUiContract(contract: UiContract): UiContractIssue[] {
         if (rule.display) validateDisplayPolicy(rule.display, `${rulePath}.display`, issues);
       }
     }
+    validatePatternEvidence(screen, screenPath, issues);
   }
   return issues;
+}
+
+function includesString(values: readonly string[], value: string): boolean {
+  return values.includes(value);
+}
+
+function validateMarkers(
+  markers: UiMarkerContract[] | undefined,
+  path: string,
+  issues: UiContractIssue[],
+): void {
+  for (let i = 0; i < (markers?.length ?? 0); i++) {
+    const marker = markers![i]!;
+    const markerPath = `${path}[${i}]`;
+    if (!includesString(UI_MARKER_KINDS, marker.kind)) {
+      issues.push({ path: `${markerPath}.kind`, message: "unknown marker kind" });
+    }
+    if (marker.required && !marker.selector && !marker.attribute && !marker.target) {
+      issues.push({ path: markerPath, message: "required marker must declare selector, attribute, or target" });
+    }
+  }
+}
+
+function validateStates(
+  states: UiStateContract[] | undefined,
+  path: string,
+  issues: UiContractIssue[],
+): void {
+  for (let i = 0; i < (states?.length ?? 0); i++) {
+    const state = states![i]!;
+    const statePath = `${path}[${i}]`;
+    if (!state.id) issues.push({ path: `${statePath}.id`, message: "state id is required" });
+    if (!includesString(UI_STATE_KINDS, state.kind)) {
+      issues.push({ path: `${statePath}.kind`, message: "unknown state kind" });
+    }
+    if (state.required && !state.selector && !state.trigger) {
+      issues.push({ path: statePath, message: "required state must declare selector or trigger" });
+    }
+  }
+}
+
+function validateSlots(
+  slots: UiSlotContract[] | undefined,
+  path: string,
+  issues: UiContractIssue[],
+): void {
+  for (let i = 0; i < (slots?.length ?? 0); i++) {
+    const slot = slots![i]!;
+    const slotPath = `${path}[${i}]`;
+    if (!slot.id) issues.push({ path: `${slotPath}.id`, message: "slot id is required" });
+  }
+}
+
+function validateRepeat(
+  repeat: UiRepeatContract | undefined,
+  path: string,
+  issues: UiContractIssue[],
+): void {
+  if (!repeat) return;
+  validateOptionalRange(repeat.minItems, repeat.maxItems, path, issues);
+}
+
+function validateContent(
+  content: UiContentContract | undefined,
+  path: string,
+  issues: UiContractIssue[],
+): void {
+  if (!content) return;
+  if (content.items) {
+    validateOptionalRange(content.items.min, content.items.max, `${path}.items`, issues);
+    if (content.items.exact !== undefined && content.items.exact < 0) {
+      issues.push({ path: `${path}.items.exact`, message: "exact must be non-negative" });
+    }
+  }
+  if (content.text) {
+    validateOptionalRange(content.text.minLength, content.text.maxLength, `${path}.text`, issues);
+    if (content.text.rowCount !== undefined && content.text.rowCount < 0) {
+      issues.push({ path: `${path}.text.rowCount`, message: "rowCount must be non-negative" });
+    }
+  }
+}
+
+function validateOptionalRange(
+  min: number | undefined,
+  max: number | undefined,
+  path: string,
+  issues: UiContractIssue[],
+): void {
+  if (min !== undefined && min < 0) issues.push({ path: `${path}.min`, message: "min must be non-negative" });
+  if (max !== undefined && max < 0) issues.push({ path: `${path}.max`, message: "max must be non-negative" });
+  if (min !== undefined && max !== undefined && min > max) {
+    issues.push({ path, message: "min cannot exceed max" });
+  }
+}
+
+function validateDecoration(
+  decoration: UiDecorationContract | undefined,
+  path: string,
+  issues: UiContractIssue[],
+): void {
+  if (!decoration) return;
+  for (let i = 0; i < (decoration.typography?.length ?? 0); i++) {
+    const typo = decoration.typography![i]!;
+    const typoPath = `${path}.typography[${i}]`;
+    if (!typo.role) issues.push({ path: `${typoPath}.role`, message: "typography role is required" });
+    if (typo.size !== undefined && typo.size <= 0) issues.push({ path: `${typoPath}.size`, message: "typography size must be positive" });
+    if (typo.lineHeight !== undefined && typo.lineHeight <= 0) issues.push({ path: `${typoPath}.lineHeight`, message: "lineHeight must be positive" });
+  }
+  for (let i = 0; i < (decoration.palette?.length ?? 0); i++) {
+    const color = decoration.palette![i]!;
+    const colorPath = `${path}.palette[${i}]`;
+    if (!color.role) issues.push({ path: `${colorPath}.role`, message: "palette role is required" });
+    if (color.value && !/^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/iu.test(color.value)) {
+      issues.push({ path: `${colorPath}.value`, message: "palette value must be a hex color" });
+    }
+  }
+  for (let i = 0; i < (decoration.media?.length ?? 0); i++) {
+    const media = decoration.media![i]!;
+    if (!media.slot) issues.push({ path: `${path}.media[${i}].slot`, message: "media treatment slot is required" });
+  }
+}
+
+function validateAssets(
+  assets: UiAssetContract[] | undefined,
+  path: string,
+  issues: UiContractIssue[],
+): void {
+  for (let i = 0; i < (assets?.length ?? 0); i++) {
+    const asset = assets![i]!;
+    if (!asset.id) issues.push({ path: `${path}[${i}].id`, message: "asset id is required" });
+  }
+}
+
+function validateCanvas(
+  canvas: UiCanvasContract | undefined,
+  path: string,
+  issues: UiContractIssue[],
+): void {
+  if (!canvas) return;
+  if ((canvas.requiredStateFields?.length ?? 0) > 0 && !canvas.stateHook) {
+    issues.push({ path: `${path}.stateHook`, message: "canvas stateHook is required when requiredStateFields are declared" });
+  }
+  for (let i = 0; i < (canvas.inputs?.length ?? 0); i++) {
+    const input = canvas.inputs![i]!;
+    if (!input.action) issues.push({ path: `${path}.inputs[${i}].action`, message: "canvas input action is required" });
+  }
+  for (let i = 0; i < (canvas.hud?.length ?? 0); i++) {
+    const hud = canvas.hud![i]!;
+    if (!hud.id) issues.push({ path: `${path}.hud[${i}].id`, message: "canvas HUD id is required" });
+  }
+}
+
+function validatePatternEvidence(
+  screen: UiContractScreen,
+  screenPath: string,
+  issues: UiContractIssue[],
+): void {
+  const pattern = screen.pattern ?? screen.goal;
+  const markerKinds = new Set(collectMarkers(screen).map((marker) => marker.kind));
+  if (pattern === "landing") {
+    for (const kind of ["primary-cta", "media-slot", "next-section"] as const) {
+      if (!markerKinds.has(kind)) {
+        issues.push({ path: `${screenPath}.markers`, message: `landing contracts should include ${kind} marker evidence` });
+      }
+    }
+  }
+  if (pattern === "app-shell" && !markerKinds.has("scrollport")) {
+    issues.push({ path: `${screenPath}.markers`, message: "app-shell contracts should include scrollport marker evidence" });
+  }
+  if (pattern === "canvas") {
+    const required = ["mode", "frame", "playerX", "playerY", "score", "assetsReady"];
+    const fields = new Set(screen.canvas?.requiredStateFields ?? []);
+    if (!screen.canvas?.stateHook) {
+      issues.push({ path: `${screenPath}.canvas.stateHook`, message: "canvas contracts should include a stateHook" });
+    }
+    for (const field of required) {
+      if (!fields.has(field)) {
+        issues.push({ path: `${screenPath}.canvas.requiredStateFields`, message: `canvas contracts should include ${field} state field` });
+      }
+    }
+  }
+}
+
+function collectMarkers(screen: UiContractScreen): UiMarkerContract[] {
+  return [
+    ...(screen.markers ?? []),
+    ...screen.landmarks.flatMap((landmark) => landmark.markers ?? []),
+  ];
 }
 
 function validateWidthPolicy(
@@ -183,6 +635,22 @@ export function summarizeUiContractLandmark(landmark: UiContractLandmark): strin
     summarizeDisplay(landmark.layout.display),
   ].filter(Boolean).join(", ");
   return `${landmark.role} "${landmark.name}": ${details}`;
+}
+
+export function summarizeUiContractScreen(screen: UiContractScreen): string {
+  const parts = [
+    `screen ${screen.id}`,
+    screen.pattern ? `pattern ${screen.pattern}` : "",
+    screen.goal ? `goal ${screen.goal}` : "",
+    screen.sourceOfTruth ? `source ${screen.sourceOfTruth}` : "",
+    `viewports ${screen.viewports.length}`,
+    `landmarks ${screen.landmarks.length}`,
+    screen.markers?.length ? `markers ${screen.markers.length}` : "",
+    screen.states?.length ? `states ${screen.states.length}` : "",
+    screen.assets?.length ? `assets ${screen.assets.length}` : "",
+    screen.canvas ? "canvas" : "",
+  ].filter(Boolean);
+  return parts.join(", ");
 }
 
 function summarizeWidth(width: UiWidthPolicy): string {

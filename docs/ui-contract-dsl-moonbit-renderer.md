@@ -10,12 +10,16 @@ CSS remains an output target and escape hatch, but the editable source of truth
 for agent loops should be:
 
 - semantic landmarks
+- pattern / goal metadata
 - layout contracts
 - responsive rules
+- machine-readable markers
+- interaction states
 - scrollports
 - grid/subgrid tracks
 - decoration tokens
 - content bindings
+- asset / canvas hooks
 
 This keeps design intent separate from browser-specific CSS serialization.
 
@@ -46,11 +50,14 @@ regression.
 The contract should retain intentionally high-level metadata:
 
 - landmark role and accessible name
+- pattern, goal, and source-of-truth metadata
 - min/max width policy
 - height / scrollport policy
 - grid/subgrid tracks
 - responsive viewport overrides
+- required markers and states
 - decoration/token references
+- content density and asset/canvas policy
 
 It should not become a full CSS AST. CSS remains an output/escape-hatch layer.
 
@@ -62,6 +69,7 @@ individual declarations. It is trying to answer higher-level questions:
 - Is this landmark fluid, fixed, or bounded by min/max width?
 - Is this section document-flow content or an internal scrollport?
 - Are these children aligned by shared grid tracks or local offsets?
+- Which markers and states prove that the implementation is usable?
 - Is the mismatch in layout, decoration, or content?
 - Which semantic region should be edited next?
 
@@ -83,11 +91,15 @@ It is intentionally small:
 - `UiContractViewport`
 - `UiContractLandmark`
 - `UiLayoutContract`
+- pattern / goal metadata
+- marker / state / slot / repeat contracts
+- content / decoration / asset / canvas contracts
 - width / height / display / scroll policies
 - responsive overrides
 
-This TypeScript version is a schema anchor and dogfood harness. It is not meant
-to become the final heavy implementation.
+This TypeScript version is a schema anchor and dogfood harness. It validates the
+editing metadata needed by current dogfood, but it is not meant to become the
+final heavy implementation.
 
 ## Introspection Tool
 
@@ -96,13 +108,16 @@ Existing implementations can be converted into a draft UI Contract:
 ```bash
 vlmkit contract introspect path/to/page.html \
   --screen-id blog-home \
+  --pattern editorial \
+  --goal app \
   --viewport desktop:1536x1024 \
   --viewport mobile:432x911@2 \
   --out design-runs/blog-20260519/ui.contract.json
 ```
 
 The tool opens the page, captures concrete ARIA/semantic landmarks, reads the
-current layout contract from computed styles, and writes `ui.contract.json`.
+current layout contract from computed styles, captures common implementation
+markers / assets / canvas hooks, and writes `ui.contract.json`.
 
 The initial introspector intentionally reports incomplete contracts instead of
 guessing intent. For example, a region with no `min-width` / `max-width` is
@@ -244,9 +259,36 @@ Example:
   "screens": [
     {
       "id": "blog-home",
+      "pattern": "editorial",
+      "goal": "app",
+      "sourceOfTruth": "semantic-dom",
       "viewports": [
         { "label": "desktop", "width": 1536, "height": 1024 },
         { "label": "mobile", "width": 432, "height": 911, "dpr": 2 }
+      ],
+      "markers": [
+        { "kind": "primary-cta", "selector": "[data-primary-cta]", "required": true }
+      ],
+      "states": [
+        { "id": "cta-focus", "kind": "focus-visible", "selector": "[data-primary-cta]" }
+      ],
+      "content": {
+        "kind": "static",
+        "text": { "rowCount": 12, "maxLength": 420 }
+      },
+      "decoration": {
+        "typography": [
+          { "role": "hero-title", "family": "system-serif", "size": 56, "lineHeight": 1.08 }
+        ],
+        "palette": [
+          { "role": "surface", "token": "surface", "value": "#f8faf7" }
+        ],
+        "media": [
+          { "slot": "hero-preview", "crop": "cover", "aspectRatio": "16/10" }
+        ]
+      },
+      "assets": [
+        { "id": "hero-preview", "kind": "image", "policy": "replaceable", "slot": "hero" }
       ],
       "landmarks": [
         {
@@ -264,7 +306,12 @@ Example:
               "gap": { "row": 48, "column": 64 }
             },
             "scroll": { "x": false, "y": false }
-          }
+          },
+          "slots": [
+            { "id": "content", "kind": "content", "gridArea": "content", "required": true },
+            { "id": "rail", "kind": "list", "gridArea": "rail" }
+          ],
+          "repeat": { "kind": "feed", "itemName": "article-card", "minItems": 4 }
         }
       ]
     }
@@ -275,8 +322,8 @@ Example:
 ## Migration Plan
 
 1. Keep TypeScript IR as the public JSON contract and dogfood surface.
-2. Add JSON artifact output from `vlmkit build component`.
-3. Add `vlmkit contract validate`.
+2. Keep `vlmkit contract introspect` and `validate` aligned with the schema.
+3. Add JSON artifact output from `vlmkit build component`.
 4. Add `vlmkit contract compile --html --css`.
 5. Add crater-backed `vlmkit contract simulate`.
 6. Port validator + simulator core to MoonBit after schema stops moving.

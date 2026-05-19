@@ -8,15 +8,22 @@ import {
   type LandmarkRegion,
 } from "../component/semantic-drilldown.ts";
 import {
+  summarizeUiContractScreen,
   summarizeUiContractLandmark,
   validateUiContract,
   type UiContract,
+  type UiAssetContract,
   type UiContractLandmark,
+  type UiContractGoal,
+  type UiContractPattern,
+  type UiCanvasContract,
   type UiContractViewport,
   type UiDisplayPolicy,
   type UiHeightPolicy,
   type UiLayoutContract,
+  type UiMarkerContract,
   type UiScrollPolicy,
+  type UiStateContract,
   type UiWidthPolicy,
 } from "./ui-contract.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
@@ -28,15 +35,27 @@ export interface LandmarkCapture {
 
 export interface LandmarkRegionsToUiContractInput {
   screenId: string;
+  pattern?: UiContractPattern;
+  goal?: UiContractGoal;
   viewports: UiContractViewport[];
   captures: LandmarkCapture[];
+  hints?: UiContractDomHints;
 }
 
 export interface IntrospectUiContractOptions {
   input: string;
   screenId?: string;
+  pattern?: UiContractPattern;
+  goal?: UiContractGoal;
   viewports?: UiContractViewport[];
   outputPath?: string;
+}
+
+export interface UiContractDomHints {
+  markers?: UiMarkerContract[];
+  states?: UiStateContract[];
+  assets?: UiAssetContract[];
+  canvas?: UiCanvasContract;
 }
 
 const DEFAULT_VIEWPORTS: UiContractViewport[] = [
@@ -147,7 +166,13 @@ export function landmarkRegionsToUiContract(
     version: 1,
     screens: [{
       id: input.screenId,
+      ...(input.pattern ? { pattern: input.pattern } : {}),
+      ...(input.goal ? { goal: input.goal } : {}),
       viewports: input.viewports,
+      ...(input.hints?.markers?.length ? { markers: input.hints.markers } : {}),
+      ...(input.hints?.states?.length ? { states: input.hints.states } : {}),
+      ...(input.hints?.assets?.length ? { assets: input.hints.assets } : {}),
+      ...(input.hints?.canvas ? { canvas: input.hints.canvas } : {}),
       landmarks,
     }],
   };
@@ -170,6 +195,7 @@ export async function introspectUiContractFromHtml(
   const screenId = options.screenId ?? (basename(input).replace(/\.[^.]+$/, "") || "screen");
   const browser = await chromium.launch();
   const captures: LandmarkCapture[] = [];
+  let hints: UiContractDomHints | undefined;
   try {
     for (const viewport of viewports) {
       const page = await browser.newPage({
@@ -183,13 +209,121 @@ export async function introspectUiContractFromHtml(
       const landmarks = await captureLandmarkRegions(page, {
         deviceScaleFactor: viewport.dpr ?? 1,
       });
+      if (!hints) hints = await captureUiContractDomHints(page);
       captures.push({ viewport: viewport.label, landmarks });
       await page.close();
     }
   } finally {
     await browser.close();
   }
-  return landmarkRegionsToUiContract({ screenId, viewports, captures });
+  return landmarkRegionsToUiContract({
+    screenId,
+    pattern: options.pattern,
+    goal: options.goal,
+    viewports,
+    captures,
+    hints,
+  });
+}
+
+async function captureUiContractDomHints(page: import("playwright").Page): Promise<UiContractDomHints> {
+  return await page.evaluate(() => {
+    type Hint = {
+      markers?: UiMarkerContract[];
+      states?: UiStateContract[];
+      assets?: UiAssetContract[];
+      canvas?: UiCanvasContract;
+    };
+
+    function has(selector: string): boolean {
+      return document.querySelector(selector) !== null;
+    }
+
+    const markers: UiMarkerContract[] = [];
+    if (has("[data-primary-cta]")) {
+      markers.push({ kind: "primary-cta", selector: "[data-primary-cta]", attribute: "data-primary-cta", required: true });
+    }
+    if (has("[data-next-section]")) {
+      markers.push({ kind: "next-section", selector: "[data-next-section]", attribute: "data-next-section", required: true });
+    }
+    if (has("[data-media-slot]")) {
+      markers.push({ kind: "media-slot", selector: "[data-media-slot]", attribute: "data-media-slot", required: true });
+    }
+    if (has("[data-hero-title]")) {
+      markers.push({ kind: "hero-title", selector: "[data-hero-title]", attribute: "data-hero-title" });
+    }
+
+    for (const el of Array.from(document.querySelectorAll("[data-scrollport], [data-vlmkit-scrollport], [data-ui-scrollport], [data-scroll-region]"))) {
+      const value = el.getAttribute("data-scrollport")
+        || el.getAttribute("data-vlmkit-scrollport")
+        || el.getAttribute("data-ui-scrollport")
+        || el.getAttribute("data-scroll-region")
+        || "";
+      const attribute = el.hasAttribute("data-scrollport")
+        ? "data-scrollport"
+        : el.hasAttribute("data-vlmkit-scrollport")
+          ? "data-vlmkit-scrollport"
+          : el.hasAttribute("data-ui-scrollport")
+            ? "data-ui-scrollport"
+            : "data-scroll-region";
+      markers.push({
+        kind: "scrollport",
+        name: value || undefined,
+        attribute,
+        value: value || undefined,
+        selector: value ? `[${attribute}="${value}"]` : `[${attribute}]`,
+        required: true,
+      });
+    }
+
+    if (has("[aria-current=\"page\"], [data-selected=\"true\"]")) {
+      markers.push({ kind: "selected", selector: "[aria-current=\"page\"], [data-selected=\"true\"]" });
+    }
+    if (has("[data-unread], [data-unread=\"true\"]")) {
+      markers.push({ kind: "unread", selector: "[data-unread], [data-unread=\"true\"]" });
+    }
+
+    const states: UiStateContract[] = [];
+    if (has("[aria-current=\"page\"], [data-selected=\"true\"]")) {
+      states.push({ id: "selected", kind: "selected", selector: "[aria-current=\"page\"], [data-selected=\"true\"]" });
+    }
+
+    const assets: UiAssetContract[] = [];
+    let assetIndex = 0;
+    for (const img of Array.from(document.querySelectorAll("img"))) {
+      assets.push({
+        id: img.id || img.getAttribute("data-media-slot") || `image-${assetIndex++}`,
+        kind: "image",
+        policy: "replaceable",
+        slot: img.getAttribute("data-media-slot") || undefined,
+      });
+    }
+    if (document.querySelector("svg")) {
+      assets.push({ id: "inline-svg", kind: "svg", policy: "literal" });
+    }
+    const canvasElements = Array.from(document.querySelectorAll("canvas"));
+    for (let i = 0; i < canvasElements.length; i++) {
+      assets.push({ id: canvasElements[i]!.id || `canvas-${i}`, kind: "procedural", policy: "procedural" });
+    }
+
+    const gameState = (window as unknown as { __gameState?: unknown }).__gameState;
+    const canvas: UiCanvasContract | undefined = canvasElements.length > 0
+      ? {
+          ...(gameState !== undefined ? { stateHook: "window.__gameState" } : {}),
+          ...(gameState && typeof gameState === "object" ? { requiredStateFields: Object.keys(gameState as Record<string, unknown>) } : {}),
+        }
+      : undefined;
+    if (gameState !== undefined) {
+      markers.push({ kind: "game-state", target: "window.__gameState", required: true });
+    }
+
+    const hint: Hint = {};
+    if (markers.length > 0) hint.markers = markers;
+    if (states.length > 0) hint.states = states;
+    if (assets.length > 0) hint.assets = assets;
+    if (canvas) hint.canvas = canvas;
+    return hint;
+  });
 }
 
 function parseArgs(argv: string[]) {
@@ -197,16 +331,20 @@ function parseArgs(argv: string[]) {
   const viewports: UiContractViewport[] = [];
   let out = "";
   let screenId = "";
+  let pattern = "";
+  let goal = "";
   let help = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === "--help" || arg === "-h") help = true;
     else if (arg === "--out" || arg === "-o") out = argv[++i] ?? "";
     else if (arg === "--screen-id") screenId = argv[++i] ?? "";
+    else if (arg === "--pattern") pattern = argv[++i] ?? "";
+    else if (arg === "--goal") goal = argv[++i] ?? "";
     else if (arg === "--viewport") viewports.push(parseViewport(argv[++i] ?? ""));
     else positional.push(arg);
   }
-  return { input: positional[0], out, screenId, viewports, help };
+  return { input: positional[0], out, screenId, pattern, goal, viewports, help };
 }
 
 function parseViewport(raw: string): UiContractViewport {
@@ -225,6 +363,8 @@ function printHelp(): void {
   console.log("Options:");
   console.log("  --out, -o <path>                 Write UI Contract JSON");
   console.log("  --screen-id <id>                 Screen id (default: input basename)");
+  console.log("  --pattern <name>                 Optional pattern: editorial|landing|app-shell|dashboard|canvas|mixed");
+  console.log("  --goal <name>                    Optional validation goal: app|layout|pixel|draft|app-shell|landing|canvas");
   console.log("  --viewport <label:WxH[@DPR]>     Capture viewport; repeatable");
 }
 
@@ -238,6 +378,8 @@ async function main(argv = process.argv.slice(2)) {
   const contract = await introspectUiContractFromHtml({
     input: args.input,
     screenId: args.screenId || undefined,
+    pattern: args.pattern ? args.pattern as UiContractPattern : undefined,
+    goal: args.goal ? args.goal as UiContractGoal : undefined,
     viewports: args.viewports.length > 0 ? args.viewports : undefined,
   });
   const issues = validateUiContract(contract);
@@ -248,7 +390,9 @@ async function main(argv = process.argv.slice(2)) {
   } else {
     console.log(json);
   }
-  for (const landmark of contract.screens[0]?.landmarks ?? []) {
+  const screen = contract.screens[0];
+  if (screen) console.error(`- ${summarizeUiContractScreen(screen)}`);
+  for (const landmark of screen?.landmarks ?? []) {
     console.error(`- ${summarizeUiContractLandmark(landmark)}`);
   }
   if (issues.length > 0) {
