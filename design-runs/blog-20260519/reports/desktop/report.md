@@ -3,9 +3,13 @@
 Target:  `/Users/mz/ghq/github.com/mizchi/vlmkit/design-runs/blog-20260519/target/desktop.png` (1536×1024)
 Current: `/Users/mz/ghq/github.com/mizchi/vlmkit/design-runs/blog-20260519/implementation/page.html`
 
-**Pixel diff**: 19.06% (299806 of 1572864 pixels)
+**Pixel diff**: 18.42% (289758 of 1572864 pixels)
 
-**Landscape diff**: 2.20% coarse (97.80% similarity, 9/176 changed cells, 16×11 grid)
+**Landscape diff**: 2.14% coarse (97.86% similarity, 9/176 changed cells, 16×11 grid)
+
+**Goal**: `app` (Practical app) — **pass**
+
+Practical app pass: landscape 2.14% <= 3.00%, pixel 18.42% <= 25.00%
 
 - Target:   `/Users/mz/ghq/github.com/mizchi/vlmkit/design-runs/blog-20260519/target/desktop.png`
 - Current:  `/Users/mz/ghq/github.com/mizchi/vlmkit/design-runs/blog-20260519/reports/desktop/current.png`
@@ -18,13 +22,13 @@ Coarse grid comparison of average color + ink density. Use this before pixel-per
 | Cell | Box | Score | Target | Current |
 |---|---|---:|---|---|
 | r7 c13 | 1248,651 96×93 | 20.9% | `#a7b5ae` ink 0.28 | `#e6e5dc` ink 0.07 |
-| r8 c11 | 1056,744 96×93 | 12.3% | `#f4f2ed` ink 0.03 | `#cdd6d0` ink 0.14 |
+| r8 c11 | 1056,744 96×93 | 12.1% | `#f4f2ed` ink 0.03 | `#ced7d1` ink 0.14 |
 | r5 c5 | 480,465 96×93 | 11.2% | `#dbdeda` ink 0.11 | `#bac4c2` ink 0.24 |
 | r5 c6 | 576,465 96×93 | 10.7% | `#dde0dc` ink 0.10 | `#bec7c6` ink 0.23 |
 | r7 c12 | 1152,651 96×93 | 10.3% | `#a7b5ae` ink 0.28 | `#c6cec5` ink 0.17 |
-| r5 c3 | 288,465 96×93 | 9.7% | `#d3d0c1` ink 0.16 | `#e9e8de` ink 0.06 |
-| r2 c7 | 672,186 96×93 | 9.3% | `#faf9f7` ink 0.01 | `#dfe3e0` ink 0.09 |
-| r2 c8 | 768,186 96×93 | 8.3% | `#fcfaf8` ink 0.00 | `#e4e6e4` ink 0.08 |
+| r2 c7 | 672,186 96×93 | 9.0% | `#faf9f7` ink 0.01 | `#e0e3e1` ink 0.09 |
+| r5 c3 | 288,465 96×93 | 8.5% | `#d3d0c1` ink 0.16 | `#e7e5da` ink 0.07 |
+| r8 c12 | 1152,744 96×93 | 8.1% | `#f3f2f0` ink 0.03 | `#dadfda` ink 0.10 |
 
 ## Landmark drilldown
 
@@ -36,18 +40,17 @@ The lanes are intentionally separate. Run the layout lane first until section pl
 
 | Priority | Landmark | Box | Width | Height | Scroll | Grid | Layout | Decoration | Evidence | Next |
 |---:|---|---|---|---|---|---|---:|---:|---|---|
-| 40.0 | `region "Follow the notes"` | 1020,538 360×245 | fluid-unbounded | content | none | block | 15.0% | 100.0% | 3 landscape cell(s), 2 heatmap region(s) | fix landmark geometry / spacing / section placement |
-| 26.8 | `region "Blog content"` | 156,383 1224×813 | fluid-unbounded | content | none | grid | 12.5% | 57.3% | 6 landscape cell(s), 6 heatmap region(s) | fix landmark geometry / spacing / section placement |
-| 23.8 | `main "Engineering notes for systems that outlive the sprint."` | 106,112 1324×1104 | bounded max 1324px | content | none | block | 11.6% | 49.0% | 8 landscape cell(s), 7 heatmap region(s) | fix landmark geometry / spacing / section placement |
-| 12.1 | `region "Engineering notes for systems that outlive the sprint."` | 156,156 760×199 | bounded max 760px | content | none | block | 8.8% | 13.2% | 2 landscape cell(s), 1 heatmap region(s) | fix landmark geometry / spacing / section placement |
+| 39.0 | `region "Follow the notes"` | 1020,538 360×245 | fluid-unbounded | content | none | block | 14.0% | 100.0% | 4 landscape cell(s), 2 heatmap region(s) | fix landmark geometry / spacing / section placement |
+| 23.5 | `region "Blog content"` | 156,383 1224×895 | fluid-unbounded | content | none | grid | 11.7% | 47.1% | 7 landscape cell(s), 6 heatmap region(s) | fix landmark geometry / spacing / section placement |
+| 20.2 | `main "Engineering notes for systems that outlive the sprint."` | 106,112 1324×1186 | bounded max 1324px | content | none | block | 11.3% | 35.3% | 8 landscape cell(s), 7 heatmap region(s) | fix landmark geometry / spacing / section placement |
+| 12.3 | `region "Engineering notes for systems that outlive the sprint."` | 156,156 760×199 | bounded max 760px | content | none | block | 9.0% | 13.2% | 1 landscape cell(s), 1 heatmap region(s) | fix landmark geometry / spacing / section placement |
 
 ### Decoration lane
 
 | Priority | Landmark | Box | Width | Height | Scroll | Grid | Layout | Decoration | Evidence | Next |
 |---:|---|---|---|---|---|---|---:|---:|---|---|
-| 100.0 | `complementary "Topics"` | 1020,129 360×369 | fluid-unbounded | content | none | block | 0.0% | 100.0% | 0 landscape cell(s), 1 heatmap region(s) | fix colors / media / text styling after layout stabilizes |
 | 9.1 | `banner` | 106,0 1324×112 | bounded max 1324px | content | none | flex | 0.0% | 9.1% | 0 landscape cell(s), 1 heatmap region(s) | fix colors / media / text styling after layout stabilizes |
-| 2.5 | `region "About"` | 1020,960 360×204 | fluid-unbounded | content | none | block | 0.0% | 2.5% | 0 landscape cell(s), 1 heatmap region(s) | fix colors / media / text styling after layout stabilizes |
+| 1.4 | `complementary "Topics"` | 1020,129 360×369 | fluid-unbounded | content | none | block | 0.0% | 1.4% | 0 landscape cell(s), 1 heatmap region(s) | fix colors / media / text styling after layout stabilizes |
 
 ## Heatmap region clusters
 
@@ -55,18 +58,18 @@ Each cluster is a contiguous run of differing pixels. `Fill` is the dominant col
 
 | Top-Left | Size | Hot pixels | Fill | Kind |
 |---|---|---|---|---|
-| 144,380 | 828×370 | 98585 | `#f8f7f2` | `text` |
-| 1008,129 | 401×836 | 43273 | `#fbfaf8` | `text` |
+| 147,380 | 825×356 | 94867 | `#fbf9f4` | `text` |
+| 1012,493 | 397×472 | 36429 | `#fbfaf8` | `text` |
 | 1061,655 | 302×44 | 10963 | `#375a50` | `text` |
 | 464,480 | 341×46 | 6602 | `#faf9f4` | `text`? |
 | 468,444 | 319×40 | 6143 | `#faf9f4` | `text`? |
-| 155,41 | 306×44 | 5555 | `#faf9f7` | `text`? |
-| 156,186 | 219×91 | 5107 | `#fbfaf8` | `text` |
+| 155,41 | 306×44 | 5557 | `#faf9f7` | `text`? |
+| 156,186 | 219×91 | 5130 | `#fbfaf8` | `text` |
 | 467,526 | 280×44 | 5018 | `#faf9f4` | `text` |
 
 ## Text-row Δy
 
-Target has 1 text rows; current has 19.
+Target has 1 text rows; current has 18.
 
 **Count mismatch** — current is missing rows of content (or has spurious extras). Add the missing elements before tweaking CSS.
 
@@ -86,7 +89,7 @@ Direct samples of the page bg (image perimeter) and inner bg (central rectangle)
 
 | Layer | Target | Current |
 |---|---|---|
-| outer (page) | `#faf9f7` | `#faf9f7` |
+| outer (page) | `#faf9f7` | `#fbfaf8` |
 
 _(target outer and inner are the same; page is a single solid background.)_
 
@@ -104,10 +107,11 @@ _(target outer and inner are the same; page is a single solid background.)_
 Aggregated from every actionable signal above. Each line is either a paste-ready declaration or a `/* hint */` describing the delta. Selectors are intentionally omitted (the tool can't see your DOM); apply each declaration to whichever element matches the described region or row.
 
 ```css
-/* HTML: remove 18 row(s) of content — target has 1, current has 19 */
+body { background: #faf9f7; }
+/* HTML: remove 17 row(s) of content — target has 1, current has 18 */
 /* row #0: font-size: 72px; */
-/* region 144,380 828×370: color: #f8f7f2 (text) */
-/* region 1008,129 401×836: color: #fbfaf8 (text) */
+/* region 147,380 825×356: color: #fbf9f4 (text) */
+/* region 1012,493 397×472: color: #fbfaf8 (text) */
 /* region 1061,655 302×44: color: #375a50 (text) */
 /* region 464,480 341×46: color: #faf9f4 (text) */
 /* region 468,444 319×40: color: #faf9f4 (text) */

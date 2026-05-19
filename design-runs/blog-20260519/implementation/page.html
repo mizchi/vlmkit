@@ -12,6 +12,11 @@
         <a class="brand" href="#">Memory Atlas</a>
         <p>Field notes on systems<br />that outlive the sprint.</p>
       </div>
+      <button class="menu-button" type="button" aria-label="Open menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
       <nav class="nav" aria-label="Primary">
         <a href="#">Essays</a>
         <a href="#">Notes</a>
@@ -35,10 +40,21 @@
       <section class="layout" aria-label="Blog content">
         <article class="featured">
           <div class="feature-art" aria-hidden="true">
-            <span></span>
+            <svg class="botanical" viewBox="0 0 120 160" focusable="false">
+              <path class="stem" d="M62 142 C60 112 62 84 58 54 C56 36 52 25 45 14" />
+              <path class="leaf" d="M58 50 C38 40 28 28 27 13 C47 18 56 30 58 50Z" />
+              <path class="leaf" d="M62 67 C83 53 94 39 94 21 C73 29 64 43 62 67Z" />
+              <path class="leaf" d="M60 84 C38 76 26 63 21 45 C44 48 57 62 60 84Z" />
+              <path class="leaf" d="M64 101 C88 89 101 74 104 55 C80 61 67 78 64 101Z" />
+              <path class="leaf" d="M61 118 C39 110 24 96 18 78 C43 80 57 96 61 118Z" />
+            </svg>
           </div>
           <div class="feature-copy">
-            <p class="meta">Featured essay · May 18, 2026 · 12 min read</p>
+            <p class="meta">
+              <span>Featured essay</span>
+              <span class="desktop-meta"> · May 18, 2026 · 12 min read</span>
+              <span class="mobile-meta">May 2026</span>
+            </p>
             <h2>Designing visual regression loops for coding agents</h2>
             <p>
               Turning screenshots, heatmaps, and structured reports into
@@ -54,7 +70,7 @@
           <a href="#"><span>Agent tooling</span><strong>18</strong></a>
           <a href="#"><span>Frontend architecture</span><strong>21</strong></a>
           <a href="#"><span>Research notes</span><strong>15</strong></a>
-          <a href="#"><span>Archive</span><strong>All posts</strong></a>
+          <a class="archive-topic" href="#"><span>Archive</span><strong>All posts</strong></a>
           <a class="browse" href="#">Browse all topics -></a>
         </aside>
 
@@ -83,6 +99,14 @@
               <p>Using images as executable specifications in everyday workflows.</p>
             </div>
             <span class="tag">Process & craft</span>
+          </article>
+          <article>
+            <p class="date">Apr 21, 2026<br /><span>9 min read</span></p>
+            <div>
+              <h3>Tiny decisions that improve long-term DX</h3>
+              <p>Small workflow constraints that make future edits easier.</p>
+            </div>
+            <span class="tag">Research notes</span>
           </article>
           <a class="read-link recent-link" href="#">See all recent notes -></a>
         </section>
