@@ -23,6 +23,18 @@ export {
   type ExtractComponentsOptions,
   type MatchComponentsOptions,
 } from "./component/component-bbox.ts";
+export {
+  buildSemanticDrilldown,
+  describeLandmarkLayoutContract,
+  normalizeLandmarkRole,
+  selectNextSemanticDrilldown,
+  type LandmarkLayoutContract,
+  type LandmarkLayoutSummary,
+  type LandmarkRegion,
+  type LandmarkRole,
+  type SemanticDrilldownEntry,
+  type SemanticDrilldownInput,
+} from "./component/semantic-drilldown.ts";
 
 // ---- Palette ----
 export {
@@ -48,6 +60,25 @@ export {
   findAffectedComponents,
   graphStats,
 } from "./inspect/dep-graph.ts";
+
+// ---- UI Contract IR ----
+export {
+  summarizeUiContractLandmark,
+  validateUiContract,
+  type LandmarkRole as UiContractLandmarkRole,
+  type UiContract,
+  type UiContractIssue,
+  type UiContractLandmark,
+  type UiContractScreen,
+  type UiContractVersion,
+  type UiContractViewport,
+  type UiDisplayPolicy,
+  type UiHeightPolicy,
+  type UiLayoutContract,
+  type UiResponsiveRule,
+  type UiScrollPolicy,
+  type UiWidthPolicy,
+} from "./contract/ui-contract.ts";
 
 // ---- Introspect / spec verify ----
 export {

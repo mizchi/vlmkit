@@ -117,6 +117,8 @@ const SPECS: Record<string, Spec> = {
   diffForAgent: spec("diff-for-agent-cli", () => import("./commands/diff-for-agent-cli.ts")),
   compareRuns: spec("compare-runs-cli", () => import("./commands/compare-runs-cli.ts")),
   componentFromImage: spec("component-from-image", () => import("@mizchi/vlmkit-markup/component/component-from-image.ts")),
+  contractIntrospect: spec("contract-introspect", () => import("@mizchi/vlmkit-markup/contract/introspect-contract.ts")),
+  contractValidate: spec("contract-validate", () => import("@mizchi/vlmkit-markup/contract/validate-contract.ts")),
   multiPageConsistency: spec("multi-page-consistency", () => import("@mizchi/vlmkit-markup/stress/multi-page-consistency.ts")),
   componentConsistency: spec("component-consistency", () => import("@mizchi/vlmkit-markup/component/component-consistency.ts")),
   themeParity: spec("theme-parity", () => import("@mizchi/vlmkit-markup/style/theme-parity.ts")),
@@ -168,6 +170,10 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
   },
   build: {
     component: { spec: SPECS.componentFromImage, desc: "Build a component from a target screenshot" },
+  },
+  contract: {
+    introspect: { spec: SPECS.contractIntrospect, desc: "Infer UI Contract IR from existing HTML / URL" },
+    validate: { spec: SPECS.contractValidate, desc: "Validate UI Contract IR" },
   },
 };
 
@@ -294,6 +300,7 @@ Common command groups:
   vlmkit stress i18n|media
   vlmkit scan component|breakpoints
   vlmkit build component
+  vlmkit contract introspect|validate
   vlmkit snapshot [<url>...]
   vlmkit workflow <subcommand>
   vlmkit bench / api / skill / report

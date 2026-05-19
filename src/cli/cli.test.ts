@@ -109,4 +109,18 @@ describe("vrt CLI tree (cac-based)", () => {
     // No deprecation warning here — this is the new canonical path
     assert.doesNotMatch(r.stderr, /\[vlmkit deprecated\]/);
   });
+
+  it("`vrt contract` prints contract group usage", () => {
+    const r = runVrt(["contract"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vlmkit contract <subcommand>/);
+    assert.match(r.stdout, /introspect.*Infer UI Contract/);
+    assert.match(r.stdout, /validate.*Validate UI Contract/);
+  });
+
+  it("`vrt contract introspect --help` delegates to the introspector", () => {
+    const r = runVrt(["contract", "introspect", "--help"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vlmkit contract introspect <html-file-or-url>/);
+  });
 });
