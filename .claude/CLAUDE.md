@@ -103,8 +103,8 @@ vrt snapshot http://localhost:3000/ --mask ".marquee-container,.hero-badge"
 ## Dogfooding
 
 ```bash
-# luna.mbt (requires: npx serve ~/ghq/.../luna.mbt/dist -p 4200)
-just dogfood-luna
+# luna.mbt (requires: npx serve ~/ghq/.../luna.mbt/dist/luna -p 4200)
+pkf run dogfood-luna
 
 # sol.mbt (requires: npx serve ~/ghq/.../sol.mbt/website/dist-docs -p 3000)
 just dogfood-sol
