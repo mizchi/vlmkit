@@ -66,7 +66,10 @@ describe("package manifest for publishable CLI", () => {
     const files = pkg.files as string[] | undefined;
 
     assert.ok(files, "package.json should define files");
-    assert.ok(files.includes("dist"), "dist should be published");
+    assert.ok(
+      files.some((f) => f === "dist" || f.startsWith("dist/")),
+      "dist should be published (either 'dist' or 'dist/**' patterns)",
+    );
     assert.ok(files.includes("README.md"), "README should be published");
   });
 });

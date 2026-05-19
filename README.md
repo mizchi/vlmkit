@@ -1,23 +1,37 @@
 # vrt
 
-Visual Regression Testing toolkit — pixel diff, computed style diff, a11y tree diff, and AI-powered CSS fix generation.
+Visual Regression Testing toolkit — pixel diff, computed-style diff,
+a11y tree diff, agent-readable Markdown reports, and AI-powered CSS
+fix generation.
 
 Requires Node 24+.
 
-The public surface is organized into:
+```bash
+npm install -g @mizchi/vrt
+# or, from this repo:
+pnpm install && pnpm build
+```
 
-- **Dev inner loop**: `vrt compare` (rich signal output), `vrt watch`
-  (file-watcher + round-vs-round delta), `vrt manifest` (approval
-  authoring).
-- **CI gate**: `vrt diff-pr {pin,verify,post}` — visual diff +
-  optional a11y / media-variants / cross-browser gates per route.
-  `vrt baseline` is the canonical alias.
-- **One-shot analysis**: `vrt compare`, `vrt png-diff`, `vrt snapshot`,
-  the 10+ markup-assistance commands.
-- **Legacy / internal**: `vrt workflow <command>` — vrt's own
-  dogfood harness; external projects should prefer `vrt baseline` /
-  `vrt diff-pr`.
-- **API**: `vrt api {serve,status}` for HTTP integrations.
+The CLI is organized into verb groups. Run `vrt <group> --help` for
+options.
+
+| Group | Subcommands |
+|---|---|
+| `vrt diff` | `html`, `png`, `elements`, `browsers`, `agent`, `runs` |
+| `vrt check` | `a11y {contrast,touch,focus}`, `tokens`, `theme`, `perf`, `drift {component,pages}` |
+| `vrt inspect` | `interact`, `explore`, `smoke` |
+| `vrt stress` | `i18n`, `media` |
+| `vrt scan` | `component`, `breakpoints` |
+| `vrt build` | `component` |
+| `vrt snapshot` | `[<url>...]`, `approve`, `fix-prompt`, `stability`, `flipbook`, `report` |
+| `vrt migration` | `compare`, `blind`, `subagent` |
+| `vrt workflow` | `init`, `capture`, `verify`, `approve`, `graph`, `affected`, `introspect`, `spec-verify`, `expect` |
+| Standalone | `vrt watch`, `vrt manifest`, `vrt diff-pr`, `vrt baseline`, `vrt api`, `vrt bench`, `vrt report`, `vrt skill` |
+
+The single-token commands from 0.4.x (`vrt compare`, `vrt png-diff`,
+`vrt theme-parity`, …) remain as deprecation shims that forward to
+the new names and print a one-line hint. See the [CHANGELOG](./CHANGELOG.md)
+for the full old → new mapping.
 
 ## Features
 
@@ -45,13 +59,17 @@ pnpm install
 pnpm test
 
 # Compare two HTML files
-vrt compare before.html after.html
+vrt diff html before.html after.html --output reports/
+
+# Render the diff into an agent-friendly Markdown report
+vrt diff agent reports/diff-report.json > reports/diff.md
 
 # Compare two existing PNG screenshots without Playwright
-vrt png-diff baselines/home.png snapshots/home.png
+vrt diff png baselines/home.png snapshots/home.png
 
 # Compare two URLs
-vrt compare --url http://localhost:3000/ --current-url http://localhost:8080/
+vrt diff html --url http://localhost:3000/ --current-url http://localhost:8080/ \
+  --output reports/
 
 # Snapshot URLs (creates baseline on first run, diffs on subsequent runs)
 vrt snapshot http://localhost:3000/ http://localhost:3000/about/ --output snapshots/
@@ -69,7 +87,7 @@ vrt snapshot approve --output snapshots/
 vrt snapshot
 
 # Dev inner loop with rich signal output (token-aware + cross-round)
-vrt compare baseline.html variant.html --tokens DESIGN.md
+vrt diff html baseline.html variant.html --tokens DESIGN.md --output reports/
 vrt watch baseline.html variant.html --tokens DESIGN.md
 
 # Author approval rules (sub-pixel deviations, intentional design exceptions, etc.)
@@ -109,7 +127,7 @@ pkf run migration-blind-evaluate --scenario shadcn-to-luna -- --before-report te
 vrt snapshot http://localhost:3000/ --mask ".marquee-container,.hero-badge"
 
 # Detect broken baseline renders (e.g. CDN failed to load) — on by default
-vrt compare --dir fixtures/migration/tailwind-to-vanilla \
+vrt diff html --dir fixtures/migration/tailwind-to-vanilla \
   --baseline before.html --variants after.html
 # Add --strict-baseline-sanity to exit non-zero when warnings fire,
 # or --no-baseline-sanity to skip the check entirely.
@@ -150,55 +168,61 @@ nix run git+https://github.com/mizchi/pkspec  -- check Spec.pkl Test.pkl
 
 ## CLI Surface
 
-### Core Commands
+### Diff (compare two things)
 
 ```bash
-vrt compare <before.html> <after.html>      # Migration VRT for files or URLs
-                                             # ([--strict-baseline-sanity] to fail on broken baseline renders)
-vrt diff-for-agent <migration-report.json>  # Agent-friendly Markdown summary of a compare report
-vrt png-diff <baseline.png> <current.png>   # Direct PNG pixel diff + heatmap
-vrt snapshot <url1> [url2] ...              # Multi-viewport snapshot + diff
-vrt snapshot approve                        # Promote *-current.png to *-baseline.png
+vrt diff html <baseline> <variant>          # HTML/URL pair → multi-viewport diff + report.json
+vrt diff agent <report.json>                # Render report.json as agent-friendly Markdown
+vrt diff png <baseline.png> <current.png>   # Direct PNG pixel diff + heatmap
+vrt diff elements [options]                 # Element-level diff with shift isolation
+vrt diff browsers <html|url>                # chromium / firefox / webkit parity
+vrt diff runs <dir...>                      # Aggregate multiple VRT runs into one table
+```
+
+### Snapshot (URL → baseline + diff)
+
+```bash
+vrt snapshot <url1> [url2] ...              # First run: baseline. Subsequent: baseline + diff
+vrt snapshot approve                        # Promote *-current.png → *-baseline.png
 vrt snapshot fix-prompt                     # Emit a subagent-ready prompt from snapshot-report.json
 vrt snapshot stability <url...>             # Run N iterations and report false-positive rate
 vrt snapshot flipbook                       # Diff three-frame (baseline ↔ current ↔ heatmap) HTML flipbooks
-vrt flipbook <frame1.png> ...               # Assemble arbitrary PNG sequence into a single-file HTML flipbook
-vrt smoke --record-video <dir>              # Capture a WebM video of the smoke-test session (Playwright recordVideo)
-vrt elements [options]                      # Element-level diff with shift isolation
-vrt smoke <file-or-url>                     # A11y-driven random interaction test
-vrt discover <html-file>                    # Breakpoint discovery from HTML/CSS
-vrt bench [options]                         # CSS challenge benchmark
-vrt report                                  # Detection pattern report
+vrt snapshot report                         # Render snapshot-report.json as Markdown
 ```
 
-### Markup-Assistance Commands
+### Check (gates: a11y / tokens / theme / perf / drift)
 
-Built on the same Playwright + pixel-diff foundation, these commands cover the
-LLM-agent markup-authoring loop: build from a screenshot, verify the result,
-catch a11y / theme / i18n / cross-browser regressions before they ship.
+```bash
+vrt check a11y contrast <html>              # WCAG AA contrast scan
+vrt check a11y touch    <html|url>          # Touch target size (WCAG 2.5.5 / 2.5.8)
+vrt check a11y focus    <html|url>          # Tab order vs visual order
+vrt check tokens        <html>              # radius/spacing/z-index/shadow scale conformance
+vrt check theme         <html>              # prefers-color-scheme dark / unthemed components
+vrt check perf          <html|url>          # Web Vitals (CLS / LCP / FCP)
+vrt check drift component <html> --selector .card
+vrt check drift pages     --selector .footer --files A.html B.html C.html
+```
+
+### Build / Scan / Inspect / Stress (markup-assistance)
 
 ```bash
 # Build component from a target screenshot, iterate until close.
-vrt component-from-image <target.png> <current.html>
+vrt build component <target.png> <current.html>
   # signals: bbox + heatmap regions + dominant fill + typography hints
   # + spacing-fix table + palette diff + multi-state suspect flags.
 
-# Verify a fully-built page.
-vrt theme-parity      <html>            # prefers-color-scheme dark / unthemed components
-vrt media-variants    <html>            # forced-colors, reduced-motion, print, RTL, 200% zoom
-vrt cross-browser     <html|url>        # chromium / firefox / webkit parity
-vrt i18n-stress       <html>            # text-node inflation overflow detection
-vrt design-tokens     <html>            # radius/spacing/z-index/shadow scale conformance
-vrt a11y-contrast     <html>            # WCAG AA contrast scan
-vrt a11y-touch        <html|url>        # touch target size (WCAG 2.5.5 / 2.5.8)
-vrt a11y-focus-order  <html|url>        # Tab order vs visual order
+# Detect components in a screenshot.
+vrt scan component <screenshot.png>         # Crop to standalone PNGs
+vrt scan breakpoints <html-file>            # Discover responsive breakpoints
 
-# Drift checks.
-vrt multi-page-consistency --selector .footer --files A.html B.html C.html
-vrt component-consistency  <html> --selector .card
+# Scripted / exploratory interaction.
+vrt inspect interact <html|url> --sequence <path.json>
+vrt inspect explore  <html|url>             # Auto-discover declared actions and diff each
+vrt inspect smoke    <html|url>             # A11y-driven exploratory smoke test
 
-# Scripted UI interactions (dropdowns, forms, scroll, multi-step flows).
-vrt interact <html|url> --sequence <path.json>
+# Stress tests.
+vrt stress i18n  <html>                     # Text-node inflation overflow detection
+vrt stress media <html>                     # forced-colors, reduced-motion, print, RTL, 200% zoom
 ```
 
 All emit a self-contained Markdown report under `--output-dir`. Each
@@ -312,7 +336,7 @@ PRs:
 
 ```bash
 # 1. Fix-loop convergence (or any ordered PNG sequence)
-vrt flipbook round-0.png round-1.png round-2.png \
+vrt snapshot flipbook round-0.png round-1.png round-2.png \
   --label "round 0" --label "round 1" --label "round 2" \
   --title "Fix-loop convergence" --out fix-loop.html
 
@@ -326,7 +350,7 @@ vrt snapshot stability http://localhost:3000/ \
 # → test-results/stability/flipbooks/<label>-<viewport>-stability.html
 
 # 4. WebM recording of a smoke-test session (Playwright recordVideo)
-vrt smoke --url http://localhost:3000/ --max-actions 20 --record-video videos/
+vrt inspect smoke --url http://localhost:3000/ --max-actions 20 --record-video videos/
 # → videos/<hash>.webm
 ```
 
@@ -335,17 +359,17 @@ Common flags: `--delay <ms>` controls per-frame duration (default 700),
 
 #### Agent-friendly diff summary
 
-When a coding agent is iterating with `vrt compare`, the natural workflow
+When a coding agent is iterating with `vrt diff html`, the natural workflow
 (see [`docs/reports/2026-05-12-dogfood-shadcn-luna.md`](docs/reports/2026-05-12-dogfood-shadcn-luna.md))
 is: read the worst-viewport PNGs side-by-side, then write a CSS patch.
-`vrt diff-for-agent` collapses the inputs the agent needs into a single
+`vrt diff agent` collapses the inputs the agent needs into a single
 Markdown blob:
 
 ```bash
-vrt compare --dir fixtures/migration/shadcn-to-luna \
+vrt diff html --dir fixtures/migration/shadcn-to-luna \
   --baseline before.html --variants working.html \
-  --output-dir test-results/iter1
-vrt diff-for-agent test-results/iter1/migration-report.json --max-viewports 2
+  --output test-results/iter1
+vrt diff agent test-results/iter1/diff-report.json --max-viewports 2
 ```
 
 The output contains: a worst-first diff table, category totals across

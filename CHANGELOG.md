@@ -1,6 +1,100 @@
 # Changelog
 
-## Unreleased — design-md scenario branch (2026-05-15)
+All notable changes to this project will be documented in this file.
+Dates are YYYY-MM-DD.
+
+## 0.5.0 — 2026-05-19 (first public release)
+
+The internal 0.4.x history is preserved in commits; npm publication
+starts here. Two work streams since `0.4.0` rolled up under this
+release: the **0.5.0 CLI restructure + dispatcher rewrite** (this
+section) and the prior **design-md / markup-assistance** sections
+below.
+
+### CLI restructure — verb groups
+
+Every command now lives under a verb group. Single-token names from
+0.4.x remain as deprecation shims that print a one-line hint and
+forward.
+
+| Old | New |
+|---|---|
+| `vrt compare` | `vrt diff html` |
+| `vrt png-diff` | `vrt diff png` |
+| `vrt elements` | `vrt diff elements` |
+| `vrt cross-browser` | `vrt diff browsers` |
+| `vrt diff-for-agent` | `vrt diff agent` |
+| `vrt compare-runs` | `vrt diff runs` |
+| `vrt a11y-{contrast,touch,focus-order}` | `vrt check a11y {contrast,touch,focus}` |
+| `vrt design-tokens` | `vrt check tokens` |
+| `vrt theme-parity` | `vrt check theme` |
+| `vrt perf` | `vrt check perf` |
+| `vrt {component,multi-page}-consistency` | `vrt check drift {component,pages}` |
+| `vrt interact` / `vrt explore` / `vrt smoke` | `vrt inspect {interact,explore,smoke}` |
+| `vrt i18n-stress` / `vrt media-variants` | `vrt stress {i18n,media}` |
+| `vrt component-extract` | `vrt scan component` |
+| `vrt component-from-image` | `vrt build component` |
+| `vrt flipbook` | `vrt snapshot flipbook` |
+| `vrt migration {compare,blind,subagent}` | unchanged (already grouped) |
+| `vrt snapshot`, `vrt workflow`, `vrt manifest`, `vrt watch`, `vrt diff-pr`, `vrt baseline` | unchanged |
+
+### Dispatcher rewrite for bundled `dist/vrt.mjs`
+
+`src/cli/cli.ts` previously routed leaves via
+`import.meta.resolve(<source-relative-path>)`, which only worked from
+the source tree. The bundled binary failed with
+`ERR_MODULE_NOT_FOUND` on every leaf. Rewritten in this release:
+
+- SPECS is a `{ name, loader }` map where `loader` is a
+  `() => import("literal-path")` closure. tsdown statically discovers
+  the import and code-splits each leaf into a chunk under `dist/`.
+- A per-leaf signal (`__VRT_DISPATCHER_LEAF__=<name>`) replaces the
+  earlier `process.argv` swap. Each leaf's CLI-entry guard checks the
+  env var against its *own* name, so cross-leaf static imports
+  (e.g. `diff-pr.ts` ↔ `media-variants.ts` for shared types) don't
+  accidentally fire a sibling's `main()`.
+- `scripts/smoke-dist.sh` runs strict by default and gates every
+  documented subcommand.
+
+### Workspace packages published
+
+`@mizchi/vrt-core`, `@mizchi/vrt-capture`, `@mizchi/vrt-ai`, and
+`@mizchi/vrt-markup` all 0.5.0. Each ships raw `.ts` via the `exports`
+map — consumers need Node 24+ with `--experimental-strip-types`, or a
+bundler that resolves `.ts` extensions. The packages expose both a
+curated barrel and deep per-module exports (e.g.
+`@mizchi/vrt-core/png-diff.ts`).
+
+### Agent skills (APM-distributable)
+
+Five skill packs at `.claude/skills/`:
+
+- `vrt-visual-diff` — `vrt diff html` → `vrt diff agent` workflow.
+- `vrt-migration-eval` — `vrt migration compare|blind|subagent`.
+- `vrt-markup-synth` — five DOM/pixel-based signal tools (no VLM).
+- `vrt-regression-watch` — stateful `--previous` / `--persist-summary`.
+- `vrt-css-fix-loop` — VLM + LLM 2-stage repair loop.
+
+Install via `apm install mizchi/vrt/.claude/skills/<name>` (or pin to
+`@v0.5.0`).
+
+### Diff-report filename
+
+`vrt diff html` / `vrt migration compare` now write both
+`diff-report.json` (canonical, prefer this) and
+`migration-report.json` (legacy alias, byte-identical). Pinning the
+canonical name lets the legacy alias be removed in a future major.
+
+### Repo / task-runner
+
+Migrated from `justfile` to `Taskfile.pkl` (pkfire). Doc snippets
+across the repo and CLAUDE.md now read `pkf run <task>`. Tasks that
+take positional flags carry `acceptsArgs = true`; tasks with named
+params use the `--<param> <value>` syntax.
+
+---
+
+## 0.5.0 — design-md scenario branch (2026-05-15)
 
 A single branch of work — `claude/design-md-scenario-2026-05-15` —
 turning vrt from a single-shot diff tool into a complete UI-regression
@@ -136,7 +230,7 @@ Detailed analysis of each validation run is under
 report quotes the agent's friction verbatim and records what was
 fixed in response.
 
-## Unreleased — Markup-assistance toolkit
+## 0.5.0 — Markup-assistance toolkit (2026-05-13)
 
 A new suite of commands focused on the LLM-agent markup-authoring loop:
 build from screenshot, verify a11y / theme / i18n / cross-browser
