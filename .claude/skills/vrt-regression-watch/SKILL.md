@@ -61,8 +61,9 @@ from triggering false alarms.
 ## Quickstart
 
 `--output <dir>` is a **directory** path; `vrt diff html` writes
-`<dir>/migration-report.json` into it. Pass that JSON file path —
-not the dir — to `vrt diff agent`.
+`<dir>/diff-report.json` into it. Pass that JSON file path — not
+the dir — to `vrt diff agent`. (`migration-report.json` is also
+written as a legacy alias; both files have identical content.)
 
 The filename is `migration-report.json` even when there's no migration
 involved because the writer is shared with `vrt migration compare`.
@@ -74,7 +75,7 @@ A no-op re-run (same inputs both times) is guaranteed to produce
 wiring the workflow into CI.
 
 ```bash
-REPORT=reports/migration-report.json
+REPORT=reports/diff-report.json
 
 # First run: establishes baseline. No banner possible (no prior summary).
 vrt diff html before.html after.html --output reports/
@@ -125,7 +126,7 @@ Two retention strategies:
 - name: Render current PR + diff
   run: |
     vrt diff html main.html pr.html --output reports/
-    vrt diff agent reports/migration-report.json \
+    vrt diff agent reports/diff-report.json \
       --previous .vrt/baseline.json \
       --persist-summary /tmp/pr-summary.json \
       --fail-on-regression \

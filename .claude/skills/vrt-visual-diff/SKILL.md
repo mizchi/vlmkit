@@ -65,8 +65,10 @@ skill assume one of these two forms.
 ## Quickstart
 
 `--output <dir>` is a **directory** path; the diff writes
-`<dir>/migration-report.json` (+ per-viewport PNGs) into it. Feed
-that JSON path — not the dir — to `vrt diff agent`.
+`<dir>/diff-report.json` (+ per-viewport PNGs) into it. Feed that
+JSON path — not the dir — to `vrt diff agent`. (`migration-report.json`
+is still written alongside as a legacy alias for callers pinning
+the old name; the two files are byte-identical.)
 
 The filename is `migration-report.json` even on this non-migration
 path because the writer is shared with `vrt migration compare`. The
@@ -75,16 +77,16 @@ you came here via `diff html` or `migration compare`. (Tracked for
 rename in #50.)
 
 ```bash
-# Local HTML pair → writes reports/migration-report.json
+# Local HTML pair → writes reports/diff-report.json
 vrt diff html before.html after.html --output reports/
-vrt diff agent reports/migration-report.json > reports/diff.md
+vrt diff agent reports/diff-report.json > reports/diff.md
 
 # URL pair (e.g. before/after a code change on the dev server)
 vrt diff html \
   --url http://localhost:3000/ \
   --current-url http://localhost:8080/ \
   --output reports/
-vrt diff agent reports/migration-report.json
+vrt diff agent reports/diff-report.json
 
 # Mask dynamic regions. The value is one quoted, comma-separated CSS
 # selector list — shell-quoting is required so commas don't split args.
