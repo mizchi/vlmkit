@@ -52,10 +52,34 @@ test("pixel goal remains strict for screenshot reproduction", () => {
   assert.equal(result.primaryMetric, "pixel");
 });
 
+test("app-shell goal fails when an explicit scrollport is broken", () => {
+  const result = evaluateComponentGoal({
+    goal: "app-shell",
+    pixelDiffRatio: 0.04,
+    landscapeDiffRatio: 0.0014,
+    scrollports: { total: 3, ok: 2, broken: 1, empty: 0 },
+  });
+
+  assert.equal(result.status, "fail");
+  assert.equal(result.primaryMetric, "landscape");
+  assert.match(result.summary, /scrollports 2\/3 ok, 1 broken/);
+});
+
+test("app-shell goal sends missing scrollport evidence to review", () => {
+  const result = evaluateComponentGoal({
+    goal: "app-shell",
+    pixelDiffRatio: 0.02,
+    landscapeDiffRatio: 0.001,
+  });
+
+  assert.equal(result.status, "review");
+  assert.match(result.summary, /no explicit scrollports/);
+});
+
 test("unknown goal falls back to app profile", () => {
   assert.equal(getComponentGoalProfile("unknown").goal, "app");
 });
 
 test("goal list is stable for CLI help", () => {
-  assert.deepEqual(listComponentGoals(), ["app", "layout", "pixel", "draft"]);
+  assert.deepEqual(listComponentGoals(), ["app", "layout", "pixel", "draft", "app-shell"]);
 });

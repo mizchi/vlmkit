@@ -152,8 +152,9 @@ density. Name which panels scroll independently.
 
 ### Goal
 
-既存の `--goal layout` を使いつつ、手動 checklist で shell invariant を見る。
-将来的には `app-shell` profile が必要。
+`--goal app-shell` を使い、visual layout と explicit scrollport evidence を
+同時に見る。手動 checklist は selected / unread / scrolled state など、まだ
+goal に入っていない shell invariant を補う。
 
 `app-shell` profile では、pixel diff より次を強く評価する:
 
@@ -273,5 +274,5 @@ landing では hero/CTA weighting、game では interaction/state gate を足さ
 2026-05-20 の non-blog dogfood では、landing と game は既存 goal で visual
 pass した。一方で app-shell は `layout` pass のまま message scrollport が
 壊れていた。これを受けて `build component` に explicit scrollport inspector
-を追加した。次は `landing`, `app-shell`, `canvas` の pattern-specific goal
-profile に昇格する。
+と `--goal app-shell` を追加した。次は `landing` と `canvas` の
+pattern-specific goal profile に昇格する。

@@ -7,9 +7,9 @@ Current: `/Users/mz/ghq/github.com/mizchi/vlmkit/design-runs/patterns-20260520/a
 
 **Landscape diff**: 0.14% coarse (99.86% similarity, 0/160 changed cells, 16×10 grid)
 
-**Goal**: `layout` (Layout first) — **pass**
+**Goal**: `app-shell` (App shell) — **fail**
 
-Layout first pass: landscape 0.14% <= 3.00%
+App shell fail: landscape 0.14% <= 5.00%, scrollports 2/3 ok, 1 broken
 
 - Target:   `/Users/mz/ghq/github.com/mizchi/vlmkit/design-runs/patterns-20260520/app-shell/target.png`
 - Current:  `/Users/mz/ghq/github.com/mizchi/vlmkit/design-runs/patterns-20260520/app-shell/reports/component/current.png`

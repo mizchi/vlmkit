@@ -31,7 +31,7 @@ node src/cli/vlmkit.ts build component \
 node src/cli/vlmkit.ts build component \
   design-runs/patterns-20260520/app-shell/target.png \
   design-runs/patterns-20260520/app-shell/current.html \
-  --goal layout \
+  --goal app-shell \
   --output-dir design-runs/patterns-20260520/app-shell/reports/component
 
 node src/cli/vlmkit.ts build component \
@@ -48,19 +48,19 @@ node design-runs/patterns-20260520/check-patterns.mjs
 | Pattern | Goal result | Component metrics | Pattern checks |
 |---|---|---|---|
 | landing | `app` pass | pixel 8.00%, landscape 1.12% | CTA in first viewport, next-section hint, media slot all pass |
-| app-shell | `layout` pass | pixel 4.00%, landscape 0.14% | channels and members scroll; messages is broken |
+| app-shell | `app-shell` fail | pixel 4.00%, landscape 0.14% | channels and members scroll; messages is broken |
 | game | `draft` pass | pixel 0.95%, landscape 0.02% | canvas nonblank, frame delta, input response all pass |
 
 The app-shell case is the important Red:
 
 ```text
-Layout first pass: landscape 0.14% <= 3.00%
+App shell fail: landscape 0.14% <= 5.00%, scrollports 2/3 ok, 1 broken
 scrollports: 2/3 ok, 1 broken
 ```
 
-The visual report passed because the viewport shell looked close enough. The
-actual UI was still broken: `messages` had overflowing content but
-`overflow-y: visible`, so the message list was not an independent scrollport.
+The visual layout is close enough, but the goal now fails because the actual UI
+is broken: `messages` has overflowing content and `overflow-y: visible`, so the
+message list is not an independent scrollport.
 
 ## Findings
 
@@ -98,8 +98,8 @@ Current report evidence:
 | broken | `messages` | 336,58 848x769 | visible/visible | 848x769 | 848x1335 | content overflows but overflow is not scrollable |
 ```
 
-This should become part of an `app-shell` goal profile. A shell with expected
-scrollports should not pass only because landscape is close.
+This is now part of the `app-shell` goal profile. A shell with expected
+scrollports does not pass only because landscape is close.
 
 ### Finding 3: game/canvas needs a different command family
 
@@ -149,13 +149,18 @@ Added scrollport reporting to `vlmkit build component`:
   - `empty`: marked as scrollport but content does not overflow
 - print CLI summary, e.g. `scrollports: 2/3 ok, 1 broken`
 
+Added `--goal app-shell`:
+
+- uses the same broad landscape threshold as layout-first app shells;
+- fails when any explicit scrollport is broken;
+- sends missing or empty scrollport evidence to review instead of pass.
+
 ## Next implementation candidates
 
-1. Add `app-shell` goal profile that fails when expected scrollports are broken.
-2. Add `landing` goal profile with CTA / first-viewport / media-slot gates.
-3. Add contract fields for `pattern`, `expectedScrollports`, and required states.
-4. Add scrolled-state snapshots for app shells.
-5. Add `build interactive` / `canvas` mode for nonblank, frame delta, input
+1. Add `landing` goal profile with CTA / first-viewport / media-slot gates.
+2. Add contract fields for `pattern`, `expectedScrollports`, and required states.
+3. Add scrolled-state snapshots for app shells.
+4. Add `build interactive` / `canvas` mode for nonblank, frame delta, input
    response, HUD overlap, and asset visibility.
 
 ## Verification
@@ -163,7 +168,7 @@ Added scrollport reporting to `vlmkit build component`:
 ```bash
 node --test packages/vlmkit-markup/src/component/semantic-drilldown.test.ts
 node --test packages/vlmkit-markup/src/component/component-from-image.test.ts
-node src/cli/vlmkit.ts build component design-runs/patterns-20260520/app-shell/target.png design-runs/patterns-20260520/app-shell/current.html --goal layout --output-dir design-runs/patterns-20260520/app-shell/reports/component
+node --test packages/vlmkit-markup/src/component/component-goal.test.ts
+node src/cli/vlmkit.ts build component design-runs/patterns-20260520/app-shell/target.png design-runs/patterns-20260520/app-shell/current.html --goal app-shell --output-dir design-runs/patterns-20260520/app-shell/reports/component
 node design-runs/patterns-20260520/check-patterns.mjs
 ```
-

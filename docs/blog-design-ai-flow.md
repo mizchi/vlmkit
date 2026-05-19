@@ -319,6 +319,7 @@ node src/cli/vlmkit.ts build component \
 | `layout` | landscape | landscape <= 3% | landscape <= 5% | レイアウト/ランドマークだけを先に合わせる |
 | `pixel` | pixel | pixel <= 3%, landscape <= 1% | pixel <= 8%, landscape <= 3% | Figma export や deterministic UI の再現 |
 | `draft` | landscape | landscape <= 6%, pixel <= 35% | landscape <= 8%, pixel <= 45% | 早い mock 探索 |
+| `app-shell` | landscape + scrollports | landscape <= 3%, broken scrollport なし | landscape <= 5%, scrollport evidence 要確認 | sidebar/app shell 用 |
 
 このフローの現実的な初期値は `--goal app`。ピクセルパーフェクトではなく、
 「使える画面として成立し、主要ランドマークが近い場所にあり、過剰な空白や

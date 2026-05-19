@@ -63,6 +63,7 @@ import {
   evaluateComponentGoal,
   listComponentGoals,
   type ComponentGoalEvaluation,
+  type ComponentScrollportEvidence,
 } from "./component-goal.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -307,10 +308,12 @@ export async function runComponentFromImage(
     const totalPixels = diff?.totalPixels ?? (viewport.width * viewport.height);
     const heatmapPath = join(outputDir, "component_heatmap.png");
     const landscapeDiff = await compareLandscapeFromPngFiles(targetCopyPath, currentPath);
+    const scrollportEvidence = summarizeScrollportEvidence(scrollportRegions);
     const goalEvaluation = evaluateComponentGoal({
       goal: options.goal,
       pixelDiffRatio: diffRatio,
       landscapeDiffRatio: landscapeDiff.score,
+      scrollports: scrollportEvidence,
     });
 
     // All image-only signals run identically on both files.
@@ -580,9 +583,8 @@ export async function runComponentFromImage(
     }
     console.log(`  ${DIM}bbox: ${bboxMatches.length}, heatmap: ${heatmapRegions.length}, text-rows ${targetRows.length}/${currentRows.length}, palette missing: ${paletteDiff.onlyInBaseline.length}${RESET}`);
     if (scrollportRegions.length > 0) {
-      const ok = scrollportRegions.filter((region) => describeScrollportStatus(region).status === "ok").length;
-      const broken = scrollportRegions.filter((region) => describeScrollportStatus(region).status === "broken").length;
-      console.log(`  ${DIM}scrollports: ${ok}/${scrollportRegions.length} ok${broken > 0 ? `, ${broken} broken` : ""}${RESET}`);
+      const evidence = summarizeScrollportEvidence(scrollportRegions);
+      console.log(`  ${DIM}scrollports: ${formatScrollportEvidence(evidence)}${RESET}`);
     }
     if (stateResults.length > 0) {
       for (const s of stateResults) {
@@ -615,6 +617,27 @@ export async function runComponentFromImage(
   } finally {
     await browser.close();
   }
+}
+
+function summarizeScrollportEvidence(regions: ScrollportRegion[]): ComponentScrollportEvidence {
+  const evidence: ComponentScrollportEvidence = {
+    total: regions.length,
+    ok: 0,
+    broken: 0,
+    empty: 0,
+  };
+  for (const region of regions) {
+    const status = describeScrollportStatus(region).status;
+    evidence[status]++;
+  }
+  return evidence;
+}
+
+function formatScrollportEvidence(evidence: ComponentScrollportEvidence): string {
+  const parts = [`${evidence.ok}/${evidence.total} ok`];
+  if (evidence.broken > 0) parts.push(`${evidence.broken} broken`);
+  if (evidence.empty > 0) parts.push(`${evidence.empty} empty`);
+  return parts.join(", ");
 }
 
 interface RenderInput {

@@ -80,6 +80,7 @@ Current profiles:
 | `layout` | landscape | landscape <= 3% | landscape <= 5% | geometry/order first, decoration later |
 | `pixel` | pixel | pixel <= 3%, landscape <= 1% | pixel <= 8%, landscape <= 3% | deterministic screenshot reproduction |
 | `draft` | landscape | landscape <= 6%, pixel <= 35% | landscape <= 8%, pixel <= 45% | early mock exploration |
+| `app-shell` | landscape + scrollports | landscape <= 3%, no broken scrollports | landscape <= 5%, no missing/empty scrollport evidence | persistent sidebar/app shells |
 
 The default is `app`. In dogfood, the blog mock converged to:
 

@@ -1,4 +1,4 @@
-export const COMPONENT_GOALS = ["app", "layout", "pixel", "draft"] as const;
+export const COMPONENT_GOALS = ["app", "layout", "pixel", "draft", "app-shell"] as const;
 
 export type ComponentGoal = typeof COMPONENT_GOALS[number];
 export type ComponentGoalStatus = "pass" | "review" | "fail";
@@ -29,6 +29,13 @@ export interface ComponentGoalEvaluation {
   pass: ComponentGoalProfile["pass"];
   review: ComponentGoalProfile["review"];
   summary: string;
+}
+
+export interface ComponentScrollportEvidence {
+  total: number;
+  ok: number;
+  broken: number;
+  empty: number;
 }
 
 const GOAL_PROFILES: Record<ComponentGoal, ComponentGoalProfile> = {
@@ -64,6 +71,14 @@ const GOAL_PROFILES: Record<ComponentGoal, ComponentGoalProfile> = {
     pass: { landscape: 0.06, pixel: 0.35 },
     review: { landscape: 0.08, pixel: 0.45 },
   },
+  "app-shell": {
+    goal: "app-shell",
+    label: "App shell",
+    primaryMetric: "landscape",
+    description: "Persistent viewport shell convergence with explicit scrollport behavior.",
+    pass: { landscape: 0.03 },
+    review: { landscape: 0.05 },
+  },
 };
 
 export function listComponentGoals(): ComponentGoal[] {
@@ -82,13 +97,15 @@ export function evaluateComponentGoal(input: {
   goal?: string;
   pixelDiffRatio: number;
   landscapeDiffRatio: number;
+  scrollports?: ComponentScrollportEvidence;
 }): ComponentGoalEvaluation {
   const profile = getComponentGoalProfile(input.goal);
-  const status = passesAll(profile.pass, input)
+  const thresholdStatus: ComponentGoalStatus = passesAll(profile.pass, input)
     ? "pass"
     : passesAll(profile.review, input)
       ? "review"
       : "fail";
+  const status = applyPatternGates(profile, thresholdStatus, input);
   return {
     goal: profile.goal,
     label: profile.label,
@@ -100,6 +117,23 @@ export function evaluateComponentGoal(input: {
     review: profile.review,
     summary: summarizeEvaluation(profile, status, input),
   };
+}
+
+function applyPatternGates(
+  profile: ComponentGoalProfile,
+  status: ComponentGoalStatus,
+  input: {
+    scrollports?: ComponentScrollportEvidence;
+  },
+): ComponentGoalStatus {
+  if (profile.goal !== "app-shell") return status;
+  const scrollports = input.scrollports;
+  if (!scrollports || scrollports.total === 0) {
+    return status === "pass" ? "review" : status;
+  }
+  if (scrollports.broken > 0) return "fail";
+  if (scrollports.empty > 0 && status === "pass") return "review";
+  return status;
 }
 
 function passesAll(
@@ -118,7 +152,11 @@ function passesAll(
 function summarizeEvaluation(
   profile: ComponentGoalProfile,
   status: ComponentGoalStatus,
-  input: { pixelDiffRatio: number; landscapeDiffRatio: number },
+  input: {
+    pixelDiffRatio: number;
+    landscapeDiffRatio: number;
+    scrollports?: ComponentScrollportEvidence;
+  },
 ): string {
   const target = status === "pass" ? profile.pass : profile.review;
   const clauses: string[] = [];
@@ -128,8 +166,19 @@ function summarizeEvaluation(
   if (target.pixel !== undefined) {
     clauses.push(`pixel ${formatPct(input.pixelDiffRatio)} <= ${formatPct(target.pixel)}`);
   }
+  if (profile.goal === "app-shell") {
+    clauses.push(summarizeScrollports(input.scrollports));
+  }
   const suffix = clauses.length > 0 ? `: ${clauses.join(", ")}` : "";
   return `${profile.label} ${status}${suffix}`;
+}
+
+function summarizeScrollports(scrollports: ComponentScrollportEvidence | undefined): string {
+  if (!scrollports || scrollports.total === 0) return "no explicit scrollports";
+  const parts = [`scrollports ${scrollports.ok}/${scrollports.total} ok`];
+  if (scrollports.broken > 0) parts.push(`${scrollports.broken} broken`);
+  if (scrollports.empty > 0) parts.push(`${scrollports.empty} empty`);
+  return parts.join(", ");
 }
 
 export function formatPct(ratio: number): string {

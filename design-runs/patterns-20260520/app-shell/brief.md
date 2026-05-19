@@ -16,6 +16,6 @@ right detail panel, selected state.
 
 ## Expected signal
 
-`--goal layout` should catch broad shell drift, but it cannot yet prove nested
-scroll behavior. The dogfood script checks scrollport invariants separately.
-
+`--goal app-shell` should catch broad shell drift and explicit scrollport
+breakage. The dogfood script still checks scrollport invariants separately as a
+pattern-specific oracle.
