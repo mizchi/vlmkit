@@ -110,9 +110,8 @@ Keep all sections expressible as semantic HTML plus CSS grid/flex.
 
 ### Goal
 
-現在は `--goal app` から始める。将来的には `landing` profile を足し、
-landscape と CTA/hero visibility を重く、media texture の pixel diff を軽く
-見る。
+現在は `--goal landing` を使う。landscape と CTA/hero visibility を重く、
+media texture の pixel diff を軽く見る。
 
 ## Sidebar app shell
 
@@ -274,5 +273,6 @@ landing では hero/CTA weighting、game では interaction/state gate を足さ
 2026-05-20 の non-blog dogfood では、landing と game は既存 goal で visual
 pass した。一方で app-shell は `layout` pass のまま message scrollport が
 壊れていた。これを受けて `build component` に explicit scrollport inspector
-と `--goal app-shell` を追加した。次は `landing` と `canvas` の
-pattern-specific goal profile に昇格する。
+と `--goal app-shell` を追加した。その後、landing first-viewport gates を
+`--goal landing` に昇格した。次は `canvas` の pattern-specific goal
+profile に昇格する。

@@ -127,3 +127,53 @@ test("renderReportMarkdown includes explicit scrollport diagnostics", () => {
   assert.match(markdown, /\| broken \| `messages` \|/);
   assert.match(markdown, /content overflows but overflow is not scrollable/);
 });
+
+test("renderReportMarkdown includes landing first-viewport diagnostics", () => {
+  const markdown = renderReportMarkdown({
+    targetImage: "/tmp/target.png",
+    currentHtml: "/tmp/current.html",
+    viewport: { width: 320, height: 240 },
+    diffPixels: 0,
+    totalPixels: 76800,
+    diffRatio: 0,
+    landscapeDiff: {
+      score: 0,
+      similarity: 1,
+      changedCells: 0,
+      totalCells: 1,
+      grid: { cols: 1, rows: 1 },
+      topCells: [],
+    },
+    goalEvaluation: {
+      goal: "landing",
+      label: "Landing page",
+      status: "pass",
+      summary: "Landing page pass",
+      primaryMetric: "landscape",
+    },
+    landmarkRegions: [],
+    scrollportRegions: [],
+    landingEvidence: {
+      heroVisible: true,
+      primaryCtaVisible: true,
+      nextSectionHintVisible: true,
+      mediaSlotVisible: true,
+    },
+    semanticDrilldown: [],
+    currentPath: "/tmp/current.png",
+    bboxMatches: [],
+    heatmapRegions: [],
+    textRowMatches: [],
+    rowGapDeltas: [],
+    typographyMismatches: [],
+    baselineRowCount: 0,
+    variantRowCount: 0,
+    paletteDiff: { onlyInBaseline: [], onlyInVariant: [] },
+    stateResults: [],
+    dpr: 1,
+  } as any);
+
+  assert.match(markdown, /## Landing inspector/);
+  assert.match(markdown, /\| Primary CTA visible \| ok \|/);
+  assert.match(markdown, /\| Next section hint visible \| ok \|/);
+});

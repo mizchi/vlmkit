@@ -7,9 +7,9 @@ Current: `/Users/mz/ghq/github.com/mizchi/vlmkit/design-runs/patterns-20260520/l
 
 **Landscape diff**: 1.12% coarse (98.88% similarity, 5/176 changed cells, 16×11 grid)
 
-**Goal**: `app` (Practical app) — **pass**
+**Goal**: `landing` (Landing page) — **pass**
 
-Practical app pass: landscape 1.12% <= 3.00%, pixel 8.00% <= 25.00%
+Landing page pass: landscape 1.12% <= 3.00%, pixel 8.00% <= 30.00%, landing hero ok, CTA ok, next hint ok, media slot ok
 
 - Target:   `/Users/mz/ghq/github.com/mizchi/vlmkit/design-runs/patterns-20260520/landing/target.png`
 - Current:  `/Users/mz/ghq/github.com/mizchi/vlmkit/design-runs/patterns-20260520/landing/reports/component/current.png`
@@ -47,6 +47,17 @@ No layout rows detected.
 | 102.0 | `complementary "Campaign preview"` | 682,144 699×590 | fluid-unbounded | bounded min 590px | none | grid | 7.9% | 100.0% | 7 landscape cell(s), 8 heatmap region(s) | fix colors / media / text styling after layout stabilizes |
 | 67.1 | `region "SignalDeck"` | 0,81 1440×724 | fluid-unbounded | content | none | grid | 8.0% | 65.1% | 8 landscape cell(s), 8 heatmap region(s) | fix colors / media / text styling after layout stabilizes |
 | 55.6 | `main "SignalDeck"` | 0,81 1440×879 | fluid-unbounded | content | none | grid | 8.0% | 53.6% | 8 landscape cell(s), 8 heatmap region(s) | fix colors / media / text styling after layout stabilizes |
+
+## Landing inspector
+
+Current DOM evidence for landing-page first-viewport gates. Use `data-primary-cta`, `data-next-section`, and `data-media-slot` to make the intended regions explicit.
+
+| Gate | Status |
+|---|---|
+| Hero visible | ok |
+| Primary CTA visible | ok |
+| Next section hint visible | ok |
+| Media slot visible | ok |
 
 ## Component bbox diff
 

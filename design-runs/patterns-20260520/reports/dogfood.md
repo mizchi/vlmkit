@@ -25,7 +25,7 @@ node design-runs/patterns-20260520/capture-targets.mjs
 node src/cli/vlmkit.ts build component \
   design-runs/patterns-20260520/landing/target.png \
   design-runs/patterns-20260520/landing/current.html \
-  --goal app \
+  --goal landing \
   --output-dir design-runs/patterns-20260520/landing/reports/component
 
 node src/cli/vlmkit.ts build component \
@@ -47,7 +47,7 @@ node design-runs/patterns-20260520/check-patterns.mjs
 
 | Pattern | Goal result | Component metrics | Pattern checks |
 |---|---|---|---|
-| landing | `app` pass | pixel 8.00%, landscape 1.12% | CTA in first viewport, next-section hint, media slot all pass |
+| landing | `landing` pass | pixel 8.00%, landscape 1.12% | CTA in first viewport, next-section hint, media slot all pass |
 | app-shell | `app-shell` fail | pixel 4.00%, landscape 0.14% | channels and members scroll; messages is broken |
 | game | `draft` pass | pixel 0.95%, landscape 0.02% | canvas nonblank, frame delta, input response all pass |
 
@@ -66,14 +66,14 @@ message list is not an independent scrollport.
 
 ### Finding 1: landing needs CTA/hero gates, not only landscape
 
-`--goal app` worked for the synthetic landing target:
+`--goal landing` worked for the synthetic landing target:
 
 - landscape 1.12% is low enough to trust the broad layout
 - pixel 8.00% reflects acceptable media/decorative drift
 - first viewport checks confirmed CTA, media slot, and next-section hint
 
-This suggests a future `landing` profile should keep landscape as a major
-signal but add product-specific gates:
+The `landing` profile keeps landscape as a major signal and adds
+product-specific gates:
 
 - primary CTA visible in first viewport
 - hero offer / product name visible
@@ -155,12 +155,18 @@ Added `--goal app-shell`:
 - fails when any explicit scrollport is broken;
 - sends missing or empty scrollport evidence to review instead of pass.
 
+Added `--goal landing`:
+
+- uses landscape + a looser pixel threshold for media/decorative drift;
+- checks current DOM evidence for hero, primary CTA, next-section hint, and
+  media slot;
+- fails when the primary CTA or hero is missing from the first viewport.
+
 ## Next implementation candidates
 
-1. Add `landing` goal profile with CTA / first-viewport / media-slot gates.
-2. Add contract fields for `pattern`, `expectedScrollports`, and required states.
-3. Add scrolled-state snapshots for app shells.
-4. Add `build interactive` / `canvas` mode for nonblank, frame delta, input
+1. Add contract fields for `pattern`, `expectedScrollports`, and required states.
+2. Add scrolled-state snapshots for app shells.
+3. Add `build interactive` / `canvas` mode for nonblank, frame delta, input
    response, HUD overlap, and asset visibility.
 
 ## Verification
@@ -169,6 +175,7 @@ Added `--goal app-shell`:
 node --test packages/vlmkit-markup/src/component/semantic-drilldown.test.ts
 node --test packages/vlmkit-markup/src/component/component-from-image.test.ts
 node --test packages/vlmkit-markup/src/component/component-goal.test.ts
+node src/cli/vlmkit.ts build component design-runs/patterns-20260520/landing/target.png design-runs/patterns-20260520/landing/current.html --goal landing --output-dir design-runs/patterns-20260520/landing/reports/component
 node src/cli/vlmkit.ts build component design-runs/patterns-20260520/app-shell/target.png design-runs/patterns-20260520/app-shell/current.html --goal app-shell --output-dir design-runs/patterns-20260520/app-shell/reports/component
 node design-runs/patterns-20260520/check-patterns.mjs
 ```

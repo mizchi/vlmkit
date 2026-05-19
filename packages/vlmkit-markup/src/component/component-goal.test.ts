@@ -76,10 +76,45 @@ test("app-shell goal sends missing scrollport evidence to review", () => {
   assert.match(result.summary, /no explicit scrollports/);
 });
 
+test("landing goal passes when first-viewport evidence is present", () => {
+  const result = evaluateComponentGoal({
+    goal: "landing",
+    pixelDiffRatio: 0.08,
+    landscapeDiffRatio: 0.0112,
+    landing: {
+      heroVisible: true,
+      primaryCtaVisible: true,
+      nextSectionHintVisible: true,
+      mediaSlotVisible: true,
+    },
+  });
+
+  assert.equal(result.status, "pass");
+  assert.equal(result.primaryMetric, "landscape");
+  assert.match(result.summary, /landing hero ok, CTA ok, next hint ok, media slot ok/);
+});
+
+test("landing goal fails when the primary CTA is not visible", () => {
+  const result = evaluateComponentGoal({
+    goal: "landing",
+    pixelDiffRatio: 0.04,
+    landscapeDiffRatio: 0.01,
+    landing: {
+      heroVisible: true,
+      primaryCtaVisible: false,
+      nextSectionHintVisible: true,
+      mediaSlotVisible: true,
+    },
+  });
+
+  assert.equal(result.status, "fail");
+  assert.match(result.summary, /CTA missing/);
+});
+
 test("unknown goal falls back to app profile", () => {
   assert.equal(getComponentGoalProfile("unknown").goal, "app");
 });
 
 test("goal list is stable for CLI help", () => {
-  assert.deepEqual(listComponentGoals(), ["app", "layout", "pixel", "draft", "app-shell"]);
+  assert.deepEqual(listComponentGoals(), ["app", "layout", "pixel", "draft", "app-shell", "landing"]);
 });

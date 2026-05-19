@@ -28,7 +28,7 @@ import { readFile, writeFile, mkdir, copyFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
-import { chromium } from "playwright";
+import { chromium, type Page } from "playwright";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import {
   compareLandscapeFromPngFiles,
@@ -63,6 +63,7 @@ import {
   evaluateComponentGoal,
   listComponentGoals,
   type ComponentGoalEvaluation,
+  type ComponentLandingEvidence,
   type ComponentScrollportEvidence,
 } from "./component-goal.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
@@ -103,6 +104,7 @@ export interface ComponentFromImageReport {
   goalEvaluation: ComponentGoalEvaluation;
   landmarkRegions: LandmarkRegion[];
   scrollportRegions: ScrollportRegion[];
+  landingEvidence?: ComponentLandingEvidence;
   semanticDrilldown: SemanticDrilldownEntry[];
   bboxMatches: MatchedBbox[];
   heatmapRegions: HeatmapRegion[];
@@ -286,6 +288,7 @@ export async function runComponentFromImage(
     const scrollportRegions = await captureScrollportRegions(page, {
       deviceScaleFactor: dpr,
     }).catch(() => []);
+    const landingEvidence = await captureLandingEvidence(page).catch(() => undefined);
     const currentPath = join(outputDir, "current.png");
     await page.screenshot({ path: currentPath, fullPage: false });
     await page.close();
@@ -314,6 +317,7 @@ export async function runComponentFromImage(
       pixelDiffRatio: diffRatio,
       landscapeDiffRatio: landscapeDiff.score,
       scrollports: scrollportEvidence,
+      landing: landingEvidence,
     });
 
     // All image-only signals run identically on both files.
@@ -551,6 +555,7 @@ export async function runComponentFromImage(
       goalEvaluation,
       landmarkRegions,
       scrollportRegions,
+      landingEvidence,
       semanticDrilldown,
       heatmapPath: diffPixels > 0 ? heatmapPath : undefined,
       currentPath,
@@ -586,6 +591,9 @@ export async function runComponentFromImage(
       const evidence = summarizeScrollportEvidence(scrollportRegions);
       console.log(`  ${DIM}scrollports: ${formatScrollportEvidence(evidence)}${RESET}`);
     }
+    if (landingEvidence) {
+      console.log(`  ${DIM}landing: ${formatLandingEvidence(landingEvidence)}${RESET}`);
+    }
     if (stateResults.length > 0) {
       for (const s of stateResults) {
         console.log(`  ${DIM}:${s.state} induced ${(s.inducedDiffRatio * 100).toFixed(2)}% (${s.forcedCount} forced)${RESET}`);
@@ -602,6 +610,7 @@ export async function runComponentFromImage(
       goalEvaluation,
       landmarkRegions,
       scrollportRegions,
+      landingEvidence,
       semanticDrilldown,
       bboxMatches,
       heatmapRegions,
@@ -617,6 +626,51 @@ export async function runComponentFromImage(
   } finally {
     await browser.close();
   }
+}
+
+async function captureLandingEvidence(page: Page): Promise<ComponentLandingEvidence | undefined> {
+  return await page.evaluate(() => {
+    const hero = document.querySelector("[data-hero-title], h1");
+    const cta = document.querySelector("[data-primary-cta]");
+    const next = document.querySelector("[data-next-section]");
+    const media = document.querySelector("[data-media-slot]");
+    if (!hero && !cta && !next && !media) return undefined;
+
+    function intersectsViewport(el: Element | null): boolean {
+      if (!el) return false;
+      const rect = el.getBoundingClientRect();
+      return rect.width > 1
+        && rect.height > 1
+        && rect.right > 0
+        && rect.bottom > 0
+        && rect.left < window.innerWidth
+        && rect.top < window.innerHeight;
+    }
+
+    function fullyInViewport(el: Element | null): boolean {
+      if (!el) return false;
+      const rect = el.getBoundingClientRect();
+      return rect.width > 1
+        && rect.height > 1
+        && rect.left >= 0
+        && rect.top >= 0
+        && rect.right <= window.innerWidth
+        && rect.bottom <= window.innerHeight;
+    }
+
+    function mediaSlotVisible(el: Element | null): boolean {
+      if (!intersectsViewport(el)) return false;
+      const rect = el!.getBoundingClientRect();
+      return rect.width >= 160 && rect.height >= 120;
+    }
+
+    return {
+      heroVisible: intersectsViewport(hero),
+      primaryCtaVisible: fullyInViewport(cta),
+      nextSectionHintVisible: intersectsViewport(next),
+      mediaSlotVisible: mediaSlotVisible(media),
+    };
+  });
 }
 
 function summarizeScrollportEvidence(regions: ScrollportRegion[]): ComponentScrollportEvidence {
@@ -640,6 +694,16 @@ function formatScrollportEvidence(evidence: ComponentScrollportEvidence): string
   return parts.join(", ");
 }
 
+function formatLandingEvidence(evidence: ComponentLandingEvidence): string {
+  const parts = [
+    evidence.heroVisible ? "hero ok" : "hero missing",
+    evidence.primaryCtaVisible ? "CTA ok" : "CTA missing",
+    evidence.nextSectionHintVisible ? "next hint ok" : "next hint missing",
+    evidence.mediaSlotVisible ? "media slot ok" : "media slot missing",
+  ];
+  return parts.join(", ");
+}
+
 interface RenderInput {
   targetImage: string;
   currentHtml: string;
@@ -651,6 +715,7 @@ interface RenderInput {
   goalEvaluation: ComponentGoalEvaluation;
   landmarkRegions: LandmarkRegion[];
   scrollportRegions: ScrollportRegion[];
+  landingEvidence?: ComponentLandingEvidence;
   semanticDrilldown: SemanticDrilldownEntry[];
   heatmapPath?: string;
   currentPath: string;
@@ -795,6 +860,22 @@ export function renderReportMarkdown(r: RenderInput): string {
       lines.push(`| ${status.status} | \`${region.name}\` | ${box} | ` +
         `${overflow} | ${client} | ${scroll} | ${status.reason} |`);
     }
+    lines.push("");
+  }
+
+  if (r.landingEvidence) {
+    lines.push("## Landing inspector");
+    lines.push("");
+    lines.push("Current DOM evidence for landing-page first-viewport gates. Use " +
+      "`data-primary-cta`, `data-next-section`, and `data-media-slot` to make " +
+      "the intended regions explicit.");
+    lines.push("");
+    lines.push("| Gate | Status |");
+    lines.push("|---|---|");
+    lines.push(`| Hero visible | ${r.landingEvidence.heroVisible ? "ok" : "missing"} |`);
+    lines.push(`| Primary CTA visible | ${r.landingEvidence.primaryCtaVisible ? "ok" : "missing"} |`);
+    lines.push(`| Next section hint visible | ${r.landingEvidence.nextSectionHintVisible ? "ok" : "missing"} |`);
+    lines.push(`| Media slot visible | ${r.landingEvidence.mediaSlotVisible ? "ok" : "missing"} |`);
     lines.push("");
   }
 

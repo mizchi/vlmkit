@@ -1,4 +1,4 @@
-export const COMPONENT_GOALS = ["app", "layout", "pixel", "draft", "app-shell"] as const;
+export const COMPONENT_GOALS = ["app", "layout", "pixel", "draft", "app-shell", "landing"] as const;
 
 export type ComponentGoal = typeof COMPONENT_GOALS[number];
 export type ComponentGoalStatus = "pass" | "review" | "fail";
@@ -36,6 +36,13 @@ export interface ComponentScrollportEvidence {
   ok: number;
   broken: number;
   empty: number;
+}
+
+export interface ComponentLandingEvidence {
+  heroVisible: boolean;
+  primaryCtaVisible: boolean;
+  nextSectionHintVisible: boolean;
+  mediaSlotVisible: boolean;
 }
 
 const GOAL_PROFILES: Record<ComponentGoal, ComponentGoalProfile> = {
@@ -79,6 +86,14 @@ const GOAL_PROFILES: Record<ComponentGoal, ComponentGoalProfile> = {
     pass: { landscape: 0.03 },
     review: { landscape: 0.05 },
   },
+  landing: {
+    goal: "landing",
+    label: "Landing page",
+    primaryMetric: "landscape",
+    description: "Landing-page convergence with first-viewport hero, CTA, next-section, and media-slot gates.",
+    pass: { landscape: 0.03, pixel: 0.30 },
+    review: { landscape: 0.05, pixel: 0.40 },
+  },
 };
 
 export function listComponentGoals(): ComponentGoal[] {
@@ -98,6 +113,7 @@ export function evaluateComponentGoal(input: {
   pixelDiffRatio: number;
   landscapeDiffRatio: number;
   scrollports?: ComponentScrollportEvidence;
+  landing?: ComponentLandingEvidence;
 }): ComponentGoalEvaluation {
   const profile = getComponentGoalProfile(input.goal);
   const thresholdStatus: ComponentGoalStatus = passesAll(profile.pass, input)
@@ -124,15 +140,29 @@ function applyPatternGates(
   status: ComponentGoalStatus,
   input: {
     scrollports?: ComponentScrollportEvidence;
+    landing?: ComponentLandingEvidence;
   },
 ): ComponentGoalStatus {
-  if (profile.goal !== "app-shell") return status;
-  const scrollports = input.scrollports;
-  if (!scrollports || scrollports.total === 0) {
-    return status === "pass" ? "review" : status;
+  if (profile.goal === "app-shell") {
+    const scrollports = input.scrollports;
+    if (!scrollports || scrollports.total === 0) {
+      return status === "pass" ? "review" : status;
+    }
+    if (scrollports.broken > 0) return "fail";
+    if (scrollports.empty > 0 && status === "pass") return "review";
+    return status;
   }
-  if (scrollports.broken > 0) return "fail";
-  if (scrollports.empty > 0 && status === "pass") return "review";
+
+  if (profile.goal === "landing") {
+    const landing = input.landing;
+    if (!landing) return status === "pass" ? "review" : status;
+    if (!landing.primaryCtaVisible) return "fail";
+    if (!landing.heroVisible) return "fail";
+    if ((!landing.nextSectionHintVisible || !landing.mediaSlotVisible) && status === "pass") {
+      return "review";
+    }
+  }
+
   return status;
 }
 
@@ -156,6 +186,7 @@ function summarizeEvaluation(
     pixelDiffRatio: number;
     landscapeDiffRatio: number;
     scrollports?: ComponentScrollportEvidence;
+    landing?: ComponentLandingEvidence;
   },
 ): string {
   const target = status === "pass" ? profile.pass : profile.review;
@@ -169,6 +200,9 @@ function summarizeEvaluation(
   if (profile.goal === "app-shell") {
     clauses.push(summarizeScrollports(input.scrollports));
   }
+  if (profile.goal === "landing") {
+    clauses.push(summarizeLanding(input.landing));
+  }
   const suffix = clauses.length > 0 ? `: ${clauses.join(", ")}` : "";
   return `${profile.label} ${status}${suffix}`;
 }
@@ -179,6 +213,17 @@ function summarizeScrollports(scrollports: ComponentScrollportEvidence | undefin
   if (scrollports.broken > 0) parts.push(`${scrollports.broken} broken`);
   if (scrollports.empty > 0) parts.push(`${scrollports.empty} empty`);
   return parts.join(", ");
+}
+
+function summarizeLanding(landing: ComponentLandingEvidence | undefined): string {
+  if (!landing) return "no landing evidence";
+  const parts = [
+    landing.heroVisible ? "hero ok" : "hero missing",
+    landing.primaryCtaVisible ? "CTA ok" : "CTA missing",
+    landing.nextSectionHintVisible ? "next hint ok" : "next hint missing",
+    landing.mediaSlotVisible ? "media slot ok" : "media slot missing",
+  ];
+  return `landing ${parts.join(", ")}`;
 }
 
 export function formatPct(ratio: number): string {

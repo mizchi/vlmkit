@@ -17,5 +17,6 @@ visible hint of the next section.
 
 ## Expected signal
 
-`--goal app` should be useful, but the report also needs future CTA/hero gates.
-
+`--goal landing` should pass only when the broad visual layout is close and
+the first-viewport hero, CTA, next-section hint, and media slot gates are
+present.
