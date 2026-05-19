@@ -24,7 +24,7 @@ local vrtTest = new Task {
 local bench = new Task {
   name = "bench"
   cmd = "node src/experiments/benchmark/benchmark.ts"
-  inputs { "src/experiments/benchmark/benchmark.ts"; "packages/vrt-core/src/heatmap.ts" }
+  inputs { "src/experiments/benchmark/benchmark.ts"; "packages/vlmkit-core/src/heatmap.ts" }
 }
 
 // ---- Demos ----
@@ -212,7 +212,7 @@ local fixLoop = new Task {
   name = "fix-loop"
   acceptsArgs = true
   cmd = "node src/experiments/css-challenge/fix-loop.ts"
-  inputs { "src/experiments/css-challenge/fix-loop.ts"; "packages/vrt-ai/src/vlm-client.ts"; "packages/vrt-ai/src/llm-client.ts" }
+  inputs { "src/experiments/css-challenge/fix-loop.ts"; "packages/vlmkit-ai/src/vlm-client.ts"; "packages/vlmkit-ai/src/llm-client.ts" }
 }
 
 local vlmBench = new Task {
@@ -232,14 +232,14 @@ local apiServer = new Task {
 
 local smokeTest = new Task {
   name = "smoke-test"
-  cmd = "node packages/vrt-markup/src/inspect/smoke-runner.ts"
-  inputs { "packages/vrt-markup/src/inspect/smoke-runner.ts" }
+  cmd = "node packages/vlmkit-markup/src/inspect/smoke-runner.ts"
+  inputs { "packages/vlmkit-markup/src/inspect/smoke-runner.ts" }
 }
 
 local snapshot = new Task {
   name = "snapshot"
-  cmd = "node --experimental-strip-types src/cli/vrt.ts snapshot"
-  inputs { "src/cli/vrt.ts"; "src/cli/commands/snapshot.ts"; "src/vrt/snapshot/**.ts" }
+  cmd = "node --experimental-strip-types src/cli/vlmkit.ts snapshot"
+  inputs { "src/cli/vlmkit.ts"; "src/cli/commands/snapshot.ts"; "src/vrt/snapshot/**.ts" }
 }
 
 // ---- Dogfood ----
@@ -247,7 +247,7 @@ local snapshot = new Task {
 local dogfoodLuna = new Task {
   name = "dogfood-luna"
   cmd = #"""
-    node --experimental-strip-types src/cli/vrt.ts snapshot \
+    node --experimental-strip-types src/cli/vlmkit.ts snapshot \
       http://localhost:4200/src/examples/todomvc/ \
       http://localhost:4200/src/examples/spa/ \
       http://localhost:4200/src/examples/wc/ \
@@ -261,7 +261,7 @@ local dogfoodLuna = new Task {
 local dogfoodSol = new Task {
   name = "dogfood-sol"
   cmd = #"""
-    node --experimental-strip-types src/cli/vrt.ts snapshot \
+    node --experimental-strip-types src/cli/vlmkit.ts snapshot \
       http://localhost:3000/ \
       http://localhost:3000/luna/ \
       http://localhost:3000/sol/ \
@@ -315,8 +315,8 @@ local smokeAll = new Task {
 
 local vrtHelp = new Task {
   name = "vrt-help"
-  cmd = "node --experimental-strip-types src/cli/vrt.ts help"
-  inputs { "src/cli/vrt.ts"; "src/cli/router.ts" }
+  cmd = "node --experimental-strip-types src/cli/vlmkit.ts help"
+  inputs { "src/cli/vlmkit.ts"; "src/cli/router.ts" }
 }
 
 // ---- Spec gates (pkspec) ----

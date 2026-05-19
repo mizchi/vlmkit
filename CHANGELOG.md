@@ -3,6 +3,56 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
+## 0.6.0 — 2026-05-19 (rebrand: vrt → vlmkit)
+
+The project scope had grown well beyond visual regression. Markup
+synthesis from screenshots, design-token / theme / a11y / i18n
+audits, and a 2-stage VLM + LLM CSS auto-repair loop now account for
+the majority of the surface. Rebrand the umbrella to **vlmkit**;
+visual regression becomes one of several offered features.
+
+### Breaking — package + CLI rename
+
+| Old | New |
+|---|---|
+| GitHub repo `mizchi/vrt` | `mizchi/vlmkit` (auto-redirect in place) |
+| `@mizchi/vrt` (root) | `@mizchi/vlmkit` |
+| `@mizchi/vrt-core` | `@mizchi/vlmkit-core` |
+| `@mizchi/vrt-capture` | `@mizchi/vlmkit-capture` |
+| `@mizchi/vrt-ai` | `@mizchi/vlmkit-ai` |
+| `@mizchi/vrt-markup` | `@mizchi/vlmkit-markup` |
+| CLI binary `vrt` | `vlmkit` |
+| `dist/vrt.mjs` | `dist/vlmkit.mjs` |
+| Deprecation prefix `[vrt deprecated]` | `[vlmkit deprecated]` |
+
+The `vrt verb …` CLI form is no longer supported as a binary
+shortcut — type `vlmkit verb …` instead. (Inside the `vlmkit` CLI
+the deprecation shims from 0.5.0 still work, e.g. `vlmkit png-diff
+--help` forwards to `vlmkit diff png`.)
+
+### Repository structure
+
+`@mizchi/vrt@0.5.0` on npm is now deprecated. The current package
+under that name is `@mizchi/vlmkit`. A future minor version will
+carve out `packages/vrt/` as a leaf package containing the VRT-
+specific subset (`snapshot`, `diff html`, regression-watch,
+`diff-pr`, `baseline`, `watch`); see Phase 2 plan in the repo.
+
+### State files preserved
+
+The `.vrt/` state directory name is unchanged — existing users'
+`.vrt/last-diff-for-agent.json` continues to work.
+
+### Verified
+
+- 776 tests / 11 dist smoke probes pass on the new structure.
+- `vlmkit diff html` against `fixtures/element-compare/` runs
+  end-to-end.
+- All cross-package imports resolve under the new `@mizchi/vlmkit-*`
+  scope.
+
+---
+
 ## 0.5.0 — 2026-05-19 (first public release)
 
 The internal 0.4.x history is preserved in commits; npm publication

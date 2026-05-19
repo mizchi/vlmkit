@@ -1,32 +1,44 @@
-# vrt
+# vlmkit
 
-Visual Regression Testing toolkit — pixel diff, computed-style diff,
-a11y tree diff, agent-readable Markdown reports, and AI-powered CSS
-fix generation.
+VLM-driven frontend toolkit. Combines:
+
+- **Visual regression** — pixel + computed-style + a11y tree diff,
+  multi-viewport snapshot, regression watch across runs.
+- **Markup synthesis** — build a component from a target screenshot;
+  detect components in a screenshot; extract design tokens.
+- **Design audits** — token-scale conformance, theme parity, a11y
+  contrast / touch / focus order, i18n stress, cross-browser parity,
+  Web Vitals.
+- **CSS auto-repair** — 2-stage VLM + LLM pipeline that detects a CSS
+  regression and proposes a fix.
+
+Originated as `@mizchi/vrt` (visual regression only); rebranded to
+`vlmkit` at 0.6.0 to reflect the broader scope. The VRT capabilities
+remain a first-class feature group within the kit.
 
 Requires Node 24+.
 
 ```bash
-npm install -g @mizchi/vrt
+npm install -g @mizchi/vlmkit
 # or, from this repo:
 pnpm install && pnpm build
 ```
 
-The CLI is organized into verb groups. Run `vrt <group> --help` for
-options.
+The CLI is organized into verb groups. Run `vlmkit <group> --help`
+for options.
 
 | Group | Subcommands |
 |---|---|
-| `vrt diff` | `html`, `png`, `elements`, `browsers`, `agent`, `runs` |
-| `vrt check` | `a11y {contrast,touch,focus}`, `tokens`, `theme`, `perf`, `drift {component,pages}` |
-| `vrt inspect` | `interact`, `explore`, `smoke` |
-| `vrt stress` | `i18n`, `media` |
-| `vrt scan` | `component`, `breakpoints` |
-| `vrt build` | `component` |
-| `vrt snapshot` | `[<url>...]`, `approve`, `fix-prompt`, `stability`, `flipbook`, `report` |
-| `vrt migration` | `compare`, `blind`, `subagent` |
-| `vrt workflow` | `init`, `capture`, `verify`, `approve`, `graph`, `affected`, `introspect`, `spec-verify`, `expect` |
-| Standalone | `vrt watch`, `vrt manifest`, `vrt diff-pr`, `vrt baseline`, `vrt api`, `vrt bench`, `vrt report`, `vrt skill` |
+| `vlmkit diff` | `html`, `png`, `elements`, `browsers`, `agent`, `runs` |
+| `vlmkit check` | `a11y {contrast,touch,focus}`, `tokens`, `theme`, `perf`, `drift {component,pages}` |
+| `vlmkit inspect` | `interact`, `explore`, `smoke` |
+| `vlmkit stress` | `i18n`, `media` |
+| `vlmkit scan` | `component`, `breakpoints` |
+| `vlmkit build` | `component` |
+| `vlmkit snapshot` | `[<url>...]`, `approve`, `fix-prompt`, `stability`, `flipbook`, `report` |
+| `vlmkit migration` | `compare`, `blind`, `subagent` |
+| `vlmkit workflow` | `init`, `capture`, `verify`, `approve`, `graph`, `affected`, `introspect`, `spec-verify`, `expect` |
+| Standalone | `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
 
 The single-token commands from 0.4.x (`vrt compare`, `vrt png-diff`,
 `vrt theme-parity`, …) remain as deprecation shims that forward to
@@ -59,56 +71,56 @@ pnpm install
 pnpm test
 
 # Compare two HTML files
-vrt diff html before.html after.html --output reports/
+vlmkit diff html before.html after.html --output reports/
 
 # Render the diff into an agent-friendly Markdown report
-vrt diff agent reports/diff-report.json > reports/diff.md
+vlmkit diff agent reports/diff-report.json > reports/diff.md
 
 # Compare two existing PNG screenshots without Playwright
-vrt diff png baselines/home.png snapshots/home.png
+vlmkit diff png baselines/home.png snapshots/home.png
 
 # Compare two URLs
-vrt diff html --url http://localhost:3000/ --current-url http://localhost:8080/ \
+vlmkit diff html --url http://localhost:3000/ --current-url http://localhost:8080/ \
   --output reports/
 
 # Snapshot URLs (creates baseline on first run, diffs on subsequent runs)
-vrt snapshot http://localhost:3000/ http://localhost:3000/about/ --output snapshots/
+vlmkit snapshot http://localhost:3000/ http://localhost:3000/about/ --output snapshots/
 
 # Use explicit labels when URL-derived names are not ideal
-vrt snapshot http://localhost:3000/issues?severity=critical --label critical-issues
+vlmkit snapshot http://localhost:3000/issues?severity=critical --label critical-issues
 
 # Fail CI when diffs or new baselines are detected
-vrt snapshot http://localhost:3000/ --fail-on-diff --fail-on-new-baseline --max-diff-ratio 0.01
+vlmkit snapshot http://localhost:3000/ --fail-on-diff --fail-on-new-baseline --max-diff-ratio 0.01
 
 # Promote accepted snapshot diffs to the new baseline
-vrt snapshot approve --output snapshots/
+vlmkit snapshot approve --output snapshots/
 
 # Load snapshot targets from vrt.config.json
-vrt snapshot
+vlmkit snapshot
 
 # Dev inner loop with rich signal output (token-aware + cross-round)
-vrt diff html baseline.html variant.html --tokens DESIGN.md --output reports/
-vrt watch baseline.html variant.html --tokens DESIGN.md
+vlmkit diff html baseline.html variant.html --tokens DESIGN.md --output reports/
+vlmkit watch baseline.html variant.html --tokens DESIGN.md
 
 # Author approval rules (sub-pixel deviations, intentional design exceptions, etc.)
-vrt manifest add --selector .hero__body --max-px 2 --reason "AA artifact" --expires 2026-08-15
-vrt manifest add --a11y-contrast --selector "button" --reason "decorative" --expires 2026-08-15
-vrt manifest add --from-run .vrt/runs/diff-pr/  # auto-acknowledge sub-pixel deltas
-vrt manifest list
+vlmkit manifest add --selector .hero__body --max-px 2 --reason "AA artifact" --expires 2026-08-15
+vlmkit manifest add --a11y-contrast --selector "button" --reason "decorative" --expires 2026-08-15
+vlmkit manifest add --from-run .vrt/runs/diff-pr/  # auto-acknowledge sub-pixel deltas
+vlmkit manifest list
 
 # CI gate — declare routes in vrt.config.json, pin baselines, gate per PR
-vrt baseline pin                                       # on main
-vrt baseline verify                                    # in PR
-vrt baseline post --pr owner/repo#123                  # send summary.md as PR comment
+vlmkit baseline pin                                       # on main
+vlmkit baseline verify                                    # in PR
+vlmkit baseline post --pr owner/repo#123                  # send summary.md as PR comment
 
 # Legacy internal-dogfood verification loop (vrt's own e2e suite)
-vrt workflow init
-vrt workflow capture
-vrt workflow verify
+vlmkit workflow init
+vlmkit workflow capture
+vlmkit workflow verify
 
 # Workflow loop with external-project routes/config
-vrt workflow init --config ./vrt.config.json
-vrt workflow capture --config ./vrt.config.json
+vlmkit workflow init --config ./vrt.config.json
+vlmkit workflow capture --config ./vrt.config.json
 
 # Prepare a migration diff packet for an external fixer
 pkf run migration-subagent-prepare -- --report test-results/migration/migration-report.json --output test-results/migration/subagent-task.md
@@ -124,10 +136,10 @@ pkf run migration-blind-solo --scenario shadcn-to-luna -- --output test-results/
 pkf run migration-blind-evaluate --scenario shadcn-to-luna -- --before-report test-results/migration/blind/shadcn-to-luna/migration-report.json --after-report test-results/migration/blind/shadcn-to-luna/solo-report/migration-report.json --rounds 1
 
 # Mask dynamic content
-vrt snapshot http://localhost:3000/ --mask ".marquee-container,.hero-badge"
+vlmkit snapshot http://localhost:3000/ --mask ".marquee-container,.hero-badge"
 
 # Detect broken baseline renders (e.g. CDN failed to load) — on by default
-vrt diff html --dir fixtures/migration/tailwind-to-vanilla \
+vlmkit diff html --dir fixtures/migration/tailwind-to-vanilla \
   --baseline before.html --variants after.html
 # Add --strict-baseline-sanity to exit non-zero when warnings fire,
 # or --no-baseline-sanity to skip the check entirely.
@@ -171,58 +183,58 @@ nix run git+https://github.com/mizchi/pkspec  -- check Spec.pkl Test.pkl
 ### Diff (compare two things)
 
 ```bash
-vrt diff html <baseline> <variant>          # HTML/URL pair → multi-viewport diff + report.json
-vrt diff agent <report.json>                # Render report.json as agent-friendly Markdown
-vrt diff png <baseline.png> <current.png>   # Direct PNG pixel diff + heatmap
-vrt diff elements [options]                 # Element-level diff with shift isolation
-vrt diff browsers <html|url>                # chromium / firefox / webkit parity
-vrt diff runs <dir...>                      # Aggregate multiple VRT runs into one table
+vlmkit diff html <baseline> <variant>          # HTML/URL pair → multi-viewport diff + report.json
+vlmkit diff agent <report.json>                # Render report.json as agent-friendly Markdown
+vlmkit diff png <baseline.png> <current.png>   # Direct PNG pixel diff + heatmap
+vlmkit diff elements [options]                 # Element-level diff with shift isolation
+vlmkit diff browsers <html|url>                # chromium / firefox / webkit parity
+vlmkit diff runs <dir...>                      # Aggregate multiple VRT runs into one table
 ```
 
 ### Snapshot (URL → baseline + diff)
 
 ```bash
-vrt snapshot <url1> [url2] ...              # First run: baseline. Subsequent: baseline + diff
-vrt snapshot approve                        # Promote *-current.png → *-baseline.png
-vrt snapshot fix-prompt                     # Emit a subagent-ready prompt from snapshot-report.json
-vrt snapshot stability <url...>             # Run N iterations and report false-positive rate
-vrt snapshot flipbook                       # Diff three-frame (baseline ↔ current ↔ heatmap) HTML flipbooks
-vrt snapshot report                         # Render snapshot-report.json as Markdown
+vlmkit snapshot <url1> [url2] ...              # First run: baseline. Subsequent: baseline + diff
+vlmkit snapshot approve                        # Promote *-current.png → *-baseline.png
+vlmkit snapshot fix-prompt                     # Emit a subagent-ready prompt from snapshot-report.json
+vlmkit snapshot stability <url...>             # Run N iterations and report false-positive rate
+vlmkit snapshot flipbook                       # Diff three-frame (baseline ↔ current ↔ heatmap) HTML flipbooks
+vlmkit snapshot report                         # Render snapshot-report.json as Markdown
 ```
 
 ### Check (gates: a11y / tokens / theme / perf / drift)
 
 ```bash
-vrt check a11y contrast <html>              # WCAG AA contrast scan
-vrt check a11y touch    <html|url>          # Touch target size (WCAG 2.5.5 / 2.5.8)
-vrt check a11y focus    <html|url>          # Tab order vs visual order
-vrt check tokens        <html>              # radius/spacing/z-index/shadow scale conformance
-vrt check theme         <html>              # prefers-color-scheme dark / unthemed components
-vrt check perf          <html|url>          # Web Vitals (CLS / LCP / FCP)
-vrt check drift component <html> --selector .card
-vrt check drift pages     --selector .footer --files A.html B.html C.html
+vlmkit check a11y contrast <html>              # WCAG AA contrast scan
+vlmkit check a11y touch    <html|url>          # Touch target size (WCAG 2.5.5 / 2.5.8)
+vlmkit check a11y focus    <html|url>          # Tab order vs visual order
+vlmkit check tokens        <html>              # radius/spacing/z-index/shadow scale conformance
+vlmkit check theme         <html>              # prefers-color-scheme dark / unthemed components
+vlmkit check perf          <html|url>          # Web Vitals (CLS / LCP / FCP)
+vlmkit check drift component <html> --selector .card
+vlmkit check drift pages     --selector .footer --files A.html B.html C.html
 ```
 
 ### Build / Scan / Inspect / Stress (markup-assistance)
 
 ```bash
 # Build component from a target screenshot, iterate until close.
-vrt build component <target.png> <current.html>
+vlmkit build component <target.png> <current.html>
   # signals: bbox + heatmap regions + dominant fill + typography hints
   # + spacing-fix table + palette diff + multi-state suspect flags.
 
 # Detect components in a screenshot.
-vrt scan component <screenshot.png>         # Crop to standalone PNGs
-vrt scan breakpoints <html-file>            # Discover responsive breakpoints
+vlmkit scan component <screenshot.png>         # Crop to standalone PNGs
+vlmkit scan breakpoints <html-file>            # Discover responsive breakpoints
 
 # Scripted / exploratory interaction.
-vrt inspect interact <html|url> --sequence <path.json>
-vrt inspect explore  <html|url>             # Auto-discover declared actions and diff each
-vrt inspect smoke    <html|url>             # A11y-driven exploratory smoke test
+vlmkit inspect interact <html|url> --sequence <path.json>
+vlmkit inspect explore  <html|url>             # Auto-discover declared actions and diff each
+vlmkit inspect smoke    <html|url>             # A11y-driven exploratory smoke test
 
 # Stress tests.
-vrt stress i18n  <html>                     # Text-node inflation overflow detection
-vrt stress media <html>                     # forced-colors, reduced-motion, print, RTL, 200% zoom
+vlmkit stress i18n  <html>                     # Text-node inflation overflow detection
+vlmkit stress media <html>                     # forced-colors, reduced-motion, print, RTL, 200% zoom
 ```
 
 All emit a self-contained Markdown report under `--output-dir`. Each
@@ -232,7 +244,7 @@ scenario × coverage matrix.
 
 Snapshot labels are query-aware by default, so `/issues` and `/issues?severity=critical` no longer share the same baseline name.
 Use repeated `--label` flags to override labels explicitly when needed.
-The same `--label` flag can be used with `vrt snapshot approve` to approve only selected labels.
+The same `--label` flag can be used with `vlmkit snapshot approve` to approve only selected labels.
 
 Minimal `vrt.config.json`:
 
@@ -253,45 +265,45 @@ Minimal `vrt.config.json`:
 }
 ```
 
-When `vrt.config.json` exists in the current directory, `vrt snapshot` loads it automatically. Use `--config <path>` to point at another file, and pass URLs or flags directly when you want CLI values to override config defaults.
-`vrt workflow init` and `vrt workflow capture` also auto-load the same file, reuse `baseUrl`/`routes`, and accept `workflow.captureSpec` or `--capture-spec <path>` when you want a custom Playwright entrypoint.
+When `vrt.config.json` exists in the current directory, `vlmkit snapshot` loads it automatically. Use `--config <path>` to point at another file, and pass URLs or flags directly when you want CLI values to override config defaults.
+`vlmkit workflow init` and `vlmkit workflow capture` also auto-load the same file, reuse `baseUrl`/`routes`, and accept `workflow.captureSpec` or `--capture-spec <path>` when you want a custom Playwright entrypoint.
 
 #### Subagent-ready fix prompt
 
-`vrt snapshot fix-prompt` reads the last `snapshot-report.json` and emits a structured task list that a coding agent can act on:
+`vlmkit snapshot fix-prompt` reads the last `snapshot-report.json` and emits a structured task list that a coding agent can act on:
 
 ```bash
 # Markdown prompt to stdout (default)
-vrt snapshot fix-prompt --output test-results/snapshots
+vlmkit snapshot fix-prompt --output test-results/snapshots
 
 # Limit to the 5 worst diffs, write to a file
-vrt snapshot fix-prompt --output test-results/snapshots --limit 5 --out fix-prompt.md
+vlmkit snapshot fix-prompt --output test-results/snapshots --limit 5 --out fix-prompt.md
 
 # Filter by label, minimum diff ratio, and emit JSON for programmatic use
-vrt snapshot fix-prompt --label home --min-diff 0.01 --format json
+vlmkit snapshot fix-prompt --label home --min-diff 0.01 --format json
 ```
 
 The prompt includes per-task URL, viewport, diff ratio (with shift compensation), and relative paths to the baseline / current / heatmap PNGs plus the captured HTML, so a subagent can map the visual regression back to source code.
 
 #### Measuring false-positive rate
 
-`vrt snapshot stability` captures the same URLs across N iterations against a
+`vlmkit snapshot stability` captures the same URLs across N iterations against a
 baseline locked in on iteration 0, then reports how often comparisons showed a
 non-zero diff. Useful for tracking renderer noise, animation leakage, or mask
 gaps before turning on `--fail-on-diff` in CI:
 
 ```bash
 # 3 iterations (default), any non-zero diff counts as a positive
-vrt snapshot stability http://localhost:3000/ http://localhost:3000/about/
+vlmkit snapshot stability http://localhost:3000/ http://localhost:3000/about/
 
 # Fail CI if the overall FP rate exceeds 5%
-vrt snapshot stability http://localhost:3000/ \
+vlmkit snapshot stability http://localhost:3000/ \
   --iterations 5 \
   --fail-above-rate 0.05 \
   --output test-results/stability
 
 # Only count diffs above 1% as positives (filters out subpixel noise)
-vrt snapshot stability http://localhost:3000/ --fp-threshold 0.01
+vlmkit snapshot stability http://localhost:3000/ --fp-threshold 0.01
 ```
 
 The run writes `stability-report.json` to the output directory with per-URL +
@@ -300,14 +312,14 @@ suited to artifact upload + over-time tracking.
 
 #### Capture backend (`--backend`)
 
-By default `vrt snapshot` launches a local Chromium via Playwright. To offload
+By default `vlmkit snapshot` launches a local Chromium via Playwright. To offload
 capture to [Cloudflare Browser Run](https://blog.cloudflare.com/browser-run-for-ai-agents/)
 without installing Playwright browsers in CI, switch the backend:
 
 ```bash
 # Connect via CDP WebSocket; credentials come from env vars
 CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=... \
-  vrt snapshot --backend cloudflare http://localhost:3000/
+  vlmkit snapshot --backend cloudflare http://localhost:3000/
 ```
 
 Resolution order for the backend selector:
@@ -336,21 +348,21 @@ PRs:
 
 ```bash
 # 1. Fix-loop convergence (or any ordered PNG sequence)
-vrt snapshot flipbook round-0.png round-1.png round-2.png \
+vlmkit snapshot flipbook round-0.png round-1.png round-2.png \
   --label "round 0" --label "round 1" --label "round 2" \
   --title "Fix-loop convergence" --out fix-loop.html
 
 # 2. Diff three-frame (baseline ↔ current ↔ heatmap) for every regressed entry
-vrt snapshot flipbook --output test-results/snapshots
+vlmkit snapshot flipbook --output test-results/snapshots
 # → test-results/snapshots/flipbooks/<label>-<viewport>.html
 
 # 3. Stability iterations as flipbook per (URL, viewport)
-vrt snapshot stability http://localhost:3000/ \
+vlmkit snapshot stability http://localhost:3000/ \
   --iterations 5 --flipbook --output test-results/stability
 # → test-results/stability/flipbooks/<label>-<viewport>-stability.html
 
 # 4. WebM recording of a smoke-test session (Playwright recordVideo)
-vrt inspect smoke --url http://localhost:3000/ --max-actions 20 --record-video videos/
+vlmkit inspect smoke --url http://localhost:3000/ --max-actions 20 --record-video videos/
 # → videos/<hash>.webm
 ```
 
@@ -359,17 +371,17 @@ Common flags: `--delay <ms>` controls per-frame duration (default 700),
 
 #### Agent-friendly diff summary
 
-When a coding agent is iterating with `vrt diff html`, the natural workflow
+When a coding agent is iterating with `vlmkit diff html`, the natural workflow
 (see [`docs/reports/2026-05-12-dogfood-shadcn-luna.md`](docs/reports/2026-05-12-dogfood-shadcn-luna.md))
 is: read the worst-viewport PNGs side-by-side, then write a CSS patch.
-`vrt diff agent` collapses the inputs the agent needs into a single
+`vlmkit diff agent` collapses the inputs the agent needs into a single
 Markdown blob:
 
 ```bash
-vrt diff html --dir fixtures/migration/shadcn-to-luna \
+vlmkit diff html --dir fixtures/migration/shadcn-to-luna \
   --baseline before.html --variants working.html \
   --output test-results/iter1
-vrt diff agent test-results/iter1/diff-report.json --max-viewports 2
+vlmkit diff agent test-results/iter1/diff-report.json --max-viewports 2
 ```
 
 The output contains: a worst-first diff table, category totals across
@@ -384,39 +396,39 @@ These commands manage state under the current project root: `baselines/`, `snaps
 
 Before running them, start the target app and point `VRT_BASE_URL` at it when needed.
 The built-in capture workflow defaults to `http://127.0.0.1:4174`.
-`vrt workflow verify` itself only compares the PNG and `.a11y.json` artifacts already present under `baselines/` and `snapshots/`; it does not launch Playwright.
+`vlmkit workflow verify` itself only compares the PNG and `.a11y.json` artifacts already present under `baselines/` and `snapshots/`; it does not launch Playwright.
 
 ```bash
-vrt workflow init
-vrt workflow capture
-vrt workflow verify
-vrt workflow approve
-vrt workflow report
-vrt workflow graph
-vrt workflow affected
-vrt workflow introspect
-vrt workflow spec-verify
-vrt workflow expect
+vlmkit workflow init
+vlmkit workflow capture
+vlmkit workflow verify
+vlmkit workflow approve
+vlmkit workflow report
+vlmkit workflow graph
+vlmkit workflow affected
+vlmkit workflow introspect
+vlmkit workflow spec-verify
+vlmkit workflow expect
 ```
 
 If `vrt.config.json` defines `routes`, the built-in capture spec uses those routes instead of the repo-local defaults.
 
 The PR workflow also runs a deterministic snapshot false-positive check against `fixtures/css-challenge` using `.github/vrt-snapshot-ci.config.json`.
-It creates baselines once, re-runs the same URLs, and summarizes `test-results/snapshots/ci/snapshot-report.json` with `vrt snapshot report`.
+It creates baselines once, re-runs the same URLs, and summarizes `test-results/snapshots/ci/snapshot-report.json` with `vlmkit snapshot report`.
 
-For migration workflows, `vrt migration subagent` packages the highest-impact diff per variant into a prompt for an external fixer, then compares before/after `migration-report.json` files to measure resolved/improved success rates.
-Blind migration scenarios are declared in `fixtures/migration/blind-scenarios.json`, including the existing reset-css blind target and a scaffolded `shadcn-to-luna/after-blind.html` target for reproducible E3 runs. `vrt migration blind` supports `list`, `show`, `prepare`, `solo`, and `evaluate` so the blind run can emit a fresh compare report, generate a fixer packet, run a deterministic reference-CSS repair, and check the `diff < 1% within 3 rounds` contract without hand-assembling paths.
+For migration workflows, `vlmkit migration subagent` packages the highest-impact diff per variant into a prompt for an external fixer, then compares before/after `migration-report.json` files to measure resolved/improved success rates.
+Blind migration scenarios are declared in `fixtures/migration/blind-scenarios.json`, including the existing reset-css blind target and a scaffolded `shadcn-to-luna/after-blind.html` target for reproducible E3 runs. `vlmkit migration blind` supports `list`, `show`, `prepare`, `solo`, and `evaluate` so the blind run can emit a fresh compare report, generate a fixer packet, run a deterministic reference-CSS repair, and check the `diff < 1% within 3 rounds` contract without hand-assembling paths.
 
 Workflow aliases are kept for ergonomics where they do not collide:
 
-- `vrt init`, `vrt capture`, `vrt verify`, `vrt approve`
-- `vrt graph`, `vrt affected`, `vrt introspect`, `vrt spec-verify`, `vrt expect`
+- `vlmkit init`, `vlmkit capture`, `vlmkit verify`, `vlmkit approve`
+- `vlmkit graph`, `vlmkit affected`, `vlmkit introspect`, `vlmkit spec-verify`, `vlmkit expect`
 
-`vrt report` remains the detection pattern report, so verification output lives under `vrt workflow report`.
+`vlmkit report` remains the detection pattern report, so verification output lives under `vlmkit workflow report`.
 
 #### Capture routes for external projects
 
-`vrt workflow init|capture` runs `e2e/vrt-capture.spec.ts`, which now resolves
+`vlmkit workflow init|capture` runs `e2e/vrt-capture.spec.ts`, which now resolves
 its route list from your project rather than hard-coding vrt's own pages.
 Drop a `vrt.config.json` next to your app with a `capture` block:
 
@@ -439,33 +451,33 @@ an optional `waitFor` CSS selector. Resolution order:
 1. `VRT_CAPTURE_ROUTES` env var (JSON-encoded array)
 2. `--config <path>` flag or `VRT_CONFIG_PATH` env var
 3. `vrt.config.json` auto-discovered in the working directory
-4. Built-in defaults (vrt's own UI — useful only when developing vrt itself)
+4. Built-in defaults (vlmkit's own UI — useful only when developing vlmkit itself)
 
 ```bash
 # External project usage
-vrt workflow init --config ./vrt.config.json --base-url http://localhost:5173
-vrt workflow capture --config ./vrt.config.json
-vrt workflow verify
+vlmkit workflow init --config ./vrt.config.json --base-url http://localhost:5173
+vlmkit workflow capture --config ./vrt.config.json
+vlmkit workflow verify
 ```
 
 ### API Commands
 
 ```bash
-vrt api serve [--port 3456]                # Start HTTP API server
-vrt api status [--url http://localhost:3456]
+vlmkit api serve [--port 3456]                # Start HTTP API server
+vlmkit api status [--url http://localhost:3456]
 ```
 
 Compatibility aliases:
 
-- `vrt serve` -> `vrt api serve`
-- `vrt status` -> `vrt api status`
+- `vlmkit serve` -> `vlmkit api serve`
+- `vlmkit status` -> `vlmkit api status`
 
 ## HTTP API
 
 Start the server:
 
 ```bash
-vrt api serve --port 3456
+vlmkit api serve --port 3456
 ```
 
 The shared Hono app also exposes a Cloudflare Workers entry point at `worker/index.ts`.
@@ -484,7 +496,7 @@ When running on Workers, `/api/status` also reports detected `R2` / `KV` / `D1` 
 TypeScript client:
 
 ```ts
-import { VrtClient } from "@mizchi/vrt/client";
+import { VrtClient } from "@mizchi/vlmkit/client";
 
 const client = new VrtClient("http://localhost:3456");
 const status = await client.status();
@@ -494,7 +506,7 @@ const result = await client.compareHtml(
 );
 ```
 
-Install: `pnpm add @mizchi/vrt`
+Install: `pnpm add @mizchi/vlmkit`
 
 `compareUrls(...)` is intended for public HTTP(S) targets. The API server rejects localhost and private-network URLs.
 
@@ -560,29 +572,29 @@ docs/
 
 ## Agent Skills (APM)
 
-vrt ships five coding-agent skills under `.claude/skills/`. They wrap
+vlmkit ships five coding-agent skills under `.claude/skills/`. They wrap
 the most common workflows as standalone, agent-readable playbooks.
 Other repos can install them via [APM](https://agentskills.io):
 
 ```bash
 # Install a single skill into the current repo's .claude/skills/
-apm install mizchi/vrt/.claude/skills/vrt-visual-diff
+apm install mizchi/vlmkit/.claude/skills/vrt-visual-diff
 
 # Install all five
-apm install mizchi/vrt/.claude/skills/vrt-visual-diff \
-            mizchi/vrt/.claude/skills/vrt-migration-eval \
-            mizchi/vrt/.claude/skills/vrt-css-fix-loop \
-            mizchi/vrt/.claude/skills/vrt-markup-synth \
-            mizchi/vrt/.claude/skills/vrt-regression-watch
+apm install mizchi/vlmkit/.claude/skills/vrt-visual-diff \
+            mizchi/vlmkit/.claude/skills/vrt-migration-eval \
+            mizchi/vlmkit/.claude/skills/vrt-css-fix-loop \
+            mizchi/vlmkit/.claude/skills/vrt-markup-synth \
+            mizchi/vlmkit/.claude/skills/vrt-regression-watch
 ```
 
 | Skill | Entry workflow | Use when |
 |---|---|---|
-| `vrt-visual-diff` | `vrt diff html` → `vrt diff agent` | One-shot "did this CSS edit visibly change something?" |
-| `vrt-migration-eval` | `vrt migration compare\|blind\|subagent` | Framework / CSS-lib / build-system swap audit |
+| `vrt-visual-diff` | `vlmkit diff html` → `vlmkit diff agent` | One-shot "did this CSS edit visibly change something?" |
+| `vrt-migration-eval` | `vlmkit migration compare\|blind\|subagent` | Framework / CSS-lib / build-system swap audit |
 | `vrt-css-fix-loop` | `fix-loop.ts` (VLM-driven) | Closed-loop CSS auto-repair benchmark |
-| `vrt-markup-synth` | `vrt build\|scan\|check\|stress *` | Screenshot → HTML/CSS, token / theme / i18n audits |
-| `vrt-regression-watch` | `vrt diff agent --previous --fail-on-regression` | Per-PR or scheduled regression gate |
+| `vrt-markup-synth` | `vlmkit build\|scan\|check\|stress *` | Screenshot → HTML/CSS, token / theme / i18n audits |
+| `vrt-regression-watch` | `vlmkit diff agent --previous --fail-on-regression` | Per-PR or scheduled regression gate |
 
 Each skill assumes the `vrt` CLI is on `$PATH` (this repo published as
 a Node package, or built from source) and Node 24+. VLM-using skills
