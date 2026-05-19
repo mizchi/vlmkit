@@ -1,0 +1,239 @@
+{
+  "version": 1,
+  "screens": [
+    {
+      "id": "blog-home",
+      "viewports": [
+        {
+          "label": "desktop",
+          "width": 1536,
+          "height": 1024
+        },
+        {
+          "label": "mobile",
+          "width": 432,
+          "height": 911,
+          "dpr": 2
+        }
+      ],
+      "landmarks": [
+        {
+          "id": "banner-body-0-header-0",
+          "role": "banner",
+          "name": "",
+          "layout": {
+            "width": {
+              "kind": "fluid",
+              "max": 1324
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "flex",
+              "direction": "row"
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          }
+        },
+        {
+          "id": "navigation-primary",
+          "role": "navigation",
+          "name": "Primary",
+          "layout": {
+            "width": {
+              "kind": "fluid"
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "flex",
+              "direction": "row"
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          }
+        },
+        {
+          "id": "main-engineering-notes-for-systems-that-outlive-the-sprint",
+          "role": "main",
+          "name": "Engineering notes for systems that outlive the sprint.",
+          "layout": {
+            "width": {
+              "kind": "fluid",
+              "max": 1324
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "block"
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          }
+        },
+        {
+          "id": "region-engineering-notes-for-systems-that-outlive-the-sprint",
+          "role": "region",
+          "name": "Engineering notes for systems that outlive the sprint.",
+          "layout": {
+            "width": {
+              "kind": "fluid",
+              "max": 760
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "block"
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          }
+        },
+        {
+          "id": "region-blog-content",
+          "role": "region",
+          "name": "Blog content",
+          "layout": {
+            "width": {
+              "kind": "fluid"
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "grid",
+              "columns": [
+                "786px",
+                "360px"
+              ],
+              "rows": [
+                "312.734px",
+                "344.5px",
+                "0px"
+              ]
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          }
+        },
+        {
+          "id": "complementary-topics",
+          "role": "complementary",
+          "name": "Topics",
+          "layout": {
+            "width": {
+              "kind": "fluid"
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "block"
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          }
+        },
+        {
+          "id": "region-recent-notes",
+          "role": "region",
+          "name": "Recent notes",
+          "layout": {
+            "width": {
+              "kind": "fluid"
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "block"
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          }
+        },
+        {
+          "id": "region-follow-the-notes",
+          "role": "region",
+          "name": "Follow the notes",
+          "layout": {
+            "width": {
+              "kind": "fluid"
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "block"
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          }
+        },
+        {
+          "id": "region-about",
+          "role": "region",
+          "name": "About",
+          "layout": {
+            "width": {
+              "kind": "fluid"
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "block"
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          }
+        },
+        {
+          "id": "contentinfo-body-0-footer-0",
+          "role": "contentinfo",
+          "name": "",
+          "layout": {
+            "width": {
+              "kind": "fluid",
+              "max": 1324
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "flex",
+              "direction": "row"
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
