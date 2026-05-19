@@ -97,11 +97,16 @@ The manual layout pass made the rendered page look more like the target at a
 glance, but the measured diff worsened. The next pass should be driven by the
 report order:
 
-1. Match page and section top offsets.
-2. Match card dimensions.
-3. Match right-rail vertical placement.
-4. Match typography scale.
+1. Lock the typography contract first: font family class, scale, line-height,
+   and mobile wrapping.
+2. Match page and section top offsets.
+3. Match card dimensions.
+4. Match right-rail vertical placement.
 5. Only then add decorative image blocks.
+
+The blog run showed that typography is not a late decoration detail. On mobile,
+heading scale and line-height directly control feature-card height, recent-list
+row height, and whether the subscription block enters the first viewport.
 
 ### Finding 5: pixel diff is too strict for AI mock targets
 
@@ -265,6 +270,32 @@ close, even though generated text, icons, and decorative details still differ.
 Pixel-perfect work should be reserved for `--goal pixel` and deterministic
 baselines, not for AI-generated design mocks.
 
+### Finding 14: mock generation needs implementation feasibility constraints
+
+The initial mock prompts asked for "strong typography" but did not constrain
+the generated design to web-standard typography. That leaves too much room for
+AI to invent font shapes, weights, logo text, and decorative glyph density that
+look good in an image but are expensive to reproduce with semantic HTML/CSS.
+
+For future runs, the mock prompt should explicitly require:
+
+- Georgia/system serif or system-ui/Inter-like sans typography;
+- plausible CSS font sizes, line heights, weights, and mobile wrapping;
+- no custom display fonts, hand lettering, or rasterized logo text;
+- decorative art as simple SVG or replaceable media slots;
+- every visible region explainable as semantic HTML plus CSS grid/flex.
+
+This should happen before image generation, not after implementation starts.
+The desired first loop is now:
+
+```text
+brief -> typography/web feasibility envelope -> AI mock -> feasibility review -> implementation
+```
+
+This also affects report order. `Text rows / typography` should be checked
+before deep layout tweaking because font choices determine the box sizes that
+landscape matching later depends on.
+
 ## Next steps
 
 1. Add a repo-local task or README note for:
@@ -289,6 +320,10 @@ baselines, not for AI-generated design mocks.
     loops do not need to parse markdown.
 12. Add decoration/a11y gates on top of `app` goal once layout convergence is
     stable.
+13. Add a `vlmkit design analyze-brief` or prompt helper that emits the
+    typography/web feasibility envelope before mock generation.
+14. Add a mock feasibility review artifact that records which generated
+    details are implementable, normalized, or ignored.
 
 ## Verification
 

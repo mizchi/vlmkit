@@ -22,9 +22,25 @@
 - Avoid decorative gradient blobs, fake browser chrome, and oversized hero imagery.
 - Use restrained colors, strong typography, and clear spacing.
 
+## Typography feasibility
+
+- Use web-standard typography that can be approximated with Georgia/system serif
+  and system-ui/Inter-like sans.
+- Do not require custom display fonts, rasterized logo text, hand lettering, or
+  font weights that are unavailable in normal CSS.
+- Keep heading/body/meta scale plausible across desktop and mobile so real HTML
+  text wraps into similar card heights.
+
+## Implementation feasibility
+
+- Every visible region should map to semantic HTML landmarks and CSS grid/flex.
+- Use explicit min/max width constraints for liquid regions.
+- Treat illustration/detail areas as simple SVG or replaceable media slots.
+- Avoid visual effects that depend on image-only text, complex textures, or
+  nonstandard browser features.
+
 ## Deliverables
 
 - Desktop mock target: landscape
 - Mobile mock target: portrait
 - Final implementation: semantic HTML + responsive CSS
-
