@@ -30,7 +30,7 @@ import {
   RED,
   RESET,
   YELLOW,
-} from "@mizchi/vrt-core/terminal-colors.ts";
+} from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { WireframeFixSuggestion } from "./experiments/migration/wireframe-fix-candidates.ts";
 
 const DEBOUNCE_MS = 150;

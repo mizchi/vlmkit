@@ -11,13 +11,13 @@
  */
 import { readFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { diffA11yTrees, parsePlaywrightA11ySnapshot, verifyA11yTree } from "@mizchi/vrt-core/a11y-semantic.ts";
-import { reasonAboutChanges, type ReasoningChain } from "@mizchi/vrt-ai/reasoning.ts";
-import { introspectToSpec, verifySpec } from "@mizchi/vrt-markup/inspect/introspect.ts";
-import { encodePng } from "@mizchi/vrt-core/png-utils.ts";
-import { createLLMProvider } from "@mizchi/vrt-ai/llm-client.ts";
-import type { LLMProvider } from "@mizchi/vrt-ai/intent.ts";
-import type { A11yNode, UiSpec } from "@mizchi/vrt-core/types.ts";
+import { diffA11yTrees, parsePlaywrightA11ySnapshot, verifyA11yTree } from "@mizchi/vlmkit-core/a11y-semantic.ts";
+import { reasonAboutChanges, type ReasoningChain } from "@mizchi/vlmkit-ai/reasoning.ts";
+import { introspectToSpec, verifySpec } from "@mizchi/vlmkit-markup/inspect/introspect.ts";
+import { encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
+import { createLLMProvider } from "@mizchi/vlmkit-ai/llm-client.ts";
+import type { LLMProvider } from "@mizchi/vlmkit-ai/intent.ts";
+import type { A11yNode, UiSpec } from "@mizchi/vlmkit-core/types.ts";
 
 const FIXTURES = join(import.meta.dirname!, "..", "..", "fixtures", "react-sample");
 const TMP = join(import.meta.dirname!, "..", "..", "test-results", "demo-multi");

@@ -13,9 +13,9 @@
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { listModels, resolveModel, createVlmClient, type VlmModel, type VlmResponse } from "@mizchi/vrt-ai/vlm-client.ts";
-import { getArg, hasFlag, getPositionalArgs } from "@mizchi/vrt-core/cli-args.ts";
-import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD } from "@mizchi/vrt-core/terminal-colors.ts";
+import { listModels, resolveModel, createVlmClient, type VlmModel, type VlmResponse } from "@mizchi/vlmkit-ai/vlm-client.ts";
+import { getArg, hasFlag, getPositionalArgs } from "@mizchi/vlmkit-core/cli-args.ts";
+import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 const modelArgs = getPositionalArgs();
 
@@ -91,7 +91,7 @@ async function runBench(modelIds: string[]) {
     imageLabel = IMAGE_PATH;
   } else {
     console.log(`  ${DIM}Generating test heatmap...${RESET}`);
-    const { compareScreenshots } = await import("@mizchi/vrt-core/heatmap.ts");
+    const { compareScreenshots } = await import("@mizchi/vlmkit-core/heatmap.ts");
     const { chromium } = await import("playwright");
     const browser = await chromium.launch();
 

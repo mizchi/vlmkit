@@ -1,8 +1,8 @@
-import { classifyVisualDiff } from "@mizchi/vrt-core/visual-semantic.ts";
+import { classifyVisualDiff } from "@mizchi/vlmkit-core/visual-semantic.ts";
 import type { ApprovalChangeType } from "../../vrt/snapshot/approval.ts";
 import type { PropertyCategory } from "../css-challenge/css-challenge-core.ts";
-import type { VisualSemanticChange, VrtDiff } from "@mizchi/vrt-core/types.ts";
-import { createScopedVrtDiff, normalizeVrtDiffRegions } from "@mizchi/vrt-core/diff-regions.ts";
+import type { VisualSemanticChange, VrtDiff } from "@mizchi/vlmkit-core/types.ts";
+import { createScopedVrtDiff, normalizeVrtDiffRegions } from "@mizchi/vlmkit-core/diff-regions.ts";
 
 export type MigrationDiffCategory =
   | "layout-shift"

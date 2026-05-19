@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { discoverViewports } from "@mizchi/vrt-capture/viewport-discovery.ts";
+import { discoverViewports } from "@mizchi/vlmkit-capture/viewport-discovery.ts";
 import { parseMigrationBlindManifest, selectMigrationBlindScenario } from "./migration-blind.ts";
 
 const MIGRATION_DIR = join(import.meta.dirname!, "..", "..", "..", "fixtures", "migration");

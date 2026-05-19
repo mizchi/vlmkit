@@ -3,7 +3,7 @@ import { defineConfig } from "tsdown";
 export default defineConfig([
   {
     entry: {
-      vrt: "src/cli/vrt.ts",
+      vlmkit: "src/cli/vlmkit.ts",
     },
     format: ["esm"],
     platform: "node",
@@ -22,7 +22,7 @@ export default defineConfig([
   },
   {
     entry: {
-      "e2e/vrt-capture.spec": "e2e/vrt-capture.spec.ts",
+      "e2e/vlmkit-capture.spec": "e2e/vlmkit-capture.spec.ts",
     },
     format: ["esm"],
     platform: "node",

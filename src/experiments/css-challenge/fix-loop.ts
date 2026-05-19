@@ -12,17 +12,17 @@
 import { readFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { chromium } from "playwright";
-import { compareScreenshots, generateDiffReport } from "@mizchi/vrt-core/heatmap.ts";
+import { compareScreenshots, generateDiffReport } from "@mizchi/vlmkit-core/heatmap.ts";
 import {
   parseCssDeclarations, removeCssProperty, extractCss, replaceCss,
   seededRandom, groupBySelector, removeSelectorBlock, escapeRegex,
   type CssDeclaration,
 } from "./css-challenge-core.ts";
-import { createReasoningPipeline } from "@mizchi/vrt-ai/reasoning-pipeline.ts";
-import { resolveResolutionForViewport } from "@mizchi/vrt-core/image-resize.ts";
+import { createReasoningPipeline } from "@mizchi/vlmkit-ai/reasoning-pipeline.ts";
+import { resolveResolutionForViewport } from "@mizchi/vlmkit-core/image-resize.ts";
 import { getCssChallengeFixturePath } from "./css-challenge-fixtures.ts";
-import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "@mizchi/vrt-core/terminal-colors.ts";
-import { getArg } from "@mizchi/vrt-core/cli-args.ts";
+import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { getArg } from "@mizchi/vlmkit-core/cli-args.ts";
 
 // ---- Config ----
 

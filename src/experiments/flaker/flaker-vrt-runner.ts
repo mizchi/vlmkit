@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { handleCliError } from "@mizchi/vrt-core/cli-error.ts";
+import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { loadFlakerVrtConfig, toViewportSpec, type FlakerVrtConfig, type FlakerVrtMigrationScenario } from "./flaker-vrt-config.ts";
 import {
   runMigrationCompare,

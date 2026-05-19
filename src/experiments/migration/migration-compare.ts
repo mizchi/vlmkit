@@ -28,8 +28,8 @@ import {
   type CraterBreakpointDiscoveryDiagnostics,
   type PaintNode,
   type PaintTreeChange,
-} from "@mizchi/vrt-capture/crater-client.ts";
-import { compareScreenshots, generateDiffReport } from "@mizchi/vrt-core/heatmap.ts";
+} from "@mizchi/vlmkit-capture/crater-client.ts";
+import { compareScreenshots, generateDiffReport } from "@mizchi/vlmkit-core/heatmap.ts";
 import { composeTriptych } from "./triptych.ts";
 import { loadDesignTokens, snapColor, type DesignTokens } from "./design-md-tokens.ts";
 import { generateWireframeFixCandidates, type WireframeFixSuggestion } from "./wireframe-fix-candidates.ts";
@@ -55,11 +55,11 @@ import {
   mergeResponsiveBreakpoints,
   type ResponsiveBreakpoint,
   type ViewportSpec,
-} from "@mizchi/vrt-capture/viewport-discovery.ts";
-import { formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vrt-capture/playwright-launch-error.ts";
-import type { ShiftRegion, VrtSnapshot } from "@mizchi/vrt-core/types.ts";
-import { applyMask, parseMaskSelectors } from "@mizchi/vrt-core/mask.ts";
-import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr as _hr } from "@mizchi/vrt-core/terminal-colors.ts";
+} from "@mizchi/vlmkit-capture/viewport-discovery.ts";
+import { formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
+import type { ShiftRegion, VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
+import { applyMask, parseMaskSelectors } from "@mizchi/vlmkit-core/mask.ts";
+import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr as _hr } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import {
   evaluateRenderSanity,
   probeSourceHtml,
@@ -72,9 +72,9 @@ import {
   DOM_FINGERPRINT_BROWSER_SCRIPT,
   type DomFingerprint,
   type DomEquivalenceResult,
-} from "@mizchi/vrt-core/dom-equivalence.ts";
-import { buildComputedStyleCaptureJsonExpression, parseComputedStyleSnapshot } from "@mizchi/vrt-core/computed-style-capture.ts";
-import { aggregateCsdByViewport, diffComputedStyles, type CsdPerViewportResult, type CsdResult, type ComputedStyleSnapshot } from "@mizchi/vrt-core/computed-style-diff.ts";
+} from "@mizchi/vlmkit-core/dom-equivalence.ts";
+import { buildComputedStyleCaptureJsonExpression, parseComputedStyleSnapshot } from "@mizchi/vlmkit-core/computed-style-capture.ts";
+import { aggregateCsdByViewport, diffComputedStyles, type CsdPerViewportResult, type CsdResult, type ComputedStyleSnapshot } from "@mizchi/vlmkit-core/computed-style-diff.ts";
 import {
   diffDomPositionStyles,
   diffPositionStylesAcrossViewports,
@@ -83,36 +83,36 @@ import {
   type DpResult,
   type DpPerViewportResult,
   type PositionedElement,
-} from "@mizchi/vrt-core/dom-position-styles.ts";
+} from "@mizchi/vlmkit-core/dom-position-styles.ts";
 import {
   findShiftOrigins,
   DOM_BBOX_BROWSER_SCRIPT,
   parseBboxes,
   type BboxElement,
   type ShiftOrigin,
-} from "@mizchi/vrt-core/shift-origin.ts";
-import { findGridSuggestions, type GridSuggestion } from "@mizchi/vrt-core/grid-ratio.ts";
+} from "@mizchi/vlmkit-core/shift-origin.ts";
+import { findGridSuggestions, type GridSuggestion } from "@mizchi/vlmkit-core/grid-ratio.ts";
 import {
   extractComponentsFromFile,
   matchComponents,
   type MatchedBbox,
-} from "@mizchi/vrt-markup/component/component-bbox.ts";
-import { buildGeometryProfiles, type PerRankGeometry } from "@mizchi/vrt-markup/component/component-geometry.ts";
-import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vrt-core/heatmap-regions.ts";
+} from "@mizchi/vlmkit-markup/component/component-bbox.ts";
+import { buildGeometryProfiles, type PerRankGeometry } from "@mizchi/vlmkit-markup/component/component-geometry.ts";
+import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
 import {
   extractTextRowsFromFile,
   matchTextRows,
   type MatchedTextRow,
-} from "@mizchi/vrt-core/text-rows.ts";
-import { extractPaletteFromFile, type PaletteColor } from "@mizchi/vrt-markup/style/palette-extract.ts";
-import { diffPalettes, type PaletteDiff } from "@mizchi/vrt-markup/style/palette-diff.ts";
-import { handleCliError } from "@mizchi/vrt-core/cli-error.ts";
+} from "@mizchi/vlmkit-core/text-rows.ts";
+import { extractPaletteFromFile, type PaletteColor } from "@mizchi/vlmkit-markup/style/palette-extract.ts";
+import { diffPalettes, type PaletteDiff } from "@mizchi/vlmkit-markup/style/palette-diff.ts";
+import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import {
   applyForcedPseudoState,
   clearStateMarkers,
   type ForcedPseudoState,
   type AppliedForcedState,
-} from "@mizchi/vrt-markup/stress/multi-state.ts";
+} from "@mizchi/vlmkit-markup/stress/multi-state.ts";
 
 // ---- Config ----
 

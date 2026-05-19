@@ -32,8 +32,8 @@ export interface CompareRequest {
   options?: CompareOptions;
 }
 
-export type { HtmlSource } from "@mizchi/vrt-core/types.ts";
-import type { HtmlSource } from "@mizchi/vrt-core/types.ts";
+export type { HtmlSource } from "@mizchi/vlmkit-core/types.ts";
+import type { HtmlSource } from "@mizchi/vlmkit-core/types.ts";
 
 export interface DiscoverOptions {
   /** Breakpoint discovery backend */
@@ -315,7 +315,7 @@ export type {
   SmokeTestMeta,
   A11ySnapshot,
   A11yNodeCompact,
-} from "@mizchi/vrt-markup/inspect/smoke-types.ts";
+} from "@mizchi/vlmkit-markup/inspect/smoke-types.ts";
 
 // ---- Report API ----
 

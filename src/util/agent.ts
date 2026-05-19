@@ -4,9 +4,9 @@ import type {
   VrtDiff,
   ChangeIntent,
   QualityCheckResult,
-} from "@mizchi/vrt-core/types.ts";
-import type { LLMProvider } from "@mizchi/vrt-ai/intent.ts";
-import { buildReasoningPrompt } from "@mizchi/vrt-ai/intent.ts";
+} from "@mizchi/vlmkit-core/types.ts";
+import type { LLMProvider } from "@mizchi/vlmkit-ai/intent.ts";
+import { buildReasoningPrompt } from "@mizchi/vlmkit-ai/intent.ts";
 
 export interface AgentConfig {
   /** Auto-approve diffRatio threshold. Below this = auto-approve */

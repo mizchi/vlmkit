@@ -1,6 +1,6 @@
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { PrescannerTrialSummary } from "@mizchi/vrt-capture/prescanner.ts";
+import type { PrescannerTrialSummary } from "@mizchi/vlmkit-capture/prescanner.ts";
 
 export type BenchHistoryBackend = "chromium" | "crater" | "prescanner";
 

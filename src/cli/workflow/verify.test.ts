@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { encodePng } from "@mizchi/vrt-core/png-utils.ts";
+import { encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
 import { runVerifyPipeline } from "./verify.ts";
 
 // Use the OS tmp dir (outside the repo) so `git` invoked from the

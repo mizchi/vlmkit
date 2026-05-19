@@ -29,7 +29,7 @@ import {
   parseApprovalManifest,
   validateApprovalManifest,
 } from "./vrt/snapshot/approval.ts";
-import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vrt-core/terminal-colors.ts";
+import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 const DEFAULT_MANIFEST_PATH = "approval.json";
 

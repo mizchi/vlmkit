@@ -14,9 +14,9 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { diffA11yTrees, parsePlaywrightA11ySnapshot, checkA11yTree } from "@mizchi/vrt-core/a11y-semantic.ts";
+import { diffA11yTrees, parsePlaywrightA11ySnapshot, checkA11yTree } from "@mizchi/vlmkit-core/a11y-semantic.ts";
 import { matchA11yExpectation, crossValidateWithExpectation, scoreLoop } from "../vrt/snapshot/expectation.ts";
-import { introspectToSpec, verifySpec } from "@mizchi/vrt-markup/inspect/introspect.ts";
+import { introspectToSpec, verifySpec } from "@mizchi/vlmkit-markup/inspect/introspect.ts";
 import type {
   A11yNode,
   PageExpectation,
@@ -24,7 +24,7 @@ import type {
   UnifiedAgentContext,
   VrtExpectation,
   PageIntrospection,
-} from "@mizchi/vrt-core/types.ts";
+} from "@mizchi/vlmkit-core/types.ts";
 
 const FIXTURES = join(import.meta.dirname!, "..", "..", "fixtures", "react-sample");
 

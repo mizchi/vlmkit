@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import type { PaintTreeChange } from "@mizchi/vrt-capture/crater-client.ts";
-import type { VrtDiff, VrtSnapshot } from "@mizchi/vrt-core/types.ts";
+import type { PaintTreeChange } from "@mizchi/vlmkit-capture/crater-client.ts";
+import type { VrtDiff, VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import {
   applyApprovalToVrtDiff,
   collectApprovalWarnings,

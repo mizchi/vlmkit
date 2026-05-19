@@ -13,18 +13,18 @@
 import { readFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { chromium } from "playwright";
-import { formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vrt-capture/playwright-launch-error.ts";
+import { formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
 import { applyApprovalToVrtDiff, collectApprovalWarnings, inferApprovalChangeType, loadApprovalManifest } from "../../vrt/snapshot/approval.ts";
 import { getCssChallengeFixturePath } from "./css-challenge-fixtures.ts";
 import { categorizeProperty, escapeRegex } from "./css-challenge-core.ts";
-import { compareScreenshots } from "@mizchi/vrt-core/heatmap.ts";
-import { classifyVisualDiff } from "@mizchi/vrt-core/visual-semantic.ts";
-import { diffA11yTrees, verifyA11yTree, parsePlaywrightA11ySnapshot } from "@mizchi/vrt-core/a11y-semantic.ts";
-import { createLLMProvider } from "@mizchi/vrt-ai/llm-client.ts";
-import type { A11yNode, VrtSnapshot } from "@mizchi/vrt-core/types.ts";
-import { getArg, hasFlag } from "@mizchi/vrt-core/cli-args.ts";
-import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "@mizchi/vrt-core/terminal-colors.ts";
-import { handleCliError } from "@mizchi/vrt-core/cli-error.ts";
+import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
+import { classifyVisualDiff } from "@mizchi/vlmkit-core/visual-semantic.ts";
+import { diffA11yTrees, verifyA11yTree, parsePlaywrightA11ySnapshot } from "@mizchi/vlmkit-core/a11y-semantic.ts";
+import { createLLMProvider } from "@mizchi/vlmkit-ai/llm-client.ts";
+import type { A11yNode, VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
+import { getArg, hasFlag } from "@mizchi/vlmkit-core/cli-args.ts";
+import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 
 // ---- Config ----
 

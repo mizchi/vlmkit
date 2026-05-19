@@ -2,7 +2,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { extractCss } from "../css-challenge/css-challenge-core.ts";
-import { createLLMProvider } from "@mizchi/vrt-ai/llm-client.ts";
+import { createLLMProvider } from "@mizchi/vlmkit-ai/llm-client.ts";
 import { runMigrationCompare, type MigrationCompareOptions } from "./migration-compare.ts";
 import {
   applyMigrationFixToHtml,
@@ -16,8 +16,8 @@ import {
   type MigrationFix,
   type SelectedMigrationFixTarget,
 } from "./migration-fix-loop-core.ts";
-import { getArg, hasFlag } from "@mizchi/vrt-core/cli-args.ts";
-import { handleCliError } from "@mizchi/vrt-core/cli-error.ts";
+import { getArg, hasFlag } from "@mizchi/vlmkit-core/cli-args.ts";
+import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 
 const REPORT_PATH = resolve(getArg("report", join(process.cwd(), "test-results", "migration", "migration-report.json")));
 const VARIANT_FILTER = getArg("variant");

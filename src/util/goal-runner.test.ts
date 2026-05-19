@@ -16,7 +16,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { runGoal, formatGoalReport } from "./goal-runner.ts";
 import type { Goal } from "./goal-runner.ts";
-import type { A11yNode } from "@mizchi/vrt-core/types.ts";
+import type { A11yNode } from "@mizchi/vlmkit-core/types.ts";
 
 const FIXTURES = join(import.meta.dirname!, "..", "..", "fixtures", "react-sample");
 

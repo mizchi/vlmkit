@@ -36,8 +36,8 @@ import { readFile, writeFile, readdir, mkdir, stat } from "node:fs/promises";
 import { join, resolve, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn } from "node:child_process";
-import { handleCliError } from "@mizchi/vrt-core/cli-error.ts";
-import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vrt-core/terminal-colors.ts";
+import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 const SKILLS_DIR = ".vrt-skills";
 

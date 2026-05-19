@@ -38,16 +38,16 @@ import {
   type DiffPrConfig,
   type DiffPrRoute,
 } from "./diff-pr-config.ts";
-import { compareScreenshots } from "@mizchi/vrt-core/heatmap.ts";
+import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { runA11yOnPage } from "./a11y-on-page.ts";
-import { runMediaVariants, type VariantResult, type MediaVariant } from "@mizchi/vrt-markup/stress/media-variants.ts";
-import { runCrossBrowser, type EngineName, type EngineResult } from "@mizchi/vrt-markup/stress/cross-browser.ts";
+import { runMediaVariants, type VariantResult, type MediaVariant } from "@mizchi/vlmkit-markup/stress/media-variants.ts";
+import { runCrossBrowser, type EngineName, type EngineResult } from "@mizchi/vlmkit-markup/stress/cross-browser.ts";
 import { filterA11yFindings, filterCrossBrowserFindings, filterMediaVariantFindings, loadApprovalManifest, type ApprovalManifest } from "./vrt/snapshot/approval.ts";
-import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vrt-core/terminal-colors.ts";
-import type { VrtSnapshot } from "@mizchi/vrt-core/types.ts";
-import type { ContrastFinding } from "@mizchi/vrt-core/a11y-contrast.ts";
-import type { TouchTargetFinding } from "@mizchi/vrt-core/a11y-touch.ts";
-import type { FocusOrderFinding } from "@mizchi/vrt-core/a11y-focus-order.ts";
+import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
+import type { ContrastFinding } from "@mizchi/vlmkit-core/a11y-contrast.ts";
+import type { TouchTargetFinding } from "@mizchi/vlmkit-core/a11y-touch.ts";
+import type { FocusOrderFinding } from "@mizchi/vlmkit-core/a11y-focus-order.ts";
 import type { SemanticFinding } from "./a11y-semantic-checks.ts";
 
 // Same defaults as migration-compare's STATIC_VIEWPORTS so a baseline

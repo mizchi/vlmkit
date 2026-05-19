@@ -8,7 +8,7 @@ import { after, before, describe, it } from "node:test";
 let tmp: string;
 let manifestPath: string;
 
-const CLI_PATH = new URL("./cli/vrt.ts", import.meta.url).pathname;
+const CLI_PATH = new URL("./cli/vlmkit.ts", import.meta.url).pathname;
 
 function cli(...argv: string[]): { stdout: string; stderr: string; status: number } {
   const result = spawnSync(

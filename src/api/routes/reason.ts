@@ -17,7 +17,7 @@ export function registerReasonRoute(app: Hono): void {
       return c.json({ error: "Need at least one of: heatmapBase64, currentBase64, textReport" }, 400);
     }
 
-    const { createReasoningPipeline } = await import("@mizchi/vrt-ai/reasoning-pipeline.ts");
+    const { createReasoningPipeline } = await import("@mizchi/vlmkit-ai/reasoning-pipeline.ts");
     const pipeline = createReasoningPipeline({
       vlmModel: body.vlmModel,
       llmProvider: body.llmProvider,

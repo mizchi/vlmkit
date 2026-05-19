@@ -33,8 +33,8 @@ export function registerCompareRoute(app: Hono): void {
     }
 
     const { chromium } = await import("playwright");
-    const { compareScreenshots } = await import("@mizchi/vrt-core/heatmap.ts");
-    const { discoverViewports } = await import("@mizchi/vrt-capture/viewport-discovery.ts");
+    const { compareScreenshots } = await import("@mizchi/vlmkit-core/heatmap.ts");
+    const { discoverViewports } = await import("@mizchi/vlmkit-capture/viewport-discovery.ts");
     const { mkdir, rm } = await import("node:fs/promises");
     const { join } = await import("node:path");
 

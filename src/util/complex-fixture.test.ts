@@ -2,10 +2,10 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { diffA11yTrees, checkA11yTree, parsePlaywrightA11ySnapshot } from "@mizchi/vrt-core/a11y-semantic.ts";
-import { introspectToSpec, verifySpec } from "@mizchi/vrt-markup/inspect/introspect.ts";
-import { reasonAboutChanges } from "@mizchi/vrt-ai/reasoning.ts";
-import type { A11yNode, A11ySnapshot, ChangeIntent, PageExpectation } from "@mizchi/vrt-core/types.ts";
+import { diffA11yTrees, checkA11yTree, parsePlaywrightA11ySnapshot } from "@mizchi/vlmkit-core/a11y-semantic.ts";
+import { introspectToSpec, verifySpec } from "@mizchi/vlmkit-markup/inspect/introspect.ts";
+import { reasonAboutChanges } from "@mizchi/vlmkit-ai/reasoning.ts";
+import type { A11yNode, A11ySnapshot, ChangeIntent, PageExpectation } from "@mizchi/vlmkit-core/types.ts";
 
 const FIXTURES = join(import.meta.dirname!, "..", "..", "fixtures");
 

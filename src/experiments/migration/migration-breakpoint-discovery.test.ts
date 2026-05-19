@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import type {
   CraterBreakpointDiscoveryDiagnostics,
   CraterBreakpointDiscoveryResult,
-} from "@mizchi/vrt-capture/crater-client.ts";
+} from "@mizchi/vlmkit-capture/crater-client.ts";
 import {
   discoverResponsiveBreakpointsForHtmlDocuments,
   summarizeBreakpointDiscoveryDiagnostics,
