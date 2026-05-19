@@ -2,11 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildSemanticDrilldown,
+  describeScrollportStatus,
   describeLandmarkLayoutContract,
   normalizeLandmarkRole,
   selectNextSemanticDrilldown,
   type LandmarkRegion,
   type LandmarkLayoutContract,
+  type ScrollportRegion,
 } from "./semantic-drilldown.ts";
 import type { LandscapeCellDiff } from "@mizchi/vlmkit-core/landscape-diff.ts";
 import type { HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
@@ -169,5 +171,46 @@ test("describeLandmarkLayoutContract identifies unbounded fluid blocks", () => {
     height: "content",
     scroll: "none",
     grid: "block",
+  });
+});
+
+function scrollport(partial: Partial<ScrollportRegion>): ScrollportRegion {
+  return {
+    name: "messages",
+    path: "[data-scrollport][0]",
+    bbox: { left: 0, top: 0, width: 320, height: 480 },
+    order: 0,
+    explicit: true,
+    overflowX: "visible",
+    overflowY: "auto",
+    clientWidth: 320,
+    clientHeight: 480,
+    scrollWidth: 320,
+    scrollHeight: 960,
+    ...partial,
+  };
+}
+
+test("describeScrollportStatus accepts explicit independent scrollports", () => {
+  assert.deepEqual(describeScrollportStatus(scrollport({})), {
+    status: "ok",
+    scroll: "y",
+    reason: "independent scrollport",
+  });
+});
+
+test("describeScrollportStatus flags overflowing content without scroll overflow", () => {
+  assert.deepEqual(describeScrollportStatus(scrollport({ overflowY: "visible" })), {
+    status: "broken",
+    scroll: "none",
+    reason: "content overflows but overflow is not scrollable",
+  });
+});
+
+test("describeScrollportStatus flags scrollport markers without overflowing content", () => {
+  assert.deepEqual(describeScrollportStatus(scrollport({ scrollHeight: 480 })), {
+    status: "empty",
+    scroll: "none",
+    reason: "marked as scrollport but content does not overflow",
   });
 });

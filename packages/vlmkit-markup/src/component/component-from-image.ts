@@ -51,10 +51,13 @@ import {
 import {
   buildSemanticDrilldown,
   captureLandmarkRegions,
+  captureScrollportRegions,
   describeLandmarkLayoutContract,
+  describeScrollportStatus,
   selectNextSemanticDrilldown,
   type LandmarkRegion,
   type SemanticDrilldownEntry,
+  type ScrollportRegion,
 } from "./semantic-drilldown.ts";
 import {
   evaluateComponentGoal,
@@ -98,6 +101,7 @@ export interface ComponentFromImageReport {
   landscapeDiff: LandscapeDiffResult;
   goalEvaluation: ComponentGoalEvaluation;
   landmarkRegions: LandmarkRegion[];
+  scrollportRegions: ScrollportRegion[];
   semanticDrilldown: SemanticDrilldownEntry[];
   bboxMatches: MatchedBbox[];
   heatmapRegions: HeatmapRegion[];
@@ -276,6 +280,9 @@ export async function runComponentFromImage(
     });
     await page.setContent(html, { waitUntil: "networkidle" });
     const landmarkRegions = await captureLandmarkRegions(page, {
+      deviceScaleFactor: dpr,
+    }).catch(() => []);
+    const scrollportRegions = await captureScrollportRegions(page, {
       deviceScaleFactor: dpr,
     }).catch(() => []);
     const currentPath = join(outputDir, "current.png");
@@ -540,6 +547,7 @@ export async function runComponentFromImage(
       landscapeDiff,
       goalEvaluation,
       landmarkRegions,
+      scrollportRegions,
       semanticDrilldown,
       heatmapPath: diffPixels > 0 ? heatmapPath : undefined,
       currentPath,
@@ -571,6 +579,11 @@ export async function runComponentFromImage(
       console.log(`  ${YELLOW}!${RESET} ${DIM}${dprSuggestion.reason}; try --dpr ${dprSuggestion.deviceScaleFactor} (${dprSuggestion.cssViewport.width}×${dprSuggestion.cssViewport.height} CSS px)${RESET}`);
     }
     console.log(`  ${DIM}bbox: ${bboxMatches.length}, heatmap: ${heatmapRegions.length}, text-rows ${targetRows.length}/${currentRows.length}, palette missing: ${paletteDiff.onlyInBaseline.length}${RESET}`);
+    if (scrollportRegions.length > 0) {
+      const ok = scrollportRegions.filter((region) => describeScrollportStatus(region).status === "ok").length;
+      const broken = scrollportRegions.filter((region) => describeScrollportStatus(region).status === "broken").length;
+      console.log(`  ${DIM}scrollports: ${ok}/${scrollportRegions.length} ok${broken > 0 ? `, ${broken} broken` : ""}${RESET}`);
+    }
     if (stateResults.length > 0) {
       for (const s of stateResults) {
         console.log(`  ${DIM}:${s.state} induced ${(s.inducedDiffRatio * 100).toFixed(2)}% (${s.forcedCount} forced)${RESET}`);
@@ -586,6 +599,7 @@ export async function runComponentFromImage(
       landscapeDiff,
       goalEvaluation,
       landmarkRegions,
+      scrollportRegions,
       semanticDrilldown,
       bboxMatches,
       heatmapRegions,
@@ -613,6 +627,7 @@ interface RenderInput {
   landscapeDiff: LandscapeDiffResult;
   goalEvaluation: ComponentGoalEvaluation;
   landmarkRegions: LandmarkRegion[];
+  scrollportRegions: ScrollportRegion[];
   semanticDrilldown: SemanticDrilldownEntry[];
   heatmapPath?: string;
   currentPath: string;
@@ -735,6 +750,28 @@ export function renderReportMarkdown(r: RenderInput): string {
     lines.push("No current DOM landmarks were detected. Add semantic wrappers " +
       "such as `<header>`, `<nav>`, `<main>`, `<aside>`, `<footer>`, " +
       "or named `<section>` regions before relying on visual drilldown.");
+    lines.push("");
+  }
+
+  if (r.scrollportRegions.length > 0) {
+    lines.push("## Scrollport inspector");
+    lines.push("");
+    lines.push("Explicit scrollport candidates from `data-scrollport`, " +
+      "`data-vlmkit-scrollport`, `data-ui-scrollport`, or " +
+      "`data-scroll-region`. This is separate from visual matching: an app " +
+      "shell can pass landscape diff while the actual scroll container is wrong.");
+    lines.push("");
+    lines.push("| Status | Name | Box | Overflow | Client | Scroll | Reason |");
+    lines.push("|---|---|---|---|---|---|---|");
+    for (const region of r.scrollportRegions.slice(0, 12)) {
+      const status = describeScrollportStatus(region);
+      const box = `${region.bbox.left},${region.bbox.top} ${region.bbox.width}×${region.bbox.height}`;
+      const overflow = `${region.overflowX}/${region.overflowY}`;
+      const client = `${region.clientWidth}×${region.clientHeight}`;
+      const scroll = `${region.scrollWidth}×${region.scrollHeight}`;
+      lines.push(`| ${status.status} | \`${region.name}\` | ${box} | ` +
+        `${overflow} | ${client} | ${scroll} | ${status.reason} |`);
+    }
     lines.push("");
   }
 

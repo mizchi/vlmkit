@@ -56,6 +56,26 @@ export interface LandmarkLayoutSummary {
   grid: string;
 }
 
+export interface ScrollportRegion {
+  name: string;
+  path: string;
+  bbox: Rect;
+  order: number;
+  explicit: boolean;
+  overflowX: string;
+  overflowY: string;
+  clientWidth: number;
+  clientHeight: number;
+  scrollWidth: number;
+  scrollHeight: number;
+}
+
+export interface ScrollportStatus {
+  status: "ok" | "broken" | "empty";
+  scroll: "none" | "x" | "y" | "xy";
+  reason: string;
+}
+
 export interface SemanticDrilldownInput {
   landmarks: LandmarkRegion[];
   landscapeCells: LandscapeCellDiff[];
@@ -189,6 +209,36 @@ export function describeLandmarkLayoutContract(
   const grid = usesGrid ? gridParts.join(" ") : display;
 
   return { width, height, scroll, grid };
+}
+
+export function describeScrollportStatus(region: ScrollportRegion): ScrollportStatus {
+  const contentOverflowsX = region.scrollWidth > region.clientWidth + 1;
+  const contentOverflowsY = region.scrollHeight > region.clientHeight + 1;
+  const scrollableX = isScrollableOverflow(region.overflowX) && contentOverflowsX;
+  const scrollableY = isScrollableOverflow(region.overflowY) && contentOverflowsY;
+  const scroll: ScrollportStatus["scroll"] = scrollableX && scrollableY
+    ? "xy"
+    : scrollableX
+      ? "x"
+      : scrollableY
+        ? "y"
+        : "none";
+
+  if (scroll !== "none") {
+    return { status: "ok", scroll, reason: "independent scrollport" };
+  }
+  if (contentOverflowsX || contentOverflowsY) {
+    return {
+      status: "broken",
+      scroll,
+      reason: "content overflows but overflow is not scrollable",
+    };
+  }
+  return {
+    status: "empty",
+    scroll,
+    reason: "marked as scrollport but content does not overflow",
+  };
 }
 
 export function buildSemanticDrilldown(input: SemanticDrilldownInput): SemanticDrilldownEntry[] {
@@ -373,4 +423,78 @@ export async function captureLandmarkRegions(
     }
     return out;
   }, { roles: LANDMARK_ROLE_VALUES, dpr });
+}
+
+export async function captureScrollportRegions(
+  page: Page,
+  options: { deviceScaleFactor?: number } = {},
+): Promise<ScrollportRegion[]> {
+  const dpr = options.deviceScaleFactor ?? 1;
+  return await page.evaluate(({ dpr }) => {
+    const selector = [
+      "[data-scrollport]",
+      "[data-vlmkit-scrollport]",
+      "[data-ui-scrollport]",
+      "[data-scroll-region]",
+    ].join(",");
+
+    function domPath(el: Element): string {
+      const parts: string[] = [];
+      let cur: Element | null = el;
+      while (cur && cur !== document.documentElement) {
+        const tag = cur.tagName.toLowerCase();
+        const parent = cur.parentElement;
+        if (!parent) {
+          parts.push(`${tag}[0]`);
+          break;
+        }
+        const siblings = Array.from(parent.children).filter((s) =>
+          s.tagName.toLowerCase() === tag,
+        );
+        const index = Math.max(0, siblings.indexOf(cur));
+        parts.push(`${tag}[${index}]`);
+        cur = parent;
+      }
+      return parts.reverse().join(">");
+    }
+
+    function scrollportName(el: Element): string {
+      return el.getAttribute("data-scrollport")?.trim()
+        || el.getAttribute("data-vlmkit-scrollport")?.trim()
+        || el.getAttribute("data-ui-scrollport")?.trim()
+        || el.getAttribute("data-scroll-region")?.trim()
+        || el.getAttribute("aria-label")?.trim()
+        || el.id
+        || domPath(el);
+    }
+
+    const out: ScrollportRegion[] = [];
+    let order = 0;
+    for (const el of Array.from(document.querySelectorAll(selector))) {
+      const rect = el.getBoundingClientRect();
+      if (rect.width < 1 || rect.height < 1) continue;
+      const style = window.getComputedStyle(el);
+      if (style.display === "none" || style.visibility === "hidden") continue;
+      const element = el as HTMLElement;
+      out.push({
+        name: scrollportName(el),
+        path: domPath(el),
+        bbox: {
+          left: Math.round(rect.left * dpr),
+          top: Math.round(rect.top * dpr),
+          width: Math.round(rect.width * dpr),
+          height: Math.round(rect.height * dpr),
+        },
+        order: order++,
+        explicit: true,
+        overflowX: style.overflowX,
+        overflowY: style.overflowY,
+        clientWidth: Math.round(element.clientWidth * dpr),
+        clientHeight: Math.round(element.clientHeight * dpr),
+        scrollWidth: Math.round(element.scrollWidth * dpr),
+        scrollHeight: Math.round(element.scrollHeight * dpr),
+      });
+    }
+    return out;
+  }, { dpr });
 }

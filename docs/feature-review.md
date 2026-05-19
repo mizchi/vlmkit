@@ -138,3 +138,4 @@ OpenAI API で画像生成を機能化するなら、モデル ID は `gpt-image
 ## 関連 workflow
 
 - [AI mock to markup flow for blog design](./blog-design-ai-flow.md)
+- [Design pattern feasibility matrix](./design-pattern-feasibility.md)

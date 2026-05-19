@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SignalDeck Current</title>
+  <style>
+    :root { color-scheme: light; --ink: #17201b; --muted: #65746b; --line: #d9dfd8; --brand: #176b5c; --accent: #e1b14b; --paper: #f7f4ec; --panel: #ffffff; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: var(--ink); background: var(--paper); letter-spacing: 0; }
+    .page { min-height: 100vh; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+    header { display: flex; align-items: center; justify-content: space-between; padding: 26px 60px 16px; }
+    .brand { font: 800 24px/1 Georgia, serif; }
+    nav { display: flex; gap: 24px; align-items: center; font-size: 14px; color: var(--muted); }
+    nav a { color: inherit; text-decoration: none; }
+    .nav-cta { border: 1px solid var(--line); border-radius: 999px; padding: 10px 16px; color: var(--ink); background: #fffaf0; }
+    main { display: grid; grid-template-rows: minmax(0, 1fr) auto; }
+    .hero { display: grid; grid-template-columns: minmax(0, .9fr) minmax(440px, 1.1fr); gap: 50px; align-items: center; padding: 24px 60px 32px; }
+    .eyebrow { margin: 0 0 16px; color: var(--brand); text-transform: uppercase; font-weight: 800; font-size: 12px; letter-spacing: .08em; }
+    h1 { margin: 0; max-width: 690px; font: 800 72px/1 Georgia, serif; letter-spacing: 0; }
+    .lead { margin: 26px 0 0; max-width: 610px; color: var(--muted); font-size: 20px; line-height: 1.56; }
+    .actions { display: flex; gap: 14px; margin-top: 32px; align-items: center; }
+    .button { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 22px; border-radius: 8px; text-decoration: none; font-weight: 750; }
+    .primary { background: var(--brand); color: white; box-shadow: 0 14px 30px rgba(20, 108, 93, .22); }
+    .secondary { color: var(--ink); border: 1px solid var(--line); background: #fffdf7; }
+    .trust { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; margin-top: 38px; max-width: 620px; }
+    .trust div { border-top: 1px solid var(--line); padding-top: 12px; }
+    .trust strong { display: block; font: 800 23px/1 Georgia, serif; }
+    .trust span { color: var(--muted); font-size: 12px; }
+    .media { min-height: 590px; border: 1px solid #cbd7cf; border-radius: 14px; background: linear-gradient(135deg, #ffffff 0%, #eff5f1 56%, #dce8e2 100%); box-shadow: 0 24px 62px rgba(40, 58, 49, .16); padding: 24px; display: grid; grid-template-rows: auto 1fr auto; gap: 20px; overflow: hidden; }
+    .media-top { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 12px; }
+    .preview { display: grid; grid-template-columns: 1.15fr .85fr; gap: 16px; min-height: 0; }
+    .chart { border-radius: 14px; background: #173f39; padding: 20px; display: grid; align-content: end; gap: 10px; }
+    .bar { height: 18px; border-radius: 999px; background: #74c8b5; }
+    .bar:nth-child(2) { width: 74%; background: #e1b14b; }
+    .bar:nth-child(3) { width: 60%; }
+    .bar:nth-child(4) { width: 86%; background: #f5e8bd; }
+    .cards { display: grid; gap: 13px; }
+    .mini { border: 1px solid var(--line); border-radius: 12px; background: rgba(255, 255, 255, .82); padding: 17px; }
+    .mini strong { display: block; margin-bottom: 8px; }
+    .media-foot { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .chip { min-height: 60px; border-radius: 12px; background: #fffaf0; border: 1px solid var(--line); padding: 12px; font-size: 12px; color: var(--muted); }
+    .next { border-top: 1px solid var(--line); padding: 22px 60px 30px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; background: rgba(255, 255, 255, .42); }
+    .next article { min-height: 92px; border-radius: 12px; background: white; border: 1px solid var(--line); padding: 18px; }
+    .next h2 { margin: 0 0 8px; font-size: 16px; }
+    .next p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header role="banner">
+      <div class="brand">SignalDeck</div>
+      <nav aria-label="Primary">
+        <a href="#">Product</a>
+        <a href="#">Customers</a>
+        <a href="#">Pricing</a>
+        <a class="nav-cta" href="#">Sign in</a>
+      </nav>
+    </header>
+    <main>
+      <section class="hero" aria-labelledby="hero-title">
+        <div>
+          <p class="eyebrow">Operational launch pages</p>
+          <h1 id="hero-title">SignalDeck</h1>
+          <p class="lead">A launch workspace for teams that need crisp campaign pages, live metrics, and rollout notes in one shared surface.</p>
+          <div class="actions">
+            <a class="button primary" data-primary-cta href="#">Start a workspace</a>
+            <a class="button secondary" href="#">View demo</a>
+          </div>
+          <div class="trust" aria-label="Product metrics">
+            <div><strong>42%</strong><span>faster launch review</span></div>
+            <div><strong>18k</strong><span>live sections shipped</span></div>
+            <div><strong>3 min</strong><span>publish rollback</span></div>
+          </div>
+        </div>
+        <aside class="media" data-media-slot aria-label="Campaign preview">
+          <div class="media-top"><span>Campaign health</span><span>Live preview</span></div>
+          <div class="preview">
+            <div class="chart" aria-hidden="true"><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div></div>
+            <div class="cards"><div class="mini"><strong>Hero copy</strong><span>Approved</span></div><div class="mini"><strong>CTA variant</strong><span>Testing</span></div><div class="mini"><strong>Assets</strong><span>Ready</span></div></div>
+          </div>
+          <div class="media-foot"><div class="chip">North America</div><div class="chip">Changelog live</div><div class="chip">Rollback ready</div></div>
+        </aside>
+      </section>
+      <section class="next" data-next-section aria-labelledby="next-title">
+        <article><h2 id="next-title">Reusable sections</h2><p>Compose hero, proof, pricing, and rollout blocks from one library.</p></article>
+        <article><h2>Approval states</h2><p>Track review status without moving screenshots between tools.</p></article>
+        <article><h2>Production handoff</h2><p>Export the contract that implementation should preserve.</p></article>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
+

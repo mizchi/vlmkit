@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>App Shell Current</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #1d232b; color: #e8eef4; letter-spacing: 0; }
+    .shell { height: 100dvh; display: grid; grid-template-columns: 72px 264px minmax(0, 1fr) 256px; grid-template-rows: 58px minmax(0, 1fr); grid-template-areas: "rail side top top" "rail side main members"; }
+    .rail { grid-area: rail; background: #151a21; padding: 14px 10px; display: grid; gap: 12px; align-content: start; border-right: 1px solid #28313c; }
+    .dot { width: 48px; height: 48px; border-radius: 14px; background: #28313c; display: grid; place-items: center; color: #9eb0c2; font-weight: 800; }
+    .dot.is-active { background: #34a06f; color: #07130e; }
+    .side { grid-area: side; background: #202832; border-right: 1px solid #303a46; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+    .workspace { padding: 18px 18px 14px; border-bottom: 1px solid #303a46; }
+    .workspace strong { display: block; font-size: 16px; }
+    .workspace span { display: block; color: #93a4b7; font-size: 12px; margin-top: 4px; }
+    .channels { overflow-y: auto; min-height: 0; padding: 14px 10px; }
+    .group { margin: 14px 8px 8px; color: #8da0b4; font-size: 11px; text-transform: uppercase; font-weight: 800; }
+    .channel { display: flex; justify-content: space-between; align-items: center; min-height: 34px; padding: 0 10px; border-radius: 8px; color: #b5c2cf; font-size: 14px; }
+    .channel.is-selected { background: #33404d; color: #fff; }
+    .badge { min-width: 20px; height: 20px; border-radius: 999px; background: #e85d6a; color: #fff; display: grid; place-items: center; font-size: 11px; }
+    .profile { border-top: 1px solid #303a46; padding: 14px 18px; display: flex; gap: 10px; align-items: center; }
+    .avatar { width: 32px; height: 32px; border-radius: 50%; background: #e6b450; }
+    .top { grid-area: top; background: #252e39; border-bottom: 1px solid #303a46; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; }
+    .top h1 { margin: 0; font-size: 16px; }
+    .search { width: 280px; height: 34px; border-radius: 8px; background: #151a21; color: #8ea0b3; display: flex; align-items: center; padding: 0 12px; font-size: 13px; }
+    main { grid-area: main; min-width: 0; min-height: 0; overflow: hidden; display: grid; grid-template-rows: minmax(0, 1fr) auto; background: #26303b; }
+    .messages { overflow-y: visible; min-height: 0; padding: 18px 26px; display: grid; gap: 16px; align-content: start; }
+    .message { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 12px; }
+    .message .avatar { background: #6caee8; }
+    .bubble { border-radius: 12px; background: #2f3a47; padding: 12px 14px; }
+    .bubble strong { display: block; font-size: 14px; margin-bottom: 6px; }
+    .bubble p { margin: 0; color: #c9d3dd; font-size: 14px; line-height: 1.45; }
+    .composer { border-top: 1px solid #303a46; padding: 14px 22px; }
+    .input { min-height: 44px; border-radius: 12px; background: #1b222b; color: #7f92a6; display: flex; align-items: center; padding: 0 14px; }
+    .members { grid-area: members; background: #202832; border-left: 1px solid #303a46; min-height: 0; overflow-y: auto; padding: 16px 14px; }
+    .member { display: flex; align-items: center; gap: 10px; min-height: 38px; color: #b5c2cf; font-size: 14px; }
+    .member::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: #34a06f; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <nav class="rail" aria-label="Servers"><div class="dot is-active" aria-current="page">V</div><div class="dot">D</div><div class="dot">L</div><div class="dot">+</div></nav>
+    <aside class="side" aria-label="Workspace navigation">
+      <div class="workspace"><strong>VLM Lab</strong><span>Pattern dogfood</span></div>
+      <div class="channels" data-scrollport="channels">
+        <div class="group">Design</div>
+        <div class="channel is-selected"><span># landing-review</span><span class="badge">4</span></div>
+        <div class="channel"><span># app-shell</span><span></span></div>
+        <div class="channel"><span># canvas-tests</span><span class="badge">2</span></div>
+        <div class="group">Build</div>
+        <div class="channel"><span># reports</span></div><div class="channel"><span># fixtures</span></div><div class="channel"><span># renderer</span></div><div class="channel"><span># contracts</span></div><div class="channel"><span># scrollports</span></div><div class="channel"><span># states</span></div><div class="channel"><span># accessibility</span></div><div class="channel"><span># moonbit</span></div><div class="channel"><span># crater</span></div><div class="channel"><span># prompts</span></div><div class="channel"><span># archive</span></div><div class="channel"><span># target-images</span></div><div class="channel"><span># typography</span></div><div class="channel"><span># landmarks</span></div><div class="channel"><span># heatmaps</span></div><div class="channel"><span># release</span></div><div class="channel"><span># mobile</span></div><div class="channel"><span># desktop</span></div><div class="channel"><span># qa</span></div><div class="channel"><span># backlog</span></div><div class="channel"><span># notes</span></div><div class="channel"><span># support</span></div><div class="channel"><span># integrations</span></div><div class="channel"><span># experiments</span></div><div class="channel"><span># offscreen</span></div>
+      </div>
+      <div class="profile"><div class="avatar"></div><span>mizchi</span></div>
+    </aside>
+    <header class="top"><h1># landing-review</h1><div class="search" role="search">Search discussions</div></header>
+    <main>
+      <section class="messages" data-scrollport="messages" aria-label="Messages">
+        <div class="message"><div class="avatar"></div><div class="bubble"><strong>Aki</strong><p>The landing page target should preserve the offer and CTA before tuning media texture.</p></div></div>
+        <div class="message"><div class="avatar"></div><div class="bubble"><strong>Ren</strong><p>Agree. Landscape is useful, but CTA visibility needs its own gate.</p></div></div>
+        <div class="message"><div class="avatar"></div><div class="bubble"><strong>Mika</strong><p>For app shells, scrollports are the first contract. The screenshot can look close while behavior is broken.</p></div></div>
+        <div class="message"><div class="avatar"></div><div class="bubble"><strong>Aki</strong><p>Let's keep the rail fixed, the message list scrollable, and the member panel independent.</p></div></div>
+        <div class="message"><div class="avatar"></div><div class="bubble"><strong>Ren</strong><p>Selected row and unread badges should be visible in every target state.</p></div></div>
+        <div class="message"><div class="avatar"></div><div class="bubble"><strong>Mika</strong><p>The target should include enough messages to prove overflow, not just show a static list.</p></div></div>
+        <div class="message"><div class="avatar"></div><div class="bubble"><strong>Aki</strong><p>This creates a dogfood case where visual layout passes, but scroll behavior can still fail.</p></div></div>
+        <div class="message"><div class="avatar"></div><div class="bubble"><strong>Ren</strong><p>Good. That is exactly the missing signal.</p></div></div>
+        <div class="message"><div class="avatar"></div><div class="bubble"><strong>Mika</strong><p>We also need a scrolled snapshot so sticky headers and composer placement are verified.</p></div></div>
+        <div class="message"><div class="avatar"></div><div class="bubble"><strong>Aki</strong><p>The first screenshot should not be the only state for this pattern.</p></div></div>
+        <div class="message"><div class="avatar"></div><div class="bubble"><strong>Ren</strong><p>Exactly. The contract should describe behavior before decoration.</p></div></div>
+        <div class="message"><div class="avatar"></div><div class="bubble"><strong>Mika</strong><p>If the message list is clipped by a parent, the visual can still look plausible.</p></div></div>
+        <div class="message"><div class="avatar"></div><div class="bubble"><strong>Aki</strong><p>That is why the scrollport inspector should report overflow style and scrollHeight.</p></div></div>
+        <div class="message"><div class="avatar"></div><div class="bubble"><strong>Ren</strong><p>After that we can add selected-state and unread-state snapshots.</p></div></div>
+        <div class="message"><div class="avatar"></div><div class="bubble"><strong>Mika</strong><p>The fixture now has enough content to require an independent message scrollport.</p></div></div>
+        <div class="message"><div class="avatar"></div><div class="bubble"><strong>Aki</strong><p>This should fail behavior checks when overflow is visible instead of auto.</p></div></div>
+      </section>
+      <div class="composer"><div class="input">Message #landing-review</div></div>
+    </main>
+    <aside class="members" data-scrollport="members" aria-label="Members">
+      <div class="group">Online</div>
+      <div class="member">Aki</div><div class="member">Ren</div><div class="member">Mika</div><div class="member">Jules</div><div class="member">Noa</div><div class="member">Kai</div><div class="member">Iris</div><div class="member">Theo</div><div class="member">Lena</div><div class="member">Omar</div><div class="member">Sara</div><div class="member">Tao</div><div class="member">Yui</div><div class="member">Nina</div><div class="member">Eli</div><div class="member">June</div><div class="member">Rio</div><div class="member">Moe</div><div class="member">Hana</div><div class="member">Sora</div><div class="member">Rin</div><div class="member">Mei</div><div class="member">Tess</div><div class="member">Uma</div><div class="member">Vic</div><div class="member">Wen</div><div class="member">Xia</div><div class="member">Yan</div><div class="member">Zed</div><div class="member">Ada</div>
+    </aside>
+  </div>
+</body>
+</html>

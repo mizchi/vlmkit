@@ -16,6 +16,11 @@ visual target として固定し、vlmkit の `build component` / `diff` /
 そこから semantic HTML / CSS grid / subgrid / tokens を生成する。
 詳細は `docs/ui-contract-dsl-moonbit-renderer.md`。
 
+これは editorial / blog パターン用の runbook であり、landing page,
+sidebar app shell, dashboard, game / canvas scene にはそのまま適用しない。
+パターン別の source of truth と評価 signal は
+`docs/design-pattern-feasibility.md` に分ける。
+
 ## ディレクトリ規約
 
 ```text

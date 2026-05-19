@@ -1,0 +1,59 @@
+{
+  "generatedAt": "2026-05-19T17:22:35.333Z",
+  "landing": {
+    "ctaInFirstViewport": true,
+    "nextSectionHintVisible": true,
+    "mediaSlotVisible": true,
+    "h1": "SignalDeck"
+  },
+  "appShell": {
+    "bodyOverflowY": "hidden",
+    "shellHeight": 900,
+    "activeNavCount": 2,
+    "scrollports": [
+      {
+        "name": "channels",
+        "overflowY": "auto",
+        "hasScrollableContent": true,
+        "isIndependentScrollport": true,
+        "rect": {
+          "x": 72,
+          "y": 70,
+          "width": 263,
+          "height": 769
+        }
+      },
+      {
+        "name": "messages",
+        "overflowY": "visible",
+        "hasScrollableContent": true,
+        "isIndependentScrollport": false,
+        "rect": {
+          "x": 336,
+          "y": 58,
+          "width": 848,
+          "height": 769
+        }
+      },
+      {
+        "name": "members",
+        "overflowY": "auto",
+        "hasScrollableContent": true,
+        "isIndependentScrollport": true,
+        "rect": {
+          "x": 1184,
+          "y": 58,
+          "width": 256,
+          "height": 842
+        }
+      }
+    ]
+  },
+  "game": {
+    "canvasNonblank": true,
+    "frameDelta": true,
+    "inputChangedState": true,
+    "playerXBefore": 356,
+    "playerXAfter": 374
+  }
+}

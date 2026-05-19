@@ -12,6 +12,7 @@ from page landscape into actionable regions.
 This design is the visual-analysis half of the larger UI Contract DSL plan:
 
 - `docs/ui-contract-dsl-moonbit-renderer.md`
+- `docs/design-pattern-feasibility.md`
 
 ## Principle
 
@@ -38,6 +39,21 @@ sections.
 For HTML-to-HTML migration workflows, the same abstraction can be upgraded to a
 true landmark-to-landmark comparison by matching baseline and variant landmark
 trees.
+
+## Scope
+
+Landmark drilldown is strongest for document-like pages, landing pages, and app
+shells that have meaningful semantic DOM. It is not a universal model for every
+visual surface.
+
+For Discord-like app shells, landmarks are only the first layer. The primary
+contract is the viewport shell: rails, named grid areas, independent
+scrollports, selected state, and overflow policy.
+
+For games, WebGL, canvas, and other scene-graph UIs, DOM landmarks should stop
+at the outer shell. The inner scene needs a separate contract based on game
+state, scene objects, HUD regions, input response, frame deltas, and canvas
+pixel sanity checks.
 
 ## Flow Separation
 

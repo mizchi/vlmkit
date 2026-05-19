@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Canvas Current</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; width: 100vw; height: 100vh; overflow: hidden; background: #071117; color: #f4f6f1; font-family: ui-sans-serif, system-ui, sans-serif; letter-spacing: 0; }
+    main { width: 100vw; height: 100vh; display: grid; place-items: stretch; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+  </style>
+</head>
+<body>
+  <main aria-label="Skyline runner">
+    <canvas id="game" width="1280" height="720" aria-label="Skyline runner game scene"></canvas>
+  </main>
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const state = { playerX: 356, playerY: 474, tick: 0, score: 1280 };
+    window.__gameState = state;
+    function draw() {
+      state.tick++;
+      ctx.fillStyle = "#071117";
+      ctx.fillRect(0, 0, 1280, 720);
+      const sky = ctx.createLinearGradient(0, 0, 0, 540);
+      sky.addColorStop(0, "#123142");
+      sky.addColorStop(1, "#0a1820");
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, 1280, 540);
+      ctx.fillStyle = "#d7b96a";
+      ctx.font = "700 28px system-ui";
+      ctx.fillText("SCORE " + state.score, 42, 54);
+      ctx.fillText("SHIELD 3", 1060, 54);
+      ctx.fillStyle = "#1f4452";
+      for (let i = 0; i < 10; i++) ctx.fillRect(i * 140 - 20, 350 - (i % 3) * 42, 92, 190 + (i % 4) * 26);
+      ctx.fillStyle = "#10232c";
+      ctx.fillRect(0, 540, 1280, 180);
+      ctx.fillStyle = "#294753";
+      for (let x = -state.tick % 96; x < 1280; x += 96) ctx.fillRect(x, 610, 64, 10);
+      ctx.fillStyle = "#67d29b";
+      ctx.fillRect(state.playerX, state.playerY, 58, 66);
+      ctx.fillStyle = "#f2e6b8";
+      ctx.fillRect(state.playerX + 14, state.playerY - 20, 28, 28);
+      ctx.fillStyle = "#e96f62";
+      ctx.fillRect(850, 498, 48, 42);
+      ctx.fillStyle = "#7dd0ff";
+      ctx.beginPath();
+      ctx.arc(650, 500 + Math.sin(state.tick / 12) * 4, 18, 0, Math.PI * 2);
+      ctx.fill();
+      requestAnimationFrame(draw);
+    }
+    addEventListener("keydown", (event) => {
+      if (event.key === "ArrowRight") state.playerX += 18;
+      if (event.key === "ArrowLeft") state.playerX -= 18;
+      if (event.key === "ArrowUp") state.playerY -= 18;
+      if (event.key === "ArrowDown") state.playerY += 18;
+      state.score += 1;
+    });
+    draw();
+  </script>
+</body>
+</html>

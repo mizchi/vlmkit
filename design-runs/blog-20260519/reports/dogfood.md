@@ -324,6 +324,9 @@ landscape matching later depends on.
     typography/web feasibility envelope before mock generation.
 14. Add a mock feasibility review artifact that records which generated
     details are implementable, normalized, or ignored.
+15. Run non-blog dogfood targets before freezing thresholds: landing page,
+    sidebar app shell, dashboard/data tool, and game/canvas scene. Blog results
+    should seed the `app` profile, but not define all future profiles.
 
 ## Verification
 
