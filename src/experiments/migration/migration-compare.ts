@@ -9,6 +9,7 @@
  *   npx tsx src/migration-compare.ts before.html after.html
  *   npx tsx src/migration-compare.ts --dir fixtures/migration/reset-css --baseline normalize.html --variants modern-normalize.html destyle.html no-reset.html
  */
+import { existsSync } from "node:fs";
 import { readFile, writeFile, mkdir, access } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -1970,8 +1971,13 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     }
     console.log();
 
-    // Save JSON report
-    const reportPath = join(outputDir, "migration-report.json");
+    // Save JSON report. The canonical name is `diff-report.json`;
+    // `migration-report.json` is kept as a legacy alias (same content)
+    // so callers pinning the old filename continue to work. Track the
+    // rename completion under issue #50 — once no consumer references
+    // the legacy name, the second write can drop.
+    const reportPath = join(outputDir, "diff-report.json");
+    const legacyReportPath = join(outputDir, "migration-report.json");
     const report: MigrationCompareReport = {
       dir,
       baseline,
@@ -2003,7 +2009,9 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       reportPath,
     };
     const convergence = summarizeMigrationReportConvergence(report);
-    await writeFile(reportPath, JSON.stringify(report, null, 2));
+    const reportJson = JSON.stringify(report, null, 2);
+    await writeFile(reportPath, reportJson);
+    await writeFile(legacyReportPath, reportJson);
     console.log(`  ${BOLD}Convergence${RESET}`);
     for (const variant of convergence.variants) {
       console.log(`    ${variant.variant.padEnd(18)} ${formatMigrationConvergenceSummary(variant.status, variant)}`);
@@ -2020,9 +2028,16 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     if (options.againstPreviousPath) {
       try {
         const { diffWatchRuns, formatWatchDelta, summarizeReport } = await import("./watch.ts");
-        const prevPath = options.againstPreviousPath.endsWith(".json")
-          ? options.againstPreviousPath
-          : join(options.againstPreviousPath, "migration-report.json");
+        // Accept a direct .json path; otherwise try the canonical
+        // `diff-report.json` first, falling back to the legacy
+        // `migration-report.json` for previous runs from before the
+        // rename in #50.
+        let prevPath = options.againstPreviousPath;
+        if (!prevPath.endsWith(".json")) {
+          const canonical = join(options.againstPreviousPath, "diff-report.json");
+          const legacy = join(options.againstPreviousPath, "migration-report.json");
+          prevPath = existsSync(canonical) ? canonical : legacy;
+        }
         const prevRaw = await readFile(prevPath, "utf-8");
         const prevReport = JSON.parse(prevRaw) as MigrationCompareReport;
         const prev = summarizeReport(prevReport);
