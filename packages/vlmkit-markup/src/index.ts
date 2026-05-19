@@ -35,6 +35,18 @@ export {
   type SemanticDrilldownEntry,
   type SemanticDrilldownInput,
 } from "./component/semantic-drilldown.ts";
+export {
+  evaluateComponentGoal,
+  formatPct as formatComponentGoalPct,
+  getComponentGoalProfile,
+  listComponentGoals,
+  normalizeComponentGoal,
+  type ComponentGoal,
+  type ComponentGoalEvaluation,
+  type ComponentGoalMetric,
+  type ComponentGoalProfile,
+  type ComponentGoalStatus,
+} from "./component/component-goal.ts";
 
 // ---- Palette ----
 export {

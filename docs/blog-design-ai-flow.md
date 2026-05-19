@@ -190,11 +190,13 @@ desktop と mobile を別々に回す。
 vlmkit build component \
   design-runs/blog-YYYYMMDD/target/desktop.png \
   design-runs/blog-YYYYMMDD/implementation/page.html \
+  --goal app \
   --output-dir design-runs/blog-YYYYMMDD/reports/desktop
 
 vlmkit build component \
   design-runs/blog-YYYYMMDD/target/mobile.png \
   design-runs/blog-YYYYMMDD/implementation/page.html \
+  --goal app \
   --output-dir design-runs/blog-YYYYMMDD/reports/mobile
 ```
 
@@ -205,8 +207,28 @@ vlmkit の repo 内で未ビルドのまま dogfood する場合は、bin がま
 node src/cli/vlmkit.ts build component \
   design-runs/blog-YYYYMMDD/target/desktop.png \
   design-runs/blog-YYYYMMDD/implementation/page.html \
+  --goal app \
   --output-dir design-runs/blog-YYYYMMDD/reports/desktop
 ```
+
+### `--threshold` と `--goal` を分ける
+
+`--threshold` は pixelmatch の感度であり、成果物として何%の diff ratio を
+許容するかではない。AI mock から実用可能なアプリへ収束させるときは、
+`--goal` で合格基準を選ぶ。
+
+| Goal | Primary | Pass | Review | 用途 |
+|---|---|---|---|---|
+| `app` | landscape | landscape <= 3%, pixel <= 25% | landscape <= 5%, pixel <= 35% | AI mock を実用可能なアプリに落とす既定値 |
+| `layout` | landscape | landscape <= 3% | landscape <= 5% | レイアウト/ランドマークだけを先に合わせる |
+| `pixel` | pixel | pixel <= 3%, landscape <= 1% | pixel <= 8%, landscape <= 3% | Figma export や deterministic UI の再現 |
+| `draft` | landscape | landscape <= 6%, pixel <= 35% | landscape <= 8%, pixel <= 45% | 早い mock 探索 |
+
+このフローの現実的な初期値は `--goal app`。ピクセルパーフェクトではなく、
+「使える画面として成立し、主要ランドマークが近い場所にあり、過剰な空白や
+大きな欠落がない」ことを pass とする。pixel diff は文字内容、生成画像の
+装飾、アンチエイリアス、アイコン差分に引っ張られるので、まず primary は
+`Landscape diff` に置く。
 
 `report.md` の見る順番:
 
@@ -219,20 +241,29 @@ node src/cli/vlmkit.ts build component \
 7. Palette diff: 背景色、カード色、アクセント色
 8. Text rows / typography: 行位置、サイズ、太さ
 
-収束目標の目安:
+周回ごとの収束目標の目安:
 
 | Round | 目標 |
 |---|---|
 | 1 | 大枠の layout を合わせる |
 | 2 | spacing / card size / color を合わせる |
 | 3 | typography / mobile wrapping を合わせる |
-| 4+ | diff ratio 1-3% 未満を狙う |
+| 4+ | `--goal app` pass を狙う |
 
 完全一致は目標にしない。AI mock は文字や細部が不安定なので、まず
 `Landscape diff` と `Landmark drilldown` の layout lane を下げる。
 layout lane ではまず `min-width` / `max-width`, scrollport, grid/subgrid track
 を直す。layout lane が安定してから decoration lane の palette / media / text を詰める。
 pixel diff は最後の確認用に扱い、semantic HTML として自然な範囲で一致させる。
+
+`app` goal を pass した後も pixel diff が高い場合は、画面としての実用性を
+先に確認する。以下を満たすなら、その時点で通常の実装レビューへ進めてよい。
+
+- header / main / rail / footer などの landmark が target と同じ構造で読める
+- mobile first viewport に主要 CTA と主要セクションが入る
+- 余白、カードサイズ、列幅が破綻していない
+- 文字が収まり、操作要素が十分なサイズである
+- 装飾差分が layout lane を汚していない
 
 ## Phase 5: 通常の VRT baseline に昇格する
 

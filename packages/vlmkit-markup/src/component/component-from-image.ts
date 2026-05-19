@@ -56,6 +56,11 @@ import {
   type LandmarkRegion,
   type SemanticDrilldownEntry,
 } from "./semantic-drilldown.ts";
+import {
+  evaluateComponentGoal,
+  listComponentGoals,
+  type ComponentGoalEvaluation,
+} from "./component-goal.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
@@ -68,8 +73,10 @@ export interface ComponentFromImageOptions {
   reportPath?: string;
   /** Pseudo-states to additionally capture. Empty = none. */
   states?: ForcedPseudoState[];
-  /** Pixel-diff threshold (0..1). Default 0.03 (stricter than VRT default). */
+  /** Pixelmatch sensitivity (0..1). Default 0.03 (stricter than VRT default). */
   threshold?: number;
+  /** Convergence goal used for pass/review/fail reporting. Default: app. */
+  goal?: string;
   /**
    * Device pixel ratio for capture. Default 1. Use 2 to simulate
    * retina rendering — catches blurry low-res image assets that
@@ -89,6 +96,7 @@ export interface ComponentFromImageReport {
     diffRatio: number;
   };
   landscapeDiff: LandscapeDiffResult;
+  goalEvaluation: ComponentGoalEvaluation;
   landmarkRegions: LandmarkRegion[];
   semanticDrilldown: SemanticDrilldownEntry[];
   bboxMatches: MatchedBbox[];
@@ -200,12 +208,14 @@ function parseArgs(argv: string[]) {
   let outputDir = "";
   let report = "";
   let threshold = 0.03;
+  let goal = "app";
   let deviceScaleFactor: number | undefined;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--output-dir") outputDir = argv[++i];
     else if (a === "--report") report = argv[++i];
     else if (a === "--threshold") threshold = parseFloat(argv[++i] ?? "0.03");
+    else if (a === "--goal") goal = argv[++i] ?? "app";
     else if (a === "--device-scale-factor" || a === "--dpr") {
       deviceScaleFactor = parseFloat(argv[++i] ?? "1");
     }
@@ -220,7 +230,7 @@ function parseArgs(argv: string[]) {
       positional.push(a);
     }
   }
-  return { positional, outputDir, report, threshold, states, deviceScaleFactor };
+  return { positional, outputDir, report, threshold, goal, states, deviceScaleFactor };
 }
 
 export async function runComponentFromImage(
@@ -290,6 +300,11 @@ export async function runComponentFromImage(
     const totalPixels = diff?.totalPixels ?? (viewport.width * viewport.height);
     const heatmapPath = join(outputDir, "component_heatmap.png");
     const landscapeDiff = await compareLandscapeFromPngFiles(targetCopyPath, currentPath);
+    const goalEvaluation = evaluateComponentGoal({
+      goal: options.goal,
+      pixelDiffRatio: diffRatio,
+      landscapeDiffRatio: landscapeDiff.score,
+    });
 
     // All image-only signals run identically on both files.
     const [bboxBaseline, bboxVariant] = await Promise.all([
@@ -523,6 +538,7 @@ export async function runComponentFromImage(
       totalPixels,
       diffRatio,
       landscapeDiff,
+      goalEvaluation,
       landmarkRegions,
       semanticDrilldown,
       heatmapPath: diffPixels > 0 ? heatmapPath : undefined,
@@ -544,8 +560,13 @@ export async function runComponentFromImage(
     await writeFile(reportPath, markdown);
 
     const pct = (diffRatio * 100).toFixed(2);
-    const icon = diffRatio === 0 ? `${GREEN}✓${RESET}` : diffRatio < 0.01 ? `${YELLOW}~${RESET}` : `${RED}✗${RESET}`;
-    console.log(`  ${icon} diff: ${pct}% (${diffPixels} px), landscape ${(landscapeDiff.score * 100).toFixed(2)}%`);
+    const icon = goalEvaluation.status === "pass"
+      ? `${GREEN}✓${RESET}`
+      : goalEvaluation.status === "review"
+        ? `${YELLOW}~${RESET}`
+        : `${RED}✗${RESET}`;
+    console.log(`  ${icon} ${goalEvaluation.summary}`);
+    console.log(`  ${DIM}diff: ${pct}% (${diffPixels} px), landscape ${(landscapeDiff.score * 100).toFixed(2)}%${RESET}`);
     if (dprSuggestion) {
       console.log(`  ${YELLOW}!${RESET} ${DIM}${dprSuggestion.reason}; try --dpr ${dprSuggestion.deviceScaleFactor} (${dprSuggestion.cssViewport.width}×${dprSuggestion.cssViewport.height} CSS px)${RESET}`);
     }
@@ -563,6 +584,7 @@ export async function runComponentFromImage(
       viewport,
       diff: { diffPixels, totalPixels, diffRatio },
       landscapeDiff,
+      goalEvaluation,
       landmarkRegions,
       semanticDrilldown,
       bboxMatches,
@@ -589,6 +611,7 @@ interface RenderInput {
   totalPixels: number;
   diffRatio: number;
   landscapeDiff: LandscapeDiffResult;
+  goalEvaluation: ComponentGoalEvaluation;
   landmarkRegions: LandmarkRegion[];
   semanticDrilldown: SemanticDrilldownEntry[];
   heatmapPath?: string;
@@ -629,6 +652,11 @@ export function renderReportMarkdown(r: RenderInput): string {
     `(${(r.landscapeDiff.similarity * 100).toFixed(2)}% similarity, ` +
     `${r.landscapeDiff.changedCells}/${r.landscapeDiff.totalCells} changed cells, ` +
     `${r.landscapeDiff.grid.cols}×${r.landscapeDiff.grid.rows} grid)`);
+  lines.push("");
+  lines.push(`**Goal**: \`${r.goalEvaluation.goal}\` (${r.goalEvaluation.label}) — ` +
+    `**${r.goalEvaluation.status}**`);
+  lines.push("");
+  lines.push(r.goalEvaluation.summary);
   lines.push("");
   if (r.heatmapPath) {
     lines.push("- Target:   `" + r.targetImage + "`");
@@ -995,13 +1023,14 @@ export function renderReportMarkdown(r: RenderInput): string {
 async function main(argv = process.argv.slice(2)) {
   const showHelp = argv[0] === "--help" || argv[0] === "-h";
   if (showHelp) argv = [];
-  const { positional, outputDir, report, threshold, states, deviceScaleFactor } = parseArgs(argv);
+  const { positional, outputDir, report, threshold, goal, states, deviceScaleFactor } = parseArgs(argv);
   if (positional.length < 2) {
     console.log("Usage: vlmkit build component <target.png> <current.html> [options]");
     console.log("Options:");
     console.log("  --output-dir <dir>              Output directory (default: ./test-results/component)");
     console.log("  --report <path>                 Markdown report path (default: <output-dir>/report.md)");
-    console.log("  --threshold <0..1>              Pixel diff threshold (default: 0.03)");
+    console.log("  --threshold <0..1>              Pixelmatch sensitivity (default: 0.03)");
+    console.log(`  --goal <${listComponentGoals().join("|")}>      Convergence goal (default: app)`);
     console.log("  --states hover focus-visible …  Capture additional pseudo-state diffs");
     console.log("  --device-scale-factor, --dpr <n>");
     console.log("                                   Render at higher DPR (e.g. 2 for retina simulation)");
@@ -1015,6 +1044,7 @@ async function main(argv = process.argv.slice(2)) {
     outputDir: outputDir || join(process.cwd(), "test-results", "component"),
     reportPath: report || undefined,
     threshold,
+    goal,
     states: states.length > 0 ? states : undefined,
     deviceScaleFactor,
   });

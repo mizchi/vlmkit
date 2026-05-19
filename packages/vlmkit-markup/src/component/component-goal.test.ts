@@ -1,0 +1,61 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  evaluateComponentGoal,
+  getComponentGoalProfile,
+  listComponentGoals,
+} from "./component-goal.ts";
+
+test("app goal accepts practical AI mock convergence without pixel perfection", () => {
+  const result = evaluateComponentGoal({
+    goal: "app",
+    pixelDiffRatio: 0.2257,
+    landscapeDiffRatio: 0.0252,
+  });
+
+  assert.equal(result.status, "pass");
+  assert.equal(result.primaryMetric, "landscape");
+  assert.match(result.summary, /landscape 2\.52% <= 3\.00%/);
+  assert.match(result.summary, /pixel 22\.57% <= 25\.00%/);
+});
+
+test("app goal sends borderline practical output to visual review", () => {
+  const result = evaluateComponentGoal({
+    goal: "app",
+    pixelDiffRatio: 0.31,
+    landscapeDiffRatio: 0.041,
+  });
+
+  assert.equal(result.status, "review");
+  assert.match(result.summary, /review/);
+});
+
+test("layout goal ignores high pixel diff when coarse structure is good", () => {
+  const result = evaluateComponentGoal({
+    goal: "layout",
+    pixelDiffRatio: 0.42,
+    landscapeDiffRatio: 0.026,
+  });
+
+  assert.equal(result.status, "pass");
+  assert.equal(result.primaryMetric, "landscape");
+});
+
+test("pixel goal remains strict for screenshot reproduction", () => {
+  const result = evaluateComponentGoal({
+    goal: "pixel",
+    pixelDiffRatio: 0.04,
+    landscapeDiffRatio: 0.004,
+  });
+
+  assert.equal(result.status, "review");
+  assert.equal(result.primaryMetric, "pixel");
+});
+
+test("unknown goal falls back to app profile", () => {
+  assert.equal(getComponentGoalProfile("unknown").goal, "app");
+});
+
+test("goal list is stable for CLI help", () => {
+  assert.deepEqual(listComponentGoals(), ["app", "layout", "pixel", "draft"]);
+});

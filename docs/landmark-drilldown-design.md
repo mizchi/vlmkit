@@ -43,6 +43,37 @@ trees.
 
 Layout and decoration should be handled as separate lanes.
 
+## Goal Profiles
+
+`diffRatio` should not be interpreted as a single universal pass/fail number.
+For AI mock workflows, the practical question is whether the page is usable and
+semantically close to the target, not whether every generated glyph and texture
+matches.
+
+`vlmkit build component` therefore separates two concepts:
+
+- `--threshold`: pixelmatch sensitivity, used while counting pixel diffs.
+- `--goal`: convergence profile, used to interpret the resulting pixel and
+  landscape ratios.
+
+Current profiles:
+
+| Goal | Primary | Pass | Review | Use case |
+|---|---|---|---|---|
+| `app` | landscape | landscape <= 3%, pixel <= 25% | landscape <= 5%, pixel <= 35% | practical AI mock to usable UI |
+| `layout` | landscape | landscape <= 3% | landscape <= 5% | geometry/order first, decoration later |
+| `pixel` | pixel | pixel <= 3%, landscape <= 1% | pixel <= 8%, landscape <= 3% | deterministic screenshot reproduction |
+| `draft` | landscape | landscape <= 6%, pixel <= 35% | landscape <= 8%, pixel <= 45% | early mock exploration |
+
+The default is `app`. In dogfood, the blog mock converged to:
+
+- desktop: pixel 18.42%, landscape 2.14% — `app` pass
+- mobile: pixel 22.57%, landscape 2.52% — `app` pass
+
+This is intentionally not a pixel-perfect threshold. It says the large page
+regions, responsive order, and first-viewport information scent are close
+enough to continue as a normal app implementation.
+
 ## Layout Contract
 
 `Landscape diff` should not be modeled as a flat screenshot grid only. It
@@ -138,7 +169,7 @@ containers.
    visual analysis layer.
 2. Add an HTML-to-HTML mode that matches baseline and variant landmarks by
    role, accessible name, and geometry.
-3. Add `--goal landscape`, `--goal layout`, and `--goal decoration` so agents
-   can choose convergence criteria.
+3. Extend the current `--goal app|layout|pixel|draft` profiles with explicit
+   decoration and accessibility gates.
 4. Add artifact JSON for drilldown rows so agent loops can consume the lane
    data without scraping markdown.
