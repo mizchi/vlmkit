@@ -49,6 +49,58 @@ first viewport は landing として見て、preview 内部は app shell とし�
 この phase の出力を `brief.md` と mock prompt に入れる。AI に自由に絵を
 作らせるより、実装に優しい design envelope を先に狭める。
 
+## Canonical implementation markers
+
+AI mock prompt と実装 checklist は、検証可能な marker 名まで固定する。
+executor に任せると `data-vlm-role=*` のような独自 vocabulary が混ざり、
+`build component` の inspector とズレる。
+
+Landing:
+
+- primary CTA: `data-primary-cta`
+- next section hint: `data-next-section`
+- replaceable hero/product media: `data-media-slot`
+- optional hero title marker: `data-hero-title`
+
+App shell:
+
+- independent scrollports: `data-scrollport="<name>"`
+- accepted aliases: `data-vlmkit-scrollport`, `data-ui-scrollport`,
+  `data-scroll-region`
+- recommended names: `channel-list`, `message-list`, `member-list`,
+  `detail-panel`
+- selected state: `aria-current="page"` or `data-selected="true"`
+- unread state: visible badge/count plus text weight or contrast change
+
+Canvas:
+
+- expose a serializable `window.__gameState` when input response matters
+- minimum fields: `mode`, `frame`, `playerX`, `playerY`, `score`, `assetsReady`
+- keyboard input such as `ArrowRight` should change the serialized state
+- if a game cannot expose state, record an equivalent test hook in `brief.md`
+
+## Canonical validation command shape
+
+Checklist と agent 向け brief には、現在の CLI が受け取る command shape を
+そのまま書く。`vlmkit build component` は target screenshot と current HTML
+を positional argument として受け取り、viewport は target PNG から推定する。
+executor に任せると `--mock`, `--out`, `--viewport` のような未実装 flag を
+補ってしまう。
+
+```sh
+vlmkit build component <target.png> <current.html> --goal <goal> --output-dir <dir>
+```
+
+必要に応じて追加する option:
+
+- multi-state capture: `--states hover focus-visible`
+- retina target: `--device-scale-factor 2` または `--dpr 2`
+- custom pixel sensitivity: `--threshold <0..1>`
+
+Target PNG と current render の DPR は合わせる。`<current.html>` は単体で
+render できる HTML file にする。URL や framework component source を直接渡す
+場合は、先に HTML fixture / route capture に変換する。
+
 ## Editorial / blog
 
 ブログ dogfood の結果はこのパターンに属する。
@@ -84,6 +136,11 @@ Landing は document だが、ブログより first viewport と media impressio
 - H1 は brand / product / literal offer / category のいずれか
 - first viewport に hero, primary CTA, supporting copy, next section hint を入れる
 - hero media は replaceable media slot として扱う
+- implementation markers: `data-primary-cta`, `data-next-section`,
+  `data-media-slot`, optional `data-hero-title`
+- hero 内の app-shell 風 preview は、interactive app ではなく static media slot
+  として扱う。内側の channel/message/member scrollport は landing の
+  acceptance gate にしない
 - section order は semantic HTML に戻せる形にする
 - decorative gradient や image-only text を必須条件にしない
 - desktop / mobile で CTA と offer の意味が変わらないようにする
@@ -97,6 +154,11 @@ one primary CTA, and leave a visible hint of the next section.
 Use real or replaceable media slots; avoid SVG-only gradient hero art, blurred
 stock-like backgrounds, and text that can only be represented as an image.
 Keep all sections expressible as semantic HTML plus CSS grid/flex.
+Require implementation markers: data-primary-cta for the primary CTA,
+data-next-section for the first next-section hint, and data-media-slot for the
+replaceable hero/product media.
+If the hero media visually resembles an app shell, treat it as a static media
+slot unless this page implements the preview as an interactive app surface.
 ```
 
 ### Signals
@@ -105,6 +167,8 @@ Keep all sections expressible as semantic HTML plus CSS grid/flex.
 - primary CTA position, size, and contrast
 - next section visibility on desktop and mobile
 - media aspect ratio and crop slot, not exact generated texture
+- embedded app preview geometry/crop, not inner app-shell behavior unless the
+  preview is interactive
 - section order and landmark mapping
 - decoration lane for palette and brand impression
 
@@ -126,6 +190,7 @@ scrollport が独立して動く。
 - rail/sidebar は fixed or bounded width
 - main/detail は fluid width と min/max constraints を持つ
 - scrollport を明示する: channel list, message list, details, member list
+- scrollport marker は `data-scrollport="<name>"` を使う
 - active / selected / unread / hover / focus-visible state を target に含める
 - mobile では panel collapse, drawer, tab などの navigation policy を決める
 
@@ -136,7 +201,9 @@ Create an app-shell mock similar in structure to Discord, not a document page.
 Use a full viewport shell with persistent left rail, secondary sidebar, main
 content scrollport, and optional right panel.
 Show active navigation state, unread badges, selected content row, and realistic
-density. Name which panels scroll independently.
+density. Mark independent scrollports with data-scrollport=\"channel-list\",
+data-scrollport=\"message-list\", and data-scrollport=\"member-list\" or
+data-scrollport=\"detail-panel\".
 ```
 
 ### Signals
@@ -205,6 +272,8 @@ state machine, scene graph, asset pipeline, input loop に置く。
 - input: keyboard, pointer, touch, gamepad
 - animation: at least one deterministic frame delta
 - assets: generated sprites, vector primitives, tile map, or procedural art
+- test hook: expose `window.__gameState` or an equivalent serializable state
+  hook when validating input response
 
 ### Mock prompt constraints
 
@@ -214,6 +283,9 @@ Keep the scene compatible with a browser canvas implementation.
 Define the aspect ratio, HUD positions, main playable area, controls, and asset
 style. Avoid visual details that require one-off raster text or impossible
 physics. The final implementation may use a game engine and generated sprites.
+Expose window.__gameState with mode, frame, player position, score, and asset
+readiness so input response can be validated. Use the canonical fields mode,
+frame, playerX, playerY, score, and assetsReady.
 ```
 
 ### Signals
@@ -244,9 +316,9 @@ vlmkit 側で追加したい機能:
 
 - `vlmkit design analyze-brief`: brief から pattern を推定し、必要な contract を出す
 - `vlmkit design prompt`: pattern-specific mock prompt を生成する
-- `vlmkit build component --goal landing`
-- `vlmkit build component --goal app-shell`
-- `vlmkit build component --goal canvas`
+- `vlmkit build component target.png current.html --goal landing`
+- `vlmkit build component target.png current.html --goal app-shell`
+- `vlmkit build component target.png current.html --goal canvas`
 - `vlmkit build interactive --goal canvas`: future richer interaction runner
 - scrollport inspector: `overflow`, bbox, scrollHeight/clientHeight, sticky descendants
 - state snapshots: hover, focus, selected, scrolled, empty/loading/error
