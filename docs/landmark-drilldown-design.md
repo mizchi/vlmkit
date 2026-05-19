@@ -82,6 +82,7 @@ Current profiles:
 | `draft` | landscape | landscape <= 6%, pixel <= 35% | landscape <= 8%, pixel <= 45% | early mock exploration |
 | `app-shell` | landscape + scrollports | landscape <= 3%, no broken scrollports | landscape <= 5%, no missing/empty scrollport evidence | persistent sidebar/app shells |
 | `landing` | landscape + first viewport | landscape <= 3%, pixel <= 30%, hero/CTA/media/next hint present | landscape <= 5%, pixel <= 40% | landing pages with hero and CTA gates |
+| `canvas` | landscape + canvas evidence | landscape <= 6%, pixel <= 35%, nonblank/frame/input evidence | landscape <= 8%, pixel <= 45% | canvas/game art direction and basic interaction |
 
 The default is `app`. In dogfood, the blog mock converged to:
 

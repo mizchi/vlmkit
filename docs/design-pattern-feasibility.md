@@ -229,9 +229,11 @@ physics. The final implementation may use a game engine and generated sprites.
 
 ### Goal
 
-単発 screenshot の `diffRatio` は参考値に留める。将来的には `canvas` または
-`interactive` profile を作り、Playwright interaction, canvas pixel checks,
-state assertions, FPS/animation sanity を gate にする。
+単発 screenshot の `diffRatio` は参考値に留める。現在は `--goal canvas` で
+nonblank canvas, short frame delta, optional `window.__gameState` input response
+を gate にする。将来的には `build interactive` / `build canvas` に分け、
+HUD overlap, asset visibility, richer state assertions, FPS/animation sanity を
+追加する。
 
 DOM landmark drilldown は outer shell までに限定する。canvas 内部の drilldown
 は scene graph / object labels / collision layer から生成する。
@@ -244,7 +246,8 @@ vlmkit 側で追加したい機能:
 - `vlmkit design prompt`: pattern-specific mock prompt を生成する
 - `vlmkit build component --goal landing`
 - `vlmkit build component --goal app-shell`
-- `vlmkit build interactive --goal canvas`
+- `vlmkit build component --goal canvas`
+- `vlmkit build interactive --goal canvas`: future richer interaction runner
 - scrollport inspector: `overflow`, bbox, scrollHeight/clientHeight, sticky descendants
 - state snapshots: hover, focus, selected, scrolled, empty/loading/error
 - canvas inspector: nonblank, frame delta, asset visibility, input response
@@ -274,5 +277,6 @@ landing では hero/CTA weighting、game では interaction/state gate を足さ
 pass した。一方で app-shell は `layout` pass のまま message scrollport が
 壊れていた。これを受けて `build component` に explicit scrollport inspector
 と `--goal app-shell` を追加した。その後、landing first-viewport gates を
-`--goal landing` に昇格した。次は `canvas` の pattern-specific goal
-profile に昇格する。
+`--goal landing` に昇格し、canvas nonblank / frame delta / input response を
+`--goal canvas` に昇格した。次は contract から expected pattern gates を
+自動注入する。

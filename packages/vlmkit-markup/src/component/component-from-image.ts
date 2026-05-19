@@ -63,6 +63,7 @@ import {
   evaluateComponentGoal,
   listComponentGoals,
   type ComponentGoalEvaluation,
+  type ComponentCanvasEvidence,
   type ComponentLandingEvidence,
   type ComponentScrollportEvidence,
 } from "./component-goal.ts";
@@ -105,6 +106,7 @@ export interface ComponentFromImageReport {
   landmarkRegions: LandmarkRegion[];
   scrollportRegions: ScrollportRegion[];
   landingEvidence?: ComponentLandingEvidence;
+  canvasEvidence?: ComponentCanvasEvidence;
   semanticDrilldown: SemanticDrilldownEntry[];
   bboxMatches: MatchedBbox[];
   heatmapRegions: HeatmapRegion[];
@@ -291,6 +293,7 @@ export async function runComponentFromImage(
     const landingEvidence = await captureLandingEvidence(page).catch(() => undefined);
     const currentPath = join(outputDir, "current.png");
     await page.screenshot({ path: currentPath, fullPage: false });
+    const canvasEvidence = await captureCanvasEvidence(page).catch(() => undefined);
     await page.close();
 
     // Pixel diff against the target.
@@ -318,6 +321,7 @@ export async function runComponentFromImage(
       landscapeDiffRatio: landscapeDiff.score,
       scrollports: scrollportEvidence,
       landing: landingEvidence,
+      canvas: canvasEvidence,
     });
 
     // All image-only signals run identically on both files.
@@ -556,6 +560,7 @@ export async function runComponentFromImage(
       landmarkRegions,
       scrollportRegions,
       landingEvidence,
+      canvasEvidence,
       semanticDrilldown,
       heatmapPath: diffPixels > 0 ? heatmapPath : undefined,
       currentPath,
@@ -594,6 +599,9 @@ export async function runComponentFromImage(
     if (landingEvidence) {
       console.log(`  ${DIM}landing: ${formatLandingEvidence(landingEvidence)}${RESET}`);
     }
+    if (canvasEvidence) {
+      console.log(`  ${DIM}canvas: ${formatCanvasEvidence(canvasEvidence)}${RESET}`);
+    }
     if (stateResults.length > 0) {
       for (const s of stateResults) {
         console.log(`  ${DIM}:${s.state} induced ${(s.inducedDiffRatio * 100).toFixed(2)}% (${s.forcedCount} forced)${RESET}`);
@@ -611,6 +619,7 @@ export async function runComponentFromImage(
       landmarkRegions,
       scrollportRegions,
       landingEvidence,
+      canvasEvidence,
       semanticDrilldown,
       bboxMatches,
       heatmapRegions,
@@ -673,6 +682,69 @@ async function captureLandingEvidence(page: Page): Promise<ComponentLandingEvide
   });
 }
 
+async function captureCanvasEvidence(page: Page): Promise<ComponentCanvasEvidence | undefined> {
+  const first = await readCanvasFrame(page);
+  if (!first || first.canvasCount === 0) return undefined;
+  await page.waitForTimeout(120);
+  const second = await readCanvasFrame(page);
+  let inputResponsive: boolean | null = null;
+  const beforeState = await serializedGameState(page);
+  if (beforeState !== null) {
+    await page.keyboard.press("ArrowRight").catch(() => {});
+    await page.waitForTimeout(60);
+    const afterState = await serializedGameState(page);
+    inputResponsive = afterState !== null ? afterState !== beforeState : null;
+  }
+  return {
+    canvasCount: first.canvasCount,
+    nonblank: first.nonblank,
+    frameDelta: second ? first.checksum !== second.checksum : false,
+    inputResponsive,
+  };
+}
+
+async function serializedGameState(page: Page): Promise<string | null> {
+  return await page.evaluate(() => {
+    const state = (window as typeof window & { __gameState?: unknown }).__gameState;
+    if (state === undefined || state === null) return null;
+    try {
+      return JSON.stringify(state);
+    } catch {
+      return String(state);
+    }
+  }).catch(() => null);
+}
+
+async function readCanvasFrame(
+  page: Page,
+): Promise<{ canvasCount: number; checksum: number; nonblank: boolean } | undefined> {
+  return await page.evaluate(() => {
+    const canvases = Array.from(document.querySelectorAll("canvas")) as HTMLCanvasElement[];
+    if (canvases.length === 0) {
+      return { canvasCount: 0, checksum: 0, nonblank: false };
+    }
+    const canvas = canvases[0]!;
+    const ctx = canvas.getContext("2d");
+    if (!ctx || canvas.width <= 0 || canvas.height <= 0) {
+      return { canvasCount: canvases.length, checksum: 0, nonblank: false };
+    }
+    const width = Math.min(canvas.width, 1280);
+    const height = Math.min(canvas.height, 720);
+    const data = ctx.getImageData(0, 0, width, height).data;
+    let checksum = 0;
+    let nonblank = false;
+    for (let i = 0; i < data.length; i += 32) {
+      const r = data[i] ?? 0;
+      const g = data[i + 1] ?? 0;
+      const b = data[i + 2] ?? 0;
+      const a = data[i + 3] ?? 0;
+      checksum = (checksum + r * 3 + g * 5 + b * 7 + a) >>> 0;
+      if (a !== 0 && (r !== 0 || g !== 0 || b !== 0)) nonblank = true;
+    }
+    return { canvasCount: canvases.length, checksum, nonblank };
+  }).catch(() => undefined);
+}
+
 function summarizeScrollportEvidence(regions: ScrollportRegion[]): ComponentScrollportEvidence {
   const evidence: ComponentScrollportEvidence = {
     total: regions.length,
@@ -704,6 +776,20 @@ function formatLandingEvidence(evidence: ComponentLandingEvidence): string {
   return parts.join(", ");
 }
 
+function formatCanvasEvidence(evidence: ComponentCanvasEvidence): string {
+  const input = evidence.inputResponsive === true
+    ? "input ok"
+    : evidence.inputResponsive === false
+      ? "input missing"
+      : "input unknown";
+  const parts = [
+    evidence.nonblank ? "nonblank ok" : "blank",
+    evidence.frameDelta ? "frame delta ok" : "frame delta missing",
+    input,
+  ];
+  return parts.join(", ");
+}
+
 interface RenderInput {
   targetImage: string;
   currentHtml: string;
@@ -716,6 +802,7 @@ interface RenderInput {
   landmarkRegions: LandmarkRegion[];
   scrollportRegions: ScrollportRegion[];
   landingEvidence?: ComponentLandingEvidence;
+  canvasEvidence?: ComponentCanvasEvidence;
   semanticDrilldown: SemanticDrilldownEntry[];
   heatmapPath?: string;
   currentPath: string;
@@ -876,6 +963,27 @@ export function renderReportMarkdown(r: RenderInput): string {
     lines.push(`| Primary CTA visible | ${r.landingEvidence.primaryCtaVisible ? "ok" : "missing"} |`);
     lines.push(`| Next section hint visible | ${r.landingEvidence.nextSectionHintVisible ? "ok" : "missing"} |`);
     lines.push(`| Media slot visible | ${r.landingEvidence.mediaSlotVisible ? "ok" : "missing"} |`);
+    lines.push("");
+  }
+
+  if (r.canvasEvidence) {
+    lines.push("## Canvas inspector");
+    lines.push("");
+    lines.push("Current DOM canvas evidence for interactive/game-like surfaces. " +
+      "This checks the rendered canvas, a short frame delta, and optional " +
+      "`window.__gameState` response to `ArrowRight`.");
+    lines.push("");
+    lines.push("| Gate | Status |");
+    lines.push("|---|---|");
+    lines.push(`| Canvas count | ${r.canvasEvidence.canvasCount} |`);
+    lines.push(`| Nonblank canvas | ${r.canvasEvidence.nonblank ? "ok" : "blank"} |`);
+    lines.push(`| Frame delta | ${r.canvasEvidence.frameDelta ? "ok" : "missing"} |`);
+    const input = r.canvasEvidence.inputResponsive === true
+      ? "ok"
+      : r.canvasEvidence.inputResponsive === false
+        ? "missing"
+        : "unknown";
+    lines.push(`| Input response | ${input} |`);
     lines.push("");
   }
 

@@ -37,7 +37,7 @@ node src/cli/vlmkit.ts build component \
 node src/cli/vlmkit.ts build component \
   design-runs/patterns-20260520/game/target.png \
   design-runs/patterns-20260520/game/current.html \
-  --goal draft \
+  --goal canvas \
   --output-dir design-runs/patterns-20260520/game/reports/component
 
 node design-runs/patterns-20260520/check-patterns.mjs
@@ -49,7 +49,7 @@ node design-runs/patterns-20260520/check-patterns.mjs
 |---|---|---|---|
 | landing | `landing` pass | pixel 8.00%, landscape 1.12% | CTA in first viewport, next-section hint, media slot all pass |
 | app-shell | `app-shell` fail | pixel 4.00%, landscape 0.14% | channels and members scroll; messages is broken |
-| game | `draft` pass | pixel 0.95%, landscape 0.02% | canvas nonblank, frame delta, input response all pass |
+| game | `canvas` pass | pixel 0.95%, landscape 0.02% | canvas nonblank, frame delta, input response all pass |
 
 The app-shell case is the important Red:
 
@@ -103,21 +103,19 @@ scrollports does not pass only because landscape is close.
 
 ### Finding 3: game/canvas needs a different command family
 
-The game target passed `draft` easily:
+The game target passed `canvas`:
 
 - pixel 0.95%
 - landscape 0.02%
+- canvas nonblank
+- frame delta detected
+- `ArrowRight` changes `window.__gameState.playerX`
 
-But the component report only sees `main "Skyline runner"` and recommends CSS
-paint fixes. That is correct for DOM, but insufficient for a game. The useful
-signals came from the pattern check script:
-
-- canvas is nonblank
-- frame N and frame N+1 differ
-- ArrowRight changes `window.__gameState.playerX`
-
-This should not live as a special case in `build component`. It wants a future
-`build interactive` or `build canvas` flow.
+The component report still sees `main "Skyline runner"` at the DOM layer, but
+it now also emits a `Canvas inspector` section. This is enough for a first
+`build component` goal. A future `build interactive` or `build canvas` flow
+should add multi-state screenshots, HUD overlap, asset visibility, and richer
+input assertions.
 
 ### Finding 4: synthetic targets are useful for Red/Green loops
 
@@ -162,12 +160,19 @@ Added `--goal landing`:
   media slot;
 - fails when the primary CTA or hero is missing from the first viewport.
 
+Added `--goal canvas`:
+
+- uses loose landscape/pixel thresholds suitable for art-direction screenshots;
+- checks current-side canvas nonblank state;
+- checks a short frame delta;
+- checks optional `window.__gameState` response to `ArrowRight`.
+
 ## Next implementation candidates
 
 1. Add contract fields for `pattern`, `expectedScrollports`, and required states.
 2. Add scrolled-state snapshots for app shells.
-3. Add `build interactive` / `canvas` mode for nonblank, frame delta, input
-   response, HUD overlap, and asset visibility.
+3. Promote canvas checks into `build interactive` / `build canvas` with HUD
+   overlap, asset visibility, and richer input assertions.
 
 ## Verification
 
@@ -177,5 +182,6 @@ node --test packages/vlmkit-markup/src/component/component-from-image.test.ts
 node --test packages/vlmkit-markup/src/component/component-goal.test.ts
 node src/cli/vlmkit.ts build component design-runs/patterns-20260520/landing/target.png design-runs/patterns-20260520/landing/current.html --goal landing --output-dir design-runs/patterns-20260520/landing/reports/component
 node src/cli/vlmkit.ts build component design-runs/patterns-20260520/app-shell/target.png design-runs/patterns-20260520/app-shell/current.html --goal app-shell --output-dir design-runs/patterns-20260520/app-shell/reports/component
+node src/cli/vlmkit.ts build component design-runs/patterns-20260520/game/target.png design-runs/patterns-20260520/game/current.html --goal canvas --output-dir design-runs/patterns-20260520/game/reports/component
 node design-runs/patterns-20260520/check-patterns.mjs
 ```

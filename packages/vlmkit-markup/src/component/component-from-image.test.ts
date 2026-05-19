@@ -177,3 +177,53 @@ test("renderReportMarkdown includes landing first-viewport diagnostics", () => {
   assert.match(markdown, /\| Primary CTA visible \| ok \|/);
   assert.match(markdown, /\| Next section hint visible \| ok \|/);
 });
+
+test("renderReportMarkdown includes canvas diagnostics", () => {
+  const markdown = renderReportMarkdown({
+    targetImage: "/tmp/target.png",
+    currentHtml: "/tmp/current.html",
+    viewport: { width: 320, height: 240 },
+    diffPixels: 0,
+    totalPixels: 76800,
+    diffRatio: 0,
+    landscapeDiff: {
+      score: 0,
+      similarity: 1,
+      changedCells: 0,
+      totalCells: 1,
+      grid: { cols: 1, rows: 1 },
+      topCells: [],
+    },
+    goalEvaluation: {
+      goal: "canvas",
+      label: "Canvas scene",
+      status: "pass",
+      summary: "Canvas scene pass",
+      primaryMetric: "landscape",
+    },
+    landmarkRegions: [],
+    scrollportRegions: [],
+    canvasEvidence: {
+      canvasCount: 1,
+      nonblank: true,
+      frameDelta: true,
+      inputResponsive: true,
+    },
+    semanticDrilldown: [],
+    currentPath: "/tmp/current.png",
+    bboxMatches: [],
+    heatmapRegions: [],
+    textRowMatches: [],
+    rowGapDeltas: [],
+    typographyMismatches: [],
+    baselineRowCount: 0,
+    variantRowCount: 0,
+    paletteDiff: { onlyInBaseline: [], onlyInVariant: [] },
+    stateResults: [],
+    dpr: 1,
+  } as any);
+
+  assert.match(markdown, /## Canvas inspector/);
+  assert.match(markdown, /\| Nonblank canvas \| ok \|/);
+  assert.match(markdown, /\| Input response \| ok \|/);
+});

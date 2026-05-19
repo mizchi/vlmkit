@@ -111,10 +111,38 @@ test("landing goal fails when the primary CTA is not visible", () => {
   assert.match(result.summary, /CTA missing/);
 });
 
+test("canvas goal passes with nonblank frame delta and input evidence", () => {
+  const result = evaluateComponentGoal({
+    goal: "canvas",
+    pixelDiffRatio: 0.0095,
+    landscapeDiffRatio: 0.0002,
+    canvas: {
+      canvasCount: 1,
+      nonblank: true,
+      frameDelta: true,
+      inputResponsive: true,
+    },
+  });
+
+  assert.equal(result.status, "pass");
+  assert.match(result.summary, /canvas nonblank ok, frame delta ok, input ok/);
+});
+
+test("canvas goal fails when no canvas is detected", () => {
+  const result = evaluateComponentGoal({
+    goal: "canvas",
+    pixelDiffRatio: 0.01,
+    landscapeDiffRatio: 0.001,
+  });
+
+  assert.equal(result.status, "fail");
+  assert.match(result.summary, /no canvas evidence/);
+});
+
 test("unknown goal falls back to app profile", () => {
   assert.equal(getComponentGoalProfile("unknown").goal, "app");
 });
 
 test("goal list is stable for CLI help", () => {
-  assert.deepEqual(listComponentGoals(), ["app", "layout", "pixel", "draft", "app-shell", "landing"]);
+  assert.deepEqual(listComponentGoals(), ["app", "layout", "pixel", "draft", "app-shell", "landing", "canvas"]);
 });

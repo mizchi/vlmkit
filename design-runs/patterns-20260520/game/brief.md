@@ -14,6 +14,6 @@ Canvas game: the screenshot is art direction, not the full contract.
 
 ## Expected signal
 
-`build component` can compare the initial frame but cannot prove interaction.
-The dogfood script checks canvas nonblank, frame delta, and input response.
-
+`--goal canvas` compares the initial frame and checks current-side canvas
+evidence: nonblank canvas, frame delta, and input response. The dogfood script
+keeps the same checks as an external oracle.

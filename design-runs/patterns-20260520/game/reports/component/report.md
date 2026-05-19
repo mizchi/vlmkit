@@ -7,9 +7,9 @@ Current: `/Users/mz/ghq/github.com/mizchi/vlmkit/design-runs/patterns-20260520/g
 
 **Landscape diff**: 0.02% coarse (99.98% similarity, 0/144 changed cells, 16×9 grid)
 
-**Goal**: `draft` (Draft mock) — **pass**
+**Goal**: `canvas` (Canvas scene) — **pass**
 
-Draft mock pass: landscape 0.02% <= 6.00%, pixel 0.95% <= 35.00%
+Canvas scene pass: landscape 0.02% <= 6.00%, pixel 0.95% <= 35.00%, canvas nonblank ok, frame delta ok, input ok
 
 - Target:   `/Users/mz/ghq/github.com/mizchi/vlmkit/design-runs/patterns-20260520/game/target.png`
 - Current:  `/Users/mz/ghq/github.com/mizchi/vlmkit/design-runs/patterns-20260520/game/reports/component/current.png`
@@ -45,6 +45,17 @@ No layout rows detected.
 | Priority | Landmark | Box | Width | Height | Scroll | Grid | Layout | Decoration | Evidence | Next |
 |---:|---|---|---|---|---|---|---:|---:|---|---|
 | 0.6 | `main "Skyline runner"` | 0,0 1280×720 | fluid-unbounded | content | none | grid | 0.3% | 0.6% | 8 landscape cell(s), 8 heatmap region(s) | fix colors / media / text styling after layout stabilizes |
+
+## Canvas inspector
+
+Current DOM canvas evidence for interactive/game-like surfaces. This checks the rendered canvas, a short frame delta, and optional `window.__gameState` response to `ArrowRight`.
+
+| Gate | Status |
+|---|---|
+| Canvas count | 1 |
+| Nonblank canvas | ok |
+| Frame delta | ok |
+| Input response | ok |
 
 ## Heatmap region clusters
 

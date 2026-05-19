@@ -321,6 +321,7 @@ node src/cli/vlmkit.ts build component \
 | `draft` | landscape | landscape <= 6%, pixel <= 35% | landscape <= 8%, pixel <= 45% | 早い mock 探索 |
 | `app-shell` | landscape + scrollports | landscape <= 3%, broken scrollport なし | landscape <= 5%, scrollport evidence 要確認 | sidebar/app shell 用 |
 | `landing` | landscape + first viewport | landscape <= 3%, pixel <= 30%, hero/CTA/media/next hint | landscape <= 5%, pixel <= 40% | landing page 用 |
+| `canvas` | landscape + canvas evidence | landscape <= 6%, pixel <= 35%, nonblank/frame/input | landscape <= 8%, pixel <= 45% | game/canvas 用 |
 
 このフローの現実的な初期値は `--goal app`。ピクセルパーフェクトではなく、
 「使える画面として成立し、主要ランドマークが近い場所にあり、過剰な空白や

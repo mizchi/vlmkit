@@ -1,4 +1,4 @@
-export const COMPONENT_GOALS = ["app", "layout", "pixel", "draft", "app-shell", "landing"] as const;
+export const COMPONENT_GOALS = ["app", "layout", "pixel", "draft", "app-shell", "landing", "canvas"] as const;
 
 export type ComponentGoal = typeof COMPONENT_GOALS[number];
 export type ComponentGoalStatus = "pass" | "review" | "fail";
@@ -43,6 +43,13 @@ export interface ComponentLandingEvidence {
   primaryCtaVisible: boolean;
   nextSectionHintVisible: boolean;
   mediaSlotVisible: boolean;
+}
+
+export interface ComponentCanvasEvidence {
+  canvasCount: number;
+  nonblank: boolean;
+  frameDelta: boolean;
+  inputResponsive: boolean | null;
 }
 
 const GOAL_PROFILES: Record<ComponentGoal, ComponentGoalProfile> = {
@@ -94,6 +101,14 @@ const GOAL_PROFILES: Record<ComponentGoal, ComponentGoalProfile> = {
     pass: { landscape: 0.03, pixel: 0.30 },
     review: { landscape: 0.05, pixel: 0.40 },
   },
+  canvas: {
+    goal: "canvas",
+    label: "Canvas scene",
+    primaryMetric: "landscape",
+    description: "Canvas/game convergence with nonblank, frame-delta, and input-response gates.",
+    pass: { landscape: 0.06, pixel: 0.35 },
+    review: { landscape: 0.08, pixel: 0.45 },
+  },
 };
 
 export function listComponentGoals(): ComponentGoal[] {
@@ -114,6 +129,7 @@ export function evaluateComponentGoal(input: {
   landscapeDiffRatio: number;
   scrollports?: ComponentScrollportEvidence;
   landing?: ComponentLandingEvidence;
+  canvas?: ComponentCanvasEvidence;
 }): ComponentGoalEvaluation {
   const profile = getComponentGoalProfile(input.goal);
   const thresholdStatus: ComponentGoalStatus = passesAll(profile.pass, input)
@@ -141,6 +157,7 @@ function applyPatternGates(
   input: {
     scrollports?: ComponentScrollportEvidence;
     landing?: ComponentLandingEvidence;
+    canvas?: ComponentCanvasEvidence;
   },
 ): ComponentGoalStatus {
   if (profile.goal === "app-shell") {
@@ -159,6 +176,15 @@ function applyPatternGates(
     if (!landing.primaryCtaVisible) return "fail";
     if (!landing.heroVisible) return "fail";
     if ((!landing.nextSectionHintVisible || !landing.mediaSlotVisible) && status === "pass") {
+      return "review";
+    }
+  }
+
+  if (profile.goal === "canvas") {
+    const canvas = input.canvas;
+    if (!canvas || canvas.canvasCount === 0) return "fail";
+    if (!canvas.nonblank) return "fail";
+    if ((!canvas.frameDelta || canvas.inputResponsive !== true) && status === "pass") {
       return "review";
     }
   }
@@ -187,6 +213,7 @@ function summarizeEvaluation(
     landscapeDiffRatio: number;
     scrollports?: ComponentScrollportEvidence;
     landing?: ComponentLandingEvidence;
+    canvas?: ComponentCanvasEvidence;
   },
 ): string {
   const target = status === "pass" ? profile.pass : profile.review;
@@ -202,6 +229,9 @@ function summarizeEvaluation(
   }
   if (profile.goal === "landing") {
     clauses.push(summarizeLanding(input.landing));
+  }
+  if (profile.goal === "canvas") {
+    clauses.push(summarizeCanvas(input.canvas));
   }
   const suffix = clauses.length > 0 ? `: ${clauses.join(", ")}` : "";
   return `${profile.label} ${status}${suffix}`;
@@ -224,6 +254,21 @@ function summarizeLanding(landing: ComponentLandingEvidence | undefined): string
     landing.mediaSlotVisible ? "media slot ok" : "media slot missing",
   ];
   return `landing ${parts.join(", ")}`;
+}
+
+function summarizeCanvas(canvas: ComponentCanvasEvidence | undefined): string {
+  if (!canvas || canvas.canvasCount === 0) return "no canvas evidence";
+  const input = canvas.inputResponsive === true
+    ? "input ok"
+    : canvas.inputResponsive === false
+      ? "input missing"
+      : "input unknown";
+  const parts = [
+    canvas.nonblank ? "nonblank ok" : "blank",
+    canvas.frameDelta ? "frame delta ok" : "frame delta missing",
+    input,
+  ];
+  return `canvas ${parts.join(", ")}`;
 }
 
 export function formatPct(ratio: number): string {
