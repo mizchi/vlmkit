@@ -157,7 +157,7 @@ export async function runPngDiffCli(cliArgs = process.argv.slice(2)) {
   }
 }
 
-if (process.argv[1]?.endsWith("png-diff.ts")) {
+if (process.env.__VRT_DISPATCHER_LEAF__ === "png-diff" || process.argv[1]?.endsWith("png-diff.ts")) {
   runPngDiffCli().catch((error) => {
     console.error(error);
     process.exit(1);

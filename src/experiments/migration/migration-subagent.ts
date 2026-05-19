@@ -367,7 +367,7 @@ function optionalNumber(args: string[], flag: string): number | undefined {
   return parsed;
 }
 
-if (process.argv[1]?.endsWith("migration-subagent.ts")) {
+if (process.env.__VRT_DISPATCHER_LEAF__ === "migration-subagent" || process.argv[1]?.endsWith("migration-subagent.ts")) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

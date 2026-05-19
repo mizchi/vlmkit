@@ -106,7 +106,7 @@ async function main() {
   }
 }
 
-if (process.argv[1] && (process.argv[1].endsWith("compare-runs-cli.ts") || process.argv[1].endsWith("compare-runs-cli.mjs"))) {
+if (process.env.__VRT_DISPATCHER_LEAF__ === "compare-runs-cli" || (process.argv[1] && (process.argv[1].endsWith("compare-runs-cli.ts") || process.argv[1].endsWith("compare-runs-cli.mjs")))) {
   main().catch((err) => {
     console.error(String(err?.message ?? err));
     process.exit(1);

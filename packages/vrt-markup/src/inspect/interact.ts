@@ -552,7 +552,7 @@ async function main(argv = process.argv.slice(2)) {
   });
 }
 
-const isCliEntry = process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false;
+const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "interact" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch(handleCliError);
 }

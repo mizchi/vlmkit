@@ -123,7 +123,7 @@ async function main() {
   console.log();
 }
 
-if (process.argv[1] && (process.argv[1].endsWith("flipbook-cli.ts") || process.argv[1].endsWith("flipbook-cli.mjs"))) {
+if (process.env.__VRT_DISPATCHER_LEAF__ === "flipbook-cli" || (process.argv[1] && (process.argv[1].endsWith("flipbook-cli.ts") || process.argv[1].endsWith("flipbook-cli.mjs")))) {
   main().catch((err) => {
     console.error(String(err.message ?? err));
     process.exit(1);

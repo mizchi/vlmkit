@@ -350,8 +350,8 @@ function stripAnsi(s: string): string {
   return s.replace(/\x1b\[[0-9;]*m/g, "");
 }
 
-const isCliEntry = process.argv[1]
-  && new URL(import.meta.url).pathname === process.argv[1];
+const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "watch" || (process.argv[1]
+  && new URL(import.meta.url).pathname === process.argv[1]);
 if (isCliEntry) {
   runWatch(process.argv.slice(2)).catch((err) => {
     console.error(err);

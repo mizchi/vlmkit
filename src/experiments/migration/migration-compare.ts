@@ -2287,7 +2287,7 @@ function formatResponsiveBreakpoint(breakpoint: ResponsiveBreakpoint): string {
   return `width${opLabel}${breakpoint.valuePx}px`;
 }
 
-const isCliEntry = process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false;
+const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "migration-compare" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 
 if (isCliEntry) {
   main().catch((error) => {

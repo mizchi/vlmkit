@@ -635,6 +635,6 @@ async function main() {
   console.log();
 }
 
-if (process.argv[1]?.endsWith("snapshot.ts")) {
+if (process.env.__VRT_DISPATCHER_LEAF__ === "snapshot" || process.argv[1]?.endsWith("snapshot.ts")) {
   main().catch((e) => { console.error(e); process.exit(1); });
 }

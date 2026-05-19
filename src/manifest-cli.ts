@@ -469,8 +469,8 @@ async function main(argv = process.argv.slice(2)) {
   }
 }
 
-const isCliEntry = process.argv[1]
-  && new URL(import.meta.url).pathname === process.argv[1];
+const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "manifest-cli" || (process.argv[1]
+  && new URL(import.meta.url).pathname === process.argv[1]);
 if (isCliEntry) {
   main().catch((err) => {
     console.error(err);

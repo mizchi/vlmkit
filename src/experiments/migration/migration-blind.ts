@@ -604,7 +604,7 @@ function parseFormat(value: string | undefined): "markdown" | "json" {
   return format;
 }
 
-if (process.argv[1]?.endsWith("migration-blind.ts")) {
+if (process.env.__VRT_DISPATCHER_LEAF__ === "migration-blind" || process.argv[1]?.endsWith("migration-blind.ts")) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
