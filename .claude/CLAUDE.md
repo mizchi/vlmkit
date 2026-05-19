@@ -9,7 +9,7 @@ Periodically evaluate VLM (Vision Language Model) cost-performance for analyzing
 
 1. **Check available models** (dynamically fetched from OpenRouter API):
 ```bash
-just vlm-bench --list --max-cost 0.001 --limit 30
+pkf run vlm-bench -- --list --max-cost 0.001 --limit 30
 ```
 
 2. **Run fix-loop with candidate models** (hard case: seed 11):
@@ -20,7 +20,7 @@ VRT_VLM_MODEL="<model-id>" node --experimental-strip-types src/experiments/css-c
 
 3. **Measure VLM quality** (token count, latency, CHANGE detection count):
 ```bash
-just vlm-bench <model1> <model2> <model3> --md
+pkf run vlm-bench -- <model1> <model2> <model3> --md
 ```
 
 4. **Update results in the "VLM Model Comparison" section of `docs/knowledge.md`**
@@ -63,22 +63,22 @@ NO_IMAGES=1 node --experimental-strip-types src/experiments/css-challenge/css-ch
 cd ~/ghq/github.com/mizchi/crater && just build-bidi && just start-bidi-with-font
 
 # Run bench
-just css-bench-crater --fixture page --trials 30
+pkf run css-bench-crater -- --fixture page --trials 30
 ```
 
 ### Tracking Detection Rate
 ```bash
-just css-report  # Aggregate accumulated data
+pkf run css-report  # Aggregate accumulated data
 ```
 
 ## Running Migration VRT
 
 ```bash
 # Tailwind → vanilla CSS
-just migration-tailwind
+pkf run migration-tailwind
 
 # Reset CSS comparison
-just migration-reset
+pkf run migration-reset
 
 # File comparison
 vrt compare before.html after.html
@@ -107,23 +107,23 @@ vrt snapshot http://localhost:3000/ --mask ".marquee-container,.hero-badge"
 pkf run dogfood-luna
 
 # sol.mbt (requires: npx serve ~/ghq/.../sol.mbt/website/dist-docs -p 3000)
-just dogfood-sol
+pkf run dogfood-sol
 
 # False positive test (compare same URL twice)
-just false-positive http://localhost:3000/luna/
+pkf run false-positive --url http://localhost:3000/luna/
 ```
 
 ## Running Fix Loop
 
 ```bash
 # Property mode (delete 1 CSS property)
-just fix-loop --fixture page --seed 42
+pkf run fix-loop -- --fixture page --seed 42
 
 # Selector mode (delete 1 selector block)
-just fix-loop --fixture page --seed 11 --mode selector --max-rounds 3
+pkf run fix-loop -- --fixture page --seed 11 --mode selector --max-rounds 3
 
 # Specify a VLM model
-VRT_VLM_MODEL="bytedance/ui-tars-1.5-7b" just fix-loop --fixture page --seed 11 --mode selector
+VRT_VLM_MODEL="bytedance/ui-tars-1.5-7b" pkf run fix-loop -- --fixture page --seed 11 --mode selector
 ```
 
 ## Environment Variables
