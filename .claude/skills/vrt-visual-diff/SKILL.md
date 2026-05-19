@@ -25,7 +25,9 @@ top-down:
 - **Per-viewport diffRatio** — raw pixel diff per breakpoint, with
   worst-viewport PNG path inline so the agent can `Read` the image.
 - **Heuristic fix candidates** — `selector { property: a → b }` hints
-  from the migration compare engine.
+  from the migration compare engine. *May read `no suggestions` when
+  the rule signal isn't strong enough; in that case wireframe-level
+  Δtop suggestions still appear in earlier sections.*
 - **Regression banner** — if a prior run's summary exists and the
   majority of viewports got worse, a `### ⚠ REGRESSION` block sits
   at the top.
