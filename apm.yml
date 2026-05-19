@@ -1,0 +1,11 @@
+name: vrt
+version: 0.5.0
+# vrt ships coding-agent skills via APM so other repos can `apm install`
+# them. The repo itself is a CC project, hence `targets: [claude]`.
+targets:
+  - claude
+dependencies:
+  apm: []
+  mcp: []
+scripts:
+  verify: "ls -1 .claude/skills | sort"
