@@ -634,7 +634,7 @@ By fixture:
 
 ## VLM Model Comparison (2026-05-18 — current)
 
-### Single-call latency / output bench (`just vlm-bench`, generated heatmap 1.7% diff, n=1)
+### Single-call latency / output bench (`pkf run vlm-bench`, generated heatmap 1.7% diff, n=1)
 
 | Model | Latency | Tokens | Output | Notes |
 |-------|--------:|-------:|-------:|-------|

@@ -35,10 +35,10 @@ vrt snapshot http://localhost:3000/ http://localhost:3000/about/ --output snapsh
 vrt snapshot http://localhost:3000/ --mask ".marquee-container,.hero-badge"
 
 # CSS チャレンジベンチマーク
-just css-bench --fixture page --trials 30
+pkf run css-bench -- --fixture page --trials 30
 
 # Fix ループ (CSS 破壊 → VLM 分析 → LLM 修正 → 検証)
-just fix-loop --fixture page --seed 42
+pkf run fix-loop -- --fixture page --seed 42
 ```
 
 ## CLI

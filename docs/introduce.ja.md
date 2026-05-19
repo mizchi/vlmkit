@@ -121,16 +121,16 @@ CSS プロパティやセレクタブロックを1つ削除し、各検出手法
 
 ```bash
 # プロパティ削除モード
-just css-bench --fixture page --trials 30
+pkf run css-bench -- --fixture page --trials 30
 
 # セレクタブロック削除モード
-just css-bench --fixture page --mode selector --trials 30
+pkf run css-bench -- --fixture page --mode selector --trials 30
 
 # 全フィクスチャ横断
-just css-bench --fixture all --trials 10
+pkf run css-bench -- --fixture all --trials 10
 
 # 検出率レポート
-just css-report
+pkf run css-report
 ```
 
 現在の検出率: Chromium 96.7% (scoped)
@@ -141,10 +141,10 @@ CSS の破壊を検出し、AI が修正を生成して検証するループで�
 
 ```bash
 # Fix ループ（CSS 破壊 → VLM 分析 → LLM 修正 → 検証）
-just fix-loop --fixture page --seed 42
+pkf run fix-loop -- --fixture page --seed 42
 
 # セレクタモード + VLM 指定
-VRT_VLM_MODEL="meta-llama/llama-4-scout" just fix-loop --fixture page --seed 11 --mode selector
+VRT_VLM_MODEL="meta-llama/llama-4-scout" pkf run fix-loop -- --fixture page --seed 11 --mode selector
 ```
 
 2段階パイプライン:
@@ -186,7 +186,7 @@ TypeScript クライアント SDK (`src/api/client.ts`) も用意しています
 cd ~/ghq/github.com/mizchi/crater && just build-bidi && just start-bidi-with-font
 
 # Crater プリスキャナ付きベンチマーク
-just css-bench-crater --fixture page --trials 30
+pkf run css-bench-crater -- --fixture page --trials 30
 ```
 
 ## 環境変数

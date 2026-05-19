@@ -93,17 +93,17 @@ vrt workflow init --config ./vrt.config.json
 vrt workflow capture --config ./vrt.config.json
 
 # Prepare a migration diff packet for an external fixer
-just migration-subagent-prepare --report test-results/migration/migration-report.json --output test-results/migration/subagent-task.md
+pkf run migration-subagent-prepare -- --report test-results/migration/migration-report.json --output test-results/migration/subagent-task.md
 
 # Measure success rate from before/after migration reports
-just migration-subagent-evaluate --before-report test-results/migration/migration-report.json --after-report test-results/migration/migration-report.after.json
+pkf run migration-subagent-evaluate -- --before-report test-results/migration/migration-report.json --after-report test-results/migration/migration-report.after.json
 
 # Inspect blind migration scenarios
-just migration-blind-list
-just migration-blind-show shadcn-to-luna
-just migration-blind-prepare shadcn-to-luna --packet test-results/migration/blind/shadcn-to-luna/task.md
-just migration-blind-solo shadcn-to-luna --output test-results/migration/blind/shadcn-to-luna/solo/after-blind.html --report-output-dir test-results/migration/blind/shadcn-to-luna/solo-report
-just migration-blind-evaluate shadcn-to-luna --before-report test-results/migration/blind/shadcn-to-luna/migration-report.json --after-report test-results/migration/blind/shadcn-to-luna/solo-report/migration-report.json --rounds 1
+pkf run migration-blind-list
+pkf run migration-blind-show --scenario shadcn-to-luna
+pkf run migration-blind-prepare --scenario shadcn-to-luna -- --packet test-results/migration/blind/shadcn-to-luna/task.md
+pkf run migration-blind-solo --scenario shadcn-to-luna -- --output test-results/migration/blind/shadcn-to-luna/solo/after-blind.html --report-output-dir test-results/migration/blind/shadcn-to-luna/solo-report
+pkf run migration-blind-evaluate --scenario shadcn-to-luna -- --before-report test-results/migration/blind/shadcn-to-luna/migration-report.json --after-report test-results/migration/blind/shadcn-to-luna/solo-report/migration-report.json --rounds 1
 
 # Mask dynamic content
 vrt snapshot http://localhost:3000/ --mask ".marquee-container,.hero-badge"

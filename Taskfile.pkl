@@ -54,11 +54,13 @@ local vrtDemoMultistep = new Task {
 
 local cssBench = new Task {
   name = "css-bench"
+  acceptsArgs = true
   cmd = "NO_IMAGES=1 node src/experiments/css-challenge/css-challenge-bench.ts"
   inputs { "src/experiments/css-challenge/css-challenge*.ts"; "fixtures/css-challenge/**" }
 }
 local cssBenchSelector = new Task {
   name = "css-bench-selector"
+  acceptsArgs = true
   cmd = "NO_IMAGES=1 node src/experiments/css-challenge/css-challenge-bench.ts --mode selector"
   inputs { "src/experiments/css-challenge/css-challenge*.ts"; "fixtures/css-challenge/**" }
 }
@@ -72,11 +74,13 @@ local cssBenchAll = new Task {
 }
 local cssBenchCrater = new Task {
   name = "css-bench-crater"
+  acceptsArgs = true
   cmd = "NO_IMAGES=1 node src/experiments/css-challenge/css-challenge-bench.ts --backend crater"
   inputs { "src/experiments/css-challenge/css-challenge*.ts"; "fixtures/css-challenge/**" }
 }
 local cssBenchPrescanner = new Task {
   name = "css-bench-prescanner"
+  acceptsArgs = true
   cmd = "NO_IMAGES=1 node src/experiments/css-challenge/css-challenge-bench.ts --backend prescanner"
   inputs { "src/experiments/css-challenge/css-challenge*.ts"; "fixtures/css-challenge/**" }
 }
@@ -139,12 +143,14 @@ local migrationShadcn = new Task {
 
 local migrationSubagentPrepare = new Task {
   name = "migration-subagent-prepare"
+  acceptsArgs = true
   cmd = "node src/experiments/migration/migration-subagent.ts prepare"
   inputs { "src/experiments/migration/migration-subagent.ts"; "src/experiments/migration/migration-fix-loop-core.ts" }
 }
 
 local migrationSubagentEvaluate = new Task {
   name = "migration-subagent-evaluate"
+  acceptsArgs = true
   cmd = "node src/experiments/migration/migration-subagent.ts evaluate"
   inputs { "src/experiments/migration/migration-subagent.ts" }
 }
@@ -166,6 +172,7 @@ local migrationBlindShow = new Task {
 
 local migrationBlindPrepare = new Task {
   name = "migration-blind-prepare"
+  acceptsArgs = true
   params {
     new { name = "scenario"; type = "string" }
   }
@@ -175,6 +182,7 @@ local migrationBlindPrepare = new Task {
 
 local migrationBlindSolo = new Task {
   name = "migration-blind-solo"
+  acceptsArgs = true
   params {
     new { name = "scenario"; type = "string" }
   }
@@ -184,6 +192,7 @@ local migrationBlindSolo = new Task {
 
 local migrationBlindEvaluate = new Task {
   name = "migration-blind-evaluate"
+  acceptsArgs = true
   params {
     new { name = "scenario"; type = "string" }
   }
@@ -201,12 +210,14 @@ local flakerVrtAdapt = new Task {
 
 local fixLoop = new Task {
   name = "fix-loop"
+  acceptsArgs = true
   cmd = "node src/experiments/css-challenge/fix-loop.ts"
   inputs { "src/experiments/css-challenge/fix-loop.ts"; "packages/vrt-ai/src/vlm-client.ts"; "packages/vrt-ai/src/llm-client.ts" }
 }
 
 local vlmBench = new Task {
   name = "vlm-bench"
+  acceptsArgs = true
   cmd = "node src/experiments/benchmark/vlm-bench.ts"
   inputs { "src/experiments/benchmark/vlm-bench.ts" }
 }
