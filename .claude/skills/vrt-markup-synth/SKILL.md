@@ -16,7 +16,7 @@ keys.
 
 | Command | Input | Output | What runs |
 |---|---|---|---|
-| `vrt build component <target.png> <current.html>` | Reference image + your current HTML | Markdown report: pixel diff + bbox + palette + heatmap + text-row signals | Playwright renders `current.html` at the target's viewport, pixel-diffs vs `target.png`, surfaces image-only signals. **No VLM.** Agent iterates `current.html`. |
+| `vrt build component <target.png> <current.html>` | Reference image + your current HTML | Markdown report at `test-results/component/report.md` (+ `component_heatmap.png` alongside): pixel diff + bbox + palette + heatmap + text-row signals | Playwright renders `current.html` at the target's viewport, pixel-diffs vs `target.png`, surfaces image-only signals. **No VLM.** Agent iterates `current.html`. Internal binary name: `vrt component-from-image` — the CLI banner uses the legacy name even when invoked as `vrt build component`. `--output` is **not** a destination path here — the report always lands at the fixed `test-results/component/` path; the flag is silently ignored. |
 | `vrt scan component <screenshot>` | Full-page PNG | `components/*.png` + `manifest.json` (bbox + role guess) | Bbox detection + clustering on the image. **No VLM.** |
 | `vrt check tokens <html-or-url>` | Page | Markdown table: violation + nearest-token | Playwright + computed-style scan; snaps to allowed scale within tolerance. **No VLM.** Internal binary name: `vrt design-tokens` — the dispatcher routes both, but **the CLI banner and the generated report still call it `vrt design-tokens`** (legacy). Both invocations work; don't get tripped up when the output names a command different from the one you typed. |
 | `vrt check theme <html>` | Page | Markdown report: "unthemed" bboxes (light/dark render same) | Playwright with `emulateMedia({ colorScheme: 'light' / 'dark' })`, per-bbox color sampling, identical-fill flag. **No VLM.** |
@@ -60,8 +60,9 @@ dist is stale — run `pnpm build` or use the source form. All
 ```bash
 # Image-driven build loop. You supply current.html; the tool returns
 # pixel signal each iteration. Agent (= you) edits current.html until
-# the diff converges.
-vrt build component design.png current.html --output report.md
+# the diff converges. The report lands at test-results/component/report.md
+# (path is fixed — `--output` is ignored for this sub-tool).
+vrt build component design.png current.html
 
 # Full screenshot → per-component crops
 vrt scan component dashboard.png --output components/
