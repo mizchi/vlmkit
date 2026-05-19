@@ -40,6 +40,8 @@
   "scripts": {
     "build": "tsdown",
     "prepack": "pnpm build",
+    "smoke:dist": "pnpm build && bash scripts/smoke-dist.sh",
+    "smoke:dist:strict": "pnpm build && bash scripts/smoke-dist.sh --strict",
     "test": "node --test 'src/**/*.test.ts' 'packages/*/src/**/*.test.ts' 'worker/**/*.test.ts'",
     "demo": "node src/demo/demo.ts",
     "demo:fix": "node src/demo/demo-fix-loop.ts",
