@@ -88,7 +88,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
       return c.json({ error: "maxActions must be 1-1000" }, 400);
     }
 
-    const { runSmokeTest } = await import("@mizchi/vrt-markup/inspect/smoke-runner.ts");
+    const { runSmokeTest } = await import("@mizchi/vlmkit-markup/inspect/smoke-runner.ts");
     const result = await runSmokeTest(body);
     return c.json(result);
   });

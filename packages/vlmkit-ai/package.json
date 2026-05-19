@@ -1,0 +1,34 @@
+{
+  "name": "@mizchi/vlmkit-ai",
+  "version": "0.6.0",
+  "description": "VLM / LLM clients, reasoning pipeline, and NLP helpers used by VRT to interpret diff images and natural-language intent.",
+  "license": "MIT",
+  "author": "mizchi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mizchi/vlmkit.git",
+    "directory": "packages/vlmkit-ai"
+  },
+  "homepage": "https://github.com/mizchi/vlmkit/tree/main/packages/vlmkit-ai#readme",
+  "bugs": {
+    "url": "https://github.com/mizchi/vlmkit/issues"
+  },
+  "type": "module",
+  "files": [
+    "src/**/*.ts",
+    "!src/**/*.test.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test 'src/**/*.test.ts'"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./*.ts": "./src/*.ts"
+  },
+  "dependencies": {
+    "@mizchi/vlmkit-core": "workspace:*",
+    "@google/generative-ai": "^0.24.1"
+  }
+}

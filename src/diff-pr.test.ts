@@ -7,7 +7,7 @@ import { after, before, describe, it } from "node:test";
 import { buildMarkdownSummary } from "./diff-pr.ts";
 import { parseDiffPrConfig } from "./diff-pr-config.ts";
 
-const CLI_PATH = new URL("./cli/vrt.ts", import.meta.url).pathname;
+const CLI_PATH = new URL("./cli/vlmkit.ts", import.meta.url).pathname;
 function cli(cwd: string, ...argv: string[]): { stdout: string; stderr: string; status: number } {
   const r = spawnSync(
     "node",

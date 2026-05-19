@@ -64,12 +64,12 @@ async function delegate(s: Spec, args: string[]): Promise<void> {
 async function runDiscover(args: string[]): Promise<void> {
   const file = args.find((a) => !a.startsWith("-") && a !== HELP_SENTINEL);
   if (!file || args.includes(HELP_SENTINEL) || args.includes("--help") || args.includes("-h")) {
-    console.log("Usage: vrt scan breakpoints <html-file>");
+    console.log("Usage: vlmkit scan breakpoints <html-file>");
     if (!file) process.exit(1);
     return;
   }
   const { readFile } = await import("node:fs/promises");
-  const { discoverViewports } = await import("@mizchi/vrt-capture/viewport-discovery.ts");
+  const { discoverViewports } = await import("@mizchi/vlmkit-capture/viewport-discovery.ts");
   const html = await readFile(file, "utf-8");
   const result = discoverViewports(html, { randomSamples: 1, maxViewports: 15 });
   console.log();
@@ -104,34 +104,34 @@ async function runWorkflow(args: string[]): Promise<void> {
 
 const SPECS: Record<string, Spec> = {
   migrationCompare: spec("migration-compare", () => import("../experiments/migration/migration-compare.ts")),
-  pngDiff: spec("png-diff", () => import("@mizchi/vrt-core/png-diff.ts")),
+  pngDiff: spec("png-diff", () => import("@mizchi/vlmkit-core/png-diff.ts")),
   cssBench: spec("css-challenge-bench", () => import("../experiments/css-challenge/css-challenge-bench.ts")),
   detectionReport: spec("detection-report", () => import("../experiments/detection/detection-report.ts")),
   snapshot: spec("snapshot", () => import("../vrt/snapshot/snapshot.ts")),
   snapshotReport: spec("snapshot-report", () => import("../vrt/snapshot/snapshot-report.ts")),
   migrationBlind: spec("migration-blind", () => import("../experiments/migration/migration-blind.ts")),
   migrationSubagent: spec("migration-subagent", () => import("../experiments/migration/migration-subagent.ts")),
-  elementCompare: spec("element-compare", () => import("@mizchi/vrt-core/element-compare.ts")),
-  smokeRunner: spec("smoke-runner", () => import("@mizchi/vrt-markup/inspect/smoke-runner.ts")),
+  elementCompare: spec("element-compare", () => import("@mizchi/vlmkit-core/element-compare.ts")),
+  smokeRunner: spec("smoke-runner", () => import("@mizchi/vlmkit-markup/inspect/smoke-runner.ts")),
   flipbook: spec("flipbook-cli", () => import("./commands/flipbook-cli.ts")),
   diffForAgent: spec("diff-for-agent-cli", () => import("./commands/diff-for-agent-cli.ts")),
   compareRuns: spec("compare-runs-cli", () => import("./commands/compare-runs-cli.ts")),
-  componentFromImage: spec("component-from-image", () => import("@mizchi/vrt-markup/component/component-from-image.ts")),
-  multiPageConsistency: spec("multi-page-consistency", () => import("@mizchi/vrt-markup/stress/multi-page-consistency.ts")),
-  componentConsistency: spec("component-consistency", () => import("@mizchi/vrt-markup/component/component-consistency.ts")),
-  themeParity: spec("theme-parity", () => import("@mizchi/vrt-markup/style/theme-parity.ts")),
-  i18nStress: spec("i18n-stress", () => import("@mizchi/vrt-markup/stress/i18n-stress.ts")),
-  a11yContrast: spec("a11y-contrast", () => import("@mizchi/vrt-core/a11y-contrast.ts")),
-  a11yTouch: spec("a11y-touch", () => import("@mizchi/vrt-core/a11y-touch.ts")),
-  a11yFocusOrder: spec("a11y-focus-order", () => import("@mizchi/vrt-core/a11y-focus-order.ts")),
-  interact: spec("interact", () => import("@mizchi/vrt-markup/inspect/interact.ts")),
-  mediaVariants: spec("media-variants", () => import("@mizchi/vrt-markup/stress/media-variants.ts")),
-  crossBrowser: spec("cross-browser", () => import("@mizchi/vrt-markup/stress/cross-browser.ts")),
-  designTokens: spec("design-tokens", () => import("@mizchi/vrt-markup/style/design-tokens.ts")),
+  componentFromImage: spec("component-from-image", () => import("@mizchi/vlmkit-markup/component/component-from-image.ts")),
+  multiPageConsistency: spec("multi-page-consistency", () => import("@mizchi/vlmkit-markup/stress/multi-page-consistency.ts")),
+  componentConsistency: spec("component-consistency", () => import("@mizchi/vlmkit-markup/component/component-consistency.ts")),
+  themeParity: spec("theme-parity", () => import("@mizchi/vlmkit-markup/style/theme-parity.ts")),
+  i18nStress: spec("i18n-stress", () => import("@mizchi/vlmkit-markup/stress/i18n-stress.ts")),
+  a11yContrast: spec("a11y-contrast", () => import("@mizchi/vlmkit-core/a11y-contrast.ts")),
+  a11yTouch: spec("a11y-touch", () => import("@mizchi/vlmkit-core/a11y-touch.ts")),
+  a11yFocusOrder: spec("a11y-focus-order", () => import("@mizchi/vlmkit-core/a11y-focus-order.ts")),
+  interact: spec("interact", () => import("@mizchi/vlmkit-markup/inspect/interact.ts")),
+  mediaVariants: spec("media-variants", () => import("@mizchi/vlmkit-markup/stress/media-variants.ts")),
+  crossBrowser: spec("cross-browser", () => import("@mizchi/vlmkit-markup/stress/cross-browser.ts")),
+  designTokens: spec("design-tokens", () => import("@mizchi/vlmkit-markup/style/design-tokens.ts")),
   perf: spec("perf", () => import("../util/perf.ts")),
-  explore: spec("explore", () => import("@mizchi/vrt-markup/inspect/explore.ts")),
+  explore: spec("explore", () => import("@mizchi/vlmkit-markup/inspect/explore.ts")),
   skill: spec("skill", () => import("../util/skill.ts")),
-  componentExtract: spec("component-extract", () => import("@mizchi/vrt-markup/component/component-extract.ts")),
+  componentExtract: spec("component-extract", () => import("@mizchi/vlmkit-markup/component/component-extract.ts")),
   apiServer: spec("api-server", () => import("../api/api-server.ts")),
   manifest: spec("manifest-cli", () => import("../manifest-cli.ts")),
   watch: spec("watch", () => import("../watch.ts")),
@@ -214,7 +214,7 @@ const WORKFLOW_ALIASES = [
 function printGroupHelp(groupName: string): void {
   const group = GROUPS[groupName];
   if (groupName === "check") {
-    console.log(`vrt check <subcommand>\n`);
+    console.log(`vlmkit check <subcommand>\n`);
     console.log("Subcommands:");
     console.log("  a11y contrast <html>          WCAG AA contrast scan");
     console.log("  a11y touch <html>             Touch-target size check");
@@ -226,7 +226,7 @@ function printGroupHelp(groupName: string): void {
     console.log("  drift pages --urls/--files    Drift of one selector across N pages");
     return;
   }
-  console.log(`vrt ${groupName} <subcommand>\n`);
+  console.log(`vlmkit ${groupName} <subcommand>\n`);
   console.log("Subcommands:");
   for (const [name, info] of Object.entries(group)) {
     console.log(`  ${name.padEnd(16)}${info.desc}`);
@@ -241,7 +241,7 @@ async function runGroupLeaf(
   if (groupName === "check" && leafName === "a11y") {
     const sub = rest[0];
     if (!sub || sub === HELP_SENTINEL) {
-      console.log("vrt check a11y <contrast|touch|focus> <html>");
+      console.log("vlmkit check a11y <contrast|touch|focus> <html>");
       return;
     }
     const entry = CHECK_A11Y[sub];
@@ -255,7 +255,7 @@ async function runGroupLeaf(
   if (groupName === "check" && leafName === "drift") {
     const sub = rest[0];
     if (!sub || sub === HELP_SENTINEL) {
-      console.log("vrt check drift <component|pages> <html>");
+      console.log("vlmkit check drift <component|pages> <html>");
       return;
     }
     const entry = CHECK_DRIFT[sub];
@@ -279,25 +279,26 @@ async function runGroupLeaf(
 }
 
 export async function runCli(argv: string[] = process.argv.slice(2)): Promise<void> {
-  const cli = cac("vrt");
-  cli.version("0.5.0");
+  const cli = cac("vlmkit");
+  cli.version("0.6.0");
 
   cli.usage(`<command> [options]
 
-Pixel / DOM / a11y diff toolkit with VLM-driven markup assistance.
+VLM-driven frontend toolkit. Visual regression (snapshot / diff /
+regression-watch) + markup synthesis + design audits + CSS auto-repair.
 
 Common command groups:
-  vrt diff html|png|elements|browsers|agent|runs
-  vrt check a11y|tokens|theme|perf|drift
-  vrt inspect interact|explore|smoke
-  vrt stress i18n|media
-  vrt scan component|breakpoints
-  vrt build component
-  vrt snapshot [<url>...]
-  vrt workflow <subcommand>
-  vrt bench / api / skill / report
+  vlmkit diff html|png|elements|browsers|agent|runs
+  vlmkit check a11y|tokens|theme|perf|drift
+  vlmkit inspect interact|explore|smoke
+  vlmkit stress i18n|media
+  vlmkit scan component|breakpoints
+  vlmkit build component
+  vlmkit snapshot [<url>...]
+  vlmkit workflow <subcommand>
+  vlmkit bench / api / skill / report
 
-Run \`vrt <command> --help\` for command-specific options.`);
+Run \`vlmkit <command> --help\` for command-specific options.`);
 
   // Group commands — second-level dispatch happens in the action.
   for (const groupName of Object.keys(GROUPS)) {
@@ -350,7 +351,7 @@ Run \`vrt <command> --help\` for command-specific options.`);
       } else if (sub === "subagent") {
         await delegate(SPECS.migrationSubagent, rest.slice(1));
       } else {
-        console.log("vrt migration <compare|blind|subagent>");
+        console.log("vlmkit migration <compare|blind|subagent>");
         if (sub) process.exitCode = 1;
       }
     });
@@ -381,7 +382,7 @@ Run \`vrt <command> --help\` for command-specific options.`);
       } else if (sub === "status") {
         await runApiStatus(rest.slice(1));
       } else {
-        console.log("vrt api <serve|status>");
+        console.log("vlmkit api <serve|status>");
         if (sub) process.exitCode = 1;
       }
     });
@@ -404,41 +405,41 @@ Run \`vrt <command> --help\` for command-specific options.`);
 
   // Deprecated top-level command shims.
   for (const [oldName, { newName, spec }] of Object.entries(DEPRECATED_TOP_LEVEL)) {
-    cli.command(`${oldName} [...args]`, `[deprecated] Use 'vrt ${newName}'`)
+    cli.command(`${oldName} [...args]`, `[deprecated] Use 'vlmkit ${newName}'`)
       .allowUnknownOptions()
       .action(async () => {
-        reportDeprecation(oldName, `vrt ${newName}`);
+        reportDeprecation(oldName, `vlmkit ${newName}`);
         await delegate(spec, passThrough(argv, [oldName]));
       });
   }
 
   // Workflow single-word aliases — deprecation shims.
   for (const alias of WORKFLOW_ALIASES) {
-    cli.command(`${alias} [...args]`, `[deprecated] Use 'vrt workflow ${alias}'`)
+    cli.command(`${alias} [...args]`, `[deprecated] Use 'vlmkit workflow ${alias}'`)
       .allowUnknownOptions()
       .action(async () => {
-        reportDeprecation(alias, `vrt workflow ${alias}`);
+        reportDeprecation(alias, `vlmkit workflow ${alias}`);
         await runWorkflow([alias, ...passThrough(argv, [alias])]);
       });
   }
 
   // serve / status — legacy top-level aliases for api.
-  cli.command("serve [...args]", "[deprecated] Use 'vrt api serve'")
+  cli.command("serve [...args]", "[deprecated] Use 'vlmkit api serve'")
     .allowUnknownOptions()
     .action(async () => {
-      reportDeprecation("serve", "vrt api serve");
+      reportDeprecation("serve", "vlmkit api serve");
       await delegate(SPECS.apiServer, passThrough(argv, ["serve"]));
     });
-  cli.command("status [...args]", "[deprecated] Use 'vrt api status'")
+  cli.command("status [...args]", "[deprecated] Use 'vlmkit api status'")
     .allowUnknownOptions()
     .action(async () => {
-      reportDeprecation("status", "vrt api status");
+      reportDeprecation("status", "vlmkit api status");
       await runApiStatus(passThrough(argv, ["status"]));
     });
 
-  cli.command("discover <file>", "[deprecated] Use 'vrt scan breakpoints'")
+  cli.command("discover <file>", "[deprecated] Use 'vlmkit scan breakpoints'")
     .action(async (file: string) => {
-      reportDeprecation("discover", "vrt scan breakpoints");
+      reportDeprecation("discover", "vlmkit scan breakpoints");
       await runDiscover([file]);
     });
 

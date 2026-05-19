@@ -28,9 +28,9 @@ export function registerCompareRenderersRoute(
     }
 
     const { chromium: pw } = await import("playwright");
-    const { compareScreenshots } = await import("@mizchi/vrt-core/heatmap.ts");
-    const { discoverViewports } = await import("@mizchi/vrt-capture/viewport-discovery.ts");
-    const { CraterClient } = await import("@mizchi/vrt-capture/crater-client.ts");
+    const { compareScreenshots } = await import("@mizchi/vlmkit-core/heatmap.ts");
+    const { discoverViewports } = await import("@mizchi/vlmkit-capture/viewport-discovery.ts");
+    const { CraterClient } = await import("@mizchi/vlmkit-capture/crater-client.ts");
     const { mkdir, rm, writeFile } = await import("node:fs/promises");
     const { join } = await import("node:path");
     const tmpDir = join(process.cwd(), "test-results", "api", `renderers-${Date.now()}`);

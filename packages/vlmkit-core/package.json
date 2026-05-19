@@ -1,0 +1,35 @@
+{
+  "name": "@mizchi/vlmkit-core",
+  "version": "0.6.0",
+  "description": "VRT diff engine + shared types — pure image / DOM / a11y / visual comparison primitives.",
+  "license": "MIT",
+  "author": "mizchi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mizchi/vlmkit.git",
+    "directory": "packages/vlmkit-core"
+  },
+  "homepage": "https://github.com/mizchi/vlmkit/tree/main/packages/vlmkit-core#readme",
+  "bugs": {
+    "url": "https://github.com/mizchi/vlmkit/issues"
+  },
+  "type": "module",
+  "files": [
+    "src/**/*.ts",
+    "!src/**/*.test.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test 'src/**/*.test.ts'"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./*.ts": "./src/*.ts"
+  },
+  "dependencies": {
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0",
+    "playwright": "^1.58.2"
+  }
+}

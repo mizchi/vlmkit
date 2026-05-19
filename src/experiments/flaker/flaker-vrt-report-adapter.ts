@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { handleCliError } from "@mizchi/vrt-core/cli-error.ts";
+import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import type { MigrationCompareReport } from "../migration/migration-compare.ts";
 import {
   convertMigrationReportToFlakerResults,

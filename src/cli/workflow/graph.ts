@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { buildDepGraph, findAffectedComponents, graphStats } from "@mizchi/vrt-markup/inspect/dep-graph.ts";
+import { buildDepGraph, findAffectedComponents, graphStats } from "@mizchi/vlmkit-markup/inspect/dep-graph.ts";
 
 export async function runGraph(projectRoot: string) {
   console.log("=== Dependency Graph ===\n");

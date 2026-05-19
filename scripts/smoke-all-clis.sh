@@ -29,89 +29,89 @@ mkdir -p "$OUT_BASE"
 
 # Markup-assistance commands (new)
 run "component-from-image" "report.md" \
-  node --experimental-strip-types src/cli/vrt.ts component-from-image \
+  node --experimental-strip-types src/cli/vlmkit.ts component-from-image \
     fixtures/wireframe/pricing-card/target-desktop.png \
     fixtures/wireframe/pricing-card/blank.html \
     --output-dir "$OUT_BASE/component-from-image"
 
 run "multi-page-consistency" "report.md" \
-  node --experimental-strip-types src/cli/vrt.ts multi-page-consistency \
+  node --experimental-strip-types src/cli/vlmkit.ts multi-page-consistency \
     --selector .footer \
     --files fixtures/multi-page/footer-drift/about.html fixtures/multi-page/footer-drift/blog.html fixtures/multi-page/footer-drift/pricing.html \
     --output-dir "$OUT_BASE/multi-page-consistency"
 
 run "component-consistency" "report.md" \
-  node --experimental-strip-types src/cli/vrt.ts component-consistency \
+  node --experimental-strip-types src/cli/vlmkit.ts component-consistency \
     fixtures/component-consistency/inline-leak/page.html \
     --selector .card \
     --output-dir "$OUT_BASE/component-consistency"
 
 run "theme-parity" "report.md" \
-  node --experimental-strip-types src/cli/vrt.ts theme-parity \
+  node --experimental-strip-types src/cli/vlmkit.ts theme-parity \
     fixtures/theme-parity/card-with-bug/buggy.html \
     --output-dir "$OUT_BASE/theme-parity"
 
 run "i18n-stress" "report.md" \
-  node --experimental-strip-types src/cli/vrt.ts i18n-stress \
+  node --experimental-strip-types src/cli/vlmkit.ts i18n-stress \
     fixtures/i18n-stress/button-overflow/page.html \
     --output-dir "$OUT_BASE/i18n-stress"
 
 run "a11y-contrast" "report.md" \
-  node --experimental-strip-types src/cli/vrt.ts a11y-contrast \
+  node --experimental-strip-types src/cli/vlmkit.ts a11y-contrast \
     fixtures/a11y-contrast/low-contrast/page.html \
     --output-dir "$OUT_BASE/a11y-contrast"
 
 run "a11y-touch" "report.md" \
-  node --experimental-strip-types src/cli/vrt.ts a11y-touch \
+  node --experimental-strip-types src/cli/vlmkit.ts a11y-touch \
     fixtures/a11y-touch/small-targets/page.html \
     --output-dir "$OUT_BASE/a11y-touch"
 
 run "a11y-focus-order" "report.md" \
-  node --experimental-strip-types src/cli/vrt.ts a11y-focus-order \
+  node --experimental-strip-types src/cli/vlmkit.ts a11y-focus-order \
     fixtures/a11y-focus-order/reversed/page.html \
     --output-dir "$OUT_BASE/a11y-focus-order"
 
 run "component-from-image-typo" "report.md" \
-  node --experimental-strip-types src/cli/vrt.ts component-from-image \
+  node --experimental-strip-types src/cli/vlmkit.ts component-from-image \
     fixtures/typography/wrong-size-weight/target.png \
     fixtures/typography/wrong-size-weight/buggy.html \
     --output-dir "$OUT_BASE/component-from-image-typo"
 
 run "interact" "report.md" \
-  node --experimental-strip-types src/cli/vrt.ts interact \
+  node --experimental-strip-types src/cli/vlmkit.ts interact \
     fixtures/interact/dropdown-form/page.html \
     --sequence fixtures/interact/dropdown-form/sequence.json \
     --output-dir "$OUT_BASE/interact"
 
 run "form-validation-diff" "report.md" \
-  node --experimental-strip-types src/cli/vrt.ts interact \
+  node --experimental-strip-types src/cli/vlmkit.ts interact \
     fixtures/interact/form-validation/page.html \
     --sequence fixtures/interact/form-validation/sequence.json \
     --output-dir "$OUT_BASE/form-validation-diff"
 
 run "media-variants" "report.md" \
-  node --experimental-strip-types src/cli/vrt.ts media-variants \
+  node --experimental-strip-types src/cli/vlmkit.ts media-variants \
     fixtures/media-variants/card/hostile.html \
     --output-dir "$OUT_BASE/media-variants"
 
 run "cross-browser" "report.md" \
-  node --experimental-strip-types src/cli/vrt.ts cross-browser \
+  node --experimental-strip-types src/cli/vlmkit.ts cross-browser \
     fixtures/wireframe/pricing-card/reference.html \
     --allow-skipped \
     --output-dir "$OUT_BASE/cross-browser"
 
 run "design-tokens" "report.md" \
-  node --experimental-strip-types src/cli/vrt.ts design-tokens \
+  node --experimental-strip-types src/cli/vlmkit.ts design-tokens \
     fixtures/design-tokens/off-scale/page.html \
     --output-dir "$OUT_BASE/design-tokens"
 
 run "perf" "report.md" \
-  node --experimental-strip-types src/cli/vrt.ts perf \
+  node --experimental-strip-types src/cli/vlmkit.ts perf \
     fixtures/perf/cls-bug/page.html \
     --output-dir "$OUT_BASE/perf"
 
 run "explore" "report.md" \
-  node --experimental-strip-types src/cli/vrt.ts explore \
+  node --experimental-strip-types src/cli/vlmkit.ts explore \
     fixtures/explore/declarative/page.html \
     --output-dir "$OUT_BASE/explore"
 
@@ -120,7 +120,7 @@ run "explore" "report.md" \
 # exit code is 1 — wrap with `|| true` so the smoke survives. The
 # log assertion stays on `report.md` being emitted.
 run "explore-strict-timing" "report.md" \
-  bash -c "node --experimental-strip-types src/cli/vrt.ts explore \
+  bash -c "node --experimental-strip-types src/cli/vlmkit.ts explore \
     fixtures/explore/byte-identical-bug/silent-listener.html \
     --output-dir '$OUT_BASE/explore-strict-timing' \
     --strict-timing || true"
@@ -130,14 +130,14 @@ run "explore-strict-timing" "report.md" \
 # (#11). Fixture has a btn-primary / btn-secondary pair that fires
 # the healer with confidence ~13%.
 run "interact-heal-all" "report.md" \
-  node --experimental-strip-types src/cli/vrt.ts interact \
+  node --experimental-strip-types src/cli/vlmkit.ts interact \
     fixtures/interact/heal-all-demo/page.html \
     --sequence fixtures/interact/heal-all-demo/sequence.json \
     --output-dir "$OUT_BASE/interact-heal-all" \
     --heal-all
 
 run "component-extract" "report.md" \
-  node --experimental-strip-types src/cli/vrt.ts component-extract \
+  node --experimental-strip-types src/cli/vlmkit.ts component-extract \
     fixtures/wireframe/pricing-card/target-desktop.png \
     --crop 0 \
     --output-dir "$OUT_BASE/component-extract"
@@ -146,13 +146,13 @@ run "component-extract" "report.md" \
 # pass --output-dir = OUT_BASE, then the resulting report lives at
 # $OUT_BASE/skill-pricing-card/report.md — assert with that label.
 run "skill-pricing-card" "report.md" \
-  node --experimental-strip-types src/cli/vrt.ts skill run pricing-card \
+  node --experimental-strip-types src/cli/vlmkit.ts skill run pricing-card \
     --against fixtures/wireframe/pricing-card/reference.html \
     --output-dir "$OUT_BASE"
 
 # Migration mode (existing) — uses the shadcn fixture
 run "compare" "migration-report.json" \
-  node --experimental-strip-types src/cli/vrt.ts compare \
+  node --experimental-strip-types src/cli/vlmkit.ts compare \
     --dir fixtures/migration/shadcn-to-luna \
     --baseline before.html --variants after-blank.html \
     --output-dir "$OUT_BASE/compare" \
@@ -160,7 +160,7 @@ run "compare" "migration-report.json" \
 
 # Existing image tools
 run "png-diff" "-" \
-  node --experimental-strip-types src/cli/vrt.ts png-diff \
+  node --experimental-strip-types src/cli/vlmkit.ts png-diff \
     fixtures/wireframe/pricing-card/target-desktop.png \
     fixtures/wireframe/pricing-card/target-desktop.png \
     --output-dir "$OUT_BASE/png-diff"

@@ -18,9 +18,9 @@ import {
   type ApprovalHistoryEntry,
 } from "../../vrt/snapshot/approval-history.ts";
 import { getCssBenchApprovalSuggestionsPath } from "../../experiments/css-challenge/css-challenge-fixtures.ts";
-import { getArg, hasFlag } from "@mizchi/vrt-core/cli-args.ts";
-import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD } from "@mizchi/vrt-core/terminal-colors.ts";
-import { handleCliError } from "@mizchi/vrt-core/cli-error.ts";
+import { getArg, hasFlag } from "@mizchi/vlmkit-core/cli-args.ts";
+import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 
 const FIXTURE = getArg("fixture", "page");
 const INPUT_PATH = getArg("input", getCssBenchApprovalSuggestionsPath(FIXTURE));

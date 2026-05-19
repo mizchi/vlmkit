@@ -8,7 +8,7 @@ import { existsSync } from "node:fs";
  * - `HARNESS_ROOT` is the installed vrt package root (used to locate
  *   `dist/e2e/vrt-capture.spec.mjs` or `e2e/vrt-capture.spec.ts`).
  *   Resolved by walking up from the CLI entry until a `package.json` is
- *   found, so it works in both the source layout (`src/cli/vrt.ts`) and
+ *   found, so it works in both the source layout (`src/cli/vlmkit.ts`) and
  *   the bundled CLI (`dist/vrt.mjs`).
  * - `PROJECT_ROOT` is the *target* project — where baselines, snapshots,
  *   output, and report files land. Overridable via `VRT_PROJECT_ROOT`;

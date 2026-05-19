@@ -19,9 +19,9 @@ PATTERN=$(IFS='|'; echo "${FORBIDDEN[*]}")
 #   - the source files that *declare* the alias
 #   - the curated barrels that re-export the alias
 ALLOWLIST=(
-  'packages/vrt-core/src/a11y-semantic\.ts'
-  'packages/vrt-core/src/dom-equivalence\.ts'
-  'packages/vrt-core/src/index\.ts'
+  'packages/vlmkit-core/src/a11y-semantic\.ts'
+  'packages/vlmkit-core/src/dom-equivalence\.ts'
+  'packages/vlmkit-core/src/index\.ts'
   '\.test\.ts'
 )
 ALLOW_PATTERN=$(IFS='|'; echo "${ALLOWLIST[*]}")

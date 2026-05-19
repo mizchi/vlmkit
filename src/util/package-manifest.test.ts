@@ -12,12 +12,12 @@ async function readPackageJson() {
 describe("package manifest for publishable CLI", () => {
   it("uses the scoped npm package name for the published client", async () => {
     const pkg = await readPackageJson();
-    assert.equal(pkg.name, "@mizchi/vrt");
+    assert.equal(pkg.name, "@mizchi/vlmkit");
   });
 
   it("points the CLI bin to built JavaScript", async () => {
     const pkg = await readPackageJson();
-    assert.deepEqual(pkg.bin, { vrt: "./dist/vrt.mjs" });
+    assert.deepEqual(pkg.bin, { vlmkit: "./dist/vlmkit.mjs" });
   });
 
   it("declares a build script and supported Node runtime", async () => {

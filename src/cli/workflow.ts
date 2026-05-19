@@ -39,8 +39,8 @@ import {
   EXPECTATION_PATH,
   SPEC_PATH,
 } from "./workflow/paths.ts";
-import { resolveCaptureRoutes } from "@mizchi/vrt-capture/capture-config.ts";
-import type { UnifiedAgentContext } from "@mizchi/vrt-core/types.ts";
+import { resolveCaptureRoutes } from "@mizchi/vlmkit-capture/capture-config.ts";
+import type { UnifiedAgentContext } from "@mizchi/vlmkit-core/types.ts";
 
 const NPX_COMMAND = process.platform === "win32" ? "npx.cmd" : "npx";
 
@@ -86,7 +86,7 @@ function resolveCaptureSpecPath(): string {
   ];
   const found = candidates.find((candidate) => existsSync(candidate));
   if (!found) {
-    throw new Error("Missing VRT capture spec. Run `pnpm build` or restore `e2e/vrt-capture.spec.ts`.");
+    throw new Error("Missing VRT capture spec. Run `pnpm build` or restore `e2e/vlmkit-capture.spec.ts`.");
   }
   return found;
 }
@@ -311,7 +311,7 @@ const commands: Record<string, (argv: string[]) => Promise<void>> = {
 };
 
 function formatWorkflowUsage(): string {
-  return `vrt workflow <command>
+  return `vlmkit workflow <command>
 
 Commands:
   init [--config <path>] [--base-url <url>]

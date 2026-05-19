@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { crossValidate } from "./cross-validation.ts";
-import type { VisualSemanticDiff, A11yDiff, ChangeIntent } from "@mizchi/vrt-core/types.ts";
+import type { VisualSemanticDiff, A11yDiff, ChangeIntent } from "@mizchi/vlmkit-core/types.ts";
 
 const styleIntent: ChangeIntent = {
   summary: "style: change button color",

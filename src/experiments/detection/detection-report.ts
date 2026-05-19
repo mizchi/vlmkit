@@ -9,7 +9,7 @@
 import { readAllRecords, getDbStats } from "./detection-db.ts";
 import { isOutOfScope } from "./detection-classify.ts";
 import { getBenchHistoryStats, readBenchHistory } from "../benchmark/bench-history.ts";
-import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr as _hr } from "@mizchi/vrt-core/terminal-colors.ts";
+import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr as _hr } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 function hr() { _hr(76); }
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Smoke test for the built dist/vrt.mjs. Verifies the published bin
+# Smoke test for the built dist/vlmkit.mjs. Verifies the published bin
 # accepts every top-level subcommand the source CLI exposes.
 #
-# History: #48 originally surfaced that dist/vrt.mjs's dispatcher used
+# History: #48 originally surfaced that dist/vlmkit.mjs's dispatcher used
 # `import.meta.resolve(<source-path-string>)`, so leaves couldn't
 # resolve from the bundled artifact. That has been fixed — the
 # dispatcher now uses `() => import("literal-path")` factory functions
@@ -22,7 +22,7 @@ for arg in "$@"; do
   esac
 done
 
-DIST="dist/vrt.mjs"
+DIST="dist/vlmkit.mjs"
 if [[ ! -f "$DIST" ]]; then
   echo "error: $DIST not found. Run 'pnpm build' first." >&2
   exit 2

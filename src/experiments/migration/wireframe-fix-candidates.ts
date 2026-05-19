@@ -19,10 +19,10 @@
  * Pure module; no Playwright or filesystem.
  */
 
-import type { MatchedBbox } from "@mizchi/vrt-markup/component/component-bbox.ts";
-import type { MatchedTextRow } from "@mizchi/vrt-core/text-rows.ts";
+import type { MatchedBbox } from "@mizchi/vlmkit-markup/component/component-bbox.ts";
+import type { MatchedTextRow } from "@mizchi/vlmkit-core/text-rows.ts";
 import { snapSpacing, parseLengthToPx, type DesignTokens } from "./design-md-tokens.ts";
-import type { DpEntryWithViewport } from "@mizchi/vrt-core/dom-position-styles.ts";
+import type { DpEntryWithViewport } from "@mizchi/vlmkit-core/dom-position-styles.ts";
 
 export interface WireframeFixSuggestion {
   /** What we observed in the image diff. */

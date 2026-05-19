@@ -11,18 +11,18 @@ importers:
       '@hono/node-server':
         specifier: ^1.19.12
         version: 1.19.12(hono@4.12.10)
-      '@mizchi/vrt-ai':
+      '@mizchi/vlmkit-ai':
         specifier: workspace:*
-        version: link:packages/vrt-ai
-      '@mizchi/vrt-capture':
+        version: link:packages/vlmkit-ai
+      '@mizchi/vlmkit-capture':
         specifier: workspace:*
-        version: link:packages/vrt-capture
-      '@mizchi/vrt-core':
+        version: link:packages/vlmkit-capture
+      '@mizchi/vlmkit-core':
         specifier: workspace:*
-        version: link:packages/vrt-core
-      '@mizchi/vrt-markup':
+        version: link:packages/vlmkit-core
+      '@mizchi/vlmkit-markup':
         specifier: workspace:*
-        version: link:packages/vrt-markup
+        version: link:packages/vlmkit-markup
       '@playwright/test':
         specifier: ^1.52.0
         version: 1.58.2
@@ -61,20 +61,20 @@ importers:
         specifier: ^6.0.2
         version: 6.0.2
 
-  packages/vrt-ai:
+  packages/vlmkit-ai:
     dependencies:
       '@google/generative-ai':
         specifier: ^0.24.1
         version: 0.24.1
-      '@mizchi/vrt-core':
+      '@mizchi/vlmkit-core':
         specifier: workspace:*
-        version: link:../vrt-core
+        version: link:../vlmkit-core
 
-  packages/vrt-capture:
+  packages/vlmkit-capture:
     dependencies:
-      '@mizchi/vrt-core':
+      '@mizchi/vlmkit-core':
         specifier: workspace:*
-        version: link:../vrt-core
+        version: link:../vlmkit-core
       playwright:
         specifier: ^1.58.2
         version: 1.58.2
@@ -85,7 +85,7 @@ importers:
         specifier: ^8.20.0
         version: 8.20.0
 
-  packages/vrt-core:
+  packages/vlmkit-core:
     dependencies:
       pixelmatch:
         specifier: ^7.1.0
@@ -97,17 +97,17 @@ importers:
         specifier: ^7.0.0
         version: 7.0.0
 
-  packages/vrt-markup:
+  packages/vlmkit-markup:
     dependencies:
-      '@mizchi/vrt-ai':
+      '@mizchi/vlmkit-ai':
         specifier: workspace:*
-        version: link:../vrt-ai
-      '@mizchi/vrt-capture':
+        version: link:../vlmkit-ai
+      '@mizchi/vlmkit-capture':
         specifier: workspace:*
-        version: link:../vrt-capture
-      '@mizchi/vrt-core':
+        version: link:../vlmkit-capture
+      '@mizchi/vlmkit-core':
         specifier: workspace:*
-        version: link:../vrt-core
+        version: link:../vlmkit-core
       playwright:
         specifier: ^1.58.2
         version: 1.58.2

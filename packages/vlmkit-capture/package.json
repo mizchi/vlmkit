@@ -1,0 +1,36 @@
+{
+  "name": "@mizchi/vlmkit-capture",
+  "version": "0.6.0",
+  "description": "Playwright + Crater capture infrastructure for VRT — viewport discovery, multi-route capture, prescanner.",
+  "license": "MIT",
+  "author": "mizchi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mizchi/vlmkit.git",
+    "directory": "packages/vlmkit-capture"
+  },
+  "homepage": "https://github.com/mizchi/vlmkit/tree/main/packages/vlmkit-capture#readme",
+  "bugs": {
+    "url": "https://github.com/mizchi/vlmkit/issues"
+  },
+  "type": "module",
+  "files": [
+    "src/**/*.ts",
+    "!src/**/*.test.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test 'src/**/*.test.ts'"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./*.ts": "./src/*.ts"
+  },
+  "dependencies": {
+    "@mizchi/vlmkit-core": "workspace:*",
+    "playwright": "^1.58.2",
+    "pngjs": "^7.0.0",
+    "ws": "^8.20.0"
+  }
+}

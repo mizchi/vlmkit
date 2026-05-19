@@ -16,7 +16,7 @@ import { homedir, platform } from "node:os";
 export function reportDeprecation(oldName: string, newName: string): void {
   // Respect NO_COLOR (https://no-color.org/) — useful for CI grep + tests.
   const useColor = !process.env.NO_COLOR && process.stderr.isTTY;
-  const tag = useColor ? "\x1b[33m[vrt deprecated]\x1b[0m" : "[vrt deprecated]";
+  const tag = useColor ? "\x1b[33m[vlmkit deprecated]\x1b[0m" : "[vlmkit deprecated]";
   process.stderr.write(`${tag} '${oldName}' → '${newName}' — old name removed in 1.0.0\n`);
   try {
     const logPath = resolveLogPath();

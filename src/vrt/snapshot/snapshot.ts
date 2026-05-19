@@ -9,9 +9,9 @@
 import { existsSync } from "node:fs";
 import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { compareScreenshots, generateDiffReport } from "@mizchi/vrt-core/heatmap.ts";
-import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "@mizchi/vrt-core/terminal-colors.ts";
-import { applyMask } from "@mizchi/vrt-core/mask.ts";
+import { compareScreenshots, generateDiffReport } from "@mizchi/vlmkit-core/heatmap.ts";
+import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { applyMask } from "@mizchi/vlmkit-core/mask.ts";
 import { approveSnapshotsFromReport } from "./approve.ts";
 import { determineSnapshotExitCode, parseSnapshotCliArgs, parseSnapshotConfig, type SnapshotConfig } from "../../cli/commands/snapshot.ts";
 import {
@@ -19,15 +19,15 @@ import {
   formatSnapshotFixPromptJson,
   formatSnapshotFixPromptMarkdown,
   type SnapshotReport,
-} from "@mizchi/vrt-markup/heal/fix-prompt.ts";
+} from "@mizchi/vlmkit-markup/heal/fix-prompt.ts";
 import {
   buildStabilityReport,
   formatStabilitySummary,
   type StabilityIterationResult,
 } from "./stability.ts";
-import { resolveCaptureBackend, type CaptureBackend } from "@mizchi/vrt-capture/capturer.ts";
+import { resolveCaptureBackend, type CaptureBackend } from "@mizchi/vlmkit-capture/capturer.ts";
 import { writeFlipbook, type FlipbookFrame } from "../compare/flipbook.ts";
-import type { VrtSnapshot } from "@mizchi/vrt-core/types.ts";
+import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 
 const DEFAULT_SNAPSHOT_CONFIG_FILE = "vrt.config.json";
 const VIEWPORTS = [

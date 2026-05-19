@@ -11,7 +11,7 @@
  *     `<baselineDir>/<route>/<viewport>.png`.
  *
  *   - `vrt workflow` is vrt's own e2e dogfood harness. Uses a
- *     Playwright spec (`e2e/vrt-capture.spec.ts`) + bulk approval.
+ *     Playwright spec (`e2e/vlmkit-capture.spec.ts`) + bulk approval.
  *     Baselines live at `<VRT_ROOT>/baselines/*.png`.
  *
  * `vrt baseline` is the canonical name for the diff-pr flow —
@@ -54,7 +54,7 @@ import {
   loadDiffPrConfig,
   type DiffPrConfig,
 } from "./diff-pr-config.ts";
-import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vrt-core/terminal-colors.ts";
+import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 function getArg(args: string[], name: string): string | undefined {
   const i = args.indexOf(`--${name}`);

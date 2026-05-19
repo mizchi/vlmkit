@@ -39,7 +39,7 @@ jobs:
       - name: Run stability measurement
         run: |
           ITERATIONS="${{ github.event.inputs.iterations || '5' }}"
-          node --experimental-strip-types src/cli/vrt.ts snapshot stability \
+          node --experimental-strip-types src/cli/vlmkit.ts snapshot stability \
             http://127.0.0.1:4500/migration/tailwind-to-vanilla/after.html \
             http://127.0.0.1:4500/migration/reset-css/normalize.html \
             --iterations "$ITERATIONS" \

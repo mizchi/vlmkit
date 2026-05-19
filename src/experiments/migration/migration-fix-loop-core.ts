@@ -6,8 +6,8 @@ import {
 } from "../css-challenge/css-challenge-core.ts";
 import type { MigrationDiffCategory } from "./migration-diff.ts";
 import type { MigrationFixCandidate } from "./migration-fix-candidates.ts";
-import { isPlaywrightSandboxRestrictionError } from "@mizchi/vrt-capture/playwright-launch-error.ts";
-import type { ViewportSpec } from "@mizchi/vrt-capture/viewport-discovery.ts";
+import { isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
+import type { ViewportSpec } from "@mizchi/vlmkit-capture/viewport-discovery.ts";
 
 export interface MigrationCompareReportResult {
   variant: string;

@@ -1,7 +1,7 @@
 import type { HtmlSource } from "../api-types.ts";
 
 export async function loadCraterAvailability(): Promise<boolean> {
-  const { isCraterAvailable } = await import("@mizchi/vrt-capture/crater-client.ts");
+  const { isCraterAvailable } = await import("@mizchi/vlmkit-capture/crater-client.ts");
   return await isCraterAvailable();
 }
 

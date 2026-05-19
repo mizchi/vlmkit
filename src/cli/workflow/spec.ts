@@ -2,10 +2,10 @@ import { execSync } from "node:child_process";
 import { readFile, writeFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
-import { extractDiffSemantics } from "@mizchi/vrt-ai/intent.ts";
-import { diffA11yTrees, parsePlaywrightA11ySnapshot } from "@mizchi/vrt-core/a11y-semantic.ts";
-import { introspect, introspectToSpec, verifySpec } from "@mizchi/vrt-markup/inspect/introspect.ts";
-import type { UiSpec, A11yNode } from "@mizchi/vrt-core/types.ts";
+import { extractDiffSemantics } from "@mizchi/vlmkit-ai/intent.ts";
+import { diffA11yTrees, parsePlaywrightA11ySnapshot } from "@mizchi/vlmkit-core/a11y-semantic.ts";
+import { introspect, introspectToSpec, verifySpec } from "@mizchi/vlmkit-markup/inspect/introspect.ts";
+import type { UiSpec, A11yNode } from "@mizchi/vlmkit-core/types.ts";
 
 export interface SpecPaths {
   projectRoot: string;
