@@ -20,9 +20,9 @@
  *     diff-for-agent pass needed).
  *
  * Usage:
- *   vrt component-from-image <target.png> <current.html>
- *   vrt component-from-image <target.png> <current.html> --output report.md
- *   vrt component-from-image <target.png> <current.html> --states hover focus-visible
+ *   vlmkit build component <target.png> <current.html>
+ *   vlmkit build component <target.png> <current.html> --output report.md
+ *   vlmkit build component <target.png> <current.html> --states hover focus-visible
  */
 import { readFile, writeFile, mkdir, copyFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
@@ -30,6 +30,10 @@ import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
 import { chromium } from "playwright";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
+import {
+  compareLandscapeFromPngFiles,
+  type LandscapeDiffResult,
+} from "@mizchi/vlmkit-core/landscape-diff.ts";
 import {
   extractComponentsFromFile,
   matchComponents,
@@ -44,6 +48,14 @@ import {
   clearStateMarkers,
   type ForcedPseudoState,
 } from "../stress/multi-state.ts";
+import {
+  buildSemanticDrilldown,
+  captureLandmarkRegions,
+  describeLandmarkLayoutContract,
+  selectNextSemanticDrilldown,
+  type LandmarkRegion,
+  type SemanticDrilldownEntry,
+} from "./semantic-drilldown.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
@@ -76,6 +88,9 @@ export interface ComponentFromImageReport {
     totalPixels: number;
     diffRatio: number;
   };
+  landscapeDiff: LandscapeDiffResult;
+  landmarkRegions: LandmarkRegion[];
+  semanticDrilldown: SemanticDrilldownEntry[];
   bboxMatches: MatchedBbox[];
   heatmapRegions: HeatmapRegion[];
   textRowMatches: MatchedTextRow[];
@@ -98,6 +113,85 @@ export interface ComponentFromImageReport {
     lumaDelta: number | null;
   }>;
   reportPath: string;
+}
+
+export interface DeviceScaleFactorSuggestion {
+  deviceScaleFactor: number;
+  cssViewport: { width: number; height: number };
+  reason: string;
+}
+
+export function suggestDeviceScaleFactorForTarget(
+  viewport: { width: number; height: number },
+): DeviceScaleFactorSuggestion | undefined {
+  if (viewport.height <= viewport.width) return undefined;
+  if (viewport.width < 720) return undefined;
+
+  const candidates = [2, 3];
+  const commonMobileWidths = [360, 375, 390, 393, 414, 430, 432];
+  let best: { dpr: number; cssWidth: number; distance: number } | undefined;
+  for (const dpr of candidates) {
+    const cssWidth = viewport.width / dpr;
+    if (cssWidth < 320 || cssWidth > 520) continue;
+    const distance = Math.min(...commonMobileWidths.map((w) => Math.abs(w - cssWidth)));
+    if (!best || distance < best.distance) {
+      best = { dpr, cssWidth, distance };
+    }
+  }
+  if (!best) return undefined;
+  return {
+    deviceScaleFactor: best.dpr,
+    cssViewport: {
+      width: Math.round(viewport.width / best.dpr),
+      height: Math.round(viewport.height / best.dpr),
+    },
+    reason: `portrait target ${viewport.width}×${viewport.height} looks like a ${best.dpr}x mobile mock`,
+  };
+}
+
+function readAttr(tag: string, name: string): string | undefined {
+  const re = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, "i");
+  const m = tag.match(re);
+  return m?.[1] ?? m?.[2] ?? m?.[3];
+}
+
+function isStylesheetLink(tag: string): boolean {
+  if (!/^<link\b/i.test(tag)) return false;
+  const rel = readAttr(tag, "rel");
+  if (!rel) return false;
+  return rel.split(/\s+/).some((part) => part.toLowerCase() === "stylesheet");
+}
+
+function isLocalStylesheetHref(href: string): boolean {
+  if (!href) return false;
+  if (href.startsWith("#") || href.startsWith("//")) return false;
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/u.test(href)) return false;
+  return true;
+}
+
+export async function inlineLocalStylesheets(
+  html: string,
+  htmlPath: string,
+): Promise<string> {
+  const baseDir = dirname(resolve(htmlPath));
+  const linkTags = html.match(/<link\b[^>]*>/gi) ?? [];
+  let out = html;
+
+  for (const tag of linkTags) {
+    if (!isStylesheetLink(tag)) continue;
+    const href = readAttr(tag, "href");
+    if (!href || !isLocalStylesheetHref(href)) continue;
+
+    const [pathname] = href.split(/[?#]/u);
+    if (!pathname) continue;
+    const cssPath = resolve(baseDir, pathname);
+    const css = await readFile(cssPath, "utf-8");
+    const escapedHref = href.replace(/"/g, "&quot;");
+    const styleTag = `<style data-vlmkit-inline-stylesheet="${escapedHref}">\n${css}\n</style>`;
+    out = out.replace(tag, styleTag);
+  }
+
+  return out;
 }
 
 function parseArgs(argv: string[]) {
@@ -145,9 +239,9 @@ export async function runComponentFromImage(
   await copyFile(targetPath, targetCopyPath);
 
   const htmlPath = resolve(options.currentHtmlPath);
-  const html = await readFile(htmlPath, "utf-8");
+  const html = await inlineLocalStylesheets(await readFile(htmlPath, "utf-8"), htmlPath);
 
-  console.log(`  ${BOLD}${CYAN}vrt component-from-image${RESET}`);
+  console.log(`  ${BOLD}${CYAN}vlmkit build component${RESET}`);
   console.log(`  ${DIM}target:  ${targetPath} (${viewport.width}×${viewport.height})${RESET}`);
   console.log(`  ${DIM}current: ${htmlPath}${RESET}`);
 
@@ -157,6 +251,9 @@ export async function runComponentFromImage(
   // page lays out at the *intended* dimensions, but render at the
   // higher dpr.
   const dpr = options.deviceScaleFactor ?? 1;
+  const dprSuggestion = options.deviceScaleFactor === undefined
+    ? suggestDeviceScaleFactorForTarget(viewport)
+    : undefined;
   const cssViewport = dpr > 1
     ? { width: Math.round(viewport.width / dpr), height: Math.round(viewport.height / dpr) }
     : viewport;
@@ -168,6 +265,9 @@ export async function runComponentFromImage(
       deviceScaleFactor: dpr,
     });
     await page.setContent(html, { waitUntil: "networkidle" });
+    const landmarkRegions = await captureLandmarkRegions(page, {
+      deviceScaleFactor: dpr,
+    }).catch(() => []);
     const currentPath = join(outputDir, "current.png");
     await page.screenshot({ path: currentPath, fullPage: false });
     await page.close();
@@ -189,6 +289,7 @@ export async function runComponentFromImage(
     const diffPixels = diff?.diffPixels ?? 0;
     const totalPixels = diff?.totalPixels ?? (viewport.width * viewport.height);
     const heatmapPath = join(outputDir, "component_heatmap.png");
+    const landscapeDiff = await compareLandscapeFromPngFiles(targetCopyPath, currentPath);
 
     // All image-only signals run identically on both files.
     const [bboxBaseline, bboxVariant] = await Promise.all([
@@ -206,6 +307,11 @@ export async function runComponentFromImage(
     } catch {
       // Heatmap may be absent when diff is zero.
     }
+    const semanticDrilldown = buildSemanticDrilldown({
+      landmarks: landmarkRegions,
+      landscapeCells: landscapeDiff.topCells,
+      heatmapRegions,
+    });
 
     const [targetRows, currentRows] = await Promise.all([
       extractTextRowsFromFile(targetCopyPath).catch(() => []),
@@ -361,7 +467,10 @@ export async function runComponentFromImage(
       // diff against the *default* current screenshot — surfaces "what
       // the state does to the variant" alongside the default delta.
       for (const state of options.states) {
-        const statePage = await browser.newPage({ viewport });
+        const statePage = await browser.newPage({
+          viewport: cssViewport,
+          deviceScaleFactor: dpr,
+        });
         await statePage.setContent(html, { waitUntil: "networkidle" });
         const applied = await applyForcedPseudoState(statePage, { state });
         const stateShotPath = join(outputDir, `current-${state}.png`);
@@ -413,6 +522,9 @@ export async function runComponentFromImage(
       diffPixels,
       totalPixels,
       diffRatio,
+      landscapeDiff,
+      landmarkRegions,
+      semanticDrilldown,
       heatmapPath: diffPixels > 0 ? heatmapPath : undefined,
       currentPath,
       bboxMatches,
@@ -426,12 +538,17 @@ export async function runComponentFromImage(
       targetBg,
       currentBg,
       stateResults,
+      dpr,
+      dprSuggestion,
     });
     await writeFile(reportPath, markdown);
 
     const pct = (diffRatio * 100).toFixed(2);
     const icon = diffRatio === 0 ? `${GREEN}✓${RESET}` : diffRatio < 0.01 ? `${YELLOW}~${RESET}` : `${RED}✗${RESET}`;
-    console.log(`  ${icon} diff: ${pct}% (${diffPixels} px)`);
+    console.log(`  ${icon} diff: ${pct}% (${diffPixels} px), landscape ${(landscapeDiff.score * 100).toFixed(2)}%`);
+    if (dprSuggestion) {
+      console.log(`  ${YELLOW}!${RESET} ${DIM}${dprSuggestion.reason}; try --dpr ${dprSuggestion.deviceScaleFactor} (${dprSuggestion.cssViewport.width}×${dprSuggestion.cssViewport.height} CSS px)${RESET}`);
+    }
     console.log(`  ${DIM}bbox: ${bboxMatches.length}, heatmap: ${heatmapRegions.length}, text-rows ${targetRows.length}/${currentRows.length}, palette missing: ${paletteDiff.onlyInBaseline.length}${RESET}`);
     if (stateResults.length > 0) {
       for (const s of stateResults) {
@@ -445,6 +562,9 @@ export async function runComponentFromImage(
       currentHtml: htmlPath,
       viewport,
       diff: { diffPixels, totalPixels, diffRatio },
+      landscapeDiff,
+      landmarkRegions,
+      semanticDrilldown,
       bboxMatches,
       heatmapRegions,
       textRowMatches,
@@ -468,6 +588,9 @@ interface RenderInput {
   diffPixels: number;
   totalPixels: number;
   diffRatio: number;
+  landscapeDiff: LandscapeDiffResult;
+  landmarkRegions: LandmarkRegion[];
+  semanticDrilldown: SemanticDrilldownEntry[];
   heatmapPath?: string;
   currentPath: string;
   bboxMatches: MatchedBbox[];
@@ -481,6 +604,8 @@ interface RenderInput {
   targetBg?: DominantBackgrounds;
   currentBg?: DominantBackgrounds;
   stateResults: NonNullable<ComponentFromImageReport["states"]>;
+  dpr: number;
+  dprSuggestion?: DeviceScaleFactorSuggestion;
 }
 
 export function renderReportMarkdown(r: RenderInput): string {
@@ -489,14 +614,99 @@ export function renderReportMarkdown(r: RenderInput): string {
   lines.push("");
   lines.push(`Target:  \`${r.targetImage}\` (${r.viewport.width}×${r.viewport.height})`);
   lines.push(`Current: \`${r.currentHtml}\``);
+  if (r.dpr > 1) {
+    lines.push(`Capture: DPR ${r.dpr} (${Math.round(r.viewport.width / r.dpr)}×${Math.round(r.viewport.height / r.dpr)} CSS px)`);
+  }
+  if (r.dprSuggestion) {
+    lines.push(`DPR hint: ${r.dprSuggestion.reason}; try \`--dpr ${r.dprSuggestion.deviceScaleFactor}\` ` +
+      `to render at ${r.dprSuggestion.cssViewport.width}×${r.dprSuggestion.cssViewport.height} CSS px.`);
+  }
   lines.push("");
   const pct = (r.diffRatio * 100).toFixed(2);
   lines.push(`**Pixel diff**: ${pct}% (${r.diffPixels} of ${r.totalPixels} pixels)`);
+  lines.push("");
+  lines.push(`**Landscape diff**: ${(r.landscapeDiff.score * 100).toFixed(2)}% coarse ` +
+    `(${(r.landscapeDiff.similarity * 100).toFixed(2)}% similarity, ` +
+    `${r.landscapeDiff.changedCells}/${r.landscapeDiff.totalCells} changed cells, ` +
+    `${r.landscapeDiff.grid.cols}×${r.landscapeDiff.grid.rows} grid)`);
   lines.push("");
   if (r.heatmapPath) {
     lines.push("- Target:   `" + r.targetImage + "`");
     lines.push("- Current:  `" + r.currentPath + "`");
     lines.push("- Heatmap:  `" + r.heatmapPath + "`");
+    lines.push("");
+  }
+
+  if (r.landscapeDiff.topCells.length > 0) {
+    lines.push("## Landscape cell diff");
+    lines.push("");
+    lines.push("Coarse grid comparison of average color + ink density. Use this " +
+      "before pixel-perfect work: it answers whether the large page regions " +
+      "land in roughly the same places.");
+    lines.push("");
+    lines.push("| Cell | Box | Score | Target | Current |");
+    lines.push("|---|---|---:|---|---|");
+    for (const c of r.landscapeDiff.topCells) {
+      lines.push(`| r${c.row} c${c.col} | ${c.x},${c.y} ${c.width}×${c.height} | ` +
+        `${(c.score * 100).toFixed(1)}% | \`${c.baseline.hex}\` ink ${c.baseline.ink.toFixed(2)} | ` +
+        `\`${c.current.hex}\` ink ${c.current.ink.toFixed(2)} |`);
+    }
+    lines.push("");
+  }
+
+  if (r.semanticDrilldown.length > 0) {
+    lines.push("## Landmark drilldown");
+    lines.push("");
+    lines.push("Current DOM landmarks are used as semantic lenses over the visual " +
+      "diff. This follows ARIA landmark practice: concrete roles such as " +
+      "`banner`, `navigation`, `main`, `complementary`, `contentinfo`, " +
+      "`region`, `search`, and named `form` are used; `role=\"landmark\"` " +
+      "itself is ignored.");
+    lines.push("");
+    lines.push("The lanes are intentionally separate. Run the layout lane first " +
+      "until section placement is stable, then use the decoration lane for " +
+      "paint, media, and local text details.");
+    lines.push("");
+    const renderDrilldownRows = (rows: SemanticDrilldownEntry[], flow: "layout" | "decoration") => {
+      const title = flow === "layout" ? "Layout lane" : "Decoration lane";
+      const next = flow === "layout"
+        ? "fix landmark geometry / spacing / section placement"
+        : "fix colors / media / text styling after layout stabilizes";
+      lines.push(`### ${title}`);
+      lines.push("");
+      if (rows.length === 0) {
+        lines.push(`No ${flow} rows detected.`);
+        lines.push("");
+        return;
+      }
+      lines.push("| Priority | Landmark | Box | Width | Height | Scroll | Grid | Layout | Decoration | Evidence | Next |");
+      lines.push("|---:|---|---|---|---|---|---|---:|---:|---|---|");
+      for (const row of rows.slice(0, 8)) {
+        const lm = row.landmark;
+        const name = lm.name ? ` "${lm.name}"` : "";
+        const box = `${lm.bbox.left},${lm.bbox.top} ${lm.bbox.width}×${lm.bbox.height}`;
+        const contract = lm.layout ? describeLandmarkLayoutContract(lm.layout) : undefined;
+        const evidence = `${row.landscapeCells.length} landscape cell(s), ` +
+          `${row.heatmapRegions.length} heatmap region(s)`;
+        lines.push(`| ${(row.priorityScore * 100).toFixed(1)} | ` +
+          `\`${lm.role}${name}\` | ${box} | ` +
+          `${contract?.width ?? "—"} | ${contract?.height ?? "—"} | ` +
+          `${contract?.scroll ?? "—"} | ${contract?.grid ?? "—"} | ` +
+          `${(row.layoutScore * 100).toFixed(1)}% | ` +
+          `${(row.decorationScore * 100).toFixed(1)}% | ${evidence} | ${next} |`);
+      }
+      lines.push("");
+    };
+    const layoutRows = r.semanticDrilldown.filter((row) => row.flow === "layout");
+    const decorationRows = r.semanticDrilldown.filter((row) => row.flow === "decoration");
+    renderDrilldownRows(layoutRows, "layout");
+    renderDrilldownRows(decorationRows, "decoration");
+  } else if (r.landmarkRegions.length === 0) {
+    lines.push("## Landmark drilldown");
+    lines.push("");
+    lines.push("No current DOM landmarks were detected. Add semantic wrappers " +
+      "such as `<header>`, `<nav>`, `<main>`, `<aside>`, `<footer>`, " +
+      "or named `<section>` regions before relying on visual drilldown.");
     lines.push("");
   }
 
@@ -752,7 +962,20 @@ export function renderReportMarkdown(r: RenderInput): string {
 
   lines.push("## Suggested next step");
   lines.push("");
-  if (r.baselineRowCount > r.variantRowCount) {
+  const topDrilldown = selectNextSemanticDrilldown(r.semanticDrilldown);
+  if (topDrilldown?.flow === "layout") {
+    const lm = topDrilldown.landmark;
+    const name = lm.name ? ` "${lm.name}"` : "";
+    lines.push(`1. Start with the \`${lm.role}${name}\` landmark. Its coarse ` +
+      "landscape cells changed, so fix section geometry, spacing, and " +
+      "placement before chasing local colors.");
+  } else if (topDrilldown?.flow === "decoration") {
+    const lm = topDrilldown.landmark;
+    const name = lm.name ? ` "${lm.name}"` : "";
+    lines.push(`1. Start with decoration inside the \`${lm.role}${name}\` ` +
+      "landmark. The coarse layout is relatively stable; fix local " +
+      "paint, media, and text details.");
+  } else if (r.baselineRowCount > r.variantRowCount) {
     lines.push("1. The current rendering is missing text rows — add the missing " +
       "HTML elements first. Bbox / palette tables tell you what styling they need.");
   } else {
@@ -763,24 +986,27 @@ export function renderReportMarkdown(r: RenderInput): string {
     "the current rendering doesn't have (paste the hex values into your CSS).");
   lines.push("3. If bbox deltas are large, the current element's dimensions don't " +
     "match the target — adjust `width` / `padding` / `font-size` until they converge.");
-  lines.push("4. Re-run `vrt component-from-image` and check that diff %, bbox " +
+  lines.push("4. Re-run `vlmkit build component` and check that diff %, bbox " +
     "deltas, heatmap regions, palette deltas all shrink toward zero.");
   lines.push("");
   return lines.join("\n");
 }
 
 async function main(argv = process.argv.slice(2)) {
-  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
+  const showHelp = argv[0] === "--help" || argv[0] === "-h";
+  if (showHelp) argv = [];
   const { positional, outputDir, report, threshold, states, deviceScaleFactor } = parseArgs(argv);
   if (positional.length < 2) {
-    console.log("Usage: vrt component-from-image <target.png> <current.html> [options]");
+    console.log("Usage: vlmkit build component <target.png> <current.html> [options]");
     console.log("Options:");
     console.log("  --output-dir <dir>              Output directory (default: ./test-results/component)");
     console.log("  --report <path>                 Markdown report path (default: <output-dir>/report.md)");
     console.log("  --threshold <0..1>              Pixel diff threshold (default: 0.03)");
     console.log("  --states hover focus-visible …  Capture additional pseudo-state diffs");
-    console.log("  --device-scale-factor <n>       Render at higher DPR (e.g. 2 for retina simulation)");
+    console.log("  --device-scale-factor, --dpr <n>");
+    console.log("                                   Render at higher DPR (e.g. 2 for retina simulation)");
     console.log("                                  Target PNG must be captured at the same DPR.");
+    if (showHelp) return;
     process.exit(1);
   }
   await runComponentFromImage({
