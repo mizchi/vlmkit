@@ -18,6 +18,7 @@ function parseArgs(argv) {
     mode: "material",
     renderTimes: "",
     rootTranslationMode: "relative",
+    poseNormalization: "none",
     retargetProfile: "robot-voxel",
     minQuality: "warn",
     out: "",
@@ -36,6 +37,7 @@ function parseArgs(argv) {
     else if (arg === "--mode") args.mode = required(argv, ++i, arg);
     else if (arg === "--time") args.renderTimes = required(argv, ++i, arg);
     else if (arg === "--root-translation-mode") args.rootTranslationMode = required(argv, ++i, arg);
+    else if (arg === "--pose-normalization") args.poseNormalization = required(argv, ++i, arg);
     else if (arg === "--retarget-profile") args.retargetProfile = required(argv, ++i, arg);
     else if (arg === "--min-quality") args.minQuality = required(argv, ++i, arg);
     else if (arg === "--out") args.out = resolve(required(argv, ++i, arg));
@@ -57,6 +59,8 @@ Options:
   --time <csv>            Render sample times; default is derived from motion duration
   --root-translation-mode <mode>
                           keep|relative|horizontal-only|zero|scale-to-model (default: relative)
+  --pose-normalization <mode>
+                          none|arm-rest-offset (default: none)
   --retarget-profile <profile>
                           ${retargetProfileNames().join("|")} (default: robot-voxel)
   --min-quality <verdict>
@@ -76,6 +80,9 @@ Options:
   if (args.samples.length === 0) throw new Error("at least one sample is required");
   if (!["keep", "relative", "horizontal-only", "zero", "scale-to-model"].includes(args.rootTranslationMode)) {
     throw new Error("--root-translation-mode must be keep, relative, horizontal-only, zero, or scale-to-model");
+  }
+  if (!["none", "arm-rest-offset"].includes(args.poseNormalization)) {
+    throw new Error("--pose-normalization must be none or arm-rest-offset");
   }
   if (!retargetProfileNames().includes(args.retargetProfile)) {
     throw new Error(`--retarget-profile must be one of: ${retargetProfileNames().join(", ")}`);
@@ -117,6 +124,7 @@ async function main() {
     model: relative(repoRoot, args.model),
     externalDir: relative(repoRoot, args.externalDir),
     rootTranslationMode: args.rootTranslationMode,
+    poseNormalization: args.poseNormalization,
     retargetProfile: args.retargetProfile,
     minQuality: args.minQuality,
     samples,
@@ -164,6 +172,7 @@ async function runSample(args, sample) {
       "--motion", motionPath,
       "--replace-existing",
       "--root-translation-mode", args.rootTranslationMode,
+      "--pose-normalization", args.poseNormalization,
       "--audit-out", normalizationAuditPath,
       "--out", roundtripPath,
     ]);
@@ -357,6 +366,8 @@ function summarizeNormalization(audit) {
   );
   return {
     rootTranslationMode: audit.rootTranslationMode,
+    poseNormalization: audit.poseNormalization ?? "none",
+    poseNormalizationDetails: audit.poseNormalizationDetails ?? null,
     sourceRig: audit.sourceRig ? {
       humanoidBoneCount: audit.sourceRig.humanoidBoneCount,
       measuredHumanoidBoneCount: audit.sourceRig.measuredHumanoidBoneCount,

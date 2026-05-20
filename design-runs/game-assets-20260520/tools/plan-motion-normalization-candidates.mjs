@@ -48,6 +48,8 @@ async function main() {
     for (const candidate of sample.normalization?.normalizationCandidates ?? []) {
       if (candidate.status === "runnable" && candidate.kind === "root-translation-mode") {
         candidates.push(rootTranslationCandidate(args.report, report, sample, candidate));
+      } else if (candidate.status === "runnable" && candidate.kind === "pose-pre-normalization") {
+        candidates.push(poseNormalizationCandidate(args.report, report, sample, candidate));
       } else {
         blocked.push(blockedCandidate(sample, candidate));
       }
@@ -87,6 +89,51 @@ function rootTranslationCandidate(reportPath, report, sample, candidate) {
       sample.sample,
       "--root-translation-mode",
       candidate.rootTranslationMode,
+      "--retarget-profile",
+      report.retargetProfile ?? "robot-voxel",
+      "--min-quality",
+      report.minQuality ?? "pass",
+      "--review-vlm",
+      "--review-dry-run",
+      "--out",
+      out,
+    ],
+    compare: [
+      "node",
+      compareScriptPath,
+      "--baseline",
+      relative(repoRoot, reportPath),
+      "--candidate",
+      out,
+      "--samples",
+      sample.sample,
+      "--fail-on-regression",
+      "--fail-on-tradeoff",
+      "--out",
+      out.replace(/\.json$/, ".compare.json"),
+    ],
+  };
+}
+
+function poseNormalizationCandidate(reportPath, report, sample, candidate) {
+  const out = candidateReportPath(report, sample, candidate);
+  return {
+    sample: sample.sample,
+    id: candidate.id,
+    kind: candidate.kind,
+    status: candidate.status,
+    automatic: candidate.automatic === true,
+    reason: candidate.reason,
+    outputReport: out,
+    run: [
+      "node",
+      scriptPath,
+      "--samples",
+      sample.sample,
+      "--root-translation-mode",
+      report.rootTranslationMode ?? "relative",
+      "--pose-normalization",
+      candidate.poseNormalization,
       "--retarget-profile",
       report.retargetProfile ?? "robot-voxel",
       "--min-quality",

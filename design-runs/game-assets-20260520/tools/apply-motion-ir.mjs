@@ -16,6 +16,7 @@ function parseArgs(argv) {
     clip: "",
     replaceExisting: false,
     rootTranslationMode: "keep",
+    poseNormalization: "none",
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -26,6 +27,7 @@ function parseArgs(argv) {
     else if (arg === "--clip") args.clip = required(argv, ++i, arg);
     else if (arg === "--replace-existing") args.replaceExisting = true;
     else if (arg === "--root-translation-mode") args.rootTranslationMode = required(argv, ++i, arg);
+    else if (arg === "--pose-normalization") args.poseNormalization = required(argv, ++i, arg);
     else if (arg === "--help" || arg === "-h") {
       console.log(`Usage:
   node design-runs/game-assets-20260520/tools/apply-motion-ir.mjs --input <model.glb> --motion <motion.json> [options]
@@ -37,6 +39,8 @@ Options:
   --replace-existing     Remove existing GLB animations before adding motion IR
   --root-translation-mode <mode>
                          keep|relative|horizontal-only|zero|scale-to-model (default: keep)
+  --pose-normalization <mode>
+                         none|arm-rest-offset (default: none)
 `);
       process.exit(0);
     } else {
@@ -46,6 +50,9 @@ Options:
   if (!args.motion) throw new Error("--motion is required");
   if (!["keep", "relative", "horizontal-only", "zero", "scale-to-model"].includes(args.rootTranslationMode)) {
     throw new Error("--root-translation-mode must be keep, relative, horizontal-only, zero, or scale-to-model");
+  }
+  if (!["none", "arm-rest-offset"].includes(args.poseNormalization)) {
+    throw new Error("--pose-normalization must be none or arm-rest-offset");
   }
   return args;
 }
@@ -69,9 +76,12 @@ async function main() {
 
   const chunks = [bin];
   const audit = createAudit(args, motion, gltf, nodeIndexByName);
+  const poseOffsets = poseNormalizationOffsets(audit, args.poseNormalization);
   for (const clip of clips) {
     gltf.animations.push(buildAnimation(gltf, chunks, motion, clip, nodeIndexByName, {
       rootTranslationMode: args.rootTranslationMode,
+      poseNormalization: args.poseNormalization,
+      poseOffsets,
       audit,
     }));
   }
@@ -102,6 +112,8 @@ function buildAnimation(gltf, chunks, motion, clip, nodeIndexByName, options) {
       baseTranslation: gltf.nodes[node]?.translation ?? [0, 0, 0],
       isRootTranslation: isRootTranslationTrack(track, nodeName),
       rootTranslationMode: options.rootTranslationMode,
+      poseNormalization: options.poseNormalization,
+      poseOffset: options.poseOffsets.get(track.target) ?? null,
     });
     recordRootTranslationAudit(options.audit, clip, track, nodeName, gltf.nodes[node]?.translation ?? [0, 0, 0], samples, options.rootTranslationMode);
     const inputAccessor = addAccessor(
@@ -137,6 +149,7 @@ function createAudit(args, motion, gltf, nodeIndexByName) {
     motion: relative(repoRoot, args.motion),
     output: relative(repoRoot, args.out),
     rootTranslationMode: args.rootTranslationMode,
+    poseNormalization: args.poseNormalization,
     motionSource: {
       kind: motion.source?.kind ?? null,
       targetSpace: motion.source?.targetSpace ?? null,
@@ -145,6 +158,7 @@ function createAudit(args, motion, gltf, nodeIndexByName) {
     sourceRig,
     targetRig,
     sourceTargetRigComparison: compareSourceTargetRig(sourceRig, targetRig),
+    poseNormalizationDetails: null,
     clips: [],
   };
 }
@@ -202,6 +216,40 @@ function targetBindMetrics(trackedPositions, retargetPositions) {
     leftArmDownAngleDeg: roundNullable(leftArmDownAngle),
     rightArmDownAngleDeg: roundNullable(rightArmDownAngle),
     armDownAngleDeg: roundNullable(averageFinite([leftArmDownAngle, rightArmDownAngle])),
+  };
+}
+
+function poseNormalizationOffsets(audit, mode) {
+  if (mode === "none") {
+    audit.poseNormalizationDetails = { mode, offsets: [] };
+    return new Map();
+  }
+  if (mode !== "arm-rest-offset") throw new Error(`unsupported pose normalization mode: ${mode}`);
+  const source = audit.sourceRig?.trackedBonePositions ?? {};
+  const target = audit.targetRig?.trackedNodePositions ?? {};
+  const offsets = ARM_REST_OFFSET_SEGMENTS
+    .map((segment) => armRestOffset(segment, source, target))
+    .filter(Boolean);
+  audit.poseNormalizationDetails = { mode, offsets };
+  return new Map(offsets.map((offset) => [offset.sourceTarget, offset]));
+}
+
+function armRestOffset(segment, source, target) {
+  const sourceStart = source[segment.sourceStart];
+  const sourceEnd = source[segment.sourceEnd];
+  const targetStart = target[segment.targetStart];
+  const targetEnd = target[segment.targetEnd];
+  const sourceVector = vectorBetween(sourceStart, sourceEnd);
+  const targetVector = vectorBetween(targetStart, targetEnd);
+  if (!sourceVector || !targetVector) return null;
+  const alignQuaternion = quatFromUnitVectors(sourceVector, targetVector);
+  return {
+    sourceTarget: segment.sourceTarget,
+    targetNode: segment.targetNode,
+    sourceVector: sourceVector.map(round),
+    targetVector: targetVector.map(round),
+    alignQuaternion: alignQuaternion.map(round),
+    alignAngleDeg: round(2 * Math.acos(clamp(alignQuaternion[3], -1, 1)) * 180 / Math.PI),
   };
 }
 
@@ -315,8 +363,9 @@ function poseNormalizationCandidates(warnings) {
     candidates.push({
       id: "arm-rest-pose-offset",
       kind: "pose-pre-normalization",
-      status: "needs-implementation",
+      status: "runnable",
       automatic: false,
+      poseNormalization: "arm-rest-offset",
       triggerWarnings: ["arm-rest-angle-mismatch"],
       reason: "source arms are in a different rest direction from target arms; retargeting needs a rest-pose rotation offset before it can be automatic",
     });
@@ -502,9 +551,9 @@ function normalizeSamples(clip, track, options = {}) {
       const translation = vec3(keyframe.translation, `translation for ${clip.id}.${track.target}`);
       values.push(normalizeTranslation(translation, firstTranslation, options));
     } else if (keyframe.rotation) {
-      values.push(vec4(keyframe.rotation, `rotation for ${clip.id}.${track.target}`));
+      values.push(normalizeRotation(vec4(keyframe.rotation, `rotation for ${clip.id}.${track.target}`), options));
     } else {
-      values.push(quatFromEuler(...vec3(keyframe.euler, `euler for ${clip.id}.${track.target}`)));
+      values.push(normalizeRotation(quatFromEuler(...vec3(keyframe.euler, `euler for ${clip.id}.${track.target}`)), options));
     }
   }
   if (clip.durationSeconds !== undefined && sorted.at(-1).time > clip.durationSeconds + 0.0001) {
@@ -517,6 +566,12 @@ function normalizeSamples(clip, track, options = {}) {
     throw new Error(`looping clip ${clip.id} track ${track.target}.${track.path} does not close`);
   }
   return { times, values };
+}
+
+function normalizeRotation(rotation, options) {
+  if (options.poseNormalization !== "arm-rest-offset" || !options.poseOffset) return rotation;
+  const align = options.poseOffset.alignQuaternion;
+  return quatNormalize(quatMultiply(quatMultiply(align, rotation), quatInvert(align))).map(round);
 }
 
 function normalizeTranslation(value, firstValue, options) {
@@ -564,6 +619,13 @@ function distanceAxis(a, b, axis) {
   return Math.abs(b[axis] - a[axis]);
 }
 
+function vectorBetween(a, b) {
+  if (!a || !b) return null;
+  const vector = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const length = Math.hypot(...vector);
+  return length > 0.0001 ? vector.map((value) => value / length) : null;
+}
+
 function armDownAngleDeg(shoulder, hand) {
   if (!shoulder || !hand) return null;
   const vector = [hand[0] - shoulder[0], hand[1] - shoulder[1], hand[2] - shoulder[2]];
@@ -585,6 +647,39 @@ function minFinite(values) {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function quatFromUnitVectors(from, to) {
+  const dot = clamp(from[0] * to[0] + from[1] * to[1] + from[2] * to[2], -1, 1);
+  if (dot < -0.999999) {
+    const axis = Math.abs(from[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+    return quatNormalize([axis[1] * from[2] - axis[2] * from[1], axis[2] * from[0] - axis[0] * from[2], axis[0] * from[1] - axis[1] * from[0], 0]);
+  }
+  const cross = [
+    from[1] * to[2] - from[2] * to[1],
+    from[2] * to[0] - from[0] * to[2],
+    from[0] * to[1] - from[1] * to[0],
+  ];
+  return quatNormalize([cross[0], cross[1], cross[2], 1 + dot]);
+}
+
+function quatMultiply(a, b) {
+  return [
+    a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1],
+    a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0],
+    a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3],
+    a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2],
+  ];
+}
+
+function quatInvert(q) {
+  return [-q[0], -q[1], -q[2], q[3]];
+}
+
+function quatNormalize(q) {
+  const length = Math.hypot(...q);
+  if (length <= 0.0001) return [0, 0, 0, 1];
+  return q.map((value) => value / length);
 }
 
 function decodeGlb(buffer) {
@@ -694,12 +789,48 @@ function roundNullable(value) {
 }
 
 const ROOT_TRANSLATION_TARGETS = new Set(["root", "hips", "pelvis", "robot_root"]);
+const ARM_REST_OFFSET_SEGMENTS = [
+  {
+    sourceTarget: "leftUpperArm",
+    targetNode: "left_upper_arm",
+    sourceStart: "leftUpperArm",
+    sourceEnd: "leftLowerArm",
+    targetStart: "left_upper_arm",
+    targetEnd: "left_forearm",
+  },
+  {
+    sourceTarget: "leftLowerArm",
+    targetNode: "left_forearm",
+    sourceStart: "leftLowerArm",
+    sourceEnd: "leftHand",
+    targetStart: "left_forearm",
+    targetEnd: "left_hand",
+  },
+  {
+    sourceTarget: "rightUpperArm",
+    targetNode: "right_upper_arm",
+    sourceStart: "rightUpperArm",
+    sourceEnd: "rightLowerArm",
+    targetStart: "right_upper_arm",
+    targetEnd: "right_forearm",
+  },
+  {
+    sourceTarget: "rightLowerArm",
+    targetNode: "right_forearm",
+    sourceStart: "rightLowerArm",
+    sourceEnd: "rightHand",
+    targetStart: "right_forearm",
+    targetEnd: "right_hand",
+  },
+];
 const TARGET_RIG_TRACKED_NODES = [
   "robot_root",
   "pelvis",
   "head",
   "left_upper_arm",
   "right_upper_arm",
+  "left_forearm",
+  "right_forearm",
   "left_hand",
   "right_hand",
   "left_upper_leg",

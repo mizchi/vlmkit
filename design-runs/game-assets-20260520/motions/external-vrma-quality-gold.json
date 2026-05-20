@@ -58,7 +58,17 @@
           "arm-rest-pose-offset",
           "stance-width-adapter",
           "shoulder-width-adapter"
-        ]
+        ],
+        "candidateStatuses": {
+          "arm-rest-pose-offset": "runnable",
+          "stance-width-adapter": "needs-implementation",
+          "shoulder-width-adapter": "review-target-rig"
+        },
+        "candidateAutomatic": {
+          "arm-rest-pose-offset": false,
+          "stance-width-adapter": false,
+          "shoulder-width-adapter": false
+        }
       }
     },
     "Goodbye": {
@@ -111,7 +121,17 @@
           "arm-rest-pose-offset",
           "stance-width-adapter",
           "shoulder-width-adapter"
-        ]
+        ],
+        "candidateStatuses": {
+          "arm-rest-pose-offset": "runnable",
+          "stance-width-adapter": "needs-implementation",
+          "shoulder-width-adapter": "review-target-rig"
+        },
+        "candidateAutomatic": {
+          "arm-rest-pose-offset": false,
+          "stance-width-adapter": false,
+          "shoulder-width-adapter": false
+        }
       }
     },
     "Jump": {
@@ -165,7 +185,17 @@
           "arm-rest-pose-offset",
           "stance-width-adapter",
           "shoulder-width-adapter"
-        ]
+        ],
+        "candidateStatuses": {
+          "arm-rest-pose-offset": "runnable",
+          "stance-width-adapter": "needs-implementation",
+          "shoulder-width-adapter": "review-target-rig"
+        },
+        "candidateAutomatic": {
+          "arm-rest-pose-offset": false,
+          "stance-width-adapter": false,
+          "shoulder-width-adapter": false
+        }
       }
     }
   }

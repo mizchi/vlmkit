@@ -1049,8 +1049,12 @@ Current smoke status:
   `compare-motion-quality-reports.mjs` classifies metric deltas as improved,
   regressed, stable, or tradeoff
 - [x] Normalization candidate planner: smoke reports now expose runnable root
-  candidates and blocked pose candidates; `plan-motion-normalization-candidates`
+  candidates and pose candidates; `plan-motion-normalization-candidates`
   emits run/compare commands and comparison can fail on tradeoff
+- [x] Experimental arm rest pose pre-normalization:
+  `--pose-normalization arm-rest-offset` computes source-to-target upper/lower
+  arm rest offsets, emits them in the audit, and remains runnable but
+  non-automatic because `Jump` regresses while `Goodbye` improves
 - [x] Named `robot-voxel` retarget profile for voxel robot smoke: skipped
   fingers, toes, chest, neck, and shoulders are tolerated with zero penalty,
   while skipped core bones fail the weighted profile

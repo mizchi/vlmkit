@@ -100,6 +100,7 @@ function summarizeReport(path, report) {
     path: relative(repoRoot, path),
     ok: report.ok ?? null,
     rootTranslationMode: report.rootTranslationMode ?? null,
+    poseNormalization: report.poseNormalization ?? "none",
     retargetProfile: report.retargetProfile ?? null,
     minQuality: report.minQuality ?? null,
   };
@@ -142,6 +143,7 @@ function summarizeSample(sample) {
     ok: sample.ok ?? null,
     verdict: sample.quality?.verdict ?? null,
     rootTranslationMode: rootNormalization?.mode ?? null,
+    poseNormalization: sample.normalization?.poseNormalization ?? "none",
     rootRecommendation: rootNormalization?.recommendation ?? null,
     heightScale: rootNormalization?.heightScale ?? null,
     verticalDeltaRange: rootNormalization?.verticalDeltaRange ?? null,

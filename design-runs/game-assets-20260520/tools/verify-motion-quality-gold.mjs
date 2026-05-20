@@ -106,6 +106,34 @@ async function main() {
         checkIncludes(checks, `sample:${sampleName}:sourceTargetRigComparison.candidate:${candidate}`, candidateIds(sample.normalization?.sourceTargetRigComparison), candidate);
         checkIncludes(checks, `sample:${sampleName}:normalization.candidate:${candidate}`, candidateIds(sample.normalization), candidate);
       }
+      for (const [candidate, status] of Object.entries(expected.sourceRig.candidateStatuses ?? {})) {
+        checkEqual(
+          checks,
+          `sample:${sampleName}:sourceTargetRigComparison.candidateStatus:${candidate}`,
+          candidateStatus(sample.normalization?.sourceTargetRigComparison, candidate),
+          status,
+        );
+        checkEqual(
+          checks,
+          `sample:${sampleName}:normalization.candidateStatus:${candidate}`,
+          candidateStatus(sample.normalization, candidate),
+          status,
+        );
+      }
+      for (const [candidate, automatic] of Object.entries(expected.sourceRig.candidateAutomatic ?? {})) {
+        checkEqual(
+          checks,
+          `sample:${sampleName}:sourceTargetRigComparison.candidateAutomatic:${candidate}`,
+          candidateAutomatic(sample.normalization?.sourceTargetRigComparison, candidate),
+          automatic,
+        );
+        checkEqual(
+          checks,
+          `sample:${sampleName}:normalization.candidateAutomatic:${candidate}`,
+          candidateAutomatic(sample.normalization, candidate),
+          automatic,
+        );
+      }
     }
   }
 
@@ -140,6 +168,14 @@ function warningIds(comparison) {
 
 function candidateIds(value) {
   return (value?.normalizationCandidates ?? []).map((candidate) => candidate.id);
+}
+
+function candidateStatus(value, id) {
+  return (value?.normalizationCandidates ?? []).find((candidate) => candidate.id === id)?.status;
+}
+
+function candidateAutomatic(value, id) {
+  return (value?.normalizationCandidates ?? []).find((candidate) => candidate.id === id)?.automatic;
 }
 
 function checkIncludes(checks, id, actual, expected) {

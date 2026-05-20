@@ -64,8 +64,13 @@ The concrete scenario used a voxel robot and real `.vrma` motion samples from
   but regresses foot contact and pelvis displacement, so the decision is
   `candidate-tradeoff`.
 - Smoke reports now expose normalization candidates. The candidate planner
-  turns runnable candidates into smoke/compare commands and leaves
-  pose-normalization candidates blocked until their implementation exists.
+  turns runnable candidates into smoke/compare commands, including the first
+  runnable pose pre-normalization candidate.
+- `--pose-normalization arm-rest-offset` now computes source-to-target
+  upper/lower arm rest offsets and records the applied offsets in the audit.
+  `LookAround` stayed `stable`, `Goodbye` improved one displacement metric,
+  and `Jump` regressed it, so this is a runnable experiment path rather than a
+  new default.
 - The dry-run VLM review scaffold can create a contact sheet and strict JSON
   prompt for cheap reviewers such as UI-TARS / Nova Lite without adding a
   blocking human step.
@@ -155,6 +160,11 @@ schema out of the dogfood directory.
   (`armDownAngleDeg` 90) while the voxel target arms hang down
   (`armDownAngleDeg` 1.3), so the audit emits `arm-rest-angle-mismatch`.
   Shoulder width and upper-leg spread also diverge from skeleton-height scale.
+- The first arm-rest pre-normalization is mechanically runnable but not safe
+  to apply automatically. It adds four offsets for upper/lower arms, improves
+  `Goodbye`, stays stable on `LookAround`, and regresses `Jump`; the next loop
+  should include samples with obvious arm contact or reach poses and look for a
+  motion-aware gate before enabling it automatically.
 
 ## Next Implementation Order
 

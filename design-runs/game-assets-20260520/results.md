@@ -231,10 +231,15 @@ Observed shape:
   0.107 -> 0.079, but foot contact error regresses 0.118 -> 0.173 and pelvis
   displacement regresses 0.183 -> 0.265; classify as `candidate-tradeoff`,
   not an automatic replacement for `relative`
-- normalization candidate plan: 1 runnable candidate
-  (`Jump` `root-scale-to-model`) and 9 blocked pose candidates
-  (`arm-rest-pose-offset`, `stance-width-adapter`, `shoulder-width-adapter`
-  across 3 samples)
+- normalization candidate plan: 4 runnable candidates
+  (`arm-rest-pose-offset` across 3 samples plus `Jump` `root-scale-to-model`)
+  and 6 blocked pose candidates (`stance-width-adapter`,
+  `shoulder-width-adapter` across 3 samples)
+- `arm-rest-pose-offset`: applies 4 upper/lower arm pose offsets around 90deg
+  and remains runnable but not automatic. `LookAround` stayed `stable`
+  (max tracked-node delta +0.0013), `Goodbye` improved max tracked-node
+  displacement by 0.0135, and `Jump` regressed it by 0.0807, so adoption must
+  stay compare-gated per sample
 - `--fail-on-tradeoff` rejects the runnable root candidate automatically
   because its comparison is mixed, so it does not become the new default
 - retarget profile: `robot-voxel` (`simple-rig` is an alias)

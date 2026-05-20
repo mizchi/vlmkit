@@ -362,6 +362,8 @@ const SOURCE_RIG_TRACKED_BONES = [
   "head",
   "leftUpperArm",
   "rightUpperArm",
+  "leftLowerArm",
+  "rightLowerArm",
   "leftHand",
   "rightHand",
   "leftUpperLeg",
