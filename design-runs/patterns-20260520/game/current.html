@@ -18,10 +18,10 @@
   <script>
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
-    const state = { playerX: 356, playerY: 474, tick: 0, score: 1280 };
+    const state = { mode: "playing", frame: 0, playerX: 356, playerY: 474, score: 1280, assetsReady: true };
     window.__gameState = state;
     function draw() {
-      state.tick++;
+      state.frame++;
       ctx.fillStyle = "#071117";
       ctx.fillRect(0, 0, 1280, 720);
       const sky = ctx.createLinearGradient(0, 0, 0, 540);
@@ -38,7 +38,7 @@
       ctx.fillStyle = "#10232c";
       ctx.fillRect(0, 540, 1280, 180);
       ctx.fillStyle = "#294753";
-      for (let x = -state.tick % 96; x < 1280; x += 96) ctx.fillRect(x, 610, 64, 10);
+      for (let x = -state.frame % 96; x < 1280; x += 96) ctx.fillRect(x, 610, 64, 10);
       ctx.fillStyle = "#67d29b";
       ctx.fillRect(state.playerX, state.playerY, 58, 66);
       ctx.fillStyle = "#f2e6b8";
@@ -47,7 +47,7 @@
       ctx.fillRect(850, 498, 48, 42);
       ctx.fillStyle = "#7dd0ff";
       ctx.beginPath();
-      ctx.arc(650, 500 + Math.sin(state.tick / 12) * 4, 18, 0, Math.PI * 2);
+      ctx.arc(650, 500 + Math.sin(state.frame / 12) * 4, 18, 0, Math.PI * 2);
       ctx.fill();
       requestAnimationFrame(draw);
     }

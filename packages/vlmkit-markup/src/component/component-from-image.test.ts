@@ -5,7 +5,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { PNG } from "pngjs";
 import {
-  deriveComponentContractRuntime,
   inlineLocalStylesheets,
   renderReportMarkdown,
   sampleContrastFromImage,
@@ -212,6 +211,11 @@ test("renderReportMarkdown includes canvas diagnostics", () => {
       nonblank: true,
       frameDelta: true,
       inputResponsive: true,
+      stateHook: "window.__gameState",
+      stateHookPresent: true,
+      requiredStateFields: ["mode", "frame", "playerX", "playerY", "score", "assetsReady"],
+      observedStateFields: ["mode", "frame", "playerX", "playerY", "score", "assetsReady"],
+      missingStateFields: [],
     },
     semanticDrilldown: [],
     currentPath: "/tmp/current.png",
@@ -230,6 +234,8 @@ test("renderReportMarkdown includes canvas diagnostics", () => {
   assert.match(markdown, /## Canvas inspector/);
   assert.match(markdown, /\| Nonblank canvas \| ok \|/);
   assert.match(markdown, /\| Input response \| ok \|/);
+  assert.match(markdown, /\| State hook \| ok: `window\.__gameState` \|/);
+  assert.match(markdown, /\| Required state fields \| ok: `mode`, `frame`, `playerX`, `playerY`, `score`, `assetsReady` \|/);
 });
 
 test("renderReportMarkdown includes expressive menu diagnostics", () => {
@@ -377,49 +383,6 @@ test("sampleContrastFromImage estimates backdrop behind transparent menu text", 
 
   assert.deepEqual(result.background, [232, 0, 16]);
   assert.ok((result.contrastRatio ?? 0) >= 4.5);
-});
-
-test("deriveComponentContractRuntime injects goal states and expected scrollports", () => {
-  const runtime = deriveComponentContractRuntime({
-    version: 1,
-    screens: [
-      {
-        id: "shell",
-        pattern: "app-shell",
-        goal: "app-shell",
-        viewports: [{ label: "desktop", width: 1440, height: 900 }],
-        markers: [
-          { kind: "scrollport", name: "messages", selector: "[data-scrollport=\"messages\"]", required: true },
-        ],
-        requiredStates: [
-          { id: "selected", kind: "selected", selector: "[aria-current=\"page\"]", required: true },
-          { id: "hover", kind: "hover", selector: "button", required: true },
-          { id: "focus", kind: "focus-visible", selector: "button", required: true },
-          { id: "scrolled", kind: "scrolled", selector: "[data-scrollport=\"messages\"]", required: true },
-        ],
-        expectedScrollports: [
-          { id: "messages", name: "messages", selector: "[data-scrollport=\"messages\"]", axis: "y", required: true },
-        ],
-        landmarks: [
-          {
-            id: "main",
-            role: "main",
-            name: "",
-            layout: {
-              width: { kind: "fluid", max: 960 },
-              height: { kind: "content" },
-              display: { kind: "block" },
-              scroll: { x: false, y: false },
-            },
-          },
-        ],
-      },
-    ],
-  });
-
-  assert.equal(runtime.goal, "app-shell");
-  assert.deepEqual(runtime.states, ["hover", "focus-visible"]);
-  assert.equal(runtime.expectedScrollports[0]?.name, "messages");
 });
 
 test("summarizeScrollportEvidence checks expected scroll axis", () => {

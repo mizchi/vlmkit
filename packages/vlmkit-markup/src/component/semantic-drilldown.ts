@@ -313,8 +313,8 @@ export async function captureLandmarkRegions(
 ): Promise<LandmarkRegion[]> {
   const dpr = options.deviceScaleFactor ?? 1;
   return await page.evaluate(({ roles, dpr }) => {
-    const roleSet = new Set(roles);
-    const semantic: Record<string, string | undefined> = {
+    const roleSet = new Set<string>(roles);
+    const semantic: Record<string, LandmarkRole | undefined> = {
       header: "banner",
       aside: "complementary",
       footer: "contentinfo",
@@ -352,12 +352,12 @@ export async function captureLandmarkRegions(
       return (heading?.textContent ?? "").replace(/\s+/g, " ").trim();
     }
 
-    function normalizedRole(el: Element, name: string): string | undefined {
+    function normalizedRole(el: Element, name: string): LandmarkRole | undefined {
       const tag = el.tagName.toLowerCase();
       const role = el.getAttribute("role")?.trim().toLowerCase();
       if (role && roleSet.has(role)) {
         if ((role === "region" || role === "form") && name.length === 0) return undefined;
-        return role;
+        return role as LandmarkRole;
       }
       if (role === "landmark") return undefined;
       if (tag === "section") return name.length > 0 ? "region" : undefined;
@@ -370,12 +370,12 @@ export async function captureLandmarkRegions(
       let cur: Element | null = el;
       while (cur && cur !== document.documentElement) {
         const tag = cur.tagName.toLowerCase();
-        const parent = cur.parentElement;
+        const parent: Element | null = cur.parentElement;
         if (!parent) {
           parts.push(`${tag}[0]`);
           break;
         }
-        const siblings = Array.from(parent.children).filter((s) =>
+        const siblings = Array.from(parent.children as HTMLCollectionOf<Element>).filter((s: Element) =>
           s.tagName.toLowerCase() === tag,
         );
         const index = Math.max(0, siblings.indexOf(cur));
@@ -445,12 +445,12 @@ export async function captureScrollportRegions(
       let cur: Element | null = el;
       while (cur && cur !== document.documentElement) {
         const tag = cur.tagName.toLowerCase();
-        const parent = cur.parentElement;
+        const parent: Element | null = cur.parentElement;
         if (!parent) {
           parts.push(`${tag}[0]`);
           break;
         }
-        const siblings = Array.from(parent.children).filter((s) =>
+        const siblings = Array.from(parent.children as HTMLCollectionOf<Element>).filter((s: Element) =>
           s.tagName.toLowerCase() === tag,
         );
         const index = Math.max(0, siblings.indexOf(cur));

@@ -383,9 +383,11 @@ frame, playerX, playerY, score, and assetsReady.
 
 単発 screenshot の `diffRatio` は参考値に留める。現在は `--goal canvas` で
 nonblank canvas, short frame delta, optional `window.__gameState` input response
-を gate にする。将来的には `build interactive` / `build canvas` に分け、
-HUD overlap, asset visibility, richer state assertions, FPS/animation sanity を
-追加する。
+を gate にする。`--contract ui.contract.json` を使う場合は
+`canvas.stateHook` と `canvas.requiredStateFields` も gate に入り、hook 欠落や
+state field 欠落を fail に落とす。将来的には `build interactive` /
+`build canvas` に分け、HUD overlap, asset visibility, expected input delta,
+FPS/animation sanity を追加する。
 
 DOM landmark drilldown は outer shell までに限定する。canvas 内部の drilldown
 は scene graph / object labels / collision layer から生成する。
@@ -401,10 +403,13 @@ vlmkit 側で追加したい機能:
 - `vlmkit build component target.png current.html --goal canvas`
 - `vlmkit build component target.png current.html --goal expressive-menu --states hover focus-visible`
 - `vlmkit build component target.png current.html --contract ui.contract.json`
-  to inject goal, required pseudo-state captures, and expected scrollport gates
+  to inject goal, required state captures, scrolled scrollport snapshots, and
+  expected scrollport/canvas state gates
 - `vlmkit contract introspect current.html --pattern expressive-menu --goal expressive-menu`
+- `vlmkit contract introspect current.html --pattern canvas --goal canvas`
 - UI Contract fields: `expectedScrollports` for app-shell scroll areas and
-  `requiredStates` for pattern-specific interaction states
+  `requiredStates` for pattern-specific interaction states, plus
+  `canvas.stateHook` / `canvas.requiredStateFields` for canvas scenes
 - `vlmkit build interactive --goal canvas`: future richer interaction runner
 - scrollport inspector: `overflow`, bbox, scrollHeight/clientHeight, sticky descendants
 - state snapshots: hover, focus, selected, scrolled, empty/loading/error
@@ -413,6 +418,22 @@ vlmkit 側で追加したい機能:
   selected/focus-visible states, measured width bounds, unique layer ids, and
   rendered screenshot pixel contrast sampling with transparent-ancestor
   fallback
+
+### Runner API shape
+
+`build component --contract` should treat UI Contract as input IR, not as
+ad-hoc CLI defaults. Internally this is normalized into `ComponentContractPlan`:
+
+- `goal`: default goal when the CLI does not pass `--goal`
+- `probes.states`: state snapshots to capture, such as `hover`,
+  `focus-visible`, and `scrolled`
+- `probes.scrollTargets`: scroll containers to move for the `scrolled` probe
+- `expectations.scrollports`: named scrollport gates used by the app-shell goal
+- `expectations.canvas`: canvas state hook and required state fields used by
+  the canvas goal
+
+This keeps the API readable: `probes` are actions the runner performs, while
+`expectations` are evidence gates the goal evaluator enforces.
 
 当面は、`landing|app-shell|canvas|expressive-menu` の pattern-specific
 profile を dogfood し、必要な gate を report と UI Contract IR に寄せていく。
@@ -447,6 +468,9 @@ pixel-sampled contrast を report / goal evidence に入れた。さらに UI Co
 IR に `expectedScrollports` と `requiredStates` を追加し、introspection から
 app-shell の独立スクロール領域と expressive-menu の selected / hover /
 focus-visible requirement を復元できるようにした。`build component --contract`
-はこの IR から goal、required pseudo-state captures、expected scrollport gate
-を注入する。次は scrolled-state snapshots と canvas interaction profile を
-contract-driven にする。
+はこの IR から goal、required state captures、scrolled scrollport snapshots、
+expected scrollport gate を注入する。canvas も `canvas.stateHook` と
+`canvas.requiredStateFields` を Contract から注入し、missing hook / missing
+field を goal failure として扱えるようにした。次は expected input delta を
+Contract に持たせ、`ArrowRight` が `playerX` を増やす、のような richer
+interaction assertion を一般化する。

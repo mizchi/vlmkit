@@ -53,6 +53,24 @@
       ],
       "requiredStates": [
         {
+          "id": "channels-scrolled",
+          "kind": "scrolled",
+          "selector": "[data-scrollport=\"channels\"]",
+          "required": true
+        },
+        {
+          "id": "messages-scrolled",
+          "kind": "scrolled",
+          "selector": "[data-scrollport=\"messages\"]",
+          "required": true
+        },
+        {
+          "id": "members-scrolled",
+          "kind": "scrolled",
+          "selector": "[data-scrollport=\"members\"]",
+          "required": true
+        },
+        {
           "id": "selected",
           "kind": "selected",
           "selector": "[aria-current=\"page\"], [data-selected=\"true\"]",

@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "screens": [
+    {
+      "id": "current",
+      "pattern": "canvas",
+      "goal": "canvas",
+      "sourceOfTruth": "semantic-dom",
+      "viewports": [
+        {
+          "label": "desktop",
+          "width": 1280,
+          "height": 720
+        }
+      ],
+      "markers": [
+        {
+          "kind": "game-state",
+          "target": "window.__gameState",
+          "required": true
+        }
+      ],
+      "assets": [
+        {
+          "id": "game",
+          "kind": "procedural",
+          "policy": "procedural"
+        }
+      ],
+      "canvas": {
+        "stateHook": "window.__gameState",
+        "requiredStateFields": [
+          "mode",
+          "frame",
+          "playerX",
+          "playerY",
+          "score",
+          "assetsReady"
+        ]
+      },
+      "landmarks": [
+        {
+          "id": "main-skyline-runner",
+          "role": "main",
+          "name": "Skyline runner",
+          "layout": {
+            "width": {
+              "kind": "fluid",
+              "max": 1280
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "grid",
+              "columns": [
+                "1280px"
+              ],
+              "rows": [
+                "720px"
+              ]
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -21,6 +21,8 @@ import { PNG } from "pngjs";
 import { readFile } from "node:fs/promises";
 
 export interface TextRow {
+  /** Optional OCR/debug text when a caller can supply it. Pixel extraction does not infer this. */
+  text?: string;
   /** Y-coordinate of the row's vertical center. */
   yCenter: number;
   /** Top y of the run of dark rows (inclusive). */

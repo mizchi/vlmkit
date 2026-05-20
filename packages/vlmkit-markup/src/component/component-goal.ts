@@ -62,6 +62,11 @@ export interface ComponentCanvasEvidence {
   nonblank: boolean;
   frameDelta: boolean;
   inputResponsive: boolean | null;
+  stateHook?: string;
+  stateHookPresent?: boolean;
+  requiredStateFields?: string[];
+  observedStateFields?: string[];
+  missingStateFields?: string[];
 }
 
 export interface ComponentExpressiveMenuEvidence {
@@ -226,6 +231,8 @@ function applyPatternGates(
     const canvas = input.canvas;
     if (!canvas || canvas.canvasCount === 0) return "fail";
     if (!canvas.nonblank) return "fail";
+    if (canvas.stateHook && canvas.stateHookPresent === false) return "fail";
+    if ((canvas.missingStateFields?.length ?? 0) > 0) return "fail";
     if ((!canvas.frameDelta || canvas.inputResponsive !== true) && status === "pass") {
       return "review";
     }
@@ -339,11 +346,25 @@ function summarizeCanvas(canvas: ComponentCanvasEvidence | undefined): string {
     : canvas.inputResponsive === false
       ? "input missing"
       : "input unknown";
+  const stateHook = canvas.stateHook
+    ? canvas.stateHookPresent === false
+      ? `state hook missing: ${canvas.stateHook}`
+      : `state hook ok: ${canvas.stateHook}`
+    : undefined;
+  const stateFields = canvas.missingStateFields && canvas.missingStateFields.length > 0
+    ? `state fields missing: ${canvas.missingStateFields.join("/")}`
+    : canvas.requiredStateFields && canvas.requiredStateFields.length > 0
+      ? `state fields ok: ${canvas.requiredStateFields.join("/")}`
+      : canvas.observedStateFields && canvas.observedStateFields.length > 0
+        ? `state fields observed: ${canvas.observedStateFields.join("/")}`
+        : undefined;
   const parts = [
     canvas.nonblank ? "nonblank ok" : "blank",
     canvas.frameDelta ? "frame delta ok" : "frame delta missing",
     input,
-  ];
+    stateHook,
+    stateFields,
+  ].filter((part): part is string => part !== undefined);
   return `canvas ${parts.join(", ")}`;
 }
 

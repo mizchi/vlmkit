@@ -73,7 +73,8 @@ async function checkGame(browser) {
     const ctx = document.querySelector("canvas").getContext("2d");
     return [...ctx.getImageData(0, 0, 1280, 720).data];
   });
-  const xBefore = await page.evaluate(() => window.__gameState?.playerX ?? 0);
+  const stateBefore = await page.evaluate(() => window.__gameState ?? {});
+  const xBefore = typeof stateBefore.playerX === "number" ? stateBefore.playerX : 0;
   await page.waitForTimeout(180);
   const after = await page.evaluate(() => {
     const ctx = document.querySelector("canvas").getContext("2d");
@@ -85,10 +86,13 @@ async function checkGame(browser) {
   await page.close();
   const first = checksum(before);
   const second = checksum(after);
+  const requiredStateFields = ["mode", "frame", "playerX", "playerY", "score", "assetsReady"];
   return {
     canvasNonblank: first !== 0,
     frameDelta: first !== second,
     inputChangedState: xAfter > xBefore,
+    requiredStateFieldsPresent: requiredStateFields.every((field) => Object.hasOwn(stateBefore, field)),
+    stateFields: Object.keys(stateBefore),
     playerXBefore: xBefore,
     playerXAfter: xAfter,
   };

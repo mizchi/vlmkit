@@ -16,10 +16,12 @@ right detail panel, selected state.
   and axis.
 - Active navigation and selected content state must be visible.
 - UI Contract `requiredStates` must include selected state.
+- UI Contract `requiredStates` should include scrolled state for each expected
+  scrollport.
 
 ## Expected signal
 
-`build component --contract ui.contract.json` should infer `--goal app-shell`
-and catch broad shell drift plus named expected scrollport breakage. The dogfood
-script still checks scrollport invariants separately as a pattern-specific
-oracle.
+`build component --contract ui.contract.json` should infer `--goal app-shell`,
+catch broad shell drift plus named expected scrollport breakage, and capture a
+`scrolled` state snapshot for expected scrollports. The dogfood script still
+checks scrollport invariants separately as a pattern-specific oracle.

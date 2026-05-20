@@ -167,6 +167,27 @@ test("canvas goal fails when no canvas is detected", () => {
   assert.match(result.summary, /no canvas evidence/);
 });
 
+test("canvas goal fails when contract-required state fields are missing", () => {
+  const result = evaluateComponentGoal({
+    goal: "canvas",
+    pixelDiffRatio: 0.0095,
+    landscapeDiffRatio: 0.0002,
+    canvas: {
+      canvasCount: 1,
+      nonblank: true,
+      frameDelta: true,
+      inputResponsive: true,
+      stateHook: "window.__gameState",
+      stateHookPresent: true,
+      observedStateFields: ["playerX", "playerY", "score"],
+      missingStateFields: ["mode", "frame", "assetsReady"],
+    },
+  });
+
+  assert.equal(result.status, "fail");
+  assert.match(result.summary, /state fields missing: mode\/frame\/assetsReady/);
+});
+
 test("expressive-menu goal passes with semantic composition evidence", () => {
   const result = evaluateComponentGoal({
     goal: "expressive-menu",

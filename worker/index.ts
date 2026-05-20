@@ -1,3 +1,4 @@
+import type { ExecutionContext } from "hono";
 import { createApiApp } from "../src/api/api-app.ts";
 import { detectWorkerStorageCapabilities, type WorkerStorageEnv } from "./storage.ts";
 

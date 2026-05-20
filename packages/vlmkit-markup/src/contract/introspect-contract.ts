@@ -330,6 +330,14 @@ async function captureUiContractDomHints(page: import("playwright").Page): Promi
 
     const states: UiStateContract[] = [];
     const requiredStates: UiRequiredStateContract[] = [];
+    for (const scrollport of expectedScrollports) {
+      requiredStates.push({
+        id: `${scrollport.id}-scrolled`,
+        kind: "scrolled",
+        selector: scrollport.selector,
+        required: true,
+      });
+    }
     if (has("[aria-current=\"page\"], [data-selected=\"true\"]")) {
       const selector = "[aria-current=\"page\"], [data-selected=\"true\"]";
       states.push({ id: "selected", kind: "selected", selector });

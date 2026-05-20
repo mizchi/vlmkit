@@ -42,10 +42,17 @@ node src/cli/vlmkit.ts build component \
   --contract design-runs/patterns-20260520/app-shell/ui.contract.json \
   --output-dir design-runs/patterns-20260520/app-shell/reports/component
 
+node src/cli/vlmkit.ts contract introspect \
+  design-runs/patterns-20260520/game/current.html \
+  --pattern canvas \
+  --goal canvas \
+  --viewport desktop:1280x720 \
+  --out design-runs/patterns-20260520/game/ui.contract.json
+
 node src/cli/vlmkit.ts build component \
   design-runs/patterns-20260520/game/target.png \
   design-runs/patterns-20260520/game/current.html \
-  --goal canvas \
+  --contract design-runs/patterns-20260520/game/ui.contract.json \
   --output-dir design-runs/patterns-20260520/game/reports/component
 
 node src/cli/vlmkit.ts build component \
@@ -56,6 +63,9 @@ node src/cli/vlmkit.ts build component \
 
 node src/cli/vlmkit.ts contract validate \
   design-runs/patterns-20260520/app-shell/ui.contract.json
+
+node src/cli/vlmkit.ts contract validate \
+  design-runs/patterns-20260520/game/ui.contract.json
 
 node src/cli/vlmkit.ts contract validate \
   design-runs/patterns-20260520/expressive-menu/ui.contract.json
@@ -69,7 +79,7 @@ node design-runs/patterns-20260520/check-patterns.mjs
 |---|---|---|---|
 | landing | `landing` pass | pixel 8.00%, landscape 1.12% | CTA in first viewport, next-section hint, media slot all pass |
 | app-shell | `app-shell` fail | pixel 4.00%, landscape 0.14% | channels and members scroll; messages is broken |
-| game | `canvas` pass | pixel 0.95%, landscape 0.02% | canvas nonblank, frame delta, input response all pass |
+| game | `canvas` pass | pixel 0.95%, landscape 0.02% | canvas nonblank, frame delta, input response, state hook fields all pass |
 | expressive-menu | `expressive-menu` pass | pixel 7.30%, landscape 2.54% | semantic shell, selected state, pixel-sampled contrast, composition markers all pass |
 
 The app-shell case is the important Red:
@@ -78,6 +88,7 @@ The app-shell case is the important Red:
 App shell fail: landscape 0.14% <= 5.00%, scrollports 2/3 ok, 1 broken
 expected 2/3 ok, 1 expected broken: messages
 scrollports: 2/3 ok, 1 broken
+scrolled induced 1.62% (2 applied)
 ```
 
 The visual layout is close enough, but the goal now fails because the actual UI
@@ -132,12 +143,14 @@ The game target passed `canvas`:
 - canvas nonblank
 - frame delta detected
 - `ArrowRight` changes `window.__gameState.playerX`
+- `window.__gameState` exposes `mode`, `frame`, `playerX`, `playerY`,
+  `score`, and `assetsReady` from the UI Contract
 
 The component report still sees `main "Skyline runner"` at the DOM layer, but
-it now also emits a `Canvas inspector` section. This is enough for a first
-`build component` goal. A future `build interactive` or `build canvas` flow
-should add multi-state screenshots, HUD overlap, asset visibility, and richer
-input assertions.
+it now also emits a `Canvas inspector` section with Contract-derived state hook
+and required field checks. This is enough for a first `build component` goal. A
+future `build interactive` or `build canvas` flow should add multi-state
+screenshots, HUD overlap, asset visibility, and richer input assertions.
 
 ### Finding 4: synthetic targets are useful for Red/Green loops
 
@@ -213,6 +226,8 @@ Added `--contract` to `build component`:
 - injects pseudo-state captures from `requiredStates` when `--states` is omitted;
 - compares captured app-shell scrollports against `expectedScrollports`, so
   the summary can name the broken expected region, e.g. `messages`.
+- applies `scrolled` state by scrolling contract-targeted scrollports and
+  reporting the rendered delta.
 
 Added `--goal landing`:
 
@@ -226,7 +241,10 @@ Added `--goal canvas`:
 - uses loose landscape/pixel thresholds suitable for art-direction screenshots;
 - checks current-side canvas nonblank state;
 - checks a short frame delta;
-- checks optional `window.__gameState` response to `ArrowRight`.
+- checks optional `window.__gameState` response to `ArrowRight`;
+- when a UI Contract provides `canvas.stateHook` and
+  `canvas.requiredStateFields`, fails missing hook/field evidence and reports
+  the observed state fields.
 
 Added `--goal expressive-menu`:
 
@@ -244,6 +262,7 @@ Added UI Contract IR support for expressive composition:
 
 - `pattern` / `goal`: `expressive-menu`
 - `expectedScrollports` for app-shell scroll areas
+- `canvas.stateHook` and `canvas.requiredStateFields` for canvas/game scenes
 - `requiredStates` for pattern-specific selected / hover / focus-visible /
   scrolled states
 - screen or landmark-level `composition`
@@ -258,7 +277,9 @@ Added expressive-menu introspection:
   selected / hover / focus-visible requirements;
 - `contract introspect --pattern app-shell --goal app-shell` now turns
   `data-scrollport` markers into `expectedScrollports` with axis and overflow
-  hints, and preserves selected state as a required state;
+  hints, and preserves selected / scrolled states as required states;
+- `contract introspect --pattern canvas --goal canvas` now captures procedural
+  canvas assets, `window.__gameState`, and its serializable state field names;
 - when CSS min/max constraints are missing, measured landmark width is kept as
   a draft `max` bound so introspected contracts avoid `fluid unbounded`.
 
@@ -280,11 +301,11 @@ Additional dogfood fixes:
 
 ## Next implementation candidates
 
-1. Use UI Contract `expectedScrollports` / `requiredStates` to inject build
-   command flags and goal evidence automatically.
-2. Add scrolled-state snapshots for app shells.
-3. Promote canvas checks into `build interactive` / `build canvas` with HUD
-   overlap, asset visibility, and richer input assertions.
+1. Promote canvas checks into `build interactive` / `build canvas` with HUD
+   overlap, asset visibility, richer input assertions, and multi-input probes.
+2. Add Contract syntax for expected input deltas, e.g. `ArrowRight` must
+   increase `playerX`.
+3. Add mobile/collapsed app-shell contract variants.
 
 ## Verification
 
@@ -294,12 +315,14 @@ node --test packages/vlmkit-markup/src/component/component-from-image.test.ts
 node --test packages/vlmkit-markup/src/component/component-goal.test.ts
 node src/cli/vlmkit.ts build component design-runs/patterns-20260520/landing/target.png design-runs/patterns-20260520/landing/current.html --goal landing --output-dir design-runs/patterns-20260520/landing/reports/component
 node src/cli/vlmkit.ts build component design-runs/patterns-20260520/app-shell/target.png design-runs/patterns-20260520/app-shell/current.html --contract design-runs/patterns-20260520/app-shell/ui.contract.json --output-dir design-runs/patterns-20260520/app-shell/reports/component
-node src/cli/vlmkit.ts build component design-runs/patterns-20260520/game/target.png design-runs/patterns-20260520/game/current.html --goal canvas --output-dir design-runs/patterns-20260520/game/reports/component
+node src/cli/vlmkit.ts build component design-runs/patterns-20260520/game/target.png design-runs/patterns-20260520/game/current.html --contract design-runs/patterns-20260520/game/ui.contract.json --output-dir design-runs/patterns-20260520/game/reports/component
 node src/cli/vlmkit.ts build component design-runs/patterns-20260520/expressive-menu/target.png design-runs/patterns-20260520/expressive-menu/current.html --contract design-runs/patterns-20260520/expressive-menu/ui.contract.json --output-dir design-runs/patterns-20260520/expressive-menu/reports/component
 node src/cli/vlmkit.ts contract validate design-runs/patterns-20260520/app-shell/ui.contract.json
+node src/cli/vlmkit.ts contract validate design-runs/patterns-20260520/game/ui.contract.json
 node src/cli/vlmkit.ts contract validate design-runs/patterns-20260520/expressive-menu/ui.contract.json
 node src/cli/vlmkit.ts contract introspect design-runs/patterns-20260520/expressive-menu/current.html --pattern expressive-menu --goal expressive-menu --viewport desktop:1440x900
 node src/cli/vlmkit.ts contract introspect design-runs/patterns-20260520/app-shell/current.html --pattern app-shell --goal app-shell --viewport desktop:1440x900
+node src/cli/vlmkit.ts contract introspect design-runs/patterns-20260520/game/current.html --pattern canvas --goal canvas --viewport desktop:1280x720
 node design-runs/patterns-20260520/check-patterns.mjs
 node --test 'packages/vlmkit-markup/src/**/*.test.ts' src/cli/cli.test.ts
 ```

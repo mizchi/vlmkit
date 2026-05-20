@@ -70,14 +70,26 @@ import {
   type ComponentScrollportEvidence,
 } from "./component-goal.ts";
 import {
-  validateUiContract,
-  type UiContract,
-  type UiContractScreen,
   type UiExpectedScrollportContract,
 } from "../contract/ui-contract.ts";
+import {
+  isComponentProbeState,
+  loadComponentContractPlan,
+  mergeComponentProbeStates,
+  type ComponentProbeState,
+} from "./component-contract-plan.ts";
+import { captureCanvasEvidence } from "./component-canvas-evidence.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+
+export {
+  deriveComponentContractPlan,
+  deriveComponentContractRuntime,
+  type ComponentContractPlan,
+  type ComponentContractRuntime,
+  type ComponentProbeState,
+} from "./component-contract-plan.ts";
 
 export interface ComponentFromImageOptions {
   targetImagePath: string;
@@ -85,8 +97,8 @@ export interface ComponentFromImageOptions {
   outputDir: string;
   /** Markdown report path. Default: `${outputDir}/report.md`. */
   reportPath?: string;
-  /** Pseudo-states to additionally capture. Empty = none. */
-  states?: ForcedPseudoState[];
+  /** Interaction states to additionally capture. Empty = none. */
+  states?: ComponentProbeState[];
   /** Pixelmatch sensitivity (0..1). Default 0.03 (stricter than VRT default). */
   threshold?: number;
   /** Convergence goal used for pass/review/fail reporting. Default: app. */
@@ -128,7 +140,7 @@ export interface ComponentFromImageReport {
   variantRowCount: number;
   paletteDiff: PaletteDiff & { baseline: PaletteColor[]; variant: PaletteColor[] };
   states?: Array<{
-    state: ForcedPseudoState;
+    state: ComponentProbeState;
     forcedCount: number;
     inducedDiffRatio: number;
     /** Pixels with any RGB channel delta ≥ 4 (no perceptual filter). */
@@ -158,12 +170,6 @@ interface ExpressiveMenuPixelSample {
 
 interface ExpressiveMenuEvidenceWithSamples extends ComponentExpressiveMenuEvidence {
   menuItemSamples?: ExpressiveMenuPixelSample[];
-}
-
-export interface ComponentContractRuntime {
-  goal?: string;
-  states: ForcedPseudoState[];
-  expectedScrollports: UiExpectedScrollportContract[];
 }
 
 export interface PixelContrastInput {
@@ -333,7 +339,7 @@ export async function inlineLocalStylesheets(
 
 function parseArgs(argv: string[]) {
   const positional: string[] = [];
-  const states: ForcedPseudoState[] = [];
+  const states: ComponentProbeState[] = [];
   let outputDir = "";
   let report = "";
   let contract = "";
@@ -353,7 +359,7 @@ function parseArgs(argv: string[]) {
     else if (a === "--states") {
       while (i + 1 < argv.length && !argv[i + 1].startsWith("--")) {
         const v = argv[++i];
-        if (v === "hover" || v === "focus" || v === "active" || v === "focus-visible") {
+        if (isComponentProbeState(v)) {
           states.push(v);
         }
       }
@@ -364,62 +370,14 @@ function parseArgs(argv: string[]) {
   return { positional, outputDir, report, contract, threshold, goal, states, deviceScaleFactor };
 }
 
-export function deriveComponentContractRuntime(contract: UiContract): ComponentContractRuntime {
-  const screen = contract.screens[0];
-  if (!screen) return { states: [], expectedScrollports: [] };
-  return deriveComponentRuntimeFromScreen(screen);
-}
-
-function deriveComponentRuntimeFromScreen(screen: UiContractScreen): ComponentContractRuntime {
-  return {
-    goal: screen.goal ?? screen.pattern,
-    states: requiredForcedStates(screen),
-    expectedScrollports: screen.expectedScrollports ?? [],
-  };
-}
-
-function requiredForcedStates(screen: UiContractScreen): ForcedPseudoState[] {
-  const states = new Set<ForcedPseudoState>();
-  for (const state of screen.requiredStates ?? []) {
-    if (isForcedPseudoState(state.kind)) states.add(state.kind);
-  }
-  return [...states];
-}
-
-function isForcedPseudoState(value: string): value is ForcedPseudoState {
-  return value === "hover" || value === "focus" || value === "active" || value === "focus-visible";
-}
-
-async function loadContractRuntime(path: string | undefined): Promise<ComponentContractRuntime> {
-  if (!path) return { states: [], expectedScrollports: [] };
-  const contractPath = resolve(path);
-  const contract = JSON.parse(await readFile(contractPath, "utf-8")) as UiContract;
-  const issues = validateUiContract(contract);
-  if (issues.length > 0) {
-    const details = issues.slice(0, 5).map((issue) => `${issue.path}: ${issue.message}`).join("; ");
-    throw new Error(`Invalid UI Contract: ${details}`);
-  }
-  return deriveComponentContractRuntime(contract);
-}
-
-function mergeForcedStates(
-  explicit: ForcedPseudoState[] | undefined,
-  injected: ForcedPseudoState[],
-): ForcedPseudoState[] | undefined {
-  const states = new Set<ForcedPseudoState>();
-  for (const state of explicit ?? []) states.add(state);
-  for (const state of injected) states.add(state);
-  return states.size > 0 ? [...states] : undefined;
-}
-
 export async function runComponentFromImage(
   options: ComponentFromImageOptions,
 ): Promise<ComponentFromImageReport> {
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
-  const contractRuntime = await loadContractRuntime(options.contractPath);
-  const effectiveGoal = options.goal ?? contractRuntime.goal ?? "app";
-  const effectiveStates = mergeForcedStates(options.states, contractRuntime.states);
+  const contractPlan = await loadComponentContractPlan(options.contractPath);
+  const effectiveGoal = options.goal ?? contractPlan.goal ?? "app";
+  const effectiveStates = mergeComponentProbeStates(options.states, contractPlan.probes.states);
 
   const targetPath = resolve(options.targetImagePath);
   const targetPng = PNG.sync.read(await readFile(targetPath));
@@ -467,7 +425,7 @@ export async function runComponentFromImage(
     const expressiveMenuEvidence = await captureExpressiveMenuEvidence(page).catch(() => undefined);
     const currentPath = join(outputDir, "current.png");
     await page.screenshot({ path: currentPath, fullPage: false });
-    const canvasEvidence = await captureCanvasEvidence(page).catch(() => undefined);
+    const canvasEvidence = await captureCanvasEvidence(page, contractPlan.expectations.canvas).catch(() => undefined);
     await page.close();
 
     // Pixel diff against the target.
@@ -488,7 +446,7 @@ export async function runComponentFromImage(
     const totalPixels = diff?.totalPixels ?? (viewport.width * viewport.height);
     const heatmapPath = join(outputDir, "component_heatmap.png");
     const landscapeDiff = await compareLandscapeFromPngFiles(targetCopyPath, currentPath);
-    const scrollportEvidence = summarizeScrollportEvidence(scrollportRegions, contractRuntime.expectedScrollports);
+    const scrollportEvidence = summarizeScrollportEvidence(scrollportRegions, contractPlan.expectations.scrollports);
 
     // All image-only signals run identically on both files.
     const [bboxBaseline, bboxVariant] = await Promise.all([
@@ -662,7 +620,7 @@ export async function runComponentFromImage(
     const stateResults: ComponentFromImageReport["states"] = [];
     if (effectiveStates && effectiveStates.length > 0) {
       // Baseline screenshot is the target PNG (already captured). For
-      // each state, render the current HTML with the state forced and
+      // each state, render the current HTML with the state applied and
       // diff against the *default* current screenshot — surfaces "what
       // the state does to the variant" alongside the default delta.
       for (const state of effectiveStates) {
@@ -671,10 +629,12 @@ export async function runComponentFromImage(
           deviceScaleFactor: dpr,
         });
         await statePage.setContent(html, { waitUntil: "networkidle" });
-        const applied = await applyForcedPseudoState(statePage, { state });
+        const applied = state === "scrolled"
+          ? await applyScrolledState(statePage, contractPlan.probes.scrollTargets)
+          : await applyForcedPseudoState(statePage, { state });
         const stateShotPath = join(outputDir, `current-${state}.png`);
         await statePage.screenshot({ path: stateShotPath, fullPage: false });
-        await clearStateMarkers(statePage).catch(() => {});
+        if (state !== "scrolled") await clearStateMarkers(statePage).catch(() => {});
         await statePage.close();
 
         const stateSnap: VrtSnapshot = {
@@ -789,7 +749,7 @@ export async function runComponentFromImage(
     }
     if (stateResults.length > 0) {
       for (const s of stateResults) {
-        console.log(`  ${DIM}:${s.state} induced ${(s.inducedDiffRatio * 100).toFixed(2)}% (${s.forcedCount} forced)${RESET}`);
+        console.log(`  ${DIM}${formatProbeState(s.state)} induced ${(s.inducedDiffRatio * 100).toFixed(2)}% (${s.forcedCount} applied)${RESET}`);
       }
     }
     console.log(`  ${DIM}report: ${reportPath}${RESET}`);
@@ -1029,67 +989,93 @@ function stateChanged(
   return result.inducedDiffRatio >= 0.001 || result.rawInducedDiffRatio >= 0.001;
 }
 
-async function captureCanvasEvidence(page: Page): Promise<ComponentCanvasEvidence | undefined> {
-  const first = await readCanvasFrame(page);
-  if (!first || first.canvasCount === 0) return undefined;
-  await page.waitForTimeout(120);
-  const second = await readCanvasFrame(page);
-  let inputResponsive: boolean | null = null;
-  const beforeState = await serializedGameState(page);
-  if (beforeState !== null) {
-    await page.keyboard.press("ArrowRight").catch(() => {});
-    await page.waitForTimeout(60);
-    const afterState = await serializedGameState(page);
-    inputResponsive = afterState !== null ? afterState !== beforeState : null;
-  }
-  return {
-    canvasCount: first.canvasCount,
-    nonblank: first.nonblank,
-    frameDelta: second ? first.checksum !== second.checksum : false,
-    inputResponsive,
-  };
-}
-
-async function serializedGameState(page: Page): Promise<string | null> {
-  return await page.evaluate(() => {
-    const state = (window as typeof window & { __gameState?: unknown }).__gameState;
-    if (state === undefined || state === null) return null;
-    try {
-      return JSON.stringify(state);
-    } catch {
-      return String(state);
-    }
-  }).catch(() => null);
-}
-
-async function readCanvasFrame(
+async function applyScrolledState(
   page: Page,
-): Promise<{ canvasCount: number; checksum: number; nonblank: boolean } | undefined> {
-  return await page.evaluate(() => {
-    const canvases = Array.from(document.querySelectorAll("canvas")) as HTMLCanvasElement[];
-    if (canvases.length === 0) {
-      return { canvasCount: 0, checksum: 0, nonblank: false };
+  targets: UiExpectedScrollportContract[],
+): Promise<{
+  state: "scrolled";
+  forcedCount: number;
+  skippedCount: number;
+  affectedElements: string[];
+  bboxes: Array<{ x: number; y: number; width: number; height: number }>;
+}> {
+  return await page.evaluate((rawTargets) => {
+    type Target = {
+      id?: string;
+      name?: string;
+      selector?: string;
+      axis?: "x" | "y" | "both";
+    };
+    const targets = rawTargets as Target[];
+    const selectors = targets.length > 0
+      ? targets.flatMap((target) => target.selector ? [target.selector] : target.name ? [`[data-scrollport="${target.name}"]`] : [])
+      : ["[data-scrollport], [data-vlmkit-scrollport], [data-ui-scrollport], [data-scroll-region]"];
+    const elements: Element[] = [];
+    const seen = new Set<Element>();
+    for (const selector of selectors) {
+      try {
+        for (const el of Array.from(document.querySelectorAll(selector))) {
+          if (!seen.has(el)) {
+            seen.add(el);
+            elements.push(el);
+          }
+        }
+      } catch {
+        // Ignore invalid selectors from draft contracts.
+      }
     }
-    const canvas = canvases[0]!;
-    const ctx = canvas.getContext("2d");
-    if (!ctx || canvas.width <= 0 || canvas.height <= 0) {
-      return { canvasCount: canvases.length, checksum: 0, nonblank: false };
+
+    let forcedCount = 0;
+    const affectedElements: string[] = [];
+    const bboxes: Array<{ x: number; y: number; width: number; height: number }> = [];
+    for (let i = 0; i < elements.length; i++) {
+      const el = elements[i] as HTMLElement;
+      const target = targets.find((candidate) =>
+        candidate.selector ? matchesSelector(el, candidate.selector) : candidate.name ? scrollportName(el) === candidate.name : false
+      );
+      const axis = target?.axis ?? "y";
+      const beforeTop = el.scrollTop;
+      const beforeLeft = el.scrollLeft;
+      const maxTop = Math.max(0, el.scrollHeight - el.clientHeight);
+      const maxLeft = Math.max(0, el.scrollWidth - el.clientWidth);
+      if ((axis === "y" || axis === "both") && maxTop > 0) {
+        el.scrollTop = Math.max(1, Math.round(maxTop * 0.6));
+      }
+      if ((axis === "x" || axis === "both") && maxLeft > 0) {
+        el.scrollLeft = Math.max(1, Math.round(maxLeft * 0.6));
+      }
+      if (el.scrollTop !== beforeTop || el.scrollLeft !== beforeLeft) {
+        forcedCount++;
+        const rect = el.getBoundingClientRect();
+        bboxes.push({ x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+        const label = scrollportName(el) || el.id || el.tagName.toLowerCase();
+        affectedElements.push(label);
+      }
     }
-    const width = Math.min(canvas.width, 1280);
-    const height = Math.min(canvas.height, 720);
-    const data = ctx.getImageData(0, 0, width, height).data;
-    let checksum = 0;
-    let nonblank = false;
-    for (let i = 0; i < data.length; i += 32) {
-      const r = data[i] ?? 0;
-      const g = data[i + 1] ?? 0;
-      const b = data[i + 2] ?? 0;
-      const a = data[i + 3] ?? 0;
-      checksum = (checksum + r * 3 + g * 5 + b * 7 + a) >>> 0;
-      if (a !== 0 && (r !== 0 || g !== 0 || b !== 0)) nonblank = true;
+    return {
+      state: "scrolled" as const,
+      forcedCount,
+      skippedCount: 0,
+      affectedElements: affectedElements.slice(0, 12),
+      bboxes,
+    };
+
+    function matchesSelector(el: Element, selector: string): boolean {
+      try {
+        return el.matches(selector);
+      } catch {
+        return false;
+      }
     }
-    return { canvasCount: canvases.length, checksum, nonblank };
-  }).catch(() => undefined);
+
+    function scrollportName(el: Element): string {
+      return el.getAttribute("data-scrollport")
+        || el.getAttribute("data-vlmkit-scrollport")
+        || el.getAttribute("data-ui-scrollport")
+        || el.getAttribute("data-scroll-region")
+        || "";
+    }
+  }, targets);
 }
 
 export function summarizeScrollportEvidence(
@@ -1210,12 +1196,37 @@ function formatCanvasEvidence(evidence: ComponentCanvasEvidence): string {
     : evidence.inputResponsive === false
       ? "input missing"
       : "input unknown";
+  const stateHook = evidence.stateHook
+    ? evidence.stateHookPresent === false
+      ? `state hook missing: ${evidence.stateHook}`
+      : `state hook ok: ${evidence.stateHook}`
+    : undefined;
+  const stateFields = formatCanvasStateFields(evidence);
   const parts = [
     evidence.nonblank ? "nonblank ok" : "blank",
     evidence.frameDelta ? "frame delta ok" : "frame delta missing",
     input,
-  ];
+    stateHook,
+    stateFields,
+  ].filter((part): part is string => part !== undefined);
   return parts.join(", ");
+}
+
+function formatCanvasStateFields(evidence: ComponentCanvasEvidence): string | undefined {
+  if (evidence.missingStateFields && evidence.missingStateFields.length > 0) {
+    return `state fields missing: ${evidence.missingStateFields.join("/")}`;
+  }
+  if (evidence.requiredStateFields && evidence.requiredStateFields.length > 0) {
+    return `state fields ok: ${evidence.requiredStateFields.join("/")}`;
+  }
+  if (evidence.observedStateFields && evidence.observedStateFields.length > 0) {
+    return `state fields observed: ${evidence.observedStateFields.join("/")}`;
+  }
+  return undefined;
+}
+
+function mdCodeList(values: string[]): string {
+  return values.map((value) => `\`${value.replaceAll("`", "\\`")}\``).join(", ");
 }
 
 function formatExpressiveMenuEvidence(evidence: ComponentExpressiveMenuEvidence): string {
@@ -1441,6 +1452,18 @@ export function renderReportMarkdown(r: RenderInput): string {
         ? "missing"
         : "unknown";
     lines.push(`| Input response | ${input} |`);
+    if (r.canvasEvidence.stateHook) {
+      const hookStatus = r.canvasEvidence.stateHookPresent === false ? "missing" : "ok";
+      lines.push(`| State hook | ${hookStatus}: \`${r.canvasEvidence.stateHook}\` |`);
+    }
+    if (r.canvasEvidence.requiredStateFields && r.canvasEvidence.requiredStateFields.length > 0) {
+      const fieldStatus = r.canvasEvidence.missingStateFields && r.canvasEvidence.missingStateFields.length > 0
+        ? `missing: ${mdCodeList(r.canvasEvidence.missingStateFields)}`
+        : `ok: ${mdCodeList(r.canvasEvidence.requiredStateFields)}`;
+      lines.push(`| Required state fields | ${fieldStatus} |`);
+    } else if (r.canvasEvidence.observedStateFields && r.canvasEvidence.observedStateFields.length > 0) {
+      lines.push(`| Observed state fields | ${mdCodeList(r.canvasEvidence.observedStateFields)} |`);
+    }
     lines.push("");
   }
 
@@ -1604,10 +1627,11 @@ export function renderReportMarkdown(r: RenderInput): string {
   }
 
   if (r.stateResults.length > 0) {
-    lines.push("## Forced-state diff");
+    lines.push("## State diff");
     lines.push("");
-    lines.push("Each row: current HTML rendered with the named pseudo-class " +
-      "forced on all interactive elements, diffed against the default render.");
+    lines.push("Each row: current HTML rendered with the named state applied, " +
+      "diffed against the default render. Pseudo-classes are forced on " +
+      "interactive elements; `scrolled` scrolls contract-targeted scrollports.");
     lines.push("");
     lines.push("- **Perceptual %**: pixelmatch at threshold 0.03 — what the eye " +
       "would notice. Filters anti-aliasing and subpixel jitter.");
@@ -1615,9 +1639,9 @@ export function renderReportMarkdown(r: RenderInput): string {
       "Catches subtle hover effects (Δ10/channel shifts) that the perceptual " +
       "filter swallows.");
     lines.push("- **Edge %**: of all diff pixels, fraction within 4px of any " +
-      "forced bbox perimeter. High = outline-only change (likely UA default focus " +
+      "applied target bbox perimeter. High = outline-only change (likely UA default focus " +
       "ring); low = interior fill/text changed (author CSS).");
-    lines.push("- **ΔLuma**: change in mean interior luminance of the forced " +
+    lines.push("- **ΔLuma**: change in mean interior luminance of the applied " +
       "elements (state minus default). Negative = elements got darker; positive = " +
       "lighter. Typical `:hover` darkens (−5 to −30); a *large positive ΔLuma* on " +
       "an already-light state is a wrong-direction-shift suspect.");
@@ -1626,7 +1650,7 @@ export function renderReportMarkdown(r: RenderInput): string {
       "(catches missing author `:focus-visible` rules that the UA default hides). " +
       "`direction?` when ΔLuma > +15 on a state that conventionally darkens.");
     lines.push("");
-    lines.push("| State | Perceptual % | Raw % | Edge % | ΔLuma | Forced | Note |");
+    lines.push("| State | Perceptual % | Raw % | Edge % | ΔLuma | Applied | Note |");
     lines.push("|---|---|---|---|---|---|---|");
     for (const s of r.stateResults) {
       const perceptZero = s.inducedDiffRatio < 0.0005;
@@ -1656,7 +1680,7 @@ export function renderReportMarkdown(r: RenderInput): string {
       const luma = s.lumaDelta === null
         ? "—"
         : (s.lumaDelta > 0 ? `+${s.lumaDelta.toFixed(1)}` : s.lumaDelta.toFixed(1));
-      lines.push(`| \`:${s.state}\` | ${(s.inducedDiffRatio * 100).toFixed(2)}% | ${(s.rawInducedDiffRatio * 100).toFixed(2)}% | ${edgePct} | ${luma} | ${s.forcedCount} | ${note} |`);
+      lines.push(`| \`${formatProbeState(s.state)}\` | ${(s.inducedDiffRatio * 100).toFixed(2)}% | ${(s.rawInducedDiffRatio * 100).toFixed(2)}% | ${edgePct} | ${luma} | ${s.forcedCount} | ${note} |`);
     }
     lines.push("");
   }
@@ -1755,6 +1779,10 @@ function formatContrastRatio(value: number | null): string {
   return value === null ? "unknown" : value.toFixed(2);
 }
 
+function formatProbeState(state: ComponentProbeState): string {
+  return state === "scrolled" ? "scrolled" : `:${state}`;
+}
+
 async function main(argv = process.argv.slice(2)) {
   const showHelp = argv[0] === "--help" || argv[0] === "-h";
   if (showHelp) argv = [];
@@ -1767,7 +1795,8 @@ async function main(argv = process.argv.slice(2)) {
     console.log("  --contract <ui.contract.json>   Inject goal, required states, and expected scrollports");
     console.log("  --threshold <0..1>              Pixelmatch sensitivity (default: 0.03)");
     console.log(`  --goal <${listComponentGoals().join("|")}>      Convergence goal (default: app)`);
-    console.log("  --states hover focus-visible …  Capture additional pseudo-state diffs");
+    console.log("  --states hover focus-visible scrolled …");
+    console.log("                                   Capture additional state diffs");
     console.log("  --device-scale-factor, --dpr <n>");
     console.log("                                   Render at higher DPR (e.g. 2 for retina simulation)");
     console.log("                                  Target PNG must be captured at the same DPR.");

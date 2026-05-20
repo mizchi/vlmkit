@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-20T05:52:20.415Z",
+  "generatedAt": "2026-05-20T06:20:28.866Z",
   "landing": {
     "ctaInFirstViewport": true,
     "nextSectionHintVisible": true,
@@ -53,6 +53,15 @@
     "canvasNonblank": true,
     "frameDelta": true,
     "inputChangedState": true,
+    "requiredStateFieldsPresent": true,
+    "stateFields": [
+      "mode",
+      "frame",
+      "playerX",
+      "playerY",
+      "score",
+      "assetsReady"
+    ],
     "playerXBefore": 356,
     "playerXAfter": 374
   },

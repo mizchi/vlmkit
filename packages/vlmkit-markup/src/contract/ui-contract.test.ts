@@ -137,6 +137,7 @@ test("validateUiContract enforces pattern-specific evidence", () => {
   assert.ok(validateUiContract(appShell).some((issue) => issue.message.includes("scrollport")));
   assert.ok(validateUiContract(appShell).some((issue) => issue.message.includes("expectedScrollports")));
   assert.ok(validateUiContract(appShell).some((issue) => issue.message.includes("selected state")));
+  assert.ok(validateUiContract(appShell).some((issue) => issue.message.includes("scrolled state")));
 
   const canvas = structuredClone(valid);
   canvas.screens[0]!.pattern = "canvas";
@@ -171,11 +172,12 @@ test("validateUiContract accepts app-shell expected scrollports and required sta
   ];
   screen.requiredStates = [
     { id: "active-route", kind: "selected", selector: "[aria-current=\"page\"]", required: true },
+    { id: "channels-scrolled", kind: "scrolled", selector: "[data-scrollport=\"channels\"]", required: true },
   ];
 
   assert.deepEqual(validateUiContract(contract), []);
   assert.match(summarizeUiContractScreen(screen), /expected scrollports 1/);
-  assert.match(summarizeUiContractScreen(screen), /required states 1/);
+  assert.match(summarizeUiContractScreen(screen), /required states 2/);
 });
 
 test("validateUiContract validates expected scrollports and required states", () => {

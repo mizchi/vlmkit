@@ -2,6 +2,32 @@ const API_VERSION = "0.4.0";
 
 type OpenApiSchema = Record<string, unknown>;
 
+interface OpenApiMediaType {
+  schema: OpenApiSchema;
+}
+
+interface OpenApiRequestBody {
+  required?: boolean;
+  content: Record<string, OpenApiMediaType>;
+}
+
+interface OpenApiResponse {
+  description: string;
+  content?: Record<string, OpenApiMediaType>;
+}
+
+interface OpenApiOperation {
+  tags?: string[];
+  summary?: string;
+  requestBody?: OpenApiRequestBody;
+  responses: Record<string, OpenApiResponse>;
+}
+
+interface OpenApiPathItem {
+  get?: OpenApiOperation;
+  post?: OpenApiOperation;
+}
+
 export interface OpenApiSpecOptions {
   serverUrl?: string;
 }
@@ -15,7 +41,7 @@ export interface OpenApiSpec {
   };
   servers: Array<{ url: string }>;
   tags: Array<{ name: string; description: string }>;
-  paths: Record<string, Record<string, unknown>>;
+  paths: Record<string, OpenApiPathItem>;
   components: {
     schemas: Record<string, OpenApiSchema>;
   };
@@ -534,7 +560,7 @@ function arrayOf(items: OpenApiSchema): OpenApiSchema {
   return { type: "array", items };
 }
 
-function jsonRefBody(schemaName: string): OpenApiSchema {
+function jsonRefBody(schemaName: string): OpenApiRequestBody {
   return {
     required: true,
     content: {
@@ -545,7 +571,7 @@ function jsonRefBody(schemaName: string): OpenApiSchema {
   };
 }
 
-function jsonRefResponse(description: string, schemaName: string): OpenApiSchema {
+function jsonRefResponse(description: string, schemaName: string): OpenApiResponse {
   return {
     description,
     content: {

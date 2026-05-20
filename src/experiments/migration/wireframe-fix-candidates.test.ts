@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import type { MatchedBbox } from "./component-bbox.ts";
-import type { MatchedTextRow } from "./text-rows.ts";
+import type { MatchedBbox } from "@mizchi/vlmkit-markup/component/component-bbox.ts";
+import type { MatchedTextRow } from "@mizchi/vlmkit-core/text-rows.ts";
 import { parseDesignTokens } from "./design-md-tokens.ts";
 import { generateWireframeFixCandidates } from "./wireframe-fix-candidates.ts";
 
@@ -23,8 +23,8 @@ function bbox(rank: number, deltaTop: number, w = 200, h = 100): MatchedBbox {
 function row(text: string, deltaY: number): MatchedTextRow {
   return {
     rank: 0,
-    baseline: { rank: 0, yCenter: 100, yTop: 95, yBottom: 105, ink: 10, text },
-    variant: { rank: 0, yCenter: 100 + deltaY, yTop: 95 + deltaY, yBottom: 105 + deltaY, ink: 10, text },
+    baseline: { yCenter: 100, yStart: 95, yEnd: 105, meanLuma: 64, height: 10, text },
+    variant: { yCenter: 100 + deltaY, yStart: 95 + deltaY, yEnd: 105 + deltaY, meanLuma: 64, height: 10, text },
     deltaY,
   };
 }

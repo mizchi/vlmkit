@@ -111,6 +111,20 @@ Direct samples of the page bg (image perimeter) and inner bg (central rectangle)
 | outer (page) | `#202832` | `#202832` |
 | inner (content) | `#2f3a47` | `#2f3a47` |
 
+## State diff
+
+Each row: current HTML rendered with the named state applied, diffed against the default render. Pseudo-classes are forced on interactive elements; `scrolled` scrolls contract-targeted scrollports.
+
+- **Perceptual %**: pixelmatch at threshold 0.03 — what the eye would notice. Filters anti-aliasing and subpixel jitter.
+- **Raw %**: any pixel where any RGB channel changed by ≥ 4. Catches subtle hover effects (Δ10/channel shifts) that the perceptual filter swallows.
+- **Edge %**: of all diff pixels, fraction within 4px of any applied target bbox perimeter. High = outline-only change (likely UA default focus ring); low = interior fill/text changed (author CSS).
+- **ΔLuma**: change in mean interior luminance of the applied elements (state minus default). Negative = elements got darker; positive = lighter. Typical `:hover` darkens (−5 to −30); a *large positive ΔLuma* on an already-light state is a wrong-direction-shift suspect.
+- **Note**: `suspect` when both diff metrics are essentially zero. `ua-likely` when only the outline changed and the interior is untouched (catches missing author `:focus-visible` rules that the UA default hides). `direction?` when ΔLuma > +15 on a state that conventionally darkens.
+
+| State | Perceptual % | Raw % | Edge % | ΔLuma | Applied | Note |
+|---|---|---|---|---|---|---|
+| `scrolled` | 1.62% | 2.41% | 1% | +0.3 | 2 |  |
+
 ## Suggested CSS patch
 
 Aggregated from every actionable signal above. Each line is either a paste-ready declaration or a `/* hint */` describing the delta. Selectors are intentionally omitted (the tool can't see your DOM); apply each declaration to whichever element matches the described region or row.

@@ -868,6 +868,9 @@ function validatePatternEvidence(
     if (!requiredStateKinds.has("selected")) {
       issues.push({ path: `${screenPath}.requiredStates`, message: "app-shell contracts should require a selected state" });
     }
+    if (!requiredStateKinds.has("scrolled")) {
+      issues.push({ path: `${screenPath}.requiredStates`, message: "app-shell contracts should require a scrolled state" });
+    }
   }
   if (pattern === "canvas") {
     const required = ["mode", "frame", "playerX", "playerY", "score", "assetsReady"];

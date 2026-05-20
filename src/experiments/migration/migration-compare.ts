@@ -2027,7 +2027,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     // diffWatchRuns + zero-crossing detector.
     if (options.againstPreviousPath) {
       try {
-        const { diffWatchRuns, formatWatchDelta, summarizeReport } = await import("./watch.ts");
+        const { diffWatchRuns, formatWatchDelta, summarizeReport } = await import("../../watch.ts");
         // Accept a direct .json path; otherwise try the canonical
         // `diff-report.json` first, falling back to the legacy
         // `migration-report.json` for previous runs from before the
