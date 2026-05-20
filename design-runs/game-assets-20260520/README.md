@@ -234,12 +234,13 @@ shared tools now live in `tools/`:
 - `tools/render-model.mjs`: fixed-camera GLB/GLTF/OBJ snapshots
 - `tools/compare-renders.mjs`: GLB vs OBJ pixel comparison
 - `tools/render-animation.mjs`: fixed-camera animation frame snapshots
+  with direct canvas capture and transparent-buffer retry
 - `tools/verify-renders.mjs`: nonblank frame and finite-bounds checks
 - `tools/verify-gltf-motion.mjs`: node, clip, channel, and loop checks
 - `tools/verify-asset-contract.mjs`: handoff contract checks
 - `tools/apply-motion-ir.mjs`: retarget normalized humanoid motion IR and write
   derived GLB animation clips; supports root translation policies for simplified
-  target rigs
+  target rigs and `--audit-out` normalization reports
 - `tools/verify-motion-ir.mjs`: validate motion IR shape, loop closure, and
   optional model retarget targets
 - `tools/extract-gltf-motion-ir.mjs`: extract glTF/GLB animation clips into
@@ -250,7 +251,8 @@ shared tools now live in `tools/`:
   samples for local smoke tests
 - `tools/run-external-vrma-smoke.mjs`: batch fetch/extract/retarget/render
   external VRMA samples and write a structured smoke report; supports
-  `--min-quality pass|warn|fail` for CI-style gating
+  normalization audit summaries and `--min-quality pass|warn|fail` for
+  CI-style gating
 - `tools/verify-motion-quality.mjs`: turn render metadata, frame bboxes,
   normalized ground deltas, tracked foot contact, tracked limb displacement,
   and Motion IR warnings into `pass` / `warn` / `fail`; supports strict and

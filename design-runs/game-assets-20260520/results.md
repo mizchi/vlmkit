@@ -189,6 +189,8 @@ Checks:
 - `extract-gltf-motion-ir.mjs`: emitted `LookAround` using the input filename because the source animation clip had no name
 - `verify-motion-ir.mjs`: passed against the robot model
 - `apply-motion-ir.mjs --root-translation-mode relative`: produced ignored `LookAround.robot-roundtrip.glb`
+- `apply-motion-ir.mjs --audit-out`: emitted per-sample normalization audits
+  for root translation tracks
 - `verify-gltf-motion.mjs --motion-ir`: passed required clip checks and skipped loop closure because the IR marks `LookAround` as non-loop
 - `render-animation.mjs` and `verify-renders.mjs`: passed nonblank fixed-camera render checks
 - `run-external-vrma-smoke.mjs --min-quality pass`: passed `LookAround`,
@@ -206,6 +208,11 @@ Observed shape:
 - skipped channels: 36
 - skipped channel regions: 30 finger, 2 body, 2 arm, 2 toe/foot
 - root translation mode: `relative`
+- source initial root height: `LookAround` 0.87944, `Goodbye` 0.89459,
+  `Jump` 0.86145
+- target base root height: 1.25
+- root delta y range: `LookAround` -0.006..0.003, `Goodbye` -0.007..0.011,
+  `Jump` -0.094..0.230
 - retarget profile: `robot-voxel` (`simple-rig` is an alias)
 - quality verdict: `pass`
 - retarget weighted score: 1.0, penalty 0
@@ -239,6 +246,9 @@ Learned:
 - Render capture now waits two browser animation frames after viewer readiness
   before screenshotting, avoiding first-frame WebGL paint races in quality
   metrics.
+- Animation capture now saves the WebGL canvas directly, retries transparent
+  buffers, and reloads the viewer once before failing a frame. This removed a
+  flaky first-frame white/transparent capture during smoke runs.
 - The animation viewer now records tracked node positions for pelvis, hands,
   and feet. The quality gate uses `left_foot` / `right_foot` bind-vs-animated
   deltas to flag foot sinking or always-floating motion without human review.
@@ -249,6 +259,9 @@ Learned:
 - Root translation should default to relative motion for generated simplified
   characters. Copying source hips translation directly mixes the source
   avatar's body height into the target pelvis.
+- The normalization audit is the right boundary for autonomous debugging:
+  it records source root height, target base height, delta ranges, normalized
+  ranges, and scale without opening a viewer.
 - Ground checks should compare the animated bounds against the normalized bind
   bounds (`groundDeltaY`), not raw world `minGroundY` after camera-fit
   normalization.

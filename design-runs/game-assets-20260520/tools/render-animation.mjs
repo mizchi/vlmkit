@@ -4,6 +4,7 @@ import { mkdir, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { PNG } from "pngjs";
 import { chromium } from "playwright";
 
 const repoRoot = resolve(new URL("../../..", import.meta.url).pathname);
@@ -168,33 +169,66 @@ async function renderOne(page, server, args, view, time) {
     background: args.background,
   });
   const url = `${server.origin}${toServerPath(args.viewer)}?${params}`;
-  await page.goto(url, { waitUntil: "load" });
-  await page.waitForFunction(() => {
-    const status = window.__animationRenderState?.status;
-    return status === "ready" || status === "error";
-  }, null, { timeout: 30_000 });
-  const state = await page.evaluate(() => window.__animationRenderState);
-  if (state?.status === "error") {
-    throw new Error(`animation viewer failed for ${view} t=${time}: ${state.message}`);
-  }
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const outPath = join(args.outDir, outputName(args.input, args.clip, view, args.mode, time));
-  await page.screenshot({ path: outPath, animations: "disabled", caret: "hide" });
   const metadataPath = outPath.replace(/\.png$/, ".metadata.json");
-  await writeFile(metadataPath, `${JSON.stringify({
-    input: relative(repoRoot, args.input),
-    clip: args.clip,
-    sampleTime: time,
-    view,
-    mode: args.mode,
-    width: args.width,
-    height: args.height,
-    background: args.background,
-    renderer: "three-playwright-animation",
-    state,
-    output: relative(repoRoot, outPath),
-  }, null, 2)}\n`);
-  return { outPath, metadataPath, state };
+  let lastError = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await page.goto(url, { waitUntil: "load" });
+    await page.waitForFunction(() => {
+      const status = window.__animationRenderState?.status;
+      return status === "ready" || status === "error";
+    }, null, { timeout: 30_000 });
+    const state = await page.evaluate(() => window.__animationRenderState);
+    if (state?.status === "error") {
+      throw new Error(`animation viewer failed for ${view} t=${time}: ${state.message}`);
+    }
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    try {
+      await writeFile(outPath, await captureCanvasPng(page));
+      await writeFile(metadataPath, `${JSON.stringify({
+        input: relative(repoRoot, args.input),
+        clip: args.clip,
+        sampleTime: time,
+        view,
+        mode: args.mode,
+        width: args.width,
+        height: args.height,
+        background: args.background,
+        renderer: "three-playwright-animation",
+        state,
+        output: relative(repoRoot, outPath),
+      }, null, 2)}\n`);
+      return { outPath, metadataPath, state };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw new Error(`animation capture failed for ${view} t=${time}: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
+}
+
+async function captureCanvasPng(page) {
+  let lastBuffer = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const pngDataUrl = await page.evaluate(async () => {
+      window.__renderAnimationFrame?.();
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      window.__renderAnimationFrame?.();
+      const canvas = document.querySelector("canvas");
+      if (!canvas) throw new Error("animation viewer canvas not found");
+      return canvas.toDataURL("image/png");
+    });
+    lastBuffer = Buffer.from(pngDataUrl.split(",")[1], "base64");
+    if (!isTransparentPng(lastBuffer)) return lastBuffer;
+  }
+  throw new Error("captured transparent canvas");
+}
+
+function isTransparentPng(buffer) {
+  const image = PNG.sync.read(buffer);
+  for (let i = 3; i < image.data.length; i += 4) {
+    if (image.data[i] !== 0) return false;
+  }
+  return true;
 }
 
 async function main() {

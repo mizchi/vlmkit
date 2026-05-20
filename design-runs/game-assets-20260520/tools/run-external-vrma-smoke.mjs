@@ -131,6 +131,7 @@ async function runSample(args, sample) {
   const motionPath = join(args.externalDir, `${sample}.extracted.motion.json`);
   const motionVerifyPath = join(args.externalDir, `${sample}.extracted.motion.verify.json`);
   const roundtripPath = join(args.externalDir, `${sample}.robot-roundtrip.glb`);
+  const normalizationAuditPath = join(args.externalDir, `${sample}.normalization-audit.json`);
   const glbVerifyPath = join(args.externalDir, `${sample}.robot-roundtrip.verify.json`);
   const renderDir = join(args.externalDir, "renders", sample);
   const renderVerifyPath = join(args.externalDir, `${sample}.robot-roundtrip.render-verify.json`);
@@ -163,8 +164,10 @@ async function runSample(args, sample) {
       "--motion", motionPath,
       "--replace-existing",
       "--root-translation-mode", args.rootTranslationMode,
+      "--audit-out", normalizationAuditPath,
       "--out", roundtripPath,
     ]);
+    const normalizationAudit = JSON.parse(await readFile(normalizationAuditPath, "utf8"));
     await runStep(steps, "verify-gltf-motion", [
       "node", script("verify-gltf-motion.mjs"),
       "--input", roundtripPath,
@@ -226,6 +229,8 @@ async function runSample(args, sample) {
       motion,
       quality,
       vlmReview,
+      normalizationAudit,
+      normalizationAuditPath,
     });
   } catch (error) {
     return sampleSummary(sample, false, steps, {
@@ -242,6 +247,7 @@ async function runSample(args, sample) {
       motion,
       quality,
       vlmReview,
+      normalizationAuditPath,
     });
   }
 }
@@ -308,6 +314,7 @@ function sampleSummary(sample, ok, steps, data) {
     } : null,
     retargetCount: motion?.retarget ? Object.keys(motion.retarget).length : 0,
     skippedChannelCount: motion?.source?.skippedChannelCount ?? warnings.length,
+    normalization: summarizeNormalization(data.normalizationAudit),
     quality: summarizeQuality(data.quality),
     vlmReview: summarizeVlmReview(data.vlmReview),
     artifacts: {
@@ -315,6 +322,7 @@ function sampleSummary(sample, ok, steps, data) {
       motion: rel(data.motionPath),
       motionVerify: rel(data.motionVerifyPath),
       roundtripModel: rel(data.roundtripPath),
+      normalizationAudit: rel(data.normalizationAuditPath),
       glbVerify: rel(data.glbVerifyPath),
       renderDir: rel(data.renderDir),
       renderVerify: rel(data.renderVerifyPath),
@@ -323,6 +331,27 @@ function sampleSummary(sample, ok, steps, data) {
     },
     steps,
     error: data.error ?? null,
+  };
+}
+
+function summarizeNormalization(audit) {
+  if (!audit) return null;
+  const rootTranslations = (audit.clips ?? []).flatMap((clip) =>
+    (clip.rootTranslations ?? []).map((item) => ({
+      clip: clip.id,
+      sourceTarget: item.sourceTarget,
+      targetNode: item.targetNode,
+      mode: item.mode,
+      sourceInitialRootHeight: item.sourceInitialRootHeight,
+      targetBaseRootHeight: item.targetBaseRootHeight,
+      appliedScale: item.appliedScale,
+      deltaRange: item.deltaRange,
+      normalizedRange: item.normalizedRange,
+    })),
+  );
+  return {
+    rootTranslationMode: audit.rootTranslationMode,
+    rootTranslations,
   };
 }
 

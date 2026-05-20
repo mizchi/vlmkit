@@ -11,6 +11,7 @@ function parseArgs(argv) {
     input: join(entryDir, `${entryName}.glb`),
     motion: "",
     out: join(entryDir, `${entryName}.motion.glb`),
+    auditOut: "",
     clip: "",
     replaceExisting: false,
     rootTranslationMode: "keep",
@@ -20,6 +21,7 @@ function parseArgs(argv) {
     if (arg === "--input") args.input = resolve(required(argv, ++i, arg));
     else if (arg === "--motion") args.motion = resolve(required(argv, ++i, arg));
     else if (arg === "--out") args.out = resolve(required(argv, ++i, arg));
+    else if (arg === "--audit-out") args.auditOut = resolve(required(argv, ++i, arg));
     else if (arg === "--clip") args.clip = required(argv, ++i, arg);
     else if (arg === "--replace-existing") args.replaceExisting = true;
     else if (arg === "--root-translation-mode") args.rootTranslationMode = required(argv, ++i, arg);
@@ -29,6 +31,7 @@ function parseArgs(argv) {
 
 Options:
   --out <path>           Output GLB path
+  --audit-out <path>     Write normalization audit JSON
   --clip <id>            Apply only one motion clip
   --replace-existing     Remove existing GLB animations before adding motion IR
   --root-translation-mode <mode>
@@ -64,13 +67,19 @@ async function main() {
   if (args.replaceExisting || !gltf.animations) gltf.animations = [];
 
   const chunks = [bin];
+  const audit = createAudit(args, motion);
   for (const clip of clips) {
     gltf.animations.push(buildAnimation(gltf, chunks, motion, clip, nodeIndexByName, {
       rootTranslationMode: args.rootTranslationMode,
+      audit,
     }));
   }
   const output = encodeGlb(gltf, chunks);
   await writeFile(args.out, output);
+  if (args.auditOut) {
+    audit.output = relative(repoRoot, args.out);
+    await writeFile(args.auditOut, `${JSON.stringify(audit, null, 2)}\n`);
+  }
   console.log(`Wrote ${relative(repoRoot, args.out)} (${clips.map((clip) => clip.id).join(", ")})`);
 }
 
@@ -93,6 +102,7 @@ function buildAnimation(gltf, chunks, motion, clip, nodeIndexByName, options) {
       isRootTranslation: isRootTranslationTrack(track, nodeName),
       rootTranslationMode: options.rootTranslationMode,
     });
+    recordRootTranslationAudit(options.audit, clip, track, nodeName, gltf.nodes[node]?.translation ?? [0, 0, 0], samples, options.rootTranslationMode);
     const inputAccessor = addAccessor(
       gltf,
       chunks,
@@ -114,6 +124,55 @@ function buildAnimation(gltf, chunks, motion, clip, nodeIndexByName, options) {
     animation.channels.push({ sampler, target: { node, path: gltfPath(track.path) } });
   }
   return animation;
+}
+
+function createAudit(args, motion) {
+  return {
+    version: 1,
+    kind: "motion-normalization-audit",
+    input: relative(repoRoot, args.input),
+    motion: relative(repoRoot, args.motion),
+    output: relative(repoRoot, args.out),
+    rootTranslationMode: args.rootTranslationMode,
+    motionSource: {
+      kind: motion.source?.kind ?? null,
+      targetSpace: motion.source?.targetSpace ?? null,
+      humanoidBoneCount: motion.source?.vrmcVrmAnimation?.humanoidBoneCount ?? null,
+    },
+    clips: [],
+  };
+}
+
+function recordRootTranslationAudit(audit, clip, track, nodeName, baseTranslation, samples, rootTranslationMode) {
+  if (!audit || track.path !== "translation" || !isRootTranslationTrack(track, nodeName)) return;
+  const sorted = [...track.keyframes].sort((a, b) => a.time - b.time);
+  const sourceTranslations = sorted.map((keyframe) => vec3(keyframe.translation, `translation for ${clip.id}.${track.target}`));
+  const normalizedTranslations = samples.values.map((value) => vec3(value, `normalized translation for ${clip.id}.${track.target}`));
+  const base = vec3(baseTranslation, "base translation");
+  const first = sourceTranslations[0] ?? [0, 0, 0];
+  const scale = rootTranslationMode === "scale-to-model" && Math.abs(first[1]) > 0.0001
+    ? base[1] / first[1]
+    : 1;
+  const clipAudit = audit.clips.find((item) => item.id === clip.id) ?? { id: clip.id, durationSeconds: clip.durationSeconds ?? null, rootTranslations: [] };
+  if (!audit.clips.includes(clipAudit)) audit.clips.push(clipAudit);
+  clipAudit.rootTranslations.push({
+    sourceTarget: track.target,
+    targetNode: nodeName,
+    mode: rootTranslationMode,
+    keyframeCount: sorted.length,
+    sourceInitialTranslation: first.map(round),
+    targetBaseTranslation: base.map(round),
+    sourceInitialRootHeight: round(first[1]),
+    targetBaseRootHeight: round(base[1]),
+    appliedScale: round(scale),
+    sourceRange: vec3Range(sourceTranslations),
+    normalizedRange: vec3Range(normalizedTranslations),
+    deltaRange: vec3Range(sourceTranslations.map((value) => [
+      value[0] - first[0],
+      value[1] - first[1],
+      value[2] - first[2],
+    ])),
+  });
 }
 
 function normalizeSamples(clip, track, options = {}) {
@@ -201,6 +260,22 @@ function vec4(value, context) {
 function tuplesClose(a, b, tolerance) {
   if (!a || !b || a.length !== b.length) return false;
   return a.every((value, index) => Math.abs(value - b[index]) <= tolerance);
+}
+
+function vec3Range(values) {
+  if (values.length === 0) return null;
+  return {
+    min: [
+      round(Math.min(...values.map((value) => value[0]))),
+      round(Math.min(...values.map((value) => value[1]))),
+      round(Math.min(...values.map((value) => value[2]))),
+    ],
+    max: [
+      round(Math.max(...values.map((value) => value[0]))),
+      round(Math.max(...values.map((value) => value[1]))),
+      round(Math.max(...values.map((value) => value[2]))),
+    ],
+  };
 }
 
 function decodeGlb(buffer) {

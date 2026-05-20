@@ -131,6 +131,9 @@
         renderer.render(scene, camera);
         await new Promise((resolve) => requestAnimationFrame(resolve));
         renderer.render(scene, camera);
+        window.__renderAnimationFrame = () => {
+          renderer.render(scene, camera);
+        };
 
         const nodes = [];
         const meshes = [];

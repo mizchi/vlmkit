@@ -35,8 +35,14 @@ The concrete scenario used a voxel robot and real `.vrma` motion samples from
   penalty, and skipped-by-policy breakdown.
 - Smoke runs can require `--min-quality pass` so warnings do not silently pass
   CI-style loops. The failure report keeps the quality summary for debugging.
+- `apply-motion-ir --audit-out` now writes a root normalization audit. The
+  smoke report summarizes source root height, target base height, root delta
+  ranges, normalized ranges, and applied scale for each root translation track.
 - Animation renders wait for two extra browser frames after viewer readiness
   before screenshot capture, reducing first-frame WebGL paint races.
+- The renderer saves canvas PNG data directly and retries transparent capture
+  buffers by reloading the viewer once. This is more stable than page-level
+  screenshots for first-frame WebGL smoke tests.
 - `ground-y` is now checked with `groundDeltaY` when render metadata includes
   normalized bind bounds, avoiding false warnings from camera-fit world
   coordinates.
@@ -68,6 +74,11 @@ After adding relative root translation, normalized ground deltas, and the
 - retarget profile score: 1.0
 - weighted penalty: 0
 - skipped-by-policy: 30 finger ignored, 4 upper-body fallback, 2 toe ignored
+- source initial root height: `LookAround` 0.87944, `Goodbye` 0.89459,
+  `Jump` 0.86145
+- target base root height: 1.25
+- root delta y range: `LookAround` -0.006..0.003, `Goodbye` -0.007..0.011,
+  `Jump` -0.094..0.230
 - `LookAround` groundDeltaY: -0.047..-0.012
 - `Goodbye` groundDeltaY: -0.031..-0.013
 - `Jump` groundDeltaY: -0.107..-0.052
@@ -101,6 +112,9 @@ schema out of the dogfood directory.
 - Root translation must be policy-controlled. For generated simplified
   characters, `relative` is safer than copying source hips coordinates because
   it keeps the target bind height and only applies motion deltas.
+- Normalization must leave a machine-readable audit trail. Otherwise an agent
+  cannot tell whether a bad render came from parser drift, root scaling, or the
+  target rig's bind pose.
 
 ## Next Implementation Order
 
@@ -114,7 +128,8 @@ schema out of the dogfood directory.
 2. **Root and ground normalization**
    - Add source/target height scaling to the existing root translation modes:
      keep, relative, zero, horizontal-only, scale-to-model.
-   - Compute source root height and target bind height.
+   - Expand the current normalization audit from target base height to full
+     target bind height.
    - Add actionable suggestions when `groundDeltaY` exceeds thresholds.
 
 3. **Motion quality gate v2**
