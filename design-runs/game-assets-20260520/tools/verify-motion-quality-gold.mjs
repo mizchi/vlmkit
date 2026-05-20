@@ -78,17 +78,27 @@ async function main() {
     }
     if (expected.targetRig) {
       checkRange(checks, `sample:${sampleName}:targetRig.skeletonHeight`, sample.normalization?.targetRig?.bindMetrics?.skeletonHeight, expected.targetRig.skeletonHeight);
+      checkRange(checks, `sample:${sampleName}:targetRig.shoulderWidth`, sample.normalization?.targetRig?.bindMetrics?.shoulderWidth, expected.targetRig.shoulderWidth);
       checkRange(checks, `sample:${sampleName}:targetRig.handSpan`, sample.normalization?.targetRig?.bindMetrics?.handSpan, expected.targetRig.handSpan);
+      checkRange(checks, `sample:${sampleName}:targetRig.upperLegSpread`, sample.normalization?.targetRig?.bindMetrics?.upperLegSpread, expected.targetRig.upperLegSpread);
       checkRange(checks, `sample:${sampleName}:targetRig.footSpread`, sample.normalization?.targetRig?.bindMetrics?.footSpread, expected.targetRig.footSpread);
       checkRange(checks, `sample:${sampleName}:targetRig.pelvisToLowestFootHeight`, sample.normalization?.targetRig?.bindMetrics?.pelvisToLowestFootHeight, expected.targetRig.pelvisToLowestFootHeight);
+      checkRange(checks, `sample:${sampleName}:targetRig.armDownAngleDeg`, sample.normalization?.targetRig?.bindMetrics?.armDownAngleDeg, expected.targetRig.armDownAngleDeg);
     }
     if (expected.sourceRig) {
       checkRange(checks, `sample:${sampleName}:sourceRig.skeletonHeight`, sample.normalization?.sourceRig?.bindMetrics?.skeletonHeight, expected.sourceRig.skeletonHeight);
+      checkRange(checks, `sample:${sampleName}:sourceRig.shoulderWidth`, sample.normalization?.sourceRig?.bindMetrics?.shoulderWidth, expected.sourceRig.shoulderWidth);
       checkRange(checks, `sample:${sampleName}:sourceRig.handSpan`, sample.normalization?.sourceRig?.bindMetrics?.handSpan, expected.sourceRig.handSpan);
+      checkRange(checks, `sample:${sampleName}:sourceRig.upperLegSpread`, sample.normalization?.sourceRig?.bindMetrics?.upperLegSpread, expected.sourceRig.upperLegSpread);
       checkRange(checks, `sample:${sampleName}:sourceRig.footSpread`, sample.normalization?.sourceRig?.bindMetrics?.footSpread, expected.sourceRig.footSpread);
+      checkRange(checks, `sample:${sampleName}:sourceRig.armDownAngleDeg`, sample.normalization?.sourceRig?.bindMetrics?.armDownAngleDeg, expected.sourceRig.armDownAngleDeg);
       checkRange(checks, `sample:${sampleName}:sourceTargetRigComparison.skeletonHeightScale`, sample.normalization?.sourceTargetRigComparison?.scales?.skeletonHeight, expected.sourceRig.skeletonHeightScale);
+      checkRange(checks, `sample:${sampleName}:sourceTargetRigComparison.shoulderWidthScale`, sample.normalization?.sourceTargetRigComparison?.scales?.shoulderWidth, expected.sourceRig.shoulderWidthScale);
+      checkRange(checks, `sample:${sampleName}:sourceTargetRigComparison.upperLegSpreadScale`, sample.normalization?.sourceTargetRigComparison?.scales?.upperLegSpread, expected.sourceRig.upperLegSpreadScale);
       checkEqual(checks, `sample:${sampleName}:sourceTargetRigComparison.recommendation`, sample.normalization?.sourceTargetRigComparison?.recommendation?.id, expected.sourceRig.recommendation);
-      checkEqual(checks, `sample:${sampleName}:sourceTargetRigComparison.warning`, firstWarningId(sample.normalization?.sourceTargetRigComparison), expected.sourceRig.warning);
+      for (const warning of expected.sourceRig.warnings ?? [expected.sourceRig.warning].filter(Boolean)) {
+        checkIncludes(checks, `sample:${sampleName}:sourceTargetRigComparison.warning:${warning}`, warningIds(sample.normalization?.sourceTargetRigComparison), warning);
+      }
     }
   }
 
@@ -117,8 +127,14 @@ function firstRootNormalization(sample) {
   return sample.normalization?.rootTranslations?.[0] ?? null;
 }
 
-function firstWarningId(comparison) {
-  return comparison?.warnings?.[0]?.id ?? null;
+function warningIds(comparison) {
+  return (comparison?.warnings ?? []).map((warning) => warning.id);
+}
+
+function checkIncludes(checks, id, actual, expected) {
+  checks.push(Array.isArray(actual) && actual.includes(expected)
+    ? pass(id, { actual, expected })
+    : fail(id, "value is missing", { actual, expected }));
 }
 
 function checkEqual(checks, id, actual, expected) {

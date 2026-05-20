@@ -1042,6 +1042,9 @@ Current smoke status:
 - [x] Source rest metrics from VRMA humanoid nodes: Motion IR now records
   source skeleton bounds, skeleton height, hand span, foot spread, and
   source-to-target scale / pose warnings
+- [x] Pose mismatch scoring expanded beyond foot spacing: shoulder width,
+  upper-leg spread, and arm rest angle are measured and pinned in the external
+  VRMA gold fixture
 - [x] Smoke-report comparison for root normalization candidates:
   `compare-motion-quality-reports.mjs` classifies metric deltas as improved,
   regressed, stable, or tradeoff
@@ -1123,7 +1126,9 @@ Stepwise cleanup:
   world positions. `compare-motion-quality-reports.mjs` can compare a
   recommended candidate mode against the baseline smoke report. Source rest
   metrics and an initial `foot-spread-mismatch` pose warning now exist.
-  Remaining work is richer pose mismatch scoring across shoulder/arm/leg axes.
+  Pose mismatch scoring now covers shoulder width, upper-leg spread, foot
+  spread, and arm-down angle. Remaining work is deciding which warnings should
+  trigger automatic pre-normalization instead of only audit output.
 - [ ] **G6. VRM + VRMA real playback check.** Use a real VRM model with a
   matching VRMA file to verify that our extractor agrees with an expected
   runtime playback path before retargeting onto simplified generated assets.

@@ -30,17 +30,30 @@
       },
       "targetRig": {
         "skeletonHeight": [1.8, 1.95],
+        "shoulderWidth": [1.05, 1.2],
         "handSpan": [1.05, 1.2],
+        "upperLegSpread": [0.4, 0.55],
         "footSpread": [0.4, 0.55],
-        "pelvisToLowestFootHeight": [0.95, 1.1]
+        "pelvisToLowestFootHeight": [0.95, 1.1],
+        "armDownAngleDeg": [0, 5]
       },
       "sourceRig": {
         "skeletonHeight": [1.2, 1.4],
+        "shoulderWidth": [0.2, 0.3],
         "handSpan": [0.85, 1.0],
+        "upperLegSpread": [0.1, 0.2],
         "footSpread": [0.1, 0.2],
+        "armDownAngleDeg": [85, 95],
         "skeletonHeightScale": [1.35, 1.5],
+        "shoulderWidthScale": [4.5, 5.2],
+        "upperLegSpreadScale": [3.2, 3.7],
         "recommendation": "pose-mismatch-warning",
-        "warning": "foot-spread-mismatch"
+        "warnings": [
+          "foot-spread-mismatch",
+          "leg-spread-mismatch",
+          "shoulder-width-mismatch",
+          "arm-rest-angle-mismatch"
+        ]
       }
     },
     "Goodbye": {
@@ -65,17 +78,30 @@
       },
       "targetRig": {
         "skeletonHeight": [1.8, 1.95],
+        "shoulderWidth": [1.05, 1.2],
         "handSpan": [1.05, 1.2],
+        "upperLegSpread": [0.4, 0.55],
         "footSpread": [0.4, 0.55],
-        "pelvisToLowestFootHeight": [0.95, 1.1]
+        "pelvisToLowestFootHeight": [0.95, 1.1],
+        "armDownAngleDeg": [0, 5]
       },
       "sourceRig": {
         "skeletonHeight": [1.2, 1.4],
+        "shoulderWidth": [0.2, 0.3],
         "handSpan": [0.85, 1.0],
+        "upperLegSpread": [0.1, 0.2],
         "footSpread": [0.1, 0.2],
+        "armDownAngleDeg": [85, 95],
         "skeletonHeightScale": [1.35, 1.5],
+        "shoulderWidthScale": [4.5, 5.2],
+        "upperLegSpreadScale": [3.2, 3.7],
         "recommendation": "pose-mismatch-warning",
-        "warning": "foot-spread-mismatch"
+        "warnings": [
+          "foot-spread-mismatch",
+          "leg-spread-mismatch",
+          "shoulder-width-mismatch",
+          "arm-rest-angle-mismatch"
+        ]
       }
     },
     "Jump": {
@@ -100,17 +126,30 @@
       },
       "targetRig": {
         "skeletonHeight": [1.8, 1.95],
+        "shoulderWidth": [1.05, 1.2],
         "handSpan": [1.05, 1.2],
+        "upperLegSpread": [0.4, 0.55],
         "footSpread": [0.4, 0.55],
-        "pelvisToLowestFootHeight": [0.95, 1.1]
+        "pelvisToLowestFootHeight": [0.95, 1.1],
+        "armDownAngleDeg": [0, 5]
       },
       "sourceRig": {
         "skeletonHeight": [1.2, 1.4],
+        "shoulderWidth": [0.2, 0.3],
         "handSpan": [0.85, 1.0],
+        "upperLegSpread": [0.1, 0.2],
         "footSpread": [0.1, 0.2],
+        "armDownAngleDeg": [85, 95],
         "skeletonHeightScale": [1.35, 1.5],
+        "shoulderWidthScale": [4.5, 5.2],
+        "upperLegSpreadScale": [3.2, 3.7],
         "recommendation": "pose-mismatch-warning",
-        "warning": "foot-spread-mismatch"
+        "warnings": [
+          "foot-spread-mismatch",
+          "leg-spread-mismatch",
+          "shoulder-width-mismatch",
+          "arm-rest-angle-mismatch"
+        ]
       }
     }
   }

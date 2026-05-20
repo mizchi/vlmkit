@@ -144,6 +144,11 @@ schema out of the dogfood directory.
   foot spread 0.140. Core scale ratios are close enough to be usable
   (`skeletonHeight` 1.442, `legHeight` 1.258, `handSpan` 1.209), but foot
   spread scale is 3.438, so the audit emits `foot-spread-mismatch`.
+- Pose mismatch scoring now also measures shoulder width, upper-leg spread,
+  and arm rest angle. The current source is effectively T-pose
+  (`armDownAngleDeg` 90) while the voxel target arms hang down
+  (`armDownAngleDeg` 1.3), so the audit emits `arm-rest-angle-mismatch`.
+  Shoulder width and upper-leg spread also diverge from skeleton-height scale.
 
 ## Next Implementation Order
 
@@ -157,8 +162,9 @@ schema out of the dogfood directory.
 2. **Root and ground normalization**
    - Use the new report comparison output to calibrate when
      `consider-scale-to-model` should escalate from warning to candidate mode.
-   - Expand pose mismatch scoring beyond foot spread: shoulder width, arm
-     rest angle, leg spread, and source/target up-axis assumptions.
+   - Decide whether pose warnings should trigger an automatic pre-normalization
+     pass, starting with T-pose/A-pose to arms-down target rigs.
+   - Add source/target up-axis assumptions once a non-Y-up source appears.
    - Add actionable suggestions when `groundDeltaY` exceeds thresholds.
 
 3. **Motion quality gate v2**

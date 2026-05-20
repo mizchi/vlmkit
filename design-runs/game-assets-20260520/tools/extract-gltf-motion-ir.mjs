@@ -213,17 +213,28 @@ function humanoidBindMetrics(trackedBonePositions, bonePositions) {
   const head = trackedBonePositions.head ?? null;
   const leftHand = trackedBonePositions.leftHand ?? null;
   const rightHand = trackedBonePositions.rightHand ?? null;
+  const leftUpperArm = trackedBonePositions.leftUpperArm ?? null;
+  const rightUpperArm = trackedBonePositions.rightUpperArm ?? null;
+  const leftUpperLeg = trackedBonePositions.leftUpperLeg ?? null;
+  const rightUpperLeg = trackedBonePositions.rightUpperLeg ?? null;
   const leftFoot = trackedBonePositions.leftFoot ?? null;
   const rightFoot = trackedBonePositions.rightFoot ?? null;
   const lowestFootY = minFinite([leftFoot?.[1], rightFoot?.[1]]);
+  const leftArmDownAngle = armDownAngleDeg(leftUpperArm, leftHand);
+  const rightArmDownAngle = armDownAngleDeg(rightUpperArm, rightHand);
   return {
     skeletonHeight: roundNullable(axisRange(skeletonBounds, 1)),
     skeletonWidth: roundNullable(axisRange(skeletonBounds, 0)),
     skeletonDepth: roundNullable(axisRange(skeletonBounds, 2)),
     hipsToHeadHeight: roundNullable(deltaAxis(hips, head, 1)),
     hipsToLowestFootHeight: roundNullable(lowestFootY === null || !hips ? null : hips[1] - lowestFootY),
+    shoulderWidth: roundNullable(distanceAxis(leftUpperArm, rightUpperArm, 0)),
     handSpan: roundNullable(distanceAxis(leftHand, rightHand, 0)),
+    upperLegSpread: roundNullable(distanceAxis(leftUpperLeg, rightUpperLeg, 0)),
     footSpread: roundNullable(distanceAxis(leftFoot, rightFoot, 0)),
+    leftArmDownAngleDeg: roundNullable(leftArmDownAngle),
+    rightArmDownAngleDeg: roundNullable(rightArmDownAngle),
+    armDownAngleDeg: roundNullable(averageFinite([leftArmDownAngle, rightArmDownAngle])),
   };
 }
 
@@ -315,9 +326,27 @@ function distanceAxis(a, b, axis) {
   return Math.abs(b[axis] - a[axis]);
 }
 
+function armDownAngleDeg(shoulder, hand) {
+  if (!shoulder || !hand) return null;
+  const vector = [hand[0] - shoulder[0], hand[1] - shoulder[1], hand[2] - shoulder[2]];
+  const length = Math.hypot(...vector);
+  if (length <= 0.0001) return null;
+  const dotWithDown = -vector[1] / length;
+  return Math.acos(clamp(dotWithDown, -1, 1)) * 180 / Math.PI;
+}
+
+function averageFinite(values) {
+  const finite = values.filter(Number.isFinite);
+  return finite.length > 0 ? finite.reduce((sum, value) => sum + value, 0) / finite.length : null;
+}
+
 function minFinite(values) {
   const finite = values.filter(Number.isFinite);
   return finite.length > 0 ? Math.min(...finite) : null;
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function roundNullable(value) {
@@ -331,8 +360,12 @@ function round(value) {
 const SOURCE_RIG_TRACKED_BONES = [
   "hips",
   "head",
+  "leftUpperArm",
+  "rightUpperArm",
   "leftHand",
   "rightHand",
+  "leftUpperLeg",
+  "rightUpperLeg",
   "leftFoot",
   "rightFoot",
 ];

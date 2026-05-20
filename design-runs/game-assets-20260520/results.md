@@ -218,10 +218,15 @@ Observed shape:
 - target rig bind metrics: skeleton height 1.88, hand span 1.12, foot spread
   0.48, pelvis-to-lowest-foot height 1.02
 - source rest metrics: skeleton height 1.304, hand span 0.926, foot spread
-  0.140
+  0.140, shoulder width 0.229, upper-leg spread 0.140, arm-down angle 90deg
+- target rest metrics: shoulder width 1.12, upper-leg spread 0.48, arm-down
+  angle 1.3deg
 - source-to-target scale comparison: skeleton height scale 1.442, leg height
-  scale 1.258, hand span scale 1.209, foot spread scale 3.438; emits
-  `pose-mismatch-warning` / `foot-spread-mismatch`
+  scale 1.258, hand span scale 1.209, shoulder width scale 4.895, upper-leg
+  spread scale 3.438, foot spread scale 3.438; emits
+  `pose-mismatch-warning` with `foot-spread-mismatch`,
+  `leg-spread-mismatch`, `shoulder-width-mismatch`, and
+  `arm-rest-angle-mismatch`
 - `Jump` `scale-to-model` comparison: still `pass`, ground error improves
   0.107 -> 0.079, but foot contact error regresses 0.118 -> 0.173 and pelvis
   displacement regresses 0.183 -> 0.265; classify as `candidate-tradeoff`,
@@ -293,6 +298,10 @@ Learned:
   source and target have compatible core scale spread (1.21..1.44), but the
   target stance is much wider, so foot spacing is treated as pose mismatch
   rather than a reason to globally scale the motion.
+- Arm rest angle makes the T-pose vs game-rig rest-pose difference explicit:
+  the source arms are horizontal (90deg from down) while the voxel target arms
+  hang almost straight down (1.3deg). This is the strongest signal that pose
+  normalization should be separate from uniform scale normalization.
 - Ground checks should compare the animated bounds against the normalized bind
   bounds (`groundDeltaY`), not raw world `minGroundY` after camera-fit
   normalization.

@@ -178,9 +178,15 @@ function targetBindMetrics(trackedPositions, retargetPositions) {
   const head = trackedPositions.head ?? null;
   const leftHand = trackedPositions.left_hand ?? null;
   const rightHand = trackedPositions.right_hand ?? null;
+  const leftUpperArm = trackedPositions.left_upper_arm ?? null;
+  const rightUpperArm = trackedPositions.right_upper_arm ?? null;
+  const leftUpperLeg = trackedPositions.left_upper_leg ?? null;
+  const rightUpperLeg = trackedPositions.right_upper_leg ?? null;
   const leftFoot = trackedPositions.left_foot ?? null;
   const rightFoot = trackedPositions.right_foot ?? null;
   const lowestFootY = minFinite([leftFoot?.[1], rightFoot?.[1]]);
+  const leftArmDownAngle = armDownAngleDeg(leftUpperArm, leftHand);
+  const rightArmDownAngle = armDownAngleDeg(rightUpperArm, rightHand);
   return {
     skeletonHeight: roundNullable(axisRange(skeletonBounds, 1)),
     skeletonWidth: roundNullable(axisRange(skeletonBounds, 0)),
@@ -189,8 +195,13 @@ function targetBindMetrics(trackedPositions, retargetPositions) {
     rootToLowestFootHeight: roundNullable(lowestFootY === null || !root ? null : lowestFootY - root[1]),
     pelvisToHeadHeight: roundNullable(deltaAxis(pelvis, head, 1)),
     pelvisToLowestFootHeight: roundNullable(lowestFootY === null || !pelvis ? null : pelvis[1] - lowestFootY),
+    shoulderWidth: roundNullable(distanceAxis(leftUpperArm, rightUpperArm, 0)),
     handSpan: roundNullable(distanceAxis(leftHand, rightHand, 0)),
+    upperLegSpread: roundNullable(distanceAxis(leftUpperLeg, rightUpperLeg, 0)),
     footSpread: roundNullable(distanceAxis(leftFoot, rightFoot, 0)),
+    leftArmDownAngleDeg: roundNullable(leftArmDownAngle),
+    rightArmDownAngleDeg: roundNullable(rightArmDownAngle),
+    armDownAngleDeg: roundNullable(averageFinite([leftArmDownAngle, rightArmDownAngle])),
   };
 }
 
@@ -208,7 +219,9 @@ function compareSourceTargetRig(sourceRig, targetRig) {
   const scales = {
     skeletonHeight: scaleMetric(sourceRig.bindMetrics.skeletonHeight, targetRig.bindMetrics.skeletonHeight),
     legHeight: scaleMetric(sourceRig.bindMetrics.hipsToLowestFootHeight, targetRig.bindMetrics.pelvisToLowestFootHeight),
+    shoulderWidth: scaleMetric(sourceRig.bindMetrics.shoulderWidth, targetRig.bindMetrics.shoulderWidth),
     handSpan: scaleMetric(sourceRig.bindMetrics.handSpan, targetRig.bindMetrics.handSpan),
+    upperLegSpread: scaleMetric(sourceRig.bindMetrics.upperLegSpread, targetRig.bindMetrics.upperLegSpread),
     footSpread: scaleMetric(sourceRig.bindMetrics.footSpread, targetRig.bindMetrics.footSpread),
   };
   const coreScales = [scales.skeletonHeight, scales.legHeight, scales.handSpan].filter(Number.isFinite);
@@ -230,6 +243,29 @@ function compareSourceTargetRig(sourceRig, targetRig) {
       id: "foot-spread-mismatch",
       severity: "warn",
       reason: "source and target rest poses have very different foot spacing",
+    });
+  }
+  if (Number.isFinite(scales.upperLegSpread) && (scales.upperLegSpread >= LEG_SPREAD_POSE_WARN_RATIO || scales.upperLegSpread <= 1 / LEG_SPREAD_POSE_WARN_RATIO)) {
+    warnings.push({
+      id: "leg-spread-mismatch",
+      severity: "warn",
+      reason: "source and target rest poses have very different upper-leg spacing",
+    });
+  }
+  if (hasRelativeScaleMismatch(scales.shoulderWidth, scales.skeletonHeight, SHOULDER_SCALE_MISMATCH_WARN_DELTA)) {
+    warnings.push({
+      id: "shoulder-width-mismatch",
+      severity: "warn",
+      reason: "source and target shoulder widths do not scale with skeleton height",
+    });
+  }
+  const armAngleDelta = angleDelta(sourceRig.bindMetrics.armDownAngleDeg, targetRig.bindMetrics.armDownAngleDeg);
+  if (armAngleDelta !== null && armAngleDelta >= ARM_REST_ANGLE_WARN_DEG) {
+    warnings.push({
+      id: "arm-rest-angle-mismatch",
+      severity: "warn",
+      reason: "source and target rest arms point in different directions",
+      value: { deltaDeg: round(armAngleDelta) },
     });
   }
   const recommendation = warnings.length > 0
@@ -255,6 +291,16 @@ function compareSourceTargetRig(sourceRig, targetRig) {
 function scaleMetric(source, target) {
   if (!Number.isFinite(source) || !Number.isFinite(target) || Math.abs(source) <= 0.0001) return null;
   return target / source;
+}
+
+function hasRelativeScaleMismatch(scale, referenceScale, threshold) {
+  if (!Number.isFinite(scale) || !Number.isFinite(referenceScale) || Math.abs(referenceScale) <= 0.0001) return false;
+  return Math.abs(scale / referenceScale - 1) >= threshold;
+}
+
+function angleDelta(source, target) {
+  if (!Number.isFinite(source) || !Number.isFinite(target)) return null;
+  return Math.abs(source - target);
 }
 
 function mapValues(object, mapper) {
@@ -453,9 +499,27 @@ function distanceAxis(a, b, axis) {
   return Math.abs(b[axis] - a[axis]);
 }
 
+function armDownAngleDeg(shoulder, hand) {
+  if (!shoulder || !hand) return null;
+  const vector = [hand[0] - shoulder[0], hand[1] - shoulder[1], hand[2] - shoulder[2]];
+  const length = Math.hypot(...vector);
+  if (length <= 0.0001) return null;
+  const dotWithDown = -vector[1] / length;
+  return Math.acos(clamp(dotWithDown, -1, 1)) * 180 / Math.PI;
+}
+
+function averageFinite(values) {
+  const finite = values.filter(Number.isFinite);
+  return finite.length > 0 ? finite.reduce((sum, value) => sum + value, 0) / finite.length : null;
+}
+
 function minFinite(values) {
   const finite = values.filter(Number.isFinite);
   return finite.length > 0 ? Math.min(...finite) : null;
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }
 
 function decodeGlb(buffer) {
@@ -569,13 +633,20 @@ const TARGET_RIG_TRACKED_NODES = [
   "robot_root",
   "pelvis",
   "head",
+  "left_upper_arm",
+  "right_upper_arm",
   "left_hand",
   "right_hand",
+  "left_upper_leg",
+  "right_upper_leg",
   "left_foot",
   "right_foot",
 ];
 const CORE_SCALE_SPREAD_WARN_RATIO = 1.25;
 const FOOT_SPREAD_POSE_WARN_RATIO = 2.0;
+const LEG_SPREAD_POSE_WARN_RATIO = 2.0;
+const SHOULDER_SCALE_MISMATCH_WARN_DELTA = 0.4;
+const ARM_REST_ANGLE_WARN_DEG = 45;
 const HEIGHT_SCALE_DELTA_THRESHOLD = 0.2;
 const VERTICAL_ROOT_MOTION_SCALE_THRESHOLD = 0.08;
 
