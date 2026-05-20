@@ -39,6 +39,9 @@ The concrete scenario used a voxel robot and real `.vrma` motion samples from
   smoke report summarizes source root height, target base height, root delta
   ranges, normalized ranges, applied scale, and a root scaling recommendation
   for each root translation track.
+- The same audit now records target rig bind metrics from retargeted node world
+  positions: skeleton bounds, skeleton height, hand span, foot spread, and
+  pelvis-to-foot height.
 - Animation renders wait for two extra browser frames after viewer readiness
   before screenshot capture, reducing first-frame WebGL paint races.
 - The renderer saves canvas PNG data directly and retries transparent capture
@@ -129,6 +132,10 @@ schema out of the dogfood directory.
   Jump, but it was not strictly better: ground error improved while foot contact
   and pelvis displacement regressed. That argues for keeping `relative` as the
   smoke default until the target bind-height measurement is richer.
+- Target bind metrics are now available in the audit. For the voxel robot the
+  measured retarget skeleton is height 1.88, hand span 1.12, foot spread 0.48,
+  and pelvis-to-lowest-foot height 1.02. This is the right input for source
+  rest-pose comparison; `targetBaseRootHeight` alone was only pelvis height.
 
 ## Next Implementation Order
 
@@ -142,8 +149,8 @@ schema out of the dogfood directory.
 2. **Root and ground normalization**
    - Use the new report comparison output to calibrate when
      `consider-scale-to-model` should escalate from warning to candidate mode.
-   - Expand the current normalization audit from target base height to full
-     target bind height.
+   - Add source rest-pose metrics so target bind metrics can detect scale and
+     pose mismatch before rendering.
    - Add actionable suggestions when `groundDeltaY` exceeds thresholds.
 
 3. **Motion quality gate v2**

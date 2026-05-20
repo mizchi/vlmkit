@@ -215,6 +215,8 @@ Observed shape:
   `Jump` -0.094..0.230
 - root height scale recommendation: `LookAround` `relative-ok`, `Goodbye`
   `relative-ok`, `Jump` `consider-scale-to-model`
+- target rig bind metrics: skeleton height 1.88, hand span 1.12, foot spread
+  0.48, pelvis-to-lowest-foot height 1.02
 - `Jump` `scale-to-model` comparison: still `pass`, ground error improves
   0.107 -> 0.079, but foot contact error regresses 0.118 -> 0.173 and pelvis
   displacement regresses 0.183 -> 0.265; classify as `candidate-tradeoff`,
@@ -267,7 +269,8 @@ Learned:
   avatar's body height into the target pelvis.
 - The normalization audit is the right boundary for autonomous debugging:
   it records source root height, target base height, delta ranges, normalized
-  ranges, scale, and root scaling recommendations without opening a viewer.
+  ranges, scale, target bind metrics, and root scaling recommendations without
+  opening a viewer.
 - Recommendation policy should not change the selected normalization mode
   automatically. It is a smoke-report signal: small vertical deltas can stay
   `relative`, while Jump-like clips with large vertical root motion should be
@@ -276,6 +279,11 @@ Learned:
   signal. It can take the recommended candidate smoke report and show whether
   the candidate is an improvement, regression, or tradeoff without opening a
   viewer.
+- Target bind metrics make the scale decision less pelvis-only. The current
+  audit now knows the simplified rig's skeleton height and limb spans before
+  any candidate render, so future policy can compare source rest pose against
+  target proportions instead of only comparing source hips height to target
+  pelvis height.
 - Ground checks should compare the animated bounds against the normalized bind
   bounds (`groundDeltaY`), not raw world `minGroundY` after camera-fit
   normalization.

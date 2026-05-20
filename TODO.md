@@ -1036,6 +1036,9 @@ Current smoke status:
 - [x] Root normalization audit recommendations: source/target root height
   scale, vertical/horizontal root motion ranges, and recommendation ids such
   as `relative-ok` or `consider-scale-to-model`
+- [x] Target rig bind metrics in the normalization audit: measured retarget
+  skeleton bounds, skeleton height, hand span, foot spread, and
+  pelvis-to-foot height
 - [x] Smoke-report comparison for root normalization candidates:
   `compare-motion-quality-reports.mjs` classifies metric deltas as improved,
   regressed, stable, or tradeoff
@@ -1113,9 +1116,10 @@ Stepwise cleanup:
   `apply-motion-ir.mjs`; external VRMA smoke defaults to relative root motion.
   `--audit-out` now records source root height, target base height, delta
   ranges, normalized ranges, scale, and a source/target height scaling
-  recommendation. `compare-motion-quality-reports.mjs` can compare a
+  recommendation. It also records target rig bind metrics from retargeted node
+  world positions. `compare-motion-quality-reports.mjs` can compare a
   recommended candidate mode against the baseline smoke report. Remaining work
-  is full target bind-height measurement and pose mismatch scoring.
+  is source bind/rest pose measurement and pose mismatch scoring.
 - [ ] **G6. VRM + VRMA real playback check.** Use a real VRM model with a
   matching VRMA file to verify that our extractor agrees with an expected
   runtime playback path before retargeting onto simplified generated assets.

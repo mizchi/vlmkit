@@ -76,6 +76,12 @@ async function main() {
       checkRange(checks, `sample:${sampleName}:rootNormalization.heightScale`, rootNormalization?.heightScale, expected.rootNormalization.heightScale);
       checkRange(checks, `sample:${sampleName}:rootNormalization.verticalDeltaRange`, rootNormalization?.verticalDeltaRange, expected.rootNormalization.verticalDeltaRange);
     }
+    if (expected.targetRig) {
+      checkRange(checks, `sample:${sampleName}:targetRig.skeletonHeight`, sample.normalization?.targetRig?.bindMetrics?.skeletonHeight, expected.targetRig.skeletonHeight);
+      checkRange(checks, `sample:${sampleName}:targetRig.handSpan`, sample.normalization?.targetRig?.bindMetrics?.handSpan, expected.targetRig.handSpan);
+      checkRange(checks, `sample:${sampleName}:targetRig.footSpread`, sample.normalization?.targetRig?.bindMetrics?.footSpread, expected.targetRig.footSpread);
+      checkRange(checks, `sample:${sampleName}:targetRig.pelvisToLowestFootHeight`, sample.normalization?.targetRig?.bindMetrics?.pelvisToLowestFootHeight, expected.targetRig.pelvisToLowestFootHeight);
+    }
   }
 
   const ok = checks.every((check) => check.ok);

@@ -240,7 +240,7 @@ shared tools now live in `tools/`:
 - `tools/verify-asset-contract.mjs`: handoff contract checks
 - `tools/apply-motion-ir.mjs`: retarget normalized humanoid motion IR and write
   derived GLB animation clips; supports root translation policies for simplified
-  target rigs and `--audit-out` normalization reports
+  target rigs and `--audit-out` normalization reports with target bind metrics
 - `tools/verify-motion-ir.mjs`: validate motion IR shape, loop closure, and
   optional model retarget targets
 - `tools/extract-gltf-motion-ir.mjs`: extract glTF/GLB animation clips into

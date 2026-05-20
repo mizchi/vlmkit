@@ -356,6 +356,13 @@ function summarizeNormalization(audit) {
   );
   return {
     rootTranslationMode: audit.rootTranslationMode,
+    targetRig: audit.targetRig ? {
+      nodeCount: audit.targetRig.nodeCount,
+      retargetNodeCount: audit.targetRig.retargetNodeCount,
+      measuredRetargetNodeCount: audit.targetRig.measuredRetargetNodeCount,
+      skeletonBounds: audit.targetRig.skeletonBounds,
+      bindMetrics: audit.targetRig.bindMetrics,
+    } : null,
     rootTranslations,
   };
 }

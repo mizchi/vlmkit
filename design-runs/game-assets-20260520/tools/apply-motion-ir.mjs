@@ -67,7 +67,7 @@ async function main() {
   if (args.replaceExisting || !gltf.animations) gltf.animations = [];
 
   const chunks = [bin];
-  const audit = createAudit(args, motion);
+  const audit = createAudit(args, motion, gltf, nodeIndexByName);
   for (const clip of clips) {
     gltf.animations.push(buildAnimation(gltf, chunks, motion, clip, nodeIndexByName, {
       rootTranslationMode: args.rootTranslationMode,
@@ -126,7 +126,7 @@ function buildAnimation(gltf, chunks, motion, clip, nodeIndexByName, options) {
   return animation;
 }
 
-function createAudit(args, motion) {
+function createAudit(args, motion, gltf, nodeIndexByName) {
   return {
     version: 1,
     kind: "motion-normalization-audit",
@@ -139,8 +139,61 @@ function createAudit(args, motion) {
       targetSpace: motion.source?.targetSpace ?? null,
       humanoidBoneCount: motion.source?.vrmcVrmAnimation?.humanoidBoneCount ?? null,
     },
+    targetRig: analyzeTargetRig(gltf, motion, nodeIndexByName),
     clips: [],
   };
+}
+
+function analyzeTargetRig(gltf, motion, nodeIndexByName) {
+  const worldMatrices = computeWorldMatrices(gltf);
+  const retargetNodes = [...new Set(Object.values(motion.retarget ?? {}).filter((name) => typeof name === "string" && name))];
+  const nodePositions = Object.fromEntries(retargetNodes
+    .map((name) => [name, nodeWorldPosition(name, nodeIndexByName, worldMatrices)])
+    .filter(([, position]) => position !== null)
+    .map(([name, position]) => [name, position.map(round)]));
+  const trackedPositions = Object.fromEntries(TARGET_RIG_TRACKED_NODES
+    .map((name) => [name, nodeWorldPosition(name, nodeIndexByName, worldMatrices)])
+    .filter(([, position]) => position !== null)
+    .map(([name, position]) => [name, position.map(round)]));
+  const positions = Object.values(nodePositions);
+  return {
+    nodeCount: gltf.nodes?.length ?? 0,
+    retargetNodeCount: retargetNodes.length,
+    measuredRetargetNodeCount: positions.length,
+    skeletonBounds: vec3Range(positions),
+    bindMetrics: targetBindMetrics(trackedPositions, positions),
+    trackedNodePositions: trackedPositions,
+  };
+}
+
+function targetBindMetrics(trackedPositions, retargetPositions) {
+  const skeletonBounds = vec3Range(retargetPositions);
+  const root = trackedPositions.robot_root ?? null;
+  const pelvis = trackedPositions.pelvis ?? null;
+  const head = trackedPositions.head ?? null;
+  const leftHand = trackedPositions.left_hand ?? null;
+  const rightHand = trackedPositions.right_hand ?? null;
+  const leftFoot = trackedPositions.left_foot ?? null;
+  const rightFoot = trackedPositions.right_foot ?? null;
+  const lowestFootY = minFinite([leftFoot?.[1], rightFoot?.[1]]);
+  return {
+    skeletonHeight: roundNullable(axisRangeOrNull(skeletonBounds, 1)),
+    skeletonWidth: roundNullable(axisRangeOrNull(skeletonBounds, 0)),
+    skeletonDepth: roundNullable(axisRangeOrNull(skeletonBounds, 2)),
+    rootToHeadHeight: roundNullable(deltaAxis(root, head, 1)),
+    rootToLowestFootHeight: roundNullable(lowestFootY === null || !root ? null : lowestFootY - root[1]),
+    pelvisToHeadHeight: roundNullable(deltaAxis(pelvis, head, 1)),
+    pelvisToLowestFootHeight: roundNullable(lowestFootY === null || !pelvis ? null : pelvis[1] - lowestFootY),
+    handSpan: roundNullable(distanceAxis(leftHand, rightHand, 0)),
+    footSpread: roundNullable(distanceAxis(leftFoot, rightFoot, 0)),
+  };
+}
+
+function nodeWorldPosition(name, nodeIndexByName, worldMatrices) {
+  const index = nodeIndexByName.get(name);
+  if (index === undefined) return null;
+  const matrix = worldMatrices.get(index);
+  return matrix ? transformPoint(matrix, [0, 0, 0]) : null;
 }
 
 function recordRootTranslationAudit(audit, clip, track, nodeName, baseTranslation, samples, rootTranslationMode) {
@@ -360,6 +413,112 @@ function axisRange(range, axis) {
   return range.max[axis] - range.min[axis];
 }
 
+function axisRangeOrNull(range, axis) {
+  return range ? range.max[axis] - range.min[axis] : null;
+}
+
+function computeWorldMatrices(gltf) {
+  const matrices = new Map();
+  const sceneRoots = gltf.scenes?.[gltf.scene ?? 0]?.nodes;
+  const roots = Array.isArray(sceneRoots) && sceneRoots.length > 0
+    ? sceneRoots
+    : rootNodeIndexes(gltf.nodes ?? []);
+  for (const root of roots) visitWorldMatrix(gltf, root, identityMatrix(), matrices);
+  return matrices;
+}
+
+function rootNodeIndexes(nodes) {
+  const childIndexes = new Set(nodes.flatMap((node) => node.children ?? []));
+  return nodes.map((_, index) => index).filter((index) => !childIndexes.has(index));
+}
+
+function visitWorldMatrix(gltf, nodeIndex, parentMatrix, output) {
+  const node = gltf.nodes?.[nodeIndex];
+  if (!node) return;
+  const worldMatrix = multiplyMatrices(parentMatrix, nodeLocalMatrix(node));
+  output.set(nodeIndex, worldMatrix);
+  for (const child of node.children ?? []) visitWorldMatrix(gltf, child, worldMatrix, output);
+}
+
+function nodeLocalMatrix(node) {
+  if (Array.isArray(node.matrix) && node.matrix.length === 16 && node.matrix.every(Number.isFinite)) return node.matrix;
+  return composeMatrix(
+    vec3(node.translation ?? [0, 0, 0], `translation for node ${node.name ?? ""}`),
+    vec4(node.rotation ?? [0, 0, 0, 1], `rotation for node ${node.name ?? ""}`),
+    vec3(node.scale ?? [1, 1, 1], `scale for node ${node.name ?? ""}`),
+  );
+}
+
+function identityMatrix() {
+  return [
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1,
+  ];
+}
+
+function composeMatrix(translation, rotation, scale) {
+  const [x, y, z, w] = rotation;
+  const [sx, sy, sz] = scale;
+  const x2 = x + x;
+  const y2 = y + y;
+  const z2 = z + z;
+  const xx = x * x2;
+  const xy = x * y2;
+  const xz = x * z2;
+  const yy = y * y2;
+  const yz = y * z2;
+  const zz = z * z2;
+  const wx = w * x2;
+  const wy = w * y2;
+  const wz = w * z2;
+  return [
+    (1 - (yy + zz)) * sx, (xy + wz) * sx, (xz - wy) * sx, 0,
+    (xy - wz) * sy, (1 - (xx + zz)) * sy, (yz + wx) * sy, 0,
+    (xz + wy) * sz, (yz - wx) * sz, (1 - (xx + yy)) * sz, 0,
+    translation[0], translation[1], translation[2], 1,
+  ];
+}
+
+function multiplyMatrices(a, b) {
+  const result = new Array(16).fill(0);
+  for (let column = 0; column < 4; column++) {
+    for (let row = 0; row < 4; row++) {
+      result[column * 4 + row] =
+        a[0 * 4 + row] * b[column * 4 + 0] +
+        a[1 * 4 + row] * b[column * 4 + 1] +
+        a[2 * 4 + row] * b[column * 4 + 2] +
+        a[3 * 4 + row] * b[column * 4 + 3];
+    }
+  }
+  return result;
+}
+
+function transformPoint(matrix, point) {
+  const [x, y, z] = point;
+  return [
+    matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12],
+    matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13],
+    matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14],
+  ];
+}
+
+function deltaAxis(a, b, axis) {
+  if (!a || !b) return null;
+  return b[axis] - a[axis];
+}
+
+function distanceAxis(a, b, axis) {
+  if (!a || !b) return null;
+  return Math.abs(b[axis] - a[axis]);
+}
+
+function minFinite(values) {
+  const finite = values.filter(Number.isFinite);
+  return finite.length > 0 ? Math.min(...finite) : null;
+}
+
 function decodeGlb(buffer) {
   if (buffer.readUInt32LE(0) !== 0x46546c67) throw new Error("invalid GLB magic");
   if (buffer.readUInt32LE(4) !== 2) throw new Error("unsupported GLB version");
@@ -467,6 +626,15 @@ function roundNullable(value) {
 }
 
 const ROOT_TRANSLATION_TARGETS = new Set(["root", "hips", "pelvis", "robot_root"]);
+const TARGET_RIG_TRACKED_NODES = [
+  "robot_root",
+  "pelvis",
+  "head",
+  "left_hand",
+  "right_hand",
+  "left_foot",
+  "right_foot",
+];
 const HEIGHT_SCALE_DELTA_THRESHOLD = 0.2;
 const VERTICAL_ROOT_MOTION_SCALE_THRESHOLD = 0.08;
 

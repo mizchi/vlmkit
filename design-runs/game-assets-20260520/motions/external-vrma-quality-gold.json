@@ -27,6 +27,12 @@
         "severity": "info",
         "heightScale": [1.35, 1.5],
         "verticalDeltaRange": [0, 0.03]
+      },
+      "targetRig": {
+        "skeletonHeight": [1.8, 1.95],
+        "handSpan": [1.05, 1.2],
+        "footSpread": [0.4, 0.55],
+        "pelvisToLowestFootHeight": [0.95, 1.1]
       }
     },
     "Goodbye": {
@@ -48,6 +54,12 @@
         "severity": "info",
         "heightScale": [1.35, 1.5],
         "verticalDeltaRange": [0, 0.03]
+      },
+      "targetRig": {
+        "skeletonHeight": [1.8, 1.95],
+        "handSpan": [1.05, 1.2],
+        "footSpread": [0.4, 0.55],
+        "pelvisToLowestFootHeight": [0.95, 1.1]
       }
     },
     "Jump": {
@@ -69,6 +81,12 @@
         "severity": "warn",
         "heightScale": [1.35, 1.55],
         "verticalDeltaRange": [0.25, 0.4]
+      },
+      "targetRig": {
+        "skeletonHeight": [1.8, 1.95],
+        "handSpan": [1.05, 1.2],
+        "footSpread": [0.4, 0.55],
+        "pelvisToLowestFootHeight": [0.95, 1.1]
       }
     }
   }
