@@ -1,0 +1,16 @@
+{
+  "subject": "voxel-club-goblin",
+  "sourceReference": "../../references/goblin-voxel-turnaround.png",
+  "format": [
+    "obj",
+    "mtl",
+    "glb"
+  ],
+  "style": "voxel block model",
+  "sourceMethod": "manual voxel reconstruction based on generated voxel turnaround",
+  "unit": 0.12,
+  "cubeSize": 0.11279999999999998,
+  "cubeCount": 865,
+  "materialCount": 11,
+  "generatedAt": "2026-05-20T12:24:58.093Z"
+}

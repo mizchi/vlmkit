@@ -1,0 +1,236 @@
+{
+  "input": "design-runs/game-assets-20260520/models/goblin-club-blockout/goblin-club-blockout.glb",
+  "format": "glb",
+  "view": "front",
+  "mode": "material",
+  "width": 1024,
+  "height": 1024,
+  "background": "#e8e8e4",
+  "renderer": "three-playwright",
+  "state": {
+    "status": "ready",
+    "format": "glb",
+    "view": "front",
+    "mode": "material",
+    "sourceBounds": {
+      "min": [
+        -1.212,
+        0.05,
+        -0.324
+      ],
+      "max": [
+        0.984,
+        2.98,
+        0.723
+      ]
+    },
+    "normalizedBounds": {
+      "min": [
+        -0.941,
+        -1.471,
+        -0.482
+      ],
+      "max": [
+        0.97,
+        1.079,
+        0.43
+      ]
+    },
+    "meshCount": 48,
+    "meshes": [
+      {
+        "name": "club-goblin-blockout_1",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "club-goblin-blockout_2",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "club-goblin-blockout_3",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "club-goblin-blockout_4",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "club-goblin-blockout_5",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "club-goblin-blockout_6",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "club-goblin-blockout_7",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "club-goblin-blockout_8",
+        "material": "ear_inner_warm_brown"
+      },
+      {
+        "name": "club-goblin-blockout_9",
+        "material": "ear_inner_warm_brown"
+      },
+      {
+        "name": "club-goblin-blockout_10",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "club-goblin-blockout_11",
+        "material": "golden_eye"
+      },
+      {
+        "name": "club-goblin-blockout_12",
+        "material": "golden_eye"
+      },
+      {
+        "name": "club-goblin-blockout_13",
+        "material": "dull_tooth"
+      },
+      {
+        "name": "club-goblin-blockout_14",
+        "material": "dull_tooth"
+      },
+      {
+        "name": "club-goblin-blockout_15",
+        "material": "dark_worn_leather"
+      },
+      {
+        "name": "club-goblin-blockout_16",
+        "material": "dark_worn_leather"
+      },
+      {
+        "name": "club-goblin-blockout_17",
+        "material": "tan_cloth_wrap"
+      },
+      {
+        "name": "club-goblin-blockout_18",
+        "material": "ragged_skirt_brown"
+      },
+      {
+        "name": "club-goblin-blockout_19",
+        "material": "ragged_skirt_brown"
+      },
+      {
+        "name": "club-goblin-blockout_20",
+        "material": "ragged_skirt_brown"
+      },
+      {
+        "name": "club-goblin-blockout_21",
+        "material": "ragged_skirt_brown"
+      },
+      {
+        "name": "club-goblin-blockout_22",
+        "material": "ragged_skirt_brown"
+      },
+      {
+        "name": "club-goblin-blockout_23",
+        "material": "ragged_skirt_brown"
+      },
+      {
+        "name": "club-goblin-blockout_24",
+        "material": "ragged_skirt_brown"
+      },
+      {
+        "name": "club-goblin-blockout_25",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "club-goblin-blockout_26",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "club-goblin-blockout_27",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "club-goblin-blockout_28",
+        "material": "tan_cloth_wrap"
+      },
+      {
+        "name": "club-goblin-blockout_29",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "club-goblin-blockout_30",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "club-goblin-blockout_31",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "club-goblin-blockout_32",
+        "material": "tan_cloth_wrap"
+      },
+      {
+        "name": "club-goblin-blockout_33",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "club-goblin-blockout_34",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "club-goblin-blockout_35",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "club-goblin-blockout_36",
+        "material": "tan_cloth_wrap"
+      },
+      {
+        "name": "club-goblin-blockout_37",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "club-goblin-blockout_38",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "club-goblin-blockout_39",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "club-goblin-blockout_40",
+        "material": "tan_cloth_wrap"
+      },
+      {
+        "name": "club-goblin-blockout_41",
+        "material": "club_rough_wood"
+      },
+      {
+        "name": "club-goblin-blockout_42",
+        "material": "club_rough_wood"
+      },
+      {
+        "name": "club-goblin-blockout_43",
+        "material": "club_rough_wood"
+      },
+      {
+        "name": "club-goblin-blockout_44",
+        "material": "club_rough_wood"
+      },
+      {
+        "name": "club-goblin-blockout_45",
+        "material": "club_rough_wood"
+      },
+      {
+        "name": "club-goblin-blockout_46",
+        "material": "club_rough_wood"
+      },
+      {
+        "name": "club-goblin-blockout_47",
+        "material": "club_rough_wood"
+      },
+      {
+        "name": "club-goblin-blockout_48",
+        "material": "club_rough_wood"
+      }
+    ]
+  },
+  "output": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/goblin-club-blockout-glb-material-front.png"
+}

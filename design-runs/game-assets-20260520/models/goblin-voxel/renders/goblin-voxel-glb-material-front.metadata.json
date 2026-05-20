@@ -1,0 +1,88 @@
+{
+  "input": "design-runs/game-assets-20260520/models/goblin-voxel/goblin-voxel.glb",
+  "format": "glb",
+  "view": "front",
+  "mode": "material",
+  "width": 1024,
+  "height": 1024,
+  "background": "#e8e8e4",
+  "renderer": "three-playwright",
+  "state": {
+    "status": "ready",
+    "format": "glb",
+    "view": "front",
+    "mode": "material",
+    "sourceBounds": {
+      "min": [
+        -1.616,
+        -0.056,
+        -0.296
+      ],
+      "max": [
+        1.016,
+        2.696,
+        0.536
+      ]
+    },
+    "normalizedBounds": {
+      "min": [
+        -1.197,
+        -1.372,
+        -0.395
+      ],
+      "max": [
+        1.242,
+        1.178,
+        0.377
+      ]
+    },
+    "meshCount": 11,
+    "meshes": [
+      {
+        "name": "goblin-voxel_1",
+        "material": "voxel_skin_olive"
+      },
+      {
+        "name": "goblin-voxel_2",
+        "material": "voxel_skin_shadow"
+      },
+      {
+        "name": "goblin-voxel_3",
+        "material": "voxel_ear_inner"
+      },
+      {
+        "name": "goblin-voxel_4",
+        "material": "voxel_black_brow"
+      },
+      {
+        "name": "goblin-voxel_5",
+        "material": "voxel_gold_eye"
+      },
+      {
+        "name": "goblin-voxel_6",
+        "material": "voxel_tooth"
+      },
+      {
+        "name": "goblin-voxel_7",
+        "material": "voxel_dark_leather"
+      },
+      {
+        "name": "goblin-voxel_8",
+        "material": "voxel_tan_wrap"
+      },
+      {
+        "name": "goblin-voxel_9",
+        "material": "voxel_ragged_brown"
+      },
+      {
+        "name": "goblin-voxel_10",
+        "material": "voxel_wood"
+      },
+      {
+        "name": "goblin-voxel_11",
+        "material": "voxel_wood_shadow"
+      }
+    ]
+  },
+  "output": "design-runs/game-assets-20260520/models/goblin-voxel/renders/goblin-voxel-glb-material-front.png"
+}

@@ -1,0 +1,88 @@
+{
+  "input": "design-runs/game-assets-20260520/models/goblin-voxel/goblin-voxel.obj",
+  "format": "obj",
+  "view": "side",
+  "mode": "material",
+  "width": 1024,
+  "height": 1024,
+  "background": "#e8e8e4",
+  "renderer": "three-playwright",
+  "state": {
+    "status": "ready",
+    "format": "obj",
+    "view": "side",
+    "mode": "material",
+    "sourceBounds": {
+      "min": [
+        -1.616,
+        -0.056,
+        -0.296
+      ],
+      "max": [
+        1.016,
+        2.696,
+        0.536
+      ]
+    },
+    "normalizedBounds": {
+      "min": [
+        -1.197,
+        -1.372,
+        -0.395
+      ],
+      "max": [
+        1.242,
+        1.178,
+        0.377
+      ]
+    },
+    "meshCount": 11,
+    "meshes": [
+      {
+        "name": "skin",
+        "material": "voxel_skin_olive"
+      },
+      {
+        "name": "skinDark",
+        "material": "voxel_skin_shadow"
+      },
+      {
+        "name": "earInner",
+        "material": "voxel_ear_inner"
+      },
+      {
+        "name": "brow",
+        "material": "voxel_black_brow"
+      },
+      {
+        "name": "eye",
+        "material": "voxel_gold_eye"
+      },
+      {
+        "name": "tooth",
+        "material": "voxel_tooth"
+      },
+      {
+        "name": "leather",
+        "material": "voxel_dark_leather"
+      },
+      {
+        "name": "wrap",
+        "material": "voxel_tan_wrap"
+      },
+      {
+        "name": "pants",
+        "material": "voxel_ragged_brown"
+      },
+      {
+        "name": "wood",
+        "material": "voxel_wood"
+      },
+      {
+        "name": "woodDark",
+        "material": "voxel_wood_shadow"
+      }
+    ]
+  },
+  "output": "design-runs/game-assets-20260520/models/goblin-voxel/renders/goblin-voxel-obj-material-side.png"
+}

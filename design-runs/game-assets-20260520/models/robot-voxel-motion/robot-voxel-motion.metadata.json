@@ -1,0 +1,61 @@
+{
+  "subject": "voxel-motion-robot",
+  "format": [
+    "glb",
+    "obj",
+    "mtl"
+  ],
+  "style": "motion-ready voxel humanoid robot",
+  "sourceMethod": "manual procedural voxel model with named transform nodes and glTF animation clips",
+  "sourceReference": "https://note.com/npaka/n/nde5589d13536",
+  "unit": 0.12,
+  "cubeSize": 0.1104,
+  "cubeCount": 729,
+  "materialCount": 8,
+  "nodeCount": 16,
+  "animationClips": [
+    {
+      "id": "idle_bob",
+      "durationSeconds": 2,
+      "purpose": "subtle loop for pivot stability and head readability"
+    },
+    {
+      "id": "walk_cycle",
+      "durationSeconds": 1,
+      "purpose": "in-place humanoid gait smoke test"
+    },
+    {
+      "id": "wave",
+      "durationSeconds": 1.5,
+      "purpose": "upper-body articulation smoke test"
+    }
+  ],
+  "motionContract": {
+    "requiredNodes": [
+      "robot_root",
+      "pelvis",
+      "torso",
+      "head",
+      "left_upper_arm",
+      "left_forearm",
+      "left_hand",
+      "right_upper_arm",
+      "right_forearm",
+      "right_hand",
+      "left_upper_leg",
+      "left_lower_leg",
+      "left_foot",
+      "right_upper_leg",
+      "right_lower_leg",
+      "right_foot"
+    ],
+    "requiredChecks": [
+      "named humanoid transform nodes are present",
+      "feet remain near the ground plane in sampled walk frames",
+      "arm and leg swings preserve blocky silhouette",
+      "animation clips loop without first/last pose drift",
+      "fixed-camera snapshots are nonblank for front, side, and iso views"
+    ]
+  },
+  "generatedAt": "2026-05-20T12:43:38.358Z"
+}

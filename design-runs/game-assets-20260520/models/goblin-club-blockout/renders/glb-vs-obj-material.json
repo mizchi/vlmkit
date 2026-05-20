@@ -1,0 +1,30 @@
+{
+  "mode": "material",
+  "threshold": 0.1,
+  "rows": [
+    {
+      "view": "front",
+      "diffPixels": 147596,
+      "diffRatio": 0.140759,
+      "diffPath": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/glb-vs-obj-material-front.png"
+    },
+    {
+      "view": "side",
+      "diffPixels": 85881,
+      "diffRatio": 0.081903,
+      "diffPath": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/glb-vs-obj-material-side.png"
+    },
+    {
+      "view": "back",
+      "diffPixels": 141436,
+      "diffRatio": 0.134884,
+      "diffPath": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/glb-vs-obj-material-back.png"
+    },
+    {
+      "view": "iso",
+      "diffPixels": 127500,
+      "diffRatio": 0.121593,
+      "diffPath": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/glb-vs-obj-material-iso.png"
+    }
+  ]
+}

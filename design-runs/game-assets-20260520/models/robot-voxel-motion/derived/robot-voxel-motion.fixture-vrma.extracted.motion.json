@@ -1,0 +1,697 @@
+{
+  "version": 1,
+  "id": "robot-voxel-motion.vrma-bridge.fixture",
+  "source": {
+    "kind": "vrma-fixture",
+    "input": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/robot-voxel-motion.vrma-bridge.fixture.vrma",
+    "targetSpace": "humanoid",
+    "vrmcVrmAnimation": {
+      "specVersion": "1.0",
+      "humanoidBoneCount": 15
+    },
+    "skippedChannelCount": 0,
+    "warnings": [],
+    "note": "Extracted from VRMC_vrm_animation humanoid mapping. Targets are humanoid bone names."
+  },
+  "retarget": {
+    "hips": "pelvis",
+    "spine": "torso",
+    "head": "head",
+    "rightUpperArm": "right_upper_arm",
+    "rightLowerArm": "right_forearm",
+    "leftUpperArm": "left_upper_arm",
+    "leftUpperLeg": "left_upper_leg",
+    "rightUpperLeg": "right_upper_leg",
+    "leftLowerLeg": "left_lower_leg",
+    "rightLowerLeg": "right_lower_leg"
+  },
+  "clips": [
+    {
+      "id": "vrma_alert_wave",
+      "durationSeconds": 1.6,
+      "loop": true,
+      "tracks": [
+        {
+          "target": "hips",
+          "path": "translation",
+          "keyframes": [
+            {
+              "time": 0,
+              "translation": [
+                0,
+                1.25,
+                0
+              ]
+            },
+            {
+              "time": 0.4,
+              "translation": [
+                0,
+                1.285,
+                0
+              ]
+            },
+            {
+              "time": 0.8,
+              "translation": [
+                0,
+                1.265,
+                0
+              ]
+            },
+            {
+              "time": 1.2,
+              "translation": [
+                0,
+                1.285,
+                0
+              ]
+            },
+            {
+              "time": 1.6,
+              "translation": [
+                0,
+                1.25,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "target": "spine",
+          "path": "rotation",
+          "keyframes": [
+            {
+              "time": 0,
+              "rotation": [
+                0,
+                0,
+                0.02,
+                0.9998
+              ]
+            },
+            {
+              "time": 0.4,
+              "rotation": [
+                0.02,
+                0.0002,
+                -0.01,
+                0.99975
+              ]
+            },
+            {
+              "time": 0.8,
+              "rotation": [
+                0.01,
+                0.00025,
+                -0.025,
+                0.99964
+              ]
+            },
+            {
+              "time": 1.2,
+              "rotation": [
+                0.02,
+                0.0002,
+                -0.01,
+                0.99975
+              ]
+            },
+            {
+              "time": 1.6,
+              "rotation": [
+                0,
+                0,
+                0.02,
+                0.9998
+              ]
+            }
+          ]
+        },
+        {
+          "target": "head",
+          "path": "rotation",
+          "keyframes": [
+            {
+              "time": 0,
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            },
+            {
+              "time": 0.4,
+              "rotation": [
+                0,
+                0,
+                -0.04998,
+                0.99875
+              ]
+            },
+            {
+              "time": 0.8,
+              "rotation": [
+                0,
+                0,
+                -0.03999,
+                0.9992
+              ]
+            },
+            {
+              "time": 1.2,
+              "rotation": [
+                0,
+                0,
+                -0.04998,
+                0.99875
+              ]
+            },
+            {
+              "time": 1.6,
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "target": "rightUpperArm",
+          "path": "rotation",
+          "keyframes": [
+            {
+              "time": 0,
+              "rotation": [
+                -0.07456,
+                -0.00748,
+                -0.09955,
+                0.99221
+              ]
+            },
+            {
+              "time": 0.4,
+              "rotation": [
+                -0.14611,
+                -0.09469,
+                -0.53553,
+                0.82637
+              ]
+            },
+            {
+              "time": 0.8,
+              "rotation": [
+                -0.09733,
+                -0.07791,
+                -0.62002,
+                0.77462
+              ]
+            },
+            {
+              "time": 1.2,
+              "rotation": [
+                -0.14611,
+                -0.09469,
+                -0.53553,
+                0.82637
+              ]
+            },
+            {
+              "time": 1.6,
+              "rotation": [
+                -0.07456,
+                -0.00748,
+                -0.09955,
+                0.99221
+              ]
+            }
+          ]
+        },
+        {
+          "target": "rightLowerArm",
+          "path": "rotation",
+          "keyframes": [
+            {
+              "time": 0,
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            },
+            {
+              "time": 0.4,
+              "rotation": [
+                0,
+                0,
+                -0.31931,
+                0.94765
+              ]
+            },
+            {
+              "time": 0.8,
+              "rotation": [
+                0,
+                0,
+                -0.12467,
+                0.9922
+              ]
+            },
+            {
+              "time": 1.2,
+              "rotation": [
+                0,
+                0,
+                -0.31931,
+                0.94765
+              ]
+            },
+            {
+              "time": 1.6,
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "target": "leftUpperArm",
+          "path": "rotation",
+          "keyframes": [
+            {
+              "time": 0,
+              "rotation": [
+                0.05992,
+                -0.0024,
+                0.03992,
+                0.9974
+              ]
+            },
+            {
+              "time": 0.4,
+              "rotation": [
+                0.03998,
+                -0.0006,
+                0.01499,
+                0.99909
+              ]
+            },
+            {
+              "time": 0.8,
+              "rotation": [
+                0.05996,
+                0.0006,
+                -0.00998,
+                0.99815
+              ]
+            },
+            {
+              "time": 1.2,
+              "rotation": [
+                0.03998,
+                -0.0006,
+                0.01499,
+                0.99909
+              ]
+            },
+            {
+              "time": 1.6,
+              "rotation": [
+                0.05992,
+                -0.0024,
+                0.03992,
+                0.9974
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mixamo_walk_standin",
+      "durationSeconds": 1,
+      "loop": true,
+      "tracks": [
+        {
+          "target": "hips",
+          "path": "translation",
+          "keyframes": [
+            {
+              "time": 0,
+              "translation": [
+                0,
+                1.25,
+                0
+              ]
+            },
+            {
+              "time": 0.25,
+              "translation": [
+                0,
+                1.295,
+                0
+              ]
+            },
+            {
+              "time": 0.5,
+              "translation": [
+                0,
+                1.25,
+                0
+              ]
+            },
+            {
+              "time": 0.75,
+              "translation": [
+                0,
+                1.295,
+                0
+              ]
+            },
+            {
+              "time": 1,
+              "translation": [
+                0,
+                1.25,
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "target": "leftUpperLeg",
+          "path": "rotation",
+          "keyframes": [
+            {
+              "time": 0,
+              "rotation": [
+                -0.27155,
+                0,
+                0,
+                0.96243
+              ]
+            },
+            {
+              "time": 0.25,
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            },
+            {
+              "time": 0.5,
+              "rotation": [
+                0.27155,
+                0,
+                0,
+                0.96243
+              ]
+            },
+            {
+              "time": 0.75,
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            },
+            {
+              "time": 1,
+              "rotation": [
+                -0.27155,
+                0,
+                0,
+                0.96243
+              ]
+            }
+          ]
+        },
+        {
+          "target": "rightUpperLeg",
+          "path": "rotation",
+          "keyframes": [
+            {
+              "time": 0,
+              "rotation": [
+                0.27155,
+                0,
+                0,
+                0.96243
+              ]
+            },
+            {
+              "time": 0.25,
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            },
+            {
+              "time": 0.5,
+              "rotation": [
+                -0.27155,
+                0,
+                0,
+                0.96243
+              ]
+            },
+            {
+              "time": 0.75,
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            },
+            {
+              "time": 1,
+              "rotation": [
+                0.27155,
+                0,
+                0,
+                0.96243
+              ]
+            }
+          ]
+        },
+        {
+          "target": "leftLowerLeg",
+          "path": "rotation",
+          "keyframes": [
+            {
+              "time": 0,
+              "rotation": [
+                0.09983,
+                0,
+                0,
+                0.995
+              ]
+            },
+            {
+              "time": 0.25,
+              "rotation": [
+                0.27155,
+                0,
+                0,
+                0.96243
+              ]
+            },
+            {
+              "time": 0.5,
+              "rotation": [
+                0.07493,
+                0,
+                0,
+                0.99719
+              ]
+            },
+            {
+              "time": 0.75,
+              "rotation": [
+                0.12467,
+                0,
+                0,
+                0.9922
+              ]
+            },
+            {
+              "time": 1,
+              "rotation": [
+                0.09983,
+                0,
+                0,
+                0.995
+              ]
+            }
+          ]
+        },
+        {
+          "target": "rightLowerLeg",
+          "path": "rotation",
+          "keyframes": [
+            {
+              "time": 0,
+              "rotation": [
+                0.07493,
+                0,
+                0,
+                0.99719
+              ]
+            },
+            {
+              "time": 0.25,
+              "rotation": [
+                0.12467,
+                0,
+                0,
+                0.9922
+              ]
+            },
+            {
+              "time": 0.5,
+              "rotation": [
+                0.09983,
+                0,
+                0,
+                0.995
+              ]
+            },
+            {
+              "time": 0.75,
+              "rotation": [
+                0.27155,
+                0,
+                0,
+                0.96243
+              ]
+            },
+            {
+              "time": 1,
+              "rotation": [
+                0.07493,
+                0,
+                0,
+                0.99719
+              ]
+            }
+          ]
+        },
+        {
+          "target": "leftUpperArm",
+          "path": "rotation",
+          "keyframes": [
+            {
+              "time": 0,
+              "rotation": [
+                0.20846,
+                0,
+                0,
+                0.97803
+              ]
+            },
+            {
+              "time": 0.25,
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            },
+            {
+              "time": 0.5,
+              "rotation": [
+                -0.20846,
+                0,
+                0,
+                0.97803
+              ]
+            },
+            {
+              "time": 0.75,
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            },
+            {
+              "time": 1,
+              "rotation": [
+                0.20846,
+                0,
+                0,
+                0.97803
+              ]
+            }
+          ]
+        },
+        {
+          "target": "rightUpperArm",
+          "path": "rotation",
+          "keyframes": [
+            {
+              "time": 0,
+              "rotation": [
+                -0.20846,
+                0,
+                0,
+                0.97803
+              ]
+            },
+            {
+              "time": 0.25,
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            },
+            {
+              "time": 0.5,
+              "rotation": [
+                0.20846,
+                0,
+                0,
+                0.97803
+              ]
+            },
+            {
+              "time": 0.75,
+              "rotation": [
+                0,
+                0,
+                0,
+                1
+              ]
+            },
+            {
+              "time": 1,
+              "rotation": [
+                -0.20846,
+                0,
+                0,
+                0.97803
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

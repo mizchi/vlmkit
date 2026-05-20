@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "engine": "mizchi/kagura",
+  "asset": {
+    "id": "goblin-voxel",
+    "kind": "voxel-character",
+    "sourceReference": "../../references/goblin-voxel-turnaround.png",
+    "primaryModel": "goblin-voxel.glb",
+    "debugModel": "goblin-voxel.obj",
+    "debugMaterial": "goblin-voxel.mtl",
+    "unit": "voxel-grid",
+    "voxelUnit": 0.12,
+    "originPolicy": "feet-near-y0-center-xz",
+    "coordinateNotes": "Y-up. Front direction is +Z in the generated model.",
+    "intendedUse": [
+      "voxel character runtime import",
+      "fixed-camera visual smoke test",
+      "future kagura glTF asset pipeline"
+    ]
+  },
+  "renderChecks": {
+    "renderer": "three-playwright",
+    "views": ["front", "side", "back", "iso"],
+    "geometryComparison": "renders/glb-vs-obj-geometry.json",
+    "materialComparison": "renders/glb-vs-obj-material.json",
+    "acceptance": {
+      "geometryDiffRatioMax": 0.001,
+      "materialDiffRatioMax": 0.25,
+      "notes": "Geometry comparison should be zero. Material comparison is allowed to drift because GLB PBR and OBJ/MTL material paths differ."
+    }
+  },
+  "styleContract": {
+    "target": "MagicaVoxel-like blocky voxel character",
+    "disallow": [
+      "smooth sculpting",
+      "realistic skin pores",
+      "PS1-style triangulated low poly",
+      "painterly details"
+    ],
+    "requiredParts": [
+      "large square head",
+      "oversized pointed ears",
+      "club",
+      "dark leather vest",
+      "ragged shorts",
+      "tan wraps",
+      "blocky bare feet"
+    ]
+  }
+}

@@ -1,0 +1,206 @@
+{
+  "subject": "club-goblin",
+  "sourceReference": "../../references/goblin-turnaround.png",
+  "format": [
+    "obj",
+    "mtl",
+    "glb"
+  ],
+  "style": "low-poly blockout",
+  "sourceMethod": "manual procedural model based on generated three-view image",
+  "generatedAt": "2026-05-20T11:45:56.348Z",
+  "parts": [
+    {
+      "name": "head",
+      "material": "skin"
+    },
+    {
+      "name": "brow",
+      "material": "skin"
+    },
+    {
+      "name": "torso",
+      "material": "skin"
+    },
+    {
+      "name": "belly",
+      "material": "skin"
+    },
+    {
+      "name": "neck",
+      "material": "skin"
+    },
+    {
+      "name": "left_ear_outer",
+      "material": "skin"
+    },
+    {
+      "name": "right_ear_outer",
+      "material": "skin"
+    },
+    {
+      "name": "left_ear_inner",
+      "material": "earInner"
+    },
+    {
+      "name": "right_ear_inner",
+      "material": "earInner"
+    },
+    {
+      "name": "hooked_nose",
+      "material": "skin"
+    },
+    {
+      "name": "left_eye",
+      "material": "eye"
+    },
+    {
+      "name": "right_eye",
+      "material": "eye"
+    },
+    {
+      "name": "left_tusk",
+      "material": "tooth"
+    },
+    {
+      "name": "right_tusk",
+      "material": "tooth"
+    },
+    {
+      "name": "left_vest_panel",
+      "material": "leather"
+    },
+    {
+      "name": "right_vest_panel",
+      "material": "leather"
+    },
+    {
+      "name": "waist_rope",
+      "material": "wrap"
+    },
+    {
+      "name": "ragged_skirt_0",
+      "material": "skirt"
+    },
+    {
+      "name": "ragged_skirt_1",
+      "material": "skirt"
+    },
+    {
+      "name": "ragged_skirt_2",
+      "material": "skirt"
+    },
+    {
+      "name": "ragged_skirt_3",
+      "material": "skirt"
+    },
+    {
+      "name": "ragged_skirt_4",
+      "material": "skirt"
+    },
+    {
+      "name": "ragged_skirt_5",
+      "material": "skirt"
+    },
+    {
+      "name": "ragged_skirt_6",
+      "material": "skirt"
+    },
+    {
+      "name": "left_upper_arm",
+      "material": "skin"
+    },
+    {
+      "name": "left_forearm",
+      "material": "skin"
+    },
+    {
+      "name": "left_hand",
+      "material": "skin"
+    },
+    {
+      "name": "left_wrist_wrap",
+      "material": "wrap"
+    },
+    {
+      "name": "right_upper_arm",
+      "material": "skin"
+    },
+    {
+      "name": "right_forearm",
+      "material": "skin"
+    },
+    {
+      "name": "right_hand",
+      "material": "skin"
+    },
+    {
+      "name": "right_wrist_wrap",
+      "material": "wrap"
+    },
+    {
+      "name": "left_thigh",
+      "material": "skin"
+    },
+    {
+      "name": "left_shin",
+      "material": "skin"
+    },
+    {
+      "name": "left_foot",
+      "material": "skin"
+    },
+    {
+      "name": "left_ankle_wrap",
+      "material": "wrap"
+    },
+    {
+      "name": "right_thigh",
+      "material": "skin"
+    },
+    {
+      "name": "right_shin",
+      "material": "skin"
+    },
+    {
+      "name": "right_foot",
+      "material": "skin"
+    },
+    {
+      "name": "right_ankle_wrap",
+      "material": "wrap"
+    },
+    {
+      "name": "club_handle",
+      "material": "wood"
+    },
+    {
+      "name": "club_head",
+      "material": "wood"
+    },
+    {
+      "name": "club_bark_spike_0",
+      "material": "wood"
+    },
+    {
+      "name": "club_bark_spike_1",
+      "material": "wood"
+    },
+    {
+      "name": "club_bark_spike_2",
+      "material": "wood"
+    },
+    {
+      "name": "club_bark_spike_3",
+      "material": "wood"
+    },
+    {
+      "name": "club_bark_spike_4",
+      "material": "wood"
+    },
+    {
+      "name": "club_bark_spike_5",
+      "material": "wood"
+    }
+  ]
+}

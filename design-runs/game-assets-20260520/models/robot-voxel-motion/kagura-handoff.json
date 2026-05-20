@@ -1,0 +1,149 @@
+{
+  "version": 1,
+  "engine": "mizchi/kagura",
+  "asset": {
+    "id": "robot-voxel-motion",
+    "kind": "voxel-humanoid-character",
+    "sourceReference": "https://note.com/npaka/n/nde5589d13536",
+    "primaryModel": "robot-voxel-motion.glb",
+    "debugModel": "robot-voxel-motion.obj",
+    "debugMaterial": "robot-voxel-motion.mtl",
+    "unit": "voxel-grid",
+    "voxelUnit": 0.12,
+    "originPolicy": "feet-near-y0-center-xz",
+    "coordinateNotes": "Y-up. Front direction is +Z in the generated model.",
+    "intendedUse": [
+      "animated voxel humanoid runtime import",
+      "fixed-camera motion visual smoke test",
+      "future kagura glTF animation pipeline",
+      "VRM/VRMA bridge trial"
+    ],
+    "derivedModels": [
+      {
+        "id": "robot-voxel-motion-vrma-bridge",
+        "model": "derived/robot-voxel-motion.vrma-bridge.glb",
+        "sourceMotion": "../../motions/robot-vrma-standin.motion.json",
+        "extractedMotion": "derived/robot-voxel-motion.vrma-bridge.extracted.motion.json",
+        "extractedMotionVerification": "derived/robot-voxel-motion.vrma-bridge.extracted.motion.verify.json",
+        "roundtripModel": "derived/robot-voxel-motion.extracted-roundtrip.glb",
+        "roundtripVerification": "derived/robot-voxel-motion.extracted-roundtrip.verify.json",
+        "roundtripRenderVerification": "derived/robot-voxel-motion.extracted-roundtrip.render-verify.json",
+        "vrmaFixture": "derived/robot-voxel-motion.vrma-bridge.fixture.vrma",
+        "vrmaFixtureExtractedMotion": "derived/robot-voxel-motion.fixture-vrma.extracted.motion.json",
+        "vrmaFixtureExtractedMotionVerification": "derived/robot-voxel-motion.fixture-vrma.extracted.motion.verify.json",
+        "vrmaFixtureRoundtripModel": "derived/robot-voxel-motion.fixture-vrma.roundtrip.glb",
+        "vrmaFixtureRoundtripVerification": "derived/robot-voxel-motion.fixture-vrma.roundtrip.verify.json",
+        "vrmaFixtureRoundtripRenderVerification": "derived/robot-voxel-motion.fixture-vrma.roundtrip.render-verify.json",
+        "clips": [
+          "vrma_alert_wave",
+          "mixamo_walk_standin"
+        ],
+        "structureVerification": "derived/robot-voxel-motion.vrma-bridge.verify.json",
+        "renderVerification": "derived/robot-voxel-motion.vrma-bridge.render-verify.json",
+        "renderChecks": {
+          "views": [
+            "front",
+            "side",
+            "iso"
+          ],
+          "sampledClips": [
+            "vrma_alert_wave",
+            "mixamo_walk_standin"
+          ]
+        },
+        "notes": "Stand-in for real VRMA and Mixamo imports. The model proves motion IR retargeting and GLB animation writing before adding parser dependencies."
+      }
+    ]
+  },
+  "motionContract": {
+    "primaryRuntimeFormat": "glb",
+    "futureRuntimeFormat": "vrm-with-vrma",
+    "motionIr": {
+      "format": "vlmkit-humanoid-motion-ir",
+      "version": 1,
+      "source": "../../motions/robot-vrma-standin.motion.json",
+      "retargetPolicy": "source skeleton names map to generated glTF node names before animation clips are written"
+    },
+    "clips": [
+      {
+        "id": "idle_bob",
+        "durationSeconds": 2,
+        "type": "loop",
+        "purpose": "pivot stability and baseline readability"
+      },
+      {
+        "id": "walk_cycle",
+        "durationSeconds": 1,
+        "type": "loop",
+        "purpose": "in-place humanoid gait smoke test"
+      },
+      {
+        "id": "wave",
+        "durationSeconds": 1.5,
+        "type": "loop",
+        "purpose": "upper-body articulation smoke test"
+      }
+    ],
+    "requiredNodes": [
+      "robot_root",
+      "pelvis",
+      "torso",
+      "head",
+      "left_upper_arm",
+      "left_forearm",
+      "left_hand",
+      "right_upper_arm",
+      "right_forearm",
+      "right_hand",
+      "left_upper_leg",
+      "left_lower_leg",
+      "left_foot",
+      "right_upper_leg",
+      "right_lower_leg",
+      "right_foot"
+    ],
+    "metadataPolicy": {
+      "reservedExtras": [
+        "pivot"
+      ],
+      "notes": "Use pivotLabel for human-readable pivot names. The local GLTFLoader treats extras.pivot as numeric loader-owned data."
+    }
+  },
+  "renderChecks": {
+    "renderer": "three-playwright-animation",
+    "views": [
+      "front",
+      "side",
+      "iso"
+    ],
+    "sampledClips": [
+      "walk_cycle",
+      "wave"
+    ],
+    "structureVerification": "robot-voxel-motion.verify.json",
+    "renderVerification": "robot-voxel-motion.render-verify.json",
+    "acceptance": {
+      "minForegroundRatio": 0.03,
+      "requiresFiniteAnimatedBounds": true,
+      "requiresLoopClosure": true
+    }
+  },
+  "styleContract": {
+    "target": "motion-ready blocky voxel robot",
+    "disallow": [
+      "smooth sculpting",
+      "unlabeled monolithic mesh",
+      "decorative-only robot illustration",
+      "static-only bind-pose export"
+    ],
+    "requiredParts": [
+      "large square head",
+      "readable face plate",
+      "separate torso and pelvis",
+      "separate upper and lower arms",
+      "separate upper and lower legs",
+      "wide feet",
+      "named animation clips"
+    ]
+  }
+}

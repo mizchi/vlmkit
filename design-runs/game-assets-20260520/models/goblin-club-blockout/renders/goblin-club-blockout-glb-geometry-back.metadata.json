@@ -1,0 +1,236 @@
+{
+  "input": "design-runs/game-assets-20260520/models/goblin-club-blockout/goblin-club-blockout.glb",
+  "format": "glb",
+  "view": "back",
+  "mode": "geometry",
+  "width": 1024,
+  "height": 1024,
+  "background": "#e8e8e4",
+  "renderer": "three-playwright",
+  "state": {
+    "status": "ready",
+    "format": "glb",
+    "view": "back",
+    "mode": "geometry",
+    "sourceBounds": {
+      "min": [
+        -1.212,
+        0.05,
+        -0.324
+      ],
+      "max": [
+        0.984,
+        2.98,
+        0.723
+      ]
+    },
+    "normalizedBounds": {
+      "min": [
+        -0.941,
+        -1.471,
+        -0.482
+      ],
+      "max": [
+        0.97,
+        1.079,
+        0.43
+      ]
+    },
+    "meshCount": 48,
+    "meshes": [
+      {
+        "name": "club-goblin-blockout_1",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_2",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_3",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_4",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_5",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_6",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_7",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_8",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_9",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_10",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_11",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_12",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_13",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_14",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_15",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_16",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_17",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_18",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_19",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_20",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_21",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_22",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_23",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_24",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_25",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_26",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_27",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_28",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_29",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_30",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_31",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_32",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_33",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_34",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_35",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_36",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_37",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_38",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_39",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_40",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_41",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_42",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_43",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_44",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_45",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_46",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_47",
+        "material": ""
+      },
+      {
+        "name": "club-goblin-blockout_48",
+        "material": ""
+      }
+    ]
+  },
+  "output": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/goblin-club-blockout-glb-geometry-back.png"
+}

@@ -1,0 +1,21 @@
+{
+  "ok": true,
+  "motion": "design-runs/game-assets-20260520/motions/robot-vrma-standin.motion.json",
+  "model": "design-runs/game-assets-20260520/models/robot-voxel-motion/robot-voxel-motion.glb",
+  "clipSummaries": [
+    {
+      "id": "vrma_alert_wave",
+      "durationSeconds": 1.6,
+      "loop": true,
+      "trackCount": 6
+    },
+    {
+      "id": "mixamo_walk_standin",
+      "durationSeconds": 1,
+      "loop": true,
+      "trackCount": 7
+    }
+  ],
+  "failures": [],
+  "warnings": []
+}

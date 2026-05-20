@@ -1,0 +1,90 @@
+{
+  "model": "gpt-image-2",
+  "subject": {
+    "id": "moss-skimmer",
+    "name": "Moss Skimmer",
+    "description": "A small stylized hover skiff for an exploration game: rounded hull, mossy green panels, brass trim, two side fins, compact rear thruster, readable front/back orientation."
+  },
+  "stages": [
+    {
+      "id": "concept-single",
+      "title": "Single concept image",
+      "size": "1024x1024",
+      "quality": "medium",
+      "prompt": [
+        "Draw one production-ready game asset concept image for the Moss Skimmer.",
+        "Subject: a small stylized hover skiff for an exploration game; rounded hull, mossy green panels, brass trim, two side fins, compact rear thruster, readable front/back orientation.",
+        "Use a clean three-quarter view, front-left angle, neutral studio lighting, readable silhouette, opaque warm gray background.",
+        "Keep the object centered with enough margin for cropping. Make the asset feel usable in a browser canvas game.",
+        "Avoid text, logos, UI labels, background scenery, dramatic poster lighting, motion blur, and characters."
+      ],
+      "checks": [
+        "thumbnail silhouette readable",
+        "single coherent object",
+        "front/back/top cues visible",
+        "no unwanted text",
+        "style usable for game production"
+      ]
+    },
+    {
+      "id": "turnaround-3view",
+      "title": "Front side back turnaround",
+      "size": "1536x1024",
+      "quality": "medium",
+      "prompt": [
+        "Draw a three-view orthographic turnaround sheet for the same Moss Skimmer hover skiff.",
+        "Use exactly three separated views in one row: front view, side view, back view.",
+        "Keep the same rounded hull, mossy green panels, brass trim, two side fins, and compact rear thruster across all views.",
+        "Use flat neutral lighting, identical scale, clean outlines, opaque light gray background, no perspective camera, no shadows crossing panel boundaries.",
+        "Avoid text, labels, logos, characters, decorative scenery, and extra views."
+      ],
+      "checks": [
+        "front side back are the same object",
+        "view scale is consistent",
+        "orthographic enough for modeling",
+        "asymmetries preserved",
+        "no background interference"
+      ]
+    },
+    {
+      "id": "sprite-atlas-2d",
+      "title": "2D sprite atlas",
+      "size": "1536x1024",
+      "quality": "medium",
+      "prompt": [
+        "Draw a 2D sprite atlas sheet for the same Moss Skimmer hover skiff.",
+        "Create a clean 4 columns by 3 rows grid of 12 sprites, equal cell size, consistent anchor point, consistent scale.",
+        "Sprites should show game-ready top-down or slight isometric variants: idle, hover, bank left, bank right, accelerate, brake, damage, repair glow, turn left, turn right, boost, destroyed shell.",
+        "Use a perfectly flat chroma-key green background (#00ff00), clear gutters between cells, no shadows crossing cells, no labels, no text, no UI, no decorative background.",
+        "Every sprite must be the same object with the same mossy green panels, brass trim, side fins, and rear thruster."
+      ],
+      "checks": [
+        "regular 4x3 grid",
+        "flat chroma-key background",
+        "consistent scale and anchor",
+        "variants stay the same object",
+        "no gutter bleed or labels"
+      ]
+    },
+    {
+      "id": "model-reference-3d",
+      "title": "3D model reference sheet",
+      "size": "1536x1024",
+      "quality": "high",
+      "prompt": [
+        "Draw a text-free 3D modeling reference sheet for the same Moss Skimmer hover skiff.",
+        "Show four clean orthographic views: front, side, top, and back. Also show one small shaded three-quarter preview in a corner.",
+        "Keep geometry simple enough to model: rounded main hull, two side fins, brass trim strips, compact rear thruster, mossy green material blocks.",
+        "Use a plain opaque light gray background, consistent scale across views, flat lighting for the orthographic views, no perspective distortion in the four reference views.",
+        "Avoid text, labels, logos, characters, scenery, dramatic lighting, exploded diagrams, and extra unrelated objects."
+      ],
+      "checks": [
+        "front side top back are consistent",
+        "simple geometry is visible",
+        "material regions are readable",
+        "matches earlier Moss Skimmer identity",
+        "useful as image-to-3D or Blender reference"
+      ]
+    }
+  ]
+}

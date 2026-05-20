@@ -1,0 +1,232 @@
+{
+  "input": "design-runs/game-assets-20260520/models/robot-voxel-motion/robot-voxel-motion.glb",
+  "format": "glb",
+  "view": "iso",
+  "mode": "material",
+  "width": 1024,
+  "height": 1024,
+  "background": "#e8e8e4",
+  "renderer": "three-playwright",
+  "state": {
+    "status": "ready",
+    "format": "glb",
+    "view": "iso",
+    "mode": "material",
+    "sourceBounds": {
+      "min": [
+        -0.735,
+        0.055,
+        -0.295
+      ],
+      "max": [
+        0.735,
+        3.005,
+        0.535
+      ]
+    },
+    "normalizedBounds": {
+      "min": [
+        -0.635,
+        -1.483,
+        -0.375
+      ],
+      "max": [
+        0.635,
+        1.067,
+        0.343
+      ]
+    },
+    "meshCount": 47,
+    "meshes": [
+      {
+        "name": "pelvis_1",
+        "material": "robot_graphite_frame"
+      },
+      {
+        "name": "pelvis_2",
+        "material": "robot_blue_panel"
+      },
+      {
+        "name": "pelvis_3",
+        "material": "robot_red_accent"
+      },
+      {
+        "name": "pelvis_4",
+        "material": "robot_violet_joint"
+      },
+      {
+        "name": "torso_1",
+        "material": "robot_graphite_frame"
+      },
+      {
+        "name": "torso_2",
+        "material": "robot_blue_panel"
+      },
+      {
+        "name": "torso_3",
+        "material": "robot_light_trim"
+      },
+      {
+        "name": "torso_4",
+        "material": "robot_red_accent"
+      },
+      {
+        "name": "torso_5",
+        "material": "robot_violet_joint"
+      },
+      {
+        "name": "head_1",
+        "material": "robot_graphite_frame"
+      },
+      {
+        "name": "head_2",
+        "material": "robot_black_shadow"
+      },
+      {
+        "name": "head_3",
+        "material": "robot_cyan_face"
+      },
+      {
+        "name": "head_4",
+        "material": "robot_amber_eye"
+      },
+      {
+        "name": "head_5",
+        "material": "robot_light_trim"
+      },
+      {
+        "name": "head_6",
+        "material": "robot_red_accent"
+      },
+      {
+        "name": "upper_arm",
+        "material": "robot_violet_joint"
+      },
+      {
+        "name": "upper_arm_1",
+        "material": "robot_graphite_frame"
+      },
+      {
+        "name": "upper_arm_2",
+        "material": "robot_red_accent"
+      },
+      {
+        "name": "forearm",
+        "material": "robot_graphite_frame"
+      },
+      {
+        "name": "forearm_1",
+        "material": "robot_blue_panel"
+      },
+      {
+        "name": "forearm_2",
+        "material": "robot_violet_joint"
+      },
+      {
+        "name": "hand",
+        "material": "robot_light_trim"
+      },
+      {
+        "name": "hand_1",
+        "material": "robot_red_accent"
+      },
+      {
+        "name": "upper_arm",
+        "material": "robot_violet_joint"
+      },
+      {
+        "name": "upper_arm_1",
+        "material": "robot_graphite_frame"
+      },
+      {
+        "name": "upper_arm_2",
+        "material": "robot_red_accent"
+      },
+      {
+        "name": "forearm",
+        "material": "robot_graphite_frame"
+      },
+      {
+        "name": "forearm_1",
+        "material": "robot_blue_panel"
+      },
+      {
+        "name": "forearm_2",
+        "material": "robot_violet_joint"
+      },
+      {
+        "name": "hand",
+        "material": "robot_light_trim"
+      },
+      {
+        "name": "hand_1",
+        "material": "robot_red_accent"
+      },
+      {
+        "name": "upper_leg",
+        "material": "robot_violet_joint"
+      },
+      {
+        "name": "upper_leg_1",
+        "material": "robot_graphite_frame"
+      },
+      {
+        "name": "upper_leg_2",
+        "material": "robot_blue_panel"
+      },
+      {
+        "name": "lower_leg",
+        "material": "robot_graphite_frame"
+      },
+      {
+        "name": "lower_leg_1",
+        "material": "robot_violet_joint"
+      },
+      {
+        "name": "lower_leg_2",
+        "material": "robot_red_accent"
+      },
+      {
+        "name": "foot",
+        "material": "robot_light_trim"
+      },
+      {
+        "name": "foot_1",
+        "material": "robot_black_shadow"
+      },
+      {
+        "name": "upper_leg",
+        "material": "robot_violet_joint"
+      },
+      {
+        "name": "upper_leg_1",
+        "material": "robot_graphite_frame"
+      },
+      {
+        "name": "upper_leg_2",
+        "material": "robot_blue_panel"
+      },
+      {
+        "name": "lower_leg",
+        "material": "robot_graphite_frame"
+      },
+      {
+        "name": "lower_leg_1",
+        "material": "robot_violet_joint"
+      },
+      {
+        "name": "lower_leg_2",
+        "material": "robot_red_accent"
+      },
+      {
+        "name": "foot",
+        "material": "robot_light_trim"
+      },
+      {
+        "name": "foot_1",
+        "material": "robot_black_shadow"
+      }
+    ]
+  },
+  "output": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-glb-material-iso.png"
+}

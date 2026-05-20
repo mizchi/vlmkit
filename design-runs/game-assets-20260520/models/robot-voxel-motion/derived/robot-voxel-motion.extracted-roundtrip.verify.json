@@ -1,0 +1,52 @@
+{
+  "ok": true,
+  "input": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/robot-voxel-motion.extracted-roundtrip.glb",
+  "contract": null,
+  "motionIr": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/robot-voxel-motion.vrma-bridge.extracted.motion.json",
+  "glb": {
+    "version": 2,
+    "byteLength": 558000,
+    "nodeCount": 16,
+    "meshCount": 9,
+    "materialCount": 8,
+    "animationCount": 2
+  },
+  "requiredNodes": [
+    "pelvis",
+    "torso",
+    "head",
+    "right_upper_arm",
+    "right_forearm",
+    "left_upper_arm",
+    "left_upper_leg",
+    "right_upper_leg",
+    "left_lower_leg",
+    "right_lower_leg"
+  ],
+  "missingNodes": [],
+  "requiredClips": [
+    "vrma_alert_wave",
+    "mixamo_walk_standin"
+  ],
+  "missingClips": [],
+  "loopClips": [
+    "vrma_alert_wave",
+    "mixamo_walk_standin"
+  ],
+  "duplicateTargets": [],
+  "loopFailures": [],
+  "clipSummaries": [
+    {
+      "name": "vrma_alert_wave",
+      "durationSeconds": 1.6,
+      "channels": 6,
+      "samplers": 6
+    },
+    {
+      "name": "mixamo_walk_standin",
+      "durationSeconds": 1,
+      "channels": 7,
+      "samplers": 7
+    }
+  ]
+}

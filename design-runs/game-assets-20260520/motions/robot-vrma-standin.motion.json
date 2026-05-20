@@ -1,0 +1,184 @@
+{
+  "version": 1,
+  "id": "robot-vrma-standin",
+  "source": {
+    "kind": "vrma-standin",
+    "note": "Manual normalized motion IR that mirrors the VRMA replay step before wiring a real VRMA parser."
+  },
+  "retarget": {
+    "hips": "pelvis",
+    "spine": "torso",
+    "head": "head",
+    "leftUpperArm": "left_upper_arm",
+    "leftLowerArm": "left_forearm",
+    "leftHand": "left_hand",
+    "rightUpperArm": "right_upper_arm",
+    "rightLowerArm": "right_forearm",
+    "rightHand": "right_hand",
+    "leftUpperLeg": "left_upper_leg",
+    "leftLowerLeg": "left_lower_leg",
+    "leftFoot": "left_foot",
+    "rightUpperLeg": "right_upper_leg",
+    "rightLowerLeg": "right_lower_leg",
+    "rightFoot": "right_foot"
+  },
+  "clips": [
+    {
+      "id": "vrma_alert_wave",
+      "durationSeconds": 1.6,
+      "loop": true,
+      "tracks": [
+        {
+          "target": "hips",
+          "path": "translation",
+          "keyframes": [
+            { "time": 0.0, "translation": [0, 1.25, 0] },
+            { "time": 0.4, "translation": [0, 1.285, 0] },
+            { "time": 0.8, "translation": [0, 1.265, 0] },
+            { "time": 1.2, "translation": [0, 1.285, 0] },
+            { "time": 1.6, "translation": [0, 1.25, 0] }
+          ]
+        },
+        {
+          "target": "spine",
+          "path": "rotation",
+          "keyframes": [
+            { "time": 0.0, "euler": [0, 0, 0.04] },
+            { "time": 0.4, "euler": [0.04, 0, -0.02] },
+            { "time": 0.8, "euler": [0.02, 0, -0.05] },
+            { "time": 1.2, "euler": [0.04, 0, -0.02] },
+            { "time": 1.6, "euler": [0, 0, 0.04] }
+          ]
+        },
+        {
+          "target": "head",
+          "path": "rotation",
+          "keyframes": [
+            { "time": 0.0, "euler": [0, 0, 0] },
+            { "time": 0.4, "euler": [0, 0, -0.1] },
+            { "time": 0.8, "euler": [0, 0, -0.08] },
+            { "time": 1.2, "euler": [0, 0, -0.1] },
+            { "time": 1.6, "euler": [0, 0, 0] }
+          ]
+        },
+        {
+          "target": "rightUpperArm",
+          "path": "rotation",
+          "keyframes": [
+            { "time": 0.0, "euler": [-0.15, 0, -0.2] },
+            { "time": 0.4, "euler": [-0.35, 0, -1.15] },
+            { "time": 0.8, "euler": [-0.25, 0, -1.35] },
+            { "time": 1.2, "euler": [-0.35, 0, -1.15] },
+            { "time": 1.6, "euler": [-0.15, 0, -0.2] }
+          ]
+        },
+        {
+          "target": "rightLowerArm",
+          "path": "rotation",
+          "keyframes": [
+            { "time": 0.0, "euler": [0, 0, 0] },
+            { "time": 0.4, "euler": [0, 0, -0.65] },
+            { "time": 0.8, "euler": [0, 0, -0.25] },
+            { "time": 1.2, "euler": [0, 0, -0.65] },
+            { "time": 1.6, "euler": [0, 0, 0] }
+          ]
+        },
+        {
+          "target": "leftUpperArm",
+          "path": "rotation",
+          "keyframes": [
+            { "time": 0.0, "euler": [0.12, 0, 0.08] },
+            { "time": 0.4, "euler": [0.08, 0, 0.03] },
+            { "time": 0.8, "euler": [0.12, 0, -0.02] },
+            { "time": 1.2, "euler": [0.08, 0, 0.03] },
+            { "time": 1.6, "euler": [0.12, 0, 0.08] }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mixamo_walk_standin",
+      "durationSeconds": 1.0,
+      "loop": true,
+      "tracks": [
+        {
+          "target": "hips",
+          "path": "translation",
+          "keyframes": [
+            { "time": 0.0, "translation": [0, 1.25, 0] },
+            { "time": 0.25, "translation": [0, 1.295, 0] },
+            { "time": 0.5, "translation": [0, 1.25, 0] },
+            { "time": 0.75, "translation": [0, 1.295, 0] },
+            { "time": 1.0, "translation": [0, 1.25, 0] }
+          ]
+        },
+        {
+          "target": "leftUpperLeg",
+          "path": "rotation",
+          "keyframes": [
+            { "time": 0.0, "euler": [-0.55, 0, 0] },
+            { "time": 0.25, "euler": [0, 0, 0] },
+            { "time": 0.5, "euler": [0.55, 0, 0] },
+            { "time": 0.75, "euler": [0, 0, 0] },
+            { "time": 1.0, "euler": [-0.55, 0, 0] }
+          ]
+        },
+        {
+          "target": "rightUpperLeg",
+          "path": "rotation",
+          "keyframes": [
+            { "time": 0.0, "euler": [0.55, 0, 0] },
+            { "time": 0.25, "euler": [0, 0, 0] },
+            { "time": 0.5, "euler": [-0.55, 0, 0] },
+            { "time": 0.75, "euler": [0, 0, 0] },
+            { "time": 1.0, "euler": [0.55, 0, 0] }
+          ]
+        },
+        {
+          "target": "leftLowerLeg",
+          "path": "rotation",
+          "keyframes": [
+            { "time": 0.0, "euler": [0.2, 0, 0] },
+            { "time": 0.25, "euler": [0.55, 0, 0] },
+            { "time": 0.5, "euler": [0.15, 0, 0] },
+            { "time": 0.75, "euler": [0.25, 0, 0] },
+            { "time": 1.0, "euler": [0.2, 0, 0] }
+          ]
+        },
+        {
+          "target": "rightLowerLeg",
+          "path": "rotation",
+          "keyframes": [
+            { "time": 0.0, "euler": [0.15, 0, 0] },
+            { "time": 0.25, "euler": [0.25, 0, 0] },
+            { "time": 0.5, "euler": [0.2, 0, 0] },
+            { "time": 0.75, "euler": [0.55, 0, 0] },
+            { "time": 1.0, "euler": [0.15, 0, 0] }
+          ]
+        },
+        {
+          "target": "leftUpperArm",
+          "path": "rotation",
+          "keyframes": [
+            { "time": 0.0, "euler": [0.42, 0, 0] },
+            { "time": 0.25, "euler": [0, 0, 0] },
+            { "time": 0.5, "euler": [-0.42, 0, 0] },
+            { "time": 0.75, "euler": [0, 0, 0] },
+            { "time": 1.0, "euler": [0.42, 0, 0] }
+          ]
+        },
+        {
+          "target": "rightUpperArm",
+          "path": "rotation",
+          "keyframes": [
+            { "time": 0.0, "euler": [-0.42, 0, 0] },
+            { "time": 0.25, "euler": [0, 0, 0] },
+            { "time": 0.5, "euler": [0.42, 0, 0] },
+            { "time": 0.75, "euler": [0, 0, 0] },
+            { "time": 1.0, "euler": [-0.42, 0, 0] }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -989,6 +989,125 @@ band at viewports ≥ 1024.
 - [ ] `onlyOnFailure` pattern
 - [ ] `toHaveScreenshot()` integration
 
+### Game Asset / Motion Dogfood (from 2026-05-20)
+
+Goal: make the image -> asset contract -> model -> motion -> render gate useful
+enough for game asset production, then decide which parts should become first
+class vlmkit APIs.
+
+Autonomy principle:
+
+- Prefer deterministic probes, renderer metadata, and model/IR contracts over
+  human visual checks.
+- Human review should calibrate thresholds and label a small gold set, not sit
+  in the main loop.
+- Every quality concern should first become a machine-readable metric with
+  `pass` / `warn` / `fail`, examples, and a regression fixture.
+- If a check still needs a person, record the exact missing signal and add a
+  task to automate it.
+
+Current smoke status:
+
+- [x] `gpt-image-2` game asset run scaffold:
+  `design-runs/game-assets-20260520/`
+- [x] Goblin one-shot / turnaround / voxel reference dogfood recorded
+- [x] Procedural GLB/OBJ blockouts for low-poly and voxel goblin
+- [x] Fixed-camera GLB/OBJ render and compare tools
+- [x] Voxel robot with named joints and animation clips
+- [x] Motion IR bridge:
+  external-ish humanoid motion -> normalized IR -> retargeted GLB
+- [x] Local VRMA-style fixture using
+  `VRMC_vrm_animation.humanoid.humanBones`
+- [x] Real `.vrma` smoke with `tk256ailab/vrm-viewer` `LookAround.vrma`
+  downloaded into ignored `external/`
+- [x] `extract-gltf-motion-ir --target-space humanoid` handles real VRMA,
+  unnamed clips, and target-skeleton downgrade warnings
+- [x] `verify-gltf-motion --motion-ir` uses IR clip/loop metadata so
+  one-shot motions do not fail loop checks
+- [x] Batch external VRMA smoke command for `LookAround`, `Goodbye`, and `Jump`
+- [x] Initial automated motion quality report: frame bbox stability, screen
+  coverage, ground-y, retained-channel ratio, and skipped-channel regions
+- [x] Root translation normalization for external VRMA smoke:
+  `keep|relative|horizontal-only|zero|scale-to-model`, with batch smoke
+  defaulting to `relative`
+- [x] Simplified-rig retarget policy for voxel robot smoke: skipped fingers,
+  toes, chest, neck, and shoulders are tolerated while unexpected core-bone
+  skips remain surfaced
+- [x] Cheap multi-VLM review scaffold with dry-run contact sheet + strict JSON
+  prompt for UI-TARS / Nova Lite
+
+Stepwise cleanup:
+
+- [x] **G1. Batch external VRMA smoke.** Add a command that runs all or a
+  selected list of `.vrma` samples through fetch -> extract -> verify IR ->
+  apply -> verify GLB -> render -> verify renders. Report per sample:
+  retained track count, skipped channel count, render status, duration,
+  loop/one-shot, and failure reason.
+- [ ] **G2. Automated motion quality gate.** Replace ad hoc human visual
+  review with metrics computed from the rendered frames, animation samples,
+  and model bounds. Start with:
+  - frame nonblank / finite bounds / foreground ratio
+  - on-screen coverage and camera-fit margin
+  - per-frame bbox jump and root drift
+  - foot/ground penetration and floating distance
+  - limb extent outliers compared with bind-pose bounds
+  - retained-vs-skipped channel ratio by skeleton region
+  - one-shot/loop metadata consistency
+  Emit a compact report with `pass` / `warn` / `fail` and only require human
+  review for threshold calibration. Initial implementation exists in
+  `verify-motion-quality.mjs`; it now uses normalized `groundDeltaY` when
+  render metadata provides bind bounds. Remaining work is foot contact, limb
+  extent, and threshold calibration against a small gold set.
+- [x] **G3. Cheap multi-VLM review gate.** Add optional model reviewers as a
+  second opinion on top of deterministic metrics. Default candidates:
+  `bytedance/ui-tars-1.5-7b` for fast UI/game-image review via OpenRouter and
+  `amazon/nova-lite-v1` / `amazon.nova-lite-v1:0` as the stable cheap Nova
+  path through OpenRouter or Bedrock. The reviewer receives a contact sheet,
+  render metadata, Motion IR warnings, and asset contract excerpts, then emits
+  strict JSON: `verdict`, `defects[]`, `confidence`, `model`, `costUsd`,
+  `latencyMs`, and `evidenceFrameIds[]`. Consensus policy:
+  - deterministic `fail` always fails
+  - deterministic `pass` plus VLM `pass` passes
+  - deterministic `pass` plus VLM `warn/fail` becomes `warn`, not hard fail
+  - model disagreement triggers a second cheap reviewer before escalation
+  Keep VLM review disabled when credentials are absent, and never require a
+  human unless both deterministic metrics and reviewer consensus are
+  inconclusive. Initial implementation exists as a dry-run-safe OpenRouter
+  contact-sheet reviewer; Bedrock-native Nova can be added later if needed.
+- [ ] **G4. Retarget downgrade policy.** Formalize per-target skeleton
+  profiles. For `robot-voxel`, define required bones, optional bones,
+  ignored fine-grained bones, fallback mappings (`chest`/`neck`/shoulders),
+  and whether skipped fingers/toes are acceptable. The policy must produce a
+  deterministic score so agents can decide whether to continue, retry, or fail.
+  First pass exists as `--retarget-profile simple-rig`: fingers, toes, chest,
+  neck, and shoulders are tolerated; unexpected skipped channels still warn.
+  Remaining work is moving the policy from hard-coded checker rules into a
+  reusable named profile with weighted region scoring.
+- [ ] **G5. Pose and scale normalization.** Measure source root height,
+  root motion, and bind/rest orientation. Add options for root translation
+  modes: keep, zero, horizontal-only, scale-to-model. Track T-pose/A-pose
+  mismatch as a warning. Prefer automatic normalization with a written audit
+  trail over asking for manual pose judgment. First pass exists in
+  `apply-motion-ir.mjs`; external VRMA smoke defaults to relative root motion.
+  Remaining work is source/target height scaling policy and pose mismatch
+  scoring.
+- [ ] **G6. VRM + VRMA real playback check.** Use a real VRM model with a
+  matching VRMA file to verify that our extractor agrees with an expected
+  runtime playback path before retargeting onto simplified generated assets.
+  Compare sampled transforms and render metadata automatically; keep manual
+  playback viewing as a debugging fallback only.
+- [ ] **G7. Kagura integration smoke.** Define the `mizchi/kagura` handoff:
+  GLB path, animation clip ids, scale/origin convention, fixed camera
+  snapshots, and a minimal runtime load/play smoke test. The gate should be
+  CLI-runnable in CI and return structured JSON.
+- [ ] **G8. Mixamo / FBX adapter decision.** Decide whether to convert FBX
+  through an external tool or parse a converted GLB. The output contract
+  should still be the same Motion IR.
+- [ ] **G9. Promote stable pieces out of `design-runs`.** Once G1-G5 settle,
+  move reusable asset contract, Motion IR schema, retarget verifier, and
+  render gates into package code with tests. Keep generated assets as fixtures
+  only when they are small and license-safe.
+
 ### Spec coverage
 - [ ] Heading hierarchy validation
 - [ ] ARIA relationship validation

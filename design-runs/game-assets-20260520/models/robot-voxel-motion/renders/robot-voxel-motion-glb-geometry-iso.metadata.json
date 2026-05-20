@@ -1,0 +1,232 @@
+{
+  "input": "design-runs/game-assets-20260520/models/robot-voxel-motion/robot-voxel-motion.glb",
+  "format": "glb",
+  "view": "iso",
+  "mode": "geometry",
+  "width": 1024,
+  "height": 1024,
+  "background": "#e8e8e4",
+  "renderer": "three-playwright-model",
+  "state": {
+    "status": "ready",
+    "format": "glb",
+    "view": "iso",
+    "mode": "geometry",
+    "sourceBounds": {
+      "min": [
+        -0.735,
+        0.055,
+        -0.295
+      ],
+      "max": [
+        0.735,
+        3.005,
+        0.535
+      ]
+    },
+    "normalizedBounds": {
+      "min": [
+        -0.635,
+        -1.483,
+        -0.375
+      ],
+      "max": [
+        0.635,
+        1.067,
+        0.343
+      ]
+    },
+    "meshCount": 47,
+    "meshes": [
+      {
+        "name": "pelvis_1",
+        "material": ""
+      },
+      {
+        "name": "pelvis_2",
+        "material": ""
+      },
+      {
+        "name": "pelvis_3",
+        "material": ""
+      },
+      {
+        "name": "pelvis_4",
+        "material": ""
+      },
+      {
+        "name": "torso_1",
+        "material": ""
+      },
+      {
+        "name": "torso_2",
+        "material": ""
+      },
+      {
+        "name": "torso_3",
+        "material": ""
+      },
+      {
+        "name": "torso_4",
+        "material": ""
+      },
+      {
+        "name": "torso_5",
+        "material": ""
+      },
+      {
+        "name": "head_1",
+        "material": ""
+      },
+      {
+        "name": "head_2",
+        "material": ""
+      },
+      {
+        "name": "head_3",
+        "material": ""
+      },
+      {
+        "name": "head_4",
+        "material": ""
+      },
+      {
+        "name": "head_5",
+        "material": ""
+      },
+      {
+        "name": "head_6",
+        "material": ""
+      },
+      {
+        "name": "upper_arm",
+        "material": ""
+      },
+      {
+        "name": "upper_arm_1",
+        "material": ""
+      },
+      {
+        "name": "upper_arm_2",
+        "material": ""
+      },
+      {
+        "name": "forearm",
+        "material": ""
+      },
+      {
+        "name": "forearm_1",
+        "material": ""
+      },
+      {
+        "name": "forearm_2",
+        "material": ""
+      },
+      {
+        "name": "hand",
+        "material": ""
+      },
+      {
+        "name": "hand_1",
+        "material": ""
+      },
+      {
+        "name": "upper_arm",
+        "material": ""
+      },
+      {
+        "name": "upper_arm_1",
+        "material": ""
+      },
+      {
+        "name": "upper_arm_2",
+        "material": ""
+      },
+      {
+        "name": "forearm",
+        "material": ""
+      },
+      {
+        "name": "forearm_1",
+        "material": ""
+      },
+      {
+        "name": "forearm_2",
+        "material": ""
+      },
+      {
+        "name": "hand",
+        "material": ""
+      },
+      {
+        "name": "hand_1",
+        "material": ""
+      },
+      {
+        "name": "upper_leg",
+        "material": ""
+      },
+      {
+        "name": "upper_leg_1",
+        "material": ""
+      },
+      {
+        "name": "upper_leg_2",
+        "material": ""
+      },
+      {
+        "name": "lower_leg",
+        "material": ""
+      },
+      {
+        "name": "lower_leg_1",
+        "material": ""
+      },
+      {
+        "name": "lower_leg_2",
+        "material": ""
+      },
+      {
+        "name": "foot",
+        "material": ""
+      },
+      {
+        "name": "foot_1",
+        "material": ""
+      },
+      {
+        "name": "upper_leg",
+        "material": ""
+      },
+      {
+        "name": "upper_leg_1",
+        "material": ""
+      },
+      {
+        "name": "upper_leg_2",
+        "material": ""
+      },
+      {
+        "name": "lower_leg",
+        "material": ""
+      },
+      {
+        "name": "lower_leg_1",
+        "material": ""
+      },
+      {
+        "name": "lower_leg_2",
+        "material": ""
+      },
+      {
+        "name": "foot",
+        "material": ""
+      },
+      {
+        "name": "foot_1",
+        "material": ""
+      }
+    ]
+  },
+  "output": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-glb-geometry-iso.png"
+}

@@ -54,6 +54,9 @@ importers:
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
+      three:
+        specifier: ^0.184.0
+        version: 0.184.0
       tsdown:
         specifier: ^0.21.7
         version: 0.21.7(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(typescript@6.0.2)
@@ -433,6 +436,9 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
+  three@0.184.0:
+    resolution: {integrity: sha512-wtTRjG92pM5eUg/KuUnHsqSAlPM296brTOcLgMRqEeylYTh/CdtvKUvCyyCQTzFuStieWxvZb8mVTMvdPyUpxg==}
+
   tinyexec@1.1.1:
     resolution: {integrity: sha512-VKS/ZaQhhkKFMANmAOhhXVoIfBXblQxGX1myCQ2faQrfmobMftXeJPcZGp0gS07ocvGJWDLZGyOZDadDBqYIJg==}
     engines: {node: '>=18'}
@@ -767,6 +773,8 @@ snapshots:
       - '@emnapi/runtime'
 
   semver@7.7.4: {}
+
+  three@0.184.0: {}
 
   tinyexec@1.1.1: {}
 

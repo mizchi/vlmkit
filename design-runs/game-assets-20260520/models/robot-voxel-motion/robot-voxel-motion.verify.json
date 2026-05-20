@@ -1,0 +1,65 @@
+{
+  "ok": true,
+  "input": "design-runs/game-assets-20260520/models/robot-voxel-motion/robot-voxel-motion.glb",
+  "contract": "design-runs/game-assets-20260520/models/robot-voxel-motion/kagura-handoff.json",
+  "glb": {
+    "version": 2,
+    "byteLength": 553852,
+    "nodeCount": 16,
+    "meshCount": 9,
+    "materialCount": 8,
+    "animationCount": 3
+  },
+  "requiredNodes": [
+    "robot_root",
+    "pelvis",
+    "torso",
+    "head",
+    "left_upper_arm",
+    "left_forearm",
+    "left_hand",
+    "right_upper_arm",
+    "right_forearm",
+    "right_hand",
+    "left_upper_leg",
+    "left_lower_leg",
+    "left_foot",
+    "right_upper_leg",
+    "right_lower_leg",
+    "right_foot"
+  ],
+  "missingNodes": [],
+  "requiredClips": [
+    "idle_bob",
+    "walk_cycle",
+    "wave"
+  ],
+  "missingClips": [],
+  "loopClips": [
+    "idle_bob",
+    "walk_cycle",
+    "wave"
+  ],
+  "duplicateTargets": [],
+  "loopFailures": [],
+  "clipSummaries": [
+    {
+      "name": "walk_cycle",
+      "durationSeconds": 1,
+      "channels": 13,
+      "samplers": 13
+    },
+    {
+      "name": "idle_bob",
+      "durationSeconds": 2,
+      "channels": 4,
+      "samplers": 4
+    },
+    {
+      "name": "wave",
+      "durationSeconds": 1.5,
+      "channels": 3,
+      "samplers": 3
+    }
+  ]
+}

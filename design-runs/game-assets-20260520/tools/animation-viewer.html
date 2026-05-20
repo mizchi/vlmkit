@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Game asset animation viewer</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #e8e8e4;
+      }
+
+      canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/node_modules/three/build/three.module.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <script type="module">
+      import * as THREE from "three";
+      import { GLTFLoader } from "/node_modules/three/examples/jsm/loaders/GLTFLoader.js";
+
+      const params = new URLSearchParams(location.search);
+      const modelUrl = params.get("model");
+      const clipName = params.get("clip") || "walk_cycle";
+      const sampleTime = Number(params.get("time") || "0");
+      const view = params.get("view") || "iso";
+      const geometryOnly = params.get("mode") === "geometry";
+      const background = params.get("background") || "#e8e8e4";
+
+      window.__animationRenderState = {
+        status: "loading",
+        clip: clipName,
+        sampleTime,
+        view,
+        mode: geometryOnly ? "geometry" : "material",
+      };
+
+      if (!modelUrl) {
+        fail("model query parameter is required");
+      } else {
+        run().catch((error) => fail(error instanceof Error ? error.message : String(error)));
+      }
+
+      async function run() {
+        const width = innerWidth;
+        const height = innerHeight;
+        const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+        renderer.setPixelRatio(1);
+        renderer.setSize(width, height, false);
+        renderer.setClearColor(new THREE.Color(background), 1);
+        document.body.append(renderer.domElement);
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(background);
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x665f79, 2.2));
+        const key = new THREE.DirectionalLight(0xffffff, 2.4);
+        key.position.set(4, 5, 6);
+        scene.add(key);
+        const rim = new THREE.DirectionalLight(0x9ad7ff, 0.85);
+        rim.position.set(-4, 3, -5);
+        scene.add(rim);
+
+        const gltf = await new GLTFLoader().loadAsync(modelUrl);
+        const object = gltf.scene;
+        object.name = "animated-asset";
+        scene.add(object);
+
+        const bindBox = new THREE.Box3().setFromObject(object);
+        const bindSize = bindBox.getSize(new THREE.Vector3());
+        const bindCenter = bindBox.getCenter(new THREE.Vector3());
+        object.position.sub(bindCenter);
+        const maxAxis = Math.max(bindSize.x, bindSize.y, bindSize.z, 0.001);
+        object.scale.multiplyScalar(2.6 / maxAxis);
+        object.updateMatrixWorld(true);
+        const normalizedBindBox = new THREE.Box3().setFromObject(object);
+
+        const clip = gltf.animations.find((item) => item.name === clipName);
+        if (!clip) {
+          throw new Error(`animation clip not found: ${clipName}`);
+        }
+        const mixer = new THREE.AnimationMixer(object);
+        const action = mixer.clipAction(clip);
+        action.play();
+        mixer.setTime(wrapTime(sampleTime, clip.duration));
+        object.updateMatrixWorld(true);
+
+        if (geometryOnly) {
+          const material = new THREE.MeshStandardMaterial({
+            color: 0x77817e,
+            roughness: 0.82,
+            metalness: 0,
+            side: THREE.DoubleSide,
+          });
+          object.traverse((node) => {
+            if (node.isMesh) node.material = material;
+          });
+        } else {
+          object.traverse((node) => {
+            if (!node.isMesh) return;
+            const materials = Array.isArray(node.material) ? node.material : [node.material];
+            for (const material of materials) {
+              if (!material) continue;
+              material.side = THREE.DoubleSide;
+              material.needsUpdate = true;
+            }
+          });
+        }
+
+        const animatedBox = new THREE.Box3().setFromObject(object);
+        const animatedSize = animatedBox.getSize(new THREE.Vector3());
+        const animatedCenter = animatedBox.getCenter(new THREE.Vector3());
+        const camera = createCamera(width, height, view, animatedSize, animatedCenter);
+        scene.add(camera);
+
+        renderer.render(scene, camera);
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        renderer.render(scene, camera);
+
+        const nodes = [];
+        const meshes = [];
+        object.traverse((node) => {
+          if (node.name) nodes.push(node.name);
+          if (node.isMesh) meshes.push(node.name || "");
+        });
+
+        window.__animationRenderState = {
+          status: "ready",
+          clip: clipName,
+          clipDuration: round(clip.duration),
+          sampleTime,
+          wrappedTime: round(wrapTime(sampleTime, clip.duration)),
+          view,
+          mode: geometryOnly ? "geometry" : "material",
+          animationNames: gltf.animations.map((item) => item.name),
+          bindBounds: vectorBounds(bindBox),
+          normalizedBindBounds: vectorBounds(normalizedBindBox),
+          animatedBounds: vectorBounds(animatedBox),
+          minGroundY: round(animatedBox.min.y),
+          groundDeltaY: round(animatedBox.min.y - normalizedBindBox.min.y),
+          meshCount: meshes.length,
+          nodeCount: nodes.length,
+          nodes,
+        };
+      }
+
+      function createCamera(width, height, view, size, center) {
+        const aspect = width / height;
+        const span = Math.max(size.x / aspect, size.y, size.z, 2.8) * 1.22;
+        const camera = new THREE.OrthographicCamera(
+          -span * aspect / 2,
+          span * aspect / 2,
+          span / 2,
+          -span / 2,
+          0.01,
+          100,
+        );
+        const distance = 6;
+        const direction = cameraDirection(view).normalize();
+        camera.position.copy(center.clone().add(direction.multiplyScalar(distance)));
+        camera.up.copy(cameraUp(view));
+        camera.lookAt(center);
+        camera.updateProjectionMatrix();
+        return camera;
+      }
+
+      function cameraDirection(view) {
+        if (view === "front") return new THREE.Vector3(0, 0, 1);
+        if (view === "back") return new THREE.Vector3(0, 0, -1);
+        if (view === "side") return new THREE.Vector3(1, 0, 0);
+        if (view === "left") return new THREE.Vector3(-1, 0, 0);
+        if (view === "top") return new THREE.Vector3(0, 1, 0);
+        return new THREE.Vector3(3, 2.2, 4);
+      }
+
+      function cameraUp(view) {
+        if (view === "top") return new THREE.Vector3(0, 0, -1);
+        return new THREE.Vector3(0, 1, 0);
+      }
+
+      function wrapTime(time, duration) {
+        if (!Number.isFinite(time) || !Number.isFinite(duration) || duration <= 0) return 0;
+        return ((time % duration) + duration) % duration;
+      }
+
+      function vectorBounds(box) {
+        return {
+          min: [round(box.min.x), round(box.min.y), round(box.min.z)],
+          max: [round(box.max.x), round(box.max.y), round(box.max.z)],
+        };
+      }
+
+      function round(value) {
+        return Math.round(value * 1000) / 1000;
+      }
+
+      function fail(message) {
+        window.__animationRenderState = { status: "error", message };
+        const pre = document.createElement("pre");
+        pre.textContent = message;
+        pre.style.cssText = "font: 14px monospace; color: #900; padding: 16px;";
+        document.body.append(pre);
+        throw new Error(message);
+      }
+    </script>
+  </body>
+</html>

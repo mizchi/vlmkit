@@ -1,0 +1,31 @@
+{
+  "base": "goblin-voxel",
+  "mode": "geometry",
+  "threshold": 0.1,
+  "rows": [
+    {
+      "view": "front",
+      "diffPixels": 0,
+      "diffRatio": 0,
+      "diffPath": "design-runs/game-assets-20260520/models/goblin-voxel/renders/glb-vs-obj-geometry-front.png"
+    },
+    {
+      "view": "side",
+      "diffPixels": 0,
+      "diffRatio": 0,
+      "diffPath": "design-runs/game-assets-20260520/models/goblin-voxel/renders/glb-vs-obj-geometry-side.png"
+    },
+    {
+      "view": "back",
+      "diffPixels": 0,
+      "diffRatio": 0,
+      "diffPath": "design-runs/game-assets-20260520/models/goblin-voxel/renders/glb-vs-obj-geometry-back.png"
+    },
+    {
+      "view": "iso",
+      "diffPixels": 0,
+      "diffRatio": 0,
+      "diffPath": "design-runs/game-assets-20260520/models/goblin-voxel/renders/glb-vs-obj-geometry-iso.png"
+    }
+  ]
+}

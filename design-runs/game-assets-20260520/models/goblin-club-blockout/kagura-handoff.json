@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "engine": "mizchi/kagura",
+  "asset": {
+    "id": "club-goblin-blockout",
+    "kind": "character-blockout",
+    "sourceReference": "../../references/goblin-turnaround.png",
+    "primaryModel": "goblin-club-blockout.glb",
+    "debugModel": "goblin-club-blockout.obj",
+    "debugMaterial": "goblin-club-blockout.mtl",
+    "unit": "model-space",
+    "originPolicy": "feet-near-y0-center-xz",
+    "coordinateNotes": "Y-up. Front direction is +Z in the generated model.",
+    "intendedUse": [
+      "visual sanity preview",
+      "proportion blockout",
+      "future kagura glTF runtime import test"
+    ]
+  },
+  "renderChecks": {
+    "renderer": "three-playwright",
+    "views": ["front", "side", "back", "iso"],
+    "geometryComparison": "renders/glb-vs-obj-geometry.json",
+    "materialComparison": "renders/glb-vs-obj-material.json",
+    "acceptance": {
+      "geometryDiffRatioMax": 0.001,
+      "materialDiffRatioMax": 0.2,
+      "notes": "Geometry comparison should be near-zero. Material comparison is allowed to drift because GLB PBR and OBJ/MTL shading are different renderer paths."
+    }
+  },
+  "styleContract": {
+    "target": "rough low-poly character blockout for proportion and scale checks",
+    "disallow": [
+      "final production art claims",
+      "smooth high-detail sculpting",
+      "runtime animation readiness claims"
+    ],
+    "requiredParts": [
+      "large goblin head",
+      "pointed ears",
+      "wooden club",
+      "dark vest",
+      "ragged shorts",
+      "bare feet"
+    ]
+  },
+  "kaguraIntegrationPlan": {
+    "stage1": "Use vlmkit to generate fixed render snapshots for GLB assets before they are imported into kagura.",
+    "stage2": "Use GLB as the primary handoff format because kagura exposes glTF loading and 2D/3D renderer boundaries.",
+    "stage3": "Keep OBJ/MTL as a debugging export only; do not make it the runtime asset format unless kagura needs it.",
+    "stage4": "Add a kagura-side visual smoke test that renders the same front/side/back/iso camera presets and compares against vlmkit snapshots."
+  }
+}

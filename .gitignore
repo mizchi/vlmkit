@@ -5,6 +5,8 @@ test-results/
 baselines/
 snapshots/
 output/
+design-runs/game-assets-20260520/outputs/
+design-runs/game-assets-20260520/external/
 vrt-report.json
 playwright-report/
 .playwright-mcp/

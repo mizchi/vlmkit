@@ -1,0 +1,88 @@
+{
+  "input": "design-runs/game-assets-20260520/models/goblin-voxel/goblin-voxel.obj",
+  "format": "obj",
+  "view": "front",
+  "mode": "geometry",
+  "width": 1024,
+  "height": 1024,
+  "background": "#e8e8e4",
+  "renderer": "three-playwright",
+  "state": {
+    "status": "ready",
+    "format": "obj",
+    "view": "front",
+    "mode": "geometry",
+    "sourceBounds": {
+      "min": [
+        -1.616,
+        -0.056,
+        -0.296
+      ],
+      "max": [
+        1.016,
+        2.696,
+        0.536
+      ]
+    },
+    "normalizedBounds": {
+      "min": [
+        -1.197,
+        -1.372,
+        -0.395
+      ],
+      "max": [
+        1.242,
+        1.178,
+        0.377
+      ]
+    },
+    "meshCount": 11,
+    "meshes": [
+      {
+        "name": "skin",
+        "material": ""
+      },
+      {
+        "name": "skinDark",
+        "material": ""
+      },
+      {
+        "name": "earInner",
+        "material": ""
+      },
+      {
+        "name": "brow",
+        "material": ""
+      },
+      {
+        "name": "eye",
+        "material": ""
+      },
+      {
+        "name": "tooth",
+        "material": ""
+      },
+      {
+        "name": "leather",
+        "material": ""
+      },
+      {
+        "name": "wrap",
+        "material": ""
+      },
+      {
+        "name": "pants",
+        "material": ""
+      },
+      {
+        "name": "wood",
+        "material": ""
+      },
+      {
+        "name": "woodDark",
+        "material": ""
+      }
+    ]
+  },
+  "output": "design-runs/game-assets-20260520/models/goblin-voxel/renders/goblin-voxel-obj-geometry-front.png"
+}

@@ -1,0 +1,134 @@
+{
+  "ok": true,
+  "minForegroundRatio": 0.03,
+  "checkedFrameCount": 21,
+  "frames": [
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-glb-geometry-iso.png",
+      "foregroundRatio": 0.2062,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-glb-material-iso.png",
+      "foregroundRatio": 0.2062,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-obj-material-iso.png",
+      "foregroundRatio": 0.2062,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-walk_cycle-geometry-iso-t0p00.png",
+      "foregroundRatio": 0.2052,
+      "finiteBounds": true,
+      "minGroundY": -1.559
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-walk_cycle-material-front-t0p00.png",
+      "foregroundRatio": 0.1849,
+      "finiteBounds": true,
+      "minGroundY": -1.559
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-walk_cycle-material-front-t0p25.png",
+      "foregroundRatio": 0.1865,
+      "finiteBounds": true,
+      "minGroundY": -1.569
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-walk_cycle-material-front-t0p50.png",
+      "foregroundRatio": 0.185,
+      "finiteBounds": true,
+      "minGroundY": -1.559
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-walk_cycle-material-front-t0p75.png",
+      "foregroundRatio": 0.1862,
+      "finiteBounds": true,
+      "minGroundY": -1.569
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-walk_cycle-material-iso-t0p00.png",
+      "foregroundRatio": 0.2052,
+      "finiteBounds": true,
+      "minGroundY": -1.559
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-walk_cycle-material-iso-t0p25.png",
+      "foregroundRatio": 0.2138,
+      "finiteBounds": true,
+      "minGroundY": -1.569
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-walk_cycle-material-iso-t0p50.png",
+      "foregroundRatio": 0.2116,
+      "finiteBounds": true,
+      "minGroundY": -1.559
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-walk_cycle-material-iso-t0p75.png",
+      "foregroundRatio": 0.2178,
+      "finiteBounds": true,
+      "minGroundY": -1.569
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-walk_cycle-material-side-t0p00.png",
+      "foregroundRatio": 0.1391,
+      "finiteBounds": true,
+      "minGroundY": -1.559
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-walk_cycle-material-side-t0p25.png",
+      "foregroundRatio": 0.0984,
+      "finiteBounds": true,
+      "minGroundY": -1.569
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-walk_cycle-material-side-t0p50.png",
+      "foregroundRatio": 0.1391,
+      "finiteBounds": true,
+      "minGroundY": -1.559
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-walk_cycle-material-side-t0p75.png",
+      "foregroundRatio": 0.0984,
+      "finiteBounds": true,
+      "minGroundY": -1.569
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-wave-material-iso-t0p00.png",
+      "foregroundRatio": 0.2049,
+      "finiteBounds": true,
+      "minGroundY": -1.482
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-wave-material-iso-t0p30.png",
+      "foregroundRatio": 0.198,
+      "finiteBounds": true,
+      "minGroundY": -1.482
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-wave-material-iso-t0p60.png",
+      "foregroundRatio": 0.1979,
+      "finiteBounds": true,
+      "minGroundY": -1.482
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-wave-material-iso-t0p90.png",
+      "foregroundRatio": 0.198,
+      "finiteBounds": true,
+      "minGroundY": -1.482
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/renders/robot-voxel-motion-wave-material-iso-t1p20.png",
+      "foregroundRatio": 0.1979,
+      "finiteBounds": true,
+      "minGroundY": -1.482
+    }
+  ],
+  "failures": []
+}

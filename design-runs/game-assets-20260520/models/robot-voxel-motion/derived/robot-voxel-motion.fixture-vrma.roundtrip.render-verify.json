@@ -1,0 +1,20 @@
+{
+  "ok": true,
+  "minForegroundRatio": 0.03,
+  "checkedFrameCount": 2,
+  "frames": [
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/fixture-vrma-renders/robot-voxel-motion.fixture-vrma.roundtrip-vrma_alert_wave-material-iso-t0p00.png",
+      "foregroundRatio": 0.1988,
+      "finiteBounds": true,
+      "minGroundY": -1.482
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/fixture-vrma-renders/robot-voxel-motion.fixture-vrma.roundtrip-vrma_alert_wave-material-iso-t0p80.png",
+      "foregroundRatio": 0.1943,
+      "finiteBounds": true,
+      "minGroundY": -1.468
+    }
+  ],
+  "failures": []
+}

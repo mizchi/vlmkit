@@ -1,0 +1,104 @@
+{
+  "ok": true,
+  "minForegroundRatio": 0.03,
+  "checkedFrameCount": 16,
+  "frames": [
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/renders/robot-voxel-motion.vrma-bridge-mixamo_walk_standin-material-iso-t0p00.png",
+      "foregroundRatio": 0.2001,
+      "finiteBounds": true,
+      "minGroundY": -1.591
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/renders/robot-voxel-motion.vrma-bridge-mixamo_walk_standin-material-iso-t0p25.png",
+      "foregroundRatio": 0.2121,
+      "finiteBounds": true,
+      "minGroundY": -1.602
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/renders/robot-voxel-motion.vrma-bridge-mixamo_walk_standin-material-iso-t0p50.png",
+      "foregroundRatio": 0.208,
+      "finiteBounds": true,
+      "minGroundY": -1.591
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/renders/robot-voxel-motion.vrma-bridge-mixamo_walk_standin-material-iso-t0p75.png",
+      "foregroundRatio": 0.2186,
+      "finiteBounds": true,
+      "minGroundY": -1.602
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/renders/robot-voxel-motion.vrma-bridge-vrma_alert_wave-material-front-t0p00.png",
+      "foregroundRatio": 0.1706,
+      "finiteBounds": true,
+      "minGroundY": -1.482
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/renders/robot-voxel-motion.vrma-bridge-vrma_alert_wave-material-front-t0p40.png",
+      "foregroundRatio": 0.1676,
+      "finiteBounds": true,
+      "minGroundY": -1.451
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/renders/robot-voxel-motion.vrma-bridge-vrma_alert_wave-material-front-t0p80.png",
+      "foregroundRatio": 0.1684,
+      "finiteBounds": true,
+      "minGroundY": -1.468
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/renders/robot-voxel-motion.vrma-bridge-vrma_alert_wave-material-front-t1p20.png",
+      "foregroundRatio": 0.1676,
+      "finiteBounds": true,
+      "minGroundY": -1.451
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/renders/robot-voxel-motion.vrma-bridge-vrma_alert_wave-material-iso-t0p00.png",
+      "foregroundRatio": 0.1988,
+      "finiteBounds": true,
+      "minGroundY": -1.482
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/renders/robot-voxel-motion.vrma-bridge-vrma_alert_wave-material-iso-t0p40.png",
+      "foregroundRatio": 0.193,
+      "finiteBounds": true,
+      "minGroundY": -1.451
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/renders/robot-voxel-motion.vrma-bridge-vrma_alert_wave-material-iso-t0p80.png",
+      "foregroundRatio": 0.1943,
+      "finiteBounds": true,
+      "minGroundY": -1.468
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/renders/robot-voxel-motion.vrma-bridge-vrma_alert_wave-material-iso-t1p20.png",
+      "foregroundRatio": 0.193,
+      "finiteBounds": true,
+      "minGroundY": -1.451
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/renders/robot-voxel-motion.vrma-bridge-vrma_alert_wave-material-side-t0p00.png",
+      "foregroundRatio": 0.1027,
+      "finiteBounds": true,
+      "minGroundY": -1.482
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/renders/robot-voxel-motion.vrma-bridge-vrma_alert_wave-material-side-t0p40.png",
+      "foregroundRatio": 0.0993,
+      "finiteBounds": true,
+      "minGroundY": -1.451
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/renders/robot-voxel-motion.vrma-bridge-vrma_alert_wave-material-side-t0p80.png",
+      "foregroundRatio": 0.1004,
+      "finiteBounds": true,
+      "minGroundY": -1.468
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/renders/robot-voxel-motion.vrma-bridge-vrma_alert_wave-material-side-t1p20.png",
+      "foregroundRatio": 0.0993,
+      "finiteBounds": true,
+      "minGroundY": -1.451
+    }
+  ],
+  "failures": []
+}

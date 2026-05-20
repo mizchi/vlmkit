@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Model render viewer</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #e8e8e4;
+      }
+
+      canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/node_modules/three/build/three.module.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <script type="module">
+      import * as THREE from "three";
+      import { GLTFLoader } from "/node_modules/three/examples/jsm/loaders/GLTFLoader.js";
+      import { MTLLoader } from "/node_modules/three/examples/jsm/loaders/MTLLoader.js";
+      import { OBJLoader } from "/node_modules/three/examples/jsm/loaders/OBJLoader.js";
+
+      const params = new URLSearchParams(location.search);
+      const modelUrl = params.get("model");
+      const mtlUrl = params.get("mtl");
+      const format = params.get("format") || inferFormat(modelUrl);
+      const view = params.get("view") || "iso";
+      const geometryOnly = params.get("mode") === "geometry";
+      const background = params.get("background") || "#e8e8e4";
+
+      window.__modelRenderState = {
+        status: "loading",
+        format,
+        view,
+        mode: geometryOnly ? "geometry" : "material",
+      };
+
+      if (!modelUrl) {
+        fail("model query parameter is required");
+      } else {
+        run().catch((error) => fail(error instanceof Error ? error.message : String(error)));
+      }
+
+      async function run() {
+        const width = innerWidth;
+        const height = innerHeight;
+        const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+        renderer.setPixelRatio(1);
+        renderer.setSize(width, height, false);
+        renderer.setClearColor(new THREE.Color(background), 1);
+        document.body.append(renderer.domElement);
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(background);
+        scene.add(new THREE.HemisphereLight(0xffffff, 0x766a58, 2.0));
+        const key = new THREE.DirectionalLight(0xffffff, 2.2);
+        key.position.set(4, 5, 6);
+        scene.add(key);
+        const fill = new THREE.DirectionalLight(0xffffff, 0.8);
+        fill.position.set(-3, 2, 4);
+        scene.add(fill);
+
+        const object = await loadObject();
+        object.name = "render-target";
+        scene.add(object);
+
+        const sourceBox = new THREE.Box3().setFromObject(object);
+        const sourceSize = sourceBox.getSize(new THREE.Vector3());
+        const sourceCenter = sourceBox.getCenter(new THREE.Vector3());
+        object.position.sub(sourceCenter);
+        const maxAxis = Math.max(sourceSize.x, sourceSize.y, sourceSize.z, 0.001);
+        object.scale.multiplyScalar(2.55 / maxAxis);
+
+        if (geometryOnly) {
+          const material = new THREE.MeshStandardMaterial({
+            color: 0x9aa06c,
+            roughness: 0.82,
+            metalness: 0,
+            side: THREE.DoubleSide,
+          });
+          object.traverse((node) => {
+            if (node.isMesh) node.material = material;
+          });
+        } else {
+          object.traverse((node) => {
+            if (!node.isMesh) return;
+            const materials = Array.isArray(node.material) ? node.material : [node.material];
+            for (const material of materials) {
+              if (!material) continue;
+              material.side = THREE.DoubleSide;
+              material.needsUpdate = true;
+            }
+          });
+        }
+
+        const box = new THREE.Box3().setFromObject(object);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        const camera = createCamera(width, height, view, size, center);
+        scene.add(camera);
+
+        renderer.render(scene, camera);
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+        renderer.render(scene, camera);
+
+        const meshes = [];
+        object.traverse((node) => {
+          if (node.isMesh) {
+            meshes.push({
+              name: node.name || "",
+              material: Array.isArray(node.material)
+                ? node.material.map((item) => item?.name ?? "")
+                : node.material?.name ?? "",
+            });
+          }
+        });
+
+        window.__modelRenderState = {
+          status: "ready",
+          format,
+          view,
+          mode: geometryOnly ? "geometry" : "material",
+          sourceBounds: vectorBounds(sourceBox),
+          normalizedBounds: vectorBounds(box),
+          meshCount: meshes.length,
+          meshes,
+        };
+      }
+
+      async function loadObject() {
+        if (format === "glb" || format === "gltf") {
+          const gltf = await new GLTFLoader().loadAsync(modelUrl);
+          return gltf.scene;
+        }
+        if (format === "obj") {
+          const loader = new OBJLoader();
+          if (mtlUrl) {
+            const materials = await new MTLLoader().loadAsync(mtlUrl);
+            materials.preload();
+            loader.setMaterials(materials);
+          }
+          return loader.loadAsync(modelUrl);
+        }
+        throw new Error(`unsupported format: ${format}`);
+      }
+
+      function createCamera(width, height, view, size, center) {
+        const aspect = width / height;
+        const span = Math.max(size.x / aspect, size.y, size.z, 2.8) * 1.22;
+        const camera = new THREE.OrthographicCamera(
+          -span * aspect / 2,
+          span * aspect / 2,
+          span / 2,
+          -span / 2,
+          0.01,
+          100,
+        );
+        const distance = 6;
+        const direction = cameraDirection(view).normalize();
+        camera.position.copy(center.clone().add(direction.multiplyScalar(distance)));
+        camera.up.copy(cameraUp(view));
+        camera.lookAt(center);
+        camera.updateProjectionMatrix();
+        return camera;
+      }
+
+      function cameraDirection(view) {
+        if (view === "front") return new THREE.Vector3(0, 0, 1);
+        if (view === "back") return new THREE.Vector3(0, 0, -1);
+        if (view === "side") return new THREE.Vector3(1, 0, 0);
+        if (view === "left") return new THREE.Vector3(-1, 0, 0);
+        if (view === "top") return new THREE.Vector3(0, 1, 0);
+        return new THREE.Vector3(3, 2.2, 4);
+      }
+
+      function cameraUp(view) {
+        if (view === "top") return new THREE.Vector3(0, 0, -1);
+        return new THREE.Vector3(0, 1, 0);
+      }
+
+      function vectorBounds(box) {
+        return {
+          min: [round(box.min.x), round(box.min.y), round(box.min.z)],
+          max: [round(box.max.x), round(box.max.y), round(box.max.z)],
+        };
+      }
+
+      function round(value) {
+        return Math.round(value * 1000) / 1000;
+      }
+
+      function inferFormat(url) {
+        if (!url) return "glb";
+        const pathname = new URL(url, location.href).pathname.toLowerCase();
+        if (pathname.endsWith(".obj")) return "obj";
+        if (pathname.endsWith(".gltf")) return "gltf";
+        return "glb";
+      }
+
+      function fail(message) {
+        window.__modelRenderState = { status: "error", message };
+        const pre = document.createElement("pre");
+        pre.textContent = message;
+        pre.style.cssText = "font: 14px monospace; color: #900; padding: 16px;";
+        document.body.append(pre);
+        throw new Error(message);
+      }
+    </script>
+  </body>
+</html>

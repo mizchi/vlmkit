@@ -1,0 +1,236 @@
+{
+  "input": "design-runs/game-assets-20260520/models/goblin-club-blockout/goblin-club-blockout.obj",
+  "format": "obj",
+  "view": "iso",
+  "mode": "geometry",
+  "width": 1024,
+  "height": 1024,
+  "background": "#e8e8e4",
+  "renderer": "three-playwright",
+  "state": {
+    "status": "ready",
+    "format": "obj",
+    "view": "iso",
+    "mode": "geometry",
+    "sourceBounds": {
+      "min": [
+        -1.212,
+        0.05,
+        -0.324
+      ],
+      "max": [
+        0.984,
+        2.98,
+        0.723
+      ]
+    },
+    "normalizedBounds": {
+      "min": [
+        -0.941,
+        -1.471,
+        -0.482
+      ],
+      "max": [
+        0.97,
+        1.079,
+        0.43
+      ]
+    },
+    "meshCount": 48,
+    "meshes": [
+      {
+        "name": "head",
+        "material": ""
+      },
+      {
+        "name": "brow",
+        "material": ""
+      },
+      {
+        "name": "torso",
+        "material": ""
+      },
+      {
+        "name": "belly",
+        "material": ""
+      },
+      {
+        "name": "neck",
+        "material": ""
+      },
+      {
+        "name": "left_ear_outer",
+        "material": ""
+      },
+      {
+        "name": "right_ear_outer",
+        "material": ""
+      },
+      {
+        "name": "left_ear_inner",
+        "material": ""
+      },
+      {
+        "name": "right_ear_inner",
+        "material": ""
+      },
+      {
+        "name": "hooked_nose",
+        "material": ""
+      },
+      {
+        "name": "left_eye",
+        "material": ""
+      },
+      {
+        "name": "right_eye",
+        "material": ""
+      },
+      {
+        "name": "left_tusk",
+        "material": ""
+      },
+      {
+        "name": "right_tusk",
+        "material": ""
+      },
+      {
+        "name": "left_vest_panel",
+        "material": ""
+      },
+      {
+        "name": "right_vest_panel",
+        "material": ""
+      },
+      {
+        "name": "waist_rope",
+        "material": ""
+      },
+      {
+        "name": "ragged_skirt_0",
+        "material": ""
+      },
+      {
+        "name": "ragged_skirt_1",
+        "material": ""
+      },
+      {
+        "name": "ragged_skirt_2",
+        "material": ""
+      },
+      {
+        "name": "ragged_skirt_3",
+        "material": ""
+      },
+      {
+        "name": "ragged_skirt_4",
+        "material": ""
+      },
+      {
+        "name": "ragged_skirt_5",
+        "material": ""
+      },
+      {
+        "name": "ragged_skirt_6",
+        "material": ""
+      },
+      {
+        "name": "left_upper_arm",
+        "material": ""
+      },
+      {
+        "name": "left_forearm",
+        "material": ""
+      },
+      {
+        "name": "left_hand",
+        "material": ""
+      },
+      {
+        "name": "left_wrist_wrap",
+        "material": ""
+      },
+      {
+        "name": "right_upper_arm",
+        "material": ""
+      },
+      {
+        "name": "right_forearm",
+        "material": ""
+      },
+      {
+        "name": "right_hand",
+        "material": ""
+      },
+      {
+        "name": "right_wrist_wrap",
+        "material": ""
+      },
+      {
+        "name": "left_thigh",
+        "material": ""
+      },
+      {
+        "name": "left_shin",
+        "material": ""
+      },
+      {
+        "name": "left_foot",
+        "material": ""
+      },
+      {
+        "name": "left_ankle_wrap",
+        "material": ""
+      },
+      {
+        "name": "right_thigh",
+        "material": ""
+      },
+      {
+        "name": "right_shin",
+        "material": ""
+      },
+      {
+        "name": "right_foot",
+        "material": ""
+      },
+      {
+        "name": "right_ankle_wrap",
+        "material": ""
+      },
+      {
+        "name": "club_handle",
+        "material": ""
+      },
+      {
+        "name": "club_head",
+        "material": ""
+      },
+      {
+        "name": "club_bark_spike_0",
+        "material": ""
+      },
+      {
+        "name": "club_bark_spike_1",
+        "material": ""
+      },
+      {
+        "name": "club_bark_spike_2",
+        "material": ""
+      },
+      {
+        "name": "club_bark_spike_3",
+        "material": ""
+      },
+      {
+        "name": "club_bark_spike_4",
+        "material": ""
+      },
+      {
+        "name": "club_bark_spike_5",
+        "material": ""
+      }
+    ]
+  },
+  "output": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/goblin-club-blockout-obj-geometry-iso.png"
+}

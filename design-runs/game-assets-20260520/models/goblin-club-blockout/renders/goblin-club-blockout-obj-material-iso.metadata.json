@@ -1,0 +1,236 @@
+{
+  "input": "design-runs/game-assets-20260520/models/goblin-club-blockout/goblin-club-blockout.obj",
+  "format": "obj",
+  "view": "iso",
+  "mode": "material",
+  "width": 1024,
+  "height": 1024,
+  "background": "#e8e8e4",
+  "renderer": "three-playwright",
+  "state": {
+    "status": "ready",
+    "format": "obj",
+    "view": "iso",
+    "mode": "material",
+    "sourceBounds": {
+      "min": [
+        -1.212,
+        0.05,
+        -0.324
+      ],
+      "max": [
+        0.984,
+        2.98,
+        0.723
+      ]
+    },
+    "normalizedBounds": {
+      "min": [
+        -0.941,
+        -1.471,
+        -0.482
+      ],
+      "max": [
+        0.97,
+        1.079,
+        0.43
+      ]
+    },
+    "meshCount": 48,
+    "meshes": [
+      {
+        "name": "head",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "brow",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "torso",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "belly",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "neck",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "left_ear_outer",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "right_ear_outer",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "left_ear_inner",
+        "material": "ear_inner_warm_brown"
+      },
+      {
+        "name": "right_ear_inner",
+        "material": "ear_inner_warm_brown"
+      },
+      {
+        "name": "hooked_nose",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "left_eye",
+        "material": "golden_eye"
+      },
+      {
+        "name": "right_eye",
+        "material": "golden_eye"
+      },
+      {
+        "name": "left_tusk",
+        "material": "dull_tooth"
+      },
+      {
+        "name": "right_tusk",
+        "material": "dull_tooth"
+      },
+      {
+        "name": "left_vest_panel",
+        "material": "dark_worn_leather"
+      },
+      {
+        "name": "right_vest_panel",
+        "material": "dark_worn_leather"
+      },
+      {
+        "name": "waist_rope",
+        "material": "tan_cloth_wrap"
+      },
+      {
+        "name": "ragged_skirt_0",
+        "material": "ragged_skirt_brown"
+      },
+      {
+        "name": "ragged_skirt_1",
+        "material": "ragged_skirt_brown"
+      },
+      {
+        "name": "ragged_skirt_2",
+        "material": "ragged_skirt_brown"
+      },
+      {
+        "name": "ragged_skirt_3",
+        "material": "ragged_skirt_brown"
+      },
+      {
+        "name": "ragged_skirt_4",
+        "material": "ragged_skirt_brown"
+      },
+      {
+        "name": "ragged_skirt_5",
+        "material": "ragged_skirt_brown"
+      },
+      {
+        "name": "ragged_skirt_6",
+        "material": "ragged_skirt_brown"
+      },
+      {
+        "name": "left_upper_arm",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "left_forearm",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "left_hand",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "left_wrist_wrap",
+        "material": "tan_cloth_wrap"
+      },
+      {
+        "name": "right_upper_arm",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "right_forearm",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "right_hand",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "right_wrist_wrap",
+        "material": "tan_cloth_wrap"
+      },
+      {
+        "name": "left_thigh",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "left_shin",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "left_foot",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "left_ankle_wrap",
+        "material": "tan_cloth_wrap"
+      },
+      {
+        "name": "right_thigh",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "right_shin",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "right_foot",
+        "material": "skin_olive_green"
+      },
+      {
+        "name": "right_ankle_wrap",
+        "material": "tan_cloth_wrap"
+      },
+      {
+        "name": "club_handle",
+        "material": "club_rough_wood"
+      },
+      {
+        "name": "club_head",
+        "material": "club_rough_wood"
+      },
+      {
+        "name": "club_bark_spike_0",
+        "material": "club_rough_wood"
+      },
+      {
+        "name": "club_bark_spike_1",
+        "material": "club_rough_wood"
+      },
+      {
+        "name": "club_bark_spike_2",
+        "material": "club_rough_wood"
+      },
+      {
+        "name": "club_bark_spike_3",
+        "material": "club_rough_wood"
+      },
+      {
+        "name": "club_bark_spike_4",
+        "material": "club_rough_wood"
+      },
+      {
+        "name": "club_bark_spike_5",
+        "material": "club_rough_wood"
+      }
+    ]
+  },
+  "output": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/goblin-club-blockout-obj-material-iso.png"
+}
