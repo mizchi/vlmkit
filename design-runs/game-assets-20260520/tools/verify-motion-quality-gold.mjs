@@ -134,6 +134,20 @@ async function main() {
           automatic,
         );
       }
+      for (const [candidate, status] of Object.entries(expected.sourceRig.candidateMotionGateStatuses ?? {})) {
+        checkEqual(
+          checks,
+          `sample:${sampleName}:sourceTargetRigComparison.candidateMotionGateStatus:${candidate}`,
+          candidateMotionGateStatus(sample.normalization?.sourceTargetRigComparison, candidate),
+          status,
+        );
+        checkEqual(
+          checks,
+          `sample:${sampleName}:normalization.candidateMotionGateStatus:${candidate}`,
+          candidateMotionGateStatus(sample.normalization, candidate),
+          status,
+        );
+      }
     }
   }
 
@@ -176,6 +190,10 @@ function candidateStatus(value, id) {
 
 function candidateAutomatic(value, id) {
   return (value?.normalizationCandidates ?? []).find((candidate) => candidate.id === id)?.automatic;
+}
+
+function candidateMotionGateStatus(value, id) {
+  return (value?.normalizationCandidates ?? []).find((candidate) => candidate.id === id)?.motionGate?.status;
 }
 
 function checkIncludes(checks, id, actual, expected) {

@@ -142,6 +142,7 @@ function buildAnimation(gltf, chunks, motion, clip, nodeIndexByName, options) {
 function createAudit(args, motion, gltf, nodeIndexByName) {
   const sourceRig = motion.source?.sourceRig ?? null;
   const targetRig = analyzeTargetRig(gltf, motion, nodeIndexByName);
+  const motionActivity = analyzeMotionActivity(motion);
   return {
     version: 1,
     kind: "motion-normalization-audit",
@@ -157,7 +158,8 @@ function createAudit(args, motion, gltf, nodeIndexByName) {
     },
     sourceRig,
     targetRig,
-    sourceTargetRigComparison: compareSourceTargetRig(sourceRig, targetRig),
+    motionActivity,
+    sourceTargetRigComparison: compareSourceTargetRig(sourceRig, targetRig, motionActivity),
     poseNormalizationDetails: null,
     clips: [],
   };
@@ -253,7 +255,53 @@ function armRestOffset(segment, source, target) {
   };
 }
 
-function compareSourceTargetRig(sourceRig, targetRig) {
+function analyzeMotionActivity(motion) {
+  const clips = (motion.clips ?? []).map((clip) => analyzeClipMotionActivity(clip));
+  const bestClip = clips
+    .filter((clip) => Number.isFinite(clip.upperArmRotationRangeDeg))
+    .sort((a, b) => b.upperArmRotationRangeDeg - a.upperArmRotationRangeDeg)[0] ?? null;
+  return {
+    armRest: {
+      gate: "upper-arm-rotation-range",
+      thresholdDeg: ARM_REST_MOTION_GATE_DEG,
+      maxUpperArmRotationRangeDeg: roundNullable(bestClip?.upperArmRotationRangeDeg ?? null),
+      strongestClip: bestClip?.id ?? null,
+      measuredClipCount: clips.filter((clip) => Number.isFinite(clip.upperArmRotationRangeDeg)).length,
+      clips,
+    },
+  };
+}
+
+function analyzeClipMotionActivity(clip) {
+  const upperArmTracks = (clip.tracks ?? [])
+    .filter((track) => track.path === "rotation" && ARM_REST_MOTION_GATE_TARGETS.has(track.target))
+    .map((track) => ({
+      target: track.target,
+      rotationRangeDeg: roundNullable(rotationTrackRangeDeg(clip, track)),
+      keyframeCount: track.keyframes?.length ?? 0,
+    }));
+  const ranges = upperArmTracks.map((track) => track.rotationRangeDeg).filter(Number.isFinite);
+  return {
+    id: clip.id,
+    durationSeconds: clip.durationSeconds ?? null,
+    upperArmTrackCount: upperArmTracks.length,
+    upperArmRotationRangeDeg: ranges.length > 0 ? round(Math.max(...ranges)) : null,
+    upperArmTracks,
+  };
+}
+
+function rotationTrackRangeDeg(clip, track) {
+  if (!Array.isArray(track.keyframes) || track.keyframes.length === 0) return null;
+  const sorted = [...track.keyframes].sort((a, b) => a.time - b.time);
+  const first = sorted[0]?.rotation ? vec4(sorted[0].rotation, `rotation for ${clip.id}.${track.target}`) : null;
+  if (!first) return null;
+  const ranges = sorted
+    .map((keyframe) => keyframe.rotation ? quatAngleDeg(first, vec4(keyframe.rotation, `rotation for ${clip.id}.${track.target}`)) : null)
+    .filter(Number.isFinite);
+  return ranges.length > 0 ? Math.max(...ranges) : null;
+}
+
+function compareSourceTargetRig(sourceRig, targetRig, motionActivity) {
   if (!sourceRig?.bindMetrics || !targetRig?.bindMetrics) {
     return {
       status: "unavailable",
@@ -333,7 +381,7 @@ function compareSourceTargetRig(sourceRig, targetRig) {
     scaleSpread,
     warnings,
     recommendation,
-    normalizationCandidates: poseNormalizationCandidates(warnings),
+    normalizationCandidates: poseNormalizationCandidates(warnings, motionActivity),
   };
 }
 
@@ -356,18 +404,23 @@ function mapValues(object, mapper) {
   return Object.fromEntries(Object.entries(object).map(([key, value]) => [key, mapper(value)]));
 }
 
-function poseNormalizationCandidates(warnings) {
+function poseNormalizationCandidates(warnings, motionActivity) {
   const ids = new Set(warnings.map((warning) => warning.id));
   const candidates = [];
   if (ids.has("arm-rest-angle-mismatch")) {
+    const motionGate = armRestMotionGate(motionActivity);
+    const runnable = motionGate.status === "passed";
     candidates.push({
       id: "arm-rest-pose-offset",
       kind: "pose-pre-normalization",
-      status: "runnable",
+      status: runnable ? "runnable" : "needs-motion-evidence",
       automatic: false,
       poseNormalization: "arm-rest-offset",
+      motionGate,
       triggerWarnings: ["arm-rest-angle-mismatch"],
-      reason: "source arms are in a different rest direction from target arms; retargeting needs a rest-pose rotation offset before it can be automatic",
+      reason: runnable
+        ? "source arms are in a different rest direction and the clip has strong upper-arm motion; run arm-rest-offset as a per-sample candidate"
+        : "source arms are in a different rest direction, but this clip does not have enough upper-arm motion evidence to justify arm-rest-offset",
     });
   }
   if (ids.has("foot-spread-mismatch") || ids.has("leg-spread-mismatch")) {
@@ -391,6 +444,34 @@ function poseNormalizationCandidates(warnings) {
     });
   }
   return candidates;
+}
+
+function armRestMotionGate(motionActivity) {
+  const armRest = motionActivity?.armRest;
+  const value = armRest?.maxUpperArmRotationRangeDeg;
+  if (!Number.isFinite(value)) {
+    return {
+      id: "upper-arm-rotation-range",
+      status: "unavailable",
+      metric: "maxUpperArmRotationRangeDeg",
+      thresholdDeg: ARM_REST_MOTION_GATE_DEG,
+      valueDeg: null,
+      strongestClip: null,
+      reason: "upper-arm rotation tracks are unavailable",
+    };
+  }
+  const passed = value >= ARM_REST_MOTION_GATE_DEG;
+  return {
+    id: "upper-arm-rotation-range",
+    status: passed ? "passed" : "blocked",
+    metric: "maxUpperArmRotationRangeDeg",
+    thresholdDeg: ARM_REST_MOTION_GATE_DEG,
+    valueDeg: round(value),
+    strongestClip: armRest.strongestClip ?? null,
+    reason: passed
+      ? "upper-arm motion is large enough to test rest-pose arm offsets"
+      : "upper-arm motion is too small; rest-pose arm offsets are more likely to be noise than a useful fix",
+  };
 }
 
 function recordRootTranslationAudit(audit, clip, track, nodeName, baseTranslation, samples, rootTranslationMode) {
@@ -682,6 +763,13 @@ function quatNormalize(q) {
   return q.map((value) => value / length);
 }
 
+function quatAngleDeg(a, b) {
+  const from = quatNormalize(a);
+  const to = quatNormalize(b);
+  const dot = Math.abs(from[0] * to[0] + from[1] * to[1] + from[2] * to[2] + from[3] * to[3]);
+  return 2 * Math.acos(clamp(dot, -1, 1)) * 180 / Math.PI;
+}
+
 function decodeGlb(buffer) {
   if (buffer.readUInt32LE(0) !== 0x46546c67) throw new Error("invalid GLB magic");
   if (buffer.readUInt32LE(4) !== 2) throw new Error("unsupported GLB version");
@@ -789,6 +877,7 @@ function roundNullable(value) {
 }
 
 const ROOT_TRANSLATION_TARGETS = new Set(["root", "hips", "pelvis", "robot_root"]);
+const ARM_REST_MOTION_GATE_TARGETS = new Set(["leftUpperArm", "rightUpperArm"]);
 const ARM_REST_OFFSET_SEGMENTS = [
   {
     sourceTarget: "leftUpperArm",
@@ -843,6 +932,7 @@ const FOOT_SPREAD_POSE_WARN_RATIO = 2.0;
 const LEG_SPREAD_POSE_WARN_RATIO = 2.0;
 const SHOULDER_SCALE_MISMATCH_WARN_DELTA = 0.4;
 const ARM_REST_ANGLE_WARN_DEG = 45;
+const ARM_REST_MOTION_GATE_DEG = 60;
 const HEIGHT_SCALE_DELTA_THRESHOLD = 0.2;
 const VERTICAL_ROOT_MOTION_SCALE_THRESHOLD = 0.08;
 

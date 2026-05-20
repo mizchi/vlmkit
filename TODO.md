@@ -1053,8 +1053,11 @@ Current smoke status:
   emits run/compare commands and comparison can fail on tradeoff
 - [x] Experimental arm rest pose pre-normalization:
   `--pose-normalization arm-rest-offset` computes source-to-target upper/lower
-  arm rest offsets, emits them in the audit, and remains runnable but
-  non-automatic because `Jump` regresses while `Goodbye` improves
+  arm rest offsets and emits them in the audit
+- [x] Motion-aware arm rest gate:
+  arm-rest candidates now require at least 60deg of upper-arm rotation evidence;
+  `Goodbye` remains runnable, while `LookAround` and `Jump` are blocked as
+  `needs-motion-evidence`
 - [x] Candidate selection summary:
   `select-motion-normalization-candidates.mjs` groups runnable candidate
   comparisons and emits accepted/rejected/neutral/missing recommendations so

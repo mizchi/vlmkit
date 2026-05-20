@@ -125,6 +125,7 @@ function poseNormalizationCandidate(reportPath, report, sample, candidate) {
     status: candidate.status,
     automatic: candidate.automatic === true,
     poseNormalization: candidate.poseNormalization,
+    motionGate: candidate.motionGate ?? null,
     reason: candidate.reason,
     outputReport: out,
     run: [
@@ -175,6 +176,9 @@ function blockedCandidate(sample, candidate) {
     status: candidate.status,
     automatic: candidate.automatic === true,
     triggerWarnings: candidate.triggerWarnings ?? [],
+    rootTranslationMode: candidate.rootTranslationMode ?? null,
+    poseNormalization: candidate.poseNormalization ?? null,
+    motionGate: candidate.motionGate ?? null,
     reason: candidate.reason,
   };
 }

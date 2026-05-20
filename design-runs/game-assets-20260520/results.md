@@ -227,24 +227,26 @@ Observed shape:
   `pose-mismatch-warning` with `foot-spread-mismatch`,
   `leg-spread-mismatch`, `shoulder-width-mismatch`, and
   `arm-rest-angle-mismatch`
+- arm-rest motion gate: max upper-arm rotation is `LookAround` 14.5deg,
+  `Goodbye` 108.4deg, and `Jump` 30.0deg; only samples at or above the 60deg
+  threshold become runnable arm-rest candidates
 - `Jump` `scale-to-model` comparison: still `pass`, ground error improves
   0.107 -> 0.079, but foot contact error regresses 0.118 -> 0.173 and pelvis
   displacement regresses 0.183 -> 0.265; classify as `candidate-tradeoff`,
   not an automatic replacement for `relative`
-- normalization candidate plan: 4 runnable candidates
-  (`arm-rest-pose-offset` across 3 samples plus `Jump` `root-scale-to-model`)
-  and 6 blocked pose candidates (`stance-width-adapter`,
-  `shoulder-width-adapter` across 3 samples)
-- `arm-rest-pose-offset`: applies 4 upper/lower arm pose offsets around 90deg
-  and remains runnable but not automatic. `LookAround` stayed `stable`
-  (max tracked-node delta +0.0013), `Goodbye` improved max tracked-node
-  displacement by 0.0135, and `Jump` regressed it by 0.0807, so adoption must
-  stay compare-gated per sample
+- normalization candidate plan: 2 runnable candidates (`Goodbye`
+  `arm-rest-pose-offset` and `Jump` `root-scale-to-model`) and 8 blocked
+  candidates, including motion-gated arm-rest candidates for `LookAround` and
+  `Jump`
+- `arm-rest-pose-offset`: applies 4 upper/lower arm pose offsets around 90deg.
+  The motion gate removes the known regressing `Jump` case; `Goodbye` remains
+  runnable but non-automatic because it still needs a broader policy before
+  becoming a default
 - `--fail-on-tradeoff` rejects the runnable root candidate automatically
   because its comparison is mixed, so it does not become the new default
-- candidate selection summary: 2 runnable candidate groups were compared and
-  both are rejected. `arm-rest-pose-offset` has 1 improved, 1 stable, and 1
-  regressed sample; `root-scale-to-model` remains a tradeoff on `Jump`
+- candidate selection summary: 2 runnable candidate groups were compared.
+  `arm-rest-pose-offset` is now `needs-policy` with one improved sample;
+  `root-scale-to-model` remains rejected as a `Jump` tradeoff
 - retarget profile: `robot-voxel` (`simple-rig` is an alias)
 - quality verdict: `pass`
 - retarget weighted score: 1.0, penalty 0

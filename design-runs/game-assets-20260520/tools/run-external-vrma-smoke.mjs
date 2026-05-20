@@ -381,6 +381,7 @@ function summarizeNormalization(audit) {
       skeletonBounds: audit.targetRig.skeletonBounds,
       bindMetrics: audit.targetRig.bindMetrics,
     } : null,
+    motionActivity: audit.motionActivity ?? null,
     sourceTargetRigComparison: audit.sourceTargetRigComparison ?? null,
     normalizationCandidates: collectNormalizationCandidates(audit, rootTranslations),
     rootTranslations,

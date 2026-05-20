@@ -60,7 +60,7 @@
           "shoulder-width-adapter"
         ],
         "candidateStatuses": {
-          "arm-rest-pose-offset": "runnable",
+          "arm-rest-pose-offset": "needs-motion-evidence",
           "stance-width-adapter": "needs-implementation",
           "shoulder-width-adapter": "review-target-rig"
         },
@@ -68,6 +68,9 @@
           "arm-rest-pose-offset": false,
           "stance-width-adapter": false,
           "shoulder-width-adapter": false
+        },
+        "candidateMotionGateStatuses": {
+          "arm-rest-pose-offset": "blocked"
         }
       }
     },
@@ -131,6 +134,9 @@
           "arm-rest-pose-offset": false,
           "stance-width-adapter": false,
           "shoulder-width-adapter": false
+        },
+        "candidateMotionGateStatuses": {
+          "arm-rest-pose-offset": "passed"
         }
       }
     },
@@ -187,7 +193,7 @@
           "shoulder-width-adapter"
         ],
         "candidateStatuses": {
-          "arm-rest-pose-offset": "runnable",
+          "arm-rest-pose-offset": "needs-motion-evidence",
           "stance-width-adapter": "needs-implementation",
           "shoulder-width-adapter": "review-target-rig"
         },
@@ -195,6 +201,9 @@
           "arm-rest-pose-offset": false,
           "stance-width-adapter": false,
           "shoulder-width-adapter": false
+        },
+        "candidateMotionGateStatuses": {
+          "arm-rest-pose-offset": "blocked"
         }
       }
     }
