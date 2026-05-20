@@ -213,6 +213,8 @@ Observed shape:
 - target base root height: 1.25
 - root delta y range: `LookAround` -0.006..0.003, `Goodbye` -0.007..0.011,
   `Jump` -0.094..0.230
+- root height scale recommendation: `LookAround` `relative-ok`, `Goodbye`
+  `relative-ok`, `Jump` `consider-scale-to-model`
 - retarget profile: `robot-voxel` (`simple-rig` is an alias)
 - quality verdict: `pass`
 - retarget weighted score: 1.0, penalty 0
@@ -261,7 +263,11 @@ Learned:
   avatar's body height into the target pelvis.
 - The normalization audit is the right boundary for autonomous debugging:
   it records source root height, target base height, delta ranges, normalized
-  ranges, and scale without opening a viewer.
+  ranges, scale, and root scaling recommendations without opening a viewer.
+- Recommendation policy should not change the selected normalization mode
+  automatically. It is a smoke-report signal: small vertical deltas can stay
+  `relative`, while Jump-like clips with large vertical root motion should be
+  compared against `scale-to-model`.
 - Ground checks should compare the animated bounds against the normalized bind
   bounds (`groundDeltaY`), not raw world `minGroundY` after camera-fit
   normalization.

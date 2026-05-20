@@ -37,7 +37,8 @@ The concrete scenario used a voxel robot and real `.vrma` motion samples from
   CI-style loops. The failure report keeps the quality summary for debugging.
 - `apply-motion-ir --audit-out` now writes a root normalization audit. The
   smoke report summarizes source root height, target base height, root delta
-  ranges, normalized ranges, and applied scale for each root translation track.
+  ranges, normalized ranges, applied scale, and a root scaling recommendation
+  for each root translation track.
 - Animation renders wait for two extra browser frames after viewer readiness
   before screenshot capture, reducing first-frame WebGL paint races.
 - The renderer saves canvas PNG data directly and retries transparent capture
@@ -115,6 +116,11 @@ schema out of the dogfood directory.
 - Normalization must leave a machine-readable audit trail. Otherwise an agent
   cannot tell whether a bad render came from parser drift, root scaling, or the
   target rig's bind pose.
+- The audit should recommend, not silently switch, root scaling policy. In the
+  current three-sample set, `LookAround` and `Goodbye` stay `relative-ok`
+  because their vertical root motion is tiny; `Jump` emits
+  `consider-scale-to-model` because source/target root height differs and the
+  clip has meaningful vertical root motion.
 
 ## Next Implementation Order
 
@@ -126,8 +132,8 @@ schema out of the dogfood directory.
      fail.
 
 2. **Root and ground normalization**
-   - Add source/target height scaling to the existing root translation modes:
-     keep, relative, zero, horizontal-only, scale-to-model.
+   - Compare the current recommendation-only source/target height scaling
+     policy against actual `scale-to-model` smoke outputs.
    - Expand the current normalization audit from target base height to full
      target bind height.
    - Add actionable suggestions when `groundDeltaY` exceeds thresholds.

@@ -345,8 +345,13 @@ function summarizeNormalization(audit) {
       sourceInitialRootHeight: item.sourceInitialRootHeight,
       targetBaseRootHeight: item.targetBaseRootHeight,
       appliedScale: item.appliedScale,
+      heightScale: item.heightScale,
+      heightScaleDelta: item.heightScaleDelta,
+      verticalDeltaRange: item.verticalDeltaRange,
+      horizontalDeltaRange: item.horizontalDeltaRange,
       deltaRange: item.deltaRange,
       normalizedRange: item.normalizedRange,
+      recommendation: item.recommendation,
     })),
   );
   return {

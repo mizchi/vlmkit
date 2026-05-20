@@ -1033,6 +1033,9 @@ Current smoke status:
 - [x] Root translation normalization audit: `apply-motion-ir --audit-out`
   records source root height, target base height, delta ranges, normalized
   ranges, and applied scale for each root translation track
+- [x] Root normalization audit recommendations: source/target root height
+  scale, vertical/horizontal root motion ranges, and recommendation ids such
+  as `relative-ok` or `consider-scale-to-model`
 - [x] Named `robot-voxel` retarget profile for voxel robot smoke: skipped
   fingers, toes, chest, neck, and shoulders are tolerated with zero penalty,
   while skipped core bones fail the weighted profile
@@ -1106,8 +1109,9 @@ Stepwise cleanup:
   trail over asking for manual pose judgment. First pass exists in
   `apply-motion-ir.mjs`; external VRMA smoke defaults to relative root motion.
   `--audit-out` now records source root height, target base height, delta
-  ranges, normalized ranges, and scale. Remaining work is source/target height
-  scaling policy and pose mismatch scoring.
+  ranges, normalized ranges, scale, and a source/target height scaling
+  recommendation. Remaining work is full target bind-height measurement and
+  pose mismatch scoring.
 - [ ] **G6. VRM + VRMA real playback check.** Use a real VRM model with a
   matching VRMA file to verify that our extractor agrees with an expected
   runtime playback path before retargeting onto simplified generated assets.

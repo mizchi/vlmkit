@@ -69,6 +69,13 @@ async function main() {
     checkRange(checks, `sample:${sampleName}:footMinDeltaY.max`, sample.quality?.metrics?.footContact?.minDeltaY?.max, expected.footMinDeltaY?.max);
     checkRange(checks, `sample:${sampleName}:maxTrackedNodeDisplacement`, maxTrackedNodeDisplacement(sample), expected.maxTrackedNodeDisplacement);
     checkRange(checks, `sample:${sampleName}:maxPelvisDisplacement`, sample.quality?.metrics?.trackedNodeDisplacement?.pelvis?.max, expected.maxPelvisDisplacement);
+    if (expected.rootNormalization) {
+      const rootNormalization = firstRootNormalization(sample);
+      checkEqual(checks, `sample:${sampleName}:rootNormalization.recommendation`, rootNormalization?.recommendation?.id, expected.rootNormalization.recommendation);
+      checkEqual(checks, `sample:${sampleName}:rootNormalization.severity`, rootNormalization?.recommendation?.severity, expected.rootNormalization.severity);
+      checkRange(checks, `sample:${sampleName}:rootNormalization.heightScale`, rootNormalization?.heightScale, expected.rootNormalization.heightScale);
+      checkRange(checks, `sample:${sampleName}:rootNormalization.verticalDeltaRange`, rootNormalization?.verticalDeltaRange, expected.rootNormalization.verticalDeltaRange);
+    }
   }
 
   const ok = checks.every((check) => check.ok);
@@ -90,6 +97,10 @@ function maxTrackedNodeDisplacement(sample) {
     .map((range) => range?.max)
     .filter(Number.isFinite);
   return values.length > 0 ? Math.max(...values) : null;
+}
+
+function firstRootNormalization(sample) {
+  return sample.normalization?.rootTranslations?.[0] ?? null;
 }
 
 function checkEqual(checks, id, actual, expected) {

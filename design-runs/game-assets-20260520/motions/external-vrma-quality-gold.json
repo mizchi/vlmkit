@@ -21,7 +21,13 @@
         "max": [-0.01, 0.04]
       },
       "maxTrackedNodeDisplacement": [0.8, 1.15],
-      "maxPelvisDisplacement": [0, 0.2]
+      "maxPelvisDisplacement": [0, 0.2],
+      "rootNormalization": {
+        "recommendation": "relative-ok",
+        "severity": "info",
+        "heightScale": [1.35, 1.5],
+        "verticalDeltaRange": [0, 0.03]
+      }
     },
     "Goodbye": {
       "verdict": "pass",
@@ -36,7 +42,13 @@
         "max": [-0.01, 0.04]
       },
       "maxTrackedNodeDisplacement": [0.8, 1.15],
-      "maxPelvisDisplacement": [0, 0.2]
+      "maxPelvisDisplacement": [0, 0.2],
+      "rootNormalization": {
+        "recommendation": "relative-ok",
+        "severity": "info",
+        "heightScale": [1.35, 1.5],
+        "verticalDeltaRange": [0, 0.03]
+      }
     },
     "Jump": {
       "verdict": "pass",
@@ -51,7 +63,13 @@
         "max": [0.08, 0.16]
       },
       "maxTrackedNodeDisplacement": [0.9, 1.2],
-      "maxPelvisDisplacement": [0.1, 0.25]
+      "maxPelvisDisplacement": [0.1, 0.25],
+      "rootNormalization": {
+        "recommendation": "consider-scale-to-model",
+        "severity": "warn",
+        "heightScale": [1.35, 1.55],
+        "verticalDeltaRange": [0.25, 0.4]
+      }
     }
   }
 }

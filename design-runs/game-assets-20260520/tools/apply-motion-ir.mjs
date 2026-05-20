@@ -150,9 +150,16 @@ function recordRootTranslationAudit(audit, clip, track, nodeName, baseTranslatio
   const normalizedTranslations = samples.values.map((value) => vec3(value, `normalized translation for ${clip.id}.${track.target}`));
   const base = vec3(baseTranslation, "base translation");
   const first = sourceTranslations[0] ?? [0, 0, 0];
-  const scale = rootTranslationMode === "scale-to-model" && Math.abs(first[1]) > 0.0001
-    ? base[1] / first[1]
-    : 1;
+  const heightScale = Math.abs(first[1]) > 0.0001 ? base[1] / first[1] : null;
+  const scale = rootTranslationMode === "scale-to-model" && heightScale !== null ? heightScale : 1;
+  const deltaRange = vec3Range(sourceTranslations.map((value) => [
+    value[0] - first[0],
+    value[1] - first[1],
+    value[2] - first[2],
+  ]));
+  const verticalDeltaRange = axisRange(deltaRange, 1);
+  const horizontalDeltaRange = Math.hypot(axisRange(deltaRange, 0), axisRange(deltaRange, 2));
+  const heightScaleDelta = heightScale === null ? null : Math.abs(heightScale - 1);
   const clipAudit = audit.clips.find((item) => item.id === clip.id) ?? { id: clip.id, durationSeconds: clip.durationSeconds ?? null, rootTranslations: [] };
   if (!audit.clips.includes(clipAudit)) audit.clips.push(clipAudit);
   clipAudit.rootTranslations.push({
@@ -165,14 +172,84 @@ function recordRootTranslationAudit(audit, clip, track, nodeName, baseTranslatio
     sourceInitialRootHeight: round(first[1]),
     targetBaseRootHeight: round(base[1]),
     appliedScale: round(scale),
+    heightScale: roundNullable(heightScale),
+    heightScaleDelta: roundNullable(heightScaleDelta),
+    verticalDeltaRange: round(verticalDeltaRange),
+    horizontalDeltaRange: round(horizontalDeltaRange),
     sourceRange: vec3Range(sourceTranslations),
     normalizedRange: vec3Range(normalizedTranslations),
-    deltaRange: vec3Range(sourceTranslations.map((value) => [
-      value[0] - first[0],
-      value[1] - first[1],
-      value[2] - first[2],
-    ])),
+    deltaRange,
+    recommendation: recommendRootTranslationNormalization({
+      mode: rootTranslationMode,
+      heightScale,
+      heightScaleDelta,
+      verticalDeltaRange,
+    }),
   });
+}
+
+function recommendRootTranslationNormalization({ mode, heightScale, heightScaleDelta, verticalDeltaRange }) {
+  if (heightScale === null) {
+    return {
+      id: "height-scale-unavailable",
+      severity: "warn",
+      reason: "source initial root height is too close to zero to compare source and target scale",
+    };
+  }
+  if (mode === "scale-to-model") {
+    return {
+      id: "scale-to-model-active",
+      severity: "info",
+      reason: "root deltas are scaled by target/source root height",
+    };
+  }
+  if (mode === "zero") {
+    return {
+      id: "root-motion-locked",
+      severity: "info",
+      reason: "root translation is locked to the target base transform",
+    };
+  }
+  if (mode === "horizontal-only") {
+    if (verticalDeltaRange >= VERTICAL_ROOT_MOTION_SCALE_THRESHOLD) {
+      return {
+        id: "vertical-motion-dropped",
+        severity: "warn",
+        reason: "clip has meaningful vertical root motion but horizontal-only mode drops it",
+      };
+    }
+    return {
+      id: "horizontal-only-ok",
+      severity: "info",
+      reason: "vertical root delta is small enough for horizontal-only normalization",
+    };
+  }
+  if (mode === "keep") {
+    if (heightScaleDelta >= HEIGHT_SCALE_DELTA_THRESHOLD) {
+      return {
+        id: "source-space-kept",
+        severity: "warn",
+        reason: "source and target root heights differ; keep mode may import source avatar scale",
+      };
+    }
+    return {
+      id: "keep-ok",
+      severity: "info",
+      reason: "source and target root heights are close enough for keep mode",
+    };
+  }
+  if (heightScaleDelta >= HEIGHT_SCALE_DELTA_THRESHOLD && verticalDeltaRange >= VERTICAL_ROOT_MOTION_SCALE_THRESHOLD) {
+    return {
+      id: "consider-scale-to-model",
+      severity: "warn",
+      reason: "source and target root heights differ and the clip has meaningful vertical root motion; compare scale-to-model before accepting relative",
+    };
+  }
+  return {
+    id: "relative-ok",
+    severity: "info",
+    reason: "relative root motion avoids importing source avatar height while preserving the clip delta",
+  };
 }
 
 function normalizeSamples(clip, track, options = {}) {
@@ -278,6 +355,11 @@ function vec3Range(values) {
   };
 }
 
+function axisRange(range, axis) {
+  if (!range) return 0;
+  return range.max[axis] - range.min[axis];
+}
+
 function decodeGlb(buffer) {
   if (buffer.readUInt32LE(0) !== 0x46546c67) throw new Error("invalid GLB magic");
   if (buffer.readUInt32LE(4) !== 2) throw new Error("unsupported GLB version");
@@ -380,7 +462,13 @@ function round(value) {
   return Math.round(value * 100000) / 100000;
 }
 
+function roundNullable(value) {
+  return value === null ? null : round(value);
+}
+
 const ROOT_TRANSLATION_TARGETS = new Set(["root", "hips", "pelvis", "robot_root"]);
+const HEIGHT_SCALE_DELTA_THRESHOLD = 0.2;
+const VERTICAL_ROOT_MOTION_SCALE_THRESHOLD = 0.08;
 
 main().catch((error) => {
   console.error(error instanceof Error ? error.message : error);

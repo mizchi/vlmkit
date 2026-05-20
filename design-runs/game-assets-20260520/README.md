@@ -251,8 +251,8 @@ shared tools now live in `tools/`:
   samples for local smoke tests
 - `tools/run-external-vrma-smoke.mjs`: batch fetch/extract/retarget/render
   external VRMA samples and write a structured smoke report; supports
-  normalization audit summaries and `--min-quality pass|warn|fail` for
-  CI-style gating
+  normalization audit summaries, root scaling recommendations, and
+  `--min-quality pass|warn|fail` for CI-style gating
 - `tools/verify-motion-quality.mjs`: turn render metadata, frame bboxes,
   normalized ground deltas, tracked foot contact, tracked limb displacement,
   and Motion IR warnings into `pass` / `warn` / `fail`; supports strict and
