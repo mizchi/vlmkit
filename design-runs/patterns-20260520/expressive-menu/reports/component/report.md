@@ -9,7 +9,7 @@ Current: `/Users/mz/ghq/github.com/mizchi/vlmkit/design-runs/patterns-20260520/e
 
 **Goal**: `expressive-menu` (Expressive menu) — **pass**
 
-Expressive menu pass: landscape 2.54% <= 5.00%, expressive selected ok, menu text ok, items 5, composition 6 layers/9 shapes, diagonal ok, contrast ok
+Expressive menu pass: landscape 2.54% <= 5.00%, expressive selected ok, menu text ok, items 5, composition 6 layers/9 shapes, diagonal ok, contrast ok, contrast min 5.03, 0 low contrast, hover changed, focus changed
 
 - Target:   `/Users/mz/ghq/github.com/mizchi/vlmkit/design-runs/patterns-20260520/expressive-menu/target.png`
 - Current:  `/Users/mz/ghq/github.com/mizchi/vlmkit/design-runs/patterns-20260520/expressive-menu/reports/component/current.png`
@@ -40,15 +40,15 @@ The lanes are intentionally separate. Run the layout lane first until section pl
 
 | Priority | Landmark | Box | Width | Height | Scroll | Grid | Layout | Decoration | Evidence | Next |
 |---:|---|---|---|---|---|---|---:|---:|---|---|
-| 33.5 | `main "Night Dispatch"` | 514,143 863×614 | fluid-unbounded | content | none | block | 11.8% | 86.9% | 5 landscape cell(s), 3 heatmap region(s) | fix landmark geometry / spacing / section placement |
+| 33.5 | `main "Night Dispatch"` | 514,143 863×614 | fluid measured 848px | content | none | block | 11.8% | 86.9% | 5 landscape cell(s), 3 heatmap region(s) | fix landmark geometry / spacing / section placement |
 | 25.0 | `banner` | 70,36 1300×70 | bounded max 1300px | bounded min 70px | none | flex | 24.2% | 3.2% | 2 landscape cell(s), 1 heatmap region(s) | fix landmark geometry / spacing / section placement |
-| 16.3 | `navigation "Primary commands"` | 50,168 461×520 | fluid-unbounded | content | none | grid | 9.4% | 27.8% | 2 landscape cell(s), 3 heatmap region(s) | fix landmark geometry / spacing / section placement |
+| 16.3 | `navigation "Primary commands"` | 50,168 461×520 | fluid measured 420px | content | none | grid | 9.4% | 27.8% | 2 landscape cell(s), 3 heatmap region(s) | fix landmark geometry / spacing / section placement |
 
 ### Decoration lane
 
 | Priority | Landmark | Box | Width | Height | Scroll | Grid | Layout | Decoration | Evidence | Next |
 |---:|---|---|---|---|---|---|---:|---:|---|---|
-| 87.1 | `region "Dispatch status"` | 70,770 1300×98 | fluid-unbounded | content | none | grid | 0.0% | 87.1% | 0 landscape cell(s), 4 heatmap region(s) | fix colors / media / text styling after layout stabilizes |
+| 87.1 | `region "Dispatch status"` | 70,770 1300×98 | fluid measured 1300px | content | none | grid | 0.0% | 87.1% | 0 landscape cell(s), 4 heatmap region(s) | fix colors / media / text styling after layout stabilizes |
 
 ## Expressive menu inspector
 
@@ -63,6 +63,11 @@ Current DOM evidence for poster-like menu surfaces. This checks semantic menu te
 | Composition shapes | 9 |
 | Diagonal / layered evidence | ok |
 | High contrast | ok |
+| Minimum menu contrast | 5.03 |
+| Low-contrast menu items | 0 |
+| Contrast source | pixel |
+| Hover state changes | ok |
+| Focus-visible state changes | ok |
 
 ## Component bbox diff
 
@@ -114,7 +119,7 @@ Each row: current HTML rendered with the named pseudo-class forced on all intera
 
 | State | Perceptual % | Raw % | Edge % | ΔLuma | Forced | Note |
 |---|---|---|---|---|---|---|
-| `:hover` | 5.35% | 6.01% | 0% | +63.4 | 5 | **direction?** — `:hover` lightened by 63 luma; verify this matches the intended hover direction |
+| `:hover` | 5.35% | 6.01% | 0% | +63.4 | 5 |  |
 | `:focus-visible` | 5.35% | 6.01% | 0% | +63.4 | 5 |  |
 
 ## Suggested CSS patch

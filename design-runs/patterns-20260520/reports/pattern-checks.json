@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-19T19:27:56.155Z",
+  "generatedAt": "2026-05-20T05:52:20.415Z",
   "landing": {
     "ctaInFirstViewport": true,
     "nextSectionHintVisible": true,
@@ -60,6 +60,9 @@
     "semanticShell": true,
     "selectedVisible": true,
     "selectedContrast": 5.06,
+    "minMenuContrast": 5.03,
+    "lowContrastItemCount": 0,
+    "contrastSource": "pixel",
     "highContrast": true,
     "focusableItemCount": 5,
     "semanticMenuText": true,

@@ -9,7 +9,7 @@ Current: `/Users/mz/ghq/github.com/mizchi/vlmkit/design-runs/patterns-20260520/a
 
 **Goal**: `app-shell` (App shell) — **fail**
 
-App shell fail: landscape 0.14% <= 5.00%, scrollports 2/3 ok, 1 broken
+App shell fail: landscape 0.14% <= 5.00%, scrollports 2/3 ok, 1 broken, expected 2/3 ok, 1 expected broken: messages
 
 - Target:   `/Users/mz/ghq/github.com/mizchi/vlmkit/design-runs/patterns-20260520/app-shell/target.png`
 - Current:  `/Users/mz/ghq/github.com/mizchi/vlmkit/design-runs/patterns-20260520/app-shell/reports/component/current.png`
@@ -44,10 +44,10 @@ No layout rows detected.
 
 | Priority | Landmark | Box | Width | Height | Scroll | Grid | Layout | Decoration | Evidence | Next |
 |---:|---|---|---|---|---|---|---:|---:|---|---|
-| 4.2 | `main` | 336,58 848×842 | fluid-unbounded | content | none | grid | 1.2% | 3.9% | 8 landscape cell(s), 8 heatmap region(s) | fix colors / media / text styling after layout stabilizes |
-| 1.6 | `region "Messages"` | 336,58 848×769 | fluid-unbounded | content | none | grid | 1.2% | 1.3% | 8 landscape cell(s), 4 heatmap region(s) | fix colors / media / text styling after layout stabilizes |
-| 0.4 | `complementary "Members"` | 1184,58 256×842 | fluid-unbounded | scrollport-y | y | block | 0.0% | 0.4% | 0 landscape cell(s), 1 heatmap region(s) | fix colors / media / text styling after layout stabilizes |
-| 0.3 | `complementary "Workspace navigation"` | 72,0 264×900 | fluid-unbounded | content | none | grid | 0.0% | 0.3% | 0 landscape cell(s), 1 heatmap region(s) | fix colors / media / text styling after layout stabilizes |
+| 4.2 | `main` | 336,58 848×842 | fluid measured 848px | content | none | grid | 1.2% | 3.9% | 8 landscape cell(s), 8 heatmap region(s) | fix colors / media / text styling after layout stabilizes |
+| 1.6 | `region "Messages"` | 336,58 848×769 | fluid measured 848px | content | none | grid | 1.2% | 1.3% | 8 landscape cell(s), 4 heatmap region(s) | fix colors / media / text styling after layout stabilizes |
+| 0.4 | `complementary "Members"` | 1184,58 256×842 | fluid measured 255px | scrollport-y | y | block | 0.0% | 0.4% | 0 landscape cell(s), 1 heatmap region(s) | fix colors / media / text styling after layout stabilizes |
+| 0.3 | `complementary "Workspace navigation"` | 72,0 264×900 | fluid measured 263px | content | none | grid | 0.0% | 0.3% | 0 landscape cell(s), 1 heatmap region(s) | fix colors / media / text styling after layout stabilizes |
 
 ## Scrollport inspector
 

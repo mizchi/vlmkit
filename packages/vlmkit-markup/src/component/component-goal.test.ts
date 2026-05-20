@@ -76,6 +76,34 @@ test("app-shell goal sends missing scrollport evidence to review", () => {
   assert.match(result.summary, /no explicit scrollports/);
 });
 
+test("app-shell goal fails when contract expected scrollports are missing", () => {
+  const result = evaluateComponentGoal({
+    goal: "app-shell",
+    pixelDiffRatio: 0.02,
+    landscapeDiffRatio: 0.001,
+    scrollports: {
+      total: 2,
+      ok: 2,
+      broken: 0,
+      empty: 0,
+      expected: {
+        total: 3,
+        ok: 2,
+        missing: 1,
+        broken: 0,
+        empty: 0,
+        missingNames: ["messages"],
+        brokenNames: [],
+        emptyNames: [],
+      },
+    },
+  });
+
+  assert.equal(result.status, "fail");
+  assert.match(result.summary, /expected 2\/3 ok/);
+  assert.match(result.summary, /1 expected missing: messages/);
+});
+
 test("landing goal passes when first-viewport evidence is present", () => {
   const result = evaluateComponentGoal({
     goal: "landing",
@@ -152,6 +180,10 @@ test("expressive-menu goal passes with semantic composition evidence", () => {
       semanticMenuText: true,
       diagonalEvidence: true,
       highContrast: true,
+      minMenuContrastRatio: 5.06,
+      lowContrastItemCount: 0,
+      hoverChanged: true,
+      focusVisibleChanged: true,
     },
   });
 
@@ -174,12 +206,63 @@ test("expressive-menu goal fails when selected state or contrast evidence is mis
       semanticMenuText: true,
       diagonalEvidence: true,
       highContrast: false,
+      minMenuContrastRatio: 2.8,
+      lowContrastItemCount: 1,
+      hoverChanged: true,
+      focusVisibleChanged: true,
     },
   });
 
   assert.equal(result.status, "fail");
   assert.match(result.summary, /selected missing/);
   assert.match(result.summary, /contrast missing/);
+  assert.match(result.summary, /contrast min 2\.80/);
+  assert.match(result.summary, /1 low contrast/);
+});
+
+test("expressive-menu goal reviews missing state probes and fails inert state probes", () => {
+  const noProbe = evaluateComponentGoal({
+    goal: "expressive-menu",
+    pixelDiffRatio: 0.05,
+    landscapeDiffRatio: 0.01,
+    expressiveMenu: {
+      compositionLayers: 3,
+      compositionShapes: 2,
+      selectedVisible: true,
+      focusableItemCount: 4,
+      semanticMenuText: true,
+      diagonalEvidence: true,
+      highContrast: true,
+      minMenuContrastRatio: 5.06,
+      lowContrastItemCount: 0,
+      hoverChanged: null,
+      focusVisibleChanged: null,
+    },
+  });
+  assert.equal(noProbe.status, "review");
+  assert.match(noProbe.summary, /state probes missing/);
+
+  const inert = evaluateComponentGoal({
+    goal: "expressive-menu",
+    pixelDiffRatio: 0.05,
+    landscapeDiffRatio: 0.01,
+    expressiveMenu: {
+      compositionLayers: 3,
+      compositionShapes: 2,
+      selectedVisible: true,
+      focusableItemCount: 4,
+      semanticMenuText: true,
+      diagonalEvidence: true,
+      highContrast: true,
+      minMenuContrastRatio: 5.06,
+      lowContrastItemCount: 0,
+      hoverChanged: false,
+      focusVisibleChanged: false,
+    },
+  });
+  assert.equal(inert.status, "fail");
+  assert.match(inert.summary, /hover inert/);
+  assert.match(inert.summary, /focus inert/);
 });
 
 test("unknown goal falls back to app profile", () => {

@@ -34,6 +34,28 @@
           "required": true
         }
       ],
+      "requiredStates": [
+        {
+          "id": "selected-menu-item",
+          "kind": "selected",
+          "selector": "[data-selected=\"true\"]",
+          "required": true
+        },
+        {
+          "id": "menu-hover",
+          "kind": "hover",
+          "selector": ".menu button",
+          "required": true,
+          "minChangeRatio": 0.001
+        },
+        {
+          "id": "menu-focus",
+          "kind": "focus-visible",
+          "selector": ".menu button",
+          "required": true,
+          "minChangeRatio": 0.001
+        }
+      ],
       "composition": {
         "style": "poster",
         "axes": ["diagonal", "layered"],

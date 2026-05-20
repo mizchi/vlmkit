@@ -2,6 +2,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { chromium } from "playwright";
+import { PNG } from "pngjs";
+import { sampleContrastFromImage } from "../../packages/vlmkit-markup/src/component/component-from-image.ts";
 
 const runDir = dirname(fileURLToPath(import.meta.url));
 
@@ -109,9 +111,25 @@ async function checkExpressiveMenu(browser) {
     }
 
     function parseRgb(value) {
-      const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+      const parsed = parseRgba(value);
+      return parsed ? [parsed[0], parsed[1], parsed[2]] : undefined;
+    }
+
+    function parseRgba(value) {
+      const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?/i);
       if (!match) return undefined;
-      return [Number(match[1]), Number(match[2]), Number(match[3])];
+      return [Number(match[1]), Number(match[2]), Number(match[3]), match[4] === undefined ? 1 : Number(match[4])];
+    }
+
+    function effectiveBackground(el) {
+      let cursor = el;
+      while (cursor) {
+        const rgba = parseRgba(getComputedStyle(cursor).backgroundColor);
+        if (rgba && rgba[3] > 0.01) return [rgba[0], rgba[1], rgba[2]];
+        cursor = cursor.parentElement;
+      }
+      const bodyBg = parseRgba(getComputedStyle(document.body).backgroundColor);
+      return bodyBg ? [bodyBg[0], bodyBg[1], bodyBg[2]] : undefined;
     }
 
     function channel(value) {
@@ -131,8 +149,26 @@ async function checkExpressiveMenu(browser) {
 
     const selectedStyle = selected ? getComputedStyle(selected) : undefined;
     const selectedColor = selectedStyle ? parseRgb(selectedStyle.color) : undefined;
-    const selectedBg = selectedStyle ? parseRgb(selectedStyle.backgroundColor) : undefined;
+    const selectedBg = selected ? effectiveBackground(selected) : undefined;
     const selectedContrast = selectedColor && selectedBg ? contrastRatio(selectedColor, selectedBg) : 0;
+    const menuContrasts = menuItems.filter(isVisible).map((el) => {
+      const style = getComputedStyle(el);
+      const color = parseRgb(style.color);
+      const bg = effectiveBackground(el);
+      return color && bg ? contrastRatio(color, bg) : 0;
+    });
+    const menuItemSamples = menuItems.filter(isVisible).map((el) => {
+      const style = getComputedStyle(el);
+      const color = parseRgb(style.color);
+      if (!color) return undefined;
+      const rect = el.getBoundingClientRect();
+      return {
+        bbox: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+        color,
+      };
+    }).filter(Boolean);
+    const minMenuContrast = menuContrasts.length > 0 ? Math.min(...menuContrasts) : 0;
+    const lowContrastItemCount = menuContrasts.filter((ratio) => ratio < 4.5).length;
     const diagonalEvidence = [...layers, ...shapes].some((el) => {
       const style = getComputedStyle(el);
       return style.transform !== "none" || style.clipPath !== "none";
@@ -142,7 +178,11 @@ async function checkExpressiveMenu(browser) {
       semanticShell: !!document.querySelector("header") && !!document.querySelector("nav") && !!document.querySelector("main"),
       selectedVisible: isVisible(selected),
       selectedContrast: Number(selectedContrast.toFixed(2)),
-      highContrast: selectedContrast >= 4.5,
+      minMenuContrast: Number(minMenuContrast.toFixed(2)),
+      lowContrastItemCount,
+      contrastSource: "dom",
+      menuItemSamples,
+      highContrast: selectedContrast >= 4.5 && lowContrastItemCount === 0,
       focusableItemCount: menuItems.filter(isVisible).length,
       semanticMenuText: menuItems.every((el) => (el.textContent ?? "").trim().length >= 2),
       compositionLayerCount: layers.length,
@@ -151,8 +191,23 @@ async function checkExpressiveMenu(browser) {
       imageTextCount: document.querySelectorAll("img").length,
     };
   });
+  const screenshot = PNG.sync.read(await page.screenshot({ fullPage: false }));
   await page.close();
-  return result;
+  const pixelRatios = result.menuItemSamples
+    .map((sample) => sampleContrastFromImage(screenshot, sample).contrastRatio)
+    .filter((ratio) => ratio !== null && Number.isFinite(ratio));
+  const pixelMin = pixelRatios.length > 0 ? Math.min(...pixelRatios) : undefined;
+  const pixelLowCount = pixelRatios.filter((ratio) => ratio < 4.5).length;
+  const { menuItemSamples: _samples, ...publicResult } = result;
+  return {
+    ...publicResult,
+    minMenuContrast: pixelMin !== undefined ? Number(pixelMin.toFixed(2)) : result.minMenuContrast,
+    lowContrastItemCount: pixelMin !== undefined ? pixelLowCount : result.lowContrastItemCount,
+    contrastSource: pixelMin !== undefined ? "pixel" : result.contrastSource,
+    highContrast: pixelMin !== undefined
+      ? result.selectedContrast >= 4.5 && pixelLowCount === 0
+      : result.highContrast,
+  };
 }
 
 const browser = await chromium.launch();

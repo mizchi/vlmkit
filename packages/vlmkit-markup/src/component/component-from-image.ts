@@ -64,10 +64,17 @@ import {
   listComponentGoals,
   type ComponentGoalEvaluation,
   type ComponentCanvasEvidence,
+  type ComponentExpectedScrollportEvidence,
   type ComponentExpressiveMenuEvidence,
   type ComponentLandingEvidence,
   type ComponentScrollportEvidence,
 } from "./component-goal.ts";
+import {
+  validateUiContract,
+  type UiContract,
+  type UiContractScreen,
+  type UiExpectedScrollportContract,
+} from "../contract/ui-contract.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
@@ -84,6 +91,8 @@ export interface ComponentFromImageOptions {
   threshold?: number;
   /** Convergence goal used for pass/review/fail reporting. Default: app. */
   goal?: string;
+  /** Optional UI Contract JSON. Its screen goal, required states, and expected scrollports can fill omitted CLI flags. */
+  contractPath?: string;
   /**
    * Device pixel ratio for capture. Default 1. Use 2 to simulate
    * retina rendering — catches blurry low-res image assets that
@@ -130,6 +139,8 @@ export interface ComponentFromImageReport {
     interiorPixels: number;
     /** Mean luma at state minus mean luma at default, averaged over forced bbox interiors. Null if no bboxes. Negative = darker on state. */
     lumaDelta: number | null;
+    lumaBefore: number | null;
+    lumaAfter: number | null;
   }>;
   reportPath: string;
 }
@@ -138,6 +149,113 @@ export interface DeviceScaleFactorSuggestion {
   deviceScaleFactor: number;
   cssViewport: { width: number; height: number };
   reason: string;
+}
+
+interface ExpressiveMenuPixelSample {
+  bbox: { x: number; y: number; width: number; height: number };
+  color: [number, number, number];
+}
+
+interface ExpressiveMenuEvidenceWithSamples extends ComponentExpressiveMenuEvidence {
+  menuItemSamples?: ExpressiveMenuPixelSample[];
+}
+
+export interface ComponentContractRuntime {
+  goal?: string;
+  states: ForcedPseudoState[];
+  expectedScrollports: UiExpectedScrollportContract[];
+}
+
+export interface PixelContrastInput {
+  bbox: { x: number; y: number; width: number; height: number };
+  color: [number, number, number];
+  dpr?: number;
+}
+
+export interface PixelContrastResult {
+  background: [number, number, number] | null;
+  contrastRatio: number | null;
+  sampledPixels: number;
+}
+
+export function sampleContrastFromImage(
+  png: PNG,
+  input: PixelContrastInput,
+): PixelContrastResult {
+  const dpr = input.dpr ?? 1;
+  const x0 = Math.max(0, Math.floor(input.bbox.x * dpr));
+  const y0 = Math.max(0, Math.floor(input.bbox.y * dpr));
+  const x1 = Math.min(png.width, Math.ceil((input.bbox.x + input.bbox.width) * dpr));
+  const y1 = Math.min(png.height, Math.ceil((input.bbox.y + input.bbox.height) * dpr));
+  if (x1 <= x0 || y1 <= y0) {
+    return { background: null, contrastRatio: null, sampledPixels: 0 };
+  }
+
+  const buckets = new Map<string, { rgb: [number, number, number]; count: number }>();
+  const step = Math.max(1, Math.floor(Math.min(x1 - x0, y1 - y0) / 32));
+  let sampledPixels = 0;
+  for (let y = y0; y < y1; y += step) {
+    for (let x = x0; x < x1; x += step) {
+      const i = (y * png.width + x) * 4;
+      const a = png.data[i + 3] ?? 0;
+      if (a < 128) continue;
+      const rgb: [number, number, number] = [
+        png.data[i] ?? 0,
+        png.data[i + 1] ?? 0,
+        png.data[i + 2] ?? 0,
+      ];
+      if (rgbDistance(rgb, input.color) < 35) continue;
+      const quantized = quantizeRgb(rgb, 8);
+      const key = quantized.join(",");
+      const bucket = buckets.get(key);
+      if (bucket) bucket.count++;
+      else buckets.set(key, { rgb: quantized, count: 1 });
+      sampledPixels++;
+    }
+  }
+
+  let best: { rgb: [number, number, number]; count: number } | undefined;
+  for (const bucket of buckets.values()) {
+    if (!best || bucket.count > best.count) best = bucket;
+  }
+  if (!best) {
+    return { background: null, contrastRatio: null, sampledPixels };
+  }
+  return {
+    background: best.rgb,
+    contrastRatio: contrastRatio(input.color, best.rgb),
+    sampledPixels,
+  };
+}
+
+function quantizeRgb(rgb: [number, number, number], step: number): [number, number, number] {
+  return [
+    quantizeChannel(rgb[0], step),
+    quantizeChannel(rgb[1], step),
+    quantizeChannel(rgb[2], step),
+  ];
+}
+
+function quantizeChannel(value: number, step: number): number {
+  return Math.max(0, Math.min(255, Math.round(value / step) * step));
+}
+
+function rgbDistance(a: [number, number, number], b: [number, number, number]): number {
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+}
+
+function relativeLuma(rgb: [number, number, number]): number {
+  const channel = (value: number): number => {
+    const normalized = value / 255;
+    return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(rgb[0]) + 0.7152 * channel(rgb[1]) + 0.0722 * channel(rgb[2]);
+}
+
+function contrastRatio(a: [number, number, number], b: [number, number, number]): number {
+  const high = Math.max(relativeLuma(a), relativeLuma(b));
+  const low = Math.min(relativeLuma(a), relativeLuma(b));
+  return (high + 0.05) / (low + 0.05);
 }
 
 export function suggestDeviceScaleFactorForTarget(
@@ -218,13 +336,15 @@ function parseArgs(argv: string[]) {
   const states: ForcedPseudoState[] = [];
   let outputDir = "";
   let report = "";
+  let contract = "";
   let threshold = 0.03;
-  let goal = "app";
+  let goal: string | undefined;
   let deviceScaleFactor: number | undefined;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--output-dir") outputDir = argv[++i];
     else if (a === "--report") report = argv[++i];
+    else if (a === "--contract" || a === "--ui-contract") contract = argv[++i] ?? "";
     else if (a === "--threshold") threshold = parseFloat(argv[++i] ?? "0.03");
     else if (a === "--goal") goal = argv[++i] ?? "app";
     else if (a === "--device-scale-factor" || a === "--dpr") {
@@ -241,7 +361,55 @@ function parseArgs(argv: string[]) {
       positional.push(a);
     }
   }
-  return { positional, outputDir, report, threshold, goal, states, deviceScaleFactor };
+  return { positional, outputDir, report, contract, threshold, goal, states, deviceScaleFactor };
+}
+
+export function deriveComponentContractRuntime(contract: UiContract): ComponentContractRuntime {
+  const screen = contract.screens[0];
+  if (!screen) return { states: [], expectedScrollports: [] };
+  return deriveComponentRuntimeFromScreen(screen);
+}
+
+function deriveComponentRuntimeFromScreen(screen: UiContractScreen): ComponentContractRuntime {
+  return {
+    goal: screen.goal ?? screen.pattern,
+    states: requiredForcedStates(screen),
+    expectedScrollports: screen.expectedScrollports ?? [],
+  };
+}
+
+function requiredForcedStates(screen: UiContractScreen): ForcedPseudoState[] {
+  const states = new Set<ForcedPseudoState>();
+  for (const state of screen.requiredStates ?? []) {
+    if (isForcedPseudoState(state.kind)) states.add(state.kind);
+  }
+  return [...states];
+}
+
+function isForcedPseudoState(value: string): value is ForcedPseudoState {
+  return value === "hover" || value === "focus" || value === "active" || value === "focus-visible";
+}
+
+async function loadContractRuntime(path: string | undefined): Promise<ComponentContractRuntime> {
+  if (!path) return { states: [], expectedScrollports: [] };
+  const contractPath = resolve(path);
+  const contract = JSON.parse(await readFile(contractPath, "utf-8")) as UiContract;
+  const issues = validateUiContract(contract);
+  if (issues.length > 0) {
+    const details = issues.slice(0, 5).map((issue) => `${issue.path}: ${issue.message}`).join("; ");
+    throw new Error(`Invalid UI Contract: ${details}`);
+  }
+  return deriveComponentContractRuntime(contract);
+}
+
+function mergeForcedStates(
+  explicit: ForcedPseudoState[] | undefined,
+  injected: ForcedPseudoState[],
+): ForcedPseudoState[] | undefined {
+  const states = new Set<ForcedPseudoState>();
+  for (const state of explicit ?? []) states.add(state);
+  for (const state of injected) states.add(state);
+  return states.size > 0 ? [...states] : undefined;
 }
 
 export async function runComponentFromImage(
@@ -249,6 +417,9 @@ export async function runComponentFromImage(
 ): Promise<ComponentFromImageReport> {
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
+  const contractRuntime = await loadContractRuntime(options.contractPath);
+  const effectiveGoal = options.goal ?? contractRuntime.goal ?? "app";
+  const effectiveStates = mergeForcedStates(options.states, contractRuntime.states);
 
   const targetPath = resolve(options.targetImagePath);
   const targetPng = PNG.sync.read(await readFile(targetPath));
@@ -317,19 +488,7 @@ export async function runComponentFromImage(
     const totalPixels = diff?.totalPixels ?? (viewport.width * viewport.height);
     const heatmapPath = join(outputDir, "component_heatmap.png");
     const landscapeDiff = await compareLandscapeFromPngFiles(targetCopyPath, currentPath);
-    const scrollportEvidence = summarizeScrollportEvidence(scrollportRegions);
-    const goalEvaluation = evaluateComponentGoal({
-      goal: options.goal,
-      pixelDiffRatio: diffRatio,
-      landscapeDiffRatio: landscapeDiff.score,
-      scrollports: scrollportEvidence,
-      landing: landingEvidence,
-      canvas: canvasEvidence,
-      expressiveMenu: expressiveMenuEvidence,
-    });
-    const reportLandingEvidence = goalEvaluation.goal === "landing" ? landingEvidence : undefined;
-    const reportCanvasEvidence = goalEvaluation.goal === "canvas" ? canvasEvidence : undefined;
-    const reportExpressiveMenuEvidence = goalEvaluation.goal === "expressive-menu" ? expressiveMenuEvidence : undefined;
+    const scrollportEvidence = summarizeScrollportEvidence(scrollportRegions, contractRuntime.expectedScrollports);
 
     // All image-only signals run identically on both files.
     const [bboxBaseline, bboxVariant] = await Promise.all([
@@ -501,12 +660,12 @@ export async function runComponentFromImage(
     }
 
     const stateResults: ComponentFromImageReport["states"] = [];
-    if (options.states && options.states.length > 0) {
+    if (effectiveStates && effectiveStates.length > 0) {
       // Baseline screenshot is the target PNG (already captured). For
       // each state, render the current HTML with the state forced and
       // diff against the *default* current screenshot — surfaces "what
       // the state does to the variant" alongside the default delta.
-      for (const state of options.states) {
+      for (const state of effectiveStates) {
         const statePage = await browser.newPage({
           viewport: cssViewport,
           deviceScaleFactor: dpr,
@@ -550,9 +709,25 @@ export async function runComponentFromImage(
           edgeFraction: edgeClass.edgeFraction,
           interiorPixels: edgeClass.interiorPixels,
           lumaDelta,
+          lumaBefore: defaultLuma,
+          lumaAfter: stateLuma,
         });
       }
     }
+
+    const expressiveMenuGoalEvidence = await enrichExpressiveMenuEvidence(expressiveMenuEvidence, stateResults, currentPath, dpr);
+    const goalEvaluation = evaluateComponentGoal({
+      goal: effectiveGoal,
+      pixelDiffRatio: diffRatio,
+      landscapeDiffRatio: landscapeDiff.score,
+      scrollports: scrollportEvidence,
+      landing: landingEvidence,
+      canvas: canvasEvidence,
+      expressiveMenu: expressiveMenuGoalEvidence,
+    });
+    const reportLandingEvidence = goalEvaluation.goal === "landing" ? landingEvidence : undefined;
+    const reportCanvasEvidence = goalEvaluation.goal === "canvas" ? canvasEvidence : undefined;
+    const reportExpressiveMenuEvidence = goalEvaluation.goal === "expressive-menu" ? expressiveMenuGoalEvidence : undefined;
 
     const reportPath = options.reportPath ?? join(outputDir, "report.md");
     const markdown = renderReportMarkdown({
@@ -601,8 +776,7 @@ export async function runComponentFromImage(
     }
     console.log(`  ${DIM}bbox: ${bboxMatches.length}, heatmap: ${heatmapRegions.length}, text-rows ${targetRows.length}/${currentRows.length}, palette missing: ${paletteDiff.onlyInBaseline.length}${RESET}`);
     if (scrollportRegions.length > 0) {
-      const evidence = summarizeScrollportEvidence(scrollportRegions);
-      console.log(`  ${DIM}scrollports: ${formatScrollportEvidence(evidence)}${RESET}`);
+      console.log(`  ${DIM}scrollports: ${formatScrollportEvidence(scrollportEvidence)}${RESET}`);
     }
     if (reportLandingEvidence) {
       console.log(`  ${DIM}landing: ${formatLandingEvidence(reportLandingEvidence)}${RESET}`);
@@ -694,7 +868,7 @@ async function captureLandingEvidence(page: Page): Promise<ComponentLandingEvide
   });
 }
 
-async function captureExpressiveMenuEvidence(page: Page): Promise<ComponentExpressiveMenuEvidence | undefined> {
+async function captureExpressiveMenuEvidence(page: Page): Promise<ExpressiveMenuEvidenceWithSamples | undefined> {
   return await page.evaluate(() => {
     const layers = Array.from(document.querySelectorAll("[data-composition-layer]"));
     const shapes = Array.from(document.querySelectorAll("[data-shape]"));
@@ -717,9 +891,25 @@ async function captureExpressiveMenuEvidence(page: Page): Promise<ComponentExpre
     }
 
     function parseRgb(value: string): [number, number, number] | undefined {
-      const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+      const parsed = parseRgba(value);
+      return parsed ? [parsed[0], parsed[1], parsed[2]] : undefined;
+    }
+
+    function parseRgba(value: string): [number, number, number, number] | undefined {
+      const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?/i);
       if (!match) return undefined;
-      return [Number(match[1]), Number(match[2]), Number(match[3])];
+      return [Number(match[1]), Number(match[2]), Number(match[3]), match[4] === undefined ? 1 : Number(match[4])];
+    }
+
+    function effectiveBackground(el: Element): [number, number, number] | undefined {
+      let cursor: Element | null = el;
+      while (cursor) {
+        const rgba = parseRgba(getComputedStyle(cursor).backgroundColor);
+        if (rgba && rgba[3] > 0.01) return [rgba[0], rgba[1], rgba[2]];
+        cursor = cursor.parentElement;
+      }
+      const bodyBg = parseRgba(getComputedStyle(document.body).backgroundColor);
+      return bodyBg ? [bodyBg[0], bodyBg[1], bodyBg[2]] : undefined;
     }
 
     function channel(value: number): number {
@@ -742,12 +932,34 @@ async function captureExpressiveMenuEvidence(page: Page): Promise<ComponentExpre
       ...menuItems.slice(0, 6),
       document.querySelector("[data-accent=\"red\"]"),
     ].filter((el): el is Element => !!el);
-    const highContrast = contrastTargets.some((el) => {
+    const menuContrastRatios = menuItems.filter(isVisible).map((el) => {
       const style = getComputedStyle(el);
       const color = parseRgb(style.color);
-      const bg = parseRgb(style.backgroundColor);
-      return !!color && !!bg && contrastRatio(color, bg) >= 4.5;
+      const bg = effectiveBackground(el);
+      return color && bg ? contrastRatio(color, bg) : 0;
     });
+    const minMenuContrastRatio = menuContrastRatios.length > 0
+      ? Math.min(...menuContrastRatios)
+      : null;
+    const lowContrastItemCount = menuContrastRatios.filter((ratio) => ratio < 4.5).length;
+    const highContrast = menuContrastRatios.length > 0
+      ? lowContrastItemCount === 0
+      : contrastTargets.some((el) => {
+        const style = getComputedStyle(el);
+        const color = parseRgb(style.color);
+        const bg = effectiveBackground(el);
+        return !!color && !!bg && contrastRatio(color, bg) >= 4.5;
+      });
+    const menuItemSamples = menuItems.filter(isVisible).map((el) => {
+      const style = getComputedStyle(el);
+      const color = parseRgb(style.color);
+      if (!color) return undefined;
+      const rect = el.getBoundingClientRect();
+      return {
+        bbox: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+        color,
+      };
+    }).filter((item): item is { bbox: { x: number; y: number; width: number; height: number }; color: [number, number, number] } => !!item);
     const diagonalEvidence = [...layers, ...shapes].some((el) => {
       const style = getComputedStyle(el);
       return style.transform !== "none" || style.clipPath !== "none";
@@ -761,8 +973,60 @@ async function captureExpressiveMenuEvidence(page: Page): Promise<ComponentExpre
       semanticMenuText: menuItems.some((el) => visibleText(el).length >= 2),
       diagonalEvidence,
       highContrast,
+      minMenuContrastRatio: minMenuContrastRatio !== null ? Number(minMenuContrastRatio.toFixed(2)) : null,
+      lowContrastItemCount,
+      contrastSource: "dom",
+      menuItemSamples,
+      hoverChanged: null,
+      focusVisibleChanged: null,
     };
   });
+}
+
+async function enrichExpressiveMenuEvidence(
+  evidence: ExpressiveMenuEvidenceWithSamples | undefined,
+  stateResults: NonNullable<ComponentFromImageReport["states"]>,
+  currentPath: string,
+  dpr: number,
+): Promise<ComponentExpressiveMenuEvidence | undefined> {
+  if (!evidence) return undefined;
+  const pixelContrast = await sampleMenuItemContrasts(currentPath, evidence.menuItemSamples, dpr).catch(() => undefined);
+  return {
+    ...evidence,
+    ...(pixelContrast ?? {}),
+    hoverChanged: stateChanged(stateResults, "hover"),
+    focusVisibleChanged: stateChanged(stateResults, "focus-visible"),
+  };
+}
+
+async function sampleMenuItemContrasts(
+  currentPath: string,
+  samples: ExpressiveMenuPixelSample[] | undefined,
+  dpr: number,
+): Promise<Pick<ComponentExpressiveMenuEvidence, "highContrast" | "minMenuContrastRatio" | "lowContrastItemCount" | "contrastSource"> | undefined> {
+  if (!samples || samples.length === 0) return undefined;
+  const png = PNG.sync.read(await readFile(currentPath));
+  const ratios = samples
+    .map((sample) => sampleContrastFromImage(png, { ...sample, dpr }).contrastRatio)
+    .filter((ratio): ratio is number => ratio !== null && Number.isFinite(ratio));
+  if (ratios.length === 0) return undefined;
+  const minMenuContrastRatio = Math.min(...ratios);
+  const lowContrastItemCount = ratios.filter((ratio) => ratio < 4.5).length;
+  return {
+    highContrast: lowContrastItemCount === 0,
+    minMenuContrastRatio: Number(minMenuContrastRatio.toFixed(2)),
+    lowContrastItemCount,
+    contrastSource: "pixel",
+  };
+}
+
+function stateChanged(
+  stateResults: NonNullable<ComponentFromImageReport["states"]>,
+  state: ForcedPseudoState,
+): boolean | null {
+  const result = stateResults.find((item) => item.state === state);
+  if (!result || result.forcedCount === 0) return null;
+  return result.inducedDiffRatio >= 0.001 || result.rawInducedDiffRatio >= 0.001;
 }
 
 async function captureCanvasEvidence(page: Page): Promise<ComponentCanvasEvidence | undefined> {
@@ -828,7 +1092,10 @@ async function readCanvasFrame(
   }).catch(() => undefined);
 }
 
-function summarizeScrollportEvidence(regions: ScrollportRegion[]): ComponentScrollportEvidence {
+export function summarizeScrollportEvidence(
+  regions: ScrollportRegion[],
+  expectedScrollports: UiExpectedScrollportContract[] = [],
+): ComponentScrollportEvidence {
   const evidence: ComponentScrollportEvidence = {
     total: regions.length,
     ok: 0,
@@ -839,6 +1106,9 @@ function summarizeScrollportEvidence(regions: ScrollportRegion[]): ComponentScro
     const status = describeScrollportStatus(region).status;
     evidence[status]++;
   }
+  if (expectedScrollports.length > 0) {
+    evidence.expected = summarizeExpectedScrollports(regions, expectedScrollports);
+  }
   return evidence;
 }
 
@@ -846,7 +1116,82 @@ function formatScrollportEvidence(evidence: ComponentScrollportEvidence): string
   const parts = [`${evidence.ok}/${evidence.total} ok`];
   if (evidence.broken > 0) parts.push(`${evidence.broken} broken`);
   if (evidence.empty > 0) parts.push(`${evidence.empty} empty`);
+  if (evidence.expected && evidence.expected.total > 0) {
+    parts.push(`expected ${evidence.expected.ok}/${evidence.expected.total} ok`);
+    if (evidence.expected.missing > 0) parts.push(`${evidence.expected.missing} expected missing`);
+    if (evidence.expected.broken > 0) parts.push(`${evidence.expected.broken} expected broken`);
+    if (evidence.expected.empty > 0) parts.push(`${evidence.expected.empty} expected empty`);
+  }
   return parts.join(", ");
+}
+
+function summarizeExpectedScrollports(
+  regions: ScrollportRegion[],
+  expectedScrollports: UiExpectedScrollportContract[],
+): ComponentExpectedScrollportEvidence {
+  const evidence: ComponentExpectedScrollportEvidence = {
+    total: expectedScrollports.length,
+    ok: 0,
+    missing: 0,
+    broken: 0,
+    empty: 0,
+    missingNames: [],
+    brokenNames: [],
+    emptyNames: [],
+  };
+
+  for (let i = 0; i < expectedScrollports.length; i++) {
+    const expected = expectedScrollports[i]!;
+    const label = expectedScrollportLabel(expected, i);
+    const region = regions.find((candidate) => matchesExpectedScrollport(candidate, expected));
+    if (!region) {
+      evidence.missing++;
+      evidence.missingNames.push(label);
+      continue;
+    }
+    const status = expectedScrollportStatus(region, expected);
+    if (status === "ok") evidence.ok++;
+    else if (status === "broken") {
+      evidence.broken++;
+      evidence.brokenNames.push(label);
+    } else {
+      evidence.empty++;
+      evidence.emptyNames.push(label);
+    }
+  }
+
+  return evidence;
+}
+
+function matchesExpectedScrollport(region: ScrollportRegion, expected: UiExpectedScrollportContract): boolean {
+  const candidates = new Set<string>();
+  if (expected.name) candidates.add(expected.name);
+  if (expected.id) candidates.add(expected.id);
+  const selectorName = scrollportNameFromSelector(expected.selector);
+  if (selectorName) candidates.add(selectorName);
+  return candidates.has(region.name);
+}
+
+function expectedScrollportStatus(
+  region: ScrollportRegion,
+  expected: UiExpectedScrollportContract,
+): "ok" | "broken" | "empty" {
+  const status = describeScrollportStatus(region);
+  if (status.status !== "ok") return status.status;
+  if (!expected.axis) return "ok";
+  if (expected.axis === "x") return status.scroll === "x" || status.scroll === "xy" ? "ok" : "broken";
+  if (expected.axis === "y") return status.scroll === "y" || status.scroll === "xy" ? "ok" : "broken";
+  return status.scroll === "xy" ? "ok" : "broken";
+}
+
+function expectedScrollportLabel(expected: UiExpectedScrollportContract, index: number): string {
+  return expected.name ?? expected.id ?? scrollportNameFromSelector(expected.selector) ?? `expected-${index + 1}`;
+}
+
+function scrollportNameFromSelector(selector: string | undefined): string | undefined {
+  if (!selector) return undefined;
+  const match = selector.match(/\bdata-(?:vlmkit-scrollport|ui-scrollport|scroll-region|scrollport)\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\]\s]+))/u);
+  return match?.[1] ?? match?.[2] ?? match?.[3];
 }
 
 function formatLandingEvidence(evidence: ComponentLandingEvidence): string {
@@ -881,8 +1226,24 @@ function formatExpressiveMenuEvidence(evidence: ComponentExpressiveMenuEvidence)
     `composition ${evidence.compositionLayers}/${evidence.compositionShapes}`,
     evidence.diagonalEvidence ? "diagonal ok" : "diagonal missing",
     evidence.highContrast ? "contrast ok" : "contrast missing",
+    `contrast min ${formatContrastRatio(evidence.minMenuContrastRatio)}`,
+    `${evidence.lowContrastItemCount} low contrast`,
+    formatStateSummary("hover", evidence.hoverChanged),
+    formatStateSummary("focus", evidence.focusVisibleChanged),
   ];
   return parts.join(", ");
+}
+
+function formatStateSummary(label: string, value: boolean | null): string {
+  if (value === true) return `${label} changed`;
+  if (value === false) return `${label} inert`;
+  return `${label} unprobed`;
+}
+
+function formatOptionalGate(value: boolean | null): string {
+  if (value === true) return "ok";
+  if (value === false) return "missing";
+  return "not probed";
 }
 
 interface RenderInput {
@@ -1099,6 +1460,11 @@ export function renderReportMarkdown(r: RenderInput): string {
     lines.push(`| Composition shapes | ${r.expressiveMenuEvidence.compositionShapes} |`);
     lines.push(`| Diagonal / layered evidence | ${r.expressiveMenuEvidence.diagonalEvidence ? "ok" : "missing"} |`);
     lines.push(`| High contrast | ${r.expressiveMenuEvidence.highContrast ? "ok" : "missing"} |`);
+    lines.push(`| Minimum menu contrast | ${formatContrastRatio(r.expressiveMenuEvidence.minMenuContrastRatio)} |`);
+    lines.push(`| Low-contrast menu items | ${r.expressiveMenuEvidence.lowContrastItemCount} |`);
+    lines.push(`| Contrast source | ${r.expressiveMenuEvidence.contrastSource ?? "unknown"} |`);
+    lines.push(`| Hover state changes | ${formatOptionalGate(r.expressiveMenuEvidence.hoverChanged)} |`);
+    lines.push(`| Focus-visible state changes | ${formatOptionalGate(r.expressiveMenuEvidence.focusVisibleChanged)} |`);
     lines.push("");
   }
 
@@ -1275,7 +1641,8 @@ export function renderReportMarkdown(r: RenderInput): string {
       const wrongDir = !rawZero
         && !uaLikely
         && (s.state === "hover" || s.state === "active")
-        && s.lumaDelta !== null && s.lumaDelta > 15;
+        && s.lumaDelta !== null && s.lumaDelta > 15
+        && s.lumaBefore !== null && s.lumaBefore > 160;
       const note = s.forcedCount > 0 && perceptZero && rawZero
         ? "**suspect** — state did not change rendering"
         : s.forcedCount > 0 && perceptZero && !rawZero
@@ -1384,15 +1751,20 @@ export function renderReportMarkdown(r: RenderInput): string {
   return lines.join("\n");
 }
 
+function formatContrastRatio(value: number | null): string {
+  return value === null ? "unknown" : value.toFixed(2);
+}
+
 async function main(argv = process.argv.slice(2)) {
   const showHelp = argv[0] === "--help" || argv[0] === "-h";
   if (showHelp) argv = [];
-  const { positional, outputDir, report, threshold, goal, states, deviceScaleFactor } = parseArgs(argv);
+  const { positional, outputDir, report, contract, threshold, goal, states, deviceScaleFactor } = parseArgs(argv);
   if (positional.length < 2) {
     console.log("Usage: vlmkit build component <target.png> <current.html> [options]");
     console.log("Options:");
     console.log("  --output-dir <dir>              Output directory (default: ./test-results/component)");
     console.log("  --report <path>                 Markdown report path (default: <output-dir>/report.md)");
+    console.log("  --contract <ui.contract.json>   Inject goal, required states, and expected scrollports");
     console.log("  --threshold <0..1>              Pixelmatch sensitivity (default: 0.03)");
     console.log(`  --goal <${listComponentGoals().join("|")}>      Convergence goal (default: app)`);
     console.log("  --states hover focus-visible …  Capture additional pseudo-state diffs");
@@ -1407,6 +1779,7 @@ async function main(argv = process.argv.slice(2)) {
     currentHtmlPath: positional[1]!,
     outputDir: outputDir || join(process.cwd(), "test-results", "component"),
     reportPath: report || undefined,
+    contractPath: contract || undefined,
     threshold,
     goal,
     states: states.length > 0 ? states : undefined,

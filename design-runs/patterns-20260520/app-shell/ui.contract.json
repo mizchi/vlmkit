@@ -1,0 +1,286 @@
+{
+  "version": 1,
+  "screens": [
+    {
+      "id": "current",
+      "pattern": "app-shell",
+      "goal": "app-shell",
+      "sourceOfTruth": "semantic-dom",
+      "viewports": [
+        {
+          "label": "desktop",
+          "width": 1440,
+          "height": 900
+        }
+      ],
+      "markers": [
+        {
+          "kind": "scrollport",
+          "name": "channels",
+          "attribute": "data-scrollport",
+          "value": "channels",
+          "selector": "[data-scrollport=\"channels\"]",
+          "required": true
+        },
+        {
+          "kind": "scrollport",
+          "name": "messages",
+          "attribute": "data-scrollport",
+          "value": "messages",
+          "selector": "[data-scrollport=\"messages\"]",
+          "required": true
+        },
+        {
+          "kind": "scrollport",
+          "name": "members",
+          "attribute": "data-scrollport",
+          "value": "members",
+          "selector": "[data-scrollport=\"members\"]",
+          "required": true
+        },
+        {
+          "kind": "selected",
+          "selector": "[aria-current=\"page\"], [data-selected=\"true\"]",
+          "required": true
+        }
+      ],
+      "states": [
+        {
+          "id": "selected",
+          "kind": "selected",
+          "selector": "[aria-current=\"page\"], [data-selected=\"true\"]"
+        }
+      ],
+      "requiredStates": [
+        {
+          "id": "selected",
+          "kind": "selected",
+          "selector": "[aria-current=\"page\"], [data-selected=\"true\"]",
+          "required": true
+        }
+      ],
+      "expectedScrollports": [
+        {
+          "id": "channels",
+          "name": "channels",
+          "selector": "[data-scrollport=\"channels\"]",
+          "axis": "y",
+          "required": true,
+          "minOverflow": 281
+        },
+        {
+          "id": "messages",
+          "name": "messages",
+          "selector": "[data-scrollport=\"messages\"]",
+          "axis": "y",
+          "required": true,
+          "minOverflow": 566
+        },
+        {
+          "id": "members",
+          "name": "members",
+          "selector": "[data-scrollport=\"members\"]",
+          "axis": "y",
+          "required": true,
+          "minOverflow": 365
+        }
+      ],
+      "landmarks": [
+        {
+          "id": "navigation-servers",
+          "role": "navigation",
+          "name": "Servers",
+          "layout": {
+            "width": {
+              "kind": "fluid",
+              "max": 71
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "grid",
+              "columns": [
+                "51px"
+              ],
+              "rows": [
+                "48px",
+                "48px",
+                "48px",
+                "48px"
+              ]
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          }
+        },
+        {
+          "id": "complementary-workspace-navigation",
+          "role": "complementary",
+          "name": "Workspace navigation",
+          "layout": {
+            "width": {
+              "kind": "fluid",
+              "max": 263
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "grid",
+              "columns": [
+                "263px"
+              ],
+              "rows": [
+                "70px",
+                "769px",
+                "61px"
+              ]
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          }
+        },
+        {
+          "id": "banner-landing-review",
+          "role": "banner",
+          "name": "# landing-review",
+          "layout": {
+            "width": {
+              "kind": "fluid",
+              "max": 1104
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "flex",
+              "direction": "row"
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          }
+        },
+        {
+          "id": "search-body-0-div-0-header-0-div-0",
+          "role": "search",
+          "name": "",
+          "layout": {
+            "width": {
+              "kind": "fluid",
+              "max": 280
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "flex",
+              "direction": "row"
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          }
+        },
+        {
+          "id": "main-body-0-div-0-main-0",
+          "role": "main",
+          "name": "",
+          "layout": {
+            "width": {
+              "kind": "fluid",
+              "max": 848
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "grid",
+              "columns": [
+                "848px"
+              ],
+              "rows": [
+                "769px",
+                "73px"
+              ]
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          }
+        },
+        {
+          "id": "region-messages",
+          "role": "region",
+          "name": "Messages",
+          "layout": {
+            "width": {
+              "kind": "fluid",
+              "max": 848
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "grid",
+              "columns": [
+                "796px"
+              ],
+              "rows": [
+                "67.2969px",
+                "67.2969px",
+                "67.2969px",
+                "67.2969px",
+                "67.2969px",
+                "67.2969px",
+                "67.2969px",
+                "67.2969px",
+                "67.2969px",
+                "67.2969px",
+                "67.2969px",
+                "67.2969px",
+                "67.2969px",
+                "67.2969px",
+                "67.2969px",
+                "67.2969px"
+              ]
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          }
+        },
+        {
+          "id": "complementary-members",
+          "role": "complementary",
+          "name": "Members",
+          "layout": {
+            "width": {
+              "kind": "fluid",
+              "max": 255
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "block"
+            },
+            "scroll": {
+              "x": false,
+              "y": true
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

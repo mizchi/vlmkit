@@ -135,6 +135,8 @@ test("validateUiContract enforces pattern-specific evidence", () => {
   appShell.screens[0]!.pattern = "app-shell";
   appShell.screens[0]!.goal = "app-shell";
   assert.ok(validateUiContract(appShell).some((issue) => issue.message.includes("scrollport")));
+  assert.ok(validateUiContract(appShell).some((issue) => issue.message.includes("expectedScrollports")));
+  assert.ok(validateUiContract(appShell).some((issue) => issue.message.includes("selected state")));
 
   const canvas = structuredClone(valid);
   canvas.screens[0]!.pattern = "canvas";
@@ -145,6 +147,61 @@ test("validateUiContract enforces pattern-specific evidence", () => {
     frameDelta: true,
   };
   assert.ok(validateUiContract(canvas).some((issue) => issue.message.includes("playerX")));
+});
+
+test("validateUiContract accepts app-shell expected scrollports and required states", () => {
+  const contract = structuredClone(valid);
+  const screen = contract.screens[0]!;
+  screen.pattern = "app-shell";
+  screen.goal = "app-shell";
+  screen.sourceOfTruth = "viewport-shell";
+  screen.markers = [
+    { kind: "scrollport", name: "channels", selector: "[data-scrollport=\"channels\"]", required: true },
+    { kind: "selected", selector: "[aria-current=\"page\"]", required: true },
+  ];
+  screen.expectedScrollports = [
+    {
+      id: "channels",
+      name: "channels",
+      selector: "[data-scrollport=\"channels\"]",
+      axis: "y",
+      required: true,
+      minOverflow: 1,
+    },
+  ];
+  screen.requiredStates = [
+    { id: "active-route", kind: "selected", selector: "[aria-current=\"page\"]", required: true },
+  ];
+
+  assert.deepEqual(validateUiContract(contract), []);
+  assert.match(summarizeUiContractScreen(screen), /expected scrollports 1/);
+  assert.match(summarizeUiContractScreen(screen), /required states 1/);
+});
+
+test("validateUiContract validates expected scrollports and required states", () => {
+  const contract = structuredClone(valid);
+  const screen = contract.screens[0]!;
+  screen.expectedScrollports = [
+    { id: "", axis: "vertical" as never, required: true, minOverflow: -1 },
+    { id: "dup", axis: "y" },
+    { id: "dup", axis: "x" },
+  ];
+  screen.requiredStates = [
+    { id: "", kind: "hover", required: true, minChangeRatio: 2 },
+    { id: "dup", kind: "pressed" as never, selector: "button" },
+    { id: "dup", kind: "focus-visible", selector: "button" },
+  ];
+
+  const issues = validateUiContract(contract);
+  assert.ok(issues.some((issue) => issue.message.includes("expected scrollport id")));
+  assert.ok(issues.some((issue) => issue.message.includes("unknown expected scrollport axis")));
+  assert.ok(issues.some((issue) => issue.message.includes("required expected scrollport")));
+  assert.ok(issues.some((issue) => issue.message.includes("minOverflow")));
+  assert.ok(issues.some((issue) => issue.message.includes("required state id")));
+  assert.ok(issues.some((issue) => issue.message.includes("required state must declare selector")));
+  assert.ok(issues.some((issue) => issue.message.includes("unknown state kind")));
+  assert.ok(issues.some((issue) => issue.message.includes("required state id must be unique")));
+  assert.ok(issues.some((issue) => issue.message.includes("minChangeRatio")));
 });
 
 test("validateUiContract validates hierarchy and rich metadata ranges", () => {
@@ -179,6 +236,11 @@ test("validateUiContract accepts expressive menu composition contracts", () => {
     { id: "selected-menu-item", kind: "selected", selector: "[data-selected=\"true\"]", required: true },
     { id: "menu-focus", kind: "focus-visible", selector: "button", required: true },
   ];
+  screen.requiredStates = [
+    { id: "selected-menu-item", kind: "selected", selector: "[data-selected=\"true\"]", required: true },
+    { id: "menu-hover", kind: "hover", selector: "button", required: true, minChangeRatio: 0.001 },
+    { id: "menu-focus", kind: "focus-visible", selector: "button", required: true, minChangeRatio: 0.001 },
+  ];
   screen.composition = {
     style: "poster",
     axes: ["diagonal", "layered"],
@@ -212,18 +274,28 @@ test("validateUiContract requires expressive menu composition and state evidence
   const issues = validateUiContract(contract);
   assert.ok(issues.some((issue) => issue.message.includes("composition")));
   assert.ok(issues.some((issue) => issue.message.includes("selected or focus-visible")));
+  assert.ok(issues.some((issue) => issue.message.includes("require hover state")));
 
   contract.screens[0]!.composition = {
-    style: "poster",
-    contrast: { mode: "high", minRatio: 0, palette: ["red"] },
-    layers: [{ id: "", role: "background" }],
-    shapes: [{ id: "", kind: "slash-panel" }],
-    motion: [{ id: "", trigger: "hover", effect: "slam", durationMs: -1 }],
+    style: "zigzag" as never,
+    axes: ["sideways" as never],
+    contrast: { mode: "extreme" as never, minRatio: 0, palette: ["red"] },
+    layers: [{ id: "", role: "backdrop" as never }, { id: "dup", role: "content" }, { id: "dup", role: "accent" }],
+    shapes: [{ id: "", kind: "triangle" as never }],
+    motion: [{ id: "", trigger: "tap" as never, effect: "wiggle" as never, durationMs: -1 }],
   };
   const richerIssues = validateUiContract(contract);
+  assert.ok(richerIssues.some((issue) => issue.message.includes("unknown composition style")));
+  assert.ok(richerIssues.some((issue) => issue.message.includes("unknown composition axis")));
+  assert.ok(richerIssues.some((issue) => issue.message.includes("unknown composition layer role")));
+  assert.ok(richerIssues.some((issue) => issue.message.includes("unknown composition shape kind")));
+  assert.ok(richerIssues.some((issue) => issue.message.includes("unknown motion trigger")));
+  assert.ok(richerIssues.some((issue) => issue.message.includes("unknown motion effect")));
+  assert.ok(richerIssues.some((issue) => issue.message.includes("unknown contrast mode")));
   assert.ok(richerIssues.some((issue) => issue.message.includes("contrast minRatio")));
   assert.ok(richerIssues.some((issue) => issue.message.includes("hex color")));
   assert.ok(richerIssues.some((issue) => issue.message.includes("composition layer id")));
+  assert.ok(richerIssues.some((issue) => issue.message.includes("composition layer id must be unique")));
   assert.ok(richerIssues.some((issue) => issue.message.includes("composition shape id")));
   assert.ok(richerIssues.some((issue) => issue.message.includes("motion id")));
   assert.ok(richerIssues.some((issue) => issue.message.includes("durationMs")));

@@ -29,10 +29,17 @@ node src/cli/vlmkit.ts build component \
   --goal landing \
   --output-dir design-runs/patterns-20260520/landing/reports/component
 
+node src/cli/vlmkit.ts contract introspect \
+  design-runs/patterns-20260520/app-shell/current.html \
+  --pattern app-shell \
+  --goal app-shell \
+  --viewport desktop:1440x900 \
+  --out design-runs/patterns-20260520/app-shell/ui.contract.json
+
 node src/cli/vlmkit.ts build component \
   design-runs/patterns-20260520/app-shell/target.png \
   design-runs/patterns-20260520/app-shell/current.html \
-  --goal app-shell \
+  --contract design-runs/patterns-20260520/app-shell/ui.contract.json \
   --output-dir design-runs/patterns-20260520/app-shell/reports/component
 
 node src/cli/vlmkit.ts build component \
@@ -44,9 +51,11 @@ node src/cli/vlmkit.ts build component \
 node src/cli/vlmkit.ts build component \
   design-runs/patterns-20260520/expressive-menu/target.png \
   design-runs/patterns-20260520/expressive-menu/current.html \
-  --goal expressive-menu \
-  --states hover focus-visible \
+  --contract design-runs/patterns-20260520/expressive-menu/ui.contract.json \
   --output-dir design-runs/patterns-20260520/expressive-menu/reports/component
+
+node src/cli/vlmkit.ts contract validate \
+  design-runs/patterns-20260520/app-shell/ui.contract.json
 
 node src/cli/vlmkit.ts contract validate \
   design-runs/patterns-20260520/expressive-menu/ui.contract.json
@@ -61,12 +70,13 @@ node design-runs/patterns-20260520/check-patterns.mjs
 | landing | `landing` pass | pixel 8.00%, landscape 1.12% | CTA in first viewport, next-section hint, media slot all pass |
 | app-shell | `app-shell` fail | pixel 4.00%, landscape 0.14% | channels and members scroll; messages is broken |
 | game | `canvas` pass | pixel 0.95%, landscape 0.02% | canvas nonblank, frame delta, input response all pass |
-| expressive-menu | `expressive-menu` pass | pixel 7.30%, landscape 2.54% | semantic shell, selected state, high contrast, composition markers all pass |
+| expressive-menu | `expressive-menu` pass | pixel 7.30%, landscape 2.54% | semantic shell, selected state, pixel-sampled contrast, composition markers all pass |
 
 The app-shell case is the important Red:
 
 ```text
 App shell fail: landscape 0.14% <= 5.00%, scrollports 2/3 ok, 1 broken
+expected 2/3 ok, 1 expected broken: messages
 scrollports: 2/3 ok, 1 broken
 ```
 
@@ -161,7 +171,8 @@ semantic/composition contract:
 
 ```text
 Expressive menu pass: landscape 2.54% <= 5.00%, expressive selected ok,
-menu text ok, items 5, composition 6 layers/9 shapes, diagonal ok, contrast ok
+menu text ok, items 5, composition 6 layers/9 shapes, diagonal ok,
+contrast ok, contrast min 5.03, 0 low contrast, hover changed, focus changed
 ```
 
 Forced states also became visible:
@@ -196,6 +207,13 @@ Added `--goal app-shell`:
 - fails when any explicit scrollport is broken;
 - sends missing or empty scrollport evidence to review instead of pass.
 
+Added `--contract` to `build component`:
+
+- reads UI Contract `goal` when `--goal` is omitted;
+- injects pseudo-state captures from `requiredStates` when `--states` is omitted;
+- compares captured app-shell scrollports against `expectedScrollports`, so
+  the summary can name the broken expected region, e.g. `messages`.
+
 Added `--goal landing`:
 
 - uses landscape + a looser pixel threshold for media/decorative drift;
@@ -218,22 +236,54 @@ Added `--goal expressive-menu`:
   `data-shape`;
 - requires visible selected state, semantic menu text, at least three
   focusable menu items, diagonal/layered evidence, and high contrast;
+- reviews missing `hover` / `focus-visible` probes and fails inert probes when
+  they were requested;
 - emits an `Expressive menu inspector` section in component reports.
 
 Added UI Contract IR support for expressive composition:
 
 - `pattern` / `goal`: `expressive-menu`
+- `expectedScrollports` for app-shell scroll areas
+- `requiredStates` for pattern-specific selected / hover / focus-visible /
+  scrolled states
 - screen or landmark-level `composition`
 - `layers`, `shapes`, `motion`, and `contrast` metadata
-- validator gates for composition plus selected/focus-visible evidence
+- validator gates for composition plus selected / hover / focus-visible
+  requirements
+
+Added expressive-menu introspection:
+
+- `contract introspect --pattern expressive-menu --goal expressive-menu`
+  now captures `data-composition-layer`, `data-shape`, selected state, and
+  selected / hover / focus-visible requirements;
+- `contract introspect --pattern app-shell --goal app-shell` now turns
+  `data-scrollport` markers into `expectedScrollports` with axis and overflow
+  hints, and preserves selected state as a required state;
+- when CSS min/max constraints are missing, measured landmark width is kept as
+  a draft `max` bound so introspected contracts avoid `fluid unbounded`.
+
+Additional dogfood fixes:
+
+- component report drilldown now shows measured fluid width instead of
+  `fluid-unbounded`, e.g. `fluid measured 848px`;
+- composition layer ids are validated as unique, and introspection suffixes
+  duplicates such as `foreground-2`;
+- high-contrast checks resolve transparent element backgrounds through
+  ancestors;
+- expressive-menu contrast now uses the minimum visible menu-item ratio,
+  rather than passing because one accent happens to be readable;
+- rendered screenshot pixel sampling is used when menu text sits over
+  overlapping composition layers that are not DOM ancestors. Current report:
+  `Contrast source | pixel`, `Minimum menu contrast | 5.03`;
+- state direction warnings no longer flag a dark menu item that intentionally
+  lightens on hover.
 
 ## Next implementation candidates
 
-1. Add contract fields for `expectedScrollports` and pattern-specific required states.
+1. Use UI Contract `expectedScrollports` / `requiredStates` to inject build
+   command flags and goal evidence automatically.
 2. Add scrolled-state snapshots for app shells.
-3. Promote expressive-menu composition into an introspection path so existing
-   markup can emit layer/shape candidates automatically.
-4. Promote canvas checks into `build interactive` / `build canvas` with HUD
+3. Promote canvas checks into `build interactive` / `build canvas` with HUD
    overlap, asset visibility, and richer input assertions.
 
 ## Verification
@@ -243,9 +293,13 @@ node --test packages/vlmkit-markup/src/component/semantic-drilldown.test.ts
 node --test packages/vlmkit-markup/src/component/component-from-image.test.ts
 node --test packages/vlmkit-markup/src/component/component-goal.test.ts
 node src/cli/vlmkit.ts build component design-runs/patterns-20260520/landing/target.png design-runs/patterns-20260520/landing/current.html --goal landing --output-dir design-runs/patterns-20260520/landing/reports/component
-node src/cli/vlmkit.ts build component design-runs/patterns-20260520/app-shell/target.png design-runs/patterns-20260520/app-shell/current.html --goal app-shell --output-dir design-runs/patterns-20260520/app-shell/reports/component
+node src/cli/vlmkit.ts build component design-runs/patterns-20260520/app-shell/target.png design-runs/patterns-20260520/app-shell/current.html --contract design-runs/patterns-20260520/app-shell/ui.contract.json --output-dir design-runs/patterns-20260520/app-shell/reports/component
 node src/cli/vlmkit.ts build component design-runs/patterns-20260520/game/target.png design-runs/patterns-20260520/game/current.html --goal canvas --output-dir design-runs/patterns-20260520/game/reports/component
-node src/cli/vlmkit.ts build component design-runs/patterns-20260520/expressive-menu/target.png design-runs/patterns-20260520/expressive-menu/current.html --goal expressive-menu --states hover focus-visible --output-dir design-runs/patterns-20260520/expressive-menu/reports/component
+node src/cli/vlmkit.ts build component design-runs/patterns-20260520/expressive-menu/target.png design-runs/patterns-20260520/expressive-menu/current.html --contract design-runs/patterns-20260520/expressive-menu/ui.contract.json --output-dir design-runs/patterns-20260520/expressive-menu/reports/component
+node src/cli/vlmkit.ts contract validate design-runs/patterns-20260520/app-shell/ui.contract.json
 node src/cli/vlmkit.ts contract validate design-runs/patterns-20260520/expressive-menu/ui.contract.json
+node src/cli/vlmkit.ts contract introspect design-runs/patterns-20260520/expressive-menu/current.html --pattern expressive-menu --goal expressive-menu --viewport desktop:1440x900
+node src/cli/vlmkit.ts contract introspect design-runs/patterns-20260520/app-shell/current.html --pattern app-shell --goal app-shell --viewport desktop:1440x900
 node design-runs/patterns-20260520/check-patterns.mjs
+node --test 'packages/vlmkit-markup/src/**/*.test.ts' src/cli/cli.test.ts
 ```

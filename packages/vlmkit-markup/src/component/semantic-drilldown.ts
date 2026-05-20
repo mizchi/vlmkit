@@ -174,7 +174,9 @@ export function describeLandmarkLayoutContract(
       ? `bounded max ${maxW}`
       : minW
         ? `bounded min ${minW}`
-        : "fluid-unbounded";
+        : contract.clientWidth > 0
+          ? `fluid measured ${Math.round(contract.clientWidth)}px`
+          : "fluid-unbounded";
 
   const canScrollX = isScrollableOverflow(contract.overflowX)
     && contract.scrollWidth > contract.clientWidth + 1;

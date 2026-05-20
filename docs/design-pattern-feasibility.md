@@ -47,11 +47,15 @@ first viewport は landing として見て、preview 内部は app shell とし�
 - layout feasibility: grid/flex/subgrid で説明できるか
 - responsive policy: mobile で順序が同じ意味を保つか
 - asset policy: 実画像、generated image、SVG、canvas asset のどれを使うか
+- required states: selected / hover / focus-visible / scrolled など、
+  pattern-specific に保持する状態
+- expected scrollports: viewport shell で独立スクロールすべき領域名、
+  selector、axis
 - pass policy: `app`, `layout`, `pixel`, `draft`, or pattern-specific goal
   (`landing`, `app-shell`, `canvas`, `expressive-menu`) のどれを使うか
 
-この phase の出力を `brief.md` と mock prompt に入れる。AI に自由に絵を
-作らせるより、実装に優しい design envelope を先に狭める。
+この phase の出力を `brief.md`、mock prompt、UI Contract IR に入れる。
+AI に自由に絵を作らせるより、実装に優しい design envelope を先に狭める。
 
 ## Canonical implementation markers
 
@@ -73,8 +77,11 @@ App shell:
   `data-scroll-region`
 - recommended names: `channel-list`, `message-list`, `member-list`,
   `detail-panel`
+- UI Contract: mirror these as `expectedScrollports` with `selector`, `axis`,
+  and `required: true`
 - selected state: `aria-current="page"` or `data-selected="true"`
 - unread state: visible badge/count plus text weight or contrast change
+- UI Contract: mirror preserved states as `requiredStates`
 
 Canvas:
 
@@ -89,7 +96,12 @@ Expressive menu:
 - composition shapes: `data-shape="slash-panel|sticker|burst|cutout|mask|ribbon"`
 - selected state: `data-selected="true"` or `aria-current="page"`
 - menu items: real `button`, `a`, `[role="menuitem"]`, or `data-menu-item`
-- accent contrast target: optional `data-accent="red"` for high-contrast checks
+- UI Contract: require `selected`, `hover`, and `focus-visible` in
+  `requiredStates`
+- contrast gate: minimum visible menu-item contrast should be >= 4.5. Prefer
+  rendered screenshot pixel sampling when text sits over overlapping
+  composition layers; DOM background lookup is only the fallback. Optional
+  `data-accent="red"` is supporting evidence, not a pass condition.
 
 ## Canonical validation command shape
 
@@ -203,7 +215,9 @@ scrollport が独立して動く。
 - main/detail は fluid width と min/max constraints を持つ
 - scrollport を明示する: channel list, message list, details, member list
 - scrollport marker は `data-scrollport="<name>"` を使う
+- UI Contract の `expectedScrollports` に同じ名前と selector、axis を保持する
 - active / selected / unread / hover / focus-visible state を target に含める
+- UI Contract の `requiredStates` には最低限 selected state を入れる
 - mobile では panel collapse, drawer, tab などの navigation policy を決める
 
 ### Mock prompt constraints
@@ -285,6 +299,8 @@ grid/flex で持ち、見た目の非直交性は composition metadata と decor
 - composition metadata: `poster`, `asymmetric`, `collage`, `diagonal`, `layered`
 - high contrast palette: black / red / white など、readability を先に固定する
 - selected / hover / focus-visible state を target に含める
+- UI Contract の `requiredStates` に selected / hover / focus-visible を入れ、
+  build command は `--states hover focus-visible` を使う
 - shape は slash panel, sticker, burst, cutout, mask などの role として扱う
 - IP 固有の logo, typeface, icon, exact slash shape を必須にしない
 
@@ -304,16 +320,22 @@ exact typography, or distinctive menu shapes.
 
 - semantic landmark and menu order
 - selected item visibility and focus-visible affordance
-- high contrast readability over red/black panels
+- hover / focus-visible state probes should induce a visible change
+- high contrast readability over red/black panels, sampled from the rendered
+  screenshot when overlapping composition layers are involved
 - composition layer metadata: diagonal axes, z layers, shape roles
 - layout lane before decoration lane; do not chase exact slash geometry early
 - no image-only menu text
 
 ### Goal
 
-現在は `--goal expressive-menu` を使う。pixel diff は派手な decoration に
-引っ張られるため、primary metric は landscape とし、semantic menu order,
-state evidence, contrast, and composition metadata を gate にする。
+現在は `--goal expressive-menu --states hover focus-visible` を使う。pixel diff
+は派手な decoration に引っ張られるため、primary metric は landscape とし、
+semantic menu order, state evidence, contrast, and composition metadata を
+gate にする。state probes が無ければ review、probe して inert なら fail にする。
+contrast は visible menu item の最小値を見る。透明背景や重なりがある場合は
+DOM ancestor の背景推定だけではなく、rendered screenshot の pixel sampling を
+優先して読み取り、report に `Contrast source` として残す。
 
 ## Game / canvas scene
 
@@ -377,11 +399,20 @@ vlmkit 側で追加したい機能:
 - `vlmkit build component target.png current.html --goal landing`
 - `vlmkit build component target.png current.html --goal app-shell`
 - `vlmkit build component target.png current.html --goal canvas`
-- `vlmkit build component target.png current.html --goal expressive-menu`
+- `vlmkit build component target.png current.html --goal expressive-menu --states hover focus-visible`
+- `vlmkit build component target.png current.html --contract ui.contract.json`
+  to inject goal, required pseudo-state captures, and expected scrollport gates
+- `vlmkit contract introspect current.html --pattern expressive-menu --goal expressive-menu`
+- UI Contract fields: `expectedScrollports` for app-shell scroll areas and
+  `requiredStates` for pattern-specific interaction states
 - `vlmkit build interactive --goal canvas`: future richer interaction runner
 - scrollport inspector: `overflow`, bbox, scrollHeight/clientHeight, sticky descendants
 - state snapshots: hover, focus, selected, scrolled, empty/loading/error
 - canvas inspector: nonblank, frame delta, asset visibility, input response
+- expressive composition introspector: `data-composition-layer`, `data-shape`,
+  selected/focus-visible states, measured width bounds, unique layer ids, and
+  rendered screenshot pixel contrast sampling with transparent-ancestor
+  fallback
 
 当面は、`landing|app-shell|canvas|expressive-menu` の pattern-specific
 profile を dogfood し、必要な gate を report と UI Contract IR に寄せていく。
@@ -410,5 +441,12 @@ pass した。一方で app-shell は `layout` pass のまま message scrollport
 壊れていた。これを受けて `build component` に explicit scrollport inspector
 と `--goal app-shell` を追加した。その後、landing first-viewport gates を
 `--goal landing` に昇格し、canvas nonblank / frame delta / input response を
-`--goal canvas` に昇格した。次は contract から expected pattern gates を
-自動注入する。
+`--goal canvas` に昇格した。expressive-menu では overlapping composition layer
+越しの readability を DOM だけで見誤らないよう、rendered screenshot の
+pixel-sampled contrast を report / goal evidence に入れた。さらに UI Contract
+IR に `expectedScrollports` と `requiredStates` を追加し、introspection から
+app-shell の独立スクロール領域と expressive-menu の selected / hover /
+focus-visible requirement を復元できるようにした。`build component --contract`
+はこの IR から goal、required pseudo-state captures、expected scrollport gate
+を注入する。次は scrolled-state snapshots と canvas interaction profile を
+contract-driven にする。

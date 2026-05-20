@@ -12,10 +12,14 @@ right detail panel, selected state.
 - Body should not be the scrolling container.
 - Rail, sidebar, main, and right panel should map to stable grid areas.
 - Channel list, message list, and member list are independent scrollports.
+- UI Contract `expectedScrollports` must list those scrollports with selector
+  and axis.
 - Active navigation and selected content state must be visible.
+- UI Contract `requiredStates` must include selected state.
 
 ## Expected signal
 
-`--goal app-shell` should catch broad shell drift and explicit scrollport
-breakage. The dogfood script still checks scrollport invariants separately as a
-pattern-specific oracle.
+`build component --contract ui.contract.json` should infer `--goal app-shell`
+and catch broad shell drift plus named expected scrollport breakage. The dogfood
+script still checks scrollport invariants separately as a pattern-specific
+oracle.

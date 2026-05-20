@@ -149,7 +149,7 @@ test("describeLandmarkLayoutContract exposes bounded grid scrollports", () => {
   });
 });
 
-test("describeLandmarkLayoutContract identifies unbounded fluid blocks", () => {
+test("describeLandmarkLayoutContract keeps measured fluid width visible", () => {
   const contract: LandmarkLayoutContract = {
     display: "block",
     gridTemplateColumns: "none",
@@ -167,7 +167,7 @@ test("describeLandmarkLayoutContract identifies unbounded fluid blocks", () => {
   };
 
   assert.deepEqual(describeLandmarkLayoutContract(contract), {
-    width: "fluid-unbounded",
+    width: "fluid measured 1180px",
     height: "content",
     scroll: "none",
     grid: "block",

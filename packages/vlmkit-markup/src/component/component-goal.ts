@@ -36,6 +36,18 @@ export interface ComponentScrollportEvidence {
   ok: number;
   broken: number;
   empty: number;
+  expected?: ComponentExpectedScrollportEvidence;
+}
+
+export interface ComponentExpectedScrollportEvidence {
+  total: number;
+  ok: number;
+  missing: number;
+  broken: number;
+  empty: number;
+  missingNames: string[];
+  brokenNames: string[];
+  emptyNames: string[];
 }
 
 export interface ComponentLandingEvidence {
@@ -60,6 +72,11 @@ export interface ComponentExpressiveMenuEvidence {
   semanticMenuText: boolean;
   diagonalEvidence: boolean;
   highContrast: boolean;
+  minMenuContrastRatio: number | null;
+  lowContrastItemCount: number;
+  contrastSource?: "dom" | "pixel" | "unknown";
+  hoverChanged: boolean | null;
+  focusVisibleChanged: boolean | null;
 }
 
 const GOAL_PROFILES: Record<ComponentGoal, ComponentGoalProfile> = {
@@ -182,6 +199,11 @@ function applyPatternGates(
 ): ComponentGoalStatus {
   if (profile.goal === "app-shell") {
     const scrollports = input.scrollports;
+    const expected = scrollports?.expected;
+    if (expected && expected.total > 0) {
+      if (expected.missing > 0 || expected.broken > 0) return "fail";
+      if (expected.empty > 0 && status === "pass") return "review";
+    }
     if (!scrollports || scrollports.total === 0) {
       return status === "pass" ? "review" : status;
     }
@@ -217,7 +239,11 @@ function applyPatternGates(
     if (!expressiveMenu.semanticMenuText) return "fail";
     if (expressiveMenu.compositionLayers < 2 || expressiveMenu.compositionShapes < 2) return "fail";
     if (!expressiveMenu.diagonalEvidence) return "fail";
-    if (!expressiveMenu.highContrast) return "fail";
+    if (!expressiveMenu.highContrast || expressiveMenu.lowContrastItemCount > 0) return "fail";
+    if (expressiveMenu.hoverChanged === false || expressiveMenu.focusVisibleChanged === false) return "fail";
+    if ((expressiveMenu.hoverChanged === null || expressiveMenu.focusVisibleChanged === null) && status === "pass") {
+      return "review";
+    }
   }
 
   return status;
@@ -273,10 +299,25 @@ function summarizeEvaluation(
 }
 
 function summarizeScrollports(scrollports: ComponentScrollportEvidence | undefined): string {
-  if (!scrollports || scrollports.total === 0) return "no explicit scrollports";
+  if (!scrollports) return "no explicit scrollports";
+  if (scrollports.total === 0 && (!scrollports.expected || scrollports.expected.total === 0)) {
+    return "no explicit scrollports";
+  }
   const parts = [`scrollports ${scrollports.ok}/${scrollports.total} ok`];
   if (scrollports.broken > 0) parts.push(`${scrollports.broken} broken`);
   if (scrollports.empty > 0) parts.push(`${scrollports.empty} empty`);
+  if (scrollports.expected && scrollports.expected.total > 0) {
+    parts.push(`expected ${scrollports.expected.ok}/${scrollports.expected.total} ok`);
+    if (scrollports.expected.missing > 0) {
+      parts.push(`${scrollports.expected.missing} expected missing: ${scrollports.expected.missingNames.join("/")}`);
+    }
+    if (scrollports.expected.broken > 0) {
+      parts.push(`${scrollports.expected.broken} expected broken: ${scrollports.expected.brokenNames.join("/")}`);
+    }
+    if (scrollports.expected.empty > 0) {
+      parts.push(`${scrollports.expected.empty} expected empty: ${scrollports.expected.emptyNames.join("/")}`);
+    }
+  }
   return parts.join(", ");
 }
 
@@ -314,9 +355,30 @@ function summarizeExpressiveMenu(expressiveMenu: ComponentExpressiveMenuEvidence
     `items ${expressiveMenu.focusableItemCount}`,
     `composition ${expressiveMenu.compositionLayers} layers/${expressiveMenu.compositionShapes} shapes`,
     expressiveMenu.diagonalEvidence ? "diagonal ok" : "diagonal missing",
-    expressiveMenu.highContrast ? "contrast ok" : "contrast missing",
+    contrastSummary(expressiveMenu),
+    summarizeInteractionState("hover", expressiveMenu.hoverChanged),
+    summarizeInteractionState("focus", expressiveMenu.focusVisibleChanged),
   ];
   return `expressive ${parts.join(", ")}`;
+}
+
+function contrastSummary(expressiveMenu: ComponentExpressiveMenuEvidence): string {
+  const min = expressiveMenu.minMenuContrastRatio === null
+    ? "contrast min unknown"
+    : `contrast min ${expressiveMenu.minMenuContrastRatio.toFixed(2)}`;
+  const low = expressiveMenu.lowContrastItemCount > 0
+    ? `${expressiveMenu.lowContrastItemCount} low contrast`
+    : "0 low contrast";
+  const status = expressiveMenu.highContrast && expressiveMenu.lowContrastItemCount === 0
+    ? "contrast ok"
+    : "contrast missing";
+  return `${status}, ${min}, ${low}`;
+}
+
+function summarizeInteractionState(label: string, changed: boolean | null): string {
+  if (changed === true) return `${label} changed`;
+  if (changed === false) return `${label} inert`;
+  return "state probes missing";
 }
 
 export function formatPct(ratio: number): string {

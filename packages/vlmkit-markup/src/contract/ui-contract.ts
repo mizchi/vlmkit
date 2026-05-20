@@ -48,6 +48,8 @@ export interface UiContractScreen {
   viewports: UiContractViewport[];
   markers?: UiMarkerContract[];
   states?: UiStateContract[];
+  requiredStates?: UiRequiredStateContract[];
+  expectedScrollports?: UiExpectedScrollportContract[];
   composition?: UiCompositionContract;
   content?: UiContentContract;
   decoration?: UiDecorationContract;
@@ -167,6 +169,28 @@ export interface UiStateContract {
   required?: boolean;
 }
 
+export interface UiRequiredStateContract extends UiStateContract {
+  minChangeRatio?: number;
+}
+
+export type UiScrollAxis = "x" | "y" | "both";
+
+const UI_SCROLL_AXES: readonly UiScrollAxis[] = [
+  "x",
+  "y",
+  "both",
+];
+
+export interface UiExpectedScrollportContract {
+  id: string;
+  name?: string;
+  selector?: string;
+  axis?: UiScrollAxis;
+  required?: boolean;
+  minOverflow?: number;
+  landmarkId?: string;
+}
+
 export type UiCompositionStyle =
   | "regular"
   | "asymmetric"
@@ -175,12 +199,29 @@ export type UiCompositionStyle =
   | "radial"
   | "layered";
 
+const UI_COMPOSITION_STYLES: readonly UiCompositionStyle[] = [
+  "regular",
+  "asymmetric",
+  "poster",
+  "collage",
+  "radial",
+  "layered",
+];
+
 export type UiCompositionAxis =
   | "orthogonal"
   | "diagonal"
   | "radial"
   | "freeform"
   | "layered";
+
+const UI_COMPOSITION_AXES: readonly UiCompositionAxis[] = [
+  "orthogonal",
+  "diagonal",
+  "radial",
+  "freeform",
+  "layered",
+];
 
 export interface UiCompositionContract {
   style: UiCompositionStyle;
@@ -197,6 +238,14 @@ export type UiCompositionLayerRole =
   | "accent"
   | "foreground"
   | "scrim";
+
+const UI_COMPOSITION_LAYER_ROLES: readonly UiCompositionLayerRole[] = [
+  "background",
+  "content",
+  "accent",
+  "foreground",
+  "scrim",
+];
 
 export interface UiCompositionLayer {
   id: string;
@@ -216,6 +265,16 @@ export type UiCompositionShapeKind =
   | "frame"
   | "ribbon";
 
+const UI_COMPOSITION_SHAPE_KINDS: readonly UiCompositionShapeKind[] = [
+  "slash-panel",
+  "sticker",
+  "burst",
+  "cutout",
+  "mask",
+  "frame",
+  "ribbon",
+];
+
 export interface UiCompositionShape {
   id: string;
   kind: UiCompositionShapeKind;
@@ -232,12 +291,34 @@ export interface UiMotionContract {
   target?: string;
 }
 
+const UI_MOTION_TRIGGERS: readonly UiMotionContract["trigger"][] = [
+  "hover",
+  "focus",
+  "selected",
+  "route",
+  "load",
+];
+
+const UI_MOTION_EFFECTS: readonly UiMotionContract["effect"][] = [
+  "slam",
+  "pulse",
+  "slide",
+  "scale",
+  "flash",
+  "none",
+];
+
 export interface UiContrastContract {
   mode: "normal" | "high";
   minRatio?: number;
   palette?: string[];
   textOverAccent?: boolean;
 }
+
+const UI_CONTRAST_MODES: readonly UiContrastContract["mode"][] = [
+  "normal",
+  "high",
+];
 
 export type UiSlotKind =
   | "content"
@@ -417,6 +498,8 @@ export function validateUiContract(contract: UiContract): UiContractIssue[] {
     }
     validateMarkers(screen.markers, `${screenPath}.markers`, issues);
     validateStates(screen.states, `${screenPath}.states`, issues);
+    validateRequiredStates(screen.requiredStates, `${screenPath}.requiredStates`, issues);
+    validateExpectedScrollports(screen.expectedScrollports, `${screenPath}.expectedScrollports`, issues);
     validateComposition(screen.composition, `${screenPath}.composition`, issues);
     validateContent(screen.content, `${screenPath}.content`, issues);
     validateDecoration(screen.decoration, `${screenPath}.decoration`, issues);
@@ -503,14 +586,67 @@ function validateStates(
   issues: UiContractIssue[],
 ): void {
   for (let i = 0; i < (states?.length ?? 0); i++) {
+    validateStateContract(states![i]!, `${path}[${i}]`, issues);
+  }
+}
+
+function validateStateContract(
+  state: UiStateContract,
+  path: string,
+  issues: UiContractIssue[],
+): void {
+  if (!state.id) issues.push({ path: `${path}.id`, message: "state id is required" });
+  if (!includesString(UI_STATE_KINDS, state.kind)) {
+    issues.push({ path: `${path}.kind`, message: "unknown state kind" });
+  }
+  if (state.required && !state.selector && !state.trigger) {
+    issues.push({ path, message: "required state must declare selector or trigger" });
+  }
+}
+
+function validateRequiredStates(
+  states: UiRequiredStateContract[] | undefined,
+  path: string,
+  issues: UiContractIssue[],
+): void {
+  const ids = new Set<string>();
+  for (let i = 0; i < (states?.length ?? 0); i++) {
     const state = states![i]!;
     const statePath = `${path}[${i}]`;
-    if (!state.id) issues.push({ path: `${statePath}.id`, message: "state id is required" });
-    if (!includesString(UI_STATE_KINDS, state.kind)) {
-      issues.push({ path: `${statePath}.kind`, message: "unknown state kind" });
+    validateStateContract(state, statePath, issues);
+    if (state.id) {
+      if (ids.has(state.id)) issues.push({ path: `${statePath}.id`, message: "required state id must be unique" });
+      ids.add(state.id);
     }
-    if (state.required && !state.selector && !state.trigger) {
+    if (!state.required && !state.selector && !state.trigger) {
       issues.push({ path: statePath, message: "required state must declare selector or trigger" });
+    }
+    if (state.minChangeRatio !== undefined && (state.minChangeRatio < 0 || state.minChangeRatio > 1)) {
+      issues.push({ path: `${statePath}.minChangeRatio`, message: "required state minChangeRatio must be between 0 and 1" });
+    }
+  }
+}
+
+function validateExpectedScrollports(
+  scrollports: UiExpectedScrollportContract[] | undefined,
+  path: string,
+  issues: UiContractIssue[],
+): void {
+  const ids = new Set<string>();
+  for (let i = 0; i < (scrollports?.length ?? 0); i++) {
+    const scrollport = scrollports![i]!;
+    const scrollportPath = `${path}[${i}]`;
+    if (!scrollport.id) issues.push({ path: `${scrollportPath}.id`, message: "expected scrollport id is required" });
+    else if (ids.has(scrollport.id)) issues.push({ path: `${scrollportPath}.id`, message: "expected scrollport id must be unique" });
+    else ids.add(scrollport.id);
+    if (scrollport.axis && !includesString(UI_SCROLL_AXES, scrollport.axis)) {
+      issues.push({ path: `${scrollportPath}.axis`, message: "unknown expected scrollport axis" });
+    }
+    if (scrollport.required && !scrollport.selector && !scrollport.name && !scrollport.landmarkId) {
+      issues.push({ path: scrollportPath, message: "required expected scrollport must declare selector, name, or landmarkId" });
+    }
+    if (scrollport.minOverflow !== undefined && scrollport.minOverflow < 0) {
+      issues.push({ path: `${scrollportPath}.minOverflow`, message: "expected scrollport minOverflow must be non-negative" });
     }
   }
 }
@@ -542,29 +678,62 @@ function validateComposition(
   issues: UiContractIssue[],
 ): void {
   if (!composition) return;
+  if (!includesString(UI_COMPOSITION_STYLES, composition.style)) {
+    issues.push({ path: `${path}.style`, message: "unknown composition style" });
+  }
+  for (let i = 0; i < (composition.axes?.length ?? 0); i++) {
+    const axis = composition.axes![i]!;
+    if (!includesString(UI_COMPOSITION_AXES, axis)) {
+      issues.push({ path: `${path}.axes[${i}]`, message: "unknown composition axis" });
+    }
+  }
+  const layerIds = new Set<string>();
   for (let i = 0; i < (composition.layers?.length ?? 0); i++) {
     const layer = composition.layers![i]!;
     const layerPath = `${path}.layers[${i}]`;
     if (!layer.id) issues.push({ path: `${layerPath}.id`, message: "composition layer id is required" });
+    else if (layerIds.has(layer.id)) issues.push({ path: `${layerPath}.id`, message: "composition layer id must be unique" });
+    else layerIds.add(layer.id);
+    if (!includesString(UI_COMPOSITION_LAYER_ROLES, layer.role)) {
+      issues.push({ path: `${layerPath}.role`, message: "unknown composition layer role" });
+    }
     if (layer.z !== undefined && !Number.isFinite(layer.z)) {
       issues.push({ path: `${layerPath}.z`, message: "composition layer z must be finite" });
     }
   }
+  const shapeIds = new Set<string>();
   for (let i = 0; i < (composition.shapes?.length ?? 0); i++) {
     const shape = composition.shapes![i]!;
     const shapePath = `${path}.shapes[${i}]`;
     if (!shape.id) issues.push({ path: `${shapePath}.id`, message: "composition shape id is required" });
+    else if (shapeIds.has(shape.id)) issues.push({ path: `${shapePath}.id`, message: "composition shape id must be unique" });
+    else shapeIds.add(shape.id);
+    if (!includesString(UI_COMPOSITION_SHAPE_KINDS, shape.kind)) {
+      issues.push({ path: `${shapePath}.kind`, message: "unknown composition shape kind" });
+    }
   }
+  const motionIds = new Set<string>();
   for (let i = 0; i < (composition.motion?.length ?? 0); i++) {
     const motion = composition.motion![i]!;
     const motionPath = `${path}.motion[${i}]`;
     if (!motion.id) issues.push({ path: `${motionPath}.id`, message: "motion id is required" });
+    else if (motionIds.has(motion.id)) issues.push({ path: `${motionPath}.id`, message: "motion id must be unique" });
+    else motionIds.add(motion.id);
+    if (!includesString(UI_MOTION_TRIGGERS, motion.trigger)) {
+      issues.push({ path: `${motionPath}.trigger`, message: "unknown motion trigger" });
+    }
+    if (!includesString(UI_MOTION_EFFECTS, motion.effect)) {
+      issues.push({ path: `${motionPath}.effect`, message: "unknown motion effect" });
+    }
     if (motion.durationMs !== undefined && motion.durationMs < 0) {
       issues.push({ path: `${motionPath}.durationMs`, message: "durationMs must be non-negative" });
     }
   }
   if (composition.contrast) {
     const contrastPath = `${path}.contrast`;
+    if (!includesString(UI_CONTRAST_MODES, composition.contrast.mode)) {
+      issues.push({ path: `${contrastPath}.mode`, message: "unknown contrast mode" });
+    }
     if (composition.contrast.minRatio !== undefined && composition.contrast.minRatio <= 0) {
       issues.push({ path: `${contrastPath}.minRatio`, message: "contrast minRatio must be positive" });
     }
@@ -678,6 +847,10 @@ function validatePatternEvidence(
 ): void {
   const pattern = screen.pattern ?? screen.goal;
   const markerKinds = new Set(collectMarkers(screen).map((marker) => marker.kind));
+  const requiredStateKinds = new Set([
+    ...(screen.states ?? []).filter((state) => state.required).map((state) => state.kind),
+    ...(screen.requiredStates ?? []).map((state) => state.kind),
+  ]);
   if (pattern === "landing") {
     for (const kind of ["primary-cta", "media-slot", "next-section"] as const) {
       if (!markerKinds.has(kind)) {
@@ -687,6 +860,14 @@ function validatePatternEvidence(
   }
   if (pattern === "app-shell" && !markerKinds.has("scrollport")) {
     issues.push({ path: `${screenPath}.markers`, message: "app-shell contracts should include scrollport marker evidence" });
+  }
+  if (pattern === "app-shell") {
+    if ((screen.expectedScrollports?.length ?? 0) === 0) {
+      issues.push({ path: `${screenPath}.expectedScrollports`, message: "app-shell contracts should declare expectedScrollports" });
+    }
+    if (!requiredStateKinds.has("selected")) {
+      issues.push({ path: `${screenPath}.requiredStates`, message: "app-shell contracts should require a selected state" });
+    }
   }
   if (pattern === "canvas") {
     const required = ["mode", "frame", "playerX", "playerY", "score", "assetsReady"];
@@ -704,11 +885,17 @@ function validatePatternEvidence(
     if (!screen.composition) {
       issues.push({ path: `${screenPath}.composition`, message: "expressive-menu contracts should include composition metadata" });
     }
-    const hasStateEvidence = (screen.states ?? []).some((state) =>
-      state.kind === "selected" || state.kind === "focus-visible"
-    ) || markerKinds.has("selected");
+    const hasStateEvidence = requiredStateKinds.has("selected")
+      || requiredStateKinds.has("focus-visible")
+      || markerKinds.has("selected")
+      || (screen.states ?? []).some((state) => state.kind === "selected" || state.kind === "focus-visible");
     if (!hasStateEvidence) {
       issues.push({ path: `${screenPath}.states`, message: "expressive-menu contracts should include selected or focus-visible state evidence" });
+    }
+    for (const kind of ["selected", "hover", "focus-visible"] as const) {
+      if (!requiredStateKinds.has(kind)) {
+        issues.push({ path: `${screenPath}.requiredStates`, message: `expressive-menu contracts should require ${kind} state` });
+      }
     }
   }
 }
@@ -781,6 +968,8 @@ export function summarizeUiContractScreen(screen: UiContractScreen): string {
     `landmarks ${screen.landmarks.length}`,
     screen.markers?.length ? `markers ${screen.markers.length}` : "",
     screen.states?.length ? `states ${screen.states.length}` : "",
+    screen.requiredStates?.length ? `required states ${screen.requiredStates.length}` : "",
+    screen.expectedScrollports?.length ? `expected scrollports ${screen.expectedScrollports.length}` : "",
     screen.composition ? `composition ${screen.composition.style}` : "",
     screen.assets?.length ? `assets ${screen.assets.length}` : "",
     screen.canvas ? "canvas" : "",
