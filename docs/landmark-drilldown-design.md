@@ -185,6 +185,19 @@ The current implementation deliberately ignores `role="landmark"`, and only
 treats named `<section>` and named `<form>` as landmarks to avoid noisy generic
 containers.
 
+`vlmkit contract introspect` now also uses landmark capture as contract
+evidence:
+
+- repeated `--viewport` captures are matched back to the base landmark by
+  role/name, then path/order, and emitted as `responsive` layout rules;
+- each landmark can carry coarse content probes: slots, repeat counts, content
+  kind, text length, and density;
+- `--profile` and `--profile-json` expose browser launch, navigation,
+  landmark capture, and hint capture timing;
+- local file inputs wait for `load` instead of `networkidle`, which keeps
+  dogfood introspection under roughly a few hundred milliseconds after cold
+  browser start.
+
 ## Next Generalization
 
 1. Promote `semantic-drilldown` from component-specific reporting to a shared

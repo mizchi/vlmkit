@@ -283,6 +283,30 @@ Added expressive-menu introspection:
 - when CSS min/max constraints are missing, measured landmark width is kept as
   a draft `max` bound so introspected contracts avoid `fluid unbounded`.
 
+Added responsive/content introspection and profiling:
+
+- multiple `--viewport` captures now emit landmark `responsive` rules by
+  matching landmarks across viewports by role/name first, then path/order;
+- landmark content probes recover title/control/media/canvas/adornment slots,
+  repeat counts, content kind, text length, and rough density;
+- `contract introspect --profile` prints browser / navigation / landmark /
+  hint timings, and `--profile-json` writes the same breakdown as JSON;
+- local file inputs use `load` instead of `networkidle`, removing the ~500ms
+  idle wait per viewport observed in the first profile run.
+
+Current 3-round dogfood benchmark:
+
+| Case | Avg total | p95 | Avg browser launch | Avg viewport work | Avg goto | Avg landmark |
+|---|---:|---:|---:|---:|---:|---:|
+| app-shell | 385ms | 747ms | 232ms | 130ms | 10ms | 35ms |
+| expressive-menu | 204ms | 216ms | 89ms | 96ms | 7ms | 28ms |
+| canvas | 146ms | 169ms | 92ms | 43ms | 8ms | 3ms |
+
+The remaining performance cost is mostly browser launch, especially on the
+cold first app-shell run. Precision improved most from responsive rules and
+landmark content/repeat probes; decoration and motion are still better kept in
+hand-authored contract metadata until the introspector learns those fields.
+
 Additional dogfood fixes:
 
 - component report drilldown now shows measured fluid width instead of
@@ -305,7 +329,12 @@ Additional dogfood fixes:
    overlap, asset visibility, richer input assertions, and multi-input probes.
 2. Add Contract syntax for expected input deltas, e.g. `ArrowRight` must
    increase `playerX`.
-3. Add mobile/collapsed app-shell contract variants.
+3. Add mobile/collapsed app-shell contract variants from the new responsive
+   introspection data.
+4. Reuse a browser across batch introspection to remove launch time from
+   multi-page benchmark runs.
+5. Add decoration/motion introspection without overwriting hand-authored
+   contract metadata.
 
 ## Verification
 
@@ -321,8 +350,9 @@ node src/cli/vlmkit.ts contract validate design-runs/patterns-20260520/app-shell
 node src/cli/vlmkit.ts contract validate design-runs/patterns-20260520/game/ui.contract.json
 node src/cli/vlmkit.ts contract validate design-runs/patterns-20260520/expressive-menu/ui.contract.json
 node src/cli/vlmkit.ts contract introspect design-runs/patterns-20260520/expressive-menu/current.html --pattern expressive-menu --goal expressive-menu --viewport desktop:1440x900
-node src/cli/vlmkit.ts contract introspect design-runs/patterns-20260520/app-shell/current.html --pattern app-shell --goal app-shell --viewport desktop:1440x900
+node src/cli/vlmkit.ts contract introspect design-runs/patterns-20260520/app-shell/current.html --pattern app-shell --goal app-shell --viewport desktop:1440x900 --viewport mobile:390x844 --profile
 node src/cli/vlmkit.ts contract introspect design-runs/patterns-20260520/game/current.html --pattern canvas --goal canvas --viewport desktop:1280x720
+node src/experiments/benchmark/introspect-bench.ts --rounds 3 --out test-results/introspect/benchmark.json
 node design-runs/patterns-20260520/check-patterns.mjs
 node --test 'packages/vlmkit-markup/src/**/*.test.ts' src/cli/cli.test.ts
 ```

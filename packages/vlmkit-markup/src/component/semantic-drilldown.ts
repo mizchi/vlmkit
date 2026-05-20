@@ -31,6 +31,9 @@ export interface LandmarkRegion {
   bbox: Rect;
   order: number;
   layout?: LandmarkLayoutContract;
+  slots?: LandmarkSlotSummary[];
+  repeat?: LandmarkRepeatSummary;
+  content?: LandmarkContentSummary;
 }
 
 export interface LandmarkLayoutContract {
@@ -47,6 +50,48 @@ export interface LandmarkLayoutContract {
   clientHeight: number;
   scrollWidth: number;
   scrollHeight: number;
+}
+
+export type LandmarkSlotKind =
+  | "content"
+  | "media"
+  | "control"
+  | "list"
+  | "canvas"
+  | "adornment";
+
+export type LandmarkSlotMarker =
+  | "primary-cta"
+  | "next-section"
+  | "media-slot"
+  | "hero-title"
+  | "scrollport"
+  | "selected"
+  | "unread"
+  | "game-state"
+  | "custom";
+
+export interface LandmarkSlotSummary {
+  id: string;
+  kind: LandmarkSlotKind;
+  name?: string;
+  marker?: LandmarkSlotMarker;
+  gridArea?: string;
+  required?: boolean;
+}
+
+export interface LandmarkRepeatSummary {
+  kind: "list" | "grid" | "table" | "feed";
+  itemName?: string;
+  itemCount: number;
+}
+
+export interface LandmarkContentSummary {
+  kind: "static" | "list" | "table" | "chart" | "form" | "canvas" | "generated";
+  density?: "sparse" | "normal" | "dense";
+  itemCount?: number;
+  textLength?: number;
+  textRowCount?: number;
 }
 
 export interface LandmarkLayoutSummary {
@@ -385,6 +430,173 @@ export async function captureLandmarkRegions(
       return parts.reverse().join(">");
     }
 
+    function visibleDescendants(el: Element, selector: string): Element[] {
+      return Array.from(el.querySelectorAll(selector)).filter((candidate) => {
+        const rect = candidate.getBoundingClientRect();
+        if (rect.width < 1 || rect.height < 1) return false;
+        const style = getComputedStyle(candidate);
+        return style.display !== "none" && style.visibility !== "hidden";
+      });
+    }
+
+    function directContentChildren(el: Element): Element[] {
+      return Array.from(el.children).filter((child) => {
+        const rect = child.getBoundingClientRect();
+        if (rect.width < 1 || rect.height < 1) return false;
+        const text = (child.textContent ?? "").replace(/\s+/g, " ").trim();
+        if (!text) return false;
+        const style = getComputedStyle(child);
+        return style.display !== "none" && style.visibility !== "hidden";
+      });
+    }
+
+    function textRowCount(el: Element): number {
+      const rows = visibleDescendants(el, [
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "p",
+        "li",
+        "button",
+        "[data-menu-item]",
+        "[data-repeat-item]",
+        "td",
+        "th",
+        "figcaption",
+      ].join(",")).filter((candidate) =>
+        (candidate.textContent ?? "").replace(/\s+/g, " ").trim().length > 0,
+      );
+      return rows.length;
+    }
+
+    function captureLandmarkDetails(
+      el: Element,
+      role: LandmarkRole,
+      style: CSSStyleDeclaration,
+      rect: DOMRect,
+    ): Pick<LandmarkRegion, "slots" | "repeat" | "content"> {
+      const controls = visibleDescendants(el, [
+        "button",
+        "a[href]",
+        "input",
+        "select",
+        "textarea",
+        "[role=\"button\"]",
+        "[role=\"menuitem\"]",
+        "[data-menu-item]",
+      ].join(","));
+      const headings = visibleDescendants(el, "h1,h2,h3,h4,h5,h6,[data-hero-title]");
+      const media = visibleDescendants(el, "img,picture,video,[data-media-slot]");
+      const canvases = visibleDescendants(el, "canvas");
+      const adornments = visibleDescendants(el, "[data-shape]");
+      const explicitItems = visibleDescendants(el, "[data-repeat-item],[data-menu-item],li,article,tr");
+      const directChildren = directContentChildren(el);
+      const repeatItems = explicitItems.length >= 2
+        ? explicitItems
+        : role === "navigation" && controls.length >= 2
+          ? controls
+          : (style.display.includes("grid") || style.display.includes("flex")) && directChildren.length >= 3
+            ? directChildren
+            : [];
+
+      const slots: LandmarkSlotSummary[] = [];
+      if (headings.length > 0) {
+        slots.push({ id: "title", kind: "content", required: true });
+      }
+      if (controls.length > 0) {
+        slots.push({
+          id: "controls",
+          kind: "control",
+          ...(hasSelected(controls) ? { marker: "selected" } : {}),
+          required: true,
+        });
+      }
+      if (media.length > 0) {
+        slots.push({ id: "media", kind: "media", marker: "media-slot", required: true });
+      }
+      if (canvases.length > 0) {
+        slots.push({ id: "canvas", kind: "canvas", required: true });
+      }
+      if (adornments.length > 0) {
+        slots.push({ id: "adornment", kind: "adornment" });
+      }
+
+      const text = (el.textContent ?? "").replace(/\s+/g, " ").trim();
+      const rows = textRowCount(el);
+      const itemCount = repeatItems.length >= 2 ? repeatItems.length : undefined;
+      const content: LandmarkContentSummary = {
+        kind: inferContentKind(el, role, canvases.length, itemCount),
+        density: inferDensity(text.length, rect),
+        ...(itemCount !== undefined ? { itemCount } : {}),
+        ...(text.length > 0 ? { textLength: text.length } : {}),
+        ...(rows > 0 ? { textRowCount: rows } : {}),
+      };
+      const repeat = itemCount !== undefined
+        ? {
+            kind: inferRepeatKind(style, repeatItems),
+            itemName: inferItemName(repeatItems[0]!),
+            itemCount,
+          }
+        : undefined;
+
+      return {
+        ...(slots.length > 0 ? { slots } : {}),
+        ...(repeat ? { repeat } : {}),
+        content,
+      };
+    }
+
+    function hasSelected(elements: Element[]): boolean {
+      return elements.some((el) =>
+        el.matches("[data-selected=\"true\"], [aria-current=\"page\"]")
+        || el.querySelector("[data-selected=\"true\"], [aria-current=\"page\"]") !== null,
+      );
+    }
+
+    function inferContentKind(
+      el: Element,
+      role: LandmarkRole,
+      canvasCount: number,
+      itemCount: number | undefined,
+    ): LandmarkContentSummary["kind"] {
+      if (canvasCount > 0) return "canvas";
+      if (el.tagName.toLowerCase() === "form" || role === "form") return "form";
+      if (el.querySelector("table")) return "table";
+      if (itemCount !== undefined) return "list";
+      return "static";
+    }
+
+    function inferDensity(textLength: number, rect: DOMRect): LandmarkContentSummary["density"] {
+      const area = Math.max(1, rect.width * rect.height);
+      const perKpx = textLength / (area / 1000);
+      if (perKpx >= 2.5) return "dense";
+      if (perKpx >= 0.7) return "normal";
+      return "sparse";
+    }
+
+    function inferRepeatKind(
+      style: CSSStyleDeclaration,
+      items: Element[],
+    ): LandmarkRepeatSummary["kind"] {
+      if (items[0]?.tagName.toLowerCase() === "tr") return "table";
+      const columns = style.gridTemplateColumns.split(/\s+/).filter(Boolean);
+      if (style.display.includes("grid") && columns.length > 1) return "grid";
+      return "list";
+    }
+
+    function inferItemName(item: Element): string {
+      const explicit = item.getAttribute("data-repeat-item") || item.getAttribute("data-menu-item");
+      if (explicit) return explicit.trim() || "item";
+      const tag = item.tagName.toLowerCase();
+      if (tag === "article") return "article";
+      if (tag === "tr") return "row";
+      if (tag === "button") return "control";
+      return "item";
+    }
+
     const out: LandmarkRegion[] = [];
     let order = 0;
     for (const el of Array.from(document.querySelectorAll(selector))) {
@@ -395,6 +607,7 @@ export async function captureLandmarkRegions(
       if (rect.width < 1 || rect.height < 1) continue;
       const style = window.getComputedStyle(el);
       if (style.display === "none" || style.visibility === "hidden") continue;
+      const details = captureLandmarkDetails(el, role, style, rect);
       out.push({
         role: role as LandmarkRole,
         name,
@@ -420,6 +633,7 @@ export async function captureLandmarkRegions(
           scrollWidth: Math.round((el as HTMLElement).scrollWidth * dpr),
           scrollHeight: Math.round((el as HTMLElement).scrollHeight * dpr),
         },
+        ...details,
         order: order++,
       });
     }

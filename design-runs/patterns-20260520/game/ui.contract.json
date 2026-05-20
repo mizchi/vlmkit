@@ -43,6 +43,17 @@
           "id": "main-skyline-runner",
           "role": "main",
           "name": "Skyline runner",
+          "slots": [
+            {
+              "id": "canvas",
+              "kind": "canvas",
+              "required": true
+            }
+          ],
+          "content": {
+            "kind": "canvas",
+            "density": "sparse"
+          },
           "layout": {
             "width": {
               "kind": "fluid",

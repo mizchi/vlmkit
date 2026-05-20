@@ -17,6 +17,7 @@ import {
   type UiContractGoal,
   type UiContractPattern,
   type UiCanvasContract,
+  type UiContentContract,
   type UiContractViewport,
   type UiCompositionContract,
   type UiDisplayPolicy,
@@ -25,7 +26,10 @@ import {
   type UiLayoutContract,
   type UiMarkerContract,
   type UiRequiredStateContract,
+  type UiRepeatContract,
+  type UiResponsiveRule,
   type UiScrollPolicy,
+  type UiSlotContract,
   type UiStateContract,
   type UiWidthPolicy,
 } from "./ui-contract.ts";
@@ -52,6 +56,7 @@ export interface IntrospectUiContractOptions {
   goal?: UiContractGoal;
   viewports?: UiContractViewport[];
   outputPath?: string;
+  onProfile?: (profile: UiContractIntrospectionProfile) => void;
 }
 
 export interface UiContractDomHints {
@@ -62,6 +67,25 @@ export interface UiContractDomHints {
   composition?: UiCompositionContract;
   assets?: UiAssetContract[];
   canvas?: UiCanvasContract;
+}
+
+export interface UiContractIntrospectionViewportProfile {
+  label: string;
+  width: number;
+  height: number;
+  dpr: number;
+  totalMs: number;
+  navigateMs: number;
+  landmarkMs: number;
+  hintMs: number;
+  landmarks: number;
+}
+
+export interface UiContractIntrospectionProfile {
+  totalMs: number;
+  browserLaunchMs: number;
+  browserCloseMs: number;
+  viewports: UiContractIntrospectionViewportProfile[];
 }
 
 const DEFAULT_VIEWPORTS: UiContractViewport[] = [
@@ -157,19 +181,22 @@ export function landmarkRegionsToUiContract(
   input: LandmarkRegionsToUiContractInput,
 ): UiContract {
   const baseCapture = input.captures[0];
-  const landmarks = (baseCapture?.landmarks ?? []).map((landmark): UiContractLandmark => ({
-    id: landmarkId(landmark),
-    role: landmark.role,
-    name: landmark.name,
-    layout: landmark.layout
-      ? layoutContractToUiLayout(landmark.layout)
-      : {
-          width: { kind: "fluid" },
-          height: { kind: "content" },
-          display: { kind: "block" },
-          scroll: { x: false, y: false },
-        },
-  }));
+  const baseLandmarks = baseCapture?.landmarks ?? [];
+  const landmarks = baseLandmarks.map((landmark): UiContractLandmark => {
+    const responsive = responsiveRulesForLandmark(landmark, baseLandmarks, input.captures);
+    return {
+      id: landmarkId(landmark),
+      role: landmark.role,
+      name: landmark.name,
+      ...(landmark.slots?.length ? { slots: landmark.slots.map(mapLandmarkSlot) } : {}),
+      ...(landmark.repeat ? { repeat: mapLandmarkRepeat(landmark.repeat) } : {}),
+      ...(landmark.content ? { content: mapLandmarkContent(landmark.content) } : {}),
+      layout: landmark.layout
+        ? layoutContractToUiLayout(landmark.layout)
+        : defaultUiLayout(),
+      ...(responsive.length > 0 ? { responsive } : {}),
+    };
+  });
 
   return {
     version: 1,
@@ -191,6 +218,42 @@ export function landmarkRegionsToUiContract(
   };
 }
 
+function mapLandmarkSlot(slot: NonNullable<LandmarkRegion["slots"]>[number]): UiSlotContract {
+  return {
+    id: slot.id,
+    kind: slot.kind,
+    ...(slot.name ? { name: slot.name } : {}),
+    ...(slot.marker ? { marker: slot.marker } : {}),
+    ...(slot.gridArea ? { gridArea: slot.gridArea } : {}),
+    ...(slot.required !== undefined ? { required: slot.required } : {}),
+  };
+}
+
+function mapLandmarkRepeat(repeat: NonNullable<LandmarkRegion["repeat"]>): UiRepeatContract {
+  return {
+    kind: repeat.kind,
+    ...(repeat.itemName ? { itemName: repeat.itemName } : {}),
+    minItems: repeat.itemCount,
+    maxItems: repeat.itemCount,
+  };
+}
+
+function mapLandmarkContent(content: NonNullable<LandmarkRegion["content"]>): UiContentContract {
+  return {
+    kind: content.kind,
+    ...(content.density ? { density: content.density } : {}),
+    ...(content.itemCount !== undefined ? { items: { exact: content.itemCount } } : {}),
+    ...(content.textLength !== undefined || content.textRowCount !== undefined
+      ? {
+          text: {
+            ...(content.textLength !== undefined ? { maxLength: content.textLength } : {}),
+            ...(content.textRowCount !== undefined ? { rowCount: content.textRowCount } : {}),
+          },
+        }
+      : {}),
+  };
+}
+
 function landmarkId(landmark: LandmarkRegion): string {
   const raw = `${landmark.role}-${landmark.name || landmark.path || landmark.order}`;
   const slug = raw
@@ -200,35 +263,138 @@ function landmarkId(landmark: LandmarkRegion): string {
   return slug || `${landmark.role}-${landmark.order}`;
 }
 
+function defaultUiLayout(): UiLayoutContract {
+  return {
+    width: { kind: "fluid" },
+    height: { kind: "content" },
+    display: { kind: "block" },
+    scroll: { x: false, y: false },
+  };
+}
+
+function responsiveRulesForLandmark(
+  base: LandmarkRegion,
+  baseLandmarks: LandmarkRegion[],
+  captures: LandmarkCapture[],
+): UiResponsiveRule[] {
+  if (!base.layout || captures.length <= 1) return [];
+  const baseLayout = layoutContractToUiLayout(base.layout);
+  const rules: UiResponsiveRule[] = [];
+  for (const capture of captures.slice(1)) {
+    const matched = matchResponsiveLandmark(base, baseLandmarks, capture.landmarks);
+    if (!matched?.layout) continue;
+    const layout = layoutContractToUiLayout(matched.layout);
+    const rule: UiResponsiveRule = { viewport: capture.viewport };
+    if (!samePolicy(baseLayout.width, layout.width)) rule.width = layout.width;
+    if (!samePolicy(baseLayout.height, layout.height)) rule.height = layout.height;
+    if (!samePolicy(baseLayout.display, layout.display)) rule.display = layout.display;
+    if (!samePolicy(baseLayout.scroll, layout.scroll)) rule.scroll = layout.scroll;
+    if (Object.keys(rule).length > 1) rules.push(rule);
+  }
+  return rules;
+}
+
+function matchResponsiveLandmark(
+  base: LandmarkRegion,
+  baseLandmarks: LandmarkRegion[],
+  candidates: LandmarkRegion[],
+): LandmarkRegion | undefined {
+  const byName = base.name
+    ? nthMatch(
+      base,
+      baseLandmarks.filter((candidate) => candidate.role === base.role && candidate.name === base.name),
+      candidates.filter((candidate) => candidate.role === base.role && candidate.name === base.name),
+    )
+    : undefined;
+  if (byName) return byName;
+
+  const byPath = candidates.find((candidate) =>
+    candidate.role === base.role && candidate.path === base.path,
+  );
+  if (byPath) return byPath;
+
+  return nthMatch(
+    base,
+    baseLandmarks.filter((candidate) => candidate.role === base.role),
+    candidates.filter((candidate) => candidate.role === base.role),
+  );
+}
+
+function nthMatch(
+  base: LandmarkRegion,
+  baseGroup: LandmarkRegion[],
+  candidateGroup: LandmarkRegion[],
+): LandmarkRegion | undefined {
+  if (candidateGroup.length === 0) return undefined;
+  if (candidateGroup.length === 1) return candidateGroup[0];
+  const nth = baseGroup.indexOf(base);
+  return nth >= 0 ? candidateGroup[nth] : undefined;
+}
+
+function samePolicy(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export async function introspectUiContractFromHtml(
   options: IntrospectUiContractOptions,
 ): Promise<UiContract> {
   const viewports = options.viewports ?? DEFAULT_VIEWPORTS;
   const input = options.input;
   const screenId = options.screenId ?? (basename(input).replace(/\.[^.]+$/, "") || "screen");
+  const profileStart = performance.now();
+  const launchStart = performance.now();
   const browser = await chromium.launch();
+  const profile: UiContractIntrospectionProfile = {
+    totalMs: 0,
+    browserLaunchMs: performance.now() - launchStart,
+    browserCloseMs: 0,
+    viewports: [],
+  };
   const captures: LandmarkCapture[] = [];
   let hints: UiContractDomHints | undefined;
   try {
     for (const viewport of viewports) {
+      const viewportStart = performance.now();
       const page = await browser.newPage({
         viewport: { width: viewport.width, height: viewport.height },
         deviceScaleFactor: viewport.dpr ?? 1,
       });
-      const target = /^https?:\/\//u.test(input)
-        ? input
-        : pathToFileURL(resolve(input)).toString();
-      await page.goto(target, { waitUntil: "networkidle" });
+      const target = introspectionTarget(input);
+      const navigateStart = performance.now();
+      await page.goto(target, { waitUntil: waitUntilForIntrospectionInput(input) });
+      const navigateMs = performance.now() - navigateStart;
+      const landmarkStart = performance.now();
       const landmarks = await captureLandmarkRegions(page, {
         deviceScaleFactor: viewport.dpr ?? 1,
       });
-      if (!hints) hints = await captureUiContractDomHints(page);
+      const landmarkMs = performance.now() - landmarkStart;
+      let hintMs = 0;
+      if (!hints) {
+        const hintStart = performance.now();
+        hints = await captureUiContractDomHints(page);
+        hintMs = performance.now() - hintStart;
+      }
       captures.push({ viewport: viewport.label, landmarks });
       await page.close();
+      profile.viewports.push({
+        label: viewport.label,
+        width: viewport.width,
+        height: viewport.height,
+        dpr: viewport.dpr ?? 1,
+        totalMs: performance.now() - viewportStart,
+        navigateMs,
+        landmarkMs,
+        hintMs,
+        landmarks: landmarks.length,
+      });
     }
   } finally {
+    const closeStart = performance.now();
     await browser.close();
+    profile.browserCloseMs = performance.now() - closeStart;
+    profile.totalMs = performance.now() - profileStart;
   }
+  options.onProfile?.(profile);
   return landmarkRegionsToUiContract({
     screenId,
     pattern: options.pattern,
@@ -237,6 +403,46 @@ export async function introspectUiContractFromHtml(
     captures,
     hints,
   });
+}
+
+function introspectionTarget(input: string): string {
+  return isHttpUrl(input) || isFileUrl(input)
+    ? input
+    : pathToFileURL(resolve(input)).toString();
+}
+
+export function waitUntilForIntrospectionInput(input: string): "load" | "networkidle" {
+  return isHttpUrl(input) ? "networkidle" : "load";
+}
+
+function isHttpUrl(input: string): boolean {
+  return /^https?:\/\//u.test(input);
+}
+
+function isFileUrl(input: string): boolean {
+  return /^file:\/\//u.test(input);
+}
+
+export function formatIntrospectionProfile(profile: UiContractIntrospectionProfile): string {
+  const lines = [
+    `introspect profile: total ${formatMs(profile.totalMs)}, browser launch ${formatMs(profile.browserLaunchMs)}, close ${formatMs(profile.browserCloseMs)}`,
+  ];
+  for (const viewport of profile.viewports) {
+    lines.push(
+      [
+        `- ${viewport.label} ${viewport.width}x${viewport.height}@${viewport.dpr}`,
+        `total ${formatMs(viewport.totalMs)}`,
+        `goto ${formatMs(viewport.navigateMs)}`,
+        `landmarks ${viewport.landmarks} in ${formatMs(viewport.landmarkMs)}`,
+        viewport.hintMs > 0 ? `hints ${formatMs(viewport.hintMs)}` : "",
+      ].filter(Boolean).join(", "),
+    );
+  }
+  return lines.join("\n");
+}
+
+function formatMs(value: number): string {
+  return `${Math.round(value)}ms`;
 }
 
 async function captureUiContractDomHints(page: import("playwright").Page): Promise<UiContractDomHints> {
@@ -496,21 +702,25 @@ function parseArgs(argv: string[]) {
   const positional: string[] = [];
   const viewports: UiContractViewport[] = [];
   let out = "";
+  let profileJson = "";
   let screenId = "";
   let pattern = "";
   let goal = "";
   let help = false;
+  let profile = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === "--help" || arg === "-h") help = true;
     else if (arg === "--out" || arg === "-o") out = argv[++i] ?? "";
+    else if (arg === "--profile") profile = true;
+    else if (arg === "--profile-json") profileJson = argv[++i] ?? "";
     else if (arg === "--screen-id") screenId = argv[++i] ?? "";
     else if (arg === "--pattern") pattern = argv[++i] ?? "";
     else if (arg === "--goal") goal = argv[++i] ?? "";
     else if (arg === "--viewport") viewports.push(parseViewport(argv[++i] ?? ""));
     else positional.push(arg);
   }
-  return { input: positional[0], out, screenId, pattern, goal, viewports, help };
+  return { input: positional[0], out, profile, profileJson, screenId, pattern, goal, viewports, help };
 }
 
 function parseViewport(raw: string): UiContractViewport {
@@ -532,6 +742,8 @@ function printHelp(): void {
   console.log("  --pattern <name>                 Optional pattern: editorial|landing|app-shell|dashboard|canvas|expressive-menu|mixed");
   console.log("  --goal <name>                    Optional validation goal: app|layout|pixel|draft|app-shell|landing|canvas|expressive-menu");
   console.log("  --viewport <label:WxH[@DPR]>     Capture viewport; repeatable");
+  console.log("  --profile                        Print timing breakdown to stderr");
+  console.log("  --profile-json <path>            Write timing breakdown JSON");
 }
 
 async function main(argv = process.argv.slice(2)) {
@@ -541,12 +753,18 @@ async function main(argv = process.argv.slice(2)) {
     if (!args.input && !args.help) process.exit(1);
     return;
   }
+  let profile: UiContractIntrospectionProfile | undefined;
   const contract = await introspectUiContractFromHtml({
     input: args.input,
     screenId: args.screenId || undefined,
     pattern: args.pattern ? args.pattern as UiContractPattern : undefined,
     goal: args.goal ? args.goal as UiContractGoal : undefined,
     viewports: args.viewports.length > 0 ? args.viewports : undefined,
+    onProfile: args.profile || args.profileJson
+      ? (next) => {
+        profile = next;
+      }
+      : undefined,
   });
   const issues = validateUiContract(contract);
   const json = JSON.stringify(contract, null, 2);
@@ -560,6 +778,13 @@ async function main(argv = process.argv.slice(2)) {
   if (screen) console.error(`- ${summarizeUiContractScreen(screen)}`);
   for (const landmark of screen?.landmarks ?? []) {
     console.error(`- ${summarizeUiContractLandmark(landmark)}`);
+  }
+  if (profile && args.profileJson) {
+    await writeFile(args.profileJson, JSON.stringify(profile, null, 2));
+    console.error(`Profile written to: ${args.profileJson}`);
+  }
+  if (profile && args.profile) {
+    console.error(`\n${formatIntrospectionProfile(profile)}`);
   }
   if (issues.length > 0) {
     console.error(`\n${issues.length} validation issue(s):`);

@@ -11,6 +11,11 @@
           "label": "desktop",
           "width": 1440,
           "height": 900
+        },
+        {
+          "label": "mobile",
+          "width": 390,
+          "height": 844
         }
       ],
       "markers": [
@@ -108,6 +113,22 @@
           "id": "navigation-servers",
           "role": "navigation",
           "name": "Servers",
+          "repeat": {
+            "kind": "list",
+            "itemName": "item",
+            "minItems": 4,
+            "maxItems": 4
+          },
+          "content": {
+            "kind": "list",
+            "density": "sparse",
+            "items": {
+              "exact": 4
+            },
+            "text": {
+              "maxLength": 4
+            }
+          },
           "layout": {
             "width": {
               "kind": "fluid",
@@ -138,6 +159,22 @@
           "id": "complementary-workspace-navigation",
           "role": "complementary",
           "name": "Workspace navigation",
+          "repeat": {
+            "kind": "list",
+            "itemName": "item",
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "content": {
+            "kind": "list",
+            "density": "normal",
+            "items": {
+              "exact": 3
+            },
+            "text": {
+              "maxLength": 341
+            }
+          },
           "layout": {
             "width": {
               "kind": "fluid",
@@ -161,12 +198,43 @@
               "x": false,
               "y": false
             }
-          }
+          },
+          "responsive": [
+            {
+              "viewport": "mobile",
+              "display": {
+                "kind": "grid",
+                "columns": [
+                  "263px"
+                ],
+                "rows": [
+                  "70px",
+                  "713px",
+                  "61px"
+                ]
+              }
+            }
+          ]
         },
         {
           "id": "banner-landing-review",
           "role": "banner",
           "name": "# landing-review",
+          "slots": [
+            {
+              "id": "title",
+              "kind": "content",
+              "required": true
+            }
+          ],
+          "content": {
+            "kind": "static",
+            "density": "sparse",
+            "text": {
+              "maxLength": 34,
+              "rowCount": 1
+            }
+          },
           "layout": {
             "width": {
               "kind": "fluid",
@@ -183,12 +251,28 @@
               "x": false,
               "y": false
             }
-          }
+          },
+          "responsive": [
+            {
+              "viewport": "mobile",
+              "width": {
+                "kind": "fluid",
+                "max": 256
+              }
+            }
+          ]
         },
         {
           "id": "search-body-0-div-0-header-0-div-0",
           "role": "search",
           "name": "",
+          "content": {
+            "kind": "static",
+            "density": "normal",
+            "text": {
+              "maxLength": 18
+            }
+          },
           "layout": {
             "width": {
               "kind": "fluid",
@@ -205,12 +289,29 @@
               "x": false,
               "y": false
             }
-          }
+          },
+          "responsive": [
+            {
+              "viewport": "mobile",
+              "width": {
+                "kind": "fluid",
+                "max": 147
+              }
+            }
+          ]
         },
         {
           "id": "main-body-0-div-0-main-0",
           "role": "main",
           "name": "",
+          "content": {
+            "kind": "static",
+            "density": "normal",
+            "text": {
+              "maxLength": 1332,
+              "rowCount": 16
+            }
+          },
           "layout": {
             "width": {
               "kind": "fluid",
@@ -239,6 +340,23 @@
           "id": "region-messages",
           "role": "region",
           "name": "Messages",
+          "repeat": {
+            "kind": "list",
+            "itemName": "item",
+            "minItems": 16,
+            "maxItems": 16
+          },
+          "content": {
+            "kind": "list",
+            "density": "normal",
+            "items": {
+              "exact": 16
+            },
+            "text": {
+              "maxLength": 1308,
+              "rowCount": 16
+            }
+          },
           "layout": {
             "width": {
               "kind": "fluid",
@@ -275,12 +393,52 @@
               "x": false,
               "y": false
             }
-          }
+          },
+          "responsive": [
+            {
+              "viewport": "mobile",
+              "width": {
+                "kind": "fluid",
+                "max": 142
+              },
+              "display": {
+                "kind": "grid",
+                "columns": [
+                  "89.8906px"
+                ],
+                "rows": [
+                  "331.156px",
+                  "270.266px",
+                  "392.047px",
+                  "331.156px",
+                  "290.562px",
+                  "351.453px",
+                  "351.453px",
+                  "189.078px",
+                  "331.156px",
+                  "290.562px",
+                  "209.375px",
+                  "351.453px",
+                  "290.562px",
+                  "270.266px",
+                  "290.562px",
+                  "290.562px"
+                ]
+              }
+            }
+          ]
         },
         {
           "id": "complementary-members",
           "role": "complementary",
           "name": "Members",
+          "content": {
+            "kind": "static",
+            "density": "sparse",
+            "text": {
+              "maxLength": 110
+            }
+          },
           "layout": {
             "width": {
               "kind": "fluid",

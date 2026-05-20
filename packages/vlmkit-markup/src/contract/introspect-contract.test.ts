@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  formatIntrospectionProfile,
   landmarkRegionsToUiContract,
   layoutContractToUiLayout,
+  waitUntilForIntrospectionInput,
 } from "./introspect-contract.ts";
 import type { LandmarkRegion } from "../component/semantic-drilldown.ts";
 import { validateUiContract } from "./ui-contract.ts";
@@ -93,6 +95,175 @@ test("landmarkRegionsToUiContract builds draft contract from captured landmarks"
   assert.equal(contract.screens[0]!.landmarks[1]!.id, "complementary-topics");
 });
 
+test("landmarkRegionsToUiContract emits responsive rules from non-base captures", () => {
+  const contract = landmarkRegionsToUiContract({
+    screenId: "blog-home",
+    viewports: [
+      { label: "desktop", width: 1440, height: 900 },
+      { label: "mobile", width: 390, height: 844 },
+    ],
+    captures: [
+      {
+        viewport: "desktop",
+        landmarks: [
+          region({
+            role: "main",
+            name: "Blog home",
+            layout: {
+              ...region({}).layout!,
+              gridTemplateColumns: "760px 320px",
+              clientWidth: 1080,
+              scrollWidth: 1080,
+            },
+          }),
+        ],
+      },
+      {
+        viewport: "mobile",
+        landmarks: [
+          region({
+            role: "main",
+            name: "Blog home",
+            layout: {
+              ...region({}).layout!,
+              gridTemplateColumns: "390px",
+              minWidth: "0px",
+              maxWidth: "none",
+              clientWidth: 390,
+              scrollWidth: 390,
+            },
+          }),
+        ],
+      },
+    ],
+  });
+
+  const responsive = contract.screens[0]!.landmarks[0]!.responsive;
+  assert.equal(responsive?.length, 1);
+  assert.equal(responsive?.[0]?.viewport, "mobile");
+  assert.deepEqual(responsive?.[0]?.display, {
+    kind: "grid",
+    columns: ["390px"],
+    rows: ["auto", "1fr"],
+  });
+  assert.deepEqual(responsive?.[0]?.width, { kind: "fluid", max: 390 });
+});
+
+test("landmarkRegionsToUiContract matches responsive landmarks by role and name", () => {
+  const contract = landmarkRegionsToUiContract({
+    screenId: "shell",
+    viewports: [
+      { label: "desktop", width: 1440, height: 900 },
+      { label: "mobile", width: 390, height: 844 },
+    ],
+    captures: [
+      {
+        viewport: "desktop",
+        landmarks: [
+          region({ role: "navigation", name: "Primary", path: "body[0]>nav[0]", order: 0 }),
+          region({ role: "main", name: "Workspace", path: "body[0]>main[0]", order: 1 }),
+        ],
+      },
+      {
+        viewport: "mobile",
+        landmarks: [
+          region({
+            role: "main",
+            name: "Workspace",
+            path: "body[0]>div[0]>main[0]",
+            order: 0,
+            layout: {
+              ...region({}).layout!,
+              gridTemplateColumns: "390px",
+              clientWidth: 390,
+              scrollWidth: 390,
+            },
+          }),
+          region({
+            role: "navigation",
+            name: "Primary",
+            path: "body[0]>div[0]>nav[0]",
+            order: 1,
+            layout: {
+              ...region({}).layout!,
+              maxHeight: "64px",
+              clientHeight: 64,
+              scrollHeight: 64,
+            },
+          }),
+        ],
+      },
+    ],
+  });
+
+  const nav = contract.screens[0]!.landmarks.find((landmark) => landmark.id === "navigation-primary");
+  const main = contract.screens[0]!.landmarks.find((landmark) => landmark.id === "main-workspace");
+  assert.equal(nav?.responsive?.[0]?.height?.kind, "content");
+  assert.deepEqual(main?.responsive?.[0]?.display, {
+    kind: "grid",
+    columns: ["390px"],
+    rows: ["auto", "1fr"],
+  });
+});
+
+test("landmarkRegionsToUiContract preserves landmark content, repeat, and slots", () => {
+  const contract = landmarkRegionsToUiContract({
+    screenId: "signal-slash",
+    pattern: "expressive-menu",
+    goal: "expressive-menu",
+    viewports: [{ label: "desktop", width: 1440, height: 900 }],
+    captures: [{
+      viewport: "desktop",
+      landmarks: [
+        region({
+          role: "navigation",
+          name: "Primary commands",
+          slots: [
+            { id: "controls", kind: "control", marker: "selected", required: true },
+            { id: "title", kind: "content", required: true },
+          ],
+          repeat: { kind: "list", itemName: "menu-item", itemCount: 5 },
+          content: {
+            kind: "list",
+            density: "normal",
+            itemCount: 5,
+            textLength: 39,
+            textRowCount: 5,
+          },
+        }),
+      ],
+    }],
+    hints: {
+      markers: [{ kind: "selected", selector: "[data-selected=\"true\"]", required: true }],
+      requiredStates: [
+        { id: "selected", kind: "selected", selector: "[data-selected=\"true\"]", required: true },
+        { id: "hover", kind: "hover", selector: "button", required: true },
+        { id: "focus-visible", kind: "focus-visible", selector: "button", required: true },
+      ],
+      composition: { style: "poster" },
+    },
+  });
+
+  const landmark = contract.screens[0]!.landmarks[0]!;
+  assert.deepEqual(landmark.slots, [
+    { id: "controls", kind: "control", marker: "selected", required: true },
+    { id: "title", kind: "content", required: true },
+  ]);
+  assert.deepEqual(landmark.repeat, {
+    kind: "list",
+    itemName: "menu-item",
+    minItems: 5,
+    maxItems: 5,
+  });
+  assert.deepEqual(landmark.content, {
+    kind: "list",
+    density: "normal",
+    items: { exact: 5 },
+    text: { maxLength: 39, rowCount: 5 },
+  });
+  assert.deepEqual(validateUiContract(contract), []);
+});
+
 test("landmarkRegionsToUiContract preserves pattern, goal, and DOM hints", () => {
   const contract = landmarkRegionsToUiContract({
     screenId: "landing-home",
@@ -172,4 +343,50 @@ test("landmarkRegionsToUiContract preserves expressive composition hints", () =>
   assert.equal(screen.composition?.layers?.length, 2);
   assert.equal(screen.composition?.shapes?.[0]?.kind, "slash-panel");
   assert.deepEqual(validateUiContract(contract), []);
+});
+
+test("formatIntrospectionProfile reports browser and viewport timing", () => {
+  const summary = formatIntrospectionProfile({
+    totalMs: 1520.4,
+    browserLaunchMs: 410.2,
+    browserCloseMs: 30.1,
+    viewports: [
+      {
+        label: "desktop",
+        width: 1440,
+        height: 900,
+        dpr: 1,
+        totalMs: 600.3,
+        navigateMs: 320.1,
+        landmarkMs: 45.2,
+        hintMs: 20.5,
+        landmarks: 4,
+      },
+      {
+        label: "mobile",
+        width: 390,
+        height: 844,
+        dpr: 1,
+        totalMs: 480.2,
+        navigateMs: 260.1,
+        landmarkMs: 35.2,
+        hintMs: 0,
+        landmarks: 3,
+      },
+    ],
+  });
+
+  assert.match(summary, /total 1520ms/);
+  assert.match(summary, /browser launch 410ms/);
+  assert.match(summary, /desktop 1440x900@1/);
+  assert.match(summary, /landmarks 4/);
+  assert.match(summary, /mobile 390x844@1/);
+});
+
+test("waitUntilForIntrospectionInput avoids networkidle for local files", () => {
+  assert.equal(waitUntilForIntrospectionInput("fixtures/page.html"), "load");
+  assert.equal(waitUntilForIntrospectionInput("/tmp/page.html"), "load");
+  assert.equal(waitUntilForIntrospectionInput("file:///tmp/page.html"), "load");
+  assert.equal(waitUntilForIntrospectionInput("https://example.com/page.html"), "networkidle");
+  assert.equal(waitUntilForIntrospectionInput("http://example.com/page.html"), "networkidle");
 });

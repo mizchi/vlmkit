@@ -27,6 +27,18 @@ local bench = new Task {
   inputs { "src/experiments/benchmark/benchmark.ts"; "packages/vlmkit-core/src/heatmap.ts" }
 }
 
+local introspectBench = new Task {
+  name = "introspect-bench"
+  acceptsArgs = true
+  cmd = "node src/experiments/benchmark/introspect-bench.ts"
+  inputs {
+    "src/experiments/benchmark/introspect-bench.ts"
+    "packages/vlmkit-markup/src/contract/introspect-contract.ts"
+    "packages/vlmkit-markup/src/component/semantic-drilldown.ts"
+    "design-runs/patterns-20260520/**/current.html"
+  }
+}
+
 // ---- Demos ----
 
 local vrtDemo = new Task {
@@ -355,6 +367,7 @@ local specRun = new Task {
 tasks {
   vrtTest
   bench
+  introspectBench
   vrtDemo
   vrtDemoFix
   vrtDemoMulti
