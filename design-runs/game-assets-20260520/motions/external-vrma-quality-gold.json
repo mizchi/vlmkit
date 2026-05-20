@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "id": "tk256ailab-vrma-robot-voxel-quality",
+  "description": "Small quality calibration set for external VRMA retargeting onto the voxel robot.",
+  "report": {
+    "minQuality": "pass",
+    "retargetProfile": "robot-voxel",
+    "rootTranslationMode": "relative"
+  },
+  "samples": {
+    "LookAround": {
+      "verdict": "pass",
+      "minRetargetScore": 0.95,
+      "maxRetargetPenalty": 0,
+      "groundDeltaY": {
+        "min": [-0.06, 0.02],
+        "max": [-0.03, 0.03]
+      },
+      "footMinDeltaY": {
+        "min": [-0.03, 0.02],
+        "max": [-0.01, 0.04]
+      },
+      "maxTrackedNodeDisplacement": [0.8, 1.15],
+      "maxPelvisDisplacement": [0, 0.2]
+    },
+    "Goodbye": {
+      "verdict": "pass",
+      "minRetargetScore": 0.95,
+      "maxRetargetPenalty": 0,
+      "groundDeltaY": {
+        "min": [-0.05, 0.02],
+        "max": [-0.02, 0.03]
+      },
+      "footMinDeltaY": {
+        "min": [-0.03, 0.02],
+        "max": [-0.01, 0.04]
+      },
+      "maxTrackedNodeDisplacement": [0.8, 1.15],
+      "maxPelvisDisplacement": [0, 0.2]
+    },
+    "Jump": {
+      "verdict": "pass",
+      "minRetargetScore": 0.95,
+      "maxRetargetPenalty": 0,
+      "groundDeltaY": {
+        "min": [-0.15, 0],
+        "max": [-0.08, 0.02]
+      },
+      "footMinDeltaY": {
+        "min": [-0.02, 0.04],
+        "max": [0.08, 0.16]
+      },
+      "maxTrackedNodeDisplacement": [0.9, 1.2],
+      "maxPelvisDisplacement": [0.1, 0.25]
+    }
+  }
+}

@@ -44,6 +44,8 @@ The concrete scenario used a voxel robot and real `.vrma` motion samples from
   `verify-motion-quality` now emits a `foot-contact` check based on
   `left_foot` / `right_foot` bind-vs-animated delta.
   It also emits a `limb-extent` check from tracked node displacement.
+- `verify-motion-quality-gold` now compares smoke reports against a committed
+  small calibration fixture for `LookAround`, `Goodbye`, and `Jump`.
 - The dry-run VLM review scaffold can create a contact sheet and strict JSON
   prompt for cheap reviewers such as UI-TARS / Nova Lite without adding a
   blocking human step.
@@ -78,8 +80,8 @@ After adding relative root translation, normalized ground deltas, and the
   tolerated regions are skipped
 
 This means parser correctness is no longer the main blocker. The next blocker
-is calibrating the profile schema against more target rigs and then promoting
-it out of the dogfood directory.
+is adding more target rigs and expanding the gold set before promoting the
+schema out of the dogfood directory.
 
 ## Product Lessons
 
@@ -116,7 +118,7 @@ it out of the dogfood directory.
    - Add actionable suggestions when `groundDeltaY` exceeds thresholds.
 
 3. **Motion quality gate v2**
-   - Calibrate foot-contact and limb-extent thresholds against a small gold set.
+   - Expand the current three-sample gold set with more styles and target rigs.
    - Include per-clip and per-region scores in the JSON report.
 
 4. **VLM review real run**
@@ -142,6 +144,10 @@ node design-runs/game-assets-20260520/tools/run-external-vrma-smoke.mjs \
   --min-quality pass \
   --review-vlm \
   --review-dry-run
+
+node design-runs/game-assets-20260520/tools/verify-motion-quality-gold.mjs \
+  --report design-runs/game-assets-20260520/external/vrma/tk256ailab/smoke-report.json \
+  --gold design-runs/game-assets-20260520/motions/external-vrma-quality-gold.json
 ```
 
 Useful ignored outputs:

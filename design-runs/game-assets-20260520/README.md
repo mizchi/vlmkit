@@ -255,10 +255,14 @@ shared tools now live in `tools/`:
   normalized ground deltas, tracked foot contact, tracked limb displacement,
   and Motion IR warnings into `pass` / `warn` / `fail`; supports strict and
   named weighted retarget profiles
+- `tools/verify-motion-quality-gold.mjs`: compare a smoke report against a
+  small committed quality calibration fixture
 - `tools/review-motion-with-vlm.mjs`: optional cheap VLM second opinion using
   a generated contact sheet; dry-runs without credentials
 - `tools/retarget-profiles.mjs`: named retarget downgrade profiles with
   weighted skip scoring; `simple-rig` is kept as an alias of `robot-voxel`
+- `motions/external-vrma-quality-gold.json`: calibration ranges for
+  `LookAround`, `Goodbye`, and `Jump` on the voxel robot
 
 Model-local scripts are thin wrappers for backwards compatibility. New
 scenarios should call the shared tools directly and keep only generation logic

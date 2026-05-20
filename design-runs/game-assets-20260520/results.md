@@ -194,6 +194,8 @@ Checks:
 - `run-external-vrma-smoke.mjs --min-quality pass`: passed `LookAround`,
   `Goodbye`, and `Jump` as a batch with the `robot-voxel` profile
 - `verify-motion-quality.mjs --retarget-profile robot-voxel`: emitted structured `pass` reports instead of requiring human visual review
+- `verify-motion-quality-gold.mjs`: verified the smoke report against
+  `motions/external-vrma-quality-gold.json` (34 checks)
 - `review-motion-with-vlm.mjs --dry-run`: generated contact sheets and strict-JSON reviewer prompts for UI-TARS / Nova Lite without API spend
 
 Observed shape:
@@ -241,6 +243,9 @@ Learned:
   and feet. The quality gate uses `left_foot` / `right_foot` bind-vs-animated
   deltas to flag foot sinking or always-floating motion without human review.
   The same tracked nodes also produce a `limb-extent` envelope check.
+- The first calibration fixture now pins realistic ranges for the three
+  external VRMA samples. This lets later threshold changes fail mechanically
+  before relying on visual inspection.
 - Root translation should default to relative motion for generated simplified
   characters. Copying source hips translation directly mixes the source
   avatar's body height into the target pelvis.

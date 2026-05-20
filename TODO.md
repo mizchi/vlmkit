@@ -1040,6 +1040,9 @@ Current smoke status:
   deltas and emits a `foot-contact` check for sinking or always-floating motion
 - [x] Motion quality report tracks pelvis, hand, and foot displacement from
   bind pose and emits a `limb-extent` check for outlier motion
+- [x] External VRMA quality gold fixture captures realistic ranges for
+  `LookAround`, `Goodbye`, and `Jump`; `verify-motion-quality-gold.mjs`
+  checks smoke reports against it
 - [x] Cheap multi-VLM review scaffold with dry-run contact sheet + strict JSON
   prompt for UI-TARS / Nova Lite
 
@@ -1064,8 +1067,9 @@ Stepwise cleanup:
   review for threshold calibration. Initial implementation exists in
   `verify-motion-quality.mjs`; it now uses normalized `groundDeltaY` when
   render metadata provides bind bounds, checks tracked foot contact, and checks
-  pelvis/hand/foot displacement from bind pose. Remaining work is threshold
-  calibration against a small gold set.
+  pelvis/hand/foot displacement from bind pose. First gold calibration set
+  exists for `LookAround`, `Goodbye`, and `Jump`; remaining work is expanding it
+  across more motions and target rigs.
 - [x] **G3. Cheap multi-VLM review gate.** Add optional model reviewers as a
   second opinion on top of deterministic metrics. Default candidates:
   `bytedance/ui-tars-1.5-7b` for fast UI/game-image review via OpenRouter and
