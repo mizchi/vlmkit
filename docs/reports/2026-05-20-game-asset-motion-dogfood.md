@@ -43,6 +43,7 @@ The concrete scenario used a voxel robot and real `.vrma` motion samples from
 - The animation viewer records tracked pelvis, hand, and foot positions.
   `verify-motion-quality` now emits a `foot-contact` check based on
   `left_foot` / `right_foot` bind-vs-animated delta.
+  It also emits a `limb-extent` check from tracked node displacement.
 - The dry-run VLM review scaffold can create a contact sheet and strict JSON
   prompt for cheap reviewers such as UI-TARS / Nova Lite without adding a
   blocking human step.
@@ -71,6 +72,8 @@ After adding relative root translation, normalized ground deltas, and the
 - `LookAround` foot minDeltaY: -0.009..0.009
 - `Goodbye` foot minDeltaY: -0.004..0.007
 - `Jump` foot minDeltaY: 0.004..0.118
+- tracked node max displacement: `LookAround` 0.991, `Goodbye` 1.012,
+  `Jump` 1.104; pelvis stays under 0.183 across the batch
 - retained-channel ratio: 0.3077, accepted because only simplified-rig
   tolerated regions are skipped
 
@@ -113,7 +116,7 @@ it out of the dogfood directory.
    - Add actionable suggestions when `groundDeltaY` exceeds thresholds.
 
 3. **Motion quality gate v2**
-   - Add limb extent outlier checks against bind-pose bounds.
+   - Calibrate foot-contact and limb-extent thresholds against a small gold set.
    - Include per-clip and per-region scores in the JSON report.
 
 4. **VLM review real run**

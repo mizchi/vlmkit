@@ -212,6 +212,8 @@ Observed shape:
   `Goodbye` -0.031..-0.013, `Jump` -0.107..-0.052
 - foot contact min delta: `LookAround` -0.009..0.009,
   `Goodbye` -0.004..0.007, `Jump` 0.004..0.118
+- tracked node max displacement: `LookAround` 0.991, `Goodbye` 1.012,
+  `Jump` 1.104; pelvis stays under 0.183 across the batch
 
 Learned:
 
@@ -238,6 +240,7 @@ Learned:
 - The animation viewer now records tracked node positions for pelvis, hands,
   and feet. The quality gate uses `left_foot` / `right_foot` bind-vs-animated
   deltas to flag foot sinking or always-floating motion without human review.
+  The same tracked nodes also produce a `limb-extent` envelope check.
 - Root translation should default to relative motion for generated simplified
   characters. Copying source hips translation directly mixes the source
   avatar's body height into the target pelvis.

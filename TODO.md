@@ -1038,6 +1038,8 @@ Current smoke status:
   report
 - [x] Motion quality report tracks `left_foot` / `right_foot` bind-vs-animated
   deltas and emits a `foot-contact` check for sinking or always-floating motion
+- [x] Motion quality report tracks pelvis, hand, and foot displacement from
+  bind pose and emits a `limb-extent` check for outlier motion
 - [x] Cheap multi-VLM review scaffold with dry-run contact sheet + strict JSON
   prompt for UI-TARS / Nova Lite
 
@@ -1061,9 +1063,9 @@ Stepwise cleanup:
   Emit a compact report with `pass` / `warn` / `fail` and only require human
   review for threshold calibration. Initial implementation exists in
   `verify-motion-quality.mjs`; it now uses normalized `groundDeltaY` when
-  render metadata provides bind bounds and checks tracked foot contact from
-  viewer metadata. Remaining work is limb extent and threshold calibration
-  against a small gold set.
+  render metadata provides bind bounds, checks tracked foot contact, and checks
+  pelvis/hand/foot displacement from bind pose. Remaining work is threshold
+  calibration against a small gold set.
 - [x] **G3. Cheap multi-VLM review gate.** Add optional model reviewers as a
   second opinion on top of deterministic metrics. Default candidates:
   `bytedance/ui-tars-1.5-7b` for fast UI/game-image review via OpenRouter and

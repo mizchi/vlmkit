@@ -341,6 +341,7 @@ function summarizeQuality(quality) {
       minGroundY: quality.metrics?.minGroundY ?? null,
       groundDeltaY: quality.metrics?.groundDeltaY ?? null,
       footContact: quality.metrics?.footContact ?? null,
+      trackedNodeDisplacement: quality.metrics?.trackedNodeDisplacement ?? null,
       retainedChannelRatio: quality.metrics?.motion?.retainedChannelRatio ?? null,
       skippedByRegion: quality.metrics?.motion?.skippedByRegion ?? null,
     },

@@ -29,6 +29,8 @@ function parseArgs(argv) {
     minGroundYFail: -2.5,
     minFootDeltaYWarn: -0.25,
     maxAlwaysFloatingFootDeltaYWarn: 0.65,
+    maxTrackedNodeDisplacementWarn: 1.35,
+    maxPelvisDisplacementWarn: 0.45,
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -48,6 +50,8 @@ function parseArgs(argv) {
     else if (arg === "--min-ground-y-fail") args.minGroundYFail = Number(required(argv, ++i, arg));
     else if (arg === "--min-foot-delta-y-warn") args.minFootDeltaYWarn = Number(required(argv, ++i, arg));
     else if (arg === "--max-always-floating-foot-delta-y-warn") args.maxAlwaysFloatingFootDeltaYWarn = Number(required(argv, ++i, arg));
+    else if (arg === "--max-tracked-node-displacement-warn") args.maxTrackedNodeDisplacementWarn = Number(required(argv, ++i, arg));
+    else if (arg === "--max-pelvis-displacement-warn") args.maxPelvisDisplacementWarn = Number(required(argv, ++i, arg));
     else if (arg === "--help" || arg === "-h") {
       console.log(`Usage:
   node design-runs/game-assets-20260520/tools/verify-motion-quality.mjs --renders-dir <dir> [options]
@@ -70,6 +74,10 @@ Options:
   --min-foot-delta-y-warn <n>       Warning threshold for foot pivot sinking below bind pose
   --max-always-floating-foot-delta-y-warn <n>
                                     Warning threshold when all sampled frames have both feet above bind pose
+  --max-tracked-node-displacement-warn <n>
+                                    Warning threshold for tracked hand/foot displacement from bind pose
+  --max-pelvis-displacement-warn <n>
+                                    Warning threshold for pelvis displacement from bind pose
 `);
       process.exit(0);
     } else {
@@ -102,6 +110,7 @@ async function main() {
   checkFrameStability(frames, args, checks);
   checkGround(frames, args, checks);
   checkFootContact(frames, args, checks);
+  checkLimbExtent(frames, args, checks);
   checkRetainedChannels(motion, args, checks);
   checkLoopMetadata(motion, checks);
 
@@ -127,6 +136,7 @@ async function main() {
       minGroundY: frame.minGroundY,
       groundDeltaY: frame.groundDeltaY,
       footContact: frame.footContact,
+      trackedNodeDisplacement: frame.trackedNodeDisplacement,
     })),
   };
   await writeFile(args.out, `${JSON.stringify(result, null, 2)}\n`);
@@ -165,9 +175,40 @@ async function readFrames(args) {
       bindTrackedNodes: metadata.state?.bindTrackedNodes ?? null,
       animatedTrackedNodes: metadata.state?.animatedTrackedNodes ?? null,
       footContact: footContactFromState(metadata.state),
+      trackedNodeDisplacement: trackedNodeDisplacementFromState(metadata.state),
     });
   }
   return frames.sort((a, b) => `${a.view}:${a.sampleTime}`.localeCompare(`${b.view}:${b.sampleTime}`));
+}
+
+function checkLimbExtent(frames, args, checks) {
+  const displacements = frames.map((frame) => frame.trackedNodeDisplacement).filter(Boolean);
+  if (displacements.length === 0) {
+    checks.push(warn("limb-extent", "no tracked node displacement metadata"));
+    return;
+  }
+  const maxByNode = {};
+  for (const displacement of displacements) {
+    for (const [node, value] of Object.entries(displacement)) {
+      maxByNode[node] = Math.max(maxByNode[node] ?? 0, value);
+    }
+  }
+  const maxTrackedNode = Math.max(...Object.values(maxByNode));
+  const pelvis = maxByNode.pelvis ?? 0;
+  const value = {
+    maxTrackedNode: round(maxTrackedNode),
+    maxTrackedNodeDisplacementWarn: args.maxTrackedNodeDisplacementWarn,
+    pelvis: round(pelvis),
+    maxPelvisDisplacementWarn: args.maxPelvisDisplacementWarn,
+    maxByNode: Object.fromEntries(Object.entries(maxByNode).map(([node, item]) => [node, round(item)])),
+  };
+  if (pelvis > args.maxPelvisDisplacementWarn) {
+    checks.push(warn("limb-extent", "pelvis displacement exceeds bind-pose envelope", value));
+  } else if (maxTrackedNode > args.maxTrackedNodeDisplacementWarn) {
+    checks.push(warn("limb-extent", "tracked limb displacement exceeds bind-pose envelope", value));
+  } else {
+    checks.push(pass("limb-extent", "tracked limb displacement is within threshold", value));
+  }
 }
 
 function checkFootContact(frames, args, checks) {
@@ -323,6 +364,7 @@ function summarizeMetrics(frames, motion) {
     minGroundY: range(frames.map((frame) => frame.minGroundY).filter(Number.isFinite)),
     groundDeltaY: range(frames.map((frame) => frame.groundDeltaY).filter(Number.isFinite)),
     footContact: summarizeFootContact(frames),
+    trackedNodeDisplacement: summarizeTrackedNodeDisplacement(frames),
     motion: motion ? {
       clipCount: motion.clips?.length ?? 0,
       trackCount,
@@ -331,6 +373,35 @@ function summarizeMetrics(frames, motion) {
       skippedByRegion: skippedChannelRegions(motion.source?.warnings ?? []),
     } : null,
   };
+}
+
+function trackedNodeDisplacementFromState(state) {
+  const bind = state?.bindTrackedNodes;
+  const animated = state?.animatedTrackedNodes;
+  if (!bind || !animated) return null;
+  const displacement = {};
+  for (const [name, bindPosition] of Object.entries(bind)) {
+    const start = vec3OrNull(bindPosition);
+    const end = vec3OrNull(animated[name]);
+    if (!start || !end) continue;
+    displacement[name] = round(distance3(start, end));
+  }
+  return Object.keys(displacement).length > 0 ? displacement : null;
+}
+
+function summarizeTrackedNodeDisplacement(frames) {
+  const byNode = {};
+  for (const frame of frames) {
+    const displacement = frame.trackedNodeDisplacement;
+    if (!displacement) continue;
+    for (const [node, value] of Object.entries(displacement)) {
+      const values = byNode[node] ?? [];
+      values.push(value);
+      byNode[node] = values;
+    }
+  }
+  if (Object.keys(byNode).length === 0) return null;
+  return Object.fromEntries(Object.entries(byNode).map(([node, values]) => [node, range(values)]));
 }
 
 function footContactFromState(state) {
@@ -428,6 +499,10 @@ function groupBy(items, keyFn) {
 
 function distance(a, b) {
   return Math.hypot(a[0] - b[0], a[1] - b[1]);
+}
+
+function distance3(a, b) {
+  return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 }
 
 function range(values) {
