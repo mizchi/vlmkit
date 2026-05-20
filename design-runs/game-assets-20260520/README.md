@@ -259,6 +259,9 @@ shared tools now live in `tools/`:
   named weighted retarget profiles
 - `tools/verify-motion-quality-gold.mjs`: compare a smoke report against a
   small committed quality calibration fixture
+- `tools/compare-motion-quality-reports.mjs`: compare two smoke reports, such
+  as `relative` vs `scale-to-model`, and classify metric deltas as improved,
+  regressed, stable, or tradeoff
 - `tools/review-motion-with-vlm.mjs`: optional cheap VLM second opinion using
   a generated contact sheet; dry-runs without credentials
 - `tools/retarget-profiles.mjs`: named retarget downgrade profiles with

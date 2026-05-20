@@ -53,6 +53,10 @@ The concrete scenario used a voxel robot and real `.vrma` motion samples from
   It also emits a `limb-extent` check from tracked node displacement.
 - `verify-motion-quality-gold` now compares smoke reports against a committed
   small calibration fixture for `LookAround`, `Goodbye`, and `Jump`.
+- `compare-motion-quality-reports` now compares candidate smoke reports against
+  a baseline. In the current Jump test, `scale-to-model` improves ground error
+  but regresses foot contact and pelvis displacement, so the decision is
+  `candidate-tradeoff`.
 - The dry-run VLM review scaffold can create a contact sheet and strict JSON
   prompt for cheap reviewers such as UI-TARS / Nova Lite without adding a
   blocking human step.
@@ -121,6 +125,10 @@ schema out of the dogfood directory.
   because their vertical root motion is tiny; `Jump` emits
   `consider-scale-to-model` because source/target root height differs and the
   clip has meaningful vertical root motion.
+- A recommendation needs a paired comparison run. `scale-to-model` passed for
+  Jump, but it was not strictly better: ground error improved while foot contact
+  and pelvis displacement regressed. That argues for keeping `relative` as the
+  smoke default until the target bind-height measurement is richer.
 
 ## Next Implementation Order
 
@@ -132,8 +140,8 @@ schema out of the dogfood directory.
      fail.
 
 2. **Root and ground normalization**
-   - Compare the current recommendation-only source/target height scaling
-     policy against actual `scale-to-model` smoke outputs.
+   - Use the new report comparison output to calibrate when
+     `consider-scale-to-model` should escalate from warning to candidate mode.
    - Expand the current normalization audit from target base height to full
      target bind height.
    - Add actionable suggestions when `groundDeltaY` exceeds thresholds.
@@ -169,6 +177,11 @@ node design-runs/game-assets-20260520/tools/run-external-vrma-smoke.mjs \
 node design-runs/game-assets-20260520/tools/verify-motion-quality-gold.mjs \
   --report design-runs/game-assets-20260520/external/vrma/tk256ailab/smoke-report.json \
   --gold design-runs/game-assets-20260520/motions/external-vrma-quality-gold.json
+
+node design-runs/game-assets-20260520/tools/compare-motion-quality-reports.mjs \
+  --baseline design-runs/game-assets-20260520/external/vrma/tk256ailab/smoke-report.json \
+  --candidate design-runs/game-assets-20260520/external/vrma/tk256ailab/smoke-report.scale-to-model.json \
+  --samples Jump
 ```
 
 Useful ignored outputs:

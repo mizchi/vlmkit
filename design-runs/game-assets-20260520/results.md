@@ -215,6 +215,10 @@ Observed shape:
   `Jump` -0.094..0.230
 - root height scale recommendation: `LookAround` `relative-ok`, `Goodbye`
   `relative-ok`, `Jump` `consider-scale-to-model`
+- `Jump` `scale-to-model` comparison: still `pass`, ground error improves
+  0.107 -> 0.079, but foot contact error regresses 0.118 -> 0.173 and pelvis
+  displacement regresses 0.183 -> 0.265; classify as `candidate-tradeoff`,
+  not an automatic replacement for `relative`
 - retarget profile: `robot-voxel` (`simple-rig` is an alias)
 - quality verdict: `pass`
 - retarget weighted score: 1.0, penalty 0
@@ -268,6 +272,10 @@ Learned:
   automatically. It is a smoke-report signal: small vertical deltas can stay
   `relative`, while Jump-like clips with large vertical root motion should be
   compared against `scale-to-model`.
+- `compare-motion-quality-reports.mjs` is the missing second half of that
+  signal. It can take the recommended candidate smoke report and show whether
+  the candidate is an improvement, regression, or tradeoff without opening a
+  viewer.
 - Ground checks should compare the animated bounds against the normalized bind
   bounds (`groundDeltaY`), not raw world `minGroundY` after camera-fit
   normalization.
