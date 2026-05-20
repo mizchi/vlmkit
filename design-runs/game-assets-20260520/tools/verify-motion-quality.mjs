@@ -2,6 +2,11 @@
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { PNG } from "pngjs";
+import {
+  evaluateRetargetWarnings,
+  retargetProfileNames,
+  skippedChannelRegions,
+} from "./retarget-profiles.mjs";
 
 const repoRoot = resolve(new URL("../../..", import.meta.url).pathname);
 const defaultBackground = [0xe8, 0xe8, 0xe4];
@@ -55,7 +60,7 @@ Options:
   --max-center-jump-ratio <n>       Warning threshold for bbox center jumps
   --max-area-jump-ratio <n>         Warning threshold for bbox area jumps
   --min-retained-ratio-warn <n>     Warning threshold for retained motion channels
-  --retarget-profile <profile>      strict|simple-rig (default: strict)
+  --retarget-profile <profile>      ${retargetProfileNames().join("|")} (default: strict)
   --min-ground-y-warn <n>           Warning threshold for groundDeltaY when available, otherwise minGroundY
   --min-ground-y-fail <n>           Failure threshold for groundDeltaY when available, otherwise minGroundY
 `);
@@ -65,8 +70,8 @@ Options:
     }
   }
   if (!args.rendersDir) throw new Error("--renders-dir is required");
-  if (!["strict", "simple-rig"].includes(args.retargetProfile)) {
-    throw new Error("--retarget-profile must be strict or simple-rig");
+  if (!retargetProfileNames().includes(args.retargetProfile)) {
+    throw new Error(`--retarget-profile must be one of: ${retargetProfileNames().join(", ")}`);
   }
   if (!args.out) args.out = join(dirname(args.rendersDir), `${basenameNoExt(args.rendersDir)}.motion-quality.json`);
   return args;
@@ -238,48 +243,26 @@ function checkRetainedChannels(motion, args, checks) {
     checks.push(warn("retained-channels", "motion IR was not provided"));
     return;
   }
-  const trackCount = (motion.clips ?? []).reduce((sum, clip) => sum + (clip.tracks?.length ?? 0), 0);
-  const skipped = motion.source?.skippedChannelCount ?? motion.source?.warnings?.length ?? 0;
-  const total = trackCount + skipped;
-  const retainedRatio = total > 0 ? trackCount / total : 0;
-  const warnings = motion.source?.warnings ?? [];
-  const skippedByRegion = skippedChannelRegions(warnings);
-  if (args.retargetProfile === "simple-rig") {
-    const unexpected = warnings.filter((warning) => !isAllowedSimpleRigSkip(warning));
-    const value = {
-      profile: args.retargetProfile,
-      retainedRatio: round(retainedRatio),
-      trackCount,
-      skipped,
-      toleratedSkipped: skipped - unexpected.length,
-      unexpectedSkipped: unexpected.length,
-      skippedByRegion,
-      unexpected: unexpected.slice(0, 8).map(formatWarning),
-    };
-    checks.push(unexpected.length > 0
-      ? warn("retained-channels", "retarget skipped channels outside the simplified rig tolerance", value)
-      : pass("retained-channels", "retarget skips are allowed by simplified rig profile", value));
-    return;
-  }
-  checks.push(retainedRatio < args.minRetainedRatioWarn
-    ? warn("retained-channels", "retarget kept a low ratio of source channels", { retainedRatio: round(retainedRatio), trackCount, skipped, skippedByRegion, threshold: args.minRetainedRatioWarn })
-    : pass("retained-channels", "retarget retained enough source channels", { retainedRatio: round(retainedRatio), trackCount, skipped, skippedByRegion, threshold: args.minRetainedRatioWarn }));
-}
-
-function isAllowedSimpleRigSkip(warning) {
-  const value = `${warning.node ?? ""} ${warning.reason ?? ""}`.toLowerCase();
-  if (/(thumb|index|middle|ring|little|finger)/.test(value)) return true;
-  if (/toe/.test(value)) return true;
-  if (/(chest|neck|shoulder)/.test(value)) return true;
-  return false;
-}
-
-function formatWarning(warning) {
-  return {
-    node: warning.node ?? null,
-    path: warning.path ?? null,
-    reason: warning.reason ?? null,
-  };
+  const result = evaluateRetargetWarnings(motion, {
+    profileName: args.retargetProfile,
+    minRetainedRatioWarn: args.minRetainedRatioWarn,
+  });
+  const reason = result.mode === "weighted-profile"
+    ? {
+      pass: "retarget skips are accepted by the weighted profile",
+      warn: "retarget skipped channels outside the weighted profile tolerance",
+      fail: "retarget skipped required channels for the target profile",
+    }[result.verdict]
+    : {
+      pass: "retarget retained enough source channels",
+      warn: "retarget kept a low ratio of source channels",
+      fail: "retarget failed",
+    }[result.verdict];
+  checks.push(result.verdict === "fail"
+    ? fail("retained-channels", reason, result)
+    : result.verdict === "warn"
+      ? warn("retained-channels", reason, result)
+      : pass("retained-channels", reason, result));
 }
 
 function checkLoopMetadata(motion, checks) {
@@ -310,25 +293,6 @@ function summarizeMetrics(frames, motion) {
       skippedByRegion: skippedChannelRegions(motion.source?.warnings ?? []),
     } : null,
   };
-}
-
-function skippedChannelRegions(warnings) {
-  const regions = {};
-  for (const warning of warnings) {
-    const region = skeletonRegion(warning.reason ?? warning.node ?? "");
-    regions[region] = (regions[region] ?? 0) + 1;
-  }
-  return Object.fromEntries(Object.entries(regions).sort((a, b) => b[1] - a[1]));
-}
-
-function skeletonRegion(text) {
-  const value = String(text).toLowerCase();
-  if (/(thumb|index|middle|ring|little|finger)/.test(value)) return "finger";
-  if (/(toe|foot)/.test(value)) return "toe-foot";
-  if (/(shoulder|upperarm|lowerarm|hand|arm)/.test(value)) return "arm";
-  if (/(upperleg|lowerleg|leg)/.test(value)) return "leg";
-  if (/(chest|spine|neck|head|hips)/.test(value)) return "body";
-  return "other";
 }
 
 function foregroundRatio(image, background) {

@@ -1030,9 +1030,9 @@ Current smoke status:
 - [x] Root translation normalization for external VRMA smoke:
   `keep|relative|horizontal-only|zero|scale-to-model`, with batch smoke
   defaulting to `relative`
-- [x] Simplified-rig retarget policy for voxel robot smoke: skipped fingers,
-  toes, chest, neck, and shoulders are tolerated while unexpected core-bone
-  skips remain surfaced
+- [x] Named `robot-voxel` retarget profile for voxel robot smoke: skipped
+  fingers, toes, chest, neck, and shoulders are tolerated with zero penalty,
+  while skipped core bones fail the weighted profile
 - [x] Cheap multi-VLM review scaffold with dry-run contact sheet + strict JSON
   prompt for UI-TARS / Nova Lite
 
@@ -1079,10 +1079,11 @@ Stepwise cleanup:
   ignored fine-grained bones, fallback mappings (`chest`/`neck`/shoulders),
   and whether skipped fingers/toes are acceptable. The policy must produce a
   deterministic score so agents can decide whether to continue, retry, or fail.
-  First pass exists as `--retarget-profile simple-rig`: fingers, toes, chest,
-  neck, and shoulders are tolerated; unexpected skipped channels still warn.
-  Remaining work is moving the policy from hard-coded checker rules into a
-  reusable named profile with weighted region scoring.
+  First pass exists as `--retarget-profile robot-voxel`: fingers, toes,
+  chest, neck, and shoulders are tolerated; skipped core channels such as
+  hips/head/arms/legs fail. `simple-rig` remains an alias. Remaining work is
+  calibrating weights against more target skeletons and promoting the profile
+  schema out of `design-runs`.
 - [ ] **G5. Pose and scale normalization.** Measure source root height,
   root motion, and bind/rest orientation. Add options for root translation
   modes: keep, zero, horizontal-only, scale-to-model. Track T-pose/A-pose

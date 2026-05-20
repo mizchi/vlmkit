@@ -252,9 +252,11 @@ shared tools now live in `tools/`:
   external VRMA samples and write a structured smoke report
 - `tools/verify-motion-quality.mjs`: turn render metadata, frame bboxes,
   normalized ground deltas, and Motion IR warnings into `pass` / `warn` /
-  `fail`; supports strict and simplified-rig retarget profiles
+  `fail`; supports strict and named weighted retarget profiles
 - `tools/review-motion-with-vlm.mjs`: optional cheap VLM second opinion using
   a generated contact sheet; dry-runs without credentials
+- `tools/retarget-profiles.mjs`: named retarget downgrade profiles with
+  weighted skip scoring; `simple-rig` is kept as an alias of `robot-voxel`
 
 Model-local scripts are thin wrappers for backwards compatibility. New
 scenarios should call the shared tools directly and keep only generation logic

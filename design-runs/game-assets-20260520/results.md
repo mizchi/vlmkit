@@ -180,7 +180,7 @@ Used a local-only ignored sample from `tk256ailab/vrm-viewer`:
 | Input | Verdict | Notes |
 |---|---|---|
 | `LookAround.vrma` | `pass` | Extracted as one non-loop clip, retargeted to the voxel robot with relative root translation, and rendered through the visual + quality gates. |
-| `Goodbye.vrma` | `pass` | Same execution path passed; simplified-skeleton skips are accepted by the `simple-rig` retarget profile. |
+| `Goodbye.vrma` | `pass` | Same execution path passed; simplified-skeleton skips are accepted by the `robot-voxel` retarget profile. |
 | `Jump.vrma` | `pass` | Same execution path passed; larger motion stays on-screen and normalized ground delta remains within threshold. |
 
 Checks:
@@ -192,7 +192,7 @@ Checks:
 - `verify-gltf-motion.mjs --motion-ir`: passed required clip checks and skipped loop closure because the IR marks `LookAround` as non-loop
 - `render-animation.mjs` and `verify-renders.mjs`: passed nonblank fixed-camera render checks
 - `run-external-vrma-smoke.mjs`: passed `LookAround`, `Goodbye`, and `Jump` as a batch
-- `verify-motion-quality.mjs --retarget-profile simple-rig`: emitted structured `pass` reports instead of requiring human visual review
+- `verify-motion-quality.mjs --retarget-profile robot-voxel`: emitted structured `pass` reports instead of requiring human visual review
 - `review-motion-with-vlm.mjs --dry-run`: generated contact sheets and strict-JSON reviewer prompts for UI-TARS / Nova Lite without API spend
 
 Observed shape:
@@ -203,8 +203,10 @@ Observed shape:
 - skipped channels: 36
 - skipped channel regions: 30 finger, 2 body, 2 arm, 2 toe/foot
 - root translation mode: `relative`
-- retarget profile: `simple-rig`
+- retarget profile: `robot-voxel` (`simple-rig` is an alias)
 - quality verdict: `pass`
+- retarget weighted score: 1.0, penalty 0
+- skipped-by-policy: 30 finger ignored, 4 upper-body fallback, 2 toe ignored
 - normalized ground delta: `LookAround` -0.047..-0.012,
   `Goodbye` -0.031..-0.013, `Jump` -0.107..-0.052
 
@@ -221,6 +223,9 @@ Learned:
   target is declared as a simplified rig, because dropped fingers, toes,
   chest, neck, and shoulder channels are tolerated while core limb channels
   remain mapped.
+- The retarget policy now has a first named profile module. `robot-voxel`
+  assigns zero penalty to fingers, toes, chest, neck, and shoulder fallback
+  skips, while skipped core bones such as hips/head/arms/legs fail the profile.
 - Root translation should default to relative motion for generated simplified
   characters. Copying source hips translation directly mixes the source
   avatar's body height into the target pelvis.

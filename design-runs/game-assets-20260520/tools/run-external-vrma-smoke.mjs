@@ -2,6 +2,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { basename, dirname, join, relative, resolve } from "node:path";
+import { retargetProfileNames } from "./retarget-profiles.mjs";
 
 const repoRoot = resolve(new URL("../../..", import.meta.url).pathname);
 const toolsDir = dirname(new URL(import.meta.url).pathname);
@@ -17,7 +18,7 @@ function parseArgs(argv) {
     mode: "material",
     renderTimes: "",
     rootTranslationMode: "relative",
-    retargetProfile: "simple-rig",
+    retargetProfile: "robot-voxel",
     out: "",
     continueOnError: true,
     reviewVlm: false,
@@ -55,7 +56,7 @@ Options:
   --root-translation-mode <mode>
                           keep|relative|horizontal-only|zero|scale-to-model (default: relative)
   --retarget-profile <profile>
-                          strict|simple-rig (default: simple-rig)
+                          ${retargetProfileNames().join("|")} (default: robot-voxel)
   --out <path>            Smoke report path
   --fail-fast             Stop on first sample failure
   --review-vlm            Run optional VLM review after deterministic checks
@@ -72,8 +73,8 @@ Options:
   if (!["keep", "relative", "horizontal-only", "zero", "scale-to-model"].includes(args.rootTranslationMode)) {
     throw new Error("--root-translation-mode must be keep, relative, horizontal-only, zero, or scale-to-model");
   }
-  if (!["strict", "simple-rig"].includes(args.retargetProfile)) {
-    throw new Error("--retarget-profile must be strict or simple-rig");
+  if (!retargetProfileNames().includes(args.retargetProfile)) {
+    throw new Error(`--retarget-profile must be one of: ${retargetProfileNames().join(", ")}`);
   }
   if (!args.out) args.out = join(args.externalDir, "smoke-report.json");
   return args;
@@ -306,11 +307,13 @@ function sampleSummary(sample, ok, steps, data) {
 
 function summarizeQuality(quality) {
   if (!quality) return null;
+  const retainedCheck = (quality.checks ?? []).find((check) => check.id === "retained-channels") ?? null;
   return {
     verdict: quality.verdict,
     checks: (quality.checks ?? [])
       .filter((check) => check.verdict !== "pass")
       .map((check) => ({ id: check.id, verdict: check.verdict, value: check.value })),
+    retarget: retainedCheck ? retainedCheck.value : null,
     metrics: {
       foregroundRatio: quality.metrics?.foregroundRatio ?? null,
       screenCoverageRatio: quality.metrics?.screenCoverageRatio ?? null,

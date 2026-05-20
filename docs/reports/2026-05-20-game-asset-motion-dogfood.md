@@ -29,7 +29,10 @@ The concrete scenario used a voxel robot and real `.vrma` motion samples from
   fetch, extract, verify IR, apply to robot, verify GLB, render, verify renders.
 - The same three samples now pass the deterministic quality gate when the target
   is declared as a simplified rig:
-  `--root-translation-mode relative --retarget-profile simple-rig`.
+  `--root-translation-mode relative --retarget-profile robot-voxel`.
+- `robot-voxel` is now a named weighted retarget profile. `simple-rig` remains
+  an alias, but the report records the canonical profile name, score, weighted
+  penalty, and skipped-by-policy breakdown.
 - `ground-y` is now checked with `groundDeltaY` when render metadata includes
   normalized bind bounds, avoiding false warnings from camera-fit world
   coordinates.
@@ -49,9 +52,12 @@ same quality warnings:
 - warning checks: `ground-y`, `retained-channels`
 
 After adding relative root translation, normalized ground deltas, and the
-`simple-rig` retarget profile, the same batch reports:
+`robot-voxel` retarget profile, the same batch reports:
 
 - quality verdict: `pass`
+- retarget profile score: 1.0
+- weighted penalty: 0
+- skipped-by-policy: 30 finger ignored, 4 upper-body fallback, 2 toe ignored
 - `LookAround` groundDeltaY: -0.047..-0.012
 - `Goodbye` groundDeltaY: -0.031..-0.013
 - `Jump` groundDeltaY: -0.107..-0.052
@@ -59,8 +65,8 @@ After adding relative root translation, normalized ground deltas, and the
   tolerated regions are skipped
 
 This means parser correctness is no longer the main blocker. The next blocker
-is making retarget policies explicit, reusable, and weighted rather than
-hard-coded into the quality checker.
+is calibrating the profile schema against more target rigs and then promoting
+it out of the dogfood directory.
 
 ## Product Lessons
 
@@ -84,9 +90,9 @@ hard-coded into the quality checker.
 ## Next Implementation Order
 
 1. **Retarget profile policy v2**
-   - Move `simple-rig` out of hard-coded checker rules into a named profile.
+   - Add more named profiles beyond `robot-voxel`.
    - Classify bones into required, optional, ignorable, and fallback.
-   - Replace global retained-channel ratio with weighted region scoring.
+   - Calibrate weighted region scoring against more targets.
    - Example: dropped fingers = pass/low cost, dropped hips/head/upper arms =
      fail.
 
@@ -120,7 +126,7 @@ hard-coded into the quality checker.
 node design-runs/game-assets-20260520/tools/run-external-vrma-smoke.mjs \
   --samples LookAround,Goodbye,Jump \
   --root-translation-mode relative \
-  --retarget-profile simple-rig \
+  --retarget-profile robot-voxel \
   --review-vlm \
   --review-dry-run
 ```
