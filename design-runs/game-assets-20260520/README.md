@@ -267,6 +267,8 @@ shared tools now live in `tools/`:
   a generated contact sheet; dry-runs without credentials
 - `tools/retarget-profiles.mjs`: named retarget downgrade profiles with
   weighted skip scoring; `simple-rig` is kept as an alias of `robot-voxel`
+- `tools/gltf-bind-pose.mjs`: shared glTF node world-transform and bind-pose
+  measurement helpers used by extraction and retarget audit steps
 - `motions/external-vrma-quality-gold.json`: calibration ranges for
   `LookAround`, `Goodbye`, and `Jump` on the voxel robot
 
