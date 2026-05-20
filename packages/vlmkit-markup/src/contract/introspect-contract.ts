@@ -363,8 +363,8 @@ function printHelp(): void {
   console.log("Options:");
   console.log("  --out, -o <path>                 Write UI Contract JSON");
   console.log("  --screen-id <id>                 Screen id (default: input basename)");
-  console.log("  --pattern <name>                 Optional pattern: editorial|landing|app-shell|dashboard|canvas|mixed");
-  console.log("  --goal <name>                    Optional validation goal: app|layout|pixel|draft|app-shell|landing|canvas");
+  console.log("  --pattern <name>                 Optional pattern: editorial|landing|app-shell|dashboard|canvas|expressive-menu|mixed");
+  console.log("  --goal <name>                    Optional validation goal: app|layout|pixel|draft|app-shell|landing|canvas|expressive-menu");
   console.log("  --viewport <label:WxH[@DPR]>     Capture viewport; repeatable");
 }
 

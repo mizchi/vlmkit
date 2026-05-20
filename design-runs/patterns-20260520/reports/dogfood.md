@@ -16,6 +16,7 @@ Date: 2026-05-20
 - landing page: hero / CTA / media slot / next-section hint
 - Discord-like app shell: rail / sidebar / main scrollport / member panel
 - canvas game: screenshot ではなく canvas state / input / frame delta が主語
+- expressive menu: semantic menu / selected state / composition metadata が主語
 
 ## Commands
 
@@ -40,6 +41,16 @@ node src/cli/vlmkit.ts build component \
   --goal canvas \
   --output-dir design-runs/patterns-20260520/game/reports/component
 
+node src/cli/vlmkit.ts build component \
+  design-runs/patterns-20260520/expressive-menu/target.png \
+  design-runs/patterns-20260520/expressive-menu/current.html \
+  --goal expressive-menu \
+  --states hover focus-visible \
+  --output-dir design-runs/patterns-20260520/expressive-menu/reports/component
+
+node src/cli/vlmkit.ts contract validate \
+  design-runs/patterns-20260520/expressive-menu/ui.contract.json
+
 node design-runs/patterns-20260520/check-patterns.mjs
 ```
 
@@ -50,6 +61,7 @@ node design-runs/patterns-20260520/check-patterns.mjs
 | landing | `landing` pass | pixel 8.00%, landscape 1.12% | CTA in first viewport, next-section hint, media slot all pass |
 | app-shell | `app-shell` fail | pixel 4.00%, landscape 0.14% | channels and members scroll; messages is broken |
 | game | `canvas` pass | pixel 0.95%, landscape 0.02% | canvas nonblank, frame delta, input response all pass |
+| expressive-menu | `expressive-menu` pass | pixel 7.30%, landscape 2.54% | semantic shell, selected state, high contrast, composition markers all pass |
 
 The app-shell case is the important Red:
 
@@ -132,6 +144,37 @@ This suggests two dogfood layers:
 1. synthetic targets for tool signal development
 2. generated mocks for real design quality and prompt feasibility
 
+### Finding 5: expressive UI needs a composition lane, not pixel chasing
+
+The red/black poster menu stayed practical when layout and decoration were
+split:
+
+- semantic shell: `header`, `nav`, `main`, named status `section`
+- menu affordance: real buttons with real text, selected state, focus-visible
+  and hover states
+- composition metadata: `data-composition-layer` and `data-shape`
+- feasibility gate: high contrast and diagonal/layered evidence
+
+The component run passed with pixel 7.30% and landscape 2.54%. Pixel diff is
+still useful for local polish, but the acceptance signal should be the
+semantic/composition contract:
+
+```text
+Expressive menu pass: landscape 2.54% <= 5.00%, expressive selected ok,
+menu text ok, items 5, composition 6 layers/9 shapes, diagonal ok, contrast ok
+```
+
+Forced states also became visible:
+
+```text
+:hover induced 5.35% (5 forced)
+:focus-visible induced 5.35% (5 forced)
+```
+
+This confirms the flow: keep the underlying layout editable with grid/flex and
+landmarks, then let the composition lane describe the non-orthogonal visual
+language.
+
 ## Implementation changes from this run
 
 Added scrollport reporting to `vlmkit build component`:
@@ -167,11 +210,30 @@ Added `--goal canvas`:
 - checks a short frame delta;
 - checks optional `window.__gameState` response to `ArrowRight`.
 
+Added `--goal expressive-menu`:
+
+- uses landscape as the primary metric and does not require pixel-perfect
+  reproduction;
+- checks current-side composition metadata from `data-composition-layer` and
+  `data-shape`;
+- requires visible selected state, semantic menu text, at least three
+  focusable menu items, diagonal/layered evidence, and high contrast;
+- emits an `Expressive menu inspector` section in component reports.
+
+Added UI Contract IR support for expressive composition:
+
+- `pattern` / `goal`: `expressive-menu`
+- screen or landmark-level `composition`
+- `layers`, `shapes`, `motion`, and `contrast` metadata
+- validator gates for composition plus selected/focus-visible evidence
+
 ## Next implementation candidates
 
-1. Add contract fields for `pattern`, `expectedScrollports`, and required states.
+1. Add contract fields for `expectedScrollports` and pattern-specific required states.
 2. Add scrolled-state snapshots for app shells.
-3. Promote canvas checks into `build interactive` / `build canvas` with HUD
+3. Promote expressive-menu composition into an introspection path so existing
+   markup can emit layer/shape candidates automatically.
+4. Promote canvas checks into `build interactive` / `build canvas` with HUD
    overlap, asset visibility, and richer input assertions.
 
 ## Verification
@@ -183,5 +245,7 @@ node --test packages/vlmkit-markup/src/component/component-goal.test.ts
 node src/cli/vlmkit.ts build component design-runs/patterns-20260520/landing/target.png design-runs/patterns-20260520/landing/current.html --goal landing --output-dir design-runs/patterns-20260520/landing/reports/component
 node src/cli/vlmkit.ts build component design-runs/patterns-20260520/app-shell/target.png design-runs/patterns-20260520/app-shell/current.html --goal app-shell --output-dir design-runs/patterns-20260520/app-shell/reports/component
 node src/cli/vlmkit.ts build component design-runs/patterns-20260520/game/target.png design-runs/patterns-20260520/game/current.html --goal canvas --output-dir design-runs/patterns-20260520/game/reports/component
+node src/cli/vlmkit.ts build component design-runs/patterns-20260520/expressive-menu/target.png design-runs/patterns-20260520/expressive-menu/current.html --goal expressive-menu --states hover focus-visible --output-dir design-runs/patterns-20260520/expressive-menu/reports/component
+node src/cli/vlmkit.ts contract validate design-runs/patterns-20260520/expressive-menu/ui.contract.json
 node design-runs/patterns-20260520/check-patterns.mjs
 ```

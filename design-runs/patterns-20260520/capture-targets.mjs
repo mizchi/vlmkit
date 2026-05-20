@@ -9,6 +9,7 @@ const cases = [
   { name: "landing", width: 1440, height: 960 },
   { name: "app-shell", width: 1440, height: 900 },
   { name: "game", width: 1280, height: 720 },
+  { name: "expressive-menu", width: 1440, height: 900 },
 ];
 
 const browser = await chromium.launch();
@@ -29,4 +30,3 @@ try {
 } finally {
   await browser.close();
 }
-

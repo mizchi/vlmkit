@@ -92,6 +92,69 @@ async function checkGame(browser) {
   };
 }
 
+async function checkExpressiveMenu(browser) {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await page.goto(pathToFileURL(resolve(runDir, "expressive-menu", "current.html")).href, { waitUntil: "networkidle" });
+  const result = await page.evaluate(() => {
+    const selected = document.querySelector("[data-selected=\"true\"], [aria-current=\"page\"], .is-selected");
+    const layers = [...document.querySelectorAll("[data-composition-layer]")];
+    const shapes = [...document.querySelectorAll("[data-shape]")];
+    const menuItems = [...document.querySelectorAll("nav button, nav a, [role=\"menuitem\"], [data-menu-item]")];
+
+    function isVisible(el) {
+      if (!el) return false;
+      const rect = el.getBoundingClientRect();
+      const style = getComputedStyle(el);
+      return rect.width > 1 && rect.height > 1 && style.visibility !== "hidden" && style.display !== "none";
+    }
+
+    function parseRgb(value) {
+      const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+      if (!match) return undefined;
+      return [Number(match[1]), Number(match[2]), Number(match[3])];
+    }
+
+    function channel(value) {
+      const normalized = value / 255;
+      return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+    }
+
+    function luma(rgb) {
+      return 0.2126 * channel(rgb[0]) + 0.7152 * channel(rgb[1]) + 0.0722 * channel(rgb[2]);
+    }
+
+    function contrastRatio(a, b) {
+      const high = Math.max(luma(a), luma(b));
+      const low = Math.min(luma(a), luma(b));
+      return (high + 0.05) / (low + 0.05);
+    }
+
+    const selectedStyle = selected ? getComputedStyle(selected) : undefined;
+    const selectedColor = selectedStyle ? parseRgb(selectedStyle.color) : undefined;
+    const selectedBg = selectedStyle ? parseRgb(selectedStyle.backgroundColor) : undefined;
+    const selectedContrast = selectedColor && selectedBg ? contrastRatio(selectedColor, selectedBg) : 0;
+    const diagonalEvidence = [...layers, ...shapes].some((el) => {
+      const style = getComputedStyle(el);
+      return style.transform !== "none" || style.clipPath !== "none";
+    });
+
+    return {
+      semanticShell: !!document.querySelector("header") && !!document.querySelector("nav") && !!document.querySelector("main"),
+      selectedVisible: isVisible(selected),
+      selectedContrast: Number(selectedContrast.toFixed(2)),
+      highContrast: selectedContrast >= 4.5,
+      focusableItemCount: menuItems.filter(isVisible).length,
+      semanticMenuText: menuItems.every((el) => (el.textContent ?? "").trim().length >= 2),
+      compositionLayerCount: layers.length,
+      compositionShapeCount: shapes.length,
+      diagonalEvidence,
+      imageTextCount: document.querySelectorAll("img").length,
+    };
+  });
+  await page.close();
+  return result;
+}
+
 const browser = await chromium.launch();
 try {
   const result = {
@@ -99,6 +162,7 @@ try {
     landing: await checkLanding(browser),
     appShell: await checkAppShell(browser),
     game: await checkGame(browser),
+    expressiveMenu: await checkExpressiveMenu(browser),
   };
   const outDir = join(runDir, "reports");
   await mkdir(outDir, { recursive: true });
@@ -108,4 +172,3 @@ try {
 } finally {
   await browser.close();
 }
-

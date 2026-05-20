@@ -1,0 +1,245 @@
+{
+  "version": 1,
+  "screens": [
+    {
+      "id": "signal-slash-dispatch",
+      "pattern": "expressive-menu",
+      "goal": "expressive-menu",
+      "sourceOfTruth": "semantic-dom",
+      "viewports": [
+        {
+          "label": "desktop",
+          "width": 1440,
+          "height": 900
+        }
+      ],
+      "markers": [
+        {
+          "kind": "selected",
+          "selector": "[data-selected=\"true\"]",
+          "required": true
+        }
+      ],
+      "states": [
+        {
+          "id": "selected-menu-item",
+          "kind": "selected",
+          "selector": "[data-selected=\"true\"]",
+          "required": true
+        },
+        {
+          "id": "menu-focus",
+          "kind": "focus-visible",
+          "selector": ".menu button",
+          "required": true
+        }
+      ],
+      "composition": {
+        "style": "poster",
+        "axes": ["diagonal", "layered"],
+        "contrast": {
+          "mode": "high",
+          "minRatio": 4.5,
+          "palette": ["#050505", "#111111", "#e60012", "#f7f4ec", "#ffffff"],
+          "textOverAccent": true
+        },
+        "layers": [
+          {
+            "id": "background",
+            "role": "background",
+            "target": ".stage",
+            "z": 0
+          },
+          {
+            "id": "menu-slash",
+            "role": "content",
+            "target": ".menu",
+            "z": 10,
+            "overlap": "avoid-text",
+            "transform": "rotate(-5deg)"
+          },
+          {
+            "id": "content-panel",
+            "role": "content",
+            "target": ".hero-panel",
+            "z": 20,
+            "overlap": "avoid-text",
+            "transform": "rotate(-2deg)"
+          },
+          {
+            "id": "foreground",
+            "role": "foreground",
+            "target": ".status",
+            "z": 30
+          }
+        ],
+        "shapes": [
+          {
+            "id": "slash-shadow",
+            "kind": "slash-panel",
+            "role": "menu backing",
+            "target": ".slash-shadow",
+            "clipPath": "polygon"
+          },
+          {
+            "id": "active-sticker",
+            "kind": "sticker",
+            "role": "state label",
+            "target": ".eyebrow"
+          },
+          {
+            "id": "live-burst",
+            "kind": "burst",
+            "role": "status accent",
+            "target": ".burst"
+          }
+        ],
+        "motion": [
+          {
+            "id": "menu-hover-slam",
+            "trigger": "hover",
+            "effect": "slam",
+            "durationMs": 140,
+            "target": ".menu button"
+          },
+          {
+            "id": "menu-focus-scale",
+            "trigger": "focus",
+            "effect": "scale",
+            "durationMs": 120,
+            "target": ".menu button"
+          }
+        ]
+      },
+      "decoration": {
+        "typography": [
+          {
+            "role": "display",
+            "family": "Impact fallback stack",
+            "size": 112,
+            "lineHeight": 0.84,
+            "weight": 900,
+            "maxLines": 2
+          },
+          {
+            "role": "menu",
+            "family": "Impact fallback stack",
+            "size": 34,
+            "lineHeight": 1,
+            "weight": 900,
+            "maxLines": 1
+          }
+        ],
+        "palette": [
+          {
+            "role": "background",
+            "value": "#050505"
+          },
+          {
+            "role": "ink",
+            "value": "#111111"
+          },
+          {
+            "role": "accent",
+            "value": "#e60012"
+          },
+          {
+            "role": "paper",
+            "value": "#f7f4ec"
+          }
+        ]
+      },
+      "landmarks": [
+        {
+          "id": "topbar",
+          "role": "banner",
+          "name": "Signal Slash",
+          "layout": {
+            "width": { "kind": "fluid", "min": 320, "max": 1320 },
+            "height": { "kind": "content", "min": 70 },
+            "display": { "kind": "flex", "direction": "row", "gap": 14 },
+            "scroll": { "x": false, "y": false }
+          }
+        },
+        {
+          "id": "commands",
+          "role": "navigation",
+          "name": "Primary commands",
+          "slots": [
+            {
+              "id": "menu-items",
+              "kind": "control",
+              "marker": "selected",
+              "required": true
+            }
+          ],
+          "content": {
+            "kind": "list",
+            "items": { "exact": 5 }
+          },
+          "layout": {
+            "width": { "kind": "fixed", "value": 430 },
+            "height": { "kind": "content", "min": 420 },
+            "display": { "kind": "flex", "direction": "column", "gap": 14 },
+            "scroll": { "x": false, "y": false }
+          }
+        },
+        {
+          "id": "mission",
+          "role": "main",
+          "name": "Night Dispatch",
+          "slots": [
+            {
+              "id": "title",
+              "kind": "content",
+              "required": true
+            },
+            {
+              "id": "accent",
+              "kind": "adornment",
+              "required": true
+            }
+          ],
+          "content": {
+            "kind": "static",
+            "density": "sparse",
+            "text": { "rowCount": 4, "maxLength": 220 }
+          },
+          "layout": {
+            "width": { "kind": "fluid", "min": 480, "max": 820 },
+            "height": { "kind": "content", "min": 560 },
+            "display": {
+              "kind": "grid",
+              "columns": ["minmax(0, 1fr)"],
+              "rows": ["auto", "auto", "1fr"],
+              "gap": { "row": 24, "column": 0 }
+            },
+            "scroll": { "x": false, "y": false }
+          }
+        },
+        {
+          "id": "dispatch-status",
+          "role": "region",
+          "name": "Dispatch status",
+          "repeat": {
+            "kind": "grid",
+            "itemName": "status-card",
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "layout": {
+            "width": { "kind": "fluid", "min": 320, "max": 1320 },
+            "height": { "kind": "content", "min": 88 },
+            "display": {
+              "kind": "grid",
+              "columns": ["1fr", "1fr", "1fr"],
+              "rows": ["auto"],
+              "gap": { "row": 0, "column": 18 }
+            },
+            "scroll": { "x": false, "y": false }
+          }
+        }
+      ]
+    }
+  ]
+}

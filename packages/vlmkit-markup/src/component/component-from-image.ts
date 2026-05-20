@@ -64,6 +64,7 @@ import {
   listComponentGoals,
   type ComponentGoalEvaluation,
   type ComponentCanvasEvidence,
+  type ComponentExpressiveMenuEvidence,
   type ComponentLandingEvidence,
   type ComponentScrollportEvidence,
 } from "./component-goal.ts";
@@ -107,6 +108,7 @@ export interface ComponentFromImageReport {
   scrollportRegions: ScrollportRegion[];
   landingEvidence?: ComponentLandingEvidence;
   canvasEvidence?: ComponentCanvasEvidence;
+  expressiveMenuEvidence?: ComponentExpressiveMenuEvidence;
   semanticDrilldown: SemanticDrilldownEntry[];
   bboxMatches: MatchedBbox[];
   heatmapRegions: HeatmapRegion[];
@@ -291,6 +293,7 @@ export async function runComponentFromImage(
       deviceScaleFactor: dpr,
     }).catch(() => []);
     const landingEvidence = await captureLandingEvidence(page).catch(() => undefined);
+    const expressiveMenuEvidence = await captureExpressiveMenuEvidence(page).catch(() => undefined);
     const currentPath = join(outputDir, "current.png");
     await page.screenshot({ path: currentPath, fullPage: false });
     const canvasEvidence = await captureCanvasEvidence(page).catch(() => undefined);
@@ -322,7 +325,11 @@ export async function runComponentFromImage(
       scrollports: scrollportEvidence,
       landing: landingEvidence,
       canvas: canvasEvidence,
+      expressiveMenu: expressiveMenuEvidence,
     });
+    const reportLandingEvidence = goalEvaluation.goal === "landing" ? landingEvidence : undefined;
+    const reportCanvasEvidence = goalEvaluation.goal === "canvas" ? canvasEvidence : undefined;
+    const reportExpressiveMenuEvidence = goalEvaluation.goal === "expressive-menu" ? expressiveMenuEvidence : undefined;
 
     // All image-only signals run identically on both files.
     const [bboxBaseline, bboxVariant] = await Promise.all([
@@ -559,8 +566,9 @@ export async function runComponentFromImage(
       goalEvaluation,
       landmarkRegions,
       scrollportRegions,
-      landingEvidence,
-      canvasEvidence,
+      landingEvidence: reportLandingEvidence,
+      canvasEvidence: reportCanvasEvidence,
+      expressiveMenuEvidence: reportExpressiveMenuEvidence,
       semanticDrilldown,
       heatmapPath: diffPixels > 0 ? heatmapPath : undefined,
       currentPath,
@@ -596,11 +604,14 @@ export async function runComponentFromImage(
       const evidence = summarizeScrollportEvidence(scrollportRegions);
       console.log(`  ${DIM}scrollports: ${formatScrollportEvidence(evidence)}${RESET}`);
     }
-    if (landingEvidence) {
-      console.log(`  ${DIM}landing: ${formatLandingEvidence(landingEvidence)}${RESET}`);
+    if (reportLandingEvidence) {
+      console.log(`  ${DIM}landing: ${formatLandingEvidence(reportLandingEvidence)}${RESET}`);
     }
-    if (canvasEvidence) {
-      console.log(`  ${DIM}canvas: ${formatCanvasEvidence(canvasEvidence)}${RESET}`);
+    if (reportCanvasEvidence) {
+      console.log(`  ${DIM}canvas: ${formatCanvasEvidence(reportCanvasEvidence)}${RESET}`);
+    }
+    if (reportExpressiveMenuEvidence) {
+      console.log(`  ${DIM}expressive-menu: ${formatExpressiveMenuEvidence(reportExpressiveMenuEvidence)}${RESET}`);
     }
     if (stateResults.length > 0) {
       for (const s of stateResults) {
@@ -618,8 +629,9 @@ export async function runComponentFromImage(
       goalEvaluation,
       landmarkRegions,
       scrollportRegions,
-      landingEvidence,
-      canvasEvidence,
+      landingEvidence: reportLandingEvidence,
+      canvasEvidence: reportCanvasEvidence,
+      expressiveMenuEvidence: reportExpressiveMenuEvidence,
       semanticDrilldown,
       bboxMatches,
       heatmapRegions,
@@ -678,6 +690,77 @@ async function captureLandingEvidence(page: Page): Promise<ComponentLandingEvide
       primaryCtaVisible: fullyInViewport(cta),
       nextSectionHintVisible: intersectsViewport(next),
       mediaSlotVisible: mediaSlotVisible(media),
+    };
+  });
+}
+
+async function captureExpressiveMenuEvidence(page: Page): Promise<ComponentExpressiveMenuEvidence | undefined> {
+  return await page.evaluate(() => {
+    const layers = Array.from(document.querySelectorAll("[data-composition-layer]"));
+    const shapes = Array.from(document.querySelectorAll("[data-shape]"));
+    const selected = document.querySelector("[data-selected=\"true\"], [aria-current=\"page\"], .is-selected");
+    const menuItems = Array.from(document.querySelectorAll("nav button, nav a, [role=\"menuitem\"], [data-menu-item]"));
+    if (layers.length === 0 && shapes.length === 0 && menuItems.length === 0 && !selected) return undefined;
+
+    function visibleText(el: Element): string {
+      return (el.textContent ?? "").replace(/\s+/g, " ").trim();
+    }
+
+    function isVisible(el: Element | null): boolean {
+      if (!el) return false;
+      const rect = el.getBoundingClientRect();
+      const style = getComputedStyle(el);
+      return rect.width > 1
+        && rect.height > 1
+        && style.visibility !== "hidden"
+        && style.display !== "none";
+    }
+
+    function parseRgb(value: string): [number, number, number] | undefined {
+      const match = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+      if (!match) return undefined;
+      return [Number(match[1]), Number(match[2]), Number(match[3])];
+    }
+
+    function channel(value: number): number {
+      const normalized = value / 255;
+      return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+    }
+
+    function luma(rgb: [number, number, number]): number {
+      return 0.2126 * channel(rgb[0]) + 0.7152 * channel(rgb[1]) + 0.0722 * channel(rgb[2]);
+    }
+
+    function contrastRatio(a: [number, number, number], b: [number, number, number]): number {
+      const high = Math.max(luma(a), luma(b));
+      const low = Math.min(luma(a), luma(b));
+      return (high + 0.05) / (low + 0.05);
+    }
+
+    const contrastTargets = [
+      selected,
+      ...menuItems.slice(0, 6),
+      document.querySelector("[data-accent=\"red\"]"),
+    ].filter((el): el is Element => !!el);
+    const highContrast = contrastTargets.some((el) => {
+      const style = getComputedStyle(el);
+      const color = parseRgb(style.color);
+      const bg = parseRgb(style.backgroundColor);
+      return !!color && !!bg && contrastRatio(color, bg) >= 4.5;
+    });
+    const diagonalEvidence = [...layers, ...shapes].some((el) => {
+      const style = getComputedStyle(el);
+      return style.transform !== "none" || style.clipPath !== "none";
+    });
+
+    return {
+      compositionLayers: layers.length,
+      compositionShapes: shapes.length,
+      selectedVisible: isVisible(selected),
+      focusableItemCount: menuItems.filter(isVisible).length,
+      semanticMenuText: menuItems.some((el) => visibleText(el).length >= 2),
+      diagonalEvidence,
+      highContrast,
     };
   });
 }
@@ -790,6 +873,18 @@ function formatCanvasEvidence(evidence: ComponentCanvasEvidence): string {
   return parts.join(", ");
 }
 
+function formatExpressiveMenuEvidence(evidence: ComponentExpressiveMenuEvidence): string {
+  const parts = [
+    evidence.selectedVisible ? "selected ok" : "selected missing",
+    evidence.semanticMenuText ? "menu text ok" : "menu text missing",
+    `items ${evidence.focusableItemCount}`,
+    `composition ${evidence.compositionLayers}/${evidence.compositionShapes}`,
+    evidence.diagonalEvidence ? "diagonal ok" : "diagonal missing",
+    evidence.highContrast ? "contrast ok" : "contrast missing",
+  ];
+  return parts.join(", ");
+}
+
 interface RenderInput {
   targetImage: string;
   currentHtml: string;
@@ -803,6 +898,7 @@ interface RenderInput {
   scrollportRegions: ScrollportRegion[];
   landingEvidence?: ComponentLandingEvidence;
   canvasEvidence?: ComponentCanvasEvidence;
+  expressiveMenuEvidence?: ComponentExpressiveMenuEvidence;
   semanticDrilldown: SemanticDrilldownEntry[];
   heatmapPath?: string;
   currentPath: string;
@@ -984,6 +1080,25 @@ export function renderReportMarkdown(r: RenderInput): string {
         ? "missing"
         : "unknown";
     lines.push(`| Input response | ${input} |`);
+    lines.push("");
+  }
+
+  if (r.expressiveMenuEvidence) {
+    lines.push("## Expressive menu inspector");
+    lines.push("");
+    lines.push("Current DOM evidence for poster-like menu surfaces. This checks " +
+      "semantic menu text and explicit composition metadata instead of asking " +
+      "pixel diff to reproduce every slash, sticker, and overlap exactly.");
+    lines.push("");
+    lines.push("| Gate | Status |");
+    lines.push("|---|---|");
+    lines.push(`| Selected state visible | ${r.expressiveMenuEvidence.selectedVisible ? "ok" : "missing"} |`);
+    lines.push(`| Focusable menu items | ${r.expressiveMenuEvidence.focusableItemCount} |`);
+    lines.push(`| Semantic menu text | ${r.expressiveMenuEvidence.semanticMenuText ? "ok" : "missing"} |`);
+    lines.push(`| Composition layers | ${r.expressiveMenuEvidence.compositionLayers} |`);
+    lines.push(`| Composition shapes | ${r.expressiveMenuEvidence.compositionShapes} |`);
+    lines.push(`| Diagonal / layered evidence | ${r.expressiveMenuEvidence.diagonalEvidence ? "ok" : "missing"} |`);
+    lines.push(`| High contrast | ${r.expressiveMenuEvidence.highContrast ? "ok" : "missing"} |`);
     lines.push("");
   }
 

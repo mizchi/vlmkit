@@ -139,10 +139,53 @@ test("canvas goal fails when no canvas is detected", () => {
   assert.match(result.summary, /no canvas evidence/);
 });
 
+test("expressive-menu goal passes with semantic composition evidence", () => {
+  const result = evaluateComponentGoal({
+    goal: "expressive-menu",
+    pixelDiffRatio: 0.31,
+    landscapeDiffRatio: 0.034,
+    expressiveMenu: {
+      compositionLayers: 3,
+      compositionShapes: 3,
+      selectedVisible: true,
+      focusableItemCount: 5,
+      semanticMenuText: true,
+      diagonalEvidence: true,
+      highContrast: true,
+    },
+  });
+
+  assert.equal(result.status, "pass");
+  assert.equal(result.primaryMetric, "landscape");
+  assert.match(result.summary, /expressive selected ok, menu text ok/);
+  assert.match(result.summary, /composition 3 layers\/3 shapes/);
+});
+
+test("expressive-menu goal fails when selected state or contrast evidence is missing", () => {
+  const result = evaluateComponentGoal({
+    goal: "expressive-menu",
+    pixelDiffRatio: 0.05,
+    landscapeDiffRatio: 0.01,
+    expressiveMenu: {
+      compositionLayers: 3,
+      compositionShapes: 2,
+      selectedVisible: false,
+      focusableItemCount: 4,
+      semanticMenuText: true,
+      diagonalEvidence: true,
+      highContrast: false,
+    },
+  });
+
+  assert.equal(result.status, "fail");
+  assert.match(result.summary, /selected missing/);
+  assert.match(result.summary, /contrast missing/);
+});
+
 test("unknown goal falls back to app profile", () => {
   assert.equal(getComponentGoalProfile("unknown").goal, "app");
 });
 
 test("goal list is stable for CLI help", () => {
-  assert.deepEqual(listComponentGoals(), ["app", "layout", "pixel", "draft", "app-shell", "landing", "canvas"]);
+  assert.deepEqual(listComponentGoals(), ["app", "layout", "pixel", "draft", "app-shell", "landing", "canvas", "expressive-menu"]);
 });

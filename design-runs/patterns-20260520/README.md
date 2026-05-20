@@ -11,6 +11,7 @@ Patterns:
 - `landing`: first-viewport offer, CTA, media slot, next-section hint.
 - `app-shell`: Discord-like persistent rails, nested scrollports, selected state.
 - `game`: canvas scene where DOM landmarks only describe the outer shell.
+- `expressive-menu`: poster-like semantic menu with composition metadata.
 
 Run:
 
@@ -19,6 +20,7 @@ node design-runs/patterns-20260520/capture-targets.mjs
 node src/cli/vlmkit.ts build component design-runs/patterns-20260520/landing/target.png design-runs/patterns-20260520/landing/current.html --goal landing --output-dir design-runs/patterns-20260520/landing/reports/component
 node src/cli/vlmkit.ts build component design-runs/patterns-20260520/app-shell/target.png design-runs/patterns-20260520/app-shell/current.html --goal app-shell --output-dir design-runs/patterns-20260520/app-shell/reports/component
 node src/cli/vlmkit.ts build component design-runs/patterns-20260520/game/target.png design-runs/patterns-20260520/game/current.html --goal canvas --output-dir design-runs/patterns-20260520/game/reports/component
+node src/cli/vlmkit.ts build component design-runs/patterns-20260520/expressive-menu/target.png design-runs/patterns-20260520/expressive-menu/current.html --goal expressive-menu --states hover focus-visible --output-dir design-runs/patterns-20260520/expressive-menu/reports/component
 node design-runs/patterns-20260520/check-patterns.mjs
 ```
 

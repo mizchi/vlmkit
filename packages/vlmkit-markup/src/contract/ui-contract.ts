@@ -6,6 +6,7 @@ export const UI_CONTRACT_PATTERNS = [
   "app-shell",
   "dashboard",
   "canvas",
+  "expressive-menu",
   "mixed",
 ] as const;
 
@@ -19,6 +20,7 @@ export const UI_CONTRACT_GOALS = [
   "app-shell",
   "landing",
   "canvas",
+  "expressive-menu",
 ] as const;
 
 export type UiContractGoal = typeof UI_CONTRACT_GOALS[number];
@@ -46,6 +48,7 @@ export interface UiContractScreen {
   viewports: UiContractViewport[];
   markers?: UiMarkerContract[];
   states?: UiStateContract[];
+  composition?: UiCompositionContract;
   content?: UiContentContract;
   decoration?: UiDecorationContract;
   assets?: UiAssetContract[];
@@ -70,6 +73,7 @@ export interface UiContractLandmark {
   repeat?: UiRepeatContract;
   markers?: UiMarkerContract[];
   states?: UiStateContract[];
+  composition?: UiCompositionContract;
   content?: UiContentContract;
   decoration?: UiDecorationContract;
   assets?: UiAssetContract[];
@@ -161,6 +165,78 @@ export interface UiStateContract {
   trigger?: string;
   viewport?: string;
   required?: boolean;
+}
+
+export type UiCompositionStyle =
+  | "regular"
+  | "asymmetric"
+  | "poster"
+  | "collage"
+  | "radial"
+  | "layered";
+
+export type UiCompositionAxis =
+  | "orthogonal"
+  | "diagonal"
+  | "radial"
+  | "freeform"
+  | "layered";
+
+export interface UiCompositionContract {
+  style: UiCompositionStyle;
+  axes?: UiCompositionAxis[];
+  layers?: UiCompositionLayer[];
+  shapes?: UiCompositionShape[];
+  motion?: UiMotionContract[];
+  contrast?: UiContrastContract;
+}
+
+export type UiCompositionLayerRole =
+  | "background"
+  | "content"
+  | "accent"
+  | "foreground"
+  | "scrim";
+
+export interface UiCompositionLayer {
+  id: string;
+  role: UiCompositionLayerRole;
+  target?: string;
+  z?: number;
+  overlap?: "allowed" | "avoid-text" | "none";
+  transform?: string;
+}
+
+export type UiCompositionShapeKind =
+  | "slash-panel"
+  | "sticker"
+  | "burst"
+  | "cutout"
+  | "mask"
+  | "frame"
+  | "ribbon";
+
+export interface UiCompositionShape {
+  id: string;
+  kind: UiCompositionShapeKind;
+  role?: string;
+  target?: string;
+  clipPath?: string;
+}
+
+export interface UiMotionContract {
+  id: string;
+  trigger: "hover" | "focus" | "selected" | "route" | "load";
+  effect: "slam" | "pulse" | "slide" | "scale" | "flash" | "none";
+  durationMs?: number;
+  target?: string;
+}
+
+export interface UiContrastContract {
+  mode: "normal" | "high";
+  minRatio?: number;
+  palette?: string[];
+  textOverAccent?: boolean;
 }
 
 export type UiSlotKind =
@@ -341,6 +417,7 @@ export function validateUiContract(contract: UiContract): UiContractIssue[] {
     }
     validateMarkers(screen.markers, `${screenPath}.markers`, issues);
     validateStates(screen.states, `${screenPath}.states`, issues);
+    validateComposition(screen.composition, `${screenPath}.composition`, issues);
     validateContent(screen.content, `${screenPath}.content`, issues);
     validateDecoration(screen.decoration, `${screenPath}.decoration`, issues);
     validateAssets(screen.assets, `${screenPath}.assets`, issues);
@@ -376,6 +453,7 @@ export function validateUiContract(contract: UiContract): UiContractIssue[] {
       validateRepeat(lm.repeat, `${lmPath}.repeat`, issues);
       validateMarkers(lm.markers, `${lmPath}.markers`, issues);
       validateStates(lm.states, `${lmPath}.states`, issues);
+      validateComposition(lm.composition, `${lmPath}.composition`, issues);
       validateContent(lm.content, `${lmPath}.content`, issues);
       validateDecoration(lm.decoration, `${lmPath}.decoration`, issues);
       validateAssets(lm.assets, `${lmPath}.assets`, issues);
@@ -458,6 +536,47 @@ function validateRepeat(
   validateOptionalRange(repeat.minItems, repeat.maxItems, path, issues);
 }
 
+function validateComposition(
+  composition: UiCompositionContract | undefined,
+  path: string,
+  issues: UiContractIssue[],
+): void {
+  if (!composition) return;
+  for (let i = 0; i < (composition.layers?.length ?? 0); i++) {
+    const layer = composition.layers![i]!;
+    const layerPath = `${path}.layers[${i}]`;
+    if (!layer.id) issues.push({ path: `${layerPath}.id`, message: "composition layer id is required" });
+    if (layer.z !== undefined && !Number.isFinite(layer.z)) {
+      issues.push({ path: `${layerPath}.z`, message: "composition layer z must be finite" });
+    }
+  }
+  for (let i = 0; i < (composition.shapes?.length ?? 0); i++) {
+    const shape = composition.shapes![i]!;
+    const shapePath = `${path}.shapes[${i}]`;
+    if (!shape.id) issues.push({ path: `${shapePath}.id`, message: "composition shape id is required" });
+  }
+  for (let i = 0; i < (composition.motion?.length ?? 0); i++) {
+    const motion = composition.motion![i]!;
+    const motionPath = `${path}.motion[${i}]`;
+    if (!motion.id) issues.push({ path: `${motionPath}.id`, message: "motion id is required" });
+    if (motion.durationMs !== undefined && motion.durationMs < 0) {
+      issues.push({ path: `${motionPath}.durationMs`, message: "durationMs must be non-negative" });
+    }
+  }
+  if (composition.contrast) {
+    const contrastPath = `${path}.contrast`;
+    if (composition.contrast.minRatio !== undefined && composition.contrast.minRatio <= 0) {
+      issues.push({ path: `${contrastPath}.minRatio`, message: "contrast minRatio must be positive" });
+    }
+    for (let i = 0; i < (composition.contrast.palette?.length ?? 0); i++) {
+      const value = composition.contrast.palette![i]!;
+      if (!isHexColor(value)) {
+        issues.push({ path: `${contrastPath}.palette[${i}]`, message: "composition contrast palette value must be a hex color" });
+      }
+    }
+  }
+}
+
 function validateContent(
   content: UiContentContract | undefined,
   path: string,
@@ -508,7 +627,7 @@ function validateDecoration(
     const color = decoration.palette![i]!;
     const colorPath = `${path}.palette[${i}]`;
     if (!color.role) issues.push({ path: `${colorPath}.role`, message: "palette role is required" });
-    if (color.value && !/^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/iu.test(color.value)) {
+    if (color.value && !isHexColor(color.value)) {
       issues.push({ path: `${colorPath}.value`, message: "palette value must be a hex color" });
     }
   }
@@ -516,6 +635,10 @@ function validateDecoration(
     const media = decoration.media![i]!;
     if (!media.slot) issues.push({ path: `${path}.media[${i}].slot`, message: "media treatment slot is required" });
   }
+}
+
+function isHexColor(value: string): boolean {
+  return /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/iu.test(value);
 }
 
 function validateAssets(
@@ -575,6 +698,17 @@ function validatePatternEvidence(
       if (!fields.has(field)) {
         issues.push({ path: `${screenPath}.canvas.requiredStateFields`, message: `canvas contracts should include ${field} state field` });
       }
+    }
+  }
+  if (pattern === "expressive-menu") {
+    if (!screen.composition) {
+      issues.push({ path: `${screenPath}.composition`, message: "expressive-menu contracts should include composition metadata" });
+    }
+    const hasStateEvidence = (screen.states ?? []).some((state) =>
+      state.kind === "selected" || state.kind === "focus-visible"
+    ) || markerKinds.has("selected");
+    if (!hasStateEvidence) {
+      issues.push({ path: `${screenPath}.states`, message: "expressive-menu contracts should include selected or focus-visible state evidence" });
     }
   }
 }
@@ -647,6 +781,7 @@ export function summarizeUiContractScreen(screen: UiContractScreen): string {
     `landmarks ${screen.landmarks.length}`,
     screen.markers?.length ? `markers ${screen.markers.length}` : "",
     screen.states?.length ? `states ${screen.states.length}` : "",
+    screen.composition ? `composition ${screen.composition.style}` : "",
     screen.assets?.length ? `assets ${screen.assets.length}` : "",
     screen.canvas ? "canvas" : "",
   ].filter(Boolean);

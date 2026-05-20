@@ -165,3 +165,66 @@ test("validateUiContract validates hierarchy and rich metadata ranges", () => {
   assert.ok(issues.some((issue) => issue.message.includes("min cannot exceed max")));
   assert.ok(issues.some((issue) => issue.message.includes("asset id is required")));
 });
+
+test("validateUiContract accepts expressive menu composition contracts", () => {
+  const contract = structuredClone(valid);
+  const screen = contract.screens[0]!;
+  screen.pattern = "expressive-menu";
+  screen.goal = "expressive-menu";
+  screen.sourceOfTruth = "semantic-dom";
+  screen.markers = [
+    { kind: "selected", selector: "[data-selected=\"true\"]", required: true },
+  ];
+  screen.states = [
+    { id: "selected-menu-item", kind: "selected", selector: "[data-selected=\"true\"]", required: true },
+    { id: "menu-focus", kind: "focus-visible", selector: "button", required: true },
+  ];
+  screen.composition = {
+    style: "poster",
+    axes: ["diagonal", "layered"],
+    contrast: {
+      mode: "high",
+      minRatio: 4.5,
+      palette: ["#050505", "#e60012", "#ffffff"],
+    },
+    layers: [
+      { id: "background", role: "background", z: 0 },
+      { id: "menu-slash", role: "content", z: 10, overlap: "avoid-text" },
+      { id: "accent", role: "accent", z: 20, transform: "rotate(-8deg)" },
+    ],
+    shapes: [
+      { id: "slash-panel", kind: "slash-panel", role: "menu" },
+      { id: "sticker", kind: "sticker", role: "selected item" },
+    ],
+    motion: [
+      { id: "menu-hover", trigger: "hover", effect: "slam", durationMs: 140 },
+    ],
+  };
+
+  assert.deepEqual(validateUiContract(contract), []);
+  assert.match(summarizeUiContractScreen(screen), /expressive-menu/);
+  assert.match(summarizeUiContractScreen(screen), /composition poster/);
+});
+
+test("validateUiContract requires expressive menu composition and state evidence", () => {
+  const contract = structuredClone(valid);
+  contract.screens[0]!.pattern = "expressive-menu";
+  const issues = validateUiContract(contract);
+  assert.ok(issues.some((issue) => issue.message.includes("composition")));
+  assert.ok(issues.some((issue) => issue.message.includes("selected or focus-visible")));
+
+  contract.screens[0]!.composition = {
+    style: "poster",
+    contrast: { mode: "high", minRatio: 0, palette: ["red"] },
+    layers: [{ id: "", role: "background" }],
+    shapes: [{ id: "", kind: "slash-panel" }],
+    motion: [{ id: "", trigger: "hover", effect: "slam", durationMs: -1 }],
+  };
+  const richerIssues = validateUiContract(contract);
+  assert.ok(richerIssues.some((issue) => issue.message.includes("contrast minRatio")));
+  assert.ok(richerIssues.some((issue) => issue.message.includes("hex color")));
+  assert.ok(richerIssues.some((issue) => issue.message.includes("composition layer id")));
+  assert.ok(richerIssues.some((issue) => issue.message.includes("composition shape id")));
+  assert.ok(richerIssues.some((issue) => issue.message.includes("motion id")));
+  assert.ok(richerIssues.some((issue) => issue.message.includes("durationMs")));
+});

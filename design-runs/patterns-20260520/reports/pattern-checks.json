@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-19T18:17:05.032Z",
+  "generatedAt": "2026-05-19T19:27:56.155Z",
   "landing": {
     "ctaInFirstViewport": true,
     "nextSectionHintVisible": true,
@@ -55,5 +55,17 @@
     "inputChangedState": true,
     "playerXBefore": 356,
     "playerXAfter": 374
+  },
+  "expressiveMenu": {
+    "semanticShell": true,
+    "selectedVisible": true,
+    "selectedContrast": 5.06,
+    "highContrast": true,
+    "focusableItemCount": 5,
+    "semanticMenuText": true,
+    "compositionLayerCount": 6,
+    "compositionShapeCount": 9,
+    "diagonalEvidence": true,
+    "imageTextCount": 0
   }
 }

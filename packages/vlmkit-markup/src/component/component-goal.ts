@@ -1,4 +1,4 @@
-export const COMPONENT_GOALS = ["app", "layout", "pixel", "draft", "app-shell", "landing", "canvas"] as const;
+export const COMPONENT_GOALS = ["app", "layout", "pixel", "draft", "app-shell", "landing", "canvas", "expressive-menu"] as const;
 
 export type ComponentGoal = typeof COMPONENT_GOALS[number];
 export type ComponentGoalStatus = "pass" | "review" | "fail";
@@ -50,6 +50,16 @@ export interface ComponentCanvasEvidence {
   nonblank: boolean;
   frameDelta: boolean;
   inputResponsive: boolean | null;
+}
+
+export interface ComponentExpressiveMenuEvidence {
+  compositionLayers: number;
+  compositionShapes: number;
+  selectedVisible: boolean;
+  focusableItemCount: number;
+  semanticMenuText: boolean;
+  diagonalEvidence: boolean;
+  highContrast: boolean;
 }
 
 const GOAL_PROFILES: Record<ComponentGoal, ComponentGoalProfile> = {
@@ -109,6 +119,14 @@ const GOAL_PROFILES: Record<ComponentGoal, ComponentGoalProfile> = {
     pass: { landscape: 0.06, pixel: 0.35 },
     review: { landscape: 0.08, pixel: 0.45 },
   },
+  "expressive-menu": {
+    goal: "expressive-menu",
+    label: "Expressive menu",
+    primaryMetric: "landscape",
+    description: "Poster-like menu convergence with semantic menu text, selected state, composition markers, and contrast gates.",
+    pass: { landscape: 0.05 },
+    review: { landscape: 0.08 },
+  },
 };
 
 export function listComponentGoals(): ComponentGoal[] {
@@ -130,6 +148,7 @@ export function evaluateComponentGoal(input: {
   scrollports?: ComponentScrollportEvidence;
   landing?: ComponentLandingEvidence;
   canvas?: ComponentCanvasEvidence;
+  expressiveMenu?: ComponentExpressiveMenuEvidence;
 }): ComponentGoalEvaluation {
   const profile = getComponentGoalProfile(input.goal);
   const thresholdStatus: ComponentGoalStatus = passesAll(profile.pass, input)
@@ -158,6 +177,7 @@ function applyPatternGates(
     scrollports?: ComponentScrollportEvidence;
     landing?: ComponentLandingEvidence;
     canvas?: ComponentCanvasEvidence;
+    expressiveMenu?: ComponentExpressiveMenuEvidence;
   },
 ): ComponentGoalStatus {
   if (profile.goal === "app-shell") {
@@ -189,6 +209,17 @@ function applyPatternGates(
     }
   }
 
+  if (profile.goal === "expressive-menu") {
+    const expressiveMenu = input.expressiveMenu;
+    if (!expressiveMenu) return status === "pass" ? "review" : status;
+    if (!expressiveMenu.selectedVisible) return "fail";
+    if (expressiveMenu.focusableItemCount < 3) return "fail";
+    if (!expressiveMenu.semanticMenuText) return "fail";
+    if (expressiveMenu.compositionLayers < 2 || expressiveMenu.compositionShapes < 2) return "fail";
+    if (!expressiveMenu.diagonalEvidence) return "fail";
+    if (!expressiveMenu.highContrast) return "fail";
+  }
+
   return status;
 }
 
@@ -214,6 +245,7 @@ function summarizeEvaluation(
     scrollports?: ComponentScrollportEvidence;
     landing?: ComponentLandingEvidence;
     canvas?: ComponentCanvasEvidence;
+    expressiveMenu?: ComponentExpressiveMenuEvidence;
   },
 ): string {
   const target = status === "pass" ? profile.pass : profile.review;
@@ -232,6 +264,9 @@ function summarizeEvaluation(
   }
   if (profile.goal === "canvas") {
     clauses.push(summarizeCanvas(input.canvas));
+  }
+  if (profile.goal === "expressive-menu") {
+    clauses.push(summarizeExpressiveMenu(input.expressiveMenu));
   }
   const suffix = clauses.length > 0 ? `: ${clauses.join(", ")}` : "";
   return `${profile.label} ${status}${suffix}`;
@@ -269,6 +304,19 @@ function summarizeCanvas(canvas: ComponentCanvasEvidence | undefined): string {
     input,
   ];
   return `canvas ${parts.join(", ")}`;
+}
+
+function summarizeExpressiveMenu(expressiveMenu: ComponentExpressiveMenuEvidence | undefined): string {
+  if (!expressiveMenu) return "no expressive menu evidence";
+  const parts = [
+    expressiveMenu.selectedVisible ? "selected ok" : "selected missing",
+    expressiveMenu.semanticMenuText ? "menu text ok" : "menu text missing",
+    `items ${expressiveMenu.focusableItemCount}`,
+    `composition ${expressiveMenu.compositionLayers} layers/${expressiveMenu.compositionShapes} shapes`,
+    expressiveMenu.diagonalEvidence ? "diagonal ok" : "diagonal missing",
+    expressiveMenu.highContrast ? "contrast ok" : "contrast missing",
+  ];
+  return `expressive ${parts.join(", ")}`;
 }
 
 export function formatPct(ratio: number): string {

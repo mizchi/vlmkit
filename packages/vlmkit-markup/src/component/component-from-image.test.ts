@@ -227,3 +227,56 @@ test("renderReportMarkdown includes canvas diagnostics", () => {
   assert.match(markdown, /\| Nonblank canvas \| ok \|/);
   assert.match(markdown, /\| Input response \| ok \|/);
 });
+
+test("renderReportMarkdown includes expressive menu diagnostics", () => {
+  const markdown = renderReportMarkdown({
+    targetImage: "/tmp/target.png",
+    currentHtml: "/tmp/current.html",
+    viewport: { width: 320, height: 240 },
+    diffPixels: 0,
+    totalPixels: 76800,
+    diffRatio: 0,
+    landscapeDiff: {
+      score: 0,
+      similarity: 1,
+      changedCells: 0,
+      totalCells: 1,
+      grid: { cols: 1, rows: 1 },
+      topCells: [],
+    },
+    goalEvaluation: {
+      goal: "expressive-menu",
+      label: "Expressive menu",
+      status: "pass",
+      summary: "Expressive menu pass",
+      primaryMetric: "landscape",
+    },
+    landmarkRegions: [],
+    scrollportRegions: [],
+    expressiveMenuEvidence: {
+      compositionLayers: 3,
+      compositionShapes: 2,
+      selectedVisible: true,
+      focusableItemCount: 5,
+      semanticMenuText: true,
+      diagonalEvidence: true,
+      highContrast: true,
+    },
+    semanticDrilldown: [],
+    currentPath: "/tmp/current.png",
+    bboxMatches: [],
+    heatmapRegions: [],
+    textRowMatches: [],
+    rowGapDeltas: [],
+    typographyMismatches: [],
+    baselineRowCount: 0,
+    variantRowCount: 0,
+    paletteDiff: { onlyInBaseline: [], onlyInVariant: [] },
+    stateResults: [],
+    dpr: 1,
+  } as any);
+
+  assert.match(markdown, /## Expressive menu inspector/);
+  assert.match(markdown, /\| Selected state visible \| ok \|/);
+  assert.match(markdown, /\| Composition layers \| 3 \|/);
+});

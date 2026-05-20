@@ -22,6 +22,7 @@ contract を作る。
 | Sidebar app shell | persistent viewport shell | rails, scrollports, active state, density | grid tracks, scrollport bboxes, selected rows, overflow | 本文テキストの pixel 差分 |
 | Dashboard / data tool | task and data hierarchy | table/chart density, filters, empty/loading states | layout lanes, row height, control affordances | chart のランダム点や数値内容 |
 | Game / canvas scene | game state and scene graph | rules, aspect ratio, HUD, input loop | canvas nonblank, frame delta, input response, overlap | screenshot の単発 pixel diff |
+| Expressive menu / poster UI | semantic DOM + composition layer | high contrast, selected/focus state, composition rules | landmark order, contrast, selected state, composition metadata | IP 固有の字形・斜め形状の完全一致 |
 
 分類は排他的でなくてよい。たとえば SaaS landing の下に app preview がある場合、
 first viewport は landing として見て、preview 内部は app shell として見る。
@@ -32,7 +33,9 @@ first viewport は landing として見て、preview 内部は app shell とし�
 2. 画面の中心が offer / CTA / media impression なら、landing 系として扱う。
 3. 画面の中心が常駐 navigation と作業領域なら、app shell 系として扱う。
 4. 画面の中心が canvas / WebGL / 連続入力なら、game / interactive 系として扱う。
-5. 混在する場合は、first viewport の主要目的と独立 scrollport の有無で分割する。
+5. 画面の中心が menu / command palette で、斜め・重なり・poster 的な視覚構成が
+   主役なら、expressive menu として扱う。
+6. 混在する場合は、first viewport の主要目的と独立 scrollport の有無で分割する。
 
 ## Common analysis phase
 
@@ -44,7 +47,8 @@ first viewport は landing として見て、preview 内部は app shell とし�
 - layout feasibility: grid/flex/subgrid で説明できるか
 - responsive policy: mobile で順序が同じ意味を保つか
 - asset policy: 実画像、generated image、SVG、canvas asset のどれを使うか
-- pass policy: `app`, `layout`, `pixel`, `draft` のどれを使うか、または将来 profile が必要か
+- pass policy: `app`, `layout`, `pixel`, `draft`, or pattern-specific goal
+  (`landing`, `app-shell`, `canvas`, `expressive-menu`) のどれを使うか
 
 この phase の出力を `brief.md` と mock prompt に入れる。AI に自由に絵を
 作らせるより、実装に優しい design envelope を先に狭める。
@@ -78,6 +82,14 @@ Canvas:
 - minimum fields: `mode`, `frame`, `playerX`, `playerY`, `score`, `assetsReady`
 - keyboard input such as `ArrowRight` should change the serialized state
 - if a game cannot expose state, record an equivalent test hook in `brief.md`
+
+Expressive menu:
+
+- composition layers: `data-composition-layer="<name>"`
+- composition shapes: `data-shape="slash-panel|sticker|burst|cutout|mask|ribbon"`
+- selected state: `data-selected="true"` or `aria-current="page"`
+- menu items: real `button`, `a`, `[role="menuitem"]`, or `data-menu-item`
+- accent contrast target: optional `data-accent="red"` for high-contrast checks
 
 ## Canonical validation command shape
 
@@ -257,6 +269,52 @@ summary, empty/loading/error state の情報密度が重要。
 現在は `--goal app`。将来的には `data-tool` profile で table density,
 overflow, control state を追加 gate にする。
 
+## Expressive menu / poster UI
+
+Persona 5 そのものではなく、赤/黒/白の高コントラスト、斜めの panel、
+切り抜き風 layer、太い menu typography を使う original UI pattern として扱う。
+「グリッドがない」ことを source of truth にしない。内部構造は semantic DOM と
+grid/flex で持ち、見た目の非直交性は composition metadata と decoration lane で
+管理する。
+
+### Contract
+
+- pattern: `expressive-menu`
+- source of truth: semantic DOM + composition layer
+- underlying layout は landmark / region / menu item として再編集可能にする
+- composition metadata: `poster`, `asymmetric`, `collage`, `diagonal`, `layered`
+- high contrast palette: black / red / white など、readability を先に固定する
+- selected / hover / focus-visible state を target に含める
+- shape は slash panel, sticker, burst, cutout, mask などの role として扱う
+- IP 固有の logo, typeface, icon, exact slash shape を必須にしない
+
+### Mock prompt constraints
+
+```text
+Create an original expressive menu UI with a black/red/white high-contrast
+poster composition. Use diagonal panels, layered stickers, and bold menu
+typography, but keep all important text as real text that can be implemented
+with system fonts. The implementation must use semantic HTML landmarks and
+menu buttons underneath the composition layer. Include selected, hover, and
+focus-visible states. Do not copy any existing game's logo, character art,
+exact typography, or distinctive menu shapes.
+```
+
+### Signals
+
+- semantic landmark and menu order
+- selected item visibility and focus-visible affordance
+- high contrast readability over red/black panels
+- composition layer metadata: diagonal axes, z layers, shape roles
+- layout lane before decoration lane; do not chase exact slash geometry early
+- no image-only menu text
+
+### Goal
+
+現在は `--goal expressive-menu` を使う。pixel diff は派手な decoration に
+引っ張られるため、primary metric は landscape とし、semantic menu order,
+state evidence, contrast, and composition metadata を gate にする。
+
 ## Game / canvas scene
 
 ゲームや creative canvas は CSS の慣習だけでは一般化できない。mock image は
@@ -319,13 +377,14 @@ vlmkit 側で追加したい機能:
 - `vlmkit build component target.png current.html --goal landing`
 - `vlmkit build component target.png current.html --goal app-shell`
 - `vlmkit build component target.png current.html --goal canvas`
+- `vlmkit build component target.png current.html --goal expressive-menu`
 - `vlmkit build interactive --goal canvas`: future richer interaction runner
 - scrollport inspector: `overflow`, bbox, scrollHeight/clientHeight, sticky descendants
 - state snapshots: hover, focus, selected, scrolled, empty/loading/error
 - canvas inspector: nonblank, frame delta, asset visibility, input response
 
-当面は、既存 `app|layout|pixel|draft` profile を使いつつ、pattern-specific
-checklist を report に残す。新しい profile は dogfood の結果で gate を決める。
+当面は、`landing|app-shell|canvas|expressive-menu` の pattern-specific
+profile を dogfood し、必要な gate を report と UI Contract IR に寄せていく。
 
 ## Suggested dogfood matrix
 
@@ -335,6 +394,7 @@ checklist を report に残す。新しい profile は dogfood の結果で gate
 | `app-shell-YYYYMMDD` | Sidebar app | scrollport と active state の収束 | nested scroll, selected state |
 | `dashboard-YYYYMMDD` | Data tool | dense operational UI の収束 | table density, overflow |
 | `game-YYYYMMDD` | Canvas game | screenshot 以外の gate 設計 | input, frame delta, HUD overlap |
+| `expressive-menu-YYYYMMDD` | Expressive menu | composition と semantic menu の分離 | high contrast, selected/focus state |
 
 ブログで得た `landscape <= 3%` は document/app-like UI の初期値としては有効だが、
 landing では hero/CTA weighting、game では interaction/state gate を足さないと
