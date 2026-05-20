@@ -177,6 +177,7 @@ async function renderOne(page, server, args, view, time) {
   if (state?.status === "error") {
     throw new Error(`animation viewer failed for ${view} t=${time}: ${state.message}`);
   }
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const outPath = join(args.outDir, outputName(args.input, args.clip, view, args.mode, time));
   await page.screenshot({ path: outPath, animations: "disabled", caret: "hide" });
   const metadataPath = outPath.replace(/\.png$/, ".metadata.json");

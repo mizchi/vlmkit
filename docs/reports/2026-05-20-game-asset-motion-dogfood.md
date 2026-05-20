@@ -33,6 +33,10 @@ The concrete scenario used a voxel robot and real `.vrma` motion samples from
 - `robot-voxel` is now a named weighted retarget profile. `simple-rig` remains
   an alias, but the report records the canonical profile name, score, weighted
   penalty, and skipped-by-policy breakdown.
+- Smoke runs can require `--min-quality pass` so warnings do not silently pass
+  CI-style loops. The failure report keeps the quality summary for debugging.
+- Animation renders wait for two extra browser frames after viewer readiness
+  before screenshot capture, reducing first-frame WebGL paint races.
 - `ground-y` is now checked with `groundDeltaY` when render metadata includes
   normalized bind bounds, avoiding false warnings from camera-fit world
   coordinates.
@@ -127,6 +131,7 @@ node design-runs/game-assets-20260520/tools/run-external-vrma-smoke.mjs \
   --samples LookAround,Goodbye,Jump \
   --root-translation-mode relative \
   --retarget-profile robot-voxel \
+  --min-quality pass \
   --review-vlm \
   --review-dry-run
 ```

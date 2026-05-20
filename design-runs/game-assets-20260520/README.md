@@ -249,7 +249,8 @@ shared tools now live in `tools/`:
 - `tools/fetch-external-vrma-sample.mjs`: download ignored third-party VRMA
   samples for local smoke tests
 - `tools/run-external-vrma-smoke.mjs`: batch fetch/extract/retarget/render
-  external VRMA samples and write a structured smoke report
+  external VRMA samples and write a structured smoke report; supports
+  `--min-quality pass|warn|fail` for CI-style gating
 - `tools/verify-motion-quality.mjs`: turn render metadata, frame bboxes,
   normalized ground deltas, and Motion IR warnings into `pass` / `warn` /
   `fail`; supports strict and named weighted retarget profiles

@@ -19,6 +19,7 @@ function parseArgs(argv) {
     renderTimes: "",
     rootTranslationMode: "relative",
     retargetProfile: "robot-voxel",
+    minQuality: "warn",
     out: "",
     continueOnError: true,
     reviewVlm: false,
@@ -36,6 +37,7 @@ function parseArgs(argv) {
     else if (arg === "--time") args.renderTimes = required(argv, ++i, arg);
     else if (arg === "--root-translation-mode") args.rootTranslationMode = required(argv, ++i, arg);
     else if (arg === "--retarget-profile") args.retargetProfile = required(argv, ++i, arg);
+    else if (arg === "--min-quality") args.minQuality = required(argv, ++i, arg);
     else if (arg === "--out") args.out = resolve(required(argv, ++i, arg));
     else if (arg === "--fail-fast") args.continueOnError = false;
     else if (arg === "--review-vlm") args.reviewVlm = true;
@@ -57,6 +59,8 @@ Options:
                           keep|relative|horizontal-only|zero|scale-to-model (default: relative)
   --retarget-profile <profile>
                           ${retargetProfileNames().join("|")} (default: robot-voxel)
+  --min-quality <verdict>
+                          Minimum accepted quality verdict: pass|warn|fail (default: warn)
   --out <path>            Smoke report path
   --fail-fast             Stop on first sample failure
   --review-vlm            Run optional VLM review after deterministic checks
@@ -75,6 +79,9 @@ Options:
   }
   if (!retargetProfileNames().includes(args.retargetProfile)) {
     throw new Error(`--retarget-profile must be one of: ${retargetProfileNames().join(", ")}`);
+  }
+  if (!["pass", "warn", "fail"].includes(args.minQuality)) {
+    throw new Error("--min-quality must be pass, warn, or fail");
   }
   if (!args.out) args.out = join(args.externalDir, "smoke-report.json");
   return args;
@@ -111,6 +118,7 @@ async function main() {
     externalDir: relative(repoRoot, args.externalDir),
     rootTranslationMode: args.rootTranslationMode,
     retargetProfile: args.retargetProfile,
+    minQuality: args.minQuality,
     samples,
   };
   await writeFile(args.out, `${JSON.stringify(report, null, 2)}\n`);
@@ -129,6 +137,9 @@ async function runSample(args, sample) {
   const qualityPath = join(args.externalDir, `${sample}.motion-quality.json`);
   const vlmReviewPath = join(args.externalDir, `${sample}.vlm-review.json`);
   const steps = [];
+  let motion = null;
+  let quality = null;
+  let vlmReview = null;
 
   try {
     await runStep(steps, "fetch", ["node", script("fetch-external-vrma-sample.mjs"), "--sample", sample, "--out-dir", args.externalDir]);
@@ -160,7 +171,7 @@ async function runSample(args, sample) {
       "--motion-ir", motionPath,
       "--out", glbVerifyPath,
     ]);
-    const motion = JSON.parse(await readFile(motionPath, "utf8"));
+    motion = JSON.parse(await readFile(motionPath, "utf8"));
     const clipId = motion.clips[0]?.id ?? sample;
     const times = args.renderTimes || renderTimesForMotion(motion);
     await runStep(steps, "render-animation", [
@@ -185,8 +196,10 @@ async function runSample(args, sample) {
       "--retarget-profile", args.retargetProfile,
       "--out", qualityPath,
     ]);
-    const quality = JSON.parse(await readFile(qualityPath, "utf8"));
-    let vlmReview = null;
+    quality = JSON.parse(await readFile(qualityPath, "utf8"));
+    if (!meetsQuality(quality.verdict, args.minQuality)) {
+      throw new Error(`quality verdict ${quality.verdict} is below required ${args.minQuality}`);
+    }
     if (args.reviewVlm) {
       const reviewArgs = [
         "node", script("review-motion-with-vlm.mjs"),
@@ -226,6 +239,9 @@ async function runSample(args, sample) {
       qualityPath,
       vlmReviewPath,
       error: error instanceof Error ? error.message : String(error),
+      motion,
+      quality,
+      vlmReview,
     });
   }
 }
@@ -243,6 +259,11 @@ function renderTimesForMotion(motion) {
 
 function timeLabel(value) {
   return String(Math.round(value * 1000) / 1000);
+}
+
+function meetsQuality(actual, minimum) {
+  const rank = { fail: 0, warn: 1, pass: 2 };
+  return rank[actual] >= rank[minimum];
 }
 
 async function runStep(steps, name, argv) {

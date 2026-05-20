@@ -191,7 +191,8 @@ Checks:
 - `apply-motion-ir.mjs --root-translation-mode relative`: produced ignored `LookAround.robot-roundtrip.glb`
 - `verify-gltf-motion.mjs --motion-ir`: passed required clip checks and skipped loop closure because the IR marks `LookAround` as non-loop
 - `render-animation.mjs` and `verify-renders.mjs`: passed nonblank fixed-camera render checks
-- `run-external-vrma-smoke.mjs`: passed `LookAround`, `Goodbye`, and `Jump` as a batch
+- `run-external-vrma-smoke.mjs --min-quality pass`: passed `LookAround`,
+  `Goodbye`, and `Jump` as a batch with the `robot-voxel` profile
 - `verify-motion-quality.mjs --retarget-profile robot-voxel`: emitted structured `pass` reports instead of requiring human visual review
 - `review-motion-with-vlm.mjs --dry-run`: generated contact sheets and strict-JSON reviewer prompts for UI-TARS / Nova Lite without API spend
 
@@ -226,6 +227,12 @@ Learned:
 - The retarget policy now has a first named profile module. `robot-voxel`
   assigns zero penalty to fingers, toes, chest, neck, and shoulder fallback
   skips, while skipped core bones such as hips/head/arms/legs fail the profile.
+- Smoke runs can now require a minimum quality verdict. `--min-quality pass`
+  passes for `robot-voxel` and fails for `strict`, preserving the quality
+  summary in the failure report.
+- Render capture now waits two browser animation frames after viewer readiness
+  before screenshotting, avoiding first-frame WebGL paint races in quality
+  metrics.
 - Root translation should default to relative motion for generated simplified
   characters. Copying source hips translation directly mixes the source
   avatar's body height into the target pelvis.

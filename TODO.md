@@ -1033,6 +1033,9 @@ Current smoke status:
 - [x] Named `robot-voxel` retarget profile for voxel robot smoke: skipped
   fingers, toes, chest, neck, and shoulders are tolerated with zero penalty,
   while skipped core bones fail the weighted profile
+- [x] External VRMA smoke supports `--min-quality pass|warn|fail`, so CI-style
+  loops can fail on `warn` while still preserving the quality summary in the
+  report
 - [x] Cheap multi-VLM review scaffold with dry-run contact sheet + strict JSON
   prompt for UI-TARS / Nova Lite
 
