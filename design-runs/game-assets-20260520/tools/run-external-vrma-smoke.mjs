@@ -356,6 +356,12 @@ function summarizeNormalization(audit) {
   );
   return {
     rootTranslationMode: audit.rootTranslationMode,
+    sourceRig: audit.sourceRig ? {
+      humanoidBoneCount: audit.sourceRig.humanoidBoneCount,
+      measuredHumanoidBoneCount: audit.sourceRig.measuredHumanoidBoneCount,
+      skeletonBounds: audit.sourceRig.skeletonBounds,
+      bindMetrics: audit.sourceRig.bindMetrics,
+    } : null,
     targetRig: audit.targetRig ? {
       nodeCount: audit.targetRig.nodeCount,
       retargetNodeCount: audit.targetRig.retargetNodeCount,
@@ -363,6 +369,7 @@ function summarizeNormalization(audit) {
       skeletonBounds: audit.targetRig.skeletonBounds,
       bindMetrics: audit.targetRig.bindMetrics,
     } : null,
+    sourceTargetRigComparison: audit.sourceTargetRigComparison ?? null,
     rootTranslations,
   };
 }

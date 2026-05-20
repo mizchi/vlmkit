@@ -217,6 +217,11 @@ Observed shape:
   `relative-ok`, `Jump` `consider-scale-to-model`
 - target rig bind metrics: skeleton height 1.88, hand span 1.12, foot spread
   0.48, pelvis-to-lowest-foot height 1.02
+- source rest metrics: skeleton height 1.304, hand span 0.926, foot spread
+  0.140
+- source-to-target scale comparison: skeleton height scale 1.442, leg height
+  scale 1.258, hand span scale 1.209, foot spread scale 3.438; emits
+  `pose-mismatch-warning` / `foot-spread-mismatch`
 - `Jump` `scale-to-model` comparison: still `pass`, ground error improves
   0.107 -> 0.079, but foot contact error regresses 0.118 -> 0.173 and pelvis
   displacement regresses 0.183 -> 0.265; classify as `candidate-tradeoff`,
@@ -284,6 +289,10 @@ Learned:
   any candidate render, so future policy can compare source rest pose against
   target proportions instead of only comparing source hips height to target
   pelvis height.
+- Source rest metrics complete the first automatic pose comparison. The current
+  source and target have compatible core scale spread (1.21..1.44), but the
+  target stance is much wider, so foot spacing is treated as pose mismatch
+  rather than a reason to globally scale the motion.
 - Ground checks should compare the animated bounds against the normalized bind
   bounds (`groundDeltaY`), not raw world `minGroundY` after camera-fit
   normalization.

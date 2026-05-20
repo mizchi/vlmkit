@@ -1039,6 +1039,9 @@ Current smoke status:
 - [x] Target rig bind metrics in the normalization audit: measured retarget
   skeleton bounds, skeleton height, hand span, foot spread, and
   pelvis-to-foot height
+- [x] Source rest metrics from VRMA humanoid nodes: Motion IR now records
+  source skeleton bounds, skeleton height, hand span, foot spread, and
+  source-to-target scale / pose warnings
 - [x] Smoke-report comparison for root normalization candidates:
   `compare-motion-quality-reports.mjs` classifies metric deltas as improved,
   regressed, stable, or tradeoff
@@ -1118,8 +1121,9 @@ Stepwise cleanup:
   ranges, normalized ranges, scale, and a source/target height scaling
   recommendation. It also records target rig bind metrics from retargeted node
   world positions. `compare-motion-quality-reports.mjs` can compare a
-  recommended candidate mode against the baseline smoke report. Remaining work
-  is source bind/rest pose measurement and pose mismatch scoring.
+  recommended candidate mode against the baseline smoke report. Source rest
+  metrics and an initial `foot-spread-mismatch` pose warning now exist.
+  Remaining work is richer pose mismatch scoring across shoulder/arm/leg axes.
 - [ ] **G6. VRM + VRMA real playback check.** Use a real VRM model with a
   matching VRMA file to verify that our extractor agrees with an expected
   runtime playback path before retargeting onto simplified generated assets.

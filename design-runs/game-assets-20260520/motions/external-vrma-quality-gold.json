@@ -33,6 +33,14 @@
         "handSpan": [1.05, 1.2],
         "footSpread": [0.4, 0.55],
         "pelvisToLowestFootHeight": [0.95, 1.1]
+      },
+      "sourceRig": {
+        "skeletonHeight": [1.2, 1.4],
+        "handSpan": [0.85, 1.0],
+        "footSpread": [0.1, 0.2],
+        "skeletonHeightScale": [1.35, 1.5],
+        "recommendation": "pose-mismatch-warning",
+        "warning": "foot-spread-mismatch"
       }
     },
     "Goodbye": {
@@ -60,6 +68,14 @@
         "handSpan": [1.05, 1.2],
         "footSpread": [0.4, 0.55],
         "pelvisToLowestFootHeight": [0.95, 1.1]
+      },
+      "sourceRig": {
+        "skeletonHeight": [1.2, 1.4],
+        "handSpan": [0.85, 1.0],
+        "footSpread": [0.1, 0.2],
+        "skeletonHeightScale": [1.35, 1.5],
+        "recommendation": "pose-mismatch-warning",
+        "warning": "foot-spread-mismatch"
       }
     },
     "Jump": {
@@ -87,6 +103,14 @@
         "handSpan": [1.05, 1.2],
         "footSpread": [0.4, 0.55],
         "pelvisToLowestFootHeight": [0.95, 1.1]
+      },
+      "sourceRig": {
+        "skeletonHeight": [1.2, 1.4],
+        "handSpan": [0.85, 1.0],
+        "footSpread": [0.1, 0.2],
+        "skeletonHeightScale": [1.35, 1.5],
+        "recommendation": "pose-mismatch-warning",
+        "warning": "foot-spread-mismatch"
       }
     }
   }

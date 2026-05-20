@@ -244,7 +244,8 @@ shared tools now live in `tools/`:
 - `tools/verify-motion-ir.mjs`: validate motion IR shape, loop closure, and
   optional model retarget targets
 - `tools/extract-gltf-motion-ir.mjs`: extract glTF/GLB animation clips into
-  normalized motion IR
+  normalized motion IR with source humanoid rest metrics when VRMA metadata is
+  available
 - `tools/stamp-vrma-humanoid.mjs`: create a local VRMA-style fixture by adding
   `VRMC_vrm_animation.humanoid.humanBones` to an animated GLB
 - `tools/fetch-external-vrma-sample.mjs`: download ignored third-party VRMA

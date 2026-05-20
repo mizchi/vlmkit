@@ -42,6 +42,9 @@ The concrete scenario used a voxel robot and real `.vrma` motion samples from
 - The same audit now records target rig bind metrics from retargeted node world
   positions: skeleton bounds, skeleton height, hand span, foot spread, and
   pelvis-to-foot height.
+- Motion IR extraction now records source humanoid rest metrics from VRMA
+  nodes. `apply-motion-ir` compares those source metrics with target bind
+  metrics and emits an initial pose warning.
 - Animation renders wait for two extra browser frames after viewer readiness
   before screenshot capture, reducing first-frame WebGL paint races.
 - The renderer saves canvas PNG data directly and retries transparent capture
@@ -136,6 +139,11 @@ schema out of the dogfood directory.
   measured retarget skeleton is height 1.88, hand span 1.12, foot spread 0.48,
   and pelvis-to-lowest-foot height 1.02. This is the right input for source
   rest-pose comparison; `targetBaseRootHeight` alone was only pelvis height.
+- Source rest metrics show why this should be pose-aware rather than only
+  scale-aware. The VRMA source skeleton height is 1.304, hand span 0.926, and
+  foot spread 0.140. Core scale ratios are close enough to be usable
+  (`skeletonHeight` 1.442, `legHeight` 1.258, `handSpan` 1.209), but foot
+  spread scale is 3.438, so the audit emits `foot-spread-mismatch`.
 
 ## Next Implementation Order
 
@@ -149,8 +157,8 @@ schema out of the dogfood directory.
 2. **Root and ground normalization**
    - Use the new report comparison output to calibrate when
      `consider-scale-to-model` should escalate from warning to candidate mode.
-   - Add source rest-pose metrics so target bind metrics can detect scale and
-     pose mismatch before rendering.
+   - Expand pose mismatch scoring beyond foot spread: shoulder width, arm
+     rest angle, leg spread, and source/target up-axis assumptions.
    - Add actionable suggestions when `groundDeltaY` exceeds thresholds.
 
 3. **Motion quality gate v2**

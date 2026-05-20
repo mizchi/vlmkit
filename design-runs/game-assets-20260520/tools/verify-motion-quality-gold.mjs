@@ -82,6 +82,14 @@ async function main() {
       checkRange(checks, `sample:${sampleName}:targetRig.footSpread`, sample.normalization?.targetRig?.bindMetrics?.footSpread, expected.targetRig.footSpread);
       checkRange(checks, `sample:${sampleName}:targetRig.pelvisToLowestFootHeight`, sample.normalization?.targetRig?.bindMetrics?.pelvisToLowestFootHeight, expected.targetRig.pelvisToLowestFootHeight);
     }
+    if (expected.sourceRig) {
+      checkRange(checks, `sample:${sampleName}:sourceRig.skeletonHeight`, sample.normalization?.sourceRig?.bindMetrics?.skeletonHeight, expected.sourceRig.skeletonHeight);
+      checkRange(checks, `sample:${sampleName}:sourceRig.handSpan`, sample.normalization?.sourceRig?.bindMetrics?.handSpan, expected.sourceRig.handSpan);
+      checkRange(checks, `sample:${sampleName}:sourceRig.footSpread`, sample.normalization?.sourceRig?.bindMetrics?.footSpread, expected.sourceRig.footSpread);
+      checkRange(checks, `sample:${sampleName}:sourceTargetRigComparison.skeletonHeightScale`, sample.normalization?.sourceTargetRigComparison?.scales?.skeletonHeight, expected.sourceRig.skeletonHeightScale);
+      checkEqual(checks, `sample:${sampleName}:sourceTargetRigComparison.recommendation`, sample.normalization?.sourceTargetRigComparison?.recommendation?.id, expected.sourceRig.recommendation);
+      checkEqual(checks, `sample:${sampleName}:sourceTargetRigComparison.warning`, firstWarningId(sample.normalization?.sourceTargetRigComparison), expected.sourceRig.warning);
+    }
   }
 
   const ok = checks.every((check) => check.ok);
@@ -107,6 +115,10 @@ function maxTrackedNodeDisplacement(sample) {
 
 function firstRootNormalization(sample) {
   return sample.normalization?.rootTranslations?.[0] ?? null;
+}
+
+function firstWarningId(comparison) {
+  return comparison?.warnings?.[0]?.id ?? null;
 }
 
 function checkEqual(checks, id, actual, expected) {

@@ -95,6 +95,7 @@ async function main() {
       input: relative(repoRoot, args.input),
       targetSpace,
       vrmcVrmAnimation: vrmaHumanoid ? { specVersion: vrmaHumanoid.specVersion, humanoidBoneCount: vrmaHumanoid.nodeToBone.size } : null,
+      sourceRig: vrmaHumanoid ? analyzeSourceRig(gltf, vrmaHumanoid) : null,
       skippedChannelCount: warnings.length,
       warnings,
       note: targetSpace === "humanoid"
@@ -176,10 +177,53 @@ function readVrmaHumanoid(gltf) {
   const humanBones = extension?.humanoid?.humanBones;
   if (!humanBones) return null;
   const nodeToBone = new Map();
+  const boneToNode = new Map();
   for (const [boneName, bone] of Object.entries(humanBones)) {
-    if (Number.isInteger(bone?.node)) nodeToBone.set(bone.node, boneName);
+    if (Number.isInteger(bone?.node)) {
+      nodeToBone.set(bone.node, boneName);
+      boneToNode.set(boneName, bone.node);
+    }
   }
-  return { specVersion: extension.specVersion ?? "", nodeToBone };
+  return { specVersion: extension.specVersion ?? "", nodeToBone, boneToNode };
+}
+
+function analyzeSourceRig(gltf, vrmaHumanoid) {
+  const worldMatrices = computeWorldMatrices(gltf);
+  const bonePositions = Object.fromEntries([...vrmaHumanoid.boneToNode.entries()]
+    .map(([boneName, nodeIndex]) => [boneName, nodeIndexWorldPosition(nodeIndex, worldMatrices)])
+    .filter(([, position]) => position !== null)
+    .map(([boneName, position]) => [boneName, position.map(round)]));
+  const trackedBonePositions = Object.fromEntries(SOURCE_RIG_TRACKED_BONES
+    .map((boneName) => [boneName, bonePositions[boneName] ?? null])
+    .filter(([, position]) => position !== null));
+  const positions = Object.values(bonePositions);
+  return {
+    humanoidBoneCount: vrmaHumanoid.nodeToBone.size,
+    measuredHumanoidBoneCount: positions.length,
+    skeletonBounds: vec3Range(positions),
+    bindMetrics: humanoidBindMetrics(trackedBonePositions, positions),
+    trackedBonePositions,
+  };
+}
+
+function humanoidBindMetrics(trackedBonePositions, bonePositions) {
+  const skeletonBounds = vec3Range(bonePositions);
+  const hips = trackedBonePositions.hips ?? null;
+  const head = trackedBonePositions.head ?? null;
+  const leftHand = trackedBonePositions.leftHand ?? null;
+  const rightHand = trackedBonePositions.rightHand ?? null;
+  const leftFoot = trackedBonePositions.leftFoot ?? null;
+  const rightFoot = trackedBonePositions.rightFoot ?? null;
+  const lowestFootY = minFinite([leftFoot?.[1], rightFoot?.[1]]);
+  return {
+    skeletonHeight: roundNullable(axisRange(skeletonBounds, 1)),
+    skeletonWidth: roundNullable(axisRange(skeletonBounds, 0)),
+    skeletonDepth: roundNullable(axisRange(skeletonBounds, 2)),
+    hipsToHeadHeight: roundNullable(deltaAxis(hips, head, 1)),
+    hipsToLowestFootHeight: roundNullable(lowestFootY === null || !hips ? null : hips[1] - lowestFootY),
+    handSpan: roundNullable(distanceAxis(leftHand, rightHand, 0)),
+    footSpread: roundNullable(distanceAxis(leftFoot, rightFoot, 0)),
+  };
 }
 
 function targetNameForChannel(channel, nodeName, options) {
@@ -260,9 +304,163 @@ function tuplesClose(a, b, tolerance) {
   return a.every((value, index) => Math.abs(value - b[index]) <= tolerance);
 }
 
+function computeWorldMatrices(gltf) {
+  const matrices = new Map();
+  const sceneRoots = gltf.scenes?.[gltf.scene ?? 0]?.nodes;
+  const roots = Array.isArray(sceneRoots) && sceneRoots.length > 0
+    ? sceneRoots
+    : rootNodeIndexes(gltf.nodes ?? []);
+  for (const root of roots) visitWorldMatrix(gltf, root, identityMatrix(), matrices);
+  return matrices;
+}
+
+function rootNodeIndexes(nodes) {
+  const childIndexes = new Set(nodes.flatMap((node) => node.children ?? []));
+  return nodes.map((_, index) => index).filter((index) => !childIndexes.has(index));
+}
+
+function visitWorldMatrix(gltf, nodeIndex, parentMatrix, output) {
+  const node = gltf.nodes?.[nodeIndex];
+  if (!node) return;
+  const worldMatrix = multiplyMatrices(parentMatrix, nodeLocalMatrix(node));
+  output.set(nodeIndex, worldMatrix);
+  for (const child of node.children ?? []) visitWorldMatrix(gltf, child, worldMatrix, output);
+}
+
+function nodeLocalMatrix(node) {
+  if (Array.isArray(node.matrix) && node.matrix.length === 16 && node.matrix.every(Number.isFinite)) return node.matrix;
+  return composeMatrix(
+    vec3(node.translation ?? [0, 0, 0], `translation for node ${node.name ?? ""}`),
+    vec4(node.rotation ?? [0, 0, 0, 1], `rotation for node ${node.name ?? ""}`),
+    vec3(node.scale ?? [1, 1, 1], `scale for node ${node.name ?? ""}`),
+  );
+}
+
+function identityMatrix() {
+  return [
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1,
+  ];
+}
+
+function composeMatrix(translation, rotation, scale) {
+  const [x, y, z, w] = rotation;
+  const [sx, sy, sz] = scale;
+  const x2 = x + x;
+  const y2 = y + y;
+  const z2 = z + z;
+  const xx = x * x2;
+  const xy = x * y2;
+  const xz = x * z2;
+  const yy = y * y2;
+  const yz = y * z2;
+  const zz = z * z2;
+  const wx = w * x2;
+  const wy = w * y2;
+  const wz = w * z2;
+  return [
+    (1 - (yy + zz)) * sx, (xy + wz) * sx, (xz - wy) * sx, 0,
+    (xy - wz) * sy, (1 - (xx + zz)) * sy, (yz + wx) * sy, 0,
+    (xz + wy) * sz, (yz - wx) * sz, (1 - (xx + yy)) * sz, 0,
+    translation[0], translation[1], translation[2], 1,
+  ];
+}
+
+function multiplyMatrices(a, b) {
+  const result = new Array(16).fill(0);
+  for (let column = 0; column < 4; column++) {
+    for (let row = 0; row < 4; row++) {
+      result[column * 4 + row] =
+        a[0 * 4 + row] * b[column * 4 + 0] +
+        a[1 * 4 + row] * b[column * 4 + 1] +
+        a[2 * 4 + row] * b[column * 4 + 2] +
+        a[3 * 4 + row] * b[column * 4 + 3];
+    }
+  }
+  return result;
+}
+
+function nodeIndexWorldPosition(nodeIndex, worldMatrices) {
+  const matrix = worldMatrices.get(nodeIndex);
+  return matrix ? transformPoint(matrix, [0, 0, 0]) : null;
+}
+
+function transformPoint(matrix, point) {
+  const [x, y, z] = point;
+  return [
+    matrix[0] * x + matrix[4] * y + matrix[8] * z + matrix[12],
+    matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13],
+    matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14],
+  ];
+}
+
+function vec3(value, context) {
+  if (!Array.isArray(value) || value.length !== 3 || value.some((item) => !Number.isFinite(item))) {
+    throw new Error(`${context} must be a finite vec3`);
+  }
+  return value;
+}
+
+function vec4(value, context) {
+  if (!Array.isArray(value) || value.length !== 4 || value.some((item) => !Number.isFinite(item))) {
+    throw new Error(`${context} must be a finite vec4`);
+  }
+  return value;
+}
+
+function vec3Range(values) {
+  if (values.length === 0) return null;
+  return {
+    min: [
+      round(Math.min(...values.map((value) => value[0]))),
+      round(Math.min(...values.map((value) => value[1]))),
+      round(Math.min(...values.map((value) => value[2]))),
+    ],
+    max: [
+      round(Math.max(...values.map((value) => value[0]))),
+      round(Math.max(...values.map((value) => value[1]))),
+      round(Math.max(...values.map((value) => value[2]))),
+    ],
+  };
+}
+
+function axisRange(range, axis) {
+  return range ? range.max[axis] - range.min[axis] : null;
+}
+
+function deltaAxis(a, b, axis) {
+  if (!a || !b) return null;
+  return b[axis] - a[axis];
+}
+
+function distanceAxis(a, b, axis) {
+  if (!a || !b) return null;
+  return Math.abs(b[axis] - a[axis]);
+}
+
+function minFinite(values) {
+  const finite = values.filter(Number.isFinite);
+  return finite.length > 0 ? Math.min(...finite) : null;
+}
+
+function roundNullable(value) {
+  return value === null ? null : round(value);
+}
+
 function round(value) {
   return Math.round(value * 100000) / 100000;
 }
+
+const SOURCE_RIG_TRACKED_BONES = [
+  "hips",
+  "head",
+  "leftHand",
+  "rightHand",
+  "leftFoot",
+  "rightFoot",
+];
 
 const ROBOT_VOXEL_RETARGET = {
   hips: "pelvis",

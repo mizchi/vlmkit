@@ -127,6 +127,8 @@ function buildAnimation(gltf, chunks, motion, clip, nodeIndexByName, options) {
 }
 
 function createAudit(args, motion, gltf, nodeIndexByName) {
+  const sourceRig = motion.source?.sourceRig ?? null;
+  const targetRig = analyzeTargetRig(gltf, motion, nodeIndexByName);
   return {
     version: 1,
     kind: "motion-normalization-audit",
@@ -139,7 +141,9 @@ function createAudit(args, motion, gltf, nodeIndexByName) {
       targetSpace: motion.source?.targetSpace ?? null,
       humanoidBoneCount: motion.source?.vrmcVrmAnimation?.humanoidBoneCount ?? null,
     },
-    targetRig: analyzeTargetRig(gltf, motion, nodeIndexByName),
+    sourceRig,
+    targetRig,
+    sourceTargetRigComparison: compareSourceTargetRig(sourceRig, targetRig),
     clips: [],
   };
 }
@@ -194,6 +198,73 @@ function nodeWorldPosition(name, nodeIndexByName, worldMatrices) {
   if (index === undefined) return null;
   const matrix = worldMatrices.get(index);
   return matrix ? transformPoint(matrix, [0, 0, 0]) : null;
+}
+
+function compareSourceTargetRig(sourceRig, targetRig) {
+  if (!sourceRig?.bindMetrics || !targetRig?.bindMetrics) {
+    return {
+      status: "unavailable",
+      recommendation: {
+        id: "rig-comparison-unavailable",
+        severity: "warn",
+        reason: "source or target bind metrics are missing",
+      },
+    };
+  }
+  const scales = {
+    skeletonHeight: scaleMetric(sourceRig.bindMetrics.skeletonHeight, targetRig.bindMetrics.skeletonHeight),
+    legHeight: scaleMetric(sourceRig.bindMetrics.hipsToLowestFootHeight, targetRig.bindMetrics.pelvisToLowestFootHeight),
+    handSpan: scaleMetric(sourceRig.bindMetrics.handSpan, targetRig.bindMetrics.handSpan),
+    footSpread: scaleMetric(sourceRig.bindMetrics.footSpread, targetRig.bindMetrics.footSpread),
+  };
+  const coreScales = [scales.skeletonHeight, scales.legHeight, scales.handSpan].filter(Number.isFinite);
+  const scaleSpread = coreScales.length > 0 ? {
+    min: round(Math.min(...coreScales)),
+    max: round(Math.max(...coreScales)),
+    ratio: round(Math.max(...coreScales) / Math.min(...coreScales)),
+  } : null;
+  const warnings = [];
+  if (scaleSpread && scaleSpread.ratio >= CORE_SCALE_SPREAD_WARN_RATIO) {
+    warnings.push({
+      id: "scale-inconsistent",
+      severity: "warn",
+      reason: "source-to-target scale differs across skeleton height, leg height, and hand span",
+    });
+  }
+  if (Number.isFinite(scales.footSpread) && (scales.footSpread >= FOOT_SPREAD_POSE_WARN_RATIO || scales.footSpread <= 1 / FOOT_SPREAD_POSE_WARN_RATIO)) {
+    warnings.push({
+      id: "foot-spread-mismatch",
+      severity: "warn",
+      reason: "source and target rest poses have very different foot spacing",
+    });
+  }
+  const recommendation = warnings.length > 0
+    ? {
+      id: "pose-mismatch-warning",
+      severity: "warn",
+      reason: "source and target bind metrics are measurable but rest-pose proportions differ",
+    }
+    : {
+      id: "source-target-scale-compatible",
+      severity: "info",
+      reason: "source and target bind metrics have compatible scale ratios",
+    };
+  return {
+    status: "measured",
+    scales: mapValues(scales, roundNullable),
+    scaleSpread,
+    warnings,
+    recommendation,
+  };
+}
+
+function scaleMetric(source, target) {
+  if (!Number.isFinite(source) || !Number.isFinite(target) || Math.abs(source) <= 0.0001) return null;
+  return target / source;
+}
+
+function mapValues(object, mapper) {
+  return Object.fromEntries(Object.entries(object).map(([key, value]) => [key, mapper(value)]));
 }
 
 function recordRootTranslationAudit(audit, clip, track, nodeName, baseTranslation, samples, rootTranslationMode) {
@@ -635,6 +706,8 @@ const TARGET_RIG_TRACKED_NODES = [
   "left_foot",
   "right_foot",
 ];
+const CORE_SCALE_SPREAD_WARN_RATIO = 1.25;
+const FOOT_SPREAD_POSE_WARN_RATIO = 2.0;
 const HEIGHT_SCALE_DELTA_THRESHOLD = 0.2;
 const VERTICAL_ROOT_MOTION_SCALE_THRESHOLD = 0.08;
 
