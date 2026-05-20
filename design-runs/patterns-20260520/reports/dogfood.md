@@ -15,6 +15,8 @@ Date: 2026-05-20
 
 - landing page: hero / CTA / media slot / next-section hint
 - Discord-like app shell: rail / sidebar / main scrollport / member panel
+- dashboard: filter form / KPI repeats / chart region / table / alerts
+- responsive stretch: mobile/tablet/desktop/wide width stress
 - canvas game: screenshot ではなく canvas state / input / frame delta が主語
 - expressive menu: semantic menu / selected state / composition metadata が主語
 
@@ -34,6 +36,7 @@ node src/cli/vlmkit.ts contract introspect \
   --pattern app-shell \
   --goal app-shell \
   --viewport desktop:1440x900 \
+  --viewport mobile:390x844 \
   --out design-runs/patterns-20260520/app-shell/ui.contract.json
 
 node src/cli/vlmkit.ts build component \
@@ -41,6 +44,37 @@ node src/cli/vlmkit.ts build component \
   design-runs/patterns-20260520/app-shell/current.html \
   --contract design-runs/patterns-20260520/app-shell/ui.contract.json \
   --output-dir design-runs/patterns-20260520/app-shell/reports/component
+
+node src/cli/vlmkit.ts contract introspect \
+  design-runs/patterns-20260520/dashboard/current.html \
+  --pattern dashboard \
+  --goal app \
+  --viewport desktop:1440x900 \
+  --viewport mobile:390x844 \
+  --out design-runs/patterns-20260520/dashboard/ui.contract.json
+
+node src/cli/vlmkit.ts build component \
+  design-runs/patterns-20260520/dashboard/target.png \
+  design-runs/patterns-20260520/dashboard/current.html \
+  --contract design-runs/patterns-20260520/dashboard/ui.contract.json \
+  --output-dir design-runs/patterns-20260520/dashboard/reports/component
+
+node src/cli/vlmkit.ts contract introspect \
+  design-runs/patterns-20260520/responsive-stretch/current.html \
+  --pattern landing \
+  --goal app \
+  --viewport desktop:1440x900 \
+  --viewport mobile:390x844 \
+  --viewport tablet:768x900 \
+  --viewport wide:1920x1080 \
+  --out design-runs/patterns-20260520/responsive-stretch/ui.contract.json \
+  --profile
+
+node src/cli/vlmkit.ts build component \
+  design-runs/patterns-20260520/responsive-stretch/target.png \
+  design-runs/patterns-20260520/responsive-stretch/current.html \
+  --contract design-runs/patterns-20260520/responsive-stretch/ui.contract.json \
+  --output-dir design-runs/patterns-20260520/responsive-stretch/reports/component
 
 node src/cli/vlmkit.ts contract introspect \
   design-runs/patterns-20260520/game/current.html \
@@ -68,6 +102,12 @@ node src/cli/vlmkit.ts contract validate \
   design-runs/patterns-20260520/game/ui.contract.json
 
 node src/cli/vlmkit.ts contract validate \
+  design-runs/patterns-20260520/dashboard/ui.contract.json
+
+node src/cli/vlmkit.ts contract validate \
+  design-runs/patterns-20260520/responsive-stretch/ui.contract.json
+
+node src/cli/vlmkit.ts contract validate \
   design-runs/patterns-20260520/expressive-menu/ui.contract.json
 
 node design-runs/patterns-20260520/check-patterns.mjs
@@ -79,6 +119,8 @@ node design-runs/patterns-20260520/check-patterns.mjs
 |---|---|---|---|
 | landing | `landing` pass | pixel 8.00%, landscape 1.12% | CTA in first viewport, next-section hint, media slot all pass |
 | app-shell | `app-shell` fail | pixel 4.00%, landscape 0.14% | channels and members scroll; messages is broken |
+| dashboard | `app` pass | pixel 17.53%, landscape 1.06% | semantic shell, filter form, 4 KPIs, 5 rows, chart, alerts all pass |
+| responsive-stretch | `app` pass | pixel 7.41%, landscape 0.67% | no horizontal scroll, bounded wide container, readable measure, bounded cards, stable media aspect all pass |
 | game | `canvas` pass | pixel 0.95%, landscape 0.02% | canvas nonblank, frame delta, input response, state hook fields all pass |
 | expressive-menu | `expressive-menu` pass | pixel 7.30%, landscape 2.54% | semantic shell, selected state, pixel-sampled contrast, composition markers all pass |
 
@@ -134,7 +176,61 @@ Current report evidence:
 This is now part of the `app-shell` goal profile. A shell with expected
 scrollports does not pass only because landscape is close.
 
-### Finding 3: game/canvas needs a different command family
+### Finding 3: dashboard is a useful introspection stress case
+
+The dashboard scenario exercises the middle layer between document landmarks
+and visual pixels:
+
+- semantic shell: `header`, `nav`, `main`, named `search`, named `region`,
+  and `complementary`
+- repeat evidence: 4 KPI cards, 5 account rows, and 3 alert rows
+- content evidence: form controls, table text, chart region, and alert density
+- responsive evidence: desktop 2-column dashboard collapses to mobile
+  one-column order through `responsive` rules
+
+The component run passed with pixel 17.53% and landscape 1.06%:
+
+```text
+Practical app pass: landscape 1.06% <= 3.00%, pixel 17.53% <= 25.00%
+scrollports: 1/1 ok, expected 1/1 ok
+```
+
+This is a good scenario for checking whether the intermediate UI Contract IR
+is doing real work. Pixel diff stays high because chart/table paint and text
+details differ, but landscape and semantic content are close enough to move
+forward as an application implementation.
+
+### Finding 4: responsive stretch needs width stress, not just screenshots
+
+The responsive-stretch scenario checks whether a design still feels plausible
+when widened or narrowed:
+
+- no horizontal scroll at 390, 768, 1440, and 1920px
+- wide container remains bounded instead of becoming a 1920px line
+- readable text measure stays under 700px
+- repeated cards do not become huge tiles on tablet or desktop
+- media slot keeps a stable 4:3-ish aspect ratio
+- next section remains visible in large first viewports
+
+The useful Red was not a pixel mismatch. The first tablet pass let `.copy` and
+cards stretch too much, so the view looked technically responsive but visually
+loose. Green came from keeping the copy width bounded, allowing tablet cards to
+stay multi-column, and stacking cards only below 640px.
+
+Current check evidence:
+
+```text
+mobile 390: container 350, measure 350, max card 350, media 1.33
+tablet 768: container 707, measure 660, max card 225, media 1.33
+desktop 1440: container 1160, measure 624, max card 373, next visible
+wide 1920: container 1160, left 380, measure 624, max card 373, next visible
+```
+
+This should become a reusable scenario shape: one target image can still be
+desktop-sized, but the contract/check phase must include width stress probes
+for liquid regions, scroll regions, and min/max bounds.
+
+### Finding 5: game/canvas needs a different command family
 
 The game target passed `canvas`:
 
@@ -152,7 +248,7 @@ and required field checks. This is enough for a first `build component` goal. A
 future `build interactive` or `build canvas` flow should add multi-state
 screenshots, HUD overlap, asset visibility, and richer input assertions.
 
-### Finding 4: synthetic targets are useful for Red/Green loops
+### Finding 6: synthetic targets are useful for Red/Green loops
 
 AI-generated mocks are still the real target for design dogfood, but synthetic
 HTML targets are faster for feature development:
@@ -167,7 +263,7 @@ This suggests two dogfood layers:
 1. synthetic targets for tool signal development
 2. generated mocks for real design quality and prompt feasibility
 
-### Finding 5: expressive UI needs a composition lane, not pixel chasing
+### Finding 7: expressive UI needs a composition lane, not pixel chasing
 
 The red/black poster menu stayed practical when layout and decoration were
 split:
@@ -294,18 +390,29 @@ Added responsive/content introspection and profiling:
 - local file inputs use `load` instead of `networkidle`, removing the ~500ms
   idle wait per viewport observed in the first profile run.
 
+Added responsive-stretch dogfood:
+
+- checks 390, 768, 1440, and 1920px widths for horizontal overflow;
+- treats readable measure, bounded wide containers, card sizing, media aspect,
+  and next-section visibility as first-class pass/fail evidence;
+- adds the scenario to the introspection benchmark so multi-viewport cost is
+  visible.
+
 Current 3-round dogfood benchmark:
 
 | Case | Avg total | p95 | Avg browser launch | Avg viewport work | Avg goto | Avg landmark |
 |---|---:|---:|---:|---:|---:|---:|
-| app-shell | 385ms | 747ms | 232ms | 130ms | 10ms | 35ms |
-| expressive-menu | 204ms | 216ms | 89ms | 96ms | 7ms | 28ms |
-| canvas | 146ms | 169ms | 92ms | 43ms | 8ms | 3ms |
+| app-shell | 263ms | 423ms | 155ms | 97ms | 7ms | 29ms |
+| expressive-menu | 182ms | 197ms | 83ms | 89ms | 6ms | 24ms |
+| dashboard | 194ms | 202ms | 80ms | 104ms | 32ms | 11ms |
+| responsive-stretch | 280ms | 291ms | 78ms | 190ms | 12ms | 60ms |
+| canvas | 127ms | 132ms | 79ms | 41ms | 7ms | 3ms |
 
 The remaining performance cost is mostly browser launch, especially on the
-cold first app-shell run. Precision improved most from responsive rules and
-landmark content/repeat probes; decoration and motion are still better kept in
-hand-authored contract metadata until the introspector learns those fields.
+cold first app-shell run. The responsive-stretch case shows the expected extra
+viewport cost from four captures. Precision improved most from responsive rules
+and landmark content/repeat probes; decoration and motion are still better kept
+in hand-authored contract metadata until the introspector learns those fields.
 
 Additional dogfood fixes:
 
@@ -335,6 +442,8 @@ Additional dogfood fixes:
    multi-page benchmark runs.
 5. Add decoration/motion introspection without overwriting hand-authored
    contract metadata.
+6. Promote responsive-stretch checks into a reusable contract goal instead of
+   keeping them only in the dogfood script.
 
 ## Verification
 
@@ -344,13 +453,19 @@ node --test packages/vlmkit-markup/src/component/component-from-image.test.ts
 node --test packages/vlmkit-markup/src/component/component-goal.test.ts
 node src/cli/vlmkit.ts build component design-runs/patterns-20260520/landing/target.png design-runs/patterns-20260520/landing/current.html --goal landing --output-dir design-runs/patterns-20260520/landing/reports/component
 node src/cli/vlmkit.ts build component design-runs/patterns-20260520/app-shell/target.png design-runs/patterns-20260520/app-shell/current.html --contract design-runs/patterns-20260520/app-shell/ui.contract.json --output-dir design-runs/patterns-20260520/app-shell/reports/component
+node src/cli/vlmkit.ts build component design-runs/patterns-20260520/dashboard/target.png design-runs/patterns-20260520/dashboard/current.html --contract design-runs/patterns-20260520/dashboard/ui.contract.json --output-dir design-runs/patterns-20260520/dashboard/reports/component
+node src/cli/vlmkit.ts build component design-runs/patterns-20260520/responsive-stretch/target.png design-runs/patterns-20260520/responsive-stretch/current.html --contract design-runs/patterns-20260520/responsive-stretch/ui.contract.json --output-dir design-runs/patterns-20260520/responsive-stretch/reports/component
 node src/cli/vlmkit.ts build component design-runs/patterns-20260520/game/target.png design-runs/patterns-20260520/game/current.html --contract design-runs/patterns-20260520/game/ui.contract.json --output-dir design-runs/patterns-20260520/game/reports/component
 node src/cli/vlmkit.ts build component design-runs/patterns-20260520/expressive-menu/target.png design-runs/patterns-20260520/expressive-menu/current.html --contract design-runs/patterns-20260520/expressive-menu/ui.contract.json --output-dir design-runs/patterns-20260520/expressive-menu/reports/component
 node src/cli/vlmkit.ts contract validate design-runs/patterns-20260520/app-shell/ui.contract.json
+node src/cli/vlmkit.ts contract validate design-runs/patterns-20260520/dashboard/ui.contract.json
+node src/cli/vlmkit.ts contract validate design-runs/patterns-20260520/responsive-stretch/ui.contract.json
 node src/cli/vlmkit.ts contract validate design-runs/patterns-20260520/game/ui.contract.json
 node src/cli/vlmkit.ts contract validate design-runs/patterns-20260520/expressive-menu/ui.contract.json
 node src/cli/vlmkit.ts contract introspect design-runs/patterns-20260520/expressive-menu/current.html --pattern expressive-menu --goal expressive-menu --viewport desktop:1440x900
 node src/cli/vlmkit.ts contract introspect design-runs/patterns-20260520/app-shell/current.html --pattern app-shell --goal app-shell --viewport desktop:1440x900 --viewport mobile:390x844 --profile
+node src/cli/vlmkit.ts contract introspect design-runs/patterns-20260520/dashboard/current.html --pattern dashboard --goal app --viewport desktop:1440x900 --viewport mobile:390x844 --profile
+node src/cli/vlmkit.ts contract introspect design-runs/patterns-20260520/responsive-stretch/current.html --pattern landing --goal app --viewport desktop:1440x900 --viewport mobile:390x844 --viewport tablet:768x900 --viewport wide:1920x1080 --profile
 node src/cli/vlmkit.ts contract introspect design-runs/patterns-20260520/game/current.html --pattern canvas --goal canvas --viewport desktop:1280x720
 node src/experiments/benchmark/introspect-bench.ts --rounds 3 --out test-results/introspect/benchmark.json
 node design-runs/patterns-20260520/check-patterns.mjs

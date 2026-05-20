@@ -8,6 +8,8 @@ const runDir = dirname(fileURLToPath(import.meta.url));
 const cases = [
   { name: "landing", width: 1440, height: 960 },
   { name: "app-shell", width: 1440, height: 900 },
+  { name: "dashboard", width: 1440, height: 900 },
+  { name: "responsive-stretch", width: 1440, height: 900 },
   { name: "game", width: 1280, height: 720 },
   { name: "expressive-menu", width: 1440, height: 900 },
 ];
@@ -20,7 +22,7 @@ try {
       deviceScaleFactor: 1,
     });
     const targetHtml = resolve(runDir, item.name, "target.html");
-    await page.goto(pathToFileURL(targetHtml).href, { waitUntil: "networkidle" });
+    await page.goto(pathToFileURL(targetHtml).href, { waitUntil: "load" });
     await mkdir(join(runDir, item.name, "reports"), { recursive: true });
     const out = join(runDir, item.name, "target.png");
     await page.screenshot({ path: out, fullPage: false });

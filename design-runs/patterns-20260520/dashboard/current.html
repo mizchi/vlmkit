@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Operations Dashboard Current</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1d2521;
+      --muted: #68736e;
+      --line: #d9dfd9;
+      --paper: #f4f1e9;
+      --panel: #ffffff;
+      --green: #24705d;
+      --amber: #d4a348;
+      --blue: #4b5f8b;
+      --rose: #b95862;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+      letter-spacing: 0;
+    }
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+    }
+    header {
+      min-height: 74px;
+      padding: 0 34px;
+      display: grid;
+      grid-template-columns: 204px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 22px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,.72);
+    }
+    .brand { font-weight: 850; font-size: 22px; }
+    nav { display: flex; gap: 9px; align-items: center; }
+    nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-weight: 720;
+      font-size: 14px;
+      padding: 9px 12px;
+      border-radius: 7px;
+    }
+    nav a[aria-current="page"] { color: var(--ink); background: #eef4ef; }
+    .user { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; }
+    .avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, var(--green), var(--amber)); }
+    main {
+      min-width: 0;
+      padding: 26px 34px 32px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 308px;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 18px;
+    }
+    .title {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 22px;
+    }
+    h1 { margin: 0; font-size: 33px; line-height: 1.05; }
+    .title p { margin: 9px 0 0; color: var(--muted); line-height: 1.5; }
+    .period { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 11px 14px; font-weight: 740; }
+    .filters {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) 176px 176px auto;
+      gap: 12px;
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+    label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 720; }
+    input, select {
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 0 12px;
+      font: inherit;
+      color: var(--ink);
+      background: #fffdf8;
+    }
+    button {
+      min-height: 42px;
+      align-self: end;
+      border: 0;
+      border-radius: 7px;
+      padding: 0 16px;
+      background: var(--green);
+      color: white;
+      font-weight: 820;
+    }
+    .overview {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 18px;
+      min-width: 0;
+    }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 13px;
+    }
+    .kpi {
+      min-height: 126px;
+      padding: 17px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      display: grid;
+      align-content: space-between;
+    }
+    .kpi span { color: var(--muted); font-size: 12px; font-weight: 760; }
+    .kpi strong { display: block; margin-top: 12px; font-size: 31px; line-height: 1; }
+    .kpi small { color: var(--green); font-weight: 760; }
+    .work {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: minmax(0, .9fr) minmax(440px, 1.1fr);
+      gap: 18px;
+    }
+    section, aside {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+    .panel-head {
+      min-height: 56px;
+      padding: 15px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--line);
+    }
+    h2 { margin: 0; font-size: 16px; }
+    .chart {
+      min-height: 360px;
+      padding: 18px;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      gap: 15px;
+    }
+    .plot {
+      border-radius: 8px;
+      background:
+        linear-gradient(to top, rgba(36,112,93,.18), transparent 58%),
+        repeating-linear-gradient(to bottom, transparent 0 56px, #e9eee7 57px 58px),
+        #fbfaf6;
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      align-items: end;
+      gap: 12px;
+      padding: 20px;
+    }
+    .bar { border-radius: 8px 8px 0 0; background: var(--green); min-height: 60px; }
+    .bar:nth-child(2) { height: 50%; background: var(--blue); }
+    .bar:nth-child(3) { height: 74%; background: var(--amber); }
+    .bar:nth-child(4) { height: 62%; }
+    .bar:nth-child(5) { height: 84%; background: var(--blue); }
+    .bar:nth-child(6) { height: 56%; background: var(--rose); }
+    .bar:nth-child(7) { height: 90%; }
+    .bar:nth-child(8) { height: 70%; background: var(--amber); }
+    .legend { display: flex; gap: 16px; color: var(--muted); font-size: 12px; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; min-width: 600px; border-collapse: collapse; }
+    th, td { padding: 13px 16px; text-align: left; border-bottom: 1px solid var(--line); font-size: 13px; }
+    th { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+    td strong { display: block; margin-bottom: 3px; }
+    .pill { display: inline-flex; align-items: center; min-height: 24px; padding: 0 9px; border-radius: 999px; background: #eef4ef; color: var(--green); font-weight: 760; }
+    .risk { background: #fff2df; color: #8d5b1f; }
+    aside {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      align-self: start;
+    }
+    .alerts { padding: 15px; display: grid; gap: 12px; }
+    .alert {
+      min-height: 92px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: #fffdf8;
+    }
+    .alert strong { display: block; margin-bottom: 7px; }
+    .alert p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    @media (max-width: 720px) {
+      header {
+        grid-template-columns: 1fr auto;
+        padding: 0 18px;
+      }
+      nav { display: none; }
+      main {
+        padding: 18px;
+        grid-template-columns: 1fr;
+        grid-template-rows: auto;
+      }
+      .title { align-items: start; flex-direction: column; }
+      .filters { grid-template-columns: 1fr; }
+      .kpis { grid-template-columns: 1fr 1fr; }
+      .work { grid-template-columns: 1fr; }
+      aside { align-self: stretch; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header role="banner">
+      <div class="brand">OpsLedger</div>
+      <nav aria-label="Primary">
+        <a href="#" aria-current="page">Overview</a>
+        <a href="#">Pipeline</a>
+        <a href="#">Teams</a>
+        <a href="#">Reports</a>
+      </nav>
+      <div class="user"><span>North region</span><span class="avatar" aria-hidden="true"></span></div>
+    </header>
+    <main aria-labelledby="dashboard-title">
+      <div class="title">
+        <div>
+          <h1 id="dashboard-title">Revenue operations</h1>
+          <p>Monitor pipeline quality, response time, and account risk across active sales regions.</p>
+        </div>
+        <div class="period">May 2026</div>
+      </div>
+      <form class="filters" role="search" aria-label="Lead filters" data-filter-form>
+        <label>Search accounts<input name="q" value="enterprise rollout"></label>
+        <label>Region<select name="region"><option>North America</option><option>Europe</option></select></label>
+        <label>Status<select name="status"><option>Active</option><option>At risk</option></select></label>
+        <button type="button" data-primary-cta>Apply filters</button>
+      </form>
+      <div class="overview">
+        <section class="kpis" aria-label="KPI summary">
+          <article class="kpi" data-repeat-item="kpi"><span>Qualified pipeline</span><strong>$8.4m</strong><small>+12.8%</small></article>
+          <article class="kpi" data-repeat-item="kpi"><span>Win confidence</span><strong>74%</strong><small>+4.1%</small></article>
+          <article class="kpi" data-repeat-item="kpi"><span>Open renewals</span><strong>126</strong><small>+9</small></article>
+          <article class="kpi" data-repeat-item="kpi"><span>Response SLA</span><strong>91%</strong><small>+2.6%</small></article>
+        </section>
+        <div class="work">
+          <section aria-label="Conversion chart" data-chart-region>
+            <div class="panel-head"><h2>Conversion by week</h2><span class="pill">Healthy</span></div>
+            <div class="chart">
+              <div class="plot" aria-hidden="true">
+                <div class="bar" style="height: 60%"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+                <div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div>
+              </div>
+              <div class="legend"><span>Inbound</span><span>Expansion</span><span>Renewal</span></div>
+            </div>
+          </section>
+          <section aria-label="Pipeline table">
+            <div class="panel-head"><h2>Priority accounts</h2><span>6 active</span></div>
+            <div class="table-wrap" data-scrollport="pipeline-table">
+              <table data-dashboard-table>
+                <thead><tr><th>Account</th><th>Stage</th><th>Owner</th><th>Value</th><th>Status</th></tr></thead>
+                <tbody>
+                  <tr data-repeat-item="account-row"><td><strong>Acme Grid</strong><span>Cloud migration</span></td><td>Proposal</td><td>Mika</td><td>$1.8m</td><td><span class="pill">Ready</span></td></tr>
+                  <tr data-repeat-item="account-row"><td><strong>Northstar Labs</strong><span>AI platform</span></td><td>Security</td><td>Ren</td><td>$940k</td><td><span class="pill risk">Review</span></td></tr>
+                  <tr data-repeat-item="account-row"><td><strong>Blue Orbit</strong><span>Support suite</span></td><td>Negotiation</td><td>Aya</td><td>$620k</td><td><span class="pill">Ready</span></td></tr>
+                  <tr data-repeat-item="account-row"><td><strong>Riverbank Co</strong><span>Renewal</span></td><td>Legal</td><td>Sol</td><td>$410k</td><td><span class="pill risk">Risk</span></td></tr>
+                  <tr data-repeat-item="account-row"><td><strong>Helio Works</strong><span>Expansion</span></td><td>Discovery</td><td>Noa</td><td>$360k</td><td><span class="pill">New</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>
+      <aside aria-label="Operational alerts">
+        <div class="panel-head"><h2>Alerts</h2><span>3 open</span></div>
+        <div class="alerts">
+          <article class="alert" data-repeat-item="alert"><strong>Legal review delay</strong><p>Riverbank has been idle for six business days.</p></article>
+          <article class="alert" data-repeat-item="alert"><strong>SLA improvement</strong><p>North region response time improved by 14% this week.</p></article>
+          <article class="alert" data-repeat-item="alert"><strong>Forecast changed</strong><p>Expansion accounts added $480k to the May forecast.</p></article>
+        </div>
+      </aside>
+    </main>
+  </div>
+</body>
+</html>

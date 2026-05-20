@@ -58,6 +58,28 @@ const CASES: BenchCase[] = [
     ],
   },
   {
+    name: "dashboard",
+    input: "design-runs/patterns-20260520/dashboard/current.html",
+    pattern: "dashboard",
+    goal: "app",
+    viewports: [
+      { label: "desktop", width: 1440, height: 900 },
+      { label: "mobile", width: 390, height: 844 },
+    ],
+  },
+  {
+    name: "responsive-stretch",
+    input: "design-runs/patterns-20260520/responsive-stretch/current.html",
+    pattern: "landing",
+    goal: "app",
+    viewports: [
+      { label: "mobile", width: 390, height: 844 },
+      { label: "tablet", width: 768, height: 900 },
+      { label: "desktop", width: 1440, height: 900 },
+      { label: "wide", width: 1920, height: 1080 },
+    ],
+  },
+  {
     name: "canvas",
     input: "design-runs/patterns-20260520/game/current.html",
     pattern: "canvas",

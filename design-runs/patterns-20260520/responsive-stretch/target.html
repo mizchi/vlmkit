@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Responsive Stretch Target</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17211d;
+      --muted: #65736c;
+      --line: #d8ded6;
+      --paper: #f5f1e8;
+      --panel: #ffffff;
+      --green: #1e725f;
+      --gold: #d8ac52;
+      --blue: #53699a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow-x: hidden;
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      color: var(--ink);
+      background:
+        linear-gradient(90deg, rgba(30,114,95,.08), transparent 34%, transparent 66%, rgba(216,172,82,.11)),
+        var(--paper);
+      letter-spacing: 0;
+    }
+    .page {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 72px;
+      padding: 0 clamp(18px, 4vw, 52px);
+      border-bottom: 1px solid rgba(216,222,214,.75);
+      background: rgba(255,255,255,.55);
+      backdrop-filter: blur(10px);
+    }
+    .brand { font-weight: 850; font-size: 22px; }
+    nav { display: flex; gap: 18px; align-items: center; color: var(--muted); font-size: 14px; }
+    nav a { color: inherit; text-decoration: none; font-weight: 720; }
+    main {
+      padding: clamp(20px, 4vw, 54px);
+      display: grid;
+      gap: clamp(22px, 4vw, 46px);
+    }
+    .container {
+      width: min(100%, 1180px);
+      margin-inline: auto;
+    }
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(360px, 480px);
+      gap: clamp(28px, 5vw, 70px);
+      align-items: center;
+    }
+    .copy { max-width: 680px; }
+    .eyebrow {
+      margin: 0 0 16px;
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 850;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    h1 {
+      margin: 0;
+      max-width: 680px;
+      font: 850 clamp(48px, 6vw, 82px)/.98 Georgia, serif;
+      letter-spacing: 0;
+    }
+    .lead {
+      max-width: 660px;
+      margin: 26px 0 0;
+      color: var(--muted);
+      font-size: clamp(18px, 1.35vw, 21px);
+      line-height: 1.55;
+    }
+    .actions { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 32px; }
+    .button {
+      min-height: 48px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      padding: 0 22px;
+      text-decoration: none;
+      font-weight: 800;
+    }
+    .primary { background: var(--green); color: white; }
+    .secondary { border: 1px solid var(--line); color: var(--ink); background: rgba(255,255,255,.72); }
+    .media {
+      aspect-ratio: 4 / 3;
+      min-height: 340px;
+      border: 1px solid #cbd5cd;
+      border-radius: 16px;
+      background: var(--panel);
+      box-shadow: 0 30px 70px rgba(39, 54, 47, .16);
+      padding: clamp(18px, 3vw, 28px);
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 18px;
+      overflow: hidden;
+    }
+    .media-head, .media-foot { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; font-weight: 760; }
+    .visual {
+      min-height: 0;
+      border-radius: 14px;
+      background:
+        linear-gradient(142deg, transparent 0 46%, rgba(216,172,82,.72) 46.5% 54%, transparent 54.5%),
+        linear-gradient(180deg, #193f37, #255f53);
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      align-items: end;
+      gap: 12px;
+      padding: 20px;
+    }
+    .visual div { border-radius: 10px 10px 0 0; background: #83cfbd; min-height: 54px; }
+    .visual div:nth-child(2) { height: 62%; background: var(--gold); }
+    .visual div:nth-child(3) { height: 82%; }
+    .visual div:nth-child(4) { height: 48%; background: #f3e2b5; }
+    .visual div:nth-child(5) { height: 72%; background: #91d7c7; }
+    .features {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: clamp(14px, 2vw, 20px);
+    }
+    .card {
+      min-height: 178px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255,255,255,.82);
+      padding: 22px;
+      display: grid;
+      align-content: space-between;
+    }
+    .card strong { font-size: 20px; line-height: 1.1; }
+    .card p { margin: 14px 0 0; color: var(--muted); line-height: 1.5; }
+    .next {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 24px;
+      border-top: 1px solid var(--line);
+      padding-top: 24px;
+    }
+    .next h2 { margin: 0; font-size: 22px; }
+    .next p { margin: 8px 0 0; color: var(--muted); }
+    @media (max-width: 860px) {
+      nav { display: none; }
+      .hero { grid-template-columns: 1fr; }
+      h1, .lead { max-width: 100%; }
+      .media { min-height: 280px; }
+      .next { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .copy { max-width: 100%; }
+      .features { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header role="banner">
+      <div class="brand">Wideframe</div>
+      <nav aria-label="Primary">
+        <a href="#">Layout</a>
+        <a href="#">Cards</a>
+        <a href="#">Measure</a>
+        <a href="#">Handoff</a>
+      </nav>
+    </header>
+    <main>
+      <section class="container hero" aria-labelledby="stretch-title" data-responsive-container>
+        <div class="copy" data-measure>
+          <p class="eyebrow">Fluid bounds audit</p>
+          <h1 id="stretch-title" data-hero-title>Wideframe</h1>
+          <p class="lead">A responsive layout fixture for checking whether wide screens stay composed, readable, and bounded instead of stretching every region to the viewport edge.</p>
+          <div class="actions">
+            <a class="button primary" data-primary-cta href="#">Check stretch</a>
+            <a class="button secondary" href="#">Review contract</a>
+          </div>
+        </div>
+        <aside class="media" data-media-slot aria-label="Responsive preview">
+          <div class="media-head"><span>Viewport fit</span><span>4:3</span></div>
+          <div class="visual" aria-hidden="true"><div style="height: 52%"></div><div></div><div></div><div></div><div></div></div>
+          <div class="media-foot"><span>Bounded</span><span>No overflow</span></div>
+        </aside>
+      </section>
+      <section class="container features" aria-label="Responsive guardrails">
+        <article class="card" data-repeat-item="feature-card"><strong>Readable measure</strong><p>Hero copy remains under a practical line length on wide screens.</p></article>
+        <article class="card" data-repeat-item="feature-card"><strong>Bounded cards</strong><p>Cards expand into columns without becoming oversized panels.</p></article>
+        <article class="card" data-repeat-item="feature-card"><strong>Stable media</strong><p>The media slot preserves aspect ratio and avoids accidental cropping.</p></article>
+      </section>
+      <section class="container next" data-next-section aria-labelledby="stretch-next">
+        <div>
+          <h2 id="stretch-next">Next section remains visible and aligned</h2>
+          <p>Wide gutters are allowed; stretched content is not.</p>
+        </div>
+        <a class="button secondary" href="#">Open report</a>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

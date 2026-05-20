@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-20T06:20:28.866Z",
+  "generatedAt": "2026-05-20T07:37:47.472Z",
   "landing": {
     "ctaInFirstViewport": true,
     "nextSectionHintVisible": true,
@@ -46,6 +46,87 @@
           "width": 256,
           "height": 842
         }
+      }
+    ]
+  },
+  "dashboard": {
+    "semanticShell": true,
+    "searchFormPresent": true,
+    "selectedNavPresent": true,
+    "kpiCount": 4,
+    "accountRowCount": 5,
+    "alertCount": 3,
+    "chartRegionPresent": true,
+    "namedSectionCount": 4,
+    "tableScrollportPresent": true,
+    "tableCanScrollX": true,
+    "tableRect": {
+      "x": 516,
+      "y": 504,
+      "width": 563,
+      "height": 350
+    }
+  },
+  "responsiveStretch": {
+    "allNoHorizontalScroll": true,
+    "boundedWideContainer": true,
+    "readableMeasure": true,
+    "boundedCards": true,
+    "mediaAspectStable": true,
+    "mobileStacks": true,
+    "largeViewportNextVisible": true,
+    "viewports": [
+      {
+        "label": "mobile",
+        "width": 390,
+        "noHorizontalScroll": true,
+        "containerWidth": 350,
+        "containerLeft": 20,
+        "measureWidth": 350,
+        "maxCardWidth": 350,
+        "minCardWidth": 350,
+        "cardCount": 3,
+        "mediaRatio": 1.33,
+        "nextSectionVisible": false
+      },
+      {
+        "label": "tablet",
+        "width": 768,
+        "noHorizontalScroll": true,
+        "containerWidth": 707,
+        "containerLeft": 31,
+        "measureWidth": 660,
+        "maxCardWidth": 225,
+        "minCardWidth": 225,
+        "cardCount": 3,
+        "mediaRatio": 1.33,
+        "nextSectionVisible": false
+      },
+      {
+        "label": "desktop",
+        "width": 1440,
+        "noHorizontalScroll": true,
+        "containerWidth": 1160,
+        "containerLeft": 140,
+        "measureWidth": 624,
+        "maxCardWidth": 373,
+        "minCardWidth": 373,
+        "cardCount": 3,
+        "mediaRatio": 1.33,
+        "nextSectionVisible": true
+      },
+      {
+        "label": "wide",
+        "width": 1920,
+        "noHorizontalScroll": true,
+        "containerWidth": 1160,
+        "containerLeft": 380,
+        "measureWidth": 624,
+        "maxCardWidth": 373,
+        "minCardWidth": 373,
+        "cardCount": 3,
+        "mediaRatio": 1.33,
+        "nextSectionVisible": true
       }
     ]
   },

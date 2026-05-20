@@ -1,0 +1,588 @@
+{
+  "version": 1,
+  "screens": [
+    {
+      "id": "current",
+      "pattern": "dashboard",
+      "goal": "app",
+      "sourceOfTruth": "semantic-dom",
+      "viewports": [
+        {
+          "label": "desktop",
+          "width": 1440,
+          "height": 900
+        },
+        {
+          "label": "mobile",
+          "width": 390,
+          "height": 844
+        }
+      ],
+      "markers": [
+        {
+          "kind": "primary-cta",
+          "selector": "[data-primary-cta]",
+          "attribute": "data-primary-cta",
+          "required": true
+        },
+        {
+          "kind": "scrollport",
+          "name": "pipeline-table",
+          "attribute": "data-scrollport",
+          "value": "pipeline-table",
+          "selector": "[data-scrollport=\"pipeline-table\"]",
+          "required": true
+        },
+        {
+          "kind": "selected",
+          "selector": "[aria-current=\"page\"], [data-selected=\"true\"]",
+          "required": true
+        }
+      ],
+      "states": [
+        {
+          "id": "selected",
+          "kind": "selected",
+          "selector": "[aria-current=\"page\"], [data-selected=\"true\"]"
+        }
+      ],
+      "requiredStates": [
+        {
+          "id": "pipeline-table-scrolled",
+          "kind": "scrolled",
+          "selector": "[data-scrollport=\"pipeline-table\"]",
+          "required": true
+        },
+        {
+          "id": "selected",
+          "kind": "selected",
+          "selector": "[aria-current=\"page\"], [data-selected=\"true\"]",
+          "required": true
+        }
+      ],
+      "expectedScrollports": [
+        {
+          "id": "pipeline-table",
+          "name": "pipeline-table",
+          "selector": "[data-scrollport=\"pipeline-table\"]",
+          "axis": "x",
+          "required": true,
+          "minOverflow": 37
+        }
+      ],
+      "landmarks": [
+        {
+          "id": "banner-body-0-div-0-header-0",
+          "role": "banner",
+          "name": "",
+          "slots": [
+            {
+              "id": "controls",
+              "kind": "control",
+              "marker": "selected",
+              "required": true
+            }
+          ],
+          "repeat": {
+            "kind": "grid",
+            "itemName": "item",
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "content": {
+            "kind": "list",
+            "density": "sparse",
+            "items": {
+              "exact": 3
+            },
+            "text": {
+              "maxLength": 54
+            }
+          },
+          "layout": {
+            "width": {
+              "kind": "fluid",
+              "max": 1440
+            },
+            "height": {
+              "kind": "content",
+              "min": 74
+            },
+            "display": {
+              "kind": "grid",
+              "columns": [
+                "204px",
+                "1001.89px",
+                "122.109px"
+              ],
+              "rows": [
+                "73px"
+              ]
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          },
+          "responsive": [
+            {
+              "viewport": "mobile",
+              "width": {
+                "kind": "fluid",
+                "max": 390
+              },
+              "display": {
+                "kind": "grid",
+                "columns": [
+                  "209.891px",
+                  "122.109px"
+                ],
+                "rows": [
+                  "73px"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "navigation-primary",
+          "role": "navigation",
+          "name": "Primary",
+          "slots": [
+            {
+              "id": "controls",
+              "kind": "control",
+              "marker": "selected",
+              "required": true
+            }
+          ],
+          "repeat": {
+            "kind": "list",
+            "itemName": "item",
+            "minItems": 4,
+            "maxItems": 4
+          },
+          "content": {
+            "kind": "list",
+            "density": "normal",
+            "items": {
+              "exact": 4
+            },
+            "text": {
+              "maxLength": 31
+            }
+          },
+          "layout": {
+            "width": {
+              "kind": "fluid",
+              "max": 1002
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "flex",
+              "direction": "row"
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          }
+        },
+        {
+          "id": "main-revenue-operations",
+          "role": "main",
+          "name": "Revenue operations",
+          "slots": [
+            {
+              "id": "title",
+              "kind": "content",
+              "required": true
+            },
+            {
+              "id": "controls",
+              "kind": "control",
+              "required": true
+            }
+          ],
+          "repeat": {
+            "kind": "grid",
+            "itemName": "kpi",
+            "minItems": 13,
+            "maxItems": 13
+          },
+          "content": {
+            "kind": "table",
+            "density": "sparse",
+            "items": {
+              "exact": 13
+            },
+            "text": {
+              "maxLength": 824,
+              "rowCount": 51
+            }
+          },
+          "layout": {
+            "width": {
+              "kind": "fluid",
+              "max": 1440
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "grid",
+              "columns": [
+                "1046px",
+                "308px"
+              ],
+              "rows": [
+                "67.6406px",
+                "97px",
+                "567.359px"
+              ]
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          },
+          "responsive": [
+            {
+              "viewport": "mobile",
+              "width": {
+                "kind": "fluid",
+                "max": 390
+              },
+              "display": {
+                "kind": "grid",
+                "columns": [
+                  "354px"
+                ],
+                "rows": [
+                  "155.641px",
+                  "301px",
+                  "1129px",
+                  "389.375px"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "search-lead-filters",
+          "role": "search",
+          "name": "Lead filters",
+          "slots": [
+            {
+              "id": "controls",
+              "kind": "control",
+              "required": true
+            }
+          ],
+          "repeat": {
+            "kind": "grid",
+            "itemName": "item",
+            "minItems": 4,
+            "maxItems": 4
+          },
+          "content": {
+            "kind": "form",
+            "density": "sparse",
+            "items": {
+              "exact": 4
+            },
+            "text": {
+              "maxLength": 75,
+              "rowCount": 1
+            }
+          },
+          "layout": {
+            "width": {
+              "kind": "fluid",
+              "max": 1370
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "grid",
+              "columns": [
+                "840.953px",
+                "176px",
+                "176px",
+                "109.047px"
+              ],
+              "rows": [
+                "63px"
+              ]
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          },
+          "responsive": [
+            {
+              "viewport": "mobile",
+              "width": {
+                "kind": "fluid",
+                "max": 352
+              },
+              "display": {
+                "kind": "grid",
+                "columns": [
+                  "320px"
+                ],
+                "rows": [
+                  "63px",
+                  "63px",
+                  "63px",
+                  "42px"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "region-kpi-summary",
+          "role": "region",
+          "name": "KPI summary",
+          "repeat": {
+            "kind": "grid",
+            "itemName": "kpi",
+            "minItems": 4,
+            "maxItems": 4
+          },
+          "content": {
+            "kind": "list",
+            "density": "sparse",
+            "items": {
+              "exact": 4
+            },
+            "text": {
+              "maxLength": 92,
+              "rowCount": 4
+            }
+          },
+          "layout": {
+            "width": {
+              "kind": "fluid",
+              "max": 1044
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "grid",
+              "columns": [
+                "251.25px",
+                "251.25px",
+                "251.25px",
+                "251.25px"
+              ],
+              "rows": [
+                "126px"
+              ]
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          },
+          "responsive": [
+            {
+              "viewport": "mobile",
+              "width": {
+                "kind": "fluid",
+                "max": 352
+              },
+              "display": {
+                "kind": "grid",
+                "columns": [
+                  "169.5px",
+                  "169.5px"
+                ],
+                "rows": [
+                  "126px",
+                  "126px"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": "region-conversion-chart",
+          "role": "region",
+          "name": "Conversion chart",
+          "slots": [
+            {
+              "id": "title",
+              "kind": "content",
+              "required": true
+            }
+          ],
+          "content": {
+            "kind": "static",
+            "density": "sparse",
+            "text": {
+              "maxLength": 49,
+              "rowCount": 1
+            }
+          },
+          "layout": {
+            "width": {
+              "kind": "fluid",
+              "max": 461
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "block"
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          },
+          "responsive": [
+            {
+              "viewport": "mobile",
+              "width": {
+                "kind": "fluid",
+                "max": 352
+              }
+            }
+          ]
+        },
+        {
+          "id": "region-pipeline-table",
+          "role": "region",
+          "name": "Pipeline table",
+          "slots": [
+            {
+              "id": "title",
+              "kind": "content",
+              "required": true
+            }
+          ],
+          "repeat": {
+            "kind": "table",
+            "itemName": "row",
+            "minItems": 6,
+            "maxItems": 6
+          },
+          "content": {
+            "kind": "table",
+            "density": "normal",
+            "items": {
+              "exact": 6
+            },
+            "text": {
+              "maxLength": 275,
+              "rowCount": 36
+            }
+          },
+          "layout": {
+            "width": {
+              "kind": "fluid",
+              "max": 563
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "block"
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          },
+          "responsive": [
+            {
+              "viewport": "mobile",
+              "width": {
+                "kind": "fluid",
+                "max": 352
+              }
+            }
+          ]
+        },
+        {
+          "id": "complementary-operational-alerts",
+          "role": "complementary",
+          "name": "Operational alerts",
+          "slots": [
+            {
+              "id": "title",
+              "kind": "content",
+              "required": true
+            }
+          ],
+          "repeat": {
+            "kind": "list",
+            "itemName": "alert",
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "content": {
+            "kind": "list",
+            "density": "normal",
+            "items": {
+              "exact": 3
+            },
+            "text": {
+              "maxLength": 214,
+              "rowCount": 7
+            }
+          },
+          "layout": {
+            "width": {
+              "kind": "fluid",
+              "max": 306
+            },
+            "height": {
+              "kind": "content"
+            },
+            "display": {
+              "kind": "grid",
+              "columns": [
+                "306px"
+              ],
+              "rows": [
+                "56px",
+                "332.062px"
+              ]
+            },
+            "scroll": {
+              "x": false,
+              "y": false
+            }
+          },
+          "responsive": [
+            {
+              "viewport": "mobile",
+              "width": {
+                "kind": "fluid",
+                "max": 352
+              },
+              "display": {
+                "kind": "grid",
+                "columns": [
+                  "352px"
+                ],
+                "rows": [
+                  "56px",
+                  "331.375px"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
