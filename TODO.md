@@ -1055,6 +1055,10 @@ Current smoke status:
   `--pose-normalization arm-rest-offset` computes source-to-target upper/lower
   arm rest offsets, emits them in the audit, and remains runnable but
   non-automatic because `Jump` regresses while `Goodbye` improves
+- [x] Candidate selection summary:
+  `select-motion-normalization-candidates.mjs` groups runnable candidate
+  comparisons and emits accepted/rejected/neutral/missing recommendations so
+  the loop can reject mixed candidates without a manual read-through
 - [x] Named `robot-voxel` retarget profile for voxel robot smoke: skipped
   fingers, toes, chest, neck, and shoulders are tolerated with zero penalty,
   while skipped core bones fail the weighted profile

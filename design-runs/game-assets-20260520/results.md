@@ -242,6 +242,9 @@ Observed shape:
   stay compare-gated per sample
 - `--fail-on-tradeoff` rejects the runnable root candidate automatically
   because its comparison is mixed, so it does not become the new default
+- candidate selection summary: 2 runnable candidate groups were compared and
+  both are rejected. `arm-rest-pose-offset` has 1 improved, 1 stable, and 1
+  regressed sample; `root-scale-to-model` remains a tradeoff on `Jump`
 - retarget profile: `robot-voxel` (`simple-rig` is an alias)
 - quality verdict: `pass`
 - retarget weighted score: 1.0, penalty 0

@@ -71,6 +71,10 @@ The concrete scenario used a voxel robot and real `.vrma` motion samples from
   `LookAround` stayed `stable`, `Goodbye` improved one displacement metric,
   and `Jump` regressed it, so this is a runnable experiment path rather than a
   new default.
+- `select-motion-normalization-candidates` now groups runnable candidate
+  comparisons and emits a selection report. In this loop it rejects both
+  `arm-rest-pose-offset` and `root-scale-to-model`, which is the behavior we
+  want before any automatic default change.
 - The dry-run VLM review scaffold can create a contact sheet and strict JSON
   prompt for cheap reviewers such as UI-TARS / Nova Lite without adding a
   blocking human step.
@@ -165,6 +169,10 @@ schema out of the dogfood directory.
   `Goodbye`, stays stable on `LookAround`, and regresses `Jump`; the next loop
   should include samples with obvious arm contact or reach poses and look for a
   motion-aware gate before enabling it automatically.
+- A selection layer is now necessary between "candidate is runnable" and
+  "candidate should change defaults." Per-sample comparisons are too granular
+  for autonomous loops; the group-level report gives the agent one stable
+  contract to reject mixed evidence.
 
 ## Next Implementation Order
 

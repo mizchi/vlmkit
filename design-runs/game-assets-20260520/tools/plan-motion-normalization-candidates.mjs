@@ -80,6 +80,7 @@ function rootTranslationCandidate(reportPath, report, sample, candidate) {
     kind: candidate.kind,
     status: candidate.status,
     automatic: candidate.automatic === true,
+    rootTranslationMode: candidate.rootTranslationMode,
     reason: candidate.reason,
     outputReport: out,
     run: [
@@ -123,6 +124,7 @@ function poseNormalizationCandidate(reportPath, report, sample, candidate) {
     kind: candidate.kind,
     status: candidate.status,
     automatic: candidate.automatic === true,
+    poseNormalization: candidate.poseNormalization,
     reason: candidate.reason,
     outputReport: out,
     run: [

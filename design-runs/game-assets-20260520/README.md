@@ -268,6 +268,9 @@ shared tools now live in `tools/`:
 - `tools/plan-motion-normalization-candidates.mjs`: turn smoke-report
   normalization candidates into runnable experiment commands and blocked
   follow-ups
+- `tools/select-motion-normalization-candidates.mjs`: read the candidate plan
+  plus generated comparison reports and summarize candidate groups as accepted,
+  rejected, neutral, missing, or needing policy
 - `tools/review-motion-with-vlm.mjs`: optional cheap VLM second opinion using
   a generated contact sheet; dry-runs without credentials
 - `tools/retarget-profiles.mjs`: named retarget downgrade profiles with
