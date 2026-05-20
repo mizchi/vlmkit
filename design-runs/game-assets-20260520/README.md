@@ -252,8 +252,9 @@ shared tools now live in `tools/`:
   external VRMA samples and write a structured smoke report; supports
   `--min-quality pass|warn|fail` for CI-style gating
 - `tools/verify-motion-quality.mjs`: turn render metadata, frame bboxes,
-  normalized ground deltas, and Motion IR warnings into `pass` / `warn` /
-  `fail`; supports strict and named weighted retarget profiles
+  normalized ground deltas, tracked foot contact, and Motion IR warnings into
+  `pass` / `warn` / `fail`; supports strict and named weighted retarget
+  profiles
 - `tools/review-motion-with-vlm.mjs`: optional cheap VLM second opinion using
   a generated contact sheet; dry-runs without credentials
 - `tools/retarget-profiles.mjs`: named retarget downgrade profiles with
@@ -552,8 +553,9 @@ Learned:
   VRMA samples such as `LookAround` should pass `--motion-ir` so clip and loop
   metadata come from the adapter output.
 - The first automated quality gate is intentionally conservative: nonblank and
-  bounds failures are hard failures, while ground penetration and low
-  retained-channel ratio are warnings that keep the agent loop moving.
+  bounds failures are hard failures, while ground penetration, foot-contact
+  envelope drift, and low retained-channel ratio are warnings that keep the
+  agent loop moving unless `--min-quality pass` is requested.
 - Cheap VLM review is a second opinion, not the source of truth. The reviewer
   sees a contact sheet plus deterministic metrics and must return strict JSON.
   With no `OPENROUTER_API_KEY`, the review step is skipped but still emits

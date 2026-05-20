@@ -340,6 +340,7 @@ function summarizeQuality(quality) {
       screenCoverageRatio: quality.metrics?.screenCoverageRatio ?? null,
       minGroundY: quality.metrics?.minGroundY ?? null,
       groundDeltaY: quality.metrics?.groundDeltaY ?? null,
+      footContact: quality.metrics?.footContact ?? null,
       retainedChannelRatio: quality.metrics?.motion?.retainedChannelRatio ?? null,
       skippedByRegion: quality.metrics?.motion?.skippedByRegion ?? null,
     },

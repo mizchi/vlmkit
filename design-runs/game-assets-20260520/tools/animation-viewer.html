@@ -87,6 +87,7 @@
         object.scale.multiplyScalar(2.6 / maxAxis);
         object.updateMatrixWorld(true);
         const normalizedBindBox = new THREE.Box3().setFromObject(object);
+        const bindTrackedNodes = collectTrackedNodes(object);
 
         const clip = gltf.animations.find((item) => item.name === clipName);
         if (!clip) {
@@ -123,6 +124,7 @@
         const animatedBox = new THREE.Box3().setFromObject(object);
         const animatedSize = animatedBox.getSize(new THREE.Vector3());
         const animatedCenter = animatedBox.getCenter(new THREE.Vector3());
+        const animatedTrackedNodes = collectTrackedNodes(object);
         const camera = createCamera(width, height, view, animatedSize, animatedCenter);
         scene.add(camera);
 
@@ -149,6 +151,8 @@
           bindBounds: vectorBounds(bindBox),
           normalizedBindBounds: vectorBounds(normalizedBindBox),
           animatedBounds: vectorBounds(animatedBox),
+          bindTrackedNodes,
+          animatedTrackedNodes,
           minGroundY: round(animatedBox.min.y),
           groundDeltaY: round(animatedBox.min.y - normalizedBindBox.min.y),
           meshCount: meshes.length,
@@ -196,6 +200,17 @@
         return ((time % duration) + duration) % duration;
       }
 
+      function collectTrackedNodes(root) {
+        const tracked = {};
+        root.traverse((node) => {
+          if (!TRACKED_NODE_NAMES.has(node.name)) return;
+          const position = new THREE.Vector3();
+          node.getWorldPosition(position);
+          tracked[node.name] = [round(position.x), round(position.y), round(position.z)];
+        });
+        return tracked;
+      }
+
       function vectorBounds(box) {
         return {
           min: [round(box.min.x), round(box.min.y), round(box.min.z)],
@@ -206,6 +221,14 @@
       function round(value) {
         return Math.round(value * 1000) / 1000;
       }
+
+      const TRACKED_NODE_NAMES = new Set([
+        "pelvis",
+        "left_hand",
+        "right_hand",
+        "left_foot",
+        "right_foot",
+      ]);
 
       function fail(message) {
         window.__animationRenderState = { status: "error", message };

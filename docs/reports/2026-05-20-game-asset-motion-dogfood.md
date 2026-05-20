@@ -40,6 +40,9 @@ The concrete scenario used a voxel robot and real `.vrma` motion samples from
 - `ground-y` is now checked with `groundDeltaY` when render metadata includes
   normalized bind bounds, avoiding false warnings from camera-fit world
   coordinates.
+- The animation viewer records tracked pelvis, hand, and foot positions.
+  `verify-motion-quality` now emits a `foot-contact` check based on
+  `left_foot` / `right_foot` bind-vs-animated delta.
 - The dry-run VLM review scaffold can create a contact sheet and strict JSON
   prompt for cheap reviewers such as UI-TARS / Nova Lite without adding a
   blocking human step.
@@ -65,6 +68,9 @@ After adding relative root translation, normalized ground deltas, and the
 - `LookAround` groundDeltaY: -0.047..-0.012
 - `Goodbye` groundDeltaY: -0.031..-0.013
 - `Jump` groundDeltaY: -0.107..-0.052
+- `LookAround` foot minDeltaY: -0.009..0.009
+- `Goodbye` foot minDeltaY: -0.004..0.007
+- `Jump` foot minDeltaY: 0.004..0.118
 - retained-channel ratio: 0.3077, accepted because only simplified-rig
   tolerated regions are skipped
 
@@ -107,7 +113,6 @@ it out of the dogfood directory.
    - Add actionable suggestions when `groundDeltaY` exceeds thresholds.
 
 3. **Motion quality gate v2**
-   - Add foot contact / floating metrics.
    - Add limb extent outlier checks against bind-pose bounds.
    - Include per-clip and per-region scores in the JSON report.
 

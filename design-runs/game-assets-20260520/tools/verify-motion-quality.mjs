@@ -27,6 +27,8 @@ function parseArgs(argv) {
     retargetProfile: "strict",
     minGroundYWarn: -0.35,
     minGroundYFail: -2.5,
+    minFootDeltaYWarn: -0.25,
+    maxAlwaysFloatingFootDeltaYWarn: 0.65,
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -44,6 +46,8 @@ function parseArgs(argv) {
     else if (arg === "--retarget-profile") args.retargetProfile = required(argv, ++i, arg);
     else if (arg === "--min-ground-y-warn") args.minGroundYWarn = Number(required(argv, ++i, arg));
     else if (arg === "--min-ground-y-fail") args.minGroundYFail = Number(required(argv, ++i, arg));
+    else if (arg === "--min-foot-delta-y-warn") args.minFootDeltaYWarn = Number(required(argv, ++i, arg));
+    else if (arg === "--max-always-floating-foot-delta-y-warn") args.maxAlwaysFloatingFootDeltaYWarn = Number(required(argv, ++i, arg));
     else if (arg === "--help" || arg === "-h") {
       console.log(`Usage:
   node design-runs/game-assets-20260520/tools/verify-motion-quality.mjs --renders-dir <dir> [options]
@@ -63,6 +67,9 @@ Options:
   --retarget-profile <profile>      ${retargetProfileNames().join("|")} (default: strict)
   --min-ground-y-warn <n>           Warning threshold for groundDeltaY when available, otherwise minGroundY
   --min-ground-y-fail <n>           Failure threshold for groundDeltaY when available, otherwise minGroundY
+  --min-foot-delta-y-warn <n>       Warning threshold for foot pivot sinking below bind pose
+  --max-always-floating-foot-delta-y-warn <n>
+                                    Warning threshold when all sampled frames have both feet above bind pose
 `);
       process.exit(0);
     } else {
@@ -94,6 +101,7 @@ async function main() {
   checkFrameBasics(frames, args, checks);
   checkFrameStability(frames, args, checks);
   checkGround(frames, args, checks);
+  checkFootContact(frames, args, checks);
   checkRetainedChannels(motion, args, checks);
   checkLoopMetadata(motion, checks);
 
@@ -118,6 +126,7 @@ async function main() {
       bboxCenter: frame.bboxCenter,
       minGroundY: frame.minGroundY,
       groundDeltaY: frame.groundDeltaY,
+      footContact: frame.footContact,
     })),
   };
   await writeFile(args.out, `${JSON.stringify(result, null, 2)}\n`);
@@ -153,9 +162,37 @@ async function readFrames(args) {
       animatedBounds: metadata.state?.animatedBounds ?? null,
       bindBounds: metadata.state?.bindBounds ?? null,
       normalizedBindBounds: metadata.state?.normalizedBindBounds ?? null,
+      bindTrackedNodes: metadata.state?.bindTrackedNodes ?? null,
+      animatedTrackedNodes: metadata.state?.animatedTrackedNodes ?? null,
+      footContact: footContactFromState(metadata.state),
     });
   }
   return frames.sort((a, b) => `${a.view}:${a.sampleTime}`.localeCompare(`${b.view}:${b.sampleTime}`));
+}
+
+function checkFootContact(frames, args, checks) {
+  const contacts = frames.map((frame) => frame.footContact).filter(Boolean);
+  if (contacts.length === 0) {
+    checks.push(warn("foot-contact", "no tracked foot metadata"));
+    return;
+  }
+  const minFootDeltaY = Math.min(...contacts.map((contact) => contact.minDeltaY));
+  const maxMinFootDeltaY = Math.max(...contacts.map((contact) => contact.minDeltaY));
+  const alwaysFloating = contacts.every((contact) => contact.minDeltaY > args.maxAlwaysFloatingFootDeltaYWarn);
+  const value = {
+    frameCount: contacts.length,
+    minFootDeltaY: round(minFootDeltaY),
+    maxMinFootDeltaY: round(maxMinFootDeltaY),
+    sinkWarnThreshold: args.minFootDeltaYWarn,
+    alwaysFloatingWarnThreshold: args.maxAlwaysFloatingFootDeltaYWarn,
+  };
+  if (minFootDeltaY < args.minFootDeltaYWarn) {
+    checks.push(warn("foot-contact", "foot pivots sink below bind-pose contact threshold", value));
+  } else if (alwaysFloating) {
+    checks.push(warn("foot-contact", "both feet float above bind-pose contact threshold in all sampled frames", value));
+  } else {
+    checks.push(pass("foot-contact", "foot contact envelope is within threshold", value));
+  }
 }
 
 function checkRenderVerify(renderVerify, checks) {
@@ -285,6 +322,7 @@ function summarizeMetrics(frames, motion) {
     screenCoverageRatio: range(coverage),
     minGroundY: range(frames.map((frame) => frame.minGroundY).filter(Number.isFinite)),
     groundDeltaY: range(frames.map((frame) => frame.groundDeltaY).filter(Number.isFinite)),
+    footContact: summarizeFootContact(frames),
     motion: motion ? {
       clipCount: motion.clips?.length ?? 0,
       trackCount,
@@ -293,6 +331,39 @@ function summarizeMetrics(frames, motion) {
       skippedByRegion: skippedChannelRegions(motion.source?.warnings ?? []),
     } : null,
   };
+}
+
+function footContactFromState(state) {
+  const bind = state?.bindTrackedNodes;
+  const animated = state?.animatedTrackedNodes;
+  const bindLeft = vec3OrNull(bind?.left_foot);
+  const bindRight = vec3OrNull(bind?.right_foot);
+  const animatedLeft = vec3OrNull(animated?.left_foot);
+  const animatedRight = vec3OrNull(animated?.right_foot);
+  if (!bindLeft || !bindRight || !animatedLeft || !animatedRight) return null;
+  const leftDeltaY = round(animatedLeft[1] - bindLeft[1]);
+  const rightDeltaY = round(animatedRight[1] - bindRight[1]);
+  return {
+    leftDeltaY,
+    rightDeltaY,
+    minDeltaY: round(Math.min(leftDeltaY, rightDeltaY)),
+    maxDeltaY: round(Math.max(leftDeltaY, rightDeltaY)),
+    leftY: animatedLeft[1],
+    rightY: animatedRight[1],
+  };
+}
+
+function summarizeFootContact(frames) {
+  const contacts = frames.map((frame) => frame.footContact).filter(Boolean);
+  if (contacts.length === 0) return null;
+  return {
+    minDeltaY: range(contacts.map((contact) => contact.minDeltaY)),
+    maxDeltaY: range(contacts.map((contact) => contact.maxDeltaY)),
+  };
+}
+
+function vec3OrNull(value) {
+  return Array.isArray(value) && value.length === 3 && value.every(Number.isFinite) ? value : null;
 }
 
 function foregroundRatio(image, background) {
