@@ -285,6 +285,7 @@ function compareSourceTargetRig(sourceRig, targetRig) {
     scaleSpread,
     warnings,
     recommendation,
+    normalizationCandidates: poseNormalizationCandidates(warnings),
   };
 }
 
@@ -307,6 +308,42 @@ function mapValues(object, mapper) {
   return Object.fromEntries(Object.entries(object).map(([key, value]) => [key, mapper(value)]));
 }
 
+function poseNormalizationCandidates(warnings) {
+  const ids = new Set(warnings.map((warning) => warning.id));
+  const candidates = [];
+  if (ids.has("arm-rest-angle-mismatch")) {
+    candidates.push({
+      id: "arm-rest-pose-offset",
+      kind: "pose-pre-normalization",
+      status: "needs-implementation",
+      automatic: false,
+      triggerWarnings: ["arm-rest-angle-mismatch"],
+      reason: "source arms are in a different rest direction from target arms; retargeting needs a rest-pose rotation offset before it can be automatic",
+    });
+  }
+  if (ids.has("foot-spread-mismatch") || ids.has("leg-spread-mismatch")) {
+    candidates.push({
+      id: "stance-width-adapter",
+      kind: "pose-pre-normalization",
+      status: "needs-implementation",
+      automatic: false,
+      triggerWarnings: ["foot-spread-mismatch", "leg-spread-mismatch"].filter((id) => ids.has(id)),
+      reason: "source and target lower-body rest stance differ; root/leg offsets need a separate candidate before changing animation data",
+    });
+  }
+  if (ids.has("shoulder-width-mismatch")) {
+    candidates.push({
+      id: "shoulder-width-adapter",
+      kind: "target-rig-or-pose-policy",
+      status: "review-target-rig",
+      automatic: false,
+      triggerWarnings: ["shoulder-width-mismatch"],
+      reason: "target shoulder width differs from source skeleton scale; prefer target rig policy or explicit pose adapter over blind rotation retargeting",
+    });
+  }
+  return candidates;
+}
+
 function recordRootTranslationAudit(audit, clip, track, nodeName, baseTranslation, samples, rootTranslationMode) {
   if (!audit || track.path !== "translation" || !isRootTranslationTrack(track, nodeName)) return;
   const sorted = [...track.keyframes].sort((a, b) => a.time - b.time);
@@ -326,6 +363,12 @@ function recordRootTranslationAudit(audit, clip, track, nodeName, baseTranslatio
   const heightScaleDelta = heightScale === null ? null : Math.abs(heightScale - 1);
   const clipAudit = audit.clips.find((item) => item.id === clip.id) ?? { id: clip.id, durationSeconds: clip.durationSeconds ?? null, rootTranslations: [] };
   if (!audit.clips.includes(clipAudit)) audit.clips.push(clipAudit);
+  const recommendation = recommendRootTranslationNormalization({
+    mode: rootTranslationMode,
+    heightScale,
+    heightScaleDelta,
+    verticalDeltaRange,
+  });
   clipAudit.rootTranslations.push({
     sourceTarget: track.target,
     targetNode: nodeName,
@@ -343,13 +386,35 @@ function recordRootTranslationAudit(audit, clip, track, nodeName, baseTranslatio
     sourceRange: vec3Range(sourceTranslations),
     normalizedRange: vec3Range(normalizedTranslations),
     deltaRange,
-    recommendation: recommendRootTranslationNormalization({
-      mode: rootTranslationMode,
-      heightScale,
-      heightScaleDelta,
-      verticalDeltaRange,
-    }),
+    recommendation,
+    normalizationCandidates: rootTranslationNormalizationCandidates(recommendation),
   });
+}
+
+function rootTranslationNormalizationCandidates(recommendation) {
+  if (recommendation.id === "consider-scale-to-model") {
+    return [{
+      id: "root-scale-to-model",
+      kind: "root-translation-mode",
+      status: "runnable",
+      automatic: true,
+      rootTranslationMode: "scale-to-model",
+      triggerRecommendation: recommendation.id,
+      reason: "source and target root heights differ while vertical root motion is significant; run scale-to-model as a candidate and compare quality metrics",
+    }];
+  }
+  if (recommendation.id === "vertical-motion-dropped") {
+    return [{
+      id: "root-relative",
+      kind: "root-translation-mode",
+      status: "runnable",
+      automatic: true,
+      rootTranslationMode: "relative",
+      triggerRecommendation: recommendation.id,
+      reason: "horizontal-only mode drops meaningful vertical motion; run relative root motion as a candidate",
+    }];
+  }
+  return [];
 }
 
 function recommendRootTranslationNormalization({ mode, heightScale, heightScaleDelta, verticalDeltaRange }) {

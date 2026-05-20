@@ -262,7 +262,11 @@ shared tools now live in `tools/`:
   small committed quality calibration fixture
 - `tools/compare-motion-quality-reports.mjs`: compare two smoke reports, such
   as `relative` vs `scale-to-model`, and classify metric deltas as improved,
-  regressed, stable, or tradeoff
+  regressed, stable, or tradeoff; `--fail-on-tradeoff` prevents automatic
+  acceptance of mixed results
+- `tools/plan-motion-normalization-candidates.mjs`: turn smoke-report
+  normalization candidates into runnable experiment commands and blocked
+  pose-normalization follow-ups
 - `tools/review-motion-with-vlm.mjs`: optional cheap VLM second opinion using
   a generated contact sheet; dry-runs without credentials
 - `tools/retarget-profiles.mjs`: named retarget downgrade profiles with

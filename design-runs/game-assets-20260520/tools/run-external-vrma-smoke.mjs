@@ -352,6 +352,7 @@ function summarizeNormalization(audit) {
       deltaRange: item.deltaRange,
       normalizedRange: item.normalizedRange,
       recommendation: item.recommendation,
+      normalizationCandidates: item.normalizationCandidates ?? [],
     })),
   );
   return {
@@ -370,8 +371,27 @@ function summarizeNormalization(audit) {
       bindMetrics: audit.targetRig.bindMetrics,
     } : null,
     sourceTargetRigComparison: audit.sourceTargetRigComparison ?? null,
+    normalizationCandidates: collectNormalizationCandidates(audit, rootTranslations),
     rootTranslations,
   };
+}
+
+function collectNormalizationCandidates(audit, rootTranslations) {
+  const candidates = [];
+  for (const item of rootTranslations) {
+    for (const candidate of item.normalizationCandidates ?? []) {
+      candidates.push({
+        ...candidate,
+        clip: item.clip,
+        sourceTarget: item.sourceTarget,
+        targetNode: item.targetNode,
+      });
+    }
+  }
+  for (const candidate of audit.sourceTargetRigComparison?.normalizationCandidates ?? []) {
+    candidates.push(candidate);
+  }
+  return candidates;
 }
 
 function summarizeQuality(quality) {

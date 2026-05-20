@@ -53,6 +53,11 @@
           "leg-spread-mismatch",
           "shoulder-width-mismatch",
           "arm-rest-angle-mismatch"
+        ],
+        "candidates": [
+          "arm-rest-pose-offset",
+          "stance-width-adapter",
+          "shoulder-width-adapter"
         ]
       }
     },
@@ -101,6 +106,11 @@
           "leg-spread-mismatch",
           "shoulder-width-mismatch",
           "arm-rest-angle-mismatch"
+        ],
+        "candidates": [
+          "arm-rest-pose-offset",
+          "stance-width-adapter",
+          "shoulder-width-adapter"
         ]
       }
     },
@@ -122,7 +132,8 @@
         "recommendation": "consider-scale-to-model",
         "severity": "warn",
         "heightScale": [1.35, 1.55],
-        "verticalDeltaRange": [0.25, 0.4]
+        "verticalDeltaRange": [0.25, 0.4],
+        "candidate": "root-scale-to-model"
       },
       "targetRig": {
         "skeletonHeight": [1.8, 1.95],
@@ -149,6 +160,11 @@
           "leg-spread-mismatch",
           "shoulder-width-mismatch",
           "arm-rest-angle-mismatch"
+        ],
+        "candidates": [
+          "arm-rest-pose-offset",
+          "stance-width-adapter",
+          "shoulder-width-adapter"
         ]
       }
     }

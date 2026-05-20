@@ -75,6 +75,9 @@ async function main() {
       checkEqual(checks, `sample:${sampleName}:rootNormalization.severity`, rootNormalization?.recommendation?.severity, expected.rootNormalization.severity);
       checkRange(checks, `sample:${sampleName}:rootNormalization.heightScale`, rootNormalization?.heightScale, expected.rootNormalization.heightScale);
       checkRange(checks, `sample:${sampleName}:rootNormalization.verticalDeltaRange`, rootNormalization?.verticalDeltaRange, expected.rootNormalization.verticalDeltaRange);
+      if (expected.rootNormalization.candidate) {
+        checkIncludes(checks, `sample:${sampleName}:rootNormalization.candidate:${expected.rootNormalization.candidate}`, candidateIds(rootNormalization), expected.rootNormalization.candidate);
+      }
     }
     if (expected.targetRig) {
       checkRange(checks, `sample:${sampleName}:targetRig.skeletonHeight`, sample.normalization?.targetRig?.bindMetrics?.skeletonHeight, expected.targetRig.skeletonHeight);
@@ -98,6 +101,10 @@ async function main() {
       checkEqual(checks, `sample:${sampleName}:sourceTargetRigComparison.recommendation`, sample.normalization?.sourceTargetRigComparison?.recommendation?.id, expected.sourceRig.recommendation);
       for (const warning of expected.sourceRig.warnings ?? [expected.sourceRig.warning].filter(Boolean)) {
         checkIncludes(checks, `sample:${sampleName}:sourceTargetRigComparison.warning:${warning}`, warningIds(sample.normalization?.sourceTargetRigComparison), warning);
+      }
+      for (const candidate of expected.sourceRig.candidates ?? []) {
+        checkIncludes(checks, `sample:${sampleName}:sourceTargetRigComparison.candidate:${candidate}`, candidateIds(sample.normalization?.sourceTargetRigComparison), candidate);
+        checkIncludes(checks, `sample:${sampleName}:normalization.candidate:${candidate}`, candidateIds(sample.normalization), candidate);
       }
     }
   }
@@ -129,6 +136,10 @@ function firstRootNormalization(sample) {
 
 function warningIds(comparison) {
   return (comparison?.warnings ?? []).map((warning) => warning.id);
+}
+
+function candidateIds(value) {
+  return (value?.normalizationCandidates ?? []).map((candidate) => candidate.id);
 }
 
 function checkIncludes(checks, id, actual, expected) {

@@ -11,6 +11,7 @@ function parseArgs(argv) {
     out: "",
     samples: [],
     failOnRegression: false,
+    failOnTradeoff: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -19,6 +20,7 @@ function parseArgs(argv) {
     else if (arg === "--out") args.out = resolve(required(argv, ++i, arg));
     else if (arg === "--samples") args.samples = csv(required(argv, ++i, arg));
     else if (arg === "--fail-on-regression") args.failOnRegression = true;
+    else if (arg === "--fail-on-tradeoff") args.failOnTradeoff = true;
     else if (arg === "--help" || arg === "-h") {
       console.log(`Usage:
   node design-runs/game-assets-20260520/tools/compare-motion-quality-reports.mjs --baseline <smoke-report.json> --candidate <smoke-report.json> [options]
@@ -29,6 +31,7 @@ Options:
   --out <path>            Comparison report JSON
   --samples <csv>         Restrict comparison to selected sample names
   --fail-on-regression    Exit non-zero if any sample is a hard regression or missing
+  --fail-on-tradeoff      Exit non-zero if any sample has mixed improvements and regressions
 `);
       process.exit(0);
     } else {
@@ -68,7 +71,10 @@ async function main() {
     if (!baselineSamples.some((sample) => sample.sample === sampleName)) samples.push(missingSample(sampleName, "baseline report does not include this requested sample"));
   }
   const summary = summarize(samples);
-  const ok = samples.length > 0 && summary.missing === 0 && (!args.failOnRegression || summary.candidateRegressed === 0);
+  const ok = samples.length > 0 &&
+    summary.missing === 0 &&
+    (!args.failOnRegression || summary.candidateRegressed === 0) &&
+    (!args.failOnTradeoff || summary.candidateTradeoff === 0);
   const report = {
     version: 1,
     kind: "motion-quality-report-comparison",
@@ -77,6 +83,10 @@ async function main() {
     baseline: summarizeReport(args.baseline, baseline),
     candidate: summarizeReport(args.candidate, candidate),
     requestedSamples: args.samples,
+    policy: {
+      failOnRegression: args.failOnRegression,
+      failOnTradeoff: args.failOnTradeoff,
+    },
     summary,
     samples,
   };

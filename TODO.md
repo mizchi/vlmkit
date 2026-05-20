@@ -1048,6 +1048,9 @@ Current smoke status:
 - [x] Smoke-report comparison for root normalization candidates:
   `compare-motion-quality-reports.mjs` classifies metric deltas as improved,
   regressed, stable, or tradeoff
+- [x] Normalization candidate planner: smoke reports now expose runnable root
+  candidates and blocked pose candidates; `plan-motion-normalization-candidates`
+  emits run/compare commands and comparison can fail on tradeoff
 - [x] Named `robot-voxel` retarget profile for voxel robot smoke: skipped
   fingers, toes, chest, neck, and shoulders are tolerated with zero penalty,
   while skipped core bones fail the weighted profile
@@ -1128,7 +1131,7 @@ Stepwise cleanup:
   metrics and an initial `foot-spread-mismatch` pose warning now exist.
   Pose mismatch scoring now covers shoulder width, upper-leg spread, foot
   spread, and arm-down angle. Remaining work is deciding which warnings should
-  trigger automatic pre-normalization instead of only audit output.
+  trigger implemented pre-normalization instead of candidate planning only.
 - [ ] **G6. VRM + VRMA real playback check.** Use a real VRM model with a
   matching VRMA file to verify that our extractor agrees with an expected
   runtime playback path before retargeting onto simplified generated assets.

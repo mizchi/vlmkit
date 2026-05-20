@@ -63,6 +63,9 @@ The concrete scenario used a voxel robot and real `.vrma` motion samples from
   a baseline. In the current Jump test, `scale-to-model` improves ground error
   but regresses foot contact and pelvis displacement, so the decision is
   `candidate-tradeoff`.
+- Smoke reports now expose normalization candidates. The candidate planner
+  turns runnable candidates into smoke/compare commands and leaves
+  pose-normalization candidates blocked until their implementation exists.
 - The dry-run VLM review scaffold can create a contact sheet and strict JSON
   prompt for cheap reviewers such as UI-TARS / Nova Lite without adding a
   blocking human step.
@@ -135,6 +138,9 @@ schema out of the dogfood directory.
   Jump, but it was not strictly better: ground error improved while foot contact
   and pelvis displacement regressed. That argues for keeping `relative` as the
   smoke default until the target bind-height measurement is richer.
+- `--fail-on-tradeoff` is important for autonomy. A candidate can pass quality
+  gates and still be mixed; the plan runner must not treat that as an automatic
+  replacement for the baseline.
 - Target bind metrics are now available in the audit. For the voxel robot the
   measured retarget skeleton is height 1.88, hand span 1.12, foot spread 0.48,
   and pelvis-to-lowest-foot height 1.02. This is the right input for source
@@ -202,7 +208,12 @@ node design-runs/game-assets-20260520/tools/verify-motion-quality-gold.mjs \
 node design-runs/game-assets-20260520/tools/compare-motion-quality-reports.mjs \
   --baseline design-runs/game-assets-20260520/external/vrma/tk256ailab/smoke-report.json \
   --candidate design-runs/game-assets-20260520/external/vrma/tk256ailab/smoke-report.scale-to-model.json \
-  --samples Jump
+  --samples Jump \
+  --fail-on-regression \
+  --fail-on-tradeoff
+
+node design-runs/game-assets-20260520/tools/plan-motion-normalization-candidates.mjs \
+  --report design-runs/game-assets-20260520/external/vrma/tk256ailab/smoke-report.json
 ```
 
 Useful ignored outputs:

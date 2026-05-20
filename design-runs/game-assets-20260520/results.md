@@ -231,6 +231,12 @@ Observed shape:
   0.107 -> 0.079, but foot contact error regresses 0.118 -> 0.173 and pelvis
   displacement regresses 0.183 -> 0.265; classify as `candidate-tradeoff`,
   not an automatic replacement for `relative`
+- normalization candidate plan: 1 runnable candidate
+  (`Jump` `root-scale-to-model`) and 9 blocked pose candidates
+  (`arm-rest-pose-offset`, `stance-width-adapter`, `shoulder-width-adapter`
+  across 3 samples)
+- `--fail-on-tradeoff` rejects the runnable root candidate automatically
+  because its comparison is mixed, so it does not become the new default
 - retarget profile: `robot-voxel` (`simple-rig` is an alias)
 - quality verdict: `pass`
 - retarget weighted score: 1.0, penalty 0
@@ -289,6 +295,9 @@ Learned:
   signal. It can take the recommended candidate smoke report and show whether
   the candidate is an improvement, regression, or tradeoff without opening a
   viewer.
+- `plan-motion-normalization-candidates.mjs` is now the orchestration boundary:
+  runnable candidates get concrete smoke/compare commands, while pose candidates
+  stay blocked until their normalization implementation exists.
 - Target bind metrics make the scale decision less pelvis-only. The current
   audit now knows the simplified rig's skeleton height and limb spans before
   any candidate render, so future policy can compare source rest pose against
