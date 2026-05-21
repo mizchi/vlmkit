@@ -194,7 +194,7 @@ pub fn pose_normalization_candidate_specs(
     specs
   }
   let specs = if has_foot_spread_mismatch || has_leg_spread_mismatch {
-    append_id(specs, "stance-width-adapter:needs-implementation")
+    append_id(specs, "stance-width-adapter:runnable")
   } else {
     specs
   }

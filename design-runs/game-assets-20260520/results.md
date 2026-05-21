@@ -234,14 +234,19 @@ Observed shape:
   0.107 -> 0.079, but foot contact error regresses 0.118 -> 0.173 and pelvis
   displacement regresses 0.183 -> 0.265; classify as `candidate-tradeoff`,
   not an automatic replacement for `relative`
-- normalization candidate plan: 2 runnable candidates (`Goodbye`
-  `arm-rest-pose-offset` and `Jump` `root-scale-to-model`) and 8 blocked
-  candidates, including motion-gated arm-rest candidates for `LookAround` and
-  `Jump`
+- normalization candidate plan: 5 runnable candidates (`Goodbye`
+  `arm-rest-pose-offset`, all three `stance-width-adapter` samples, and
+  `Jump` `root-scale-to-model`) and 5 blocked candidates, including
+  motion-gated arm-rest candidates for `LookAround` and `Jump`
 - `arm-rest-pose-offset`: applies 4 upper/lower arm pose offsets around 90deg.
   The motion gate removes the known regressing `Jump` case; `Goodbye` remains
   runnable but non-automatic because it still needs a broader policy before
   becoming a default
+- `stance-width-offset`: applies lower-body rest-vector offsets for upper
+  legs, lower legs, and feet. The first attempt exposed a source/target lateral
+  sign mismatch and regressed foot contact; matching the source lateral sign to
+  the target side reduced upper-leg offsets to about 3.5deg, and `Goodbye`
+  compares as stable. It remains non-automatic.
 - `--fail-on-tradeoff` rejects the runnable root candidate automatically
   because its comparison is mixed, so it does not become the new default
 - candidate selection summary: 2 runnable candidate groups were compared.

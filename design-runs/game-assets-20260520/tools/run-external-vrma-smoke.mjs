@@ -60,7 +60,7 @@ Options:
   --root-translation-mode <mode>
                           keep|relative|horizontal-only|zero|scale-to-model (default: relative)
   --pose-normalization <mode>
-                          none|arm-rest-offset (default: none)
+                          none|arm-rest-offset|stance-width-offset (default: none)
   --retarget-profile <profile>
                           ${retargetProfileNames().join("|")} (default: robot-voxel)
   --min-quality <verdict>
@@ -81,8 +81,8 @@ Options:
   if (!["keep", "relative", "horizontal-only", "zero", "scale-to-model"].includes(args.rootTranslationMode)) {
     throw new Error("--root-translation-mode must be keep, relative, horizontal-only, zero, or scale-to-model");
   }
-  if (!["none", "arm-rest-offset"].includes(args.poseNormalization)) {
-    throw new Error("--pose-normalization must be none or arm-rest-offset");
+  if (!["none", "arm-rest-offset", "stance-width-offset"].includes(args.poseNormalization)) {
+    throw new Error("--pose-normalization must be none, arm-rest-offset, or stance-width-offset");
   }
   if (!retargetProfileNames().includes(args.retargetProfile)) {
     throw new Error(`--retarget-profile must be one of: ${retargetProfileNames().join(", ")}`);

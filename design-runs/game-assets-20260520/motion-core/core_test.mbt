@@ -155,7 +155,7 @@ test "pose mismatch warning ids" {
 test "pose normalization candidate specs" {
   inspect(
     pose_normalization_candidate_specs(true, true, true, true, Some(108.40739)),
-    content="arm-rest-pose-offset:runnable|stance-width-adapter:needs-implementation|shoulder-width-adapter:review-target-rig",
+    content="arm-rest-pose-offset:runnable|stance-width-adapter:runnable|shoulder-width-adapter:review-target-rig",
   )
   inspect(
     pose_normalization_candidate_specs(
@@ -169,11 +169,11 @@ test "pose normalization candidate specs" {
   )
   inspect(
     pose_normalization_candidate_specs(false, true, false, false, None),
-    content="stance-width-adapter:needs-implementation",
+    content="stance-width-adapter:runnable",
   )
   inspect(
     pose_normalization_candidate_specs(false, false, true, false, None),
-    content="stance-width-adapter:needs-implementation",
+    content="stance-width-adapter:runnable",
   )
   inspect(
     pose_normalization_candidate_specs(false, false, false, false, None),

@@ -368,6 +368,8 @@ const SOURCE_RIG_TRACKED_BONES = [
   "rightHand",
   "leftUpperLeg",
   "rightUpperLeg",
+  "leftLowerLeg",
+  "rightLowerLeg",
   "leftFoot",
   "rightFoot",
 ];

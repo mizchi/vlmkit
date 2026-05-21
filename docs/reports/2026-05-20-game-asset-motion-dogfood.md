@@ -71,6 +71,12 @@ The concrete scenario used a voxel robot and real `.vrma` motion samples from
   `LookAround` stayed `stable`, `Goodbye` improved one displacement metric,
   and `Jump` regressed it, so this is a runnable experiment path rather than a
   new default.
+- `--pose-normalization stance-width-offset` now computes lower-body rest
+  offsets for stance mismatch candidates. The dogfood run caught a lateral-axis
+  sign problem: naive world-vector alignment produced 116deg upper-leg offsets
+  and worse foot contact. Matching the source lateral sign to the target side
+  reduced the offset to about 3.5deg, and the `Goodbye` candidate now compares
+  as stable.
 - Arm-rest candidates now have a motion-aware gate. The audit measures max
   upper-arm rotation and only emits a runnable arm-rest candidate at 60deg or
   more. In this set, `Goodbye` passes with 108.4deg while `LookAround` 14.5deg
@@ -184,6 +190,10 @@ schema out of the dogfood directory.
   when the clip actually exercises upper arms. Gating on upper-arm rotation
   removes the known regressing `Jump` case while keeping the improved
   `Goodbye` case visible for policy work.
+- Stance-width pre-normalization is also mechanically runnable, but it should
+  stay non-automatic until multiple samples show improvement. The current
+  value is exposing safe candidate execution and catching lateral-axis mistakes
+  without promoting a default.
 - A selection layer is now necessary between "candidate is runnable" and
   "candidate should change defaults." Per-sample comparisons are too granular
   for autonomous loops; the group-level report gives the agent one stable

@@ -61,7 +61,7 @@
         ],
         "candidateStatuses": {
           "arm-rest-pose-offset": "needs-motion-evidence",
-          "stance-width-adapter": "needs-implementation",
+          "stance-width-adapter": "runnable",
           "shoulder-width-adapter": "review-target-rig"
         },
         "candidateAutomatic": {
@@ -127,7 +127,7 @@
         ],
         "candidateStatuses": {
           "arm-rest-pose-offset": "runnable",
-          "stance-width-adapter": "needs-implementation",
+          "stance-width-adapter": "runnable",
           "shoulder-width-adapter": "review-target-rig"
         },
         "candidateAutomatic": {
@@ -194,7 +194,7 @@
         ],
         "candidateStatuses": {
           "arm-rest-pose-offset": "needs-motion-evidence",
-          "stance-width-adapter": "needs-implementation",
+          "stance-width-adapter": "runnable",
           "shoulder-width-adapter": "review-target-rig"
         },
         "candidateAutomatic": {

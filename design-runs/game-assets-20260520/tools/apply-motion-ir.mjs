@@ -41,7 +41,7 @@ Options:
   --root-translation-mode <mode>
                          keep|relative|horizontal-only|zero|scale-to-model (default: keep)
   --pose-normalization <mode>
-                         none|arm-rest-offset (default: none)
+                         none|arm-rest-offset|stance-width-offset (default: none)
 `);
       process.exit(0);
     } else {
@@ -52,8 +52,8 @@ Options:
   if (!["keep", "relative", "horizontal-only", "zero", "scale-to-model"].includes(args.rootTranslationMode)) {
     throw new Error("--root-translation-mode must be keep, relative, horizontal-only, zero, or scale-to-model");
   }
-  if (!["none", "arm-rest-offset"].includes(args.poseNormalization)) {
-    throw new Error("--pose-normalization must be none or arm-rest-offset");
+  if (!["none", "arm-rest-offset", "stance-width-offset"].includes(args.poseNormalization)) {
+    throw new Error("--pose-normalization must be none, arm-rest-offset, or stance-width-offset");
   }
   return args;
 }
@@ -227,28 +227,33 @@ function poseNormalizationOffsets(audit, mode) {
     audit.poseNormalizationDetails = { mode, offsets: [] };
     return new Map();
   }
-  if (mode !== "arm-rest-offset") throw new Error(`unsupported pose normalization mode: ${mode}`);
+  const segments = POSE_NORMALIZATION_OFFSET_SEGMENTS[mode];
+  if (!segments) throw new Error(`unsupported pose normalization mode: ${mode}`);
   const source = audit.sourceRig?.trackedBonePositions ?? {};
   const target = audit.targetRig?.trackedNodePositions ?? {};
-  const offsets = ARM_REST_OFFSET_SEGMENTS
-    .map((segment) => armRestOffset(segment, source, target))
+  const offsets = segments
+    .map((segment) => poseSegmentOffset(segment, source, target))
     .filter(Boolean);
   audit.poseNormalizationDetails = { mode, offsets };
   return new Map(offsets.map((offset) => [offset.sourceTarget, offset]));
 }
 
-function armRestOffset(segment, source, target) {
+function poseSegmentOffset(segment, source, target) {
   const sourceStart = source[segment.sourceStart];
   const sourceEnd = source[segment.sourceEnd];
   const targetStart = target[segment.targetStart];
   const targetEnd = target[segment.targetEnd];
-  const sourceVector = vectorBetween(sourceStart, sourceEnd);
+  const rawSourceVector = vectorBetween(sourceStart, sourceEnd);
   const targetVector = vectorBetween(targetStart, targetEnd);
-  if (!sourceVector || !targetVector) return null;
+  if (!rawSourceVector || !targetVector) return null;
+  const sourceVector = segment.matchLateralSign
+    ? matchLateralSign(rawSourceVector, targetVector)
+    : rawSourceVector;
   const alignQuaternion = quatFromUnitVectors(sourceVector, targetVector);
   return {
     sourceTarget: segment.sourceTarget,
     targetNode: segment.targetNode,
+    lateralSignAdjusted: sourceVector[0] !== rawSourceVector[0],
     sourceVector: sourceVector.map(round),
     targetVector: targetVector.map(round),
     alignQuaternion: alignQuaternion.map(round),
@@ -415,6 +420,7 @@ function poseNormalizationCandidate(spec, warningIds, motionActivity) {
       kind: detail.kind,
       status: spec.status,
       automatic: detail.automatic,
+      poseNormalization: detail.poseNormalization,
       triggerWarnings: detail.triggerWarnings.filter((id) => warningIds.has(id)),
       reason: detail.reason,
     };
@@ -570,7 +576,7 @@ function normalizeSamples(clip, track, options = {}) {
 }
 
 function normalizeRotation(rotation, options) {
-  if (options.poseNormalization !== "arm-rest-offset" || !options.poseOffset) return rotation;
+  if (options.poseNormalization === "none" || !options.poseOffset) return rotation;
   const align = options.poseOffset.alignQuaternion;
   return quatNormalize(quatMultiply(quatMultiply(align, rotation), quatInvert(align))).map(round);
 }
@@ -625,6 +631,14 @@ function vectorBetween(a, b) {
   const vector = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
   const length = Math.hypot(...vector);
   return length > 0.0001 ? vector.map((value) => value / length) : null;
+}
+
+function matchLateralSign(sourceVector, targetVector) {
+  if (Math.abs(sourceVector[0]) <= 0.0001 || Math.abs(targetVector[0]) <= 0.0001) {
+    return sourceVector;
+  }
+  if (Math.sign(sourceVector[0]) === Math.sign(targetVector[0])) return sourceVector;
+  return [-sourceVector[0], sourceVector[1], sourceVector[2]];
 }
 
 function armDownAngleDeg(shoulder, hand) {
@@ -832,6 +846,62 @@ const ARM_REST_OFFSET_SEGMENTS = [
     targetEnd: "right_hand",
   },
 ];
+const STANCE_WIDTH_OFFSET_SEGMENTS = [
+  {
+    sourceTarget: "leftUpperLeg",
+    targetNode: "left_upper_leg",
+    sourceStart: "hips",
+    sourceEnd: "leftUpperLeg",
+    targetStart: "pelvis",
+    targetEnd: "left_upper_leg",
+    matchLateralSign: true,
+  },
+  {
+    sourceTarget: "leftLowerLeg",
+    targetNode: "left_lower_leg",
+    sourceStart: "leftUpperLeg",
+    sourceEnd: "leftLowerLeg",
+    targetStart: "left_upper_leg",
+    targetEnd: "left_lower_leg",
+  },
+  {
+    sourceTarget: "leftFoot",
+    targetNode: "left_foot",
+    sourceStart: "leftLowerLeg",
+    sourceEnd: "leftFoot",
+    targetStart: "left_lower_leg",
+    targetEnd: "left_foot",
+  },
+  {
+    sourceTarget: "rightUpperLeg",
+    targetNode: "right_upper_leg",
+    sourceStart: "hips",
+    sourceEnd: "rightUpperLeg",
+    targetStart: "pelvis",
+    targetEnd: "right_upper_leg",
+    matchLateralSign: true,
+  },
+  {
+    sourceTarget: "rightLowerLeg",
+    targetNode: "right_lower_leg",
+    sourceStart: "rightUpperLeg",
+    sourceEnd: "rightLowerLeg",
+    targetStart: "right_upper_leg",
+    targetEnd: "right_lower_leg",
+  },
+  {
+    sourceTarget: "rightFoot",
+    targetNode: "right_foot",
+    sourceStart: "rightLowerLeg",
+    sourceEnd: "rightFoot",
+    targetStart: "right_lower_leg",
+    targetEnd: "right_foot",
+  },
+];
+const POSE_NORMALIZATION_OFFSET_SEGMENTS = Object.freeze({
+  "arm-rest-offset": ARM_REST_OFFSET_SEGMENTS,
+  "stance-width-offset": STANCE_WIDTH_OFFSET_SEGMENTS,
+});
 const TARGET_RIG_TRACKED_NODES = [
   "robot_root",
   "pelvis",
@@ -844,6 +914,8 @@ const TARGET_RIG_TRACKED_NODES = [
   "right_hand",
   "left_upper_leg",
   "right_upper_leg",
+  "left_lower_leg",
+  "right_lower_leg",
   "left_foot",
   "right_foot",
 ];
@@ -881,8 +953,9 @@ const POSE_NORMALIZATION_CANDIDATE_DETAILS = Object.freeze({
   "stance-width-adapter": {
     kind: "pose-pre-normalization",
     automatic: false,
+    poseNormalization: "stance-width-offset",
     triggerWarnings: ["foot-spread-mismatch", "leg-spread-mismatch"],
-    reason: "source and target lower-body rest stance differ; root/leg offsets need a separate candidate before changing animation data",
+    reason: "source and target lower-body rest stance differ; run stance-width-offset as a per-sample candidate before changing defaults",
   },
   "shoulder-width-adapter": {
     kind: "target-rig-or-pose-policy",

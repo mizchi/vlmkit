@@ -254,7 +254,8 @@ shared tools now live in `tools/`:
   external VRMA samples and write a structured smoke report; supports
   normalization audit summaries, root scaling recommendations,
   motion-aware arm-rest candidate gates, `--pose-normalization
-  arm-rest-offset`, and `--min-quality pass|warn|fail` for CI-style gating
+  arm-rest-offset|stance-width-offset`, and `--min-quality pass|warn|fail` for
+  CI-style gating
 - `tools/verify-motion-quality.mjs`: turn render metadata, frame bboxes,
   normalized ground deltas, tracked foot contact, tracked limb displacement,
   and Motion IR warnings into `pass` / `warn` / `fail`; supports strict and
@@ -267,7 +268,7 @@ shared tools now live in `tools/`:
   acceptance of mixed results
 - `tools/plan-motion-normalization-candidates.mjs`: turn smoke-report
   normalization candidates into runnable experiment commands and blocked
-  follow-ups
+  follow-ups; pose candidates can run arm-rest or stance-width offset modes
 - `tools/select-motion-normalization-candidates.mjs`: read the candidate plan
   plus generated comparison reports and summarize candidate groups as accepted,
   rejected, neutral, missing, or needing policy; group recommendation is

@@ -1058,6 +1058,12 @@ Current smoke status:
   arm-rest candidates now require at least 60deg of upper-arm rotation evidence;
   `Goodbye` remains runnable, while `LookAround` and `Jump` are blocked as
   `needs-motion-evidence`
+- [x] Experimental stance width pose pre-normalization:
+  `--pose-normalization stance-width-offset` computes lower-body rest-vector
+  offsets for upper legs, lower legs, and feet. The adapter is runnable for
+  `foot-spread-mismatch` / `leg-spread-mismatch`, records lateral-axis sign
+  adjustment in the audit, and remains non-automatic until candidate
+  comparisons justify changing defaults.
 - [x] Candidate selection summary:
   `select-motion-normalization-candidates.mjs` groups runnable candidate
   comparisons and emits accepted/rejected/neutral/missing recommendations so
@@ -1156,8 +1162,9 @@ Stepwise cleanup:
   recommended candidate mode against the baseline smoke report. Source rest
   metrics and an initial `foot-spread-mismatch` pose warning now exist.
   Pose mismatch scoring now covers shoulder width, upper-leg spread, foot
-  spread, and arm-down angle. Remaining work is deciding which warnings should
-  trigger implemented pre-normalization instead of candidate planning only.
+  spread, and arm-down angle. Arm-rest and stance-width warnings now trigger
+  runnable pre-normalization candidates; remaining work is deciding promotion
+  policy from repeated candidate comparisons.
 - [ ] **G6. VRM + VRMA real playback check.** Use a real VRM model with a
   matching VRMA file to verify that our extractor agrees with an expected
   runtime playback path before retargeting onto simplified generated assets.

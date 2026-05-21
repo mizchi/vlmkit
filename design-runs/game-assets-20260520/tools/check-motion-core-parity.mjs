@@ -163,7 +163,7 @@ const cases = [
       hasShoulderWidthMismatch: true,
       maxUpperArmRotationRangeDeg: 108.40739,
     })),
-    "arm-rest-pose-offset:runnable|stance-width-adapter:needs-implementation|shoulder-width-adapter:review-target-rig",
+    "arm-rest-pose-offset:runnable|stance-width-adapter:runnable|shoulder-width-adapter:review-target-rig",
   ],
   [
     "pose-normalization-candidate-specs arm blocked",
@@ -185,7 +185,7 @@ const cases = [
       hasShoulderWidthMismatch: false,
       maxUpperArmRotationRangeDeg: null,
     })),
-    "stance-width-adapter:needs-implementation",
+    "stance-width-adapter:runnable",
   ],
   [
     "policy.root.recommendationId",
