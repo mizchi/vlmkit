@@ -215,6 +215,10 @@ export type MarkupCoreUiContractPatternEvidenceIssueId =
   | "expressive-menu-required-hover"
   | "expressive-menu-required-focus-visible";
 
+export type MarkupCoreUiContractMarkerIssueId =
+  | "marker-kind-unknown"
+  | "marker-target-required";
+
 export type MarkupCoreUiContractLayoutIssueId =
   | "layout-width-fluid-bounds"
   | "layout-width-fixed-positive"
@@ -266,6 +270,29 @@ export function computeUiContractPatternEvidenceIssueIds(input: {
       return issueId;
     }
     throw new Error(`unexpected markup-core UI contract issue id: ${issueId}`);
+  });
+}
+
+export function computeUiContractMarkerIssueIds(input: {
+  kind: string;
+  required: boolean;
+  hasSelector: boolean;
+  hasAttribute: boolean;
+  hasTarget: boolean;
+}): MarkupCoreUiContractMarkerIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-marker-issue-ids",
+    input.kind,
+    boolArg(input.required),
+    boolArg(input.hasSelector),
+    boolArg(input.hasAttribute),
+    boolArg(input.hasTarget),
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractMarkerIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(`unexpected markup-core UI contract marker issue id: ${issueId}`);
   });
 }
 
@@ -421,6 +448,15 @@ function isMarkupCoreUiContractLayoutIssueId(
     issueId === "layout-height-scrollport-max-positive" ||
     issueId === "layout-grid-columns" ||
     issueId === "layout-grid-rows"
+  );
+}
+
+function isMarkupCoreUiContractMarkerIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractMarkerIssueId {
+  return (
+    issueId === "marker-kind-unknown" ||
+    issueId === "marker-target-required"
   );
 }
 

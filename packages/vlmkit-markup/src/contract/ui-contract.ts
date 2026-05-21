@@ -1,11 +1,13 @@
 import {
   computeUiContractExpectedScrollportIssueIds,
   computeUiContractLayoutIssueIds,
+  computeUiContractMarkerIssueIds,
   computeUiContractPatternEvidenceIssueIds,
   computeUiContractRequiredStateIssueIds,
   computeUiContractStateIssueIds,
   type MarkupCoreUiContractExpectedScrollportIssueId,
   type MarkupCoreUiContractLayoutIssueId,
+  type MarkupCoreUiContractMarkerIssueId,
   type MarkupCoreUiContractPatternEvidenceIssueId,
   type MarkupCoreUiContractRequiredStateIssueId,
   type MarkupCoreUiContractStateIssueId,
@@ -123,18 +125,6 @@ export type UiMarkerKind =
   | "unread"
   | "game-state"
   | "custom";
-
-const UI_MARKER_KINDS: readonly UiMarkerKind[] = [
-  "primary-cta",
-  "next-section",
-  "media-slot",
-  "hero-title",
-  "scrollport",
-  "selected",
-  "unread",
-  "game-state",
-  "custom",
-];
 
 export interface UiMarkerContract {
   id?: string;
@@ -586,12 +576,28 @@ function validateMarkers(
   for (let i = 0; i < (markers?.length ?? 0); i++) {
     const marker = markers![i]!;
     const markerPath = `${path}[${i}]`;
-    if (!includesString(UI_MARKER_KINDS, marker.kind)) {
-      issues.push({ path: `${markerPath}.kind`, message: "unknown marker kind" });
+    const issueIds = computeUiContractMarkerIssueIds({
+      kind: marker.kind,
+      required: Boolean(marker.required),
+      hasSelector: Boolean(marker.selector),
+      hasAttribute: Boolean(marker.attribute),
+      hasTarget: Boolean(marker.target),
+    });
+    for (const issueId of issueIds) {
+      issues.push(uiContractMarkerIssue(issueId, markerPath));
     }
-    if (marker.required && !marker.selector && !marker.attribute && !marker.target) {
-      issues.push({ path: markerPath, message: "required marker must declare selector, attribute, or target" });
-    }
+  }
+}
+
+function uiContractMarkerIssue(
+  issueId: MarkupCoreUiContractMarkerIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "marker-kind-unknown":
+      return { path: `${path}.kind`, message: "unknown marker kind" };
+    case "marker-target-required":
+      return { path, message: "required marker must declare selector, attribute, or target" };
   }
 }
 

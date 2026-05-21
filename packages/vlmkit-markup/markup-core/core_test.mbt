@@ -441,3 +441,19 @@ test "ui contract state and scrollport issue policy" {
     content="expected-scrollport-id-unique",
   )
 }
+
+///|
+test "ui contract marker issue policy" {
+  inspect(
+    ui_contract_marker_issue_ids("primary-cta", true, false, false, false),
+    content="marker-target-required",
+  )
+  inspect(
+    ui_contract_marker_issue_ids("unknown", false, false, false, false),
+    content="marker-kind-unknown",
+  )
+  inspect(
+    ui_contract_marker_issue_ids("scrollport", true, true, false, false),
+    content="",
+  )
+}

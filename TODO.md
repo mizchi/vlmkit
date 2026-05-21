@@ -1311,10 +1311,14 @@ Stepwise cleanup:
   issue ids and expected-scrollport axis / target / minOverflow issue ids to
   `markup-core`. TypeScript still owns array traversal, duplicate tracking, and
   mapping the returned ids back to nested issue paths.
+- [x] UI Contract marker validator slice:
+  `contract/ui-contract.ts` now delegates marker kind and required marker target
+  issue ids to `markup-core`. TypeScript still owns marker array traversal and
+  maps ids back to nested issue paths and human-readable messages.
 - [ ] Continue UI Contract validator core:
-  move the remaining enum/range/uniqueness predicates for markers,
-  composition, content, decoration, assets, and canvas metadata into MoonBit in
-  small slices, while keeping TypeScript as the contract schema and report-text
+  move the remaining enum/range/uniqueness predicates for composition, content,
+  decoration, assets, slots, repeat, and canvas metadata into MoonBit in small
+  slices, while keeping TypeScript as the contract schema and report-text
   boundary.
 - [x] Semantic drilldown selection policy slice:
   `component/semantic-drilldown.ts` now delegates layout-vs-decoration flow,

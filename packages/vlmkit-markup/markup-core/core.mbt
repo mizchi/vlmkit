@@ -475,6 +475,24 @@ pub fn ui_contract_pattern_evidence_issue_ids(
 }
 
 ///|
+pub fn ui_contract_marker_issue_ids(
+  kind : String,
+  required : Bool,
+  has_selector : Bool,
+  has_attribute : Bool,
+  has_target : Bool,
+) -> String {
+  let issues : Array[String] = []
+  if !is_ui_marker_kind(kind) {
+    issues.push("marker-kind-unknown")
+  }
+  if required && !has_selector && !has_attribute && !has_target {
+    issues.push("marker-target-required")
+  }
+  issues.join("|")
+}
+
+///|
 pub fn ui_contract_layout_issue_ids(
   width_kind : String,
   width_min_present : Bool,
@@ -600,6 +618,19 @@ fn is_ui_state_kind(kind : String) -> Bool {
   kind == "playing" ||
   kind == "paused" ||
   kind == "result"
+}
+
+///|
+fn is_ui_marker_kind(kind : String) -> Bool {
+  kind == "primary-cta" ||
+  kind == "next-section" ||
+  kind == "media-slot" ||
+  kind == "hero-title" ||
+  kind == "scrollport" ||
+  kind == "selected" ||
+  kind == "unread" ||
+  kind == "game-state" ||
+  kind == "custom"
 }
 
 ///|

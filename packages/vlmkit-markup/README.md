@@ -59,7 +59,7 @@ TypeScript while MoonBit owns layout-vs-decoration flow selection, priority
 scoring, reason ids, and next-action ordering.
 `validateUiContract()` keeps JSON traversal, issue paths, and report text in
 TypeScript while MoonBit owns pattern-specific evidence and layout-policy issue
-id selection, plus state and expected-scrollport predicate ids.
+id selection, plus marker, state, and expected-scrollport predicate ids.
 
 This keeps the policy owner single while TypeScript continues to own file I/O,
 Playwright/browser integration, and package ergonomics.

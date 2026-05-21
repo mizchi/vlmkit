@@ -150,6 +150,18 @@ test("validateUiContract enforces pattern-specific evidence", () => {
   assert.ok(validateUiContract(canvas).some((issue) => issue.message.includes("playerX")));
 });
 
+test("validateUiContract validates marker policy through markup core", () => {
+  const contract = structuredClone(valid);
+  contract.screens[0]!.markers = [
+    { kind: "primary-cta", required: true },
+    { kind: "badge" as never },
+  ];
+
+  const issues = validateUiContract(contract);
+  assert.ok(issues.some((issue) => issue.message.includes("required marker")));
+  assert.ok(issues.some((issue) => issue.message.includes("unknown marker kind")));
+});
+
 test("validateUiContract accepts app-shell expected scrollports and required states", () => {
   const contract = structuredClone(valid);
   const screen = contract.screens[0]!;
