@@ -227,6 +227,11 @@ test("validateUiContract validates hierarchy and rich metadata ranges", () => {
     kind: "list",
     items: { min: 4, max: 2 },
   };
+  contract.screens[0]!.canvas = {
+    requiredStateFields: ["mode"],
+    inputs: [{ kind: "keyboard", action: "" }],
+    hud: [{ id: "" }],
+  };
   contract.screens[0]!.landmarks[1]!.assets = [
     { id: "", kind: "image", policy: "replaceable" },
   ];
@@ -238,6 +243,9 @@ test("validateUiContract validates hierarchy and rich metadata ranges", () => {
   assert.ok(issues.some((issue) => issue.message.includes("max must be non-negative")));
   assert.ok(issues.some((issue) => issue.message.includes("min cannot exceed max")));
   assert.ok(issues.some((issue) => issue.message.includes("asset id is required")));
+  assert.ok(issues.some((issue) => issue.message.includes("canvas stateHook")));
+  assert.ok(issues.some((issue) => issue.message.includes("canvas input action")));
+  assert.ok(issues.some((issue) => issue.message.includes("canvas HUD id")));
 });
 
 test("validateUiContract accepts expressive menu composition contracts", () => {

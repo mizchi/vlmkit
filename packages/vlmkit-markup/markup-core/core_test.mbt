@@ -468,8 +468,28 @@ test "ui contract optional range issue policy" {
     ui_contract_optional_range_issue_ids(true, 4, true, 2),
     content="range-min-lte-max",
   )
+  inspect(ui_contract_optional_range_issue_ids(false, 0, true, 2), content="")
+}
+
+///|
+test "ui contract metadata presence issue policy" {
+  inspect(ui_contract_slot_issue_ids(""), content="slot-id-required")
+  inspect(ui_contract_slot_issue_ids("hero"), content="")
+  inspect(ui_contract_asset_issue_ids(""), content="asset-id-required")
+  inspect(ui_contract_asset_issue_ids("hero-image"), content="")
   inspect(
-    ui_contract_optional_range_issue_ids(false, 0, true, 2),
-    content="",
+    ui_contract_canvas_issue_ids(false, 2),
+    content="canvas-state-hook-required",
   )
+  inspect(ui_contract_canvas_issue_ids(false, 0), content="")
+  inspect(
+    ui_contract_canvas_input_issue_ids(""),
+    content="canvas-input-action-required",
+  )
+  inspect(ui_contract_canvas_input_issue_ids("jump"), content="")
+  inspect(
+    ui_contract_canvas_hud_issue_ids(""),
+    content="canvas-hud-id-required",
+  )
+  inspect(ui_contract_canvas_hud_issue_ids("score"), content="")
 }

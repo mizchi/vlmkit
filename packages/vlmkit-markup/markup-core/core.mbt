@@ -513,6 +513,54 @@ pub fn ui_contract_optional_range_issue_ids(
 }
 
 ///|
+pub fn ui_contract_slot_issue_ids(id : String) -> String {
+  if id == "" {
+    "slot-id-required"
+  } else {
+    ""
+  }
+}
+
+///|
+pub fn ui_contract_asset_issue_ids(id : String) -> String {
+  if id == "" {
+    "asset-id-required"
+  } else {
+    ""
+  }
+}
+
+///|
+pub fn ui_contract_canvas_issue_ids(
+  has_state_hook : Bool,
+  required_state_field_count : Int,
+) -> String {
+  if required_state_field_count > 0 && !has_state_hook {
+    "canvas-state-hook-required"
+  } else {
+    ""
+  }
+}
+
+///|
+pub fn ui_contract_canvas_input_issue_ids(action : String) -> String {
+  if action == "" {
+    "canvas-input-action-required"
+  } else {
+    ""
+  }
+}
+
+///|
+pub fn ui_contract_canvas_hud_issue_ids(id : String) -> String {
+  if id == "" {
+    "canvas-hud-id-required"
+  } else {
+    ""
+  }
+}
+
+///|
 pub fn ui_contract_layout_issue_ids(
   width_kind : String,
   width_min_present : Bool,

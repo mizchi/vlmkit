@@ -191,6 +191,21 @@ fn main_err() -> Unit raise {
           parse_double(max_value),
         ),
       )
+    ["ui-contract-slot-issue-ids", id] =>
+      println(@core.ui_contract_slot_issue_ids(id))
+    ["ui-contract-asset-issue-ids", id] =>
+      println(@core.ui_contract_asset_issue_ids(id))
+    ["ui-contract-canvas-issue-ids", has_state_hook, required_state_field_count] =>
+      println(
+        @core.ui_contract_canvas_issue_ids(
+          parse_bool(has_state_hook),
+          parse_int(required_state_field_count),
+        ),
+      )
+    ["ui-contract-canvas-input-issue-ids", action] =>
+      println(@core.ui_contract_canvas_input_issue_ids(action))
+    ["ui-contract-canvas-hud-issue-ids", id] =>
+      println(@core.ui_contract_canvas_hud_issue_ids(id))
     [
       "ui-contract-layout-issue-ids",
       width_kind,
@@ -315,6 +330,11 @@ fn is_command(value : String) -> Bool {
   value == "ui-contract-pattern-evidence-issue-ids" ||
   value == "ui-contract-marker-issue-ids" ||
   value == "ui-contract-optional-range-issue-ids" ||
+  value == "ui-contract-slot-issue-ids" ||
+  value == "ui-contract-asset-issue-ids" ||
+  value == "ui-contract-canvas-issue-ids" ||
+  value == "ui-contract-canvas-input-issue-ids" ||
+  value == "ui-contract-canvas-hud-issue-ids" ||
   value == "ui-contract-layout-issue-ids" ||
   value == "ui-contract-state-issue-ids" ||
   value == "ui-contract-required-state-issue-ids" ||
@@ -392,6 +412,6 @@ fn parse_int_list(value : String) -> Array[Int] raise {
 ///|
 fn print_usage() -> Unit {
   println(
-    "Usage: markup-core-cli component-goal-status <...> | is-component-probe-state <state> | is-forced-pseudo-state <state> | component-probe-states <kind|kind> | merge-component-probe-states <explicit|...> <injected|...> | component-scroll-target-source <kind|kind> <state-target-count> | semantic-drilldown-policy <layout-score> <decoration-score> <heatmap-kind-count> | semantic-drilldown-select-index <flow|...> <priority|...> <order|...> | ui-contract-pattern-evidence-issue-ids <pattern> <marker|...> <required-state|...> <state|...> <expected-scrollport-count> <has-composition> <has-canvas-state-hook> <canvas-field|...> | ui-contract-marker-issue-ids <kind> <required> <has-selector> <has-attribute> <has-target> | ui-contract-optional-range-issue-ids <has-min> <min> <has-max> <max> | ui-contract-layout-issue-ids <width-kind> <has-min> <has-max> <width-value> <height-kind> <height-value> <height-max> <display-kind> <columns> <rows> | ui-contract-state-issue-ids <id> <kind> <required> <has-selector> <has-trigger> | ui-contract-required-state-issue-ids <id> <kind> <required> <has-selector> <has-trigger> <duplicate-id> <has-min-change-ratio> <min-change-ratio> | ui-contract-expected-scrollport-issue-ids <id> <axis> <required> <has-selector> <has-name> <has-landmark-id> <duplicate-id> <has-min-overflow> <min-overflow>",
+    "Usage: markup-core-cli component-goal-status <...> | is-component-probe-state <state> | is-forced-pseudo-state <state> | component-probe-states <kind|kind> | merge-component-probe-states <explicit|...> <injected|...> | component-scroll-target-source <kind|kind> <state-target-count> | semantic-drilldown-policy <layout-score> <decoration-score> <heatmap-kind-count> | semantic-drilldown-select-index <flow|...> <priority|...> <order|...> | ui-contract-pattern-evidence-issue-ids <pattern> <marker|...> <required-state|...> <state|...> <expected-scrollport-count> <has-composition> <has-canvas-state-hook> <canvas-field|...> | ui-contract-marker-issue-ids <kind> <required> <has-selector> <has-attribute> <has-target> | ui-contract-optional-range-issue-ids <has-min> <min> <has-max> <max> | ui-contract-slot-issue-ids <id> | ui-contract-asset-issue-ids <id> | ui-contract-canvas-issue-ids <has-state-hook> <required-state-field-count> | ui-contract-canvas-input-issue-ids <action> | ui-contract-canvas-hud-issue-ids <id> | ui-contract-layout-issue-ids <width-kind> <has-min> <has-max> <width-value> <height-kind> <height-value> <height-max> <display-kind> <columns> <rows> | ui-contract-state-issue-ids <id> <kind> <required> <has-selector> <has-trigger> | ui-contract-required-state-issue-ids <id> <kind> <required> <has-selector> <has-trigger> <duplicate-id> <has-min-change-ratio> <min-change-ratio> | ui-contract-expected-scrollport-issue-ids <id> <axis> <required> <has-selector> <has-name> <has-landmark-id> <duplicate-id> <has-min-overflow> <min-overflow>",
   )
 }

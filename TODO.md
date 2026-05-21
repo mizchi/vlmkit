@@ -1320,10 +1320,14 @@ Stepwise cleanup:
   TypeScript still owns the contextual path mapping, so the same range policy
   can be reused across repeat metadata and content metadata without leaking
   report wording into MoonBit.
+- [x] UI Contract metadata presence validator slice:
+  slot ids, asset ids, and canvas stateHook/input/HUD presence predicates now
+  delegate to `markup-core`. TypeScript still owns nested array traversal and
+  maps each returned id to the existing report path/message.
 - [ ] Continue UI Contract validator core:
-  move the remaining enum/uniqueness predicates for composition, decoration,
-  assets, slots, and canvas metadata into MoonBit in small slices, while
-  keeping TypeScript as the contract schema and report-text boundary.
+  move the remaining enum/uniqueness predicates for composition and decoration
+  metadata into MoonBit in small slices, while keeping TypeScript as the
+  contract schema and report-text boundary.
 - [x] Semantic drilldown selection policy slice:
   `component/semantic-drilldown.ts` now delegates layout-vs-decoration flow,
   priority scoring, reason id selection, and next-action ordering to

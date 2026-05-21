@@ -224,6 +224,17 @@ export type MarkupCoreUiContractRangeIssueId =
   | "range-max-non-negative"
   | "range-min-lte-max";
 
+export type MarkupCoreUiContractSlotIssueId = "slot-id-required";
+
+export type MarkupCoreUiContractAssetIssueId = "asset-id-required";
+
+export type MarkupCoreUiContractCanvasIssueId = "canvas-state-hook-required";
+
+export type MarkupCoreUiContractCanvasInputIssueId =
+  "canvas-input-action-required";
+
+export type MarkupCoreUiContractCanvasHudIssueId = "canvas-hud-id-required";
+
 export type MarkupCoreUiContractLayoutIssueId =
   | "layout-width-fluid-bounds"
   | "layout-width-fixed-positive"
@@ -317,6 +328,74 @@ export function computeUiContractOptionalRangeIssueIds(input: {
       return issueId;
     }
     throw new Error(`unexpected markup-core UI contract range issue id: ${issueId}`);
+  });
+}
+
+export function computeUiContractSlotIssueIds(input: {
+  id: string;
+}): MarkupCoreUiContractSlotIssueId[] {
+  const output = runMarkupCore(["ui-contract-slot-issue-ids", input.id]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractSlotIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(`unexpected markup-core UI contract slot issue id: ${issueId}`);
+  });
+}
+
+export function computeUiContractAssetIssueIds(input: {
+  id: string;
+}): MarkupCoreUiContractAssetIssueId[] {
+  const output = runMarkupCore(["ui-contract-asset-issue-ids", input.id]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractAssetIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(`unexpected markup-core UI contract asset issue id: ${issueId}`);
+  });
+}
+
+export function computeUiContractCanvasIssueIds(input: {
+  hasStateHook: boolean;
+  requiredStateFieldCount: number;
+}): MarkupCoreUiContractCanvasIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-canvas-issue-ids",
+    boolArg(input.hasStateHook),
+    intArg(input.requiredStateFieldCount),
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractCanvasIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(`unexpected markup-core UI contract canvas issue id: ${issueId}`);
+  });
+}
+
+export function computeUiContractCanvasInputIssueIds(input: {
+  action: string;
+}): MarkupCoreUiContractCanvasInputIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-canvas-input-issue-ids",
+    input.action,
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractCanvasInputIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(`unexpected markup-core UI contract canvas input issue id: ${issueId}`);
+  });
+}
+
+export function computeUiContractCanvasHudIssueIds(input: {
+  id: string;
+}): MarkupCoreUiContractCanvasHudIssueId[] {
+  const output = runMarkupCore(["ui-contract-canvas-hud-issue-ids", input.id]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractCanvasHudIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(`unexpected markup-core UI contract canvas HUD issue id: ${issueId}`);
   });
 }
 
@@ -492,6 +571,36 @@ function isMarkupCoreUiContractRangeIssueId(
     issueId === "range-max-non-negative" ||
     issueId === "range-min-lte-max"
   );
+}
+
+function isMarkupCoreUiContractSlotIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractSlotIssueId {
+  return issueId === "slot-id-required";
+}
+
+function isMarkupCoreUiContractAssetIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractAssetIssueId {
+  return issueId === "asset-id-required";
+}
+
+function isMarkupCoreUiContractCanvasIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractCanvasIssueId {
+  return issueId === "canvas-state-hook-required";
+}
+
+function isMarkupCoreUiContractCanvasInputIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractCanvasInputIssueId {
+  return issueId === "canvas-input-action-required";
+}
+
+function isMarkupCoreUiContractCanvasHudIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractCanvasHudIssueId {
+  return issueId === "canvas-hud-id-required";
 }
 
 function isMarkupCoreUiContractStateIssueId(

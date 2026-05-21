@@ -1,17 +1,27 @@
 import {
+  computeUiContractAssetIssueIds,
+  computeUiContractCanvasHudIssueIds,
+  computeUiContractCanvasInputIssueIds,
+  computeUiContractCanvasIssueIds,
   computeUiContractExpectedScrollportIssueIds,
   computeUiContractLayoutIssueIds,
   computeUiContractMarkerIssueIds,
   computeUiContractOptionalRangeIssueIds,
   computeUiContractPatternEvidenceIssueIds,
   computeUiContractRequiredStateIssueIds,
+  computeUiContractSlotIssueIds,
   computeUiContractStateIssueIds,
+  type MarkupCoreUiContractAssetIssueId,
+  type MarkupCoreUiContractCanvasHudIssueId,
+  type MarkupCoreUiContractCanvasInputIssueId,
+  type MarkupCoreUiContractCanvasIssueId,
   type MarkupCoreUiContractExpectedScrollportIssueId,
   type MarkupCoreUiContractLayoutIssueId,
   type MarkupCoreUiContractMarkerIssueId,
   type MarkupCoreUiContractPatternEvidenceIssueId,
   type MarkupCoreUiContractRangeIssueId,
   type MarkupCoreUiContractRequiredStateIssueId,
+  type MarkupCoreUiContractSlotIssueId,
   type MarkupCoreUiContractStateIssueId,
 } from "../markup-core-runtime.ts";
 
@@ -743,7 +753,20 @@ function validateSlots(
   for (let i = 0; i < (slots?.length ?? 0); i++) {
     const slot = slots![i]!;
     const slotPath = `${path}[${i}]`;
-    if (!slot.id) issues.push({ path: `${slotPath}.id`, message: "slot id is required" });
+    const issueIds = computeUiContractSlotIssueIds({ id: slot.id });
+    for (const issueId of issueIds) {
+      issues.push(uiContractSlotIssue(issueId, slotPath));
+    }
+  }
+}
+
+function uiContractSlotIssue(
+  issueId: MarkupCoreUiContractSlotIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "slot-id-required":
+      return { path: `${path}.id`, message: "slot id is required" };
   }
 }
 
@@ -914,7 +937,21 @@ function validateAssets(
 ): void {
   for (let i = 0; i < (assets?.length ?? 0); i++) {
     const asset = assets![i]!;
-    if (!asset.id) issues.push({ path: `${path}[${i}].id`, message: "asset id is required" });
+    const assetPath = `${path}[${i}]`;
+    const issueIds = computeUiContractAssetIssueIds({ id: asset.id });
+    for (const issueId of issueIds) {
+      issues.push(uiContractAssetIssue(issueId, assetPath));
+    }
+  }
+}
+
+function uiContractAssetIssue(
+  issueId: MarkupCoreUiContractAssetIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "asset-id-required":
+      return { path: `${path}.id`, message: "asset id is required" };
   }
 }
 
@@ -924,16 +961,58 @@ function validateCanvas(
   issues: UiContractIssue[],
 ): void {
   if (!canvas) return;
-  if ((canvas.requiredStateFields?.length ?? 0) > 0 && !canvas.stateHook) {
-    issues.push({ path: `${path}.stateHook`, message: "canvas stateHook is required when requiredStateFields are declared" });
+  const issueIds = computeUiContractCanvasIssueIds({
+    hasStateHook: Boolean(canvas.stateHook),
+    requiredStateFieldCount: canvas.requiredStateFields?.length ?? 0,
+  });
+  for (const issueId of issueIds) {
+    issues.push(uiContractCanvasIssue(issueId, path));
   }
   for (let i = 0; i < (canvas.inputs?.length ?? 0); i++) {
     const input = canvas.inputs![i]!;
-    if (!input.action) issues.push({ path: `${path}.inputs[${i}].action`, message: "canvas input action is required" });
+    const inputPath = `${path}.inputs[${i}]`;
+    const inputIssueIds = computeUiContractCanvasInputIssueIds({ action: input.action });
+    for (const issueId of inputIssueIds) {
+      issues.push(uiContractCanvasInputIssue(issueId, inputPath));
+    }
   }
   for (let i = 0; i < (canvas.hud?.length ?? 0); i++) {
     const hud = canvas.hud![i]!;
-    if (!hud.id) issues.push({ path: `${path}.hud[${i}].id`, message: "canvas HUD id is required" });
+    const hudPath = `${path}.hud[${i}]`;
+    const hudIssueIds = computeUiContractCanvasHudIssueIds({ id: hud.id });
+    for (const issueId of hudIssueIds) {
+      issues.push(uiContractCanvasHudIssue(issueId, hudPath));
+    }
+  }
+}
+
+function uiContractCanvasIssue(
+  issueId: MarkupCoreUiContractCanvasIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "canvas-state-hook-required":
+      return { path: `${path}.stateHook`, message: "canvas stateHook is required when requiredStateFields are declared" };
+  }
+}
+
+function uiContractCanvasInputIssue(
+  issueId: MarkupCoreUiContractCanvasInputIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "canvas-input-action-required":
+      return { path: `${path}.action`, message: "canvas input action is required" };
+  }
+}
+
+function uiContractCanvasHudIssue(
+  issueId: MarkupCoreUiContractCanvasHudIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "canvas-hud-id-required":
+      return { path: `${path}.id`, message: "canvas HUD id is required" };
   }
 }
 
