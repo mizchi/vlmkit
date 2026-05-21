@@ -1330,10 +1330,14 @@ Stepwise cleanup:
   mode/minRatio predicates now delegate to `markup-core`. TypeScript still owns
   array traversal, duplicate tracking inputs, palette hex checks, and mapping
   issue ids to report paths/messages.
+- [x] UI Contract decoration validator slice:
+  decoration typography role/size/lineHeight, palette role/value hex, and media
+  slot predicates now delegate to `markup-core`. TypeScript still owns
+  decoration array traversal and report path/message mapping.
 - [ ] Continue UI Contract validator core:
-  move the remaining decoration metadata predicates into MoonBit in small
-  slices, while keeping TypeScript as the contract schema and report-text
-  boundary.
+  move the remaining small scalar predicates, such as content exact/rowCount
+  non-negative checks and composition contrast palette hex checks, into MoonBit
+  while keeping TypeScript as the contract schema and report-text boundary.
 - [x] Semantic drilldown selection policy slice:
   `component/semantic-drilldown.ts` now delegates layout-vs-decoration flow,
   priority scoring, reason id selection, and next-action ordering to

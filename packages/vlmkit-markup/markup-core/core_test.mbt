@@ -528,3 +528,32 @@ test "ui contract composition issue policy" {
     content="contrast-mode-unknown|contrast-min-ratio-positive",
   )
 }
+
+///|
+test "ui contract decoration issue policy" {
+  inspect(
+    ui_contract_decoration_typography_issue_ids("", true, 0, true, -1),
+    content="typography-role-required|typography-size-positive|typography-line-height-positive",
+  )
+  inspect(
+    ui_contract_decoration_typography_issue_ids("body", false, 0, false, 0),
+    content="",
+  )
+  inspect(
+    ui_contract_decoration_palette_issue_ids("", "red"),
+    content="palette-role-required|palette-value-hex",
+  )
+  inspect(
+    ui_contract_decoration_palette_issue_ids("surface", "#abc"),
+    content="",
+  )
+  inspect(
+    ui_contract_decoration_palette_issue_ids("accent", "#aabbcc"),
+    content="",
+  )
+  inspect(
+    ui_contract_decoration_media_issue_ids(""),
+    content="media-slot-required",
+  )
+  inspect(ui_contract_decoration_media_issue_ids("hero"), content="")
+}

@@ -263,6 +263,18 @@ export type MarkupCoreUiContractCompositionContrastIssueId =
   | "contrast-mode-unknown"
   | "contrast-min-ratio-positive";
 
+export type MarkupCoreUiContractDecorationTypographyIssueId =
+  | "typography-role-required"
+  | "typography-size-positive"
+  | "typography-line-height-positive";
+
+export type MarkupCoreUiContractDecorationPaletteIssueId =
+  | "palette-role-required"
+  | "palette-value-hex";
+
+export type MarkupCoreUiContractDecorationMediaIssueId =
+  "media-slot-required";
+
 export type MarkupCoreUiContractLayoutIssueId =
   | "layout-width-fluid-bounds"
   | "layout-width-fixed-positive"
@@ -543,6 +555,59 @@ export function computeUiContractCompositionContrastIssueIds(input: {
   });
 }
 
+export function computeUiContractDecorationTypographyIssueIds(input: {
+  role: string;
+  size?: number;
+  lineHeight?: number;
+}): MarkupCoreUiContractDecorationTypographyIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-decoration-typography-issue-ids",
+    input.role,
+    boolArg(input.size !== undefined),
+    doubleArg(input.size ?? 0),
+    boolArg(input.lineHeight !== undefined),
+    doubleArg(input.lineHeight ?? 0),
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractDecorationTypographyIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(`unexpected markup-core UI contract decoration typography issue id: ${issueId}`);
+  });
+}
+
+export function computeUiContractDecorationPaletteIssueIds(input: {
+  role: string;
+  value?: string;
+}): MarkupCoreUiContractDecorationPaletteIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-decoration-palette-issue-ids",
+    input.role,
+    input.value ?? "",
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractDecorationPaletteIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(`unexpected markup-core UI contract decoration palette issue id: ${issueId}`);
+  });
+}
+
+export function computeUiContractDecorationMediaIssueIds(input: {
+  slot: string;
+}): MarkupCoreUiContractDecorationMediaIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-decoration-media-issue-ids",
+    input.slot,
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractDecorationMediaIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(`unexpected markup-core UI contract decoration media issue id: ${issueId}`);
+  });
+}
+
 export function computeUiContractLayoutIssueIds(input: {
   widthKind?: string;
   widthMinPresent?: boolean;
@@ -799,6 +864,31 @@ function isMarkupCoreUiContractCompositionContrastIssueId(
     issueId === "contrast-mode-unknown" ||
     issueId === "contrast-min-ratio-positive"
   );
+}
+
+function isMarkupCoreUiContractDecorationTypographyIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractDecorationTypographyIssueId {
+  return (
+    issueId === "typography-role-required" ||
+    issueId === "typography-size-positive" ||
+    issueId === "typography-line-height-positive"
+  );
+}
+
+function isMarkupCoreUiContractDecorationPaletteIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractDecorationPaletteIssueId {
+  return (
+    issueId === "palette-role-required" ||
+    issueId === "palette-value-hex"
+  );
+}
+
+function isMarkupCoreUiContractDecorationMediaIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractDecorationMediaIssueId {
+  return issueId === "media-slot-required";
 }
 
 function isMarkupCoreUiContractStateIssueId(

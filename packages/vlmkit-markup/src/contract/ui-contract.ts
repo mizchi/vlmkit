@@ -9,6 +9,9 @@ import {
   computeUiContractCompositionLayerIssueIds,
   computeUiContractCompositionMotionIssueIds,
   computeUiContractCompositionShapeIssueIds,
+  computeUiContractDecorationMediaIssueIds,
+  computeUiContractDecorationPaletteIssueIds,
+  computeUiContractDecorationTypographyIssueIds,
   computeUiContractExpectedScrollportIssueIds,
   computeUiContractLayoutIssueIds,
   computeUiContractMarkerIssueIds,
@@ -27,6 +30,9 @@ import {
   type MarkupCoreUiContractCompositionLayerIssueId,
   type MarkupCoreUiContractCompositionMotionIssueId,
   type MarkupCoreUiContractCompositionShapeIssueId,
+  type MarkupCoreUiContractDecorationMediaIssueId,
+  type MarkupCoreUiContractDecorationPaletteIssueId,
+  type MarkupCoreUiContractDecorationTypographyIssueId,
   type MarkupCoreUiContractExpectedScrollportIssueId,
   type MarkupCoreUiContractLayoutIssueId,
   type MarkupCoreUiContractMarkerIssueId,
@@ -941,21 +947,69 @@ function validateDecoration(
   for (let i = 0; i < (decoration.typography?.length ?? 0); i++) {
     const typo = decoration.typography![i]!;
     const typoPath = `${path}.typography[${i}]`;
-    if (!typo.role) issues.push({ path: `${typoPath}.role`, message: "typography role is required" });
-    if (typo.size !== undefined && typo.size <= 0) issues.push({ path: `${typoPath}.size`, message: "typography size must be positive" });
-    if (typo.lineHeight !== undefined && typo.lineHeight <= 0) issues.push({ path: `${typoPath}.lineHeight`, message: "lineHeight must be positive" });
+    const issueIds = computeUiContractDecorationTypographyIssueIds({
+      role: typo.role,
+      size: typo.size,
+      lineHeight: typo.lineHeight,
+    });
+    for (const issueId of issueIds) {
+      issues.push(uiContractDecorationTypographyIssue(issueId, typoPath));
+    }
   }
   for (let i = 0; i < (decoration.palette?.length ?? 0); i++) {
     const color = decoration.palette![i]!;
     const colorPath = `${path}.palette[${i}]`;
-    if (!color.role) issues.push({ path: `${colorPath}.role`, message: "palette role is required" });
-    if (color.value && !isHexColor(color.value)) {
-      issues.push({ path: `${colorPath}.value`, message: "palette value must be a hex color" });
+    const issueIds = computeUiContractDecorationPaletteIssueIds({
+      role: color.role,
+      value: color.value,
+    });
+    for (const issueId of issueIds) {
+      issues.push(uiContractDecorationPaletteIssue(issueId, colorPath));
     }
   }
   for (let i = 0; i < (decoration.media?.length ?? 0); i++) {
     const media = decoration.media![i]!;
-    if (!media.slot) issues.push({ path: `${path}.media[${i}].slot`, message: "media treatment slot is required" });
+    const mediaPath = `${path}.media[${i}]`;
+    const issueIds = computeUiContractDecorationMediaIssueIds({ slot: media.slot });
+    for (const issueId of issueIds) {
+      issues.push(uiContractDecorationMediaIssue(issueId, mediaPath));
+    }
+  }
+}
+
+function uiContractDecorationTypographyIssue(
+  issueId: MarkupCoreUiContractDecorationTypographyIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "typography-role-required":
+      return { path: `${path}.role`, message: "typography role is required" };
+    case "typography-size-positive":
+      return { path: `${path}.size`, message: "typography size must be positive" };
+    case "typography-line-height-positive":
+      return { path: `${path}.lineHeight`, message: "lineHeight must be positive" };
+  }
+}
+
+function uiContractDecorationPaletteIssue(
+  issueId: MarkupCoreUiContractDecorationPaletteIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "palette-role-required":
+      return { path: `${path}.role`, message: "palette role is required" };
+    case "palette-value-hex":
+      return { path: `${path}.value`, message: "palette value must be a hex color" };
+  }
+}
+
+function uiContractDecorationMediaIssue(
+  issueId: MarkupCoreUiContractDecorationMediaIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "media-slot-required":
+      return { path: `${path}.slot`, message: "media treatment slot is required" };
   }
 }
 

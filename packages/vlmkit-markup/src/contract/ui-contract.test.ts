@@ -232,6 +232,11 @@ test("validateUiContract validates hierarchy and rich metadata ranges", () => {
     inputs: [{ kind: "keyboard", action: "" }],
     hud: [{ id: "" }],
   };
+  contract.screens[0]!.decoration = {
+    typography: [{ role: "", size: 0, lineHeight: -1 }],
+    palette: [{ role: "", value: "red" }],
+    media: [{ slot: "" }],
+  };
   contract.screens[0]!.landmarks[1]!.assets = [
     { id: "", kind: "image", policy: "replaceable" },
   ];
@@ -246,6 +251,12 @@ test("validateUiContract validates hierarchy and rich metadata ranges", () => {
   assert.ok(issues.some((issue) => issue.message.includes("canvas stateHook")));
   assert.ok(issues.some((issue) => issue.message.includes("canvas input action")));
   assert.ok(issues.some((issue) => issue.message.includes("canvas HUD id")));
+  assert.ok(issues.some((issue) => issue.message.includes("typography role")));
+  assert.ok(issues.some((issue) => issue.message.includes("typography size")));
+  assert.ok(issues.some((issue) => issue.message.includes("lineHeight")));
+  assert.ok(issues.some((issue) => issue.message.includes("palette role")));
+  assert.ok(issues.some((issue) => issue.message.includes("palette value")));
+  assert.ok(issues.some((issue) => issue.message.includes("media treatment slot")));
 });
 
 test("validateUiContract accepts expressive menu composition contracts", () => {

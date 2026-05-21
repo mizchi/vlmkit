@@ -663,6 +663,51 @@ pub fn ui_contract_composition_contrast_issue_ids(
 }
 
 ///|
+pub fn ui_contract_decoration_typography_issue_ids(
+  role : String,
+  size_present : Bool,
+  size : Double,
+  line_height_present : Bool,
+  line_height : Double,
+) -> String {
+  let issues : Array[String] = []
+  if role == "" {
+    issues.push("typography-role-required")
+  }
+  if size_present && size <= 0 {
+    issues.push("typography-size-positive")
+  }
+  if line_height_present && line_height <= 0 {
+    issues.push("typography-line-height-positive")
+  }
+  issues.join("|")
+}
+
+///|
+pub fn ui_contract_decoration_palette_issue_ids(
+  role : String,
+  value : String,
+) -> String {
+  let issues : Array[String] = []
+  if role == "" {
+    issues.push("palette-role-required")
+  }
+  if value != "" && !is_hex_color(value) {
+    issues.push("palette-value-hex")
+  }
+  issues.join("|")
+}
+
+///|
+pub fn ui_contract_decoration_media_issue_ids(slot : String) -> String {
+  if slot == "" {
+    "media-slot-required"
+  } else {
+    ""
+  }
+}
+
+///|
 pub fn ui_contract_layout_issue_ids(
   width_kind : String,
   width_min_present : Bool,
@@ -869,6 +914,17 @@ fn is_ui_motion_effect(effect : String) -> Bool {
 ///|
 fn is_ui_contrast_mode(mode : String) -> Bool {
   mode == "normal" || mode == "high"
+}
+
+///|
+fn is_hex_color(value : String) -> Bool {
+  match
+    @string.Regex::unsafe_from_string("^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$").execute(
+      value,
+    ) {
+    Some(_) => true
+    None => false
+  }
 }
 
 ///|
