@@ -130,17 +130,12 @@ async function runKaguraRuntimeSmoke(args) {
 
     browser = await chromium.launch({
       headless: true,
-      args: [
-        "--enable-unsafe-webgpu",
-        "--enable-unsafe-swiftshader",
-        "--enable-features=Vulkan",
-        "--enable-webgl",
-        "--use-angle=vulkan",
-        "--use-gl=swiftshader",
-        "--use-vulkan=swiftshader",
-      ],
+      args: chromiumLaunchArgs(),
     });
     const page = await browser.newPage({ viewport: { width: 640, height: 480 } });
+    await page.addInitScript(() => {
+      globalThis.__kaguraVrtReadbackEnabled = true;
+    });
     page.on("console", (msg) => {
       const text = msg.text();
       if (["error", "warning", "warn"].includes(msg.type())) consoleMessages.push({ type: msg.type(), text });
@@ -157,6 +152,7 @@ async function runKaguraRuntimeSmoke(args) {
     );
     const frameSignal = await waitForFrameSignal(page, Math.min(5_000, args.timeoutMs));
     await waitForAnimationFrames(page, 2);
+    const readback = await waitForRuntimeReadback(page, Math.min(5_000, args.timeoutMs));
     const canvasInfo = await page.locator("#app").evaluate((canvas) => ({
       tagName: canvas.tagName,
       width: canvas.width,
@@ -165,7 +161,7 @@ async function runKaguraRuntimeSmoke(args) {
       clientHeight: canvas.clientHeight,
     }));
     const screenshot = await page.locator("#app").screenshot({ path: args.screenshot || undefined });
-    const frame = analyzePngFrame(screenshot);
+    const frame = readback.ok ? analyzeReadbackFrame(readback.summary) : analyzePngFrame(screenshot);
 
     checks.push({
       id: "kagura-dev-server",
@@ -183,6 +179,7 @@ async function runKaguraRuntimeSmoke(args) {
       lastCompletedFrameMs: frameSignal.lastCompletedFrameMs,
       lastRenderCpuMs: frameSignal.lastRenderCpuMs,
       lastRenderSubmitCpuMs: frameSignal.lastRenderSubmitCpuMs,
+      readback: readback.ok ? readback.summary : null,
     });
     if (!frameSignal.ok) {
       failures.push({
@@ -199,6 +196,7 @@ async function runKaguraRuntimeSmoke(args) {
       nonDominantPixelRatio: round(frame.nonDominantPixelRatio),
       visiblePixelRatio: round(frame.visiblePixelRatio),
       dominantPixelRatio: round(frame.dominantPixelRatio),
+      source: frame.source,
       width: frame.width,
       height: frame.height,
     });
@@ -348,6 +346,13 @@ function delay(ms) {
   return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 }
 
+function chromiumLaunchArgs() {
+  return [
+    "--enable-unsafe-webgpu",
+    ...(process.env.KAGURA_RUNTIME_CHROMIUM_ARGS ?? "").split(/\s+/).filter(Boolean),
+  ];
+}
+
 async function waitForFrameSignal(page, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   let lastState = await readFrameSignal(page);
@@ -373,6 +378,20 @@ async function readFrameSignal(page) {
       lastRenderSubmitCpuMs,
     };
   });
+}
+
+async function waitForRuntimeReadback(page, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let summary = await readRuntimeReadback(page);
+  while (!summary && Date.now() < deadline) {
+    await page.waitForTimeout(100);
+    summary = await readRuntimeReadback(page);
+  }
+  return summary ? { ok: true, summary } : { ok: false, summary: null };
+}
+
+async function readRuntimeReadback(page) {
+  return page.evaluate(() => globalThis.__kaguraVrtLastReadback ?? null);
 }
 
 async function waitForAnimationFrames(page, count) {
@@ -404,11 +423,24 @@ function analyzePngFrame(buffer) {
   const dominant = Math.max(...buckets.values());
   const dominantPixelRatio = dominant / total;
   return {
+    source: "canvas-screenshot",
     width: image.width,
     height: image.height,
     dominantPixelRatio,
     nonDominantPixelRatio: 1 - dominantPixelRatio,
     visiblePixelRatio: visible / total,
+  };
+}
+
+function analyzeReadbackFrame(summary) {
+  const visiblePixelRatio = Number(summary.nonDarkPixelRatio ?? 0);
+  return {
+    source: "webgpu-readback",
+    width: Number(summary.width ?? 0),
+    height: Number(summary.height ?? 0),
+    dominantPixelRatio: 1 - visiblePixelRatio,
+    nonDominantPixelRatio: visiblePixelRatio,
+    visiblePixelRatio,
   };
 }
 
