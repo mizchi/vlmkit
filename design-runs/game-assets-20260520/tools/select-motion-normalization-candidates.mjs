@@ -61,6 +61,11 @@ async function main() {
     policy: {
       failOnRejected: args.failOnRejected,
       failOnMissing: args.failOnMissing,
+      promotion: {
+        minComparedSamples: 3,
+        minImprovedSamples: 2,
+        note: "Non-automatic candidates become promotable only with enough repeated improvements and no regressions, tradeoffs, or missing comparisons.",
+      },
     },
     summary,
     groups,
@@ -175,6 +180,7 @@ function summarize(groups, plan) {
     runnable: plan.summary?.runnable ?? (plan.runnable?.length ?? 0),
     blocked: plan.summary?.blocked ?? (plan.blocked?.length ?? 0),
     accepted: groups.filter((group) => group.recommendation === "accepted").length,
+    promotable: groups.filter((group) => group.recommendation === "promotable").length,
     rejected: groups.filter((group) => group.recommendation === "rejected").length,
     needsPolicy: groups.filter((group) => group.recommendation === "needs-policy").length,
     neutral: groups.filter((group) => group.recommendation === "neutral").length,

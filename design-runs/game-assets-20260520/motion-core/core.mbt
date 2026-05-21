@@ -23,6 +23,12 @@ const SHOULDER_SCALE_MISMATCH_WARN_DELTA : Double = 0.4
 const ARM_REST_ANGLE_WARN_DEG : Double = 45.0
 
 ///|
+const PROMOTION_MIN_COMPARED_SAMPLES : Int = 3
+
+///|
+const PROMOTION_MIN_IMPROVED_SAMPLES : Int = 2
+
+///|
 /// Return the arm-rest motion gate status used before running
 /// `arm-rest-pose-offset`.
 pub fn arm_rest_motion_gate_status(
@@ -58,15 +64,20 @@ pub fn select_candidate_group(
   candidate_improved : Int,
   candidate_regressed : Int,
   candidate_tradeoff : Int,
+  stable : Int,
   missing_comparison : Int,
   missing_sample_comparison : Int,
 ) -> String {
+  let compared = candidate_improved + stable
   if missing_comparison > 0 || missing_sample_comparison > 0 {
     "missing-comparison"
   } else if candidate_regressed > 0 || candidate_tradeoff > 0 {
     "rejected"
   } else if candidate_improved > 0 && automatic {
     "accepted"
+  } else if candidate_improved >= PROMOTION_MIN_IMPROVED_SAMPLES &&
+    compared >= PROMOTION_MIN_COMPARED_SAMPLES {
+    "promotable"
   } else if candidate_improved > 0 {
     "needs-policy"
   } else {

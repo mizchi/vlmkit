@@ -249,9 +249,13 @@ Observed shape:
   compares as stable. It remains non-automatic.
 - `--fail-on-tradeoff` rejects the runnable root candidate automatically
   because its comparison is mixed, so it does not become the new default
-- candidate selection summary: 2 runnable candidate groups were compared.
-  `arm-rest-pose-offset` is now `needs-policy` with one improved sample;
-  `root-scale-to-model` remains rejected as a `Jump` tradeoff
+- candidate selection summary: current candidate groups are
+  `arm-rest-pose-offset` = `needs-policy` with one improved sample,
+  `root-scale-to-model` = `rejected` as a `Jump` tradeoff, and
+  `stance-width-adapter` = `missing-comparison` until all runnable samples have
+  comparison reports. Non-automatic candidates now become `promotable` only
+  with at least 3 compared samples, at least 2 improvements, and no regressions
+  or tradeoffs.
 - MoonBit core slice: the arm-rest motion gate, root-translation
   recommendation/candidate selection, pose mismatch warning-id selection, and
   pose normalization candidate spec selection, plus candidate selection

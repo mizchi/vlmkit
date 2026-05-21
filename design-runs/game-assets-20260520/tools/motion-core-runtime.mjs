@@ -49,6 +49,7 @@ export function selectCandidateGroup(automatic, decisions) {
     intArg(decisions.candidateImproved),
     intArg(decisions.candidateRegressed),
     intArg(decisions.candidateTradeoff),
+    intArg(decisions.stable),
     intArg(decisions.missingComparison),
     intArg(decisions.missingSampleComparison),
   ]);

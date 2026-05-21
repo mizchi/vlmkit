@@ -10,12 +10,12 @@ test "command args normalize moon run argv" {
 test "command args normalize direct node argv" {
   let args = command_args([
     "/opt/homebrew/bin/node", "_build/js/debug/build/motion-core-cli/motion-core-cli.js",
-    "select-candidate-group", "false", "1", "0", "0", "0", "0",
+    "select-candidate-group", "false", "1", "0", "0", "0", "0", "0",
   ])
-  inspect(args.length(), content="7")
+  inspect(args.length(), content="8")
   inspect(args[0], content="select-candidate-group")
   inspect(args[1], content="false")
-  inspect(args[6], content="0")
+  inspect(args[7], content="0")
 }
 
 ///|

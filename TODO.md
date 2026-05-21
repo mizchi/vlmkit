@@ -1068,6 +1068,12 @@ Current smoke status:
   `select-motion-normalization-candidates.mjs` groups runnable candidate
   comparisons and emits accepted/rejected/neutral/missing recommendations so
   the loop can reject mixed candidates without a manual read-through
+- [x] Candidate promotion policy:
+  non-automatic candidates become `promotable` only when repeated comparisons
+  have at least 3 compared samples, at least 2 improvements, and no
+  regressions, tradeoffs, or missing comparisons. This gives the autonomous
+  loop a deterministic bridge between "runnable experiment" and "change the
+  default".
 - [x] MoonBit core slice:
   `motion-core` ports the arm-rest motion gate, root-translation
   recommendation/candidate selection, pose mismatch warning-id selection, and
@@ -1163,8 +1169,10 @@ Stepwise cleanup:
   metrics and an initial `foot-spread-mismatch` pose warning now exist.
   Pose mismatch scoring now covers shoulder width, upper-leg spread, foot
   spread, and arm-down angle. Arm-rest and stance-width warnings now trigger
-  runnable pre-normalization candidates; remaining work is deciding promotion
-  policy from repeated candidate comparisons.
+  runnable pre-normalization candidates, and repeated comparison results now
+  produce deterministic `accepted` / `promotable` / `rejected` selection
+  decisions. Remaining work is collecting enough real comparison samples before
+  changing defaults.
 - [ ] **G6. VRM + VRMA real playback check.** Use a real VRM model with a
   matching VRMA file to verify that our extractor agrees with an expected
   runtime playback path before retargeting onto simplified generated assets.

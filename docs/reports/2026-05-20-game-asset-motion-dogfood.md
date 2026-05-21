@@ -84,7 +84,9 @@ The concrete scenario used a voxel robot and real `.vrma` motion samples from
 - `select-motion-normalization-candidates` now groups runnable candidate
   comparisons and emits a selection report. After motion gating, it reports
   `arm-rest-pose-offset` as `needs-policy` and keeps `root-scale-to-model`
-  rejected.
+  rejected. Non-automatic candidates now require at least 3 compared samples,
+  at least 2 improvements, and no regressions/tradeoffs/missing comparisons
+  before they become `promotable`.
 - A first MoonBit `motion-core` package now ports the pure policy slice:
   arm-rest motion gate status, arm-rest candidate status, root-translation
   recommendation/candidate selection, pose mismatch warning-id selection, and
@@ -197,7 +199,8 @@ schema out of the dogfood directory.
 - A selection layer is now necessary between "candidate is runnable" and
   "candidate should change defaults." Per-sample comparisons are too granular
   for autonomous loops; the group-level report gives the agent one stable
-  contract to reject mixed evidence or mark a candidate as `needs-policy`.
+  contract to reject mixed evidence, hold weak evidence as `needs-policy`, or
+  mark repeated safe improvements as `promotable`.
 
 ## Next Implementation Order
 

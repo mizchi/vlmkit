@@ -19,19 +19,23 @@ test "arm rest candidate status" {
 
 ///|
 test "selection recommendation" {
-  inspect(select_candidate_group(false, 1, 0, 0, 0, 0), content="needs-policy")
-  inspect(select_candidate_group(true, 1, 0, 0, 0, 0), content="accepted")
-  inspect(select_candidate_group(false, 0, 1, 0, 0, 0), content="rejected")
-  inspect(select_candidate_group(false, 0, 0, 1, 0, 0), content="rejected")
   inspect(
-    select_candidate_group(false, 0, 0, 0, 1, 0),
+    select_candidate_group(false, 1, 0, 0, 0, 0, 0),
+    content="needs-policy",
+  )
+  inspect(select_candidate_group(true, 1, 0, 0, 0, 0, 0), content="accepted")
+  inspect(select_candidate_group(false, 2, 0, 0, 1, 0, 0), content="promotable")
+  inspect(select_candidate_group(false, 0, 1, 0, 0, 0, 0), content="rejected")
+  inspect(select_candidate_group(false, 0, 0, 1, 0, 0, 0), content="rejected")
+  inspect(
+    select_candidate_group(false, 0, 0, 0, 0, 1, 0),
     content="missing-comparison",
   )
   inspect(
-    select_candidate_group(false, 0, 0, 0, 0, 1),
+    select_candidate_group(false, 0, 0, 0, 0, 0, 1),
     content="missing-comparison",
   )
-  inspect(select_candidate_group(false, 0, 0, 0, 0, 0), content="neutral")
+  inspect(select_candidate_group(false, 0, 0, 0, 2, 0, 0), content="neutral")
 }
 
 ///|

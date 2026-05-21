@@ -271,8 +271,10 @@ shared tools now live in `tools/`:
   follow-ups; pose candidates can run arm-rest or stance-width offset modes
 - `tools/select-motion-normalization-candidates.mjs`: read the candidate plan
   plus generated comparison reports and summarize candidate groups as accepted,
-  rejected, neutral, missing, or needing policy; group recommendation is
-  delegated to the MoonBit runtime adapter
+  promotable, rejected, neutral, missing, or needing policy; non-automatic
+  candidates require at least 3 compared samples and 2 improvements before
+  promotion, and group recommendation is delegated to the MoonBit runtime
+  adapter
 - `motion-core/`: MoonBit port of pure candidate policy logic. It currently
   covers the arm-rest motion gate, root-translation recommendation/candidate
   selection, pose mismatch warning-id selection, pose normalization candidate

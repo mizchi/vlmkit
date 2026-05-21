@@ -12,6 +12,7 @@ fn main_err() -> Unit raise {
       improved,
       regressed,
       tradeoff,
+      stable,
       missing,
       missing_sample,
     ] =>
@@ -21,6 +22,7 @@ fn main_err() -> Unit raise {
           parse_int(improved),
           parse_int(regressed),
           parse_int(tradeoff),
+          parse_int(stable),
           parse_int(missing),
           parse_int(missing_sample),
         ),
@@ -111,7 +113,7 @@ fn parse_bool(value : String) -> Bool {
 ///|
 fn print_usage() -> Unit {
   println(
-    "Usage: motion-core-cli arm-rest-gate <deg|null> | arm-rest-candidate <deg|null> | select-candidate-group <automatic> <improved> <regressed> <tradeoff> <missing> <missing-sample> | root-translation-recommendation <mode> <height-scale|null> <height-scale-delta|null> <vertical-delta-range|null> | root-translation-candidate <recommendation-id> | pose-mismatch-warning-ids <scale-spread-ratio|null> <foot-spread-scale|null> <upper-leg-spread-scale|null> <shoulder-width-scale|null> <skeleton-height-scale|null> <arm-angle-delta-deg|null> | pose-normalization-candidate-specs <arm-rest?> <foot-spread?> <leg-spread?> <shoulder-width?> <upper-arm-rotation-range|null>",
+    "Usage: motion-core-cli arm-rest-gate <deg|null> | arm-rest-candidate <deg|null> | select-candidate-group <automatic> <improved> <regressed> <tradeoff> <stable> <missing> <missing-sample> | root-translation-recommendation <mode> <height-scale|null> <height-scale-delta|null> <vertical-delta-range|null> | root-translation-candidate <recommendation-id> | pose-mismatch-warning-ids <scale-spread-ratio|null> <foot-spread-scale|null> <upper-leg-spread-scale|null> <shoulder-width-scale|null> <skeleton-height-scale|null> <arm-angle-delta-deg|null> | pose-normalization-candidate-specs <arm-rest?> <foot-spread?> <leg-spread?> <shoulder-width?> <upper-arm-rotation-range|null>",
   )
 }
 
