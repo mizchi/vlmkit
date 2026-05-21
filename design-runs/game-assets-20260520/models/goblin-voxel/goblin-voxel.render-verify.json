@@ -1,0 +1,104 @@
+{
+  "ok": true,
+  "minForegroundRatio": 0.03,
+  "checkedFrameCount": 16,
+  "frames": [
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-voxel/renders/goblin-voxel-glb-geometry-back.png",
+      "foregroundRatio": 0.2425,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-voxel/renders/goblin-voxel-glb-geometry-front.png",
+      "foregroundRatio": 0.2424,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-voxel/renders/goblin-voxel-glb-geometry-iso.png",
+      "foregroundRatio": 0.2887,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-voxel/renders/goblin-voxel-glb-geometry-side.png",
+      "foregroundRatio": 0.0939,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-voxel/renders/goblin-voxel-glb-material-back.png",
+      "foregroundRatio": 0.2424,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-voxel/renders/goblin-voxel-glb-material-front.png",
+      "foregroundRatio": 0.2424,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-voxel/renders/goblin-voxel-glb-material-iso.png",
+      "foregroundRatio": 0.2887,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-voxel/renders/goblin-voxel-glb-material-side.png",
+      "foregroundRatio": 0.0939,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-voxel/renders/goblin-voxel-obj-geometry-back.png",
+      "foregroundRatio": 0.2425,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-voxel/renders/goblin-voxel-obj-geometry-front.png",
+      "foregroundRatio": 0.2424,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-voxel/renders/goblin-voxel-obj-geometry-iso.png",
+      "foregroundRatio": 0.2887,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-voxel/renders/goblin-voxel-obj-geometry-side.png",
+      "foregroundRatio": 0.0939,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-voxel/renders/goblin-voxel-obj-material-back.png",
+      "foregroundRatio": 0.2425,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-voxel/renders/goblin-voxel-obj-material-front.png",
+      "foregroundRatio": 0.2424,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-voxel/renders/goblin-voxel-obj-material-iso.png",
+      "foregroundRatio": 0.2887,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-voxel/renders/goblin-voxel-obj-material-side.png",
+      "foregroundRatio": 0.0939,
+      "finiteBounds": true,
+      "minGroundY": null
+    }
+  ],
+  "failures": []
+}

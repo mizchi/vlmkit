@@ -1,0 +1,75 @@
+{
+  "ok": true,
+  "contract": "design-runs/game-assets-20260520/models/goblin-voxel/kagura-handoff.json",
+  "assetId": "goblin-voxel",
+  "runtime": {
+    "format": "glb",
+    "model": "goblin-voxel.glb",
+    "worldScale": 1,
+    "originPolicy": "feet-near-y0-center-xz",
+    "axes": {
+      "up": "+Y",
+      "front": "+Z"
+    },
+    "fixedCameraViews": [
+      "front",
+      "side",
+      "back",
+      "iso"
+    ],
+    "animationClips": []
+  },
+  "checks": [
+    {
+      "id": "engine",
+      "status": "pass"
+    },
+    {
+      "id": "runtime-format",
+      "status": "pass"
+    },
+    {
+      "id": "model-path-matches-primary",
+      "status": "pass"
+    },
+    {
+      "id": "model-path-glb",
+      "status": "pass"
+    },
+    {
+      "id": "origin-policy",
+      "status": "pass"
+    },
+    {
+      "id": "up-axis",
+      "status": "pass"
+    },
+    {
+      "id": "front-axis",
+      "status": "pass"
+    },
+    {
+      "id": "fixed-camera-views-present",
+      "status": "pass"
+    },
+    {
+      "id": "glb-inspect",
+      "status": "pass",
+      "nodeCount": 1,
+      "meshCount": 1,
+      "animationClips": []
+    },
+    {
+      "id": "snapshot-verification",
+      "status": "pass",
+      "checkedFrameCount": 16
+    }
+  ],
+  "warnings": [
+    {
+      "path": "kaguraHandoff.animationClips",
+      "reason": "static asset handoff has no animation clips"
+    }
+  ],
+  "failures": []
+}

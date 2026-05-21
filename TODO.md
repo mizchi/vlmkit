@@ -1102,6 +1102,11 @@ Current smoke status:
   checks smoke reports against it
 - [x] Cheap multi-VLM review scaffold with dry-run contact sheet + strict JSON
   prompt for UI-TARS / Nova Lite
+- [x] Kagura handoff pre-runtime smoke:
+  `kaguraHandoff` records GLB path, world scale, origin, axes, fixed camera
+  views, animation clip ids, and snapshot verification path. `pnpm run
+  motion:kagura-handoff:game-assets` validates all local handoff contracts and
+  writes structured `*.kagura-smoke.json` reports.
 
 Stepwise cleanup:
 
@@ -1181,7 +1186,10 @@ Stepwise cleanup:
 - [ ] **G7. Kagura integration smoke.** Define the `mizchi/kagura` handoff:
   GLB path, animation clip ids, scale/origin convention, fixed camera
   snapshots, and a minimal runtime load/play smoke test. The gate should be
-  CLI-runnable in CI and return structured JSON.
+  CLI-runnable in CI and return structured JSON. First pass exists as a
+  pre-runtime contract smoke: it validates the GLB path, clip ids, axes,
+  scale/origin convention, fixed camera snapshots, and checked render reports.
+  Remaining work is the real Kagura runtime load/play check.
 - [ ] **G8. Mixamo / FBX adapter decision.** Decide whether to convert FBX
   through an external tool or parse a converted GLB. The output contract
   should still be the same Motion IR.

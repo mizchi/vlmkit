@@ -224,6 +224,8 @@ Initial shared contract:
 - `originPolicy`: model origin convention
 - `coordinateNotes`: Y-up / front direction notes
 - `renderChecks`: front / side / back / iso snapshots and thresholds
+- `kaguraHandoff`: runtime-facing GLB path, world scale, origin transform,
+  axes, fixed camera views, animation clip ids, and checked snapshot report
 
 ## Shared asset tools
 
@@ -238,6 +240,11 @@ shared tools now live in `tools/`:
 - `tools/verify-renders.mjs`: nonblank frame and finite-bounds checks
 - `tools/verify-gltf-motion.mjs`: node, clip, channel, and loop checks
 - `tools/verify-asset-contract.mjs`: handoff contract checks
+- `tools/verify-kagura-handoff.mjs`: pre-runtime Kagura handoff smoke for GLB
+  path, clip ids, scale/origin, axes, fixed camera snapshots, and render
+  verification reports
+- `tools/check-kagura-handoffs.mjs`: batch runner for local Kagura handoff
+  contracts; available as `pnpm run motion:kagura-handoff:game-assets`
 - `tools/apply-motion-ir.mjs`: retarget normalized humanoid motion IR and write
   derived GLB animation clips; supports root translation policies for simplified
   target rigs and `--audit-out` normalization reports with target bind metrics
@@ -390,6 +397,7 @@ node design-runs/game-assets-20260520/tools/verify-renders.mjs \
   --out design-runs/game-assets-20260520/models/robot-voxel-motion/robot-voxel-motion.render-verify.json
 node design-runs/game-assets-20260520/tools/verify-asset-contract.mjs \
   --contract design-runs/game-assets-20260520/models/robot-voxel-motion/kagura-handoff.json
+pnpm run motion:kagura-handoff:game-assets
 ```
 
 Implementation note:

@@ -268,6 +268,12 @@ Observed shape:
   `apply-motion-ir` keeps audit-facing severity/reason text in explicit detail
   maps keyed by the MoonBit ids/specs. New JS callers use categorized
   `motionCorePolicy.root`, `.pose`, and `.selection` APIs
+- Kagura handoff pre-runtime smoke: all three local handoff contracts now carry
+  `kaguraHandoff` metadata for runtime format, GLB path, world scale,
+  origin/axes, fixed camera views, animation clip ids, and snapshot
+  verification. `motion:kagura-handoff:game-assets` verifies those contracts and
+  writes structured `*.kagura-smoke.json` reports. This does not yet load
+  `mizchi/kagura`, but it pins the contract a Kagura runtime smoke must satisfy.
 - retarget profile: `robot-voxel` (`simple-rig` is an alias)
 - quality verdict: `pass`
 - retarget weighted score: 1.0, penalty 0
@@ -352,3 +358,7 @@ Learned:
 - VLM review should consume the deterministic quality report and contact sheet.
   It should not be a blocking human proxy; it is a cheap second opinion for
   suspicious `warn` cases.
+- Kagura integration should keep a pre-runtime contract gate separate from the
+  runtime load/play gate. The former catches broken paths, missing clips, origin
+  drift, and absent fixed-camera snapshots without adding an engine dependency;
+  the latter can later prove that Kagura renders the same handoff.

@@ -1,0 +1,104 @@
+{
+  "ok": true,
+  "minForegroundRatio": 0.03,
+  "checkedFrameCount": 16,
+  "frames": [
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/goblin-club-blockout-glb-geometry-back.png",
+      "foregroundRatio": 0.1652,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/goblin-club-blockout-glb-geometry-front.png",
+      "foregroundRatio": 0.1651,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/goblin-club-blockout-glb-geometry-iso.png",
+      "foregroundRatio": 0.1514,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/goblin-club-blockout-glb-geometry-side.png",
+      "foregroundRatio": 0.0974,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/goblin-club-blockout-glb-material-back.png",
+      "foregroundRatio": 0.1652,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/goblin-club-blockout-glb-material-front.png",
+      "foregroundRatio": 0.1651,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/goblin-club-blockout-glb-material-iso.png",
+      "foregroundRatio": 0.1514,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/goblin-club-blockout-glb-material-side.png",
+      "foregroundRatio": 0.0974,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/goblin-club-blockout-obj-geometry-back.png",
+      "foregroundRatio": 0.1652,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/goblin-club-blockout-obj-geometry-front.png",
+      "foregroundRatio": 0.1651,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/goblin-club-blockout-obj-geometry-iso.png",
+      "foregroundRatio": 0.1514,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/goblin-club-blockout-obj-geometry-side.png",
+      "foregroundRatio": 0.0974,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/goblin-club-blockout-obj-material-back.png",
+      "foregroundRatio": 0.1652,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/goblin-club-blockout-obj-material-front.png",
+      "foregroundRatio": 0.1651,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/goblin-club-blockout-obj-material-iso.png",
+      "foregroundRatio": 0.1514,
+      "finiteBounds": true,
+      "minGroundY": null
+    },
+    {
+      "file": "design-runs/game-assets-20260520/models/goblin-club-blockout/renders/goblin-club-blockout-obj-material-side.png",
+      "foregroundRatio": 0.0974,
+      "finiteBounds": true,
+      "minGroundY": null
+    }
+  ],
+  "failures": []
+}

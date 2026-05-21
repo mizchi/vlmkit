@@ -229,8 +229,12 @@ schema out of the dogfood directory.
    - Measure whether VLM adds signal beyond deterministic warnings.
 
 5. **Kagura smoke**
-   - Load the generated GLB and play a clip in `mizchi/kagura`.
-   - Emit the same structured JSON style: load status, clip status, frame status.
+   - Pre-runtime handoff smoke now exists: validate GLB path, clip ids,
+     scale/origin, axes, fixed camera views, and snapshot verification with
+     `motion:kagura-handoff:game-assets`.
+   - Next step is the real runtime gate: load the generated GLB, play a clip in
+     `mizchi/kagura`, and emit load status, clip status, and frame status in the
+     same structured JSON style.
 
 6. **Promote stable tools**
    - After the retarget and normalization policy stabilizes, move Motion IR,

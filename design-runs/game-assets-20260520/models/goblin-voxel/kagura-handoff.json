@@ -18,6 +18,22 @@
       "future kagura glTF asset pipeline"
     ]
   },
+  "kaguraHandoff": {
+    "runtimeFormat": "glb",
+    "modelPath": "goblin-voxel.glb",
+    "worldScale": 1,
+    "origin": {
+      "policy": "feet-near-y0-center-xz",
+      "translation": [0, 0, 0]
+    },
+    "axes": {
+      "up": "+Y",
+      "front": "+Z"
+    },
+    "fixedCameraViews": ["front", "side", "back", "iso"],
+    "animationClips": [],
+    "snapshotVerification": "goblin-voxel.render-verify.json"
+  },
   "renderChecks": {
     "renderer": "three-playwright",
     "views": ["front", "side", "back", "iso"],

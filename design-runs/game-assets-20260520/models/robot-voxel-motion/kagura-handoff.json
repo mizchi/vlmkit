@@ -55,6 +55,30 @@
       }
     ]
   },
+  "kaguraHandoff": {
+    "runtimeFormat": "glb",
+    "modelPath": "robot-voxel-motion.glb",
+    "worldScale": 1,
+    "origin": {
+      "policy": "feet-near-y0-center-xz",
+      "translation": [0, 0, 0]
+    },
+    "axes": {
+      "up": "+Y",
+      "front": "+Z"
+    },
+    "fixedCameraViews": [
+      "front",
+      "side",
+      "iso"
+    ],
+    "animationClips": [
+      "idle_bob",
+      "walk_cycle",
+      "wave"
+    ],
+    "snapshotVerification": "robot-voxel-motion.render-verify.json"
+  },
   "motionContract": {
     "primaryRuntimeFormat": "glb",
     "futureRuntimeFormat": "vrm-with-vrma",
