@@ -15,6 +15,7 @@ function parseArgs(argv) {
     contract: "",
     out: "",
     screenshot: "",
+    calibrationContract: "",
     kaguraRepo: process.env.KAGURA_REPO ? resolve(process.env.KAGURA_REPO) : defaultKaguraRepo,
     port: 8765,
     timeoutMs: 90_000,
@@ -26,6 +27,7 @@ function parseArgs(argv) {
     if (arg === "--contract") args.contract = resolve(required(argv, ++i, arg));
     else if (arg === "--out") args.out = resolve(required(argv, ++i, arg));
     else if (arg === "--screenshot") args.screenshot = resolve(required(argv, ++i, arg));
+    else if (arg === "--calibration-contract") args.calibrationContract = resolve(required(argv, ++i, arg));
     else if (arg === "--kagura-repo") args.kaguraRepo = resolve(required(argv, ++i, arg));
     else if (arg === "--port") args.port = Number(required(argv, ++i, arg));
     else if (arg === "--timeout-ms") args.timeoutMs = Number(required(argv, ++i, arg));
@@ -42,6 +44,7 @@ Options:
   --contract <path>                  Kagura handoff JSON contract
   --out <path>                       JSON report path
   --screenshot <path>                Optional canvas screenshot path
+  --calibration-contract <path>      Optional known-good Kagura handoff contract
   --kagura-repo <path>               Local mizchi/kagura repo (default: sibling ghq checkout)
   --port <n>                         Kagura dev server port (default: 8765)
   --timeout-ms <n>                   Startup/browser timeout (default: 90000)
@@ -67,9 +70,32 @@ function required(argv, index, flag) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const report = await runKaguraRuntimeSmoke(args);
+  if (args.calibrationContract) {
+    const calibration = await runKaguraRuntimeSmoke({
+      ...args,
+      contract: args.calibrationContract,
+      out: "",
+      screenshot: "",
+      calibrationContract: "",
+      port: args.port + 1,
+    });
+    report.calibration = summarizeCalibration(calibration);
+    report.environmentLikelyBroken = report.ok === false && calibration.ok === false;
+  }
   await writeFile(args.out, `${JSON.stringify(report, null, 2)}\n`);
   console.log(`${report.ok ? "OK" : "FAIL"} ${relative(repoRoot, args.out)}`);
   if (!report.ok) process.exit(1);
+}
+
+function summarizeCalibration(report) {
+  return {
+    ok: report.ok,
+    contract: report.contract,
+    assetId: report.assetId,
+    checks: report.checks,
+    warnings: report.warnings,
+    failures: report.failures,
+  };
 }
 
 async function runKaguraRuntimeSmoke(args) {

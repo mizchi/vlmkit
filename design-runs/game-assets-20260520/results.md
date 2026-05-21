@@ -383,3 +383,7 @@ Learned:
   blaming a generated asset. In this loop, Kagura's bundled GLB and vlmkit's
   GLBs fail identically under headless Playwright, which moves the next fix to
   the Kagura smoke environment or renderer path.
+- `run-kagura-runtime-smoke.mjs --calibration-contract <known-good>` now makes
+  that calibration mechanical. If both target and calibration fail, the report
+  sets `environmentLikelyBroken: true` so the autonomous loop does not spend
+  time tuning generated GLB output for an environment-level failure.

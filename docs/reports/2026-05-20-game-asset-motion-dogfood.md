@@ -240,6 +240,8 @@ schema out of the dogfood directory.
      is a headless Kagura/WebGPU smoke blocker rather than a generated-asset
      blocker. The probe now separates frame-signal from frame-substance checks:
      a render submit can be observed even while the visible frame remains black.
+     `--calibration-contract` records a known-good Kagura asset in the same
+     report and sets `environmentLikelyBroken` when both paths fail.
    - Next step is to fix/calibrate the Kagura headless render path and expose
      real clip playback status, then emit load status, clip status, and frame
      status in the same structured JSON style.

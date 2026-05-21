@@ -1116,7 +1116,9 @@ Current smoke status:
   `test_scene.glb`, so the current blocker is the headless Kagura/WebGPU smoke
   path rather than the vlmkit GLB. The probe now separates frame-signal from
   frame-substance checks: the robot run reports a render submit while the
-  visible frame still fails. Clip playback remains pending viewer support.
+  visible frame still fails. `--calibration-contract` can run a known-good
+  Kagura asset in the same report and marks `environmentLikelyBroken` when both
+  sides fail. Clip playback remains pending viewer support.
 
 Stepwise cleanup:
 

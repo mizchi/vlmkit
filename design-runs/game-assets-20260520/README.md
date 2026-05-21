@@ -252,7 +252,8 @@ shared tools now live in `tools/`:
   WebGPU validation warnings. The probe now records a separate frame-signal
   check, so "render submitted" and "visible frame rendered" do not collapse into
   the same status. Kagura's bundled `test_scene.glb` fails the same way in this
-  headless path, so this is not yet a CI gate.
+  headless path; pass `--calibration-contract` to record that comparison in the
+  same report and mark environment-level failures. This is not yet a CI gate.
 - `tools/apply-motion-ir.mjs`: retarget normalized humanoid motion IR and write
   derived GLB animation clips; supports root translation policies for simplified
   target rigs and `--audit-out` normalization reports with target bind metrics
@@ -411,6 +412,11 @@ node design-runs/game-assets-20260520/tools/run-kagura-runtime-smoke.mjs \
   --out /tmp/vlmkit-kagura-runtime-smoke.json \
   --screenshot /tmp/vlmkit-kagura-runtime-smoke.png
 ```
+
+For headless-environment debugging, pass a known Kagura asset as a separate
+contract with `--calibration-contract`. If both target and calibration fail, the
+report sets `environmentLikelyBroken: true` instead of blaming the generated
+asset first.
 
 Implementation note:
 
