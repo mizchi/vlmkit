@@ -52,6 +52,7 @@
     "moon:test:game-assets": "moon -C design-runs/game-assets-20260520 test motion-core && moon -C design-runs/game-assets-20260520 test motion-core-cli-args && moon -C design-runs/game-assets-20260520 check motion-core-cli",
     "moon:build:game-assets": "moon -C design-runs/game-assets-20260520 build motion-core motion-core-cli-args motion-core-cli --target js",
     "moon:parity:game-assets": "node design-runs/game-assets-20260520/tools/check-motion-core-parity.mjs",
+    "motion:retarget-profiles:game-assets": "node design-runs/game-assets-20260520/tools/check-retarget-profiles.mjs",
     "vrt": "playwright test",
     "vrt:update": "playwright test --update-snapshots"
   },

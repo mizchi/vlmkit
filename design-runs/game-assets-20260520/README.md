@@ -296,7 +296,10 @@ shared tools now live in `tools/`:
 - `tools/review-motion-with-vlm.mjs`: optional cheap VLM second opinion using
   a generated contact sheet; dry-runs without credentials
 - `tools/retarget-profiles.mjs`: named retarget downgrade profiles with
-  weighted skip scoring; `simple-rig` is kept as an alias of `robot-voxel`
+  schema descriptions, validation, and weighted skip scoring; `simple-rig` is
+  kept as an alias of `robot-voxel`
+- `tools/check-retarget-profiles.mjs`: pins profile schema validity plus the
+  expected `robot-voxel` tolerance/failure behavior
 - `tools/gltf-bind-pose.mjs`: shared glTF node world-transform and bind-pose
   measurement helpers used by extraction and retarget audit steps
 - `motions/external-vrma-quality-gold.json`: calibration ranges for

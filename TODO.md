@@ -1138,9 +1138,11 @@ Stepwise cleanup:
   deterministic score so agents can decide whether to continue, retry, or fail.
   First pass exists as `--retarget-profile robot-voxel`: fingers, toes,
   chest, neck, and shoulders are tolerated; skipped core channels such as
-  hips/head/arms/legs fail. `simple-rig` remains an alias. Remaining work is
-  calibrating weights against more target skeletons and promoting the profile
-  schema out of `design-runs`.
+  hips/head/arms/legs fail. The profile schema is now machine-checkable via
+  `motion:retarget-profiles:game-assets`, and the motion quality gate validates
+  profile definitions before scoring. `simple-rig` remains an alias. Remaining
+  work is calibrating weights against more target skeletons and promoting the
+  profile schema out of `design-runs`.
 - [ ] **G5. Pose and scale normalization.** Measure source root height,
   root motion, and bind/rest orientation. Add options for root translation
   modes: keep, zero, horizontal-only, scale-to-model. Track T-pose/A-pose

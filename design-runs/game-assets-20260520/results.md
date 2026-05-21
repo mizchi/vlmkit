@@ -286,6 +286,10 @@ Learned:
 - The retarget policy now has a first named profile module. `robot-voxel`
   assigns zero penalty to fingers, toes, chest, neck, and shoulder fallback
   skips, while skipped core bones such as hips/head/arms/legs fail the profile.
+- Retarget profiles now expose a schema-shaped description and validation
+  check. The quality gate validates profile definitions before scoring, and
+  `motion:retarget-profiles:game-assets` pins the `robot-voxel`/`simple-rig`
+  contract.
 - Smoke runs can now require a minimum quality verdict. `--min-quality pass`
   passes for `robot-voxel` and fails for `strict`, preserving the quality
   summary in the failure report.

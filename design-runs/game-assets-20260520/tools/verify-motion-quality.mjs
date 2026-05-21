@@ -6,6 +6,7 @@ import {
   evaluateRetargetWarnings,
   retargetProfileNames,
   skippedChannelRegions,
+  validateRetargetProfiles,
 } from "./retarget-profiles.mjs";
 
 const repoRoot = resolve(new URL("../../..", import.meta.url).pathname);
@@ -87,6 +88,10 @@ Options:
   if (!args.rendersDir) throw new Error("--renders-dir is required");
   if (!retargetProfileNames().includes(args.retargetProfile)) {
     throw new Error(`--retarget-profile must be one of: ${retargetProfileNames().join(", ")}`);
+  }
+  const profileValidation = validateRetargetProfiles();
+  if (!profileValidation.ok) {
+    throw new Error(`invalid retarget profiles:\n${profileValidation.errors.join("\n")}`);
   }
   if (!args.out) args.out = join(dirname(args.rendersDir), `${basenameNoExt(args.rendersDir)}.motion-quality.json`);
   return args;

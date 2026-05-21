@@ -193,7 +193,7 @@ schema out of the dogfood directory.
 
 1. **Retarget profile policy v2**
    - Add more named profiles beyond `robot-voxel`.
-   - Classify bones into required, optional, ignorable, and fallback.
+   - Calibrate the new machine-checkable profile schema against more targets.
    - Calibrate weighted region scoring against more targets.
    - Example: dropped fingers = pass/low cost, dropped hips/head/upper arms =
      fail.
