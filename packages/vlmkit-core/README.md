@@ -30,6 +30,7 @@ import { runA11yTouch } from "@mizchi/vlmkit-core/a11y-touch.ts";
 | Image diff | `png-diff`, `heatmap`, `heatmap-regions`, `diff-regions`, `region-classify`, `shift-origin`, `text-rows`, `grid-ratio`, `image-resize` | Pixel-level diff + region clustering + shift compensation. |
 | DOM | `dom-equivalence`, `dom-position-styles`, `computed-style-diff`, `computed-style-capture` | DOM structural / style comparison. |
 | Semantic | `a11y-semantic`, `visual-semantic`, `quality` | Accessibility-tree diff, visual-classification, quality scoring. |
+| Game asset motion | `game-asset-motion` | Motion IR verification, source adapter decisions, glTF clip sampling, and runtime playback gates. |
 | CLI tools (deep import) | `a11y-contrast`, `a11y-touch`, `a11y-focus-order`, `element-compare`, `mask` | Run via the `vrt` CLI or import the exported `runXxx` functions. |
 | Shared | `types`, `terminal-colors`, `cli-args`, `cli-error`, `png-utils` | Cross-package types and utilities. |
 

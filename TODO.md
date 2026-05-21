@@ -1257,13 +1257,20 @@ Stepwise cleanup:
   known-good runtime calibration contract, and
   `motion:kagura-runtime-calibrated:game-assets` runs targets with that
   calibration so environment failures and asset failures stay separable.
-- [ ] **G8. Mixamo / FBX adapter decision.** Decide whether to convert FBX
-  through an external tool or parse a converted GLB. The output contract
-  should still be the same Motion IR.
-- [ ] **G9. Promote stable pieces out of `design-runs`.** Once G1-G5 settle,
-  move reusable asset contract, Motion IR schema, retarget verifier, and
-  render gates into package code with tests. Keep generated assets as fixtures
-  only when they are small and license-safe.
+- [x] **G8. Mixamo / FBX adapter decision.** FBX/Mixamo is now treated as
+  `requires-conversion`: convert to GLB with an external tool such as Blender
+  or FBX2glTF, then run the same GLB -> Motion IR extraction path. Direct FBX
+  parsing stays out of core because FBX is tool-version dependent; the package
+  API records this through
+  `decideMotionSourceAdapter(...).strategy === "convert-to-glb-first"`.
+- [x] **G9. Promote stable pieces out of `design-runs`.** The first stable
+  game-asset slice now lives in `@mizchi/vlmkit-core`:
+  Motion IR schema/retarget verification, FBX/GLB/VRMA source adapter
+  decisions, GLB clip-pose sampling, and Kagura runtime clip/pose gates.
+  `verify-motion-ir.mjs` and `kagura-runtime-smoke-utils.mjs` now delegate to
+  the package code; generated assets remain design-run fixtures, and heavier
+  renderer/browser orchestration stays in `design-runs` until more rigs and
+  fixtures prove it stable.
 
 ### Spec coverage
 - [ ] Heading hierarchy validation

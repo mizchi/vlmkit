@@ -107,6 +107,35 @@ export {
 export { classifyVisualDiff } from "./visual-semantic.ts";
 export { runQualityChecks } from "./quality.ts";
 
+// ---- Game asset motion ----
+export {
+  createClipPlaybackStatus,
+  createPosePlaybackStatus,
+  decideMotionSourceAdapter,
+  decodeGlb,
+  sampleGltfClipPose,
+  sampleGltfClipPoseFromGlb,
+  verifyMotionIr,
+} from "./game-asset-motion.ts";
+export type {
+  ClipPlaybackLike,
+  ClipPlaybackStatus,
+  GltfClipPose,
+  GltfClipPoseNode,
+  GltfDocument,
+  MotionIrClipSummary,
+  MotionIrVerificationOptions,
+  MotionIrVerificationResult,
+  MotionSourceAdapterDecision,
+  MotionSourceAdapterInput,
+  MotionSourceAdapterStrategy,
+  MotionSourceFormat,
+  PosePlaybackInput,
+  PosePlaybackMismatch,
+  PosePlaybackStatus,
+  VerificationFinding,
+} from "./game-asset-motion.ts";
+
 // ---- Public config constants ----
 export { RESOLUTION_PRESETS } from "./image-resize.ts";
 export { TRACKED_PROPERTIES } from "./computed-style-capture.ts";
