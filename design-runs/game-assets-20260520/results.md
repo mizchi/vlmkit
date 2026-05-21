@@ -274,6 +274,13 @@ Observed shape:
   verification. `motion:kagura-handoff:game-assets` verifies those contracts and
   writes structured `*.kagura-smoke.json` reports. This does not yet load
   `mizchi/kagura`, but it pins the contract a Kagura runtime smoke must satisfy.
+- Kagura runtime smoke probe: `run-kagura-runtime-smoke.mjs` starts local
+  `mizchi/kagura` `gltf_viewer`, serves the vlmkit GLB through a CORS asset
+  server, and captures the canvas with Playwright. The first robot run reaches
+  the canvas but correctly fails the frame gate: `visiblePixelRatio=0.0111`
+  with WebGPU invalid texture/texture-view/command-buffer warnings. This is a
+  useful failure because the previous pre-runtime gate could only prove that
+  paths, clips, and snapshots existed.
 - retarget profile: `robot-voxel` (`simple-rig` is an alias)
 - quality verdict: `pass`
 - retarget weighted score: 1.0, penalty 0
@@ -362,3 +369,7 @@ Learned:
   runtime load/play gate. The former catches broken paths, missing clips, origin
   drift, and absent fixed-camera snapshots without adding an engine dependency;
   the latter can later prove that Kagura renders the same handoff.
+- Runtime smoke needs two gates: load status and frame substance. A WebGPU
+  canvas can exist while still rendering black; foreground/visible-pixel checks
+  and browser validation warnings must be part of the contract before trusting
+  a Kagura import.

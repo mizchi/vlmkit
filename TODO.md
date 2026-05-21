@@ -1107,6 +1107,12 @@ Current smoke status:
   views, animation clip ids, and snapshot verification path. `pnpm run
   motion:kagura-handoff:game-assets` validates all local handoff contracts and
   writes structured `*.kagura-smoke.json` reports.
+- [x] Experimental Kagura runtime smoke probe:
+  `run-kagura-runtime-smoke.mjs` starts local `mizchi/kagura` `gltf_viewer`,
+  serves a vlmkit GLB through a CORS asset server, opens it with Playwright, and
+  reports runtime load/frame status. First robot run reaches the canvas but
+  correctly fails on a black frame (`visiblePixelRatio=0.0111`) and WebGPU
+  validation warnings; clip playback remains pending viewer support.
 
 Stepwise cleanup:
 
@@ -1189,7 +1195,10 @@ Stepwise cleanup:
   CLI-runnable in CI and return structured JSON. First pass exists as a
   pre-runtime contract smoke: it validates the GLB path, clip ids, axes,
   scale/origin convention, fixed camera snapshots, and checked render reports.
-  Remaining work is the real Kagura runtime load/play check.
+  An experimental runtime probe now loads the GLB through Kagura `gltf_viewer`,
+  but the first headless run fails on WebGPU invalid texture/command-buffer
+  warnings and a black frame. Remaining work is fixing the Kagura runtime
+  render path for this asset and exposing real clip playback status.
 - [ ] **G8. Mixamo / FBX adapter decision.** Decide whether to convert FBX
   through an external tool or parse a converted GLB. The output contract
   should still be the same Motion IR.
