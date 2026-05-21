@@ -25,5 +25,20 @@ fn is_command(value : String) -> Bool {
   value == "retarget-strict-verdict" ||
   value == "robot-voxel-retarget-rule" ||
   value == "robot-voxel-retarget-score" ||
-  value == "robot-voxel-retarget-verdict"
+  value == "robot-voxel-retarget-verdict" ||
+  value == "quality-verdict-score" ||
+  value == "quality-compare-metric-status" ||
+  value == "quality-comparison-decision" ||
+  value == "quality-summary-verdict" ||
+  value == "quality-render-verify-verdict" ||
+  value == "quality-foreground-verdict" ||
+  value == "quality-screen-coverage-min-verdict" ||
+  value == "quality-screen-coverage-max-verdict" ||
+  value == "quality-jump-verdict" ||
+  value == "quality-ground-verdict" ||
+  value == "quality-foot-contact-verdict" ||
+  value == "quality-limb-extent-verdict" ||
+  value == "quality-loop-metadata-verdict" ||
+  value == "kagura-runtime-outcome-status" ||
+  value == "kagura-runtime-should-fail"
 }

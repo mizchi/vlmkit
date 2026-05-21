@@ -8,6 +8,7 @@ import {
   skippedChannelRegions,
   validateRetargetProfiles,
 } from "./retarget-profiles.mjs";
+import { motionCorePolicy } from "./motion-core-runtime.mjs";
 
 const repoRoot = resolve(new URL("../../..", import.meta.url).pathname);
 const defaultBackground = [0xe8, 0xe8, 0xe4];
@@ -189,7 +190,17 @@ async function readFrames(args) {
 function checkLimbExtent(frames, args, checks) {
   const displacements = frames.map((frame) => frame.trackedNodeDisplacement).filter(Boolean);
   if (displacements.length === 0) {
-    checks.push(warn("limb-extent", "no tracked node displacement metadata"));
+    checks.push(checkFromVerdict(
+      motionCorePolicy.quality.limbExtentVerdict({
+        displacementCount: 0,
+        pelvis: 0,
+        maxTrackedNode: 0,
+        maxPelvisWarn: args.maxPelvisDisplacementWarn,
+        maxTrackedNodeWarn: args.maxTrackedNodeDisplacementWarn,
+      }),
+      "limb-extent",
+      "no tracked node displacement metadata",
+    ));
     return;
   }
   const maxByNode = {};
@@ -207,19 +218,34 @@ function checkLimbExtent(frames, args, checks) {
     maxPelvisDisplacementWarn: args.maxPelvisDisplacementWarn,
     maxByNode: Object.fromEntries(Object.entries(maxByNode).map(([node, item]) => [node, round(item)])),
   };
-  if (pelvis > args.maxPelvisDisplacementWarn) {
-    checks.push(warn("limb-extent", "pelvis displacement exceeds bind-pose envelope", value));
-  } else if (maxTrackedNode > args.maxTrackedNodeDisplacementWarn) {
-    checks.push(warn("limb-extent", "tracked limb displacement exceeds bind-pose envelope", value));
-  } else {
-    checks.push(pass("limb-extent", "tracked limb displacement is within threshold", value));
-  }
+  const verdict = motionCorePolicy.quality.limbExtentVerdict({
+    displacementCount: displacements.length,
+    pelvis,
+    maxTrackedNode,
+    maxPelvisWarn: args.maxPelvisDisplacementWarn,
+    maxTrackedNodeWarn: args.maxTrackedNodeDisplacementWarn,
+  });
+  const reason = pelvis > args.maxPelvisDisplacementWarn
+    ? "pelvis displacement exceeds bind-pose envelope"
+    : maxTrackedNode > args.maxTrackedNodeDisplacementWarn
+      ? "tracked limb displacement exceeds bind-pose envelope"
+      : "tracked limb displacement is within threshold";
+  checks.push(checkFromVerdict(verdict, "limb-extent", reason, value));
 }
 
 function checkFootContact(frames, args, checks) {
   const contacts = frames.map((frame) => frame.footContact).filter(Boolean);
   if (contacts.length === 0) {
-    checks.push(warn("foot-contact", "no tracked foot metadata"));
+    checks.push(checkFromVerdict(
+      motionCorePolicy.quality.footContactVerdict({
+        contactCount: 0,
+        minFootDeltaY: 0,
+        sinkWarnThreshold: args.minFootDeltaYWarn,
+        alwaysFloatingWarnThreshold: args.maxAlwaysFloatingFootDeltaYWarn,
+      }),
+      "foot-contact",
+      "no tracked foot metadata",
+    ));
     return;
   }
   const minFootDeltaY = Math.min(...contacts.map((contact) => contact.minDeltaY));
@@ -232,21 +258,35 @@ function checkFootContact(frames, args, checks) {
     sinkWarnThreshold: args.minFootDeltaYWarn,
     alwaysFloatingWarnThreshold: args.maxAlwaysFloatingFootDeltaYWarn,
   };
-  if (minFootDeltaY < args.minFootDeltaYWarn) {
-    checks.push(warn("foot-contact", "foot pivots sink below bind-pose contact threshold", value));
-  } else if (alwaysFloating) {
-    checks.push(warn("foot-contact", "both feet float above bind-pose contact threshold in all sampled frames", value));
-  } else {
-    checks.push(pass("foot-contact", "foot contact envelope is within threshold", value));
-  }
+  const verdict = motionCorePolicy.quality.footContactVerdict({
+    contactCount: contacts.length,
+    minFootDeltaY,
+    sinkWarnThreshold: args.minFootDeltaYWarn,
+    alwaysFloatingWarnThreshold: args.maxAlwaysFloatingFootDeltaYWarn,
+  });
+  const reason = minFootDeltaY < args.minFootDeltaYWarn
+    ? "foot pivots sink below bind-pose contact threshold"
+    : alwaysFloating
+      ? "both feet float above bind-pose contact threshold in all sampled frames"
+      : "foot contact envelope is within threshold";
+  checks.push(checkFromVerdict(verdict, "foot-contact", reason, value));
 }
 
 function checkRenderVerify(renderVerify, checks) {
+  const verdict = motionCorePolicy.quality.renderVerifyVerdict({
+    hasReport: Boolean(renderVerify),
+    ok: renderVerify?.ok === true,
+  });
   if (!renderVerify) {
-    checks.push(warn("render-verify-missing", "render verify report was not provided"));
-    return;
+    checks.push(checkFromVerdict(verdict, "render-verify-missing", "render verify report was not provided"));
+  } else {
+    checks.push(checkFromVerdict(
+      verdict,
+      "render-verify",
+      renderVerify.ok ? "verify-renders passed" : "verify-renders failed",
+      renderVerify.failures ?? [],
+    ));
   }
-  checks.push(renderVerify.ok ? pass("render-verify", "verify-renders passed") : fail("render-verify", "verify-renders failed", renderVerify.failures ?? []));
 }
 
 function checkFrameBasics(frames, args, checks) {
@@ -256,21 +296,41 @@ function checkFrameBasics(frames, args, checks) {
   }
   checks.push(pass("frame-count", `${frames.length} frame(s) checked`, frames.length));
   const minForeground = Math.min(...frames.map((frame) => frame.foregroundRatio));
-  checks.push(minForeground < args.minForegroundRatio
-    ? fail("foreground-ratio", "foreground ratio below threshold", { minForeground, threshold: args.minForegroundRatio })
-    : pass("foreground-ratio", "foreground ratio is above threshold", { minForeground, threshold: args.minForegroundRatio }));
+  checks.push(checkFromVerdict(
+    motionCorePolicy.quality.foregroundVerdict({
+      minForeground,
+      threshold: args.minForegroundRatio,
+    }),
+    "foreground-ratio",
+    minForeground < args.minForegroundRatio
+      ? "foreground ratio below threshold"
+      : "foreground ratio is above threshold",
+    { minForeground, threshold: args.minForegroundRatio },
+  ));
   const minCoverage = Math.min(...frames.map((frame) => frame.screenCoverageRatio));
   const maxCoverage = Math.max(...frames.map((frame) => frame.screenCoverageRatio));
-  if (minCoverage < args.minCoverageRatio) {
-    checks.push(warn("screen-coverage-min", "rendered asset is small on screen", { minCoverage, threshold: args.minCoverageRatio }));
-  } else {
-    checks.push(pass("screen-coverage-min", "screen coverage minimum is acceptable", { minCoverage, threshold: args.minCoverageRatio }));
-  }
-  if (maxCoverage > args.maxCoverageRatio) {
-    checks.push(warn("screen-coverage-max", "rendered asset is close to filling the screen", { maxCoverage, threshold: args.maxCoverageRatio }));
-  } else {
-    checks.push(pass("screen-coverage-max", "screen coverage maximum is acceptable", { maxCoverage, threshold: args.maxCoverageRatio }));
-  }
+  checks.push(checkFromVerdict(
+    motionCorePolicy.quality.screenCoverageMinVerdict({
+      minCoverage,
+      threshold: args.minCoverageRatio,
+    }),
+    "screen-coverage-min",
+    minCoverage < args.minCoverageRatio
+      ? "rendered asset is small on screen"
+      : "screen coverage minimum is acceptable",
+    { minCoverage, threshold: args.minCoverageRatio },
+  ));
+  checks.push(checkFromVerdict(
+    motionCorePolicy.quality.screenCoverageMaxVerdict({
+      maxCoverage,
+      threshold: args.maxCoverageRatio,
+    }),
+    "screen-coverage-max",
+    maxCoverage > args.maxCoverageRatio
+      ? "rendered asset is close to filling the screen"
+      : "screen coverage maximum is acceptable",
+    { maxCoverage, threshold: args.maxCoverageRatio },
+  ));
 }
 
 function checkFrameStability(frames, args, checks) {
@@ -292,12 +352,28 @@ function checkFrameStability(frames, args, checks) {
       }
     }
   }
-  checks.push(maxCenterJump > args.maxCenterJumpRatio
-    ? warn("bbox-center-jump", "large frame-to-frame screen center movement", { maxCenterJump: round(maxCenterJump), threshold: args.maxCenterJumpRatio })
-    : pass("bbox-center-jump", "frame-to-frame screen center movement is bounded", { maxCenterJump: round(maxCenterJump), threshold: args.maxCenterJumpRatio }));
-  checks.push(maxAreaJump > args.maxAreaJumpRatio
-    ? warn("bbox-area-jump", "large frame-to-frame screen area change", { maxAreaJump: round(maxAreaJump), threshold: args.maxAreaJumpRatio })
-    : pass("bbox-area-jump", "frame-to-frame screen area change is bounded", { maxAreaJump: round(maxAreaJump), threshold: args.maxAreaJumpRatio }));
+  checks.push(checkFromVerdict(
+    motionCorePolicy.quality.jumpVerdict({
+      value: maxCenterJump,
+      threshold: args.maxCenterJumpRatio,
+    }),
+    "bbox-center-jump",
+    maxCenterJump > args.maxCenterJumpRatio
+      ? "large frame-to-frame screen center movement"
+      : "frame-to-frame screen center movement is bounded",
+    { maxCenterJump: round(maxCenterJump), threshold: args.maxCenterJumpRatio },
+  ));
+  checks.push(checkFromVerdict(
+    motionCorePolicy.quality.jumpVerdict({
+      value: maxAreaJump,
+      threshold: args.maxAreaJumpRatio,
+    }),
+    "bbox-area-jump",
+    maxAreaJump > args.maxAreaJumpRatio
+      ? "large frame-to-frame screen area change"
+      : "frame-to-frame screen area change is bounded",
+    { maxAreaJump: round(maxAreaJump), threshold: args.maxAreaJumpRatio },
+  ));
 }
 
 function checkGround(frames, args, checks) {
@@ -307,18 +383,30 @@ function checkGround(frames, args, checks) {
     ? groundDeltaValues
     : frames.map((frame) => frame.minGroundY).filter(Number.isFinite);
   if (values.length === 0) {
-    checks.push(warn("ground-y", "no finite ground metadata"));
+    checks.push(checkFromVerdict(
+      motionCorePolicy.quality.groundVerdict({
+        minGround: null,
+        warnThreshold: args.minGroundYWarn,
+        failThreshold: args.minGroundYFail,
+      }),
+      "ground-y",
+      "no finite ground metadata",
+    ));
     return;
   }
   const minGround = Math.min(...values);
   const value = { metric, minGround: round(minGround), warnThreshold: args.minGroundYWarn, failThreshold: args.minGroundYFail };
-  if (minGround < args.minGroundYFail) {
-    checks.push(fail("ground-y", "motion sinks far below ground threshold", value));
-  } else if (minGround < args.minGroundYWarn) {
-    checks.push(warn("ground-y", "motion goes below ground warning threshold", value));
-  } else {
-    checks.push(pass("ground-y", "ground contact metadata is within threshold", value));
-  }
+  const verdict = motionCorePolicy.quality.groundVerdict({
+    minGround,
+    warnThreshold: args.minGroundYWarn,
+    failThreshold: args.minGroundYFail,
+  });
+  const reason = minGround < args.minGroundYFail
+    ? "motion sinks far below ground threshold"
+    : minGround < args.minGroundYWarn
+      ? "motion goes below ground warning threshold"
+      : "ground contact metadata is within threshold";
+  checks.push(checkFromVerdict(verdict, "ground-y", reason, value));
 }
 
 function checkRetainedChannels(motion, args, checks) {
@@ -352,9 +440,16 @@ function checkLoopMetadata(motion, checks) {
   if (!motion) return;
   const clips = motion.clips ?? [];
   const missing = clips.filter((clip) => typeof clip.loop !== "boolean");
-  checks.push(missing.length > 0
-    ? warn("loop-metadata", "some clips have no explicit loop metadata", missing.map((clip) => clip.id))
-    : pass("loop-metadata", "all clips have explicit loop metadata", clips.map((clip) => ({ id: clip.id, loop: clip.loop }))));
+  checks.push(checkFromVerdict(
+    motionCorePolicy.quality.loopMetadataVerdict(missing.length),
+    "loop-metadata",
+    missing.length > 0
+      ? "some clips have no explicit loop metadata"
+      : "all clips have explicit loop metadata",
+    missing.length > 0
+      ? missing.map((clip) => clip.id)
+      : clips.map((clip) => ({ id: clip.id, loop: clip.loop })),
+  ));
 }
 
 function summarizeMetrics(frames, motion) {
@@ -474,9 +569,16 @@ function foregroundBbox(image, background) {
 }
 
 function summarizeVerdict(checks) {
-  if (checks.some((check) => check.verdict === "fail")) return "fail";
-  if (checks.some((check) => check.verdict === "warn")) return "warn";
-  return "pass";
+  return motionCorePolicy.quality.summaryVerdict({
+    failCount: checks.filter((check) => check.verdict === "fail").length,
+    warnCount: checks.filter((check) => check.verdict === "warn").length,
+  });
+}
+
+function checkFromVerdict(verdict, id, reason, value) {
+  if (verdict === "fail") return fail(id, reason, value);
+  if (verdict === "warn") return warn(id, reason, value);
+  return pass(id, reason, value);
 }
 
 function pass(id, reason, value) {

@@ -1,19 +1,25 @@
+import { motionCorePolicy } from "./motion-core-runtime.mjs";
+
 export function classifyRuntimeOutcome({ targetOk, calibrationOk }) {
-  if (targetOk) {
+  const status = motionCorePolicy.kaguraRuntime.outcomeStatus({
+    targetOk,
+    calibrationOk,
+  });
+  if (status === "pass") {
     return {
       status: "pass",
       environmentLikelyBroken: false,
       assetLikelyBroken: false,
     };
   }
-  if (calibrationOk === false) {
+  if (status === "environment-failed") {
     return {
       status: "environment-failed",
       environmentLikelyBroken: true,
       assetLikelyBroken: false,
     };
   }
-  if (calibrationOk === true) {
+  if (status === "asset-failed") {
     return {
       status: "asset-failed",
       environmentLikelyBroken: false,
@@ -28,9 +34,9 @@ export function classifyRuntimeOutcome({ targetOk, calibrationOk }) {
 }
 
 export function shouldFailProcess(outcome, { allowEnvironmentFailure = false } = {}) {
-  if (outcome.status === "pass") return false;
-  if (outcome.status === "environment-failed" && allowEnvironmentFailure) return false;
-  return true;
+  return motionCorePolicy.kaguraRuntime.shouldFail(outcome.status, {
+    allowEnvironmentFailure,
+  });
 }
 
 export function sanitizeServerLogLine(line, { kaguraRepo = "" } = {}) {

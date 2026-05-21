@@ -1,8 +1,18 @@
 import {
   armRestCandidateStatus,
   armRestMotionGateStatus,
+  kaguraRuntimeOutcomeStatus,
+  kaguraRuntimeShouldFail,
   poseMismatchWarningIds,
   poseNormalizationCandidateSpecs,
+  qualityCompareMetricStatus,
+  qualityComparisonDecision,
+  qualityFootContactVerdict,
+  qualityGroundVerdict,
+  qualityLimbExtentVerdict,
+  qualityRenderVerifyVerdict,
+  qualitySummaryVerdict,
+  qualityVerdictScore,
   retargetStrictVerdict,
   robotVoxelRetargetRuleId,
   robotVoxelRetargetScore,
@@ -339,6 +349,108 @@ const cases = [
       hardFailureCount: 0,
     }),
     "pass",
+  ],
+  [
+    "quality-verdict-score pass",
+    () => String(qualityVerdictScore("pass")),
+    "3",
+  ],
+  [
+    "quality-compare-metric-status lower improved",
+    () => qualityCompareMetricStatus({
+      baseline: 1.0,
+      candidate: 0.98,
+      tolerance: 0.01,
+      better: "lower",
+    }),
+    "improved",
+  ],
+  [
+    "quality-comparison-decision tradeoff",
+    () => qualityComparisonDecision({
+      improved: 1,
+      regressed: 1,
+    }),
+    "candidate-tradeoff",
+  ],
+  [
+    "quality-summary-verdict warn",
+    () => qualitySummaryVerdict({
+      failCount: 0,
+      warnCount: 1,
+    }),
+    "warn",
+  ],
+  [
+    "quality-render-verify-verdict missing",
+    () => qualityRenderVerifyVerdict({
+      hasReport: false,
+      ok: false,
+    }),
+    "warn",
+  ],
+  [
+    "quality-ground-verdict fail",
+    () => qualityGroundVerdict({
+      minGround: -2.6,
+      warnThreshold: -0.35,
+      failThreshold: -2.5,
+    }),
+    "fail",
+  ],
+  [
+    "quality-foot-contact-verdict floating",
+    () => qualityFootContactVerdict({
+      contactCount: 2,
+      minFootDeltaY: 0.66,
+      sinkWarnThreshold: -0.25,
+      alwaysFloatingWarnThreshold: 0.65,
+    }),
+    "warn",
+  ],
+  [
+    "quality-limb-extent-verdict pass",
+    () => qualityLimbExtentVerdict({
+      displacementCount: 2,
+      pelvis: 0.2,
+      maxTrackedNode: 1.35,
+      maxPelvisWarn: 0.45,
+      maxTrackedNodeWarn: 1.35,
+    }),
+    "pass",
+  ],
+  [
+    "policy.quality.compareMetricStatus",
+    () => motionCorePolicy.quality.compareMetricStatus({
+      baseline: 2,
+      candidate: 1,
+      tolerance: 0,
+      better: "higher",
+    }),
+    "regressed",
+  ],
+  [
+    "kagura-runtime-outcome-status environment",
+    () => kaguraRuntimeOutcomeStatus({
+      targetOk: false,
+      calibrationOk: false,
+    }),
+    "environment-failed",
+  ],
+  [
+    "kagura-runtime-should-fail allowed environment",
+    () => String(kaguraRuntimeShouldFail("environment-failed", {
+      allowEnvironmentFailure: true,
+    })),
+    "false",
+  ],
+  [
+    "policy.kaguraRuntime.outcomeStatus",
+    () => motionCorePolicy.kaguraRuntime.outcomeStatus({
+      targetOk: false,
+      calibrationOk: true,
+    }),
+    "asset-failed",
   ],
 ];
 

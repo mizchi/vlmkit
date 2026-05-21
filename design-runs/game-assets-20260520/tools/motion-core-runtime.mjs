@@ -32,6 +32,25 @@ export const motionCorePolicy = Object.freeze({
     robotVoxelScore: robotVoxelRetargetScore,
     robotVoxelVerdict: robotVoxelRetargetVerdict,
   }),
+  quality: Object.freeze({
+    verdictScore: qualityVerdictScore,
+    compareMetricStatus: qualityCompareMetricStatus,
+    comparisonDecision: qualityComparisonDecision,
+    summaryVerdict: qualitySummaryVerdict,
+    renderVerifyVerdict: qualityRenderVerifyVerdict,
+    foregroundVerdict: qualityForegroundVerdict,
+    screenCoverageMinVerdict: qualityScreenCoverageMinVerdict,
+    screenCoverageMaxVerdict: qualityScreenCoverageMaxVerdict,
+    jumpVerdict: qualityJumpVerdict,
+    groundVerdict: qualityGroundVerdict,
+    footContactVerdict: qualityFootContactVerdict,
+    limbExtentVerdict: qualityLimbExtentVerdict,
+    loopMetadataVerdict: qualityLoopMetadataVerdict,
+  }),
+  kaguraRuntime: Object.freeze({
+    outcomeStatus: kaguraRuntimeOutcomeStatus,
+    shouldFail: kaguraRuntimeShouldFail,
+  }),
 });
 
 export function armRestMotionGateStatus(maxUpperArmRotationRangeDeg) {
@@ -159,6 +178,156 @@ export function robotVoxelRetargetVerdict({
   ]);
 }
 
+export function qualityVerdictScore(verdict) {
+  return Number(runMotionCore([
+    "quality-verdict-score",
+    String(verdict ?? ""),
+  ]));
+}
+
+export function qualityCompareMetricStatus({
+  baseline,
+  candidate,
+  tolerance,
+  better,
+}) {
+  return runMotionCore([
+    "quality-compare-metric-status",
+    optionalDoubleArg(baseline),
+    optionalDoubleArg(candidate),
+    optionalDoubleArg(tolerance),
+    String(better ?? ""),
+  ]);
+}
+
+export function qualityComparisonDecision({
+  improved,
+  regressed,
+}) {
+  return runMotionCore([
+    "quality-comparison-decision",
+    intArg(improved),
+    intArg(regressed),
+  ]);
+}
+
+export function qualitySummaryVerdict({ failCount, warnCount }) {
+  return runMotionCore([
+    "quality-summary-verdict",
+    intArg(failCount),
+    intArg(warnCount),
+  ]);
+}
+
+export function qualityRenderVerifyVerdict({ hasReport, ok }) {
+  return runMotionCore([
+    "quality-render-verify-verdict",
+    hasReport ? "true" : "false",
+    ok ? "true" : "false",
+  ]);
+}
+
+export function qualityForegroundVerdict({ minForeground, threshold }) {
+  return runMotionCore([
+    "quality-foreground-verdict",
+    optionalDoubleArg(minForeground),
+    optionalDoubleArg(threshold),
+  ]);
+}
+
+export function qualityScreenCoverageMinVerdict({ minCoverage, threshold }) {
+  return runMotionCore([
+    "quality-screen-coverage-min-verdict",
+    optionalDoubleArg(minCoverage),
+    optionalDoubleArg(threshold),
+  ]);
+}
+
+export function qualityScreenCoverageMaxVerdict({ maxCoverage, threshold }) {
+  return runMotionCore([
+    "quality-screen-coverage-max-verdict",
+    optionalDoubleArg(maxCoverage),
+    optionalDoubleArg(threshold),
+  ]);
+}
+
+export function qualityJumpVerdict({ value, threshold }) {
+  return runMotionCore([
+    "quality-jump-verdict",
+    optionalDoubleArg(value),
+    optionalDoubleArg(threshold),
+  ]);
+}
+
+export function qualityGroundVerdict({ minGround, warnThreshold, failThreshold }) {
+  return runMotionCore([
+    "quality-ground-verdict",
+    optionalDoubleArg(minGround),
+    optionalDoubleArg(warnThreshold),
+    optionalDoubleArg(failThreshold),
+  ]);
+}
+
+export function qualityFootContactVerdict({
+  contactCount,
+  minFootDeltaY,
+  sinkWarnThreshold,
+  alwaysFloatingWarnThreshold,
+}) {
+  return runMotionCore([
+    "quality-foot-contact-verdict",
+    intArg(contactCount),
+    optionalDoubleArg(minFootDeltaY),
+    optionalDoubleArg(sinkWarnThreshold),
+    optionalDoubleArg(alwaysFloatingWarnThreshold),
+  ]);
+}
+
+export function qualityLimbExtentVerdict({
+  displacementCount,
+  pelvis,
+  maxTrackedNode,
+  maxPelvisWarn,
+  maxTrackedNodeWarn,
+}) {
+  return runMotionCore([
+    "quality-limb-extent-verdict",
+    intArg(displacementCount),
+    optionalDoubleArg(pelvis),
+    optionalDoubleArg(maxTrackedNode),
+    optionalDoubleArg(maxPelvisWarn),
+    optionalDoubleArg(maxTrackedNodeWarn),
+  ]);
+}
+
+export function qualityLoopMetadataVerdict(missingCount) {
+  return runMotionCore([
+    "quality-loop-metadata-verdict",
+    intArg(missingCount),
+  ]);
+}
+
+export function kaguraRuntimeOutcomeStatus({
+  targetOk,
+  calibrationOk,
+}) {
+  return runMotionCore([
+    "kagura-runtime-outcome-status",
+    targetOk ? "true" : "false",
+    optionalBoolArg(calibrationOk),
+  ]);
+}
+
+export function kaguraRuntimeShouldFail(outcomeStatus, {
+  allowEnvironmentFailure = false,
+} = {}) {
+  return runMotionCore([
+    "kagura-runtime-should-fail",
+    String(outcomeStatus ?? ""),
+    allowEnvironmentFailure ? "true" : "false",
+  ]) === "true";
+}
+
 export function runMotionCore(args) {
   ensureMotionCoreCli();
   return run(process.execPath, [cliPath, ...args]);
@@ -185,6 +354,10 @@ function optionalDoubleArg(value) {
 
 function intArg(value) {
   return String(Number.isFinite(value) ? Math.trunc(value) : 0);
+}
+
+function optionalBoolArg(value) {
+  return typeof value === "boolean" ? String(value) : "null";
 }
 
 function parseCandidateSpec(value) {

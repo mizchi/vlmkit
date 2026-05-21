@@ -302,8 +302,9 @@ shared tools now live in `tools/`:
 - `motion-core/`: MoonBit port of pure candidate policy logic. It currently
   covers the arm-rest motion gate, root-translation recommendation/candidate
   selection, pose mismatch warning-id selection, pose normalization candidate
-  spec selection, candidate-group selection recommendation, and retarget
-  downgrade verdict/rule scoring; run it with
+  spec selection, candidate-group selection recommendation, retarget downgrade
+  verdict/rule scoring, motion-quality threshold verdicts, comparison decisions,
+  and Kagura runtime outcome policy; run it with
   `moon -C design-runs/game-assets-20260520 test motion-core`
 - `motion-kagura-bridge/`: compile-time smoke that imports the published
   `mizchi/kagura` Moon package and calls the root facade fixed-timestep API.
@@ -325,6 +326,10 @@ shared tools now live in `tools/`:
   - `motionCorePolicy.selection`: candidate-group recommendation
   - `motionCorePolicy.retarget`: strict retained-ratio verdicts plus
     `robot-voxel` rule id / score / verdict decisions
+  - `motionCorePolicy.quality`: motion-quality threshold verdicts plus
+    comparison metric status and sample decisions
+  - `motionCorePolicy.kaguraRuntime`: runtime target/calibration outcome and
+    process-fail policy
 - `tools/check-motion-core-parity.mjs`: builds the MoonBit JS target and checks
   the generated CLI decisions against the expected policy fixtures
 - `tools/review-motion-with-vlm.mjs`: optional cheap VLM second opinion using
@@ -333,6 +338,10 @@ shared tools now live in `tools/`:
   schema descriptions, validation, and weighted skip scoring; score/verdict
   decisions delegate to the MoonBit runtime, and `simple-rig` is kept as an
   alias of `robot-voxel`
+- `tools/verify-motion-quality.mjs`: keeps PNG/metadata extraction in JS, while
+  quality verdict decisions delegate to the MoonBit runtime
+- `tools/compare-motion-quality-reports.mjs`: keeps report diff shaping in JS,
+  while metric status and sample decision policy delegate to MoonBit
 - `tools/check-retarget-profiles.mjs`: pins profile schema validity plus the
   expected `robot-voxel` tolerance/failure behavior
 - `tools/gltf-bind-pose.mjs`: shared glTF node world-transform and bind-pose

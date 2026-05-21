@@ -239,3 +239,95 @@ test "robot voxel retarget score and verdict" {
   inspect(robot_voxel_retarget_verdict(1.5, 0), content="fail")
   inspect(robot_voxel_retarget_verdict(0.0, 1), content="fail")
 }
+
+///|
+test "quality comparison policy" {
+  inspect(quality_verdict_score("pass"), content="3")
+  inspect(quality_verdict_score("warn"), content="2")
+  inspect(quality_verdict_score("fail"), content="1")
+  inspect(quality_verdict_score("unknown"), content="0")
+  inspect(
+    quality_compare_metric_status(Some(1.0), Some(0.98), 0.01, "lower"),
+    content="improved",
+  )
+  inspect(
+    quality_compare_metric_status(Some(1.0), Some(1.02), 0.01, "lower"),
+    content="regressed",
+  )
+  inspect(
+    quality_compare_metric_status(Some(1.0), Some(1.005), 0.01, "lower"),
+    content="stable",
+  )
+  inspect(
+    quality_compare_metric_status(Some(2.0), Some(3.0), 0.0, "higher"),
+    content="improved",
+  )
+  inspect(
+    quality_compare_metric_status(Some(2.0), Some(1.0), 0.0, "higher"),
+    content="regressed",
+  )
+  inspect(
+    quality_compare_metric_status(None, Some(1.0), 0.0, "higher"),
+    content="missing",
+  )
+  inspect(quality_comparison_decision(1, 0), content="candidate-improved")
+  inspect(quality_comparison_decision(0, 1), content="candidate-regressed")
+  inspect(quality_comparison_decision(1, 1), content="candidate-tradeoff")
+  inspect(quality_comparison_decision(0, 0), content="stable")
+}
+
+///|
+test "motion quality gate policy" {
+  inspect(quality_summary_verdict(0, 0), content="pass")
+  inspect(quality_summary_verdict(0, 1), content="warn")
+  inspect(quality_summary_verdict(1, 0), content="fail")
+  inspect(quality_render_verify_verdict(false, false), content="warn")
+  inspect(quality_render_verify_verdict(true, false), content="fail")
+  inspect(quality_render_verify_verdict(true, true), content="pass")
+  inspect(quality_foreground_verdict(0.02, 0.03), content="fail")
+  inspect(quality_foreground_verdict(0.03, 0.03), content="pass")
+  inspect(quality_screen_coverage_min_verdict(0.014, 0.015), content="warn")
+  inspect(quality_screen_coverage_min_verdict(0.015, 0.015), content="pass")
+  inspect(quality_screen_coverage_max_verdict(0.76, 0.75), content="warn")
+  inspect(quality_screen_coverage_max_verdict(0.75, 0.75), content="pass")
+  inspect(quality_jump_verdict(0.181, 0.18), content="warn")
+  inspect(quality_jump_verdict(0.18, 0.18), content="pass")
+  inspect(quality_ground_verdict(None, -0.35, -2.5), content="warn")
+  inspect(quality_ground_verdict(Some(-2.6), -0.35, -2.5), content="fail")
+  inspect(quality_ground_verdict(Some(-0.36), -0.35, -2.5), content="warn")
+  inspect(quality_ground_verdict(Some(-0.35), -0.35, -2.5), content="pass")
+  inspect(quality_foot_contact_verdict(0, 0.0, -0.25, 0.65), content="warn")
+  inspect(quality_foot_contact_verdict(2, -0.26, -0.25, 0.65), content="warn")
+  inspect(quality_foot_contact_verdict(2, 0.66, -0.25, 0.65), content="warn")
+  inspect(quality_foot_contact_verdict(2, 0.0, -0.25, 0.65), content="pass")
+  inspect(quality_limb_extent_verdict(0, 0.0, 0.0, 0.45, 1.35), content="warn")
+  inspect(quality_limb_extent_verdict(2, 0.46, 0.5, 0.45, 1.35), content="warn")
+  inspect(quality_limb_extent_verdict(2, 0.2, 1.36, 0.45, 1.35), content="warn")
+  inspect(quality_limb_extent_verdict(2, 0.2, 1.35, 0.45, 1.35), content="pass")
+  inspect(quality_loop_metadata_verdict(1), content="warn")
+  inspect(quality_loop_metadata_verdict(0), content="pass")
+}
+
+///|
+test "kagura runtime outcome policy" {
+  inspect(kagura_runtime_outcome_status(true, None), content="pass")
+  inspect(
+    kagura_runtime_outcome_status(false, Some(false)),
+    content="environment-failed",
+  )
+  inspect(
+    kagura_runtime_outcome_status(false, Some(true)),
+    content="asset-failed",
+  )
+  inspect(kagura_runtime_outcome_status(false, None), content="target-failed")
+  inspect(kagura_runtime_should_fail("pass", false), content="false")
+  inspect(
+    kagura_runtime_should_fail("environment-failed", true),
+    content="false",
+  )
+  inspect(
+    kagura_runtime_should_fail("environment-failed", false),
+    content="true",
+  )
+  inspect(kagura_runtime_should_fail("asset-failed", true), content="true")
+}

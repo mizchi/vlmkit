@@ -325,6 +325,233 @@ pub fn robot_voxel_retarget_verdict(
 }
 
 ///|
+/// Return an ordinal score for quality verdict comparison.
+pub fn quality_verdict_score(verdict : String) -> Int {
+  if verdict == "pass" {
+    3
+  } else if verdict == "warn" {
+    2
+  } else if verdict == "fail" {
+    1
+  } else {
+    0
+  }
+}
+
+///|
+/// Return the metric comparison status used by motion-quality candidates.
+pub fn quality_compare_metric_status(
+  baseline : Double?,
+  candidate : Double?,
+  tolerance : Double,
+  better : String,
+) -> String {
+  match (baseline, candidate) {
+    (Some(baseline), Some(candidate)) =>
+      if better == "lower" {
+        if candidate < baseline - tolerance {
+          "improved"
+        } else if candidate > baseline + tolerance {
+          "regressed"
+        } else {
+          "stable"
+        }
+      } else if better == "higher" {
+        if candidate > baseline + tolerance {
+          "improved"
+        } else if candidate < baseline - tolerance {
+          "regressed"
+        } else {
+          "stable"
+        }
+      } else {
+        "stable"
+      }
+    _ => "missing"
+  }
+}
+
+///|
+/// Collapse per-metric comparison statuses into a sample-level decision.
+pub fn quality_comparison_decision(improved : Int, regressed : Int) -> String {
+  if improved > 0 && regressed > 0 {
+    "candidate-tradeoff"
+  } else if regressed > 0 {
+    "candidate-regressed"
+  } else if improved > 0 {
+    "candidate-improved"
+  } else {
+    "stable"
+  }
+}
+
+///|
+/// Collapse quality check counts into a report verdict.
+pub fn quality_summary_verdict(fail_count : Int, warn_count : Int) -> String {
+  if fail_count > 0 {
+    "fail"
+  } else if warn_count > 0 {
+    "warn"
+  } else {
+    "pass"
+  }
+}
+
+///|
+/// Return the quality verdict for an optional render verification report.
+pub fn quality_render_verify_verdict(has_report : Bool, ok : Bool) -> String {
+  if !has_report {
+    "warn"
+  } else if ok {
+    "pass"
+  } else {
+    "fail"
+  }
+}
+
+///|
+pub fn quality_foreground_verdict(
+  min_foreground : Double,
+  threshold : Double,
+) -> String {
+  if min_foreground < threshold {
+    "fail"
+  } else {
+    "pass"
+  }
+}
+
+///|
+pub fn quality_screen_coverage_min_verdict(
+  min_coverage : Double,
+  threshold : Double,
+) -> String {
+  if min_coverage < threshold {
+    "warn"
+  } else {
+    "pass"
+  }
+}
+
+///|
+pub fn quality_screen_coverage_max_verdict(
+  max_coverage : Double,
+  threshold : Double,
+) -> String {
+  if max_coverage > threshold {
+    "warn"
+  } else {
+    "pass"
+  }
+}
+
+///|
+pub fn quality_jump_verdict(value : Double, threshold : Double) -> String {
+  if value > threshold {
+    "warn"
+  } else {
+    "pass"
+  }
+}
+
+///|
+pub fn quality_ground_verdict(
+  min_ground : Double?,
+  warn_threshold : Double,
+  fail_threshold : Double,
+) -> String {
+  match min_ground {
+    None => "warn"
+    Some(value) =>
+      if value < fail_threshold {
+        "fail"
+      } else if value < warn_threshold {
+        "warn"
+      } else {
+        "pass"
+      }
+  }
+}
+
+///|
+pub fn quality_foot_contact_verdict(
+  contact_count : Int,
+  min_foot_delta_y : Double,
+  sink_warn_threshold : Double,
+  always_floating_warn_threshold : Double,
+) -> String {
+  if contact_count <= 0 {
+    "warn"
+  } else if min_foot_delta_y < sink_warn_threshold {
+    "warn"
+  } else if min_foot_delta_y > always_floating_warn_threshold {
+    "warn"
+  } else {
+    "pass"
+  }
+}
+
+///|
+pub fn quality_limb_extent_verdict(
+  displacement_count : Int,
+  pelvis : Double,
+  max_tracked_node : Double,
+  max_pelvis_warn : Double,
+  max_tracked_node_warn : Double,
+) -> String {
+  if displacement_count <= 0 {
+    "warn"
+  } else if pelvis > max_pelvis_warn {
+    "warn"
+  } else if max_tracked_node > max_tracked_node_warn {
+    "warn"
+  } else {
+    "pass"
+  }
+}
+
+///|
+pub fn quality_loop_metadata_verdict(missing_count : Int) -> String {
+  if missing_count > 0 {
+    "warn"
+  } else {
+    "pass"
+  }
+}
+
+///|
+/// Classify a Kagura runtime smoke target/calibration result.
+pub fn kagura_runtime_outcome_status(
+  target_ok : Bool,
+  calibration_ok : Bool?,
+) -> String {
+  if target_ok {
+    "pass"
+  } else {
+    match calibration_ok {
+      Some(false) => "environment-failed"
+      Some(true) => "asset-failed"
+      None => "target-failed"
+    }
+  }
+}
+
+///|
+/// Return whether a Kagura runtime outcome should fail the process.
+pub fn kagura_runtime_should_fail(
+  outcome_status : String,
+  allow_environment_failure : Bool,
+) -> Bool {
+  if outcome_status == "pass" {
+    false
+  } else if outcome_status == "environment-failed" && allow_environment_failure {
+    false
+  } else {
+    true
+  }
+}
+
+///|
 fn optional_gte(value : Double?, threshold : Double) -> Bool {
   match value {
     None => false

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
+import { motionCorePolicy } from "./motion-core-runtime.mjs";
 
 const repoRoot = resolve(new URL("../../..", import.meta.url).pathname);
 
@@ -153,12 +154,10 @@ function summarizeSample(sample) {
 
 function decide(metrics) {
   const values = Object.values(metrics);
-  const hasRegression = values.some((metric) => metric.status === "regressed");
-  const hasImprovement = values.some((metric) => metric.status === "improved");
-  if (hasImprovement && hasRegression) return "candidate-tradeoff";
-  if (hasRegression) return "candidate-regressed";
-  if (hasImprovement) return "candidate-improved";
-  return "stable";
+  return motionCorePolicy.quality.comparisonDecision({
+    improved: values.filter((metric) => metric.status === "improved").length,
+    regressed: values.filter((metric) => metric.status === "regressed").length,
+  });
 }
 
 function metricReasons(metrics) {
@@ -186,27 +185,22 @@ function higherBetter(id, baseline, candidate, tolerance) {
 }
 
 function compareMetric(id, baseline, candidate, tolerance, better) {
-  if (!Number.isFinite(baseline) || !Number.isFinite(candidate)) {
+  const status = motionCorePolicy.quality.compareMetricStatus({
+    baseline,
+    candidate,
+    tolerance,
+    better,
+  });
+  if (status === "missing") {
     return { id, better, baseline: finiteOrNull(baseline), candidate: finiteOrNull(candidate), delta: null, status: "missing" };
   }
   const delta = round(candidate - baseline);
-  let status = "stable";
-  if (better === "lower") {
-    if (candidate < baseline - tolerance) status = "improved";
-    else if (candidate > baseline + tolerance) status = "regressed";
-  } else if (candidate > baseline + tolerance) {
-    status = "improved";
-  } else if (candidate < baseline - tolerance) {
-    status = "regressed";
-  }
   return { id, better, baseline: round(baseline), candidate: round(candidate), delta, tolerance, status };
 }
 
 function verdictScore(verdict) {
-  if (verdict === "pass") return 3;
-  if (verdict === "warn") return 2;
-  if (verdict === "fail") return 1;
-  return null;
+  const score = motionCorePolicy.quality.verdictScore(verdict);
+  return score > 0 ? score : null;
 }
 
 function maxAbsRange(range) {

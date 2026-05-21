@@ -267,7 +267,11 @@ Observed shape:
   portable while JS remains responsible for GLB/JSON file orchestration.
   `apply-motion-ir` keeps audit-facing severity/reason text in explicit detail
   maps keyed by the MoonBit ids/specs. New JS callers use categorized
-  `motionCorePolicy.root`, `.pose`, and `.selection` APIs
+  `motionCorePolicy.root`, `.pose`, `.selection`, `.retarget`, `.quality`, and
+  `.kaguraRuntime` APIs. `compare-motion-quality-reports` now delegates metric
+  status/sample decisions to MoonBit, `verify-motion-quality` delegates
+  threshold verdicts to MoonBit, and Kagura runtime smoke delegates
+  target/calibration outcome policy to MoonBit.
 - Kagura handoff pre-runtime smoke: all three local handoff contracts now carry
   `kaguraHandoff` metadata for runtime format, GLB path, world scale,
   origin/axes, fixed camera views, animation clip ids, and snapshot
@@ -317,6 +321,10 @@ Learned:
   motion policies: MoonBit `motion-core` owns strict retained-ratio verdicts and
   `robot-voxel` rule id / score / verdict decisions, while JS keeps profile
   descriptions and report shaping.
+- G5/G2/G7 policy slices followed the same split: MoonBit owns comparison
+  statuses, motion-quality threshold verdicts, summary verdicts, and Kagura
+  target/calibration outcome status; JS keeps image/GLB/Playwright I/O and
+  report formatting.
 - Smoke runs can now require a minimum quality verdict. `--min-quality pass`
   passes for `robot-voxel` and fails for `strict`, preserving the quality
   summary in the failure report.

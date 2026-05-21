@@ -1083,9 +1083,9 @@ Current smoke status:
   tools now call `motion-core-runtime` for those decisions while still owning
   GLB/JSON I/O; audit-facing severity/reason text stays in explicit JS detail
   maps keyed by the MoonBit ids/specs. The runtime exposes categorized
-  `motionCorePolicy.root`, `.pose`, `.selection`, and `.retarget` APIs so new
-  orchestration code does not need to infer policy ownership from individual
-  function names.
+  `motionCorePolicy.root`, `.pose`, `.selection`, `.retarget`, `.quality`, and
+  `.kaguraRuntime` APIs so new orchestration code does not need to infer policy
+  ownership from individual function names.
   `check-motion-core-parity` verifies the generated JS CLI decisions for the
   current policy fixtures
 - [x] Named `robot-voxel` retarget profile for voxel robot smoke: skipped
@@ -1157,9 +1157,12 @@ Stepwise cleanup:
   review for threshold calibration. Initial implementation exists in
   `verify-motion-quality.mjs`; it now uses normalized `groundDeltaY` when
   render metadata provides bind bounds, checks tracked foot contact, and checks
-  pelvis/hand/foot displacement from bind pose. First gold calibration set
-  exists for `LookAround`, `Goodbye`, and `Jump`; remaining work is expanding it
-  across more motions and target rigs.
+  pelvis/hand/foot displacement from bind pose. Its threshold verdicts
+  (foreground, coverage, bbox jump, ground, foot contact, limb extent, loop
+  metadata, and summary verdict) now delegate to MoonBit
+  `motionCorePolicy.quality`. First gold calibration set exists for
+  `LookAround`, `Goodbye`, and `Jump`; remaining work is expanding it across
+  more motions and target rigs.
 - [x] **G3. Cheap multi-VLM review gate.** Add optional model reviewers as a
   second opinion on top of deterministic metrics. Default candidates:
   `bytedance/ui-tars-1.5-7b` for fast UI/game-image review via OpenRouter and
@@ -1207,8 +1210,11 @@ Stepwise cleanup:
   spread, and arm-down angle. Arm-rest and stance-width warnings now trigger
   runnable pre-normalization candidates, and repeated comparison results now
   produce deterministic `accepted` / `promotable` / `rejected` selection
-  decisions. Remaining work is collecting enough real comparison samples before
-  changing defaults.
+  decisions. Per-metric comparison status and candidate sample decisions in
+  `compare-motion-quality-reports.mjs` now delegate to MoonBit
+  `motionCorePolicy.quality`, so the empirical loop has the same generated JS
+  policy boundary as candidate-group promotion. Remaining work is collecting
+  enough real comparison samples before changing defaults.
 - [ ] **G6. VRM + VRMA real playback check.** Use a real VRM model with a
   matching VRMA file to verify that our extractor agrees with an expected
   runtime playback path before retargeting onto simplified generated assets.
@@ -1222,8 +1228,11 @@ Stepwise cleanup:
   scale/origin convention, fixed camera snapshots, and checked render reports.
   The runtime probe now loads the robot GLB through Kagura `gltf_viewer` and
   passes load/frame-substance checks via WebGPU readback. Batch runtime smoke
-  now covers all local handoff contracts. Remaining work is adding known-good
-  Kagura calibration coverage and exposing real clip playback status.
+  now covers all local handoff contracts. Target/calibration outcome
+  classification and `--allow-environment-failure` process-fail policy now
+  delegate to MoonBit `motionCorePolicy.kaguraRuntime`. Remaining work is
+  adding known-good Kagura calibration coverage and exposing real clip playback
+  status.
 - [ ] **G8. Mixamo / FBX adapter decision.** Decide whether to convert FBX
   through an external tool or parse a converted GLB. The output contract
   should still be the same Motion IR.

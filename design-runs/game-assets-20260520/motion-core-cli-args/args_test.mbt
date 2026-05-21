@@ -75,3 +75,34 @@ test "command args normalize retarget commands" {
   inspect(verdict_args.length(), content="3")
   inspect(verdict_args[0], content="robot-voxel-retarget-verdict")
 }
+
+///|
+test "command args normalize quality comparison commands" {
+  let args = command_args([
+    "node", "motion-core-cli.js", "quality-compare-metric-status", "1.0", "0.98",
+    "0.01", "lower",
+  ])
+  inspect(args.length(), content="5")
+  inspect(args[0], content="quality-compare-metric-status")
+  inspect(args[4], content="lower")
+}
+
+///|
+test "command args normalize quality gate commands" {
+  let args = command_args([
+    "node", "motion-core-cli.js", "quality-ground-verdict", "-0.36", "-0.35", "-2.5",
+  ])
+  inspect(args.length(), content="4")
+  inspect(args[0], content="quality-ground-verdict")
+  inspect(args[3], content="-2.5")
+}
+
+///|
+test "command args normalize kagura runtime commands" {
+  let args = command_args([
+    "node", "motion-core-cli.js", "kagura-runtime-outcome-status", "false", "null",
+  ])
+  inspect(args.length(), content="3")
+  inspect(args[0], content="kagura-runtime-outcome-status")
+  inspect(args[2], content="null")
+}
