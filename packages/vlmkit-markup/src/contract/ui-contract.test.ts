@@ -222,6 +222,7 @@ test("validateUiContract validates hierarchy and rich metadata ranges", () => {
   const contract = structuredClone(valid);
   contract.screens[0]!.landmarks[1]!.parentId = "missing-parent";
   contract.screens[0]!.landmarks[1]!.slots = [{ id: "", kind: "content" }];
+  contract.screens[0]!.landmarks[0]!.repeat = { kind: "list", minItems: -1, maxItems: -2 };
   contract.screens[0]!.landmarks[1]!.content = {
     kind: "list",
     items: { min: 4, max: 2 },
@@ -233,6 +234,8 @@ test("validateUiContract validates hierarchy and rich metadata ranges", () => {
   const issues = validateUiContract(contract);
   assert.ok(issues.some((issue) => issue.message.includes("unknown parentId")));
   assert.ok(issues.some((issue) => issue.message.includes("slot id is required")));
+  assert.ok(issues.some((issue) => issue.message.includes("min must be non-negative")));
+  assert.ok(issues.some((issue) => issue.message.includes("max must be non-negative")));
   assert.ok(issues.some((issue) => issue.message.includes("min cannot exceed max")));
   assert.ok(issues.some((issue) => issue.message.includes("asset id is required")));
 });

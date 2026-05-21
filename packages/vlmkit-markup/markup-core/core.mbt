@@ -493,6 +493,26 @@ pub fn ui_contract_marker_issue_ids(
 }
 
 ///|
+pub fn ui_contract_optional_range_issue_ids(
+  min_present : Bool,
+  min_value : Double,
+  max_present : Bool,
+  max_value : Double,
+) -> String {
+  let issues : Array[String] = []
+  if min_present && min_value < 0 {
+    issues.push("range-min-non-negative")
+  }
+  if max_present && max_value < 0 {
+    issues.push("range-max-non-negative")
+  }
+  if min_present && max_present && min_value > max_value {
+    issues.push("range-min-lte-max")
+  }
+  issues.join("|")
+}
+
+///|
 pub fn ui_contract_layout_issue_ids(
   width_kind : String,
   width_min_present : Bool,

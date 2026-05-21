@@ -457,3 +457,19 @@ test "ui contract marker issue policy" {
     content="",
   )
 }
+
+///|
+test "ui contract optional range issue policy" {
+  inspect(
+    ui_contract_optional_range_issue_ids(true, -1, true, -2),
+    content="range-min-non-negative|range-max-non-negative|range-min-lte-max",
+  )
+  inspect(
+    ui_contract_optional_range_issue_ids(true, 4, true, 2),
+    content="range-min-lte-max",
+  )
+  inspect(
+    ui_contract_optional_range_issue_ids(false, 0, true, 2),
+    content="",
+  )
+}

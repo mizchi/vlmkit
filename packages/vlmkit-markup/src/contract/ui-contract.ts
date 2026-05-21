@@ -2,6 +2,7 @@ import {
   computeUiContractExpectedScrollportIssueIds,
   computeUiContractLayoutIssueIds,
   computeUiContractMarkerIssueIds,
+  computeUiContractOptionalRangeIssueIds,
   computeUiContractPatternEvidenceIssueIds,
   computeUiContractRequiredStateIssueIds,
   computeUiContractStateIssueIds,
@@ -9,6 +10,7 @@ import {
   type MarkupCoreUiContractLayoutIssueId,
   type MarkupCoreUiContractMarkerIssueId,
   type MarkupCoreUiContractPatternEvidenceIssueId,
+  type MarkupCoreUiContractRangeIssueId,
   type MarkupCoreUiContractRequiredStateIssueId,
   type MarkupCoreUiContractStateIssueId,
 } from "../markup-core-runtime.ts";
@@ -854,10 +856,23 @@ function validateOptionalRange(
   path: string,
   issues: UiContractIssue[],
 ): void {
-  if (min !== undefined && min < 0) issues.push({ path: `${path}.min`, message: "min must be non-negative" });
-  if (max !== undefined && max < 0) issues.push({ path: `${path}.max`, message: "max must be non-negative" });
-  if (min !== undefined && max !== undefined && min > max) {
-    issues.push({ path, message: "min cannot exceed max" });
+  const issueIds = computeUiContractOptionalRangeIssueIds({ min, max });
+  for (const issueId of issueIds) {
+    issues.push(uiContractRangeIssue(issueId, path));
+  }
+}
+
+function uiContractRangeIssue(
+  issueId: MarkupCoreUiContractRangeIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "range-min-non-negative":
+      return { path: `${path}.min`, message: "min must be non-negative" };
+    case "range-max-non-negative":
+      return { path: `${path}.max`, message: "max must be non-negative" };
+    case "range-min-lte-max":
+      return { path, message: "min cannot exceed max" };
   }
 }
 

@@ -1315,11 +1315,15 @@ Stepwise cleanup:
   `contract/ui-contract.ts` now delegates marker kind and required marker target
   issue ids to `markup-core`. TypeScript still owns marker array traversal and
   maps ids back to nested issue paths and human-readable messages.
+- [x] UI Contract optional range validator slice:
+  repeat/content min/max range predicates now delegate to `markup-core`.
+  TypeScript still owns the contextual path mapping, so the same range policy
+  can be reused across repeat metadata and content metadata without leaking
+  report wording into MoonBit.
 - [ ] Continue UI Contract validator core:
-  move the remaining enum/range/uniqueness predicates for composition, content,
-  decoration, assets, slots, repeat, and canvas metadata into MoonBit in small
-  slices, while keeping TypeScript as the contract schema and report-text
-  boundary.
+  move the remaining enum/uniqueness predicates for composition, decoration,
+  assets, slots, and canvas metadata into MoonBit in small slices, while
+  keeping TypeScript as the contract schema and report-text boundary.
 - [x] Semantic drilldown selection policy slice:
   `component/semantic-drilldown.ts` now delegates layout-vs-decoration flow,
   priority scoring, reason id selection, and next-action ordering to

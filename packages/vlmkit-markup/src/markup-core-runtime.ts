@@ -219,6 +219,11 @@ export type MarkupCoreUiContractMarkerIssueId =
   | "marker-kind-unknown"
   | "marker-target-required";
 
+export type MarkupCoreUiContractRangeIssueId =
+  | "range-min-non-negative"
+  | "range-max-non-negative"
+  | "range-min-lte-max";
+
 export type MarkupCoreUiContractLayoutIssueId =
   | "layout-width-fluid-bounds"
   | "layout-width-fixed-positive"
@@ -293,6 +298,25 @@ export function computeUiContractMarkerIssueIds(input: {
       return issueId;
     }
     throw new Error(`unexpected markup-core UI contract marker issue id: ${issueId}`);
+  });
+}
+
+export function computeUiContractOptionalRangeIssueIds(input: {
+  min?: number;
+  max?: number;
+}): MarkupCoreUiContractRangeIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-optional-range-issue-ids",
+    boolArg(input.min !== undefined),
+    doubleArg(input.min ?? 0),
+    boolArg(input.max !== undefined),
+    doubleArg(input.max ?? 0),
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractRangeIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(`unexpected markup-core UI contract range issue id: ${issueId}`);
   });
 }
 
@@ -457,6 +481,16 @@ function isMarkupCoreUiContractMarkerIssueId(
   return (
     issueId === "marker-kind-unknown" ||
     issueId === "marker-target-required"
+  );
+}
+
+function isMarkupCoreUiContractRangeIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractRangeIssueId {
+  return (
+    issueId === "range-min-non-negative" ||
+    issueId === "range-max-non-negative" ||
+    issueId === "range-min-lte-max"
   );
 }
 
