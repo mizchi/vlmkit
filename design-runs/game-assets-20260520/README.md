@@ -296,6 +296,10 @@ shared tools now live in `tools/`:
   selection, pose mismatch warning-id selection, pose normalization candidate
   spec selection, and candidate-group selection recommendation; run it with
   `moon -C design-runs/game-assets-20260520 test motion-core`
+- `motion-kagura-bridge/`: compile-time smoke that imports the published
+  `mizchi/kagura` Moon package and calls the root facade fixed-timestep API.
+  This pins the package-level integration separately from the local
+  `run-kagura-runtime-smoke.mjs` checkout-based browser probe.
 - `motion-core-cli/`: thin MoonBit entrypoint over `motion-core`. Build it with
   `pnpm run moon:build:game-assets`, then run the generated JS command, for
   example `node design-runs/game-assets-20260520/_build/js/debug/build/motion-core-cli/motion-core-cli.js arm-rest-gate 14.48395`

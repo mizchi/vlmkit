@@ -5,7 +5,7 @@
   "repository": "https://github.com/mizchi/vlmkit",
   "license": "MIT",
   "deps": {
-    "mizchi/kagura": "0.3.4"
+    "mizchi/kagura": "0.3.5"
   },
   "keywords": ["vlmkit", "motion", "retargeting"],
   "description": "MoonBit core logic experiments for vlmkit game asset dogfood runs."

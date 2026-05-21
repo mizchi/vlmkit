@@ -387,3 +387,10 @@ Learned:
   that calibration mechanical. If both target and calibration fail, the report
   sets `environmentLikelyBroken: true` so the autonomous loop does not spend
   time tuning generated GLB output for an environment-level failure.
+- Published Moon package integration needs a separate compile-time smoke from
+  browser runtime smoke. The first `mizchi/kagura` facade was technically
+  importable but not useful from a consumer without touching `kagura_core`
+  directly, because type aliases did not provide constructors or accessors.
+  `motion-kagura-bridge` now pins the desired shape: `vlmkit` imports the
+  published root package and calls facade helpers without depending on a
+  sibling checkout.

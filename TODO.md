@@ -1107,6 +1107,12 @@ Current smoke status:
   views, animation clip ids, and snapshot verification path. `pnpm run
   motion:kagura-handoff:game-assets` validates all local handoff contracts and
   writes structured `*.kagura-smoke.json` reports.
+- [x] Published Kagura Moon package bridge:
+  `design-runs/game-assets-20260520` depends on `mizchi/kagura@0.3.5`, and
+  `motion-kagura-bridge` imports the root package facade without a sibling
+  checkout. This caught and fixed a Kagura API gap where consumers needed
+  root-level fixed-timestep constructors/accessors rather than direct
+  `kagura_core` imports.
 - [x] Experimental Kagura runtime smoke probe:
   `run-kagura-runtime-smoke.mjs` starts local `mizchi/kagura` `gltf_viewer`,
   serves a vlmkit GLB through a CORS asset server, opens it with Playwright, and

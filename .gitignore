@@ -3,6 +3,7 @@ node_modules/
 .mooncakes/
 dist/
 test-results/
+design-runs/game-assets-20260520/**/pkg.generated.mbti
 baselines/
 snapshots/
 output/
