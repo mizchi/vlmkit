@@ -19,6 +19,7 @@ const cliPath = join(
 );
 
 let built = false;
+const runMarkupCoreCache = new Map<string, string>();
 
 export function computeComponentGoalStatus(input: {
   goal: string;
@@ -80,7 +81,12 @@ export function computeComponentGoalStatus(input: {
 
 export function runMarkupCore(args: string[]): string {
   ensureMarkupCoreCli();
-  return run(process.execPath, [cliPath, ...args]);
+  const cacheKey = JSON.stringify(args);
+  const cached = runMarkupCoreCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+  const output = run(process.execPath, [cliPath, ...args]);
+  runMarkupCoreCache.set(cacheKey, output);
+  return output;
 }
 
 export function isMarkupCoreComponentProbeState(value: string): boolean {

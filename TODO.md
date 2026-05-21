@@ -1352,7 +1352,8 @@ Stepwise cleanup:
   responsive-stretch cases as JSON fixtures so TS bridge, MoonBit CLI, and
   future direct JS/WASM bindings share the same expected status matrix.
 - [ ] Avoid per-call process cost:
-  current bridge calls the generated JS CLI by process spawn. That is fine for
+  current bridge calls the generated JS CLI by process spawn, with a
+  process-local memoization layer for repeated pure calls. That is fine for
   low-volume dogfood, but repeated component scoring should move to a direct
   generated JS/WASM module boundary once the package API is stable.
 
