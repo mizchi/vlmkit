@@ -60,3 +60,18 @@ test "command args normalize pose normalization candidate specs" {
   inspect(args[0], content="pose-normalization-candidate-specs")
   inspect(args[5], content="108.40739")
 }
+
+///|
+test "command args normalize retarget commands" {
+  let args = command_args([
+    "node", "motion-core-cli.js", "robot-voxel-retarget-rule", "left thumb skipped",
+  ])
+  inspect(args.length(), content="2")
+  inspect(args[0], content="robot-voxel-retarget-rule")
+  inspect(args[1], content="left thumb skipped")
+  let verdict_args = command_args([
+    "node", "motion-core-cli.js", "robot-voxel-retarget-verdict", "1.5", "0",
+  ])
+  inspect(verdict_args.length(), content="3")
+  inspect(verdict_args[0], content="robot-voxel-retarget-verdict")
+}

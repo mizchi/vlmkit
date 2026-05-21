@@ -302,7 +302,8 @@ shared tools now live in `tools/`:
 - `motion-core/`: MoonBit port of pure candidate policy logic. It currently
   covers the arm-rest motion gate, root-translation recommendation/candidate
   selection, pose mismatch warning-id selection, pose normalization candidate
-  spec selection, and candidate-group selection recommendation; run it with
+  spec selection, candidate-group selection recommendation, and retarget
+  downgrade verdict/rule scoring; run it with
   `moon -C design-runs/game-assets-20260520 test motion-core`
 - `motion-kagura-bridge/`: compile-time smoke that imports the published
   `mizchi/kagura` Moon package and calls the root facade fixed-timestep API.
@@ -322,13 +323,16 @@ shared tools now live in `tools/`:
   - `motionCorePolicy.pose`: arm-rest gates, pose warning ids, and pose
     candidate specs
   - `motionCorePolicy.selection`: candidate-group recommendation
+  - `motionCorePolicy.retarget`: strict retained-ratio verdicts plus
+    `robot-voxel` rule id / score / verdict decisions
 - `tools/check-motion-core-parity.mjs`: builds the MoonBit JS target and checks
   the generated CLI decisions against the expected policy fixtures
 - `tools/review-motion-with-vlm.mjs`: optional cheap VLM second opinion using
   a generated contact sheet; dry-runs without credentials
 - `tools/retarget-profiles.mjs`: named retarget downgrade profiles with
-  schema descriptions, validation, and weighted skip scoring; `simple-rig` is
-  kept as an alias of `robot-voxel`
+  schema descriptions, validation, and weighted skip scoring; score/verdict
+  decisions delegate to the MoonBit runtime, and `simple-rig` is kept as an
+  alias of `robot-voxel`
 - `tools/check-retarget-profiles.mjs`: pins profile schema validity plus the
   expected `robot-voxel` tolerance/failure behavior
 - `tools/gltf-bind-pose.mjs`: shared glTF node world-transform and bind-pose

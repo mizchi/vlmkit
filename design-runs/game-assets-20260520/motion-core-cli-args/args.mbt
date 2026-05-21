@@ -21,5 +21,9 @@ fn is_command(value : String) -> Bool {
   value == "root-translation-recommendation" ||
   value == "root-translation-candidate" ||
   value == "pose-mismatch-warning-ids" ||
-  value == "pose-normalization-candidate-specs"
+  value == "pose-normalization-candidate-specs" ||
+  value == "retarget-strict-verdict" ||
+  value == "robot-voxel-retarget-rule" ||
+  value == "robot-voxel-retarget-score" ||
+  value == "robot-voxel-retarget-verdict"
 }

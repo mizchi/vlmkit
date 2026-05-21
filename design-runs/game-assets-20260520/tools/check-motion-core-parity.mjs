@@ -3,6 +3,10 @@ import {
   armRestMotionGateStatus,
   poseMismatchWarningIds,
   poseNormalizationCandidateSpecs,
+  retargetStrictVerdict,
+  robotVoxelRetargetRuleId,
+  robotVoxelRetargetScore,
+  robotVoxelRetargetVerdict,
   rootTranslationCandidateId,
   rootTranslationRecommendationId,
   selectCandidateGroup,
@@ -268,6 +272,73 @@ const cases = [
       missingSampleComparison: 0,
     }),
     "rejected",
+  ],
+  [
+    "retarget-strict-verdict pass",
+    () => retargetStrictVerdict({
+      trackCount: 6,
+      skipped: 4,
+      minRetainedRatioWarn: 0.4,
+    }),
+    "pass",
+  ],
+  [
+    "retarget-strict-verdict warn",
+    () => retargetStrictVerdict({
+      trackCount: 2,
+      skipped: 4,
+      minRetainedRatioWarn: 0.4,
+    }),
+    "warn",
+  ],
+  [
+    "robot-voxel-retarget-rule finger",
+    () => robotVoxelRetargetRuleId("LeftThumbProximal skipped"),
+    "finger",
+  ],
+  [
+    "robot-voxel-retarget-rule fallback",
+    () => robotVoxelRetargetRuleId("neck skipped"),
+    "upper-body-fallback",
+  ],
+  [
+    "robot-voxel-retarget-rule core",
+    () => robotVoxelRetargetRuleId("leftUpperArm skipped"),
+    "required-core",
+  ],
+  [
+    "robot-voxel-retarget-score warn",
+    () => String(robotVoxelRetargetScore(0.5)),
+    "0.75",
+  ],
+  [
+    "robot-voxel-retarget-verdict warn",
+    () => robotVoxelRetargetVerdict({
+      weightedPenalty: 0.5,
+      hardFailureCount: 0,
+    }),
+    "warn",
+  ],
+  [
+    "robot-voxel-retarget-verdict hard fail",
+    () => robotVoxelRetargetVerdict({
+      weightedPenalty: 0,
+      hardFailureCount: 1,
+    }),
+    "fail",
+  ],
+  [
+    "policy.retarget.robotVoxelRuleId",
+    () => motionCorePolicy.retarget.robotVoxelRuleId("right foot skipped"),
+    "required-core",
+  ],
+  [
+    "policy.retarget.robotVoxelVerdict",
+    () => motionCorePolicy.retarget.robotVoxelVerdict({
+      weightedPenalty: 0,
+      hardFailureCount: 0,
+    }),
+    "pass",
   ],
 ];
 

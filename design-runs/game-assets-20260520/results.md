@@ -313,6 +313,10 @@ Learned:
   check. The quality gate validates profile definitions before scoring, and
   `motion:retarget-profiles:game-assets` pins the `robot-voxel`/`simple-rig`
   contract.
+- Retarget downgrade decisions are now split at the same boundary as the other
+  motion policies: MoonBit `motion-core` owns strict retained-ratio verdicts and
+  `robot-voxel` rule id / score / verdict decisions, while JS keeps profile
+  descriptions and report shaping.
 - Smoke runs can now require a minimum quality verdict. `--min-quality pass`
   passes for `robot-voxel` and fails for `strict`, preserving the quality
   summary in the failure report.

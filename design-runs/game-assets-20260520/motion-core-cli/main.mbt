@@ -80,6 +80,25 @@ fn main_err() -> Unit raise {
           parse_optional_double(max_upper_arm_rotation_range_deg),
         ),
       )
+    ["retarget-strict-verdict", track_count, skipped, threshold] =>
+      println(
+        @core.retarget_strict_verdict(
+          parse_int(track_count),
+          parse_int(skipped),
+          parse_double(threshold),
+        ),
+      )
+    ["robot-voxel-retarget-rule", normalized_text] =>
+      println(@core.robot_voxel_retarget_rule_id(normalized_text))
+    ["robot-voxel-retarget-score", weighted_penalty] =>
+      println(@core.robot_voxel_retarget_score(parse_double(weighted_penalty)))
+    ["robot-voxel-retarget-verdict", weighted_penalty, hard_failure_count] =>
+      println(
+        @core.robot_voxel_retarget_verdict(
+          parse_double(weighted_penalty),
+          parse_int(hard_failure_count),
+        ),
+      )
     _ => print_usage()
   }
 }
@@ -113,7 +132,7 @@ fn parse_bool(value : String) -> Bool {
 ///|
 fn print_usage() -> Unit {
   println(
-    "Usage: motion-core-cli arm-rest-gate <deg|null> | arm-rest-candidate <deg|null> | select-candidate-group <automatic> <improved> <regressed> <tradeoff> <stable> <missing> <missing-sample> | root-translation-recommendation <mode> <height-scale|null> <height-scale-delta|null> <vertical-delta-range|null> | root-translation-candidate <recommendation-id> | pose-mismatch-warning-ids <scale-spread-ratio|null> <foot-spread-scale|null> <upper-leg-spread-scale|null> <shoulder-width-scale|null> <skeleton-height-scale|null> <arm-angle-delta-deg|null> | pose-normalization-candidate-specs <arm-rest?> <foot-spread?> <leg-spread?> <shoulder-width?> <upper-arm-rotation-range|null>",
+    "Usage: motion-core-cli arm-rest-gate <deg|null> | arm-rest-candidate <deg|null> | select-candidate-group <automatic> <improved> <regressed> <tradeoff> <stable> <missing> <missing-sample> | root-translation-recommendation <mode> <height-scale|null> <height-scale-delta|null> <vertical-delta-range|null> | root-translation-candidate <recommendation-id> | pose-mismatch-warning-ids <scale-spread-ratio|null> <foot-spread-scale|null> <upper-leg-spread-scale|null> <shoulder-width-scale|null> <skeleton-height-scale|null> <arm-angle-delta-deg|null> | pose-normalization-candidate-specs <arm-rest?> <foot-spread?> <leg-spread?> <shoulder-width?> <upper-arm-rotation-range|null> | retarget-strict-verdict <track-count> <skipped> <threshold> | robot-voxel-retarget-rule <normalized-text> | robot-voxel-retarget-score <weighted-penalty> | robot-voxel-retarget-verdict <weighted-penalty> <hard-failure-count>",
   )
 }
 

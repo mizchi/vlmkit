@@ -1083,8 +1083,9 @@ Current smoke status:
   tools now call `motion-core-runtime` for those decisions while still owning
   GLB/JSON I/O; audit-facing severity/reason text stays in explicit JS detail
   maps keyed by the MoonBit ids/specs. The runtime exposes categorized
-  `motionCorePolicy.root`, `.pose`, and `.selection` APIs so new orchestration
-  code does not need to infer policy ownership from individual function names.
+  `motionCorePolicy.root`, `.pose`, `.selection`, and `.retarget` APIs so new
+  orchestration code does not need to infer policy ownership from individual
+  function names.
   `check-motion-core-parity` verifies the generated JS CLI decisions for the
   current policy fixtures
 - [x] Named `robot-voxel` retarget profile for voxel robot smoke: skipped
@@ -1184,9 +1185,12 @@ Stepwise cleanup:
   chest, neck, and shoulders are tolerated; skipped core channels such as
   hips/head/arms/legs fail. The profile schema is now machine-checkable via
   `motion:retarget-profiles:game-assets`, and the motion quality gate validates
-  profile definitions before scoring. `simple-rig` remains an alias. Remaining
-  work is calibrating weights against more target skeletons and promoting the
-  profile schema out of `design-runs`.
+  profile definitions before scoring. The `strict` retained-ratio verdict and
+  `robot-voxel` rule id / score / verdict decisions are now MoonBit
+  `motion-core` functions exposed through `motionCorePolicy.retarget`; JS still
+  owns schema descriptions and report shaping. `simple-rig` remains an alias.
+  Remaining work is calibrating weights against more target skeletons and
+  promoting the profile schema out of `design-runs`.
 - [ ] **G5. Pose and scale normalization.** Measure source root height,
   root motion, and bind/rest orientation. Add options for root translation
   modes: keep, zero, horizontal-only, scale-to-model. Track T-pose/A-pose

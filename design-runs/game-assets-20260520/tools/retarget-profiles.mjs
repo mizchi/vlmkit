@@ -1,3 +1,5 @@
+import { motionCorePolicy } from "./motion-core-runtime.mjs";
+
 const STRICT_PROFILE = {
   name: "strict",
   aliases: [],
@@ -103,7 +105,11 @@ export function evaluateRetargetWarnings(motion, options = {}) {
       profile: profile.name,
       requestedProfile: options.profileName ?? profile.name,
       mode: "retained-ratio",
-      verdict: retainedRatio < threshold ? "warn" : "pass",
+      verdict: motionCorePolicy.retarget.strictVerdict({
+        trackCount,
+        skipped,
+        minRetainedRatioWarn: threshold,
+      }),
       retainedRatio: round(retainedRatio),
       trackCount,
       skipped,
@@ -114,14 +120,14 @@ export function evaluateRetargetWarnings(motion, options = {}) {
 
   const classified = warnings.map((warning) => classifyWarning(warning, profile));
   const penalty = classified.reduce((sum, item) => sum + item.penalty, 0);
-  const score = round(Math.max(0, 1 - Math.min(1, penalty / profile.failPenalty)));
+  const score = weightedProfileScore(profile, penalty);
   const hardFailures = classified.filter((item) => item.hardFail);
   const nonTolerated = classified.filter((item) => item.penalty > 0 || item.hardFail);
-  const verdict = hardFailures.length > 0 || score < profile.failScore
-    ? "fail"
-    : score < profile.warnScore
-      ? "warn"
-      : "pass";
+  const verdict = weightedProfileVerdict(profile, {
+    score,
+    weightedPenalty: penalty,
+    hardFailureCount: hardFailures.length,
+  });
 
   return {
     profile: profile.name,
@@ -165,7 +171,7 @@ export function skeletonRegion(text) {
 
 function classifyWarning(warning, profile) {
   const value = `${warning.node ?? ""} ${warning.reason ?? ""}`.toLowerCase();
-  const rule = profile.rules.find((item) => item.match.test(value)) ?? profile.fallbackRule;
+  const rule = resolveProfileRule(profile, value);
   return {
     warning,
     ruleId: rule.id,
@@ -174,6 +180,35 @@ function classifyWarning(warning, profile) {
     penalty: rule.penalty,
     hardFail: Boolean(rule.hardFail),
   };
+}
+
+function resolveProfileRule(profile, value) {
+  if (profile.name === ROBOT_VOXEL_PROFILE.name) {
+    const ruleId = motionCorePolicy.retarget.robotVoxelRuleId(value);
+    return profile.rules.find((item) => item.id === ruleId) ?? profile.fallbackRule;
+  }
+  return profile.rules.find((item) => item.match.test(value)) ?? profile.fallbackRule;
+}
+
+function weightedProfileScore(profile, penalty) {
+  if (profile.name === ROBOT_VOXEL_PROFILE.name) {
+    return motionCorePolicy.retarget.robotVoxelScore(penalty);
+  }
+  return round(Math.max(0, 1 - Math.min(1, penalty / profile.failPenalty)));
+}
+
+function weightedProfileVerdict(profile, { score, weightedPenalty, hardFailureCount }) {
+  if (profile.name === ROBOT_VOXEL_PROFILE.name) {
+    return motionCorePolicy.retarget.robotVoxelVerdict({
+      weightedPenalty,
+      hardFailureCount,
+    });
+  }
+  return hardFailureCount > 0 || score < profile.failScore
+    ? "fail"
+    : score < profile.warnScore
+      ? "warn"
+      : "pass";
 }
 
 function describeRetargetProfile(profile) {

@@ -184,3 +184,58 @@ test "pose normalization candidate specs" {
     content="",
   )
 }
+
+///|
+test "retarget strict verdict" {
+  inspect(retarget_strict_verdict(6, 4, 0.4), content="pass")
+  inspect(retarget_strict_verdict(2, 4, 0.4), content="warn")
+  inspect(retarget_strict_verdict(0, 0, 0.4), content="warn")
+}
+
+///|
+test "robot voxel retarget rule ids" {
+  inspect(
+    robot_voxel_retarget_rule_id("leftthumbproximal skipped"),
+    content="finger",
+  )
+  inspect(robot_voxel_retarget_rule_id("right toe skipped"), content="toe")
+  inspect(
+    robot_voxel_retarget_rule_id("chest fallback"),
+    content="upper-body-fallback",
+  )
+  inspect(
+    robot_voxel_retarget_rule_id("neck fallback"),
+    content="upper-body-fallback",
+  )
+  inspect(
+    robot_voxel_retarget_rule_id("left shoulder fallback"),
+    content="upper-body-fallback",
+  )
+  inspect(robot_voxel_retarget_rule_id("hips skipped"), content="required-core")
+  inspect(robot_voxel_retarget_rule_id("head skipped"), content="required-core")
+  inspect(
+    robot_voxel_retarget_rule_id("left upperarm skipped"),
+    content="required-core",
+  )
+  inspect(
+    robot_voxel_retarget_rule_id("right hand skipped"),
+    content="required-core",
+  )
+  inspect(robot_voxel_retarget_rule_id("antenna skipped"), content="unexpected")
+}
+
+///|
+test "robot voxel retarget score and verdict" {
+  inspect(robot_voxel_retarget_rule_penalty("finger"), content="0")
+  inspect(robot_voxel_retarget_rule_penalty("unexpected"), content="0.5")
+  inspect(robot_voxel_retarget_rule_penalty("required-core"), content="2")
+  inspect(robot_voxel_retarget_rule_hard_fail("required-core"), content="true")
+  inspect(robot_voxel_retarget_rule_hard_fail("unexpected"), content="false")
+  inspect(robot_voxel_retarget_score(0.0), content="1")
+  inspect(robot_voxel_retarget_score(0.5), content="0.75")
+  inspect(robot_voxel_retarget_score(1.5), content="0.25")
+  inspect(robot_voxel_retarget_verdict(0.0, 0), content="pass")
+  inspect(robot_voxel_retarget_verdict(0.5, 0), content="warn")
+  inspect(robot_voxel_retarget_verdict(1.5, 0), content="fail")
+  inspect(robot_voxel_retarget_verdict(0.0, 1), content="fail")
+}

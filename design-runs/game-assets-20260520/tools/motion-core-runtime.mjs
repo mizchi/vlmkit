@@ -26,6 +26,12 @@ export const motionCorePolicy = Object.freeze({
   selection: Object.freeze({
     candidateGroup: selectCandidateGroup,
   }),
+  retarget: Object.freeze({
+    strictVerdict: retargetStrictVerdict,
+    robotVoxelRuleId: robotVoxelRetargetRuleId,
+    robotVoxelScore: robotVoxelRetargetScore,
+    robotVoxelVerdict: robotVoxelRetargetVerdict,
+  }),
 });
 
 export function armRestMotionGateStatus(maxUpperArmRotationRangeDeg) {
@@ -113,6 +119,44 @@ export function poseNormalizationCandidateSpecs({
     optionalDoubleArg(maxUpperArmRotationRangeDeg),
   ]);
   return output ? output.split("|").map(parseCandidateSpec) : [];
+}
+
+export function retargetStrictVerdict({
+  trackCount,
+  skipped,
+  minRetainedRatioWarn,
+}) {
+  return runMotionCore([
+    "retarget-strict-verdict",
+    intArg(trackCount),
+    intArg(skipped),
+    optionalDoubleArg(minRetainedRatioWarn ?? 0.4),
+  ]);
+}
+
+export function robotVoxelRetargetRuleId(text) {
+  return runMotionCore([
+    "robot-voxel-retarget-rule",
+    String(text ?? "").toLowerCase(),
+  ]);
+}
+
+export function robotVoxelRetargetScore(weightedPenalty) {
+  return Number(runMotionCore([
+    "robot-voxel-retarget-score",
+    optionalDoubleArg(weightedPenalty),
+  ]));
+}
+
+export function robotVoxelRetargetVerdict({
+  weightedPenalty,
+  hardFailureCount,
+}) {
+  return runMotionCore([
+    "robot-voxel-retarget-verdict",
+    optionalDoubleArg(weightedPenalty),
+    intArg(hardFailureCount),
+  ]);
 }
 
 export function runMotionCore(args) {

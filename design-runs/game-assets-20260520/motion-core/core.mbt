@@ -29,6 +29,15 @@ const PROMOTION_MIN_COMPARED_SAMPLES : Int = 3
 const PROMOTION_MIN_IMPROVED_SAMPLES : Int = 2
 
 ///|
+const ROBOT_VOXEL_WARN_SCORE : Double = 0.95
+
+///|
+const ROBOT_VOXEL_FAIL_SCORE : Double = 0.5
+
+///|
+const ROBOT_VOXEL_FAIL_PENALTY : Double = 2.0
+
+///|
 /// Return the arm-rest motion gate status used before running
 /// `arm-rest-pose-offset`.
 pub fn arm_rest_motion_gate_status(
@@ -217,6 +226,105 @@ pub fn pose_normalization_candidate_specs(
 }
 
 ///|
+/// Return the strict retarget retained-ratio verdict.
+pub fn retarget_strict_verdict(
+  track_count : Int,
+  skipped : Int,
+  min_retained_ratio_warn : Double,
+) -> String {
+  let total = track_count + skipped
+  let retained_ratio = if total > 0 {
+    track_count.to_double() / total.to_double()
+  } else {
+    0.0
+  }
+  if retained_ratio < min_retained_ratio_warn {
+    "warn"
+  } else {
+    "pass"
+  }
+}
+
+///|
+/// Return the `robot-voxel` rule id for a normalized lowercase warning text.
+pub fn robot_voxel_retarget_rule_id(normalized_text : String) -> String {
+  if normalized_text.contains("thumb") ||
+    normalized_text.contains("index") ||
+    normalized_text.contains("middle") ||
+    normalized_text.contains("ring") ||
+    normalized_text.contains("little") ||
+    normalized_text.contains("finger") {
+    "finger"
+  } else if normalized_text.contains("toe") {
+    "toe"
+  } else if normalized_text.contains("chest") ||
+    normalized_text.contains("neck") ||
+    normalized_text.contains("shoulder") {
+    "upper-body-fallback"
+  } else if normalized_text.contains("hips") ||
+    normalized_text.contains("spine") ||
+    normalized_text.contains("head") ||
+    normalized_text.contains("upperarm") ||
+    normalized_text.contains("lowerarm") ||
+    normalized_text.contains("hand") ||
+    normalized_text.contains("upperleg") ||
+    normalized_text.contains("lowerleg") ||
+    normalized_text.contains("foot") {
+    "required-core"
+  } else {
+    "unexpected"
+  }
+}
+
+///|
+/// Return the weighted penalty for a `robot-voxel` retarget rule id.
+pub fn robot_voxel_retarget_rule_penalty(rule_id : String) -> Double {
+  if rule_id == "required-core" {
+    2.0
+  } else if rule_id == "unexpected" {
+    0.5
+  } else {
+    0.0
+  }
+}
+
+///|
+/// Return whether a `robot-voxel` retarget rule is a hard failure.
+pub fn robot_voxel_retarget_rule_hard_fail(rule_id : String) -> Bool {
+  rule_id == "required-core"
+}
+
+///|
+/// Return the rounded `robot-voxel` score for a weighted penalty.
+pub fn robot_voxel_retarget_score(weighted_penalty : Double) -> Double {
+  let ratio = weighted_penalty / ROBOT_VOXEL_FAIL_PENALTY
+  let clipped = if ratio < 0.0 {
+    0.0
+  } else if ratio > 1.0 {
+    1.0
+  } else {
+    ratio
+  }
+  round4(1.0 - clipped)
+}
+
+///|
+/// Return the `robot-voxel` verdict for aggregate retarget penalties.
+pub fn robot_voxel_retarget_verdict(
+  weighted_penalty : Double,
+  hard_failure_count : Int,
+) -> String {
+  let score = robot_voxel_retarget_score(weighted_penalty)
+  if hard_failure_count > 0 || score < ROBOT_VOXEL_FAIL_SCORE {
+    "fail"
+  } else if score < ROBOT_VOXEL_WARN_SCORE {
+    "warn"
+  } else {
+    "pass"
+  }
+}
+
+///|
 fn optional_gte(value : Double?, threshold : Double) -> Bool {
   match value {
     None => false
@@ -256,6 +364,11 @@ fn append_id(ids : String, id : String) -> String {
   } else {
     ids + "|" + id
   }
+}
+
+///|
+fn round4(value : Double) -> Double {
+  @math.floor(value * 10000.0 + 0.5) / 10000.0
 }
 
 ///|
