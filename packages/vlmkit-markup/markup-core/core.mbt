@@ -561,6 +561,108 @@ pub fn ui_contract_canvas_hud_issue_ids(id : String) -> String {
 }
 
 ///|
+pub fn ui_contract_composition_issue_ids(style : String) -> String {
+  if !is_ui_composition_style(style) {
+    "composition-style-unknown"
+  } else {
+    ""
+  }
+}
+
+///|
+pub fn ui_contract_composition_axis_issue_ids(axis : String) -> String {
+  if !is_ui_composition_axis(axis) {
+    "composition-axis-unknown"
+  } else {
+    ""
+  }
+}
+
+///|
+pub fn ui_contract_composition_layer_issue_ids(
+  id : String,
+  role : String,
+  duplicate_id : Bool,
+  z_present : Bool,
+  z_finite : Bool,
+) -> String {
+  let issues : Array[String] = []
+  if id == "" {
+    issues.push("composition-layer-id-required")
+  } else if duplicate_id {
+    issues.push("composition-layer-id-unique")
+  }
+  if !is_ui_composition_layer_role(role) {
+    issues.push("composition-layer-role-unknown")
+  }
+  if z_present && !z_finite {
+    issues.push("composition-layer-z-finite")
+  }
+  issues.join("|")
+}
+
+///|
+pub fn ui_contract_composition_shape_issue_ids(
+  id : String,
+  kind : String,
+  duplicate_id : Bool,
+) -> String {
+  let issues : Array[String] = []
+  if id == "" {
+    issues.push("composition-shape-id-required")
+  } else if duplicate_id {
+    issues.push("composition-shape-id-unique")
+  }
+  if !is_ui_composition_shape_kind(kind) {
+    issues.push("composition-shape-kind-unknown")
+  }
+  issues.join("|")
+}
+
+///|
+pub fn ui_contract_composition_motion_issue_ids(
+  id : String,
+  trigger : String,
+  effect : String,
+  duplicate_id : Bool,
+  duration_present : Bool,
+  duration_ms : Double,
+) -> String {
+  let issues : Array[String] = []
+  if id == "" {
+    issues.push("motion-id-required")
+  } else if duplicate_id {
+    issues.push("motion-id-unique")
+  }
+  if !is_ui_motion_trigger(trigger) {
+    issues.push("motion-trigger-unknown")
+  }
+  if !is_ui_motion_effect(effect) {
+    issues.push("motion-effect-unknown")
+  }
+  if duration_present && duration_ms < 0 {
+    issues.push("motion-duration-non-negative")
+  }
+  issues.join("|")
+}
+
+///|
+pub fn ui_contract_composition_contrast_issue_ids(
+  mode : String,
+  min_ratio_present : Bool,
+  min_ratio : Double,
+) -> String {
+  let issues : Array[String] = []
+  if !is_ui_contrast_mode(mode) {
+    issues.push("contrast-mode-unknown")
+  }
+  if min_ratio_present && min_ratio <= 0 {
+    issues.push("contrast-min-ratio-positive")
+  }
+  issues.join("|")
+}
+
+///|
 pub fn ui_contract_layout_issue_ids(
   width_kind : String,
   width_min_present : Bool,
@@ -704,6 +806,69 @@ fn is_ui_marker_kind(kind : String) -> Bool {
 ///|
 fn is_ui_scroll_axis(axis : String) -> Bool {
   axis == "x" || axis == "y" || axis == "both"
+}
+
+///|
+fn is_ui_composition_style(style : String) -> Bool {
+  style == "regular" ||
+  style == "asymmetric" ||
+  style == "poster" ||
+  style == "collage" ||
+  style == "radial" ||
+  style == "layered"
+}
+
+///|
+fn is_ui_composition_axis(axis : String) -> Bool {
+  axis == "orthogonal" ||
+  axis == "diagonal" ||
+  axis == "radial" ||
+  axis == "freeform" ||
+  axis == "layered"
+}
+
+///|
+fn is_ui_composition_layer_role(role : String) -> Bool {
+  role == "background" ||
+  role == "content" ||
+  role == "accent" ||
+  role == "foreground" ||
+  role == "scrim"
+}
+
+///|
+fn is_ui_composition_shape_kind(kind : String) -> Bool {
+  kind == "slash-panel" ||
+  kind == "sticker" ||
+  kind == "burst" ||
+  kind == "cutout" ||
+  kind == "mask" ||
+  kind == "frame" ||
+  kind == "ribbon"
+}
+
+///|
+fn is_ui_motion_trigger(trigger : String) -> Bool {
+  trigger == "hover" ||
+  trigger == "focus" ||
+  trigger == "selected" ||
+  trigger == "route" ||
+  trigger == "load"
+}
+
+///|
+fn is_ui_motion_effect(effect : String) -> Bool {
+  effect == "slam" ||
+  effect == "pulse" ||
+  effect == "slide" ||
+  effect == "scale" ||
+  effect == "flash" ||
+  effect == "none"
+}
+
+///|
+fn is_ui_contrast_mode(mode : String) -> Bool {
+  mode == "normal" || mode == "high"
 }
 
 ///|

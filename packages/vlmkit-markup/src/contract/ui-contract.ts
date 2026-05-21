@@ -3,6 +3,12 @@ import {
   computeUiContractCanvasHudIssueIds,
   computeUiContractCanvasInputIssueIds,
   computeUiContractCanvasIssueIds,
+  computeUiContractCompositionAxisIssueIds,
+  computeUiContractCompositionContrastIssueIds,
+  computeUiContractCompositionIssueIds,
+  computeUiContractCompositionLayerIssueIds,
+  computeUiContractCompositionMotionIssueIds,
+  computeUiContractCompositionShapeIssueIds,
   computeUiContractExpectedScrollportIssueIds,
   computeUiContractLayoutIssueIds,
   computeUiContractMarkerIssueIds,
@@ -15,6 +21,12 @@ import {
   type MarkupCoreUiContractCanvasHudIssueId,
   type MarkupCoreUiContractCanvasInputIssueId,
   type MarkupCoreUiContractCanvasIssueId,
+  type MarkupCoreUiContractCompositionAxisIssueId,
+  type MarkupCoreUiContractCompositionContrastIssueId,
+  type MarkupCoreUiContractCompositionIssueId,
+  type MarkupCoreUiContractCompositionLayerIssueId,
+  type MarkupCoreUiContractCompositionMotionIssueId,
+  type MarkupCoreUiContractCompositionShapeIssueId,
   type MarkupCoreUiContractExpectedScrollportIssueId,
   type MarkupCoreUiContractLayoutIssueId,
   type MarkupCoreUiContractMarkerIssueId,
@@ -162,19 +174,6 @@ export type UiStateKind =
   | "paused"
   | "result";
 
-const UI_STATE_KINDS: readonly UiStateKind[] = [
-  "hover",
-  "focus-visible",
-  "selected",
-  "scrolled",
-  "empty",
-  "loading",
-  "error",
-  "playing",
-  "paused",
-  "result",
-];
-
 export interface UiStateContract {
   id: string;
   kind: UiStateKind;
@@ -189,12 +188,6 @@ export interface UiRequiredStateContract extends UiStateContract {
 }
 
 export type UiScrollAxis = "x" | "y" | "both";
-
-const UI_SCROLL_AXES: readonly UiScrollAxis[] = [
-  "x",
-  "y",
-  "both",
-];
 
 export interface UiExpectedScrollportContract {
   id: string;
@@ -214,29 +207,12 @@ export type UiCompositionStyle =
   | "radial"
   | "layered";
 
-const UI_COMPOSITION_STYLES: readonly UiCompositionStyle[] = [
-  "regular",
-  "asymmetric",
-  "poster",
-  "collage",
-  "radial",
-  "layered",
-];
-
 export type UiCompositionAxis =
   | "orthogonal"
   | "diagonal"
   | "radial"
   | "freeform"
   | "layered";
-
-const UI_COMPOSITION_AXES: readonly UiCompositionAxis[] = [
-  "orthogonal",
-  "diagonal",
-  "radial",
-  "freeform",
-  "layered",
-];
 
 export interface UiCompositionContract {
   style: UiCompositionStyle;
@@ -253,14 +229,6 @@ export type UiCompositionLayerRole =
   | "accent"
   | "foreground"
   | "scrim";
-
-const UI_COMPOSITION_LAYER_ROLES: readonly UiCompositionLayerRole[] = [
-  "background",
-  "content",
-  "accent",
-  "foreground",
-  "scrim",
-];
 
 export interface UiCompositionLayer {
   id: string;
@@ -280,16 +248,6 @@ export type UiCompositionShapeKind =
   | "frame"
   | "ribbon";
 
-const UI_COMPOSITION_SHAPE_KINDS: readonly UiCompositionShapeKind[] = [
-  "slash-panel",
-  "sticker",
-  "burst",
-  "cutout",
-  "mask",
-  "frame",
-  "ribbon",
-];
-
 export interface UiCompositionShape {
   id: string;
   kind: UiCompositionShapeKind;
@@ -306,34 +264,12 @@ export interface UiMotionContract {
   target?: string;
 }
 
-const UI_MOTION_TRIGGERS: readonly UiMotionContract["trigger"][] = [
-  "hover",
-  "focus",
-  "selected",
-  "route",
-  "load",
-];
-
-const UI_MOTION_EFFECTS: readonly UiMotionContract["effect"][] = [
-  "slam",
-  "pulse",
-  "slide",
-  "scale",
-  "flash",
-  "none",
-];
-
 export interface UiContrastContract {
   mode: "normal" | "high";
   minRatio?: number;
   palette?: string[];
   textOverAccent?: boolean;
 }
-
-const UI_CONTRAST_MODES: readonly UiContrastContract["mode"][] = [
-  "normal",
-  "high",
-];
 
 export type UiSlotKind =
   | "content"
@@ -785,64 +721,81 @@ function validateComposition(
   issues: UiContractIssue[],
 ): void {
   if (!composition) return;
-  if (!includesString(UI_COMPOSITION_STYLES, composition.style)) {
-    issues.push({ path: `${path}.style`, message: "unknown composition style" });
+  for (const issueId of computeUiContractCompositionIssueIds({ style: composition.style })) {
+    issues.push(uiContractCompositionIssue(issueId, path));
   }
   for (let i = 0; i < (composition.axes?.length ?? 0); i++) {
     const axis = composition.axes![i]!;
-    if (!includesString(UI_COMPOSITION_AXES, axis)) {
-      issues.push({ path: `${path}.axes[${i}]`, message: "unknown composition axis" });
+    const axisPath = `${path}.axes[${i}]`;
+    for (const issueId of computeUiContractCompositionAxisIssueIds({ axis })) {
+      issues.push(uiContractCompositionAxisIssue(issueId, axisPath));
     }
   }
   const layerIds = new Set<string>();
   for (let i = 0; i < (composition.layers?.length ?? 0); i++) {
     const layer = composition.layers![i]!;
     const layerPath = `${path}.layers[${i}]`;
-    if (!layer.id) issues.push({ path: `${layerPath}.id`, message: "composition layer id is required" });
-    else if (layerIds.has(layer.id)) issues.push({ path: `${layerPath}.id`, message: "composition layer id must be unique" });
-    else layerIds.add(layer.id);
-    if (!includesString(UI_COMPOSITION_LAYER_ROLES, layer.role)) {
-      issues.push({ path: `${layerPath}.role`, message: "unknown composition layer role" });
+    const duplicateId = Boolean(layer.id && layerIds.has(layer.id));
+    const issueIds = computeUiContractCompositionLayerIssueIds({
+      id: layer.id,
+      role: layer.role,
+      duplicateId,
+      zPresent: layer.z !== undefined,
+      zFinite: Number.isFinite(layer.z),
+    });
+    for (const issueId of issueIds) {
+      issues.push(uiContractCompositionLayerIssue(issueId, layerPath));
     }
-    if (layer.z !== undefined && !Number.isFinite(layer.z)) {
-      issues.push({ path: `${layerPath}.z`, message: "composition layer z must be finite" });
+    if (layer.id) {
+      layerIds.add(layer.id);
     }
   }
   const shapeIds = new Set<string>();
   for (let i = 0; i < (composition.shapes?.length ?? 0); i++) {
     const shape = composition.shapes![i]!;
     const shapePath = `${path}.shapes[${i}]`;
-    if (!shape.id) issues.push({ path: `${shapePath}.id`, message: "composition shape id is required" });
-    else if (shapeIds.has(shape.id)) issues.push({ path: `${shapePath}.id`, message: "composition shape id must be unique" });
-    else shapeIds.add(shape.id);
-    if (!includesString(UI_COMPOSITION_SHAPE_KINDS, shape.kind)) {
-      issues.push({ path: `${shapePath}.kind`, message: "unknown composition shape kind" });
+    const duplicateId = Boolean(shape.id && shapeIds.has(shape.id));
+    const issueIds = computeUiContractCompositionShapeIssueIds({
+      id: shape.id,
+      kind: shape.kind,
+      duplicateId,
+    });
+    for (const issueId of issueIds) {
+      issues.push(uiContractCompositionShapeIssue(issueId, shapePath));
+    }
+    if (shape.id) {
+      shapeIds.add(shape.id);
     }
   }
   const motionIds = new Set<string>();
   for (let i = 0; i < (composition.motion?.length ?? 0); i++) {
     const motion = composition.motion![i]!;
     const motionPath = `${path}.motion[${i}]`;
-    if (!motion.id) issues.push({ path: `${motionPath}.id`, message: "motion id is required" });
-    else if (motionIds.has(motion.id)) issues.push({ path: `${motionPath}.id`, message: "motion id must be unique" });
-    else motionIds.add(motion.id);
-    if (!includesString(UI_MOTION_TRIGGERS, motion.trigger)) {
-      issues.push({ path: `${motionPath}.trigger`, message: "unknown motion trigger" });
+    const duplicateId = Boolean(motion.id && motionIds.has(motion.id));
+    const issueIds = computeUiContractCompositionMotionIssueIds({
+      id: motion.id,
+      trigger: motion.trigger,
+      effect: motion.effect,
+      duplicateId,
+      durationPresent: motion.durationMs !== undefined,
+      durationMs: motion.durationMs ?? 0,
+    });
+    for (const issueId of issueIds) {
+      issues.push(uiContractCompositionMotionIssue(issueId, motionPath));
     }
-    if (!includesString(UI_MOTION_EFFECTS, motion.effect)) {
-      issues.push({ path: `${motionPath}.effect`, message: "unknown motion effect" });
-    }
-    if (motion.durationMs !== undefined && motion.durationMs < 0) {
-      issues.push({ path: `${motionPath}.durationMs`, message: "durationMs must be non-negative" });
+    if (motion.id) {
+      motionIds.add(motion.id);
     }
   }
   if (composition.contrast) {
     const contrastPath = `${path}.contrast`;
-    if (!includesString(UI_CONTRAST_MODES, composition.contrast.mode)) {
-      issues.push({ path: `${contrastPath}.mode`, message: "unknown contrast mode" });
-    }
-    if (composition.contrast.minRatio !== undefined && composition.contrast.minRatio <= 0) {
-      issues.push({ path: `${contrastPath}.minRatio`, message: "contrast minRatio must be positive" });
+    const issueIds = computeUiContractCompositionContrastIssueIds({
+      mode: composition.contrast.mode,
+      minRatioPresent: composition.contrast.minRatio !== undefined,
+      minRatio: composition.contrast.minRatio ?? 0,
+    });
+    for (const issueId of issueIds) {
+      issues.push(uiContractCompositionContrastIssue(issueId, contrastPath));
     }
     for (let i = 0; i < (composition.contrast.palette?.length ?? 0); i++) {
       const value = composition.contrast.palette![i]!;
@@ -850,6 +803,86 @@ function validateComposition(
         issues.push({ path: `${contrastPath}.palette[${i}]`, message: "composition contrast palette value must be a hex color" });
       }
     }
+  }
+}
+
+function uiContractCompositionIssue(
+  issueId: MarkupCoreUiContractCompositionIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "composition-style-unknown":
+      return { path: `${path}.style`, message: "unknown composition style" };
+  }
+}
+
+function uiContractCompositionAxisIssue(
+  issueId: MarkupCoreUiContractCompositionAxisIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "composition-axis-unknown":
+      return { path, message: "unknown composition axis" };
+  }
+}
+
+function uiContractCompositionLayerIssue(
+  issueId: MarkupCoreUiContractCompositionLayerIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "composition-layer-id-required":
+      return { path: `${path}.id`, message: "composition layer id is required" };
+    case "composition-layer-id-unique":
+      return { path: `${path}.id`, message: "composition layer id must be unique" };
+    case "composition-layer-role-unknown":
+      return { path: `${path}.role`, message: "unknown composition layer role" };
+    case "composition-layer-z-finite":
+      return { path: `${path}.z`, message: "composition layer z must be finite" };
+  }
+}
+
+function uiContractCompositionShapeIssue(
+  issueId: MarkupCoreUiContractCompositionShapeIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "composition-shape-id-required":
+      return { path: `${path}.id`, message: "composition shape id is required" };
+    case "composition-shape-id-unique":
+      return { path: `${path}.id`, message: "composition shape id must be unique" };
+    case "composition-shape-kind-unknown":
+      return { path: `${path}.kind`, message: "unknown composition shape kind" };
+  }
+}
+
+function uiContractCompositionMotionIssue(
+  issueId: MarkupCoreUiContractCompositionMotionIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "motion-id-required":
+      return { path: `${path}.id`, message: "motion id is required" };
+    case "motion-id-unique":
+      return { path: `${path}.id`, message: "motion id must be unique" };
+    case "motion-trigger-unknown":
+      return { path: `${path}.trigger`, message: "unknown motion trigger" };
+    case "motion-effect-unknown":
+      return { path: `${path}.effect`, message: "unknown motion effect" };
+    case "motion-duration-non-negative":
+      return { path: `${path}.durationMs`, message: "durationMs must be non-negative" };
+  }
+}
+
+function uiContractCompositionContrastIssue(
+  issueId: MarkupCoreUiContractCompositionContrastIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "contrast-mode-unknown":
+      return { path: `${path}.mode`, message: "unknown contrast mode" };
+    case "contrast-min-ratio-positive":
+      return { path: `${path}.minRatio`, message: "contrast minRatio must be positive" };
   }
 }
 

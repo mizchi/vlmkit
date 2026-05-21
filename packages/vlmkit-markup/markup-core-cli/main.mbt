@@ -206,6 +206,67 @@ fn main_err() -> Unit raise {
       println(@core.ui_contract_canvas_input_issue_ids(action))
     ["ui-contract-canvas-hud-issue-ids", id] =>
       println(@core.ui_contract_canvas_hud_issue_ids(id))
+    ["ui-contract-composition-issue-ids", style] =>
+      println(@core.ui_contract_composition_issue_ids(style))
+    ["ui-contract-composition-axis-issue-ids", axis] =>
+      println(@core.ui_contract_composition_axis_issue_ids(axis))
+    [
+      "ui-contract-composition-layer-issue-ids",
+      id,
+      role,
+      duplicate_id,
+      z_present,
+      z_finite,
+    ] =>
+      println(
+        @core.ui_contract_composition_layer_issue_ids(
+          id,
+          role,
+          parse_bool(duplicate_id),
+          parse_bool(z_present),
+          parse_bool(z_finite),
+        ),
+      )
+    ["ui-contract-composition-shape-issue-ids", id, kind, duplicate_id] =>
+      println(
+        @core.ui_contract_composition_shape_issue_ids(
+          id,
+          kind,
+          parse_bool(duplicate_id),
+        ),
+      )
+    [
+      "ui-contract-composition-motion-issue-ids",
+      id,
+      trigger,
+      effect,
+      duplicate_id,
+      duration_present,
+      duration_ms,
+    ] =>
+      println(
+        @core.ui_contract_composition_motion_issue_ids(
+          id,
+          trigger,
+          effect,
+          parse_bool(duplicate_id),
+          parse_bool(duration_present),
+          parse_double(duration_ms),
+        ),
+      )
+    [
+      "ui-contract-composition-contrast-issue-ids",
+      mode,
+      min_ratio_present,
+      min_ratio,
+    ] =>
+      println(
+        @core.ui_contract_composition_contrast_issue_ids(
+          mode,
+          parse_bool(min_ratio_present),
+          parse_double(min_ratio),
+        ),
+      )
     [
       "ui-contract-layout-issue-ids",
       width_kind,
@@ -335,6 +396,12 @@ fn is_command(value : String) -> Bool {
   value == "ui-contract-canvas-issue-ids" ||
   value == "ui-contract-canvas-input-issue-ids" ||
   value == "ui-contract-canvas-hud-issue-ids" ||
+  value == "ui-contract-composition-issue-ids" ||
+  value == "ui-contract-composition-axis-issue-ids" ||
+  value == "ui-contract-composition-layer-issue-ids" ||
+  value == "ui-contract-composition-shape-issue-ids" ||
+  value == "ui-contract-composition-motion-issue-ids" ||
+  value == "ui-contract-composition-contrast-issue-ids" ||
   value == "ui-contract-layout-issue-ids" ||
   value == "ui-contract-state-issue-ids" ||
   value == "ui-contract-required-state-issue-ids" ||
@@ -412,6 +479,6 @@ fn parse_int_list(value : String) -> Array[Int] raise {
 ///|
 fn print_usage() -> Unit {
   println(
-    "Usage: markup-core-cli component-goal-status <...> | is-component-probe-state <state> | is-forced-pseudo-state <state> | component-probe-states <kind|kind> | merge-component-probe-states <explicit|...> <injected|...> | component-scroll-target-source <kind|kind> <state-target-count> | semantic-drilldown-policy <layout-score> <decoration-score> <heatmap-kind-count> | semantic-drilldown-select-index <flow|...> <priority|...> <order|...> | ui-contract-pattern-evidence-issue-ids <pattern> <marker|...> <required-state|...> <state|...> <expected-scrollport-count> <has-composition> <has-canvas-state-hook> <canvas-field|...> | ui-contract-marker-issue-ids <kind> <required> <has-selector> <has-attribute> <has-target> | ui-contract-optional-range-issue-ids <has-min> <min> <has-max> <max> | ui-contract-slot-issue-ids <id> | ui-contract-asset-issue-ids <id> | ui-contract-canvas-issue-ids <has-state-hook> <required-state-field-count> | ui-contract-canvas-input-issue-ids <action> | ui-contract-canvas-hud-issue-ids <id> | ui-contract-layout-issue-ids <width-kind> <has-min> <has-max> <width-value> <height-kind> <height-value> <height-max> <display-kind> <columns> <rows> | ui-contract-state-issue-ids <id> <kind> <required> <has-selector> <has-trigger> | ui-contract-required-state-issue-ids <id> <kind> <required> <has-selector> <has-trigger> <duplicate-id> <has-min-change-ratio> <min-change-ratio> | ui-contract-expected-scrollport-issue-ids <id> <axis> <required> <has-selector> <has-name> <has-landmark-id> <duplicate-id> <has-min-overflow> <min-overflow>",
+    "Usage: markup-core-cli component-goal-status <...> | is-component-probe-state <state> | is-forced-pseudo-state <state> | component-probe-states <kind|kind> | merge-component-probe-states <explicit|...> <injected|...> | component-scroll-target-source <kind|kind> <state-target-count> | semantic-drilldown-policy <layout-score> <decoration-score> <heatmap-kind-count> | semantic-drilldown-select-index <flow|...> <priority|...> <order|...> | ui-contract-pattern-evidence-issue-ids <pattern> <marker|...> <required-state|...> <state|...> <expected-scrollport-count> <has-composition> <has-canvas-state-hook> <canvas-field|...> | ui-contract-marker-issue-ids <kind> <required> <has-selector> <has-attribute> <has-target> | ui-contract-optional-range-issue-ids <has-min> <min> <has-max> <max> | ui-contract-slot-issue-ids <id> | ui-contract-asset-issue-ids <id> | ui-contract-canvas-issue-ids <has-state-hook> <required-state-field-count> | ui-contract-canvas-input-issue-ids <action> | ui-contract-canvas-hud-issue-ids <id> | ui-contract-composition-issue-ids <style> | ui-contract-composition-axis-issue-ids <axis> | ui-contract-composition-layer-issue-ids <id> <role> <duplicate-id> <has-z> <z-finite> | ui-contract-composition-shape-issue-ids <id> <kind> <duplicate-id> | ui-contract-composition-motion-issue-ids <id> <trigger> <effect> <duplicate-id> <has-duration> <duration-ms> | ui-contract-composition-contrast-issue-ids <mode> <has-min-ratio> <min-ratio> | ui-contract-layout-issue-ids <width-kind> <has-min> <has-max> <width-value> <height-kind> <height-value> <height-max> <display-kind> <columns> <rows> | ui-contract-state-issue-ids <id> <kind> <required> <has-selector> <has-trigger> | ui-contract-required-state-issue-ids <id> <kind> <required> <has-selector> <has-trigger> <duplicate-id> <has-min-change-ratio> <min-change-ratio> | ui-contract-expected-scrollport-issue-ids <id> <axis> <required> <has-selector> <has-name> <has-landmark-id> <duplicate-id> <has-min-overflow> <min-overflow>",
   )
 }

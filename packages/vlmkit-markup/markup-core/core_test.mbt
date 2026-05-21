@@ -493,3 +493,38 @@ test "ui contract metadata presence issue policy" {
   )
   inspect(ui_contract_canvas_hud_issue_ids("score"), content="")
 }
+
+///|
+test "ui contract composition issue policy" {
+  inspect(
+    ui_contract_composition_issue_ids("zigzag"),
+    content="composition-style-unknown",
+  )
+  inspect(ui_contract_composition_axis_issue_ids("diagonal"), content="")
+  inspect(
+    ui_contract_composition_axis_issue_ids("sideways"),
+    content="composition-axis-unknown",
+  )
+  inspect(
+    ui_contract_composition_layer_issue_ids("", "backdrop", false, true, false),
+    content="composition-layer-id-required|composition-layer-role-unknown|composition-layer-z-finite",
+  )
+  inspect(
+    ui_contract_composition_layer_issue_ids("dup", "content", true, false, true),
+    content="composition-layer-id-unique",
+  )
+  inspect(
+    ui_contract_composition_shape_issue_ids("", "triangle", false),
+    content="composition-shape-id-required|composition-shape-kind-unknown",
+  )
+  inspect(
+    ui_contract_composition_motion_issue_ids(
+      "", "tap", "wiggle", false, true, -1,
+    ),
+    content="motion-id-required|motion-trigger-unknown|motion-effect-unknown|motion-duration-non-negative",
+  )
+  inspect(
+    ui_contract_composition_contrast_issue_ids("extreme", true, 0),
+    content="contrast-mode-unknown|contrast-min-ratio-positive",
+  )
+}

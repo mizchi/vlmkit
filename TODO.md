@@ -1324,10 +1324,16 @@ Stepwise cleanup:
   slot ids, asset ids, and canvas stateHook/input/HUD presence predicates now
   delegate to `markup-core`. TypeScript still owns nested array traversal and
   maps each returned id to the existing report path/message.
+- [x] UI Contract composition validator slice:
+  composition style/axis, layer role/z/id uniqueness, shape kind/id
+  uniqueness, motion trigger/effect/duration/id uniqueness, and contrast
+  mode/minRatio predicates now delegate to `markup-core`. TypeScript still owns
+  array traversal, duplicate tracking inputs, palette hex checks, and mapping
+  issue ids to report paths/messages.
 - [ ] Continue UI Contract validator core:
-  move the remaining enum/uniqueness predicates for composition and decoration
-  metadata into MoonBit in small slices, while keeping TypeScript as the
-  contract schema and report-text boundary.
+  move the remaining decoration metadata predicates into MoonBit in small
+  slices, while keeping TypeScript as the contract schema and report-text
+  boundary.
 - [x] Semantic drilldown selection policy slice:
   `component/semantic-drilldown.ts` now delegates layout-vs-decoration flow,
   priority scoring, reason id selection, and next-action ordering to

@@ -235,6 +235,34 @@ export type MarkupCoreUiContractCanvasInputIssueId =
 
 export type MarkupCoreUiContractCanvasHudIssueId = "canvas-hud-id-required";
 
+export type MarkupCoreUiContractCompositionIssueId =
+  "composition-style-unknown";
+
+export type MarkupCoreUiContractCompositionAxisIssueId =
+  "composition-axis-unknown";
+
+export type MarkupCoreUiContractCompositionLayerIssueId =
+  | "composition-layer-id-required"
+  | "composition-layer-id-unique"
+  | "composition-layer-role-unknown"
+  | "composition-layer-z-finite";
+
+export type MarkupCoreUiContractCompositionShapeIssueId =
+  | "composition-shape-id-required"
+  | "composition-shape-id-unique"
+  | "composition-shape-kind-unknown";
+
+export type MarkupCoreUiContractCompositionMotionIssueId =
+  | "motion-id-required"
+  | "motion-id-unique"
+  | "motion-trigger-unknown"
+  | "motion-effect-unknown"
+  | "motion-duration-non-negative";
+
+export type MarkupCoreUiContractCompositionContrastIssueId =
+  | "contrast-mode-unknown"
+  | "contrast-min-ratio-positive";
+
 export type MarkupCoreUiContractLayoutIssueId =
   | "layout-width-fluid-bounds"
   | "layout-width-fixed-positive"
@@ -396,6 +424,122 @@ export function computeUiContractCanvasHudIssueIds(input: {
       return issueId;
     }
     throw new Error(`unexpected markup-core UI contract canvas HUD issue id: ${issueId}`);
+  });
+}
+
+export function computeUiContractCompositionIssueIds(input: {
+  style: string;
+}): MarkupCoreUiContractCompositionIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-composition-issue-ids",
+    input.style,
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractCompositionIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(`unexpected markup-core UI contract composition issue id: ${issueId}`);
+  });
+}
+
+export function computeUiContractCompositionAxisIssueIds(input: {
+  axis: string;
+}): MarkupCoreUiContractCompositionAxisIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-composition-axis-issue-ids",
+    input.axis,
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractCompositionAxisIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(`unexpected markup-core UI contract composition axis issue id: ${issueId}`);
+  });
+}
+
+export function computeUiContractCompositionLayerIssueIds(input: {
+  id: string;
+  role: string;
+  duplicateId: boolean;
+  zPresent: boolean;
+  zFinite: boolean;
+}): MarkupCoreUiContractCompositionLayerIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-composition-layer-issue-ids",
+    input.id,
+    input.role,
+    boolArg(input.duplicateId),
+    boolArg(input.zPresent),
+    boolArg(input.zFinite),
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractCompositionLayerIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(`unexpected markup-core UI contract composition layer issue id: ${issueId}`);
+  });
+}
+
+export function computeUiContractCompositionShapeIssueIds(input: {
+  id: string;
+  kind: string;
+  duplicateId: boolean;
+}): MarkupCoreUiContractCompositionShapeIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-composition-shape-issue-ids",
+    input.id,
+    input.kind,
+    boolArg(input.duplicateId),
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractCompositionShapeIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(`unexpected markup-core UI contract composition shape issue id: ${issueId}`);
+  });
+}
+
+export function computeUiContractCompositionMotionIssueIds(input: {
+  id: string;
+  trigger: string;
+  effect: string;
+  duplicateId: boolean;
+  durationPresent: boolean;
+  durationMs: number;
+}): MarkupCoreUiContractCompositionMotionIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-composition-motion-issue-ids",
+    input.id,
+    input.trigger,
+    input.effect,
+    boolArg(input.duplicateId),
+    boolArg(input.durationPresent),
+    doubleArg(input.durationMs),
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractCompositionMotionIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(`unexpected markup-core UI contract composition motion issue id: ${issueId}`);
+  });
+}
+
+export function computeUiContractCompositionContrastIssueIds(input: {
+  mode: string;
+  minRatioPresent: boolean;
+  minRatio: number;
+}): MarkupCoreUiContractCompositionContrastIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-composition-contrast-issue-ids",
+    input.mode,
+    boolArg(input.minRatioPresent),
+    doubleArg(input.minRatio),
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractCompositionContrastIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(`unexpected markup-core UI contract composition contrast issue id: ${issueId}`);
   });
 }
 
@@ -601,6 +745,60 @@ function isMarkupCoreUiContractCanvasHudIssueId(
   issueId: string,
 ): issueId is MarkupCoreUiContractCanvasHudIssueId {
   return issueId === "canvas-hud-id-required";
+}
+
+function isMarkupCoreUiContractCompositionIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractCompositionIssueId {
+  return issueId === "composition-style-unknown";
+}
+
+function isMarkupCoreUiContractCompositionAxisIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractCompositionAxisIssueId {
+  return issueId === "composition-axis-unknown";
+}
+
+function isMarkupCoreUiContractCompositionLayerIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractCompositionLayerIssueId {
+  return (
+    issueId === "composition-layer-id-required" ||
+    issueId === "composition-layer-id-unique" ||
+    issueId === "composition-layer-role-unknown" ||
+    issueId === "composition-layer-z-finite"
+  );
+}
+
+function isMarkupCoreUiContractCompositionShapeIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractCompositionShapeIssueId {
+  return (
+    issueId === "composition-shape-id-required" ||
+    issueId === "composition-shape-id-unique" ||
+    issueId === "composition-shape-kind-unknown"
+  );
+}
+
+function isMarkupCoreUiContractCompositionMotionIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractCompositionMotionIssueId {
+  return (
+    issueId === "motion-id-required" ||
+    issueId === "motion-id-unique" ||
+    issueId === "motion-trigger-unknown" ||
+    issueId === "motion-effect-unknown" ||
+    issueId === "motion-duration-non-negative"
+  );
+}
+
+function isMarkupCoreUiContractCompositionContrastIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractCompositionContrastIssueId {
+  return (
+    issueId === "contrast-mode-unknown" ||
+    issueId === "contrast-min-ratio-positive"
+  );
 }
 
 function isMarkupCoreUiContractStateIssueId(
