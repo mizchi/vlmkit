@@ -1062,6 +1062,16 @@ Current smoke status:
   `select-motion-normalization-candidates.mjs` groups runnable candidate
   comparisons and emits accepted/rejected/neutral/missing recommendations so
   the loop can reject mixed candidates without a manual read-through
+- [x] MoonBit core slice:
+  `motion-core` ports the arm-rest motion gate, root-translation
+  recommendation/candidate selection, pose mismatch warning-id selection, and
+  pose normalization candidate spec selection, plus candidate-group selection
+  recommendation into tested MoonBit pure functions. `motion-core-cli` exposes
+  the same decisions as a generated JS command surface. The JS orchestration
+  tools now call `motion-core-runtime` for those decisions while still owning
+  GLB/JSON I/O; audit-facing severity/reason text stays in explicit JS detail
+  maps keyed by the MoonBit ids/specs. `check-motion-core-parity` verifies the
+  generated JS CLI decisions for the current policy fixtures
 - [x] Named `robot-voxel` retarget profile for voxel robot smoke: skipped
   fingers, toes, chest, neck, and shoulders are tolerated with zero penalty,
   while skipped core bones fail the weighted profile

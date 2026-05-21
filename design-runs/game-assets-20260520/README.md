@@ -270,7 +270,24 @@ shared tools now live in `tools/`:
   follow-ups
 - `tools/select-motion-normalization-candidates.mjs`: read the candidate plan
   plus generated comparison reports and summarize candidate groups as accepted,
-  rejected, neutral, missing, or needing policy
+  rejected, neutral, missing, or needing policy; group recommendation is
+  delegated to the MoonBit runtime adapter
+- `motion-core/`: MoonBit port of pure candidate policy logic. It currently
+  covers the arm-rest motion gate, root-translation recommendation/candidate
+  selection, pose mismatch warning-id selection, pose normalization candidate
+  spec selection, and candidate-group selection recommendation; run it with
+  `moon -C design-runs/game-assets-20260520 test motion-core`
+- `motion-core-cli/`: thin MoonBit entrypoint over `motion-core`. Build it with
+  `pnpm run moon:build:game-assets`, then run the generated JS command, for
+  example `node design-runs/game-assets-20260520/_build/js/debug/build/motion-core-cli/motion-core-cli.js arm-rest-gate 14.48395`
+- `tools/motion-core-runtime.mjs`: synchronous JS adapter that builds the
+  MoonBit JS target on demand and exposes the policy decisions to the existing
+  orchestration scripts, including `apply-motion-ir` root/pose recommendations,
+  pose warning IDs, pose candidate specs, and normalization candidate selection
+  while `apply-motion-ir` keeps only stable audit detail maps for
+  severity/reason text
+- `tools/check-motion-core-parity.mjs`: builds the MoonBit JS target and checks
+  the generated CLI decisions against the expected policy fixtures
 - `tools/review-motion-with-vlm.mjs`: optional cheap VLM second opinion using
   a generated contact sheet; dry-runs without credentials
 - `tools/retarget-profiles.mjs`: named retarget downgrade profiles with

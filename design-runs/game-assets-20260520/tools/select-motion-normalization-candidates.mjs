@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
+import { selectCandidateGroup } from "./motion-core-runtime.mjs";
 
 const repoRoot = resolve(new URL("../../..", import.meta.url).pathname);
 
@@ -153,7 +154,7 @@ function groupCandidates(results) {
       decision: result.decision,
       reasons: result.reasons,
     });
-    group.recommendation = recommend(group);
+    group.recommendation = selectCandidateGroup(group.automatic, group.decisions);
     groups.set(key, group);
   }
   return [...groups.values()].sort((a, b) => a.id.localeCompare(b.id) || String(a.poseNormalization).localeCompare(String(b.poseNormalization)));
@@ -166,14 +167,6 @@ function incrementDecision(decisions, decision) {
   else if (decision === "stable") decisions.stable += 1;
   else if (decision === "missing-sample-comparison") decisions.missingSampleComparison += 1;
   else decisions.missingComparison += 1;
-}
-
-function recommend(group) {
-  if (group.decisions.missingComparison > 0 || group.decisions.missingSampleComparison > 0) return "missing-comparison";
-  if (group.decisions.candidateRegressed > 0 || group.decisions.candidateTradeoff > 0) return "rejected";
-  if (group.decisions.candidateImproved > 0 && group.automatic) return "accepted";
-  if (group.decisions.candidateImproved > 0) return "needs-policy";
-  return "neutral";
 }
 
 function summarize(groups, plan) {

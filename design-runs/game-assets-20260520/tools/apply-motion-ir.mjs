@@ -2,6 +2,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { axisRange, computeWorldMatrices, nodeWorldPosition, vec3, vec3Range, vec4 } from "./gltf-bind-pose.mjs";
+import { armRestMotionGateStatus, poseMismatchWarningIds, poseNormalizationCandidateSpecs, rootTranslationCandidateId, rootTranslationRecommendationId } from "./motion-core-runtime.mjs";
 
 const repoRoot = resolve(new URL("../../..", import.meta.url).pathname);
 const entryDir = dirname(resolve(process.argv[1] ?? new URL(".", import.meta.url).pathname));
@@ -326,44 +327,15 @@ function compareSourceTargetRig(sourceRig, targetRig, motionActivity) {
     max: round(Math.max(...coreScales)),
     ratio: round(Math.max(...coreScales) / Math.min(...coreScales)),
   } : null;
-  const warnings = [];
-  if (scaleSpread && scaleSpread.ratio >= CORE_SCALE_SPREAD_WARN_RATIO) {
-    warnings.push({
-      id: "scale-inconsistent",
-      severity: "warn",
-      reason: "source-to-target scale differs across skeleton height, leg height, and hand span",
-    });
-  }
-  if (Number.isFinite(scales.footSpread) && (scales.footSpread >= FOOT_SPREAD_POSE_WARN_RATIO || scales.footSpread <= 1 / FOOT_SPREAD_POSE_WARN_RATIO)) {
-    warnings.push({
-      id: "foot-spread-mismatch",
-      severity: "warn",
-      reason: "source and target rest poses have very different foot spacing",
-    });
-  }
-  if (Number.isFinite(scales.upperLegSpread) && (scales.upperLegSpread >= LEG_SPREAD_POSE_WARN_RATIO || scales.upperLegSpread <= 1 / LEG_SPREAD_POSE_WARN_RATIO)) {
-    warnings.push({
-      id: "leg-spread-mismatch",
-      severity: "warn",
-      reason: "source and target rest poses have very different upper-leg spacing",
-    });
-  }
-  if (hasRelativeScaleMismatch(scales.shoulderWidth, scales.skeletonHeight, SHOULDER_SCALE_MISMATCH_WARN_DELTA)) {
-    warnings.push({
-      id: "shoulder-width-mismatch",
-      severity: "warn",
-      reason: "source and target shoulder widths do not scale with skeleton height",
-    });
-  }
   const armAngleDelta = angleDelta(sourceRig.bindMetrics.armDownAngleDeg, targetRig.bindMetrics.armDownAngleDeg);
-  if (armAngleDelta !== null && armAngleDelta >= ARM_REST_ANGLE_WARN_DEG) {
-    warnings.push({
-      id: "arm-rest-angle-mismatch",
-      severity: "warn",
-      reason: "source and target rest arms point in different directions",
-      value: { deltaDeg: round(armAngleDelta) },
-    });
-  }
+  const warnings = poseMismatchWarningIds({
+    scaleSpreadRatio: scaleSpread?.ratio,
+    footSpreadScale: scales.footSpread,
+    upperLegSpreadScale: scales.upperLegSpread,
+    shoulderWidthScale: scales.shoulderWidth,
+    skeletonHeightScale: scales.skeletonHeight,
+    armAngleDeltaDeg: armAngleDelta,
+  }).map((id) => poseMismatchWarning(id, armAngleDelta));
   const recommendation = warnings.length > 0
     ? {
       id: "pose-mismatch-warning",
@@ -385,14 +357,19 @@ function compareSourceTargetRig(sourceRig, targetRig, motionActivity) {
   };
 }
 
+function poseMismatchWarning(id, armAngleDelta) {
+  const detail = POSE_MISMATCH_WARNING_DETAILS[id];
+  if (!detail) throw new Error(`unknown pose mismatch warning id: ${id}`);
+  const warning = { id, ...detail };
+  if (id === "arm-rest-angle-mismatch") {
+    warning.value = { deltaDeg: round(armAngleDelta) };
+  }
+  return warning;
+}
+
 function scaleMetric(source, target) {
   if (!Number.isFinite(source) || !Number.isFinite(target) || Math.abs(source) <= 0.0001) return null;
   return target / source;
-}
-
-function hasRelativeScaleMismatch(scale, referenceScale, threshold) {
-  if (!Number.isFinite(scale) || !Number.isFinite(referenceScale) || Math.abs(referenceScale) <= 0.0001) return false;
-  return Math.abs(scale / referenceScale - 1) >= threshold;
 }
 
 function angleDelta(source, target) {
@@ -406,53 +383,63 @@ function mapValues(object, mapper) {
 
 function poseNormalizationCandidates(warnings, motionActivity) {
   const ids = new Set(warnings.map((warning) => warning.id));
-  const candidates = [];
-  if (ids.has("arm-rest-angle-mismatch")) {
+  return poseNormalizationCandidateSpecs({
+    hasArmRestAngleMismatch: ids.has("arm-rest-angle-mismatch"),
+    hasFootSpreadMismatch: ids.has("foot-spread-mismatch"),
+    hasLegSpreadMismatch: ids.has("leg-spread-mismatch"),
+    hasShoulderWidthMismatch: ids.has("shoulder-width-mismatch"),
+    maxUpperArmRotationRangeDeg: motionActivity?.armRest?.maxUpperArmRotationRangeDeg,
+  }).map((spec) => poseNormalizationCandidate(spec, ids, motionActivity));
+}
+
+function poseNormalizationCandidate(spec, warningIds, motionActivity) {
+  const detail = POSE_NORMALIZATION_CANDIDATE_DETAILS[spec.id];
+  if (!detail) throw new Error(`unknown pose normalization candidate id: ${spec.id}`);
+  if (spec.id === "arm-rest-pose-offset") {
     const motionGate = armRestMotionGate(motionActivity);
-    const runnable = motionGate.status === "passed";
-    candidates.push({
-      id: "arm-rest-pose-offset",
-      kind: "pose-pre-normalization",
-      status: runnable ? "runnable" : "needs-motion-evidence",
-      automatic: false,
-      poseNormalization: "arm-rest-offset",
+    const runnable = spec.status === "runnable";
+    return {
+      id: spec.id,
+      kind: detail.kind,
+      status: spec.status,
+      automatic: detail.automatic,
+      poseNormalization: detail.poseNormalization,
       motionGate,
-      triggerWarnings: ["arm-rest-angle-mismatch"],
-      reason: runnable
-        ? "source arms are in a different rest direction and the clip has strong upper-arm motion; run arm-rest-offset as a per-sample candidate"
-        : "source arms are in a different rest direction, but this clip does not have enough upper-arm motion evidence to justify arm-rest-offset",
-    });
+      triggerWarnings: [...detail.triggerWarnings],
+      reason: runnable ? detail.runnableReason : detail.blockedReason,
+    };
   }
-  if (ids.has("foot-spread-mismatch") || ids.has("leg-spread-mismatch")) {
-    candidates.push({
-      id: "stance-width-adapter",
-      kind: "pose-pre-normalization",
-      status: "needs-implementation",
-      automatic: false,
-      triggerWarnings: ["foot-spread-mismatch", "leg-spread-mismatch"].filter((id) => ids.has(id)),
-      reason: "source and target lower-body rest stance differ; root/leg offsets need a separate candidate before changing animation data",
-    });
+  if (spec.id === "stance-width-adapter") {
+    return {
+      id: spec.id,
+      kind: detail.kind,
+      status: spec.status,
+      automatic: detail.automatic,
+      triggerWarnings: detail.triggerWarnings.filter((id) => warningIds.has(id)),
+      reason: detail.reason,
+    };
   }
-  if (ids.has("shoulder-width-mismatch")) {
-    candidates.push({
-      id: "shoulder-width-adapter",
-      kind: "target-rig-or-pose-policy",
-      status: "review-target-rig",
-      automatic: false,
-      triggerWarnings: ["shoulder-width-mismatch"],
-      reason: "target shoulder width differs from source skeleton scale; prefer target rig policy or explicit pose adapter over blind rotation retargeting",
-    });
+  if (spec.id === "shoulder-width-adapter") {
+    return {
+      id: spec.id,
+      kind: detail.kind,
+      status: spec.status,
+      automatic: detail.automatic,
+      triggerWarnings: [...detail.triggerWarnings],
+      reason: detail.reason,
+    };
   }
-  return candidates;
+  throw new Error(`unhandled pose normalization candidate id: ${spec.id}`);
 }
 
 function armRestMotionGate(motionActivity) {
   const armRest = motionActivity?.armRest;
   const value = armRest?.maxUpperArmRotationRangeDeg;
-  if (!Number.isFinite(value)) {
+  const status = armRestMotionGateStatus(value);
+  if (status === "unavailable") {
     return {
       id: "upper-arm-rotation-range",
-      status: "unavailable",
+      status,
       metric: "maxUpperArmRotationRangeDeg",
       thresholdDeg: ARM_REST_MOTION_GATE_DEG,
       valueDeg: null,
@@ -460,15 +447,14 @@ function armRestMotionGate(motionActivity) {
       reason: "upper-arm rotation tracks are unavailable",
     };
   }
-  const passed = value >= ARM_REST_MOTION_GATE_DEG;
   return {
     id: "upper-arm-rotation-range",
-    status: passed ? "passed" : "blocked",
+    status,
     metric: "maxUpperArmRotationRangeDeg",
     thresholdDeg: ARM_REST_MOTION_GATE_DEG,
     valueDeg: round(value),
     strongestClip: armRest.strongestClip ?? null,
-    reason: passed
+    reason: status === "passed"
       ? "upper-arm motion is large enough to test rest-pose arm offsets"
       : "upper-arm motion is too small; rest-pose arm offsets are more likely to be noise than a useful fix",
   };
@@ -522,93 +508,27 @@ function recordRootTranslationAudit(audit, clip, track, nodeName, baseTranslatio
 }
 
 function rootTranslationNormalizationCandidates(recommendation) {
-  if (recommendation.id === "consider-scale-to-model") {
-    return [{
-      id: "root-scale-to-model",
-      kind: "root-translation-mode",
-      status: "runnable",
-      automatic: true,
-      rootTranslationMode: "scale-to-model",
-      triggerRecommendation: recommendation.id,
-      reason: "source and target root heights differ while vertical root motion is significant; run scale-to-model as a candidate and compare quality metrics",
-    }];
-  }
-  if (recommendation.id === "vertical-motion-dropped") {
-    return [{
-      id: "root-relative",
-      kind: "root-translation-mode",
-      status: "runnable",
-      automatic: true,
-      rootTranslationMode: "relative",
-      triggerRecommendation: recommendation.id,
-      reason: "horizontal-only mode drops meaningful vertical motion; run relative root motion as a candidate",
-    }];
-  }
-  return [];
+  const candidateId = rootTranslationCandidateId(recommendation.id);
+  if (candidateId === "none") return [];
+  const detail = ROOT_TRANSLATION_CANDIDATE_DETAILS[candidateId];
+  if (!detail) throw new Error(`unknown root translation candidate id: ${candidateId}`);
+  return [{ id: candidateId, ...detail, triggerRecommendation: recommendation.id }];
 }
 
 function recommendRootTranslationNormalization({ mode, heightScale, heightScaleDelta, verticalDeltaRange }) {
-  if (heightScale === null) {
-    return {
-      id: "height-scale-unavailable",
-      severity: "warn",
-      reason: "source initial root height is too close to zero to compare source and target scale",
-    };
-  }
-  if (mode === "scale-to-model") {
-    return {
-      id: "scale-to-model-active",
-      severity: "info",
-      reason: "root deltas are scaled by target/source root height",
-    };
-  }
-  if (mode === "zero") {
-    return {
-      id: "root-motion-locked",
-      severity: "info",
-      reason: "root translation is locked to the target base transform",
-    };
-  }
-  if (mode === "horizontal-only") {
-    if (verticalDeltaRange >= VERTICAL_ROOT_MOTION_SCALE_THRESHOLD) {
-      return {
-        id: "vertical-motion-dropped",
-        severity: "warn",
-        reason: "clip has meaningful vertical root motion but horizontal-only mode drops it",
-      };
-    }
-    return {
-      id: "horizontal-only-ok",
-      severity: "info",
-      reason: "vertical root delta is small enough for horizontal-only normalization",
-    };
-  }
-  if (mode === "keep") {
-    if (heightScaleDelta >= HEIGHT_SCALE_DELTA_THRESHOLD) {
-      return {
-        id: "source-space-kept",
-        severity: "warn",
-        reason: "source and target root heights differ; keep mode may import source avatar scale",
-      };
-    }
-    return {
-      id: "keep-ok",
-      severity: "info",
-      reason: "source and target root heights are close enough for keep mode",
-    };
-  }
-  if (heightScaleDelta >= HEIGHT_SCALE_DELTA_THRESHOLD && verticalDeltaRange >= VERTICAL_ROOT_MOTION_SCALE_THRESHOLD) {
-    return {
-      id: "consider-scale-to-model",
-      severity: "warn",
-      reason: "source and target root heights differ and the clip has meaningful vertical root motion; compare scale-to-model before accepting relative",
-    };
-  }
-  return {
-    id: "relative-ok",
-    severity: "info",
-    reason: "relative root motion avoids importing source avatar height while preserving the clip delta",
-  };
+  const id = rootTranslationRecommendationId({
+    mode,
+    heightScale,
+    heightScaleDelta,
+    verticalDeltaRange,
+  });
+  return rootTranslationRecommendationDetails(id);
+}
+
+function rootTranslationRecommendationDetails(id) {
+  const detail = ROOT_TRANSLATION_RECOMMENDATION_DETAILS[id];
+  if (!detail) throw new Error(`unknown root translation recommendation id: ${id}`);
+  return { id, ...detail };
 }
 
 function normalizeSamples(clip, track, options = {}) {
@@ -927,14 +847,105 @@ const TARGET_RIG_TRACKED_NODES = [
   "left_foot",
   "right_foot",
 ];
-const CORE_SCALE_SPREAD_WARN_RATIO = 1.25;
-const FOOT_SPREAD_POSE_WARN_RATIO = 2.0;
-const LEG_SPREAD_POSE_WARN_RATIO = 2.0;
-const SHOULDER_SCALE_MISMATCH_WARN_DELTA = 0.4;
-const ARM_REST_ANGLE_WARN_DEG = 45;
+const POSE_MISMATCH_WARNING_DETAILS = Object.freeze({
+  "scale-inconsistent": {
+    severity: "warn",
+    reason: "source-to-target scale differs across skeleton height, leg height, and hand span",
+  },
+  "foot-spread-mismatch": {
+    severity: "warn",
+    reason: "source and target rest poses have very different foot spacing",
+  },
+  "leg-spread-mismatch": {
+    severity: "warn",
+    reason: "source and target rest poses have very different upper-leg spacing",
+  },
+  "shoulder-width-mismatch": {
+    severity: "warn",
+    reason: "source and target shoulder widths do not scale with skeleton height",
+  },
+  "arm-rest-angle-mismatch": {
+    severity: "warn",
+    reason: "source and target rest arms point in different directions",
+  },
+});
+const POSE_NORMALIZATION_CANDIDATE_DETAILS = Object.freeze({
+  "arm-rest-pose-offset": {
+    kind: "pose-pre-normalization",
+    automatic: false,
+    poseNormalization: "arm-rest-offset",
+    triggerWarnings: ["arm-rest-angle-mismatch"],
+    runnableReason: "source arms are in a different rest direction and the clip has strong upper-arm motion; run arm-rest-offset as a per-sample candidate",
+    blockedReason: "source arms are in a different rest direction, but this clip does not have enough upper-arm motion evidence to justify arm-rest-offset",
+  },
+  "stance-width-adapter": {
+    kind: "pose-pre-normalization",
+    automatic: false,
+    triggerWarnings: ["foot-spread-mismatch", "leg-spread-mismatch"],
+    reason: "source and target lower-body rest stance differ; root/leg offsets need a separate candidate before changing animation data",
+  },
+  "shoulder-width-adapter": {
+    kind: "target-rig-or-pose-policy",
+    automatic: false,
+    triggerWarnings: ["shoulder-width-mismatch"],
+    reason: "target shoulder width differs from source skeleton scale; prefer target rig policy or explicit pose adapter over blind rotation retargeting",
+  },
+});
+const ROOT_TRANSLATION_RECOMMENDATION_DETAILS = Object.freeze({
+  "height-scale-unavailable": {
+    severity: "warn",
+    reason: "source initial root height is too close to zero to compare source and target scale",
+  },
+  "scale-to-model-active": {
+    severity: "info",
+    reason: "root deltas are scaled by target/source root height",
+  },
+  "root-motion-locked": {
+    severity: "info",
+    reason: "root translation is locked to the target base transform",
+  },
+  "vertical-motion-dropped": {
+    severity: "warn",
+    reason: "clip has meaningful vertical root motion but horizontal-only mode drops it",
+  },
+  "horizontal-only-ok": {
+    severity: "info",
+    reason: "vertical root delta is small enough for horizontal-only normalization",
+  },
+  "source-space-kept": {
+    severity: "warn",
+    reason: "source and target root heights differ; keep mode may import source avatar scale",
+  },
+  "keep-ok": {
+    severity: "info",
+    reason: "source and target root heights are close enough for keep mode",
+  },
+  "consider-scale-to-model": {
+    severity: "warn",
+    reason: "source and target root heights differ and the clip has meaningful vertical root motion; compare scale-to-model before accepting relative",
+  },
+  "relative-ok": {
+    severity: "info",
+    reason: "relative root motion avoids importing source avatar height while preserving the clip delta",
+  },
+});
+const ROOT_TRANSLATION_CANDIDATE_DETAILS = Object.freeze({
+  "root-scale-to-model": {
+    kind: "root-translation-mode",
+    status: "runnable",
+    automatic: true,
+    rootTranslationMode: "scale-to-model",
+    reason: "source and target root heights differ while vertical root motion is significant; run scale-to-model as a candidate and compare quality metrics",
+  },
+  "root-relative": {
+    kind: "root-translation-mode",
+    status: "runnable",
+    automatic: true,
+    rootTranslationMode: "relative",
+    reason: "horizontal-only mode drops meaningful vertical motion; run relative root motion as a candidate",
+  },
+});
 const ARM_REST_MOTION_GATE_DEG = 60;
-const HEIGHT_SCALE_DELTA_THRESHOLD = 0.2;
-const VERTICAL_ROOT_MOTION_SCALE_THRESHOLD = 0.08;
 
 main().catch((error) => {
   console.error(error instanceof Error ? error.message : error);

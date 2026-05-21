@@ -247,6 +247,17 @@ Observed shape:
 - candidate selection summary: 2 runnable candidate groups were compared.
   `arm-rest-pose-offset` is now `needs-policy` with one improved sample;
   `root-scale-to-model` remains rejected as a `Jump` tradeoff
+- MoonBit core slice: the arm-rest motion gate, root-translation
+  recommendation/candidate selection, pose mismatch warning-id selection, and
+  pose normalization candidate spec selection, plus candidate selection
+  recommendation now have tested MoonBit implementations in `motion-core`.
+  `motion-core-cli` builds to JS and can be executed directly with `node`, with
+  `check-motion-core-parity` pinning the current command decisions.
+  `apply-motion-ir` and `select-motion-normalization-candidates` now call the
+  generated JS through `motion-core-runtime`, keeping policy logic small and
+  portable while JS remains responsible for GLB/JSON file orchestration.
+  `apply-motion-ir` keeps audit-facing severity/reason text in explicit detail
+  maps keyed by the MoonBit ids/specs
 - retarget profile: `robot-voxel` (`simple-rig` is an alias)
 - quality verdict: `pass`
 - retarget weighted score: 1.0, penalty 0

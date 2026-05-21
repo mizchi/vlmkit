@@ -79,6 +79,16 @@ The concrete scenario used a voxel robot and real `.vrma` motion samples from
   comparisons and emits a selection report. After motion gating, it reports
   `arm-rest-pose-offset` as `needs-policy` and keeps `root-scale-to-model`
   rejected.
+- A first MoonBit `motion-core` package now ports the pure policy slice:
+  arm-rest motion gate status, arm-rest candidate status, root-translation
+  recommendation/candidate selection, pose mismatch warning-id selection, and
+  pose normalization candidate spec selection, plus group-level candidate
+  selection. A thin `motion-core-cli` entrypoint builds to JS and preserves the
+  same command decisions under both `moon run` and direct `node` execution.
+  `check-motion-core-parity` pins the generated JS command decisions for the
+  current fixtures. `motion-core-runtime` now lets the JS orchestration scripts
+  call those generated decisions while JS still performs GLB/JSON orchestration
+  and audit detail mapping.
 - The dry-run VLM review scaffold can create a contact sheet and strict JSON
   prompt for cheap reviewers such as UI-TARS / Nova Lite without adding a
   blocking human step.

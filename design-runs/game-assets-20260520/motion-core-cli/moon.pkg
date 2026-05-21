@@ -1,0 +1,10 @@
+import {
+  "mizchi/vlmkit-game-assets/motion-core-cli-args" @cli_args,
+  "mizchi/vlmkit-game-assets/motion-core" @core,
+  "moonbitlang/core/env" @env,
+  "moonbitlang/core/string" @string,
+}
+
+options(
+  "is-main": true,
+)
