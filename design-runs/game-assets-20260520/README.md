@@ -247,7 +247,9 @@ shared tools now live in `tools/`:
   contracts; available as `pnpm run motion:kagura-handoff:game-assets`
 - `tools/check-kagura-runtime-smokes.mjs`: batch runner for Kagura runtime
   load/frame smoke across all local handoffs; available as
-  `pnpm run motion:kagura-runtime:game-assets`
+  `pnpm run motion:kagura-runtime:game-assets`. It writes ignored per-asset
+  runtime reports and an ignored batch summary at
+  `models/kagura-runtime-batch.kagura-runtime-smoke.json`.
 - `tools/run-kagura-runtime-smoke.mjs`: experimental Kagura `gltf_viewer`
   runtime probe. It serves the handoff GLB to local `mizchi/kagura`, opens the
   viewer with Playwright/WebGPU flags, and checks for non-empty canvas output.
@@ -427,7 +429,9 @@ node design-runs/game-assets-20260520/tools/run-kagura-runtime-smoke.mjs \
 Current robot runtime smoke status: load pass, frame-signal pass,
 frame-substance pass via `webgpu-readback`, with `visiblePixelRatio` around
 0.64. Runtime smoke JSON is local-only because frame timing and readback ids are
-expected to vary per run.
+expected to vary per run. Current batch dogfood status is 3/3 pass:
+`goblin-club-blockout` around 0.66, `goblin-voxel` around 0.69, and
+`robot-voxel-motion` around 0.64 visible-pixel ratio.
 
 For headless-environment debugging, pass a known Kagura asset as a separate
 contract with `--calibration-contract`. If both target and calibration fail, the

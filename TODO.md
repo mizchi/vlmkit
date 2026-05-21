@@ -1131,7 +1131,9 @@ Current smoke status:
   smoke against all local handoff contracts, writes local-only
   `*.kagura-runtime-smoke.json` reports, and summarizes pass /
   environment-failed / asset-failed / target-failed counts. Current local
-  batch status is 3/3 pass.
+  batch status is 3/3 pass. The batch also writes a local-only summary JSON with
+  per-asset outcome, frame source, visible-pixel ratio, warning count, and
+  failure count for autonomous follow-up decisions.
 
 Stepwise cleanup:
 

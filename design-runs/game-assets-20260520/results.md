@@ -393,7 +393,10 @@ Learned:
   per contract, writes ignored local reports next to each handoff, and prints
   pass / environment-failed / asset-failed / target-failed counts. Current
   batch status is 3/3 pass for `goblin-club-blockout`, `goblin-voxel`, and
-  `robot-voxel-motion`.
+  `robot-voxel-motion`. Dogfooding showed stdout alone is not enough for an
+  autonomous loop, so the batch now also writes
+  `models/kagura-runtime-batch.kagura-runtime-smoke.json` with per-asset
+  outcome and frame metrics.
 - Published Moon package integration needs a separate compile-time smoke from
   browser runtime smoke. The first `mizchi/kagura` facade was technically
   importable but not useful from a consumer without touching `kagura_core`
