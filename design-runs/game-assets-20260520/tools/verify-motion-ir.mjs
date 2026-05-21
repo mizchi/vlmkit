@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
-import { decodeGlb, verifyMotionIr } from "../../../packages/vlmkit-core/src/game-asset-motion.ts";
+import { decodeGlb, verifyMotionIr } from "./game-asset-motion-core.mjs";
 
 const repoRoot = resolve(new URL("../../..", import.meta.url).pathname);
 

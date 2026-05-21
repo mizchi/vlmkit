@@ -3,7 +3,7 @@ import {
   createPosePlaybackStatus,
   sampleGltfClipPose,
   sampleGltfClipPoseFromGlb,
-} from "../../../packages/vlmkit-core/src/game-asset-motion.ts";
+} from "./game-asset-motion-core.mjs";
 import { motionCorePolicy } from "./motion-core-runtime.mjs";
 
 export {

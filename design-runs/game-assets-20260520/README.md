@@ -250,12 +250,15 @@ shared tools now live in `tools/`:
   `pnpm run motion:kagura-runtime:game-assets`. It writes ignored per-asset
   runtime reports and an ignored batch summary at
   `models/kagura-runtime-batch.kagura-runtime-smoke.json`.
-- `tools/check-game-asset-motion-core.mjs`: package-level dogfood smoke for
-  the promoted `@mizchi/vlmkit-core` game-asset motion APIs. It checks the
-  FBX/Mixamo -> GLB -> Motion IR adapter decision, verifies the robot Motion
-  IR fixture against the model, samples a roundtrip GLB clip pose, and runs the
-  clip/pose playback gates without launching a browser. Available as
-  `pnpm run motion:core-smoke:game-assets`.
+- `tools/game-asset-motion-core.mjs`: single JS owner for dogfood-only
+  game-asset motion helpers that are not yet worth a package or MoonBit
+  boundary: FBX/GLB/VRMA source decisions, Motion IR verification, GLB clip
+  pose sampling, and runtime clip/pose playback gates.
+- `tools/check-game-asset-motion-core.mjs`: dogfood smoke for that helper. It
+  checks the FBX/Mixamo -> GLB -> Motion IR adapter decision, verifies the
+  robot Motion IR fixture against the model, samples a roundtrip GLB clip pose,
+  and runs the clip/pose playback gates without launching a browser. Available
+  as `pnpm run motion:core-smoke:game-assets`.
 - `tools/run-kagura-runtime-smoke.mjs`: experimental Kagura `gltf_viewer`
   runtime probe. It serves the handoff GLB to local `mizchi/kagura`, opens the
   viewer with Playwright/WebGPU flags, and checks for non-empty canvas output.

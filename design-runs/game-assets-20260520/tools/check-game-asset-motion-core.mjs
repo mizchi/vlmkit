@@ -9,7 +9,7 @@ import {
   decideMotionSourceAdapter,
   sampleGltfClipPoseFromGlb,
   verifyMotionIr,
-} from "../../../packages/vlmkit-core/src/game-asset-motion.ts";
+} from "./game-asset-motion-core.mjs";
 
 const repoRoot = resolve(new URL("../../..", import.meta.url).pathname);
 const robotDir = resolve(repoRoot, "design-runs/game-assets-20260520/models/robot-voxel-motion");

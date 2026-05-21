@@ -1135,9 +1135,9 @@ Current smoke status:
   batch status is 3/3 pass. The batch also writes a local-only summary JSON with
   per-asset outcome, frame source, visible-pixel ratio, warning count, and
   failure count for autonomous follow-up decisions.
-- [x] Promoted core API dogfood smoke:
-  `pnpm run motion:core-smoke:game-assets` exercises the
-  `@mizchi/vlmkit-core` game-asset motion surface against real robot fixtures:
+- [x] Game-asset motion dogfood smoke:
+  `pnpm run motion:core-smoke:game-assets` exercises the single
+  `design-runs` game-asset motion helper against real robot fixtures:
   FBX/Mixamo adapter decision, VRMA/GLB/Motion IR adapter decisions, Motion IR
   retarget verification, GLB clip-pose sampling, and clip/pose playback gates.
   Current local status is pass with `vrma_alert_wave`, 2 verified clips, 6
@@ -1267,17 +1267,18 @@ Stepwise cleanup:
 - [x] **G8. Mixamo / FBX adapter decision.** FBX/Mixamo is now treated as
   `requires-conversion`: convert to GLB with an external tool such as Blender
   or FBX2glTF, then run the same GLB -> Motion IR extraction path. Direct FBX
-  parsing stays out of core because FBX is tool-version dependent; the package
-  API records this through
+  parsing stays out of reusable core because FBX is tool-version dependent; the
+  dogfood helper records this through
   `decideMotionSourceAdapter(...).strategy === "convert-to-glb-first"`.
-- [x] **G9. Promote stable pieces out of `design-runs`.** The first stable
-  game-asset slice now lives in `@mizchi/vlmkit-core`:
-  Motion IR schema/retarget verification, FBX/GLB/VRMA source adapter
-  decisions, GLB clip-pose sampling, and Kagura runtime clip/pose gates.
-  `verify-motion-ir.mjs` and `kagura-runtime-smoke-utils.mjs` now delegate to
-  the package code; generated assets remain design-run fixtures, and heavier
-  renderer/browser orchestration stays in `design-runs` until more rigs and
-  fixtures prove it stable.
+- [x] **G9. Avoid TypeScript double maintenance.** The temporary
+  `@mizchi/vlmkit-core` TypeScript game-asset motion API was removed. Until
+  this surface is worth a MoonBit package boundary, the single owner is
+  `tools/game-asset-motion-core.mjs`: Motion IR schema/retarget verification,
+  FBX/GLB/VRMA source adapter decisions, GLB clip-pose sampling, and Kagura
+  runtime clip/pose gates. `verify-motion-ir.mjs`,
+  `kagura-runtime-smoke-utils.mjs`, and the dogfood smoke delegate to that one
+  module. MoonBit continues to own policy decisions; JS keeps renderer/browser
+  orchestration and file I/O.
 
 ### Spec coverage
 - [ ] Heading hierarchy validation
