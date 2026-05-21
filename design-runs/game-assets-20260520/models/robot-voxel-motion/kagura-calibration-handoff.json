@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "engine": "mizchi/kagura",
+  "asset": {
+    "id": "robot-voxel-motion-roundtrip-calibration",
+    "kind": "known-good-runtime-calibration",
+    "primaryModel": "derived/robot-voxel-motion.extracted-roundtrip.glb",
+    "originPolicy": "feet-near-y0-center-xz",
+    "coordinateNotes": "Y-up. Front direction is +Z in the generated model.",
+    "intendedUse": [
+      "known-good Kagura runtime calibration",
+      "animated GLB load/play/pose smoke baseline"
+    ]
+  },
+  "kaguraHandoff": {
+    "runtimeFormat": "glb",
+    "modelPath": "derived/robot-voxel-motion.extracted-roundtrip.glb",
+    "worldScale": 1,
+    "origin": {
+      "policy": "feet-near-y0-center-xz",
+      "translation": [0, 0, 0]
+    },
+    "axes": {
+      "up": "+Y",
+      "front": "+Z"
+    },
+    "fixedCameraViews": [
+      "iso"
+    ],
+    "animationClips": [
+      "vrma_alert_wave",
+      "mixamo_walk_standin"
+    ],
+    "snapshotVerification": "derived/robot-voxel-motion.extracted-roundtrip.render-verify.json"
+  },
+  "motionContract": {
+    "primaryRuntimeFormat": "glb",
+    "motionIr": {
+      "format": "vlmkit-humanoid-motion-ir",
+      "version": 1,
+      "source": "derived/robot-voxel-motion.vrma-bridge.extracted.motion.json",
+      "retargetPolicy": "roundtrip GLB generated from extracted Motion IR"
+    },
+    "clips": [
+      {
+        "id": "vrma_alert_wave",
+        "durationSeconds": 1.6,
+        "type": "loop",
+        "purpose": "known-good upper-body runtime animation calibration"
+      },
+      {
+        "id": "mixamo_walk_standin",
+        "durationSeconds": 1,
+        "type": "loop",
+        "purpose": "known-good gait runtime animation calibration"
+      }
+    ],
+    "requiredNodes": [
+      "pelvis",
+      "torso",
+      "head",
+      "right_upper_arm",
+      "right_forearm",
+      "left_upper_arm",
+      "left_upper_leg",
+      "right_upper_leg",
+      "left_lower_leg",
+      "right_lower_leg"
+    ]
+  },
+  "renderChecks": {
+    "renderer": "three-playwright-animation",
+    "views": [
+      "iso"
+    ],
+    "sampledClips": [
+      "vrma_alert_wave"
+    ],
+    "structureVerification": "derived/robot-voxel-motion.extracted-roundtrip.verify.json",
+    "renderVerification": "derived/robot-voxel-motion.extracted-roundtrip.render-verify.json",
+    "acceptance": {
+      "minForegroundRatio": 0.03,
+      "requiresFiniteAnimatedBounds": true,
+      "requiresLoopClosure": true
+    }
+  }
+}

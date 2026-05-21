@@ -1,6 +1,10 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
+import {
+  createSampleSetChecks,
+  summarizeGoldCoverage,
+} from "./motion-quality-gold-utils.mjs";
 
 const repoRoot = resolve(new URL("../../..", import.meta.url).pathname);
 
@@ -51,6 +55,7 @@ async function main() {
   checkEqual(checks, "min-quality", report.minQuality, gold.report?.minQuality);
   checkEqual(checks, "retarget-profile", report.retargetProfile, gold.report?.retargetProfile);
   checkEqual(checks, "root-translation-mode", report.rootTranslationMode, gold.report?.rootTranslationMode);
+  checks.push(...createSampleSetChecks(report, gold));
 
   const samplesByName = new Map((report.samples ?? []).map((sample) => [sample.sample, sample]));
   for (const [sampleName, expected] of Object.entries(gold.samples ?? {})) {
@@ -158,6 +163,7 @@ async function main() {
       report: relative(repoRoot, args.report),
       gold: relative(repoRoot, args.gold),
     },
+    summary: summarizeGoldCoverage(report, gold, checks),
     checks,
   };
   await writeFile(args.out, `${JSON.stringify(result, null, 2)}\n`);

@@ -9,6 +9,9 @@ import { PNG } from "pngjs";
 import { chromium } from "playwright";
 import {
   classifyRuntimeOutcome,
+  createClipPlaybackStatus,
+  createPosePlaybackStatus,
+  sampleGltfClipPoseFromGlb,
   sanitizeServerLogLine,
   shouldFailProcess,
 } from "./kagura-runtime-smoke-utils.mjs";
@@ -141,6 +144,7 @@ export async function runKaguraRuntimeSmoke(args) {
   const consoleMessages = [];
   const pageErrors = [];
   try {
+    const modelBuffer = await readFile(modelPath);
     assetServer = await startAssetServer(modelPath);
     kaguraProc = startKaguraDevServer(args.kaguraRepo, args.port, serverLogs);
     const baseUrl = `http://127.0.0.1:${args.port}/`;
@@ -171,6 +175,16 @@ export async function runKaguraRuntimeSmoke(args) {
     const frameSignal = await waitForFrameSignal(page, Math.min(5_000, args.timeoutMs));
     await waitForAnimationFrames(page, 2);
     const readback = await waitForRuntimeReadback(page, Math.min(5_000, args.timeoutMs));
+    const runtimeState = await readClipPlaybackState(page);
+    const clipPlayback = createClipPlaybackStatus(handoff.animationClips ?? [], runtimeState);
+    const expectedPose = clipPlayback.status === "verified"
+      ? sampleGltfClipPoseFromGlb(modelBuffer, clipPlayback.playedClip, clipPlayback.timeSeconds ?? 0)
+      : null;
+    const posePlayback = createPosePlaybackStatus({
+      clipPlayback,
+      runtimeState,
+      expectedPose,
+    });
     const canvasInfo = await page.locator("#app").evaluate((canvas) => ({
       tagName: canvas.tagName,
       width: canvas.width,
@@ -230,10 +244,47 @@ export async function runKaguraRuntimeSmoke(args) {
         reason: `canvas is too dark/empty: visiblePixelRatio=${round(frame.visiblePixelRatio)}`,
       });
     }
-    if ((handoff.animationClips ?? []).length > 0) {
+    checks.push({
+      id: "runtime-clip-playback",
+      status: clipPlayback.status === "verified"
+        ? "pass"
+        : clipPlayback.status === "not-applicable"
+          ? "info"
+          : clipPlayback.status === "pending-viewer-support"
+            ? "info"
+            : "fail",
+      clipPlayback,
+    });
+    checks.push({
+      id: "runtime-pose-playback",
+      status: posePlayback.status === "verified"
+        ? "pass"
+        : posePlayback.status === "not-applicable" || posePlayback.status === "pending-viewer-support"
+          ? "info"
+          : "fail",
+      posePlayback,
+    });
+    if (clipPlayback.status === "pending-viewer-support") {
       warnings.push({
         path: "kaguraHandoff.animationClips",
-        reason: "Kagura gltf_viewer load/render smoke does not expose clip playback yet",
+        reason: clipPlayback.reason,
+      });
+    } else if (["missing-clips", "unexpected-clip", "available-not-playing"].includes(clipPlayback.status)) {
+      failures.push({
+        path: "runtime.clipPlayback",
+        reason: clipPlayback.reason,
+      });
+    }
+    if (posePlayback.status === "pending-viewer-support") {
+      warnings.push({
+        path: "runtime.posePlayback",
+        reason: posePlayback.reason,
+      });
+    } else if (["missing-node-transform", "mismatch"].includes(posePlayback.status)) {
+      failures.push({
+        path: "runtime.posePlayback",
+        reason: posePlayback.reason,
+        mismatches: posePlayback.mismatches,
       });
     }
   } catch (error) {
@@ -283,7 +334,17 @@ function buildReport(args, contract, checks, warnings, failures) {
       example: "gltf_viewer",
       model: handoff?.modelPath ?? null,
       animationClips: handoff?.animationClips ?? [],
-      clipPlayback: (handoff?.animationClips ?? []).length > 0 ? "pending-viewer-support" : "not-applicable",
+      clipPlayback: clipPlaybackFromChecks(checks) ??
+        createClipPlaybackStatus(handoff?.animationClips ?? [], null),
+      posePlayback: posePlaybackFromChecks(checks) ?? {
+        status: "not-applicable",
+        clip: null,
+        timeSeconds: null,
+        comparedNodeCount: 0,
+        maxDelta: null,
+        mismatches: [],
+        reason: "runtime pose playback was not checked",
+      },
     },
     checks,
     warnings,
@@ -416,6 +477,51 @@ async function waitForRuntimeReadback(page, timeoutMs) {
 
 async function readRuntimeReadback(page) {
   return page.evaluate(() => globalThis.__kaguraVrtLastReadback ?? null);
+}
+
+async function readClipPlaybackState(page) {
+  return page.evaluate(() => {
+    const tupleOrUndefined = (value, size) => {
+      if (!Array.isArray(value) || value.length !== size) return undefined;
+      const tuple = value.map((item) => Number(item));
+      return tuple.every(Number.isFinite) ? tuple : undefined;
+    };
+    const candidates = [
+      globalThis.__kaguraRuntimeClipPlayback,
+      globalThis.__kaguraGltfViewerAnimation,
+      globalThis.__kaguraGltfViewer?.animation,
+      globalThis.__kaguraGltfViewer?.clipPlayback,
+    ];
+    for (const candidate of candidates) {
+      if (candidate && typeof candidate === "object") return {
+        clips: Array.isArray(candidate.clips) ? candidate.clips : undefined,
+        clipIds: Array.isArray(candidate.clipIds) ? candidate.clipIds : undefined,
+        availableClips: Array.isArray(candidate.availableClips) ? candidate.availableClips : undefined,
+        currentClip: candidate.currentClip ?? candidate.playedClip ?? candidate.clip ?? undefined,
+        playedClip: candidate.playedClip ?? undefined,
+        clip: candidate.clip ?? undefined,
+        playing: candidate.playing,
+        timeSeconds: Number(candidate.timeSeconds ?? candidate.time ?? candidate.currentTime),
+        nodeTransforms: Array.isArray(candidate.nodeTransforms)
+          ? candidate.nodeTransforms.map((node) => ({
+              nodeIndex: Number(node?.nodeIndex),
+              translation: tupleOrUndefined(node?.translation, 3),
+              rotation: tupleOrUndefined(node?.rotation, 4),
+              scale: tupleOrUndefined(node?.scale, 3),
+            })).filter((node) => Number.isInteger(node.nodeIndex))
+          : undefined,
+      };
+    }
+    return null;
+  });
+}
+
+function clipPlaybackFromChecks(checks) {
+  return checks.find((check) => check.id === "runtime-clip-playback")?.clipPlayback ?? null;
+}
+
+function posePlaybackFromChecks(checks) {
+  return checks.find((check) => check.id === "runtime-pose-playback")?.posePlayback ?? null;
 }
 
 async function waitForAnimationFrames(page, count) {

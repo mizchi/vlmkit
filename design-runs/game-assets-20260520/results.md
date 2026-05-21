@@ -197,7 +197,9 @@ Checks:
   `Goodbye`, and `Jump` as a batch with the `robot-voxel` profile
 - `verify-motion-quality.mjs --retarget-profile robot-voxel`: emitted structured `pass` reports instead of requiring human visual review
 - `verify-motion-quality-gold.mjs`: verified the smoke report against
-  `motions/external-vrma-quality-gold.json` (34 checks)
+  `motions/external-vrma-quality-gold.json` (173 checks), including exact
+  calibrated sample-set matching so uncalibrated new samples cannot silently
+  pass the gold gate
 - `review-motion-with-vlm.mjs --dry-run`: generated contact sheets and strict-JSON reviewer prompts for UI-TARS / Nova Lite without API spend
 
 Observed shape:
@@ -255,7 +257,9 @@ Observed shape:
   `stance-width-adapter` = `missing-comparison` until all runnable samples have
   comparison reports. Non-automatic candidates now become `promotable` only
   with at least 3 compared samples, at least 2 improvements, and no regressions
-  or tradeoffs.
+  or tradeoffs. The selection report now also emits `readiness`: current local
+  data has 0 default-change-ready groups, 3 groups still needing more samples,
+  and no blocked default changes beyond those missing comparison thresholds.
 - MoonBit core slice: the arm-rest motion gate, root-translation
   recommendation/candidate selection, pose mismatch warning-id selection, and
   pose normalization candidate spec selection, plus candidate selection
@@ -284,9 +288,21 @@ Observed shape:
   readback fix, the robot handoff passes runtime load, frame-signal, and
   frame-substance checks via `webgpu-readback` with `visiblePixelRatio` around
   0.64. This upgrades the runtime smoke from "environment blocker" to a useful
-  local gate for at least the robot handoff. Clip playback is still only
-  reported as pending viewer support.
+  local gate for at least the robot handoff. Runtime reports now include a
+  structured `runtime.clipPlayback` object. Current status for the robot is
+  `verified`: requested clips are `idle_bob`, `walk_cycle`, and `wave`,
+  Kagura `gltf_viewer` exposes all three as playable, and the smoke observed
+  `playedClip=walk_cycle` with `playing=true`. Runtime reports also include
+  `runtime.posePlayback`: vlmkit samples the same GLB clip at Kagura's reported
+  time and compares node transforms. The robot currently verifies 13 animated
+  nodes with `maxDelta` around 0.000004. The batch summary carries
+  requested/playable/missing clip counts and pose mismatch counts, so future
+  viewer regressions fail mechanically instead of becoming prose-only warnings.
 - retarget profile: `robot-voxel` (`simple-rig` is an alias)
+- retarget calibration fixture: `motions/retarget-profile-calibration.json`
+  pins 4 synthetic downgrade cases for tolerated fingers/toes/upper-body
+  fallbacks, unexpected soft penalties, core hard failures, and the
+  `simple-rig` alias
 - quality verdict: `pass`
 - retarget weighted score: 1.0, penalty 0
 - skipped-by-policy: 30 finger ignored, 4 upper-body fallback, 2 toe ignored
@@ -296,6 +312,12 @@ Observed shape:
   `Goodbye` -0.004..0.007, `Jump` 0.004..0.118
 - tracked node max displacement: `LookAround` 0.991, `Goodbye` 1.012,
   `Jump` 1.104; pelvis stays under 0.183 across the batch
+- VRM/VRMA playback contract check: local fixture mode passes with one warning
+  because the voxel robot is not a real VRM target. The same checker passes
+  against the downloaded tk256ailab `VRM/sample.vrm` + `VRMA/LookAround.vrma`
+  pair with 54 VRM humanoid bones, 51 VRMA humanoid bones, 1 extracted clip,
+  and 16 extracted tracks. The checker supports both VRM 1.0 `VRMC_vrm` and
+  VRM 0.x `VRM` humanoid extension shapes.
 
 Learned:
 
@@ -341,6 +363,12 @@ Learned:
 - The first calibration fixture now pins realistic ranges for the three
   external VRMA samples. This lets later threshold changes fail mechanically
   before relying on visual inspection.
+- Gold verification should check the sample set, not just known sample values.
+  If a smoke report adds `SpinKick` or drops `Jump`, the gate now fails before
+  a new motion can ride along under an unrelated calibration range.
+- Retarget downgrade policy needs its own fixture, separate from quality-gold
+  metrics. Synthetic cases make it obvious when a profile change starts
+  accepting skipped core bones or rejecting harmless fingers/toes.
 - Root translation should default to relative motion for generated simplified
   characters. Copying source hips translation directly mixes the source
   avatar's body height into the target pelvis.
@@ -359,6 +387,9 @@ Learned:
 - `plan-motion-normalization-candidates.mjs` is now the orchestration boundary:
   runnable candidates get concrete smoke/compare commands, while pose candidates
   stay blocked until their normalization implementation exists.
+- Candidate selection needs an explicit default-change readiness layer. A
+  candidate can be `promotable` in policy terms but still not safe to make a
+  default until enough independent samples have clean comparison reports.
 - Target bind metrics make the scale decision less pelvis-only. The current
   audit now knows the simplified rig's skeleton height and limb spans before
   any candidate render, so future policy can compare source rest pose against
@@ -378,6 +409,17 @@ Learned:
 - VLM review should consume the deterministic quality report and contact sheet.
   It should not be a blocking human proxy; it is a cheap second opinion for
   suspicious `warn` cases.
+- G6 should stay separate from Kagura clip playback. The useful pre-runtime
+  check is: VRM has humanoid bones, VRMA has humanoid animation bones, the
+  extractor emits humanoid Motion IR with matching bone metadata, required clips
+  and required bones have tracks, and the derived render verification passes.
+  Engine sampled-transform comparison still belongs to the Kagura runtime path.
+- G7 now has a clear runtime boundary: `gltf_viewer` load/frame checks can pass
+  independently from clip playback. Clip playback is no longer a loose warning
+  string; Kagura now exposes `globalThis.__kaguraRuntimeClipPlayback` with
+  `clips`, `currentClip`, `playing`, `timeSeconds`, and node transform
+  snapshots. vlmkit verifies both active clip playback and sampled transform
+  parity through the same runtime smoke report.
 - Kagura integration should keep a pre-runtime contract gate separate from the
   runtime load/play gate. The former catches broken paths, missing clips, origin
   drift, and absent fixed-camera snapshots without adding an engine dependency;
@@ -390,8 +432,9 @@ Learned:
   separate even though the current robot smoke passes; this prevents a future
   submitted-but-empty frame from being treated as an asset import success.
 - Always calibrate runtime probes against a known-good engine asset before
-  blaming a generated asset. The current robot handoff passes, but calibration
-  remains necessary before promoting this into a CI gate.
+  blaming a generated asset. `kagura-calibration-handoff.json` now uses the
+  roundtrip GLB as a known-good animated runtime calibration asset; its clip
+  playback and pose playback both verify locally.
 - `run-kagura-runtime-smoke.mjs --calibration-contract <known-good>` now makes
   that calibration mechanical. If both target and calibration fail, the report
   sets `environmentLikelyBroken: true` so the autonomous loop does not spend
@@ -401,7 +444,10 @@ Learned:
   `--allow-environment-failure` can soft-pass that state while still failing
   `asset-failed` when calibration succeeds.
 - Runtime smoke is now batch-runnable through
-  `pnpm run motion:kagura-runtime:game-assets`. The batch uses separate ports
+  `pnpm run motion:kagura-runtime:game-assets`. A calibrated variant is
+  available as `pnpm run motion:kagura-runtime-calibrated:game-assets`, which
+  runs each target against the known-good roundtrip calibration contract. The
+  batch uses separate ports
   per contract, writes ignored local reports next to each handoff, and prints
   pass / environment-failed / asset-failed / target-failed counts. Current
   batch status is 3/3 pass for `goblin-club-blockout`, `goblin-voxel`, and

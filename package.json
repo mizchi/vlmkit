@@ -52,9 +52,13 @@
     "moon:test:game-assets": "moon -C design-runs/game-assets-20260520 test motion-core && moon -C design-runs/game-assets-20260520 test motion-core-cli-args && moon -C design-runs/game-assets-20260520 test motion-kagura-bridge && moon -C design-runs/game-assets-20260520 check motion-core-cli",
     "moon:build:game-assets": "moon -C design-runs/game-assets-20260520 build motion-core motion-core-cli-args motion-kagura-bridge motion-core-cli --target js",
     "moon:parity:game-assets": "node design-runs/game-assets-20260520/tools/check-motion-core-parity.mjs",
+    "motion:policy-utils:game-assets": "node --test design-runs/game-assets-20260520/tools/motion-quality-gold-utils.test.mjs design-runs/game-assets-20260520/tools/retarget-profile-calibration-utils.test.mjs design-runs/game-assets-20260520/tools/motion-normalization-selection-utils.test.mjs design-runs/game-assets-20260520/tools/vrm-vrma-playback-contract-utils.test.mjs",
     "motion:retarget-profiles:game-assets": "node design-runs/game-assets-20260520/tools/check-retarget-profiles.mjs",
+    "motion:retarget-calibration:game-assets": "node design-runs/game-assets-20260520/tools/check-retarget-profile-calibration.mjs",
+    "motion:vrm-vrma-contract:game-assets": "node design-runs/game-assets-20260520/tools/verify-vrm-vrma-playback-contract.mjs --vrm design-runs/game-assets-20260520/models/robot-voxel-motion/robot-voxel-motion.glb --vrma design-runs/game-assets-20260520/models/robot-voxel-motion/derived/robot-voxel-motion.vrma-bridge.fixture.vrma --motion design-runs/game-assets-20260520/models/robot-voxel-motion/derived/robot-voxel-motion.fixture-vrma.extracted.motion.json --render-verify design-runs/game-assets-20260520/models/robot-voxel-motion/derived/robot-voxel-motion.fixture-vrma.roundtrip.render-verify.json --required-bones hips,head --required-clips vrma_alert_wave --allow-non-vrm-target",
     "motion:kagura-handoff:game-assets": "node design-runs/game-assets-20260520/tools/check-kagura-handoffs.mjs",
     "motion:kagura-runtime:game-assets": "node design-runs/game-assets-20260520/tools/check-kagura-runtime-smokes.mjs",
+    "motion:kagura-runtime-calibrated:game-assets": "node design-runs/game-assets-20260520/tools/check-kagura-runtime-smokes.mjs --calibration-contract design-runs/game-assets-20260520/models/robot-voxel-motion/kagura-calibration-handoff.json",
     "motion:kagura-runtime-utils:game-assets": "node --test design-runs/game-assets-20260520/tools/kagura-runtime-smoke-utils.test.mjs design-runs/game-assets-20260520/tools/kagura-runtime-batch-utils.test.mjs",
     "vrt": "playwright test",
     "vrt:update": "playwright test --update-snapshots"

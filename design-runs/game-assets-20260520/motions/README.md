@@ -105,8 +105,41 @@ Local-only third-party sample fetch:
 
 ```bash
 node design-runs/game-assets-20260520/tools/fetch-external-vrma-sample.mjs \
-  --sample LookAround
+  --sample LookAround \
+  --include-vrm
 ```
 
-The downloaded `.vrma`, license, extracted IR, roundtrip GLB, and renders stay
-under ignored `design-runs/game-assets-20260520/external/`.
+The downloaded `.vrma`, optional `sample.vrm`, license, extracted IR, roundtrip
+GLB, and renders stay under ignored
+`design-runs/game-assets-20260520/external/`.
+
+Quality-gold verification for the current external smoke set:
+
+```bash
+node design-runs/game-assets-20260520/tools/verify-motion-quality-gold.mjs \
+  --report design-runs/game-assets-20260520/external/vrma/tk256ailab/smoke-report.json \
+  --gold design-runs/game-assets-20260520/motions/external-vrma-quality-gold.json
+```
+
+The verifier checks both the exact calibrated sample set and per-sample metric
+ranges. Retarget downgrade policy has a separate synthetic calibration fixture:
+
+```bash
+pnpm run motion:retarget-calibration:game-assets
+```
+
+VRM/VRMA playback contract verification:
+
+```bash
+node design-runs/game-assets-20260520/tools/verify-vrm-vrma-playback-contract.mjs \
+  --vrm design-runs/game-assets-20260520/external/vrma/tk256ailab/sample.vrm \
+  --vrma design-runs/game-assets-20260520/external/vrma/tk256ailab/LookAround.vrma \
+  --motion design-runs/game-assets-20260520/external/vrma/tk256ailab/LookAround.extracted.motion.json \
+  --render-verify design-runs/game-assets-20260520/external/vrma/tk256ailab/LookAround.robot-roundtrip.render-verify.json \
+  --required-bones hips,head,leftFoot,rightFoot \
+  --required-clips LookAround
+```
+
+This check supports VRM 1.0 `VRMC_vrm`, VRM 0.x `VRM`, and VRMA
+`VRMC_vrm_animation` humanoid mappings. It is a pre-runtime contract gate; real
+engine clip playback remains in the Kagura smoke path.

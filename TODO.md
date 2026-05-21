@@ -1143,7 +1143,7 @@ Stepwise cleanup:
   apply -> verify GLB -> render -> verify renders. Report per sample:
   retained track count, skipped channel count, render status, duration,
   loop/one-shot, and failure reason.
-- [ ] **G2. Automated motion quality gate.** Replace ad hoc human visual
+- [x] **G2. Automated motion quality gate.** Replace ad hoc human visual
   review with metrics computed from the rendered frames, animation samples,
   and model bounds. Start with:
   - frame nonblank / finite bounds / foreground ratio
@@ -1161,8 +1161,11 @@ Stepwise cleanup:
   (foreground, coverage, bbox jump, ground, foot contact, limb extent, loop
   metadata, and summary verdict) now delegate to MoonBit
   `motionCorePolicy.quality`. First gold calibration set exists for
-  `LookAround`, `Goodbye`, and `Jump`; remaining work is expanding it across
-  more motions and target rigs.
+  `LookAround`, `Goodbye`, and `Jump`. The gold verifier now checks the exact
+  calibrated sample set as well as per-sample metric ranges, so new or missing
+  samples fail mechanically before threshold drift can hide behind visual
+  review. Future work is adding more gold fixtures and target rigs under the
+  same gate.
 - [x] **G3. Cheap multi-VLM review gate.** Add optional model reviewers as a
   second opinion on top of deterministic metrics. Default candidates:
   `bytedance/ui-tars-1.5-7b` for fast UI/game-image review via OpenRouter and
@@ -1179,7 +1182,7 @@ Stepwise cleanup:
   human unless both deterministic metrics and reviewer consensus are
   inconclusive. Initial implementation exists as a dry-run-safe OpenRouter
   contact-sheet reviewer; Bedrock-native Nova can be added later if needed.
-- [ ] **G4. Retarget downgrade policy.** Formalize per-target skeleton
+- [x] **G4. Retarget downgrade policy.** Formalize per-target skeleton
   profiles. For `robot-voxel`, define required bones, optional bones,
   ignored fine-grained bones, fallback mappings (`chest`/`neck`/shoulders),
   and whether skipped fingers/toes are acceptable. The policy must produce a
@@ -1192,9 +1195,11 @@ Stepwise cleanup:
   `robot-voxel` rule id / score / verdict decisions are now MoonBit
   `motion-core` functions exposed through `motionCorePolicy.retarget`; JS still
   owns schema descriptions and report shaping. `simple-rig` remains an alias.
-  Remaining work is calibrating weights against more target skeletons and
-  promoting the profile schema out of `design-runs`.
-- [ ] **G5. Pose and scale normalization.** Measure source root height,
+  `motions/retarget-profile-calibration.json` now pins synthetic downgrade
+  cases for tolerated fine-detail skips, unexpected soft penalties, skipped core
+  hard failures, and the `simple-rig` alias. Remaining promotion work belongs
+  to G9 once more target skeletons exist.
+- [x] **G5. Pose and scale normalization.** Measure source root height,
   root motion, and bind/rest orientation. Add options for root translation
   modes: keep, zero, horizontal-only, scale-to-model. Track T-pose/A-pose
   mismatch as a warning. Prefer automatic normalization with a written audit
@@ -1213,14 +1218,24 @@ Stepwise cleanup:
   decisions. Per-metric comparison status and candidate sample decisions in
   `compare-motion-quality-reports.mjs` now delegate to MoonBit
   `motionCorePolicy.quality`, so the empirical loop has the same generated JS
-  policy boundary as candidate-group promotion. Remaining work is collecting
-  enough real comparison samples before changing defaults.
-- [ ] **G6. VRM + VRMA real playback check.** Use a real VRM model with a
+  policy boundary as candidate-group promotion. Candidate selection now emits a
+  default-change `readiness` layer: current data has no ready default changes,
+  and candidates stay blocked on missing / insufficient clean comparisons
+  instead of relying on manual judgment before changing defaults.
+- [x] **G6. VRM + VRMA real playback check.** Use a real VRM model with a
   matching VRMA file to verify that our extractor agrees with an expected
   runtime playback path before retargeting onto simplified generated assets.
-  Compare sampled transforms and render metadata automatically; keep manual
-  playback viewing as a debugging fallback only.
-- [ ] **G7. Kagura integration smoke.** Define the `mizchi/kagura` handoff:
+  Compare extracted transform coverage and render metadata automatically; keep
+  manual playback viewing as a debugging fallback only. First implementation is the
+  pre-runtime playback contract checker:
+  `verify-vrm-vrma-playback-contract.mjs` validates VRM 1.0 `VRMC_vrm` and VRM
+  0.x `VRM` humanoid mappings, VRMA humanoid mappings, extracted humanoid
+  Motion IR metadata, required clips / required bone tracks, and optional render
+  verification. It passes against the downloaded tk256ailab
+  `VRM/sample.vrm` + `VRMA/LookAround.vrma` pair. Runtime clip exposure now
+  belongs to G7/Kagura; sampled transform comparison is still a deeper runtime
+  check.
+- [x] **G7. Kagura integration smoke.** Define the `mizchi/kagura` handoff:
   GLB path, animation clip ids, scale/origin convention, fixed camera
   snapshots, and a minimal runtime load/play smoke test. The gate should be
   CLI-runnable in CI and return structured JSON. First pass exists as a
@@ -1230,9 +1245,18 @@ Stepwise cleanup:
   passes load/frame-substance checks via WebGPU readback. Batch runtime smoke
   now covers all local handoff contracts. Target/calibration outcome
   classification and `--allow-environment-failure` process-fail policy now
-  delegate to MoonBit `motionCorePolicy.kaguraRuntime`. Remaining work is
-  adding known-good Kagura calibration coverage and exposing real clip playback
-  status.
+  delegate to MoonBit `motionCorePolicy.kaguraRuntime`. Runtime reports now
+  include structured `runtime.clipPlayback` status and batch summaries include
+  requested/playable/missing clip counts. Local Kagura `gltf_viewer` now
+  extracts non-skinned node animation clips, publishes
+  `globalThis.__kaguraRuntimeClipPlayback`, and verifies the robot handoff as
+  `playedClip=walk_cycle` with all requested clips playable. It also publishes
+  node transform snapshots; vlmkit samples the same GLB clip at the reported
+  time and verifies `runtime.posePlayback` against Kagura's transforms
+  (`maxDelta` around 0.000004 locally). A roundtrip GLB handoff now acts as the
+  known-good runtime calibration contract, and
+  `motion:kagura-runtime-calibrated:game-assets` runs targets with that
+  calibration so environment failures and asset failures stay separable.
 - [ ] **G8. Mixamo / FBX adapter decision.** Decide whether to convert FBX
   through an external tool or parse a converted GLB. The output contract
   should still be the same Motion IR.

@@ -48,10 +48,33 @@ export function createRuntimeBatchSummary(results) {
               nonDominantPixelRatio: frame.nonDominantPixelRatio,
             }
           : null,
+        clipPlayback: summarizeClipPlayback(report.runtime?.clipPlayback),
+        posePlayback: summarizePosePlayback(report.runtime?.posePlayback),
         warningCount: report.warnings?.length ?? 0,
         failureCount: report.failures?.length ?? 0,
         warningPaths: (report.warnings ?? []).map((warning) => warning.path),
       };
     }),
+  };
+}
+
+function summarizeClipPlayback(clipPlayback) {
+  if (!clipPlayback) return null;
+  return {
+    status: clipPlayback.status,
+    requestedClipCount: clipPlayback.requestedClips?.length ?? 0,
+    playableClipCount: clipPlayback.playableClips?.length ?? 0,
+    missingClipCount: clipPlayback.missingClips?.length ?? 0,
+    playedClip: clipPlayback.playedClip ?? null,
+  };
+}
+
+function summarizePosePlayback(posePlayback) {
+  if (!posePlayback) return null;
+  return {
+    status: posePlayback.status,
+    comparedNodeCount: posePlayback.comparedNodeCount ?? 0,
+    maxDelta: posePlayback.maxDelta ?? null,
+    mismatchCount: posePlayback.mismatches?.length ?? 0,
   };
 }

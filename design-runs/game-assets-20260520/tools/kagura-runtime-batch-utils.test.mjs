@@ -69,6 +69,21 @@ test("createRuntimeBatchSummary includes stable per-asset metrics", () => {
       ],
       warnings: [{ path: "kaguraHandoff.animationClips" }],
       failures: [],
+      runtime: {
+        clipPlayback: {
+          status: "pending-viewer-support",
+          requestedClips: ["idle_bob"],
+          playableClips: [],
+          missingClips: ["idle_bob"],
+          playedClip: null,
+        },
+        posePlayback: {
+          status: "pending-viewer-support",
+          comparedNodeCount: 0,
+          maxDelta: null,
+          mismatches: [],
+        },
+      },
     },
   ]);
   assert.deepEqual(summary, {
@@ -92,6 +107,19 @@ test("createRuntimeBatchSummary includes stable per-asset metrics", () => {
           source: "webgpu-readback",
           visiblePixelRatio: 0.6422,
           nonDominantPixelRatio: 0.6422,
+        },
+        clipPlayback: {
+          status: "pending-viewer-support",
+          requestedClipCount: 1,
+          playableClipCount: 0,
+          missingClipCount: 1,
+          playedClip: null,
+        },
+        posePlayback: {
+          status: "pending-viewer-support",
+          comparedNodeCount: 0,
+          maxDelta: null,
+          mismatchCount: 0,
         },
         warningCount: 1,
         failureCount: 0,

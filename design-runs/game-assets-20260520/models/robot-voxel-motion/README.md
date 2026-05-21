@@ -43,6 +43,8 @@ Generated files:
 - `kagura-handoff.json`: engine-facing contract sketch
 - `derived/robot-voxel-motion.vrma-bridge.glb`: GLB with imported stand-in
   external motion clips
+- `derived/vrm-vrma-playback-contract.verify.json`: fixture-mode VRM/VRMA
+  playback contract report for the local humanoid VRMA bridge
 
 The GLB contains named transform nodes for hips, torso, head, arms, legs, hands,
 and feet. It includes three clips:
@@ -202,3 +204,38 @@ node design-runs/game-assets-20260520/tools/verify-renders.mjs \
   --dir design-runs/game-assets-20260520/models/robot-voxel-motion/derived/renders \
   --out design-runs/game-assets-20260520/models/robot-voxel-motion/derived/robot-voxel-motion.vrma-bridge.render-verify.json
 ```
+
+Fixture-mode VRM/VRMA playback contract check:
+
+```bash
+pnpm run motion:vrm-vrma-contract:game-assets
+```
+
+This intentionally passes `--allow-non-vrm-target` because the voxel robot GLB
+is not a real VRM avatar. Use the same checker without that flag for downloaded
+real VRM/VRMA pairs before treating the extractor as compatible with a runtime
+VRM playback path.
+
+Kagura runtime smoke:
+
+```bash
+node design-runs/game-assets-20260520/tools/run-kagura-runtime-smoke.mjs \
+  --contract design-runs/game-assets-20260520/models/robot-voxel-motion/kagura-handoff.json
+```
+
+The report includes `runtime.clipPlayback` and `runtime.posePlayback`. With the
+local Kagura checkout, the robot handoff now reports `verified`: `gltf_viewer`
+exposes `idle_bob`, `walk_cycle`, and `wave`, observes an active requested clip
+through `globalThis.__kaguraRuntimeClipPlayback`, and publishes node transform
+snapshots. The smoke samples the same GLB clip at the reported `timeSeconds`
+and compares Kagura's node transforms against the expected pose.
+
+Calibrated runtime smoke:
+
+```bash
+pnpm run motion:kagura-runtime-calibrated:game-assets
+```
+
+The calibration contract is `kagura-calibration-handoff.json`, backed by the
+roundtrip GLB under `derived/`. It is a known-good animated handoff used to
+separate local Kagura/browser environment failures from target asset failures.

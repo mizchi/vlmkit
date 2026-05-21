@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "id": "robot-voxel-retarget-profile-calibration",
+  "description": "Synthetic calibration cases for deciding which skipped humanoid channels are acceptable when retargeting VRMA motion to the generated voxel robot.",
+  "cases": [
+    {
+      "id": "robot-voxel-fine-detail-skips",
+      "profile": "robot-voxel",
+      "warnings": [
+        "retarget preset robot-voxel has no target for leftThumbProximal",
+        "retarget preset robot-voxel has no target for rightToes",
+        "retarget preset robot-voxel has no target for chest",
+        "retarget preset robot-voxel has no target for neck"
+      ],
+      "expected": {
+        "verdict": "pass",
+        "score": 1,
+        "weightedPenalty": 0,
+        "toleratedSkipped": 4,
+        "nonToleratedSkipped": 0,
+        "skippedByPolicy": {
+          "finger": {
+            "count": 1,
+            "penalty": 0
+          },
+          "toe": {
+            "count": 1,
+            "penalty": 0
+          },
+          "upper-body-fallback": {
+            "count": 2,
+            "penalty": 0
+          }
+        }
+      }
+    },
+    {
+      "id": "robot-voxel-unexpected-soft-penalty",
+      "profile": "robot-voxel",
+      "warnings": [
+        "retarget preset robot-voxel has no target for antenna",
+        "retarget preset robot-voxel has no target for tail",
+        "retarget preset robot-voxel has no target for cape"
+      ],
+      "expected": {
+        "verdict": "fail",
+        "score": 0.25,
+        "weightedPenalty": 1.5,
+        "nonToleratedSkipped": 3,
+        "skippedByPolicy": {
+          "unexpected": {
+            "count": 3,
+            "penalty": 1.5
+          }
+        }
+      }
+    },
+    {
+      "id": "robot-voxel-core-hard-fail",
+      "profile": "robot-voxel",
+      "warnings": [
+        "retarget preset robot-voxel has no target for hips"
+      ],
+      "expected": {
+        "verdict": "fail",
+        "weightedPenalty": 2,
+        "hardFailureSkipped": 1,
+        "skippedByPolicy": {
+          "required-core": {
+            "count": 1,
+            "penalty": 2
+          }
+        }
+      }
+    },
+    {
+      "id": "simple-rig-alias-matches-robot-voxel",
+      "profile": "simple-rig",
+      "warnings": [
+        "retarget preset simple-rig has no target for leftIndexIntermediate",
+        "retarget preset simple-rig has no target for shoulder"
+      ],
+      "expected": {
+        "profile": "robot-voxel",
+        "requestedProfile": "simple-rig",
+        "verdict": "pass",
+        "score": 1,
+        "weightedPenalty": 0
+      }
+    }
+  ]
+}
+

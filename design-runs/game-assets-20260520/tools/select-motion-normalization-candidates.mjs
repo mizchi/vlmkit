@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
-import { motionCorePolicy } from "./motion-core-runtime.mjs";
+import {
+  DEFAULT_NORMALIZATION_PROMOTION_POLICY,
+  attachNormalizationReadiness,
+  groupCandidates,
+  summarizeNormalizationSelection,
+} from "./motion-normalization-selection-utils.mjs";
 
 const repoRoot = resolve(new URL("../../..", import.meta.url).pathname);
 
@@ -48,8 +53,8 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   const plan = JSON.parse(await readFile(args.plan, "utf8"));
   const runnable = plan.runnable ?? [];
-  const groups = groupCandidates(await Promise.all(runnable.map((candidate) => candidateResult(candidate))));
-  const summary = summarize(groups, plan);
+  const groups = attachNormalizationReadiness(groupCandidates(await Promise.all(runnable.map((candidate) => candidateResult(candidate)))));
+  const summary = summarizeNormalizationSelection(groups, plan);
   const ok = (!args.failOnRejected || summary.rejected === 0) &&
     (!args.failOnMissing || summary.missingComparison === 0);
   const report = {
@@ -61,11 +66,7 @@ async function main() {
     policy: {
       failOnRejected: args.failOnRejected,
       failOnMissing: args.failOnMissing,
-      promotion: {
-        minComparedSamples: 3,
-        minImprovedSamples: 2,
-        note: "Non-automatic candidates become promotable only with enough repeated improvements and no regressions, tradeoffs, or missing comparisons.",
-      },
+      promotion: DEFAULT_NORMALIZATION_PROMOTION_POLICY,
     },
     summary,
     groups,
@@ -118,74 +119,6 @@ async function readJsonOptional(path) {
     if (error?.code === "ENOENT") return null;
     throw error;
   }
-}
-
-function groupCandidates(results) {
-  const groups = new Map();
-  for (const result of results) {
-    const key = [
-      result.id,
-      result.kind,
-      result.rootTranslationMode ?? "",
-      result.poseNormalization ?? "",
-    ].join("|");
-    const group = groups.get(key) ?? {
-      id: result.id,
-      kind: result.kind,
-      status: result.status,
-      automatic: result.automatic,
-      rootTranslationMode: result.rootTranslationMode,
-      poseNormalization: result.poseNormalization,
-      recommendation: "",
-      sampleCount: 0,
-      comparedSampleCount: 0,
-      decisions: {
-        candidateImproved: 0,
-        candidateRegressed: 0,
-        candidateTradeoff: 0,
-        stable: 0,
-        missingComparison: 0,
-        missingSampleComparison: 0,
-      },
-      samples: [],
-    };
-    group.sampleCount += 1;
-    if (result.comparisonFound) group.comparedSampleCount += 1;
-    incrementDecision(group.decisions, result.decision);
-    group.samples.push({
-      sample: result.sample,
-      outputReport: result.outputReport,
-      compareReport: result.compareReport,
-      decision: result.decision,
-      reasons: result.reasons,
-    });
-    group.recommendation = motionCorePolicy.selection.candidateGroup(group.automatic, group.decisions);
-    groups.set(key, group);
-  }
-  return [...groups.values()].sort((a, b) => a.id.localeCompare(b.id) || String(a.poseNormalization).localeCompare(String(b.poseNormalization)));
-}
-
-function incrementDecision(decisions, decision) {
-  if (decision === "candidate-improved") decisions.candidateImproved += 1;
-  else if (decision === "candidate-regressed") decisions.candidateRegressed += 1;
-  else if (decision === "candidate-tradeoff") decisions.candidateTradeoff += 1;
-  else if (decision === "stable") decisions.stable += 1;
-  else if (decision === "missing-sample-comparison") decisions.missingSampleComparison += 1;
-  else decisions.missingComparison += 1;
-}
-
-function summarize(groups, plan) {
-  return {
-    groupCount: groups.length,
-    runnable: plan.summary?.runnable ?? (plan.runnable?.length ?? 0),
-    blocked: plan.summary?.blocked ?? (plan.blocked?.length ?? 0),
-    accepted: groups.filter((group) => group.recommendation === "accepted").length,
-    promotable: groups.filter((group) => group.recommendation === "promotable").length,
-    rejected: groups.filter((group) => group.recommendation === "rejected").length,
-    needsPolicy: groups.filter((group) => group.recommendation === "needs-policy").length,
-    neutral: groups.filter((group) => group.recommendation === "neutral").length,
-    missingComparison: groups.filter((group) => group.recommendation === "missing-comparison").length,
-  };
 }
 
 main().catch((error) => {

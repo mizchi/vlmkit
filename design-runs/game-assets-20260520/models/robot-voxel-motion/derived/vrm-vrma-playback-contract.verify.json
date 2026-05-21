@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "kind": "vrm-vrma-playback-contract-verification",
+  "ok": true,
+  "inputs": {
+    "vrm": "design-runs/game-assets-20260520/models/robot-voxel-motion/robot-voxel-motion.glb",
+    "vrma": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/robot-voxel-motion.vrma-bridge.fixture.vrma",
+    "motion": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/robot-voxel-motion.fixture-vrma.extracted.motion.json",
+    "renderVerify": "design-runs/game-assets-20260520/models/robot-voxel-motion/derived/robot-voxel-motion.fixture-vrma.roundtrip.render-verify.json"
+  },
+  "policy": {
+    "requiredBones": [
+      "hips",
+      "head"
+    ],
+    "requiredClips": [
+      "vrma_alert_wave"
+    ],
+    "allowNonVrmTarget": true
+  },
+  "summary": {
+    "checkCount": 9,
+    "failed": 0,
+    "warnings": 1,
+    "vrmHumanoidBoneCount": 0,
+    "vrmaHumanoidBoneCount": 15,
+    "motionClipCount": 2,
+    "motionTrackCount": 13
+  },
+  "checks": [
+    {
+      "id": "vrm.humanoid",
+      "status": "warn",
+      "ok": true,
+      "reason": "target model has no VRMC_vrm humanoid mapping",
+      "value": {
+        "humanoidBoneCount": 0,
+        "allowNonVrmTarget": true
+      }
+    },
+    {
+      "id": "vrma.humanoid",
+      "status": "pass",
+      "ok": true,
+      "reason": null,
+      "value": {
+        "humanoidBoneCount": 15
+      }
+    },
+    {
+      "id": "humanoid.required-bones",
+      "status": "pass",
+      "ok": true,
+      "reason": null,
+      "value": {
+        "requiredBones": [
+          "hips",
+          "head"
+        ],
+        "missingFromVrm": [],
+        "missingFromVrma": []
+      }
+    },
+    {
+      "id": "motion.target-space",
+      "status": "pass",
+      "ok": true,
+      "reason": null,
+      "value": {
+        "targetSpace": "humanoid"
+      }
+    },
+    {
+      "id": "motion.vrma-extension",
+      "status": "pass",
+      "ok": true,
+      "reason": null,
+      "value": {
+        "specVersion": "1.0",
+        "humanoidBoneCount": 15
+      }
+    },
+    {
+      "id": "motion.bone-count",
+      "status": "pass",
+      "ok": true,
+      "reason": null,
+      "value": {
+        "motion": 15,
+        "vrma": 15
+      }
+    },
+    {
+      "id": "clips.required",
+      "status": "pass",
+      "ok": true,
+      "reason": null,
+      "value": {
+        "requiredClips": [
+          "vrma_alert_wave"
+        ],
+        "motionClips": [
+          "vrma_alert_wave",
+          "mixamo_walk_standin"
+        ]
+      }
+    },
+    {
+      "id": "tracks.required-bones",
+      "status": "pass",
+      "ok": true,
+      "reason": null,
+      "value": {
+        "requiredBones": [
+          "hips",
+          "head"
+        ],
+        "trackTargets": [
+          "head",
+          "hips",
+          "leftLowerLeg",
+          "leftUpperArm",
+          "leftUpperLeg",
+          "rightLowerArm",
+          "rightLowerLeg",
+          "rightUpperArm",
+          "rightUpperLeg",
+          "spine"
+        ]
+      }
+    },
+    {
+      "id": "render.verify",
+      "status": "pass",
+      "ok": true,
+      "reason": null,
+      "value": {
+        "ok": true
+      }
+    }
+  ]
+}

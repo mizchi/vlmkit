@@ -444,7 +444,10 @@ frame-substance pass via `webgpu-readback`, with `visiblePixelRatio` around
 0.64. Runtime smoke JSON is local-only because frame timing and readback ids are
 expected to vary per run. Current batch dogfood status is 3/3 pass:
 `goblin-club-blockout` around 0.66, `goblin-voxel` around 0.69, and
-`robot-voxel-motion` around 0.64 visible-pixel ratio.
+`robot-voxel-motion` around 0.64 visible-pixel ratio. The animated robot also
+verifies `runtime.clipPlayback` and `runtime.posePlayback`: Kagura exposes all
+requested clips, reports the active clip/time, and vlmkit samples the GLB at
+that time to compare node transforms.
 
 For headless-environment debugging, pass a known Kagura asset as a separate
 contract with `--calibration-contract`. If both target and calibration fail, the
@@ -452,6 +455,9 @@ report sets `outcome.status: "environment-failed"` and
 `environmentLikelyBroken: true` instead of blaming the generated asset first.
 Use `--allow-environment-failure` to exit 0 for that blocked-environment state
 while still exiting non-zero when the calibration passes and the target fails.
+`pnpm run motion:kagura-runtime-calibrated:game-assets` uses
+`models/robot-voxel-motion/kagura-calibration-handoff.json` as the known-good
+animated calibration contract.
 
 Implementation note:
 
