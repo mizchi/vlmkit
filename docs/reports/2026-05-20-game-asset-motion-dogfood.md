@@ -88,7 +88,9 @@ The concrete scenario used a voxel robot and real `.vrma` motion samples from
   `check-motion-core-parity` pins the generated JS command decisions for the
   current fixtures. `motion-core-runtime` now lets the JS orchestration scripts
   call those generated decisions while JS still performs GLB/JSON orchestration
-  and audit detail mapping.
+  and audit detail mapping. The JS adapter exposes categorized
+  `motionCorePolicy.root`, `.pose`, and `.selection` APIs to keep policy
+  ownership explicit.
 - The dry-run VLM review scaffold can create a contact sheet and strict JSON
   prompt for cheap reviewers such as UI-TARS / Nova Lite without adding a
   blocking human step.

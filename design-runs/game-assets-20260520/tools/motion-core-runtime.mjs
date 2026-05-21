@@ -12,6 +12,22 @@ const cliPath = join(
 
 let built = false;
 
+export const motionCorePolicy = Object.freeze({
+  root: Object.freeze({
+    recommendationId: rootTranslationRecommendationId,
+    candidateId: rootTranslationCandidateId,
+  }),
+  pose: Object.freeze({
+    armRestMotionGateStatus,
+    armRestCandidateStatus,
+    mismatchWarningIds: poseMismatchWarningIds,
+    normalizationCandidateSpecs: poseNormalizationCandidateSpecs,
+  }),
+  selection: Object.freeze({
+    candidateGroup: selectCandidateGroup,
+  }),
+});
+
 export function armRestMotionGateStatus(maxUpperArmRotationRangeDeg) {
   return runMotionCore([
     "arm-rest-gate",

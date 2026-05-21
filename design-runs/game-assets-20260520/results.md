@@ -257,7 +257,8 @@ Observed shape:
   generated JS through `motion-core-runtime`, keeping policy logic small and
   portable while JS remains responsible for GLB/JSON file orchestration.
   `apply-motion-ir` keeps audit-facing severity/reason text in explicit detail
-  maps keyed by the MoonBit ids/specs
+  maps keyed by the MoonBit ids/specs. New JS callers use categorized
+  `motionCorePolicy.root`, `.pose`, and `.selection` APIs
 - retarget profile: `robot-voxel` (`simple-rig` is an alias)
 - quality verdict: `pass`
 - retarget weighted score: 1.0, penalty 0

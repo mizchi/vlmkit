@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
-import { selectCandidateGroup } from "./motion-core-runtime.mjs";
+import { motionCorePolicy } from "./motion-core-runtime.mjs";
 
 const repoRoot = resolve(new URL("../../..", import.meta.url).pathname);
 
@@ -154,7 +154,7 @@ function groupCandidates(results) {
       decision: result.decision,
       reasons: result.reasons,
     });
-    group.recommendation = selectCandidateGroup(group.automatic, group.decisions);
+    group.recommendation = motionCorePolicy.selection.candidateGroup(group.automatic, group.decisions);
     groups.set(key, group);
   }
   return [...groups.values()].sort((a, b) => a.id.localeCompare(b.id) || String(a.poseNormalization).localeCompare(String(b.poseNormalization)));

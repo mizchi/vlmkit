@@ -1070,8 +1070,11 @@ Current smoke status:
   the same decisions as a generated JS command surface. The JS orchestration
   tools now call `motion-core-runtime` for those decisions while still owning
   GLB/JSON I/O; audit-facing severity/reason text stays in explicit JS detail
-  maps keyed by the MoonBit ids/specs. `check-motion-core-parity` verifies the
-  generated JS CLI decisions for the current policy fixtures
+  maps keyed by the MoonBit ids/specs. The runtime exposes categorized
+  `motionCorePolicy.root`, `.pose`, and `.selection` APIs so new orchestration
+  code does not need to infer policy ownership from individual function names.
+  `check-motion-core-parity` verifies the generated JS CLI decisions for the
+  current policy fixtures
 - [x] Named `robot-voxel` retarget profile for voxel robot smoke: skipped
   fingers, toes, chest, neck, and shoulders are tolerated with zero penalty,
   while skipped core bones fail the weighted profile

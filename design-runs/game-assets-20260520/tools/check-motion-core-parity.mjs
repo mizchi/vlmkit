@@ -6,6 +6,7 @@ import {
   rootTranslationCandidateId,
   rootTranslationRecommendationId,
   selectCandidateGroup,
+  motionCorePolicy,
 } from "./motion-core-runtime.mjs";
 
 const cases = [
@@ -185,6 +186,60 @@ const cases = [
       maxUpperArmRotationRangeDeg: null,
     })),
     "stance-width-adapter:needs-implementation",
+  ],
+  [
+    "policy.root.recommendationId",
+    () => motionCorePolicy.root.recommendationId({
+      mode: "relative",
+      heightScale: 0.6,
+      heightScaleDelta: 0.2,
+      verticalDeltaRange: 0.08,
+    }),
+    "consider-scale-to-model",
+  ],
+  [
+    "policy.root.candidateId",
+    () => motionCorePolicy.root.candidateId("vertical-motion-dropped"),
+    "root-relative",
+  ],
+  [
+    "policy.pose.armRestMotionGateStatus",
+    () => motionCorePolicy.pose.armRestMotionGateStatus(108.40739),
+    "passed",
+  ],
+  [
+    "policy.pose.mismatchWarningIds",
+    () => motionCorePolicy.pose.mismatchWarningIds({
+      scaleSpreadRatio: null,
+      footSpreadScale: 2.0,
+      upperLegSpreadScale: null,
+      shoulderWidthScale: null,
+      skeletonHeightScale: null,
+      armAngleDeltaDeg: null,
+    }).join("|"),
+    "foot-spread-mismatch",
+  ],
+  [
+    "policy.pose.normalizationCandidateSpecs",
+    () => formatCandidateSpecs(motionCorePolicy.pose.normalizationCandidateSpecs({
+      hasArmRestAngleMismatch: true,
+      hasFootSpreadMismatch: false,
+      hasLegSpreadMismatch: false,
+      hasShoulderWidthMismatch: false,
+      maxUpperArmRotationRangeDeg: 108.40739,
+    })),
+    "arm-rest-pose-offset:runnable",
+  ],
+  [
+    "policy.selection.candidateGroup",
+    () => motionCorePolicy.selection.candidateGroup(false, {
+      candidateImproved: 0,
+      candidateRegressed: 0,
+      candidateTradeoff: 1,
+      missingComparison: 0,
+      missingSampleComparison: 0,
+    }),
+    "rejected",
   ],
 ];
 

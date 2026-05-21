@@ -285,7 +285,12 @@ shared tools now live in `tools/`:
   orchestration scripts, including `apply-motion-ir` root/pose recommendations,
   pose warning IDs, pose candidate specs, and normalization candidate selection
   while `apply-motion-ir` keeps only stable audit detail maps for
-  severity/reason text
+  severity/reason text. New orchestration code should prefer the categorized
+  API:
+  - `motionCorePolicy.root`: root translation recommendation/candidate ids
+  - `motionCorePolicy.pose`: arm-rest gates, pose warning ids, and pose
+    candidate specs
+  - `motionCorePolicy.selection`: candidate-group recommendation
 - `tools/check-motion-core-parity.mjs`: builds the MoonBit JS target and checks
   the generated CLI decisions against the expected policy fixtures
 - `tools/review-motion-with-vlm.mjs`: optional cheap VLM second opinion using

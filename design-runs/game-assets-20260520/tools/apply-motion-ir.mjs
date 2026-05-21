@@ -2,7 +2,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { axisRange, computeWorldMatrices, nodeWorldPosition, vec3, vec3Range, vec4 } from "./gltf-bind-pose.mjs";
-import { armRestMotionGateStatus, poseMismatchWarningIds, poseNormalizationCandidateSpecs, rootTranslationCandidateId, rootTranslationRecommendationId } from "./motion-core-runtime.mjs";
+import { motionCorePolicy } from "./motion-core-runtime.mjs";
 
 const repoRoot = resolve(new URL("../../..", import.meta.url).pathname);
 const entryDir = dirname(resolve(process.argv[1] ?? new URL(".", import.meta.url).pathname));
@@ -328,7 +328,7 @@ function compareSourceTargetRig(sourceRig, targetRig, motionActivity) {
     ratio: round(Math.max(...coreScales) / Math.min(...coreScales)),
   } : null;
   const armAngleDelta = angleDelta(sourceRig.bindMetrics.armDownAngleDeg, targetRig.bindMetrics.armDownAngleDeg);
-  const warnings = poseMismatchWarningIds({
+  const warnings = motionCorePolicy.pose.mismatchWarningIds({
     scaleSpreadRatio: scaleSpread?.ratio,
     footSpreadScale: scales.footSpread,
     upperLegSpreadScale: scales.upperLegSpread,
@@ -383,7 +383,7 @@ function mapValues(object, mapper) {
 
 function poseNormalizationCandidates(warnings, motionActivity) {
   const ids = new Set(warnings.map((warning) => warning.id));
-  return poseNormalizationCandidateSpecs({
+  return motionCorePolicy.pose.normalizationCandidateSpecs({
     hasArmRestAngleMismatch: ids.has("arm-rest-angle-mismatch"),
     hasFootSpreadMismatch: ids.has("foot-spread-mismatch"),
     hasLegSpreadMismatch: ids.has("leg-spread-mismatch"),
@@ -435,7 +435,7 @@ function poseNormalizationCandidate(spec, warningIds, motionActivity) {
 function armRestMotionGate(motionActivity) {
   const armRest = motionActivity?.armRest;
   const value = armRest?.maxUpperArmRotationRangeDeg;
-  const status = armRestMotionGateStatus(value);
+  const status = motionCorePolicy.pose.armRestMotionGateStatus(value);
   if (status === "unavailable") {
     return {
       id: "upper-arm-rotation-range",
@@ -508,7 +508,7 @@ function recordRootTranslationAudit(audit, clip, track, nodeName, baseTranslatio
 }
 
 function rootTranslationNormalizationCandidates(recommendation) {
-  const candidateId = rootTranslationCandidateId(recommendation.id);
+  const candidateId = motionCorePolicy.root.candidateId(recommendation.id);
   if (candidateId === "none") return [];
   const detail = ROOT_TRANSLATION_CANDIDATE_DETAILS[candidateId];
   if (!detail) throw new Error(`unknown root translation candidate id: ${candidateId}`);
@@ -516,7 +516,7 @@ function rootTranslationNormalizationCandidates(recommendation) {
 }
 
 function recommendRootTranslationNormalization({ mode, heightScale, heightScaleDelta, verticalDeltaRange }) {
-  const id = rootTranslationRecommendationId({
+  const id = motionCorePolicy.root.recommendationId({
     mode,
     heightScale,
     heightScaleDelta,
