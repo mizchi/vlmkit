@@ -1135,6 +1135,13 @@ Current smoke status:
   batch status is 3/3 pass. The batch also writes a local-only summary JSON with
   per-asset outcome, frame source, visible-pixel ratio, warning count, and
   failure count for autonomous follow-up decisions.
+- [x] Promoted core API dogfood smoke:
+  `pnpm run motion:core-smoke:game-assets` exercises the
+  `@mizchi/vlmkit-core` game-asset motion surface against real robot fixtures:
+  FBX/Mixamo adapter decision, VRMA/GLB/Motion IR adapter decisions, Motion IR
+  retarget verification, GLB clip-pose sampling, and clip/pose playback gates.
+  Current local status is pass with `vrma_alert_wave`, 2 verified clips, 6
+  sampled nodes, and `posePlayback=verified`.
 
 Stepwise cleanup:
 

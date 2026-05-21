@@ -56,6 +56,7 @@
     "motion:retarget-profiles:game-assets": "node design-runs/game-assets-20260520/tools/check-retarget-profiles.mjs",
     "motion:retarget-calibration:game-assets": "node design-runs/game-assets-20260520/tools/check-retarget-profile-calibration.mjs",
     "motion:vrm-vrma-contract:game-assets": "node design-runs/game-assets-20260520/tools/verify-vrm-vrma-playback-contract.mjs --vrm design-runs/game-assets-20260520/models/robot-voxel-motion/robot-voxel-motion.glb --vrma design-runs/game-assets-20260520/models/robot-voxel-motion/derived/robot-voxel-motion.vrma-bridge.fixture.vrma --motion design-runs/game-assets-20260520/models/robot-voxel-motion/derived/robot-voxel-motion.fixture-vrma.extracted.motion.json --render-verify design-runs/game-assets-20260520/models/robot-voxel-motion/derived/robot-voxel-motion.fixture-vrma.roundtrip.render-verify.json --required-bones hips,head --required-clips vrma_alert_wave --allow-non-vrm-target",
+    "motion:core-smoke:game-assets": "node design-runs/game-assets-20260520/tools/check-game-asset-motion-core.mjs",
     "motion:kagura-handoff:game-assets": "node design-runs/game-assets-20260520/tools/check-kagura-handoffs.mjs",
     "motion:kagura-runtime:game-assets": "node design-runs/game-assets-20260520/tools/check-kagura-runtime-smokes.mjs",
     "motion:kagura-runtime-calibrated:game-assets": "node design-runs/game-assets-20260520/tools/check-kagura-runtime-smokes.mjs --calibration-contract design-runs/game-assets-20260520/models/robot-voxel-motion/kagura-calibration-handoff.json",
