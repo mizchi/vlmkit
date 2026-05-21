@@ -1280,6 +1280,56 @@ Stepwise cleanup:
   module. MoonBit continues to own policy decisions; JS keeps renderer/browser
   orchestration and file I/O.
 
+### Markup MoonBit migration
+
+- [x] First markup policy slice:
+  `packages/vlmkit-markup/markup-core` now owns the pure
+  `component-goal` pass / review / fail policy and app-shell / landing /
+  canvas / expressive-menu gates. TypeScript keeps the public
+  `evaluateComponentGoal()` API, threshold profile metadata, and
+  human-readable summaries, but delegates the status decision through
+  `markup-core-cli`.
+  `pnpm moon:test:markup` checks the MoonBit package and CLI surface, and the
+  existing `component-goal` Node tests dogfood the bridge.
+- [x] Component contract-plan policy slice:
+  `component-contract-plan` now delegates probe-state validation, stable
+  state merging, required-state extraction, and scroll-target source selection
+  to `markup-core`. TypeScript still owns UI Contract JSON object traversal,
+  validation loading, and carrying the original scrollport/canvas objects into
+  the runner.
+- [x] UI Contract pattern evidence validator slice:
+  `contract/ui-contract.ts` now delegates pattern-specific evidence issue id
+  selection for landing, app-shell, canvas, and expressive-menu contracts to
+  `markup-core`. TypeScript still owns JSON traversal, issue paths, and
+  human-readable messages.
+- [x] UI Contract layout validator slice:
+  `contract/ui-contract.ts` now delegates width / height / grid-display issue
+  id selection to `markup-core`. TypeScript still owns schema types and maps
+  the returned ids back to nested issue paths.
+- [x] UI Contract state / scrollport validator slice:
+  `contract/ui-contract.ts` now delegates state kind / target / minChangeRatio
+  issue ids and expected-scrollport axis / target / minOverflow issue ids to
+  `markup-core`. TypeScript still owns array traversal, duplicate tracking, and
+  mapping the returned ids back to nested issue paths.
+- [ ] Continue UI Contract validator core:
+  move the remaining enum/range/uniqueness predicates for markers,
+  composition, content, decoration, assets, and canvas metadata into MoonBit in
+  small slices, while keeping TypeScript as the contract schema and report-text
+  boundary.
+- [x] Semantic drilldown selection policy slice:
+  `component/semantic-drilldown.ts` now delegates layout-vs-decoration flow,
+  priority scoring, reason id selection, and next-action ordering to
+  `markup-core`. TypeScript still owns DOM/landmark capture, overlap scoring,
+  heatmap kind extraction, and report text formatting.
+- [ ] Add markup-core parity fixtures:
+  pin representative app-shell, landing, canvas, expressive-menu, and
+  responsive-stretch cases as JSON fixtures so TS bridge, MoonBit CLI, and
+  future direct JS/WASM bindings share the same expected status matrix.
+- [ ] Avoid per-call process cost:
+  current bridge calls the generated JS CLI by process spawn. That is fine for
+  low-volume dogfood, but repeated component scoring should move to a direct
+  generated JS/WASM module boundary once the package API is stable.
+
 ### Spec coverage
 - [ ] Heading hierarchy validation
 - [ ] ARIA relationship validation

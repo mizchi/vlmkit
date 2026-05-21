@@ -1,3 +1,5 @@
+import { computeComponentGoalStatus } from "../markup-core-runtime.ts";
+
 export const COMPONENT_GOALS = ["app", "layout", "pixel", "draft", "app-shell", "landing", "canvas", "expressive-menu"] as const;
 
 export type ComponentGoal = typeof COMPONENT_GOALS[number];
@@ -173,12 +175,17 @@ export function evaluateComponentGoal(input: {
   expressiveMenu?: ComponentExpressiveMenuEvidence;
 }): ComponentGoalEvaluation {
   const profile = getComponentGoalProfile(input.goal);
-  const thresholdStatus: ComponentGoalStatus = passesAll(profile.pass, input)
-    ? "pass"
-    : passesAll(profile.review, input)
-      ? "review"
-      : "fail";
-  const status = applyPatternGates(profile, thresholdStatus, input);
+  const status = computeComponentGoalStatus({
+    goal: profile.goal,
+    pixelDiffRatio: input.pixelDiffRatio,
+    landscapeDiffRatio: input.landscapeDiffRatio,
+    pass: profile.pass,
+    review: profile.review,
+    scrollports: input.scrollports,
+    landing: input.landing,
+    canvas: input.canvas,
+    expressiveMenu: input.expressiveMenu,
+  });
   return {
     goal: profile.goal,
     label: profile.label,
@@ -190,83 +197,6 @@ export function evaluateComponentGoal(input: {
     review: profile.review,
     summary: summarizeEvaluation(profile, status, input),
   };
-}
-
-function applyPatternGates(
-  profile: ComponentGoalProfile,
-  status: ComponentGoalStatus,
-  input: {
-    scrollports?: ComponentScrollportEvidence;
-    landing?: ComponentLandingEvidence;
-    canvas?: ComponentCanvasEvidence;
-    expressiveMenu?: ComponentExpressiveMenuEvidence;
-  },
-): ComponentGoalStatus {
-  if (profile.goal === "app-shell") {
-    const scrollports = input.scrollports;
-    const expected = scrollports?.expected;
-    if (expected && expected.total > 0) {
-      if (expected.missing > 0 || expected.broken > 0) return "fail";
-      if (expected.empty > 0 && status === "pass") return "review";
-    }
-    if (!scrollports || scrollports.total === 0) {
-      return status === "pass" ? "review" : status;
-    }
-    if (scrollports.broken > 0) return "fail";
-    if (scrollports.empty > 0 && status === "pass") return "review";
-    return status;
-  }
-
-  if (profile.goal === "landing") {
-    const landing = input.landing;
-    if (!landing) return status === "pass" ? "review" : status;
-    if (!landing.primaryCtaVisible) return "fail";
-    if (!landing.heroVisible) return "fail";
-    if ((!landing.nextSectionHintVisible || !landing.mediaSlotVisible) && status === "pass") {
-      return "review";
-    }
-  }
-
-  if (profile.goal === "canvas") {
-    const canvas = input.canvas;
-    if (!canvas || canvas.canvasCount === 0) return "fail";
-    if (!canvas.nonblank) return "fail";
-    if (canvas.stateHook && canvas.stateHookPresent === false) return "fail";
-    if ((canvas.missingStateFields?.length ?? 0) > 0) return "fail";
-    if ((!canvas.frameDelta || canvas.inputResponsive !== true) && status === "pass") {
-      return "review";
-    }
-  }
-
-  if (profile.goal === "expressive-menu") {
-    const expressiveMenu = input.expressiveMenu;
-    if (!expressiveMenu) return status === "pass" ? "review" : status;
-    if (!expressiveMenu.selectedVisible) return "fail";
-    if (expressiveMenu.focusableItemCount < 3) return "fail";
-    if (!expressiveMenu.semanticMenuText) return "fail";
-    if (expressiveMenu.compositionLayers < 2 || expressiveMenu.compositionShapes < 2) return "fail";
-    if (!expressiveMenu.diagonalEvidence) return "fail";
-    if (!expressiveMenu.highContrast || expressiveMenu.lowContrastItemCount > 0) return "fail";
-    if (expressiveMenu.hoverChanged === false || expressiveMenu.focusVisibleChanged === false) return "fail";
-    if ((expressiveMenu.hoverChanged === null || expressiveMenu.focusVisibleChanged === null) && status === "pass") {
-      return "review";
-    }
-  }
-
-  return status;
-}
-
-function passesAll(
-  limits: ComponentGoalProfile["pass"],
-  input: { pixelDiffRatio: number; landscapeDiffRatio: number },
-): boolean {
-  if (limits.landscape !== undefined && input.landscapeDiffRatio > limits.landscape) {
-    return false;
-  }
-  if (limits.pixel !== undefined && input.pixelDiffRatio > limits.pixel) {
-    return false;
-  }
-  return true;
 }
 
 function summarizeEvaluation(

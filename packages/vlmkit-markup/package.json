@@ -17,11 +17,18 @@
   "files": [
     "src/**/*.ts",
     "!src/**/*.test.ts",
+    "moon.mod.json",
+    "markup-core/**/*.mbt",
+    "markup-core/moon.pkg",
+    "markup-core-cli/**/*.mbt",
+    "markup-core-cli/moon.pkg",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
-    "test": "node --test 'src/**/*.test.ts'"
+    "test": "node --test 'src/**/*.test.ts'",
+    "moon:test": "moon test markup-core && moon check markup-core-cli",
+    "moon:build": "moon build markup-core markup-core-cli --target js"
   },
   "exports": {
     ".": "./src/index.ts",

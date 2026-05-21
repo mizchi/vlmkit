@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   deriveComponentContractPlan,
   deriveComponentContractRuntime,
+  isComponentProbeState,
+  isForcedPseudoState,
   mergeComponentProbeStates,
 } from "./component-contract-plan.ts";
 
@@ -57,6 +59,14 @@ test("mergeComponentProbeStates keeps explicit and contract-derived states uniqu
     ["hover", "scrolled", "focus-visible"],
   );
   assert.equal(mergeComponentProbeStates(undefined, []), undefined);
+});
+
+test("component probe state guards delegate to markup-core policy", () => {
+  assert.equal(isComponentProbeState("hover"), true);
+  assert.equal(isComponentProbeState("scrolled"), true);
+  assert.equal(isComponentProbeState("selected"), false);
+  assert.equal(isForcedPseudoState("focus-visible"), true);
+  assert.equal(isForcedPseudoState("scrolled"), false);
 });
 
 test("deriveComponentContractRuntime remains a compatibility alias", () => {

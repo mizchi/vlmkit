@@ -2,6 +2,13 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { ForcedPseudoState } from "../stress/multi-state.ts";
 import {
+  computeComponentProbeStates,
+  computeComponentScrollTargetSource,
+  isMarkupCoreComponentProbeState,
+  isMarkupCoreForcedPseudoState,
+  mergeMarkupCoreComponentProbeStates,
+} from "../markup-core-runtime.ts";
+import {
   validateUiContract,
   type UiCanvasContract,
   type UiContract,
@@ -63,18 +70,16 @@ export function mergeComponentProbeStates(
   explicit: ComponentProbeState[] | undefined,
   injected: ComponentProbeState[],
 ): ComponentProbeState[] | undefined {
-  const states = new Set<ComponentProbeState>();
-  for (const state of explicit ?? []) states.add(state);
-  for (const state of injected) states.add(state);
-  return states.size > 0 ? [...states] : undefined;
+  const states = mergeMarkupCoreComponentProbeStates(explicit, injected) as ComponentProbeState[];
+  return states.length > 0 ? states : undefined;
 }
 
 export function isComponentProbeState(value: string): value is ComponentProbeState {
-  return value === "scrolled" || isForcedPseudoState(value);
+  return isMarkupCoreComponentProbeState(value);
 }
 
 export function isForcedPseudoState(value: string): value is ForcedPseudoState {
-  return value === "hover" || value === "focus" || value === "active" || value === "focus-visible";
+  return isMarkupCoreForcedPseudoState(value);
 }
 
 function deriveComponentPlanFromScreen(screen: UiContractScreen): ComponentContractPlan {
@@ -92,11 +97,7 @@ function deriveComponentPlanFromScreen(screen: UiContractScreen): ComponentContr
 }
 
 function requiredProbeStates(screen: UiContractScreen): ComponentProbeState[] {
-  const states = new Set<ComponentProbeState>();
-  for (const state of screen.requiredStates ?? []) {
-    if (isComponentProbeState(state.kind)) states.add(state.kind);
-  }
-  return [...states];
+  return computeComponentProbeStates((screen.requiredStates ?? []).map((state) => state.kind)) as ComponentProbeState[];
 }
 
 function requiredScrollTargets(screen: UiContractScreen): UiExpectedScrollportContract[] {
@@ -109,8 +110,11 @@ function requiredScrollTargets(screen: UiContractScreen): UiExpectedScrollportCo
       axis: "y",
     }))
     .filter((target) => target.selector || target.id);
-  if (stateTargets.length > 0) return stateTargets;
-  return (screen.requiredStates ?? []).some((state) => state.kind === "scrolled")
-    ? screen.expectedScrollports ?? []
-    : [];
+  const source = computeComponentScrollTargetSource(
+    (screen.requiredStates ?? []).map((state) => state.kind),
+    stateTargets.length,
+  );
+  if (source === "state-targets") return stateTargets;
+  if (source === "expected-scrollports") return screen.expectedScrollports ?? [];
+  return [];
 }

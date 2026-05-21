@@ -1,3 +1,16 @@
+import {
+  computeUiContractExpectedScrollportIssueIds,
+  computeUiContractLayoutIssueIds,
+  computeUiContractPatternEvidenceIssueIds,
+  computeUiContractRequiredStateIssueIds,
+  computeUiContractStateIssueIds,
+  type MarkupCoreUiContractExpectedScrollportIssueId,
+  type MarkupCoreUiContractLayoutIssueId,
+  type MarkupCoreUiContractPatternEvidenceIssueId,
+  type MarkupCoreUiContractRequiredStateIssueId,
+  type MarkupCoreUiContractStateIssueId,
+} from "../markup-core-runtime.ts";
+
 export type UiContractVersion = 1;
 
 export const UI_CONTRACT_PATTERNS = [
@@ -540,18 +553,20 @@ export function validateUiContract(contract: UiContract): UiContractIssue[] {
       validateContent(lm.content, `${lmPath}.content`, issues);
       validateDecoration(lm.decoration, `${lmPath}.decoration`, issues);
       validateAssets(lm.assets, `${lmPath}.assets`, issues);
-      validateWidthPolicy(lm.layout.width, `${lmPath}.layout.width`, issues);
-      validateHeightPolicy(lm.layout.height, `${lmPath}.layout.height`, issues);
-      validateDisplayPolicy(lm.layout.display, `${lmPath}.layout.display`, issues);
+      validateLayoutPolicy(
+        lm.layout.width,
+        lm.layout.height,
+        lm.layout.display,
+        `${lmPath}.layout`,
+        issues,
+      );
       for (let ri = 0; ri < (lm.responsive?.length ?? 0); ri++) {
         const rule = lm.responsive![ri]!;
         const rulePath = `${lmPath}.responsive[${ri}]`;
         if (!viewportLabels.has(rule.viewport)) {
           issues.push({ path: `${rulePath}.viewport`, message: "responsive rule references an unknown viewport" });
         }
-        if (rule.width) validateWidthPolicy(rule.width, `${rulePath}.width`, issues);
-        if (rule.height) validateHeightPolicy(rule.height, `${rulePath}.height`, issues);
-        if (rule.display) validateDisplayPolicy(rule.display, `${rulePath}.display`, issues);
+        validateLayoutPolicy(rule.width, rule.height, rule.display, rulePath, issues);
       }
     }
     validatePatternEvidence(screen, screenPath, issues);
@@ -595,12 +610,15 @@ function validateStateContract(
   path: string,
   issues: UiContractIssue[],
 ): void {
-  if (!state.id) issues.push({ path: `${path}.id`, message: "state id is required" });
-  if (!includesString(UI_STATE_KINDS, state.kind)) {
-    issues.push({ path: `${path}.kind`, message: "unknown state kind" });
-  }
-  if (state.required && !state.selector && !state.trigger) {
-    issues.push({ path, message: "required state must declare selector or trigger" });
+  const issueIds = computeUiContractStateIssueIds({
+    id: state.id,
+    kind: state.kind,
+    required: Boolean(state.required),
+    hasSelector: Boolean(state.selector),
+    hasTrigger: Boolean(state.trigger),
+  });
+  for (const issueId of issueIds) {
+    issues.push(uiContractStateIssue(issueId, path));
   }
 }
 
@@ -613,16 +631,22 @@ function validateRequiredStates(
   for (let i = 0; i < (states?.length ?? 0); i++) {
     const state = states![i]!;
     const statePath = `${path}[${i}]`;
-    validateStateContract(state, statePath, issues);
+    const duplicateId = Boolean(state.id && ids.has(state.id));
+    const issueIds = computeUiContractRequiredStateIssueIds({
+      id: state.id,
+      kind: state.kind,
+      required: Boolean(state.required),
+      hasSelector: Boolean(state.selector),
+      hasTrigger: Boolean(state.trigger),
+      duplicateId,
+      minChangeRatioPresent: state.minChangeRatio !== undefined,
+      minChangeRatio: state.minChangeRatio ?? 0,
+    });
+    for (const issueId of issueIds) {
+      issues.push(uiContractRequiredStateIssue(issueId, statePath));
+    }
     if (state.id) {
-      if (ids.has(state.id)) issues.push({ path: `${statePath}.id`, message: "required state id must be unique" });
       ids.add(state.id);
-    }
-    if (!state.required && !state.selector && !state.trigger) {
-      issues.push({ path: statePath, message: "required state must declare selector or trigger" });
-    }
-    if (state.minChangeRatio !== undefined && (state.minChangeRatio < 0 || state.minChangeRatio > 1)) {
-      issues.push({ path: `${statePath}.minChangeRatio`, message: "required state minChangeRatio must be between 0 and 1" });
     }
   }
 }
@@ -636,18 +660,70 @@ function validateExpectedScrollports(
   for (let i = 0; i < (scrollports?.length ?? 0); i++) {
     const scrollport = scrollports![i]!;
     const scrollportPath = `${path}[${i}]`;
-    if (!scrollport.id) issues.push({ path: `${scrollportPath}.id`, message: "expected scrollport id is required" });
-    else if (ids.has(scrollport.id)) issues.push({ path: `${scrollportPath}.id`, message: "expected scrollport id must be unique" });
-    else ids.add(scrollport.id);
-    if (scrollport.axis && !includesString(UI_SCROLL_AXES, scrollport.axis)) {
-      issues.push({ path: `${scrollportPath}.axis`, message: "unknown expected scrollport axis" });
+    const duplicateId = Boolean(scrollport.id && ids.has(scrollport.id));
+    const issueIds = computeUiContractExpectedScrollportIssueIds({
+      id: scrollport.id,
+      axis: scrollport.axis ?? "",
+      required: Boolean(scrollport.required),
+      hasSelector: Boolean(scrollport.selector),
+      hasName: Boolean(scrollport.name),
+      hasLandmarkId: Boolean(scrollport.landmarkId),
+      duplicateId,
+      minOverflowPresent: scrollport.minOverflow !== undefined,
+      minOverflow: scrollport.minOverflow ?? 0,
+    });
+    for (const issueId of issueIds) {
+      issues.push(uiContractExpectedScrollportIssue(issueId, scrollportPath));
     }
-    if (scrollport.required && !scrollport.selector && !scrollport.name && !scrollport.landmarkId) {
-      issues.push({ path: scrollportPath, message: "required expected scrollport must declare selector, name, or landmarkId" });
+    if (scrollport.id) {
+      ids.add(scrollport.id);
     }
-    if (scrollport.minOverflow !== undefined && scrollport.minOverflow < 0) {
-      issues.push({ path: `${scrollportPath}.minOverflow`, message: "expected scrollport minOverflow must be non-negative" });
-    }
+  }
+}
+
+function uiContractStateIssue(
+  issueId: MarkupCoreUiContractStateIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "state-id-required":
+      return { path: `${path}.id`, message: "state id is required" };
+    case "state-kind-unknown":
+      return { path: `${path}.kind`, message: "unknown state kind" };
+    case "state-target-required":
+      return { path, message: "required state must declare selector or trigger" };
+  }
+}
+
+function uiContractRequiredStateIssue(
+  issueId: MarkupCoreUiContractRequiredStateIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "required-state-id-unique":
+      return { path: `${path}.id`, message: "required state id must be unique" };
+    case "required-state-min-change-ratio":
+      return { path: `${path}.minChangeRatio`, message: "required state minChangeRatio must be between 0 and 1" };
+    default:
+      return uiContractStateIssue(issueId, path);
+  }
+}
+
+function uiContractExpectedScrollportIssue(
+  issueId: MarkupCoreUiContractExpectedScrollportIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "expected-scrollport-id-required":
+      return { path: `${path}.id`, message: "expected scrollport id is required" };
+    case "expected-scrollport-id-unique":
+      return { path: `${path}.id`, message: "expected scrollport id must be unique" };
+    case "expected-scrollport-axis-unknown":
+      return { path: `${path}.axis`, message: "unknown expected scrollport axis" };
+    case "expected-scrollport-target-required":
+      return { path, message: "required expected scrollport must declare selector, name, or landmarkId" };
+    case "expected-scrollport-min-overflow":
+      return { path: `${path}.minOverflow`, message: "expected scrollport minOverflow must be non-negative" };
   }
 }
 
@@ -845,61 +921,69 @@ function validatePatternEvidence(
   screenPath: string,
   issues: UiContractIssue[],
 ): void {
-  const pattern = screen.pattern ?? screen.goal;
-  const markerKinds = new Set(collectMarkers(screen).map((marker) => marker.kind));
-  const requiredStateKinds = new Set([
+  const markerKinds = collectMarkers(screen).map((marker) => marker.kind);
+  const requiredStateKinds = [
     ...(screen.states ?? []).filter((state) => state.required).map((state) => state.kind),
     ...(screen.requiredStates ?? []).map((state) => state.kind),
-  ]);
-  if (pattern === "landing") {
-    for (const kind of ["primary-cta", "media-slot", "next-section"] as const) {
-      if (!markerKinds.has(kind)) {
-        issues.push({ path: `${screenPath}.markers`, message: `landing contracts should include ${kind} marker evidence` });
-      }
-    }
+  ];
+  const issueIds = computeUiContractPatternEvidenceIssueIds({
+    pattern: screen.pattern ?? screen.goal,
+    markerKinds,
+    requiredStateKinds,
+    stateKinds: (screen.states ?? []).map((state) => state.kind),
+    expectedScrollportCount: screen.expectedScrollports?.length ?? 0,
+    hasComposition: Boolean(screen.composition),
+    hasCanvasStateHook: Boolean(screen.canvas?.stateHook),
+    canvasRequiredStateFields: screen.canvas?.requiredStateFields ?? [],
+  });
+  for (const issueId of issueIds) {
+    issues.push(uiContractPatternEvidenceIssue(issueId, screenPath));
   }
-  if (pattern === "app-shell" && !markerKinds.has("scrollport")) {
-    issues.push({ path: `${screenPath}.markers`, message: "app-shell contracts should include scrollport marker evidence" });
-  }
-  if (pattern === "app-shell") {
-    if ((screen.expectedScrollports?.length ?? 0) === 0) {
-      issues.push({ path: `${screenPath}.expectedScrollports`, message: "app-shell contracts should declare expectedScrollports" });
-    }
-    if (!requiredStateKinds.has("selected")) {
-      issues.push({ path: `${screenPath}.requiredStates`, message: "app-shell contracts should require a selected state" });
-    }
-    if (!requiredStateKinds.has("scrolled")) {
-      issues.push({ path: `${screenPath}.requiredStates`, message: "app-shell contracts should require a scrolled state" });
-    }
-  }
-  if (pattern === "canvas") {
-    const required = ["mode", "frame", "playerX", "playerY", "score", "assetsReady"];
-    const fields = new Set(screen.canvas?.requiredStateFields ?? []);
-    if (!screen.canvas?.stateHook) {
-      issues.push({ path: `${screenPath}.canvas.stateHook`, message: "canvas contracts should include a stateHook" });
-    }
-    for (const field of required) {
-      if (!fields.has(field)) {
-        issues.push({ path: `${screenPath}.canvas.requiredStateFields`, message: `canvas contracts should include ${field} state field` });
-      }
-    }
-  }
-  if (pattern === "expressive-menu") {
-    if (!screen.composition) {
-      issues.push({ path: `${screenPath}.composition`, message: "expressive-menu contracts should include composition metadata" });
-    }
-    const hasStateEvidence = requiredStateKinds.has("selected")
-      || requiredStateKinds.has("focus-visible")
-      || markerKinds.has("selected")
-      || (screen.states ?? []).some((state) => state.kind === "selected" || state.kind === "focus-visible");
-    if (!hasStateEvidence) {
-      issues.push({ path: `${screenPath}.states`, message: "expressive-menu contracts should include selected or focus-visible state evidence" });
-    }
-    for (const kind of ["selected", "hover", "focus-visible"] as const) {
-      if (!requiredStateKinds.has(kind)) {
-        issues.push({ path: `${screenPath}.requiredStates`, message: `expressive-menu contracts should require ${kind} state` });
-      }
-    }
+}
+
+function uiContractPatternEvidenceIssue(
+  issueId: MarkupCoreUiContractPatternEvidenceIssueId,
+  screenPath: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "landing-marker-primary-cta":
+      return { path: `${screenPath}.markers`, message: "landing contracts should include primary-cta marker evidence" };
+    case "landing-marker-media-slot":
+      return { path: `${screenPath}.markers`, message: "landing contracts should include media-slot marker evidence" };
+    case "landing-marker-next-section":
+      return { path: `${screenPath}.markers`, message: "landing contracts should include next-section marker evidence" };
+    case "app-shell-marker-scrollport":
+      return { path: `${screenPath}.markers`, message: "app-shell contracts should include scrollport marker evidence" };
+    case "app-shell-expected-scrollports":
+      return { path: `${screenPath}.expectedScrollports`, message: "app-shell contracts should declare expectedScrollports" };
+    case "app-shell-state-selected":
+      return { path: `${screenPath}.requiredStates`, message: "app-shell contracts should require a selected state" };
+    case "app-shell-state-scrolled":
+      return { path: `${screenPath}.requiredStates`, message: "app-shell contracts should require a scrolled state" };
+    case "canvas-state-hook":
+      return { path: `${screenPath}.canvas.stateHook`, message: "canvas contracts should include a stateHook" };
+    case "canvas-state-field-mode":
+      return { path: `${screenPath}.canvas.requiredStateFields`, message: "canvas contracts should include mode state field" };
+    case "canvas-state-field-frame":
+      return { path: `${screenPath}.canvas.requiredStateFields`, message: "canvas contracts should include frame state field" };
+    case "canvas-state-field-playerX":
+      return { path: `${screenPath}.canvas.requiredStateFields`, message: "canvas contracts should include playerX state field" };
+    case "canvas-state-field-playerY":
+      return { path: `${screenPath}.canvas.requiredStateFields`, message: "canvas contracts should include playerY state field" };
+    case "canvas-state-field-score":
+      return { path: `${screenPath}.canvas.requiredStateFields`, message: "canvas contracts should include score state field" };
+    case "canvas-state-field-assetsReady":
+      return { path: `${screenPath}.canvas.requiredStateFields`, message: "canvas contracts should include assetsReady state field" };
+    case "expressive-menu-composition":
+      return { path: `${screenPath}.composition`, message: "expressive-menu contracts should include composition metadata" };
+    case "expressive-menu-state-evidence":
+      return { path: `${screenPath}.states`, message: "expressive-menu contracts should include selected or focus-visible state evidence" };
+    case "expressive-menu-required-selected":
+      return { path: `${screenPath}.requiredStates`, message: "expressive-menu contracts should require selected state" };
+    case "expressive-menu-required-hover":
+      return { path: `${screenPath}.requiredStates`, message: "expressive-menu contracts should require hover state" };
+    case "expressive-menu-required-focus-visible":
+      return { path: `${screenPath}.requiredStates`, message: "expressive-menu contracts should require focus-visible state" };
   }
 }
 
@@ -910,44 +994,47 @@ function collectMarkers(screen: UiContractScreen): UiMarkerContract[] {
   ];
 }
 
-function validateWidthPolicy(
-  width: UiWidthPolicy,
+function validateLayoutPolicy(
+  width: UiWidthPolicy | undefined,
+  height: UiHeightPolicy | undefined,
+  display: UiDisplayPolicy | undefined,
   path: string,
   issues: UiContractIssue[],
 ): void {
-  if (width.kind === "fluid" && width.min === undefined && width.max === undefined) {
-    issues.push({ path, message: "fluid width must declare min or max" });
-  }
-  if (width.kind === "fixed" && width.value <= 0) {
-    issues.push({ path, message: "fixed width must be positive" });
+  const issueIds = computeUiContractLayoutIssueIds({
+    widthKind: width?.kind,
+    widthMinPresent: width?.kind === "fluid" && width.min !== undefined,
+    widthMaxPresent: width?.kind === "fluid" && width.max !== undefined,
+    widthValue: width?.kind === "fixed" ? width.value : 0,
+    heightKind: height?.kind,
+    heightValue: height?.kind === "fixed" ? height.value : 0,
+    heightMax: height?.kind === "scrollport" ? height.max : 0,
+    displayKind: display?.kind,
+    displayColumnsCount: display?.kind === "grid" ? display.columns.length : 0,
+    displayRowsCount: display?.kind === "grid" ? display.rows.length : 0,
+  });
+  for (const issueId of issueIds) {
+    issues.push(uiContractLayoutIssue(issueId, path));
   }
 }
 
-function validateHeightPolicy(
-  height: UiHeightPolicy,
+function uiContractLayoutIssue(
+  issueId: MarkupCoreUiContractLayoutIssueId,
   path: string,
-  issues: UiContractIssue[],
-): void {
-  if (height.kind === "fixed" && height.value <= 0) {
-    issues.push({ path, message: "fixed height must be positive" });
-  }
-  if (height.kind === "scrollport" && height.max <= 0) {
-    issues.push({ path, message: "scrollport height must declare a positive max" });
-  }
-}
-
-function validateDisplayPolicy(
-  display: UiDisplayPolicy,
-  path: string,
-  issues: UiContractIssue[],
-): void {
-  if (display.kind === "grid") {
-    if (display.columns.length === 0) {
-      issues.push({ path: `${path}.columns`, message: "grid display requires at least one column track" });
-    }
-    if (display.rows.length === 0) {
-      issues.push({ path: `${path}.rows`, message: "grid display requires at least one row track" });
-    }
+): UiContractIssue {
+  switch (issueId) {
+    case "layout-width-fluid-bounds":
+      return { path: `${path}.width`, message: "fluid width must declare min or max" };
+    case "layout-width-fixed-positive":
+      return { path: `${path}.width`, message: "fixed width must be positive" };
+    case "layout-height-fixed-positive":
+      return { path: `${path}.height`, message: "fixed height must be positive" };
+    case "layout-height-scrollport-max-positive":
+      return { path: `${path}.height`, message: "scrollport height must declare a positive max" };
+    case "layout-grid-columns":
+      return { path: `${path}.display.columns`, message: "grid display requires at least one column track" };
+    case "layout-grid-rows":
+      return { path: `${path}.display.rows`, message: "grid display requires at least one row track" };
   }
 }
 

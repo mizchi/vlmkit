@@ -1,6 +1,11 @@
 import type { Page } from "playwright";
 import type { LandscapeCellDiff } from "@mizchi/vlmkit-core/landscape-diff.ts";
 import type { HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
+import {
+  computeSemanticDrilldownPolicy,
+  selectMarkupCoreSemanticDrilldownIndex,
+  type MarkupCoreSemanticDrilldownReasonId,
+} from "../markup-core-runtime.ts";
 
 export const LANDMARK_ROLE_VALUES = [
   "banner",
@@ -196,6 +201,19 @@ function dominantKinds(regions: HeatmapRegion[]): string[] {
   return [...kinds];
 }
 
+function formatSemanticDrilldownReason(
+  reasonId: MarkupCoreSemanticDrilldownReasonId,
+  kinds: string[],
+): string {
+  if (reasonId === "coarse-landscape") {
+    return "coarse landscape cells changed inside this landmark; fix geometry, spacing, and section placement first";
+  }
+  if (reasonId === "local-kinds" && kinds.length > 0) {
+    return `local ${kinds.join("/")} diff inside a stable landmark; fix paint, media, or copy after layout`;
+  }
+  return "local pixel diff inside a stable landmark; inspect decorative details";
+}
+
 function isNone(value: string): boolean {
   return value === "" || value === "none" || value === "auto";
 }
@@ -315,26 +333,22 @@ export function buildSemanticDrilldown(input: SemanticDrilldownInput): SemanticD
       heatmapArea += overlapArea(landmark.bbox, heatmapRect(region));
     }
     const decorationScore = Math.min(1, heatmapArea / landmarkArea);
-    const flow = layoutScore >= 0.08 ? "layout" : "decoration";
-    const priorityScore = flow === "layout"
-      ? layoutScore + decorationScore * 0.25
-      : decorationScore + layoutScore * 0.25;
     const kinds = dominantKinds(overlappingHeatmap);
-    const reason = flow === "layout"
-      ? "coarse landscape cells changed inside this landmark; fix geometry, spacing, and section placement first"
-      : kinds.length > 0
-        ? `local ${kinds.join("/")} diff inside a stable landmark; fix paint, media, or copy after layout`
-        : "local pixel diff inside a stable landmark; inspect decorative details";
+    const policy = computeSemanticDrilldownPolicy(
+      layoutScore,
+      decorationScore,
+      kinds.length,
+    );
 
     rows.push({
       landmark,
-      flow,
-      priorityScore,
+      flow: policy.flow,
+      priorityScore: policy.priorityScore,
       layoutScore,
       decorationScore,
       landscapeCells: overlappingCells,
       heatmapRegions: overlappingHeatmap,
-      reason,
+      reason: formatSemanticDrilldownReason(policy.reasonId, kinds),
     });
   }
 
@@ -346,10 +360,12 @@ export function buildSemanticDrilldown(input: SemanticDrilldownInput): SemanticD
 export function selectNextSemanticDrilldown(
   entries: SemanticDrilldownEntry[],
 ): SemanticDrilldownEntry | undefined {
-  return entries
-    .filter((entry) => entry.flow === "layout")
-    .sort((a, b) => b.priorityScore - a.priorityScore || a.landmark.order - b.landmark.order)[0]
-    ?? entries[0];
+  const index = selectMarkupCoreSemanticDrilldownIndex(entries.map((entry) => ({
+    flow: entry.flow,
+    priorityScore: entry.priorityScore,
+    order: entry.landmark.order,
+  })));
+  return index === undefined ? undefined : entries[index];
 }
 
 export async function captureLandmarkRegions(

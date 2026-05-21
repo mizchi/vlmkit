@@ -40,10 +40,29 @@ import { runComponentFromImage } from "@mizchi/vlmkit-markup/component/component
 
 | Domain | Module | Purpose |
 |---|---|---|
+| MoonBit policy core | `markup-core`, `markup-core-cli` | Pure component-goal, contract-plan, semantic-drilldown, and UI-contract evidence policy compiled to JS and called from TypeScript wrappers. |
 | Component geometry | `component/component-geometry`, `component/component-bbox` | BBox / DOM geometry helpers. |
 | Palette | `style/palette-diff`, `style/palette-extract` | Color extraction + diff. |
 | Project graph | `inspect/dep-graph`, `inspect/introspect` | Build dep graph; generate `spec.json` from a11y snapshots. |
 | Heal | `heal/fix-prompt` | Markdown fix-prompt for snapshot diffs. |
+
+## MoonBit core boundary
+
+`evaluateComponentGoal()` keeps the public TypeScript API and report-summary
+formatting, but delegates the deterministic pass / review / fail decision to
+the MoonBit `markup-core` package through the generated JS CLI.
+`deriveComponentContractPlan()` likewise keeps JSON object shaping in
+TypeScript while MoonBit owns probe-state normalization and scroll-target
+selection policy.
+`buildSemanticDrilldown()` keeps browser capture and overlap scoring in
+TypeScript while MoonBit owns layout-vs-decoration flow selection, priority
+scoring, reason ids, and next-action ordering.
+`validateUiContract()` keeps JSON traversal, issue paths, and report text in
+TypeScript while MoonBit owns pattern-specific evidence and layout-policy issue
+id selection, plus state and expected-scrollport predicate ids.
+
+This keeps the policy owner single while TypeScript continues to own file I/O,
+Playwright/browser integration, and package ergonomics.
 
 ## What's included (CLI commands, deep import)
 
