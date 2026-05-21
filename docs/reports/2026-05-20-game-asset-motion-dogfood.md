@@ -238,7 +238,8 @@ schema out of the dogfood directory.
      frame (`visiblePixelRatio=0.0111`) plus WebGPU invalid texture/command
      buffer warnings. Kagura's own `test_scene.glb` fails the same way, so this
      is a headless Kagura/WebGPU smoke blocker rather than a generated-asset
-     blocker.
+     blocker. The probe now separates frame-signal from frame-substance checks:
+     a render submit can be observed even while the visible frame remains black.
    - Next step is to fix/calibrate the Kagura headless render path and expose
      real clip playback status, then emit load status, clip status, and frame
      status in the same structured JSON style.

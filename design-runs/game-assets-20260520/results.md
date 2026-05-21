@@ -375,6 +375,10 @@ Learned:
   canvas can exist while still rendering black; foreground/visible-pixel checks
   and browser validation warnings must be part of the contract before trusting
   a Kagura import.
+- Frame submission is not enough. The current Kagura probe reports a submitted
+  render (`lastRenderCpuMs` / `lastRenderSubmitCpuMs` are non-zero) while the
+  visible frame still fails, so runtime smoke must keep frame-signal and
+  frame-substance checks separate.
 - Always calibrate runtime probes against a known-good engine asset before
   blaming a generated asset. In this loop, Kagura's bundled GLB and vlmkit's
   GLBs fail identically under headless Playwright, which moves the next fix to

@@ -1114,7 +1114,9 @@ Current smoke status:
   correctly fails on a black frame (`visiblePixelRatio=0.0111`) and WebGPU
   validation warnings. The same failure reproduces with Kagura's bundled
   `test_scene.glb`, so the current blocker is the headless Kagura/WebGPU smoke
-  path rather than the vlmkit GLB. Clip playback remains pending viewer support.
+  path rather than the vlmkit GLB. The probe now separates frame-signal from
+  frame-substance checks: the robot run reports a render submit while the
+  visible frame still fails. Clip playback remains pending viewer support.
 
 Stepwise cleanup:
 

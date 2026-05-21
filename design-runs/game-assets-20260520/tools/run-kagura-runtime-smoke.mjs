@@ -129,7 +129,8 @@ async function runKaguraRuntimeSmoke(args) {
       undefined,
       { timeout: args.timeoutMs },
     );
-    await page.waitForTimeout(500);
+    const frameSignal = await waitForFrameSignal(page, Math.min(5_000, args.timeoutMs));
+    await waitForAnimationFrames(page, 2);
     const canvasInfo = await page.locator("#app").evaluate((canvas) => ({
       tagName: canvas.tagName,
       width: canvas.width,
@@ -150,6 +151,19 @@ async function runKaguraRuntimeSmoke(args) {
       status: "pass",
       canvas: canvasInfo,
     });
+    checks.push({
+      id: "runtime-frame-signal",
+      status: frameSignal.ok ? "pass" : "fail",
+      lastCompletedFrameMs: frameSignal.lastCompletedFrameMs,
+      lastRenderCpuMs: frameSignal.lastRenderCpuMs,
+      lastRenderSubmitCpuMs: frameSignal.lastRenderSubmitCpuMs,
+    });
+    if (!frameSignal.ok) {
+      failures.push({
+        path: "runtime-frame-signal",
+        reason: "Kagura did not report a completed or submitted render frame",
+      });
+    }
     checks.push({
       id: "runtime-frame",
       status: frame.nonDominantPixelRatio >= args.minChangedPixelRatio &&
@@ -306,6 +320,45 @@ async function waitForHttp(url, timeoutMs) {
 
 function delay(ms) {
   return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
+}
+
+async function waitForFrameSignal(page, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let lastState = await readFrameSignal(page);
+  while (Date.now() < deadline) {
+    if (lastState.ok) return lastState;
+    await page.waitForTimeout(100);
+    lastState = await readFrameSignal(page);
+  }
+  return lastState;
+}
+
+async function readFrameSignal(page) {
+  return page.evaluate(() => {
+    const gfx = globalThis.__kaguraGfx;
+    const lastGpu = globalThis.__kaguraLastGpu;
+    const lastCompletedFrameMs = Number(gfx?.lastCompletedFrameMs?.() ?? lastGpu?._lastCompletedFrameMs ?? 0);
+    const lastRenderCpuMs = Number(gfx?.lastRenderCpuMs?.() ?? lastGpu?._lastRenderCpuMs ?? 0);
+    const lastRenderSubmitCpuMs = Number(gfx?.lastRenderSubmitCpuMs?.() ?? lastGpu?._lastRenderSubmitCpuMs ?? 0);
+    return {
+      ok: lastCompletedFrameMs > 0 || lastRenderSubmitCpuMs > 0 || lastRenderCpuMs > 0,
+      lastCompletedFrameMs,
+      lastRenderCpuMs,
+      lastRenderSubmitCpuMs,
+    };
+  });
+}
+
+async function waitForAnimationFrames(page, count) {
+  await page.evaluate((frameCount) => new Promise((resolvePromise) => {
+    let remaining = Math.max(0, frameCount | 0);
+    const tick = () => {
+      remaining -= 1;
+      if (remaining <= 0) resolvePromise(undefined);
+      else requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }), count);
 }
 
 function analyzePngFrame(buffer) {
