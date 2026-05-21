@@ -276,13 +276,12 @@ Observed shape:
   `mizchi/kagura`, but it pins the contract a Kagura runtime smoke must satisfy.
 - Kagura runtime smoke probe: `run-kagura-runtime-smoke.mjs` starts local
   `mizchi/kagura` `gltf_viewer`, serves the vlmkit GLB through a CORS asset
-  server, and captures the canvas with Playwright. The first robot run reaches
-  the canvas but correctly fails the frame gate: `visiblePixelRatio=0.0111`
-  with WebGPU invalid texture/texture-view/command-buffer warnings. This is a
-  useful failure because the previous pre-runtime gate could only prove that
-  paths, clips, and snapshots existed. The same failure reproduces with
-  Kagura's bundled `examples/gltf_viewer/assets/test_scene.glb`, so the current
-  blocker is the headless Kagura/WebGPU smoke path rather than vlmkit GLB shape.
+  server, and captures the canvas with Playwright. After the Kagura WebGPU
+  readback fix, the robot handoff passes runtime load, frame-signal, and
+  frame-substance checks via `webgpu-readback` with `visiblePixelRatio` around
+  0.64. This upgrades the runtime smoke from "environment blocker" to a useful
+  local gate for at least the robot handoff. Clip playback is still only
+  reported as pending viewer support.
 - retarget profile: `robot-voxel` (`simple-rig` is an alias)
 - quality verdict: `pass`
 - retarget weighted score: 1.0, penalty 0
@@ -375,18 +374,20 @@ Learned:
   canvas can exist while still rendering black; foreground/visible-pixel checks
   and browser validation warnings must be part of the contract before trusting
   a Kagura import.
-- Frame submission is not enough. The current Kagura probe reports a submitted
-  render (`lastRenderCpuMs` / `lastRenderSubmitCpuMs` are non-zero) while the
-  visible frame still fails, so runtime smoke must keep frame-signal and
-  frame-substance checks separate.
+- Frame submission is not enough. Keep frame-signal and frame-substance checks
+  separate even though the current robot smoke passes; this prevents a future
+  submitted-but-empty frame from being treated as an asset import success.
 - Always calibrate runtime probes against a known-good engine asset before
-  blaming a generated asset. In this loop, Kagura's bundled GLB and vlmkit's
-  GLBs fail identically under headless Playwright, which moves the next fix to
-  the Kagura smoke environment or renderer path.
+  blaming a generated asset. The current robot handoff passes, but calibration
+  remains necessary before promoting this into a CI gate.
 - `run-kagura-runtime-smoke.mjs --calibration-contract <known-good>` now makes
   that calibration mechanical. If both target and calibration fail, the report
   sets `environmentLikelyBroken: true` so the autonomous loop does not spend
   time tuning generated GLB output for an environment-level failure.
+- Runtime smoke now records an explicit `outcome.status`. A target +
+  calibration double-fail becomes `environment-failed`, and
+  `--allow-environment-failure` can soft-pass that state while still failing
+  `asset-failed` when calibration succeeds.
 - Published Moon package integration needs a separate compile-time smoke from
   browser runtime smoke. The first `mizchi/kagura` facade was technically
   importable but not useful from a consumer without touching `kagura_core`

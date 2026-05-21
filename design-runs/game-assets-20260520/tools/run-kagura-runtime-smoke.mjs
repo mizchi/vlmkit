@@ -6,6 +6,11 @@ import { spawn } from "node:child_process";
 import { dirname, relative, resolve } from "node:path";
 import { PNG } from "pngjs";
 import { chromium } from "playwright";
+import {
+  classifyRuntimeOutcome,
+  sanitizeServerLogLine,
+  shouldFailProcess,
+} from "./kagura-runtime-smoke-utils.mjs";
 
 const repoRoot = resolve(new URL("../../..", import.meta.url).pathname);
 const defaultKaguraRepo = resolve(repoRoot, "..", "kagura");
@@ -21,6 +26,7 @@ function parseArgs(argv) {
     timeoutMs: 90_000,
     minChangedPixelRatio: 0.01,
     minVisiblePixelRatio: 0.03,
+    allowEnvironmentFailure: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -35,6 +41,8 @@ function parseArgs(argv) {
       args.minChangedPixelRatio = Number(required(argv, ++i, arg));
     } else if (arg === "--min-visible-pixel-ratio") {
       args.minVisiblePixelRatio = Number(required(argv, ++i, arg));
+    } else if (arg === "--allow-environment-failure") {
+      args.allowEnvironmentFailure = true;
     }
     else if (arg === "--help" || arg === "-h") {
       console.log(`Usage:
@@ -50,6 +58,7 @@ Options:
   --timeout-ms <n>                   Startup/browser timeout (default: 90000)
   --min-changed-pixel-ratio <n>      Minimum non-flat canvas ratio (default: 0.01)
   --min-visible-pixel-ratio <n>      Minimum non-dark canvas ratio (default: 0.03)
+  --allow-environment-failure        Exit 0 when target and calibration both fail
 `);
       process.exit(0);
     } else {
@@ -70,6 +79,7 @@ function required(argv, index, flag) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const report = await runKaguraRuntimeSmoke(args);
+  let calibrationOk = null;
   if (args.calibrationContract) {
     const calibration = await runKaguraRuntimeSmoke({
       ...args,
@@ -79,12 +89,18 @@ async function main() {
       calibrationContract: "",
       port: args.port + 1,
     });
+    calibrationOk = calibration.ok;
     report.calibration = summarizeCalibration(calibration);
-    report.environmentLikelyBroken = report.ok === false && calibration.ok === false;
   }
+  report.outcome = classifyRuntimeOutcome({
+    targetOk: report.ok,
+    calibrationOk,
+  });
+  report.environmentLikelyBroken = report.outcome.environmentLikelyBroken;
+  report.assetLikelyBroken = report.outcome.assetLikelyBroken;
   await writeFile(args.out, `${JSON.stringify(report, null, 2)}\n`);
-  console.log(`${report.ok ? "OK" : "FAIL"} ${relative(repoRoot, args.out)}`);
-  if (!report.ok) process.exit(1);
+  console.log(`${report.outcome.status.toUpperCase()} ${relative(repoRoot, args.out)}`);
+  if (shouldFailProcess(report.outcome, args)) process.exit(1);
 }
 
 function summarizeCalibration(report) {
@@ -226,7 +242,13 @@ async function runKaguraRuntimeSmoke(args) {
     if (assetServer) await assetServer.close();
   }
   if (serverLogs.length > 0) {
-    checks.push({ id: "kagura-server-log-tail", status: "info", lines: serverLogs.slice(-10) });
+    checks.push({
+      id: "kagura-server-log-tail",
+      status: "info",
+      lines: serverLogs
+        .slice(-10)
+        .map((line) => sanitizeServerLogLine(line, { kaguraRepo: args.kaguraRepo })),
+    });
   }
   if (pageErrors.length > 0) {
     failures.push({ path: "pageerror", reason: pageErrors.join("\n") });

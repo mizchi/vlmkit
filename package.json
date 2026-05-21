@@ -54,6 +54,7 @@
     "moon:parity:game-assets": "node design-runs/game-assets-20260520/tools/check-motion-core-parity.mjs",
     "motion:retarget-profiles:game-assets": "node design-runs/game-assets-20260520/tools/check-retarget-profiles.mjs",
     "motion:kagura-handoff:game-assets": "node design-runs/game-assets-20260520/tools/check-kagura-handoffs.mjs",
+    "motion:kagura-runtime-utils:game-assets": "node --test design-runs/game-assets-20260520/tools/kagura-runtime-smoke-utils.test.mjs",
     "vrt": "playwright test",
     "vrt:update": "playwright test --update-snapshots"
   },

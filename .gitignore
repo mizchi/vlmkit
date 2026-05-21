@@ -4,6 +4,7 @@ node_modules/
 dist/
 test-results/
 design-runs/game-assets-20260520/**/pkg.generated.mbti
+design-runs/game-assets-20260520/models/**/*.kagura-runtime-smoke.json
 baselines/
 snapshots/
 output/

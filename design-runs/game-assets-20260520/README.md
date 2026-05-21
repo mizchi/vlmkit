@@ -248,12 +248,15 @@ shared tools now live in `tools/`:
 - `tools/run-kagura-runtime-smoke.mjs`: experimental Kagura `gltf_viewer`
   runtime probe. It serves the handoff GLB to local `mizchi/kagura`, opens the
   viewer with Playwright/WebGPU flags, and checks for non-empty canvas output.
-  The current robot run reaches runtime load but fails on a black frame and
-  WebGPU validation warnings. The probe now records a separate frame-signal
-  check, so "render submitted" and "visible frame rendered" do not collapse into
-  the same status. Kagura's bundled `test_scene.glb` fails the same way in this
-  headless path; pass `--calibration-contract` to record that comparison in the
-  same report and mark environment-level failures. This is not yet a CI gate.
+  The current robot run passes load, frame-signal, and frame-substance checks
+  through WebGPU readback (`visiblePixelRatio` around 0.64). The probe keeps
+  frame-signal and frame-substance separate, so "render submitted" and "visible
+  frame rendered" do not collapse into the same status. Pass
+  `--calibration-contract` to compare against a known-good engine asset in the
+  same report, and `--allow-environment-failure` when an autonomous loop should
+  treat a target + calibration double-fail as an environment block instead of
+  an asset failure. Clip playback remains pending viewer support, so this is
+  not yet a full CI gate.
 - `tools/apply-motion-ir.mjs`: retarget normalized humanoid motion IR and write
   derived GLB animation clips; supports root translation policies for simplified
   target rigs and `--audit-out` normalization reports with target bind metrics
@@ -417,10 +420,17 @@ node design-runs/game-assets-20260520/tools/run-kagura-runtime-smoke.mjs \
   --screenshot /tmp/vlmkit-kagura-runtime-smoke.png
 ```
 
+Current robot runtime smoke status: load pass, frame-signal pass,
+frame-substance pass via `webgpu-readback`, with `visiblePixelRatio` around
+0.64. Runtime smoke JSON is local-only because frame timing and readback ids are
+expected to vary per run.
+
 For headless-environment debugging, pass a known Kagura asset as a separate
 contract with `--calibration-contract`. If both target and calibration fail, the
-report sets `environmentLikelyBroken: true` instead of blaming the generated
-asset first.
+report sets `outcome.status: "environment-failed"` and
+`environmentLikelyBroken: true` instead of blaming the generated asset first.
+Use `--allow-environment-failure` to exit 0 for that blocked-environment state
+while still exiting non-zero when the calibration passes and the target fails.
 
 Implementation note:
 
