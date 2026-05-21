@@ -249,7 +249,8 @@ shared tools now live in `tools/`:
   runtime probe. It serves the handoff GLB to local `mizchi/kagura`, opens the
   viewer with Playwright/WebGPU flags, and checks for non-empty canvas output.
   The current robot run reaches runtime load but fails on a black frame and
-  WebGPU validation warnings, so it is not yet a CI gate.
+  WebGPU validation warnings. Kagura's bundled `test_scene.glb` fails the same
+  way in this headless path, so this is not yet a CI gate.
 - `tools/apply-motion-ir.mjs`: retarget normalized humanoid motion IR and write
   derived GLB animation clips; supports root translation policies for simplified
   target rigs and `--audit-out` normalization reports with target bind metrics

@@ -280,7 +280,9 @@ Observed shape:
   the canvas but correctly fails the frame gate: `visiblePixelRatio=0.0111`
   with WebGPU invalid texture/texture-view/command-buffer warnings. This is a
   useful failure because the previous pre-runtime gate could only prove that
-  paths, clips, and snapshots existed.
+  paths, clips, and snapshots existed. The same failure reproduces with
+  Kagura's bundled `examples/gltf_viewer/assets/test_scene.glb`, so the current
+  blocker is the headless Kagura/WebGPU smoke path rather than vlmkit GLB shape.
 - retarget profile: `robot-voxel` (`simple-rig` is an alias)
 - quality verdict: `pass`
 - retarget weighted score: 1.0, penalty 0
@@ -373,3 +375,7 @@ Learned:
   canvas can exist while still rendering black; foreground/visible-pixel checks
   and browser validation warnings must be part of the contract before trusting
   a Kagura import.
+- Always calibrate runtime probes against a known-good engine asset before
+  blaming a generated asset. In this loop, Kagura's bundled GLB and vlmkit's
+  GLBs fail identically under headless Playwright, which moves the next fix to
+  the Kagura smoke environment or renderer path.

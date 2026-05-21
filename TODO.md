@@ -1112,7 +1112,9 @@ Current smoke status:
   serves a vlmkit GLB through a CORS asset server, opens it with Playwright, and
   reports runtime load/frame status. First robot run reaches the canvas but
   correctly fails on a black frame (`visiblePixelRatio=0.0111`) and WebGPU
-  validation warnings; clip playback remains pending viewer support.
+  validation warnings. The same failure reproduces with Kagura's bundled
+  `test_scene.glb`, so the current blocker is the headless Kagura/WebGPU smoke
+  path rather than the vlmkit GLB. Clip playback remains pending viewer support.
 
 Stepwise cleanup:
 
@@ -1197,8 +1199,9 @@ Stepwise cleanup:
   scale/origin convention, fixed camera snapshots, and checked render reports.
   An experimental runtime probe now loads the GLB through Kagura `gltf_viewer`,
   but the first headless run fails on WebGPU invalid texture/command-buffer
-  warnings and a black frame. Remaining work is fixing the Kagura runtime
-  render path for this asset and exposing real clip playback status.
+  warnings and a black frame; Kagura's own `test_scene.glb` fails the same way.
+  Remaining work is fixing/calibrating the Kagura headless runtime smoke path
+  and exposing real clip playback status.
 - [ ] **G8. Mixamo / FBX adapter decision.** Decide whether to convert FBX
   through an external tool or parse a converted GLB. The output contract
   should still be the same Motion IR.

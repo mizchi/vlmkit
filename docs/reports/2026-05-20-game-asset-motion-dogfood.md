@@ -236,10 +236,12 @@ schema out of the dogfood directory.
      local `mizchi/kagura` `gltf_viewer` and captures the canvas with
      Playwright. The first robot run reaches canvas load but fails on a black
      frame (`visiblePixelRatio=0.0111`) plus WebGPU invalid texture/command
-     buffer warnings.
-   - Next step is to fix the Kagura render path for this handoff and expose real
-     clip playback status, then emit load status, clip status, and frame status
-     in the same structured JSON style.
+     buffer warnings. Kagura's own `test_scene.glb` fails the same way, so this
+     is a headless Kagura/WebGPU smoke blocker rather than a generated-asset
+     blocker.
+   - Next step is to fix/calibrate the Kagura headless render path and expose
+     real clip playback status, then emit load status, clip status, and frame
+     status in the same structured JSON style.
 
 6. **Promote stable tools**
    - After the retarget and normalization policy stabilizes, move Motion IR,
