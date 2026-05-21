@@ -288,6 +288,22 @@ fn main_err() -> Unit raise {
       println(@core.ui_contract_decoration_palette_issue_ids(role, value))
     ["ui-contract-decoration-media-issue-ids", slot] =>
       println(@core.ui_contract_decoration_media_issue_ids(slot))
+    ["ui-contract-content-items-issue-ids", exact_present, exact] =>
+      println(
+        @core.ui_contract_content_items_issue_ids(
+          parse_bool(exact_present),
+          parse_double(exact),
+        ),
+      )
+    ["ui-contract-content-text-issue-ids", row_count_present, row_count] =>
+      println(
+        @core.ui_contract_content_text_issue_ids(
+          parse_bool(row_count_present),
+          parse_double(row_count),
+        ),
+      )
+    ["ui-contract-composition-contrast-palette-issue-ids", value] =>
+      println(@core.ui_contract_composition_contrast_palette_issue_ids(value))
     [
       "ui-contract-layout-issue-ids",
       width_kind,
@@ -426,6 +442,9 @@ fn is_command(value : String) -> Bool {
   value == "ui-contract-decoration-typography-issue-ids" ||
   value == "ui-contract-decoration-palette-issue-ids" ||
   value == "ui-contract-decoration-media-issue-ids" ||
+  value == "ui-contract-content-items-issue-ids" ||
+  value == "ui-contract-content-text-issue-ids" ||
+  value == "ui-contract-composition-contrast-palette-issue-ids" ||
   value == "ui-contract-layout-issue-ids" ||
   value == "ui-contract-state-issue-ids" ||
   value == "ui-contract-required-state-issue-ids" ||
@@ -503,6 +522,6 @@ fn parse_int_list(value : String) -> Array[Int] raise {
 ///|
 fn print_usage() -> Unit {
   println(
-    "Usage: markup-core-cli component-goal-status <...> | is-component-probe-state <state> | is-forced-pseudo-state <state> | component-probe-states <kind|kind> | merge-component-probe-states <explicit|...> <injected|...> | component-scroll-target-source <kind|kind> <state-target-count> | semantic-drilldown-policy <layout-score> <decoration-score> <heatmap-kind-count> | semantic-drilldown-select-index <flow|...> <priority|...> <order|...> | ui-contract-pattern-evidence-issue-ids <pattern> <marker|...> <required-state|...> <state|...> <expected-scrollport-count> <has-composition> <has-canvas-state-hook> <canvas-field|...> | ui-contract-marker-issue-ids <kind> <required> <has-selector> <has-attribute> <has-target> | ui-contract-optional-range-issue-ids <has-min> <min> <has-max> <max> | ui-contract-slot-issue-ids <id> | ui-contract-asset-issue-ids <id> | ui-contract-canvas-issue-ids <has-state-hook> <required-state-field-count> | ui-contract-canvas-input-issue-ids <action> | ui-contract-canvas-hud-issue-ids <id> | ui-contract-composition-issue-ids <style> | ui-contract-composition-axis-issue-ids <axis> | ui-contract-composition-layer-issue-ids <id> <role> <duplicate-id> <has-z> <z-finite> | ui-contract-composition-shape-issue-ids <id> <kind> <duplicate-id> | ui-contract-composition-motion-issue-ids <id> <trigger> <effect> <duplicate-id> <has-duration> <duration-ms> | ui-contract-composition-contrast-issue-ids <mode> <has-min-ratio> <min-ratio> | ui-contract-decoration-typography-issue-ids <role> <has-size> <size> <has-line-height> <line-height> | ui-contract-decoration-palette-issue-ids <role> <value> | ui-contract-decoration-media-issue-ids <slot> | ui-contract-layout-issue-ids <width-kind> <has-min> <has-max> <width-value> <height-kind> <height-value> <height-max> <display-kind> <columns> <rows> | ui-contract-state-issue-ids <id> <kind> <required> <has-selector> <has-trigger> | ui-contract-required-state-issue-ids <id> <kind> <required> <has-selector> <has-trigger> <duplicate-id> <has-min-change-ratio> <min-change-ratio> | ui-contract-expected-scrollport-issue-ids <id> <axis> <required> <has-selector> <has-name> <has-landmark-id> <duplicate-id> <has-min-overflow> <min-overflow>",
+    "Usage: markup-core-cli component-goal-status <...> | is-component-probe-state <state> | is-forced-pseudo-state <state> | component-probe-states <kind|kind> | merge-component-probe-states <explicit|...> <injected|...> | component-scroll-target-source <kind|kind> <state-target-count> | semantic-drilldown-policy <layout-score> <decoration-score> <heatmap-kind-count> | semantic-drilldown-select-index <flow|...> <priority|...> <order|...> | ui-contract-pattern-evidence-issue-ids <pattern> <marker|...> <required-state|...> <state|...> <expected-scrollport-count> <has-composition> <has-canvas-state-hook> <canvas-field|...> | ui-contract-marker-issue-ids <kind> <required> <has-selector> <has-attribute> <has-target> | ui-contract-optional-range-issue-ids <has-min> <min> <has-max> <max> | ui-contract-slot-issue-ids <id> | ui-contract-asset-issue-ids <id> | ui-contract-canvas-issue-ids <has-state-hook> <required-state-field-count> | ui-contract-canvas-input-issue-ids <action> | ui-contract-canvas-hud-issue-ids <id> | ui-contract-composition-issue-ids <style> | ui-contract-composition-axis-issue-ids <axis> | ui-contract-composition-layer-issue-ids <id> <role> <duplicate-id> <has-z> <z-finite> | ui-contract-composition-shape-issue-ids <id> <kind> <duplicate-id> | ui-contract-composition-motion-issue-ids <id> <trigger> <effect> <duplicate-id> <has-duration> <duration-ms> | ui-contract-composition-contrast-issue-ids <mode> <has-min-ratio> <min-ratio> | ui-contract-composition-contrast-palette-issue-ids <value> | ui-contract-decoration-typography-issue-ids <role> <has-size> <size> <has-line-height> <line-height> | ui-contract-decoration-palette-issue-ids <role> <value> | ui-contract-decoration-media-issue-ids <slot> | ui-contract-content-items-issue-ids <has-exact> <exact> | ui-contract-content-text-issue-ids <has-row-count> <row-count> | ui-contract-layout-issue-ids <width-kind> <has-min> <has-max> <width-value> <height-kind> <height-value> <height-max> <display-kind> <columns> <rows> | ui-contract-state-issue-ids <id> <kind> <required> <has-selector> <has-trigger> | ui-contract-required-state-issue-ids <id> <kind> <required> <has-selector> <has-trigger> <duplicate-id> <has-min-change-ratio> <min-change-ratio> | ui-contract-expected-scrollport-issue-ids <id> <axis> <required> <has-selector> <has-name> <has-landmark-id> <duplicate-id> <has-min-overflow> <min-overflow>",
   )
 }

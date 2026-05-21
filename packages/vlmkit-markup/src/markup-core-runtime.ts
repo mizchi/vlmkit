@@ -263,6 +263,9 @@ export type MarkupCoreUiContractCompositionContrastIssueId =
   | "contrast-mode-unknown"
   | "contrast-min-ratio-positive";
 
+export type MarkupCoreUiContractCompositionContrastPaletteIssueId =
+  "contrast-palette-value-hex";
+
 export type MarkupCoreUiContractDecorationTypographyIssueId =
   | "typography-role-required"
   | "typography-size-positive"
@@ -274,6 +277,12 @@ export type MarkupCoreUiContractDecorationPaletteIssueId =
 
 export type MarkupCoreUiContractDecorationMediaIssueId =
   "media-slot-required";
+
+export type MarkupCoreUiContractContentItemsIssueId =
+  "content-items-exact-non-negative";
+
+export type MarkupCoreUiContractContentTextIssueId =
+  "content-text-row-count-non-negative";
 
 export type MarkupCoreUiContractLayoutIssueId =
   | "layout-width-fluid-bounds"
@@ -555,6 +564,21 @@ export function computeUiContractCompositionContrastIssueIds(input: {
   });
 }
 
+export function computeUiContractCompositionContrastPaletteIssueIds(input: {
+  value: string;
+}): MarkupCoreUiContractCompositionContrastPaletteIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-composition-contrast-palette-issue-ids",
+    input.value,
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractCompositionContrastPaletteIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(`unexpected markup-core UI contract composition contrast palette issue id: ${issueId}`);
+  });
+}
+
 export function computeUiContractDecorationTypographyIssueIds(input: {
   role: string;
   size?: number;
@@ -605,6 +629,38 @@ export function computeUiContractDecorationMediaIssueIds(input: {
       return issueId;
     }
     throw new Error(`unexpected markup-core UI contract decoration media issue id: ${issueId}`);
+  });
+}
+
+export function computeUiContractContentItemsIssueIds(input: {
+  exact?: number;
+}): MarkupCoreUiContractContentItemsIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-content-items-issue-ids",
+    boolArg(input.exact !== undefined),
+    doubleArg(input.exact ?? 0),
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractContentItemsIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(`unexpected markup-core UI contract content items issue id: ${issueId}`);
+  });
+}
+
+export function computeUiContractContentTextIssueIds(input: {
+  rowCount?: number;
+}): MarkupCoreUiContractContentTextIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-content-text-issue-ids",
+    boolArg(input.rowCount !== undefined),
+    doubleArg(input.rowCount ?? 0),
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractContentTextIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(`unexpected markup-core UI contract content text issue id: ${issueId}`);
   });
 }
 
@@ -866,6 +922,12 @@ function isMarkupCoreUiContractCompositionContrastIssueId(
   );
 }
 
+function isMarkupCoreUiContractCompositionContrastPaletteIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractCompositionContrastPaletteIssueId {
+  return issueId === "contrast-palette-value-hex";
+}
+
 function isMarkupCoreUiContractDecorationTypographyIssueId(
   issueId: string,
 ): issueId is MarkupCoreUiContractDecorationTypographyIssueId {
@@ -889,6 +951,18 @@ function isMarkupCoreUiContractDecorationMediaIssueId(
   issueId: string,
 ): issueId is MarkupCoreUiContractDecorationMediaIssueId {
   return issueId === "media-slot-required";
+}
+
+function isMarkupCoreUiContractContentItemsIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractContentItemsIssueId {
+  return issueId === "content-items-exact-non-negative";
+}
+
+function isMarkupCoreUiContractContentTextIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractContentTextIssueId {
+  return issueId === "content-text-row-count-non-negative";
 }
 
 function isMarkupCoreUiContractStateIssueId(

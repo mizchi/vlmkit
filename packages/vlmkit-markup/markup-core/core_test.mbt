@@ -557,3 +557,25 @@ test "ui contract decoration issue policy" {
   )
   inspect(ui_contract_decoration_media_issue_ids("hero"), content="")
 }
+
+///|
+test "ui contract remaining scalar issue policy" {
+  inspect(
+    ui_contract_content_items_issue_ids(true, -1),
+    content="content-items-exact-non-negative",
+  )
+  inspect(ui_contract_content_items_issue_ids(false, 0), content="")
+  inspect(
+    ui_contract_content_text_issue_ids(true, -1),
+    content="content-text-row-count-non-negative",
+  )
+  inspect(ui_contract_content_text_issue_ids(false, 0), content="")
+  inspect(
+    ui_contract_composition_contrast_palette_issue_ids("red"),
+    content="contrast-palette-value-hex",
+  )
+  inspect(
+    ui_contract_composition_contrast_palette_issue_ids("#abc"),
+    content="",
+  )
+}

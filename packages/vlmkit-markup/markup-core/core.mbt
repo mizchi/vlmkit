@@ -708,6 +708,41 @@ pub fn ui_contract_decoration_media_issue_ids(slot : String) -> String {
 }
 
 ///|
+pub fn ui_contract_content_items_issue_ids(
+  exact_present : Bool,
+  exact : Double,
+) -> String {
+  if exact_present && exact < 0 {
+    "content-items-exact-non-negative"
+  } else {
+    ""
+  }
+}
+
+///|
+pub fn ui_contract_content_text_issue_ids(
+  row_count_present : Bool,
+  row_count : Double,
+) -> String {
+  if row_count_present && row_count < 0 {
+    "content-text-row-count-non-negative"
+  } else {
+    ""
+  }
+}
+
+///|
+pub fn ui_contract_composition_contrast_palette_issue_ids(
+  value : String,
+) -> String {
+  if !is_hex_color(value) {
+    "contrast-palette-value-hex"
+  } else {
+    ""
+  }
+}
+
+///|
 pub fn ui_contract_layout_issue_ids(
   width_kind : String,
   width_min_present : Bool,

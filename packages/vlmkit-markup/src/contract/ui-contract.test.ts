@@ -225,7 +225,8 @@ test("validateUiContract validates hierarchy and rich metadata ranges", () => {
   contract.screens[0]!.landmarks[0]!.repeat = { kind: "list", minItems: -1, maxItems: -2 };
   contract.screens[0]!.landmarks[1]!.content = {
     kind: "list",
-    items: { min: 4, max: 2 },
+    items: { exact: -1, min: 4, max: 2 },
+    text: { rowCount: -1 },
   };
   contract.screens[0]!.canvas = {
     requiredStateFields: ["mode"],
@@ -247,6 +248,8 @@ test("validateUiContract validates hierarchy and rich metadata ranges", () => {
   assert.ok(issues.some((issue) => issue.message.includes("min must be non-negative")));
   assert.ok(issues.some((issue) => issue.message.includes("max must be non-negative")));
   assert.ok(issues.some((issue) => issue.message.includes("min cannot exceed max")));
+  assert.ok(issues.some((issue) => issue.message.includes("exact must be non-negative")));
+  assert.ok(issues.some((issue) => issue.message.includes("rowCount must be non-negative")));
   assert.ok(issues.some((issue) => issue.message.includes("asset id is required")));
   assert.ok(issues.some((issue) => issue.message.includes("canvas stateHook")));
   assert.ok(issues.some((issue) => issue.message.includes("canvas input action")));

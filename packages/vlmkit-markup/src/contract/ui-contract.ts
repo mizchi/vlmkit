@@ -5,10 +5,13 @@ import {
   computeUiContractCanvasIssueIds,
   computeUiContractCompositionAxisIssueIds,
   computeUiContractCompositionContrastIssueIds,
+  computeUiContractCompositionContrastPaletteIssueIds,
   computeUiContractCompositionIssueIds,
   computeUiContractCompositionLayerIssueIds,
   computeUiContractCompositionMotionIssueIds,
   computeUiContractCompositionShapeIssueIds,
+  computeUiContractContentItemsIssueIds,
+  computeUiContractContentTextIssueIds,
   computeUiContractDecorationMediaIssueIds,
   computeUiContractDecorationPaletteIssueIds,
   computeUiContractDecorationTypographyIssueIds,
@@ -26,10 +29,13 @@ import {
   type MarkupCoreUiContractCanvasIssueId,
   type MarkupCoreUiContractCompositionAxisIssueId,
   type MarkupCoreUiContractCompositionContrastIssueId,
+  type MarkupCoreUiContractCompositionContrastPaletteIssueId,
   type MarkupCoreUiContractCompositionIssueId,
   type MarkupCoreUiContractCompositionLayerIssueId,
   type MarkupCoreUiContractCompositionMotionIssueId,
   type MarkupCoreUiContractCompositionShapeIssueId,
+  type MarkupCoreUiContractContentItemsIssueId,
+  type MarkupCoreUiContractContentTextIssueId,
   type MarkupCoreUiContractDecorationMediaIssueId,
   type MarkupCoreUiContractDecorationPaletteIssueId,
   type MarkupCoreUiContractDecorationTypographyIssueId,
@@ -805,8 +811,10 @@ function validateComposition(
     }
     for (let i = 0; i < (composition.contrast.palette?.length ?? 0); i++) {
       const value = composition.contrast.palette![i]!;
-      if (!isHexColor(value)) {
-        issues.push({ path: `${contrastPath}.palette[${i}]`, message: "composition contrast palette value must be a hex color" });
+      const palettePath = `${contrastPath}.palette[${i}]`;
+      const paletteIssueIds = computeUiContractCompositionContrastPaletteIssueIds({ value });
+      for (const issueId of paletteIssueIds) {
+        issues.push(uiContractCompositionContrastPaletteIssue(issueId, palettePath));
       }
     }
   }
@@ -892,6 +900,16 @@ function uiContractCompositionContrastIssue(
   }
 }
 
+function uiContractCompositionContrastPaletteIssue(
+  issueId: MarkupCoreUiContractCompositionContrastPaletteIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "contrast-palette-value-hex":
+      return { path, message: "composition contrast palette value must be a hex color" };
+  }
+}
+
 function validateContent(
   content: UiContentContract | undefined,
   path: string,
@@ -900,15 +918,41 @@ function validateContent(
   if (!content) return;
   if (content.items) {
     validateOptionalRange(content.items.min, content.items.max, `${path}.items`, issues);
-    if (content.items.exact !== undefined && content.items.exact < 0) {
-      issues.push({ path: `${path}.items.exact`, message: "exact must be non-negative" });
+    const issueIds = computeUiContractContentItemsIssueIds({
+      exact: content.items.exact,
+    });
+    for (const issueId of issueIds) {
+      issues.push(uiContractContentItemsIssue(issueId, `${path}.items`));
     }
   }
   if (content.text) {
     validateOptionalRange(content.text.minLength, content.text.maxLength, `${path}.text`, issues);
-    if (content.text.rowCount !== undefined && content.text.rowCount < 0) {
-      issues.push({ path: `${path}.text.rowCount`, message: "rowCount must be non-negative" });
+    const issueIds = computeUiContractContentTextIssueIds({
+      rowCount: content.text.rowCount,
+    });
+    for (const issueId of issueIds) {
+      issues.push(uiContractContentTextIssue(issueId, `${path}.text`));
     }
+  }
+}
+
+function uiContractContentItemsIssue(
+  issueId: MarkupCoreUiContractContentItemsIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "content-items-exact-non-negative":
+      return { path: `${path}.exact`, message: "exact must be non-negative" };
+  }
+}
+
+function uiContractContentTextIssue(
+  issueId: MarkupCoreUiContractContentTextIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "content-text-row-count-non-negative":
+      return { path: `${path}.rowCount`, message: "rowCount must be non-negative" };
   }
 }
 
@@ -1011,10 +1055,6 @@ function uiContractDecorationMediaIssue(
     case "media-slot-required":
       return { path: `${path}.slot`, message: "media treatment slot is required" };
   }
-}
-
-function isHexColor(value: string): boolean {
-  return /^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/iu.test(value);
 }
 
 function validateAssets(

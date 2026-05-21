@@ -1334,10 +1334,14 @@ Stepwise cleanup:
   decoration typography role/size/lineHeight, palette role/value hex, and media
   slot predicates now delegate to `markup-core`. TypeScript still owns
   decoration array traversal and report path/message mapping.
-- [ ] Continue UI Contract validator core:
-  move the remaining small scalar predicates, such as content exact/rowCount
-  non-negative checks and composition contrast palette hex checks, into MoonBit
-  while keeping TypeScript as the contract schema and report-text boundary.
+- [x] UI Contract remaining scalar validator slice:
+  content exact/rowCount non-negative checks and composition contrast palette
+  hex checks now delegate to `markup-core`. TypeScript keeps the schema shape
+  and nested path/message mapping.
+- [ ] Continue UI Contract boundary hardening:
+  decide whether top-level contract/screen/viewport/landmark checks should also
+  move into MoonBit, or stay in TypeScript because they are schema/report
+  boundary checks rather than reusable policy.
 - [x] Semantic drilldown selection policy slice:
   `component/semantic-drilldown.ts` now delegates layout-vs-decoration flow,
   priority scoring, reason id selection, and next-action ordering to
