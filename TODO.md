@@ -1126,6 +1126,12 @@ Current smoke status:
   `--allow-environment-failure` lets CI/autonomous loops soft-pass a target +
   calibration double-fail as an environment block while still failing real
   asset-only failures. Clip playback remains pending viewer support.
+- [x] Kagura runtime batch smoke:
+  `pnpm run motion:kagura-runtime:game-assets` runs the runtime load/frame
+  smoke against all local handoff contracts, writes local-only
+  `*.kagura-runtime-smoke.json` reports, and summarizes pass /
+  environment-failed / asset-failed / target-failed counts. Current local
+  batch status is 3/3 pass.
 
 Stepwise cleanup:
 
@@ -1209,9 +1215,9 @@ Stepwise cleanup:
   pre-runtime contract smoke: it validates the GLB path, clip ids, axes,
   scale/origin convention, fixed camera snapshots, and checked render reports.
   The runtime probe now loads the robot GLB through Kagura `gltf_viewer` and
-  passes load/frame-substance checks via WebGPU readback. Remaining work is
-  expanding runtime smoke beyond the robot handoff, adding known-good Kagura
-  calibration coverage, and exposing real clip playback status.
+  passes load/frame-substance checks via WebGPU readback. Batch runtime smoke
+  now covers all local handoff contracts. Remaining work is adding known-good
+  Kagura calibration coverage and exposing real clip playback status.
 - [ ] **G8. Mixamo / FBX adapter decision.** Decide whether to convert FBX
   through an external tool or parse a converted GLB. The output contract
   should still be the same Motion IR.

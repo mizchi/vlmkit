@@ -388,6 +388,12 @@ Learned:
   calibration double-fail becomes `environment-failed`, and
   `--allow-environment-failure` can soft-pass that state while still failing
   `asset-failed` when calibration succeeds.
+- Runtime smoke is now batch-runnable through
+  `pnpm run motion:kagura-runtime:game-assets`. The batch uses separate ports
+  per contract, writes ignored local reports next to each handoff, and prints
+  pass / environment-failed / asset-failed / target-failed counts. Current
+  batch status is 3/3 pass for `goblin-club-blockout`, `goblin-voxel`, and
+  `robot-voxel-motion`.
 - Published Moon package integration needs a separate compile-time smoke from
   browser runtime smoke. The first `mizchi/kagura` facade was technically
   importable but not useful from a consumer without touching `kagura_core`

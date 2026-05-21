@@ -4,6 +4,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { dirname, relative, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import { chromium } from "playwright";
 import {
@@ -30,7 +31,8 @@ function parseArgs(argv) {
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === "--contract") args.contract = resolve(required(argv, ++i, arg));
+    if (arg === "--") continue;
+    else if (arg === "--contract") args.contract = resolve(required(argv, ++i, arg));
     else if (arg === "--out") args.out = resolve(required(argv, ++i, arg));
     else if (arg === "--screenshot") args.screenshot = resolve(required(argv, ++i, arg));
     else if (arg === "--calibration-contract") args.calibrationContract = resolve(required(argv, ++i, arg));
@@ -114,7 +116,7 @@ function summarizeCalibration(report) {
   };
 }
 
-async function runKaguraRuntimeSmoke(args) {
+export async function runKaguraRuntimeSmoke(args) {
   const contract = JSON.parse(await readFile(args.contract, "utf8"));
   const contractDir = dirname(args.contract);
   const handoff = contract.kaguraHandoff;
@@ -474,7 +476,9 @@ function round(value) {
   return Math.round(value * 10000) / 10000;
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}

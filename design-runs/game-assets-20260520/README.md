@@ -245,6 +245,9 @@ shared tools now live in `tools/`:
   verification reports
 - `tools/check-kagura-handoffs.mjs`: batch runner for local Kagura handoff
   contracts; available as `pnpm run motion:kagura-handoff:game-assets`
+- `tools/check-kagura-runtime-smokes.mjs`: batch runner for Kagura runtime
+  load/frame smoke across all local handoffs; available as
+  `pnpm run motion:kagura-runtime:game-assets`
 - `tools/run-kagura-runtime-smoke.mjs`: experimental Kagura `gltf_viewer`
   runtime probe. It serves the handoff GLB to local `mizchi/kagura`, opens the
   viewer with Playwright/WebGPU flags, and checks for non-empty canvas output.
@@ -414,6 +417,7 @@ node design-runs/game-assets-20260520/tools/verify-renders.mjs \
 node design-runs/game-assets-20260520/tools/verify-asset-contract.mjs \
   --contract design-runs/game-assets-20260520/models/robot-voxel-motion/kagura-handoff.json
 pnpm run motion:kagura-handoff:game-assets
+pnpm run motion:kagura-runtime:game-assets
 node design-runs/game-assets-20260520/tools/run-kagura-runtime-smoke.mjs \
   --contract design-runs/game-assets-20260520/models/robot-voxel-motion/kagura-handoff.json \
   --out /tmp/vlmkit-kagura-runtime-smoke.json \
