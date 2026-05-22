@@ -1348,10 +1348,12 @@ Stepwise cleanup:
   priority scoring, reason id selection, and next-action ordering to
   `markup-core`. TypeScript still owns DOM/landmark capture, overlap scoring,
   heatmap kind extraction, and report text formatting.
-- [ ] Add markup-core parity fixtures:
-  pin representative app-shell, landing, canvas, expressive-menu, and
-  responsive-stretch cases as JSON fixtures so TS bridge, MoonBit CLI, and
-  future direct JS/WASM bindings share the same expected status matrix.
+- [x] Add markup-core parity fixtures:
+  `fixtures/markup-core/parity.json` now pins representative app-shell,
+  landing, canvas, expressive-menu, and responsive-stretch cases.
+  `src/markup-core-parity.test.ts` checks the same matrix through both the TS
+  bridge and the generated MoonBit CLI, leaving a direct JS/WASM binding target
+  for the next migration step.
 - [ ] Avoid per-call process cost:
   current bridge calls the generated JS CLI by process spawn, with a
   process-local memoization layer for repeated pure calls. That is fine for

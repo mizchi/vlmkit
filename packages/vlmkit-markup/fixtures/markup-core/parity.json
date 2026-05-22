@@ -1,0 +1,112 @@
+{
+  "componentGoalStatus": [
+    {
+      "id": "app-shell-scrollports-ok",
+      "input": {
+        "goal": "app-shell",
+        "pixelDiffRatio": 0.02,
+        "landscapeDiffRatio": 0.001,
+        "pass": { "landscape": 0.03 },
+        "review": { "landscape": 0.05 },
+        "scrollports": {
+          "total": 2,
+          "broken": 0,
+          "empty": 0,
+          "expected": {
+            "total": 2,
+            "missing": 0,
+            "broken": 0,
+            "empty": 0
+          }
+        }
+      },
+      "expectedStatus": "pass"
+    },
+    {
+      "id": "landing-first-viewport-ok",
+      "input": {
+        "goal": "landing",
+        "pixelDiffRatio": 0.08,
+        "landscapeDiffRatio": 0.0112,
+        "pass": { "landscape": 0.03, "pixel": 0.3 },
+        "review": { "landscape": 0.05, "pixel": 0.4 },
+        "landing": {
+          "heroVisible": true,
+          "primaryCtaVisible": true,
+          "nextSectionHintVisible": true,
+          "mediaSlotVisible": true
+        }
+      },
+      "expectedStatus": "pass"
+    },
+    {
+      "id": "canvas-state-hook-ok",
+      "input": {
+        "goal": "canvas",
+        "pixelDiffRatio": 0.0095,
+        "landscapeDiffRatio": 0.0002,
+        "pass": { "landscape": 0.06, "pixel": 0.35 },
+        "review": { "landscape": 0.08, "pixel": 0.45 },
+        "canvas": {
+          "canvasCount": 1,
+          "nonblank": true,
+          "frameDelta": true,
+          "inputResponsive": true,
+          "stateHook": "window.__gameState",
+          "stateHookPresent": true,
+          "missingStateFields": []
+        }
+      },
+      "expectedStatus": "pass"
+    },
+    {
+      "id": "expressive-menu-composition-ok",
+      "input": {
+        "goal": "expressive-menu",
+        "pixelDiffRatio": 0.31,
+        "landscapeDiffRatio": 0.034,
+        "pass": { "landscape": 0.05 },
+        "review": { "landscape": 0.08 },
+        "expressiveMenu": {
+          "compositionLayers": 3,
+          "compositionShapes": 3,
+          "selectedVisible": true,
+          "focusableItemCount": 5,
+          "semanticMenuText": true,
+          "diagonalEvidence": true,
+          "highContrast": true,
+          "lowContrastItemCount": 0,
+          "hoverChanged": true,
+          "focusVisibleChanged": true
+        }
+      },
+      "expectedStatus": "pass"
+    },
+    {
+      "id": "responsive-stretch-layout-fail",
+      "input": {
+        "goal": "layout",
+        "pixelDiffRatio": 0.18,
+        "landscapeDiffRatio": 0.081,
+        "pass": { "landscape": 0.03 },
+        "review": { "landscape": 0.05 }
+      },
+      "expectedStatus": "fail"
+    }
+  ],
+  "semanticDrilldownPolicy": [
+    {
+      "id": "responsive-stretch-prioritizes-layout",
+      "input": {
+        "layoutScore": 0.12,
+        "decorationScore": 0.02,
+        "heatmapKindCount": 0
+      },
+      "expected": {
+        "flow": "layout",
+        "priorityScore": 0.125,
+        "reasonId": "coarse-landscape"
+      }
+    }
+  ]
+}
