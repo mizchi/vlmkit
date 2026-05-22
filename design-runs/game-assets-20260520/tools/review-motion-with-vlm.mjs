@@ -128,7 +128,8 @@ async function main() {
       rawContent: response.content,
     });
   }
-  const consensusVerdict = combineVerdicts(quality.verdict, reviewerVerdicts(reviewers));
+  const analysis = analyzeConsensus(quality.verdict, reviewers);
+  const consensusVerdict = analysis.verdict;
   const result = {
     ok: consensusVerdict !== "fail",
     status: "reviewed",
@@ -136,12 +137,16 @@ async function main() {
     deterministicVerdict: quality.verdict,
     reviewers,
     consensusVerdict,
+    consensusReasons: analysis.reasons,
     totalCostUsd: reviewers.reduce((sum, reviewer) => sum + (reviewer.costUsd ?? 0), 0),
     maxLatencyMs: Math.max(...reviewers.map((reviewer) => reviewer.latencyMs ?? 0)),
     artifacts: artifactPaths(args),
   };
   await writeFile(args.out, `${JSON.stringify(result, null, 2)}\n`);
   console.log(`${consensusVerdict.toUpperCase()} ${relative(repoRoot, args.out)} (${args.model})`);
+  if (analysis.reasons.length > 0) {
+    for (const reason of analysis.reasons) console.log(`  - ${reason}`);
+  }
   if (consensusVerdict === "fail") process.exit(1);
 }
 
@@ -344,6 +349,69 @@ function combineVerdicts(deterministic, reviewerVerdictsList) {
   if (verdicts.has("fail")) return "warn";
   if (verdicts.size > 1) return "warn";
   return "pass";
+}
+
+/**
+ * Detailed consensus analysis on top of the simple verdict-set logic.
+ * Produces `consensusReasons[]` strings describing WHY the consensus
+ * verdict landed where it did, useful for log + downstream tooling.
+ *
+ * Triggers:
+ *   - Any reviewer below `lowConfidenceThreshold` (default 0.7) →
+ *     downgrade to "warn" with a "low-confidence-from-<model>" reason.
+ *   - Two reviewers disagree on the *set of defect kinds* (one catches
+ *     a defect the other misses) → downgrade to "warn" with a
+ *     "defect-disagreement" reason; doesn't penalize when the catching
+ *     reviewer's only defect is `severity: low`.
+ *   - Reviewer marks `confidence: 1.0` on every reviewed asset → flag
+ *     as "rubber-stamp-suspect" (advisory; doesn't change verdict).
+ */
+function analyzeConsensus(deterministic, reviewers, options = {}) {
+  const lowConfidenceThreshold = options.lowConfidenceThreshold ?? 0.7;
+  const reasons = [];
+  const reviewerVerdictsList = reviewerVerdicts(reviewers);
+  let verdict = combineVerdicts(deterministic, reviewerVerdictsList);
+
+  const reviewedOnes = reviewers.filter((r) => r.reviewer);
+  for (const reviewer of reviewedOnes) {
+    const confidence = reviewer.reviewer?.confidence;
+    // Treat missing confidence as "no signal" — not a low-confidence
+    // trigger. Some reviewers (ui-tars) omit the field entirely.
+    if (typeof confidence !== "number") continue;
+    if (confidence < lowConfidenceThreshold) {
+      reasons.push(`low-confidence-from-${reviewer.model} (conf=${confidence})`);
+      if (verdict === "pass") verdict = "warn";
+    }
+  }
+
+  if (reviewedOnes.length >= 2) {
+    const defectSets = reviewedOnes.map((r) => {
+      const defects = r.reviewer?.defects ?? [];
+      const meaningfulKinds = defects
+        .filter((d) => d.severity !== "low")
+        .map((d) => d.kind);
+      return new Set(meaningfulKinds);
+    });
+    const union = new Set(defectSets.flatMap((s) => [...s]));
+    for (const kind of union) {
+      const reportedBy = reviewedOnes.filter((_, i) => defectSets[i].has(kind)).map((r) => r.model);
+      const missedBy = reviewedOnes.filter((_, i) => !defectSets[i].has(kind)).map((r) => r.model);
+      if (reportedBy.length > 0 && missedBy.length > 0) {
+        reasons.push(`defect-disagreement: ${kind} reported by ${reportedBy.join(",")} but missed by ${missedBy.join(",")}`);
+        if (verdict === "pass") verdict = "warn";
+      }
+    }
+  }
+
+  if (reviewedOnes.length >= 2) {
+    for (const reviewer of reviewedOnes) {
+      if (reviewer.reviewer?.confidence === 1) {
+        reasons.push(`rubber-stamp-suspect: ${reviewer.model} returned confidence=1.0`);
+      }
+    }
+  }
+
+  return { verdict, reasons };
 }
 
 function artifactPaths(args) {
