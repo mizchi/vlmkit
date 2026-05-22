@@ -107,4 +107,31 @@ describe("png-diff", () => {
       await rm(TMP, { recursive: true, force: true });
     }
   });
+
+  it("samples baseline/current colors for diff regions", async () => {
+    const baselinePath = join(TMP, "baseline-color.png");
+    const currentPath = join(TMP, "current-color.png");
+
+    await rm(TMP, { recursive: true, force: true });
+    await mkdir(TMP, { recursive: true });
+
+    try {
+      await encodePng(baselinePath, createPalettePng(64, 64, [[17, 34, 51]]));
+      await encodePng(currentPath, createPalettePng(64, 64, [[68, 85, 102]]));
+
+      const result = await runPngDiff({
+        baselinePath,
+        currentPath,
+        outputDir: TMP,
+        threshold: 0.1,
+        skipHeatmap: true,
+        json: false,
+      });
+      const sample = result.diff.regions[0]?.colorSample;
+      assert.equal(sample?.baseline.hex, "#112233");
+      assert.equal(sample?.current.hex, "#445566");
+    } finally {
+      await rm(TMP, { recursive: true, force: true });
+    }
+  });
 });

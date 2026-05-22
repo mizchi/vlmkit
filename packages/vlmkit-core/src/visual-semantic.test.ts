@@ -47,6 +47,25 @@ describe("classifyVisualDiff", () => {
     assert.equal(result.changes[0].type, "color-change");
   });
 
+  it("includes sampled color pairs in color-change descriptions", () => {
+    const diff = makeDiff([
+      {
+        x: 0,
+        y: 0,
+        width: 200,
+        height: 100,
+        diffPixelCount: 18000,
+        colorSample: {
+          baseline: { r: 107, g: 114, b: 128, hex: "#6b7280" },
+          current: { r: 140, g: 144, b: 153, hex: "#8c9099" },
+          distance: 54,
+        },
+      },
+    ]);
+    const result = classifyVisualDiff(diff);
+    assert.match(result.changes[0].description, /#6b7280 -> #8c9099/);
+  });
+
   it("should classify large region as layout-shift", () => {
     const diff = makeDiff([
       { x: 0, y: 0, width: 1000, height: 500, diffPixelCount: 100000 },

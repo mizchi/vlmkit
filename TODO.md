@@ -955,9 +955,10 @@ band at viewports ≥ 1024.
   CSS axis. "Your `.luna-panel:nth-of-type(1)` is 50px taller
   than baseline; candidate properties affecting height:
   `padding`, `line-height`, `font-size`."
-- [ ] **Color samples on color-change category**. Today "1
-  color-change" is recorded without naming the colors. Surface
-  hex pairs (e.g. `(80,1040) was #6b7280, baseline is #8c9099`).
+- [x] **Color samples on color-change category**. Diff regions now carry
+  sampled baseline/current color pairs, visual-semantic descriptions include
+  hex pairs, migration results preserve color-change samples, and
+  `diff-for-agent` renders a "Color-change samples" table.
 - [ ] **Regression alarm + auto-revert offer.** When net Δ is
   positive across most viewports after a patch, surface loudly.
   Both subagents wasted an iteration on a regression that needed

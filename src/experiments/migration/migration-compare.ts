@@ -30,11 +30,14 @@ import {
   type PaintTreeChange,
 } from "@mizchi/vlmkit-capture/crater-client.ts";
 import { compareScreenshots, generateDiffReport } from "@mizchi/vlmkit-core/heatmap.ts";
+import { createScopedVrtDiff, normalizeVrtDiffRegions } from "@mizchi/vlmkit-core/diff-regions.ts";
+import { classifyVisualDiff } from "@mizchi/vlmkit-core/visual-semantic.ts";
 import { composeTriptych } from "./triptych.ts";
 import { loadDesignTokens, snapColor, type DesignTokens } from "./design-md-tokens.ts";
 import { generateWireframeFixCandidates, type WireframeFixSuggestion } from "./wireframe-fix-candidates.ts";
 import {
   buildMigrationRegionApprovalContexts,
+  classifyMigrationVisualChange,
   classifyMigrationDiff,
   type MigrationDiffCategory,
 } from "./migration-diff.ts";
@@ -57,7 +60,7 @@ import {
   type ViewportSpec,
 } from "@mizchi/vlmkit-capture/viewport-discovery.ts";
 import { formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
-import type { ShiftRegion, VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
+import type { ShiftRegion, VrtDiff, VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { applyMask, parseMaskSelectors } from "@mizchi/vlmkit-core/mask.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr as _hr } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import {
@@ -441,6 +444,17 @@ export interface MigrationCompareResult {
   shiftRegions?: Array<{ yStart: number; yEnd: number; shift: number; confidence?: number }>;
   /** Global vertical shift in pixels (0 if no shift). */
   globalShift?: number;
+  colorSamples?: MigrationColorSample[];
+}
+
+export interface MigrationColorSample {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  baseline: string;
+  variant: string;
+  distance?: number;
 }
 
 export interface MigrationCompareReport {
@@ -940,37 +954,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     }
 
     // Compare each variant
-    const results: Array<{
-      variant: string;
-      variantFile: string;
-      viewport: string;
-      diffRatio: number;
-      diffPixels: number;
-      totalPixels: number;
-      rawDiffRatio: number;
-      rawDiffPixels: number;
-      rawDominantCategory: MigrationDiffCategory | "none";
-      rawCategorySummary: string;
-      rawCategoryCounts: Record<MigrationDiffCategory, number>;
-      approved: boolean;
-      partiallyApproved: boolean;
-      approvedPixels: number;
-      approvalReasons: string[];
-      dominantCategory: MigrationDiffCategory | "none";
-      categorySummary: string;
-      categoryCounts: Record<MigrationDiffCategory, number>;
-      rawPaintTreeChangeCount: number;
-      rawPaintTreeSummary: string;
-      rawPaintTreeCounts: Record<PaintTreeChangeType, number>;
-      paintTreeChangeCount: number;
-      paintTreeSummary: string;
-      paintTreeCounts: Record<PaintTreeChangeType, number>;
-      approvedPaintTreeCount: number;
-      approvedPaintTreeReasons: string[];
-      fixCandidates: MigrationFixCandidate[];
-      shiftRegions?: Array<{ yStart: number; yEnd: number; shift: number; confidence?: number }>;
-      globalShift?: number;
-    }> = [];
+    const results: MigrationCompareResult[] = [];
 
     const domEquivalenceReports: Array<{ variantFile: string; result: DomEquivalenceResult }> = [];
     const computedStyleDiffReports: Array<{ variantFile: string; result: CsdResult }> = [];
@@ -1172,6 +1156,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         const diffPixels = finalDiff?.diffPixels ?? 0;
         const totalPixels = finalDiff?.totalPixels ?? 0;
         const classification = classifyMigrationDiff(finalDiff);
+        const colorSamples = extractMigrationColorSamples(finalDiff);
         const approvedPixels = rawDiffPixels - diffPixels;
         const approvalReasons = approved?.matchedRules.map((rule) => rule.reason) ?? [];
         const partiallyApproved = !approved?.approved && approvedPixels > 0;
@@ -1248,6 +1233,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           globalShift: diffReport?.globalShift && diffReport.globalShift !== 0
             ? diffReport.globalShift
             : undefined,
+          colorSamples: colorSamples.length > 0 ? colorSamples : undefined,
         });
         if (diffReport?.shiftRegions && diffReport.shiftRegions.length > 0) {
           shiftRegionsByVp.set(vp.label, diffReport.shiftRegions);
@@ -2189,6 +2175,31 @@ function uniqueStrings(values: string[]): string[] {
     unique.push(value);
   }
   return unique;
+}
+
+function extractMigrationColorSamples(diff: VrtDiff | null): MigrationColorSample[] {
+  if (!diff || diff.regions.length === 0) return [];
+  const normalizedDiff: VrtDiff = {
+    ...diff,
+    regions: normalizeVrtDiffRegions(diff),
+  };
+  const samples: MigrationColorSample[] = [];
+  for (const region of normalizedDiff.regions) {
+    if (!region.colorSample) continue;
+    const regionDiff = createScopedVrtDiff(normalizedDiff, region);
+    const change = classifyVisualDiff(regionDiff).changes[0];
+    if (!change || classifyMigrationVisualChange(change, regionDiff) !== "color-change") continue;
+    samples.push({
+      x: region.x,
+      y: region.y,
+      width: region.width,
+      height: region.height,
+      baseline: region.colorSample.baseline.hex,
+      variant: region.colorSample.current.hex,
+      distance: region.colorSample.distance,
+    });
+  }
+  return samples;
 }
 
 export function summarizeBreakpointDiscoveryDiagnostics(

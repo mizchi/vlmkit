@@ -78,6 +78,21 @@ export interface DiffRegion {
   height: number;
   diffPixelCount: number;
   regionType?: DiffRegionType;
+  colorSample?: DiffRegionColorSample;
+}
+
+export interface DiffRegionColor {
+  r: number;
+  g: number;
+  b: number;
+  hex: string;
+}
+
+export interface DiffRegionColorSample {
+  baseline: DiffRegionColor;
+  current: DiffRegionColor;
+  /** Euclidean RGB distance between sampled baseline and current colors. */
+  distance: number;
 }
 
 export interface ShiftRegion {

@@ -112,6 +112,35 @@ describe("formatMigrationReportForAgent", () => {
     assert.match(md, /parent is flex/);
   });
 
+  it("surfaces color-change sampled color pairs", () => {
+    const md = formatMigrationReportForAgent(sampleReport({
+      results: [{
+        variant: "working",
+        variantFile: "working.html",
+        viewport: "mobile",
+        diffRatio: 0.1,
+        diffPixels: 10,
+        totalPixels: 100,
+        dominantCategory: "color-change",
+        categorySummary: "1 color-change",
+        categoryCounts: { "color-change": 1 },
+        colorSamples: [{
+          x: 80,
+          y: 1040,
+          width: 64,
+          height: 32,
+          baseline: "#6b7280",
+          variant: "#8c9099",
+          distance: 54,
+        }],
+      }],
+    }));
+
+    assert.match(md, /Color-change samples/);
+    assert.match(md, /#6b7280/);
+    assert.match(md, /#8c9099/);
+  });
+
   it("emits absolute paths to baseline/current/heatmap PNGs for the worst viewport", () => {
     const md = formatMigrationReportForAgent(sampleReport(), { outputDir: "/abs/out" });
     assert.match(md, /Baseline: `\/abs\/out\/before-mobile\.png`/);

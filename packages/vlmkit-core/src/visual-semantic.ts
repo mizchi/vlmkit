@@ -73,7 +73,7 @@ function classifyRegion(
       type: "color-change",
       region,
       confidence: 0.65,
-      description: `Color change in region (${region.x}, ${region.y}), ${region.width}x${region.height}, ${(density * 100).toFixed(0)}% density`,
+      description: `Color change in region (${region.x}, ${region.y}), ${region.width}x${region.height}, ${(density * 100).toFixed(0)}% density${formatColorSample(region)}`,
     };
   }
 
@@ -104,6 +104,11 @@ function classifyRegion(
     confidence: 0.3,
     description: `Change at (${region.x}, ${region.y}), ${region.width}x${region.height}`,
   };
+}
+
+function formatColorSample(region: DiffRegion): string {
+  if (!region.colorSample) return "";
+  return `, ${region.colorSample.baseline.hex} -> ${region.colorSample.current.hex}`;
 }
 
 /**

@@ -1,4 +1,4 @@
-import type { VrtDiff, VrtSnapshot, DiffRegion, DiffRegionType, DiffReport, ShiftRegion } from "./types.ts";
+import type { VrtDiff, VrtSnapshot, DiffRegion, DiffRegionType, DiffReport, ShiftRegion, DiffRegionColor } from "./types.ts";
 import { type PngData, cropImage, decodePng, encodePng } from "./png-utils.ts";
 
 // ---- Shared diff pipeline ----
@@ -75,6 +75,7 @@ export async function compareScreenshots(
 
   const r = await runPixelDiff(snapshot.baselinePath, snapshot.screenshotPath, snapshot.testId, opts);
   const regions = detectDiffRegions(r.diffOutput, r.width, r.height);
+  attachRegionColorSamples(regions, r.resizedBaseline, r.resizedCurrent);
 
   return {
     snapshot,
@@ -174,6 +175,65 @@ function detectDiffRegions(
   }
 
   return regions;
+}
+
+function attachRegionColorSamples(
+  regions: DiffRegion[],
+  baseline: PngData,
+  current: PngData,
+): void {
+  for (const region of regions) {
+    const baselineColor = sampleRegionColor(baseline, region);
+    const currentColor = sampleRegionColor(current, region);
+    if (!baselineColor || !currentColor) continue;
+    region.colorSample = {
+      baseline: baselineColor,
+      current: currentColor,
+      distance: Math.round(rgbDistance(baselineColor, currentColor)),
+    };
+  }
+}
+
+function sampleRegionColor(image: PngData, region: DiffRegion): DiffRegionColor | undefined {
+  const inset = Math.min(2, Math.floor(Math.min(region.width, region.height) / 4));
+  const x0 = Math.max(0, region.x + inset);
+  const y0 = Math.max(0, region.y + inset);
+  const x1 = Math.min(image.width, region.x + region.width - inset);
+  const y1 = Math.min(image.height, region.y + region.height - inset);
+  if (x1 <= x0 || y1 <= y0) return undefined;
+
+  const stepX = Math.max(1, Math.floor((x1 - x0) / 5));
+  const stepY = Math.max(1, Math.floor((y1 - y0) / 5));
+  const rs: number[] = [];
+  const gs: number[] = [];
+  const bs: number[] = [];
+  for (let y = y0; y < y1; y += stepY) {
+    for (let x = x0; x < x1; x += stepX) {
+      const idx = (y * image.width + x) * 4;
+      if (image.data[idx + 3]! === 0) continue;
+      rs.push(image.data[idx]!);
+      gs.push(image.data[idx + 1]!);
+      bs.push(image.data[idx + 2]!);
+    }
+  }
+  if (rs.length === 0) return undefined;
+  rs.sort((a, b) => a - b);
+  gs.sort((a, b) => a - b);
+  bs.sort((a, b) => a - b);
+  const mid = rs.length >> 1;
+  const r = rs[mid]!;
+  const g = gs[mid]!;
+  const b = bs[mid]!;
+  return { r, g, b, hex: toHex(r, g, b) };
+}
+
+function toHex(r: number, g: number, b: number): string {
+  const hex = (value: number) => value.toString(16).padStart(2, "0");
+  return `#${hex(r)}${hex(g)}${hex(b)}`;
+}
+
+function rgbDistance(a: DiffRegionColor, b: DiffRegionColor): number {
+  return Math.sqrt((a.r - b.r) ** 2 + (a.g - b.g) ** 2 + (a.b - b.b) ** 2);
 }
 
 /**

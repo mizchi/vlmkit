@@ -31,6 +31,17 @@ export interface DfaResult {
   fixCandidates?: Array<{ selector?: string; property?: string }>;
   shiftRegions?: Array<{ yStart: number; yEnd: number; shift: number; confidence?: number }>;
   globalShift?: number;
+  colorSamples?: DfaColorSample[];
+}
+
+export interface DfaColorSample {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  baseline: string;
+  variant: string;
+  distance?: number;
 }
 
 export interface DfaCsdEntry {
@@ -1166,6 +1177,27 @@ export function formatMigrationReportForAgent(
       lines.push("");
       for (const c of categoryAgg) {
         lines.push(`- **${c.category}** — ${c.total} change(s) across ${c.viewports} viewport(s)`);
+      }
+      lines.push("");
+    }
+
+    const colorSamples = results.flatMap((r) =>
+      (r.colorSamples ?? []).map((sample) => ({ viewport: r.viewport, ...sample })),
+    );
+    if (colorSamples.length > 0) {
+      lines.push("### Color-change samples");
+      lines.push("");
+      lines.push("Sampled baseline/current colors for dense color-change regions. Use these as concrete paint-token hints before guessing from the PNG.");
+      lines.push("");
+      lines.push("| Viewport | Region | Baseline | Current | RGB distance |");
+      lines.push("|---|---|---|---|---|");
+      for (const sample of colorSamples.slice(0, 12)) {
+        const region = `${sample.x},${sample.y} ${sample.width}x${sample.height}`;
+        const distance = sample.distance === undefined ? "-" : String(sample.distance);
+        lines.push(`| \`${sample.viewport}\` | \`${region}\` | \`${sample.baseline}\` | \`${sample.variant}\` | ${distance} |`);
+      }
+      if (colorSamples.length > 12) {
+        lines.push(`| _…${colorSamples.length - 12} more_ | | | | |`);
       }
       lines.push("");
     }
