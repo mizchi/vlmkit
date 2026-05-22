@@ -16,13 +16,18 @@ import {
   computeUiContractDecorationPaletteIssueIds,
   computeUiContractDecorationTypographyIssueIds,
   computeUiContractExpectedScrollportIssueIds,
+  computeUiContractLandmarkIssueIds,
   computeUiContractLayoutIssueIds,
   computeUiContractMarkerIssueIds,
   computeUiContractOptionalRangeIssueIds,
   computeUiContractPatternEvidenceIssueIds,
+  computeUiContractResponsiveRuleIssueIds,
   computeUiContractRequiredStateIssueIds,
+  computeUiContractScreenIssueIds,
   computeUiContractSlotIssueIds,
   computeUiContractStateIssueIds,
+  computeUiContractVersionIssueIds,
+  computeUiContractViewportIssueIds,
   type MarkupCoreUiContractAssetIssueId,
   type MarkupCoreUiContractCanvasHudIssueId,
   type MarkupCoreUiContractCanvasInputIssueId,
@@ -40,13 +45,18 @@ import {
   type MarkupCoreUiContractDecorationPaletteIssueId,
   type MarkupCoreUiContractDecorationTypographyIssueId,
   type MarkupCoreUiContractExpectedScrollportIssueId,
+  type MarkupCoreUiContractLandmarkIssueId,
   type MarkupCoreUiContractLayoutIssueId,
   type MarkupCoreUiContractMarkerIssueId,
   type MarkupCoreUiContractPatternEvidenceIssueId,
   type MarkupCoreUiContractRangeIssueId,
+  type MarkupCoreUiContractResponsiveRuleIssueId,
   type MarkupCoreUiContractRequiredStateIssueId,
+  type MarkupCoreUiContractScreenIssueId,
   type MarkupCoreUiContractSlotIssueId,
   type MarkupCoreUiContractStateIssueId,
+  type MarkupCoreUiContractVersionIssueId,
+  type MarkupCoreUiContractViewportIssueId,
 } from "../markup-core-runtime.ts";
 
 export type UiContractVersion = 1;
@@ -141,15 +151,6 @@ export type UiSourceOfTruth =
   | "data-hierarchy"
   | "scene-graph"
   | "mixed";
-
-const UI_SOURCE_OF_TRUTHS: readonly UiSourceOfTruth[] = [
-  "semantic-dom",
-  "landmarks",
-  "viewport-shell",
-  "data-hierarchy",
-  "scene-graph",
-  "mixed",
-];
 
 export type UiMarkerKind =
   | "primary-cta"
@@ -443,21 +444,22 @@ export interface UiContractIssue {
 
 export function validateUiContract(contract: UiContract): UiContractIssue[] {
   const issues: UiContractIssue[] = [];
-  if (contract.version !== 1) {
-    issues.push({ path: "version", message: "unsupported UI contract version" });
+  for (const issueId of computeUiContractVersionIssueIds({
+    version: contract.version,
+  })) {
+    issues.push(uiContractVersionIssue(issueId));
   }
   for (let si = 0; si < contract.screens.length; si++) {
     const screen = contract.screens[si]!;
     const screenPath = `screens[${si}]`;
-    if (!screen.id) issues.push({ path: `${screenPath}.id`, message: "screen id is required" });
-    if (screen.pattern && !includesString(UI_CONTRACT_PATTERNS, screen.pattern)) {
-      issues.push({ path: `${screenPath}.pattern`, message: "unknown UI contract pattern" });
-    }
-    if (screen.goal && !includesString(UI_CONTRACT_GOALS, screen.goal)) {
-      issues.push({ path: `${screenPath}.goal`, message: "unknown UI contract goal" });
-    }
-    if (screen.sourceOfTruth && !includesString(UI_SOURCE_OF_TRUTHS, screen.sourceOfTruth)) {
-      issues.push({ path: `${screenPath}.sourceOfTruth`, message: "unknown source of truth" });
+    const screenIssueIds = computeUiContractScreenIssueIds({
+      id: screen.id,
+      pattern: screen.pattern,
+      goal: screen.goal,
+      sourceOfTruth: screen.sourceOfTruth,
+    });
+    for (const issueId of screenIssueIds) {
+      issues.push(uiContractScreenIssue(issueId, screenPath));
     }
     validateMarkers(screen.markers, `${screenPath}.markers`, issues);
     validateStates(screen.states, `${screenPath}.states`, issues);
@@ -472,28 +474,35 @@ export function validateUiContract(contract: UiContract): UiContractIssue[] {
     for (let vi = 0; vi < screen.viewports.length; vi++) {
       const vp = screen.viewports[vi]!;
       const vpPath = `${screenPath}.viewports[${vi}]`;
-      if (!vp.label) issues.push({ path: `${vpPath}.label`, message: "viewport label is required" });
-      if (viewportLabels.has(vp.label)) issues.push({ path: `${vpPath}.label`, message: "viewport label must be unique" });
+      const viewportIssueIds = computeUiContractViewportIssueIds({
+        label: vp.label,
+        duplicateLabel: viewportLabels.has(vp.label),
+        width: vp.width,
+        height: vp.height,
+        dprPresent: vp.dpr !== undefined,
+        dpr: vp.dpr ?? 0,
+      });
+      for (const issueId of viewportIssueIds) {
+        issues.push(uiContractViewportIssue(issueId, vpPath));
+      }
       viewportLabels.add(vp.label);
-      if (vp.width <= 0 || vp.height <= 0) {
-        issues.push({ path: vpPath, message: "viewport width and height must be positive" });
-      }
-      if (vp.dpr !== undefined && vp.dpr <= 0) {
-        issues.push({ path: `${vpPath}.dpr`, message: "viewport dpr must be positive" });
-      }
     }
     for (let li = 0; li < screen.landmarks.length; li++) {
       const lm = screen.landmarks[li]!;
       const lmPath = `${screenPath}.landmarks[${li}]`;
-      if ((lm.role as string) === "landmark") {
-        issues.push({ path: `${lmPath}.role`, message: "abstract landmark role is not allowed; use a concrete landmark role" });
-      }
-      if (!lm.id) issues.push({ path: `${lmPath}.id`, message: "landmark id is required" });
-      if ((lm.role === "region" || lm.role === "form") && !lm.name.trim()) {
-        issues.push({ path: `${lmPath}.name`, message: `${lm.role} landmarks require an accessible name` });
-      }
-      if (lm.parentId && !screen.landmarks.some((candidate) => candidate.id === lm.parentId)) {
-        issues.push({ path: `${lmPath}.parentId`, message: "unknown parentId landmark" });
+      const landmarkIssueIds = computeUiContractLandmarkIssueIds({
+        id: lm.id,
+        role: lm.role as string,
+        name: lm.name.trim(),
+        parentIdPresent: Boolean(lm.parentId),
+        parentKnown:
+          !lm.parentId ||
+          screen.landmarks.some((candidate) => candidate.id === lm.parentId),
+      });
+      for (const issueId of landmarkIssueIds) {
+        issues.push(
+          uiContractLandmarkIssue(issueId, lmPath, lm.role as string),
+        );
       }
       validateSlots(lm.slots, `${lmPath}.slots`, issues);
       validateRepeat(lm.repeat, `${lmPath}.repeat`, issues);
@@ -513,8 +522,11 @@ export function validateUiContract(contract: UiContract): UiContractIssue[] {
       for (let ri = 0; ri < (lm.responsive?.length ?? 0); ri++) {
         const rule = lm.responsive![ri]!;
         const rulePath = `${lmPath}.responsive[${ri}]`;
-        if (!viewportLabels.has(rule.viewport)) {
-          issues.push({ path: `${rulePath}.viewport`, message: "responsive rule references an unknown viewport" });
+        const responsiveIssueIds = computeUiContractResponsiveRuleIssueIds({
+          viewportKnown: viewportLabels.has(rule.viewport),
+        });
+        for (const issueId of responsiveIssueIds) {
+          issues.push(uiContractResponsiveRuleIssue(issueId, rulePath));
         }
         validateLayoutPolicy(rule.width, rule.height, rule.display, rulePath, issues);
       }
@@ -524,8 +536,81 @@ export function validateUiContract(contract: UiContract): UiContractIssue[] {
   return issues;
 }
 
-function includesString(values: readonly string[], value: string): boolean {
-  return values.includes(value);
+function uiContractVersionIssue(
+  issueId: MarkupCoreUiContractVersionIssueId,
+): UiContractIssue {
+  switch (issueId) {
+    case "contract-version-unsupported":
+      return { path: "version", message: "unsupported UI contract version" };
+  }
+}
+
+function uiContractScreenIssue(
+  issueId: MarkupCoreUiContractScreenIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "screen-id-required":
+      return { path: `${path}.id`, message: "screen id is required" };
+    case "screen-pattern-unknown":
+      return { path: `${path}.pattern`, message: "unknown UI contract pattern" };
+    case "screen-goal-unknown":
+      return { path: `${path}.goal`, message: "unknown UI contract goal" };
+    case "screen-source-of-truth-unknown":
+      return { path: `${path}.sourceOfTruth`, message: "unknown source of truth" };
+  }
+}
+
+function uiContractViewportIssue(
+  issueId: MarkupCoreUiContractViewportIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "viewport-label-required":
+      return { path: `${path}.label`, message: "viewport label is required" };
+    case "viewport-label-unique":
+      return { path: `${path}.label`, message: "viewport label must be unique" };
+    case "viewport-size-positive":
+      return { path, message: "viewport width and height must be positive" };
+    case "viewport-dpr-positive":
+      return { path: `${path}.dpr`, message: "viewport dpr must be positive" };
+  }
+}
+
+function uiContractLandmarkIssue(
+  issueId: MarkupCoreUiContractLandmarkIssueId,
+  path: string,
+  role: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "landmark-abstract-role":
+      return {
+        path: `${path}.role`,
+        message: "abstract landmark role is not allowed; use a concrete landmark role",
+      };
+    case "landmark-id-required":
+      return { path: `${path}.id`, message: "landmark id is required" };
+    case "landmark-name-required":
+      return {
+        path: `${path}.name`,
+        message: `${role} landmarks require an accessible name`,
+      };
+    case "landmark-parent-unknown":
+      return { path: `${path}.parentId`, message: "unknown parentId landmark" };
+  }
+}
+
+function uiContractResponsiveRuleIssue(
+  issueId: MarkupCoreUiContractResponsiveRuleIssueId,
+  path: string,
+): UiContractIssue {
+  switch (issueId) {
+    case "responsive-rule-viewport-unknown":
+      return {
+        path: `${path}.viewport`,
+        message: "responsive rule references an unknown viewport",
+      };
+  }
 }
 
 function validateMarkers(

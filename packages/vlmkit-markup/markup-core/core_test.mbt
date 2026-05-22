@@ -395,6 +395,44 @@ test "ui contract pattern evidence issue policy" {
 }
 
 ///|
+test "ui contract boundary issue policy" {
+  inspect(
+    ui_contract_version_issue_ids(2),
+    content="contract-version-unsupported",
+  )
+  inspect(ui_contract_version_issue_ids(1), content="")
+  inspect(
+    ui_contract_screen_issue_ids("", "poster", "site", "unknown"),
+    content="screen-id-required|screen-pattern-unknown|screen-goal-unknown|screen-source-of-truth-unknown",
+  )
+  inspect(
+    ui_contract_screen_issue_ids("home", "landing", "app", "landmarks"),
+    content="",
+  )
+  inspect(
+    ui_contract_viewport_issue_ids("", true, 0, -1, true, 0),
+    content="viewport-label-required|viewport-label-unique|viewport-size-positive|viewport-dpr-positive",
+  )
+  inspect(
+    ui_contract_viewport_issue_ids("desktop", false, 1440, 900, false, 0),
+    content="",
+  )
+  inspect(
+    ui_contract_landmark_issue_ids("", "landmark", "", false, true),
+    content="landmark-abstract-role|landmark-id-required",
+  )
+  inspect(
+    ui_contract_landmark_issue_ids("filters", "region", "", true, false),
+    content="landmark-name-required|landmark-parent-unknown",
+  )
+  inspect(
+    ui_contract_responsive_rule_issue_ids(false),
+    content="responsive-rule-viewport-unknown",
+  )
+  inspect(ui_contract_responsive_rule_issue_ids(true), content="")
+}
+
+///|
 test "ui contract layout issue policy" {
   inspect(
     ui_contract_layout_issue_ids(

@@ -221,6 +221,30 @@ export type MarkupCoreUiContractPatternEvidenceIssueId =
   | "expressive-menu-required-hover"
   | "expressive-menu-required-focus-visible";
 
+export type MarkupCoreUiContractVersionIssueId =
+  "contract-version-unsupported";
+
+export type MarkupCoreUiContractScreenIssueId =
+  | "screen-id-required"
+  | "screen-pattern-unknown"
+  | "screen-goal-unknown"
+  | "screen-source-of-truth-unknown";
+
+export type MarkupCoreUiContractViewportIssueId =
+  | "viewport-label-required"
+  | "viewport-label-unique"
+  | "viewport-size-positive"
+  | "viewport-dpr-positive";
+
+export type MarkupCoreUiContractLandmarkIssueId =
+  | "landmark-abstract-role"
+  | "landmark-id-required"
+  | "landmark-name-required"
+  | "landmark-parent-unknown";
+
+export type MarkupCoreUiContractResponsiveRuleIssueId =
+  "responsive-rule-viewport-unknown";
+
 export type MarkupCoreUiContractMarkerIssueId =
   | "marker-kind-unknown"
   | "marker-target-required";
@@ -314,6 +338,115 @@ export type MarkupCoreUiContractExpectedScrollportIssueId =
   | "expected-scrollport-axis-unknown"
   | "expected-scrollport-target-required"
   | "expected-scrollport-min-overflow";
+
+export function computeUiContractVersionIssueIds(input: {
+  version: number;
+}): MarkupCoreUiContractVersionIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-version-issue-ids",
+    intArg(input.version),
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractVersionIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(
+      `unexpected markup-core UI contract version issue id: ${issueId}`,
+    );
+  });
+}
+
+export function computeUiContractScreenIssueIds(input: {
+  id: string;
+  pattern?: string;
+  goal?: string;
+  sourceOfTruth?: string;
+}): MarkupCoreUiContractScreenIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-screen-issue-ids",
+    input.id,
+    input.pattern ?? "",
+    input.goal ?? "",
+    input.sourceOfTruth ?? "",
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractScreenIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(
+      `unexpected markup-core UI contract screen issue id: ${issueId}`,
+    );
+  });
+}
+
+export function computeUiContractViewportIssueIds(input: {
+  label: string;
+  duplicateLabel: boolean;
+  width: number;
+  height: number;
+  dprPresent: boolean;
+  dpr: number;
+}): MarkupCoreUiContractViewportIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-viewport-issue-ids",
+    input.label,
+    boolArg(input.duplicateLabel),
+    doubleArg(input.width),
+    doubleArg(input.height),
+    boolArg(input.dprPresent),
+    doubleArg(input.dpr),
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractViewportIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(
+      `unexpected markup-core UI contract viewport issue id: ${issueId}`,
+    );
+  });
+}
+
+export function computeUiContractLandmarkIssueIds(input: {
+  id: string;
+  role: string;
+  name: string;
+  parentIdPresent: boolean;
+  parentKnown: boolean;
+}): MarkupCoreUiContractLandmarkIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-landmark-issue-ids",
+    input.id,
+    input.role,
+    input.name,
+    boolArg(input.parentIdPresent),
+    boolArg(input.parentKnown),
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractLandmarkIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(
+      `unexpected markup-core UI contract landmark issue id: ${issueId}`,
+    );
+  });
+}
+
+export function computeUiContractResponsiveRuleIssueIds(input: {
+  viewportKnown: boolean;
+}): MarkupCoreUiContractResponsiveRuleIssueId[] {
+  const output = runMarkupCore([
+    "ui-contract-responsive-rule-issue-ids",
+    boolArg(input.viewportKnown),
+  ]);
+  return splitList(output).map((issueId) => {
+    if (isMarkupCoreUiContractResponsiveRuleIssueId(issueId)) {
+      return issueId;
+    }
+    throw new Error(
+      `unexpected markup-core UI contract responsive rule issue id: ${issueId}`,
+    );
+  });
+}
 
 export function computeUiContractPatternEvidenceIssueIds(input: {
   pattern: string | undefined;
@@ -810,6 +943,51 @@ function isMarkupCoreUiContractPatternEvidenceIssueId(
     issueId === "expressive-menu-required-hover" ||
     issueId === "expressive-menu-required-focus-visible"
   );
+}
+
+function isMarkupCoreUiContractVersionIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractVersionIssueId {
+  return issueId === "contract-version-unsupported";
+}
+
+function isMarkupCoreUiContractScreenIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractScreenIssueId {
+  return (
+    issueId === "screen-id-required" ||
+    issueId === "screen-pattern-unknown" ||
+    issueId === "screen-goal-unknown" ||
+    issueId === "screen-source-of-truth-unknown"
+  );
+}
+
+function isMarkupCoreUiContractViewportIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractViewportIssueId {
+  return (
+    issueId === "viewport-label-required" ||
+    issueId === "viewport-label-unique" ||
+    issueId === "viewport-size-positive" ||
+    issueId === "viewport-dpr-positive"
+  );
+}
+
+function isMarkupCoreUiContractLandmarkIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractLandmarkIssueId {
+  return (
+    issueId === "landmark-abstract-role" ||
+    issueId === "landmark-id-required" ||
+    issueId === "landmark-name-required" ||
+    issueId === "landmark-parent-unknown"
+  );
+}
+
+function isMarkupCoreUiContractResponsiveRuleIssueId(
+  issueId: string,
+): issueId is MarkupCoreUiContractResponsiveRuleIssueId {
+  return issueId === "responsive-rule-viewport-unknown";
 }
 
 function isMarkupCoreUiContractLayoutIssueId(

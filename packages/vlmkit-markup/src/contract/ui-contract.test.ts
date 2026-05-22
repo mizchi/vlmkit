@@ -61,6 +61,46 @@ test("validateUiContract rejects abstract landmark role", () => {
   assert.ok(issues.some((issue) => issue.message.includes("abstract")));
 });
 
+test("validateUiContract validates boundary policy through markup core", () => {
+  const contract = structuredClone(valid);
+  contract.version = 2 as never;
+  const screen = contract.screens[0]!;
+  screen.id = "";
+  screen.pattern = "poster" as never;
+  screen.goal = "site" as never;
+  screen.sourceOfTruth = "unknown" as never;
+  screen.viewports = [
+    { label: "", width: 0, height: -1, dpr: 0 },
+    { label: "", width: 320, height: 480 },
+  ];
+  screen.landmarks[0]!.id = "";
+  screen.landmarks[0]!.role = "region";
+  screen.landmarks[0]!.name = "";
+  screen.landmarks[0]!.responsive = [{ viewport: "missing" }];
+  screen.landmarks[1]!.parentId = "missing-parent";
+
+  const issues = validateUiContract(contract);
+  const hasIssue = (fragment: string) =>
+    issues.some((issue) => issue.message.includes(fragment));
+  for (const fragment of [
+    "unsupported UI contract version",
+    "screen id",
+    "unknown UI contract pattern",
+    "unknown UI contract goal",
+    "unknown source of truth",
+    "viewport label is required",
+    "viewport label must be unique",
+    "width and height",
+    "viewport dpr",
+    "landmark id",
+    "accessible name",
+    "unknown parentId",
+    "unknown viewport",
+  ]) {
+    assert.ok(hasIssue(fragment), fragment);
+  }
+});
+
 test("validateUiContract requires fluid width constraints", () => {
   const contract = structuredClone(valid);
   contract.screens[0]!.landmarks[0]!.layout.width = { kind: "fluid" };

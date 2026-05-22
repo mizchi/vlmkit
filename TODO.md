@@ -1328,7 +1328,7 @@ Stepwise cleanup:
   composition style/axis, layer role/z/id uniqueness, shape kind/id
   uniqueness, motion trigger/effect/duration/id uniqueness, and contrast
   mode/minRatio predicates now delegate to `markup-core`. TypeScript still owns
-  array traversal, duplicate tracking inputs, palette hex checks, and mapping
+  array traversal, duplicate tracking inputs, and mapping
   issue ids to report paths/messages.
 - [x] UI Contract decoration validator slice:
   decoration typography role/size/lineHeight, palette role/value hex, and media
@@ -1338,10 +1338,11 @@ Stepwise cleanup:
   content exact/rowCount non-negative checks and composition contrast palette
   hex checks now delegate to `markup-core`. TypeScript keeps the schema shape
   and nested path/message mapping.
-- [ ] Continue UI Contract boundary hardening:
-  decide whether top-level contract/screen/viewport/landmark checks should also
-  move into MoonBit, or stay in TypeScript because they are schema/report
-  boundary checks rather than reusable policy.
+- [x] UI Contract boundary hardening:
+  contract version, screen id/pattern/goal/source, viewport label/size/dpr,
+  landmark id/role/name/parent, and responsive viewport predicates now delegate
+  to `markup-core`. TypeScript still owns traversal, duplicate/parent/viewport
+  lookup materialization, and path/message mapping.
 - [x] Semantic drilldown selection policy slice:
   `component/semantic-drilldown.ts` now delegates layout-vs-decoration flow,
   priority scoring, reason id selection, and next-action ordering to

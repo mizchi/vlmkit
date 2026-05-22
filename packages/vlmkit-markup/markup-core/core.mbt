@@ -399,6 +399,96 @@ fn min_int(left : Int, right : Int) -> Int {
 }
 
 ///|
+pub fn ui_contract_version_issue_ids(version : Int) -> String {
+  if version != 1 {
+    "contract-version-unsupported"
+  } else {
+    ""
+  }
+}
+
+///|
+pub fn ui_contract_screen_issue_ids(
+  id : String,
+  pattern : String,
+  goal : String,
+  source_of_truth : String,
+) -> String {
+  let issues : Array[String] = []
+  if id == "" {
+    issues.push("screen-id-required")
+  }
+  if pattern != "" && !is_ui_contract_pattern(pattern) {
+    issues.push("screen-pattern-unknown")
+  }
+  if goal != "" && !is_ui_contract_goal(goal) {
+    issues.push("screen-goal-unknown")
+  }
+  if source_of_truth != "" && !is_ui_source_of_truth(source_of_truth) {
+    issues.push("screen-source-of-truth-unknown")
+  }
+  issues.join("|")
+}
+
+///|
+pub fn ui_contract_viewport_issue_ids(
+  label : String,
+  duplicate_label : Bool,
+  width : Double,
+  height : Double,
+  dpr_present : Bool,
+  dpr : Double,
+) -> String {
+  let issues : Array[String] = []
+  if label == "" {
+    issues.push("viewport-label-required")
+  }
+  if duplicate_label {
+    issues.push("viewport-label-unique")
+  }
+  if width <= 0 || height <= 0 {
+    issues.push("viewport-size-positive")
+  }
+  if dpr_present && dpr <= 0 {
+    issues.push("viewport-dpr-positive")
+  }
+  issues.join("|")
+}
+
+///|
+pub fn ui_contract_landmark_issue_ids(
+  id : String,
+  role : String,
+  name : String,
+  parent_id_present : Bool,
+  parent_known : Bool,
+) -> String {
+  let issues : Array[String] = []
+  if role == "landmark" {
+    issues.push("landmark-abstract-role")
+  }
+  if id == "" {
+    issues.push("landmark-id-required")
+  }
+  if (role == "region" || role == "form") && name == "" {
+    issues.push("landmark-name-required")
+  }
+  if parent_id_present && !parent_known {
+    issues.push("landmark-parent-unknown")
+  }
+  issues.join("|")
+}
+
+///|
+pub fn ui_contract_responsive_rule_issue_ids(viewport_known : Bool) -> String {
+  if !viewport_known {
+    "responsive-rule-viewport-unknown"
+  } else {
+    ""
+  }
+}
+
+///|
 pub fn ui_contract_pattern_evidence_issue_ids(
   pattern : String,
   marker_kinds : String,
@@ -854,6 +944,39 @@ pub fn ui_contract_expected_scrollport_issue_ids(
     issues.push("expected-scrollport-min-overflow")
   }
   issues.join("|")
+}
+
+///|
+fn is_ui_contract_pattern(pattern : String) -> Bool {
+  pattern == "editorial" ||
+  pattern == "landing" ||
+  pattern == "app-shell" ||
+  pattern == "dashboard" ||
+  pattern == "canvas" ||
+  pattern == "expressive-menu" ||
+  pattern == "mixed"
+}
+
+///|
+fn is_ui_contract_goal(goal : String) -> Bool {
+  goal == "app" ||
+  goal == "layout" ||
+  goal == "pixel" ||
+  goal == "draft" ||
+  goal == "app-shell" ||
+  goal == "landing" ||
+  goal == "canvas" ||
+  goal == "expressive-menu"
+}
+
+///|
+fn is_ui_source_of_truth(source_of_truth : String) -> Bool {
+  source_of_truth == "semantic-dom" ||
+  source_of_truth == "landmarks" ||
+  source_of_truth == "viewport-shell" ||
+  source_of_truth == "data-hierarchy" ||
+  source_of_truth == "scene-graph" ||
+  source_of_truth == "mixed"
 }
 
 ///|
