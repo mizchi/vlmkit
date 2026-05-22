@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  determineSnapshotReportEvaluationExitStatus,
   determineSnapshotReportExitStatus,
+  formatSnapshotReportEvaluationMarkdown,
   formatSnapshotSummaryMarkdown,
   parseSnapshotReportCliArgs,
+  summarizeSnapshotReportEvaluation,
   summarizeSnapshotReport,
   type SnapshotReportDocument,
 } from "./snapshot-report.ts";
@@ -87,6 +90,59 @@ describe("determineSnapshotReportExitStatus", () => {
   });
 });
 
+describe("summarizeSnapshotReportEvaluation", () => {
+  it("measures resolved and improved rates for before/after fix reports", () => {
+    const before: SnapshotReportDocument = {
+      ...makeReport(),
+      results: [
+        { label: "page", viewport: "desktop", isNew: false, diffRatio: 0.02 },
+        { label: "page", viewport: "mobile", isNew: false, diffRatio: 0.02 },
+        { label: "dashboard", viewport: "desktop", isNew: false, diffRatio: 0 },
+        { label: "dashboard", viewport: "mobile", isNew: true },
+      ],
+    };
+    const after: SnapshotReportDocument = {
+      ...makeReport(),
+      results: [
+        { label: "page", viewport: "desktop", isNew: false, diffRatio: 0 },
+        { label: "page", viewport: "mobile", isNew: false, diffRatio: 0.01 },
+        { label: "dashboard", viewport: "desktop", isNew: false, diffRatio: 0 },
+        { label: "dashboard", viewport: "mobile", isNew: true },
+      ],
+    };
+
+    const summary = summarizeSnapshotReportEvaluation(before, after);
+
+    assert.equal(summary.targetCount, 2);
+    assert.equal(summary.resolvedCount, 1);
+    assert.equal(summary.improvedCount, 2);
+    assert.equal(summary.successRate, 0.5);
+    assert.equal(summary.improvementRate, 1);
+    assert.equal(summary.targets[0]?.label, "page");
+    assert.equal(summary.targets[0]?.viewport, "desktop");
+    assert.equal(summary.targets[0]?.result, "resolved");
+    assert.equal(summary.targets[1]?.result, "improved");
+  });
+});
+
+describe("determineSnapshotReportEvaluationExitStatus", () => {
+  it("fails when success rate stays below the configured threshold", () => {
+    const before = makeReport();
+    const after: SnapshotReportDocument = {
+      ...makeReport(),
+      results: before.results,
+    };
+
+    const result = determineSnapshotReportEvaluationExitStatus(
+      summarizeSnapshotReportEvaluation(before, after),
+      { minSuccessRate: 0.1 },
+    );
+
+    assert.equal(result.exitCode, 1);
+    assert.match(result.reasons[0] ?? "", /success rate/i);
+  });
+});
+
 describe("parseSnapshotReportCliArgs", () => {
   it("parses report path and thresholds", () => {
     const parsed = parseSnapshotReportCliArgs([
@@ -97,10 +153,31 @@ describe("parseSnapshotReportCliArgs", () => {
       "--format", "json",
     ]);
 
+    assert.equal(parsed.mode, "summary");
     assert.equal(parsed.reportPath, "test-results/snapshots/ci/snapshot-report.json");
     assert.equal(parsed.maxFalsePositiveRate, 0);
     assert.equal(parsed.maxDiffRatio, 0.001);
     assert.equal(parsed.githubStepSummaryPath, "/tmp/summary.md");
+    assert.equal(parsed.format, "json");
+  });
+
+  it("parses before/after evaluation reports and thresholds", () => {
+    const parsed = parseSnapshotReportCliArgs([
+      "evaluate",
+      "--before-report", "before/snapshot-report.json",
+      "--after-report", "after/snapshot-report.json",
+      "--min-success-rate", "0.5",
+      "--min-improvement-rate", "1",
+      "--output", "artifacts/snapshot-fix-eval.md",
+      "--format", "json",
+    ]);
+
+    assert.equal(parsed.mode, "evaluate");
+    assert.equal(parsed.beforeReportPath, "before/snapshot-report.json");
+    assert.equal(parsed.afterReportPath, "after/snapshot-report.json");
+    assert.equal(parsed.minSuccessRate, 0.5);
+    assert.equal(parsed.minImprovementRate, 1);
+    assert.equal(parsed.outputPath, "artifacts/snapshot-fix-eval.md");
     assert.equal(parsed.format, "json");
   });
 });
@@ -116,5 +193,41 @@ describe("formatSnapshotSummaryMarkdown", () => {
     assert.match(markdown, /66\.7%/);
     assert.match(markdown, /Worst diff/);
     assert.match(markdown, /page \/ mobile/);
+  });
+});
+
+describe("formatSnapshotReportEvaluationMarkdown", () => {
+  it("renders a fix success summary", () => {
+    const before: SnapshotReportDocument = {
+      ...makeReport(),
+      results: [
+        { label: "page", viewport: "desktop", isNew: false, diffRatio: 0.02 },
+        { label: "page", viewport: "mobile", isNew: false, diffRatio: 0.02 },
+        { label: "dashboard", viewport: "desktop", isNew: false, diffRatio: 0 },
+        { label: "dashboard", viewport: "mobile", isNew: true },
+      ],
+    };
+    const after: SnapshotReportDocument = {
+      ...makeReport(),
+      results: [
+        { label: "page", viewport: "desktop", isNew: false, diffRatio: 0 },
+        { label: "page", viewport: "mobile", isNew: false, diffRatio: 0.01 },
+        { label: "dashboard", viewport: "desktop", isNew: false, diffRatio: 0 },
+        { label: "dashboard", viewport: "mobile", isNew: true },
+      ],
+    };
+
+    const markdown = formatSnapshotReportEvaluationMarkdown(
+      summarizeSnapshotReportEvaluation(before, after),
+      {
+        beforeReportPath: "before/snapshot-report.json",
+        afterReportPath: "after/snapshot-report.json",
+      },
+    );
+
+    assert.match(markdown, /VRT Snapshot Fix Evaluation/);
+    assert.match(markdown, /Success rate: 50\.0%/);
+    assert.match(markdown, /page \/ desktop/);
+    assert.match(markdown, /resolved/);
   });
 });

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 
 export interface SnapshotReportEntry {
   label: string;
@@ -56,11 +57,61 @@ export interface SnapshotReportThresholdOptions {
   maxDiffRatio?: number;
 }
 
-export interface ParsedSnapshotReportCliArgs extends SnapshotReportThresholdOptions {
+export type SnapshotReportEvaluationResult =
+  | "resolved"
+  | "improved"
+  | "unchanged"
+  | "worsened"
+  | "missing"
+  | "new-baseline";
+
+export interface SnapshotReportEvaluationTarget {
+  label: string;
+  viewport: string;
+  beforeDiffRatio: number;
+  beforeShiftOnly: boolean;
+  afterDiffRatio?: number;
+  afterShiftOnly?: boolean;
+  resolved: boolean;
+  improved: boolean;
+  result: SnapshotReportEvaluationResult;
+}
+
+export interface SnapshotReportEvaluationSummary {
+  targetCount: number;
+  resolvedCount: number;
+  improvedCount: number;
+  worsenedCount: number;
+  missingCount: number;
+  successRate: number;
+  improvementRate: number;
+  targets: SnapshotReportEvaluationTarget[];
+}
+
+export interface SnapshotReportEvaluationThresholdOptions {
+  minSuccessRate?: number;
+  minImprovementRate?: number;
+}
+
+export interface ParsedSnapshotReportSummaryCliArgs extends SnapshotReportThresholdOptions {
+  mode: "summary";
   reportPath: string;
   githubStepSummaryPath?: string;
   format: "markdown" | "json";
 }
+
+export interface ParsedSnapshotReportEvaluateCliArgs extends SnapshotReportEvaluationThresholdOptions {
+  mode: "evaluate";
+  beforeReportPath: string;
+  afterReportPath: string;
+  outputPath?: string;
+  githubStepSummaryPath?: string;
+  format: "markdown" | "json";
+}
+
+export type ParsedSnapshotReportCliArgs =
+  | ParsedSnapshotReportSummaryCliArgs
+  | ParsedSnapshotReportEvaluateCliArgs;
 
 export function summarizeSnapshotReport(report: SnapshotReportDocument): SnapshotReportMetrics {
   const compared = report.results.filter((entry) => !entry.isNew);
@@ -94,6 +145,76 @@ export function summarizeSnapshotReport(report: SnapshotReportDocument): Snapsho
   };
 }
 
+function snapshotEntryKey(entry: { label: string; viewport: string }): string {
+  return `${entry.label}\u0000${entry.viewport}`;
+}
+
+function snapshotEntryDiffRatio(entry: SnapshotReportEntry | undefined): number | undefined {
+  if (!entry || entry.isNew) return undefined;
+  return entry.diffRatio ?? 0;
+}
+
+function classifySnapshotEvaluationTarget(
+  before: SnapshotReportEntry,
+  after: SnapshotReportEntry | undefined,
+): SnapshotReportEvaluationTarget {
+  const beforeDiffRatio = before.diffRatio ?? 0;
+  const afterDiffRatio = snapshotEntryDiffRatio(after);
+  let result: SnapshotReportEvaluationResult;
+
+  if (!after) {
+    result = "missing";
+  } else if (after.isNew) {
+    result = "new-baseline";
+  } else if ((afterDiffRatio ?? 0) <= 0) {
+    result = "resolved";
+  } else if ((afterDiffRatio ?? 0) < beforeDiffRatio) {
+    result = "improved";
+  } else if ((afterDiffRatio ?? 0) > beforeDiffRatio) {
+    result = "worsened";
+  } else {
+    result = "unchanged";
+  }
+
+  return {
+    label: before.label,
+    viewport: before.viewport,
+    beforeDiffRatio,
+    beforeShiftOnly: before.shiftOnly ?? false,
+    afterDiffRatio,
+    afterShiftOnly: after?.shiftOnly,
+    resolved: result === "resolved",
+    improved: result === "resolved" || result === "improved",
+    result,
+  };
+}
+
+export function summarizeSnapshotReportEvaluation(
+  beforeReport: SnapshotReportDocument,
+  afterReport: SnapshotReportDocument,
+): SnapshotReportEvaluationSummary {
+  const afterByKey = new Map(afterReport.results.map((entry) => [snapshotEntryKey(entry), entry]));
+  const targets = beforeReport.results
+    .filter((entry) => !entry.isNew && (entry.diffRatio ?? 0) > 0)
+    .map((entry) => classifySnapshotEvaluationTarget(entry, afterByKey.get(snapshotEntryKey(entry))))
+    .sort((a, b) => a.label.localeCompare(b.label) || a.viewport.localeCompare(b.viewport));
+
+  const targetCount = targets.length;
+  const resolvedCount = targets.filter((target) => target.resolved).length;
+  const improvedCount = targets.filter((target) => target.improved).length;
+
+  return {
+    targetCount,
+    resolvedCount,
+    improvedCount,
+    worsenedCount: targets.filter((target) => target.result === "worsened").length,
+    missingCount: targets.filter((target) => target.result === "missing" || target.result === "new-baseline").length,
+    successRate: targetCount === 0 ? 1 : resolvedCount / targetCount,
+    improvementRate: targetCount === 0 ? 1 : improvedCount / targetCount,
+    targets,
+  };
+}
+
 export function determineSnapshotReportExitStatus(
   metrics: SnapshotReportMetrics,
   options: SnapshotReportThresholdOptions,
@@ -109,6 +230,30 @@ export function determineSnapshotReportExitStatus(
   if (options.maxDiffRatio !== undefined && metrics.maxDiffRatio > options.maxDiffRatio) {
     reasons.push(
       `Max diff ratio ${(metrics.maxDiffRatio * 100).toFixed(2)}% exceeds ${(options.maxDiffRatio * 100).toFixed(2)}%`,
+    );
+  }
+
+  return {
+    exitCode: reasons.length > 0 ? 1 : 0,
+    reasons,
+  };
+}
+
+export function determineSnapshotReportEvaluationExitStatus(
+  summary: SnapshotReportEvaluationSummary,
+  options: SnapshotReportEvaluationThresholdOptions,
+): SnapshotReportExitStatus {
+  const reasons: string[] = [];
+
+  if (options.minSuccessRate !== undefined && summary.successRate < options.minSuccessRate) {
+    reasons.push(
+      `Success rate ${(summary.successRate * 100).toFixed(1)}% is below ${(options.minSuccessRate * 100).toFixed(1)}%`,
+    );
+  }
+
+  if (options.minImprovementRate !== undefined && summary.improvementRate < options.minImprovementRate) {
+    reasons.push(
+      `Improvement rate ${(summary.improvementRate * 100).toFixed(1)}% is below ${(options.minImprovementRate * 100).toFixed(1)}%`,
     );
   }
 
@@ -148,7 +293,58 @@ export function formatSnapshotSummaryMarkdown(
   return lines.join("\n");
 }
 
+function formatPct(ratio: number): string {
+  return `${(ratio * 100).toFixed(1)}%`;
+}
+
+function formatDiffPct(ratio: number | undefined): string {
+  return ratio === undefined ? "-" : `${(ratio * 100).toFixed(2)}%`;
+}
+
+export function formatSnapshotReportEvaluationMarkdown(
+  summary: SnapshotReportEvaluationSummary,
+  options: { beforeReportPath?: string; afterReportPath?: string } = {},
+): string {
+  const lines = [
+    "## VRT Snapshot Fix Evaluation",
+    "",
+    `- Targets: ${summary.targetCount}`,
+    `- Resolved: ${summary.resolvedCount} (${formatPct(summary.successRate)})`,
+    `- Improved: ${summary.improvedCount} (${formatPct(summary.improvementRate)})`,
+    `- Worsened: ${summary.worsenedCount}`,
+    `- Missing/new-baseline after entries: ${summary.missingCount}`,
+    `- Success rate: ${formatPct(summary.successRate)}`,
+    `- Improvement rate: ${formatPct(summary.improvementRate)}`,
+  ];
+
+  if (options.beforeReportPath) {
+    lines.push(`- Before report: \`${options.beforeReportPath}\``);
+  }
+  if (options.afterReportPath) {
+    lines.push(`- After report: \`${options.afterReportPath}\``);
+  }
+
+  lines.push("");
+  lines.push("| Target | Before diff | After diff | Result |");
+  lines.push("|---|---:|---:|---|");
+  for (const target of summary.targets) {
+    lines.push(
+      `| ${target.label} / ${target.viewport} | ${formatDiffPct(target.beforeDiffRatio)} | ` +
+      `${formatDiffPct(target.afterDiffRatio)} | ${target.result} |`,
+    );
+  }
+
+  return lines.join("\n");
+}
+
 export function parseSnapshotReportCliArgs(args: string[]): ParsedSnapshotReportCliArgs {
+  if (args[0] === "evaluate") {
+    return parseSnapshotReportEvaluateCliArgs(args.slice(1));
+  }
+  return parseSnapshotReportSummaryCliArgs(args);
+}
+
+function parseSnapshotReportSummaryCliArgs(args: string[]): ParsedSnapshotReportSummaryCliArgs {
   const positional: string[] = [];
   let maxFalsePositiveRate: number | undefined;
   let maxDiffRatio: number | undefined;
@@ -203,9 +399,80 @@ export function parseSnapshotReportCliArgs(args: string[]): ParsedSnapshotReport
   }
 
   return {
+    mode: "summary",
     reportPath,
     maxFalsePositiveRate,
     maxDiffRatio,
+    githubStepSummaryPath,
+    format,
+  };
+}
+
+function parseSnapshotReportEvaluateCliArgs(args: string[]): ParsedSnapshotReportEvaluateCliArgs {
+  let beforeReportPath: string | undefined;
+  let afterReportPath: string | undefined;
+  let minSuccessRate: number | undefined;
+  let minImprovementRate: number | undefined;
+  let outputPath: string | undefined;
+  let githubStepSummaryPath: string | undefined;
+  let format: "markdown" | "json" = "markdown";
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    switch (arg) {
+      case "--before-report": {
+        beforeReportPath = requireOptionValue(args[++i], "--before-report");
+        break;
+      }
+      case "--after-report": {
+        afterReportPath = requireOptionValue(args[++i], "--after-report");
+        break;
+      }
+      case "--min-success-rate": {
+        minSuccessRate = parseRatioLike(args[++i], "Invalid --min-success-rate value");
+        break;
+      }
+      case "--min-improvement-rate": {
+        minImprovementRate = parseRatioLike(args[++i], "Invalid --min-improvement-rate value");
+        break;
+      }
+      case "--output": {
+        outputPath = requireOptionValue(args[++i], "--output");
+        break;
+      }
+      case "--github-step-summary": {
+        githubStepSummaryPath = requireOptionValue(args[++i], "--github-step-summary");
+        break;
+      }
+      case "--format": {
+        const value = args[++i];
+        if (value !== "markdown" && value !== "json") {
+          throw new Error("Invalid --format value. Expected 'markdown' or 'json'");
+        }
+        format = value;
+        break;
+      }
+      case "--help":
+      case "-h":
+        throw new Error(formatSnapshotReportUsage(0));
+      default:
+        if (arg.startsWith("--")) {
+          throw new Error(`Unknown option: ${arg}`);
+        }
+        throw new Error(`Unexpected positional argument for evaluate: ${arg}`);
+    }
+  }
+
+  if (!beforeReportPath) throw new Error("Missing value for --before-report");
+  if (!afterReportPath) throw new Error("Missing value for --after-report");
+
+  return {
+    mode: "evaluate",
+    beforeReportPath,
+    afterReportPath,
+    minSuccessRate,
+    minImprovementRate,
+    outputPath,
     githubStepSummaryPath,
     format,
   };
@@ -215,6 +482,7 @@ export function formatSnapshotReportUsage(exitCode = 1): string {
   const body = [
     "Usage:",
     "  vrt snapshot report <snapshot-report.json> [--format markdown|json] [--max-false-positive-rate n] [--max-diff-ratio n] [--github-step-summary path]",
+    "  vrt snapshot report evaluate --before-report before.json --after-report after.json [--format markdown|json] [--output path] [--min-success-rate n] [--min-improvement-rate n]",
   ].join("\n");
   return exitCode === 0 ? body : `${body}\n`;
 }
@@ -239,6 +507,15 @@ async function main() {
   }
 
   const options = parseSnapshotReportCliArgs(argv);
+  if (options.mode === "evaluate") {
+    await runEvaluate(options);
+    return;
+  }
+
+  await runSummary(options);
+}
+
+async function runSummary(options: ParsedSnapshotReportSummaryCliArgs) {
   const raw = await readFile(options.reportPath, "utf-8");
   const report = parseSnapshotReport(raw);
   const metrics = summarizeSnapshotReport(report);
@@ -256,12 +533,53 @@ async function main() {
   console.log(output.trimEnd());
 
   if (options.githubStepSummaryPath) {
-    await writeFile(options.githubStepSummaryPath, `${output.trimEnd()}\n`, "utf-8");
+    await writeOutput(options.githubStepSummaryPath, output);
   }
 
   if (exitStatus.exitCode !== 0) {
     process.exit(exitStatus.exitCode);
   }
+}
+
+async function runEvaluate(options: ParsedSnapshotReportEvaluateCliArgs) {
+  const beforeReport = parseSnapshotReport(await readFile(options.beforeReportPath, "utf-8"));
+  const afterReport = parseSnapshotReport(await readFile(options.afterReportPath, "utf-8"));
+  const summary = summarizeSnapshotReportEvaluation(beforeReport, afterReport);
+  const exitStatus = determineSnapshotReportEvaluationExitStatus(summary, {
+    minSuccessRate: options.minSuccessRate,
+    minImprovementRate: options.minImprovementRate,
+  });
+
+  const output = options.format === "json"
+    ? JSON.stringify({ summary, exitStatus }, null, 2)
+    : [
+        formatSnapshotReportEvaluationMarkdown(summary, {
+          beforeReportPath: options.beforeReportPath,
+          afterReportPath: options.afterReportPath,
+        }),
+        exitStatus.reasons.length > 0
+          ? `\n### Threshold Failures\n\n${exitStatus.reasons.map((reason) => `- ${reason}`).join("\n")}`
+          : "",
+      ].join("\n");
+
+  if (options.outputPath) {
+    await writeOutput(options.outputPath, output);
+  } else {
+    console.log(output.trimEnd());
+  }
+
+  if (options.githubStepSummaryPath) {
+    await writeOutput(options.githubStepSummaryPath, output);
+  }
+
+  if (exitStatus.exitCode !== 0) {
+    process.exit(exitStatus.exitCode);
+  }
+}
+
+async function writeOutput(path: string, output: string) {
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, `${output.trimEnd()}\n`, "utf-8");
 }
 
 function parseRatioLike(value: string | undefined, message: string): number {
@@ -270,6 +588,13 @@ function parseRatioLike(value: string | undefined, message: string): number {
     throw new Error(message);
   }
   return parsed;
+}
+
+function requireOptionValue(value: string | undefined, flag: string): string {
+  if (!value) {
+    throw new Error(`Missing value for ${flag}`);
+  }
+  return value;
 }
 
 if (process.env.__VRT_DISPATCHER_LEAF__ === "snapshot-report" || process.argv[1]?.endsWith("snapshot-report.ts")) {

@@ -122,10 +122,11 @@ Use vrt on real projects to verify practicality.
   - `.github/workflows/vrt-stability.yml` runs the measurement nightly on the migration fixtures and uploads `stability-report.json` as an artifact.
   - `vrt snapshot stability-history <stability-report.json>... [--out path]` aggregates multiple runs over time and reports latest/best/worst FP rate plus run-to-run deltas.
   - Real downstream rollout still requires adopting the workflow in each project, but vlmkit now has the measurement and aggregation primitives.
-- [ ] Pass diff report to subagent for fix code generation, measure success rate
+- [x] Pass diff report to subagent for fix code generation, measure success rate
   - `vrt snapshot fix-prompt` ships a markdown / JSON task descriptor (URL, viewport, diff ratio with shift compensation, baseline/current/heatmap/HTML paths) ready to feed to a subagent.
+  - `vrt snapshot report evaluate --before-report before.json --after-report after.json` compares pre/post fix `snapshot-report.json` files and reports resolved/improved rates for the changed label+viewport targets.
   - `vrt migration subagent prepare` (and the `migration-subagent-prepare` task) produces a subagent packet from `migration-report.json`; `vrt migration blind` provides reproducible blind scenarios.
-  - Success-rate measurement on real PRs still pending (needs LLM API key + repeated runs).
+  - Real PR measurement still requires an LLM API key and repeated downstream runs, but vlmkit now has the report packet and success-rate evaluation primitives.
 
 ### E2. Crater prescanner tracking
 
