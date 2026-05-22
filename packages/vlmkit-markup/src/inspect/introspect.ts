@@ -37,11 +37,53 @@ export interface SpecPageData {
   screenshotExists: boolean;
   contrastFindings?: SpecContrastFinding[];
   contrastSamples?: SpecContrastSample[];
+  responsiveSnapshots?: SpecResponsiveSnapshot[];
+  responsiveFindings?: SpecResponsiveIssue[];
+}
+
+export interface SpecResponsiveViewport {
+  width: number;
+  height: number;
+  label?: string;
+}
+
+export interface SpecResponsiveRegion {
+  role?: string;
+  name?: string;
+  selector?: string;
+  left?: number;
+  top?: number;
+  width?: number;
+  height?: number;
+  minWidth?: number;
+  maxWidth?: number;
+}
+
+export interface SpecResponsiveIssue {
+  severity?: "error" | "warning" | "info";
+  message: string;
+  viewport?: SpecResponsiveViewport;
+  selector?: string;
+}
+
+export interface SpecResponsiveSnapshot {
+  viewport: SpecResponsiveViewport;
+  clientWidth?: number;
+  scrollWidth?: number;
+  clientHeight?: number;
+  scrollHeight?: number;
+  regions?: SpecResponsiveRegion[];
+  issues?: SpecResponsiveIssue[];
 }
 
 interface ContrastSidecarSummary {
   sampleCount: number;
   failureCount: number;
+}
+
+interface ResponsiveSidecarSummary {
+  snapshotCount: number;
+  issueCount: number;
 }
 
 /**
@@ -51,6 +93,7 @@ export async function introspect(snapshotDir: string): Promise<IntrospectResult>
   const entries = await readdir(snapshotDir);
   const files = entries.filter((f) => f.endsWith(".a11y.json"));
   const contrastSummaries = await readContrastSidecars(snapshotDir, entries);
+  const responsiveSummaries = await readResponsiveSidecars(snapshotDir, entries);
   const pages: PageIntrospection[] = [];
 
   for (const file of files) {
@@ -58,7 +101,12 @@ export async function introspect(snapshotDir: string): Promise<IntrospectResult>
     const raw = JSON.parse(await readFile(join(snapshotDir, file), "utf-8"));
     if (!raw) continue;
 
-    pages.push(introspectPage(testId, raw as A11yNode, contrastSummaries.get(testId)));
+    pages.push(introspectPage(
+      testId,
+      raw as A11yNode,
+      contrastSummaries.get(testId),
+      responsiveSummaries.get(testId)
+    ));
   }
 
   return { generatedAt: new Date().toISOString(), pages };
@@ -67,7 +115,8 @@ export async function introspect(snapshotDir: string): Promise<IntrospectResult>
 function introspectPage(
   testId: string,
   tree: A11yNode,
-  contrastSummary?: ContrastSidecarSummary
+  contrastSummary?: ContrastSidecarSummary,
+  responsiveSummary?: ResponsiveSidecarSummary
 ): PageIntrospection {
   const landmarks: { role: string; name: string }[] = [];
   const interactiveElements: { role: string; name: string; hasLabel: boolean }[] = [];
@@ -113,6 +162,7 @@ function introspectPage(
     headingLevels,
     ariaRelationshipCount,
     !!contrastSummary,
+    !!responsiveSummary,
     unlabeledCount
   );
 
@@ -134,6 +184,12 @@ function introspectPage(
         ? {
             contrastSampleCount: contrastSummary.sampleCount,
             contrastFailureCount: contrastSummary.failureCount,
+          }
+        : {}),
+      ...(responsiveSummary
+        ? {
+            responsiveSnapshotCount: responsiveSummary.snapshotCount,
+            responsiveIssueCount: responsiveSummary.issueCount,
           }
         : {}),
     },
@@ -178,6 +234,34 @@ function parseContrastSidecar(raw: unknown): ContrastSidecarSummary | undefined 
   };
 }
 
+async function readResponsiveSidecars(
+  snapshotDir: string,
+  entries: string[]
+): Promise<Map<string, ResponsiveSidecarSummary>> {
+  const summaries = new Map<string, ResponsiveSidecarSummary>();
+  for (const file of entries.filter((f) => f.endsWith(".responsive.json"))) {
+    const testId = file.replace(/\.responsive\.json$/, "");
+    const raw = JSON.parse(await readFile(join(snapshotDir, file), "utf-8"));
+    const summary = parseResponsiveSidecar(raw);
+    if (summary) summaries.set(testId, summary);
+  }
+  return summaries;
+}
+
+function parseResponsiveSidecar(raw: unknown): ResponsiveSidecarSummary | undefined {
+  const snapshots = normalizeResponsiveSnapshots(raw);
+  const findings = normalizeResponsiveFindings(raw);
+  if (snapshots.length === 0 && findings.length === 0) {
+    return undefined;
+  }
+  const detectedIssues = snapshots.flatMap(analyzeResponsiveSnapshot);
+  return {
+    snapshotCount: snapshots.length,
+    issueCount: findings.filter(isActionableResponsiveIssue).length
+      + detectedIssues.filter(isActionableResponsiveIssue).length,
+  };
+}
+
 function generateDescription(
   testId: string,
   landmarks: { role: string; name: string }[],
@@ -203,6 +287,7 @@ function generateInvariants(
   headingLevels: number[],
   ariaRelationshipCount: number,
   hasContrastData: boolean,
+  hasResponsiveData: boolean,
   unlabeledCount: number
 ): SpecInvariant[] {
   const invariants: SpecInvariant[] = [];
@@ -249,6 +334,14 @@ function generateInvariants(
     invariants.push({
       description: "Text color contrast passes WCAG AA",
       check: "color-contrast",
+      cost: "low",
+    });
+  }
+
+  if (hasResponsiveData) {
+    invariants.push({
+      description: "Responsive layout stays within viewport bounds",
+      check: "responsive-layout",
       cost: "low",
     });
   }
@@ -364,6 +457,11 @@ function checkInvariant(
 
   if (inv.check === "color-contrast") {
     const result = checkColorContrast(data);
+    return { invariant: inv, passed: result.passed, reasoning: result.reasoning };
+  }
+
+  if (inv.check === "responsive-layout") {
+    const result = checkResponsiveLayout(data);
     return { invariant: inv, passed: result.passed, reasoning: result.reasoning };
   }
 
@@ -593,6 +691,138 @@ function checkColorContrast(data: SpecPageData): { passed: boolean; reasoning: s
     passed: false,
     reasoning: `${failures.length} color contrast failure(s): ${path}${text} ${formatContrastRatio(first.ratio)}:1${need}`,
   };
+}
+
+function checkResponsiveLayout(data: SpecPageData): { passed: boolean; reasoning: string } {
+  const issues = [
+    ...(data.responsiveFindings ?? []),
+    ...(data.responsiveSnapshots ?? []).flatMap(analyzeResponsiveSnapshot),
+  ].filter(isActionableResponsiveIssue);
+
+  const hasResponsiveData = data.responsiveFindings !== undefined || data.responsiveSnapshots !== undefined;
+  if (!hasResponsiveData) {
+    return { passed: false, reasoning: "No responsive layout data available" };
+  }
+  if (issues.length === 0) {
+    const snapshotCount = data.responsiveSnapshots?.length ?? 0;
+    return {
+      passed: true,
+      reasoning: snapshotCount > 0
+        ? `All ${snapshotCount} responsive snapshot(s) pass layout invariants`
+        : "No responsive layout issues",
+    };
+  }
+
+  const first = issues[0]!;
+  const viewport = first.viewport ? ` at ${formatViewport(first.viewport)}` : "";
+  const selector = first.selector ? ` ${first.selector}` : "";
+  return {
+    passed: false,
+    reasoning: `${issues.length} responsive layout issue(s)${viewport}${selector}: ${first.message}`,
+  };
+}
+
+function analyzeResponsiveSnapshot(snapshot: SpecResponsiveSnapshot): SpecResponsiveIssue[] {
+  const issues: SpecResponsiveIssue[] = [...(snapshot.issues ?? [])];
+  if (
+    typeof snapshot.scrollWidth === "number"
+    && typeof snapshot.clientWidth === "number"
+    && snapshot.scrollWidth > snapshot.clientWidth + 1
+  ) {
+    issues.push({
+      severity: "error",
+      viewport: snapshot.viewport,
+      message: `horizontal overflow: scrollWidth ${snapshot.scrollWidth} > clientWidth ${snapshot.clientWidth}`,
+    });
+  }
+
+  for (const region of snapshot.regions ?? []) {
+    if (
+      typeof region.width === "number"
+      && typeof region.maxWidth === "number"
+      && region.width > region.maxWidth + 1
+    ) {
+      issues.push({
+        severity: "warning",
+        viewport: snapshot.viewport,
+        selector: region.selector,
+        message: `${responsiveRegionLabel(region)} width ${region.width} exceeds maxWidth ${region.maxWidth}`,
+      });
+    }
+    if (
+      typeof region.width === "number"
+      && typeof region.minWidth === "number"
+      && region.width < region.minWidth - 1
+    ) {
+      issues.push({
+        severity: "warning",
+        viewport: snapshot.viewport,
+        selector: region.selector,
+        message: `${responsiveRegionLabel(region)} width ${region.width} is below minWidth ${region.minWidth}`,
+      });
+    }
+    if (
+      typeof region.left === "number"
+      && typeof region.width === "number"
+      && typeof snapshot.clientWidth === "number"
+      && (region.left < -1 || region.left + region.width > snapshot.clientWidth + 1)
+    ) {
+      issues.push({
+        severity: "error",
+        viewport: snapshot.viewport,
+        selector: region.selector,
+        message: `${responsiveRegionLabel(region)} extends outside viewport bounds`,
+      });
+    }
+  }
+
+  return issues;
+}
+
+function normalizeResponsiveSnapshots(raw: unknown): SpecResponsiveSnapshot[] {
+  const values = Array.isArray(raw)
+    ? raw
+    : isRecord(raw) && Array.isArray(raw.snapshots)
+      ? raw.snapshots
+      : isRecord(raw) && Array.isArray(raw.viewports)
+        ? raw.viewports
+        : [];
+  return values.filter(isResponsiveSnapshotLike);
+}
+
+function normalizeResponsiveFindings(raw: unknown): SpecResponsiveIssue[] {
+  const values = isRecord(raw) && Array.isArray(raw.findings)
+    ? raw.findings
+    : isRecord(raw) && Array.isArray(raw.issues)
+      ? raw.issues
+      : [];
+  return values.filter(isResponsiveIssueLike);
+}
+
+function isResponsiveSnapshotLike(value: unknown): value is SpecResponsiveSnapshot {
+  return isRecord(value) && isResponsiveViewportLike(value.viewport);
+}
+
+function isResponsiveViewportLike(value: unknown): value is SpecResponsiveViewport {
+  return isRecord(value) && typeof value.width === "number" && typeof value.height === "number";
+}
+
+function isResponsiveIssueLike(value: unknown): value is SpecResponsiveIssue {
+  return isRecord(value) && typeof value.message === "string";
+}
+
+function isActionableResponsiveIssue(issue: SpecResponsiveIssue): boolean {
+  return issue.severity !== "info";
+}
+
+function formatViewport(viewport: SpecResponsiveViewport): string {
+  return viewport.label ?? `${viewport.width}x${viewport.height}`;
+}
+
+function responsiveRegionLabel(region: SpecResponsiveRegion): string {
+  if (region.selector) return region.selector;
+  const name = region.name ? ` "${region.name}"` : "";
+  return `${region.role ?? "region"}${name}`;
 }
 
 function analyzeContrastSample(sample: SpecContrastSample): SpecContrastFinding | undefined {

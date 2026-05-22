@@ -115,6 +115,32 @@ describe("introspectToSpec", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it("should suggest responsive layout invariants from responsive sidecars", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "vlmkit-introspect-"));
+    try {
+      await writeFile(join(dir, "home.a11y.json"), JSON.stringify({
+        role: "document",
+        name: "",
+        children: [{ role: "main", name: "" }],
+      }));
+      await writeFile(join(dir, "home.responsive.json"), JSON.stringify({
+        snapshots: [
+          { viewport: { width: 375, height: 812 }, clientWidth: 375, scrollWidth: 375 },
+          { viewport: { width: 1440, height: 900 }, clientWidth: 1440, scrollWidth: 1440 },
+        ],
+      }));
+
+      const result = await introspect(dir);
+      assert.ok(
+        result.pages[0]!.suggestedInvariants.some(
+          (inv) => inv.check === "responsive-layout",
+        ),
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("verifySpec", () => {
@@ -288,6 +314,65 @@ describe("verifySpec", () => {
       (check) => check.invariant.check === "color-contrast",
     );
     assert.equal(contrastCheck?.passed, true);
+  });
+
+  it("should detect responsive horizontal overflow", () => {
+    const spec: UiSpec = {
+      description: "test",
+      pages: [{
+        testId: "home",
+        invariants: [
+          { description: "Responsive layout stays within viewport bounds", check: "responsive-layout", cost: "low" },
+        ],
+      }],
+    };
+
+    const data = new Map([["home", {
+      a11yTree: tree,
+      screenshotExists: true,
+      responsiveSnapshots: [
+        { viewport: { width: 375, height: 812 }, clientWidth: 375, scrollWidth: 421 },
+      ],
+    }]]);
+    const result = verifySpec(spec, data);
+    const responsiveCheck = result.results[0].checked.find(
+      (check) => check.invariant.check === "responsive-layout",
+    );
+    assert.equal(responsiveCheck?.passed, false);
+    assert.match(responsiveCheck?.reasoning ?? "", /horizontal overflow/);
+  });
+
+  it("should detect responsive max-width violations", () => {
+    const spec: UiSpec = {
+      description: "test",
+      pages: [{
+        testId: "home",
+        invariants: [
+          { description: "Responsive layout stays within viewport bounds", check: "responsive-layout", cost: "low" },
+        ],
+      }],
+    };
+
+    const data = new Map([["home", {
+      a11yTree: tree,
+      screenshotExists: true,
+      responsiveSnapshots: [
+        {
+          viewport: { width: 1440, height: 900 },
+          clientWidth: 1440,
+          scrollWidth: 1440,
+          regions: [
+            { role: "main", name: "Article", width: 1280, maxWidth: 960 },
+          ],
+        },
+      ],
+    }]]);
+    const result = verifySpec(spec, data);
+    const responsiveCheck = result.results[0].checked.find(
+      (check) => check.invariant.check === "responsive-layout",
+    );
+    assert.equal(responsiveCheck?.passed, false);
+    assert.match(responsiveCheck?.reasoning ?? "", /maxWidth 960/);
   });
 
   it("should skip high-cost assertions", () => {

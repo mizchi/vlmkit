@@ -1373,7 +1373,10 @@ Stepwise cleanup:
   `*.contrast.json` sidecars now generate a low-cost `color-contrast`
   invariant. `verifySpec` accepts either precomputed contrast failures or raw
   foreground/background samples and checks WCAG AA thresholds locally.
-- [ ] Responsive layout invariants
+- [x] Responsive layout invariants:
+  `*.responsive.json` sidecars now generate a low-cost `responsive-layout`
+  invariant. `verifySpec` accepts responsive snapshots/findings and detects
+  horizontal overflow, viewport-boundary escapes, and min/max width violations.
 
 ### Dashboard (separate repo)
 - [ ] Execution result list/search

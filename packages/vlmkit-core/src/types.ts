@@ -234,6 +234,7 @@ export type SpecCheckType =
   | "heading-hierarchy"
   | "aria-relationships"
   | "color-contrast"
+  | "responsive-layout"
   | "nl-assertion";
 
 // ---- Introspect Output ----
@@ -260,6 +261,8 @@ export interface PageIntrospection {
     headingLevels: number[];
     contrastSampleCount?: number;
     contrastFailureCount?: number;
+    responsiveSnapshotCount?: number;
+    responsiveIssueCount?: number;
   };
   /** Auto-inferred invariants */
   suggestedInvariants: SpecInvariant[];
