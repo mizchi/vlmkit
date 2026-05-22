@@ -47,6 +47,26 @@ export {
   formatPlaywrightLaunchError,
 } from "./playwright-launch-error.ts";
 
+// ---- Cloudflare Browser Run Quick Actions ----
+export {
+  buildCloudflareQuickActionEndpoint,
+  createCloudflareQuickActionsClient,
+  extractCloudflareCrawlRoutes,
+  resolveCloudflareQuickActionsConfig,
+  type CloudflareCrawlRecord,
+  type CloudflareCrawlRecordStatus,
+  type CloudflareCrawlRequest,
+  type CloudflareCrawlResult,
+  type CloudflareCrawlRoute,
+  type CloudflareCrawlStartResult,
+  type CloudflareQuickAction,
+  type CloudflareQuickActionEndpointInput,
+  type CloudflareQuickActionsConfig,
+  type CloudflareQuickActionsEnv,
+  type CloudflareScreenshotRequest,
+  type CloudflareScreenshotResult,
+} from "./cloudflare-quick-actions.ts";
+
 // ---- Playwright report analyzer ----
 export {
   analyzeReport,

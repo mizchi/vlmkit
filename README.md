@@ -339,9 +339,15 @@ For the Cloudflare backend, additional env vars are required:
 | `CLOUDFLARE_ACCOUNT_ID` | yes | Account id for the CDP URL |
 | `CLOUDFLARE_API_TOKEN` | yes | Token with Browser Rendering permissions |
 | `CLOUDFLARE_BROWSER_RUN_ENDPOINT` | no | Override the default WS endpoint |
+| `CLOUDFLARE_BROWSER_RENDERING_API_BASE` | no | Override the Quick Actions REST API base |
 
 See `examples/vrt-snapshot-cloudflare.workflow.yml` for a complete GitHub
 Actions template that skips the local Playwright install step.
+
+The HTTP API also supports Cloudflare Browser Run Quick Actions when
+`CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` are present:
+`POST /api/cloudflare/screenshot`, `POST /api/cloudflare/crawl`, and
+`GET /api/cloudflare/crawl/:jobId/routes`.
 
 #### Visualizing the VRT process — flipbooks + video
 
@@ -495,6 +501,8 @@ Available endpoints:
 - `GET /api/detection-series` — benchmark detection-rate time-series points
 - `GET /api/component-status-matrix` — snapshot report label/component × viewport status matrix
 - `GET|POST /api/approvals` — list/add/remove approval manifest rules for review UIs
+- `POST /api/cloudflare/screenshot` — Cloudflare Browser Run Quick Actions screenshot proxy
+- `POST|GET /api/cloudflare/crawl` — start/read crawl jobs and extract route candidates
 - `POST /api/compare` — compare baseline/current HTML or URLs across viewports
 - `POST /api/compare-renderers` — compare Chromium vs Crater rendering
 - `POST /api/reason` — VLM/LLM reasoning pipeline for diff analysis and fixes

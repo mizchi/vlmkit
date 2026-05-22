@@ -34,6 +34,14 @@ export interface CompareRequest {
 
 export type { HtmlSource } from "@mizchi/vlmkit-core/types.ts";
 import type { HtmlSource } from "@mizchi/vlmkit-core/types.ts";
+export type {
+  CloudflareCrawlRequest,
+  CloudflareCrawlResult,
+  CloudflareCrawlRoute,
+  CloudflareCrawlStartResult,
+  CloudflareScreenshotRequest,
+  CloudflareScreenshotResult,
+} from "@mizchi/vlmkit-capture/cloudflare-quick-actions.ts";
 
 export interface DiscoverOptions {
   /** Breakpoint discovery backend */

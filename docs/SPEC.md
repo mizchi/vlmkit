@@ -272,14 +272,15 @@
   - contributes to: GOAL-MARKUP-FIDELITY
   - body: _not yet implemented_
 
-- [ ] **HTTP API server exposes compare / reason / smoke endpoints** (minor) — verifies: API-001
+- [x] **HTTP API server exposes compare / reason / smoke endpoints** (minor) — verifies: API-001
   >   `vrt api serve [--port N]` starts a Hono server with
   >   /api/compare, /api/compare-renderers, /api/reason,
   >   /api/smoke-test, /api/status, /api/execution-results, /api/visual-diffs, /api/detection-series,
-  >   /api/component-status-matrix, /api/approvals. Lets a browser extension or
+  >   /api/component-status-matrix, /api/approvals, /api/cloudflare/screenshot,
+  >   /api/cloudflare/crawl. Lets a browser extension or
   >   editor plugin drive vrt without spawning a Node child.
   - contributes to: GOAL-API
-  - body: partial implementation in `src/api/api-app.ts`; execution-result search and visual-diff display models are backed by Worker D1 artifact rows when available. Local `api serve` exposes detection-rate time-series points from `data/bench-history.jsonl`, component/label status matrices from snapshot reports, and approval-manifest list/add/remove operations.
+  - body: partial implementation in `src/api/api-app.ts`; execution-result search and visual-diff display models are backed by Worker D1 artifact rows when available. Local `api serve` exposes detection-rate time-series points from `data/bench-history.jsonl`, component/label status matrices from snapshot reports, approval-manifest list/add/remove operations, and Cloudflare Browser Run Quick Actions proxies when credentials are configured.
 
 - [ ] **Hot-reload validation** ⊘ deprecated (minor) — verifies: L4
   > Preserved for matrix-row parity.

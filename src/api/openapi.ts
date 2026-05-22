@@ -191,6 +191,59 @@ export function buildOpenApiSpec(options: OpenApiSpecOptions = {}): OpenApiSpec 
           },
         },
       },
+      "/api/cloudflare/screenshot": {
+        post: {
+          tags: ["dashboard"],
+          summary: "Capture a screenshot through Cloudflare Browser Run Quick Actions",
+          requestBody: jsonRefBody("CloudflareScreenshotRequest"),
+          responses: {
+            "200": {
+              description: "Screenshot image",
+              content: {
+                "image/png": {
+                  schema: { type: "string", format: "binary" },
+                },
+              },
+            },
+            "400": jsonRefResponse("Validation error", "ErrorResponse"),
+            "501": jsonRefResponse("Cloudflare Quick Actions provider is not configured", "ErrorResponse"),
+          },
+        },
+      },
+      "/api/cloudflare/crawl": {
+        post: {
+          tags: ["dashboard"],
+          summary: "Start a Cloudflare Browser Run crawl job",
+          requestBody: jsonRefBody("CloudflareCrawlRequest"),
+          responses: {
+            "200": jsonRefResponse("Started crawl job", "CloudflareCrawlStartResult"),
+            "400": jsonRefResponse("Validation error", "ErrorResponse"),
+            "501": jsonRefResponse("Cloudflare Quick Actions provider is not configured", "ErrorResponse"),
+          },
+        },
+      },
+      "/api/cloudflare/crawl/{jobId}": {
+        get: {
+          tags: ["dashboard"],
+          summary: "Get a Cloudflare Browser Run crawl result",
+          responses: {
+            "200": jsonRefResponse("Crawl result", "CloudflareCrawlResult"),
+            "400": jsonRefResponse("Validation error", "ErrorResponse"),
+            "501": jsonRefResponse("Cloudflare Quick Actions provider is not configured", "ErrorResponse"),
+          },
+        },
+      },
+      "/api/cloudflare/crawl/{jobId}/routes": {
+        get: {
+          tags: ["dashboard"],
+          summary: "Extract route candidates from a Cloudflare crawl result",
+          responses: {
+            "200": jsonRefResponse("Crawl route candidates", "CloudflareCrawlRoutesResponse"),
+            "400": jsonRefResponse("Validation error", "ErrorResponse"),
+            "501": jsonRefResponse("Cloudflare Quick Actions provider is not configured", "ErrorResponse"),
+          },
+        },
+      },
       "/api/smoke-test": {
         post: {
           tags: ["smoke"],
@@ -684,6 +737,113 @@ function buildSchemas(): Record<string, OpenApiSchema> {
         "rules",
         "warnings",
       ],
+    },
+    CloudflareViewport: {
+      type: "object",
+      properties: {
+        width: { type: "number" },
+        height: { type: "number" },
+        deviceScaleFactor: { type: "number" },
+      },
+      required: ["width", "height"],
+    },
+    CloudflareScreenshotRequest: {
+      type: "object",
+      properties: {
+        url: { type: "string" },
+        html: { type: "string" },
+        viewport: ref("CloudflareViewport"),
+        selector: { type: "string" },
+        screenshotOptions: {
+          type: "object",
+          properties: {
+            fullPage: { type: "boolean" },
+            omitBackground: { type: "boolean" },
+            type: {
+              type: "string",
+              enum: ["png", "jpeg", "webp"],
+            },
+            quality: { type: "number" },
+          },
+        },
+        gotoOptions: { type: "object" },
+        userAgent: { type: "string" },
+      },
+    },
+    CloudflareCrawlRequest: {
+      type: "object",
+      properties: {
+        url: { type: "string" },
+        limit: { type: "number" },
+        depth: { type: "number" },
+        formats: arrayOf({
+          type: "string",
+          enum: ["html", "markdown", "json"],
+        }),
+        render: { type: "boolean" },
+        maxAge: { type: "number" },
+        options: { type: "object" },
+        gotoOptions: { type: "object" },
+      },
+      required: ["url"],
+    },
+    CloudflareCrawlStartResult: {
+      type: "object",
+      properties: {
+        jobId: { type: "string" },
+      },
+      required: ["jobId"],
+    },
+    CloudflareCrawlRecord: {
+      type: "object",
+      properties: {
+        url: { type: "string" },
+        status: {
+          type: "string",
+          enum: ["queued", "errored", "completed", "disallowed", "skipped", "cancelled"],
+        },
+        metadata: {
+          type: "object",
+          properties: {
+            status: { type: "number" },
+            url: { type: "string" },
+            title: { type: "string" },
+          },
+        },
+        html: { type: "string" },
+        markdown: { type: "string" },
+      },
+      required: ["url", "status"],
+    },
+    CloudflareCrawlResult: {
+      type: "object",
+      properties: {
+        id: { type: "string" },
+        status: { type: "string" },
+        browserSecondsUsed: { type: "number" },
+        total: { type: "number" },
+        finished: { type: "number" },
+        records: arrayOf(ref("CloudflareCrawlRecord")),
+      },
+      required: ["id", "status", "records"],
+    },
+    CloudflareCrawlRoute: {
+      type: "object",
+      properties: {
+        url: { type: "string" },
+        path: { type: "string" },
+        title: { type: "string" },
+      },
+      required: ["url", "path"],
+    },
+    CloudflareCrawlRoutesResponse: {
+      type: "object",
+      properties: {
+        jobId: { type: "string" },
+        status: { type: "string" },
+        routes: arrayOf(ref("CloudflareCrawlRoute")),
+      },
+      required: ["jobId", "status", "routes"],
     },
     ReasoningPipelineRequest: {
       type: "object",

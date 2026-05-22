@@ -14,6 +14,12 @@ import type {
   ApprovalListResponse,
   ApprovalOperationApiRequest,
   ApprovalOperationResponse,
+  CloudflareCrawlRequest,
+  CloudflareCrawlResult,
+  CloudflareCrawlRoute,
+  CloudflareCrawlStartResult,
+  CloudflareScreenshotRequest,
+  CloudflareScreenshotResult,
   ComponentStatusMatrixQuery,
   ComponentStatusMatrixResponse,
   CompareRequest, CompareResponse,
@@ -137,6 +143,31 @@ export class VrtClient {
     return this.post("/api/approvals", request);
   }
 
+  async cloudflareScreenshot(request: CloudflareScreenshotRequest): Promise<CloudflareScreenshotResult> {
+    const res = await this.postRaw("/api/cloudflare/screenshot", request);
+    const browserMsUsed = res.headers.get("x-browser-ms-used");
+    return {
+      bytes: await res.arrayBuffer(),
+      contentType: res.headers.get("content-type") ?? "image/png",
+      browserMsUsed: browserMsUsed ? Number(browserMsUsed) : undefined,
+    };
+  }
+
+  async cloudflareStartCrawl(request: CloudflareCrawlRequest): Promise<CloudflareCrawlStartResult> {
+    return this.post("/api/cloudflare/crawl", request);
+  }
+
+  async cloudflareCrawlResult(jobId: string): Promise<CloudflareCrawlResult> {
+    return this.get(`/api/cloudflare/crawl/${encodeURIComponent(jobId)}`);
+  }
+
+  async cloudflareCrawlRoutes(
+    jobId: string,
+    query: { baseUrl?: string } = {},
+  ): Promise<{ jobId: string; status: string; routes: CloudflareCrawlRoute[] }> {
+    return this.get(buildQueryPath(`/api/cloudflare/crawl/${encodeURIComponent(jobId)}/routes`, query));
+  }
+
   // ---- Reasoning Pipeline ----
 
   async reason(request: import("./api-types.ts").ReasoningPipelineRequest): Promise<import("./api-types.ts").ReasoningPipelineResponse> {
@@ -184,13 +215,18 @@ export class VrtClient {
   }
 
   private async post<T>(path: string, body: unknown): Promise<T> {
+    const res = await this.postRaw(path, body);
+    return res.json() as Promise<T>;
+  }
+
+  private async postRaw(path: string, body: unknown): Promise<Response> {
     const res = await fetch(`${this.baseUrl}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}: ${await res.text()}`);
-    return res.json() as Promise<T>;
+    return res;
   }
 }
 

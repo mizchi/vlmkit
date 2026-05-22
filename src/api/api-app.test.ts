@@ -261,4 +261,58 @@ describe("createApiApp", () => {
     assert.equal(operation.action, "add");
     assert.equal(operation.added?.selector, ".card");
   });
+
+  it("serves Cloudflare Quick Actions providers when configured", async () => {
+    const app = createApiApp({
+      resolveCraterAvailable: async () => false,
+      cloudflareQuickActions: {
+        async screenshot() {
+          return {
+            bytes: new Uint8Array([1, 2, 3]).buffer,
+            contentType: "image/png",
+            browserMsUsed: 25,
+          };
+        },
+        async startCrawl() {
+          return { jobId: "crawl-1" };
+        },
+        async getCrawlResult() {
+          return {
+            id: "crawl-1",
+            status: "completed",
+            total: 1,
+            finished: 1,
+            records: [{
+              url: "https://example.com/docs",
+              status: "completed",
+              metadata: { status: 200, url: "https://example.com/docs", title: "Docs" },
+            }],
+          };
+        },
+      },
+    });
+
+    const screenshotResponse = await app.request("http://vrt.local/api/cloudflare/screenshot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com" }),
+    });
+    assert.equal(screenshotResponse.status, 200);
+    assert.equal(screenshotResponse.headers.get("content-type"), "image/png");
+    assert.equal(screenshotResponse.headers.get("x-browser-ms-used"), "25");
+    assert.deepEqual(new Uint8Array(await screenshotResponse.arrayBuffer()), new Uint8Array([1, 2, 3]));
+
+    const crawlResponse = await app.request("http://vrt.local/api/cloudflare/crawl", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/docs", render: false }),
+    });
+    assert.equal(crawlResponse.status, 200);
+    assert.equal((await crawlResponse.json() as { jobId: string }).jobId, "crawl-1");
+
+    const routesResponse = await app.request("http://vrt.local/api/cloudflare/crawl/crawl-1/routes?baseUrl=https://example.com");
+    assert.equal(routesResponse.status, 200);
+    const routes = await routesResponse.json() as { routes: Array<{ path: string; title?: string }> };
+    assert.deepEqual(routes.routes, [{ url: "https://example.com/docs", path: "/docs", title: "Docs" }]);
+  });
 });

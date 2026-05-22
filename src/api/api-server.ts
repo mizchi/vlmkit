@@ -15,6 +15,10 @@ import type {
   ApprovalOperationApiRequest,
   ComponentStatusMatrixQuery,
 } from "./api-types.ts";
+import {
+  createCloudflareQuickActionsClient,
+  resolveCloudflareQuickActionsConfig,
+} from "@mizchi/vlmkit-capture/cloudflare-quick-actions.ts";
 import { buildBenchDetectionSeries, readBenchHistory } from "../experiments/benchmark/bench-history.ts";
 import {
   applyApprovalOperation,
@@ -94,12 +98,21 @@ async function applyLocalApprovalOperation(request: ApprovalOperationApiRequest)
   return applyApprovalOperation(resolved, operation);
 }
 
+function resolveLocalCloudflareQuickActions() {
+  try {
+    return createCloudflareQuickActionsClient(resolveCloudflareQuickActionsConfig(process.env));
+  } catch {
+    return undefined;
+  }
+}
+
 const app = createApiApp({
   serverUrl: `http://127.0.0.1:${PORT}`,
   listDetectionSeries: async (query) => buildBenchDetectionSeries(await readBenchHistory(), query),
   getComponentStatusMatrix: getLocalComponentStatusMatrix,
   listApprovals: listLocalApprovals,
   applyApprovalOperation: applyLocalApprovalOperation,
+  cloudflareQuickActions: resolveLocalCloudflareQuickActions(),
 });
 
 console.log(`vrt API server on http://127.0.0.1:${PORT}`);

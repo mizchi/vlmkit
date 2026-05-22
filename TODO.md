@@ -159,7 +159,8 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 ### Infrastructure / Deploy
 - [x] Cloudflare Browser Run CDP backend (`vrt snapshot --backend cloudflare`) — connects via `chromium.connectOverCDP` to `wss://api.cloudflare.com/.../browser-rendering/devtools/browser`. See `examples/vrt-snapshot-cloudflare.workflow.yml`.
 - [x] Cloudflare Workers entry point (`worker/`) — `worker/index.ts` re-exports `createApiApp()` from `src/api/api-app.ts`. `env.BROWSER` wiring still pending.
-- [ ] Cloudflare Quick Actions REST backend (`/screenshot`, `/crawl` for route discovery)
+- [x] Cloudflare Quick Actions REST backend (`/screenshot`, `/crawl` for route discovery)
+  - `@mizchi/vlmkit-capture` now includes a Browser Run Quick Actions client for `/screenshot` and `/crawl`, route extraction from crawl results, and Hono API proxy endpoints under `/api/cloudflare/*`.
 - [ ] crater WASM backend (layout only — paint is future)
 - [x] Cloudflare R2 / KV / D1 storage — `worker/storage.ts` detects bindings; `/api/status` exposes `r2`/`kv`/`d1` availability via `StorageStatus`. Read/write wiring still pending.
 - [x] npm package (`@mizchi/vrt`) — `pnpm add @mizchi/vrt`; exports both root and `/client`.

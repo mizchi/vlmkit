@@ -1,9 +1,15 @@
 import { Hono } from "hono";
+import { extractCloudflareCrawlRoutes } from "@mizchi/vlmkit-capture/cloudflare-quick-actions.ts";
 import type {
   ApprovalListQuery,
   ApprovalListResponse,
   ApprovalOperationApiRequest,
   ApprovalOperationResponse,
+  CloudflareCrawlRequest,
+  CloudflareCrawlResult,
+  CloudflareCrawlStartResult,
+  CloudflareScreenshotRequest,
+  CloudflareScreenshotResult,
   ComponentStatusMatrixQuery,
   ComponentStatusMatrixResponse,
   DetectionSeriesQuery,
@@ -35,6 +41,11 @@ export interface CreateApiAppOptions {
   getComponentStatusMatrix?: (query: ComponentStatusMatrixQuery) => Promise<ComponentStatusMatrixResponse> | ComponentStatusMatrixResponse;
   listApprovals?: (query: ApprovalListQuery) => Promise<ApprovalListResponse> | ApprovalListResponse;
   applyApprovalOperation?: (request: ApprovalOperationApiRequest) => Promise<ApprovalOperationResponse> | ApprovalOperationResponse;
+  cloudflareQuickActions?: {
+    screenshot: (request: CloudflareScreenshotRequest) => Promise<CloudflareScreenshotResult> | CloudflareScreenshotResult;
+    startCrawl: (request: CloudflareCrawlRequest) => Promise<CloudflareCrawlStartResult> | CloudflareCrawlStartResult;
+    getCrawlResult: (jobId: string) => Promise<CloudflareCrawlResult> | CloudflareCrawlResult;
+  };
 }
 
 export function createApiApp(options: CreateApiAppOptions = {}) {
@@ -76,6 +87,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
         ...(options.listDetectionSeries ? ["detection-series"] : []),
         ...(options.getComponentStatusMatrix ? ["component-status-matrix"] : []),
         ...(options.listApprovals && options.applyApprovalOperation ? ["approvals"] : []),
+        ...(options.cloudflareQuickActions ? ["cloudflare-quick-actions"] : []),
       ],
       backends: [
         { name: "chromium", available: true },
@@ -140,6 +152,74 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     }
     try {
       return c.json(await options.applyApprovalOperation(body));
+    } catch (error) {
+      return c.json({ error: errorMessage(error) }, 400);
+    }
+  });
+
+  app.post("/api/cloudflare/screenshot", async (c) => {
+    if (!options.cloudflareQuickActions) {
+      return c.json({ error: "Cloudflare Quick Actions provider is not configured" }, 501);
+    }
+    let body: CloudflareScreenshotRequest;
+    try {
+      body = await c.req.json<CloudflareScreenshotRequest>();
+    } catch {
+      return c.json({ error: "Invalid JSON body" }, 400);
+    }
+    try {
+      const result = await options.cloudflareQuickActions.screenshot(body);
+      const headers = new Headers({ "content-type": result.contentType });
+      if (result.browserMsUsed !== undefined) {
+        headers.set("x-browser-ms-used", String(result.browserMsUsed));
+      }
+      return new Response(result.bytes, { status: 200, headers });
+    } catch (error) {
+      return c.json({ error: errorMessage(error) }, 400);
+    }
+  });
+
+  app.post("/api/cloudflare/crawl", async (c) => {
+    if (!options.cloudflareQuickActions) {
+      return c.json({ error: "Cloudflare Quick Actions provider is not configured" }, 501);
+    }
+    let body: CloudflareCrawlRequest;
+    try {
+      body = await c.req.json<CloudflareCrawlRequest>();
+    } catch {
+      return c.json({ error: "Invalid JSON body" }, 400);
+    }
+    try {
+      return c.json(await options.cloudflareQuickActions.startCrawl(body));
+    } catch (error) {
+      return c.json({ error: errorMessage(error) }, 400);
+    }
+  });
+
+  app.get("/api/cloudflare/crawl/:jobId/routes", async (c) => {
+    if (!options.cloudflareQuickActions) {
+      return c.json({ error: "Cloudflare Quick Actions provider is not configured" }, 501);
+    }
+    try {
+      const result = await options.cloudflareQuickActions.getCrawlResult(c.req.param("jobId"));
+      return c.json({
+        jobId: result.id,
+        status: result.status,
+        routes: extractCloudflareCrawlRoutes(result, {
+          baseUrl: new URL(c.req.url).searchParams.get("baseUrl") ?? undefined,
+        }),
+      });
+    } catch (error) {
+      return c.json({ error: errorMessage(error) }, 400);
+    }
+  });
+
+  app.get("/api/cloudflare/crawl/:jobId", async (c) => {
+    if (!options.cloudflareQuickActions) {
+      return c.json({ error: "Cloudflare Quick Actions provider is not configured" }, 501);
+    }
+    try {
+      return c.json(await options.cloudflareQuickActions.getCrawlResult(c.req.param("jobId")));
     } catch (error) {
       return c.json({ error: errorMessage(error) }, 400);
     }
