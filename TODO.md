@@ -962,10 +962,11 @@ band at viewports ≥ 1024.
   positive across most viewports after a patch, surface loudly.
   Both subagents wasted an iteration on a regression that needed
   manual reverting.
-- [ ] **Per-viewport computed-style capture + label.** CSD today
-  is a single global sample with no viewport tag. Capture per
-  viewport and surface which width produced each tuple — both
-  subagents struggled to know which.
+- [x] **Per-viewport computed-style capture + label.** CSD now has
+  `computedStyleDiffPerViewport`, `bySelectorProperty`, universal vs
+  breakpoint-gated rows, and sample values tagged by viewport. It is
+  captured in `migration-compare`, surfaced by `diff-for-agent`, and covered
+  by `computed-style-diff` plus `diff-for-agent` tests.
 - [ ] **Widen computed-style selector coverage** to include class
   selectors declared in the variant's CSS. (Prerequisite for
   item #1 above.) Already on the wish-list from Pass C; the
