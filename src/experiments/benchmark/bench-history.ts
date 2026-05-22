@@ -24,6 +24,12 @@ export interface BenchHistoryRecord {
   eitherDetected: number;
   neitherDetected: number;
   detectionRate: number;
+  /**
+   * Trials where every viewport in the crater path skipped PNG capture
+   * (metadata-only detection). Lifted from `prescanner.metadataOnly` for
+   * cheap dashboard access; null when the backend has no prescanner data.
+   */
+  metadataOnly: number | null;
   prescanner: PrescannerTrialSummary | null;
 }
 
@@ -111,6 +117,8 @@ export interface BenchDetectionSeriesPoint {
   detected: number;
   detectionRate: number;
   avgMsPerTrial: number;
+  /** Crater-resolved trials that skipped PNG capture (prescanner only). */
+  metadataOnly: number | null;
 }
 
 export interface BenchDetectionSeries {
@@ -142,6 +150,7 @@ export function buildBenchHistoryRecord(input: BenchHistoryRecordInput): BenchHi
     ...input,
     avgMsPerTrial: input.trials === 0 ? 0 : input.elapsedMs / input.trials,
     detectionRate: input.trials === 0 ? 0 : input.eitherDetected / input.trials,
+    metadataOnly: input.prescanner?.metadataOnly ?? null,
     prescanner: input.prescanner ?? null,
   };
 }
@@ -212,6 +221,7 @@ export function buildBenchDetectionSeries(
       detected: record.eitherDetected,
       detectionRate: record.detectionRate,
       avgMsPerTrial: record.avgMsPerTrial,
+      metadataOnly: record.metadataOnly ?? record.prescanner?.metadataOnly ?? null,
     })),
   };
 }

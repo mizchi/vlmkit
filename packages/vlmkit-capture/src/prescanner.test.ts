@@ -67,12 +67,48 @@ describe("resolvePrescannerTrial", () => {
       fallbackUsed: false,
       finalDetected: true,
       resolvedBy: "crater",
+      metadataOnly: false,
+      craterSignal: "visual",
     });
+  });
+
+  it("classifies metadata-only crater wins by first matching signal", () => {
+    const resolution = resolvePrescannerTrial([
+      makeViewportResult({
+        visualCaptureSkipped: true,
+        paintTreeDiffCount: 3,
+        computedStyleDiffCount: 1,
+      }),
+    ]);
+
+    assert.equal(resolution.resolvedBy, "crater");
+    assert.equal(resolution.metadataOnly, true);
+    assert.equal(resolution.craterSignal, "paint-tree");
+  });
+
+  it("classifies computed-style as the next signal when no paint tree diff", () => {
+    const resolution = resolvePrescannerTrial([
+      makeViewportResult({
+        visualCaptureSkipped: true,
+        computedStyleDiffCount: 2,
+      }),
+    ]);
+
+    assert.equal(resolution.craterSignal, "computed-style");
+    assert.equal(resolution.metadataOnly, true);
+  });
+
+  it("classifies forced-state as the signal when only hover diff fires", () => {
+    const resolution = resolvePrescannerTrial([
+      makeViewportResult({ visualCaptureSkipped: true, hoverDiffDetected: true }),
+    ]);
+
+    assert.equal(resolution.craterSignal, "forced-state");
   });
 
   it("falls back to chromium when crater is silent and detects chromium-only signals", () => {
     const resolution = resolvePrescannerTrial(
-      [makeViewportResult()],
+      [makeViewportResult({ visualCaptureSkipped: true })],
       [makeViewportResult({ computedStyleDiffCount: 2 })],
     );
 
@@ -81,6 +117,8 @@ describe("resolvePrescannerTrial", () => {
       fallbackUsed: true,
       finalDetected: true,
       resolvedBy: "chromium",
+      metadataOnly: true,
+      craterSignal: "none",
     });
   });
 
@@ -95,6 +133,8 @@ describe("resolvePrescannerTrial", () => {
       fallbackUsed: true,
       finalDetected: false,
       resolvedBy: "none",
+      metadataOnly: false,
+      craterSignal: "none",
     });
   });
 });
@@ -102,9 +142,9 @@ describe("resolvePrescannerTrial", () => {
 describe("summarizePrescannerTrials", () => {
   it("counts crater resolution and chromium fallback separately", () => {
     const summary = summarizePrescannerTrials([
-      { craterDetected: true, fallbackUsed: false, finalDetected: true, resolvedBy: "crater" },
-      { craterDetected: false, fallbackUsed: true, finalDetected: true, resolvedBy: "chromium" },
-      { craterDetected: false, fallbackUsed: true, finalDetected: false, resolvedBy: "none" },
+      { craterDetected: true, fallbackUsed: false, finalDetected: true, resolvedBy: "crater", metadataOnly: false, craterSignal: "visual" },
+      { craterDetected: false, fallbackUsed: true, finalDetected: true, resolvedBy: "chromium", metadataOnly: false, craterSignal: "none" },
+      { craterDetected: false, fallbackUsed: true, finalDetected: false, resolvedBy: "none", metadataOnly: false, craterSignal: "none" },
     ]);
 
     assert.deepEqual(summary, {
@@ -114,6 +154,25 @@ describe("summarizePrescannerTrials", () => {
       chromiumFallbacks: 2,
       chromiumDetected: 1,
       passedAfterFallback: 1,
+      metadataOnly: 0,
+      craterBySignal: { paintTree: 0, computedStyle: 0, forcedState: 0, visual: 1 },
+    });
+  });
+
+  it("counts metadata-only crater wins and per-signal breakdown", () => {
+    const summary = summarizePrescannerTrials([
+      { craterDetected: true, fallbackUsed: false, finalDetected: true, resolvedBy: "crater", metadataOnly: true, craterSignal: "paint-tree" },
+      { craterDetected: true, fallbackUsed: false, finalDetected: true, resolvedBy: "crater", metadataOnly: true, craterSignal: "computed-style" },
+      { craterDetected: true, fallbackUsed: false, finalDetected: true, resolvedBy: "crater", metadataOnly: false, craterSignal: "forced-state" },
+    ]);
+
+    assert.equal(summary.craterResolved, 3);
+    assert.equal(summary.metadataOnly, 2);
+    assert.deepEqual(summary.craterBySignal, {
+      paintTree: 1,
+      computedStyle: 1,
+      forcedState: 1,
+      visual: 0,
     });
   });
 });

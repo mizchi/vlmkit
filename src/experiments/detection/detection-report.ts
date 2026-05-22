@@ -100,6 +100,30 @@ async function main() {
       console.log();
     }
 
+    const prescannerStats = benchStats.byBackend.get("prescanner");
+    if (prescannerStats?.latest.prescanner) {
+      const summary = prescannerStats.latest.prescanner;
+      const bySignal = summary.craterBySignal;
+      const signalParts = [
+        bySignal.paintTree ? `paint-tree ${bySignal.paintTree}` : null,
+        bySignal.computedStyle ? `computed-style ${bySignal.computedStyle}` : null,
+        bySignal.forcedState ? `forced-state ${bySignal.forcedState}` : null,
+        bySignal.visual ? `visual ${bySignal.visual}` : null,
+      ].filter((part): part is string => part !== null);
+      if (summary.metadataOnly > 0 || signalParts.length > 0) {
+        console.log(`  ${BOLD}Latest Prescanner Crater Signals${RESET}`);
+        if (summary.metadataOnly > 0) {
+          console.log(
+            `    metadata-only      ${fmtRate(summary.metadataOnly, summary.craterResolved)} ${DIM}(of crater-resolved trials)${RESET}`,
+          );
+        }
+        if (signalParts.length > 0) {
+          console.log(`    first signal       ${signalParts.join(" | ")}`);
+        }
+        console.log();
+      }
+    }
+
     if (goalProgress.prescannerDetection || goalProgress.prescannerSpeedup) {
       console.log(`  ${BOLD}Prescanner Goals${RESET}`);
       if (goalProgress.prescannerDetection) {

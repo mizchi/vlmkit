@@ -575,6 +575,11 @@ function buildSchemas(): Record<string, OpenApiSchema> {
         detected: { type: "number" },
         detectionRate: { type: "number" },
         avgMsPerTrial: { type: "number" },
+        metadataOnly: {
+          type: ["number", "null"],
+          description:
+            "Crater-resolved trials where every viewport skipped PNG capture (prescanner only). Null when the backend has no prescanner data.",
+        },
       },
       required: [
         "runId",
@@ -585,6 +590,7 @@ function buildSchemas(): Record<string, OpenApiSchema> {
         "detected",
         "detectionRate",
         "avgMsPerTrial",
+        "metadataOnly",
       ],
     },
     DetectionSeriesResponse: {

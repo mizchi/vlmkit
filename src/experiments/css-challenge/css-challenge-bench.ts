@@ -250,6 +250,9 @@ async function analyzeAcrossViewports(
         ? analysis.referencedComputedStyleDiffs.length
         : analysis.computedStyleDiffs.length);
 
+    const visualCaptureSkipped =
+      brokenState.visualCaptureSkipped === true || baseline.visualCaptureSkipped === true;
+
     viewportResults.push({
       width: viewport.width,
       height: viewport.height,
@@ -260,6 +263,7 @@ async function analyzeAcrossViewports(
       computedStyleDiffCount,
       hoverDiffDetected: analysis.hoverDiffDetected,
       paintTreeDiffCount,
+      ...(visualCaptureSkipped ? { visualCaptureSkipped: true } : {}),
     });
 
     if (visualDiffDetected) anyVisual = true;
@@ -691,6 +695,21 @@ async function runFixtureBenchmark(fixture: string) {
     console.log();
     console.log(`  ${BOLD}Prescanner${RESET}`);
     console.log(`    Resolved by crater:    ${fmtRate(prescannerSummary.craterResolved, prescannerSummary.total)}`);
+    if (prescannerSummary.metadataOnly > 0) {
+      console.log(`    ${DIM}└─ metadata-only:    ${fmtRate(prescannerSummary.metadataOnly, prescannerSummary.craterResolved)} (no PNG captured)${RESET}`);
+    }
+    const bySignal = prescannerSummary.craterBySignal;
+    if (prescannerSummary.craterResolved > 0) {
+      const signalParts = [
+        bySignal.paintTree ? `paint-tree ${bySignal.paintTree}` : null,
+        bySignal.computedStyle ? `computed-style ${bySignal.computedStyle}` : null,
+        bySignal.forcedState ? `forced-state ${bySignal.forcedState}` : null,
+        bySignal.visual ? `visual ${bySignal.visual}` : null,
+      ].filter((part): part is string => part !== null);
+      if (signalParts.length > 0) {
+        console.log(`    ${DIM}└─ first signal:     ${signalParts.join(" | ")}${RESET}`);
+      }
+    }
     console.log(`    Chromium fallback:     ${fmtRate(prescannerSummary.chromiumFallbacks, prescannerSummary.total, true)}`);
     console.log(`    Fallback detected:     ${fmtRate(prescannerSummary.chromiumDetected, prescannerSummary.total)}`);
     console.log(`    Fallback pass:         ${fmtRate(prescannerSummary.passedAfterFallback, prescannerSummary.total, true)}`);
@@ -705,18 +724,30 @@ async function runFixtureBenchmark(fixture: string) {
   }
   console.log();
 
-  // Viewport comparison
-  console.log(`  ${BOLD}Detection by Viewport${RESET}`);
+  // Viewport comparison — when visual is skipped (prescanner / metadata-only),
+  // accept paint-tree / computed-style / forced-state signals so the table does
+  // not read as a silent false-negative.
+  const viewportDetected = (v: ViewportDetectionResult | undefined): boolean => {
+    if (!v) return false;
+    if (v.visualDiffDetected || v.a11yDiffDetected) return true;
+    if (v.visualCaptureSkipped) {
+      return v.paintTreeDiffCount > 0 || v.computedStyleDiffCount > 0 || v.hoverDiffDetected;
+    }
+    return false;
+  };
+  const metadataOnlyViewport = dbRecords.some((r) => r.viewports.some((v) => v.visualCaptureSkipped));
+  const viewportHeader = metadataOnlyViewport ? "Detection by Viewport (metadata-only)" : "Detection by Viewport";
+  console.log(`  ${BOLD}${viewportHeader}${RESET}`);
   for (const vp of VIEWPORTS) {
     const vpIdx = VIEWPORTS.indexOf(vp);
-    const vpDetected = dbRecords.filter((r) => r.viewports[vpIdx]?.visualDiffDetected || r.viewports[vpIdx]?.a11yDiffDetected).length;
+    const vpDetected = dbRecords.filter((r) => viewportDetected(r.viewports[vpIdx])).length;
     console.log(`    ${vp.label.padEnd(10)} ${fmtRate(vpDetected, TRIALS)}`);
   }
   const multiOnly = dbRecords.filter((r) => {
     const desktopVp = r.viewports.find((v) => v.width > 1000);
     const mobileVp = r.viewports.find((v) => v.width <= 500);
-    const desktopDetected = desktopVp ? (desktopVp.visualDiffDetected || desktopVp.a11yDiffDetected) : false;
-    const mobileDetected = mobileVp ? (mobileVp.visualDiffDetected || mobileVp.a11yDiffDetected) : false;
+    const desktopDetected = viewportDetected(desktopVp);
+    const mobileDetected = viewportDetected(mobileVp);
     return r.detected && (!desktopDetected || !mobileDetected);
   }).length;
   console.log(`    ${DIM}multi-viewport bonus: ${multiOnly} additional detection(s)${RESET}`);

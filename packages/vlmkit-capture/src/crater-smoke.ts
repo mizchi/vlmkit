@@ -30,6 +30,18 @@ export interface CraterSmokeClient {
     axis?: "width";
     includeDiagnostics?: boolean;
   }): Promise<{ breakpoints: unknown[] }>;
+  getRequiredTestViewports?(): Promise<{ viewports: Array<{ width: number; reason: string }> }>;
+  getCssRuleViewportMap?(viewportWidths?: number[]): Promise<{ rules: unknown[] }>;
+  getComputedStylesWithState?(
+    selector: string,
+    forcedStates: string[],
+    properties: string[],
+  ): Promise<{ normal: Record<string, string>; forced: Record<string, string>; diff: Array<{ property: string; normal: string; forced: string }> }>;
+  batchRender?(
+    baseHtml: string,
+    viewport: { width: number; height: number },
+    variants: Array<{ id: string; mutations: Array<{ selector: string; property: string; action?: "remove" | { override: string } }> }>,
+  ): Promise<{ results: Array<{ id: string; paintTree?: unknown }> }>;
 }
 
 export type CraterSmokeStatus = "pass" | "skip" | "fail";
@@ -53,6 +65,13 @@ export interface CraterSmokeOptions {
   html?: string;
   viewport?: { width: number; height: number };
   requireAvailable?: boolean;
+  /**
+   * When true, also exercises rendering-heavy v0.18.0 APIs (batchRender).
+   * Metadata-only v0.18.0 checks (`getRequiredTestViewports`,
+   * `getCssRuleViewportMap`, `getComputedStylesWithState`) always run when the
+   * client exposes them — they are cheap RPC round-trips.
+   */
+  deep?: boolean;
   isAvailable?: (url: string) => Promise<boolean>;
   createClient?: (url: string) => CraterSmokeClient;
 }
@@ -64,6 +83,7 @@ const DEFAULT_HTML = `<!doctype html>
       body { margin: 0; font-family: system-ui; }
       main { display: grid; grid-template-columns: 1fr auto; gap: 16px; padding: 24px; }
       button { padding: 10px 14px; border-radius: 8px; background: #2563eb; color: white; border: 0; }
+      button:hover { background: #1d4ed8; text-decoration: underline; }
       @media (min-width: 700px) { main { max-width: 680px; } }
     </style>
   </head>
@@ -183,6 +203,54 @@ export async function runCraterBidiSmoke(
         return { status: "fail", url, checks, elapsedMs: now() - start };
       }
     }
+
+    if (client.getRequiredTestViewports) {
+      if (!await runCheck("required-test-viewports", async () => {
+        const result = await client.getRequiredTestViewports!();
+        return `viewport intelligence returned ${result.viewports.length} viewport(s)`;
+      })) {
+        return { status: "fail", url, checks, elapsedMs: now() - start };
+      }
+    }
+
+    if (client.getCssRuleViewportMap) {
+      if (!await runCheck("css-rule-viewport-map", async () => {
+        const result = await client.getCssRuleViewportMap!();
+        return `rule/viewport map returned ${result.rules.length} rule(s)`;
+      })) {
+        return { status: "fail", url, checks, elapsedMs: now() - start };
+      }
+    }
+
+    if (client.getComputedStylesWithState) {
+      if (!await runCheck("computed-styles-with-state", async () => {
+        const result = await client.getComputedStylesWithState!(
+          "button",
+          ["hover"],
+          ["background-color", "text-decoration"],
+        );
+        const diffCount = result.diff?.length ?? 0;
+        return `forced-state API returned ${diffCount} diff(s)`;
+      })) {
+        return { status: "fail", url, checks, elapsedMs: now() - start };
+      }
+    }
+
+    if (options.deep && client.batchRender) {
+      if (!await runCheck("batch-render", async () => {
+        const result = await client.batchRender!(
+          options.html ?? DEFAULT_HTML,
+          options.viewport ?? viewport,
+          [{
+            id: "no-op",
+            mutations: [{ selector: "button", property: "color", action: { override: "white" } }],
+          }],
+        );
+        return `batch render returned ${result.results.length} variant(s)`;
+      })) {
+        return { status: "fail", url, checks, elapsedMs: now() - start };
+      }
+    }
   } finally {
     if (connected) {
       const closeStart = now();
@@ -220,6 +288,7 @@ function printUsage(exitCode: number): never {
   console.log("Options:");
   console.log("  --url <ws-url>       Crater BiDi URL (default: ws://127.0.0.1:9222)");
   console.log("  --require            Fail if Crater is unavailable");
+  console.log("  --deep               Exercise heavier v0.18.0 APIs (batchRender)");
   console.log("  --json               Print JSON report");
   process.exit(exitCode);
 }
@@ -230,15 +299,17 @@ export function parseCraterSmokeArgs(
 ) {
   let url = resolveCraterBidiUrl({ env });
   let requireAvailable = false;
+  let deep = false;
   let json = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--help" || arg === "-h" || arg === "help") printUsage(0);
     else if (arg === "--url") url = argv[++i] ?? DEFAULT_BIDI_URL;
     else if (arg === "--require") requireAvailable = true;
+    else if (arg === "--deep") deep = true;
     else if (arg === "--json") json = true;
   }
-  return { url, requireAvailable, json };
+  return { url, requireAvailable, deep, json };
 }
 
 async function main(argv = process.argv.slice(2)): Promise<void> {
@@ -246,6 +317,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   const report = await runCraterBidiSmoke({
     url: args.url,
     requireAvailable: args.requireAvailable,
+    deep: args.deep,
   });
   if (args.json) {
     console.log(JSON.stringify(report, null, 2));

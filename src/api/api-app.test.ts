@@ -158,6 +158,7 @@ describe("createApiApp", () => {
           detected: 8,
           detectionRate: 0.8,
           avgMsPerTrial: 380,
+          metadataOnly: 3,
         }],
       }),
     });

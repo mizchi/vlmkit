@@ -14,6 +14,24 @@ import {
   type BenchHistoryRecord,
 } from "./bench-history.ts";
 
+const EMPTY_BY_SIGNAL = { paintTree: 0, computedStyle: 0, forcedState: 0, visual: 0 };
+
+function makePrescannerSummary(
+  overrides: Partial<NonNullable<BenchHistoryRecord["prescanner"]>> = {},
+): NonNullable<BenchHistoryRecord["prescanner"]> {
+  return {
+    total: 0,
+    detected: 0,
+    craterResolved: 0,
+    chromiumFallbacks: 0,
+    chromiumDetected: 0,
+    passedAfterFallback: 0,
+    metadataOnly: 0,
+    craterBySignal: { ...EMPTY_BY_SIGNAL },
+    ...overrides,
+  };
+}
+
 function makeRecord(overrides: Partial<BenchHistoryRecord> = {}): BenchHistoryRecord {
   return {
     runId: "2026-04-02T00:00:00.000Z",
@@ -35,6 +53,7 @@ function makeRecord(overrides: Partial<BenchHistoryRecord> = {}): BenchHistoryRe
     eitherDetected: 9,
     neitherDetected: 1,
     detectionRate: 0.9,
+    metadataOnly: null,
     prescanner: null,
     ...overrides,
   };
@@ -66,19 +85,45 @@ describe("buildBenchHistoryRecord", () => {
       a11yDetected: 0,
       eitherDetected: 5,
       neitherDetected: 0,
-      prescanner: {
+      prescanner: makePrescannerSummary({
         total: 5,
         detected: 5,
         craterResolved: 3,
         chromiumFallbacks: 2,
         chromiumDetected: 2,
         passedAfterFallback: 0,
-      },
+        metadataOnly: 2,
+        craterBySignal: { paintTree: 2, computedStyle: 1, forcedState: 0, visual: 0 },
+      }),
     });
 
     assert.equal(record.avgMsPerTrial, 376);
     assert.equal(record.detectionRate, 1);
     assert.equal(record.prescanner?.craterResolved, 3);
+    assert.equal(record.metadataOnly, 2, "metadataOnly is lifted from the prescanner summary");
+  });
+
+  it("leaves metadataOnly null when there is no prescanner data", () => {
+    const record = buildBenchHistoryRecord({
+      runId: "2026-04-02T00:00:00.000Z",
+      fixture: "page",
+      backend: "chromium",
+      trials: 5,
+      startSeed: 11,
+      elapsedMs: 1000,
+      llmEnabled: false,
+      strict: false,
+      suggestApproval: false,
+      visualDetected: 1,
+      computedDetected: 0,
+      hoverDetected: 0,
+      paintTreeDetected: 0,
+      a11yDetected: 0,
+      eitherDetected: 1,
+      neitherDetected: 4,
+    });
+
+    assert.equal(record.metadataOnly, null);
   });
 });
 
@@ -89,7 +134,7 @@ describe("bench-history round trip", () => {
     try {
       await appendBenchHistory([
         makeRecord({ backend: "chromium" }),
-        makeRecord({ backend: "prescanner", prescanner: { total: 10, detected: 9, craterResolved: 4, chromiumFallbacks: 6, chromiumDetected: 5, passedAfterFallback: 1 } }),
+        makeRecord({ backend: "prescanner", prescanner: makePrescannerSummary({ total: 10, detected: 9, craterResolved: 4, chromiumFallbacks: 6, chromiumDetected: 5, passedAfterFallback: 1 }) }),
       ], historyPath);
 
       const loaded = await readBenchHistory(historyPath);
@@ -120,7 +165,7 @@ describe("getBenchHistoryStats", () => {
         avgMsPerTrial: 375.8667,
         trials: 15,
         startSeed: 1,
-        prescanner: { total: 15, detected: 15, craterResolved: 7, chromiumFallbacks: 8, chromiumDetected: 8, passedAfterFallback: 0 },
+        prescanner: makePrescannerSummary({ total: 15, detected: 15, craterResolved: 7, chromiumFallbacks: 8, chromiumDetected: 8, passedAfterFallback: 0 }),
       }),
       makeRecord({
         runId: "2026-04-02T00:00:00.000Z",
@@ -233,14 +278,14 @@ describe("getBenchGoalProgress", () => {
         startSeed: 1,
         eitherDetected: 7,
         detectionRate: 0.7,
-        prescanner: {
+        prescanner: makePrescannerSummary({
           total: 10,
           detected: 7,
           craterResolved: 4,
           chromiumFallbacks: 6,
           chromiumDetected: 3,
           passedAfterFallback: 0,
-        },
+        }),
       }),
     ]);
 

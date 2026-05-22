@@ -13,4 +13,11 @@ export interface ViewportDetectionResult {
   computedStyleDiffCount: number;
   hoverDiffDetected: boolean;
   paintTreeDiffCount: number;
+  /**
+   * When true, no PNG was captured for this viewport (metadata-only path).
+   * `visualDiffDetected` will be `false` because there was nothing to diff —
+   * this flag exists so downstream summaries can avoid reporting it as a
+   * silent false-negative.
+   */
+  visualCaptureSkipped?: boolean;
 }

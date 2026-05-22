@@ -46,6 +46,38 @@ class FakeCraterClient implements CraterSmokeClient {
     this.calls.push("getResponsiveBreakpoints");
     return { breakpoints: [] };
   }
+
+  async getRequiredTestViewports(): Promise<{ viewports: Array<{ width: number; reason: string }> }> {
+    this.calls.push("getRequiredTestViewports");
+    return { viewports: [{ width: 700, reason: "media-query" }] };
+  }
+
+  async getCssRuleViewportMap(): Promise<{ rules: unknown[] }> {
+    this.calls.push("getCssRuleViewportMap");
+    return { rules: [{ selector: "main", properties: ["max-width"], mediaCondition: "(min-width: 700px)", activeAtWidths: [800], inactiveAtWidths: [320] }] };
+  }
+
+  async getComputedStylesWithState(
+    selector: string,
+    forcedStates: string[],
+    _properties: string[],
+  ): Promise<{ normal: Record<string, string>; forced: Record<string, string>; diff: Array<{ property: string; normal: string; forced: string }> }> {
+    this.calls.push(`getComputedStylesWithState:${selector}:${forcedStates.join("+")}`);
+    return {
+      normal: { "background-color": "rgb(37, 99, 235)" },
+      forced: { "background-color": "rgb(29, 78, 216)" },
+      diff: [{ property: "background-color", normal: "rgb(37, 99, 235)", forced: "rgb(29, 78, 216)" }],
+    };
+  }
+
+  async batchRender(
+    _baseHtml: string,
+    _viewport: { width: number; height: number },
+    variants: Array<{ id: string; mutations: Array<{ selector: string; property: string }> }>,
+  ): Promise<{ results: Array<{ id: string; paintTree?: unknown }> }> {
+    this.calls.push(`batchRender:${variants.map((v) => v.id).join(",")}`);
+    return { results: variants.map((v) => ({ id: v.id, paintTree: {} })) };
+  }
 }
 
 describe("parseCraterSmokeArgs", () => {
@@ -106,7 +138,38 @@ describe("runCraterBidiSmoke", () => {
       "capturePaintTree",
       "captureComputedStyles",
       "getResponsiveBreakpoints",
+      "getRequiredTestViewports",
+      "getCssRuleViewportMap",
+      "getComputedStylesWithState:button:hover",
       "close",
     ]);
+    const checkNames = result.checks.map((c) => c.name);
+    assert.ok(checkNames.includes("required-test-viewports"));
+    assert.ok(checkNames.includes("css-rule-viewport-map"));
+    assert.ok(checkNames.includes("computed-styles-with-state"));
+    assert.ok(!checkNames.includes("batch-render"), "batch-render should be gated on --deep");
+  });
+
+  it("exercises batchRender when --deep is set", async () => {
+    const client = new FakeCraterClient();
+    const result = await runCraterBidiSmoke({
+      isAvailable: async () => true,
+      createClient: () => client,
+      viewport: { width: 320, height: 180 },
+      deep: true,
+    });
+
+    assert.equal(result.status, "pass");
+    assert.ok(
+      client.calls.some((call) => call.startsWith("batchRender:")),
+      "batchRender should be called in deep mode",
+    );
+    const checkNames = result.checks.map((c) => c.name);
+    assert.ok(checkNames.includes("batch-render"));
+  });
+
+  it("parses --deep flag", () => {
+    assert.equal(parseCraterSmokeArgs(["--deep"]).deep, true);
+    assert.equal(parseCraterSmokeArgs([]).deep, false);
   });
 });

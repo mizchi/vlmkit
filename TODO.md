@@ -136,6 +136,13 @@ Crater-only 解決は 65%。target detection 80% は達成済みだが、speedup
 1.06x で target 3x には未達。残りは hover-only / dead-code /
 content-dependent を fallback なしで扱えるかが焦点。
 
+**v0.18.0 quick dogfood**: 2026-05-22 に `crater v0.18.0` の
+`getAllComputedStyles`, `getComputedStylesWithState`, `batchRender`
+契約へ VLMKit 側を追従。`VLMKIT_CRATER_ROOT=../crater vlmkit check crater
+--require` は session URL (`.bidi-ws-url`) 経由で pass。`page`, prescanner,
+5 trials, 5 viewports, LLM/DB disabled では Crater-only 5/5、Chromium fallback
+0/5。これは小標本なので KPI 更新にはまだ使わず、次に full bench で確認する。
+
 - [x] Re-run bench after text-decoration #18 fix
   - 2026-05-22: `page`, prescanner, 20 trials, 5 viewports, LLM disabled.
     Any signal 19/20 (95%), Crater-only 13/20 (65%), Chromium fallback 7/20 (35%).
@@ -146,6 +153,53 @@ content-dependent を fallback なしで扱えるかが焦点。
   - `detection-report` now shows Prescanner Goals using `bench-history`: latest/best detection, 80% target, and remaining gap.
 - [x] Track progress toward prescanner speedup 1.66x → target 3x+
   - `detection-report` now compares latest/best prescanner speedup against the 3x target when comparable Chromium/prescanner runs exist.
+
+#### E2-next. Crater v0.18.0 adoption follow-ups
+
+- [ ] Full prescanner bench with Crater v0.18.0
+  - Run `page`, `dashboard`, `form-app` for both `property` and `selector` modes.
+  - Use at least 20 trials per fixture/mode with `--no-llm --no-db`, then run a comparable Chromium baseline.
+  - Update bench-history with Crater-only %, fallback %, speedup, and per-signal breakdown.
+  - First target: Crater-only >= 80% and fallback <= 20% on `page`; second target: prescanner speedup >= 2x before revisiting the 3x goal.
+- [ ] Use Crater viewport intelligence as the primary viewport source
+  - Prefer `browsingContext.getRequiredTestViewports` / `getCssRuleViewportMap` when Crater is available.
+  - Keep regex discovery as fallback and record which backend supplied each viewport in reports.
+  - Verify media-scoped deletions show up as targeted viewport coverage rather than broad all-viewport scans.
+- [ ] Wire `batchRender` into the prescanner hot path
+  - Current prescanner still does repeated `setContent` + capture per mutation.
+  - Use v0.18.0 `variants[].mutations` to render baseline + broken variants in one Crater call where possible.
+  - Compare returned paint trees directly, and only capture PNG/Chromium when metadata signals are silent or a visual artifact is explicitly requested.
+- [ ] Expand forced-state coverage beyond hover
+  - Use `getComputedStylesWithState` for `:focus`, `:focus-visible`, `:focus-within`, and `:active`, not only `:hover`.
+  - Share selector normalization with Playwright fallback so reports key diffs by original selector and normalized target.
+  - Add fixtures where default visual diff is zero but focus/active state reveals the regression.
+- [x] Make metadata-only capture a first-class report mode
+  - `ViewportDetectionResult` now carries an optional `visualCaptureSkipped`
+    so downstream consumers can tell "no diff" from "no capture."
+  - `PrescannerTrialResolution` carries `metadataOnly` + a per-trial
+    `craterSignal` (paint-tree / computed-style / forced-state / visual).
+  - `PrescannerTrialSummary` exposes `metadataOnly` and a `craterBySignal`
+    breakdown; `BenchHistoryRecord` + `BenchDetectionSeriesPoint` lift the
+    same `metadataOnly` for the dashboard (OpenAPI schema updated).
+  - `css-challenge-bench` console now prints "metadata-only" + first-signal
+    rollup under the Prescanner section, and the "Detection by Viewport"
+    table accepts paint-tree / computed-style / forced-state signals when
+    visual was skipped so the table no longer reads as a silent false-
+    negative.
+  - `detection-report` adds a "Latest Prescanner Crater Signals" section
+    sourced from the latest prescanner bench record.
+- [x] Extend `vlmkit check crater` smoke coverage for v0.18.0 APIs
+  - `runCraterBidiSmoke` now exercises `getRequiredTestViewports`,
+    `getCssRuleViewportMap`, and `getComputedStylesWithState` whenever the
+    client exposes them (all cheap RPC round-trips, stay in the fast default).
+  - `batchRender` is gated behind `--deep` because it triggers actual render
+    work — the contract still has a passing test path via the fake client.
+  - DEFAULT_HTML now ships with a `button:hover` rule so the forced-state
+    check has a real diff to surface when Crater is connected.
+- [ ] Feed results back to `mizchi/crater`
+  - Update crater issue #225 with v0.18.0 full-bench numbers.
+  - Close or split old API-readiness items that v0.18.0 now covers.
+  - File focused issues for remaining misses: speedup bottleneck, dead-code classification, and content-dependent selectors.
 
 ### E3. Blind test replication
 
@@ -182,14 +236,14 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 - [ ] text-decoration #18 / border-radius #19 / font-weight #20 / margin #21 / align-items #22
 
 **VRT detection rate improvement (94.4% → 100%)**:
-- [ ] Breakpoint-aware CSS rule mapping #33 — resolve media-scoped detection gaps
-- [ ] Hover/focus state computed style #34 — resolve hover-only detection gaps
-- [ ] Computed styles BiDi #26 — prescanner detection rate 60% → 80%+
-- [ ] CSS rule usage tracking #27 — dead-code determination
+- [x] Breakpoint-aware CSS rule mapping #33 — Crater v0.18.0 exposes viewport/rule-map APIs; VLMKit primary-viewport adoption is tracked in E2-next.
+- [x] Hover/focus state computed style #34 — Crater v0.18.0 exposes `getComputedStylesWithState`; VLMKit currently uses hover and still needs full focus/active coverage.
+- [x] Computed styles BiDi #26 — VLMKit now prefers `getAllComputedStyles` and falls back to script evaluation when unavailable.
+- [ ] CSS rule usage tracking #27 — dead-code determination; Crater API availability should be dogfooded from VLMKit before marking done here.
 
 **VRT optimization**:
 - [ ] Paint tree diff API #23 / CSS mutation API #24 / Selector-scoped rendering #25
-- [ ] Batch rendering #28
+- [x] Batch rendering #28 — Crater v0.18.0 `batchRender` contract is adopted in `CraterClient`; prescanner hot-path integration remains in E2-next.
 - [ ] VRT prescanner benchmark tracking #29
 
 ### Feature Extensions
