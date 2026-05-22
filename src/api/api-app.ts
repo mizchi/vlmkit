@@ -12,6 +12,8 @@ import type {
   CloudflareScreenshotResult,
   ComponentStatusMatrixQuery,
   ComponentStatusMatrixResponse,
+  CraterWasmRenderRequest,
+  CraterWasmRenderResult,
   DetectionSeriesQuery,
   DetectionSeriesResponse,
   ExecutionResultsQuery,
@@ -45,6 +47,9 @@ export interface CreateApiAppOptions {
     screenshot: (request: CloudflareScreenshotRequest) => Promise<CloudflareScreenshotResult> | CloudflareScreenshotResult;
     startCrawl: (request: CloudflareCrawlRequest) => Promise<CloudflareCrawlStartResult> | CloudflareCrawlStartResult;
     getCrawlResult: (jobId: string) => Promise<CloudflareCrawlResult> | CloudflareCrawlResult;
+  };
+  craterWasmLayout?: {
+    renderLayout: (request: CraterWasmRenderRequest) => Promise<CraterWasmRenderResult> | CraterWasmRenderResult;
   };
 }
 
@@ -88,10 +93,12 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
         ...(options.getComponentStatusMatrix ? ["component-status-matrix"] : []),
         ...(options.listApprovals && options.applyApprovalOperation ? ["approvals"] : []),
         ...(options.cloudflareQuickActions ? ["cloudflare-quick-actions"] : []),
+        ...(options.craterWasmLayout ? ["crater-wasm-layout"] : []),
       ],
       backends: [
         { name: "chromium", available: true },
         { name: "crater", available: craterAvailable },
+        { name: "crater-wasm", available: Boolean(options.craterWasmLayout) },
       ],
       storage,
     };
@@ -220,6 +227,26 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     }
     try {
       return c.json(await options.cloudflareQuickActions.getCrawlResult(c.req.param("jobId")));
+    } catch (error) {
+      return c.json({ error: errorMessage(error) }, 400);
+    }
+  });
+
+  app.post("/api/crater/layout", async (c) => {
+    if (!options.craterWasmLayout) {
+      return c.json({ error: "Crater WASM layout provider is not configured" }, 501);
+    }
+    let body: CraterWasmRenderRequest;
+    try {
+      body = await c.req.json<CraterWasmRenderRequest>();
+    } catch {
+      return c.json({ error: "Invalid JSON body" }, 400);
+    }
+    if (typeof body.html !== "string" || !body.viewport) {
+      return c.json({ error: "Missing html or viewport" }, 400);
+    }
+    try {
+      return c.json(await options.craterWasmLayout.renderLayout(body));
     } catch (error) {
       return c.json({ error: errorMessage(error) }, 400);
     }

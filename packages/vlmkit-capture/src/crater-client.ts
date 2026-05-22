@@ -10,6 +10,8 @@
  */
 import WebSocket from "ws";
 import { PNG } from "pngjs";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   buildComputedStyleCaptureJsonExpression,
   computedStyleSnapshotToMap,
@@ -18,6 +20,55 @@ import {
 } from "@mizchi/vlmkit-core/computed-style-capture.ts";
 
 export const DEFAULT_BIDI_URL = "ws://127.0.0.1:9222";
+export const VLMKIT_CRATER_BIDI_URL_ENV = "VLMKIT_CRATER_BIDI_URL";
+export const CRATER_BIDI_URL_ENV = "CRATER_BIDI_URL";
+export const VLMKIT_CRATER_ROOT_ENV = "VLMKIT_CRATER_ROOT";
+export const CRATER_ROOT_ENV = "CRATER_ROOT";
+
+export interface ResolveCraterBidiUrlOptions {
+  env?: Partial<Record<
+    | typeof VLMKIT_CRATER_BIDI_URL_ENV
+    | typeof CRATER_BIDI_URL_ENV
+    | typeof VLMKIT_CRATER_ROOT_ENV
+    | typeof CRATER_ROOT_ENV,
+    string | undefined
+  >>;
+  craterRoot?: string;
+  urlFile?: string;
+}
+
+export function resolveCraterBidiUrl(
+  options: ResolveCraterBidiUrlOptions = {},
+): string {
+  const env = options.env ?? process.env;
+  const fromEnv = env[VLMKIT_CRATER_BIDI_URL_ENV] ?? env[CRATER_BIDI_URL_ENV];
+  if (fromEnv?.trim()) return fromEnv.trim();
+
+  const fileCandidates = [
+    options.urlFile,
+    resolveCraterBidiUrlFile(
+      options.craterRoot
+        ?? env[VLMKIT_CRATER_ROOT_ENV]
+        ?? env[CRATER_ROOT_ENV],
+    ),
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  for (const candidate of fileCandidates) {
+    try {
+      if (!existsSync(candidate)) continue;
+      const value = readFileSync(candidate, "utf-8").trim();
+      if (value) return value;
+    } catch {
+      // Ignore stale or unreadable helper files and fall back to the root URL.
+    }
+  }
+
+  return DEFAULT_BIDI_URL;
+}
+
+function resolveCraterBidiUrlFile(craterRoot: string | undefined): string | undefined {
+  return craterRoot?.trim() ? resolve(craterRoot, ".bidi-ws-url") : undefined;
+}
 
 export interface CraterResponsiveBreakpoint {
   axis: "width";
@@ -89,7 +140,7 @@ export class CraterClient {
   private contextId: string | null = null;
   private url: string;
 
-  constructor(url = DEFAULT_BIDI_URL) {
+  constructor(url = resolveCraterBidiUrl()) {
     this.url = url;
   }
 
@@ -432,7 +483,7 @@ export function diffPaintTrees(baseline: PaintNode, current: PaintNode, path = "
 // ---- Utility ----
 
 /** Check if crater server is running */
-export async function isCraterAvailable(url = DEFAULT_BIDI_URL): Promise<boolean> {
+export async function isCraterAvailable(url = resolveCraterBidiUrl()): Promise<boolean> {
   try {
     const httpUrl = url.replace("ws://", "http://");
     const resp = await fetch(httpUrl, { signal: AbortSignal.timeout(2000) });

@@ -16,6 +16,7 @@ describe("parseCssChallengeBenchArgs", () => {
       "--suggest-approval",
       "--output-root", "artifacts/css-bench",
       "--no-db",
+      "--no-llm",
     ]);
 
     assert.equal(options.trials, 5);
@@ -27,6 +28,7 @@ describe("parseCssChallengeBenchArgs", () => {
     assert.equal(options.strict, true);
     assert.equal(options.suggestApproval, true);
     assert.equal(options.outputRoot, "artifacts/css-bench");
+    assert.equal(options.enableLlm, false);
   });
 
   it("uses defaults when flags are omitted", () => {
@@ -41,5 +43,6 @@ describe("parseCssChallengeBenchArgs", () => {
     assert.equal(options.strict, false);
     assert.equal(options.suggestApproval, false);
     assert.equal(options.outputRoot, CSS_BENCH_OUTPUT_ROOT);
+    assert.equal(options.enableLlm, true);
   });
 });

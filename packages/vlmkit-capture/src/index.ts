@@ -91,7 +91,12 @@ export {
 // ---- Crater client (Bidi protocol) ----
 export {
   CraterClient,
+  CRATER_BIDI_URL_ENV,
+  CRATER_ROOT_ENV,
   DEFAULT_BIDI_URL,
+  VLMKIT_CRATER_BIDI_URL_ENV,
+  VLMKIT_CRATER_ROOT_ENV,
+  resolveCraterBidiUrl,
   type CraterResponsiveBreakpoint,
   type CraterBreakpointDiscoveryDiagnostics,
   type CraterRuleViewportMapEntry,
@@ -103,6 +108,23 @@ export {
   type PaintProps,
 } from "./crater-client.ts";
 export { isCraterAvailable } from "./crater-client.ts";
+export {
+  CRATER_WASM_MODULE_ENV,
+  createCraterWasmLayoutBackend,
+  loadCraterWasmModule,
+  normalizeCraterLayoutJson,
+  summarizeCraterLayout,
+  type CraterBoxRect,
+  type CraterLayoutDiagnostics,
+  type CraterLayoutNode,
+  type CraterLayoutRootBox,
+  type CraterWasmLayoutBackend,
+  type CraterWasmModule,
+  type CraterWasmRenderRequest,
+  type CraterWasmRenderResult,
+  type CraterWasmViewport,
+  type LoadCraterWasmModuleOptions,
+} from "./crater-wasm.ts";
 export {
   runCraterBidiSmoke,
   formatCraterSmokeReport,

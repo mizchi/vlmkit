@@ -41,13 +41,16 @@
   - contributes to: GOAL-MIGRATION-VERIFICATION, GOAL-AGENT-ERGONOMICS
   - body: _not yet implemented_
 
-- [ ] **Alternate bench backends: Crater BiDi and Prescanner** (minor) — verifies: BENCH-003
+- [x] **Alternate bench backends: Crater BiDi and Prescanner** (minor) — verifies: BENCH-003
   >   `--backend crater` and `--backend prescanner` route the bench
   >   through alternative renderers. Crater requires a running
-  >   `crater bidi` server; Prescanner is in-process.
+  >   Crater BiDi server; Prescanner uses Crater first and falls back
+  >   to Chromium when needed. `--no-llm` keeps KPI runs detection-only
+  >   even when API keys are present.
   > Smoke coverage: `vlmkit check crater` verifies the Crater BiDi backend
   > contract and skips cleanly when the external server is not running.
   - contributes to: GOAL-CSS-CHALLENGE
+  - body: implemented in `src/experiments/css-challenge/css-challenge-bench.ts` and `@mizchi/vlmkit-capture`; BiDi URL resolution supports `VLMKIT_CRATER_BIDI_URL`, `CRATER_BIDI_URL`, `VLMKIT_CRATER_ROOT`, and `CRATER_ROOT`.
   - body: _not yet implemented_
 
 - [ ] **Animation or transition correctness** ⊘ deprecated (minor) — verifies: N3
@@ -128,13 +131,13 @@
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
-- [ ] **CSS challenge bench delete-and-detect** — verifies: BENCH-001
+- [x] **CSS challenge bench delete-and-detect** — verifies: BENCH-001
   >   `vrt bench` (alias `pkf run css-bench`) randomly deletes a
   >   CSS property or selector block, runs the chosen detection
   >   backend, and accumulates a per-trial pass/fail record into
   >   `data/*.jsonl`.
   - contributes to: GOAL-CSS-CHALLENGE
-  - body: _not yet implemented_
+  - body: implemented in `src/experiments/css-challenge/css-challenge-bench.ts`; supports fixture selection, trials/start seed, backend selection, `--no-db`, approval suggestions, and `--no-llm` for detection-only KPI runs.
 
 - [ ] **Canvas or WebGL content** ⊘ deprecated (minor) — verifies: N1
   > Preserved for matrix-row parity.
@@ -277,10 +280,10 @@
   >   /api/compare, /api/compare-renderers, /api/reason,
   >   /api/smoke-test, /api/status, /api/execution-results, /api/visual-diffs, /api/detection-series,
   >   /api/component-status-matrix, /api/approvals, /api/cloudflare/screenshot,
-  >   /api/cloudflare/crawl. Lets a browser extension or
+  >   /api/cloudflare/crawl, /api/crater/layout. Lets a browser extension or
   >   editor plugin drive vrt without spawning a Node child.
   - contributes to: GOAL-API
-  - body: partial implementation in `src/api/api-app.ts`; execution-result search and visual-diff display models are backed by Worker D1 artifact rows when available. Local `api serve` exposes detection-rate time-series points from `data/bench-history.jsonl`, component/label status matrices from snapshot reports, approval-manifest list/add/remove operations, and Cloudflare Browser Run Quick Actions proxies when credentials are configured.
+  - body: partial implementation in `src/api/api-app.ts`; execution-result search and visual-diff display models are backed by Worker D1 artifact rows when available. Local `api serve` exposes detection-rate time-series points from `data/bench-history.jsonl`, component/label status matrices from snapshot reports, approval-manifest list/add/remove operations, Cloudflare Browser Run Quick Actions proxies when credentials are configured, and a layout-only Crater JS/WASM renderer when `VLMKIT_CRATER_WASM_MODULE` is set.
 
 - [ ] **Hot-reload validation** ⊘ deprecated (minor) — verifies: L4
   > Preserved for matrix-row parity.
@@ -666,12 +669,12 @@
   - contributes to: GOAL-A11Y-COMPLIANCE
   - body: _not yet implemented_
 
-- [ ] **TypeScript client mirrors the HTTP surface** (minor) — verifies: API-002
+- [x] **TypeScript client mirrors the HTTP surface** (minor) — verifies: API-002
   >   `VrtClient` in `src/api/client.ts` is the typed in-process
   >   client; one method per HTTP endpoint with shared input/output
   >   types from `src/api/api-types.ts`.
   - contributes to: GOAL-API
-  - body: _not yet implemented_
+  - body: `src/api/client.ts` mirrors the current Hono surface, including dashboard review endpoints, Cloudflare Quick Actions, and `craterLayout()` for the layout-only Crater JS/WASM backend.
 
 - [ ] **Typography scale compliance** — verifies: M3
   > Typography hints surface the size and weight buckets observed; comparison against the declared scale catches off-scale glyphs.

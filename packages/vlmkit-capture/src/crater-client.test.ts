@@ -1,6 +1,51 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { CraterClient } from "./crater-client.ts";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import {
+  CraterClient,
+  DEFAULT_BIDI_URL,
+  resolveCraterBidiUrl,
+} from "./crater-client.ts";
+
+describe("resolveCraterBidiUrl", () => {
+  it("prefers explicit environment URLs", () => {
+    assert.equal(
+      resolveCraterBidiUrl({
+        env: { VLMKIT_CRATER_BIDI_URL: " ws://127.0.0.1:9222/session/from-env " },
+      }),
+      "ws://127.0.0.1:9222/session/from-env",
+    );
+    assert.equal(
+      resolveCraterBidiUrl({
+        env: { CRATER_BIDI_URL: "ws://127.0.0.1:9222/session/legacy" },
+      }),
+      "ws://127.0.0.1:9222/session/legacy",
+    );
+  });
+
+  it("reads the Crater start-with-font URL file when a root is provided", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "crater-bidi-url-"));
+    try {
+      await writeFile(join(dir, ".bidi-ws-url"), "ws://127.0.0.1:9222/session/from-file\n");
+      assert.equal(
+        resolveCraterBidiUrl({ craterRoot: dir, env: {} }),
+        "ws://127.0.0.1:9222/session/from-file",
+      );
+      assert.equal(
+        resolveCraterBidiUrl({ env: { VLMKIT_CRATER_ROOT: dir } }),
+        "ws://127.0.0.1:9222/session/from-file",
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("falls back to the root BiDi URL", () => {
+    assert.equal(resolveCraterBidiUrl({ env: {} }), DEFAULT_BIDI_URL);
+  });
+});
 
 describe("CraterClient.captureComputedStyles", () => {
   it("parses JSON-serialized snapshots returned by script.evaluate", async () => {

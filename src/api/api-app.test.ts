@@ -315,4 +315,66 @@ describe("createApiApp", () => {
     const routes = await routesResponse.json() as { routes: Array<{ path: string; title?: string }> };
     assert.deepEqual(routes.routes, [{ url: "https://example.com/docs", path: "/docs", title: "Docs" }]);
   });
+
+  it("serves Crater WASM layout providers when configured", async () => {
+    const app = createApiApp({
+      resolveCraterAvailable: async () => false,
+      craterWasmLayout: {
+        async renderLayout(request) {
+          return {
+            backend: "crater-wasm",
+            viewport: request.viewport,
+            rawJson: "{}",
+            elapsedMs: 1,
+            layout: {
+              id: request.html.includes("main") ? "main-root" : "root",
+              x: 0,
+              y: 0,
+              width: request.viewport.width,
+              height: request.viewport.height,
+              margin: { top: 0, right: 0, bottom: 0, left: 0 },
+              padding: { top: 0, right: 0, bottom: 0, left: 0 },
+              border: { top: 0, right: 0, bottom: 0, left: 0 },
+              children: [],
+            },
+            diagnostics: {
+              nodeCount: 1,
+              maxDepth: 1,
+              rootBox: { x: 0, y: 0, width: request.viewport.width, height: request.viewport.height },
+            },
+          };
+        },
+      },
+    });
+
+    const statusResponse = await app.request("http://vrt.local/api/status");
+    const status = await statusResponse.json() as {
+      capabilities: string[];
+      backends: Array<{ name: string; available: boolean }>;
+    };
+    assert.ok(status.capabilities.includes("crater-wasm-layout"));
+    assert.equal(status.backends.find((backend) => backend.name === "crater-wasm")?.available, true);
+
+    const layoutResponse = await app.request("http://vrt.local/api/crater/layout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        html: "<main>Hello</main>",
+        viewport: { width: 640, height: 360, label: "wide" },
+      }),
+    });
+
+    assert.equal(layoutResponse.status, 200);
+    const layout = await layoutResponse.json() as {
+      backend: string;
+      viewport: { width: number; height: number; label?: string };
+      layout: { id: string; width: number; height: number };
+      diagnostics: { nodeCount: number };
+    };
+    assert.equal(layout.backend, "crater-wasm");
+    assert.equal(layout.viewport.label, "wide");
+    assert.equal(layout.layout.id, "main-root");
+    assert.equal(layout.layout.width, 640);
+    assert.equal(layout.diagnostics.nodeCount, 1);
+  });
 });

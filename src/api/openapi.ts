@@ -244,6 +244,18 @@ export function buildOpenApiSpec(options: OpenApiSpecOptions = {}): OpenApiSpec 
           },
         },
       },
+      "/api/crater/layout": {
+        post: {
+          tags: ["compare"],
+          summary: "Render HTML to Crater layout JSON through a JS/WASM module",
+          requestBody: jsonRefBody("CraterWasmRenderRequest"),
+          responses: {
+            "200": jsonRefResponse("Crater layout tree and diagnostics", "CraterWasmRenderResult"),
+            "400": jsonRefResponse("Validation error", "ErrorResponse"),
+            "501": jsonRefResponse("Crater WASM layout provider is not configured", "ErrorResponse"),
+          },
+        },
+      },
       "/api/smoke-test": {
         post: {
           tags: ["smoke"],
@@ -844,6 +856,82 @@ function buildSchemas(): Record<string, OpenApiSchema> {
         routes: arrayOf(ref("CloudflareCrawlRoute")),
       },
       required: ["jobId", "status", "routes"],
+    },
+    CraterWasmViewport: {
+      type: "object",
+      properties: {
+        width: { type: "number" },
+        height: { type: "number" },
+        label: { type: "string" },
+      },
+      required: ["width", "height"],
+    },
+    CraterBoxRect: {
+      type: "object",
+      properties: {
+        top: { type: "number" },
+        right: { type: "number" },
+        bottom: { type: "number" },
+        left: { type: "number" },
+      },
+      required: ["top", "right", "bottom", "left"],
+    },
+    CraterLayoutNode: {
+      type: "object",
+      properties: {
+        id: { type: "string" },
+        x: { type: "number" },
+        y: { type: "number" },
+        width: { type: "number" },
+        height: { type: "number" },
+        margin: ref("CraterBoxRect"),
+        padding: ref("CraterBoxRect"),
+        border: ref("CraterBoxRect"),
+        children: arrayOf(ref("CraterLayoutNode")),
+      },
+      required: ["id", "x", "y", "width", "height", "margin", "padding", "border", "children"],
+    },
+    CraterLayoutRootBox: {
+      type: "object",
+      properties: {
+        x: { type: "number" },
+        y: { type: "number" },
+        width: { type: "number" },
+        height: { type: "number" },
+      },
+      required: ["x", "y", "width", "height"],
+    },
+    CraterLayoutDiagnostics: {
+      type: "object",
+      properties: {
+        nodeCount: { type: "number" },
+        maxDepth: { type: "number" },
+        rootBox: ref("CraterLayoutRootBox"),
+      },
+      required: ["nodeCount", "maxDepth", "rootBox"],
+    },
+    CraterWasmRenderRequest: {
+      type: "object",
+      properties: {
+        html: { type: "string" },
+        viewport: ref("CraterWasmViewport"),
+      },
+      required: ["html", "viewport"],
+    },
+    CraterWasmRenderResult: {
+      type: "object",
+      properties: {
+        backend: {
+          type: "string",
+          enum: ["crater-wasm"],
+        },
+        viewport: ref("CraterWasmViewport"),
+        layout: ref("CraterLayoutNode"),
+        rawJson: { type: "string" },
+        elapsedMs: { type: "number" },
+        diagnostics: ref("CraterLayoutDiagnostics"),
+      },
+      required: ["backend", "viewport", "layout", "rawJson", "elapsedMs", "diagnostics"],
     },
     ReasoningPipelineRequest: {
       type: "object",

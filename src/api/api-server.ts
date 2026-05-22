@@ -19,6 +19,11 @@ import {
   createCloudflareQuickActionsClient,
   resolveCloudflareQuickActionsConfig,
 } from "@mizchi/vlmkit-capture/cloudflare-quick-actions.ts";
+import {
+  createCraterWasmLayoutBackend,
+  loadCraterWasmModule,
+  type CraterWasmLayoutBackend,
+} from "@mizchi/vlmkit-capture/crater-wasm.ts";
 import { buildBenchDetectionSeries, readBenchHistory } from "../experiments/benchmark/bench-history.ts";
 import {
   applyApprovalOperation,
@@ -106,6 +111,19 @@ function resolveLocalCloudflareQuickActions() {
   }
 }
 
+function resolveLocalCraterWasmLayout() {
+  const modulePath = process.env.VLMKIT_CRATER_WASM_MODULE ?? process.env.CRATER_WASM_MODULE;
+  if (!modulePath) return undefined;
+  let backendPromise: Promise<CraterWasmLayoutBackend> | undefined;
+  return {
+    async renderLayout(request: Parameters<CraterWasmLayoutBackend["renderLayout"]>[0]) {
+      backendPromise ??= loadCraterWasmModule({ modulePath })
+        .then((module) => createCraterWasmLayoutBackend(module));
+      return (await backendPromise).renderLayout(request);
+    },
+  };
+}
+
 const app = createApiApp({
   serverUrl: `http://127.0.0.1:${PORT}`,
   listDetectionSeries: async (query) => buildBenchDetectionSeries(await readBenchHistory(), query),
@@ -113,6 +131,7 @@ const app = createApiApp({
   listApprovals: listLocalApprovals,
   applyApprovalOperation: applyLocalApprovalOperation,
   cloudflareQuickActions: resolveLocalCloudflareQuickActions(),
+  craterWasmLayout: resolveLocalCraterWasmLayout(),
 });
 
 console.log(`vrt API server on http://127.0.0.1:${PORT}`);

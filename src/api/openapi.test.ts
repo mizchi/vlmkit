@@ -25,6 +25,7 @@ describe("buildOpenApiSpec", () => {
     assert.ok(spec.paths["/api/cloudflare/crawl"]);
     assert.ok(spec.paths["/api/cloudflare/crawl/{jobId}"]);
     assert.ok(spec.paths["/api/cloudflare/crawl/{jobId}/routes"]);
+    assert.ok(spec.paths["/api/crater/layout"]);
     assert.ok(spec.paths["/api/reason"]);
     assert.ok(spec.paths["/api/smoke-test"]);
 
@@ -61,6 +62,8 @@ describe("buildOpenApiSpec", () => {
     assert.ok(spec.components.schemas.CloudflareScreenshotRequest);
     assert.ok(spec.components.schemas.CloudflareCrawlStartResult);
     assert.ok(spec.components.schemas.CloudflareCrawlRoutesResponse);
+    assert.ok(spec.components.schemas.CraterWasmRenderRequest);
+    assert.ok(spec.components.schemas.CraterWasmRenderResult);
     assert.ok(spec.components.schemas.ErrorResponse);
   });
 });

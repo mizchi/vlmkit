@@ -23,6 +23,8 @@ import type {
   ComponentStatusMatrixQuery,
   ComponentStatusMatrixResponse,
   CompareRequest, CompareResponse,
+  CraterWasmRenderRequest,
+  CraterWasmRenderResult,
   DetectionSeriesQuery,
   DetectionSeriesResponse,
   ExecutionResultsQuery,
@@ -166,6 +168,10 @@ export class VrtClient {
     query: { baseUrl?: string } = {},
   ): Promise<{ jobId: string; status: string; routes: CloudflareCrawlRoute[] }> {
     return this.get(buildQueryPath(`/api/cloudflare/crawl/${encodeURIComponent(jobId)}/routes`, query));
+  }
+
+  async craterLayout(request: CraterWasmRenderRequest): Promise<CraterWasmRenderResult> {
+    return this.post("/api/crater/layout", request);
   }
 
   // ---- Reasoning Pipeline ----

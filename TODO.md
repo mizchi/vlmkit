@@ -131,9 +131,17 @@ Use vrt on real projects to verify practicality.
 ### E2. Crater prescanner tracking
 
 Measure detection rate improvement after crater-side fixes (#18-22).
-**Status**: #18-22 all Open (no progress as of 2026-04-05). Waiting for crater-side fixes.
+**Status**: 2026-05-22 の再計測では prescanner detection 95% が維持され、
+Crater-only 解決は 65%。target detection 80% は達成済みだが、speedup は最新
+1.06x で target 3x には未達。残りは hover-only / dead-code /
+content-dependent を fallback なしで扱えるかが焦点。
 
-- [ ] Re-run bench after text-decoration #18 fix
+- [x] Re-run bench after text-decoration #18 fix
+  - 2026-05-22: `page`, prescanner, 20 trials, 5 viewports, LLM disabled.
+    Any signal 19/20 (95%), Crater-only 13/20 (65%), Chromium fallback 7/20 (35%).
+    `text-decoration` は通常リンクでは prescan 解決、`:hover` は fallback に残る。
+  - Dogfood fix: `vlmkit bench` now supports `--no-llm`, so detection KPI runs
+    do not accidentally spend LLM calls when API keys are present.
 - [x] Track progress toward detection rate 60% → target 80%+
   - `detection-report` now shows Prescanner Goals using `bench-history`: latest/best detection, 80% target, and remaining gap.
 - [x] Track progress toward prescanner speedup 1.66x → target 3x+
@@ -161,7 +169,9 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 - [x] Cloudflare Workers entry point (`worker/`) — `worker/index.ts` re-exports `createApiApp()` from `src/api/api-app.ts`. `env.BROWSER` wiring still pending.
 - [x] Cloudflare Quick Actions REST backend (`/screenshot`, `/crawl` for route discovery)
   - `@mizchi/vlmkit-capture` now includes a Browser Run Quick Actions client for `/screenshot` and `/crawl`, route extraction from crawl results, and Hono API proxy endpoints under `/api/cloudflare/*`.
-- [ ] crater WASM backend (layout only — paint is future)
+- [x] crater WASM backend (layout only — paint is future)
+  - `@mizchi/vlmkit-capture` now exposes a layout-only adapter for Crater modules exporting `renderHtmlToJsonForWpt(html, width, height)`.
+  - Local `vlmkit api serve` enables `POST /api/crater/layout` when `VLMKIT_CRATER_WASM_MODULE` points at a Crater JS/WASM artifact; dogfooded with `../crater/conformance/_build/js/release/build/wpt/wpt.js`.
 - [x] Cloudflare R2 / KV / D1 storage — `worker/storage.ts` detects bindings; `/api/status` exposes `r2`/`kv`/`d1` availability via `StorageStatus`. Read/write wiring still pending.
 - [x] npm package (`@mizchi/vrt`) — `pnpm add @mizchi/vrt`; exports both root and `/client`.
 - [x] OpenAPI spec

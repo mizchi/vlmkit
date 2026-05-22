@@ -42,6 +42,15 @@ export type {
   CloudflareScreenshotRequest,
   CloudflareScreenshotResult,
 } from "@mizchi/vlmkit-capture/cloudflare-quick-actions.ts";
+export type {
+  CraterBoxRect,
+  CraterLayoutDiagnostics,
+  CraterLayoutNode,
+  CraterLayoutRootBox,
+  CraterWasmRenderRequest,
+  CraterWasmRenderResult,
+  CraterWasmViewport,
+} from "@mizchi/vlmkit-capture/crater-wasm.ts";
 
 export interface DiscoverOptions {
   /** Breakpoint discovery backend */

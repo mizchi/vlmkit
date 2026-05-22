@@ -11,6 +11,7 @@
  *   npx tsx src/css-challenge-bench.ts --approval approval.json --suggest-approval
  *   npx tsx src/css-challenge-bench.ts --backend prescanner
  *   npx tsx src/css-challenge-bench.ts --trials 30 --no-db
+ *   npx tsx src/css-challenge-bench.ts --backend prescanner --no-llm
  *   ANTHROPIC_API_KEY=... npx tsx src/css-challenge-bench.ts --trials 10
  */
 import { mkdir, rm, writeFile } from "node:fs/promises";
@@ -87,6 +88,7 @@ export interface CssChallengeBenchCliOptions {
   suggestApproval: boolean;
   outputRoot: string;
   mode: ChallengeMode;
+  enableLlm: boolean;
 }
 
 export function parseCssChallengeBenchArgs(cliArgs: string[]): CssChallengeBenchCliOptions {
@@ -116,6 +118,7 @@ export function parseCssChallengeBenchArgs(cliArgs: string[]): CssChallengeBench
     suggestApproval: hasCliFlag("suggest-approval"),
     outputRoot: getCliArg("output-root", CSS_BENCH_OUTPUT_ROOT),
     mode: getCliArg("mode", "property") as ChallengeMode,
+    enableLlm: !hasCliFlag("no-llm"),
   };
 }
 
@@ -130,6 +133,7 @@ const STRICT = CLI_OPTIONS.strict;
 const SUGGEST_APPROVAL = CLI_OPTIONS.suggestApproval;
 const OUTPUT_ROOT = CLI_OPTIONS.outputRoot;
 const MODE = CLI_OPTIONS.mode;
+const ENABLE_LLM = CLI_OPTIONS.enableLlm;
 
 const BASE_VIEWPORTS = [
   { width: 1440, height: 900, label: "wide" },
@@ -307,7 +311,7 @@ async function runFixtureBenchmark(fixture: string) {
     TRACKED_PROPERTIES,
     collectComputedStyleTrackingProperties(declarations),
   );
-  const llm = createLLMProvider({ throwIfMissing: false });
+  const llm = ENABLE_LLM ? createLLMProvider({ throwIfMissing: false }) : null;
   const approvalManifest = APPROVAL_PATH ? await loadApprovalManifest(APPROVAL_PATH) : null;
   const approvalWarnings = approvalManifest ? collectApprovalWarnings(approvalManifest) : [];
 

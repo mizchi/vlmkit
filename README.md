@@ -55,7 +55,8 @@ for the full old → new mapping.
 - **Migration VRT** — compare HTML before/after across responsive viewports
 - **Snapshot** — URL-based multi-viewport capture with baseline diff
 - **Mask** — selector-based masking for dynamic content (animations, counters)
-- **Crater integration** — lightweight prescanner via BiDi (1.66x speedup, 0% false positive)
+- **Crater integration** — lightweight prescanner via BiDi (1.66x speedup,
+  0% false positive) plus a layout-only JS/WASM backend.
 - **Markup-assistance toolkit** (10+ commands): build from screenshot, theme-parity,
   i18n stress, a11y contrast / touch / focus-order, media-variant adaptations,
   cross-browser parity, design-token conformance, interaction sequences.
@@ -146,6 +147,7 @@ vlmkit diff html --dir fixtures/migration/tailwind-to-vanilla \
 
 # CSS challenge benchmark
 pkf run css-bench --fixture page --trials 30
+vlmkit bench --backend prescanner --fixture page --trials 20 --no-llm
 
 # Fix loop (break CSS → VLM analyze → LLM fix → verify)
 pkf run fix-loop --fixture page --seed 42
@@ -349,6 +351,27 @@ The HTTP API also supports Cloudflare Browser Run Quick Actions when
 `POST /api/cloudflare/screenshot`, `POST /api/cloudflare/crawl`, and
 `GET /api/cloudflare/crawl/:jobId/routes`.
 
+For browserless Crater layout checks, point `VLMKIT_CRATER_WASM_MODULE` at a
+Crater JS/WASM module that exports `renderHtmlToJsonForWpt(html, width,
+height)`, for example:
+
+```bash
+VLMKIT_CRATER_WASM_MODULE=../crater/conformance/_build/js/release/build/wpt/wpt.js \
+  vlmkit api serve --port 3456
+```
+
+Then call `POST /api/crater/layout` with `{ "html": "...", "viewport": {
+"width": 800, "height": 480 } }`. This path returns layout JSON and summary
+diagnostics only; paint output remains on the Crater BiDi path for now.
+
+When using `just start-bidi-with-font` from the Crater checkout, pass the
+generated session URL to BiDi clients with either `VLMKIT_CRATER_BIDI_URL` or
+`VLMKIT_CRATER_ROOT`:
+
+```bash
+VLMKIT_CRATER_ROOT=../crater vlmkit bench --backend prescanner
+```
+
 #### Visualizing the VRT process — flipbooks + video
 
 The VRT process can be saved as a self-contained HTML "flipbook" (PNGs
@@ -503,6 +526,7 @@ Available endpoints:
 - `GET|POST /api/approvals` — list/add/remove approval manifest rules for review UIs
 - `POST /api/cloudflare/screenshot` — Cloudflare Browser Run Quick Actions screenshot proxy
 - `POST|GET /api/cloudflare/crawl` — start/read crawl jobs and extract route candidates
+- `POST /api/crater/layout` — render HTML to Crater layout JSON via a JS/WASM module
 - `POST /api/compare` — compare baseline/current HTML or URLs across viewports
 - `POST /api/compare-renderers` — compare Chromium vs Crater rendering
 - `POST /api/reason` — VLM/LLM reasoning pipeline for diff analysis and fixes
@@ -559,6 +583,9 @@ HTML (file or URL)
 | `OPENROUTER_API_KEY` | OpenRouter API key | — |
 | `GEMINI_API_KEY` | Google AI API key | — |
 | `ANTHROPIC_API_KEY` | Anthropic API key | — |
+| `VLMKIT_CRATER_BIDI_URL` | Crater BiDi WebSocket URL, including `/session/...` when required | `ws://127.0.0.1:9222` |
+| `VLMKIT_CRATER_ROOT` | Crater checkout containing `.bidi-ws-url` from `just start-bidi-with-font` | — |
+| `VLMKIT_CRATER_WASM_MODULE` | Crater layout JS/WASM module path for `POST /api/crater/layout` | — |
 
 ## Project Structure
 
@@ -577,8 +604,11 @@ src/
   mask.ts                   # Selector-based visibility masking
   vlm-client.ts             # OpenRouter / Gemini VLM client
   llm-client.ts             # Multi-provider LLM client
+  api/
+    api-server.ts           # Hono API server
+packages/vlmkit-capture/src/
   crater-client.ts          # Crater BiDi WebSocket client
-  api-server.ts             # Hono API server
+  crater-wasm.ts            # Crater layout-only JS/WASM adapter
 fixtures/
   css-challenge/            # 9 HTML fixtures for CSS bench
   migration/                # Migration comparison fixtures
