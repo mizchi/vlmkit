@@ -14,9 +14,12 @@ export interface WorkerKVNamespaceLike {
 }
 
 export interface WorkerD1PreparedStatementLike {
-  bind(...values: unknown[]): {
-    run(): Promise<unknown>;
-  };
+  bind(...values: unknown[]): WorkerD1BoundStatementLike;
+}
+
+export interface WorkerD1BoundStatementLike {
+  run(): Promise<unknown>;
+  all?(): Promise<{ results?: unknown[] }>;
 }
 
 export interface WorkerD1Like {
@@ -46,6 +49,28 @@ export interface WorkerArtifactRecord {
   kvKey: string;
   contentType: string;
   createdAt: string;
+}
+
+export interface WorkerExecutionResultRecord {
+  runId: string;
+  runType: string;
+  latestCreatedAt: string;
+  artifactCount: number;
+  artifactKinds: string[];
+  artifacts: WorkerArtifactRecord[];
+}
+
+export interface ListWorkerExecutionResultsInput {
+  q?: string;
+  runType?: string;
+  artifactKind?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface WorkerExecutionResultsResponse {
+  total: number;
+  results: WorkerExecutionResultRecord[];
 }
 
 export interface PutWorkerJsonArtifactInput {
@@ -110,6 +135,95 @@ export function buildWorkerArtifactIndexKey(input: {
     input.artifactKind,
     normalizeWorkerArtifactPath(input.artifactPath),
   ].join(":");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function readString(record: Record<string, unknown>, ...keys: string[]): string {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string") return value;
+  }
+  return "";
+}
+
+export function normalizeWorkerArtifactRecord(row: unknown): WorkerArtifactRecord | null {
+  if (!isRecord(row)) return null;
+  const runId = readString(row, "runId", "run_id");
+  const runType = readString(row, "runType", "run_type");
+  const artifactKind = readString(row, "artifactKind", "artifact_kind");
+  const artifactPath = readString(row, "artifactPath", "artifact_path");
+  const r2Key = readString(row, "r2Key", "r2_key");
+  const contentType = readString(row, "contentType", "content_type");
+  const createdAt = readString(row, "createdAt", "created_at");
+  if (!runId || !runType || !artifactKind || !artifactPath || !r2Key || !contentType || !createdAt) {
+    return null;
+  }
+  return {
+    runId,
+    runType,
+    artifactKind,
+    artifactPath,
+    r2Key,
+    kvKey: readString(row, "kvKey", "kv_key") || buildWorkerArtifactIndexKey({ runId, artifactKind, artifactPath }),
+    contentType,
+    createdAt,
+  };
+}
+
+function artifactMatchesQuery(
+  record: WorkerArtifactRecord,
+  query: ListWorkerExecutionResultsInput,
+): boolean {
+  if (query.runType && record.runType !== query.runType) return false;
+  if (query.artifactKind && record.artifactKind !== query.artifactKind) return false;
+  const q = query.q?.trim().toLowerCase();
+  if (!q) return true;
+  return [
+    record.runId,
+    record.runType,
+    record.artifactKind,
+    record.artifactPath,
+    record.r2Key,
+  ].some((value) => value.toLowerCase().includes(q));
+}
+
+export function buildWorkerExecutionResults(
+  records: WorkerArtifactRecord[],
+  query: ListWorkerExecutionResultsInput = {},
+): WorkerExecutionResultsResponse {
+  const matchingRunIds = new Set(
+    records.filter((record) => artifactMatchesQuery(record, query)).map((record) => record.runId),
+  );
+  const grouped = new Map<string, WorkerArtifactRecord[]>();
+  for (const record of records) {
+    if (!matchingRunIds.has(record.runId)) continue;
+    const list = grouped.get(record.runId) ?? [];
+    list.push(record);
+    grouped.set(record.runId, list);
+  }
+
+  const allResults = [...grouped.entries()].map(([runId, artifacts]) => {
+    const sortedArtifacts = [...artifacts].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const latest = sortedArtifacts[0]!;
+    return {
+      runId,
+      runType: latest.runType,
+      latestCreatedAt: latest.createdAt,
+      artifactCount: sortedArtifacts.length,
+      artifactKinds: [...new Set(sortedArtifacts.map((record) => record.artifactKind))].sort(),
+      artifacts: sortedArtifacts,
+    };
+  }).sort((a, b) => b.latestCreatedAt.localeCompare(a.latestCreatedAt));
+
+  const offset = Math.max(0, query.offset ?? 0);
+  const limit = Math.max(1, Math.min(query.limit ?? 50, 500));
+  return {
+    total: allResults.length,
+    results: allResults.slice(offset, offset + limit),
+  };
 }
 
 export function createWorkerStorage(env: WorkerStorageEnv) {
@@ -194,6 +308,29 @@ export function createWorkerStorage(env: WorkerStorageEnv) {
       }
 
       return record;
+    },
+    async listExecutionResults(
+      input: ListWorkerExecutionResultsInput = {},
+    ): Promise<WorkerExecutionResultsResponse> {
+      if (!env.VRT_DB) return { total: 0, results: [] };
+      const statement = env.VRT_DB.prepare(`
+        SELECT
+          run_id,
+          run_type,
+          artifact_kind,
+          artifact_path,
+          r2_key,
+          content_type,
+          created_at
+        FROM vrt_artifacts
+        ORDER BY created_at DESC
+        LIMIT ?
+      `).bind(1000);
+      const rows = await statement.all?.();
+      const records = (rows?.results ?? [])
+        .map(normalizeWorkerArtifactRecord)
+        .filter((record): record is WorkerArtifactRecord => Boolean(record));
+      return buildWorkerExecutionResults(records, input);
     },
   };
 }

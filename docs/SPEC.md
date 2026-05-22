@@ -275,10 +275,10 @@
 - [ ] **HTTP API server exposes compare / reason / smoke endpoints** (minor) — verifies: API-001
   >   `vrt api serve [--port N]` starts a Hono server with
   >   /api/compare, /api/compare-renderers, /api/reason,
-  >   /api/smoke-test, /api/status. Lets a browser extension or
+  >   /api/smoke-test, /api/status, /api/execution-results. Lets a browser extension or
   >   editor plugin drive vrt without spawning a Node child.
   - contributes to: GOAL-API
-  - body: _not yet implemented_
+  - body: partial implementation in `src/api/api-app.ts`; execution-result search is backed by Worker D1 artifact rows when available.
 
 - [ ] **Hot-reload validation** ⊘ deprecated (minor) — verifies: L4
   > Preserved for matrix-row parity.

@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import type {
+  ExecutionResultsQuery,
+  ExecutionResultsResponse,
   SmokeTestRequest,
   StatusResponse,
   StorageStatus,
@@ -18,6 +20,7 @@ export interface CreateApiAppOptions {
   serverUrl?: string;
   resolveCraterAvailable?: () => Promise<boolean>;
   resolveStorageStatus?: () => Promise<StorageStatus | undefined> | StorageStatus | undefined;
+  listExecutionResults?: (query: ExecutionResultsQuery) => Promise<ExecutionResultsResponse> | ExecutionResultsResponse;
 }
 
 export function createApiApp(options: CreateApiAppOptions = {}) {
@@ -54,6 +57,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
         "report",
         "openapi",
         ...(storage?.available ? ["storage"] : []),
+        ...(options.listExecutionResults ? ["execution-results"] : []),
       ],
       backends: [
         { name: "chromium", available: true },
@@ -69,6 +73,23 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     resolveCraterAvailable: options.resolveCraterAvailable,
   });
   registerReasonRoute(app);
+
+  app.get("/api/execution-results", async (c) => {
+    if (!options.listExecutionResults) {
+      return c.json({ error: "Execution result provider is not configured" }, 501);
+    }
+    const url = new URL(c.req.url);
+    const limit = parsePositiveInt(url.searchParams.get("limit"));
+    const offset = parseNonNegativeInt(url.searchParams.get("offset"));
+    const query: ExecutionResultsQuery = {
+      q: url.searchParams.get("q") ?? undefined,
+      runType: url.searchParams.get("runType") ?? undefined,
+      artifactKind: url.searchParams.get("artifactKind") ?? undefined,
+      limit,
+      offset,
+    };
+    return c.json(await options.listExecutionResults(query));
+  });
 
   app.post("/api/smoke-test", async (c) => {
     let body: SmokeTestRequest;
@@ -94,4 +115,16 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
   });
 
   return app;
+}
+
+function parsePositiveInt(value: string | null): number | undefined {
+  if (value == null || value === "") return undefined;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function parseNonNegativeInt(value: string | null): number | undefined {
+  if (value == null || value === "") return undefined;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }

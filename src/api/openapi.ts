@@ -63,6 +63,7 @@ export function buildOpenApiSpec(options: OpenApiSpecOptions = {}): OpenApiSpec 
       { name: "compare", description: "Visual diff and renderer comparison endpoints." },
       { name: "reason", description: "VLM/LLM reasoning and CSS fix suggestions." },
       { name: "smoke", description: "Interactive smoke testing endpoints." },
+      { name: "dashboard", description: "Result listing and review UI support endpoints." },
     ],
     paths: {
       "/api/openapi.json": {
@@ -127,6 +128,16 @@ export function buildOpenApiSpec(options: OpenApiSpecOptions = {}): OpenApiSpec 
             "400": jsonRefResponse("Validation error", "ErrorResponse"),
             "500": jsonRefResponse("Pipeline failure", "ErrorResponse"),
             "503": jsonRefResponse("Reasoning backend unavailable", "ErrorResponse"),
+          },
+        },
+      },
+      "/api/execution-results": {
+        get: {
+          tags: ["dashboard"],
+          summary: "List and search stored execution results",
+          responses: {
+            "200": jsonRefResponse("Stored execution result list", "ExecutionResultsResponse"),
+            "501": jsonRefResponse("Execution result provider is not configured", "ErrorResponse"),
           },
         },
       },
@@ -368,6 +379,40 @@ function buildSchemas(): Record<string, OpenApiSchema> {
         },
       },
       required: ["status", "results", "meta"],
+    },
+    ExecutionResultArtifact: {
+      type: "object",
+      properties: {
+        runId: { type: "string" },
+        runType: { type: "string" },
+        artifactKind: { type: "string" },
+        artifactPath: { type: "string" },
+        r2Key: { type: "string" },
+        kvKey: { type: "string" },
+        contentType: { type: "string" },
+        createdAt: { type: "string" },
+      },
+      required: ["runId", "runType", "artifactKind", "artifactPath", "r2Key", "kvKey", "contentType", "createdAt"],
+    },
+    ExecutionResultRecord: {
+      type: "object",
+      properties: {
+        runId: { type: "string" },
+        runType: { type: "string" },
+        latestCreatedAt: { type: "string" },
+        artifactCount: { type: "number" },
+        artifactKinds: arrayOf({ type: "string" }),
+        artifacts: arrayOf(ref("ExecutionResultArtifact")),
+      },
+      required: ["runId", "runType", "latestCreatedAt", "artifactCount", "artifactKinds", "artifacts"],
+    },
+    ExecutionResultsResponse: {
+      type: "object",
+      properties: {
+        total: { type: "number" },
+        results: arrayOf(ref("ExecutionResultRecord")),
+      },
+      required: ["total", "results"],
     },
     ReasoningPipelineRequest: {
       type: "object",

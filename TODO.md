@@ -1418,7 +1418,8 @@ Stepwise cleanup:
   horizontal overflow, viewport-boundary escapes, and min/max width violations.
 
 ### Dashboard (separate repo)
-- [ ] Execution result list/search
+- [x] Execution result list/search
+  - Worker storage now groups artifact rows into execution-result summaries, and `/api/execution-results` exposes searchable run metadata for dashboard clients.
 - [ ] Visual diff display (heatmap, side-by-side, overlay)
 - [ ] Interactive approval operations
 - [ ] Detection rate time-series graph

@@ -355,6 +355,15 @@ export interface TrialSummary {
   undetectedReason?: string;
 }
 
+// ---- Execution Results API ----
+
+export type {
+  ListWorkerExecutionResultsInput as ExecutionResultsQuery,
+  WorkerArtifactRecord as ExecutionResultArtifact,
+  WorkerExecutionResultRecord as ExecutionResultRecord,
+  WorkerExecutionResultsResponse as ExecutionResultsResponse,
+} from "../../worker/storage.ts";
+
 // ---- Status API ----
 
 export interface StatusResponse {

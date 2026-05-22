@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   buildWorkerArtifactKey,
+  buildWorkerExecutionResults,
   createWorkerStorage,
   detectWorkerStorageCapabilities,
   normalizeWorkerArtifactPath,
@@ -33,6 +34,7 @@ class FakeKVNamespace implements WorkerKVNamespaceLike {
 class FakeD1Database implements WorkerD1Like {
   execCalls: string[] = [];
   prepared: Array<{ sql: string; values: unknown[] }> = [];
+  rows: unknown[] = [];
 
   async exec(query: string): Promise<unknown> {
     this.execCalls.push(query);
@@ -45,6 +47,10 @@ class FakeD1Database implements WorkerD1Like {
         run: async () => {
           this.prepared.push({ sql: query, values });
           return { success: true };
+        },
+        all: async () => {
+          this.prepared.push({ sql: query, values });
+          return { results: this.rows };
         },
       }),
     };
@@ -124,5 +130,67 @@ describe("createWorkerStorage", () => {
     assert.match(d1.prepared[0]?.sql ?? "", /INSERT INTO vrt_artifacts/);
     assert.equal(d1.prepared[0]?.values[0], "run-123");
     assert.equal(d1.prepared[0]?.values[1], "migration-blind");
+  });
+
+  it("lists execution results grouped by run id from D1 artifact rows", async () => {
+    const d1 = new FakeD1Database();
+    d1.rows = [
+      {
+        run_id: "run-a",
+        run_type: "snapshot",
+        artifact_kind: "snapshot",
+        artifact_path: "snapshot-report.json",
+        r2_key: "runs/run-a/snapshot/snapshot-report.json",
+        content_type: "application/json",
+        created_at: "2026-05-22T00:00:00.000Z",
+      },
+      {
+        run_id: "run-a",
+        run_type: "snapshot",
+        artifact_kind: "heatmap",
+        artifact_path: "home_heatmap.png",
+        r2_key: "runs/run-a/heatmap/home_heatmap.png",
+        content_type: "image/png",
+        created_at: "2026-05-22T00:00:01.000Z",
+      },
+    ];
+    const storage = createWorkerStorage({ VRT_DB: d1 });
+
+    const result = await storage.listExecutionResults({ q: "heatmap" });
+
+    assert.equal(result.total, 1);
+    assert.equal(result.results[0]?.runId, "run-a");
+    assert.equal(result.results[0]?.artifactCount, 2);
+    assert.deepEqual(result.results[0]?.artifactKinds, ["heatmap", "snapshot"]);
+  });
+});
+
+describe("buildWorkerExecutionResults", () => {
+  it("searches across run metadata and artifact paths", () => {
+    const result = buildWorkerExecutionResults([
+      {
+        runId: "daily-1",
+        runType: "snapshot",
+        artifactKind: "snapshot",
+        artifactPath: "snapshot-report.json",
+        r2Key: "runs/daily-1/snapshot/snapshot-report.json",
+        kvKey: "artifacts:daily-1:snapshot:snapshot-report.json",
+        contentType: "application/json",
+        createdAt: "2026-05-22T00:00:00.000Z",
+      },
+      {
+        runId: "migration-1",
+        runType: "migration-blind",
+        artifactKind: "heatmap",
+        artifactPath: "diffs/home_heatmap.png",
+        r2Key: "runs/migration-1/heatmap/diffs/home_heatmap.png",
+        kvKey: "artifacts:migration-1:heatmap:diffs/home_heatmap.png",
+        contentType: "image/png",
+        createdAt: "2026-05-22T00:01:00.000Z",
+      },
+    ], { q: "home", limit: 10 });
+
+    assert.equal(result.total, 1);
+    assert.equal(result.results[0]?.runId, "migration-1");
   });
 });
