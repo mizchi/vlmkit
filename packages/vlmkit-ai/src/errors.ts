@@ -26,7 +26,9 @@ export type VrtConfigErrorCode =
   /** No provider in the fallback chain has an API key configured. */
   | "NO_PROVIDER_AVAILABLE"
   /** An optional runtime dependency (e.g. `@google/generative-ai`) failed to import. */
-  | "MISSING_DEPENDENCY";
+  | "MISSING_DEPENDENCY"
+  /** Caller-supplied request parameters are malformed (empty prompt, out-of-range size, etc.). */
+  | "INVALID_REQUEST";
 
 export class VrtConfigError extends Error {
   readonly code: VrtConfigErrorCode;

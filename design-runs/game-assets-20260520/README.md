@@ -53,14 +53,15 @@ file.
 Dry-run all prompts without spending API credits:
 
 ```bash
-node design-runs/game-assets-20260520/run-gpt-image-2.mjs --list
-node design-runs/game-assets-20260520/run-gpt-image-2.mjs --stage all
+node --experimental-strip-types design-runs/game-assets-20260520/run-gpt-image-2.ts --list
+node --experimental-strip-types design-runs/game-assets-20260520/run-gpt-image-2.ts --stage all
 ```
 
 Generate one stage:
 
 ```bash
-OPENAI_API_KEY=... node design-runs/game-assets-20260520/run-gpt-image-2.mjs \
+OPENAI_API_KEY=... node --experimental-strip-types \
+  design-runs/game-assets-20260520/run-gpt-image-2.ts \
   --stage concept-single \
   --run
 ```
@@ -68,7 +69,8 @@ OPENAI_API_KEY=... node design-runs/game-assets-20260520/run-gpt-image-2.mjs \
 Generate the full first pass:
 
 ```bash
-OPENAI_API_KEY=... node design-runs/game-assets-20260520/run-gpt-image-2.mjs \
+OPENAI_API_KEY=... node --experimental-strip-types \
+  design-runs/game-assets-20260520/run-gpt-image-2.ts \
   --stage all \
   --quality medium \
   --n 1 \

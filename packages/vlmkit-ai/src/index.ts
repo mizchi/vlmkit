@@ -38,6 +38,28 @@ export {
   type VlmResponse,
 } from "./vlm-client.ts";
 
+// ---- Image generation clients ----
+export {
+  buildGenerationBody,
+  createImageGenClient,
+  estimateImageGenCost,
+  listImageGenModels,
+  parseGenerationResponse,
+  resolveImageGenModel,
+  type CreateImageGenClientOptions,
+  type ImageGenBackground,
+  type ImageGenClient,
+  type ImageGenModel,
+  type ImageGenOutputFormat,
+  type ImageGenQuality,
+  type ImageGenRequest,
+  type ImageGenRequestBody,
+  type ImageGenResponse,
+  type ImageGenSize,
+  type ImageGenUsage,
+  type ParsedGeneration,
+} from "./image-gen-client.ts";
+
 // ---- Reasoning ----
 export {
   createReasoningPipeline,

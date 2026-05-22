@@ -1,21 +1,55 @@
 #!/usr/bin/env node
+/**
+ * Dogfood driver for the gpt-image-2 game-asset pipeline.
+ *
+ * The OpenAI request/response/cost arithmetic lives in
+ * `@mizchi/vlmkit-ai/image-gen-client.ts` so other parts of vlmkit
+ * (CLI workflows, markup tools) can reuse the same plumbing.
+ */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  createImageGenClient,
+  resolveImageGenModel,
+  type ImageGenQuality,
+  type ImageGenRequest,
+  type ImageGenSize,
+} from "@mizchi/vlmkit-ai/image-gen-client.ts";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const defaultManifestPath = join(here, "stages.json");
 const defaultOutDir = join(here, "outputs");
 
-const RATES_PER_1M = {
-  textInput: 5,
-  imageInput: 8,
-  imageOutput: 30,
-};
+interface CliArgs {
+  list: boolean;
+  stage: string;
+  run: boolean;
+  model: string | undefined;
+  quality: ImageGenQuality | undefined;
+  size: ImageGenSize | undefined;
+  n: number;
+  outDir: string;
+  manifestPath: string;
+}
 
-function usage() {
+interface Stage {
+  id: string;
+  title?: string;
+  size?: ImageGenSize;
+  quality?: ImageGenQuality;
+  prompt: string[];
+  checks?: string[];
+}
+
+interface Manifest {
+  model: string;
+  stages: Stage[];
+}
+
+function usage(): void {
   console.log(`Usage:
-  node design-runs/game-assets-20260520/run-gpt-image-2.mjs [options]
+  node design-runs/game-assets-20260520/run-gpt-image-2.ts [options]
 
 Options:
   --list                    List stages
@@ -31,8 +65,20 @@ Options:
 `);
 }
 
-function parseArgs(argv) {
-  const args = {
+function requiredValue(argv: string[], index: number, flag: string): string {
+  const value = argv[index];
+  if (!value || value.startsWith("--")) throw new Error(`${flag} requires a value`);
+  return value;
+}
+
+function parsePositiveInt(value: string, flag: string): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) throw new Error(`${flag} must be a positive integer`);
+  return parsed;
+}
+
+function parseArgs(argv: string[]): CliArgs {
+  const args: CliArgs = {
     list: false,
     stage: "all",
     run: false,
@@ -49,8 +95,8 @@ function parseArgs(argv) {
     else if (arg === "--run") args.run = true;
     else if (arg === "--stage") args.stage = requiredValue(argv, ++i, "--stage");
     else if (arg === "--model") args.model = requiredValue(argv, ++i, "--model");
-    else if (arg === "--quality") args.quality = requiredValue(argv, ++i, "--quality");
-    else if (arg === "--size") args.size = requiredValue(argv, ++i, "--size");
+    else if (arg === "--quality") args.quality = requiredValue(argv, ++i, "--quality") as ImageGenQuality;
+    else if (arg === "--size") args.size = requiredValue(argv, ++i, "--size") as ImageGenSize;
     else if (arg === "--n") args.n = parsePositiveInt(requiredValue(argv, ++i, "--n"), "--n");
     else if (arg === "--out") args.outDir = resolve(requiredValue(argv, ++i, "--out"));
     else if (arg === "--manifest") args.manifestPath = resolve(requiredValue(argv, ++i, "--manifest"));
@@ -64,21 +110,9 @@ function parseArgs(argv) {
   return args;
 }
 
-function requiredValue(argv, index, flag) {
-  const value = argv[index];
-  if (!value || value.startsWith("--")) throw new Error(`${flag} requires a value`);
-  return value;
-}
-
-function parsePositiveInt(value, flag) {
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0) throw new Error(`${flag} must be a positive integer`);
-  return parsed;
-}
-
-async function loadManifest(path) {
+async function loadManifest(path: string): Promise<Manifest> {
   const raw = await readFile(path, "utf8");
-  const manifest = JSON.parse(raw);
+  const manifest = JSON.parse(raw) as Manifest;
   if (!manifest.model) throw new Error("manifest.model is required");
   if (!Array.isArray(manifest.stages) || manifest.stages.length === 0) {
     throw new Error("manifest.stages must be a non-empty array");
@@ -92,7 +126,7 @@ async function loadManifest(path) {
   return manifest;
 }
 
-function selectStages(manifest, selected) {
+function selectStages(manifest: Manifest, selected: string): Stage[] {
   if (selected === "all") return manifest.stages;
   const stage = manifest.stages.find((item) => item.id === selected);
   if (!stage) {
@@ -102,11 +136,11 @@ function selectStages(manifest, selected) {
   return [stage];
 }
 
-function buildPrompt(stage) {
+function buildPrompt(stage: Stage): string {
   return stage.prompt.join("\n");
 }
 
-function printStage(stage, options, model) {
+function printStage(stage: Stage, options: CliArgs, model: string): void {
   const quality = options.quality ?? stage.quality ?? "medium";
   const size = options.size ?? stage.size ?? "1024x1024";
   console.log(`\n## ${stage.id} - ${stage.title ?? stage.id}`);
@@ -122,60 +156,39 @@ function printStage(stage, options, model) {
   }
 }
 
-async function generateStage(stage, options, model) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY is required when --run is set");
+async function generateStage(stage: Stage, options: CliArgs, modelId: string): Promise<{ files: string[]; metadataPath: string; metadata: Record<string, unknown> }> {
+  const model = resolveImageGenModel(modelId);
+  const client = createImageGenClient(model);
   const quality = options.quality ?? stage.quality ?? "medium";
   const size = options.size ?? stage.size ?? "1024x1024";
-  const body = {
-    model,
+  const request: ImageGenRequest = {
     prompt: buildPrompt(stage),
     quality,
     size,
     n: options.n,
-    output_format: "png",
+    outputFormat: "png",
     background: "opaque",
   };
-  const response = await fetch("https://api.openai.com/v1/images/generations", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  const text = await response.text();
-  let json;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    json = { raw: text };
-  }
-  if (!response.ok) {
-    const message = json?.error?.message ?? text;
-    throw new Error(`OpenAI image generation failed for ${stage.id}: ${message}`);
-  }
+  const response = await client.generate(request);
   await mkdir(options.outDir, { recursive: true });
-  const files = [];
-  const images = Array.isArray(json.data) ? json.data : [];
-  for (let i = 0; i < images.length; i++) {
-    const b64 = images[i]?.b64_json;
-    if (!b64) continue;
-    const suffix = images.length > 1 ? `-${i + 1}` : "";
+  const files: string[] = [];
+  for (let i = 0; i < response.images.length; i++) {
+    const suffix = response.images.length > 1 ? `-${i + 1}` : "";
     const file = join(options.outDir, `${stage.id}${suffix}.png`);
-    await writeFile(file, Buffer.from(b64, "base64"));
+    await writeFile(file, response.images[i]);
     files.push(file);
   }
   const metadata = {
     stage: stage.id,
-    model,
+    model: response.model,
     quality,
     size,
     n: options.n,
-    prompt: body.prompt,
+    prompt: request.prompt,
     checks: stage.checks ?? [],
-    usage: json.usage,
-    estimatedCostUsd: estimateCost(json.usage),
+    usage: response.usage,
+    estimatedCostUsd: response.costUsd,
+    latencyMs: response.latencyMs,
     outputFiles: files.map((file) => basename(file)),
     createdAt: new Date().toISOString(),
   };
@@ -184,18 +197,7 @@ async function generateStage(stage, options, model) {
   return { files, metadataPath, metadata };
 }
 
-function estimateCost(usage) {
-  if (!usage) return undefined;
-  const textTokens = usage.input_tokens_details?.text_tokens ?? usage.input_text_tokens ?? 0;
-  const imageTokens = usage.input_tokens_details?.image_tokens ?? 0;
-  const outputTokens = usage.output_tokens ?? 0;
-  const cost = (textTokens * RATES_PER_1M.textInput
-    + imageTokens * RATES_PER_1M.imageInput
-    + outputTokens * RATES_PER_1M.imageOutput) / 1_000_000;
-  return Math.round(cost * 1_000_000) / 1_000_000;
-}
-
-async function main() {
+async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const manifest = await loadManifest(args.manifestPath);
   const model = args.model ?? manifest.model;
@@ -220,7 +222,7 @@ async function main() {
     printStage(stage, args, model);
     const result = await generateStage(stage, args, model);
     console.log(`\nWrote ${result.files.length} image(s) and ${result.metadataPath}`);
-    if (result.metadata.estimatedCostUsd !== undefined) {
+    if (typeof result.metadata.estimatedCostUsd === "number") {
       console.log(`Estimated stage cost from returned usage: $${result.metadata.estimatedCostUsd}`);
     }
   }
