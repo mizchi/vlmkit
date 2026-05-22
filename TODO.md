@@ -1005,7 +1005,12 @@ band at viewports ≥ 1024.
   Diagnostics are skipped on pass / expected-fail / skip, run only
   on unexpected Playwright statuses, and preserve the original
   assertion error unless the diagnostic also fails.
-- [ ] `toHaveScreenshot()` integration
+- [x] `toHaveScreenshot()` integration. Added
+  `toHaveScreenshotWithDiagnostics({ expect, target, name, options,
+  onFailure })`, a thin adapter around Playwright's existing
+  `expect(page).toHaveScreenshot(...)`. It preserves Playwright's
+  matcher arguments and only invokes VLM/VRT diagnostics through the
+  `onlyOnFailure` path when the screenshot assertion throws.
 
 ### Game Asset / Motion Dogfood (from 2026-05-20)
 
