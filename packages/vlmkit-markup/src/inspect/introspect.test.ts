@@ -1,11 +1,14 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { A11yNode, UiSpec } from "@mizchi/vlmkit-core/types.ts";
 
 // Inline the functions to test (avoid fs dependency in unit tests)
 // We test the core logic via introspectToSpec + verifySpec
 
-import { introspectToSpec, verifySpec } from "./introspect.ts";
+import { introspect, introspectToSpec, verifySpec } from "./introspect.ts";
 import type { IntrospectResult, PageIntrospection } from "@mizchi/vlmkit-core/types.ts";
 
 function makePage(testId: string, overrides: Partial<PageIntrospection> = {}): PageIntrospection {
@@ -41,6 +44,29 @@ describe("introspectToSpec", () => {
     assert.ok(spec.pages[0].invariants.length > 0);
     assert.ok(spec.global!.length > 0);
     assert.equal(spec.pages[0].testId, "home");
+  });
+
+  it("should suggest heading hierarchy invariants from a11y snapshots", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "vlmkit-introspect-"));
+    try {
+      await writeFile(join(dir, "home.a11y.json"), JSON.stringify({
+        role: "document",
+        name: "",
+        children: [
+          { role: "heading", name: "Title", level: 1 },
+          { role: "heading", name: "Section", level: 2 },
+        ],
+      }));
+
+      const result = await introspect(dir);
+      assert.ok(
+        result.pages[0]!.suggestedInvariants.some(
+          (inv) => inv.check === "heading-hierarchy",
+        ),
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -100,6 +126,36 @@ describe("verifySpec", () => {
     const data = new Map([["home", { a11yTree: tree, screenshotExists: true }]]);
     const result = verifySpec(spec, data);
     assert.ok(result.results[0].checked.some((c) => !c.passed));
+  });
+
+  it("should detect skipped heading levels", () => {
+    const spec: UiSpec = {
+      description: "test",
+      pages: [{
+        testId: "home",
+        invariants: [
+          { description: "Heading hierarchy does not skip levels", check: "heading-hierarchy", cost: "low" },
+        ],
+      }],
+    };
+    const badTree: A11yNode = {
+      role: "document",
+      name: "",
+      children: [
+        { role: "main", name: "", children: [
+          { role: "heading", name: "Title", level: 1 },
+          { role: "heading", name: "Details", level: 3 },
+        ] },
+      ],
+    };
+
+    const data = new Map([["home", { a11yTree: badTree, screenshotExists: true }]]);
+    const result = verifySpec(spec, data);
+    const headingCheck = result.results[0].checked.find(
+      (check) => check.invariant.check === "heading-hierarchy",
+    );
+    assert.equal(headingCheck?.passed, false);
+    assert.match(headingCheck?.reasoning ?? "", /h3 after h1/);
   });
 
   it("should skip high-cost assertions", () => {

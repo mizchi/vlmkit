@@ -1361,7 +1361,9 @@ Stepwise cleanup:
   validation no longer spawn per call.
 
 ### Spec coverage
-- [ ] Heading hierarchy validation
+- [x] Heading hierarchy validation:
+  introspection now emits a low-cost `heading-hierarchy` invariant when a page
+  has headings, and `verifySpec` fails skipped levels such as `h1 -> h3`.
 - [ ] ARIA relationship validation
 - [ ] Color contrast invariants
 - [ ] Responsive layout invariants

@@ -231,6 +231,7 @@ export type SpecCheckType =
   | "no-error-state"
   | "text-visible"
   | "element-count"
+  | "heading-hierarchy"
   | "nl-assertion";
 
 // ---- Introspect Output ----

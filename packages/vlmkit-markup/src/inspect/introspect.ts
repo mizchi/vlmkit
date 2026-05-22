@@ -106,7 +106,7 @@ function generateInvariants(
   _testId: string,
   landmarks: { role: string; name: string }[],
   interactive: { role: string; name: string; hasLabel: boolean }[],
-  _headingLevels: number[],
+  headingLevels: number[],
   unlabeledCount: number
 ): SpecInvariant[] {
   const invariants: SpecInvariant[] = [];
@@ -129,6 +129,14 @@ function generateInvariants(
     invariants.push({
       description: `${count} ${role} element(s) expected`,
       check: "element-count",
+      cost: "low",
+    });
+  }
+
+  if (headingLevels.length > 0) {
+    invariants.push({
+      description: "Heading hierarchy does not skip levels",
+      check: "heading-hierarchy",
       cost: "low",
     });
   }
@@ -270,6 +278,10 @@ function checkInvariant(
           : `${role}: ${actualCount} found but expected ${expectedCount}`,
       };
     }
+    case "heading-hierarchy": {
+      const result = checkHeadingHierarchy(data.a11yTree);
+      return { invariant: inv, passed: result.passed, reasoning: result.reasoning };
+    }
     default:
       return { invariant: inv, passed: true, reasoning: `Check "${inv.check ?? "none"}" — passed (no verifier)` };
   }
@@ -300,6 +312,35 @@ function countUnlabeled(node: A11yNode): number {
   if (INTERACTIVE_ROLES.has(node.role) && !node.name) count++;
   for (const child of node.children ?? []) count += countUnlabeled(child);
   return count;
+}
+
+function collectHeadingLevels(node: A11yNode, levels: number[] = []): number[] {
+  if (node.role === "heading" && typeof node.level === "number") {
+    levels.push(node.level);
+  }
+  for (const child of node.children ?? []) collectHeadingLevels(child, levels);
+  return levels;
+}
+
+function checkHeadingHierarchy(tree: A11yNode): { passed: boolean; reasoning: string } {
+  const levels = collectHeadingLevels(tree);
+  if (levels.length === 0) {
+    return { passed: true, reasoning: "No headings found" };
+  }
+
+  let previousLevel = 0;
+  for (const level of levels) {
+    if (level > previousLevel + 1) {
+      const previousLabel = previousLevel === 0 ? "document start" : `h${previousLevel}`;
+      return {
+        passed: false,
+        reasoning: `Heading hierarchy skips to h${level} after ${previousLabel}`,
+      };
+    }
+    previousLevel = level;
+  }
+
+  return { passed: true, reasoning: `Heading hierarchy OK (${levels.map((level) => `h${level}`).join(" > ")})` };
 }
 
 function isAffectedByChanges(
