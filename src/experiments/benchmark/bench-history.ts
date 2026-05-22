@@ -72,6 +72,45 @@ export interface BenchHistoryStats {
   comparableSpeedups: ComparableBenchSpeedup[];
 }
 
+export interface BenchGoalTargets {
+  prescannerDetectionRate: number;
+  prescannerSpeedup: number;
+}
+
+export interface BenchRateGoalProgress {
+  latestRate: number;
+  bestRate: number;
+  targetRate: number;
+  gap: number;
+  passed: boolean;
+  runId: string;
+}
+
+export interface BenchSpeedupGoalProgress {
+  latestSpeedup: number;
+  bestSpeedup: number;
+  targetSpeedup: number;
+  gap: number;
+  passed: boolean;
+  fixture: string;
+  chromiumRunId: string;
+  prescannerRunId: string;
+}
+
+export interface BenchGoalProgress {
+  prescannerDetection?: BenchRateGoalProgress;
+  prescannerSpeedup?: BenchSpeedupGoalProgress;
+}
+
+const DEFAULT_GOAL_TARGETS: BenchGoalTargets = {
+  prescannerDetectionRate: 0.8,
+  prescannerSpeedup: 3,
+};
+
+function metricGap(target: number, current: number): number {
+  return Number(Math.max(0, target - current).toFixed(6));
+}
+
 export function getBenchHistoryPath(): string {
   return join(import.meta.dirname!, "..", "..", "..", "data", "bench-history.jsonl");
 }
@@ -83,6 +122,46 @@ export function buildBenchHistoryRecord(input: BenchHistoryRecordInput): BenchHi
     detectionRate: input.trials === 0 ? 0 : input.eitherDetected / input.trials,
     prescanner: input.prescanner ?? null,
   };
+}
+
+export function getBenchGoalProgress(
+  stats: BenchHistoryStats,
+  targets: BenchGoalTargets = DEFAULT_GOAL_TARGETS,
+): BenchGoalProgress {
+  const progress: BenchGoalProgress = {};
+  const prescannerStats = stats.byBackend.get("prescanner");
+
+  if (prescannerStats) {
+    const latestRate = prescannerStats.latest.detectionRate;
+    progress.prescannerDetection = {
+      latestRate,
+      bestRate: prescannerStats.bestDetectionRate,
+      targetRate: targets.prescannerDetectionRate,
+      gap: metricGap(targets.prescannerDetectionRate, latestRate),
+      passed: latestRate >= targets.prescannerDetectionRate,
+      runId: prescannerStats.latest.runId,
+    };
+  }
+
+  const latestSpeedup = stats.comparableSpeedups[0];
+  if (latestSpeedup) {
+    const bestSpeedup = stats.comparableSpeedups.reduce(
+      (best, speedup) => Math.max(best, speedup.speedup),
+      latestSpeedup.speedup,
+    );
+    progress.prescannerSpeedup = {
+      latestSpeedup: latestSpeedup.speedup,
+      bestSpeedup,
+      targetSpeedup: targets.prescannerSpeedup,
+      gap: metricGap(targets.prescannerSpeedup, latestSpeedup.speedup),
+      passed: latestSpeedup.speedup >= targets.prescannerSpeedup,
+      fixture: latestSpeedup.fixture,
+      chromiumRunId: latestSpeedup.chromiumRunId,
+      prescannerRunId: latestSpeedup.prescannerRunId,
+    };
+  }
+
+  return progress;
 }
 
 export async function appendBenchHistory(

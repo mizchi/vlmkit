@@ -134,8 +134,10 @@ Measure detection rate improvement after crater-side fixes (#18-22).
 **Status**: #18-22 all Open (no progress as of 2026-04-05). Waiting for crater-side fixes.
 
 - [ ] Re-run bench after text-decoration #18 fix
-- [ ] Track progress toward detection rate 60% → target 80%+
-- [ ] Track progress toward prescanner speedup 1.66x → target 3x+
+- [x] Track progress toward detection rate 60% → target 80%+
+  - `detection-report` now shows Prescanner Goals using `bench-history`: latest/best detection, 80% target, and remaining gap.
+- [x] Track progress toward prescanner speedup 1.66x → target 3x+
+  - `detection-report` now compares latest/best prescanner speedup against the 3x target when comparable Chromium/prescanner runs exist.
 
 ### E3. Blind test replication
 

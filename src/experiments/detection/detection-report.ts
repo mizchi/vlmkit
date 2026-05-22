@@ -8,7 +8,7 @@
  */
 import { readAllRecords, getDbStats } from "./detection-db.ts";
 import { isOutOfScope } from "./detection-classify.ts";
-import { getBenchHistoryStats, readBenchHistory } from "../benchmark/bench-history.ts";
+import { getBenchGoalProgress, getBenchHistoryStats, readBenchHistory } from "../benchmark/bench-history.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr as _hr } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 function hr() { _hr(76); }
@@ -26,6 +26,10 @@ function bar(n: number, total: number, width = 20): string {
   return `${GREEN}${"█".repeat(filled)}${DIM}${"░".repeat(width - filled)}${RESET}`;
 }
 
+function pct(ratio: number): string {
+  return `${(ratio * 100).toFixed(1)}%`;
+}
+
 // ---- Main ----
 
 async function main() {
@@ -38,6 +42,7 @@ async function main() {
   }
   const stats = getDbStats(records);
   const benchStats = getBenchHistoryStats(benchHistory);
+  const goalProgress = getBenchGoalProgress(benchStats);
 
   console.log();
   console.log(`${BOLD}${CYAN}╔═══════════════════════════════════════════════════════════════════════════╗${RESET}`);
@@ -92,6 +97,27 @@ async function main() {
       }
       console.log();
     } else {
+      console.log();
+    }
+
+    if (goalProgress.prescannerDetection || goalProgress.prescannerSpeedup) {
+      console.log(`  ${BOLD}Prescanner Goals${RESET}`);
+      if (goalProgress.prescannerDetection) {
+        const p = goalProgress.prescannerDetection;
+        const status = p.passed ? `${GREEN}pass${RESET}` : `${YELLOW}gap ${pct(p.gap)}${RESET}`;
+        console.log(
+          `    detection ${pct(p.latestRate)} latest / ${pct(p.bestRate)} best` +
+          `  target ${pct(p.targetRate)}  ${status}`,
+        );
+      }
+      if (goalProgress.prescannerSpeedup) {
+        const p = goalProgress.prescannerSpeedup;
+        const status = p.passed ? `${GREEN}pass${RESET}` : `${YELLOW}gap ${p.gap.toFixed(2)}x${RESET}`;
+        console.log(
+          `    speedup   ${p.latestSpeedup.toFixed(2)}x latest / ${p.bestSpeedup.toFixed(2)}x best` +
+          `  target ${p.targetSpeedup.toFixed(2)}x  ${status}`,
+        );
+      }
       console.log();
     }
   }

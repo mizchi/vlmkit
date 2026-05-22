@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import {
   appendBenchHistory,
   buildBenchHistoryRecord,
+  getBenchGoalProgress,
   getBenchHistoryPath,
   getBenchHistoryStats,
   readBenchHistory,
@@ -136,5 +137,52 @@ describe("getBenchHistoryStats", () => {
     assert.equal(stats.comparableSpeedups[0]?.fixture, "page");
     assert.equal(stats.comparableSpeedups[0]?.trials, 15);
     assert.equal(stats.comparableSpeedups[0]?.speedup.toFixed(2), "1.66");
+  });
+});
+
+describe("getBenchGoalProgress", () => {
+  it("reports prescanner detection and speedup gaps against targets", () => {
+    const stats = getBenchHistoryStats([
+      makeRecord({
+        runId: "2026-04-01T00:00:00.000Z",
+        backend: "chromium",
+        elapsedMs: 9000,
+        avgMsPerTrial: 900,
+        trials: 10,
+        startSeed: 1,
+        eitherDetected: 10,
+        detectionRate: 1,
+      }),
+      makeRecord({
+        runId: "2026-04-01T00:05:00.000Z",
+        backend: "prescanner",
+        elapsedMs: 4500,
+        avgMsPerTrial: 450,
+        trials: 10,
+        startSeed: 1,
+        eitherDetected: 7,
+        detectionRate: 0.7,
+        prescanner: {
+          total: 10,
+          detected: 7,
+          craterResolved: 4,
+          chromiumFallbacks: 6,
+          chromiumDetected: 3,
+          passedAfterFallback: 0,
+        },
+      }),
+    ]);
+
+    const progress = getBenchGoalProgress(stats, {
+      prescannerDetectionRate: 0.8,
+      prescannerSpeedup: 3,
+    });
+
+    assert.equal(progress.prescannerDetection?.latestRate, 0.7);
+    assert.equal(progress.prescannerDetection?.gap, 0.1);
+    assert.equal(progress.prescannerDetection?.passed, false);
+    assert.equal(progress.prescannerSpeedup?.latestSpeedup, 2);
+    assert.equal(progress.prescannerSpeedup?.gap, 1);
+    assert.equal(progress.prescannerSpeedup?.passed, false);
   });
 });
