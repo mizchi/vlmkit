@@ -134,6 +134,51 @@ function getArgList(args: string[], name: string): string[] {
 }
 function hasFlag(args: string[], name: string): boolean { return args.includes(`--${name}`); }
 
+interface DomPositionTrimEntry {
+  baselineClasses: string;
+  variantClasses: string;
+  property: string;
+}
+
+function domPositionClassPairKey(entry: DomPositionTrimEntry): string {
+  return `${entry.baselineClasses}\u0000${entry.variantClasses}\u0000${entry.property}`;
+}
+
+export function trimDomPositionEntriesByClassPair<T extends DomPositionTrimEntry>(
+  entries: T[],
+  limit: number,
+): T[] {
+  if (limit <= 0) return [];
+  if (entries.length <= limit) return entries;
+
+  const groupOrder: string[] = [];
+  const groups = new Map<string, T[]>();
+  for (const entry of entries) {
+    const key = domPositionClassPairKey(entry);
+    const group = groups.get(key);
+    if (group) {
+      group.push(entry);
+    } else {
+      groupOrder.push(key);
+      groups.set(key, [entry]);
+    }
+  }
+
+  const trimmed: T[] = [];
+  for (let depth = 0; trimmed.length < limit; depth++) {
+    let added = false;
+    for (const key of groupOrder) {
+      const entry = groups.get(key)?.[depth];
+      if (!entry) continue;
+      trimmed.push(entry);
+      added = true;
+      if (trimmed.length >= limit) break;
+    }
+    if (!added) break;
+  }
+  return trimmed;
+}
+
 export type BreakpointDiscoveryBackend = "auto" | "regex" | "crater";
 
 function parseDiscoveryBackend(args: string[]): BreakpointDiscoveryBackend {
@@ -1295,7 +1340,10 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       if (dpEnabled && baselineDomPositionStyles && variantDomPositionStyles) {
         const variantFileLabel = variant.url || variant.file;
         const result = diffDomPositionStyles(baselineDomPositionStyles, variantDomPositionStyles);
-        const trimmedResult = { ...result, entries: result.entries.slice(0, 200) };
+        const trimmedResult = {
+          ...result,
+          entries: trimDomPositionEntriesByClassPair(result.entries, 200),
+        };
         domPositionDiffReports.push({ variantFile: variantFileLabel, result: trimmedResult });
         if (result.totalDiffs > 0) {
           const topProps = result.byProperty.slice(0, 5)
@@ -1316,7 +1364,10 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         // viewports.
         const trimmedPerVp = {
           ...perVp,
-          entries: perVp.entries.slice(0, 200),
+          entries: trimDomPositionEntriesByClassPair(
+            perVp.entries,
+            200,
+          ),
           byPathProperty: perVp.byPathProperty.slice(0, 200),
         };
         domPositionDiffPerViewportReports.push({ variantFile: variantFileLabel, result: trimmedPerVp });

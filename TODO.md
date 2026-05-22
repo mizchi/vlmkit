@@ -925,10 +925,13 @@ band at viewports ≥ 1024.
   `eyebrow → luna-pill` × 22 properties, `card → luna-panel` × 17,
   `card-header → luna-panel-head` × 17). C called this "the
   single most valuable artifact"; it's now first billing.
-- [ ] **De-dupe / re-cap `domPositionDiff.entries`.** The 200-tuple
-  cap currently spends most of its budget on 4 repeats of each
-  card / metric / button shape. Group by class-pair before
-  truncating so unique deltas dominate.
+- [x] **De-dupe / re-cap `domPositionDiff.entries`.**
+  `migration-compare` now trims both single-viewport and
+  per-viewport DOM-position entries by round-robin over
+  `(baseline classes, variant classes, property)` groups, so the
+  200-tuple cap keeps representative class-pair deltas instead of
+  spending most of the budget on repeated card / metric / button
+  shapes.
 - [x] **Fix-candidate scorer "value actually differs" gate.**
   `diff-for-agent` now marks `Verified?` as ✓ only when the
   candidate's `(selector, property)` appears in a real
