@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  buildSnapshotStatusMatrix,
   determineSnapshotReportEvaluationExitStatus,
   determineSnapshotReportExitStatus,
   formatSnapshotReportEvaluationMarkdown,
@@ -55,6 +56,48 @@ describe("summarizeSnapshotReport", () => {
       diffRatio: 0.02,
       shiftOnly: false,
     });
+  });
+});
+
+describe("buildSnapshotStatusMatrix", () => {
+  it("normalizes snapshot entries into a component by viewport status matrix", () => {
+    const matrix = buildSnapshotStatusMatrix({
+      ...makeReport(),
+      labels: ["page", "dashboard", "settings"],
+      results: [
+        { label: "page", viewport: "desktop", isNew: false, diffRatio: 0 },
+        { label: "page", viewport: "mobile", isNew: false, diffRatio: 0.02 },
+        { label: "dashboard", viewport: "desktop", isNew: false, diffRatio: 0.01, shiftOnly: true },
+        { label: "dashboard", viewport: "mobile", isNew: true },
+      ],
+    });
+
+    assert.deepEqual(matrix.components, ["page", "dashboard", "settings"]);
+    assert.deepEqual(matrix.viewports, ["desktop", "mobile"]);
+    assert.equal(matrix.rows[0]?.component, "page");
+    assert.deepEqual(matrix.rows[0]?.cells.map((cell) => cell.status), ["pass", "diff"]);
+    assert.equal(matrix.rows[1]?.worstStatus, "new-baseline");
+    assert.deepEqual(matrix.rows[1]?.cells.map((cell) => cell.status), ["shift-only", "new-baseline"]);
+    assert.deepEqual(matrix.rows[2]?.cells.map((cell) => cell.status), ["missing", "missing"]);
+    assert.equal(matrix.summary.totalCells, 6);
+    assert.equal(matrix.summary.passCount, 1);
+    assert.equal(matrix.summary.diffCount, 1);
+    assert.equal(matrix.summary.shiftOnlyCount, 1);
+    assert.equal(matrix.summary.newBaselineCount, 1);
+    assert.equal(matrix.summary.missingCount, 2);
+    assert.equal(matrix.summary.maxDiffRatio, 0.02);
+  });
+
+  it("can filter components and viewports for focused dashboard panes", () => {
+    const matrix = buildSnapshotStatusMatrix(makeReport(), {
+      labels: ["dashboard"],
+      viewports: ["desktop"],
+    });
+
+    assert.deepEqual(matrix.components, ["dashboard"]);
+    assert.deepEqual(matrix.viewports, ["desktop"]);
+    assert.equal(matrix.rows.length, 1);
+    assert.equal(matrix.rows[0]?.cells[0]?.status, "shift-only");
   });
 });
 

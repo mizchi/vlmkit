@@ -357,6 +357,20 @@ export interface TrialSummary {
 
 // ---- Execution Results API ----
 
+export interface ComponentStatusMatrixQuery {
+  report?: string;
+  label?: string;
+  viewport?: string;
+}
+
+export type {
+  SnapshotStatusMatrix as ComponentStatusMatrixResponse,
+  SnapshotStatusMatrixCell as ComponentStatusMatrixCell,
+  SnapshotStatusMatrixRow as ComponentStatusMatrixRow,
+  SnapshotStatusMatrixStatus as ComponentStatusMatrixStatus,
+  SnapshotStatusMatrixSummary as ComponentStatusMatrixSummary,
+} from "../vrt/snapshot/snapshot-report.ts";
+
 export type {
   BenchDetectionSeriesOptions as DetectionSeriesQuery,
   BenchDetectionSeriesPoint as DetectionSeriesPoint,

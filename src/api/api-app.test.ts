@@ -173,4 +173,49 @@ describe("createApiApp", () => {
     assert.equal(body.points[0]?.runId, "prescanner:page");
     assert.equal(body.points[0]?.detectionRate, 0.8);
   });
+
+  it("serves component status matrices when a provider is configured", async () => {
+    const app = createApiApp({
+      resolveCraterAvailable: async () => false,
+      getComponentStatusMatrix: async (query) => ({
+        timestamp: "2026-05-22T00:00:00.000Z",
+        components: [query.label ?? "card"],
+        viewports: [query.viewport ?? "desktop"],
+        rows: [{
+          component: query.label ?? "card",
+          worstStatus: "diff",
+          maxDiffRatio: 0.02,
+          cells: [{
+            component: query.label ?? "card",
+            viewport: query.viewport ?? "desktop",
+            status: "diff",
+            isNew: false,
+            diffRatio: 0.02,
+            shiftOnly: false,
+          }],
+        }],
+        summary: {
+          totalCells: 1,
+          passCount: 0,
+          diffCount: 1,
+          shiftOnlyCount: 0,
+          newBaselineCount: 0,
+          missingCount: 0,
+          maxDiffRatio: 0.02,
+        },
+      }),
+    });
+
+    const response = await app.request("http://vrt.local/api/component-status-matrix?label=hero&viewport=mobile");
+
+    assert.equal(response.status, 200);
+    const body = await response.json() as {
+      components: string[];
+      viewports: string[];
+      rows: Array<{ component: string; worstStatus: string }>;
+    };
+    assert.deepEqual(body.components, ["hero"]);
+    assert.deepEqual(body.viewports, ["mobile"]);
+    assert.equal(body.rows[0]?.worstStatus, "diff");
+  });
 });

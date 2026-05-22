@@ -47,6 +47,52 @@ export interface SnapshotReportMetrics {
   };
 }
 
+export type SnapshotStatusMatrixStatus =
+  | "pass"
+  | "diff"
+  | "shift-only"
+  | "new-baseline"
+  | "missing";
+
+export interface SnapshotStatusMatrixCell {
+  component: string;
+  viewport: string;
+  status: SnapshotStatusMatrixStatus;
+  isNew: boolean;
+  diffRatio?: number;
+  shiftOnly: boolean;
+}
+
+export interface SnapshotStatusMatrixRow {
+  component: string;
+  cells: SnapshotStatusMatrixCell[];
+  worstStatus: SnapshotStatusMatrixStatus;
+  maxDiffRatio: number;
+}
+
+export interface SnapshotStatusMatrixSummary {
+  totalCells: number;
+  passCount: number;
+  diffCount: number;
+  shiftOnlyCount: number;
+  newBaselineCount: number;
+  missingCount: number;
+  maxDiffRatio: number;
+}
+
+export interface SnapshotStatusMatrix {
+  timestamp: string;
+  components: string[];
+  viewports: string[];
+  rows: SnapshotStatusMatrixRow[];
+  summary: SnapshotStatusMatrixSummary;
+}
+
+export interface SnapshotStatusMatrixOptions {
+  labels?: string[];
+  viewports?: string[];
+}
+
 export interface SnapshotReportExitStatus {
   exitCode: number;
   reasons: string[];
@@ -142,6 +188,81 @@ export function summarizeSnapshotReport(report: SnapshotReportDocument): Snapsho
     averageDiffRatio: changed.length === 0 ? 0 : totalDiffRatio / changed.length,
     labelsWithDiff: [...new Set(changed.map((entry) => entry.label))].sort((a, b) => a.localeCompare(b)),
     worstDiff: worst,
+  };
+}
+
+function uniqueInOrder(values: string[]): string[] {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function snapshotMatrixCellStatus(entry: SnapshotReportEntry | undefined): SnapshotStatusMatrixStatus {
+  if (!entry) return "missing";
+  if (entry.isNew) return "new-baseline";
+  if ((entry.diffRatio ?? 0) <= 0) return "pass";
+  if (entry.shiftOnly) return "shift-only";
+  return "diff";
+}
+
+const SNAPSHOT_MATRIX_STATUS_RANK: Record<SnapshotStatusMatrixStatus, number> = {
+  pass: 0,
+  "shift-only": 1,
+  diff: 2,
+  "new-baseline": 3,
+  missing: 4,
+};
+
+function pickWorstSnapshotStatus(
+  statuses: SnapshotStatusMatrixStatus[],
+): SnapshotStatusMatrixStatus {
+  return statuses.reduce<SnapshotStatusMatrixStatus>((worst, status) =>
+    SNAPSHOT_MATRIX_STATUS_RANK[status] > SNAPSHOT_MATRIX_STATUS_RANK[worst] ? status : worst,
+  "pass");
+}
+
+export function buildSnapshotStatusMatrix(
+  report: SnapshotReportDocument,
+  options: SnapshotStatusMatrixOptions = {},
+): SnapshotStatusMatrix {
+  const components = options.labels ?? uniqueInOrder([
+    ...report.labels,
+    ...report.results.map((entry) => entry.label),
+  ]);
+  const viewports = options.viewports ?? uniqueInOrder(report.results.map((entry) => entry.viewport));
+  const byKey = new Map(report.results.map((entry) => [snapshotEntryKey(entry), entry]));
+  const rows = components.map((component): SnapshotStatusMatrixRow => {
+    const cells = viewports.map((viewport): SnapshotStatusMatrixCell => {
+      const entry = byKey.get(snapshotEntryKey({ label: component, viewport }));
+      return {
+        component,
+        viewport,
+        status: snapshotMatrixCellStatus(entry),
+        isNew: entry?.isNew ?? false,
+        diffRatio: entry?.diffRatio,
+        shiftOnly: entry?.shiftOnly ?? false,
+      };
+    });
+    return {
+      component,
+      cells,
+      worstStatus: pickWorstSnapshotStatus(cells.map((cell) => cell.status)),
+      maxDiffRatio: cells.reduce((max, cell) => Math.max(max, cell.diffRatio ?? 0), 0),
+    };
+  });
+  const cells = rows.flatMap((row) => row.cells);
+  return {
+    timestamp: report.timestamp,
+    components,
+    viewports,
+    rows,
+    summary: {
+      totalCells: cells.length,
+      passCount: cells.filter((cell) => cell.status === "pass").length,
+      diffCount: cells.filter((cell) => cell.status === "diff").length,
+      shiftOnlyCount: cells.filter((cell) => cell.status === "shift-only").length,
+      newBaselineCount: cells.filter((cell) => cell.status === "new-baseline").length,
+      missingCount: cells.filter((cell) => cell.status === "missing").length,
+      maxDiffRatio: cells.reduce((max, cell) => Math.max(max, cell.diffRatio ?? 0), 0),
+    },
   };
 }
 

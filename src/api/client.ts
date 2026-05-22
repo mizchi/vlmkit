@@ -10,6 +10,8 @@
  *   const result = await client.compare({ baseline: { html: "..." }, current: { html: "..." } });
  */
 import type {
+  ComponentStatusMatrixQuery,
+  ComponentStatusMatrixResponse,
   CompareRequest, CompareResponse,
   DetectionSeriesQuery,
   DetectionSeriesResponse,
@@ -115,6 +117,12 @@ export class VrtClient {
 
   async detectionSeries(query: DetectionSeriesQuery = {}): Promise<DetectionSeriesResponse> {
     return this.get(buildQueryPath("/api/detection-series", query));
+  }
+
+  async componentStatusMatrix(
+    query: ComponentStatusMatrixQuery = {},
+  ): Promise<ComponentStatusMatrixResponse> {
+    return this.get(buildQueryPath("/api/component-status-matrix", query));
   }
 
   // ---- Reasoning Pipeline ----

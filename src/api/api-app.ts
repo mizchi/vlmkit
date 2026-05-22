@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import type {
+  ComponentStatusMatrixQuery,
+  ComponentStatusMatrixResponse,
   DetectionSeriesQuery,
   DetectionSeriesResponse,
   ExecutionResultsQuery,
@@ -26,6 +28,7 @@ export interface CreateApiAppOptions {
   listExecutionResults?: (query: ExecutionResultsQuery) => Promise<ExecutionResultsResponse> | ExecutionResultsResponse;
   listVisualDiffDisplays?: (query: ExecutionResultsQuery) => Promise<VisualDiffDisplaysResponse> | VisualDiffDisplaysResponse;
   listDetectionSeries?: (query: DetectionSeriesQuery) => Promise<DetectionSeriesResponse> | DetectionSeriesResponse;
+  getComponentStatusMatrix?: (query: ComponentStatusMatrixQuery) => Promise<ComponentStatusMatrixResponse> | ComponentStatusMatrixResponse;
 }
 
 export function createApiApp(options: CreateApiAppOptions = {}) {
@@ -65,6 +68,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
         ...(options.listExecutionResults ? ["execution-results"] : []),
         ...(options.listVisualDiffDisplays ? ["visual-diffs"] : []),
         ...(options.listDetectionSeries ? ["detection-series"] : []),
+        ...(options.getComponentStatusMatrix ? ["component-status-matrix"] : []),
       ],
       backends: [
         { name: "chromium", available: true },
@@ -101,6 +105,13 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
       return c.json({ error: "Detection series provider is not configured" }, 501);
     }
     return c.json(await options.listDetectionSeries(parseDetectionSeriesQuery(new URL(c.req.url))));
+  });
+
+  app.get("/api/component-status-matrix", async (c) => {
+    if (!options.getComponentStatusMatrix) {
+      return c.json({ error: "Component status matrix provider is not configured" }, 501);
+    }
+    return c.json(await options.getComponentStatusMatrix(parseComponentStatusMatrixQuery(new URL(c.req.url))));
   });
 
   app.post("/api/smoke-test", async (c) => {
@@ -153,6 +164,14 @@ function parseDetectionSeriesQuery(url: URL): DetectionSeriesQuery {
       : undefined,
     fixture: url.searchParams.get("fixture") ?? undefined,
     limit: parsePositiveInt(url.searchParams.get("limit")),
+  };
+}
+
+function parseComponentStatusMatrixQuery(url: URL): ComponentStatusMatrixQuery {
+  return {
+    report: url.searchParams.get("report") ?? undefined,
+    label: url.searchParams.get("label") ?? undefined,
+    viewport: url.searchParams.get("viewport") ?? undefined,
   };
 }
 

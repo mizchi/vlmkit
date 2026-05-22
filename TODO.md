@@ -1425,4 +1425,5 @@ Stepwise cleanup:
 - [ ] Interactive approval operations
 - [x] Detection rate time-series graph
   - `bench-history` now builds chart-ready detection-rate series, and local `/api/detection-series` exposes filtered points by backend/fixture/limit for dashboard clients.
-- [ ] Component-level status matrix
+- [x] Component-level status matrix
+  - `snapshot-report` now normalizes label/component × viewport statuses (`pass`, `diff`, `shift-only`, `new-baseline`, `missing`), and local `/api/component-status-matrix` exposes it for dashboard panes.

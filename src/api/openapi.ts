@@ -161,6 +161,16 @@ export function buildOpenApiSpec(options: OpenApiSpecOptions = {}): OpenApiSpec 
           },
         },
       },
+      "/api/component-status-matrix": {
+        get: {
+          tags: ["dashboard"],
+          summary: "Build a component by viewport status matrix from a snapshot report",
+          responses: {
+            "200": jsonRefResponse("Component status matrix", "ComponentStatusMatrixResponse"),
+            "501": jsonRefResponse("Component status matrix provider is not configured", "ErrorResponse"),
+          },
+        },
+      },
       "/api/smoke-test": {
         post: {
           tags: ["smoke"],
@@ -499,6 +509,66 @@ function buildSchemas(): Record<string, OpenApiSchema> {
         points: arrayOf(ref("DetectionSeriesPoint")),
       },
       required: ["total", "points"],
+    },
+    ComponentStatusMatrixCell: {
+      type: "object",
+      properties: {
+        component: { type: "string" },
+        viewport: { type: "string" },
+        status: {
+          type: "string",
+          enum: ["pass", "diff", "shift-only", "new-baseline", "missing"],
+        },
+        isNew: { type: "boolean" },
+        diffRatio: { type: "number" },
+        shiftOnly: { type: "boolean" },
+      },
+      required: ["component", "viewport", "status", "isNew", "shiftOnly"],
+    },
+    ComponentStatusMatrixRow: {
+      type: "object",
+      properties: {
+        component: { type: "string" },
+        cells: arrayOf(ref("ComponentStatusMatrixCell")),
+        worstStatus: {
+          type: "string",
+          enum: ["pass", "diff", "shift-only", "new-baseline", "missing"],
+        },
+        maxDiffRatio: { type: "number" },
+      },
+      required: ["component", "cells", "worstStatus", "maxDiffRatio"],
+    },
+    ComponentStatusMatrixSummary: {
+      type: "object",
+      properties: {
+        totalCells: { type: "number" },
+        passCount: { type: "number" },
+        diffCount: { type: "number" },
+        shiftOnlyCount: { type: "number" },
+        newBaselineCount: { type: "number" },
+        missingCount: { type: "number" },
+        maxDiffRatio: { type: "number" },
+      },
+      required: [
+        "totalCells",
+        "passCount",
+        "diffCount",
+        "shiftOnlyCount",
+        "newBaselineCount",
+        "missingCount",
+        "maxDiffRatio",
+      ],
+    },
+    ComponentStatusMatrixResponse: {
+      type: "object",
+      properties: {
+        timestamp: { type: "string" },
+        components: arrayOf({ type: "string" }),
+        viewports: arrayOf({ type: "string" }),
+        rows: arrayOf(ref("ComponentStatusMatrixRow")),
+        summary: ref("ComponentStatusMatrixSummary"),
+      },
+      required: ["timestamp", "components", "viewports", "rows", "summary"],
     },
     ReasoningPipelineRequest: {
       type: "object",
