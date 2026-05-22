@@ -857,10 +857,11 @@ band at viewports ≥ 1024.
   in `vrt diff-for-agent`. Dogfood Pass B iter 1: the workspace at
   768px reports `393/299 → 1.316 : 1.000 → 13fr 10fr` — the exact
   case Subagent D guessed manually as "1.316fr 1fr".
-- [ ] **`display` context note for flex items.** A pill with
+- [x] **`display` context note for flex items.** A pill with
   `display: inline-flex` computes as `flex` when its parent is a
-  flex container. Annotate so agents don't chase a delta that
-  isn't a rule change.
+  flex container. DOM-position capture carries parent display context,
+  and `diff-for-agent` annotates display rows with a flex/grid-item note
+  so agents don't chase a delta that isn't a source rule change.
 - [x] **Unit-normalized property reporting.** `DpEntry` now carries
   `baselineEm` / `variantEm` for `letter-spacing`, `word-spacing`,
   `line-height` — values divided by the element's own font-size.

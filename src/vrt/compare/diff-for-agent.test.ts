@@ -75,6 +75,43 @@ describe("formatMigrationReportForAgent", () => {
     assert.ok(fieldDisplay, "field display has 2 viewports");
   });
 
+  it("annotates display deltas that may be flex item coercion", () => {
+    const md = formatMigrationReportForAgent(sampleReport({
+      domPositionDiff: [{
+        variantFile: "working.html",
+        result: {
+          totalDiffs: 1,
+          pathsOnlyInBaseline: [],
+          pathsOnlyInVariant: [],
+          byProperty: [{ property: "display", count: 1 }],
+          byPath: [{
+            path: "main[0]>span[0]",
+            baselineClasses: "pill",
+            variantClasses: "luna-pill",
+            count: 1,
+          }],
+          entries: [{
+            path: "main[0]>span[0]",
+            tag: "span",
+            baselineClasses: "pill",
+            variantClasses: "luna-pill",
+            property: "display",
+            baseline: "inline-flex",
+            variant: "flex",
+            parentDisplayContext: {
+              baselineParent: "flex",
+              variantParent: "flex",
+              isFlexOrGridItem: true,
+            },
+          }],
+        },
+      }],
+    }));
+
+    assert.match(md, /flex\/grid item/);
+    assert.match(md, /parent is flex/);
+  });
+
   it("emits absolute paths to baseline/current/heatmap PNGs for the worst viewport", () => {
     const md = formatMigrationReportForAgent(sampleReport(), { outputDir: "/abs/out" });
     assert.match(md, /Baseline: `\/abs\/out\/before-mobile\.png`/);
