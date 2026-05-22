@@ -11,9 +11,14 @@
  */
 import type {
   CompareRequest, CompareResponse,
+  DetectionSeriesQuery,
+  DetectionSeriesResponse,
+  ExecutionResultsQuery,
+  ExecutionResultsResponse,
   SmokeTestRequest, SmokeTestResponse,
   StatusResponse,
   HtmlSource,
+  VisualDiffDisplaysResponse,
   Viewport,
 } from "./api-types.ts";
 
@@ -100,6 +105,18 @@ export class VrtClient {
     });
   }
 
+  async executionResults(query: ExecutionResultsQuery = {}): Promise<ExecutionResultsResponse> {
+    return this.get(buildQueryPath("/api/execution-results", query));
+  }
+
+  async visualDiffs(query: ExecutionResultsQuery = {}): Promise<VisualDiffDisplaysResponse> {
+    return this.get(buildQueryPath("/api/visual-diffs", query));
+  }
+
+  async detectionSeries(query: DetectionSeriesQuery = {}): Promise<DetectionSeriesResponse> {
+    return this.get(buildQueryPath("/api/detection-series", query));
+  }
+
   // ---- Reasoning Pipeline ----
 
   async reason(request: import("./api-types.ts").ReasoningPipelineRequest): Promise<import("./api-types.ts").ReasoningPipelineResponse> {
@@ -155,4 +172,14 @@ export class VrtClient {
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}: ${await res.text()}`);
     return res.json() as Promise<T>;
   }
+}
+
+function buildQueryPath(path: string, query: object): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value == null || value === "") continue;
+    params.set(key, String(value));
+  }
+  const qs = params.toString();
+  return qs ? `${path}?${qs}` : path;
 }

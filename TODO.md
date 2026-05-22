@@ -1423,5 +1423,6 @@ Stepwise cleanup:
 - [x] Visual diff display (heatmap, side-by-side, overlay)
   - Worker storage now infers baseline/current/heatmap/triptych artifact groups and `/api/visual-diffs` exposes dashboard-ready display modes.
 - [ ] Interactive approval operations
-- [ ] Detection rate time-series graph
+- [x] Detection rate time-series graph
+  - `bench-history` now builds chart-ready detection-rate series, and local `/api/detection-series` exposes filtered points by backend/fixture/limit for dashboard clients.
 - [ ] Component-level status matrix

@@ -18,6 +18,7 @@ describe("buildOpenApiSpec", () => {
     assert.ok(spec.paths["/api/compare-renderers"]);
     assert.ok(spec.paths["/api/execution-results"]);
     assert.ok(spec.paths["/api/visual-diffs"]);
+    assert.ok(spec.paths["/api/detection-series"]);
     assert.ok(spec.paths["/api/reason"]);
     assert.ok(spec.paths["/api/smoke-test"]);
 
@@ -47,6 +48,7 @@ describe("buildOpenApiSpec", () => {
     assert.ok(spec.components.schemas.SmokeTestResponse);
     assert.ok(spec.components.schemas.ExecutionResultsResponse);
     assert.ok(spec.components.schemas.VisualDiffDisplaysResponse);
+    assert.ok(spec.components.schemas.DetectionSeriesResponse);
     assert.ok(spec.components.schemas.ErrorResponse);
   });
 });

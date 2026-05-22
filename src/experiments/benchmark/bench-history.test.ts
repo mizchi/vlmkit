@@ -5,6 +5,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import {
   appendBenchHistory,
+  buildBenchDetectionSeries,
   buildBenchHistoryRecord,
   getBenchGoalProgress,
   getBenchHistoryPath,
@@ -137,6 +138,76 @@ describe("getBenchHistoryStats", () => {
     assert.equal(stats.comparableSpeedups[0]?.fixture, "page");
     assert.equal(stats.comparableSpeedups[0]?.trials, 15);
     assert.equal(stats.comparableSpeedups[0]?.speedup.toFixed(2), "1.66");
+  });
+});
+
+describe("buildBenchDetectionSeries", () => {
+  it("returns the latest filtered points in chronological order for charting", () => {
+    const series = buildBenchDetectionSeries([
+      makeRecord({
+        runId: "2026-04-03T00:00:00.000Z",
+        backend: "prescanner",
+        fixture: "page",
+        trials: 10,
+        eitherDetected: 7,
+        detectionRate: 0.7,
+        avgMsPerTrial: 410,
+      }),
+      makeRecord({
+        runId: "2026-04-01T00:00:00.000Z",
+        backend: "prescanner",
+        fixture: "page",
+        trials: 10,
+        eitherDetected: 6,
+        detectionRate: 0.6,
+        avgMsPerTrial: 430,
+      }),
+      makeRecord({
+        runId: "2026-04-02T00:00:00.000Z",
+        backend: "chromium",
+        fixture: "page",
+        trials: 10,
+        eitherDetected: 9,
+        detectionRate: 0.9,
+        avgMsPerTrial: 690,
+      }),
+      makeRecord({
+        runId: "2026-04-04T00:00:00.000Z",
+        backend: "prescanner",
+        fixture: "dashboard",
+        trials: 10,
+        eitherDetected: 8,
+        detectionRate: 0.8,
+        avgMsPerTrial: 390,
+      }),
+    ], {
+      backend: "prescanner",
+      fixture: "page",
+      limit: 1,
+    });
+
+    assert.equal(series.total, 2);
+    assert.equal(series.points.length, 1);
+    assert.equal(series.points[0]?.runId, "2026-04-03T00:00:00.000Z");
+    assert.equal(series.points[0]?.detected, 7);
+    assert.equal(series.points[0]?.detectionRate, 0.7);
+    assert.equal(series.points[0]?.avgMsPerTrial, 410);
+  });
+
+  it("keeps limited points ascending after selecting the newest records", () => {
+    const series = buildBenchDetectionSeries([
+      makeRecord({ runId: "2026-04-01T00:00:00.000Z", detectionRate: 0.5 }),
+      makeRecord({ runId: "2026-04-03T00:00:00.000Z", detectionRate: 0.7 }),
+      makeRecord({ runId: "2026-04-02T00:00:00.000Z", detectionRate: 0.6 }),
+    ], {
+      limit: 2,
+    });
+
+    assert.equal(series.total, 3);
+    assert.deepEqual(series.points.map((point) => point.runId), [
+      "2026-04-02T00:00:00.000Z",
+      "2026-04-03T00:00:00.000Z",
+    ]);
   });
 });
 

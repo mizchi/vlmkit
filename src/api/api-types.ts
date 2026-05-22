@@ -358,6 +358,12 @@ export interface TrialSummary {
 // ---- Execution Results API ----
 
 export type {
+  BenchDetectionSeriesOptions as DetectionSeriesQuery,
+  BenchDetectionSeriesPoint as DetectionSeriesPoint,
+  BenchDetectionSeries as DetectionSeriesResponse,
+} from "../experiments/benchmark/bench-history.ts";
+
+export type {
   ListWorkerExecutionResultsInput as ExecutionResultsQuery,
   WorkerArtifactRecord as ExecutionResultArtifact,
   WorkerExecutionResultRecord as ExecutionResultRecord,

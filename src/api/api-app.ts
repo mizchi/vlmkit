@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import type {
+  DetectionSeriesQuery,
+  DetectionSeriesResponse,
   ExecutionResultsQuery,
   ExecutionResultsResponse,
   SmokeTestRequest,
@@ -23,6 +25,7 @@ export interface CreateApiAppOptions {
   resolveStorageStatus?: () => Promise<StorageStatus | undefined> | StorageStatus | undefined;
   listExecutionResults?: (query: ExecutionResultsQuery) => Promise<ExecutionResultsResponse> | ExecutionResultsResponse;
   listVisualDiffDisplays?: (query: ExecutionResultsQuery) => Promise<VisualDiffDisplaysResponse> | VisualDiffDisplaysResponse;
+  listDetectionSeries?: (query: DetectionSeriesQuery) => Promise<DetectionSeriesResponse> | DetectionSeriesResponse;
 }
 
 export function createApiApp(options: CreateApiAppOptions = {}) {
@@ -61,6 +64,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
         ...(storage?.available ? ["storage"] : []),
         ...(options.listExecutionResults ? ["execution-results"] : []),
         ...(options.listVisualDiffDisplays ? ["visual-diffs"] : []),
+        ...(options.listDetectionSeries ? ["detection-series"] : []),
       ],
       backends: [
         { name: "chromium", available: true },
@@ -90,6 +94,13 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     }
     const query = parseResultQuery(new URL(c.req.url));
     return c.json(await options.listVisualDiffDisplays(query));
+  });
+
+  app.get("/api/detection-series", async (c) => {
+    if (!options.listDetectionSeries) {
+      return c.json({ error: "Detection series provider is not configured" }, 501);
+    }
+    return c.json(await options.listDetectionSeries(parseDetectionSeriesQuery(new URL(c.req.url))));
   });
 
   app.post("/api/smoke-test", async (c) => {
@@ -131,6 +142,17 @@ function parseResultQuery(url: URL): ExecutionResultsQuery {
     artifactKind: url.searchParams.get("artifactKind") ?? undefined,
     limit: parsePositiveInt(url.searchParams.get("limit")),
     offset: parseNonNegativeInt(url.searchParams.get("offset")),
+  };
+}
+
+function parseDetectionSeriesQuery(url: URL): DetectionSeriesQuery {
+  const backend = url.searchParams.get("backend");
+  return {
+    backend: backend === "chromium" || backend === "crater" || backend === "prescanner"
+      ? backend
+      : undefined,
+    fixture: url.searchParams.get("fixture") ?? undefined,
+    limit: parsePositiveInt(url.searchParams.get("limit")),
   };
 }
 

@@ -143,4 +143,34 @@ describe("createApiApp", () => {
     assert.equal(body.total, 1);
     assert.equal(body.results[0]?.displayKey, "home-desktop");
   });
+
+  it("serves benchmark detection series when a provider is configured", async () => {
+    const app = createApiApp({
+      resolveCraterAvailable: async () => false,
+      listDetectionSeries: async (query) => ({
+        total: 2,
+        points: [{
+          runId: `${query.backend ?? "all"}:${query.fixture ?? "all"}`,
+          createdAt: "2026-05-22T00:00:00.000Z",
+          fixture: query.fixture ?? "page",
+          backend: query.backend ?? "prescanner",
+          trials: 10,
+          detected: 8,
+          detectionRate: 0.8,
+          avgMsPerTrial: 380,
+        }],
+      }),
+    });
+
+    const response = await app.request("http://vrt.local/api/detection-series?backend=prescanner&fixture=page&limit=5");
+
+    assert.equal(response.status, 200);
+    const body = await response.json() as {
+      total: number;
+      points: Array<{ runId: string; detectionRate: number }>;
+    };
+    assert.equal(body.total, 2);
+    assert.equal(body.points[0]?.runId, "prescanner:page");
+    assert.equal(body.points[0]?.detectionRate, 0.8);
+  });
 });

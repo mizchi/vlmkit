@@ -102,6 +102,28 @@ export interface BenchGoalProgress {
   prescannerSpeedup?: BenchSpeedupGoalProgress;
 }
 
+export interface BenchDetectionSeriesPoint {
+  runId: string;
+  createdAt: string;
+  fixture: string;
+  backend: BenchHistoryBackend;
+  trials: number;
+  detected: number;
+  detectionRate: number;
+  avgMsPerTrial: number;
+}
+
+export interface BenchDetectionSeries {
+  total: number;
+  points: BenchDetectionSeriesPoint[];
+}
+
+export interface BenchDetectionSeriesOptions {
+  backend?: BenchHistoryBackend;
+  fixture?: string;
+  limit?: number;
+}
+
 const DEFAULT_GOAL_TARGETS: BenchGoalTargets = {
   prescannerDetectionRate: 0.8,
   prescannerSpeedup: 3,
@@ -162,6 +184,36 @@ export function getBenchGoalProgress(
   }
 
   return progress;
+}
+
+export function buildBenchDetectionSeries(
+  records: BenchHistoryRecord[],
+  options: BenchDetectionSeriesOptions = {},
+): BenchDetectionSeries {
+  const filtered = records.filter((record) => {
+    if (options.backend && record.backend !== options.backend) return false;
+    if (options.fixture && record.fixture !== options.fixture) return false;
+    return true;
+  });
+  const sortedLatestFirst = [...filtered].sort((a, b) => b.runId.localeCompare(a.runId));
+  const limit = Math.max(1, Math.min(options.limit ?? 100, 1000));
+  const selected = sortedLatestFirst
+    .slice(0, limit)
+    .sort((a, b) => a.runId.localeCompare(b.runId));
+
+  return {
+    total: filtered.length,
+    points: selected.map((record) => ({
+      runId: record.runId,
+      createdAt: record.runId,
+      fixture: record.fixture,
+      backend: record.backend,
+      trials: record.trials,
+      detected: record.eitherDetected,
+      detectionRate: record.detectionRate,
+      avgMsPerTrial: record.avgMsPerTrial,
+    })),
+  };
 }
 
 export async function appendBenchHistory(

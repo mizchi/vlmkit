@@ -151,6 +151,16 @@ export function buildOpenApiSpec(options: OpenApiSpecOptions = {}): OpenApiSpec 
           },
         },
       },
+      "/api/detection-series": {
+        get: {
+          tags: ["dashboard"],
+          summary: "List benchmark detection-rate time-series points",
+          responses: {
+            "200": jsonRefResponse("Benchmark detection-rate series", "DetectionSeriesResponse"),
+            "501": jsonRefResponse("Detection series provider is not configured", "ErrorResponse"),
+          },
+        },
+      },
       "/api/smoke-test": {
         post: {
           tags: ["smoke"],
@@ -455,6 +465,40 @@ function buildSchemas(): Record<string, OpenApiSchema> {
         results: arrayOf(ref("VisualDiffDisplayRecord")),
       },
       required: ["total", "results"],
+    },
+    DetectionSeriesPoint: {
+      type: "object",
+      properties: {
+        runId: { type: "string" },
+        createdAt: { type: "string" },
+        fixture: { type: "string" },
+        backend: {
+          type: "string",
+          enum: ["chromium", "crater", "prescanner"],
+        },
+        trials: { type: "number" },
+        detected: { type: "number" },
+        detectionRate: { type: "number" },
+        avgMsPerTrial: { type: "number" },
+      },
+      required: [
+        "runId",
+        "createdAt",
+        "fixture",
+        "backend",
+        "trials",
+        "detected",
+        "detectionRate",
+        "avgMsPerTrial",
+      ],
+    },
+    DetectionSeriesResponse: {
+      type: "object",
+      properties: {
+        total: { type: "number" },
+        points: arrayOf(ref("DetectionSeriesPoint")),
+      },
+      required: ["total", "points"],
     },
     ReasoningPipelineRequest: {
       type: "object",
