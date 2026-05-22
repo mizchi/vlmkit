@@ -203,6 +203,10 @@ async function main() {
     await writeFile(outputPath, workingHtml);
     console.log(`Wrote: ${outputPath}`);
 
+    const afterByViewport = NO_RERUN
+      ? null
+      : await rerunCompare(report, baselinePath, outputPath);
+
     await writeSummary({
       target,
       proposals: rawFixes,
@@ -211,10 +215,9 @@ async function main() {
       applied,
       skipped,
       outputPath,
+      afterByViewport,
+      beforeByViewport: report.results.map((r) => ({ viewport: r.viewport, diffRatio: r.diffRatio })),
     });
-
-    if (NO_RERUN) return;
-    await rerunCompare(report, baselinePath, outputPath);
     return;
   }
 
@@ -268,11 +271,13 @@ async function writeSummary(input: {
   applied: MigrationFix[];
   skipped: MigrationFix[];
   outputPath: string | null;
+  beforeByViewport?: Array<{ viewport: string; diffRatio: number }>;
+  afterByViewport?: Array<{ viewport: string; diffRatio: number }> | null;
 }): Promise<void> {
   if (!SUMMARY_OUT) return;
   const out = resolve(SUMMARY_OUT);
   await mkdir(dirname(out), { recursive: true });
-  const payload = {
+  const payload: Record<string, unknown> = {
     target: {
       variantFile: input.target.variantFile,
       viewport: input.target.viewport,
@@ -295,6 +300,8 @@ async function writeSummary(input: {
     proposals: input.proposals,
     outputPath: input.outputPath,
   };
+  if (input.beforeByViewport) payload.beforeByViewport = input.beforeByViewport;
+  if (input.afterByViewport) payload.afterByViewport = input.afterByViewport;
   await writeFile(out, `${JSON.stringify(payload, null, 2)}\n`);
   console.log(`Summary: ${out}`);
 }
@@ -303,7 +310,7 @@ async function rerunCompare(
   report: MigrationCompareReport,
   baselinePath: string,
   outputPath: string,
-): Promise<void> {
+): Promise<Array<{ viewport: string; diffRatio: number }> | null> {
   const rerunOptions = buildRerunOptions(report, baselinePath, outputPath);
   console.log();
   console.log(`Rerun: in-process migration compare (${basename(baselinePath)} vs ${basename(outputPath)})`);
@@ -311,9 +318,26 @@ async function rerunCompare(
     const rerunReport = await runMigrationCompare(rerunOptions);
     const rerunConvergence = summarizeMigrationReportConvergence(rerunReport);
     console.log(`Convergence after rerun: ${rerunConvergence.status}`);
+    const perViewport = rerunReport.results.map((r) => ({
+      viewport: r.viewport,
+      diffRatio: r.diffRatio,
+    }));
+    // Render a compact per-viewport summary so the operator sees the
+    // before/after delta without grepping logs.
+    const before = new Map(report.results.map((r) => [r.viewport, r.diffRatio]));
+    console.log();
+    console.log("Per-viewport diff (before → after):");
+    for (const after of perViewport) {
+      const b = before.get(after.viewport) ?? 0;
+      const delta = after.diffRatio - b;
+      const arrow = delta < -0.003 ? "↓" : delta > 0.003 ? "↑" : "≈";
+      console.log(`  ${after.viewport.padEnd(12)} ${(b * 100).toFixed(2)}% → ${(after.diffRatio * 100).toFixed(2)}%  ${arrow}`);
+    }
+    return perViewport;
   } catch (error) {
     if (!shouldIgnoreMigrationRerunError(error)) throw error;
     console.log("Rerun skipped: Playwright browser launch is blocked in the current sandbox.");
+    return null;
   }
 }
 
