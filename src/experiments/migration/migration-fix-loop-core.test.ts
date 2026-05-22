@@ -4,8 +4,10 @@ import type { MigrationFixCandidate } from "./migration-fix-candidates.ts";
 import {
   applyMigrationFixToCss,
   applyMigrationFixToHtml,
+  buildBaselineValueIndex,
   buildMigrationFixLoopMultiPrompt,
   buildMigrationFixLoopPrompt,
+  correctMigrationFixesWithReport,
   parseMigrationFixMultiResponse,
   parseMigrationFixResponse,
   resolveMigrationFixFromBaselineHtml,
@@ -352,6 +354,91 @@ describe("buildMigrationFixLoopMultiPrompt", () => {
     assert.match(prompt, /up to 5 high-confidence/);
     assert.match(prompt, /"fixes"/);
     assert.match(prompt, /max-width: 700px/);
+  });
+});
+
+describe("buildBaselineValueIndex + correctMigrationFixesWithReport", () => {
+  const report: MigrationCompareReport = {
+    baseline: "target.html",
+    variants: ["current.html"],
+    viewports: [],
+    results: [],
+    computedStyleDiff: [{
+      variantFile: "current.html",
+      result: {
+        entries: [
+          { selector: ".btn", property: "background-color", baseline: "rgb(29, 78, 216)", variant: "rgb(37, 99, 235)" },
+          { selector: ".hero", property: "padding", baseline: "24px", variant: "16px" },
+        ],
+      },
+    }],
+    domPositionDiffPerViewport: [{
+      variantFile: "current.html",
+      result: {
+        entries: [
+          { path: "body[0]>div[0]", baselineClasses: "actions", variantClasses: "actions", property: "margin-top", baseline: "34px", variant: "32px", viewport: "mobile" },
+        ],
+      },
+    }],
+  };
+
+  it("indexes baseline values by selector+property", () => {
+    const idx = buildBaselineValueIndex(report, "current.html");
+    assert.equal(idx.global.size > 0, true);
+    // Spot-check: a known (selector, property) pair has the right baseline
+    const found = [...idx.global.entries()].find(([k]) => k.startsWith(".btn") && k.endsWith("background-color"));
+    assert.ok(found, "should index .btn background-color");
+    assert.equal(found?.[1], "rgb(29, 78, 216)");
+  });
+
+  it("overrides a hallucinated value with the indexed baseline", () => {
+    const idx = buildBaselineValueIndex(report, "current.html");
+    const result = correctMigrationFixesWithReport(
+      [{ selector: ".btn", property: "background-color", value: "rgb(0, 0, 255)", mediaCondition: null }],
+      idx,
+    );
+    assert.equal(result.corrections.length, 1);
+    assert.equal(result.fixes[0]?.value, "rgb(29, 78, 216)");
+  });
+
+  it("keeps the proposal as-is when no baseline is indexed", () => {
+    const idx = buildBaselineValueIndex(report, "current.html");
+    const result = correctMigrationFixesWithReport(
+      [{ selector: ".unknown", property: "color", value: "red", mediaCondition: null }],
+      idx,
+    );
+    assert.equal(result.corrections.length, 0);
+    assert.equal(result.fixes[0]?.value, "red");
+  });
+
+  it("drops proposals with path-style selectors", () => {
+    const idx = buildBaselineValueIndex(report, "current.html");
+    const result = correctMigrationFixesWithReport(
+      [
+        { selector: ".page>header[1]", property: "padding", value: "8px", mediaCondition: null },
+        { selector: ">nav[1]", property: "gap", value: "4px", mediaCondition: null },
+        { selector: ".real", property: "padding", value: "8px", mediaCondition: null },
+      ],
+      idx,
+    );
+    assert.equal(result.fixes.length, 1, "only .real survives");
+    assert.equal(result.dropped.length, 2);
+    assert.match(result.dropped[0]?.reason ?? "", /path-style/);
+  });
+
+  it("drops proposals that target computed-layout properties", () => {
+    const idx = buildBaselineValueIndex(report, "current.html");
+    const result = correctMigrationFixesWithReport(
+      [
+        { selector: ".page", property: "height", value: "1334.41px", mediaCondition: null },
+        { selector: ".page", property: "width", value: "1280px", mediaCondition: null },
+        { selector: ".page", property: "padding", value: "8px", mediaCondition: null },
+      ],
+      idx,
+    );
+    assert.equal(result.fixes.length, 1, "only .page padding survives");
+    assert.equal(result.dropped.length, 2);
+    assert.match(result.dropped[0]?.reason ?? "", /computed-layout/);
   });
 });
 

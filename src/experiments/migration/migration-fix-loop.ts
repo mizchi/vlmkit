@@ -6,8 +6,10 @@ import { createLLMProvider } from "@mizchi/vlmkit-ai/llm-client.ts";
 import { runMigrationCompare, type MigrationCompareOptions } from "./migration-compare.ts";
 import {
   applyMigrationFixToHtml,
+  buildBaselineValueIndex,
   buildMigrationFixLoopMultiPrompt,
   buildMigrationFixLoopPrompt,
+  correctMigrationFixesWithReport,
   parseMigrationFixMultiResponse,
   parseMigrationFixResponse,
   resolveMigrationFixFromBaselineHtml,
@@ -63,6 +65,9 @@ async function main() {
   }
 
   const useMultiMode = PROPOSE_ONLY || MAX_FIXES > 1;
+  const baselineIndex = useMultiMode
+    ? buildBaselineValueIndex(report, target.variantFile)
+    : null;
   const prompt = useMultiMode
     ? buildMigrationFixLoopMultiPrompt({
         baselineFile: basename(baselinePath),
@@ -70,6 +75,7 @@ async function main() {
         target,
         currentCss,
         maxFixes: MAX_FIXES,
+        baselineValueIndex: baselineIndex ?? undefined,
       })
     : buildMigrationFixLoopPrompt({
         baselineFile: basename(baselinePath),
@@ -92,7 +98,23 @@ async function main() {
   console.log(`Current convergence: ${convergence.status}`);
 
   if (useMultiMode) {
-    const fixes = await resolveMultiFixes({ baselineHtml, prompt, target });
+    const rawFixes = await resolveMultiFixes({ baselineHtml, prompt, target });
+    // Correct LLM proposals against the report's authoritative baseline
+    // values. Prevents value hallucinations like `font: 800 48px/1` when
+    // the report only knows specific computed sub-properties.
+    const index = baselineIndex ?? buildBaselineValueIndex(report, target.variantFile);
+    const correction = correctMigrationFixesWithReport(rawFixes, index, { viewport: target.viewport });
+    if (correction.corrections.length > 0) {
+      console.log();
+      console.log(`Corrected ${correction.corrections.length} proposal value(s) using report baselines:`);
+      for (const c of correction.corrections.slice(0, 5)) {
+        console.log(`  ~ ${c.selector} { ${c.property} } ${c.from} → ${c.to}`);
+      }
+      if (correction.corrections.length > 5) {
+        console.log(`  ... +${correction.corrections.length - 5} more`);
+      }
+    }
+    const fixes = correction.fixes;
     if (PROPOSE_ONLY) {
       const payload = JSON.stringify({
         report: REPORT_PATH,

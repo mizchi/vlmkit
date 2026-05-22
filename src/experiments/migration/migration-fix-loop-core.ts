@@ -37,6 +37,16 @@ export interface MigrationCompareReport {
     url?: string;
     error?: string;
   };
+  /** Per-variant computed-style diff: { selector, property, baseline, variant }. */
+  computedStyleDiff?: Array<{
+    variantFile: string;
+    result?: { entries?: Array<{ selector: string; property: string; baseline: string; variant: string }> };
+  }>;
+  /** Per-viewport, per-element computed-style diff via DOM-position match. */
+  domPositionDiffPerViewport?: Array<{
+    variantFile: string;
+    result?: { entries?: Array<{ path: string; baselineClasses?: string; variantClasses?: string; property: string; baseline: string; variant: string; viewport: string }> };
+  }>;
   results: MigrationCompareReportResult[];
 }
 
@@ -193,6 +203,8 @@ export function buildMigrationFixLoopMultiPrompt(input: {
   target: SelectedMigrationFixTarget;
   currentCss: string;
   maxFixes: number;
+  /** Authoritative baseline values from the diff report, used to ground LLM proposals. */
+  baselineValueIndex?: BaselineValueIndex;
 }): string {
   const candidateLines = input.target.fixCandidates.length === 0
     ? ["(no heuristic candidates)"]
@@ -200,6 +212,66 @@ export function buildMigrationFixLoopMultiPrompt(input: {
       const mediaSuffix = candidate.mediaCondition ? ` @media ${candidate.mediaCondition}` : "";
       return `${index + 1}. ${candidate.selector} { ${candidate.property}: ${candidate.value}; }${mediaSuffix} [score=${candidate.score}; ${candidate.reasoning}]`;
     });
+
+  // Pull report-grounded "baseline value table" rows so the LLM never has
+  // to hallucinate a value — it can copy verbatim from the table when the
+  // (selector, property) pair already has a recorded baseline.
+  //
+  // Filter out dom-position pseudo-selectors (`.page>header[1]`,
+  // `>nav[1]`, etc.) — the report generates those when an element has
+  // no class, but they aren't valid CSS selectors a fix can target.
+  const isAuthoredCssSelector = (selector: string): boolean => {
+    if (!selector) return false;
+    if (/[>\[\]]/.test(selector)) return false; // child combinator + bracket = path-style
+    if (/^\.[A-Za-z][\w-]*(\.[A-Za-z][\w-]*)*$/.test(selector)) return true; // .class or .class.class
+    if (/^#[A-Za-z][\w-]*$/.test(selector)) return true; // #id
+    if (/^[a-zA-Z][\w-]*$/.test(selector)) return true; // tag
+    return false;
+  };
+
+  // Properties that are typically authored vs. computed-layout byproducts.
+  // We only present authored-style properties in the prompt table because
+  // values like `.page { height: 1334.41px }` come from the layout pass,
+  // not the stylesheet — hard-coding them overconstrains the page.
+  const AUTHORED_PROPERTIES = new Set([
+    "color", "background-color", "border-color",
+    "border-top-color", "border-right-color", "border-bottom-color", "border-left-color",
+    "background", "border", "outline-color", "fill",
+    "padding", "padding-top", "padding-right", "padding-bottom", "padding-left",
+    "margin", "margin-top", "margin-right", "margin-bottom", "margin-left",
+    "gap", "row-gap", "column-gap",
+    "font-size", "font-weight", "font-family", "line-height", "letter-spacing",
+    "text-align", "text-transform", "text-decoration",
+    "border-radius", "border-width", "border-style",
+    "opacity", "visibility", "display", "flex-direction", "justify-content", "align-items",
+    "box-shadow",
+  ]);
+  const isAuthoredProperty = (property: string): boolean => AUTHORED_PROPERTIES.has(property);
+
+  const reportTableLines: string[] = [];
+  if (input.baselineValueIndex) {
+    // Collect global rows (one entry per (selector, property), value-stable
+    // across viewports because `buildBaselineValueIndex` uses first-write-wins).
+    type Row = { selector: string; property: string; baseline: string };
+    const rows: Row[] = [];
+    for (const [key, baseline] of input.baselineValueIndex.global) {
+      const sep = key.lastIndexOf(" ");
+      const selector = key.slice(0, sep);
+      const property = key.slice(sep + 1);
+      if (!isAuthoredCssSelector(selector)) continue;
+      if (!isAuthoredProperty(property)) continue;
+      rows.push({ selector, property, baseline });
+    }
+    const top = rows.slice(0, 24);
+    if (top.length > 0) {
+      reportTableLines.push("");
+      reportTableLines.push(`Report-authoritative baseline values (${top.length} of ${rows.length} authored-property pairs):`);
+      for (const r of top) {
+        reportTableLines.push(`  ${r.selector} { ${r.property} } → baseline=\`${r.baseline}\``);
+      }
+      reportTableLines.push("Rules: (a) copy the baseline value VERBATIM when proposing a fix; (b) only use real CSS selectors (no `.parent>tag[1]` path syntax); (c) only target authored properties — never computed layout dimensions like \`height: 1334.41px\`.");
+    }
+  }
 
   return `You are fixing a CSS migration regression.
 
@@ -214,6 +286,7 @@ Paint tree summary: ${input.target.paintTreeSummary}
 
 Top fix candidates:
 ${candidateLines.join("\n")}
+${reportTableLines.join("\n")}
 
 Current CSS:
 \`\`\`css
@@ -221,7 +294,7 @@ ${input.currentCss}
 \`\`\`
 
 Task:
-Return up to ${input.maxFixes} high-confidence CSS declaration changes that together would reduce this regression. Prefer authoritative universal pairs (every-viewport differences) and explicit color tokens over sub-pixel widths. Skip any candidate whose computed-style value already matches the baseline.
+Return up to ${input.maxFixes} high-confidence CSS declaration changes that together would reduce this regression. Prefer (selector, property) pairs that appear in the "Report-authoritative baseline values" table above — those have a known correct value you can copy verbatim. Avoid inventing new structural changes when a value-only fix is available.
 
 Viewport gating (CRITICAL):
 - The target viewport above (\`${input.target.viewport}\`, ${input.target.viewportWidth}px) is the WORST viewport — the other viewports may render correctly.
@@ -235,6 +308,136 @@ Output VALID JSON with this exact shape — no prose, no markdown fences:
     { "selector": "<css selector>", "property": "<css property>", "value": "<css value>", "mediaCondition": null | "<media condition>" }
   ]
 }`;
+}
+
+/**
+ * Index of authoritative baseline (target) values from the migration
+ * report, keyed by `${selector} ${property}` and optionally
+ * `${selector} ${property} ${viewport}`. Used to correct LLM
+ * proposals whose `value` field hallucinated a literal — the report
+ * already knows what the target rendered, so we swap the LLM's
+ * proposal-value for the reported baseline.
+ */
+export interface BaselineValueIndex {
+  global: Map<string, string>;
+  byViewport: Map<string, string>;
+}
+
+function classListToSelectors(classList: string | undefined): string[] {
+  if (!classList) return [];
+  const tokens = classList.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return [];
+  const selectors: string[] = [];
+  // Each single class
+  for (const t of tokens) selectors.push(`.${t}`);
+  // Joined combo (matches the snapshot-key shape used elsewhere)
+  if (tokens.length > 1) selectors.push(`.${tokens.join(".")}`);
+  return selectors;
+}
+
+export function buildBaselineValueIndex(
+  report: MigrationCompareReport,
+  variantFile?: string,
+): BaselineValueIndex {
+  const global = new Map<string, string>();
+  const byViewport = new Map<string, string>();
+  const addGlobal = (key: string, value: string) => {
+    if (!global.has(key)) global.set(key, value);
+  };
+  const csd = report.computedStyleDiff ?? [];
+  for (const block of csd) {
+    if (variantFile && block.variantFile !== variantFile) continue;
+    for (const e of block.result?.entries ?? []) {
+      addGlobal(`${e.selector} ${e.property}`, e.baseline);
+    }
+  }
+  const dpv = report.domPositionDiffPerViewport ?? [];
+  for (const block of dpv) {
+    if (variantFile && block.variantFile !== variantFile) continue;
+    for (const e of block.result?.entries ?? []) {
+      const selectors = [
+        ...classListToSelectors(e.baselineClasses),
+        ...classListToSelectors(e.variantClasses),
+      ];
+      for (const sel of selectors) {
+        addGlobal(`${sel} ${e.property}`, e.baseline);
+        byViewport.set(`${sel} ${e.property} ${e.viewport}`, e.baseline);
+      }
+    }
+  }
+  return { global, byViewport };
+}
+
+export interface CorrectionResult {
+  fixes: MigrationFix[];
+  corrections: Array<{ selector: string; property: string; from: string; to: string }>;
+  dropped: Array<{ selector: string; property: string; reason: string }>;
+}
+
+/**
+ * Walk LLM-proposed fixes and, when the report carries an authoritative
+ * baseline value for the (selector, property) pair, override the LLM's
+ * `value` with the reported baseline. Returns the corrected list plus a
+ * trail of {from, to} entries so the caller can log what was swapped.
+ *
+ * Goal: protect against LLM hallucinations like `font: 800 48px/1
+ * Georgia, serif` when the report only knows specific computed
+ * sub-properties.
+ */
+function isAuthoredCssSelectorForFix(selector: string): boolean {
+  if (!selector) return false;
+  // Path-style selectors from the report (`.parent>tag[1]`, `>nav[1]`,
+  // `body[0]>div[0]`, etc.) are diagnostic identifiers, not writable CSS.
+  if (/[>\[\]]/.test(selector)) return false;
+  return true;
+}
+
+const COMPUTED_LAYOUT_PROPERTIES = new Set([
+  "width", "height", "min-width", "min-height", "max-width", "max-height",
+  "top", "right", "bottom", "left",
+]);
+
+function isAuthoredCssPropertyForFix(property: string): boolean {
+  if (!property) return false;
+  // Computed-layout dimensions (width/height/etc.) carry sub-pixel rendered
+  // values that aren't valid authored CSS. Allow them only when paired with
+  // a baseline that looks token-shaped (handled at the value-check layer).
+  if (COMPUTED_LAYOUT_PROPERTIES.has(property)) return false;
+  return true;
+}
+
+export function correctMigrationFixesWithReport(
+  fixes: MigrationFix[],
+  index: BaselineValueIndex,
+  options: { viewport?: string } = {},
+): CorrectionResult {
+  const corrections: CorrectionResult["corrections"] = [];
+  const dropped: CorrectionResult["dropped"] = [];
+  const out: MigrationFix[] = [];
+  for (const fix of fixes) {
+    if (!fix.selector || !fix.property || !fix.value) {
+      dropped.push({ selector: fix.selector, property: fix.property, reason: "missing field" });
+      continue;
+    }
+    if (!isAuthoredCssSelectorForFix(fix.selector)) {
+      dropped.push({ selector: fix.selector, property: fix.property, reason: "path-style selector (not writable CSS)" });
+      continue;
+    }
+    if (!isAuthoredCssPropertyForFix(fix.property)) {
+      dropped.push({ selector: fix.selector, property: fix.property, reason: "computed-layout property (e.g. height/width) is not a stable authored value" });
+      continue;
+    }
+    const globalKey = `${fix.selector} ${fix.property}`;
+    const viewportKey = options.viewport ? `${globalKey} ${options.viewport}` : null;
+    const baseline = (viewportKey && index.byViewport.get(viewportKey)) ?? index.global.get(globalKey);
+    if (baseline && baseline !== fix.value) {
+      corrections.push({ selector: fix.selector, property: fix.property, from: fix.value, to: baseline });
+      out.push({ ...fix, value: baseline });
+      continue;
+    }
+    out.push(fix);
+  }
+  return { fixes: out, corrections, dropped };
 }
 
 export function parseMigrationFixMultiResponse(response: string): MigrationFix[] {
