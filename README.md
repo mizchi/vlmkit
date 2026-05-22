@@ -491,6 +491,7 @@ Available endpoints:
 - `GET /api/openapi.json` — OpenAPI 3.1 spec for the current HTTP surface
 - `GET /api/status` — server version, backends, and capabilities
 - `GET /api/execution-results` — searchable stored run summaries for dashboards
+- `GET /api/visual-diffs` — grouped baseline/current/heatmap/triptych display models
 - `POST /api/compare` — compare baseline/current HTML or URLs across viewports
 - `POST /api/compare-renderers` — compare Chromium vs Crater rendering
 - `POST /api/reason` — VLM/LLM reasoning pipeline for diff analysis and fixes

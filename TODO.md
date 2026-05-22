@@ -1420,7 +1420,8 @@ Stepwise cleanup:
 ### Dashboard (separate repo)
 - [x] Execution result list/search
   - Worker storage now groups artifact rows into execution-result summaries, and `/api/execution-results` exposes searchable run metadata for dashboard clients.
-- [ ] Visual diff display (heatmap, side-by-side, overlay)
+- [x] Visual diff display (heatmap, side-by-side, overlay)
+  - Worker storage now infers baseline/current/heatmap/triptych artifact groups and `/api/visual-diffs` exposes dashboard-ready display modes.
 - [ ] Interactive approval operations
 - [ ] Detection rate time-series graph
 - [ ] Component-level status matrix

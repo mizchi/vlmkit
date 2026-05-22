@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   buildWorkerArtifactKey,
   buildWorkerExecutionResults,
+  buildWorkerVisualDiffDisplays,
   createWorkerStorage,
   detectWorkerStorageCapabilities,
   normalizeWorkerArtifactPath,
@@ -192,5 +193,49 @@ describe("buildWorkerExecutionResults", () => {
 
     assert.equal(result.total, 1);
     assert.equal(result.results[0]?.runId, "migration-1");
+  });
+});
+
+describe("buildWorkerVisualDiffDisplays", () => {
+  it("groups baseline/current/heatmap artifacts into dashboard display models", () => {
+    const result = buildWorkerVisualDiffDisplays([
+      {
+        runId: "run-1",
+        runType: "snapshot",
+        artifactKind: "baseline",
+        artifactPath: "home-desktop-baseline.png",
+        r2Key: "runs/run-1/baseline/home-desktop-baseline.png",
+        kvKey: "artifacts:run-1:baseline:home-desktop-baseline.png",
+        contentType: "image/png",
+        createdAt: "2026-05-22T00:00:00.000Z",
+      },
+      {
+        runId: "run-1",
+        runType: "snapshot",
+        artifactKind: "current",
+        artifactPath: "home-desktop-current.png",
+        r2Key: "runs/run-1/current/home-desktop-current.png",
+        kvKey: "artifacts:run-1:current:home-desktop-current.png",
+        contentType: "image/png",
+        createdAt: "2026-05-22T00:00:01.000Z",
+      },
+      {
+        runId: "run-1",
+        runType: "snapshot",
+        artifactKind: "heatmap",
+        artifactPath: "home-desktop_heatmap.png",
+        r2Key: "runs/run-1/heatmap/home-desktop_heatmap.png",
+        kvKey: "artifacts:run-1:heatmap:home-desktop_heatmap.png",
+        contentType: "image/png",
+        createdAt: "2026-05-22T00:00:02.000Z",
+      },
+    ], { q: "home" });
+
+    assert.equal(result.total, 1);
+    assert.equal(result.results[0]?.displayKey, "home-desktop");
+    assert.deepEqual(result.results[0]?.availableModes, ["heatmap", "overlay", "side-by-side"]);
+    assert.equal(result.results[0]?.assets.baseline?.artifactKind, "baseline");
+    assert.equal(result.results[0]?.assets.current?.artifactKind, "current");
+    assert.equal(result.results[0]?.assets.heatmap?.artifactKind, "heatmap");
   });
 });

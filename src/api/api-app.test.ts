@@ -116,4 +116,31 @@ describe("createApiApp", () => {
     };
     assert.equal(body.results[0]?.runId, "worker-run");
   });
+
+  it("serves visual diff display models when a provider is configured", async () => {
+    const app = createApiApp({
+      resolveCraterAvailable: async () => false,
+      listVisualDiffDisplays: async () => ({
+        total: 1,
+        results: [{
+          runId: "run-1",
+          runType: "snapshot",
+          displayKey: "home-desktop",
+          latestCreatedAt: "2026-05-22T00:00:00.000Z",
+          availableModes: ["side-by-side", "heatmap", "overlay"],
+          assets: {},
+        }],
+      }),
+    });
+
+    const response = await app.request("http://vrt.local/api/visual-diffs?q=home");
+
+    assert.equal(response.status, 200);
+    const body = await response.json() as {
+      total: number;
+      results: Array<{ displayKey: string }>;
+    };
+    assert.equal(body.total, 1);
+    assert.equal(body.results[0]?.displayKey, "home-desktop");
+  });
 });

@@ -5,6 +5,7 @@ import type {
   SmokeTestRequest,
   StatusResponse,
   StorageStatus,
+  VisualDiffDisplaysResponse,
 } from "./api-types.ts";
 import { buildOpenApiSpec } from "./openapi.ts";
 import { registerCompareRoute } from "./routes/compare.ts";
@@ -21,6 +22,7 @@ export interface CreateApiAppOptions {
   resolveCraterAvailable?: () => Promise<boolean>;
   resolveStorageStatus?: () => Promise<StorageStatus | undefined> | StorageStatus | undefined;
   listExecutionResults?: (query: ExecutionResultsQuery) => Promise<ExecutionResultsResponse> | ExecutionResultsResponse;
+  listVisualDiffDisplays?: (query: ExecutionResultsQuery) => Promise<VisualDiffDisplaysResponse> | VisualDiffDisplaysResponse;
 }
 
 export function createApiApp(options: CreateApiAppOptions = {}) {
@@ -58,6 +60,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
         "openapi",
         ...(storage?.available ? ["storage"] : []),
         ...(options.listExecutionResults ? ["execution-results"] : []),
+        ...(options.listVisualDiffDisplays ? ["visual-diffs"] : []),
       ],
       backends: [
         { name: "chromium", available: true },
@@ -78,17 +81,15 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     if (!options.listExecutionResults) {
       return c.json({ error: "Execution result provider is not configured" }, 501);
     }
-    const url = new URL(c.req.url);
-    const limit = parsePositiveInt(url.searchParams.get("limit"));
-    const offset = parseNonNegativeInt(url.searchParams.get("offset"));
-    const query: ExecutionResultsQuery = {
-      q: url.searchParams.get("q") ?? undefined,
-      runType: url.searchParams.get("runType") ?? undefined,
-      artifactKind: url.searchParams.get("artifactKind") ?? undefined,
-      limit,
-      offset,
-    };
-    return c.json(await options.listExecutionResults(query));
+    return c.json(await options.listExecutionResults(parseResultQuery(new URL(c.req.url))));
+  });
+
+  app.get("/api/visual-diffs", async (c) => {
+    if (!options.listVisualDiffDisplays) {
+      return c.json({ error: "Visual diff provider is not configured" }, 501);
+    }
+    const query = parseResultQuery(new URL(c.req.url));
+    return c.json(await options.listVisualDiffDisplays(query));
   });
 
   app.post("/api/smoke-test", async (c) => {
@@ -121,6 +122,16 @@ function parsePositiveInt(value: string | null): number | undefined {
   if (value == null || value === "") return undefined;
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function parseResultQuery(url: URL): ExecutionResultsQuery {
+  return {
+    q: url.searchParams.get("q") ?? undefined,
+    runType: url.searchParams.get("runType") ?? undefined,
+    artifactKind: url.searchParams.get("artifactKind") ?? undefined,
+    limit: parsePositiveInt(url.searchParams.get("limit")),
+    offset: parseNonNegativeInt(url.searchParams.get("offset")),
+  };
 }
 
 function parseNonNegativeInt(value: string | null): number | undefined {

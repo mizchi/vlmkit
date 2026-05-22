@@ -141,6 +141,16 @@ export function buildOpenApiSpec(options: OpenApiSpecOptions = {}): OpenApiSpec 
           },
         },
       },
+      "/api/visual-diffs": {
+        get: {
+          tags: ["dashboard"],
+          summary: "List stored visual diff display models",
+          responses: {
+            "200": jsonRefResponse("Stored visual diff display list", "VisualDiffDisplaysResponse"),
+            "501": jsonRefResponse("Visual diff provider is not configured", "ErrorResponse"),
+          },
+        },
+      },
       "/api/smoke-test": {
         post: {
           tags: ["smoke"],
@@ -411,6 +421,38 @@ function buildSchemas(): Record<string, OpenApiSchema> {
       properties: {
         total: { type: "number" },
         results: arrayOf(ref("ExecutionResultRecord")),
+      },
+      required: ["total", "results"],
+    },
+    VisualDiffAssets: {
+      type: "object",
+      properties: {
+        baseline: ref("ExecutionResultArtifact"),
+        current: ref("ExecutionResultArtifact"),
+        heatmap: ref("ExecutionResultArtifact"),
+        triptych: ref("ExecutionResultArtifact"),
+      },
+    },
+    VisualDiffDisplayRecord: {
+      type: "object",
+      properties: {
+        runId: { type: "string" },
+        runType: { type: "string" },
+        displayKey: { type: "string" },
+        latestCreatedAt: { type: "string" },
+        availableModes: arrayOf({
+          type: "string",
+          enum: ["side-by-side", "heatmap", "overlay", "triptych"],
+        }),
+        assets: ref("VisualDiffAssets"),
+      },
+      required: ["runId", "runType", "displayKey", "latestCreatedAt", "availableModes", "assets"],
+    },
+    VisualDiffDisplaysResponse: {
+      type: "object",
+      properties: {
+        total: { type: "number" },
+        results: arrayOf(ref("VisualDiffDisplayRecord")),
       },
       required: ["total", "results"],
     },

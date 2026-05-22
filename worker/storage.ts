@@ -73,6 +73,30 @@ export interface WorkerExecutionResultsResponse {
   results: WorkerExecutionResultRecord[];
 }
 
+export type WorkerVisualDiffAssetRole = "baseline" | "current" | "heatmap" | "triptych";
+export type WorkerVisualDiffMode = "side-by-side" | "heatmap" | "overlay" | "triptych";
+
+export interface WorkerVisualDiffAssets {
+  baseline?: WorkerArtifactRecord;
+  current?: WorkerArtifactRecord;
+  heatmap?: WorkerArtifactRecord;
+  triptych?: WorkerArtifactRecord;
+}
+
+export interface WorkerVisualDiffDisplayRecord {
+  runId: string;
+  runType: string;
+  displayKey: string;
+  latestCreatedAt: string;
+  availableModes: WorkerVisualDiffMode[];
+  assets: WorkerVisualDiffAssets;
+}
+
+export interface WorkerVisualDiffDisplaysResponse {
+  total: number;
+  results: WorkerVisualDiffDisplayRecord[];
+}
+
 export interface PutWorkerJsonArtifactInput {
   runId: string;
   runType: string;
@@ -226,6 +250,141 @@ export function buildWorkerExecutionResults(
   };
 }
 
+function artifactPathBasename(path: string): string {
+  return path.split("/").filter(Boolean).at(-1) ?? path;
+}
+
+export function inferWorkerVisualDiffAssetRole(
+  record: WorkerArtifactRecord,
+): WorkerVisualDiffAssetRole | null {
+  const kind = record.artifactKind.toLowerCase();
+  const base = artifactPathBasename(record.artifactPath).toLowerCase();
+  if (kind.includes("baseline") || /(?:^|[-_.])baseline\.png$/.test(base)) return "baseline";
+  if (kind.includes("current") || kind.includes("variant") || /(?:^|[-_.])(current|variant)\.png$/.test(base)) {
+    return "current";
+  }
+  if (kind.includes("heatmap") || /(?:^|[-_.])heatmap\.png$/.test(base)) return "heatmap";
+  if (kind.includes("triptych") || /(?:^|[-_.])triptych\.png$/.test(base)) return "triptych";
+  return null;
+}
+
+function inferWorkerVisualDiffDisplayKey(record: WorkerArtifactRecord, role: WorkerVisualDiffAssetRole): string {
+  const base = artifactPathBasename(record.artifactPath).replace(/\.[^.]+$/, "");
+  switch (role) {
+    case "baseline":
+      return base.replace(/[-_.]?baseline$/i, "");
+    case "current":
+      return base.replace(/[-_.]?(current|variant)$/i, "");
+    case "heatmap":
+      return base.replace(/[-_.]?heatmap$/i, "");
+    case "triptych":
+      return base.replace(/[-_.]?triptych$/i, "");
+  }
+}
+
+function visualDiffMatchesQuery(
+  record: WorkerArtifactRecord,
+  displayKey: string,
+  query: ListWorkerExecutionResultsInput,
+): boolean {
+  if (query.runType && record.runType !== query.runType) return false;
+  if (query.artifactKind && record.artifactKind !== query.artifactKind) return false;
+  const q = query.q?.trim().toLowerCase();
+  if (!q) return true;
+  return [
+    record.runId,
+    record.runType,
+    record.artifactKind,
+    record.artifactPath,
+    record.r2Key,
+    displayKey,
+  ].some((value) => value.toLowerCase().includes(q));
+}
+
+export function buildWorkerVisualDiffDisplays(
+  records: WorkerArtifactRecord[],
+  query: ListWorkerExecutionResultsInput = {},
+): WorkerVisualDiffDisplaysResponse {
+  const visualRecords = records.flatMap((record) => {
+    const role = inferWorkerVisualDiffAssetRole(record);
+    if (!role) return [];
+    return [{ record, role, displayKey: inferWorkerVisualDiffDisplayKey(record, role) }];
+  });
+  const matchingKeys = new Set(
+    visualRecords
+      .filter((entry) => visualDiffMatchesQuery(entry.record, entry.displayKey, query))
+      .map((entry) => `${entry.record.runId}:${entry.displayKey}`),
+  );
+  const grouped = new Map<string, {
+    runId: string;
+    runType: string;
+    displayKey: string;
+    records: Array<{ record: WorkerArtifactRecord; role: WorkerVisualDiffAssetRole }>;
+  }>();
+  for (const entry of visualRecords) {
+    const key = `${entry.record.runId}:${entry.displayKey}`;
+    if (!matchingKeys.has(key)) continue;
+    const group = grouped.get(key) ?? {
+      runId: entry.record.runId,
+      runType: entry.record.runType,
+      displayKey: entry.displayKey,
+      records: [],
+    };
+    group.records.push({ record: entry.record, role: entry.role });
+    grouped.set(key, group);
+  }
+
+  const allResults = [...grouped.values()].map((group) => {
+    const sorted = [...group.records].sort((a, b) => b.record.createdAt.localeCompare(a.record.createdAt));
+    const assets: WorkerVisualDiffAssets = {};
+    for (const entry of sorted) {
+      assets[entry.role] ??= entry.record;
+    }
+    const availableModes: WorkerVisualDiffMode[] = [];
+    if (assets.heatmap) availableModes.push("heatmap");
+    if (assets.current && assets.heatmap) availableModes.push("overlay");
+    if (assets.baseline && assets.current) availableModes.push("side-by-side");
+    if (assets.triptych) availableModes.push("triptych");
+    return {
+      runId: group.runId,
+      runType: group.runType,
+      displayKey: group.displayKey,
+      latestCreatedAt: sorted[0]?.record.createdAt ?? "",
+      availableModes,
+      assets,
+    };
+  }).filter((entry) => entry.availableModes.length > 0)
+    .sort((a, b) => b.latestCreatedAt.localeCompare(a.latestCreatedAt));
+
+  const offset = Math.max(0, query.offset ?? 0);
+  const limit = Math.max(1, Math.min(query.limit ?? 50, 500));
+  return {
+    total: allResults.length,
+    results: allResults.slice(offset, offset + limit),
+  };
+}
+
+async function listD1ArtifactRecords(env: WorkerStorageEnv): Promise<WorkerArtifactRecord[]> {
+  if (!env.VRT_DB) return [];
+  const statement = env.VRT_DB.prepare(`
+    SELECT
+      run_id,
+      run_type,
+      artifact_kind,
+      artifact_path,
+      r2_key,
+      content_type,
+      created_at
+    FROM vrt_artifacts
+    ORDER BY created_at DESC
+    LIMIT ?
+  `).bind(1000);
+  const rows = await statement.all?.();
+  return (rows?.results ?? [])
+    .map(normalizeWorkerArtifactRecord)
+    .filter((record): record is WorkerArtifactRecord => Boolean(record));
+}
+
 export function createWorkerStorage(env: WorkerStorageEnv) {
   return {
     capabilities: detectWorkerStorageCapabilities(env),
@@ -312,25 +471,12 @@ export function createWorkerStorage(env: WorkerStorageEnv) {
     async listExecutionResults(
       input: ListWorkerExecutionResultsInput = {},
     ): Promise<WorkerExecutionResultsResponse> {
-      if (!env.VRT_DB) return { total: 0, results: [] };
-      const statement = env.VRT_DB.prepare(`
-        SELECT
-          run_id,
-          run_type,
-          artifact_kind,
-          artifact_path,
-          r2_key,
-          content_type,
-          created_at
-        FROM vrt_artifacts
-        ORDER BY created_at DESC
-        LIMIT ?
-      `).bind(1000);
-      const rows = await statement.all?.();
-      const records = (rows?.results ?? [])
-        .map(normalizeWorkerArtifactRecord)
-        .filter((record): record is WorkerArtifactRecord => Boolean(record));
-      return buildWorkerExecutionResults(records, input);
+      return buildWorkerExecutionResults(await listD1ArtifactRecords(env), input);
+    },
+    async listVisualDiffDisplays(
+      input: ListWorkerExecutionResultsInput = {},
+    ): Promise<WorkerVisualDiffDisplaysResponse> {
+      return buildWorkerVisualDiffDisplays(await listD1ArtifactRecords(env), input);
     },
   };
 }

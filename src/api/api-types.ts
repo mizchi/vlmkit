@@ -362,6 +362,11 @@ export type {
   WorkerArtifactRecord as ExecutionResultArtifact,
   WorkerExecutionResultRecord as ExecutionResultRecord,
   WorkerExecutionResultsResponse as ExecutionResultsResponse,
+  WorkerVisualDiffAssetRole as VisualDiffAssetRole,
+  WorkerVisualDiffAssets as VisualDiffAssets,
+  WorkerVisualDiffDisplayRecord as VisualDiffDisplayRecord,
+  WorkerVisualDiffDisplaysResponse as VisualDiffDisplaysResponse,
+  WorkerVisualDiffMode as VisualDiffMode,
 } from "../../worker/storage.ts";
 
 // ---- Status API ----

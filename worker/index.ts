@@ -11,6 +11,7 @@ export default {
       serverUrl: new URL(request.url).origin,
       resolveStorageStatus: () => detectWorkerStorageCapabilities(env),
       listExecutionResults: env.VRT_DB ? (query) => storage.listExecutionResults(query) : undefined,
+      listVisualDiffDisplays: env.VRT_DB ? (query) => storage.listVisualDiffDisplays(query) : undefined,
     });
     return app.fetch(request, env, executionCtx);
   },
