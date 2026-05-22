@@ -72,6 +72,17 @@ export interface MigrationBlindSoloResult {
   scenario: MigrationBlindScenario;
   outputPath: string;
   reportPath: string;
+  finalWorstDiffRatio: number;
+  targetDiffRatio: number;
+  passed: boolean;
+  reasons: string[];
+}
+
+export interface MigrationBlindSoloEvaluation {
+  finalWorstDiffRatio: number;
+  targetDiffRatio: number;
+  passed: boolean;
+  reasons: string[];
 }
 
 export function parseMigrationBlindManifest(raw: string): MigrationBlindManifest {
@@ -211,6 +222,27 @@ export function evaluateMigrationBlindSuccess(input: {
     reasons,
     convergenceStatus: convergence.status,
     subagent,
+  };
+}
+
+export function evaluateMigrationBlindSoloResult(
+  scenario: MigrationBlindScenario,
+  report: MigrationCompareReport,
+): MigrationBlindSoloEvaluation {
+  const finalWorstDiffRatio = findWorstDiffRatio(report);
+  const targetDiffRatio = scenario.successCriteria.maxDiffRatio;
+  const reasons: string[] = [];
+  if (finalWorstDiffRatio > targetDiffRatio) {
+    reasons.push(
+      `Final worst diff ${(finalWorstDiffRatio * 100).toFixed(2)}% ` +
+      `is above ${(targetDiffRatio * 100).toFixed(1)}%`,
+    );
+  }
+  return {
+    finalWorstDiffRatio,
+    targetDiffRatio,
+    passed: reasons.length === 0,
+    reasons,
   };
 }
 
@@ -407,7 +439,7 @@ function formatUsage(): string {
     "  vrt migration blind <manifest.json> show <scenario-id>",
     "  vrt migration blind <manifest.json> prepare <scenario-id> [--output-dir path] [--packet path] [--format markdown|json] [--paint-tree]",
     "  vrt migration blind <manifest.json> evaluate <scenario-id> --before-report before.json --after-report after.json --rounds n [--output path] [--format markdown|json]",
-    "  vrt migration blind <manifest.json> solo <scenario-id> [--output path] [--report-output-dir path] [--format markdown|json] [--paint-tree]",
+    "  vrt migration blind <manifest.json> solo <scenario-id> [--output path] [--report-output-dir path] [--format markdown|json] [--paint-tree] [--check]",
   ].join("\n");
 }
 
@@ -476,6 +508,7 @@ async function runSolo(scenario: MigrationBlindScenario, args: string[]) {
     ?? resolve("test-results", "migration", "blind", scenario.id, "solo-report"));
   const format = parseFormat(optionalValue(args, "--format"));
   const enablePaintTree = hasFlag(args, "--paint-tree");
+  const check = hasFlag(args, "--check");
 
   const blindPath = resolve(scenario.dir, scenario.blindTarget);
   const referencePath = resolve(scenario.dir, scenario.reference);
@@ -501,22 +534,41 @@ async function runSolo(scenario: MigrationBlindScenario, args: string[]) {
 
   const { runMigrationCompare } = await import("./migration-compare.ts");
   const report = await runMigrationCompare(compareOptions);
+  const evaluation = evaluateMigrationBlindSoloResult(scenario, report);
   const result: MigrationBlindSoloResult = {
     scenario,
     outputPath,
     reportPath: report.reportPath,
+    ...evaluation,
   };
   const output = format === "json"
     ? JSON.stringify(result, null, 2)
-    : [
-        `## Blind Scenario Solo Repair: ${scenario.title}`,
-        "",
-        `- Output: \`${result.outputPath}\``,
-        `- Report: \`${result.reportPath}\``,
-        `- Reference: \`${scenario.reference}\``,
-      ].join("\n");
+    : formatMigrationBlindSoloMarkdown(result);
 
   console.log(output);
+  if (check && !result.passed) {
+    process.exit(1);
+  }
+}
+
+function formatMigrationBlindSoloMarkdown(result: MigrationBlindSoloResult): string {
+  const lines = [
+    `## Blind Scenario Solo Repair: ${result.scenario.title}`,
+    "",
+    `- Result: ${result.passed ? "PASS" : "FAIL"}`,
+    `- Output: \`${result.outputPath}\``,
+    `- Report: \`${result.reportPath}\``,
+    `- Reference: \`${result.scenario.reference}\``,
+    `- Final worst diff: ${(result.finalWorstDiffRatio * 100).toFixed(2)}%`,
+    `- Threshold: ${(result.targetDiffRatio * 100).toFixed(1)}%`,
+  ];
+  if (result.reasons.length > 0) {
+    lines.push("", "### Threshold Failures", "");
+    for (const reason of result.reasons) {
+      lines.push(`- ${reason}`);
+    }
+  }
+  return lines.join("\n");
 }
 
 async function buildPreparationFromReport(

@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { extractCss } from "../css-challenge/css-challenge-core.ts";
 import {
   buildMigrationBlindCompareOptions,
+  evaluateMigrationBlindSoloResult,
   evaluateMigrationBlindSuccess,
   formatMigrationBlindScenarioMarkdown,
   formatMigrationBlindSuccessMarkdown,
@@ -246,6 +247,34 @@ describe("evaluateMigrationBlindSuccess", () => {
     assert.equal(summary.withinRoundBudget, false);
     assert.match(summary.reasons.join("\n"), /1\.0%/);
     assert.match(summary.reasons.join("\n"), /3 rounds/);
+  });
+});
+
+describe("evaluateMigrationBlindSoloResult", () => {
+  it("checks the reference repair report against scenario diff criteria", () => {
+    const manifest = parseMigrationBlindManifest(`{
+      "scenarios": [
+        {
+          "id": "shadcn-to-luna",
+          "title": "shadcn/ui -> luna",
+          "dir": "fixtures/migration/shadcn-to-luna",
+          "baseline": "before.html",
+          "blindTarget": "after-blind.html",
+          "reference": "after.html",
+          "successCriteria": { "maxDiffRatio": 0.01, "maxRounds": 3 }
+        }
+      ]
+    }`);
+    const scenario = selectMigrationBlindScenario(manifest, "shadcn-to-luna");
+    assert.ok(scenario);
+
+    const pass = evaluateMigrationBlindSoloResult(scenario, createReport([0.008, 0.004]));
+    const fail = evaluateMigrationBlindSoloResult(scenario, createReport([0.02, 0.004]));
+
+    assert.equal(pass.passed, true);
+    assert.equal(pass.finalWorstDiffRatio, 0.008);
+    assert.equal(fail.passed, false);
+    assert.match(fail.reasons[0] ?? "", /above/);
   });
 });
 
