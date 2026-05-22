@@ -1,5 +1,5 @@
 import type { Page } from "playwright";
-import type { LandscapeCellDiff } from "@mizchi/vlmkit-core/landscape-diff.ts";
+import type { LandscapeCellDiff } from "../landscape-diff.ts";
 import type { HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
 import {
   computeSemanticDrilldownPolicy,

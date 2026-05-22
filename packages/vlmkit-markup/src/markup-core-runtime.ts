@@ -94,19 +94,31 @@ export function computeComponentGoalStatus(input: {
   throw new Error(`unexpected markup-core status: ${output}`);
 }
 
-export function runMarkupCore(args: string[]): string {
+export interface RunMarkupCoreOptions {
+  /**
+   * When `false`, the result is not memoized. Use for commands whose
+   * args list can be megabytes (e.g. landscape-diff-summary forwards
+   * per-cell stats), otherwise the cache turns into a leak.
+   */
+  cache?: boolean;
+}
+
+export function runMarkupCore(args: string[], options?: RunMarkupCoreOptions): string {
   ensureMarkupCoreCli();
-  const cacheKey = JSON.stringify(args);
-  const cached = runMarkupCoreCache.get(cacheKey);
-  if (cached !== undefined) return cached;
+  const useCache = options?.cache !== false;
+  const cacheKey = useCache ? JSON.stringify(args) : null;
+  if (cacheKey !== null) {
+    const cached = runMarkupCoreCache.get(cacheKey);
+    if (cached !== undefined) return cached;
+  }
   const directOutput = runMarkupCoreDirect(args);
   if (directOutput !== undefined) {
-    runMarkupCoreCache.set(cacheKey, directOutput);
+    if (cacheKey !== null) runMarkupCoreCache.set(cacheKey, directOutput);
     return directOutput;
   }
   const output = run(process.execPath, [cliPath, ...args]);
   runtimeBackend = "spawn";
-  runMarkupCoreCache.set(cacheKey, output);
+  if (cacheKey !== null) runMarkupCoreCache.set(cacheKey, output);
   return output;
 }
 

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { compareLandscapeFromRgba } from "./landscape-diff.ts";
-import type { PngData } from "./png-utils.ts";
+import type { PngData } from "@mizchi/vlmkit-core/png-utils.ts";
 
 function image(
   width: number,
@@ -63,4 +63,12 @@ test("compareLandscapeFromRgba is less sensitive to tiny text-like pixel changes
   const r = compareLandscapeFromRgba(baseline, current, { cols: 10, rows: 6 });
   assert.ok(r.score < 0.01, `score=${r.score}`);
   assert.equal(r.changedCells, 0);
+});
+
+test("default grid follows MoonBit policy for wide canvases", () => {
+  const baseline = image(320, 200);
+  const current = image(320, 200);
+  const r = compareLandscapeFromRgba(baseline, current);
+  assert.equal(r.grid.cols, 16);
+  assert.equal(r.grid.rows, 10);
 });

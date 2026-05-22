@@ -10,7 +10,7 @@ import {
   type LandmarkLayoutContract,
   type ScrollportRegion,
 } from "./semantic-drilldown.ts";
-import type { LandscapeCellDiff } from "@mizchi/vlmkit-core/landscape-diff.ts";
+import type { LandscapeCellDiff } from "../landscape-diff.ts";
 import type { HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
 
 function landmark(partial: Partial<LandmarkRegion>): LandmarkRegion {

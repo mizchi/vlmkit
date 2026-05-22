@@ -617,3 +617,69 @@ test "ui contract remaining scalar issue policy" {
     content="",
   )
 }
+
+///|
+test "landscape default grid for wide canvas" {
+  inspect(landscape_default_grid_cols(320, 200), content="16")
+  inspect(landscape_default_grid_rows(320, 200), content="10")
+}
+
+///|
+test "landscape default grid for tall canvas" {
+  inspect(landscape_default_grid_cols(200, 320), content="10")
+  inspect(landscape_default_grid_rows(200, 320), content="16")
+}
+
+///|
+test "landscape default grid clamps short side to 8" {
+  inspect(landscape_default_grid_rows(1000, 100), content="8")
+  inspect(landscape_default_grid_cols(100, 1000), content="8")
+}
+
+///|
+test "landscape default grid handles non-positive sizes" {
+  inspect(landscape_default_grid_cols(0, 100), content="0")
+  inspect(landscape_default_grid_rows(100, 0), content="0")
+}
+
+///|
+test "landscape clamp byte" {
+  inspect(landscape_clamp_byte(-1.0), content="0")
+  inspect(landscape_clamp_byte(0.4), content="0")
+  inspect(landscape_clamp_byte(0.6), content="1")
+  inspect(landscape_clamp_byte(123.5), content="124")
+  inspect(landscape_clamp_byte(255.9), content="255")
+  inspect(landscape_clamp_byte(999.0), content="255")
+}
+
+///|
+test "landscape cell score returns zero for identical stats" {
+  let s = landscape_cell_score(10, 20, 30, 25, 0.5, 10, 20, 30, 25, 0.5)
+  inspect(s, content="0")
+}
+
+///|
+test "landscape cell score caps at 1" {
+  let s = landscape_cell_score(0, 0, 0, 0, 0, 255, 255, 255, 255, 1.0)
+  inspect(s, content="1")
+}
+
+///|
+test "landscape cell hex pads channels" {
+  inspect(landscape_cell_hex(0, 0, 0), content="#000000")
+  inspect(landscape_cell_hex(255, 255, 255), content="#ffffff")
+  inspect(landscape_cell_hex(18, 52, 171), content="#1234ab")
+}
+
+///|
+test "landscape diff summary detects no change" {
+  let stats = "10,20,30,22,0.1|40,50,60,49,0.2"
+  let summary = landscape_diff_summary(2, 1, 0.08, 4, stats, stats)
+  inspect(summary, content="0|1|0|2|0:0|1:0")
+}
+
+///|
+test "landscape diff summary degenerate grid" {
+  let summary = landscape_diff_summary(0, 0, 0.08, 4, "", "")
+  inspect(summary, content="1|0|0|0")
+}

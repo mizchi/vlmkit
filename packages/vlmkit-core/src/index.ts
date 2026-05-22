@@ -53,10 +53,6 @@ export {
 } from "./diff-regions.ts";
 export { classifyRegion } from "./region-classify.ts";
 export { explainShiftAccumulations, findShiftOrigins } from "./shift-origin.ts";
-export {
-  compareLandscapeFromPngFiles,
-  compareLandscapeFromRgba,
-} from "./landscape-diff.ts";
 
 // ---- Layout / typography ----
 export {

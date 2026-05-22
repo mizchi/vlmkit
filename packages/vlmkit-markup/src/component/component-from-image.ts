@@ -33,7 +33,7 @@ import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import {
   compareLandscapeFromPngFiles,
   type LandscapeDiffResult,
-} from "@mizchi/vlmkit-core/landscape-diff.ts";
+} from "../landscape-diff.ts";
 import {
   extractComponentsFromFile,
   matchComponents,

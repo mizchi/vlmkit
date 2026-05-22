@@ -442,6 +442,69 @@ fn main_err() -> Unit raise {
           parse_double(min_overflow),
         ),
       )
+    ["landscape-default-grid", width, height] => {
+      let w = parse_int(width)
+      let h = parse_int(height)
+      let cols = @core.landscape_default_grid_cols(w, h)
+      let rows = @core.landscape_default_grid_rows(w, h)
+      println("\{cols}|\{rows}")
+    }
+    ["landscape-clamp-byte", value] =>
+      println(@core.landscape_clamp_byte(parse_double(value)).to_string())
+    [
+      "landscape-cell-score",
+      r1,
+      g1,
+      b1,
+      l1,
+      i1,
+      r2,
+      g2,
+      b2,
+      l2,
+      i2,
+    ] =>
+      println(
+        @core.landscape_cell_score(
+          parse_double(r1),
+          parse_double(g1),
+          parse_double(b1),
+          parse_double(l1),
+          parse_double(i1),
+          parse_double(r2),
+          parse_double(g2),
+          parse_double(b2),
+          parse_double(l2),
+          parse_double(i2),
+        ).to_string(),
+      )
+    ["landscape-cell-hex", r, g, b] =>
+      println(
+        @core.landscape_cell_hex(
+          parse_double(r),
+          parse_double(g),
+          parse_double(b),
+        ),
+      )
+    [
+      "landscape-diff-summary",
+      cols,
+      rows,
+      changed_threshold,
+      top_n,
+      baseline_stats,
+      current_stats,
+    ] =>
+      println(
+        @core.landscape_diff_summary(
+          parse_int(cols),
+          parse_int(rows),
+          parse_double(changed_threshold),
+          parse_int(top_n),
+          baseline_stats,
+          current_stats,
+        ),
+      )
     _ => print_usage()
   }
 }
@@ -499,7 +562,12 @@ fn is_command(value : String) -> Bool {
   value == "ui-contract-layout-issue-ids" ||
   value == "ui-contract-state-issue-ids" ||
   value == "ui-contract-required-state-issue-ids" ||
-  value == "ui-contract-expected-scrollport-issue-ids"
+  value == "ui-contract-expected-scrollport-issue-ids" ||
+  value == "landscape-default-grid" ||
+  value == "landscape-clamp-byte" ||
+  value == "landscape-cell-score" ||
+  value == "landscape-cell-hex" ||
+  value == "landscape-diff-summary"
 }
 
 ///|

@@ -1,10 +1,33 @@
-import { decodePng, type PngData } from "./png-utils.ts";
+/**
+ * Landscape diff — coarse-grid baseline vs current comparison.
+ *
+ * Pixel sampling and hex formatting stay in TS (hot inner loop, no
+ * benefit from crossing the FFI boundary for every channel). The
+ * scoring formula, default grid geometry, threshold count, and top-N
+ * ranking live in `markup-core` MoonBit. See
+ * `markup-core/landscape_diff.mbt`.
+ */
+import { decodePng, type PngData } from "@mizchi/vlmkit-core/png-utils.ts";
+import {
+  computeLandscapeDefaultGrid,
+  computeLandscapeDiffSummary,
+  type LandscapeCellStat,
+} from "./markup-core-landscape.ts";
 
 export interface LandscapeDiffOptions {
   cols?: number;
   rows?: number;
   changedThreshold?: number;
   topN?: number;
+}
+
+export interface LandscapeCellStats {
+  r: number;
+  g: number;
+  b: number;
+  luma: number;
+  ink: number;
+  hex: string;
 }
 
 export interface LandscapeCellDiff {
@@ -17,15 +40,6 @@ export interface LandscapeCellDiff {
   score: number;
   baseline: LandscapeCellStats;
   current: LandscapeCellStats;
-}
-
-export interface LandscapeCellStats {
-  r: number;
-  g: number;
-  b: number;
-  luma: number;
-  ink: number;
-  hex: string;
 }
 
 export interface LandscapeDiffResult {
@@ -41,20 +55,6 @@ export interface LandscapeDiffResult {
 
 const DEFAULT_CHANGED_THRESHOLD = 0.08;
 const DEFAULT_TOP_N = 8;
-
-function defaultGrid(width: number, height: number): { cols: number; rows: number } {
-  const longSide = 16;
-  if (width >= height) {
-    return {
-      cols: longSide,
-      rows: Math.max(8, Math.round(longSide * height / width)),
-    };
-  }
-  return {
-    cols: Math.max(8, Math.round(longSide * width / height)),
-    rows: longSide,
-  };
-}
 
 function clampByte(value: number): number {
   return Math.max(0, Math.min(255, Math.round(value)));
@@ -90,8 +90,6 @@ function sampleCell(
       g += pg;
       b += pb;
       luma += pl;
-      // A soft "ink density" channel: near-white backgrounds contribute
-      // almost nothing; dark text and large dark blocks contribute more.
       ink += Math.max(0, (245 - pl) / 245);
       count++;
     }
@@ -114,15 +112,6 @@ function sampleCell(
   };
 }
 
-function cellScore(a: LandscapeCellStats, b: LandscapeCellStats): number {
-  const dr = (a.r - b.r) / 255;
-  const dg = (a.g - b.g) / 255;
-  const db = (a.b - b.b) / 255;
-  const dl = (a.luma - b.luma) / 255;
-  const di = a.ink - b.ink;
-  return Math.min(1, Math.sqrt((dr * dr + dg * dg + db * db + dl * dl + di * di) / 5));
-}
-
 export function compareLandscapeFromRgba(
   baseline: PngData,
   current: PngData,
@@ -130,7 +119,9 @@ export function compareLandscapeFromRgba(
 ): LandscapeDiffResult {
   const width = Math.min(baseline.width, current.width);
   const height = Math.min(baseline.height, current.height);
-  const fallback = defaultGrid(width, height);
+  const fallback = options.cols !== undefined && options.rows !== undefined
+    ? { cols: options.cols, rows: options.rows }
+    : computeLandscapeDefaultGrid(width, height);
   const cols = options.cols ?? fallback.cols;
   const rows = options.rows ?? fallback.rows;
   const changedThreshold = options.changedThreshold ?? DEFAULT_CHANGED_THRESHOLD;
@@ -149,9 +140,12 @@ export function compareLandscapeFromRgba(
     };
   }
 
-  const cells: LandscapeCellDiff[] = [];
-  let sum = 0;
-  let changedCells = 0;
+  const totalCells = rows * cols;
+  const geometries: Array<{ x: number; y: number; w: number; h: number; row: number; col: number }> = new Array(totalCells);
+  const baselineStats: LandscapeCellStats[] = new Array(totalCells);
+  const currentStats: LandscapeCellStats[] = new Array(totalCells);
+  const baselineBulk: LandscapeCellStat[] = new Array(totalCells);
+  const currentBulk: LandscapeCellStat[] = new Array(totalCells);
 
   for (let row = 0; row < rows; row++) {
     const y0 = Math.floor(row * height / rows);
@@ -159,36 +153,57 @@ export function compareLandscapeFromRgba(
     for (let col = 0; col < cols; col++) {
       const x0 = Math.floor(col * width / cols);
       const x1 = Math.floor((col + 1) * width / cols);
+      const idx = row * cols + col;
       const base = sampleCell(baseline, x0, y0, x1, y1);
       const curr = sampleCell(current, x0, y0, x1, y1);
-      const score = cellScore(base, curr);
-      sum += score;
-      if (score >= changedThreshold) changedCells++;
-      cells.push({
-        row,
-        col,
+      baselineStats[idx] = base;
+      currentStats[idx] = curr;
+      baselineBulk[idx] = { r: base.r, g: base.g, b: base.b, luma: base.luma, ink: base.ink };
+      currentBulk[idx] = { r: curr.r, g: curr.g, b: curr.b, luma: curr.luma, ink: curr.ink };
+      geometries[idx] = {
         x: x0,
         y: y0,
-        width: Math.max(0, x1 - x0),
-        height: Math.max(0, y1 - y0),
-        score,
-        baseline: base,
-        current: curr,
-      });
+        w: Math.max(0, x1 - x0),
+        h: Math.max(0, y1 - y0),
+        row,
+        col,
+      };
     }
   }
 
-  const totalCells = rows * cols;
-  const score = totalCells === 0 ? 1 : sum / totalCells;
+  const summary = computeLandscapeDiffSummary({
+    cols,
+    rows,
+    changedThreshold,
+    topN,
+    baseline: baselineBulk,
+    current: currentBulk,
+  });
+
+  const topCells: LandscapeCellDiff[] = summary.topIndices.map(({ index, score }) => {
+    const g = geometries[index]!;
+    return {
+      row: g.row,
+      col: g.col,
+      x: g.x,
+      y: g.y,
+      width: g.w,
+      height: g.h,
+      score,
+      baseline: baselineStats[index]!,
+      current: currentStats[index]!,
+    };
+  });
+
   return {
     width,
     height,
     grid: { cols, rows },
-    score,
-    similarity: Math.max(0, 1 - score),
-    changedCells,
-    totalCells,
-    topCells: cells.sort((a, b) => b.score - a.score).slice(0, topN),
+    score: summary.score,
+    similarity: summary.similarity,
+    changedCells: summary.changedCells,
+    totalCells: summary.totalCells,
+    topCells,
   };
 }
 
