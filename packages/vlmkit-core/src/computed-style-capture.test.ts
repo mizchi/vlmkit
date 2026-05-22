@@ -205,6 +205,44 @@ describe("captureComputedStyleSnapshotInDom", () => {
 
     assert.deepEqual(selectors, ["*"]);
   });
+
+  it("adds aliases for class selectors declared in stylesheets", () => {
+    const queries: string[] = [];
+    const badge: FakeElement = {
+      classList: ["luna-pill", "is-active"],
+      tagName: "SPAN",
+      parentElement: null,
+    };
+
+    installFakeDom(
+      [badge],
+      new Map([
+        [".luna-pill.is-active", { color: "rgb(255, 0, 0)" }],
+      ]),
+    );
+
+    const documentRecord = (globalThis as Record<string, unknown>).document as Record<string, unknown>;
+    documentRecord.querySelectorAll = (selector: string) => {
+      queries.push(selector);
+      if (selector === "*") return [badge];
+      return [];
+    };
+    documentRecord.styleSheets = [
+      {
+        cssRules: [
+          { selectorText: ".luna-pill" },
+        ],
+      },
+    ];
+
+    const snapshot = captureComputedStyleSnapshotInDom(["color"]);
+
+    assert.deepEqual(snapshot, {
+      ".luna-pill.is-active": { color: "rgb(255, 0, 0)" },
+      ".luna-pill": { color: "rgb(255, 0, 0)" },
+    });
+    assert.deepEqual(queries, ["*"]);
+  });
 });
 
 describe("captureComputedStyleSnapshotForTargetSelectorsInDom", () => {

@@ -141,6 +141,7 @@ export function captureComputedStyleSnapshotInDom(props: string[]): ComputedStyl
   if (!getStyle) {
     throw new Error("getComputedStyle is not available in this realm");
   }
+  const styleGetter = getStyle;
 
   function shouldTrackElement(element: HTMLElement): boolean {
     if (element.id) return true;
@@ -164,16 +165,53 @@ export function captureComputedStyleSnapshotInDom(props: string[]): ComputedStyl
     return `${ctx}>${tag}[${count}]`;
   }
 
-  const elements = document.querySelectorAll("*");
-  const tagCounters: Record<string, number> = {};
+  function normalizeCssClassToken(token: string): string {
+    return token.replace(/\\([^\n\r\f])/g, "$1");
+  }
 
-  for (const element of elements) {
-    const he = element as HTMLElement;
-    if (!shouldTrackElement(he)) continue;
-    const key = buildElementKey(he, tagCounters);
-    if (!key || results[key]) continue;
+  function collectDeclaredClassAliases(): Set<string> {
+    const aliases = new Set<string>();
+    const classPattern = /\.((?:\\.|[-_a-zA-Z0-9])+)/g;
 
-    const computed = getStyle(he);
+    function collectFromSelectorText(selectorText: string) {
+      let match: RegExpExecArray | null;
+      while ((match = classPattern.exec(selectorText))) {
+        aliases.add(`.${normalizeCssClassToken(match[1])}`);
+      }
+    }
+
+    function visitRule(rule: { selectorText?: unknown; cssRules?: unknown }) {
+      if (typeof rule.selectorText === "string") {
+        collectFromSelectorText(rule.selectorText);
+      }
+      const nested = rule.cssRules;
+      if (!nested || typeof (nested as { length?: unknown }).length !== "number") return;
+      const nestedRules = nested as { length: number; [index: number]: unknown };
+      for (let i = 0; i < nestedRules.length; i++) {
+        const child = nestedRules[i];
+        if (child && typeof child === "object") {
+          visitRule(child as { selectorText?: unknown; cssRules?: unknown });
+        }
+      }
+    }
+
+    const styleSheets = (document as Document & { styleSheets?: StyleSheetList }).styleSheets;
+    if (!styleSheets) return aliases;
+    for (const sheet of Array.from(styleSheets)) {
+      try {
+        const rules = (sheet as CSSStyleSheet).cssRules;
+        for (const rule of Array.from(rules)) {
+          visitRule(rule as { selectorText?: unknown; cssRules?: unknown });
+        }
+      } catch { /* cross-origin stylesheet */ }
+    }
+    return aliases;
+  }
+
+  function captureElementStyles(key: string, element: HTMLElement) {
+    if (!key || results[key]) return;
+
+    const computed = styleGetter(element);
     const styles: Record<string, string> = {};
     for (const prop of props) {
       styles[prop] = computed.getPropertyValue(prop);
@@ -181,7 +219,7 @@ export function captureComputedStyleSnapshotInDom(props: string[]): ComputedStyl
     results[key] = styles;
 
     for (const pseudo of ["::before", "::after"] as const) {
-      const pseudoComputed = getStyle(he, pseudo);
+      const pseudoComputed = styleGetter(element, pseudo);
       const content = pseudoComputed.getPropertyValue("content");
       if (!content || content === "none" || content === "normal") continue;
 
@@ -190,6 +228,23 @@ export function captureComputedStyleSnapshotInDom(props: string[]): ComputedStyl
         pseudoStyles[prop] = pseudoComputed.getPropertyValue(prop);
       }
       results[`${key}${pseudo}`] = pseudoStyles;
+    }
+  }
+
+  const elements = document.querySelectorAll("*");
+  const tagCounters: Record<string, number> = {};
+  const declaredClassAliases = collectDeclaredClassAliases();
+
+  for (const element of elements) {
+    const he = element as HTMLElement;
+    if (!shouldTrackElement(he)) continue;
+    const key = buildElementKey(he, tagCounters);
+    captureElementStyles(key, he);
+    for (const className of getClassNames(he)) {
+      const alias = `.${className}`;
+      if (declaredClassAliases.has(alias)) {
+        captureElementStyles(alias, he);
+      }
     }
   }
 

@@ -971,10 +971,13 @@ band at viewports ≥ 1024.
   breakpoint-gated rows, and sample values tagged by viewport. It is
   captured in `migration-compare`, surfaced by `diff-for-agent`, and covered
   by `computed-style-diff` plus `diff-for-agent` tests.
-- [ ] **Widen computed-style selector coverage** to include class
-  selectors declared in the variant's CSS. (Prerequisite for
-  item #1 above.) Already on the wish-list from Pass C; the
-  subagent eval reinforces its priority.
+- [x] **Widen computed-style selector coverage** to include class
+  selectors declared in the variant's CSS. `captureComputedStyleSnapshotInDom`
+  now reads same-origin CSSOM selectors and adds declared class-selector
+  aliases (for example `.luna-pill`) while retaining the existing DOM
+  class-combination key (for example `.luna-pill.is-active`). This gives
+  downstream reports a stable variant-side selector to reference before
+  the "missing CSS rule" diagnostic is added.
 
 - [x] Heuristic fix-candidate ranking now reconciles with computed-style.
   `vrt diff-for-agent` renames the heuristic table to "Heuristic fix
