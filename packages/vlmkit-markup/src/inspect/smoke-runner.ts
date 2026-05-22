@@ -155,6 +155,70 @@ function buildA11ySnapshot(page: Page, step: number): Promise<A11ySnapshot | nul
     .catch(() => null);
 }
 
+function countA11yNodes(node: A11yNodeCompact | undefined): number {
+  if (!node) return 0;
+  return 1 + (node.children ?? []).reduce((sum, child) => sum + countA11yNodes(child), 0);
+}
+
+function collectA11ySnapshotConsistencyIssues(
+  baseline: A11ySnapshot,
+  current: A11ySnapshot,
+): string[] {
+  const issues: string[] = [];
+  const baselineNodeCount = countA11yNodes(baseline.tree);
+  const currentNodeCount = countA11yNodes(current.tree);
+
+  if (baselineNodeCount > 1 && currentNodeCount <= 1) {
+    issues.push(`a11y tree became empty after step ${current.step}`);
+  }
+  if (baseline.interactiveCount > 0 && current.interactiveCount === 0) {
+    issues.push(
+      `interactive targets disappeared after step ${current.step} (${baseline.interactiveCount} -> 0)`,
+    );
+  }
+  if (baseline.landmarkCount > 0 && current.landmarkCount === 0) {
+    issues.push(
+      `landmarks disappeared after step ${current.step} (${baseline.landmarkCount} -> 0)`,
+    );
+  }
+
+  return issues;
+}
+
+export function evaluateA11ySnapshotConsistency(
+  snapshots: readonly A11ySnapshot[],
+): SmokeError[] {
+  if (snapshots.length < 2) return [];
+  const baseline = snapshots[0];
+  if (!baseline) return [];
+
+  const errors: SmokeError[] = [];
+  for (const snapshot of snapshots.slice(1)) {
+    const issues = collectA11ySnapshotConsistencyIssues(baseline, snapshot);
+    if (issues.length === 0) continue;
+    errors.push({
+      step: snapshot.step,
+      type: "a11y-regression",
+      message: issues.join("; "),
+    });
+  }
+  return errors;
+}
+
+export function annotateA11ySnapshotConsistency(
+  snapshots: A11ySnapshot[],
+): SmokeError[] {
+  const errors = evaluateA11ySnapshotConsistency(snapshots);
+  for (const error of errors) {
+    const snapshot = snapshots.find((item) => item.step === error.step);
+    if (!snapshot) continue;
+    for (const issue of error.message.split("; ")) {
+      if (!snapshot.issues.includes(issue)) snapshot.issues.push(issue);
+    }
+  }
+  return errors;
+}
+
 // ---- Runner ----
 
 export async function runSmokeTest(
@@ -392,7 +456,16 @@ ACTION: click ROLE: button NAME: Submit`;
 
   // Final snapshot
   const finalSnap = await buildA11ySnapshot(page, actions.length);
-  if (finalSnap) snapshots.push(finalSnap);
+  if (finalSnap) {
+    const lastIndex = snapshots.length - 1;
+    if (snapshots[lastIndex]?.step === finalSnap.step) {
+      snapshots[lastIndex] = finalSnap;
+    } else {
+      snapshots.push(finalSnap);
+    }
+  }
+
+  errors.push(...annotateA11ySnapshotConsistency(snapshots));
 
   // Capture the recording path before closing the context (close finalizes the WebM).
   let videoPath: string | undefined;

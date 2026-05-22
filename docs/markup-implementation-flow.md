@@ -269,7 +269,8 @@ layout が安定してから、色・余白・typography を詰める。
 - `vlmkit inspect explore <html|url>`:
   宣言された action を探索して差分を見る。
 - `vlmkit inspect smoke <html|url>`:
-  a11y driven な smoke test。
+  a11y driven な smoke test。操作後に interactive target / landmark が全消失した場合は
+  `a11y-regression` として扱う。
 - `vlmkit check a11y focus <html|url>`:
   focus order と visual order を見る。
 

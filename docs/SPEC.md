@@ -358,9 +358,11 @@
   >   its canonical fixture and asserts exit 0 + expected output. The
   >   pkspec Test.pkl mirror provides the same gate with the added
   >   Pkl-typed expectations.
+  > Partial: `inspect smoke` now records a11y snapshots across operations and reports
+  > `a11y-regression` when interactive targets or landmarks fully disappear.
   - contributes to: GOAL-AGENT-ERGONOMICS
   - decisions: 1 entry(ies)
-  - body: _not yet implemented_
+  - body: partial implementation in `packages/vlmkit-markup/src/inspect/smoke-runner.ts`
 
 - [ ] **Media variants: forced-colors / reduced-motion / print / RTL / zoom-200** — verifies: C2-C6
   > `vrt media-variants` sweeps the five hostile-user-preference media queries in one command and reports per-variant diffs.

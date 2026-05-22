@@ -187,7 +187,8 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 - [x] Enhanced diff classification (layout shift / color change / text change / element added/removed)
   - `classifyVisualDiff` now trusts `DiffRegion.regionType === "shift"` as layout shift and uses sampled baseline/current colors to distinguish element-added vs element-removed when a region changes to/from a page-surface color.
 - [ ] Smoke test: Crater BiDi backend
-- [ ] Smoke test: a11y tree consistency check after operations
+- [x] Smoke test: a11y tree consistency check after operations
+  - `inspect smoke` now compares post-action a11y snapshots against the initial snapshot and reports `a11y-regression` when all interactive targets or landmarks disappear.
 - [ ] Animation detection (animation-play-state: paused / CSSOM diff)
 - [x] External stylesheet breakpoint discovery
   - Regex fallback now reads local `<link rel="stylesheet" href="./...">` CSS during migration breakpoint discovery and merges those breakpoints with Crater results.
