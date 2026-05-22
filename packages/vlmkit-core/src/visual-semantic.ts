@@ -43,6 +43,21 @@ function classifyRegion(
   const density = region.diffPixelCount / area;
   const globalRatio = region.diffPixelCount / diff.totalPixels;
 
+  if (region.regionType === "shift") {
+    return {
+      type: "layout-shift",
+      region,
+      confidence: 0.8,
+      description: `Layout shift region hint at (${region.x}, ${region.y}), ` +
+        `${region.width}x${region.height}`,
+    };
+  }
+
+  const elementPresenceChange = classifyElementPresenceChange(region, density, area);
+  if (elementPresenceChange) {
+    return elementPresenceChange;
+  }
+
   // Small square -> icon change
   if (
     area < 4096 && // <= 64x64
@@ -104,6 +119,43 @@ function classifyRegion(
     confidence: 0.3,
     description: `Change at (${region.x}, ${region.y}), ${region.width}x${region.height}`,
   };
+}
+
+function classifyElementPresenceChange(
+  region: DiffRegion,
+  density: number,
+  area: number,
+): VisualSemanticChange | undefined {
+  if (!region.colorSample || density < 0.5 || area < 1024) return undefined;
+  const baselineIsSurface = isLikelyPageSurface(region.colorSample.baseline);
+  const currentIsSurface = isLikelyPageSurface(region.colorSample.current);
+  if (baselineIsSurface === currentIsSurface) return undefined;
+
+  if (baselineIsSurface) {
+    return {
+      type: "element-added",
+      region,
+      confidence: 0.65,
+      description: `Element appeared at (${region.x}, ${region.y}), ` +
+        `${region.width}x${region.height}${formatColorSample(region)}`,
+    };
+  }
+
+  return {
+    type: "element-removed",
+    region,
+    confidence: 0.65,
+    description: `Element disappeared at (${region.x}, ${region.y}), ` +
+      `${region.width}x${region.height}${formatColorSample(region)}`,
+  };
+}
+
+function isLikelyPageSurface(color: { r: number; g: number; b: number }): boolean {
+  const max = Math.max(color.r, color.g, color.b);
+  const min = Math.min(color.r, color.g, color.b);
+  const chroma = max - min;
+  const luma = 0.299 * color.r + 0.587 * color.g + 0.114 * color.b;
+  return chroma <= 12 && (luma >= 240 || luma <= 18);
 }
 
 function formatColorSample(region: DiffRegion): string {

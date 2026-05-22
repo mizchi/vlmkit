@@ -183,7 +183,8 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 
 ### Feature Extensions
 - [ ] Component (selector) level comparison
-- [ ] Enhanced diff classification (layout shift / color change / text change / element added/removed)
+- [x] Enhanced diff classification (layout shift / color change / text change / element added/removed)
+  - `classifyVisualDiff` now trusts `DiffRegion.regionType === "shift"` as layout shift and uses sampled baseline/current colors to distinguish element-added vs element-removed when a region changes to/from a page-surface color.
 - [ ] Smoke test: Crater BiDi backend
 - [ ] Smoke test: a11y tree consistency check after operations
 - [ ] Animation detection (animation-play-state: paused / CSSOM diff)

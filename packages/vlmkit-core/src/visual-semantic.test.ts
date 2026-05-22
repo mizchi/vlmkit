@@ -74,6 +74,66 @@ describe("classifyVisualDiff", () => {
     assert.equal(result.changes[0].type, "layout-shift");
   });
 
+  it("should trust shift region hints as layout-shift", () => {
+    const diff = makeDiff([
+      {
+        x: 20,
+        y: 80,
+        width: 48,
+        height: 48,
+        diffPixelCount: 1800,
+        regionType: "shift",
+      },
+    ]);
+
+    const result = classifyVisualDiff(diff);
+
+    assert.equal(result.changes[0].type, "layout-shift");
+    assert.match(result.changes[0].description, /region hint/);
+  });
+
+  it("should classify removed elements when a non-background region becomes background", () => {
+    const diff = makeDiff([
+      {
+        x: 100,
+        y: 120,
+        width: 220,
+        height: 80,
+        diffPixelCount: 16000,
+        colorSample: {
+          baseline: { r: 30, g: 64, b: 175, hex: "#1e40af" },
+          current: { r: 255, g: 255, b: 255, hex: "#ffffff" },
+          distance: 330,
+        },
+      },
+    ]);
+
+    const result = classifyVisualDiff(diff);
+
+    assert.equal(result.changes[0].type, "element-removed");
+  });
+
+  it("should classify added elements when background becomes a non-background region", () => {
+    const diff = makeDiff([
+      {
+        x: 100,
+        y: 120,
+        width: 220,
+        height: 80,
+        diffPixelCount: 16000,
+        colorSample: {
+          baseline: { r: 255, g: 255, b: 255, hex: "#ffffff" },
+          current: { r: 30, g: 64, b: 175, hex: "#1e40af" },
+          distance: 330,
+        },
+      },
+    ]);
+
+    const result = classifyVisualDiff(diff);
+
+    assert.equal(result.changes[0].type, "element-added");
+  });
+
   it("should group adjacent layout shifts", () => {
     const diff = makeDiff([
       { x: 0, y: 100, width: 500, height: 200, diffPixelCount: 60000 },
