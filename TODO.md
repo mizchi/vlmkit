@@ -179,10 +179,19 @@ content-dependent を fallback なしで扱えるかが焦点。
   - Media-scoped detection coverage still needs a live full-bench
     re-run against Crater to confirm the targeted-viewport behavior —
     primitives + wiring are in place.
-- [ ] Wire `batchRender` into the prescanner hot path
-  - Current prescanner still does repeated `setContent` + capture per mutation.
-  - Use v0.18.0 `variants[].mutations` to render baseline + broken variants in one Crater call where possible.
-  - Compare returned paint trees directly, and only capture PNG/Chromium when metadata signals are silent or a visual artifact is explicitly requested.
+- [x] Wire `batchRender` into the prescanner hot path
+  - New `@mizchi/vlmkit-capture/batch-prescan.ts` exposes
+    `runBatchPrescan`, `mutationsForPropertyRemoval`,
+    `mutationsForSelectorBlockRemoval`, and `hasAnyBatchPrescanSignal`.
+    The driver hands Crater the baseline HTML + multiple variants in one
+    `batchRender` call and diffs every returned paint tree against the
+    caller-supplied baseline tree.
+  - `css-challenge-bench` opts into a per-trial fast-path via
+    `VLMKIT_BATCH_PRESCAN=1`. When the paint-tree diff at the
+    representative viewport fires, the trial resolves as a metadata-only
+    crater win and the per-viewport `setContent` loop is skipped.
+  - Multi-trial batching (the bigger speedup — group K trials into one
+    `batchRender` call) is the next iteration, tracked separately.
 - [x] Expand forced-state coverage beyond hover
   - `InteractionTargetPlan` now carries the full `forcedStates` list
     (hover / focus / focus-visible / focus-within / active) extracted from

@@ -144,3 +144,14 @@ export {
 // ---- Detection / paint-tree types ----
 export * from "./detection-types.ts";
 export { diffPaintTrees } from "./crater-client.ts";
+
+// ---- Batch prescan (Crater v0.18.0 batchRender driver) ----
+export {
+  hasAnyBatchPrescanSignal,
+  mutationsForPropertyRemoval,
+  mutationsForSelectorBlockRemoval,
+  runBatchPrescan,
+  type BatchPrescanOptions,
+  type BatchPrescanRequest,
+  type BatchPrescanResult,
+} from "./batch-prescan.ts";

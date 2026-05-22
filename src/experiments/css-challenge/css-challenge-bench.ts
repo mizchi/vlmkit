@@ -35,6 +35,13 @@ import {
 } from "./css-challenge-core.ts";
 import { isCraterAvailable, type CraterClient } from "@mizchi/vlmkit-capture/crater-client.ts";
 import {
+  hasAnyBatchPrescanSignal,
+  mutationsForPropertyRemoval,
+  mutationsForSelectorBlockRemoval,
+  runBatchPrescan,
+  type BatchPrescanRequest,
+} from "@mizchi/vlmkit-capture/batch-prescan.ts";
+import {
   classifyDeclaration,
   classifyUndetectedReason,
   isInteractiveSelector,
@@ -473,17 +480,78 @@ async function runFixtureBenchmark(fixture: string) {
     let prescannerResolution: PrescannerTrialResolution | null = null;
 
     if (BACKEND === "prescanner") {
-      const craterBundle = await analyzeAcrossViewports("crater", brokenHtml, trialDir, craterBaselines, {
-        browser: null,
-        craterClient,
-        captureHover,
-        trackedProperties,
-        manifest: approvalManifest,
-        approvalContext,
-        expectedComputedStyleTargets,
-        strict: STRICT,
-        skipScreenshot: true,
-      });
+      // Optional batchRender fast-path. Enabled with `VLMKIT_BATCH_PRESCAN=1`.
+      // When the paint-tree signal at the representative viewport fires
+      // through one batchRender call, we synthesize a metadata-only result
+      // for every viewport (`visualCaptureSkipped: true`) and skip the
+      // per-viewport setContent loop. When silent, we fall through to the
+      // existing crater capture path so computed-style / forced-state
+      // signals still get a chance to detect.
+      const batchPrescanEnabled = process.env.VLMKIT_BATCH_PRESCAN === "1";
+      let batchSignalBundle: ViewportAnalysisBundle | null = null;
+      if (batchPrescanEnabled && craterClient && craterBaselines.size > 0) {
+        const fastViewport = VIEWPORTS[Math.floor(VIEWPORTS.length / 2)];
+        const baseline = craterBaselines.get(fastViewport.label);
+        if (baseline?.paintTree) {
+          const mutations = MODE === "selector"
+            ? mutationsForSelectorBlockRemoval(
+              removed.selector,
+              removedDeclarations.map((d) => d.property),
+            )
+            : mutationsForPropertyRemoval(removed.selector, removed.property);
+          const request: BatchPrescanRequest = { id: `trial-${seed}`, mutations };
+          try {
+            const batch = await runBatchPrescan(
+              craterClient,
+              htmlRaw,
+              { width: fastViewport.width, height: fastViewport.height },
+              baseline.paintTree,
+              [request],
+            );
+            if (hasAnyBatchPrescanSignal(batch)) {
+              const result = batch[0]!;
+              const viewportResults: ViewportDetectionResult[] = VIEWPORTS.map((vp) => ({
+                width: vp.width,
+                height: vp.height,
+                visualDiffDetected: false,
+                visualDiffRatio: 0,
+                a11yDiffDetected: false,
+                a11yChangeCount: 0,
+                computedStyleDiffCount: 0,
+                hoverDiffDetected: false,
+                paintTreeDiffCount: vp.label === fastViewport.label ? result.changes.length : 0,
+                visualCaptureSkipped: true,
+              }));
+              batchSignalBundle = {
+                viewportResults,
+                primaryAnalysis: null,
+                anyVisual: false,
+                anyA11y: false,
+                anyComputed: false,
+                anyHover: false,
+                anyPaintTree: true,
+                maxDiffRatio: 0,
+                maxDiffPixels: 0,
+                totalA11yChanges: 0,
+                detected: true,
+              };
+            }
+          } catch { /* fall through to per-viewport capture */ }
+        }
+      }
+
+      const craterBundle = batchSignalBundle
+        ?? await analyzeAcrossViewports("crater", brokenHtml, trialDir, craterBaselines, {
+          browser: null,
+          craterClient,
+          captureHover,
+          trackedProperties,
+          manifest: approvalManifest,
+          approvalContext,
+          expectedComputedStyleTargets,
+          strict: STRICT,
+          skipScreenshot: true,
+        });
 
       if (hasCraterPrescanSignal(craterBundle.viewportResults)) {
         prescannerResolution = resolvePrescannerTrial(craterBundle.viewportResults, craterBundle.viewportResults);
