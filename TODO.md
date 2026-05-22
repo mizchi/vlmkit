@@ -169,10 +169,24 @@ content-dependent を fallback なしで扱えるかが焦点。
   - Current prescanner still does repeated `setContent` + capture per mutation.
   - Use v0.18.0 `variants[].mutations` to render baseline + broken variants in one Crater call where possible.
   - Compare returned paint trees directly, and only capture PNG/Chromium when metadata signals are silent or a visual artifact is explicitly requested.
-- [ ] Expand forced-state coverage beyond hover
-  - Use `getComputedStylesWithState` for `:focus`, `:focus-visible`, `:focus-within`, and `:active`, not only `:hover`.
-  - Share selector normalization with Playwright fallback so reports key diffs by original selector and normalized target.
-  - Add fixtures where default visual diff is zero but focus/active state reveals the regression.
+- [x] Expand forced-state coverage beyond hover
+  - `InteractionTargetPlan` now carries the full `forcedStates` list
+    (hover / focus / focus-visible / focus-within / active) extracted from
+    the original selector. Both Crater and the Playwright fallback key off
+    the same plan so reports use a single selector identifier.
+  - `captureCraterForcedStateStyles` passes `plan.forcedStates` directly to
+    Crater `getComputedStylesWithState`, replacing the local
+    `forcedStatesForSelector` helper.
+  - The Playwright fallback now drives all five states via CDP
+    `CSS.forcePseudoState` rather than `.focus()` / `.hover()` — this is
+    the only reliable way to hit `:active` (no DOM API) and
+    `:focus-visible` (requires keyboard focus).
+  - `selectInteractionFallbackPlans` routes `:active` and any `:focus*`
+    plans to the fallback unconditionally, since CSS-rule rewriting can't
+    emulate them.
+  - New `fixtures/forced-state-demo/page.html` demonstrates the
+    zero-default / non-zero-forced regression case for `:active` +
+    `:focus-within`.
 - [x] Make metadata-only capture a first-class report mode
   - `ViewportDetectionResult` now carries an optional `visualCaptureSkipped`
     so downstream consumers can tell "no diff" from "no capture."

@@ -274,29 +274,35 @@ describe("captureComputedStyleSnapshotForTargetSelectorsInDom", () => {
 });
 
 describe("buildInteractionTargetPlans", () => {
-  it("normalizes hover, focus, and pseudo-element selectors for runtime targeting", () => {
+  it("normalizes hover, focus, active, and pseudo-element selectors for runtime targeting", () => {
     const plans = buildInteractionTargetPlans([
       ".btn:hover, input:focus-visible",
       ".tooltip:hover::after",
+      ".cta:active",
+      ".pressed:hover:active",
     ]);
 
     assert.deepEqual(plans, [
-      { selector: ".btn:hover", normalizedSelector: ".btn", interaction: "hover" },
-      { selector: "input:focus-visible", normalizedSelector: "input", interaction: "focus" },
-      { selector: ".tooltip:hover::after", normalizedSelector: ".tooltip", interaction: "hover" },
+      { selector: ".btn:hover", normalizedSelector: ".btn", interaction: "hover", forcedStates: ["hover"] },
+      { selector: "input:focus-visible", normalizedSelector: "input", interaction: "focus", forcedStates: ["focus-visible"] },
+      { selector: ".tooltip:hover::after", normalizedSelector: ".tooltip", interaction: "hover", forcedStates: ["hover"] },
+      { selector: ".cta:active", normalizedSelector: ".cta", interaction: "active", forcedStates: ["active"] },
+      { selector: ".pressed:hover:active", normalizedSelector: ".pressed", interaction: "active", forcedStates: ["hover", "active"] },
     ]);
   });
 });
 
 describe("selectInteractionFallbackPlans", () => {
-  it("always keeps focus plans and adds hover plans when emulation is empty", () => {
+  it("keeps focus and active plans, plus hover plans when emulation is empty", () => {
     const plans = [
-      { selector: ".btn:hover", normalizedSelector: ".btn", interaction: "hover" as const },
-      { selector: "input:focus", normalizedSelector: "input", interaction: "focus" as const },
+      { selector: ".btn:hover", normalizedSelector: ".btn", interaction: "hover" as const, forcedStates: ["hover" as const] },
+      { selector: "input:focus", normalizedSelector: "input", interaction: "focus" as const, forcedStates: ["focus" as const] },
+      { selector: ".cta:active", normalizedSelector: ".cta", interaction: "active" as const, forcedStates: ["active" as const] },
     ];
 
     assert.deepEqual(selectInteractionFallbackPlans(plans, true), [
-      { selector: "input:focus", normalizedSelector: "input", interaction: "focus" },
+      { selector: "input:focus", normalizedSelector: "input", interaction: "focus", forcedStates: ["focus"] },
+      { selector: ".cta:active", normalizedSelector: ".cta", interaction: "active", forcedStates: ["active"] },
     ]);
     assert.deepEqual(selectInteractionFallbackPlans(plans, false), plans);
   });

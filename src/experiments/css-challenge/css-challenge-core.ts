@@ -6,7 +6,7 @@
  */
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { Browser, Page } from "playwright";
+import type { Browser, CDPSession, Page } from "playwright";
 import { chromium } from "playwright";
 import {
   applyApprovalToVrtDiff,
@@ -92,22 +92,6 @@ export function diffComputedStyles(
   return diffs;
 }
 
-const CRATER_FORCED_STATE_PSEUDO_PATTERN = /:(focus-visible|focus-within|focus|hover|active)\b/g;
-
-function forcedStatesForSelector(selector: string): string[] {
-  const states: string[] = [];
-  const seen = new Set<string>();
-  let match: RegExpExecArray | null;
-  CRATER_FORCED_STATE_PSEUDO_PATTERN.lastIndex = 0;
-  while ((match = CRATER_FORCED_STATE_PSEUDO_PATTERN.exec(selector)) !== null) {
-    const state = match[1];
-    if (seen.has(state)) continue;
-    seen.add(state);
-    states.push(state);
-  }
-  return states;
-}
-
 function hasCapturedStyleValues(styles: Record<string, string>): boolean {
   return Object.keys(styles).length > 0 &&
     Object.values(styles).some((value) => value.trim().length > 0);
@@ -121,12 +105,14 @@ export async function captureCraterForcedStateStyles(
   const styles = new Map<string, Record<string, string>>();
   const plans = buildInteractionTargetPlans(selectors);
 
+  // Use the plan's `forcedStates` so the Crater path and Playwright fallback
+  // both key off the same pseudo-class list extracted from the original
+  // selector. Crater forces all extracted states in one BiDi call.
   for (const plan of plans) {
-    const forcedStates = forcedStatesForSelector(plan.selector);
-    if (forcedStates.length === 0) continue;
+    if (plan.forcedStates.length === 0) continue;
     const result = await client.getComputedStylesWithState(
       plan.selector,
-      forcedStates,
+      plan.forcedStates,
       properties,
     );
     if (!hasCapturedStyleValues(result.forced)) continue;
@@ -477,56 +463,80 @@ function dedupeInteractionPlans(
   return deduped;
 }
 
+/**
+ * Drive forced pseudo-states (`:hover`, `:focus`, `:focus-visible`,
+ * `:focus-within`, `:active`) via CDP `CSS.forcePseudoState` and capture the
+ * computed styles for each plan's normalized selector. CDP gives us
+ * deterministic activation that user-action emulation (`page.hover`,
+ * `element.focus()`) can't match — `.focus()` never triggers
+ * `:focus-visible`, and there's no DOM API for `:active` at all.
+ *
+ * Each plan's `forcedStates` carries the exact set of pseudo classes
+ * extracted from the original selector, so a `.btn:hover:active` rule
+ * forces both `hover` and `active` in one round.
+ */
 async function capturePlaywrightInteractionFallbackSnapshot(
   page: Page,
   plans: InteractionTargetPlan[],
   trackedProperties: string[],
 ): Promise<ComputedStyleSnapshot> {
+  if (plans.length === 0) return {};
+
+  let cdp: CDPSession | null = null;
+  try {
+    cdp = await page.context().newCDPSession(page);
+  } catch {
+    return {};
+  }
+
   const snapshots: ComputedStyleSnapshot[] = [];
+  try {
+    await cdp.send("DOM.enable");
+    await cdp.send("CSS.enable");
+    const { root } = await cdp.send("DOM.getDocument", { depth: -1, pierce: true });
 
-  for (const plan of plans) {
-    let interactionApplied = false;
-    try {
-      const locator = page.locator(plan.normalizedSelector).first();
-      if (await locator.count() === 0) continue;
-
-      if (plan.interaction === "focus") {
-        const descendant = locator.locator("input, button, select, textarea, a[href], [tabindex]").first();
-        if (await descendant.count() > 0) {
-          await descendant.focus();
-        } else {
-          await locator.evaluate((element) => {
-            if (element instanceof HTMLElement && typeof element.focus === "function") {
-              element.focus();
-            }
-          });
-        }
-      } else {
-        await locator.hover({ force: true, timeout: 1000 });
-      }
-      interactionApplied = true;
-
-      await page.evaluate(`(function(){ ${ESBUILD_NAME_POLYFILL} return (${waitForInteractionStylesInDom.toString()})(); })()`);
-      const targetExpr = `(function(){ ${ESBUILD_NAME_POLYFILL} return (${captureComputedStyleSnapshotForTargetSelectorsInDom.toString()})(${JSON.stringify({ props: trackedProperties, selectors: [plan.normalizedSelector] })}); })()`;
-      snapshots.push(await page.evaluate(targetExpr) as ComputedStyleSnapshot);
-    } catch { /* ignore individual fallback failures */ }
-    finally {
-      if (!interactionApplied) continue;
+    for (const plan of plans) {
+      const forcedNodeIds: number[] = [];
       try {
-        if (plan.interaction === "focus") {
-          await page.evaluate(() => {
-            const active = document.activeElement;
-            if (active instanceof HTMLElement && typeof active.blur === "function") {
-              active.blur();
-            }
-          });
-        } else {
-          await page.mouse.move(0, 0);
-        }
-        await page.evaluate(`(function(){ ${ESBUILD_NAME_POLYFILL} return (${waitForInteractionStylesInDom.toString()})(); })()`);
+        const { nodeIds } = await cdp.send("DOM.querySelectorAll", {
+          nodeId: root.nodeId,
+          selector: plan.normalizedSelector,
+        });
+        if (nodeIds.length === 0) continue;
 
-      } catch { /* ignore cleanup failures */ }
+        for (const nodeId of nodeIds) {
+          try {
+            await cdp.send("CSS.forcePseudoState", {
+              nodeId,
+              forcedPseudoClasses: plan.forcedStates,
+            });
+            forcedNodeIds.push(nodeId);
+          } catch {
+            // forcePseudoState rejects detached / pseudo-element nodes.
+          }
+        }
+        if (forcedNodeIds.length === 0) continue;
+
+        await page.evaluate(`(function(){ ${ESBUILD_NAME_POLYFILL} return (${waitForInteractionStylesInDom.toString()})(); })()`);
+        const targetExpr = `(function(){ ${ESBUILD_NAME_POLYFILL} return (${captureComputedStyleSnapshotForTargetSelectorsInDom.toString()})(${JSON.stringify({ props: trackedProperties, selectors: [plan.normalizedSelector] })}); })()`;
+        snapshots.push(await page.evaluate(targetExpr) as ComputedStyleSnapshot);
+      } catch {
+        // ignore per-plan failures
+      } finally {
+        // Clear forced state on this batch before moving on so the next plan's
+        // computed-style read isn't polluted.
+        for (const nodeId of forcedNodeIds) {
+          try {
+            await cdp.send("CSS.forcePseudoState", {
+              nodeId,
+              forcedPseudoClasses: [],
+            });
+          } catch { /* ignore */ }
+        }
+      }
     }
+  } finally {
+    try { await cdp.detach(); } catch { /* ignore */ }
   }
 
   return mergeComputedStyleSnapshots(...snapshots);

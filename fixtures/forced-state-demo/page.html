@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Forced-state regression demo</title>
+<style>
+  :root {
+    color-scheme: light;
+    --fg: #1f2328;
+    --muted: #656d76;
+    --brand: #2563eb;
+    --brand-dark: #1d4ed8;
+    --brand-deep: #1e40af;
+    --surface: #f6f8fa;
+    --border: #d0d7de;
+  }
+
+  body {
+    margin: 0;
+    padding: 32px;
+    font-family: system-ui, sans-serif;
+    color: var(--fg);
+  }
+
+  h1 { margin-top: 0; font-size: 20px; }
+
+  .group { margin-bottom: 24px; }
+  .group > p {
+    margin: 0 0 8px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  /*
+    The default visual diff for these elements should be zero across all
+    viewports — the regression only shows up when a forced state activates.
+  */
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--fg);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* hover lightens — caught by the existing hover signal */
+  .btn:hover {
+    background: #eaeef2;
+  }
+
+  /*
+    Focus-visible only triggers via CDP forcePseudoState — the default
+    Playwright .focus() call does NOT fire :focus-visible.
+  */
+  .btn:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+
+  /*
+    Active state needs a CDP-level force; there is no DOM API that
+    triggers :active reliably from script. Removing the `transform` line
+    below produces a zero default-visual-diff and a non-zero
+    forced-state diff.
+  */
+  .btn:active {
+    background: var(--brand-deep);
+    color: white;
+    transform: translateY(1px);
+  }
+
+  /* focus-within reveals the wrapper-level forced-state path */
+  .field-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+  }
+
+  .field-row:focus-within {
+    border-color: var(--brand-dark);
+    background: white;
+  }
+
+  .field-row input {
+    flex: 1;
+    padding: 4px 6px;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    color: inherit;
+  }
+</style>
+</head>
+<body>
+  <h1>Forced-state regression demo</h1>
+
+  <div class="group">
+    <p>Button — default has the same paint, regression hides in :active.</p>
+    <button class="btn" type="button">Submit</button>
+  </div>
+
+  <div class="group">
+    <p>Wrapped input — :focus-within drives the border color.</p>
+    <label class="field-row">
+      <span>Tag</span>
+      <input type="text" placeholder="search term">
+    </label>
+  </div>
+</body>
+</html>

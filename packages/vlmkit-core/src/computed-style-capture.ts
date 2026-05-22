@@ -1,11 +1,51 @@
 /// <reference lib="dom" />
 export type ComputedStyleSnapshot = Record<string, Record<string, string>>;
-export type InteractionType = "hover" | "focus";
+export type InteractionType = "hover" | "focus" | "active";
+
+/** Pseudo-class state names that CDP `CSS.forcePseudoState` accepts. */
+export type ForcedPseudoState =
+  | "hover"
+  | "focus"
+  | "focus-visible"
+  | "focus-within"
+  | "active";
 
 export interface InteractionTargetPlan {
   selector: string;
   normalizedSelector: string;
+  /**
+   * Primary interaction kind, kept for legacy fallback ordering:
+   * `:active` collapses to "active", any `:focus*` to "focus", else "hover".
+   */
   interaction: InteractionType;
+  /**
+   * The actual pseudo-class names extracted from the selector — preserves
+   * the full set (e.g. `:hover:active` → ["hover", "active"]) so Crater and
+   * the CDP-driven Playwright fallback can force identical states.
+   */
+  forcedStates: ForcedPseudoState[];
+}
+
+const FORCED_PSEUDO_REGEX = /:(focus-visible|focus-within|focus|hover|active)\b/g;
+
+function extractForcedStates(selector: string): ForcedPseudoState[] {
+  const states: ForcedPseudoState[] = [];
+  const seen = new Set<string>();
+  FORCED_PSEUDO_REGEX.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = FORCED_PSEUDO_REGEX.exec(selector)) !== null) {
+    const state = match[1] as ForcedPseudoState;
+    if (seen.has(state)) continue;
+    seen.add(state);
+    states.push(state);
+  }
+  return states;
+}
+
+function classifyInteractionFromStates(states: ForcedPseudoState[]): InteractionType {
+  if (states.includes("active")) return "active";
+  if (states.some((s) => s === "focus" || s === "focus-visible" || s === "focus-within")) return "focus";
+  return "hover";
 }
 
 export const TRACKED_PROPERTIES = [
@@ -28,7 +68,6 @@ export const TRACKED_PROPERTIES = [
 ];
 
 const INTERACTION_PSEUDO_PATTERN = /:(focus-visible|focus-within|focus|hover|active)\b/g;
-const FOCUS_PATTERN = /:(focus-visible|focus-within|focus)\b/;
 const INTERACTION_SELECTOR_PATTERN = /:(focus-visible|focus-within|focus|hover|active)\b/;
 
 export function normalizeInteractionSelector(selector: string): string {
@@ -52,11 +91,13 @@ export function buildInteractionTargetPlans(
       if (!selector || !INTERACTION_SELECTOR_PATTERN.test(selector)) continue;
       const normalizedSelector = normalizeInteractionSelector(selector);
       if (!normalizedSelector) continue;
-      const interaction: InteractionType = FOCUS_PATTERN.test(selector) ? "focus" : "hover";
-      const key = `${interaction}\u0000${normalizedSelector}`;
+      const forcedStates = extractForcedStates(selector);
+      if (forcedStates.length === 0) continue;
+      const interaction = classifyInteractionFromStates(forcedStates);
+      const key = `${interaction}\u0000${normalizedSelector}\u0000${forcedStates.join(",")}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      plans.push({ selector, normalizedSelector, interaction });
+      plans.push({ selector, normalizedSelector, interaction, forcedStates });
     }
   }
 
@@ -71,14 +112,18 @@ export function selectInteractionFallbackPlans(
   const seen = new Set<string>();
 
   function add(plan: InteractionTargetPlan) {
-    const key = `${plan.interaction}\u0000${plan.normalizedSelector}`;
+    const key = `${plan.interaction}\u0000${plan.normalizedSelector}\u0000${plan.forcedStates.join(",")}`;
     if (seen.has(key)) return;
     seen.add(key);
     selected.push(plan);
   }
 
   for (const plan of plans) {
-    if (plan.interaction === "focus" || !emulatedSnapshotMeaningful) add(plan);
+    // `:active` and any `:focus*` cannot be triggered by CSS-rule rewriting
+    // alone — they need real DOM activation or a forced-state override.
+    // Pure `:hover` plans only fall back when the in-page rewrite produced
+    // nothing meaningful.
+    if (plan.interaction !== "hover" || !emulatedSnapshotMeaningful) add(plan);
   }
 
   return selected;
@@ -390,13 +435,28 @@ export function collectInteractionTargetPlansInDom(): InteractionTargetPlan[] {
           .replace(/\s*([>+~])\s*/g, " $1 ")
           .trim();
         if (!normalizedSelector) continue;
-      const interaction: InteractionType = /:(focus-visible|focus-within|focus)\b/.test(selector)
-        ? "focus"
-        : "hover";
-      const key = `${interaction}\u0000${normalizedSelector}`;
+      const forcedStates: ForcedPseudoState[] = [];
+      {
+        const seenStates = new Set<string>();
+        const pattern = /:(focus-visible|focus-within|focus|hover|active)\b/g;
+        let m: RegExpExecArray | null;
+        while ((m = pattern.exec(selector)) !== null) {
+          const s = m[1] as ForcedPseudoState;
+          if (seenStates.has(s)) continue;
+          seenStates.add(s);
+          forcedStates.push(s);
+        }
+      }
+      if (forcedStates.length === 0) continue;
+      const interaction: InteractionType = forcedStates.includes("active")
+        ? "active"
+        : forcedStates.some((s) => s === "focus" || s === "focus-visible" || s === "focus-within")
+          ? "focus"
+          : "hover";
+      const key = `${interaction}\u0000${normalizedSelector}\u0000${forcedStates.join(",")}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      plans.push({ selector, normalizedSelector, interaction });
+      plans.push({ selector, normalizedSelector, interaction, forcedStates });
     }
   }
 
