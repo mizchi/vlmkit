@@ -220,12 +220,12 @@
   - contributes to: GOAL-MARKUP-FIDELITY
   - body: _not yet implemented_
 
-- [ ] **Element-level shift-isolated diff** — verifies: CORE-004
+- [x] **Element-level shift-isolated diff** — verifies: CORE-004
   >   `vrt elements` diffs per-element bounding boxes after isolating
   >   cascading layout shift; useful when a single element moves and
   >   pixel diff would otherwise blame everything downstream.
   - contributes to: GOAL-CORE-DIFF
-  - body: _not yet implemented_
+  - body: implemented as `vrt diff elements` and `vrt diff component` in `packages/vlmkit-core/src/element-compare.ts`
 
 - [ ] **Empty state** (minor) [draft] — verifies: E6
   > Scriptable via `interact` (set state then snapshot); no first-class empty-state CLI.

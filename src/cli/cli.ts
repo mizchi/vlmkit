@@ -146,6 +146,7 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
     html: { spec: SPECS.migrationCompare, desc: "Compare two HTML files / URLs across viewports" },
     png: { spec: SPECS.pngDiff, desc: "Compare existing PNG screenshots directly" },
     elements: { spec: SPECS.elementCompare, desc: "Element-level comparison with shift isolation" },
+    component: { spec: SPECS.elementCompare, desc: "Component selector comparison with shift isolation" },
     browsers: { spec: SPECS.crossBrowser, desc: "Render in chromium / firefox / webkit and diff" },
     agent: { spec: SPECS.diffForAgent, desc: "Generate agent-friendly Markdown diff report" },
     runs: { spec: SPECS.compareRuns, desc: "Aggregate multiple VRT runs" },
@@ -294,7 +295,7 @@ VLM-driven frontend toolkit. Visual regression (snapshot / diff /
 regression-watch) + markup synthesis + design audits + CSS auto-repair.
 
 Common command groups:
-  vlmkit diff html|png|elements|browsers|agent|runs
+  vlmkit diff html|png|elements|component|browsers|agent|runs
   vlmkit check a11y|tokens|theme|perf|drift
   vlmkit inspect interact|explore|smoke
   vlmkit stress i18n|media

@@ -38,6 +38,7 @@ describe("vrt CLI tree (cac-based)", () => {
     assert.match(r.stdout, /vlmkit diff <subcommand>/);
     assert.match(r.stdout, /html.*Compare two HTML/);
     assert.match(r.stdout, /png.*Compare existing PNG/);
+    assert.match(r.stdout, /component.*selector comparison/);
   });
 
   it("`vrt check` (group) prints group usage including a11y / drift", () => {
@@ -55,6 +56,13 @@ describe("vrt CLI tree (cac-based)", () => {
     const r = runVrt(["diff", "png", "--help"]);
     // png-diff exits 0 after printing help
     assert.match(r.stdout, /vrt png-diff <baseline\.png> <current\.png>/);
+  });
+
+  it("`vrt diff component --help` delegates to element-level comparison help", () => {
+    const r = runVrt(["diff", "component", "--help"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vrt diff component/);
+    assert.match(r.stdout, /--selectors/);
   });
 
   it("deprecated `vrt png-diff` warns and delegates", () => {

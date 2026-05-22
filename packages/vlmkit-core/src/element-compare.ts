@@ -260,21 +260,36 @@ function parseArgs(args: string[]): ElementCompareOptions {
   };
 }
 
+function formatUsage(): string {
+  return [
+    "Usage:",
+    "  vrt diff component --url <baseline> --current-url <current> --selectors \"header,main,footer\"",
+    "  vrt diff component before.html after.html --selectors \"header,.content\"",
+    "",
+    "Aliases:",
+    "  vrt diff elements",
+    "  vrt elements",
+    "",
+    "Options:",
+    "  --selectors <sel1,sel2,...>   CSS selectors to compare (required)",
+    "  --viewport <WxH>              Viewport size (default: 1280x900)",
+    "  --output <dir>                Output directory",
+    "  --mask <selectors>            Mask dynamic content",
+    "  --threshold <0-1>             pixelmatch threshold (default: 0.1)",
+  ].join("\n");
+}
+
 async function main() {
   const cliArgs = process.argv.slice(2);
+  if (cliArgs.includes("--help") || cliArgs.includes("-h") || cliArgs.includes("help")) {
+    console.log(formatUsage());
+    return;
+  }
+
   const options = parseArgs(cliArgs);
 
   if (!options.baselineUrl && !options.baselineFile) {
-    console.log(`Usage:`);
-    console.log(`  vrt elements --url <baseline> --current-url <current> --selectors "header,main,footer"`);
-    console.log(`  vrt elements before.html after.html --selectors "header,.content"`);
-    console.log();
-    console.log(`Options:`);
-    console.log(`  --selectors <sel1,sel2,...>   CSS selectors to compare (required)`);
-    console.log(`  --viewport <WxH>             Viewport size (default: 1280x900)`);
-    console.log(`  --output <dir>               Output directory`);
-    console.log(`  --mask <selectors>            Mask dynamic content`);
-    console.log(`  --threshold <0-1>             pixelmatch threshold (default: 0.1)`);
+    console.log(formatUsage());
     process.exit(1);
   }
 
