@@ -331,6 +331,7 @@ describe("formatMigrationReportForAgent", () => {
     const md = formatMigrationReportForAgent(sampleReport(), { previous });
     assert.match(md, /⚠ REGRESSION/);
     assert.match(md, /2 of 2 viewports got worse/);
+    assert.match(md, /Auto-revert offer/);
     assert.match(md, /Previous report.*migration-report\.prev\.json/);
   });
 

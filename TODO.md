@@ -965,10 +965,11 @@ band at viewports ≥ 1024.
   sampled baseline/current color pairs, visual-semantic descriptions include
   hex pairs, migration results preserve color-change samples, and
   `diff-for-agent` renders a "Color-change samples" table.
-- [ ] **Regression alarm + auto-revert offer.** When net Δ is
-  positive across most viewports after a patch, surface loudly.
-  Both subagents wasted an iteration on a regression that needed
-  manual reverting.
+- [x] **Regression alarm + auto-revert offer.** When net Δ is
+  positive across most viewports after a patch, `diff-for-agent`
+  surfaces a loud regression banner and now includes an explicit
+  "Auto-revert offer" line: stop layering fixes, ask for approval
+  to revert the last patch, and re-run against the previous report.
 - [x] **Per-viewport computed-style capture + label.** CSD now has
   `computedStyleDiffPerViewport`, `bySelectorProperty`, universal vs
   breakpoint-gated rows, and sample values tagged by viewport. It is

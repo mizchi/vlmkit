@@ -926,6 +926,10 @@ export function formatMigrationReportForAgent(
         lines.push(`**${finding.worsenedViewports.length} of ${finding.totalViewports} viewports got worse since the previous run** ` +
           `(threshold ≥ ${finding.threshold}). Consider reverting the last patch and re-running.`);
         lines.push("");
+        lines.push("Auto-revert offer: stop layering fixes on top of this regression. " +
+          "If this run followed one patch, ask for approval to revert that patch, " +
+          "then re-run against the previous report before attempting another fix.");
+        lines.push("");
         lines.push("| Viewport | Previous | Current | Δ |");
         lines.push("|---|---|---|---|");
         for (const w of finding.worsenedViewports) {
