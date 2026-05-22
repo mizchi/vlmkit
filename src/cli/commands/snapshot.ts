@@ -33,7 +33,7 @@ export interface SnapshotConfig {
 }
 
 export interface ParsedSnapshotCliOptions {
-  mode: "capture" | "approve" | "fix-prompt" | "stability" | "flipbook";
+  mode: "capture" | "approve" | "fix-prompt" | "stability" | "stability-history" | "flipbook";
   urls: string[];
   labels: string[];
   outputDir: string;
@@ -54,6 +54,9 @@ export interface ParsedSnapshotCliOptions {
     failAboveRate?: number;
     fpThreshold: number;
     flipbook?: boolean;
+  };
+  stabilityHistory?: {
+    outPath?: string;
   };
   flipbook?: {
     delayMs: number;
@@ -350,6 +353,28 @@ export function parseSnapshotCliArgs(
         failAboveRate: stabilityFailAboveRate,
         fpThreshold: stabilityFpThreshold,
         flipbook: stabilityFlipbook,
+      },
+      backend,
+    };
+  }
+
+  if (positional[0] === "stability-history") {
+    const reportPaths = positional.slice(1);
+    if (reportPaths.length === 0) {
+      throw new Error("`vrt snapshot stability-history` requires one or more stability-report.json paths");
+    }
+    return {
+      mode: "stability-history",
+      urls: reportPaths,
+      labels: explicitLabels,
+      outputDir,
+      threshold,
+      failOnDiff,
+      failOnNewBaseline,
+      maxDiffRatio,
+      maskSelectors: maskSelectors.length > 0 ? maskSelectors : (config.mask ?? []),
+      stabilityHistory: {
+        outPath: fixOutPath,
       },
       backend,
     };

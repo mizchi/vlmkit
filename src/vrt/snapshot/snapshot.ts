@@ -21,9 +21,12 @@ import {
   type SnapshotReport,
 } from "@mizchi/vlmkit-markup/heal/fix-prompt.ts";
 import {
+  buildStabilityHistory,
   buildStabilityReport,
+  formatStabilityHistorySummary,
   formatStabilitySummary,
   type StabilityIterationResult,
+  type StabilityReport,
 } from "./stability.ts";
 import { resolveCaptureBackend, type CaptureBackend } from "@mizchi/vlmkit-capture/capturer.ts";
 import { writeFlipbook, type FlipbookFrame } from "../compare/flipbook.ts";
@@ -55,6 +58,7 @@ function formatSnapshotUsage(): string {
     "  vrt snapshot approve [--output dir] [--label name] [--config vrt.config.json]",
     "  vrt snapshot fix-prompt [--output dir] [--label name] [--format markdown|json] [--limit n] [--min-diff 0.01] [--out path] [--config vrt.config.json]",
     "  vrt snapshot stability <url1> [url2]... [--iterations 3] [--output dir] [--threshold 0.1] [--fp-threshold 0] [--fail-above-rate 0.05] [--config vrt.config.json]",
+    "  vrt snapshot stability-history <stability-report.json>... [--out path]",
   ].join("\n");
 }
 
@@ -342,6 +346,37 @@ async function runStability(options: {
   }
 }
 
+async function runStabilityHistory(options: {
+  reportPaths: string[];
+  outPath?: string;
+}) {
+  const inputs = [];
+  for (const reportPath of options.reportPaths) {
+    const raw = await readFile(reportPath, "utf-8");
+    inputs.push({
+      reportPath,
+      report: JSON.parse(raw) as StabilityReport,
+    });
+  }
+
+  const history = buildStabilityHistory(inputs);
+  const summary = formatStabilityHistorySummary(history);
+  if (options.outPath) {
+    const outPath = resolve(options.outPath);
+    await mkdir(dirname(outPath), { recursive: true });
+    await writeFile(outPath, summary);
+    console.log();
+    console.log(`${BOLD}${CYAN}Snapshot Stability History${RESET}`);
+    console.log(`  ${DIM}Reports: ${options.reportPaths.length}${RESET}`);
+    console.log(`  ${DIM}Output: ${outPath}${RESET}`);
+    console.log();
+    return;
+  }
+
+  process.stdout.write(summary);
+  if (!summary.endsWith("\n")) process.stdout.write("\n");
+}
+
 async function runDiffFlipbook(options: {
   outputDir: string;
   labels: string[];
@@ -444,6 +479,14 @@ async function main() {
       delayMs: parsed.flipbook!.delayMs,
       flipbookOutDir: parsed.flipbook!.outDir,
       configPath,
+    });
+    return;
+  }
+
+  if (parsed.mode === "stability-history") {
+    await runStabilityHistory({
+      reportPaths: parsed.urls,
+      outPath: parsed.stabilityHistory?.outPath,
     });
     return;
   }

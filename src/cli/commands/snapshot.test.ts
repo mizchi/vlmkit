@@ -211,6 +211,23 @@ describe("parseSnapshotCliArgs", () => {
     assert.equal(options.outputDir, "artifacts/snapshots");
   });
 
+  it("parses snapshot stability-history report paths", () => {
+    const options = parseSnapshotCliArgs([
+      "stability-history",
+      "runs/one/stability-report.json",
+      "runs/two/stability-report.json",
+      "--out",
+      "artifacts/stability-history.md",
+    ]);
+
+    assert.equal(options.mode, "stability-history");
+    assert.deepEqual(options.urls, [
+      "runs/one/stability-report.json",
+      "runs/two/stability-report.json",
+    ]);
+    assert.equal(options.stabilityHistory?.outPath, "artifacts/stability-history.md");
+  });
+
   it("rejects relative routes without baseUrl", () => {
     assert.throws(
       () => parseSnapshotCliArgs([], {

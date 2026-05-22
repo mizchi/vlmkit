@@ -117,10 +117,11 @@ Use vrt on real projects to verify practicality.
 - [x] `vrt snapshot` の config file を公式サポートする
   - sample では `vrt.config.json` に `baseUrl`, `routes`, `outputDir`, `threshold` を寄せて wrapper で解釈している
   - JSON/TOML の config を直接読めると導入がかなり軽くなる
-- [ ] Run VRT in CI per PR, measure false positive rate
+- [x] Run VRT in CI per PR, measure false positive rate
   - `vrt snapshot stability <urls> --iterations N --fail-above-rate R` measures the FP rate by capturing N times against a locked baseline.
   - `.github/workflows/vrt-stability.yml` runs the measurement nightly on the migration fixtures and uploads `stability-report.json` as an artifact.
-  - Per-PR rollout in real downstream projects still pending — needs aggregation of multiple runs over time.
+  - `vrt snapshot stability-history <stability-report.json>... [--out path]` aggregates multiple runs over time and reports latest/best/worst FP rate plus run-to-run deltas.
+  - Real downstream rollout still requires adopting the workflow in each project, but vlmkit now has the measurement and aggregation primitives.
 - [ ] Pass diff report to subagent for fix code generation, measure success rate
   - `vrt snapshot fix-prompt` ships a markdown / JSON task descriptor (URL, viewport, diff ratio with shift compensation, baseline/current/heatmap/HTML paths) ready to feed to a subagent.
   - `vrt migration subagent prepare` (and the `migration-subagent-prepare` task) produces a subagent packet from `migration-report.json`; `vrt migration blind` provides reproducible blind scenarios.
