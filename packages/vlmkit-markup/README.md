@@ -21,13 +21,57 @@ pnpm add @mizchi/vlmkit-markup
 import {
   buildDepGraph,
   introspect,
-  buildFixPrompt,
+  introspectToSpec,
+  verifySpec,
   diffPalettes,
 } from "@mizchi/vlmkit-markup";
 
 const graph = await buildDepGraph(projectRoot);
-const spec = await introspect("./snapshots");
+const result = await introspect("./snapshots");
+const spec = introspectToSpec(result);
+const verification = verifySpec(spec, new Map([
+  ["home", { a11yTree: homeTree, screenshotExists: true }],
+]));
 ```
+
+### Spec sidecars
+
+`introspect("./snapshots")` always reads `*.a11y.json` files. Optional
+sidecars enrich the generated low-cost invariants:
+
+```text
+home.a11y.json
+home.contrast.json
+home.responsive.json
+```
+
+`home.contrast.json` may be the `vrt a11y-contrast` report shape:
+
+```json
+{ "totalText": 2, "failures": [] }
+```
+
+`home.responsive.json` records viewport probes for coarse responsive checks:
+
+```json
+{
+  "snapshots": [
+    { "viewport": { "width": 375, "height": 812 }, "clientWidth": 375, "scrollWidth": 375 },
+    {
+      "viewport": { "width": 1440, "height": 900 },
+      "clientWidth": 1440,
+      "scrollWidth": 1440,
+      "regions": [{ "role": "main", "width": 960, "maxWidth": 960 }]
+    }
+  ]
+}
+```
+
+The generated spec can now include `heading-hierarchy`,
+`aria-relationships`, `color-contrast`, and `responsive-layout` checks.
+`verifySpec()` accepts matching `SpecPageData` fields directly when the caller
+already has contrast samples, contrast failures, or responsive snapshots in
+memory.
 
 ### CLI-style modules (deep import — Playwright required)
 
