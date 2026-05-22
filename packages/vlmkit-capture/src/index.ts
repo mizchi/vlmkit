@@ -83,6 +83,14 @@ export {
   type PaintProps,
 } from "./crater-client.ts";
 export { isCraterAvailable } from "./crater-client.ts";
+export {
+  runCraterBidiSmoke,
+  formatCraterSmokeReport,
+  type CraterSmokeCheck,
+  type CraterSmokeClient,
+  type CraterSmokeReport,
+  type CraterSmokeStatus,
+} from "./crater-smoke.ts";
 
 // ---- Detection / paint-tree types ----
 export * from "./detection-types.ts";

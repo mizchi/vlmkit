@@ -186,7 +186,8 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - `vrt diff component` / `vrt diff elements` run selector-scoped screenshots and compare components independently from full-page layout shift noise.
 - [x] Enhanced diff classification (layout shift / color change / text change / element added/removed)
   - `classifyVisualDiff` now trusts `DiffRegion.regionType === "shift"` as layout shift and uses sampled baseline/current colors to distinguish element-added vs element-removed when a region changes to/from a page-surface color.
-- [ ] Smoke test: Crater BiDi backend
+- [x] Smoke test: Crater BiDi backend
+  - `vlmkit check crater` verifies availability, viewport/content load, PNG capture, paint tree capture, computed styles, and breakpoint discovery. Missing Crater is `skip` by default; `--require` turns it into a failure.
 - [x] Smoke test: a11y tree consistency check after operations
   - `inspect smoke` now compares post-action a11y snapshots against the initial snapshot and reports `a11y-regression` when all interactive targets or landmarks disappear.
 - [x] Animation detection (animation-play-state: paused / CSSOM diff)

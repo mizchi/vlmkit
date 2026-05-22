@@ -51,6 +51,7 @@ describe("vrt CLI tree (cac-based)", () => {
     assert.match(r.stdout, /tokens/);
     assert.match(r.stdout, /theme/);
     assert.match(r.stdout, /motion/);
+    assert.match(r.stdout, /crater/);
   });
 
   it("`vrt diff png --help` delegates to the png-diff module's help", () => {
@@ -138,5 +139,12 @@ describe("vrt CLI tree (cac-based)", () => {
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit check motion <html-or-url>/);
     assert.match(r.stdout, /--fail-on-suspect/);
+  });
+
+  it("`vrt check crater --help` delegates to Crater smoke help", () => {
+    const r = runVrt(["check", "crater", "--help"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vlmkit check crater/);
+    assert.match(r.stdout, /--require/);
   });
 });

@@ -45,6 +45,8 @@
   >   `--backend crater` and `--backend prescanner` route the bench
   >   through alternative renderers. Crater requires a running
   >   `crater bidi` server; Prescanner is in-process.
+  > Smoke coverage: `vlmkit check crater` verifies the Crater BiDi backend
+  > contract and skips cleanly when the external server is not running.
   - contributes to: GOAL-CSS-CHALLENGE
   - body: _not yet implemented_
 
@@ -498,6 +500,8 @@
   >   Optional Crater-backed paint-tree comparison; ~1.66x speedup
   >   vs pixelmatch on the dogfood corpus with 0% false positive.
   >   Off by default (`--no-paint-tree`).
+  > `vlmkit check crater` smoke-tests paint tree capture before relying
+  > on this optional backend.
   - contributes to: GOAL-CORE-DIFF, GOAL-MIGRATION-VERIFICATION
   - body: _not yet implemented_
 

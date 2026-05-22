@@ -234,6 +234,7 @@ vlmkit inspect smoke    <html|url>             # A11y-driven exploratory smoke t
 
 # Checks.
 vlmkit check motion <html|url>                 # CSS motion / reduced-motion detection
+vlmkit check crater                            # Crater BiDi backend smoke check
 
 # Stress tests.
 vlmkit stress i18n  <html>                     # Text-node inflation overflow detection
