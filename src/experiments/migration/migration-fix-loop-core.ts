@@ -1,4 +1,5 @@
-import { basename } from "node:path";
+import { readFile } from "node:fs/promises";
+import { basename, dirname, resolve as resolvePath } from "node:path";
 import {
   extractCss,
   parseCssDeclarations,
@@ -654,6 +655,63 @@ export function extractCustomPropertyDiffs(
     });
   }
   return fixes;
+}
+
+function readLinkTagAttr(tag: string, name: string): string | undefined {
+  const re = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, "i");
+  const m = tag.match(re);
+  return m?.[1] ?? m?.[2] ?? m?.[3];
+}
+
+function isLocalStylesheetHref(href: string): boolean {
+  if (!href) return false;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(href)) return false;     // absolute URL (http://, etc.)
+  if (href.startsWith("//")) return false;                       // protocol-relative
+  if (href.startsWith("data:")) return false;                    // data URL
+  return true;
+}
+
+/**
+ * Inline every `<link rel="stylesheet" href="./local.css">` reference
+ * by reading the local CSS file and replacing the `<link>` tag with a
+ * `<style data-inlined-from="...">` block. Absolute URLs / data: URLs
+ * / protocol-relative hrefs are left untouched. Unreadable local files
+ * are silently skipped (the link stays in place).
+ *
+ * `migration-fix-loop` calls this on both baseline and variant HTML
+ * BEFORE `extractCss`, so the fix flow works on a single inline CSS
+ * source even when the original variant referenced external sheets.
+ * The fixed HTML written back to disk carries the inlined form — a
+ * one-way conversion that's acceptable for derived `fixed.html` files.
+ */
+export async function inlineExternalStylesheets(
+  html: string,
+  baseDir: string,
+): Promise<string> {
+  // Extract `<link>` tags first so we can resolve hrefs in one pass.
+  const linkTags = html.match(/<link\b[^>]*>/gi) ?? [];
+  let result = html;
+  for (const tag of linkTags) {
+    if (!/^<link\b/i.test(tag)) continue;
+    const rel = readLinkTagAttr(tag, "rel");
+    if (!rel) continue;
+    if (!rel.split(/\s+/).some((p) => p.toLowerCase() === "stylesheet")) continue;
+    const href = readLinkTagAttr(tag, "href");
+    if (!href || !isLocalStylesheetHref(href)) continue;
+    const cssPath = resolvePath(baseDir, href);
+    let css: string;
+    try {
+      css = await readFile(cssPath, "utf-8");
+    } catch {
+      continue;
+    }
+    // Escape special regex chars in the tag itself so .replace() takes it
+    // verbatim instead of treating quotes as character classes.
+    const tagPattern = tag.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const replacement = `<style data-inlined-from="${href.replace(/"/g, "&quot;")}">\n${css}\n</style>`;
+    result = result.replace(new RegExp(tagPattern, "g"), replacement);
+  }
+  return result;
 }
 
 export function resolveMigrationFixFromBaselineHtml(

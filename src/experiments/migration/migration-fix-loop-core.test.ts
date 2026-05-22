@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { MigrationFixCandidate } from "./migration-fix-candidates.ts";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import {
   applyMigrationFixToCss,
   applyMigrationFixToHtml,
@@ -10,6 +13,7 @@ import {
   correctMigrationFixesWithReport,
   extractCustomProperties,
   extractCustomPropertyDiffs,
+  inlineExternalStylesheets,
   parseMigrationFixMultiResponse,
   parseMigrationFixResponse,
   resolveMigrationFixFromBaselineHtml,
@@ -676,6 +680,62 @@ describe("extractCustomProperties + extractCustomPropertyDiffs", () => {
     assert.match(next, /--black: #050505/);
     assert.match(next, /--red: #df0012/);
     assert.equal(next.includes("--black: #070707"), false);
+  });
+});
+
+describe("inlineExternalStylesheets", () => {
+  it("replaces a local <link rel=stylesheet> with an inline <style> block", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "inline-ext-"));
+    try {
+      await writeFile(join(dir, "site.css"), `body { color: blue; }\n`);
+      const html = `<!doctype html><html><head><link rel="stylesheet" href="./site.css"></head><body></body></html>`;
+      const inlined = await inlineExternalStylesheets(html, dir);
+      assert.match(inlined, /<style data-inlined-from="\.\/site\.css">/);
+      assert.match(inlined, /body \{ color: blue; \}/);
+      // The original <link> tag should be gone.
+      assert.equal(inlined.includes(`<link rel="stylesheet"`), false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("leaves absolute URLs / data URLs / protocol-relative hrefs untouched", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "inline-ext-"));
+    try {
+      const html = [
+        `<link rel="stylesheet" href="https://example.com/cdn.css">`,
+        `<link rel="stylesheet" href="//example.com/proto.css">`,
+        `<link rel="stylesheet" href="data:text/css,body{}">`,
+      ].join("");
+      const inlined = await inlineExternalStylesheets(html, dir);
+      assert.equal(inlined, html, "absolute / protocol-relative / data: hrefs are not inlined");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("silently keeps the link when the local file is missing", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "inline-ext-"));
+    try {
+      const html = `<link rel="stylesheet" href="./nonexistent.css">`;
+      const inlined = await inlineExternalStylesheets(html, dir);
+      assert.equal(inlined, html);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not touch <link rel=icon> or other non-stylesheet links", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "inline-ext-"));
+    try {
+      await writeFile(join(dir, "site.css"), `body{}\n`);
+      const html = `<link rel="icon" href="./favicon.ico"><link rel="stylesheet" href="./site.css">`;
+      const inlined = await inlineExternalStylesheets(html, dir);
+      assert.match(inlined, /rel="icon"/);
+      assert.match(inlined, /<style data-inlined-from="\.\/site\.css">/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
 

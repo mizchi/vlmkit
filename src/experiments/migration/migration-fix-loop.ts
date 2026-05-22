@@ -11,6 +11,7 @@ import {
   buildMigrationFixLoopPrompt,
   correctMigrationFixesWithReport,
   extractCustomPropertyDiffs,
+  inlineExternalStylesheets,
   parseMigrationFixMultiResponse,
   parseMigrationFixResponse,
   resolveMigrationFixFromBaselineHtml,
@@ -56,10 +57,15 @@ async function main() {
 
   const baselinePath = resolveSourcePath(report.dir, report.baseline);
   const variantPath = resolveSourcePath(report.dir, target.variantFile);
-  const [baselineHtml, variantHtml] = await Promise.all([
+  let [baselineHtml, variantHtml] = await Promise.all([
     readFile(baselinePath, "utf-8"),
     readFile(variantPath, "utf-8"),
   ]);
+  // Inline `<link rel="stylesheet" href="./local.css">` references so the
+  // fix-loop's extractCss + apply pipeline works on a single inline `<style>`
+  // block. Absolute / data: / protocol-relative hrefs are left alone.
+  baselineHtml = await inlineExternalStylesheets(baselineHtml, dirname(baselinePath));
+  variantHtml = await inlineExternalStylesheets(variantHtml, dirname(variantPath));
   const currentCss = extractCss(variantHtml);
   if (!currentCss) {
     console.error(`Could not find any <style> block in ${variantPath} (extractCss expects either <style id="target-css"> or a generic <style>...).`);
