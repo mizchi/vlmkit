@@ -53,7 +53,8 @@ import {
 } from "./migration-fix-candidates.ts";
 import { summarizeMigrationReportConvergence, type MigrationConvergenceStatus } from "./migration-fix-loop-core.ts";
 import {
-  extractResponsiveBreakpointsFromHtml,
+  extractResponsiveBreakpointsFromHtmlWithStylesheets,
+  extractStylesheetHrefsFromHtml,
   generateViewports,
   mergeResponsiveBreakpoints,
   type ResponsiveBreakpoint,
@@ -434,6 +435,7 @@ interface BreakpointDiscoveryStatus {
 export interface BreakpointDiscoveryDocumentInput {
   label: string;
   html: string;
+  htmlPath?: string;
 }
 
 export interface BreakpointDiscoveryDocumentDiagnostics extends CraterBreakpointDiscoveryDiagnostics {
@@ -777,12 +779,14 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     VIEWPORTS = options.fixedViewports;
   } else if (autoDiscover && !isUrlMode) {
     const allHtmls: BreakpointDiscoveryDocumentInput[] = [
-      { label: "baseline", html: baselineHtml },
+      { label: "baseline", html: baselineHtml, htmlPath: resolve(dir, baseline) },
     ];
     for (const v of variants) {
+      const htmlPath = resolve(dir, v);
       allHtmls.push({
         label: `variant:${v}`,
-        html: await readFile(resolve(dir, v), "utf-8"),
+        html: await readFile(htmlPath, "utf-8"),
+        htmlPath,
       });
     }
     breakpointDiscoveryStatus = await discoverResponsiveBreakpointsForHtmlDocuments(
@@ -2308,9 +2312,15 @@ export async function discoverResponsiveBreakpointsForHtmlDocuments(
   craterUrl: string,
   createClient: (url: string) => BreakpointDiscoveryClient = (url) => new CraterClient(url),
 ): Promise<BreakpointDiscoveryStatus> {
-  const regexBreakpoints = mergeResponsiveBreakpoints(
-    ...htmlDocuments.map(({ html }) => extractResponsiveBreakpointsFromHtml(html)),
+  const regexCollections = await Promise.all(
+    htmlDocuments.map(async (document) =>
+      extractResponsiveBreakpointsFromHtmlWithStylesheets(
+        document.html,
+        await readLocalStylesheetTextsForBreakpointDiscovery(document),
+      ),
+    ),
   );
+  const regexBreakpoints = mergeResponsiveBreakpoints(...regexCollections);
 
   if (backend === "regex") {
     return {
@@ -2342,7 +2352,7 @@ export async function discoverResponsiveBreakpointsForHtmlDocuments(
       return {
         requestedBackend: backend,
         backendUsed: "crater",
-        breakpoints: mergeResponsiveBreakpoints(...craterCollections),
+        breakpoints: mergeResponsiveBreakpoints(...craterCollections, regexBreakpoints),
         diagnostics: summarizeBreakpointDiscoveryDiagnostics(diagnosticsEntries),
       };
     } finally {
@@ -2359,6 +2369,32 @@ export async function discoverResponsiveBreakpointsForHtmlDocuments(
       breakpoints: regexBreakpoints,
     };
   }
+}
+
+function isLocalStylesheetHref(href: string): boolean {
+  if (!href) return false;
+  if (href.startsWith("#") || href.startsWith("//")) return false;
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/u.test(href)) return false;
+  return true;
+}
+
+async function readLocalStylesheetTextsForBreakpointDiscovery(
+  document: BreakpointDiscoveryDocumentInput,
+): Promise<string[]> {
+  if (!document.htmlPath) return [];
+  const baseDir = dirname(resolve(document.htmlPath));
+  const texts: string[] = [];
+  for (const href of extractStylesheetHrefsFromHtml(document.html)) {
+    if (!isLocalStylesheetHref(href)) continue;
+    const [pathname] = href.split(/[?#]/u);
+    if (!pathname) continue;
+    try {
+      texts.push(await readFile(resolve(baseDir, pathname), "utf-8"));
+    } catch {
+      // Broken or generated stylesheet links should not disable inline fallback.
+    }
+  }
+  return texts;
 }
 
 function formatResponsiveBreakpoint(breakpoint: ResponsiveBreakpoint): string {

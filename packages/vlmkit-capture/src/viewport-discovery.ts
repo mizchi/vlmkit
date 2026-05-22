@@ -67,12 +67,46 @@ export function extractBreakpoints(css: string): Breakpoint[] {
   return [...breakpoints.values()].sort((a, b) => a.value - b.value);
 }
 
+function extractInlineStyleCss(html: string): string {
+  const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/g);
+  if (!styleMatch) return "";
+  return styleMatch.map((s) => s.replace(/<\/?style[^>]*>/g, "")).join("\n");
+}
+
 /** Extract breakpoints from HTML <style> */
 export function extractBreakpointsFromHtml(html: string): Breakpoint[] {
-  const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/g);
-  if (!styleMatch) return [];
-  const css = styleMatch.map((s) => s.replace(/<\/?style[^>]*>/g, "")).join("\n");
-  return extractBreakpoints(css);
+  return extractBreakpoints(extractInlineStyleCss(html));
+}
+
+function readAttr(tag: string, name: string): string | undefined {
+  const re = new RegExp(`\\b${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, "i");
+  const m = tag.match(re);
+  return m?.[1] ?? m?.[2] ?? m?.[3];
+}
+
+function isStylesheetLink(tag: string): boolean {
+  if (!/^<link\b/i.test(tag)) return false;
+  const rel = readAttr(tag, "rel");
+  if (!rel) return false;
+  return rel.split(/\s+/).some((part) => part.toLowerCase() === "stylesheet");
+}
+
+export function extractStylesheetHrefsFromHtml(html: string): string[] {
+  const linkTags = html.match(/<link\b[^>]*>/gi) ?? [];
+  return linkTags
+    .filter(isStylesheetLink)
+    .map((tag) => readAttr(tag, "href"))
+    .filter((href): href is string => !!href);
+}
+
+export function extractBreakpointsFromHtmlWithStylesheets(
+  html: string,
+  stylesheetTexts: string[],
+): Breakpoint[] {
+  return extractBreakpoints([
+    extractInlineStyleCss(html),
+    ...stylesheetTexts,
+  ].join("\n"));
 }
 
 function isResponsiveBreakpoint(
@@ -154,6 +188,15 @@ export function extractResponsiveBreakpointsFromHtml(
   html: string,
 ): ResponsiveBreakpoint[] {
   return toResponsiveBreakpoints(extractBreakpointsFromHtml(html));
+}
+
+export function extractResponsiveBreakpointsFromHtmlWithStylesheets(
+  html: string,
+  stylesheetTexts: string[],
+): ResponsiveBreakpoint[] {
+  return toResponsiveBreakpoints(
+    extractBreakpointsFromHtmlWithStylesheets(html, stylesheetTexts),
+  );
 }
 
 // ---- Viewport generation ----

@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type {
   CraterBreakpointDiscoveryDiagnostics,
   CraterBreakpointDiscoveryResult,
@@ -155,5 +158,32 @@ describe("discoverResponsiveBreakpointsForHtmlDocuments", () => {
       status.diagnostics.totals.unsupportedQueries,
       ["(prefers-color-scheme: dark)"],
     );
+  });
+
+  it("should include local external stylesheet breakpoints in regex fallback", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "vlmkit-breakpoints-"));
+    try {
+      const htmlPath = join(dir, "index.html");
+      const cssPath = join(dir, "layout.css");
+      await writeFile(cssPath, "@media (min-width: 60rem) { .shell { display: grid } }");
+      const html = [
+        "<link rel=\"stylesheet\" href=\"./layout.css\">",
+        "<style>@media (min-width: 720px) { .card { display:block } }</style>",
+      ].join("\n");
+      await writeFile(htmlPath, html);
+
+      const status = await discoverResponsiveBreakpointsForHtmlDocuments(
+        [{ label: "page", html, htmlPath }],
+        "regex",
+        "ws://127.0.0.1:9222",
+      );
+
+      assert.deepEqual(
+        status.breakpoints.map((bp) => bp.valuePx),
+        [720, 960],
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

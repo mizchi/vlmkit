@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import {
   discoverViewports,
   extractBreakpoints,
+  extractBreakpointsFromHtmlWithStylesheets,
   extractResponsiveBreakpointsFromHtml,
+  extractResponsiveBreakpointsFromHtmlWithStylesheets,
+  extractStylesheetHrefsFromHtml,
   generateViewports,
   mergeResponsiveBreakpoints,
   toResponsiveBreakpoints,
@@ -150,6 +153,48 @@ describe("discoverViewports", () => {
     assert.ok(widths.includes(640));
     assert.ok(widths.includes(1023));
     assert.ok(widths.includes(1024));
+  });
+});
+
+describe("external stylesheet helpers", () => {
+  it("should extract stylesheet hrefs from link tags", () => {
+    const html = `
+      <link rel="preload" href="/ignored.css">
+      <link href="./base.css" rel="stylesheet">
+      <link rel="stylesheet alternate" href="theme.css?version=1">
+    `;
+
+    assert.deepEqual(
+      extractStylesheetHrefsFromHtml(html),
+      ["./base.css", "theme.css?version=1"],
+    );
+  });
+
+  it("should extract breakpoints from HTML plus stylesheet texts", () => {
+    const html = `<style>@media (min-width: 640px) { .a {} }</style>`;
+    const breakpoints = extractBreakpointsFromHtmlWithStylesheets(html, [
+      "@media (min-width: 960px) { .b {} }",
+    ]);
+
+    assert.deepEqual(
+      breakpoints.map((bp) => bp.value),
+      [640, 960],
+    );
+  });
+
+  it("should extract responsive breakpoints from HTML plus stylesheet texts", () => {
+    const responsive = extractResponsiveBreakpointsFromHtmlWithStylesheets(
+      `<style>@media (max-width: 40rem) { .a {} }</style>`,
+      ["@media (min-width: 60rem) { .b {} }"],
+    );
+
+    assert.deepEqual(
+      responsive.map((bp) => ({ op: bp.op, valuePx: bp.valuePx })),
+      [
+        { op: "le", valuePx: 640 },
+        { op: "ge", valuePx: 960 },
+      ],
+    );
   });
 });
 

@@ -187,7 +187,8 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 - [ ] Smoke test: Crater BiDi backend
 - [ ] Smoke test: a11y tree consistency check after operations
 - [ ] Animation detection (animation-play-state: paused / CSSOM diff)
-- [ ] External stylesheet breakpoint discovery
+- [x] External stylesheet breakpoint discovery
+  - Regex fallback now reads local `<link rel="stylesheet" href="./...">` CSS during migration breakpoint discovery and merges those breakpoints with Crater results.
 
 ### Agent-loop UX (from 2026-05-12 dogfood)
 
