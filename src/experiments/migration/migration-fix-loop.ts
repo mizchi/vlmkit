@@ -120,7 +120,10 @@ async function main() {
     // values. Prevents value hallucinations like `font: 800 48px/1` when
     // the report only knows specific computed sub-properties.
     const index = baselineIndex ?? buildBaselineValueIndex(report, target.variantFile);
-    const correction = correctMigrationFixesWithReport(rawFixes, index, { viewport: target.viewport });
+    const correction = correctMigrationFixesWithReport(rawFixes, index, {
+      viewport: target.viewport,
+      currentCss,
+    });
     if (correction.corrections.length > 0) {
       console.log();
       console.log(`Corrected ${correction.corrections.length} proposal value(s) using report baselines:`);

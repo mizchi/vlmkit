@@ -245,15 +245,26 @@ export function buildMigrationFixLoopMultiPrompt(input: {
     "border-radius", "border-width", "border-style",
     "opacity", "visibility", "display", "flex-direction", "justify-content", "align-items",
     "box-shadow",
+    // Grid / layout structural properties — pixel-explicit but typically
+    // hand-authored (e.g. `grid-template-columns: 72px 268px minmax(0, 1fr)`).
+    "grid-template-columns", "grid-template-rows", "grid-template-areas",
+    "grid-auto-columns", "grid-auto-rows", "grid-auto-flow",
+    "grid-column", "grid-row", "grid-column-start", "grid-row-start",
+    "flex", "flex-basis", "flex-grow", "flex-shrink", "flex-wrap",
+    "aspect-ratio", "place-items", "place-content", "place-self",
+    "align-content", "align-self", "justify-self", "justify-items",
   ]);
   const isAuthoredProperty = (property: string): boolean => AUTHORED_PROPERTIES.has(property);
 
   const reportTableLines: string[] = [];
   if (input.baselineValueIndex) {
+    const variantMap = input.baselineValueIndex.variantValues;
     // Collect global rows (one entry per (selector, property) that has the
     // SAME baseline value at every recorded viewport — safe to apply
-    // universally without media gating).
-    type Row = { selector: string; property: string; baseline: string };
+    // universally without media gating). Annotate with the variant value
+    // so the LLM can self-filter pairs where variant already matches
+    // baseline (those are no-ops).
+    type Row = { selector: string; property: string; baseline: string; variant: string | null };
     const rows: Row[] = [];
     for (const [key, baseline] of input.baselineValueIndex.global) {
       const sep = key.lastIndexOf(" ");
@@ -261,7 +272,9 @@ export function buildMigrationFixLoopMultiPrompt(input: {
       const property = key.slice(sep + 1);
       if (!isAuthoredCssSelector(selector)) continue;
       if (!isAuthoredProperty(property)) continue;
-      rows.push({ selector, property, baseline });
+      const variant = variantMap.get(key) ?? null;
+      if (variant !== null && variant === baseline) continue; // already in sync
+      rows.push({ selector, property, baseline, variant });
     }
     // Viewport-variant pairs — different baseline values across viewports.
     // List them separately so the LLM knows they need explicit media
@@ -281,9 +294,10 @@ export function buildMigrationFixLoopMultiPrompt(input: {
       reportTableLines.push("");
       reportTableLines.push(`Report-authoritative baseline values (${top.length} of ${rows.length} authored-property pairs):`);
       for (const r of top) {
-        reportTableLines.push(`  ${r.selector} { ${r.property} } → baseline=\`${r.baseline}\``);
+        const variantSuffix = r.variant !== null ? ` (variant=\`${r.variant}\`)` : "";
+        reportTableLines.push(`  ${r.selector} { ${r.property} } → baseline=\`${r.baseline}\`${variantSuffix}`);
       }
-      reportTableLines.push("Rules: (a) copy the baseline value VERBATIM when proposing a fix; (b) only use real CSS selectors (no `.parent>tag[1]` path syntax); (c) only target authored properties — never computed layout dimensions like \`height: 1334.41px\`.");
+      reportTableLines.push("Rules: (a) copy the baseline value VERBATIM when proposing a fix; (b) only use real CSS selectors (no `.parent>tag[1]` path syntax); (c) only target authored properties — never computed layout dimensions like \`height: 1334.41px\`; (d) if `variant` already equals `baseline`, skip — that pair is already in sync.");
     }
     if (variantRows.length > 0) {
       const topVariant = variantRows.slice(0, 12);
@@ -353,6 +367,12 @@ export interface BaselineValueIndex {
    * Maps to the set of distinct values observed (for debugging).
    */
   viewportVariant: Map<string, Set<string>>;
+  /**
+   * `(selector, property)` → variant-side value (the value currently
+   * rendered, before any fix). Used to detect no-op proposals where the
+   * LLM/heuristic suggests a value that's already matching the variant.
+   */
+  variantValues: Map<string, string>;
 }
 
 function classListToSelectors(classList: string | undefined): string[] {
@@ -375,6 +395,7 @@ export function buildBaselineValueIndex(
   // tuple and aggregate distinct values per (selector, property).
   const byViewport = new Map<string, string>();
   const observed = new Map<string, Set<string>>();
+  const variantValues = new Map<string, string>();
   const observeValue = (key: string, value: string) => {
     let set = observed.get(key);
     if (!set) {
@@ -383,12 +404,16 @@ export function buildBaselineValueIndex(
     }
     set.add(value);
   };
+  const observeVariant = (key: string, value: string) => {
+    if (!variantValues.has(key)) variantValues.set(key, value);
+  };
   const csd = report.computedStyleDiff ?? [];
   for (const block of csd) {
     if (variantFile && block.variantFile !== variantFile) continue;
     for (const e of block.result?.entries ?? []) {
       const key = `${e.selector} ${e.property}`;
       observeValue(key, e.baseline);
+      observeVariant(key, e.variant);
     }
   }
   const dpv = report.domPositionDiffPerViewport ?? [];
@@ -402,6 +427,7 @@ export function buildBaselineValueIndex(
       for (const sel of selectors) {
         const key = `${sel} ${e.property}`;
         observeValue(key, e.baseline);
+        observeVariant(key, e.variant);
         byViewport.set(`${key} ${e.viewport}`, e.baseline);
       }
     }
@@ -419,7 +445,7 @@ export function buildBaselineValueIndex(
       viewportVariant.set(key, values);
     }
   }
-  return { global, byViewport, viewportVariant };
+  return { global, byViewport, viewportVariant, variantValues };
 }
 
 export interface CorrectionResult {
@@ -460,15 +486,37 @@ function isAuthoredCssPropertyForFix(property: string): boolean {
   return true;
 }
 
+/**
+ * Read the current value of `(selector, property)` from a CSS source.
+ * Returns null when the rule doesn't exist at the matching media scope.
+ */
+export function readExistingCssValue(
+  css: string,
+  fix: Pick<MigrationFix, "selector" | "property" | "mediaCondition">,
+): string | null {
+  const blocks = scanCssBlocks(css);
+  const target = normalizeSelectorWhitespace(fix.selector);
+  const escaped = fix.property.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+  const declRe = new RegExp(`(?:^|[\\s;])${escaped}\\s*:\\s*([^;}]+)`, "i");
+  for (const block of blocks) {
+    if (normalizeSelectorWhitespace(block.selector) !== target) continue;
+    if ((block.mediaCondition ?? null) !== fix.mediaCondition) continue;
+    const body = css.slice(block.bodyStart, block.bodyEnd);
+    const m = declRe.exec(body);
+    if (m) return m[1].trim();
+  }
+  return null;
+}
+
 export function correctMigrationFixesWithReport(
   fixes: MigrationFix[],
   index: BaselineValueIndex,
-  options: { viewport?: string } = {},
+  options: { viewport?: string; currentCss?: string } = {},
 ): CorrectionResult {
   const corrections: CorrectionResult["corrections"] = [];
   const dropped: CorrectionResult["dropped"] = [];
   const out: MigrationFix[] = [];
-  for (const fix of fixes) {
+  for (let fix of fixes) {
     if (!fix.selector || !fix.property || !fix.value) {
       dropped.push({ selector: fix.selector, property: fix.property, reason: "missing field" });
       continue;
@@ -497,8 +545,22 @@ export function correctMigrationFixesWithReport(
     const baseline = (viewportKey && index.byViewport.get(viewportKey)) ?? index.global.get(globalKey);
     if (baseline && baseline !== fix.value) {
       corrections.push({ selector: fix.selector, property: fix.property, from: fix.value, to: baseline });
-      out.push({ ...fix, value: baseline });
-      continue;
+      // Use the corrected value for the rest of the no-op check below.
+      fix = { ...fix, value: baseline };
+    }
+    // No-op pre-filter: if the proposed value already matches what's in
+    // currentCss, applying it is wasted apply-step work (and confuses the
+    // "skipped — selector not in writable CSS" count). Drop it.
+    if (options.currentCss) {
+      const existing = readExistingCssValue(options.currentCss, fix);
+      if (existing !== null && existing === fix.value) {
+        dropped.push({
+          selector: fix.selector,
+          property: fix.property,
+          reason: "value already matches current CSS — no-op",
+        });
+        continue;
+      }
     }
     out.push(fix);
   }

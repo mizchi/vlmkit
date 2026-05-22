@@ -527,6 +527,29 @@ describe("buildBaselineValueIndex + correctMigrationFixesWithReport", () => {
     assert.match(result.dropped[0]?.reason ?? "", /path-style/);
   });
 
+  it("records variant values for no-op detection", () => {
+    const idx = buildBaselineValueIndex(report, "current.html");
+    assert.equal(idx.variantValues.get(".btn background-color"), "rgb(37, 99, 235)");
+    assert.equal(idx.variantValues.get(".hero padding"), "16px");
+  });
+
+  it("drops proposals whose value already matches the current CSS (no-op pre-filter)", () => {
+    const idx = buildBaselineValueIndex(report, "current.html");
+    const currentCss = `.btn { color: blue; padding: 8px; }`;
+    const result = correctMigrationFixesWithReport(
+      [
+        { selector: ".btn", property: "color", value: "blue", mediaCondition: null }, // dropped — already blue
+        { selector: ".btn", property: "color", value: "red", mediaCondition: null }, // kept — differs
+      ],
+      idx,
+      { currentCss },
+    );
+    assert.equal(result.fixes.length, 1);
+    assert.equal(result.fixes[0]?.value, "red");
+    assert.equal(result.dropped.length, 1);
+    assert.match(result.dropped[0]?.reason ?? "", /already matches current CSS/);
+  });
+
   it("flags viewport-variant pairs and excludes them from `global`", () => {
     const multiViewportReport: MigrationCompareReport = {
       baseline: "target.html",

@@ -64,7 +64,13 @@ export const TRACKED_PROPERTIES = [
   "flex-direction", "flex-wrap", "flex-grow", "flex-shrink",
   "align-items", "justify-content", "gap",
   "position", "top", "right", "bottom", "left",
-  "overflow", "box-shadow", "cursor",
+  "overflow", "overflow-x", "overflow-y", "box-shadow", "cursor",
+  // Note: grid-template-columns / rows etc. are NOT tracked here because
+  // `getComputedStyle()` resolves `minmax(0, 1fr)` to `0px`, which looks
+  // like an authored value but would break layout if written back as CSS.
+  // The LLM still has the authored values via the full CSS embedded in
+  // the prompt — those just aren't surfaced as report deltas.
+  "aspect-ratio",
 ];
 
 const INTERACTION_PSEUDO_PATTERN = /:(focus-visible|focus-within|focus|hover|active)\b/g;
