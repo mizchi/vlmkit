@@ -50,7 +50,8 @@ import { runComponentFromImage } from "@mizchi/vlmkit-markup/component/component
 
 `evaluateComponentGoal()` keeps the public TypeScript API and report-summary
 formatting, but delegates the deterministic pass / review / fail decision to
-the MoonBit `markup-core` package through the generated JS CLI.
+the MoonBit `markup-core` package through the generated `markup-core-api` JS
+module, with the generated CLI kept as a fallback and manual debugging surface.
 `deriveComponentContractPlan()` likewise keeps JSON object shaping in
 TypeScript while MoonBit owns probe-state normalization and scroll-target
 selection policy.
@@ -58,9 +59,9 @@ selection policy.
 TypeScript while MoonBit owns layout-vs-decoration flow selection, priority
 scoring, reason ids, and next-action ordering.
 `validateUiContract()` keeps JSON traversal, issue paths, and report text in
-TypeScript while MoonBit owns pattern-specific evidence and layout-policy issue
-id selection, plus composition, decoration, marker, optional-range,
-metadata-presence, state, and expected-scrollport predicate ids.
+TypeScript while MoonBit owns pattern-specific evidence, boundary checks,
+layout-policy issue id selection, plus composition, decoration, marker,
+optional-range, metadata-presence, state, and expected-scrollport predicate ids.
 
 This keeps the policy owner single while TypeScript continues to own file I/O,
 Playwright/browser integration, and package ergonomics.

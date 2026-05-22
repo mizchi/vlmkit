@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   computeComponentGoalStatus,
   computeSemanticDrilldownPolicy,
+  getMarkupCoreRuntimeBackend,
   runMarkupCore,
   type MarkupCoreSemanticDrilldownPolicy,
 } from "./markup-core-runtime.ts";
@@ -68,6 +69,7 @@ test("markup-core component goal fixtures match TS bridge and CLI", () => {
       `${entry.id} CLI`,
     );
   }
+  assert.equal(getMarkupCoreRuntimeBackend(), "direct-js");
 });
 
 test("markup-core semantic drilldown fixtures match TS bridge and CLI", () => {

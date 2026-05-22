@@ -1354,11 +1354,11 @@ Stepwise cleanup:
   `src/markup-core-parity.test.ts` checks the same matrix through both the TS
   bridge and the generated MoonBit CLI, leaving a direct JS/WASM binding target
   for the next migration step.
-- [ ] Avoid per-call process cost:
-  current bridge calls the generated JS CLI by process spawn, with a
-  process-local memoization layer for repeated pure calls. That is fine for
-  low-volume dogfood, but repeated component scoring should move to a direct
-  generated JS/WASM module boundary once the package API is stable.
+- [x] Avoid per-call process cost:
+  `markup-core-api` now exports a direct generated JS dispatcher used by the TS
+  bridge before falling back to the CLI. The process-local memoization remains
+  for repeated pure calls, but normal component scoring and UI contract
+  validation no longer spawn per call.
 
 ### Spec coverage
 - [ ] Heading hierarchy validation

@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type {
@@ -17,9 +18,23 @@ const cliPath = join(
   packageRoot,
   "_build/js/debug/build/markup-core-cli/markup-core-cli.js",
 );
+const apiPath = join(
+  packageRoot,
+  "_build/js/debug/build/markup-core-api/markup-core-api.js",
+);
 
 let built = false;
 const runMarkupCoreCache = new Map<string, string>();
+const requireGenerated = createRequire(import.meta.url);
+const directArgSeparator = "\t";
+const directEmptyArg = "__VLMKIT_EMPTY_ARG__";
+let directModule: DirectMarkupCoreModule | undefined;
+let directModuleUnavailable = false;
+let runtimeBackend: "direct-js" | "spawn" = "spawn";
+
+interface DirectMarkupCoreModule {
+  run_markup_core: (command: string, encodedArgs: string) => unknown;
+}
 
 export function computeComponentGoalStatus(input: {
   goal: string;
@@ -84,9 +99,79 @@ export function runMarkupCore(args: string[]): string {
   const cacheKey = JSON.stringify(args);
   const cached = runMarkupCoreCache.get(cacheKey);
   if (cached !== undefined) return cached;
+  const directOutput = runMarkupCoreDirect(args);
+  if (directOutput !== undefined) {
+    runMarkupCoreCache.set(cacheKey, directOutput);
+    return directOutput;
+  }
   const output = run(process.execPath, [cliPath, ...args]);
+  runtimeBackend = "spawn";
   runMarkupCoreCache.set(cacheKey, output);
   return output;
+}
+
+export function getMarkupCoreRuntimeBackend(): "direct-js" | "spawn" {
+  return runtimeBackend;
+}
+
+function runMarkupCoreDirect(args: string[]): string | undefined {
+  const command = args[0];
+  if (!command) return undefined;
+  const encodedArgs = encodeDirectArgs(args.slice(1));
+  if (encodedArgs === undefined) return undefined;
+  const api = loadMarkupCoreApi();
+  if (!api) return undefined;
+  runtimeBackend = "direct-js";
+  return unwrapMoonBitResult(api.run_markup_core(command, encodedArgs)).trim();
+}
+
+function encodeDirectArgs(args: string[]): string | undefined {
+  const encoded: string[] = [];
+  for (const arg of args) {
+    if (arg.includes(directArgSeparator) || arg === directEmptyArg) {
+      return undefined;
+    }
+    encoded.push(arg === "" ? directEmptyArg : arg);
+  }
+  return encoded.join(directArgSeparator);
+}
+
+function loadMarkupCoreApi(): DirectMarkupCoreModule | undefined {
+  if (directModule) return directModule;
+  if (directModuleUnavailable) return undefined;
+  try {
+    const loaded = requireGenerated(apiPath) as Partial<DirectMarkupCoreModule>;
+    if (typeof loaded.run_markup_core === "function") {
+      directModule = { run_markup_core: loaded.run_markup_core };
+      return directModule;
+    }
+  } catch {
+    directModuleUnavailable = true;
+    return undefined;
+  }
+  directModuleUnavailable = true;
+  return undefined;
+}
+
+function unwrapMoonBitResult(value: unknown): string {
+  if (isMoonBitResult(value)) {
+    if (value.$tag === 1) {
+      return String(value._0);
+    }
+    throw new Error(`markup-core direct call failed: ${String(value._0)}`);
+  }
+  return String(value);
+}
+
+function isMoonBitResult(
+  value: unknown,
+): value is { $tag: 0 | 1; _0: unknown } {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "$tag" in value &&
+    "_0" in value
+  );
 }
 
 export function isMarkupCoreComponentProbeState(value: string): boolean {
@@ -1188,6 +1273,7 @@ export function ensureMarkupCoreCli(): void {
     packageRoot,
     "build",
     "markup-core",
+    "markup-core-api",
     "markup-core-cli",
     "--target",
     "js",

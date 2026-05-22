@@ -1,0 +1,503 @@
+///|
+/// Direct JS API for markup-core.
+let direct_arg_separator : String = "\t"
+
+///|
+let direct_empty_arg : String = "__VLMKIT_EMPTY_ARG__"
+
+///|
+pub fn run_markup_core(command : String, encoded_args : String) -> String raise {
+  dispatch(command_args(command, encoded_args))
+}
+
+///|
+fn dispatch(args : Array[String]) -> String raise {
+  match args {
+    [
+      "component-goal-status",
+      goal,
+      pixel_diff_ratio,
+      landscape_diff_ratio,
+      pass_landscape,
+      pass_pixel,
+      review_landscape,
+      review_pixel,
+      scroll_total,
+      scroll_broken,
+      scroll_empty,
+      expected_total,
+      expected_missing,
+      expected_broken,
+      expected_empty,
+      landing_present,
+      landing_hero_visible,
+      landing_primary_cta_visible,
+      landing_next_section_hint_visible,
+      landing_media_slot_visible,
+      canvas_count,
+      canvas_nonblank,
+      canvas_frame_delta,
+      canvas_input_responsive,
+      canvas_state_hook_present,
+      canvas_missing_state_fields,
+      expressive_present,
+      expressive_layers,
+      expressive_shapes,
+      expressive_selected_visible,
+      expressive_focusable_item_count,
+      expressive_semantic_menu_text,
+      expressive_diagonal_evidence,
+      expressive_high_contrast,
+      expressive_low_contrast_item_count,
+      expressive_hover_changed,
+      expressive_focus_visible_changed,
+    ] =>
+      @core.component_goal_status(
+        goal,
+        parse_double(pixel_diff_ratio),
+        parse_double(landscape_diff_ratio),
+        parse_optional_double(pass_landscape),
+        parse_optional_double(pass_pixel),
+        parse_optional_double(review_landscape),
+        parse_optional_double(review_pixel),
+        parse_int(scroll_total),
+        parse_int(scroll_broken),
+        parse_int(scroll_empty),
+        parse_int(expected_total),
+        parse_int(expected_missing),
+        parse_int(expected_broken),
+        parse_int(expected_empty),
+        parse_bool(landing_present),
+        parse_bool(landing_hero_visible),
+        parse_bool(landing_primary_cta_visible),
+        parse_bool(landing_next_section_hint_visible),
+        parse_bool(landing_media_slot_visible),
+        parse_int(canvas_count),
+        parse_bool(canvas_nonblank),
+        parse_bool(canvas_frame_delta),
+        parse_optional_bool(canvas_input_responsive),
+        parse_optional_bool(canvas_state_hook_present),
+        parse_int(canvas_missing_state_fields),
+        parse_bool(expressive_present),
+        parse_int(expressive_layers),
+        parse_int(expressive_shapes),
+        parse_bool(expressive_selected_visible),
+        parse_int(expressive_focusable_item_count),
+        parse_bool(expressive_semantic_menu_text),
+        parse_bool(expressive_diagonal_evidence),
+        parse_bool(expressive_high_contrast),
+        parse_int(expressive_low_contrast_item_count),
+        parse_optional_bool(expressive_hover_changed),
+        parse_optional_bool(expressive_focus_visible_changed),
+      )
+    ["is-component-probe-state", value] =>
+      bool_to_string(@core.is_component_probe_state(value))
+    ["is-forced-pseudo-state", value] =>
+      bool_to_string(@core.is_forced_pseudo_state(value))
+    ["component-probe-states", required_state_kinds] =>
+      @core.component_probe_states(required_state_kinds)
+    ["merge-component-probe-states", explicit_states, injected_states] =>
+      @core.merge_component_probe_states(explicit_states, injected_states)
+    [
+      "component-scroll-target-source",
+      required_state_kinds,
+      explicit_scrolled_target_count,
+    ] =>
+      @core.component_scroll_target_source(
+        required_state_kinds,
+        parse_int(explicit_scrolled_target_count),
+      )
+    [
+      "semantic-drilldown-policy",
+      layout_score,
+      decoration_score,
+      heatmap_kind_count,
+    ] => {
+      let layout = parse_double(layout_score)
+      let decoration = parse_double(decoration_score)
+      let flow = @core.semantic_drilldown_flow(layout)
+      let priority = @core.semantic_drilldown_priority(flow, layout, decoration)
+      let reason_id = @core.semantic_drilldown_reason_id(
+        flow,
+        parse_int(heatmap_kind_count),
+      )
+      [flow, priority.to_string(), reason_id].join("|")
+    }
+    ["semantic-drilldown-select-index", flows, priority_scores, orders] =>
+      @core.semantic_drilldown_select_index(
+        parse_string_list(flows),
+        parse_double_list(priority_scores),
+        parse_int_list(orders),
+      ).to_string()
+    ["ui-contract-version-issue-ids", version] =>
+      @core.ui_contract_version_issue_ids(parse_int(version))
+    ["ui-contract-screen-issue-ids", id, pattern, goal, source_of_truth] =>
+      @core.ui_contract_screen_issue_ids(id, pattern, goal, source_of_truth)
+    [
+      "ui-contract-viewport-issue-ids",
+      label,
+      duplicate_label,
+      width,
+      height,
+      dpr_present,
+      dpr,
+    ] =>
+      @core.ui_contract_viewport_issue_ids(
+        label,
+        parse_bool(duplicate_label),
+        parse_double(width),
+        parse_double(height),
+        parse_bool(dpr_present),
+        parse_double(dpr),
+      )
+    [
+      "ui-contract-landmark-issue-ids",
+      id,
+      role,
+      name,
+      parent_id_present,
+      parent_known,
+    ] =>
+      @core.ui_contract_landmark_issue_ids(
+        id,
+        role,
+        name,
+        parse_bool(parent_id_present),
+        parse_bool(parent_known),
+      )
+    ["ui-contract-responsive-rule-issue-ids", viewport_known] =>
+      @core.ui_contract_responsive_rule_issue_ids(parse_bool(viewport_known))
+    [
+      "ui-contract-pattern-evidence-issue-ids",
+      pattern,
+      marker_kinds,
+      required_state_kinds,
+      state_kinds,
+      expected_scrollport_count,
+      has_composition,
+      has_canvas_state_hook,
+      canvas_required_state_fields,
+    ] =>
+      @core.ui_contract_pattern_evidence_issue_ids(
+        pattern,
+        marker_kinds,
+        required_state_kinds,
+        state_kinds,
+        parse_int(expected_scrollport_count),
+        parse_bool(has_composition),
+        parse_bool(has_canvas_state_hook),
+        canvas_required_state_fields,
+      )
+    [
+      "ui-contract-marker-issue-ids",
+      kind,
+      required,
+      has_selector,
+      has_attribute,
+      has_target,
+    ] =>
+      @core.ui_contract_marker_issue_ids(
+        kind,
+        parse_bool(required),
+        parse_bool(has_selector),
+        parse_bool(has_attribute),
+        parse_bool(has_target),
+      )
+    [
+      "ui-contract-optional-range-issue-ids",
+      min_present,
+      min_value,
+      max_present,
+      max_value,
+    ] =>
+      @core.ui_contract_optional_range_issue_ids(
+        parse_bool(min_present),
+        parse_double(min_value),
+        parse_bool(max_present),
+        parse_double(max_value),
+      )
+    ["ui-contract-slot-issue-ids", id] => @core.ui_contract_slot_issue_ids(id)
+    ["ui-contract-asset-issue-ids", id] => @core.ui_contract_asset_issue_ids(id)
+    ["ui-contract-canvas-issue-ids", has_state_hook, required_state_field_count] =>
+      @core.ui_contract_canvas_issue_ids(
+        parse_bool(has_state_hook),
+        parse_int(required_state_field_count),
+      )
+    ["ui-contract-canvas-input-issue-ids", action] =>
+      @core.ui_contract_canvas_input_issue_ids(action)
+    ["ui-contract-canvas-hud-issue-ids", id] =>
+      @core.ui_contract_canvas_hud_issue_ids(id)
+    ["ui-contract-composition-issue-ids", style] =>
+      @core.ui_contract_composition_issue_ids(style)
+    ["ui-contract-composition-axis-issue-ids", axis] =>
+      @core.ui_contract_composition_axis_issue_ids(axis)
+    [
+      "ui-contract-composition-layer-issue-ids",
+      id,
+      role,
+      duplicate_id,
+      z_present,
+      z_finite,
+    ] =>
+      @core.ui_contract_composition_layer_issue_ids(
+        id,
+        role,
+        parse_bool(duplicate_id),
+        parse_bool(z_present),
+        parse_bool(z_finite),
+      )
+    ["ui-contract-composition-shape-issue-ids", id, kind, duplicate_id] =>
+      @core.ui_contract_composition_shape_issue_ids(
+        id,
+        kind,
+        parse_bool(duplicate_id),
+      )
+    [
+      "ui-contract-composition-motion-issue-ids",
+      id,
+      trigger,
+      effect,
+      duplicate_id,
+      duration_present,
+      duration_ms,
+    ] =>
+      @core.ui_contract_composition_motion_issue_ids(
+        id,
+        trigger,
+        effect,
+        parse_bool(duplicate_id),
+        parse_bool(duration_present),
+        parse_double(duration_ms),
+      )
+    [
+      "ui-contract-composition-contrast-issue-ids",
+      mode,
+      min_ratio_present,
+      min_ratio,
+    ] =>
+      @core.ui_contract_composition_contrast_issue_ids(
+        mode,
+        parse_bool(min_ratio_present),
+        parse_double(min_ratio),
+      )
+    [
+      "ui-contract-decoration-typography-issue-ids",
+      role,
+      size_present,
+      size,
+      line_height_present,
+      line_height,
+    ] =>
+      @core.ui_contract_decoration_typography_issue_ids(
+        role,
+        parse_bool(size_present),
+        parse_double(size),
+        parse_bool(line_height_present),
+        parse_double(line_height),
+      )
+    ["ui-contract-decoration-palette-issue-ids", role, value] =>
+      @core.ui_contract_decoration_palette_issue_ids(role, value)
+    ["ui-contract-decoration-media-issue-ids", slot] =>
+      @core.ui_contract_decoration_media_issue_ids(slot)
+    ["ui-contract-content-items-issue-ids", exact_present, exact] =>
+      @core.ui_contract_content_items_issue_ids(
+        parse_bool(exact_present),
+        parse_double(exact),
+      )
+    ["ui-contract-content-text-issue-ids", row_count_present, row_count] =>
+      @core.ui_contract_content_text_issue_ids(
+        parse_bool(row_count_present),
+        parse_double(row_count),
+      )
+    ["ui-contract-composition-contrast-palette-issue-ids", value] =>
+      @core.ui_contract_composition_contrast_palette_issue_ids(value)
+    [
+      "ui-contract-layout-issue-ids",
+      width_kind,
+      width_min_present,
+      width_max_present,
+      width_value,
+      height_kind,
+      height_value,
+      height_max,
+      display_kind,
+      display_columns_count,
+      display_rows_count,
+    ] =>
+      @core.ui_contract_layout_issue_ids(
+        width_kind,
+        parse_bool(width_min_present),
+        parse_bool(width_max_present),
+        parse_double(width_value),
+        height_kind,
+        parse_double(height_value),
+        parse_double(height_max),
+        display_kind,
+        parse_int(display_columns_count),
+        parse_int(display_rows_count),
+      )
+    [
+      "ui-contract-state-issue-ids",
+      id,
+      kind,
+      required,
+      has_selector,
+      has_trigger,
+    ] =>
+      @core.ui_contract_state_issue_ids(
+        id,
+        kind,
+        parse_bool(required),
+        parse_bool(has_selector),
+        parse_bool(has_trigger),
+      )
+    [
+      "ui-contract-required-state-issue-ids",
+      id,
+      kind,
+      required,
+      has_selector,
+      has_trigger,
+      duplicate_id,
+      min_change_ratio_present,
+      min_change_ratio,
+    ] =>
+      @core.ui_contract_required_state_issue_ids(
+        id,
+        kind,
+        parse_bool(required),
+        parse_bool(has_selector),
+        parse_bool(has_trigger),
+        parse_bool(duplicate_id),
+        parse_bool(min_change_ratio_present),
+        parse_double(min_change_ratio),
+      )
+    [
+      "ui-contract-expected-scrollport-issue-ids",
+      id,
+      axis,
+      required,
+      has_selector,
+      has_name,
+      has_landmark_id,
+      duplicate_id,
+      min_overflow_present,
+      min_overflow,
+    ] =>
+      @core.ui_contract_expected_scrollport_issue_ids(
+        id,
+        axis,
+        parse_bool(required),
+        parse_bool(has_selector),
+        parse_bool(has_name),
+        parse_bool(has_landmark_id),
+        parse_bool(duplicate_id),
+        parse_bool(min_overflow_present),
+        parse_double(min_overflow),
+      )
+    _ => usage()
+  }
+}
+
+///|
+fn command_args(command : String, encoded_args : String) -> Array[String] {
+  let args : Array[String] = [command]
+  if encoded_args == "" {
+    return args
+  }
+  for part in encoded_args.split(direct_arg_separator) {
+    args.push(decode_arg(part.to_owned()))
+  }
+  args
+}
+
+///|
+fn decode_arg(value : String) -> String {
+  if value == direct_empty_arg {
+    ""
+  } else {
+    value
+  }
+}
+
+///|
+fn parse_optional_double(value : String) -> Double? raise {
+  if value == "none" || value == "null" || value == "" {
+    None
+  } else {
+    Some(parse_double(value))
+  }
+}
+
+///|
+fn parse_double(value : String) -> Double raise {
+  let parsed : Double = @string.from_str(value)
+  parsed
+}
+
+///|
+fn parse_int(value : String) -> Int raise {
+  let parsed : Int = @string.from_str(value)
+  parsed
+}
+
+///|
+fn parse_bool(value : String) -> Bool {
+  value == "true" || value == "1" || value == "yes"
+}
+
+///|
+fn parse_optional_bool(value : String) -> Bool? {
+  if value == "none" || value == "null" || value == "" {
+    None
+  } else {
+    Some(parse_bool(value))
+  }
+}
+
+///|
+fn parse_string_list(value : String) -> Array[String] {
+  let values : Array[String] = []
+  if value == "" {
+    return values
+  }
+  for part in value.split("|") {
+    let owned = part.to_owned().trim().to_owned()
+    if !owned.is_empty() {
+      values.push(owned)
+    }
+  }
+  values
+}
+
+///|
+fn parse_double_list(value : String) -> Array[Double] raise {
+  let values : Array[Double] = []
+  for part in parse_string_list(value) {
+    values.push(parse_double(part))
+  }
+  values
+}
+
+///|
+fn parse_int_list(value : String) -> Array[Int] raise {
+  let values : Array[Int] = []
+  for part in parse_string_list(value) {
+    values.push(parse_int(part))
+  }
+  values
+}
+
+///|
+fn bool_to_string(value : Bool) -> String {
+  if value {
+    "true"
+  } else {
+    "false"
+  }
+}
+
+///|
+fn usage() -> String {
+  "Usage: markup-core-api run_markup_core <command> <tab-separated-args>"
+}
