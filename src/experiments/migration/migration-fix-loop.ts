@@ -6,7 +6,9 @@ import { createLLMProvider } from "@mizchi/vlmkit-ai/llm-client.ts";
 import { runMigrationCompare, type MigrationCompareOptions } from "./migration-compare.ts";
 import {
   applyMigrationFixToHtml,
+  buildMigrationFixLoopMultiPrompt,
   buildMigrationFixLoopPrompt,
+  parseMigrationFixMultiResponse,
   parseMigrationFixResponse,
   resolveMigrationFixFromBaselineHtml,
   selectMigrationFixTarget,
@@ -31,6 +33,9 @@ const MANUAL_MEDIA = getArg("media", "none");
 const DRY_RUN = hasFlag("dry-run");
 const NO_RERUN = hasFlag("no-rerun");
 const IN_PLACE = hasFlag("in-place");
+const PROPOSE_ONLY = hasFlag("propose-only");
+const MAX_FIXES = Math.max(1, parseInt(getArg("max-fixes", "1"), 10) || 1);
+const PROPOSALS_OUT = getArg("proposals-out");
 
 async function main() {
   const report = JSON.parse(await readFile(REPORT_PATH, "utf-8")) as MigrationCompareReport;
@@ -53,16 +58,25 @@ async function main() {
   ]);
   const currentCss = extractCss(variantHtml);
   if (!currentCss) {
-    console.error(`Could not find <style id="target-css"> in ${variantPath}`);
+    console.error(`Could not find any <style> block in ${variantPath} (extractCss expects either <style id="target-css"> or a generic <style>...).`);
     process.exit(1);
   }
 
-  const prompt = buildMigrationFixLoopPrompt({
-    baselineFile: basename(baselinePath),
-    variantFile: basename(variantPath),
-    target,
-    currentCss,
-  });
+  const useMultiMode = PROPOSE_ONLY || MAX_FIXES > 1;
+  const prompt = useMultiMode
+    ? buildMigrationFixLoopMultiPrompt({
+        baselineFile: basename(baselinePath),
+        variantFile: basename(variantPath),
+        target,
+        currentCss,
+        maxFixes: MAX_FIXES,
+      })
+    : buildMigrationFixLoopPrompt({
+        baselineFile: basename(baselinePath),
+        variantFile: basename(variantPath),
+        target,
+        currentCss,
+      });
 
   if (PROMPT_OUT) {
     const promptPath = resolve(PROMPT_OUT);
@@ -70,18 +84,85 @@ async function main() {
     await writeFile(promptPath, prompt);
   }
 
-  const fix = await resolveFix({
-    baselineHtml,
-    prompt,
-    target,
-  });
-
   console.log();
   console.log(`Target: ${target.variantFile} @ ${target.viewport} (${target.viewportWidth}px)`);
   console.log(`Diff: ${(target.diffRatio * 100).toFixed(2)}% / ${target.diffPixels} px`);
   console.log(`Category: ${target.categorySummary}`);
   console.log(`Paint tree: ${target.paintTreeSummary}`);
   console.log(`Current convergence: ${convergence.status}`);
+
+  if (useMultiMode) {
+    const fixes = await resolveMultiFixes({ baselineHtml, prompt, target });
+    if (PROPOSE_ONLY) {
+      const payload = JSON.stringify({
+        report: REPORT_PATH,
+        variant: target.variantFile,
+        viewport: target.viewport,
+        viewportWidth: target.viewportWidth,
+        diffRatio: target.diffRatio,
+        proposals: fixes,
+      }, null, 2);
+      if (PROPOSALS_OUT) {
+        const out = resolve(PROPOSALS_OUT);
+        await mkdir(dirname(out), { recursive: true });
+        await writeFile(out, `${payload}\n`);
+        console.log();
+        console.log(`Proposals: ${out} (${fixes.length} fix${fixes.length === 1 ? "" : "es"})`);
+      } else {
+        console.log();
+        console.log(payload);
+      }
+      return;
+    }
+
+    if (fixes.length === 0) {
+      console.log();
+      console.log("No concrete fixes could be resolved automatically.");
+      process.exit(0);
+    }
+
+    let workingHtml = variantHtml;
+    const applied: MigrationFix[] = [];
+    const skipped: MigrationFix[] = [];
+    // Multi-fix lets the LLM propose media-gated fixes for blocks that
+    // may not yet exist — allow appending new @media wrappers.
+    for (const fix of fixes) {
+      const nextHtml = applyMigrationFixToHtml(workingHtml, fix, { appendIfMissing: true });
+      if (nextHtml === workingHtml) {
+        skipped.push(fix);
+        continue;
+      }
+      workingHtml = nextHtml;
+      applied.push(fix);
+    }
+
+    console.log();
+    console.log(`Multi-fix: ${applied.length}/${fixes.length} applied${skipped.length > 0 ? ` (${skipped.length} skipped — selector not in writable CSS)` : ""}`);
+    for (const fix of applied) {
+      console.log(`  + ${fix.selector} { ${fix.property}: ${fix.value}; }${fix.mediaCondition ? ` @media ${fix.mediaCondition}` : ""}`);
+    }
+
+    if (DRY_RUN || applied.length === 0) {
+      if (DRY_RUN) console.log("Dry run: fixes were not written.");
+      return;
+    }
+
+    const outputPath = resolveOutputPath(variantPath);
+    await mkdir(dirname(outputPath), { recursive: true });
+    await writeFile(outputPath, workingHtml);
+    console.log(`Wrote: ${outputPath}`);
+
+    if (NO_RERUN) return;
+    await rerunCompare(report, baselinePath, outputPath);
+    return;
+  }
+
+  // Single-fix path (legacy behaviour).
+  const fix = await resolveFix({
+    baselineHtml,
+    prompt,
+    target,
+  });
 
   if (!fix) {
     console.log();
@@ -115,7 +196,14 @@ async function main() {
   console.log(`Wrote: ${outputPath}`);
 
   if (NO_RERUN) return;
+  await rerunCompare(report, baselinePath, outputPath);
+}
 
+async function rerunCompare(
+  report: MigrationCompareReport,
+  baselinePath: string,
+  outputPath: string,
+): Promise<void> {
   const rerunOptions = buildRerunOptions(report, baselinePath, outputPath);
   console.log();
   console.log(`Rerun: in-process migration compare (${basename(baselinePath)} vs ${basename(outputPath)})`);
@@ -127,6 +215,32 @@ async function main() {
     if (!shouldIgnoreMigrationRerunError(error)) throw error;
     console.log("Rerun skipped: Playwright browser launch is blocked in the current sandbox.");
   }
+}
+
+async function resolveMultiFixes(input: {
+  baselineHtml: string;
+  prompt: string;
+  target: SelectedMigrationFixTarget;
+}): Promise<MigrationFix[]> {
+  if (MANUAL_SELECTOR && MANUAL_PROPERTY && MANUAL_VALUE) {
+    return [{
+      selector: MANUAL_SELECTOR,
+      property: MANUAL_PROPERTY,
+      value: MANUAL_VALUE,
+      mediaCondition: MANUAL_MEDIA === "none" ? null : MANUAL_MEDIA,
+    }];
+  }
+  if (RESPONSE_FILE) {
+    const raw = await readFile(resolve(RESPONSE_FILE), "utf-8");
+    const parsedMulti = parseMigrationFixMultiResponse(raw);
+    if (parsedMulti.length > 0) return parsedMulti;
+    const single = parseMigrationFixResponse(raw);
+    return single ? [single] : [];
+  }
+  const llm = createLLMProvider({ throwIfMissing: false });
+  if (!llm || DRY_RUN) return [];
+  const response = await llm.complete(input.prompt);
+  return parseMigrationFixMultiResponse(response);
 }
 
 async function resolveFix(input: {

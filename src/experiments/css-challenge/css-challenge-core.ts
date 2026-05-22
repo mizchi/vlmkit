@@ -887,9 +887,19 @@ export function parseLLMFix(response: string): { selector: string; property: str
 
 export const HTML_PATH = join(import.meta.dirname!, "..", "..", "..", "fixtures", "css-challenge", "page.html");
 
+/**
+ * Extract the CSS body used by the css-challenge / migration fix-loop
+ * pipelines. Prefers an explicit `<style id="target-css">` block (used
+ * by the css-challenge fixtures). For arbitrary HTML — e.g. the
+ * `design-runs/` patterns and any external project — fall back to the
+ * first `<style>` element, regardless of id. Returns `null` only when
+ * there is no inline `<style>` block at all.
+ */
 export function extractCss(html: string): string | null {
-  const m = html.match(/<style id="target-css">([\s\S]*?)<\/style>/);
-  return m ? m[1] : null;
+  const explicit = html.match(/<style[^>]*id=["']target-css["'][^>]*>([\s\S]*?)<\/style>/i);
+  if (explicit) return explicit[1];
+  const generic = html.match(/<style\b[^>]*>([\s\S]*?)<\/style>/i);
+  return generic ? generic[1] : null;
 }
 
 export function replaceCss(html: string, originalCss: string, newCss: string): string {

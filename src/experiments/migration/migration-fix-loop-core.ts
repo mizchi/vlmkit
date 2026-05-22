@@ -181,6 +181,92 @@ export function parseMigrationFixResponse(response: string): MigrationFix | null
   };
 }
 
+/**
+ * Multi-fix prompt for `migration-fix-loop --max-fixes N`. Same context as
+ * the single-fix prompt but asks for up to N JSON-shaped fix proposals,
+ * which lets the LLM emit every high-confidence universal pair the diff
+ * report surfaced rather than one declaration per round-trip.
+ */
+export function buildMigrationFixLoopMultiPrompt(input: {
+  baselineFile: string;
+  variantFile: string;
+  target: SelectedMigrationFixTarget;
+  currentCss: string;
+  maxFixes: number;
+}): string {
+  const candidateLines = input.target.fixCandidates.length === 0
+    ? ["(no heuristic candidates)"]
+    : input.target.fixCandidates.slice(0, 12).map((candidate, index) => {
+      const mediaSuffix = candidate.mediaCondition ? ` @media ${candidate.mediaCondition}` : "";
+      return `${index + 1}. ${candidate.selector} { ${candidate.property}: ${candidate.value}; }${mediaSuffix} [score=${candidate.score}; ${candidate.reasoning}]`;
+    });
+
+  return `You are fixing a CSS migration regression.
+
+Baseline file: ${input.baselineFile}
+Current file: ${input.variantFile}
+Viewport: ${input.target.viewport} (${input.target.viewportWidth}px)
+Diff ratio: ${(input.target.diffRatio * 100).toFixed(2)}%
+Diff pixels: ${input.target.diffPixels}
+Dominant category: ${input.target.dominantCategory}
+Category summary: ${input.target.categorySummary}
+Paint tree summary: ${input.target.paintTreeSummary}
+
+Top fix candidates:
+${candidateLines.join("\n")}
+
+Current CSS:
+\`\`\`css
+${input.currentCss}
+\`\`\`
+
+Task:
+Return up to ${input.maxFixes} high-confidence CSS declaration changes that together would reduce this regression. Prefer authoritative universal pairs (every-viewport differences) and explicit color tokens over sub-pixel widths. Skip any candidate whose computed-style value already matches the baseline.
+
+Viewport gating (CRITICAL):
+- The target viewport above (\`${input.target.viewport}\`, ${input.target.viewportWidth}px) is the WORST viewport — the other viewports may render correctly.
+- If a fix is only meaningful at \`${input.target.viewport}\` (e.g. a layout change for ${input.target.viewportWidth <= 600 ? "mobile" : input.target.viewportWidth <= 1100 ? "desktop" : "wide"} only), wrap it in an appropriate media condition.
+- Use \`"mediaCondition": "(max-width: 700px)"\` for mobile-only, \`"(min-width: 980px)"\` for desktop, \`"(min-width: 1200px)"\` for wide. Use \`null\` ONLY for true universal pairs that should apply everywhere.
+- A base-CSS change that fixes mobile but breaks desktop is worse than no change.
+
+Output VALID JSON with this exact shape — no prose, no markdown fences:
+{
+  "fixes": [
+    { "selector": "<css selector>", "property": "<css property>", "value": "<css value>", "mediaCondition": null | "<media condition>" }
+  ]
+}`;
+}
+
+export function parseMigrationFixMultiResponse(response: string): MigrationFix[] {
+  const stripped = response.replace(/^[\s\S]*?({[\s\S]*})[\s\S]*$/, "$1");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stripped);
+  } catch {
+    return [];
+  }
+  if (!parsed || typeof parsed !== "object") return [];
+  const fixesRaw = (parsed as { fixes?: unknown }).fixes;
+  if (!Array.isArray(fixesRaw)) return [];
+  const fixes: MigrationFix[] = [];
+  for (const entry of fixesRaw) {
+    if (!entry || typeof entry !== "object") continue;
+    const item = entry as Record<string, unknown>;
+    const selector = typeof item.selector === "string" ? item.selector.trim() : "";
+    const property = typeof item.property === "string" ? item.property.trim() : "";
+    const value = typeof item.value === "string" ? item.value.trim() : "";
+    if (!selector || !property || !value) continue;
+    let mediaCondition: string | null = null;
+    const rawMedia = item.mediaCondition;
+    if (typeof rawMedia === "string") {
+      const trimmed = rawMedia.trim();
+      mediaCondition = (trimmed === "" || trimmed.toLowerCase() === "none") ? null : trimmed;
+    }
+    fixes.push({ selector, property, value, mediaCondition });
+  }
+  return fixes;
+}
+
 export function resolveMigrationFixFromBaselineHtml(
   baselineHtml: string,
   candidate: Pick<MigrationFixCandidate, "selector" | "property" | "mediaCondition">,
@@ -201,14 +287,32 @@ export function resolveMigrationFixFromBaselineHtml(
   };
 }
 
-export function applyMigrationFixToHtml(html: string, fix: MigrationFix): string {
+export interface ApplyMigrationFixOptions {
+  /**
+   * When true, append a brand-new declaration block (or `@media` wrapper)
+   * if the (selector, mediaCondition) pair is not already in the stylesheet.
+   * Used by the multi-fix path where the LLM may legitimately propose
+   * media-gated fixes for which no existing block exists yet.
+   */
+  appendIfMissing?: boolean;
+}
+
+export function applyMigrationFixToHtml(
+  html: string,
+  fix: MigrationFix,
+  options: ApplyMigrationFixOptions = {},
+): string {
   const css = extractCss(html);
   if (!css) return html;
-  const nextCss = applyMigrationFixToCss(css, fix);
+  const nextCss = applyMigrationFixToCss(css, fix, options);
   return nextCss === css ? html : replaceCss(html, css, nextCss);
 }
 
-export function applyMigrationFixToCss(css: string, fix: MigrationFix): string {
+export function applyMigrationFixToCss(
+  css: string,
+  fix: MigrationFix,
+  options: ApplyMigrationFixOptions = {},
+): string {
   const lines = css.split("\n");
   let currentMedia: string | null = null;
 
@@ -235,7 +339,14 @@ export function applyMigrationFixToCss(css: string, fix: MigrationFix): string {
     return lines.join("\n");
   }
 
-  return css;
+  if (!options.appendIfMissing) return css;
+
+  // No existing matching rule — append a new block.
+  const declaration = `${fix.selector} { ${fix.property}: ${fix.value}; }`;
+  const appended = fix.mediaCondition
+    ? `${css.replace(/\s*$/, "")}\n@media ${fix.mediaCondition} {\n  ${declaration}\n}\n`
+    : `${css.replace(/\s*$/, "")}\n${declaration}\n`;
+  return appended;
 }
 
 export function shouldIgnoreMigrationRerunError(error: unknown): boolean {

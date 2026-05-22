@@ -2,8 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { MigrationFixCandidate } from "./migration-fix-candidates.ts";
 import {
+  applyMigrationFixToCss,
   applyMigrationFixToHtml,
+  buildMigrationFixLoopMultiPrompt,
   buildMigrationFixLoopPrompt,
+  parseMigrationFixMultiResponse,
   parseMigrationFixResponse,
   resolveMigrationFixFromBaselineHtml,
   summarizeMigrationReportConvergence,
@@ -238,6 +241,117 @@ describe("applyMigrationFixToHtml", () => {
     });
 
     assert.match(nextHtml, /@media \(min-width: 768px\) \{\n  \.panel \{ gap: 28px; padding: 32px; \}\n\}/);
+  });
+});
+
+describe("parseMigrationFixMultiResponse", () => {
+  it("parses a JSON array of fixes", () => {
+    const raw = JSON.stringify({
+      fixes: [
+        { selector: ".btn", property: "padding", value: "12px", mediaCondition: null },
+        { selector: ".hero", property: "gap", value: "24px", mediaCondition: "(max-width: 700px)" },
+      ],
+    });
+    const fixes = parseMigrationFixMultiResponse(raw);
+    assert.equal(fixes.length, 2);
+    assert.deepEqual(fixes[0], { selector: ".btn", property: "padding", value: "12px", mediaCondition: null });
+    assert.equal(fixes[1]?.mediaCondition, "(max-width: 700px)");
+  });
+
+  it("normalizes 'none' / empty mediaCondition strings to null", () => {
+    const raw = JSON.stringify({
+      fixes: [
+        { selector: ".x", property: "color", value: "red", mediaCondition: "none" },
+        { selector: ".y", property: "color", value: "blue", mediaCondition: "" },
+      ],
+    });
+    const fixes = parseMigrationFixMultiResponse(raw);
+    assert.equal(fixes[0]?.mediaCondition, null);
+    assert.equal(fixes[1]?.mediaCondition, null);
+  });
+
+  it("strips prose / markdown fences around the JSON block", () => {
+    const wrapped = "Sure! Here are the fixes:\n\n```json\n" +
+      JSON.stringify({ fixes: [{ selector: ".a", property: "color", value: "red", mediaCondition: null }] }) +
+      "\n```\n";
+    assert.equal(parseMigrationFixMultiResponse(wrapped).length, 1);
+  });
+
+  it("returns an empty list when the JSON is malformed", () => {
+    assert.deepEqual(parseMigrationFixMultiResponse("not json at all"), []);
+    assert.deepEqual(parseMigrationFixMultiResponse("{ fixes: oops }"), []);
+  });
+
+  it("drops entries missing required fields", () => {
+    const raw = JSON.stringify({
+      fixes: [
+        { selector: ".ok", property: "color", value: "red", mediaCondition: null },
+        { selector: ".bad", property: "", value: "x" },
+        { property: "color", value: "red" },
+      ],
+    });
+    const fixes = parseMigrationFixMultiResponse(raw);
+    assert.equal(fixes.length, 1);
+    assert.equal(fixes[0]?.selector, ".ok");
+  });
+});
+
+describe("applyMigrationFixToCss appendIfMissing", () => {
+  it("appends a new declaration block when the selector is not in the stylesheet", () => {
+    const css = ".existing { color: red; }";
+    const next = applyMigrationFixToCss(
+      css,
+      { selector: ".new", property: "padding", value: "12px", mediaCondition: null },
+      { appendIfMissing: true },
+    );
+    assert.match(next, /\.new \{ padding: 12px; \}/);
+  });
+
+  it("wraps the new declaration in @media when mediaCondition is set", () => {
+    const css = ".hero { gap: 16px; }";
+    const next = applyMigrationFixToCss(
+      css,
+      { selector: ".hero", property: "padding", value: "24px", mediaCondition: "(max-width: 700px)" },
+      { appendIfMissing: true },
+    );
+    assert.match(next, /@media \(max-width: 700px\) \{\n  \.hero \{ padding: 24px; \}\n\}/);
+  });
+
+  it("returns unchanged CSS when appendIfMissing is false and no rule matches", () => {
+    const css = ".existing { color: red; }";
+    const next = applyMigrationFixToCss(
+      css,
+      { selector: ".missing", property: "padding", value: "12px", mediaCondition: null },
+    );
+    assert.equal(next, css);
+  });
+});
+
+describe("buildMigrationFixLoopMultiPrompt", () => {
+  it("includes maxFixes and asks for JSON output with mediaCondition guidance", () => {
+    const prompt = buildMigrationFixLoopMultiPrompt({
+      baselineFile: "target.html",
+      variantFile: "current.html",
+      target: {
+        variantFile: "current.html",
+        viewport: "mobile",
+        viewportWidth: 375,
+        diffRatio: 0.16,
+        diffPixels: 1000,
+        dominantCategory: "layout-shift",
+        categorySummary: "3 layout-shift",
+        paintTreeSummary: "no changes",
+        fixCandidates: [],
+        category: "layout-shift",
+        score: 0,
+        reasoning: "test",
+      } as any,
+      currentCss: ".x { color: red; }",
+      maxFixes: 5,
+    });
+    assert.match(prompt, /up to 5 high-confidence/);
+    assert.match(prompt, /"fixes"/);
+    assert.match(prompt, /max-width: 700px/);
   });
 });
 
