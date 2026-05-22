@@ -751,6 +751,54 @@ interface SectionDiffRow {
   rank: number;
 }
 
+interface BboxCssAxisHint {
+  axis: string;
+  candidates: string;
+}
+
+function signedPx(value: number): string {
+  return `${value > 0 ? "+" : ""}${value}px`;
+}
+
+function inferBboxCssAxis(match: {
+  deltaTop: number;
+  deltaLeft: number;
+  deltaWidth: number;
+  deltaHeight: number;
+}): BboxCssAxisHint {
+  const axes = [
+    {
+      axis: "height",
+      delta: match.deltaHeight,
+      candidates: "height, min-height, padding-block, line-height, font-size",
+    },
+    {
+      axis: "width",
+      delta: match.deltaWidth,
+      candidates: "width, min-width, max-width, padding-inline, flex-basis, grid-template-columns",
+    },
+    {
+      axis: "y-position",
+      delta: match.deltaTop,
+      candidates: "margin-top, padding-top, row-gap, top, transform",
+    },
+    {
+      axis: "x-position",
+      delta: match.deltaLeft,
+      candidates: "margin-left, padding-left, column-gap, left, transform",
+    },
+  ].sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+
+  const dominant = axes[0]!;
+  if (Math.abs(dominant.delta) <= 1) {
+    return { axis: "-", candidates: "-" };
+  }
+  return {
+    axis: `${dominant.axis} (${signedPx(dominant.delta)})`,
+    candidates: dominant.candidates,
+  };
+}
+
 function rectIntersectionArea(a: SectionRect, b: SectionRect): number {
   const left = Math.max(a.left, b.left);
   const top = Math.max(a.top, b.top);
@@ -1060,17 +1108,19 @@ export function formatMigrationReportForAgent(
         "matched by rank-after-sort-by-area between baseline and variant. " +
         "Survives DOM rewrites — useful when the agent invented a different " +
         "tag tree than the reference. `iou` is intersection-over-union ∈ [0,1] " +
-        "(higher = more overlap).");
+        "(higher = more overlap). The CSS-axis columns name the dominant bbox " +
+        "delta and the properties most likely to affect it.");
       lines.push("");
-      lines.push("| Viewport | Rank | Baseline bbox | Variant bbox | Δ top / left / W / H | IoU |");
-      lines.push("|---|---|---|---|---|---|");
+      lines.push("| Viewport | Rank | Baseline bbox | Variant bbox | Δ top / left / W / H | Likely CSS axis | Candidate properties | IoU |");
+      lines.push("|---|---|---|---|---|---|---|---|");
       for (const vp of bboxSummary.perViewport) {
         for (const m of vp.matches) {
           const b = `${m.baseline.left},${m.baseline.top} ${m.baseline.width}×${m.baseline.height}`;
           const v = `${m.variant.left},${m.variant.top} ${m.variant.width}×${m.variant.height}`;
           const sign = (n: number) => (n > 0 ? `+${n}` : `${n}`);
           const delta = `${sign(m.deltaTop)} / ${sign(m.deltaLeft)} / ${sign(m.deltaWidth)} / ${sign(m.deltaHeight)}`;
-          lines.push(`| \`${vp.viewport}\` | #${m.rank} | ${b} | ${v} | ${delta} | ${m.iou} |`);
+          const axisHint = inferBboxCssAxis(m);
+          lines.push(`| \`${vp.viewport}\` | #${m.rank} | ${b} | ${v} | ${delta} | ${axisHint.axis} | ${axisHint.candidates} | ${m.iou} |`);
         }
       }
       lines.push("");

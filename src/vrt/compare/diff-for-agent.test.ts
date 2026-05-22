@@ -269,6 +269,33 @@ describe("formatMigrationReportForAgent", () => {
     assert.ok(heroLine!.includes("⚠"), "hero row marked worst");
   });
 
+  it("labels component bbox diffs with likely CSS axis candidates", () => {
+    const md = formatMigrationReportForAgent(sampleReport({
+      componentBboxDiffs: [{
+        variantFile: "working.html",
+        perViewport: [{
+          viewport: "mobile",
+          matches: [{
+            rank: 1,
+            baseline: { top: 100, left: 20, width: 320, height: 120, area: 38400, fillColor: "#fff" },
+            variant: { top: 100, left: 20, width: 320, height: 170, area: 54400, fillColor: "#fff" },
+            deltaTop: 0,
+            deltaLeft: 0,
+            deltaWidth: 0,
+            deltaHeight: 50,
+            iou: 0.71,
+          }],
+        }],
+      }],
+    }));
+
+    assert.match(md, /Component bbox diff/);
+    assert.match(md, /height \(\+50px\)/);
+    assert.match(md, /padding-block/);
+    assert.match(md, /line-height/);
+    assert.match(md, /font-size/);
+  });
+
   it("computeSectionDiffRows: sorts by sectionRatio desc and skips zero-area sections", () => {
     const rows = computeSectionDiffRows(
       {

@@ -955,10 +955,12 @@ band at viewports ≥ 1024.
   combines component bbox matches with heatmap regions and renders
   "Per-section diffRatio" rows, including worst-row marking and tests for
   section-ratio sorting.
-- [ ] **Element bounding-box diff** that names the responsible
-  CSS axis. "Your `.luna-panel:nth-of-type(1)` is 50px taller
-  than baseline; candidate properties affecting height:
-  `padding`, `line-height`, `font-size`."
+- [x] **Element bounding-box diff** that names the responsible
+  CSS axis. `diff-for-agent` now annotates component bbox rows with
+  the dominant geometry delta (`height (+50px)`, `width (-18px)`,
+  `y-position (+24px)`, etc.) plus likely CSS properties such as
+  `padding-block`, `line-height`, `font-size`, `max-width`,
+  `grid-template-columns`, or margin/gap/transform candidates.
 - [x] **Color samples on color-change category**. Diff regions now carry
   sampled baseline/current color pairs, visual-semantic descriptions include
   hex pairs, migration results preserve color-change samples, and
