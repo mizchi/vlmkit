@@ -585,46 +585,203 @@ function normalizeSelectorWhitespace(selector: string): string {
     .trim();
 }
 
+/**
+ * A single style block discovered by `scanCssBlocks` — covers both
+ * single-line and multi-line rules at the top level and inside
+ * `@media` wrappers.
+ */
+interface CssBlock {
+  selector: string;
+  /** Body slice between `{` and `}` (exclusive on both sides). */
+  bodyStart: number;
+  bodyEnd: number;
+  /** Full block slice, `${selector}{...}` inclusive. */
+  blockStart: number;
+  blockEnd: number;
+  mediaCondition: string | null;
+}
+
+/**
+ * Tokenize the CSS into selector blocks. Handles top-level rules and
+ * one level of `@media` nesting. Strings and `/* ... *​/` comments are
+ * skipped so braces inside them don't confuse the depth counter.
+ */
+function scanCssBlocks(css: string): CssBlock[] {
+  const blocks: CssBlock[] = [];
+  const len = css.length;
+  let i = 0;
+  let depth = 0;
+  let mediaStack: Array<{ condition: string; closeAt: number | null }> = [];
+  let selectorStart = -1;
+
+  while (i < len) {
+    const ch = css[i];
+    // Skip comments
+    if (ch === "/" && css[i + 1] === "*") {
+      const end = css.indexOf("*/", i + 2);
+      i = end === -1 ? len : end + 2;
+      continue;
+    }
+    // Skip strings
+    if (ch === '"' || ch === "'") {
+      const quote = ch;
+      i++;
+      while (i < len && css[i] !== quote) {
+        if (css[i] === "\\") i += 2;
+        else i++;
+      }
+      i++;
+      continue;
+    }
+    if (ch === "{") {
+      // Determine which selector this `{` opens.
+      const headRaw = css.slice(selectorStart < 0 ? 0 : selectorStart, i);
+      const head = headRaw.trim();
+      selectorStart = -1;
+      if (depth === 0 && head.startsWith("@media")) {
+        // Open a media wrapper. Track its closing brace.
+        const condition = head.replace(/^@media\s+/, "").trim();
+        mediaStack.push({ condition, closeAt: null });
+        depth++;
+        i++;
+        continue;
+      }
+      // Otherwise this is a rule. Find matching closing brace.
+      const blockStart = headRaw.length === 0 ? i : i - headRaw.length;
+      const bodyStart = i + 1;
+      let inner = 1;
+      let j = i + 1;
+      while (j < len && inner > 0) {
+        const c = css[j];
+        if (c === "/" && css[j + 1] === "*") {
+          const end = css.indexOf("*/", j + 2);
+          j = end === -1 ? len : end + 2;
+          continue;
+        }
+        if (c === '"' || c === "'") {
+          const q = c;
+          j++;
+          while (j < len && css[j] !== q) {
+            if (css[j] === "\\") j += 2;
+            else j++;
+          }
+          j++;
+          continue;
+        }
+        if (c === "{") inner++;
+        else if (c === "}") inner--;
+        j++;
+      }
+      const bodyEnd = j - 1;
+      const blockEnd = j;
+      const mediaCondition = mediaStack.length > 0
+        ? mediaStack[mediaStack.length - 1]!.condition
+        : null;
+      blocks.push({
+        selector: head,
+        bodyStart,
+        bodyEnd,
+        blockStart,
+        blockEnd,
+        mediaCondition,
+      });
+      i = j;
+      continue;
+    }
+    if (ch === "}") {
+      // Closing a media wrapper.
+      depth--;
+      mediaStack.pop();
+      i++;
+      continue;
+    }
+    if (selectorStart < 0 && ch !== "\n" && ch !== " " && ch !== "\t" && ch !== "\r") {
+      selectorStart = i;
+    }
+    i++;
+  }
+  return blocks;
+}
+
 export function applyMigrationFixToCss(
   css: string,
   fix: MigrationFix,
   options: ApplyMigrationFixOptions = {},
 ): string {
-  const lines = css.split("\n");
-  let currentMedia: string | null = null;
   const targetSelector = normalizeSelectorWhitespace(fix.selector);
+  const blocks = scanCssBlocks(css);
 
-  for (let index = 0; index < lines.length; index++) {
-    const line = lines[index];
-    const trimmed = line.trim();
-    const mediaMatch = trimmed.match(/^@media\s+(.+?)\s*\{$/);
-    if (mediaMatch) {
-      currentMedia = mediaMatch[1];
-      continue;
-    }
-    if (trimmed === "}" && currentMedia !== null) {
-      currentMedia = null;
-      continue;
-    }
-    const ruleMatch = trimmed.match(/^([^{]+)\{([^}]+)\}\s*$/);
-    if (!ruleMatch) continue;
-    if (normalizeSelectorWhitespace(ruleMatch[1]) !== targetSelector) continue;
-    if ((currentMedia ?? null) !== fix.mediaCondition) continue;
+  for (const block of blocks) {
+    if (normalizeSelectorWhitespace(block.selector) !== targetSelector) continue;
+    if ((block.mediaCondition ?? null) !== fix.mediaCondition) continue;
 
-    const body = upsertDeclaration(ruleMatch[2].trim(), fix.property, fix.value);
-    const indent = line.match(/^\s*/)?.[0] ?? "";
-    lines[index] = `${indent}${fix.selector} { ${body} }`;
-    return lines.join("\n");
+    const body = css.slice(block.bodyStart, block.bodyEnd);
+    const updatedBody = upsertDeclarationMultiline(body, fix.property, fix.value);
+    if (updatedBody === body) return css; // no-op (value already matches)
+    return css.slice(0, block.bodyStart) + updatedBody + css.slice(block.bodyEnd);
   }
 
   if (!options.appendIfMissing) return css;
 
-  // No existing matching rule — append a new block.
+  // No existing matching rule — append a new block at the end.
   const declaration = `${fix.selector} { ${fix.property}: ${fix.value}; }`;
   const appended = fix.mediaCondition
     ? `${css.replace(/\s*$/, "")}\n@media ${fix.mediaCondition} {\n  ${declaration}\n}\n`
     : `${css.replace(/\s*$/, "")}\n${declaration}\n`;
   return appended;
+}
+
+/**
+ * Upsert a single declaration into a CSS block body, preserving the
+ * surrounding whitespace / line structure. Works for both single-line
+ * (`padding: 16px; color: red`) and multi-line bodies where each
+ * declaration sits on its own indented line.
+ */
+function upsertDeclarationMultiline(body: string, property: string, value: string): string {
+  // Find existing property declaration.
+  // Match: optional whitespace, property, ws, `:`, ws, value (until `;` or end-of-block).
+  const escaped = property.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
+  const re = new RegExp(`(^|[\\s;])(${escaped})\\s*:\\s*([^;}]*)`, "i");
+  const match = re.exec(body);
+  if (match) {
+    const start = match.index + match[1].length;
+    const propEnd = start + match[2].length;
+    // Find end of the value (next `;` or end of body).
+    let valueEnd = body.length;
+    for (let k = propEnd; k < body.length; k++) {
+      const ch = body[k];
+      if (ch === ";") { valueEnd = k; break; }
+    }
+    // The value slice from `:` to `;`.
+    const colonIdx = body.indexOf(":", propEnd);
+    if (colonIdx === -1 || colonIdx > valueEnd) return body;
+    const currentValue = body.slice(colonIdx + 1, valueEnd).trim();
+    if (currentValue === value) return body; // no-op
+    return body.slice(0, colonIdx + 1) + ` ${value}` + body.slice(valueEnd);
+  }
+
+  // Property not present — insert before the closing brace context.
+  // If the body is single-line (no leading newline before content),
+  // append `; <property>: <value>` to the trimmed body.
+  const trailingWsMatch = body.match(/(\s*)$/);
+  const trailing = trailingWsMatch?.[1] ?? "";
+  const core = body.slice(0, body.length - trailing.length);
+  // Detect indent of the last non-empty declaration line for multi-line bodies.
+  const lines = core.split("\n");
+  if (lines.length >= 2) {
+    // Multi-line body: append a new indented declaration.
+    const indent = lines[lines.length - 1].match(/^\s*/)?.[0]
+      ?? lines.find((l) => l.trim())?.match(/^\s*/)?.[0]
+      ?? "  ";
+    const needsSemicolon = !core.trimEnd().endsWith(";") && core.trim().length > 0;
+    const prefix = needsSemicolon ? ";" : "";
+    return `${core}${prefix}\n${indent}${property}: ${value};${trailing}`;
+  }
+  // Single-line body.
+  const trimmedCore = core.trim();
+  if (trimmedCore.length === 0) return `${property}: ${value};`;
+  const needsSemi = !trimmedCore.endsWith(";");
+  return `${needsSemi ? `${core}; ` : `${core} `}${property}: ${value};${trailing}`;
 }
 
 export function shouldIgnoreMigrationRerunError(error: unknown): boolean {

@@ -307,7 +307,9 @@ describe("applyMigrationFixToCss whitespace tolerance", () => {
       value: "block",
       mediaCondition: null,
     });
-    assert.match(next, /\.kpi strong \{ display: block;/);
+    // Value updated in place; original selector formatting preserved.
+    assert.match(next, /display: block/);
+    assert.equal(next.includes("display: inline"), false);
   });
 
   it("matches a rule with extra spaces around child combinator", () => {
@@ -318,7 +320,80 @@ describe("applyMigrationFixToCss whitespace tolerance", () => {
       value: "blue",
       mediaCondition: null,
     });
-    assert.match(next, /\.a>b \{ color: blue;/);
+    assert.match(next, /color: blue/);
+    assert.equal(next.includes("color: red"), false);
+  });
+});
+
+describe("applyMigrationFixToCss multi-line block in-place update", () => {
+  it("updates a single property inside a multi-line block without appending", () => {
+    const css = `.stage {
+  padding: 36px 52px 40px;
+  background: linear-gradient(to right, red, blue), var(--black);
+}`;
+    const next = applyMigrationFixToCss(css, {
+      selector: ".stage",
+      property: "padding",
+      value: "34px",
+      mediaCondition: null,
+    });
+    assert.match(next, /padding: 34px;/);
+    // The other declaration must survive.
+    assert.match(next, /background: linear-gradient/);
+    // Must NOT append a longhand at end of stylesheet.
+    assert.equal(next.includes(".stage { padding: 34px"), false, "should be updated in place, not appended");
+    // Sanity: single occurrence of `.stage`.
+    assert.equal((next.match(/\.stage/g) ?? []).length, 1);
+  });
+
+  it("inserts a new property into a multi-line block when not present", () => {
+    const css = `.card {
+  padding: 16px;
+  background: white;
+}`;
+    const next = applyMigrationFixToCss(css, {
+      selector: ".card",
+      property: "border-radius",
+      value: "8px",
+      mediaCondition: null,
+    });
+    assert.match(next, /border-radius: 8px;/);
+    assert.match(next, /padding: 16px;/);
+    // New declaration should be inserted inside the block, indented.
+    assert.match(next, /background: white;\s+border-radius: 8px;/);
+    // Block count unchanged (no append).
+    assert.equal((next.match(/\.card/g) ?? []).length, 1);
+  });
+
+  it("updates a rule nested in @media", () => {
+    const css = `.box { color: red; }
+@media (max-width: 700px) {
+  .box {
+    color: red;
+    padding: 8px;
+  }
+}`;
+    const next = applyMigrationFixToCss(css, {
+      selector: ".box",
+      property: "padding",
+      value: "16px",
+      mediaCondition: "(max-width: 700px)",
+    });
+    // The @media `.box` padding gets updated, not the top-level one.
+    assert.match(next, /@media \(max-width: 700px\)[\s\S]*padding: 16px;/);
+    // Original top-level `.box { color: red; }` untouched.
+    assert.match(next, /^\.box \{ color: red; \}/);
+  });
+
+  it("returns unchanged CSS when the value already matches", () => {
+    const css = `.btn {\n  color: blue;\n  padding: 8px;\n}`;
+    const next = applyMigrationFixToCss(css, {
+      selector: ".btn",
+      property: "color",
+      value: "blue",
+      mediaCondition: null,
+    });
+    assert.equal(next, css);
   });
 });
 
