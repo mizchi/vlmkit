@@ -944,11 +944,12 @@ band at viewports ≥ 1024.
   candidates (real deltas) get ✓, while `display` /
   `flex-direction` candidates whose computed values already match
   baseline get ✗ — same fixture, opposite ranking from before.
-- [ ] **"Missing CSS rule" output.** Specced-vs-computed: "Baseline
-  `.eyebrow` declares `text-transform: uppercase`; your variant has
-  no rule producing that on `.luna-pill`." Today the tool emits
-  computed-vs-computed but doesn't tell the agent which baseline
-  selector is missing on the variant side.
+- [x] **"Missing CSS rule" output.** `diff-for-agent` now emits
+  "Missing CSS rule hints" directly after the class-rename map.
+  It combines DOM-position deltas with computed-style selector-only
+  evidence, so rows like baseline `.eyebrow` → variant `.luna-pill`
+  show the property and computed value gap (`text-transform:
+  uppercase → none`) as a concrete variant-rule candidate.
 
 - [x] **Per-element / per-section diffRatio**. `diff-for-agent` now
   combines component bbox matches with heatmap regions and renders

@@ -112,6 +112,50 @@ describe("formatMigrationReportForAgent", () => {
     assert.match(md, /parent is flex/);
   });
 
+  it("surfaces missing CSS rule hints across class-renamed selectors", () => {
+    const md = formatMigrationReportForAgent(sampleReport({
+      computedStyleDiff: [{
+        variantFile: "working.html",
+        result: {
+          totalDiffs: 0,
+          byProperty: [],
+          bySelector: [],
+          entries: [],
+          selectorsOnlyInBaseline: [".eyebrow"],
+          selectorsOnlyInVariant: [".luna-pill"],
+        },
+      }],
+      domPositionDiffPerViewport: [{
+        variantFile: "working.html",
+        result: {
+          totalDiffs: 2,
+          verifiedPairs: [".luna-pill::text-transform"],
+          byViewport: [
+            { viewport: "mobile", count: 1 },
+            { viewport: "desktop", count: 1 },
+          ],
+          byPathProperty: [{
+            path: "main[0]>section[0]>span[0]",
+            property: "text-transform",
+            baselineClasses: "eyebrow",
+            variantClasses: "luna-pill",
+            viewports: ["mobile", "desktop"],
+            samples: [
+              { viewport: "mobile", baseline: "uppercase", variant: "none" },
+              { viewport: "desktop", baseline: "uppercase", variant: "none" },
+            ],
+          }],
+        },
+      }],
+    }));
+
+    assert.match(md, /Missing CSS rule hints/);
+    assert.match(md, /`\.eyebrow`/);
+    assert.match(md, /`\.luna-pill`/);
+    assert.match(md, /`text-transform`/);
+    assert.match(md, /`uppercase` → `none`/);
+  });
+
   it("surfaces color-change sampled color pairs", () => {
     const md = formatMigrationReportForAgent(sampleReport({
       results: [{

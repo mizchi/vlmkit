@@ -57,6 +57,8 @@ export interface DfaCsdSummary {
     totalDiffs: number;
     byProperty: Array<{ property: string; count: number }>;
     bySelector: Array<{ selector: string; count: number }>;
+    selectorsOnlyInBaseline?: string[];
+    selectorsOnlyInVariant?: string[];
     entries?: DfaCsdEntry[];
   };
 }
@@ -556,6 +558,16 @@ interface ClassRenamePair {
   uniqueProperties: number;  // unique properties that differ for this class pair
 }
 
+interface MissingCssRuleHint {
+  baselineSelector: string;
+  variantSelector: string;
+  property: string;
+  baseline: string;
+  variant: string;
+  viewports: string[];
+  selectorEvidence: boolean;
+}
+
 function extractClassRenameMap(report: DfaReport, variantFile: string): ClassRenamePair[] {
   // Prefer per-viewport data (richer); fall back to single-viewport DOM-position diff.
   const perVp = (report.domPositionDiffPerViewport ?? []).find((d) => d.variantFile === variantFile);
@@ -624,6 +636,91 @@ function extractClassRenameMap(report: DfaReport, variantFile: string): ClassRen
       || b.pathCount - a.pathCount
       || a.baselineClasses.localeCompare(b.baselineClasses),
     );
+}
+
+function classStringToSelector(classNames: string): string | null {
+  const tokens = classNames.split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return null;
+  return tokens.map((token) => `.${token}`).join("");
+}
+
+function extractMissingCssRuleHints(report: DfaReport, variantFile: string): MissingCssRuleHint[] {
+  const csd = (report.computedStyleDiff ?? []).find((c) => c.variantFile === variantFile);
+  const selectorsOnlyInBaseline = new Set(csd?.result.selectorsOnlyInBaseline ?? []);
+  const selectorsOnlyInVariant = new Set(csd?.result.selectorsOnlyInVariant ?? []);
+  const perVp = (report.domPositionDiffPerViewport ?? []).find((d) => d.variantFile === variantFile);
+  const single = (report.domPositionDiff ?? []).find((d) => d.variantFile === variantFile);
+  const hints = new Map<string, MissingCssRuleHint>();
+
+  function addHint(input: {
+    baselineClasses: string;
+    variantClasses: string;
+    property: string;
+    baseline: string;
+    variant: string;
+    viewports: string[];
+  }) {
+    if (input.baselineClasses === input.variantClasses) return;
+    const baselineSelector = classStringToSelector(input.baselineClasses);
+    const variantSelector = classStringToSelector(input.variantClasses);
+    if (!baselineSelector || !variantSelector) return;
+    if (input.baseline === input.variant) return;
+
+    const key = `${baselineSelector}\u0000${variantSelector}\u0000${input.property}` +
+      `\u0000${input.baseline}\u0000${input.variant}`;
+    const selectorEvidence = selectorsOnlyInBaseline.has(baselineSelector) ||
+      selectorsOnlyInVariant.has(variantSelector);
+    const existing = hints.get(key);
+    if (existing) {
+      const viewports = new Set([...existing.viewports, ...input.viewports]);
+      existing.viewports = [...viewports];
+      existing.selectorEvidence ||= selectorEvidence;
+      return;
+    }
+    hints.set(key, {
+      baselineSelector,
+      variantSelector,
+      property: input.property,
+      baseline: input.baseline,
+      variant: input.variant,
+      viewports: input.viewports,
+      selectorEvidence,
+    });
+  }
+
+  if (perVp) {
+    for (const pp of perVp.result.byPathProperty) {
+      const sample = pp.samples[0];
+      if (!sample) continue;
+      addHint({
+        baselineClasses: pp.baselineClasses,
+        variantClasses: pp.variantClasses,
+        property: pp.property,
+        baseline: sample.baseline,
+        variant: sample.variant,
+        viewports: pp.viewports,
+      });
+    }
+  } else if (single) {
+    const viewport = report.viewports[0]?.label ?? "single";
+    for (const entry of single.result.entries ?? []) {
+      addHint({
+        baselineClasses: entry.baselineClasses,
+        variantClasses: entry.variantClasses,
+        property: entry.property,
+        baseline: entry.baseline,
+        variant: entry.variant,
+        viewports: [viewport],
+      });
+    }
+  }
+
+  return [...hints.values()].sort((a, b) => {
+    if (a.selectorEvidence !== b.selectorEvidence) return a.selectorEvidence ? -1 : 1;
+    if (b.viewports.length !== a.viewports.length) return b.viewports.length - a.viewports.length;
+    if (a.variantSelector !== b.variantSelector) return a.variantSelector.localeCompare(b.variantSelector);
+    return a.property.localeCompare(b.property);
+  });
 }
 
 function formatShiftBands(r: DfaResult): string {
@@ -814,6 +911,27 @@ export function formatMigrationReportForAgent(
       }
       if (renameMapEntries.length > 25) {
         lines.push(`| _…${renameMapEntries.length - 25} more pairs_ | | | |`);
+      }
+      lines.push("");
+    }
+
+    const missingRuleHints = extractMissingCssRuleHints(report, variantFile);
+    if (missingRuleHints.length > 0) {
+      lines.push("### Missing CSS rule hints");
+      lines.push("");
+      lines.push("Derived from DOM-position deltas across class-renamed elements. " +
+        "Values here are computed values, not parsed source declarations; use them as " +
+        "rule candidates for the variant selector.");
+      lines.push("");
+      lines.push("| Baseline selector | Variant selector | Property | Computed baseline → variant | Viewports | Evidence |");
+      lines.push("|---|---|---|---|---|---|");
+      for (const hint of missingRuleHints.slice(0, 20)) {
+        const viewports = hint.viewports.length > 0 ? hint.viewports.join(", ") : "-";
+        const evidence = hint.selectorEvidence ? "selector-only + DOM-position" : "DOM-position";
+        lines.push(`| \`${hint.baselineSelector}\` | \`${hint.variantSelector}\` | \`${hint.property}\` | \`${hint.baseline}\` → \`${hint.variant}\` | ${viewports} | ${evidence} |`);
+      }
+      if (missingRuleHints.length > 20) {
+        lines.push(`| _…${missingRuleHints.length - 20} more hints_ | | | | | |`);
       }
       lines.push("");
     }
