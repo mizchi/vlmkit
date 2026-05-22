@@ -999,7 +999,12 @@ band at viewports ≥ 1024.
 
 ### Playwright Integration
 - [ ] `nlAssert()` with Vision LLM
-- [ ] `onlyOnFailure` pattern
+- [x] `onlyOnFailure` pattern. Added `@mizchi/vlmkit/playwright`
+  with `onlyOnFailure(testInfo, diagnostic)` for `test.afterEach`
+  and `withOnlyOnFailure(run, diagnostic)` for wrapper-style tests.
+  Diagnostics are skipped on pass / expected-fail / skip, run only
+  on unexpected Playwright statuses, and preserve the original
+  assertion error unless the diagnostic also fails.
 - [ ] `toHaveScreenshot()` integration
 
 ### Game Asset / Motion Dogfood (from 2026-05-20)

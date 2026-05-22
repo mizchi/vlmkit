@@ -51,6 +51,10 @@ describe("package manifest for publishable CLI", () => {
         types: "./dist/client.d.mts",
         import: "./dist/client.mjs",
       },
+      "./playwright": {
+        types: "./dist/playwright.d.mts",
+        import: "./dist/playwright.mjs",
+      },
     });
   });
 

@@ -27,6 +27,10 @@
     "./client": {
       "types": "./dist/client.d.mts",
       "import": "./dist/client.mjs"
+    },
+    "./playwright": {
+      "types": "./dist/playwright.d.mts",
+      "import": "./dist/playwright.mjs"
     }
   },
   "publishConfig": {
