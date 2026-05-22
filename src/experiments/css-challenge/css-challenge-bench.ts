@@ -165,6 +165,45 @@ interface ViewportAnalysisBundle {
   detected: boolean;
 }
 
+/**
+ * Synthesize a metadata-only `ViewportAnalysisBundle` from a paint-tree
+ * signal that fired at a single representative viewport via batchRender.
+ * Other viewports are emitted as `visualCaptureSkipped: true` so the
+ * prescanner summary records them as metadata-only crater wins rather
+ * than silent false-negatives.
+ */
+function buildBatchPrescanBundle(
+  viewports: Array<{ width: number; height: number; label: string }>,
+  fastViewport: { width: number; height: number; label: string },
+  paintTreeDiffCount: number,
+): ViewportAnalysisBundle {
+  const viewportResults: ViewportDetectionResult[] = viewports.map((vp) => ({
+    width: vp.width,
+    height: vp.height,
+    visualDiffDetected: false,
+    visualDiffRatio: 0,
+    a11yDiffDetected: false,
+    a11yChangeCount: 0,
+    computedStyleDiffCount: 0,
+    hoverDiffDetected: false,
+    paintTreeDiffCount: vp.label === fastViewport.label ? paintTreeDiffCount : 0,
+    visualCaptureSkipped: true,
+  }));
+  return {
+    viewportResults,
+    primaryAnalysis: null,
+    anyVisual: false,
+    anyA11y: false,
+    anyComputed: false,
+    anyHover: false,
+    anyPaintTree: true,
+    maxDiffRatio: 0,
+    maxDiffPixels: 0,
+    totalA11yChanges: 0,
+    detected: true,
+  };
+}
+
 async function captureStateForBackend(
   backend: RenderBackend,
   viewport: { width: number; height: number; label: string },
@@ -436,6 +475,98 @@ async function runFixtureBenchmark(fixture: string) {
   const shuffledProps = shuffleWithSeed(declarations, START_SEED);
   const shuffledBlocks = shuffleWithSeed(selectorBlocks, START_SEED);
 
+  // ---- Optional multi-trial batchRender pre-pass ----
+  //
+  // `VLMKIT_BATCH_PRESCAN=1`  → single-trial fast path (handled inline)
+  // `VLMKIT_BATCH_PRESCAN=K`  → pre-render K trials per Crater call and
+  //                            short-circuit the per-viewport loop on
+  //                            paint-tree signal. K=0 disables.
+  //
+  // The pre-pass renders ALL trials at the representative viewport in
+  // chunks of K, so the speedup is roughly N × (per-viewport setContent
+  // time) per detected trial. Silent trials still fall through to the
+  // existing crater capture so computed-style / forced-state can fire.
+  const batchPrescanEnv = process.env.VLMKIT_BATCH_PRESCAN;
+  const batchPrescanSize = batchPrescanEnv === undefined
+    ? 0
+    : Math.max(0, Number.parseInt(batchPrescanEnv, 10) || 0);
+  const batchPrescanResults = new Map<number, ReturnType<typeof buildBatchPrescanBundle>>();
+  let batchPrescanRepresentativeViewport: typeof VIEWPORTS[number] | null = null;
+  if (
+    batchPrescanSize >= 1
+    && BACKEND === "prescanner"
+    && craterClient
+    && craterBaselines.size > 0
+  ) {
+    batchPrescanRepresentativeViewport = VIEWPORTS[Math.floor(VIEWPORTS.length / 2)];
+    const baseline = craterBaselines.get(batchPrescanRepresentativeViewport.label);
+    if (baseline?.paintTree && batchPrescanSize >= 2) {
+      // Build trial plans for every trial so we can chunk-batch them.
+      type TrialPlan = {
+        seed: number;
+        request: BatchPrescanRequest;
+      };
+      const plans: TrialPlan[] = [];
+      for (let i = 0; i < TRIALS; i++) {
+        const seed = START_SEED + i;
+        let selector: string;
+        let propertyNames: string[];
+        if (MODE === "selector") {
+          const block = shuffledBlocks[i % shuffledBlocks.length];
+          selector = block.declarations[0]?.selector ?? "";
+          propertyNames = block.declarations.map((d) => d.property);
+        } else {
+          const decl = shuffledProps[i % shuffledProps.length];
+          selector = decl.selector;
+          propertyNames = [decl.property];
+        }
+        if (!selector || propertyNames.length === 0) continue;
+        const mutations = propertyNames.length === 1
+          ? mutationsForPropertyRemoval(selector, propertyNames[0])
+          : mutationsForSelectorBlockRemoval(selector, propertyNames);
+        plans.push({ seed, request: { id: `trial-${seed}`, mutations } });
+      }
+
+      const fastViewport = batchPrescanRepresentativeViewport;
+      console.log(
+        `  ${DIM}Batch prescan: ${plans.length} trial(s) in chunks of ${batchPrescanSize} @ ${fastViewport.label}(${fastViewport.width})${RESET}`,
+      );
+      const batchStart = Date.now();
+      let chunksRun = 0;
+      let signalsFound = 0;
+      try {
+        for (let offset = 0; offset < plans.length; offset += batchPrescanSize) {
+          const chunk = plans.slice(offset, offset + batchPrescanSize);
+          const batch = await runBatchPrescan(
+            craterClient,
+            htmlRaw,
+            { width: fastViewport.width, height: fastViewport.height },
+            baseline.paintTree,
+            chunk.map((p) => p.request),
+          );
+          chunksRun++;
+          for (let j = 0; j < chunk.length; j++) {
+            const plan = chunk[j];
+            const result = batch[j];
+            if (!result || result.missing || result.changes.length === 0) continue;
+            const bundle = buildBatchPrescanBundle(VIEWPORTS, fastViewport, result.changes.length);
+            batchPrescanResults.set(plan.seed, bundle);
+            signalsFound++;
+          }
+        }
+        const elapsedMs = Date.now() - batchStart;
+        console.log(
+          `  ${DIM}Batch prescan: ${signalsFound}/${plans.length} trials short-circuited (${chunksRun} chunk(s), ${elapsedMs}ms)${RESET}`,
+        );
+      } catch (error) {
+        console.log(
+          `  ${YELLOW}Batch prescan failed, falling back per trial: ${error instanceof Error ? error.message : String(error)}${RESET}`,
+        );
+        batchPrescanResults.clear();
+      }
+    }
+  }
+
   for (let i = 0; i < TRIALS; i++) {
     const seed = START_SEED + i;
 
@@ -480,16 +611,19 @@ async function runFixtureBenchmark(fixture: string) {
     let prescannerResolution: PrescannerTrialResolution | null = null;
 
     if (BACKEND === "prescanner") {
-      // Optional batchRender fast-path. Enabled with `VLMKIT_BATCH_PRESCAN=1`.
-      // When the paint-tree signal at the representative viewport fires
-      // through one batchRender call, we synthesize a metadata-only result
-      // for every viewport (`visualCaptureSkipped: true`) and skip the
-      // per-viewport setContent loop. When silent, we fall through to the
-      // existing crater capture path so computed-style / forced-state
-      // signals still get a chance to detect.
-      const batchPrescanEnabled = process.env.VLMKIT_BATCH_PRESCAN === "1";
-      let batchSignalBundle: ViewportAnalysisBundle | null = null;
-      if (batchPrescanEnabled && craterClient && craterBaselines.size > 0) {
+      // batchRender fast-path. Two modes share a single result store:
+      //   - K=1 → render this trial only, inline
+      //   - K>=2 → consult the pre-pass map populated above
+      // Either way, a non-empty paint-tree diff at the representative
+      // viewport synthesizes a metadata-only bundle covering every
+      // viewport and short-circuits the per-viewport setContent loop.
+      let batchSignalBundle: ViewportAnalysisBundle | null = batchPrescanResults.get(seed) ?? null;
+      if (
+        !batchSignalBundle
+        && batchPrescanSize === 1
+        && craterClient
+        && craterBaselines.size > 0
+      ) {
         const fastViewport = VIEWPORTS[Math.floor(VIEWPORTS.length / 2)];
         const baseline = craterBaselines.get(fastViewport.label);
         if (baseline?.paintTree) {
@@ -509,32 +643,7 @@ async function runFixtureBenchmark(fixture: string) {
               [request],
             );
             if (hasAnyBatchPrescanSignal(batch)) {
-              const result = batch[0]!;
-              const viewportResults: ViewportDetectionResult[] = VIEWPORTS.map((vp) => ({
-                width: vp.width,
-                height: vp.height,
-                visualDiffDetected: false,
-                visualDiffRatio: 0,
-                a11yDiffDetected: false,
-                a11yChangeCount: 0,
-                computedStyleDiffCount: 0,
-                hoverDiffDetected: false,
-                paintTreeDiffCount: vp.label === fastViewport.label ? result.changes.length : 0,
-                visualCaptureSkipped: true,
-              }));
-              batchSignalBundle = {
-                viewportResults,
-                primaryAnalysis: null,
-                anyVisual: false,
-                anyA11y: false,
-                anyComputed: false,
-                anyHover: false,
-                anyPaintTree: true,
-                maxDiffRatio: 0,
-                maxDiffPixels: 0,
-                totalA11yChanges: 0,
-                detected: true,
-              };
+              batchSignalBundle = buildBatchPrescanBundle(VIEWPORTS, fastViewport, batch[0]!.changes.length);
             }
           } catch { /* fall through to per-viewport capture */ }
         }

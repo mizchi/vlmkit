@@ -186,12 +186,16 @@ content-dependent を fallback なしで扱えるかが焦点。
     The driver hands Crater the baseline HTML + multiple variants in one
     `batchRender` call and diffs every returned paint tree against the
     caller-supplied baseline tree.
-  - `css-challenge-bench` opts into a per-trial fast-path via
-    `VLMKIT_BATCH_PRESCAN=1`. When the paint-tree diff at the
-    representative viewport fires, the trial resolves as a metadata-only
-    crater win and the per-viewport `setContent` loop is skipped.
-  - Multi-trial batching (the bigger speedup — group K trials into one
-    `batchRender` call) is the next iteration, tracked separately.
+  - `css-challenge-bench` opts in via `VLMKIT_BATCH_PRESCAN`:
+    - `=1` → inline single-trial fast-path
+    - `>=2` → pre-pass that batches K trials per `batchRender` call at
+      the representative viewport, stores per-trial results in a map,
+      and the main loop short-circuits when the map has a paint-tree
+      signal for the current seed. Silent trials fall through to the
+      existing per-viewport crater capture so computed-style /
+      forced-state can still fire.
+  - Bench prints `Batch prescan: M/N trials short-circuited` so the
+    speedup vs. signal-loss tradeoff is observable per run.
 - [x] Expand forced-state coverage beyond hover
   - `InteractionTargetPlan` now carries the full `forcedStates` list
     (hover / focus / focus-visible / focus-within / active) extracted from
