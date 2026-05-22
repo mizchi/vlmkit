@@ -68,6 +68,29 @@ describe("introspectToSpec", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it("should suggest ARIA relationship invariants when references are present", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "vlmkit-introspect-"));
+    try {
+      await writeFile(join(dir, "tabs.a11y.json"), JSON.stringify({
+        role: "document",
+        name: "",
+        children: [
+          { role: "button", name: "Overview", id: "tab-overview", ariaControls: "panel-overview" },
+          { role: "region", name: "Overview panel", id: "panel-overview" },
+        ],
+      }));
+
+      const result = await introspect(dir);
+      assert.ok(
+        result.pages[0]!.suggestedInvariants.some(
+          (inv) => inv.check === "aria-relationships",
+        ),
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("verifySpec", () => {
@@ -156,6 +179,33 @@ describe("verifySpec", () => {
     );
     assert.equal(headingCheck?.passed, false);
     assert.match(headingCheck?.reasoning ?? "", /h3 after h1/);
+  });
+
+  it("should detect missing ARIA relationship targets", () => {
+    const spec: UiSpec = {
+      description: "test",
+      pages: [{
+        testId: "tabs",
+        invariants: [
+          { description: "ARIA relationship references resolve", check: "aria-relationships", cost: "low" },
+        ],
+      }],
+    };
+    const badTree: A11yNode = {
+      role: "document",
+      name: "",
+      children: [
+        { role: "button", name: "Overview", id: "tab-overview", ariaControls: "missing-panel" },
+      ],
+    };
+
+    const data = new Map([["tabs", { a11yTree: badTree, screenshotExists: true }]]);
+    const result = verifySpec(spec, data);
+    const ariaCheck = result.results[0].checked.find(
+      (check) => check.invariant.check === "aria-relationships",
+    );
+    assert.equal(ariaCheck?.passed, false);
+    assert.match(ariaCheck?.reasoning ?? "", /missing-panel/);
   });
 
   it("should skip high-cost assertions", () => {

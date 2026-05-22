@@ -32,6 +32,7 @@ function introspectPage(testId: string, tree: A11yNode): PageIntrospection {
   const landmarks: { role: string; name: string }[] = [];
   const interactiveElements: { role: string; name: string; hasLabel: boolean }[] = [];
   const headingLevels: number[] = [];
+  let ariaRelationshipCount = 0;
   let totalNodes = 0;
 
   function walk(node: A11yNode) {
@@ -53,6 +54,8 @@ function introspectPage(testId: string, tree: A11yNode): PageIntrospection {
       headingLevels.push(node.level);
     }
 
+    ariaRelationshipCount += countNodeAriaRelationshipRefs(node);
+
     for (const child of node.children ?? []) {
       walk(child);
     }
@@ -63,7 +66,14 @@ function introspectPage(testId: string, tree: A11yNode): PageIntrospection {
   const unlabeledCount = interactiveElements.filter((e) => !e.hasLabel).length;
 
   // Auto-inferred invariants
-  const suggestedInvariants = generateInvariants(testId, landmarks, interactiveElements, headingLevels, unlabeledCount);
+  const suggestedInvariants = generateInvariants(
+    testId,
+    landmarks,
+    interactiveElements,
+    headingLevels,
+    ariaRelationshipCount,
+    unlabeledCount
+  );
 
   // Auto-generate page description
   const description = generateDescription(testId, landmarks, interactiveElements);
@@ -107,6 +117,7 @@ function generateInvariants(
   landmarks: { role: string; name: string }[],
   interactive: { role: string; name: string; hasLabel: boolean }[],
   headingLevels: number[],
+  ariaRelationshipCount: number,
   unlabeledCount: number
 ): SpecInvariant[] {
   const invariants: SpecInvariant[] = [];
@@ -137,6 +148,14 @@ function generateInvariants(
     invariants.push({
       description: "Heading hierarchy does not skip levels",
       check: "heading-hierarchy",
+      cost: "low",
+    });
+  }
+
+  if (ariaRelationshipCount > 0) {
+    invariants.push({
+      description: "ARIA relationship references resolve",
+      check: "aria-relationships",
       cost: "low",
     });
   }
@@ -282,6 +301,10 @@ function checkInvariant(
       const result = checkHeadingHierarchy(data.a11yTree);
       return { invariant: inv, passed: result.passed, reasoning: result.reasoning };
     }
+    case "aria-relationships": {
+      const result = checkAriaRelationships(data.a11yTree);
+      return { invariant: inv, passed: result.passed, reasoning: result.reasoning };
+    }
     default:
       return { invariant: inv, passed: true, reasoning: `Check "${inv.check ?? "none"}" — passed (no verifier)` };
   }
@@ -341,6 +364,102 @@ function checkHeadingHierarchy(tree: A11yNode): { passed: boolean; reasoning: st
   }
 
   return { passed: true, reasoning: `Heading hierarchy OK (${levels.map((level) => `h${level}`).join(" > ")})` };
+}
+
+const ARIA_RELATIONSHIP_FIELDS = [
+  { label: "aria-labelledby", keys: ["ariaLabelledBy", "ariaLabeledBy", "aria-labelledby"] },
+  { label: "aria-describedby", keys: ["ariaDescribedBy", "aria-describedby"] },
+  { label: "aria-controls", keys: ["ariaControls", "aria-controls"] },
+  { label: "aria-owns", keys: ["ariaOwns", "aria-owns"] },
+  { label: "aria-details", keys: ["ariaDetails", "aria-details"] },
+  { label: "aria-activedescendant", keys: ["ariaActiveDescendant", "aria-activedescendant"] },
+] as const;
+
+interface AriaRelationshipRef {
+  source: string;
+  attribute: string;
+  targetId: string;
+}
+
+function countNodeAriaRelationshipRefs(node: A11yNode): number {
+  let count = 0;
+  for (const field of ARIA_RELATIONSHIP_FIELDS) {
+    for (const key of field.keys) {
+      count += normalizeAriaReferenceValue(readA11yNodeValue(node, key)).length;
+    }
+  }
+  return count;
+}
+
+function checkAriaRelationships(tree: A11yNode): { passed: boolean; reasoning: string } {
+  const ids = collectA11yNodeIds(tree);
+  const refs = collectAriaRelationshipRefs(tree);
+  if (refs.length === 0) {
+    return { passed: true, reasoning: "No ARIA relationship references found" };
+  }
+
+  const missing = refs.filter((ref) => !ids.has(ref.targetId));
+  if (missing.length > 0) {
+    const details = missing
+      .map((ref) => `${ref.attribute} -> ${ref.targetId} from ${ref.source}`)
+      .join("; ");
+    return { passed: false, reasoning: `Missing ARIA relationship target(s): ${details}` };
+  }
+
+  return { passed: true, reasoning: `All ${refs.length} ARIA relationship reference(s) resolve` };
+}
+
+function collectA11yNodeIds(node: A11yNode, ids: Set<string> = new Set()): Set<string> {
+  const id = readA11yNodeValue(node, "id");
+  if (typeof id === "string" && id.trim()) {
+    ids.add(id.trim());
+  }
+  for (const child of node.children ?? []) collectA11yNodeIds(child, ids);
+  return ids;
+}
+
+function collectAriaRelationshipRefs(node: A11yNode, refs: AriaRelationshipRef[] = []): AriaRelationshipRef[] {
+  const source = describeA11yNode(node);
+  for (const field of ARIA_RELATIONSHIP_FIELDS) {
+    const targets = new Set<string>();
+    for (const key of field.keys) {
+      for (const targetId of normalizeAriaReferenceValue(readA11yNodeValue(node, key))) {
+        targets.add(targetId);
+      }
+    }
+    for (const targetId of targets) {
+      refs.push({ source, attribute: field.label, targetId });
+    }
+  }
+  for (const child of node.children ?? []) collectAriaRelationshipRefs(child, refs);
+  return refs;
+}
+
+function readA11yNodeValue(node: A11yNode, key: string): unknown {
+  if (key in node) {
+    return (node as unknown as Record<string, unknown>)[key];
+  }
+  return node.attributes?.[key];
+}
+
+function normalizeAriaReferenceValue(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap(normalizeAriaReferenceValue);
+  }
+  if (typeof value !== "string") {
+    return [];
+  }
+  return value
+    .split(/\s+/)
+    .map((token) => token.trim().replace(/^#/, ""))
+    .filter(Boolean);
+}
+
+function describeA11yNode(node: A11yNode): string {
+  const label = node.name ? ` "${node.name}"` : "";
+  const id = readA11yNodeValue(node, "id");
+  const idLabel = typeof id === "string" && id.trim() ? `#${id.trim()}` : "";
+  return `${node.role}${label}${idLabel}`;
 }
 
 function isAffectedByChanges(

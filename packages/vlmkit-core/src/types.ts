@@ -232,6 +232,7 @@ export type SpecCheckType =
   | "text-visible"
   | "element-count"
   | "heading-hierarchy"
+  | "aria-relationships"
   | "nl-assertion";
 
 // ---- Introspect Output ----
@@ -338,6 +339,8 @@ export interface AgentContext {
 export interface A11yNode {
   role: string;
   name: string;
+  id?: string;
+  attributes?: Record<string, string | number | boolean | null | undefined>;
   level?: number;
   value?: string;
   description?: string;
@@ -346,6 +349,13 @@ export interface A11yNode {
   expanded?: boolean;
   pressed?: boolean | "mixed";
   selected?: boolean;
+  ariaLabelledBy?: string | string[];
+  ariaLabeledBy?: string | string[];
+  ariaDescribedBy?: string | string[];
+  ariaControls?: string | string[];
+  ariaOwns?: string | string[];
+  ariaDetails?: string | string[];
+  ariaActiveDescendant?: string | string[];
   children?: A11yNode[];
 }
 

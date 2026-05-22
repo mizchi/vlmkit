@@ -1364,7 +1364,11 @@ Stepwise cleanup:
 - [x] Heading hierarchy validation:
   introspection now emits a low-cost `heading-hierarchy` invariant when a page
   has headings, and `verifySpec` fails skipped levels such as `h1 -> h3`.
-- [ ] ARIA relationship validation
+- [x] ARIA relationship validation:
+  a11y snapshots can carry `id`, `attributes`, or camelCase ARIA reference
+  fields, and `verifySpec` now fails unresolved `aria-labelledby`,
+  `aria-describedby`, `aria-controls`, `aria-owns`, `aria-details`, and
+  `aria-activedescendant` targets.
 - [ ] Color contrast invariants
 - [ ] Responsive layout invariants
 
