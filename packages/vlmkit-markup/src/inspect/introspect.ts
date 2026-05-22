@@ -10,11 +10,47 @@ import type {
 } from "@mizchi/vlmkit-core/types.ts";
 import { LANDMARK_ROLES, INTERACTIVE_ROLES } from "@mizchi/vlmkit-core/a11y-semantic.ts";
 
+export interface SpecContrastColor {
+  r: number;
+  g: number;
+  b: number;
+}
+
+export interface SpecContrastSample {
+  path: string;
+  text?: string;
+  fontSize: number;
+  fontWeight: number;
+  foreground: SpecContrastColor;
+  background: SpecContrastColor;
+}
+
+export interface SpecContrastFinding {
+  path?: string;
+  text?: string;
+  ratio: number;
+  requiredAA?: number;
+}
+
+export interface SpecPageData {
+  a11yTree?: A11yNode;
+  screenshotExists: boolean;
+  contrastFindings?: SpecContrastFinding[];
+  contrastSamples?: SpecContrastSample[];
+}
+
+interface ContrastSidecarSummary {
+  sampleCount: number;
+  failureCount: number;
+}
+
 /**
  * Auto-generate UI specifications from a11y snapshots.
  */
 export async function introspect(snapshotDir: string): Promise<IntrospectResult> {
-  const files = (await readdir(snapshotDir)).filter((f) => f.endsWith(".a11y.json"));
+  const entries = await readdir(snapshotDir);
+  const files = entries.filter((f) => f.endsWith(".a11y.json"));
+  const contrastSummaries = await readContrastSidecars(snapshotDir, entries);
   const pages: PageIntrospection[] = [];
 
   for (const file of files) {
@@ -22,13 +58,17 @@ export async function introspect(snapshotDir: string): Promise<IntrospectResult>
     const raw = JSON.parse(await readFile(join(snapshotDir, file), "utf-8"));
     if (!raw) continue;
 
-    pages.push(introspectPage(testId, raw as A11yNode));
+    pages.push(introspectPage(testId, raw as A11yNode, contrastSummaries.get(testId)));
   }
 
   return { generatedAt: new Date().toISOString(), pages };
 }
 
-function introspectPage(testId: string, tree: A11yNode): PageIntrospection {
+function introspectPage(
+  testId: string,
+  tree: A11yNode,
+  contrastSummary?: ContrastSidecarSummary
+): PageIntrospection {
   const landmarks: { role: string; name: string }[] = [];
   const interactiveElements: { role: string; name: string; hasLabel: boolean }[] = [];
   const headingLevels: number[] = [];
@@ -72,6 +112,7 @@ function introspectPage(testId: string, tree: A11yNode): PageIntrospection {
     interactiveElements,
     headingLevels,
     ariaRelationshipCount,
+    !!contrastSummary,
     unlabeledCount
   );
 
@@ -89,8 +130,51 @@ function introspectPage(testId: string, tree: A11yNode): PageIntrospection {
       interactiveCount: interactiveElements.length,
       unlabeledCount,
       headingLevels: [...new Set(headingLevels)].sort(),
+      ...(contrastSummary
+        ? {
+            contrastSampleCount: contrastSummary.sampleCount,
+            contrastFailureCount: contrastSummary.failureCount,
+          }
+        : {}),
     },
     suggestedInvariants,
+  };
+}
+
+async function readContrastSidecars(
+  snapshotDir: string,
+  entries: string[]
+): Promise<Map<string, ContrastSidecarSummary>> {
+  const summaries = new Map<string, ContrastSidecarSummary>();
+  for (const file of entries.filter((f) => f.endsWith(".contrast.json"))) {
+    const testId = file.replace(/\.contrast\.json$/, "");
+    const raw = JSON.parse(await readFile(join(snapshotDir, file), "utf-8"));
+    const summary = parseContrastSidecar(raw);
+    if (summary) summaries.set(testId, summary);
+  }
+  return summaries;
+}
+
+function parseContrastSidecar(raw: unknown): ContrastSidecarSummary | undefined {
+  if (Array.isArray(raw)) {
+    return { sampleCount: raw.length, failureCount: countUnknownContrastFailures(raw, true) };
+  }
+  if (!isRecord(raw)) return undefined;
+
+  const failures = Array.isArray(raw.failures) ? raw.failures : undefined;
+  const samples = Array.isArray(raw.samples)
+    ? raw.samples
+    : Array.isArray(raw.contrastSamples)
+      ? raw.contrastSamples
+      : undefined;
+  const totalText = typeof raw.totalText === "number" ? raw.totalText : undefined;
+  if (failures === undefined && samples === undefined && totalText === undefined) {
+    return undefined;
+  }
+
+  return {
+    sampleCount: totalText ?? samples?.length ?? failures?.length ?? 0,
+    failureCount: failures?.length ?? countUnknownContrastFailures(samples ?? [], false),
   };
 }
 
@@ -118,6 +202,7 @@ function generateInvariants(
   interactive: { role: string; name: string; hasLabel: boolean }[],
   headingLevels: number[],
   ariaRelationshipCount: number,
+  hasContrastData: boolean,
   unlabeledCount: number
 ): SpecInvariant[] {
   const invariants: SpecInvariant[] = [];
@@ -156,6 +241,14 @@ function generateInvariants(
     invariants.push({
       description: "ARIA relationship references resolve",
       check: "aria-relationships",
+      cost: "low",
+    });
+  }
+
+  if (hasContrastData) {
+    invariants.push({
+      description: "Text color contrast passes WCAG AA",
+      check: "color-contrast",
       cost: "low",
     });
   }
@@ -205,7 +298,7 @@ export function introspectToSpec(result: IntrospectResult): UiSpec {
  */
 export function verifySpec(
   spec: UiSpec,
-  pageData: Map<string, { a11yTree?: A11yNode; screenshotExists: boolean }>,
+  pageData: Map<string, SpecPageData>,
   changedFiles?: string[],
   depEdges?: Map<string, string[]>
 ): SpecVerifyResult {
@@ -263,8 +356,17 @@ export function verifySpec(
 
 function checkInvariant(
   inv: SpecInvariant,
-  data: { a11yTree?: A11yNode; screenshotExists: boolean }
+  data: SpecPageData
 ): CheckedInvariant {
+  if (inv.check === "no-whiteout") {
+    return { invariant: inv, passed: data.screenshotExists, reasoning: data.screenshotExists ? "Screenshot exists" : "No screenshot" };
+  }
+
+  if (inv.check === "color-contrast") {
+    const result = checkColorContrast(data);
+    return { invariant: inv, passed: result.passed, reasoning: result.reasoning };
+  }
+
   if (!data.a11yTree) {
     return { invariant: inv, passed: false, reasoning: "No a11y tree available" };
   }
@@ -278,8 +380,6 @@ function checkInvariant(
       const unlabeled = countUnlabeled(data.a11yTree);
       return { invariant: inv, passed: unlabeled === 0, reasoning: `${unlabeled} unlabeled element(s)` };
     }
-    case "no-whiteout":
-      return { invariant: inv, passed: data.screenshotExists, reasoning: data.screenshotExists ? "Screenshot exists" : "No screenshot" };
     case "no-error-state":
       return { invariant: inv, passed: true, reasoning: "Heuristic check (a11y-based) — OK" };
     case "element-count": {
@@ -460,6 +560,118 @@ function describeA11yNode(node: A11yNode): string {
   const id = readA11yNodeValue(node, "id");
   const idLabel = typeof id === "string" && id.trim() ? `#${id.trim()}` : "";
   return `${node.role}${label}${idLabel}`;
+}
+
+function checkColorContrast(data: SpecPageData): { passed: boolean; reasoning: string } {
+  const failures: SpecContrastFinding[] = [
+    ...(data.contrastFindings ?? []),
+    ...(data.contrastSamples ?? []).flatMap((sample) => {
+      const finding = analyzeContrastSample(sample);
+      return finding ? [finding] : [];
+    }),
+  ];
+
+  const hasContrastData = data.contrastFindings !== undefined || data.contrastSamples !== undefined;
+  if (!hasContrastData) {
+    return { passed: false, reasoning: "No color contrast data available" };
+  }
+  if (failures.length === 0) {
+    const sampleCount = data.contrastSamples?.length ?? 0;
+    return {
+      passed: true,
+      reasoning: sampleCount > 0
+        ? `All ${sampleCount} color contrast sample(s) pass WCAG AA`
+        : "No color contrast failures",
+    };
+  }
+
+  const first = failures[0]!;
+  const path = first.path ?? "(unknown)";
+  const need = first.requiredAA === undefined ? "" : ` need ${formatContrastRatio(first.requiredAA)}:1`;
+  const text = first.text ? ` "${first.text}"` : "";
+  return {
+    passed: false,
+    reasoning: `${failures.length} color contrast failure(s): ${path}${text} ${formatContrastRatio(first.ratio)}:1${need}`,
+  };
+}
+
+function analyzeContrastSample(sample: SpecContrastSample): SpecContrastFinding | undefined {
+  const ratio = contrastRatio(sample.foreground, sample.background);
+  const requiredAA = requiredContrastRatio(sample.fontSize, sample.fontWeight);
+  if (ratio >= requiredAA) return undefined;
+  return {
+    path: sample.path,
+    text: sample.text,
+    ratio: Number(ratio.toFixed(2)),
+    requiredAA,
+  };
+}
+
+function countUnknownContrastFailures(entries: unknown[], treatUnknownAsFailure: boolean): number {
+  let count = 0;
+  for (const entry of entries) {
+    if (!isRecord(entry)) {
+      if (treatUnknownAsFailure) count++;
+      continue;
+    }
+    const ratio = typeof entry.ratio === "number" ? entry.ratio : undefined;
+    const requiredAA = typeof entry.requiredAA === "number"
+      ? entry.requiredAA
+      : typeof entry.required === "number"
+        ? entry.required
+        : undefined;
+    if (ratio !== undefined && ratio < (requiredAA ?? 4.5)) {
+      count++;
+      continue;
+    }
+    if (isContrastSampleLike(entry) && analyzeContrastSample(entry)) {
+      count++;
+      continue;
+    }
+    if (ratio === undefined && treatUnknownAsFailure) count++;
+  }
+  return count;
+}
+
+function isContrastSampleLike(value: Record<string, unknown>): value is Record<string, unknown> & SpecContrastSample {
+  return typeof value.path === "string"
+    && typeof value.fontSize === "number"
+    && typeof value.fontWeight === "number"
+    && isColor(value.foreground)
+    && isColor(value.background);
+}
+
+function isColor(value: unknown): value is SpecContrastColor {
+  return isRecord(value)
+    && typeof value.r === "number"
+    && typeof value.g === "number"
+    && typeof value.b === "number";
+}
+
+function requiredContrastRatio(fontSize: number, fontWeight: number): number {
+  return fontSize >= 18 || (fontSize >= 14 && fontWeight >= 700) ? 3.0 : 4.5;
+}
+
+function contrastRatio(a: SpecContrastColor, b: SpecContrastColor): number {
+  const la = relativeLuminance(a);
+  const lb = relativeLuminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+function relativeLuminance(color: SpecContrastColor): number {
+  const channel = (value: number) => {
+    const normalized = value / 255;
+    return normalized <= 0.03928 ? normalized / 12.92 : Math.pow((normalized + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * channel(color.r) + 0.7152 * channel(color.g) + 0.0722 * channel(color.b);
+}
+
+function formatContrastRatio(value: number): string {
+  return value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function isAffectedByChanges(

@@ -233,6 +233,7 @@ export type SpecCheckType =
   | "element-count"
   | "heading-hierarchy"
   | "aria-relationships"
+  | "color-contrast"
   | "nl-assertion";
 
 // ---- Introspect Output ----
@@ -257,6 +258,8 @@ export interface PageIntrospection {
     interactiveCount: number;
     unlabeledCount: number;
     headingLevels: number[];
+    contrastSampleCount?: number;
+    contrastFailureCount?: number;
   };
   /** Auto-inferred invariants */
   suggestedInvariants: SpecInvariant[];

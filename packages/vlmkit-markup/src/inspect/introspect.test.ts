@@ -91,6 +91,30 @@ describe("introspectToSpec", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it("should suggest color contrast invariants from contrast sidecars", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "vlmkit-introspect-"));
+    try {
+      await writeFile(join(dir, "home.a11y.json"), JSON.stringify({
+        role: "document",
+        name: "",
+        children: [{ role: "main", name: "" }],
+      }));
+      await writeFile(join(dir, "home.contrast.json"), JSON.stringify({
+        totalText: 2,
+        failures: [],
+      }));
+
+      const result = await introspect(dir);
+      assert.ok(
+        result.pages[0]!.suggestedInvariants.some(
+          (inv) => inv.check === "color-contrast",
+        ),
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("verifySpec", () => {
@@ -206,6 +230,64 @@ describe("verifySpec", () => {
     );
     assert.equal(ariaCheck?.passed, false);
     assert.match(ariaCheck?.reasoning ?? "", /missing-panel/);
+  });
+
+  it("should detect color contrast failures", () => {
+    const spec: UiSpec = {
+      description: "test",
+      pages: [{
+        testId: "home",
+        invariants: [
+          { description: "Text color contrast passes WCAG AA", check: "color-contrast", cost: "low" },
+        ],
+      }],
+    };
+
+    const data = new Map([["home", {
+      a11yTree: tree,
+      screenshotExists: true,
+      contrastFindings: [
+        { path: "main>p", text: "Muted copy", ratio: 2.1, requiredAA: 4.5 },
+      ],
+    }]]);
+    const result = verifySpec(spec, data);
+    const contrastCheck = result.results[0].checked.find(
+      (check) => check.invariant.check === "color-contrast",
+    );
+    assert.equal(contrastCheck?.passed, false);
+    assert.match(contrastCheck?.reasoning ?? "", /2\.1:1/);
+  });
+
+  it("should pass color contrast samples that meet WCAG AA", () => {
+    const spec: UiSpec = {
+      description: "test",
+      pages: [{
+        testId: "home",
+        invariants: [
+          { description: "Text color contrast passes WCAG AA", check: "color-contrast", cost: "low" },
+        ],
+      }],
+    };
+
+    const data = new Map([["home", {
+      a11yTree: tree,
+      screenshotExists: true,
+      contrastSamples: [
+        {
+          path: "main>p",
+          text: "Body copy",
+          fontSize: 16,
+          fontWeight: 400,
+          foreground: { r: 0, g: 0, b: 0 },
+          background: { r: 255, g: 255, b: 255 },
+        },
+      ],
+    }]]);
+    const result = verifySpec(spec, data);
+    const contrastCheck = result.results[0].checked.find(
+      (check) => check.invariant.check === "color-contrast",
+    );
+    assert.equal(contrastCheck?.passed, true);
   });
 
   it("should skip high-cost assertions", () => {

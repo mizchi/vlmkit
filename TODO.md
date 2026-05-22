@@ -1369,7 +1369,10 @@ Stepwise cleanup:
   fields, and `verifySpec` now fails unresolved `aria-labelledby`,
   `aria-describedby`, `aria-controls`, `aria-owns`, `aria-details`, and
   `aria-activedescendant` targets.
-- [ ] Color contrast invariants
+- [x] Color contrast invariants:
+  `*.contrast.json` sidecars now generate a low-cost `color-contrast`
+  invariant. `verifySpec` accepts either precomputed contrast failures or raw
+  foreground/background samples and checks WCAG AA thresholds locally.
 - [ ] Responsive layout invariants
 
 ### Dashboard (separate repo)
