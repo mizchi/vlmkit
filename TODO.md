@@ -1523,6 +1523,40 @@ Stepwise cleanup:
   invariant. `verifySpec` accepts responsive snapshots/findings and detects
   horizontal overflow, viewport-boundary escapes, and min/max width violations.
 
+### Migration fix-loop follow-ups (2026-05-23 dogfood)
+
+Two structural gaps left after the 2026-05-23 design-runs / patterns
+dogfood. Everything else from that day's improvement-followups report
+has been closed (commits `ef95260`, `2656786`, `f934122`, `4e6d45d`,
+`4efe14b`, `3ce514b`).
+
+- [ ] **Authored grid-template-* capture without computed-style fr→px
+  resolution.** `getComputedStyle().getPropertyValue("grid-template-
+  columns")` resolves `minmax(0, 1fr)` to `0px`, so the report's
+  `computedStyleDiff` can't surface the `.shell` 4px column-width
+  difference in `design-runs/patterns-20260520/app-shell/`. Writing the
+  resolved value back would corrupt the layout. Needs a separate
+  capture path that walks `CSSOM.cssRules` and emits the AUTHORED
+  `grid-template-*` strings as a new report channel
+  (`authoredStyleDiff`?). Then `migration-fix-loop` can include it in
+  the prompt table without going through the computed-style filter.
+  Same shape would help `flex` shorthand, `transform`, and any other
+  property whose computed form diverges from authored.
+- [ ] **VLM color hallucination on `vlm-region-diff`.** The 2026-05-23
+  expressive-menu run showed `bytedance/ui-tars-1.5-7b` returning
+  fabricated `rgb(0, 255, 127)` for a black/red/cream page;
+  `qwen/qwen3-vl-30b-a3b-instruct` correctly identified region NAMES
+  but picked up the heatmap red instead of the variant's authored
+  color. Try a model bake-off with `gemini-2.5-flash` (Stage-2 LLM
+  default — multi-modal capable) and `claude:claude-haiku-4-5` (known
+  more grounded). Second-tier mitigation: pass split baseline + variant
+  PNGs without the heatmap so the model isn't confused by overlay red;
+  pixel-sample colors at the model-identified bbox client-side and
+  swap them into the JSON before downstream uses. Today the CLI is
+  intentionally informational only (`docs/reports/...` not auto-fed to
+  fix-loop). Goal of this follow-up is to make the color values
+  trustworthy enough to feed back automatically.
+
 ### Dashboard (separate repo)
 - [x] Execution result list/search
   - Worker storage now groups artifact rows into execution-result summaries, and `/api/execution-results` exposes searchable run metadata for dashboard clients.
