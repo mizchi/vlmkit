@@ -427,6 +427,10 @@ export async function capturePageState(
       const fallbackHoverStyles = fallbackPlans.length > 0
         ? await capturePlaywrightInteractionFallbackSnapshot(page, fallbackPlans, trackedProperties)
         : {};
+      // Fallback (CDP) result wins over emulated values — CDP forces the
+      // pseudo-state and reads the real computed value, while emulation
+      // rewrites CSS rules and is unreliable when the rule body is empty
+      // (e.g. `.btn-cart:hover { }` after a property-mode removal).
       const mergedHoverStyles = mergeComputedStyleSnapshots(emulatedHoverStyles, fallbackHoverStyles);
       for (const [sel, props] of Object.entries(mergedHoverStyles)) {
         hoverComputedStyles.set(sel, props);
@@ -475,17 +479,50 @@ function dedupeInteractionPlans(
  * extracted from the original selector, so a `.btn:hover:active` rule
  * forces both `hover` and `active` in one round.
  */
+function planSpecificity(plan: InteractionTargetPlan): number {
+  // More chained classes / ids in the normalizedSelector = more specific.
+  // Used to ensure that when multiple plans target overlapping elements
+  // (e.g. `.btn-cart` and `.btn` both match the same `<button class="btn
+  // btn-cart">`), the snapshot keeps the value captured under the more
+  // specific plan rather than letting the broader plan's forced-state
+  // capture overwrite it.
+  return (
+    (plan.normalizedSelector.match(/\./g)?.length ?? 0) * 10
+    + (plan.normalizedSelector.match(/#/g)?.length ?? 0) * 100
+    + plan.normalizedSelector.length
+  );
+}
+
 async function capturePlaywrightInteractionFallbackSnapshot(
   page: Page,
   plans: InteractionTargetPlan[],
   trackedProperties: string[],
 ): Promise<ComputedStyleSnapshot> {
   if (plans.length === 0) return {};
+  // Sort by specificity descending so first-write-wins below keeps the
+  // most-specific plan's forced-state value.
+  plans = [...plans].sort((a, b) => planSpecificity(b) - planSpecificity(a));
+
+  // Disable transitions / animations BEFORE forcing the pseudo-state. Without
+  // this, the captured computed style is the mid-transition interpolation
+  // (e.g. `rgb(37, 98, 234)` instead of the final `var(--accent-hover) =
+  // rgb(29, 78, 216)`), which collapses to the default value and produces a
+  // false "hover diff is 0" signal. The same fix is documented in
+  // vlmkit-markup/src/stress/multi-state.ts.
+  let transitionStyleTag: Awaited<ReturnType<Page["addStyleTag"]>> | null = null;
+  try {
+    transitionStyleTag = await page.addStyleTag({
+      content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
+    });
+  } catch { /* page may be detached; CDP path still works without */ }
 
   let cdp: CDPSession | null = null;
   try {
     cdp = await page.context().newCDPSession(page);
   } catch {
+    if (transitionStyleTag) {
+      try { await transitionStyleTag.evaluate((el) => { (el as HTMLElement).remove(); }); } catch { /* ignore */ }
+    }
     return {};
   }
 
@@ -537,9 +574,21 @@ async function capturePlaywrightInteractionFallbackSnapshot(
     }
   } finally {
     try { await cdp.detach(); } catch { /* ignore */ }
+    if (transitionStyleTag) {
+      try { await transitionStyleTag.evaluate((el) => { (el as HTMLElement).remove(); }); } catch { /* ignore */ }
+    }
   }
 
-  return mergeComputedStyleSnapshots(...snapshots);
+  // First-write-wins merge: plans are already sorted by specificity desc, so
+  // the most specific match for each element key is preserved.
+  const accumulated: ComputedStyleSnapshot = {};
+  for (const snapshot of snapshots) {
+    for (const [key, value] of Object.entries(snapshot)) {
+      if (key in accumulated) continue;
+      accumulated[key] = value;
+    }
+  }
+  return accumulated;
 }
 
 /** Capture via Crater BiDi backend */

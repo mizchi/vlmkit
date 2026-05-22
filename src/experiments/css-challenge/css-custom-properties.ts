@@ -162,9 +162,28 @@ function matchesComputedStyleTargetSelector(
   const semanticPrefix = buildSemanticSnapshotSelectorPrefix(normalizedTarget);
   if (!semanticPrefix) return false;
 
-  return diffSelector === semanticPrefix ||
+  if (
+    diffSelector === semanticPrefix ||
     diffSelector.startsWith(`${semanticPrefix}[`) ||
-    diffSelector.startsWith(`${semanticPrefix}::`);
+    diffSelector.startsWith(`${semanticPrefix}::`)
+  ) return true;
+
+  // Hover/forced-state snapshots key by the element's full joined-class
+  // identifier (e.g. `.btn.btn-cart`), but the target's selector comes
+  // straight from CSS (e.g. `.btn-cart`). Treat them as matching when the
+  // target's class/id appears as one of the diff selector's class/id
+  // tokens — the joined-key element does belong to the target class.
+  if (semanticPrefix.startsWith(".") || semanticPrefix.startsWith("#")) {
+    const sigil = semanticPrefix[0];
+    const token = semanticPrefix.slice(1);
+    if (!token) return false;
+    const tokens = diffSelector
+      .split(/[.#\s>+~]/)
+      .filter(Boolean);
+    if (sigil === "." && tokens.includes(token)) return true;
+    if (sigil === "#" && tokens.includes(token)) return true;
+  }
+  return false;
 }
 
 function buildSemanticSnapshotSelectorPrefix(selector: string): string | null {
