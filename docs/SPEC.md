@@ -52,7 +52,7 @@
   > Preserved for matrix-row parity.
   - contributes to: GOAL-MARKUP-FIDELITY
   - deprecated: Out of scope per v2 matrix: transitions are intentionally disabled for determinism — mid-frame correctness is fundamentally incompatible.
-  - body: _not yet implemented_
+  - body: correctness remains out of scope; detection exists as `vlmkit check motion`, which samples CSSOM animation / transition declarations and running vs paused animation state.
 
 - [ ] **Asset 404 or broken images** (minor) [draft] — verifies: K6
   > Partial: `render-sanity` in `compare` flags pages with missing-image placeholders; no dedicated network-error gate.
@@ -521,10 +521,10 @@
   - contributes to: GOAL-DESIGN-SYSTEM
   - body: _not yet implemented_
 
-- [ ] **Reduced motion compliance** — verifies: F9
-  > `media-variants --variants reduced-motion` does the static-stylesheet sweep.
+- [x] **Reduced motion compliance** — verifies: F9
+  > `media-variants --variants reduced-motion` does the static-stylesheet sweep; `vlmkit check motion` adds CSSOM motion sampling and flags active motion without `prefers-reduced-motion: reduce`.
   - contributes to: GOAL-A11Y-COMPLIANCE
-  - body: _not yet implemented_
+  - body: implemented by `packages/vlmkit-markup/src/stress/media-variants.ts` and `packages/vlmkit-markup/src/style/motion-detect.ts`
 
 - [ ] **Reproduce user bug from screenshot** — verifies: K1
   > `vrt component-extract` crops the bug region from the user-supplied screenshot; `vrt component-from-image` drives the rebuild loop.

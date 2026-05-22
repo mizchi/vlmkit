@@ -50,6 +50,7 @@ describe("vrt CLI tree (cac-based)", () => {
     assert.match(r.stdout, /drift pages/);
     assert.match(r.stdout, /tokens/);
     assert.match(r.stdout, /theme/);
+    assert.match(r.stdout, /motion/);
   });
 
   it("`vrt diff png --help` delegates to the png-diff module's help", () => {
@@ -130,5 +131,12 @@ describe("vrt CLI tree (cac-based)", () => {
     const r = runVrt(["contract", "introspect", "--help"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit contract introspect <html-file-or-url>/);
+  });
+
+  it("`vrt check motion --help` delegates to motion detection help", () => {
+    const r = runVrt(["check", "motion", "--help"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vlmkit check motion <html-or-url>/);
+    assert.match(r.stdout, /--fail-on-suspect/);
   });
 });

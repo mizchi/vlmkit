@@ -189,7 +189,8 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 - [ ] Smoke test: Crater BiDi backend
 - [x] Smoke test: a11y tree consistency check after operations
   - `inspect smoke` now compares post-action a11y snapshots against the initial snapshot and reports `a11y-regression` when all interactive targets or landmarks disappear.
-- [ ] Animation detection (animation-play-state: paused / CSSOM diff)
+- [x] Animation detection (animation-play-state: paused / CSSOM diff)
+  - `vlmkit check motion` samples CSSOM animation / transition declarations, reports running vs paused animations, and flags missing `prefers-reduced-motion: reduce` coverage.
 - [x] External stylesheet breakpoint discovery
   - Regex fallback now reads local `<link rel="stylesheet" href="./...">` CSS during migration breakpoint discovery and merges those breakpoints with Crater results.
 

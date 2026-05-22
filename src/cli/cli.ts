@@ -130,6 +130,7 @@ const SPECS: Record<string, Spec> = {
   mediaVariants: spec("media-variants", () => import("@mizchi/vlmkit-markup/stress/media-variants.ts")),
   crossBrowser: spec("cross-browser", () => import("@mizchi/vlmkit-markup/stress/cross-browser.ts")),
   designTokens: spec("design-tokens", () => import("@mizchi/vlmkit-markup/style/design-tokens.ts")),
+  motionDetect: spec("motion-detect", () => import("@mizchi/vlmkit-markup/style/motion-detect.ts")),
   perf: spec("perf", () => import("../util/perf.ts")),
   explore: spec("explore", () => import("@mizchi/vlmkit-markup/inspect/explore.ts")),
   skill: spec("skill", () => import("../util/skill.ts")),
@@ -154,6 +155,7 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
   check: {
     tokens: { spec: SPECS.designTokens, desc: "Design-token scale conformance" },
     theme: { spec: SPECS.themeParity, desc: "Theme parity (hard-coded color scan in dark mode)" },
+    motion: { spec: SPECS.motionDetect, desc: "CSS motion detection (animation / transition / reduced-motion)" },
     perf: { spec: SPECS.perf, desc: "Web Vitals thresholds (CLS / LCP / FCP)" },
   },
   inspect: {
@@ -296,7 +298,7 @@ regression-watch) + markup synthesis + design audits + CSS auto-repair.
 
 Common command groups:
   vlmkit diff html|png|elements|component|browsers|agent|runs
-  vlmkit check a11y|tokens|theme|perf|drift
+  vlmkit check a11y|tokens|theme|motion|perf|drift
   vlmkit inspect interact|explore|smoke
   vlmkit stress i18n|media
   vlmkit scan component|breakpoints

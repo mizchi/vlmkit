@@ -232,6 +232,9 @@ vlmkit inspect interact <html|url> --sequence <path.json>
 vlmkit inspect explore  <html|url>             # Auto-discover declared actions and diff each
 vlmkit inspect smoke    <html|url>             # A11y-driven exploratory smoke test
 
+# Checks.
+vlmkit check motion <html|url>                 # CSS motion / reduced-motion detection
+
 # Stress tests.
 vlmkit stress i18n  <html>                     # Text-node inflation overflow detection
 vlmkit stress media <html>                     # forced-colors, reduced-motion, print, RTL, 200% zoom

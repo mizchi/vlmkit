@@ -264,6 +264,9 @@ layout が安定してから、色・余白・typography を詰める。
   長い文言で overflow / wrap / clipping を見る。
 - `vlmkit stress media <html>`:
   forced-colors, reduced-motion, print, RTL, 200% zoom などを見る。
+- `vlmkit check motion <html|url>`:
+  CSSOM の animation / transition を拾い、running / paused と
+  reduced-motion 対応漏れを見る。
 - `vlmkit inspect interact <html|url> --sequence <path.json>`:
   明示した操作列で UI が崩れないかを見る。
 - `vlmkit inspect explore <html|url>`:
