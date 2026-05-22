@@ -947,10 +947,10 @@ band at viewports ≥ 1024.
   computed-vs-computed but doesn't tell the agent which baseline
   selector is missing on the variant side.
 
-- [ ] **Per-element / per-section diffRatio**. Today granularity
-  bottoms out at the viewport. "Hero 0.4%, Panel 1.2%, Modal 4.0%"
-  would let the agent target the worst offender. Both subagents
-  independently asked for this.
+- [x] **Per-element / per-section diffRatio**. `diff-for-agent` now
+  combines component bbox matches with heatmap regions and renders
+  "Per-section diffRatio" rows, including worst-row marking and tests for
+  section-ratio sorting.
 - [ ] **Element bounding-box diff** that names the responsible
   CSS axis. "Your `.luna-panel:nth-of-type(1)` is 50px taller
   than baseline; candidate properties affecting height:
