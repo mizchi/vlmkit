@@ -88,10 +88,12 @@ import {
   type PositionedElement,
 } from "@mizchi/vlmkit-core/dom-position-styles.ts";
 import {
+  explainShiftAccumulations,
   findShiftOrigins,
   DOM_BBOX_BROWSER_SCRIPT,
   parseBboxes,
   type BboxElement,
+  type ShiftAccumulationBreakdown,
   type ShiftOrigin,
 } from "@mizchi/vlmkit-core/shift-origin.ts";
 import { findGridSuggestions, type GridSuggestion } from "@mizchi/vlmkit-core/grid-ratio.ts";
@@ -548,6 +550,14 @@ export interface MigrationCompareReport {
       /** Bands the pixel-shift detector reported but for which no DOM-level Δy was found.
        *  Usually a pixelmatch cross-correlation artifact (phantom shift). */
       unexplainedBands?: ShiftRegion[];
+    }>;
+  }>;
+  /** Per-band upstream height-delta accumulation grouped by class pair. */
+  shiftAccumulations?: Array<{
+    variantFile: string;
+    perViewport: Array<{
+      viewport: string;
+      breakdowns: ShiftAccumulationBreakdown[];
     }>;
   }>;
   /** Per-viewport grid-template-columns suggestions (children widths differ). */
@@ -1007,6 +1017,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     const domPositionDiffReports: Array<{ variantFile: string; result: DpResult }> = [];
     const domPositionDiffPerViewportReports: Array<{ variantFile: string; result: DpPerViewportResult }> = [];
     const shiftOriginsReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; origins: ShiftOrigin[]; unexplainedBands?: ShiftRegion[] }> }> = [];
+    const shiftAccumulationsReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; breakdowns: ShiftAccumulationBreakdown[] }> }> = [];
     const gridSuggestionsReports: Array<{ variantFile: string; suggestions: GridSuggestion[] }> = [];
     const componentBboxReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; matches: MatchedBbox[] }> }> = [];
     const componentGeometryReports: Array<{ variantFile: string; profiles: PerRankGeometry[] }> = [];
@@ -1374,11 +1385,15 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         // Shift-origin diagnostics: which element causes each band's shift?
         if (baselineBboxesByVp.size > 0 && variantBboxesByVp.size > 0 && shiftRegionsByVp.size > 0) {
           const perViewport: Array<{ viewport: string; origins: ShiftOrigin[]; unexplainedBands?: ShiftRegion[] }> = [];
+          const accumulationPerViewport: Array<{ viewport: string; breakdowns: ShiftAccumulationBreakdown[] }> = [];
           for (const [vpLabel, bands] of shiftRegionsByVp) {
             const baselineBboxes = baselineBboxesByVp.get(vpLabel);
             const variantBboxes = variantBboxesByVp.get(vpLabel);
             if (!baselineBboxes || !variantBboxes) continue;
             const origins = findShiftOrigins(baselineBboxes, variantBboxes, bands, { perBandLimit: 2 });
+            const breakdowns = explainShiftAccumulations(baselineBboxes, variantBboxes, bands, {
+              maxGroups: 6,
+            });
             const explainedBandKeys = new Set(origins.map((o) => `${o.bandStart}-${o.bandEnd}-${o.bandShift}`));
             const unexplainedBands = bands.filter(
               (b) => !explainedBandKeys.has(`${b.yStart}-${b.yEnd}-${b.shift}`),
@@ -1390,11 +1405,17 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
                 unexplainedBands: unexplainedBands.length > 0 ? unexplainedBands : undefined,
               });
             }
+            if (breakdowns.length > 0) {
+              accumulationPerViewport.push({ viewport: vpLabel, breakdowns });
+            }
           }
           if (perViewport.length > 0) {
             shiftOriginsReports.push({ variantFile: variantFileLabel, perViewport });
             const totalOrigins = perViewport.reduce((s, v) => s + v.origins.length, 0);
             console.log(`  ${DIM}Shift origins: ${totalOrigins} explanation(s) across ${perViewport.length} viewport(s)${RESET}`);
+          }
+          if (accumulationPerViewport.length > 0) {
+            shiftAccumulationsReports.push({ variantFile: variantFileLabel, perViewport: accumulationPerViewport });
           }
 
           // Grid `fr`-ratio suggestions (one set per viewport, then merged
@@ -2034,6 +2055,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         ? domPositionDiffPerViewportReports
         : undefined,
       shiftOrigins: shiftOriginsReports.length > 0 ? shiftOriginsReports : undefined,
+      shiftAccumulations: shiftAccumulationsReports.length > 0 ? shiftAccumulationsReports : undefined,
       gridSuggestions: gridSuggestionsReports.length > 0 ? gridSuggestionsReports : undefined,
       componentBboxDiffs: componentBboxReports.length > 0 ? componentBboxReports : undefined,
       componentGeometryProfiles: componentGeometryReports.length > 0 ? componentGeometryReports : undefined,

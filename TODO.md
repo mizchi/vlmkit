@@ -911,12 +911,12 @@ band at viewports ≥ 1024.
   and `.luna-page` `width / margin` (differs only at desktop/wide
   → max-width value mismatch). Sample de-dupe + 200-entry cap
   keeps `migration-report.json` at ~360 KB.
-- [ ] **Vertical-accumulation breakdown for layout-shift bands.**
-  After C's iter 4 the DOM-position diff was nearly clean but
-  `[720-1047]:+99px` persisted. Today the band reports the *shift*,
-  not the *cause*. Decompose: "the +99px shift in band Y is
-  explained by upstream accumulated height delta: `.luna-metric`
-  −9px × 4 + `.luna-panel-title` line-height −1.5px × 3 …".
+- [x] **Vertical-accumulation breakdown for layout-shift bands.**
+  `shift-origin` now groups upstream bbox height deltas by
+  `(baseline class → variant class)` for each shift band, and
+  `diff-for-agent` renders a "Vertical accumulation breakdown"
+  table such as `.metric → .luna-metric` `-9px × 4 = -36px`
+  plus `.panel-title → .luna-panel-title` `-1.5px × 3 = -4.5px`.
 - [x] **Class-rename map as a header summary table** lands at the
   top of each variant section in `vrt diff-for-agent`, before the
   diff-by-viewport table. Aggregated from `domPositionDiff[Per

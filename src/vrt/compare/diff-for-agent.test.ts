@@ -296,6 +296,49 @@ describe("formatMigrationReportForAgent", () => {
     assert.match(md, /font-size/);
   });
 
+  it("renders vertical accumulation breakdowns for shift bands", () => {
+    const md = formatMigrationReportForAgent(sampleReport({
+      shiftAccumulations: [{
+        variantFile: "working.html",
+        perViewport: [{
+          viewport: "desktop",
+          breakdowns: [{
+            bandStart: 720,
+            bandEnd: 1047,
+            bandShift: 99,
+            accumulatedDeltaHeight: 94.5,
+            contributions: [
+              {
+                tag: "article",
+                baselineClasses: "metric",
+                variantClasses: "luna-metric",
+                count: 4,
+                averageDeltaHeight: -9,
+                totalDeltaHeight: -36,
+                samplePaths: ["metric[0]", "metric[1]"],
+              },
+              {
+                tag: "h3",
+                baselineClasses: "panel-title",
+                variantClasses: "luna-panel-title",
+                count: 3,
+                averageDeltaHeight: -1.5,
+                totalDeltaHeight: -4.5,
+                samplePaths: ["title[0]"],
+              },
+            ],
+          }],
+        }],
+      }],
+    }));
+
+    assert.match(md, /Vertical accumulation breakdown/);
+    assert.match(md, /`metric` → `luna-metric`/);
+    assert.match(md, /-9px × 4 = -36px/);
+    assert.match(md, /`panel-title` → `luna-panel-title`/);
+    assert.match(md, /-1\.5px × 3 = -4\.5px/);
+  });
+
   it("computeSectionDiffRows: sorts by sectionRatio desc and skips zero-area sections", () => {
     const rows = computeSectionDiffRows(
       {

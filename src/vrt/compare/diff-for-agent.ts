@@ -153,6 +153,30 @@ export interface DfaShiftOriginsSummary {
   }>;
 }
 
+export interface DfaShiftAccumulationContribution {
+  tag: string;
+  baselineClasses: string;
+  variantClasses: string;
+  count: number;
+  averageDeltaHeight: number;
+  totalDeltaHeight: number;
+  samplePaths: string[];
+}
+
+export interface DfaShiftAccumulationsSummary {
+  variantFile: string;
+  perViewport: Array<{
+    viewport: string;
+    breakdowns: Array<{
+      bandStart: number;
+      bandEnd: number;
+      bandShift: number;
+      accumulatedDeltaHeight: number;
+      contributions: DfaShiftAccumulationContribution[];
+    }>;
+  }>;
+}
+
 export interface DfaGridSuggestion {
   parentPath: string;
   parentTag: string;
@@ -182,6 +206,7 @@ export interface DfaReport {
   domPositionDiff?: DfaDpSummary[];
   domPositionDiffPerViewport?: DfaDpPerViewportSummary[];
   shiftOrigins?: DfaShiftOriginsSummary[];
+  shiftAccumulations?: DfaShiftAccumulationsSummary[];
   gridSuggestions?: DfaGridSuggestionsSummary[];
   componentBboxDiffs?: Array<{
     variantFile: string;
@@ -1315,6 +1340,31 @@ export function formatMigrationReportForAgent(
         }
         lines.push("");
       }
+    }
+
+    const shiftAccumulationSummary = (report.shiftAccumulations ?? []).find((s) => s.variantFile === variantFile);
+    if (shiftAccumulationSummary && shiftAccumulationSummary.perViewport.length > 0) {
+      lines.push("### Vertical accumulation breakdown (height deltas above shift bands)");
+      lines.push("");
+      lines.push("Groups upstream bbox height changes by `(baseline class → variant class)` " +
+        "for each reported shift band. This is a heuristic accounting view: " +
+        "use it to see whether many small height differences add up to the band shift.");
+      lines.push("");
+      lines.push("| Viewport | Band (y) | Reported shift | Accumulated height Δ | Class pair | Contribution | Sample paths |");
+      lines.push("|---|---|---|---|---|---|---|");
+      for (const vp of shiftAccumulationSummary.perViewport) {
+        for (const breakdown of vp.breakdowns) {
+          const band = `${breakdown.bandStart}–${breakdown.bandEnd}`;
+          for (const c of breakdown.contributions) {
+            const bcls = c.baselineClasses || "_(none)_";
+            const vcls = c.variantClasses || "_(none)_";
+            const contribution = `${signedPx(c.averageDeltaHeight)} × ${c.count} = ${signedPx(c.totalDeltaHeight)}`;
+            const samplePaths = c.samplePaths.map((p) => `\`${p}\``).join(", ");
+            lines.push(`| \`${vp.viewport}\` | ${band} | ${signedPx(breakdown.bandShift)} | ${signedPx(breakdown.accumulatedDeltaHeight)} | \`${bcls}\` → \`${vcls}\` | ${contribution} | ${samplePaths} |`);
+          }
+        }
+      }
+      lines.push("");
     }
 
     const gridSummary = (report.gridSuggestions ?? []).find((g) => g.variantFile === variantFile);

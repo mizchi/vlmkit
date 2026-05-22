@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { findShiftOrigins, parseBboxes, type BboxElement } from "./shift-origin.ts";
+import {
+  explainShiftAccumulations,
+  findShiftOrigins,
+  parseBboxes,
+  type BboxElement,
+} from "./shift-origin.ts";
 
 function bbox(over: Partial<BboxElement> & { path: string }): BboxElement {
   const base: BboxElement = {
@@ -97,6 +102,51 @@ describe("findShiftOrigins", () => {
   it("returns empty array on empty inputs", () => {
     assert.equal(findShiftOrigins([], [], []).length, 0);
     assert.equal(findShiftOrigins([bbox({ path: "p1" })], [], [{ yStart: 0, yEnd: 10, shift: 10 }]).length, 0);
+  });
+});
+
+describe("explainShiftAccumulations", () => {
+  it("groups upstream height deltas by class pair for a shift band", () => {
+    const baseline: BboxElement[] = [
+      bbox({ path: "metric[0]", classes: "metric", top: 100, height: 100 }),
+      bbox({ path: "metric[1]", classes: "metric", top: 210, height: 100 }),
+      bbox({ path: "metric[2]", classes: "metric", top: 320, height: 100 }),
+      bbox({ path: "metric[3]", classes: "metric", top: 430, height: 100 }),
+      bbox({ path: "title[0]", classes: "panel-title", top: 540, height: 24 }),
+      bbox({ path: "title[1]", classes: "panel-title", top: 580, height: 24 }),
+      bbox({ path: "title[2]", classes: "panel-title", top: 620, height: 24 }),
+    ];
+    const variant: BboxElement[] = [
+      bbox({ path: "metric[0]", classes: "luna-metric", top: 100, height: 91 }),
+      bbox({ path: "metric[1]", classes: "luna-metric", top: 201, height: 91 }),
+      bbox({ path: "metric[2]", classes: "luna-metric", top: 302, height: 91 }),
+      bbox({ path: "metric[3]", classes: "luna-metric", top: 403, height: 91 }),
+      bbox({ path: "title[0]", classes: "luna-panel-title", top: 504, height: 22.5 }),
+      bbox({ path: "title[1]", classes: "luna-panel-title", top: 542.5, height: 22.5 }),
+      bbox({ path: "title[2]", classes: "luna-panel-title", top: 581, height: 22.5 }),
+    ];
+
+    const [breakdown] = explainShiftAccumulations(
+      baseline,
+      variant,
+      [{ yStart: 650, yEnd: 900, shift: -40.5 }],
+    );
+
+    assert.ok(breakdown);
+    assert.equal(breakdown.accumulatedDeltaHeight, -40.5);
+    assert.deepEqual(
+      breakdown.contributions.map((c) => [
+        c.baselineClasses,
+        c.variantClasses,
+        c.count,
+        c.averageDeltaHeight,
+        c.totalDeltaHeight,
+      ]),
+      [
+        ["metric", "luna-metric", 4, -9, -36],
+        ["panel-title", "luna-panel-title", 3, -1.5, -4.5],
+      ],
+    );
   });
 });
 

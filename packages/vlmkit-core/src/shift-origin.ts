@@ -46,6 +46,24 @@ export interface ShiftOrigin {
   suspectedAxis?: "height" | "margin/padding-above" | "y-position" | "unknown";
 }
 
+export interface ShiftAccumulationContribution {
+  tag: string;
+  baselineClasses: string;
+  variantClasses: string;
+  count: number;
+  averageDeltaHeight: number;
+  totalDeltaHeight: number;
+  samplePaths: string[];
+}
+
+export interface ShiftAccumulationBreakdown {
+  bandStart: number;
+  bandEnd: number;
+  bandShift: number;
+  accumulatedDeltaHeight: number;
+  contributions: ShiftAccumulationContribution[];
+}
+
 export interface FindShiftOriginsOptions {
   /**
    * Δy magnitude (px) above which an element is considered "shifted." Defaults
@@ -62,6 +80,10 @@ export interface FindShiftOriginsOptions {
 
 const DEFAULT_MIN_DELTA = 5;
 const DEFAULT_PER_BAND_LIMIT = 3;
+
+function roundDelta(value: number): number {
+  return Math.round(value * 100) / 100;
+}
 
 function classifySuspect(
   baseline: BboxElement,
@@ -151,6 +173,81 @@ export function findShiftOrigins(
   }
 
   return origins;
+}
+
+export function explainShiftAccumulations(
+  baseline: BboxElement[],
+  variant: BboxElement[],
+  shiftRegions: ShiftRegion[],
+  options: { minDeltaPx?: number; maxGroups?: number } = {},
+): ShiftAccumulationBreakdown[] {
+  const minDelta = options.minDeltaPx ?? 1;
+  const maxGroups = options.maxGroups ?? 8;
+  if (baseline.length === 0 || variant.length === 0 || shiftRegions.length === 0) return [];
+
+  const variantByPath = new Map<string, BboxElement>();
+  for (const v of variant) variantByPath.set(v.path, v);
+
+  const out: ShiftAccumulationBreakdown[] = [];
+  for (const band of shiftRegions) {
+    const groups = new Map<string, {
+      tag: string;
+      baselineClasses: string;
+      variantClasses: string;
+      deltas: number[];
+      samplePaths: string[];
+    }>();
+
+    for (const b of baseline) {
+      if (b.top >= band.yStart) continue;
+      const v = variantByPath.get(b.path);
+      if (!v) continue;
+      const deltaHeight = roundDelta(v.height - b.height);
+      if (Math.abs(deltaHeight) < minDelta) continue;
+
+      const key = `${b.tag}\u0000${b.classes}\u0000${v.classes}`;
+      const group = groups.get(key) ?? {
+        tag: b.tag,
+        baselineClasses: b.classes,
+        variantClasses: v.classes,
+        deltas: [],
+        samplePaths: [],
+      };
+      group.deltas.push(deltaHeight);
+      if (group.samplePaths.length < 3) group.samplePaths.push(b.path);
+      groups.set(key, group);
+    }
+
+    const contributions = [...groups.values()]
+      .map((g) => {
+        const totalDeltaHeight = roundDelta(g.deltas.reduce((sum, d) => sum + d, 0));
+        return {
+          tag: g.tag,
+          baselineClasses: g.baselineClasses,
+          variantClasses: g.variantClasses,
+          count: g.deltas.length,
+          averageDeltaHeight: roundDelta(totalDeltaHeight / g.deltas.length),
+          totalDeltaHeight,
+          samplePaths: g.samplePaths,
+        };
+      })
+      .sort((a, b) =>
+        Math.abs(b.totalDeltaHeight) - Math.abs(a.totalDeltaHeight) ||
+        a.baselineClasses.localeCompare(b.baselineClasses),
+      )
+      .slice(0, maxGroups);
+
+    if (contributions.length === 0) continue;
+    out.push({
+      bandStart: band.yStart,
+      bandEnd: band.yEnd,
+      bandShift: band.shift,
+      accumulatedDeltaHeight: roundDelta(contributions.reduce((sum, c) => sum + c.totalDeltaHeight, 0)),
+      contributions,
+    });
+  }
+
+  return out;
 }
 
 /**
