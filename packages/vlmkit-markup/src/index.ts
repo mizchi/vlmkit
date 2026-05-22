@@ -101,6 +101,16 @@ export {
   type SpecPageResult,
   type CheckedInvariant,
 } from "./inspect/introspect.ts";
+export type {
+  SpecContrastColor,
+  SpecContrastFinding,
+  SpecContrastSample,
+  SpecPageData,
+  SpecResponsiveIssue,
+  SpecResponsiveRegion,
+  SpecResponsiveSnapshot,
+  SpecResponsiveViewport,
+} from "./inspect/spec-checks.ts";
 
 // ---- Heal / fix prompt ----
 export {
