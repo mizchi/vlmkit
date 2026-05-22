@@ -10,6 +10,10 @@
  *   const result = await client.compare({ baseline: { html: "..." }, current: { html: "..." } });
  */
 import type {
+  ApprovalListQuery,
+  ApprovalListResponse,
+  ApprovalOperationApiRequest,
+  ApprovalOperationResponse,
   ComponentStatusMatrixQuery,
   ComponentStatusMatrixResponse,
   CompareRequest, CompareResponse,
@@ -123,6 +127,14 @@ export class VrtClient {
     query: ComponentStatusMatrixQuery = {},
   ): Promise<ComponentStatusMatrixResponse> {
     return this.get(buildQueryPath("/api/component-status-matrix", query));
+  }
+
+  async approvals(query: ApprovalListQuery = {}): Promise<ApprovalListResponse> {
+    return this.get(buildQueryPath("/api/approvals", query));
+  }
+
+  async applyApproval(request: ApprovalOperationApiRequest): Promise<ApprovalOperationResponse> {
+    return this.post("/api/approvals", request);
   }
 
   // ---- Reasoning Pipeline ----

@@ -363,6 +363,19 @@ export interface ComponentStatusMatrixQuery {
   viewport?: string;
 }
 
+export interface ApprovalListQuery {
+  path?: string;
+}
+
+export type {
+  ApprovalManifestListResponse as ApprovalListResponse,
+  ApprovalOperationRequest,
+  ApprovalOperationResponse,
+} from "../vrt/snapshot/approval-operations.ts";
+import type { ApprovalOperationRequest } from "../vrt/snapshot/approval-operations.ts";
+
+export type ApprovalOperationApiRequest = ApprovalOperationRequest & ApprovalListQuery;
+
 export type {
   SnapshotStatusMatrix as ComponentStatusMatrixResponse,
   SnapshotStatusMatrixCell as ComponentStatusMatrixCell,

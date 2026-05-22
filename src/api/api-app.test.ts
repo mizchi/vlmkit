@@ -218,4 +218,47 @@ describe("createApiApp", () => {
     assert.deepEqual(body.viewports, ["mobile"]);
     assert.equal(body.rows[0]?.worstStatus, "diff");
   });
+
+  it("serves interactive approval list and operation providers", async () => {
+    const app = createApiApp({
+      resolveCraterAvailable: async () => false,
+      listApprovals: async (query) => ({
+        path: query.path ?? "approval.json",
+        total: 1,
+        rules: [{ selector: ".hero", reason: "intentional" }],
+        warnings: [],
+      }),
+      applyApprovalOperation: async (request) => ({
+        path: request.path ?? "approval.json",
+        action: request.action,
+        dryRun: request.dryRun ?? false,
+        beforeCount: 0,
+        afterCount: 1,
+        added: request.action === "add" ? request.rule : undefined,
+        total: 1,
+        rules: request.action === "add" ? [request.rule] : [],
+        warnings: [],
+      }),
+    });
+
+    const listResponse = await app.request("http://vrt.local/api/approvals?path=approval.json");
+    assert.equal(listResponse.status, 200);
+    const list = await listResponse.json() as { total: number; rules: Array<{ selector?: string }> };
+    assert.equal(list.total, 1);
+    assert.equal(list.rules[0]?.selector, ".hero");
+
+    const operationResponse = await app.request("http://vrt.local/api/approvals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "add",
+        path: "approval.json",
+        rule: { selector: ".card", reason: "reviewed in dashboard" },
+      }),
+    });
+    assert.equal(operationResponse.status, 200);
+    const operation = await operationResponse.json() as { action: string; added?: { selector?: string } };
+    assert.equal(operation.action, "add");
+    assert.equal(operation.added?.selector, ".card");
+  });
 });

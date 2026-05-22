@@ -1422,7 +1422,8 @@ Stepwise cleanup:
   - Worker storage now groups artifact rows into execution-result summaries, and `/api/execution-results` exposes searchable run metadata for dashboard clients.
 - [x] Visual diff display (heatmap, side-by-side, overlay)
   - Worker storage now infers baseline/current/heatmap/triptych artifact groups and `/api/visual-diffs` exposes dashboard-ready display modes.
-- [ ] Interactive approval operations
+- [x] Interactive approval operations
+  - `/api/approvals` now exposes approval-manifest list/add/remove operations for dashboard review flows, backed by the same `approval.json` schema as `vrt manifest`.
 - [x] Detection rate time-series graph
   - `bench-history` now builds chart-ready detection-rate series, and local `/api/detection-series` exposes filtered points by backend/fixture/limit for dashboard clients.
 - [x] Component-level status matrix

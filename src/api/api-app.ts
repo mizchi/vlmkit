@@ -1,5 +1,9 @@
 import { Hono } from "hono";
 import type {
+  ApprovalListQuery,
+  ApprovalListResponse,
+  ApprovalOperationApiRequest,
+  ApprovalOperationResponse,
   ComponentStatusMatrixQuery,
   ComponentStatusMatrixResponse,
   DetectionSeriesQuery,
@@ -29,6 +33,8 @@ export interface CreateApiAppOptions {
   listVisualDiffDisplays?: (query: ExecutionResultsQuery) => Promise<VisualDiffDisplaysResponse> | VisualDiffDisplaysResponse;
   listDetectionSeries?: (query: DetectionSeriesQuery) => Promise<DetectionSeriesResponse> | DetectionSeriesResponse;
   getComponentStatusMatrix?: (query: ComponentStatusMatrixQuery) => Promise<ComponentStatusMatrixResponse> | ComponentStatusMatrixResponse;
+  listApprovals?: (query: ApprovalListQuery) => Promise<ApprovalListResponse> | ApprovalListResponse;
+  applyApprovalOperation?: (request: ApprovalOperationApiRequest) => Promise<ApprovalOperationResponse> | ApprovalOperationResponse;
 }
 
 export function createApiApp(options: CreateApiAppOptions = {}) {
@@ -69,6 +75,7 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
         ...(options.listVisualDiffDisplays ? ["visual-diffs"] : []),
         ...(options.listDetectionSeries ? ["detection-series"] : []),
         ...(options.getComponentStatusMatrix ? ["component-status-matrix"] : []),
+        ...(options.listApprovals && options.applyApprovalOperation ? ["approvals"] : []),
       ],
       backends: [
         { name: "chromium", available: true },
@@ -114,6 +121,30 @@ export function createApiApp(options: CreateApiAppOptions = {}) {
     return c.json(await options.getComponentStatusMatrix(parseComponentStatusMatrixQuery(new URL(c.req.url))));
   });
 
+  app.get("/api/approvals", async (c) => {
+    if (!options.listApprovals) {
+      return c.json({ error: "Approval provider is not configured" }, 501);
+    }
+    return c.json(await options.listApprovals(parseApprovalListQuery(new URL(c.req.url))));
+  });
+
+  app.post("/api/approvals", async (c) => {
+    if (!options.applyApprovalOperation) {
+      return c.json({ error: "Approval provider is not configured" }, 501);
+    }
+    let body: ApprovalOperationApiRequest;
+    try {
+      body = await c.req.json<ApprovalOperationApiRequest>();
+    } catch {
+      return c.json({ error: "Invalid JSON body" }, 400);
+    }
+    try {
+      return c.json(await options.applyApprovalOperation(body));
+    } catch (error) {
+      return c.json({ error: errorMessage(error) }, 400);
+    }
+  });
+
   app.post("/api/smoke-test", async (c) => {
     let body: SmokeTestRequest;
     try {
@@ -146,6 +177,10 @@ function parsePositiveInt(value: string | null): number | undefined {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 function parseResultQuery(url: URL): ExecutionResultsQuery {
   return {
     q: url.searchParams.get("q") ?? undefined,
@@ -172,6 +207,12 @@ function parseComponentStatusMatrixQuery(url: URL): ComponentStatusMatrixQuery {
     report: url.searchParams.get("report") ?? undefined,
     label: url.searchParams.get("label") ?? undefined,
     viewport: url.searchParams.get("viewport") ?? undefined,
+  };
+}
+
+function parseApprovalListQuery(url: URL): ApprovalListQuery {
+  return {
+    path: url.searchParams.get("path") ?? undefined,
   };
 }
 

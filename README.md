@@ -494,6 +494,7 @@ Available endpoints:
 - `GET /api/visual-diffs` — grouped baseline/current/heatmap/triptych display models
 - `GET /api/detection-series` — benchmark detection-rate time-series points
 - `GET /api/component-status-matrix` — snapshot report label/component × viewport status matrix
+- `GET|POST /api/approvals` — list/add/remove approval manifest rules for review UIs
 - `POST /api/compare` — compare baseline/current HTML or URLs across viewports
 - `POST /api/compare-renderers` — compare Chromium vs Crater rendering
 - `POST /api/reason` — VLM/LLM reasoning pipeline for diff analysis and fixes

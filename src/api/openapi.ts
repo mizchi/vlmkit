@@ -171,6 +171,26 @@ export function buildOpenApiSpec(options: OpenApiSpecOptions = {}): OpenApiSpec 
           },
         },
       },
+      "/api/approvals": {
+        get: {
+          tags: ["dashboard"],
+          summary: "List approval manifest rules for interactive review",
+          responses: {
+            "200": jsonRefResponse("Approval manifest list", "ApprovalListResponse"),
+            "501": jsonRefResponse("Approval provider is not configured", "ErrorResponse"),
+          },
+        },
+        post: {
+          tags: ["dashboard"],
+          summary: "Apply an interactive approval operation",
+          requestBody: jsonRefBody("ApprovalOperationRequest"),
+          responses: {
+            "200": jsonRefResponse("Approval operation result", "ApprovalOperationResponse"),
+            "400": jsonRefResponse("Validation error", "ErrorResponse"),
+            "501": jsonRefResponse("Approval provider is not configured", "ErrorResponse"),
+          },
+        },
+      },
       "/api/smoke-test": {
         post: {
           tags: ["smoke"],
@@ -569,6 +589,101 @@ function buildSchemas(): Record<string, OpenApiSchema> {
         summary: ref("ComponentStatusMatrixSummary"),
       },
       required: ["timestamp", "components", "viewports", "rows", "summary"],
+    },
+    ApprovalTolerance: {
+      type: "object",
+      properties: {
+        pixels: { type: "number" },
+        ratio: { type: "number" },
+        geometryDelta: { type: "number" },
+        colorDelta: { type: "number" },
+      },
+    },
+    ApprovalRule: {
+      type: "object",
+      properties: {
+        kind: {
+          type: "string",
+          enum: [
+            "visual",
+            "a11y-contrast",
+            "a11y-touch",
+            "a11y-focus-order",
+            "a11y-semantic",
+            "media-variant",
+            "cross-browser",
+          ],
+        },
+        selector: { type: "string" },
+        property: { type: "string" },
+        category: { type: "string" },
+        changeType: { type: "string" },
+        tolerance: ref("ApprovalTolerance"),
+        reason: { type: "string" },
+        issue: { type: "string" },
+        expires: { type: "string" },
+      },
+      required: ["reason"],
+    },
+    ApprovalWarning: {
+      type: "object",
+      properties: {
+        rule: ref("ApprovalRule"),
+        message: { type: "string" },
+      },
+      required: ["rule", "message"],
+    },
+    ApprovalListResponse: {
+      type: "object",
+      properties: {
+        path: { type: "string" },
+        total: { type: "number" },
+        rules: arrayOf(ref("ApprovalRule")),
+        warnings: arrayOf(ref("ApprovalWarning")),
+      },
+      required: ["path", "total", "rules", "warnings"],
+    },
+    ApprovalOperationRequest: {
+      type: "object",
+      properties: {
+        path: { type: "string" },
+        action: {
+          type: "string",
+          enum: ["add", "remove"],
+        },
+        rule: ref("ApprovalRule"),
+        index: { type: "number" },
+        dryRun: { type: "boolean" },
+      },
+      required: ["action"],
+    },
+    ApprovalOperationResponse: {
+      type: "object",
+      properties: {
+        path: { type: "string" },
+        action: {
+          type: "string",
+          enum: ["add", "remove"],
+        },
+        dryRun: { type: "boolean" },
+        beforeCount: { type: "number" },
+        afterCount: { type: "number" },
+        added: ref("ApprovalRule"),
+        removed: ref("ApprovalRule"),
+        total: { type: "number" },
+        rules: arrayOf(ref("ApprovalRule")),
+        warnings: arrayOf(ref("ApprovalWarning")),
+      },
+      required: [
+        "path",
+        "action",
+        "dryRun",
+        "beforeCount",
+        "afterCount",
+        "total",
+        "rules",
+        "warnings",
+      ],
     },
     ReasoningPipelineRequest: {
       type: "object",
