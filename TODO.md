@@ -998,7 +998,12 @@ band at viewports ≥ 1024.
   to fix.
 
 ### Playwright Integration
-- [ ] `nlAssert()` with Vision LLM
+- [x] `nlAssert()` with Vision LLM. Added
+  `nlAssert({ assertion, target | screenshot, reviewer })` to
+  `@mizchi/vlmkit/playwright`. It captures from a Playwright-like
+  `target.screenshot()` or accepts an explicit image buffer, passes
+  the natural-language assertion to an injected Vision reviewer, and
+  throws `NlAssertError` with reasoning/evidence on failure.
 - [x] `onlyOnFailure` pattern. Added `@mizchi/vlmkit/playwright`
   with `onlyOnFailure(testInfo, diagnostic)` for `test.afterEach`
   and `withOnlyOnFailure(run, diagnostic)` for wrapper-style tests.

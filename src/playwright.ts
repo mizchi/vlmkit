@@ -16,3 +16,14 @@ export {
   type ToHaveScreenshotOptions,
   type ToHaveScreenshotWithDiagnosticsOptions,
 } from "./vrt/playwright/to-have-screenshot.ts";
+export {
+  captureNlAssertImage,
+  nlAssert,
+  NlAssertError,
+  type NlAssertImage,
+  type NlAssertOptions,
+  type NlAssertReviewer,
+  type NlAssertReviewRequest,
+  type NlAssertReviewResult,
+  type ScreenshotTargetLike,
+} from "./vrt/playwright/nl-assert.ts";
