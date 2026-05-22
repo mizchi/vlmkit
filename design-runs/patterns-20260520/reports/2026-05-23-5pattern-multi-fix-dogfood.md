@@ -1,4 +1,19 @@
-# 5-pattern multi-fix dogfood (2026-05-23)
+# 5-pattern multi-fix dogfood (2026-05-23) — CORRECTED
+
+**Correction note (also 2026-05-23)**: the original table below
+overstated the outcome. `app-shell`, `game`, and `responsive-stretch`
+were marked "fully converged" because the python aggregation script
+defaulted missing After data to 0.00%. In reality, those patterns
+produced no `fixed.html` (the LLM proposed values that already exist
+in `current.html`, so every apply was a no-op skip). The HONEST
+outcome is **0/5 patterns materially improved**; the LLM proposals
+either match the current value or target a structural diff that no
+value-only fix can express. See `2026-05-23-improvement-followups.md`
+for the resulting infrastructure changes (apply whitespace tolerance,
+viewport-variant detection, summary.json).
+
+---
+
 
 End-to-end LLM-driven fix loop across every patterns-20260520 scenario
 that wasn't yet exercised. Uses the new recommended combo

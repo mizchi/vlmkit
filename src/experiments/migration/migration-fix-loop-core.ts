@@ -250,8 +250,9 @@ export function buildMigrationFixLoopMultiPrompt(input: {
 
   const reportTableLines: string[] = [];
   if (input.baselineValueIndex) {
-    // Collect global rows (one entry per (selector, property), value-stable
-    // across viewports because `buildBaselineValueIndex` uses first-write-wins).
+    // Collect global rows (one entry per (selector, property) that has the
+    // SAME baseline value at every recorded viewport — safe to apply
+    // universally without media gating).
     type Row = { selector: string; property: string; baseline: string };
     const rows: Row[] = [];
     for (const [key, baseline] of input.baselineValueIndex.global) {
@@ -262,6 +263,19 @@ export function buildMigrationFixLoopMultiPrompt(input: {
       if (!isAuthoredProperty(property)) continue;
       rows.push({ selector, property, baseline });
     }
+    // Viewport-variant pairs — different baseline values across viewports.
+    // List them separately so the LLM knows they need explicit media
+    // conditions instead of being applied universally.
+    type VariantRow = { selector: string; property: string; values: string[] };
+    const variantRows: VariantRow[] = [];
+    for (const [key, values] of input.baselineValueIndex.viewportVariant) {
+      const sep = key.lastIndexOf(" ");
+      const selector = key.slice(0, sep);
+      const property = key.slice(sep + 1);
+      if (!isAuthoredCssSelector(selector)) continue;
+      if (!isAuthoredProperty(property)) continue;
+      variantRows.push({ selector, property, values: [...values] });
+    }
     const top = rows.slice(0, 24);
     if (top.length > 0) {
       reportTableLines.push("");
@@ -270,6 +284,15 @@ export function buildMigrationFixLoopMultiPrompt(input: {
         reportTableLines.push(`  ${r.selector} { ${r.property} } → baseline=\`${r.baseline}\``);
       }
       reportTableLines.push("Rules: (a) copy the baseline value VERBATIM when proposing a fix; (b) only use real CSS selectors (no `.parent>tag[1]` path syntax); (c) only target authored properties — never computed layout dimensions like \`height: 1334.41px\`.");
+    }
+    if (variantRows.length > 0) {
+      const topVariant = variantRows.slice(0, 12);
+      reportTableLines.push("");
+      reportTableLines.push(`Viewport-variant pairs (${topVariant.length} of ${variantRows.length} — same selector/property has DIFFERENT baselines per viewport):`);
+      for (const v of topVariant) {
+        reportTableLines.push(`  ${v.selector} { ${v.property} } → values=${v.values.map((x) => `\`${x}\``).join(" | ")}`);
+      }
+      reportTableLines.push("These MUST be media-gated. Setting `mediaCondition: null` for a viewport-variant pair will be REJECTED by the apply step — fix one viewport at a time with the matching media condition.");
     }
   }
 
@@ -319,8 +342,17 @@ Output VALID JSON with this exact shape — no prose, no markdown fences:
  * proposal-value for the reported baseline.
  */
 export interface BaselineValueIndex {
+  /** `(selector, property)` → universal baseline value (same at every viewport that recorded it). */
   global: Map<string, string>;
+  /** `(selector, property, viewport)` → per-viewport baseline value. */
   byViewport: Map<string, string>;
+  /**
+   * `(selector, property)` pairs where different viewports recorded
+   * different baseline values. These MUST NOT be applied universally —
+   * either gate them with the matching media condition or drop them.
+   * Maps to the set of distinct values observed (for debugging).
+   */
+  viewportVariant: Map<string, Set<string>>;
 }
 
 function classListToSelectors(classList: string | undefined): string[] {
@@ -339,16 +371,24 @@ export function buildBaselineValueIndex(
   report: MigrationCompareReport,
   variantFile?: string,
 ): BaselineValueIndex {
-  const global = new Map<string, string>();
+  // First pass: collect every observed (selector, property, viewport)
+  // tuple and aggregate distinct values per (selector, property).
   const byViewport = new Map<string, string>();
-  const addGlobal = (key: string, value: string) => {
-    if (!global.has(key)) global.set(key, value);
+  const observed = new Map<string, Set<string>>();
+  const observeValue = (key: string, value: string) => {
+    let set = observed.get(key);
+    if (!set) {
+      set = new Set();
+      observed.set(key, set);
+    }
+    set.add(value);
   };
   const csd = report.computedStyleDiff ?? [];
   for (const block of csd) {
     if (variantFile && block.variantFile !== variantFile) continue;
     for (const e of block.result?.entries ?? []) {
-      addGlobal(`${e.selector} ${e.property}`, e.baseline);
+      const key = `${e.selector} ${e.property}`;
+      observeValue(key, e.baseline);
     }
   }
   const dpv = report.domPositionDiffPerViewport ?? [];
@@ -360,12 +400,26 @@ export function buildBaselineValueIndex(
         ...classListToSelectors(e.variantClasses),
       ];
       for (const sel of selectors) {
-        addGlobal(`${sel} ${e.property}`, e.baseline);
-        byViewport.set(`${sel} ${e.property} ${e.viewport}`, e.baseline);
+        const key = `${sel} ${e.property}`;
+        observeValue(key, e.baseline);
+        byViewport.set(`${key} ${e.viewport}`, e.baseline);
       }
     }
   }
-  return { global, byViewport };
+
+  // Second pass: promote single-value pairs to `global` (safe to apply
+  // universally); collect multi-value pairs into `viewportVariant` so
+  // callers can either gate them with media conditions or skip them.
+  const global = new Map<string, string>();
+  const viewportVariant = new Map<string, Set<string>>();
+  for (const [key, values] of observed) {
+    if (values.size === 1) {
+      global.set(key, values.values().next().value as string);
+    } else {
+      viewportVariant.set(key, values);
+    }
+  }
+  return { global, byViewport, viewportVariant };
 }
 
 export interface CorrectionResult {
@@ -428,6 +482,17 @@ export function correctMigrationFixesWithReport(
       continue;
     }
     const globalKey = `${fix.selector} ${fix.property}`;
+    // Viewport-variant pairs (same selector/property but different baselines
+    // across viewports) MUST NOT be applied universally — that's the
+    // expressive-menu regression pattern. Require a media condition.
+    if (!fix.mediaCondition && index.viewportVariant.has(globalKey)) {
+      dropped.push({
+        selector: fix.selector,
+        property: fix.property,
+        reason: "viewport-variant baseline (different value per viewport) requires media gating",
+      });
+      continue;
+    }
     const viewportKey = options.viewport ? `${globalKey} ${options.viewport}` : null;
     const baseline = (viewportKey && index.byViewport.get(viewportKey)) ?? index.global.get(globalKey);
     if (baseline && baseline !== fix.value) {
@@ -511,6 +576,15 @@ export function applyMigrationFixToHtml(
   return nextCss === css ? html : replaceCss(html, css, nextCss);
 }
 
+/** Collapse internal whitespace + combinator padding so `.a  >  b` and `.a > b` compare equal. */
+function normalizeSelectorWhitespace(selector: string): string {
+  return selector
+    .replace(/\s+/g, " ")
+    .replace(/\s*([>+~,])\s*/g, "$1")
+    .replace(/,/g, ", ")
+    .trim();
+}
+
 export function applyMigrationFixToCss(
   css: string,
   fix: MigrationFix,
@@ -518,6 +592,7 @@ export function applyMigrationFixToCss(
 ): string {
   const lines = css.split("\n");
   let currentMedia: string | null = null;
+  const targetSelector = normalizeSelectorWhitespace(fix.selector);
 
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index];
@@ -533,7 +608,7 @@ export function applyMigrationFixToCss(
     }
     const ruleMatch = trimmed.match(/^([^{]+)\{([^}]+)\}\s*$/);
     if (!ruleMatch) continue;
-    if (ruleMatch[1].trim() !== fix.selector) continue;
+    if (normalizeSelectorWhitespace(ruleMatch[1]) !== targetSelector) continue;
     if ((currentMedia ?? null) !== fix.mediaCondition) continue;
 
     const body = upsertDeclaration(ruleMatch[2].trim(), fix.property, fix.value);

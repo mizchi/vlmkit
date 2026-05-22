@@ -298,6 +298,30 @@ describe("parseMigrationFixMultiResponse", () => {
   });
 });
 
+describe("applyMigrationFixToCss whitespace tolerance", () => {
+  it("matches a rule with non-canonical descendant-combinator whitespace", () => {
+    const css = ".kpi  strong { display: inline; margin-top: 12px; }";
+    const next = applyMigrationFixToCss(css, {
+      selector: ".kpi strong",
+      property: "display",
+      value: "block",
+      mediaCondition: null,
+    });
+    assert.match(next, /\.kpi strong \{ display: block;/);
+  });
+
+  it("matches a rule with extra spaces around child combinator", () => {
+    const css = ".a  >  b { color: red; }";
+    const next = applyMigrationFixToCss(css, {
+      selector: ".a>b",
+      property: "color",
+      value: "blue",
+      mediaCondition: null,
+    });
+    assert.match(next, /\.a>b \{ color: blue;/);
+  });
+});
+
 describe("applyMigrationFixToCss appendIfMissing", () => {
   it("appends a new declaration block when the selector is not in the stylesheet", () => {
     const css = ".existing { color: red; }";
@@ -424,6 +448,61 @@ describe("buildBaselineValueIndex + correctMigrationFixesWithReport", () => {
     assert.equal(result.fixes.length, 1, "only .real survives");
     assert.equal(result.dropped.length, 2);
     assert.match(result.dropped[0]?.reason ?? "", /path-style/);
+  });
+
+  it("flags viewport-variant pairs and excludes them from `global`", () => {
+    const multiViewportReport: MigrationCompareReport = {
+      baseline: "target.html",
+      variants: ["current.html"],
+      viewports: [],
+      results: [],
+      domPositionDiffPerViewport: [{
+        variantFile: "current.html",
+        result: {
+          entries: [
+            { path: "body[0]", baselineClasses: "stage", variantClasses: "stage", property: "padding", baseline: "34px", variant: "20px", viewport: "wide" },
+            { path: "body[0]", baselineClasses: "stage", variantClasses: "stage", property: "padding", baseline: "20px", variant: "20px", viewport: "mobile" },
+            { path: "body[0]", baselineClasses: "card", variantClasses: "card", property: "color", baseline: "red", variant: "blue", viewport: "wide" },
+            { path: "body[0]", baselineClasses: "card", variantClasses: "card", property: "color", baseline: "red", variant: "blue", viewport: "mobile" },
+          ],
+        },
+      }],
+    };
+    const idx = buildBaselineValueIndex(multiViewportReport, "current.html");
+    assert.ok(idx.viewportVariant.has(".stage padding"), "two distinct baselines for .stage padding → variant");
+    assert.ok(!idx.global.has(".stage padding"), "should be excluded from `global`");
+    assert.ok(idx.global.has(".card color"), ".card color is universal across viewports");
+    assert.ok(!idx.viewportVariant.has(".card color"));
+  });
+
+  it("drops viewport-variant proposals that lack a mediaCondition", () => {
+    const multiViewportReport: MigrationCompareReport = {
+      baseline: "target.html",
+      variants: ["current.html"],
+      viewports: [],
+      results: [],
+      domPositionDiffPerViewport: [{
+        variantFile: "current.html",
+        result: {
+          entries: [
+            { path: "body[0]", baselineClasses: "stage", variantClasses: "stage", property: "padding", baseline: "34px", variant: "20px", viewport: "wide" },
+            { path: "body[0]", baselineClasses: "stage", variantClasses: "stage", property: "padding", baseline: "20px", variant: "20px", viewport: "mobile" },
+          ],
+        },
+      }],
+    };
+    const idx = buildBaselineValueIndex(multiViewportReport, "current.html");
+    const result = correctMigrationFixesWithReport(
+      [
+        { selector: ".stage", property: "padding", value: "16px", mediaCondition: null }, // dropped
+        { selector: ".stage", property: "padding", value: "34px", mediaCondition: "(min-width: 980px)" }, // kept
+      ],
+      idx,
+    );
+    assert.equal(result.fixes.length, 1, "only the media-gated proposal survives");
+    assert.equal(result.fixes[0]?.mediaCondition, "(min-width: 980px)");
+    assert.equal(result.dropped.length, 1);
+    assert.match(result.dropped[0]?.reason ?? "", /viewport-variant/);
   });
 
   it("drops proposals that target computed-layout properties", () => {

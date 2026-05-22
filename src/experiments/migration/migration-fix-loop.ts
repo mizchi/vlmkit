@@ -38,6 +38,7 @@ const IN_PLACE = hasFlag("in-place");
 const PROPOSE_ONLY = hasFlag("propose-only");
 const MAX_FIXES = Math.max(1, parseInt(getArg("max-fixes", "1"), 10) || 1);
 const PROPOSALS_OUT = getArg("proposals-out");
+const SUMMARY_OUT = getArg("summary-out");
 
 async function main() {
   const report = JSON.parse(await readFile(REPORT_PATH, "utf-8")) as MigrationCompareReport;
@@ -166,6 +167,15 @@ async function main() {
 
     if (DRY_RUN || applied.length === 0) {
       if (DRY_RUN) console.log("Dry run: fixes were not written.");
+      await writeSummary({
+        target,
+        proposals: rawFixes,
+        corrections: correction.corrections,
+        dropped: correction.dropped,
+        applied,
+        skipped,
+        outputPath: null,
+      });
       return;
     }
 
@@ -173,6 +183,16 @@ async function main() {
     await mkdir(dirname(outputPath), { recursive: true });
     await writeFile(outputPath, workingHtml);
     console.log(`Wrote: ${outputPath}`);
+
+    await writeSummary({
+      target,
+      proposals: rawFixes,
+      corrections: correction.corrections,
+      dropped: correction.dropped,
+      applied,
+      skipped,
+      outputPath,
+    });
 
     if (NO_RERUN) return;
     await rerunCompare(report, baselinePath, outputPath);
@@ -219,6 +239,45 @@ async function main() {
 
   if (NO_RERUN) return;
   await rerunCompare(report, baselinePath, outputPath);
+}
+
+async function writeSummary(input: {
+  target: SelectedMigrationFixTarget;
+  proposals: MigrationFix[];
+  corrections: Array<{ selector: string; property: string; from: string; to: string }>;
+  dropped: Array<{ selector: string; property: string; reason: string }>;
+  applied: MigrationFix[];
+  skipped: MigrationFix[];
+  outputPath: string | null;
+}): Promise<void> {
+  if (!SUMMARY_OUT) return;
+  const out = resolve(SUMMARY_OUT);
+  await mkdir(dirname(out), { recursive: true });
+  const payload = {
+    target: {
+      variantFile: input.target.variantFile,
+      viewport: input.target.viewport,
+      viewportWidth: input.target.viewportWidth,
+      diffRatio: input.target.diffRatio,
+      diffPixels: input.target.diffPixels,
+      dominantCategory: input.target.dominantCategory,
+    },
+    counts: {
+      proposed: input.proposals.length,
+      corrected: input.corrections.length,
+      dropped: input.dropped.length,
+      applied: input.applied.length,
+      skipped: input.skipped.length,
+    },
+    applied: input.applied,
+    skipped: input.skipped,
+    corrections: input.corrections,
+    dropped: input.dropped,
+    proposals: input.proposals,
+    outputPath: input.outputPath,
+  };
+  await writeFile(out, `${JSON.stringify(payload, null, 2)}\n`);
+  console.log(`Summary: ${out}`);
 }
 
 async function rerunCompare(
