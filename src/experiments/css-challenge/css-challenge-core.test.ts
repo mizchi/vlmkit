@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import type { PaintTreeChange } from "@mizchi/vlmkit-capture/crater-client.ts";
 import type { VrtDiff, VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { parseApprovalManifest } from "../../vrt/snapshot/approval.ts";
-import { applyApprovalsToAnalysisSignals } from "./css-challenge-core.ts";
+import {
+  analyzeVrtDiff,
+  applyApprovalsToAnalysisSignals,
+  captureCraterForcedStateStyles,
+} from "./css-challenge-core.ts";
 
 const snapshot: VrtSnapshot = {
   testId: "page",
@@ -92,5 +96,60 @@ describe("applyApprovalsToAnalysisSignals", () => {
     assert.equal(result.paintTreeChanges.length, 1);
     assert.equal(result.approvedVisualRules.length, 0);
     assert.equal(result.approvedPaintTreeMatches.length, 0);
+  });
+});
+
+describe("captureCraterForcedStateStyles", () => {
+  it("captures forced hover styles keyed by the original selector", async () => {
+    const calls: Array<{ selector: string; forcedStates: string[]; properties: string[] }> = [];
+    const client = {
+      getComputedStylesWithState: async (
+        selector: string,
+        forcedStates: string[],
+        properties: string[],
+      ) => {
+        calls.push({ selector, forcedStates, properties });
+        return {
+          normal: { "text-decoration": "none" },
+          forced: { "text-decoration": "underline" },
+          diff: [{ property: "text-decoration", normal: "none", forced: "underline" }],
+        };
+      },
+    };
+
+    const styles = await captureCraterForcedStateStyles(
+      client,
+      [".footer a:hover", ".plain a"],
+      ["text-decoration"],
+    );
+
+    assert.deepEqual(calls, [
+      { selector: ".footer a:hover", forcedStates: ["hover"], properties: ["text-decoration"] },
+    ]);
+    assert.deepEqual(styles.get(".footer a:hover"), { "text-decoration": "underline" });
+  });
+});
+
+describe("analyzeVrtDiff", () => {
+  it("skips screenshot comparison when visual capture was skipped", async () => {
+    const baseline = {
+      a11yTree: { role: "document", name: "", children: [] },
+      screenshotPath: "/missing-baseline.png",
+      visualCaptureSkipped: true,
+      computedStyles: new Map([[".card", { display: "block" }]]),
+      hoverComputedStyles: new Map(),
+    };
+    const broken = {
+      a11yTree: { role: "document", name: "", children: [] },
+      screenshotPath: "/missing-broken.png",
+      visualCaptureSkipped: true,
+      computedStyles: new Map([[".card", { display: "none" }]]),
+      hoverComputedStyles: new Map(),
+    };
+
+    const analysis = await analyzeVrtDiff(baseline, broken, "/tmp");
+
+    assert.equal(analysis.vrtDiff, null);
+    assert.equal(analysis.computedStyleDiffs.length, 1);
   });
 });

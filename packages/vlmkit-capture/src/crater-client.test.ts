@@ -48,6 +48,40 @@ describe("resolveCraterBidiUrl", () => {
 });
 
 describe("CraterClient.captureComputedStyles", () => {
+  it("uses native getAllComputedStyles when connected to crater", async () => {
+    const client = new CraterClient("ws://unused");
+    const calls: Array<{ method: string; params: Record<string, unknown> }> = [];
+
+    (client as unknown as { contextId: string }).contextId = "session-1";
+    (client as unknown as {
+      sendBidi: (method: string, params: Record<string, unknown>) => Promise<unknown>;
+    }).sendBidi = async (method, params) => {
+      calls.push({ method, params });
+      return {
+        id: 1,
+        type: "success",
+        result: {
+          styles: {
+            "div#card": { display: "flex" },
+          },
+        },
+      };
+    };
+    (client as unknown as { evaluate: () => Promise<unknown> }).evaluate = async () => {
+      throw new Error("captureComputedStyles should prefer getAllComputedStyles");
+    };
+
+    const snapshot = await client.captureComputedStyles(["display"]);
+
+    assert.equal(snapshot.get("div#card")?.display, "flex");
+    assert.deepEqual(calls, [
+      {
+        method: "browsingContext.getAllComputedStyles",
+        params: { context: "session-1", properties: ["display"] },
+      },
+    ]);
+  });
+
   it("parses JSON-serialized snapshots returned by script.evaluate", async () => {
     const client = new CraterClient("ws://unused");
     const evaluateCalls: string[] = [];
@@ -77,5 +111,98 @@ describe("CraterClient.captureComputedStyles", () => {
     const snapshot = await client.captureComputedStyles(["color", "display"]);
 
     assert.equal(snapshot.size, 0);
+  });
+});
+
+describe("CraterClient.getComputedStylesWithState", () => {
+  it("sends forced state requests to crater v0.18 BiDi", async () => {
+    const client = new CraterClient("ws://unused");
+    const calls: Array<{ method: string; params: Record<string, unknown> }> = [];
+
+    (client as unknown as { contextId: string }).contextId = "session-1";
+    (client as unknown as {
+      sendBidi: (method: string, params: Record<string, unknown>) => Promise<unknown>;
+    }).sendBidi = async (method, params) => {
+      calls.push({ method, params });
+      return {
+        id: 1,
+        type: "success",
+        result: {
+          normal: { "text-decoration": "none" },
+          forced: { "text-decoration": "underline" },
+          diff: [{ property: "text-decoration", normal: "none", forced: "underline" }],
+        },
+      };
+    };
+
+    const result = await client.getComputedStylesWithState(
+      ".file-table .file-name a:hover",
+      ["hover"],
+      ["text-decoration"],
+    );
+
+    assert.deepEqual(result.forced, { "text-decoration": "underline" });
+    assert.deepEqual(calls, [
+      {
+        method: "browsingContext.getComputedStylesWithState",
+        params: {
+          context: "session-1",
+          selector: ".file-table .file-name a:hover",
+          forcedStates: ["hover"],
+          properties: ["text-decoration"],
+        },
+      },
+    ]);
+  });
+});
+
+describe("CraterClient.batchRender", () => {
+  it("uses crater v0.18 mutation variants and returns paint trees", async () => {
+    const client = new CraterClient("ws://unused");
+    const calls: Array<{ method: string; params: Record<string, unknown> }> = [];
+
+    (client as unknown as { contextId: string }).contextId = "session-1";
+    (client as unknown as {
+      sendBidi: (method: string, params: Record<string, unknown>) => Promise<unknown>;
+    }).sendBidi = async (method, params) => {
+      calls.push({ method, params });
+      return {
+        id: 1,
+        type: "success",
+        result: {
+          results: [
+            {
+              id: "remove-card-padding",
+              paintTree: { x: 0, y: 0, w: 1280, h: 900, tag: "root", ch: [] },
+            },
+          ],
+        },
+      };
+    };
+
+    const result = await client.batchRender(
+      "<!doctype html><style>.card{padding:16px}</style><div class='card'>A</div>",
+      { width: 1280, height: 900 },
+      [{
+        id: "remove-card-padding",
+        mutations: [{ selector: ".card", property: "padding", action: "remove" }],
+      }],
+    );
+
+    assert.equal(result.results[0]?.paintTree?.w, 1280);
+    assert.deepEqual(calls, [
+      {
+        method: "browsingContext.batchRender",
+        params: {
+          context: "session-1",
+          baseHtml: "<!doctype html><style>.card{padding:16px}</style><div class='card'>A</div>",
+          viewport: { width: 1280, height: 900 },
+          variants: [{
+            id: "remove-card-padding",
+            mutations: [{ selector: ".card", property: "padding", action: "remove" }],
+          }],
+        },
+      },
+    ]);
   });
 });

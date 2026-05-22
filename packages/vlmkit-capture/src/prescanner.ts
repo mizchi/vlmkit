@@ -19,7 +19,12 @@ export interface PrescannerTrialSummary {
 }
 
 export function hasCraterPrescanSignal(viewports: ViewportDetectionResult[]): boolean {
-  return viewports.some((viewport) => viewport.visualDiffDetected || viewport.paintTreeDiffCount > 0);
+  return viewports.some((viewport) =>
+    viewport.visualDiffDetected ||
+    viewport.computedStyleDiffCount > 0 ||
+    viewport.hoverDiffDetected ||
+    viewport.paintTreeDiffCount > 0
+  );
 }
 
 export function hasAnyDetectionSignal(viewports: ViewportDetectionResult[]): boolean {

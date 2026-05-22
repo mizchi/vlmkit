@@ -169,12 +169,16 @@ async function captureStateForBackend(
     captureHover: boolean;
     trackedProperties: string[];
     interactionSelectors?: string[];
+    skipScreenshot?: boolean;
   },
 ): Promise<CapturedState> {
   if (backend === "crater") {
     if (!options.craterClient) throw new Error("Crater client is not initialized");
     return capturePageStateCrater(options.craterClient, viewport, html, screenshotPath, {
       trackedProperties: options.trackedProperties,
+      captureHover: options.captureHover,
+      interactionSelectors: options.interactionSelectors,
+      skipScreenshot: options.skipScreenshot,
     });
   }
   if (!options.browser) throw new Error("Chromium browser is not initialized");
@@ -199,6 +203,7 @@ async function analyzeAcrossViewports(
     approvalContext: { selector: string; property: string; category: ReturnType<typeof categorizeProperty> };
     expectedComputedStyleTargets: ComputedStyleTarget[];
     strict: boolean;
+    skipScreenshot?: boolean;
   },
 ): Promise<ViewportAnalysisBundle> {
   const viewportResults: ViewportDetectionResult[] = [];
@@ -211,6 +216,10 @@ async function analyzeAcrossViewports(
   let anyComputed = false;
   let anyHover = false;
   let anyPaintTree = false;
+  const interactionSelectors = [...new Set([
+    options.approvalContext.selector,
+    ...options.expectedComputedStyleTargets.map((target) => target.selector),
+  ])];
 
   for (const viewport of VIEWPORTS) {
     const brokenPath = join(trialDir, `${backend}-broken-${viewport.label}.png`);
@@ -219,7 +228,8 @@ async function analyzeAcrossViewports(
         craterClient: options.craterClient,
         captureHover: options.captureHover,
         trackedProperties: options.trackedProperties,
-        interactionSelectors: options.expectedComputedStyleTargets.map((target) => target.selector),
+        interactionSelectors,
+        skipScreenshot: options.skipScreenshot,
       });
     const baseline = baselines.get(viewport.label);
     if (!baseline) throw new Error(`Missing ${backend} baseline for viewport ${viewport.label}`);
@@ -311,6 +321,11 @@ async function runFixtureBenchmark(fixture: string) {
     TRACKED_PROPERTIES,
     collectComputedStyleTrackingProperties(declarations),
   );
+  const interactionSelectors = [...new Set(
+    declarations
+      .map((declaration) => declaration.selector)
+      .filter(isInteractiveSelector),
+  )];
   const llm = ENABLE_LLM ? createLLMProvider({ throwIfMissing: false }) : null;
   const approvalManifest = APPROVAL_PATH ? await loadApprovalManifest(APPROVAL_PATH) : null;
   const approvalWarnings = approvalManifest ? collectApprovalWarnings(approvalManifest) : [];
@@ -360,6 +375,7 @@ async function runFixtureBenchmark(fixture: string) {
         await capturePageState(browser, viewport, htmlRaw, path, {
           captureHover: true,
           trackedProperties,
+          interactionSelectors,
         }),
       );
     }
@@ -376,6 +392,9 @@ async function runFixtureBenchmark(fixture: string) {
         viewport.label,
         await capturePageStateCrater(craterClient, viewport, htmlRaw, path, {
           trackedProperties,
+          captureHover: interactionSelectors.length > 0,
+          interactionSelectors,
+          skipScreenshot: BACKEND === "prescanner",
         }),
       );
     }
@@ -438,12 +457,13 @@ async function runFixtureBenchmark(fixture: string) {
       const craterBundle = await analyzeAcrossViewports("crater", brokenHtml, trialDir, craterBaselines, {
         browser: null,
         craterClient,
-        captureHover: false,
+        captureHover,
         trackedProperties,
         manifest: approvalManifest,
         approvalContext,
         expectedComputedStyleTargets,
         strict: STRICT,
+        skipScreenshot: true,
       });
 
       if (hasCraterPrescanSignal(craterBundle.viewportResults)) {

@@ -32,10 +32,16 @@ describe("hasCraterPrescanSignal", () => {
     ]), true);
   });
 
-  it("does not treat computed style only changes as crater detection", () => {
+  it("treats native computed style changes as crater detection", () => {
     assert.equal(hasCraterPrescanSignal([
       makeViewportResult({ computedStyleDiffCount: 3 }),
-    ]), false);
+    ]), true);
+  });
+
+  it("treats forced hover style changes as crater detection", () => {
+    assert.equal(hasCraterPrescanSignal([
+      makeViewportResult({ hoverDiffDetected: true }),
+    ]), true);
   });
 });
 

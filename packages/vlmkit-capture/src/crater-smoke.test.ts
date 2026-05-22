@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  parseCraterSmokeArgs,
   runCraterBidiSmoke,
   type CraterSmokeClient,
 } from "./crater-smoke.ts";
@@ -46,6 +47,26 @@ class FakeCraterClient implements CraterSmokeClient {
     return { breakpoints: [] };
   }
 }
+
+describe("parseCraterSmokeArgs", () => {
+  it("uses the resolved crater BiDi URL unless --url overrides it", () => {
+    assert.equal(
+      parseCraterSmokeArgs([], {
+        VLMKIT_CRATER_BIDI_URL: " ws://127.0.0.1:9222/session/from-env ",
+      }).url,
+      "ws://127.0.0.1:9222/session/from-env",
+    );
+    assert.equal(
+      parseCraterSmokeArgs([
+        "--url",
+        "ws://127.0.0.1:9333/session/explicit",
+      ], {
+        VLMKIT_CRATER_BIDI_URL: "ws://127.0.0.1:9222/session/from-env",
+      }).url,
+      "ws://127.0.0.1:9333/session/explicit",
+    );
+  });
+});
 
 describe("runCraterBidiSmoke", () => {
   it("skips when crater is unavailable and not required", async () => {

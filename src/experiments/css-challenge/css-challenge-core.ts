@@ -60,6 +60,7 @@ export interface CssDeclaration {
 export interface CapturedState {
   a11yTree: A11yNode;
   screenshotPath: string;
+  visualCaptureSkipped?: boolean;
   computedStyles: Map<string, Record<string, string>>;  // selector → { property: value }
   hoverComputedStyles: Map<string, Record<string, string>>;  // hover-forced computed styles
   paintTree?: PaintNode;  // crater only: internal paint tree
@@ -89,6 +90,50 @@ export function diffComputedStyles(
     }
   }
   return diffs;
+}
+
+const CRATER_FORCED_STATE_PSEUDO_PATTERN = /:(focus-visible|focus-within|focus|hover|active)\b/g;
+
+function forcedStatesForSelector(selector: string): string[] {
+  const states: string[] = [];
+  const seen = new Set<string>();
+  let match: RegExpExecArray | null;
+  CRATER_FORCED_STATE_PSEUDO_PATTERN.lastIndex = 0;
+  while ((match = CRATER_FORCED_STATE_PSEUDO_PATTERN.exec(selector)) !== null) {
+    const state = match[1];
+    if (seen.has(state)) continue;
+    seen.add(state);
+    states.push(state);
+  }
+  return states;
+}
+
+function hasCapturedStyleValues(styles: Record<string, string>): boolean {
+  return Object.keys(styles).length > 0 &&
+    Object.values(styles).some((value) => value.trim().length > 0);
+}
+
+export async function captureCraterForcedStateStyles(
+  client: Pick<CraterClient, "getComputedStylesWithState">,
+  selectors: string[],
+  properties: string[],
+): Promise<Map<string, Record<string, string>>> {
+  const styles = new Map<string, Record<string, string>>();
+  const plans = buildInteractionTargetPlans(selectors);
+
+  for (const plan of plans) {
+    const forcedStates = forcedStatesForSelector(plan.selector);
+    if (forcedStates.length === 0) continue;
+    const result = await client.getComputedStylesWithState(
+      plan.selector,
+      forcedStates,
+      properties,
+    );
+    if (!hasCapturedStyleValues(result.forced)) continue;
+    styles.set(plan.selector, result.forced);
+  }
+
+  return styles;
 }
 
 export function applyApprovalsToAnalysisSignals(
@@ -493,15 +538,22 @@ export async function capturePageStateCrater(
   viewport: { width: number; height: number },
   html: string,
   screenshotPath: string,
-  options?: { trackedProperties?: string[] },
+  options?: {
+    trackedProperties?: string[];
+    captureHover?: boolean;
+    interactionSelectors?: string[];
+    skipScreenshot?: boolean;
+  },
 ): Promise<CapturedState> {
   await client.setViewport(viewport.width, viewport.height);
   await client.setContent(html);
   const trackedProperties = options?.trackedProperties ?? TRACKED_PROPERTIES;
 
   // PNG screenshot (capturePaintData -> PNG conversion)
-  const { png } = await client.capturePng();
-  await writeFile(screenshotPath, png);
+  if (!options?.skipScreenshot) {
+    const { png } = await client.capturePng();
+    await writeFile(screenshotPath, png);
+  }
 
   // Paint tree -- crater-specific advantage
   let paintTree: PaintNode | undefined;
@@ -516,9 +568,25 @@ export async function capturePageStateCrater(
   try {
     computedStyles = await client.captureComputedStyles(trackedProperties);
   } catch { /* ignore */ }
-  const hoverComputedStyles = new Map<string, Record<string, string>>();
+  let hoverComputedStyles = new Map<string, Record<string, string>>();
+  if (options?.captureHover && options.interactionSelectors?.length) {
+    try {
+      hoverComputedStyles = await captureCraterForcedStateStyles(
+        client,
+        options.interactionSelectors,
+        trackedProperties,
+      );
+    } catch { /* ignore */ }
+  }
 
-  return { a11yTree, screenshotPath, computedStyles, hoverComputedStyles, paintTree };
+  return {
+    a11yTree,
+    screenshotPath,
+    visualCaptureSkipped: options?.skipScreenshot,
+    computedStyles,
+    hoverComputedStyles,
+    paintTree,
+  };
 }
 
 function cdpNodesToTree(nodes: Array<{
@@ -577,7 +645,10 @@ export async function analyzeVrtDiff(
     baselinePath: baselineState.screenshotPath,
     status: "changed",
   };
-  const rawVrtDiff = await compareScreenshots(vrtSnap, { outputDir, skipHeatmap: options?.skipHeatmap });
+  const visualCaptureSkipped = baselineState.visualCaptureSkipped || brokenState.visualCaptureSkipped;
+  const rawVrtDiff = visualCaptureSkipped
+    ? null
+    : await compareScreenshots(vrtSnap, { outputDir, skipHeatmap: options?.skipHeatmap });
 
   let visualSemantic: VisualSemanticDiff | null = null;
   let visualReport = "";
@@ -616,6 +687,8 @@ export async function analyzeVrtDiff(
       visualSemantic.changes.map((c) => `  - [${c.type}] ${c.description}`).join("\n");
   } else if (approvals.approvedVisualRules.length > 0) {
     visualReport = `Visual diff approved by manifest: ${approvals.approvedVisualRules.map((rule) => rule.reason).join("; ")}`;
+  } else if (visualCaptureSkipped) {
+    visualReport = "Visual diff skipped for metadata-only capture.";
   } else {
     visualReport = "No visual diff detected — the removed CSS line had no visible effect at this viewport size.";
   }

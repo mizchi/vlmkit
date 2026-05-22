@@ -14,6 +14,7 @@ import {
   CraterClient,
   DEFAULT_BIDI_URL,
   isCraterAvailable,
+  resolveCraterBidiUrl,
 } from "./crater-client.ts";
 
 export interface CraterSmokeClient {
@@ -223,8 +224,11 @@ function printUsage(exitCode: number): never {
   process.exit(exitCode);
 }
 
-function parseArgs(argv: string[]) {
-  let url = DEFAULT_BIDI_URL;
+export function parseCraterSmokeArgs(
+  argv: string[],
+  env: NodeJS.ProcessEnv | Partial<NodeJS.ProcessEnv> = process.env,
+) {
+  let url = resolveCraterBidiUrl({ env });
   let requireAvailable = false;
   let json = false;
   for (let i = 0; i < argv.length; i++) {
@@ -238,7 +242,7 @@ function parseArgs(argv: string[]) {
 }
 
 async function main(argv = process.argv.slice(2)): Promise<void> {
-  const args = parseArgs(argv);
+  const args = parseCraterSmokeArgs(argv);
   const report = await runCraterBidiSmoke({
     url: args.url,
     requireAvailable: args.requireAvailable,

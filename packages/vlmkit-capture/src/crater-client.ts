@@ -106,12 +106,25 @@ export interface CraterComputedStyleWithState {
   diff: Array<{ property: string; normal: string; forced: string }>;
 }
 
+type ComputedStyleRecord = Record<string, Record<string, string>>;
+
+export type CraterCssMutationAction = "remove" | { override: string };
+
+export interface CraterCssMutation {
+  selector: string;
+  property: string;
+  action?: CraterCssMutationAction;
+}
+
+export interface CraterRenderVariant {
+  id: string;
+  mutations: CraterCssMutation[];
+}
+
 export interface CraterBatchRenderResult {
   results: Array<{
     id: string;
-    paintData?: string;
-    width?: number;
-    height?: number;
+    paintTree?: PaintNode | null;
   }>;
 }
 
@@ -247,6 +260,9 @@ export class CraterClient {
   async captureComputedStyles(
     properties: string[],
   ): Promise<Map<string, Record<string, string>>> {
+    const nativeSnapshot = await this.captureNativeComputedStyles(properties);
+    if (nativeSnapshot) return nativeSnapshot;
+
     const rawSnapshot = await this.evaluate<unknown>(
       buildComputedStyleCaptureJsonExpression(properties),
     );
@@ -255,6 +271,33 @@ export class CraterClient {
       return new Map();
     }
     return computedStyleSnapshotToMap(snapshot);
+  }
+
+  private async captureNativeComputedStyles(
+    properties: string[],
+  ): Promise<Map<string, Record<string, string>> | null> {
+    let context: string;
+    try {
+      context = this.requireContextId();
+    } catch {
+      return null;
+    }
+
+    try {
+      const resp = await this.sendBidi("browsingContext.getAllComputedStyles", {
+        context,
+        properties,
+      }, 30_000);
+      if (resp.type === "error") return null;
+      const result = resp.result as { styles?: ComputedStyleRecord } | undefined;
+      const snapshot = parseComputedStyleSnapshot(result?.styles ?? {});
+      if (!hasMeaningfulComputedStyleSnapshot(snapshot)) {
+        return new Map();
+      }
+      return computedStyleSnapshotToMap(snapshot);
+    } catch {
+      return null;
+    }
   }
 
   async getResponsiveBreakpoints(
@@ -319,7 +362,7 @@ export class CraterClient {
   async batchRender(
     baseHtml: string,
     viewport: { width: number; height: number },
-    variants: Array<{ id: string; cssRemove?: { selector: string; property?: string }; replaceCss?: { original: string; replacement: string } }>,
+    variants: CraterRenderVariant[],
   ): Promise<CraterBatchRenderResult> {
     const resp = await this.sendBidi("browsingContext.batchRender", {
       context: this.requireContextId(),
