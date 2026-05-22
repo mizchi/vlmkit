@@ -535,6 +535,65 @@ export function parseMigrationFixMultiResponse(response: string): MigrationFix[]
   return fixes;
 }
 
+/**
+ * Extract custom-property declarations from every `:root { ... }` (or
+ * `html { ... }`) block in the stylesheet. Returns `Map<--name, value>`.
+ * Only the first declaration wins per variable — matches CSS cascade
+ * order (later wins) by scanning right-to-left.
+ */
+export function extractCustomProperties(css: string): Map<string, string> {
+  const out = new Map<string, string>();
+  const rootBlocks: string[] = [];
+  // Match `:root` or `html` selector followed by a brace-balanced body.
+  // No leading boundary requirement: blocks back-to-back (`} :root {`) are
+  // picked up by allowing the regex to continue past the previous match.
+  const blockRe = /(?<![\w-])(?::root|html)\s*\{([\s\S]*?)\}/g;
+  let match: RegExpExecArray | null;
+  while ((match = blockRe.exec(css)) !== null) {
+    rootBlocks.push(match[1]);
+  }
+  // Walk in document order; later declarations win.
+  for (const body of rootBlocks) {
+    for (const decl of body.split(";")) {
+      const m = decl.match(/^\s*(--[A-Za-z_][\w-]*)\s*:\s*([^;]+)\s*$/);
+      if (!m) continue;
+      out.set(m[1].trim(), m[2].trim());
+    }
+  }
+  return out;
+}
+
+/**
+ * Compute the `:root` custom-property diff between baseline and variant
+ * HTML. Each differing variable becomes a deterministic `MigrationFix`
+ * the apply step can write directly — the LLM never has to "discover"
+ * the mismatch because the report's computed-style diff doesn't surface
+ * CSS variables (the resolved RGB values appear instead).
+ */
+export function extractCustomPropertyDiffs(
+  baselineHtml: string,
+  variantHtml: string,
+): MigrationFix[] {
+  const baselineCss = extractCss(baselineHtml);
+  const variantCss = extractCss(variantHtml);
+  if (!baselineCss || !variantCss) return [];
+  const baseVars = extractCustomProperties(baselineCss);
+  const variantVars = extractCustomProperties(variantCss);
+  const fixes: MigrationFix[] = [];
+  for (const [name, baseValue] of baseVars) {
+    const variantValue = variantVars.get(name);
+    if (variantValue === undefined) continue;
+    if (variantValue === baseValue) continue;
+    fixes.push({
+      selector: ":root",
+      property: name,
+      value: baseValue,
+      mediaCondition: null,
+    });
+  }
+  return fixes;
+}
+
 export function resolveMigrationFixFromBaselineHtml(
   baselineHtml: string,
   candidate: Pick<MigrationFixCandidate, "selector" | "property" | "mediaCondition">,

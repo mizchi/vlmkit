@@ -8,6 +8,8 @@ import {
   buildMigrationFixLoopMultiPrompt,
   buildMigrationFixLoopPrompt,
   correctMigrationFixesWithReport,
+  extractCustomProperties,
+  extractCustomPropertyDiffs,
   parseMigrationFixMultiResponse,
   parseMigrationFixResponse,
   resolveMigrationFixFromBaselineHtml,
@@ -593,6 +595,64 @@ describe("buildBaselineValueIndex + correctMigrationFixesWithReport", () => {
     assert.equal(result.fixes.length, 1, "only .page padding survives");
     assert.equal(result.dropped.length, 2);
     assert.match(result.dropped[0]?.reason ?? "", /computed-layout/);
+  });
+});
+
+describe("extractCustomProperties + extractCustomPropertyDiffs", () => {
+  it("collects --vars from :root and from html selectors", () => {
+    const css = `:root { --black: #050505; --red: #e60012; }\nhtml { --paper: #f7f4ec; }`;
+    const vars = extractCustomProperties(css);
+    assert.equal(vars.get("--black"), "#050505");
+    assert.equal(vars.get("--red"), "#e60012");
+    assert.equal(vars.get("--paper"), "#f7f4ec");
+  });
+
+  it("applies later-block winning cascade", () => {
+    const css = `:root { --color: red; } :root { --color: blue; }`;
+    const vars = extractCustomProperties(css);
+    assert.equal(vars.get("--color"), "blue");
+  });
+
+  it("ignores non-var properties inside :root", () => {
+    const css = `:root { color-scheme: dark; --color: blue; font-family: sans-serif; }`;
+    const vars = extractCustomProperties(css);
+    assert.equal(vars.size, 1);
+    assert.equal(vars.get("--color"), "blue");
+  });
+
+  it("emits MigrationFix entries for changed variables", () => {
+    const baselineHtml = `<style>:root { --black: #050505; --red: #e60012; --paper: #f7f4ec; }</style>`;
+    const variantHtml = `<style>:root { --black: #070707; --red: #df0012; --paper: #f7f4ec; }</style>`;
+    const fixes = extractCustomPropertyDiffs(baselineHtml, variantHtml);
+    assert.equal(fixes.length, 2);
+    assert.deepEqual(
+      fixes.map((f) => ({ name: f.property, value: f.value })).sort((a, b) => a.name.localeCompare(b.name)),
+      [
+        { name: "--black", value: "#050505" },
+        { name: "--red", value: "#e60012" },
+      ],
+    );
+    assert.equal(fixes[0]?.selector, ":root");
+    assert.equal(fixes[0]?.mediaCondition, null);
+  });
+
+  it("returns [] when the variant does not declare the same variable", () => {
+    const baselineHtml = `<style>:root { --black: #050505; }</style>`;
+    const variantHtml = `<style>body { color: black; }</style>`;
+    assert.deepEqual(extractCustomPropertyDiffs(baselineHtml, variantHtml), []);
+  });
+
+  it("applyMigrationFixToCss updates a custom property in :root", () => {
+    const css = `:root {\n  --black: #070707;\n  --red: #df0012;\n}`;
+    const next = applyMigrationFixToCss(css, {
+      selector: ":root",
+      property: "--black",
+      value: "#050505",
+      mediaCondition: null,
+    });
+    assert.match(next, /--black: #050505/);
+    assert.match(next, /--red: #df0012/);
+    assert.equal(next.includes("--black: #070707"), false);
   });
 });
 

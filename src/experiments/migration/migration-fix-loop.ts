@@ -10,6 +10,7 @@ import {
   buildMigrationFixLoopMultiPrompt,
   buildMigrationFixLoopPrompt,
   correctMigrationFixesWithReport,
+  extractCustomPropertyDiffs,
   parseMigrationFixMultiResponse,
   parseMigrationFixResponse,
   resolveMigrationFixFromBaselineHtml,
@@ -99,7 +100,22 @@ async function main() {
   console.log(`Current convergence: ${convergence.status}`);
 
   if (useMultiMode) {
-    const rawFixes = await resolveMultiFixes({ baselineHtml, prompt, target });
+    // Deterministic step: CSS custom properties (e.g. `:root { --black }`)
+    // don't appear in the report's computed-style diff (the resolved RGB
+    // is what gets recorded), but baseline-vs-variant `:root` differences
+    // affect every var() use site. Extract them straight from HTML and
+    // prepend to the LLM proposals — no model call needed.
+    const cssVarFixes = extractCustomPropertyDiffs(baselineHtml, variantHtml);
+    if (cssVarFixes.length > 0) {
+      console.log();
+      console.log(`CSS variable diffs (deterministic): ${cssVarFixes.length}`);
+      for (const fix of cssVarFixes.slice(0, 8)) {
+        console.log(`  ! :root { ${fix.property}: ${fix.value}; }`);
+      }
+      if (cssVarFixes.length > 8) console.log(`  ... +${cssVarFixes.length - 8} more`);
+    }
+    const llmFixes = await resolveMultiFixes({ baselineHtml, prompt, target });
+    const rawFixes = [...cssVarFixes, ...llmFixes];
     // Correct LLM proposals against the report's authoritative baseline
     // values. Prevents value hallucinations like `font: 800 48px/1` when
     // the report only knows specific computed sub-properties.
