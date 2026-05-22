@@ -25,6 +25,8 @@ export {
 // ---- Viewport / breakpoint discovery ----
 export {
   discoverViewports,
+  discoverViewportsViaCrater,
+  discoverViewportsWithBackend,
   generateViewports,
   extractBreakpoints,
   extractBreakpointsFromHtml,
@@ -35,7 +37,9 @@ export {
   toResponsiveBreakpoints,
   mergeResponsiveBreakpoints,
   type Breakpoint,
+  type CraterViewportSource,
   type ResponsiveBreakpoint,
+  type ViewportSource,
   type ViewportSpec,
   type ViewportOptions,
   type DiscoveryResult,

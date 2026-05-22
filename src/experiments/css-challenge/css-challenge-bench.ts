@@ -310,16 +310,42 @@ async function runFixtureBenchmark(fixture: string) {
   const selectorBlocks = groupBySelector(declarations);
   const customPropertyUsage = buildCustomPropertyUsageIndex(declarations);
 
-  // Discover breakpoints and expand viewports
-  const { discoverViewports } = await import("@mizchi/vlmkit-capture/viewport-discovery.ts");
-  const discovery = discoverViewports(htmlRaw, { maxViewports: 10, randomSamples: 0, includeStandard: false });
+  // Spin up Crater early when we'll be using it, so viewport discovery can
+  // call its v0.18.0 intelligence APIs against the loaded baseline.
+  let craterClient: CraterClient | null = null;
+  if (BACKEND === "crater" || BACKEND === "prescanner") {
+    if (!await isCraterAvailable()) {
+      console.log(`  ${RED}Crater BiDi server not available at ws://127.0.0.1:9222${RESET}`);
+      console.log(`  ${DIM}Start it: cd ~/ghq/github.com/mizchi/crater && just build-bidi && just start-bidi-with-font${RESET}`);
+      process.exit(1);
+    }
+    craterClient = await createCraterClient();
+    // Load the baseline HTML at a representative width so the viewport
+    // intelligence APIs see real CSS rules and matching elements.
+    await craterClient.setViewport(1280, 900);
+    await craterClient.setContent(htmlRaw);
+  }
+
+  // Discover breakpoints and expand viewports. When Crater is available,
+  // prefer its v0.18.0 viewport intelligence (`getRequiredTestViewports` +
+  // `getCssRuleViewportMap`) and fall back to regex for any widths Crater
+  // didn't surface.
+  const { discoverViewportsWithBackend } = await import("@mizchi/vlmkit-capture/viewport-discovery.ts");
+  const discovery = await discoverViewportsWithBackend(htmlRaw, {
+    maxViewports: 10,
+    randomSamples: 0,
+    includeStandard: false,
+    craterClient: craterClient ?? undefined,
+  });
   const existingWidths = new Set(BASE_VIEWPORTS.map((v) => v.width));
   const extraViewports = discovery.viewports
     .filter((v) => !existingWidths.has(v.width))
     .map((v) => ({ width: v.width, height: 900, label: v.label }));
   VIEWPORTS = [...BASE_VIEWPORTS, ...extraViewports];
   if (extraViewports.length > 0) {
-    console.log(`  ${DIM}Breakpoint discovery: +${extraViewports.length} viewport(s): ${extraViewports.map((v) => `${v.label}(${v.width})`).join(", ")}${RESET}`);
+    console.log(
+      `  ${DIM}Breakpoint discovery (${discovery.backend}): +${extraViewports.length} viewport(s): ${extraViewports.map((v) => `${v.label}(${v.width})`).join(", ")}${RESET}`,
+    );
   }
   const trackedProperties = mergeComputedStyleProperties(
     TRACKED_PROPERTIES,
@@ -351,17 +377,6 @@ async function runFixtureBenchmark(fixture: string) {
     console.log(`  ${DIM}Approval suggestions: enabled${RESET}`);
   }
   console.log();
-
-  // Check crater availability
-  let craterClient: CraterClient | null = null;
-  if (BACKEND === "crater" || BACKEND === "prescanner") {
-    if (!await isCraterAvailable()) {
-      console.log(`  ${RED}Crater BiDi server not available at ws://127.0.0.1:9222${RESET}`);
-      console.log(`  ${DIM}Start it: cd ~/ghq/github.com/mizchi/crater && just build-bidi && just start-bidi-with-font${RESET}`);
-      process.exit(1);
-    }
-    craterClient = await createCraterClient();
-  }
 
   let browser: Browser | null = null;
   const chromiumBaselines = new Map<string, CapturedState>();

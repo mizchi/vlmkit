@@ -23,17 +23,39 @@ export interface ResponsiveBreakpoint {
   ruleCount: number;
 }
 
+/** Where a viewport candidate originated. */
+export type ViewportSource =
+  | "standard"
+  | "regex-boundary"
+  | "regex-sample"
+  | "crater-required"
+  | "crater-rule-map";
+
 export interface ViewportSpec {
   width: number;
   height: number;
   label: string;
   reason: string;         // why this viewport was chosen
+  /**
+   * Optional provenance for downstream reports — present when discovery
+   * went through `generateViewports` / the Crater discovery path. Older
+   * callers that build a plain spec without this field still validate.
+   */
+  source?: ViewportSource;
 }
 
 export interface DiscoveryResult {
   breakpoints: Breakpoint[];
   responsiveBreakpoints: ResponsiveBreakpoint[];
   viewports: ViewportSpec[];
+  /**
+   * Which backend supplied the viewport list. `"crater"` means the
+   * BiDi v0.18.0 viewport intelligence APIs returned a usable set;
+   * `"regex"` means the inline-CSS regex discovery did. `"hybrid"`
+   * means Crater seeded the list and regex contributed additional
+   * widths (or vice versa).
+   */
+  backend: "regex" | "crater" | "hybrid";
 }
 
 type ViewportBreakpoint = Breakpoint | ResponsiveBreakpoint;
@@ -236,34 +258,34 @@ export function generateViewports(
 
   const viewportMap = new Map<number, ViewportSpec>();
 
-  function add(width: number, label: string, reason: string) {
+  function add(width: number, label: string, reason: string, source: ViewportSource) {
     if (width < 320 || width > 2560) return;
     if (!viewportMap.has(width)) {
-      viewportMap.set(width, { width, height, label, reason });
+      viewportMap.set(width, { width, height, label, reason, source });
     }
   }
 
   // Standard viewports
   if (includeStandard) {
     for (const sv of STANDARD_VIEWPORTS) {
-      add(sv.width, sv.label, "standard");
+      add(sv.width, sv.label, "standard", "standard");
     }
   }
 
   // Boundary viewports for each breakpoint
   for (const bp of responsiveBreakpoints) {
     if (bp.op === "ge") {
-      add(bp.valuePx - 1, `below-${bp.valuePx}`, `${bp.raw} boundary-below`);
-      add(bp.valuePx, `at-${bp.valuePx}`, `${bp.raw} boundary-at`);
+      add(bp.valuePx - 1, `below-${bp.valuePx}`, `${bp.raw} boundary-below`, "regex-boundary");
+      add(bp.valuePx, `at-${bp.valuePx}`, `${bp.raw} boundary-at`, "regex-boundary");
     } else if (bp.op === "gt") {
-      add(bp.valuePx, `at-${bp.valuePx}`, `${bp.raw} boundary-at`);
-      add(bp.valuePx + 1, `above-${bp.valuePx}`, `${bp.raw} boundary-above`);
+      add(bp.valuePx, `at-${bp.valuePx}`, `${bp.raw} boundary-at`, "regex-boundary");
+      add(bp.valuePx + 1, `above-${bp.valuePx}`, `${bp.raw} boundary-above`, "regex-boundary");
     } else if (bp.op === "le") {
-      add(bp.valuePx, `at-${bp.valuePx}`, `${bp.raw} boundary-at`);
-      add(bp.valuePx + 1, `above-${bp.valuePx}`, `${bp.raw} boundary-above`);
+      add(bp.valuePx, `at-${bp.valuePx}`, `${bp.raw} boundary-at`, "regex-boundary");
+      add(bp.valuePx + 1, `above-${bp.valuePx}`, `${bp.raw} boundary-above`, "regex-boundary");
     } else {
-      add(bp.valuePx - 1, `below-${bp.valuePx}`, `${bp.raw} boundary-below`);
-      add(bp.valuePx, `at-${bp.valuePx}`, `${bp.raw} boundary-at`);
+      add(bp.valuePx - 1, `below-${bp.valuePx}`, `${bp.raw} boundary-below`, "regex-boundary");
+      add(bp.valuePx, `at-${bp.valuePx}`, `${bp.raw} boundary-at`, "regex-boundary");
     }
   }
 
@@ -286,7 +308,7 @@ export function generateViewports(
       if (hi - lo < 2) continue;
       for (let j = 0; j < randomSamples; j++) {
         const w = Math.round(lo + rand() * (hi - lo));
-        add(w, `sample-${w}`, `random sample in [${lo}, ${hi}]`);
+        add(w, `sample-${w}`, `random sample in [${lo}, ${hi}]`, "regex-sample");
       }
     }
   }
@@ -306,5 +328,128 @@ export function discoverViewports(
   const breakpoints = extractBreakpointsFromHtml(html);
   const responsiveBreakpoints = toResponsiveBreakpoints(breakpoints);
   const viewports = generateViewports(responsiveBreakpoints, options);
-  return { breakpoints, responsiveBreakpoints, viewports };
+  return { breakpoints, responsiveBreakpoints, viewports, backend: "regex" };
+}
+
+// ---- Crater viewport intelligence ----
+
+export interface CraterViewportSource {
+  getRequiredTestViewports(): Promise<{ viewports: Array<{ width: number; reason: string }> }>;
+  getCssRuleViewportMap?(viewportWidths?: number[]): Promise<{
+    rules: Array<{ activeAtWidths?: number[]; inactiveAtWidths?: number[] }>;
+  }>;
+}
+
+function clampViewport(width: number): boolean {
+  return Number.isFinite(width) && width >= 320 && width <= 2560;
+}
+
+function buildCraterViewport(
+  width: number,
+  height: number,
+  reason: string,
+  source: ViewportSource,
+): ViewportSpec | null {
+  if (!clampViewport(width)) return null;
+  return {
+    width,
+    height,
+    label: `at-${width}`,
+    reason,
+    source,
+  };
+}
+
+/**
+ * Drive Crater v0.18.0 viewport intelligence (`getRequiredTestViewports`
+ * + optional `getCssRuleViewportMap`) to seed the viewport list with
+ * breakpoints the renderer itself determined are load-bearing for the
+ * current document. Falls back gracefully when either RPC fails.
+ */
+export async function discoverViewportsViaCrater(
+  client: CraterViewportSource,
+  options: ViewportOptions = {},
+): Promise<{ viewports: ViewportSpec[]; widthsSeen: Set<number> }> {
+  const height = options.height ?? 900;
+  const widthsSeen = new Set<number>();
+  const viewports: ViewportSpec[] = [];
+
+  function pushIfNew(spec: ViewportSpec | null) {
+    if (!spec) return;
+    if (widthsSeen.has(spec.width)) return;
+    widthsSeen.add(spec.width);
+    viewports.push(spec);
+  }
+
+  try {
+    const required = await client.getRequiredTestViewports();
+    for (const v of required.viewports ?? []) {
+      pushIfNew(buildCraterViewport(v.width, height, v.reason || "crater required", "crater-required"));
+    }
+  } catch {
+    // ignored — the regex fallback will still run from discoverViewportsWithBackend.
+  }
+
+  if (client.getCssRuleViewportMap) {
+    try {
+      const map = await client.getCssRuleViewportMap();
+      const extraWidths = new Set<number>();
+      for (const rule of map.rules ?? []) {
+        for (const w of rule.activeAtWidths ?? []) extraWidths.add(w);
+        for (const w of rule.inactiveAtWidths ?? []) extraWidths.add(w);
+      }
+      for (const width of extraWidths) {
+        pushIfNew(buildCraterViewport(width, height, "crater rule/viewport map", "crater-rule-map"));
+      }
+    } catch {
+      // ignored
+    }
+  }
+
+  return { viewports, widthsSeen };
+}
+
+/**
+ * Hybrid viewport discovery: prefer Crater v0.18.0 viewport intelligence
+ * when available, fall back to regex breakpoints for any widths Crater
+ * didn't surface, and tag each viewport with its `source`. The returned
+ * `backend` field tells downstream reports which path supplied the list.
+ */
+export async function discoverViewportsWithBackend(
+  html: string,
+  options: ViewportOptions & { craterClient?: CraterViewportSource | null } = {},
+): Promise<DiscoveryResult> {
+  const breakpoints = extractBreakpointsFromHtml(html);
+  const responsiveBreakpoints = toResponsiveBreakpoints(breakpoints);
+  const regexViewports = generateViewports(responsiveBreakpoints, options);
+
+  const client = options.craterClient ?? null;
+  if (!client) {
+    return { breakpoints, responsiveBreakpoints, viewports: regexViewports, backend: "regex" };
+  }
+
+  const craterResult = await discoverViewportsViaCrater(client, options);
+  if (craterResult.viewports.length === 0) {
+    return { breakpoints, responsiveBreakpoints, viewports: regexViewports, backend: "regex" };
+  }
+
+  // Fold regex output in as fallback, keeping anything Crater didn't already cover.
+  const merged: ViewportSpec[] = [...craterResult.viewports];
+  let usedFallback = false;
+  for (const v of regexViewports) {
+    if (craterResult.widthsSeen.has(v.width)) continue;
+    merged.push(v);
+    if (v.source !== "standard") usedFallback = true;
+  }
+
+  const maxViewports = options.maxViewports ?? 20;
+  merged.sort((a, b) => a.width - b.width);
+  const limited = merged.slice(0, maxViewports);
+
+  return {
+    breakpoints,
+    responsiveBreakpoints,
+    viewports: limited,
+    backend: usedFallback ? "hybrid" : "crater",
+  };
 }

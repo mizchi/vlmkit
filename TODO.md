@@ -161,10 +161,24 @@ content-dependent を fallback なしで扱えるかが焦点。
   - Use at least 20 trials per fixture/mode with `--no-llm --no-db`, then run a comparable Chromium baseline.
   - Update bench-history with Crater-only %, fallback %, speedup, and per-signal breakdown.
   - First target: Crater-only >= 80% and fallback <= 20% on `page`; second target: prescanner speedup >= 2x before revisiting the 3x goal.
-- [ ] Use Crater viewport intelligence as the primary viewport source
-  - Prefer `browsingContext.getRequiredTestViewports` / `getCssRuleViewportMap` when Crater is available.
-  - Keep regex discovery as fallback and record which backend supplied each viewport in reports.
-  - Verify media-scoped deletions show up as targeted viewport coverage rather than broad all-viewport scans.
+- [x] Use Crater viewport intelligence as the primary viewport source
+  - New `discoverViewportsViaCrater` + `discoverViewportsWithBackend`
+    in `@mizchi/vlmkit-capture/viewport-discovery.ts`. The hybrid form
+    seeds the list with `getRequiredTestViewports` +
+    `getCssRuleViewportMap` and folds in regex breakpoints for any
+    widths Crater didn't surface.
+  - `ViewportSpec` now carries `source`
+    (`standard`/`regex-boundary`/`regex-sample`/`crater-required`/
+    `crater-rule-map`) and `DiscoveryResult.backend` is one of
+    `regex`/`crater`/`hybrid` so reports can show which path supplied
+    each width.
+  - `css-challenge-bench` now spins up the Crater client *before*
+    viewport discovery, loads the baseline HTML, and passes the client
+    into `discoverViewportsWithBackend`. The discovery log line prints
+    the backend used.
+  - Media-scoped detection coverage still needs a live full-bench
+    re-run against Crater to confirm the targeted-viewport behavior —
+    primitives + wiring are in place.
 - [ ] Wire `batchRender` into the prescanner hot path
   - Current prescanner still does repeated `setContent` + capture per mutation.
   - Use v0.18.0 `variants[].mutations` to render baseline + broken variants in one Crater call where possible.

@@ -153,6 +153,101 @@ describe("discoverViewports", () => {
     assert.ok(widths.includes(640));
     assert.ok(widths.includes(1023));
     assert.ok(widths.includes(1024));
+    assert.equal(result.backend, "regex");
+    for (const v of result.viewports) {
+      assert.ok(v.source, "regex discovery should tag each viewport with a source");
+    }
+  });
+});
+
+describe("discoverViewportsViaCrater", () => {
+  it("collects required-test-viewports and css-rule-viewport-map widths", async () => {
+    const { discoverViewportsViaCrater } = await import("./viewport-discovery.ts");
+    const result = await discoverViewportsViaCrater({
+      getRequiredTestViewports: async () => ({
+        viewports: [
+          { width: 640, reason: "(min-width: 640px)" },
+          { width: 1024, reason: "(min-width: 1024px)" },
+        ],
+      }),
+      getCssRuleViewportMap: async () => ({
+        rules: [
+          { activeAtWidths: [1024, 1280], inactiveAtWidths: [639] },
+        ],
+      }),
+    });
+
+    const widths = result.viewports.map((v) => v.width).sort((a, b) => a - b);
+    assert.deepEqual(widths, [639, 640, 1024, 1280]);
+    const requiredSources = result.viewports
+      .filter((v) => v.source === "crater-required")
+      .map((v) => v.width)
+      .sort((a, b) => a - b);
+    assert.deepEqual(requiredSources, [640, 1024]);
+    const ruleMapSources = result.viewports
+      .filter((v) => v.source === "crater-rule-map")
+      .map((v) => v.width)
+      .sort((a, b) => a - b);
+    assert.deepEqual(ruleMapSources, [639, 1280]);
+  });
+
+  it("ignores RPC failures gracefully", async () => {
+    const { discoverViewportsViaCrater } = await import("./viewport-discovery.ts");
+    const result = await discoverViewportsViaCrater({
+      getRequiredTestViewports: async () => { throw new Error("boom"); },
+    });
+    assert.equal(result.viewports.length, 0);
+  });
+});
+
+describe("discoverViewportsWithBackend", () => {
+  it("returns regex output when no crater client is provided", async () => {
+    const { discoverViewportsWithBackend } = await import("./viewport-discovery.ts");
+    const html = `<html><head><style>
+      @media (min-width: 640px) { .a { color: red; } }
+    </style></head><body></body></html>`;
+    const result = await discoverViewportsWithBackend(html, { includeStandard: false });
+    assert.equal(result.backend, "regex");
+    assert.ok(result.viewports.length >= 2);
+  });
+
+  it("prefers crater intelligence and marks the backend as crater when regex adds nothing new", async () => {
+    const { discoverViewportsWithBackend } = await import("./viewport-discovery.ts");
+    const html = ""; // no inline CSS → regex produces only standard viewports
+    const result = await discoverViewportsWithBackend(html, {
+      includeStandard: false,
+      craterClient: {
+        getRequiredTestViewports: async () => ({
+          viewports: [{ width: 720, reason: "crater" }],
+        }),
+      },
+    });
+    assert.equal(result.backend, "crater");
+    assert.deepEqual(result.viewports.map((v) => v.width), [720]);
+    assert.equal(result.viewports[0]?.source, "crater-required");
+  });
+
+  it("merges regex widths and reports hybrid when both contribute", async () => {
+    const { discoverViewportsWithBackend } = await import("./viewport-discovery.ts");
+    const html = `<html><head><style>
+      @media (min-width: 480px) { .a { color: red; } }
+    </style></head><body></body></html>`;
+    const result = await discoverViewportsWithBackend(html, {
+      includeStandard: false,
+      craterClient: {
+        getRequiredTestViewports: async () => ({
+          viewports: [{ width: 1024, reason: "crater" }],
+        }),
+      },
+    });
+    assert.equal(result.backend, "hybrid");
+    const widths = result.viewports.map((v) => v.width).sort((a, b) => a - b);
+    assert.ok(widths.includes(479));
+    assert.ok(widths.includes(480));
+    assert.ok(widths.includes(1024));
+    const sources = result.viewports.map((v) => v.source);
+    assert.ok(sources.includes("crater-required"));
+    assert.ok(sources.includes("regex-boundary"));
   });
 });
 
