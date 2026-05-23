@@ -17,7 +17,7 @@ import { classifyVisualDiff } from "@mizchi/vlmkit-core/visual-semantic.ts";
 import { diffA11yTrees, parsePlaywrightA11ySnapshot, verifyA11yTree } from "@mizchi/vlmkit-core/a11y-semantic.ts";
 import { crossValidate, crossValidationToQualityChecks } from "../../experiments/detection/cross-validation.ts";
 import { loadExpectation, crossValidateWithExpectation, scoreLoop } from "../../vrt/snapshot/expectation.ts";
-import { runQualityChecks } from "@mizchi/vlmkit-core/quality.ts";
+import { runQualityChecks } from "@mizchi/vlmkit-markup/quality.ts";
 import { runVerificationLoop } from "../../util/agent.ts";
 import type { VrtDiff, A11yDiff, VisualSemanticDiff, UnifiedAgentContext, VrtExpectation, ChangeIntent } from "@mizchi/vlmkit-core/types.ts";
 

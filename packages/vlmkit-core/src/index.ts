@@ -99,7 +99,6 @@ export {
 
 // ---- Semantic / quality ----
 export { classifyVisualDiff } from "./visual-semantic.ts";
-export { runQualityChecks } from "./quality.ts";
 
 // ---- Public config constants ----
 export { RESOLUTION_PRESETS } from "./image-resize.ts";

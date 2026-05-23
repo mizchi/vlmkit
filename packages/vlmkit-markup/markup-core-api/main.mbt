@@ -470,6 +470,17 @@ fn dispatch(args : Array[String]) -> String raise {
         parse_double(abs_height_delta),
         parse_double(abs_top_delta),
       )
+    ["quality-error-state-kind", red_ratio, yellow_ratio] =>
+      @core.quality_error_state_kind(
+        parse_double(red_ratio),
+        parse_double(yellow_ratio),
+      )
+    ["quality-coverage-passed", covered, total] =>
+      bool_to_string(
+        @core.quality_coverage_passed(parse_int(covered), parse_int(total)),
+      )
+    ["quality-diff-severity", diff_ratio] =>
+      @core.quality_diff_severity(parse_double(diff_ratio))
     _ => usage()
   }
 }

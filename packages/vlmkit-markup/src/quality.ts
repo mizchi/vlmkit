@@ -4,9 +4,14 @@ import type {
   VrtDiff,
   DepGraph,
   AffectedComponent,
-} from "./types.ts";
-import { detectWhiteout, detectEmptyContent } from "./heatmap.ts";
-import { decodePng } from "./png-utils.ts";
+} from "@mizchi/vlmkit-core/types.ts";
+import { detectWhiteout, detectEmptyContent } from "@mizchi/vlmkit-core/heatmap.ts";
+import { decodePng } from "@mizchi/vlmkit-core/png-utils.ts";
+import {
+  computeQualityCoveragePassed,
+  computeQualityDiffSeverity,
+  computeQualityErrorStateKind,
+} from "./markup-core-quality.ts";
 
 /**
  * Run all quality checks.
@@ -19,20 +24,17 @@ export async function runQualityChecks(
 ): Promise<QualityCheckResult[]> {
   const results: QualityCheckResult[] = [];
 
-  // Per-snapshot checks
   for (const snapshot of snapshots) {
     const snapshotChecks = await checkSnapshot(snapshot);
     results.push(...snapshotChecks);
   }
 
-  // Coverage check
   if (graph && affected) {
     results.push(checkCoverage(snapshots, affected));
   }
 
-  // Error state check (when diff exists)
   for (const diff of diffs) {
-    if (diff.diffRatio > 0.5) {
+    if (computeQualityDiffSeverity(diff.diffRatio) === "large") {
       results.push({
         check: "layout-shift",
         passed: false,
@@ -45,18 +47,12 @@ export async function runQualityChecks(
   return results;
 }
 
-/**
- * Per-snapshot quality checks.
- */
-async function checkSnapshot(
-  snapshot: VrtSnapshot
-): Promise<QualityCheckResult[]> {
+async function checkSnapshot(snapshot: VrtSnapshot): Promise<QualityCheckResult[]> {
   const results: QualityCheckResult[] = [];
 
   try {
     const png = await decodePng(snapshot.screenshotPath);
 
-    // Whiteout detection
     const whiteout = detectWhiteout(png);
     results.push({
       check: "whiteout",
@@ -67,7 +63,6 @@ async function checkSnapshot(
       severity: whiteout.isWhiteout ? "error" : "info",
     });
 
-    // Empty content detection
     const empty = detectEmptyContent(png);
     results.push({
       check: "empty-content",
@@ -78,7 +73,6 @@ async function checkSnapshot(
       severity: empty.isEmpty ? "error" : "info",
     });
 
-    // Error state detection (red pixel ratio)
     const errorState = detectErrorIndicators(png);
     results.push({
       check: "error-state",
@@ -100,11 +94,6 @@ async function checkSnapshot(
   return results;
 }
 
-/**
- * Detect visual indicators of error states.
- * - High red pixel ratio (error messages, validation errors)
- * - Yellow/orange warning colors
- */
 function detectErrorIndicators(data: {
   width: number;
   height: number;
@@ -125,42 +114,30 @@ function detectErrorIndicators(data: {
     const b = pixels[offset + 2];
     sampled++;
 
-    // Red (error): high R, low G, low B
-    if (r > 180 && g < 80 && b < 80) {
-      redCount++;
-    }
-    // Yellow/orange (warning): high R, mid-high G, low B
-    if (r > 200 && g > 120 && g < 220 && b < 60) {
-      yellowCount++;
-    }
+    if (r > 180 && g < 80 && b < 80) redCount++;
+    if (r > 200 && g > 120 && g < 220 && b < 60) yellowCount++;
   }
 
   const redRatio = redCount / sampled;
   const yellowRatio = yellowCount / sampled;
+  const kind = computeQualityErrorStateKind(redRatio, yellowRatio);
 
-  if (redRatio > 0.05) {
+  if (kind === "error") {
     return {
       hasError: true,
       reason: `${(redRatio * 100).toFixed(1)}% red pixels (possible error state)`,
     };
   }
-  if (yellowRatio > 0.1) {
+  if (kind === "warning") {
     return {
       hasError: true,
       reason: `${(yellowRatio * 100).toFixed(1)}% yellow/orange pixels (possible warning state)`,
     };
   }
-
   return { hasError: false, reason: "" };
 }
 
-/**
- * VRT coverage: ratio of affected components that have VRT snapshots.
- */
-function checkCoverage(
-  snapshots: VrtSnapshot[],
-  affected: AffectedComponent[]
-): QualityCheckResult {
+function checkCoverage(snapshots: VrtSnapshot[], affected: AffectedComponent[]): QualityCheckResult {
   if (affected.length === 0) {
     return {
       check: "coverage",
@@ -170,7 +147,6 @@ function checkCoverage(
     };
   }
 
-  // Check if snapshot testTitle/testId contains the component name
   const snapshotNames = new Set(
     snapshots.flatMap((s) => [s.testTitle.toLowerCase(), s.testId.toLowerCase()])
   );
@@ -179,7 +155,6 @@ function checkCoverage(
   const uncovered: string[] = [];
 
   for (const comp of affected) {
-    // Match by component filename (without extension)
     const name = comp.node.id
       .replace(/\.[^.]+$/, "")
       .split("/")
@@ -190,15 +165,12 @@ function checkCoverage(
       (sn) => sn.includes(name) || name.includes(sn)
     );
 
-    if (isCovered) {
-      covered.push(comp.node.id);
-    } else {
-      uncovered.push(comp.node.id);
-    }
+    if (isCovered) covered.push(comp.node.id);
+    else uncovered.push(comp.node.id);
   }
 
+  const passed = computeQualityCoveragePassed(covered.length, affected.length);
   const ratio = covered.length / affected.length;
-  const passed = ratio >= 0.8; // 80% coverage threshold
 
   return {
     check: "coverage",

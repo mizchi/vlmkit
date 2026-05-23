@@ -532,6 +532,21 @@ fn main_err() -> Unit raise {
           parse_double(abs_top_delta),
         ),
       )
+    ["quality-error-state-kind", red_ratio, yellow_ratio] =>
+      println(
+        @core.quality_error_state_kind(
+          parse_double(red_ratio),
+          parse_double(yellow_ratio),
+        ),
+      )
+    ["quality-coverage-passed", covered, total] =>
+      println(
+        bool_to_string_cli(
+          @core.quality_coverage_passed(parse_int(covered), parse_int(total)),
+        ),
+      )
+    ["quality-diff-severity", diff_ratio] =>
+      println(@core.quality_diff_severity(parse_double(diff_ratio)))
     _ => print_usage()
   }
 }
@@ -610,7 +625,10 @@ fn is_command(value : String) -> Bool {
   value == "grid-ratios-to-decimal" ||
   value == "grid-approximate-integer-fr" ||
   value == "shift-round-delta" ||
-  value == "shift-classify-suspect"
+  value == "shift-classify-suspect" ||
+  value == "quality-error-state-kind" ||
+  value == "quality-coverage-passed" ||
+  value == "quality-diff-severity"
 }
 
 ///|

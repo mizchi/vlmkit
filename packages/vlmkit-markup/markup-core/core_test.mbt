@@ -756,3 +756,30 @@ test "shift_classify_suspect picks height first, then top" {
   inspect(shift_classify_suspect(5.0, 100.0), content="height")
   inspect(shift_classify_suspect(4.99, 5.0), content="margin/padding-above")
 }
+
+///|
+test "quality_error_state_kind thresholds" {
+  inspect(quality_error_state_kind(0.06, 0.0), content="error")
+  inspect(quality_error_state_kind(0.0, 0.11), content="warning")
+  inspect(quality_error_state_kind(0.0, 0.0), content="none")
+  // Red wins over yellow when both fire.
+  inspect(quality_error_state_kind(0.10, 0.50), content="error")
+  // Exact threshold edges (strict greater-than).
+  inspect(quality_error_state_kind(0.05, 0.0), content="none")
+  inspect(quality_error_state_kind(0.0, 0.10), content="none")
+}
+
+///|
+test "quality_coverage_passed" {
+  inspect(quality_coverage_passed(8, 10), content="true")
+  inspect(quality_coverage_passed(7, 10), content="false")
+  inspect(quality_coverage_passed(0, 0), content="true")
+  inspect(quality_coverage_passed(10, 10), content="true")
+}
+
+///|
+test "quality_diff_severity" {
+  inspect(quality_diff_severity(0.6), content="large")
+  inspect(quality_diff_severity(0.5), content="small")
+  inspect(quality_diff_severity(0.0), content="small")
+}
