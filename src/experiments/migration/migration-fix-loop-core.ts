@@ -43,6 +43,17 @@ export interface MigrationCompareReport {
     variantFile: string;
     result?: { entries?: Array<{ selector: string; property: string; baseline: string; variant: string }> };
   }>;
+  /**
+   * Per-variant authored-style diff: same shape as computedStyleDiff but the
+   * selector may carry an `@media (...) :: ` prefix when the rule lives
+   * inside a media block. Values are AUTHORED strings (verbatim from the
+   * stylesheet) — safe to write back without the fr→px corruption that
+   * affects the computed channel.
+   */
+  authoredStyleDiff?: Array<{
+    variantFile: string;
+    result?: { entries?: Array<{ selector: string; property: string; baseline: string; variant: string }> };
+  }>;
   /** Per-viewport, per-element computed-style diff via DOM-position match. */
   domPositionDiffPerViewport?: Array<{
     variantFile: string;
@@ -309,6 +320,25 @@ export function buildMigrationFixLoopMultiPrompt(input: {
       }
       reportTableLines.push("These MUST be media-gated. Setting `mediaCondition: null` for a viewport-variant pair will be REJECTED by the apply step — fix one viewport at a time with the matching media condition.");
     }
+
+    // Media-scoped authored entries. Already carry their `@media (...)`
+    // wrapper from the source stylesheet so the LLM keeps it intact when
+    // writing the fix. Authored values for `grid-template-*` / `flex` /
+    // `transform` are safe to copy verbatim because the source path is the
+    // CSSOM cssText, not the computed-style channel that resolves `1fr` to
+    // `0px`.
+    const authoredScoped = input.baselineValueIndex.authoredMediaScoped
+      .filter((row) => isAuthoredCssSelector(row.selector))
+      .filter((row) => row.baseline !== row.variant);
+    if (authoredScoped.length > 0) {
+      const top = authoredScoped.slice(0, 16);
+      reportTableLines.push("");
+      reportTableLines.push(`Media-scoped authored CSS deltas (${top.length} of ${authoredScoped.length} — captured from CSSOM, value is the AUTHORED string):`);
+      for (const r of top) {
+        reportTableLines.push(`  @media ${r.mediaCondition} { ${r.selector} { ${r.property}: ${r.baseline}; } } → variant=\`${r.variant}\``);
+      }
+      reportTableLines.push("Apply these with `mediaCondition: \"" + (authoredScoped[0]!.mediaCondition) + "\"` (or whatever matches each row). Authored values may include `minmax(0, 1fr)` / `auto` / `var(--...)` — copy verbatim, do not resolve to px.");
+    }
   }
 
   return `You are fixing a CSS migration regression.
@@ -374,6 +404,37 @@ export interface BaselineValueIndex {
    * LLM/heuristic suggests a value that's already matching the variant.
    */
   variantValues: Map<string, string>;
+  /**
+   * Authored CSS deltas scoped to a specific `@media` block. Bare-selector
+   * authored entries flow into the regular `global` / `viewportVariant`
+   * pool above; this array is only for entries whose authored rule lives
+   * INSIDE `@media (...)` / `@supports (...)`. The fix prompt renders them
+   * as media-gated candidates so the LLM keeps the matching media
+   * condition when writing the fix.
+   */
+  authoredMediaScoped: Array<{
+    selector: string;
+    property: string;
+    mediaCondition: string;
+    baseline: string;
+    variant: string;
+  }>;
+}
+
+const AUTHORED_MEDIA_SEPARATOR = " :: ";
+const AUTHORED_MEDIA_PREFIX = "@media ";
+
+function splitAuthoredScopedSelector(
+  scoped: string,
+): { selector: string; mediaCondition: string } {
+  if (!scoped.startsWith(AUTHORED_MEDIA_PREFIX)) {
+    return { selector: scoped, mediaCondition: "" };
+  }
+  const sepIndex = scoped.indexOf(AUTHORED_MEDIA_SEPARATOR);
+  if (sepIndex < 0) return { selector: scoped, mediaCondition: "" };
+  const mediaCondition = scoped.slice(AUTHORED_MEDIA_PREFIX.length, sepIndex).trim();
+  const selector = scoped.slice(sepIndex + AUTHORED_MEDIA_SEPARATOR.length).trim();
+  return { selector, mediaCondition };
 }
 
 function classListToSelectors(classList: string | undefined): string[] {
@@ -417,6 +478,36 @@ export function buildBaselineValueIndex(
       observeVariant(key, e.variant);
     }
   }
+  const authoredMediaScoped: BaselineValueIndex["authoredMediaScoped"] = [];
+  const authoredSeen = new Set<string>();
+  const authored = report.authoredStyleDiff ?? [];
+  for (const block of authored) {
+    if (variantFile && block.variantFile !== variantFile) continue;
+    for (const e of block.result?.entries ?? []) {
+      const { selector, mediaCondition } = splitAuthoredScopedSelector(e.selector);
+      if (!selector) continue;
+      if (mediaCondition) {
+        // Media-scoped entries don't fold into the global pool — they need
+        // the matching `@media (...)` wrapper when written back. The
+        // viewport-variant detector below also wouldn't recognize them
+        // because they aren't keyed by viewport label.
+        const dedupeKey = `${mediaCondition} ${selector} ${e.property}`;
+        if (authoredSeen.has(dedupeKey)) continue;
+        authoredSeen.add(dedupeKey);
+        authoredMediaScoped.push({
+          selector,
+          property: e.property,
+          mediaCondition,
+          baseline: e.baseline,
+          variant: e.variant,
+        });
+        continue;
+      }
+      const key = `${selector} ${e.property}`;
+      observeValue(key, e.baseline);
+      observeVariant(key, e.variant);
+    }
+  }
   const dpv = report.domPositionDiffPerViewport ?? [];
   for (const block of dpv) {
     if (variantFile && block.variantFile !== variantFile) continue;
@@ -446,7 +537,7 @@ export function buildBaselineValueIndex(
       viewportVariant.set(key, values);
     }
   }
-  return { global, byViewport, viewportVariant, variantValues };
+  return { global, byViewport, viewportVariant, variantValues, authoredMediaScoped };
 }
 
 export interface CorrectionResult {

@@ -625,6 +625,148 @@ describe("buildBaselineValueIndex + correctMigrationFixesWithReport", () => {
   });
 });
 
+describe("buildBaselineValueIndex + authored-style channel", () => {
+  it("folds bare-selector authored entries into the global pool", () => {
+    const report: MigrationCompareReport = {
+      baseline: "target.html",
+      variants: ["current.html"],
+      viewports: [],
+      results: [],
+      authoredStyleDiff: [{
+        variantFile: "current.html",
+        result: {
+          entries: [
+            {
+              selector: ".shell",
+              property: "grid-template-columns",
+              baseline: "minmax(0, 1fr) 4px minmax(0, 1fr)",
+              variant: "minmax(0, 1fr) minmax(0, 1fr)",
+            },
+          ],
+        },
+      }],
+    };
+    const idx = buildBaselineValueIndex(report, "current.html");
+    assert.equal(
+      idx.global.get(".shell grid-template-columns"),
+      "minmax(0, 1fr) 4px minmax(0, 1fr)",
+    );
+    assert.equal(
+      idx.variantValues.get(".shell grid-template-columns"),
+      "minmax(0, 1fr) minmax(0, 1fr)",
+    );
+    assert.equal(idx.authoredMediaScoped.length, 0);
+  });
+
+  it("captures media-scoped entries into authoredMediaScoped", () => {
+    const report: MigrationCompareReport = {
+      baseline: "target.html",
+      variants: ["current.html"],
+      viewports: [],
+      results: [],
+      authoredStyleDiff: [{
+        variantFile: "current.html",
+        result: {
+          entries: [
+            {
+              selector: "@media (min-width: 768px) :: .shell",
+              property: "grid-template-columns",
+              baseline: "minmax(0, 1fr) 4px minmax(0, 1fr)",
+              variant: "minmax(0, 1fr) minmax(0, 1fr)",
+            },
+          ],
+        },
+      }],
+    };
+    const idx = buildBaselineValueIndex(report, "current.html");
+    assert.equal(idx.authoredMediaScoped.length, 1);
+    const row = idx.authoredMediaScoped[0]!;
+    assert.equal(row.selector, ".shell");
+    assert.equal(row.property, "grid-template-columns");
+    assert.equal(row.mediaCondition, "(min-width: 768px)");
+    assert.equal(row.baseline, "minmax(0, 1fr) 4px minmax(0, 1fr)");
+    assert.equal(row.variant, "minmax(0, 1fr) minmax(0, 1fr)");
+    // Bare-selector pool should NOT pick up the media-scoped value.
+    assert.equal(idx.global.has(".shell grid-template-columns"), false);
+  });
+
+  it("dedupes media-scoped entries that appear multiple times", () => {
+    const report: MigrationCompareReport = {
+      baseline: "target.html",
+      variants: ["current.html"],
+      viewports: [],
+      results: [],
+      authoredStyleDiff: [{
+        variantFile: "current.html",
+        result: {
+          entries: [
+            {
+              selector: "@media (min-width: 768px) :: .shell",
+              property: "transform",
+              baseline: "translateY(4px)",
+              variant: "translateY(0)",
+            },
+            {
+              selector: "@media (min-width: 768px) :: .shell",
+              property: "transform",
+              baseline: "translateY(4px)",
+              variant: "translateY(0)",
+            },
+          ],
+        },
+      }],
+    };
+    const idx = buildBaselineValueIndex(report, "current.html");
+    assert.equal(idx.authoredMediaScoped.length, 1);
+  });
+
+  it("renders the media-scoped table inside buildMigrationFixLoopMultiPrompt", () => {
+    const report: MigrationCompareReport = {
+      baseline: "target.html",
+      variants: ["current.html"],
+      viewports: [],
+      results: [],
+      authoredStyleDiff: [{
+        variantFile: "current.html",
+        result: {
+          entries: [
+            {
+              selector: "@media (min-width: 768px) :: .shell",
+              property: "grid-template-columns",
+              baseline: "minmax(0, 1fr) 4px minmax(0, 1fr)",
+              variant: "minmax(0, 1fr) minmax(0, 1fr)",
+            },
+          ],
+        },
+      }],
+    };
+    const idx = buildBaselineValueIndex(report, "current.html");
+    const prompt = buildMigrationFixLoopMultiPrompt({
+      baselineFile: "target.html",
+      variantFile: "current.html",
+      target: {
+        variant: "current",
+        variantFile: "current.html",
+        viewport: "desktop",
+        viewportWidth: 1280,
+        diffRatio: 0.041,
+        diffPixels: 4100,
+        dominantCategory: "color-change",
+        categorySummary: "1 color-change",
+        paintTreeSummary: "",
+        paintTreeChangeCount: 0,
+        fixCandidates: [],
+      },
+      currentCss: "",
+      maxFixes: 3,
+      baselineValueIndex: idx,
+    });
+    assert.match(prompt, /Media-scoped authored CSS deltas/);
+    assert.match(prompt, /@media \(min-width: 768px\) \{ \.shell \{ grid-template-columns: minmax\(0, 1fr\) 4px minmax\(0, 1fr\); \} \}/);
+    assert.match(prompt, /mediaCondition: "\(min-width: 768px\)"/);
+  });
+});
+
 describe("extractCustomProperties + extractCustomPropertyDiffs", () => {
   it("collects --vars from :root and from html selectors", () => {
     const css = `:root { --black: #050505; --red: #e60012; }\nhtml { --paper: #f7f4ec; }`;
