@@ -21,12 +21,12 @@ import {
   type A11yTouchRawSample,
   type TouchTargetFinding,
   type WcagTouchLevel,
-} from "@mizchi/vlmkit-core/a11y-touch.ts";
+} from "@mizchi/vlmkit-markup/a11y-touch.ts";
 import {
   analyzeFocusOrderSteps,
   collectFocusStepsOnPage,
   type FocusOrderFinding,
-} from "@mizchi/vlmkit-core/a11y-focus-order.ts";
+} from "@mizchi/vlmkit-markup/a11y-focus-order.ts";
 import {
   A11Y_SEMANTIC_SAMPLE_SCRIPT,
   analyzeA11ySemanticSamples,

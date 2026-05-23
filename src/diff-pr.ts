@@ -46,8 +46,8 @@ import { filterA11yFindings, filterCrossBrowserFindings, filterMediaVariantFindi
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import type { ContrastFinding } from "@mizchi/vlmkit-markup/a11y-contrast.ts";
-import type { TouchTargetFinding } from "@mizchi/vlmkit-core/a11y-touch.ts";
-import type { FocusOrderFinding } from "@mizchi/vlmkit-core/a11y-focus-order.ts";
+import type { TouchTargetFinding } from "@mizchi/vlmkit-markup/a11y-touch.ts";
+import type { FocusOrderFinding } from "@mizchi/vlmkit-markup/a11y-focus-order.ts";
 import type { SemanticFinding } from "./a11y-semantic-checks.ts";
 
 // Same defaults as migration-compare's STATIC_VIEWPORTS so a baseline

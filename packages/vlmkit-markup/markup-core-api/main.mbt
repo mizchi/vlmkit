@@ -547,6 +547,25 @@ fn dispatch(args : Array[String]) -> String raise {
         parse_double(font_size),
         parse_int(font_weight),
       )
+    ["focus-order-classify", same_path, prev_x, prev_y, cur_x, cur_y] =>
+      @core.focus_order_classify(
+        parse_bool(same_path),
+        parse_double(prev_x),
+        parse_double(prev_y),
+        parse_double(cur_x),
+        parse_double(cur_y),
+      )
+    ["a11y-touch-required-side", level] =>
+      @core.a11y_touch_required_side(level).to_string()
+    ["a11y-touch-below-required", min_side, level] =>
+      @core.a11y_touch_below_required(parse_double(min_side), level)
+    ["a11y-touch-in-cluster", ax, ay, bx, by] =>
+      @core.a11y_touch_in_cluster(
+        parse_double(ax),
+        parse_double(ay),
+        parse_double(bx),
+        parse_double(by),
+      )
     _ => usage()
   }
 }

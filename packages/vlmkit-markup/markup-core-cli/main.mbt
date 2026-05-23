@@ -621,6 +621,29 @@ fn main_err() -> Unit raise {
           parse_int(font_weight),
         ),
       )
+    ["focus-order-classify", same_path, prev_x, prev_y, cur_x, cur_y] =>
+      println(
+        @core.focus_order_classify(
+          parse_bool(same_path),
+          parse_double(prev_x),
+          parse_double(prev_y),
+          parse_double(cur_x),
+          parse_double(cur_y),
+        ),
+      )
+    ["a11y-touch-required-side", level] =>
+      println(@core.a11y_touch_required_side(level).to_string())
+    ["a11y-touch-below-required", min_side, level] =>
+      println(@core.a11y_touch_below_required(parse_double(min_side), level))
+    ["a11y-touch-in-cluster", ax, ay, bx, by] =>
+      println(
+        @core.a11y_touch_in_cluster(
+          parse_double(ax),
+          parse_double(ay),
+          parse_double(bx),
+          parse_double(by),
+        ),
+      )
     _ => print_usage()
   }
 }
@@ -707,7 +730,11 @@ fn is_command(value : String) -> Bool {
   value == "visual-classify-region" ||
   value == "visual-layout-shift-group-threshold" ||
   value == "region-classify-kind" ||
-  value == "a11y-contrast-evaluate"
+  value == "a11y-contrast-evaluate" ||
+  value == "focus-order-classify" ||
+  value == "a11y-touch-required-side" ||
+  value == "a11y-touch-below-required" ||
+  value == "a11y-touch-in-cluster"
 }
 
 ///|

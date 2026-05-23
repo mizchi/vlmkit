@@ -27,8 +27,9 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, type Page } from "playwright";
-import { handleCliError } from "./cli-error.ts";
-import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "./terminal-colors.ts";
+import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { classifyFocusOrderStep } from "./markup-core-a11y-focus-order.ts";
 
 export interface FocusOrderOptions {
   source: string;
@@ -157,33 +158,32 @@ export function analyzeFocusOrderSteps(steps: FocusStep[]): FocusOrderFinding[] 
   for (let i = 1; i < steps.length; i++) {
     const prev = steps[i - 1]!;
     const cur = steps[i]!;
-    const samePath = prev.path === cur.path;
-    const sameBbox = Math.abs(prev.bbox.x - cur.bbox.x) < 4
-      && Math.abs(prev.bbox.y - cur.bbox.y) < 4;
-    if (samePath && sameBbox) {
+    const transition = classifyFocusOrderStep({
+      samePath: prev.path === cur.path,
+      prev: { x: prev.bbox.x, y: prev.bbox.y },
+      cur: { x: cur.bbox.x, y: cur.bbox.y },
+    });
+    if (transition === "ok") continue;
+    const dy = cur.bbox.y - prev.bbox.y;
+    if (transition === "trap") {
       findings.push({
         kind: "trap",
         fromIndex: i - 1, toIndex: i,
         message: `Focus stayed on the same element (\`${cur.path}\`) across two Tab presses.`,
       });
-      continue;
-    }
-    const dy = cur.bbox.y - prev.bbox.y;
-    const dx = cur.bbox.x - prev.bbox.x;
-    const sameRow = Math.abs(dy) <= 16;
-    if (sameRow && dx < -40) {
+    } else if (transition === "reverse-left") {
       findings.push({
         kind: "reverse",
         fromIndex: i - 1, toIndex: i,
         message: `Focus moved left within the same row (from \`${prev.path}\` at x=${prev.bbox.x.toFixed(0)} to \`${cur.path}\` at x=${cur.bbox.x.toFixed(0)}). Visual order is L-to-R; check \`tabindex\` or DOM order.`,
       });
-    } else if (dy < -24) {
+    } else if (transition === "reverse-up") {
       findings.push({
         kind: "reverse",
         fromIndex: i - 1, toIndex: i,
         message: `Focus moved up by ${(-dy).toFixed(0)}px (from \`${prev.path}\` at y=${prev.bbox.y.toFixed(0)} to \`${cur.path}\` at y=${cur.bbox.y.toFixed(0)}). Visual order is top-to-bottom; check \`tabindex\` or DOM order.`,
       });
-    } else if (dy > 200) {
+    } else if (transition === "skip-row") {
       findings.push({
         kind: "skip-row",
         fromIndex: i - 1, toIndex: i,
@@ -237,66 +237,8 @@ export async function runFocusOrder(
     await browser.close();
   }
 
-  // Detect findings:
-  //   trap     — same element twice in a row
-  //   reverse  — y moved up by > 4px, or x moved left by > 40px on
-  //              the same row (similar y, within ±16px). Out-of-DOM
-  //              order on the visual page.
-  //   skip-row — y jumped > 200px without intermediate stops on rows
-  //              in between. (Heuristic; large jumps are sometimes
-  //              legitimate, e.g. jumping past a paragraph.)
-  const findings: FocusOrderFinding[] = [];
-  for (let i = 1; i < steps.length; i++) {
-    const prev = steps[i - 1]!;
-    const cur = steps[i]!;
-    // Trap = same path AND overlapping bbox. Sibling elements with
-    // identical class/tag (the path generator can't distinguish them
-    // without nth-of-type) would otherwise false-positive.
-    const samePath = prev.path === cur.path;
-    const sameBbox = Math.abs(prev.bbox.x - cur.bbox.x) < 4
-      && Math.abs(prev.bbox.y - cur.bbox.y) < 4;
-    if (samePath && sameBbox) {
-      findings.push({
-        kind: "trap",
-        fromIndex: i - 1, toIndex: i,
-        message: `Focus stayed on the same element (\`${cur.path}\`) across two Tab presses.`,
-      });
-      continue;
-    }
-    if (samePath && !sameBbox) {
-      // Two siblings with identical class/tag — not a trap, just
-      // path-generator ambiguity. Continue with visual checks below.
-    }
-    const dy = cur.bbox.y - prev.bbox.y;
-    const dx = cur.bbox.x - prev.bbox.x;
-    const sameRow = Math.abs(dy) <= 16;
-    if (sameRow && dx < -40) {
-      findings.push({
-        kind: "reverse",
-        fromIndex: i - 1, toIndex: i,
-        message: `Focus moved left within the same row (from \`${prev.path}\` at x=${prev.bbox.x.toFixed(0)} to \`${cur.path}\` at x=${cur.bbox.x.toFixed(0)}). Visual order is L-to-R; check \`tabindex\` or DOM order.`,
-      });
-    } else if (dy < -24) {
-      // 24 px is approximately one button-row height — anything less
-      // is the inline-text vs button-row bbox.y delta and would
-      // false-positive on normal layouts. Subagent dogfood validated
-      // this threshold needs to be conservative.
-      findings.push({
-        kind: "reverse",
-        fromIndex: i - 1, toIndex: i,
-        message: `Focus moved up the page (from y=${prev.bbox.y.toFixed(0)} to y=${cur.bbox.y.toFixed(0)}, Δ ${dy.toFixed(0)}px). Visual order is T-to-B; reorder DOM or remove \`tabindex\` overrides.`,
-      });
-    } else if (dy > 200) {
-      // Only flag if there are other interactive elements in between
-      // — checking inside the report would require capturing the
-      // full element list. For now, surface as a heuristic.
-      findings.push({
-        kind: "skip-row",
-        fromIndex: i - 1, toIndex: i,
-        message: `Focus jumped from y=${prev.bbox.y.toFixed(0)} to y=${cur.bbox.y.toFixed(0)} (Δ ${dy.toFixed(0)}px) — verify no focusable elements were skipped between.`,
-      });
-    }
-  }
+  // Detect findings via the shared MoonBit-backed classifier.
+  const findings: FocusOrderFinding[] = analyzeFocusOrderSteps(steps);
 
   const reportPath = options.reportPath ?? join(outputDir, "report.md");
   const md = renderReport({

@@ -22,8 +22,13 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, type Page } from "playwright";
-import { handleCliError } from "./cli-error.ts";
-import { DIM, RESET, GREEN, RED, BOLD, CYAN } from "./terminal-colors.ts";
+import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { DIM, RESET, GREEN, RED, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import {
+  requiredTouchSide,
+  touchTargetBelowRequired,
+  touchTargetInCluster,
+} from "./markup-core-a11y-touch.ts";
 
 export type WcagTouchLevel = "AAA" | "AA";
 
@@ -126,23 +131,26 @@ export function analyzeA11yTouchSamples(
   samples: A11yTouchRawSample[],
   level: WcagTouchLevel = "AAA",
 ): TouchTargetFinding[] {
-  const required = level === "AAA" ? 44 : 24;
+  const required = requiredTouchSide(level);
   const byPath = new Map<string, A11yTouchRawSample>();
   for (const s of samples) if (!byPath.has(s.path)) byPath.set(s.path, s);
   const findings: TouchTargetFinding[] = [];
   const elements = [...byPath.values()];
+  const centers = elements.map((e) => ({
+    x: e.bbox.x + e.bbox.width / 2,
+    y: e.bbox.y + e.bbox.height / 2,
+  }));
   for (let i = 0; i < elements.length; i++) {
     const e = elements[i]!;
     const minSide = Math.min(e.bbox.width, e.bbox.height);
-    if (minSide >= required) continue;
+    if (!touchTargetBelowRequired(minSide, level)) continue;
     let cluster = false;
     for (let j = 0; j < elements.length; j++) {
       if (i === j) continue;
-      const o = elements[j]!;
-      const cx1 = e.bbox.x + e.bbox.width / 2, cy1 = e.bbox.y + e.bbox.height / 2;
-      const cx2 = o.bbox.x + o.bbox.width / 2, cy2 = o.bbox.y + o.bbox.height / 2;
-      const dx = cx2 - cx1, dy = cy2 - cy1;
-      if (Math.sqrt(dx * dx + dy * dy) < 24) { cluster = true; break; }
+      if (touchTargetInCluster(centers[i]!, centers[j]!)) {
+        cluster = true;
+        break;
+      }
     }
     findings.push({
       path: e.path,
