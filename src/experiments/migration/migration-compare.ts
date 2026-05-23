@@ -97,7 +97,7 @@ import {
   type ShiftAccumulationBreakdown,
   type ShiftOrigin,
 } from "@mizchi/vlmkit-core/shift-origin.ts";
-import { findGridSuggestions, type GridSuggestion } from "@mizchi/vlmkit-core/grid-ratio.ts";
+import { findGridSuggestions, type GridSuggestion } from "@mizchi/vlmkit-markup/grid-ratio.ts";
 import {
   extractComponentsFromFile,
   matchComponents,

@@ -505,7 +505,34 @@ fn main_err() -> Unit raise {
           current_stats,
         ),
       )
+    ["grid-gcd", a, b] =>
+      println(@core.grid_gcd(parse_int(a), parse_int(b)).to_string())
+    ["grid-all-equal", widths, tolerance] =>
+      println(
+        bool_to_string_cli(
+          @core.grid_all_equal(widths, parse_double(tolerance)),
+        ),
+      )
+    ["grid-arrays-close", a, b, tolerance] =>
+      println(
+        bool_to_string_cli(
+          @core.grid_arrays_close(a, b, parse_double(tolerance)),
+        ),
+      )
+    ["grid-ratios-to-decimal", widths] =>
+      println(@core.grid_ratios_to_decimal(widths))
+    ["grid-approximate-integer-fr", widths, max_denom] =>
+      println(@core.grid_approximate_integer_fr(widths, parse_int(max_denom)))
     _ => print_usage()
+  }
+}
+
+///|
+fn bool_to_string_cli(value : Bool) -> String {
+  if value {
+    "true"
+  } else {
+    "false"
   }
 }
 
@@ -567,7 +594,12 @@ fn is_command(value : String) -> Bool {
   value == "landscape-clamp-byte" ||
   value == "landscape-cell-score" ||
   value == "landscape-cell-hex" ||
-  value == "landscape-diff-summary"
+  value == "landscape-diff-summary" ||
+  value == "grid-gcd" ||
+  value == "grid-all-equal" ||
+  value == "grid-arrays-close" ||
+  value == "grid-ratios-to-decimal" ||
+  value == "grid-approximate-integer-fr"
 }
 
 ///|

@@ -683,3 +683,56 @@ test "landscape diff summary degenerate grid" {
   let summary = landscape_diff_summary(0, 0, 0.08, 4, "", "")
   inspect(summary, content="1|0|0|0")
 }
+
+///|
+test "grid_gcd basic" {
+  inspect(grid_gcd(12, 8), content="4")
+  inspect(grid_gcd(800, 200), content="200")
+  inspect(grid_gcd(0, 5), content="5")
+  inspect(grid_gcd(-12, 8), content="4")
+}
+
+///|
+test "grid_all_equal honors tolerance" {
+  inspect(grid_all_equal("200,200,200", 0.0), content="true")
+  inspect(grid_all_equal("200,201,200", 0.5), content="false")
+  inspect(grid_all_equal("200,201,200", 2.0), content="true")
+  inspect(grid_all_equal("", 0.0), content="true")
+  inspect(grid_all_equal("500", 0.0), content="true")
+}
+
+///|
+test "grid_arrays_close compares length and per-element delta" {
+  inspect(grid_arrays_close("100,200", "101,199", 2.0), content="true")
+  inspect(grid_arrays_close("100,200", "104,199", 2.0), content="false")
+  inspect(grid_arrays_close("100,200", "100", 0.0), content="false")
+  inspect(grid_arrays_close("", "", 0.0), content="true")
+}
+
+///|
+test "grid_ratios_to_decimal divides by smallest with 3-dp formatting" {
+  inspect(grid_ratios_to_decimal("393,298"), content="1.319 : 1.000")
+  inspect(grid_ratios_to_decimal("800,200"), content="4.000 : 1.000")
+  inspect(grid_ratios_to_decimal("343,343"), content="1.000 : 1.000")
+  inspect(grid_ratios_to_decimal(""), content="")
+}
+
+///|
+test "grid_approximate_integer_fr returns clean integer form when one fits" {
+  inspect(grid_approximate_integer_fr("800,200", 12), content="4fr 1fr")
+  inspect(grid_approximate_integer_fr("600,400", 12), content="3fr 2fr")
+  inspect(grid_approximate_integer_fr("250,250,500", 12), content="1fr 1fr 2fr")
+}
+
+///|
+test "grid_approximate_integer_fr falls back when no <1% denom fits" {
+  // 1.319 has no <1% denominator within [1,2]. Force a tighter cap
+  // so the search exits without a candidate.
+  inspect(grid_approximate_integer_fr("393,298", 2), content="")
+}
+
+///|
+test "grid_approximate_integer_fr handles degenerate input" {
+  inspect(grid_approximate_integer_fr("", 12), content="")
+  inspect(grid_approximate_integer_fr("0,200", 12), content="")
+}

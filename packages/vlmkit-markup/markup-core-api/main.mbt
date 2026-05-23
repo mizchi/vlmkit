@@ -454,6 +454,15 @@ fn dispatch(args : Array[String]) -> String raise {
         baseline_stats,
         current_stats,
       )
+    ["grid-gcd", a, b] =>
+      @core.grid_gcd(parse_int(a), parse_int(b)).to_string()
+    ["grid-all-equal", widths, tolerance] =>
+      bool_to_string(@core.grid_all_equal(widths, parse_double(tolerance)))
+    ["grid-arrays-close", a, b, tolerance] =>
+      bool_to_string(@core.grid_arrays_close(a, b, parse_double(tolerance)))
+    ["grid-ratios-to-decimal", widths] => @core.grid_ratios_to_decimal(widths)
+    ["grid-approximate-integer-fr", widths, max_denom] =>
+      @core.grid_approximate_integer_fr(widths, parse_int(max_denom))
     _ => usage()
   }
 }

@@ -62,7 +62,6 @@ export {
   compareRowTypography,
   computeRowGapDeltas,
 } from "./text-rows.ts";
-export { findGridSuggestions } from "./grid-ratio.ts";
 
 // ---- PNG IO ----
 export {
