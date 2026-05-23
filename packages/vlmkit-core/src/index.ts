@@ -52,7 +52,6 @@ export {
   normalizeVrtDiffRegionPixels,
 } from "./diff-regions.ts";
 export { classifyRegion } from "./region-classify.ts";
-export { explainShiftAccumulations, findShiftOrigins } from "./shift-origin.ts";
 
 // ---- Layout / typography ----
 export {

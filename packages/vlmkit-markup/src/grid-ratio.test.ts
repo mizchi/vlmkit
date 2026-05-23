@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { findGridSuggestions } from "./grid-ratio.ts";
-import type { BboxElement } from "@mizchi/vlmkit-core/shift-origin.ts";
+import type { BboxElement } from "./shift-origin.ts";
 
 function bbox(path: string, width: number, tag = "div", classes = ""): BboxElement {
   return { path, tag, classes, top: 0, left: 0, width, height: 100 };

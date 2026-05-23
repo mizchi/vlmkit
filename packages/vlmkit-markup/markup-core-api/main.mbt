@@ -463,6 +463,13 @@ fn dispatch(args : Array[String]) -> String raise {
     ["grid-ratios-to-decimal", widths] => @core.grid_ratios_to_decimal(widths)
     ["grid-approximate-integer-fr", widths, max_denom] =>
       @core.grid_approximate_integer_fr(widths, parse_int(max_denom))
+    ["shift-round-delta", value] =>
+      @core.shift_round_delta(parse_double(value)).to_string()
+    ["shift-classify-suspect", abs_height_delta, abs_top_delta] =>
+      @core.shift_classify_suspect(
+        parse_double(abs_height_delta),
+        parse_double(abs_top_delta),
+      )
     _ => usage()
   }
 }

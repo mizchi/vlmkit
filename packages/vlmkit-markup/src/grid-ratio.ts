@@ -5,7 +5,7 @@
  * policy (gcd, equality, decimal ratio, integer-fr approximation) lives
  * in MoonBit (`markup-core/grid_ratio.mbt`).
  */
-import type { BboxElement } from "@mizchi/vlmkit-core/shift-origin.ts";
+import type { BboxElement } from "./shift-origin.ts";
 import {
   computeGridAllEqual,
   computeGridApproximateIntegerFr,

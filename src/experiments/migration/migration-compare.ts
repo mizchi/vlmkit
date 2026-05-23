@@ -96,7 +96,7 @@ import {
   type BboxElement,
   type ShiftAccumulationBreakdown,
   type ShiftOrigin,
-} from "@mizchi/vlmkit-core/shift-origin.ts";
+} from "@mizchi/vlmkit-markup/shift-origin.ts";
 import { findGridSuggestions, type GridSuggestion } from "@mizchi/vlmkit-markup/grid-ratio.ts";
 import {
   extractComponentsFromFile,

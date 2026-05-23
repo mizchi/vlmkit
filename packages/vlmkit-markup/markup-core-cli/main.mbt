@@ -523,6 +523,15 @@ fn main_err() -> Unit raise {
       println(@core.grid_ratios_to_decimal(widths))
     ["grid-approximate-integer-fr", widths, max_denom] =>
       println(@core.grid_approximate_integer_fr(widths, parse_int(max_denom)))
+    ["shift-round-delta", value] =>
+      println(@core.shift_round_delta(parse_double(value)).to_string())
+    ["shift-classify-suspect", abs_height_delta, abs_top_delta] =>
+      println(
+        @core.shift_classify_suspect(
+          parse_double(abs_height_delta),
+          parse_double(abs_top_delta),
+        ),
+      )
     _ => print_usage()
   }
 }
@@ -599,7 +608,9 @@ fn is_command(value : String) -> Bool {
   value == "grid-all-equal" ||
   value == "grid-arrays-close" ||
   value == "grid-ratios-to-decimal" ||
-  value == "grid-approximate-integer-fr"
+  value == "grid-approximate-integer-fr" ||
+  value == "shift-round-delta" ||
+  value == "shift-classify-suspect"
 }
 
 ///|

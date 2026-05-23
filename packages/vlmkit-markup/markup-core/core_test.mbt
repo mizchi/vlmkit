@@ -736,3 +736,23 @@ test "grid_approximate_integer_fr handles degenerate input" {
   inspect(grid_approximate_integer_fr("", 12), content="")
   inspect(grid_approximate_integer_fr("0,200", 12), content="")
 }
+
+///|
+test "shift_round_delta keeps 2 decimal places" {
+  inspect(shift_round_delta(1.234), content="1.23")
+  inspect(shift_round_delta(1.235), content="1.24")
+  // JS `Math.round(-1.235 * 100) / 100` returns -1.24 because the IEEE-754
+  // product is -123.50000000000001; MoonBit matches that behavior.
+  inspect(shift_round_delta(-1.235), content="-1.24")
+  inspect(shift_round_delta(0.0), content="0")
+  inspect(shift_round_delta(100.0), content="100")
+}
+
+///|
+test "shift_classify_suspect picks height first, then top" {
+  inspect(shift_classify_suspect(10.0, 0.0), content="height")
+  inspect(shift_classify_suspect(0.0, 12.0), content="margin/padding-above")
+  inspect(shift_classify_suspect(2.0, 2.0), content="y-position")
+  inspect(shift_classify_suspect(5.0, 100.0), content="height")
+  inspect(shift_classify_suspect(4.99, 5.0), content="margin/padding-above")
+}
