@@ -203,6 +203,13 @@ export interface DfaReport {
   results: DfaResult[];
   computedStyleDiff?: DfaCsdSummary[];
   computedStyleDiffPerViewport?: DfaCsdPerViewportSummary[];
+  /**
+   * Authored CSS diff (CSSOM walk). Same shape as `computedStyleDiff`,
+   * surfaces grid-template-* / flex / transform deltas that the computed
+   * channel can't represent without corrupting fr→px resolution.
+   */
+  authoredStyleDiff?: DfaCsdSummary[];
+  authoredStyleDiffPerViewport?: DfaCsdPerViewportSummary[];
   domPositionDiff?: DfaDpSummary[];
   domPositionDiffPerViewport?: DfaDpPerViewportSummary[];
   shiftOrigins?: DfaShiftOriginsSummary[];
@@ -1683,6 +1690,37 @@ export function formatMigrationReportForAgent(
       }
     }
 
+    const authoredSummary = (report.authoredStyleDiff ?? []).find((c) => c.variantFile === variantFile);
+    if (authoredSummary && authoredSummary.result.totalDiffs > 0) {
+      lines.push("### Authored CSS deltas (CSSOM)");
+      lines.push("");
+      lines.push(`Total differing (selector, property) tuples: **${authoredSummary.result.totalDiffs}**. ` +
+        "Captured from `document.styleSheets.cssRules`, so values reflect the AUTHORED string. " +
+        "`grid-template-*` / `flex` / `transform` rows here are safe to write back verbatim — " +
+        "the computed channel above resolves `1fr` to `0px` and would corrupt the layout if used as the fix.");
+      lines.push("");
+      const entries = authoredSummary.result.entries ?? [];
+      if (entries.length > 0) {
+        lines.push("| Selector (scoped) | Property | Baseline | Variant |");
+        lines.push("|---|---|---|---|");
+        for (const e of entries.slice(0, 15)) {
+          lines.push(`| \`${e.selector}\` | \`${e.property}\` | \`${e.baseline}\` | \`${e.variant}\` |`);
+        }
+        if (entries.length > 15) {
+          lines.push(`| _…${entries.length - 15} more rows_ | | | |`);
+        }
+        lines.push("");
+      }
+      const topAuthoredProps = authoredSummary.result.byProperty.slice(0, 8);
+      if (topAuthoredProps.length > 0) {
+        lines.push("Top authored properties:");
+        for (const p of topAuthoredProps) {
+          lines.push(`- \`${p.property}\` — ${p.count} selector(s)`);
+        }
+        lines.push("");
+      }
+    }
+
     // Scenario detector. The current "Suggested next step" wording
     // assumes the migration scenario (read PNGs → cross-check fix
     // candidates → write CSS patch). Subagent F's eval showed that
@@ -1694,6 +1732,7 @@ export function formatMigrationReportForAgent(
       (dpSummary?.result.totalDiffs ?? 0) > 0 ||
       (csdSummary?.result.totalDiffs ?? 0) > 0 ||
       (csdPerVpSummary?.result.totalDiffs ?? 0) > 0 ||
+      (authoredSummary?.result.totalDiffs ?? 0) > 0 ||
       fixCandidates.length > 0;
     const hasWireframeSignal =
       (bboxSummary?.perViewport.length ?? 0) > 0 ||

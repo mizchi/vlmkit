@@ -79,6 +79,8 @@ import {
 } from "@mizchi/vlmkit-core/dom-equivalence.ts";
 import { buildComputedStyleCaptureJsonExpression, parseComputedStyleSnapshot } from "@mizchi/vlmkit-core/computed-style-capture.ts";
 import { aggregateCsdByViewport, diffComputedStyles, type CsdPerViewportResult, type CsdResult, type ComputedStyleSnapshot } from "@mizchi/vlmkit-core/computed-style-diff.ts";
+import { buildAuthoredStyleCaptureJsonExpression, parseAuthoredStyleSnapshot, type AuthoredStyleSnapshot } from "@mizchi/vlmkit-core/authored-style-capture.ts";
+import { aggregateAuthoredStyleByViewport, diffAuthoredStyles, type AuthoredStyleDiffResult, type AuthoredStylePerViewportResult } from "@mizchi/vlmkit-core/authored-style-diff.ts";
 import {
   diffDomPositionStyles,
   diffPositionStylesAcrossViewports,
@@ -534,6 +536,21 @@ export interface MigrationCompareReport {
     variantFile: string;
     result: CsdPerViewportResult;
   }>;
+  /**
+   * Authored-style diff. Same shape as `computedStyleDiff` but captured
+   * via CSSOM (`document.styleSheets.cssRules`) instead of
+   * `getComputedStyle`. Catches grid-template-* / flex / transform diffs
+   * that the computed channel can't surface without corrupting the fr→px
+   * resolution.
+   */
+  authoredStyleDiff?: Array<{
+    variantFile: string;
+    result: AuthoredStyleDiffResult;
+  }>;
+  authoredStyleDiffPerViewport?: Array<{
+    variantFile: string;
+    result: AuthoredStylePerViewportResult;
+  }>;
   domPositionDiff?: Array<{
     variantFile: string;
     result: DpResult;
@@ -886,6 +903,8 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     let baselineDomFingerprint: DomFingerprint | undefined;
     let baselineComputedStyles: ComputedStyleSnapshot | undefined;
     const baselineComputedStylesByVp = new Map<string, ComputedStyleSnapshot>();
+    let baselineAuthoredStyles: AuthoredStyleSnapshot | undefined;
+    const baselineAuthoredStylesByVp = new Map<string, AuthoredStyleSnapshot>();
     let baselineDomPositionStyles: PositionedElement[] | undefined;
     const baselineDomPositionByVp = new Map<string, PositionedElement[]>();
     const baselineBboxesByVp = new Map<string, BboxElement[]>();
@@ -973,6 +992,14 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         } catch (error) {
           console.log(`  ${YELLOW}Baseline computed-style capture error (${vp.label}): ${String(error)}${RESET}`);
         }
+        try {
+          const raw = await page.evaluate(buildAuthoredStyleCaptureJsonExpression());
+          const snapshot = parseAuthoredStyleSnapshot(raw);
+          baselineAuthoredStylesByVp.set(vp.label, snapshot);
+          if (vpIndex === 0) baselineAuthoredStyles = snapshot;
+        } catch (error) {
+          console.log(`  ${YELLOW}Baseline authored-style capture error (${vp.label}): ${String(error)}${RESET}`);
+        }
       }
 
       // Capture baseline DOM-position styles per viewport.
@@ -1018,6 +1045,8 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     const domEquivalenceReports: Array<{ variantFile: string; result: DomEquivalenceResult }> = [];
     const computedStyleDiffReports: Array<{ variantFile: string; result: CsdResult }> = [];
     const computedStyleDiffPerViewportReports: Array<{ variantFile: string; result: CsdPerViewportResult }> = [];
+    const authoredStyleDiffReports: Array<{ variantFile: string; result: AuthoredStyleDiffResult }> = [];
+    const authoredStyleDiffPerViewportReports: Array<{ variantFile: string; result: AuthoredStylePerViewportResult }> = [];
     const domPositionDiffReports: Array<{ variantFile: string; result: DpResult }> = [];
     const domPositionDiffPerViewportReports: Array<{ variantFile: string; result: DpPerViewportResult }> = [];
     const shiftOriginsReports: Array<{ variantFile: string; perViewport: Array<{ viewport: string; origins: ShiftOrigin[]; unexplainedBands?: ShiftRegion[] }> }> = [];
@@ -1060,6 +1089,8 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       let variantDomFingerprint: DomFingerprint | undefined;
       let variantComputedStyles: ComputedStyleSnapshot | undefined;
       const variantComputedStylesByVp = new Map<string, ComputedStyleSnapshot>();
+      let variantAuthoredStyles: AuthoredStyleSnapshot | undefined;
+      const variantAuthoredStylesByVp = new Map<string, AuthoredStyleSnapshot>();
       let variantDomPositionStyles: PositionedElement[] | undefined;
       const variantDomPositionByVp = new Map<string, PositionedElement[]>();
       const variantBboxesByVp = new Map<string, BboxElement[]>();
@@ -1143,6 +1174,14 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             if (vpIndex === 0 && !variantComputedStyles) variantComputedStyles = snapshot;
           } catch (error) {
             console.log(`  ${YELLOW}Variant computed-style capture error (${variantName} / ${vp.label}): ${String(error)}${RESET}`);
+          }
+          try {
+            const raw = await page.evaluate(buildAuthoredStyleCaptureJsonExpression());
+            const snapshot = parseAuthoredStyleSnapshot(raw);
+            variantAuthoredStylesByVp.set(vp.label, snapshot);
+            if (vpIndex === 0 && !variantAuthoredStyles) variantAuthoredStyles = snapshot;
+          } catch (error) {
+            console.log(`  ${YELLOW}Variant authored-style capture error (${variantName} / ${vp.label}): ${String(error)}${RESET}`);
           }
         }
         if (dpEnabled) {
@@ -1505,6 +1544,53 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             });
             if (perViewportResult.totalDiffs > 0) {
               console.log(`  ${DIM}Per-viewport CSD: ${perViewportResult.bySelectorProperty.length} unique pairs ` +
+                `(${perViewportResult.universalPairs.length} universal, ` +
+                `${perViewportResult.breakpointGatedPairs.length} breakpoint-gated)${RESET}`);
+            }
+          }
+        }
+      }
+
+      // Authored-style diff. Same opt-in as computed-style: piggybacks on
+      // --no-computed-style so callers don't need a second flag. The
+      // captured CSSOM walks are cheap (already same-origin), and the
+      // diff is only emitted when there is something to report.
+      if (csdEnabled && baselineAuthoredStyles && variantAuthoredStyles) {
+        const variantFileLabel = variant.url || variant.file;
+        const result = diffAuthoredStyles(baselineAuthoredStyles, variantAuthoredStyles);
+        const trimmedResult = { ...result, entries: result.entries.slice(0, 100) };
+        authoredStyleDiffReports.push({ variantFile: variantFileLabel, result: trimmedResult });
+        if (result.totalDiffs > 0) {
+          const topProps = result.byProperty.slice(0, 5)
+            .map((p) => `${p.property}(${p.count})`)
+            .join(", ");
+          console.log(`  ${DIM}Authored-style diff: ${result.totalDiffs} (selector, prop) ` +
+            `tuples. Top properties: ${topProps}${RESET}`);
+        }
+
+        if (baselineAuthoredStylesByVp.size > 0 && variantAuthoredStylesByVp.size > 0) {
+          const perViewportDiffs: Array<{ viewport: string; result: AuthoredStyleDiffResult }> = [];
+          for (const vp of VIEWPORTS) {
+            const baselineSnap = baselineAuthoredStylesByVp.get(vp.label);
+            const variantSnap = variantAuthoredStylesByVp.get(vp.label);
+            if (!baselineSnap || !variantSnap) continue;
+            perViewportDiffs.push({
+              viewport: vp.label,
+              result: diffAuthoredStyles(baselineSnap, variantSnap),
+            });
+          }
+          if (perViewportDiffs.length > 0) {
+            const perViewportResult = aggregateAuthoredStyleByViewport(perViewportDiffs);
+            const trimmedPerViewport: AuthoredStylePerViewportResult = {
+              ...perViewportResult,
+              bySelectorProperty: perViewportResult.bySelectorProperty.slice(0, 200),
+            };
+            authoredStyleDiffPerViewportReports.push({
+              variantFile: variantFileLabel,
+              result: trimmedPerViewport,
+            });
+            if (perViewportResult.totalDiffs > 0) {
+              console.log(`  ${DIM}Per-viewport authored-style: ${perViewportResult.bySelectorProperty.length} unique pairs ` +
                 `(${perViewportResult.universalPairs.length} universal, ` +
                 `${perViewportResult.breakpointGatedPairs.length} breakpoint-gated)${RESET}`);
             }
@@ -2054,6 +2140,8 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       domEquivalence: domEquivalenceReports.length > 0 ? domEquivalenceReports : undefined,
       computedStyleDiff: computedStyleDiffReports.length > 0 ? computedStyleDiffReports : undefined,
       computedStyleDiffPerViewport: computedStyleDiffPerViewportReports.length > 0 ? computedStyleDiffPerViewportReports : undefined,
+      authoredStyleDiff: authoredStyleDiffReports.length > 0 ? authoredStyleDiffReports : undefined,
+      authoredStyleDiffPerViewport: authoredStyleDiffPerViewportReports.length > 0 ? authoredStyleDiffPerViewportReports : undefined,
       domPositionDiff: domPositionDiffReports.length > 0 ? domPositionDiffReports : undefined,
       domPositionDiffPerViewport: domPositionDiffPerViewportReports.length > 0
         ? domPositionDiffPerViewportReports

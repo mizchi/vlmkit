@@ -83,6 +83,10 @@ export {
   diffPositionStylesAcrossViewports,
 } from "./dom-position-styles.ts";
 export { diffComputedStyles } from "./computed-style-diff.ts";
+export {
+  diffAuthoredStyles,
+  aggregateAuthoredStyleByViewport,
+} from "./authored-style-diff.ts";
 
 // ---- A11y diff ----
 export {
@@ -98,3 +102,4 @@ export {
 // ---- Public config constants ----
 export { RESOLUTION_PRESETS } from "./image-resize.ts";
 export { TRACKED_PROPERTIES } from "./computed-style-capture.ts";
+export { AUTHORED_PROPERTIES } from "./authored-style-capture.ts";

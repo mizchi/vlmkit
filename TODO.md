@@ -1530,18 +1530,17 @@ dogfood. Everything else from that day's improvement-followups report
 has been closed (commits `ef95260`, `2656786`, `f934122`, `4e6d45d`,
 `4efe14b`, `3ce514b`).
 
-- [ ] **Authored grid-template-* capture without computed-style fr→px
-  resolution.** `getComputedStyle().getPropertyValue("grid-template-
-  columns")` resolves `minmax(0, 1fr)` to `0px`, so the report's
-  `computedStyleDiff` can't surface the `.shell` 4px column-width
-  difference in `design-runs/patterns-20260520/app-shell/`. Writing the
-  resolved value back would corrupt the layout. Needs a separate
-  capture path that walks `CSSOM.cssRules` and emits the AUTHORED
-  `grid-template-*` strings as a new report channel
-  (`authoredStyleDiff`?). Then `migration-fix-loop` can include it in
-  the prompt table without going through the computed-style filter.
-  Same shape would help `flex` shorthand, `transform`, and any other
-  property whose computed form diverges from authored.
+- [x] **Authored grid-template-* capture without computed-style fr→px
+  resolution.** `@mizchi/vlmkit-core/authored-style-capture.ts` walks
+  `document.styleSheets.cssRules` (including nested `@media` /
+  `@supports`) and emits authored strings for `grid-template-*`, `flex`,
+  `transform`, `clip-path`, `mask*` etc. Selectors inside `@media`
+  blocks are scoped as `@media (...) :: <selector>` so the diff treats
+  them as distinct rows. `migration-compare` captures both sides under
+  the existing `--computed-style` flag and emits `authoredStyleDiff` /
+  `authoredStyleDiffPerViewport` in `migration-report.json`. `vrt
+  diff-for-agent` renders an "Authored CSS deltas (CSSOM)" table
+  alongside the verified computed-style section.
 - [ ] **`vlm-region-diff` client-side bbox pixel sampling.** Bake-off
   done (`docs/reports/2026-05-23-vlm-region-diff-bakeoff.md`): on the
   expressive-menu 86%-changed pair `anthropic/claude-haiku-4-5` is the
