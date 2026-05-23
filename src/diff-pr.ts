@@ -45,7 +45,7 @@ import { runCrossBrowser, type EngineName, type EngineResult } from "@mizchi/vlm
 import { filterA11yFindings, filterCrossBrowserFindings, filterMediaVariantFindings, loadApprovalManifest, type ApprovalManifest } from "./vrt/snapshot/approval.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
-import type { ContrastFinding } from "@mizchi/vlmkit-core/a11y-contrast.ts";
+import type { ContrastFinding } from "@mizchi/vlmkit-markup/a11y-contrast.ts";
 import type { TouchTargetFinding } from "@mizchi/vlmkit-core/a11y-touch.ts";
 import type { FocusOrderFinding } from "@mizchi/vlmkit-core/a11y-focus-order.ts";
 import type { SemanticFinding } from "./a11y-semantic-checks.ts";

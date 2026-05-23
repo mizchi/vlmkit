@@ -14,7 +14,7 @@ import {
   analyzeA11yContrastSamples,
   type A11yContrastRawSample,
   type ContrastFinding,
-} from "@mizchi/vlmkit-core/a11y-contrast.ts";
+} from "@mizchi/vlmkit-markup/a11y-contrast.ts";
 import {
   A11Y_TOUCH_SAMPLE_SCRIPT,
   analyzeA11yTouchSamples,

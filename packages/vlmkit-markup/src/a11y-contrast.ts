@@ -27,8 +27,9 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "./terminal-colors.ts";
-import { handleCliError } from "./cli-error.ts";
+import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { evaluateA11yContrast } from "./markup-core-a11y-contrast.ts";
 
 export interface A11yContrastOptions {
   htmlPath: string;
@@ -148,23 +149,6 @@ export interface A11yContrastRawSample {
   background: { r: number; g: number; b: number };
 }
 
-function relLuma(r: number, g: number, b: number): number {
-  // WCAG relative luminance formula.
-  const s = (c: number) => {
-    const v = c / 255;
-    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-  };
-  return 0.2126 * s(r) + 0.7152 * s(g) + 0.0722 * s(b);
-}
-
-function contrastRatio(a: { r: number; g: number; b: number }, b: { r: number; g: number; b: number }): number {
-  const la = relLuma(a.r, a.g, a.b);
-  const lb = relLuma(b.r, b.g, b.b);
-  const lighter = Math.max(la, lb);
-  const darker = Math.min(la, lb);
-  return (lighter + 0.05) / (darker + 0.05);
-}
-
 function toHex(c: { r: number; g: number; b: number }): string {
   const h = (n: number) => n.toString(16).padStart(2, "0");
   return `#${h(c.r)}${h(c.g)}${h(c.b)}`;
@@ -182,9 +166,13 @@ export function analyzeA11yContrastSamples(samples: A11yContrastRawSample[]): Co
   for (const s of samples) if (!byPath.has(s.path)) byPath.set(s.path, s);
   const findings: ContrastFinding[] = [];
   for (const s of byPath.values()) {
-    const ratio = contrastRatio(s.foreground, s.background);
-    const { requiredAA, level } = classify(ratio, s.fontSize, s.fontWeight);
-    if (level !== "fail") continue;
+    const evaluation = evaluateA11yContrast({
+      foreground: s.foreground,
+      background: s.background,
+      fontSize: s.fontSize,
+      fontWeight: s.fontWeight,
+    });
+    if (evaluation.level !== "fail") continue;
     findings.push({
       path: s.path,
       tag: s.tag,
@@ -194,24 +182,13 @@ export function analyzeA11yContrastSamples(samples: A11yContrastRawSample[]): Co
       bbox: s.bbox,
       foreground: { ...s.foreground, hex: toHex(s.foreground) },
       background: { ...s.background, hex: toHex(s.background) },
-      ratio: Number(ratio.toFixed(2)),
-      requiredAA,
-      level,
+      ratio: evaluation.ratio,
+      requiredAA: evaluation.requiredAA,
+      level: evaluation.level,
     });
   }
   findings.sort((a, b) => a.ratio - b.ratio);
   return findings;
-}
-
-function classify(ratio: number, fontSize: number, fontWeight: number): { requiredAA: number; level: WcagLevel } {
-  // WCAG 2.1 "large text" threshold: ≥ 18px regular, or ≥ 14px bold (≥ 700).
-  const isLarge = fontSize >= 18 || (fontSize >= 14 && fontWeight >= 700);
-  const requiredAA = isLarge ? 3.0 : 4.5;
-  let level: WcagLevel = "fail";
-  if (ratio >= 7) level = "AAA";
-  else if (ratio >= 4.5) level = "AA";
-  else if (ratio >= 3 && isLarge) level = "AA-large";
-  return { requiredAA, level };
 }
 
 function parseArgs(argv: string[]) {
@@ -263,9 +240,13 @@ export async function runA11yContrast(
 
   const findings: ContrastFinding[] = [];
   for (const s of byPath.values()) {
-    const ratio = contrastRatio(s.foreground, s.background);
-    const { requiredAA, level } = classify(ratio, s.fontSize, s.fontWeight);
-    if (level !== "fail") continue;
+    const evaluation = evaluateA11yContrast({
+      foreground: s.foreground,
+      background: s.background,
+      fontSize: s.fontSize,
+      fontWeight: s.fontWeight,
+    });
+    if (evaluation.level !== "fail") continue;
     findings.push({
       path: s.path,
       tag: s.tag,
@@ -275,9 +256,9 @@ export async function runA11yContrast(
       bbox: s.bbox,
       foreground: { ...s.foreground, hex: toHex(s.foreground) },
       background: { ...s.background, hex: toHex(s.background) },
-      ratio: Number(ratio.toFixed(2)),
-      requiredAA,
-      level,
+      ratio: evaluation.ratio,
+      requiredAA: evaluation.requiredAA,
+      level: evaluation.level,
     });
   }
   findings.sort((a, b) => a.ratio - b.ratio);  // worst first

@@ -526,6 +526,27 @@ fn dispatch(args : Array[String]) -> String raise {
         parse_int(color_count),
         parse_int(stripe_rows),
       )
+    [
+      "a11y-contrast-evaluate",
+      fr,
+      fg,
+      fb,
+      br,
+      bg,
+      bb,
+      font_size,
+      font_weight,
+    ] =>
+      @core.a11y_contrast_evaluate(
+        parse_int(fr),
+        parse_int(fg),
+        parse_int(fb),
+        parse_int(br),
+        parse_int(bg),
+        parse_int(bb),
+        parse_double(font_size),
+        parse_int(font_weight),
+      )
     _ => usage()
   }
 }
