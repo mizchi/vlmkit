@@ -14,7 +14,7 @@
  * Usage:
  *   node src/experiments/migration/vlm-region-diff.ts \
  *     --baseline target.png --variant current.html.png \
- *     [--model bytedance/ui-tars-1.5-7b] [--out path] [--max-tokens 600]
+ *     [--model anthropic/claude-haiku-4-5] [--out path] [--max-tokens 600]
  *
  *   # Triptych mode (baseline | variant | heatmap concatenated):
  *   node src/experiments/migration/vlm-region-diff.ts \
@@ -52,7 +52,7 @@ function parseArgs(argv: string[]): CliArgs {
     baseline: null,
     variant: null,
     triptych: null,
-    model: "bytedance/ui-tars-1.5-7b",
+    model: "anthropic/claude-haiku-4-5",
     out: null,
     maxTokens: 600,
     dryRun: false,
@@ -75,7 +75,8 @@ Options:
   --baseline <path>   Baseline (target) PNG
   --variant  <path>   Variant (current) PNG
   --triptych <path>   Single PNG: [baseline | variant | heatmap]
-  --model    <id>     OpenRouter VLM model (default: bytedance/ui-tars-1.5-7b)
+  --model    <id>     OpenRouter VLM model (default: anthropic/claude-haiku-4-5;
+                      see docs/reports/2026-05-23-vlm-region-diff-bakeoff.md)
   --out      <path>   Write JSON result to this file (default: stdout)
   --max-tokens <n>    OpenRouter max_tokens (default: 600)
   --dry-run           Build the request but skip the API call

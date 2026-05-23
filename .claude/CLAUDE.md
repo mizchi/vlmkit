@@ -50,6 +50,28 @@ pkf run vlm-bench -- <model1> <model2> <model3> --md
 See `docs/reports/2026-05-19-vlm-haiku-vs-uitars.md` for today's 2-way re-bench (haiku + UI-TARS, both FIXED r1);
 `docs/reports/2026-05-18-vlm-claude-vs-openrouter-vs-newcomers.md` for the 8-way bench from the prior week.
 
+### `vlm-region-diff` CLI Default (2026-05-23)
+
+The defaults above are for **fix-loop VLMs** (Stage-1 CHANGE list + Stage-2 LLM).
+`src/experiments/migration/vlm-region-diff.ts` is a different tool — it asks
+the VLM directly for `{verdict, regions, baselineColor, variantColor}`. The
+two roles call for different models.
+
+- **Default**: `anthropic/claude-haiku-4-5` (~$0.005/call). Only model that
+  returned `diff` with correct *direction* on the 2026-05-23 bake-off
+  (expressive-menu component pair, 86% changed pixels). Per-channel hex
+  numbers are still off by ~±10 — treat them as vibes, not measurements.
+- **Avoid as `vlm-region-diff` default**: `bytedance/ui-tars-1.5-7b` (returns
+  `diff` verdict but every region reports `baselineColor == variantColor`),
+  `qwen/qwen3-vl-30b-a3b-instruct` and `google/gemini-2.5-flash` (both
+  return `no-diff` on a ~6% palette shift across the entire image).
+
+The `ui-tars` recommendation in the section above is unchanged — it remains
+the fix-loop Stage-1 VLM default. It just fails specifically at the
+`vlm-region-diff` job of naming color literals.
+
+Full bench: `docs/reports/2026-05-23-vlm-region-diff-bakeoff.md`.
+
 ### Stage-2 LLM Recommendations (2026-05-22)
 
 Hard case: `ui-tars-1.5-7b` VLM + various LLMs, seed 11 selector mode.
