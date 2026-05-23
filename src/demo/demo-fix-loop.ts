@@ -16,7 +16,7 @@ import { reasonAboutChanges, type ReasoningChain } from "@mizchi/vlmkit-ai/reaso
 import { introspectToSpec, verifySpec } from "@mizchi/vlmkit-markup/inspect/introspect.ts";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
-import { classifyVisualDiff } from "@mizchi/vlmkit-core/visual-semantic.ts";
+import { classifyVisualDiff } from "@mizchi/vlmkit-markup/visual-semantic.ts";
 import { createLLMProvider } from "@mizchi/vlmkit-ai/llm-client.ts";
 import type { A11yNode, PageExpectation, ChangeIntent, VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr as _hr } from "@mizchi/vlmkit-core/terminal-colors.ts";

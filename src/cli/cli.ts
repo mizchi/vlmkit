@@ -104,7 +104,7 @@ async function runWorkflow(args: string[]): Promise<void> {
 
 const SPECS: Record<string, Spec> = {
   migrationCompare: spec("migration-compare", () => import("../experiments/migration/migration-compare.ts")),
-  pngDiff: spec("png-diff", () => import("@mizchi/vlmkit-core/png-diff.ts")),
+  pngDiff: spec("png-diff", () => import("@mizchi/vlmkit-markup/png-diff.ts")),
   cssBench: spec("css-challenge-bench", () => import("../experiments/css-challenge/css-challenge-bench.ts")),
   detectionReport: spec("detection-report", () => import("../experiments/detection/detection-report.ts")),
   snapshot: spec("snapshot", () => import("../vrt/snapshot/snapshot.ts")),

@@ -13,7 +13,7 @@ import { existsSync } from "node:fs";
 import { buildDepGraph, findAffectedComponents, graphStats } from "@mizchi/vlmkit-markup/inspect/dep-graph.ts";
 import { extractDiffSemantics } from "@mizchi/vlmkit-ai/intent.ts";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
-import { classifyVisualDiff } from "@mizchi/vlmkit-core/visual-semantic.ts";
+import { classifyVisualDiff } from "@mizchi/vlmkit-markup/visual-semantic.ts";
 import { diffA11yTrees, parsePlaywrightA11ySnapshot, verifyA11yTree } from "@mizchi/vlmkit-core/a11y-semantic.ts";
 import { crossValidate, crossValidationToQualityChecks } from "../../experiments/detection/cross-validation.ts";
 import { loadExpectation, crossValidateWithExpectation, scoreLoop } from "../../vrt/snapshot/expectation.ts";

@@ -31,7 +31,7 @@ import {
 } from "@mizchi/vlmkit-capture/crater-client.ts";
 import { compareScreenshots, generateDiffReport } from "@mizchi/vlmkit-core/heatmap.ts";
 import { createScopedVrtDiff, normalizeVrtDiffRegions } from "@mizchi/vlmkit-core/diff-regions.ts";
-import { classifyVisualDiff } from "@mizchi/vlmkit-core/visual-semantic.ts";
+import { classifyVisualDiff } from "@mizchi/vlmkit-markup/visual-semantic.ts";
 import { composeTriptych } from "./triptych.ts";
 import { loadDesignTokens, snapColor, type DesignTokens } from "./design-md-tokens.ts";
 import { generateWireframeFixCandidates, type WireframeFixSuggestion } from "./wireframe-fix-candidates.ts";

@@ -10,10 +10,10 @@ import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { compareScreenshots, detectWhiteout } from "./heatmap.ts";
-import { decodePng } from "./png-utils.ts";
+import { compareScreenshots, detectWhiteout } from "@mizchi/vlmkit-core/heatmap.ts";
+import { decodePng } from "@mizchi/vlmkit-core/png-utils.ts";
 import { classifyVisualDiff } from "./visual-semantic.ts";
-import type { VrtSnapshot } from "./types.ts";
+import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 
 const TMP = join(import.meta.dirname!, "..", "..", "..", "test-results", "visual-test");
 
@@ -45,7 +45,7 @@ function createTestPng(width: number, height: number, regions: Array<{
 }
 
 async function savePng(path: string, png: { width: number; height: number; data: Uint8Array }) {
-  const { encodePng } = await import("./png-utils.ts");
+  const { encodePng } = await import("@mizchi/vlmkit-core/png-utils.ts");
   await encodePng(path, png);
 }
 

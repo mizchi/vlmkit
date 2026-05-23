@@ -481,6 +481,51 @@ fn dispatch(args : Array[String]) -> String raise {
       )
     ["quality-diff-severity", diff_ratio] =>
       @core.quality_diff_severity(parse_double(diff_ratio))
+    ["visual-is-likely-page-surface", r, g, b] =>
+      @core.visual_is_likely_page_surface(
+        parse_int(r),
+        parse_int(g),
+        parse_int(b),
+      )
+    [
+      "visual-classify-region",
+      region_type,
+      width,
+      height,
+      diff_pixel_count,
+      total_pixels,
+      has_color_sample,
+      baseline_r,
+      baseline_g,
+      baseline_b,
+      current_r,
+      current_g,
+      current_b,
+    ] =>
+      @core.visual_classify_region(
+        region_type,
+        parse_int(width),
+        parse_int(height),
+        parse_int(diff_pixel_count),
+        parse_int(total_pixels),
+        parse_bool(has_color_sample),
+        parse_int(baseline_r),
+        parse_int(baseline_g),
+        parse_int(baseline_b),
+        parse_int(current_r),
+        parse_int(current_g),
+        parse_int(current_b),
+      )
+    ["visual-layout-shift-group-threshold"] =>
+      @core.visual_layout_shift_group_threshold().to_string()
+    ["region-classify-kind", area, aspect, luma_std, color_count, stripe_rows] =>
+      @core.region_classify_kind(
+        parse_int(area),
+        parse_double(aspect),
+        parse_double(luma_std),
+        parse_int(color_count),
+        parse_int(stripe_rows),
+      )
     _ => usage()
   }
 }

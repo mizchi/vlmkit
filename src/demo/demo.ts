@@ -14,7 +14,7 @@ import { reasonAboutChanges } from "@mizchi/vlmkit-ai/reasoning.ts";
 import { matchA11yExpectation } from "../vrt/snapshot/expectation.ts";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
-import { classifyVisualDiff } from "@mizchi/vlmkit-core/visual-semantic.ts";
+import { classifyVisualDiff } from "@mizchi/vlmkit-markup/visual-semantic.ts";
 import type { PageExpectation, ChangeIntent, VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 
 const FIXTURES = join(import.meta.dirname!, "..", "..", "fixtures", "react-sample");

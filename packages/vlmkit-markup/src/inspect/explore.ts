@@ -36,6 +36,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, type Page } from "playwright";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
+import { annotateHeatmapRegionKinds } from "../heatmap-region-kinds.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -315,6 +316,7 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
         const heatmapMaybe = join(outputDir, `explore-${safe}_heatmap.png`);
         try {
           heatmapRegions = await findHeatmapRegionsFromFile(heatmapMaybe, {}, afterShot);
+          await annotateHeatmapRegionKinds(heatmapRegions, afterShot);
           if (diffPixels > 0) heatmapPath = heatmapMaybe;
         } catch { /* no heatmap */ }
       }

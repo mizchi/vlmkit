@@ -18,7 +18,6 @@
  */
 import { PNG } from "pngjs";
 import { readFile } from "node:fs/promises";
-import { classifyRegion } from "./region-classify.ts";
 
 export interface HeatmapRegion {
   top: number;
@@ -39,8 +38,11 @@ export interface HeatmapRegion {
    * Content classification of the region inside the source image —
    * `text` / `filled-rect` / `icon` / `image` / `unknown`. Helps the
    * agent decide whether to paint a flat background, write a text
-   * run, or place an icon. Only populated when `sourceImagePath` is
-   * provided.
+   * run, or place an icon. Only populated when callers run an
+   * explicit annotation pass (see `annotateHeatmapRegionKinds` in
+   * `@mizchi/vlmkit-markup/heatmap-region-kinds.ts`); the bare
+   * `findHeatmapRegionsFromFile` no longer fills it in to keep
+   * vlmkit-core free of MoonBit policy.
    */
   kind?: "text" | "filled-rect" | "icon" | "image" | "unknown";
   /** Classifier confidence ∈ [0, 1]. */
@@ -234,9 +236,6 @@ export async function findHeatmapRegionsFromFile(
       for (const region of regions) {
         const color = sampleRegionColor(sourcePng.data, sourcePng.width, sourcePng.height, region);
         if (color) region.dominantColor = color;
-        const cls = classifyRegion(sourcePng.data, sourcePng.width, sourcePng.height, region);
-        region.kind = cls.kind;
-        region.kindConfidence = Number(cls.confidence.toFixed(2));
       }
     } catch {
       // Source image unavailable — leave regions without annotations.

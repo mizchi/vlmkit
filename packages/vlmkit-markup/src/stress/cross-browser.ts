@@ -26,6 +26,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, firefox, webkit, type Browser, type BrowserType } from "playwright";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
+import { annotateHeatmapRegionKinds } from "../heatmap-region-kinds.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -200,6 +201,7 @@ export async function runCrossBrowser(
     let heatmapRegions: HeatmapRegion[] = [];
     try {
       heatmapRegions = await findHeatmapRegionsFromFile(heatmapPath, {}, screenshotPath);
+      await annotateHeatmapRegionKinds(heatmapRegions, screenshotPath);
     } catch {
       // No heatmap (zero diff).
     }

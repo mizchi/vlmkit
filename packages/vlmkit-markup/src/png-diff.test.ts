@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { parsePngDiffArgs, runPngDiff } from "./png-diff.ts";
-import { encodePng } from "./png-utils.ts";
+import { encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
 
 const TMP = join(import.meta.dirname!, "..", "..", "..", "test-results", "png-diff-test");
 

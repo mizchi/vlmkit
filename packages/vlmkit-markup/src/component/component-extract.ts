@@ -31,7 +31,7 @@ import { basename, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
 import { extractComponentsFromFile, type ComponentBbox } from "./component-bbox.ts";
-import { classifyRegion } from "@mizchi/vlmkit-core/region-classify.ts";
+import { classifyRegion } from "../region-classify.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 

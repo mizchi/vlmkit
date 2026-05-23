@@ -19,7 +19,7 @@ import {
   type PaintTreeApprovalMatch,
 } from "../../vrt/snapshot/approval.ts";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
-import { classifyVisualDiff } from "@mizchi/vlmkit-core/visual-semantic.ts";
+import { classifyVisualDiff } from "@mizchi/vlmkit-markup/visual-semantic.ts";
 import { diffA11yTrees, verifyA11yTree, parsePlaywrightA11ySnapshot } from "@mizchi/vlmkit-core/a11y-semantic.ts";
 import { CraterClient, diffPaintTrees, type PaintNode, type PaintTreeChange } from "@mizchi/vlmkit-capture/crater-client.ts";
 import {

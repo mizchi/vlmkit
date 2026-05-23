@@ -40,6 +40,7 @@ import {
   type MatchedBbox,
 } from "./component-bbox.ts";
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
+import { annotateHeatmapRegionKinds } from "../heatmap-region-kinds.ts";
 import { extractTextRowsFromFile, matchTextRows, computeRowGapDeltas, compareRowTypography, type MatchedTextRow, type RowGapDelta, type TypographyMismatch } from "@mizchi/vlmkit-core/text-rows.ts";
 import { extractPaletteFromFile, findDominantBackgroundsFromFile, type PaletteColor, type DominantBackgrounds } from "../style/palette-extract.ts";
 import { diffPalettes, type PaletteDiff } from "../style/palette-diff.ts";
@@ -457,10 +458,8 @@ export async function runComponentFromImage(
 
     let heatmapRegions: HeatmapRegion[] = [];
     try {
-      // Pass the target image so each region gets its dominant color
-      // annotated — closes the loop between "this region differs" and
-      // "fill it with this color".
       heatmapRegions = await findHeatmapRegionsFromFile(heatmapPath, {}, targetCopyPath);
+      await annotateHeatmapRegionKinds(heatmapRegions, targetCopyPath);
     } catch {
       // Heatmap may be absent when diff is zero.
     }

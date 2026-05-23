@@ -44,14 +44,12 @@ export {
   detectWhiteout,
   detectEmptyContent,
 } from "./heatmap.ts";
-export { runPngDiff } from "./png-diff.ts";
 export { findHeatmapRegionsFromFile, findHeatmapRegionsFromRgba } from "./heatmap-regions.ts";
 export {
   createScopedVrtDiff,
   normalizeVrtDiffRegions,
   normalizeVrtDiffRegionPixels,
 } from "./diff-regions.ts";
-export { classifyRegion } from "./region-classify.ts";
 
 // ---- Layout / typography ----
 export {
@@ -96,9 +94,6 @@ export {
   INTERACTIVE_ROLES,
   LANDMARK_ROLES,
 } from "./a11y-semantic.ts";
-
-// ---- Semantic / quality ----
-export { classifyVisualDiff } from "./visual-semantic.ts";
 
 // ---- Public config constants ----
 export { RESOLUTION_PRESETS } from "./image-resize.ts";

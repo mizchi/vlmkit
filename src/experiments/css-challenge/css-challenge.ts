@@ -18,7 +18,7 @@ import { applyApprovalToVrtDiff, collectApprovalWarnings, inferApprovalChangeTyp
 import { getCssChallengeFixturePath } from "./css-challenge-fixtures.ts";
 import { categorizeProperty, escapeRegex } from "./css-challenge-core.ts";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
-import { classifyVisualDiff } from "@mizchi/vlmkit-core/visual-semantic.ts";
+import { classifyVisualDiff } from "@mizchi/vlmkit-markup/visual-semantic.ts";
 import { diffA11yTrees, verifyA11yTree, parsePlaywrightA11ySnapshot } from "@mizchi/vlmkit-core/a11y-semantic.ts";
 import { createLLMProvider } from "@mizchi/vlmkit-ai/llm-client.ts";
 import type { A11yNode, VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";

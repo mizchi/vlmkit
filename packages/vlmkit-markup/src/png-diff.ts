@@ -1,8 +1,8 @@
 import { mkdir } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { compareScreenshots } from "./heatmap.ts";
+import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { classifyVisualDiff } from "./visual-semantic.ts";
-import type { VrtSnapshot } from "./types.ts";
+import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 
 export interface PngDiffCliOptions {
   baselinePath: string;

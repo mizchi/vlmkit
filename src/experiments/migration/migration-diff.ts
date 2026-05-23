@@ -1,4 +1,4 @@
-import { classifyVisualDiff } from "@mizchi/vlmkit-core/visual-semantic.ts";
+import { classifyVisualDiff } from "@mizchi/vlmkit-markup/visual-semantic.ts";
 import type { ApprovalChangeType } from "../../vrt/snapshot/approval.ts";
 import type { PropertyCategory } from "../css-challenge/css-challenge-core.ts";
 import type { VisualSemanticChange, VrtDiff } from "@mizchi/vlmkit-core/types.ts";

@@ -5,7 +5,7 @@ import {
   classifyMigrationDiff,
   classifyMigrationVisualChange,
 } from "./migration-diff.ts";
-import { classifyVisualDiff } from "@mizchi/vlmkit-core/visual-semantic.ts";
+import { classifyVisualDiff } from "@mizchi/vlmkit-markup/visual-semantic.ts";
 import type { DiffRegion, VrtDiff } from "@mizchi/vlmkit-core/types.ts";
 
 function makeDiff(regions: DiffRegion[], totalPixels = 1_000_000): VrtDiff {

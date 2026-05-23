@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { classifyVisualDiff } from "./visual-semantic.ts";
-import type { VrtDiff, DiffRegion } from "./types.ts";
+import type { VrtDiff, DiffRegion } from "@mizchi/vlmkit-core/types.ts";
 
 function makeDiff(regions: DiffRegion[], totalPixels = 1_000_000): VrtDiff {
   const diffPixels = regions.reduce((s, r) => s + r.diffPixelCount, 0);

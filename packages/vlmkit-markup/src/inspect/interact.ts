@@ -38,6 +38,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, type Page } from "playwright";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
+import { annotateHeatmapRegionKinds } from "../heatmap-region-kinds.ts";
 import { healSelector } from "../heal/selector-heal.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
@@ -338,6 +339,7 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
     let heatmapRegions: HeatmapRegion[] = [];
     try {
       heatmapRegions = await findHeatmapRegionsFromFile(heatmapPath, {}, cur.screenshotPath);
+      await annotateHeatmapRegionKinds(heatmapRegions, cur.screenshotPath);
     } catch {
       // No heatmap (zero diff).
     }

@@ -547,6 +547,57 @@ fn main_err() -> Unit raise {
       )
     ["quality-diff-severity", diff_ratio] =>
       println(@core.quality_diff_severity(parse_double(diff_ratio)))
+    ["visual-is-likely-page-surface", r, g, b] =>
+      println(
+        @core.visual_is_likely_page_surface(
+          parse_int(r),
+          parse_int(g),
+          parse_int(b),
+        ),
+      )
+    [
+      "visual-classify-region",
+      region_type,
+      width,
+      height,
+      diff_pixel_count,
+      total_pixels,
+      has_color_sample,
+      baseline_r,
+      baseline_g,
+      baseline_b,
+      current_r,
+      current_g,
+      current_b,
+    ] =>
+      println(
+        @core.visual_classify_region(
+          region_type,
+          parse_int(width),
+          parse_int(height),
+          parse_int(diff_pixel_count),
+          parse_int(total_pixels),
+          parse_bool(has_color_sample),
+          parse_int(baseline_r),
+          parse_int(baseline_g),
+          parse_int(baseline_b),
+          parse_int(current_r),
+          parse_int(current_g),
+          parse_int(current_b),
+        ),
+      )
+    ["visual-layout-shift-group-threshold"] =>
+      println(@core.visual_layout_shift_group_threshold().to_string())
+    ["region-classify-kind", area, aspect, luma_std, color_count, stripe_rows] =>
+      println(
+        @core.region_classify_kind(
+          parse_int(area),
+          parse_double(aspect),
+          parse_double(luma_std),
+          parse_int(color_count),
+          parse_int(stripe_rows),
+        ),
+      )
     _ => print_usage()
   }
 }
@@ -628,7 +679,11 @@ fn is_command(value : String) -> Bool {
   value == "shift-classify-suspect" ||
   value == "quality-error-state-kind" ||
   value == "quality-coverage-passed" ||
-  value == "quality-diff-severity"
+  value == "quality-diff-severity" ||
+  value == "visual-is-likely-page-surface" ||
+  value == "visual-classify-region" ||
+  value == "visual-layout-shift-group-threshold" ||
+  value == "region-classify-kind"
 }
 
 ///|
