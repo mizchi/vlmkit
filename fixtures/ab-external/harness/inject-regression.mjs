@@ -1,20 +1,25 @@
 #!/usr/bin/env node
 // A/B experiment harness: inject a seeded CSS regression by deleting one
-// selector block from a CSS file. Mirrors the css-challenge "selector mode"
-// but works standalone against any external stylesheet.
+// selector block from a CSS file, or by mutating property values across
+// several blocks. Deletion mirrors the css-challenge "selector mode";
+// mutation is the harder class — no sibling rule to copy values from,
+// so repairing requires measuring the rendered pixels.
 //
 // Usage:
 //   node inject-regression.mjs --css path/to/style.css --list
 //   node inject-regression.mjs --css path/to/style.css --seed 7 --apply
+//   node inject-regression.mjs --css path/to/style.css --seed 7 --mutate 3 --apply
 //
-// --list  prints candidate count + a few samples (no mutation)
-// --apply deletes the chosen block in place and prints JSON metadata
-//         (keep that JSON in the harness dir — it is the hidden answer key)
+// --list      prints candidate count + a few samples (no mutation)
+// --mutate N  mutate N color/px values in N distinct blocks instead of
+//             deleting a block
+// --apply     writes the change in place and prints JSON metadata
+//             (keep that JSON in the harness dir — it is the hidden answer key)
 
 import { readFileSync, writeFileSync } from "node:fs";
 
 function parseArgs(argv) {
-  const args = { css: null, seed: null, list: false, apply: false, minLine: 0 };
+  const args = { css: null, seed: null, list: false, apply: false, minLine: 0, mutate: 0 };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--css") args.css = argv[++i];
@@ -22,6 +27,7 @@ function parseArgs(argv) {
     else if (a === "--list") args.list = true;
     else if (a === "--apply") args.apply = true;
     else if (a === "--min-line") args.minLine = Number(argv[++i]);
+    else if (a === "--mutate") args.mutate = Number(argv[++i]);
   }
   return args;
 }
@@ -107,6 +113,129 @@ function candidateBlocks(css) {
   });
 }
 
+// --- mutation mode helpers ---
+
+const HEX_RE = /#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g;
+const PX_RE = /(\d+(?:\.\d+)?)px\b/g;
+
+function blockBodyStart(block) {
+  // body = css.slice(bodyStart, end - 1)
+  return block.end - 1 - block.body.length;
+}
+
+// Declarations inside a leaf block whose value contains a hex color or a
+// px length — the mutatable population.
+function mutatableDecls(block) {
+  const decls = [];
+  let offset = 0;
+  for (const segment of block.body.split(";")) {
+    const m = segment.match(/^(\s*)([-a-zA-Z]+)\s*:\s*(.+?)\s*$/s);
+    if (m) {
+      const property = m[2];
+      const value = m[3];
+      const hex = value.match(HEX_RE);
+      const px = value.match(PX_RE);
+      if ((hex && hex.length > 0) || (px && px.some((p) => parseFloat(p) > 0))) {
+        decls.push({
+          property,
+          value,
+          kind: hex && hex.length > 0 ? "color" : "length",
+          // absolute offset of the segment within the file
+          segmentStart: blockBodyStart(block) + offset,
+          segmentText: segment,
+        });
+      }
+    }
+    offset += segment.length + 1; // + ";"
+  }
+  return decls;
+}
+
+function mutateHex(hex, rand) {
+  const raw = hex.slice(1);
+  const full = raw.length === 3 ? raw.split("").map((c) => c + c).join("") : raw;
+  const channels = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16));
+  const mutated = channels.map((c) => {
+    const sign = rand() < 0.5 ? -1 : 1;
+    const delta = Math.round(24 + rand() * 56); // 24..80 per channel — clearly visible
+    return Math.max(0, Math.min(255, c + sign * delta));
+  });
+  return "#" + mutated.map((c) => c.toString(16).padStart(2, "0")).join("");
+}
+
+function mutatePx(px, rand) {
+  const value = parseFloat(px);
+  if (value === 0) return "16px";
+  const grow = rand() < 0.5;
+  const factor = grow ? 1.6 + rand() * 0.8 : 0.35 + rand() * 0.25;
+  return `${Math.max(1, Math.round(value * factor))}px`;
+}
+
+function mutateValue(decl, rand) {
+  if (decl.kind === "color") {
+    const matches = [...decl.value.matchAll(HEX_RE)];
+    const target = matches[Math.floor(rand() * matches.length)];
+    const replacement = mutateHex(target[0], rand);
+    return {
+      from: target[0],
+      to: replacement,
+      value: decl.value.slice(0, target.index) + replacement +
+        decl.value.slice(target.index + target[0].length),
+    };
+  }
+  const matches = [...decl.value.matchAll(PX_RE)].filter((m) => parseFloat(m[1]) > 0);
+  const target = matches[Math.floor(rand() * matches.length)];
+  const replacement = mutatePx(target[0], rand);
+  return {
+    from: target[0],
+    to: replacement,
+    value: decl.value.slice(0, target.index) + replacement +
+      decl.value.slice(target.index + target[0].length),
+  };
+}
+
+function applyMutations(css, candidates, count, rand) {
+  // Pool: every mutatable decl, at most one per block so the damage spreads.
+  const pool = [];
+  for (const block of candidates) {
+    const decls = mutatableDecls(block);
+    if (decls.length === 0) continue;
+    pool.push({ block, decls });
+  }
+  // Seeded shuffle of blocks, then pick `count`.
+  const shuffled = [...pool];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  const chosen = shuffled.slice(0, count);
+  const edits = [];
+  for (const { block, decls } of chosen) {
+    const decl = decls[Math.floor(rand() * decls.length)];
+    const mutated = mutateValue(decl, rand);
+    const newSegment = decl.segmentText.replace(decl.value, mutated.value);
+    edits.push({
+      selector: block.prelude,
+      parents: block.parents,
+      property: decl.property,
+      from: decl.value,
+      to: mutated.value,
+      changed: `${mutated.from} -> ${mutated.to}`,
+      start: decl.segmentStart,
+      end: decl.segmentStart + decl.segmentText.length,
+      replacement: newSegment,
+      line: css.slice(0, decl.segmentStart).split("\n").length,
+    });
+  }
+  // Apply from the end so earlier offsets stay valid.
+  edits.sort((a, b) => b.start - a.start);
+  let next = css;
+  for (const e of edits) {
+    next = next.slice(0, e.start) + e.replacement + next.slice(e.end);
+  }
+  return { next, edits: edits.sort((a, b) => a.start - b.start) };
+}
+
 const args = parseArgs(process.argv);
 if (!args.css) {
   console.error("--css is required");
@@ -136,6 +265,26 @@ if (args.seed == null || Number.isNaN(args.seed)) {
   process.exit(1);
 }
 const rand = mulberry32(args.seed);
+
+if (args.mutate > 0) {
+  const { next, edits } = applyMutations(css, candidates, args.mutate, rand);
+  if (edits.length < args.mutate) {
+    console.error(`only ${edits.length} mutatable blocks available`);
+    process.exit(1);
+  }
+  const meta = {
+    seed: args.seed,
+    mode: "mutate",
+    cssFile: args.css,
+    mutations: edits.map(({ selector, parents, property, from, to, changed, line }) => ({
+      selector, parents, property, from, to, changed, line,
+    })),
+  };
+  if (args.apply) writeFileSync(args.css, next);
+  console.log(JSON.stringify(meta, null, 2));
+  process.exit(0);
+}
+
 const pick = candidates[Math.floor(rand() * candidates.length)];
 if (!pick) {
   console.error("no candidate blocks found");
