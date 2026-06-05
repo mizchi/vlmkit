@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { MigrationFixCandidate } from "./migration-fix-candidates.ts";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -223,6 +224,106 @@ describe("buildMigrationFixLoopPrompt", () => {
     assert.match(prompt, /\.cta \{ background-color \} -> target=`#2d69ec` \(authored\), current=`#f04b4b` \(authored\)/);
     assert.match(prompt, /sampled=#366fed -> #f15353/);
     assert.match(prompt, /viewport=desktop/);
+  });
+});
+
+describe("migration-fix-loop CLI", () => {
+  it("uses region-diff authored baseline values to correct a single-fix response", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "vlmkit-fix-loop-region-diff-"));
+    try {
+      const beforeHtml = `<!doctype html>
+<style>
+.cta { background-color: #2d69ec; color: white; }
+</style>
+<a class="cta">Start review</a>`;
+      const afterHtml = `<!doctype html>
+<style>
+.cta { background-color: #f04b4b; color: white; }
+</style>
+<a class="cta">Start review</a>`;
+      const report: MigrationCompareReport = {
+        dir,
+        baseline: "before.html",
+        variants: ["after.html"],
+        viewports: [{ width: 375, height: 812, label: "mobile", reason: "dogfood" }],
+        results: [{
+          variant: "after",
+          variantFile: "after.html",
+          viewport: "mobile",
+          diffRatio: 0.045,
+          diffPixels: 13789,
+          dominantCategory: "color-change",
+          categorySummary: "1 color-change",
+          paintTreeSummary: "1 paint",
+          paintTreeChangeCount: 1,
+          fixCandidates: [],
+        }],
+        authoredStyleDiff: [{
+          variantFile: "after.html",
+          result: {
+            entries: [
+              { selector: ".cta", property: "background-color", baseline: "#2d69ec", variant: "#f04b4b" },
+            ],
+          },
+        }],
+        regionDiffs: [{
+          variantFile: "after.html",
+          perViewport: [{
+            viewport: "mobile",
+            verdict: "diff",
+            summary: "Primary CTA background changed from blue to red.",
+            changeCount: 1,
+            changes: [{
+              selector: ".cta",
+              selectorHint: "primary CTA",
+              selectorConfidence: "high",
+              property: "background-color",
+              from: "#366fed",
+              to: "#f15353",
+              averageChannelDelta: 128.67,
+              bbox: { left: 170, top: 338, width: 156, height: 50 },
+              confidence: "high",
+            }],
+          }],
+        }],
+      };
+      const reportPath = join(dir, "diff-report.json");
+      const responsePath = join(dir, "response.txt");
+      const outputPath = join(dir, "after.fixed.html");
+      const promptPath = join(dir, "prompt.md");
+      await writeFile(join(dir, "before.html"), beforeHtml);
+      await writeFile(join(dir, "after.html"), afterHtml);
+      await writeFile(reportPath, JSON.stringify(report, null, 2));
+      await writeFile(responsePath, `SELECTOR: .cta
+PROPERTY: background-color
+VALUE: #366fed
+MEDIA: none
+`);
+
+      const result = spawnSync(process.execPath, [
+        join(import.meta.dirname!, "migration-fix-loop.ts"),
+        "--report", reportPath,
+        "--response-file", responsePath,
+        "--output", outputPath,
+        "--prompt-out", promptPath,
+        "--no-rerun",
+      ], {
+        cwd: join(import.meta.dirname!, "..", "..", ".."),
+        encoding: "utf-8",
+        timeout: 10000,
+      });
+
+      assert.equal(result.status, 0, result.stderr || result.stdout);
+      const prompt = await readFile(promptPath, "utf-8");
+      assert.match(prompt, /VLM region-diff candidates/);
+      assert.match(prompt, /\.cta \{ background-color \} -> target=`#2d69ec` \(authored\)/);
+
+      const fixed = await readFile(outputPath, "utf-8");
+      assert.match(fixed, /background-color: #2d69ec/);
+      assert.doesNotMatch(fixed, /background-color: #366fed/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });
 

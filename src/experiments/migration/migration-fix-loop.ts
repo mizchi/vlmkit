@@ -229,13 +229,13 @@ async function main() {
   }
 
   // Single-fix path (legacy behaviour).
-  const fix = await resolveFix({
+  const rawFix = await resolveFix({
     baselineHtml,
     prompt,
     target,
   });
 
-  if (!fix) {
+  if (!rawFix) {
     console.log();
     console.log("No concrete fix could be resolved automatically.");
     if (!PROMPT_OUT) {
@@ -246,6 +246,27 @@ async function main() {
     }
     process.exit(0);
   }
+
+  const correction = correctMigrationFixesWithReport([rawFix], baselineIndex, {
+    viewport: target.viewport,
+    currentCss,
+  });
+  if (correction.corrections.length > 0) {
+    console.log();
+    console.log("Corrected proposal value using report baselines:");
+    for (const c of correction.corrections) {
+      console.log(`  ~ ${c.selector} { ${c.property} } ${c.from} → ${c.to}`);
+    }
+  }
+  if (correction.dropped.length > 0 && correction.fixes.length === 0) {
+    console.log();
+    console.log("No concrete fix could be resolved after report-baseline validation.");
+    for (const drop of correction.dropped) {
+      console.log(`  - ${drop.selector} { ${drop.property} }: ${drop.reason}`);
+    }
+    process.exit(0);
+  }
+  const fix = correction.fixes[0]!;
 
   console.log();
   console.log(`Fix: ${fix.selector} { ${fix.property}: ${fix.value}; }${fix.mediaCondition ? ` @media ${fix.mediaCondition}` : ""}`);
