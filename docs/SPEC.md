@@ -692,10 +692,11 @@
   >   Partial: `vlmkit diff region --baseline a.png --variant b.png`
   >   asks a VLM for changed region names and bboxes, then overwrites
   >   `baselineColor` / `variantColor` with client-side PNG samples.
-  >   It also emits `changes[]` records with `selector: null`,
-  >   `selectorHint`, inferred/explicit `property`, measured `from` / `to`,
-  >   and color `delta`; joining those image-only hints to real DOM
-  >   selectors remains a downstream fix-loop integration target.
+  >   It also emits `changes[]` records with `selectorHint`,
+  >   inferred/explicit `property`, measured `from` / `to`, and color
+  >   `delta`; when `--elements-json` is supplied, VLM bboxes are joined
+  >   to DOM element rects to fill `selector` plus selector evidence.
+  >   `--format markdown` renders those changes as an agent-facing table.
   - contributes to: GOAL-AI-FIX-LOOP
   - body: `src/experiments/migration/vlm-region-diff.ts`
 

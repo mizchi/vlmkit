@@ -4,6 +4,8 @@ import { PNG } from "pngjs";
 import {
   buildStructuredRegionChanges,
   enrichRegionColorsWithBboxSamples,
+  formatRegionDiffMarkdown,
+  parseRegionElementsJson,
   parseVlmResponse,
 } from "./vlm-region-diff.ts";
 
@@ -327,6 +329,220 @@ describe("buildStructuredRegionChanges", () => {
     });
 
     assert.deepEqual(changes, []);
+  });
+
+  it("joins region bboxes to the most overlapping DOM selector candidate", () => {
+    const changes = buildStructuredRegionChanges(
+      {
+        verdict: "diff",
+        regions: [
+          {
+            region: "button label",
+            bbox: { left: 120, top: 80, width: 40, height: 20 },
+            baselineColor: "#111111",
+            variantColor: "#333333",
+            description: "The label is lighter.",
+          },
+        ],
+        summary: "label changed",
+      },
+      {
+        elements: [
+          {
+            path: "body[0]>main[0]>section[0]",
+            tag: "section",
+            classes: "hero",
+            top: 40,
+            left: 80,
+            width: 300,
+            height: 160,
+          },
+          {
+            path: "body[0]>main[0]>section[0]>button[0]",
+            tag: "button",
+            classes: "cta primary",
+            top: 70,
+            left: 110,
+            width: 80,
+            height: 44,
+          },
+        ],
+      },
+    );
+
+    assert.equal(changes[0]?.selector, ".cta");
+    assert.equal(changes[0]?.selectorConfidence, "high");
+    assert.equal(changes[0]?.evidence.selectorMatch?.path, "body[0]>main[0]>section[0]>button[0]");
+  });
+
+  it("falls back from class to id to tag when building selector candidates", () => {
+    const result = {
+      verdict: "diff" as const,
+      regions: [
+        {
+          region: "panel",
+          bbox: { left: 0, top: 0, width: 10, height: 10 },
+          baselineColor: "#000",
+          variantColor: "#fff",
+          description: "panel changed",
+        },
+      ],
+      summary: "changed",
+    };
+
+    assert.equal(
+      buildStructuredRegionChanges(result, {
+        elements: [{ path: "main[0]", tag: "main", id: "page", classes: "shell", top: 0, left: 0, width: 10, height: 10 }],
+      })[0]?.selector,
+      ".shell",
+    );
+    assert.equal(
+      buildStructuredRegionChanges(result, {
+        elements: [{ path: "main[0]", tag: "main", id: "page", classes: "", top: 0, left: 0, width: 10, height: 10 }],
+      })[0]?.selector,
+      "#page",
+    );
+    assert.equal(
+      buildStructuredRegionChanges(result, {
+        elements: [{ path: "main[0]", tag: "main", classes: "", top: 0, left: 0, width: 10, height: 10 }],
+      })[0]?.selector,
+      "main",
+    );
+  });
+
+  it("keeps selector null when no DOM rect overlaps the VLM bbox", () => {
+    const changes = buildStructuredRegionChanges(
+      {
+        verdict: "diff",
+        regions: [
+          {
+            region: "panel",
+            bbox: { left: 0, top: 0, width: 10, height: 10 },
+            baselineColor: "#000",
+            variantColor: "#fff",
+            description: "panel changed",
+          },
+        ],
+        summary: "changed",
+      },
+      {
+        elements: [{ path: "aside[0]", tag: "aside", classes: "sidebar", top: 100, left: 100, width: 20, height: 20 }],
+      },
+    );
+
+    assert.equal(changes[0]?.selector, null);
+    assert.equal(changes[0]?.selectorConfidence, undefined);
+    assert.equal(changes[0]?.evidence.selectorMatch, undefined);
+  });
+});
+
+describe("parseRegionElementsJson", () => {
+  it("parses a raw element array and filters malformed rows", () => {
+    const elements = parseRegionElementsJson(JSON.stringify([
+      {
+        path: "body[0]>main[0]",
+        tag: "main",
+        id: "page",
+        classes: "shell",
+        top: 0,
+        left: 0,
+        width: 100,
+        height: 200,
+      },
+      { path: "bad", tag: "div", top: 0, left: 0, width: 100 },
+    ]));
+
+    assert.deepEqual(elements, [
+      {
+        path: "body[0]>main[0]",
+        tag: "main",
+        id: "page",
+        classes: "shell",
+        top: 0,
+        left: 0,
+        width: 100,
+        height: 200,
+      },
+    ]);
+  });
+
+  it("parses an object with an elements array", () => {
+    const elements = parseRegionElementsJson(JSON.stringify({
+      elements: [
+        { path: "button[0]", tag: "button", classes: "cta", top: 1, left: 2, width: 3, height: 4 },
+      ],
+    }));
+
+    assert.equal(elements.length, 1);
+    assert.equal(elements[0]?.path, "button[0]");
+  });
+
+  it("returns an empty list for malformed JSON", () => {
+    assert.deepEqual(parseRegionElementsJson("not json"), []);
+  });
+});
+
+describe("formatRegionDiffMarkdown", () => {
+  it("renders selector-ready changes as an agent-facing table", () => {
+    const markdown = formatRegionDiffMarkdown({
+      model: "anthropic/claude-haiku-4-5",
+      mode: "split",
+      usage: null,
+      verdict: "diff",
+      regions: [],
+      summary: "One changed region.",
+      changes: [
+        {
+          type: "CHANGE",
+          source: "vlm-region-diff",
+          selector: ".cta",
+          selectorHint: "primary action",
+          selectorConfidence: "high",
+          property: "background-color",
+          from: "#112233",
+          to: "#445566",
+          delta: { kind: "color", averageChannelDelta: 51 },
+          bbox: { left: 10, top: 20, width: 30, height: 40 },
+          region: "primary action",
+          description: "The CTA background is lighter.",
+          confidence: "high",
+          evidence: {
+            selectorMatch: {
+              path: "body[0]>button[0]",
+              tag: "button",
+              classes: "cta",
+              bbox: { left: 8, top: 18, width: 36, height: 44 },
+              regionCoverage: 1,
+              elementCoverage: 0.76,
+              iou: 0.76,
+              score: 0.93,
+            },
+          },
+        },
+      ],
+      rawContent: "{}",
+    });
+
+    assert.match(markdown, /# VLM region diff/);
+    assert.match(markdown, /Model: `anthropic\/claude-haiku-4-5`/);
+    assert.match(markdown, /\| Selector \| Property \| From \| To \| Delta \| Bbox \| Confidence \| Evidence \|/);
+    assert.match(markdown, /\| `\.cta` \| `background-color` \| `#112233` \| `#445566` \| 51 \| `10,20 30x40` \| high \/ high \| `button` `body\[0\]>button\[0\]` /);
+    assert.match(markdown, /The CTA background is lighter\./);
+  });
+
+  it("renders no-change results without an empty table", () => {
+    const markdown = formatRegionDiffMarkdown({
+      model: "model",
+      mode: "split",
+      usage: null,
+      verdict: "no-diff",
+      regions: [],
+      summary: "No visible region diff.",
+      changes: [],
+      rawContent: "{}",
+    });
+
+    assert.match(markdown, /No structured region changes/);
   });
 });
 

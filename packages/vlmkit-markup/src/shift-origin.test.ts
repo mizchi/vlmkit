@@ -158,6 +158,12 @@ describe("parseBboxes", () => {
     assert.equal(out[0]!.path, "p");
   });
 
+  it("preserves optional element ids from the DOM bbox browser script", () => {
+    const json = JSON.stringify([{ path: "main[0]", tag: "main", id: "page", classes: "", top: 0, left: 0, width: 10, height: 10 }]);
+    const out = parseBboxes(json);
+    assert.equal(out[0]?.id, "page");
+  });
+
   it("returns [] on garbage input", () => {
     assert.deepEqual(parseBboxes("not json"), []);
     assert.deepEqual(parseBboxes(123), []);

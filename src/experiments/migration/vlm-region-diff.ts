@@ -5,11 +5,11 @@
  * Takes a baseline PNG + variant PNG (or a single triptych: baseline |
  * variant | heatmap), sends both via OpenRouter to a VLM with a strict
  * JSON prompt, and emits measured region differences plus downstream
- * CHANGE records. The selector stays null until a DOM-position join layer
- * can attach a real CSS selector, but property, measured colors, bbox,
- * and delta are structured so a coding agent (or the operator) can target
- * gradients, image sources, or sub-color literals that computedStyleDiff
- * misses.
+ * CHANGE records. With `--elements-json`, it can join VLM bboxes to DOM
+ * element rects and attach a concrete selector candidate. Property,
+ * measured colors, bbox, and delta are structured so a coding agent
+ * (or the operator) can target gradients, image sources, or sub-color
+ * literals that computedStyleDiff misses.
  *
  * Usage:
  *   node src/experiments/migration/vlm-region-diff.ts \
@@ -71,6 +71,7 @@ interface RegionStructuredChange {
   source: "vlm-region-diff";
   selector: string | null;
   selectorHint: string;
+  selectorConfidence?: "high" | "medium" | "low";
   property: RegionChangeProperty;
   from: string | null;
   to: string | null;
@@ -84,15 +85,61 @@ interface RegionStructuredChange {
   confidence: "high" | "medium" | "low";
   evidence: {
     colorSample?: RegionColorSample;
+    selectorMatch?: RegionSelectorMatchEvidence;
   };
+}
+
+interface RegionElementRect {
+  path: string;
+  tag: string;
+  id?: string;
+  classes?: string;
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
+
+interface RegionSelectorMatchEvidence {
+  path: string;
+  tag: string;
+  id?: string;
+  classes: string;
+  bbox: RegionBbox;
+  regionCoverage: number;
+  elementCoverage: number;
+  iou: number;
+  score: number;
+}
+
+interface RegionSelectorMatch {
+  selector: string;
+  confidence: "high" | "medium" | "low";
+  evidence: RegionSelectorMatchEvidence;
+}
+
+interface BuildStructuredRegionChangesOptions {
+  elements?: RegionElementRect[];
+}
+
+type RegionDiffOutputMode = "triptych" | "split";
+
+interface RegionDiffOutput extends VlmReviewResult {
+  model: string;
+  mode: RegionDiffOutputMode;
+  usage: unknown | null;
+  changes: RegionStructuredChange[];
+  rawContent?: string;
 }
 
 interface CliArgs {
   baseline: string | null;
   variant: string | null;
   triptych: string | null;
+  elementsJson: string | null;
   model: string;
   out: string | null;
+  format: "json" | "markdown";
   maxTokens: number;
   dryRun: boolean;
 }
@@ -102,8 +149,10 @@ function parseArgs(argv: string[]): CliArgs {
     baseline: null,
     variant: null,
     triptych: null,
+    elementsJson: null,
     model: "anthropic/claude-haiku-4-5",
     out: null,
+    format: "json",
     maxTokens: 600,
     dryRun: false,
   };
@@ -112,8 +161,16 @@ function parseArgs(argv: string[]): CliArgs {
     if (arg === "--baseline") args.baseline = resolve(argv[++i] ?? "");
     else if (arg === "--variant") args.variant = resolve(argv[++i] ?? "");
     else if (arg === "--triptych") args.triptych = resolve(argv[++i] ?? "");
+    else if (arg === "--elements-json") args.elementsJson = resolve(argv[++i] ?? "");
     else if (arg === "--model") args.model = argv[++i] ?? args.model;
     else if (arg === "--out") args.out = resolve(argv[++i] ?? "");
+    else if (arg === "--format") {
+      const value = argv[++i] ?? "json";
+      if (value !== "json" && value !== "markdown") {
+        throw new Error(`--format must be json|markdown, got ${value}`);
+      }
+      args.format = value;
+    }
     else if (arg === "--max-tokens") args.maxTokens = Number.parseInt(argv[++i] ?? "600", 10) || 600;
     else if (arg === "--dry-run") args.dryRun = true;
     else if (arg === "--help" || arg === "-h") {
@@ -125,9 +182,14 @@ Options:
   --baseline <path>   Baseline (target) PNG
   --variant  <path>   Variant (current) PNG
   --triptych <path>   Single PNG: [baseline | variant | heatmap]
+  --elements-json <path>
+                      Optional DOM bbox JSON for the variant screenshot;
+                      accepts an array or { "elements": [...] } where each
+                      row has path/tag/classes/top/left/width/height
   --model    <id>     OpenRouter VLM model (default: anthropic/claude-haiku-4-5;
                       see docs/reports/2026-05-23-vlm-region-diff-bakeoff.md)
-  --out      <path>   Write JSON result to this file (default: stdout)
+  --out      <path>   Write result to this file (default: stdout)
+  --format <kind>     json|markdown (default: json)
   --max-tokens <n>    OpenRouter max_tokens (default: 600)
   --dry-run           Build the request but skip the API call
 `);
@@ -452,16 +514,26 @@ function enrichRegionColorsWithBboxSamples(
   };
 }
 
-function buildStructuredRegionChanges(result: VlmReviewResult): RegionStructuredChange[] {
+function buildStructuredRegionChanges(
+  result: VlmReviewResult,
+  options: BuildStructuredRegionChangesOptions = {},
+): RegionStructuredChange[] {
   if (result.verdict === "no-diff") return [];
   return result.regions.map((region): RegionStructuredChange => {
     const averageDelta = region.colorSample?.averageChannelDelta
       ?? computeAverageDeltaFromColorStrings(region.baselineColor, region.variantColor);
+    const selectorMatch = region.bbox && options.elements
+      ? matchRegionBboxToElement(region.bbox, options.elements)
+      : null;
+    const evidence: RegionStructuredChange["evidence"] = {};
+    if (region.colorSample) evidence.colorSample = region.colorSample;
+    if (selectorMatch) evidence.selectorMatch = selectorMatch.evidence;
     return {
       type: "CHANGE",
       source: "vlm-region-diff",
-      selector: null,
+      selector: selectorMatch?.selector ?? null,
       selectorHint: region.selectorHint ?? region.region,
+      ...(selectorMatch ? { selectorConfidence: selectorMatch.confidence } : {}),
       property: region.propertyHint ?? inferRegionChangeProperty(region),
       from: region.baselineColor,
       to: region.variantColor,
@@ -473,9 +545,125 @@ function buildStructuredRegionChanges(result: VlmReviewResult): RegionStructured
       region: region.region,
       description: region.description,
       confidence: inferRegionChangeConfidence(region, averageDelta),
-      evidence: region.colorSample ? { colorSample: region.colorSample } : {},
+      evidence,
     };
   });
+}
+
+function matchRegionBboxToElement(
+  region: RegionBbox,
+  elements: RegionElementRect[],
+): RegionSelectorMatch | null {
+  const regionArea = areaOfBbox(region);
+  if (regionArea <= 0) return null;
+
+  let best: (RegionSelectorMatch & { sortTop: number; sortLeft: number }) | null = null;
+  for (const element of elements) {
+    const selector = selectorForElement(element);
+    if (!selector || element.width <= 0 || element.height <= 0) continue;
+    const elementBbox = {
+      left: element.left,
+      top: element.top,
+      width: element.width,
+      height: element.height,
+    };
+    const elementArea = areaOfBbox(elementBbox);
+    if (elementArea <= 0) continue;
+    const intersection = intersectionArea(region, elementBbox);
+    if (intersection <= 0) continue;
+
+    const union = regionArea + elementArea - intersection;
+    const regionCoverage = intersection / regionArea;
+    const elementCoverage = intersection / elementArea;
+    const iou = union > 0 ? intersection / union : 0;
+    const score = regionCoverage * 0.7 + elementCoverage * 0.3;
+    const roundedScore = roundMetric(score);
+    const match: RegionSelectorMatch & { sortTop: number; sortLeft: number } = {
+      selector,
+      confidence: selectorConfidenceFromScore(score, regionCoverage),
+      evidence: {
+        path: element.path,
+        tag: element.tag,
+        ...(element.id ? { id: element.id } : {}),
+        classes: element.classes ?? "",
+        bbox: elementBbox,
+        regionCoverage: roundMetric(regionCoverage),
+        elementCoverage: roundMetric(elementCoverage),
+        iou: roundMetric(iou),
+        score: roundedScore,
+      },
+      sortTop: element.top,
+      sortLeft: element.left,
+    };
+    if (!best || compareSelectorMatches(match, best) < 0) {
+      best = match;
+    }
+  }
+  if (!best || best.evidence.regionCoverage < 0.15) return null;
+  const { sortTop: _sortTop, sortLeft: _sortLeft, ...out } = best;
+  return out;
+}
+
+function compareSelectorMatches(
+  left: RegionSelectorMatch & { sortTop: number; sortLeft: number },
+  right: RegionSelectorMatch & { sortTop: number; sortLeft: number },
+): number {
+  if (left.evidence.score !== right.evidence.score) return right.evidence.score - left.evidence.score;
+  if (left.evidence.regionCoverage !== right.evidence.regionCoverage) {
+    return right.evidence.regionCoverage - left.evidence.regionCoverage;
+  }
+  const leftArea = areaOfBbox(left.evidence.bbox);
+  const rightArea = areaOfBbox(right.evidence.bbox);
+  if (leftArea !== rightArea) return leftArea - rightArea;
+  if (left.sortTop !== right.sortTop) return left.sortTop - right.sortTop;
+  if (left.sortLeft !== right.sortLeft) return left.sortLeft - right.sortLeft;
+  return left.selector.localeCompare(right.selector);
+}
+
+function selectorForElement(element: RegionElementRect): string | null {
+  const className = firstCssIdentifier(element.classes ?? "");
+  if (className) return `.${className}`;
+  const id = cssIdentifier(element.id ?? "");
+  if (id) return `#${id}`;
+  return cssIdentifier(element.tag.toLowerCase());
+}
+
+function firstCssIdentifier(classes: string): string | null {
+  for (const token of classes.split(/\s+/)) {
+    const value = cssIdentifier(token);
+    if (value) return value;
+  }
+  return null;
+}
+
+function cssIdentifier(value: string): string | null {
+  const trimmed = value.trim();
+  return /^-?[A-Za-z_][A-Za-z0-9_-]*$/.test(trimmed) ? trimmed : null;
+}
+
+function selectorConfidenceFromScore(
+  score: number,
+  regionCoverage: number,
+): RegionSelectorMatch["confidence"] {
+  if (regionCoverage >= 0.85 && score >= 0.75) return "high";
+  if (regionCoverage >= 0.35 && score >= 0.35) return "medium";
+  return "low";
+}
+
+function areaOfBbox(bbox: RegionBbox): number {
+  return Math.max(0, bbox.width) * Math.max(0, bbox.height);
+}
+
+function intersectionArea(a: RegionBbox, b: RegionBbox): number {
+  const left = Math.max(a.left, b.left);
+  const top = Math.max(a.top, b.top);
+  const right = Math.min(a.left + a.width, b.left + b.width);
+  const bottom = Math.min(a.top + a.height, b.top + b.height);
+  return Math.max(0, right - left) * Math.max(0, bottom - top);
+}
+
+function roundMetric(value: number): number {
+  return Number(value.toFixed(4));
 }
 
 function inferRegionChangeProperty(region: RegionDiff): RegionChangeProperty {
@@ -536,15 +724,127 @@ function clampRgb(value: number): number {
   return Math.max(0, Math.min(255, Math.round(value)));
 }
 
+function parseRegionElementsJson(content: string): RegionElementRect[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return [];
+  }
+  const rows = Array.isArray(parsed)
+    ? parsed
+    : parsed && typeof parsed === "object" && Array.isArray((parsed as { elements?: unknown }).elements)
+      ? (parsed as { elements: unknown[] }).elements
+      : [];
+  return rows
+    .map((row) => parseRegionElementRect(row))
+    .filter((row): row is RegionElementRect => row !== null);
+}
+
+function parseRegionElementRect(value: unknown): RegionElementRect | null {
+  if (!value || typeof value !== "object") return null;
+  const obj = value as Record<string, unknown>;
+  const path = typeof obj.path === "string" ? obj.path : null;
+  const tag = typeof obj.tag === "string" ? obj.tag : null;
+  const top = numberFromUnknown(obj.top);
+  const left = numberFromUnknown(obj.left);
+  const width = numberFromUnknown(obj.width);
+  const height = numberFromUnknown(obj.height);
+  if (!path || !tag || top === null || left === null || width === null || height === null) return null;
+  if (width <= 0 || height <= 0) return null;
+  return {
+    path,
+    tag,
+    ...(typeof obj.id === "string" && obj.id.trim() ? { id: obj.id.trim() } : {}),
+    classes: typeof obj.classes === "string" ? obj.classes : "",
+    top,
+    left,
+    width,
+    height,
+  };
+}
+
+function formatRegionDiffMarkdown(result: RegionDiffOutput): string {
+  const lines: string[] = [];
+  lines.push("# VLM region diff");
+  lines.push("");
+  lines.push(`Model: \`${result.model}\``);
+  lines.push(`Mode: \`${result.mode}\``);
+  lines.push(`Verdict: \`${result.verdict}\``);
+  if (result.summary) lines.push(`Summary: ${result.summary}`);
+  lines.push("");
+  if (result.changes.length === 0) {
+    lines.push("No structured region changes.");
+    return lines.join("\n") + "\n";
+  }
+
+  lines.push("| Selector | Property | From | To | Delta | Bbox | Confidence | Evidence |");
+  lines.push("|---|---|---|---|---:|---|---|---|");
+  for (const change of result.changes) {
+    lines.push([
+      codeCell(change.selector ?? change.selectorHint),
+      codeCell(change.property),
+      codeCell(change.from),
+      codeCell(change.to),
+      formatDelta(change.delta.averageChannelDelta),
+      codeCell(formatBbox(change.bbox)),
+      escapeMarkdownCell(`${change.confidence}${change.selectorConfidence ? ` / ${change.selectorConfidence}` : ""}`),
+      escapeMarkdownCell(formatSelectorEvidence(change.evidence.selectorMatch)),
+    ].join(" | ").replace(/^/, "| ").replace(/$/, " |"));
+  }
+  lines.push("");
+  for (const change of result.changes) {
+    if (!change.description) continue;
+    const selector = change.selector ?? change.selectorHint;
+    lines.push(`- ${codeCell(selector)} ${codeCell(change.property)}: ${change.description}`);
+  }
+  return lines.join("\n") + "\n";
+}
+
+function codeCell(value: string | null): string {
+  return value ? `\`${escapeBackticks(value)}\`` : "-";
+}
+
+function escapeBackticks(value: string): string {
+  return value.replace(/`/g, "\\`");
+}
+
+function escapeMarkdownCell(value: string): string {
+  return value.replace(/\|/g, "\\|");
+}
+
+function formatDelta(value: number | null): string {
+  return value === null ? "-" : String(value);
+}
+
+function formatBbox(bbox: RegionBbox | null): string | null {
+  if (!bbox) return null;
+  return `${bbox.left},${bbox.top} ${bbox.width}x${bbox.height}`;
+}
+
+function formatSelectorEvidence(evidence: RegionSelectorMatchEvidence | undefined): string {
+  if (!evidence) return "-";
+  return [
+    codeCell(evidence.tag),
+    codeCell(evidence.path),
+    `score=${evidence.score}`,
+    `coverage=${evidence.regionCoverage}`,
+  ].join(" ");
+}
+
 export {
   buildStructuredRegionChanges,
   enrichRegionColorsWithBboxSamples,
+  formatRegionDiffMarkdown,
+  parseRegionElementsJson,
   parseVlmResponse,
   buildPrompt,
   buildRequestBody,
   type RegionDiff,
   type RegionBbox,
   type RegionColorSample,
+  type RegionElementRect,
+  type RegionDiffOutput,
   type RegionStructuredChange,
   type VlmReviewResult,
 };
@@ -593,15 +893,21 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     ]);
     parsed = enrichRegionColorsWithBboxSamples(parsed, baselinePng, variantPng);
   }
-  const result = {
+  const elements = !args.triptych && args.elementsJson
+    ? parseRegionElementsJson(await readFile(args.elementsJson, "utf-8"))
+    : undefined;
+  const mode: RegionDiffOutputMode = args.triptych ? "triptych" : "split";
+  const result: RegionDiffOutput = {
     model: args.model,
-    mode: args.triptych ? "triptych" : "split" as const,
+    mode,
     usage: data.usage ?? null,
     ...parsed,
-    changes: buildStructuredRegionChanges(parsed),
+    changes: buildStructuredRegionChanges(parsed, { elements }),
     rawContent: content,
   };
-  const text = JSON.stringify(result, null, 2);
+  const text = args.format === "markdown"
+    ? formatRegionDiffMarkdown(result)
+    : JSON.stringify(result, null, 2);
   if (args.out) {
     const out = resolve(args.out);
     await mkdir(dirname(out), { recursive: true });

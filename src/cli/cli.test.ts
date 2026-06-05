@@ -66,6 +66,8 @@ describe("vrt CLI tree (cac-based)", () => {
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit diff region --baseline <png> --variant <png>/);
     assert.match(r.stdout, /--triptych <path>/);
+    assert.match(r.stdout, /--elements-json <path>/);
+    assert.match(r.stdout, /--format <kind>/);
   });
 
   it("`vrt diff component --help` delegates to element-level comparison help", () => {

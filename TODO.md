@@ -1562,11 +1562,13 @@ has been closed (commits `ef95260`, `2656786`, `f934122`, `4e6d45d`,
     the full bbox when no changed pixels are present. Triptych mode
     remains informational because the coordinate space is ambiguous.
   - `vlm-region-diff` now also emits downstream-facing `changes[]`
-    records: `type: "CHANGE"`, `selector: null`, `selectorHint`,
+    records: `type: "CHANGE"`, `selector`, `selectorHint`,
     inferred/explicit `property`, measured `from` / `to`, bbox, and
-    color delta. Real DOM selector join remains a separate fix-loop
-    integration step because it needs DOM/position evidence, not just
-    before/after PNGs.
+    color delta. When `--elements-json` is supplied, VLM bboxes are
+    joined to DOM element rects and `selector` / `selectorConfidence` /
+    `evidence.selectorMatch` are filled; without DOM evidence, selector
+    remains `null`. `--format markdown` renders the same data as an
+    agent-facing selector/property/from/to table.
 
 ### Dashboard (separate repo)
 - [x] Execution result list/search
