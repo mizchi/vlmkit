@@ -377,6 +377,50 @@ describe("buildStructuredRegionChanges", () => {
     assert.equal(changes[0]?.evidence.selectorMatch?.path, "body[0]>main[0]>section[0]>button[0]");
   });
 
+  it("prefers a concrete partial match over a huge ancestor container", () => {
+    const changes = buildStructuredRegionChanges(
+      {
+        verdict: "diff",
+        regions: [
+          {
+            region: "primary action button",
+            bbox: { left: 399, top: 534, width: 150, height: 44 },
+            baselineColor: "#366fed",
+            variantColor: "#f15353",
+            description: "The primary action button changed from blue to red.",
+          },
+        ],
+        summary: "CTA color changed",
+      },
+      {
+        elements: [
+          {
+            path: "body[0]>main[0]",
+            tag: "main",
+            classes: "launch-panel",
+            top: 265.203125,
+            left: 380,
+            width: 680,
+            height: 369.578125,
+          },
+          {
+            path: "body[0]>main[0]>div[4]>button[0]",
+            tag: "button",
+            classes: "cta",
+            top: 551.78125,
+            left: 413,
+            width: 156,
+            height: 50,
+          },
+        ],
+      },
+    );
+
+    assert.equal(changes[0]?.selector, ".cta");
+    assert.equal(changes[0]?.selectorConfidence, "medium");
+    assert.equal(changes[0]?.evidence.selectorMatch?.path, "body[0]>main[0]>div[4]>button[0]");
+  });
+
   it("falls back from class to id to tag when building selector candidates", () => {
     const result = {
       verdict: "diff" as const,

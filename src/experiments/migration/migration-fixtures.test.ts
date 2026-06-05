@@ -16,10 +16,25 @@ describe("migration fixture inventory", () => {
       .sort((a, b) => a.localeCompare(b));
 
     assert.deepEqual(directories, [
+      "region-diff-handoff",
       "reset-css",
       "shadcn-to-luna",
       "tailwind-to-vanilla",
     ]);
+  });
+});
+
+describe("region-diff-handoff dogfood fixture", () => {
+  it("keeps the DOM stable while changing the primary CTA paint", async () => {
+    const beforeHtml = await readFile(join(MIGRATION_DIR, "region-diff-handoff", "before.html"), "utf-8");
+    const afterHtml = await readFile(join(MIGRATION_DIR, "region-diff-handoff", "after.html"), "utf-8");
+
+    assert.match(beforeHtml, /<main class="launch-panel">/);
+    assert.match(afterHtml, /<main class="launch-panel">/);
+    assert.match(beforeHtml, /<button class="cta" type="button">Start review<\/button>/);
+    assert.match(afterHtml, /<button class="cta" type="button">Start review<\/button>/);
+    assert.match(beforeHtml, /\.cta\s*\{[^}]*background:\s*#2d69ec/s);
+    assert.match(afterHtml, /\.cta\s*\{[^}]*background:\s*#f04b4b/s);
   });
 });
 

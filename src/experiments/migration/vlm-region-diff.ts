@@ -606,7 +606,12 @@ function matchRegionBboxToElement(
     const regionCoverage = intersection / regionArea;
     const elementCoverage = intersection / elementArea;
     const iou = union > 0 ? intersection / union : 0;
-    const score = regionCoverage * 0.7 + elementCoverage * 0.3;
+    let score = regionCoverage * 0.7 + elementCoverage * 0.3;
+    // VLM bboxes often include a little surrounding whitespace; avoid
+    // letting huge ancestor containers beat the partially overlapped control.
+    if (elementArea > regionArea * 4 && elementCoverage < 0.15) {
+      score *= 0.55;
+    }
     const roundedScore = roundMetric(score);
     const match: RegionSelectorMatch & { sortTop: number; sortLeft: number } = {
       selector,

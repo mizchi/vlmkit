@@ -40,6 +40,7 @@ import {
   type RegionDiffOutput,
   type RegionElementRect,
   type RegionStructuredChange,
+  type RunRegionDiffAnalysisOptions,
 } from "./vlm-region-diff.ts";
 import { loadDesignTokens, snapColor, type DesignTokens } from "./design-md-tokens.ts";
 import { generateWireframeFixCandidates, type WireframeFixSuggestion } from "./wireframe-fix-candidates.ts";
@@ -194,6 +195,9 @@ export function trimDomPositionEntriesByClassPair<T extends DomPositionTrimEntry
 
 export type BreakpointDiscoveryBackend = "auto" | "regex" | "crater";
 export type MigrationRegionDiffFormat = "json" | "markdown" | "both";
+export type MigrationRegionDiffAnalyzer = (
+  options: RunRegionDiffAnalysisOptions,
+) => Promise<RegionDiffOutput>;
 
 function parseDiscoveryBackend(args: string[]): BreakpointDiscoveryBackend {
   const value = getArg(args, "discover-backend", "auto");
@@ -289,6 +293,11 @@ export interface MigrationCompareOptions {
   regionDiffModel?: string;
   /** max_tokens for each VLM region-diff request. */
   regionDiffMaxTokens?: number;
+  /**
+   * Optional analyzer hook for offline dogfood/tests. CLI users leave this
+   * unset so region diff calls the default OpenRouter-backed analyzer.
+   */
+  regionDiffAnalyzer?: MigrationRegionDiffAnalyzer;
 }
 
 export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptions {
@@ -782,8 +791,9 @@ async function writeMigrationRegionDiffArtifacts(options: {
   format: MigrationRegionDiffFormat;
   model: string;
   maxTokens: number;
+  analyzer: MigrationRegionDiffAnalyzer;
 }): Promise<MigrationRegionDiffViewportReport> {
-  const output = await runRegionDiffAnalysis({
+  const output = await options.analyzer({
     baseline: options.baselinePath,
     variant: options.variantPath,
     elements: options.elements,
@@ -846,6 +856,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
   const regionDiffFormat = options.regionDiffFormat ?? "both";
   const regionDiffModel = options.regionDiffModel ?? DEFAULT_REGION_DIFF_MODEL;
   const regionDiffMaxTokens = options.regionDiffMaxTokens ?? 600;
+  const regionDiffAnalyzer = options.regionDiffAnalyzer ?? runRegionDiffAnalysis;
 
   await mkdir(outputDir, { recursive: true });
 
@@ -1485,6 +1496,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
               format: regionDiffFormat,
               model: regionDiffModel,
               maxTokens: regionDiffMaxTokens,
+              analyzer: regionDiffAnalyzer,
             });
             regionDiffPerViewport.push(regionSummary);
           } catch (error) {

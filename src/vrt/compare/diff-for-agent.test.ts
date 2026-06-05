@@ -185,6 +185,41 @@ describe("formatMigrationReportForAgent", () => {
     assert.match(md, /#8c9099/);
   });
 
+  it("surfaces VLM region-diff handoff summaries with artifact paths", () => {
+    const md = formatMigrationReportForAgent(sampleReport({
+      regionDiffs: [{
+        variantFile: "working.html",
+        perViewport: [{
+          viewport: "mobile",
+          jsonPath: "/work/fix/out/working-mobile-region-diff.json",
+          markdownPath: "/work/fix/out/working-mobile-region-diff.md",
+          verdict: "diff",
+          summary: "Primary CTA background changed from blue to red.",
+          changeCount: 1,
+          changes: [{
+            selector: ".cta",
+            selectorHint: "primary CTA",
+            selectorConfidence: "high",
+            property: "background-color",
+            from: "#2d69ec",
+            to: "#f04b4b",
+            averageChannelDelta: 128.67,
+            bbox: { left: 170, top: 338, width: 156, height: 50 },
+            confidence: "high",
+          }],
+        }],
+      }],
+    }));
+
+    assert.match(md, /VLM region diff/);
+    assert.match(md, /Primary CTA background changed/);
+    assert.match(md, /`\.cta`/);
+    assert.match(md, /`background-color`/);
+    assert.match(md, /`#2d69ec` → `#f04b4b`/);
+    assert.match(md, /working-mobile-region-diff\.json/);
+    assert.match(md, /working-mobile-region-diff\.md/);
+  });
+
   it("emits absolute paths to baseline/current/heatmap PNGs for the worst viewport", () => {
     const md = formatMigrationReportForAgent(sampleReport(), { outputDir: "/abs/out" });
     assert.match(md, /Baseline: `\/abs\/out\/before-mobile\.png`/);
