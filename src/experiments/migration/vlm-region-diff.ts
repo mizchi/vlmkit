@@ -22,7 +22,9 @@
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { DOM_BBOX_BROWSER_SCRIPT } from "@mizchi/vlmkit-markup/shift-origin.ts";
 import { PNG } from "pngjs";
 
 interface RegionBbox {
@@ -122,6 +124,11 @@ interface BuildStructuredRegionChangesOptions {
   elements?: RegionElementRect[];
 }
 
+interface RegionElementsViewport {
+  width: number;
+  height: number;
+}
+
 type RegionDiffOutputMode = "triptych" | "split";
 
 interface RegionDiffOutput extends VlmReviewResult {
@@ -137,6 +144,8 @@ interface CliArgs {
   variant: string | null;
   triptych: string | null;
   elementsJson: string | null;
+  elementsHtml: string | null;
+  elementsViewport: RegionElementsViewport | null;
   model: string;
   out: string | null;
   format: "json" | "markdown";
@@ -150,6 +159,8 @@ function parseArgs(argv: string[]): CliArgs {
     variant: null,
     triptych: null,
     elementsJson: null,
+    elementsHtml: null,
+    elementsViewport: null,
     model: "anthropic/claude-haiku-4-5",
     out: null,
     format: "json",
@@ -162,6 +173,8 @@ function parseArgs(argv: string[]): CliArgs {
     else if (arg === "--variant") args.variant = resolve(argv[++i] ?? "");
     else if (arg === "--triptych") args.triptych = resolve(argv[++i] ?? "");
     else if (arg === "--elements-json") args.elementsJson = resolve(argv[++i] ?? "");
+    else if (arg === "--elements-html") args.elementsHtml = argv[++i] ?? "";
+    else if (arg === "--elements-viewport") args.elementsViewport = parseRegionElementsViewport(argv[++i] ?? "");
     else if (arg === "--model") args.model = argv[++i] ?? args.model;
     else if (arg === "--out") args.out = resolve(argv[++i] ?? "");
     else if (arg === "--format") {
@@ -186,6 +199,12 @@ Options:
                       Optional DOM bbox JSON for the variant screenshot;
                       accepts an array or { "elements": [...] } where each
                       row has path/tag/classes/top/left/width/height
+  --elements-html <path-or-url>
+                      Capture DOM bbox JSON from the variant/current HTML or URL.
+                      Ignored when --elements-json is supplied.
+  --elements-viewport <size>
+                      Viewport for --elements-html, e.g. 1280x900.
+                      Defaults to the variant PNG dimensions in split mode.
   --model    <id>     OpenRouter VLM model (default: anthropic/claude-haiku-4-5;
                       see docs/reports/2026-05-23-vlm-region-diff-bakeoff.md)
   --out      <path>   Write result to this file (default: stdout)
@@ -764,6 +783,66 @@ function parseRegionElementRect(value: unknown): RegionElementRect | null {
   };
 }
 
+function parseRegionElementsViewport(value: string): RegionElementsViewport {
+  const match = value.trim().match(/^([1-9]\d*)x([1-9]\d*)$/i);
+  if (!match) {
+    throw new Error(`--elements-viewport must be WIDTHxHEIGHT, got ${value}`);
+  }
+  return {
+    width: Number.parseInt(match[1]!, 10),
+    height: Number.parseInt(match[2]!, 10),
+  };
+}
+
+function resolveRegionElementsTargetUrl(target: string): string {
+  const trimmed = target.trim();
+  if (!trimmed) throw new Error("--elements-html requires <path-or-url>");
+  if (/^[A-Za-z][A-Za-z0-9+.-]*:/.test(trimmed)) return trimmed;
+  return pathToFileURL(resolve(trimmed)).href;
+}
+
+async function captureRegionElementsFromHtml(
+  target: string,
+  viewport: RegionElementsViewport,
+): Promise<RegionElementRect[]> {
+  const { chromium } = await import("playwright");
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage({
+      viewport,
+      deviceScaleFactor: 1,
+    });
+    await page.goto(resolveRegionElementsTargetUrl(target), { waitUntil: "load" });
+    try {
+      await page.evaluate(() => document.fonts ? document.fonts.ready.then(() => undefined) : undefined);
+    } catch {
+      // Font readiness is best-effort; bbox capture should still work.
+    }
+    const raw = await page.evaluate(DOM_BBOX_BROWSER_SCRIPT);
+    return parseRegionElementsJson(raw);
+  } finally {
+    await browser.close();
+  }
+}
+
+async function resolveRegionElementsForArgs(
+  args: CliArgs,
+  variantPng: PNG | null,
+): Promise<RegionElementRect[] | undefined> {
+  if (args.triptych) return undefined;
+  if (args.elementsJson) {
+    return parseRegionElementsJson(await readFile(args.elementsJson, "utf-8"));
+  }
+  if (!args.elementsHtml) return undefined;
+  const viewport = args.elementsViewport ?? (
+    variantPng ? { width: variantPng.width, height: variantPng.height } : null
+  );
+  if (!viewport) {
+    throw new Error("--elements-html requires --elements-viewport when variant PNG dimensions are unavailable");
+  }
+  return captureRegionElementsFromHtml(args.elementsHtml, viewport);
+}
+
 function formatRegionDiffMarkdown(result: RegionDiffOutput): string {
   const lines: string[] = [];
   lines.push("# VLM region diff");
@@ -837,13 +916,16 @@ export {
   enrichRegionColorsWithBboxSamples,
   formatRegionDiffMarkdown,
   parseRegionElementsJson,
+  parseRegionElementsViewport,
   parseVlmResponse,
+  resolveRegionElementsTargetUrl,
   buildPrompt,
   buildRequestBody,
   type RegionDiff,
   type RegionBbox,
   type RegionColorSample,
   type RegionElementRect,
+  type RegionElementsViewport,
   type RegionDiffOutput,
   type RegionStructuredChange,
   type VlmReviewResult,
@@ -886,16 +968,16 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   };
   const content = data.choices?.[0]?.message?.content ?? "";
   let parsed = parseVlmResponse(content);
+  let variantPng: PNG | null = null;
   if (!args.triptych && args.baseline && args.variant) {
-    const [baselinePng, variantPng] = await Promise.all([
+    const [baselinePng, loadedVariantPng] = await Promise.all([
       readPng(args.baseline),
       readPng(args.variant),
     ]);
+    variantPng = loadedVariantPng;
     parsed = enrichRegionColorsWithBboxSamples(parsed, baselinePng, variantPng);
   }
-  const elements = !args.triptych && args.elementsJson
-    ? parseRegionElementsJson(await readFile(args.elementsJson, "utf-8"))
-    : undefined;
+  const elements = await resolveRegionElementsForArgs(args, variantPng);
   const mode: RegionDiffOutputMode = args.triptych ? "triptych" : "split";
   const result: RegionDiffOutput = {
     model: args.model,

@@ -82,7 +82,7 @@ vlmkit diff png baselines/home.png snapshots/home.png
 
 # Ask a VLM to name changed regions, then emit measured colors and CHANGE records
 vlmkit diff region --baseline baselines/home.png --variant snapshots/home.png \
-  --elements-json snapshots/home.elements.json --format markdown
+  --elements-html http://localhost:3000/ --format markdown
 
 # Compare two URLs
 vlmkit diff html --url http://localhost:3000/ --current-url http://localhost:8080/ \
@@ -192,7 +192,7 @@ nix run git+https://github.com/mizchi/pkspec  -- check Spec.pkl Test.pkl
 vlmkit diff html <baseline> <variant>          # HTML/URL pair → multi-viewport diff + report.json
 vlmkit diff agent <report.json>                # Render report.json as agent-friendly Markdown
 vlmkit diff png <baseline.png> <current.png>   # Direct PNG pixel diff + heatmap
-vlmkit diff region --baseline a.png --variant b.png [--elements-json rects.json] [--format markdown] # VLM region diff + selector hints
+vlmkit diff region --baseline a.png --variant b.png [--elements-html current.html|url] [--format markdown] # VLM region diff + selector hints
 vlmkit diff elements [options]                 # Element-level diff with shift isolation
 vlmkit diff browsers <html|url>                # chromium / firefox / webkit parity
 vlmkit diff runs <dir...>                      # Aggregate multiple VRT runs into one table

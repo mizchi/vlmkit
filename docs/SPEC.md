@@ -694,8 +694,10 @@
   >   `baselineColor` / `variantColor` with client-side PNG samples.
   >   It also emits `changes[]` records with `selectorHint`,
   >   inferred/explicit `property`, measured `from` / `to`, and color
-  >   `delta`; when `--elements-json` is supplied, VLM bboxes are joined
-  >   to DOM element rects to fill `selector` plus selector evidence.
+  >   `delta`; when `--elements-json` is supplied, or when
+  >   `--elements-html` captures DOM rects from the variant HTML/URL, VLM
+  >   bboxes are joined to DOM element rects to fill `selector` plus
+  >   selector evidence.
   >   `--format markdown` renders those changes as an agent-facing table.
   - contributes to: GOAL-AI-FIX-LOOP
   - body: `src/experiments/migration/vlm-region-diff.ts`

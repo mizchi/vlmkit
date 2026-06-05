@@ -6,7 +6,9 @@ import {
   enrichRegionColorsWithBboxSamples,
   formatRegionDiffMarkdown,
   parseRegionElementsJson,
+  parseRegionElementsViewport,
   parseVlmResponse,
+  resolveRegionElementsTargetUrl,
 } from "./vlm-region-diff.ts";
 
 describe("parseVlmResponse", () => {
@@ -479,6 +481,24 @@ describe("parseRegionElementsJson", () => {
 
   it("returns an empty list for malformed JSON", () => {
     assert.deepEqual(parseRegionElementsJson("not json"), []);
+  });
+});
+
+describe("region elements capture helpers", () => {
+  it("parses WIDTHxHEIGHT viewport specs", () => {
+    assert.deepEqual(parseRegionElementsViewport("1280x900"), { width: 1280, height: 900 });
+    assert.deepEqual(parseRegionElementsViewport(" 800X600 "), { width: 800, height: 600 });
+  });
+
+  it("rejects malformed viewport specs", () => {
+    assert.throws(() => parseRegionElementsViewport("1280"), /--elements-viewport must be WIDTHxHEIGHT/);
+    assert.throws(() => parseRegionElementsViewport("0x900"), /--elements-viewport must be WIDTHxHEIGHT/);
+  });
+
+  it("keeps URL targets and converts file paths to file URLs", () => {
+    assert.equal(resolveRegionElementsTargetUrl("https://example.test/page"), "https://example.test/page");
+    assert.match(resolveRegionElementsTargetUrl("fixtures/page.html"), /^file:\/\//);
+    assert.match(resolveRegionElementsTargetUrl("fixtures/page.html"), /fixtures\/page\.html$/);
   });
 });
 
