@@ -1,8 +1,8 @@
-# CSS regression repair — arm: CONTROL (no vlmkit)
+# CSS regression repair — arm: CONTROL (no vlmkit), scenario v3
 
 ## Task
 
-The page served at **http://localhost:4321/** has a CSS regression.
+The page served at **http://localhost:4341/** has a CSS regression.
 The three PNGs under `baselines/` in this directory show how the page
 MUST look (full-page captures at viewports 1280x800, 768x900, 375x700).
 
@@ -17,22 +17,20 @@ scorer (commands below). You can self-check at any time.
 ## Verify loop (run from the vlmkit repo root)
 
 ```bash
-# capture current state (3 viewports)
 node fixtures/ab-external/harness/capture.mjs \
-  --url http://localhost:4321/ \
-  --out-dir test-results/ab-external/seed-1/control/current
+  --url http://localhost:4341/ \
+  --out-dir test-results/ab-external/seed-42s/control/current
 
-# score vs baselines
 node fixtures/ab-external/harness/score.mjs \
-  --baseline-dir test-results/ab-external/seed-1/control/baselines \
-  --current-dir  test-results/ab-external/seed-1/control/current
+  --baseline-dir test-results/ab-external/seed-42s/control/baselines \
+  --current-dir  test-results/ab-external/seed-42s/control/current
 ```
 
 ## Allowed tools
 
 - `capture.mjs` / `score.mjs` above (neutral pixel tooling).
-- Your own ad-hoc Node scripts using the `playwright` package
-  (resolvable from the vlmkit repo root node_modules).
+- Your own ad-hoc Node scripts using packages resolvable from the
+  vlmkit repo root (`playwright`, `pngjs`, `pixelmatch`).
 - Reading the baseline / current PNGs directly (you can view images).
 - Editing `workspace/css/styles.css`.
 
@@ -42,13 +40,15 @@ node fixtures/ab-external/harness/score.mjs \
   `/Users/mz/ghq/github.com/mizchi/vlmkit/dist/`,
   `/Users/mz/ghq/github.com/mizchi/vlmkit/src/`, or
   `/Users/mz/ghq/github.com/mizchi/vlmkit/packages/`.
-- The original template source. This page is built from an OSS
-  template; fetching its source from the network or from disk is
-  cheating. Concretely, do NOT access:
+- The original template source and anything that encodes the answer:
   - `/Users/mz/ghq/github.com/startbootstrap/` (any path under it)
   - `test-results/ab-external/pristine/`, `.../scratch/`,
     `.../seed-scan/`, `.../baselines/` (top-level one),
-    `.../seed-1/answer-key.json`, `.../seed-1/treatment/`
+    `.../seed-1/` and `.../seed-23m/` (ALL of both — prior, different
+    experiments whose workspaces encode this page's original CSS),
+    `.../seed-42s/answer-key.json`, `.../seed-42s/treatment/`
+  - `fixtures/ab-external/harness/inject-regression.mjs` (the
+    regression generator) and `docs/reports/` / `docs/issues-drafts/`
   - Any network fetch (WebFetch/WebSearch/curl to the internet).
 - `git` operations to recover file history.
 
@@ -57,12 +57,12 @@ node fixtures/ab-external/harness/score.mjs \
 **5 rounds.** One round = one batch of CSS edits + one capture+score.
 Stop when the success criterion is met or the budget is exhausted.
 Log each round (1 line: what you changed, resulting max diff) to
-`test-results/ab-external/seed-1/control/log.md`.
+`test-results/ab-external/seed-42s/control/log.md`.
 
 ## Deliverable (final message, < 300 words)
 
 1. Final score JSON (all 3 viewports).
 2. Rounds used; one line per round.
 3. What signal helped you most (concrete example).
-4. What was missing / what tool you wished you had — be specific.
-5. Total wall-clock feel: where did you spend the most time?
+4. What tool you wished you had — be specific.
+5. Where time went.
