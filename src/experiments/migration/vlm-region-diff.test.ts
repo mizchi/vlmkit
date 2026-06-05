@@ -3,13 +3,58 @@ import { describe, it } from "node:test";
 import { PNG } from "pngjs";
 import {
   buildStructuredRegionChanges,
+  computeRegionImageScale,
   enrichRegionColorsWithBboxSamples,
   formatRegionDiffMarkdown,
   parseRegionElementsJson,
   parseRegionElementsViewport,
   parseVlmResponse,
   resolveRegionElementsTargetUrl,
+  scaleRegionBboxesToOriginal,
 } from "./vlm-region-diff.ts";
+
+describe("computeRegionImageScale", () => {
+  it("returns 1 when every dimension fits within the max edge", () => {
+    const scale = computeRegionImageScale(
+      [{ width: 1280, height: 800 }, { width: 375, height: 7000 }],
+      7500,
+    );
+    assert.equal(scale, 1);
+  });
+
+  it("scales down to fit the tallest dimension", () => {
+    const scale = computeRegionImageScale(
+      [{ width: 375, height: 9541 }, { width: 375, height: 9377 }],
+      7500,
+    );
+    assert.equal(scale, 7500 / 9541);
+  });
+});
+
+describe("scaleRegionBboxesToOriginal", () => {
+  it("returns the result unchanged when scale is 1", () => {
+    const result = parseVlmResponse(JSON.stringify({
+      verdict: "diff",
+      regions: [{ region: "a", bbox: { left: 10, top: 20, width: 30, height: 40 }, description: "" }],
+      summary: "",
+    }));
+    assert.deepEqual(scaleRegionBboxesToOriginal(result, 1), result);
+  });
+
+  it("maps bboxes from downscaled coordinates back to original pixels", () => {
+    const result = parseVlmResponse(JSON.stringify({
+      verdict: "diff",
+      regions: [
+        { region: "a", bbox: { left: 10, top: 20, width: 30, height: 40 }, description: "" },
+        { region: "b", bbox: null, description: "" },
+      ],
+      summary: "",
+    }));
+    const scaled = scaleRegionBboxesToOriginal(result, 0.5);
+    assert.deepEqual(scaled.regions[0]?.bbox, { left: 20, top: 40, width: 60, height: 80 });
+    assert.equal(scaled.regions[1]?.bbox, null);
+  });
+});
 
 describe("parseVlmResponse", () => {
   it("parses a strict JSON response with regions", () => {

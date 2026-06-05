@@ -24,6 +24,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { readPngDimensions, resizePngBuffer } from "@mizchi/vlmkit-core/image-resize.ts";
 import { DOM_BBOX_BROWSER_SCRIPT } from "@mizchi/vlmkit-markup/shift-origin.ts";
 import { PNG } from "pngjs";
 
@@ -159,6 +160,7 @@ interface CliArgs {
   out: string | null;
   format: "json" | "markdown";
   maxTokens: number;
+  maxImageEdge: number;
   dryRun: boolean;
 }
 
@@ -174,6 +176,7 @@ function parseArgs(argv: string[]): CliArgs {
     out: null,
     format: "json",
     maxTokens: 600,
+    maxImageEdge: DEFAULT_REGION_DIFF_MAX_IMAGE_EDGE,
     dryRun: false,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -194,6 +197,9 @@ function parseArgs(argv: string[]): CliArgs {
       args.format = value;
     }
     else if (arg === "--max-tokens") args.maxTokens = Number.parseInt(argv[++i] ?? "600", 10) || 600;
+    else if (arg === "--max-image-edge") {
+      args.maxImageEdge = Number.parseInt(argv[++i] ?? "", 10) || DEFAULT_REGION_DIFF_MAX_IMAGE_EDGE;
+    }
     else if (arg === "--dry-run") args.dryRun = true;
     else if (arg === "--help" || arg === "-h") {
       console.log(`Usage:
@@ -219,6 +225,10 @@ Options:
   --out      <path>   Write result to this file (default: stdout)
   --format <kind>     json|markdown (default: json)
   --max-tokens <n>    OpenRouter max_tokens (default: 600)
+  --max-image-edge <px>
+                      Downscale images so no edge exceeds this before the
+                      VLM call (default: 7500; Anthropic rejects >8000px).
+                      Region bboxes are mapped back to original pixels.
   --dry-run           Build the request but skip the API call
 `);
       process.exit(0);
@@ -228,6 +238,58 @@ Options:
 }
 
 const DEFAULT_REGION_DIFF_MODEL = "anthropic/claude-haiku-4-5";
+
+// Anthropic rejects images with any edge above 8000px; full-page mobile
+// captures routinely exceed that. Keep a safety margin below the limit.
+const DEFAULT_REGION_DIFF_MAX_IMAGE_EDGE = 7500;
+
+/**
+ * Common downscale factor so every image fits within maxEdge on both
+ * axes. A single factor is used for all images so VLM bbox coordinates
+ * stay consistent across baseline and variant.
+ */
+function computeRegionImageScale(
+  dims: Array<{ width: number; height: number }>,
+  maxEdge: number = DEFAULT_REGION_DIFF_MAX_IMAGE_EDGE,
+): number {
+  let maxDim = 0;
+  for (const d of dims) maxDim = Math.max(maxDim, d.width, d.height);
+  return maxDim > maxEdge ? maxEdge / maxDim : 1;
+}
+
+/** Map VLM bboxes from downscaled image coordinates back to original pixels. */
+function scaleRegionBboxesToOriginal(
+  result: VlmReviewResult,
+  imageScale: number,
+): VlmReviewResult {
+  if (imageScale === 1) return result;
+  const inverse = 1 / imageScale;
+  return {
+    ...result,
+    regions: result.regions.map((region) => region.bbox
+      ? {
+          ...region,
+          bbox: {
+            left: Math.round(region.bbox.left * inverse),
+            top: Math.round(region.bbox.top * inverse),
+            width: Math.round(region.bbox.width * inverse),
+            height: Math.round(region.bbox.height * inverse),
+          },
+        }
+      : region),
+  };
+}
+
+function downscaleForVlm(buffer: Buffer, scale: number): Buffer {
+  if (scale >= 1) return buffer;
+  const { width, height } = readPngDimensions(buffer);
+  return resizePngBuffer(buffer, {
+    resolution: {
+      maxWidth: Math.max(1, Math.round(width * scale)),
+      maxHeight: Math.max(1, Math.round(height * scale)),
+    },
+  });
+}
 
 function ensureArgs(args: CliArgs): void {
   if (args.triptych) return;
@@ -263,41 +325,65 @@ function buildPrompt(args: CliArgs): string {
     : "The two images below are baseline (first) and variant (second). Compare them and list visible color/region differences.";
 }
 
-async function buildRequestBody(args: CliArgs): Promise<Record<string, unknown>> {
+interface RegionDiffRequest {
+  body: Record<string, unknown>;
+  /** Factor the images were downscaled by before the VLM call (1 = untouched). */
+  imageScale: number;
+}
+
+async function buildRegionDiffRequest(args: CliArgs): Promise<RegionDiffRequest> {
   const userContent: Array<Record<string, unknown>> = [
     { type: "text", text: buildPrompt(args) },
   ];
+  let imageScale = 1;
   if (args.triptych) {
     const data = await readFile(args.triptych);
+    imageScale = computeRegionImageScale([readPngDimensions(data)], args.maxImageEdge);
     userContent.push({
       type: "image_url",
-      image_url: { url: `data:image/png;base64,${data.toString("base64")}` },
+      image_url: { url: `data:image/png;base64,${downscaleForVlm(data, imageScale).toString("base64")}` },
     });
   } else {
     const [base, variant] = await Promise.all([
       readFile(args.baseline!),
       readFile(args.variant!),
     ]);
+    imageScale = computeRegionImageScale(
+      [readPngDimensions(base), readPngDimensions(variant)],
+      args.maxImageEdge,
+    );
     userContent.push({ type: "text", text: "Baseline:" });
     userContent.push({
       type: "image_url",
-      image_url: { url: `data:image/png;base64,${base.toString("base64")}` },
+      image_url: { url: `data:image/png;base64,${downscaleForVlm(base, imageScale).toString("base64")}` },
     });
     userContent.push({ type: "text", text: "Variant:" });
     userContent.push({
       type: "image_url",
-      image_url: { url: `data:image/png;base64,${variant.toString("base64")}` },
+      image_url: { url: `data:image/png;base64,${downscaleForVlm(variant, imageScale).toString("base64")}` },
     });
   }
+  if (imageScale < 1) {
+    console.error(
+      `vlm-region-diff: downscaled image(s) by x${imageScale.toFixed(3)} to fit --max-image-edge ${args.maxImageEdge}; bboxes are mapped back to original pixels`,
+    );
+  }
   return {
-    model: args.model,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: userContent },
-    ],
-    temperature: 0,
-    max_tokens: args.maxTokens,
+    body: {
+      model: args.model,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userContent },
+      ],
+      temperature: 0,
+      max_tokens: args.maxTokens,
+    },
+    imageScale,
   };
+}
+
+async function buildRequestBody(args: CliArgs): Promise<Record<string, unknown>> {
+  return (await buildRegionDiffRequest(args)).body;
 }
 
 function parseVlmResponse(content: string): VlmReviewResult {
@@ -874,9 +960,10 @@ async function runRegionDiffAnalysis(
     out: null,
     format: "json",
     maxTokens: options.maxTokens ?? 600,
+    maxImageEdge: DEFAULT_REGION_DIFF_MAX_IMAGE_EDGE,
     dryRun: false,
   };
-  const body = await buildRequestBody(args);
+  const { body, imageScale } = await buildRegionDiffRequest(args);
   const apiKey = options.apiKey ?? process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     throw new Error("OPENROUTER_API_KEY is required for region diff analysis");
@@ -888,7 +975,7 @@ async function runRegionDiffAnalysis(
     readPng(args.variant!),
   ]);
   const parsed = enrichRegionColorsWithBboxSamples(
-    parseVlmResponse(content),
+    scaleRegionBboxesToOriginal(parseVlmResponse(content), imageScale),
     baselinePng,
     variantPng,
   );
@@ -998,6 +1085,8 @@ function formatSelectorEvidence(evidence: RegionSelectorMatchEvidence | undefine
 export {
   DEFAULT_REGION_DIFF_MODEL,
   buildStructuredRegionChanges,
+  computeRegionImageScale,
+  scaleRegionBboxesToOriginal,
   enrichRegionColorsWithBboxSamples,
   formatRegionDiffMarkdown,
   parseRegionElementsJson,
@@ -1021,7 +1110,7 @@ export {
 async function main(argv = process.argv.slice(2)): Promise<void> {
   const args = parseArgs(argv);
   ensureArgs(args);
-  const body = await buildRequestBody(args);
+  const { body, imageScale } = await buildRegionDiffRequest(args);
   if (args.dryRun) {
     const payload = { dryRun: true, model: args.model, mode: args.triptych ? "triptych" : "split" };
     if (args.out) {
@@ -1039,7 +1128,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   }
   const data = await callOpenRouterRegionDiff(body, apiKey);
   const content = data.choices?.[0]?.message?.content ?? "";
-  let parsed = parseVlmResponse(content);
+  let parsed = scaleRegionBboxesToOriginal(parseVlmResponse(content), imageScale);
   let variantPng: PNG | null = null;
   if (!args.triptych && args.baseline && args.variant) {
     const [baselinePng, loadedVariantPng] = await Promise.all([
