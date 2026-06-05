@@ -67,6 +67,11 @@ shift worth investigating?" detector and consult it for `region` names,
   annotates the result with `colorSample.pixelCount`,
   `colorSample.totalPixelCount`, `colorSample.changedPixelCount`, and
   `colorSample.averageChannelDelta`.
+- Done: results now include downstream-facing `changes[]` records with
+  measured color `from` / `to`, inferred or explicit paint `property`,
+  `selectorHint`, bbox, confidence, and color delta. The selector is
+  still `null` until a DOM-position join layer can attach a real CSS
+  selector.
 - Re-run this bake-off on a genuinely small (<1%) delta fixture before
   trusting any model in that regime — even the haiku-4-5 hit here was on
   a *visible* shift. Sub-1% may flip everyone to `no-diff`.

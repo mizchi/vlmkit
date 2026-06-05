@@ -1561,6 +1561,12 @@ has been closed (commits `ef95260`, `2656786`, `f934122`, `4e6d45d`,
     averages changed pixels inside the bbox first, then falls back to
     the full bbox when no changed pixels are present. Triptych mode
     remains informational because the coordinate space is ambiguous.
+  - `vlm-region-diff` now also emits downstream-facing `changes[]`
+    records: `type: "CHANGE"`, `selector: null`, `selectorHint`,
+    inferred/explicit `property`, measured `from` / `to`, bbox, and
+    color delta. Real DOM selector join remains a separate fix-loop
+    integration step because it needs DOM/position evidence, not just
+    before/after PNGs.
 
 ### Dashboard (separate repo)
 - [x] Execution result list/search

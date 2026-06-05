@@ -692,8 +692,10 @@
   >   Partial: `vlmkit diff region --baseline a.png --variant b.png`
   >   asks a VLM for changed region names and bboxes, then overwrites
   >   `baselineColor` / `variantColor` with client-side PNG samples.
-  >   The selector + property + delta CHANGE format is still a downstream
-  >   fix-loop integration target.
+  >   It also emits `changes[]` records with `selector: null`,
+  >   `selectorHint`, inferred/explicit `property`, measured `from` / `to`,
+  >   and color `delta`; joining those image-only hints to real DOM
+  >   selectors remains a downstream fix-loop integration target.
   - contributes to: GOAL-AI-FIX-LOOP
   - body: `src/experiments/migration/vlm-region-diff.ts`
 

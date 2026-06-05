@@ -29,7 +29,7 @@ for options.
 
 | Group | Subcommands |
 |---|---|
-| `vlmkit diff` | `html`, `png`, `elements`, `browsers`, `agent`, `runs` |
+| `vlmkit diff` | `html`, `png`, `region`, `elements`, `browsers`, `agent`, `runs` |
 | `vlmkit check` | `a11y {contrast,touch,focus}`, `tokens`, `theme`, `perf`, `drift {component,pages}` |
 | `vlmkit inspect` | `interact`, `explore`, `smoke` |
 | `vlmkit stress` | `i18n`, `media` |
@@ -80,7 +80,7 @@ vlmkit diff agent reports/diff-report.json > reports/diff.md
 # Compare two existing PNG screenshots without Playwright
 vlmkit diff png baselines/home.png snapshots/home.png
 
-# Ask a VLM to name changed regions, then overwrite returned colors with bbox pixel samples
+# Ask a VLM to name changed regions, then emit measured colors and CHANGE records
 vlmkit diff region --baseline baselines/home.png --variant snapshots/home.png
 
 # Compare two URLs
@@ -191,7 +191,7 @@ nix run git+https://github.com/mizchi/pkspec  -- check Spec.pkl Test.pkl
 vlmkit diff html <baseline> <variant>          # HTML/URL pair → multi-viewport diff + report.json
 vlmkit diff agent <report.json>                # Render report.json as agent-friendly Markdown
 vlmkit diff png <baseline.png> <current.png>   # Direct PNG pixel diff + heatmap
-vlmkit diff region --baseline a.png --variant b.png # VLM region/color diff with measured bbox colors
+vlmkit diff region --baseline a.png --variant b.png # VLM region/color diff with measured bbox colors + CHANGE records
 vlmkit diff elements [options]                 # Element-level diff with shift isolation
 vlmkit diff browsers <html|url>                # chromium / firefox / webkit parity
 vlmkit diff runs <dir...>                      # Aggregate multiple VRT runs into one table

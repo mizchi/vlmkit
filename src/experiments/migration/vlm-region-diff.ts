@@ -4,12 +4,12 @@
  *
  * Takes a baseline PNG + variant PNG (or a single triptych: baseline |
  * variant | heatmap), sends both via OpenRouter to a VLM with a strict
- * JSON prompt, and emits a list of {region, baselineColor, variantColor,
- * description} differences. The output is informational — the diff
- * loop's value-only fix pipeline can't act on sub-pixel rasterization
- * artifacts, but a coding agent (or the operator) can use the report to
- * target gradients, image sources, or sub-color literals that
- * computedStyleDiff misses.
+ * JSON prompt, and emits measured region differences plus downstream
+ * CHANGE records. The selector stays null until a DOM-position join layer
+ * can attach a real CSS selector, but property, measured colors, bbox,
+ * and delta are structured so a coding agent (or the operator) can target
+ * gradients, image sources, or sub-color literals that computedStyleDiff
+ * misses.
  *
  * Usage:
  *   node src/experiments/migration/vlm-region-diff.ts \
@@ -42,6 +42,8 @@ interface RegionColorSample {
 
 interface RegionDiff {
   region: string;
+  selectorHint?: string | null;
+  propertyHint?: RegionChangeProperty | null;
   bbox: RegionBbox | null;
   baselineColor: string | null;
   variantColor: string | null;
@@ -53,6 +55,36 @@ interface VlmReviewResult {
   verdict: "diff" | "no-diff" | "uncertain";
   regions: RegionDiff[];
   summary: string;
+}
+
+type RegionChangeProperty =
+  | "background-color"
+  | "background"
+  | "color"
+  | "border-color"
+  | "outline-color"
+  | "fill"
+  | "box-shadow";
+
+interface RegionStructuredChange {
+  type: "CHANGE";
+  source: "vlm-region-diff";
+  selector: string | null;
+  selectorHint: string;
+  property: RegionChangeProperty;
+  from: string | null;
+  to: string | null;
+  delta: {
+    kind: "color";
+    averageChannelDelta: number | null;
+  };
+  bbox: RegionBbox | null;
+  region: string;
+  description: string;
+  confidence: "high" | "medium" | "low";
+  evidence: {
+    colorSample?: RegionColorSample;
+  };
 }
 
 interface CliArgs {
@@ -118,13 +150,15 @@ Strict JSON output:
 {
   "verdict": "diff" | "no-diff" | "uncertain",
   "regions": [
-    { "region": "<short descriptor of the area>", "bbox": { "left": 0, "top": 0, "width": 100, "height": 50 }, "baselineColor": "<hex or rgb()>", "variantColor": "<hex or rgb()>", "description": "<one sentence>" }
+    { "region": "<short descriptor of the area>", "selectorHint": "<semantic selector or null>", "propertyHint": "background-color" | "background" | "color" | "border-color" | "outline-color" | "fill" | "box-shadow" | null, "bbox": { "left": 0, "top": 0, "width": 100, "height": 50 }, "baselineColor": "<hex or rgb()>", "variantColor": "<hex or rgb()>", "description": "<one sentence>" }
   ],
   "summary": "<one-sentence overall judgement>"
 }
 
 Rules:
 - Only list regions with clearly visible color differences (>5% RGB delta).
+- Include selectorHint when the screenshot gives an obvious semantic target, but use null rather than inventing a real CSS selector.
+- Include propertyHint when the changed visual property is obvious.
 - When possible, include bbox in baseline/variant image pixel coordinates for the visible changed area.
 - If you cannot localize a region to a bbox, set bbox to null.
 - Use hex like \`#1234ab\` or \`rgb(18, 52, 171)\` when you can read a value off the pixels.
@@ -196,6 +230,8 @@ function parseVlmResponse(content: string): VlmReviewResult {
     const r = entry as Record<string, unknown>;
     regions.push({
       region: typeof r.region === "string" ? r.region : "(unnamed)",
+      selectorHint: typeof r.selectorHint === "string" ? r.selectorHint : null,
+      propertyHint: parseRegionChangeProperty(r.propertyHint),
       bbox: parseRegionBbox(r.bbox),
       baselineColor: typeof r.baselineColor === "string" ? r.baselineColor : null,
       variantColor: typeof r.variantColor === "string" ? r.variantColor : null,
@@ -204,6 +240,22 @@ function parseVlmResponse(content: string): VlmReviewResult {
   }
   const summary = typeof obj.summary === "string" ? obj.summary : "";
   return { verdict, regions, summary };
+}
+
+function parseRegionChangeProperty(value: unknown): RegionChangeProperty | null {
+  if (typeof value !== "string") return null;
+  switch (value) {
+    case "background-color":
+    case "background":
+    case "color":
+    case "border-color":
+    case "outline-color":
+    case "fill":
+    case "box-shadow":
+      return value;
+    default:
+      return null;
+  }
 }
 
 function parseRegionBbox(value: unknown): RegionBbox | null {
@@ -400,7 +452,92 @@ function enrichRegionColorsWithBboxSamples(
   };
 }
 
+function buildStructuredRegionChanges(result: VlmReviewResult): RegionStructuredChange[] {
+  if (result.verdict === "no-diff") return [];
+  return result.regions.map((region): RegionStructuredChange => {
+    const averageDelta = region.colorSample?.averageChannelDelta
+      ?? computeAverageDeltaFromColorStrings(region.baselineColor, region.variantColor);
+    return {
+      type: "CHANGE",
+      source: "vlm-region-diff",
+      selector: null,
+      selectorHint: region.selectorHint ?? region.region,
+      property: region.propertyHint ?? inferRegionChangeProperty(region),
+      from: region.baselineColor,
+      to: region.variantColor,
+      delta: {
+        kind: "color",
+        averageChannelDelta: averageDelta,
+      },
+      bbox: region.bbox,
+      region: region.region,
+      description: region.description,
+      confidence: inferRegionChangeConfidence(region, averageDelta),
+      evidence: region.colorSample ? { colorSample: region.colorSample } : {},
+    };
+  });
+}
+
+function inferRegionChangeProperty(region: RegionDiff): RegionChangeProperty {
+  const text = `${region.region} ${region.description}`.toLowerCase();
+  if (/\b(text|label|copy|glyph|font|type)\b/.test(text)) return "color";
+  if (/\b(border|stroke|divider|rule)\b/.test(text)) return "border-color";
+  if (/\boutline|focus-ring|focus ring\b/.test(text)) return "outline-color";
+  if (/\b(icon|svg|fill)\b/.test(text)) return "fill";
+  if (/\bshadow\b/.test(text)) return "box-shadow";
+  if (/\bgradient|image\b/.test(text)) return "background";
+  return "background-color";
+}
+
+function inferRegionChangeConfidence(
+  region: RegionDiff,
+  averageDelta: number | null,
+): RegionStructuredChange["confidence"] {
+  if (region.bbox && region.colorSample && (averageDelta ?? 0) >= 5) return "high";
+  if (region.bbox && region.baselineColor && region.variantColor) return "medium";
+  return "low";
+}
+
+function computeAverageDeltaFromColorStrings(
+  baselineColor: string | null,
+  variantColor: string | null,
+): number | null {
+  const baseline = parseColorString(baselineColor);
+  const variant = parseColorString(variantColor);
+  if (!baseline || !variant) return null;
+  return averageChannelDelta(baseline, variant);
+}
+
+function parseColorString(value: string | null): [number, number, number] | null {
+  if (!value) return null;
+  const hex = value.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (hex) {
+    const raw = hex[1]!;
+    const full = raw.length === 3
+      ? raw.split("").map((char) => char + char).join("")
+      : raw;
+    return [
+      Number.parseInt(full.slice(0, 2), 16),
+      Number.parseInt(full.slice(2, 4), 16),
+      Number.parseInt(full.slice(4, 6), 16),
+    ];
+  }
+  const rgb = value.trim().match(/^rgb\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*\)$/i);
+  if (!rgb) return null;
+  return [
+    clampRgb(Number.parseFloat(rgb[1]!)),
+    clampRgb(Number.parseFloat(rgb[2]!)),
+    clampRgb(Number.parseFloat(rgb[3]!)),
+  ];
+}
+
+function clampRgb(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(255, Math.round(value)));
+}
+
 export {
+  buildStructuredRegionChanges,
   enrichRegionColorsWithBboxSamples,
   parseVlmResponse,
   buildPrompt,
@@ -408,6 +545,7 @@ export {
   type RegionDiff,
   type RegionBbox,
   type RegionColorSample,
+  type RegionStructuredChange,
   type VlmReviewResult,
 };
 
@@ -460,6 +598,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     mode: args.triptych ? "triptych" : "split" as const,
     usage: data.usage ?? null,
     ...parsed,
+    changes: buildStructuredRegionChanges(parsed),
     rawContent: content,
   };
   const text = JSON.stringify(result, null, 2);

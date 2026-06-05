@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { PNG } from "pngjs";
 import {
+  buildStructuredRegionChanges,
   enrichRegionColorsWithBboxSamples,
   parseVlmResponse,
 } from "./vlm-region-diff.ts";
@@ -202,6 +203,130 @@ describe("enrichRegionColorsWithBboxSamples", () => {
 
     assert.equal(result.regions[0]?.baselineColor, "#111111");
     assert.equal(result.regions[0]?.variantColor, "#222222");
+  });
+});
+
+describe("buildStructuredRegionChanges", () => {
+  it("maps sampled VLM regions into downstream CHANGE records", () => {
+    const changes = buildStructuredRegionChanges({
+      verdict: "diff",
+      regions: [
+        {
+          region: "hero panel",
+          bbox: { left: 10, top: 20, width: 30, height: 40 },
+          baselineColor: "#112233",
+          variantColor: "#445566",
+          description: "The hero panel background is lighter.",
+          colorSample: {
+            source: "bbox-average",
+            pixelCount: 12,
+            totalPixelCount: 20,
+            changedPixelCount: 12,
+            averageChannelDelta: 51,
+          },
+        },
+      ],
+      summary: "One color change",
+    });
+
+    assert.deepEqual(changes, [
+      {
+        type: "CHANGE",
+        source: "vlm-region-diff",
+        selector: null,
+        selectorHint: "hero panel",
+        property: "background-color",
+        from: "#112233",
+        to: "#445566",
+        delta: {
+          kind: "color",
+          averageChannelDelta: 51,
+        },
+        bbox: { left: 10, top: 20, width: 30, height: 40 },
+        region: "hero panel",
+        description: "The hero panel background is lighter.",
+        confidence: "high",
+        evidence: {
+          colorSample: {
+            source: "bbox-average",
+            pixelCount: 12,
+            totalPixelCount: 20,
+            changedPixelCount: 12,
+            averageChannelDelta: 51,
+          },
+        },
+      },
+    ]);
+  });
+
+  it("infers text and border properties from VLM region wording", () => {
+    const changes = buildStructuredRegionChanges({
+      verdict: "diff",
+      regions: [
+        {
+          region: "button label text",
+          bbox: { left: 0, top: 0, width: 4, height: 4 },
+          baselineColor: "#000",
+          variantColor: "#fff",
+          description: "Text color changed.",
+        },
+        {
+          region: "card border",
+          bbox: { left: 4, top: 4, width: 2, height: 2 },
+          baselineColor: "rgb(10, 20, 30)",
+          variantColor: "rgb(20, 20, 20)",
+          description: "The border stroke is darker.",
+        },
+      ],
+      summary: "Two color changes",
+    });
+
+    assert.equal(changes[0]?.property, "color");
+    assert.deepEqual(changes[0]?.delta, { kind: "color", averageChannelDelta: 255 });
+    assert.equal(changes[0]?.confidence, "medium");
+
+    assert.equal(changes[1]?.property, "border-color");
+    assert.deepEqual(changes[1]?.delta, { kind: "color", averageChannelDelta: 6.67 });
+  });
+
+  it("uses explicit VLM selector/property hints when present", () => {
+    const result = parseVlmResponse(JSON.stringify({
+      verdict: "diff",
+      regions: [
+        {
+          region: "primary action",
+          selectorHint: ".cta",
+          propertyHint: "background",
+          bbox: [1, 2, 3, 4],
+          baselineColor: "#123456",
+          variantColor: "#654321",
+          description: "The CTA gradient differs.",
+        },
+      ],
+      summary: "CTA differs",
+    }));
+
+    const changes = buildStructuredRegionChanges(result);
+    assert.equal(changes[0]?.selectorHint, ".cta");
+    assert.equal(changes[0]?.property, "background");
+  });
+
+  it("does not emit CHANGE records when the VLM verdict is no-diff", () => {
+    const changes = buildStructuredRegionChanges({
+      verdict: "no-diff",
+      regions: [
+        {
+          region: "contradictory row",
+          bbox: { left: 0, top: 0, width: 1, height: 1 },
+          baselineColor: "#000000",
+          variantColor: "#ffffff",
+          description: "Should be ignored because verdict is no-diff.",
+        },
+      ],
+      summary: "no diff",
+    });
+
+    assert.deepEqual(changes, []);
   });
 });
 
