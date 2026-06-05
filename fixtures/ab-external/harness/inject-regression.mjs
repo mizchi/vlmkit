@@ -19,7 +19,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 
 function parseArgs(argv) {
-  const args = { css: null, seed: null, list: false, apply: false, minLine: 0, mutate: 0 };
+  const args = { css: null, seed: null, list: false, apply: false, minLine: 0, mutate: 0, subtle: false };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--css") args.css = argv[++i];
@@ -28,6 +28,7 @@ function parseArgs(argv) {
     else if (a === "--apply") args.apply = true;
     else if (a === "--min-line") args.minLine = Number(argv[++i]);
     else if (a === "--mutate") args.mutate = Number(argv[++i]);
+    else if (a === "--subtle") args.subtle = true;
   }
   return args;
 }
@@ -151,31 +152,39 @@ function mutatableDecls(block) {
   return decls;
 }
 
-function mutateHex(hex, rand) {
+function mutateHex(hex, rand, subtle) {
   const raw = hex.slice(1);
   const full = raw.length === 3 ? raw.split("").map((c) => c + c).join("") : raw;
   const channels = [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16));
   const mutated = channels.map((c) => {
     const sign = rand() < 0.5 ? -1 : 1;
-    const delta = Math.round(24 + rand() * 56); // 24..80 per channel — clearly visible
+    // subtle: hard to eyeball, still above the pixelmatch 0.1 threshold
+    const delta = subtle
+      ? Math.round(24 + rand() * 20) // 24..44
+      : Math.round(24 + rand() * 56); // 24..80 — clearly visible
     return Math.max(0, Math.min(255, c + sign * delta));
   });
   return "#" + mutated.map((c) => c.toString(16).padStart(2, "0")).join("");
 }
 
-function mutatePx(px, rand) {
+function mutatePx(px, rand, subtle) {
   const value = parseFloat(px);
   if (value === 0) return "16px";
   const grow = rand() < 0.5;
-  const factor = grow ? 1.6 + rand() * 0.8 : 0.35 + rand() * 0.25;
-  return `${Math.max(1, Math.round(value * factor))}px`;
+  const factor = subtle
+    ? (grow ? 1.15 + rand() * 0.2 : 0.72 + rand() * 0.16)
+    : (grow ? 1.6 + rand() * 0.8 : 0.35 + rand() * 0.25);
+  const next = Math.max(1, Math.round(value * factor));
+  // Guarantee at least a few px of movement even for small values.
+  if (next === value) return `${grow ? value + 3 : Math.max(1, value - 3)}px`;
+  return `${next}px`;
 }
 
-function mutateValue(decl, rand) {
+function mutateValue(decl, rand, subtle) {
   if (decl.kind === "color") {
     const matches = [...decl.value.matchAll(HEX_RE)];
     const target = matches[Math.floor(rand() * matches.length)];
-    const replacement = mutateHex(target[0], rand);
+    const replacement = mutateHex(target[0], rand, subtle);
     return {
       from: target[0],
       to: replacement,
@@ -185,7 +194,7 @@ function mutateValue(decl, rand) {
   }
   const matches = [...decl.value.matchAll(PX_RE)].filter((m) => parseFloat(m[1]) > 0);
   const target = matches[Math.floor(rand() * matches.length)];
-  const replacement = mutatePx(target[0], rand);
+  const replacement = mutatePx(target[0], rand, subtle);
   return {
     from: target[0],
     to: replacement,
@@ -194,7 +203,7 @@ function mutateValue(decl, rand) {
   };
 }
 
-function applyMutations(css, candidates, count, rand) {
+function applyMutations(css, candidates, count, rand, subtle) {
   // Pool: every mutatable decl, at most one per block so the damage spreads.
   const pool = [];
   for (const block of candidates) {
@@ -212,7 +221,7 @@ function applyMutations(css, candidates, count, rand) {
   const edits = [];
   for (const { block, decls } of chosen) {
     const decl = decls[Math.floor(rand() * decls.length)];
-    const mutated = mutateValue(decl, rand);
+    const mutated = mutateValue(decl, rand, subtle);
     const newSegment = decl.segmentText.replace(decl.value, mutated.value);
     edits.push({
       selector: block.prelude,
@@ -267,7 +276,7 @@ if (args.seed == null || Number.isNaN(args.seed)) {
 const rand = mulberry32(args.seed);
 
 if (args.mutate > 0) {
-  const { next, edits } = applyMutations(css, candidates, args.mutate, rand);
+  const { next, edits } = applyMutations(css, candidates, args.mutate, rand, args.subtle);
   if (edits.length < args.mutate) {
     console.error(`only ${edits.length} mutatable blocks available`);
     process.exit(1);
