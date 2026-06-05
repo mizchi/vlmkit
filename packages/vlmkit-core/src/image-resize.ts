@@ -77,7 +77,7 @@ export function resizePngBuffer(pngBuffer: Buffer, options: ResizeOptions = {}):
 }
 
 /** Read dimensions from PNG IHDR chunk (no full decode needed) */
-function readPngDimensions(buf: Buffer): { width: number; height: number } {
+export function readPngDimensions(buf: Buffer): { width: number; height: number } {
   // PNG header: 8-byte signature, then IHDR chunk: 4-byte length, 4-byte type, 4-byte width, 4-byte height
   if (buf.length >= 24 && buf[0] === 0x89 && buf[1] === 0x50) {
     return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };

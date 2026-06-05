@@ -1,6 +1,7 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
+import { readPngDimensions } from "@mizchi/vlmkit-core/image-resize.ts";
 import { classifyVisualDiff } from "./visual-semantic.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 
@@ -110,7 +111,17 @@ export async function runPngDiff(options: PngDiffCliOptions) {
   }
 
   const semantic = classifyVisualDiff(diff);
-  return { diff, semantic };
+  const [baselineBuf, currentBuf] = await Promise.all([
+    readFile(options.baselinePath),
+    readFile(options.currentPath),
+  ]);
+  const baselineSize = readPngDimensions(baselineBuf);
+  const currentSize = readPngDimensions(currentBuf);
+  const sizeDelta = {
+    width: currentSize.width - baselineSize.width,
+    height: currentSize.height - baselineSize.height,
+  };
+  return { diff, semantic, baselineSize, currentSize, sizeDelta };
 }
 
 export async function runPngDiffCli(cliArgs = process.argv.slice(2)) {
@@ -121,6 +132,9 @@ export async function runPngDiffCli(cliArgs = process.argv.slice(2)) {
       status: result.diff.diffPixels === 0 ? "pass" : "changed",
       baselinePath: options.baselinePath,
       currentPath: options.currentPath,
+      baselineSize: result.baselineSize,
+      currentSize: result.currentSize,
+      sizeDelta: result.sizeDelta,
       diffPixels: result.diff.diffPixels,
       totalPixels: result.diff.totalPixels,
       diffRatio: result.diff.diffRatio,
@@ -138,6 +152,18 @@ export async function runPngDiffCli(cliArgs = process.argv.slice(2)) {
     console.log("PNG Diff");
     console.log(`  baseline: ${output.baselinePath}`);
     console.log(`  current:  ${output.currentPath}`);
+    console.log(
+      `  size:     baseline ${output.baselineSize.width}x${output.baselineSize.height}` +
+      ` / current ${output.currentSize.width}x${output.currentSize.height}` +
+      (output.sizeDelta.width !== 0 || output.sizeDelta.height !== 0
+        ? ` (Δ ${formatSizeDelta(output.sizeDelta.width)}w ${formatSizeDelta(output.sizeDelta.height)}h)`
+        : ""),
+    );
+    if (output.sizeDelta.height !== 0) {
+      console.log(
+        `  note:     height differs by ${formatSizeDelta(output.sizeDelta.height)}px — content reflow likely (an element gained or lost vertical space)`,
+      );
+    }
     console.log(`  diff:     ${(output.diffRatio * 100).toFixed(2)}% (${output.diffPixels} / ${output.totalPixels} px)`);
     console.log(`  regions:  ${output.regions.length}`);
     console.log(`  summary:  ${output.summary}`);
@@ -155,6 +181,10 @@ export async function runPngDiffCli(cliArgs = process.argv.slice(2)) {
     }
     throw error;
   }
+}
+
+function formatSizeDelta(value: number): string {
+  return value > 0 ? `+${value}` : String(value);
 }
 
 if (process.env.__VRT_DISPATCHER_LEAF__ === "png-diff" || process.argv[1]?.endsWith("png-diff.ts")) {

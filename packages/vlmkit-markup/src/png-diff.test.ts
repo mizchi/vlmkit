@@ -108,6 +108,34 @@ describe("png-diff", () => {
     }
   });
 
+  it("reports baseline/current dimensions and their delta", async () => {
+    const baselinePath = join(TMP, "baseline-size.png");
+    const currentPath = join(TMP, "current-size.png");
+
+    await rm(TMP, { recursive: true, force: true });
+    await mkdir(TMP, { recursive: true });
+
+    try {
+      await encodePng(baselinePath, createPalettePng(64, 96, [[17, 34, 51]]));
+      await encodePng(currentPath, createPalettePng(64, 64, [[17, 34, 51]]));
+
+      const result = await runPngDiff({
+        baselinePath,
+        currentPath,
+        outputDir: TMP,
+        threshold: 0.1,
+        skipHeatmap: true,
+        json: false,
+      });
+
+      assert.deepEqual(result.baselineSize, { width: 64, height: 96 });
+      assert.deepEqual(result.currentSize, { width: 64, height: 64 });
+      assert.deepEqual(result.sizeDelta, { width: 0, height: -32 });
+    } finally {
+      await rm(TMP, { recursive: true, force: true });
+    }
+  });
+
   it("samples baseline/current colors for diff regions", async () => {
     const baselinePath = join(TMP, "baseline-color.png");
     const currentPath = join(TMP, "current-color.png");
