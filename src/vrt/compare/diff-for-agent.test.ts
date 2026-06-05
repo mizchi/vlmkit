@@ -228,10 +228,13 @@ describe("formatMigrationReportForAgent", () => {
     }));
 
     assert.match(md, /VLM region diff/);
-    assert.match(md, /Primary CTA background changed/);
+    assert.doesNotMatch(md, /Optional VLM handoff generated/);
+    assert.doesNotMatch(md, /\| Viewport \| Selector \| Property \| Baseline → Variant \| Δ \| Bbox \| Confidence \|/);
+    assert.match(md, /\| Viewport \| Selector \| Property \| Target \| Current \| Evidence \| Artifacts \|/);
+    assert.match(md, /`mobile` \| `\.cta` \| `background-color` \| `#2d69ec` _\(authored CSSOM\)_ \| `#f04b4b` \| sampled `#366fed` → `#f15353`; bbox `170,338 156x50`; conf high\/high \| json: `\/work\/fix\/out\/working-mobile-region-diff\.json`; md: `\/work\/fix\/out\/working-mobile-region-diff\.md`/);
+    assert.match(md, /Notes: `mobile`: Primary CTA background changed/);
     assert.match(md, /`\.cta`/);
     assert.match(md, /`background-color`/);
-    assert.match(md, /`#2d69ec` → `#f04b4b`/);
     assert.match(md, /authored CSSOM/);
     assert.match(md, /sampled `#366fed` → `#f15353`/);
     assert.match(md, /working-mobile-region-diff\.json/);
