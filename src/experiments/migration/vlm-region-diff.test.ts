@@ -6,12 +6,34 @@ import {
   computeRegionImageScale,
   enrichRegionColorsWithBboxSamples,
   formatRegionDiffMarkdown,
+  isTruncatedRegionDiffResponse,
   parseRegionElementsJson,
   parseRegionElementsViewport,
   parseVlmResponse,
   resolveRegionElementsTargetUrl,
   scaleRegionBboxesToOriginal,
 } from "./vlm-region-diff.ts";
+
+describe("isTruncatedRegionDiffResponse", () => {
+  it("is true when the provider reports finish_reason=length", () => {
+    const content = JSON.stringify({ verdict: "diff", regions: [], summary: "ok" });
+    assert.equal(isTruncatedRegionDiffResponse(content, "length"), true);
+  });
+
+  it("is false for a complete response with finish_reason=stop", () => {
+    const content = JSON.stringify({ verdict: "diff", regions: [], summary: "ok" });
+    assert.equal(isTruncatedRegionDiffResponse(content, "stop"), false);
+  });
+
+  it("is true for unparseable JSON when finish_reason is missing", () => {
+    const cutOff = '{"verdict": "diff", "regions": [{"region": "head';
+    assert.equal(isTruncatedRegionDiffResponse(cutOff, undefined), true);
+  });
+
+  it("is false for prose without JSON when finish_reason is stop", () => {
+    assert.equal(isTruncatedRegionDiffResponse("no differences found", "stop"), false);
+  });
+});
 
 describe("computeRegionImageScale", () => {
   it("returns 1 when every dimension fits within the max edge", () => {

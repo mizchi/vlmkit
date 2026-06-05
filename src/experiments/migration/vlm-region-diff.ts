@@ -175,7 +175,7 @@ function parseArgs(argv: string[]): CliArgs {
     model: DEFAULT_REGION_DIFF_MODEL,
     out: null,
     format: "json",
-    maxTokens: 600,
+    maxTokens: DEFAULT_REGION_DIFF_MAX_TOKENS,
     maxImageEdge: DEFAULT_REGION_DIFF_MAX_IMAGE_EDGE,
     dryRun: false,
   };
@@ -196,7 +196,9 @@ function parseArgs(argv: string[]): CliArgs {
       }
       args.format = value;
     }
-    else if (arg === "--max-tokens") args.maxTokens = Number.parseInt(argv[++i] ?? "600", 10) || 600;
+    else if (arg === "--max-tokens") {
+      args.maxTokens = Number.parseInt(argv[++i] ?? "", 10) || DEFAULT_REGION_DIFF_MAX_TOKENS;
+    }
     else if (arg === "--max-image-edge") {
       args.maxImageEdge = Number.parseInt(argv[++i] ?? "", 10) || DEFAULT_REGION_DIFF_MAX_IMAGE_EDGE;
     }
@@ -224,7 +226,9 @@ Options:
                       see docs/reports/2026-05-23-vlm-region-diff-bakeoff.md)
   --out      <path>   Write result to this file (default: stdout)
   --format <kind>     json|markdown (default: json)
-  --max-tokens <n>    OpenRouter max_tokens (default: 600)
+  --max-tokens <n>    OpenRouter max_tokens (default: 1500; auto-retries
+                      once with doubled tokens when the response is
+                      truncated)
   --max-image-edge <px>
                       Downscale images so no edge exceeds this before the
                       VLM call (default: 7500; Anthropic rejects >8000px).
@@ -278,6 +282,50 @@ function scaleRegionBboxesToOriginal(
         }
       : region),
   };
+}
+
+// Region lists on a busy page easily exceed the old 600-token default,
+// which silently degraded the verdict to `uncertain` via truncated JSON.
+const DEFAULT_REGION_DIFF_MAX_TOKENS = 1500;
+
+/**
+ * Detect a truncated VLM response: the provider says `length`, or the
+ * content contains an opening brace but never parses (mid-JSON cut)
+ * while no finish reason is available.
+ */
+function isTruncatedRegionDiffResponse(
+  content: string,
+  finishReason: string | undefined,
+): boolean {
+  if (finishReason === "length") return true;
+  if (finishReason != null) return false;
+  if (!content.includes("{")) return false;
+  const stripped = content.replace(/^[\s\S]*?({[\s\S]*})[\s\S]*$/, "$1");
+  try {
+    JSON.parse(stripped);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+async function callRegionDiffWithTruncationRetry(
+  body: Record<string, unknown>,
+  apiKey: string,
+  maxTokens: number,
+): Promise<{ data: Awaited<ReturnType<typeof callOpenRouterRegionDiff>>; content: string }> {
+  let data = await callOpenRouterRegionDiff(body, apiKey);
+  let content = data.choices?.[0]?.message?.content ?? "";
+  const finishReason = data.choices?.[0]?.finish_reason;
+  if (isTruncatedRegionDiffResponse(content, finishReason)) {
+    const retryTokens = maxTokens * 2;
+    console.error(
+      `vlm-region-diff: response truncated (finish_reason=${finishReason ?? "unknown"}); retrying once with max_tokens=${retryTokens}`,
+    );
+    data = await callOpenRouterRegionDiff({ ...body, max_tokens: retryTokens }, apiKey);
+    content = data.choices?.[0]?.message?.content ?? "";
+  }
+  return { data, content };
 }
 
 function downscaleForVlm(buffer: Buffer, scale: number): Buffer {
@@ -959,7 +1007,7 @@ async function runRegionDiffAnalysis(
     model,
     out: null,
     format: "json",
-    maxTokens: options.maxTokens ?? 600,
+    maxTokens: options.maxTokens ?? DEFAULT_REGION_DIFF_MAX_TOKENS,
     maxImageEdge: DEFAULT_REGION_DIFF_MAX_IMAGE_EDGE,
     dryRun: false,
   };
@@ -968,8 +1016,7 @@ async function runRegionDiffAnalysis(
   if (!apiKey) {
     throw new Error("OPENROUTER_API_KEY is required for region diff analysis");
   }
-  const data = await callOpenRouterRegionDiff(body, apiKey);
-  const content = data.choices?.[0]?.message?.content ?? "";
+  const { data, content } = await callRegionDiffWithTruncationRetry(body, apiKey, args.maxTokens);
   const [baselinePng, variantPng] = await Promise.all([
     readPng(args.baseline!),
     readPng(args.variant!),
@@ -993,7 +1040,7 @@ async function callOpenRouterRegionDiff(
   body: Record<string, unknown>,
   apiKey: string,
 ): Promise<{
-  choices?: Array<{ message?: { content?: string } }>;
+  choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
   usage?: { total_tokens?: number; cost?: number; prompt_tokens?: number; completion_tokens?: number };
 }> {
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -1009,7 +1056,7 @@ async function callOpenRouterRegionDiff(
     throw new Error(`OpenRouter ${response.status}: ${text.slice(0, 500)}`);
   }
   return await response.json() as {
-    choices?: Array<{ message?: { content?: string } }>;
+    choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
     usage?: { total_tokens?: number; cost?: number; prompt_tokens?: number; completion_tokens?: number };
   };
 }
@@ -1086,6 +1133,7 @@ export {
   DEFAULT_REGION_DIFF_MODEL,
   buildStructuredRegionChanges,
   computeRegionImageScale,
+  isTruncatedRegionDiffResponse,
   scaleRegionBboxesToOriginal,
   enrichRegionColorsWithBboxSamples,
   formatRegionDiffMarkdown,
@@ -1126,8 +1174,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   if (!apiKey) {
     throw new Error("OPENROUTER_API_KEY is required (or pass --dry-run to skip the call)");
   }
-  const data = await callOpenRouterRegionDiff(body, apiKey);
-  const content = data.choices?.[0]?.message?.content ?? "";
+  const { data, content } = await callRegionDiffWithTruncationRetry(body, apiKey, args.maxTokens);
   let parsed = scaleRegionBboxesToOriginal(parseVlmResponse(content), imageScale);
   let variantPng: PNG | null = null;
   if (!args.triptych && args.baseline && args.variant) {
