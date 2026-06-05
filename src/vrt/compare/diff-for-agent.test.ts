@@ -187,6 +187,17 @@ describe("formatMigrationReportForAgent", () => {
 
   it("surfaces VLM region-diff handoff summaries with artifact paths", () => {
     const md = formatMigrationReportForAgent(sampleReport({
+      authoredStyleDiff: [{
+        variantFile: "working.html",
+        result: {
+          totalDiffs: 1,
+          byProperty: [{ property: "background-color", count: 1 }],
+          bySelector: [{ selector: ".cta", count: 1 }],
+          entries: [
+            { selector: ".cta", property: "background-color", baseline: "#2d69ec", variant: "#f04b4b" },
+          ],
+        },
+      }],
       regionDiffs: [{
         variantFile: "working.html",
         perViewport: [{
@@ -201,8 +212,8 @@ describe("formatMigrationReportForAgent", () => {
             selectorHint: "primary CTA",
             selectorConfidence: "high",
             property: "background-color",
-            from: "#2d69ec",
-            to: "#f04b4b",
+            from: "#366fed",
+            to: "#f15353",
             averageChannelDelta: 128.67,
             bbox: { left: 170, top: 338, width: 156, height: 50 },
             confidence: "high",
@@ -216,8 +227,12 @@ describe("formatMigrationReportForAgent", () => {
     assert.match(md, /`\.cta`/);
     assert.match(md, /`background-color`/);
     assert.match(md, /`#2d69ec` → `#f04b4b`/);
+    assert.match(md, /authored CSSOM/);
+    assert.match(md, /sampled `#366fed` → `#f15353`/);
     assert.match(md, /working-mobile-region-diff\.json/);
     assert.match(md, /working-mobile-region-diff\.md/);
+    assert.match(md, /Start from the VLM region diff table/);
+    assert.match(md, /`\.cta \{ background-color: #2d69ec; \}`/);
   });
 
   it("emits absolute paths to baseline/current/heatmap PNGs for the worst viewport", () => {

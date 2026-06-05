@@ -158,6 +158,72 @@ describe("buildMigrationFixLoopPrompt", () => {
     assert.match(prompt, /SELECTOR: <css selector>/);
     assert.match(prompt, /MEDIA: <media condition or none>/);
   });
+
+  it("includes VLM region-diff candidates with authored baseline values", () => {
+    const target = selectMigrationFixTarget(createReport());
+    assert.ok(target);
+
+    const report: MigrationCompareReport = {
+      ...createReport(),
+      authoredStyleDiff: [{
+        variantFile: "after.html",
+        result: {
+          entries: [
+            { selector: ".cta", property: "background-color", baseline: "#2d69ec", variant: "#f04b4b" },
+          ],
+        },
+      }],
+      domPositionDiffPerViewport: [{
+        variantFile: "after.html",
+        result: {
+          entries: [
+            {
+              path: "body[0]>a[0]",
+              baselineClasses: "cta",
+              variantClasses: "cta",
+              property: "background-color",
+              baseline: "rgb(45, 105, 236)",
+              variant: "rgb(240, 75, 75)",
+              viewport: "desktop",
+            },
+          ],
+        },
+      }],
+      regionDiffs: [{
+        variantFile: "after.html",
+        perViewport: [{
+          viewport: "desktop",
+          verdict: "diff",
+          summary: "CTA button background color changed.",
+          changeCount: 1,
+          changes: [{
+            selector: ".cta",
+            selectorHint: ".cta",
+            selectorConfidence: "high",
+            property: "background-color",
+            from: "#366fed",
+            to: "#f15353",
+            averageChannelDelta: 124.2,
+            bbox: { left: 80, top: 220, width: 160, height: 44 },
+            confidence: "high",
+          }],
+        }],
+      }],
+    };
+    const prompt = buildMigrationFixLoopPrompt({
+      baselineFile: "before.html",
+      variantFile: "after.html",
+      target,
+      currentCss: ".cta { background-color: #f04b4b; }",
+      regionDiffs: report.regionDiffs,
+      baselineValueIndex: buildBaselineValueIndex(report, "after.html"),
+    });
+
+    assert.match(prompt, /VLM region-diff candidates/);
+    assert.match(prompt, /\.cta \{ background-color \} -> target=`#2d69ec` \(authored\), current=`#f04b4b` \(authored\)/);
+    assert.match(prompt, /sampled=#366fed -> #f15353/);
+    assert.match(prompt, /viewport=desktop/);
+  });
 });
 
 describe("parseMigrationFixResponse", () => {
@@ -459,6 +525,70 @@ describe("buildMigrationFixLoopMultiPrompt", () => {
     assert.match(prompt, /up to 5 high-confidence/);
     assert.match(prompt, /"fixes"/);
     assert.match(prompt, /max-width: 700px/);
+  });
+
+  it("prioritizes VLM region-diff rows before generic baseline tables", () => {
+    const report: MigrationCompareReport = {
+      baseline: "target.html",
+      variants: ["current.html"],
+      viewports: [],
+      results: [],
+      authoredStyleDiff: [{
+        variantFile: "current.html",
+        result: {
+          entries: [
+            { selector: ".cta", property: "background-color", baseline: "#2d69ec", variant: "#f04b4b" },
+          ],
+        },
+      }],
+      regionDiffs: [{
+        variantFile: "current.html",
+        perViewport: [{
+          viewport: "mobile",
+          verdict: "diff",
+          summary: "CTA background differs.",
+          changeCount: 1,
+          changes: [{
+            selector: ".cta",
+            selectorHint: ".cta",
+            selectorConfidence: "high",
+            property: "background-color",
+            from: "#366fed",
+            to: "#f15353",
+            averageChannelDelta: 118.9,
+            bbox: { left: 24, top: 300, width: 144, height: 42 },
+            confidence: "high",
+          }],
+        }],
+      }],
+    };
+    const prompt = buildMigrationFixLoopMultiPrompt({
+      baselineFile: "target.html",
+      variantFile: "current.html",
+      target: {
+        variant: "current",
+        variantFile: "current.html",
+        viewport: "mobile",
+        viewportWidth: 375,
+        diffRatio: 0.16,
+        diffPixels: 1000,
+        dominantCategory: "color-change",
+        categorySummary: "1 color-change",
+        paintTreeSummary: "no changes",
+        paintTreeChangeCount: 0,
+        fixCandidates: [],
+      },
+      currentCss: ".cta { background-color: #f04b4b; }",
+      maxFixes: 5,
+      baselineValueIndex: buildBaselineValueIndex(report, "current.html"),
+      regionDiffs: report.regionDiffs,
+    });
+    const vlmIndex = prompt.indexOf("VLM region-diff candidates");
+    const baselineTableIndex = prompt.indexOf("Report-authoritative baseline values");
+    assert.ok(vlmIndex >= 0);
+    assert.ok(baselineTableIndex >= 0);
+    assert.ok(vlmIndex < baselineTableIndex, "VLM handoff should appear before generic baseline rows");
+    assert.match(prompt, /\.cta \{ background-color \} -> target=`#2d69ec` \(authored\), current=`#f04b4b` \(authored\)/);
   });
 });
 

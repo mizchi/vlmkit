@@ -73,9 +73,7 @@ async function main() {
   }
 
   const useMultiMode = PROPOSE_ONLY || MAX_FIXES > 1;
-  const baselineIndex = useMultiMode
-    ? buildBaselineValueIndex(report, target.variantFile)
-    : null;
+  const baselineIndex = buildBaselineValueIndex(report, target.variantFile);
   const prompt = useMultiMode
     ? buildMigrationFixLoopMultiPrompt({
         baselineFile: basename(baselinePath),
@@ -83,13 +81,16 @@ async function main() {
         target,
         currentCss,
         maxFixes: MAX_FIXES,
-        baselineValueIndex: baselineIndex ?? undefined,
+        baselineValueIndex: baselineIndex,
+        regionDiffs: report.regionDiffs,
       })
     : buildMigrationFixLoopPrompt({
         baselineFile: basename(baselinePath),
         variantFile: basename(variantPath),
         target,
         currentCss,
+        baselineValueIndex: baselineIndex,
+        regionDiffs: report.regionDiffs,
       });
 
   if (PROMPT_OUT) {
@@ -125,7 +126,7 @@ async function main() {
     // Correct LLM proposals against the report's authoritative baseline
     // values. Prevents value hallucinations like `font: 800 48px/1` when
     // the report only knows specific computed sub-properties.
-    const index = baselineIndex ?? buildBaselineValueIndex(report, target.variantFile);
+    const index = baselineIndex;
     const correction = correctMigrationFixesWithReport(rawFixes, index, {
       viewport: target.viewport,
       currentCss,

@@ -293,6 +293,8 @@ export interface MigrationCompareOptions {
   regionDiffModel?: string;
   /** max_tokens for each VLM region-diff request. */
   regionDiffMaxTokens?: number;
+  /** Maximum changed viewports per variant that run VLM region diff. Undefined means no cap. */
+  regionDiffMaxViewports?: number;
   /**
    * Optional analyzer hook for offline dogfood/tests. CLI users leave this
    * unset so region diff calls the default OpenRouter-backed analyzer.
@@ -343,7 +345,21 @@ export function parseMigrationCompareArgs(args: string[]): MigrationCompareOptio
     regionDiffFormat: parseRegionDiffFormat(args),
     regionDiffModel: getArg(args, "region-diff-model", DEFAULT_REGION_DIFF_MODEL),
     regionDiffMaxTokens: parseInt(getArg(args, "region-diff-max-tokens", "600"), 10) || 600,
+    regionDiffMaxViewports: parseOptionalNonNegativeIntArg(args, "region-diff-max-viewports"),
   };
+}
+
+function parseOptionalNonNegativeIntArg(args: string[], name: string): number | undefined {
+  const raw = getArg(args, name, "");
+  if (!raw) return undefined;
+  if (!/^\d+$/.test(raw)) {
+    throw new Error(`invalid --${name}: expected a non-negative integer`);
+  }
+  const value = Number.parseInt(raw, 10);
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`invalid --${name}: expected a non-negative integer`);
+  }
+  return value;
 }
 
 function parseStatesArg(args: string[]): ForcedPseudoState[] | undefined {
@@ -831,7 +847,7 @@ async function main(cliArgs = process.argv.slice(2)) {
     console.log();
     console.log(`Options: [--output-dir path] [--approval approval.json] [--strict]`);
     console.log(`         [--discover-backend auto|regex|crater] [--no-paint-tree] [--no-discover]`);
-    console.log(`         [--region-diff] [--region-diff-format json|markdown|both]`);
+    console.log(`         [--region-diff] [--region-diff-format json|markdown|both] [--region-diff-max-viewports n]`);
     process.exit(1);
   }
   await runMigrationCompare(options);
@@ -856,6 +872,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
   const regionDiffFormat = options.regionDiffFormat ?? "both";
   const regionDiffModel = options.regionDiffModel ?? DEFAULT_REGION_DIFF_MODEL;
   const regionDiffMaxTokens = options.regionDiffMaxTokens ?? 600;
+  const regionDiffMaxViewports = options.regionDiffMaxViewports;
   const regionDiffAnalyzer = options.regionDiffAnalyzer ?? runRegionDiffAnalysis;
 
   await mkdir(outputDir, { recursive: true });
@@ -1220,6 +1237,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       let variantHtml: string;
       const variantName = variant.label;
       const regionDiffPerViewport: MigrationRegionDiffViewportReport[] = [];
+      let regionDiffViewportCount = 0;
 
       if (variant.url) {
         variantHtml = ""; // captured via goto
@@ -1484,7 +1502,12 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           shiftRegionsByVp.set(vp.label, diffReport.shiftRegions);
         }
 
-        if (regionDiffEnabled && diffRatio > 0) {
+        if (
+          regionDiffEnabled
+          && diffRatio > 0
+          && (regionDiffMaxViewports === undefined || regionDiffViewportCount < regionDiffMaxViewports)
+        ) {
+          regionDiffViewportCount++;
           try {
             const regionSummary = await writeMigrationRegionDiffArtifacts({
               baselinePath: baselineScreenshots.get(vp.label)!,

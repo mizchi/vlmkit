@@ -25,6 +25,31 @@ export interface MigrationCompareReportResult {
   fixCandidates: MigrationFixCandidate[];
 }
 
+export type MigrationRegionDiffConfidence = "high" | "medium" | "low";
+
+export interface MigrationRegionDiffChange {
+  selector: string | null;
+  selectorHint: string;
+  selectorConfidence?: MigrationRegionDiffConfidence;
+  property: string;
+  from: string | null;
+  to: string | null;
+  averageChannelDelta: number | null;
+  bbox: { left: number; top: number; width: number; height: number } | null;
+  confidence: MigrationRegionDiffConfidence;
+}
+
+export interface MigrationRegionDiffViewportReport {
+  viewport: string;
+  jsonPath?: string;
+  markdownPath?: string;
+  verdict?: "diff" | "no-diff" | "uncertain";
+  summary?: string;
+  changeCount: number;
+  changes: MigrationRegionDiffChange[];
+  error?: string;
+}
+
 export interface MigrationCompareReport {
   dir?: string;
   baseline: string;
@@ -58,6 +83,11 @@ export interface MigrationCompareReport {
   domPositionDiffPerViewport?: Array<{
     variantFile: string;
     result?: { entries?: Array<{ path: string; baselineClasses?: string; variantClasses?: string; property: string; baseline: string; variant: string; viewport: string }> };
+  }>;
+  /** VLM region-diff handoff rows: selector/property hints derived from changed screenshot regions. */
+  regionDiffs?: Array<{
+    variantFile: string;
+    perViewport: MigrationRegionDiffViewportReport[];
   }>;
   results: MigrationCompareReportResult[];
 }
@@ -144,11 +174,145 @@ export function summarizeMigrationReportConvergence(
   };
 }
 
+function isPromptAuthoredCssSelector(selector: string): boolean {
+  if (!selector) return false;
+  if (/[>\[\]]/.test(selector)) return false; // path-style report identifiers are not writable CSS
+  if (/^\.[A-Za-z][\w-]*(\.[A-Za-z][\w-]*)*$/.test(selector)) return true;
+  if (/^#[A-Za-z][\w-]*$/.test(selector)) return true;
+  if (/^[a-zA-Z][\w-]*$/.test(selector)) return true;
+  if (selector === ":root" || selector === "html") return true;
+  return false;
+}
+
+const PROMPT_AUTHORED_PROPERTIES = new Set([
+  "color", "background-color", "border-color",
+  "border-top-color", "border-right-color", "border-bottom-color", "border-left-color",
+  "background", "border", "outline-color", "fill",
+  "padding", "padding-top", "padding-right", "padding-bottom", "padding-left",
+  "margin", "margin-top", "margin-right", "margin-bottom", "margin-left",
+  "gap", "row-gap", "column-gap",
+  "font-size", "font-weight", "font-family", "line-height", "letter-spacing",
+  "text-align", "text-transform", "text-decoration",
+  "border-radius", "border-width", "border-style",
+  "opacity", "visibility", "display", "flex-direction", "justify-content", "align-items",
+  "box-shadow",
+  "grid-template-columns", "grid-template-rows", "grid-template-areas",
+  "grid-auto-columns", "grid-auto-rows", "grid-auto-flow",
+  "grid-column", "grid-row", "grid-column-start", "grid-row-start",
+  "flex", "flex-basis", "flex-grow", "flex-shrink", "flex-wrap",
+  "aspect-ratio", "place-items", "place-content", "place-self",
+  "align-content", "align-self", "justify-self", "justify-items",
+]);
+
+function isPromptAuthoredProperty(property: string): boolean {
+  return PROMPT_AUTHORED_PROPERTIES.has(property);
+}
+
+function confidenceRank(confidence: MigrationRegionDiffConfidence | undefined): number {
+  if (confidence === "high") return 3;
+  if (confidence === "medium") return 2;
+  if (confidence === "low") return 1;
+  return 0;
+}
+
+function formatBacktickedValue(value: string | null): string {
+  return value === null || value === "" ? "`unknown`" : `\`${value}\``;
+}
+
+function formatRegionDiffBbox(bbox: MigrationRegionDiffChange["bbox"]): string {
+  if (!bbox) return "n/a";
+  return `${Math.round(bbox.left)},${Math.round(bbox.top)} ${Math.round(bbox.width)}x${Math.round(bbox.height)}`;
+}
+
+function resolveRegionDiffPromptValues(
+  selector: string,
+  property: string,
+  viewport: string,
+  change: MigrationRegionDiffChange,
+  index: BaselineValueIndex | undefined,
+): {
+  target: string | null;
+  targetSource: "authored" | "report" | "sampled";
+  current: string | null;
+  currentSource: "authored" | "report" | "sampled";
+} {
+  const key = `${selector} ${property}`;
+  const viewportKey = `${key} ${viewport}`;
+  const authored = index?.authoredKeys.has(key) ?? false;
+  const indexedTarget = index
+    ? (authored ? (index.global.get(key) ?? null) : (index.byViewport.get(viewportKey) ?? index.global.get(key) ?? null))
+    : null;
+  const indexedCurrent = index?.variantValues.get(key) ?? null;
+  return {
+    target: indexedTarget ?? change.from,
+    targetSource: indexedTarget ? (authored ? "authored" : "report") : "sampled",
+    current: indexedCurrent ?? change.to,
+    currentSource: indexedCurrent ? (authored ? "authored" : "report") : "sampled",
+  };
+}
+
+function buildRegionDiffPromptLines(input: {
+  target: SelectedMigrationFixTarget;
+  regionDiffs?: MigrationCompareReport["regionDiffs"];
+  baselineValueIndex?: BaselineValueIndex;
+  limit?: number;
+}): string[] {
+  const summary = (input.regionDiffs ?? []).find((entry) => entry.variantFile === input.target.variantFile);
+  if (!summary) return [];
+  const rows = summary.perViewport.flatMap((entry) =>
+    entry.changes.map((change) => ({ viewport: entry.viewport, change }))
+  )
+    .map((row) => ({
+      ...row,
+      selector: row.change.selector ?? row.change.selectorHint,
+    }))
+    .filter((row) => isPromptAuthoredCssSelector(row.selector))
+    .filter((row) => isPromptAuthoredProperty(row.change.property))
+    .sort((left, right) => {
+      const leftTarget = left.viewport === input.target.viewport ? 1 : 0;
+      const rightTarget = right.viewport === input.target.viewport ? 1 : 0;
+      if (rightTarget !== leftTarget) return rightTarget - leftTarget;
+      const leftConfidence = confidenceRank(left.change.confidence) + confidenceRank(left.change.selectorConfidence);
+      const rightConfidence = confidenceRank(right.change.confidence) + confidenceRank(right.change.selectorConfidence);
+      if (rightConfidence !== leftConfidence) return rightConfidence - leftConfidence;
+      return (right.change.averageChannelDelta ?? 0) - (left.change.averageChannelDelta ?? 0);
+    });
+  const top = rows.slice(0, input.limit ?? 8);
+  if (top.length === 0) return [];
+  const lines: string[] = [
+    "",
+    `VLM region-diff candidates (${top.length} of ${rows.length}; selector/property handoff from changed screenshot regions):`,
+  ];
+  for (const [index, row] of top.entries()) {
+    const values = resolveRegionDiffPromptValues(
+      row.selector,
+      row.change.property,
+      row.viewport,
+      row.change,
+      input.baselineValueIndex,
+    );
+    const sampled = (row.change.from || row.change.to)
+      ? `; sampled=${row.change.from ?? "unknown"} -> ${row.change.to ?? "unknown"}`
+      : "";
+    const delta = row.change.averageChannelDelta !== null
+      ? `; delta=${row.change.averageChannelDelta.toFixed(1)}`
+      : "";
+    lines.push(
+      `  ${index + 1}. ${row.selector} { ${row.change.property} } -> target=${formatBacktickedValue(values.target)} (${values.targetSource}), current=${formatBacktickedValue(values.current)} (${values.currentSource})${sampled}; viewport=${row.viewport}; confidence=${row.change.confidence}/${row.change.selectorConfidence ?? "unknown"}${delta}; bbox=${formatRegionDiffBbox(row.change.bbox)}`,
+    );
+  }
+  lines.push("Rules: treat these as the highest-priority concrete fixes. Prefer the `target` value, especially when it is marked `(authored)`, because sampled PNG colors can drift from authored CSS literals.");
+  return lines;
+}
+
 export function buildMigrationFixLoopPrompt(input: {
   baselineFile: string;
   variantFile: string;
   target: SelectedMigrationFixTarget;
   currentCss: string;
+  regionDiffs?: MigrationCompareReport["regionDiffs"];
+  /** Authoritative baseline values from the diff report, used to ground VLM handoff values. */
+  baselineValueIndex?: BaselineValueIndex;
 }): string {
   const candidateLines = input.target.fixCandidates.length === 0
     ? ["(no heuristic candidates)"]
@@ -156,6 +320,12 @@ export function buildMigrationFixLoopPrompt(input: {
       const mediaSuffix = candidate.mediaCondition ? ` @media ${candidate.mediaCondition}` : "";
       return `${index + 1}. ${candidate.selector} { ${candidate.property}: ${candidate.value}; }${mediaSuffix} [score=${candidate.score}; ${candidate.reasoning}]`;
     });
+  const regionDiffLines = buildRegionDiffPromptLines({
+    target: input.target,
+    regionDiffs: input.regionDiffs,
+    baselineValueIndex: input.baselineValueIndex,
+    limit: 5,
+  });
 
   return `You are fixing a CSS migration regression.
 
@@ -170,6 +340,7 @@ Paint tree summary: ${input.target.paintTreeSummary}
 
 Top fix candidates:
 ${candidateLines.join("\n")}
+${regionDiffLines.join("\n")}
 
 Current CSS:
 \`\`\`css
@@ -217,6 +388,7 @@ export function buildMigrationFixLoopMultiPrompt(input: {
   maxFixes: number;
   /** Authoritative baseline values from the diff report, used to ground LLM proposals. */
   baselineValueIndex?: BaselineValueIndex;
+  regionDiffs?: MigrationCompareReport["regionDiffs"];
 }): string {
   const candidateLines = input.target.fixCandidates.length === 0
     ? ["(no heuristic candidates)"]
@@ -224,6 +396,12 @@ export function buildMigrationFixLoopMultiPrompt(input: {
       const mediaSuffix = candidate.mediaCondition ? ` @media ${candidate.mediaCondition}` : "";
       return `${index + 1}. ${candidate.selector} { ${candidate.property}: ${candidate.value}; }${mediaSuffix} [score=${candidate.score}; ${candidate.reasoning}]`;
     });
+  const regionDiffLines = buildRegionDiffPromptLines({
+    target: input.target,
+    regionDiffs: input.regionDiffs,
+    baselineValueIndex: input.baselineValueIndex,
+    limit: 12,
+  });
 
   // Pull report-grounded "baseline value table" rows so the LLM never has
   // to hallucinate a value — it can copy verbatim from the table when the
@@ -354,6 +532,7 @@ Paint tree summary: ${input.target.paintTreeSummary}
 
 Top fix candidates:
 ${candidateLines.join("\n")}
+${regionDiffLines.join("\n")}
 ${reportTableLines.join("\n")}
 
 Current CSS:
@@ -419,6 +598,8 @@ export interface BaselineValueIndex {
     baseline: string;
     variant: string;
   }>;
+  /** `(selector, property)` keys whose global/variant values came from authored CSSOM, not sampled/computed pixels. */
+  authoredKeys: Set<string>;
 }
 
 const AUTHORED_MEDIA_SEPARATOR = " :: ";
@@ -458,16 +639,19 @@ export function buildBaselineValueIndex(
   const byViewport = new Map<string, string>();
   const observed = new Map<string, Set<string>>();
   const variantValues = new Map<string, string>();
-  const observeValue = (key: string, value: string) => {
+  const authoredKeys = new Set<string>();
+  const observeValue = (key: string, value: string, options: { override?: boolean } = {}) => {
+    if (authoredKeys.has(key) && !options.override) return;
     let set = observed.get(key);
-    if (!set) {
+    if (!set || options.override) {
       set = new Set();
       observed.set(key, set);
     }
     set.add(value);
   };
-  const observeVariant = (key: string, value: string) => {
-    if (!variantValues.has(key)) variantValues.set(key, value);
+  const observeVariant = (key: string, value: string, options: { override?: boolean } = {}) => {
+    if (authoredKeys.has(key) && !options.override) return;
+    if (options.override || !variantValues.has(key)) variantValues.set(key, value);
   };
   const csd = report.computedStyleDiff ?? [];
   for (const block of csd) {
@@ -504,8 +688,9 @@ export function buildBaselineValueIndex(
         continue;
       }
       const key = `${selector} ${e.property}`;
-      observeValue(key, e.baseline);
-      observeVariant(key, e.variant);
+      authoredKeys.add(key);
+      observeValue(key, e.baseline, { override: true });
+      observeVariant(key, e.variant, { override: true });
     }
   }
   const dpv = report.domPositionDiffPerViewport ?? [];
@@ -520,7 +705,7 @@ export function buildBaselineValueIndex(
         const key = `${sel} ${e.property}`;
         observeValue(key, e.baseline);
         observeVariant(key, e.variant);
-        byViewport.set(`${key} ${e.viewport}`, e.baseline);
+        if (!authoredKeys.has(key)) byViewport.set(`${key} ${e.viewport}`, e.baseline);
       }
     }
   }
@@ -537,7 +722,7 @@ export function buildBaselineValueIndex(
       viewportVariant.set(key, values);
     }
   }
-  return { global, byViewport, viewportVariant, variantValues, authoredMediaScoped };
+  return { global, byViewport, viewportVariant, variantValues, authoredMediaScoped, authoredKeys };
 }
 
 export interface CorrectionResult {

@@ -134,6 +134,7 @@ describe("parseMigrationCompareArgs", () => {
       "--region-diff-format", "markdown",
       "--region-diff-model", "anthropic/custom",
       "--region-diff-max-tokens", "900",
+      "--region-diff-max-viewports", "2",
       "before.html",
       "after.html",
     ]);
@@ -142,6 +143,7 @@ describe("parseMigrationCompareArgs", () => {
     assert.equal(options.regionDiffFormat, "markdown");
     assert.equal(options.regionDiffModel, "anthropic/custom");
     assert.equal(options.regionDiffMaxTokens, 900);
+    assert.equal(options.regionDiffMaxViewports, 2);
   });
 
   it("should reject invalid VLM region diff formats", () => {
