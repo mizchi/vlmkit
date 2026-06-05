@@ -108,6 +108,45 @@ describe("png-diff", () => {
     }
   });
 
+  it("attaches deterministic selector candidates from an elements JSON", async () => {
+    const baselinePath = join(TMP, "baseline-sel.png");
+    const currentPath = join(TMP, "current-sel.png");
+    const elementsPath = join(TMP, "elements.json");
+
+    await rm(TMP, { recursive: true, force: true });
+    await mkdir(TMP, { recursive: true });
+
+    try {
+      // Single-color page; bottom-right cell recolors.
+      const colors: Array<[number, number, number]> = Array.from({ length: 9 }, () => [255, 255, 255]);
+      const changed = [...colors];
+      changed[8] = [180, 209, 250];
+      await encodePng(baselinePath, createPalettePng(120, 120, colors));
+      await encodePng(currentPath, createPalettePng(120, 120, changed));
+      const { writeFile } = await import("node:fs/promises");
+      await writeFile(elementsPath, JSON.stringify([
+        { path: "div.portfolio-caption", tag: "div", classes: "portfolio-caption", left: 80, top: 80, width: 40, height: 40 },
+        { path: "header.masthead", tag: "header", classes: "masthead", left: 0, top: 0, width: 120, height: 40 },
+      ]));
+
+      const result = await runPngDiff({
+        baselinePath,
+        currentPath,
+        outputDir: TMP,
+        threshold: 0.1,
+        skipHeatmap: true,
+        json: false,
+        elementsJson: elementsPath,
+      });
+
+      const withSelector = result.diff.regions.filter((r) => r.selectorCandidate);
+      assert.ok(withSelector.length > 0, "at least one region should get a selector candidate");
+      assert.equal(withSelector[0]!.selectorCandidate!.selector, ".portfolio-caption");
+    } finally {
+      await rm(TMP, { recursive: true, force: true });
+    }
+  });
+
   it("reports baseline/current dimensions and their delta", async () => {
     const baselinePath = join(TMP, "baseline-size.png");
     const currentPath = join(TMP, "current-size.png");
