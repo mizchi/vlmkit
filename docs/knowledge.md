@@ -632,6 +632,40 @@ By fixture:
 - `width` 50% — dead-code when natural size equals CSS width
 - `background` 82% — same as parent color, `pre code` override, etc.
 
+## A/B Controlled Evaluation — control vs vlmkit on an external repo (2026-06-05/06)
+
+First evaluation with a **control arm**: same CSS-regression repair
+task on `startbootstrap-agency` (never in any vlmkit fixture), one
+fresh agent bare-handed (playwright/pngjs/pixelmatch allowed), one
+with vlmkit. Three runs, escalating difficulty. Full series:
+`docs/reports/2026-06-06-ab-external-synthesis.md`.
+
+| run | regression | cost | repair completeness |
+|---|---|---|---|
+| v1 | 1 block deleted | vlmkit **1.8× slower** (diff region crash + truncation workarounds) | tie |
+| v2 | 3 value mutations | parity (after drafts 01–03 fixed) | tie |
+| v3 | 5 subtle mutations | parity | **vlmkit 3/5 vs 2/5**, no screenshots needed |
+
+Standing conclusions:
+
+- **Agent-facing value lives in the deterministic signal layer**
+  (colorSamples, region bboxes, `shift {dx,dy}`, Δheight,
+  `--elements-html` selector candidates). All agent praise across
+  three runs attaches to it. Three independent control agents
+  specified region→selector mapping as their top missing tool before
+  it shipped.
+- **`diff region` (VLM) was net-negative in every run that tried it**
+  — wrong selector attribution, fabricated deltas (drafts 06/09).
+  Steer agents to `diff png` until those land.
+- **Static-capture "pixel-perfect" ≠ fully repaired.** Blind spots
+  observed: JS state classes (navbar-shrink), engine-specific rules
+  (`:-moz-placeholder`), sub-threshold deltas. State-aware /
+  cross-engine capture is the strongest feature argument from the
+  series.
+- Top open item: draft 10 — colorSample must sample **differing
+  pixels only** (whole-region median reported `#ffffff → #ffffff`
+  over a real `#212529 → #090353` change).
+
 ## VLM Model Comparison
 
 ### 2026-05-19 — haiku vs UI-TARS re-bench (post-0.5.0 release)

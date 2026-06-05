@@ -47,7 +47,12 @@ for the full old → new mapping.
 
 ## Features
 
-- **Pixel diff** — pixelmatch v7 + heatmap generation
+- **Pixel diff** — pixelmatch v7 + heatmap generation; per-region
+  measured colors, translation estimates (`shift {dx, dy}`), and
+  deterministic DOM selector candidates (`--elements-html`). This
+  deterministic signal layer is the agent-facing core — see the
+  controlled A/B evaluation in
+  `docs/reports/2026-06-06-ab-external-synthesis.md`.
 - **Computed style diff** — `getComputedStyle` capture including hover/focus states
 - **A11y tree diff** — accessibility snapshot comparison
 - **CSS challenge bench** — automated CSS deletion/recovery with detection rate tracking (96.7%)
@@ -195,6 +200,9 @@ nix run git+https://github.com/mizchi/pkspec  -- check Spec.pkl Test.pkl
 vlmkit diff html <baseline> <variant>          # HTML/URL pair → multi-viewport diff + report.json
 vlmkit diff agent <report.json>                # Render report.json as agent-friendly Markdown
 vlmkit diff png <baseline.png> <current.png>   # Direct PNG pixel diff + heatmap
+  # per region: measured colorSamples, translation estimate (shift dx/dy),
+  # image-size delta; add --elements-html <url> for a deterministic DOM
+  # selector candidate per region (no VLM, no API key)
 vlmkit diff region --baseline a.png --variant b.png [--elements-html current.html|url] [--format markdown] # VLM region diff + selector hints
 vlmkit diff elements [options]                 # Element-level diff with shift isolation
 vlmkit diff browsers <html|url>                # chromium / firefox / webkit parity

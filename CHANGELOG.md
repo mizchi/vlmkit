@@ -3,6 +3,58 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
+## Unreleased
+
+### A/B validation series (control vs vlmkit, external repo)
+
+First controlled evaluation of the product claim "vlmkit makes a
+coding agent better at visual repair": three runs on
+`startbootstrap-agency` with a bare-handed control arm. Result: cost
+parity once v1's friction was fixed, and a repair-quality edge for
+vlmkit in v3 (3/5 vs 2/5 mutations, screenshot-free localization) via
+the deterministic signal layer. The VLM `diff region` path was
+net-negative in every run. Reports:
+`docs/reports/2026-06-06-ab-external-synthesis.md` (+ v1/v2/v3).
+Each fix below cites the agent complaint it answers
+(`docs/issues-drafts/01-12`, 7 still open).
+
+### `diff png`
+
+- Reports baseline/current image dimensions and Δheight (a reflow
+  indicator) in text and `--json` output. (draft 03)
+- Per-region translation estimates: `shift: {dx, dy, confidence}` via
+  mean-subtracted NCC of luminance profiles; semantic classifier
+  reports "Content translated by (+36, +0) px" instead of
+  `element-added` with meaningless identical color samples. (draft 04)
+- `--elements-html <url>` / `--elements-json <path>` /
+  `--elements-viewport <WxH>`: deterministic DOM hit-test attaches a
+  `selectorCandidate` (selector, confidence, coverage) to every diff
+  region — no VLM, no API key. (draft 07)
+- Identical-hex color samples are omitted from descriptions; a
+  measured in-place recolor is no longer masked by the wide-band
+  "layout shift" shape hint.
+
+### `diff region`
+
+- Auto-downscales images so no edge exceeds `--max-image-edge`
+  (default 7500; Anthropic rejects >8000px) and maps VLM bboxes back
+  to original pixel coordinates. Fixes the crash on full-page mobile
+  captures. (draft 01)
+- `--max-tokens` default 600 → 1500; truncated responses
+  (finish_reason=length or mid-JSON cut) retry once with doubled
+  tokens. (draft 02)
+
+### Internal
+
+- `estimateRegionShift` in `@mizchi/vlmkit-core/region-shift.ts`.
+- Region-bbox → DOM-selector matcher extracted to
+  `@mizchi/vlmkit-markup/region-selector-match.ts` (shared by
+  `diff png` and `vlm-region-diff`).
+- `readPngDimensions` exported from `@mizchi/vlmkit-core/image-resize.ts`.
+- A/B harness under `fixtures/ab-external/harness/` (seeded block
+  deletion + value mutation `--mutate N [--subtle]`, deterministic
+  capture, fixed scorer).
+
 ## 0.6.0 — 2026-05-19 (rebrand: vrt → vlmkit)
 
 The project scope had grown well beyond visual regression. Markup

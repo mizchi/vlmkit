@@ -72,6 +72,13 @@ the fix-loop Stage-1 VLM default. It just fails specifically at the
 
 Full bench: `docs/reports/2026-05-23-vlm-region-diff-bakeoff.md`.
 
+**A/B caveat (2026-06-06)**: in the controlled control-vs-vlmkit repair
+runs, `diff region` was net-negative for agent-driven repair in every
+run that tried it (wrong selector attribution, fabricated deltas —
+drafts 06/09). For agent repair loops prefer the deterministic
+`diff png --elements-html` path (selector candidates + shift estimates,
+no VLM). See `docs/reports/2026-06-06-ab-external-synthesis.md`.
+
 ### Stage-2 LLM Recommendations (2026-05-22)
 
 Hard case: `ui-tars-1.5-7b` VLM + various LLMs, seed 11 selector mode.
