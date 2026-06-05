@@ -130,6 +130,9 @@ vlmkit workflow capture --config ./vrt.config.json
 # Prepare a migration diff packet for an external fixer
 pkf run migration-subagent-prepare -- --report test-results/migration/migration-report.json --output test-results/migration/subagent-task.md
 
+# Attach VLM region-diff JSON/Markdown handoff files to a migration compare report
+vlmkit migration compare before.html after.html --region-diff --region-diff-format both
+
 # Measure success rate from before/after migration reports
 pkf run migration-subagent-evaluate -- --before-report test-results/migration/migration-report.json --after-report test-results/migration/migration-report.after.json
 

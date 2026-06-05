@@ -699,8 +699,13 @@
   >   bboxes are joined to DOM element rects to fill `selector` plus
   >   selector evidence.
   >   `--format markdown` renders those changes as an agent-facing table.
+  >   `vlmkit migration compare --region-diff` runs the same split-mode
+  >   analysis for changed viewports, writes per-viewport JSON/Markdown
+  >   artifacts, and stores their paths plus compact `changes[]` summaries
+  >   under `report.regionDiffs`.
   - contributes to: GOAL-AI-FIX-LOOP
   - body: `src/experiments/migration/vlm-region-diff.ts`
+  - body: `src/experiments/migration/migration-compare.ts`
 
 - [ ] **Variant rendering across props** (minor) [draft] — verifies: J3
   > Partial: combine `interact` (drive prop changes) with `component-consistency` (diff each variant) — no first-class props-matrix CLI.

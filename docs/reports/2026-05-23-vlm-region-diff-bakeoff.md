@@ -75,6 +75,9 @@ shift worth investigating?" detector and consult it for `region` names,
   the change receives a concrete selector candidate plus selector
   evidence. `--format markdown` prints the selector/property/from/to
   table for direct agent handoff.
+- Done: `migration-compare --region-diff` runs the same split-mode
+  analysis for changed, unapproved viewports and attaches compact
+  summaries plus JSON/Markdown artifact paths under `report.regionDiffs`.
 - Re-run this bake-off on a genuinely small (<1%) delta fixture before
   trusting any model in that regime — even the haiku-4-5 hit here was on
   a *visible* shift. Sub-1% may flip everyone to `no-diff`.

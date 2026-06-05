@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { describe, it } from "node:test";
 import { DEFAULT_BIDI_URL } from "@mizchi/vlmkit-capture/crater-client.ts";
-import { parseMigrationCompareArgs } from "./migration-compare.ts";
+import {
+  parseMigrationCompareArgs,
+  summarizeMigrationRegionDiffOutput,
+} from "./migration-compare.ts";
 
 describe("parseMigrationCompareArgs", () => {
   it("should parse explicit flags into reusable options", () => {
@@ -123,5 +126,90 @@ describe("parseMigrationCompareArgs", () => {
       "after.html",
     ]);
     assert.equal(optOut.triptych, false);
+  });
+
+  it("should parse optional VLM region diff handoff flags", () => {
+    const options = parseMigrationCompareArgs([
+      "--region-diff",
+      "--region-diff-format", "markdown",
+      "--region-diff-model", "anthropic/custom",
+      "--region-diff-max-tokens", "900",
+      "before.html",
+      "after.html",
+    ]);
+
+    assert.equal(options.regionDiff, true);
+    assert.equal(options.regionDiffFormat, "markdown");
+    assert.equal(options.regionDiffModel, "anthropic/custom");
+    assert.equal(options.regionDiffMaxTokens, 900);
+  });
+
+  it("should reject invalid VLM region diff formats", () => {
+    assert.throws(
+      () => parseMigrationCompareArgs([
+        "--region-diff-format", "xml",
+        "before.html",
+        "after.html",
+      ]),
+      /invalid --region-diff-format/i,
+    );
+  });
+
+  it("summarizes VLM region diff outputs for the migration report", () => {
+    const summary = summarizeMigrationRegionDiffOutput(
+      "desktop",
+      {
+        model: "anthropic/claude-haiku-4-5",
+        mode: "split",
+        usage: null,
+        verdict: "diff",
+        regions: [],
+        summary: "CTA color changed.",
+        changes: [
+          {
+            type: "CHANGE",
+            source: "vlm-region-diff",
+            selector: ".cta",
+            selectorHint: "primary action",
+            selectorConfidence: "high",
+            property: "background-color",
+            from: "#2563eb",
+            to: "#ef4444",
+            delta: { kind: "color", averageChannelDelta: 128.67 },
+            bbox: { left: 170, top: 338, width: 156, height: 50 },
+            region: "primary action",
+            description: "The CTA fill changed from blue to red.",
+            confidence: "high",
+            evidence: {},
+          },
+        ],
+      },
+      {
+        jsonPath: "out/after-desktop-region-diff.json",
+        markdownPath: "out/after-desktop-region-diff.md",
+      },
+    );
+
+    assert.deepEqual(summary, {
+      viewport: "desktop",
+      jsonPath: "out/after-desktop-region-diff.json",
+      markdownPath: "out/after-desktop-region-diff.md",
+      verdict: "diff",
+      summary: "CTA color changed.",
+      changeCount: 1,
+      changes: [
+        {
+          selector: ".cta",
+          selectorHint: "primary action",
+          selectorConfidence: "high",
+          property: "background-color",
+          from: "#2563eb",
+          to: "#ef4444",
+          averageChannelDelta: 128.67,
+          bbox: { left: 170, top: 338, width: 156, height: 50 },
+          confidence: "high",
+        },
+      ],
+    });
   });
 });

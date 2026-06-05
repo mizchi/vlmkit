@@ -1570,6 +1570,10 @@ has been closed (commits `ef95260`, `2656786`, `f934122`, `4e6d45d`,
     `selectorConfidence` / `evidence.selectorMatch` are filled; without
     DOM evidence, selector remains `null`. `--format markdown` renders
     the same data as an agent-facing selector/property/from/to table.
+  - `migration-compare --region-diff` now runs the split-mode region
+    diff on changed, unapproved viewports, writes per-viewport
+    `*-region-diff.json` / `*.md` handoff artifacts, and stores compact
+    summaries plus artifact paths under `report.regionDiffs`.
 
 ### Dashboard (separate repo)
 - [x] Execution result list/search

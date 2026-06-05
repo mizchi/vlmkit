@@ -139,6 +139,15 @@ interface RegionDiffOutput extends VlmReviewResult {
   rawContent?: string;
 }
 
+interface RunRegionDiffAnalysisOptions {
+  baseline: string;
+  variant: string;
+  elements?: RegionElementRect[];
+  model?: string;
+  maxTokens?: number;
+  apiKey?: string;
+}
+
 interface CliArgs {
   baseline: string | null;
   variant: string | null;
@@ -161,7 +170,7 @@ function parseArgs(argv: string[]): CliArgs {
     elementsJson: null,
     elementsHtml: null,
     elementsViewport: null,
-    model: "anthropic/claude-haiku-4-5",
+    model: DEFAULT_REGION_DIFF_MODEL,
     out: null,
     format: "json",
     maxTokens: 600,
@@ -217,6 +226,8 @@ Options:
   }
   return args;
 }
+
+const DEFAULT_REGION_DIFF_MODEL = "anthropic/claude-haiku-4-5";
 
 function ensureArgs(args: CliArgs): void {
   if (args.triptych) return;
@@ -843,6 +854,74 @@ async function resolveRegionElementsForArgs(
   return captureRegionElementsFromHtml(args.elementsHtml, viewport);
 }
 
+async function runRegionDiffAnalysis(
+  options: RunRegionDiffAnalysisOptions,
+): Promise<RegionDiffOutput> {
+  const model = options.model ?? DEFAULT_REGION_DIFF_MODEL;
+  const args: CliArgs = {
+    baseline: resolve(options.baseline),
+    variant: resolve(options.variant),
+    triptych: null,
+    elementsJson: null,
+    elementsHtml: null,
+    elementsViewport: null,
+    model,
+    out: null,
+    format: "json",
+    maxTokens: options.maxTokens ?? 600,
+    dryRun: false,
+  };
+  const body = await buildRequestBody(args);
+  const apiKey = options.apiKey ?? process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENROUTER_API_KEY is required for region diff analysis");
+  }
+  const data = await callOpenRouterRegionDiff(body, apiKey);
+  const content = data.choices?.[0]?.message?.content ?? "";
+  const [baselinePng, variantPng] = await Promise.all([
+    readPng(args.baseline!),
+    readPng(args.variant!),
+  ]);
+  const parsed = enrichRegionColorsWithBboxSamples(
+    parseVlmResponse(content),
+    baselinePng,
+    variantPng,
+  );
+  return {
+    model,
+    mode: "split",
+    usage: data.usage ?? null,
+    ...parsed,
+    changes: buildStructuredRegionChanges(parsed, { elements: options.elements }),
+    rawContent: content,
+  };
+}
+
+async function callOpenRouterRegionDiff(
+  body: Record<string, unknown>,
+  apiKey: string,
+): Promise<{
+  choices?: Array<{ message?: { content?: string } }>;
+  usage?: { total_tokens?: number; cost?: number; prompt_tokens?: number; completion_tokens?: number };
+}> {
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`OpenRouter ${response.status}: ${text.slice(0, 500)}`);
+  }
+  return await response.json() as {
+    choices?: Array<{ message?: { content?: string } }>;
+    usage?: { total_tokens?: number; cost?: number; prompt_tokens?: number; completion_tokens?: number };
+  };
+}
+
 function formatRegionDiffMarkdown(result: RegionDiffOutput): string {
   const lines: string[] = [];
   lines.push("# VLM region diff");
@@ -912,6 +991,7 @@ function formatSelectorEvidence(evidence: RegionSelectorMatchEvidence | undefine
 }
 
 export {
+  DEFAULT_REGION_DIFF_MODEL,
   buildStructuredRegionChanges,
   enrichRegionColorsWithBboxSamples,
   formatRegionDiffMarkdown,
@@ -919,6 +999,7 @@ export {
   parseRegionElementsViewport,
   parseVlmResponse,
   resolveRegionElementsTargetUrl,
+  runRegionDiffAnalysis,
   buildPrompt,
   buildRequestBody,
   type RegionDiff,
@@ -928,6 +1009,7 @@ export {
   type RegionElementsViewport,
   type RegionDiffOutput,
   type RegionStructuredChange,
+  type RunRegionDiffAnalysisOptions,
   type VlmReviewResult,
 };
 
@@ -950,22 +1032,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   if (!apiKey) {
     throw new Error("OPENROUTER_API_KEY is required (or pass --dry-run to skip the call)");
   }
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`OpenRouter ${response.status}: ${text.slice(0, 500)}`);
-  }
-  const data = await response.json() as {
-    choices?: Array<{ message?: { content?: string } }>;
-    usage?: { total_tokens?: number; cost?: number; prompt_tokens?: number; completion_tokens?: number };
-  };
+  const data = await callOpenRouterRegionDiff(body, apiKey);
   const content = data.choices?.[0]?.message?.content ?? "";
   let parsed = parseVlmResponse(content);
   let variantPng: PNG | null = null;
