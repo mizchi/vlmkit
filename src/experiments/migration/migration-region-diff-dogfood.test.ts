@@ -123,7 +123,7 @@ describe("migration compare region-diff dogfood", () => {
     }
   });
 
-  it("caps region-diff analyzer calls across changed viewports", async () => {
+  it("caps region-diff analyzer calls to the worst changed viewports", async () => {
     const outputDir = await mkdtemp(join(tmpdir(), "vlmkit-region-diff-cap-"));
     const oldKey = process.env.OPENROUTER_API_KEY;
     delete process.env.OPENROUTER_API_KEY;
@@ -191,10 +191,10 @@ describe("migration compare region-diff dogfood", () => {
 
       const report = await runMigrationCompare(options);
 
-      assert.deepEqual(analyzerViewports, ["wide"]);
+      assert.deepEqual(analyzerViewports, ["mobile"]);
       assert.equal(report.results.length, 3);
       assert.equal(report.regionDiffs?.[0]?.perViewport.length, 1);
-      assert.equal(report.regionDiffs?.[0]?.perViewport[0]?.viewport, "wide");
+      assert.equal(report.regionDiffs?.[0]?.perViewport[0]?.viewport, "mobile");
     } finally {
       if (oldKey === undefined) {
         delete process.env.OPENROUTER_API_KEY;

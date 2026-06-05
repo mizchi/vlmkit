@@ -1237,7 +1237,15 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       let variantHtml: string;
       const variantName = variant.label;
       const regionDiffPerViewport: MigrationRegionDiffViewportReport[] = [];
-      let regionDiffViewportCount = 0;
+      const regionDiffCandidates: Array<{
+        viewport: string;
+        baselinePath: string;
+        variantPath: string;
+        elements: RegionElementRect[];
+        diffRatio: number;
+        diffPixels: number;
+        order: number;
+      }> = [];
 
       if (variant.url) {
         variantHtml = ""; // captured via goto
@@ -1502,36 +1510,16 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           shiftRegionsByVp.set(vp.label, diffReport.shiftRegions);
         }
 
-        if (
-          regionDiffEnabled
-          && diffRatio > 0
-          && (regionDiffMaxViewports === undefined || regionDiffViewportCount < regionDiffMaxViewports)
-        ) {
-          regionDiffViewportCount++;
-          try {
-            const regionSummary = await writeMigrationRegionDiffArtifacts({
-              baselinePath: baselineScreenshots.get(vp.label)!,
-              variantPath: variantScreenshotPath,
-              elements: variantBboxesByVp.get(vp.label) ?? [],
-              outputDir,
-              variantName,
-              viewport: vp.label,
-              format: regionDiffFormat,
-              model: regionDiffModel,
-              maxTokens: regionDiffMaxTokens,
-              analyzer: regionDiffAnalyzer,
-            });
-            regionDiffPerViewport.push(regionSummary);
-          } catch (error) {
-            const message = String(error);
-            regionDiffPerViewport.push({
-              viewport: vp.label,
-              changeCount: 0,
-              changes: [],
-              error: message,
-            });
-            console.log(`  ${YELLOW}Region diff handoff error (${variantName} / ${vp.label}): ${message}${RESET}`);
-          }
+        if (regionDiffEnabled && diffRatio > 0) {
+          regionDiffCandidates.push({
+            viewport: vp.label,
+            baselinePath: baselineScreenshots.get(vp.label)!,
+            variantPath: variantScreenshotPath,
+            elements: variantBboxesByVp.get(vp.label) ?? [],
+            diffRatio,
+            diffPixels,
+            order: vpIndex,
+          });
         }
 
         const pct = (diffRatio * 100).toFixed(1);
@@ -1570,6 +1558,44 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           process.stdout.write(` ${DIM}[shift ${diffReport.globalShift > 0 ? "+" : ""}${diffReport.globalShift}px → ${compPct}%]${RESET}`);
         }
         console.log();
+      }
+
+      if (regionDiffCandidates.length > 0) {
+        const selectedRegionDiffCandidates = regionDiffMaxViewports === undefined
+          ? regionDiffCandidates
+          : [...regionDiffCandidates]
+            .sort((left, right) => {
+              if (right.diffRatio !== left.diffRatio) return right.diffRatio - left.diffRatio;
+              if (right.diffPixels !== left.diffPixels) return right.diffPixels - left.diffPixels;
+              return left.order - right.order;
+            })
+            .slice(0, regionDiffMaxViewports);
+        for (const candidate of selectedRegionDiffCandidates) {
+          try {
+            const regionSummary = await writeMigrationRegionDiffArtifacts({
+              baselinePath: candidate.baselinePath,
+              variantPath: candidate.variantPath,
+              elements: candidate.elements,
+              outputDir,
+              variantName,
+              viewport: candidate.viewport,
+              format: regionDiffFormat,
+              model: regionDiffModel,
+              maxTokens: regionDiffMaxTokens,
+              analyzer: regionDiffAnalyzer,
+            });
+            regionDiffPerViewport.push(regionSummary);
+          } catch (error) {
+            const message = String(error);
+            regionDiffPerViewport.push({
+              viewport: candidate.viewport,
+              changeCount: 0,
+              changes: [],
+              error: message,
+            });
+            console.log(`  ${YELLOW}Region diff handoff error (${variantName} / ${candidate.viewport}): ${message}${RESET}`);
+          }
+        }
       }
 
       if (regionDiffPerViewport.length > 0) {
