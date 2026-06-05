@@ -38,6 +38,7 @@ describe("vrt CLI tree (cac-based)", () => {
     assert.match(r.stdout, /vlmkit diff <subcommand>/);
     assert.match(r.stdout, /html.*Compare two HTML/);
     assert.match(r.stdout, /png.*Compare existing PNG/);
+    assert.match(r.stdout, /region.*VLM region diff/);
     assert.match(r.stdout, /component.*selector comparison/);
   });
 
@@ -58,6 +59,13 @@ describe("vrt CLI tree (cac-based)", () => {
     const r = runVrt(["diff", "png", "--help"]);
     // png-diff exits 0 after printing help
     assert.match(r.stdout, /vrt png-diff <baseline\.png> <current\.png>/);
+  });
+
+  it("`vrt diff region --help` delegates to the VLM region-diff helper", () => {
+    const r = runVrt(["diff", "region", "--help"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vlmkit diff region --baseline <png> --variant <png>/);
+    assert.match(r.stdout, /--triptych <path>/);
   });
 
   it("`vrt diff component --help` delegates to element-level comparison help", () => {

@@ -689,12 +689,13 @@
   - body: _not yet implemented_
 
 - [ ] **VLM-extracted structured diff from before/after PNG** — verifies: AIFIX-001
-  >   Stage 1 of the 2-stage pipeline: a vision-language model is
-  >   shown the diff image and returns a structured list of
-  >   CHANGE entries (selector + property + delta). Default
-  >   VLM is meta-llama/llama-4-scout (docs/knowledge.md).
+  >   Partial: `vlmkit diff region --baseline a.png --variant b.png`
+  >   asks a VLM for changed region names and bboxes, then overwrites
+  >   `baselineColor` / `variantColor` with client-side PNG samples.
+  >   The selector + property + delta CHANGE format is still a downstream
+  >   fix-loop integration target.
   - contributes to: GOAL-AI-FIX-LOOP
-  - body: _not yet implemented_
+  - body: `src/experiments/migration/vlm-region-diff.ts`
 
 - [ ] **Variant rendering across props** (minor) [draft] — verifies: J3
   > Partial: combine `interact` (drive prop changes) with `component-consistency` (diff each variant) — no first-class props-matrix CLI.
@@ -769,7 +770,7 @@
 - **A8** — Extract a single component from a page screenshot
   - _No active implementation._
 - **AIFIX-001** — VLM-extracted structured diff from before/after PNG
-  - code: `packages/vrt-ai/src/reasoning-pipeline.ts`
+  - code: `src/experiments/migration/vlm-region-diff.ts`
 - **AIFIX-002** — LLM-synthesised CSS patch from structured diff
   - code: `src/experiments/css-challenge/fix-loop.ts`
 - **AIFIX-003** — VLM benchmarking: cost / latency / CHANGE count per model

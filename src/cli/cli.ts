@@ -111,6 +111,7 @@ const SPECS: Record<string, Spec> = {
   snapshotReport: spec("snapshot-report", () => import("../vrt/snapshot/snapshot-report.ts")),
   migrationBlind: spec("migration-blind", () => import("../experiments/migration/migration-blind.ts")),
   migrationSubagent: spec("migration-subagent", () => import("../experiments/migration/migration-subagent.ts")),
+  vlmRegionDiff: spec("vlm-region-diff", () => import("../experiments/migration/vlm-region-diff.ts")),
   elementCompare: spec("element-compare", () => import("@mizchi/vlmkit-core/element-compare.ts")),
   smokeRunner: spec("smoke-runner", () => import("@mizchi/vlmkit-markup/inspect/smoke-runner.ts")),
   flipbook: spec("flipbook-cli", () => import("./commands/flipbook-cli.ts")),
@@ -147,6 +148,7 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
   diff: {
     html: { spec: SPECS.migrationCompare, desc: "Compare two HTML files / URLs across viewports" },
     png: { spec: SPECS.pngDiff, desc: "Compare existing PNG screenshots directly" },
+    region: { spec: SPECS.vlmRegionDiff, desc: "VLM region diff from before/after PNGs" },
     elements: { spec: SPECS.elementCompare, desc: "Element-level comparison with shift isolation" },
     component: { spec: SPECS.elementCompare, desc: "Component selector comparison with shift isolation" },
     browsers: { spec: SPECS.crossBrowser, desc: "Render in chromium / firefox / webkit and diff" },
@@ -299,7 +301,7 @@ VLM-driven frontend toolkit. Visual regression (snapshot / diff /
 regression-watch) + markup synthesis + design audits + CSS auto-repair.
 
 Common command groups:
-  vlmkit diff html|png|elements|component|browsers|agent|runs
+  vlmkit diff html|png|region|elements|component|browsers|agent|runs
   vlmkit check a11y|tokens|theme|motion|crater|perf|drift
   vlmkit inspect interact|explore|smoke
   vlmkit stress i18n|media

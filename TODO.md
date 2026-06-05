@@ -1541,18 +1541,26 @@ has been closed (commits `ef95260`, `2656786`, `f934122`, `4e6d45d`,
   `authoredStyleDiffPerViewport` in `migration-report.json`. `vrt
   diff-for-agent` renders an "Authored CSS deltas (CSSOM)" table
   alongside the verified computed-style section.
-- [ ] **`vlm-region-diff` client-side bbox pixel sampling.** Bake-off
+- [x] **`vlm-region-diff` client-side bbox pixel sampling.** Bake-off
   done (`docs/reports/2026-05-23-vlm-region-diff-bakeoff.md`): on the
   expressive-menu 86%-changed pair `anthropic/claude-haiku-4-5` is the
   only model whose `verdict` tracked ground truth; `ui-tars`, `qwen3-vl-30b`
   and `gemini-2.5-flash` returned `no-diff` (or self-contradicting
   `diff`-with-same-colors). Default flipped to `claude-haiku-4-5` and
   `.claude/CLAUDE.md` notes the role split (fix-loop VLM vs region-diff
-  VLM). Per-channel hex from haiku-4-5 is still off by ~±10; remaining
-  work is to pixel-sample colors at the model-identified bbox client-side
-  and overwrite `baselineColor`/`variantColor` before downstream uses,
-  so the JSON becomes trustworthy enough to auto-feed the fix-loop
-  (currently informational only).
+  VLM). Per-channel hex from haiku-4-5 was off by ~±10, so the fix is
+  to trust the model for region naming / bbox localization and measure
+  colors client-side before downstream use.
+  - `vlm-region-diff` now asks the VLM for `bbox` in image pixel
+    coordinates, parses object/array bbox forms, and in split-PNG mode
+    samples colors from both PNGs client-side.
+  - Sampled colors overwrite `baselineColor` / `variantColor`, with
+    `colorSample: { source: "bbox-average", pixelCount,
+    totalPixelCount, changedPixelCount, averageChannelDelta }` added so
+    downstream can tell measured colors from VLM guesses. The sampler
+    averages changed pixels inside the bbox first, then falls back to
+    the full bbox when no changed pixels are present. Triptych mode
+    remains informational because the coordinate space is ambiguous.
 
 ### Dashboard (separate repo)
 - [x] Execution result list/search

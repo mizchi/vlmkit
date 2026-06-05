@@ -54,18 +54,19 @@ shift worth investigating?" detector and consult it for `region` names,
   what is unambiguously a ~6% palette shift across the entire image.
   Cheap, but the cheapness is wasted when the answer is wrong.
 - **Color literals**: never trust the VLM. The
-  `vlm-region-diff` `baseline+variant` PNG split mode should be paired
-  with client-side pixel sampling at the bbox the VLM points at (already
-  on the TODO list as "split-PNG mode + pixel sampling at bbox").
+  `vlm-region-diff` `baseline+variant` PNG split mode now asks the model
+  for a bbox, then overwrites `baselineColor` / `variantColor` with
+  client-side PNG samples. The sampler averages changed pixels inside
+  the bbox first, then falls back to the full bbox when no changed
+  pixels are present.
 
 ## Follow-ups
 
-- Promote `claude-haiku-4-5` to the `vlm-region-diff` default in the
-  CLI (currently `bytedance/ui-tars-1.5-7b`). Document the change in
-  `.claude/CLAUDE.md`.
-- Implement the client-side pixel sampler at returned bbox coords so the
-  `baselineColor` / `variantColor` fields can be overwritten with actual
-  measurements before the result is consumed downstream.
+- Done: `claude-haiku-4-5` is the `vlm-region-diff` default.
+- Done: split-PNG mode now samples returned bbox coords client-side and
+  annotates the result with `colorSample.pixelCount`,
+  `colorSample.totalPixelCount`, `colorSample.changedPixelCount`, and
+  `colorSample.averageChannelDelta`.
 - Re-run this bake-off on a genuinely small (<1%) delta fixture before
   trusting any model in that regime — even the haiku-4-5 hit here was on
   a *visible* shift. Sub-1% may flip everyone to `no-diff`.
