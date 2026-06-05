@@ -195,6 +195,12 @@ describe("migration compare region-diff dogfood", () => {
       assert.equal(report.results.length, 3);
       assert.equal(report.regionDiffs?.[0]?.perViewport.length, 1);
       assert.equal(report.regionDiffs?.[0]?.perViewport[0]?.viewport, "mobile");
+      assert.equal(report.regionDiffs?.[0]?.maxViewports, 1);
+      const skipped = report.regionDiffs?.[0]?.skippedViewports ?? [];
+      assert.deepEqual(skipped.map((entry) => entry.viewport).sort(), ["desktop", "wide"]);
+      assert.ok(skipped.every((entry) => entry.reason === "region-diff-max-viewports"));
+      assert.ok(skipped.every((entry) => entry.diffRatio > 0));
+      assert.ok(skipped.every((entry) => entry.diffPixels > 0));
     } finally {
       if (oldKey === undefined) {
         delete process.env.OPENROUTER_API_KEY;

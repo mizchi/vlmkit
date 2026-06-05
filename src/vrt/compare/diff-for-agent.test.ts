@@ -200,6 +200,11 @@ describe("formatMigrationReportForAgent", () => {
       }],
       regionDiffs: [{
         variantFile: "working.html",
+        maxViewports: 1,
+        skippedViewports: [
+          { viewport: "desktop", diffRatio: 0.2398, diffPixels: 30, reason: "region-diff-max-viewports" },
+          { viewport: "wide", diffRatio: 0.0312, diffPixels: 12, reason: "region-diff-max-viewports" },
+        ],
         perViewport: [{
           viewport: "mobile",
           jsonPath: "/work/fix/out/working-mobile-region-diff.json",
@@ -231,6 +236,11 @@ describe("formatMigrationReportForAgent", () => {
     assert.match(md, /sampled `#366fed` → `#f15353`/);
     assert.match(md, /working-mobile-region-diff\.json/);
     assert.match(md, /working-mobile-region-diff\.md/);
+    assert.match(md, /Region diff cap/);
+    assert.match(md, /--region-diff-max-viewports=1/);
+    assert.match(md, /skipped 2 changed viewport/);
+    assert.match(md, /`desktop` 23\.98%/);
+    assert.match(md, /`wide` 3\.12%/);
     assert.match(md, /Start from the VLM region diff table/);
     assert.match(md, /`\.cta \{ background-color: #2d69ec; \}`/);
   });

@@ -588,6 +588,13 @@ export interface MigrationRegionDiffViewportReport {
   error?: string;
 }
 
+export interface MigrationRegionDiffSkippedViewport {
+  viewport: string;
+  diffRatio: number;
+  diffPixels: number;
+  reason: "region-diff-max-viewports";
+}
+
 export interface MigrationCompareReport {
   dir: string;
   baseline: string;
@@ -756,7 +763,9 @@ export interface MigrationCompareReport {
    */
   regionDiffs?: Array<{
     variantFile: string;
+    maxViewports?: number;
     perViewport: MigrationRegionDiffViewportReport[];
+    skippedViewports?: MigrationRegionDiffSkippedViewport[];
   }>;
   /**
    * Wireframe-mode fix suggestions emitted by
@@ -1222,7 +1231,12 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       variantFile: string;
       perViewport: Array<{ viewport: string; baseline: PaletteColor[]; variant: PaletteColor[]; diff: PaletteDiff }>;
     }> = [];
-    const regionDiffReports: Array<{ variantFile: string; perViewport: MigrationRegionDiffViewportReport[] }> = [];
+    const regionDiffReports: Array<{
+      variantFile: string;
+      maxViewports?: number;
+      perViewport: MigrationRegionDiffViewportReport[];
+      skippedViewports?: MigrationRegionDiffSkippedViewport[];
+    }> = [];
     const wireframeFixReports: Array<{ variantFile: string; suggestions: WireframeFixSuggestion[] }> = [];
     const stateDiffsReports: Array<{
       variantFile: string;
@@ -1237,6 +1251,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       let variantHtml: string;
       const variantName = variant.label;
       const regionDiffPerViewport: MigrationRegionDiffViewportReport[] = [];
+      const regionDiffSkippedViewports: MigrationRegionDiffSkippedViewport[] = [];
       const regionDiffCandidates: Array<{
         viewport: string;
         baselinePath: string;
@@ -1561,15 +1576,27 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       }
 
       if (regionDiffCandidates.length > 0) {
-        const selectedRegionDiffCandidates = regionDiffMaxViewports === undefined
+        const orderedRegionDiffCandidates = regionDiffMaxViewports === undefined
           ? regionDiffCandidates
           : [...regionDiffCandidates]
             .sort((left, right) => {
               if (right.diffRatio !== left.diffRatio) return right.diffRatio - left.diffRatio;
               if (right.diffPixels !== left.diffPixels) return right.diffPixels - left.diffPixels;
               return left.order - right.order;
-            })
-            .slice(0, regionDiffMaxViewports);
+            });
+        const selectedRegionDiffCandidates = regionDiffMaxViewports === undefined
+          ? orderedRegionDiffCandidates
+          : orderedRegionDiffCandidates.slice(0, regionDiffMaxViewports);
+        if (regionDiffMaxViewports !== undefined) {
+          for (const candidate of orderedRegionDiffCandidates.slice(regionDiffMaxViewports)) {
+            regionDiffSkippedViewports.push({
+              viewport: candidate.viewport,
+              diffRatio: candidate.diffRatio,
+              diffPixels: candidate.diffPixels,
+              reason: "region-diff-max-viewports",
+            });
+          }
+        }
         for (const candidate of selectedRegionDiffCandidates) {
           try {
             const regionSummary = await writeMigrationRegionDiffArtifacts({
@@ -1598,13 +1625,20 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         }
       }
 
-      if (regionDiffPerViewport.length > 0) {
+      if (regionDiffPerViewport.length > 0 || regionDiffSkippedViewports.length > 0) {
         regionDiffReports.push({
           variantFile: variant.url || variant.file,
+          maxViewports: regionDiffMaxViewports,
           perViewport: regionDiffPerViewport,
+          skippedViewports: regionDiffSkippedViewports.length > 0
+            ? regionDiffSkippedViewports
+            : undefined,
         });
         const okCount = regionDiffPerViewport.filter((entry) => !entry.error).length;
-        console.log(`  ${DIM}Region diff handoff: ${okCount}/${regionDiffPerViewport.length} viewport artifact(s)${RESET}`);
+        const skippedText = regionDiffSkippedViewports.length > 0
+          ? `, skipped ${regionDiffSkippedViewports.length} by cap`
+          : "";
+        console.log(`  ${DIM}Region diff handoff: ${okCount}/${regionDiffPerViewport.length} viewport artifact(s)${skippedText}${RESET}`);
       }
 
       // DOM-equivalence preflight comparison (variant-side completion)
