@@ -1,5 +1,6 @@
 import type { VrtDiff, VrtSnapshot, DiffRegion, DiffRegionType, DiffReport, ShiftRegion, DiffRegionColor } from "./types.ts";
 import { type PngData, cropImage, decodePng, encodePng } from "./png-utils.ts";
+import { estimateRegionShift } from "./region-shift.ts";
 
 // ---- Shared diff pipeline ----
 
@@ -76,6 +77,7 @@ export async function compareScreenshots(
   const r = await runPixelDiff(snapshot.baselinePath, snapshot.screenshotPath, snapshot.testId, opts);
   const regions = detectDiffRegions(r.diffOutput, r.width, r.height);
   attachRegionColorSamples(regions, r.resizedBaseline, r.resizedCurrent);
+  attachRegionShiftEstimates(regions, r.resizedBaseline, r.resizedCurrent);
 
   return {
     snapshot,
@@ -191,6 +193,18 @@ function attachRegionColorSamples(
       current: currentColor,
       distance: Math.round(rgbDistance(baselineColor, currentColor)),
     };
+  }
+}
+
+function attachRegionShiftEstimates(
+  regions: DiffRegion[],
+  baseline: PngData,
+  current: PngData,
+): void {
+  for (const region of regions) {
+    if (region.regionType === "edge") continue;
+    const shift = estimateRegionShift(baseline, current, region);
+    if (shift) region.shift = shift;
   }
 }
 

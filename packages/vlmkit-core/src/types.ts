@@ -79,6 +79,27 @@ export interface DiffRegion {
   diffPixelCount: number;
   regionType?: DiffRegionType;
   colorSample?: DiffRegionColorSample;
+  /** Translation estimate when the region is better explained by movement than recolor. */
+  shift?: DiffRegionShift;
+  /** Deterministic DOM hit-test result for this region's bbox (diff png --elements-*). */
+  selectorCandidate?: DiffRegionSelectorCandidate;
+}
+
+export interface DiffRegionShift {
+  /** Content moved by +dx px horizontally in current (vs baseline). */
+  dx: number;
+  /** Content moved by +dy px vertically in current (vs baseline). */
+  dy: number;
+  confidence: number;
+}
+
+export interface DiffRegionSelectorCandidate {
+  selector: string;
+  confidence: "high" | "medium" | "low";
+  path: string;
+  tag: string;
+  regionCoverage: number;
+  elementCoverage: number;
 }
 
 export interface DiffRegionColor {

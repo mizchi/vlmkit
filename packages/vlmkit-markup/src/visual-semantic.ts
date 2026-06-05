@@ -38,8 +38,27 @@ export function classifyVisualDiff(diff: VrtDiff): VisualSemanticDiff {
 }
 
 function classifyRegion(region: DiffRegion, diff: VrtDiff): VisualSemanticChange {
+  // A measured translation beats the shape/color heuristics: a moved
+  // element samples near-identical colors on both sides, which the
+  // policy would misread as element-added (A/B validation v1/v2).
+  if (region.shift && (region.shift.dx !== 0 || region.shift.dy !== 0)) {
+    return {
+      type: "layout-shift",
+      region,
+      confidence: region.shift.confidence,
+      description: describeShift(region),
+    };
+  }
+
+  // Shape says "wide band = shift", but if the pixels recolored in place
+  // (large color delta, no measured movement) the shape hint is wrong —
+  // a full-width background recolor has the same silhouette.
+  const recoloredInPlace = !region.shift
+    && region.colorSample !== undefined
+    && region.colorSample.distance >= 24;
+
   const policy = classifyRegionPolicy({
-    regionType: region.regionType === "shift" ? "shift" : undefined,
+    regionType: region.regionType === "shift" && !recoloredInPlace ? "shift" : undefined,
     width: region.width,
     height: region.height,
     diffPixelCount: region.diffPixelCount,
@@ -90,8 +109,21 @@ function describeChange(
   }
 }
 
+function describeShift(region: DiffRegion): string {
+  const shift = region.shift!;
+  const fmt = (v: number) => (v >= 0 ? `+${v}` : String(v));
+  const offset = `${fmt(shift.dx)}, ${fmt(shift.dy)}`;
+  const recolor = region.colorSample && region.colorSample.distance >= 24
+    ? `${formatColorSample(region)} (also recolored)`
+    : "";
+  return `Content translated by (${offset}) px at (${region.x}, ${region.y}), ${region.width}x${region.height}${recolor}`;
+}
+
 function formatColorSample(region: DiffRegion): string {
   if (!region.colorSample) return "";
+  // Identical samples carry zero information — the usual signature of a
+  // position shift over a shared background. Omit rather than mislead.
+  if (region.colorSample.baseline.hex === region.colorSample.current.hex) return "";
   return `, ${region.colorSample.baseline.hex} -> ${region.colorSample.current.hex}`;
 }
 

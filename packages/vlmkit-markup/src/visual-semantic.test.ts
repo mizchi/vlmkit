@@ -66,6 +66,68 @@ describe("classifyVisualDiff", () => {
     assert.match(result.changes[0].description, /#6b7280 -> #8c9099/);
   });
 
+  it("classifies a region with a translation estimate as layout-shift with offset", () => {
+    const diff = makeDiff([
+      {
+        x: 555,
+        y: 3488,
+        width: 224,
+        height: 192,
+        diffPixelCount: 9000,
+        shift: { dx: 36, dy: 0, confidence: 0.91 },
+        colorSample: {
+          baseline: { r: 255, g: 255, b: 255, hex: "#ffffff" },
+          current: { r: 255, g: 255, b: 255, hex: "#ffffff" },
+          distance: 0,
+        },
+      },
+    ]);
+    const result = classifyVisualDiff(diff);
+    assert.equal(result.changes[0].type, "layout-shift");
+    assert.match(result.changes[0].description, /\+36/);
+    assert.doesNotMatch(result.changes[0].description, /#ffffff -> #ffffff/);
+  });
+
+  it("does not call a recolored band a layout shift when no movement was measured", () => {
+    const diff = makeDiff([
+      {
+        x: 64,
+        y: 1888,
+        width: 1152,
+        height: 160,
+        diffPixelCount: 150000,
+        regionType: "shift",
+        colorSample: {
+          baseline: { r: 248, g: 249, b: 250, hex: "#f8f9fa" },
+          current: { r: 180, g: 209, b: 250, hex: "#b4d1fa" },
+          distance: 79,
+        },
+      },
+    ]);
+    const result = classifyVisualDiff(diff);
+    assert.notEqual(result.changes[0].type, "layout-shift");
+    assert.match(result.changes[0].description, /#f8f9fa -> #b4d1fa/);
+  });
+
+  it("omits identical color samples from element-added descriptions", () => {
+    const diff = makeDiff([
+      {
+        x: 10,
+        y: 10,
+        width: 300,
+        height: 300,
+        diffPixelCount: 5000,
+        colorSample: {
+          baseline: { r: 255, g: 255, b: 255, hex: "#ffffff" },
+          current: { r: 255, g: 255, b: 255, hex: "#ffffff" },
+          distance: 0,
+        },
+      },
+    ]);
+    const result = classifyVisualDiff(diff);
+    assert.doesNotMatch(result.changes[0].description, /#ffffff -> #ffffff/);
+  });
+
   it("should classify large region as layout-shift", () => {
     const diff = makeDiff([
       { x: 0, y: 0, width: 1000, height: 500, diffPixelCount: 100000 },
