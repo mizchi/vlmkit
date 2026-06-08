@@ -17,3 +17,15 @@ colorSamples show before ≈ after, demote/drop a `color` claim and
 re-ask or fall back to `layout`. Long-term: constrain the VLM to
 verdict + region naming and let measured pixels supply all numbers
 (the direction `vlm-region-diff` docs already recommend).
+
+---
+
+**Status (2026-06-08)**: Partially resolved via a deterministic
+refutation gate (`PIXEL_REFUTE_FLOOR = 3` in vlm-region-diff.ts). When a
+region carries a measured `bbox-average` colorSample whose
+`averageChannelDelta` falls below the floor, the change is marked
+`verification.refuted`, demoted to `confidence: low`, and moved out of the
+confident markdown table into an "Unverified — measured pixels refute the
+VLM claim" section. This catches fabricated color deltas where the pixels
+show before ≈ after. The deeper fix (constrain the VLM to verdict + region
+naming, never let it name property/number) is still future work.

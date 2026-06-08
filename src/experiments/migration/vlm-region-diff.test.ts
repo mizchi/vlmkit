@@ -317,6 +317,11 @@ describe("buildStructuredRegionChanges", () => {
         region: "hero panel",
         description: "The hero panel background is lighter.",
         confidence: "high",
+        verification: {
+          measuredDelta: 51,
+          refuted: false,
+          floor: 3,
+        },
         evidence: {
           colorSample: {
             source: "bbox-average",
@@ -328,6 +333,62 @@ describe("buildStructuredRegionChanges", () => {
         },
       },
     ]);
+  });
+
+  it("refutes a region whose measured pixels show no change (draft 09)", () => {
+    // The VLM placed the bbox in the wrong page area, so the measured
+    // colorSample shows ~zero delta. The pixels refute the claim — it must
+    // not stay a confident finding.
+    const changes = buildStructuredRegionChanges({
+      verdict: "diff",
+      regions: [
+        {
+          region: "portfolio labels",
+          bbox: { left: 0, top: 0, width: 40, height: 20 },
+          baselineColor: "#252327",
+          variantColor: "#252328",
+          description: "labels white -> light blue",
+          colorSample: {
+            source: "bbox-average",
+            pixelCount: 800,
+            totalPixelCount: 800,
+            changedPixelCount: 0,
+            averageChannelDelta: 0.33,
+          },
+        },
+      ],
+      summary: "One claimed color change",
+    });
+
+    assert.equal(changes[0]?.confidence, "low");
+    assert.equal(changes[0]?.verification?.refuted, true);
+    assert.equal(changes[0]?.verification?.measuredDelta, 0.33);
+  });
+
+  it("keeps a region whose measured pixels confirm the change (draft 09)", () => {
+    const changes = buildStructuredRegionChanges({
+      verdict: "diff",
+      regions: [
+        {
+          region: "hero panel",
+          bbox: { left: 10, top: 20, width: 30, height: 40 },
+          baselineColor: "#112233",
+          variantColor: "#445566",
+          description: "background is lighter",
+          colorSample: {
+            source: "bbox-average",
+            pixelCount: 12,
+            totalPixelCount: 20,
+            changedPixelCount: 12,
+            averageChannelDelta: 51,
+          },
+        },
+      ],
+      summary: "One confirmed color change",
+    });
+
+    assert.equal(changes[0]?.verification?.refuted, false);
+    assert.equal(changes[0]?.confidence, "high");
   });
 
   it("infers text and border properties from VLM region wording", () => {
@@ -659,6 +720,62 @@ describe("formatRegionDiffMarkdown", () => {
     assert.match(markdown, /\| Selector \| Property \| From \| To \| Delta \| Bbox \| Confidence \| Evidence \|/);
     assert.match(markdown, /\| `\.cta` \| `background-color` \| `#112233` \| `#445566` \| 51 \| `10,20 30x40` \| high \/ high \| `button` `body\[0\]>button\[0\]` /);
     assert.match(markdown, /The CTA background is lighter\./);
+  });
+
+  it("separates pixel-refuted changes from the confident table (drafts 06/09)", () => {
+    const markdown = formatRegionDiffMarkdown({
+      model: "anthropic/claude-haiku-4-5",
+      mode: "split",
+      usage: null,
+      verdict: "diff",
+      regions: [],
+      summary: "One confirmed, one refuted.",
+      changes: [
+        {
+          type: "CHANGE",
+          source: "vlm-region-diff",
+          selector: ".cta",
+          selectorHint: "primary action",
+          property: "background-color",
+          from: "#112233",
+          to: "#445566",
+          delta: { kind: "color", averageChannelDelta: 51 },
+          bbox: { left: 10, top: 20, width: 30, height: 40 },
+          region: "primary action",
+          description: "The CTA background is lighter.",
+          confidence: "high",
+          verification: { measuredDelta: 51, refuted: false, floor: 3 },
+          evidence: {},
+        },
+        {
+          type: "CHANGE",
+          source: "vlm-region-diff",
+          selector: ".masthead",
+          selectorHint: "portfolio labels",
+          property: "background-color",
+          from: "#252327",
+          to: "#252328",
+          delta: { kind: "color", averageChannelDelta: 0.33 },
+          bbox: { left: 0, top: 0, width: 40, height: 20 },
+          region: "portfolio labels",
+          description: "labels white -> light blue",
+          confidence: "low",
+          verification: { measuredDelta: 0.33, refuted: true, floor: 3 },
+          evidence: {},
+        },
+      ],
+      rawContent: "{}",
+    });
+
+    // Confident table holds only the confirmed change.
+    assert.match(markdown, /`\.cta`/);
+    // The refuted row is moved out of the confident table into a clearly
+    // labeled unverified section that warns the pixels disagree.
+    assert.match(markdown, /[Uu]nverified|pixels refute|measured pixels disagree/);
+    assert.match(markdown, /`\.masthead`/);
+    // The refuted selector must not appear in the confident table body.
+    const confidentTable = markdown.split(/##/)[0]!;
+    assert.doesNotMatch(confidentTable, /`\.masthead`/);
   });
 
   it("renders no-change results without an empty table", () => {

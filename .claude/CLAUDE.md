@@ -79,6 +79,15 @@ drafts 06/09). For agent repair loops prefer the deterministic
 `diff png --elements-html` path (selector candidates + shift estimates,
 no VLM). See `docs/reports/2026-06-06-ab-external-synthesis.md`.
 
+**Refutation gate (2026-06-08)**: `diff region` now cross-checks each
+VLM claim against the measured bbox pixels. When the measured average
+channel delta is below `PIXEL_REFUTE_FLOOR` (3) the row is demoted to
+`confidence: low`, flagged `verification.refuted` in the JSON report,
+and segregated into an "Unverified — measured pixels refute the VLM
+claim" markdown section. This blunts the worst of 06/09 (zero-delta
+rows no longer read as findings) but the deterministic path is still
+the recommended default.
+
 ### Stage-2 LLM Recommendations (2026-05-22)
 
 Hard case: `ui-tars-1.5-7b` VLM + various LLMs, seed 11 selector mode.

@@ -95,6 +95,18 @@ interface RegionStructuredChange {
   region: string;
   description: string;
   confidence: "high" | "medium" | "low";
+  /**
+   * Deterministic cross-check of the VLM's claim against the measured pixels
+   * in the region's bbox. When `refuted`, the measured average channel delta
+   * fell below `floor` — the pixels themselves show no change, so the VLM's
+   * color/property claim is fabricated or the bbox is misplaced (drafts 06/09).
+   * Present only when a measured bbox-average colorSample exists.
+   */
+  verification?: {
+    measuredDelta: number;
+    refuted: boolean;
+    floor: number;
+  };
   evidence: {
     colorSample?: RegionColorSample;
     selectorMatch?: RegionSelectorMatchEvidence;
@@ -667,6 +679,26 @@ function buildStructuredRegionChanges(
     const evidence: RegionStructuredChange["evidence"] = {};
     if (region.colorSample) evidence.colorSample = region.colorSample;
     if (selectorMatch) evidence.selectorMatch = selectorMatch.evidence;
+
+    // Deterministic cross-check: a measured bbox-average sample whose channel
+    // delta is below the floor means the pixels show no change — the VLM's
+    // claim is fabricated or the bbox is misplaced. Demote it so a zero-delta
+    // row never reads as a confident finding (drafts 06/09).
+    const measured = region.colorSample?.source === "bbox-average"
+      ? region.colorSample.averageChannelDelta
+      : null;
+    const verification = measured !== null
+      ? {
+          measuredDelta: measured,
+          refuted: measured < PIXEL_REFUTE_FLOOR,
+          floor: PIXEL_REFUTE_FLOOR,
+        }
+      : undefined;
+
+    const confidence = verification?.refuted
+      ? "low"
+      : inferRegionChangeConfidence(region, averageDelta);
+
     return {
       type: "CHANGE",
       source: "vlm-region-diff",
@@ -683,11 +715,19 @@ function buildStructuredRegionChanges(
       bbox: region.bbox,
       region: region.region,
       description: region.description,
-      confidence: inferRegionChangeConfidence(region, averageDelta),
+      confidence,
+      ...(verification ? { verification } : {}),
       evidence,
     };
   });
 }
+
+/**
+ * Measured per-channel average delta below which the pixels are treated as
+ * refuting the VLM's claim. Mirrors the `averageChannelDelta > 1` changed-pixel
+ * gate in sampleBboxColorPair, with headroom for antialiasing noise.
+ */
+const PIXEL_REFUTE_FLOOR = 3;
 
 function inferRegionChangeProperty(region: RegionDiff): RegionChangeProperty {
   const text = `${region.region} ${region.description}`.toLowerCase();
@@ -847,27 +887,67 @@ function formatRegionDiffMarkdown(result: RegionDiffOutput): string {
     return lines.join("\n") + "\n";
   }
 
-  lines.push("| Selector | Property | From | To | Delta | Bbox | Confidence | Evidence |");
-  lines.push("|---|---|---|---|---:|---|---|---|");
-  for (const change of result.changes) {
-    lines.push([
-      codeCell(change.selector ?? change.selectorHint),
-      codeCell(change.property),
-      codeCell(change.from),
-      codeCell(change.to),
-      formatDelta(change.delta.averageChannelDelta),
-      codeCell(formatBbox(change.bbox)),
-      escapeMarkdownCell(`${change.confidence}${change.selectorConfidence ? ` / ${change.selectorConfidence}` : ""}`),
-      escapeMarkdownCell(formatSelectorEvidence(change.evidence.selectorMatch)),
-    ].join(" | ").replace(/^/, "| ").replace(/$/, " |"));
+  // Pixels override the VLM: a row the measured bbox sample refuted must not
+  // sit in the confident table steering an agent to a fabricated cause
+  // (drafts 06/09).
+  const confident = result.changes.filter((c) => !c.verification?.refuted);
+  const refuted = result.changes.filter((c) => c.verification?.refuted);
+
+  if (confident.length === 0) {
+    lines.push("No measured-confirmed region changes.");
+  } else {
+    lines.push("| Selector | Property | From | To | Delta | Bbox | Confidence | Evidence |");
+    lines.push("|---|---|---|---|---:|---|---|---|");
+    for (const change of confident) {
+      lines.push(formatRegionChangeRow(change));
+    }
+    lines.push("");
+    for (const change of confident) {
+      if (!change.description) continue;
+      const selector = change.selector ?? change.selectorHint;
+      lines.push(`- ${codeCell(selector)} ${codeCell(change.property)}: ${change.description}`);
+    }
   }
-  lines.push("");
-  for (const change of result.changes) {
-    if (!change.description) continue;
-    const selector = change.selector ?? change.selectorHint;
-    lines.push(`- ${codeCell(selector)} ${codeCell(change.property)}: ${change.description}`);
+
+  if (refuted.length > 0) {
+    lines.push("");
+    lines.push("## Unverified — measured pixels refute the VLM claim");
+    lines.push("");
+    lines.push(
+      `These regions were reported by the VLM but the measured average channel `
+        + `delta in their bbox stayed below ${PIXEL_REFUTE_FLOOR} — the pixels show `
+        + `no change there, so the bbox is likely misplaced or the property is `
+        + `fabricated. Do not treat as findings without independent evidence.`,
+    );
+    lines.push("");
+    lines.push("| Selector | Property | Claimed From | Claimed To | Measured Delta | Bbox |");
+    lines.push("|---|---|---|---|---:|---|");
+    for (const change of refuted) {
+      lines.push([
+        codeCell(change.selector ?? change.selectorHint),
+        codeCell(change.property),
+        codeCell(change.from),
+        codeCell(change.to),
+        formatDelta(change.verification?.measuredDelta ?? change.delta.averageChannelDelta),
+        codeCell(formatBbox(change.bbox)),
+      ].join(" | ").replace(/^/, "| ").replace(/$/, " |"));
+    }
   }
+
   return lines.join("\n") + "\n";
+}
+
+function formatRegionChangeRow(change: RegionStructuredChange): string {
+  return [
+    codeCell(change.selector ?? change.selectorHint),
+    codeCell(change.property),
+    codeCell(change.from),
+    codeCell(change.to),
+    formatDelta(change.delta.averageChannelDelta),
+    codeCell(formatBbox(change.bbox)),
+    escapeMarkdownCell(`${change.confidence}${change.selectorConfidence ? ` / ${change.selectorConfidence}` : ""}`),
+    escapeMarkdownCell(formatSelectorEvidence(change.evidence.selectorMatch)),
+  ].join(" | ").replace(/^/, "| ").replace(/$/, " |");
 }
 
 function codeCell(value: string | null): string {

@@ -575,6 +575,8 @@ export interface MigrationRegionDiffChangeSummary {
   averageChannelDelta: number | null;
   bbox: RegionStructuredChange["bbox"];
   confidence: "high" | "medium" | "low";
+  /** True when the measured bbox pixels refuted the VLM's claim (drafts 06/09). */
+  refuted?: boolean;
 }
 
 export interface MigrationRegionDiffViewportReport {
@@ -802,6 +804,7 @@ export function summarizeMigrationRegionDiffOutput(
       averageChannelDelta: change.delta.averageChannelDelta,
       bbox: change.bbox,
       confidence: change.confidence,
+      ...(change.verification?.refuted ? { refuted: true } : {}),
     })),
   };
 }

@@ -22,3 +22,14 @@ below a floor (e.g. 3) — the pixels themselves refute the claim.
 Related: docs/issues-drafts/06 (fabricated property deltas); the
 deterministic mapping in draft 07 would bypass this failure mode
 entirely.
+
+---
+
+**Status (2026-06-08)**: Resolved (failure mode 1). A misplaced bbox
+measures ~zero channel delta; the new refutation gate
+(`PIXEL_REFUTE_FLOOR = 3`) now demotes such rows to `confidence: low`,
+sets `verification.refuted`, surfaces a `refuted` flag in the JSON report,
+and segregates them into an "Unverified" markdown section so a zero-delta
+row no longer reads as a confident finding. Failure mode 2 (a plausible
+selector attached to the wrong bbox) is still best avoided by the
+deterministic `diff png --elements-html` path (draft 07).
