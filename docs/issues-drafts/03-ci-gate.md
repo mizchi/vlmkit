@@ -111,3 +111,16 @@ output" — which doesn't scale to multi-person codebases.
 - baseline-and-approve.md (prerequisite)
 - vrt-watch.md (sibling — both consume the suite definition but
   watch is dev-time, diff-pr is CI-time)
+
+---
+
+**Status (2026-06-08)**: Implemented earlier (config loader,
+per-route thresholds, approval suppression, exit 0/1, markdown summary).
+TOML config now also supported: `vrt.config.toml` is parsed by the
+minimal `toml-min.ts` reader (scalars / arrays / nested tables /
+`[[routes]]` arrays-of-tables with dotted sub-tables). Format is chosen
+by file extension; `findConfigPath` discovers `.json` then `.toml`. No new
+runtime dependency (the repo shares a pnpm store with the old `vrt`
+checkout, so a hand-rolled parser avoided a risky relink). Tests in
+`toml-min.test.ts` + `diff-pr-config.test.ts`. JS-format config remains
+out of scope.

@@ -11,10 +11,15 @@
  *
  * Backward-compatible: a vrt.config that the workflow already uses
  * remains valid here; the new fields are all optional.
+ *
+ * Formats: `vrt.config.json` (default) and `vrt.config.toml` (parsed by
+ * the minimal TOML reader in `toml-min.ts`). Format is chosen by the file
+ * extension; JSON is preferred when both files exist.
  */
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
+import { parseToml } from "./toml-min.ts";
 
 export interface DiffPrRoute {
   name: string;
@@ -113,6 +118,25 @@ export interface DiffPrConfig {
   configPath?: string;
 }
 
+/**
+ * Decode the config text as TOML when the path ends in `.toml`, otherwise
+ * JSON. Without a path (raw string in tests) JSON is assumed.
+ */
+function parseConfigSource(raw: string, configPath?: string): unknown {
+  if (configPath && /\.toml$/i.test(configPath)) {
+    try {
+      return parseToml(raw);
+    } catch (error) {
+      throw new Error(`Invalid vrt.config TOML: ${String(error)}`);
+    }
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`Invalid vrt.config JSON: ${String(error)}`);
+  }
+}
+
 const DEFAULT_THRESHOLDS: Record<string, number> = {
   mobile: 0.01,
   desktop: 0.005,
@@ -121,12 +145,7 @@ const DEFAULT_THRESHOLDS: Record<string, number> = {
 const DEFAULT_BASELINE_DIR = ".vrt/baselines";
 
 export function parseDiffPrConfig(raw: string, configPath?: string): DiffPrConfig {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (error) {
-    throw new Error(`Invalid vrt.config JSON: ${String(error)}`);
-  }
+  const parsed = parseConfigSource(raw, configPath);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error("vrt.config must be an object");
   }
@@ -390,8 +409,12 @@ export function findConfigPath(cwd: string, explicit?: string): string | undefin
     if (!existsSync(abs)) throw new Error(`vrt.config not found: ${abs}`);
     return abs;
   }
-  const candidate = resolve(cwd, "vrt.config.json");
-  return existsSync(candidate) ? candidate : undefined;
+  // Prefer JSON when both exist (back-compat); otherwise pick up TOML.
+  for (const name of ["vrt.config.json", "vrt.config.toml"]) {
+    const candidate = resolve(cwd, name);
+    if (existsSync(candidate)) return candidate;
+  }
+  return undefined;
 }
 
 export function loadDiffPrConfig(configPath: string): DiffPrConfig {

@@ -32,6 +32,52 @@ describe("parseDiffPrConfig", () => {
     assert.equal(resolveThreshold(cfg, cfg.routes[1], "desktop"), 0.02);
   });
 
+  it("parses a TOML config (detected by the .toml path) with per-route overrides", () => {
+    const toml = `
+baseUrl = "http://localhost:3000"
+viewports = ["mobile", "desktop", "wide"]
+baselineDir = ".vrt/goldens"
+
+[thresholds]
+mobile = 0.01
+desktop = 0.005
+wide = 0.005
+
+[a11y]
+level = "AAA"
+
+[[routes]]
+name = "home"
+path = "/"
+
+[[routes]]
+name = "admin"
+path = "/admin"
+[routes.thresholds]
+mobile = 0.03
+desktop = 0.02
+wide = 0.02
+`;
+    const cfg = parseDiffPrConfig(toml, "/tmp/vrt.config.toml");
+    assert.equal(cfg.routes.length, 2);
+    assert.equal(cfg.routes[0].name, "home");
+    assert.equal(cfg.routes[0].url, "http://localhost:3000/");
+    assert.equal(cfg.baselineDir, ".vrt/goldens");
+    assert.deepEqual(cfg.viewports, ["mobile", "desktop", "wide"]);
+    assert.equal(cfg.a11y?.level, "AAA");
+    assert.equal(resolveThreshold(cfg, cfg.routes[0], "mobile"), 0.01);
+    assert.equal(resolveThreshold(cfg, cfg.routes[1], "mobile"), 0.03);
+    assert.equal(resolveThreshold(cfg, cfg.routes[1], "wide"), 0.02);
+  });
+
+  it("still parses JSON when the path is not .toml", () => {
+    const cfg = parseDiffPrConfig(
+      JSON.stringify({ routes: [{ name: "home", url: "http://x/" }] }),
+      "/tmp/vrt.config.json",
+    );
+    assert.equal(cfg.routes[0].name, "home");
+  });
+
   it("accepts routes under `capture.routes` (workflow-config parity)", () => {
     const cfg = parseDiffPrConfig(JSON.stringify({
       baseUrl: "http://localhost:3000",
