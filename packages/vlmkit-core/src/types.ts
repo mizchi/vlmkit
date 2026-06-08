@@ -109,11 +109,22 @@ export interface DiffRegionColor {
   hex: string;
 }
 
-export interface DiffRegionColorSample {
+export interface DiffRegionColorPair {
   baseline: DiffRegionColor;
   current: DiffRegionColor;
-  /** Euclidean RGB distance between sampled baseline and current colors. */
+  /** Euclidean RGB distance between baseline and current. */
   distance: number;
+}
+
+export interface DiffRegionColorSample extends DiffRegionColorPair {
+  /**
+   * The single differing pixel with the largest baseline↔current channel
+   * delta, attached when the differing pixels are sparse (thin glyphs, a
+   * minority background recolor). The region mean is dominated by
+   * antialiasing blends or the unchanged majority; this peak approximates
+   * the glyph / edge core color the mean blurs away (A/B v3 draft 11).
+   */
+  peak?: DiffRegionColorPair;
 }
 
 export interface ShiftRegion {

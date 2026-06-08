@@ -1,4 +1,4 @@
-import type { VrtDiff, VrtSnapshot, DiffRegion, DiffRegionType, DiffReport, ShiftRegion, DiffRegionColor } from "./types.ts";
+import type { VrtDiff, VrtSnapshot, DiffRegion, DiffRegionType, DiffReport, ShiftRegion, DiffRegionColor, DiffRegionColorSample, DiffRegionColorPair } from "./types.ts";
 import { type PngData, cropImage, decodePng, encodePng } from "./png-utils.ts";
 import { estimateRegionShift } from "./region-shift.ts";
 
@@ -185,14 +185,8 @@ function attachRegionColorSamples(
   current: PngData,
 ): void {
   for (const region of regions) {
-    const baselineColor = sampleRegionColor(baseline, region);
-    const currentColor = sampleRegionColor(current, region);
-    if (!baselineColor || !currentColor) continue;
-    region.colorSample = {
-      baseline: baselineColor,
-      current: currentColor,
-      distance: Math.round(rgbDistance(baselineColor, currentColor)),
-    };
+    const sample = sampleRegionColorSample(baseline, current, region);
+    if (sample) region.colorSample = sample;
   }
 }
 
@@ -208,37 +202,123 @@ function attachRegionShiftEstimates(
   }
 }
 
-function sampleRegionColor(image: PngData, region: DiffRegion): DiffRegionColor | undefined {
-  const inset = Math.min(2, Math.floor(Math.min(region.width, region.height) / 4));
-  const x0 = Math.max(0, region.x + inset);
-  const y0 = Math.max(0, region.y + inset);
-  const x1 = Math.min(image.width, region.x + region.width - inset);
-  const y1 = Math.min(image.height, region.y + region.height - inset);
-  if (x1 <= x0 || y1 <= y0) return undefined;
+/** Fraction of a region's opaque pixels below which the change counts as
+ *  "sparse" (thin glyphs, a minority recolor) and a peak pixel is worth
+ *  surfacing alongside the mean. */
+const SPARSE_CHANGE_RATIO = 0.5;
+/** Per-channel mean delta above which a pixel counts as actually changed,
+ *  matching `diff region`'s sampleBboxColorPair gate. */
+const CHANGED_PIXEL_DELTA = 1;
 
-  const stepX = Math.max(1, Math.floor((x1 - x0) / 5));
-  const stepY = Math.max(1, Math.floor((y1 - y0) / 5));
-  const rs: number[] = [];
-  const gs: number[] = [];
-  const bs: number[] = [];
-  for (let y = y0; y < y1; y += stepY) {
-    for (let x = x0; x < x1; x += stepX) {
-      const idx = (y * image.width + x) * 4;
-      if (image.data[idx + 3]! === 0) continue;
-      rs.push(image.data[idx]!);
-      gs.push(image.data[idx + 1]!);
-      bs.push(image.data[idx + 2]!);
+interface ColorAccumulator {
+  br: number;
+  bg: number;
+  bb: number;
+  cr: number;
+  cg: number;
+  cb: number;
+  n: number;
+}
+
+function makeColorAccumulator(): ColorAccumulator {
+  return { br: 0, bg: 0, bb: 0, cr: 0, cg: 0, cb: 0, n: 0 };
+}
+
+function meanPair(acc: ColorAccumulator): DiffRegionColorPair {
+  const baseline = roundColor(acc.br / acc.n, acc.bg / acc.n, acc.bb / acc.n);
+  const current = roundColor(acc.cr / acc.n, acc.cg / acc.n, acc.cb / acc.n);
+  return { baseline, current, distance: Math.round(rgbDistance(baseline, current)) };
+}
+
+function roundColor(r: number, g: number, b: number): DiffRegionColor {
+  const ri = Math.round(r);
+  const gi = Math.round(g);
+  const bi = Math.round(b);
+  return { r: ri, g: gi, b: bi, hex: toHex(ri, gi, bi) };
+}
+
+/**
+ * Sample a region's color pair from the pixels that actually differ.
+ *
+ * A region-wide median (the old behaviour) reflects the unchanged majority
+ * and reads as "no change" on exactly the regions that changed in a minority
+ * of their pixels — e.g. a dark background recolor hidden behind dominant
+ * white form inputs (A/B v3 draft 10). We accumulate only pixels whose
+ * baseline↔current per-channel delta clears CHANGED_PIXEL_DELTA, falling back
+ * to every opaque pixel when nothing clears the gate.
+ *
+ * When the changed pixels are sparse, the mean is still dominated by
+ * antialiasing blends, so we additionally surface the single highest-delta
+ * pixel pair as `peak` (draft 11).
+ */
+export function sampleRegionColorSample(
+  baseline: PngData,
+  current: PngData,
+  region: { x: number; y: number; width: number; height: number },
+): DiffRegionColorSample | undefined {
+  const left = Math.max(0, region.x);
+  const top = Math.max(0, region.y);
+  const right = Math.min(baseline.width, current.width, region.x + region.width);
+  const bottom = Math.min(baseline.height, current.height, region.y + region.height);
+  if (right <= left || bottom <= top) return undefined;
+
+  const all = makeColorAccumulator();
+  const changed = makeColorAccumulator();
+  let peakDelta = -1;
+  let peakBaseline: DiffRegionColor | undefined;
+  let peakCurrent: DiffRegionColor | undefined;
+
+  for (let y = top; y < bottom; y++) {
+    for (let x = left; x < right; x++) {
+      const bi = (y * baseline.width + x) * 4;
+      const ci = (y * current.width + x) * 4;
+      if (baseline.data[bi + 3]! === 0 || current.data[ci + 3]! === 0) continue;
+      const br = baseline.data[bi]!;
+      const bg = baseline.data[bi + 1]!;
+      const bb = baseline.data[bi + 2]!;
+      const cr = current.data[ci]!;
+      const cg = current.data[ci + 1]!;
+      const cb = current.data[ci + 2]!;
+      all.br += br; all.bg += bg; all.bb += bb;
+      all.cr += cr; all.cg += cg; all.cb += cb;
+      all.n++;
+
+      const delta = (Math.abs(br - cr) + Math.abs(bg - cg) + Math.abs(bb - cb)) / 3;
+      if (delta > CHANGED_PIXEL_DELTA) {
+        changed.br += br; changed.bg += bg; changed.bb += bb;
+        changed.cr += cr; changed.cg += cg; changed.cb += cb;
+        changed.n++;
+        if (delta > peakDelta) {
+          peakDelta = delta;
+          peakBaseline = { r: br, g: bg, b: bb, hex: toHex(br, bg, bb) };
+          peakCurrent = { r: cr, g: cg, b: cb, hex: toHex(cr, cg, cb) };
+        }
+      }
     }
   }
-  if (rs.length === 0) return undefined;
-  rs.sort((a, b) => a - b);
-  gs.sort((a, b) => a - b);
-  bs.sort((a, b) => a - b);
-  const mid = rs.length >> 1;
-  const r = rs[mid]!;
-  const g = gs[mid]!;
-  const b = bs[mid]!;
-  return { r, g, b, hex: toHex(r, g, b) };
+
+  if (all.n === 0) return undefined;
+
+  const source = changed.n > 0 ? changed : all;
+  const sample: DiffRegionColorSample = meanPair(source);
+
+  // The peak only adds signal when the mean is unreliable — i.e. the change
+  // is sparse and the peak names a different color than the averaged-out mean.
+  if (
+    changed.n > 0
+    && peakBaseline
+    && peakCurrent
+    && changed.n < all.n * SPARSE_CHANGE_RATIO
+    && (peakBaseline.hex !== sample.baseline.hex || peakCurrent.hex !== sample.current.hex)
+  ) {
+    sample.peak = {
+      baseline: peakBaseline,
+      current: peakCurrent,
+      distance: Math.round(rgbDistance(peakBaseline, peakCurrent)),
+    };
+  }
+
+  return sample;
 }
 
 function toHex(r: number, g: number, b: number): string {

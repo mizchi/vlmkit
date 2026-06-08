@@ -128,6 +128,33 @@ describe("classifyVisualDiff", () => {
     assert.doesNotMatch(result.changes[0].description, /#ffffff -> #ffffff/);
   });
 
+  it("surfaces the peak glyph color on a text-change region (draft 11)", () => {
+    const diff = makeDiff([
+      {
+        x: 50,
+        y: 100,
+        width: 400,
+        height: 20,
+        diffPixelCount: 600,
+        colorSample: {
+          baseline: { r: 200, g: 200, b: 200, hex: "#c8c8c8" },
+          current: { r: 205, g: 195, b: 195, hex: "#cdc3c3" },
+          distance: 9,
+          peak: {
+            baseline: { r: 51, g: 51, b: 51, hex: "#333333" },
+            current: { r: 204, g: 0, b: 0, hex: "#cc0000" },
+            distance: 222,
+          },
+        },
+      },
+    ]);
+    const result = classifyVisualDiff(diff);
+    assert.equal(result.changes[0].type, "text-change");
+    // The glyph core color, not the antialiasing-muddied mean.
+    assert.match(result.changes[0].description, /#333333 -> #cc0000/);
+    assert.doesNotMatch(result.changes[0].description, /#c8c8c8/);
+  });
+
   it("should classify large region as layout-shift", () => {
     const diff = makeDiff([
       { x: 0, y: 0, width: 1000, height: 500, diffPixelCount: 100000 },

@@ -93,7 +93,7 @@ function describeChange(
     case "icon-change":
       return `Small square region changed at ${where}`;
     case "text-change":
-      return `Text-like region changed at ${where}, ${dims}`;
+      return `Text-like region changed at ${where}, ${dims}${formatColorSample(region)}`;
     case "color-change":
       return `Color change in region ${where}, ${dims}, ${(density * 100).toFixed(0)}% density${formatColorSample(region)}`;
     case "element-added":
@@ -121,10 +121,15 @@ function describeShift(region: DiffRegion): string {
 
 function formatColorSample(region: DiffRegion): string {
   if (!region.colorSample) return "";
+  // Prefer the peak pixel pair when present: on sparse changes (thin glyphs,
+  // a minority recolor) the region mean is muddied by antialiasing blends and
+  // names a useless blend color, while the peak recovers the glyph/edge core
+  // (A/B v3 draft 11). On dense changes peak is absent and we use the mean.
+  const pair = region.colorSample.peak ?? region.colorSample;
   // Identical samples carry zero information — the usual signature of a
   // position shift over a shared background. Omit rather than mislead.
-  if (region.colorSample.baseline.hex === region.colorSample.current.hex) return "";
-  return `, ${region.colorSample.baseline.hex} -> ${region.colorSample.current.hex}`;
+  if (pair.baseline.hex === pair.current.hex) return "";
+  return `, ${pair.baseline.hex} -> ${pair.current.hex}`;
 }
 
 /**

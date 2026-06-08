@@ -22,3 +22,10 @@ whole-region median as a secondary `surroundColor` if useful. Note
 `diff region`'s `sampleBboxColorPair` already does exactly this
 (changed-pixels accumulator with `averageChannelDelta > 1` gate) —
 port that approach.
+
+---
+
+**Status (2026-06-08)**: Resolved. `sampleRegionColorSample`
+(vlmkit-core/heatmap.ts) now accumulates only pixels whose baseline↔current
+per-channel delta clears the gate (mean of differing pixels, fallback to the
+whole region when nothing differs). Tests in `region-color-sample.test.ts`.

@@ -18,3 +18,11 @@ differing pixel pair — e.g. the darkest differing pixel in baseline
 vs the same coordinate's current value — which approximates the glyph
 core color. Draft 10 (diff-pixels-only median) is the prerequisite;
 this is the text-specific refinement on top.
+
+---
+
+**Status (2026-06-08)**: Resolved on top of draft 10. The color sample
+now carries an optional `peak` pair — the single highest-delta differing
+pixel — attached when the change is sparse. `formatColorSample`
+(visual-semantic.ts) prefers `peak` over the mean, so text-change regions
+surface the glyph core color instead of an antialiasing-muddied blend.
