@@ -18,3 +18,16 @@ region × viewport presence matrix and annotate viewport-exclusive
 rows with the matching media-query ranges from the stylesheet, e.g.
 `region "timeline circle" present at 1280 only → check @media
 (min-width: 1200px) blocks`.
+
+---
+
+**Status (2026-06-08)**: Resolved. `buildPresenceMatrix` /
+`formatPresenceMatrix` (vlmkit-markup/presence-matrix.ts) cluster the
+regions of N viewport captures by spatial overlap and, for any cluster
+present in a strict subset of viewports, surface the @media breakpoints
+that are active at exactly the present widths (directional: desktop-only →
+min-width, mobile-only → max-width). Reachable via `vlmkit diff matrix
+--viewport <label>:<width>:<baseline>:<current> ... [--css|--html]`.
+Breakpoints come from the existing `extractBreakpoints` extractor. Tests:
+`presence-matrix.test.ts` + the `diff matrix --help` delegation in
+`cli.test.ts`.

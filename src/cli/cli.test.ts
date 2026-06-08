@@ -39,7 +39,15 @@ describe("vrt CLI tree (cac-based)", () => {
     assert.match(r.stdout, /html.*Compare two HTML/);
     assert.match(r.stdout, /png.*Compare existing PNG/);
     assert.match(r.stdout, /region.*VLM region diff/);
+    assert.match(r.stdout, /matrix.*presence matrix/);
     assert.match(r.stdout, /component.*selector comparison/);
+  });
+
+  it("`vrt diff matrix --help` delegates to the presence-matrix helper", () => {
+    const r = runVrt(["diff", "matrix", "--help"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vlmkit diff matrix --viewport/);
+    assert.match(r.stdout, /presence matrix/i);
   });
 
   it("`vrt check` (group) prints group usage including a11y / drift", () => {
