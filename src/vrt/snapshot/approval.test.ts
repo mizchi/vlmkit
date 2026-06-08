@@ -291,6 +291,60 @@ describe("filterApprovedVrtRegions", () => {
   });
 });
 
+describe("filterApprovedVrtRegions region bbox matching", () => {
+  const diff = createDiff({
+    diffPixels: 100,
+    diffRatio: 0.1,
+    regions: [
+      { x: 100, y: 120, width: 220, height: 80, diffPixelCount: 100 },
+    ],
+  });
+
+  it("suppresses a diff region covered by an approved zone", () => {
+    const manifest = parseApprovalManifest(JSON.stringify({
+      rules: [
+        {
+          region: { x: 90, y: 110, width: 240, height: 100 },
+          reason: "marquee animation; intentionally dynamic",
+        },
+      ],
+    }));
+    const result = filterApprovedVrtRegions(diff, manifest, [{}]);
+    assert.equal(result.approved, true);
+    assert.equal(result.approvedRegions.length, 1);
+    assert.equal(result.diff.diffPixels, 0);
+  });
+
+  it("does not suppress a diff region outside the approved zone", () => {
+    const manifest = parseApprovalManifest(JSON.stringify({
+      rules: [
+        {
+          region: { x: 0, y: 0, width: 50, height: 50 },
+          reason: "unrelated zone",
+        },
+      ],
+    }));
+    const result = filterApprovedVrtRegions(diff, manifest, [{}]);
+    assert.equal(result.approved, false);
+    assert.equal(result.remainingRegions.length, 1);
+  });
+
+  it("honors a viewport-scoped region rule only on the matching viewport", () => {
+    const manifest = parseApprovalManifest(JSON.stringify({
+      rules: [
+        {
+          region: { x: 90, y: 110, width: 240, height: 100, viewport: "mobile" },
+          reason: "mobile-only dynamic banner",
+        },
+      ],
+    }));
+    const onMobile = filterApprovedVrtRegions(diff, manifest, [{}], { viewport: "mobile" });
+    assert.equal(onMobile.approved, true);
+    const onDesktop = filterApprovedVrtRegions(diff, manifest, [{}], { viewport: "desktop" });
+    assert.equal(onDesktop.approved, false);
+  });
+});
+
 describe("inferApprovalChangeType", () => {
   it("should infer geometry for spacing properties", () => {
     assert.equal(inferApprovalChangeType("margin-left", "spacing"), "geometry");
@@ -420,9 +474,30 @@ describe("buildApprovalRuleFromInput", () => {
     );
   });
 
-  it("requires a selector and a reason", () => {
-    assert.throws(() => buildApprovalRuleFromInput({ selector: "", reason: "r" }), /selector/i);
+  it("requires a selector or region, and a reason", () => {
+    assert.throws(() => buildApprovalRuleFromInput({ reason: "r" }), /selector or .*region/i);
     assert.throws(() => buildApprovalRuleFromInput({ selector: ".x", reason: "" }), /reason/i);
+  });
+
+  it("builds a region-bbox rule", () => {
+    const rule = buildApprovalRuleFromInput({
+      region: { x: 120, y: 80, width: 200, height: 40, viewport: "mobile" },
+      reason: "marquee; intentionally dynamic",
+    });
+    assert.equal(rule.selector, undefined);
+    assert.deepEqual(rule.region, { x: 120, y: 80, width: 200, height: 40, viewport: "mobile" });
+    assert.equal(rule.reason, "marquee; intentionally dynamic");
+  });
+
+  it("rejects supplying both selector and region", () => {
+    assert.throws(
+      () => buildApprovalRuleFromInput({
+        selector: ".x",
+        region: { x: 0, y: 0, width: 10, height: 10 },
+        reason: "r",
+      }),
+      /both/i,
+    );
   });
 
   it("produces a rule the existing pipeline suppresses", () => {

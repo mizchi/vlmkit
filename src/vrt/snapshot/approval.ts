@@ -30,6 +30,13 @@ export interface ApprovalRule {
   property?: string;
   category?: PropertyCategory;
   changeType?: string;
+  /**
+   * Approve any diff region whose bbox falls within this zone. Unlike the
+   * selector matcher, this needs no DOM — an operator draws a box around an
+   * area (e.g. a marquee) they accept as intentionally dynamic. Optionally
+   * scoped to a single viewport.
+   */
+  region?: ApprovalRegionMatch;
   tolerance?: ApprovalTolerance;
   reason: string;
   issue?: string;
@@ -45,6 +52,48 @@ export interface ApprovalTolerance {
   ratio?: number;
   geometryDelta?: number;
   colorDelta?: number;
+}
+
+export interface ApprovalRegionMatch {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** When set, the rule only applies on this viewport label. */
+  viewport?: string;
+  /** Px the approved zone is inflated by before the coverage test (default 8). */
+  tolerance?: number;
+}
+
+/** Fraction of a diff region that must fall inside the approved zone. */
+const REGION_APPROVAL_COVERAGE = 0.8;
+const REGION_APPROVAL_DEFAULT_TOLERANCE = 8;
+
+/**
+ * True when `region` (a measured diff region) is covered by the approved
+ * `zone` on the current `viewport`. Coverage = fraction of the diff region's
+ * area inside the zone (inflated by the zone's px tolerance). A viewport-
+ * scoped zone only matches its viewport.
+ */
+export function matchesApprovalRegion(
+  zone: ApprovalRegionMatch,
+  region: { x: number; y: number; width: number; height: number },
+  viewport?: string,
+): boolean {
+  if (zone.viewport !== undefined && zone.viewport !== viewport) return false;
+  const tol = zone.tolerance ?? REGION_APPROVAL_DEFAULT_TOLERANCE;
+  const zx = zone.x - tol;
+  const zy = zone.y - tol;
+  const zr = zone.x + zone.width + tol;
+  const zb = zone.y + zone.height + tol;
+
+  const ix = Math.max(region.x, zx);
+  const iy = Math.max(region.y, zy);
+  const ir = Math.min(region.x + region.width, zr);
+  const ib = Math.min(region.y + region.height, zb);
+  const interArea = Math.max(0, ir - ix) * Math.max(0, ib - iy);
+  const regionArea = Math.max(1, region.width * region.height);
+  return interArea / regionArea >= REGION_APPROVAL_COVERAGE;
 }
 
 export interface ApprovalContext {
@@ -181,7 +230,7 @@ export function filterApprovedVrtRegions(
   diff: VrtDiff,
   manifest: ApprovalManifest,
   contexts: ApprovalContext[] = [],
-  opts: { strict?: boolean; now?: Date } = {},
+  opts: { strict?: boolean; now?: Date; viewport?: string } = {},
 ): VrtRegionApprovalResult {
   const warnings = collectApprovalWarnings(manifest, opts);
   if (opts.strict) {
@@ -203,11 +252,16 @@ export function filterApprovedVrtRegions(
   for (const [index, region] of normalizedRegions.entries()) {
     const context = contexts[index] ?? {};
     const regionDiff = createScopedVrtDiff(diff, region);
-    const rules = manifest.rules.filter((rule) =>
-      !isApprovalRuleExpired(rule, opts.now) &&
-      matchesApprovalRule(rule, context) &&
-      approvesVrtDiff(rule, regionDiff)
-    );
+    const rules = manifest.rules.filter((rule) => {
+      if (isApprovalRuleExpired(rule, opts.now)) return false;
+      // A region-bbox rule approves any diff inside its zone — no DOM context
+      // needed. An optional tolerance still bounds the scoped diff.
+      if (rule.region) {
+        return matchesApprovalRegion(rule.region, region, opts.viewport) &&
+          approvesVrtDiff(rule, regionDiff);
+      }
+      return matchesApprovalRule(rule, context) && approvesVrtDiff(rule, regionDiff);
+    });
 
     if (rules.length === 0) {
       remainingRegions.push(region);
@@ -385,6 +439,7 @@ function validateApprovalRule(value: unknown, index: number): ApprovalRule {
     property,
     category,
     changeType,
+    region: validateRegionMatch(rule.region, index),
     tolerance: validateTolerance(rule.tolerance, index),
     reason,
     issue,
@@ -394,8 +449,31 @@ function validateApprovalRule(value: unknown, index: number): ApprovalRule {
   };
 }
 
+function validateRegionMatch(value: unknown, index: number): ApprovalRegionMatch | undefined {
+  if (value === undefined) return undefined;
+  const region = asRecord(value, `approval.rules[${index}].region must be an object`);
+  const num = (key: keyof ApprovalRegionMatch) => {
+    const v = region[key];
+    if (typeof v !== "number" || Number.isNaN(v)) {
+      throw new Error(`approval.rules[${index}].region.${String(key)} must be a number`);
+    }
+    return v;
+  };
+  return {
+    x: num("x"),
+    y: num("y"),
+    width: num("width"),
+    height: num("height"),
+    viewport: asOptionalString(region.viewport, `approval.rules[${index}].region.viewport`),
+    tolerance: asOptionalNumber(region.tolerance, `approval.rules[${index}].region.tolerance`),
+  };
+}
+
 export interface AuthorApprovalRuleInput {
-  selector: string;
+  /** Approve by DOM selector. Mutually exclusive with `region`. */
+  selector?: string;
+  /** Approve by bbox zone. Mutually exclusive with `selector`. */
+  region?: ApprovalRegionMatch;
   reason: string;
   /** Pixel tolerance — diff is suppressed when diffPixels ≤ maxPx. */
   maxPx?: number;
@@ -409,17 +487,22 @@ export interface AuthorApprovalRuleInput {
 }
 
 /**
- * Author a single selector-scoped approval rule from CLI input. The existing
- * pipeline matches by selector (+ optional property/category/changeType) with
- * a pixel/ratio tolerance, so `vrt baseline approve` produces exactly that
- * shape plus the audit fields (acknowledgedBy / createdAt / expires).
- *
- * Region-bbox approval (matching a raw `x,y,w,h`) is intentionally not built
- * here — the pipeline has no bbox matcher, so a geometry-only rule would never
- * suppress anything. Approve by the region's selector instead.
+ * Author a single approval rule from CLI input — scoped either by DOM selector
+ * (the pipeline matches selector + optional property/category/changeType with a
+ * pixel/ratio tolerance) or by a region bbox zone (matches any diff region
+ * inside the zone, optionally viewport-scoped). Exactly one of `selector` /
+ * `region` is required. Audit fields (acknowledgedBy / createdAt / expires)
+ * are recorded as given.
  */
 export function buildApprovalRuleFromInput(input: AuthorApprovalRuleInput): ApprovalRule {
-  const selector = asRequiredString(input.selector, "approve: --selector is required");
+  const hasSelector = typeof input.selector === "string" && input.selector.trim() !== "";
+  const hasRegion = input.region !== undefined;
+  if (hasSelector && hasRegion) {
+    throw new Error("approve: pass either --selector or --region, not both");
+  }
+  if (!hasSelector && !hasRegion) {
+    throw new Error("approve: a --selector or a --region is required");
+  }
   const reason = asRequiredString(input.reason, "approve: --reason is required");
   if (input.expires) parseExpiry(input.expires); // throws on invalid expiry
 
@@ -429,7 +512,8 @@ export function buildApprovalRuleFromInput(input: AuthorApprovalRuleInput): Appr
 
   return {
     kind: input.kind ?? "visual",
-    selector,
+    selector: hasSelector ? input.selector : undefined,
+    region: input.region,
     tolerance: Object.keys(tolerance).length > 0 ? tolerance : undefined,
     reason,
     expires: input.expires,
@@ -704,7 +788,8 @@ function isSameApprovalIdentity(a: ApprovalRule, b: ApprovalRule): boolean {
     a.selector === b.selector &&
     a.property === b.property &&
     a.category === b.category &&
-    a.changeType === b.changeType;
+    a.changeType === b.changeType &&
+    JSON.stringify(a.region) === JSON.stringify(b.region);
 }
 
 const TEXTUAL_PROPERTIES = new Set([

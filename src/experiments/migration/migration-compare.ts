@@ -1437,7 +1437,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             diff,
             approvalManifest,
             buildMigrationRegionApprovalContexts(diff),
-            { strict },
+            { strict, viewport: vp.label },
           )
           : null;
         const finalDiff = approved?.diff ?? diff;

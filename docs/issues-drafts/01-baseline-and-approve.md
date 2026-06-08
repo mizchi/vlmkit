@@ -119,3 +119,14 @@ selector instead. `update` reuses the diff-pr pin path. Tests:
 `approval.test.ts` (schema + builder), `baseline-cli.test.ts` (archive +
 approve CLI). Note: command lives under `vrt baseline approve`, not top-
 level `vrt approve` (that name is taken by the workflow bulk-approve).
+
+**Update (2026-06-08): region-bbox approval now shipped.** `vrt
+baseline approve --region "x=,y=,w=,h=[,viewport=,tol=]"` authors an
+`ApprovalRule.region` zone. `filterApprovedVrtRegions` gained a
+`viewport` opt and a region branch: a diff region is suppressed when ≥80%
+of its area falls inside the zone (inflated by `tolerance`, default 8px)
+and the rule’s viewport matches. `diff-pr` now applies
+`filterApprovedVrtRegions` before the visual gate (empty DOM contexts, so
+region-bbox rules bind in CI even without a selector). Epic 01 is now
+complete bar TOML config (separate, in epic 03). Tests: `approval.test.ts`
+(matcher + builder), `baseline-cli.test.ts` (--region CLI).

@@ -42,7 +42,7 @@ import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { runA11yOnPage } from "./a11y-on-page.ts";
 import { runMediaVariants, type VariantResult, type MediaVariant } from "@mizchi/vlmkit-markup/stress/media-variants.ts";
 import { runCrossBrowser, type EngineName, type EngineResult } from "@mizchi/vlmkit-markup/stress/cross-browser.ts";
-import { filterA11yFindings, filterCrossBrowserFindings, filterMediaVariantFindings, loadApprovalManifest, type ApprovalManifest } from "./vrt/snapshot/approval.ts";
+import { filterA11yFindings, filterApprovedVrtRegions, filterCrossBrowserFindings, filterMediaVariantFindings, loadApprovalManifest, type ApprovalManifest } from "./vrt/snapshot/approval.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import type { ContrastFinding } from "@mizchi/vlmkit-markup/a11y-contrast.ts";
@@ -336,10 +336,17 @@ async function cmdRun(args: string[]): Promise<number> {
           baselinePath,
           status: "changed",
         };
-        const diff = await compareScreenshots(snap, { outputDir: routeOut });
+        const rawDiff = await compareScreenshots(snap, { outputDir: routeOut });
+        // Suppress diffs covered by an approval before gating. Without a DOM
+        // here, selector rules can't bind, but region-bbox rules (the zone
+        // matcher) do — that's the CI consumer of `vrt baseline approve
+        // --region` (A/B epic 01).
+        const diff = rawDiff && manifest
+          ? filterApprovedVrtRegions(rawDiff, manifest, [], { viewport: vp.label }).diff
+          : rawDiff;
         const diffRatio = diff?.diffRatio ?? 0;
         const diffPixels = diff?.diffPixels ?? 0;
-        const totalPixels = diff?.totalPixels ?? 0;
+        const totalPixels = diff?.totalPixels ?? rawDiff?.totalPixels ?? 0;
         const threshold = resolveThreshold(config, route, vp.label);
         const visualPass = diffRatio <= threshold;
         let a11y: PerViewportResult["a11y"];

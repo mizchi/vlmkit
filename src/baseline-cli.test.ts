@@ -112,9 +112,31 @@ describe("vrt baseline approve", () => {
     }
   });
 
-  it("errors without --selector / --reason", () => {
-    const r = runBaseline(["approve", "--selector", ".x"], tmpdir());
+  it("writes a region-bbox approval rule", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "vlmkit-approve-"));
+    try {
+      const r = runBaseline(
+        [
+          "approve",
+          "--region", "x=120,y=80,w=200,h=40,viewport=mobile",
+          "--reason", "marquee; intentionally dynamic",
+        ],
+        dir,
+      );
+      assert.equal(r.status, 0, r.stderr);
+      const manifest = JSON.parse(await readFile(join(dir, "approval.json"), "utf-8"));
+      assert.deepEqual(manifest.rules[0].region, {
+        x: 120, y: 80, width: 200, height: 40, viewport: "mobile",
+      });
+      assert.equal(manifest.rules[0].selector, undefined);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("errors without --selector / --region", () => {
+    const r = runBaseline(["approve", "--reason", "r"], tmpdir());
     assert.equal(r.status, 1);
-    assert.match(r.stderr, /--selector and --reason are required/);
+    assert.match(r.stderr, /--selector or --region/);
   });
 });

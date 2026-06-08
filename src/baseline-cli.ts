@@ -59,6 +59,7 @@ import {
   mergeApprovalManifest,
   parseApprovalManifest,
   type ApprovalManifest,
+  type ApprovalRegionMatch,
   type ApprovalRuleKind,
 } from "./vrt/snapshot/approval.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -230,12 +231,47 @@ function approvalKind(value: string | undefined): ApprovalRuleKind | undefined {
   return value as ApprovalRuleKind | undefined;
 }
 
+/**
+ * Parse `--region "x=120,y=80,w=200,h=40,viewport=mobile[,tol=8]"` into an
+ * ApprovalRegionMatch. Accepts both `w`/`width` and `h`/`height`.
+ */
+function parseRegionArg(value: string): ApprovalRegionMatch {
+  const fields = new Map<string, string>();
+  for (const pair of value.split(",")) {
+    const [k, v] = pair.split("=");
+    if (k && v !== undefined) fields.set(k.trim().toLowerCase(), v.trim());
+  }
+  const num = (keys: string[], label: string): number => {
+    for (const k of keys) {
+      const v = fields.get(k);
+      if (v !== undefined) {
+        const n = Number(v);
+        if (!Number.isFinite(n)) throw new Error(`approve: --region ${label} must be a number`);
+        return n;
+      }
+    }
+    throw new Error(`approve: --region is missing ${label} (expected x=,y=,w=,h=)`);
+  };
+  const region: ApprovalRegionMatch = {
+    x: num(["x"], "x"),
+    y: num(["y"], "y"),
+    width: num(["w", "width"], "w"),
+    height: num(["h", "height"], "h"),
+  };
+  const viewport = fields.get("viewport");
+  if (viewport) region.viewport = viewport;
+  const tol = fields.get("tol") ?? fields.get("tolerance");
+  if (tol !== undefined) region.tolerance = Number(tol);
+  return region;
+}
+
 async function cmdApprove(args: string[]): Promise<number> {
   const selector = getArg(args, "selector");
+  const regionRaw = getArg(args, "region");
   const reason = getArg(args, "reason");
-  if (!selector || !reason) {
-    console.error(`${RED}error:${RESET} --selector and --reason are required`);
-    console.error(`\n  vrt baseline approve --selector <css> --reason <text> [--max-px N] [--max-ratio R] [--expires YYYY-MM-DD] [--acknowledged-by name] [--kind visual] [--manifest approval.json] [--dry-run]`);
+  if ((!selector && !regionRaw) || !reason) {
+    console.error(`${RED}error:${RESET} a --selector or --region, plus --reason, are required`);
+    console.error(`\n  vrt baseline approve (--selector <css> | --region "x=,y=,w=,h=[,viewport=]") --reason <text> [--max-px N] [--max-ratio R] [--expires YYYY-MM-DD] [--acknowledged-by name] [--kind visual] [--manifest approval.json] [--dry-run]`);
     return 1;
   }
   const maxPxRaw = getArg(args, "max-px");
@@ -246,7 +282,8 @@ async function cmdApprove(args: string[]): Promise<number> {
   let rule;
   try {
     rule = buildApprovalRuleFromInput({
-      selector,
+      ...(selector ? { selector } : {}),
+      ...(regionRaw ? { region: parseRegionArg(regionRaw) } : {}),
       reason,
       ...(maxPxRaw !== undefined ? { maxPx: Number(maxPxRaw) } : {}),
       ...(maxRatioRaw !== undefined ? { maxRatio: Number(maxRatioRaw) } : {}),
@@ -279,7 +316,8 @@ async function cmdApprove(args: string[]): Promise<number> {
   }
 
   await writeFile(manifestPath, json);
-  console.log(`  ${GREEN}✓${RESET} approved ${CYAN}${selector}${RESET} in ${manifestPath} (${merged.rules.length} rule(s) total)`);
+  const label = selector ?? `region ${regionRaw}`;
+  console.log(`  ${GREEN}✓${RESET} approved ${CYAN}${label}${RESET} in ${manifestPath} (${merged.rules.length} rule(s) total)`);
   return 0;
 }
 
@@ -301,12 +339,15 @@ Subcommands:
   list    [--config vrt.config.json]
                               Show all pinned baselines.
   rm      <route...>          Remove one or more routes' baselines.
-  approve --selector <css> --reason <text>
+  approve (--selector <css> | --region "x=,y=,w=,h=[,viewport=]")
+          --reason <text>
           [--max-px N] [--max-ratio R] [--expires YYYY-MM-DD]
           [--acknowledged-by name] [--kind visual] [--manifest approval.json]
           [--dry-run]
                               Author an approval.json rule the diff gate
-                              honors (selector-scoped; audit fields recorded).
+                              honors. Scope by DOM selector or by a bbox zone
+                              (any diff inside it is accepted; audit fields
+                              recorded).
 
 \`vrt workflow {init,capture,verify,approve}\` is the legacy vrt-
 internal dogfood path (uses a Playwright spec + bulk approval).
