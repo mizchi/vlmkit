@@ -43,6 +43,8 @@ export function classifyMigrationVisualChange(
       return "color-change";
     case "layout-shift":
       return isSpacingLikeChange(change, diff) ? "spacing" : "layout-shift";
+    case "reflow":
+      return "layout-shift";
     case "element-added":
     case "element-removed":
       return "layout-shift";

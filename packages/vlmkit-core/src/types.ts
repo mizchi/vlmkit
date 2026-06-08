@@ -454,6 +454,7 @@ export type VisualChangeType =
   | "text-change"
   | "color-change"
   | "layout-shift"
+  | "reflow"
   | "element-added"
   | "element-removed"
   | "icon-change";

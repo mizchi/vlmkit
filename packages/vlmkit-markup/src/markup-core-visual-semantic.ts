@@ -74,6 +74,7 @@ export function layoutShiftGroupThreshold(): number {
 function isVisualChangeType(value: string): value is VisualChangeType {
   return (
     value === "layout-shift" ||
+    value === "reflow" ||
     value === "icon-change" ||
     value === "text-change" ||
     value === "color-change" ||

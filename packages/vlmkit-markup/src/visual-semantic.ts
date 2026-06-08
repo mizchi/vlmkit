@@ -42,11 +42,17 @@ function classifyRegion(region: DiffRegion, diff: VrtDiff): VisualSemanticChange
   // element samples near-identical colors on both sides, which the
   // policy would misread as element-added (A/B validation v1/v2).
   if (region.shift && (region.shift.dx !== 0 || region.shift.dy !== 0)) {
+    // A vertical-dominant translation is a reflow: a rule above the region
+    // changed its block height and pushed everything below it down (A/B v1
+    // draft 04). Horizontal-dominant movement keeps the generic layout-shift
+    // label, since reflow specifically means the vertical document flow moved.
+    const s = region.shift;
+    const isReflow = s.dy !== 0 && Math.abs(s.dy) >= Math.abs(s.dx);
     return {
-      type: "layout-shift",
+      type: isReflow ? "reflow" : "layout-shift",
       region,
-      confidence: region.shift.confidence,
-      description: describeShift(region),
+      confidence: s.confidence,
+      description: describeShift(region, isReflow),
     };
   }
 
@@ -94,6 +100,12 @@ function describeChange(
         return `Layout shift region hint at ${where}, ${dims} (wide-band shape; no translation measured — likely reflow or in-place change)`;
       }
       return `Layout shift at ${where}, ${dims}, ${(globalRatio * 100).toFixed(1)}% of total (shape-derived; no translation measured — likely reflow or in-place change)`;
+    case "reflow":
+      // A measured reflow returns early via describeShift; this defensive
+      // branch keeps the switch exhaustive over VisualChangeType.
+      return region.shift
+        ? describeShift(region, true)
+        : `Vertical reflow at ${where}, ${dims}`;
     case "icon-change":
       return `Small square region changed at ${where}`;
     case "text-change":
@@ -113,14 +125,17 @@ function describeChange(
   }
 }
 
-function describeShift(region: DiffRegion): string {
+function describeShift(region: DiffRegion, isReflow = false): string {
   const shift = region.shift!;
   const fmt = (v: number) => (v >= 0 ? `+${v}` : String(v));
   const offset = `${fmt(shift.dx)}, ${fmt(shift.dy)}`;
   const recolor = region.colorSample && region.colorSample.distance >= 24
     ? `${formatColorSample(region)} (also recolored)`
     : "";
-  return `Content translated by (${offset}) px at (${region.x}, ${region.y}), ${region.width}x${region.height}${recolor}`;
+  const lead = isReflow
+    ? `Vertical reflow: content below shifted by ${fmt(shift.dy)}px`
+    : `Content translated by (${offset}) px`;
+  return `${lead} at (${region.x}, ${region.y}), ${region.width}x${region.height}${recolor}`;
 }
 
 function formatColorSample(region: DiffRegion): string {

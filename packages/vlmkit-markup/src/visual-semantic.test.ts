@@ -88,6 +88,43 @@ describe("classifyVisualDiff", () => {
     assert.doesNotMatch(result.changes[0].description, /#ffffff -> #ffffff/);
   });
 
+  it("classifies a vertical-dominant measured shift as reflow (draft 04)", () => {
+    const diff = makeDiff([
+      {
+        x: 0,
+        y: 2000,
+        width: 1200,
+        height: 300,
+        diffPixelCount: 50000,
+        shift: { dx: 0, dy: 120, confidence: 0.88 },
+        colorSample: {
+          baseline: { r: 255, g: 255, b: 255, hex: "#ffffff" },
+          current: { r: 255, g: 255, b: 255, hex: "#ffffff" },
+          distance: 0,
+        },
+      },
+    ]);
+    const result = classifyVisualDiff(diff);
+    assert.equal(result.changes[0].type, "reflow");
+    assert.match(result.changes[0].description, /reflow/i);
+    assert.match(result.changes[0].description, /\+120/);
+  });
+
+  it("keeps a horizontal-dominant measured shift as layout-shift, not reflow", () => {
+    const diff = makeDiff([
+      {
+        x: 555,
+        y: 3488,
+        width: 224,
+        height: 192,
+        diffPixelCount: 9000,
+        shift: { dx: 36, dy: 0, confidence: 0.91 },
+      },
+    ]);
+    const result = classifyVisualDiff(diff);
+    assert.equal(result.changes[0].type, "layout-shift");
+  });
+
   it("does not call a recolored band a layout shift when no movement was measured", () => {
     const diff = makeDiff([
       {
