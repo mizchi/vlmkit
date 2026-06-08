@@ -34,6 +34,10 @@ export interface ApprovalRule {
   reason: string;
   issue?: string;
   expires?: string;
+  /** Audit trail: who signed off on this approval (vrt baseline approve). */
+  acknowledgedBy?: string;
+  /** Audit trail: when the rule was authored (ISO date or datetime). */
+  createdAt?: string;
 }
 
 export interface ApprovalTolerance {
@@ -363,6 +367,8 @@ function validateApprovalRule(value: unknown, index: number): ApprovalRule {
   const issue = asOptionalString(rule.issue, `approval.rules[${index}].issue`);
   const expires = asOptionalString(rule.expires, `approval.rules[${index}].expires`);
   if (expires) parseExpiry(expires);
+  const acknowledgedBy = asOptionalString(rule.acknowledgedBy, `approval.rules[${index}].acknowledgedBy`);
+  const createdAt = asOptionalString(rule.createdAt, `approval.rules[${index}].createdAt`);
   const kindRaw = asOptionalString(rule.kind, `approval.rules[${index}].kind`);
   const VALID_KINDS = new Set([
     "visual", "a11y-contrast", "a11y-touch", "a11y-focus-order", "a11y-semantic",
@@ -383,6 +389,52 @@ function validateApprovalRule(value: unknown, index: number): ApprovalRule {
     reason,
     issue,
     expires,
+    acknowledgedBy,
+    createdAt,
+  };
+}
+
+export interface AuthorApprovalRuleInput {
+  selector: string;
+  reason: string;
+  /** Pixel tolerance — diff is suppressed when diffPixels ≤ maxPx. */
+  maxPx?: number;
+  /** Ratio tolerance — diff is suppressed when diffRatio ≤ maxRatio. */
+  maxRatio?: number;
+  kind?: ApprovalRuleKind;
+  expires?: string;
+  acknowledgedBy?: string;
+  /** ISO date/datetime; the CLI defaults this to the current day. */
+  createdAt?: string;
+}
+
+/**
+ * Author a single selector-scoped approval rule from CLI input. The existing
+ * pipeline matches by selector (+ optional property/category/changeType) with
+ * a pixel/ratio tolerance, so `vrt baseline approve` produces exactly that
+ * shape plus the audit fields (acknowledgedBy / createdAt / expires).
+ *
+ * Region-bbox approval (matching a raw `x,y,w,h`) is intentionally not built
+ * here — the pipeline has no bbox matcher, so a geometry-only rule would never
+ * suppress anything. Approve by the region's selector instead.
+ */
+export function buildApprovalRuleFromInput(input: AuthorApprovalRuleInput): ApprovalRule {
+  const selector = asRequiredString(input.selector, "approve: --selector is required");
+  const reason = asRequiredString(input.reason, "approve: --reason is required");
+  if (input.expires) parseExpiry(input.expires); // throws on invalid expiry
+
+  const tolerance: ApprovalTolerance = {};
+  if (input.maxPx !== undefined) tolerance.pixels = Math.ceil(input.maxPx);
+  if (input.maxRatio !== undefined) tolerance.ratio = roundUp(input.maxRatio, 6);
+
+  return {
+    kind: input.kind ?? "visual",
+    selector,
+    tolerance: Object.keys(tolerance).length > 0 ? tolerance : undefined,
+    reason,
+    expires: input.expires,
+    acknowledgedBy: input.acknowledgedBy,
+    createdAt: input.createdAt,
   };
 }
 

@@ -47,13 +47,20 @@
  */
 
 import { existsSync } from "node:fs";
-import { rm, readdir, stat } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, readdir, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
   findConfigPath,
   loadDiffPrConfig,
   type DiffPrConfig,
 } from "./diff-pr-config.ts";
+import {
+  buildApprovalRuleFromInput,
+  mergeApprovalManifest,
+  parseApprovalManifest,
+  type ApprovalManifest,
+  type ApprovalRuleKind,
+} from "./vrt/snapshot/approval.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 function getArg(args: string[], name: string): string | undefined {
@@ -147,6 +154,135 @@ async function cmdRm(args: string[]): Promise<number> {
   return 0;
 }
 
+/**
+ * Move a route's current baseline PNGs into `_history/<timestamp>/` so a
+ * re-pin (`vrt baseline update`) is reversible. Returns the number of files
+ * archived. Pure file IO — no Playwright — so it is unit-testable.
+ */
+export async function archiveRouteBaselines(
+  routeDir: string,
+  timestamp: string,
+): Promise<number> {
+  if (!existsSync(routeDir)) return 0;
+  const pngs = (await readdir(routeDir)).filter((f) => f.endsWith(".png"));
+  if (pngs.length === 0) return 0;
+  const historyDir = join(routeDir, "_history", timestamp);
+  await mkdir(historyDir, { recursive: true });
+  for (const png of pngs) {
+    await rename(join(routeDir, png), join(historyDir, png));
+  }
+  return pngs.length;
+}
+
+function archiveTimestamp(): string {
+  // ISO without separators that break path segments on any OS.
+  return new Date().toISOString().replace(/[:.]/g, "-");
+}
+
+async function cmdUpdate(args: string[]): Promise<number> {
+  const cwd = process.cwd();
+  const configPath = findConfigPath(cwd, getArg(args, "config"));
+  if (!configPath) {
+    console.error(`${RED}error:${RESET} no vrt.config.json found (and --config not given)`);
+    return 1;
+  }
+  const config = loadDiffPrConfig(configPath);
+  const positional = args.filter((a) => !a.startsWith("--"));
+  const flaggedValues = new Set<string>();
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith("--") && i + 1 < args.length && !args[i + 1].startsWith("--")) {
+      flaggedValues.add(args[i + 1]);
+    }
+  }
+  const targets = positional.filter((p) => !flaggedValues.has(p));
+  const routes = targets.length > 0
+    ? config.routes.filter((r) => targets.includes(r.name))
+    : config.routes;
+  if (targets.length > 0) {
+    const unknown = targets.filter((t) => !config.routes.some((r) => r.name === t));
+    if (unknown.length > 0) {
+      console.error(`${RED}error:${RESET} unknown route(s): ${unknown.join(", ")}`);
+      console.error(`Known routes: ${config.routes.map((r) => r.name).join(", ")}`);
+      return 1;
+    }
+  }
+
+  const baselineRoot = resolve(configBaseDirFor(config), config.baselineDir);
+  const ts = archiveTimestamp();
+  let archivedRoutes = 0;
+  for (const route of routes) {
+    const archived = await archiveRouteBaselines(join(baselineRoot, route.name), ts);
+    if (archived > 0) {
+      archivedRoutes++;
+      console.log(`  ${DIM}archived ${archived} PNG(s) for ${route.name} → _history/${ts}/${RESET}`);
+    }
+  }
+  console.log(`${DIM}Archived previous baselines for ${archivedRoutes} route(s); re-pinning…${RESET}`);
+  console.log();
+
+  // Re-pin via the diff-pr pin path (the same capture machinery `pin` uses).
+  const { main: diffPrMain } = await import("./diff-pr.ts");
+  await diffPrMain(["pin", ...targets, ...(getArg(args, "config") ? ["--config", getArg(args, "config")!] : [])]);
+  return 0;
+}
+
+function approvalKind(value: string | undefined): ApprovalRuleKind | undefined {
+  return value as ApprovalRuleKind | undefined;
+}
+
+async function cmdApprove(args: string[]): Promise<number> {
+  const selector = getArg(args, "selector");
+  const reason = getArg(args, "reason");
+  if (!selector || !reason) {
+    console.error(`${RED}error:${RESET} --selector and --reason are required`);
+    console.error(`\n  vrt baseline approve --selector <css> --reason <text> [--max-px N] [--max-ratio R] [--expires YYYY-MM-DD] [--acknowledged-by name] [--kind visual] [--manifest approval.json] [--dry-run]`);
+    return 1;
+  }
+  const maxPxRaw = getArg(args, "max-px");
+  const maxRatioRaw = getArg(args, "max-ratio");
+  const dryRun = args.includes("--dry-run");
+  const manifestPath = resolve(getArg(args, "manifest") ?? "approval.json");
+
+  let rule;
+  try {
+    rule = buildApprovalRuleFromInput({
+      selector,
+      reason,
+      ...(maxPxRaw !== undefined ? { maxPx: Number(maxPxRaw) } : {}),
+      ...(maxRatioRaw !== undefined ? { maxRatio: Number(maxRatioRaw) } : {}),
+      ...(getArg(args, "expires") ? { expires: getArg(args, "expires")! } : {}),
+      ...(getArg(args, "acknowledged-by") ? { acknowledgedBy: getArg(args, "acknowledged-by")! } : {}),
+      ...(getArg(args, "kind") ? { kind: approvalKind(getArg(args, "kind")) } : {}),
+      createdAt: new Date().toISOString().slice(0, 10),
+    });
+  } catch (error) {
+    console.error(`${RED}error:${RESET} ${error instanceof Error ? error.message : String(error)}`);
+    return 1;
+  }
+
+  let existing: ApprovalManifest = { rules: [] };
+  if (existsSync(manifestPath)) {
+    try {
+      existing = parseApprovalManifest(await readFile(manifestPath, "utf-8"));
+    } catch (error) {
+      console.error(`${RED}error:${RESET} could not read ${manifestPath}: ${error instanceof Error ? error.message : String(error)}`);
+      return 1;
+    }
+  }
+  const merged = mergeApprovalManifest(existing, [rule]);
+  const json = JSON.stringify(merged, null, 2) + "\n";
+
+  if (dryRun) {
+    console.log(`${BOLD}${CYAN}vrt baseline approve${RESET} ${DIM}(dry-run — ${manifestPath})${RESET}`);
+    console.log(json);
+    return 0;
+  }
+
+  await writeFile(manifestPath, json);
+  console.log(`  ${GREEN}✓${RESET} approved ${CYAN}${selector}${RESET} in ${manifestPath} (${merged.rules.length} rule(s) total)`);
+  return 0;
+}
+
 function formatUsage(): string {
   return `vrt baseline <command>
 
@@ -159,9 +295,18 @@ Subcommands:
                               baselines. Alias for \`vrt diff-pr\`.
   post    --pr <ref>          Post the most recent summary.md to a PR.
                               Alias for \`vrt diff-pr post\`.
+  update  [route...] [--config vrt.config.json]
+                              Archive current baselines to _history/<ts>/
+                              and re-pin (reversible golden refresh).
   list    [--config vrt.config.json]
                               Show all pinned baselines.
   rm      <route...>          Remove one or more routes' baselines.
+  approve --selector <css> --reason <text>
+          [--max-px N] [--max-ratio R] [--expires YYYY-MM-DD]
+          [--acknowledged-by name] [--kind visual] [--manifest approval.json]
+          [--dry-run]
+                              Author an approval.json rule the diff gate
+                              honors (selector-scoped; audit fields recorded).
 
 \`vrt workflow {init,capture,verify,approve}\` is the legacy vrt-
 internal dogfood path (uses a Playwright spec + bulk approval).
@@ -188,11 +333,17 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
       await diffPrMain(mapped);
       return;
     }
+    case "update":
+      process.exitCode = await cmdUpdate(rest);
+      return;
     case "list":
       process.exitCode = await cmdList(rest);
       return;
     case "rm":
       process.exitCode = await cmdRm(rest);
+      return;
+    case "approve":
+      process.exitCode = await cmdApprove(rest);
       return;
     default:
       console.error(`Unknown baseline subcommand: ${command}\n`);

@@ -8,6 +8,7 @@ import {
   filterApprovedVrtRegions,
   filterApprovedPaintTreeChanges,
   inferApprovalChangeType,
+  buildApprovalRuleFromInput,
   mergeApprovalManifest,
   normalizeApprovalDecision,
   parseApprovalManifest,
@@ -351,6 +352,92 @@ describe("suggestApprovalRule", () => {
     assert.equal(rule.changeType, "paint");
     assert.equal(rule.tolerance?.colorDelta, 8);
     assert.equal(rule.reason, "known hover palette drift");
+  });
+});
+
+describe("parseApprovalManifest audit fields", () => {
+  it("round-trips acknowledgedBy and createdAt", () => {
+    const manifest = parseApprovalManifest(JSON.stringify({
+      rules: [
+        {
+          selector: ".hero__body",
+          reason: "sub-pixel AA",
+          tolerance: { pixels: 2 },
+          expires: "2026-08-15",
+          acknowledgedBy: "mizchi",
+          createdAt: "2026-06-08",
+        },
+      ],
+    }));
+    assert.equal(manifest.rules[0].acknowledgedBy, "mizchi");
+    assert.equal(manifest.rules[0].createdAt, "2026-06-08");
+  });
+
+  it("rejects a non-string acknowledgedBy", () => {
+    assert.throws(
+      () => parseApprovalManifest(JSON.stringify({
+        rules: [{ selector: ".x", reason: "r", acknowledgedBy: 5 }],
+      })),
+      /acknowledgedBy/i,
+    );
+  });
+});
+
+describe("buildApprovalRuleFromInput", () => {
+  it("builds a selector rule with pixel + ratio tolerance and audit fields", () => {
+    const rule = buildApprovalRuleFromInput({
+      selector: ".hero__body",
+      reason: "sub-pixel AA drift",
+      maxPx: 2,
+      maxRatio: 0.005,
+      expires: "2026-08-15",
+      acknowledgedBy: "mizchi",
+      createdAt: "2026-06-08",
+    });
+    assert.equal(rule.selector, ".hero__body");
+    assert.equal(rule.reason, "sub-pixel AA drift");
+    assert.equal(rule.tolerance?.pixels, 2);
+    assert.equal(rule.tolerance?.ratio, 0.005);
+    assert.equal(rule.expires, "2026-08-15");
+    assert.equal(rule.acknowledgedBy, "mizchi");
+    assert.equal(rule.createdAt, "2026-06-08");
+    assert.equal(rule.kind, "visual");
+  });
+
+  it("passes through a non-visual kind", () => {
+    const rule = buildApprovalRuleFromInput({
+      selector: ".profile__avatar",
+      reason: "intentional low contrast",
+      kind: "a11y-contrast",
+    });
+    assert.equal(rule.kind, "a11y-contrast");
+  });
+
+  it("throws on an invalid expiry date", () => {
+    assert.throws(
+      () => buildApprovalRuleFromInput({ selector: ".x", reason: "r", expires: "not-a-date" }),
+      /expiry/i,
+    );
+  });
+
+  it("requires a selector and a reason", () => {
+    assert.throws(() => buildApprovalRuleFromInput({ selector: "", reason: "r" }), /selector/i);
+    assert.throws(() => buildApprovalRuleFromInput({ selector: ".x", reason: "" }), /reason/i);
+  });
+
+  it("produces a rule the existing pipeline suppresses", () => {
+    const rule = buildApprovalRuleFromInput({
+      selector: ".hero",
+      reason: "ok",
+      maxRatio: 0.05,
+    });
+    const merged = mergeApprovalManifest({ rules: [] }, [rule]);
+    const result = applyApprovalToVrtDiff(
+      createDiff({ diffRatio: 0.04, diffPixels: 40 }),
+      merged,
+      { selector: ".hero" },
+    );
+    assert.equal(result.approved, true);
   });
 });
 

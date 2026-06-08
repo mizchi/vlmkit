@@ -104,3 +104,18 @@ is a personal-developer tool, not a team-owned regression net.
 - `docs/reports/2026-05-15-design-md-scenario-v{1,2,3}.md`
 - `src/approval.ts` (existing region/manifest matcher)
 - agent-d's "641.32px sub-pixel artifact" comment (v3 report)
+
+---
+
+**Status (2026-06-08, partial)**: `vrt baseline approve` ships the
+approval-authoring CLI (`--selector --reason --max-px --max-ratio
+--expires --acknowledged-by --kind --manifest --dry-run`), backed by the
+pure `buildApprovalRuleFromInput`. Schema gained `acknowledgedBy` +
+`createdAt` (audit trail); `expires` already existed. `vrt baseline
+update` archives current baselines to `_history/<ts>/` then re-pins
+(reversible). Region-bbox approval (`--region x,y,w,h`) is deliberately
+NOT built — the pipeline has no bbox matcher, so approve by the region’s
+selector instead. `update` reuses the diff-pr pin path. Tests:
+`approval.test.ts` (schema + builder), `baseline-cli.test.ts` (archive +
+approve CLI). Note: command lives under `vrt baseline approve`, not top-
+level `vrt approve` (that name is taken by the workflow bulk-approve).
