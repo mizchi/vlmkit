@@ -163,6 +163,34 @@ describe("classifyVisualDiff", () => {
     assert.equal(result.changes[0].type, "layout-shift");
   });
 
+  it("flags a shape-derived layout-shift as having no measured offset (draft 12)", () => {
+    // Large region, no `shift` field: the label comes from the shape
+    // heuristic, not a measured translation. The description must not read
+    // as if an offset was found.
+    const diff = makeDiff([
+      { x: 0, y: 0, width: 1000, height: 500, diffPixelCount: 100000 },
+    ]);
+    const result = classifyVisualDiff(diff);
+    assert.equal(result.changes[0].type, "layout-shift");
+    assert.match(result.changes[0].description, /no translation measured/);
+  });
+
+  it("notes no measured translation on a wide-band region hint (draft 12)", () => {
+    const diff = makeDiff([
+      {
+        x: 20,
+        y: 80,
+        width: 48,
+        height: 48,
+        diffPixelCount: 1800,
+        regionType: "shift",
+      },
+    ]);
+    const result = classifyVisualDiff(diff);
+    assert.equal(result.changes[0].type, "layout-shift");
+    assert.match(result.changes[0].description, /no translation measured/);
+  });
+
   it("should trust shift region hints as layout-shift", () => {
     const diff = makeDiff([
       {

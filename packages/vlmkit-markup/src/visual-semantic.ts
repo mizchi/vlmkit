@@ -86,10 +86,14 @@ function describeChange(
   const dims = `${region.width}x${region.height}`;
   switch (type) {
     case "layout-shift":
+      // A measured translation returns early via describeShift; reaching here
+      // means the label is shape-derived, so say so explicitly — an agent
+      // reading "layout-shift" otherwise expects a dx/dy that was never
+      // measured (A/B v3 draft 12).
       if (region.regionType === "shift") {
-        return `Layout shift region hint at ${where}, ${dims}`;
+        return `Layout shift region hint at ${where}, ${dims} (wide-band shape; no translation measured — likely reflow or in-place change)`;
       }
-      return `Layout shift at ${where}, ${dims}, ${(globalRatio * 100).toFixed(1)}% of total`;
+      return `Layout shift at ${where}, ${dims}, ${(globalRatio * 100).toFixed(1)}% of total (shape-derived; no translation measured — likely reflow or in-place change)`;
     case "icon-change":
       return `Small square region changed at ${where}`;
     case "text-change":

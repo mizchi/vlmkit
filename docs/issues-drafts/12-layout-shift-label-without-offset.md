@@ -20,3 +20,14 @@ layout-shift WITHOUT a measured offset, say so in the description
 ("wide-band shape hint; no translation measured — likely reflow or
 in-place change"). Alternatively reserve `layout-shift` for measured
 translations and use `reflow-hint` for shape-derived ones.
+
+---
+
+**Status (2026-06-08)**: Resolved via the description-clarification
+option (kept the `layout-shift` type stable for consumers rather than
+splitting the enum). A measured translation still returns early through
+`describeShift` with the dx/dy; any shape-derived `layout-shift` now
+appends "no translation measured — likely reflow or in-place change", so
+the label no longer implies an offset that was never computed. Tests in
+`visual-semantic.test.ts` (draft 12 cases). Note: grouped layout-shift
+aggregates still drop per-region offsets — out of scope here.
