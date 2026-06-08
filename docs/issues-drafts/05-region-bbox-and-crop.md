@@ -16,3 +16,13 @@ pngjs cropping scripts by hand to actually look at the regions on a
    `vlmkit scan crop`) that writes one baseline/current/diff crop
    triple per region — `scan component` already has the cropping
    machinery.
+
+---
+
+**Status (2026-06-08)**: Resolved. (1) `diff png` text output now
+lists every region as `(x,y) WxH [type] from -> to shift(dx,dy)` (capped
+at 15, full set via `--json`). (2) `--crop-regions <dir>` writes a
+baseline/current/diff crop triple per region via the new
+`cropRegion` helper in vlmkit-core/png-utils.ts. Tests:
+`png-utils.test.ts` (cropRegion) and `png-diff.test.ts` (crop triple +
+arg parse).

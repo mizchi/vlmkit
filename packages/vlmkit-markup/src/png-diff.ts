@@ -26,6 +26,16 @@ export interface PngDiffCliOptions {
   elementsHtml?: string;
   /** Viewport for --elements-html (defaults to the current PNG size). */
   elementsViewport?: RegionElementsViewport;
+  /** Directory to write one baseline/current/diff crop triple per region. */
+  cropRegions?: string;
+}
+
+export interface PngDiffRegionCrop {
+  index: number;
+  bbox: { x: number; y: number; width: number; height: number };
+  baseline: string;
+  current: string;
+  diff: string;
 }
 
 class PngDiffCliError extends Error {
@@ -54,7 +64,9 @@ Options:
   --elements-json <path>
                         Same, from a pre-captured DOM bbox JSON
   --elements-viewport <WxH>
-                        Viewport for --elements-html (default: current PNG size)`;
+                        Viewport for --elements-html (default: current PNG size)
+  --crop-regions <dir>  Write a baseline/current/diff crop triple per region
+                        into <dir> for direct inspection (no VLM)`;
 }
 
 export function parsePngDiffArgs(args: string[]): PngDiffCliOptions {
@@ -66,10 +78,17 @@ export function parsePngDiffArgs(args: string[]): PngDiffCliOptions {
   let elementsJson: string | undefined;
   let elementsHtml: string | undefined;
   let elementsViewport: RegionElementsViewport | undefined;
+  let cropRegions: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
     switch (arg) {
+      case "--crop-regions": {
+        const value = args[++i];
+        if (!value) throw new PngDiffCliError(`Missing value for ${arg}\n\n${formatPngDiffUsage()}`, 1);
+        cropRegions = value;
+        break;
+      }
       case "--elements-json": {
         const value = args[++i];
         if (!value) throw new PngDiffCliError(`Missing value for ${arg}\n\n${formatPngDiffUsage()}`, 1);
@@ -137,6 +156,7 @@ export function parsePngDiffArgs(args: string[]): PngDiffCliOptions {
     ...(elementsJson ? { elementsJson } : {}),
     ...(elementsHtml ? { elementsHtml } : {}),
     ...(elementsViewport ? { elementsViewport } : {}),
+    ...(cropRegions ? { cropRegions } : {}),
   };
 }
 
@@ -214,7 +234,62 @@ export async function runPngDiff(options: PngDiffCliOptions) {
   }
 
   const semantic = classifyVisualDiff(diff);
-  return { diff, semantic, baselineSize, currentSize, sizeDelta };
+
+  let crops: PngDiffRegionCrop[] | undefined;
+  if (options.cropRegions) {
+    crops = await writeRegionCrops(options, diff.regions, diff.heatmapPath);
+  }
+
+  return { diff, semantic, baselineSize, currentSize, sizeDelta, crops };
+}
+
+/**
+ * Write a baseline/current/diff crop triple per region so an agent can
+ * inspect each region on a tall capture without hand-rolling a pngjs
+ * cropper (A/B v1 draft 05). A small margin is added around each bbox for
+ * context; the diff crop is taken from the heatmap when one was generated.
+ */
+async function writeRegionCrops(
+  options: PngDiffCliOptions,
+  regions: DiffRegion[],
+  heatmapPath: string | undefined,
+): Promise<PngDiffRegionCrop[]> {
+  const dir = options.cropRegions!;
+  await mkdir(dir, { recursive: true });
+
+  const { decodePng, encodePng, cropRegion } = await import("@mizchi/vlmkit-core/png-utils.ts");
+  const [baseline, current, heatmap] = await Promise.all([
+    decodePng(options.baselinePath),
+    decodePng(options.currentPath),
+    heatmapPath ? decodePng(heatmapPath) : Promise.resolve(undefined),
+  ]);
+
+  const MARGIN = 8;
+  const crops: PngDiffRegionCrop[] = [];
+  for (let i = 0; i < regions.length; i++) {
+    const r = regions[i]!;
+    const x = r.x - MARGIN;
+    const y = r.y - MARGIN;
+    const w = r.width + MARGIN * 2;
+    const h = r.height + MARGIN * 2;
+    const tag = `region-${String(i).padStart(2, "0")}`;
+    const baselineFile = join(dir, `${tag}-baseline.png`);
+    const currentFile = join(dir, `${tag}-current.png`);
+    const diffFile = join(dir, `${tag}-diff.png`);
+    await encodePng(baselineFile, cropRegion(baseline, x, y, w, h));
+    await encodePng(currentFile, cropRegion(current, x, y, w, h));
+    // Fall back to the current crop when no heatmap was generated, so the
+    // triple is always complete and the manifest paths always resolve.
+    await encodePng(diffFile, cropRegion(heatmap ?? current, x, y, w, h));
+    crops.push({
+      index: i,
+      bbox: { x: r.x, y: r.y, width: r.width, height: r.height },
+      baseline: baselineFile,
+      current: currentFile,
+      diff: diffFile,
+    });
+  }
+  return crops;
 }
 
 export async function runPngDiffCli(cliArgs = process.argv.slice(2)) {
@@ -235,6 +310,7 @@ export async function runPngDiffCli(cliArgs = process.argv.slice(2)) {
       heatmapPath: result.diff.heatmapPath,
       summary: result.semantic.summary,
       changes: result.semantic.changes,
+      ...(result.crops ? { crops: result.crops } : {}),
     };
 
     if (options.json) {
@@ -259,6 +335,21 @@ export async function runPngDiffCli(cliArgs = process.argv.slice(2)) {
     }
     console.log(`  diff:     ${(output.diffRatio * 100).toFixed(2)}% (${output.diffPixels} / ${output.totalPixels} px)`);
     console.log(`  regions:  ${output.regions.length}`);
+    if (output.regions.length > 0) {
+      for (const region of output.regions.slice(0, 15)) {
+        const type = region.regionType ? ` [${region.regionType}]` : "";
+        const color = region.colorSample && region.colorSample.baseline.hex !== region.colorSample.current.hex
+          ? ` ${region.colorSample.baseline.hex} -> ${region.colorSample.current.hex}`
+          : "";
+        const shift = region.shift && (region.shift.dx !== 0 || region.shift.dy !== 0)
+          ? ` shift(${region.shift.dx >= 0 ? "+" : ""}${region.shift.dx},${region.shift.dy >= 0 ? "+" : ""}${region.shift.dy})`
+          : "";
+        console.log(`    (${region.x},${region.y}) ${region.width}x${region.height}${type}${color}${shift}`);
+      }
+      if (output.regions.length > 15) {
+        console.log(`    … ${output.regions.length - 15} more (use --json for all)`);
+      }
+    }
     const withSelectors = output.regions.filter((r) => r.selectorCandidate);
     if (withSelectors.length > 0) {
       console.log("  selectors:");
@@ -272,6 +363,9 @@ export async function runPngDiffCli(cliArgs = process.argv.slice(2)) {
     console.log(`  summary:  ${output.summary}`);
     if (output.heatmapPath) {
       console.log(`  heatmap:  ${output.heatmapPath}`);
+    }
+    if (result.crops && result.crops.length > 0) {
+      console.log(`  crops:    ${result.crops.length} region triple(s) in ${options.cropRegions}`);
     }
   } catch (error) {
     if (error instanceof PngDiffCliError) {

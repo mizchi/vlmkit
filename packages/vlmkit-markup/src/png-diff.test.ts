@@ -63,6 +63,57 @@ describe("png-diff", () => {
     assert.equal(options.skipHeatmap, true);
   });
 
+  it("parses --crop-regions into an output directory", () => {
+    const options = parsePngDiffArgs([
+      "before.png",
+      "after.png",
+      "--crop-regions",
+      "tmp/crops",
+    ]);
+    assert.equal(options.cropRegions, "tmp/crops");
+  });
+
+  it("writes a baseline/current/diff crop triple per region (draft 05)", async () => {
+    const baselinePath = join(TMP, "baseline-crop.png");
+    const currentPath = join(TMP, "current-crop.png");
+    const cropDir = join(TMP, "crops");
+
+    await rm(TMP, { recursive: true, force: true });
+    await mkdir(TMP, { recursive: true });
+
+    try {
+      const colors: Array<[number, number, number]> = Array.from({ length: 9 }, () => [255, 255, 255]);
+      const changed = [...colors];
+      changed[8] = [10, 20, 200];
+      await encodePng(baselinePath, createPalettePng(120, 120, colors));
+      await encodePng(currentPath, createPalettePng(120, 120, changed));
+
+      const result = await runPngDiff({
+        baselinePath,
+        currentPath,
+        outputDir: TMP,
+        threshold: 0.1,
+        skipHeatmap: false,
+        json: false,
+        cropRegions: cropDir,
+      });
+
+      assert.ok(result.crops && result.crops.length > 0, "expected at least one region crop");
+      const first = result.crops![0]!;
+      assert.ok(existsSync(first.baseline), "baseline crop should exist");
+      assert.ok(existsSync(first.current), "current crop should exist");
+      assert.ok(existsSync(first.diff), "diff crop should exist");
+      assert.deepEqual(first.bbox, {
+        x: result.diff.regions[0]!.x,
+        y: result.diff.regions[0]!.y,
+        width: result.diff.regions[0]!.width,
+        height: result.diff.regions[0]!.height,
+      });
+    } finally {
+      await rm(TMP, { recursive: true, force: true });
+    }
+  });
+
   it("compares two PNG files without Playwright", async () => {
     const baselinePath = join(TMP, "baseline.png");
     const currentPath = join(TMP, "current.png");
