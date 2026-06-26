@@ -73,6 +73,20 @@ describe("heal", () => {
     assert.ok(result.attempts.length >= 1);
   });
 
+  it("leaves the test file unchanged on give-up (no unverified patch left behind)", async () => {
+    const testFile = tmpTestFile("// ORIGINAL SOURCE\n");
+    await heal(
+      { ...baseOpts(testFile), budgetUsd: 0.5 },
+      {
+        // never passes, so the applied patch is never verified
+        runTest: async () => ({ ok: false, stdout: "", stderr: "locator resolved to 0 elements" }),
+        observe: { observe: async () => ({ verdict: "unknown", costUsd: 0 }) },
+        codegen: { propose: async () => ({ newTestSource: "// BAD UNVERIFIED PATCH\n", costUsd: 0.6 }) },
+      },
+    );
+    assert.equal(readFileSync(testFile, "utf8"), "// ORIGINAL SOURCE\n");
+  });
+
   it("updates the baseline when a vrt-diff is intentional (verdict=fixed), without calling codegen", async () => {
     const testFile = tmpTestFile();
     const m = failThenOk("Error: Screenshot comparison failed");

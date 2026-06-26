@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createModelRouter, type Budget } from "./router.ts";
 import { runTest as defaultRunTest, classify, type RunResult } from "./runner.ts";
@@ -48,12 +48,19 @@ export async function heal(opts: HealOptions, deps?: Partial<HealDeps>): Promise
   let finalPatch: string | undefined;
   let lastWasCodegen = false;
 
-  const done = (verdict: HealResult["verdict"]): HealResult => ({
-    verdict,
-    attempts,
-    totalCostUsd: budget.total(),
-    finalPatch,
-  });
+  // Snapshot the original so a non-"fixed" outcome leaves the working tree clean
+  // (never leave an unverified patch behind on give-up/regression).
+  const originalTestSource = readFileSync(opts.testFile, "utf8");
+
+  const done = (verdict: HealResult["verdict"]): HealResult => {
+    if (verdict === "fixed") {
+      if (finalPatch) commitPatch(opts.testFile);
+    } else {
+      writeFileSync(opts.testFile, originalTestSource);
+      commitPatch(opts.testFile); // drop any leftover .heal-bak
+    }
+    return { verdict, attempts, totalCostUsd: budget.total(), finalPatch };
+  };
 
   for (let attempt = 0; attempt < opts.maxAttempts; attempt++) {
     if (exhausted()) return done("give-up");
@@ -64,7 +71,6 @@ export async function heal(opts: HealOptions, deps?: Partial<HealDeps>): Promise
       const v1 = await d.runTest(opts.testCommand, opts.cwd);
       const v2 = await d.runTest(opts.testCommand, opts.cwd);
       if (v1.ok && v2.ok) {
-        if (finalPatch) commitPatch(opts.testFile);
         return done("fixed");
       }
       // flaky: fall through and treat as failure
