@@ -49,7 +49,6 @@ describe("heal", () => {
     const m = failThenOk("locator resolved to 0 elements");
     const result = await heal(baseOpts(testFile), {
       runTest: m.runTest,
-      observe: { observe: async () => ({ verdict: "unknown", costUsd: 0 }) },
       codegen: {
         propose: async () => ({ newTestSource: "// patched test\n", costUsd: 0.001 }),
       },
@@ -65,7 +64,6 @@ describe("heal", () => {
       { ...baseOpts(testFile), budgetUsd: 0.5 },
       {
         runTest: async () => ({ ok: false, stdout: "", stderr: "some other error" }),
-        observe: { observe: async () => ({ verdict: "unknown", costUsd: 0 }) },
         codegen: { propose: async () => ({ newTestSource: "// p\n", costUsd: 0.6 }) },
       },
     );
@@ -80,37 +78,48 @@ describe("heal", () => {
       {
         // never passes, so the applied patch is never verified
         runTest: async () => ({ ok: false, stdout: "", stderr: "locator resolved to 0 elements" }),
-        observe: { observe: async () => ({ verdict: "unknown", costUsd: 0 }) },
         codegen: { propose: async () => ({ newTestSource: "// BAD UNVERIFIED PATCH\n", costUsd: 0.6 }) },
       },
     );
     assert.equal(readFileSync(testFile, "utf8"), "// ORIGINAL SOURCE\n");
   });
 
-  it("updates the baseline when a vrt-diff is intentional (verdict=fixed), without calling codegen", async () => {
+  it("updates the baseline when review accepts a vrt-diff (verdict=fixed), without calling codegen", async () => {
     const testFile = tmpTestFile();
     const m = failThenOk("Error: Screenshot comparison failed");
-    let observedScreenshot: Buffer | undefined;
+    let sawBaseline: Buffer | undefined;
     const result = await heal(baseOpts(testFile), {
       runTest: m.runTest,
       updateSnapshotsCommand: "noop --update-snapshots",
-      captureActual: async () => Buffer.from("fake-png-bytes"),
-      observe: {
-        observe: async ({ screenshotPng }) => {
-          observedScreenshot = screenshotPng;
-          return { verdict: "intentional-change", costUsd: 0.0002 };
-        },
+      captureVrt: async () => ({ baseline: Buffer.from("BEFORE"), actual: Buffer.from("AFTER") }),
+      reviewVrt: async ({ baselinePng }) => {
+        sawBaseline = baselinePng;
+        return { verdict: "accept", confidence: 0.95, reason: "matches intent", intentSource: "expectedChange", costUsd: 0.0002 };
       },
       codegen: {
         propose: async () => {
-          throw new Error("codegen must NOT be called on the intentional-change path");
+          throw new Error("codegen must NOT be called on the accept path");
         },
       },
     });
     assert.equal(result.verdict, "fixed");
     assert.equal(result.finalPatch, "baseline-update");
     assert.ok(result.attempts.some((a) => a.phase === "observe"));
-    assert.equal(observedScreenshot?.toString(), "fake-png-bytes");
+    assert.equal(sawBaseline?.toString(), "BEFORE");
+  });
+
+  it("returns needs-review when review accepts but below acceptThreshold", async () => {
+    const testFile = tmpTestFile();
+    const result = await heal(
+      { ...baseOpts(testFile), acceptThreshold: 0.8 },
+      {
+        runTest: async () => ({ ok: false, stdout: "", stderr: "Error: Screenshot comparison failed" }),
+        captureVrt: async () => ({ baseline: Buffer.from("B"), actual: Buffer.from("A") }),
+        reviewVrt: async () => ({ verdict: "accept", confidence: 0.6, reason: "looks intentional, not sure", intentSource: "vision-only", costUsd: 0.0001 }),
+        codegen: { propose: async () => { throw new Error("codegen must NOT run on needs-review"); } },
+      },
+    );
+    assert.equal(result.verdict, "needs-review");
   });
 
   it("reports flaky (not fixed, no patch) when verify intermittently fails", async () => {
@@ -127,7 +136,6 @@ describe("heal", () => {
             ? { ok: false, stdout: "", stderr: "intermittent failure" }
             : { ok: true, stdout: "", stderr: "" };
         },
-        observe: { observe: async () => ({ verdict: "unknown", costUsd: 0 }) },
         codegen: {
           propose: async () => {
             codegenCalled = true;
@@ -141,11 +149,12 @@ describe("heal", () => {
     assert.equal(readFileSync(testFile, "utf8"), "// ORIGINAL\n");
   });
 
-  it("reports a regression when the vision tier says so (verdict=regression)", async () => {
+  it("reports a regression when review rejects a vrt-diff (verdict=regression)", async () => {
     const testFile = tmpTestFile();
     const result = await heal(baseOpts(testFile), {
       runTest: async () => ({ ok: false, stdout: "", stderr: "toHaveScreenshot pixels differ" }),
-      observe: { observe: async () => ({ verdict: "regression", costUsd: 0.0002 }) },
+      captureVrt: async () => ({ baseline: Buffer.from("B"), actual: Buffer.from("A") }),
+      reviewVrt: async () => ({ verdict: "reject", confidence: 0.9, reason: "broken layout", intentSource: "vision-only", costUsd: 0.0002 }),
       codegen: { propose: async () => ({ newTestSource: "x", costUsd: 0 }) },
     });
     assert.equal(result.verdict, "regression");

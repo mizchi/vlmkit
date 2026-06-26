@@ -64,6 +64,30 @@ await heal(opts, {
 });
 ```
 
+## VRT review — accept or reject a failed screenshot
+
+`reviewVrtDiff` judges whether a failed `toHaveScreenshot` is an intended change
+(accept → update the baseline) or a regression (reject). It compares the
+baseline and actual images, using a layered intent signal: explicit
+`expectedChange` > `gitContext` (commit message + diff) > vision-only guess.
+`confidence` reflects how strong the signal was; `intentSource` records which.
+
+```ts
+import { reviewVrtDiff, findVrtArtifacts, collectGitContext } from "@mizchi/vlmkit-heal";
+
+const { baseline, actual, diff } = findVrtArtifacts(cwd); // *-expected/-actual/-diff.png
+const r = await reviewVrtDiff({
+  baselinePng: baseline!, actualPng: actual!, diffPng: diff,
+  expectedChange: "the status badge turns red",       // or omit and pass gitContext, or neither
+  tier: { provider: "openrouter", model: "google/gemini-2.5-flash-lite", vision: true },
+});
+// r: { verdict: "accept" | "reject" | "unsure", confidence: 0..1, reason, intentSource, costUsd }
+```
+
+Inside `heal`, this drives the VRT path: `accept` with `confidence >=
+acceptThreshold` (default 0.8) updates the baseline; `reject` → `regression`;
+`unsure` or a low-confidence accept → the `needs-review` verdict (a human decides).
+
 ## Design
 
 - Edits only the test file and VRT baselines; app code is never touched
