@@ -84,11 +84,11 @@
     "@mizchi/vlmkit-capture": "workspace:*",
     "@mizchi/vlmkit-core": "workspace:*",
     "@mizchi/vlmkit-markup": "workspace:*",
-    "@playwright/test": "^1.52.0",
+    "@playwright/test": "^1.61.1",
     "cac": "^7.0.0",
     "hono": "^4.12.10",
     "pixelmatch": "^7.1.0",
-    "playwright": "^1.58.2",
+    "playwright": "^1.61.1",
     "pngjs": "^7.0.0",
     "ws": "^8.20.0"
   }

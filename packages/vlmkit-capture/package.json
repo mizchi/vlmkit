@@ -29,7 +29,7 @@
   },
   "dependencies": {
     "@mizchi/vlmkit-core": "workspace:*",
-    "playwright": "^1.58.2",
+    "playwright": "^1.61.1",
     "pngjs": "^7.0.0",
     "ws": "^8.20.0"
   }
