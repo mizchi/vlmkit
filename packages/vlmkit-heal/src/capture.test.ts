@@ -24,4 +24,22 @@ describe("capture", () => {
     assert.equal(findActualScreenshot(empty), undefined);
     assert.equal(findErrorContext(empty), undefined);
   });
+
+  it("auto-detects a non-default outputDir (e.g. Playwright's e2e-results)", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "heal-cap-e2e-"));
+    const out = join(cwd, "e2e-results", "t-chromium");
+    mkdirSync(out, { recursive: true });
+    writeFileSync(join(out, "error-context.md"), '# Page snapshot\n- navigation "Map controls"');
+    // No outputDir arg: should still find it by trying common names.
+    assert.ok(findErrorContext(cwd)?.includes('"Map controls"'));
+  });
+
+  it("honors an explicit outputDir name", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "heal-cap-custom-"));
+    const out = join(cwd, "pw-out", "t-chromium");
+    mkdirSync(out, { recursive: true });
+    writeFileSync(join(out, "error-context.md"), "# Page snapshot\n- button");
+    assert.equal(findErrorContext(cwd), undefined); // not a known name
+    assert.ok(findErrorContext(cwd, "pw-out")?.includes("Page snapshot"));
+  });
 });
