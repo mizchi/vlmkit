@@ -1,6 +1,7 @@
 import { createUnifiedLLMClient } from "@mizchi/vlmkit-ai";
 import type { ModelTier } from "./types.ts";
 import { billedCost } from "./cost.ts";
+import { openAICompatComplete } from "./openai-compat.ts";
 
 /** Observe phase: a vision model (tier0 = ui-tars) judges a vrt-diff failure. */
 export interface ObserveClient {
@@ -36,29 +37,51 @@ function clientFor(tier: ModelTier, vision: boolean) {
   return client;
 }
 
+// One entry point for both axes: a self-hosted baseURL tier hits an
+// OpenAI-compatible endpoint directly (ui-tars etc.), otherwise route through
+// the vlmkit-ai unified client. Cost is billed from the tier's per-token price
+// whenever the provider doesn't report one.
+async function completeForTier(
+  tier: ModelTier,
+  prompt: string,
+  vision: boolean,
+  screenshotPng?: Buffer,
+): Promise<{ content: string; costUsd: number }> {
+  if (tier.baseURL) {
+    const res = await openAICompatComplete({
+      tier,
+      text: prompt,
+      screenshotPng,
+      apiKey: process.env.VLMKIT_HEAL_BASEURL_KEY,
+    });
+    return { content: res.content, costUsd: billedCost(tier, 0, res) };
+  }
+  const client = clientFor(tier, vision);
+  const content = screenshotPng
+    ? [
+        { type: "text" as const, text: prompt },
+        { type: "image" as const, base64: screenshotPng.toString("base64"), mimeType: "image/png" },
+      ]
+    : prompt;
+  const res = await client.completeWithImages(content);
+  return { content: res.content, costUsd: billedCost(tier, res.costUsd, res) };
+}
+
 export function createRealObserveClient(): ObserveClient {
   return {
     async observe({ tier, screenshotPng, textReport }) {
-      const client = clientFor(tier, true);
       const prompt =
         "A visual regression test failed. Decide if the change looks like an " +
         "INTENTIONAL UI change or a REGRESSION. Answer with exactly one word: " +
         "intentional-change OR regression.\n\nReport:\n" + textReport;
-      const content = screenshotPng
-        ? [
-            { type: "text" as const, text: prompt },
-            { type: "image" as const, base64: screenshotPng.toString("base64"), mimeType: "image/png" },
-          ]
-        : prompt;
-      const res = await client.completeWithImages(content);
+      const res = await completeForTier(tier, prompt, true, screenshotPng);
       const word = res.content.toLowerCase();
       const verdict = word.includes("intentional")
         ? "intentional-change"
         : word.includes("regression")
           ? "regression"
           : "unknown";
-      const costUsd = billedCost(tier, res.costUsd, res);
-      return { verdict, costUsd };
+      return { verdict, costUsd: res.costUsd };
     },
   };
 }
@@ -66,16 +89,14 @@ export function createRealObserveClient(): ObserveClient {
 export function createRealCodegenClient(): CodegenClient {
   return {
     async propose({ tier, errorKind, testSource, context }) {
-      const client = clientFor(tier, false);
       const prompt =
         `A Playwright test is failing (errorKind: ${errorKind}). Rewrite the ` +
         `WHOLE test file so it passes against the current UI. Output ONLY the ` +
         `full updated TypeScript file inside a single \`\`\`ts code block.\n\n` +
         `Context:\n${context}\n\nCurrent file:\n\`\`\`ts\n${testSource}\n\`\`\``;
-      const res = await client.completeWithImages(prompt);
+      const res = await completeForTier(tier, prompt, false);
       const newTestSource = extractCodeBlock(res.content) ?? undefined;
-      const costUsd = billedCost(tier, res.costUsd, res);
-      return { newTestSource, costUsd };
+      return { newTestSource, costUsd: res.costUsd };
     },
   };
 }
