@@ -29,6 +29,24 @@ const result = await heal({
 // result.verdict: "fixed" | "regression" | "intentional-change" | "give-up"
 ```
 
+Heal a whole failing suite with one cross-file budget:
+
+```ts
+import { healAll } from "@mizchi/vlmkit-heal";
+
+const { entries, fixed, totalCostUsd } = await healAll(
+  [optsA, optsB, optsC],          // one HealOptions per file
+  { totalBudgetUsd: 2.0 },        // outer cap; remaining files skip once reached
+);
+```
+
+Self-hosted observe model (e.g. ui-tars) via an OpenAI-compatible endpoint —
+set `baseURL` on the tier (auth via `VLMKIT_HEAL_BASEURL_KEY` if needed):
+
+```ts
+observe: { tiers: [{ provider: "openrouter", model: "ui-tars", vision: true, baseURL: "http://localhost:8000/v1" }] }
+```
+
 Inject mocks for deterministic tests:
 
 ```ts

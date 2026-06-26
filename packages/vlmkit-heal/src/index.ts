@@ -14,3 +14,7 @@ export type {
 export { createRealObserveClient, createRealCodegenClient } from "./clients.ts";
 export { heal } from "./heal.ts";
 export type { HealDeps } from "./heal.ts";
+export { healAll } from "./heal-all.ts";
+export type { HealAllResult, HealAllEntry, HealAllOptions } from "./heal-all.ts";
+export { openAICompatComplete, buildUserContent, parseChatCompletion } from "./openai-compat.ts";
+export type { ChatUsage } from "./openai-compat.ts";

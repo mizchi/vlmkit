@@ -65,6 +65,10 @@ for the full old → new mapping.
 - **Markup-assistance toolkit** (10+ commands): build from screenshot, theme-parity,
   i18n stress, a11y contrast / touch / focus-order, media-variant adaptations,
   cross-browser parity, design-token conformance, interaction sequences.
+- **Self-healing Playwright tests** (`@mizchi/vlmkit-heal`) — a cost-optimized
+  loop that runs a test, observes the failure, and patches the test (or updates
+  a VRT baseline), escalating cheap → strong models under a shared budget cap.
+  See [`packages/vlmkit-heal`](packages/vlmkit-heal/README.md).
 
 ## Quick Start
 
@@ -625,6 +629,11 @@ src/
 packages/vlmkit-capture/src/
   crater-client.ts          # Crater BiDi WebSocket client
   crater-wasm.ts            # Crater layout-only JS/WASM adapter
+packages/vlmkit-heal/src/
+  router.ts                 # Cost-escalation model router (shared budget)
+  heal.ts                   # Self-healing loop state machine
+  clients.ts                # Observe (VLM) / codegen (LLM) tiers
+  cost.ts                   # Token×price billing so the budget cap works
 fixtures/
   css-challenge/            # 9 HTML fixtures for CSS bench
   migration/                # Migration comparison fixtures
