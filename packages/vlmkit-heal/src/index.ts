@@ -4,6 +4,8 @@ export type { Budget } from "./router.ts";
 export { runTest, classify } from "./runner.ts";
 export type { RunResult } from "./runner.ts";
 export { applyPatch, commitPatch } from "./patch.ts";
+export { estimateCost, billedCost, fetchOpenRouterPricing, withPricing } from "./cost.ts";
+export type { TokenUsage, Pricing } from "./cost.ts";
 export type {
   ObserveClient,
   CodegenClient,

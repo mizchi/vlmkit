@@ -1,5 +1,6 @@
 import { createUnifiedLLMClient } from "@mizchi/vlmkit-ai";
 import type { ModelTier } from "./types.ts";
+import { billedCost } from "./cost.ts";
 
 /** Observe phase: a vision model (tier0 = ui-tars) judges a vrt-diff failure. */
 export interface ObserveClient {
@@ -56,7 +57,8 @@ export function createRealObserveClient(): ObserveClient {
         : word.includes("regression")
           ? "regression"
           : "unknown";
-      return { verdict, costUsd: res.costUsd };
+      const costUsd = billedCost(tier, res.costUsd, res);
+      return { verdict, costUsd };
     },
   };
 }
@@ -72,7 +74,8 @@ export function createRealCodegenClient(): CodegenClient {
         `Context:\n${context}\n\nCurrent file:\n\`\`\`ts\n${testSource}\n\`\`\``;
       const res = await client.completeWithImages(prompt);
       const newTestSource = extractCodeBlock(res.content) ?? undefined;
-      return { newTestSource, costUsd: res.costUsd };
+      const costUsd = billedCost(tier, res.costUsd, res);
+      return { newTestSource, costUsd };
     },
   };
 }

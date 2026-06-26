@@ -7,6 +7,10 @@ export interface ModelTier {
   vision: boolean;
   /** For self-hosted / non-OpenRouter endpoints (e.g. ui-tars). */
   baseURL?: string;
+  /** USD per prompt token. Used to estimate cost when the provider returns 0 (e.g. OpenRouter). */
+  promptCostPerToken?: number;
+  /** USD per completion token. */
+  completionCostPerToken?: number;
 }
 
 export interface RouterOptions {

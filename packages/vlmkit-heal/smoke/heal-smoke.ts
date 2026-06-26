@@ -9,7 +9,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { heal } from "../src/index.ts";
+import { heal, fetchOpenRouterPricing, withPricing } from "../src/index.ts";
+import type { ModelTier } from "../src/index.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, "..", "fixtures");
@@ -21,19 +22,27 @@ const CORRECTED = readFileSync(testFile, "utf8").replace('name: "Begin"', 'name:
 const original = readFileSync(testFile, "utf8");
 const real = process.env.HEAL_REAL_LLM === "1";
 
+// All tiers via OpenRouter (single OPENROUTER_API_KEY).
+let observeTiers: ModelTier[] = [{ provider: "openrouter", model: "bytedance/ui-tars-1.5-7b", vision: true }];
+let codegenTiers: ModelTier[] = [
+  { provider: "openrouter", model: "qwen/qwen3-coder-30b-a3b-instruct", vision: false }, // cheapest
+  { provider: "openrouter", model: "openai/gpt-4o-mini", vision: false }, // reliable fallback
+];
+
+// Fill per-token pricing so the budget cap is effective (OpenRouter reports costUsd: 0).
+if (real) {
+  const pricing = await fetchOpenRouterPricing(process.env.OPENROUTER_API_KEY!);
+  observeTiers = withPricing(observeTiers, pricing);
+  codegenTiers = withPricing(codegenTiers, pricing);
+}
+
 const result = await heal(
   {
     testCommand: "pnpm exec playwright test broken.spec.ts",
     testFile,
     cwd: fixtures,
-    // All tiers via OpenRouter (single OPENROUTER_API_KEY).
-    observe: { tiers: [{ provider: "openrouter", model: "bytedance/ui-tars-1.5-7b", vision: true }] },
-    codegen: {
-      tiers: [
-        { provider: "openrouter", model: "qwen/qwen3-coder-30b-a3b-instruct", vision: false }, // cheapest
-        { provider: "openrouter", model: "openai/gpt-4o-mini", vision: false },                // reliable fallback
-      ],
-    },
+    observe: { tiers: observeTiers },
+    codegen: { tiers: codegenTiers },
     budgetUsd: 1,
     maxAttempts: 4,
   },
