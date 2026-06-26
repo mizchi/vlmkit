@@ -48,6 +48,12 @@ export interface HealOptions {
   maxAttempts: number;
   /** Default false: the final green patch needs human approval before commit. */
   autoApply?: boolean;
+  /**
+   * Declared expected UI change, if any. intentional-vs-regression cannot be
+   * decided from pixels alone; this is the expectation the observe tier checks
+   * the diff against (e.g. "the status badge changes from Active to Archived").
+   */
+  expectedChange?: string;
 }
 
 export type Verdict = "fixed" | "regression" | "intentional-change" | "give-up";

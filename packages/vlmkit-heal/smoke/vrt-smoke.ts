@@ -31,7 +31,9 @@ const mutated = original
   .replace("#2563eb", "#dc2626");
 writeFileSync(pageFile, mutated);
 
-let observeTiers: ModelTier[] = [{ provider: "openrouter", model: "bytedance/ui-tars-1.5-7b", vision: true }];
+// observe = a cheap *reasoning* VLM for the intentional-vs-regression judgment.
+// (ui-tars is GUI-grounding, not a judgment model — kept out of this tier.)
+let observeTiers: ModelTier[] = [{ provider: "openrouter", model: "google/gemini-2.5-flash-lite", vision: true }];
 if (real) {
   const pricing = await fetchOpenRouterPricing(process.env.OPENROUTER_API_KEY!);
   observeTiers = withPricing(observeTiers, pricing);
@@ -46,6 +48,7 @@ try {
       observe: { tiers: observeTiers },
       codegen: { tiers: [{ provider: "openrouter", model: "qwen/qwen3-coder-30b-a3b-instruct", vision: false }] },
       updateSnapshotsCommand: "pnpm exec playwright test vrt.spec.ts --update-snapshots",
+      expectedChange: "The status badge changes from a blue 'Active' to a red 'Archived'.",
       budgetUsd: 1,
       maxAttempts: 2,
     },
@@ -62,7 +65,7 @@ try {
   const observeAttempt = result.attempts.find((a) => a.phase === "observe");
   console.log("\n=== VRT-diff 疎通 result ===");
   console.log("verdict       :", result.verdict);
-  console.log("observe ran   :", observeAttempt ? "yes (ui-tars saw the screenshot)" : "no");
+  console.log("observe ran   :", observeAttempt ? "yes (observe tier saw the screenshot)" : "no");
   console.log("observe cost  :", observeAttempt ? `$${observeAttempt.costUsd.toFixed(6)}` : "-");
   console.log("totalCost     :", `$${result.totalCostUsd.toFixed(6)}`);
 
@@ -70,7 +73,7 @@ try {
     console.error("FAIL: observe tier was never reached");
     process.exitCode = 1;
   } else {
-    console.log("OK: VRT-diff routed to the observe (ui-tars) tier on a real screenshot.");
+    console.log("OK: VRT-diff routed to the observe tier on a real screenshot.");
   }
 } finally {
   // Restore the fixture: page, baseline, and transient playwright output.

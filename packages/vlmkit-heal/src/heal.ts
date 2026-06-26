@@ -78,7 +78,10 @@ export async function heal(opts: HealOptions, deps?: Partial<HealDeps>): Promise
     if (errorKind === "vrt-diff") {
       const tier = observeRouter.current();
       const screenshotPng = await d.captureActual?.(opts.cwd, output);
-      const obs = await d.observe.observe({ tier, screenshotPng, textReport: output.slice(0, 2000) });
+      const expectation = opts.expectedChange
+        ? `\n\nDeclared expected change: ${opts.expectedChange}\nIf the screenshot matches this expectation, answer intentional-change; otherwise regression.`
+        : "";
+      const obs = await d.observe.observe({ tier, screenshotPng, textReport: output.slice(0, 2000) + expectation });
       observeRouter.record({ costUsd: obs.costUsd });
       attempts.push({ tier, phase: "observe", costUsd: obs.costUsd, errorKind });
 
