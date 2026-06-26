@@ -1,7 +1,13 @@
 # Heal Loop Design (`@mizchi/vlmkit-heal`)
 
 Date: 2026-06-26
-Status: Approved (design phase)
+Status: Implemented on `feat/heal-loop`. 疎通 confirmed end-to-end against real
+OpenRouter + real Playwright: (1) locator failure healed by a cheap coder
+(`qwen3-coder-30b`), (2) token-based cost accounting makes the budget cap work
+for OpenRouter, (3) VRT-diff routed to a reasoning-VLM observe tier
+(`gemini-2.5-flash-lite`) which, given `expectedChange`, judged intentional and
+updated the baseline. ui-tars was tried in observe and found unsuitable (it
+judged an intentional change as a regression) — see "Default tiers".
 
 ## Goal
 
@@ -58,7 +64,9 @@ interface ModelTier {
   provider: "anthropic" | "gemini" | "openrouter";
   model: string;
   vision: boolean;
-  baseURL?: string; // for self-hosted / non-OpenRouter endpoints (e.g. ui-tars)
+  baseURL?: string;                 // for self-hosted / non-OpenRouter endpoints (e.g. ui-tars)
+  promptCostPerToken?: number;      // USD/token; used when the provider returns costUsd 0 (OpenRouter)
+  completionCostPerToken?: number;
 }
 
 interface RouterOptions {
@@ -78,11 +86,12 @@ interface HealOptions {
   testCommand: string;   // e.g. "pnpm exec playwright test tests/x.spec.ts"
   testFile: string;      // the only code file the loop may edit
   cwd: string;
-  observe: RouterOptions;// tier0 = ui-tars (vision). screenshot analysis / realized verdict
+  observe: RouterOptions;// vision REASONING VLM (NOT ui-tars). judges intentional vs regression
   codegen: RouterOptions;// tier0 = cheap text LLM (gemini-flash) -> last = sonnet
   budgetUsd: number;     // shared cap across BOTH routers; sum exceeding it stops the loop
   maxAttempts: number;
   autoApply?: boolean;   // default false: final apply is a human approval gate
+  expectedChange?: string; // declared expected UI change; observe checks the diff against it
 }
 
 type Verdict = "fixed" | "regression" | "intentional-change" | "give-up";
@@ -122,21 +131,41 @@ loop stops when the sum exceeds `budgetUsd`.
 
 ### Default tiers
 
-Observe axis (vision, GUI grounding):
+Observe axis (vision — judges intentional-change vs regression):
 
-- tier0: `ui-tars` (cheapest; screenshot -> structured failure state, material
-  for the realized verdict). Resolved via `listModels()` if present on
-  OpenRouter as `bytedance/ui-tars*`; otherwise via `ModelTier.baseURL`.
+- tier0: a cheap **reasoning** VLM, e.g. `google/gemini-2.5-flash-lite`
+  ($0.0000001/tok in) or `mistralai/mistral-small-3.2-24b-instruct`.
+- **Do NOT put ui-tars here.** ui-tars is a GUI-grounding/action model (it
+  emits clicks/coordinates), not a judgment model; in real 疎通 runs it
+  returned "regression" for a clearly intentional change. ui-tars belongs in a
+  future re-explore phase (drive the UI to find a path), not in observe.
 
-Codegen axis (text, patch generation — ui-tars is NOT used here, it is a GUI
-action model, not a code generator):
+Codegen axis (text, patch generation):
 
-- tier0: `gemini-2.0-flash-lite` (cheap)
-- tier1: `gemini-2.5-flash`
-- tier2: `anthropic claude-sonnet` (high accuracy, last resort)
+- tier0: cheap coder, e.g. `qwen/qwen3-coder-30b-a3b-instruct` ($0.00000007/tok)
+- tier1: reliable fallback, e.g. `openai/gpt-4o-mini`
+- (or `anthropic claude-sonnet` as a strong last resort)
 
-All tiers are caller-overridable. OpenRouter tiers can be built dynamically
-from `listModels({ maxCost })` (cost-ascending).
+All tiers are caller-overridable. OpenRouter per-token pricing can be fetched
+with `fetchOpenRouterPricing()` and applied with `withPricing(tiers, pricing)`.
+
+### Cost accounting (so the budget cap actually works)
+
+The OpenRouter client in `@mizchi/vlmkit-ai` returns `costUsd: 0` (it does not
+price responses). With OpenRouter-only tiers the budget cap would therefore
+never trip. The loop fixes this with `billedCost(tier, costUsd, usage)`: trust
+a provider `costUsd > 0`, otherwise estimate `promptTokens * promptCostPerToken
++ completionTokens * completionCostPerToken`. Fill the per-token fields via
+`withPricing()`.
+
+### Judging intentional vs regression needs an expectation
+
+intentional-change vs regression **cannot be decided from pixels alone** — even
+a human can't tell whether a change was meant without knowing the intent. Pass
+`HealOptions.expectedChange` (from the spec / PR description); the observe tier
+checks the failing screenshot against it. With no `expectedChange`, the observe
+tier conservatively returns `regression` (never bakes a possible regression into
+the baseline) — a safe default, not a bug.
 
 ## Heal loop state machine
 
@@ -144,31 +173,32 @@ from `listModels({ maxCost })` (cost-ascending).
 loop while (attempt < maxAttempts && !budget.exhausted()):
   1. run testCommand
        pass -> verify (run twice in a row) -> green => Verdict = "fixed", stop
-  2. fail -> OBSERVE phase:
-       - parse error output (classify: locator-not-found / timeout / vrt-diff)
-       - if vrt-diff: capturer screenshot -> vlmkit reasoning realized verdict
-         (intentional change vs regression). model = observe.current()
-  3. CODEGEN phase: model = codegen.current()
-       - context: error kind + current test code + (if any) screenshot / heatmap / a11y diff
-       - verdict "intentional-change" -> baseline-update patch
-       - otherwise -> test locator/wait/assert patch
-       - budget.record(response)
-  4. backup target file(s), then apply patch to testFile / baseline
-  5. -> loop top (re-run)
-  on continued failure: escalate the router for the phase that produced the bad patch
+  2. fail -> classify error output (locator / timeout / vrt-diff / other)
+  3. if vrt-diff -> OBSERVE phase (model = observe.current()):
+       - captureActual(): read newest test-results/*-actual.png
+       - observe(screenshot, textReport + expectedChange) -> verdict
+       - "regression"          -> Verdict = "regression", stop (NOT patched)
+       - "intentional-change"  -> run updateSnapshotsCommand; finalPatch =
+                                  "baseline-update"; loop top (NO codegen call)
+       - "unknown"             -> fall through to CODEGEN
+  4. CODEGEN phase (model = codegen.current()):
+       - context: error kind + current test source + error output
+       - newTestSource -> backup + applyPatch(testFile); loop top
+       - updateBaseline -> run updateSnapshotsCommand; loop top
+       - no usable patch -> escalate codegen
+  on continued failure after a codegen patch: escalate the codegen router
 
 terminate:
-  - budget.exhausted() or attempts exhausted -> Verdict = "give-up" (report best attempt)
-  - confirmed regression (realized = regression, not a test-following issue)
-    -> Verdict = "regression" (reported as an app-side problem, not patched)
+  - budget exhausted or attempts exhausted -> Verdict = "give-up" (best attempt)
 ```
 
 `verify = two consecutive green runs` reuses the reproducibility definition
 from the spec-to-playwright pipeline (flaky-test removal).
 
-The observe phase lets a cheap vision model (ui-tars) supply the
-intentional-vs-regression signal, so the loop calls the expensive codegen
-tiers fewer times — this is the core cost lever.
+The observe phase (cheap reasoning VLM) decides intentional-vs-regression
+*before* any codegen call, and an intentional change updates the baseline
+without invoking codegen at all — so the expensive text tiers run only when a
+test actually needs rewriting. That is the core cost lever.
 
 ## Safety boundary
 
