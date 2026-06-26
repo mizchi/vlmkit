@@ -48,6 +48,10 @@ export interface HealOptions {
   maxAttempts: number;
   /** Playwright outputDir name to read artifacts from (default: auto — test-results / e2e-results). */
   outputDir?: string;
+  /** Min confidence to auto-accept a VRT change (update the baseline). Below it -> needs-review. Default 0.8. */
+  acceptThreshold?: number;
+  /** Optional intent signal for VRT review (commit msg + code diff). See collectGitContext. */
+  gitContext?: string;
   /** Consecutive "gate green but verify red" observations before reporting flaky. Default 2. */
   flakyThreshold?: number;
   /** Default false: the final green patch needs human approval before commit. */
@@ -60,7 +64,7 @@ export interface HealOptions {
   expectedChange?: string;
 }
 
-export type Verdict = "fixed" | "regression" | "intentional-change" | "flaky" | "give-up";
+export type Verdict = "fixed" | "regression" | "intentional-change" | "flaky" | "needs-review" | "give-up";
 
 export type ErrorKind = "locator" | "timeout" | "vrt-diff" | "other";
 

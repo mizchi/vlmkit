@@ -37,7 +37,6 @@ function deps(): Partial<HealDeps> {
         ? { ok: false, stdout: "", stderr: "locator resolved to 0 elements" }
         : { ok: true, stdout: "", stderr: "" };
     },
-    observe: { observe: async () => ({ verdict: "unknown", costUsd: 0 }) },
     codegen: { propose: async () => ({ newTestSource: "// fixed\n", costUsd: 0.3 }) },
   };
 }

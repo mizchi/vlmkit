@@ -3,20 +3,22 @@ import { resolve } from "node:path";
 import { createModelRouter, type Budget } from "./router.ts";
 import { runTest as defaultRunTest, classify, type RunResult } from "./runner.ts";
 import { applyPatch, commitPatch } from "./patch.ts";
-import { findActualScreenshot, findErrorContext } from "./capture.ts";
-import { createRealObserveClient, createRealCodegenClient, type ObserveClient, type CodegenClient } from "./clients.ts";
-import type { HealAttempt, HealOptions, HealResult } from "./types.ts";
+import { findVrtArtifacts, findErrorContext } from "./capture.ts";
+import { createRealCodegenClient, type CodegenClient } from "./clients.ts";
+import { reviewVrtDiff, type VrtReview } from "./review.ts";
+import type { HealAttempt, HealOptions, HealResult, ModelTier } from "./types.ts";
 
 export interface HealDeps {
   runTest: (command: string, cwd: string) => Promise<RunResult>;
-  observe: ObserveClient;
+  /** Judge a vrt-diff (baseline vs actual) -> accept/reject/unsure. Default: reviewVrtDiff. */
+  reviewVrt: (input: { baselinePng: Buffer; actualPng: Buffer; diffPng?: Buffer; expectedChange?: string; gitContext?: string; tier: ModelTier }) => Promise<VrtReview>;
   codegen: CodegenClient;
   /** Baseline files the loop is also allowed to overwrite (besides testFile). */
   baselineAllow?: string[];
   /** Command to refresh VRT baselines. Default: testCommand + " --update-snapshots". */
   updateSnapshotsCommand?: string;
-  /** Grab the failing screenshot to feed the observe tier. Default: newest test-results/*-actual.png. */
-  captureActual?: (cwd: string, output: string) => Promise<Buffer | undefined>;
+  /** Grab the VRT screenshots (expected/actual/diff) for review. Default: newest from the outputDir. */
+  captureVrt?: (cwd: string) => Promise<{ baseline?: Buffer; actual?: Buffer; diff?: Buffer }>;
   /** Page aria snapshot to feed codegen (real element names). Default: newest error-context.md. */
   captureContext?: (cwd: string) => Promise<string | undefined>;
 }
@@ -29,13 +31,14 @@ export interface HealDeps {
 export async function heal(opts: HealOptions, deps?: Partial<HealDeps>): Promise<HealResult> {
   const d: HealDeps = {
     runTest: deps?.runTest ?? defaultRunTest,
-    observe: deps?.observe ?? createRealObserveClient(),
+    reviewVrt: deps?.reviewVrt ?? ((input) => reviewVrtDiff(input)),
     codegen: deps?.codegen ?? createRealCodegenClient(),
     baselineAllow: deps?.baselineAllow,
     updateSnapshotsCommand: deps?.updateSnapshotsCommand,
-    captureActual: deps?.captureActual ?? (async (cwd) => findActualScreenshot(cwd, opts.outputDir)),
+    captureVrt: deps?.captureVrt ?? (async (cwd) => findVrtArtifacts(cwd, opts.outputDir)),
     captureContext: deps?.captureContext ?? (async (cwd) => findErrorContext(cwd, opts.outputDir)),
   };
+  const acceptThreshold = opts.acceptThreshold ?? 0.8;
 
   let spent = 0;
   const budget: Budget = { budgetUsd: opts.budgetUsd, add: (n) => (spent += n), total: () => spent };
@@ -89,29 +92,36 @@ export async function heal(opts: HealOptions, deps?: Partial<HealDeps>): Promise
     const output = `${run.stdout}\n${run.stderr}`;
     const errorKind = classify(output);
 
-    // OBSERVE: for a vrt-diff, the vision tier (ui-tars) looks at the failing
-    // screenshot and judges intentional-change vs regression.
+    // REVIEW: for a vrt-diff, judge baseline vs actual -> accept / reject / unsure.
     if (errorKind === "vrt-diff") {
-      const tier = observeRouter.current();
-      const screenshotPng = await d.captureActual?.(opts.cwd, output);
-      const expectation = opts.expectedChange
-        ? `\n\nDeclared expected change: ${opts.expectedChange}\nIf the screenshot matches this expectation, answer intentional-change; otherwise regression.`
-        : "";
-      const obs = await d.observe.observe({ tier, screenshotPng, textReport: output.slice(0, 2000) + expectation });
-      observeRouter.record({ costUsd: obs.costUsd });
-      attempts.push({ tier, phase: "observe", costUsd: obs.costUsd, errorKind });
+      const art = await d.captureVrt?.(opts.cwd);
+      if (art?.baseline && art.actual) {
+        const tier = observeRouter.current();
+        const review = await d.reviewVrt({
+          baselinePng: art.baseline,
+          actualPng: art.actual,
+          diffPng: art.diff,
+          expectedChange: opts.expectedChange,
+          gitContext: opts.gitContext,
+          tier,
+        });
+        observeRouter.record({ costUsd: review.costUsd });
+        attempts.push({ tier, phase: "observe", costUsd: review.costUsd, errorKind });
 
-      if (obs.verdict === "regression") return done("regression");
-      if (obs.verdict === "intentional-change") {
-        // Refresh the baseline (no test-code edit), then verify next iteration.
-        const cmd = d.updateSnapshotsCommand ?? `${opts.testCommand} --update-snapshots`;
-        await d.runTest(cmd, opts.cwd);
-        finalPatch = "baseline-update";
-        lastWasCodegen = false;
-        continue;
+        if (review.verdict === "reject") return done("regression");
+        if (review.verdict === "accept" && review.confidence >= acceptThreshold) {
+          // Intended change with enough confidence -> refresh the baseline, then verify.
+          const cmd = d.updateSnapshotsCommand ?? `${opts.testCommand} --update-snapshots`;
+          await d.runTest(cmd, opts.cwd);
+          finalPatch = "baseline-update";
+          lastWasCodegen = false;
+          continue;
+        }
+        // unsure, or accept below acceptThreshold -> do not auto-update; a human decides.
+        return done("needs-review");
       }
       if (exhausted()) return done("give-up");
-      // verdict "unknown" -> fall through and try a codegen patch.
+      // no VRT artifacts -> fall through and try a codegen patch.
     }
 
     // CODEGEN: rewrite the test to follow the current UI. Include the page aria

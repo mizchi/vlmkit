@@ -61,3 +61,22 @@ export function findErrorContext(cwd: string, outputDir?: string): string | unde
   const path = newestMatching(cwd, "error-context.md", outputDir);
   return path ? readFileSync(path, "utf8") : undefined;
 }
+
+/**
+ * The three screenshots Playwright writes on a toHaveScreenshot failure:
+ * `*-expected.png` (baseline), `*-actual.png`, `*-diff.png`. Fed to reviewVrtDiff.
+ */
+export function findVrtArtifacts(
+  cwd: string,
+  outputDir?: string,
+): { baseline?: Buffer; actual?: Buffer; diff?: Buffer } {
+  const read = (suffix: string): Buffer | undefined => {
+    const p = newestMatching(cwd, suffix, outputDir);
+    return p ? readFileSync(p) : undefined;
+  };
+  return {
+    baseline: read("-expected.png"),
+    actual: read("-actual.png"),
+    diff: read("-diff.png"),
+  };
+}
