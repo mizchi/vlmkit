@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { createModelRouter, type Budget } from "./router.ts";
 import { runTest as defaultRunTest, classify, type RunResult } from "./runner.ts";
 import { applyPatch, commitPatch } from "./patch.ts";
-import { findActualScreenshot } from "./capture.ts";
+import { findActualScreenshot, findErrorContext } from "./capture.ts";
 import { createRealObserveClient, createRealCodegenClient, type ObserveClient, type CodegenClient } from "./clients.ts";
 import type { HealAttempt, HealOptions, HealResult } from "./types.ts";
 
@@ -17,6 +17,8 @@ export interface HealDeps {
   updateSnapshotsCommand?: string;
   /** Grab the failing screenshot to feed the observe tier. Default: newest test-results/*-actual.png. */
   captureActual?: (cwd: string, output: string) => Promise<Buffer | undefined>;
+  /** Page aria snapshot to feed codegen (real element names). Default: newest error-context.md. */
+  captureContext?: (cwd: string) => Promise<string | undefined>;
 }
 
 /**
@@ -32,6 +34,7 @@ export async function heal(opts: HealOptions, deps?: Partial<HealDeps>): Promise
     baselineAllow: deps?.baselineAllow,
     updateSnapshotsCommand: deps?.updateSnapshotsCommand,
     captureActual: deps?.captureActual ?? (async (cwd) => findActualScreenshot(cwd)),
+    captureContext: deps?.captureContext ?? (async (cwd) => findErrorContext(cwd)),
   };
 
   let spent = 0;
@@ -98,15 +101,15 @@ export async function heal(opts: HealOptions, deps?: Partial<HealDeps>): Promise
       // verdict "unknown" -> fall through and try a codegen patch.
     }
 
-    // CODEGEN: rewrite the test to follow the current UI.
+    // CODEGEN: rewrite the test to follow the current UI. Include the page aria
+    // snapshot so the model knows the real element names (fixes locator breaks).
     const ctier = codegenRouter.current();
     const testSource = readFileSync(opts.testFile, "utf8");
-    const proposal = await d.codegen.propose({
-      tier: ctier,
-      errorKind,
-      testSource,
-      context: output.slice(0, 2000),
-    });
+    const pageSnapshot = await d.captureContext?.(opts.cwd);
+    const context = pageSnapshot
+      ? `${output.slice(0, 1500)}\n\nCurrent page snapshot (real roles/names):\n${pageSnapshot.slice(0, 1500)}`
+      : output.slice(0, 2000);
+    const proposal = await d.codegen.propose({ tier: ctier, errorKind, testSource, context });
     codegenRouter.record({ costUsd: proposal.costUsd });
     attempts.push({ tier: ctier, phase: "codegen", costUsd: proposal.costUsd, errorKind, patch: proposal.newTestSource });
 

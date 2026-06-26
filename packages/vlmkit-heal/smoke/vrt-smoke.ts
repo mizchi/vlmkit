@@ -79,6 +79,7 @@ try {
   // Restore the fixture: page, baseline, and transient playwright output.
   writeFileSync(pageFile, original);
   rmSync(join(fixtures, "test-results"), { recursive: true, force: true });
+  rmSync(join(fixtures, "..", "test-results"), { recursive: true, force: true });
   try {
     execSync("git checkout -- vrt.spec.ts-snapshots", { cwd: fixtures });
   } catch {
