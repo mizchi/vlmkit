@@ -38,3 +38,6 @@ result-*
 
 # Local-only env (loaded by direnv via .envrc; holds API keys)
 .env.local
+
+# heal flaky-test counter (transient)
+_flaky_count.txt

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>app</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 40px; }
+      .result { margin-top: 16px; }
+    </style>
+  </head>
+  <body>
+    <h1>Dashboard</h1>
+    <form id="f">
+      <input id="email" placeholder="Email address" autocomplete="off" />
+      <button type="submit">Submit</button>
+    </form>
+    <p class="result" data-testid="result"></p>
+    <ul data-testid="items">
+      <li>Alpha</li>
+      <li>Beta</li>
+    </ul>
+    <script>
+      document.getElementById("f").addEventListener("submit", (e) => {
+        e.preventDefault();
+        document.querySelector('[data-testid="result"]').textContent = "submitted";
+      });
+    </script>
+  </body>
+</html>

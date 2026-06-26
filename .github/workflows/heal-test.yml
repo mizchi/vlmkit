@@ -1,0 +1,32 @@
+name: heal-test
+
+# Unit tests for @mizchi/vlmkit-heal (node:test, no network). The real-API
+# dogfood/smoke scripts under smoke/ are intentionally NOT run here — they need
+# an OPENROUTER_API_KEY and cost money. These 26 tests are deterministic and
+# offline.
+
+on:
+  pull_request:
+    paths:
+      - "packages/vlmkit-heal/**"
+      - ".github/workflows/heal-test.yml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  heal-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node --test 'src/**/*.test.ts'
+        working-directory: packages/vlmkit-heal

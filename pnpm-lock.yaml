@@ -100,6 +100,21 @@ importers:
         specifier: ^7.0.0
         version: 7.0.0
 
+  packages/vlmkit-heal:
+    dependencies:
+      '@mizchi/vlmkit-ai':
+        specifier: workspace:*
+        version: link:../vlmkit-ai
+      '@mizchi/vlmkit-capture':
+        specifier: workspace:*
+        version: link:../vlmkit-capture
+      '@mizchi/vlmkit-core':
+        specifier: workspace:*
+        version: link:../vlmkit-core
+      playwright:
+        specifier: ^1.58.2
+        version: 1.58.2
+
   packages/vlmkit-markup:
     dependencies:
       '@mizchi/vlmkit-ai':
