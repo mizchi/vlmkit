@@ -73,18 +73,30 @@ describe("heal", () => {
     assert.ok(result.attempts.length >= 1);
   });
 
-  it("updates the baseline when a vrt-diff is intentional (verdict=fixed)", async () => {
+  it("updates the baseline when a vrt-diff is intentional (verdict=fixed), without calling codegen", async () => {
     const testFile = tmpTestFile();
     const m = failThenOk("Error: Screenshot comparison failed");
+    let observedScreenshot: Buffer | undefined;
     const result = await heal(baseOpts(testFile), {
       runTest: m.runTest,
       updateSnapshotsCommand: "noop --update-snapshots",
-      observe: { observe: async () => ({ verdict: "intentional-change", costUsd: 0.0002 }) },
-      codegen: { propose: async () => ({ updateBaseline: true, costUsd: 0.0005 }) },
+      captureActual: async () => Buffer.from("fake-png-bytes"),
+      observe: {
+        observe: async ({ screenshotPng }) => {
+          observedScreenshot = screenshotPng;
+          return { verdict: "intentional-change", costUsd: 0.0002 };
+        },
+      },
+      codegen: {
+        propose: async () => {
+          throw new Error("codegen must NOT be called on the intentional-change path");
+        },
+      },
     });
     assert.equal(result.verdict, "fixed");
     assert.equal(result.finalPatch, "baseline-update");
     assert.ok(result.attempts.some((a) => a.phase === "observe"));
+    assert.equal(observedScreenshot?.toString(), "fake-png-bytes");
   });
 
   it("reports a regression when the vision tier says so (verdict=regression)", async () => {
