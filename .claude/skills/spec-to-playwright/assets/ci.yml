@@ -2,10 +2,11 @@ name: ci
 on: [push, pull_request]
 jobs:
   e2e:
-    # VRT baselines are arch-specific. baseline-linux.sh produces baselines for the
-    # host arch (arm64 on Apple Silicon); use a matching runner so CI agrees. If you
-    # author baselines on amd64, switch this to ubuntu-latest and regenerate them there.
-    runs-on: ubuntu-24.04-arm
+    # CI is the source of truth for VRT baselines, so they are always rendered in
+    # THIS environment. The official Playwright container ships the browsers (no
+    # `playwright install`), and ubuntu-latest pins the arch — developers never
+    # need Docker locally.
+    runs-on: ubuntu-latest
     container:
       image: mcr.microsoft.com/playwright:v1.61.1-noble
     steps:
@@ -18,10 +19,10 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright test   # reproducibility: run 1
+      - run: pnpm exec playwright test   # reproducibility: run 1 (verifies against committed baselines)
       - run: pnpm exec playwright test   # reproducibility: run 2
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
-          path: playwright-report/
+          name: playwright-vrt-actuals   # download these to inspect a diff, then dispatch update-baselines if intended
+          path: test-results/

@@ -44,7 +44,13 @@ The determinism layer and rules are what matter; the agents are just an automate
 Always needed: `_helpers.ts`, `seed.spec.ts`, `_generation-rules.md`, the
 deterministic `playwright.config` merge. Conditional: `init-agents` (only if you
 drive the official agents — skip when hand-writing), `@mizchi/vlmkit-heal` (only
-for the heal step), `baseline-linux.sh` + `ci.yml` (only when CI parity is needed).
+for the heal step), `ci.yml` + `update-baselines.yml` (only when you keep VRT
+baselines, i.e. use `toHaveScreenshot`).
+
+**No Docker.** Pixel baselines can't match across OSes, so instead of rendering
+them locally in a container, **CI is the source of truth**: baselines are always
+rendered in the `ci.yml` environment, and `update-baselines.yml` regenerates them
+there on demand. Developers never run Docker.
 
 1. Generate the official agents + MCP server:
    ```sh
@@ -59,8 +65,8 @@ for the heal step), `baseline-linux.sh` + `ci.yml` (only when CI parity is neede
    - `assets/seed.spec.ts` → `tests/seed.spec.ts` (adjust the initial-state assertion)
    - `assets/_generation-rules.md` → `specs/_generation-rules.md`
    - merge `assets/playwright.config.preset.ts` into your `playwright.config.ts`
-   - `assets/baseline-linux.sh` → a repo script, wired as `"baseline:linux"` in package.json
-   - `assets/ci.yml` → `.github/workflows/ci.yml`
+   - `assets/ci.yml` → `.github/workflows/ci.yml` (verifies against committed baselines)
+   - `assets/update-baselines.yml` → `.github/workflows/update-baselines.yml` (CI renders + commits baselines)
 
 3. Add the heal engine:
    ```sh
@@ -75,8 +81,7 @@ Add these npm scripts (the determinism preset and rules assume them):
 ```json
 "app:build":   "vite build",
 "app:preview": "vite preview --port 4173 --strictPort",
-"verify":      "playwright test && playwright test",
-"baseline:linux": "sh baseline-linux.sh"
+"verify":      "playwright test && playwright test"
 ```
 
 ## Run (staged)
@@ -91,19 +96,20 @@ generate  → invoke the playwright-test-generator agent with specs/<topic>.md.
             specs/_generation-rules.md: gotoApp() + a screenshot at the start and
             at the goal + role/testid/label assertions.
 
-baseline  → generate baselines BEFORE the first verify (a test with toHaveScreenshot
-            fails until its baseline exists). Two paths:
-              • CI parity needed → pnpm run baseline:linux  (linux container, matches CI arch)
-              • local only / CI parity out of scope → pnpm exec playwright test --update-snapshots
-            Either is an acceptable terminal state; pick by whether CI must match.
+baseline  → a test with toHaveScreenshot fails until its baseline exists. CI is the
+            source of truth: push the branch and run the `update-baselines` workflow
+            (it renders baselines in the CI env and commits them back). Locally you
+            MAY run `pnpm exec playwright test --update-snapshots` to preview, but do
+            NOT commit local (e.g. -darwin) snapshots — they won't match CI.
 
-verify    → pnpm run verify           (two consecutive green = reproducible)
+verify    → pnpm run verify           (two consecutive green = reproducible). Locally
+            this is green only against local baselines; the authoritative verify is CI.
 
 heal      → on failure, run the heal loop (below)
 ```
 
-A test is "done" only when `verify` is green twice in a row AND its VRT diff is
-within threshold.
+A test is "done" only when CI's `verify` is green twice in a row AND its VRT diff is
+within threshold (the `ci.yml` workflow runs the suite twice).
 
 ## Determinism essentials
 
@@ -112,9 +118,9 @@ What keeps screenshots byte-stable (all in the assets):
 - `gotoApp()` disables animations/transitions, hides the caret, waits for fonts
 - `webServer` runs `vite build && vite preview` — never the dev server (HMR
   injects scripts that perturb the DOM)
-- **cross-arch caveat**: a baseline is tied to the arch that rendered it. The
-  asset `baseline-linux.sh` renders on the host arch (arm64 on Apple Silicon), so
-  `ci.yml` uses `ubuntu-24.04-arm`. To run CI on amd64, regenerate baselines on amd64.
+- **baselines live in one environment only**: a pixel baseline is tied to the OS/arch
+  that rendered it, so committed baselines are always the ones CI rendered (via
+  `update-baselines.yml`). Never commit locally-rendered snapshots.
 
 ## Heal (failure → fix)
 
@@ -149,10 +155,9 @@ mislabels intentional changes as regressions. Use a cheap reasoning VLM.
 ## Pitfalls (lived in the reference repo)
 
 - **Port 4173 in use** → `lsof -ti tcp:4173 | xargs kill -9` before running.
-- **`baseline:linux` fails with `@rollup/rollup-linux-* not found`** → the host's
-  `node_modules` (e.g. darwin binaries) leaked into the linux container. The asset
-  script already fixes this with an anonymous `-v /work/node_modules` volume.
-- **Emulated amd64 chromium gets SIGKILLed** → never `--platform=linux/amd64` on
-  Apple Silicon. Render baselines natively; match the CI runner arch instead.
+- **VRT fails locally but the test is fine** → you're diffing against CI-rendered
+  baselines on a different OS. That's expected; the authoritative check is CI. Don't
+  "fix" it by committing local snapshots — run the `update-baselines` workflow if the
+  change was intentional.
 - **MCP tools missing / planner can't drive the browser** → `.mcp.json` was just
   created; reload Claude Code so the `playwright-test` server connects.
