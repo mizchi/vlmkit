@@ -1,15 +1,27 @@
 # CI that runs VRT and, on failure, has a model decide accept/reject/needs-review.
-# accept  -> baselines updated in the CI env and committed back to the PR branch
-# reject  -> job fails (regression)
-# needs-review -> job fails with a warning (a human decides)
+#   accept       -> baselines updated in CI and committed back to the PR branch
+#   reject       -> job fails (regression)
+#   needs-review -> job fails with a warning (a human decides)
 #
-# Requires: `@mizchi/vlmkit-heal` as a devDep, `assets/vrt-review.mjs` in the repo,
-# and an OPENROUTER_API_KEY repo secret.
+# Requires: `@mizchi/vlmkit-heal` as a devDep, `tsx` as a devDep, `vrt-review.mjs`
+# in the repo root, and an OPENROUTER_API_KEY repo secret.
+#
+# Every step below earned its place by failing on real CI — do not trim them:
+#   - runner arch MUST match the baseline arch (see runs-on)
+#   - no pnpm `version:` pin (conflicts with packageManager)
+#   - safe.directory (container runs as root; git refuses otherwise)
+#   - checkout the head branch + fetch-depth: 0 (commit-back + intent diff)
+#   - run the review via tsx (the package ships .ts sources)
+#   - push HEAD:head_ref explicitly (pull_request checkout is detached)
 name: vrt-review
 on: [pull_request]
 
 jobs:
   vrt:
+    # A pixel baseline is tied to the OS/arch that rendered it. This MUST match the
+    # arch your baselines were committed on, or every screenshot diffs on font
+    # rendering alone and the review is meaningless.
+    #   amd64 baselines -> ubuntu-latest ; arm64 baselines -> ubuntu-24.04-arm
     runs-on: ubuntu-latest
     permissions:
       contents: write   # to commit accepted baselines back to the PR branch
@@ -17,9 +29,25 @@ jobs:
       image: mcr.microsoft.com/playwright:v1.61.1-noble
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
         with:
-          version: 10
+          # Check out the PR's head branch (not the detached merge commit) so the
+          # accepted-baseline commit can be pushed back to it.
+          ref: ${{ github.head_ref }}
+          # Full history so collectGitContext can diff against origin/<base> to
+          # read the commit intent. A shallow checkout starves the model and it
+          # returns needs-review on a clearly-intended change.
+          fetch-depth: 0
+      # The Playwright container runs as root while the checkout is owned by a
+      # different uid; without this git refuses every command ("dubious ownership"
+      # / "Not a git repository"), breaking the commit-back step.
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      # Make origin/<base> resolvable for the intent diff.
+      - if: github.base_ref != ''
+        run: git fetch --no-tags origin "${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+      # No `version:` here — package.json's `packageManager` drives it. Pinning
+      # both makes pnpm/action-setup@v4 fail with "Multiple versions specified".
+      # (If you have no packageManager field, add `with: { version: 9 }` instead.)
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -35,7 +63,9 @@ jobs:
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GITHUB_BASE_REF: ${{ github.base_ref }}
-        run: node vrt-review.mjs   # exits 0 on accept (snapshots updated), 1 on reject/needs-review
+        # tsx, not bare node: @mizchi/vlmkit-heal ships .ts sources and Node won't
+        # type-strip files under node_modules (ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING).
+        run: npx tsx vrt-review.mjs   # exits 0 on accept (snapshots updated), 1 on reject/needs-review
 
       - name: Commit accepted baselines
         # only reached when the review step exited 0 (accept) and changed snapshots
@@ -46,7 +76,7 @@ jobs:
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add -A
             git commit -m "test: update VRT baselines (model-reviewed) [skip ci]"
-            git push
+            git push origin "HEAD:${{ github.head_ref }}"
           fi
 
       - name: Pass through a real VRT pass

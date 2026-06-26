@@ -170,9 +170,28 @@ assets wire this up:
   or `EXPECTED_CHANGE`, and calls `reviewVrtDiff`. accept (≥0.8) → runs
   `--update-snapshots` and exits 0; reject / unsure → exits 1.
 - `assets/vrt-review-ci.yml` → `.github/workflows/vrt-review.yml`. Runs the VRT
-  with `continue-on-error`, then `node vrt-review.mjs` on failure, then commits the
-  refreshed baselines back to the PR branch on accept (`permissions: contents: write`).
-  Needs an `OPENROUTER_API_KEY` secret.
+  with `continue-on-error`, runs the review on failure, then commits the refreshed
+  baselines back to the PR branch on accept (`permissions: contents: write`).
+  Needs an `OPENROUTER_API_KEY` secret and `tsx` as a devDep.
+
+The workflow's structure is load-bearing — each line below was added after it
+failed on real CI, so keep them when adapting:
+- **Runner arch must match the baseline arch.** A pixel baseline is tied to the
+  OS/arch that rendered it; on a mismatched runner every screenshot diffs on font
+  rendering alone. `ubuntu-latest` for amd64 baselines, `ubuntu-24.04-arm` for arm64.
+- **Run the review via `npx tsx`, not `node`.** `@mizchi/vlmkit-heal` ships `.ts`
+  sources, and Node won't type-strip files under `node_modules`
+  (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`). Add `tsx` to devDependencies.
+- **`checkout` with `ref: github.head_ref` + `fetch-depth: 0`.** `pull_request`
+  checks out a detached merge commit, so the baseline commit can't be pushed back
+  without the head ref; and a shallow checkout leaves `origin/<base>` absent, which
+  starves `collectGitContext` and forces needs-review on an intended change.
+- **`safe.directory` before any git op.** The container runs as root while the
+  checkout is owned by another uid; git refuses otherwise and commit-back fails.
+- **Drop the pnpm `version:` pin** when `package.json` has `packageManager`, or
+  `pnpm/action-setup@v4` errors with "Multiple versions specified".
+- Push with `git push origin "HEAD:${{ github.head_ref }}"` (detached HEAD has no
+  upstream).
 
 ```js
 import { findVrtArtifacts, reviewVrtDiff, collectGitContext } from "@mizchi/vlmkit-heal";
@@ -202,3 +221,7 @@ second opinion (single-tier ladders skip it automatically).
   change was intentional.
 - **MCP tools missing / planner can't drive the browser** → `.mcp.json` was just
   created; reload Claude Code so the `playwright-test` server connects.
+- **`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING` when running a heal/review
+  script** → `@mizchi/vlmkit-heal` ships `.ts` sources and Node won't type-strip
+  under `node_modules`. Run your script with `npx tsx script.mjs` (add `tsx` as a
+  devDep), not bare `node`.
