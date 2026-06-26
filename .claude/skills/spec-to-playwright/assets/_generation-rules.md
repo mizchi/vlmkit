@@ -19,7 +19,10 @@
 - CSS / xpath の直書きは避ける。
 
 ## baseline
-- 生成直後に `pnpm run baseline:linux` で baseline を撮りコミットする（CI と arch 一致）。
+- `toHaveScreenshot` を含むテストは baseline が無いと落ちる。**verify の前に必ず baseline を生成**する。
+  - CI と arch 一致が必要: `pnpm run baseline:linux`（linux コンテナ）
+  - ローカルのみ / CI parity 不要: `pnpm exec playwright test --update-snapshots`（host arch）
+- 生成した baseline はコミットする。
 
 ## 再現性の定義
 - 生成テストは「連続2回 green」で初めて合格とみなす（`pnpm run verify`）。

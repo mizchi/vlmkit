@@ -25,7 +25,26 @@ linux container.
 
 Not for: one-off edits to a single existing test (just edit it).
 
+**Assumes a Vite app** served by `vite build` + `vite preview` (the determinism
+preset uses `pnpm app:build && pnpm app:preview`). For other build tools, adapt
+the `webServer` command + the two npm scripts; the rest of the pipeline is the same.
+
+**No official agents available?** The `plan`/`generate` steps below invoke the
+`init-agents` planner/generator (they need the `playwright-test` MCP server in a
+main Claude Code session). If you can't dispatch them — e.g. you are a subagent,
+or `init-agents` isn't set up — do their job by hand with the SAME steps, in order:
+  1. explore the app to confirm real roles/labels/testids
+  2. write `specs/<topic>.md` (reference `**Seed:** tests/seed.spec.ts`)
+  3. adjust `tests/seed.spec.ts` to your app's actual initial state
+  4. hand-write `tests/<topic>.spec.ts` strictly following `specs/_generation-rules.md`
+The determinism layer and rules are what matter; the agents are just an automated author.
+
 ## Setup (once per repo)
+
+Always needed: `_helpers.ts`, `seed.spec.ts`, `_generation-rules.md`, the
+deterministic `playwright.config` merge. Conditional: `init-agents` (only if you
+drive the official agents — skip when hand-writing), `@mizchi/vlmkit-heal` (only
+for the heal step), `baseline-linux.sh` + `ci.yml` (only when CI parity is needed).
 
 1. Generate the official agents + MCP server:
    ```sh
@@ -72,7 +91,11 @@ generate  → invoke the playwright-test-generator agent with specs/<topic>.md.
             specs/_generation-rules.md: gotoApp() + a screenshot at the start and
             at the goal + role/testid/label assertions.
 
-baseline  → pnpm run baseline:linux   (linux container; baselines match CI arch)
+baseline  → generate baselines BEFORE the first verify (a test with toHaveScreenshot
+            fails until its baseline exists). Two paths:
+              • CI parity needed → pnpm run baseline:linux  (linux container, matches CI arch)
+              • local only / CI parity out of scope → pnpm exec playwright test --update-snapshots
+            Either is an acceptable terminal state; pick by whether CI must match.
 
 verify    → pnpm run verify           (two consecutive green = reproducible)
 
