@@ -644,7 +644,7 @@ docs/
 
 ## Agent Skills (APM)
 
-vlmkit ships five coding-agent skills under `.claude/skills/`. They wrap
+vlmkit ships six coding-agent skills under `.claude/skills/`. They wrap
 the most common workflows as standalone, agent-readable playbooks.
 Other repos can install them via [APM](https://agentskills.io):
 
@@ -652,12 +652,13 @@ Other repos can install them via [APM](https://agentskills.io):
 # Install a single skill into the current repo's .claude/skills/
 apm install mizchi/vlmkit/.claude/skills/vrt-visual-diff
 
-# Install all five
+# Install all six
 apm install mizchi/vlmkit/.claude/skills/vrt-visual-diff \
             mizchi/vlmkit/.claude/skills/vrt-migration-eval \
             mizchi/vlmkit/.claude/skills/vrt-css-fix-loop \
             mizchi/vlmkit/.claude/skills/vrt-markup-synth \
-            mizchi/vlmkit/.claude/skills/vrt-regression-watch
+            mizchi/vlmkit/.claude/skills/vrt-regression-watch \
+            mizchi/vlmkit/.claude/skills/spec-to-playwright
 ```
 
 | Skill | Entry workflow | Use when |
@@ -667,6 +668,7 @@ apm install mizchi/vlmkit/.claude/skills/vrt-visual-diff \
 | `vrt-css-fix-loop` | `fix-loop.ts` (VLM-driven) | Closed-loop CSS auto-repair benchmark |
 | `vrt-markup-synth` | `vlmkit build\|scan\|check\|stress *` | Screenshot → HTML/CSS, token / theme / i18n audits |
 | `vrt-regression-watch` | `vlmkit diff agent --previous --fail-on-regression` | Per-PR or scheduled regression gate |
+| `spec-to-playwright` | `init-agents` plan/generate → deterministic VRT → `@mizchi/vlmkit-heal` | Spec → Playwright test with stable VRT + self-healing |
 
 Each skill assumes the `vrt` CLI is on `$PATH` (this repo published as
 a Node package, or built from source) and Node 24+. VLM-using skills
