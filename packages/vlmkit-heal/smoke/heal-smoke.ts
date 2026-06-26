@@ -26,11 +26,12 @@ const result = await heal(
     testCommand: "pnpm exec playwright test broken.spec.ts",
     testFile,
     cwd: fixtures,
-    observe: { tiers: [{ provider: "openrouter", model: "bytedance/ui-tars-72b", vision: true }] },
+    // All tiers via OpenRouter (single OPENROUTER_API_KEY).
+    observe: { tiers: [{ provider: "openrouter", model: "bytedance/ui-tars-1.5-7b", vision: true }] },
     codegen: {
       tiers: [
-        { provider: "gemini", model: "gemini-2.0-flash-lite", vision: false },
-        { provider: "anthropic", model: "claude-sonnet-4-20250514", vision: false },
+        { provider: "openrouter", model: "qwen/qwen3-coder-30b-a3b-instruct", vision: false }, // cheapest
+        { provider: "openrouter", model: "openai/gpt-4o-mini", vision: false },                // reliable fallback
       ],
     },
     budgetUsd: 1,
