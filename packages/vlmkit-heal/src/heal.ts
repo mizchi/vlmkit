@@ -33,8 +33,8 @@ export async function heal(opts: HealOptions, deps?: Partial<HealDeps>): Promise
     codegen: deps?.codegen ?? createRealCodegenClient(),
     baselineAllow: deps?.baselineAllow,
     updateSnapshotsCommand: deps?.updateSnapshotsCommand,
-    captureActual: deps?.captureActual ?? (async (cwd) => findActualScreenshot(cwd)),
-    captureContext: deps?.captureContext ?? (async (cwd) => findErrorContext(cwd)),
+    captureActual: deps?.captureActual ?? (async (cwd) => findActualScreenshot(cwd, opts.outputDir)),
+    captureContext: deps?.captureContext ?? (async (cwd) => findErrorContext(cwd, opts.outputDir)),
   };
 
   let spent = 0;
