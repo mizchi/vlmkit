@@ -47,6 +47,8 @@ export async function heal(opts: HealOptions, deps?: Partial<HealDeps>): Promise
   const attempts: HealAttempt[] = [];
   let finalPatch: string | undefined;
   let lastWasCodegen = false;
+  let flakeStreak = 0;
+  const flakyThreshold = opts.flakyThreshold ?? 2;
 
   // Snapshot the original so a non-"fixed" outcome leaves the working tree clean
   // (never leave an unverified patch behind on give-up/regression).
@@ -73,8 +75,13 @@ export async function heal(opts: HealOptions, deps?: Partial<HealDeps>): Promise
       if (v1.ok && v2.ok) {
         return done("fixed");
       }
-      // flaky: fall through and treat as failure
+      // Gate passed but a verify run failed: the test CAN pass, so this is
+      // instability, not a code bug. Don't patch it — retry, and report flaky
+      // if it keeps happening.
+      if (++flakeStreak >= flakyThreshold) return done("flaky");
+      continue;
     }
+    flakeStreak = 0;
 
     // A codegen patch from the previous iteration didn't fix it -> escalate.
     if (lastWasCodegen) codegenRouter.escalate();

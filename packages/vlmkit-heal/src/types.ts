@@ -46,6 +46,8 @@ export interface HealOptions {
   /** Shared cap across BOTH routers; the summed cost exceeding it stops the loop. */
   budgetUsd: number;
   maxAttempts: number;
+  /** Consecutive "gate green but verify red" observations before reporting flaky. Default 2. */
+  flakyThreshold?: number;
   /** Default false: the final green patch needs human approval before commit. */
   autoApply?: boolean;
   /**
@@ -56,7 +58,7 @@ export interface HealOptions {
   expectedChange?: string;
 }
 
-export type Verdict = "fixed" | "regression" | "intentional-change" | "give-up";
+export type Verdict = "fixed" | "regression" | "intentional-change" | "flaky" | "give-up";
 
 export type ErrorKind = "locator" | "timeout" | "vrt-diff" | "other";
 

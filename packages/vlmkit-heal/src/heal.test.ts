@@ -113,26 +113,32 @@ describe("heal", () => {
     assert.equal(observedScreenshot?.toString(), "fake-png-bytes");
   });
 
-  it("does NOT declare fixed when the second verify run flakes red", async () => {
-    const testFile = tmpTestFile();
-    // gate always passes, but the 2nd verify run always fails -> never 'fixed'.
+  it("reports flaky (not fixed, no patch) when verify intermittently fails", async () => {
+    const testFile = tmpTestFile("// ORIGINAL\n");
+    // pattern per iteration: gate=ok, v1=ok, v2=FAIL -> flaky signal each round
     let call = 0;
+    let codegenCalled = false;
     const result = await heal(
-      { ...baseOpts(testFile), maxAttempts: 2 },
+      { ...baseOpts(testFile), maxAttempts: 5, flakyThreshold: 2 },
       {
         runTest: async () => {
-          call++;
-          // pattern per iteration: gate=ok, v1=ok, v2=FAIL
-          const phase = (call - 1) % 3;
+          const phase = call++ % 3;
           return phase === 2
-            ? { ok: false, stdout: "", stderr: "flaky: locator resolved to 0 elements" }
+            ? { ok: false, stdout: "", stderr: "intermittent failure" }
             : { ok: true, stdout: "", stderr: "" };
         },
         observe: { observe: async () => ({ verdict: "unknown", costUsd: 0 }) },
-        codegen: { propose: async () => ({ newTestSource: "// attempted patch\n", costUsd: 0.001 }) },
+        codegen: {
+          propose: async () => {
+            codegenCalled = true;
+            return { newTestSource: "// PATCH\n", costUsd: 0.001 };
+          },
+        },
       },
     );
-    assert.notEqual(result.verdict, "fixed");
+    assert.equal(result.verdict, "flaky");
+    assert.equal(codegenCalled, false, "must not patch a flaky test");
+    assert.equal(readFileSync(testFile, "utf8"), "// ORIGINAL\n");
   });
 
   it("reports a regression when the vision tier says so (verdict=regression)", async () => {
