@@ -50,6 +50,8 @@ export interface HealOptions {
   outputDir?: string;
   /** Min confidence to auto-accept a VRT change (update the baseline). Below it -> needs-review. Default 0.8. */
   acceptThreshold?: number;
+  /** Confirm a VRT accept with the strongest observe tier before updating the baseline. Default true. */
+  confirmAccept?: boolean;
   /** Optional intent signal for VRT review (commit msg + code diff). See collectGitContext. */
   gitContext?: string;
   /** Consecutive "gate green but verify red" observations before reporting flaky. Default 2. */

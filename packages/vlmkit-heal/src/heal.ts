@@ -39,6 +39,7 @@ export async function heal(opts: HealOptions, deps?: Partial<HealDeps>): Promise
     captureContext: deps?.captureContext ?? (async (cwd) => findErrorContext(cwd, opts.outputDir)),
   };
   const acceptThreshold = opts.acceptThreshold ?? 0.8;
+  const confirmAccept = opts.confirmAccept ?? true;
 
   let spent = 0;
   const budget: Budget = { budgetUsd: opts.budgetUsd, add: (n) => (spent += n), total: () => spent };
@@ -109,8 +110,30 @@ export async function heal(opts: HealOptions, deps?: Partial<HealDeps>): Promise
         attempts.push({ tier, phase: "observe", costUsd: review.costUsd, errorKind });
 
         if (review.verdict === "reject") return done("regression");
-        if (review.verdict === "accept" && review.confidence >= acceptThreshold) {
-          // Intended change with enough confidence -> refresh the baseline, then verify.
+
+        const accepted = review.verdict === "accept" && review.confidence >= acceptThreshold;
+        if (accepted) {
+          // An accept auto-updates the baseline, so a confidently-wrong accept (cheap
+          // VLMs miss collateral breakage) is the dangerous case. Asymmetrically
+          // confirm it with the STRONGEST observe tier before trusting it.
+          const strong = opts.observe.tiers[opts.observe.tiers.length - 1];
+          if (confirmAccept && strong && strong.model !== tier.model) {
+            const confirm = await d.reviewVrt({
+              baselinePng: art.baseline,
+              actualPng: art.actual,
+              diffPng: art.diff,
+              expectedChange: opts.expectedChange,
+              gitContext: opts.gitContext,
+              tier: strong,
+            });
+            observeRouter.record({ costUsd: confirm.costUsd });
+            attempts.push({ tier: strong, phase: "observe", costUsd: confirm.costUsd, errorKind });
+            if (!(confirm.verdict === "accept" && confirm.confidence >= acceptThreshold)) {
+              // The strong model disagrees -> don't bake it in; a human decides.
+              return done("needs-review");
+            }
+          }
+          // Intended change, confirmed -> refresh the baseline, then verify.
           const cmd = d.updateSnapshotsCommand ?? `${opts.testCommand} --update-snapshots`;
           await d.runTest(cmd, opts.cwd);
           finalPatch = "baseline-update";

@@ -1,0 +1,54 @@
+# CI that runs VRT and, on failure, has a model decide accept/reject/needs-review.
+# accept  -> baselines updated in the CI env and committed back to the PR branch
+# reject  -> job fails (regression)
+# needs-review -> job fails with a warning (a human decides)
+#
+# Requires: `@mizchi/vlmkit-heal` as a devDep, `assets/vrt-review.mjs` in the repo,
+# and an OPENROUTER_API_KEY repo secret.
+name: vrt-review
+on: [pull_request]
+
+jobs:
+  vrt:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # to commit accepted baselines back to the PR branch
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-noble
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - id: vrt
+        run: pnpm exec playwright test
+        continue-on-error: true   # let the review step interpret a VRT failure
+
+      - name: Review VRT failure with a model
+        if: steps.vrt.outcome == 'failure'
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: node vrt-review.mjs   # exits 0 on accept (snapshots updated), 1 on reject/needs-review
+
+      - name: Commit accepted baselines
+        # only reached when the review step exited 0 (accept) and changed snapshots
+        if: steps.vrt.outcome == 'failure'
+        run: |
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "test: update VRT baselines (model-reviewed) [skip ci]"
+            git push
+          fi
+
+      - name: Pass through a real VRT pass
+        if: steps.vrt.outcome == 'success'
+        run: echo "VRT green"

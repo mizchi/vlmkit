@@ -122,6 +122,71 @@ describe("heal", () => {
     assert.equal(result.verdict, "needs-review");
   });
 
+  it("downgrades an accept to needs-review when the strong observe tier disagrees (confirmAccept)", async () => {
+    const testFile = tmpTestFile();
+    const opts: HealOptions = {
+      ...baseOpts(testFile),
+      observe: { tiers: [
+        { provider: "openrouter", model: "cheap", vision: true },
+        { provider: "openrouter", model: "strong", vision: true },
+      ]},
+    };
+    let strongCalled = false;
+    const result = await heal(opts, {
+      runTest: async () => ({ ok: false, stdout: "", stderr: "Error: Screenshot comparison failed" }),
+      captureVrt: async () => ({ baseline: Buffer.from("B"), actual: Buffer.from("A") }),
+      reviewVrt: async ({ tier }) => {
+        if (tier.model === "strong") {
+          strongCalled = true;
+          return { verdict: "reject", confidence: 0.9, reason: "collateral breakage", intentSource: "expectedChange", costUsd: 0.001 };
+        }
+        return { verdict: "accept", confidence: 0.99, reason: "looks intended", intentSource: "expectedChange", costUsd: 0.0001 };
+      },
+      codegen: { propose: async () => { throw new Error("codegen must NOT run on the VRT path"); } },
+    });
+    assert.equal(result.verdict, "needs-review");
+    assert.equal(strongCalled, true, "the strong tier must confirm an accept");
+  });
+
+  it("accepts and updates the baseline when both tiers accept (verdict=fixed)", async () => {
+    const testFile = tmpTestFile();
+    const opts: HealOptions = {
+      ...baseOpts(testFile),
+      observe: { tiers: [
+        { provider: "openrouter", model: "cheap", vision: true },
+        { provider: "openrouter", model: "strong", vision: true },
+      ]},
+    };
+    const m = failThenOk("Error: Screenshot comparison failed");
+    const result = await heal(opts, {
+      runTest: m.runTest,
+      updateSnapshotsCommand: "noop --update-snapshots",
+      captureVrt: async () => ({ baseline: Buffer.from("B"), actual: Buffer.from("A") }),
+      reviewVrt: async () => ({ verdict: "accept", confidence: 0.95, reason: "intended", intentSource: "expectedChange", costUsd: 0.0001 }),
+      codegen: { propose: async () => { throw new Error("codegen must NOT run on the accept path"); } },
+    });
+    assert.equal(result.verdict, "fixed");
+    assert.equal(result.finalPatch, "baseline-update");
+  });
+
+  it("skips confirmation when confirmAccept is false (single review accepts -> fixed)", async () => {
+    const testFile = tmpTestFile();
+    const m = failThenOk("Error: Screenshot comparison failed");
+    let reviewCalls = 0;
+    const result = await heal(
+      { ...baseOpts(testFile), confirmAccept: false },
+      {
+        runTest: m.runTest,
+        updateSnapshotsCommand: "noop --update-snapshots",
+        captureVrt: async () => ({ baseline: Buffer.from("B"), actual: Buffer.from("A") }),
+        reviewVrt: async () => { reviewCalls++; return { verdict: "accept", confidence: 0.95, reason: "ok", intentSource: "expectedChange", costUsd: 0.0001 }; },
+        codegen: { propose: async () => { throw new Error("codegen must NOT run"); } },
+      },
+    );
+    assert.equal(result.verdict, "fixed");
+    assert.equal(reviewCalls, 1, "no confirmation review when confirmAccept is false");
+  });
+
   it("reports flaky (not fixed, no patch) when verify intermittently fails", async () => {
     const testFile = tmpTestFile("// ORIGINAL\n");
     // pattern per iteration: gate=ok, v1=ok, v2=FAIL -> flaky signal each round

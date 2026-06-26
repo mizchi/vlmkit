@@ -143,7 +143,7 @@ const r = await heal({
   // expectedChange: "the badge turns red"  // declare for a VRT change; omit and a
   //                                          regression is reported, NOT baked into the baseline
 });
-// r.verdict: "fixed" | "regression" | "intentional-change" | "flaky" | "give-up"
+// r.verdict: "fixed" | "regression" | "needs-review" | "flaky" | "give-up"
 ```
 
 Needs `OPENROUTER_API_KEY`. Heal only edits the test file + baselines (never app
@@ -158,6 +158,40 @@ mislabels intentional changes as regressions. Use a cheap reasoning VLM.
 `qwen/qwen3-coder-30b-a3b-instruct`, etc. — all on one `OPENROUTER_API_KEY`.
 `provider: "anthropic"` / `"gemini"` hit those APIs directly (need their own key).
 `baseURL` on a tier points at any OpenAI-compatible endpoint (e.g. self-hosted).
+
+## VRT review in CI (accept / reject / needs-review)
+
+When a `toHaveScreenshot()` VRT fails in CI, a model can decide whether the change
+is **intended** (accept → refresh the baseline) or a **regression** (reject). Two
+assets wire this up:
+
+- `assets/vrt-review.mjs` → repo root. Reads the failing VRT artifacts
+  (`findVrtArtifacts`), infers intent from the commit + diff (`collectGitContext`)
+  or `EXPECTED_CHANGE`, and calls `reviewVrtDiff`. accept (≥0.8) → runs
+  `--update-snapshots` and exits 0; reject / unsure → exits 1.
+- `assets/vrt-review-ci.yml` → `.github/workflows/vrt-review.yml`. Runs the VRT
+  with `continue-on-error`, then `node vrt-review.mjs` on failure, then commits the
+  refreshed baselines back to the PR branch on accept (`permissions: contents: write`).
+  Needs an `OPENROUTER_API_KEY` secret.
+
+```js
+import { findVrtArtifacts, reviewVrtDiff, collectGitContext } from "@mizchi/vlmkit-heal";
+const { baseline, actual, diff } = findVrtArtifacts(process.cwd());
+const review = await reviewVrtDiff({
+  baselinePng: baseline, actualPng: actual, diffPng: diff,
+  gitContext: collectGitContext(process.cwd(), { base: "origin/main" }),
+  tier: { provider: "openrouter", model: "openai/gpt-5-mini", vision: true },
+});
+// review.verdict: "accept" | "reject" | "unsure"
+```
+
+**Use a CAPABLE reasoning VLM for the review tier** (e.g. `gpt-5-mini`, not a tiny
+VLM). Cheap VLMs accept a diff with high confidence while missing *collateral*
+breakage elsewhere on the page. Inside the heal loop the same risk is guarded by
+`confirmAccept` (default `true`): an accept is re-checked by the **strongest**
+`observe` tier before the baseline is touched; if it disagrees the verdict becomes
+`needs-review` instead of silently updating. Set `confirmAccept: false` to skip the
+second opinion (single-tier ladders skip it automatically).
 
 ## Pitfalls (lived in the reference repo)
 
