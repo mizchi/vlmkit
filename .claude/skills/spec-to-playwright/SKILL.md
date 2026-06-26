@@ -136,7 +136,7 @@ const r = await heal({
   // codegen = cheap coder first, escalate to a stronger model on repeated failure
   codegen: { tiers: [
     { provider: "openrouter", model: "qwen/qwen3-coder-30b-a3b-instruct", vision: false },
-    { provider: "openrouter", model: "openai/gpt-4o-mini", vision: false },
+    { provider: "openrouter", model: "openai/gpt-5-codex", vision: false },
   ]},
   budgetUsd: 1,            // shared cap; estimated from tokens × price for OpenRouter
   maxAttempts: 4,
@@ -151,6 +151,13 @@ code), and only commits a patch that verified green twice.
 
 **Do NOT use ui-tars for the observe judgment** — it is a GUI-grounding model and
 mislabels intentional changes as regressions. Use a cheap reasoning VLM.
+
+**Any provider/model drives a tier** — `provider` is `"openrouter" | "anthropic" |
+"gemini"`. Via OpenRouter you can name any model: `openai/gpt-5-codex`,
+`openai/gpt-5-mini`, `anthropic/claude-sonnet-4.6` (Claude as the driver),
+`qwen/qwen3-coder-30b-a3b-instruct`, etc. — all on one `OPENROUTER_API_KEY`.
+`provider: "anthropic"` / `"gemini"` hit those APIs directly (need their own key).
+`baseURL` on a tier points at any OpenAI-compatible endpoint (e.g. self-hosted).
 
 ## Pitfalls (lived in the reference repo)
 

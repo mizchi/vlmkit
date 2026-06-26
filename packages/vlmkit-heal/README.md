@@ -18,16 +18,23 @@ const result = await heal({
   testCommand: "pnpm exec playwright test login.spec.ts",
   testFile: "tests/login.spec.ts",     // the only source file the loop may edit
   cwd: process.cwd(),
-  observe: { tiers: [{ provider: "openrouter", model: "bytedance/ui-tars-72b", vision: true }] },
+  // observe = a cheap REASONING VLM (NOT ui-tars, which is GUI-grounding only)
+  observe: { tiers: [{ provider: "openrouter", model: "google/gemini-2.5-flash-lite", vision: true }] },
   codegen: { tiers: [
-    { provider: "gemini",    model: "gemini-2.0-flash-lite",   vision: false }, // cheap first
-    { provider: "anthropic", model: "claude-sonnet-4-20250514", vision: false }, // strong last
+    { provider: "openrouter", model: "qwen/qwen3-coder-30b-a3b-instruct", vision: false }, // cheap first
+    { provider: "openrouter", model: "openai/gpt-5-codex", vision: false },                // strong last
   ]},
   budgetUsd: 1.0,        // shared cap across both tiers; loop stops when summed cost exceeds it
   maxAttempts: 4,
 });
-// result.verdict: "fixed" | "regression" | "intentional-change" | "give-up"
+// result.verdict: "fixed" | "regression" | "intentional-change" | "flaky" | "give-up"
 ```
+
+Any provider/model drives a tier. Via OpenRouter (one `OPENROUTER_API_KEY`) you
+can name any model — `openai/gpt-5-codex`, `openai/gpt-5-mini`,
+`anthropic/claude-sonnet-4.6` (Claude as the driver), `qwen/qwen3-coder-30b-a3b-instruct`.
+`provider: "anthropic"` / `"gemini"` hit those APIs directly (own key); a tier's
+`baseURL` points at any OpenAI-compatible endpoint.
 
 Heal a whole failing suite with one cross-file budget:
 
