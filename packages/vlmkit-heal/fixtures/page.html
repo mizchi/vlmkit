@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8" /><title>fixture</title></head>
+  <body>
+    <button id="go" aria-label="Start">Start</button>
+    <div data-testid="result"></div>
+    <script>
+      document.getElementById("go").addEventListener("click", () => {
+        document.querySelector('[data-testid="result"]').textContent = "clicked";
+      });
+    </script>
+  </body>
+</html>
