@@ -19,7 +19,7 @@ const result = await heal({
   testFile: "tests/login.spec.ts",     // the only source file the loop may edit
   cwd: process.cwd(),
   // observe = a cheap REASONING VLM (NOT ui-tars, which is GUI-grounding only)
-  observe: { tiers: [{ provider: "openrouter", model: "google/gemini-2.5-flash-lite", vision: true }] },
+  observe: { tiers: [{ provider: "openrouter", model: "openai/gpt-5-mini", vision: true }] },
   codegen: { tiers: [
     { provider: "openrouter", model: "qwen/qwen3-coder-30b-a3b-instruct", vision: false }, // cheap first
     { provider: "openrouter", model: "openai/gpt-5-codex", vision: false },                // strong last
@@ -79,7 +79,7 @@ const { baseline, actual, diff } = findVrtArtifacts(cwd); // *-expected/-actual/
 const r = await reviewVrtDiff({
   baselinePng: baseline!, actualPng: actual!, diffPng: diff,
   expectedChange: "the status badge turns red",       // or omit and pass gitContext, or neither
-  tier: { provider: "openrouter", model: "google/gemini-2.5-flash-lite", vision: true },
+  tier: { provider: "openrouter", model: "openai/gpt-5-mini", vision: true },
 });
 // r: { verdict: "accept" | "reject" | "unsure", confidence: 0..1, reason, intentSource, costUsd }
 ```
@@ -87,6 +87,13 @@ const r = await reviewVrtDiff({
 Inside `heal`, this drives the VRT path: `accept` with `confidence >=
 acceptThreshold` (default 0.8) updates the baseline; `reject` → `regression`;
 `unsure` or a low-confidence accept → the `needs-review` verdict (a human decides).
+
+**Use a capable reasoning VLM for the review tier.** A wrong `accept` bakes a
+regression into the baseline, so the model must catch *collateral* breakage (the
+declared change happened, but something else also broke). Empirically a small VLM
+(gemini-2.5-flash-lite) misses this — it accepts with high confidence even when an
+unrelated heading disappeared, and a diff image doesn't help. `openai/gpt-5-mini`
+and `anthropic/claude-sonnet-4.6` catch it reliably and are still cheap; prefer those.
 
 ## Design
 

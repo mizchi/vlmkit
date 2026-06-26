@@ -132,7 +132,7 @@ const r = await heal({
   testFile: "tests/<topic>.spec.ts",
   cwd: process.cwd(),
   // observe = a cheap REASONING VLM that judges intentional-change vs regression
-  observe: { tiers: [{ provider: "openrouter", model: "google/gemini-2.5-flash-lite", vision: true }] },
+  observe: { tiers: [{ provider: "openrouter", model: "openai/gpt-5-mini", vision: true }] },
   // codegen = cheap coder first, escalate to a stronger model on repeated failure
   codegen: { tiers: [
     { provider: "openrouter", model: "qwen/qwen3-coder-30b-a3b-instruct", vision: false },
