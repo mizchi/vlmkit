@@ -51,8 +51,10 @@ export function buildReviewPrompt(intent: ResolvedIntent): string {
     intent.intentSource === "vision-only"
       ? "There is no declared intent — judge from the images alone and keep CONFIDENCE modest."
       : `Declared intended change (${intent.intentSource}):\n${intent.text}\n` +
-        "If the visual change matches this intent, lean accept; if it contradicts or adds " +
-        "unrelated breakage, lean reject.";
+        "Accept ONLY if the change matches this intent AND nothing else unexpected " +
+        "changed. If there is ANY additional or unrelated visual change beyond the " +
+        "declared one (e.g. a heading disappears, layout shifts, other text changes), " +
+        "that is collateral breakage — reject. List the unexpected change in REASON.";
   return head + intentLine;
 }
 
