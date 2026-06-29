@@ -5,6 +5,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildPlaywrightListGate,
+  buildPlaywrightRuntimeGate,
   buildTypecheckGate,
   GeneratedTestGateError,
   GeneratedTestWriteError,
@@ -129,10 +130,14 @@ describe("writeGeneratedTestFile", () => {
 });
 
 describe("gate builders", () => {
-  it("builds Playwright --list and TypeScript gate commands", () => {
+  it("builds Playwright --list, runtime, and TypeScript gate commands", () => {
     assert.deepEqual(buildPlaywrightListGate(), {
       name: "playwright-list",
       command: "pnpm exec playwright test --list {testFile}",
+    });
+    assert.deepEqual(buildPlaywrightRuntimeGate("playwright.e2e.config.ts"), {
+      name: "playwright-runtime",
+      command: "pnpm exec playwright test --config playwright.e2e.config.ts {testFile}",
     });
     assert.deepEqual(buildTypecheckGate("tsconfig.e2e.json"), {
       name: "typecheck",

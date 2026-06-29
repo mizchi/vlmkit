@@ -110,6 +110,15 @@ export function buildPlaywrightListGate(): GateCommand {
   };
 }
 
+export function buildPlaywrightRuntimeGate(config?: string): GateCommand {
+  return {
+    name: "playwright-runtime",
+    command: config
+      ? `pnpm exec playwright test --config ${config} {testFile}`
+      : "pnpm exec playwright test {testFile}",
+  };
+}
+
 export function buildTypecheckGate(tsconfig?: string): GateCommand {
   return {
     name: "typecheck",

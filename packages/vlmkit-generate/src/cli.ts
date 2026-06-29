@@ -3,7 +3,7 @@ import { realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { generatePlaywrightTestWithRetry } from "./generate.ts";
-import { GeneratedTestGateError, GeneratedTestWriteError, type GateCommand, writeGeneratedTestFile } from "./write.ts";
+import { buildPlaywrightRuntimeGate, GeneratedTestGateError, GeneratedTestWriteError, type GateCommand, writeGeneratedTestFile } from "./write.ts";
 import type { GenerateDeps, GenerateInput, GeneratorModelOptions, LocatorInventory } from "./types.ts";
 
 export interface GenerateCliArgs {
@@ -19,6 +19,8 @@ export interface GenerateCliArgs {
   maxTokens?: number;
   maxAttempts?: number;
   overwrite: boolean;
+  runtimeGate?: boolean;
+  playwrightConfig?: string;
   gateCommands: GateCommand[];
 }
 
@@ -68,6 +70,12 @@ export function parseGenerateCliArgs(argv: string[]): GenerateCliArgs {
       case "--overwrite":
         args.overwrite = true;
         break;
+      case "--runtime-gate":
+        args.runtimeGate = true;
+        break;
+      case "--playwright-config":
+        args.playwrightConfig = next();
+        break;
       case "--gate-command":
         args.gateCommands!.push({ command: next() });
         break;
@@ -81,6 +89,7 @@ export function parseGenerateCliArgs(argv: string[]): GenerateCliArgs {
 
   if (!args.plan) throw new Error(`--plan is required\n\n${GENERATE_USAGE}`);
   if (!args.out) throw new Error(`--out is required\n\n${GENERATE_USAGE}`);
+  if (args.runtimeGate) args.gateCommands!.push(buildPlaywrightRuntimeGate(args.playwrightConfig));
   return args as GenerateCliArgs;
 }
 
@@ -175,6 +184,9 @@ Options:
   --max-tokens <n>          LLM output token budget
   --max-attempts <n>        Retry attempts when diagnostics remain
   --overwrite               Allow replacing an existing output file
+  --runtime-gate            Run the generated test after writing it
+  --playwright-config <path>
+                            Playwright config path for --runtime-gate
   --gate-command <cmd>      Repeatable post-write gate; use {testFile} placeholder`;
 
 if (isDirectRun()) {

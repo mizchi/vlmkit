@@ -23,6 +23,8 @@ describe("parseGenerateCliArgs", () => {
       "--rules", "specs/rules.md",
       "--helper-import", "../support/goto-app",
       "--locator-inventory", "specs/locators.json",
+      "--runtime-gate",
+      "--playwright-config", "playwright.e2e.config.ts",
       "--provider", "anthropic",
       "--max-attempts", "3",
     ]);
@@ -32,6 +34,12 @@ describe("parseGenerateCliArgs", () => {
     assert.equal(args.rules, "specs/rules.md");
     assert.equal(args.helperImportPath, "../support/goto-app");
     assert.equal(args.locatorInventory, "specs/locators.json");
+    assert.equal(args.runtimeGate, true);
+    assert.equal(args.playwrightConfig, "playwright.e2e.config.ts");
+    assert.deepEqual(args.gateCommands, [{
+      name: "playwright-runtime",
+      command: "pnpm exec playwright test --config playwright.e2e.config.ts {testFile}",
+    }]);
     assert.equal(args.provider, "anthropic");
     assert.equal(args.maxAttempts, 3);
   });

@@ -33,6 +33,7 @@ describe("buildGeneratePrompt", () => {
     assert.match(prompt, /Seed test reference: tests\/seed\.spec\.ts/);
     assert.match(prompt, /Use role locators/);
     assert.match(prompt, /Import and use `gotoApp` from `\.\/_helpers`/);
+    assert.match(prompt, /Keep comments sparse/);
     assert.match(prompt, /# Checkout/);
   });
 
@@ -113,6 +114,38 @@ test("x", async ({ page }) => {
 ${validSource}\`\`\``);
 
     assert.ok(diagnostics.includes("source contains markdown code fences"));
+  });
+
+  it("reports excessive standalone comments in generated source", () => {
+    const diagnostics = validateGeneratedTestSource(`import { test, expect } from "@playwright/test";
+import { gotoApp } from "./_helpers";
+
+test("x", async ({ page }) => {
+  // Open the app.
+  await gotoApp(page);
+  // Find the heading.
+  await expect(page.getByRole("heading")).toBeVisible();
+  // Capture the screenshot.
+  await expect(page).toHaveScreenshot("x.png");
+});
+`);
+
+    assert.ok(diagnostics.includes("generated source has excessive comments; keep only non-obvious comments"));
+  });
+
+  it("allows a small number of non-obvious comments", () => {
+    const diagnostics = validateGeneratedTestSource(`import { test, expect } from "@playwright/test";
+import { gotoApp } from "./_helpers";
+
+test("x", async ({ page }) => {
+  await gotoApp(page);
+  // The status region has no accessible name in Playwright.
+  await expect(page.getByRole("status")).toContainText("Saved");
+  await expect(page).toHaveScreenshot("x.png");
+});
+`);
+
+    assert.deepEqual(diagnostics, []);
   });
 
   it("does not treat comments or strings as direct page.goto calls", () => {

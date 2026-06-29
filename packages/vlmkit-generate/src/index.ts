@@ -9,6 +9,7 @@ export {
 } from "./generate.ts";
 export {
   buildPlaywrightListGate,
+  buildPlaywrightRuntimeGate,
   buildTypecheckGate,
   GeneratedTestGateError,
   GeneratedTestWriteError,

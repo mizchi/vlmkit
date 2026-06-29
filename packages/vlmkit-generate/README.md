@@ -38,6 +38,8 @@ flag `getByRole`, `getByLabel`, `getByTestId`, and `getByText` locators that
 were not observed by the planner. Live-region roles such as `status`, `alert`,
 and `log` are special-cased: generated tests should use `getByRole("status")`
 and assert text separately instead of passing a `name` filter.
+Generated source with excessive standalone comments is rejected so retries can
+produce specs closer to hand-written Playwright tests.
 
 Use `generatePlaywrightTestWithRetry` when you want diagnostics to drive a
 regeneration loop:
@@ -57,6 +59,7 @@ Write generated files with rollback-safe gates:
 ```ts
 import {
   buildPlaywrightListGate,
+  buildPlaywrightRuntimeGate,
   buildTypecheckGate,
   writeGeneratedTestFile,
 } from "@mizchi/vlmkit-generate";
@@ -67,6 +70,7 @@ await writeGeneratedTestFile({
   overwrite: true,
   gates: [
     buildPlaywrightListGate(),
+    buildPlaywrightRuntimeGate("playwright.config.ts"),
     buildTypecheckGate("tsconfig.json"),
   ],
 });
@@ -90,9 +94,12 @@ vlmkit-generate \
   --provider anthropic \
   --max-attempts 2 \
   --overwrite \
-  --gate-command "pnpm exec playwright test --list {testFile}"
+  --runtime-gate \
+  --playwright-config playwright.config.ts
 ```
 
 The CLI exits `2` and does not write `--out` when diagnostics remain after the
 retry budget. `--gate-command` runs after writing and rolls the file back when
-the command fails.
+the command fails. `--runtime-gate` is a shorthand for running the generated
+test with Playwright, which catches locator/runtime failures that `--list`
+cannot see.

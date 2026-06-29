@@ -22,6 +22,7 @@ export function buildGeneratePrompt(input: GenerateInput): string {
     `- Import and use \`gotoApp\` from \`${helperImportPath}\`; do not call \`page.goto\` directly.`,
     "- Prefer role, label, and test id locators. Avoid CSS and XPath unless no semantic locator exists.",
     "- For live-region roles such as `status`, `alert`, and `log`, use `getByRole(\"status\")` and assert text separately; do not pass a `name` filter.",
+    "- Keep comments sparse. Do not narrate obvious Playwright actions; comment only non-obvious locator or determinism constraints.",
     "- Every visual assertion must also have semantic assertions.",
     requireScreenshots ? "- Include deterministic `toHaveScreenshot()` checks for the start and goal states." : undefined,
     input.locatorInventory ? formatLocatorInventory(input.locatorInventory) : undefined,
@@ -54,6 +55,9 @@ export function validateGeneratedTestSource(
   const diagnostics: string[] = [];
   if (/```/.test(source)) {
     diagnostics.push("source contains markdown code fences");
+  }
+  if (countStandaloneCommentLines(source) >= 3) {
+    diagnostics.push("generated source has excessive comments; keep only non-obvious comments");
   }
   const sourceFile = ts.createSourceFile("generated.spec.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   for (const parseDiagnostic of sourceFile.parseDiagnostics) {
@@ -172,6 +176,13 @@ function stripOuterCodeFence(source: string): string | null {
   while (end > 0 && lines[end]!.trim() === "") end--;
   if (lines[end]!.trim() !== "```") return null;
   return lines.slice(1, end).join("\n").trim();
+}
+
+function countStandaloneCommentLines(source: string): number {
+  return source.split(/\r?\n/).filter((line) => {
+    const trimmed = line.trim();
+    return trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*");
+  }).length;
 }
 
 interface GeneratedTestAstInfo {
