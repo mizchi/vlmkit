@@ -1,0 +1,37 @@
+{
+  "name": "@mizchi/vlmkit-plan",
+  "version": "0.1.0",
+  "description": "Planner contract for Playwright test generation: turns a user story, seed test, PRD, and UI observations into a Markdown test plan.",
+  "license": "MIT",
+  "author": "mizchi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mizchi/vlmkit.git",
+    "directory": "packages/vlmkit-plan"
+  },
+  "homepage": "https://github.com/mizchi/vlmkit/tree/main/packages/vlmkit-plan#readme",
+  "bugs": {
+    "url": "https://github.com/mizchi/vlmkit/issues"
+  },
+  "type": "module",
+  "files": [
+    "src/**/*.ts",
+    "!src/**/*.test.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test 'src/**/*.test.ts'"
+  },
+  "bin": {
+    "vlmkit-plan": "./src/cli.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./cli": "./src/cli.ts",
+    "./*.ts": "./src/*.ts"
+  },
+  "dependencies": {
+    "@mizchi/vlmkit-ai": "workspace:*"
+  }
+}
