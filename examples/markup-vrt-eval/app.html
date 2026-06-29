@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Release Queue</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #172026;
+        --muted: #63707a;
+        --line: #d7dde3;
+        --panel: #ffffff;
+        --canvas: #eef2f5;
+        --accent: #176f73;
+        --accent-2: #2f5f9d;
+        --warn: #a04b19;
+        --danger: #a3313a;
+        --ok: #247247;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--canvas);
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      main {
+        width: min(1180px, calc(100vw - 48px));
+        margin: 28px auto;
+      }
+
+      header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 18px;
+        align-items: end;
+        padding-bottom: 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 32px;
+        line-height: 1.1;
+        letter-spacing: 0;
+      }
+
+      .lede {
+        margin-top: 8px;
+        color: var(--muted);
+        max-width: 70ch;
+      }
+
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .search {
+        width: 250px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 9px 11px;
+        background: white;
+      }
+
+      .ghost-button,
+      .filter-button,
+      .row-action {
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: white;
+        color: var(--ink);
+        padding: 9px 12px;
+        cursor: pointer;
+      }
+
+      .ghost-button:hover,
+      .filter-button:hover,
+      .row-action:hover {
+        border-color: #9aa7b2;
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 14px;
+        margin: 22px 0;
+      }
+
+      .metric {
+        min-height: 116px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        padding: 16px;
+        display: grid;
+        align-content: space-between;
+        gap: 10px;
+      }
+
+      .metric span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .metric strong {
+        font-size: 30px;
+        line-height: 1;
+      }
+
+      .spark {
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        align-items: end;
+        gap: 4px;
+        height: 26px;
+      }
+
+      .spark i {
+        display: block;
+        min-height: 5px;
+        border-radius: 2px;
+        background: #78a5b2;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 330px;
+        gap: 18px;
+      }
+
+      .queue,
+      .detail-panel {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+      }
+
+      .queue-header,
+      .detail-header {
+        padding: 16px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .filters {
+        display: flex;
+        gap: 8px;
+      }
+
+      .filter-button[aria-pressed="true"] {
+        border-color: var(--accent);
+        background: #e8f3f2;
+        color: #0f5558;
+        font-weight: 700;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        padding: 13px 16px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: middle;
+      }
+
+      th {
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+      }
+
+      tbody tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .service {
+        display: grid;
+        gap: 4px;
+      }
+
+      .service strong {
+        font-size: 15px;
+      }
+
+      .service span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-width: 82px;
+        justify-content: center;
+        border-radius: 999px;
+        padding: 4px 9px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .pill.ready {
+        background: #e7f4ec;
+        color: var(--ok);
+      }
+
+      .pill.blocked {
+        background: #fae9e7;
+        color: var(--danger);
+      }
+
+      .pill.watch {
+        background: #fff0dc;
+        color: var(--warn);
+      }
+
+      .risk {
+        display: grid;
+        gap: 5px;
+        min-width: 116px;
+      }
+
+      .risk-bar {
+        height: 8px;
+        border-radius: 999px;
+        background: #e7eaee;
+        overflow: hidden;
+      }
+
+      .risk-bar span {
+        display: block;
+        height: 100%;
+        background: var(--accent-2);
+      }
+
+      .detail-panel {
+        min-height: 100%;
+        padding-bottom: 16px;
+      }
+
+      .detail-body {
+        padding: 16px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .detail-kv {
+        display: grid;
+        grid-template-columns: 94px 1fr;
+        gap: 8px 12px;
+        color: var(--muted);
+      }
+
+      .detail-kv strong {
+        color: var(--ink);
+      }
+
+      .timeline {
+        display: grid;
+        gap: 10px;
+      }
+
+      .timeline li {
+        margin-left: 18px;
+      }
+
+      [data-variant="regression"] .metric:nth-child(2) {
+        min-height: 148px;
+      }
+
+      [data-variant="regression"] .pill.blocked {
+        background: #e8f3f2;
+        color: #0f5558;
+      }
+
+      [data-variant="regression"] .detail-panel {
+        border-color: #9aa7b2;
+      }
+
+      @media (max-width: 840px) {
+        main {
+          width: min(100% - 28px, 680px);
+        }
+
+        header,
+        .layout,
+        .summary-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .toolbar {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .search {
+          width: 100%;
+        }
+
+        th:nth-child(3),
+        td:nth-child(3) {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main data-variant="stable">
+      <header>
+        <div>
+          <h1>Release Queue</h1>
+          <p class="lede">Coordinate service releases, blocked approvals, and final checks from one operational screen.</p>
+        </div>
+        <div class="toolbar" role="search">
+          <input class="search" aria-label="Search releases" placeholder="Search services" />
+          <button class="ghost-button" type="button">Refresh</button>
+        </div>
+      </header>
+
+      <section class="summary-grid" aria-label="Release summary">
+        <article class="metric">
+          <span>Ready releases</span>
+          <strong data-testid="ready-count">3</strong>
+          <div class="spark" aria-hidden="true">
+            <i style="height: 8px"></i><i style="height: 16px"></i><i style="height: 12px"></i><i style="height: 24px"></i>
+            <i style="height: 18px"></i><i style="height: 21px"></i><i style="height: 15px"></i><i style="height: 25px"></i>
+          </div>
+        </article>
+        <article class="metric">
+          <span>Blocked approvals</span>
+          <strong data-testid="blocked-count">2</strong>
+          <div class="spark" aria-hidden="true">
+            <i style="height: 22px"></i><i style="height: 20px"></i><i style="height: 15px"></i><i style="height: 17px"></i>
+            <i style="height: 14px"></i><i style="height: 13px"></i><i style="height: 12px"></i><i style="height: 10px"></i>
+          </div>
+        </article>
+        <article class="metric">
+          <span>Mean lead time</span>
+          <strong>42m</strong>
+          <div class="spark" aria-hidden="true">
+            <i style="height: 18px"></i><i style="height: 17px"></i><i style="height: 14px"></i><i style="height: 12px"></i>
+            <i style="height: 11px"></i><i style="height: 13px"></i><i style="height: 10px"></i><i style="height: 9px"></i>
+          </div>
+        </article>
+        <article class="metric">
+          <span>Risk budget</span>
+          <strong>71%</strong>
+          <div class="spark" aria-hidden="true">
+            <i style="height: 9px"></i><i style="height: 11px"></i><i style="height: 17px"></i><i style="height: 13px"></i>
+            <i style="height: 19px"></i><i style="height: 16px"></i><i style="height: 20px"></i><i style="height: 22px"></i>
+          </div>
+        </article>
+      </section>
+
+      <div class="layout">
+        <section class="queue" aria-labelledby="queue-title">
+          <div class="queue-header">
+            <h2 id="queue-title">Candidate releases</h2>
+            <div class="filters" aria-label="Release filters">
+              <button class="filter-button" type="button" aria-pressed="true" data-filter="all">All</button>
+              <button class="filter-button" type="button" aria-pressed="false" data-filter="blocked">Blocked</button>
+              <button class="filter-button" type="button" aria-pressed="false" data-filter="ready">Ready</button>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>Status</th>
+                <th>Risk</th>
+                <th>ETA</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr data-status="blocked" data-service="Payments API" data-testid="release-row-payments-api">
+                <td>
+                  <div class="service">
+                    <strong>Payments API</strong>
+                    <span>Checkout authorization deploy</span>
+                  </div>
+                </td>
+                <td><span class="pill blocked">Blocked</span></td>
+                <td>
+                  <div class="risk"><span>High</span><div class="risk-bar"><span style="width: 82%"></span></div></div>
+                </td>
+                <td>14:30 UTC</td>
+                <td><button class="row-action" type="button" aria-label="Open Payments API details">Open</button></td>
+              </tr>
+              <tr data-status="ready" data-service="Search Indexer" data-testid="release-row-search-indexer">
+                <td>
+                  <div class="service">
+                    <strong>Search Indexer</strong>
+                    <span>Shard fan-out patch</span>
+                  </div>
+                </td>
+                <td><span class="pill ready">Ready</span></td>
+                <td>
+                  <div class="risk"><span>Low</span><div class="risk-bar"><span style="width: 28%"></span></div></div>
+                </td>
+                <td>15:10 UTC</td>
+                <td><button class="row-action" type="button" aria-label="Open Search Indexer details">Open</button></td>
+              </tr>
+              <tr data-status="watch" data-service="Messaging Worker" data-testid="release-row-messaging-worker">
+                <td>
+                  <div class="service">
+                    <strong>Messaging Worker</strong>
+                    <span>Retry drain tuning</span>
+                  </div>
+                </td>
+                <td><span class="pill watch">Watch</span></td>
+                <td>
+                  <div class="risk"><span>Medium</span><div class="risk-bar"><span style="width: 54%"></span></div></div>
+                </td>
+                <td>15:40 UTC</td>
+                <td><button class="row-action" type="button" aria-label="Open Messaging Worker details">Open</button></td>
+              </tr>
+              <tr data-status="blocked" data-service="Invoice Export" data-testid="release-row-invoice-export">
+                <td>
+                  <div class="service">
+                    <strong>Invoice Export</strong>
+                    <span>Ledger archive release</span>
+                  </div>
+                </td>
+                <td><span class="pill blocked">Blocked</span></td>
+                <td>
+                  <div class="risk"><span>High</span><div class="risk-bar"><span style="width: 76%"></span></div></div>
+                </td>
+                <td>16:15 UTC</td>
+                <td><button class="row-action" type="button" aria-label="Open Invoice Export details">Open</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <aside class="detail-panel" aria-labelledby="detail-title">
+          <div class="detail-header">
+            <h2 id="detail-title">Release detail</h2>
+            <span class="pill blocked" data-testid="detail-status">Blocked</span>
+          </div>
+          <div class="detail-body">
+            <h3 data-testid="selected-service">Payments API</h3>
+            <p data-testid="detail-summary">Waiting on fraud review approval before checkout authorization rollout.</p>
+            <div class="detail-kv">
+              <span>Owner</span><strong>Revenue Platform</strong>
+              <span>Approver</span><strong>Fraud Ops</strong>
+              <span>Rollback</span><strong>Feature flag prepared</strong>
+            </div>
+            <ol class="timeline" aria-label="Release checklist">
+              <li>Canary metrics are green.</li>
+              <li>Fraud review approval is pending.</li>
+              <li>Rollback owner is assigned.</li>
+            </ol>
+          </div>
+        </aside>
+      </div>
+    </main>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const variant = params.get("variant") === "regression" ? "regression" : "stable";
+      document.querySelector("main").dataset.variant = variant;
+
+      const rows = Array.from(document.querySelectorAll("tbody tr"));
+      const filters = Array.from(document.querySelectorAll("[data-filter]"));
+      const selected = document.querySelector("[data-testid='selected-service']");
+      const detailStatus = document.querySelector("[data-testid='detail-status']");
+      const detailSummary = document.querySelector("[data-testid='detail-summary']");
+
+      const summaries = {
+        "Payments API": ["Blocked", "Waiting on fraud review approval before checkout authorization rollout."],
+        "Search Indexer": ["Ready", "Shard fan-out patch is ready after cache warmup checks."],
+        "Messaging Worker": ["Watch", "Retry drain tuning is under observation for queue saturation."],
+        "Invoice Export": ["Blocked", "Ledger archive release is waiting for compliance approval."]
+      };
+
+      for (const button of filters) {
+        button.addEventListener("click", () => {
+          const filter = button.dataset.filter;
+          for (const other of filters) other.setAttribute("aria-pressed", String(other === button));
+          for (const row of rows) {
+            row.hidden = filter !== "all" && row.dataset.status !== filter;
+          }
+        });
+      }
+
+      for (const row of rows) {
+        row.querySelector("button").addEventListener("click", () => {
+          const service = row.dataset.service;
+          const [status, summary] = summaries[service];
+          selected.textContent = service;
+          detailStatus.textContent = status;
+          detailStatus.className = `pill ${status.toLowerCase() === "blocked" ? "blocked" : status.toLowerCase()}`;
+          detailSummary.textContent = summary;
+        });
+      }
+    </script>
+  </body>
+</html>

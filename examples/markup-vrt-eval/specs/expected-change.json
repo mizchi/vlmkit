@@ -1,0 +1,8 @@
+{
+  "variant": "regression",
+  "expectedFailureKind": "vrt-diff",
+  "expectedDriftKind": "visual-only",
+  "allowedPrimaryCauses": ["layout", "paint"],
+  "allowedSelectors": [".metric", ".pill", ".detail-panel", ".queue", "main"],
+  "reason": "The regression variant intentionally changes metric height, blocked status colors, and detail panel border color to verify VRT and repair-context diagnostics."
+}
