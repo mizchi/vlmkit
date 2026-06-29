@@ -39,7 +39,7 @@ export interface HealOptions {
   /** The only source file the loop may edit. */
   testFile: string;
   cwd: string;
-  /** Vision axis. tier0 = ui-tars: screenshot analysis / realized verdict. */
+  /** Vision reasoning axis for VRT review. Cheapest first, strongest last. */
   observe: RouterOptions;
   /** Text axis. tier0 = cheap LLM -> last = strong model. Produces patches. */
   codegen: RouterOptions;
@@ -48,6 +48,8 @@ export interface HealOptions {
   maxAttempts: number;
   /** Playwright outputDir name to read artifacts from (default: auto — test-results / e2e-results). */
   outputDir?: string;
+  /** Command to refresh VRT baselines. Default: testCommand + " --update-snapshots". */
+  updateSnapshotsCommand?: string;
   /** Min confidence to auto-accept a VRT change (update the baseline). Below it -> needs-review. Default 0.8. */
   acceptThreshold?: number;
   /** Confirm a VRT accept with the strongest observe tier before updating the baseline. Default true. */
@@ -56,7 +58,7 @@ export interface HealOptions {
   gitContext?: string;
   /** Consecutive "gate green but verify red" observations before reporting flaky. Default 2. */
   flakyThreshold?: number;
-  /** Default false: the final green patch needs human approval before commit. */
+  /** Reserved for a future human-approval gate; currently not used by heal(). */
   autoApply?: boolean;
   /**
    * Declared expected UI change, if any. intentional-vs-regression cannot be

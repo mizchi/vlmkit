@@ -74,7 +74,7 @@ export interface UnifiedLLMClient {
 // ---- Anthropic ----
 
 function createAnthropicClient(apiKey: string, model?: string): UnifiedLLMClient {
-  const modelId = model ?? "claude-sonnet-4-20250514";
+  const modelId = model ?? "claude-sonnet-4-6";
 
   async function call(content: MessageContent, maxTokens: number): Promise<LLMResponse> {
     const start = Date.now();

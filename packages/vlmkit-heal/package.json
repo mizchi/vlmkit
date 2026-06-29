@@ -18,6 +18,7 @@
     "src/**/*.ts",
     "!src/**/*.test.ts",
     "README.md",
+    "README.ja.md",
     "LICENSE"
   ],
   "scripts": {

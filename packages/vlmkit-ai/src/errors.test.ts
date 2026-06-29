@@ -79,6 +79,13 @@ describe("createUnifiedLLMClient", () => {
       assert.notEqual(client, null);
     });
   });
+
+  it("uses the current Anthropic Sonnet default model", () => {
+    withCleanEnv({ ANTHROPIC_API_KEY: "test-key" }, () => {
+      const client = createUnifiedLLMClient({ provider: "anthropic" });
+      assert.equal(client?.model, "claude-sonnet-4-6");
+    });
+  });
 });
 
 describe("createLLMProvider", () => {

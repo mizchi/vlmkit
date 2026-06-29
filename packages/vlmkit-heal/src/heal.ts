@@ -34,7 +34,7 @@ export async function heal(opts: HealOptions, deps?: Partial<HealDeps>): Promise
     reviewVrt: deps?.reviewVrt ?? ((input) => reviewVrtDiff(input)),
     codegen: deps?.codegen ?? createRealCodegenClient(),
     baselineAllow: deps?.baselineAllow,
-    updateSnapshotsCommand: deps?.updateSnapshotsCommand,
+    updateSnapshotsCommand: deps?.updateSnapshotsCommand ?? opts.updateSnapshotsCommand,
     captureVrt: deps?.captureVrt ?? (async (cwd) => findVrtArtifacts(cwd, opts.outputDir)),
     captureContext: deps?.captureContext ?? (async (cwd) => findErrorContext(cwd, opts.outputDir)),
   };

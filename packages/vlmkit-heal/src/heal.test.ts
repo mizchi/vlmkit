@@ -108,6 +108,34 @@ describe("heal", () => {
     assert.equal(sawBaseline?.toString(), "BEFORE");
   });
 
+  it("uses updateSnapshotsCommand from HealOptions when a vrt-diff is accepted", async () => {
+    const testFile = tmpTestFile();
+    const commands: string[] = [];
+    let normalRuns = 0;
+    const result = await heal(
+      {
+        ...baseOpts(testFile),
+        updateSnapshotsCommand: "custom update snapshots",
+      },
+      {
+        runTest: async (command) => {
+          commands.push(command);
+          if (command === "custom update snapshots") return { ok: true, stdout: "", stderr: "" };
+          normalRuns++;
+          return normalRuns === 1
+            ? { ok: false, stdout: "", stderr: "Error: Screenshot comparison failed" }
+            : { ok: true, stdout: "", stderr: "" };
+        },
+        captureVrt: async () => ({ baseline: Buffer.from("B"), actual: Buffer.from("A") }),
+        reviewVrt: async () => ({ verdict: "accept", confidence: 0.95, reason: "intended", intentSource: "expectedChange", costUsd: 0.0001 }),
+        codegen: { propose: async () => { throw new Error("codegen must NOT run"); } },
+      },
+    );
+
+    assert.equal(result.verdict, "fixed");
+    assert.ok(commands.includes("custom update snapshots"));
+  });
+
   it("returns needs-review when review accepts but below acceptThreshold", async () => {
     const testFile = tmpTestFile();
     const result = await heal(
