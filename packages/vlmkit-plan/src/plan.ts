@@ -154,12 +154,16 @@ export function validatePlanMarkdown(markdown: string, input: Pick<PlanInput, "s
 }
 
 export function parseStructuredPlan(raw: string, fallbackTitle: string): StructuredPlan {
-  let text = raw.trim();
-  const fence = text.match(/^```(?:json)?\s*\n([\s\S]*?)\n```$/i);
-  if (fence) text = fence[1]!.trim();
+  const text = extractStructuredPlanJson(raw);
   const parsed = JSON.parse(text) as StructuredPlan;
   if (!parsed.title) parsed.title = fallbackTitle;
   return parsed;
+}
+
+function extractStructuredPlanJson(raw: string): string {
+  const text = raw.trim();
+  const fence = text.match(/```(?:json)?\s*\r?\n([\s\S]*?)\r?\n```\s*/i);
+  return (fence?.[1] ?? text).trim();
 }
 
 export function validateStructuredPlan(plan: StructuredPlan, input: Pick<PlanInput, "seed" | "observations"> = {}): string[] {
@@ -396,10 +400,10 @@ function validateStructuredLocatorInventory(
   }
 
   const observed = {
-    roles: new Set(observations.flatMap((obs) => obs.roles ?? [])),
-    labels: new Set(observations.flatMap((obs) => obs.labels ?? [])),
-    testIds: new Set(observations.flatMap((obs) => obs.testIds ?? [])),
-    texts: new Set(observations.flatMap((obs) => obs.texts ?? [])),
+    roles: normalizedObservedSet("roles", observations.flatMap((obs) => obs.roles ?? [])),
+    labels: normalizedObservedSet("labels", observations.flatMap((obs) => obs.labels ?? [])),
+    testIds: normalizedObservedSet("testIds", observations.flatMap((obs) => obs.testIds ?? [])),
+    texts: normalizedObservedSet("texts", observations.flatMap((obs) => obs.texts ?? [])),
   };
   validateInventorySubset(diagnostics, "roles", inventory?.roles, observed.roles);
   validateInventorySubset(diagnostics, "labels", inventory?.labels, observed.labels);
@@ -446,10 +450,27 @@ function validateInventorySubset(
 ): void {
   if (!values?.length) return;
   for (const value of values) {
-    if (!observed.has(value)) {
+    if (!observed.has(normalizeInventoryValue(field, value))) {
       diagnostics.push(`locatorInventory.${field} contains unobserved locator: ${value}`);
     }
   }
+}
+
+function normalizedObservedSet(field: keyof PlanLocatorInventory, values: string[]): Set<string> {
+  return new Set(values.map((value) => normalizeInventoryValue(field, value)));
+}
+
+function normalizeInventoryValue(field: keyof PlanLocatorInventory, value: string): string {
+  const trimmed = value.trim();
+  return field === "roles" ? roleInventoryKey(trimmed) : trimmed;
+}
+
+function roleInventoryKey(entry: string): string {
+  const quoted = entry.match(/^([^"']+?)\s*["'](.+)["']$/);
+  if (quoted) return `${quoted[1]!.trim().replace(/:$/, "")}\u0000${quoted[2]!.trim()}`;
+  const colon = entry.match(/^([^:]+):\s*(.+)$/);
+  if (colon) return `${colon[1]!.trim()}\u0000${colon[2]!.trim()}`;
+  return entry.trim();
 }
 
 function buildPlanRepairPrompt(basePrompt: string, markdown: string, diagnostics: string[]): string {

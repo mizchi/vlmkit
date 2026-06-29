@@ -89,6 +89,13 @@ describe("structured plan contract", () => {
     );
   });
 
+  it("parses a structured plan JSON block with surrounding prose", () => {
+    assert.deepEqual(
+      parseStructuredPlan(`Here is the plan:\n\n\`\`\`json\n${JSON.stringify(structured)}\n\`\`\`\n`, "Fallback"),
+      structured,
+    );
+  });
+
   it("renders structured plans to the Markdown plan contract", () => {
     const markdown = renderStructuredPlanMarkdown(structured);
     assert.match(markdown, /# Checkout/);
@@ -137,6 +144,24 @@ describe("structured plan contract", () => {
     assert.ok(diagnostics.includes('locatorInventory.labels contains unobserved locator: Coupon'));
     assert.ok(diagnostics.includes('locatorInventory.testIds contains unobserved locator: admin-panel'));
     assert.ok(diagnostics.includes('locatorInventory.texts contains unobserved locator: Admin'));
+  });
+
+  it("accepts equivalent role inventory quote styles", () => {
+    const diagnostics = validateStructuredPlan({
+      title: "Checkout",
+      applicationOverview: "Checkout.",
+      scenarios: [{ title: "x", steps: ["Open checkout."], expectedResults: ["Checkout is visible."] }],
+      generationNotes: ["Use observed locators."],
+      locatorInventory: {
+        roles: ["button 'Pay now'", "heading 'Checkout'"],
+      },
+    }, {
+      observations: [{
+        roles: ['button "Pay now"', 'heading "Checkout"'],
+      }],
+    });
+
+    assert.deepEqual(diagnostics, []);
   });
 
   it("rejects locator inventory when no UI observations were supplied", () => {
