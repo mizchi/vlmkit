@@ -29,15 +29,27 @@ Not for: one-off edits to a single existing test (just edit it).
 preset uses `pnpm app:build && pnpm app:preview`). For other build tools, adapt
 the `webServer` command + the two npm scripts; the rest of the pipeline is the same.
 
-**No official agents available?** The `plan`/`generate` steps below invoke the
-`init-agents` planner/generator (they need the `playwright-test` MCP server in a
-main Claude Code session). If you can't dispatch them — e.g. you are a subagent,
-or `init-agents` isn't set up — do their job by hand with the SAME steps, in order:
+**No official agents available?** Prefer the runtime-neutral package path before
+hand-writing. `vlmkit-plan` and `vlmkit-generate` produce the same planner- and
+generator-shaped artifacts with diagnostics-driven retries:
+```sh
+vlmkit-plan --title "<topic>" --request-file specs/<topic>.request.md \
+  --observations specs/<topic>.observations.json --out specs/<topic>.md \
+  --locator-inventory-out specs/<topic>.locators.json \
+  --provider anthropic --max-attempts 2
+vlmkit-generate --plan specs/<topic>.md --rules specs/_generation-rules.md \
+  --locator-inventory specs/<topic>.locators.json \
+  --helper-import ../support/goto-app --out tests/<topic>.spec.ts \
+  --provider anthropic --max-attempts 2 --overwrite \
+  --gate-command "pnpm exec playwright test --list {testFile}"
+```
+If you can't use either the official agents or these CLIs, do their job by hand
+with the SAME steps, in order:
   1. explore the app to confirm real roles/labels/testids
   2. write `specs/<topic>.md` (reference `**Seed:** tests/seed.spec.ts`)
   3. adjust `tests/seed.spec.ts` to your app's actual initial state
   4. hand-write `tests/<topic>.spec.ts` strictly following `specs/_generation-rules.md`
-The determinism layer and rules are what matter; the agents are just an automated author.
+The determinism layer and rules are what matter; the agents/CLIs are just automated authors.
 
 ## Setup (once per repo)
 
@@ -52,13 +64,17 @@ them locally in a container, **CI is the source of truth**: baselines are always
 rendered in the `ci.yml` environment, and `update-baselines.yml` regenerates them
 there on demand. Developers never run Docker.
 
-1. Generate the official agents + MCP server:
+1. Generate the official agents + MCP server. Use the loop for the agent runtime
+   in this repo:
    ```sh
-   npx playwright init-agents --loop=claude
+   npx playwright init-agents --loop=codex
    ```
-   This writes `.claude/agents/playwright-test-{planner,generator,healer}.md` and
-   `.mcp.json` (the `playwright-test` MCP server). **If the MCP tools aren't
-   available in your session, reload Claude Code** so it connects.
+   Use `--loop=claude` for Claude Code, `--loop=vscode` for VS Code, and
+   `--loop=opencode` for OpenCode. Regenerate these definitions whenever
+   Playwright is updated so the MCP tools and instructions stay current.
+   For Codex this creates the Codex agent definitions and MCP config for the
+   `playwright-test` server. **If the MCP tools aren't available in your
+   session, reload the agent runtime** so it connects.
 
 2. Copy the determinism assets into the repo:
    - `assets/_helpers.ts` → `tests/_helpers.ts`
@@ -84,12 +100,28 @@ Add these npm scripts (the determinism preset and rules assume them):
 "verify":      "playwright test && playwright test"
 ```
 
+## Agent roles
+
+The official Playwright Test Agents are still the authors of the test. Use
+`@mizchi/vlmkit-heal` only after generation, where its budget, VRT review, and
+rollback guardrails matter.
+
+| Stage | Owner | Input | Output |
+|---|---|---|---|
+| Plan | Playwright `planner` or `vlmkit-plan` | user story/spec request, `tests/seed.spec.ts`, optional PRD | `specs/<topic>.md` with real flows and expected results |
+| Generate | Playwright `generator` or `vlmkit-generate` | `specs/<topic>.md`, `specs/_generation-rules.md`, seed test | `tests/<topic>.spec.ts` |
+| First repair | Playwright `healer` | failing generated test name | interactive patch or skipped test if functionality is broken |
+| Bounded heal | `@mizchi/vlmkit-heal` | generated spec path, test command, optional `expectedChange` | verified test rewrite or accepted VRT baseline update |
+
 ## Run (staged)
 
 ```
-plan      → invoke the playwright-test-planner agent with the spec.
+plan      → invoke the playwright-test-planner agent with:
+              - a clear user story / scenario request
+              - tests/seed.spec.ts so fixtures, auth, and initial state are known
+              - optional PRD / product notes for domain context
             It explores the live app (verifying real roles/labels) and writes
-            specs/<topic>.md. Reference **Seed:** tests/seed.spec.ts in the plan.
+            specs/<topic>.md. The plan must reference **Seed:** tests/seed.spec.ts.
 
 generate  → invoke the playwright-test-generator agent with specs/<topic>.md.
             It replays the steps and writes tests/<topic>.spec.ts following
@@ -105,7 +137,9 @@ baseline  → a test with toHaveScreenshot fails until its baseline exists. CI i
 verify    → pnpm run verify           (two consecutive green = reproducible). Locally
             this is green only against local baselines; the authoritative verify is CI.
 
-heal      → on failure, run the heal loop (below)
+heal      → after generator/healer output exists, run `vlmkit-heal` for bounded
+            repair:
+              npx tsx examples/test-agents/heal-after-generator.ts tests/<topic>.spec.ts
 ```
 
 A test is "done" only when CI's `verify` is green twice in a row AND its VRT diff is
@@ -129,6 +163,7 @@ import { heal } from "@mizchi/vlmkit-heal";
 
 const r = await heal({
   testCommand: "pnpm exec playwright test tests/<topic>.spec.ts",
+  updateSnapshotsCommand: "pnpm exec playwright test tests/<topic>.spec.ts --update-snapshots",
   testFile: "tests/<topic>.spec.ts",
   cwd: process.cwd(),
   // observe = a cheap REASONING VLM that judges intentional-change vs regression

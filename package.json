@@ -71,11 +71,15 @@
     "vrt:update": "playwright test --update-snapshots"
   },
   "devDependencies": {
+    "@mizchi/vlmkit-generate": "workspace:*",
+    "@mizchi/vlmkit-heal": "workspace:*",
+    "@mizchi/vlmkit-plan": "workspace:*",
     "@types/node": "^25.5.2",
     "@types/pngjs": "^6.0.5",
     "@types/ws": "^8.18.1",
     "three": "^0.184.0",
     "tsdown": "^0.21.7",
+    "tsx": "^4.22.4",
     "typescript": "^6.0.2"
   },
   "dependencies": {

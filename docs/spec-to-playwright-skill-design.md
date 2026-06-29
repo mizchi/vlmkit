@@ -62,17 +62,20 @@ tests to reproduce in CI.
 1. **When to use / not** — spec → tests, deterministic VRT, heal-follows-UI. Not
    for one-off test tweaks.
 2. **Setup (once)**
-   - `npx playwright init-agents --loop=claude` (planner/generator/healer + `.mcp.json`)
+   - `npx playwright init-agents --loop=codex` (planner/generator/healer + MCP config; use the matching loop for other runtimes)
    - copy assets: `_helpers.ts` / `seed.spec.ts` / `_generation-rules.md` →
      `tests/`+`specs/`; merge the deterministic `playwright.config` settings;
      wire `baseline-linux.sh` as an npm script; drop in `ci.yml`
    - `pnpm add -D @mizchi/vlmkit-heal`
    - append "READ `specs/_generation-rules.md` and obey it" to the generator
      agent definition
-3. **Run (staged)**: `plan` (planner → `specs/<topic>.md`, verifies real
-   roles/labels) → `generate` (generator → `tests/<topic>.spec.ts`, rule-compliant:
-   gotoApp + 2 VRT screenshots + semantic assertions) → `baseline` (linux, matches
-   CI arch) → `verify` (two consecutive green) → `heal` (on failure, vlmkit-heal).
+3. **Run (staged)**: `plan` (official planner or `vlmkit-plan` CLI →
+   `specs/<topic>.md` plus optional `specs/<topic>.locators.json`, verifies real roles/labels) → `generate` (official
+   generator or `vlmkit-generate` CLI → `tests/<topic>.spec.ts`, rule-compliant:
+   gotoApp + 2 VRT screenshots + semantic assertions; diagnostics retry + AST
+   validator gate + optional locator inventory check + rollback-safe
+   `--gate-command`) → `baseline` (linux, matches CI arch) → `verify` (two
+   consecutive green) → `heal` (on failure, vlmkit-heal).
 4. **Determinism essentials** — fixed viewport/locale/tz, `prefers-reduced-motion`,
    font wait, `vite build && preview` (avoid HMR), cross-arch baseline caveat
    (arm64 baseline ↔ arm64 runner).
@@ -87,6 +90,7 @@ tests to reproduce in CI.
 import { heal } from "@mizchi/vlmkit-heal";
 const r = await heal({
   testCommand: "pnpm exec playwright test tests/<topic>.spec.ts",
+  updateSnapshotsCommand: "pnpm exec playwright test tests/<topic>.spec.ts --update-snapshots",
   testFile: "tests/<topic>.spec.ts",
   cwd: process.cwd(),
   observe: { tiers: [{ provider: "openrouter", model: "google/gemini-2.5-flash-lite", vision: true }] },

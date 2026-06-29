@@ -68,7 +68,12 @@ for the full old → new mapping.
 - **Self-healing Playwright tests** (`@mizchi/vlmkit-heal`) — a cost-optimized
   loop that runs a test, observes the failure, and patches the test (or updates
   a VRT baseline), escalating cheap → strong models under a shared budget cap.
-  See [`packages/vlmkit-heal`](packages/vlmkit-heal/README.md).
+  See [`packages/vlmkit-heal`](packages/vlmkit-heal/README.md) /
+  [日本語ガイド](packages/vlmkit-heal/README.ja.md).
+- **Playwright planning/generation contracts** (`@mizchi/vlmkit-plan`,
+  `@mizchi/vlmkit-generate`) — runtime-neutral prompt/API layers for turning a
+  user story + seed test + UI observations into `specs/<topic>.md`, then into a
+  Playwright spec source file.
 
 ## Quick Start
 
@@ -115,6 +120,16 @@ vlmkit snapshot
 # Dev inner loop with rich signal output (token-aware + cross-round)
 vlmkit diff html baseline.html variant.html --tokens DESIGN.md --output reports/
 vlmkit watch baseline.html variant.html --tokens DESIGN.md
+
+# Plan and generate a Playwright spec with diagnostics-driven retries
+vlmkit-plan --title "Guest Checkout" --request-file specs/checkout.request.md \
+  --observations specs/checkout.observations.json --out specs/checkout.plan.md \
+  --locator-inventory-out specs/checkout.locators.json \
+  --provider anthropic --max-attempts 2
+vlmkit-generate --plan specs/checkout.plan.md --rules specs/_generation-rules.md \
+  --locator-inventory specs/checkout.locators.json --helper-import ../support/goto-app \
+  --out tests/checkout.spec.ts --provider anthropic --max-attempts 2 \
+  --overwrite --gate-command "pnpm exec playwright test --list {testFile}"
 
 # Author approval rules (sub-pixel deviations, intentional design exceptions, etc.)
 vlmkit manifest add --selector .hero__body --max-px 2 --reason "AA artifact" --expires 2026-08-15
@@ -634,6 +649,10 @@ packages/vlmkit-heal/src/
   heal.ts                   # Self-healing loop state machine
   clients.ts                # Observe (VLM) / codegen (LLM) tiers
   cost.ts                   # Token×price billing so the budget cap works
+packages/vlmkit-plan/src/
+  plan.ts                   # User story + seed + observations -> Markdown test plan
+packages/vlmkit-generate/src/
+  generate.ts               # Markdown plan + rules -> Playwright spec source
 fixtures/
   css-challenge/            # 9 HTML fixtures for CSS bench
   migration/                # Migration comparison fixtures
@@ -668,7 +687,7 @@ apm install mizchi/vlmkit/.claude/skills/vrt-visual-diff \
 | `vrt-css-fix-loop` | `fix-loop.ts` (VLM-driven) | Closed-loop CSS auto-repair benchmark |
 | `vrt-markup-synth` | `vlmkit build\|scan\|check\|stress *` | Screenshot → HTML/CSS, token / theme / i18n audits |
 | `vrt-regression-watch` | `vlmkit diff agent --previous --fail-on-regression` | Per-PR or scheduled regression gate |
-| `spec-to-playwright` | `init-agents` plan/generate → deterministic VRT → `@mizchi/vlmkit-heal` | Spec → Playwright test with stable VRT + self-healing |
+| `spec-to-playwright` | `init-agents` or `@mizchi/vlmkit-plan/generate` → deterministic VRT → `@mizchi/vlmkit-heal` | Spec → Playwright test with stable VRT + self-healing |
 
 Each skill assumes the `vrt` CLI is on `$PATH` (this repo published as
 a Node package, or built from source) and Node 24+. VLM-using skills
