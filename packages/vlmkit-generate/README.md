@@ -35,7 +35,9 @@ main().catch((error) => {
 direct `page.goto(...)`, missing `expect(...)`, missing screenshots, and leaked
 Markdown code fences. When `locatorInventory` is provided, diagnostics also
 flag `getByRole`, `getByLabel`, `getByTestId`, and `getByText` locators that
-were not observed by the planner.
+were not observed by the planner. Live-region roles such as `status`, `alert`,
+and `log` are special-cased: generated tests should use `getByRole("status")`
+and assert text separately instead of passing a `name` filter.
 
 Use `generatePlaywrightTestWithRetry` when you want diagnostics to drive a
 regeneration loop:

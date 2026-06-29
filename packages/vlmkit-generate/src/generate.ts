@@ -21,6 +21,7 @@ export function buildGeneratePrompt(input: GenerateInput): string {
     "- Import `test` and `expect` from `@playwright/test`.",
     `- Import and use \`gotoApp\` from \`${helperImportPath}\`; do not call \`page.goto\` directly.`,
     "- Prefer role, label, and test id locators. Avoid CSS and XPath unless no semantic locator exists.",
+    "- For live-region roles such as `status`, `alert`, and `log`, use `getByRole(\"status\")` and assert text separately; do not pass a `name` filter.",
     "- Every visual assertion must also have semantic assertions.",
     requireScreenshots ? "- Include deterministic `toHaveScreenshot()` checks for the start and goal states." : undefined,
     input.locatorInventory ? formatLocatorInventory(input.locatorInventory) : undefined,
@@ -83,6 +84,7 @@ export function validateGeneratedTestSource(
   if (!astInfo.hasGotoAppImport) {
     diagnostics.push(`missing gotoApp import from ${astInfo.helperImportPath}`);
   }
+  diagnostics.push(...validateRoleLocatorUsage(astInfo.locators));
   if (input.locatorInventory) {
     diagnostics.push(...validateLocatorInventory(astInfo.locators, input.locatorInventory));
   }
@@ -303,7 +305,7 @@ function validateLocatorInventory(usedLocators: UsedLocator[], inventory: Locato
   for (const locator of usedLocators) {
     if (locator.kind === "role" && allowed.roles.size) {
       const keys = [roleKey(locator.role, locator.name), roleKey(locator.role, undefined)];
-      if (!keys.some((key) => allowed.roles.has(key))) {
+      if (!keys.some((key) => allowed.roles.has(key)) && !isAllowedNamelessObservedRole(locator, allowed)) {
         diagnostics.push(`unknown role locator: ${locator.role}${locator.name ? ` "${locator.name}"` : ""}`);
       }
     }
@@ -320,21 +322,45 @@ function validateLocatorInventory(usedLocators: UsedLocator[], inventory: Locato
   return diagnostics;
 }
 
+function validateRoleLocatorUsage(usedLocators: UsedLocator[]): string[] {
+  const diagnostics: string[] = [];
+  for (const locator of usedLocators) {
+    if (locator.kind === "role" && locator.name && namelessObservedRoleNames.has(locator.role)) {
+      diagnostics.push(`role "${locator.role}" should not use a name filter; assert text separately`);
+    }
+  }
+  return diagnostics;
+}
+
 function normalizeLocatorInventory(inventory: LocatorInventory) {
+  const roleEntries = (inventory.roles ?? []).map(parseRoleInventoryEntry);
   return {
-    roles: new Set((inventory.roles ?? []).map(normalizeRoleInventoryEntry)),
+    roles: new Set(roleEntries.map((entry) => roleKey(entry.role, entry.name))),
+    observedRoleKinds: new Set(roleEntries.map((entry) => entry.role)),
     labels: new Set(inventory.labels ?? []),
     testIds: new Set(inventory.testIds ?? []),
     texts: new Set(inventory.texts ?? []),
   };
 }
 
-function normalizeRoleInventoryEntry(entry: string): string {
+function isAllowedNamelessObservedRole(
+  locator: UsedLocator,
+  allowed: ReturnType<typeof normalizeLocatorInventory>,
+): boolean {
+  return locator.kind === "role"
+    && !locator.name
+    && namelessObservedRoleNames.has(locator.role)
+    && allowed.observedRoleKinds.has(locator.role);
+}
+
+const namelessObservedRoleNames = new Set(["status", "alert", "log"]);
+
+function parseRoleInventoryEntry(entry: string): { role: string; name?: string } {
   const quoted = entry.match(/^([^"']+?)\s*["'](.+)["']$/);
-  if (quoted) return roleKey(quoted[1]!.trim().replace(/:$/, ""), quoted[2]!.trim());
+  if (quoted) return { role: quoted[1]!.trim().replace(/:$/, ""), name: quoted[2]!.trim() };
   const colon = entry.match(/^([^:]+):\s*(.+)$/);
-  if (colon) return roleKey(colon[1]!.trim(), colon[2]!.trim());
-  return roleKey(entry.trim(), undefined);
+  if (colon) return { role: colon[1]!.trim(), name: colon[2]!.trim() };
+  return { role: entry.trim() };
 }
 
 function roleKey(role: string, name: string | undefined): string {

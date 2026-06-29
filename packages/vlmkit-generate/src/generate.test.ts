@@ -168,6 +168,43 @@ test("checkout", async ({ page }) => {
     assert.ok(diagnostics.includes('unknown role locator: button "Delete account"'));
     assert.ok(diagnostics.includes('unknown test id locator: "admin-panel"'));
   });
+
+  it("rejects name filters on status role locators", () => {
+    const diagnostics = validateGeneratedTestSource(`import { test, expect } from "@playwright/test";
+import { gotoApp } from "./_helpers";
+
+test("profile", async ({ page }) => {
+  await gotoApp(page);
+  await expect(page.getByRole("status", { name: "Profile saved" })).toBeVisible();
+  await expect(page).toHaveScreenshot("profile.png");
+});
+`, {
+      locatorInventory: {
+        roles: ['status "Profile saved"'],
+      },
+    });
+
+    assert.ok(diagnostics.includes('role "status" should not use a name filter; assert text separately'));
+  });
+
+  it("allows nameless status role locators when a status role was observed", () => {
+    const diagnostics = validateGeneratedTestSource(`import { test, expect } from "@playwright/test";
+import { gotoApp } from "./_helpers";
+
+test("profile", async ({ page }) => {
+  await gotoApp(page);
+  await expect(page.getByRole("status")).toContainText("Profile saved");
+  await expect(page).toHaveScreenshot("profile.png");
+});
+`, {
+      locatorInventory: {
+        roles: ['status "Profile saved"'],
+        texts: ["Profile saved"],
+      },
+    });
+
+    assert.deepEqual(diagnostics, []);
+  });
 });
 
 describe("generatePlaywrightTest", () => {
