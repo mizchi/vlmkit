@@ -70,13 +70,16 @@ await writeGeneratedTestFile({
   overwrite: true,
   gates: [
     buildPlaywrightListGate(),
-    buildPlaywrightRuntimeGate("playwright.config.ts"),
+    buildPlaywrightRuntimeGate("playwright.config.ts", 2),
     buildTypecheckGate("tsconfig.json"),
   ],
 });
 ```
 
 If a gate fails, the helper restores the previous file or removes the new file.
+The optional second argument to `buildPlaywrightRuntimeGate` repeats the runtime
+gate, which is useful for routing, filters, hydration, and other timing-sensitive
+UI where a single run can miss a race.
 
 When `provider` is omitted, vlmkit-generate uses `VRT_LLM_PROVIDER` first, then
 available API keys in this order: Anthropic, OpenRouter, Gemini. With no key
@@ -95,11 +98,13 @@ vlmkit-generate \
   --max-attempts 2 \
   --overwrite \
   --runtime-gate \
-  --playwright-config playwright.config.ts
+  --playwright-config playwright.config.ts \
+  --runtime-gate-runs 2
 ```
 
 The CLI exits `2` and does not write `--out` when diagnostics remain after the
 retry budget. `--gate-command` runs after writing and rolls the file back when
 the command fails. `--runtime-gate` is a shorthand for running the generated
 test with Playwright, which catches locator/runtime failures that `--list`
-cannot see.
+cannot see. `--runtime-gate-runs` repeats that Playwright run before accepting
+the generated file.

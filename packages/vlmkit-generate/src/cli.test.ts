@@ -25,6 +25,7 @@ describe("parseGenerateCliArgs", () => {
       "--locator-inventory", "specs/locators.json",
       "--runtime-gate",
       "--playwright-config", "playwright.e2e.config.ts",
+      "--runtime-gate-runs", "2",
       "--provider", "anthropic",
       "--max-attempts", "3",
     ]);
@@ -39,6 +40,7 @@ describe("parseGenerateCliArgs", () => {
     assert.deepEqual(args.gateCommands, [{
       name: "playwright-runtime",
       command: "pnpm exec playwright test --config playwright.e2e.config.ts {testFile}",
+      runs: 2,
     }]);
     assert.equal(args.provider, "anthropic");
     assert.equal(args.maxAttempts, 3);

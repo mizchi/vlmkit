@@ -7,6 +7,7 @@ export interface GateCommand {
   command: string;
   cwd?: string;
   env?: Record<string, string | undefined>;
+  runs?: number;
 }
 
 export interface GateResult {
@@ -83,13 +84,16 @@ export async function writeGeneratedTestFile(
   const results: GateResult[] = [];
   try {
     for (const gate of gates) {
-      const result = await runCommand({
-        ...gate,
-        cwd: gate.cwd ?? cwd,
-        command: formatGateCommand(gate.command, filePath),
-      });
-      results.push(result);
-      if (!result.ok) throw new GeneratedTestGateError(result);
+      const runs = normalizeGateRuns(gate.runs);
+      for (let i = 0; i < runs; i++) {
+        const result = await runCommand({
+          ...gate,
+          cwd: gate.cwd ?? cwd,
+          command: formatGateCommand(gate.command, filePath),
+        });
+        results.push(result);
+        if (!result.ok) throw new GeneratedTestGateError(result);
+      }
     }
   } catch (error) {
     if (previous !== undefined) {
@@ -110,12 +114,14 @@ export function buildPlaywrightListGate(): GateCommand {
   };
 }
 
-export function buildPlaywrightRuntimeGate(config?: string): GateCommand {
+export function buildPlaywrightRuntimeGate(config?: string, runs?: number): GateCommand {
+  const normalizedRuns = normalizeGateRuns(runs);
   return {
     name: "playwright-runtime",
     command: config
       ? `pnpm exec playwright test --config ${config} {testFile}`
       : "pnpm exec playwright test {testFile}",
+    ...(normalizedRuns > 1 ? { runs: normalizedRuns } : {}),
   };
 }
 
@@ -137,6 +143,12 @@ async function readOptional(path: string): Promise<string | undefined> {
 
 function formatGateCommand(command: string, filePath: string): string {
   return command.replaceAll("{testFile}", shellQuote(filePath));
+}
+
+function normalizeGateRuns(runs: number | undefined): number {
+  if (runs === undefined) return 1;
+  if (!Number.isInteger(runs) || runs < 1) throw new Error("gate runs must be a positive integer");
+  return runs;
 }
 
 function shellQuote(value: string): string {

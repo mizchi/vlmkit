@@ -21,6 +21,7 @@ export interface GenerateCliArgs {
   overwrite: boolean;
   runtimeGate?: boolean;
   playwrightConfig?: string;
+  runtimeGateRuns?: number;
   gateCommands: GateCommand[];
 }
 
@@ -76,6 +77,9 @@ export function parseGenerateCliArgs(argv: string[]): GenerateCliArgs {
       case "--playwright-config":
         args.playwrightConfig = next();
         break;
+      case "--runtime-gate-runs":
+        args.runtimeGateRuns = parsePositiveInt(next(), arg);
+        break;
       case "--gate-command":
         args.gateCommands!.push({ command: next() });
         break;
@@ -89,7 +93,7 @@ export function parseGenerateCliArgs(argv: string[]): GenerateCliArgs {
 
   if (!args.plan) throw new Error(`--plan is required\n\n${GENERATE_USAGE}`);
   if (!args.out) throw new Error(`--out is required\n\n${GENERATE_USAGE}`);
-  if (args.runtimeGate) args.gateCommands!.push(buildPlaywrightRuntimeGate(args.playwrightConfig));
+  if (args.runtimeGate) args.gateCommands!.push(buildPlaywrightRuntimeGate(args.playwrightConfig, args.runtimeGateRuns));
   return args as GenerateCliArgs;
 }
 
@@ -187,6 +191,7 @@ Options:
   --runtime-gate            Run the generated test after writing it
   --playwright-config <path>
                             Playwright config path for --runtime-gate
+  --runtime-gate-runs <n>   Run the Playwright runtime gate n times (default: 1)
   --gate-command <cmd>      Repeatable post-write gate; use {testFile} placeholder`;
 
 if (isDirectRun()) {

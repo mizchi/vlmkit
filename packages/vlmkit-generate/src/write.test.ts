@@ -71,6 +71,37 @@ describe("writeGeneratedTestFile", () => {
     }
   });
 
+  it("runs a gate multiple times when runs is set", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "vlmkit-write-"));
+    try {
+      const filePath = join(dir, "generated.spec.ts");
+      const commands: string[] = [];
+      const result = await writeGeneratedTestFile({
+        filePath,
+        source: "new\n",
+        gates: [{ name: "runtime", command: "playwright test {testFile}", runs: 3 }],
+      }, {
+        runCommand: async (gate) => {
+          commands.push(gate.command);
+          return {
+            name: gate.name ?? gate.command,
+            command: gate.command,
+            ok: true,
+            exitCode: 0,
+            stdout: "",
+            stderr: "",
+          };
+        },
+      });
+
+      assert.equal(commands.length, 3);
+      assert.equal(result.gates.length, 3);
+      assert.equal(await readFile(filePath, "utf8"), "new\n");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it("rolls back an existing file when a gate fails", async () => {
     const dir = await mkdtemp(join(tmpdir(), "vlmkit-write-"));
     try {
@@ -138,6 +169,11 @@ describe("gate builders", () => {
     assert.deepEqual(buildPlaywrightRuntimeGate("playwright.e2e.config.ts"), {
       name: "playwright-runtime",
       command: "pnpm exec playwright test --config playwright.e2e.config.ts {testFile}",
+    });
+    assert.deepEqual(buildPlaywrightRuntimeGate("playwright.e2e.config.ts", 2), {
+      name: "playwright-runtime",
+      command: "pnpm exec playwright test --config playwright.e2e.config.ts {testFile}",
+      runs: 2,
     });
     assert.deepEqual(buildTypecheckGate("tsconfig.e2e.json"), {
       name: "typecheck",
