@@ -1,6 +1,7 @@
 export * from "./types.ts";
 export {
   buildPlanPrompt,
+  buildLocatorInventoryFromObservations,
   buildStructuredPlanPrompt,
   createPlan,
   createPlanWithRetry,

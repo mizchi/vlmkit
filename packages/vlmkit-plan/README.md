@@ -56,14 +56,16 @@ import {
 
 const planned = await createStructuredPlan(input, { provider: "anthropic" });
 const locatorInventory = planned.plan
-  ? structuredPlanToLocatorInventory(planned.plan)
+  ? structuredPlanToLocatorInventory(planned.plan, input.observations)
   : undefined;
 ```
 
 `locatorInventory` can be passed to `@mizchi/vlmkit-generate` to detect locator
 hallucinations in generated tests. The structured planner treats this inventory
 as observed data only: if no `observations` are supplied, inventory entries are
-diagnostics rather than trusted facts.
+diagnostics rather than trusted facts. If observations are supplied and the model
+omits `locatorInventory`, vlmkit-plan fills it deterministically from the
+observed roles, labels, test IDs, and text entries.
 
 When `provider` is omitted, vlmkit-plan uses `VRT_LLM_PROVIDER` first, then
 available API keys in this order: Anthropic, OpenRouter, Gemini. With no key

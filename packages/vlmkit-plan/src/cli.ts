@@ -129,7 +129,10 @@ export async function runPlanCli(argv: string[], deps?: Partial<PlanDeps>): Prom
       await writeJsonFile(args.structuredOut, result.plan);
     }
     if (args.locatorInventoryOut) {
-      await writeJsonFile(args.locatorInventoryOut, result.plan ? structuredPlanToLocatorInventory(result.plan) ?? {} : {});
+      await writeJsonFile(
+        args.locatorInventoryOut,
+        result.plan ? structuredPlanToLocatorInventory(result.plan, input.observations) ?? {} : {},
+      );
     }
   }
   return 0;

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildPlanPrompt,
   buildStructuredPlanPrompt,
+  buildLocatorInventoryFromObservations,
   createPlan,
   createPlanWithRetry,
   createStructuredPlan,
@@ -148,6 +149,76 @@ describe("structured plan contract", () => {
     });
 
     assert.ok(diagnostics.includes("unexpected locatorInventory without observed UI"));
+  });
+
+  it("rejects retry diagnostic leakage in a structured plan", () => {
+    const diagnostics = validateStructuredPlan({
+      title: "Checkout",
+      applicationOverview: "Checkout.",
+      scenarios: [{ title: "x", steps: ["Open checkout."], expectedResults: ["Checkout is visible."] }],
+      generationNotes: ["Previous structured plan diagnostics revealed a missing locatorInventory."],
+    });
+
+    assert.ok(diagnostics.includes("plan leaks retry diagnostics"));
+  });
+
+  it("builds locator inventory directly from observations", () => {
+    assert.deepEqual(buildLocatorInventoryFromObservations([{
+      roles: ['button "Pay now"', 'button "Pay now"'],
+      labels: ["Email"],
+      testIds: ["cart-count"],
+      texts: ["Order confirmed"],
+    }]), {
+      roles: ['button "Pay now"'],
+      labels: ["Email"],
+      testIds: ["cart-count"],
+      texts: ["Order confirmed"],
+    });
+  });
+
+  it("fills missing locator inventory from observed UI facts", async () => {
+    const result = await createStructuredPlan(
+      {
+        title: "Checkout",
+        request: "Plan checkout.",
+        observations: [{
+          roles: ['button "Pay now"'],
+          labels: ["Email"],
+          testIds: ["cart-count"],
+          texts: ["Order confirmed"],
+        }],
+      },
+      undefined,
+      {
+        complete: async () => ({
+          content: JSON.stringify({
+            title: "Checkout",
+            applicationOverview: "Guest checkout.",
+            scenarios: [{
+              title: "Checkout succeeds",
+              steps: ["Open checkout.", "Pay."],
+              expectedResults: ["Confirmation is visible."],
+            }],
+            generationNotes: ["Use observed locators."],
+          }),
+        }),
+      },
+    );
+
+    assert.deepEqual(result.diagnostics, []);
+    assert.deepEqual(result.plan?.locatorInventory, {
+      roles: ['button "Pay now"'],
+      labels: ["Email"],
+      testIds: ["cart-count"],
+      texts: ["Order confirmed"],
+    });
+    assert.match(result.markdown, /## Locator Inventory/);
+    assert.deepEqual(
+      structuredPlanToLocatorInventory(result.plan!, [{
+        roles: ['button "Pay now"'],
+      }]),
+      result.plan?.locatorInventory,
+    );
   });
 
   it("creates a structured plan and rendered markdown with an injected model", async () => {

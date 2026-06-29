@@ -177,6 +177,7 @@ export function validateStructuredPlan(plan: StructuredPlan, input: Pick<PlanInp
   });
   if (!plan.generationNotes?.length) diagnostics.push("missing Generation Notes");
   diagnostics.push(...validateStructuredLocatorInventory(plan.locatorInventory, input.observations));
+  diagnostics.push(...validateRetryDiagnosticLeak(plan));
   return diagnostics;
 }
 
@@ -219,8 +220,26 @@ export function renderStructuredPlanMarkdown(plan: StructuredPlan): string {
   return `${lines.join("\n").trim()}\n`;
 }
 
-export function structuredPlanToLocatorInventory(plan: StructuredPlan): PlanLocatorInventory | undefined {
-  return plan.locatorInventory;
+export function structuredPlanToLocatorInventory(
+  plan: StructuredPlan,
+  observations?: UiObservation[],
+): PlanLocatorInventory | undefined {
+  return hasInventoryEntries(plan.locatorInventory)
+    ? plan.locatorInventory
+    : buildLocatorInventoryFromObservations(observations);
+}
+
+export function buildLocatorInventoryFromObservations(
+  observations: UiObservation[] | undefined,
+): PlanLocatorInventory | undefined {
+  if (!observations?.length) return undefined;
+  const inventory: PlanLocatorInventory = {
+    roles: uniqueStrings(observations.flatMap((obs) => obs.roles ?? [])),
+    labels: uniqueStrings(observations.flatMap((obs) => obs.labels ?? [])),
+    testIds: uniqueStrings(observations.flatMap((obs) => obs.testIds ?? [])),
+    texts: uniqueStrings(observations.flatMap((obs) => obs.texts ?? [])),
+  };
+  return hasInventoryEntries(inventory) ? compactInventory(inventory) : undefined;
 }
 
 export async function createPlan(
@@ -389,6 +408,14 @@ function validateStructuredLocatorInventory(
   return diagnostics;
 }
 
+function validateRetryDiagnosticLeak(plan: StructuredPlan): string[] {
+  const text = JSON.stringify(plan);
+  return /\b(previous (structured )?plan diagnostics|previous structured plan output|fix every diagnostic|diagnostics revealed)\b/i
+    .test(text)
+    ? ["plan leaks retry diagnostics"]
+    : [];
+}
+
 function hasInventoryEntries(inventory: PlanLocatorInventory | undefined): boolean {
   return Boolean(
     inventory?.roles?.length
@@ -396,6 +423,19 @@ function hasInventoryEntries(inventory: PlanLocatorInventory | undefined): boole
       || inventory?.testIds?.length
       || inventory?.texts?.length,
   );
+}
+
+function compactInventory(inventory: PlanLocatorInventory): PlanLocatorInventory {
+  return {
+    ...(inventory.roles?.length ? { roles: inventory.roles } : {}),
+    ...(inventory.labels?.length ? { labels: inventory.labels } : {}),
+    ...(inventory.testIds?.length ? { testIds: inventory.testIds } : {}),
+    ...(inventory.texts?.length ? { texts: inventory.texts } : {}),
+  };
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values.filter((value) => value.trim().length > 0))];
 }
 
 function validateInventorySubset(
@@ -441,6 +481,7 @@ function buildStructuredPlanRepairPrompt(basePrompt: string, previousContent: st
     "```",
     "",
     "Regenerate the full structured plan. Fix every diagnostic. Output only JSON.",
+    "Do not mention previous diagnostics, validation failures, or the retry process in the returned plan.",
   ].join("\n");
 }
 
@@ -450,6 +491,9 @@ function evaluateStructuredPlanContent(
 ): Pick<StructuredPlanResult, "plan" | "markdown" | "diagnostics"> {
   try {
     const plan = parseStructuredPlan(content, input.title);
+    if (!hasInventoryEntries(plan.locatorInventory)) {
+      plan.locatorInventory = buildLocatorInventoryFromObservations(input.observations);
+    }
     const markdown = renderStructuredPlanMarkdown(plan);
     return {
       plan,
