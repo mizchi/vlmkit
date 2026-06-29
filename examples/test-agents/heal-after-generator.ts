@@ -12,7 +12,10 @@
  *   MAX_ATTEMPTS=4
  *   OUTPUT_DIR=test-results
  *   GIT_BASE=origin/main
+ *   GUARDRAIL_CONTEXT_FILE=specs/<topic>.plan.md
+ *   GUARDRAIL_CONTEXT="original request / plan / locator inventory"
  */
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   collectGitContext,
@@ -47,6 +50,10 @@ const codegenTiers: ModelTier[] = withPricing([
 ], pricing);
 
 const testCommand = process.env.TEST_COMMAND ?? `pnpm exec playwright test ${testFileArg}`;
+const guardrailContextFile = process.env.GUARDRAIL_CONTEXT_FILE;
+const guardrailContext = guardrailContextFile
+  ? readFileSync(guardrailContextFile, "utf8")
+  : process.env.GUARDRAIL_CONTEXT;
 const result = await heal({
   testCommand,
   updateSnapshotsCommand: process.env.UPDATE_SNAPSHOTS_COMMAND ?? `${testCommand} --update-snapshots`,
@@ -58,6 +65,7 @@ const result = await heal({
   maxAttempts: Number(process.env.MAX_ATTEMPTS ?? "4"),
   outputDir: process.env.OUTPUT_DIR,
   expectedChange: process.env.EXPECTED_CHANGE,
+  guardrailContext,
   gitContext: process.env.NO_GIT_CONTEXT === "1"
     ? undefined
     : collectGitContext(process.cwd(), { base: process.env.GIT_BASE ?? "origin/main" }),

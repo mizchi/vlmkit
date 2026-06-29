@@ -164,6 +164,30 @@ On a locator failure, the loop reads Playwright output and the newest
 `testFile`, then reruns the command. A fixed result is returned only after a
 passing run is followed by two passing verification runs.
 
+When healing generated tests, pass `guardrailContext` with the original request,
+plan, and locator inventory. This gives the codegen tier explicit constraints so
+a green repair does not drop the primary interaction or replace the scenario
+with weaker presence checks.
+
+```ts
+import { readFile } from "node:fs/promises";
+
+const result = await heal({
+  testCommand: "pnpm exec playwright test tests/login.spec.ts",
+  testFile,
+  cwd: process.cwd(),
+  observe: { tiers: observeTiers },
+  codegen: { tiers: codegenTiers },
+  guardrailContext: [
+    await readFile("specs/login.request.md", "utf8"),
+    await readFile("specs/login.plan.md", "utf8"),
+    await readFile("specs/login.locators.json", "utf8"),
+  ].join("\n\n---\n\n"),
+  budgetUsd: 1.0,
+  maxAttempts: 4,
+});
+```
+
 ## VRT Baseline Updates
 
 For `toHaveScreenshot` failures, the loop first reviews baseline/actual/diff

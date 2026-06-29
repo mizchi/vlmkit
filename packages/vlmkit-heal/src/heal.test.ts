@@ -58,6 +58,36 @@ describe("heal", () => {
     assert.equal(readFileSync(testFile, "utf8"), "// patched test\n");
   });
 
+  it("passes guardrail context to codegen so repairs preserve the original scenario", async () => {
+    const testFile = tmpTestFile();
+    const m = failThenOk("Expected URL to contain critical");
+    let capturedContext = "";
+    const result = await heal({
+      ...baseOpts(testFile),
+      guardrailContext: [
+        "# Original request",
+        "Click the critical severity filter and keep the shareable URL assertion.",
+        "# Locator inventory",
+        "button \"critical\"",
+        "text \"Checkout webhook retry storm\"",
+      ].join("\n"),
+    }, {
+      runTest: m.runTest,
+      codegen: {
+        propose: async ({ context }) => {
+          capturedContext = context;
+          return { newTestSource: "// patched test\n", costUsd: 0.001 };
+        },
+      },
+    });
+
+    assert.equal(result.verdict, "fixed");
+    assert.match(capturedContext, /Original request\/plan\/locator guardrails/);
+    assert.match(capturedContext, /critical severity filter/);
+    assert.match(capturedContext, /button "critical"/);
+    assert.match(capturedContext, /Do not weaken the scenario/);
+  });
+
   it("gives up when the shared budget is exhausted (verdict=give-up)", async () => {
     const testFile = tmpTestFile();
     const result = await heal(

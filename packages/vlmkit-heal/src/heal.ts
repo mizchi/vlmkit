@@ -152,9 +152,13 @@ export async function heal(opts: HealOptions, deps?: Partial<HealDeps>): Promise
     const ctier = codegenRouter.current();
     const testSource = readFileSync(opts.testFile, "utf8");
     const pageSnapshot = await d.captureContext?.(opts.cwd);
-    const context = pageSnapshot
-      ? `${output.slice(0, 1500)}\n\nCurrent page snapshot (real roles/names):\n${pageSnapshot.slice(0, 1500)}`
-      : output.slice(0, 2000);
+    const contextParts = [
+      formatGuardrailContext(opts.guardrailContext),
+      pageSnapshot
+        ? `${output.slice(0, 1500)}\n\nCurrent page snapshot (real roles/names):\n${pageSnapshot.slice(0, 1500)}`
+        : output.slice(0, 2000),
+    ].filter((part): part is string => Boolean(part));
+    const context = contextParts.join("\n\n");
     const proposal = await d.codegen.propose({ tier: ctier, errorKind, testSource, context });
     codegenRouter.record({ costUsd: proposal.costUsd });
     attempts.push({ tier: ctier, phase: "codegen", costUsd: proposal.costUsd, errorKind, patch: proposal.newTestSource });
@@ -176,4 +180,14 @@ export async function heal(opts: HealOptions, deps?: Partial<HealDeps>): Promise
   }
 
   return done("give-up");
+}
+
+function formatGuardrailContext(context: string | undefined): string | undefined {
+  const trimmed = context?.trim();
+  if (!trimmed) return undefined;
+  return [
+    "Original request/plan/locator guardrails:",
+    trimmed.slice(0, 4000),
+    "Do not weaken the scenario, drop primary interactions, or introduce locators outside the guardrails just to make the test pass.",
+  ].join("\n");
 }

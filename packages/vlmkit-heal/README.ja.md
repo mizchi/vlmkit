@@ -141,6 +141,29 @@ OPENROUTER_API_KEY=... npx tsx scripts/heal-login.ts
 
 locator の失敗では、ループは Playwright の出力と最新の `error-context.md` を読み、`codegen` tier にテストファイル全体の書き換えを依頼します。その後 `testFile` に適用し、同じコマンドを再実行します。`fixed` は、通過した実行のあとに検証実行が 2 回連続で通った場合だけ返ります。
 
+生成済みテストを heal する場合は、元の request / plan / locator inventory を
+`guardrailContext` に渡してください。これにより、codegen tier が主操作を削ったり、
+弱い存在確認だけのテストへ置き換えたりするのを避けやすくなります。
+
+```ts
+import { readFile } from "node:fs/promises";
+
+const result = await heal({
+  testCommand: "pnpm exec playwright test tests/login.spec.ts",
+  testFile,
+  cwd: process.cwd(),
+  observe: { tiers: observeTiers },
+  codegen: { tiers: codegenTiers },
+  guardrailContext: [
+    await readFile("specs/login.request.md", "utf8"),
+    await readFile("specs/login.plan.md", "utf8"),
+    await readFile("specs/login.locators.json", "utf8"),
+  ].join("\n\n---\n\n"),
+  budgetUsd: 1.0,
+  maxAttempts: 4,
+});
+```
+
 ## VRT ベースライン更新
 
 `toHaveScreenshot` の失敗では、`codegen` を呼ぶ前に baseline / actual / diff 画像をレビューします。

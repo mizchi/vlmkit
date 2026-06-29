@@ -91,7 +91,10 @@ export function createRealCodegenClient(): CodegenClient {
     async propose({ tier, errorKind, testSource, context }) {
       const prompt =
         `A Playwright test is failing (errorKind: ${errorKind}). Rewrite the ` +
-        `WHOLE test file so it passes against the current UI. Output ONLY the ` +
+        `WHOLE test file so it passes against the current UI while preserving ` +
+        `the original scenario described in Context. Do not remove the primary ` +
+        `interaction, weaken assertions, or invent locators outside any provided ` +
+        `locator inventory just to make the test pass. Output ONLY the ` +
         `full updated TypeScript file inside a single \`\`\`ts code block.\n\n` +
         `Context:\n${context}\n\nCurrent file:\n\`\`\`ts\n${testSource}\n\`\`\``;
       const res = await completeForTier(tier, prompt, false);

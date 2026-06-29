@@ -56,6 +56,12 @@ export interface HealOptions {
   confirmAccept?: boolean;
   /** Optional intent signal for VRT review (commit msg + code diff). See collectGitContext. */
   gitContext?: string;
+  /**
+   * Original request / plan / locator inventory context that codegen repairs
+   * must preserve. Use this to prevent a "green" rewrite from weakening the
+   * scenario or inventing new locators.
+   */
+  guardrailContext?: string;
   /** Consecutive "gate green but verify red" observations before reporting flaky. Default 2. */
   flakyThreshold?: number;
   /** Reserved for a future human-approval gate; currently not used by heal(). */
