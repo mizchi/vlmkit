@@ -15,6 +15,8 @@ export interface UiObservation {
   notes?: string[];
 }
 
+export type PlanScope = "smoke" | "focused" | "full";
+
 export interface PlanInput {
   title: string;
   request: string;
@@ -22,6 +24,7 @@ export interface PlanInput {
   prd?: string;
   observations?: UiObservation[];
   constraints?: string[];
+  scope?: PlanScope;
 }
 
 export interface PlanLocatorInventory {

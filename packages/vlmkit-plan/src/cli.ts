@@ -4,7 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createPlanWithRetry, createStructuredPlanWithRetry, structuredPlanToLocatorInventory } from "./plan.ts";
-import type { PlanDeps, PlanInput, PlanResult, PlannerModelOptions, StructuredPlanResult, UiObservation } from "./types.ts";
+import type { PlanDeps, PlanInput, PlanResult, PlanScope, PlannerModelOptions, StructuredPlanResult, UiObservation } from "./types.ts";
 
 export interface PlanCliArgs {
   title: string;
@@ -22,6 +22,7 @@ export interface PlanCliArgs {
   model?: string;
   maxTokens?: number;
   maxAttempts?: number;
+  scope?: PlanScope;
 }
 
 export function parsePlanCliArgs(argv: string[]): PlanCliArgs {
@@ -78,6 +79,9 @@ export function parsePlanCliArgs(argv: string[]): PlanCliArgs {
         break;
       case "--max-attempts":
         args.maxAttempts = parsePositiveInt(next(), arg);
+        break;
+      case "--scope":
+        args.scope = parseScope(next());
         break;
       case "--help":
       case "-h":
@@ -152,6 +156,7 @@ async function buildPlanInput(args: PlanCliArgs): Promise<PlanInput> {
     observations,
     seed,
     constraints: args.constraints.length ? args.constraints : undefined,
+    scope: args.scope,
   };
 }
 
@@ -163,6 +168,11 @@ function parseObservations(raw: string): UiObservation[] {
 function parseProvider(value: string): PlannerModelOptions["provider"] {
   if (value === "anthropic" || value === "gemini" || value === "openrouter") return value;
   throw new Error(`Invalid --provider: ${value}`);
+}
+
+function parseScope(value: string): PlanScope {
+  if (value === "smoke" || value === "focused" || value === "full") return value;
+  throw new Error(`Invalid --scope: ${value}`);
 }
 
 function parsePositiveInt(value: string, flag: string): number {
@@ -207,7 +217,8 @@ Options:
   --provider <name>         anthropic | gemini | openrouter
   --model <id>              Provider model id
   --max-tokens <n>          LLM output token budget
-  --max-attempts <n>        Retry attempts when diagnostics remain`;
+  --max-attempts <n>        Retry attempts when diagnostics remain
+  --scope <name>            smoke | focused | full (default: smoke)`;
 
 if (isDirectRun()) {
   runPlanCli(process.argv.slice(2)).then((code) => {

@@ -5,6 +5,7 @@ import type {
   PlanLocatorInventory,
   PlanResult,
   PlanRetryOptions,
+  PlanScope,
   PlannerModelOptions,
   StructuredPlan,
   StructuredPlanResult,
@@ -16,6 +17,7 @@ type ResolvedPlannerModelOptions = PlannerModelOptions & {
 };
 
 export function buildPlanPrompt(input: PlanInput): string {
+  const scope = normalizePlanScope(input.scope);
   const parts = [
     "You are a Playwright Test planner.",
     "Write a human-readable Markdown test plan that a generator can turn into Playwright tests.",
@@ -34,6 +36,9 @@ export function buildPlanPrompt(input: PlanInput): string {
     "List locator hints, deterministic VRT requirements, and data/setup caveats.",
     "",
     `User request:\n${input.request.trim()}`,
+    "",
+    `Scope: ${scope}`,
+    scopeGuidance(scope),
   ];
 
   if (input.seed) {
@@ -73,6 +78,7 @@ export function buildPlanPrompt(input: PlanInput): string {
 }
 
 export function buildStructuredPlanPrompt(input: PlanInput): string {
+  const scope = normalizePlanScope(input.scope);
   const parts = [
     "You are a Playwright Test planner.",
     "Return only JSON for this TypeScript contract:",
@@ -98,6 +104,9 @@ export function buildStructuredPlanPrompt(input: PlanInput): string {
     "- Do not invent seed tests. If no seed is provided, omit scenario.seed.",
     "- Include semantic expected results; screenshots alone are not enough.",
     "- If VRT is needed, set both vrt.startState and vrt.goalState.",
+    scopeGuidance(scope),
+    "",
+    `Scope: ${scope}`,
     "",
     `User request:\n${input.request.trim()}`,
   ];
@@ -130,7 +139,7 @@ export function normalizePlanMarkdown(raw: string, fallbackTitle: string): strin
   return text.endsWith("\n") ? text : `${text}\n`;
 }
 
-export function validatePlanMarkdown(markdown: string, input: Pick<PlanInput, "seed"> = {}): string[] {
+export function validatePlanMarkdown(markdown: string, input: Pick<PlanInput, "seed" | "scope"> = {}): string[] {
   const diagnostics: string[] = [];
   if (!/^##\s+Application Overview\b/im.test(markdown)) {
     diagnostics.push("missing Application Overview section");
@@ -141,6 +150,11 @@ export function validatePlanMarkdown(markdown: string, input: Pick<PlanInput, "s
   if (!/^#{2,4}\s+\d+\.\s+\S/m.test(markdown)) {
     diagnostics.push("missing numbered scenario heading");
   }
+  validateScenarioCountForScope(
+    diagnostics,
+    normalizePlanScope(input.scope),
+    countMarkdownScenarios(markdown),
+  );
   if (input.seed && !/\*\*Seed:\*\*/i.test(markdown)) {
     diagnostics.push("missing Seed reference");
   }
@@ -166,11 +180,12 @@ function extractStructuredPlanJson(raw: string): string {
   return (fence?.[1] ?? text).trim();
 }
 
-export function validateStructuredPlan(plan: StructuredPlan, input: Pick<PlanInput, "seed" | "observations"> = {}): string[] {
+export function validateStructuredPlan(plan: StructuredPlan, input: Pick<PlanInput, "seed" | "observations" | "scope"> = {}): string[] {
   const diagnostics: string[] = [];
   if (!plan.title?.trim()) diagnostics.push("missing title");
   if (!plan.applicationOverview?.trim()) diagnostics.push("missing Application Overview");
   if (!plan.scenarios?.length) diagnostics.push("missing scenarios");
+  validateScenarioCountForScope(diagnostics, normalizePlanScope(input.scope), plan.scenarios?.length ?? 0);
   plan.scenarios?.forEach((scenario, index) => {
     const n = index + 1;
     if (!scenario.title?.trim()) diagnostics.push(`scenario ${n} missing title`);
@@ -217,9 +232,10 @@ export function renderStructuredPlanMarkdown(plan: StructuredPlan): string {
 
   lines.push("## Generation Notes");
   plan.generationNotes.forEach((note) => lines.push(`- ${note}`));
-  if (plan.locatorInventory) {
+  const locatorInventory = canonicalizeLocatorInventory(plan.locatorInventory);
+  if (locatorInventory) {
     lines.push("", "## Locator Inventory");
-    appendInventoryLines(lines, plan.locatorInventory);
+    appendInventoryLines(lines, locatorInventory);
   }
   return `${lines.join("\n").trim()}\n`;
 }
@@ -229,7 +245,7 @@ export function structuredPlanToLocatorInventory(
   observations?: UiObservation[],
 ): PlanLocatorInventory | undefined {
   return hasInventoryEntries(plan.locatorInventory)
-    ? plan.locatorInventory
+    ? canonicalizeLocatorInventory(plan.locatorInventory)
     : buildLocatorInventoryFromObservations(observations);
 }
 
@@ -238,12 +254,12 @@ export function buildLocatorInventoryFromObservations(
 ): PlanLocatorInventory | undefined {
   if (!observations?.length) return undefined;
   const inventory: PlanLocatorInventory = {
-    roles: uniqueStrings(observations.flatMap((obs) => obs.roles ?? [])),
-    labels: uniqueStrings(observations.flatMap((obs) => obs.labels ?? [])),
-    testIds: uniqueStrings(observations.flatMap((obs) => obs.testIds ?? [])),
-    texts: uniqueStrings(observations.flatMap((obs) => obs.texts ?? [])),
+    roles: observations.flatMap((obs) => obs.roles ?? []),
+    labels: observations.flatMap((obs) => obs.labels ?? []),
+    testIds: observations.flatMap((obs) => obs.testIds ?? []),
+    texts: observations.flatMap((obs) => obs.texts ?? []),
   };
-  return hasInventoryEntries(inventory) ? compactInventory(inventory) : undefined;
+  return canonicalizeLocatorInventory(inventory);
 }
 
 export async function createPlan(
@@ -381,6 +397,37 @@ function formatObservation(obs: UiObservation): string {
   return lines.join("\n");
 }
 
+function normalizePlanScope(scope: PlanScope | undefined): PlanScope {
+  return scope ?? "smoke";
+}
+
+function scopeGuidance(scope: PlanScope): string {
+  if (scope === "smoke") return "- Plan exactly one primary end-to-end scenario.";
+  if (scope === "focused") return "- Plan at most two scenarios: one main flow and one high-value edge or state check.";
+  return "- Plan comprehensive coverage when it is justified by the request.";
+}
+
+function validateScenarioCountForScope(
+  diagnostics: string[],
+  scope: PlanScope,
+  count: number,
+): void {
+  const max = scenarioLimitForScope(scope);
+  if (max !== null && count > max) {
+    diagnostics.push(`scope ${scope} allows at most ${max} scenario${max === 1 ? "" : "s"}`);
+  }
+}
+
+function scenarioLimitForScope(scope: PlanScope): number | null {
+  if (scope === "smoke") return 1;
+  if (scope === "focused") return 2;
+  return null;
+}
+
+function countMarkdownScenarios(markdown: string): number {
+  return [...markdown.matchAll(/^#{2,4}\s+\d+\.\s+\S/gm)].length;
+}
+
 function appendInventoryLines(lines: string[], inventory: PlanLocatorInventory): void {
   if (inventory.roles?.length) lines.push(`- Roles: ${inventory.roles.join(", ")}`);
   if (inventory.labels?.length) lines.push(`- Labels: ${inventory.labels.join(", ")}`);
@@ -438,8 +485,18 @@ function compactInventory(inventory: PlanLocatorInventory): PlanLocatorInventory
   };
 }
 
+function canonicalizeLocatorInventory(inventory: PlanLocatorInventory | undefined): PlanLocatorInventory | undefined {
+  if (!hasInventoryEntries(inventory)) return undefined;
+  return compactInventory({
+    roles: uniqueStrings((inventory?.roles ?? []).map(canonicalizeRoleInventoryEntry)),
+    labels: uniqueStrings(inventory?.labels ?? []),
+    testIds: uniqueStrings(inventory?.testIds ?? []),
+    texts: uniqueStrings(inventory?.texts ?? []),
+  });
+}
+
 function uniqueStrings(values: string[]): string[] {
-  return [...new Set(values.filter((value) => value.trim().length > 0))];
+  return [...new Set(values.map((value) => value.trim()).filter((value) => value.length > 0))];
 }
 
 function validateInventorySubset(
@@ -466,11 +523,33 @@ function normalizeInventoryValue(field: keyof PlanLocatorInventory, value: strin
 }
 
 function roleInventoryKey(entry: string): string {
+  const parsed = parseRoleInventoryEntry(entry);
+  return parsed.name ? `${parsed.role}\u0000${parsed.name}` : parsed.role;
+}
+
+function canonicalizeRoleInventoryEntry(entry: string): string {
+  const parsed = parseRoleInventoryEntry(entry);
+  return parsed.name ? `${parsed.role} "${parsed.name.replaceAll('"', '\\"')}"` : parsed.role;
+}
+
+function parseRoleInventoryEntry(entry: string): { role: string; name?: string } {
+  const roleLocator = entry.match(/^role\s*=\s*([A-Za-z0-9_-]+)(?:\s*\[\s*name\s*=\s*(?:"([^"]+)"|'([^']+)'|([^\]]+))\s*\])?$/i);
+  if (roleLocator) {
+    return {
+      role: normalizeRoleName(roleLocator[1]!),
+      name: (roleLocator[2] ?? roleLocator[3] ?? roleLocator[4])?.trim(),
+    };
+  }
+
   const quoted = entry.match(/^([^"']+?)\s*["'](.+)["']$/);
-  if (quoted) return `${quoted[1]!.trim().replace(/:$/, "")}\u0000${quoted[2]!.trim()}`;
+  if (quoted) return { role: normalizeRoleName(quoted[1]!), name: quoted[2]!.trim() };
   const colon = entry.match(/^([^:]+):\s*(.+)$/);
-  if (colon) return `${colon[1]!.trim()}\u0000${colon[2]!.trim()}`;
-  return entry.trim();
+  if (colon) return { role: normalizeRoleName(colon[1]!), name: colon[2]!.trim() };
+  return { role: normalizeRoleName(entry) };
+}
+
+function normalizeRoleName(role: string): string {
+  return role.trim().replace(/^role\s*=\s*/i, "").replace(/:$/, "").toLowerCase();
 }
 
 function buildPlanRepairPrompt(basePrompt: string, markdown: string, diagnostics: string[]): string {
@@ -514,6 +593,8 @@ function evaluateStructuredPlanContent(
     const plan = parseStructuredPlan(content, input.title);
     if (!hasInventoryEntries(plan.locatorInventory)) {
       plan.locatorInventory = buildLocatorInventoryFromObservations(input.observations);
+    } else {
+      plan.locatorInventory = canonicalizeLocatorInventory(plan.locatorInventory);
     }
     const markdown = renderStructuredPlanMarkdown(plan);
     return {

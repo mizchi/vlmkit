@@ -51,6 +51,17 @@ describe("buildPlanPrompt", () => {
     assert.match(prompt, /Seed test: not provided/);
     assert.match(prompt, /Do not invent seed tests/);
   });
+
+  it("adds scope guidance to keep smoke plans focused", () => {
+    const prompt = buildPlanPrompt({
+      title: "Login",
+      request: "Plan login coverage.",
+      scope: "smoke",
+    });
+
+    assert.match(prompt, /Scope: smoke/);
+    assert.match(prompt, /Plan exactly one primary end-to-end scenario/);
+  });
 });
 
 describe("structured plan contract", () => {
@@ -76,10 +87,12 @@ describe("structured plan contract", () => {
     const prompt = buildStructuredPlanPrompt({
       title: "Checkout",
       request: "Plan checkout.",
+      scope: "focused",
     });
 
     assert.match(prompt, /Return only JSON/);
     assert.match(prompt, /"scenarios"/);
+    assert.match(prompt, /Scope: focused/);
   });
 
   it("parses fenced structured plan JSON", () => {
@@ -117,6 +130,20 @@ describe("structured plan contract", () => {
     assert.ok(diagnostics.includes("scenario 1 missing expected results"));
     assert.ok(diagnostics.includes("scenario 1 missing Seed reference"));
     assert.ok(diagnostics.includes("missing Generation Notes"));
+  });
+
+  it("rejects too many scenarios for smoke scope", () => {
+    const diagnostics = validateStructuredPlan({
+      title: "Checkout",
+      applicationOverview: "Checkout.",
+      scenarios: [
+        { title: "first", steps: ["Open checkout."], expectedResults: ["Checkout is visible."] },
+        { title: "second", steps: ["Open cart."], expectedResults: ["Cart is visible."] },
+      ],
+      generationNotes: ["Use observed locators."],
+    }, { scope: "smoke" });
+
+    assert.ok(diagnostics.includes("scope smoke allows at most 1 scenario"));
   });
 
   it("rejects locator inventory entries that were not observed", () => {
@@ -189,16 +216,56 @@ describe("structured plan contract", () => {
 
   it("builds locator inventory directly from observations", () => {
     assert.deepEqual(buildLocatorInventoryFromObservations([{
-      roles: ['button "Pay now"', 'button "Pay now"'],
+      roles: ['button "Pay now"', 'button "Pay now"', "role=heading[name='Checkout']"],
       labels: ["Email"],
       testIds: ["cart-count"],
       texts: ["Order confirmed"],
     }]), {
-      roles: ['button "Pay now"'],
+      roles: ['button "Pay now"', 'heading "Checkout"'],
       labels: ["Email"],
       testIds: ["cart-count"],
       texts: ["Order confirmed"],
     });
+  });
+
+  it("canonicalizes structured locator inventory before rendering and exporting", async () => {
+    const result = await createStructuredPlan(
+      {
+        title: "Checkout",
+        request: "Plan checkout.",
+        observations: [{
+          roles: ['button "Pay now"', 'heading "Checkout"', 'textbox "Email"'],
+          labels: ["Email"],
+        }],
+      },
+      undefined,
+      {
+        complete: async () => ({
+          content: JSON.stringify({
+            title: "Checkout",
+            applicationOverview: "Guest checkout.",
+            scenarios: [{
+              title: "Checkout succeeds",
+              steps: ["Open checkout."],
+              expectedResults: ["Checkout is visible."],
+            }],
+            generationNotes: ["Use observed locators."],
+            locatorInventory: {
+              roles: ["button 'Pay now'", "role=heading[name='Checkout']", "textbox: Email", "button 'Pay now'"],
+              labels: ["Email", "Email"],
+            },
+          }),
+        }),
+      },
+    );
+
+    assert.deepEqual(result.diagnostics, []);
+    assert.deepEqual(result.plan?.locatorInventory, {
+      roles: ['button "Pay now"', 'heading "Checkout"', 'textbox "Email"'],
+      labels: ["Email"],
+    });
+    assert.match(result.markdown, /- Roles: button "Pay now", heading "Checkout", textbox "Email"/);
+    assert.deepEqual(structuredPlanToLocatorInventory(result.plan!), result.plan?.locatorInventory);
   });
 
   it("fills missing locator inventory from observed UI facts", async () => {
@@ -376,6 +443,25 @@ Use role locators.
     assert.ok(diagnostics.includes("missing numbered scenario heading"));
     assert.ok(diagnostics.includes("missing Seed reference"));
     assert.ok(diagnostics.includes("missing Generation Notes section"));
+  });
+
+  it("rejects markdown plans with too many scenarios for smoke scope", () => {
+    const diagnostics = validatePlanMarkdown(`# Checkout
+
+## Application Overview
+Guest checkout.
+
+## Test Scenarios
+
+### 1. Checkout succeeds
+
+### 2. Cart updates
+
+## Generation Notes
+Use role locators.
+`, { scope: "smoke" });
+
+    assert.ok(diagnostics.includes("scope smoke allows at most 1 scenario"));
   });
 
   it("rejects invented seed references when no seed was provided", () => {

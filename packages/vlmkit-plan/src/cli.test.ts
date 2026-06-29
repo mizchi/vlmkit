@@ -15,6 +15,7 @@ describe("parsePlanCliArgs", () => {
       "--locator-inventory-out", "specs/checkout.locators.json",
       "--provider", "anthropic",
       "--max-attempts", "3",
+      "--scope", "focused",
       "--constraint", "Use role locators.",
     ]);
 
@@ -25,6 +26,7 @@ describe("parsePlanCliArgs", () => {
     assert.equal(args.locatorInventoryOut, "specs/checkout.locators.json");
     assert.equal(args.provider, "anthropic");
     assert.equal(args.maxAttempts, 3);
+    assert.equal(args.scope, "focused");
     assert.deepEqual(args.constraints, ["Use role locators."]);
   });
 });

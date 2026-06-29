@@ -66,6 +66,13 @@ as observed data only: if no `observations` are supplied, inventory entries are
 diagnostics rather than trusted facts. If observations are supplied and the model
 omits `locatorInventory`, vlmkit-plan fills it deterministically from the
 observed roles, labels, test IDs, and text entries.
+Role inventory entries are canonicalized before rendering/export. Equivalent
+forms such as `button "Pay now"`, `button 'Pay now'`, `button: Pay now`, and
+`role=button[name='Pay now']` are treated as the same observed role.
+
+Planner scope defaults to `smoke`, which keeps output to one primary scenario.
+Use `focused` for at most two scenarios, or `full` when the request explicitly
+needs broader coverage.
 
 When `provider` is omitted, vlmkit-plan uses `VRT_LLM_PROVIDER` first, then
 available API keys in this order: Anthropic, OpenRouter, Gemini. With no key
@@ -81,6 +88,7 @@ vlmkit-plan \
   --out specs/checkout.plan.md \
   --structured-out specs/checkout.plan.json \
   --locator-inventory-out specs/checkout.locators.json \
+  --scope smoke \
   --provider anthropic \
   --max-attempts 2
 ```
