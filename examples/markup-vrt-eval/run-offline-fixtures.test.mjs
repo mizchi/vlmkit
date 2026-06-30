@@ -38,6 +38,7 @@ test("offline generated test satisfies the dogfood quality gates", () => {
 
   assert.match(source, /import \{ gotoApp \}/);
   assert.doesNotMatch(source, /page\.goto\(/);
+  assert.doesNotMatch(source, /fullPage/);
   assert.equal((source.match(/toHaveScreenshot/g) ?? []).length, 2);
   assert.match(source, /getByTestId\("release-row-invoice-export"\)/);
   assert.equal(source.split(/\r?\n/).filter((line) => line.trim().startsWith("//")).length, 0);

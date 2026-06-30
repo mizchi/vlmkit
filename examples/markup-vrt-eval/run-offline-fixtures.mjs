@@ -128,7 +128,7 @@ test("Release Queue offline VRT smoke", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Release Queue" })).toBeVisible();
   await expect(page.getByTestId("blocked-count")).toHaveText("2");
   await expect(page.getByTestId("release-row-invoice-export")).toBeVisible();
-  await expect(page).toHaveScreenshot("release-queue-initial.png", { fullPage: true });
+  await expect(page).toHaveScreenshot("release-queue-initial.png");
 
   await page.getByRole("button", { name: "Blocked" }).click();
   await expect(page.getByRole("button", { name: "Blocked" })).toHaveAttribute("aria-pressed", "true");
@@ -137,7 +137,7 @@ test("Release Queue offline VRT smoke", async ({ page }) => {
   await page.getByRole("button", { name: "Open Invoice Export details" }).click();
   await expect(page.getByTestId("selected-service")).toHaveText("Invoice Export");
   await expect(page.getByTestId("detail-summary")).toHaveText("Ledger archive release is waiting for compliance approval.");
-  await expect(page).toHaveScreenshot("release-queue-invoice-export.png", { fullPage: true });
+  await expect(page).toHaveScreenshot("release-queue-invoice-export.png");
 });
 `;
 }
