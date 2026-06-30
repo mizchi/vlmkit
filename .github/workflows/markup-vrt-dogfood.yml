@@ -1,0 +1,67 @@
+name: Markup VRT Dogfood
+
+on:
+  pull_request:
+    paths:
+      - "examples/markup-vrt-eval/**"
+      - "packages/vlmkit-generate/**"
+      - "packages/vlmkit-plan/**"
+      - "packages/vlmkit-heal/**"
+      - "packages/vlmkit-markup/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/markup-vrt-dogfood.yml"
+  push:
+    branches: [main]
+    paths:
+      - "examples/markup-vrt-eval/**"
+      - "packages/vlmkit-generate/**"
+      - "packages/vlmkit-plan/**"
+      - "packages/vlmkit-heal/**"
+      - "packages/vlmkit-markup/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/markup-vrt-dogfood.yml"
+  workflow_dispatch:
+
+jobs:
+  offline-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MARKUP_EVAL_OFFLINE: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run example unit tests
+        run: pnpm test:examples
+
+      - name: Run offline markup VRT dogfood
+        run: pnpm dogfood:markup-vrt:offline
+
+      - name: Upload markup VRT dogfood artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: markup-vrt-dogfood
+          path: |
+            .vrt/markup-vrt-eval/report.json
+            .vrt/markup-vrt-eval/report.md
+            .vrt/markup-vrt-eval/report.html
+            .vrt/markup-vrt-eval/repair-context.json
+            .vrt/markup-vrt-eval/repair-context.md
+            .vrt/markup-vrt-eval/playwright-report.json
+            .vrt/markup-vrt-eval/test-results/**
+          if-no-files-found: warn

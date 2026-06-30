@@ -21,6 +21,18 @@ PROVIDER=anthropic node examples/markup-vrt-eval/run.mjs
 The run needs whichever API key matches `PROVIDER` (`ANTHROPIC_API_KEY`,
 `OPENROUTER_API_KEY`, or `GEMINI_API_KEY`).
 
+For CI or offline smoke checks, skip the live planner/generator calls and write
+deterministic planner/generator fixtures:
+
+```sh
+pnpm test:examples
+pnpm dogfood:markup-vrt:offline
+```
+
+The offline mode still runs Playwright observation, VRT baseline update,
+two stable VRT checks, the intentional regression check, and repair-context
+generation. It does not call LLM/VLM providers.
+
 The evaluator exits non-zero if the generated test skips VRT assertions, uses
 `page.goto(...)` instead of `gotoApp(page)`, falls back to ambiguous release-name
 text locators, includes comments, or fails to detect the intentional visual

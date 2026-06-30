@@ -40,6 +40,16 @@ describe("package manifest for publishable CLI", () => {
     }
   });
 
+  it("wires example tests and offline dogfood into package scripts", async () => {
+    const pkg = await readPackageJson();
+    const scripts = pkg.scripts as Record<string, string> | undefined;
+
+    assert.ok(scripts, "package.json should define scripts");
+    assert.match(scripts.test, /examples\/\*\*\/\*\.test\.mjs/);
+    assert.equal(scripts["test:examples"], "node --test 'examples/**/*.test.mjs'");
+    assert.equal(scripts["dogfood:markup-vrt:offline"], "MARKUP_EVAL_OFFLINE=1 node examples/markup-vrt-eval/run.mjs");
+  });
+
   it("exports the published client entrypoint", async () => {
     const pkg = await readPackageJson();
     assert.deepEqual(pkg.exports, {

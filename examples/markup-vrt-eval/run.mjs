@@ -2,6 +2,12 @@ import { spawn } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { performance } from "node:perf_hooks";
 import { resolve } from "node:path";
+import {
+  buildOfflineGeneratedTest,
+  buildOfflineLocatorInventory,
+  buildOfflineStructuredPlan,
+  renderOfflinePlanMarkdown,
+} from "./run-offline-fixtures.mjs";
 import { buildRepairContext, renderRepairContextMarkdown } from "./repair-context.mjs";
 import {
   buildReport,
@@ -12,7 +18,8 @@ import {
 import { buildVlmRegionDiffArgs, summarizeVlmRegionDiff } from "./run-utils.mjs";
 
 const root = process.cwd();
-const provider = process.env.PROVIDER ?? "anthropic";
+const offline = process.env.MARKUP_EVAL_OFFLINE === "1";
+const provider = offline ? "offline" : process.env.PROVIDER ?? "anthropic";
 const outRoot = ".vrt/markup-vrt-eval";
 const specRoot = `${outRoot}/specs`;
 const generatedRoot = `${outRoot}/generated`;
@@ -43,34 +50,51 @@ await timed("observe", [
   observeTestPath,
 ]);
 
-await timed("plan", [
-  "pnpm", "exec", "vlmkit-plan",
-  "--title", "Release Queue VRT Smoke",
-  "--request-file", requestPath,
-  "--observations", observationsPath,
-  "--out", planPath,
-  "--structured-out", structuredPlanPath,
-  "--locator-inventory-out", locatorsPath,
-  "--scope", "smoke",
-  "--provider", provider,
-  "--max-attempts", "3",
-]);
+if (offline) {
+  await timedTask("plan-offline", "write offline planner artifacts", async () => {
+    await writeFile(planPath, renderOfflinePlanMarkdown());
+    await writeFile(structuredPlanPath, JSON.stringify(buildOfflineStructuredPlan(), null, 2) + "\n");
+    await writeFile(locatorsPath, JSON.stringify(buildOfflineLocatorInventory(), null, 2) + "\n");
+  });
+  await timedTask("generate-offline", "write offline generated test", async () => {
+    await writeFile(generatedTestPath, buildOfflineGeneratedTest("../../../examples/markup-vrt-eval/support/goto-app"));
+  });
+  await timed("generate-and-vrt-gate", [
+    "pnpm", "exec", "playwright", "test",
+    "--config", configPath,
+    generatedTestPath,
+    "--update-snapshots",
+  ]);
+} else {
+  await timed("plan", [
+    "pnpm", "exec", "vlmkit-plan",
+    "--title", "Release Queue VRT Smoke",
+    "--request-file", requestPath,
+    "--observations", observationsPath,
+    "--out", planPath,
+    "--structured-out", structuredPlanPath,
+    "--locator-inventory-out", locatorsPath,
+    "--scope", "smoke",
+    "--provider", provider,
+    "--max-attempts", "3",
+  ]);
 
-await timed("generate-and-vrt-gate", [
-  "pnpm", "exec", "vlmkit-generate",
-  "--plan", planPath,
-  "--rules", rulesPath,
-  "--locator-inventory", locatorsPath,
-  "--helper-import", "../../../examples/markup-vrt-eval/support/goto-app",
-  "--out", generatedTestPath,
-  "--provider", provider,
-  "--max-attempts", "3",
-  "--overwrite",
-  "--gate-command", `pnpm exec playwright test --config ${configPath} {testFile} --update-snapshots`,
-  "--runtime-gate",
-  "--playwright-config", configPath,
-  "--runtime-gate-runs", "2",
-]);
+  await timed("generate-and-vrt-gate", [
+    "pnpm", "exec", "vlmkit-generate",
+    "--plan", planPath,
+    "--rules", rulesPath,
+    "--locator-inventory", locatorsPath,
+    "--helper-import", "../../../examples/markup-vrt-eval/support/goto-app",
+    "--out", generatedTestPath,
+    "--provider", provider,
+    "--max-attempts", "3",
+    "--overwrite",
+    "--gate-command", `pnpm exec playwright test --config ${configPath} {testFile} --update-snapshots`,
+    "--runtime-gate",
+    "--playwright-config", configPath,
+    "--runtime-gate-runs", "2",
+  ]);
+}
 
 const stabilityRuns = [];
 for (let i = 1; i <= 2; i++) {
@@ -170,6 +194,20 @@ async function timed(name, args, extraEnv = {}, opts = {}) {
     throw new Error(`${name} failed with exit code ${result.exitCode}`);
   }
   return result;
+}
+
+async function timedTask(name, command, task) {
+  const started = performance.now();
+  try {
+    await task();
+    const durationMs = Math.round(performance.now() - started);
+    steps.push({ name, command, exitCode: 0, durationMs });
+    return { exitCode: 0, stdout: "", stderr: "" };
+  } catch (error) {
+    const durationMs = Math.round(performance.now() - started);
+    steps.push({ name, command, exitCode: 1, durationMs });
+    throw error;
+  }
 }
 
 function run(args, extraEnv) {
