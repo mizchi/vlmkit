@@ -5,6 +5,27 @@ Dates are YYYY-MM-DD.
 
 ## Unreleased
 
+## 0.7.0 — 2026-07-01
+
+### Markup loop
+
+- Add `vlmkit markup-loop init|observe|doctor|run` for drop-in
+  real markup work: scaffold loop files, observe a live page with
+  Playwright, check readiness, then run planner + generator + VRT gates.
+- Add a reproducible local example under `examples/markup-loop-project/`
+  that runs `init`, `observe`, `doctor`, and `run --dry-run` without an
+  LLM API key.
+- Ship `@mizchi/vlmkit-plan`, `@mizchi/vlmkit-generate`, and
+  `@mizchi/vlmkit-heal` as runtime dependencies of the root package so
+  installed agents can run the loop from a consuming project.
+
+### Playwright generation
+
+- Add planner and generator contracts for turning UI observations into
+  gated Playwright smoke tests.
+- Add guardrail context and VRT handoff summaries so generated tests can
+  be evaluated and repaired without weakening the original scenario.
+
 ### A/B validation series (control vs vlmkit, external repo)
 
 First controlled evaluation of the product claim "vlmkit makes a
