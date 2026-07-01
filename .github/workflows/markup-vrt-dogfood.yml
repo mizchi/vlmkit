@@ -60,8 +60,10 @@ jobs:
             .vrt/markup-vrt-eval/report.json
             .vrt/markup-vrt-eval/report.md
             .vrt/markup-vrt-eval/report.html
+            .vrt/markup-vrt-eval/github-step-summary.md
             .vrt/markup-vrt-eval/repair-context.json
             .vrt/markup-vrt-eval/repair-context.md
+            .vrt/markup-vrt-eval/guardrail-context.md
             .vrt/markup-vrt-eval/playwright-report.json
             .vrt/markup-vrt-eval/test-results/**
           if-no-files-found: warn

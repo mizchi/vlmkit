@@ -15,6 +15,8 @@ describe("markup VRT dogfood workflow", () => {
     assert.match(workflow, /pnpm test:examples/);
     assert.match(workflow, /pnpm dogfood:markup-vrt:offline/);
     assert.match(workflow, /MARKUP_EVAL_OFFLINE:\s*"1"/);
+    assert.match(workflow, /\.vrt\/markup-vrt-eval\/github-step-summary\.md/);
+    assert.match(workflow, /\.vrt\/markup-vrt-eval\/guardrail-context\.md/);
     assert.doesNotMatch(workflow, /MARKUP_EVAL_VLM_REGION_DIFF:\s*"1"/);
     assert.doesNotMatch(workflow, /OPENROUTER_API_KEY|ANTHROPIC_API_KEY|GEMINI_API_KEY/);
   });

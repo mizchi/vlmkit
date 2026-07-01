@@ -3,6 +3,8 @@ import { test } from "node:test";
 import {
   buildQualityFailures,
   evaluateExpectedChange,
+  renderGithubStepSummary,
+  renderGuardrailContext,
   renderHtmlReport,
   renderMarkdown,
 } from "./run-report.mjs";
@@ -101,6 +103,37 @@ test("renderHtmlReport escapes report data and relativizes local artifacts", () 
   assert.doesNotMatch(html, /\.vrt\/markup-vrt-eval\/test-results\/expected\.png/);
   assert.doesNotMatch(html, /<script>alert\(1\)<\/script>/);
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+});
+
+test("renderGithubStepSummary surfaces CI-friendly dogfood status", () => {
+  const summary = renderGithubStepSummary(makeReport());
+
+  assert.match(summary, /# Markup VRT Dogfood/);
+  assert.match(summary, /\| Quality gate failures \| 0 \|/);
+  assert.match(summary, /\| Visual regression \| detected \|/);
+  assert.match(summary, /\| Diff ratio \| 10\.00% \|/);
+  assert.match(summary, /Inspect \.metric min-height\./);
+  assert.doesNotMatch(summary, /undefined|null/);
+});
+
+test("renderGuardrailContext combines request, plan, locators, repair signals, and VLM handoff", () => {
+  const context = renderGuardrailContext({
+    report: makeReport(),
+    requestMarkdown: "# Request\nKeep the blocked filter and detail panel scenario.",
+    planMarkdown: "# Plan\n### Blocked filter and Invoice Export detail panel",
+    locatorInventory: {
+      roles: ['button "Blocked"'],
+      testIds: ["release-row-invoice-export"],
+    },
+    generationRulesMarkdown: "- Use gotoApp(page).",
+  });
+
+  assert.match(context, /# Markup VRT Heal Guardrail Context/);
+  assert.match(context, /Do not weaken the scenario/);
+  assert.match(context, /Keep the blocked filter and detail panel scenario/);
+  assert.match(context, /release-row-invoice-export/);
+  assert.match(context, /\.metric: min-height `116px` -> `148px`/);
+  assert.match(context, /\.pill: background-color `#fee` -> `#eff`/);
 });
 
 function makeRepairContext() {

@@ -293,10 +293,154 @@ export function renderHtmlReport(report, repairContext) {
 </html>`;
 }
 
+export function renderGithubStepSummary(report) {
+  const rows = [
+    ["Provider", report.provider],
+    ["Scenario", report.scenario],
+    ["Quality gate failures", String(report.qualityFailures.length)],
+    ["Visual regression", report.metrics.visualRegressionDetected ? "detected" : "missing"],
+    ["Expected change", report.metrics.expectedChangeApproved ? "approved" : "rejected"],
+    ["Drift", `${report.metrics.driftKind} / ${report.metrics.driftPrimaryCause}`],
+    ["Diff ratio", formatPercent(report.repair.diffRatio)],
+    ["Stability checks", `${report.metrics.stabilityChecksPassed ? "pass" : "fail"} (${report.metrics.stabilityCheckRuns})`],
+    ["CSS attribution rows", String(report.metrics.cssAttributionCount)],
+    ["VLM region diff", `${report.metrics.vlmRegionDiffStatus} (${report.metrics.vlmRegionChangeCount} changes)`],
+  ];
+  return [
+    "# Markup VRT Dogfood",
+    "",
+    "| Metric | Value |",
+    "| --- | --- |",
+    ...rows.map(([key, value]) => `| ${escapeTableCell(key)} | ${escapeTableCell(value)} |`),
+    "",
+    "## Top Repair Hints",
+    "",
+    ...(report.repair.hints.length
+      ? report.repair.hints.slice(0, 5).map((hint) => `- ${hint}`)
+      : ["- none"]),
+    "",
+    "## Top CSS Attribution",
+    "",
+    ...(report.repair.cssAttribution.length
+      ? report.repair.cssAttribution.slice(0, 5).map((row) =>
+        `- ${row.selector}: ${row.property} \`${row.before}\` -> \`${row.after}\` (${row.category}, score ${row.score})`
+      )
+      : ["- none"]),
+    "",
+    "## Artifacts",
+    "",
+    ...Object.entries(report.artifacts)
+      .filter(([, value]) => value)
+      .map(([key, value]) => `- ${key}: \`${value}\``),
+    "",
+  ].join("\n");
+}
+
+export function renderGuardrailContext({
+  report,
+  requestMarkdown,
+  planMarkdown,
+  locatorInventory,
+  generationRulesMarkdown,
+}) {
+  return [
+    "# Markup VRT Heal Guardrail Context",
+    "",
+    "Use this as `guardrailContext` for `@mizchi/vlmkit-heal` when repairing the generated Release Queue test.",
+    "",
+    "## Non-Negotiable Repair Guardrails",
+    "",
+    "- Do not weaken the scenario, remove the Blocked filter interaction, or remove the Invoice Export detail assertion.",
+    "- Do not replace the workflow with broad presence checks just to make the test pass.",
+    "- Do not introduce locators outside the observed locator inventory unless the UI has intentionally changed.",
+    "- Prefer repairing tests and VRT baselines. Do not edit application code unless the operator explicitly asks for it.",
+    "",
+    "## Scenario Summary",
+    "",
+    `- Provider: ${report.provider}`,
+    `- Scenario: ${report.scenario}`,
+    `- Failure kind: ${report.repair.failureKind}`,
+    `- Screenshot: ${report.repair.screenshotName ?? "unknown"}`,
+    `- Diff ratio: ${formatPercent(report.repair.diffRatio)}`,
+    `- Drift: ${report.metrics.driftKind} / ${report.metrics.driftPrimaryCause}`,
+    `- Expected change approved: ${report.metrics.expectedChangeApproved ? "yes" : "no"}`,
+    "",
+    "## Original Request",
+    "",
+    fenced("markdown", requestMarkdown),
+    "",
+    "## Plan",
+    "",
+    fenced("markdown", planMarkdown),
+    "",
+    "## Observed Locator Inventory",
+    "",
+    fenced("json", JSON.stringify(locatorInventory ?? {}, null, 2)),
+    "",
+    "## Generation Rules",
+    "",
+    fenced("markdown", generationRulesMarkdown),
+    "",
+    "## Repair Signals",
+    "",
+    "### CSS Attribution",
+    "",
+    ...(report.repair.cssAttribution.length
+      ? report.repair.cssAttribution.map((row) =>
+        `- ${row.selector}: ${row.property} \`${row.before}\` -> \`${row.after}\` (${row.category}, score ${row.score})`
+      )
+      : ["- none"]),
+    "",
+    "### Selector Matches",
+    "",
+    ...(report.repair.selectorMatches.length
+      ? report.repair.selectorMatches.map((match) => `- ${match.selector} (${match.confidence}, score ${match.score ?? "n/a"})`)
+      : ["- none"]),
+    "",
+    "### Top-Edge Candidates",
+    "",
+    ...(report.repair.edgeCandidates.length
+      ? report.repair.edgeCandidates.map((candidate) => `- ${candidate.selector}: ${candidate.reason} (score ${candidate.score})`)
+      : ["- none"]),
+    "",
+    "### VLM Region Diff",
+    "",
+    ...(report.vlmRegionSummary.available
+      ? [
+        `- Model: ${report.vlmRegionSummary.model ?? "unknown"}`,
+        `- Cost: ${report.vlmRegionSummary.cost == null ? "unknown" : `$${report.vlmRegionSummary.cost}`}`,
+        `- Summary: ${report.vlmRegionSummary.summary ?? "n/a"}`,
+        ...report.vlmRegionSummary.changes.map((row) =>
+          `- ${row.selector}: ${row.property} \`${row.from ?? "?"}\` -> \`${row.to ?? "?"}\` (${row.confidence})`
+        ),
+      ]
+      : [`- ${report.metrics.vlmRegionDiffStatus}`]),
+    "",
+    "### Repair Hints",
+    "",
+    ...(report.repair.hints.length ? report.repair.hints.map((hint) => `- ${hint}`) : ["- none"]),
+    "",
+  ].join("\n");
+}
+
 function toHtmlArtifactPath(path) {
   return path.startsWith(".vrt/markup-vrt-eval/")
     ? path.slice(".vrt/markup-vrt-eval/".length)
     : path;
+}
+
+function formatPercent(value) {
+  return value == null ? "n/a" : `${(value * 100).toFixed(2)}%`;
+}
+
+function escapeTableCell(value) {
+  return String(value ?? "")
+    .replaceAll("|", "\\|")
+    .replaceAll("\n", " ");
+}
+
+function fenced(language, value) {
+  return `\`\`\`${language}\n${String(value ?? "").replaceAll("```", "`\u200b``")}\n\`\`\``;
 }
 
 function escapeHtml(value) {

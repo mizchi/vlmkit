@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { performance } from "node:perf_hooks";
 import { resolve } from "node:path";
 import {
@@ -12,6 +12,8 @@ import { buildRepairContext, renderRepairContextMarkdown } from "./repair-contex
 import {
   buildReport,
   evaluateExpectedChange,
+  renderGithubStepSummary,
+  renderGuardrailContext,
   renderHtmlReport,
   renderMarkdown,
 } from "./run-report.mjs";
@@ -31,6 +33,8 @@ const visualContextPath = `${specRoot}/release-queue.visual-context.json`;
 const generatedTestPath = `${generatedRoot}/release-queue.spec.ts`;
 const repairContextPath = `${outRoot}/repair-context.json`;
 const repairContextMarkdownPath = `${outRoot}/repair-context.md`;
+const guardrailContextPath = `${outRoot}/guardrail-context.md`;
+const githubStepSummaryPath = `${outRoot}/github-step-summary.md`;
 const htmlReportPath = `${outRoot}/report.html`;
 const vlmRegionDiffPath = `${outRoot}/vlm-region-diff.json`;
 const configPath = "examples/markup-vrt-eval/playwright.config.ts";
@@ -114,6 +118,8 @@ const regression = await timed("visual-regression-check", [
 }, { allowFailure: true });
 
 const generatedSource = await readFile(generatedTestPath, "utf8");
+const requestMarkdown = await readFile(requestPath, "utf8");
+const generationRulesMarkdown = await readFile(rulesPath, "utf8");
 const plan = await readFile(planPath, "utf8");
 const locators = JSON.parse(await readFile(locatorsPath, "utf8"));
 const visualContext = JSON.parse(await readFile(visualContextPath, "utf8"));
@@ -163,6 +169,8 @@ const report = buildReport({
     playwrightReport: `${outRoot}/playwright-report.json`,
     repairContextPath,
     repairContextMarkdownPath,
+    guardrailContextPath,
+    githubStepSummaryPath,
     htmlReportPath,
     vlmRegionDiffPath: vlmRegionDiffStatus === "written" ? vlmRegionDiffPath : null,
   },
@@ -170,6 +178,16 @@ const report = buildReport({
 
 await writeFile(`${outRoot}/report.json`, JSON.stringify(report, null, 2) + "\n");
 await writeFile(`${outRoot}/report.md`, renderMarkdown(report));
+await writeFile(guardrailContextPath, renderGuardrailContext({
+  report,
+  requestMarkdown,
+  planMarkdown: plan,
+  locatorInventory: locators,
+  generationRulesMarkdown,
+}));
+const githubStepSummary = renderGithubStepSummary(report);
+await writeFile(githubStepSummaryPath, githubStepSummary);
+await maybeAppendGithubStepSummary(githubStepSummary);
 await writeFile(htmlReportPath, renderHtmlReport(report, repairContext));
 console.log(renderMarkdown(report));
 
@@ -208,6 +226,11 @@ async function timedTask(name, command, task) {
     steps.push({ name, command, exitCode: 1, durationMs });
     throw error;
   }
+}
+
+async function maybeAppendGithubStepSummary(summary) {
+  if (!process.env.GITHUB_STEP_SUMMARY) return;
+  await appendFile(process.env.GITHUB_STEP_SUMMARY, summary);
 }
 
 function run(args, extraEnv) {
