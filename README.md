@@ -139,6 +139,9 @@ vlmkit markup-loop doctor
 vlmkit markup-loop run --dry-run
 vlmkit markup-loop run
 
+# Reproduce the drop-in flow with a local example project
+node examples/markup-loop-project/run.mjs
+
 # Author approval rules (sub-pixel deviations, intentional design exceptions, etc.)
 vlmkit manifest add --selector .hero__body --max-px 2 --reason "AA artifact" --expires 2026-08-15
 vlmkit manifest add --a11y-contrast --selector "button" --reason "decorative" --expires 2026-08-15

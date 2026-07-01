@@ -47,6 +47,9 @@ vlmkit markup-loop observe
 vlmkit markup-loop doctor
 vlmkit markup-loop run --dry-run
 vlmkit markup-loop run
+
+# examples/ 配下の再現プロジェクト
+node examples/markup-loop-project/run.mjs
 ```
 
 ## CLI

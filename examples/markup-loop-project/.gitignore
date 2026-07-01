@@ -1,0 +1,4 @@
+.vlmkit/
+tests/vlmkit/
+test-results/
+playwright-report/
