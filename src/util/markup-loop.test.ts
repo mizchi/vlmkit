@@ -1,5 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -10,6 +12,7 @@ import {
   createDefaultMarkupLoopConfig,
   initMarkupLoop,
   loadMarkupLoopConfig,
+  observeMarkupLoop,
   runMarkupLoop,
 } from "./markup-loop.ts";
 
@@ -120,6 +123,61 @@ describe("markup-loop drop-in config", () => {
       assert.deepEqual(errors, ["Missing tests/vlmkit/support/goto-app.ts"]);
     } finally {
       process.chdir(previousCwd);
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("observes a live page and replaces placeholder observations with real UI facts", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "vlmkit-markup-loop-"));
+    const server = createServer((_req, res) => {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(`<!doctype html>
+        <html>
+          <head><title>Checkout</title></head>
+          <body>
+            <main>
+              <h1>Checkout</h1>
+              <label for="email">Email address</label>
+              <input id="email" type="email" />
+              <section aria-label="Order Summary">
+                <p data-testid="order-total">Order total $42.00</p>
+                <button data-testid="pay-button">Pay now</button>
+              </section>
+            </main>
+          </body>
+        </html>`);
+    });
+    const previousCwd = process.cwd();
+    try {
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+      const address = server.address() as AddressInfo;
+      const baseUrl = `http://127.0.0.1:${address.port}`;
+      await initMarkupLoop({
+        cwd,
+        topic: "checkout",
+        title: "Checkout Smoke",
+        baseUrl,
+      });
+
+      process.chdir(cwd);
+      const result = await observeMarkupLoop();
+
+      assert.equal(result.outputPath, ".vlmkit/markup-loop/observations.json");
+      assert.equal(result.observations.length, 1);
+      assert.equal(result.observations[0]!.title, "Checkout");
+      assert.ok(result.observations[0]!.roles?.includes('heading "Checkout"'));
+      assert.ok(result.observations[0]!.roles?.includes('button "Pay now"'));
+      assert.ok(result.observations[0]!.roles?.includes('textbox "Email address"'));
+      assert.ok(result.observations[0]!.labels?.includes("Email address"));
+      assert.ok(result.observations[0]!.testIds?.includes("order-total"));
+      assert.ok(result.observations[0]!.testIds?.includes("pay-button"));
+      assert.ok(result.observations[0]!.texts?.includes("Order total $42.00"));
+
+      const written = JSON.parse(await readFile(join(cwd, ".vlmkit/markup-loop/observations.json"), "utf8"));
+      assert.deepEqual(written, result.observations);
+    } finally {
+      process.chdir(previousCwd);
+      await new Promise<void>((resolve) => server.close(() => resolve()));
       await rm(cwd, { recursive: true, force: true });
     }
   });

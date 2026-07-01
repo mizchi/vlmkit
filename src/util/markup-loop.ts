@@ -58,8 +58,138 @@ export interface MarkupLoopReadiness {
   commands: MarkupLoopCommands;
 }
 
+export interface MarkupLoopObservation {
+  url?: string;
+  title?: string;
+  roles?: string[];
+  labels?: string[];
+  testIds?: string[];
+  texts?: string[];
+  notes?: string[];
+}
+
+export interface ObserveMarkupLoopOptions {
+  url?: string;
+  outputPath?: string;
+  waitFor?: string;
+  timeoutMs?: number;
+  headless?: boolean;
+}
+
+export interface ObserveMarkupLoopResult {
+  observations: MarkupLoopObservation[];
+  outputPath: string;
+}
+
 const DEFAULT_CONFIG_PATH = ".vlmkit/markup-loop.json";
 const LOOP_DIR = ".vlmkit/markup-loop";
+const OBSERVE_SCRIPT = String.raw`(() => {
+  const MAX_ITEMS = 40;
+  const ROLE_SELECTORS = [
+    "[role]",
+    "h1,h2,h3,h4,h5,h6",
+    "button",
+    "a[href]",
+    "input",
+    "textarea",
+    "select",
+    "summary",
+    "img[alt]",
+    "table",
+  ].join(",");
+
+  const visible = (element) => {
+    const style = window.getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    return style.visibility !== "hidden"
+      && style.display !== "none"
+      && rect.width > 0
+      && rect.height > 0;
+  };
+  const clean = (value) => String(value ?? "").replace(/\s+/g, " ").trim();
+  const uniq = (values) => {
+    const seen = new Set();
+    const out = [];
+    for (const value of values.map(clean).filter(Boolean)) {
+      if (seen.has(value)) continue;
+      seen.add(value);
+      out.push(value);
+      if (out.length >= MAX_ITEMS) break;
+    }
+    return out;
+  };
+  const quoted = (value) => value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  const labelledBy = (element) => {
+    const ids = clean(element.getAttribute("aria-labelledby")).split(/\s+/).filter(Boolean);
+    return clean(ids.map((id) => document.getElementById(id)?.textContent ?? "").join(" "));
+  };
+  const controlLabel = (element) => {
+    if (element.id) {
+      const label = document.querySelector("label[for=\"" + CSS.escape(element.id) + "\"]");
+      if (label) return clean(label.textContent);
+    }
+    const wrappingLabel = element.closest("label");
+    return clean(wrappingLabel?.textContent ?? "");
+  };
+  const accessibleName = (element) => clean(element.getAttribute("aria-label"))
+    || labelledBy(element)
+    || clean(element.getAttribute("alt"))
+    || controlLabel(element)
+    || clean(element.getAttribute("placeholder"))
+    || clean(element.tagName === "INPUT" ? element.getAttribute("value") : "")
+    || clean(element.textContent);
+  const implicitRole = (element) => {
+    const tag = element.tagName.toLowerCase();
+    if (/^h[1-6]$/.test(tag)) return "heading";
+    if (tag === "button") return "button";
+    if (tag === "a" && element.hasAttribute("href")) return "link";
+    if (tag === "textarea") return "textbox";
+    if (tag === "select") return "combobox";
+    if (tag === "summary") return "button";
+    if (tag === "table") return "table";
+    if (tag === "img") return "img";
+    if (tag === "input") {
+      const type = clean(element.getAttribute("type") || "text").toLowerCase();
+      if (type === "search") return "searchbox";
+      if (["button", "submit", "reset"].includes(type)) return "button";
+      if (type === "checkbox") return "checkbox";
+      if (type === "radio") return "radio";
+      if (!["hidden", "file", "image", "range", "color"].includes(type)) return "textbox";
+    }
+    return "";
+  };
+
+  const roleEntries = Array.from(document.querySelectorAll(ROLE_SELECTORS))
+    .filter(visible)
+    .map((element) => {
+      const role = clean(element.getAttribute("role")) || implicitRole(element);
+      const name = accessibleName(element);
+      return role && name ? role + " \"" + quoted(name) + "\"" : "";
+    });
+  const labels = [
+    ...Array.from(document.querySelectorAll("label")).map((element) => element.textContent),
+    ...Array.from(document.querySelectorAll("[aria-label]")).map((element) => element.getAttribute("aria-label")),
+    ...Array.from(document.querySelectorAll("input[placeholder],textarea[placeholder]")).map((element) => element.getAttribute("placeholder")),
+  ];
+  const testIds = Array.from(document.querySelectorAll("[data-testid]"))
+    .filter(visible)
+    .map((element) => element.getAttribute("data-testid"));
+  const texts = [
+    ...Array.from(document.querySelectorAll("h1,h2,h3,h4,h5,h6,p,li,td,th,button,a,[data-testid]"))
+      .filter(visible)
+      .map((element) => clean(element.textContent))
+      .filter((value) => value.length >= 2 && value.length <= 160),
+  ];
+
+  return {
+    url: window.location.href,
+    title: document.title || clean(document.querySelector("h1")?.textContent),
+    roles: uniq(roleEntries),
+    labels: uniq(labels),
+    testIds: uniq(testIds),
+    texts: uniq(texts),
+  };
+})()`;
 
 export function createDefaultMarkupLoopConfig(options: InitMarkupLoopOptions = {}): MarkupLoopConfig {
   const topic = slugify(options.topic ?? "markup-work");
@@ -189,6 +319,39 @@ export async function runMarkupLoop(configPath = DEFAULT_CONFIG_PATH, options: {
   return runGenerateCli(commands.generate.argv);
 }
 
+export async function observeMarkupLoop(
+  configPath = DEFAULT_CONFIG_PATH,
+  options: ObserveMarkupLoopOptions = {},
+): Promise<ObserveMarkupLoopResult> {
+  const config = await loadMarkupLoopConfig(configPath);
+  const observation = await captureMarkupObservation(options.url ?? config.baseUrl, options);
+  const outputPath = options.outputPath ?? config.observationsFile;
+  const observations = [observation];
+  await mkdir(dirname(outputPath), { recursive: true });
+  await writeFile(outputPath, `${JSON.stringify(observations, null, 2)}\n`, "utf8");
+  return { observations, outputPath };
+}
+
+export async function captureMarkupObservation(url: string, options: ObserveMarkupLoopOptions = {}): Promise<MarkupLoopObservation> {
+  const { chromium } = await import("@playwright/test");
+  const timeout = options.timeoutMs ?? 15_000;
+  const browser = await chromium.launch({ headless: options.headless ?? true });
+  try {
+    const page = await browser.newPage();
+    page.setDefaultTimeout(timeout);
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout });
+    if (options.waitFor) await page.waitForSelector(options.waitFor, { timeout });
+    try {
+      await page.waitForLoadState("networkidle", { timeout: Math.min(timeout, 3_000) });
+    } catch {
+      // SPAs often keep connections open; DOM observations are still useful after domcontentloaded.
+    }
+    return await page.evaluate(OBSERVE_SCRIPT) as MarkupLoopObservation;
+  } finally {
+    await browser.close();
+  }
+}
+
 async function doctor(configPath = DEFAULT_CONFIG_PATH): Promise<number> {
   if (!existsSync(configPath)) {
     console.error(`Missing ${configPath}. Run: pnpm exec vlmkit markup-loop init`);
@@ -270,7 +433,7 @@ This directory is the handoff contract for markup agents.
 
 1. Start the app at ${config.baseUrl}.
 2. Update ${config.requestFile} with the requested markup change or workflow.
-3. Use Playwright Test Agents or manual Playwright inspection to refresh ${config.observationsFile}. Do not invent locators.
+3. Run \`pnpm exec vlmkit markup-loop observe\` to refresh ${config.observationsFile}; use Playwright Test Agents first for multi-step flows. Do not invent locators.
 4. Run \`pnpm exec vlmkit markup-loop doctor\`.
 5. Run \`pnpm exec vlmkit markup-loop run\`.
 6. If generation or VRT fails, inspect ${config.planFile}, ${config.locatorInventoryFile}, and Playwright artifacts before editing app code.
@@ -337,13 +500,14 @@ function usage(): string {
 Commands:
   init [--topic <slug>] [--title <title>] [--base-url <url>] [--provider <name>]
        Create .vlmkit/markup-loop files and a gotoApp helper
+  observe [--config <path>] [--url <url>] [--out <path>] [--wait-for <selector>]
+       Capture real UI roles, labels, test ids, and text into observations.json
   doctor [--config <path>]
        Check that required loop files exist and print planned commands
   run [--config <path>] [--dry-run]
        Run planner + generator + runtime/VRT gates
 
-The loop expects Playwright Test Agents or manual Playwright inspection to
-refresh .vlmkit/markup-loop/observations.json before generation.`;
+The loop expects observations.json to be refreshed before generation.`;
 }
 
 export async function runMarkupLoopCli(argv = process.argv.slice(2)): Promise<number> {
@@ -358,6 +522,13 @@ export async function runMarkupLoopCli(argv = process.argv.slice(2)): Promise<nu
     const result = await initMarkupLoop(options);
     for (const path of result.created) console.log(`created ${path}`);
     if (result.created.length === 0) console.log("markup loop files already exist");
+    return 0;
+  }
+  if (command === "observe") {
+    const { configPath, options } = parseObserveArgs(rest);
+    const result = await observeMarkupLoop(configPath, options);
+    console.log(`observed ${result.observations[0]?.url ?? options.url ?? "page"}`);
+    console.log(`wrote ${result.outputPath}`);
     return 0;
   }
   if (command === "doctor") {
@@ -402,6 +573,22 @@ function parseRunArgs(argv: string[]): { configPath: string; dryRun: boolean } {
   return { configPath, dryRun };
 }
 
+function parseObserveArgs(argv: string[]): { configPath: string; options: ObserveMarkupLoopOptions } {
+  let configPath = DEFAULT_CONFIG_PATH;
+  const options: ObserveMarkupLoopOptions = {};
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === "--config") configPath = requiredValue(argv, ++i, arg);
+    else if (arg === "--url") options.url = requiredValue(argv, ++i, arg);
+    else if (arg === "--out") options.outputPath = requiredValue(argv, ++i, arg);
+    else if (arg === "--wait-for") options.waitFor = requiredValue(argv, ++i, arg);
+    else if (arg === "--timeout") options.timeoutMs = parsePositiveInt(requiredValue(argv, ++i, arg), arg);
+    else if (arg === "--headed") options.headless = false;
+    else throw new Error(`Unknown argument: ${arg}`);
+  }
+  return { configPath, options };
+}
+
 function parseInitArgs(argv: string[]): InitMarkupLoopOptions {
   const options: InitMarkupLoopOptions = {};
   for (let i = 0; i < argv.length; i++) {
@@ -422,6 +609,12 @@ function requiredValue(argv: string[], index: number, flag: string): string {
   const value = argv[index];
   if (!value) throw new Error(`Missing value for ${flag}`);
   return value;
+}
+
+function parsePositiveInt(value: string, flag: string): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) throw new Error(`${flag} must be a positive integer`);
+  return parsed;
 }
 
 const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "markup-loop"

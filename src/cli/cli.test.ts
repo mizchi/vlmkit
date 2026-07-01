@@ -119,6 +119,7 @@ describe("vrt CLI tree (cac-based)", () => {
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit markup-loop <command>/);
     assert.match(r.stdout, /init/);
+    assert.match(r.stdout, /observe/);
     assert.match(r.stdout, /doctor/);
     assert.match(r.stdout, /run/);
   });

@@ -134,6 +134,7 @@ vlmkit-generate --plan specs/checkout.plan.md --rules specs/_generation-rules.md
 # Drop-in markup agent loop for real UI work
 vlmkit markup-loop init --topic checkout --title "Guest Checkout Smoke" \
   --base-url http://localhost:3000 --provider anthropic
+vlmkit markup-loop observe
 vlmkit markup-loop doctor
 vlmkit markup-loop run --dry-run
 vlmkit markup-loop run
