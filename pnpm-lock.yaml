@@ -20,9 +20,18 @@ importers:
       '@mizchi/vlmkit-core':
         specifier: workspace:*
         version: link:packages/vlmkit-core
+      '@mizchi/vlmkit-generate':
+        specifier: workspace:*
+        version: link:packages/vlmkit-generate
+      '@mizchi/vlmkit-heal':
+        specifier: workspace:*
+        version: link:packages/vlmkit-heal
       '@mizchi/vlmkit-markup':
         specifier: workspace:*
         version: link:packages/vlmkit-markup
+      '@mizchi/vlmkit-plan':
+        specifier: workspace:*
+        version: link:packages/vlmkit-plan
       '@playwright/test':
         specifier: ^1.61.1
         version: 1.61.1
@@ -45,15 +54,6 @@ importers:
         specifier: ^8.20.0
         version: 8.20.0
     devDependencies:
-      '@mizchi/vlmkit-generate':
-        specifier: workspace:*
-        version: link:packages/vlmkit-generate
-      '@mizchi/vlmkit-heal':
-        specifier: workspace:*
-        version: link:packages/vlmkit-heal
-      '@mizchi/vlmkit-plan':
-        specifier: workspace:*
-        version: link:packages/vlmkit-plan
       '@types/node':
         specifier: ^25.5.2
         version: 25.5.2

@@ -39,6 +39,13 @@ pkf run css-bench -- --fixture page --trials 30
 
 # Fix ループ (CSS 破壊 → VLM 分析 → LLM 修正 → 検証)
 pkf run fix-loop -- --fixture page --seed 42
+
+# 実際のマークアップ作業用のエージェントループ
+vlmkit markup-loop init --topic checkout --title "Guest Checkout Smoke" \
+  --base-url http://localhost:3000 --provider anthropic
+vlmkit markup-loop doctor
+vlmkit markup-loop run --dry-run
+vlmkit markup-loop run
 ```
 
 ## CLI
@@ -49,6 +56,7 @@ vrt snapshot <url1> [url2] ...             # 複数 viewport スナップショ�
 vrt bench [options]                         # CSS チャレンジベンチマーク
 vrt report                                 # 検出パターンレポート
 vrt smoke <file-or-url>                    # A11y 駆動ランダム操作テスト
+vlmkit markup-loop <init|doctor|run>       # plan/generate/VRT gate の導入用ループ
 vrt serve [--port 3456]                    # API サーバー
 vrt status [--url http://localhost:3456]   # サーバーヘルスチェック
 ```

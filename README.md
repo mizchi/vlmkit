@@ -131,6 +131,13 @@ vlmkit-generate --plan specs/checkout.plan.md --rules specs/_generation-rules.md
   --out tests/checkout.spec.ts --provider anthropic --max-attempts 2 \
   --overwrite --gate-command "pnpm exec playwright test --list {testFile}"
 
+# Drop-in markup agent loop for real UI work
+vlmkit markup-loop init --topic checkout --title "Guest Checkout Smoke" \
+  --base-url http://localhost:3000 --provider anthropic
+vlmkit markup-loop doctor
+vlmkit markup-loop run --dry-run
+vlmkit markup-loop run
+
 # Author approval rules (sub-pixel deviations, intentional design exceptions, etc.)
 vlmkit manifest add --selector .hero__body --max-px 2 --reason "AA artifact" --expires 2026-08-15
 vlmkit manifest add --a11y-contrast --selector "button" --reason "decorative" --expires 2026-08-15

@@ -86,4 +86,14 @@ describe("package manifest for publishable CLI", () => {
     );
     assert.ok(files.includes("README.md"), "README should be published");
   });
+
+  it("ships the planner, generator, and healer needed by the drop-in markup loop", async () => {
+    const pkg = await readPackageJson();
+    const dependencies = pkg.dependencies as Record<string, string> | undefined;
+
+    assert.ok(dependencies, "package.json should define dependencies");
+    assert.equal(dependencies["@mizchi/vlmkit-plan"], "workspace:*");
+    assert.equal(dependencies["@mizchi/vlmkit-generate"], "workspace:*");
+    assert.equal(dependencies["@mizchi/vlmkit-heal"], "workspace:*");
+  });
 });

@@ -30,6 +30,7 @@ describe("vrt CLI tree (cac-based)", () => {
     assert.match(r.stdout, /vlmkit diff html\|png/);
     assert.match(r.stdout, /vlmkit check a11y/);
     assert.match(r.stdout, /vlmkit inspect/);
+    assert.match(r.stdout, /vlmkit markup-loop/);
   });
 
   it("`vrt diff` (group, no leaf) prints group usage", () => {
@@ -111,6 +112,15 @@ describe("vrt CLI tree (cac-based)", () => {
     const r = runVrt(["workflow", "help"]);
     assert.equal(r.status, 0);
     assert.match(r.stdout, /vlmkit workflow <command>/);
+  });
+
+  it("`vrt markup-loop help` prints the drop-in agent loop usage", () => {
+    const r = runVrt(["markup-loop", "help"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vlmkit markup-loop <command>/);
+    assert.match(r.stdout, /init/);
+    assert.match(r.stdout, /doctor/);
+    assert.match(r.stdout, /run/);
   });
 
   it("`vrt diff --help` prints diff group usage (regression: HELP_SENTINEL leaked through)", () => {

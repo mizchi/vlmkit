@@ -137,6 +137,7 @@ const SPECS: Record<string, Spec> = {
   perf: spec("perf", () => import("../util/perf.ts")),
   explore: spec("explore", () => import("@mizchi/vlmkit-markup/inspect/explore.ts")),
   skill: spec("skill", () => import("../util/skill.ts")),
+  markupLoop: spec("markup-loop", () => import("../util/markup-loop.ts")),
   componentExtract: spec("component-extract", () => import("@mizchi/vlmkit-markup/component/component-extract.ts")),
   apiServer: spec("api-server", () => import("../api/api-server.ts")),
   manifest: spec("manifest-cli", () => import("../manifest-cli.ts")),
@@ -312,6 +313,7 @@ Common command groups:
   vlmkit contract introspect|validate
   vlmkit snapshot [<url>...]
   vlmkit workflow <subcommand>
+  vlmkit markup-loop <command>
   vlmkit bench / api / skill / report
 
 Run \`vlmkit <command> --help\` for command-specific options.`);
@@ -387,6 +389,10 @@ Run \`vlmkit <command> --help\` for command-specific options.`);
   cli.command("skill [...args]", "Per-project skill playbooks")
     .allowUnknownOptions()
     .action(async () => delegate(SPECS.skill, passThrough(argv, ["skill"])));
+
+  cli.command("markup-loop [...args]", "Drop-in markup agent loop")
+    .allowUnknownOptions()
+    .action(async () => delegate(SPECS.markupLoop, passThrough(argv, ["markup-loop"])));
 
   cli.command("api [...args]", "HTTP API server (serve / status)")
     .allowUnknownOptions()

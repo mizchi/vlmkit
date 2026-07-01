@@ -73,9 +73,6 @@
     "vrt:update": "playwright test --update-snapshots"
   },
   "devDependencies": {
-    "@mizchi/vlmkit-generate": "workspace:*",
-    "@mizchi/vlmkit-heal": "workspace:*",
-    "@mizchi/vlmkit-plan": "workspace:*",
     "@types/node": "^25.5.2",
     "@types/pngjs": "^6.0.5",
     "@types/ws": "^8.18.1",
@@ -89,7 +86,10 @@
     "@mizchi/vlmkit-ai": "workspace:*",
     "@mizchi/vlmkit-capture": "workspace:*",
     "@mizchi/vlmkit-core": "workspace:*",
+    "@mizchi/vlmkit-generate": "workspace:*",
+    "@mizchi/vlmkit-heal": "workspace:*",
     "@mizchi/vlmkit-markup": "workspace:*",
+    "@mizchi/vlmkit-plan": "workspace:*",
     "@playwright/test": "^1.61.1",
     "cac": "^7.0.0",
     "hono": "^4.12.10",
