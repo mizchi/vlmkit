@@ -11,11 +11,7 @@ import {
 import { buildRepairContext, renderRepairContextMarkdown } from "./repair-context.mjs";
 import {
   buildReport,
-  evaluateExpectedChange,
-  renderGithubStepSummary,
-  renderGuardrailContext,
-  renderHtmlReport,
-  renderMarkdown,
+  renderReportArtifacts,
 } from "./run-report.mjs";
 import { buildVlmRegionDiffArgs, summarizeVlmRegionDiff } from "./run-utils.mjs";
 
@@ -144,7 +140,6 @@ const vlmRegionDiffStatus = await maybeRunVlmRegionDiff(repairContext);
 const vlmRegionSummary = vlmRegionDiffStatus === "written"
   ? summarizeVlmRegionDiff(JSON.parse(await readFile(vlmRegionDiffPath, "utf8")))
   : summarizeVlmRegionDiff(null);
-const expectedChangeApproval = evaluateExpectedChange(repairContext, expectedChange, visualRegressionDetected);
 const report = buildReport({
   provider,
   scenario: "Release Queue blocked filter and detail panel VRT smoke",
@@ -156,7 +151,7 @@ const report = buildReport({
   repairContext,
   stabilityRuns,
   visualRegressionDetected,
-  expectedChangeApproval,
+  expectedChange,
   vlmRegionSummary,
   vlmRegionDiffStatus,
   artifacts: {
@@ -175,21 +170,24 @@ const report = buildReport({
     vlmRegionDiffPath: vlmRegionDiffStatus === "written" ? vlmRegionDiffPath : null,
   },
 });
+const reportArtifacts = renderReportArtifacts({
+  report,
+  guardrailSources: {
+    requestMarkdown,
+    planMarkdown: plan,
+    locatorInventory: locators,
+    generationRulesMarkdown,
+  },
+});
 
 await writeFile(`${outRoot}/report.json`, JSON.stringify(report, null, 2) + "\n");
-await writeFile(`${outRoot}/report.md`, renderMarkdown(report));
-await writeFile(guardrailContextPath, renderGuardrailContext({
-  report,
-  requestMarkdown,
-  planMarkdown: plan,
-  locatorInventory: locators,
-  generationRulesMarkdown,
-}));
-const githubStepSummary = renderGithubStepSummary(report);
+await writeFile(`${outRoot}/report.md`, reportArtifacts.markdown);
+await writeFile(guardrailContextPath, reportArtifacts.guardrailContext);
+const githubStepSummary = reportArtifacts.githubStepSummary;
 await writeFile(githubStepSummaryPath, githubStepSummary);
 await maybeAppendGithubStepSummary(githubStepSummary);
-await writeFile(htmlReportPath, renderHtmlReport(report, repairContext));
-console.log(renderMarkdown(report));
+await writeFile(htmlReportPath, reportArtifacts.html);
+console.log(reportArtifacts.markdown);
 
 if (report.qualityFailures.length > 0) {
   console.error(`Markup VRT eval failed quality gates:\n- ${report.qualityFailures.join("\n- ")}`);

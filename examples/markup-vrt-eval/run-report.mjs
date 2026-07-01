@@ -9,7 +9,7 @@ export function buildReport({
   repairContext,
   stabilityRuns,
   visualRegressionDetected,
-  expectedChangeApproval,
+  expectedChange,
   vlmRegionDiffStatus,
   vlmRegionSummary,
   artifacts,
@@ -19,6 +19,7 @@ export function buildReport({
   const generatedDirectPageGoto = /page\.goto\(/.test(generatedSource);
   const generatedCommentLines = generatedSource.split(/\r?\n/).filter((line) => line.trim().startsWith("//")).length;
   const generatedUsesReleaseRowTestId = /getByTestId\(["']release-row-invoice-export["']\)/.test(generatedSource);
+  const expectedChangeApproval = evaluateExpectedChange(repairContext, expectedChange, visualRegressionDetected);
   const qualityFailures = buildQualityFailures({
     planHasSingleScenario,
     generatedScreenshotAssertions,
@@ -82,6 +83,11 @@ export function buildReport({
       cssAttribution: repairContext.styleAttribution.changedProperties.slice(0, 8),
       drift: repairContext.drift,
       semanticChanged: repairContext.semanticDiff.changed,
+      artifacts: {
+        expectedPng: repairContext.artifacts?.expectedPng ?? null,
+        actualPng: repairContext.artifacts?.actualPng ?? null,
+        diffPng: repairContext.artifacts?.diffPng ?? null,
+      },
       hints: repairContext.repairHints.slice(0, 12),
     },
     artifacts,
@@ -117,7 +123,7 @@ export function buildQualityFailures({
   ].filter(Boolean);
 }
 
-export function evaluateExpectedChange(repairContext, expectedChange, visualRegressionDetected) {
+function evaluateExpectedChange(repairContext, expectedChange, visualRegressionDetected) {
   const reasons = [];
   if (!visualRegressionDetected) reasons.push("visual regression was not detected");
   if (repairContext.failure.kind !== expectedChange.expectedFailureKind) {
@@ -145,7 +151,16 @@ export function evaluateExpectedChange(repairContext, expectedChange, visualRegr
   };
 }
 
-export function renderMarkdown(report) {
+export function renderReportArtifacts({ report, guardrailSources }) {
+  return {
+    markdown: renderMarkdown(report),
+    githubStepSummary: renderGithubStepSummary(report),
+    guardrailContext: renderGuardrailContext({ report, guardrailSources }),
+    html: renderHtmlReport(report),
+  };
+}
+
+function renderMarkdown(report) {
   const lines = [
     "# Markup VRT Eval Report",
     "",
@@ -220,7 +235,8 @@ export function renderMarkdown(report) {
   return lines.join("\n");
 }
 
-export function renderHtmlReport(report, repairContext) {
+function renderHtmlReport(report) {
+  const imageArtifacts = report.repair.artifacts ?? {};
   const image = (label, path) => path
     ? `<figure><figcaption>${escapeHtml(label)}</figcaption><img src="${escapeHtml(toHtmlArtifactPath(path))}" alt="${escapeHtml(label)}"></figure>`
     : "";
@@ -270,9 +286,9 @@ export function renderHtmlReport(report, repairContext) {
   <section>
     <h2>Screenshots</h2>
     <div class="screens">
-      ${image("Expected", repairContext.artifacts.expectedPng)}
-      ${image("Actual", repairContext.artifacts.actualPng)}
-      ${image("Diff", repairContext.artifacts.diffPng)}
+      ${image("Expected", imageArtifacts.expectedPng)}
+      ${image("Actual", imageArtifacts.actualPng)}
+      ${image("Diff", imageArtifacts.diffPng)}
     </div>
   </section>
   <section>
@@ -293,7 +309,7 @@ export function renderHtmlReport(report, repairContext) {
 </html>`;
 }
 
-export function renderGithubStepSummary(report) {
+function renderGithubStepSummary(report) {
   const rows = [
     ["Provider", report.provider],
     ["Scenario", report.scenario],
@@ -336,13 +352,13 @@ export function renderGithubStepSummary(report) {
   ].join("\n");
 }
 
-export function renderGuardrailContext({
-  report,
-  requestMarkdown,
-  planMarkdown,
-  locatorInventory,
-  generationRulesMarkdown,
-}) {
+function renderGuardrailContext({ report, guardrailSources }) {
+  const {
+    requestMarkdown,
+    planMarkdown,
+    locatorInventory,
+    generationRulesMarkdown,
+  } = guardrailSources;
   return [
     "# Markup VRT Heal Guardrail Context",
     "",

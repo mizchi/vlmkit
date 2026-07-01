@@ -2,35 +2,37 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildQualityFailures,
-  evaluateExpectedChange,
-  renderGithubStepSummary,
-  renderGuardrailContext,
-  renderHtmlReport,
-  renderMarkdown,
+  buildReport,
+  renderReportArtifacts,
 } from "./run-report.mjs";
 
-test("evaluateExpectedChange approves expected visual-only selector drift", () => {
-  const approval = evaluateExpectedChange(makeRepairContext(), {
-    expectedFailureKind: "vrt-diff",
-    expectedDriftKind: "visual-only",
-    allowedPrimaryCauses: ["layout"],
-    allowedSelectors: [".metric"],
-  }, true);
+test("run-report exposes only the orchestration API used across module boundaries", async () => {
+  const reportModule = await import("./run-report.mjs");
 
-  assert.equal(approval.approved, true);
-  assert.deepEqual(approval.reasons, []);
+  assert.deepEqual(Object.keys(reportModule).sort(), [
+    "buildQualityFailures",
+    "buildReport",
+    "renderReportArtifacts",
+  ]);
 });
 
-test("evaluateExpectedChange rejects when the expected regression is not observed", () => {
-  const approval = evaluateExpectedChange(makeRepairContext(), {
-    expectedFailureKind: "vrt-diff",
-    expectedDriftKind: "visual-only",
-    allowedPrimaryCauses: ["layout"],
-    allowedSelectors: [".metric"],
-  }, false);
+test("buildReport owns expected-change approval and repair image artifact mapping", () => {
+  const report = buildReport(makeReportInput());
 
-  assert.equal(approval.approved, false);
-  assert.match(approval.reasons.join("\n"), /visual regression was not detected/);
+  assert.equal(report.expectedChangeApproval.approved, true);
+  assert.deepEqual(report.expectedChangeApproval.reasons, []);
+  assert.deepEqual(report.repair.artifacts, {
+    expectedPng: ".vrt/markup-vrt-eval/test-results/expected.png",
+    actualPng: ".vrt/markup-vrt-eval/test-results/actual.png",
+    diffPng: ".vrt/markup-vrt-eval/test-results/diff.png",
+  });
+});
+
+test("buildReport rejects expected change approval when the expected regression is not observed", () => {
+  const report = buildReport(makeReportInput({ visualRegressionDetected: false }));
+
+  assert.equal(report.expectedChangeApproval.approved, false);
+  assert.match(report.expectedChangeApproval.reasons.join("\n"), /visual regression was not detected/);
 });
 
 test("buildQualityFailures keeps the gate list separate from orchestration", () => {
@@ -75,12 +77,15 @@ test("buildQualityFailures keeps the gate list separate from orchestration", () 
 });
 
 test("renderMarkdown includes VLM rows and omits null artifacts", () => {
-  const markdown = renderMarkdown(makeReport({
-    artifacts: {
-      reportPath: ".vrt/markup-vrt-eval/report.json",
-      vlmRegionDiffPath: null,
-    },
-  }));
+  const { markdown } = renderReportArtifacts({
+    report: makeReport({
+      artifacts: {
+        reportPath: ".vrt/markup-vrt-eval/report.json",
+        vlmRegionDiffPath: null,
+      },
+    }),
+    guardrailSources: makeGuardrailSources(),
+  });
 
   assert.match(markdown, /### VLM Region Diff/);
   assert.match(markdown, /\.pill: background-color `#fee` -> `#eff` \(high\)/);
@@ -88,15 +93,19 @@ test("renderMarkdown includes VLM rows and omits null artifacts", () => {
   assert.doesNotMatch(markdown, /vlmRegionDiffPath/);
 });
 
-test("renderHtmlReport escapes report data and relativizes local artifacts", () => {
-  const html = renderHtmlReport(makeReport({
-    scenario: "<script>alert(1)</script>",
-  }), {
-    artifacts: {
-      expectedPng: ".vrt/markup-vrt-eval/test-results/expected.png",
-      actualPng: null,
-      diffPng: null,
-    },
+test("renderReportArtifacts escapes HTML data and uses report-contained image artifacts", () => {
+  const { html } = renderReportArtifacts({
+    report: makeReport({
+      scenario: "<script>alert(1)</script>",
+      repair: {
+        artifacts: {
+          expectedPng: ".vrt/markup-vrt-eval/test-results/expected.png",
+          actualPng: null,
+          diffPng: null,
+        },
+      },
+    }),
+    guardrailSources: makeGuardrailSources(),
   });
 
   assert.match(html, /test-results\/expected\.png/);
@@ -105,20 +114,81 @@ test("renderHtmlReport escapes report data and relativizes local artifacts", () 
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
 });
 
-test("renderGithubStepSummary surfaces CI-friendly dogfood status", () => {
-  const summary = renderGithubStepSummary(makeReport());
+test("renderReportArtifacts surfaces CI-friendly dogfood status", () => {
+  const { githubStepSummary } = renderReportArtifacts({
+    report: makeReport(),
+    guardrailSources: makeGuardrailSources(),
+  });
 
-  assert.match(summary, /# Markup VRT Dogfood/);
-  assert.match(summary, /\| Quality gate failures \| 0 \|/);
-  assert.match(summary, /\| Visual regression \| detected \|/);
-  assert.match(summary, /\| Diff ratio \| 10\.00% \|/);
-  assert.match(summary, /Inspect \.metric min-height\./);
-  assert.doesNotMatch(summary, /undefined|null/);
+  assert.match(githubStepSummary, /# Markup VRT Dogfood/);
+  assert.match(githubStepSummary, /\| Quality gate failures \| 0 \|/);
+  assert.match(githubStepSummary, /\| Visual regression \| detected \|/);
+  assert.match(githubStepSummary, /\| Diff ratio \| 10\.00% \|/);
+  assert.match(githubStepSummary, /Inspect \.metric min-height\./);
+  assert.doesNotMatch(githubStepSummary, /undefined|null/);
 });
 
-test("renderGuardrailContext combines request, plan, locators, repair signals, and VLM handoff", () => {
-  const context = renderGuardrailContext({
+test("renderReportArtifacts combines request, plan, locators, repair signals, and VLM handoff", () => {
+  const { guardrailContext } = renderReportArtifacts({
     report: makeReport(),
+    guardrailSources: makeGuardrailSources(),
+  });
+
+  assert.match(guardrailContext, /# Markup VRT Heal Guardrail Context/);
+  assert.match(guardrailContext, /Do not weaken the scenario/);
+  assert.match(guardrailContext, /Keep the blocked filter and detail panel scenario/);
+  assert.match(guardrailContext, /release-row-invoice-export/);
+  assert.match(guardrailContext, /\.metric: min-height `116px` -> `148px`/);
+  assert.match(guardrailContext, /\.pill: background-color `#fee` -> `#eff`/);
+});
+
+function makeReportInput(overrides = {}) {
+  const input = {
+    provider: "anthropic",
+    scenario: "Release Queue",
+    steps: [{ name: "observe", exitCode: 0, durationMs: 123 }],
+    generatedSource: [
+      "test('Release Queue', async ({ page }) => {",
+      "  await expect(page.getByTestId(\"release-row-invoice-export\")).toBeVisible();",
+      "  await expect(page).toHaveScreenshot('initial.png');",
+      "  await expect(page).toHaveScreenshot('filtered.png');",
+      "});",
+    ].join("\n"),
+    plan: "# Plan\n### Blocked filter and Invoice Export detail panel\n",
+    locators: {
+      roles: ['button "Blocked"'],
+      testIds: ["release-row-invoice-export"],
+    },
+    visualContext: { viewports: [{}, {}, {}] },
+    repairContext: makeRepairContext(),
+    stabilityRuns: [{ exitCode: 0 }, { exitCode: 0 }],
+    visualRegressionDetected: true,
+    expectedChange: {
+      expectedFailureKind: "vrt-diff",
+      expectedDriftKind: "visual-only",
+      allowedPrimaryCauses: ["layout"],
+      allowedSelectors: [".metric"],
+    },
+    vlmRegionDiffStatus: "written",
+    vlmRegionSummary: makeVlmRegionSummary(),
+    artifacts: {
+      reportPath: ".vrt/markup-vrt-eval/report.json",
+    },
+  };
+  return {
+    ...input,
+    ...overrides,
+    locators: { ...input.locators, ...overrides.locators },
+    visualContext: { ...input.visualContext, ...overrides.visualContext },
+    repairContext: { ...input.repairContext, ...overrides.repairContext },
+    expectedChange: { ...input.expectedChange, ...overrides.expectedChange },
+    vlmRegionSummary: { ...input.vlmRegionSummary, ...overrides.vlmRegionSummary },
+    artifacts: { ...input.artifacts, ...overrides.artifacts },
+  };
+}
+
+function makeGuardrailSources() {
+  return {
     requestMarkdown: "# Request\nKeep the blocked filter and detail panel scenario.",
     planMarkdown: "# Plan\n### Blocked filter and Invoice Export detail panel",
     locatorInventory: {
@@ -126,15 +196,26 @@ test("renderGuardrailContext combines request, plan, locators, repair signals, a
       testIds: ["release-row-invoice-export"],
     },
     generationRulesMarkdown: "- Use gotoApp(page).",
-  });
+  };
+}
 
-  assert.match(context, /# Markup VRT Heal Guardrail Context/);
-  assert.match(context, /Do not weaken the scenario/);
-  assert.match(context, /Keep the blocked filter and detail panel scenario/);
-  assert.match(context, /release-row-invoice-export/);
-  assert.match(context, /\.metric: min-height `116px` -> `148px`/);
-  assert.match(context, /\.pill: background-color `#fee` -> `#eff`/);
-});
+function makeVlmRegionSummary() {
+  return {
+    available: true,
+    model: "anthropic/example",
+    cost: 0.01,
+    summary: "Badge changed color.",
+    changeCount: 1,
+    changes: [{
+      selector: ".pill",
+      property: "background-color",
+      from: "#fee",
+      to: "#eff",
+      confidence: "high",
+      region: "detail badge",
+    }],
+  };
+}
 
 function makeRepairContext() {
   return {
@@ -174,6 +255,11 @@ function makeRepairContext() {
     },
     semanticDiff: {
       changed: false,
+    },
+    artifacts: {
+      expectedPng: ".vrt/markup-vrt-eval/test-results/expected.png",
+      actualPng: ".vrt/markup-vrt-eval/test-results/actual.png",
+      diffPng: ".vrt/markup-vrt-eval/test-results/diff.png",
     },
   };
 }
@@ -227,23 +313,15 @@ function makeReport(overrides = {}) {
         category: "layout",
         score: 8.3,
       }],
+      artifacts: {
+        expectedPng: ".vrt/markup-vrt-eval/test-results/expected.png",
+        actualPng: ".vrt/markup-vrt-eval/test-results/actual.png",
+        diffPng: ".vrt/markup-vrt-eval/test-results/diff.png",
+      },
       semanticChanged: false,
       hints: ["Inspect .metric min-height."],
     },
-    vlmRegionSummary: {
-      available: true,
-      model: "anthropic/example",
-      cost: 0.01,
-      summary: "Badge changed color.",
-      changes: [{
-        selector: ".pill",
-        property: "background-color",
-        from: "#fee",
-        to: "#eff",
-        confidence: "high",
-        region: "detail badge",
-      }],
-    },
+    vlmRegionSummary: makeVlmRegionSummary(),
     artifacts: {
       reportPath: ".vrt/markup-vrt-eval/report.json",
     },
