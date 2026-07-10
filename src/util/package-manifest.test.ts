@@ -1,12 +1,29 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+const repoRoot = resolve(import.meta.dirname!, "..", "..");
+
 async function readPackageJson() {
-  const packagePath = resolve(import.meta.dirname!, "..", "..", "package.json");
+  const packagePath = resolve(repoRoot, "package.json");
   const raw = await readFile(packagePath, "utf-8");
   return JSON.parse(raw) as Record<string, unknown>;
+}
+
+async function readWorkspacePackageManifests() {
+  const packagesDir = resolve(repoRoot, "packages");
+  const entries = await readdir(packagesDir, { withFileTypes: true });
+  const manifests: Array<{ dir: string; pkg: Record<string, unknown> }> = [];
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const dir = resolve(packagesDir, entry.name);
+    const raw = await readFile(resolve(dir, "package.json"), "utf-8");
+    manifests.push({ dir, pkg: JSON.parse(raw) as Record<string, unknown> });
+  }
+
+  return manifests;
 }
 
 describe("package manifest for publishable CLI", () => {
@@ -95,5 +112,23 @@ describe("package manifest for publishable CLI", () => {
     assert.equal(dependencies["@mizchi/vlmkit-plan"], "workspace:*");
     assert.equal(dependencies["@mizchi/vlmkit-generate"], "workspace:*");
     assert.equal(dependencies["@mizchi/vlmkit-heal"], "workspace:*");
+  });
+
+  it("ships a complete LICENSE for every publishable workspace package", async () => {
+    const rootLicense = await readFile(resolve(repoRoot, "LICENSE"), "utf-8");
+    const manifests = await readWorkspacePackageManifests();
+
+    for (const { dir, pkg } of manifests) {
+      if (pkg.private === true) continue;
+      const files = pkg.files as string[] | undefined;
+      if (files && !files.includes("LICENSE")) continue;
+
+      const license = await readFile(resolve(dir, "LICENSE"), "utf-8");
+      assert.equal(
+        license,
+        rootLicense,
+        `${pkg.name as string} should ship the canonical root MIT license text`,
+      );
+    }
   });
 });
