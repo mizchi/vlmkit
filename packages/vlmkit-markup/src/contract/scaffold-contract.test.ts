@@ -137,6 +137,92 @@ test("scrollport height policy emits max-height + overflow and filler for expect
   assert.match(html, /scroll-filler-y/);
 });
 
+test("selector-based scrollports attach to the landmark the selector names", () => {
+  // `contract introspect` records scrollports with a selector, no landmarkId.
+  const screen = landingScreen();
+  screen.expectedScrollports = [
+    { id: "feed-scroll", selector: "#features", axis: "y", required: true },
+  ];
+  screen.landmarks[1].layout.height = { kind: "scrollport", max: 480 };
+  const { html, warnings } = scaffoldUiContractScreen(screen);
+  assert.match(html, /<main id="features"[^>]*data-scrollport="feed-scroll"/);
+  assert.match(html, /scroll-filler-y/);
+  assert.equal(warnings.filter((w) => w.includes("feed-scroll")).length, 0);
+});
+
+test("selector-based scrollports naming no landmark materialize as standalone scrollports", () => {
+  const screen = landingScreen();
+  screen.expectedScrollports = [
+    { id: "plan-list", name: "plan-list", selector: '[data-scrollport="plan-list"]', axis: "y", required: true },
+  ];
+  const { html, warnings } = scaffoldUiContractScreen(screen);
+  assert.match(html, /<section class="scaffold-scrollport"[^>]*data-scrollport="plan-list"[^>]*overflow-y: auto/);
+  assert.match(html, /scroll-filler-y/);
+  assert.ok(warnings.some((w) => w.includes("plan-list") && w.includes("materialized")));
+});
+
+test("responsive height override resets desktop scrollport constraints", () => {
+  const screen = landingScreen();
+  screen.landmarks[1].layout.height = { kind: "scrollport", max: 480 };
+  screen.landmarks[1].responsive = [
+    { viewport: "mobile", height: { kind: "content" } },
+  ];
+  const { html } = scaffoldUiContractScreen(screen);
+  const media = html.match(/@media \(max-width: 375px\) \{(.*?)\n\}/s)?.[1] ?? "";
+  assert.match(media, /max-height: none/);
+  assert.match(media, /overflow-y: visible/);
+});
+
+test("responsive fixed→content override resets the base height", () => {
+  const screen = landingScreen();
+  screen.landmarks[0].layout.height = { kind: "fixed", value: 420 };
+  screen.landmarks[0].responsive = [
+    { viewport: "mobile", height: { kind: "content", min: 200 } },
+  ];
+  const { html } = scaffoldUiContractScreen(screen);
+  const media = html.match(/@media \(max-width: 375px\) \{(.*?)\n\}/s)?.[1] ?? "";
+  assert.match(media, /#hero \{[^}]*height: auto/s);
+  assert.match(media, /#hero \{[^}]*min-height: 200px/s);
+});
+
+test("responsive scroll:false override resets base overflow", () => {
+  const screen = landingScreen();
+  screen.landmarks[2].layout.scroll = { x: true, y: false };
+  screen.landmarks[2].responsive = [
+    { viewport: "mobile", scroll: { x: false, y: false } },
+  ];
+  const { html } = scaffoldUiContractScreen(screen);
+  const media = html.match(/@media \(max-width: 375px\) \{(.*?)\n\}/s)?.[1] ?? "";
+  assert.match(media, /#footer \{[^}]*overflow-x: visible/s);
+});
+
+test("screen-level selector markers re-home onto a landmark and keep their attribute", () => {
+  // The shape introspect emits: screen-level, selector + attribute.
+  const screen = landingScreen();
+  screen.landmarks[0].markers = []; // no landmark-level markers
+  screen.markers = [
+    { kind: "primary-cta", selector: "[data-primary-cta]", attribute: "data-primary-cta", required: true },
+    { kind: "hero-title", selector: "[data-hero-title]", attribute: "data-hero-title" },
+  ];
+  const { html } = scaffoldUiContractScreen(screen);
+  const mainOpen = html.indexOf('<main id="features"');
+  const mainClose = html.indexOf("</main>");
+  const cta = html.indexOf('data-primary-cta=""');
+  const heroTitle = html.indexOf('data-hero-title=""');
+  assert.ok(cta > mainOpen && cta < mainClose, "primary-cta materializes inside the main landmark");
+  assert.ok(heroTitle > mainOpen && heroTitle < mainClose, "hero-title materializes inside the main landmark");
+});
+
+test("screen-level selector markers already declared on a landmark are not duplicated", () => {
+  const screen = landingScreen(); // hero already declares hero-title + primary-cta
+  screen.markers = [
+    { kind: "primary-cta", selector: "[data-primary-cta]", attribute: "data-primary-cta", required: true },
+  ];
+  const { html } = scaffoldUiContractScreen(screen);
+  const ctas = html.match(/data-marker="primary-cta"|data-primary-cta=""/g) ?? [];
+  assert.equal(ctas.length, 1);
+});
+
 test("state contracts emit hover / focus-visible stub rules", () => {
   const screen = landingScreen();
   screen.landmarks[0].states = [

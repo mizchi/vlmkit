@@ -21,6 +21,7 @@ import {
   type UiContractScreen,
   type UiContractViewport,
   type UiDisplayPolicy,
+  type UiExpectedScrollportContract,
   type UiHeightPolicy,
   type UiLayoutContract,
   type UiMarkerContract,
@@ -181,14 +182,50 @@ function layoutDecls(layout: UiLayoutContract): string[] {
   ];
 }
 
-function responsiveDecls(rule: UiResponsiveRule): string[] {
+function declMap(decls: string[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const decl of decls) {
+    const colon = decl.indexOf(": ");
+    map.set(decl.slice(0, colon), decl.slice(colon + 2));
+  }
+  return map;
+}
+
+/** Initial values used to clear a base declaration an override no longer sets. */
+const RESET_VALUES: Record<string, string> = {
+  width: "auto",
+  "min-width": "auto",
+  "max-width": "none",
+  "margin-inline": "0",
+  height: "auto",
+  "min-height": "auto",
+  "max-height": "none",
+  "overflow-x": "visible",
+  "overflow-y": "visible",
+};
+
+function responsiveDecls(rule: UiResponsiveRule, base: UiLayoutContract): string[] {
+  // Compile the merged layout and diff it against the base render: emit the
+  // declarations that changed, and explicitly reset base declarations the
+  // merged layout no longer produces — otherwise a desktop `height`,
+  // `max-height`, or `overflow` would survive inside the media rule (e.g.
+  // scrollport→content would keep the desktop scroll constraints on mobile).
+  const merged: UiLayoutContract = {
+    width: rule.width ?? base.width,
+    height: rule.height ?? base.height,
+    display: rule.display ?? base.display,
+    scroll: rule.scroll ?? base.scroll,
+  };
+  const baseDecls = declMap(layoutDecls(base));
+  const mergedDecls = declMap(layoutDecls(merged));
   const decls: string[] = [];
-  if (rule.width) decls.push(...widthDecls(rule.width));
-  if (rule.height) decls.push(...heightDecls(rule.height));
-  if (rule.display) decls.push(...displayDecls(rule.display));
-  if (rule.scroll) {
-    if (rule.scroll.x) decls.push("overflow-x: auto");
-    if (rule.scroll.y) decls.push("overflow-y: auto");
+  for (const [property, value] of mergedDecls) {
+    if (baseDecls.get(property) !== value) decls.push(`${property}: ${value}`);
+  }
+  for (const property of baseDecls.keys()) {
+    if (!mergedDecls.has(property)) {
+      decls.push(`${property}: ${RESET_VALUES[property] ?? "initial"}`);
+    }
   }
   return decls;
 }
@@ -215,6 +252,59 @@ interface RenderContext {
   landmarkIds: string[];
   css: string[];
   mediaCss: Map<string, string[]>;
+  /** Scrollport expectations already attached to a landmark. */
+  claimedScrollports: Set<string>;
+  /** Screen-level selector markers re-homed onto a landmark, keyed by landmark id. */
+  extraMarkers: Map<string, UiMarkerContract[]>;
+}
+
+/**
+ * A scrollport expectation targets a landmark either explicitly via
+ * `landmarkId`, or — for contracts round-tripped through `contract
+ * introspect`, which records only a selector — when the selector's id or
+ * attribute value names the landmark.
+ */
+function scrollportTargetsLandmark(
+  scrollport: UiExpectedScrollportContract,
+  landmark: UiContractLandmark,
+  domId: string,
+): boolean {
+  if (scrollport.landmarkId) return scrollport.landmarkId === landmark.id;
+  if (!scrollport.selector) return false;
+  if (scrollport.selector === `#${domId}` || scrollport.selector === `#${landmark.id}`) return true;
+  const attrValue = scrollport.selector.match(/^\[[^=\]]+="([^"]*)"\]$/)?.[1];
+  return attrValue !== undefined
+    && (attrValue === landmark.id || attrValue === domId || attrValue === landmark.name);
+}
+
+/**
+ * Fallback for selector-based scrollports that name no landmark: emit a
+ * standalone element that satisfies the selector and measurably scrolls,
+ * so the scrolled state can still be exercised and a re-introspect
+ * recovers the scrollport.
+ */
+function materializeScrollport(
+  scrollport: UiExpectedScrollportContract,
+  ctx: RenderContext,
+): string {
+  const idMatch = scrollport.selector?.match(/^#([a-zA-Z][\w-]*)$/)?.[1];
+  const attrMatch = scrollport.selector?.match(/^\[([a-zA-Z][\w-]*)(?:="([^"]*)")?\]$/);
+  const attribute = attrMatch?.[1] ?? "data-scrollport";
+  const value = attrMatch?.[2] ?? scrollport.name ?? scrollport.id;
+  const axis = scrollport.axis ?? "y";
+  const style = axis === "x"
+    ? "max-width: 100%; overflow-x: auto"
+    : axis === "both"
+      ? "max-height: 240px; overflow: auto"
+      : "max-height: 240px; overflow-y: auto";
+  const fillers: string[] = [];
+  if (axis === "x" || axis === "both") fillers.push(`<div class="scroll-filler-x" aria-hidden="true"></div>`);
+  if (axis === "y" || axis === "both") fillers.push(`<div class="scroll-filler-y" aria-hidden="true"></div>`);
+  ctx.warnings.push(
+    `scrollport ${scrollport.id}: selector "${scrollport.selector ?? ""}" names no landmark; materialized as a standalone scrollport`,
+  );
+  const idAttr = idMatch ? ` id="${esc(idMatch)}"` : "";
+  return `<section class="scaffold-scrollport"${idAttr} aria-label="${esc(scrollport.name ?? scrollport.id)}" ${esc(attribute)}="${esc(value)}" style="${style}">${fillers.join("")}</section>`;
 }
 
 function markerAttrs(marker: UiMarkerContract): string {
@@ -380,7 +470,7 @@ function renderLandmark(landmark: UiContractLandmark, ctx: RenderContext, depth:
       continue;
     }
     const query = mediaQueryForViewport(viewport, ctx.screen.viewports);
-    const overrides = responsiveDecls(rule);
+    const overrides = responsiveDecls(rule, landmark.layout);
     if (overrides.length === 0) continue;
     const bucket = ctx.mediaCss.get(query) ?? [];
     bucket.push(`${selector} {\n    ${overrides.join(";\n    ")};\n  }`);
@@ -390,12 +480,13 @@ function renderLandmark(landmark: UiContractLandmark, ctx: RenderContext, depth:
   stateCss(selector, landmark.states ?? [], ctx.css);
 
   const body: string[] = [];
-  for (const marker of landmark.markers ?? []) {
+  const markers = [...(landmark.markers ?? []), ...(ctx.extraMarkers.get(landmark.id) ?? [])];
+  for (const marker of markers) {
     body.push(renderMarkerElement(marker, ctx));
   }
   // A landmark with no explicit heading marker still gets a visible name so
   // the scaffold reads as a wireframe.
-  const hasHeading = (landmark.markers ?? []).some((m) => m.kind === "hero-title");
+  const hasHeading = markers.some((m) => m.kind === "hero-title");
   const rowContainer = landmark.layout.display.kind === "flex"
     && landmark.layout.display.direction === "row";
   if (!hasHeading && landmark.role !== "navigation" && !rowContainer) {
@@ -416,9 +507,10 @@ function renderLandmark(landmark: UiContractLandmark, ctx: RenderContext, depth:
   }
 
   const scrollport = (ctx.screen.expectedScrollports ?? []).find(
-    (sp) => sp.landmarkId === landmark.id,
+    (sp) => !ctx.claimedScrollports.has(sp.id) && scrollportTargetsLandmark(sp, landmark, id),
   );
   if (scrollport) {
+    ctx.claimedScrollports.add(scrollport.id);
     attrs.push(`data-scrollport="${esc(scrollport.id)}"`);
     // Guarantee measurable overflow on the declared axis.
     const filler = scrollport.axis === "x"
@@ -515,7 +607,8 @@ body {
 .content-table { border-collapse: collapse; margin: 12px; }
 .content-table td, .content-table th { border: 1px solid #e5e7eb; padding: 6px 12px; }
 .scroll-filler-y { height: 200vh; }
-.scroll-filler-x { width: 300vw; height: 1px; }`;
+.scroll-filler-x { width: 300vw; height: 1px; }
+.scaffold-scrollport { border: 1px dashed #cbd5e1; padding: 12px; }`;
 
 export function scaffoldUiContractScreen(
   screen: UiContractScreen,
@@ -536,16 +629,49 @@ export function scaffoldUiContractScreen(
     landmarkIds: [],
     css: [],
     mediaCss: new Map(),
+    claimedScrollports: new Set(),
+    extraMarkers: new Map(),
   };
 
   const bodyLines: string[] = [];
+  // Screen-level markers (the shape `contract introspect` emits: selector +
+  // attribute, no landmark) must still materialize or the scaffold loses the
+  // semantic hooks and a re-introspect cannot recover the marker contract.
+  // Re-home attribute-bearing ones onto a host landmark; selector-less ones
+  // materialize at the top level as before.
+  const host = roots.find((l) => l.role === "main") ?? roots[0];
   for (const marker of screen.markers ?? []) {
-    // Screen-level markers that name a selector belong to a landmark; only
-    // selector-less ones materialize at the top level.
-    if (!marker.selector) bodyLines.push(`  ${renderMarkerElement(marker, ctx)}`);
+    if (!marker.selector) {
+      bodyLines.push(`  ${renderMarkerElement(marker, ctx)}`);
+      continue;
+    }
+    // Scrollport evidence markers are covered by expectedScrollports below.
+    if (marker.kind === "scrollport") continue;
+    const declaredOnLandmark = screen.landmarks.some((l) =>
+      (l.markers ?? []).some((m) => m.kind === marker.kind),
+    );
+    if (declaredOnLandmark) continue;
+    if (!marker.attribute) {
+      ctx.warnings.push(
+        `marker ${marker.id ?? marker.kind}: selector "${marker.selector}" carries no attribute the scaffold can emit; satisfy it during the decoration pass`,
+      );
+      continue;
+    }
+    if (!host) {
+      bodyLines.push(`  ${renderMarkerElement(marker, ctx)}`);
+      continue;
+    }
+    const bucket = ctx.extraMarkers.get(host.id) ?? [];
+    bucket.push(marker);
+    ctx.extraMarkers.set(host.id, bucket);
   }
   for (const root of roots) {
     bodyLines.push(...renderLandmark(root, ctx, 1));
+  }
+  for (const scrollport of screen.expectedScrollports ?? []) {
+    if (!ctx.claimedScrollports.has(scrollport.id)) {
+      bodyLines.push(`  ${materializeScrollport(scrollport, ctx)}`);
+    }
   }
 
   const cssBlocks = [

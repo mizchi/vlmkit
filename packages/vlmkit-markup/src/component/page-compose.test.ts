@@ -154,6 +154,36 @@ test("full-bleed dark header does not poison background detection", () => {
   for (const m of composition.matches) assert.ok(m.iou > 0.95);
 });
 
+test("a current render whose background differs from the target still extracts real components", () => {
+  // Early-reconstruction / cross-theme case: dark target, white current.
+  // Forcing the target's background onto current would turn the whole white
+  // page into one giant foreground component.
+  const darkBg: [number, number, number] = [15, 23, 42];
+  const target = {
+    ...makePage(400, 400, [
+      { x: 20, y: 20, w: 360, h: 80, rgb: GRAY },
+      { x: 20, y: 140, w: 360, h: 120, rgb: BLUE },
+    ]),
+  };
+  // Repaint the target's white base to dark.
+  for (let i = 0; i < target.data.length; i += 4) {
+    if (target.data[i] === 255 && target.data[i + 1] === 255 && target.data[i + 2] === 255) {
+      target.data[i] = darkBg[0];
+      target.data[i + 1] = darkBg[1];
+      target.data[i + 2] = darkBg[2];
+    }
+  }
+  const current = makePage(400, 400, [{ x: 20, y: 20, w: 360, h: 80, rgb: GRAY }]);
+  const composition = composePageDiff(target, current);
+  const pageSized = [...composition.extra, ...composition.matches.map((m) => m.current)]
+    .filter((c) => c.width >= 390 && c.height >= 390);
+  assert.equal(pageSized.length, 0, "current must not collapse into one page-sized component");
+  assert.equal(composition.matches.length, 1);
+  assert.equal(composition.matches[0]!.deltaTop, 0);
+  assert.equal(composition.missing.length, 1);
+  assert.equal(composition.missing[0]!.top, 140);
+});
+
 test("matchPageComponents pairs by position even when area ranks differ", () => {
   const mk = (index: number, left: number, top: number, w: number, h: number): PageComponent => ({
     index, left, top, width: w, height: h, area: w * h, fillColor: "rgb(0, 0, 0)", hex: "#000000",

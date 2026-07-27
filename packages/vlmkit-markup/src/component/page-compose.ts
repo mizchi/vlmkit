@@ -271,13 +271,27 @@ export function composePageDiff(
   // One shared background reference for BOTH extractions, anchored on the
   // target: per-image edge detection can disagree between the two renders
   // (full-bleed dark header case), making the component sets incomparable.
-  const background = options.background ?? dominantPageColor(target);
-  const extractOptions = { ...options, background };
+  // But sharing is only valid while the current render actually has the
+  // target's background — early in reconstruction (blank scaffold vs dark
+  // target) or across themes the backgrounds genuinely differ, and forcing
+  // the target reference onto current would mark every current background
+  // pixel as foreground, fusing the page into one giant component.
+  const tolerance = options.bgTolerance ?? 12;
+  const targetBackground = options.background ?? dominantPageColor(target);
+  let currentBackground = targetBackground;
+  if (!options.background) {
+    const detected = dominantPageColor(current);
+    const agrees =
+      Math.abs(detected[0] - targetBackground[0]) <= tolerance
+      && Math.abs(detected[1] - targetBackground[1]) <= tolerance
+      && Math.abs(detected[2] - targetBackground[2]) <= tolerance;
+    if (!agrees) currentBackground = detected;
+  }
   const targetComponents = toPageComponents(
-    extractComponentsFromRgba(target.data, target.width, target.height, extractOptions),
+    extractComponentsFromRgba(target.data, target.width, target.height, { ...options, background: targetBackground }),
   );
   const currentComponents = toPageComponents(
-    extractComponentsFromRgba(current.data, current.width, current.height, extractOptions),
+    extractComponentsFromRgba(current.data, current.width, current.height, { ...options, background: currentBackground }),
   );
   const { matches, missing, extra } = matchPageComponents(
     targetComponents,
@@ -428,7 +442,10 @@ async function renderHtmlToPng(
   try {
     const page = await browser.newPage({ viewport: { width, height } });
     await page.goto(pathToFileURL(resolve(htmlPath)).href, { waitUntil: "load" });
-    const buffer = await page.screenshot({ fullPage: true });
+    // Viewport-only, like `build component`: the target screenshot is bounded
+    // by the requested viewport, so a full-page capture of a taller candidate
+    // would report below-the-fold content as extra components.
+    const buffer = await page.screenshot({ fullPage: false });
     const png = PNG.sync.read(buffer);
     return {
       data: new Uint8Array(png.data.buffer, png.data.byteOffset, png.data.byteLength),
