@@ -137,6 +137,9 @@ const SPECS: Record<string, Spec> = {
   crossBrowser: spec("cross-browser", () => import("@mizchi/vlmkit-markup/stress/cross-browser.ts")),
   designTokens: spec("design-tokens", () => import("@mizchi/vlmkit-markup/style/design-tokens.ts")),
   motionDetect: spec("motion-detect", () => import("@mizchi/vlmkit-markup/style/motion-detect.ts")),
+  animationEval: spec("animation-eval", () => import("@mizchi/vlmkit-markup/style/animation-eval.ts")),
+  scrollScan: spec("scroll-scan", () => import("@mizchi/vlmkit-markup/inspect/scroll-scan.ts")),
+  breakpointCheck: spec("breakpoint-check", () => import("@mizchi/vlmkit-markup/stress/breakpoint-check.ts")),
   craterSmoke: spec("crater-smoke", () => import("@mizchi/vlmkit-capture/crater-smoke.ts")),
   perf: spec("perf", () => import("../util/perf.ts")),
   explore: spec("explore", () => import("@mizchi/vlmkit-markup/inspect/explore.ts")),
@@ -167,6 +170,8 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
     tokens: { spec: SPECS.designTokens, desc: "Design-token scale conformance" },
     theme: { spec: SPECS.themeParity, desc: "Theme parity (hard-coded color scan in dark mode)" },
     motion: { spec: SPECS.motionDetect, desc: "CSS motion detection (animation / transition / reduced-motion)" },
+    animation: { spec: SPECS.animationEval, desc: "Frame-sampled animation evaluation (visible effect / settle / reduced-motion behavior)" },
+    breakpoints: { spec: SPECS.breakpointCheck, desc: "Boundary quickcheck: render at B-1/B/B+1 per breakpoint, flag spikes/gaps/overflow" },
     crater: { spec: SPECS.craterSmoke, desc: "Crater BiDi backend smoke check" },
     perf: { spec: SPECS.perf, desc: "Web Vitals thresholds (CLS / LCP / FCP)" },
   },
@@ -181,7 +186,8 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
   },
   scan: {
     component: { spec: SPECS.componentExtract, desc: "Detect components in a screenshot; crop to standalone PNGs" },
-    breakpoints: { run: runDiscover, desc: "Discover responsive breakpoints from HTML/CSS" },
+    breakpoints: { run: runDiscover, desc: "Discover responsive breakpoints from HTML/CSS (verify them with `check breakpoints`)" },
+    scroll: { spec: SPECS.scrollScan, desc: "Annotation-free scroll inventory: containers, page overflow-x, clipped content" },
   },
   build: {
     component: { spec: SPECS.componentFromImage, desc: "Build a component from a target screenshot" },
@@ -315,10 +321,10 @@ regression-watch) + markup synthesis + design audits + CSS auto-repair.
 
 Common command groups:
   vlmkit diff html|png|region|elements|component|browsers|agent|runs
-  vlmkit check a11y|palette|tokens|theme|motion|crater|perf|drift
+  vlmkit check a11y|palette|tokens|theme|motion|animation|breakpoints|crater|perf|drift
   vlmkit inspect interact|explore|smoke
   vlmkit stress i18n|media
-  vlmkit scan component|breakpoints
+  vlmkit scan component|breakpoints|scroll
   vlmkit build component|page
   vlmkit contract introspect|validate|scaffold
   vlmkit heal selector

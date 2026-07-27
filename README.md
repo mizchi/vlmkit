@@ -282,6 +282,10 @@ vlmkit build page <target.png> <current.html|current.png> [--crop dir/] [--json]
 # Detect components in a screenshot.
 vlmkit scan component <screenshot.png>         # Crop to standalone PNGs
 vlmkit scan breakpoints <html-file>            # Discover responsive breakpoints
+vlmkit scan scroll <html|url>                  # Annotation-free scroll inventory: real scroll containers
+                                               # (axis / overflow px / bbox), unintended page overflow-x
+                                               # with offenders, overflow:hidden cut-off suspects, nested
+                                               # scrolling; --json emits UI Contract expectedScrollports
 
 # UI Contract IR: extract from existing markup, validate, or compile to a scaffold.
 vlmkit contract introspect <html|url> --out ui.contract.json
@@ -300,7 +304,18 @@ vlmkit inspect explore  <html|url>             # Auto-discover declared actions 
 vlmkit inspect smoke    <html|url>             # A11y-driven exploratory smoke test
 
 # Checks.
-vlmkit check motion <html|url>                 # CSS motion / reduced-motion detection
+vlmkit check motion <html|url>                 # CSS motion / reduced-motion detection (declarations)
+vlmkit check animation <html|url>              # Frame-sampled animation evaluation: pause + seek each
+                                               # animation (CSS @keyframes / transitions / element.animate,
+                                               # no page instrumentation), verify it visibly moves pixels,
+                                               # report motion bbox, settle time, infinite animations (VRT
+                                               # mask hints), behavioral prefers-reduced-motion parity, and
+                                               # uncontrolled motion (rAF/video/GIF) that WAAPI can't pause
+vlmkit check breakpoints <html|url>            # Boundary quickcheck: render at B-1/B/B+1 per discovered
+                                               # breakpoint and verify each discrete style property at B
+                                               # matches a neighbor — catches off-by-one media queries
+                                               # (a width styled by neither/both regimes), elements that
+                                               # vanish exactly on the boundary, overflow at boundary widths
 vlmkit check crater                            # Crater BiDi backend smoke check
 
 # Stress tests.
