@@ -85,6 +85,37 @@ same class of bug as `build page`'s background-anchoring issue: a reference
 state chosen for determinism must also be *representative*, or the
 measurement silently evaluates the wrong thing.
 
+## Addendum: controllability boundary + `uncontrolled-motion` guard
+
+A follow-up question — "does this work on CSS animations, and can they be
+controlled from outside?" — led to a per-kind verification:
+
+| Animation kind | Enumerable / seekable via WAAPI | Evaluated |
+|---|---|---|
+| CSS `@keyframes` | yes (`CSSAnimation` reflection) | yes — this was the original dogfood |
+| CSS transition | yes, while alive at collect time | yes (hover-triggered ones are `inspect interact`'s domain) |
+| WAAPI `element.animate()` | yes | yes, including the infinite flag |
+| rAF/JS tick (GSAP-ticker style) | **no** — invisible to `getAnimations()` | no, and worse: see below |
+| video / GIF / SMIL | no | no |
+
+The rAF case is not just a blind spot: the ticker keeps moving the page
+*during* evaluation, so its pixels leak into whichever animation is being
+sampled — in the mixed fixture the CSS animation's motion region grew from
+its real 60px-tall box to 220px because the rAF box below it moved between
+screenshots. A dead animation can read as visible this way.
+
+Guard added: the rest pose is captured **twice back-to-back with nothing
+seeked in between**; any delta between the two captures is motion the WAAPI
+cannot hold still. It is reported as `uncontrolledMotion` (count + bbox) and
+raises a `warn`-severity `uncontrolled-motion` issue stating that overlapping
+frame deltas may be contaminated. This also fixes the false negative where a
+page animated *only* by rAF reported `ok, animations: 0` — it now warns, with
+the moving region's bbox. Static pages stay clean (tolerance 8 absorbs
+antialiasing; the flag needs ≥ minChangedPixels).
+
+Verified: mixed fixture pinpoints the rAF box at (200,200) 85x60; rAF-only
+page warns despite `animations: 0`; static page still reports `ok`.
+
 ## Files
 
 - `packages/vlmkit-markup/src/style/animation-eval.ts` — implementation

@@ -171,6 +171,25 @@ test("animations surviving reduced-motion emulation raise a suspect", () => {
   assert.match(issues[0]!.message, /\.hero/);
 });
 
+test("uncontrolled motion between rest captures raises a warn", () => {
+  const issues = deriveAnimationIssues({
+    evaluated: [evaluated()],
+    settleMs: 800,
+    infinite: [],
+    uncontrolledMotion: {
+      changedPixels: 900,
+      ratio: 0.01,
+      bbox: { x: 40, y: 200, width: 360, height: 60 },
+    },
+  });
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0]!.kind, "uncontrolled-motion");
+  assert.equal(issues[0]!.severity, "warn");
+  assert.match(issues[0]!.message, /rAF/);
+  assert.match(issues[0]!.message, /\(40,200\) 360x60/);
+  assert.match(issues[0]!.message, /contaminated/);
+});
+
 test("a healthy finite visible animation raises no issues", () => {
   const issues = deriveAnimationIssues({
     evaluated: [evaluated()],
@@ -203,4 +222,25 @@ test("formatAnimationEvalReport renders counts, settle, and issues", () => {
   assert.match(text, /reduced-motion: honored/);
   assert.match(text, /infinite-animation/);
   assert.match(text, /motion region \(10,10\) 40x40/);
+});
+
+test("formatAnimationEvalReport surfaces uncontrolled motion", () => {
+  const report: AnimationEvalReport = {
+    source: "fixture.html",
+    viewport: { width: 1280, height: 720 },
+    animationCount: 0,
+    evaluated: [],
+    settleMs: 0,
+    infinite: [],
+    uncontrolledMotion: { changedPixels: 900, ratio: 0.01, bbox: { x: 40, y: 200, width: 360, height: 60 } },
+    issues: deriveAnimationIssues({
+      evaluated: [],
+      settleMs: 0,
+      infinite: [],
+      uncontrolledMotion: { changedPixels: 900, ratio: 0.01, bbox: { x: 40, y: 200, width: 360, height: 60 } },
+    }),
+  };
+  const text = formatAnimationEvalReport(report);
+  assert.match(text, /uncontrolled motion: 900px at \(40,200\) 360x60/);
+  assert.match(text, /uncontrolled-motion/);
 });

@@ -81,7 +81,8 @@ export type AnimationEvalIssueKind =
   | "no-visible-effect"
   | "infinite-animation"
   | "reduced-motion-ignored"
-  | "long-settle";
+  | "long-settle"
+  | "uncontrolled-motion";
 
 export interface AnimationEvalIssue {
   kind: AnimationEvalIssueKind;
@@ -103,6 +104,13 @@ export interface AnimationEvalReport {
     remainingCount: number;
     remaining: ReducedMotionRemaining[];
   };
+  /**
+   * Pixel delta between two back-to-back rest captures with every WAAPI
+   * animation held still. Present (nonzero) means a motion source the Web
+   * Animations API cannot enumerate or pause — a rAF/JS-driven animation,
+   * video, or GIF — is moving the page on its own.
+   */
+  uncontrolledMotion?: FrameDeltaStat;
   issues: AnimationEvalIssue[];
   /** Written sample frames (when --frames was passed). */
   framePaths?: string[];
@@ -207,6 +215,7 @@ export interface DeriveIssuesInput {
   settleMs: number | null;
   infinite: { selector: string; name: string }[];
   reducedMotion?: { remainingCount: number; remaining: ReducedMotionRemaining[] };
+  uncontrolledMotion?: FrameDeltaStat;
 }
 
 export function deriveAnimationIssues(
@@ -241,6 +250,16 @@ export function deriveAnimationIssues(
       kind: "long-settle",
       severity: "warn",
       message: `Page keeps animating for ${Math.round(input.settleMs)}ms after load (threshold ${settleThreshold}ms) — captures inside this window are nondeterministic.`,
+    });
+  }
+
+  if (input.uncontrolledMotion) {
+    const m = input.uncontrolledMotion;
+    const where = m.bbox ? ` at (${m.bbox.x},${m.bbox.y}) ${m.bbox.width}x${m.bbox.height}` : "";
+    issues.push({
+      kind: "uncontrolled-motion",
+      severity: "warn",
+      message: `The page moved between two back-to-back captures with every WAAPI animation held still (${m.changedPixels}px${where}) — a rAF/JS-driven animation, video, or GIF the Web Animations API cannot enumerate or pause. Per-animation frame deltas overlapping this region may be contaminated (a dead animation can read as visible), the page never settles for VRT, and reduced-motion emulation does not affect it. Mask the region or stub the ticker for capture.`,
     });
   }
 
@@ -375,12 +394,22 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       t.iterations === null ? 0 : t.delayMs + t.durationMs * t.iterations;
     for (const t of timings) await seek(t.index, restTimeMs(t));
     const evaluable = timings.filter((t) => t.durationMs > 0).slice(0, maxAnimations);
-    const baseline = evaluable.length > 0 ? await shot("rest") : undefined;
+
+    // Two back-to-back rest captures with nothing seeked in between: the
+    // second becomes the evaluation baseline, and their delta exposes motion
+    // sources the WAAPI cannot hold still — rAF/JS-driven animations, video,
+    // GIFs. Those keep moving through every sampled frame, so they both
+    // contaminate per-animation deltas and defeat VRT determinism, even on
+    // pages that declare no CSS/WAAPI animation at all.
+    const restProbe = await shot("rest");
+    const baseline = await shot("rest-recheck");
+    const restDelta = frameDelta(restProbe, baseline, tolerance);
+    const uncontrolledMotion = restDelta.changedPixels >= minChangedPixels ? restDelta : undefined;
 
     const evaluated: EvaluatedAnimation[] = [];
     for (const timing of evaluable) {
       const frames: AnimationFrameStat[] = [];
-      let previous = baseline!;
+      let previous = baseline;
       let motionBbox: EvaluatedAnimation["motionBbox"] = null;
       let totalChangedPixels = 0;
       let maxFrameRatio = 0;
@@ -432,7 +461,13 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
     }
 
     const issues = deriveAnimationIssues(
-      { evaluated, settleMs, infinite, ...(reducedMotion ? { reducedMotion } : {}) },
+      {
+        evaluated,
+        settleMs,
+        infinite,
+        ...(reducedMotion ? { reducedMotion } : {}),
+        ...(uncontrolledMotion ? { uncontrolledMotion } : {}),
+      },
       { settleThresholdMs: options.settleThresholdMs },
     );
 
@@ -444,6 +479,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       settleMs,
       infinite,
       ...(reducedMotion ? { reducedMotion } : {}),
+      ...(uncontrolledMotion ? { uncontrolledMotion } : {}),
       issues,
       ...(framePaths.length > 0 ? { framePaths } : {}),
     };
@@ -465,6 +501,11 @@ export function formatAnimationEvalReport(report: AnimationEvalReport): string {
   lines.push(`settle: ${report.settleMs === null ? "never (infinite animation)" : `${Math.round(report.settleMs)}ms`}`);
   if (report.reducedMotion) {
     lines.push(`reduced-motion: ${report.reducedMotion.remainingCount === 0 ? "honored" : `${report.reducedMotion.remainingCount} animation(s) still running`}`);
+  }
+  if (report.uncontrolledMotion) {
+    const m = report.uncontrolledMotion;
+    const where = m.bbox ? ` at (${m.bbox.x},${m.bbox.y}) ${m.bbox.width}x${m.bbox.height}` : "";
+    lines.push(`uncontrolled motion: ${m.changedPixels}px${where} (rAF / video / GIF — frame deltas may be contaminated)`);
   }
   if (report.evaluated.length > 0) {
     lines.push("");
