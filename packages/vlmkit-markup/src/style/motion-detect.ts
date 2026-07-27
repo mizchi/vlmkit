@@ -7,6 +7,10 @@
  * transitions exist, whether animations are running or paused, and
  * whether author CSS declares a reduced-motion fallback.
  *
+ * For rendered-frame evaluation (visible effect, motion bbox, settle
+ * time, behavioral reduced-motion parity) use `vlmkit check animation`
+ * (./animation-eval.ts).
+ *
  * Usage:
  *   vlmkit check motion <html-or-url>
  *   vlmkit check motion <html-or-url> --json

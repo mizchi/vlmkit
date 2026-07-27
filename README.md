@@ -300,7 +300,11 @@ vlmkit inspect explore  <html|url>             # Auto-discover declared actions 
 vlmkit inspect smoke    <html|url>             # A11y-driven exploratory smoke test
 
 # Checks.
-vlmkit check motion <html|url>                 # CSS motion / reduced-motion detection
+vlmkit check motion <html|url>                 # CSS motion / reduced-motion detection (declarations)
+vlmkit check animation <html|url>              # Frame-sampled animation evaluation: pause + seek each
+                                               # animation, verify it visibly moves pixels, report motion
+                                               # bbox, settle time, infinite animations (VRT mask hints),
+                                               # and behavioral prefers-reduced-motion parity
 vlmkit check crater                            # Crater BiDi backend smoke check
 
 # Stress tests.

@@ -172,6 +172,14 @@ describe("vrt CLI tree (cac-based)", () => {
     assert.match(r.stdout, /--fail-on-suspect/);
   });
 
+  it("`vrt check animation --help` delegates to the animation evaluator help", () => {
+    const r = runVrt(["check", "animation", "--help"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vlmkit check animation <html-or-url>/);
+    assert.match(r.stdout, /--frames <dir>/);
+    assert.match(r.stdout, /--skip-reduced-motion/);
+  });
+
   it("`vrt check crater --help` delegates to Crater smoke help", () => {
     const r = runVrt(["check", "crater", "--help"]);
     assert.equal(r.status, 0);

@@ -172,7 +172,13 @@ must serve both via `prefers-color-scheme`:
 vlmkit check palette target.png current-render.png   # missing = forgot a color; extra = hard-coded literal
 vlmkit check tokens current.html                     # off-scale radius/spacing/z-index/shadow
 vlmkit check theme current.html                      # unthemed hard-coded colors (if theming required)
+vlmkit check animation current.html                  # if you authored animations: each one visibly moves
+                                                     # (dead animations flagged), settle time, reduced-motion parity
 ```
+
+`check animation` is also why your own `build page` / `diff png` runs can
+look nondeterministic: an `infinite-animation` issue names the selector to
+`--mask` during captures.
 
 ### 5. Optional VLM assist (color naming only)
 

@@ -298,6 +298,8 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - `inspect smoke` now compares post-action a11y snapshots against the initial snapshot and reports `a11y-regression` when all interactive targets or landmarks disappear.
 - [x] Animation detection (animation-play-state: paused / CSSOM diff)
   - `vlmkit check motion` samples CSSOM animation / transition declarations, reports running vs paused animations, and flags missing `prefers-reduced-motion: reduce` coverage.
+- [x] Animation evaluation (frame-sampled, deterministic)
+  - `vlmkit check animation` pauses every animation via WAAPI, seeks `currentTime` through deterministic sample points against a settled-page baseline, and evaluates rendered frames: visible-effect verification (dead animations → `no-visible-effect`), per-animation motion bbox + peak frame delta, settle time (`long-settle`), infinite animations with a ready `--mask` hint (`infinite-animation`), and behavioral `prefers-reduced-motion` parity via emulated re-render (`reduced-motion-ignored`). `--frames` writes the sampled frame PNGs for VLM/manual inspection. Baseline gotcha (found dogfooding): holding *other* animations at t=0 hides descendants behind entrance animations' `opacity: 0` start keyframe — the baseline must be the rest pose (finite animations seeked past their end, infinite at 0).
 - [x] External stylesheet breakpoint discovery
   - Regex fallback now reads local `<link rel="stylesheet" href="./...">` CSS during migration breakpoint discovery and merges those breakpoints with Crater results.
 
