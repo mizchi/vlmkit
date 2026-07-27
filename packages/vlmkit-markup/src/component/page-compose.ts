@@ -235,16 +235,49 @@ function findGapDeltas(matches: PageMatch[], tolerance: number): PageGapDelta[] 
   return deltas;
 }
 
+/**
+ * Dominant page color via sparse whole-image sampling (mode over /8
+ * quantized bins, averaged within the winning bin). Unlike perimeter
+ * sampling this is stable on pages with full-bleed dark headers or
+ * sidebars that dominate the edges of one render but not the other.
+ */
+export function dominantPageColor(
+  img: { data: Uint8Array; width: number; height: number },
+  stride = 7,
+): [number, number, number] {
+  const counts = new Map<string, { n: number; r: number; g: number; b: number }>();
+  const total = img.width * img.height;
+  for (let p = 0; p < total; p += stride) {
+    const i = p * 4;
+    const r = img.data[i]!, g = img.data[i + 1]!, b = img.data[i + 2]!;
+    const key = `${r >> 3},${g >> 3},${b >> 3}`;
+    const bucket = counts.get(key) ?? { n: 0, r: 0, g: 0, b: 0 };
+    bucket.n++; bucket.r += r; bucket.g += g; bucket.b += b;
+    counts.set(key, bucket);
+  }
+  let best: { n: number; r: number; g: number; b: number } | undefined;
+  for (const bucket of counts.values()) {
+    if (!best || bucket.n > best.n) best = bucket;
+  }
+  if (!best) return [255, 255, 255];
+  return [Math.round(best.r / best.n), Math.round(best.g / best.n), Math.round(best.b / best.n)];
+}
+
 export function composePageDiff(
   target: { data: Uint8Array; width: number; height: number },
   current: { data: Uint8Array; width: number; height: number },
   options: ComposePageOptions = {},
 ): PageComposition {
+  // One shared background reference for BOTH extractions, anchored on the
+  // target: per-image edge detection can disagree between the two renders
+  // (full-bleed dark header case), making the component sets incomparable.
+  const background = options.background ?? dominantPageColor(target);
+  const extractOptions = { ...options, background };
   const targetComponents = toPageComponents(
-    extractComponentsFromRgba(target.data, target.width, target.height, options),
+    extractComponentsFromRgba(target.data, target.width, target.height, extractOptions),
   );
   const currentComponents = toPageComponents(
-    extractComponentsFromRgba(current.data, current.width, current.height, options),
+    extractComponentsFromRgba(current.data, current.width, current.height, extractOptions),
   );
   const { matches, missing, extra } = matchPageComponents(
     targetComponents,

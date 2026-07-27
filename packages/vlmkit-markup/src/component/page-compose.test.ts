@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { composePageDiff, matchPageComponents, type PageComponent } from "./page-compose.ts";
+import {
+  composePageDiff,
+  dominantPageColor,
+  matchPageComponents,
+  type PageComponent,
+} from "./page-compose.ts";
 
 /** White canvas with solid-color rects. */
 function makePage(
@@ -131,6 +136,22 @@ test("stacking gap deltas are reported with direction", () => {
   assert.equal(gap.targetGap, 20);
   assert.equal(gap.currentGap, 60);
   assert.equal(gap.delta, 40);
+});
+
+test("full-bleed dark header does not poison background detection", () => {
+  // A dark bar spanning the full top edge dominates perimeter sampling;
+  // the shared dominant-color background keeps both sides comparable.
+  const header = { x: 0, y: 0, w: 400, h: 60, rgb: [15, 23, 42] as [number, number, number] };
+  const card = { x: 40, y: 100, w: 320, h: 120, rgb: GRAY };
+  const target = makePage(400, 400, [header, card]);
+  const current = makePage(400, 400, [header, card]);
+  const bg = dominantPageColor(target);
+  assert.ok(bg[0] > 240 && bg[1] > 240 && bg[2] > 240, `page bg should be white-ish, got ${bg}`);
+  const composition = composePageDiff(target, current);
+  assert.equal(composition.matches.length, 2);
+  assert.equal(composition.missing.length, 0);
+  assert.equal(composition.extra.length, 0);
+  for (const m of composition.matches) assert.ok(m.iou > 0.95);
 });
 
 test("matchPageComponents pairs by position even when area ranks differ", () => {

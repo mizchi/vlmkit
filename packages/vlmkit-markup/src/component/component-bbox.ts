@@ -55,6 +55,15 @@ export interface ExtractComponentsOptions {
   topN?: number;
   /** Per-channel difference threshold for "foreground." Default 12. */
   bgTolerance?: number;
+  /**
+   * Explicit background color. When set, edge-based detection is skipped.
+   * Callers comparing two renders of the same page should compute the
+   * background once and pass it to both extractions — edge sampling can
+   * disagree between the two images (e.g. a full-bleed dark header
+   * dominates one image's perimeter but not the other's), which makes
+   * the component sets incomparable.
+   */
+  background?: [number, number, number];
 }
 
 const DEFAULT_MIN_AREA = 200;
@@ -212,7 +221,7 @@ export function extractComponentsFromRgba(
 
   if (width <= 0 || height <= 0) return [];
 
-  const [bgR, bgG, bgB] = detectBackground(data, width, height);
+  const [bgR, bgG, bgB] = options.background ?? detectBackground(data, width, height);
 
   const mask = new Uint8Array(width * height);
   for (let y = 0; y < height; y++) {

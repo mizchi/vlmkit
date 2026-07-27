@@ -83,6 +83,44 @@ typography (estimated font-size/weight per row), row-gap deltas
 missing/extra. Apply the Suggested CSS patch entries, re-run.
 Stop when `goalEvaluation.status` is `pass` (or diff plateaus).
 
+### 3.5 Multi-viewport targets (media queries)
+
+When the task supplies target PNGs at several viewport widths, one
+HTML file must satisfy all of them via `@media`:
+
+- Build the **widest** viewport first as the base stylesheet; express
+  every narrower viewport as `@media (max-width: ...)` overrides
+  (conventional breakpoints like 768px are fine unless the targets
+  imply otherwise).
+- Run the composition loop **per viewport**: `build page
+  target-desktop.png attempt.html`, then `build page
+  target-mobile.png attempt.html`. `build page` renders your HTML at
+  each target's own dimensions, so the media query is exercised
+  automatically.
+- A component present in one viewport and absent in the other (e.g. a
+  sidebar hidden on mobile) is *correct* when the narrow target also
+  lacks it — implement with `display: none` inside the media query.
+  If a viewport's report lists it missing/extra, fix it **inside that
+  viewport's media query only**; never regress the converged base.
+- Verify declared breakpoints: `vlmkit scan breakpoints attempt.html`.
+
+### 3.6 Scrollports (scrollable regions)
+
+A screenshot only shows above-the-fold content of a scrollable panel.
+Two consequences:
+
+- If the task provides an extra "scrolled to bottom" screenshot, read
+  it for the hidden items (real copy, item count). Without one, do not
+  invent hidden content — build exactly the visible items and say so.
+- Implement with a fixed height + `overflow-y: auto` (the visible
+  cut-off row in the screenshot is the tell that the panel scrolls).
+- Verify deterministically that the panel actually scrolls:
+  `vlmkit contract introspect attempt.html` lists detected scrollports
+  (`expectedScrollports`), or measure `scrollHeight > clientHeight`
+  with a small Playwright snippet. A panel that merely *looks* cut off
+  but grew to fit its content is a bug the pixel diff of the default
+  screenshot won't show.
+
 ### 4. Decoration audit
 
 ```bash
