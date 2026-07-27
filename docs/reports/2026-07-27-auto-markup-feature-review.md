@@ -217,6 +217,9 @@ M ティア(デザイントークン)はシナリオマトリクスで**全項�
   併せて `component-bbox.ts` の `detectBackground` が量子化ビン床値
   (255→248)を返して淡色フィル(#eef2ff)を背景に飲み込むバグを根本修正
   (勝ちビン内サンプル平均を返す)。
+- **P2-9 → 実装済み**: `build component` が `report.md` の隣に機械可読な
+  `report.json`(`ComponentFromImageReport` 全シグナル)を常時書き出す。
+  wireframe pricing-card フィクスチャで検証(19 キー、bbox 8 / text-rows 8/8)。
 - **P1-4/5 → 実装済み**: `vlmkit heal selector <html|url> <selector>`
   (`heal/selector-heal-cli.ts`)と `vlmkit check palette <png> [png]`
   (`style/palette-cli.ts`)を CLI に公開。実フィクスチャ / 実スクリーン

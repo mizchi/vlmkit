@@ -355,8 +355,12 @@ baseline として守る。
 - `vlmkit design analyze-brief`: brief から pattern / goal / marker checklist を
   自動生成する。
 - `vlmkit design prompt`: 実装しやすい mock prompt を pattern 別に生成する。
-- report JSON: Landmark drilldown / goal evidence / scrollport / canvas evidence を
-  agent が markdown scraping せず読めるようにする。
+- ~~report JSON: Landmark drilldown / goal evidence / scrollport / canvas evidence を
+  agent が markdown scraping せず読めるようにする。~~
+  → 2026-07-27 実装済み: `build component` が `report.md` の隣に
+  `report.json`(`ComponentFromImageReport` 全体 — semanticDrilldown /
+  goalEvaluation / landmark / scrollport / canvas evidence / bbox / heatmap /
+  text-rows / palette / states)を常時書き出す。
 - ~~UI Contract compiler: contract から HTML/CSS skeleton を生成する。~~
   → 2026-07-27 実装済み: `vlmkit contract scaffold <ui.contract.json>` が
   landmark tree / layout policy / responsive rule / slot / marker / state を

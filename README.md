@@ -310,7 +310,10 @@ vlmkit stress media <html>                     # forced-colors, reduced-motion, 
 
 All emit a self-contained Markdown report under `--output-dir`. Each
 finding includes pasteable hex / px values + a heuristic remediation
-hint. See `docs/reports/2026-05-13-capability-survey.md` for the full
+hint. `build component` also writes a machine-readable `report.json`
+twin next to `report.md` (the full `ComponentFromImageReport` object)
+so agents can consume the signals without scraping Markdown. See
+`docs/reports/2026-05-13-capability-survey.md` for the full
 scenario × coverage matrix.
 
 Snapshot labels are query-aware by default, so `/issues` and `/issues?severity=critical` no longer share the same baseline name.
