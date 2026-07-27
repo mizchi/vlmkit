@@ -142,6 +142,26 @@ in docs/reports/). With an `ANTHROPIC_API_KEY` / `OPENROUTER_API_KEY`,
 color pairs; treat it as color naming only — structure and shift always
 come from the deterministic reports (see auto-markup §5 caveats).
 
+## KPIs — rounds and tokens
+
+Every run is scored on two KPIs (ledger: `docs/knowledge.md`
+"Markup Agent KPI"):
+
+- **rounds** — one measure→fix cycle counts as one round. Keep a
+  one-line log per round and state the total in your final report.
+- **tokens** — total tokens consumed. You cannot observe your own
+  count: if you are a subagent, your *driver* records it from the
+  harness usage line, so your job is only to make the round log
+  accurate; if you are the top-level session, report your context
+  usage as an approximation and say so.
+
+KPIs only count for runs that reach the done condition below —
+stopping early with leftover deltas is a failed run, not a cheap one.
+Optimize rounds first (fix the biggest reported delta each round, never
+re-measure without changing anything); tokens second (read report
+files and crops instead of re-reading full screenshots you have
+already seen).
+
 ## Budget & stopping
 
 - Static convergence: auto-markup's budget (3-5 rounds single viewport,

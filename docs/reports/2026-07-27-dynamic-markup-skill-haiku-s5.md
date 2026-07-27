@@ -46,7 +46,10 @@ honored / infinite warn 1 のみ。
 
 ## 結果(検証者の独立再計測)
 
-Haiku は **3 ラウンド・54 tool call・231 秒**で完走。
+Haiku は **3 ラウンド・54 tool call・231 秒・76,769 tokens**で完走
+(tokens はドライバーがハーネス usage から記録 — マークアップ
+エージェントランのトークン計測はこのランが初。KPI 定義は
+`docs/knowledge.md` "Markup Agent KPI")。
 
 ### ゲート(4/4 通過 — 自己申告と独立再計測が一致)
 
@@ -119,6 +122,7 @@ direction はフレーム評価でも比較していない。brief との突き�
 | 難度要素 | なし | @media / scrollport | 細粒度 / :hover/:focus | light/dark | **アニメ ×2 + scroll + @media** |
 | ターゲット | 1 枚 | 3 枚 | 3 枚 | 2 枚 | 3 枚 + motion brief |
 | ラウンド | 4 | 10 | 6 | 4 | 3 |
+| tokens | — | — | — | — | **76,769** |
 | ピクセル diff | 1.40% | 6.2% | 2.6-3.3% | 5.6-6.6% | 6.3-8.0% |
 | 動的ゲート | — | scroll 実測 + scan breakpoints | forcePseudoState | check theme | **4 ゲート全通過** |
 | 副産物 | — | build page 背景バグ修正 | — | — | check animation の周期盲点を記録 |
