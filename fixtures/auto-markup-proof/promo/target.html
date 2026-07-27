@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pulse — ship dashboards in minutes</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; background: #f8fafc; color: #0f172a; }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #ffffff; border-bottom: 1px solid #e2e8f0;
+    padding: 14px 48px;
+  }
+  .brand { font-size: 20px; font-weight: bold; color: #0f172a; }
+  .brand span { color: #2563eb; }
+  .nav { display: flex; gap: 28px; }
+  .nav a { color: #475569; text-decoration: none; font-size: 14px; }
+
+  .hero {
+    background: #0f172a; color: #f8fafc;
+    padding: 72px 48px 64px;
+  }
+  .hero-inner {
+    max-width: 720px;
+    animation: rise 600ms ease-out both;
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .live-badge {
+    display: inline-block;
+    background: #16a34a; color: #ffffff;
+    font-size: 12px; font-weight: bold; letter-spacing: 1px;
+    padding: 4px 10px; border-radius: 999px;
+    margin-bottom: 16px;
+    animation: pulse 1.2s ease-in-out infinite alternate;
+  }
+  @keyframes pulse {
+    from { opacity: 1; }
+    to   { opacity: 0.55; }
+  }
+  .hero h1 { font-size: 40px; line-height: 1.15; margin-bottom: 14px; }
+  .hero p { font-size: 17px; color: #cbd5e1; margin-bottom: 28px; }
+  .cta {
+    display: inline-block; background: #2563eb; color: #ffffff;
+    font-size: 16px; font-weight: bold; text-decoration: none;
+    padding: 13px 28px; border-radius: 8px;
+  }
+
+  .features { padding: 56px 48px; }
+  .features h2 { font-size: 26px; margin-bottom: 24px; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .card {
+    background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 22px;
+  }
+  .card h3 { font-size: 17px; margin-bottom: 8px; color: #1d4ed8; }
+  .card p { font-size: 14px; color: #475569; line-height: 1.5; }
+
+  .changelog { padding: 8px 48px 56px; }
+  .changelog h2 { font-size: 26px; margin-bottom: 16px; }
+  .log-panel {
+    background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px;
+    height: 240px; overflow-y: auto;
+  }
+  .log-row {
+    display: flex; gap: 16px; align-items: baseline;
+    padding: 11px 18px; border-bottom: 1px solid #f1f5f9;
+    font-size: 14px;
+  }
+  .log-row:nth-child(even) { background: #f8fafc; }
+  .log-date { color: #94a3b8; font-size: 12px; min-width: 70px; }
+
+  .footer {
+    background: #e2e8f0; color: #475569;
+    text-align: center; font-size: 13px;
+    padding: 22px 48px;
+  }
+
+  @media (max-width: 768px) {
+    .topbar { padding: 14px 20px; }
+    .nav { display: none; }
+    .hero { padding: 48px 20px 44px; }
+    .hero h1 { font-size: 30px; }
+    .features { padding: 40px 20px; }
+    .grid { grid-template-columns: 1fr; }
+    .changelog { padding: 8px 20px 40px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero-inner, .live-badge { animation: none; }
+  }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Pulse<span>.</span></div>
+    <nav class="nav">
+      <a href="#">Features</a>
+      <a href="#">Changelog</a>
+      <a href="#">Pricing</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div class="hero-inner">
+      <span class="live-badge">LIVE</span>
+      <h1>Ship dashboards in minutes</h1>
+      <p>Pulse turns your metrics into shareable dashboards with zero config. Connect a source and publish.</p>
+      <a class="cta" href="#">Start free</a>
+    </div>
+  </section>
+
+  <section class="features">
+    <h2>Why Pulse</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>Instant charts</h3>
+        <p>Point Pulse at a database table and get a chart in one click. No query language required.</p>
+      </div>
+      <div class="card">
+        <h3>Live sync</h3>
+        <p>Dashboards refresh on a schedule you pick, from every minute to once a day.</p>
+      </div>
+      <div class="card">
+        <h3>Share anywhere</h3>
+        <p>Every dashboard gets a private link you can drop into Slack, Notion, or email.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="changelog">
+    <h2>Changelog</h2>
+    <div class="log-panel">
+      <div class="log-row"><span class="log-date">Jul 24</span><span>Added CSV export for every chart</span></div>
+      <div class="log-row"><span class="log-date">Jul 19</span><span>New heatmap chart type</span></div>
+      <div class="log-row"><span class="log-date">Jul 12</span><span>Dashboard folders and search</span></div>
+      <div class="log-row"><span class="log-date">Jul 05</span><span>Postgres 17 connector support</span></div>
+      <div class="log-row"><span class="log-date">Jun 28</span><span>Faster initial dashboard load</span></div>
+      <div class="log-row"><span class="log-date">Jun 21</span><span>Slack alerts on metric thresholds</span></div>
+      <div class="log-row"><span class="log-date">Jun 14</span><span>Custom date ranges in filters</span></div>
+      <div class="log-row"><span class="log-date">Jun 07</span><span>Team roles: viewer and editor</span></div>
+      <div class="log-row"><span class="log-date">May 30</span><span>Dark mode for embedded charts</span></div>
+      <div class="log-row"><span class="log-date">May 23</span><span>Public beta opens to everyone</span></div>
+    </div>
+  </section>
+
+  <footer class="footer">© 2026 Pulse Analytics — status.pulse.dev</footer>
+</body>
+</html>
