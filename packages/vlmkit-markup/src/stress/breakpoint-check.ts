@@ -30,9 +30,8 @@
  *   vlmkit check breakpoints <html-or-url>
  *   vlmkit check breakpoints <html-or-url> --breakpoints 768,1024 --json
  */
-import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { extractBreakpoints } from "@mizchi/vlmkit-capture/viewport-discovery.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -98,6 +97,8 @@ export interface BreakpointCheckReport {
   breakpoints: BreakpointResult[];
   /** Breakpoint values that were checked. */
   checkedValues: number[];
+  /** Cross-origin stylesheets whose rules were unreadable in-page: how many, and how many were recovered by fetching. */
+  stylesheets?: { crossOrigin: number; fetched: number };
   issues: BreakpointCheckIssue[];
 }
 
@@ -116,6 +117,45 @@ export interface BreakpointCheckOptions {
 
 function isUrl(source: string): boolean {
   return /^(https?|file):\/\//.test(source);
+}
+
+/**
+ * Extract width breakpoints written in media-query range syntax —
+ * `(width >= 768px)`, `(48rem < width)`, `(400px <= width <= 700px)` —
+ * which the legacy `extractBreakpoints` (min-/max-width forms only) cannot
+ * see. rem/em are converted at 16px; strict inequalities shift by 1px so
+ * the returned value is a width that belongs to the adjacent regime.
+ */
+export function extractRangeSyntaxBreakpoints(css: string): { value: number; raw: string }[] {
+  const found = new Map<number, string>();
+  const toPx = (num: string, unit: string): number =>
+    Math.round(parseFloat(num) * (unit === "rem" || unit === "em" ? 16 : 1));
+  const add = (value: number, raw: string) => {
+    if (Number.isFinite(value) && value > 0 && !found.has(value)) found.set(value, raw.trim());
+  };
+  for (const mediaMatch of css.matchAll(/@media\s+([^{]+)\{/g)) {
+    const condition = mediaMatch[1]!;
+    // width-first: (width >= 768px)
+    for (const m of condition.matchAll(/\(\s*width\s*(<=|>=|<|>)\s*([\d.]+)(px|rem|em)\s*\)/g)) {
+      const v = toPx(m[2]!, m[3]!);
+      const op = m[1]!;
+      add(op === ">" ? v + 1 : op === "<" ? v - 1 : v, m[0]!);
+    }
+    // value-first, optionally a double range: (400px <= width <= 700px)
+    for (const m of condition.matchAll(
+      /\(\s*([\d.]+)(px|rem|em)\s*(<=|>=|<|>)\s*width(?:\s*(<=|>=|<|>)\s*([\d.]+)(px|rem|em))?\s*\)/g,
+    )) {
+      const left = toPx(m[1]!, m[2]!);
+      const leftOp = m[3]!;
+      add(leftOp === "<" ? left + 1 : leftOp === ">" ? left - 1 : left, m[0]!);
+      if (m[4] && m[5] && m[6]) {
+        const right = toPx(m[5]!, m[6]!);
+        const rightOp = m[4]!;
+        add(rightOp === "<" ? right - 1 : rightOp === ">" ? right + 1 : right, m[0]!);
+      }
+    }
+  }
+  return [...found.entries()].map(([value, raw]) => ({ value, raw })).sort((a, b) => a.value - b.value);
 }
 
 const DISCRETE_PROPS = [
@@ -257,14 +297,20 @@ const collectStylesScript = (maxElements: number) => `((maxElements) => {
 
 const COLLECT_CSS_SCRIPT = `(() => {
   const chunks = [];
+  const crossOriginHrefs = [];
   for (const sheet of Array.from(document.styleSheets)) {
     try {
       const rules = sheet.cssRules;
       if (!rules) continue;
       for (const rule of Array.from(rules)) chunks.push(rule.cssText || "");
-    } catch {}
+    } catch {
+      // Cross-origin stylesheet: CSSOM access throws. Report the href so
+      // the caller can fetch the text out-of-band instead of silently
+      // discovering zero breakpoints on CDN-hosted CSS.
+      if (sheet.href) crossOriginHrefs.push(sheet.href);
+    }
   }
-  return chunks.join("\\n");
+  return { cssText: chunks.join("\\n"), crossOriginHrefs };
 })()`;
 
 export async function runBreakpointCheck(options: BreakpointCheckOptions): Promise<BreakpointCheckReport> {
@@ -281,20 +327,55 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
     } else if (isUrl(options.source)) {
       await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
     } else {
-      await page.setContent(await readFile(resolve(options.source), "utf-8"), { waitUntil: "networkidle" });
+      // file: URL navigation so relative stylesheets resolve — setContent
+      // gives the document an about:blank base URL and we'd analyze an
+      // unstyled page.
+      await page.goto(pathToFileURL(resolve(options.source)).href, { waitUntil: "networkidle", timeout: 30000 });
     }
 
     let values: number[];
     let rawByValue = new Map<number, string[]>();
+    let stylesheets: BreakpointCheckReport["stylesheets"];
     if (options.breakpoints && options.breakpoints.length > 0) {
       values = [...options.breakpoints];
     } else {
       // Collect CSS in-page so external local stylesheets count too.
-      const cssText = await page.evaluate(COLLECT_CSS_SCRIPT) as string;
-      const breakpoints = extractBreakpoints(cssText);
-      for (const bp of breakpoints) {
+      const collected = await page.evaluate(COLLECT_CSS_SCRIPT) as { cssText: string; crossOriginHrefs: string[] };
+      let cssText = collected.cssText;
+      // CSSOM refuses cross-origin rules; fetch those sheets out-of-band so
+      // CDN-hosted responsive CSS still yields breakpoints. Chromium also
+      // treats file:-linked stylesheets as cross-origin (unique file
+      // origins), and Node fetch can't read file: URLs — go through the
+      // filesystem for those.
+      let fetched = 0;
+      for (const href of collected.crossOriginHrefs.slice(0, 20)) {
+        try {
+          if (href.startsWith("file:")) {
+            const { readFile } = await import("node:fs/promises");
+            cssText += "\n" + await readFile(fileURLToPath(href), "utf-8");
+          } else {
+            const res = await fetch(href);
+            if (!res.ok) continue;
+            cssText += "\n" + await res.text();
+          }
+          fetched++;
+        } catch {
+          // Unreachable sheet — surfaced via report.stylesheets below.
+        }
+      }
+      if (collected.crossOriginHrefs.length > 0) {
+        stylesheets = { crossOrigin: collected.crossOriginHrefs.length, fetched };
+      }
+      for (const bp of extractBreakpoints(cssText)) {
         const bucket = rawByValue.get(bp.value) ?? [];
         bucket.push(bp.raw);
+        rawByValue.set(bp.value, bucket);
+      }
+      // Modern range syntax ((width >= 768px)) is invisible to the legacy
+      // extractor; merge its boundaries in.
+      for (const bp of extractRangeSyntaxBreakpoints(cssText)) {
+        const bucket = rawByValue.get(bp.value) ?? [];
+        if (!bucket.includes(bp.raw)) bucket.push(bp.raw);
         rawByValue.set(bp.value, bucket);
       }
       values = [...rawByValue.keys()];
@@ -360,6 +441,7 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
       source: options.source,
       breakpoints: results,
       checkedValues: values,
+      ...(stylesheets ? { stylesheets } : {}),
       issues: deriveBreakpointIssues(results),
     };
   } finally {
@@ -376,6 +458,9 @@ export function formatBreakpointCheckReport(report: BreakpointCheckReport): stri
   lines.push(`${DIM}source: ${report.source}${RESET}`);
   lines.push("");
   lines.push(`status: ${status}`);
+  if (report.stylesheets && report.stylesheets.fetched < report.stylesheets.crossOrigin) {
+    lines.push(`${YELLOW}note: ${report.stylesheets.crossOrigin - report.stylesheets.fetched} of ${report.stylesheets.crossOrigin} cross-origin stylesheet(s) could not be read — their breakpoints are not covered${RESET}`);
+  }
   if (report.checkedValues.length === 0) {
     lines.push("breakpoints: none discovered — nothing to check (pass --breakpoints to force widths)");
     return lines.join("\n");

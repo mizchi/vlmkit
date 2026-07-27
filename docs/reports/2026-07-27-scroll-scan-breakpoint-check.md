@@ -89,6 +89,30 @@ mobile regime correctly raised `overflow-at-boundary` at 766/767px.
   (deliberately paired with `scan breakpoints` — scan discovers, check
   verifies).
 
+## Addendum: PR #84 review fixes (Codex, all four confirmed valid)
+
+1. **Local files now navigate via their `file:` URL** (all page-loading
+   checks incl. `check motion`): `setContent()` gave the document an
+   `about:blank` base URL, so relative stylesheets/scripts/images never
+   resolved and the tools analyzed an unstyled page.
+2. **Cross-origin stylesheets are fetched out-of-band**: CSSOM throws on
+   their `cssRules`, which previously meant CDN-hosted responsive CSS
+   discovered zero breakpoints — a false pass. Unreadable sheets are now
+   counted in `report.stylesheets` and called out in the text output.
+   Chromium quirk found while verifying: `file:`-linked stylesheets are
+   *also* cross-origin (unique file origins), and Node `fetch` can't read
+   `file:` URLs — those go through the filesystem.
+3. **Modern range syntax** (`(width >= 768px)`, `(48rem < width)`, double
+   ranges) is parsed by a dedicated extractor and merged with the legacy
+   `min-/max-width` discovery; rem/em at 16px, strict inequalities ±1px.
+4. **`check animation` preserves the author-visible play state**: it was
+   recorded *after* `pause()`, so everything read "paused", and an
+   animation the page itself holds paused (visually static) was still
+   reported as `infinite-animation`/never-settling. Now settle/infinite
+   only count originally-running animations, the reduced-motion pass only
+   counts running ones, and the rest pose keeps page-paused/finished
+   animations at their author-chosen `currentTime`.
+
 ## Files
 
 - `packages/vlmkit-markup/src/inspect/scroll-scan.ts` (+ test)

@@ -15,9 +15,8 @@
  *   vlmkit check motion <html-or-url>
  *   vlmkit check motion <html-or-url> --json
  */
-import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -159,7 +158,10 @@ export async function runMotionDetection(
     } else if (isUrl(options.source)) {
       await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
     } else {
-      await page.setContent(await readFile(resolve(options.source), "utf-8"), { waitUntil: "networkidle" });
+      // file: URL navigation so relative stylesheets resolve — setContent
+      // gives the document an about:blank base URL (same fix as the other
+      // page-loading checks).
+      await page.goto(pathToFileURL(resolve(options.source)).href, { waitUntil: "networkidle", timeout: 30000 });
     }
 
     const result = await page.evaluate((limit) => {

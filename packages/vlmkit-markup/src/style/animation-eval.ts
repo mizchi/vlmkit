@@ -26,9 +26,9 @@
  *   vlmkit check animation <html-or-url>
  *   vlmkit check animation <html-or-url> --json --frames out/frames
  */
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -45,7 +45,10 @@ export interface AnimationTimingSample {
   delayMs: number;
   /** null = infinite. */
   iterations: number | null;
+  /** Play state as found on the page, captured BEFORE the evaluator pauses it. */
   playState: string;
+  /** currentTime as found on the page (ms), captured before pausing. */
+  currentTimeMs: number;
 }
 
 export interface FrameDeltaStat {
@@ -184,6 +187,17 @@ export function frameDelta(a: RgbaFrame, b: RgbaFrame, tolerance = 8): FrameDelt
   };
 }
 
+/**
+ * Rest-pose time for an animation: page-paused/finished animations stay at
+ * their author-chosen currentTime (their true resting appearance); running
+ * finite animations seek past their end (settled appearance); running
+ * infinite ones hold at 0.
+ */
+export function restTimeForAnimation(t: AnimationTimingSample): number {
+  if (t.playState !== "running") return t.currentTimeMs;
+  return t.iterations === null ? 0 : t.delayMs + t.durationMs * t.iterations;
+}
+
 export function unionBbox(
   a: { x: number; y: number; width: number; height: number } | null,
   b: { x: number; y: number; width: number; height: number } | null,
@@ -312,6 +326,11 @@ const COLLECT_ANIMATIONS_SCRIPT = `(() => {
     const type = ctor === "CSSAnimation" ? "css-animation" : ctor === "CSSTransition" ? "css-transition" : "waapi";
     const name = anim.animationName || anim.transitionProperty || anim.id || "(anonymous)";
     const target = anim.effect && anim.effect.target ? anim.effect.target : null;
+    // Record the author-visible state BEFORE pausing for evaluation — an
+    // animation the page itself holds paused is visually static and must
+    // not be reported as running/never-settling.
+    const playState = anim.playState;
+    const currentTimeMs = typeof anim.currentTime === "number" ? anim.currentTime : 0;
     anim.pause();
     return {
       index,
@@ -321,7 +340,8 @@ const COLLECT_ANIMATIONS_SCRIPT = `(() => {
       durationMs: timing.duration,
       delayMs: timing.delay,
       iterations: Number.isFinite(timing.iterations) ? timing.iterations : null,
-      playState: anim.playState,
+      playState,
+      currentTimeMs,
     };
   });
 })()`;
@@ -342,23 +362,33 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
   const tolerance = options.tolerance ?? 8;
   const minChangedPixels = options.minChangedPixels ?? 12;
 
-  const html = options.html !== undefined
-    ? options.html
-    : isUrl(options.source) ? undefined : await readFile(resolve(options.source), "utf-8");
+  // Navigate local files via their file: URL so relative stylesheets,
+  // scripts, and images resolve — setContent would give the document an
+  // about:blank base URL and evaluate an unstyled page.
+  const pageUrl = options.html !== undefined
+    ? undefined
+    : isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
+  const loadPage = async (p: import("playwright").Page) => {
+    if (options.html !== undefined) {
+      await p.setContent(options.html, { waitUntil: "networkidle" });
+    } else {
+      await p.goto(pageUrl!, { waitUntil: "networkidle", timeout: 30000 });
+    }
+  };
 
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({ viewport });
-    if (html !== undefined) {
-      await page.setContent(html, { waitUntil: "networkidle" });
-    } else {
-      await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
-    }
+    await loadPage(page);
 
     const timings = await page.evaluate(COLLECT_ANIMATIONS_SCRIPT) as AnimationTimingSample[];
-    const settleMs = computeSettleMs(timings);
-    const infinite = timings
+    // Settle / never-settles are about motion the page performs on its own:
+    // animations the page itself holds paused (or already finished) are
+    // visually static and must not count.
+    const runningTimings = timings.filter((t) => t.playState === "running");
+    const settleMs = computeSettleMs(runningTimings);
+    const infinite = runningTimings
       .filter((t) => t.iterations === null)
       .map((t) => ({ selector: t.selector, name: t.name }));
 
@@ -384,15 +414,14 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       return pngFromBuffer(buffer);
     };
 
-    // Rest pose as the shared baseline: finite animations seeked past their
-    // end (their settled appearance — fill:none falls back to natural style,
-    // fill:forwards keeps the last keyframe), infinite ones held at 0. Seeking
-    // everything to 0 instead would put entrance animations at their *start*
-    // keyframe (often `opacity: 0`), hiding descendant animations under
-    // evaluation behind a transparent ancestor.
-    const restTimeMs = (t: AnimationTimingSample) =>
-      t.iterations === null ? 0 : t.delayMs + t.durationMs * t.iterations;
-    for (const t of timings) await seek(t.index, restTimeMs(t));
+    // Rest pose as the shared baseline: running finite animations seeked past
+    // their end (their settled appearance — fill:none falls back to natural
+    // style, fill:forwards keeps the last keyframe), running infinite ones
+    // held at 0, page-paused/finished ones left at their author-chosen time.
+    // Seeking everything to 0 instead would put entrance animations at their
+    // *start* keyframe (often `opacity: 0`), hiding descendant animations
+    // under evaluation behind a transparent ancestor.
+    for (const t of timings) await seek(t.index, restTimeForAnimation(t));
     const evaluable = timings.filter((t) => t.durationMs > 0).slice(0, maxAnimations);
 
     // Two back-to-back rest captures with nothing seeked in between: the
@@ -427,7 +456,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         maxFrameRatio = Math.max(maxFrameRatio, delta.ratio);
         previous = frame;
       }
-      await seek(timing.index, restTimeMs(timing));
+      await seek(timing.index, restTimeForAnimation(timing));
       evaluated.push({
         ...timing,
         frames,
@@ -447,15 +476,11 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       const durationFloor = options.reducedMotionDurationFloorMs ?? 100;
       const rmPage = await browser.newPage({ viewport });
       await rmPage.emulateMedia({ reducedMotion: "reduce" });
-      if (html !== undefined) {
-        await rmPage.setContent(html, { waitUntil: "networkidle" });
-      } else {
-        await rmPage.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
-      }
+      await loadPage(rmPage);
       const rmTimings = await rmPage.evaluate(COLLECT_ANIMATIONS_SCRIPT) as AnimationTimingSample[];
       await rmPage.close();
       const remaining = rmTimings
-        .filter((t) => t.durationMs >= durationFloor)
+        .filter((t) => t.playState === "running" && t.durationMs >= durationFloor)
         .map((t) => ({ selector: t.selector, name: t.name, durationMs: t.durationMs }));
       reducedMotion = { remainingCount: remaining.length, remaining };
     }

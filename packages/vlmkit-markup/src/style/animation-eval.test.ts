@@ -5,6 +5,7 @@ import {
   deriveAnimationIssues,
   formatAnimationEvalReport,
   frameDelta,
+  restTimeForAnimation,
   unionBbox,
   type AnimationEvalReport,
   type AnimationTimingSample,
@@ -49,7 +50,8 @@ function timing(overrides: Partial<AnimationTimingSample> = {}): AnimationTiming
     durationMs: 800,
     delayMs: 0,
     iterations: 1,
-    playState: "paused",
+    playState: "running",
+    currentTimeMs: 0,
     ...overrides,
   };
 }
@@ -119,6 +121,22 @@ test("computeSettleMs returns null when any animation is infinite", () => {
     timing({ durationMs: 1000, iterations: null }),
   ]);
   assert.equal(settle, null);
+});
+
+test("restTimeForAnimation: running finite → past end, running infinite → 0, page-paused → author time", () => {
+  assert.equal(
+    restTimeForAnimation(timing({ durationMs: 500, delayMs: 100, iterations: 2 })),
+    1100,
+  );
+  assert.equal(restTimeForAnimation(timing({ iterations: null })), 0);
+  assert.equal(
+    restTimeForAnimation(timing({ playState: "paused", currentTimeMs: 340, iterations: null })),
+    340,
+  );
+  assert.equal(
+    restTimeForAnimation(timing({ playState: "finished", currentTimeMs: 800 })),
+    800,
+  );
 });
 
 test("a visually dead animation raises no-visible-effect", () => {

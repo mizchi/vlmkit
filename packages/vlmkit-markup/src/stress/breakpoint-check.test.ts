@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   analyzeBoundary,
   deriveBreakpointIssues,
+  extractRangeSyntaxBreakpoints,
   formatBreakpointCheckReport,
   type BreakpointCheckReport,
   type ElementStyleSample,
@@ -156,6 +157,30 @@ test("formatBreakpointCheckReport renders per-breakpoint verdicts", () => {
   assert.match(text, /768px: .*clean/);
   assert.match(text, /1024px: 1 spike\(s\), 0 gap\(s\)/);
   assert.match(text, /boundary-spike #nav/);
+});
+
+test("extractRangeSyntaxBreakpoints parses modern range media queries", () => {
+  const css = `
+    @media (width >= 768px) { a { color: red } }
+    @media (width < 480px) { a { color: blue } }
+    @media (48rem < width) { a { color: green } }
+    @media (400px <= width <= 700px) { a { color: teal } }
+  `;
+  const found = extractRangeSyntaxBreakpoints(css);
+  const values = found.map((b) => b.value);
+  // width >= 768 → 768; width < 480 → 479; 48rem(768) < width → 769;
+  // 400 <= width <= 700 → 400 and 700.
+  assert.deepEqual(values, [400, 479, 700, 768, 769]);
+  assert.match(found.find((b) => b.value === 768)!.raw, /width >= 768px/);
+});
+
+test("extractRangeSyntaxBreakpoints ignores non-width and legacy conditions", () => {
+  const css = `
+    @media (min-width: 768px) { a { color: red } }   /* legacy — extractBreakpoints' job */
+    @media (height >= 500px) { a { color: blue } }
+    @media print { a { color: black } }
+  `;
+  assert.deepEqual(extractRangeSyntaxBreakpoints(css), []);
 });
 
 test("formatBreakpointCheckReport says so when nothing was discovered", () => {

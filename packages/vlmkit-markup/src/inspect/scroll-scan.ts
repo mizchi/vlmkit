@@ -23,9 +23,8 @@
  *   vlmkit scan scroll <html-or-url>
  *   vlmkit scan scroll <html-or-url> --json
  */
-import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { UiExpectedScrollportContract } from "../contract/ui-contract.ts";
@@ -341,7 +340,9 @@ export async function runScrollScan(options: ScrollScanOptions): Promise<ScrollS
     } else if (isUrl(options.source)) {
       await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
     } else {
-      await page.setContent(await readFile(resolve(options.source), "utf-8"), { waitUntil: "networkidle" });
+      // file: URL navigation so relative stylesheets/scripts/images resolve —
+      // setContent gives the document an about:blank base URL.
+      await page.goto(pathToFileURL(resolve(options.source)).href, { waitUntil: "networkidle", timeout: 30000 });
     }
     const collected = await page.evaluate(COLLECT_SCROLL_SCRIPT) as Omit<ScrollScanInput, "source">;
     await page.close();
