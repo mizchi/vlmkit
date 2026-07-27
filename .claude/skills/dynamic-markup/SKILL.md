@@ -149,9 +149,17 @@ come from the deterministic reports (see auto-markup §5 caveats).
 - Dynamic gates: normally 1-2 rounds — the reports name the selector
   and the fix. If a gate still fails after 2 targeted fixes, re-read
   the brief/targets; you are probably fixing the wrong requirement.
-- Done means: composition converged per viewport, **all four gates
-  clean or expected-warn-only**, and a final masked, settled pixel diff.
-  Report the gate outputs verbatim alongside the diff numbers.
+- Done is an **AND**, not an OR: (1) composition converged per
+  viewport — `build page` missing 0 / extra 0, per auto-markup's
+  stopping rule — AND (2) all four gates clean or expected-warn-only,
+  AND (3) a final masked, settled pixel diff. Green gates do not excuse
+  leftover missing/extra components; a leftover `build page` delta with
+  budget remaining means keep iterating. Report the gate outputs
+  verbatim alongside the diff numbers.
+- Sizes are spec too: a scrollport must scroll (gate B2 proves it) *and*
+  match the target's panel height (Phase A proves it). Passing B2 with
+  a too-tall panel shifts everything below it — the S5 proof's main
+  residual.
 
 ## Ground rules
 

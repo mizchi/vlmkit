@@ -1,0 +1,132 @@
+# 2026-07-27 dynamic-markup skill + S5(動的挙動ページ)の Haiku 実証
+
+## 目的
+
+同日 #84 で入った動的挙動シグナルツール
+(`check animation` / `scan scroll` / `check breakpoints`)を
+**マークアップワークフローの検証ゲート**として組み込んだ新 skill
+`dynamic-markup` を作り、auto-markup 実証(S1-S4)と同じ方法論 —
+Haiku サブエージェント単独・API キーなし・エージェント自身の視覚が
+VLM — で回ることを確認する。
+
+## 提供形態
+
+`.claude/skills/dynamic-markup/SKILL.md`(本コミット)。構成:
+
+- **入力規約**: 静的な真実は screenshot、挙動の真実はキャリアが必要 —
+  viewport ごとの screenshot / scrolled screenshot / **motion brief**
+  (動き・時間・イージング・反復・reduced-motion 方針の短文仕様)。
+  キャリアのない挙動は作らない(モーション brief なし = アニメ 0 本)。
+- **Phase A**: 静的収束は auto-markup skill に委譲(entrance は
+  `both`/`forwards` で静的レイアウトに終着させる追加規約のみ)。
+- **Phase B**: 4 ゲート — `check breakpoints`(B±1 不変条件)、
+  `scan scroll`(スクロール実在 + page-overflow-x)、
+  `check animation`(brief と evaluated list の行単位突き合わせ)、
+  `check motion`(宣言レベルの相互チェック)。
+- **Phase C**: キャプチャ規律 — settleMs 待ち、infinite の `--mask` を
+  B3 レポートから転記。
+
+## S5 フィクスチャ
+
+`fixtures/auto-markup-proof/promo/` — Pulse プロモページ。S2-S4 で
+未検証だった **アニメーション要件** を初めて含む:
+
+- hero entrance(600ms ease-out ×1、14px rise、静的レイアウトに終着)
+- LIVE バッジ pulse(opacity 1↔0.55、1.2s/leg alternate、無限)
+- `prefers-reduced-motion: reduce` で両方無効化
+- チェンジログパネル(高さ 240px、overflow-y auto、10 行中 6 行可視)
+- 768px ブレークポイント(nav 消失、3 カラム → 1 カラム)
+
+ターゲットは rest-pose seek(`check animation` と同じポリシー:有限は
+終端過ぎ、無限は 0)で決定論キャプチャした 3 枚
+(desktop 1280 / mobile 375 / changelog-scrolled)+ `motion-brief.md`。
+リファレンス自体のゲート出力(期待値): breakpoints clean、
+scroll container 1(overflow 152px)、animations 2 / reduced-motion
+honored / infinite warn 1 のみ。
+
+## 結果(検証者の独立再計測)
+
+Haiku は **3 ラウンド・54 tool call・231 秒**で完走。
+
+### ゲート(4/4 通過 — 自己申告と独立再計測が一致)
+
+| ゲート | 独立再計測 |
+|---|---|
+| `check breakpoints` | 768px **clean** |
+| `scan scroll` | `div.changelog-list` axis=y **overflow 235px**、page-overflow-x 0(mobile も可)、dead/clipped 0 |
+| `check animation` | 2 本とも **visible**(entrance 600ms×1 delta 3.39% / pulse 1200ms×∞ delta 0.16%)、**reduced-motion: honored**、warn は期待どおり infinite 1 件のみ(`--mask "div.live-badge"` 案内付き) |
+| `check motion` | active 2 / running 2、reduced-motion rule **yes** |
+
+### 静的収束
+
+| 指標 | desktop (1280) | mobile (375) |
+|---|---|---|
+| `build page` | matched 6 / missing 2 / extra 2 | matched 7 / missing 1 / extra 1 |
+| hero IoU | 0.79 | 0.94 |
+| ピクセル diff(共通領域) | 10.4% | 7.0% |
+| ピクセル diff(高さパディング込み) | 8.0% | 6.3% |
+
+注: この環境は moon 欠落で `diff png` の分類パイプが動かないため、
+pixelmatch 直叩き(threshold 0.1、サイズ不一致は白パディング +
+共通領域の両方)で計測。
+
+残差の主因は 1 点に集約される: **チェンジログパネル高 400px
+(リファレンス 240px)**。ページ全高が +336px 伸び、フッターが
+build page 上「missing + extra」ペアとして現れる。次点は h1 の
+2 行折返し(フォント幅差)。構成・コピー・パレット・バッジ・
+ゼブラ行・nav のモバイル消失はすべて一致。
+
+### motion brief 準拠
+
+- entrance: 600ms ease-out / 14px rise / `both` 終着 — **完全一致**。
+- pulse: Haiku は `0%,100% → 50%` キーフレームの 1.2s サイクル
+  (= 片道 0.6s)で実装。brief の「1.2s per leg, alternating」
+  (= 片道 1.2s)の **2 倍速**。
+
+## 発見: ゲートの盲点 1 件
+
+pulse の leg 時間の違いは `check animation` の出力では**区別不能**
+だった — リファレンスも attempt も同じ `1200ms x∞` と表示される
+(WAAPI の duration は 1 iteration の長さで、`alternate` の往復も
+50% キーフレームの往復も 1 iteration に畳まれる)。周波数・位相・
+direction はフレーム評価でも比較していない。brief との突き合わせで
+「duration と iterations が一致」まではゲートで確認できるが、
+**振動の周期はまだ人間(または frame strip)しか守れない**。
+`check animation` に direction / 実効周期(キーフレームの折返し検出)
+を出す拡張が次の課題。
+
+## 解釈
+
+- **動的挙動 3 要件(breakpoint / scroll / animation)は Haiku で
+  1 ラウンド目から成立した**。ゲートが「何を満たすべきか」を選択子
+  レベルで返すため、S1-S4 同様に小型モデルでループが回る。
+  アニメーション要件は S5 が初計測で、brief → 実装 → `check animation`
+  の evaluated list 照合という伝達経路が機能した。
+- **motion brief パターンは「状態 screenshot を足す」パターン
+  (S2 scrolled / S3 hover / S4 dark)の時間軸版**として機能する。
+  静止画で伝わらない要件は brief 1 枚で小型モデルに伝わった。
+- **静的収束は S2(dashboard)より浅い**: Haiku は予算 10 のうち
+  3 ラウンドで「収束」を自己宣言して停止した。missing/extra が
+  残った状態はゲート green とは独立の未達で、skill の
+  「done = 構成収束 **かつ** 全ゲート green」の AND 条件を
+  エージェントが読み飛ばした形。stopping 節の強調(gates green ≠
+  done)が次の skill 文言改善点。
+
+## 5 シナリオまとめ
+
+| | S1 landing | S2 dashboard | S3 auth form | S4 theme | S5 promo |
+|---|---|---|---|---|---|
+| 難度要素 | なし | @media / scrollport | 細粒度 / :hover/:focus | light/dark | **アニメ ×2 + scroll + @media** |
+| ターゲット | 1 枚 | 3 枚 | 3 枚 | 2 枚 | 3 枚 + motion brief |
+| ラウンド | 4 | 10 | 6 | 4 | 3 |
+| ピクセル diff | 1.40% | 6.2% | 2.6-3.3% | 5.6-6.6% | 6.3-8.0% |
+| 動的ゲート | — | scroll 実測 + scan breakpoints | forcePseudoState | check theme | **4 ゲート全通過** |
+| 副産物 | — | build page 背景バグ修正 | — | — | check animation の周期盲点を記録 |
+
+## 関連
+
+- skill: `.claude/skills/dynamic-markup/SKILL.md`
+- ゲートツール実装: `docs/reports/2026-07-27-animation-eval.md`、
+  `docs/reports/2026-07-27-scroll-scan-breakpoint-check.md`
+- S1-S4: `docs/reports/2026-07-27-auto-markup-skill-haiku-proof.md`
+- 成果物(無編集): `fixtures/auto-markup-proof/promo/attempt-haiku.html`
