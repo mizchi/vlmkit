@@ -20,27 +20,45 @@ All commands run from the **project root**. See `docs/api-design.md` for API des
 ### Basic
 
 ```bash
-just vrt-test                  # Unit tests
-just vrt                       # Playwright VRT
-just vrt-update                # Update snapshots
+pnpm test                      # Unit tests (all workspace packages)
+vlmkit snapshot <url>...       # URL → baseline + diff
+vlmkit diff html a.html b.html # Compare two HTML files / URLs
+vlmkit diff agent <report>     # Agent-friendly Markdown diff report
+```
+
+### Markup assistance (automatic markup)
+
+All deterministic — no VLM / API key required.
+
+```bash
+vlmkit build component <target.png> <current.html>  # Converge HTML toward a target screenshot
+vlmkit scan component <screenshot.png>              # Detect + crop components
+vlmkit contract introspect <html|url>               # Existing markup → UI Contract IR
+vlmkit contract scaffold <ui.contract.json>         # UI Contract IR → HTML/CSS scaffold
+vlmkit contract validate <ui.contract.json>         # Validate the IR
+vlmkit check palette <target.png> [current.png]     # Dominant colors / palette diff
+vlmkit check tokens|theme|motion <html>             # Design-system audits
+vlmkit check a11y contrast|touch|focus <html>       # A11y gates
+vlmkit stress i18n|media <html>                     # Overflow / media-variant stress
+vlmkit heal selector <html|url> ".broken"           # Selector replacement candidates
 ```
 
 ### CSS Challenge (detection rate benchmark)
 
 ```bash
-just css-challenge             # Single CSS deletion challenge (LLM recovery)
-just css-bench --trials 30     # Benchmark (detection rate measurement)
-just css-bench --fixture dashboard --backend crater  # Specify fixture/backend
-just css-bench-all             # All fixtures at once
-just css-report                # Analysis report of accumulated data
+pkf run fix-loop -- --fixture page --seed 42         # Single CSS deletion challenge (VLM/LLM recovery)
+pkf run css-bench -- --trials 30                     # Benchmark (detection rate measurement)
+pkf run css-bench-crater -- --fixture page           # Crater prescanner backend
+pkf run css-bench-all                                # All fixtures at once
+pkf run css-report                                   # Analysis report of accumulated data
 ```
 
 ### Migration VRT (CSS migration verification)
 
 ```bash
-just migration-compare before.html after.html   # 2-file comparison
-just migration-reset           # Reset CSS comparison (normalize vs others)
-just migration-tailwind        # Tailwind → vanilla CSS
+pkf run migration-compare -- before.html after.html  # 2-file comparison
+pkf run migration-reset        # Reset CSS comparison (normalize vs others)
+pkf run migration-tailwind     # Tailwind → vanilla CSS
 ```
 
 Breakpoints are auto-discovered from CSS, generating boundary ±1px + random sample viewports.
@@ -48,10 +66,10 @@ Breakpoints are auto-discovered from CSS, generating boundary ±1px + random sam
 ### Demo
 
 ```bash
-just vrt-demo                  # Basic VRT demo (kitty graphics)
-just vrt-demo-fix              # Fix loop demo
-just vrt-demo-multi            # Multi-scenario
-just vrt-demo-multistep        # Multi-step
+pkf run vrt-demo               # Basic VRT demo (kitty graphics)
+pkf run vrt-demo-fix           # Fix loop demo
+pkf run vrt-demo-multi         # Multi-scenario
+pkf run vrt-demo-multistep     # Multi-step
 ```
 
 ## Agent Workflow
@@ -61,7 +79,7 @@ just vrt-demo-multistep        # Multi-step
 ```
 ┌─────────────────────────────────────────────┐
 │ 1. Create baseline                          │
-│    just vrt-update                          │
+│    pkf run vrt-update                       │
 └─────────┬───────────────────────────────────┘
           │
           ▼
@@ -74,7 +92,7 @@ just vrt-demo-multistep        # Multi-step
           │
           ▼
 ┌─────────────────────────────────────────────┐
-│ 3. just vrt                                 │
+│ 3. pkf run vrt                              │
 └─────────┬───────────────────────────────────┘
           │
      ┌────┴────────────────┐
@@ -156,45 +174,38 @@ semantics are likely broken.
 
 ## File Structure
 
+This repository is a pnpm workspace. See `.claude/CLAUDE.md` § Package Layout for the authoritative table.
+
 ```
 ├── SKILL.md                   ← This file
-├── Taskfile.pkl               # Task runner (pkfire)
+├── Taskfile.pkl               # Task runner (pkfire: `pkf run <task>`)
 ├── Spec.pkl / Test.pkl        # Specs + smoke gate (pkspec)
-├── package.json
 ├── playwright.config.ts       # Playwright config for VRT
-├── e2e/
-│   └── vrt-capture.spec.ts    # Screenshot + a11y collection
-├── fixtures/                  # Test fixtures
+├── e2e/                       # Screenshot + a11y collection specs
+├── fixtures/                  # Test fixtures (a11y, migration, wireframe, ...)
+├── packages/
+│   ├── vlmkit-core/           # Pixel/CSS/DOM/a11y diff engine + shared types
+│   ├── vlmkit-capture/        # Playwright / Crater capture, viewport discovery
+│   ├── vlmkit-ai/             # VLM/LLM clients, 2-stage reasoning pipeline
+│   ├── vlmkit-markup/         # Markup tooling: build/scan component, contract
+│   │                          #   introspect/validate/scaffold, checks, stress,
+│   │                          #   selector-heal (all deterministic, no VLM)
+│   ├── vlmkit-plan/           # Spec + UI observations → structured test plan
+│   ├── vlmkit-generate/       # Plan → Playwright spec (diagnostics-driven retries)
+│   └── vlmkit-heal/           # Failing-test heal loop (model escalation + budget)
 ├── src/
-│   ├── vrt-cli.ts             # CLI entry point
-│   ├── cli.ts                 # CLI helpers
-│   ├── types.ts               # All type definitions
-│   ├── playwright-analyzer.ts # Playwright output analysis
-│   ├── playwright-helper.ts   # Playwright helpers
-│   ├── dep-graph.ts           # Dependency tree (TS/MoonBit/Rust)
-│   ├── heatmap.ts             # Pixel comparison + heatmap
-│   ├── visual-semantic.ts     # Visual Semantic Diff classification
-│   ├── a11y-semantic.ts       # A11y tree diff + quality checks
-│   ├── cross-validation.ts    # Visual x A11y x Intent cross-reference
-│   ├── intent.ts              # Diff → change intent inference
-│   ├── quality.ts             # Quality gate
-│   ├── reasoning.ts           # Change reason inference
-│   ├── expectation.ts         # Expectation matching
-│   ├── introspect.ts          # Spec generation/verification
-│   ├── goal-runner.ts         # Goal-driven execution
-│   ├── llm-client.ts          # LLM provider
-│   ├── agent.ts               # 5-stage verification loop
-│   ├── demo.ts                # VRT demo
-│   ├── demo-fix-loop.ts       # Fix loop demo
-│   ├── demo-scenarios.ts      # Multi-scenario demo
-│   └── demo-multistep.ts      # Multi-step demo
-└── test-results/              # Execution results (gitignore)
+│   ├── cli/                   # `vlmkit` CLI entry + router + commands
+│   ├── api/                   # Hono HTTP API server
+│   ├── vrt/                   # snapshot / compare workflows
+│   ├── util/                  # markup-loop, skill, agent helpers
+│   └── experiments/           # migration, css-challenge, detection, benchmarks
+└── docs/                      # knowledge.md, markup-implementation-flow.md, reports/
 ```
 
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| Font rendering diffs | Adjust pixelmatch threshold (heatmap.ts) |
+| Font rendering diffs | Adjust pixelmatch threshold (packages/vlmkit-core/src/heatmap.ts) |
 | A11y tree is null | Wait for page render completion (adjust waitFor) |
 | Everything becomes ESCALATE | Add prefix to commit message (feat:/fix:/style: etc.) |
