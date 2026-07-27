@@ -134,3 +134,79 @@ direction はフレーム評価でも比較していない。brief との突き�
   `docs/reports/2026-07-27-scroll-scan-breakpoint-check.md`
 - S1-S4: `docs/reports/2026-07-27-auto-markup-skill-haiku-proof.md`
 - 成果物(無編集): `fixtures/auto-markup-proof/promo/attempt-haiku.html`
+
+## 再挑戦 r2 / r3(同日追記、KPI 運用下)
+
+v1 の敗因(gates green での早期自己宣言)を受けて skill の stopping 節を
+AND 条件に強化し、KPI(rounds / tokens)運用下で 2 回再挑戦した。
+
+### r2(失敗ラン、ツールバグ 1 件発見)
+
+- 12 ラウンド全消費で done 未達(フッター変位 + 縦余白 ~70px)。
+  7 ラウンド目に一度自己宣言 → 検証者差し戻しで再開、というループを
+  経てもなお、最後は残差を「ツールの限界」と誤帰属して停止した。
+- **実ツールバグ発見**: `build page` のキャプチャが entrance
+  アニメーションの途中(opacity < 1)を撮っており、hero が
+  `#121b2f → #e6e7e9`(d348)/ IoU 0.91 という幻のデルタを報告して
+  いた(アニメ剥がしコピーでは fill ok / IoU 0.96)。エージェント自身も
+  ラウンド 10 で手動アニメ剥がしという回避行動を取っており、幻デルタが
+  ラウンドを浪費させた。→ Playwright `animations: "disabled"`
+  (有限は終端へ fast-forward、無限は初期状態 = rest-pose 意味論)を
+  `build page` / `build component` の両キャプチャに適用して修正。
+- v1 の盲点だった pulse leg 時間は r2 では brief どおり
+  (1.2s alternate)に実装された。
+
+### r3(修正済みツール、**初の done 条件達成ラン**)
+
+- 幻デルタ消滅の効果は明確: hero はラウンド 1 で IoU 0.99 / fill ok。
+- ただし自己宣言問題は 3 たび再発 — ラウンド 4・6 で 2 度
+  「完了」を宣言し、いずれも検証者差し戻しが必要だった。決め手は
+  **校正ラン**(リファレンス HTML 自身を build page にかける →
+  8/8 matched / missing 0 / extra 0)で「0/0 は達成可能、残差は実物」
+  と示せたこと。
+- ラウンド 8 で **両 viewport とも missing 0 / extra 0** に到達。
+  独立再計測での最終値:
+
+| 指標 | desktop (1280) | mobile (375) |
+|---|---|---|
+| `build page` | **8/8、missing 0、extra 0** | **8/8、missing 0、extra 0**(1px 線ペアの交差 1 件 — 実質ノイズ) |
+| rest-pose ピクセル diff | **2.65%** | **7.51%** |
+| ページ全高 | 1108(+17px) | 1347(+12px) |
+
+- 4 ゲート独立再実行: breakpoints ok / scroll ok(1 container)/
+  animation warn=infinite のみ・reduced-motion honored /
+  motion running 2・rule yes。pulse は 1.2s alternate(brief 準拠)。
+- 観察: entrance を `.hero` セクション全体に付けており(リファレンスは
+  内側ブロック)、rest 状態は同一だが motion region が band 全体
+  (1280x355、peak 49%)になる。brief の文言上は許容内。
+
+### KPI 記録(3 ラン)
+
+| Run | rounds | tokens(セグメント計) | done | 備考 |
+|---|---:|---:|---|---|
+| v1 | 3 | 76,769 | ✗ | 早期自己宣言 |
+| r2 | 12 | 221,686 (98,094+123,592) | ✗ | 幻デルタ + 誤帰属。ツールバグ発見が成果 |
+| r3 | 8 | 375,941 (107,592+126,634+141,715) | **✓** | 差し戻し 2 回。校正ランが決め手 |
+
+- **tokens の注意**: 差し戻しは SendMessage による resume で、
+  セグメントごとにトランスクリプト再投入分を再課金される。
+  r3 の後半 2 セグメントは tool 21-22 回に対し 12-14 万 tokens と
+  入力再投入が支配的。**差し戻し前提なら resume より
+  「検証者サマリを持たせた新規エージェント」の方が安い可能性が高い**
+  — 次の計測課題。
+- 初期ターゲット(複数ターゲット ≤12 rounds / ≤150k tokens)に対し、
+  done 達成ランは 8 rounds / 375.9k。rounds は達成、tokens は
+  resume 課金込みで 2.5 倍超過 — ターゲットは「初回セグメントのみ
+  ≤150k、差し戻し込み ≤400k」に改訂するか、handoff 方式の実測後に
+  再設定する。
+
+### 早期自己宣言の対策として効いたもの / 効かなかったもの
+
+- 効かなかった: skill の AND 条件強調、プロンプトでの done 条件明示
+  (3 ラン全てで自己宣言が発生)
+- 効いた: **検証者による差し戻し**(具体的な missing の正体と修正部位の
+  名指し)、**校正ラン**(0/0 の達成可能性の証明で「ツールノイズ」への
+  誤帰属を遮断)
+- 帰結: dynamic-markup skill は「エージェント + 検証者」の 2 役構成を
+  前提とするのが現実的。skill にドライバー向けの検証者プロトコル
+  (校正ラン → 差し戻し文面)を追記するのが次の改善。

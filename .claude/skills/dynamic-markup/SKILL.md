@@ -181,6 +181,28 @@ already seen).
   a too-tall panel shifts everything below it — the S5 proof's main
   residual.
 
+## Driver / verifier protocol (when running this skill via a subagent)
+
+Every S5 run — three for three — self-declared "complete" while the
+done condition was unmet, regardless of how prominently the AND
+condition was stated. If you are the driver, plan for it:
+
+1. **Calibrate first**: if a reference render exists, run `build page
+   <target.png> <reference.html>` once. Its score (normally 0/0) is the
+   floor; it defeats the agent's "the residual is tool noise" move with
+   a measurement.
+2. **Verify the final claim independently** — re-run `build page` on
+   both viewports and the four gates yourself. Self-reported numbers
+   drift (stale copy-paste between rounds is common).
+3. **Kick back with names, not verdicts**: state which target component
+   is missing, what it really is ("your own footer, displaced by excess
+   vertical space above it"), and where the fix goes. Generic "keep
+   iterating" wastes a round; named deltas resolve in 1-2.
+4. **Budget tokens for the kickbacks**: resuming a subagent re-bills its
+   transcript, so late segments cost more than their tool-call count
+   suggests. A fresh agent with a verifier summary may be cheaper than
+   a resume (unmeasured — record it if you try).
+
 ## Ground rules
 
 - Never open the reference/original HTML if one exists.
