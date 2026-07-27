@@ -121,6 +121,28 @@ Two consequences:
   but grew to fit its content is a bug the pixel diff of the default
   screenshot won't show.
 
+### 3.7 Interactive states (:hover / :focus)
+
+State styling is invisible in a default screenshot. When the task
+provides extra state screenshots (button hovered, input focused),
+diff them against the default target *with your eyes* to read the
+state delta (darker button, focus ring color/width), then write the
+`:hover` / `:focus` / `:focus-visible` rules.
+
+Verify deterministically that the states are actually wired:
+
+```bash
+vlmkit build component target-default.png attempt.html \
+  --output-dir out/ --states hover focus-visible
+```
+
+The forced-state section flags `induced 0%` on interactive elements as
+**suspect** (state rule missing), `ua-likely` when only the browser's
+default focus ring fired (you forgot the author rule), and
+`direction?` when :hover lightens what should darken. Avoid CSS
+transitions on state properties — they blur forced-state capture and
+real-user perception alike unless the target shows them.
+
 ### 4. Decoration audit
 
 ```bash

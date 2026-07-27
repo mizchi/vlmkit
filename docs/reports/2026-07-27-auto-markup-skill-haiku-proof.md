@@ -129,6 +129,54 @@ Haiku は合計 10 ラウンド(初回 6 + フィードバック後 4)で収束:
 多めに取るべき(skill の budget 節に反映済みの 3-5 ラウンドでは不足、
 複雑ページは 8-12 ラウンド見当)。
 
+## シナリオ 3: フォーム密集 UI + :hover / :focus 状態(同日追記)
+
+### 設定
+
+`fixtures/auto-markup-proof/authform/` — 中央寄せ認証カード。
+シナリオ 1-2 で未計測だった 2 軸を検証:
+
+- **細粒度コンポーネント**: 見出し / サブタイトル / ラベル付き入力 ×2
+  (placeholder 付き)/ チェックボックス行 + リンク / primary ボタン /
+  divider / secondary ボタン / フッターリンク
+- **インタラクティブ状態**: primary ボタンの `:hover`(暗転)、
+  email 入力の `:focus`(青枠 + リング)。デフォルト screenshot には
+  写らないため、**hover 中 / focus 中の screenshot を追加ターゲット**
+  として供給(scrolled-feed と同じ手法)
+- skill に 3.7(interactive states)節を追加して対応
+
+### 結果(検証者の独立再計測 — 実際に hover / focus 操作して撮影)
+
+Haiku は 6 ラウンド・27 tool call・133 秒で完走:
+
+| 状態 | 検証方法 | ピクセル diff |
+|---|---|---|
+| default | そのまま撮影 | **2.64%** |
+| button hover | Playwright `hover()` 実操作 | **2.64%**(状態デルタは完全一致 — 残差はベースと同一) |
+| email focus | Playwright `focus()` 実操作 | **3.32%**(リング再現、微小差) |
+
+- multi-state 検証(CDP forcePseudoState): `:hover` 誘発 2.45% で
+  **ΔLuma 負(正しく暗転)**、`:focus-visible` 誘発 1.87%。
+  suspect / direction? フラグなし。
+- hover 色の読み取り: Haiku は `#2464ec → #1c4cdc` と報告
+  (実際 `#2563eb → #1d4ed8`、palette 量子化バケット由来の Δ≤9)。
+- 全コピー・placeholder・チェック状態まで一致。
+
+### 3 シナリオまとめ
+
+| | S1 landing | S2 dashboard | S3 auth form |
+|---|---|---|---|
+| 難度要素 | なし | @media 分岐、scrollport、presence 変化 | 細粒度 ×10 部品、:hover/:focus |
+| ターゲット枚数 | 1 | 3(2 viewport + scrolled) | 3(default + hover + focus) |
+| ラウンド | 4 | 10(うち 6 はツールバグ下) | 6 |
+| 構成収束 | 6/6 | 8/8 × 2 viewport | カード 1/1(IoU 0.98) |
+| ピクセル diff | 1.40% | 6.2% | 2.6-3.3%(3 状態) |
+| 副産物 | — | build page 背景検出バグ修正 | — |
+
+「状態 screenshot を追加ターゲットとして渡す」パターンは scrollport
+(S2)と states(S3)の両方で機能した — **静的画像では伝達できない
+振る舞い要件は、その状態の画像を 1 枚足せば小型モデルにも伝わる**。
+
 ## 関連
 
 - skill: `.claude/skills/auto-markup/SKILL.md`
