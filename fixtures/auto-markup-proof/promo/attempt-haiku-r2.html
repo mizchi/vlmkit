@@ -83,6 +83,17 @@
       }
     }
 
+    @keyframes heroEntrance {
+      from {
+        opacity: 0;
+        transform: translateY(14px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
     .hero-badge {
       display: inline-flex;
       align-items: center;
@@ -101,6 +112,15 @@
     @media (prefers-reduced-motion: reduce) {
       .hero-badge {
         animation: none;
+      }
+    }
+
+    @keyframes badgePulse {
+      from {
+        opacity: 1;
+      }
+      to {
+        opacity: 0.55;
       }
     }
 
@@ -150,13 +170,13 @@
     /* Why Pulse Section */
     .why-pulse {
       background-color: var(--bg-light);
-      padding: 35px 60px;
+      padding: 30px 60px 35px;
     }
 
     .why-pulse h2 {
       font-size: 36px;
       font-weight: 700;
-      margin-bottom: 35px;
+      margin-bottom: 30px;
       color: var(--text-dark);
     }
 
@@ -189,13 +209,13 @@
     /* Changelog Section */
     .changelog {
       background-color: var(--bg-light);
-      padding: 35px 60px;
+      padding: 30px 60px 40px;
     }
 
     .changelog h2 {
       font-size: 36px;
       font-weight: 700;
-      margin-bottom: 25px;
+      margin-bottom: 22px;
       color: var(--text-dark);
     }
 
@@ -211,7 +231,7 @@
     .changelog-entry {
       display: flex;
       gap: 20px;
-      padding: 11px 30px;
+      padding: 8px 30px;
       border-bottom: 1px solid var(--border-light);
       align-items: flex-start;
     }
@@ -238,16 +258,17 @@
     /* Footer */
     footer {
       background-color: #e1e7ef;
-      padding: 22px 40px;
+      padding: 19px 40px 20px;
       text-align: center;
       font-size: 13px;
       color: #606365;
+      line-height: 1.5;
     }
 
     @media (max-width: 768px) {
       footer {
         background-color: #dee4ec;
-        padding: 18px 20px;
+        padding: 15px 20px 16px;
       }
     }
 
@@ -276,12 +297,12 @@
       }
 
       .why-pulse {
-        padding: 35px 20px;
+        padding: 30px 20px 35px;
       }
 
       .why-pulse h2 {
         font-size: 28px;
-        margin-bottom: 35px;
+        margin-bottom: 30px;
       }
 
       .features-grid {
@@ -290,12 +311,12 @@
       }
 
       .changelog {
-        padding: 35px 20px;
+        padding: 30px 20px 40px;
       }
 
       .changelog h2 {
         font-size: 28px;
-        margin-bottom: 25px;
+        margin-bottom: 22px;
       }
 
       .changelog-panel {

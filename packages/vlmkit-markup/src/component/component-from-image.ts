@@ -425,7 +425,10 @@ export async function runComponentFromImage(
     const landingEvidence = await captureLandingEvidence(page).catch(() => undefined);
     const expressiveMenuEvidence = await captureExpressiveMenuEvidence(page).catch(() => undefined);
     const currentPath = join(outputDir, "current.png");
-    await page.screenshot({ path: currentPath, fullPage: false });
+    // Rest-pose capture: finite animations fast-forwarded, infinite ones at
+    // initial state — an entrance animation caught mid-flight poisons the
+    // pixel diff (S5-r2 finding, same fix as `build page`).
+    await page.screenshot({ path: currentPath, fullPage: false, animations: "disabled" });
     const canvasEvidence = await captureCanvasEvidence(page, contractPlan.expectations.canvas).catch(() => undefined);
     await page.close();
 
