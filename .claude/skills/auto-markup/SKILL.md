@@ -146,8 +146,11 @@ agent-harness.md). Structure and shift always come from `build page` /
 
 ## Budget & stopping
 
-- 3-5 rounds of step 2 + step 3 combined is normally enough; the
-  2026-05-13 dogfoods converged 87% → <2% in 3-5 rounds.
+- 3-5 rounds of step 2 + step 3 combined is normally enough for a
+  single-viewport page; the 2026-05-13 dogfoods converged 87% → <2% in
+  3-5 rounds. Multi-viewport pages need more — budget 8-12 rounds,
+  since a fix at one viewport can regress another (see the dashboard
+  proof in docs/reports/2026-07-27-auto-markup-skill-haiku-proof.md).
 - If a round does not improve the headline number, change *what* you
   fix (composition vs decoration), not just the values.
 - Report final numbers honestly: `build page` matched/missing counts +

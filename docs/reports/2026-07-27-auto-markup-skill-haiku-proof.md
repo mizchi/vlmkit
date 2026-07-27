@@ -64,6 +64,71 @@ Haiku は **4 ラウンド・23 tool call・112 秒**で完走。自己申告値
   細粒度 UI(フォーム密集、アイコン多数)での Haiku 上限は未計測 —
   次の検証課題。
 
+## シナリオ 2: スクロール + media query 分岐(同日追記)
+
+### 設定
+
+`fixtures/auto-markup-proof/dashboard/` — Ops ダッシュボード。
+シナリオ 1 より難しい要素:
+
+- **@media 分岐**: モバイル(≤768px)でサイドバーと top nav が消え、
+  統計カードが縦積みになる(presence 変化を含む)
+- **スクロールポート**: Activity フィードは固定高 + `overflow-y: auto`、
+  10 行中 6 行のみ可視
+- **入力は 3 枚の PNG**: desktop 1280 / mobile 375 / desktop のフィードを
+  最下部までスクロールした状態(不可視行の伝達手段)
+- skill に 3.5(multi-viewport)/ 3.6(scrollport)節を追加して対応
+
+### 経過 — ツールバグの発見と修正
+
+初回ラン(6 ラウンド)で desktop の `build page` が
+matched=3 / missing=5 / extra=4 という崩壊した数値を返した。独立検証で
+**ツール側のバグ**と判明: 周縁 8 点サンプリングの背景検出が全幅ダーク
+ヘッダーに汚染され、target と current で背景判定が非対称になり
+(片側は淡色 body、片側はダークヘッダー)、コンポーネント集合が比較
+不能になっていた。`composePageDiff` を「target の全画像ストライド
+最頻色を両側の共通背景として使う」方式に修正(コミット
+"Fix build page background asymmetry on dark-header pages")。
+修正後、同じ attempt の再計測は matched=8 / missing=0 / extra=0 +
+実行可能なデルタに正常化。**複雑シナリオのドッグフードが実バグを
+1 件発見・修正した。**
+
+### 結果(修正済みツール + 検証者の独立再計測)
+
+Haiku は合計 10 ラウンド(初回 6 + フィードバック後 4)で収束:
+
+| 指標 | desktop (1280) | mobile (375) |
+|---|---|---|
+| `build page` | **8/8 matched、missing 0、extra 0** | **8/8 matched、missing 0、extra 0** |
+| 統計カード | 位置 Δ≤1px、サイズ完全一致(318-319x99)、IoU 0.91-0.92 | 幅/高さ一致、Δy 8px、IoU 0.85 |
+| Activity パネル | IoU 0.94 | IoU 0.85(高さ -43px) |
+| ピクセル diff | **6.20%** | **6.23%** |
+| スクロール実測 | **450 > 298 ✓** | **440 > 258 ✓** |
+
+- breakpoint: `@media (max-width: 768px)` を `scan breakpoints` が検出 ✓
+- フィード 10 行すべて再現(2 枚の screenshot から結合、重複 2 行を排除)✓
+- サイドバー/nav のモバイル非表示 ✓、Activity 見出しのパネル内配置・
+  ゼブラ行・6 行可視 + 7 行目切れも一致 ✓
+- 残差 6.2% の内訳: topbar 高さ(mobile +8px)、フィードパネル高、
+  glyph AA — 構成レベルは完全一致で、数 px の padding 差が主
+
+### シナリオ 1 との比較
+
+| | シナリオ 1(landing) | シナリオ 2(dashboard) |
+|---|---|---|
+| ターゲット | 1 枚 | 3 枚(2 viewport + scrolled) |
+| 特殊要素 | なし | @media 分岐、scrollport、presence 変化 |
+| ラウンド | 4 | 10(うちツールバグで 6 消費) |
+| 構成 | 6/6 | 8/8 + 8/8(両 viewport) |
+| ピクセル diff | 1.40% | 6.2%(両 viewport) |
+
+小型モデルでも「viewport ごとに build page → media query 内だけ修正」
+という手順が回ること、スクロール要件は screenshot 2 枚(通常+scrolled)
+で伝達できることを確認。ピクセル収束はシナリオ 1 より緩い —
+多 viewport では 1 つの修正が他 viewport に波及するため、ラウンド予算を
+多めに取るべき(skill の budget 節に反映済みの 3-5 ラウンドでは不足、
+複雑ページは 8-12 ラウンド見当)。
+
 ## 関連
 
 - skill: `.claude/skills/auto-markup/SKILL.md`

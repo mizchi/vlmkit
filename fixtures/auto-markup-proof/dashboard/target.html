@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ops Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: system-ui, sans-serif; background: #f8fafc; color: #0f172a; }
+  .topbar { background: #0f172a; color: #ffffff; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; }
+  .topbar h1 { font-size: 20px; }
+  .topbar nav { display: flex; gap: 24px; font-size: 14px; }
+  .topbar nav a { color: #cbd5e1; text-decoration: none; }
+  .shell { display: flex; }
+  .sidebar { width: 220px; flex: none; background: #e2e8f0; min-height: 640px; padding: 24px 16px; }
+  .sidebar ul { list-style: none; padding: 0; display: grid; gap: 8px; }
+  .sidebar li { padding: 10px 12px; border-radius: 8px; background: #f1f5f9; font-size: 14px; }
+  .sidebar li.active { background: #1d4ed8; color: #ffffff; }
+  .content { flex: 1; padding: 24px 32px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+  .stat { border-radius: 10px; padding: 20px; }
+  .stat h3 { font-size: 13px; font-weight: 500; color: #475569; }
+  .stat p { font-size: 32px; font-weight: 700; margin-top: 6px; }
+  .stat.builds { background: #e0e7ff; }
+  .stat.uptime { background: #dcfce7; }
+  .stat.alerts { background: #fef3c7; }
+  .feed { margin-top: 24px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; }
+  .feed h2 { font-size: 15px; padding: 14px 18px; border-bottom: 1px solid #e2e8f0; }
+  .feed-list { height: 260px; overflow-y: auto; }
+  .feed-item { padding: 12px 18px; font-size: 14px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; }
+  .feed-item:nth-child(odd) { background: #f8fafc; }
+  .feed-item .when { color: #64748b; font-size: 12px; }
+  .pagefoot { background: #e2e8f0; padding: 18px 32px; font-size: 13px; color: #475569; }
+  @media (max-width: 768px) {
+    .sidebar { display: none; }
+    .stats { grid-template-columns: 1fr; }
+    .content { padding: 16px; }
+    .topbar { padding: 12px 16px; }
+    .topbar nav { display: none; }
+  }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <h1>Ops Dashboard</h1>
+    <nav><a href="#">Overview</a><a href="#">Deploys</a><a href="#">Settings</a></nav>
+  </header>
+  <div class="shell">
+    <aside class="sidebar">
+      <ul>
+        <li class="active">Overview</li>
+        <li>Deploys</li>
+        <li>Incidents</li>
+        <li>Metrics</li>
+        <li>Settings</li>
+      </ul>
+    </aside>
+    <main class="content">
+      <section class="stats">
+        <div class="stat builds"><h3>Builds today</h3><p>42</p></div>
+        <div class="stat uptime"><h3>Uptime</h3><p>99.9%</p></div>
+        <div class="stat alerts"><h3>Open alerts</h3><p>3</p></div>
+      </section>
+      <section class="feed">
+        <h2>Activity</h2>
+        <div class="feed-list">
+          <div class="feed-item"><span>Deploy #512 succeeded</span><span class="when">2m ago</span></div>
+          <div class="feed-item"><span>Alert: p95 latency high</span><span class="when">9m ago</span></div>
+          <div class="feed-item"><span>Deploy #511 succeeded</span><span class="when">31m ago</span></div>
+          <div class="feed-item"><span>User mika added to team</span><span class="when">1h ago</span></div>
+          <div class="feed-item"><span>Deploy #510 rolled back</span><span class="when">2h ago</span></div>
+          <div class="feed-item"><span>Incident #88 resolved</span><span class="when">3h ago</span></div>
+          <div class="feed-item"><span>Deploy #509 succeeded</span><span class="when">5h ago</span></div>
+          <div class="feed-item"><span>Alert: disk 85% on db-2</span><span class="when">6h ago</span></div>
+          <div class="feed-item"><span>Deploy #508 succeeded</span><span class="when">8h ago</span></div>
+          <div class="feed-item"><span>Weekly report generated</span><span class="when">9h ago</span></div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <footer class="pagefoot">© 2026 Ops Inc — status page</footer>
+</body>
+</html>

@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ops Dashboard</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background-color: #e2e8f0;
+      color: #1a202c;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    header {
+      background-color: #0c142c;
+      color: #ffffff;
+      padding: 12px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 56px;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      line-height: 1;
+    }
+
+    header nav a {
+      color: #ffffff;
+      text-decoration: none;
+      margin-left: 32px;
+      font-size: 13px;
+    }
+
+    .container {
+      display: flex;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .sidebar {
+      width: 220px;
+      background-color: #e2e8f0;
+      padding: 16px 0;
+    }
+
+    .sidebar a {
+      display: block;
+      padding: 12px 16px;
+      text-decoration: none;
+      color: #1a202c;
+      font-size: 14px;
+      border-radius: 6px;
+      margin: 4px 8px;
+    }
+
+    .sidebar a.active {
+      background-color: #1c4cdc;
+      color: #ffffff;
+    }
+
+    .main-content {
+      flex: 1;
+      padding: 20px 32px;
+      background-color: #fcfcfc;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stats-grid {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      flex: 0 0 calc(33.333% - 14px);
+      padding: 18px 16px;
+      border-radius: 6px;
+      background-color: #ffffff;
+      min-height: auto;
+      border: none;
+    }
+
+    .stat-card.builds {
+      background-color: #e4e4fc;
+    }
+
+    .stat-card.uptime {
+      background-color: #dcfce4;
+    }
+
+    .stat-card.alerts {
+      background-color: #fcf4c4;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: #4a5568;
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 700;
+      color: #1a202c;
+    }
+
+    .activity-section {
+      display: flex;
+      flex-direction: column;
+      margin-top: 0;
+    }
+
+    .activity-title {
+      font-size: 14px;
+      font-weight: 600;
+      padding: 12px 16px;
+      color: #1a202c;
+      border-bottom: 1px solid #e2e8f0;
+      margin: 0;
+    }
+
+    .activity-feed {
+      background-color: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      overflow-y: auto;
+      height: 300px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .activity-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+      gap: 16px;
+    }
+
+    .activity-item:nth-child(odd) {
+      background-color: #f8fafc;
+    }
+
+    .activity-item:last-child {
+      border-bottom: none;
+    }
+
+    .activity-text {
+      color: #1a202c;
+      flex: 1;
+    }
+
+    .activity-time {
+      color: #718096;
+      font-size: 12px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    footer {
+      background-color: #cbd5e0;
+      padding: 12px 32px;
+      font-size: 12px;
+      color: #4a5568;
+      flex-shrink: 0;
+      margin-top: auto;
+    }
+
+    /* Mobile styles */
+    @media (max-width: 768px) {
+      header {
+        padding: 12px 16px;
+      }
+
+      header h1 {
+        font-size: 20px;
+      }
+
+      header nav {
+        display: none;
+      }
+
+      .container {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        display: none;
+      }
+
+      .main-content {
+        padding: 16px;
+      }
+
+      .stats-grid {
+        flex-direction: column;
+        gap: 20px;
+        margin-bottom: 32px;
+      }
+
+      .stat-card {
+        flex: 0 0 auto;
+        padding: 18px 16px;
+        min-height: 99px;
+      }
+
+      .stat-label {
+        font-size: 12px;
+      }
+
+      .stat-value {
+        font-size: 32px;
+        line-height: 1.2;
+      }
+
+      .activity-feed {
+        height: 260px;
+      }
+
+      .activity-item {
+        padding: 12px 16px;
+        font-size: 13px;
+      }
+
+      footer {
+        padding: 12px 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Ops Dashboard</h1>
+    <nav>
+      <a href="#">Overview</a>
+      <a href="#">Deploys</a>
+      <a href="#">Settings</a>
+    </nav>
+  </header>
+
+  <div class="container">
+    <aside class="sidebar">
+      <a href="#" class="active">Overview</a>
+      <a href="#">Deploys</a>
+      <a href="#">Incidents</a>
+      <a href="#">Metrics</a>
+      <a href="#">Settings</a>
+    </aside>
+
+    <main class="main-content">
+      <div class="stats-grid">
+        <div class="stat-card builds">
+          <div class="stat-label">Builds today</div>
+          <div class="stat-value">42</div>
+        </div>
+        <div class="stat-card uptime">
+          <div class="stat-label">Uptime</div>
+          <div class="stat-value">99.9%</div>
+        </div>
+        <div class="stat-card alerts">
+          <div class="stat-label">Open alerts</div>
+          <div class="stat-value">3</div>
+        </div>
+      </div>
+
+      <section class="activity-section">
+        <div class="activity-feed">
+          <h2 class="activity-title">Activity</h2>
+          <div class="activity-item">
+            <span class="activity-text">Deploy #512 succeeded</span>
+            <span class="activity-time">2m ago</span>
+          </div>
+          <div class="activity-item">
+            <span class="activity-text">Alert: p95 latency high</span>
+            <span class="activity-time">9m ago</span>
+          </div>
+          <div class="activity-item">
+            <span class="activity-text">Deploy #511 succeeded</span>
+            <span class="activity-time">31m ago</span>
+          </div>
+          <div class="activity-item">
+            <span class="activity-text">User mika added to team</span>
+            <span class="activity-time">1h ago</span>
+          </div>
+          <div class="activity-item">
+            <span class="activity-text">Deploy #510 rolled back</span>
+            <span class="activity-time">2h ago</span>
+          </div>
+          <div class="activity-item">
+            <span class="activity-text">Incident #88 resolved</span>
+            <span class="activity-time">3h ago</span>
+          </div>
+          <div class="activity-item">
+            <span class="activity-text">Deploy #509 succeeded</span>
+            <span class="activity-time">5h ago</span>
+          </div>
+          <div class="activity-item">
+            <span class="activity-text">Alert: disk 85% on db-2</span>
+            <span class="activity-time">6h ago</span>
+          </div>
+          <div class="activity-item">
+            <span class="activity-text">Deploy #508 succeeded</span>
+            <span class="activity-time">8h ago</span>
+          </div>
+          <div class="activity-item">
+            <span class="activity-text">Weekly report generated</span>
+            <span class="activity-time">9h ago</span>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer>
+    © 2026 Ops Inc — status page
+  </footer>
+</body>
+</html>
