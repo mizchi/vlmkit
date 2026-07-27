@@ -187,6 +187,28 @@ M ティア(デザイントークン)はシナリオマトリクスで**全項�
 
 ---
 
+## 追記(2026-07-27 同日実装)
+
+レビュー後、同ブランチで以下を実装した:
+
+- **P0-1 → 実装済み**: `vlmkit contract scaffold <ui.contract.json>`
+  (`packages/vlmkit-markup/src/contract/scaffold-contract.ts`)。
+  landmark tree / layout policy(fluid/fixed/intrinsic ×
+  content/fixed/scrollport × block/flex/grid/subgrid)/ responsive rule
+  (viewport label → `@media` 変換)/ slot / marker / state stub /
+  decoration palette → CSS custom property を semantic HTML + CSS に
+  compile。レンダリング画像評価 2 ラウンド(grid セル占有バグ・CTA
+  stretch・中央寄せ欠落を修正)を経て、scaffold → `contract introspect`
+  のラウンドトリップで 5/5 landmark が正しい role・layout で復元される
+  ことを確認。単体テスト 12 件。
+- **P0-3 → 調査時点で既に解決済みだった**: drafts 10/11/12 は 2026-06-08 に
+  修正済み(各ドラフト末尾の Status 参照)。本レポートの記述は当時の
+  ドラフト本文のみを参照したことによる誤り。
+- **P1-4/5 → 実装済み**: `vlmkit heal selector <html|url> <selector>`
+  (`heal/selector-heal-cli.ts`)と `vlmkit check palette <png> [png]`
+  (`style/palette-cli.ts`)を CLI に公開。実フィクスチャ / 実スクリーン
+  ショットで動作確認。
+
 ## 調査ソース
 
 - `packages/vlmkit-{markup,core,capture,ai,plan,generate,heal}/src`

@@ -357,7 +357,12 @@ baseline として守る。
 - `vlmkit design prompt`: 実装しやすい mock prompt を pattern 別に生成する。
 - report JSON: Landmark drilldown / goal evidence / scrollport / canvas evidence を
   agent が markdown scraping せず読めるようにする。
-- UI Contract compiler: contract から HTML/CSS skeleton を生成する。
+- ~~UI Contract compiler: contract から HTML/CSS skeleton を生成する。~~
+  → 2026-07-27 実装済み: `vlmkit contract scaffold <ui.contract.json>` が
+  landmark tree / layout policy / responsive rule / slot / marker / state を
+  semantic HTML + grid/flex CSS に compile する
+  (`packages/vlmkit-markup/src/contract/scaffold-contract.ts`)。
+  scaffold を `contract introspect` に通すと landmark 構造が round-trip する。
 - UI Contract simulator: contract の layout を Chromium / Crater / layout
   backend で比較する。
 - Existing implementation introspection: 既存 DOM/CSS から state / content /

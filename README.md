@@ -256,6 +256,7 @@ vlmkit snapshot report                         # Render snapshot-report.json as 
 vlmkit check a11y contrast <html>              # WCAG AA contrast scan
 vlmkit check a11y touch    <html|url>          # Touch target size (WCAG 2.5.5 / 2.5.8)
 vlmkit check a11y focus    <html|url>          # Tab order vs visual order
+vlmkit check palette       <target.png> [current.png]  # Dominant colors, or palette diff (missing/extra hex)
 vlmkit check tokens        <html>              # radius/spacing/z-index/shadow scale conformance
 vlmkit check theme         <html>              # prefers-color-scheme dark / unthemed components
 vlmkit check perf          <html|url>          # Web Vitals (CLS / LCP / FCP)
@@ -274,6 +275,17 @@ vlmkit build component <target.png> <current.html>
 # Detect components in a screenshot.
 vlmkit scan component <screenshot.png>         # Crop to standalone PNGs
 vlmkit scan breakpoints <html-file>            # Discover responsive breakpoints
+
+# UI Contract IR: extract from existing markup, validate, or compile to a scaffold.
+vlmkit contract introspect <html|url> --out ui.contract.json
+vlmkit contract validate   ui.contract.json
+vlmkit contract scaffold   ui.contract.json --out dir/
+  # Emits <screen>.scaffold.html: semantic landmarks + grid/flex CSS from
+  # layout policies + responsive @media rules + slot/marker placeholders.
+  # Round-trips: introspecting the scaffold recovers the contract's landmarks.
+
+# Heal a selector that no longer matches (ranked replacement candidates).
+vlmkit heal selector <html|url> ".broken-selector"
 
 # Scripted / exploratory interaction.
 vlmkit inspect interact <html|url> --sequence <path.json>
