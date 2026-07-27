@@ -177,6 +177,51 @@ Haiku は 6 ラウンド・27 tool call・133 秒で完走:
 (S2)と states(S3)の両方で機能した — **静的画像では伝達できない
 振る舞い要件は、その状態の画像を 1 枚足せば小型モデルにも伝わる**。
 
+## シナリオ 4: ダークテーマパリティ(同日追記)
+
+### 設定
+
+`fixtures/auto-markup-proof/article-theme/` — docs 記事ページ
+(topbar / バッジ ×2 / h1 / meta / 段落 / コードブロック / CTA / footer)。
+
+- **1 つの HTML が `prefers-color-scheme: dark` で両テーマを描き分ける**
+  ことを要求。ターゲットは light / dark の 2 枚
+- ダークは背景反転だけでない: アクセントは一段明るく
+  (`#2563eb` → `#3b82f6`)、CTA 文字色は反転、バッジは
+  tint(#dbeafe)→ shade(#1e3a8a)に反転
+- skill に 3.8(theme parity: `:root` カスタムプロパティ + 変数のみの
+  dark 上書き、`check theme` 監査)節を追加して対応
+
+### 結果(検証者の独立再計測 — `emulateMedia` で両スキームをレンダ)
+
+Haiku は 4 ラウンド・65 tool call・302 秒で完走:
+
+| 指標 | 値 |
+|---|---|
+| light `build page` | 8/8 matched、missing 0、extra 0 |
+| light ピクセル diff | **5.61%** |
+| dark ピクセル diff | **6.57%** |
+| `check theme` | **unthemed 0 / 8**、テーマ pixel delta 99.8%(全面応答) |
+| テーマ実装 | `:root` 変数 + `@media (prefers-color-scheme: dark)` での変数上書きのみ(規約どおり) |
+
+残差の主因: "Release" バッジの色味(ターゲットの navy shade より明るい)
+と CTA 文字色の微差、および glyph AA。コピー・構造・コードブロック・
+バッジ pill 形状はすべて一致。
+
+### 4 シナリオまとめ
+
+| | S1 landing | S2 dashboard | S3 auth form | S4 theme |
+|---|---|---|---|---|
+| 難度要素 | なし | @media / scrollport / presence | 細粒度 / :hover/:focus | light/dark 分岐 |
+| ターゲット枚数 | 1 | 3 | 3 | 2 |
+| ラウンド | 4 | 10 | 6 | 4 |
+| ピクセル diff | 1.40% | 6.2% | 2.6-3.3% | 5.6-6.6% |
+| 決定論検証 | build page | +scroll 実測+breakpoints | +forcePseudoState | +check theme(unthemed 0) |
+
+「振る舞い要件は状態のスクリーンショットを足して伝える」パターンが
+S2(scrolled)・S3(hover/focus)・S4(dark)の 3 連続で機能。
+skill のセクション 3.5-3.8 として全パターンを収録済み。
+
 ## 関連
 
 - skill: `.claude/skills/auto-markup/SKILL.md`

@@ -143,6 +143,29 @@ default focus ring fired (you forgot the author rule), and
 transitions on state properties — they blur forced-state capture and
 real-user perception alike unless the target shows them.
 
+### 3.8 Theme parity (light / dark)
+
+When the task provides light AND dark target screenshots, one HTML
+must serve both via `prefers-color-scheme`:
+
+- Put every themed color in a CSS custom property on `:root`, and
+  override the *variables only* inside
+  `@media (prefers-color-scheme: dark)` — never fork component rules
+  per theme. Read each theme's palette off its own target
+  (`check palette target-light.png` / `check palette target-dark.png`).
+- Dark themes usually swap more than backgrounds: accents shift a
+  step lighter (`#2563eb` → `#3b82f6`), text-on-accent may invert,
+  badge fills flip from tint to shade. Compare the same component
+  across the two targets before assuming a shared value.
+- Converge each theme separately: `build page target-light.png
+  attempt.html`, then dark. `build page` renders with the OS default
+  scheme, so verify the dark render explicitly with a small
+  Playwright snippet using `emulateMedia({ colorScheme: "dark" })`
+  and pixel-diff it against the dark target (`diff png`).
+- Audit: `vlmkit check theme attempt.html` flags components whose
+  fill is identical in both themes (**unthemed** — a hard-coded color
+  that ignores the scheme). Every major surface should respond.
+
 ### 4. Decoration audit
 
 ```bash

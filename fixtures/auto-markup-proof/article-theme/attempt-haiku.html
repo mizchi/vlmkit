@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>vlmkit docs - Release Notes</title>
+  <style>
+    :root {
+      --color-bg-outer: #f8fafc;
+      --color-bg-inner: #ffffff;
+      --color-text-primary: #0c142c;
+      --color-text-secondary: #64748b;
+      --color-text-meta: #8b9db1;
+      --color-text-light: #e4ecf4;
+      --color-code-bg: #f4f4fc;
+      --color-code-border: #e4ecf4;
+      --color-border: #e2e8f0;
+      --color-accent: #2464ec;
+      --color-accent-light: #dcecfc;
+      --color-badge-release: #3b82f6;
+      --color-badge-release-light: #eff6ff;
+      --color-badge-version: #e0e7ff;
+      --color-button-text: #ffffff;
+      --color-button-hover: #1d4ed8;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --color-bg-outer: #0f172a;
+        --color-bg-inner: #1e293b;
+        --color-text-primary: #f1f5f9;
+        --color-text-secondary: #cbd5e1;
+        --color-text-meta: #94a3b8;
+        --color-text-light: #e4ecf4;
+        --color-code-bg: #1c2c3c;
+        --color-code-border: #344454;
+        --color-border: #334155;
+        --color-accent: #3c84f4;
+        --color-accent-light: #1e3a8a;
+        --color-badge-release: #3b82f6;
+        --color-badge-release-light: #0c1c3c;
+        --color-badge-version: #1c3c8c;
+        --color-button-text: #0f172a;
+        --color-button-hover: #60a5fa;
+      }
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      background-color: var(--color-bg-outer);
+      color: var(--color-text-primary);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.6;
+    }
+
+    /* Topbar */
+    header {
+      background-color: var(--color-bg-inner);
+      border-bottom: 1px solid var(--color-border);
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+    }
+
+    .brand {
+      font-weight: 700;
+      font-size: 16px;
+      color: var(--color-text-primary);
+    }
+
+    nav a {
+      color: var(--color-text-secondary);
+      text-decoration: none;
+      margin-left: 32px;
+      font-size: 14px;
+      transition: color 0.2s;
+    }
+
+    nav a:hover {
+      color: var(--color-text-primary);
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+    }
+
+    /* Main content */
+    main {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 24px;
+    }
+
+    .article-card {
+      background-color: var(--color-bg-inner);
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+      padding: 32px;
+      max-width: 700px;
+      width: 100%;
+      margin-bottom: 40px;
+    }
+
+    /* Badges */
+    .badges {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .badge-release {
+      background-color: var(--color-badge-release);
+      color: white;
+    }
+
+    .badge-version {
+      background-color: var(--color-badge-version);
+      color: var(--color-text-primary);
+    }
+
+    /* Heading */
+    h1 {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      line-height: 1.2;
+      color: var(--color-text-primary);
+    }
+
+    /* Meta */
+    .meta {
+      color: var(--color-text-meta);
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+
+    /* Paragraphs */
+    p {
+      margin-bottom: 12px;
+      font-size: 16px;
+      color: var(--color-text-secondary);
+      line-height: 1.7;
+    }
+
+    /* Code block */
+    .code-block {
+      background-color: var(--color-code-bg);
+      border: 1px solid var(--color-code-border);
+      border-radius: 8px;
+      padding: 16px;
+      font-family: "Monaco", "Courier New", monospace;
+      font-size: 13px;
+      margin: 16px 0 0px 0;
+      color: var(--color-text-primary);
+      overflow-x: auto;
+      line-height: 1.5;
+    }
+
+    .separator {
+      height: 2px;
+      background-color: var(--color-border);
+      margin: 0 0 0px 0;
+    }
+
+    /* Button */
+    .cta-button {
+      background-color: var(--color-accent);
+      color: var(--color-button-text);
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      display: inline-block;
+    }
+
+    .cta-button:hover {
+      background-color: var(--color-button-hover);
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      color: var(--color-text-meta);
+      font-size: 14px;
+      padding: 40px 24px;
+      margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">vlmkit docs</div>
+    <nav>
+      <a href="#">Guide</a>
+      <a href="#">API</a>
+      <a href="#">Blog</a>
+    </nav>
+  </header>
+
+  <main>
+    <article class="article-card">
+      <div class="badges">
+        <span class="badge badge-release">Release</span>
+        <span class="badge badge-version">v0.7</span>
+      </div>
+
+      <h1>Composition diffs land in build page</h1>
+
+      <div class="meta">July 27, 2026 - 4 min read</div>
+
+      <p>The new build page command pairs component boxes spatially, so a missing card is reported as missing instead of cascading into nonsense pairings.</p>
+
+      <div class="code-block" style="margin-bottom: -4px;">vlmkit build page target.png current.html --crop crops/</div>
+
+      <div class="separator"></div>
+
+      <p style="margin-top: 0px; margin-bottom: 12px;">Stacking gap deltas now come with a direction, so an agent can apply "reduce 72px" without guessing which margin grew.</p>
+
+      <button class="cta-button" style="margin-top: 20px;">Read the changelog</button>
+    </article>
+  </main>
+
+  <footer>
+    MIT licensed - built for agents
+  </footer>
+</body>
+</html>
