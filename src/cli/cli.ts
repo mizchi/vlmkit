@@ -124,6 +124,7 @@ const SPECS: Record<string, Spec> = {
   contractScaffold: spec("contract-scaffold", () => import("@mizchi/vlmkit-markup/contract/scaffold-contract.ts")),
   selectorHeal: spec("selector-heal-cli", () => import("@mizchi/vlmkit-markup/heal/selector-heal-cli.ts")),
   palette: spec("palette-cli", () => import("@mizchi/vlmkit-markup/style/palette-cli.ts")),
+  pageCompose: spec("page-compose", () => import("@mizchi/vlmkit-markup/component/page-compose.ts")),
   multiPageConsistency: spec("multi-page-consistency", () => import("@mizchi/vlmkit-markup/stress/multi-page-consistency.ts")),
   componentConsistency: spec("component-consistency", () => import("@mizchi/vlmkit-markup/component/component-consistency.ts")),
   themeParity: spec("theme-parity", () => import("@mizchi/vlmkit-markup/style/theme-parity.ts")),
@@ -184,6 +185,7 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
   },
   build: {
     component: { spec: SPECS.componentFromImage, desc: "Build a component from a target screenshot" },
+    page: { spec: SPECS.pageCompose, desc: "Page-level multi-component composition diff" },
   },
   contract: {
     introspect: { spec: SPECS.contractIntrospect, desc: "Infer UI Contract IR from existing HTML / URL" },
@@ -317,7 +319,7 @@ Common command groups:
   vlmkit inspect interact|explore|smoke
   vlmkit stress i18n|media
   vlmkit scan component|breakpoints
-  vlmkit build component
+  vlmkit build component|page
   vlmkit contract introspect|validate|scaffold
   vlmkit heal selector
   vlmkit snapshot [<url>...]

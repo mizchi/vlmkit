@@ -204,6 +204,19 @@ M ティア(デザイントークン)はシナリオマトリクスで**全項�
 - **P0-3 → 調査時点で既に解決済みだった**: drafts 10/11/12 は 2026-06-08 に
   修正済み(各ドラフト末尾の Status 参照)。本レポートの記述は当時の
   ドラフト本文のみを参照したことによる誤り。
+- **P0-2 → 実装済み**: `vlmkit build page <target.png> <current.html|png>`
+  (`packages/vlmkit-markup/src/component/page-compose.ts`)。ページ全体の
+  スクリーンショット同士でコンポーネント bbox を**空間近接**で対応付け
+  (area-rank 非依存 — 欠落があっても誤ペアが連鎖しない)、per-component
+  位置/サイズ/fill デルタ・**欠落/余剰コンポーネント**・縦順序違反・
+  **スタッキング gap デルタ**を報告。`--crop` で per-component の
+  target/current クロップ対を書き出し、`build component` ドリルダウンに
+  接続。壊した合成ページ(カード 1 枚削除 + margin +72px)で欠落カード
+  (298x140 `#ebeffb`)と gap(24→96px)を正確に指摘、修復後は全 IoU 1.00 に
+  収束することを画像評価で確認。単体テスト 7 件。
+  併せて `component-bbox.ts` の `detectBackground` が量子化ビン床値
+  (255→248)を返して淡色フィル(#eef2ff)を背景に飲み込むバグを根本修正
+  (勝ちビン内サンプル平均を返す)。
 - **P1-4/5 → 実装済み**: `vlmkit heal selector <html|url> <selector>`
   (`heal/selector-heal-cli.ts`)と `vlmkit check palette <png> [png]`
   (`style/palette-cli.ts`)を CLI に公開。実フィクスチャ / 実スクリーン

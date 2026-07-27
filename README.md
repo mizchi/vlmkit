@@ -272,6 +272,13 @@ vlmkit build component <target.png> <current.html>
   # signals: bbox + heatmap regions + dominant fill + typography hints
   # + spacing-fix table + palette diff + multi-state suspect flags.
 
+# Page-level multi-component composition diff.
+vlmkit build page <target.png> <current.html|current.png> [--crop dir/] [--json]
+  # Pairs component bboxes spatially (rank-free), reports per-component
+  # position/size/fill deltas, missing/extra components, section ordering,
+  # stacking-gap deltas. --crop writes target/current crop pairs so each
+  # component can be drilled into with `build component`.
+
 # Detect components in a screenshot.
 vlmkit scan component <screenshot.png>         # Crop to standalone PNGs
 vlmkit scan breakpoints <html-file>            # Discover responsive breakpoints

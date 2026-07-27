@@ -32,6 +32,7 @@ All deterministic — no VLM / API key required.
 
 ```bash
 vlmkit build component <target.png> <current.html>  # Converge HTML toward a target screenshot
+vlmkit build page <target.png> <current.html>       # Multi-component composition diff (missing/extra/order/gaps)
 vlmkit scan component <screenshot.png>              # Detect + crop components
 vlmkit contract introspect <html|url>               # Existing markup → UI Contract IR
 vlmkit contract scaffold <ui.contract.json>         # UI Contract IR → HTML/CSS scaffold

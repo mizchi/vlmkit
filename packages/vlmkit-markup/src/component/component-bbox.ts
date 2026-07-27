@@ -89,8 +89,17 @@ function detectBackground(data: Uint8Array, width: number, height: number): [num
       best = k;
     }
   }
-  const [rq, gq, bq] = best.split(",").map((s) => Number(s));
-  return [rq! << 3, gq! << 3, bq! << 3];
+  // Average the actual samples in the winning bin rather than returning
+  // the bin floor: `(255,255,255) >> 3 << 3` = 248 would shift the
+  // reference by up to 7/channel and let pale fills (e.g. #eef2ff on
+  // white) fall inside the background tolerance.
+  let sr = 0, sg = 0, sb = 0, sn = 0;
+  for (const [r, g, b] of samples) {
+    if (`${r >> 3},${g >> 3},${b >> 3}` === best) {
+      sr += r; sg += g; sb += b; sn++;
+    }
+  }
+  return [Math.round(sr / sn), Math.round(sg / sn), Math.round(sb / sn)];
 }
 
 function inBackground(
