@@ -753,7 +753,7 @@ export async function runComponentFromImage(
     }
     console.log(`  ${DIM}report: ${reportPath}${RESET}`);
 
-    return {
+    const result = {
       targetImage: targetPath,
       currentHtml: htmlPath,
       viewport,
@@ -776,7 +776,17 @@ export async function runComponentFromImage(
       paletteDiff: { ...paletteDiff, baseline: targetPalette, variant: currentPalette },
       states: stateResults,
       reportPath,
-    };
+    } satisfies ComponentFromImageReport;
+
+    // Machine-readable twin of report.md — agents consume this instead of
+    // scraping the Markdown section headers.
+    const jsonReportPath = reportPath.endsWith(".md")
+      ? `${reportPath.slice(0, -3)}.json`
+      : `${reportPath}.json`;
+    await writeFile(jsonReportPath, JSON.stringify(result, null, 2));
+    console.log(`  ${DIM}report json: ${jsonReportPath}${RESET}`);
+
+    return result;
   } finally {
     await browser.close();
   }

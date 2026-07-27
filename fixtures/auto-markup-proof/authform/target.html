@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Sign in</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: system-ui, sans-serif; background: #f1f5f9; min-height: 100vh; display: grid; place-items: center; }
+  .card { width: 420px; background: #ffffff; border-radius: 12px; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08); padding: 32px; }
+  h1 { font-size: 24px; color: #0f172a; }
+  .sub { margin-top: 6px; font-size: 14px; color: #64748b; }
+  form { margin-top: 24px; display: grid; gap: 16px; }
+  label { font-size: 13px; font-weight: 600; color: #334155; display: grid; gap: 6px; }
+  input[type="email"], input[type="password"] {
+    font-size: 14px; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none;
+  }
+  input[type="email"]:focus, input[type="password"]:focus {
+    border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+  }
+  .row { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+  .remember { display: flex; align-items: center; gap: 8px; color: #334155; }
+  a { color: #2563eb; text-decoration: none; }
+  .btn-primary {
+    font-size: 15px; font-weight: 600; color: #ffffff; background: #2563eb;
+    border: none; border-radius: 8px; padding: 12px; cursor: pointer;
+  }
+  .btn-primary:hover { background: #1d4ed8; }
+  .divider { display: flex; align-items: center; gap: 12px; color: #94a3b8; font-size: 12px; margin-top: 20px; }
+  .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: #e2e8f0; }
+  .btn-sso {
+    margin-top: 20px; width: 100%; font-size: 14px; font-weight: 500; color: #334155;
+    background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 11px; cursor: pointer;
+  }
+  .foot { margin-top: 24px; text-align: center; font-size: 13px; color: #64748b; }
+</style>
+</head>
+<body>
+  <main class="card">
+    <h1>Welcome back</h1>
+    <p class="sub">Sign in to your workspace</p>
+    <form>
+      <label>Email
+        <input type="email" name="email" placeholder="you@example.com" />
+      </label>
+      <label>Password
+        <input type="password" name="password" placeholder="********" />
+      </label>
+      <div class="row">
+        <span class="remember"><input type="checkbox" checked /> Remember me</span>
+        <a href="#">Forgot password?</a>
+      </div>
+      <button class="btn-primary" type="submit">Sign in</button>
+    </form>
+    <div class="divider">or</div>
+    <button class="btn-sso" type="button">Continue with SSO</button>
+    <p class="foot">No account? <a href="#">Create one</a></p>
+  </main>
+</body>
+</html>

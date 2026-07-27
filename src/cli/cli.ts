@@ -121,6 +121,10 @@ const SPECS: Record<string, Spec> = {
   componentFromImage: spec("component-from-image", () => import("@mizchi/vlmkit-markup/component/component-from-image.ts")),
   contractIntrospect: spec("contract-introspect", () => import("@mizchi/vlmkit-markup/contract/introspect-contract.ts")),
   contractValidate: spec("contract-validate", () => import("@mizchi/vlmkit-markup/contract/validate-contract.ts")),
+  contractScaffold: spec("contract-scaffold", () => import("@mizchi/vlmkit-markup/contract/scaffold-contract.ts")),
+  selectorHeal: spec("selector-heal-cli", () => import("@mizchi/vlmkit-markup/heal/selector-heal-cli.ts")),
+  palette: spec("palette-cli", () => import("@mizchi/vlmkit-markup/style/palette-cli.ts")),
+  pageCompose: spec("page-compose", () => import("@mizchi/vlmkit-markup/component/page-compose.ts")),
   multiPageConsistency: spec("multi-page-consistency", () => import("@mizchi/vlmkit-markup/stress/multi-page-consistency.ts")),
   componentConsistency: spec("component-consistency", () => import("@mizchi/vlmkit-markup/component/component-consistency.ts")),
   themeParity: spec("theme-parity", () => import("@mizchi/vlmkit-markup/style/theme-parity.ts")),
@@ -159,6 +163,7 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
     runs: { spec: SPECS.compareRuns, desc: "Aggregate multiple VRT runs" },
   },
   check: {
+    palette: { spec: SPECS.palette, desc: "Dominant colors of a PNG, or palette diff of two PNGs" },
     tokens: { spec: SPECS.designTokens, desc: "Design-token scale conformance" },
     theme: { spec: SPECS.themeParity, desc: "Theme parity (hard-coded color scan in dark mode)" },
     motion: { spec: SPECS.motionDetect, desc: "CSS motion detection (animation / transition / reduced-motion)" },
@@ -180,10 +185,15 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
   },
   build: {
     component: { spec: SPECS.componentFromImage, desc: "Build a component from a target screenshot" },
+    page: { spec: SPECS.pageCompose, desc: "Page-level multi-component composition diff" },
   },
   contract: {
     introspect: { spec: SPECS.contractIntrospect, desc: "Infer UI Contract IR from existing HTML / URL" },
     validate: { spec: SPECS.contractValidate, desc: "Validate UI Contract IR" },
+    scaffold: { spec: SPECS.contractScaffold, desc: "Compile UI Contract IR into an HTML/CSS scaffold" },
+  },
+  heal: {
+    selector: { spec: SPECS.selectorHeal, desc: "Suggest replacements for a selector that no longer matches" },
   },
 };
 
@@ -305,12 +315,13 @@ regression-watch) + markup synthesis + design audits + CSS auto-repair.
 
 Common command groups:
   vlmkit diff html|png|region|elements|component|browsers|agent|runs
-  vlmkit check a11y|tokens|theme|motion|crater|perf|drift
+  vlmkit check a11y|palette|tokens|theme|motion|crater|perf|drift
   vlmkit inspect interact|explore|smoke
   vlmkit stress i18n|media
   vlmkit scan component|breakpoints
-  vlmkit build component
-  vlmkit contract introspect|validate
+  vlmkit build component|page
+  vlmkit contract introspect|validate|scaffold
+  vlmkit heal selector
   vlmkit snapshot [<url>...]
   vlmkit workflow <subcommand>
   vlmkit markup-loop <command>

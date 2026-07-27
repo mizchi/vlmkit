@@ -346,6 +346,7 @@ Strict JSON output:
 
 Rules:
 - Only list regions with clearly visible color differences (>5% RGB delta).
+- A region that is filled in one image but shows the page background in the other IS a color difference (fill vs background) — report missing/added blocks this way.
 - Include selectorHint when the screenshot gives an obvious semantic target, but use null rather than inventing a real CSS selector.
 - Include propertyHint when the changed visual property is obvious.
 - When possible, include bbox in baseline/variant image pixel coordinates for the visible changed area.

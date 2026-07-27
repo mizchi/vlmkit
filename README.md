@@ -256,6 +256,7 @@ vlmkit snapshot report                         # Render snapshot-report.json as 
 vlmkit check a11y contrast <html>              # WCAG AA contrast scan
 vlmkit check a11y touch    <html|url>          # Touch target size (WCAG 2.5.5 / 2.5.8)
 vlmkit check a11y focus    <html|url>          # Tab order vs visual order
+vlmkit check palette       <target.png> [current.png]  # Dominant colors, or palette diff (missing/extra hex)
 vlmkit check tokens        <html>              # radius/spacing/z-index/shadow scale conformance
 vlmkit check theme         <html>              # prefers-color-scheme dark / unthemed components
 vlmkit check perf          <html|url>          # Web Vitals (CLS / LCP / FCP)
@@ -271,9 +272,27 @@ vlmkit build component <target.png> <current.html>
   # signals: bbox + heatmap regions + dominant fill + typography hints
   # + spacing-fix table + palette diff + multi-state suspect flags.
 
+# Page-level multi-component composition diff.
+vlmkit build page <target.png> <current.html|current.png> [--crop dir/] [--json]
+  # Pairs component bboxes spatially (rank-free), reports per-component
+  # position/size/fill deltas, missing/extra components, section ordering,
+  # stacking-gap deltas. --crop writes target/current crop pairs so each
+  # component can be drilled into with `build component`.
+
 # Detect components in a screenshot.
 vlmkit scan component <screenshot.png>         # Crop to standalone PNGs
 vlmkit scan breakpoints <html-file>            # Discover responsive breakpoints
+
+# UI Contract IR: extract from existing markup, validate, or compile to a scaffold.
+vlmkit contract introspect <html|url> --out ui.contract.json
+vlmkit contract validate   ui.contract.json
+vlmkit contract scaffold   ui.contract.json --out dir/
+  # Emits <screen>.scaffold.html: semantic landmarks + grid/flex CSS from
+  # layout policies + responsive @media rules + slot/marker placeholders.
+  # Round-trips: introspecting the scaffold recovers the contract's landmarks.
+
+# Heal a selector that no longer matches (ranked replacement candidates).
+vlmkit heal selector <html|url> ".broken-selector"
 
 # Scripted / exploratory interaction.
 vlmkit inspect interact <html|url> --sequence <path.json>
@@ -291,7 +310,10 @@ vlmkit stress media <html>                     # forced-colors, reduced-motion, 
 
 All emit a self-contained Markdown report under `--output-dir`. Each
 finding includes pasteable hex / px values + a heuristic remediation
-hint. See `docs/reports/2026-05-13-capability-survey.md` for the full
+hint. `build component` also writes a machine-readable `report.json`
+twin next to `report.md` (the full `ComponentFromImageReport` object)
+so agents can consume the signals without scraping Markdown. See
+`docs/reports/2026-05-13-capability-survey.md` for the full
 scenario × coverage matrix.
 
 Snapshot labels are query-aware by default, so `/issues` and `/issues?severity=critical` no longer share the same baseline name.

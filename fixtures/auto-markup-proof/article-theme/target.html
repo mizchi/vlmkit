@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Release notes</title>
+<style>
+  :root {
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --surface-2: #f1f5f9;
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --border: #e2e8f0;
+    --accent: #2563eb;
+    --accent-text: #ffffff;
+    --badge-bg: #dbeafe;
+    --badge-text: #1d4ed8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-2: #334155;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --accent: #3b82f6;
+      --accent-text: #0f172a;
+      --badge-bg: #1e3a8a;
+      --badge-text: #bfdbfe;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 32px; display: flex; justify-content: space-between; align-items: center; }
+  .topbar strong { font-size: 16px; }
+  .topbar a { color: var(--text-muted); text-decoration: none; font-size: 14px; margin-left: 20px; }
+  .wrap { max-width: 720px; margin: 32px auto; padding: 0 24px; }
+  .article { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; }
+  .badges { display: flex; gap: 8px; }
+  .badge { background: var(--badge-bg); color: var(--badge-text); font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; }
+  h1 { font-size: 28px; margin-top: 14px; }
+  .meta { color: var(--text-muted); font-size: 13px; margin-top: 6px; }
+  .article p { margin-top: 16px; font-size: 15px; line-height: 1.6; }
+  pre { margin-top: 16px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; font-size: 13px; overflow-x: auto; color: var(--text); }
+  .cta { display: inline-block; margin-top: 20px; background: var(--accent); color: var(--accent-text); font-size: 14px; font-weight: 600; padding: 10px 18px; border-radius: 8px; text-decoration: none; }
+  .pagefoot { text-align: center; color: var(--text-muted); font-size: 13px; padding: 24px; }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <strong>vlmkit docs</strong>
+    <nav><a href="#">Guide</a><a href="#">API</a><a href="#">Blog</a></nav>
+  </header>
+  <div class="wrap">
+    <article class="article">
+      <div class="badges"><span class="badge">Release</span><span class="badge">v0.7</span></div>
+      <h1>Composition diffs land in build page</h1>
+      <p class="meta">July 27, 2026 - 4 min read</p>
+      <p>The new build page command pairs component boxes spatially, so a missing card is reported as missing instead of cascading into nonsense pairings.</p>
+      <pre>vlmkit build page target.png current.html --crop crops/</pre>
+      <p>Stacking gap deltas now come with a direction, so an agent can apply "reduce 72px" without guessing which margin grew.</p>
+      <a class="cta" href="#">Read the changelog</a>
+    </article>
+  </div>
+  <footer class="pagefoot">MIT licensed - built for agents</footer>
+</body>
+</html>
