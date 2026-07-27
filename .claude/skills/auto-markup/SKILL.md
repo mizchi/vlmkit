@@ -102,7 +102,11 @@ HTML file must satisfy all of them via `@media`:
   lacks it — implement with `display: none` inside the media query.
   If a viewport's report lists it missing/extra, fix it **inside that
   viewport's media query only**; never regress the converged base.
-- Verify declared breakpoints: `vlmkit scan breakpoints attempt.html`.
+- Verify declared breakpoints: `vlmkit scan breakpoints attempt.html`
+  lists them; `vlmkit check breakpoints attempt.html` renders at
+  B−1/B/B+1 and catches off-by-one boundaries (a width that matches
+  neither regime), elements vanishing exactly on the boundary, and
+  overflow at boundary widths.
 
 ### 3.6 Scrollports (scrollable regions)
 
@@ -115,11 +119,14 @@ Two consequences:
 - Implement with a fixed height + `overflow-y: auto` (the visible
   cut-off row in the screenshot is the tell that the panel scrolls).
 - Verify deterministically that the panel actually scrolls:
-  `vlmkit contract introspect attempt.html` lists detected scrollports
-  (`expectedScrollports`), or measure `scrollHeight > clientHeight`
-  with a small Playwright snippet. A panel that merely *looks* cut off
-  but grew to fit its content is a bug the pixel diff of the default
-  screenshot won't show.
+  `vlmkit scan scroll attempt.html` inventories every real scroll
+  container (axis + overflow px) with no annotations needed, and its
+  `--json` output includes ready `expectedScrollports` entries; it also
+  flags unintended page-level horizontal scroll and overflow:hidden
+  cut-offs. (`vlmkit contract introspect` still works when the markup
+  carries `data-scrollport` annotations.) A panel that merely *looks*
+  cut off but grew to fit its content is a bug the pixel diff of the
+  default screenshot won't show.
 
 ### 3.7 Interactive states (:hover / :focus)
 

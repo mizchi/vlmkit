@@ -180,6 +180,21 @@ describe("vrt CLI tree (cac-based)", () => {
     assert.match(r.stdout, /--skip-reduced-motion/);
   });
 
+  it("`vrt scan scroll --help` delegates to the scroll inventory help", () => {
+    const r = runVrt(["scan", "scroll", "--help"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vlmkit scan scroll <html-or-url>/);
+    assert.match(r.stdout, /expectedScrollports/);
+  });
+
+  it("`vrt check breakpoints --help` delegates to the boundary quickcheck help", () => {
+    const r = runVrt(["check", "breakpoints", "--help"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vlmkit check breakpoints <html-or-url>/);
+    assert.match(r.stdout, /B-1 \/ B \/ B\+1/);
+    assert.match(r.stdout, /--breakpoints <list>/);
+  });
+
   it("`vrt check crater --help` delegates to Crater smoke help", () => {
     const r = runVrt(["check", "crater", "--help"]);
     assert.equal(r.status, 0);
