@@ -1,6 +1,6 @@
 ---
 name: dynamic-markup
-description: Markup with dynamic behavior — recreate a page whose requirements include responsive breakpoints, scrollable panels, and CSS animations from target screenshots plus a short motion brief, then prove the behavior with the deterministic dynamic-gate suite (check breakpoints / scan scroll / check animation / check motion). Static pixel convergence delegates to the auto-markup skill. Works with any agent model including Haiku; the agent's own vision is the only VLM required — no API key. Use when a markup task specifies how the page behaves (resizes, scrolls, animates), not just how one screenshot looks.
+description: Markup with dynamic behavior — recreate a page whose requirements include responsive breakpoints, scrollable panels, and CSS animations from target screenshots plus a short motion brief, then prove the behavior with the deterministic dynamic-gate suite (check breakpoints / scan scroll / check animation / check motion). Static pixel convergence delegates to the auto-markup skill. Works with any agent model — the agent's own vision is the only VLM required, no API key; Haiku handles structure/spacing cheaply, hard 1px endgames measured to need Sonnet (see Model selection). Use when a markup task specifies how the page behaves (resizes, scrolls, animates), not just how one screenshot looks.
 ---
 
 # dynamic-markup
@@ -209,6 +209,38 @@ self-declaration once verdicts became explicit):
   match the target's panel height (Phase A proves it). Passing B2 with
   a too-tall panel shifts everything below it — the S5 proof's main
   residual.
+
+## Model selection for the markup agent (measured 2026-07-28)
+
+A/B on the same task, same prompt, same 12-round budget, current
+toolchain (S7-fresh; pricing = Anthropic per-MTok rates at time of
+measurement — re-check before relying on the dollar figures):
+
+| | Haiku 4.5 ($1/$5) | Sonnet ($3/$15) |
+|---|---|---|
+| Outcome | NOT DONE at 12/12 (stalled on 1px-divider endgame) | **DONE in 9 rounds, zero kickbacks** |
+| Tokens / wall time | 69.6k / ~6 min | 147.8k / ~18 min |
+| Cost per run | ~1x | **~6x** (unit price 3x × tokens 2.1x) |
+
+Guidance:
+
+- **Sonnet — autonomous single-shot work.** Use it when nobody will
+  babysit the loop, when the page must actually reach DONE, or when
+  the task has a hard endgame (precise 1px hairlines, pseudo-element
+  placement, sub-pixel text tuning). It diagnoses with measurements
+  (direct pixel sampling, disposable test copies) instead of guessing.
+- **Haiku — batch / cost-sensitive work with a driver harness.** ~6x
+  cheaper per run and ~3x faster wall-clock, and fine through the
+  structural and spacing phases — but it has a measured ceiling on
+  hairline/endgame precision that more rounds do not fix. Plan for
+  NOT DONE on hard pages: budget handoff legs (~15k tokens/round) and
+  driver verification time, or escalate.
+- **Escalation pattern:** start Haiku; if the trend is flat for ~2
+  legs on the same residual class, hand the CURRENT attempt file plus
+  the verbatim `verify markup` kickback to a Sonnet leg rather than
+  burning more Haiku rounds. Never restart from scratch to escalate.
+- The verifier/driver protocol below applies to BOTH models — Sonnet
+  earns autonomy only while its runs keep independently verifying.
 
 ## Driver / verifier protocol (when running this skill via a subagent)
 

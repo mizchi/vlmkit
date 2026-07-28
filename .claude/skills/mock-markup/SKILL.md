@@ -1,6 +1,6 @@
 ---
 name: mock-markup
-description: Markup from a mock image or screenshot — recreate a page as HTML/CSS when the only input is an exported design image (Figma export, retina screenshot, competitor-site capture) with no reference HTML. Normalizes @2x/@3x exports to CSS pixels (scan mock), then drives the deterministic verify-markup loop to a DONE verdict. Works with any agent model including Haiku; the agent's own vision is the only VLM required — no API key. Use when asked to "implement this mock", "turn this screenshot into HTML", or markup from an image that did not come from this repo's own capture tooling.
+description: Markup from a mock image or screenshot — recreate a page as HTML/CSS when the only input is an exported design image (Figma export, retina screenshot, competitor-site capture) with no reference HTML. Normalizes @2x/@3x exports to CSS pixels (scan mock), then drives the deterministic verify-markup loop to a DONE verdict. Works with any agent model — the agent's own vision is the only VLM required, no API key; Haiku handles structure/spacing cheaply, hard 1px endgames measured to need Sonnet (see Model selection). Use when asked to "implement this mock", "turn this screenshot into HTML", or markup from an image that did not come from this repo's own capture tooling.
 ---
 
 # Mock Markup — image in, verified page out
@@ -74,6 +74,23 @@ caveats:
   capture-vs-capture fixtures. Composition 0/0 + height within
   tolerance is the gate; the diff number is for trend, not for judging
   done.
+
+## Model selection
+
+Measured on this exact task type (S7-fresh A/B, same prompt and
+budget): **Sonnet reached DONE autonomously in 9 rounds (~6x the cost
+per run); Haiku 4.5 stalled NOT DONE at 12 rounds on the 1px-divider
+endgame (~6x cheaper, ~3x faster).** Mock work leans harder on the
+endgame skills (hairline placement, text-tone matching against
+design-tool rasterization) than fixture work does, so the model gap
+matters more here:
+
+- Default to **Sonnet** for a one-off "turn this mock into a page"
+  request that must ship without supervision.
+- Use **Haiku + driver handoffs** when batching many mocks behind a
+  verifier harness and cost dominates; expect to finish hard pages
+  with escalation legs. Full guidance and the escalation pattern:
+  dynamic-markup SKILL.md § Model selection.
 
 ## Done condition
 
