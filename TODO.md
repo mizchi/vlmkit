@@ -273,7 +273,7 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - 方法: 既存 fixture 群の抽出済みコンポーネントクロップ(数百個、正解ラベルは fixture HTML から機械的に得られる)を分類タスクとして与える。候補: `bytedance/ui-tars-1.5-7b`(UI ドメイン学習・ほぼ無料、ただし vlm-region-diff での色リテラル失敗の前科 — 分類は別スキルなので要実測)、`qwen/qwen3-vl-30b-a3b-instruct`、`anthropic/claude-haiku-4-5`。
   - 判断基準: 精度 ≥90% かつレイテンシ ≤2s/クロップ(またはシートで一括)なら verify markup にオプトイン統合。それ未満なら決定論 kind のままで足りる(誤ラベルは誤アドバイスに直結するため、中途半端な精度はゼロより悪い)。
 
-- [ ] **kickback 品質: matched ペアの粒度不一致と top-N 取りこぼし(S9 リプレイで発見)**
+- [x] **kickback 品質: matched ペアの粒度不一致と top-N 取りこぼし(S9 リプレイで発見)** — 2026-07-28 実装済み: kickback に presence プローブを接続し、(1) 大きな dSize でも render が target fill を target box 全面に持つ場合は「size-delta caveat(segmentation grouping の可能性)」を行内表示、(2) extra/missing の同 fill が ±24px 縦近傍にある場合は「near-miss(変位、move it instead)」を同ラウンドで表示。ユニットテスト 5 本(S9 リプレイの実ケース形状)+ DONE fixture 回帰 green。
   - (1) target 側が連結成分としてグループ化した箱(card 全体)と current 側の部分箱(image のみ)が matched になると、dSize が「伸ばせ/縮めろ」と読める誤誘導になる。案: matched ペアの両箱で pixel-presence 相互チェックを行い、片側だけ大きい場合は「grouping mismatch の可能性」を行内に明記する。
   - (2) 抽出 top-N スロットから溢れた実在コンポーネントが、attempt 側で追加された直後に「extra — not in target」と一時誤報告される(次ラウンドで pixel-confirmed 降格)。案: extra 判定前に target 側の同 bbox を直接 pixel-presence して、降格を同ラウンドで行う。
   - 重要度: 強いモデルは自前計測で相殺できたが、Stage-2 LLM 自動修正はこのクラスの行を鵜呑みにするため、その前提条件。
