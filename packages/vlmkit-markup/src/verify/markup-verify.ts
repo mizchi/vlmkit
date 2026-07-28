@@ -49,6 +49,10 @@ export interface TargetVerdict {
   matched: number;
   missing: number;
   extra: number;
+  /** Missing components whose pixels are NOT present at their bbox in the render. */
+  missingBlocking: number;
+  /** Extra components whose pixels are NOT present at their bbox in the target. */
+  extraBlocking: number;
   orderViolations: number;
   gapDeltas: number;
   /** Pixel diff over the union canvas (white-padded), 0..1. */
@@ -57,6 +61,46 @@ export interface TargetVerdict {
   pass: boolean;
   composition: PageComposition;
   calibration?: { matched: number; missing: number; extra: number };
+}
+
+/**
+ * Pixel-presence check for a composition residual — the two-sided
+ * analogue of the `diff region` refutation gate (2026-06-08). The
+ * component extractor segments by connectivity, so a 1px card border
+ * that IS rendered at exactly the right place can still read as
+ * "missing" when a shadow or unrounded corner fuses it into the card
+ * ring on one side (S7 endgame: three legs chased two "missing"
+ * dividers whose pixels were correct all along). Before a missing or
+ * extra blocks the verdict, sample the OTHER side's pixels at the
+ * residual's own bbox (fill tolerance 25 — tight enough that white does
+ * not pass for a light-gray hairline): if the fill is present there, the element
+ * exists and only the segmentation disagrees — report it, don't block
+ * on it. Position still matters: the same line 30px away stays
+ * blocking, because the bbox sample misses it.
+ */
+export function pixelPresence(
+  image: { data: Uint8Array; width: number; height: number },
+  component: Pick<PageComponent, "left" | "top" | "width" | "height" | "hex">,
+  fillTolerance = 25,
+): number {
+  const r0 = parseInt(component.hex.slice(1, 3), 16);
+  const g0 = parseInt(component.hex.slice(3, 5), 16);
+  const b0 = parseInt(component.hex.slice(5, 7), 16);
+  let inside = 0;
+  let matchingPixels = 0;
+  for (let y = component.top; y < component.top + component.height; y++) {
+    if (y < 0 || y >= image.height) continue;
+    for (let x = component.left; x < component.left + component.width; x++) {
+      if (x < 0 || x >= image.width) continue;
+      inside++;
+      const i = (y * image.width + x) * 4;
+      const dist = Math.sqrt(
+        (image.data[i]! - r0) ** 2 + (image.data[i + 1]! - g0) ** 2 + (image.data[i + 2]! - b0) ** 2,
+      );
+      if (dist <= fillTolerance) matchingPixels++;
+    }
+  }
+  return inside === 0 ? 0 : matchingPixels / inside;
 }
 
 export interface GateVerdict {
@@ -282,12 +326,51 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
     const heightTolerance = heightToleranceFor(target.height);
     const heightDelta = shot.height - target.height;
     const heightOk = Math.abs(heightDelta) <= heightTolerance;
-    const pass = composition.missing.length === 0
-      && composition.extra.length === 0
+
+    // Pixel-presence demotion: a missing whose fill is present at its own
+    // bbox in the render (resp. an extra whose fill is present in the
+    // target) is a segmentation disagreement, not absent work. The floor
+    // is self-calibrating: a solid hairline covers ~100% of its bbox in
+    // its own image, but a text blob's strokes cover ~40%, so we demand
+    // the OTHER side reach 60% of whatever the residual covers in the
+    // image it was extracted from.
+    const PRESENCE_RATIO = 0.6;
+    const isSegmentationOnly = (
+      component: PageComponent,
+      ownImage: { data: Uint8Array; width: number; height: number },
+      otherImage: { data: Uint8Array; width: number; height: number },
+    ): boolean => {
+      const self = pixelPresence(ownImage, component);
+      if (self <= 0) return false;
+      return pixelPresence(otherImage, component) >= PRESENCE_RATIO * self;
+    };
+    const missingBlocking = composition.missing.filter((m) => !isSegmentationOnly(m, target, shot));
+    const missingConfirmed = composition.missing.filter((m) => isSegmentationOnly(m, target, shot));
+    const extraBlocking = composition.extra.filter((e) => !isSegmentationOnly(e, shot, target));
+    const extraConfirmed = composition.extra.filter((e) => isSegmentationOnly(e, shot, target));
+
+    const pass = missingBlocking.length === 0
+      && extraBlocking.length === 0
       && composition.orderViolations.length === 0
       && heightOk;
     const targetKickback: string[] = [];
-    if (!pass) targetKickback.push(...kickbackForComposition(label, composition));
+    if (!pass) {
+      targetKickback.push(...kickbackForComposition(label, {
+        ...composition,
+        missing: missingBlocking,
+        extra: extraBlocking,
+      }));
+    }
+    for (const m of missingConfirmed) {
+      targetKickback.push(
+        `${label}: [pixel-confirmed, not blocking] missing #${m.index} (${m.left},${m.top}) ${m.width}x${m.height} ${m.hex} — the pixels ARE at that bbox in your render; the extractor merged the element into a neighbor (shadow / connected border). No action needed unless you also see it visually.`,
+      );
+    }
+    for (const e of extraConfirmed) {
+      targetKickback.push(
+        `${label}: [pixel-confirmed, not blocking] extra (${e.left},${e.top}) ${e.width}x${e.height} ${e.hex} — the target has the same fill at that bbox; segmentation differs, the element is fine.`,
+      );
+    }
     if (!heightOk) {
       const heightBody = `rendered page height ${shot.height}px vs target ${target.height}px (${heightDelta > 0 ? "+" : ""}${heightDelta}px, tolerance ±${heightTolerance}px) — total vertical size is off.`;
       // A large height error displaces everything below the first wrong
@@ -312,6 +395,8 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
       matched: composition.matches.length,
       missing: composition.missing.length,
       extra: composition.extra.length,
+      missingBlocking: missingBlocking.length,
+      extraBlocking: extraBlocking.length,
       orderViolations: composition.orderViolations.length,
       gapDeltas: composition.gapDeltas.length,
       pixelDiffRatio: Number(pixelDiffRatio.toFixed(4)),
@@ -357,7 +442,7 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
   const done = targets.every((t) => t.pass) && gates.every((g) => g.suspects === 0);
   const currentPoint: VerifyTrendPoint = {
     targetsPassed: passing.length,
-    residuals: targets.reduce((n, t) => n + t.missing + t.extra + t.orderViolations, 0),
+    residuals: targets.reduce((n, t) => n + t.missingBlocking + t.extraBlocking + t.orderViolations, 0),
   };
   const previous = previousTrendPoint(options.attempt);
   const trend = previous ? computeTrend(previous, currentPoint) : undefined;
@@ -404,8 +489,10 @@ export function formatMarkupVerifyReport(report: MarkupVerifyReport): string {
     const cal = t.calibration
       ? ` ${DIM}(calibration floor: ${t.calibration.matched} matched, ${t.calibration.missing}/${t.calibration.extra} missing/extra)${RESET}`
       : "";
+    const demoted = (t.missing - t.missingBlocking) + (t.extra - t.extraBlocking);
+    const demotedNote = demoted > 0 ? ` ${DIM}(+${demoted} pixel-confirmed, not blocking)${RESET}` : "";
     lines.push(
-      `  - ${basename(t.target)} ${t.width}x${t.height}: ${mark} — matched ${t.matched}, missing ${t.missing}, extra ${t.extra}, ordering ${t.orderViolations}, pixel diff ${(t.pixelDiffRatio * 100).toFixed(2)}%, rendered height ${t.renderedHeight}px${cal}`,
+      `  - ${basename(t.target)} ${t.width}x${t.height}: ${mark} — matched ${t.matched}, missing ${t.missingBlocking}, extra ${t.extraBlocking}, ordering ${t.orderViolations}, pixel diff ${(t.pixelDiffRatio * 100).toFixed(2)}%, rendered height ${t.renderedHeight}px${demotedNote}${cal}`,
     );
   }
   lines.push("");
