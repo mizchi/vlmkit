@@ -241,6 +241,17 @@ function paddedDiff(
   return diff / (W * H);
 }
 
+/**
+ * Rendered-height tolerance. Height is part of the per-target verdict
+ * (Codex #86): a page with 0/0 components but hundreds of px of blank
+ * space below the target must not print DONE. The tolerance absorbs
+ * rounding/antialias-level drift — r5 shipped DONE at +8px on a 1335px
+ * target, which is fine; +500px of dead space is not.
+ */
+export function heightToleranceFor(targetHeight: number): number {
+  return Math.max(8, Math.round(targetHeight * 0.01));
+}
+
 export interface MarkupVerifyOptions {
   attempt: string;
   targets: string[];
@@ -268,13 +279,17 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
       calibration = { matched: refComp.matches.length, missing: refComp.missing.length, extra: refComp.extra.length };
     }
 
+    const heightTolerance = heightToleranceFor(target.height);
+    const heightDelta = shot.height - target.height;
+    const heightOk = Math.abs(heightDelta) <= heightTolerance;
     const pass = composition.missing.length === 0
       && composition.extra.length === 0
-      && composition.orderViolations.length === 0;
+      && composition.orderViolations.length === 0
+      && heightOk;
     if (!pass) kickback.push(...kickbackForComposition(label, composition));
-    if (shot.height !== target.height) {
+    if (!heightOk) {
       kickback.push(
-        `${label}: rendered page height ${shot.height}px vs target ${target.height}px (${shot.height > target.height ? "+" : ""}${shot.height - target.height}px) — total vertical size is off.`,
+        `${label}: rendered page height ${shot.height}px vs target ${target.height}px (${heightDelta > 0 ? "+" : ""}${heightDelta}px, tolerance ±${heightTolerance}px) — total vertical size is off.`,
       );
     }
 
@@ -314,7 +329,7 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
   push("motion", motion.issues, `running ${motion.runningAnimationCount}, reduced-motion rule ${motion.hasReducedMotionRule ? "yes" : "no"}`);
 
   for (const g of gates) {
-    if (g.suspects > 0) kickback.push(`gate ${g.gate}: ${g.suspects} suspect issue(s) — run \`vlmkit check ${g.gate === "scroll" ? "scan scroll" : g.gate}\` for detail and fix them.`);
+    if (g.suspects > 0) kickback.push(`gate ${g.gate}: ${g.suspects} suspect issue(s) — run \`vlmkit ${g.gate === "scroll" ? "scan scroll" : `check ${g.gate}`}\` for detail and fix them.`);
   }
 
   // Passing targets are an asset to protect: when only some targets fail,

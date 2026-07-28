@@ -147,6 +147,9 @@ importers:
       '@mizchi/vlmkit-core':
         specifier: workspace:*
         version: link:../vlmkit-core
+      pixelmatch:
+        specifier: ^7.1.0
+        version: 7.1.0
       playwright:
         specifier: ^1.61.1
         version: 1.61.1

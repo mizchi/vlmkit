@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeTrend, kickbackForComposition } from "./markup-verify.ts";
+import { computeTrend, heightToleranceFor, kickbackForComposition } from "./markup-verify.ts";
 import type { PageComposition, PageComponent, PageMatch } from "../component/page-compose.ts";
 
 test("computeTrend: fewer passing targets is a regression", () => {
@@ -96,4 +96,10 @@ test("kickback reports mid-range IoU matches once, not as root causes", () => {
   assert.equal(lines.length, 1);
   assert.doesNotMatch(lines[0]!, /ROOT-CAUSE/);
   assert.match(lines[0]!, /IoU 0.85/);
+});
+
+test("heightToleranceFor: floor of 8px, then 1% of the target height", () => {
+  assert.equal(heightToleranceFor(400), 8);   // 1% = 4 → floor wins
+  assert.equal(heightToleranceFor(1335), 13); // r5 mobile: +8px passes
+  assert.equal(heightToleranceFor(2905), 29); // S6 tablet: -615px fails by far
 });

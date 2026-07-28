@@ -368,6 +368,15 @@ Run \`vlmkit <command> --help\` for command-specific options.`);
           groupArgs.length === 0 ||
           (groupArgs.length === 1 && groupArgs[0] === HELP_SENTINEL)
         ) {
+          // Bare `vlmkit verify` was the documented legacy alias for
+          // `workflow verify` — printing group help and exiting 0 here
+          // would let CI scripts silently skip verification (Codex #86).
+          // Only the explicit `verify --help` form gets the group help.
+          if (groupName === "verify" && groupArgs.length === 0) {
+            reportDeprecation("verify", "vlmkit workflow verify");
+            await runWorkflow(["verify"]);
+            return;
+          }
           printGroupHelp(groupName);
           return;
         }
