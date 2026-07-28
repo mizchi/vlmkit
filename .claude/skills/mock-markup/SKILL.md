@@ -54,12 +54,21 @@ trend line, fix the first kickback item first), with two mock-specific
 caveats:
 
 - **No `--reference`, so no calibration floor.** Kickback items are
-  still real by default, but a *stable* residual that survives a
-  correct-looking fix may be the mock's own rendering (design-tool
-  antialiasing, embedded photos cresting as components). After TWO
-  rounds where a residual resists a plausible fix, re-read that crop of
-  the mock and decide whether it is reproducible in CSS at all; if not,
-  say so in your report instead of burning rounds.
+  still real by default. A residual may be declared design-tool
+  rendering (and reported instead of fixed) ONLY when ALL of these
+  hold — the S7 run abused this clause to rationalize plain CSS bugs,
+  so the bar is deliberately high:
+  1. it is ≤2px thin OR sits inside an embedded photo/illustration
+     region the intake flagged as noisy;
+  2. you re-read the actual crop and name the pixel evidence (colors,
+     alpha gradient) in your report — "survived my fixes" is not
+     evidence;
+  3. it is NOT a solid-fill component ≥8px tall, NOT a page-height
+     delta, and NOT accompanied by gap/ordering items in the same
+     region — those are always your CSS.
+  A page-height error is never an artifact: it is unclosed spacing,
+  and everything below the first wrong gap is its debris. Fix the
+  gap items before touching anything the height error displaced.
 - **Pixel diff % is advisory.** Font rasterization differs between the
   design tool and Chromium, so expect a higher floor than
   capture-vs-capture fixtures. Composition 0/0 + height within

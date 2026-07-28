@@ -286,12 +286,24 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
       && composition.extra.length === 0
       && composition.orderViolations.length === 0
       && heightOk;
-    if (!pass) kickback.push(...kickbackForComposition(label, composition));
+    const targetKickback: string[] = [];
+    if (!pass) targetKickback.push(...kickbackForComposition(label, composition));
     if (!heightOk) {
-      kickback.push(
-        `${label}: rendered page height ${shot.height}px vs target ${target.height}px (${heightDelta > 0 ? "+" : ""}${heightDelta}px, tolerance ±${heightTolerance}px) — total vertical size is off.`,
-      );
+      const heightBody = `rendered page height ${shot.height}px vs target ${target.height}px (${heightDelta > 0 ? "+" : ""}${heightDelta}px, tolerance ±${heightTolerance}px) — total vertical size is off.`;
+      // A large height error displaces everything below the first wrong
+      // gap, so downstream missing/extra/gap items are mostly its debris
+      // (S7: +325px buried at the bottom while the agent chased 1px
+      // separators for 8 rounds). Promote it to the top of this target's
+      // list; small drifts stay a footnote.
+      if (Math.abs(heightDelta) > heightTolerance * 5) {
+        targetKickback.unshift(
+          `${label}: ROOT-CAUSE CANDIDATE — ${heightBody} Fix the section spacing/gap items to close this FIRST; components below the first wrong gap cannot match until the total height is right.`,
+        );
+      } else {
+        targetKickback.push(`${label}: ${heightBody}`);
+      }
     }
+    kickback.push(...targetKickback);
 
     targets.push({
       target: targetPath,

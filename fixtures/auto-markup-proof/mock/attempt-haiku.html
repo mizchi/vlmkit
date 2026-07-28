@@ -16,6 +16,8 @@
       background-color: rgb(251, 252, 253);
       color: #1a1a1a;
       line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
     /* Header */
@@ -25,7 +27,7 @@
       align-items: center;
       padding: 16px 48px;
       background-color: rgb(251, 252, 253);
-      border-bottom: 1px solid #e5e7eb;
+      border-bottom: none;
     }
 
     .logo {
@@ -176,7 +178,11 @@
     /* Footer */
     footer {
       background-color: #e1e7ef;
-      padding: 24px 48px;
+      height: 59px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 48px;
       text-align: center;
       color: #6b7280;
       font-size: 13px;
