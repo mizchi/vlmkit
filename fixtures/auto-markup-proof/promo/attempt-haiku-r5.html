@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pulse — Ship dashboards in minutes</title>
+  <style>
+    :root {
+      --color-text-primary: #1f2937;
+      --color-text-secondary: #6b7280;
+      --color-text-light: #d1d5db;
+      --color-bg-light: #f5f5f5;
+      --color-bg-white: #ffffff;
+      --color-hero-bg: #0f172a;
+      --color-blue: #2563eb;
+      --color-green-badge: #22c55e;
+      --color-footer-bg: #e5e7eb;
+      --color-card-border: #e5e7eb;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --color-text-primary: #f3f4f6;
+        --color-text-secondary: #9ca3af;
+        --color-text-light: #6b7280;
+      }
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      color: var(--color-text-primary);
+      background: var(--color-bg-white);
+      line-height: 1.6;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 40px;
+      background: var(--color-bg-white);
+      border-bottom: 1px solid var(--color-card-border);
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--color-text-primary);
+    }
+
+    nav {
+      display: flex;
+      gap: 40px;
+    }
+
+    nav a {
+      color: var(--color-text-secondary);
+      text-decoration: none;
+      font-size: 14px;
+      transition: color 0.2s;
+    }
+
+    nav a:hover {
+      color: var(--color-text-primary);
+    }
+
+    /* Hero Section */
+    .hero {
+      background: var(--color-hero-bg);
+      color: #ffffff;
+      padding: 56px 40px;
+      text-align: left;
+      animation: heroEntrance 600ms ease-out forwards;
+      min-height: 280px;
+      display: flex;
+      align-items: center;
+    }
+
+    @keyframes heroEntrance {
+      from {
+        opacity: 0;
+        transform: translateY(14px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .hero {
+        animation: none;
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    .hero-content {
+      max-width: 700px;
+    }
+
+    .live-badge {
+      display: inline-block;
+      background: var(--color-green-badge);
+      color: #ffffff;
+      padding: 6px 14px;
+      border-radius: 24px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      animation: badgePulse 1.2s alternate infinite;
+    }
+
+    @keyframes badgePulse {
+      from {
+        opacity: 1;
+      }
+      to {
+        opacity: 0.55;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .live-badge {
+        animation: none;
+        opacity: 1;
+      }
+    }
+
+    .hero h1 {
+      font-size: 48px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+    }
+
+    .hero p {
+      font-size: 16px;
+      color: #d1d5db;
+      margin-bottom: 32px;
+      max-width: 600px;
+      line-height: 1.5;
+    }
+
+    .cta-button {
+      display: inline-block;
+      background: var(--color-blue);
+      color: #ffffff;
+      padding: 12px 32px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      border: none;
+      transition: background 0.2s;
+    }
+
+    .cta-button:hover {
+      background: #1d4ed8;
+    }
+
+    /* Why Pulse Section */
+    .why-pulse {
+      padding: 28px 40px;
+      background: #f5f6f7;
+    }
+
+    .why-pulse h2 {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: var(--color-text-primary);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+
+    .feature-card {
+      background: var(--color-bg-white);
+      padding: 24px;
+      border-radius: 8px;
+      border: 1px solid var(--color-card-border);
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .feature-card h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--color-blue);
+      margin-bottom: 8px;
+    }
+
+    .feature-card p {
+      font-size: 14px;
+      color: var(--color-text-secondary);
+      line-height: 1.6;
+    }
+
+    /* Changelog Section */
+    .changelog {
+      padding: 28px 40px;
+      background: var(--color-bg-white);
+    }
+
+    .changelog h2 {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: var(--color-text-primary);
+    }
+
+    .changelog-list {
+      background: #f5f5f5;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      height: 224px;
+      overflow-y: auto;
+    }
+
+    .changelog-item {
+      display: flex;
+      gap: 16px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--color-card-border);
+      align-items: flex-start;
+    }
+
+    .changelog-item:last-child {
+      border-bottom: none;
+    }
+
+    .changelog-date {
+      font-size: 12px;
+      color: #9ca3af;
+      font-weight: 500;
+      min-width: 50px;
+      flex-shrink: 0;
+    }
+
+    .changelog-description {
+      font-size: 14px;
+      color: var(--color-text-primary);
+    }
+
+    /* Footer */
+    footer {
+      background: #e1e7ef;
+      padding: 18px 40px;
+      text-align: center;
+      font-size: 14px;
+      color: var(--color-text-secondary);
+      width: 100%;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      header {
+        padding: 12px 16px;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .logo {
+        font-size: 20px;
+      }
+
+      nav {
+        gap: 18px;
+        font-size: 12px;
+      }
+
+      .hero {
+        padding: 48px 24px;
+        min-height: auto;
+      }
+
+      .hero h1 {
+        font-size: 28px;
+        margin-bottom: 14px;
+      }
+
+      .hero p {
+        font-size: 13px;
+        margin-bottom: 28px;
+      }
+
+      .live-badge {
+        font-size: 11px;
+        padding: 6px 13px;
+        margin-bottom: 18px;
+      }
+
+      .cta-button {
+        padding: 11px 26px;
+        font-size: 14px;
+      }
+
+      .why-pulse {
+        padding: 40px 24px;
+      }
+
+      .why-pulse h2 {
+        font-size: 24px;
+        margin-bottom: 24px;
+      }
+
+      .features-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+
+      .feature-card {
+        padding: 20px;
+      }
+
+      .feature-card h3 {
+        font-size: 14px;
+        margin-bottom: 8px;
+      }
+
+      .feature-card p {
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .changelog {
+        padding: 40px 24px;
+      }
+
+      .changelog h2 {
+        font-size: 24px;
+        margin-bottom: 16px;
+      }
+
+      .changelog-list {
+        height: 228px;
+      }
+
+      .changelog-item {
+        gap: 14px;
+        padding: 12px 18px;
+      }
+
+      .changelog-date {
+        font-size: 11px;
+        min-width: 45px;
+      }
+
+      .changelog-description {
+        font-size: 12px;
+      }
+
+      footer {
+        padding: 16px;
+        font-size: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">Pulse.</div>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#changelog">Changelog</a>
+      <a href="#pricing">Pricing</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div class="hero-content">
+      <div class="live-badge">LIVE</div>
+      <h1>Ship dashboards in minutes</h1>
+      <p>Pulse turns your metrics into shareable dashboards with zero config. Connect a source and publish.</p>
+      <button class="cta-button">Start free</button>
+    </div>
+  </section>
+
+  <section class="why-pulse" id="features">
+    <h2>Why Pulse</h2>
+    <div class="features-grid">
+      <div class="feature-card">
+        <h3>Instant charts</h3>
+        <p>Point Pulse at a database table and get a chart in one click. No query language required.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Live sync</h3>
+        <p>Dashboards refresh on a schedule you pick, from every minute to once a day.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Share anywhere</h3>
+        <p>Every dashboard gets a private link you can drop into Slack, Notion, or email.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="changelog" id="changelog">
+    <h2>Changelog</h2>
+    <div class="changelog-list">
+      <div class="changelog-item">
+        <div class="changelog-date">Jul 24</div>
+        <div class="changelog-description">Added CSV export for every chart</div>
+      </div>
+      <div class="changelog-item">
+        <div class="changelog-date">Jul 19</div>
+        <div class="changelog-description">New heatmap chart type</div>
+      </div>
+      <div class="changelog-item">
+        <div class="changelog-date">Jul 12</div>
+        <div class="changelog-description">Dashboard folders and search</div>
+      </div>
+      <div class="changelog-item">
+        <div class="changelog-date">Jul 05</div>
+        <div class="changelog-description">Postgres 17 connector support</div>
+      </div>
+      <div class="changelog-item">
+        <div class="changelog-date">Jun 28</div>
+        <div class="changelog-description">Faster initial dashboard load</div>
+      </div>
+      <div class="changelog-item">
+        <div class="changelog-date">Jun 21</div>
+        <div class="changelog-description">Slack alerts on metric thresholds</div>
+      </div>
+      <div class="changelog-item">
+        <div class="changelog-date">Jun 14</div>
+        <div class="changelog-description">Custom date ranges in filters</div>
+      </div>
+      <div class="changelog-item">
+        <div class="changelog-date">Jun 07</div>
+        <div class="changelog-description">Team roles: viewer and editor</div>
+      </div>
+      <div class="changelog-item">
+        <div class="changelog-date">May 30</div>
+        <div class="changelog-description">Dark mode for embedded charts</div>
+      </div>
+      <div class="changelog-item">
+        <div class="changelog-date">May 23</div>
+        <div class="changelog-description">Public beta opens to everyone</div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    © 2026 Pulse Analytics — status.pulse.dev
+  </footer>
+</body>
+</html>
