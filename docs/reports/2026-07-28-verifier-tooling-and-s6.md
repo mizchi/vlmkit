@@ -218,3 +218,69 @@ KPI 台帳: S7 = 556,216 tokens / 43 rounds / done(モード初回 +
 
 KPI 台帳: S7-fresh(Haiku)= 69,644 / 12r / 未達、
 S7-fresh(Sonnet)= 147,848 / 9r / **done(自律・差し戻しゼロは初)**。
+
+## 追記4: S8〜S10 — シナリオ拡張 3 本(2026-07-28)
+
+ユーザー承認の優先順で 3 シナリオを実施: S8(既存ページ改修 =
+edit モード)→ S9(sticky/snap ランディング = check scroll 実戦)→
+S10(実スクリーンショット mock = 劣化キャプチャ)。
+
+### S8: edit モード — 既存ページ + 改修指示 + 最小差分規律
+
+fixture: `fixtures/auto-markup-proof/edit/`(Nimbus 料金ページ)。
+入力は base.html + 改修後ターゲット画像 + 指示書。done 条件は
+verify markup DONE **かつ** `verify-untouched.mjs`(base と target の
+行差分から「触ってよい行帯」を導出し、帯外は base と 6/channel 以内で
+一致することを要求)の PASS。
+
+| | Haiku 4.5 | Sonnet |
+|---|---:|---:|
+| verdict | **DONE + untouched PASS** | **DONE + untouched PASS** |
+| rounds | 1 fix(初回 verify 4 residuals → 1 修正) | 0 fix(初回 verify で DONE) |
+| tokens | **44,501** | 68,495 |
+
+- **edit モードは Haiku 領域と確定**。ゼロから作る mock と違い、
+  正解 CSS の 9 割が既に手元にある。エンドゲームが発生しない。
+- 教訓(fixture 事故): base/redesign に書いた作問コメント
+  (「DO NOT CHANGE」等)が Sonnet ランに正解リストとして漏洩。
+  コメント除去 + 再レンダ後に Haiku をクリーン再走(上表の Haiku は
+  クリーン、Sonnet は汚染された数字 — 参考値)。**作問メタ情報は
+  fixture 本体に書かない**こと。
+
+### S10: 実スクリーンショット mock — 劣化キャプチャ宣言モード
+
+fixture: `fixtures/auto-markup-proof/realshot/`(Meridian 雑誌 LP)。
+入力は dpr=2 + JPEG q80 → PNG 再変換の 2560px スクリーンショット 1 枚
+(実運用の「ブラウザでスクショ撮って渡す」経路の再現)。
+
+- **ツール追加**: `scan mock --capture real` が sidecar
+  `<out>.meta.json {degraded:true}` を書き、verify markup が読んで
+  劣化許容(minArea 1400 / presence ratio 0.45 / fill tolerance 35)に
+  切替。**キャプチャ品質は宣言制** — 自動判定は 3 指標
+  (bg 偏差・平坦ジッタ・8x8 ブロック性)全て交絡で不成立を確認済み。
+- 校正: reference 自身の劣化スクショに対し 0/0 を確認(宣言なしだと
+  ピクセル完全な自己ページすら FAIL する)。
+- **Sonnet: 2 ラウンドで DONE、58,103 tokens**。pixel diff 36% は
+  advisory(写真領域をグラデ近似で再現するため高いのは設計通り)。
+  目視クロップ比較で構図・コピー・パレット一致を確認済み。
+
+### S9: sticky/snap ランディング — check scroll の実戦(結果は下記)
+
+fixture: `fixtures/auto-markup-proof/scrollpage/`(Atlas LP:
+sticky topbar + x-mandatory snap rail + fixed FAB)。done 条件は
+verify markup DONE + `check scroll` status ok 維持。
+
+- ツール修正(校正段階): rail が snap 範囲端 388px で静止 →
+  candidates(0/400/800/1200)不達で snap-not-snapping 誤検出。
+  CSS snap は到達不能位置を境界にクランプするため、
+  `|settled - maxOffset| <= 3` を整列として許容(SnapSample に
+  maxOffset 追加)。修正後 reference 校正クリーン。
+- **Haiku レグ: 12/12 ラウンド消費で NOT DONE、77,621 tokens** —
+  ただし**挙動系は完全達成**(check scroll status ok: sticky 保持・
+  rail 4 children aligned・fixed FAB 保持・overflow-x なし)。
+  静的 composition で膠着: 高さ +41px、fixed ボタンの fullPage 撮影時
+  座標(1195,720)、card-4 右端スリバー欠落、y=243 の 1px divider。
+  fixed 要素が fullPage スクショに 1 回だけ描画される座標系の理解を
+  要求する点が、S7 の 1px divider と同型の「Haiku の壁」。
+- skill のエスカレーションパターン通り、**現物 attempt + kickback
+  逐語を Sonnet レグに手渡し**(リスタートせず)。結果は追記5。
