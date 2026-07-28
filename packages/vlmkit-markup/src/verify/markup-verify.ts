@@ -38,6 +38,11 @@ import {
   type PageComponent,
 } from "../component/page-compose.ts";
 import { kindLabel } from "../component/component-classify.ts";
+import {
+  captureRegionElementsFromHtml,
+  matchRegionBboxToElement,
+  type RegionElementRect,
+} from "../region-selector-match.ts";
 
 /** "[text] " style prefix when the pixel-stat kind is informative. */
 function kindTag(c: PageComponent): string {
@@ -177,9 +182,33 @@ function fillDistanceHex(a: string, b: string): number {
  * ordering / gap residual, with the displacement interpretation applied
  * (a missing paired with a same-fill extra is one element in the wrong
  * place — the agent must move it, not add/remove it).
+ *
+ * When `elements` (attempt DOM rects) are provided, residuals carry a
+ * deterministic selector attribution — the `diff png --elements-html`
+ * pattern both A/B validation agents asked for, ported to this loop.
+ * Current-side boxes name the element that RENDERS the residual;
+ * target-side (missing) boxes name the attempt element the target box
+ * falls into, i.e. where to build.
  */
-export function kickbackForComposition(label: string, c: PageComposition): string[] {
+export function kickbackForComposition(
+  label: string,
+  c: PageComposition,
+  elements?: RegionElementRect[],
+): string[] {
   const lines: string[] = [];
+  const selectorNote = (
+    box: { left: number; top: number; width: number; height: number },
+    phrase: string,
+  ): string => {
+    if (!elements || elements.length === 0) return "";
+    const m = matchRegionBboxToElement(box, elements);
+    if (!m) return "";
+    return ` [${phrase} \`${m.selector}\`]`;
+  };
+  const renderedBy = (p: PageComponent): string =>
+    selectorNote(p, "rendered by");
+  const buildSite = (p: PageComponent): string =>
+    selectorNote(p, "target box falls in your");
   // Catastrophically mis-sized matched components go FIRST: in S5-r5 a
   // collapsed hero (IoU 0.04, dSize -280px) was the root cause of most of
   // the missing/extra list, but it was buried below them — the agent fixed
@@ -187,7 +216,7 @@ export function kickbackForComposition(label: string, c: PageComposition): strin
   for (const m of c.matches) {
     if (m.iou < 0.5 && Math.min(m.target.height, m.current.height) > 4) {
       lines.push(
-        `${label}: ROOT-CAUSE CANDIDATE — matched #${m.target.index} has collapsed geometry (IoU ${m.iou}, dPos (${m.deltaLeft},${m.deltaTop}), dSize (${m.deltaWidth},${m.deltaHeight})). Target box: (${m.target.left},${m.target.top}) ${m.target.width}x${m.target.height}. Restore this FIRST — the missing/extra items below are often its debris.`,
+        `${label}: ROOT-CAUSE CANDIDATE — matched #${m.target.index} has collapsed geometry (IoU ${m.iou}, dPos (${m.deltaLeft},${m.deltaTop}), dSize (${m.deltaWidth},${m.deltaHeight})). Target box: (${m.target.left},${m.target.top}) ${m.target.width}x${m.target.height}. Restore this FIRST — the missing/extra items below are often its debris.${renderedBy(m.current)}`,
       );
     }
   }
@@ -201,11 +230,11 @@ export function kickbackForComposition(label: string, c: PageComposition): strin
     if (twin) {
       claimedExtra.add(twin.index);
       lines.push(
-        `${label}: missing #${m.index} (${m.left},${m.top}) ${m.width}x${m.height} ${m.hex} is likely your own element DISPLACED to (${twin.left},${twin.top}) ${twin.width}x${twin.height} — move/resize it (fix the space above it), do not add a new element.`,
+        `${label}: missing #${m.index} (${m.left},${m.top}) ${m.width}x${m.height} ${m.hex} is likely your own element DISPLACED to (${twin.left},${twin.top}) ${twin.width}x${twin.height} — move/resize it (fix the space above it), do not add a new element.${renderedBy(twin)}`,
       );
     } else {
       lines.push(
-        `${label}: missing #${m.index} ${kindTag(m)}(${m.left},${m.top}) ${m.width}x${m.height} fill ${m.hex} — genuinely absent; build it.`,
+        `${label}: missing #${m.index} ${kindTag(m)}(${m.left},${m.top}) ${m.width}x${m.height} fill ${m.hex} — genuinely absent; build it.${buildSite(m)}`,
       );
     }
   }
@@ -215,7 +244,7 @@ export function kickbackForComposition(label: string, c: PageComposition): strin
       ? "this is a TEXT block — read the crop before touching it; the fix is usually its color/weight or the space around it, NEVER deleting visible text"
       : "remove, merge, or restyle (a too-dark fill can make an interior crest as a component)";
     lines.push(
-      `${label}: extra ${kindTag(e)}(${e.left},${e.top}) ${e.width}x${e.height} fill ${e.hex} — not in target; ${advice}.`,
+      `${label}: extra ${kindTag(e)}(${e.left},${e.top}) ${e.width}x${e.height} fill ${e.hex} — not in target; ${advice}.${renderedBy(e)}`,
     );
   }
   for (const v of c.orderViolations) {
@@ -226,14 +255,14 @@ export function kickbackForComposition(label: string, c: PageComposition): strin
   for (const g of c.gapDeltas) {
     const dir = g.delta > 0 ? `reduce ${g.delta}px` : `add ${-g.delta}px`;
     lines.push(
-      `${label}: gap #${g.above} -> #${g.below} is ${g.currentGap}px vs target ${g.targetGap}px — ${dir} of vertical space between them.`,
+      `${label}: gap #${g.above} -> #${g.below} is ${g.currentGap}px vs target ${g.targetGap}px — ${dir} of vertical space between them.${(() => { const below = c.matches.find((x) => x.target.index === g.below); return below ? selectorNote(below.current, "the gap sits above") : ""; })()}`,
     );
   }
   for (const m of c.matches) {
     // < 0.5 already reported up top as a root-cause candidate.
     if (m.iou >= 0.5 && m.iou < 0.9 && Math.min(m.target.height, m.current.height) > 4) {
       lines.push(
-        `${label}: matched #${m.target.index} IoU ${m.iou} — dPos (${m.deltaLeft},${m.deltaTop}), dSize (${m.deltaWidth},${m.deltaHeight}); converge size/position.`,
+        `${label}: matched #${m.target.index} IoU ${m.iou} — dPos (${m.deltaLeft},${m.deltaTop}), dSize (${m.deltaWidth},${m.deltaHeight}); converge size/position.${renderedBy(m.current)}`,
       );
     }
   }
@@ -312,11 +341,31 @@ export interface MarkupVerifyOptions {
   attempt: string;
   targets: string[];
   reference?: string;
+  /**
+   * Attach deterministic selector attributions to kickback residuals
+   * (attempt DOM rects hit-tested per residual bbox). Default true;
+   * costs one extra page load per distinct target width.
+   */
+  fixContext?: boolean;
 }
 
 export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<MarkupVerifyReport> {
   const targets: TargetVerdict[] = [];
   const kickback: string[] = [];
+  const fixContext = options.fixContext ?? true;
+  const elementsByWidth = new Map<number, RegionElementRect[]>();
+  const attemptElements = async (width: number, height: number): Promise<RegionElementRect[]> => {
+    let cached = elementsByWidth.get(width);
+    if (!cached) {
+      try {
+        cached = await captureRegionElementsFromHtml(options.attempt, { width, height: Math.min(height, 4000) });
+      } catch {
+        cached = []; // attribution is garnish — never fail the verdict over it
+      }
+      elementsByWidth.set(width, cached);
+    }
+    return cached;
+  };
 
   let widest = 1280;
   for (const targetPath of options.targets) {
@@ -382,11 +431,12 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
       && heightOk;
     const targetKickback: string[] = [];
     if (!pass) {
+      const elements = fixContext ? await attemptElements(target.width, target.height) : undefined;
       targetKickback.push(...kickbackForComposition(label, {
         ...composition,
         missing: missingBlocking,
         extra: extraBlocking,
-      }));
+      }, elements));
     }
     for (const m of missingConfirmed) {
       targetKickback.push(
@@ -548,6 +598,7 @@ listing every residual. Add --reference to print the calibration floor.
 Options:
   --target <png>       Target screenshot (repeatable; width/height define the render viewport)
   --reference <html>   Reference page measured against the same targets (calibration floor)
+  --no-fix-context     Skip selector attribution on kickback residuals (saves one page load)
   --json               Print JSON report`);
   process.exit(exitCode);
 }
@@ -557,12 +608,14 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   const targets: string[] = [];
   let reference: string | undefined;
   let json = false;
+  let fixContext = true;
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === "--target") targets.push(argv[++i]!);
     else if (arg === "--reference") reference = argv[++i]!;
     else if (arg === "--json") json = true;
+    else if (arg === "--no-fix-context") fixContext = false;
     else if (!arg.startsWith("-")) positional.push(arg);
   }
   const attempt = positional[0];
@@ -571,7 +624,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   for (const t of targets) if (!existsSync(t)) throw new Error(`Target not found: ${t}`);
   if (reference && !existsSync(reference)) throw new Error(`Reference not found: ${reference}`);
 
-  const report = await runMarkupVerify({ attempt, targets, ...(reference ? { reference } : {}) });
+  const report = await runMarkupVerify({ attempt, targets, fixContext, ...(reference ? { reference } : {}) });
   if (json) {
     console.log(JSON.stringify(report, null, 2));
   } else {

@@ -347,3 +347,54 @@ copy manifest を必ず同梱すること — 18 ラウンド誰も気づかな�
   font-metric 級の reflow と、そもそもゲートの外にあったコピー誤り。
 - ウォッチ項目更新: (1) 「ツールの誤報告」ラベルの自己適用、
   (2) copy manifest 非同梱ブリーフの禁止。
+
+## 追記6: S8〜S10 の経験から起こした新ツール 3 本(2026-07-28)
+
+S9 の 3 大教訓(コピー誤りの不可視性、kickback の誤解釈、セレクタ帰属
+の導出コスト)をその日のうちにツール化した。設計原則は全ツール共通:
+**VLM/vision は「読む・見る」だけ、座標と数値は決定論**(diff region
+の実測失敗から導いた原則の再適用)。
+
+### 1. `check copy --target` — ピクセル側コピー検証
+
+attempt の DOM テキストブロック(inline をまとめた block 単位 + bbox)
+を集め、**同じ bbox を target 画像から切り出して**コンタクトシート化。
+キーレスでは worksheet(行ごとの期待文字列)と共にエージェント自身の
+vision で照合、`--vlm` があれば VLM がクロップを転記して自動突合
+(引用符・ダッシュ類の書体差は正規化、大小文字と `·` は有意のまま)。
+acid test: S9 の 3 バグ(© 2025/2026、`·` 欠落、Imlil→Imili)が
+**シート 1 枚の一読で全部見える**ことを確認。attempt 行より target の
+行が長い「語の脱落」型のため右端に 25% のはみ出し余白を確保。
+mock-markup の done 条件に「シートレビュー済み」を追加。
+
+### 2. コンポーネント kind 分類 — bigJump 判別器
+
+抽出コンポーネントを hairline/solid/text/image/mixed に決定論分類。
+量子化色の遷移回数ではテキストとグラデーションを区別できない
+(どちらも高頻度遷移)が、**遷移の跳躍幅**(隣接ピクセルの最大
+チャンネル差 > 48 の密度)が実レンダ実測で完全分離: テキスト
+0.13〜0.52(クリーン・JPEG 劣化とも)vs 写真/グラデ/solid 0〜0.005。
+用途は 2 層 — (a) kickback の `[text]` タグ + 保護アドバイス
+(「クロップを読んでから。可視テキストの削除は絶対にしない」= S7
+leg-5 の事故クラス対策)、(b) ペアリングゲート(confident な
+solid↔text/image のみ遮断; 境界例は non-confident でゲートしない)。
+VLM 意味ラベル(button/nav 等)はキーが無くベンチ不能のため
+TODO backlog へ(精度 ≥90% でなければ採用しない基準も明記)。
+
+### 3. kickback セレクタ帰属(fix-context、既定 ON)
+
+`region-selector-match`(06/06 A/B で両検証エージェントが要求した
+決定論 bbox→DOM ヒットテスト)を verify markup に接続。残差ごとに
+attempt 自身の DOM rect と突合し、current 側は
+`[rendered by \`.footer\`]`、missing は
+`[target box falls in your \`.rail\`]`(= 作る場所)を付記。
+S9 の実残差で検証: Sonnet レグが数ラウンドかけて特定した
+`.footer` 帰属が kickback 1 行目から出る。重なる要素が無い場合は
+無注釈(fixed 要素の完全消失など — 誤帰属より無言が正しい)。
+`--no-fix-context` でオプトアウト。
+
+回帰: 既 DONE の 7 fixture 全て DONE 維持、markup パッケージ
+256 pass(+22)、CLI 27/27。残る構想(LLM Stage-2 が kickback +
+帰属セレクタから修正案を自動生成し apply-and-rollback で適用)は
+API キーが要るため、fix-loop の実証済みアーキテクチャを流用する
+前提で backlog に積んだ。

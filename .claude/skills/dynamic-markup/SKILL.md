@@ -186,6 +186,15 @@ self-declaration once verdicts became explicit):
 - ONE targeted fix per round. Fix the FIRST kickback item first — the
   list is ordered, and a ROOT-CAUSE CANDIDATE line means the items
   below it are probably debris of that one defect.
+- Kickback items carry deterministic context: a `[kind]` tag
+  (text/solid/image — a text extra is NEVER fixed by deleting the
+  text) and a selector attribution (`[rendered by \`.footer\`]`,
+  `[target box falls in your \`.rail\`]`) from hit-testing the
+  residual bbox against your own DOM rects. Start from the named
+  selector instead of re-deriving which element owns the residual —
+  the S9 escalation leg spent rounds on exactly that derivation. No
+  attribution printed means no element overlaps the box (commonly a
+  fully missing `position: fixed` element).
 - The verdict prints a `trend vs previous run` line; on REGRESSED,
   revert your last change before trying anything else.
 - When some targets pass and others fail, the kickback says which to

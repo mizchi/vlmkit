@@ -209,7 +209,7 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
     selector: { spec: SPECS.selectorHeal, desc: "Suggest replacements for a selector that no longer matches" },
   },
   verify: {
-    markup: { spec: SPECS.markupVerify, desc: "One-shot done-condition verdict: composition per target + gates + pixel diff + kickback list" },
+    markup: { spec: SPECS.markupVerify, desc: "One-shot done-condition verdict: composition per target + gates + pixel diff + kickback list with selector attribution" },
   },
 };
 
