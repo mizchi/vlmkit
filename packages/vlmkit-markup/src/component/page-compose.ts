@@ -89,6 +89,8 @@ export interface ComposePageOptions extends ExtractComponentsOptions {
   maxCenterDistance?: number;
   /** Max area ratio for a pairing. Default 6 (looser than rank matching — position already constrains). */
   maxAreaRatio?: number;
+  /** Max Euclidean RGB distance between fills for a pairing. Default 80. */
+  maxFillDistance?: number;
   /** |gap delta| below this is not reported. Default 4px. */
   gapTolerance?: number;
   /** Vertical-order comparisons ignore flips smaller than this. Default 8px. */
@@ -146,11 +148,26 @@ export function matchPageComponents(
 ): { matches: PageMatch[]; missing: PageComponent[]; extra: PageComponent[] } {
   const maxCenter = options.maxCenterDistance ?? 0.25;
   const maxAreaRatio = options.maxAreaRatio ?? 6;
+  const maxFillDistance = options.maxFillDistance ?? 80;
   const diag = Math.sqrt(pageWidth ** 2 + pageHeight ** 2) || 1;
+
+  // A hairline (1-2px thin) and a blob are never the same element even
+  // when their centers and areas agree — in S7 a 76x11 text fragment
+  // paired with a 368x1 divider, hiding a real missing divider AND a
+  // real extra fragment behind one nonsense match.
+  const isHairline = (p: PageComponent): boolean => p.height <= 2 || p.width <= 2;
 
   const scorePair = (t: PageComponent, c: PageComponent): number | null => {
     const ratio = Math.max(t.area, c.area) / Math.max(1, Math.min(t.area, c.area));
     if (ratio > maxAreaRatio) return null;
+    if (isHairline(t) !== isHairline(c)) return null;
+    // Fill acts as identity, not just a report: a pair whose fills are
+    // this far apart (#b3b6bd text vs #e2e8f0 line; S6's #e2edfe vs
+    // #3c5ab6, d=233) is two different elements, and matching them
+    // suppresses both real residuals. Deliberate-but-wrong colors the
+    // agent still has to fix surface as a missing+extra pair instead —
+    // strictly more actionable than a silently poisoned match.
+    if (fillDistance(t, c) > maxFillDistance) return null;
     const [tx, ty] = center(t);
     const [cx, cy] = center(c);
     const centerDist = Math.sqrt((tx - cx) ** 2 + (ty - cy) ** 2) / diag;

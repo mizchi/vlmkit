@@ -143,6 +143,7 @@ const SPECS: Record<string, Spec> = {
   markupVerify: spec("markup-verify", () => import("@mizchi/vlmkit-markup/verify/markup-verify.ts")),
   copyCheck: spec("copy-check", () => import("@mizchi/vlmkit-markup/inspect/copy-check.ts")),
   scrollBehavior: spec("scroll-behavior", () => import("@mizchi/vlmkit-markup/inspect/scroll-behavior.ts")),
+  mockScan: spec("mock-scan", () => import("@mizchi/vlmkit-markup/inspect/mock-scan.ts")),
   craterSmoke: spec("crater-smoke", () => import("@mizchi/vlmkit-capture/crater-smoke.ts")),
   perf: spec("perf", () => import("../util/perf.ts")),
   explore: spec("explore", () => import("@mizchi/vlmkit-markup/inspect/explore.ts")),
@@ -193,6 +194,7 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
     component: { spec: SPECS.componentExtract, desc: "Detect components in a screenshot; crop to standalone PNGs" },
     breakpoints: { run: runDiscover, desc: "Discover responsive breakpoints from HTML/CSS (verify them with `check breakpoints`)" },
     scroll: { spec: SPECS.scrollScan, desc: "Annotation-free scroll inventory: containers, page overflow-x, clipped content" },
+    mock: { spec: SPECS.mockScan, desc: "Mock-image intake: infer @2x/@3x scale, write normalized @1x target, extraction sanity" },
   },
   build: {
     component: { spec: SPECS.componentFromImage, desc: "Build a component from a target screenshot" },
@@ -343,7 +345,7 @@ Common command groups:
   vlmkit check a11y|palette|tokens|theme|motion|animation|breakpoints|scroll|copy|crater|perf|drift
   vlmkit inspect interact|explore|smoke
   vlmkit stress i18n|media
-  vlmkit scan component|breakpoints|scroll
+  vlmkit scan component|breakpoints|scroll|mock
   vlmkit build component|page
   vlmkit contract introspect|validate|scaffold
   vlmkit heal selector
@@ -368,6 +370,15 @@ Run \`vlmkit <command> --help\` for command-specific options.`);
           groupArgs.length === 0 ||
           (groupArgs.length === 1 && groupArgs[0] === HELP_SENTINEL)
         ) {
+          // Bare `vlmkit verify` was the documented legacy alias for
+          // `workflow verify` — printing group help and exiting 0 here
+          // would let CI scripts silently skip verification (Codex #86).
+          // Only the explicit `verify --help` form gets the group help.
+          if (groupName === "verify" && groupArgs.length === 0) {
+            reportDeprecation("verify", "vlmkit workflow verify");
+            await runWorkflow(["verify"]);
+            return;
+          }
           printGroupHelp(groupName);
           return;
         }

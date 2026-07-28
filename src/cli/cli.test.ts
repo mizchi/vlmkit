@@ -172,6 +172,13 @@ describe("vrt CLI tree (cac-based)", () => {
     assert.match(r.stdout, /--fail-on-suspect/);
   });
 
+  it("`vrt scan mock --help` delegates to the mock intake help", () => {
+    const r = runVrt(["scan", "mock", "--help"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vlmkit scan mock <image.png>/);
+    assert.match(r.stdout, /--width <px>/);
+  });
+
   it("`vrt check scroll --help` delegates to the scroll-behavior help", () => {
     const r = runVrt(["check", "scroll", "--help"]);
     assert.equal(r.status, 0);

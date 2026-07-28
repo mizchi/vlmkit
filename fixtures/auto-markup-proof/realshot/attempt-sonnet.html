@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Meridian — Issue 14</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+    background: #fefdf8;
+    color: #1a1a1a;
+    width: 1280px;
+  }
+
+  header {
+    height: 66px;
+    padding: 0 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid #1a1a1a;
+    background: #fefdf8;
+  }
+
+  .masthead {
+    font-family: Georgia, "Times New Roman", serif;
+    font-weight: 700;
+    font-size: 26px;
+    letter-spacing: 1px;
+    color: #1a1a1a;
+  }
+
+  .issue-line {
+    font-size: 13px;
+    color: #6b6b6b;
+  }
+
+  .hero {
+    position: relative;
+    height: 422px;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 68% 45%, rgba(252, 224, 190, 0.85) 0%, rgba(252, 224, 190, 0) 32%),
+      linear-gradient(135deg,
+        #6fb4e6 0%,
+        #f0a3b2 20%,
+        #e88a3e 42%,
+        #f4d3ad 55%,
+        #b25a24 75%,
+        #3c1a0c 100%);
+  }
+
+  .hero-copy {
+    position: absolute;
+    left: 52px;
+    bottom: 36px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .hero-label {
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #e7cf9e;
+    margin-bottom: 12px;
+  }
+
+  .hero-title {
+    font-family: Georgia, "Times New Roman", serif;
+    font-weight: 700;
+    font-size: 40px;
+    line-height: 1.1;
+    color: #ffffff;
+    margin-bottom: 12px;
+  }
+
+  .hero-subtitle {
+    font-family: Georgia, "Times New Roman", serif;
+    font-style: italic;
+    font-size: 15px;
+    color: #f3ece2;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 30px;
+    padding: 39px 52px 67px;
+  }
+
+  .card-image {
+    height: 130px;
+    width: 100%;
+  }
+
+  .card-image.blue {
+    background: linear-gradient(135deg, #0f7fc0 0%, #5cc0e6 50%, #eaf7ff 100%);
+  }
+
+  .card-image.green {
+    background: linear-gradient(135deg, #b8f0c8 0%, #1fa855 48%, #0a5c2c 100%);
+  }
+
+  .card-image.purple {
+    background: linear-gradient(135deg, #6a1fb0 0%, #a855e0 48%, #f6c6ea 100%);
+  }
+
+  .card h3 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-weight: 700;
+    font-size: 19px;
+    color: #1a1a1a;
+    margin-top: 16px;
+    margin-bottom: 8px;
+  }
+
+  .card p {
+    font-size: 14px;
+    line-height: 1.5;
+    color: #4a4a4a;
+  }
+
+  footer {
+    border-top: 1px solid #d9d7cf;
+    padding: 16px 52px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #86837c;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="masthead">MERIDIAN</div>
+    <div class="issue-line">Issue 14 — Summer 2026</div>
+  </header>
+
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="hero-label">LETTER FROM THE COAST</div>
+      <div class="hero-title">The harbor at closing time</div>
+      <div class="hero-subtitle">Photographs and field notes from six evenings in Essaouira.</div>
+    </div>
+  </section>
+
+  <main class="cards">
+    <div class="card">
+      <div class="card-image blue"></div>
+      <h3>Cold water, long light</h3>
+      <p>Swimming the fjord towns of western Norway in the weeks when the sun barely sets.</p>
+    </div>
+    <div class="card">
+      <div class="card-image green"></div>
+      <h3>The moss keepers</h3>
+      <p>Three generations of gardeners tend Kyoto's oldest temple ground cover by hand.</p>
+    </div>
+    <div class="card">
+      <div class="card-image purple"></div>
+      <h3>Violet hour in the Atacama</h3>
+      <p>Astronomers and vintners share the driest sky on earth, one hour apart.</p>
+    </div>
+  </main>
+
+  <footer>
+    <div>Meridian is printed quarterly in Porto.</div>
+    <div>Subscriptions &middot; Back issues &middot; Stockists</div>
+  </footer>
+</body>
+</html>

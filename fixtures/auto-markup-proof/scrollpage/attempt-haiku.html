@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atlas - Field guides for slow travel</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #ffffff;
+      color: #1c1917;
+    }
+
+    /* Top bar - sticky */
+    .topbar {
+      position: sticky;
+      top: 0;
+      background-color: #1c1917;
+      color: #fafaf9;
+      padding: 14px 44px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      line-height: 1;
+      z-index: 100;
+    }
+
+    .topbar-logo {
+      font-size: 20px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      color: #fafaf9;
+    }
+
+    .topbar-nav {
+      display: flex;
+      gap: 32px;
+    }
+
+    .topbar-nav a {
+      color: #d6d3d1;
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    .topbar-nav a:hover {
+      color: #fafaf9;
+      text-decoration: underline;
+    }
+
+    /* Hero band - off-white, full-bleed */
+    .hero-wrap {
+      background-color: #fafaf9;
+      padding: 40px 44px;
+    }
+
+    .hero-section {
+      max-width: 600px;
+    }
+
+    .hero-title {
+      font-size: 40px;
+      font-weight: bold;
+      line-height: 1.2;
+      margin-bottom: 16px;
+      color: #1c1917;
+    }
+
+    .hero-subtitle {
+      font-size: 16px;
+      color: #57534e;
+      line-height: 1.6;
+    }
+
+    /* Full-width divider under the hero band */
+    .divider {
+      height: 1px;
+      background-color: #e7e5e4;
+    }
+
+    /* White content well - guides + article */
+    .main-wrap {
+      background-color: #ffffff;
+      padding: 32px 44px 19px;
+    }
+
+    .guides-section {
+      margin-bottom: 93px;
+    }
+
+    .guides-title {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 20px;
+      color: #1c1917;
+    }
+
+    /* Card rail - horizontal scroll with snap */
+    .card-rail {
+      display: flex;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      gap: 20px;
+      padding-bottom: 12px;
+      margin-right: -44px;
+      padding-right: 44px;
+    }
+
+    .card-rail::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    .card-rail::-webkit-scrollbar-track {
+      background: #e0e0e0;
+    }
+
+    .card-rail::-webkit-scrollbar-thumb {
+      background: #999;
+      border-radius: 3px;
+    }
+
+    .card {
+      flex: 0 0 380px;
+      scroll-snap-align: start;
+      background-color: #ffffff;
+      border: 1px solid #e7e5e4;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .card-image {
+      width: 100%;
+      height: 150px;
+      background-color: #ddd;
+    }
+
+    .card-image.orange {
+      background-color: #b45309;
+    }
+
+    .card-image.teal {
+      background-color: #0f766e;
+    }
+
+    .card-image.blue {
+      background-color: #4338ca;
+    }
+
+    .card-image.maroon {
+      background-color: #9f1239;
+    }
+
+    .card-content {
+      padding: 12px;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: bold;
+      line-height: 1.2;
+      margin-bottom: 8px;
+      color: #1c1917;
+    }
+
+    .card-description {
+      font-size: 14px;
+      color: #78716c;
+      line-height: 1.5;
+    }
+
+    /* Article section */
+    .article-section {
+      max-width: 800px;
+    }
+
+    .article-title {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 24px;
+      color: #1c1917;
+    }
+
+    .article-paragraph {
+      font-size: 16px;
+      color: #44403c;
+      line-height: 1.8;
+      margin-bottom: 16px;
+    }
+
+    /* Footer */
+    .footer {
+      background-color: #1c1917;
+      color: #a8a29e;
+      padding: 20px 44px;
+      font-size: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      height: 59px;
+      line-height: 1;
+    }
+
+    .footer a {
+      color: #a8a29e;
+      text-decoration: none;
+      margin-left: 24px;
+    }
+
+    /* Fixed button */
+    .fab {
+      position: fixed;
+      bottom: 26px;
+      right: 26px;
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background-color: #f59e0b;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      color: #1c1917;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 50;
+    }
+
+    .fab:hover {
+      background-color: #fbbf24;
+    }
+  </style>
+</head>
+<body>
+  <!-- Sticky top bar -->
+  <div class="topbar">
+    <div class="topbar-logo">Atlas.</div>
+    <nav class="topbar-nav">
+      <a href="#">Guides</a>
+      <a href="#">Maps</a>
+      <a href="#">Journal</a>
+      <a href="#">About</a>
+    </nav>
+  </div>
+
+  <!-- Hero band (off-white, full-bleed) -->
+  <div class="hero-wrap">
+    <section class="hero-section">
+      <h1 class="hero-title">Field guides for slow travel</h1>
+      <p class="hero-subtitle">Forty hand-researched routes across four continents, written by people who walked them twice — once to get lost, once to take notes.</p>
+    </section>
+  </div>
+
+  <!-- Full-width divider -->
+  <div class="divider"></div>
+
+  <!-- White content well -->
+  <div class="main-wrap">
+    <!-- Latest guides section with scrollable cards -->
+    <section class="guides-section">
+      <h2 class="guides-title">Latest guides</h2>
+      <div class="card-rail">
+        <div class="card">
+          <div class="card-image orange"></div>
+          <div class="card-content">
+            <h3 class="card-title">High passes of the Atlas</h3>
+            <p class="card-description">Nine days between Imili and Setfi Fatma, with mule support and two market detours.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-image teal"></div>
+          <div class="card-content">
+            <h3 class="card-title">Kii Peninsula by rail</h3>
+            <p class="card-description">Kumano Kodo trailheads you can reach before breakfast from Osaka and Nagoya.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-image blue"></div>
+          <div class="card-content">
+            <h3 class="card-title">Puglia's white towns</h3>
+            <p class="card-description">A slow loop from Ostuni to Locorotondo built around bakery opening hours.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-image maroon"></div>
+          <div class="card-content">
+            <h3 class="card-title">Faroe ridgelines</h3>
+            <p class="card-description">Weatherproof itineraries for the six trails that stay open through October.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Article section -->
+    <section class="article-section">
+      <h2 class="article-title">Why we walk routes twice</h2>
+      <p class="article-paragraph">The first walk is for the route itself: where the water is, which junctions mislead, whether the 4pm light makes the descent worth slowing down for. We take almost no notes. The route has to earn a second visit before it earns a page.</p>
+      <p class="article-paragraph">The second walk is the written one. Every guide in Atlas is the record of that second pass — distances re-measured, cafés re-tested on a weekday, the one confusing stile photographed from both sides. If a detail matters at 6am in the rain, it is in the guide.</p>
+      <p class="article-paragraph">Between the two walks, routes change. A landslide closes a traverse, a ferry timetable shifts, a farm dog retires. Readers file corrections from the trail, and each guide shows the date it was last walked, not just last edited.</p>
+      <p class="article-paragraph">Slow travel is not about pace for its own sake. It is about a ratio — hours moving to hours noticing. The guides are structured around that ratio: shorter days than you expect, longer lunches than you plan, and a firm opinion about which viewpoints justify a climb.</p>
+    </section>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div>© 2025 Atlas Guides</div>
+    <div>
+      <a href="#">Instagram</a>
+      <a href="#">RSS</a>
+      <a href="#">Contact</a>
+    </div>
+  </div>
+
+  <!-- Fixed scroll-to-top button -->
+  <button class="fab">↑</button>
+</body>
+</html>

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nimbus — Pricing</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; background: #ffffff; color: #0f172a; }
+
+  /* header */
+  .nav { display: flex; align-items: center; justify-content: space-between; padding: 14px 48px; border-bottom: 1px solid #e2e8f0; background: #ffffff; }
+  .nav .logo { font-size: 20px; font-weight: 700; }
+  .nav .logo span { color: #0ea5e9; }
+  .nav ul { display: flex; gap: 28px; list-style: none; }
+  .nav a { color: #475569; text-decoration: none; font-size: 14px; }
+
+  /* hero */
+  .hero { height: 260px; background: #0e1825; display: flex; flex-direction: column; justify-content: center; padding: 0 48px; }
+  .hero h1 { font-size: 40px; font-weight: 800; color: #ffffff; margin-bottom: 12px; }
+  .hero p { font-size: 17px; color: #9ca3af; margin-bottom: 22px; }
+  .hero .cta { display: inline-block; width: fit-content; background: #10b981; color: #ffffff; font-size: 15px; font-weight: 600; padding: 11px 22px; border-radius: 8px; text-decoration: none; }
+
+  /* features strip */
+  .features { display: flex; gap: 32px; padding: 40px 48px; border-bottom: 1px solid #e2e8f0; }
+  .feature { flex: 1; }
+  .feature .dot { width: 34px; height: 34px; border-radius: 8px; margin-bottom: 12px; }
+  .feature:nth-child(1) .dot { background: #dbeafe; }
+  .feature:nth-child(2) .dot { background: #dcfce7; }
+  .feature:nth-child(3) .dot { background: #fef3c7; }
+  .feature h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+  .feature p { font-size: 14px; color: #64748b; line-height: 1.5; }
+
+  /* pricing */
+  .pricing { padding: 44px 48px 56px; background: #ffffff; }
+  .pricing h2 { font-size: 26px; font-weight: 800; margin-bottom: 26px; }
+  .plans { display: flex; gap: 24px; }
+  .plan { flex: 1; position: relative; border: 1px solid #e2e8f0; border-radius: 12px; padding: 26px 24px; height: 300px; }
+  .plan h3 { font-size: 15px; font-weight: 700; color: #475569; margin-bottom: 10px; }
+  .plan .price { font-size: 34px; font-weight: 800; color: #0f172a; margin-bottom: 4px; }
+  .plan .per { font-size: 13px; color: #94a3b8; margin-bottom: 18px; }
+  .plan ul { list-style: none; }
+  .plan li { font-size: 14px; color: #475569; padding: 7px 0; border-bottom: 1px solid #f1f5f9; }
+  .plan li:last-child { border-bottom: none; }
+  .plan-pro { border: 2px solid #534ae6; }
+  .plan-pro .price { color: #534ae6; }
+  .badge { position: absolute; top: 12px; right: 12px; background: #665ee8; color: #ffffff; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 4px; }
+
+  /* testimonial band */
+  .quote { background: #f8fafc; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 36px 48px; }
+  .quote blockquote { font-size: 18px; font-weight: 600; color: #334155; margin-bottom: 10px; }
+  .quote cite { font-size: 14px; color: #94a3b8; font-style: normal; }
+
+  /* footer */
+  .footer { display: flex; justify-content: space-between; padding: 22px 48px; background: #ffffff; }
+  .footer p { font-size: 13px; color: #94a3b8; }
+</style>
+</head>
+<body>
+  <header class="nav">
+    <div class="logo">Nimbus<span>.</span></div>
+    <ul>
+      <li><a href="#">Product</a></li>
+      <li><a href="#">Docs</a></li>
+      <li><a href="#">Pricing</a></li>
+      <li><a href="#">Support</a></li>
+    </ul>
+  </header>
+
+  <section class="hero">
+    <h1>Pricing that scales with you</h1>
+    <p>Every plan includes unlimited seats for viewers and one-click rollbacks.</p>
+    <a class="cta" href="#">Start free trial</a>
+  </section>
+
+  <section class="features">
+    <div class="feature">
+      <div class="dot"></div>
+      <h3>Instant deploys</h3>
+      <p>Push to main and your service is live in under ten seconds, every time.</p>
+    </div>
+    <div class="feature">
+      <div class="dot"></div>
+      <h3>Global edge</h3>
+      <p>Requests are served from 34 regions with automatic failover built in.</p>
+    </div>
+    <div class="feature">
+      <div class="dot"></div>
+      <h3>Zero-config TLS</h3>
+      <p>Certificates are issued and renewed for you on every custom domain.</p>
+    </div>
+  </section>
+
+  <section class="pricing">
+    <h2>Choose your plan</h2>
+    <div class="plans">
+      <div class="plan">
+        <h3>Hobby</h3>
+        <div class="price">$0</div>
+        <div class="per">per month</div>
+        <ul>
+          <li>1 project</li>
+          <li>100k requests / mo</li>
+          <li>Community support</li>
+        </ul>
+      </div>
+      <div class="plan plan-pro">
+        <div class="badge">MOST POPULAR</div>
+        <h3>Pro</h3>
+        <div class="price">$24</div>
+        <div class="per">per member / month</div>
+        <ul>
+          <li>Unlimited projects</li>
+          <li>5M requests / mo</li>
+          <li>Email support</li>
+        </ul>
+      </div>
+      <div class="plan">
+        <h3>Business</h3>
+        <div class="price">$79</div>
+        <div class="per">per member / month</div>
+        <ul>
+          <li>SSO &amp; audit log</li>
+          <li>50M requests / mo</li>
+          <li>Priority support</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="quote">
+    <blockquote>“We moved 40 services to Nimbus in a weekend and cut our infra bill in half.”</blockquote>
+    <cite>— Mara Chen, CTO at Fieldstone</cite>
+  </section>
+
+  <footer class="footer">
+    <p>© 2026 Nimbus Cloud, Inc.</p>
+    <p>Privacy · Terms · Status</p>
+  </footer>
+</body>
+</html>

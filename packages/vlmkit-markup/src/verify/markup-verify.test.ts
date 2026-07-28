@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeTrend, kickbackForComposition } from "./markup-verify.ts";
+import { computeTrend, heightToleranceFor, kickbackForComposition, pixelPresence } from "./markup-verify.ts";
 import type { PageComposition, PageComponent, PageMatch } from "../component/page-compose.ts";
 
 test("computeTrend: fewer passing targets is a regression", () => {
@@ -96,4 +96,23 @@ test("kickback reports mid-range IoU matches once, not as root causes", () => {
   assert.equal(lines.length, 1);
   assert.doesNotMatch(lines[0]!, /ROOT-CAUSE/);
   assert.match(lines[0]!, /IoU 0.85/);
+});
+
+test("heightToleranceFor: floor of 8px, then 1% of the target height", () => {
+  assert.equal(heightToleranceFor(400), 8);   // 1% = 4 → floor wins
+  assert.equal(heightToleranceFor(1335), 13); // r5 mobile: +8px passes
+  assert.equal(heightToleranceFor(2905), 29); // S6 tablet: -615px fails by far
+});
+
+test("pixelPresence: full presence when the bbox holds the fill; zero when it doesn't", () => {
+  // 10x10 white image with a 4x1 gray line at (2,5).
+  const img = { data: new Uint8Array(10 * 10 * 4).fill(255), width: 10, height: 10 };
+  for (let x = 2; x < 6; x++) {
+    const i = (5 * 10 + x) * 4;
+    img.data[i] = 226; img.data[i + 1] = 232; img.data[i + 2] = 240;
+  }
+  const line = { left: 2, top: 5, width: 4, height: 1, hex: "#e2e8f0" };
+  assert.equal(pixelPresence(img, line), 1);
+  assert.equal(pixelPresence(img, { ...line, top: 8 }), 0, "same line 3px away must not count");
+  assert.equal(pixelPresence(img, { ...line, left: -20, top: -20 }), 0, "out-of-bounds bbox is absent");
 });
