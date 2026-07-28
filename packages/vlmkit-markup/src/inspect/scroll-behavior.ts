@@ -49,6 +49,8 @@ export interface SnapSample {
   settledOffset: number;
   /** Snap-aligned candidate offsets derived from the children. */
   candidateOffsets: number[];
+  /** Maximum reachable scroll offset (scrollSize - clientSize). */
+  maxOffset: number;
   childCount: number;
 }
 
@@ -141,7 +143,8 @@ export function analyzeScrollBehavior(
       });
       continue;
     }
-    const aligned = snap.candidateOffsets.some((o) => Math.abs(o - snap.settledOffset) <= snapTolerance);
+    const aligned = snap.candidateOffsets.some((o) => Math.abs(o - snap.settledOffset) <= snapTolerance)
+      || Math.abs(snap.settledOffset - snap.maxOffset) <= snapTolerance;
     if (!aligned) {
       issues.push({
         kind: "snap-not-snapping",
@@ -232,6 +235,7 @@ const COLLECT_SCRIPT = (maxElements: number) => `(async () => {
       last = now;
     }
     const settledOffset = Math.round(axis === "x" ? el.scrollLeft : el.scrollTop);
+    const maxOffset = Math.round(axis === "x" ? el.scrollWidth - el.clientWidth : el.scrollHeight - el.clientHeight);
     const candidateOffsets = [];
     const cRect = el.getBoundingClientRect();
     for (const child of Array.from(el.children)) {
@@ -246,7 +250,7 @@ const COLLECT_SCRIPT = (maxElements: number) => `(async () => {
       else candidateOffsets.push(Math.round(childStart));
     }
     if (axis === "x") el.scrollTo({ left: 0 }); else el.scrollTo({ top: 0 });
-    snaps.push({ selector, axis, strictness, settledOffset, candidateOffsets, childCount: candidateOffsets.length });
+    snaps.push({ selector, axis, strictness, settledOffset, candidateOffsets, maxOffset, childCount: candidateOffsets.length });
   }
 
   return {

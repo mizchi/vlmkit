@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atlas — Field Guides</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; background: #ffffff; color: #1c1917; }
+
+  .topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; padding: 14px 44px; background: #1c1917; color: #fafaf9; }
+  .topbar .brand { font-size: 18px; font-weight: 800; letter-spacing: 0.3px; }
+  .topbar .brand em { color: #f59e0b; font-style: normal; }
+  .topbar nav { display: flex; gap: 24px; font-size: 14px; }
+  .topbar a { color: #d6d3d1; text-decoration: none; }
+
+  .intro { padding: 52px 44px 40px; background: #fafaf9; border-bottom: 1px solid #e7e5e4; }
+  .intro h1 { font-size: 36px; font-weight: 800; margin-bottom: 10px; }
+  .intro p { font-size: 16px; color: #57534e; max-width: 560px; line-height: 1.55; }
+
+  .guides { padding: 36px 0 44px 44px; border-bottom: 1px solid #e7e5e4; }
+  .guides h2 { font-size: 22px; font-weight: 800; margin-bottom: 18px; }
+  .rail { display: flex; gap: 20px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 14px; padding-right: 44px; }
+  .card { flex: 0 0 380px; scroll-snap-align: start; border: 1px solid #e7e5e4; border-radius: 12px; overflow: hidden; background: #ffffff; }
+  .card .art { height: 150px; }
+  .card:nth-child(1) .art { background: #b45309; }
+  .card:nth-child(2) .art { background: #0f766e; }
+  .card:nth-child(3) .art { background: #4338ca; }
+  .card:nth-child(4) .art { background: #9f1239; }
+  .card .body { padding: 16px 18px 20px; }
+  .card h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+  .card p { font-size: 13px; color: #78716c; line-height: 1.5; }
+
+  .article { padding: 40px 44px 52px; max-width: 760px; }
+  .article h2 { font-size: 22px; font-weight: 800; margin-bottom: 14px; }
+  .article p { font-size: 15px; color: #44403c; line-height: 1.7; margin-bottom: 14px; }
+
+  .fab { position: fixed; right: 26px; bottom: 26px; width: 54px; height: 54px; border-radius: 50%; background: #f59e0b; color: #1c1917; font-size: 24px; font-weight: 800; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 16px rgba(28, 25, 23, 0.25); }
+
+  .footer { padding: 22px 44px; background: #1c1917; color: #a8a29e; font-size: 13px; display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Atlas<em>.</em></div>
+    <nav>
+      <a href="#">Guides</a>
+      <a href="#">Maps</a>
+      <a href="#">Journal</a>
+      <a href="#">About</a>
+    </nav>
+  </header>
+
+  <section class="intro">
+    <h1>Field guides for slow travel</h1>
+    <p>Forty hand-researched routes across four continents, written by people who walked them twice — once to get lost, once to take notes.</p>
+  </section>
+
+  <section class="guides">
+    <h2>Latest guides</h2>
+    <div class="rail">
+      <div class="card">
+        <div class="art"></div>
+        <div class="body">
+          <h3>High passes of the Atlas</h3>
+          <p>Nine days between Imlil and Setti Fatma, with mule support and two market detours.</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="art"></div>
+        <div class="body">
+          <h3>Kii Peninsula by rail</h3>
+          <p>Kumano Kodo trailheads you can reach before breakfast from Osaka and Nagoya.</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="art"></div>
+        <div class="body">
+          <h3>Puglia's white towns</h3>
+          <p>A slow loop from Ostuni to Locorotondo built around bakery opening hours.</p>
+        </div>
+      </div>
+      <div class="card">
+        <div class="art"></div>
+        <div class="body">
+          <h3>Faroe ridgelines</h3>
+          <p>Weatherproof itineraries for the six trails that stay open through October.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="article">
+    <h2>Why we walk routes twice</h2>
+    <p>The first walk is for the route itself: where the water is, which junctions mislead, whether the 4pm light makes the descent worth slowing down for. We take almost no notes. The route has to earn a second visit before it earns a page.</p>
+    <p>The second walk is the written one. Every guide in Atlas is the record of that second pass — distances re-measured, cafés re-tested on a weekday, the one confusing stile photographed from both sides. If a detail matters at 6am in the rain, it is in the guide.</p>
+    <p>Between the two walks, routes change. A landslide closes a traverse, a ferry timetable shifts, a farm dog retires. Readers file corrections from the trail, and each guide shows the date it was last walked, not just last edited.</p>
+    <p>Slow travel is not about pace for its own sake. It is about a ratio — hours moving to hours noticing. The guides are structured around that ratio: shorter days than you expect, longer lunches than you plan, and a firm opinion about which viewpoints justify a climb.</p>
+  </section>
+
+  <a class="fab" href="#">↑</a>
+
+  <footer class="footer">
+    <p>© 2026 Atlas Guides</p>
+    <p>Instagram · RSS · Contact</p>
+  </footer>
+</body>
+</html>

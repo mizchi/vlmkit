@@ -81,10 +81,20 @@ function snap(overrides: Partial<SnapSample> = {}): SnapSample {
     strictness: "mandatory",
     settledOffset: 300,
     candidateOffsets: [0, 300, 600],
+    maxOffset: 700,
     childCount: 3,
     ...overrides,
   };
 }
+
+test("settling at the reachable scroll-range end is a legitimate snap position", () => {
+  // S9 calibration: rail candidates 0/400/800/1200 but maxOffset 388 —
+  // CSS snap clamps to the boundary, so settling there must not warn.
+  const report = analyzeScrollBehavior(input({
+    snaps: [snap({ settledOffset: 388, candidateOffsets: [0, 400, 800, 1200], maxOffset: 388 })],
+  }));
+  assert.deepEqual(report.issues, []);
+});
 
 test("a mandatory snap container settled on a child edge is clean", () => {
   const report = analyzeScrollBehavior(input({ snaps: [snap()] }));
