@@ -268,6 +268,11 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - 期待成果: skills の Model selection 節を Anthropic 2 モデルの表から多モデル表に更新、`docs/knowledge.md` に台帳行を追加、レポートを `docs/reports/` に保存(YYYY-MM-DD-markup-agent-model-bench-vN.md)。
   - 論点(設計時に決める): pi 側のツール権限(bash + read/write で十分か)、1px エンドゲームを完走できないモデルの打ち切り規準(トレンド横ばい 2 レグ相当)、vision 非対応モデルの扱い(除外 or scan component クロップ経由)。
 
+- [ ] **VLM 意味ラベリングのベンチ: コンポーネントクロップ分類(button/nav/card/badge...)**
+  - 背景: 2026-07-28 に決定論の kind 分類(hairline/solid/text/image、bigJump 判別)を実装済み — ペアリングゲートと kickback ラベルはこれで賄えている。VLM が足せるのは**意味**の層(「これは CTA ボタン」「これは nav」)で、kickback の可読性がさらに上がる可能性がある。ただし本環境に API キーがなく未ベンチのため、実装はフックだけで見送り。
+  - 方法: 既存 fixture 群の抽出済みコンポーネントクロップ(数百個、正解ラベルは fixture HTML から機械的に得られる)を分類タスクとして与える。候補: `bytedance/ui-tars-1.5-7b`(UI ドメイン学習・ほぼ無料、ただし vlm-region-diff での色リテラル失敗の前科 — 分類は別スキルなので要実測)、`qwen/qwen3-vl-30b-a3b-instruct`、`anthropic/claude-haiku-4-5`。
+  - 判断基準: 精度 ≥90% かつレイテンシ ≤2s/クロップ(またはシートで一括)なら verify markup にオプトイン統合。それ未満なら決定論 kind のままで足りる(誤ラベルは誤アドバイスに直結するため、中途半端な精度はゼロより悪い)。
+
 ### Infrastructure / Deploy
 - [x] Cloudflare Browser Run CDP backend (`vrt snapshot --backend cloudflare`) — connects via `chromium.connectOverCDP` to `wss://api.cloudflare.com/.../browser-rendering/devtools/browser`. See `examples/vrt-snapshot-cloudflare.workflow.yml`.
 - [x] Cloudflare Workers entry point (`worker/`) — `worker/index.ts` re-exports `createApiApp()` from `src/api/api-app.ts`. `env.BROWSER` wiring still pending.

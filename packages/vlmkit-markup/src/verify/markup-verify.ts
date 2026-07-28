@@ -37,6 +37,13 @@ import {
   type PageComposition,
   type PageComponent,
 } from "../component/page-compose.ts";
+import { kindLabel } from "../component/component-classify.ts";
+
+/** "[text] " style prefix when the pixel-stat kind is informative. */
+function kindTag(c: PageComponent): string {
+  const label = kindLabel(c.kind);
+  return label ? `${label} ` : "";
+}
 import { runBreakpointCheck } from "../stress/breakpoint-check.ts";
 import { runScrollScan } from "../inspect/scroll-scan.ts";
 import { runAnimationEval } from "../style/animation-eval.ts";
@@ -198,14 +205,17 @@ export function kickbackForComposition(label: string, c: PageComposition): strin
       );
     } else {
       lines.push(
-        `${label}: missing #${m.index} (${m.left},${m.top}) ${m.width}x${m.height} fill ${m.hex} — genuinely absent; build it.`,
+        `${label}: missing #${m.index} ${kindTag(m)}(${m.left},${m.top}) ${m.width}x${m.height} fill ${m.hex} — genuinely absent; build it.`,
       );
     }
   }
   for (const e of c.extra) {
     if (claimedExtra.has(e.index)) continue;
+    const advice = e.kind?.kind === "text"
+      ? "this is a TEXT block — read the crop before touching it; the fix is usually its color/weight or the space around it, NEVER deleting visible text"
+      : "remove, merge, or restyle (a too-dark fill can make an interior crest as a component)";
     lines.push(
-      `${label}: extra (${e.left},${e.top}) ${e.width}x${e.height} fill ${e.hex} — not in target; remove, merge, or restyle (a too-dark fill can make an interior crest as a component).`,
+      `${label}: extra ${kindTag(e)}(${e.left},${e.top}) ${e.width}x${e.height} fill ${e.hex} — not in target; ${advice}.`,
     );
   }
   for (const v of c.orderViolations) {
