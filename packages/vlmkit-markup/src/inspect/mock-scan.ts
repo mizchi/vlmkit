@@ -136,6 +136,8 @@ export interface MockScanReport {
     dominantBackground: string;
     friendly: boolean;
   };
+  /** Capture-quality estimate; degraded targets need relaxed tolerances. */
+  capture: { bgNoise: number; degraded: boolean };
   advice: string[];
 }
 
@@ -144,6 +146,8 @@ export interface MockScanOptions {
   out?: string;
   scale?: number;
   width?: number;
+  /** Declare the image a real capture (screenshot / JPEG-history export). */
+  captureReal?: boolean;
 }
 
 /** Components above this suggest a photo-heavy / noisy mock. */
@@ -192,6 +196,27 @@ export async function runMockScan(options: MockScanOptions): Promise<MockScanRep
   const components = extractComponentsFromRgba(normalized.data, normalized.width, normalized.height, { background });
   const friendly = components.length <= FRIENDLY_COMPONENT_CEILING;
 
+  // Capture quality is DECLARED, not detected: three auto-detection
+  // metrics (bg deviation, flat-region jitter, 8x8 blockiness) were each
+  // confounded on real fixtures (multi-tone backgrounds, text density,
+  // synthetic upscales), so the caller — who knows whether the file is a
+  // real screenshot / JPEG-history export — passes --capture real. The
+  // bgNoise number stays as informational evidence in the report.
+  let bgSum = 0;
+  let bgCount = 0;
+  for (let i = 0; i < normalized.data.length; i += 4) {
+    const dr = Math.abs(normalized.data[i]! - background[0]);
+    const dg = Math.abs(normalized.data[i + 1]! - background[1]);
+    const db = Math.abs(normalized.data[i + 2]! - background[2]);
+    const dev = Math.max(dr, dg, db);
+    if (dev <= 25) {
+      bgSum += dev;
+      bgCount++;
+    }
+  }
+  const bgNoise = bgCount === 0 ? 0 : Number((bgSum / bgCount).toFixed(3));
+  const degraded = options.captureReal === true;
+
   const advice: string[] = [];
   if (scaleSource === "inferred" && candidates.length > 1) {
     advice.push(
@@ -201,6 +226,15 @@ export async function runMockScan(options: MockScanOptions): Promise<MockScanRep
   if (!friendly) {
     advice.push(
       `Extraction found ${components.length} components — the mock is likely photo-heavy or dense. Prefer section-by-section work: crop regions and drive each with \`build component\`; use the page loop only for the skeleton.`,
+    );
+  }
+  if (degraded) {
+    advice.push(
+      `Declared a real capture: verify markup reads the sidecar and relaxes tolerances (composition floor, pixel-presence). Tiny text fragments are unreliable under compression — expect pixel-diff floors above clean-capture levels.`,
+    );
+  } else {
+    advice.push(
+      "Assumed a clean tool render. If this image is a real screenshot or was ever JPEG-encoded, re-run with --capture real so verify markup relaxes tolerances.",
     );
   }
   if (!options.out) {
@@ -220,8 +254,18 @@ export async function runMockScan(options: MockScanOptions): Promise<MockScanRep
       dominantBackground: `rgb(${background[0]},${background[1]},${background[2]})`,
       friendly,
     },
+    capture: { bgNoise, degraded },
     advice,
   };
+  if (options.out) {
+    // Sidecar lets `verify markup` pick up capture facts without flags.
+    await writeFile(`${options.out}.meta.json`, JSON.stringify({
+      scale: chosen.scale,
+      cssWidth: chosen.cssWidth,
+      bgNoise,
+      degraded,
+    }, null, 2));
+  }
   appendRunLedger({
     tool: "scan-mock",
     source: options.source,
@@ -250,6 +294,9 @@ export function formatMockScanReport(report: MockScanReport): string {
   lines.push(
     `extraction: ${report.extraction.componentCount} component(s), background ${report.extraction.dominantBackground} — ${report.extraction.friendly ? `${GREEN}extraction-friendly${RESET}` : `${YELLOW}noisy${RESET}`}`,
   );
+  lines.push(
+    `capture: ${report.capture.degraded ? `${YELLOW}declared real (relaxed tolerances)${RESET}` : `${GREEN}assumed clean${RESET}`} — bg noise ${report.capture.bgNoise}`,
+  );
   if (report.advice.length > 0) {
     lines.push("");
     lines.push("Advice:");
@@ -271,6 +318,7 @@ Options:
   --out <png>     Write the normalized @1x image here
   --scale <n>     Force the device-pixel scale (integer)
   --width <px>    Design width in CSS px (scale = image width / this)
+  --capture real  Declare a real screenshot / JPEG-history export (relaxes verify tolerances via sidecar)
   --json          Print JSON report`);
   process.exit(exitCode);
 }
@@ -280,6 +328,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   let out: string | undefined;
   let scale: number | undefined;
   let width: number | undefined;
+  let captureReal = false;
   let json = false;
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
@@ -287,6 +336,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     if (arg === "--out") out = argv[++i]!;
     else if (arg === "--scale") scale = Number(argv[++i]);
     else if (arg === "--width") width = Number(argv[++i]);
+    else if (arg === "--capture") captureReal = argv[++i] === "real";
     else if (arg === "--json") json = true;
     else if (!arg.startsWith("-")) positional.push(arg);
   }
@@ -296,6 +346,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     ...(out ? { out } : {}),
     ...(scale !== undefined ? { scale } : {}),
     ...(width !== undefined ? { width } : {}),
+    ...(captureReal ? { captureReal } : {}),
   });
   if (json) console.log(JSON.stringify(report, null, 2));
   else console.log(formatMockScanReport(report));

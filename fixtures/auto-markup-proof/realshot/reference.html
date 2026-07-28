@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Meridian — Journal</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Georgia, "Times New Roman", serif; background: #fffdf8; color: #292524; }
+
+  .masthead { display: flex; align-items: baseline; justify-content: space-between; padding: 18px 52px; border-bottom: 2px solid #292524; }
+  .masthead .title { font-size: 26px; font-weight: 700; letter-spacing: 1px; }
+  .masthead .issue { font-size: 13px; color: #78716c; font-family: Helvetica, Arial, sans-serif; }
+
+  /* photo-like hero: layered gradients stand in for a photograph */
+  .hero { position: relative; height: 420px; overflow: hidden; }
+  .hero .photo {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 900px 300px at 20% 95%, rgba(41, 37, 36, 0.85) 0%, rgba(41, 37, 36, 0) 60%),
+      radial-gradient(ellipse 700px 500px at 78% 20%, rgba(254, 215, 170, 0.9) 0%, rgba(251, 146, 60, 0.45) 40%, rgba(194, 65, 12, 0) 75%),
+      radial-gradient(ellipse 500px 380px at 55% 60%, rgba(120, 53, 15, 0.55) 0%, rgba(120, 53, 15, 0) 70%),
+      linear-gradient(175deg, #7dd3fc 0%, #fda4af 34%, #fb923c 52%, #7c2d12 78%, #431407 100%);
+  }
+  .hero .caption { position: absolute; left: 52px; bottom: 34px; color: #fffdf8; max-width: 520px; }
+  .hero .caption .kicker { font-family: Helvetica, Arial, sans-serif; font-size: 12px; letter-spacing: 2px; margin-bottom: 10px; color: #fed7aa; }
+  .hero .caption h1 { font-size: 42px; line-height: 1.1; font-weight: 700; margin-bottom: 10px; }
+  .hero .caption p { font-size: 15px; font-style: italic; color: #e7e5e4; }
+
+  .stories { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 30px; padding: 40px 52px 56px; }
+  .story .thumb { height: 130px; border-radius: 4px; margin-bottom: 14px; }
+  .story:nth-child(1) .thumb { background: linear-gradient(160deg, #0c4a6e 0%, #0ea5e9 45%, #bae6fd 80%, #e0f2fe 100%); }
+  .story:nth-child(2) .thumb { background: linear-gradient(200deg, #14532d 0%, #16a34a 40%, #bbf7d0 85%); }
+  .story:nth-child(3) .thumb { background: linear-gradient(140deg, #581c87 0%, #a855f7 50%, #fbcfe8 90%); }
+  .story h2 { font-size: 19px; font-weight: 700; margin-bottom: 8px; line-height: 1.25; }
+  .story p { font-size: 14px; color: #57534e; line-height: 1.6; font-family: Helvetica, Arial, sans-serif; }
+
+  .colophon { border-top: 1px solid #d6d3d1; padding: 20px 52px; display: flex; justify-content: space-between; font-family: Helvetica, Arial, sans-serif; font-size: 12px; color: #a8a29e; }
+</style>
+</head>
+<body>
+  <header class="masthead">
+    <div class="title">MERIDIAN</div>
+    <div class="issue">Issue 14 — Summer 2026</div>
+  </header>
+
+  <section class="hero">
+    <div class="photo"></div>
+    <div class="caption">
+      <div class="kicker">LETTER FROM THE COAST</div>
+      <h1>The harbor at closing time</h1>
+      <p>Photographs and field notes from six evenings in Essaouira.</p>
+    </div>
+  </section>
+
+  <section class="stories">
+    <article class="story">
+      <div class="thumb"></div>
+      <h2>Cold water, long light</h2>
+      <p>Swimming the fjord towns of western Norway in the weeks when the sun barely sets.</p>
+    </article>
+    <article class="story">
+      <div class="thumb"></div>
+      <h2>The moss keepers</h2>
+      <p>Three generations of gardeners tend Kyoto's oldest temple ground cover by hand.</p>
+    </article>
+    <article class="story">
+      <div class="thumb"></div>
+      <h2>Violet hour in the Atacama</h2>
+      <p>Astronomers and vintners share the driest sky on earth, one hour apart.</p>
+    </article>
+  </section>
+
+  <footer class="colophon">
+    <p>Meridian is printed quarterly in Porto.</p>
+    <p>Subscriptions · Back issues · Stockists</p>
+  </footer>
+</body>
+</html>

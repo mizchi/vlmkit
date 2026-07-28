@@ -8,20 +8,20 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; background: #ffffff; color: #0f172a; }
 
-  /* header */
+  /* header — DO NOT CHANGE in redesign */
   .nav { display: flex; align-items: center; justify-content: space-between; padding: 14px 48px; border-bottom: 1px solid #e2e8f0; background: #ffffff; }
   .nav .logo { font-size: 20px; font-weight: 700; }
   .nav .logo span { color: #0ea5e9; }
   .nav ul { display: flex; gap: 28px; list-style: none; }
   .nav a { color: #475569; text-decoration: none; font-size: 14px; }
 
-  /* hero */
+  /* hero — redesign changes skin + copy, keeps dimensions */
   .hero { height: 260px; background: #0b1220; display: flex; flex-direction: column; justify-content: center; padding: 0 48px; }
   .hero h1 { font-size: 40px; font-weight: 800; color: #ffffff; margin-bottom: 12px; }
   .hero p { font-size: 17px; color: #94a3b8; margin-bottom: 22px; }
   .hero .cta { display: inline-block; width: fit-content; background: #10b981; color: #ffffff; font-size: 15px; font-weight: 600; padding: 11px 22px; border-radius: 8px; text-decoration: none; }
 
-  /* features strip */
+  /* features strip — DO NOT CHANGE in redesign */
   .features { display: flex; gap: 32px; padding: 40px 48px; border-bottom: 1px solid #e2e8f0; }
   .feature { flex: 1; }
   .feature .dot { width: 34px; height: 34px; border-radius: 8px; margin-bottom: 12px; }
@@ -31,7 +31,7 @@
   .feature h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
   .feature p { font-size: 14px; color: #64748b; line-height: 1.5; }
 
-  /* pricing */
+  /* pricing — redesign changes accent + adds badge, keeps dimensions */
   .pricing { padding: 44px 48px 56px; background: #ffffff; }
   .pricing h2 { font-size: 26px; font-weight: 800; margin-bottom: 26px; }
   .plans { display: flex; gap: 24px; }
@@ -42,16 +42,16 @@
   .plan ul { list-style: none; }
   .plan li { font-size: 14px; color: #475569; padding: 7px 0; border-bottom: 1px solid #f1f5f9; }
   .plan li:last-child { border-bottom: none; }
-  .plan-pro { border: 2px solid #4f46e5; padding: 25px 23px; }
+  .plan-pro { border: 2px solid #4f46e5; }
   .plan-pro .price { color: #4f46e5; }
-  .badge { position: absolute; top: 16px; right: 16px; background: #4f46e5; color: #ffffff; font-size: 11px; font-weight: 700; letter-spacing: 0.4px; padding: 4px 9px; border-radius: 999px; }
+  .plan-pro .badge { position: absolute; top: 24px; right: 24px; background: #4f46e5; color: #ffffff; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 6px 12px; border-radius: 999px; }
 
-  /* testimonial band */
+  /* testimonial band — DO NOT CHANGE in redesign */
   .quote { background: #f8fafc; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 36px 48px; }
   .quote blockquote { font-size: 18px; font-weight: 600; color: #334155; margin-bottom: 10px; }
   .quote cite { font-size: 14px; color: #94a3b8; font-style: normal; }
 
-  /* footer */
+  /* footer — DO NOT CHANGE in redesign */
   .footer { display: flex; justify-content: space-between; padding: 22px 48px; background: #ffffff; }
   .footer p { font-size: 13px; color: #94a3b8; }
 </style>
@@ -105,7 +105,7 @@
         </ul>
       </div>
       <div class="plan plan-pro">
-        <div class="badge">MOST POPULAR</div>
+        <span class="badge">Most popular</span>
         <h3>Pro</h3>
         <div class="price">$24</div>
         <div class="per">per member / month</div>

@@ -49,6 +49,8 @@ export interface TargetVerdict {
   matched: number;
   missing: number;
   extra: number;
+  /** Sidecar-declared real capture; relaxed tolerances were applied. */
+  degraded?: boolean;
   /** Missing components whose pixels are NOT present at their bbox in the render. */
   missingBlocking: number;
   /** Extra components whose pixels are NOT present at their bbox in the target. */
@@ -311,15 +313,31 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
     const target = await loadPng(targetPath);
     widest = Math.max(widest, target.width);
     const label = `${basename(targetPath)} (${target.width}px)`;
+    // A `scan mock --capture real` sidecar marks the target as a real
+    // capture (JPEG history / resampling). Compression smears small text
+    // so sub-~1400px2 fragments crest asymmetrically between the target
+    // and a clean render (S10 calibration: a pixel-perfect reference
+    // failed 0/0 against its own degraded screenshot). Degraded mode
+    // raises the composition floor above that fragment class and lets
+    // pixel-presence match through the noise.
+    let degraded = false;
+    try {
+      degraded = (JSON.parse(readFileSync(`${targetPath}.meta.json`, "utf8")) as { degraded?: boolean }).degraded === true;
+    } catch {
+      // No sidecar — clean-capture semantics.
+    }
+    const composeOptions = degraded ? { minArea: 1400 } : {};
+    const presenceRatio = degraded ? 0.45 : 0.6;
+    const presenceFillTolerance = degraded ? 35 : 25;
     const current = await renderHtmlToPng(options.attempt, target.width, target.height);
-    const composition = composePageDiff(target, current);
+    const composition = composePageDiff(target, current, composeOptions);
     const shot = await fullPageRestShot(options.attempt, target.width, Math.min(target.height, 800));
     const pixelDiffRatio = paddedDiff(target, shot);
 
     let calibration: TargetVerdict["calibration"];
     if (options.reference) {
       const ref = await renderHtmlToPng(options.reference, target.width, target.height);
-      const refComp = composePageDiff(target, ref);
+      const refComp = composePageDiff(target, ref, composeOptions);
       calibration = { matched: refComp.matches.length, missing: refComp.missing.length, extra: refComp.extra.length };
     }
 
@@ -334,15 +352,14 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
     // its own image, but a text blob's strokes cover ~40%, so we demand
     // the OTHER side reach 60% of whatever the residual covers in the
     // image it was extracted from.
-    const PRESENCE_RATIO = 0.6;
     const isSegmentationOnly = (
       component: PageComponent,
       ownImage: { data: Uint8Array; width: number; height: number },
       otherImage: { data: Uint8Array; width: number; height: number },
     ): boolean => {
-      const self = pixelPresence(ownImage, component);
+      const self = pixelPresence(ownImage, component, presenceFillTolerance);
       if (self <= 0) return false;
-      return pixelPresence(otherImage, component) >= PRESENCE_RATIO * self;
+      return pixelPresence(otherImage, component, presenceFillTolerance) >= presenceRatio * self;
     };
     const missingBlocking = composition.missing.filter((m) => !isSegmentationOnly(m, target, shot));
     const missingConfirmed = composition.missing.filter((m) => isSegmentationOnly(m, target, shot));
@@ -392,6 +409,7 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
       target: targetPath,
       width: target.width,
       height: target.height,
+      ...(degraded ? { degraded } : {}),
       matched: composition.matches.length,
       missing: composition.missing.length,
       extra: composition.extra.length,
@@ -490,7 +508,8 @@ export function formatMarkupVerifyReport(report: MarkupVerifyReport): string {
       ? ` ${DIM}(calibration floor: ${t.calibration.matched} matched, ${t.calibration.missing}/${t.calibration.extra} missing/extra)${RESET}`
       : "";
     const demoted = (t.missing - t.missingBlocking) + (t.extra - t.extraBlocking);
-    const demotedNote = demoted > 0 ? ` ${DIM}(+${demoted} pixel-confirmed, not blocking)${RESET}` : "";
+    const demotedNote = (demoted > 0 ? ` ${DIM}(+${demoted} pixel-confirmed, not blocking)${RESET}` : "")
+      + (t.degraded ? ` ${DIM}[degraded-capture tolerances]${RESET}` : "");
     lines.push(
       `  - ${basename(t.target)} ${t.width}x${t.height}: ${mark} — matched ${t.matched}, missing ${t.missingBlocking}, extra ${t.extraBlocking}, ordering ${t.orderViolations}, pixel diff ${(t.pixelDiffRatio * 100).toFixed(2)}%, rendered height ${t.renderedHeight}px${demotedNote}${cal}`,
     );

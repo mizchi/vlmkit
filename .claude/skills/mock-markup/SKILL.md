@@ -25,6 +25,14 @@ vlmkit scan mock mock.png --out targets/target-desktop.png
 - If the report says the scale is ambiguous, resolve it yourself
   (`--width <design px>` when the design width is known; Figma frames
   are usually 1440 or 1280).
+- **If the image is a real screenshot or has JPEG history** (browser
+  screenshot, exported-then-recompressed asset, anything not a pristine
+  design-tool PNG), add `--capture real`. This writes a sidecar that
+  makes `verify markup` use degraded-capture tolerances — compression
+  smears small text, so sub-fragment composition and pixel-presence
+  need looser floors (a pixel-perfect page fails 0/0 against its own
+  JPEG screenshot without this). Capture quality is declared, not
+  auto-detected — you are the one who knows the file's history.
 - If the report says **noisy** (component count above ~24): the mock is
   photo-heavy or dense. Build the page skeleton with the page loop, but
   drive each busy region separately — crop it and use `build component`
