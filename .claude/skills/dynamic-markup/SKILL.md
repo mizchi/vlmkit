@@ -33,7 +33,7 @@ Static truth comes from pixels; behavior truth needs a carrier:
 | Scrollport hidden content | an extra "scrolled to bottom" screenshot |
 | Animation | a **motion brief** (short text: what moves, duration, easing, iteration, reduced-motion policy) — or a frame strip |
 | Interactive states | hover/focus screenshots (see auto-markup §3.7) |
-| Exact copy (spellings, casing) | an optional **copy manifest** (plain text, one required line per row) — verified by `check copy --manifest`; without one, `check copy` still runs its placeholder scan |
+| Exact copy (spellings, casing) | a **copy manifest** (plain text, one required line per row) — verified by `check copy --manifest`; without one, `check copy` only runs its placeholder scan. **Brief authors: mandatory whenever the page carries real copy** — measured cost of omitting it: an S9 run went 18 rounds across two models with a wrong © year, missing `·` separators, and proper-noun typos (`Imlil`→`Imili`) that composition pairs happily and no gate can see. Vision transcription of ~14px text WILL introduce these |
 
 Never invent behavior that has no carrier. No motion brief and no frame
 strip means **author zero animations** — say so in your report rather

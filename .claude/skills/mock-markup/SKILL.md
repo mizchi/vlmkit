@@ -47,7 +47,12 @@ Read the normalized image ONCE with your own vision and take thorough
 notes: structure, sizes (measure — sizes are spec), colors, and **the
 complete copy**. Real text from the mock, transcribed exactly; there is
 no reference page to fall back on, and `check copy`'s placeholder scan
-treats lorem-ipsum-style filler as a suspect. Photos and illustrations
+treats lorem-ipsum-style filler as a suspect. Transcription of small
+(~14px) text is a measured error source — proper nouns, years, and
+`·`-style separators get silently mangled and no pixel gate will catch
+it. Zoom into a crop before transcribing fine print, and if the
+requester can supply a copy manifest, ask for one and verify with
+`check copy --manifest`. Photos and illustrations
 inside the mock are content, not layout: reproduce their box (size,
 position, fill approximation or gradient), never try to redraw them.
 
