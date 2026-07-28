@@ -22,7 +22,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 20px 44px;
+      padding: 16px 44px;
       background: rgb(251, 252, 253);
       border-bottom: 1px solid #e5e7eb;
     }
@@ -52,12 +52,12 @@
     /* Hero Section */
     .hero {
       background: linear-gradient(135deg, #0f1929 0%, #1a1f2e 100%);
-      padding: 80px 44px;
+      padding: 44px 44px 20px 44px;
       color: white;
-      min-height: 400px;
+      min-height: auto;
       display: flex;
       flex-direction: column;
-      justify-content: center;
+      justify-content: flex-start;
     }
 
     .live-badge {
@@ -80,12 +80,6 @@
       height: 6px;
       background: white;
       border-radius: 50%;
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
     }
 
     h1 {
@@ -121,16 +115,22 @@
       background: #1d4ed8;
     }
 
+    @media (prefers-reduced-motion: reduce) {
+      .start-btn {
+        transition: none;
+      }
+    }
+
     /* Why Pulse Section */
     .why-pulse {
-      padding: 60px 44px;
+      padding: 12px 44px 20px 44px;
       background: rgb(251, 252, 253);
     }
 
     .section-title {
       font-size: 32px;
       font-weight: 700;
-      margin-bottom: 48px;
+      margin-bottom: 16px;
       color: #1a1a1a;
     }
 
@@ -151,7 +151,9 @@
       font-size: 16px;
       font-weight: 600;
       color: #2563eb;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #e2e8f0;
     }
 
     .card p {
@@ -160,22 +162,27 @@
       color: #4b5563;
     }
 
+    .card:nth-child(1),
+    .card:nth-child(3) {
+      border-bottom: 1px solid #e2e8f0;
+    }
+
     /* Changelog Section */
     .changelog {
-      padding: 60px 44px;
+      padding: 28px 44px 20px 44px;
       background: rgb(251, 252, 253);
     }
 
     .changelog-list {
       display: flex;
       flex-direction: column;
-      gap: 24px;
+      gap: 12px;
     }
 
     .changelog-item {
       display: flex;
       gap: 32px;
-      padding: 16px 0;
+      padding: 8px 0;
       border-bottom: 1px solid #e5e7eb;
     }
 
@@ -197,8 +204,8 @@
 
     /* Footer */
     footer {
-      background: #dce3eb;
-      padding: 40px 44px;
+      background: #e1e7ef;
+      padding: 20px 44px;
       text-align: center;
       color: #4b5563;
       font-size: 13px;
