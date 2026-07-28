@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atlas - Field Guides</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+      background: #ffffff;
+      color: #333333;
+      line-height: 1.6;
+    }
+
+    /* Sticky header */
+    header {
+      position: sticky;
+      top: 0;
+      background: #2b2b2b;
+      color: white;
+      padding: 0 40px;
+      height: 55px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .logo {
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    nav {
+      display: flex;
+      gap: 30px;
+    }
+
+    nav a {
+      color: white;
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    /* Main content */
+    main {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 40px;
+    }
+
+    /* Hero section */
+    .hero {
+      padding: 32px 0 30px 0;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .hero h1 {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: #000000;
+    }
+
+    .hero p {
+      font-size: 16px;
+      color: #666666;
+      max-width: 600px;
+      line-height: 1.7;
+    }
+
+    /* Latest guides section */
+    .guides-section {
+      padding: 30px 0 30px 0;
+    }
+
+    .guides-section h2 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 14px;
+      color: #000000;
+    }
+
+    /* Horizontal scroll rail with snap */
+    .card-rail {
+      display: flex;
+      gap: 20px;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      padding-bottom: 10px;
+      margin-bottom: 30px;
+    }
+
+    .card-rail::-webkit-scrollbar {
+      height: 8px;
+    }
+
+    .card-rail::-webkit-scrollbar-track {
+      background: #f0f0f0;
+    }
+
+    .card-rail::-webkit-scrollbar-thumb {
+      background: #ccc;
+      border-radius: 4px;
+    }
+
+    /* Card styles */
+    .card {
+      flex: 0 0 380px;
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+      border-radius: 8px;
+      overflow: hidden;
+      background: white;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      transition: box-shadow 0.2s;
+    }
+
+    .card:hover {
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .card-image {
+      width: 100%;
+      height: 242px;
+      background-size: cover;
+      background-position: center;
+    }
+
+    .card-image.orange {
+      background-color: #d85a2d;
+    }
+
+    .card-image.teal {
+      background-color: #157a6b;
+    }
+
+    .card-image.blue {
+      background-color: #4444cc;
+    }
+
+    .card-image.maroon {
+      background-color: #a12550;
+    }
+
+    .card-content {
+      padding: 12px 16px;
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #000000;
+      margin-bottom: 10px;
+    }
+
+    .card-description {
+      font-size: 14px;
+      color: #777777;
+      line-height: 1.5;
+    }
+
+    /* Content section */
+    .content-section {
+      padding: 20px 0 8px 0;
+    }
+
+    .content-section h2 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 14px;
+      color: #000000;
+    }
+
+    .content-section p {
+      font-size: 16px;
+      color: #555555;
+      margin-bottom: 10px;
+      line-height: 1.7;
+      max-width: 800px;
+    }
+
+    /* Fixed scroll-to-top button */
+    .scroll-to-top {
+      position: fixed;
+      bottom: 26px;
+      right: 26px;
+      width: 64px;
+      height: 65px;
+      border-radius: 50%;
+      background: #f4b141;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      color: #000000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      z-index: 50;
+    }
+
+    .scroll-to-top:hover {
+      background: #f5c25b;
+    }
+
+    /* Footer */
+    footer {
+      background: #1d1a18;
+      color: #999999;
+      padding: 16px 40px 14px 40px;
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    footer a {
+      color: #999999;
+      text-decoration: none;
+      margin: 0 5px;
+    }
+
+    footer a:hover {
+      color: white;
+    }
+
+    footer p {
+      margin: 0 0 4px 0;
+    }
+
+    footer div {
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">Atlas.</div>
+    <nav>
+      <a href="#guides">Guides</a>
+      <a href="#maps">Maps</a>
+      <a href="#journal">Journal</a>
+      <a href="#about">About</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Field guides for slow travel</h1>
+      <p>Forty hand-researched routes across four continents, written by people who walked them twice — once to get lost, once to take notes.</p>
+    </section>
+
+    <section class="guides-section">
+      <h2>Latest guides</h2>
+      <div class="card-rail">
+        <div class="card">
+          <div class="card-image orange"></div>
+          <div class="card-content">
+            <h3 class="card-title">High passes of the Atlas</h3>
+            <p class="card-description">Nine days between Imili and Setbi Fatma, with mule support and two market detours.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-image teal"></div>
+          <div class="card-content">
+            <h3 class="card-title">Kii Peninsula by rail</h3>
+            <p class="card-description">Kumano Kodo trailheads you can reach before breakfast from Osaka and Nagoya.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-image blue"></div>
+          <div class="card-content">
+            <h3 class="card-title">Puglia's white towns</h3>
+            <p class="card-description">A slow loop from Ostuni to Locorotondo built around bakery opening hours.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-image maroon"></div>
+          <div class="card-content">
+            <h3 class="card-title">Faroe ridgelines</h3>
+            <p class="card-description">Weatherproof itineraries for the six trails that stay open through October.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="content-section">
+      <h2>Why we walk routes twice</h2>
+      <p>The first walk is for the route itself: where the water is, which junctions mislead, whether the 4pm light makes the descent worth slowing down for. We take almost no notes. The route has to earn a second visit before it earns a page.</p>
+      <p>The second walk is the written one. Every guide in Atlas is the record of that second pass — distances re-measured, cafés re-tested on a weekday, the one confusing stile photographed from both sides. If a detail matters at 6am in the rain, it is in the guide.</p>
+      <p>Between the two walks, routes change. A landslide closes a traverse, a ferry timetable shifts, a farm dog retires. Readers file corrections from the trail, and each guide shows the date it was last walked, not just last edited.</p>
+      <p>Slow travel is not about pace for its own sake. It is about a ratio — hours moving to hours noticing. The guides are structured around that ratio: shorter days than you expect, longer lunches than you plan, and a firm opinion about which viewpoints justify a climb.</p>
+    </section>
+  </main>
+
+  <button class="scroll-to-top">↑</button>
+
+  <footer>
+    <p>© 2026 Atlas Guides</p>
+    <div>
+      <a href="#instagram">Instagram</a> · <a href="#rss">RSS</a> · <a href="#contact">Contact</a>
+    </div>
+  </footer>
+</body>
+</html>

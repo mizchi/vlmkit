@@ -30,6 +30,7 @@ import {
   type ComponentBbox,
   type ExtractComponentsOptions,
 } from "./component-bbox.ts";
+import { classifyRegion, kindsCanPair, type ComponentKindInfo } from "./component-classify.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 
@@ -38,6 +39,8 @@ export interface PageComponent extends ComponentBbox {
   index: number;
   /** fillColor as "#rrggbb". */
   hex: string;
+  /** Pixel-stat kind (attached by composePage; optional for callers). */
+  kind?: ComponentKindInfo;
 }
 
 export interface PageMatch {
@@ -168,6 +171,10 @@ export function matchPageComponents(
     // agent still has to fix surface as a missing+extra pair instead —
     // strictly more actionable than a silently poisoned match.
     if (fillDistance(t, c) > maxFillDistance) return null;
+    // Kind identity, the principled version of the two gates above:
+    // a confident solid never pairs with a confident text/image.
+    // Unconfident classifications never gate (see component-classify).
+    if (!kindsCanPair(t.kind, c.kind)) return null;
     const [tx, ty] = center(t);
     const [cx, cy] = center(c);
     const centerDist = Math.sqrt((tx - cx) ** 2 + (ty - cy) ** 2) / diag;
@@ -340,11 +347,22 @@ export function composePageDiff(
       && Math.abs(detected[2] - targetBackground[2]) <= tolerance;
     if (!agrees) currentBackground = detected;
   }
-  const targetComponents = toPageComponents(
-    extractComponentsFromRgba(target.data, target.width, target.height, { ...options, background: targetBackground }),
+  const attachKinds = (
+    components: PageComponent[],
+    image: { data: Uint8Array; width: number },
+  ): PageComponent[] =>
+    components.map((c) => ({ ...c, kind: classifyRegion(image.data, image.width, c) }));
+  const targetComponents = attachKinds(
+    toPageComponents(
+      extractComponentsFromRgba(target.data, target.width, target.height, { ...options, background: targetBackground }),
+    ),
+    target,
   );
-  const currentComponents = toPageComponents(
-    extractComponentsFromRgba(current.data, current.width, current.height, { ...options, background: currentBackground }),
+  const currentComponents = attachKinds(
+    toPageComponents(
+      extractComponentsFromRgba(current.data, current.width, current.height, { ...options, background: currentBackground }),
+    ),
+    current,
   );
   const { matches, missing, extra } = matchPageComponents(
     targetComponents,

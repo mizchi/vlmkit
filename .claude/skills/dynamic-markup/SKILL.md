@@ -33,7 +33,7 @@ Static truth comes from pixels; behavior truth needs a carrier:
 | Scrollport hidden content | an extra "scrolled to bottom" screenshot |
 | Animation | a **motion brief** (short text: what moves, duration, easing, iteration, reduced-motion policy) — or a frame strip |
 | Interactive states | hover/focus screenshots (see auto-markup §3.7) |
-| Exact copy (spellings, casing) | a **copy manifest** (plain text, one required line per row) — verified by `check copy --manifest`; without one, `check copy` only runs its placeholder scan. **Brief authors: mandatory whenever the page carries real copy** — measured cost of omitting it: an S9 run went 18 rounds across two models with a wrong © year, missing `·` separators, and proper-noun typos (`Imlil`→`Imili`) that composition pairs happily and no gate can see. Vision transcription of ~14px text WILL introduce these |
+| Exact copy (spellings, casing) | a **copy manifest** (plain text, one required line per row) — verified by `check copy --manifest`; without one, `check copy` only runs its placeholder scan. **Brief authors: mandatory whenever the page carries real copy** — measured cost of omitting it: an S9 run went 18 rounds across two models with a wrong © year, missing `·` separators, and proper-noun typos (`Imlil`→`Imili`) that composition pairs happily and no gate can see. Vision transcription of ~14px text WILL introduce these. **No manifest available** (real mock, competitor capture): the target pixels themselves are the carrier — run `check copy attempt.html --target target.png` once composition has converged; it crops every rendered text block's bbox out of the target into contact sheets. All three S9 bugs are visible in a single sheet read — **but the sheets must be read by someone other than whoever transcribed the copy** (the driver/verifier, or `--vlm`): the eyes that misread `Imlil` as `Imili` at transcription time misread the review crop the same way (S9-fresh measured exactly this — the agent reviewed its own sheets, reported PASS, and the typo survived). Self-review of your own transcription is weak evidence |
 
 Never invent behavior that has no carrier. No motion brief and no frame
 strip means **author zero animations** — say so in your report rather
@@ -186,6 +186,25 @@ self-declaration once verdicts became explicit):
 - ONE targeted fix per round. Fix the FIRST kickback item first — the
   list is ordered, and a ROOT-CAUSE CANDIDATE line means the items
   below it are probably debris of that one defect.
+- Kickback items carry deterministic context: a `[kind]` tag
+  (text/solid/image — a text extra is NEVER fixed by deleting the
+  text) and a selector attribution (`[rendered by \`.footer\`]`,
+  `[target box falls in your \`.rail\`]`) from hit-testing the
+  residual bbox against your own DOM rects. Start from the named
+  selector instead of re-deriving which element owns the residual —
+  the S9 escalation leg spent rounds on exactly that derivation, and
+  the controlled S9 replay measured the effect: same stall, same
+  budget, attribution on — Sonnet went from NOT-DONE-in-6 to
+  **DONE-in-3**. (It does not rescue Haiku — the wall there is the
+  reasoning, not the locating.) No attribution printed means no
+  element overlaps the box (commonly a fully missing
+  `position: fixed` element).
+- Demotion is the TOOL's call, never yours: only lines the tool marks
+  `[pixel-confirmed, not blocking]` are artifacts. A blocking line you
+  suspect is an extraction quirk is still a real residual — three
+  measured runs (S7, the S9 escalation, S9-fresh) each rationalized a
+  genuinely missing element as "the tool can't isolate it", and all
+  three were visually refuted by the verifier.
 - The verdict prints a `trend vs previous run` line; on REGRESSED,
   revert your last change before trying anything else.
 - When some targets pass and others fail, the kickback says which to

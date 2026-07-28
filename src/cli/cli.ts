@@ -141,6 +141,8 @@ const SPECS: Record<string, Spec> = {
   scrollScan: spec("scroll-scan", () => import("@mizchi/vlmkit-markup/inspect/scroll-scan.ts")),
   breakpointCheck: spec("breakpoint-check", () => import("@mizchi/vlmkit-markup/stress/breakpoint-check.ts")),
   markupVerify: spec("markup-verify", () => import("@mizchi/vlmkit-markup/verify/markup-verify.ts")),
+  markupAutofix: spec("markup-autofix", () => import("@mizchi/vlmkit-markup/verify/markup-autofix.ts")),
+  regionJudge: spec("region-judge", () => import("@mizchi/vlmkit-markup/inspect/region-judge.ts")),
   copyCheck: spec("copy-check", () => import("@mizchi/vlmkit-markup/inspect/copy-check.ts")),
   scrollBehavior: spec("scroll-behavior", () => import("@mizchi/vlmkit-markup/inspect/scroll-behavior.ts")),
   mockScan: spec("mock-scan", () => import("@mizchi/vlmkit-markup/inspect/mock-scan.ts")),
@@ -177,7 +179,8 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
     animation: { spec: SPECS.animationEval, desc: "Frame-sampled animation evaluation (visible effect / settle / reduced-motion behavior)" },
     breakpoints: { spec: SPECS.breakpointCheck, desc: "Boundary quickcheck: render at B-1/B/B+1 per breakpoint, flag spikes/gaps/overflow (--sweep fuzzes widths in between)" },
     scroll: { spec: SPECS.scrollBehavior, desc: "Scroll behavior: fixed holds position, engaged sticky sticks, mandatory snap lands on a child edge" },
-    copy: { spec: SPECS.copyCheck, desc: "Copy fidelity: placeholder-text scan + optional --manifest verification" },
+    copy: { spec: SPECS.copyCheck, desc: "Copy fidelity: placeholder scan + --manifest verification + --target image check (VLM or agent-vision sheets)" },
+    equivalence: { spec: SPECS.regionJudge, desc: "Visual equivalence judge for residual regions (measured delta + refutation-gated VLM or pair sheets)" },
     crater: { spec: SPECS.craterSmoke, desc: "Crater BiDi backend smoke check" },
     perf: { spec: SPECS.perf, desc: "Web Vitals thresholds (CLS / LCP / FCP)" },
   },
@@ -207,9 +210,10 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
   },
   heal: {
     selector: { spec: SPECS.selectorHeal, desc: "Suggest replacements for a selector that no longer matches" },
+    markup: { spec: SPECS.markupAutofix, desc: "Stage-2 auto-fix: LLM turns the verify-markup kickback into gated CSS overrides" },
   },
   verify: {
-    markup: { spec: SPECS.markupVerify, desc: "One-shot done-condition verdict: composition per target + gates + pixel diff + kickback list" },
+    markup: { spec: SPECS.markupVerify, desc: "One-shot done-condition verdict: composition per target + gates + pixel diff + kickback list with selector attribution" },
   },
 };
 
