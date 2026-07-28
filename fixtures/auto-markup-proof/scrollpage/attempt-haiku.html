@@ -13,20 +13,21 @@
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background-color: #f8f8f8;
-      color: #333;
+      background-color: #ffffff;
+      color: #1c1917;
     }
 
     /* Top bar - sticky */
     .topbar {
       position: sticky;
       top: 0;
-      background-color: #2b2b2b;
-      color: white;
-      padding: 16px 40px;
+      background-color: #1c1917;
+      color: #fafaf9;
+      padding: 14px 44px;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      line-height: 1;
       z-index: 100;
     }
 
@@ -34,6 +35,7 @@
       font-size: 20px;
       font-weight: bold;
       letter-spacing: 1px;
+      color: #fafaf9;
     }
 
     .topbar-nav {
@@ -42,51 +44,61 @@
     }
 
     .topbar-nav a {
-      color: white;
+      color: #d6d3d1;
       text-decoration: none;
       font-size: 14px;
     }
 
     .topbar-nav a:hover {
+      color: #fafaf9;
       text-decoration: underline;
     }
 
-    /* Main content */
-    .container {
-      background-color: white;
-      padding: 30px 40px;
+    /* Hero band - off-white, full-bleed */
+    .hero-wrap {
+      background-color: #fafaf9;
+      padding: 40px 44px;
     }
 
     .hero-section {
       max-width: 600px;
-      margin-bottom: 30px;
-      border-bottom: 1px solid #e0e0e0;
-      padding-bottom: 30px;
     }
 
     .hero-title {
       font-size: 40px;
       font-weight: bold;
+      line-height: 1.2;
       margin-bottom: 16px;
-      color: #1a1a1a;
+      color: #1c1917;
     }
 
     .hero-subtitle {
       font-size: 16px;
-      color: #666;
+      color: #57534e;
       line-height: 1.6;
     }
 
-    /* Latest guides section */
+    /* Full-width divider under the hero band */
+    .divider {
+      height: 1px;
+      background-color: #e7e5e4;
+    }
+
+    /* White content well - guides + article */
+    .main-wrap {
+      background-color: #ffffff;
+      padding: 32px 44px 19px;
+    }
+
     .guides-section {
-      margin-bottom: 30px;
+      margin-bottom: 93px;
     }
 
     .guides-title {
       font-size: 24px;
       font-weight: bold;
-      margin-bottom: 24px;
-      color: #1a1a1a;
+      margin-bottom: 20px;
+      color: #1c1917;
     }
 
     /* Card rail - horizontal scroll with snap */
@@ -94,8 +106,10 @@
       display: flex;
       overflow-x: auto;
       scroll-snap-type: x mandatory;
-      gap: 24px;
+      gap: 20px;
       padding-bottom: 12px;
+      margin-right: -44px;
+      padding-right: 44px;
     }
 
     .card-rail::-webkit-scrollbar {
@@ -114,76 +128,76 @@
     .card {
       flex: 0 0 380px;
       scroll-snap-align: start;
-      background-color: white;
+      background-color: #ffffff;
+      border: 1px solid #e7e5e4;
       border-radius: 8px;
       overflow: hidden;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
 
     .card-image {
       width: 100%;
-      height: 242px;
+      height: 150px;
       background-color: #ddd;
     }
 
     .card-image.orange {
-      background-color: #c86d2e;
+      background-color: #b45309;
     }
 
     .card-image.teal {
-      background-color: #1a8a7e;
+      background-color: #0f766e;
     }
 
     .card-image.blue {
-      background-color: #3d3dcf;
+      background-color: #4338ca;
     }
 
     .card-image.maroon {
-      background-color: #a0284c;
+      background-color: #9f1239;
     }
 
     .card-content {
-      padding: 20px;
+      padding: 12px;
     }
 
     .card-title {
       font-size: 16px;
       font-weight: bold;
-      margin-bottom: 12px;
-      color: #1a1a1a;
+      line-height: 1.2;
+      margin-bottom: 8px;
+      color: #1c1917;
     }
 
     .card-description {
       font-size: 14px;
-      color: #666;
+      color: #78716c;
       line-height: 1.5;
     }
 
     /* Article section */
     .article-section {
       max-width: 800px;
-      margin-bottom: 0;
     }
 
     .article-title {
       font-size: 24px;
       font-weight: bold;
       margin-bottom: 24px;
-      color: #1a1a1a;
+      color: #1c1917;
     }
 
     .article-paragraph {
       font-size: 16px;
-      color: #555;
+      color: #44403c;
       line-height: 1.8;
       margin-bottom: 16px;
     }
 
     /* Footer */
     .footer {
-      background-color: #2b2b2b;
-      color: white;
-      padding: 20px 40px;
+      background-color: #1c1917;
+      color: #a8a29e;
+      padding: 20px 44px;
       font-size: 14px;
       display: flex;
       justify-content: space-between;
@@ -192,28 +206,34 @@
       line-height: 1;
     }
 
+    .footer a {
+      color: #a8a29e;
+      text-decoration: none;
+      margin-left: 24px;
+    }
+
     /* Fixed button */
     .fab {
       position: fixed;
       bottom: 26px;
       right: 26px;
-      width: 64px;
-      height: 65px;
+      width: 54px;
+      height: 54px;
       border-radius: 50%;
-      background-color: #f5a623;
+      background-color: #f59e0b;
       border: none;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 24px;
-      color: #333;
+      font-size: 20px;
+      color: #1c1917;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
       z-index: 50;
     }
 
     .fab:hover {
-      background-color: #f9b84d;
+      background-color: #fbbf24;
     }
   </style>
 </head>
@@ -229,14 +249,19 @@
     </nav>
   </div>
 
-  <!-- Main content -->
-  <div class="container">
-    <!-- Hero section -->
+  <!-- Hero band (off-white, full-bleed) -->
+  <div class="hero-wrap">
     <section class="hero-section">
       <h1 class="hero-title">Field guides for slow travel</h1>
       <p class="hero-subtitle">Forty hand-researched routes across four continents, written by people who walked them twice — once to get lost, once to take notes.</p>
     </section>
+  </div>
 
+  <!-- Full-width divider -->
+  <div class="divider"></div>
+
+  <!-- White content well -->
+  <div class="main-wrap">
     <!-- Latest guides section with scrollable cards -->
     <section class="guides-section">
       <h2 class="guides-title">Latest guides</h2>
@@ -286,9 +311,9 @@
   <div class="footer">
     <div>© 2025 Atlas Guides</div>
     <div>
-      <a href="#" style="color: white; margin-left: 24px; text-decoration: none;">Instagram</a>
-      <a href="#" style="color: white; margin-left: 24px; text-decoration: none;">RSS</a>
-      <a href="#" style="color: white; margin-left: 24px; text-decoration: none;">Contact</a>
+      <a href="#">Instagram</a>
+      <a href="#">RSS</a>
+      <a href="#">Contact</a>
     </div>
   </div>
 

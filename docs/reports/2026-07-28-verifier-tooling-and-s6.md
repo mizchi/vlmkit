@@ -284,3 +284,66 @@ verify markup DONE + `check scroll` status ok 維持。
   要求する点が、S7 の 1px divider と同型の「Haiku の壁」。
 - skill のエスカレーションパターン通り、**現物 attempt + kickback
   逐語を Sonnet レグに手渡し**(リスタートせず)。結果は追記5。
+
+## 追記5: S9 Sonnet 継続レグの結果と検証者目視の追加検出(2026-07-28)
+
+skill のエスカレーションパターン初実戦: Haiku の現物 attempt +
+kickback 逐語 + 診断メモ(高さ +41px、fixed 要素の fullPage 描画座標、
+card-4 スリバー)を Sonnet に手渡し、リスタートせず同一ファイルを
+継続編集。6 ラウンド予算。
+
+### 結果: NOT DONE(ただし大幅前進)
+
+| 指標 | 引き継ぎ時(Haiku 12r 後) | Sonnet 6r 後 |
+|---|---:|---:|
+| pixel diff | 18.30% | **4.98%** |
+| missing / extra | 2 / 2 | **0 / 1** |
+| 高さ | 1228px(+41) | **1185px(許容内)** |
+| check scroll | ok | **ok 維持** |
+| tokens | 77,621 | +199,876(**S9 合計 277,497**) |
+
+Sonnet はまさに引き継ぎメモの root-cause 3 点を最初の 4 ラウンドで
+全部畳んだ: hero 帯の分割 + パレット逆算(r1)、card border による
+連結成分の一体化 — **extractor のソース(component-bbox.ts)を読んで
+「target で画像+本文が 1 成分になる条件」を逆算**(r2)、rail の
+negative-margin bleed で card-4 スリバー再現(r4)。r5-6 は残り 1 extra
+(段落 reflow)への実験で、悪化を確認して**きちんと revert**。
+
+### 残差の正体と、エージェント報告の過大解釈
+
+残る 1 extra は記事段落の折返し位置が target と 1 行ずれる reflow。
+エージェントは「1 単語の折返し差、gap/matched#0 行はツールの誤報告」と
+総括したが、**目視検証では gap/matched#0 も同じ reflow の実残差**
+(1 行増 → 記事ブロック末尾が target より ~20px 低く footer 手前まで
+食い込む)。pixel-confirmed 降格の語彙を、降格されていない行にまで
+自己適用する新パターン — 検証者はキックバック行を「アーティファクト」と
+呼ぶ報告を鵜呑みにしないこと。
+
+### 検証者目視が拾った、composition に写らないバグ 3 件
+
+reference との突合(検証者のみ閲覧可)で発覚:
+
+1. `© 2025 Atlas Guides` — 正は **© 2026**(年の転記誤り)
+2. footer リンクの `·` 区切り欠落(`Instagram · RSS · Contact` →
+   独立リンク 3 個)
+3. 固有名詞 typo: `Imlil`→`Imili`、`Setti Fatma`→`Setfi Fatma`
+   (14px 本文の vision 転記エラー)
+
+3 件とも同寸のテキスト塊として composition は正常ペアリングし、
+placeholder スキャンにも掛からない。**`check copy --manifest` が
+まさにこのためのゲート**だが、S9 のブリーフに manifest を付けなかった
+(作問側のプロセスミス)。実コピーを持つシナリオのブリーフには
+copy manifest を必ず同梱すること — 18 ラウンド誰も気づかなかった。
+
+### 判定と教訓
+
+- S9 は **NOT DONE で正直記録**(2 レグ消費、残りは人手数分の修正 —
+  比例原則で追加レグは張らない)。挙動系(sticky/snap/fixed)は
+  Haiku 段階で完全達成しており、「静的 composition と動的挙動で
+  難度が分離する」初の実例。check scroll は実戦投入に耐えた
+  (範囲端クランプ修正後、誤検出ゼロ・回帰ゼロ)。
+- エスカレーションパターン自体は設計通り機能: 引き継いだ root-cause は
+  全て解消、リスタートなし、revert 規律も維持。届かなかったのは
+  font-metric 級の reflow と、そもそもゲートの外にあったコピー誤り。
+- ウォッチ項目更新: (1) 「ツールの誤報告」ラベルの自己適用、
+  (2) copy manifest 非同梱ブリーフの禁止。
