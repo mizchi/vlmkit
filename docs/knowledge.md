@@ -820,6 +820,7 @@ S5 で Haiku が missing/extra を残して 3 ラウンドで自己宣言停止�
 | S5 promo r4 | 12 | 177,354 | 151 | 758s | —(未達で終了) | 失敗。**handoff 差し戻しの計測ラン**: 15k tokens/round(resume は ~67k)と 4 倍安いが、1 回の大きなサマリでは残差の名指し漏れ(パネル高)が最後まで直らず |
 | S6 catalog | 12 | 176,283 | 93 | 707s | —(未達で終了) | 失敗(実ページ級は 12 ラウンド予算超え)。leg-2 は **`verify markup` の printed verdict 駆動で初の「成功を偽らない」最終報告** |
 | S5 promo r5 | 21 | **187,051** | 89 | 810s | **5.60% / 10.53%** | **done(2 例目)**。`verify markup` 駆動 — to-done tokens が r3 比 **-50.2%**、tokens/round 8.9k(r3 は 47k)。leg-1 で thrash(1/2 到達→退行→5 ラウンド空転)を台帳が検出 → トレンド表示・root-cause 優先をツールに実装 → leg-3 は 3 ラウンドで収束 |
+| S7 mock(@2x 単体入力) | 43 | 556,216 | 156 | — | 3.81% | **done(mock-markup モード初回実証)**。膠着2件はツール盲点(ペアリング・抽出連結性)と判明 → fill/hairline ゲート + pixel-presence 降格で恒久修正。修正後は 1-3 ラウンドで収束 |
 
 トークン計測は S5 が初(それ以前のランは usage を記録していなかった)。
 r2/r3 の tokens はセグメント合算 — 差し戻し(resume)はトランスクリプト
