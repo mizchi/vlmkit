@@ -260,7 +260,7 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 ## Backlog (prioritize after evaluation)
 
 ### Benchmarks
-- [ ] **markup-agent モデル横断ベンチ: OpenRouter + pi でモデルごとの性能比較**
+- [ ] **markup-agent モデル横断ベンチ: OpenRouter + pi でモデルごとの性能比較**(関連: Issue #88)
   - 目的: S7-fresh A/B(Haiku 4.5 vs Sonnet — `docs/reports/2026-07-28-verifier-tooling-and-s6.md` 追記3)を Anthropic 外のモデルへ拡張し、markup-agent ループの model×cost 表を作る。既存の vlm-bench(Stage-1 VLM 比較)とは別物 — こちらは**エージェント本体**(vision 読み + CSS 執筆 + verify markup ループ運転)の比較。
   - 方法: エージェントハーネスに **pi** を使い、モデルルーティングは **OpenRouter**。条件は S7-fresh と同一に固定 — mock フィクスチャ(`fixtures/auto-markup-proof/mock/figma-export@2x.png`)単体入力、mock-markup skill 準拠プロンプト、12 ラウンド予算、`verify markup` をループ駆動、rounds は `.vlmkit/run-ledger.jsonl` で監査。
   - 指標: DONE 到達 / rounds / tokens(input・output 分離が取れる — ハーネス合算より精密)/ **実費**(OpenRouter 請求額)/ 実時間 / pixel diff / 偽 done 宣言・「再現不能」乱用の有無。
@@ -268,7 +268,7 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - 期待成果: skills の Model selection 節を Anthropic 2 モデルの表から多モデル表に更新、`docs/knowledge.md` に台帳行を追加、レポートを `docs/reports/` に保存(YYYY-MM-DD-markup-agent-model-bench-vN.md)。
   - 論点(設計時に決める): pi 側のツール権限(bash + read/write で十分か)、1px エンドゲームを完走できないモデルの打ち切り規準(トレンド横ばい 2 レグ相当)、vision 非対応モデルの扱い(除外 or scan component クロップ経由)。
 
-- [ ] **VLM 意味ラベリングのベンチ: コンポーネントクロップ分類(button/nav/card/badge...)**
+- [ ] **VLM 意味ラベリングのベンチ: コンポーネントクロップ分類(button/nav/card/badge...)**(→ Issue #88)
   - 背景: 2026-07-28 に決定論の kind 分類(hairline/solid/text/image、bigJump 判別)を実装済み — ペアリングゲートと kickback ラベルはこれで賄えている。VLM が足せるのは**意味**の層(「これは CTA ボタン」「これは nav」)で、kickback の可読性がさらに上がる可能性がある。ただし本環境に API キーがなく未ベンチのため、実装はフックだけで見送り。
   - 方法: 既存 fixture 群の抽出済みコンポーネントクロップ(数百個、正解ラベルは fixture HTML から機械的に得られる)を分類タスクとして与える。候補: `bytedance/ui-tars-1.5-7b`(UI ドメイン学習・ほぼ無料、ただし vlm-region-diff での色リテラル失敗の前科 — 分類は別スキルなので要実測)、`qwen/qwen3-vl-30b-a3b-instruct`、`anthropic/claude-haiku-4-5`。
   - 判断基準: 精度 ≥90% かつレイテンシ ≤2s/クロップ(またはシートで一括)なら verify markup にオプトイン統合。それ未満なら決定論 kind のままで足りる(誤ラベルは誤アドバイスに直結するため、中途半端な精度はゼロより悪い)。
@@ -278,7 +278,7 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - (2) 抽出 top-N スロットから溢れた実在コンポーネントが、attempt 側で追加された直後に「extra — not in target」と一時誤報告される(次ラウンドで pixel-confirmed 降格)。案: extra 判定前に target 側の同 bbox を直接 pixel-presence して、降格を同ラウンドで行う。
   - 重要度: 強いモデルは自前計測で相殺できたが、Stage-2 LLM 自動修正はこのクラスの行を鵜呑みにするため、その前提条件。
 
-- [ ] **LLM Stage-2 fix synthesis for the markup loop(kickback + セレクタ帰属 → CSS 修正案の自動適用)**
+- [ ] **LLM Stage-2 fix synthesis for the markup loop(kickback + セレクタ帰属 → CSS 修正案の自動適用)**(→ Issue #88)
   - 前提: verify markup の kickback は 2026-07-28 から決定論のセレクタ帰属(`[rendered by ...]` / `[target box falls in your ...]`)と kind タグを持つ — LLM に渡す文脈はもう揃っている。
   - 方法: fix-loop の実証済み 2 段構成を流用 — kickback(帰属付き)+ 該当セレクタの computed styles を LLM に渡し、CSS 編集案を JSON で受けて apply-and-rollback ゲート(qwen3-coder の過剰修正を吸収した実績のある形)で適用。verify markup の trend が REGRESSED なら自動ロールバック。
   - 候補 LLM: `google/gemini-2.5-flash`(Stage-2 現行既定)から。API キー必須のため本環境では未着手。
