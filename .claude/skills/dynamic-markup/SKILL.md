@@ -205,8 +205,12 @@ condition was stated. If you are the driver, plan for it:
    iterating" wastes a round; named deltas resolve in 1-2.
 4. **Budget tokens for the kickbacks**: resuming a subagent re-bills its
    transcript, so late segments cost more than their tool-call count
-   suggests. A fresh agent with a verifier summary may be cheaper than
-   a resume (unmeasured — record it if you try).
+   suggests — measured at ~67k tokens/round for resume vs ~15k for a
+   fresh agent with a verifier summary (S5-r4). Prefer the handoff for
+   cost, but keep kickbacks small, repeated, and *complete*: a residual
+   you leave out of the handoff text stays unfixed (r4's panel height),
+   because the fresh agent lacks the resume's accumulated context to
+   rediscover it.
 
 ## Ground rules
 
