@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Atlas - Field guides for slow travel</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #f8f8f8;
+      color: #333;
+    }
+
+    /* Top bar - sticky */
+    .topbar {
+      position: sticky;
+      top: 0;
+      background-color: #2b2b2b;
+      color: white;
+      padding: 16px 40px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .topbar-logo {
+      font-size: 20px;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+
+    .topbar-nav {
+      display: flex;
+      gap: 32px;
+    }
+
+    .topbar-nav a {
+      color: white;
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    .topbar-nav a:hover {
+      text-decoration: underline;
+    }
+
+    /* Main content */
+    .container {
+      background-color: white;
+      padding: 30px 40px;
+    }
+
+    .hero-section {
+      max-width: 600px;
+      margin-bottom: 30px;
+      border-bottom: 1px solid #e0e0e0;
+      padding-bottom: 30px;
+    }
+
+    .hero-title {
+      font-size: 40px;
+      font-weight: bold;
+      margin-bottom: 16px;
+      color: #1a1a1a;
+    }
+
+    .hero-subtitle {
+      font-size: 16px;
+      color: #666;
+      line-height: 1.6;
+    }
+
+    /* Latest guides section */
+    .guides-section {
+      margin-bottom: 30px;
+    }
+
+    .guides-title {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 24px;
+      color: #1a1a1a;
+    }
+
+    /* Card rail - horizontal scroll with snap */
+    .card-rail {
+      display: flex;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      gap: 24px;
+      padding-bottom: 12px;
+    }
+
+    .card-rail::-webkit-scrollbar {
+      height: 6px;
+    }
+
+    .card-rail::-webkit-scrollbar-track {
+      background: #e0e0e0;
+    }
+
+    .card-rail::-webkit-scrollbar-thumb {
+      background: #999;
+      border-radius: 3px;
+    }
+
+    .card {
+      flex: 0 0 380px;
+      scroll-snap-align: start;
+      background-color: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .card-image {
+      width: 100%;
+      height: 200px;
+      background-color: #ddd;
+    }
+
+    .card-image.orange {
+      background-color: #c86d2e;
+    }
+
+    .card-image.teal {
+      background-color: #1a8a7e;
+    }
+
+    .card-image.blue {
+      background-color: #3d3dcf;
+    }
+
+    .card-image.maroon {
+      background-color: #a0284c;
+    }
+
+    .card-content {
+      padding: 20px;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 12px;
+      color: #1a1a1a;
+    }
+
+    .card-description {
+      font-size: 14px;
+      color: #666;
+      line-height: 1.5;
+    }
+
+    /* Article section */
+    .article-section {
+      max-width: 800px;
+      margin-bottom: 0;
+    }
+
+    .article-title {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 24px;
+      color: #1a1a1a;
+    }
+
+    .article-paragraph {
+      font-size: 16px;
+      color: #555;
+      line-height: 1.8;
+      margin-bottom: 16px;
+    }
+
+    /* Footer */
+    .footer {
+      background-color: #2b2b2b;
+      color: white;
+      padding: 24px 40px;
+      font-size: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Fixed button */
+    .fab {
+      position: fixed;
+      bottom: 26px;
+      right: 26px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background-color: #f5a623;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      color: #333;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      z-index: 50;
+    }
+
+    .fab:hover {
+      background-color: #f9b84d;
+    }
+  </style>
+</head>
+<body>
+  <!-- Sticky top bar -->
+  <div class="topbar">
+    <div class="topbar-logo">Atlas.</div>
+    <nav class="topbar-nav">
+      <a href="#">Guides</a>
+      <a href="#">Maps</a>
+      <a href="#">Journal</a>
+      <a href="#">About</a>
+    </nav>
+  </div>
+
+  <!-- Main content -->
+  <div class="container">
+    <!-- Hero section -->
+    <section class="hero-section">
+      <h1 class="hero-title">Field guides for slow travel</h1>
+      <p class="hero-subtitle">Forty hand-researched routes across four continents, written by people who walked them twice — once to get lost, once to take notes.</p>
+    </section>
+
+    <!-- Latest guides section with scrollable cards -->
+    <section class="guides-section">
+      <h2 class="guides-title">Latest guides</h2>
+      <div class="card-rail">
+        <div class="card">
+          <div class="card-image orange"></div>
+          <div class="card-content">
+            <h3 class="card-title">High passes of the Atlas</h3>
+            <p class="card-description">Nine days between Imili and Setfi Fatma, with mule support and two market detours.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-image teal"></div>
+          <div class="card-content">
+            <h3 class="card-title">Kii Peninsula by rail</h3>
+            <p class="card-description">Kumano Kodo trailheads you can reach before breakfast from Osaka and Nagoya.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-image blue"></div>
+          <div class="card-content">
+            <h3 class="card-title">Puglia's white towns</h3>
+            <p class="card-description">A slow loop from Ostuni to Locorotondo built around bakery opening hours.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-image maroon"></div>
+          <div class="card-content">
+            <h3 class="card-title">Faroe ridgelines</h3>
+            <p class="card-description">Weatherproof itineraries for the six trails that stay open through October.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Article section -->
+    <section class="article-section">
+      <h2 class="article-title">Why we walk routes twice</h2>
+      <p class="article-paragraph">The first walk is for the route itself: where the water is, which junctions mislead, whether the 4pm light makes the descent worth slowing down for. We take almost no notes. The route has to earn a second visit before it earns a page.</p>
+      <p class="article-paragraph">The second walk is the written one. Every guide in Atlas is the record of that second pass — distances re-measured, cafés re-tested on a weekday, the one confusing stile photographed from both sides. If a detail matters at 6am in the rain, it is in the guide.</p>
+      <p class="article-paragraph">Between the two walks, routes change. A landslide closes a traverse, a ferry timetable shifts, a farm dog retires. Readers file corrections from the trail, and each guide shows the date it was last walked, not just last edited.</p>
+      <p class="article-paragraph">Slow travel is not about pace for its own sake. It is about a ratio — hours moving to hours noticing. The guides are structured around that ratio: shorter days than you expect, longer lunches than you plan, and a firm opinion about which viewpoints justify a climb.</p>
+    </section>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div>© 2025 Atlas Guides</div>
+    <div>
+      <a href="#" style="color: white; margin-left: 24px; text-decoration: none;">Instagram</a>
+      <a href="#" style="color: white; margin-left: 24px; text-decoration: none;">RSS</a>
+      <a href="#" style="color: white; margin-left: 24px; text-decoration: none;">Contact</a>
+    </div>
+  </div>
+
+  <!-- Fixed scroll-to-top button -->
+  <button class="fab">↑</button>
+</body>
+</html>
