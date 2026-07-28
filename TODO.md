@@ -273,6 +273,11 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - 方法: 既存 fixture 群の抽出済みコンポーネントクロップ(数百個、正解ラベルは fixture HTML から機械的に得られる)を分類タスクとして与える。候補: `bytedance/ui-tars-1.5-7b`(UI ドメイン学習・ほぼ無料、ただし vlm-region-diff での色リテラル失敗の前科 — 分類は別スキルなので要実測)、`qwen/qwen3-vl-30b-a3b-instruct`、`anthropic/claude-haiku-4-5`。
   - 判断基準: 精度 ≥90% かつレイテンシ ≤2s/クロップ(またはシートで一括)なら verify markup にオプトイン統合。それ未満なら決定論 kind のままで足りる(誤ラベルは誤アドバイスに直結するため、中途半端な精度はゼロより悪い)。
 
+- [ ] **kickback 品質: matched ペアの粒度不一致と top-N 取りこぼし(S9 リプレイで発見)**
+  - (1) target 側が連結成分としてグループ化した箱(card 全体)と current 側の部分箱(image のみ)が matched になると、dSize が「伸ばせ/縮めろ」と読める誤誘導になる。案: matched ペアの両箱で pixel-presence 相互チェックを行い、片側だけ大きい場合は「grouping mismatch の可能性」を行内に明記する。
+  - (2) 抽出 top-N スロットから溢れた実在コンポーネントが、attempt 側で追加された直後に「extra — not in target」と一時誤報告される(次ラウンドで pixel-confirmed 降格)。案: extra 判定前に target 側の同 bbox を直接 pixel-presence して、降格を同ラウンドで行う。
+  - 重要度: 強いモデルは自前計測で相殺できたが、Stage-2 LLM 自動修正はこのクラスの行を鵜呑みにするため、その前提条件。
+
 - [ ] **LLM Stage-2 fix synthesis for the markup loop(kickback + セレクタ帰属 → CSS 修正案の自動適用)**
   - 前提: verify markup の kickback は 2026-07-28 から決定論のセレクタ帰属(`[rendered by ...]` / `[target box falls in your ...]`)と kind タグを持つ — LLM に渡す文脈はもう揃っている。
   - 方法: fix-loop の実証済み 2 段構成を流用 — kickback(帰属付き)+ 該当セレクタの computed styles を LLM に渡し、CSS 編集案を JSON で受けて apply-and-rollback ゲート(qwen3-coder の過剰修正を吸収した実績のある形)で適用。verify markup の trend が REGRESSED なら自動ロールバック。

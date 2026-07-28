@@ -192,9 +192,13 @@ self-declaration once verdicts became explicit):
   `[target box falls in your \`.rail\`]`) from hit-testing the
   residual bbox against your own DOM rects. Start from the named
   selector instead of re-deriving which element owns the residual —
-  the S9 escalation leg spent rounds on exactly that derivation. No
-  attribution printed means no element overlaps the box (commonly a
-  fully missing `position: fixed` element).
+  the S9 escalation leg spent rounds on exactly that derivation, and
+  the controlled S9 replay measured the effect: same stall, same
+  budget, attribution on — Sonnet went from NOT-DONE-in-6 to
+  **DONE-in-3**. (It does not rescue Haiku — the wall there is the
+  reasoning, not the locating.) No attribution printed means no
+  element overlaps the box (commonly a fully missing
+  `position: fixed` element).
 - Demotion is the TOOL's call, never yours: only lines the tool marks
   `[pixel-confirmed, not blocking]` are artifacts. A blocking line you
   suspect is an extraction quirk is still a real residual — three
