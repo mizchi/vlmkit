@@ -98,13 +98,16 @@ test("swapped sections produce an order violation", () => {
     { x: 20, y: 20, w: 360, h: 100, rgb: DARK },
     { x: 20, y: 160, w: 360, h: 100, rgb: GRAY },
   ]);
-  // Same geometry both sides — spatial matching pairs by position, so the
-  // *fill* swap is what surfaces: matched pairs report large fillDistance.
+  // Fill acts as identity (maxFillDistance gate): GRAY pairs with GRAY
+  // and DARK with DARK across positions, so the swap surfaces as the
+  // sections having exchanged places — a vertical ordering violation —
+  // rather than as two in-place fill mismatches.
   const composition = composePageDiff(target, current);
   assert.equal(composition.matches.length, 2);
   for (const m of composition.matches) {
-    assert.ok(m.fillDistance > 100, `fill swap should surface, got ${m.fillDistance}`);
+    assert.ok(m.fillDistance < 20, `fill-identity pairing expected, got distance ${m.fillDistance}`);
   }
+  assert.ok(composition.orderViolations.length >= 1, "swap should surface as an ordering violation");
 });
 
 test("order violation fires when a matched section moved across another", () => {
@@ -217,4 +220,20 @@ test("near-identical thin lines do not cross-pair into a phantom ordering violat
   // Sorted by target top: current tops must be ascending (no crossing).
   assert.equal(matches[0]!.current.top, 617);
   assert.equal(matches[1]!.current.top, 631);
+});
+
+test("a hairline never pairs with a blob, and far-apart fills never pair", () => {
+  // S7 deadlock shape: target has a 1px divider; current has a text
+  // fragment near the same center. Old matcher paired them, hiding one
+  // real missing AND one real extra.
+  const target = makePage(1280, 300, [
+    { x: 456, y: 150, w: 368, h: 1, rgb: [226, 232, 240] },
+  ]);
+  const current = makePage(1280, 300, [
+    { x: 476, y: 145, w: 76, h: 11, rgb: [179, 182, 189] },
+  ]);
+  const composition = composePageDiff(target, current);
+  assert.equal(composition.matches.length, 0);
+  assert.equal(composition.missing.length, 1);
+  assert.equal(composition.extra.length, 1);
 });
