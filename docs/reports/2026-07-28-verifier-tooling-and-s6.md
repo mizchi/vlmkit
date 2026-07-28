@@ -96,3 +96,31 @@ leg-1 で 6/6 → **leg-2(verify markup 駆動)で初の非発生**。
 - fixtures: `fixtures/auto-markup-proof/catalog/`(S6)
 - テスト: 単体 30 追加(sweep 2 / scroll-behavior 10 / copy 6 /
   page-compose 既存 + CLI 委譲 3)、全 141 pass
+
+## 追記: r5 — 「トークンは減るか」の実測回答
+
+S5 promo を `verify markup` 駆動で再走(r5)。**done 到達の総コストで
+r3 比 -50.2%** を確認した。
+
+| | r3(個別ツール + resume 差し戻し) | r5(verify markup 駆動) |
+|---|---:|---:|
+| rounds | 8 | 21(leg1 12 + leg2 6 + leg3 3) |
+| tokens(合計) | 375,941 | **187,051** |
+| tokens/round | ~47k | **~8.9k(1/5.3)** |
+| done | ✓ | ✓(独立検証済み: 8/8・0/0 両 viewport、diff 5.60%/10.53%) |
+
+- 削減の内訳: (1) 1 ラウンド = 1 コマンド(個別ツール実行と出力読解の
+  集約)、(2) screenshot は初回 1 回のみ読んでノート化(プロンプト規律)、
+  (3) 差し戻しは handoff(resume 再課金なし)。
+- **新たに見えた失敗モード = thrash**: 早期自己宣言が verdict で消えた
+  代わりに、leg-1 は 1/2 target 到達後に退行し 5 ラウンド空転した
+  (run ledger の監査で初めて可視化)。対策として `verify markup` に
+  実装した 3 機能 — trend 表示(REGRESSED → まず revert)、
+  root-cause 優先キックバック(IoU<0.5 の matched を先頭に)、
+  pass ガード — を入れた leg-3 は **3 ラウンド・39,185 tokens で収束**。
+  ツール修正後のフレッシュランなら total はさらに下がる見込み
+  (leg-1 の空転 5 ラウンド ≈ 35k が丸ごと不要になる)。
+- rounds は増えた(8→21)が、これは r3 の rounds が「重い個別計測
+  ラウンド」だったため。KPI としては rounds 単体でなく
+  tokens/round と to-done tokens を主指標に取るべきというのが r5 の
+  帰結(台帳が rounds を客観化した今、rounds の定義差も監査できる)。
