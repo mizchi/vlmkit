@@ -177,7 +177,7 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
     animation: { spec: SPECS.animationEval, desc: "Frame-sampled animation evaluation (visible effect / settle / reduced-motion behavior)" },
     breakpoints: { spec: SPECS.breakpointCheck, desc: "Boundary quickcheck: render at B-1/B/B+1 per breakpoint, flag spikes/gaps/overflow (--sweep fuzzes widths in between)" },
     scroll: { spec: SPECS.scrollBehavior, desc: "Scroll behavior: fixed holds position, engaged sticky sticks, mandatory snap lands on a child edge" },
-    copy: { spec: SPECS.copyCheck, desc: "Copy fidelity: placeholder-text scan + optional --manifest verification" },
+    copy: { spec: SPECS.copyCheck, desc: "Copy fidelity: placeholder scan + --manifest verification + --target image check (VLM or agent-vision sheets)" },
     crater: { spec: SPECS.craterSmoke, desc: "Crater BiDi backend smoke check" },
     perf: { spec: SPECS.perf, desc: "Web Vitals thresholds (CLS / LCP / FCP)" },
   },

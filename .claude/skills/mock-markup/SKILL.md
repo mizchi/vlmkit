@@ -52,7 +52,20 @@ treats lorem-ipsum-style filler as a suspect. Transcription of small
 `·`-style separators get silently mangled and no pixel gate will catch
 it. Zoom into a crop before transcribing fine print, and if the
 requester can supply a copy manifest, ask for one and verify with
-`check copy --manifest`. Photos and illustrations
+`check copy --manifest`. Either way, **once composition converges, run
+the pixel-side copy check**:
+
+```bash
+vlmkit check copy attempt.html --target targets/target-desktop.png
+```
+
+It crops every rendered text block's bbox out of the target image into
+contact sheets plus a worksheet of expected strings. Read the sheets
+ONCE with your own vision (or pass `--vlm` with an API key) and flag
+any character difference — this is the gate that catches your own
+Phase-1 transcription errors, so do not skip it because the text
+"looks right"; the whole point is that it looked right the first time
+too. Photos and illustrations
 inside the mock are content, not layout: reproduce their box (size,
 position, fill approximation or gradient), never try to redraw them.
 
@@ -108,9 +121,10 @@ matters more here:
 ## Done condition
 
 `verify markup` prints **DONE** (all targets 0/0 + height in tolerance
-+ gates clean or expected-warn-only), and your report includes the
-transcribed-copy note and any declared-irreproducible residuals with
-their reasoning. If the intake step flagged the mock as noisy, the
++ gates clean or expected-warn-only), the `check copy --target` sheets
+have been reviewed with zero unexplained character differences, and
+your report includes the transcribed-copy note and any
+declared-irreproducible residuals with their reasoning. If the intake step flagged the mock as noisy, the
 report must say which regions were driven by `build component` instead.
 
 Budget and KPIs: as in dynamic-markup (rounds ledger-audited via

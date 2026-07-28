@@ -13,26 +13,58 @@
  *      manifest is the copy twin of the motion brief — a small text
  *      carrier for truth a screenshot can't transport reliably (exact
  *      spellings, punctuation, casing).
+ *   3. Target-image check (opt-in, `--target target.png`): each rendered
+ *      text block's bbox is cropped out of the target image and stacked
+ *      into contact sheets. Without an API key the sheets + a worksheet
+ *      go to `--out` for the agent's own vision to review; with `--vlm`
+ *      a VLM transcribes each crop and mismatches become suspects.
+ *      This is the gate for copy truth that exists ONLY in pixels (no
+ *      manifest, no reference page) — the S9 class of bug.
  *
  * Whitespace is normalized on both sides; comparison is case-sensitive
- * (casing is spec in copy). Deterministic: DOM text only, no VLM.
+ * (casing is spec in copy). Checks 1-2 are deterministic; check 3 uses
+ * vision only for READING — every coordinate is DOM/pixel math.
  *
  * CLI:
- *   vlmkit check copy <html-or-url> [--manifest <file>] [--json]
+ *   vlmkit check copy <html-or-url> [--manifest <file>] [--target <png>] [--vlm [model]] [--json]
  */
-import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { PNG } from "pngjs";
+import {
+  buildContactSheets,
+  COLLECT_TEXT_BLOCKS,
+  compareTranscript,
+  cropRegion,
+  formatCopyWorksheet,
+  TRANSCRIBE_PROMPT,
+  type TextBlock,
+} from "./copy-target.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
-export type CopyIssueKind = "placeholder-text" | "copy-missing";
+export type CopyIssueKind = "placeholder-text" | "copy-missing" | "copy-image-mismatch";
 
 export interface CopyIssue {
   kind: CopyIssueKind;
   severity: "warn" | "suspect";
   message: string;
+}
+
+export interface CopyImageReview {
+  /** Text blocks found in the attempt render, reading order. */
+  blocks: number;
+  /** Contact-sheet files written under `outDir`. */
+  sheetFiles: string[];
+  worksheetPath: string;
+  /** "vlm" when transcription ran automatically, "agent" otherwise. */
+  reviewedBy: "vlm" | "agent";
+  /** VLM path only: rows whose transcription differs from the DOM text. */
+  mismatches: { text: string; read: string; y: number }[];
+  /** Blocks dropped by the row cap, if any (never capped silently). */
+  droppedBlocks: number;
 }
 
 export interface CopyCheckReport {
@@ -41,6 +73,7 @@ export interface CopyCheckReport {
   manifestLines: number;
   missingLines: string[];
   placeholders: string[];
+  imageReview?: CopyImageReview;
   issues: CopyIssue[];
 }
 
@@ -121,17 +154,39 @@ export interface CopyCheckOptions {
   html?: string;
   manifestPath?: string;
   viewport?: { width: number; height: number };
+  /** Target screenshot for the image-side check. */
+  targetPath?: string;
+  /** Where sheets + worksheet go. Default: `.vlmkit/copy-review/`. */
+  outDir?: string;
+  /**
+   * Transcribe one crop (PNG buffer) to text. Wired to a VLM by the
+   * CLI's `--vlm`; injectable for tests. Absent = keyless agent mode.
+   */
+  readTargetText?: (cropPng: Buffer) => Promise<string>;
 }
 
 function isUrl(source: string): boolean {
   return /^(https?|file):\/\//.test(source);
 }
 
+/** Rows beyond this are dropped from the sheets (and counted, loudly). */
+const MAX_REVIEW_ROWS = 80;
+
 export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheckReport> {
+  const target = options.targetPath
+    ? PNG.sync.read(await readFile(options.targetPath) as Buffer)
+    : undefined;
+  const viewport = options.viewport ??
+    (target
+      ? { width: target.width, height: Math.min(target.height, 4000) }
+      : { width: 1280, height: 720 });
+
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
+  let pageText: string;
+  let blocks: TextBlock[] = [];
   try {
-    const page = await browser.newPage({ viewport: options.viewport ?? { width: 1280, height: 720 } });
+    const page = await browser.newPage({ viewport });
     if (options.html !== undefined) {
       await page.setContent(options.html, { waitUntil: "networkidle" });
     } else if (isUrl(options.source)) {
@@ -139,31 +194,98 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
     } else {
       await page.goto(pathToFileURL(resolve(options.source)).href, { waitUntil: "networkidle", timeout: 30000 });
     }
-    const pageText = await page.evaluate("document.body ? document.body.innerText : \"\"") as string;
+    pageText = await page.evaluate("document.body ? document.body.innerText : \"\"") as string;
+    if (target) {
+      blocks = (await page.evaluate(COLLECT_TEXT_BLOCKS) as TextBlock[])
+        .filter((b) => b.y < target.height && b.x < target.width);
+    }
     await page.close();
-
-    const manifestLines = options.manifestPath
-      ? parseCopyManifest(await readFile(options.manifestPath, "utf8"))
-      : undefined;
-    const report = analyzeCopy({
-      source: options.source,
-      pageText,
-      ...(manifestLines ? { manifestLines } : {}),
-    });
-    appendRunLedger({
-      tool: "check-copy",
-      source: options.source,
-      ...(options.manifestPath ? { target: options.manifestPath } : {}),
-      headline: {
-        missing: report.missingLines.length,
-        placeholders: report.placeholders.length,
-        manifestLines: report.manifestLines,
-      },
-    });
-    return report;
   } finally {
     await browser.close();
   }
+
+  const manifestLines = options.manifestPath
+    ? parseCopyManifest(await readFile(options.manifestPath, "utf8"))
+    : undefined;
+  const report = analyzeCopy({
+    source: options.source,
+    pageText,
+    ...(manifestLines ? { manifestLines } : {}),
+  });
+
+  if (target && options.targetPath) {
+    const droppedBlocks = Math.max(0, blocks.length - MAX_REVIEW_ROWS);
+    const kept = blocks.slice(0, MAX_REVIEW_ROWS);
+    const outDir = options.outDir ?? join(dirname(resolve(options.source)), ".vlmkit-copy-review");
+    await mkdir(outDir, { recursive: true });
+
+    const mismatches: { text: string; read: string; y: number }[] = [];
+    let reviewedBy: "vlm" | "agent" = "agent";
+    if (options.readTargetText) {
+      reviewedBy = "vlm";
+      for (const block of kept) {
+        const crop = cropRegion(target, block);
+        const read = await options.readTargetText(PNG.sync.write(crop));
+        const cmp = compareTranscript(block.text, read);
+        if (!cmp.match) mismatches.push({ text: cmp.expected, read: cmp.read, y: block.y });
+      }
+      for (const m of mismatches) {
+        report.issues.push({
+          kind: "copy-image-mismatch",
+          severity: "suspect",
+          message: `Target image reads "${m.read}" where the attempt renders "${m.text}" (y=${m.y}). Fix the attempt's copy to match the target pixels.`,
+        });
+      }
+    }
+
+    const sheets = buildContactSheets(target, kept);
+    const sheetFiles: string[] = [];
+    for (let i = 0; i < sheets.length; i++) {
+      const file = join(outDir, `copy-sheet-${i + 1}.png`);
+      await writeFile(file, PNG.sync.write(sheets[i]!.png));
+      sheetFiles.push(file);
+    }
+    const worksheetPath = join(outDir, "copy-review.md");
+    await writeFile(worksheetPath, formatCopyWorksheet({
+      source: options.source,
+      target: options.targetPath,
+      sheetFiles,
+      sheets,
+      blocks: kept,
+    }));
+    report.imageReview = {
+      blocks: kept.length,
+      sheetFiles,
+      worksheetPath,
+      reviewedBy,
+      mismatches,
+      droppedBlocks,
+    };
+  }
+
+  appendRunLedger({
+    tool: "check-copy",
+    source: options.source,
+    ...(options.targetPath
+      ? { target: options.targetPath }
+      : options.manifestPath
+      ? { target: options.manifestPath }
+      : {}),
+    headline: {
+      missing: report.missingLines.length,
+      placeholders: report.placeholders.length,
+      manifestLines: report.manifestLines,
+      ...(report.imageReview
+        ? {
+          imageBlocks: report.imageReview.blocks,
+          imageMismatches: report.imageReview.reviewedBy === "vlm"
+            ? report.imageReview.mismatches.length
+            : "pending-agent-review",
+        }
+        : {}),
+    },
+  });
+  return report;
 }
 
 export function formatCopyCheckReport(report: CopyCheckReport): string {
@@ -179,7 +301,22 @@ export function formatCopyCheckReport(report: CopyCheckReport): string {
   if (report.manifestLines > 0) {
     lines.push(`manifest: ${report.manifestLines} line(s), missing ${report.missingLines.length}`);
   } else {
-    lines.push(`manifest: none (placeholder scan only — pass --manifest for full copy verification)`);
+    lines.push(`manifest: none (pass --manifest, or --target <png> to verify copy against the target pixels)`);
+  }
+  if (report.imageReview) {
+    const r = report.imageReview;
+    lines.push(`target image: ${r.blocks} text block(s) cropped into ${r.sheetFiles.length} sheet(s)`);
+    if (r.droppedBlocks > 0) {
+      lines.push(`  ${YELLOW}! ${r.droppedBlocks} block(s) beyond the ${r.blocks}-row cap were NOT reviewed${RESET}`);
+    }
+    if (r.reviewedBy === "vlm") {
+      lines.push(`  transcribed by VLM: ${r.mismatches.length} mismatch(es) (details in Issues below)`);
+    } else {
+      lines.push("");
+      lines.push(`${BOLD}ACTION REQUIRED — keyless mode:${RESET} read the contact sheet(s) with your own vision and compare each row against the expected text in the worksheet. Any character difference is a copy bug.`);
+      lines.push(`  worksheet: ${r.worksheetPath}`);
+      for (const f of r.sheetFiles) lines.push(`  sheet: ${f}`);
+    }
   }
   if (report.issues.length > 0) {
     lines.push("");
@@ -198,12 +335,17 @@ export function formatCopyCheckReport(report: CopyCheckReport): string {
 function printUsage(exitCode: number): never {
   console.log(`Usage: vlmkit check copy <html-or-url> [options]
 
-Copy fidelity gate: placeholder-text scan (always on) plus optional
-manifest verification (every manifest line must appear in the rendered
-page text; whitespace-normalized, case-sensitive).
+Copy fidelity gate: placeholder-text scan (always on), optional manifest
+verification, and optional target-image verification (crops every
+rendered text block's bbox out of the target screenshot; a VLM
+transcribes them with --vlm, or contact sheets are written for the
+agent's own vision without an API key).
 
 Options:
   --manifest <file>   Copy manifest (plain text / markdown; one required line per row)
+  --target <png>      Target screenshot to verify copy against (bbox-cropped per text block)
+  --out <dir>         Sheet/worksheet output dir (default: .vlmkit-copy-review next to the source)
+  --vlm [model]       Transcribe crops with a VLM (default model: VRT_VLM_MODEL); requires API key
   --json              Print JSON report
   --fail-on-suspect   Exit non-zero when suspect issues are found`);
   process.exit(exitCode);
@@ -212,18 +354,51 @@ Options:
 async function main(argv = process.argv.slice(2)): Promise<void> {
   if (argv.includes("--help") || argv.includes("-h")) printUsage(0);
   let manifestPath: string | undefined;
+  let targetPath: string | undefined;
+  let outDir: string | undefined;
+  let vlm: string | true | undefined;
   let json = false;
   let failOnSuspect = false;
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === "--manifest") manifestPath = argv[++i]!;
-    else if (arg === "--json") json = true;
+    else if (arg === "--target") targetPath = argv[++i]!;
+    else if (arg === "--out") outDir = argv[++i]!;
+    else if (arg === "--vlm") {
+      const next = argv[i + 1];
+      vlm = next && !next.startsWith("-") ? argv[++i]! : true;
+    } else if (arg === "--json") json = true;
     else if (arg === "--fail-on-suspect") failOnSuspect = true;
     else if (!arg.startsWith("-")) positional.push(arg);
   }
   if (positional.length === 0) printUsage(1);
-  const report = await runCopyCheck({ source: positional[0]!, ...(manifestPath ? { manifestPath } : {}) });
+
+  let readTargetText: ((cropPng: Buffer) => Promise<string>) | undefined;
+  if (vlm !== undefined) {
+    if (!targetPath) {
+      console.error("--vlm requires --target <png>");
+      process.exit(1);
+    }
+    const { createVlmClient, resolveModel } = await import("@mizchi/vlmkit-ai/vlm-client.ts");
+    const modelId = vlm === true
+      ? (process.env.VRT_VLM_MODEL ?? "bytedance/ui-tars-1.5-7b")
+      : vlm;
+    const model = await resolveModel(modelId);
+    const client = await createVlmClient(model);
+    readTargetText = async (cropPng: Buffer) => {
+      const res = await client!.analyzeImage(cropPng.toString("base64"), TRANSCRIBE_PROMPT, { maxTokens: 256 });
+      return res.content;
+    };
+  }
+
+  const report = await runCopyCheck({
+    source: positional[0]!,
+    ...(manifestPath ? { manifestPath } : {}),
+    ...(targetPath ? { targetPath } : {}),
+    ...(outDir ? { outDir } : {}),
+    ...(readTargetText ? { readTargetText } : {}),
+  });
   if (json) console.log(JSON.stringify(report, null, 2));
   else console.log(formatCopyCheckReport(report));
   if (failOnSuspect && report.issues.some((i) => i.severity === "suspect")) process.exit(1);
