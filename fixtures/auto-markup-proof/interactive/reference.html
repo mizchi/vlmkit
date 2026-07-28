@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Atlas — Preferences</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; background: #fafaf9; color: #1c1917; padding: 40px 48px; }
+  h1 { font-size: 24px; margin-bottom: 24px; }
+  :focus-visible { outline: 3px solid #4338ca; outline-offset: 2px; }
+
+  .disclosure { margin-bottom: 24px; }
+  .disclosure > button { background: #ffffff; border: 1px solid #d6d3d1; border-radius: 8px; padding: 12px 16px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  #shipping-panel { border: 1px solid #d6d3d1; border-top: none; border-radius: 0 0 8px 8px; padding: 16px; background: #ffffff; }
+  #shipping-panel[hidden] { display: none; }
+
+  [role="tablist"] { display: flex; gap: 4px; border-bottom: 2px solid #d6d3d1; margin-bottom: 0; }
+  [role="tab"] { background: none; border: none; padding: 10px 18px; font-size: 14px; cursor: pointer; color: #78716c; }
+  [role="tab"][aria-selected="true"] { color: #1c1917; font-weight: 700; box-shadow: inset 0 -2px 0 #4338ca; }
+  [role="tabpanel"] { padding: 16px 4px; font-size: 14px; color: #44403c; }
+  [role="tabpanel"][hidden] { display: none; }
+
+  .row { display: flex; align-items: center; gap: 12px; margin-top: 28px; }
+  [role="switch"] { width: 44px; height: 24px; border-radius: 12px; border: 1px solid #d6d3d1; background: #e7e5e4; cursor: pointer; position: relative; }
+  [role="switch"]::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #ffffff; transition: none; }
+  [role="switch"][aria-checked="true"] { background: #4338ca; }
+  [role="switch"][aria-checked="true"]::after { left: 22px; }
+
+  .footer-link { display: inline-block; margin-top: 32px; font-size: 14px; color: #4338ca; }
+</style>
+</head>
+<body>
+  <h1>Preferences</h1>
+
+  <div class="disclosure">
+    <button aria-expanded="false" aria-controls="shipping-panel" id="shipping-toggle">Shipping options</button>
+    <div id="shipping-panel" hidden>
+      <p>Standard (5–7 days), Express (2 days), and counter pickup are available.</p>
+    </div>
+  </div>
+
+  <div role="tablist" aria-label="Notification channels">
+    <button role="tab" aria-selected="true" aria-controls="panel-email" id="tab-email" tabindex="0">Email</button>
+    <button role="tab" aria-selected="false" aria-controls="panel-push" id="tab-push" tabindex="-1">Push</button>
+    <button role="tab" aria-selected="false" aria-controls="panel-digest" id="tab-digest" tabindex="-1">Digest</button>
+  </div>
+  <div role="tabpanel" id="panel-email" aria-labelledby="tab-email">Order updates and receipts go to your inbox.</div>
+  <div role="tabpanel" id="panel-push" aria-labelledby="tab-push" hidden>Time-sensitive alerts on your devices.</div>
+  <div role="tabpanel" id="panel-digest" aria-labelledby="tab-digest" hidden>One weekly summary, nothing else.</div>
+
+  <div class="row">
+    <span id="marketing-label">Marketing emails</span>
+    <button role="switch" aria-checked="false" aria-labelledby="marketing-label" id="marketing-switch"></button>
+  </div>
+
+  <a class="footer-link" href="#privacy">Privacy policy</a>
+
+<script>
+  const toggle = document.getElementById("shipping-toggle");
+  toggle.addEventListener("click", () => {
+    const panel = document.getElementById("shipping-panel");
+    const open = toggle.getAttribute("aria-expanded") === "true";
+    toggle.setAttribute("aria-expanded", String(!open));
+    panel.hidden = open;
+  });
+
+  const tabs = [...document.querySelectorAll('[role="tab"]')];
+  function selectTab(tab) {
+    for (const t of tabs) {
+      const selected = t === tab;
+      t.setAttribute("aria-selected", String(selected));
+      t.tabIndex = selected ? 0 : -1;
+      document.getElementById(t.getAttribute("aria-controls")).hidden = !selected;
+    }
+    tab.focus();
+  }
+  for (const tab of tabs) {
+    tab.addEventListener("click", () => selectTab(tab));
+    tab.addEventListener("keydown", (e) => {
+      const i = tabs.indexOf(tab);
+      if (e.key === "ArrowRight") selectTab(tabs[(i + 1) % tabs.length]);
+      if (e.key === "ArrowLeft") selectTab(tabs[(i - 1 + tabs.length) % tabs.length]);
+    });
+  }
+
+  const sw = document.getElementById("marketing-switch");
+  sw.addEventListener("click", () => {
+    sw.setAttribute("aria-checked", String(sw.getAttribute("aria-checked") !== "true"));
+  });
+  sw.addEventListener("keydown", (e) => {
+    if (e.key === " " || e.key === "Enter") { e.preventDefault(); sw.click(); }
+  });
+</script>
+</body>
+</html>
