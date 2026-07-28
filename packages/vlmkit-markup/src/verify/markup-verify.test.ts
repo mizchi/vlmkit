@@ -116,3 +116,67 @@ test("pixelPresence: full presence when the bbox holds the fill; zero when it do
   assert.equal(pixelPresence(img, { ...line, top: 8 }), 0, "same line 3px away must not count");
   assert.equal(pixelPresence(img, { ...line, left: -20, top: -20 }), 0, "out-of-bounds bbox is absent");
 });
+
+test("kickback near-miss: an extra whose fill sits 12px away in the target reads as displacement", () => {
+  const hairline = component(3, 0, 645, 1280, 1, "#e7e5e4");
+  const c = composition({ extra: [hairline] });
+  // Fake probe: current has the fill at its own box; target has it 12px higher.
+  const presence = (side: "target" | "current", box: { top: number }): number => {
+    if (side === "current") return box.top === 645 ? 1 : 0;
+    return box.top === 633 ? 1 : 0;
+  };
+  const lines = kickbackForComposition("desktop", c, { presence });
+  assert.equal(lines.length, 1);
+  assert.match(lines[0]!, /near-miss/);
+  assert.match(lines[0]!, /12px higher/);
+  assert.match(lines[0]!, /move it instead/);
+});
+
+test("kickback near-miss: a missing whose fill exists nearby in the render reads as displacement", () => {
+  const divider = component(7, 0, 243, 1280, 1, "#e7e5e4");
+  const c = composition({ missing: [divider] });
+  const presence = (side: "target" | "current", box: { top: number }): number => {
+    if (side === "target") return box.top === 243 ? 1 : 0;
+    return box.top === 251 ? 1 : 0; // render has it 8px lower
+  };
+  const lines = kickbackForComposition("desktop", c, { presence });
+  assert.match(lines[0]!, /near-miss/);
+  assert.match(lines[0]!, /8px lower/);
+});
+
+test("kickback near-miss stays silent when the fill is genuinely absent", () => {
+  const sliver = component(5, 1244, 324, 36, 242, "#a31c41");
+  const c = composition({ missing: [sliver] });
+  const presence = (side: "target" | "current", box: { top: number }): number =>
+    side === "target" && box.top === 324 ? 1 : 0;
+  const lines = kickbackForComposition("desktop", c, { presence });
+  assert.doesNotMatch(lines[0]!, /near-miss/);
+  assert.match(lines[0]!, /genuinely absent/);
+});
+
+test("kickback grouping caveat: big size delta with target fill present across the full target box", () => {
+  // S9-replay shape: whole-card target component (242px) matched against
+  // an image-only current component (150px) — dSize reads "-92" but the
+  // render already shows the fill over the full target box.
+  const card = match(
+    component(2, 44, 324, 380, 242, "#b45309"),
+    component(2, 44, 324, 380, 150, "#b45309"),
+    0.55,
+  );
+  const presence = (): number => 1; // both sides fully present
+  const lines = kickbackForComposition("desktop", composition({ matches: [card] }), { presence });
+  assert.match(lines[0]!, /size-delta caveat/);
+  assert.match(lines[0]!, /segmentation grouping/);
+});
+
+test("kickback grouping caveat stays silent for small deltas and for real size bugs", () => {
+  const small = match(component(0, 0, 51, 1280, 347), component(0, 0, 60, 1280, 330), 0.85);
+  const linesSmall = kickbackForComposition("desktop", composition({ matches: [small] }), { presence: () => 1 });
+  assert.doesNotMatch(linesSmall[0]!, /size-delta caveat/);
+
+  const collapsed = match(component(0, 0, 51, 1280, 347, "#121b2f"), component(0, 0, 0, 1280, 67, "#121b2f"), 0.04);
+  const presence = (side: "target" | "current"): number => (side === "target" ? 1 : 0.1); // render lacks the fill
+  const linesReal = kickbackForComposition("desktop", composition({ matches: [collapsed] }), { presence });
+  assert.doesNotMatch(linesReal[0]!, /size-delta caveat/);
+  assert.match(linesReal[0]!, /ROOT-CAUSE/);
+});
