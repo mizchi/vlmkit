@@ -29,6 +29,29 @@ import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
 import { chromium, type Page } from "playwright";
+
+/**
+ * Seek every WAAPI-visible animation to its rest pose: running finite
+ * animations past their end (settled appearance), running infinite ones to
+ * 0, page-paused/finished ones left at their author-chosen time — the same
+ * policy as `check animation`'s baseline. Screenshot-level
+ * `animations: "disabled"` only stabilizes the captured image; DOM reads
+ * (landmark / scrollport bboxes) need the page itself held at rest.
+ */
+const REST_POSE_SCRIPT = `(() => {
+  if (!document.getAnimations) return;
+  for (const anim of document.getAnimations({ subtree: true })) {
+    try {
+      if (anim.playState !== "running") continue;
+      anim.pause();
+      const t = anim.effect && anim.effect.getComputedTiming ? anim.effect.getComputedTiming() : null;
+      const iterations = t && Number.isFinite(t.iterations) ? t.iterations : null;
+      anim.currentTime = iterations === null
+        ? 0
+        : (Number(t.delay) || 0) + (Number(t.duration) || 0) * iterations;
+    } catch {}
+  }
+})()`;
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import {
   compareLandscapeFromPngFiles,
@@ -416,6 +439,11 @@ export async function runComponentFromImage(
       deviceScaleFactor: dpr,
     });
     await page.setContent(html, { waitUntil: "networkidle" });
+    // Rest-pose seek BEFORE any evidence collection: landmark/scrollport
+    // bboxes are DOM reads, so a mid-flight entrance transform would skew
+    // them even though the screenshot itself is captured with
+    // animations: "disabled".
+    await page.evaluate(REST_POSE_SCRIPT).catch(() => {});
     const landmarkRegions = await captureLandmarkRegions(page, {
       deviceScaleFactor: dpr,
     }).catch(() => []);
@@ -425,7 +453,10 @@ export async function runComponentFromImage(
     const landingEvidence = await captureLandingEvidence(page).catch(() => undefined);
     const expressiveMenuEvidence = await captureExpressiveMenuEvidence(page).catch(() => undefined);
     const currentPath = join(outputDir, "current.png");
-    await page.screenshot({ path: currentPath, fullPage: false });
+    // Rest-pose capture: finite animations fast-forwarded, infinite ones at
+    // initial state — an entrance animation caught mid-flight poisons the
+    // pixel diff (S5-r2 finding, same fix as `build page`).
+    await page.screenshot({ path: currentPath, fullPage: false, animations: "disabled" });
     const canvasEvidence = await captureCanvasEvidence(page, contractPlan.expectations.canvas).catch(() => undefined);
     await page.close();
 
@@ -628,11 +659,16 @@ export async function runComponentFromImage(
           deviceScaleFactor: dpr,
         });
         await statePage.setContent(html, { waitUntil: "networkidle" });
+        // Same rest-pose policy as the default current.png capture: without
+        // it, entrance/infinite animation progress on this freshly loaded
+        // page is attributed to the forced state, inflating the induced
+        // diff (and masking a genuinely missing state rule).
+        await statePage.evaluate(REST_POSE_SCRIPT).catch(() => {});
         const applied = state === "scrolled"
           ? await applyScrolledState(statePage, contractPlan.probes.scrollTargets)
           : await applyForcedPseudoState(statePage, { state });
         const stateShotPath = join(outputDir, `current-${state}.png`);
-        await statePage.screenshot({ path: stateShotPath, fullPage: false });
+        await statePage.screenshot({ path: stateShotPath, fullPage: false, animations: "disabled" });
         if (state !== "scrolled") await clearStateMarkers(statePage).catch(() => {});
         await statePage.close();
 

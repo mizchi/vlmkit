@@ -445,7 +445,11 @@ async function renderHtmlToPng(
     // Viewport-only, like `build component`: the target screenshot is bounded
     // by the requested viewport, so a full-page capture of a taller candidate
     // would report below-the-fold content as extra components.
-    const buffer = await page.screenshot({ fullPage: false });
+    // animations: "disabled" captures the rest pose (finite animations
+    // fast-forwarded to completion, infinite ones at their initial state) —
+    // otherwise an entrance animation is caught mid-flight and every fill /
+    // IoU downstream reports phantom deltas (S5-r2 finding).
+    const buffer = await page.screenshot({ fullPage: false, animations: "disabled" });
     const png = PNG.sync.read(buffer);
     return {
       data: new Uint8Array(png.data.buffer, png.data.byteOffset, png.data.byteLength),

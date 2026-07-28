@@ -781,3 +781,60 @@ Stage 2 (LLM, precise): structured diff + CSS source + CSS text diff → FIX: se
 | GH Actions + Crater paint tree | $6 |
 | GH Actions + Crater pixel | $16 |
 | GH Actions + Chromium | $193 |
+
+## Markup Agent KPI — rounds / tokens (2026-07-27)
+
+auto-markup / dynamic-markup 系のエージェント実行を横比較するための
+2 主要 KPI と計測プロトコル。S5 から正式運用。
+
+### 定義
+
+| KPI | 定義 | 記録者 |
+|---|---|---|
+| **rounds**(収束効率) | 「計測ツール実行 → 修正」の 1 サイクル = 1 ラウンド。`build page` / `build component` / ゲート再実行など、レポートを見て HTML を直した回数 | エージェント自己申告(最終レポートに 1 行/ラウンド) |
+| **tokens**(コスト) | サブエージェントの総消費トークン(vision 込み) | **ドライバー(親)** — ハーネスの usage(`subagent_tokens`)から転記。サブエージェント自身は自分のトークン数を観測できない |
+
+補助指標: tool calls、wall time、最終ピクセル diff、ゲート通過数。
+派生指標: **tokens / round** — ラウンドが減ってもトークンが増えて
+いれば 1 ラウンドが肥大している(不要な全画面再読み込み等)。
+
+### Goodhart ガード
+
+rounds / tokens は **done 条件(構成収束 AND ゲート green AND
+マスク済み最終 diff)を満たしたランのみ**比較対象にする。
+未収束のまま停止したランは「安いラン」ではなく「失敗ラン」。
+S5 で Haiku が missing/extra を残して 3 ラウンドで自己宣言停止した
+ケースがまさにこれで、KPI 表では品質列を併記して読む。
+
+### ベースライン(S1-S5、Haiku 単独、API キーなし)
+
+| Run | rounds | tokens | tool calls | wall time | 最終 px diff | 品質メモ |
+|---|---:|---:|---:|---:|---:|---|
+| S1 landing | 4 | —(未計測) | 23 | 112s | 1.40% | build page 6/6 |
+| S2 dashboard | 10 | — | — | — | 6.2% | 8/8 ×2vp(うち 6 ラウンドはツールバグ下) |
+| S3 auth form | 6 | — | 27 | 133s | 2.6-3.3% | 3 状態一致 |
+| S4 theme | 4 | — | 65 | 302s | 5.6-6.6% | unthemed 0/8 |
+| S5 promo v1 | 3 | **76,769** | 54 | 231s | 6.3-8.0% | ゲート 4/4 だが構成未収束(done 条件未達)|
+| S5 promo r2 | 12 | 221,686 | 102 | 684s | —(未達で終了) | 失敗。`build page` のアニメ途中キャプチャ(幻デルタ)を発見 → 修正 |
+| S5 promo r3 | 8 | 375,941 | 138 | 918s | **2.65% / 7.51%(desktop/mobile)** | **初の done 達成**。検証者差し戻し ×2 + 校正ランが決め手 |
+
+トークン計測は S5 が初(それ以前のランは usage を記録していなかった)。
+r2/r3 の tokens はセグメント合算 — 差し戻し(resume)はトランスクリプト
+再投入を再課金されるため後半セグメントが重い。差し戻し前提の運用では
+resume より「検証者サマリ付きの新規エージェント」が安い可能性が高い
+(未計測)。done 達成ランの実測(8 rounds / 375.9k)を受けて、複数
+ターゲットの tokens ターゲットは「初回セグメント ≤150k、差し戻し込み
+≤400k」を暫定値とする。詳細:
+`docs/reports/2026-07-27-dynamic-markup-skill-haiku-s5.md` の
+「再挑戦 r2 / r3」節(早期自己宣言に効いた対策 = 差し戻し + 校正ラン、
+効かなかった対策 = skill 文言・プロンプト明示、も同節)。
+
+### 初期ターゲット(ベースライン由来、要改訂)
+
+- 単一 viewport ページ: **≤5 rounds / ≤80k tokens**
+- 複数ターゲット(viewport / state / motion 付き): **≤12 rounds / ≤150k tokens**
+- done 条件を満たした上での超過は fixture 難度シグナル、
+  未達のままの KPI 好成績は無効
+
+記録の運用: 各実証レポート(docs/reports/)の結果表に rounds /
+tokens 列を必ず含め、この節のベースライン表に 1 行追記する。

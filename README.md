@@ -711,21 +711,13 @@ docs/
 
 ## Agent Skills (APM)
 
-vlmkit ships six coding-agent skills under `.claude/skills/`. They wrap
+vlmkit ships nine coding-agent skills under `.claude/skills/`. They wrap
 the most common workflows as standalone, agent-readable playbooks.
 Other repos can install them via [APM](https://agentskills.io):
 
 ```bash
 # Install a single skill into the current repo's .claude/skills/
 apm install mizchi/vlmkit/.claude/skills/vrt-visual-diff
-
-# Install all six
-apm install mizchi/vlmkit/.claude/skills/vrt-visual-diff \
-            mizchi/vlmkit/.claude/skills/vrt-migration-eval \
-            mizchi/vlmkit/.claude/skills/vrt-css-fix-loop \
-            mizchi/vlmkit/.claude/skills/vrt-markup-synth \
-            mizchi/vlmkit/.claude/skills/vrt-regression-watch \
-            mizchi/vlmkit/.claude/skills/spec-to-playwright
 ```
 
 | Skill | Entry workflow | Use when |
@@ -736,12 +728,17 @@ apm install mizchi/vlmkit/.claude/skills/vrt-visual-diff \
 | `vrt-markup-synth` | `vlmkit build\|scan\|check\|stress *` | Screenshot → HTML/CSS, token / theme / i18n audits |
 | `vrt-regression-watch` | `vlmkit diff agent --previous --fail-on-regression` | Per-PR or scheduled regression gate |
 | `spec-to-playwright` | `init-agents` or `@mizchi/vlmkit-plan/generate` → deterministic VRT → `@mizchi/vlmkit-heal` | Spec → Playwright test with stable VRT + self-healing |
+| `auto-markup` | `check palette` → `contract scaffold` → `build page\|component` loop | Rebuild a page from a target screenshot, agent-as-VLM, no API key |
+| `dynamic-markup` | auto-markup + gates: `check breakpoints` / `scan scroll` / `check animation\|motion` | Markup whose spec includes breakpoints, scrollports, animations |
+| `agent-validation-loop` | disposable subagent runs → friction → fix → re-run | Harden a CLI/library by measuring whether agents can drive it |
 
 Each skill assumes the `vrt` CLI is on `$PATH` (this repo published as
 a Node package, or built from source) and Node 24+. VLM-using skills
 (`fix-loop`, `markup-synth`, `migration subagent`) additionally need
 one of `OPENROUTER_API_KEY` / `GEMINI_API_KEY` / `ANTHROPIC_API_KEY`
-depending on the model selected via `VRT_VLM_MODEL`.
+depending on the model selected via `VRT_VLM_MODEL`. `auto-markup` and
+`dynamic-markup` need no key: the driving agent's own vision is the VLM
+and every measurement tool is deterministic (Playwright + pixel math).
 
 ## License
 

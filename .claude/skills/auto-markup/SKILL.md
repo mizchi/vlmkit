@@ -213,6 +213,15 @@ agent-harness.md). Structure and shift always come from `build page` /
   fix (composition vs decoration), not just the values.
 - Report final numbers honestly: `build page` matched/missing counts +
   worst IoU, `build component` diff % + goal status.
+- **KPIs**: every run is scored on **rounds** (one measure→fix cycle;
+  keep a one-line log per round, state the total) and **tokens**
+  (recorded by your driver from the harness usage — you cannot see
+  your own; top-level sessions report context usage as an
+  approximation). Ledger and targets: `docs/knowledge.md` "Markup
+  Agent KPI". KPIs only count when the stopping criteria above are
+  met — declaring convergence with leftover missing/extra is a failed
+  run, not a cheap one. Save tokens by reading report files and crops
+  instead of re-reading screenshots you have already seen.
 
 ## Ground rules
 
