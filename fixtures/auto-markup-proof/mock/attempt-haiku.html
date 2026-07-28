@@ -44,7 +44,7 @@
 
     nav a {
       text-decoration: none;
-      color: #9ca3af;
+      color: #d0d0d0;
       font-size: 14px;
       font-weight: 400;
     }
@@ -106,7 +106,8 @@
     .why-pulse h2 {
       font-size: 32px;
       font-weight: 700;
-      margin-bottom: 32px;
+      margin-bottom: 15px;
+      color: #d5d5d5;
     }
 
     .cards-grid {
@@ -142,7 +143,7 @@
     }
 
     .card p {
-      color: #6b7280;
+      color: #d0d0d0;
       font-size: 14px;
       line-height: 1.6;
     }
@@ -152,6 +153,17 @@
       padding: 0 48px 0 48px;
       background-color: rgb(251, 252, 253);
       border-bottom: none;
+      position: relative;
+    }
+
+    .changelog::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 55px;
+      width: 1170px;
+      height: 1px;
+      background-color: #e2e8f0;
     }
 
     /* Footer separator */
@@ -166,7 +178,7 @@
       font-size: 32px;
       font-weight: 600;
       margin-bottom: 32px;
-      color: #1a1a1a;
+      color: #9a9a9a;
     }
 
     .changelog-list {
@@ -175,6 +187,8 @@
       border-radius: 8px;
       padding: 16px;
       border-bottom: 1px solid #e2e8f0;
+      box-shadow: 0 250px 0 -249px #e2e8f0;
+      margin-bottom: 16px;
     }
 
     .changelog-item {
@@ -196,7 +210,7 @@
     }
 
     .changelog-text {
-      color: #555555;
+      color: #d0d0d0;
       font-size: 14px;
     }
 
