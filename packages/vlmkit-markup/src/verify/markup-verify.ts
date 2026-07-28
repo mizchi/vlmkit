@@ -22,8 +22,8 @@
  *   vlmkit verify markup <attempt.html> --target <t1.png> [--target <t2.png> ...]
  *     [--reference <reference.html>] [--json]
  */
-import { existsSync } from "node:fs";
-import { basename, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { basename, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import pixelmatch from "pixelmatch";
@@ -66,11 +66,44 @@ export interface GateVerdict {
   summary: string;
 }
 
+export interface VerifyTrendPoint {
+  targetsPassed: number;
+  /** Total missing + extra + ordering violations across targets. */
+  residuals: number;
+}
+
+export interface VerifyTrend {
+  previous: VerifyTrendPoint;
+  current: VerifyTrendPoint;
+  direction: "improved" | "regressed" | "flat";
+}
+
+/**
+ * Round-over-round trend. The S5-r5 audit showed an agent reach 1/2
+ * targets passing, silently regress to 0/2, and thrash for five more
+ * rounds — the kickback list alone can't say "your last change made it
+ * worse". Comparing against the previous verify run (from the run
+ * ledger) turns "revert first" from prompt discipline into a printed
+ * signal.
+ */
+export function computeTrend(previous: VerifyTrendPoint, current: VerifyTrendPoint): VerifyTrend {
+  const direction = current.targetsPassed < previous.targetsPassed
+      || (current.targetsPassed === previous.targetsPassed && current.residuals > previous.residuals)
+    ? "regressed"
+    : current.targetsPassed > previous.targetsPassed
+        || (current.targetsPassed === previous.targetsPassed && current.residuals < previous.residuals)
+      ? "improved"
+      : "flat";
+  return { previous, current, direction };
+}
+
 export interface MarkupVerifyReport {
   attempt: string;
   targets: TargetVerdict[];
   gates: GateVerdict[];
   done: boolean;
+  /** Present when a previous verify run for the same attempt exists in the run ledger. */
+  trend?: VerifyTrend;
   /** Human/agent-readable residual list; empty when done. */
   kickback: string[];
 }
@@ -94,6 +127,17 @@ function fillDistanceHex(a: string, b: string): number {
  */
 export function kickbackForComposition(label: string, c: PageComposition): string[] {
   const lines: string[] = [];
+  // Catastrophically mis-sized matched components go FIRST: in S5-r5 a
+  // collapsed hero (IoU 0.04, dSize -280px) was the root cause of most of
+  // the missing/extra list, but it was buried below them — the agent fixed
+  // debris for rounds while the cause stood. Order = priority.
+  for (const m of c.matches) {
+    if (m.iou < 0.5 && Math.min(m.target.height, m.current.height) > 4) {
+      lines.push(
+        `${label}: ROOT-CAUSE CANDIDATE — matched #${m.target.index} has collapsed geometry (IoU ${m.iou}, dPos (${m.deltaLeft},${m.deltaTop}), dSize (${m.deltaWidth},${m.deltaHeight})). Target box: (${m.target.left},${m.target.top}) ${m.target.width}x${m.target.height}. Restore this FIRST — the missing/extra items below are often its debris.`,
+      );
+    }
+  }
   const claimedExtra = new Set<number>();
   for (const m of c.missing) {
     const twin = c.extra.find((e) =>
@@ -130,13 +174,36 @@ export function kickbackForComposition(label: string, c: PageComposition): strin
     );
   }
   for (const m of c.matches) {
-    if (m.iou < 0.9 && Math.min(m.target.height, m.current.height) > 4) {
+    // < 0.5 already reported up top as a root-cause candidate.
+    if (m.iou >= 0.5 && m.iou < 0.9 && Math.min(m.target.height, m.current.height) > 4) {
       lines.push(
         `${label}: matched #${m.target.index} IoU ${m.iou} — dPos (${m.deltaLeft},${m.deltaTop}), dSize (${m.deltaWidth},${m.deltaHeight}); converge size/position.`,
       );
     }
   }
   return lines;
+}
+
+/** Last verify-markup ledger entry for this attempt, if any. */
+function previousTrendPoint(attempt: string, cwd = process.cwd()): VerifyTrendPoint | undefined {
+  try {
+    const raw = readFileSync(join(cwd, ".vlmkit", "run-ledger.jsonl"), "utf8");
+    for (const line of raw.trim().split("\n").reverse()) {
+      const entry = JSON.parse(line) as {
+        tool?: string;
+        source?: string;
+        headline?: { targetsPassed?: number; residuals?: number };
+      };
+      if (entry.tool === "verify-markup" && entry.source === attempt
+        && typeof entry.headline?.targetsPassed === "number"
+        && typeof entry.headline?.residuals === "number") {
+        return { targetsPassed: entry.headline.targetsPassed, residuals: entry.headline.residuals };
+      }
+    }
+  } catch {
+    // No ledger / unreadable — trend is simply absent.
+  }
+  return undefined;
 }
 
 async function fullPageRestShot(
@@ -250,19 +317,42 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
     if (g.suspects > 0) kickback.push(`gate ${g.gate}: ${g.suspects} suspect issue(s) — run \`vlmkit check ${g.gate === "scroll" ? "scan scroll" : g.gate}\` for detail and fix them.`);
   }
 
+  // Passing targets are an asset to protect: when only some targets fail,
+  // the classic thrash is fixing the failing one with a base-style change
+  // that silently breaks the passing one.
+  const passing = targets.filter((t) => t.pass);
+  if (passing.length > 0 && passing.length < targets.length) {
+    kickback.unshift(
+      `${passing.map((t) => basename(t.target)).join(", ")} PASSES — protect it: scope fixes to the failing target's media regime where possible, and re-check the passing target after every change.`,
+    );
+  }
+
   const done = targets.every((t) => t.pass) && gates.every((g) => g.suspects === 0);
+  const currentPoint: VerifyTrendPoint = {
+    targetsPassed: passing.length,
+    residuals: targets.reduce((n, t) => n + t.missing + t.extra + t.orderViolations, 0),
+  };
+  const previous = previousTrendPoint(options.attempt);
+  const trend = previous ? computeTrend(previous, currentPoint) : undefined;
+  if (trend?.direction === "regressed") {
+    kickback.unshift(
+      `REGRESSION — this attempt measures WORSE than your previous verify run (targets passed ${trend.previous.targetsPassed} -> ${trend.current.targetsPassed}, residuals ${trend.previous.residuals} -> ${trend.current.residuals}). REVERT your last change before trying anything else.`,
+    );
+  }
+
   appendRunLedger({
     tool: "verify-markup",
     source: options.attempt,
     target: options.targets.join(","),
     headline: {
       done,
-      targetsPassed: targets.filter((t) => t.pass).length,
+      targetsPassed: currentPoint.targetsPassed,
       targetsTotal: targets.length,
+      residuals: currentPoint.residuals,
       gateSuspects: gates.reduce((n, g) => n + g.suspects, 0),
     },
   });
-  return { attempt: options.attempt, targets, gates, done, kickback };
+  return { attempt: options.attempt, targets, gates, done, ...(trend ? { trend } : {}), kickback };
 }
 
 export function formatMarkupVerifyReport(report: MarkupVerifyReport): string {
@@ -271,6 +361,15 @@ export function formatMarkupVerifyReport(report: MarkupVerifyReport): string {
   lines.push(`${DIM}attempt: ${report.attempt}${RESET}`);
   lines.push("");
   lines.push(`verdict: ${report.done ? `${GREEN}DONE${RESET}` : `${RED}NOT DONE${RESET}`}`);
+  if (report.trend) {
+    const t = report.trend;
+    const label = t.direction === "regressed"
+      ? `${RED}REGRESSED${RESET}`
+      : t.direction === "improved" ? `${GREEN}improved${RESET}` : `${DIM}flat${RESET}`;
+    lines.push(
+      `trend vs previous run: ${label} (targets passed ${t.previous.targetsPassed} -> ${t.current.targetsPassed}, residuals ${t.previous.residuals} -> ${t.current.residuals})`,
+    );
+  }
   lines.push("");
   lines.push("Targets:");
   for (const t of report.targets) {

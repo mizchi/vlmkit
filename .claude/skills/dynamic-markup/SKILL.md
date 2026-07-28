@@ -172,9 +172,24 @@ Every run is scored on two KPIs (ledger: `docs/knowledge.md`
 KPIs only count for runs that reach the done condition below —
 stopping early with leftover deltas is a failed run, not a cheap one.
 Optimize rounds first (fix the biggest reported delta each round, never
-re-measure without changing anything); tokens second (read report
-files and crops instead of re-reading full screenshots you have
-already seen).
+re-measure without changing anything); tokens second.
+
+Token discipline (measured: this cut tokens/round ~6x in S5-r5):
+- Read each target screenshot ONCE, take thorough notes (structure,
+  copy, colors, measured sizes), and work from your notes + tool
+  reports afterward. Screenshot re-reads are the dominant token cost.
+- Use `vlmkit verify markup` as the one measurement per round instead
+  of running build page and the four gates separately.
+
+Anti-thrash discipline (the failure mode that replaced early
+self-declaration once verdicts became explicit):
+- ONE targeted fix per round. Fix the FIRST kickback item first — the
+  list is ordered, and a ROOT-CAUSE CANDIDATE line means the items
+  below it are probably debris of that one defect.
+- The verdict prints a `trend vs previous run` line; on REGRESSED,
+  revert your last change before trying anything else.
+- When some targets pass and others fail, the kickback says which to
+  protect — scope fixes to the failing target's media regime.
 
 ## Budget & stopping
 
