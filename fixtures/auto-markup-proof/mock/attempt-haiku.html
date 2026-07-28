@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pulse — Ship dashboards in minutes</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: rgb(251, 252, 253);
+      color: #1a1a1a;
+      line-height: 1.6;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 48px;
+      background-color: rgb(251, 252, 253);
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .logo {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    nav {
+      display: flex;
+      gap: 32px;
+    }
+
+    nav a {
+      text-decoration: none;
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    /* Hero section */
+    .hero {
+      background-color: #1a2332;
+      color: white;
+      padding: 48px 48px;
+      text-align: left;
+    }
+
+    .hero-badge {
+      display: inline-block;
+      background-color: #10b981;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 24px;
+      text-transform: uppercase;
+    }
+
+    .hero h1 {
+      font-size: 56px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      line-height: 1.2;
+    }
+
+    .hero p {
+      font-size: 16px;
+      line-height: 1.6;
+      margin-bottom: 32px;
+      max-width: 600px;
+      color: #e5e7eb;
+    }
+
+    .hero-btn {
+      display: inline-block;
+      background-color: #2563eb;
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 16px;
+      border: none;
+      cursor: pointer;
+    }
+
+    /* Why Pulse section */
+    .why-pulse {
+      padding: 48px 48px;
+      background-color: rgb(251, 252, 253);
+    }
+
+    .why-pulse h2 {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 48px;
+    }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 24px;
+    }
+
+    .card {
+      background-color: white;
+      border: 1px solid #e5e7eb;
+      padding: 32px;
+      border-radius: 8px;
+    }
+
+    .card h3 {
+      color: #2563eb;
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .card p {
+      color: #6b7280;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* Changelog section */
+    .changelog {
+      padding: 48px 48px;
+      background-color: rgb(251, 252, 253);
+    }
+
+    .changelog h2 {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 48px;
+    }
+
+    .changelog-list {
+      background-color: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 24px;
+    }
+
+    .changelog-item {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 24px;
+      padding: 16px 0;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .changelog-item:last-child {
+      border-bottom: none;
+    }
+
+    .changelog-date {
+      color: #d1d5db;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .changelog-text {
+      color: #1a1a1a;
+      font-size: 14px;
+    }
+
+    /* Footer */
+    footer {
+      background-color: #e1e7ef;
+      padding: 24px 48px;
+      text-align: center;
+      color: #6b7280;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <header>
+    <div class="logo">Pulse.</div>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#changelog">Changelog</a>
+      <a href="#pricing">Pricing</a>
+    </nav>
+  </header>
+
+  <!-- Hero section -->
+  <section class="hero">
+    <div class="hero-badge">LIVE</div>
+    <h1>Ship dashboards in minutes</h1>
+    <p>Pulse turns your metrics into shareable dashboards with zero config. Connect a source and publish.</p>
+    <button class="hero-btn">Start free</button>
+  </section>
+
+  <!-- Why Pulse section -->
+  <section class="why-pulse">
+    <h2>Why Pulse</h2>
+    <div class="cards-grid">
+      <div class="card">
+        <h3>Instant charts</h3>
+        <p>Point Pulse at a database table and get a chart in one click. No query language required.</p>
+      </div>
+      <div class="card">
+        <h3>Live sync</h3>
+        <p>Dashboards refresh on a schedule you pick, from every minute to once a day.</p>
+      </div>
+      <div class="card">
+        <h3>Share anywhere</h3>
+        <p>Every dashboard gets a private link you can drop into Slack, Notion, or email.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Changelog section -->
+  <section class="changelog">
+    <h2>Changelog</h2>
+    <div class="changelog-list">
+      <div class="changelog-item">
+        <div class="changelog-date">Jul 24</div>
+        <div class="changelog-text">Added CSV export for every chart</div>
+      </div>
+      <div class="changelog-item">
+        <div class="changelog-date">Jul 19</div>
+        <div class="changelog-text">New heatmap chart type</div>
+      </div>
+      <div class="changelog-item">
+        <div class="changelog-date">Jul 12</div>
+        <div class="changelog-text">Dashboard folders and search</div>
+      </div>
+      <div class="changelog-item">
+        <div class="changelog-date">Jul 05</div>
+        <div class="changelog-text">Postgres 17 connector support</div>
+      </div>
+      <div class="changelog-item">
+        <div class="changelog-date">Jun 28</div>
+        <div class="changelog-text">Faster initial dashboard load</div>
+      </div>
+      <div class="changelog-item">
+        <div class="changelog-date">Jun 21</div>
+        <div class="changelog-text">Slack alerts on metric thresholds</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    © 2026 Pulse Analytics — status.pulse.dev
+  </footer>
+</body>
+</html>
