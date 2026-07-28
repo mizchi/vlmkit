@@ -259,6 +259,15 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 
 ## Backlog (prioritize after evaluation)
 
+### Benchmarks
+- [ ] **markup-agent モデル横断ベンチ: OpenRouter + pi でモデルごとの性能比較**
+  - 目的: S7-fresh A/B(Haiku 4.5 vs Sonnet — `docs/reports/2026-07-28-verifier-tooling-and-s6.md` 追記3)を Anthropic 外のモデルへ拡張し、markup-agent ループの model×cost 表を作る。既存の vlm-bench(Stage-1 VLM 比較)とは別物 — こちらは**エージェント本体**(vision 読み + CSS 執筆 + verify markup ループ運転)の比較。
+  - 方法: エージェントハーネスに **pi** を使い、モデルルーティングは **OpenRouter**。条件は S7-fresh と同一に固定 — mock フィクスチャ(`fixtures/auto-markup-proof/mock/figma-export@2x.png`)単体入力、mock-markup skill 準拠プロンプト、12 ラウンド予算、`verify markup` をループ駆動、rounds は `.vlmkit/run-ledger.jsonl` で監査。
+  - 指標: DONE 到達 / rounds / tokens(input・output 分離が取れる — ハーネス合算より精密)/ **実費**(OpenRouter 請求額)/ 実時間 / pixel diff / 偽 done 宣言・「再現不能」乱用の有無。
+  - 候補モデル: `google/gemini-2.5-flash`(Stage-2 LLM 現行既定)、`moonshotai/kimi-k2`、`qwen/qwen3-coder`(fix-loop では過剰修正の前科 — apply-and-rollback なしのこのループでどうなるかも観点)、`deepseek` 系、+ 基準線として `anthropic/claude-haiku-4-5` / Sonnet(OpenRouter 経由で同一ハーネス化)。
+  - 期待成果: skills の Model selection 節を Anthropic 2 モデルの表から多モデル表に更新、`docs/knowledge.md` に台帳行を追加、レポートを `docs/reports/` に保存(YYYY-MM-DD-markup-agent-model-bench-vN.md)。
+  - 論点(設計時に決める): pi 側のツール権限(bash + read/write で十分か)、1px エンドゲームを完走できないモデルの打ち切り規準(トレンド横ばい 2 レグ相当)、vision 非対応モデルの扱い(除外 or scan component クロップ経由)。
+
 ### Infrastructure / Deploy
 - [x] Cloudflare Browser Run CDP backend (`vrt snapshot --backend cloudflare`) — connects via `chromium.connectOverCDP` to `wss://api.cloudflare.com/.../browser-rendering/devtools/browser`. See `examples/vrt-snapshot-cloudflare.workflow.yml`.
 - [x] Cloudflare Workers entry point (`worker/`) — `worker/index.ts` re-exports `createApiApp()` from `src/api/api-app.ts`. `env.BROWSER` wiring still pending.
