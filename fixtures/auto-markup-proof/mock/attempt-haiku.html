@@ -25,7 +25,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 16px 48px;
+      padding: 0 48px 16px 48px;
       background-color: rgb(251, 252, 253);
       border-bottom: none;
     }
@@ -34,7 +34,7 @@
       font-size: 24px;
       font-weight: 500;
       letter-spacing: -0.5px;
-      color: #4a4a4a;
+      color: #6b7280;
     }
 
     nav {
@@ -53,7 +53,7 @@
     .hero {
       background-color: #1a2332;
       color: white;
-      padding: 48px 48px;
+      padding: 59px 48px 24px 48px;
       text-align: left;
     }
 
@@ -99,7 +99,7 @@
 
     /* Why Pulse section */
     .why-pulse {
-      padding: 24px 48px;
+      padding: 21px 48px 0 48px;
       background-color: rgb(251, 252, 253);
     }
 
@@ -120,6 +120,18 @@
       border: 1px solid #e5e7eb;
       padding: 24px;
       border-radius: 8px;
+      position: relative;
+    }
+
+    .card:nth-child(2)::after,
+    .card:nth-child(3)::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 24px;
+      right: 24px;
+      height: 1px;
+      background-color: #e2e8f0;
     }
 
     .card h3 {
@@ -137,8 +149,9 @@
 
     /* Changelog section */
     .changelog {
-      padding: 24px 48px;
+      padding: 0 48px 0 48px;
       background-color: rgb(251, 252, 253);
+      border-bottom: 1px solid #e2e8f0;
     }
 
     .changelog h2 {
@@ -152,6 +165,7 @@
       border: 1px solid #e5e7eb;
       border-radius: 8px;
       padding: 16px;
+      border-bottom: 1px solid #e2e8f0;
     }
 
     .changelog-item {
@@ -173,7 +187,7 @@
     }
 
     .changelog-text {
-      color: #1a1a1a;
+      color: #555555;
       font-size: 14px;
     }
 
