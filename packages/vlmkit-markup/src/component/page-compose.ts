@@ -31,6 +31,7 @@ import {
   type ExtractComponentsOptions,
 } from "./component-bbox.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 
 export interface PageComponent extends ComponentBbox {
   /** Index in the extraction order (area-desc) of its own side. */
@@ -458,7 +459,7 @@ export function renderPageCompositionMarkdown(
 // ---------------------------------------------------------------------------
 // CLI
 
-async function loadPng(path: string): Promise<{ data: Uint8Array; width: number; height: number }> {
+export async function loadPng(path: string): Promise<{ data: Uint8Array; width: number; height: number }> {
   const png = PNG.sync.read(await readFile(path));
   return {
     data: new Uint8Array(png.data.buffer, png.data.byteOffset, png.data.byteLength),
@@ -467,7 +468,7 @@ async function loadPng(path: string): Promise<{ data: Uint8Array; width: number;
   };
 }
 
-async function renderHtmlToPng(
+export async function renderHtmlToPng(
   htmlPath: string,
   width: number,
   height: number,
@@ -575,6 +576,17 @@ async function main(argv = process.argv.slice(2)) {
     : await renderHtmlToPng(currentInput!, target.width, target.height);
 
   const composition = composePageDiff(target, current, options);
+  appendRunLedger({
+    tool: "build-page",
+    source: currentInput!,
+    target: targetPath!,
+    headline: {
+      matched: composition.matches.length,
+      missing: composition.missing.length,
+      extra: composition.extra.length,
+      orderViolations: composition.orderViolations.length,
+    },
+  });
 
   const cropDir = flag("--crop");
   let crops: string[] = [];

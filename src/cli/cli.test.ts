@@ -172,6 +172,27 @@ describe("vrt CLI tree (cac-based)", () => {
     assert.match(r.stdout, /--fail-on-suspect/);
   });
 
+  it("`vrt check scroll --help` delegates to the scroll-behavior help", () => {
+    const r = runVrt(["check", "scroll", "--help"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vlmkit check scroll <html-or-url>/);
+    assert.match(r.stdout, /snap containers must land/);
+  });
+
+  it("`vrt check copy --help` delegates to the copy-fidelity help", () => {
+    const r = runVrt(["check", "copy", "--help"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vlmkit check copy <html-or-url>/);
+    assert.match(r.stdout, /--manifest <file>/);
+  });
+
+  it("`vrt verify markup --help` delegates to the markup verifier help", () => {
+    const r = runVrt(["verify", "markup", "--help"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vlmkit verify markup <attempt.html>/);
+    assert.match(r.stdout, /--reference <html>/);
+  });
+
   it("`vrt check animation --help` delegates to the animation evaluator help", () => {
     const r = runVrt(["check", "animation", "--help"]);
     assert.equal(r.status, 0);

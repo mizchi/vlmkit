@@ -26,6 +26,7 @@
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { UiExpectedScrollportContract } from "../contract/ui-contract.ts";
 
@@ -447,6 +448,15 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     source: parsed.source,
     ...(parsed.clipThreshold !== undefined ? { clipThreshold: parsed.clipThreshold } : {}),
     ...(parsed.viewport ? { viewport: parsed.viewport } : {}),
+  });
+  appendRunLedger({
+    tool: "scan-scroll",
+    source: parsed.source,
+    headline: {
+      containers: report.containers.length,
+      overflowX: report.page.horizontalOverflow,
+      issues: report.issues.length,
+    },
   });
   if (parsed.json) {
     console.log(JSON.stringify(report, null, 2));

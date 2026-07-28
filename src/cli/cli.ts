@@ -140,6 +140,9 @@ const SPECS: Record<string, Spec> = {
   animationEval: spec("animation-eval", () => import("@mizchi/vlmkit-markup/style/animation-eval.ts")),
   scrollScan: spec("scroll-scan", () => import("@mizchi/vlmkit-markup/inspect/scroll-scan.ts")),
   breakpointCheck: spec("breakpoint-check", () => import("@mizchi/vlmkit-markup/stress/breakpoint-check.ts")),
+  markupVerify: spec("markup-verify", () => import("@mizchi/vlmkit-markup/verify/markup-verify.ts")),
+  copyCheck: spec("copy-check", () => import("@mizchi/vlmkit-markup/inspect/copy-check.ts")),
+  scrollBehavior: spec("scroll-behavior", () => import("@mizchi/vlmkit-markup/inspect/scroll-behavior.ts")),
   craterSmoke: spec("crater-smoke", () => import("@mizchi/vlmkit-capture/crater-smoke.ts")),
   perf: spec("perf", () => import("../util/perf.ts")),
   explore: spec("explore", () => import("@mizchi/vlmkit-markup/inspect/explore.ts")),
@@ -171,7 +174,9 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
     theme: { spec: SPECS.themeParity, desc: "Theme parity (hard-coded color scan in dark mode)" },
     motion: { spec: SPECS.motionDetect, desc: "CSS motion detection (animation / transition / reduced-motion)" },
     animation: { spec: SPECS.animationEval, desc: "Frame-sampled animation evaluation (visible effect / settle / reduced-motion behavior)" },
-    breakpoints: { spec: SPECS.breakpointCheck, desc: "Boundary quickcheck: render at B-1/B/B+1 per breakpoint, flag spikes/gaps/overflow" },
+    breakpoints: { spec: SPECS.breakpointCheck, desc: "Boundary quickcheck: render at B-1/B/B+1 per breakpoint, flag spikes/gaps/overflow (--sweep fuzzes widths in between)" },
+    scroll: { spec: SPECS.scrollBehavior, desc: "Scroll behavior: fixed holds position, engaged sticky sticks, mandatory snap lands on a child edge" },
+    copy: { spec: SPECS.copyCheck, desc: "Copy fidelity: placeholder-text scan + optional --manifest verification" },
     crater: { spec: SPECS.craterSmoke, desc: "Crater BiDi backend smoke check" },
     perf: { spec: SPECS.perf, desc: "Web Vitals thresholds (CLS / LCP / FCP)" },
   },
@@ -200,6 +205,9 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
   },
   heal: {
     selector: { spec: SPECS.selectorHeal, desc: "Suggest replacements for a selector that no longer matches" },
+  },
+  verify: {
+    markup: { spec: SPECS.markupVerify, desc: "One-shot done-condition verdict: composition per target + gates + pixel diff + kickback list" },
   },
 };
 
@@ -238,8 +246,11 @@ const DEPRECATED_TOP_LEVEL: Record<string, { newName: string; spec: Spec }> = {
   "component-from-image": { newName: "build component", spec: SPECS.componentFromImage },
   flipbook: { newName: "snapshot flipbook", spec: SPECS.flipbook },
 };
+// "verify" is NOT in this list: it is a real command group now
+// (`vlmkit verify markup`); the group handler keeps the old
+// `verify → workflow verify` deprecation shim for non-leaf usage.
 const WORKFLOW_ALIASES = [
-  "init", "capture", "verify", "approve",
+  "init", "capture", "approve",
   "graph", "affected", "introspect", "spec-verify", "expect",
 ];
 
@@ -300,6 +311,14 @@ async function runGroupLeaf(
   }
   const entry = GROUPS[groupName]?.[leafName];
   if (!entry) {
+    // Back-compat: `vlmkit verify <anything-but-a-leaf>` was the deprecated
+    // single-word alias for `vlmkit workflow verify` before the verify group
+    // existed; keep that shim for unknown leaves.
+    if (groupName === "verify") {
+      reportDeprecation("verify", "vlmkit workflow verify");
+      await runWorkflow(["verify", leafName === HELP_SENTINEL ? "--help" : leafName, ...rest]);
+      return;
+    }
     console.error(`Unknown ${groupName} subcommand: ${leafName}`);
     process.exit(1);
   }
@@ -321,13 +340,14 @@ regression-watch) + markup synthesis + design audits + CSS auto-repair.
 
 Common command groups:
   vlmkit diff html|png|region|elements|component|browsers|agent|runs
-  vlmkit check a11y|palette|tokens|theme|motion|animation|breakpoints|crater|perf|drift
+  vlmkit check a11y|palette|tokens|theme|motion|animation|breakpoints|scroll|copy|crater|perf|drift
   vlmkit inspect interact|explore|smoke
   vlmkit stress i18n|media
   vlmkit scan component|breakpoints|scroll
   vlmkit build component|page
   vlmkit contract introspect|validate|scaffold
   vlmkit heal selector
+  vlmkit verify markup
   vlmkit snapshot [<url>...]
   vlmkit workflow <subcommand>
   vlmkit markup-loop <command>

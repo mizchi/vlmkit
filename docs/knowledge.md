@@ -818,6 +818,7 @@ S5 で Haiku が missing/extra を残して 3 ラウンドで自己宣言停止�
 | S5 promo r2 | 12 | 221,686 | 102 | 684s | —(未達で終了) | 失敗。`build page` のアニメ途中キャプチャ(幻デルタ)を発見 → 修正 |
 | S5 promo r3 | 8 | 375,941 | 138 | 918s | **2.65% / 7.51%(desktop/mobile)** | **初の done 達成**。検証者差し戻し ×2 + 校正ランが決め手 |
 | S5 promo r4 | 12 | 177,354 | 151 | 758s | —(未達で終了) | 失敗。**handoff 差し戻しの計測ラン**: 15k tokens/round(resume は ~67k)と 4 倍安いが、1 回の大きなサマリでは残差の名指し漏れ(パネル高)が最後まで直らず |
+| S6 catalog | 12 | 176,283 | 93 | 707s | —(未達で終了) | 失敗(実ページ級は 12 ラウンド予算超え)。leg-2 は **`verify markup` の printed verdict 駆動で初の「成功を偽らない」最終報告** |
 
 トークン計測は S5 が初(それ以前のランは usage を記録していなかった)。
 r2/r3 の tokens はセグメント合算 — 差し戻し(resume)はトランスクリプト
@@ -841,3 +842,8 @@ resume(~67k)の約 1/4。ただし r4 は done 未達 — コストは handoff�
 
 記録の運用: 各実証レポート(docs/reports/)の結果表に rounds /
 tokens 列を必ず含め、この節のベースライン表に 1 行追記する。
+**rounds は 2026-07-28 から自己申告でなく `.vlmkit/run-ledger.jsonl`
+(全ループツールが自動追記)で監査する。** done 判定は
+`vlmkit verify markup`(verdict + 校正フロア + 全残差キックバック)に
+一本化 — 検証者ツーリングの詳細と S6 の結果は
+`docs/reports/2026-07-28-verifier-tooling-and-s6.md`。

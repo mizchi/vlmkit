@@ -34,6 +34,7 @@ import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { extractBreakpoints } from "@mizchi/vlmkit-capture/viewport-discovery.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 /** Discrete computed properties compared across boundary widths. */
@@ -82,7 +83,8 @@ export interface BreakpointResult {
 export type BreakpointCheckIssueKind =
   | "boundary-spike"
   | "boundary-gap"
-  | "overflow-at-boundary";
+  | "overflow-at-boundary"
+  | "sweep-overflow";
 
 export interface BreakpointCheckIssue {
   kind: BreakpointCheckIssueKind;
@@ -92,6 +94,57 @@ export interface BreakpointCheckIssue {
   breakpoint?: number;
 }
 
+export interface SweepOverflowRange {
+  from: number;
+  to: number;
+  maxOverflow: number;
+}
+
+export interface SweepResult {
+  min: number;
+  max: number;
+  step: number;
+  sampledWidths: number;
+  overflowRanges: SweepOverflowRange[];
+}
+
+/**
+ * Collapse per-width overflow samples into contiguous ranges. The declared
+ * B±1 checks can never see a width in the middle of a regime — the classic
+ * miss is a fixed-width child that only overflows at, say, 830-870px,
+ * between two healthy breakpoints.
+ */
+export function collapseSweepOverflow(
+  samples: { width: number; horizontalOverflow: number }[],
+  minOverflow = 1,
+): SweepOverflowRange[] {
+  const ranges: SweepOverflowRange[] = [];
+  let open: SweepOverflowRange | null = null;
+  for (const s of [...samples].sort((a, b) => a.width - b.width)) {
+    if (s.horizontalOverflow >= minOverflow) {
+      if (open) {
+        open.to = s.width;
+        open.maxOverflow = Math.max(open.maxOverflow, s.horizontalOverflow);
+      } else {
+        open = { from: s.width, to: s.width, maxOverflow: s.horizontalOverflow };
+      }
+    } else if (open) {
+      ranges.push(open);
+      open = null;
+    }
+  }
+  if (open) ranges.push(open);
+  return ranges;
+}
+
+export function deriveSweepIssues(sweep: SweepResult): BreakpointCheckIssue[] {
+  return sweep.overflowRanges.map((r) => ({
+    kind: "sweep-overflow" as const,
+    severity: "warn" as const,
+    message: `Horizontal overflow at ${r.from === r.to ? `${r.from}px` : `${r.from}-${r.to}px`} (up to ${r.maxOverflow}px past the viewport) — a width between declared breakpoints that the B±1 checks never render. Look for a fixed-width element inside that regime.`,
+  }));
+}
+
 export interface BreakpointCheckReport {
   source: string;
   breakpoints: BreakpointResult[];
@@ -99,6 +152,8 @@ export interface BreakpointCheckReport {
   checkedValues: number[];
   /** Cross-origin stylesheets whose rules were unreadable in-page: how many, and how many were recovered by fetching. */
   stylesheets?: { crossOrigin: number; fetched: number };
+  /** Present when --sweep ran: continuous-width overflow fuzz results. */
+  sweep?: SweepResult;
   issues: BreakpointCheckIssue[];
 }
 
@@ -113,6 +168,13 @@ export interface BreakpointCheckOptions {
   maxElements?: number;
   /** Max breakpoints checked (default 8). */
   maxBreakpoints?: number;
+  /** Also sweep the whole width range checking horizontal overflow only. */
+  sweep?: boolean;
+  /** Sweep step in px (default 25). */
+  sweepStep?: number;
+  /** Sweep range (defaults: 320 .. max(1280, largest breakpoint + 100)). */
+  sweepMin?: number;
+  sweepMax?: number;
 }
 
 function isUrl(source: string): boolean {
@@ -397,6 +459,32 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
       const collected = await page.evaluate(collectStylesScript(maxElements)) as Omit<WidthSample, "width">;
       samples.set(width, { width, ...collected });
     }
+
+    // Continuous-width sweep: horizontal overflow only, so each width costs
+    // one resize + one scalar read. Widths in the middle of a regime are
+    // exactly what the declared B±1 checks can never render.
+    let sweep: SweepResult | undefined;
+    if (options.sweep) {
+      const step = Math.max(5, options.sweepStep ?? 25);
+      const min = options.sweepMin ?? 320;
+      const max = options.sweepMax ?? Math.max(1280, (values[values.length - 1] ?? 0) + 100);
+      const sweepSamples: { width: number; horizontalOverflow: number }[] = [];
+      for (let width = min; width <= max; width += step) {
+        await page.setViewportSize({ width, height });
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+        const overflow = await page.evaluate(
+          "Math.max(0, document.documentElement.scrollWidth - window.innerWidth)",
+        ) as number;
+        sweepSamples.push({ width, horizontalOverflow: overflow });
+      }
+      sweep = {
+        min,
+        max,
+        step,
+        sampledWidths: sweepSamples.length,
+        overflowRanges: collapseSweepOverflow(sweepSamples),
+      };
+    }
     await page.close();
 
     const results: BreakpointResult[] = values.map((value) => {
@@ -442,7 +530,8 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
       breakpoints: results,
       checkedValues: values,
       ...(stylesheets ? { stylesheets } : {}),
-      issues: deriveBreakpointIssues(results),
+      ...(sweep ? { sweep } : {}),
+      issues: [...deriveBreakpointIssues(results), ...(sweep ? deriveSweepIssues(sweep) : [])],
     };
   } finally {
     await browser.close();
@@ -461,11 +550,19 @@ export function formatBreakpointCheckReport(report: BreakpointCheckReport): stri
   if (report.stylesheets && report.stylesheets.fetched < report.stylesheets.crossOrigin) {
     lines.push(`${YELLOW}note: ${report.stylesheets.crossOrigin - report.stylesheets.fetched} of ${report.stylesheets.crossOrigin} cross-origin stylesheet(s) could not be read — their breakpoints are not covered${RESET}`);
   }
+  if (report.sweep) {
+    const s = report.sweep;
+    const verdict = s.overflowRanges.length === 0
+      ? `${GREEN}clean${RESET}`
+      : `${YELLOW}${s.overflowRanges.length} overflow range(s)${RESET}`;
+    lines.push(`width sweep: ${s.min}-${s.max}px step ${s.step} (${s.sampledWidths} widths) — ${verdict}`);
+  }
   if (report.checkedValues.length === 0) {
     lines.push("breakpoints: none discovered — nothing to check (pass --breakpoints to force widths)");
-    return lines.join("\n");
+    if (!report.sweep || report.issues.length === 0) return lines.join("\n");
+  } else {
+    lines.push(`breakpoints checked: ${report.checkedValues.join(", ")}px (each at B-1 / B / B+1)`);
   }
-  lines.push(`breakpoints checked: ${report.checkedValues.join(", ")}px (each at B-1 / B / B+1)`);
   lines.push("");
   for (const bp of report.breakpoints) {
     const overflowNote = bp.samples.some((s) => s.horizontalOverflow > 1)
@@ -504,6 +601,9 @@ and horizontal overflow at boundary widths.
 
 Options:
   --breakpoints <list>  Comma-separated px values (default: discovered from CSS)
+  --sweep               Also fuzz the whole width range for horizontal overflow
+                        (widths between breakpoints that B±1 never renders)
+  --sweep-step <px>     Sweep step (default: 25)
   --json                Print JSON report
   --height <px>         Render height (default: 900)
   --max-elements <n>    Elements sampled per width (default: 400)
@@ -517,12 +617,16 @@ function parseArgs(argv: string[]) {
   let breakpoints: number[] | undefined;
   let height: number | undefined;
   let maxElements: number | undefined;
+  let sweep = false;
+  let sweepStep: number | undefined;
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === "--help" || arg === "-h" || arg === "help") printUsage(0);
     else if (arg === "--json") json = true;
     else if (arg === "--fail-on-suspect") failOnSuspect = true;
+    else if (arg === "--sweep") sweep = true;
+    else if (arg === "--sweep-step") sweepStep = Number.parseInt(argv[++i] ?? "25", 10);
     else if (arg === "--breakpoints") {
       breakpoints = (argv[++i] ?? "").split(",").map((v) => Number.parseInt(v.trim(), 10)).filter((v) => Number.isFinite(v));
     } else if (arg === "--height") height = Number.parseInt(argv[++i] ?? "900", 10);
@@ -530,7 +634,7 @@ function parseArgs(argv: string[]) {
     else positional.push(arg);
   }
   if (positional.length === 0) printUsage(1);
-  return { source: positional[0]!, json, failOnSuspect, breakpoints, height, maxElements };
+  return { source: positional[0]!, json, failOnSuspect, breakpoints, height, maxElements, sweep, sweepStep };
 }
 
 async function main(argv = process.argv.slice(2)): Promise<void> {
@@ -540,6 +644,17 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     ...(parsed.breakpoints ? { breakpoints: parsed.breakpoints } : {}),
     ...(parsed.height !== undefined ? { height: parsed.height } : {}),
     ...(parsed.maxElements !== undefined ? { maxElements: parsed.maxElements } : {}),
+    ...(parsed.sweep ? { sweep: true } : {}),
+    ...(parsed.sweepStep !== undefined ? { sweepStep: parsed.sweepStep } : {}),
+  });
+  appendRunLedger({
+    tool: "check-breakpoints",
+    source: parsed.source,
+    headline: {
+      breakpoints: report.checkedValues.length,
+      issues: report.issues.length,
+      sweepRanges: report.sweep?.overflowRanges.length ?? null,
+    },
   });
   if (parsed.json) {
     console.log(JSON.stringify(report, null, 2));

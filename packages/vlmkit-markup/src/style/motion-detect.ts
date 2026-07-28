@@ -19,6 +19,7 @@ import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 export interface MotionComputedSample {
@@ -310,6 +311,15 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   const report = await runMotionDetection({
     source: parsed.source,
     maxSamples: parsed.maxSamples,
+  });
+  appendRunLedger({
+    tool: "check-motion",
+    source: parsed.source,
+    headline: {
+      activeAnimations: report.activeAnimationCount,
+      running: report.runningAnimationCount,
+      issues: report.issues.length,
+    },
   });
   if (parsed.json) {
     console.log(JSON.stringify(report, null, 2));

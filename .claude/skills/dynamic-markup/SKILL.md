@@ -33,6 +33,7 @@ Static truth comes from pixels; behavior truth needs a carrier:
 | Scrollport hidden content | an extra "scrolled to bottom" screenshot |
 | Animation | a **motion brief** (short text: what moves, duration, easing, iteration, reduced-motion policy) — or a frame strip |
 | Interactive states | hover/focus screenshots (see auto-markup §3.7) |
+| Exact copy (spellings, casing) | an optional **copy manifest** (plain text, one required line per row) — verified by `check copy --manifest`; without one, `check copy` still runs its placeholder scan |
 
 Never invent behavior that has no carrier. No motion brief and no frame
 strip means **author zero animations** — say so in your report rather
@@ -71,6 +72,14 @@ causes:
 - `overflow-at-boundary` — a fixed-width child wider than the boundary
   width. Fix inside the offending regime's media query only; never
   regress the converged base.
+
+Two opt-in extensions when the spec calls for them: `check breakpoints
+--sweep` fuzzes the whole width range for horizontal overflow (widths
+*between* breakpoints that B±1 never renders — the fixed-width-child
+class of bug), and `check scroll` verifies scroll *behavior* (fixed
+elements hold their viewport position, engaged sticky elements stick
+at their `top`, mandatory snap containers land on a child snap edge —
+including the "no child declares scroll-snap-align" miss).
 
 ### B2. `scan scroll attempt.html`
 
@@ -188,21 +197,33 @@ already seen).
 
 ## Driver / verifier protocol (when running this skill via a subagent)
 
-Every S5 run — three for three — self-declared "complete" while the
-done condition was unmet, regardless of how prominently the AND
+Every S5/S6 first leg — five for five — self-declared "complete" while
+the done condition was unmet, regardless of how prominently the AND
 condition was stated. If you are the driver, plan for it:
 
-1. **Calibrate first**: if a reference render exists, run `build page
-   <target.png> <reference.html>` once. Its score (normally 0/0) is the
-   floor; it defeats the agent's "the residual is tool noise" move with
-   a measurement.
-2. **Verify the final claim independently** — re-run `build page` on
-   both viewports and the four gates yourself. Self-reported numbers
-   drift (stale copy-paste between rounds is common).
-3. **Kick back with names, not verdicts**: state which target component
-   is missing, what it really is ("your own footer, displaced by excess
-   vertical space above it"), and where the fix goes. Generic "keep
-   iterating" wastes a round; named deltas resolve in 1-2.
+1. **Use `vlmkit verify markup` as the verdict**, both for the agent's
+   loop and your own check:
+
+   ```bash
+   vlmkit verify markup attempt.html --target t-desktop.png \
+     --target t-mobile.png [--reference reference.html]
+   ```
+
+   One command runs composition per target, all four gates, and a
+   rest-pose pixel diff, prints an explicit DONE / NOT DONE verdict,
+   the calibration floor (with `--reference` — kills "tool noise"
+   claims), and a paste-ready kickback listing **every** residual.
+   Instruct the agent to loop on it: in S6, an agent driven by the
+   printed verdict was the first to end WITHOUT a false success claim.
+2. **Audit rounds from the run ledger**, not the agent's log: every
+   loop tool appends to `.vlmkit/run-ledger.jsonl` (timestamp, tool,
+   headline numbers), so "did it actually re-measure?" and "did the
+   numbers improve?" are checkable facts.
+3. **Kick back with names, not verdicts**: the verify markup kickback
+   section is written for this — every missing/extra with the
+   displacement interpretation applied, gap deltas, height deltas.
+   Generic "keep iterating" wastes a round; named deltas resolve in
+   1-2.
 4. **Budget tokens for the kickbacks**: resuming a subagent re-bills its
    transcript, so late segments cost more than their tool-call count
    suggests — measured at ~67k tokens/round for resume vs ~15k for a
@@ -210,7 +231,8 @@ condition was stated. If you are the driver, plan for it:
    cost, but keep kickbacks small, repeated, and *complete*: a residual
    you leave out of the handoff text stays unfixed (r4's panel height),
    because the fresh agent lacks the resume's accumulated context to
-   rediscover it.
+   rediscover it. Passing the verbatim verify markup kickback closes
+   that omission risk.
 
 ## Ground rules
 

@@ -31,6 +31,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 export interface AnimationTimingSample {
@@ -695,6 +696,15 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     ...(parsed.settleThresholdMs !== undefined ? { settleThresholdMs: parsed.settleThresholdMs } : {}),
     ...(parsed.framesDir ? { framesDir: parsed.framesDir } : {}),
     ...(parsed.viewport ? { viewport: parsed.viewport } : {}),
+  });
+  appendRunLedger({
+    tool: "check-animation",
+    source: parsed.source,
+    headline: {
+      animations: report.animationCount,
+      settleMs: report.settleMs,
+      issues: report.issues.length,
+    },
   });
   if (parsed.json) {
     console.log(JSON.stringify(report, null, 2));
