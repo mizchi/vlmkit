@@ -31,6 +31,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 export interface AnimationTimingSample {
@@ -49,6 +50,39 @@ export interface AnimationTimingSample {
   playState: string;
   /** currentTime as found on the page (ms), captured before pausing. */
   currentTimeMs: number;
+  /** animation-direction: normal / reverse / alternate / alternate-reverse. */
+  direction: string;
+  /**
+   * Keyframes end where they start (first and last keyframes equal, with a
+   * differing keyframe in between) — one iteration is a full out-and-back
+   * sweep even without `alternate`.
+   */
+  palindromic: boolean;
+}
+
+export interface OscillationInfo {
+  /** The animation sweeps out and back rather than jumping to restart. */
+  oscillating: boolean;
+  /** Duration of one visual leg (one extreme to the other), in ms. */
+  legMs: number;
+}
+
+/**
+ * Effective oscillation of one animation. WAAPI folds both `alternate`
+ * iterations and palindromic keyframes (0% -> 50% -> 100% retracing) into
+ * the same `durationMs xN` shape, so two implementations of "pulse forever"
+ * can differ 2x in visual frequency while reporting identical duration —
+ * the S5 blind spot (motion brief said "1.2s per leg"; a palindromic 1.2s
+ * cycle passed the gate at double speed). `alternate` spends one full
+ * iteration per leg; palindromic keyframes complete out-and-back within a
+ * single iteration, so each leg is half the duration.
+ */
+export function computeOscillation(
+  t: Pick<AnimationTimingSample, "durationMs" | "direction" | "palindromic">,
+): OscillationInfo {
+  if (t.direction.startsWith("alternate")) return { oscillating: true, legMs: t.durationMs };
+  if (t.palindromic) return { oscillating: true, legMs: t.durationMs / 2 };
+  return { oscillating: false, legMs: t.durationMs };
 }
 
 export interface FrameDeltaStat {
@@ -311,7 +345,7 @@ const COLLECT_ANIMATIONS_SCRIPT = `(() => {
   const anims = document.getAnimations ? document.getAnimations({ subtree: true }) : [];
   window.__vlmkitAnims = anims;
   return anims.map((anim, index) => {
-    let timing = { duration: 0, delay: 0, iterations: 1 };
+    let timing = { duration: 0, delay: 0, iterations: 1, direction: "normal" };
     try {
       const computed = anim.effect && anim.effect.getComputedTiming ? anim.effect.getComputedTiming() : null;
       if (computed) {
@@ -319,7 +353,27 @@ const COLLECT_ANIMATIONS_SCRIPT = `(() => {
           duration: typeof computed.duration === "number" ? computed.duration : 0,
           delay: computed.delay || 0,
           iterations: computed.iterations,
+          direction: computed.direction || "normal",
         };
+      }
+    } catch {}
+    // Palindrome detection: the first and last keyframes agree on every
+    // animated property while some keyframe in between differs — one
+    // iteration visually sweeps out and back (same effective motion as
+    // alternate, at twice the frequency).
+    let palindromic = false;
+    try {
+      const keyframes = anim.effect && anim.effect.getKeyframes ? anim.effect.getKeyframes() : [];
+      if (keyframes.length >= 3) {
+        const skip = new Set(["offset", "computedOffset", "easing", "composite"]);
+        const first = keyframes[0];
+        const last = keyframes[keyframes.length - 1];
+        const props = Object.keys(first).filter((k) => !skip.has(k));
+        palindromic = props.length > 0
+          && props.every((k) => k in last && String(first[k]) === String(last[k]))
+          && keyframes.slice(1, -1).some((mid) =>
+            props.some((k) => k in mid && String(mid[k]) !== String(first[k]))
+          );
       }
     } catch {}
     const ctor = anim.constructor ? anim.constructor.name : "";
@@ -342,6 +396,8 @@ const COLLECT_ANIMATIONS_SCRIPT = `(() => {
       iterations: Number.isFinite(timing.iterations) ? timing.iterations : null,
       playState,
       currentTimeMs,
+      direction: timing.direction || "normal",
+      palindromic,
     };
   });
 })()`;
@@ -540,8 +596,15 @@ export function formatAnimationEvalReport(report: AnimationEvalReport): string {
         ? `(${anim.motionBbox.x},${anim.motionBbox.y}) ${anim.motionBbox.width}x${anim.motionBbox.height}`
         : "none";
       const visibility = anim.visible ? `${GREEN}visible${RESET}` : `${RED}no visible effect${RESET}`;
+      const osc = computeOscillation(anim);
+      // The leg annotation is what makes "1.2s per leg" briefs mechanically
+      // checkable — duration alone hides a 2x frequency difference between
+      // `alternate` and palindromic-keyframe implementations.
+      const oscLabel = osc.oscillating
+        ? ` (${anim.direction.startsWith("alternate") ? anim.direction : "palindromic keyframes"}, leg ${Math.round(osc.legMs)}ms)`
+        : "";
       lines.push(
-        `  - ${anim.selector} \`${anim.name}\` ${Math.round(anim.durationMs)}ms x${anim.iterations ?? "∞"}: ${visibility}, motion region ${bbox}, peak frame delta ${(anim.maxFrameRatio * 100).toFixed(2)}%`,
+        `  - ${anim.selector} \`${anim.name}\` ${Math.round(anim.durationMs)}ms x${anim.iterations ?? "∞"}${oscLabel}: ${visibility}, motion region ${bbox}, peak frame delta ${(anim.maxFrameRatio * 100).toFixed(2)}%`,
       );
     }
   }
@@ -633,6 +696,15 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     ...(parsed.settleThresholdMs !== undefined ? { settleThresholdMs: parsed.settleThresholdMs } : {}),
     ...(parsed.framesDir ? { framesDir: parsed.framesDir } : {}),
     ...(parsed.viewport ? { viewport: parsed.viewport } : {}),
+  });
+  appendRunLedger({
+    tool: "check-animation",
+    source: parsed.source,
+    headline: {
+      animations: report.animationCount,
+      settleMs: report.settleMs,
+      issues: report.issues.length,
+    },
   });
   if (parsed.json) {
     console.log(JSON.stringify(report, null, 2));

@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   analyzeBoundary,
+  collapseSweepOverflow,
+  deriveSweepIssues,
   deriveBreakpointIssues,
   extractRangeSyntaxBreakpoints,
   formatBreakpointCheckReport,
@@ -188,4 +190,30 @@ test("formatBreakpointCheckReport says so when nothing was discovered", () => {
   const text = formatBreakpointCheckReport(report);
   assert.match(text, /none discovered/);
   assert.match(text, /--breakpoints/);
+});
+
+test("collapseSweepOverflow merges contiguous overflowing widths into ranges", () => {
+  const ranges = collapseSweepOverflow([
+    { width: 320, horizontalOverflow: 0 },
+    { width: 345, horizontalOverflow: 12 },
+    { width: 370, horizontalOverflow: 40 },
+    { width: 395, horizontalOverflow: 0 },
+    { width: 420, horizontalOverflow: 3 },
+  ]);
+  assert.deepEqual(ranges, [
+    { from: 345, to: 370, maxOverflow: 40 },
+    { from: 420, to: 420, maxOverflow: 3 },
+  ]);
+});
+
+test("deriveSweepIssues turns ranges into warn issues with the width span", () => {
+  const issues = deriveSweepIssues({
+    min: 320, max: 1280, step: 25, sampledWidths: 39,
+    overflowRanges: [{ from: 830, to: 870, maxOverflow: 99 }],
+  });
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0]!.kind, "sweep-overflow");
+  assert.equal(issues[0]!.severity, "warn");
+  assert.match(issues[0]!.message, /830-870px/);
+  assert.match(issues[0]!.message, /99px/);
 });

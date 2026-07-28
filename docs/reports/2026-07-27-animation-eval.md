@@ -124,3 +124,24 @@ page warns despite `animations: 0`; static page still reports `ok`.
 - `packages/vlmkit-markup/src/style/animation-eval.test.ts` — 13 tests
 - CLI: `vlmkit check animation` (`src/cli/cli.ts`), cross-referenced from
   `check motion`'s header; README, TODO.md, auto-markup SKILL.md updated.
+
+## Addendum (2026-07-28): oscillation period / direction detection
+
+The S5 proof exposed a blind spot: a palindromic-keyframe pulse
+(`0%,100% { opacity:1 } 50% { opacity:.55 }` at 1.2s) and an
+`alternate` pulse (`from/to` at 1.2s) both report `1200ms x∞`, yet the
+former oscillates at twice the frequency — the motion brief said
+"1.2s per leg" and the double-speed implementation passed the gate.
+
+`check animation` now records `direction` (from computed timing) and
+`palindromic` (first and last keyframes agree on every animated
+property with a differing keyframe in between, via
+`effect.getKeyframes()`), and `computeOscillation()` derives the
+effective **leg time**: alternate → one iteration per leg;
+palindromic → half an iteration per leg; normal non-palindromic →
+sawtooth, not oscillating. The report line annotates oscillating
+animations — `(alternate, leg 1200ms)` vs `(palindromic keyframes,
+leg 600ms)` — so per-leg briefs are mechanically checkable. Verified
+E2E on the S5 reference (alternate → leg 1200ms) and a v1-style
+palindromic fixture (→ leg 600ms); sawtooth and one-shot animations
+carry no annotation.

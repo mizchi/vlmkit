@@ -31,6 +31,7 @@ import {
   type ExtractComponentsOptions,
 } from "./component-bbox.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 
 export interface PageComponent extends ComponentBbox {
   /** Index in the extraction order (area-desc) of its own side. */
@@ -147,42 +148,77 @@ export function matchPageComponents(
   const maxAreaRatio = options.maxAreaRatio ?? 6;
   const diag = Math.sqrt(pageWidth ** 2 + pageHeight ** 2) || 1;
 
+  const scorePair = (t: PageComponent, c: PageComponent): number | null => {
+    const ratio = Math.max(t.area, c.area) / Math.max(1, Math.min(t.area, c.area));
+    if (ratio > maxAreaRatio) return null;
+    const [tx, ty] = center(t);
+    const [cx, cy] = center(c);
+    const centerDist = Math.sqrt((tx - cx) ** 2 + (ty - cy) ** 2) / diag;
+    if (centerDist > maxCenter) return null;
+    const sizePenalty =
+      (Math.abs(t.width - c.width) / Math.max(t.width, c.width, 1)
+        + Math.abs(t.height - c.height) / Math.max(t.height, c.height, 1)) / 2;
+    return centerDist + sizePenalty * 0.5;
+  };
+
   interface Scored { t: PageComponent; c: PageComponent; score: number }
   const scored: Scored[] = [];
   for (const t of target) {
     for (const c of current) {
-      const ratio = Math.max(t.area, c.area) / Math.max(1, Math.min(t.area, c.area));
-      if (ratio > maxAreaRatio) continue;
-      const [tx, ty] = center(t);
-      const [cx, cy] = center(c);
-      const centerDist = Math.sqrt((tx - cx) ** 2 + (ty - cy) ** 2) / diag;
-      if (centerDist > maxCenter) continue;
-      const sizePenalty =
-        (Math.abs(t.width - c.width) / Math.max(t.width, c.width, 1)
-          + Math.abs(t.height - c.height) / Math.max(t.height, c.height, 1)) / 2;
-      scored.push({ t, c, score: centerDist + sizePenalty * 0.5 });
+      const score = scorePair(t, c);
+      if (score !== null) scored.push({ t, c, score });
     }
   }
   scored.sort((a, b) => a.score - b.score);
 
   const usedT = new Set<number>();
   const usedC = new Set<number>();
-  const matches: PageMatch[] = [];
+  const assigned: { t: PageComponent; c: PageComponent }[] = [];
   for (const { t, c } of scored) {
     if (usedT.has(t.index) || usedC.has(c.index)) continue;
     usedT.add(t.index);
     usedC.add(c.index);
-    matches.push({
-      target: t,
-      current: c,
-      deltaTop: c.top - t.top,
-      deltaLeft: c.left - t.left,
-      deltaWidth: c.width - t.width,
-      deltaHeight: c.height - t.height,
-      iou: Number(iouOf(t, c).toFixed(3)),
-      fillDistance: Number(fillDistance(t, c).toFixed(1)),
-    });
+    assigned.push({ t, c });
   }
+
+  // Greedy is not globally optimal: two near-identical thin components (1px
+  // panel/card borders ~20px apart) can end up cross-paired — the first pick
+  // grabs the closest current line, leaving its true partner to a worse,
+  // *crossed* pairing that then reads as a phantom vertical-ordering
+  // violation (S5-r3 mobile). A 2-opt pass exchanges the currents of any two
+  // matches when the swap strictly lowers the same score the greedy pass
+  // used, so it can only improve the assignment.
+  let improved = true;
+  while (improved) {
+    improved = false;
+    for (let i = 0; i < assigned.length; i++) {
+      for (let j = i + 1; j < assigned.length; j++) {
+        const a = assigned[i]!;
+        const b = assigned[j]!;
+        const currentScore = scorePair(a.t, a.c)! + scorePair(b.t, b.c)!;
+        const swappedA = scorePair(a.t, b.c);
+        const swappedB = scorePair(b.t, a.c);
+        if (swappedA === null || swappedB === null) continue;
+        if (swappedA + swappedB < currentScore - 1e-9) {
+          const tmp = a.c;
+          a.c = b.c;
+          b.c = tmp;
+          improved = true;
+        }
+      }
+    }
+  }
+
+  const matches: PageMatch[] = assigned.map(({ t, c }) => ({
+    target: t,
+    current: c,
+    deltaTop: c.top - t.top,
+    deltaLeft: c.left - t.left,
+    deltaWidth: c.width - t.width,
+    deltaHeight: c.height - t.height,
+    iou: Number(iouOf(t, c).toFixed(3)),
+    fillDistance: Number(fillDistance(t, c).toFixed(1)),
+  }));
   matches.sort((a, b) => a.target.top - b.target.top || a.target.left - b.target.left);
   return {
     matches,
@@ -423,7 +459,7 @@ export function renderPageCompositionMarkdown(
 // ---------------------------------------------------------------------------
 // CLI
 
-async function loadPng(path: string): Promise<{ data: Uint8Array; width: number; height: number }> {
+export async function loadPng(path: string): Promise<{ data: Uint8Array; width: number; height: number }> {
   const png = PNG.sync.read(await readFile(path));
   return {
     data: new Uint8Array(png.data.buffer, png.data.byteOffset, png.data.byteLength),
@@ -432,7 +468,7 @@ async function loadPng(path: string): Promise<{ data: Uint8Array; width: number;
   };
 }
 
-async function renderHtmlToPng(
+export async function renderHtmlToPng(
   htmlPath: string,
   width: number,
   height: number,
@@ -540,6 +576,17 @@ async function main(argv = process.argv.slice(2)) {
     : await renderHtmlToPng(currentInput!, target.width, target.height);
 
   const composition = composePageDiff(target, current, options);
+  appendRunLedger({
+    tool: "build-page",
+    source: currentInput!,
+    target: targetPath!,
+    headline: {
+      matched: composition.matches.length,
+      missing: composition.missing.length,
+      extra: composition.extra.length,
+      orderViolations: composition.orderViolations.length,
+    },
+  });
 
   const cropDir = flag("--crop");
   let crops: string[] = [];

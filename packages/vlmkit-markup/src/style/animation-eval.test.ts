@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  computeOscillation,
   computeSettleMs,
   deriveAnimationIssues,
   formatAnimationEvalReport,
@@ -52,6 +53,8 @@ function timing(overrides: Partial<AnimationTimingSample> = {}): AnimationTiming
     iterations: 1,
     playState: "running",
     currentTimeMs: 0,
+    direction: "normal",
+    palindromic: false,
     ...overrides,
   };
 }
@@ -137,6 +140,51 @@ test("restTimeForAnimation: running finite → past end, running infinite → 0,
     restTimeForAnimation(timing({ playState: "finished", currentTimeMs: 800 })),
     800,
   );
+});
+
+test("computeOscillation: alternate spends one iteration per leg", () => {
+  assert.deepEqual(
+    computeOscillation(timing({ durationMs: 1200, direction: "alternate" })),
+    { oscillating: true, legMs: 1200 },
+  );
+  assert.deepEqual(
+    computeOscillation(timing({ durationMs: 1200, direction: "alternate-reverse" })),
+    { oscillating: true, legMs: 1200 },
+  );
+});
+
+test("computeOscillation: palindromic keyframes sweep out and back within one iteration", () => {
+  // The S5 blind spot: same 1200ms x∞ as the alternate implementation,
+  // but each leg is half the duration — a 2x frequency difference.
+  assert.deepEqual(
+    computeOscillation(timing({ durationMs: 1200, direction: "normal", palindromic: true })),
+    { oscillating: true, legMs: 600 },
+  );
+});
+
+test("computeOscillation: normal non-palindromic animations do not oscillate", () => {
+  assert.deepEqual(
+    computeOscillation(timing({ durationMs: 800 })),
+    { oscillating: false, legMs: 800 },
+  );
+});
+
+test("formatAnimationEvalReport annotates oscillating animations with the leg time", () => {
+  const report: AnimationEvalReport = {
+    source: "fixture.html",
+    viewport: { width: 1280, height: 720 },
+    animationCount: 2,
+    evaluated: [
+      evaluated({ name: "pulse", durationMs: 1200, iterations: null, direction: "alternate" }),
+      evaluated({ name: "blink", durationMs: 1200, iterations: null, direction: "normal", palindromic: true }),
+    ],
+    settleMs: null,
+    infinite: [{ selector: ".spinner", name: "pulse" }],
+    issues: [],
+  };
+  const text = formatAnimationEvalReport(report);
+  assert.match(text, /`pulse` 1200ms x∞ \(alternate, leg 1200ms\)/);
+  assert.match(text, /`blink` 1200ms x∞ \(palindromic keyframes, leg 600ms\)/);
 });
 
 test("a visually dead animation raises no-visible-effect", () => {

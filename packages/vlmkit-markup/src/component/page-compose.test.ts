@@ -199,3 +199,22 @@ test("matchPageComponents pairs by position even when area ranks differ", () => 
   const hero = matches.find((m) => m.target.index === 0)!;
   assert.equal(hero.current.index, 1, "hero pairs with the shrunk hero, not the button");
 });
+
+test("near-identical thin lines do not cross-pair into a phantom ordering violation", () => {
+  const mk = (index: number, left: number, top: number, w: number, h: number): PageComponent => ({
+    index, left, top, width: w, height: h, area: w * h, fillColor: "rgb(226, 232, 240)", hex: "#e2e8f0",
+  });
+  // S5-r3 mobile: two 1px card borders 21px apart in the target; the current
+  // render has the same pair shifted a few px. Greedy alone pairs t(628) with
+  // c(631) first (distance 3), leaving t(649) the *crossed* c(617); the 2-opt
+  // pass must exchange them (total distance 11+18 beats 3+32).
+  const target = [mk(0, 27, 628, 321, 1), mk(1, 27, 649, 321, 1)];
+  const current = [mk(0, 24, 617, 327, 1), mk(1, 24, 631, 327, 1)];
+  const { matches, missing, extra } = matchPageComponents(target, current, 375, 1335);
+  assert.equal(matches.length, 2);
+  assert.equal(missing.length, 0);
+  assert.equal(extra.length, 0);
+  // Sorted by target top: current tops must be ascending (no crossing).
+  assert.equal(matches[0]!.current.top, 617);
+  assert.equal(matches[1]!.current.top, 631);
+});
