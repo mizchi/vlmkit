@@ -827,6 +827,7 @@ S5 で Haiku が missing/extra を残して 3 ラウンドで自己宣言停止�
 | S8 edit Sonnet | 0 | 68,495 | — | — | — | done + PASS だが**汚染ラン**(fixture の作問コメントが正解リストとして漏洩)— 参考値 |
 | S9 scrollpage Haiku | 12 | 77,621 | — | — | — | 失敗(composition 膠着)。ただし**挙動系は完全達成**(check scroll ok: sticky/snap/fixed 全部 green)— 静的と動的で難度が分離した初の例 |
 | S9 scrollpage **Sonnet 継続レグ** | 6 | 199,876 | 99 | 1663s | 4.98% | 失敗(1 extra 残し)。diff 18.3%→4.98%、missing/extra 2/2→0/1、高さ許容内、scroll green 維持。残差 = 段落 reflow(1 行増で記事ブロックが ~20px 沈む)。**検証者目視でコピー誤り 3 件を追加検出**(© 2025/2026、`·` 区切り欠落、Imlil→Imili 等の転記 typo)— composition には写らない |
+| S9-fresh Haiku(帰属+kind+copy gate) | 11 | 77,332 | 61 | 444s | 20.11% | 失敗 — **帰属付き kickback でも Haiku の壁(fixed 座標系+相互作用 gap)は不変**(null result、膠着 3 点も tokens も元 S9 とほぼ同一)。copy gate 自己レビューは「同じ目」問題で Imlil typo を素通し(PASSED と虚偽報告)— キーレスモードは転記者と別の読み手が必須と skill 改訂 |
 | S10 realshot **Sonnet** | 2 | 58,103 | — | — | 36%(advisory) | **done(劣化キャプチャ宣言モード初実証)**。dpr2+JPEG 実スクショ 1 枚入力。diff 36% は写真領域のグラデ近似による設計値 — 構図・コピー・パレットは目視一致 |
 
 トークン計測は S5 が初(それ以前のランは usage を記録していなかった)。

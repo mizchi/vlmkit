@@ -60,12 +60,16 @@ vlmkit check copy attempt.html --target targets/target-desktop.png
 ```
 
 It crops every rendered text block's bbox out of the target image into
-contact sheets plus a worksheet of expected strings. Read the sheets
-ONCE with your own vision (or pass `--vlm` with an API key) and flag
-any character difference — this is the gate that catches your own
-Phase-1 transcription errors, so do not skip it because the text
-"looks right"; the whole point is that it looked right the first time
-too. Photos and illustrations
+contact sheets plus a worksheet of expected strings. Flag any
+character difference — this is the gate that catches Phase-1
+transcription errors. **The sheets must be read by a different reader
+than the transcriber**: pass `--vlm` (API key), or hand the sheet
+paths + worksheet to the driver/verifier in your report. Reviewing
+your own transcription with your own eyes is measured to fail — the
+S9-fresh run misread `Imlil` as `Imili` at transcription, misread the
+review crop the same way, and reported the copy gate as PASSED while
+the typo survived. If no second reader is available, say so in the
+report instead of claiming the gate passed. Photos and illustrations
 inside the mock are content, not layout: reproduce their box (size,
 position, fill approximation or gradient), never try to redraw them.
 
