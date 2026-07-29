@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background-color: #f5f5f5;
+      color: #333;
+      padding: 2rem;
+    }
+
+    h1 {
+      font-size: 1.875rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    button {
+      font-family: inherit;
+      font-size: 1rem;
+      padding: 0.5rem 1rem;
+      border-radius: 0.375rem;
+      border: 1px solid;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    button:focus {
+      outline: 2px solid #0066cc;
+      outline-offset: 2px;
+    }
+
+    #account-actions-btn {
+      background-color: #fff;
+      border-color: #ccc;
+      color: #333;
+    }
+
+    #account-actions-btn:hover {
+      background-color: #f9f9f9;
+    }
+
+    #delete-account-btn {
+      background-color: #fff;
+      border-color: #c41e3a;
+      color: #c41e3a;
+    }
+
+    #delete-account-btn:hover {
+      background-color: #fef5f5;
+    }
+
+    .menu {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      background-color: #fff;
+      border: 1px solid #ddd;
+      border-radius: 0.375rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      min-width: 200px;
+      margin-top: 0.5rem;
+      display: none;
+      z-index: 1000;
+    }
+
+    .menu[aria-hidden="false"] {
+      display: block;
+    }
+
+    .menu[role="menu"] {
+      position: absolute;
+    }
+
+    .menuitem {
+      display: block;
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: none;
+      border: none;
+      text-align: left;
+      cursor: pointer;
+      color: #333;
+      font-size: 1rem;
+    }
+
+    .menuitem:hover {
+      background-color: #f0f0f0;
+    }
+
+    .menuitem:focus {
+      outline: 2px solid #0066cc;
+      outline-offset: -2px;
+      background-color: #f0f0f0;
+    }
+
+    dialog {
+      border: none;
+      border-radius: 0.5rem;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+      padding: 2rem;
+      max-width: 400px;
+    }
+
+    dialog::backdrop {
+      background-color: rgba(0, 0, 0, 0.5);
+    }
+
+    .dialog-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+
+    .dialog-body {
+      font-size: 1rem;
+      color: #666;
+      margin-bottom: 2rem;
+      line-height: 1.5;
+    }
+
+    .dialog-buttons {
+      display: flex;
+      gap: 1rem;
+      justify-content: flex-end;
+    }
+
+    .dialog-buttons button {
+      padding: 0.5rem 1.5rem;
+    }
+
+    .cancel-btn {
+      background-color: #fff;
+      border-color: #ccc;
+      color: #333;
+    }
+
+    .cancel-btn:hover {
+      background-color: #f9f9f9;
+    }
+
+    .delete-confirm-btn {
+      background-color: #c41e3a;
+      border-color: #c41e3a;
+      color: #fff;
+    }
+
+    .delete-confirm-btn:hover {
+      background-color: #a01830;
+    }
+
+    .menu-wrapper {
+      position: relative;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <h1>Account</h1>
+
+  <div class="button-group">
+    <div class="menu-wrapper">
+      <button
+        id="account-actions-btn"
+        aria-haspopup="menu"
+        aria-expanded="false"
+        aria-controls="account-menu"
+      >
+        Account actions
+      </button>
+      <div
+        id="account-menu"
+        role="menu"
+        aria-hidden="true"
+        class="menu"
+      >
+        <button role="menuitem" class="menuitem">Export data</button>
+        <button role="menuitem" class="menuitem">Transfer ownership</button>
+        <button role="menuitem" class="menuitem">Sign out everywhere</button>
+      </div>
+    </div>
+
+    <button
+      id="delete-account-btn"
+      aria-haspopup="dialog"
+    >
+      Delete account…
+    </button>
+  </div>
+
+  <dialog id="delete-dialog">
+    <div class="dialog-title">Delete this account?</div>
+    <div class="dialog-body">
+      All guides, corrections, and subscriptions are removed within 24 hours. This cannot be undone.
+    </div>
+    <div class="dialog-buttons">
+      <button class="cancel-btn" id="cancel-btn">Cancel</button>
+      <button class="delete-confirm-btn" id="delete-confirm-btn">Delete account</button>
+    </div>
+  </dialog>
+
+  <script>
+    const accountActionsBtn = document.getElementById('account-actions-btn');
+    const accountMenu = document.getElementById('account-menu');
+    const menuItems = Array.from(accountMenu.querySelectorAll('[role="menuitem"]'));
+
+    const deleteAccountBtn = document.getElementById('delete-account-btn');
+    const deleteDialog = document.getElementById('delete-dialog');
+    const cancelBtn = document.getElementById('cancel-btn');
+    const deleteConfirmBtn = document.getElementById('delete-confirm-btn');
+
+    let currentMenuIndex = -1;
+    let menuTriggerElement = null;
+    let dialogTriggerElement = null;
+
+    // Menu functionality
+    function openMenu() {
+      accountMenu.setAttribute('aria-hidden', 'false');
+      accountActionsBtn.setAttribute('aria-expanded', 'true');
+      currentMenuIndex = 0;
+      menuItems[0].focus();
+      menuTriggerElement = accountActionsBtn;
+    }
+
+    function closeMenu() {
+      accountMenu.setAttribute('aria-hidden', 'true');
+      accountActionsBtn.setAttribute('aria-expanded', 'false');
+      currentMenuIndex = -1;
+      if (menuTriggerElement) {
+        menuTriggerElement.focus();
+      }
+    }
+
+    function focusNextMenuItem() {
+      currentMenuIndex = (currentMenuIndex + 1) % menuItems.length;
+      menuItems[currentMenuIndex].focus();
+    }
+
+    function focusPrevMenuItem() {
+      currentMenuIndex = (currentMenuIndex - 1 + menuItems.length) % menuItems.length;
+      menuItems[currentMenuIndex].focus();
+    }
+
+    accountActionsBtn.addEventListener('click', () => {
+      if (accountActionsBtn.getAttribute('aria-expanded') === 'true') {
+        closeMenu();
+      } else {
+        openMenu();
+      }
+    });
+
+    accountActionsBtn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (accountActionsBtn.getAttribute('aria-expanded') === 'true') {
+          closeMenu();
+        } else {
+          openMenu();
+        }
+      }
+    });
+
+    menuItems.forEach((item, index) => {
+      item.addEventListener('click', () => {
+        closeMenu();
+      });
+
+      item.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          closeMenu();
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          focusNextMenuItem();
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          focusPrevMenuItem();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          closeMenu();
+        }
+      });
+
+      item.addEventListener('focus', () => {
+        currentMenuIndex = index;
+      });
+    });
+
+    // Dialog functionality
+    deleteAccountBtn.addEventListener('click', () => {
+      dialogTriggerElement = deleteAccountBtn;
+      deleteDialog.showModal();
+      cancelBtn.focus();
+    });
+
+    deleteAccountBtn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        dialogTriggerElement = deleteAccountBtn;
+        deleteDialog.showModal();
+        cancelBtn.focus();
+      }
+    });
+
+    cancelBtn.addEventListener('click', () => {
+      deleteDialog.close();
+      if (dialogTriggerElement) {
+        dialogTriggerElement.focus();
+      }
+    });
+
+    deleteConfirmBtn.addEventListener('click', () => {
+      deleteDialog.close();
+      if (dialogTriggerElement) {
+        dialogTriggerElement.focus();
+      }
+    });
+
+    deleteDialog.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        deleteDialog.close();
+        if (dialogTriggerElement) {
+          dialogTriggerElement.focus();
+        }
+      }
+    });
+  </script>
+</body>
+</html>
