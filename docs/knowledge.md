@@ -833,6 +833,8 @@ S5 で Haiku が missing/extra を残して 3 ラウンドで自己宣言停止�
 | S11 interactive **Sonnet 継続レグ** | 5 | 139,720 | 71 | 986s | 0.70% | **挙動契約 satisfied**(stale index バグ特定・修正)。静的は 1 extra(視覚等価を検証者が確認)で予算内正直停止。隠れ状態コピーの carrier 欠落(作問ミス)も検証者ソース突合で発見 |
 | S12 heavy-interactive Haiku | 7 | 55,187 | 34 | 260s | 0.51% | 失敗(静的 3 残差、「フォントレンダリング」合理化 6 例目)。ただし**重量級パターン(modal dialog trap + menu focus/arrows/Escape 返還)を brief から一発実装、契約 satisfied** |
 | S12 heavy-interactive **Sonnet 継続レグ** | 2 | 119,079 | 49 | 1102s | **0.24%** | **DONE — 静的 + 挙動契約の両立を達成した初のシナリオ**。ピクセル実測駆動(border #fda4af/#9f1239 をサンプリングで特定)。letter-spacing -0.4px の連結成分適合は要ウォッチ(2 例目) |
+| S13 widgets Haiku | 8 | 62,632 | 25 | 278s | 21.65% | 失敗(listbox 全幅レンダリング=合理化 7 例目をペア画像で反証)。composites+handlers standalone は ok だが **accessible name 契約が aria-labelledby 欠落を検出**(standalone・自己レビュー素通り) |
+| S13 widgets **Sonnet 継続レグ** | 4 | 138,205 | 68 | 979s | **1.52%** | **DONE — 静的 + interaction 契約 + surface 契約の三重達成は初**。extractor の top-8 ランキング席取りを読んで ordering 誤検出を解消(要ウォッチ 3 例目: 分割適合)。surface 契約の委譲偽陽性 1 件は検証者が即修正 |
 | S10 realshot **Sonnet** | 2 | 58,103 | — | — | 36%(advisory) | **done(劣化キャプチャ宣言モード初実証)**。dpr2+JPEG 実スクショ 1 枚入力。diff 36% は写真領域のグラデ近似による設計値 — 構図・コピー・パレットは目視一致 |
 
 トークン計測は S5 が初(それ以前のランは usage を記録していなかった)。

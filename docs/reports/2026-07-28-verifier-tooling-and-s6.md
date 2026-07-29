@@ -582,3 +582,46 @@ grouping caveat と同様に扱う改善余地がある(backlog 候補)。
 
 KPI 台帳: S12 = 174,266 tokens / 9 fix rounds / **完全 DONE**
 (静的 + 挙動契約の両方を満たした初のシナリオ)。
+
+## 追記11: S13 — composites + handler サーフェス監査のシナリオ実証(2026-07-28)
+
+v3 拡張(activedescendant listbox / roving grid / live region)と
+experimental の handler サーフェス(`--handlers`)を初めてエージェント
+ループに組み込んだシナリオ。検証者は interaction 契約 + surface 契約の
+両方で最終判定。
+
+| | Haiku レグ | Sonnet 継続レグ |
+|---|---:|---:|
+| rounds / tokens | 8 / 62,632 | 4 / 138,205 |
+| interactions+handlers | standalone ok | **両契約 satisfied** |
+| verify markup | NOT DONE(21.65%) | **DONE(1.52%)** |
+
+### 検出実績(この 1 ランで 3 種)
+
+1. **accessible name 契約**: attempt の listbox の名前が「Choose a
+   guide」でなくコンテンツ連結 = `aria-labelledby` 欠落。standalone
+   でも自己レビューでも素通りし、名前ベース契約が missing+extra
+   として名指し。エスカレーションが 1 属性で修正。
+2. **合理化 7 例目の反証**: 「レンダリング差」と総括された 21.65% は
+   listbox の全幅・灰背景レンダリング(正: 320px・白・枠線角丸)。
+   ペア画像で即反証、エスカレーション round 1 で diff 2.27% に。
+3. **新ツールの偽陽性 1 件を実戦で発見・即修正**: surface 契約が
+   「W1〜W8 の keyboard 配線喪失」と 8 件誤警告(reference はセル
+   単位配線、attempt はコンテナ委譲 — セル側にエントリが無い)。
+   テキスト包含フォールバックで解消し「event vocabulary matches」。
+
+### エスカレーションの注目手筋と要ウォッチ 3 例目
+
+Sonnet round 3 は round 2 で出現した 2 件の ordering violation を、
+extractor のソースを読み **top-8 面積ランキングの席の取り合い**
+(見出し語断片の ink 量差で target と current の第 8 スロットの
+中身が食い違う)と診断し、h2 を 16px→15px にして解消した。brief の
+「~15px」と target 実測に一致する方向への修正で diff も改善(1.58%→
+1.52%)しており正当だが、**「extractor の分割・ランキングを CSS で
+合わせにいく」パターンの 3 例目**(letter-spacing 2 件に続く)。
+top-N 境界の敏感さはツール側の改善余地(面積タイブレークの安定化、
+境界近傍の残差を caveat 表示)として backlog 化する価値がある。
+
+KPI 台帳: S13 = 200,837 tokens / 12 rounds / **完全 DONE(静的 +
+interaction 契約 + surface 契約の三重達成は初)**。near-miss プローブが
+kickback で初発火し「move it instead」誘導も機能。

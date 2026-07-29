@@ -278,6 +278,10 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - (2) 抽出 top-N スロットから溢れた実在コンポーネントが、attempt 側で追加された直後に「extra — not in target」と一時誤報告される(次ラウンドで pixel-confirmed 降格)。案: extra 判定前に target 側の同 bbox を直接 pixel-presence して、降格を同ラウンドで行う。
   - 重要度: 強いモデルは自前計測で相殺できたが、Stage-2 LLM 自動修正はこのクラスの行を鵜呑みにするため、その前提条件。
 
+- [ ] **extractor top-N 境界の安定化(S13 で 3 例目の「分割適合」を誘発)**
+  - 症状: 面積ランキング第 N 席の中身が target と current で食い違うと、実害のない ink 量差(見出し語断片 area 374 vs 330 等)が missing/extra/ordering として出る。エージェントは font-size 等で extractor の分割を合わせにいく(letter-spacing 2 件 + S13 h2 の計 3 例 — いずれも視覚等価方向だったが、gate を騙す方向にも使える手筋)。
+  - 案: (1) top-N 境界 ±10% の面積帯にいる残差へ「ranking-boundary caveat」を行内表示、(2) ペアリング前に両側の component 集合を面積でなく位置グリッドで安定ソート、(3) 境界成分は pixel-presence で先に demote。
+
 - [ ] **LLM Stage-2 fix synthesis for the markup loop(kickback + セレクタ帰属 → CSS 修正案の自動適用)**(→ Issue #88)
   - 前提: verify markup の kickback は 2026-07-28 から決定論のセレクタ帰属(`[rendered by ...]` / `[target box falls in your ...]`)と kind タグを持つ — LLM に渡す文脈はもう揃っている。
   - 方法: fix-loop の実証済み 2 段構成を流用 — kickback(帰属付き)+ 該当セレクタの computed styles を LLM に渡し、CSS 編集案を JSON で受けて apply-and-rollback ゲート(qwen3-coder の過剰修正を吸収した実績のある形)で適用。verify markup の trend が REGRESSED なら自動ロールバック。

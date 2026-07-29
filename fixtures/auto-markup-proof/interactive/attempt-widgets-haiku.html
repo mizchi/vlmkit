@@ -23,13 +23,14 @@
     h1 {
       font-size: 32px;
       font-weight: 600;
-      margin: 0 0 32px 0;
+      margin: -8px 0 32px 0;
       padding: 0;
       line-height: 1;
+      color: #1c1917;
     }
 
     h2 {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 600;
       margin: 24px 0 12px 0;
       padding: 0;
@@ -39,11 +40,11 @@
 
     /* Listbox styles */
     [role="listbox"] {
-      border: 1px solid #bfbfbf;
-      border-radius: 4px;
-      padding: 8px 0;
-      min-width: 320px;
-      background: #d7d4d2;
+      border: 1px solid #d6d3d1;
+      border-radius: 8px;
+      padding: 0;
+      width: 320px;
+      background: #ffffff;
       outline: none;
       display: block;
       line-height: 1;
@@ -61,22 +62,23 @@
       background: transparent;
       border: none;
       display: block;
+      font-size: 14px;
       line-height: 1.4;
     }
 
     [role="option"][aria-selected="true"] {
-      background-color: #dde3fc;
-      color: #4f46e5;
+      background-color: #eef2ff;
+      color: #4338ca;
       font-weight: 600;
     }
 
     /* Grid styles */
     [role="grid"] {
-      border: 1px solid #bfbfbf;
-      border-radius: 4px;
-      padding: 12px;
-      background: white;
-      display: inline-block;
+      display: inline-grid;
+      grid-template-columns: repeat(4, 44px);
+      padding: 0;
+      border: none;
+      background: transparent;
       outline: none;
     }
 
@@ -86,20 +88,15 @@
     }
 
     [role="row"] {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    [role="row"]:last-child {
-      margin-bottom: 0;
+      display: contents;
     }
 
     [role="gridcell"] {
       width: 44px;
-      height: 32px;
-      border: 1px solid #bfbfbf;
-      border-radius: 4px;
+      height: 36px;
+      border-top: 1px solid #e7e5e4;
+      border-left: 1px solid #e7e5e4;
+      border-radius: 0;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -109,6 +106,15 @@
       background: white;
       color: #5d5854;
       outline: none;
+      margin: 0;
+    }
+
+    [role="gridcell"]:nth-child(4n) {
+      border-right: 1px solid #e7e5e4;
+    }
+
+    [role="row"]:last-child [role="gridcell"] {
+      border-bottom: 1px solid #e7e5e4;
     }
 
     [role="gridcell"]:focus {
@@ -118,7 +124,7 @@
 
     /* Button styles */
     button {
-      background-color: #4f46e5;
+      background-color: #4338ca;
       color: white;
       border: none;
       padding: 10px 16px;
@@ -147,7 +153,7 @@
     }
 
     .button-status-container {
-      margin-top: 24px;
+      margin-top: 28px;
     }
   </style>
 </head>
