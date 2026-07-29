@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Atlas — Shop</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; background: #fafaf9; color: #1c1917; padding: 40px 48px; }
+  h1 { font-size: 24px; margin-bottom: 24px; }
+  h2 { font-size: 15px; margin: 24px 0 10px; }
+  :focus-visible { outline: 3px solid #4338ca; outline-offset: 2px; }
+
+  #guide-listbox { width: 320px; border: 1px solid #d6d3d1; border-radius: 8px; background: #ffffff; list-style: none; padding: 4px; }
+  #guide-listbox [role="option"] { padding: 9px 12px; font-size: 14px; border-radius: 6px; }
+  #guide-listbox [role="option"][aria-selected="true"] { background: #eef2ff; color: #4338ca; font-weight: 600; }
+  #guide-listbox:focus-visible [role="option"].active { box-shadow: inset 0 0 0 2px #4338ca; }
+
+  #month-grid { border-collapse: collapse; }
+  #month-grid [role="gridcell"] { width: 44px; height: 36px; text-align: center; font-size: 13px; border: 1px solid #e7e5e4; background: #ffffff; }
+  #month-grid [role="gridcell"]:focus { background: #eef2ff; }
+
+  .cart-row { display: flex; align-items: center; gap: 14px; margin-top: 28px; }
+  .cart-row button { background: #4338ca; color: #ffffff; border: none; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  #cart-status { font-size: 13px; color: #57534e; }
+</style>
+</head>
+<body>
+  <h1>Shop</h1>
+
+  <h2 id="listbox-label">Choose a guide</h2>
+  <ul id="guide-listbox" role="listbox" aria-labelledby="listbox-label" tabindex="0"
+      aria-activedescendant="opt-1">
+    <li id="opt-1" role="option" aria-selected="true" class="active">High passes of the Atlas</li>
+    <li id="opt-2" role="option" aria-selected="false">Kii Peninsula by rail</li>
+    <li id="opt-3" role="option" aria-selected="false">Puglia's white towns</li>
+    <li id="opt-4" role="option" aria-selected="false">Faroe ridgelines</li>
+  </ul>
+
+  <h2>Pick a delivery week</h2>
+  <table id="month-grid" role="grid" aria-label="Delivery week">
+    <tbody>
+      <tr>
+        <td role="gridcell" tabindex="0">W1</td>
+        <td role="gridcell" tabindex="-1">W2</td>
+        <td role="gridcell" tabindex="-1">W3</td>
+        <td role="gridcell" tabindex="-1">W4</td>
+      </tr>
+      <tr>
+        <td role="gridcell" tabindex="-1">W5</td>
+        <td role="gridcell" tabindex="-1">W6</td>
+        <td role="gridcell" tabindex="-1">W7</td>
+        <td role="gridcell" tabindex="-1">W8</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="cart-row">
+    <button id="add-btn">Add to cart</button>
+    <p id="cart-status" role="status">Cart is empty.</p>
+  </div>
+
+<script>
+  // listbox: aria-activedescendant style (DOM focus stays on the list)
+  const listbox = document.getElementById("guide-listbox");
+  const options = [...listbox.querySelectorAll('[role="option"]')];
+  function setActive(i) {
+    for (const [j, o] of options.entries()) {
+      o.setAttribute("aria-selected", String(i === j));
+      o.classList.toggle("active", i === j);
+    }
+    listbox.setAttribute("aria-activedescendant", options[i].id);
+  }
+  listbox.addEventListener("keydown", (e) => {
+    const cur = options.findIndex((o) => o.getAttribute("aria-selected") === "true");
+    if (e.key === "ArrowDown") { e.preventDefault(); setActive(Math.min(cur + 1, options.length - 1)); }
+    if (e.key === "ArrowUp") { e.preventDefault(); setActive(Math.max(cur - 1, 0)); }
+  });
+
+  // grid: roving tabindex, 2D arrows
+  const cells = [...document.querySelectorAll('[role="gridcell"]')];
+  const COLS = 4;
+  function moveCell(from, to) {
+    if (to < 0 || to >= cells.length) return;
+    cells[from].tabIndex = -1;
+    cells[to].tabIndex = 0;
+    cells[to].focus();
+  }
+  for (const [i, cell] of cells.entries()) {
+    cell.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight") { e.preventDefault(); moveCell(i, i + 1); }
+      if (e.key === "ArrowLeft") { e.preventDefault(); moveCell(i, i - 1); }
+      if (e.key === "ArrowDown") { e.preventDefault(); moveCell(i, i + COLS); }
+      if (e.key === "ArrowUp") { e.preventDefault(); moveCell(i, i - COLS); }
+    });
+  }
+
+  // live region: the announce contract
+  document.getElementById("add-btn").addEventListener("click", () => {
+    const selected = options.find((o) => o.getAttribute("aria-selected") === "true");
+    document.getElementById("cart-status").textContent =
+      "Added “" + selected.textContent + "” to cart.";
+  });
+</script>
+</body>
+</html>

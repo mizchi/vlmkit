@@ -32,7 +32,8 @@ Static truth comes from pixels; behavior truth needs a carrier:
 | Responsive variants | one screenshot per viewport width |
 | Scrollport hidden content | an extra "scrolled to bottom" screenshot |
 | Animation | a **motion brief** (short text: what moves, duration, easing, iteration, reduced-motion policy) — or a frame strip |
-| Interactive states | hover/focus screenshots (see auto-markup §3.7) |
+| Interactive states (visual) | hover/focus screenshots (see auto-markup §3.7) |
+| Interactive state CHANGES (disclosure, tabs, switches, menus) | a reference page (`check interactions --reference` makes its event→ARIA-transition inventory the contract) — or an **interaction brief**: one line per control naming role, accessible name, event, and expected transition (see B5). **Brief authors: copy that is only visible in a state needs its own carrier** — a panel no screenshot shows and no brief line quotes has none, and the agent will invent plausible text for it that no gate can catch (S11: an always-hidden tab panel shipped with fabricated copy; only the verifier's source diff found it). Quote every state's visible copy in the brief, or provide one screenshot per state |
 | Exact copy (spellings, casing) | a **copy manifest** (plain text, one required line per row) — verified by `check copy --manifest`; without one, `check copy` only runs its placeholder scan. **Brief authors: mandatory whenever the page carries real copy** — measured cost of omitting it: an S9 run went 18 rounds across two models with a wrong © year, missing `·` separators, and proper-noun typos (`Imlil`→`Imili`) that composition pairs happily and no gate can see. Vision transcription of ~14px text WILL introduce these. **No manifest available** (real mock, competitor capture): the target pixels themselves are the carrier — run `check copy attempt.html --target target.png` once composition has converged; it crops every rendered text block's bbox out of the target into contact sheets. All three S9 bugs are visible in a single sheet read — **but the sheets must be read by someone other than whoever transcribed the copy** (the driver/verifier, or `--vlm`): the eyes that misread `Imlil` as `Imili` at transcription time misread the review crop the same way (S9-fresh measured exactly this — the agent reviewed its own sheets, reported PASS, and the typo survived). Self-review of your own transcription is weak evidence |
 
 Never invent behavior that has no carrier. No motion brief and no frame
@@ -132,6 +133,61 @@ Evaluates every authored animation by rendered frames:
 Declaration-level cross-check: the reduced-motion *rule* exists in the
 CSS (B3 tests behavior, B4 the stylesheet), and the running/paused
 inventory matches what you authored.
+
+### B5. `check interactions attempt.html [--reference reference.html]`
+
+The a11y-event axis: what state changes do keyboard events produce?
+The tool discovers interactive elements (roles + implicit semantics),
+Tab-walks for reachability and focus indicators, fires each role's
+canonical key (Enter for buttons/disclosures, Space for
+checkbox/switch, arrows for tab/radio roving, ArrowDown for combobox,
+Escape on opened popups), and records the response as ARIA transitions
+(`expanded false -> true`), aria-controls target visibility, and a
+layout delta — deterministic, no VLM.
+
+When an activation opens a **popup** (dialog / menu / listbox), the
+full APG pattern is probed in the same session: focus must move INTO
+the popup, a modal dialog must trap Tab (landing on browser chrome is
+fine — native `<dialog>` does that; landing on page content outside
+the popup is a leak), menu/listbox items must be ArrowDown-navigable,
+and Escape must close AND return focus to the trigger. Popup
+*interiors* are hidden at rest, so they are verified through these
+pattern probes, not itemized in the inventory.
+
+**Composites and announcements** are also first-class: a standalone
+`listbox` tracks `aria-activedescendant` (resolved to the referenced
+element's TEXT, so differing ids never false-mismatch) and the
+selected-descendant set as ARIA transitions; a roving `grid` is
+reachable through its cells and its arrow keys must move focus within
+the composite (`focus moves within`); an action that updates a live
+region (`aria-live` / `role=status|alert` / `output`) reports
+`announces`, and losing that announcement against a reference is a
+contract suspect. Listbox `option` children are captured through the
+container's selection facts, not itemized.
+
+- Run when the page has ANY interactive element beyond plain links.
+  Suspects to fix: **dead-disclosure** (aria-expanded that never
+  changes — the attribute is a promise, wire it or drop it),
+  **broken-aria-controls** (id points at nothing),
+  **focus-escapes-trap** (a modal that doesn't trap is not modal).
+  Warns to fix or explain: **no-focus-indicator** (an explicit
+  `outline: none` with no replacement — the UA default counts as an
+  indicator, so this only fires when you killed it),
+  **not-tab-reachable** (roving-tabindex composite members are
+  correctly exempt), **inert-control**, **escape-stuck**,
+  **popup-no-focus-move**, **focus-not-returned**,
+  **popup-arrows-dead**.
+- With `--reference`, the reference's inventory is the behavioral
+  contract: same elements (matched by role + accessible name), same
+  reachability, same focus indicators, same ARIA transition per event.
+  Any divergence is named. This is the recreation gate — a page can
+  match every screenshot with `<div>`s and dead attributes; this gate
+  is what fails it.
+- Mock mode (no reference): the carrier is an **interaction brief**
+  (per control: role, name, event, expected transition — e.g.
+  "Shipping options: button, Enter toggles aria-expanded + panel").
+  Verify the standalone inventory line-by-line against the brief the
+  same way the motion brief is verified against B3.
 
 ## Phase C — capture discipline
 

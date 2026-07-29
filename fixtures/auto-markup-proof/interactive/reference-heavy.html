@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Atlas — Account</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; background: #fafaf9; color: #1c1917; padding: 40px 48px; }
+  h1 { font-size: 24px; margin-bottom: 28px; }
+  :focus-visible { outline: 3px solid #4338ca; outline-offset: 2px; }
+
+  .toolbar { display: flex; gap: 12px; align-items: center; position: relative; }
+  .toolbar > button { background: #ffffff; border: 1px solid #d6d3d1; border-radius: 8px; padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .toolbar > button.danger { color: #9f1239; border-color: #fda4af; }
+
+  #actions-menu { position: absolute; top: 46px; left: 0; min-width: 200px; background: #ffffff; border: 1px solid #d6d3d1; border-radius: 8px; box-shadow: 0 8px 24px rgba(28,25,23,0.12); padding: 6px; list-style: none; }
+  #actions-menu[hidden] { display: none; }
+  #actions-menu [role="menuitem"] { display: block; width: 100%; text-align: left; background: none; border: none; padding: 9px 12px; font-size: 14px; border-radius: 6px; cursor: pointer; }
+  #actions-menu [role="menuitem"]:hover { background: #f5f5f4; }
+
+  #confirm-dialog { border: none; border-radius: 12px; padding: 24px; width: 420px; box-shadow: 0 24px 64px rgba(28,25,23,0.3); }
+  #confirm-dialog::backdrop { background: rgba(28,25,23,0.4); }
+  #confirm-dialog h2 { font-size: 18px; margin-bottom: 10px; }
+  #confirm-dialog p { font-size: 14px; color: #57534e; margin-bottom: 20px; }
+  .dialog-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .dialog-actions button { border-radius: 8px; padding: 9px 16px; font-size: 14px; cursor: pointer; border: 1px solid #d6d3d1; background: #ffffff; }
+  .dialog-actions .confirm { background: #9f1239; border-color: #9f1239; color: #ffffff; }
+</style>
+</head>
+<body>
+  <h1>Account</h1>
+
+  <div class="toolbar">
+    <button id="menu-trigger" aria-haspopup="menu" aria-expanded="false" aria-controls="actions-menu">Account actions</button>
+    <button id="delete-trigger" class="danger" aria-haspopup="dialog">Delete account…</button>
+
+    <ul id="actions-menu" role="menu" aria-labelledby="menu-trigger" hidden>
+      <li><button role="menuitem" tabindex="-1">Export data</button></li>
+      <li><button role="menuitem" tabindex="-1">Transfer ownership</button></li>
+      <li><button role="menuitem" tabindex="-1">Sign out everywhere</button></li>
+    </ul>
+  </div>
+
+  <dialog id="confirm-dialog" aria-labelledby="confirm-title">
+    <h2 id="confirm-title">Delete this account?</h2>
+    <p>All guides, corrections, and subscriptions are removed within 24 hours. This cannot be undone.</p>
+    <div class="dialog-actions">
+      <button id="cancel-btn" autofocus>Cancel</button>
+      <button class="confirm" id="confirm-btn">Delete account</button>
+    </div>
+  </dialog>
+
+<script>
+  // --- menu button pattern
+  const menuTrigger = document.getElementById("menu-trigger");
+  const menu = document.getElementById("actions-menu");
+  const items = [...menu.querySelectorAll('[role="menuitem"]')];
+  function openMenu() {
+    menuTrigger.setAttribute("aria-expanded", "true");
+    menu.hidden = false;
+    items[0].focus();
+  }
+  function closeMenu(returnFocus) {
+    menuTrigger.setAttribute("aria-expanded", "false");
+    menu.hidden = true;
+    if (returnFocus) menuTrigger.focus();
+  }
+  menuTrigger.addEventListener("click", () => {
+    menuTrigger.getAttribute("aria-expanded") === "true" ? closeMenu(true) : openMenu();
+  });
+  menu.addEventListener("keydown", (e) => {
+    const i = items.indexOf(document.activeElement);
+    if (e.key === "ArrowDown") { e.preventDefault(); items[(i + 1) % items.length].focus(); }
+    if (e.key === "ArrowUp") { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+    if (e.key === "Escape") { e.preventDefault(); closeMenu(true); }
+  });
+  for (const item of items) item.addEventListener("click", () => closeMenu(true));
+
+  // --- modal dialog pattern (native <dialog> Escape close + manual focus return)
+  const deleteTrigger = document.getElementById("delete-trigger");
+  const dialog = document.getElementById("confirm-dialog");
+  deleteTrigger.addEventListener("click", () => dialog.showModal());
+  dialog.addEventListener("close", () => deleteTrigger.focus());
+  document.getElementById("cancel-btn").addEventListener("click", () => dialog.close());
+  document.getElementById("confirm-btn").addEventListener("click", () => dialog.close());
+</script>
+</body>
+</html>
