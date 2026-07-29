@@ -132,3 +132,15 @@ test("surface contract: lost global category warns; identical surfaces are clean
   assert.match(m[0]!.message, /global keyboard/);
   assert.deepEqual(compareHandlerSurfaces(ref, { ...att, globals: { "window:keyup": 1 } }), []);
 });
+
+test("surface contract: container delegation across structure covers per-cell reference wiring", async () => {
+  const { compareHandlerSurfaces } = await import("./handler-map.ts");
+  const ref: HandlerSurface = surface(
+    entry({ text: "W1", types: { keydown: 1 } }),
+    entry({ text: "W2", types: { keydown: 1 } }),
+  );
+  const att: HandlerSurface = surface(
+    entry({ text: "W1 W2 W3 W4", types: { keydown: 1 } }), // one container handler
+  );
+  assert.deepEqual(compareHandlerSurfaces(ref, att), []);
+});

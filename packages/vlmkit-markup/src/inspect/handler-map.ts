@@ -290,8 +290,23 @@ export function compareHandlerSurfaces(reference: HandlerSurface, attempt: Handl
   const refVocab = vocab(reference);
   const attVocab = vocab(attempt);
   const mismatches: SurfaceMismatch[] = [];
+  // Delegation across STRUCTURE: the reference may wire each cell, the
+  // attempt one container handler. The cell then has no surface entry
+  // at all — cover it through any attempt entry whose text CONTAINS
+  // the identity (the container's text includes its children's).
+  const coveredBy = (identity: string): Set<HandlerCategory> => {
+    const direct = attVocab.get(identity);
+    if (direct) return direct;
+    const merged = new Set<HandlerCategory>();
+    for (const e of attempt.elements) {
+      if (e.visible && e.text.includes(identity)) {
+        for (const t of [...Object.keys(e.types), ...e.ancestorTypes]) merged.add(categorizeHandlerType(t));
+      }
+    }
+    return merged;
+  };
   for (const [identity, refCats] of refVocab) {
-    const attCats = attVocab.get(identity) ?? new Set<HandlerCategory>();
+    const attCats = coveredBy(identity);
     const lost = [...refCats].filter((c) => !attCats.has(c));
     if (lost.length > 0) {
       mismatches.push({

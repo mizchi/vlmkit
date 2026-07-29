@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shop</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background-color: #f5f5f5;
+      padding: 48px;
+      color: #333;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    h1 {
+      font-size: 32px;
+      font-weight: 600;
+      margin: 0 0 32px 0;
+      padding: 0;
+      line-height: 1;
+    }
+
+    h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 24px 0 12px 0;
+      padding: 0;
+      line-height: 1;
+      color: #333;
+    }
+
+    /* Listbox styles */
+    [role="listbox"] {
+      border: 1px solid #bfbfbf;
+      border-radius: 4px;
+      padding: 8px 0;
+      min-width: 320px;
+      background: #d7d4d2;
+      outline: none;
+      display: block;
+      line-height: 1;
+    }
+
+    [role="listbox"]:focus {
+      outline: 2px solid #4f46e5;
+      outline-offset: 2px;
+    }
+
+    [role="option"] {
+      padding: 8px 16px;
+      cursor: pointer;
+      color: #333;
+      background: transparent;
+      border: none;
+      display: block;
+      line-height: 1.4;
+    }
+
+    [role="option"][aria-selected="true"] {
+      background-color: #dde3fc;
+      color: #4f46e5;
+      font-weight: 600;
+    }
+
+    /* Grid styles */
+    [role="grid"] {
+      border: 1px solid #bfbfbf;
+      border-radius: 4px;
+      padding: 12px;
+      background: white;
+      display: inline-block;
+      outline: none;
+    }
+
+    [role="grid"]:focus {
+      outline: 2px solid #4f46e5;
+      outline-offset: 2px;
+    }
+
+    [role="row"] {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    [role="row"]:last-child {
+      margin-bottom: 0;
+    }
+
+    [role="gridcell"] {
+      width: 44px;
+      height: 32px;
+      border: 1px solid #bfbfbf;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 500;
+      font-size: 14px;
+      cursor: pointer;
+      background: white;
+      color: #5d5854;
+      outline: none;
+    }
+
+    [role="gridcell"]:focus {
+      outline: 2px solid #4f46e5;
+      outline-offset: -2px;
+    }
+
+    /* Button styles */
+    button {
+      background-color: #4f46e5;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      outline: none;
+    }
+
+    button:focus {
+      outline: 2px solid #4f46e5;
+      outline-offset: 2px;
+    }
+
+    button:hover {
+      background-color: #4338ca;
+    }
+
+    /* Status line styles */
+    [role="status"] {
+      display: inline-block;
+      margin-left: 16px;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .button-status-container {
+      margin-top: 24px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Shop</h1>
+
+  <h2>Choose a guide</h2>
+  <div role="listbox" id="guideListbox" tabindex="0" aria-activedescendant="option-0">
+    <div role="option" id="option-0" aria-selected="true">High passes of the Atlas</div>
+    <div role="option" id="option-1" aria-selected="false">Kii Peninsula by rail</div>
+    <div role="option" id="option-2" aria-selected="false">Puglia's white towns</div>
+    <div role="option" id="option-3" aria-selected="false">Faroe ridgelines</div>
+  </div>
+
+  <h2>Pick a delivery week</h2>
+  <div role="grid" id="deliveryGrid" aria-label="Delivery week">
+    <div role="row">
+      <div role="gridcell" tabindex="0" data-cell="0">W1</div>
+      <div role="gridcell" tabindex="-1" data-cell="1">W2</div>
+      <div role="gridcell" tabindex="-1" data-cell="2">W3</div>
+      <div role="gridcell" tabindex="-1" data-cell="3">W4</div>
+    </div>
+    <div role="row">
+      <div role="gridcell" tabindex="-1" data-cell="4">W5</div>
+      <div role="gridcell" tabindex="-1" data-cell="5">W6</div>
+      <div role="gridcell" tabindex="-1" data-cell="6">W7</div>
+      <div role="gridcell" tabindex="-1" data-cell="7">W8</div>
+    </div>
+  </div>
+
+  <div class="button-status-container">
+    <button id="addToCartBtn">Add to cart</button>
+    <span role="status" id="cartStatus">Cart is empty.</span>
+  </div>
+
+  <script>
+    // Listbox handling
+    const listbox = document.getElementById('guideListbox');
+    const options = Array.from(listbox.querySelectorAll('[role="option"]'));
+    let currentIndex = 0;
+
+    listbox.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        currentIndex = Math.min(currentIndex + 1, options.length - 1);
+        updateListbox();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        currentIndex = Math.max(currentIndex - 1, 0);
+        updateListbox();
+      }
+    });
+
+    function updateListbox() {
+      options.forEach((opt, idx) => {
+        opt.setAttribute('aria-selected', idx === currentIndex ? 'true' : 'false');
+      });
+      listbox.setAttribute('aria-activedescendant', `option-${currentIndex}`);
+    }
+
+    // Grid handling (roving tabindex)
+    const grid = document.getElementById('deliveryGrid');
+    const gridcells = Array.from(grid.querySelectorAll('[role="gridcell"]'));
+    let currentCell = 0;
+
+    grid.addEventListener('keydown', (e) => {
+      let newCell = currentCell;
+
+      if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        if (currentCell % 4 < 3) {
+          newCell = currentCell + 1;
+        }
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (currentCell % 4 > 0) {
+          newCell = currentCell - 1;
+        }
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (currentCell < 4) {
+          newCell = currentCell + 4;
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (currentCell >= 4) {
+          newCell = currentCell - 4;
+        }
+      }
+
+      if (newCell !== currentCell) {
+        gridcells[currentCell].setAttribute('tabindex', '-1');
+        gridcells[newCell].setAttribute('tabindex', '0');
+        gridcells[newCell].focus();
+        currentCell = newCell;
+      }
+    });
+
+    // Button handling
+    const addToCartBtn = document.getElementById('addToCartBtn');
+    const cartStatus = document.getElementById('cartStatus');
+
+    addToCartBtn.addEventListener('click', () => {
+      const selectedOption = options[currentIndex].textContent;
+      cartStatus.textContent = `Added "${selectedOption}" to cart.`;
+    });
+
+    addToCartBtn.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addToCartBtn.click();
+      }
+    });
+  </script>
+</body>
+</html>
