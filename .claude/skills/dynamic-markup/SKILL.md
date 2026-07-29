@@ -186,7 +186,9 @@ container's selection facts, not itemized.
   **focus-escapes-trap** (a modal that doesn't trap is not modal).
   Warns to fix or explain: **no-focus-indicator** (an explicit
   `outline: none` with no replacement — the UA default counts as an
-  indicator, so this only fires when you killed it),
+  indicator, and a ring drawn on a DESCENDANT counts too (the APG
+  `span.focus` pattern: outline:none on the control, ring on an inner
+  span), so this only fires when you killed it everywhere),
   **not-tab-reachable** (roving-tabindex composite members are
   correctly exempt), **inert-control**, **escape-stuck**,
   **popup-no-focus-move**, **focus-not-returned**,

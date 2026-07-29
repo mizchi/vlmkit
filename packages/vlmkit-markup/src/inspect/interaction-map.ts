@@ -160,6 +160,17 @@ export const DISCOVER_SCRIPT = `
     ["range", "slider"], ["text", "textbox"], ["email", "textbox"], ["search", "searchbox"],
   ]);
   const EXPLICIT = new Set(["button", "tab", "checkbox", "switch", "radio", "menuitem", "combobox", "link", "option", "slider", "textbox", "searchbox", "listbox", "grid"]);
+  const focusStyleFingerprint = (root) => {
+    // The focus indicator is often drawn on a DESCENDANT (APG wraps tab
+    // text in <span class="focus"> and sets outline:none on the button).
+    // Fingerprint the element plus its descendants' focus-relevant
+    // styles so a child-borne ring is not read as 'no indicator'.
+    const nodes = [root, ...root.querySelectorAll("*")].slice(0, 12);
+    return nodes.map((n) => {
+      const s = getComputedStyle(n);
+      return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderWidth, s.backgroundColor].join(",");
+    }).join("|");
+  };
   const out = [];
   const seen = new Set();
   const els = document.querySelectorAll("*");
@@ -204,7 +215,7 @@ export const DISCOVER_SCRIPT = `
       path: parts.join(">"),
       hasAriaExpanded: el.hasAttribute("aria-expanded"),
       hasPopup: el.hasAttribute("aria-haspopup"),
-      blurredStyle: [style.outlineStyle, style.outlineWidth, style.boxShadow, style.borderColor, style.backgroundColor].join("|"),
+      blurredStyle: focusStyleFingerprint(el),
     });
   }
   return out;
@@ -216,14 +227,19 @@ const FOCUS_SAMPLE_SCRIPT = `
 (() => {
   const el = document.activeElement;
   if (!el || el === document.body || el === document.documentElement) return null;
-  const style = getComputedStyle(el);
   const direct = el.hasAttribute("data-vlmkit-ix");
   const owner = direct ? el : el.closest("[data-vlmkit-ix]");
+  const fpTarget = owner || el;
+  const nodes = [fpTarget, ...fpTarget.querySelectorAll("*")].slice(0, 12);
+  const focusedStyle = nodes.map((n) => {
+    const s = getComputedStyle(n);
+    return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderWidth, s.backgroundColor].join(",");
+  }).join("|");
   return {
     ix: owner ? Number(owner.getAttribute("data-vlmkit-ix")) : null,
     direct,
     fingerprint: el.tagName + "#" + (el.id || "") + ":" + (el.textContent || "").trim().slice(0, 24),
-    focusedStyle: [style.outlineStyle, style.outlineWidth, style.boxShadow, style.borderColor, style.backgroundColor].join("|"),
+    focusedStyle,
   };
 })()
 `;

@@ -366,3 +366,24 @@ test("E2E: widget mutations detected — silent announce, dead listbox arrows, d
   assert.ok(deriveInteractionIssues(mapC).some((i) => i.kind === "composite-arrows-dead"), "C standalone");
   assert.ok(compareInteractionMaps(refMap, mapC).mismatches.some((m) => m.severity === "suspect" && m.message.includes("composite")), "C contract");
 });
+
+test("E2E: a focus indicator drawn on a DESCENDANT (APG span.focus pattern) is not a false 'no-indicator'", { timeout: 120_000 }, async () => {
+  // Regression for the W3C APG external-dogfood false positive: the APG
+  // tabs example sets outline:none on the button and draws the ring on
+  // an inner <span class="focus"> via :focus. The element's own style is
+  // unchanged; the indicator lives on a child.
+  const dir = mkdtempSync(join(tmpdir(), "focusring-"));
+  const file = join(dir, "page.html");
+  writeFileSync(file, `<!doctype html><html><head><title>t</title><style>
+    button { outline: none; border: 1px solid #ccc; }
+    button .ring { outline: 2px solid transparent; }
+    button:focus .ring { outline-color: #4338ca; }
+  </style></head><body>
+    <button id="b"><span class="ring">Tab one</span></button>
+  </body></html>`);
+  const map = await buildInteractionMap({ source: file });
+  const btn = map.elements.find((e) => e.key.startsWith("button|"))!;
+  assert.equal(btn.tabReachable, true);
+  assert.equal(btn.focusIndicator, true); // descendant ring counts
+  assert.ok(!deriveInteractionIssues(map).some((i) => i.kind === "no-focus-indicator"));
+});

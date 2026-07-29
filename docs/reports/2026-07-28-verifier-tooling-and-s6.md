@@ -625,3 +625,38 @@ top-N 境界の敏感さはツール側の改善余地(面積タイブレーク�
 KPI 台帳: S13 = 200,837 tokens / 12 rounds / **完全 DONE(静的 +
 interaction 契約 + surface 契約の三重達成は初)**。near-miss プローブが
 kickback で初発火し「move it instead」誘導も機能。
+
+## 追記12: 外部 dogfood — W3C APG 公式実装で check interactions を検証(2026-07-29)
+
+自作 fixture への閉じこもり(自己評価の最大の妥当性リスク)を潰すため、
+**他人が書いた W3C ARIA Authoring Practices Guide の公式パターン実装**を
+proxy 経由 curl でミラーし、`check interactions --handlers` を通した。
+偽陽性が出ればこちらのバグ、クリーン通過なら外部妥当性の証拠。
+
+### 成果1: 本物の偽陽性を 1 件炙り出して修正
+APG tabs 実装は `[role="tab"]:focus { outline: none }` をボタンに掛け、
+**焦点リングを内側の `<span class="focus">`**(子孫)に描く。プローブは
+焦点要素**自身**の computed style しか見ておらず「no-focus-indicator」を
+誤検出。フォーカス指標フィンガープリントを**要素+子孫(最大12)**の
+subtree に拡張して解消。自作 fixture では全要素が自身にリングを持って
+いたため露見しなかった穴 — 外部実装でしか出ない典型。リグレッション
+テスト(子孫リング fixture)追加。
+
+### 成果2: 外部実装 2 件がクリーン通過(外部妥当性)
+- **APG tabs(tabs-automatic)**: 修正後 status ok。roving + selection
+  follows focus を正しく採取。
+- **APG menu-button(menu-button-actions)**: status ok、`opens menu
+  (focus enters), arrows cycle | Esc closes+returns focus` を公式実装
+  相手に完全一致で採取 — 重量級パターンプローブが自作でない実装でも
+  機能することの初の証拠。
+
+### 正直な限界
+listbox / dialog 例は、雑なフルページ inline が APG の app.js /
+examples.js を落として widget 初期化(FontFaceObserver 等)を壊し、
+妥当な外部テストにならなかった(ツールの所見ではなくミラー不良)。
+自己完結した widget JS を持つ tabs・menu-button のみ有効。実 React
+アプリ等での handler 軸粒度低下は既知(委譲）で未検証のまま。
+
+**評価更新**: 「補助データが有意義か」に対する外部証拠が 2 パターン
+分入った(従来は帰属の統制 A/B のみ)。妥当性リスクは縮小したが、
+非自作・非同一レンダラでの網羅検証は依然として最大の残課題。
