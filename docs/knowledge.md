@@ -831,6 +831,8 @@ S5 で Haiku が missing/extra を残して 3 ラウンドで自己宣言停止�
 | S9-replay **Sonnet**(帰属あり、同一開始状態) | **3** | 181,294 | 80 | 1616s | 6.77% | **DONE — 帰属なしの元エスカレーション(6r/199,876/未達)と同一開始状態・同ヒント・同予算のリプレイで rounds -50%、未達→達成に反転**。© 年号も crop 直読で自発修正。帰属は「診断能力のあるモデルを加速する」(Haiku には効かない — S9-fresh の null result と対称) |
 | S11 interactive Haiku | 8 | 57,820 | 31 | 263s | 1.03% | 失敗(静的 3 残差)。**interactions standalone は ok だが、検証者の --reference 契約が ArrowRight roving 誤実装を検出** — standalone と自己レビューの両方をすり抜けた。合理化 5 例目もペア画像で反証 |
 | S11 interactive **Sonnet 継続レグ** | 5 | 139,720 | 71 | 986s | 0.70% | **挙動契約 satisfied**(stale index バグ特定・修正)。静的は 1 extra(視覚等価を検証者が確認)で予算内正直停止。隠れ状態コピーの carrier 欠落(作問ミス)も検証者ソース突合で発見 |
+| S12 heavy-interactive Haiku | 7 | 55,187 | 34 | 260s | 0.51% | 失敗(静的 3 残差、「フォントレンダリング」合理化 6 例目)。ただし**重量級パターン(modal dialog trap + menu focus/arrows/Escape 返還)を brief から一発実装、契約 satisfied** |
+| S12 heavy-interactive **Sonnet 継続レグ** | 2 | 119,079 | 49 | 1102s | **0.24%** | **DONE — 静的 + 挙動契約の両立を達成した初のシナリオ**。ピクセル実測駆動(border #fda4af/#9f1239 をサンプリングで特定)。letter-spacing -0.4px の連結成分適合は要ウォッチ(2 例目) |
 | S10 realshot **Sonnet** | 2 | 58,103 | — | — | 36%(advisory) | **done(劣化キャプチャ宣言モード初実証)**。dpr2+JPEG 実スクショ 1 枚入力。diff 36% は写真領域のグラデ近似による設計値 — 構図・コピー・パレットは目視一致 |
 
 トークン計測は S5 が初(それ以前のランは usage を記録していなかった)。

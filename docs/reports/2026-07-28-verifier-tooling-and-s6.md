@@ -538,3 +538,47 @@ attempt は「押したタブ自身が selected false→true + フォーカス�
 
 KPI 台帳: S11 = 197,540 tokens / 13 rounds / 挙動契約 **satisfied**・
 静的 0.70% NOT DONE(視覚等価は判定済み)。
+
+## 追記10: S12 — 重量級パターン(modal dialog + menu button)のシナリオ実証(2026-07-28)
+
+B5 拡張(popup パターンプローブ: focus-into-popup / モーダルトラップ /
+矢印巡回 / Escape 返還)の実戦。入力は 3 状態スクショ + 全状態コピーを
+引用した brief(S11 の carrier 教訓を反映 — 今回はコピー逸脱ゼロ)。
+
+| | Haiku レグ | Sonnet 継続レグ |
+|---|---:|---:|
+| rounds / tokens | 7 / 55,187 | 2 fix / 119,079* |
+| interactions | **契約 satisfied**(重量級 2 パターン完全) | 維持 |
+| verify markup | NOT DONE(3 残差、0.51%) | **DONE(0.24%)** |
+
+*529 Overloaded で一度中断 → SendMessage 再開(コンテキスト維持)。
+中断込みの合算。
+
+### 結果1: 重量級パターンは Haiku が brief から一発実装できる
+
+`opens menu (focus enters), arrows cycle | Esc closes+returns focus` と
+`opens dialog (focus enters), traps | Esc closes+returns focus` を
+Haiku が 1 ビルドで達成し、`--reference` 契約も satisfied。native
+`<dialog>.showModal()` の存在が実装難度を下げている(トラップと
+backdrop が無料)。S11 の roving 誤実装のような綻びは出なかった。
+
+### 結果2: 静的合理化 6 例目 — 「フォントレンダリング」
+
+Haiku は 3 残差を「subpixel antialiasing の検出揺れ、受け入れ推奨」と
+総括したが、missing #3 は **148x38 のボタンサイズの pink border box**
+(danger ボタンの border/text 色違い)で、ペア画像でも h1 の
+font-size 過大・ボタン角丸/padding 不足を確認。エスカレーションが
+ピクセル実測で全部 CSS 修正した(body padding 2rem→2.5rem 3rem、
+h1 1.875rem→1.5rem、radius 0.5rem、#fda4af/#9f1239)。
+
+### ウォッチ: letter-spacing による連結成分適合(2 例目)
+
+エスカレーション round 2 は `letter-spacing: -0.4px` で語の
+グリフ断片を target と同じ連結成分形状に併合した。diff も改善
+(0.51%→0.24%)し視覚等価だが、S7-fresh の letter-spacing 0.2px に
+続く「extractor の分割粒度を CSS で合わせにいく」パターンの 2 例目。
+テキスト・セグメンテーションの粒度不一致を matched ペアの
+grouping caveat と同様に扱う改善余地がある(backlog 候補)。
+
+KPI 台帳: S12 = 174,266 tokens / 9 fix rounds / **完全 DONE**
+(静的 + 挙動契約の両方を満たした初のシナリオ)。
