@@ -55,6 +55,16 @@ export interface AriaSnapshot {
   /** `open` attribute of the owning <details> / <dialog>, if any. */
   open: boolean | null;
   controls: { id: string; exists: boolean; visible: boolean } | null;
+  /**
+   * Text of the element aria-activedescendant points at (id-agnostic:
+   * ids differ between implementations, the referenced TEXT is the
+   * comparable fact). null when the attribute is absent.
+   */
+  activeDescText: string | null;
+  /** Text of aria-selected="true" descendants (composite selection). */
+  selectedWithin: string | null;
+  /** Concatenated text of live regions (aria-live/status/alert/output). */
+  liveText: string;
   /** Coarse page-state fingerprint: visible elements : scrollHeight : text length. */
   layoutSignature: string;
 }
@@ -82,6 +92,10 @@ export interface ActivationResult {
   popupRole?: string;
   /** menu/listbox with focus inside: ArrowDown moves focus within it. */
   popupArrowCycles?: boolean;
+  /** The activation changed a live region's text (announce contract). */
+  liveRegionChanged?: boolean;
+  /** Focus moved to a different node INSIDE the same composite (grid cells). */
+  focusMovedWithin?: boolean;
 }
 
 export interface InteractionElement {
@@ -116,7 +130,8 @@ export type InteractionIssueKind =
   | "popup-no-focus-move"
   | "focus-escapes-trap"
   | "focus-not-returned"
-  | "popup-arrows-dead";
+  | "popup-arrows-dead"
+  | "composite-arrows-dead";
 
 export interface InteractionIssue {
   kind: InteractionIssueKind;
@@ -144,7 +159,7 @@ const DISCOVER_SCRIPT = `
     ["checkbox", "checkbox"], ["radio", "radio"], ["button", "button"], ["submit", "button"],
     ["range", "slider"], ["text", "textbox"], ["email", "textbox"], ["search", "searchbox"],
   ]);
-  const EXPLICIT = new Set(["button", "tab", "checkbox", "switch", "radio", "menuitem", "combobox", "link", "option", "slider", "textbox", "searchbox"]);
+  const EXPLICIT = new Set(["button", "tab", "checkbox", "switch", "radio", "menuitem", "combobox", "link", "option", "slider", "textbox", "searchbox", "listbox", "grid"]);
   const out = [];
   const seen = new Set();
   const els = document.querySelectorAll("*");
@@ -162,6 +177,7 @@ const DISCOVER_SCRIPT = `
     if (style.display === "none" || style.visibility === "hidden") continue;
     const rect = el.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) continue; // popup interiors etc. — probed via the popup pattern
+    if (role === "option" && el.closest('[role="listbox"], [role="combobox"]')) continue; // captured via the container's selection facts
     if (seen.has(el)) continue;
     seen.add(el);
     const ix = out.length;
@@ -201,8 +217,12 @@ const FOCUS_SAMPLE_SCRIPT = `
   const el = document.activeElement;
   if (!el || el === document.body || el === document.documentElement) return null;
   const style = getComputedStyle(el);
+  const direct = el.hasAttribute("data-vlmkit-ix");
+  const owner = direct ? el : el.closest("[data-vlmkit-ix]");
   return {
-    ix: el.hasAttribute("data-vlmkit-ix") ? Number(el.getAttribute("data-vlmkit-ix")) : null,
+    ix: owner ? Number(owner.getAttribute("data-vlmkit-ix")) : null,
+    direct,
+    fingerprint: el.tagName + "#" + (el.id || "") + ":" + (el.textContent || "").trim().slice(0, 24),
     focusedStyle: [style.outlineStyle, style.outlineWidth, style.boxShadow, style.borderColor, style.backgroundColor].join("|"),
   };
 })()
@@ -226,6 +246,15 @@ function ariaSnapshotScript(index: number): string {
     controls = { id: controlsId, exists: !!target, visible };
   }
   const owner = el.closest("details, dialog");
+  const adId = el.getAttribute("aria-activedescendant");
+  const adEl = adId ? document.getElementById(adId) : null;
+  const activeDescText = adEl ? (adEl.textContent || "").replace(/\\s+/g, " ").trim().slice(0, 32) : null;
+  const selectedWithin = [...el.querySelectorAll('[aria-selected="true"]')]
+    .map((o) => (o.textContent || "").replace(/\\s+/g, " ").trim().slice(0, 24))
+    .join(",") || null;
+  const liveText = [...document.querySelectorAll('[aria-live], [role="status"], [role="alert"], output')]
+    .map((e) => (e.textContent || "").replace(/\\s+/g, " ").trim())
+    .join("|").slice(0, 400);
   let visibleCount = 0;
   for (const e of document.querySelectorAll("body *")) {
     const r = e.getBoundingClientRect();
@@ -238,6 +267,9 @@ function ariaSnapshotScript(index: number): string {
     pressed: el.getAttribute("aria-pressed"),
     open: owner ? owner.hasAttribute("open") : null,
     controls,
+    activeDescText,
+    selectedWithin,
+    liveText,
     layoutSignature: visibleCount + ":" + document.documentElement.scrollHeight + ":" + (document.body.innerText || "").length,
   };
 })()
@@ -345,7 +377,10 @@ export function activationKeyForRole(role: string): string | null {
     case "radio":
       return "ArrowDown";
     case "combobox":
+    case "listbox":
       return "ArrowDown";
+    case "grid":
+      return "ArrowRight";
     default:
       return null; // link (navigation), textbox/searchbox (typing), option, slider
   }
@@ -358,6 +393,12 @@ export function ariaDelta(before: AriaSnapshot, after: AriaSnapshot): Record<str
   }
   if (before.open !== after.open) {
     delta["open"] = [String(before.open), String(after.open)];
+  }
+  if (before.activeDescText !== after.activeDescText) {
+    delta["activedescendant"] = [before.activeDescText, after.activeDescText];
+  }
+  if (before.selectedWithin !== after.selectedWithin) {
+    delta["selection"] = [before.selectedWithin, after.selectedWithin];
   }
   return delta;
 }
@@ -432,6 +473,16 @@ export function deriveInteractionIssues(map: InteractionMapResult): InteractionI
         severity: "suspect",
         element: label,
         message: `${label} opens a modal dialog whose Tab focus ESCAPES the dialog — a modal must trap focus while open.`,
+      });
+    }
+    if ((el.role === "grid" || el.role === "listbox") && el.activation
+      && Object.keys(el.activation.ariaDelta).length === 0
+      && !el.activation.focusMovedWithin && el.activation.focusMovedTo === null) {
+      issues.push({
+        kind: "composite-arrows-dead",
+        severity: "warn",
+        element: label,
+        message: `${label}: ${el.activation.key} produces no selection change and no focus movement inside the composite — arrow navigation is not wired.`,
       });
     }
     if (el.activation?.popupArrowCycles === false) {
@@ -551,6 +602,12 @@ export function compareInteractionMaps(
         if (r.activation.popupArrowCycles === true && a.activation.popupArrowCycles === false) {
           mismatches.push({ severity: "suspect", key, message: `${key}: arrow keys navigate the reference's popup items but not the attempt's.` });
         }
+        if (r.activation.liveRegionChanged === true && !a.activation.liveRegionChanged) {
+          mismatches.push({ severity: "suspect", key, message: `${key}: the reference announces this action through a live region; the attempt does not.` });
+        }
+        if (r.activation.focusMovedWithin === true && !a.activation.focusMovedWithin && JSON.stringify(a.activation.ariaDelta) === "{}") {
+          mismatches.push({ severity: "suspect", key, message: `${key}: arrow keys move focus within the reference's composite but produce no response in the attempt.` });
+        }
         if ((r.activation.focusMovedTo !== null) && (a.activation.focusMovedTo === null)) {
           mismatches.push({ severity: "warn", key, message: `${key}: ${describeKey(r.activation.key)} moves focus in the reference (roving) but not in the attempt.` });
         }
@@ -607,16 +664,24 @@ export async function buildInteractionMap(options: InteractionMapOptions): Promi
     const kept = discovered.slice(0, maxElements);
 
     // --- Tab walk (single load): reachability + focus indicator.
-    const tabReached = new Map<number, boolean>();
+    const tabReached = new Map<number, boolean | null>();
     const seenStops = new Set<number>();
     for (let i = 0; i < Math.min(96, discovered.length * 3 + 8); i++) {
       await page.keyboard.press("Tab");
-      const sample = await page.evaluate(FOCUS_SAMPLE_SCRIPT) as { ix: number | null; focusedStyle: string } | null;
+      const sample = await page.evaluate(FOCUS_SAMPLE_SCRIPT) as
+        { ix: number | null; direct: boolean; focusedStyle: string } | null;
       if (!sample || sample.ix === null) continue;
       if (seenStops.has(sample.ix)) break; // cycled
       seenStops.add(sample.ix);
-      const blurred = discovered[sample.ix]?.blurredStyle;
-      tabReached.set(sample.ix, blurred !== undefined && sample.focusedStyle !== blurred);
+      if (sample.direct) {
+        const blurred = discovered[sample.ix]?.blurredStyle;
+        tabReached.set(sample.ix, blurred !== undefined && sample.focusedStyle !== blurred);
+      } else {
+        // Focus is on a composite interior (roving gridcell etc.): the
+        // container is reachable, but its child's blurred style is
+        // unknown — leave the indicator unjudged rather than guessing.
+        tabReached.set(sample.ix, null);
+      }
     }
 
     // --- Activation probes, each from a fresh load.
@@ -629,16 +694,31 @@ export async function buildInteractionMap(options: InteractionMapOptions): Promi
         await page.evaluate(DISCOVER_SCRIPT);
         const before = await page.evaluate(ariaSnapshotScript(d.index)) as AriaSnapshot | null;
         if (before) {
-          await page.evaluate(`document.querySelector('[data-vlmkit-ix="${d.index}"]')?.focus()`);
+          await page.evaluate(`
+(() => {
+  const el = document.querySelector('[data-vlmkit-ix="${d.index}"]');
+  if (!el) return;
+  el.focus();
+  if (document.activeElement === el || el.contains(document.activeElement)) return;
+  const inner = el.querySelector('[tabindex="0"]') || el.querySelector('[role="option"], [role="gridcell"], [tabindex]');
+  if (inner) inner.focus();
+})()`);
+          const preFocus = await page.evaluate(FOCUS_SAMPLE_SCRIPT) as { fingerprint: string } | null;
           await page.keyboard.press(key === " " ? "Space" : key);
           await page.waitForTimeout(settleMs);
           const after = await page.evaluate(ariaSnapshotScript(d.index)) as AriaSnapshot | null;
           if (after) {
-            const focusSample = await page.evaluate(FOCUS_SAMPLE_SCRIPT) as { ix: number | null } | null;
+            const focusSample = await page.evaluate(FOCUS_SAMPLE_SCRIPT) as
+              { ix: number | null; fingerprint: string } | null;
             const delta = ariaDelta(before, after);
+            const movedWithin = !!(preFocus && focusSample
+              && preFocus.fingerprint !== focusSample.fingerprint
+              && (focusSample.ix === null || focusSample.ix === d.index));
             activation = {
               key: key === " " ? "Space" : key,
               ariaDelta: delta,
+              ...(before.liveText !== after.liveText ? { liveRegionChanged: true } : {}),
+              ...(movedWithin ? { focusMovedWithin: true } : {}),
               controlsBecameVisible: before.controls && after.controls
                 ? (!before.controls.visible && after.controls.visible ? true : before.controls.visible === after.controls.visible ? (after.controls.visible ? null : false) : false)
                 : null,
@@ -707,7 +787,7 @@ export async function buildInteractionMap(options: InteractionMapOptions): Promi
         hasAriaExpanded: d.hasAriaExpanded,
         hasPopup: d.hasPopup,
         tabReachable: tabReached.has(d.index),
-        focusIndicator: tabReached.has(d.index) ? tabReached.get(d.index)! : null,
+        focusIndicator: tabReached.has(d.index) ? tabReached.get(d.index) ?? null : null,
         ...(activation ? { activation } : {}),
       });
     }
@@ -735,11 +815,18 @@ export function formatInteractionReport(
   lines.push(`interactive elements: ${map.elements.length}${map.capped > 0 ? ` ${YELLOW}(+${map.capped} beyond the cap — NOT probed)${RESET}` : ""}`);
   lines.push("");
   for (const el of map.elements) {
-    const focus = !el.tabReachable ? `${YELLOW}unreachable${RESET}` : el.focusIndicator ? "focus✓" : `${YELLOW}no-indicator${RESET}`;
+    const focus = !el.tabReachable
+      ? `${YELLOW}unreachable${RESET}`
+      : el.focusIndicator === true
+      ? "focus✓"
+      : el.focusIndicator === null
+      ? "focus(interior)" // reached via a composite child; indicator unjudged
+      : `${YELLOW}no-indicator${RESET}`;
     let act = "";
     if (el.activation) {
       const delta = Object.entries(el.activation.ariaDelta).map(([k, [b, a]]) => `${k} ${b} -> ${a}`).join(", ");
-      act = ` | ${el.activation.key}: ${delta || (el.activation.layoutChanged ? "layout change" : el.activation.focusMovedTo !== null ? "focus moves" : "no response")}`;
+      act = ` | ${el.activation.key}: ${delta || (el.activation.focusMovedWithin ? "focus moves within" : el.activation.layoutChanged ? "layout change" : el.activation.focusMovedTo !== null ? "focus moves" : "no response")}`;
+      if (el.activation.liveRegionChanged) act += " | announces";
       if (el.activation.popupRole) {
         act += ` | opens ${el.activation.popupRole}${el.activation.focusMovedIntoPopup ? " (focus enters)" : ""}`;
         if (el.activation.focusTrapped !== undefined) act += el.activation.focusTrapped ? ", traps" : ", TRAP LEAKS";

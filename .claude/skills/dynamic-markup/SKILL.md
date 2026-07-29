@@ -154,6 +154,17 @@ and Escape must close AND return focus to the trigger. Popup
 *interiors* are hidden at rest, so they are verified through these
 pattern probes, not itemized in the inventory.
 
+**Composites and announcements** are also first-class: a standalone
+`listbox` tracks `aria-activedescendant` (resolved to the referenced
+element's TEXT, so differing ids never false-mismatch) and the
+selected-descendant set as ARIA transitions; a roving `grid` is
+reachable through its cells and its arrow keys must move focus within
+the composite (`focus moves within`); an action that updates a live
+region (`aria-live` / `role=status|alert` / `output`) reports
+`announces`, and losing that announcement against a reference is a
+contract suspect. Listbox `option` children are captured through the
+container's selection facts, not itemized.
+
 - Run when the page has ANY interactive element beyond plain links.
   Suspects to fix: **dead-disclosure** (aria-expanded that never
   changes — the attribute is a promise, wire it or drop it),

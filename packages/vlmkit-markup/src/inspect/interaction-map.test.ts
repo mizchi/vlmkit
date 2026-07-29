@@ -34,6 +34,9 @@ function snap(overrides: Partial<AriaSnapshot> = {}): AriaSnapshot {
     pressed: null,
     open: null,
     controls: null,
+    activeDescText: null,
+    selectedWithin: null,
+    liveText: "",
     layoutSignature: "10:800:1200",
     ...overrides,
   };
@@ -275,4 +278,91 @@ test("E2E: popup mutations are detected standalone and against the reference", {
   const mapD = await buildInteractionMap({ source: d });
   assert.ok(deriveInteractionIssues(mapD).some((i) => i.kind === "popup-arrows-dead"), "D standalone");
   assert.ok(compareInteractionMaps(refMap, mapD).mismatches.some((m) => m.severity === "suspect" && m.message.includes("arrow keys")), "D contract");
+});
+
+// ---------------------------------------------------------------------------
+// v3: listbox (activedescendant), grid nav, live-region announce
+
+test("ariaDelta covers activedescendant text and composite selection", () => {
+  const delta = ariaDelta(
+    snap({ activeDescText: "High passes", selectedWithin: "High passes" }),
+    snap({ activeDescText: "Kii Peninsula", selectedWithin: "Kii Peninsula" }),
+  );
+  assert.deepEqual(delta, {
+    activedescendant: ["High passes", "Kii Peninsula"],
+    selection: ["High passes", "Kii Peninsula"],
+  });
+});
+
+test("composite-arrows-dead warns for a grid with no response; announce regression is a contract suspect", () => {
+  const deadGrid = element({
+    key: "grid|Weeks", role: "grid", name: "Weeks",
+    activation: { key: "ArrowRight", ariaDelta: {}, controlsBecameVisible: null, layoutChanged: false, focusMovedTo: null },
+  });
+  assert.ok(deriveInteractionIssues(mapOf(deadGrid)).some((i) => i.kind === "composite-arrows-dead"));
+
+  const liveGrid = element({
+    key: "grid|Weeks", role: "grid", name: "Weeks",
+    activation: { key: "ArrowRight", ariaDelta: {}, controlsBecameVisible: null, layoutChanged: false, focusMovedTo: null, focusMovedWithin: true },
+  });
+  assert.ok(!deriveInteractionIssues(mapOf(liveGrid)).some((i) => i.kind === "composite-arrows-dead"));
+  const cmpGrid = compareInteractionMaps(mapOf(liveGrid), mapOf(deadGrid));
+  assert.ok(cmpGrid.mismatches.some((m) => m.severity === "suspect" && m.message.includes("composite")));
+
+  const announcer = element({
+    key: "button|Add", name: "Add",
+    activation: { key: "Enter", ariaDelta: {}, controlsBecameVisible: null, layoutChanged: true, focusMovedTo: null, liveRegionChanged: true },
+  });
+  const silent = element({
+    key: "button|Add", name: "Add",
+    activation: { key: "Enter", ariaDelta: {}, controlsBecameVisible: null, layoutChanged: true, focusMovedTo: null },
+  });
+  const cmp = compareInteractionMaps(mapOf(announcer), mapOf(silent));
+  assert.ok(cmp.mismatches.some((m) => m.severity === "suspect" && m.message.includes("live region")));
+});
+
+const WIDGETS = join(REPO_ROOT, "fixtures/auto-markup-proof/interactive/reference-widgets.html");
+
+test("E2E: widgets fixture — listbox activedescendant, grid roving, live announce", { timeout: 240_000 }, async () => {
+  const map = await buildInteractionMap({ source: WIDGETS });
+  const byKey = new Map(map.elements.map((e) => [e.key, e]));
+  const listbox = byKey.get("listbox|Choose a guide")!;
+  assert.equal(listbox.activation!.ariaDelta["activedescendant"]![1], "Kii Peninsula by rail");
+  assert.equal(listbox.activation!.ariaDelta["selection"]![1], "Kii Peninsula by rail");
+  const grid = byKey.get("grid|Delivery week")!;
+  assert.equal(grid.tabReachable, true); // via its roving cell
+  assert.equal(grid.activation!.focusMovedWithin, true);
+  const btn = byKey.get("button|Add to cart")!;
+  assert.equal(btn.activation!.liveRegionChanged, true);
+  assert.deepEqual(deriveInteractionIssues(map).filter((i) => i.severity === "suspect"), []);
+  // option children are captured through the container, not itemized
+  assert.ok(![...byKey.keys()].some((k) => k.startsWith("option|")));
+});
+
+test("E2E: widget mutations detected — silent announce, dead listbox arrows, dead grid", { timeout: 480_000 }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "widgets-"));
+  const src = readFileSync(WIDGETS, "utf8");
+  const refMap = await buildInteractionMap({ source: WIDGETS });
+
+  // A: add-to-cart stops announcing
+  const a = join(dir, "a.html");
+  writeFileSync(a, src.replace('document.getElementById("cart-status").textContent =', "void ("));
+  const mapA = await buildInteractionMap({ source: a });
+  assert.ok(compareInteractionMaps(refMap, mapA).mismatches.some((m) => m.message.includes("live region")), "A contract");
+
+  // B: listbox arrows dead
+  const b = join(dir, "b.html");
+  writeFileSync(b, src.replace('if (e.key === "ArrowDown") { e.preventDefault(); setActive(Math.min(cur + 1, options.length - 1)); }', ""));
+  const mapB = await buildInteractionMap({ source: b });
+  const lb = mapB.elements.find((e) => e.role === "listbox")!;
+  assert.deepEqual(lb.activation!.ariaDelta, {});
+  assert.ok(deriveInteractionIssues(mapB).some((i) => i.kind === "composite-arrows-dead"), "B standalone");
+  assert.ok(compareInteractionMaps(refMap, mapB).mismatches.some((m) => m.severity === "suspect" && m.message.includes("ARIA transition")), "B contract");
+
+  // C: grid arrows dead
+  const c = join(dir, "c.html");
+  writeFileSync(c, src.replace('if (e.key === "ArrowRight") { e.preventDefault(); moveCell(i, i + 1); }', ""));
+  const mapC = await buildInteractionMap({ source: c });
+  assert.ok(deriveInteractionIssues(mapC).some((i) => i.kind === "composite-arrows-dead"), "C standalone");
+  assert.ok(compareInteractionMaps(refMap, mapC).mismatches.some((m) => m.severity === "suspect" && m.message.includes("composite")), "C contract");
 });
