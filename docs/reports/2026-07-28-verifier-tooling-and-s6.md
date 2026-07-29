@@ -497,3 +497,44 @@ Haiku 転記の継承でベースラインと同一(copy gate はスコープ外
 どちらも「kickback の数値を字義通りに従う」ことの限界で、強いモデルは
 自分の計測で相殺できるが、Stage-2 LLM 自動修正(backlog)を作る際は
 このクラスの行を機械が鵜呑みにする — 先にツール側で塞ぐべき。
+
+## 追記9: S11 — a11y イベント軸(check interactions)のシナリオ実証(2026-07-28)
+
+新ゲート B5(`check interactions`: a11y イベント → ARIA 遷移の決定論
+採取、`--reference` で挙動契約化)の初シナリオ。入力はスクショ 2 枚
+(rest / 状態画像)+ interaction brief。エージェントは standalone
+インベントリで自走し、`--reference` 契約は検証者のみが実行する二層構成。
+
+| | Haiku レグ | Sonnet 継続レグ |
+|---|---:|---:|
+| rounds / tokens | 8 / 57,820 | 5 / 139,720 |
+| interactions | status ok(自己申告「brief 全行充足」) | **契約 satisfied(検証者確認)** |
+| verify markup | NOT DONE(3 残差、1.03%) | NOT DONE(1 extra、**0.70%**) |
+
+### 本丸の実証: 契約チェックだけが挙動バグを検出
+
+Haiku の attempt は standalone status ok・brief 充足表も全行 ✓ だったが、
+検証者の `--reference` 突合が **ArrowRight の roving 誤実装**を名指し:
+reference は「押したタブの delta {} + フォーカスが次タブへ移動」、
+attempt は「押したタブ自身が selected false→true + フォーカス不動」。
+原因は stale な `currentTabIndex` 変数(Sonnet レグが特定・修正)。
+**ピクセルにも standalone 出力にも自己レビューにも写らないバグを、
+契約だけが落とした** — 新軸の存在意義がシナリオ初回で立証された。
+
+### 残差と教訓
+
+- 静的は 1 extra("receipts" 語の ~5px x シフト + トーン差)を残して
+  予算内で正直停止。check equivalence のペア画像(初実戦)で視覚等価を
+  検証者が確認 — 比例原則で追加レグなし。
+- **合理化 5 例目(Haiku)**: 「残差は抽出の偽陽性」→ ペア画像が反証
+  (タブ列は実際に ~19px 変位)。Sonnet レグは対照的に「未確認」と
+  正直にラベルして停止 — モデル差はここにも出る。
+- **新しい作問教訓: 隠れ状態のコピーにはキャリアが要る**。Digest
+  パネル本文はどのスクショにも写らず brief にも無かったため、
+  エージェントがもっともらしい文を発明(`One weekly summary, nothing
+  else.` → `Weekly summary of your orders.`)。どのゲートも検出不能
+  (常時 hidden)で、検証者のソース突合だけが発見。brief には
+  状態ごとの可視コピーを全部書くか、状態スクショを全状態分渡すこと。
+
+KPI 台帳: S11 = 197,540 tokens / 13 rounds / 挙動契約 **satisfied**・
+静的 0.70% NOT DONE(視覚等価は判定済み)。

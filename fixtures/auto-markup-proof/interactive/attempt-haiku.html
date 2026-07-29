@@ -15,7 +15,7 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background-color: #f5f5f0;
       color: #333;
-      padding: 40px;
+      padding: 40px 48px;
       margin: 0;
     }
 
@@ -26,7 +26,7 @@
     h1 {
       font-size: 32px;
       font-weight: 600;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
     }
 
     /* Disclosure button */
@@ -41,7 +41,7 @@
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
-      margin-bottom: 31px;
+      margin-bottom: 18px;
       height: 43px;
       width: 156px;
       color: #333;
@@ -69,8 +69,8 @@
     /* Tablist */
     [role="tablist"] {
       display: flex;
-      border-bottom: 1px solid #e0e0dc;
-      margin-bottom: 9px;
+      border-bottom: 2px solid #e0e0dc;
+      margin-bottom: 14px;
       gap: 32px;
     }
 
@@ -123,10 +123,10 @@
     }
 
     [role="switch"] {
-      width: 48px;
-      height: 28px;
+      width: 44px;
+      height: 24px;
       border: none;
-      border-radius: 14px;
+      border-radius: 12px;
       background-color: #d0d0cc;
       cursor: pointer;
       position: relative;
@@ -141,8 +141,8 @@
     [role="switch"]::before {
       content: '';
       position: absolute;
-      width: 24px;
-      height: 24px;
+      width: 20px;
+      height: 20px;
       background-color: #fff;
       border-radius: 50%;
       top: 2px;
@@ -246,15 +246,19 @@
       });
 
       tab.addEventListener('keydown', (e) => {
-        let newIndex = currentTabIndex;
+        // Roving semantics: move relative to the tab that is actually
+        // focused/pressed (this tab's own index), not the stale
+        // "currently selected" index — otherwise a programmatically
+        // focused-but-unselected tab ends up selecting itself in place.
+        let newIndex = null;
         if (e.key === 'ArrowRight') {
           e.preventDefault();
-          newIndex = (currentTabIndex + 1) % tabs.length;
+          newIndex = (index + 1) % tabs.length;
         } else if (e.key === 'ArrowLeft') {
           e.preventDefault();
-          newIndex = (currentTabIndex - 1 + tabs.length) % tabs.length;
+          newIndex = (index - 1 + tabs.length) % tabs.length;
         }
-        if (newIndex !== currentTabIndex) {
+        if (newIndex !== null) {
           selectTab(newIndex);
         }
       });

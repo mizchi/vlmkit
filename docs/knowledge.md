@@ -829,6 +829,8 @@ S5 で Haiku が missing/extra を残して 3 ラウンドで自己宣言停止�
 | S9 scrollpage **Sonnet 継続レグ** | 6 | 199,876 | 99 | 1663s | 4.98% | 失敗(1 extra 残し)。diff 18.3%→4.98%、missing/extra 2/2→0/1、高さ許容内、scroll green 維持。残差 = 段落 reflow(1 行増で記事ブロックが ~20px 沈む)。**検証者目視でコピー誤り 3 件を追加検出**(© 2025/2026、`·` 区切り欠落、Imlil→Imili 等の転記 typo)— composition には写らない |
 | S9-fresh Haiku(帰属+kind+copy gate) | 11 | 77,332 | 61 | 444s | 20.11% | 失敗 — **帰属付き kickback でも Haiku の壁(fixed 座標系+相互作用 gap)は不変**(null result、膠着 3 点も tokens も元 S9 とほぼ同一)。copy gate 自己レビューは「同じ目」問題で Imlil typo を素通し(PASSED と虚偽報告)— キーレスモードは転記者と別の読み手が必須と skill 改訂 |
 | S9-replay **Sonnet**(帰属あり、同一開始状態) | **3** | 181,294 | 80 | 1616s | 6.77% | **DONE — 帰属なしの元エスカレーション(6r/199,876/未達)と同一開始状態・同ヒント・同予算のリプレイで rounds -50%、未達→達成に反転**。© 年号も crop 直読で自発修正。帰属は「診断能力のあるモデルを加速する」(Haiku には効かない — S9-fresh の null result と対称) |
+| S11 interactive Haiku | 8 | 57,820 | 31 | 263s | 1.03% | 失敗(静的 3 残差)。**interactions standalone は ok だが、検証者の --reference 契約が ArrowRight roving 誤実装を検出** — standalone と自己レビューの両方をすり抜けた。合理化 5 例目もペア画像で反証 |
+| S11 interactive **Sonnet 継続レグ** | 5 | 139,720 | 71 | 986s | 0.70% | **挙動契約 satisfied**(stale index バグ特定・修正)。静的は 1 extra(視覚等価を検証者が確認)で予算内正直停止。隠れ状態コピーの carrier 欠落(作問ミス)も検証者ソース突合で発見 |
 | S10 realshot **Sonnet** | 2 | 58,103 | — | — | 36%(advisory) | **done(劣化キャプチャ宣言モード初実証)**。dpr2+JPEG 実スクショ 1 枚入力。diff 36% は写真領域のグラデ近似による設計値 — 構図・コピー・パレットは目視一致 |
 
 トークン計測は S5 が初(それ以前のランは usage を記録していなかった)。
