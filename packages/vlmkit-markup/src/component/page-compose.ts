@@ -352,15 +352,27 @@ export function composePageDiff(
     image: { data: Uint8Array; width: number },
   ): PageComponent[] =>
     components.map((c) => ({ ...c, kind: classifyRegion(image.data, image.width, c) }));
+  // Ranking-boundary stabilization (S13, third segmentation-fitting
+  // occurrence): the Nth area-ranked slot is a seat both sides fight
+  // for — an ink-weight difference of a few pixels swaps which
+  // fragment occupies it, and the orphaned counterpart then reads as
+  // missing/extra/ordering although both pages render it. MATCH over a
+  // larger pool than the report covers: a top-N component whose
+  // counterpart sits just below the other side's cutoff pairs with it
+  // and is silently absorbed. Only unmatched components ranked inside
+  // top-N are reported, and ordering/gap chains use in-top-N pairs
+  // only — behavior is byte-identical when no boundary is straddled.
+  const topN = options.topN ?? 8;
+  const poolMargin = 6;
   const targetComponents = attachKinds(
     toPageComponents(
-      extractComponentsFromRgba(target.data, target.width, target.height, { ...options, background: targetBackground }),
+      extractComponentsFromRgba(target.data, target.width, target.height, { ...options, topN: topN + poolMargin, background: targetBackground }),
     ),
     target,
   );
   const currentComponents = attachKinds(
     toPageComponents(
-      extractComponentsFromRgba(current.data, current.width, current.height, { ...options, background: currentBackground }),
+      extractComponentsFromRgba(current.data, current.width, current.height, { ...options, topN: topN + poolMargin, background: currentBackground }),
     ),
     current,
   );
@@ -371,14 +383,15 @@ export function composePageDiff(
     target.height,
     options,
   );
+  const reportMatches = matches.filter((m) => m.target.index < topN && m.current.index < topN);
   return {
     targetSize: { width: target.width, height: target.height },
     currentSize: { width: current.width, height: current.height },
-    matches,
-    missing,
-    extra,
-    orderViolations: findOrderViolations(matches, options.orderTolerance ?? 8),
-    gapDeltas: findGapDeltas(matches, options.gapTolerance ?? 4),
+    matches: reportMatches,
+    missing: missing.filter((m) => m.index < topN),
+    extra: extra.filter((e) => e.index < topN),
+    orderViolations: findOrderViolations(reportMatches, options.orderTolerance ?? 8),
+    gapDeltas: findGapDeltas(reportMatches, options.gapTolerance ?? 4),
   };
 }
 
