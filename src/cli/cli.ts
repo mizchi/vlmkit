@@ -144,6 +144,7 @@ const SPECS: Record<string, Spec> = {
   markupAutofix: spec("markup-autofix", () => import("@mizchi/vlmkit-markup/verify/markup-autofix.ts")),
   regionJudge: spec("region-judge", () => import("@mizchi/vlmkit-markup/inspect/region-judge.ts")),
   interactionMap: spec("interaction-map", () => import("@mizchi/vlmkit-markup/inspect/interaction-map.ts")),
+  handlerMap: spec("handler-map", () => import("@mizchi/vlmkit-markup/inspect/handler-map.ts")),
   copyCheck: spec("copy-check", () => import("@mizchi/vlmkit-markup/inspect/copy-check.ts")),
   scrollBehavior: spec("scroll-behavior", () => import("@mizchi/vlmkit-markup/inspect/scroll-behavior.ts")),
   mockScan: spec("mock-scan", () => import("@mizchi/vlmkit-markup/inspect/mock-scan.ts")),
@@ -200,6 +201,7 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
     breakpoints: { run: runDiscover, desc: "Discover responsive breakpoints from HTML/CSS (verify them with `check breakpoints`)" },
     scroll: { spec: SPECS.scrollScan, desc: "Annotation-free scroll inventory: containers, page overflow-x, clipped content" },
     mock: { spec: SPECS.mockScan, desc: "Mock-image intake: infer @2x/@3x scale, write normalized @1x target, extraction sanity" },
+    handlers: { spec: SPECS.handlerMap, desc: "Event-callback surface: every wired listener + pointer-only-control cross-check (experimental)" },
   },
   build: {
     component: { spec: SPECS.componentFromImage, desc: "Build a component from a target screenshot" },

@@ -150,7 +150,7 @@ export interface InteractionIssue {
  * can address them by index. Also captures each element's BLURRED
  * focus-adjacent styles for the indicator comparison.
  */
-const DISCOVER_SCRIPT = `
+export const DISCOVER_SCRIPT = `
 (() => {
   const IMPLICIT = new Map([
     ["button", "button"], ["summary", "button"], ["select", "combobox"], ["textarea", "textbox"],
@@ -160,6 +160,17 @@ const DISCOVER_SCRIPT = `
     ["range", "slider"], ["text", "textbox"], ["email", "textbox"], ["search", "searchbox"],
   ]);
   const EXPLICIT = new Set(["button", "tab", "checkbox", "switch", "radio", "menuitem", "combobox", "link", "option", "slider", "textbox", "searchbox", "listbox", "grid"]);
+  const focusStyleFingerprint = (root) => {
+    // The focus indicator is often drawn on a DESCENDANT (APG wraps tab
+    // text in <span class="focus"> and sets outline:none on the button).
+    // Fingerprint the element plus its descendants' focus-relevant
+    // styles so a child-borne ring is not read as 'no indicator'.
+    const nodes = [root, ...root.querySelectorAll("*")].slice(0, 12);
+    return nodes.map((n) => {
+      const s = getComputedStyle(n);
+      return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderWidth, s.backgroundColor].join(",");
+    }).join("|");
+  };
   const out = [];
   const seen = new Set();
   const els = document.querySelectorAll("*");
@@ -204,7 +215,7 @@ const DISCOVER_SCRIPT = `
       path: parts.join(">"),
       hasAriaExpanded: el.hasAttribute("aria-expanded"),
       hasPopup: el.hasAttribute("aria-haspopup"),
-      blurredStyle: [style.outlineStyle, style.outlineWidth, style.boxShadow, style.borderColor, style.backgroundColor].join("|"),
+      blurredStyle: focusStyleFingerprint(el),
     });
   }
   return out;
@@ -216,14 +227,19 @@ const FOCUS_SAMPLE_SCRIPT = `
 (() => {
   const el = document.activeElement;
   if (!el || el === document.body || el === document.documentElement) return null;
-  const style = getComputedStyle(el);
   const direct = el.hasAttribute("data-vlmkit-ix");
   const owner = direct ? el : el.closest("[data-vlmkit-ix]");
+  const fpTarget = owner || el;
+  const nodes = [fpTarget, ...fpTarget.querySelectorAll("*")].slice(0, 12);
+  const focusedStyle = nodes.map((n) => {
+    const s = getComputedStyle(n);
+    return [s.outlineStyle, s.outlineWidth, s.outlineColor, s.boxShadow, s.borderColor, s.borderWidth, s.backgroundColor].join(",");
+  }).join("|");
   return {
     ix: owner ? Number(owner.getAttribute("data-vlmkit-ix")) : null,
     direct,
     fingerprint: el.tagName + "#" + (el.id || "") + ":" + (el.textContent || "").trim().slice(0, 24),
-    focusedStyle: [style.outlineStyle, style.outlineWidth, style.boxShadow, style.borderColor, style.backgroundColor].join("|"),
+    focusedStyle,
   };
 })()
 `;
@@ -879,6 +895,7 @@ contract and every response mismatch is reported.
 Options:
   --reference <html>    Reference page defining the interaction contract
   --max-elements <n>    Probe cap (default 30; the report says when capped)
+  --handlers            Also enumerate the wired event-callback surface (scan handlers) and cross-check it
   --json                Print JSON report`);
   process.exit(exitCode);
 }
@@ -888,12 +905,14 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   let reference: string | undefined;
   let maxElements = 30;
   let json = false;
+  let handlers = false;
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === "--reference") reference = argv[++i]!;
     else if (arg === "--max-elements") maxElements = Number(argv[++i]!);
     else if (arg === "--json") json = true;
+    else if (arg === "--handlers") handlers = true;
     else if (!arg.startsWith("-")) positional.push(arg);
   }
   const source = positional[0];
@@ -905,6 +924,22 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   if (reference) {
     const refMap = await buildInteractionMap({ source: reference, maxElements });
     comparison = compareInteractionMaps(refMap, map);
+  }
+  let handlerBlock = "";
+  let handlerSuspects = 0;
+  if (handlers) {
+    const { buildHandlerSurface, compareHandlerSurfaces, deriveHandlerIssues, formatHandlerSurface } = await import("./handler-map.ts");
+    const surface = await buildHandlerSurface({ source });
+    const handlerIssues = deriveHandlerIssues(surface);
+    handlerSuspects = handlerIssues.filter((i) => i.severity === "suspect").length;
+    handlerBlock = "\n\n" + formatHandlerSurface(surface, handlerIssues);
+    if (reference) {
+      const refSurface = await buildHandlerSurface({ source: reference });
+      const surfaceMismatches = compareHandlerSurfaces(refSurface, surface);
+      handlerBlock += "\n\nSurface vs reference:";
+      if (surfaceMismatches.length === 0) handlerBlock += `\n  ${GREEN}event vocabulary matches${RESET}`;
+      for (const m of surfaceMismatches) handlerBlock += `\n  ${YELLOW}warn${RESET} ${m.message}`;
+    }
   }
 
   appendRunLedger({
@@ -921,8 +956,9 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   });
 
   if (json) console.log(JSON.stringify({ map, issues, comparison }, null, 2));
-  else console.log(formatInteractionReport(map, issues, comparison));
+  else console.log(formatInteractionReport(map, issues, comparison) + handlerBlock);
   const failing = issues.some((i) => i.severity === "suspect")
+    || handlerSuspects > 0
     || (comparison && (comparison.missing.length > 0 || comparison.mismatches.some((m) => m.severity === "suspect")));
   if (failing) process.exit(1);
 }
