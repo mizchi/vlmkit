@@ -13,6 +13,7 @@ import {
 
 function entry(overrides: Partial<HandlerSurfaceEntry>): HandlerSurfaceEntry {
   return {
+    ancestorTypes: [],
     ix: null,
     path: "div.x",
     text: "Buy",
@@ -97,4 +98,37 @@ test("E2E: a pointer-only div is caught; a delegation wrapper and inline onclick
   assert.ok(pointerOnly.some((i) => i.element.includes("#ghost")));
   assert.ok(pointerOnly.some((i) => i.element.includes("#inline")));
   assert.ok(!pointerOnly.some((i) => i.element.includes("#wrap")));
+});
+
+// ---------------------------------------------------------------------------
+// Surface contract compare
+
+test("surface contract: lost categories warn, delegation and type-detail differences do not", async () => {
+  const { compareHandlerSurfaces } = await import("./handler-map.ts");
+  const ref: HandlerSurface = surface(
+    entry({ text: "Add to cart", types: { click: 1, keydown: 1 } }),
+    entry({ text: "Sort", types: { mousedown: 1 } }),
+    entry({ text: "Filter", types: {}, ancestorTypes: ["click"] }), // via delegation
+  );
+  // attempt: Add loses keyboard; Sort uses click instead of mousedown (fine);
+  // Filter wires click directly instead of delegating (fine).
+  const att: HandlerSurface = surface(
+    entry({ text: "Add to cart", types: { click: 1 } }),
+    entry({ text: "Sort", types: { click: 2 } }),
+    entry({ text: "Filter", types: { click: 1 } }),
+  );
+  const mismatches = compareHandlerSurfaces(ref, att);
+  assert.equal(mismatches.length, 1);
+  assert.match(mismatches[0]!.message, /"Add to cart"/);
+  assert.match(mismatches[0]!.message, /keyboard/);
+});
+
+test("surface contract: lost global category warns; identical surfaces are clean", async () => {
+  const { compareHandlerSurfaces } = await import("./handler-map.ts");
+  const ref: HandlerSurface = { source: "r", elements: [], globals: { "document:keydown": 1 }, totalRegistrations: 1 };
+  const att: HandlerSurface = { source: "a", elements: [], globals: {}, totalRegistrations: 0 };
+  const m = compareHandlerSurfaces(ref, att);
+  assert.equal(m.length, 1);
+  assert.match(m[0]!.message, /global keyboard/);
+  assert.deepEqual(compareHandlerSurfaces(ref, { ...att, globals: { "window:keyup": 1 } }), []);
 });

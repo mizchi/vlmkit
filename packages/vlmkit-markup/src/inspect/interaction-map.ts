@@ -912,11 +912,18 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   let handlerBlock = "";
   let handlerSuspects = 0;
   if (handlers) {
-    const { buildHandlerSurface, deriveHandlerIssues, formatHandlerSurface } = await import("./handler-map.ts");
+    const { buildHandlerSurface, compareHandlerSurfaces, deriveHandlerIssues, formatHandlerSurface } = await import("./handler-map.ts");
     const surface = await buildHandlerSurface({ source });
     const handlerIssues = deriveHandlerIssues(surface);
     handlerSuspects = handlerIssues.filter((i) => i.severity === "suspect").length;
     handlerBlock = "\n\n" + formatHandlerSurface(surface, handlerIssues);
+    if (reference) {
+      const refSurface = await buildHandlerSurface({ source: reference });
+      const surfaceMismatches = compareHandlerSurfaces(refSurface, surface);
+      handlerBlock += "\n\nSurface vs reference:";
+      if (surfaceMismatches.length === 0) handlerBlock += `\n  ${GREEN}event vocabulary matches${RESET}`;
+      for (const m of surfaceMismatches) handlerBlock += `\n  ${YELLOW}warn${RESET} ${m.message}`;
+    }
   }
 
   appendRunLedger({

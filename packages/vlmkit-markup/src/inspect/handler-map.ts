@@ -38,6 +38,8 @@ import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/
 import { DISCOVER_SCRIPT } from "./interaction-map.ts";
 
 export interface HandlerSurfaceEntry {
+  /** Handler types on ancestors that also carry handlers (delegation). */
+  ancestorTypes: string[];
   /** Discovery index when the element is also in the interaction map. */
   ix: number | null;
   path: string;
@@ -132,11 +134,19 @@ const COLLECT_SURFACE_SCRIPT = `
       }
     }
   }
+  const handledEls = [...perElement.keys()];
   const out = [];
   for (const { el, types, samples } of perElement.values()) {
     const style = getComputedStyle(el);
     const rect = el.getBoundingClientRect();
+    const ancestorTypes = {};
+    for (const other of handledEls) {
+      if (other !== el && other.contains && other.contains(el)) {
+        for (const t of Object.keys(perElement.get(other).types)) ancestorTypes[t] = true;
+      }
+    }
     out.push({
+      ancestorTypes: Object.keys(ancestorTypes),
       ix: el.hasAttribute("data-vlmkit-ix") ? Number(el.getAttribute("data-vlmkit-ix")) : null,
       path: describe(el),
       text: (el.textContent || "").replace(/\\s+/g, " ").trim().slice(0, 40),
@@ -235,6 +245,73 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
     });
   }
   return issues;
+}
+
+// ---------------------------------------------------------------------------
+// Surface contract (reference vs attempt)
+
+export type HandlerCategory = "pointer" | "keyboard" | "input" | "other";
+
+export function categorizeHandlerType(type: string): HandlerCategory {
+  if (POINTER_TYPES.has(type) || ["mouseover", "mouseenter", "mouseleave", "mouseout"].includes(type)) return "pointer";
+  if (KEYBOARD_TYPES.has(type)) return "keyboard";
+  if (["input", "change", "submit", "focus", "blur", "focusin", "focusout"].includes(type)) return "input";
+  return "other";
+}
+
+export interface SurfaceMismatch {
+  severity: "warn";
+  identity: string;
+  message: string;
+}
+
+/**
+ * Structural cross-check of the wired event vocabulary. Identity is
+ * the element's visible TEXT (paths/ids legitimately differ between
+ * implementations); the effective vocabulary of an element merges its
+ * own handler types with any handler-carrying ancestor's (delegation
+ * is a legitimate implementation choice, not a mismatch). Comparison
+ * is by CATEGORY (pointer/keyboard/input/other) — mousedown vs click
+ * is an implementation detail. Everything here is a WARN: the
+ * suspect-level authority for behavior is the interaction-map
+ * response contract; this catches wiring the probes cannot fire.
+ */
+export function compareHandlerSurfaces(reference: HandlerSurface, attempt: HandlerSurface): SurfaceMismatch[] {
+  const vocab = (s: HandlerSurface): Map<string, Set<HandlerCategory>> => {
+    const m = new Map<string, Set<HandlerCategory>>();
+    for (const e of s.elements) {
+      if (!e.visible || !e.text) continue;
+      const set = m.get(e.text) ?? new Set<HandlerCategory>();
+      for (const t of [...Object.keys(e.types), ...e.ancestorTypes]) set.add(categorizeHandlerType(t));
+      m.set(e.text, set);
+    }
+    return m;
+  };
+  const refVocab = vocab(reference);
+  const attVocab = vocab(attempt);
+  const mismatches: SurfaceMismatch[] = [];
+  for (const [identity, refCats] of refVocab) {
+    const attCats = attVocab.get(identity) ?? new Set<HandlerCategory>();
+    const lost = [...refCats].filter((c) => !attCats.has(c));
+    if (lost.length > 0) {
+      mismatches.push({
+        severity: "warn",
+        identity,
+        message: `"${identity}": the reference wires ${lost.join("/")} handler(s) here; the attempt wires ${attCats.size > 0 ? [...attCats].join("/") + " only" : "nothing"}.`,
+      });
+    }
+  }
+  const refGlobalCats = new Set([...Object.keys(reference.globals)].map((k) => categorizeHandlerType(k.split(":")[1] ?? k)));
+  const attGlobalCats = new Set([...Object.keys(attempt.globals)].map((k) => categorizeHandlerType(k.split(":")[1] ?? k)));
+  const lostGlobal = [...refGlobalCats].filter((c) => !attGlobalCats.has(c));
+  if (lostGlobal.length > 0) {
+    mismatches.push({
+      severity: "warn",
+      identity: "(globals)",
+      message: `window/document: the reference wires global ${lostGlobal.join("/")} handler(s); the attempt does not.`,
+    });
+  }
+  return mismatches;
 }
 
 // ---------------------------------------------------------------------------
