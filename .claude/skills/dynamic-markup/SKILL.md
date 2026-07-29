@@ -145,15 +145,27 @@ Escape on opened popups), and records the response as ARIA transitions
 (`expanded false -> true`), aria-controls target visibility, and a
 layout delta — deterministic, no VLM.
 
+When an activation opens a **popup** (dialog / menu / listbox), the
+full APG pattern is probed in the same session: focus must move INTO
+the popup, a modal dialog must trap Tab (landing on browser chrome is
+fine — native `<dialog>` does that; landing on page content outside
+the popup is a leak), menu/listbox items must be ArrowDown-navigable,
+and Escape must close AND return focus to the trigger. Popup
+*interiors* are hidden at rest, so they are verified through these
+pattern probes, not itemized in the inventory.
+
 - Run when the page has ANY interactive element beyond plain links.
   Suspects to fix: **dead-disclosure** (aria-expanded that never
   changes — the attribute is a promise, wire it or drop it),
-  **broken-aria-controls** (id points at nothing). Warns to fix or
-  explain: **no-focus-indicator** (an explicit `outline: none` with no
-  replacement — the UA default counts as an indicator, so this only
-  fires when you killed it), **not-tab-reachable** (roving-tabindex
-  composite members are correctly exempt), **inert-control**,
-  **escape-stuck**.
+  **broken-aria-controls** (id points at nothing),
+  **focus-escapes-trap** (a modal that doesn't trap is not modal).
+  Warns to fix or explain: **no-focus-indicator** (an explicit
+  `outline: none` with no replacement — the UA default counts as an
+  indicator, so this only fires when you killed it),
+  **not-tab-reachable** (roving-tabindex composite members are
+  correctly exempt), **inert-control**, **escape-stuck**,
+  **popup-no-focus-move**, **focus-not-returned**,
+  **popup-arrows-dead**.
 - With `--reference`, the reference's inventory is the behavioral
   contract: same elements (matched by role + accessible name), same
   reachability, same focus indicators, same ARIA transition per event.

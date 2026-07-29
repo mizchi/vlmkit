@@ -195,3 +195,84 @@ test("E2E: a de-wired disclosure and a killed focus ring are detected against th
     "lost focus indicator detected vs reference",
   );
 });
+
+// ---------------------------------------------------------------------------
+// Popup patterns (dialog / menu): pure derivations
+
+test("popup issues: no focus move, trap leak, no focus return, dead arrows", () => {
+  const issues = deriveInteractionIssues(mapOf(
+    element({ key: "button|Menu", name: "Menu", hasPopup: true, activation: { key: "Enter", ariaDelta: { expanded: ["false", "true"] }, controlsBecameVisible: true, layoutChanged: true, focusMovedTo: null, popupRole: "menu", focusMovedIntoPopup: false, escapeCloses: true, focusReturnsToOpener: false } }),
+    element({ key: "button|Del", name: "Del", hasPopup: true, activation: { key: "Enter", ariaDelta: {}, controlsBecameVisible: null, layoutChanged: true, focusMovedTo: null, popupRole: "dialog", focusMovedIntoPopup: true, focusTrapped: false, escapeCloses: true, focusReturnsToOpener: true } }),
+    element({ key: "button|Opts", name: "Opts", hasPopup: true, activation: { key: "Enter", ariaDelta: { expanded: ["false", "true"] }, controlsBecameVisible: true, layoutChanged: true, focusMovedTo: null, popupRole: "menu", focusMovedIntoPopup: true, popupArrowCycles: false, escapeCloses: true, focusReturnsToOpener: true } }),
+  ));
+  assert.ok(issues.some((i) => i.kind === "popup-no-focus-move" && i.element.includes('"Menu"')));
+  assert.ok(issues.some((i) => i.kind === "focus-not-returned" && i.element.includes('"Menu"')));
+  assert.ok(issues.some((i) => i.kind === "focus-escapes-trap" && i.severity === "suspect" && i.element.includes('"Del"')));
+  assert.ok(issues.some((i) => i.kind === "popup-arrows-dead" && i.element.includes('"Opts"')));
+});
+
+test("compare: popup-pattern regressions are suspects", () => {
+  const refEl = element({ key: "button|Del", name: "Del", hasPopup: true, activation: { key: "Enter", ariaDelta: {}, controlsBecameVisible: null, layoutChanged: true, focusMovedTo: null, popupRole: "dialog", focusMovedIntoPopup: true, focusTrapped: true, escapeCloses: true, focusReturnsToOpener: true, popupArrowCycles: true } });
+  const attEl = element({ key: "button|Del", name: "Del", hasPopup: true, activation: { key: "Enter", ariaDelta: {}, controlsBecameVisible: null, layoutChanged: true, focusMovedTo: null, popupRole: "dialog", focusMovedIntoPopup: false, focusTrapped: false, escapeCloses: true, focusReturnsToOpener: false, popupArrowCycles: false } });
+  const cmp = compareInteractionMaps(mapOf(refEl), mapOf(attEl));
+  const suspects = cmp.mismatches.filter((m) => m.severity === "suspect");
+  assert.ok(suspects.some((m) => m.message.includes("moves focus into the popup")));
+  assert.ok(suspects.some((m) => m.message.includes("traps Tab focus")));
+  assert.ok(suspects.some((m) => m.message.includes("returns focus to the trigger")));
+  assert.ok(suspects.some((m) => m.message.includes("arrow keys navigate")));
+});
+
+// ---------------------------------------------------------------------------
+// Popup patterns: E2E on the heavy fixture + mutations
+
+const HEAVY = join(REPO_ROOT, "fixtures/auto-markup-proof/interactive/reference-heavy.html");
+
+test("E2E: heavy fixture — menu and modal dialog map cleanly", { timeout: 240_000 }, async () => {
+  const map = await buildInteractionMap({ source: HEAVY });
+  const byKey = new Map(map.elements.map((e) => [e.key, e]));
+  const menu = byKey.get("button|Account actions")!;
+  assert.equal(menu.activation!.popupRole, "menu");
+  assert.equal(menu.activation!.focusMovedIntoPopup, true);
+  assert.equal(menu.activation!.popupArrowCycles, true);
+  assert.equal(menu.activation!.escapeCloses, true);
+  assert.equal(menu.activation!.focusReturnsToOpener, true);
+  const dialog = byKey.get("button|Delete account…")!;
+  assert.equal(dialog.activation!.popupRole, "dialog");
+  assert.equal(dialog.activation!.focusMovedIntoPopup, true);
+  assert.equal(dialog.activation!.focusTrapped, true);
+  assert.equal(dialog.activation!.focusReturnsToOpener, true);
+  assert.deepEqual(deriveInteractionIssues(map).filter((i) => i.severity === "suspect"), []);
+});
+
+test("E2E: popup mutations are detected standalone and against the reference", { timeout: 480_000 }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), "interactions-heavy-"));
+  const src = readFileSync(HEAVY, "utf8");
+  const refMap = await buildInteractionMap({ source: HEAVY });
+
+  // A: menu opens without moving focus into it
+  const a = join(dir, "a.html");
+  writeFileSync(a, src.replace("menu.hidden = false;\n    items[0].focus();", "menu.hidden = false;"));
+  const mapA = await buildInteractionMap({ source: a });
+  assert.ok(deriveInteractionIssues(mapA).some((i) => i.kind === "popup-no-focus-move"), "A standalone");
+  assert.ok(compareInteractionMaps(refMap, mapA).mismatches.some((m) => m.message.includes("moves focus into the popup")), "A contract");
+
+  // B: non-modal dialog (show instead of showModal) leaks Tab focus
+  const b = join(dir, "b.html");
+  writeFileSync(b, src.replace("dialog.showModal()", "dialog.show()"));
+  const mapB = await buildInteractionMap({ source: b });
+  assert.ok(deriveInteractionIssues(mapB).some((i) => i.kind === "focus-escapes-trap" && i.severity === "suspect"), "B standalone");
+
+  // C: Escape closes the menu without returning focus
+  const c = join(dir, "c.html");
+  writeFileSync(c, src.replace('if (e.key === "Escape") { e.preventDefault(); closeMenu(true); }', 'if (e.key === "Escape") { e.preventDefault(); closeMenu(false); }'));
+  const mapC = await buildInteractionMap({ source: c });
+  assert.ok(deriveInteractionIssues(mapC).some((i) => i.kind === "focus-not-returned"), "C standalone");
+  assert.ok(compareInteractionMaps(refMap, mapC).mismatches.some((m) => m.severity === "suspect" && m.message.includes("returns focus")), "C contract");
+
+  // D: menu arrows dead
+  const d = join(dir, "d.html");
+  writeFileSync(d, src.replace('if (e.key === "ArrowDown") { e.preventDefault(); items[(i + 1) % items.length].focus(); }', ""));
+  const mapD = await buildInteractionMap({ source: d });
+  assert.ok(deriveInteractionIssues(mapD).some((i) => i.kind === "popup-arrows-dead"), "D standalone");
+  assert.ok(compareInteractionMaps(refMap, mapD).mismatches.some((m) => m.severity === "suspect" && m.message.includes("arrow keys")), "D contract");
+});

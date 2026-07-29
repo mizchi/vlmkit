@@ -70,6 +70,18 @@ export interface ActivationResult {
   escapeCloses?: boolean;
   /** Set when aria-controls names an id that does not exist. */
   brokenControlsId?: string;
+  // --- popup patterns (dialog / menu / listbox), probed when the
+  // activation opened one:
+  /** Focus landed inside the popup subtree after opening. */
+  focusMovedIntoPopup?: boolean;
+  /** aria-modal dialogs only: Tab never left the popup subtree. */
+  focusTrapped?: boolean;
+  /** After Escape closed the popup, focus returned to the opener. */
+  focusReturnsToOpener?: boolean;
+  /** Role of the popup node the probe identified (dialog/menu/listbox). */
+  popupRole?: string;
+  /** menu/listbox with focus inside: ArrowDown moves focus within it. */
+  popupArrowCycles?: boolean;
 }
 
 export interface InteractionElement {
@@ -100,7 +112,11 @@ export type InteractionIssueKind =
   | "inert-control"
   | "no-focus-indicator"
   | "not-tab-reachable"
-  | "escape-stuck";
+  | "escape-stuck"
+  | "popup-no-focus-move"
+  | "focus-escapes-trap"
+  | "focus-not-returned"
+  | "popup-arrows-dead";
 
 export interface InteractionIssue {
   kind: InteractionIssueKind;
@@ -144,6 +160,8 @@ const DISCOVER_SCRIPT = `
     if (!role) continue;
     const style = getComputedStyle(el);
     if (style.display === "none" || style.visibility === "hidden") continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) continue; // popup interiors etc. — probed via the popup pattern
     if (seen.has(el)) continue;
     seen.add(el);
     const ix = out.length;
@@ -221,6 +239,90 @@ function ariaSnapshotScript(index: number): string {
     open: owner ? owner.hasAttribute("open") : null,
     controls,
     layoutSignature: visibleCount + ":" + document.documentElement.scrollHeight + ":" + (document.body.innerText || "").length,
+  };
+})()
+`;
+}
+
+/**
+ * Identify a popup that appeared after activation: the trigger's
+ * aria-controls target when visible, else any newly-visible
+ * dialog/menu/listbox. Stamps it data-vlmkit-popup and reports whether
+ * the active element sits inside it.
+ */
+function popupProbeScript(index: number): string {
+  return `
+(() => {
+  const trigger = document.querySelector('[data-vlmkit-ix="${index}"]');
+  if (!trigger) return null;
+  const visible = (el) => {
+    if (!el) return false;
+    const s = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    return s.display !== "none" && s.visibility !== "hidden" && r.width > 0 && r.height > 0;
+  };
+  let popup = null;
+  const controlsId = (trigger.getAttribute("aria-controls") || "").split(/\\s+/)[0];
+  if (controlsId) {
+    const t = document.getElementById(controlsId);
+    if (visible(t)) popup = t;
+  }
+  if (!popup) {
+    for (const el of document.querySelectorAll('[role="dialog"], [role="menu"], [role="listbox"], dialog[open]')) {
+      if (visible(el) && !el.contains(trigger)) { popup = el; break; }
+    }
+  }
+  if (!popup) return null;
+  popup.setAttribute("data-vlmkit-popup", "1");
+  const role = popup.getAttribute("role") || (popup.tagName.toLowerCase() === "dialog" ? "dialog" : "");
+  return {
+    popupRole: role,
+    modal: popup.getAttribute("aria-modal") === "true" || popup.tagName.toLowerCase() === "dialog",
+    focusInside: popup.contains(document.activeElement),
+  };
+})()
+`;
+}
+
+/**
+ * Where is focus relative to the open popup? Native modal dialogs let
+ * Tab visit BROWSER chrome (activeElement = body) — that is not a trap
+ * leak; landing on a page element OUTSIDE the popup is.
+ */
+const FOCUS_INSIDE_POPUP_SCRIPT = `
+(() => {
+  const popup = document.querySelector('[data-vlmkit-popup]');
+  if (!popup) return null;
+  const el = document.activeElement;
+  if (!el || el === document.body || el === document.documentElement) return "chrome";
+  return popup.contains(el) ? "inside" : "outside";
+})()
+`;
+
+/** ArrowDown inside an open popup: does focus move and stay inside? */
+const POPUP_ACTIVE_SCRIPT = `
+(() => {
+  const popup = document.querySelector('[data-vlmkit-popup]');
+  const el = document.activeElement;
+  if (!popup || !el) return null;
+  return { inside: popup.contains(el), tag: el.tagName + "#" + (el.id || "") + ":" + (el.textContent || "").trim().slice(0, 24) };
+})()
+`;
+
+function popupClosedScript(index: number): string {
+  return `
+(() => {
+  const popup = document.querySelector('[data-vlmkit-popup]');
+  const trigger = document.querySelector('[data-vlmkit-ix="${index}"]');
+  const visible = (el) => {
+    if (!el) return false;
+    const s = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    return s.display !== "none" && s.visibility !== "hidden" && r.width > 0 && r.height > 0;
+  };
+  return {
+    closed: !visible(popup),
+    focusOnTrigger: trigger === document.activeElement,
   };
 })()
 `;
@@ -315,6 +417,39 @@ export function deriveInteractionIssues(map: InteractionMapResult): InteractionI
         message: `${label} was never reached by Tab — keyboard users cannot operate it.`,
       });
     }
+    if (el.activation?.popupRole && (el.activation.popupRole === "dialog" || el.activation.popupRole === "menu" || el.activation.popupRole === "listbox")
+      && el.activation.focusMovedIntoPopup === false) {
+      issues.push({
+        kind: "popup-no-focus-move",
+        severity: "warn",
+        element: label,
+        message: `${label} opens a ${el.activation.popupRole} but keyboard focus stays on the trigger — the ${el.activation.popupRole} pattern moves focus into the popup.`,
+      });
+    }
+    if (el.activation?.focusTrapped === false) {
+      issues.push({
+        kind: "focus-escapes-trap",
+        severity: "suspect",
+        element: label,
+        message: `${label} opens a modal dialog whose Tab focus ESCAPES the dialog — a modal must trap focus while open.`,
+      });
+    }
+    if (el.activation?.popupArrowCycles === false) {
+      issues.push({
+        kind: "popup-arrows-dead",
+        severity: "warn",
+        element: label,
+        message: `${label} opens a ${el.activation.popupRole} but ArrowDown does not move focus within it — menu/listbox items must be arrow-navigable.`,
+      });
+    }
+    if (el.activation?.escapeCloses === true && el.activation.focusReturnsToOpener === false) {
+      issues.push({
+        kind: "focus-not-returned",
+        severity: "warn",
+        element: label,
+        message: `${label}: Escape closes its popup but focus does NOT return to the trigger — keyboard users are dropped at the document root.`,
+      });
+    }
     if ((el.hasPopup || el.role === "combobox") && el.activation?.escapeCloses === false) {
       issues.push({
         kind: "escape-stuck",
@@ -403,6 +538,18 @@ export function compareInteractionMaps(
         }
         if (r.activation.escapeCloses === true && a.activation.escapeCloses === false) {
           mismatches.push({ severity: "warn", key, message: `${key}: Escape closes the reference's popup but not the attempt's.` });
+        }
+        if (r.activation.focusMovedIntoPopup === true && a.activation.focusMovedIntoPopup === false) {
+          mismatches.push({ severity: "suspect", key, message: `${key}: opening moves focus into the popup in the reference but not in the attempt.` });
+        }
+        if (r.activation.focusTrapped === true && a.activation.focusTrapped === false) {
+          mismatches.push({ severity: "suspect", key, message: `${key}: the reference's modal dialog traps Tab focus; the attempt's does not.` });
+        }
+        if (r.activation.focusReturnsToOpener === true && a.activation.focusReturnsToOpener === false) {
+          mismatches.push({ severity: "suspect", key, message: `${key}: Escape returns focus to the trigger in the reference but not in the attempt.` });
+        }
+        if (r.activation.popupArrowCycles === true && a.activation.popupArrowCycles === false) {
+          mismatches.push({ severity: "suspect", key, message: `${key}: arrow keys navigate the reference's popup items but not the attempt's.` });
         }
         if ((r.activation.focusMovedTo !== null) && (a.activation.focusMovedTo === null)) {
           mismatches.push({ severity: "warn", key, message: `${key}: ${describeKey(r.activation.key)} moves focus in the reference (roving) but not in the attempt.` });
@@ -502,14 +649,51 @@ export async function buildInteractionMap(options: InteractionMapOptions): Promi
               activation.brokenControlsId = before.controls.id;
             }
             const openedPopup = (d.hasPopup || d.role === "combobox")
-              && (delta["expanded"]?.[1] === "true" || activation.controlsBecameVisible === true);
+              && (delta["expanded"]?.[1] === "true" || activation.controlsBecameVisible === true || activation.layoutChanged);
             if (openedPopup) {
+              // Identify the popup node and whether focus moved into it.
+              const popup = await page.evaluate(popupProbeScript(d.index)) as
+                { popupRole: string; modal: boolean; focusInside: boolean } | null;
+              if (popup) {
+                activation.popupRole = popup.popupRole;
+                activation.focusMovedIntoPopup = popup.focusInside;
+                // Modal dialogs must trap Tab: walk a bounded number of
+                // stops and require every one to stay inside the popup.
+                if (popup.modal) {
+                  let trapped = true;
+                  for (let t = 0; t < 12; t++) {
+                    await page.keyboard.press("Tab");
+                    const where = await page.evaluate(FOCUS_INSIDE_POPUP_SCRIPT) as "inside" | "outside" | "chrome" | null;
+                    if (where === "outside") {
+                      trapped = false;
+                      break;
+                    }
+                    if (where === null) break;
+                  }
+                  activation.focusTrapped = trapped;
+                }
+                if (popup.focusInside && (popup.popupRole === "menu" || popup.popupRole === "listbox")) {
+                  const beforeArrow = await page.evaluate(POPUP_ACTIVE_SCRIPT) as { inside: boolean; tag: string } | null;
+                  await page.keyboard.press("ArrowDown");
+                  const afterArrow = await page.evaluate(POPUP_ACTIVE_SCRIPT) as { inside: boolean; tag: string } | null;
+                  activation.popupArrowCycles = !!(beforeArrow && afterArrow && afterArrow.inside && afterArrow.tag !== beforeArrow.tag);
+                }
+              }
               await page.keyboard.press("Escape");
               await page.waitForTimeout(settleMs);
-              const closed = await page.evaluate(ariaSnapshotScript(d.index)) as AriaSnapshot | null;
-              activation.escapeCloses = closed
-                ? (closed.expanded !== "true" && (!closed.controls || !closed.controls.visible))
-                : false;
+              if (popup) {
+                const closedState = await page.evaluate(popupClosedScript(d.index)) as
+                  { closed: boolean; focusOnTrigger: boolean } | null;
+                activation.escapeCloses = closedState?.closed ?? false;
+                if (closedState?.closed) {
+                  activation.focusReturnsToOpener = closedState.focusOnTrigger;
+                }
+              } else {
+                const closed = await page.evaluate(ariaSnapshotScript(d.index)) as AriaSnapshot | null;
+                activation.escapeCloses = closed
+                  ? (closed.expanded !== "true" && (!closed.controls || !closed.controls.visible))
+                  : false;
+              }
             }
           }
         }
@@ -556,7 +740,15 @@ export function formatInteractionReport(
     if (el.activation) {
       const delta = Object.entries(el.activation.ariaDelta).map(([k, [b, a]]) => `${k} ${b} -> ${a}`).join(", ");
       act = ` | ${el.activation.key}: ${delta || (el.activation.layoutChanged ? "layout change" : el.activation.focusMovedTo !== null ? "focus moves" : "no response")}`;
-      if (el.activation.escapeCloses !== undefined) act += ` | Esc ${el.activation.escapeCloses ? "closes" : "stuck"}`;
+      if (el.activation.popupRole) {
+        act += ` | opens ${el.activation.popupRole}${el.activation.focusMovedIntoPopup ? " (focus enters)" : ""}`;
+        if (el.activation.focusTrapped !== undefined) act += el.activation.focusTrapped ? ", traps" : ", TRAP LEAKS";
+        if (el.activation.popupArrowCycles !== undefined) act += el.activation.popupArrowCycles ? ", arrows cycle" : ", arrows DEAD";
+      }
+      if (el.activation.escapeCloses !== undefined) {
+        act += ` | Esc ${el.activation.escapeCloses ? "closes" : "stuck"}`;
+        if (el.activation.focusReturnsToOpener !== undefined) act += el.activation.focusReturnsToOpener ? "+returns focus" : ", focus LOST";
+      }
     }
     lines.push(`  - [${el.role}] "${el.name}" ${focus}${act}`);
   }
