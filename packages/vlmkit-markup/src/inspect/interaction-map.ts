@@ -150,7 +150,7 @@ export interface InteractionIssue {
  * can address them by index. Also captures each element's BLURRED
  * focus-adjacent styles for the indicator comparison.
  */
-const DISCOVER_SCRIPT = `
+export const DISCOVER_SCRIPT = `
 (() => {
   const IMPLICIT = new Map([
     ["button", "button"], ["summary", "button"], ["select", "combobox"], ["textarea", "textbox"],
@@ -879,6 +879,7 @@ contract and every response mismatch is reported.
 Options:
   --reference <html>    Reference page defining the interaction contract
   --max-elements <n>    Probe cap (default 30; the report says when capped)
+  --handlers            Also enumerate the wired event-callback surface (scan handlers) and cross-check it
   --json                Print JSON report`);
   process.exit(exitCode);
 }
@@ -888,12 +889,14 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   let reference: string | undefined;
   let maxElements = 30;
   let json = false;
+  let handlers = false;
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === "--reference") reference = argv[++i]!;
     else if (arg === "--max-elements") maxElements = Number(argv[++i]!);
     else if (arg === "--json") json = true;
+    else if (arg === "--handlers") handlers = true;
     else if (!arg.startsWith("-")) positional.push(arg);
   }
   const source = positional[0];
@@ -905,6 +908,15 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   if (reference) {
     const refMap = await buildInteractionMap({ source: reference, maxElements });
     comparison = compareInteractionMaps(refMap, map);
+  }
+  let handlerBlock = "";
+  let handlerSuspects = 0;
+  if (handlers) {
+    const { buildHandlerSurface, deriveHandlerIssues, formatHandlerSurface } = await import("./handler-map.ts");
+    const surface = await buildHandlerSurface({ source });
+    const handlerIssues = deriveHandlerIssues(surface);
+    handlerSuspects = handlerIssues.filter((i) => i.severity === "suspect").length;
+    handlerBlock = "\n\n" + formatHandlerSurface(surface, handlerIssues);
   }
 
   appendRunLedger({
@@ -921,8 +933,9 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   });
 
   if (json) console.log(JSON.stringify({ map, issues, comparison }, null, 2));
-  else console.log(formatInteractionReport(map, issues, comparison));
+  else console.log(formatInteractionReport(map, issues, comparison) + handlerBlock);
   const failing = issues.some((i) => i.severity === "suspect")
+    || handlerSuspects > 0
     || (comparison && (comparison.missing.length > 0 || comparison.mismatches.some((m) => m.severity === "suspect")));
   if (failing) process.exit(1);
 }

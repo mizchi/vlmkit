@@ -154,6 +154,20 @@ and Escape must close AND return focus to the trigger. Popup
 *interiors* are hidden at rest, so they are verified through these
 pattern probes, not itemized in the inventory.
 
+**The wired-callback surface** (experimental): `check interactions
+--handlers` (or standalone `scan handlers`) enumerates every callback
+actually registered on the page — an `addEventListener` patch injected
+before page scripts plus an `on*` attribute/property sweep — and
+cross-checks it against the role-driven discovery. The headline
+suspect is the **pointer-only control**: a visible element with a
+click handler but no role, no keyboard handler, and no delegation
+excuse — mouse users can operate it, keyboard and AT users cannot,
+and the role-driven map alone can never see it (it is never
+discovered). Handler types the probes don't fire are listed, never
+silently dropped. Framework caveat: React-style root delegation shows
+one listener on the root; per-element granularity is a vanilla /
+Web Components property.
+
 **Composites and announcements** are also first-class: a standalone
 `listbox` tracks `aria-activedescendant` (resolved to the referenced
 element's TEXT, so differing ids never false-mismatch) and the
