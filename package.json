@@ -48,6 +48,7 @@
     "prepack": "pnpm build",
     "smoke:dist": "pnpm build && bash scripts/smoke-dist.sh",
     "smoke:dist:strict": "pnpm build && bash scripts/smoke-dist.sh --strict",
+    "smoke:pack:markup-loop": "node scripts/smoke-packed-markup-loop.mjs",
     "test": "node --test 'src/**/*.test.ts' 'packages/*/src/**/*.test.ts' 'worker/**/*.test.ts' 'examples/**/*.test.mjs'",
     "test:examples": "node --test 'examples/**/*.test.mjs'",
     "dogfood:markup-vrt:offline": "MARKUP_EVAL_OFFLINE=1 node examples/markup-vrt-eval/run.mjs",

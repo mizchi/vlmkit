@@ -67,6 +67,15 @@ describe("package manifest for publishable CLI", () => {
     assert.equal(scripts["dogfood:markup-vrt:offline"], "MARKUP_EVAL_OFFLINE=1 node examples/markup-vrt-eval/run.mjs");
   });
 
+  it("keeps the packed markup-loop install smoke explicit and out of unit tests", async () => {
+    const pkg = await readPackageJson();
+    const scripts = pkg.scripts as Record<string, string> | undefined;
+
+    assert.ok(scripts, "package.json should define scripts");
+    assert.equal(scripts["smoke:pack:markup-loop"], "node scripts/smoke-packed-markup-loop.mjs");
+    assert.doesNotMatch(scripts.test, /smoke:pack:markup-loop|smoke-packed-markup-loop/);
+  });
+
   it("exports the published client entrypoint", async () => {
     const pkg = await readPackageJson();
     assert.deepEqual(pkg.exports, {
