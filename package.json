@@ -96,6 +96,7 @@
     "pixelmatch": "^7.1.0",
     "playwright": "^1.61.1",
     "pngjs": "^7.0.0",
-    "ws": "^8.20.0"
+    "ws": "^8.20.0",
+    "@mizchi/vlmkit-mcp": "workspace:*"
   }
 }

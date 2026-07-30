@@ -141,6 +141,7 @@ const SPECS: Record<string, Spec> = {
   scrollScan: spec("scroll-scan", () => import("@mizchi/vlmkit-markup/inspect/scroll-scan.ts")),
   breakpointCheck: spec("breakpoint-check", () => import("@mizchi/vlmkit-markup/stress/breakpoint-check.ts")),
   markupVerify: spec("markup-verify", () => import("@mizchi/vlmkit-markup/verify/markup-verify.ts")),
+  flowVerify: spec("flow-verify", () => import("@mizchi/vlmkit-markup/inspect/flow-verify.ts")),
   markupAutofix: spec("markup-autofix", () => import("@mizchi/vlmkit-markup/verify/markup-autofix.ts")),
   regionJudge: spec("region-judge", () => import("@mizchi/vlmkit-markup/inspect/region-judge.ts")),
   interactionMap: spec("interaction-map", () => import("@mizchi/vlmkit-markup/inspect/interaction-map.ts")),
@@ -218,6 +219,7 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
   },
   verify: {
     markup: { spec: SPECS.markupVerify, desc: "One-shot done-condition verdict: composition per target + gates + pixel diff + kickback list with selector attribution" },
+    flow: { spec: SPECS.flowVerify, desc: "Verified scripted browser flow: action -> deterministic post-condition assert (no LLM)" },
   },
 };
 
@@ -463,6 +465,13 @@ Run \`vlmkit <command> --help\` for command-specific options.`);
         console.log("vlmkit api <serve|status>");
         if (sub) process.exitCode = 1;
       }
+    });
+
+  cli.command("mcp [...args]", "MCP server exposing the deterministic verification gates (stdio)")
+    .allowUnknownOptions()
+    .action(async () => {
+      const { runStdioServer } = await import("@mizchi/vlmkit-mcp/stdio.ts");
+      await runStdioServer();
     });
 
   cli.command("manifest [...args]", "Author / edit approval.json manifests")

@@ -1,0 +1,19 @@
+{
+  "name": "@mizchi/vlmkit-mcp",
+  "version": "0.7.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./*.ts": "./src/*.ts"
+  },
+  "scripts": {
+    "test": "node --test 'src/**/*.test.ts'"
+  },
+  "dependencies": {
+    "@mizchi/vlmkit-core": "workspace:*",
+    "@mizchi/vlmkit-markup": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^3.23.8"
+  }
+}
