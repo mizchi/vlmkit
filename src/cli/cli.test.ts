@@ -24,6 +24,12 @@ function runVrt(args: string[]): { stdout: string; stderr: string; status: numbe
 }
 
 describe("vrt CLI tree (cac-based)", () => {
+  it("`vrt --version` matches the package release", () => {
+    const r = runVrt(["--version"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vlmkit\/0\.7\.0/);
+  });
+
   it("`vrt --help` prints top-level usage", () => {
     const r = runVrt(["--help"]);
     assert.equal(r.status, 0);

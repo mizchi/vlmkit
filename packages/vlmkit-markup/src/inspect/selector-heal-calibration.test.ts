@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { chromium } from "playwright";
 import { healSelector } from "../heal/selector-heal.ts";
@@ -19,8 +19,7 @@ type CalibrationCase = {
   label: "true-positive" | "false-positive" | "true-negative";
 };
 
-const root = resolve(process.cwd(), "../..");
-const corpusPath = resolve(root, "docs/reports/data/2026-07-30-selector-heal-calibration.json");
+const corpusPath = fileURLToPath(new URL("../../../../docs/reports/data/2026-07-30-selector-heal-calibration.json", import.meta.url));
 
 test("selector-heal calibration corpus has 20+ labeled real fixture cases", async () => {
   const corpus = JSON.parse(await readFile(corpusPath, "utf8")) as { cases: CalibrationCase[] };
@@ -30,7 +29,7 @@ test("selector-heal calibration corpus has 20+ labeled real fixture cases", asyn
   try {
     const page = await browser.newPage();
     for (const entry of corpus.cases) {
-      await page.goto(`file://${resolve(root, "fixtures/interact", entry.fixture)}`);
+      await page.goto(`file://${fileURLToPath(new URL(`../../../../fixtures/interact/${entry.fixture}`, import.meta.url))}`);
       const actual = (await healSelector(page, entry.brokenSelector, { maxCandidates: 1 }))[0];
       assert.equal(actual?.selector ?? null, entry.actualSelector, entry.brokenSelector);
       assert.ok(Math.abs((actual?.confidence ?? 0) - entry.confidence) < 1e-9, entry.brokenSelector);
