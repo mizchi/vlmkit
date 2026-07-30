@@ -282,6 +282,28 @@ self-declaration once verdicts became explicit):
 - When some targets pass and others fail, the kickback says which to
   protect — scope fixes to the failing target's media regime.
 
+### B6. `check integrity attempt.html` (reference-free defect sweep)
+
+Needs NO target image or manifest — run it as the last gate on every
+attempt, and as the PRIMARY gate when there is no reference at all
+(creative/zero-shot markup from a brief). It sweeps 1280/768/375 for
+defects that are unambiguous without a reference: construction-phase JS
+errors, empty/degenerate renders, broken images/stylesheets/scripts,
+same-layer text collisions, clipped text, collapsed containers,
+horizontal page overflow, and declared-but-unapplied styling. Findings
+carry selector attribution; a `fail` flips the verdict to DEFECTS.
+
+- Intentional patterns (hero overlay, `text-overflow: ellipsis`,
+  zero-height positioning anchors, `aria-hidden` decoration) are
+  exempted by the TOOL and listed under `exempted` — same rule as
+  demotion: the exemption is the tool's judgment, not yours. If you
+  believe a `fail` is intentional, the fix is to express the intent in
+  CSS (positioned layer, ellipsis), not to argue with the report.
+- Measured value on our own fixtures: the S8 edit fixture — verified
+  DONE at 1280 — turned out to overflow 67px at 375 (`div.plans`),
+  invisible to every reference-full gate because no 375 target existed.
+  Multi-viewport integrity is exactly the net for that class.
+
 ## Budget & stopping
 
 - Static convergence: auto-markup's budget (3-5 rounds single viewport,

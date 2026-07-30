@@ -872,3 +872,28 @@ and **weak** ones at `>= 0.15`. These are precision-first thresholds: a
 fixture-derived corpus found that the former 0.30 strong cutoff promoted a
 wrong sibling. The corpus, exact scores, and reproduction command are in
 [`docs/reports/2026-07-30-selector-heal-calibration.md`](reports/2026-07-30-selector-heal-calibration.md).
+
+### check integrity — 参照なし欠陥ゲートの S14b/S14c 結果 (2026-07-30)
+
+設計: `docs/design/creative-markup-eval.md`。参照(target 画像・manifest)
+なしで判定可能な欠陥 9 クラスの決定論ゲート。
+
+- **S14b mutation 検知率: 9/9 (100%)** — JS 構築失敗 / post-load 例外 /
+  404 画像 / テキスト衝突(負マージン + 同層 absolute の両方)/ テキスト
+  切れ / 潰れコンテナ(float)/ page-overflow-x / 404 stylesheet
+  (+unstyled-page 連鎖)/ 375px 限定オーバーフローの viewport 帰属。
+  注入は自明ケースなので 100% が合格線(設計どおり)。
+- **S14c 偽陽性(自作分): 0** — hero オーバーレイ / ellipsis 切り詰め /
+  高さ 0 位置決めアンカー / aria-hidden 装飾は verdict clean のまま
+  `exempted` に理由付きで記録される(免除はツールの判定として可視)。
+- **実装知見**: Chromium は 404 の `<link rel=stylesheet>` にも空の
+  CSSStyleSheet を付ける(`link.sheet != null`)— DOM 側では死んだ
+  stylesheet を検知できず、wire(requestfailed / 非 OK response)が
+  唯一の信頼できる検知点。同様に、テキストのみのページはグリフが
+  minArea 未満で components 0 になるため、degenerate 判定は pixel 単独
+  でなく DOM textBlocks との AND が必要。
+- **初回 dogfood**: S8 edit fixture(1280 で DONE 検証済み)に 375px で
+  67px の実在オーバーフロー(`div.plans` 帰属)— 参照ありゲートは target
+  が存在しない幅に盲目、というこのゲートの存在理由をそのまま実証。
+- 未実施: 外部ページ dogfood(免除ルールの穴探し)、S14a 創造的実走、
+  Layer B(VLM ルーブリック + 反証)。

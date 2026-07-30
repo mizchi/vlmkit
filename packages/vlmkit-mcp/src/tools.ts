@@ -215,6 +215,35 @@ const checkEquivalenceTool: McpTool = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// check_integrity (reference-free defect gate)
+
+const checkIntegrityTool: McpTool = {
+  name: "check_integrity",
+  description:
+    "Reference-free integrity gate for creative/zero-shot markup — no target image or manifest needed. Detects defects that are unambiguous without a reference: JS errors (construction-phase = fatal), empty/degenerate renders, broken images/stylesheets/scripts/fonts, same-layer text collisions, clipped text, collapsed containers, horizontal page overflow, and declared-but-unapplied styling, swept across multiple viewport widths. Deterministic (DOM + pixel math, no VLM). Intentional patterns (hero overlays, ellipsis truncation, positioning anchors) are exempted by tool-side rules and reported in `exempted` — audit the rule, don't re-litigate the finding. The kickback is a paste-ready, selector-attributed fix list.",
+  inputSchema: {
+    source: z.string().describe("Path or URL of the page to check."),
+    viewports: z.array(z.number()).optional().describe("Sweep widths (default 1280, 768, 375)."),
+    maxFindings: z.number().optional().describe("Per-class report cap (default 12)."),
+  },
+  run: async (args) => {
+    const { runIntegrityCheck } = await import("@mizchi/vlmkit-markup/inspect/integrity-check.ts");
+    const heights: Record<number, number> = { 1280: 800, 768: 900, 375: 700 };
+    const report = await runIntegrityCheck({
+      source: args.source as string,
+      ...(args.viewports
+        ? { viewports: (args.viewports as number[]).map((w) => ({ width: w, height: heights[w] ?? 800 })) }
+        : {}),
+      ...(args.maxFindings !== undefined ? { maxFindings: args.maxFindings as number } : {}),
+    });
+    const fails = report.findings.filter((f) => f.severity === "fail").length;
+    const warns = report.findings.length - fails;
+    const summary = `check_integrity: ${report.verdict === "clean" ? "CLEAN" : "DEFECTS"} (${fails} fail, ${warns} warn, ${report.exempted.length} exempted)`;
+    return result(summary, report, report.verdict !== "clean");
+  },
+};
+
 const verifyFlowTool: McpTool = {
   name: "verify_flow",
   description:
@@ -241,6 +270,7 @@ const verifyFlowTool: McpTool = {
 export const TOOLS: McpTool[] = [
   verifyFlowTool,
   verifyMarkupTool,
+  checkIntegrityTool,
   checkInteractionsTool,
   scanHandlersTool,
   checkCopyTool,

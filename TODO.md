@@ -275,17 +275,21 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 
 ### 参照なし(創造的)マークアップ評価 — `check integrity` + S14(設計 2026-07-30)
 設計: `docs/design/creative-markup-eval.md`
-- [ ] **`check integrity` gate(Layer A、キー不要)** — 参照なしで判定可能な
-  欠陥 9 クラス(JS 構築失敗 / 空レンダー / 壊れリソース / テキスト衝突 /
-  はみ出し / 潰れコンテナ / 水平オーバーフロー / スタイル未適用 /
-  3-viewport 横断)を決定論プローブで検知。scroll-scan・copy-target・
-  component-bbox・smoke-runner の既存資産を束ねる。セレクタ帰属 +
-  免除(exempted)の可視化は verify markup と同一規約。MCP
-  `check_integrity` も同時追加。
-- [ ] **S14 バッテリー** — S14b mutation(9 クラス注入、検知率 100% 目標、
-  回帰テスト常設)→ S14c 偽陽性監査(意図的オーバーレイ fixture + 外部
-  ページ dogfood 必須)→ S14a 創造的実走(ブリーフ=copy manifest 兼用、
-  Haiku→Sonnet 逐語ハンドオフ、別読み手検証)。
+- [x] **`check integrity` gate(Layer A、キー不要)** — 2026-07-30 実装済み:
+  `inspect/integrity-check.ts`、欠陥 9 クラス + 免除の可視化(exempted)+
+  セレクタ帰属 kickback + 3-viewport 掃引。CLI `check integrity` + MCP
+  `check_integrity`(8 本目)。A3 は wire 検知(requestfailed / 非 OK
+  response) — `link.sheet` は 404 でも non-null と実測したため。
+- [x] **S14b mutation バッテリー + S14c 偽陽性監査(自作分)** — 2026-07-30:
+  9/9 クラス検知、意図的パターン(hero オーバーレイ / ellipsis / アンカー /
+  aria-hidden)は clean + exempted 記録。回帰テスト常設(20 テスト)。
+  初回 dogfood で S8 edit fixture の 375px 実在オーバーフロー(67px,
+  `div.plans`)を検出 — 参照ありゲートの死角の実証。
+- [ ] **S14c 外部ページ dogfood** — 実世界ページ(curl ミラー)で
+  免除ルールの穴を探す(APG の教訓: 自作 fixture だけでは見つからない)。
+- [ ] **S14a 創造的実走** — ブリーフのみ(=copy manifest 兼用)から
+  Haiku 実走、`check integrity` ループ駆動、Sonnet 逐語ハンドオフ、
+  別読み手検証。rounds / kickback 追従率 / gate 沈黙欠陥数を計測。
 - [ ] **Layer B(VLM 視覚判定、advisory)** — 固定ルーブリック強制択一 +
   根拠領域指名、決定論反証(refutation)付き。キーなし環境はワークシート
   生成(check equivalence 方式)。VLM 直結ベンチは Issue #88 枠に相乗り。

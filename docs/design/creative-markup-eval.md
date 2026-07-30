@@ -1,6 +1,25 @@
 # 設計: 参照なし(創造的)マークアップの評価シナリオ
 
-日付: 2026-07-30 / ステータス: 設計(未実装)
+日付: 2026-07-30 / ステータス: Layer A 実装済み(同日)、Layer B / S14a は未着手
+
+## 実装状況(2026-07-30)
+
+実装順序 1〜4 を出荷:
+- `packages/vlmkit-markup/src/inspect/integrity-check.ts` — Layer A 全プローブ
+  (A1-A9)。A3 の stylesheet/script/font は **wire 検知**(requestfailed +
+  非 OK response)に変更 — Chromium は 404 の `<link>` にも空の
+  CSSStyleSheet を付けるため `link.sheet != null` では死んだ stylesheet を
+  見分けられない(実装中に実測)。A2 は DOM 側 textBlocks を判定に含める
+  (テキストのみのページはグリフが minArea 未満で components 0 になるため、
+  pixel 単独では偽 degenerate になる)。
+- CLI `check integrity` + MCP `check_integrity`(8 本目)。
+- S14b mutation バッテリー: **9/9 クラス検知**(回帰テストとして常設)。
+- S14c 偽陽性監査(自作分): hero オーバーレイ / ellipsis / 位置決め
+  アンカー / aria-hidden 装飾 → verdict clean、全候補が `exempted` に記録。
+- 初回 dogfood: S8 edit fixture(1280 で DONE 検証済み)が 375 で 67px の
+  実在オーバーフローを持つことを検出(`div.plans` 帰属) — 参照ありゲートの
+  死角(target が無い幅)をそのまま裏付ける結果。
+- 未実施: S14c 外部ページ dogfood、S14a 創造的実走、Layer B ワークシート。
 
 ## 背景と目的
 
