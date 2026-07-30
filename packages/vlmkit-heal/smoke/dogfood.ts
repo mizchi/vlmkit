@@ -3,6 +3,7 @@
  * ways, and check the heal loop restores green via real OpenRouter codegen.
  *
  *   HEAL_REAL_LLM=1 node packages/vlmkit-heal/smoke/dogfood.ts
+ *   HEAL_REAL_LLM=1 HEAL_CODEGEN_MODELS=google/gemini-2.5-flash node packages/vlmkit-heal/smoke/dogfood.ts
  */
 import { readFileSync, writeFileSync, rmSync } from "node:fs";
 import { dirname, join, basename } from "node:path";
@@ -30,10 +31,22 @@ const MUTATIONS: Mutation[] = [
 ];
 
 const real = process.env.HEAL_REAL_LLM === "1";
-let codegenTiers: ModelTier[] = [
-  { provider: "openrouter", model: "qwen/qwen3-coder-30b-a3b-instruct", vision: false },
-  { provider: "openrouter", model: "openai/gpt-4o-mini", vision: false },
+const defaultCodegenModels = [
+  "qwen/qwen3-coder-30b-a3b-instruct",
+  "google/gemini-2.5-flash",
 ];
+const configuredCodegenModels = process.env.HEAL_CODEGEN_MODELS
+  ?.split(",")
+  .map((model) => model.trim())
+  .filter(Boolean);
+const codegenModels = configuredCodegenModels?.length
+  ? configuredCodegenModels
+  : defaultCodegenModels;
+let codegenTiers: ModelTier[] = codegenModels.map((model) => ({
+  provider: "openrouter",
+  model,
+  vision: false,
+}));
 if (real) {
   const pricing = await fetchOpenRouterPricing(process.env.OPENROUTER_API_KEY!);
   codegenTiers = withPricing(codegenTiers, pricing);
