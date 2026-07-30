@@ -465,6 +465,13 @@ Run \`vlmkit <command> --help\` for command-specific options.`);
       }
     });
 
+  cli.command("mcp [...args]", "MCP server exposing the deterministic verification gates (stdio)")
+    .allowUnknownOptions()
+    .action(async () => {
+      const { runStdioServer } = await import("@mizchi/vlmkit-mcp/stdio.ts");
+      await runStdioServer();
+    });
+
   cli.command("manifest [...args]", "Author / edit approval.json manifests")
     .allowUnknownOptions()
     .action(async () => delegate(SPECS.manifest, passThrough(argv, ["manifest"])));
