@@ -43,6 +43,7 @@ import { healSelector } from "../heal/selector-heal.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { classifyHealTier } from "./selector-heal-calibration.ts";
 
 export type SequenceAction =
   | { action: "snapshot"; name: string }
@@ -291,16 +292,13 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
               maxCandidates: 1,
               exclude: successSelector,
             });
-            // Tiering: 0.3+ is "did you mean" (strong, actionable);
-            // 0.1-0.3 is "weak match" (sibling-button-style overlap
-            // that's worth eyeballing but not an obvious typo).
-            // Dogfood (2026-05-15) flagged 13% as noise when labelled
-            // "did you mean", hence the split. Healer's internal
-            // floor stays at 0.05; we ignore the 0.05-0.1 band here.
+            // The corpus-calibrated strong tier is deliberately conservative:
+            // a 30% suggestion selected the wrong sibling. See docs/knowledge.md.
             const top = candidates[0];
-            if (top && top.confidence >= 0.1) {
-              const tier: "strong" | "weak" = top.confidence >= 0.3 ? "strong" : "weak";
-              healAllFindings.push({
+            if (top) {
+              const tier = classifyHealTier(top.confidence);
+              if (tier !== "none") {
+                healAllFindings.push({
                 stepIndex,
                 action: step,
                 originalSelector: successSelector,
@@ -308,7 +306,8 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
                 suggestion: { selector: top.selector, confidence: top.confidence, text: top.text },
               });
               const label = tier === "strong" ? `${YELLOW}did you mean${RESET}` : `${DIM}weak match${RESET}`;
-              console.log(`    ${label} ${DIM}\`${top.selector}\`${RESET} ${DIM}(${(top.confidence * 100).toFixed(0)}% confidence${top.text ? `, "${top.text}"` : ""})${RESET}`);
+                console.log(`    ${label} ${DIM}\`${top.selector}\`${RESET} ${DIM}(${(top.confidence * 100).toFixed(0)}% confidence${top.text ? `, "${top.text}"` : ""})${RESET}`);
+              }
             }
           } catch { /* healer failure is non-fatal */ }
         }
