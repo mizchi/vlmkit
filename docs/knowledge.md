@@ -837,6 +837,8 @@ S5 で Haiku が missing/extra を残して 3 ラウンドで自己宣言停止�
 | S13 widgets **Sonnet 継続レグ** | 4 | 138,205 | 68 | 979s | **1.52%** | **DONE — 静的 + interaction 契約 + surface 契約の三重達成は初**。extractor の top-8 ランキング席取りを読んで ordering 誤検出を解消(要ウォッチ 3 例目: 分割適合)。surface 契約の委譲偽陽性 1 件は検証者が即修正 |
 | S10 realshot **Sonnet** | 2 | 58,103 | — | — | 36%(advisory) | **done(劣化キャプチャ宣言モード初実証)**。dpr2+JPEG 実スクショ 1 枚入力。diff 36% は写真領域のグラデ近似による設計値 — 構図・コピー・パレットは目視一致 |
 | S14a creative Haiku(参照なし) | 1 | 31,616 | 9 | 69s | —(target 不在) | **DONE — 参照なし創造モード初実証**(done 条件 = check integrity CLEAN×3 + copy manifest 0 missing)。integrity は初稿 clean、修正駆動は copy gate のみ(details 内 2 行)。検証フェーズ(別読み手: gate 再実行・3 幅目視・verify flow で details 開閉実証)で gate 沈黙欠陥 0。**pixel target が無い創造タスクでは Haiku の壁(1px エンドゲーム)が発生しない** |
+| S14a-stress creative Haiku(高密度ブリーフ) | 1 | 30,499 | 5 | 52s | —(target 不在) | **DONE — 負荷ブリーフ(固定サイドバー+3 段階規律+非分割トークン)でも初稿 CLEAN**。DOM 実測で全レイアウト規律充足を確認。結論: 作成ランでは kickback 追従を計測できない(明確なブリーフ+現行 Haiku は初稿 clean が定常) |
+| S14a-fix repair Haiku(既知欠陥 6 種の修理) | 2 | 29,616 | 10 | 57s | —(target 不在) | **CLEAN — kickback 追従 7/7**(diff 監査: 全修正が名指しセレクタ、削除逃げ 0、figure/caption 保全)。r2 で dedupe に隠れていた 375 図版オーバーフローが顕在化→修正。**帰属 kickback の決定論ナビゲーションは修理タスクなら Haiku でも完全に機能**(参照ありでは Sonnet 限定だった加速効果) |
 
 トークン計測は S5 が初(それ以前のランは usage を記録していなかった)。
 r2/r3 の tokens はセグメント合算 — 差し戻し(resume)はトランスクリプト

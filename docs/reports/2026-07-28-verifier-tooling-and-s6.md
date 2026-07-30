@@ -698,3 +698,43 @@ reference もなし — ブリーフ(全コピー逐語引用、copy manifest �
 S14 バッテリー総括: S14b 9/9 検知、S14c 偽陽性 0(外部 dogfood で
 ルール 4 クラス修正後)、S14a 実走 DONE + 検証一致。Layer A は出荷状態。
 残るは Layer B(VLM ルーブリック + 反証、要キー環境)のみ。
+
+## 追記14: S14a 負荷版 + 修理レグ — kickback 追従の直接計測(2026-07-30)
+
+### 負荷ブリーフ leg(attempt-stress.html)
+
+A4/A5 を踏ませる意図で設計した高密度ブリーフ(260px 固定サイドバー +
+3 段階レイアウト規律、非分割トークン 2 種、独語複合語、定義テーブル)でも
+**Haiku は初稿 CLEAN(1 ラウンド、30.5k tokens、52 秒)**。検証(別読み手):
+gate 再実行一致、DOM 実測(sidebar 260px、統計帯 4→2x2→縦積み、768 折り
+たたみ)、3 幅目視 clean、gate 沈黙欠陥 0。
+
+**結論**: 仕様が明確なブリーフに対する現行 Haiku の創造マークアップは
+初稿 clean が定常であり、**作成ランでは kickback 追従を計測できない**。
+gate の役割は修復駆動でなく done 条件 + 回帰網。
+
+### 修理 leg(broken-spec.html → attempt-fix.html)— 計測器の転換
+
+kickback 追従を測るため、既知欠陥 6 種(衝突 / 切れ / 潰れ float /
+1400px オーバーフロー / 404 画像 / 構築時 ReferenceError)を注入した
+`broken-spec.html` を作成(全欠陥がセレクタ帰属付きで発火することを事前
+確認)。Haiku に「kickback だけを頼りに最小差分で修理、コンテンツ削除
+禁止」を課した。
+
+**結果: CLEAN(2 ラウンド、29.6k tokens、57 秒)**
+
+- **kickback 追従 7/7**: 全修正が kickback の名指しセレクタそのもの
+  (#subline margin、#ship-note 折返し化、#card-row BFC、#promo-banner
+  width、#topology data-URI SVG 差し替え、docment typo、figure max-width)。
+  diff 監査で確認 — 削除逃げ 0、リデザイン 0、figure/caption 保全。
+- ラウンド構造も教科書どおり: r1 で 6 fails 一括修正 → r2 で banner 修正に
+  隠れていた 375 の図版オーバーフローが顕在化 → 修正 → clean。
+  (page-overflow-x の dedupe が最初の viewport のみ保持するため、多重
+  オーバーフローは修正で順次顕在化する — 誤動作ではなく想定挙動として記録)
+- 検証: gate 再実行一致、ledger 一致(6+1→1→0)、修理後スクリーンショット
+  目視 clean(JS 修正で Retried カードのハイライトまで復活)。
+
+**S14a 総括**: 創造モードの gate 価値は (1) done 条件、(2) 修理タスクでの
+決定論ナビゲーション(セレクタ帰属 kickback を Haiku がそのまま実行できる
+— 参照ありモードで Sonnet 限定だった「帰属の加速」が、pixel target 不在の
+修理では Haiku でも 7/7 機能した)。

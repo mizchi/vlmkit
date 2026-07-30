@@ -295,9 +295,11 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   唯一の修正駆動。別読み手検証で gate 沈黙欠陥 0。観察: copy gate が
   disclosure を open 既定に誘導(状態別 copy 検証が将来の穴埋め)。
   `docs/reports/2026-07-28-verifier-tooling-and-s6.md` 追記13。
-- [ ] **S14a 負荷版** — 密度の高いブリーフ(多段グリッド、狭幅制約、
-  長文コピー)で A4/A5(衝突・切れ)を実際に踏ませ、kickback 追従を計測
-  (今回のブリーフは integrity 初稿 clean で gate の修正誘導が未計測)。
+- [x] **S14a 負荷版 + 修理レグ** — 2026-07-30 実施。負荷ブリーフでも Haiku
+  初稿 CLEAN(作成ランでは追従を計測不能と確定)→ 計測器を転換: 既知欠陥
+  6 種注入の `broken-spec.html` を修理させ **kickback 追従 7/7**(diff 監査、
+  削除逃げ 0)。帰属 kickback は修理タスクなら Haiku でも完全機能。
+  追記14 参照。
 - [ ] **check copy 状態別検証モード** — details/タブ等を開いてから manifest
   照合(S14a 観察: 現状はレンダリング済みテキストのみのため、エージェントが
   折りたたみを open 既定に倒すインセンティブになる)。
