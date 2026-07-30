@@ -273,6 +273,23 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   browser-use/Stagehand との差別化軸は "verified success rate"(見た目 OK
   でなく宣言事後条件の充足)。MVP は自リポジトリ UI に閉じる。
 
+### 参照なし(創造的)マークアップ評価 — `check integrity` + S14(設計 2026-07-30)
+設計: `docs/design/creative-markup-eval.md`
+- [ ] **`check integrity` gate(Layer A、キー不要)** — 参照なしで判定可能な
+  欠陥 9 クラス(JS 構築失敗 / 空レンダー / 壊れリソース / テキスト衝突 /
+  はみ出し / 潰れコンテナ / 水平オーバーフロー / スタイル未適用 /
+  3-viewport 横断)を決定論プローブで検知。scroll-scan・copy-target・
+  component-bbox・smoke-runner の既存資産を束ねる。セレクタ帰属 +
+  免除(exempted)の可視化は verify markup と同一規約。MCP
+  `check_integrity` も同時追加。
+- [ ] **S14 バッテリー** — S14b mutation(9 クラス注入、検知率 100% 目標、
+  回帰テスト常設)→ S14c 偽陽性監査(意図的オーバーレイ fixture + 外部
+  ページ dogfood 必須)→ S14a 創造的実走(ブリーフ=copy manifest 兼用、
+  Haiku→Sonnet 逐語ハンドオフ、別読み手検証)。
+- [ ] **Layer B(VLM 視覚判定、advisory)** — 固定ルーブリック強制択一 +
+  根拠領域指名、決定論反証(refutation)付き。キーなし環境はワークシート
+  生成(check equivalence 方式)。VLM 直結ベンチは Issue #88 枠に相乗り。
+
 ### Benchmarks
 - [ ] **markup-agent モデル横断ベンチ: OpenRouter + pi でモデルごとの性能比較**(関連: Issue #88)
   - 目的: S7-fresh A/B(Haiku 4.5 vs Sonnet — `docs/reports/2026-07-28-verifier-tooling-and-s6.md` 追記3)を Anthropic 外のモデルへ拡張し、markup-agent ループの model×cost 表を作る。既存の vlm-bench(Stage-1 VLM 比較)とは別物 — こちらは**エージェント本体**(vision 読み + CSS 執筆 + verify markup ループ運転)の比較。
