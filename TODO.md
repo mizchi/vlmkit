@@ -259,6 +259,20 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 
 ## Backlog (prioritize after evaluation)
 
+### Ecosystem positioning (市場調査 2026-07-29 由来)
+調査メモ: `docs/reports/2026-07-29-ai-markup-tooling-landscape.md` /
+設計: `docs/design/mcp-and-agent-expansion.md`
+- [ ] **MCP 露出(パート A、キー不要・低リスク・最優先)** — 決定論ゲート
+  (verify_markup / check_interactions / scan_handlers / build_page /
+  check_copy)を MCP tool 化。既存の純関数 + Hono/OpenAPI を再利用、
+  Playwright は dynamic import。`packages/vlmkit-mcp/` 新規 + `vlmkit mcp`
+  サブコマンド。統合面が MCP に収束した市場への刺し込み口。
+- [ ] **verified browser agent(パート B、要 LLM キー・差別化前提)** —
+  goal-runner の invariant + interaction-map の状態遷移語彙で「実行→事後
+  条件検証→失敗ならロールバック/再計画」の検証付きループ(`vlmkit act`)。
+  browser-use/Stagehand との差別化軸は "verified success rate"(見た目 OK
+  でなく宣言事後条件の充足)。MVP は自リポジトリ UI に閉じる。
+
 ### Benchmarks
 - [ ] **markup-agent モデル横断ベンチ: OpenRouter + pi でモデルごとの性能比較**(関連: Issue #88)
   - 目的: S7-fresh A/B(Haiku 4.5 vs Sonnet — `docs/reports/2026-07-28-verifier-tooling-and-s6.md` 追記3)を Anthropic 外のモデルへ拡張し、markup-agent ループの model×cost 表を作る。既存の vlm-bench(Stage-1 VLM 比較)とは別物 — こちらは**エージェント本体**(vision 読み + CSS 執筆 + verify markup ループ運転)の比較。
