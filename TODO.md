@@ -285,8 +285,11 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   aria-hidden)は clean + exempted 記録。回帰テスト常設(20 テスト)。
   初回 dogfood で S8 edit fixture の 375px 実在オーバーフロー(67px,
   `div.plans`)を検出 — 参照ありゲートの死角の実証。
-- [ ] **S14c 外部ページ dogfood** — 実世界ページ(curl ミラー)で
-  免除ルールの穴を探す(APG の教訓: 自作 fixture だけでは見つからない)。
+- [x] **S14c 外部ページ dogfood** — 2026-07-30 実施(5 ページ: example /
+  danluu / csszengarden / HN / w3.org APG)。免除ルールの穴 4 クラスを
+  発見・修正(image replacement / sr-only が最重要 — 部分切れ vs 完全隠し
+  の実測判別)。真の陽性 1 件(HN 横スクロール)。
+  `docs/reports/2026-07-30-integrity-external-dogfood.md`。
 - [ ] **S14a 創造的実走** — ブリーフのみ(=copy manifest 兼用)から
   Haiku 実走、`check integrity` ループ駆動、Sonnet 逐語ハンドオフ、
   別読み手検証。rounds / kickback 追従率 / gate 沈黙欠陥数を計測。

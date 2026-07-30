@@ -110,13 +110,28 @@ describe("pure judges", () => {
   });
 
   test("judgeClippedText: clip fails, ellipsis and line-clamp exempt", () => {
+    const visible = { textVisibleArea: 800, srOnlyShaped: false, replacement: false };
     const { findings, exempted } = judgeClippedText([
-      { selector: "#cut", text: "long text", clipX: 60, clipY: 0, textOverflow: "clip", lineClamp: "none" },
-      { selector: "#ell", text: "long text", clipX: 60, clipY: 0, textOverflow: "ellipsis", lineClamp: "none" },
-      { selector: "#clamp", text: "long text", clipX: 0, clipY: 40, textOverflow: "clip", lineClamp: "2" },
+      { selector: "#cut", text: "long text", clipX: 60, clipY: 0, textOverflow: "clip", lineClamp: "none", ...visible },
+      { selector: "#ell", text: "long text", clipX: 60, clipY: 0, textOverflow: "ellipsis", lineClamp: "none", ...visible },
+      { selector: "#clamp", text: "long text", clipX: 0, clipY: 40, textOverflow: "clip", lineClamp: "2", ...visible },
     ], 1280);
     assert.deepEqual(findings.map((f) => f.selector), ["#cut"]);
     assert.equal(exempted.length, 2);
+  });
+
+  test("judgeClippedText: fully-hidden text — image replacement / sr-only exempt, no-signal warns (csszengarden dogfood)", () => {
+    const hidden = { clipX: 0, clipY: 20, textOverflow: "clip", lineClamp: "none", textVisibleArea: 0 };
+    const { findings, exempted } = judgeClippedText([
+      { selector: "#kellum", text: "HTML", ...hidden, srOnlyShaped: false, replacement: true },
+      { selector: "#sr", text: "Skip to content", ...hidden, srOnlyShaped: true, replacement: false },
+      { selector: "#accident", text: "gone", ...hidden, srOnlyShaped: false, replacement: false },
+      { selector: "#partial", text: "partially cut", clipX: 60, clipY: 0, textOverflow: "clip", lineClamp: "none", textVisibleArea: 500, srOnlyShaped: false, replacement: true },
+    ], 1280);
+    assert.equal(exempted.length, 2);
+    assert.match(exempted[0]!.reason, /image replacement/);
+    assert.match(exempted[1]!.reason, /sr-only/);
+    assert.deepEqual(findings.map((f) => `${f.selector}:${f.severity}`), ["#accident:warn", "#partial:fail"]);
   });
 
   test("judgeCollapsedContainers: in-flow fail, anchor and overflow-hidden exempt", () => {
@@ -129,24 +144,29 @@ describe("pure judges", () => {
     assert.equal(exempted.length, 2);
   });
 
-  test("judgeUnstyled: all-failed is fail, UA fingerprint is warn, bare page is null", () => {
-    const base = { declaredStylesheets: 1, loadedStylesheets: 1, styleElements: 0, inlineStyleAttrs: 0, uaFont: false, uaMargin: false, uaLinkColor: false as boolean | null };
+  test("judgeUnstyled: all-failed is fail, UA fingerprint is warn, bare/minimal page is null", () => {
+    const base = { declaredStylesheets: 1, loadedStylesheets: 1, styleElements: 0, inlineStyleAttrs: 0, cssRules: 40, uaFont: false, uaMargin: false, uaLinkColor: false as boolean | null };
     assert.equal(judgeUnstyled({ ...base, loadedStylesheets: 0 }, 1280)?.severity, "fail");
     assert.equal(judgeUnstyled({ ...base, uaFont: true, uaMargin: true, uaLinkColor: true }, 1280)?.severity, "warn");
     assert.equal(judgeUnstyled({ ...base, declaredStylesheets: 0 }, 1280), null);
     assert.equal(judgeUnstyled({ ...base }, 1280), null);
+    // danluu.com: 4 deliberate rules keeping UA defaults — a design choice.
+    assert.equal(judgeUnstyled({ ...base, styleElements: 1, cssRules: 4, uaFont: true, uaMargin: true, uaLinkColor: true }, 1280), null);
   });
 
-  test("judgeNetworkFailures: stylesheet/script fail, font/xhr warn, other types ignored", () => {
+  test("judgeNetworkFailures: same-origin stylesheet/script fail, cross-origin (third-party) warn, font/xhr warn", () => {
     const findings = judgeNetworkFailures([
       { url: "file:///x/app.css", resourceType: "stylesheet", reason: "net::ERR_FILE_NOT_FOUND" },
       { url: "file:///x/app.js", resourceType: "script", reason: "net::ERR_FILE_NOT_FOUND" },
+      { url: "https://cdn.example/beacon.min.js", resourceType: "script", reason: "net::ERR_CONNECTION_RESET", crossOrigin: true },
+      { url: "https://fonts.example/x.css", resourceType: "stylesheet", reason: "HTTP 404", crossOrigin: true },
       { url: "file:///x/a.woff2", resourceType: "font", reason: "HTTP 404" },
       { url: "https://x/api", resourceType: "xhr", reason: "HTTP 500" },
       { url: "file:///x/other", resourceType: "other", reason: "x" },
     ], 1280);
     assert.deepEqual(findings.map((f) => `${f.kind}:${f.severity}`),
-      ["failed-stylesheet:fail", "js-error:fail", "broken-font:warn", "js-error:warn"]);
+      ["failed-stylesheet:fail", "js-error:fail", "js-error:warn", "failed-stylesheet:warn", "broken-font:warn", "js-error:warn"]);
+    assert.match(findings[2]!.message, /Third-party/);
   });
 
   test("judgeRender: blank fails, invisible text fails, text-only page is NOT degenerate", () => {
@@ -299,6 +319,26 @@ describe("S14c false-positive audit", () => {
     assert.match(reasons, /overlay|aria-hidden/, "hero overlay pattern recorded as exempted");
     assert.match(reasons, /ellipsis/, "ellipsis truncation recorded as exempted");
     assert.match(reasons, /anchor/, "zero-height positioning anchor recorded as exempted");
+  });
+
+  test("image replacement (Kellum, text-indent) and sr-only stay clean; accidental full hide warns", { timeout: 120_000 }, async () => {
+    const file = page("replacement.html", `
+      <a id="kellum" href="#v" style="display:inline-block;overflow:hidden;width:40px;height:0;padding:40px 0 0 0;background:#c33">HTML</a>
+      <a id="indent" href="#n" style="display:block;overflow:hidden;width:70px;height:70px;text-indent:100%;white-space:nowrap;background:url('data:image/gif;base64,R0lGODlhAQABAAAAACw=')">Next Designs</a>
+      <span id="sr" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Skip to main content</span>
+      <div id="accident" style="width:120px;height:0;overflow:hidden">Text nobody replaced</div>
+      <div style="width:600px;height:200px;background:#357">content</div>`,
+      `<style>body{font-family:system-ui;margin:0;padding:16px}#kellum::before{content:"\\2605";font-size:32px;color:#fff}</style>`);
+    const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+    assert.equal(report.verdict, "clean",
+      `findings: ${JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector ?? ""} ${f.severity}`))}`);
+    const reasons = report.exempted.filter((e) => e.kind === "text-clipped").map((e) => `${e.selector}:${e.reason}`);
+    assert.ok(reasons.some((r) => r.startsWith("#kellum") && r.includes("image replacement")), reasons.join(" | "));
+    assert.ok(reasons.some((r) => r.startsWith("#indent") && r.includes("image replacement")), reasons.join(" | "));
+    assert.ok(reasons.some((r) => r.startsWith("#sr") && r.includes("sr-only")), reasons.join(" | "));
+    const accident = report.findings.find((f) => f.selector === "#accident");
+    assert.equal(accident?.severity, "warn");
+    assert.match(accident!.message, /no replacement signal/);
   });
 
   test("clean multi-viewport run stays clean and reports per-viewport stats", { timeout: 180_000 }, async () => {

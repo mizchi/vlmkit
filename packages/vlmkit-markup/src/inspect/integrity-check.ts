@@ -249,6 +249,10 @@ export interface NetworkFailure {
   /** Playwright resourceType: stylesheet | image | font | script | fetch | xhr | ... */
   resourceType: string;
   reason: string;
+  /** Origin differs from the page's — third-party resource (danluu
+   * dogfood: a failing analytics beacon must not hard-fail the page's
+   * own markup integrity; a failing same-origin build script must). */
+  crossOrigin?: boolean;
 }
 
 export function judgeNetworkFailures(failures: NetworkFailure[], viewport: number): IntegrityFinding[] {
@@ -259,19 +263,23 @@ export function judgeNetworkFailures(failures: NetworkFailure[], viewport: numbe
       case "stylesheet":
         findings.push({
           kind: "failed-stylesheet",
-          severity: "fail",
+          severity: f.crossOrigin ? "warn" : "fail",
           viewport,
-          message: `Stylesheet ${tail} failed to load (${f.reason}) — its rules are not applied.`,
-          evidence: { url: f.url, reason: f.reason },
+          message: f.crossOrigin
+            ? `Third-party stylesheet ${tail} failed to load (${f.reason}) — its rules are not applied; the page's own styling is unaffected.`
+            : `Stylesheet ${tail} failed to load (${f.reason}) — its rules are not applied.`,
+          evidence: { url: f.url, reason: f.reason, crossOrigin: f.crossOrigin ?? false },
         });
         break;
       case "script":
         findings.push({
           kind: "js-error",
-          severity: "fail",
+          severity: f.crossOrigin ? "warn" : "fail",
           viewport,
-          message: `Script ${tail} failed to load (${f.reason}) — everything it builds or wires is missing.`,
-          evidence: { url: f.url, reason: f.reason, text: `script-load:${tail}` },
+          message: f.crossOrigin
+            ? `Third-party script ${tail} failed to load (${f.reason}) — usually analytics/widgets; the page's own scripts are unaffected.`
+            : `Script ${tail} failed to load (${f.reason}) — everything it builds or wires is missing.`,
+          evidence: { url: f.url, reason: f.reason, text: `script-load:${tail}`, crossOrigin: f.crossOrigin ?? false },
         });
         break;
       case "font":
@@ -429,6 +437,12 @@ export interface ClipCandidate {
   clipY: number;
   textOverflow: string;
   lineClamp: string;
+  /** px² of the element's direct text rects that remain inside its box. */
+  textVisibleArea: number;
+  /** ≤2px on both axes — the sr-only/visually-hidden box shape. */
+  srOnlyShaped: boolean;
+  /** background-image or ::before/::after content present — image-replacement signal. */
+  replacement: boolean;
 }
 
 export function judgeClippedText(
@@ -445,6 +459,34 @@ export function judgeClippedText(
     }
     if (c.lineClamp !== "none" && c.lineClamp !== "") {
       exempted.push({ kind: "text-clipped", viewport, selector: c.selector, reason: `-webkit-line-clamp: ${c.lineClamp} — intentional truncation` });
+      continue;
+    }
+    // Partial cut vs full hide (csszengarden dogfood, 2026-07-30): a
+    // genuinely broken box cuts PART of the text; image replacement
+    // (Kellum padding, text-indent 100%/-9999px) and sr-only hide ALL
+    // of it. Fully-hidden text with a replacement signal is a pattern,
+    // not a defect.
+    if (c.textVisibleArea < 4) {
+      if (c.srOnlyShaped || c.replacement) {
+        exempted.push({
+          kind: "text-clipped",
+          viewport,
+          selector: c.selector,
+          reason: c.srOnlyShaped
+            ? "visually-hidden (sr-only) pattern — 1px box, text for AT only"
+            : "image replacement — text fully hidden, background-image/pseudo-content carries the visual",
+        });
+        continue;
+      }
+      if (findings.length >= maxFindings) continue;
+      findings.push({
+        kind: "text-clipped",
+        severity: "warn",
+        viewport,
+        selector: c.selector,
+        message: `${c.selector} hides ALL of its text ("${clip(c.text)}") behind overflow:hidden but shows no replacement signal (no background-image, pseudo-content, or sr-only box) — either an unfinished visually-hidden pattern or an accidental full clip; verify intent.`,
+        evidence: { clipX: c.clipX, clipY: c.clipY, textVisibleArea: c.textVisibleArea },
+      });
       continue;
     }
     if (findings.length >= maxFindings) continue;
@@ -508,6 +550,8 @@ export interface StyleFingerprint {
   loadedStylesheets: number;
   styleElements: number;
   inlineStyleAttrs: number;
+  /** Total accessible CSS rules across all sheets. */
+  cssRules: number;
   uaFont: boolean;
   uaMargin: boolean;
   /** null when the page has no <a> to sample. */
@@ -526,6 +570,9 @@ export function judgeUnstyled(fp: StyleFingerprint, viewport: number): Integrity
       evidence: { ...fp },
     };
   }
+  // A handful of rules that deliberately keep UA defaults (danluu.com:
+  // 4 rules) is a design choice, not an unapplied stylesheet.
+  if (fp.cssRules > 0 && fp.cssRules < 5) return null;
   const uaSignals = [fp.uaFont, fp.uaMargin, fp.uaLinkColor !== false].filter(Boolean).length;
   if (fp.uaFont && fp.uaMargin && uaSignals >= 3) {
     return {
@@ -636,6 +683,25 @@ export const COLLECT_CLIP_CANDIDATES = `(() => {
     const lineH = parseFloat(style.lineHeight) || 16;
     const clipY = CLIPPING.test(style.overflowY) ? Math.max(0, el.scrollHeight - el.clientHeight) : 0;
     if (clipX < 4 && clipY < Math.max(4, lineH * 0.6)) continue;
+    // How much of the element's own text actually stays visible inside
+    // its box — the partial-cut vs fully-hidden discriminator.
+    const box = el.getBoundingClientRect();
+    let textVisibleArea = 0;
+    for (const n of el.childNodes) {
+      if (n.nodeType !== 3 || !(n.nodeValue || "").trim()) continue;
+      const range = document.createRange();
+      range.selectNodeContents(n);
+      for (const r of range.getClientRects()) {
+        const ix = Math.min(r.right, box.right) - Math.max(r.left, box.left);
+        const iy = Math.min(r.bottom, box.bottom) - Math.max(r.top, box.top);
+        if (ix > 0 && iy > 0) textVisibleArea += ix * iy;
+      }
+    }
+    let replacement = style.backgroundImage !== "none";
+    for (const pseudo of ["::before", "::after"]) {
+      const content = getComputedStyle(el, pseudo).content;
+      if (content && content !== "none" && content !== "normal" && content !== '""') replacement = true;
+    }
     out.push({
       selector: stableSelector(el),
       text: direct.replace(/\\s+/g, " ").trim().slice(0, 80),
@@ -643,6 +709,9 @@ export const COLLECT_CLIP_CANDIDATES = `(() => {
       clipY,
       textOverflow: style.textOverflow,
       lineClamp: style.webkitLineClamp || "none",
+      textVisibleArea: Math.round(textVisibleArea),
+      srOnlyShaped: el.clientWidth <= 2 && el.clientHeight <= 2,
+      replacement,
     });
   }
   return out;
@@ -701,11 +770,16 @@ export const COLLECT_STYLE_FINGERPRINT = `(() => {
   const links = Array.from(document.querySelectorAll('link[rel~="stylesheet" i]'));
   const body = getComputedStyle(document.body);
   const a = document.querySelector("a[href]");
+  let cssRules = 0;
+  for (const sheet of Array.from(document.styleSheets)) {
+    try { cssRules += sheet.cssRules.length; } catch { cssRules += 1; }
+  }
   return {
     declaredStylesheets: links.length,
     // Placeholder: link.sheet is non-null even for a 404, so the runner
     // overwrites this from the wire-observed stylesheet failures.
     loadedStylesheets: links.length,
+    cssRules,
     styleElements: document.querySelectorAll("style").length,
     inlineStyleAttrs: document.querySelectorAll("[style]").length,
     uaFont: /times/i.test(body.fontFamily),
@@ -778,12 +852,14 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
           events.push({ type: "console-error", text: msg.text().slice(0, 200), phase: loaded ? "post-load" : "construction" });
         }
       });
+      const pageOrigin = (() => { try { return new URL(url).origin; } catch { return ""; } })();
+      const originOf = (u: string) => { try { return new URL(u).origin; } catch { return pageOrigin; } };
       page.on("requestfailed", (req) => {
-        netFailures.push({ url: req.url(), resourceType: req.resourceType(), reason: req.failure()?.errorText ?? "failed" });
+        netFailures.push({ url: req.url(), resourceType: req.resourceType(), reason: req.failure()?.errorText ?? "failed", crossOrigin: originOf(req.url()) !== pageOrigin });
       });
       page.on("response", (res) => {
         if (!res.ok() && res.status() >= 400) {
-          netFailures.push({ url: res.url(), resourceType: res.request().resourceType(), reason: `HTTP ${res.status()}` });
+          netFailures.push({ url: res.url(), resourceType: res.request().resourceType(), reason: `HTTP ${res.status()}`, crossOrigin: originOf(res.url()) !== pageOrigin });
         }
       });
       await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
@@ -833,7 +909,13 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       // A7 — scan scroll delegation (page-overflow-x is a defect here)
       const scroll = await page.evaluate(COLLECT_SCROLL_SCRIPT) as Omit<ScrollScanInput, "source">;
       const scrollReport = analyzeScrollSamples({ source: options.source, ...scroll });
-      const clippedSelectors = new Set(clipped.findings.map((f) => f.selector));
+      // The text probe already ruled on these selectors — as findings OR
+      // as exemptions (an sr-only span must not resurface as a
+      // clipped-content warn from the scroll sweep).
+      const clippedSelectors = new Set([
+        ...clipped.findings.map((f) => f.selector),
+        ...clipped.exempted.map((e) => e.selector),
+      ]);
       for (const issue of scrollReport.issues) {
         if (issue.kind === "clipped-content" && issue.selector && clippedSelectors.has(issue.selector)) continue;
         push([{

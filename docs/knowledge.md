@@ -895,5 +895,12 @@ wrong sibling. The corpus, exact scores, and reproduction command are in
 - **初回 dogfood**: S8 edit fixture(1280 で DONE 検証済み)に 375px で
   67px の実在オーバーフロー(`div.plans` 帰属)— 参照ありゲートは target
   が存在しない幅に盲目、というこのゲートの存在理由をそのまま実証。
-- 未実施: 外部ページ dogfood(免除ルールの穴探し)、S14a 創造的実走、
-  Layer B(VLM ルーブリック + 反証)。
+- **S14c 外部 dogfood(同日)**: 5 実ページミラーで免除ルールの穴 4 クラス
+  を発見・修正 — ①image replacement / sr-only(csszengarden で 6 誤 fail;
+  判別軸は「部分切れ=欠陥 / 完全隠し=パターン」で、直下テキスト rects と
+  要素 box の交差面積を実測)、②scroll-scan 委譲が免除済みセレクタを
+  clipped-content で再報告、③cross-origin リソース失敗は warn(danluu の
+  CF beacon)、④総 CSS ルール数 <5 は意図的ミニマル(danluu)。真の陽性
+  1 件(HN の 36px 横スクロール @768)。詳細:
+  `docs/reports/2026-07-30-integrity-external-dogfood.md`。
+- 未実施: S14a 創造的実走、Layer B(VLM ルーブリック + 反証)。
