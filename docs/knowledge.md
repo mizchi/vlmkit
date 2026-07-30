@@ -907,3 +907,14 @@ wrong sibling. The corpus, exact scores, and reproduction command are in
   1 件(HN の 36px 横スクロール @768)。詳細:
   `docs/reports/2026-07-30-integrity-external-dogfood.md`。
 - 未実施: S14a 創造的実走、Layer B(VLM ルーブリック + 反証)。
+- **Layer A 第 2 陣(2026-07-30)**: B 軸から 4 判断を決定論降格 —
+  A10 container-protrusion(painted parent からの in-flow はみ出し;
+  positioned badge / 負マージン breakout は exempt)、A11 invisible-text /
+  low-contrast-text(単色背景のみ、αブレンド+累積 opacity、複合背景は
+  集約 exempt 行で明示スキップ;**視覚的に隠れたテキストは自要素+祖先
+  クリップ交差で除外** — zen garden の閉じたドロップダウン内白文字を
+  invisible と誤報した偽陽性 2 クラスを実測修正)、A12 near-misalignment
+  (兄弟が正確に揃う軸から 2-8px 外れ=事故、warn)、`check layout
+  --contract`(ブリーフ構造要求の宣言照合、MCP 9 本目)。全ミラー+全
+  fixture で偽陽性 0、attempt-stress の #changelog low-contrast warn
+  (2.56:1)は真の陽性。バッテリー 31 テスト。

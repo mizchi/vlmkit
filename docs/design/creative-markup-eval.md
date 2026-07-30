@@ -27,6 +27,35 @@
   追記13。派生課題: 高密度ブリーフの負荷版、check copy の状態別検証。
 - 未実施: Layer B ワークシート(VLM ルーブリック + 反証、要キー環境)。
 
+### Layer A 拡張(2026-07-30 第 2 陣) — B 軸からの決定論降格
+
+S14 の判別語彙(部分切れ vs 完全隠し / positioned+z-index は意図 /
+近接=事故)を使い、Layer B に残していた判断 4 つを決定論化:
+
+- **A10 `container-protrusion`** — overflow visible のまま painted parent
+  (枠線・背景を持つ box)から in-flow の子がはみ出す(どのゲートも
+  沈黙していた最頻クラス)。positioned な子(badge)と負の水平マージン
+  (full-bleed breakout)はツール側 exempt。
+- **A11 `invisible-text` / `low-contrast-text`** — 単色背景のみ対象に
+  αブレンド + 累積 opacity 込みで WCAG 比を実測(<1.15 fail、<3 warn)。
+  背景画像/グラデーションはページ単位の集約 exempt 行で明示スキップ
+  (Layer B 領域のまま)。disabled / text-shadow は exempt。
+  **image-replacement 等で視覚的に隠れたテキスト(自要素または祖先の
+  クリップ外)はスキップ** — zen garden dogfood で発見した偽陽性クラス
+  (閉じたドロップダウン内の白文字を invisible と誤報)への対処。
+- **A12 `near-misalignment`(warn)** — 同型兄弟 3+ が left/center/right/top
+  のいずれかで正確に揃っているとき、2-8px だけ外れた要素を警告。
+  「0px も 9px 以上も正常、帯域内だけ事故」という near-miss 原理の整列版。
+  他軸で正確に揃う要素(左揃えリスト内の中央揃え)は意図としてスキップ。
+- **`check layout --contract`(別ゲート、`inspect/layout-contract.ts`)** —
+  ブリーフの構造要求(幅±許容、1 行あたりセル数、full-width 折りたたみ、
+  積み順、可視性、個数)を宣言 JSON で照合。S14a-stress の検証者が手書き
+  していた DOM 計測の正式化。MCP `check_layout`(9 本目)。
+
+dogfood(zen garden / danluu / HN / 自作 fixture 全て)で偽陽性 0 に調整
+済み。attempt-stress の #changelog が low-contrast warn(2.56:1)として
+検出されたのは真の陽性(Haiku が書いた実際に薄すぎる文字)。
+
 ## 背景と目的
 
 これまでの評価軸(S1-S13)はすべて **お手本あり** — target 画像・reference

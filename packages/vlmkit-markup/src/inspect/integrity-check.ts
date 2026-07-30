@@ -25,6 +25,11 @@
  *   A7 page-overflow-x / clipped-content / nested-scroll (scan scroll reuse)
  *   A8 unstyled-page       stylesheets declared but the page renders UA-default
  *   A9 all of the above swept across multiple viewports
+ *   A10 container-protrusion  in-flow child sticks out of a painted parent
+ *                             (positioned overlays and breakouts exempt)
+ *   A11 invisible-text / low-contrast-text  solid backgrounds only;
+ *                             composite backgrounds are skipped visibly
+ *   A12 near-misalignment  siblings share an edge exactly, one is 2-8px off
  *
  * CLI:
  *   vlmkit check integrity <html-or-url> [--viewports 1280,768,375] [--json]
@@ -50,7 +55,11 @@ export type IntegrityFindingKind =
   | "page-overflow-x"
   | "clipped-content"
   | "nested-scroll"
-  | "unstyled-page";
+  | "unstyled-page"
+  | "container-protrusion"
+  | "invisible-text"
+  | "low-contrast-text"
+  | "near-misalignment";
 
 export interface IntegrityFinding {
   kind: IntegrityFindingKind;
@@ -587,6 +596,184 @@ export function judgeUnstyled(fp: StyleFingerprint, viewport: number): Integrity
 }
 
 // ---------------------------------------------------------------------------
+// A10 — container protrusion (bbox sticks out of a painted parent)
+
+export interface ProtrusionCandidate {
+  parent: string;
+  /** "(text)" when the parent's own text overflows its box. */
+  child: string;
+  /** Largest px the child border-box exceeds the parent padding box by. */
+  amount: number;
+  /** Child is absolute/fixed — badge/notification overlay pattern. */
+  positioned: boolean;
+  /** Child carries a negative horizontal margin — full-bleed breakout. */
+  negBreakout: boolean;
+  /** Protrusion axis for the message. */
+  axis: "horizontal" | "vertical";
+}
+
+export function judgeProtrusions(
+  candidates: ProtrusionCandidate[],
+  viewport: number,
+  maxFindings = 12,
+): { findings: IntegrityFinding[]; exempted: IntegrityExemption[] } {
+  const findings: IntegrityFinding[] = [];
+  const exempted: IntegrityExemption[] = [];
+  for (const c of candidates) {
+    const sel = `${c.child} out of ${c.parent}`;
+    if (c.positioned) {
+      exempted.push({ kind: "container-protrusion", viewport, selector: sel, reason: "positioned overlay (badge/notification pattern) — the protrusion is authored" });
+      continue;
+    }
+    if (c.negBreakout && c.axis === "horizontal") {
+      exempted.push({ kind: "container-protrusion", viewport, selector: sel, reason: "negative horizontal margin — full-bleed/breakout pattern" });
+      continue;
+    }
+    if (findings.length >= maxFindings) continue;
+    findings.push({
+      kind: "container-protrusion",
+      severity: "fail",
+      viewport,
+      selector: sel,
+      message: c.child === "(text)"
+        ? `Text inside ${c.parent} sticks out ${c.amount}px past its painted box (overflow is visible) — a long word or fixed width; allow wrapping (overflow-wrap) or widen the box.`
+        : `${c.child} sticks out ${c.amount}px (${c.axis}) past its painted parent ${c.parent} — the child is wider/taller than the container allows; shrink it, let it wrap, or make the overflow an authored overlay (position + z-index).`,
+      evidence: { parent: c.parent, child: c.child, amount: c.amount, axis: c.axis },
+    });
+  }
+  return { findings, exempted };
+}
+
+// ---------------------------------------------------------------------------
+// A11 — invisible / low-contrast text (solid backgrounds only)
+
+export interface ContrastCandidate {
+  selector: string;
+  text: string;
+  /** WCAG contrast ratio after alpha/opacity compositing. */
+  ratio: number;
+  fg: string;
+  bg: string;
+  disabled: boolean;
+  /** text-shadow present — may carry the contrast the fill lacks. */
+  shadowed: boolean;
+}
+
+export function judgeTextContrast(
+  candidates: ContrastCandidate[],
+  skippedComposite: number,
+  viewport: number,
+  maxFindings = 12,
+): { findings: IntegrityFinding[]; exempted: IntegrityExemption[] } {
+  const findings: IntegrityFinding[] = [];
+  const exempted: IntegrityExemption[] = [];
+  for (const c of candidates) {
+    if (c.disabled) {
+      exempted.push({ kind: "low-contrast-text", viewport, selector: c.selector, reason: "disabled control — reduced contrast is the platform convention" });
+      continue;
+    }
+    if (c.shadowed) {
+      exempted.push({ kind: "low-contrast-text", viewport, selector: c.selector, reason: "text-shadow present — the shadow may carry the contrast the fill lacks (not measurable deterministically)" });
+      continue;
+    }
+    if (findings.length >= maxFindings) continue;
+    if (c.ratio < 1.15) {
+      findings.push({
+        kind: "invisible-text",
+        severity: "fail",
+        viewport,
+        selector: c.selector,
+        message: `${c.selector} renders "${clip(c.text)}" in ${c.fg} on ${c.bg} (contrast ${c.ratio.toFixed(2)}:1) — the text is effectively invisible.`,
+        evidence: { ratio: c.ratio, fg: c.fg, bg: c.bg },
+      });
+    } else {
+      findings.push({
+        kind: "low-contrast-text",
+        severity: "warn",
+        viewport,
+        selector: c.selector,
+        message: `${c.selector} renders "${clip(c.text)}" at contrast ${c.ratio.toFixed(2)}:1 (${c.fg} on ${c.bg}) — below the 3:1 floor even for large text.`,
+        evidence: { ratio: c.ratio, fg: c.fg, bg: c.bg },
+      });
+    }
+  }
+  if (skippedComposite > 0) {
+    exempted.push({
+      kind: "low-contrast-text",
+      viewport,
+      selector: "(page)",
+      reason: `${skippedComposite} text block(s) skipped: background-image/gradient in the stack — composite-background contrast is not deterministically measurable (Layer B territory)`,
+    });
+  }
+  return { findings, exempted };
+}
+
+// ---------------------------------------------------------------------------
+// A12 — near-misalignment (exactly aligned and clearly offset are both fine;
+// a 2-8px deviation from siblings that otherwise share an edge is a bug)
+
+export interface AlignmentGroup {
+  parent: string;
+  children: { selector: string; left: number; right: number; centerX: number; top: number }[];
+}
+
+const ALIGN_AXES = ["left", "centerX", "right", "top"] as const;
+
+export function judgeAlignment(
+  groups: AlignmentGroup[],
+  viewport: number,
+  maxFindings = 8,
+): IntegrityFinding[] {
+  const findings: IntegrityFinding[] = [];
+  const flagged = new Set<string>();
+  for (const group of groups) {
+    if (group.children.length < 3) continue;
+    // Per axis: the modal value (rounded to .5px) among the children.
+    const modes = new Map<(typeof ALIGN_AXES)[number], { value: number; count: number }>();
+    for (const axis of ALIGN_AXES) {
+      const counts = new Map<number, number>();
+      for (const ch of group.children) {
+        const v = Math.round(ch[axis] * 2) / 2;
+        counts.set(v, (counts.get(v) ?? 0) + 1);
+      }
+      let best = { value: 0, count: 0 };
+      for (const [value, count] of counts) if (count > best.count) best = { value, count };
+      modes.set(axis, best);
+    }
+    for (const axis of ALIGN_AXES) {
+      const mode = modes.get(axis)!;
+      // Require a real shared edge: at least 2 exact members AND at most
+      // 2 deviants (a majority is aligned; scattered values mean the axis
+      // is simply not the alignment axis of this group).
+      if (mode.count < 2 || group.children.length - mode.count > 2) continue;
+      for (const ch of group.children) {
+        const dev = Math.abs(Math.round(ch[axis] * 2) / 2 - mode.value);
+        if (dev < 2 || dev > 8) continue;
+        // Exactly aligned on another axis (e.g. a centered item in a
+        // left-aligned stack) reads as intentional — skip.
+        const alignedElsewhere = ALIGN_AXES.some((other) => {
+          if (other === axis) return false;
+          const m = modes.get(other)!;
+          return m.count >= 2 && Math.abs(Math.round(ch[other] * 2) / 2 - m.value) < 1;
+        });
+        if (alignedElsewhere) continue;
+        if (flagged.has(ch.selector) || findings.length >= maxFindings) continue;
+        flagged.add(ch.selector);
+        findings.push({
+          kind: "near-misalignment",
+          severity: "warn",
+          viewport,
+          selector: ch.selector,
+          message: `${ch.selector} is off its siblings' shared ${axis === "centerX" ? "center line" : `${axis} edge`} by ${dev}px inside ${group.parent} — siblings align exactly; a 2-8px deviation is almost always an accident (stray margin/padding), not a design choice.`,
+          evidence: { axis, deviation: dev, parent: group.parent, sharedValue: mode.value },
+        });
+      }
+    }
+  }
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
 // In-page collectors
 
 const STABLE_SELECTOR_FN = `
@@ -766,6 +953,189 @@ export const COLLECT_RESOURCES = `(() => {
   return { brokenImages, brokenFonts: Array.from(new Set(brokenFonts)) };
 })()`;
 
+export const COLLECT_PROTRUSIONS = `(() => {
+  ${STABLE_SELECTOR_FN}
+  const out = [];
+  const hasAlpha = (bg) => {
+    const m = (bg || "").match(/rgba?\\(([^)]+)\\)/);
+    if (!m) return false;
+    const parts = m[1].split(",").map(parseFloat);
+    return (parts[3] === undefined ? 1 : parts[3]) > 0;
+  };
+  for (const el of Array.from(document.querySelectorAll("body *"))) {
+    if (out.length >= 60) break;
+    const style = getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden") continue;
+    if (style.overflowX !== "visible" && style.overflowY !== "visible") continue; // clipping is A5/A7's domain
+    const bordered = ["Top", "Right", "Bottom", "Left"].some((s) =>
+      parseFloat(style["border" + s + "Width"]) > 0 && style["border" + s + "Style"] !== "none");
+    const painted = bordered || hasAlpha(style.backgroundColor) || style.backgroundImage !== "none";
+    if (!painted) continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.width < 24 || rect.height < 16) continue;
+    const box = {
+      left: rect.left + parseFloat(style.borderLeftWidth),
+      right: rect.right - parseFloat(style.borderRightWidth),
+      top: rect.top + parseFloat(style.borderTopWidth),
+      bottom: rect.bottom - parseFloat(style.borderBottomWidth),
+    };
+    for (const child of Array.from(el.children)) {
+      const cs = getComputedStyle(child);
+      if (cs.display === "none" || cs.visibility === "hidden") continue;
+      const cr = child.getBoundingClientRect();
+      if (cr.width <= 0 || cr.height <= 0) continue;
+      const overX = Math.max(cr.right - box.right, box.left - cr.left);
+      const overY = Math.max(cr.bottom - box.bottom, box.top - cr.top);
+      const over = Math.max(overX, overY);
+      if (over < 4) continue;
+      out.push({
+        parent: stableSelector(el),
+        child: stableSelector(child),
+        amount: Math.round(over),
+        positioned: cs.position === "absolute" || cs.position === "fixed",
+        negBreakout: parseFloat(cs.marginLeft) < 0 || parseFloat(cs.marginRight) < 0,
+        axis: overX >= overY ? "horizontal" : "vertical",
+      });
+    }
+    let direct = "";
+    for (const n of el.childNodes) if (n.nodeType === 3) direct += n.nodeValue || "";
+    if (direct.trim() && el.scrollWidth - el.clientWidth >= 4 && style.overflowX === "visible") {
+      out.push({
+        parent: stableSelector(el),
+        child: "(text)",
+        amount: el.scrollWidth - el.clientWidth,
+        positioned: false,
+        negBreakout: false,
+        axis: "horizontal",
+      });
+    }
+  }
+  return out;
+})()`;
+
+export const COLLECT_TEXT_CONTRAST = `(() => {
+  ${STABLE_SELECTOR_FN}
+  const parseColor = (s) => {
+    const m = (s || "").match(/rgba?\\(([^)]+)\\)/);
+    if (!m) return null;
+    const p = m[1].split(",").map(parseFloat);
+    return [p[0], p[1], p[2], p[3] === undefined ? 1 : p[3]];
+  };
+  const blend = (bg, c) => {
+    const a = c[3];
+    return [bg[0] * (1 - a) + c[0] * a, bg[1] * (1 - a) + c[1] * a, bg[2] * (1 - a) + c[2] * a];
+  };
+  const lum = (c) => {
+    const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
+  };
+  const ratio = (a, b) => {
+    const l1 = lum(a), l2 = lum(b);
+    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+  };
+  const candidates = [];
+  let skippedComposite = 0;
+  for (const el of Array.from(document.querySelectorAll("body *"))) {
+    if (candidates.length >= 60) break;
+    let direct = "";
+    for (const n of el.childNodes) if (n.nodeType === 3) direct += n.nodeValue || "";
+    if (!direct.trim()) continue;
+    const style = getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") continue;
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 2 || rect.height <= 2) continue;
+    // Text fully hidden behind clipping overflow (image replacement,
+    // Kellum, text-indent) is AT-only — its paint contrast is meaningless.
+    if (/^(hidden|clip)$/.test(style.overflowX) || /^(hidden|clip)$/.test(style.overflowY)) {
+      let visibleArea = 0;
+      for (const n of el.childNodes) {
+        if (n.nodeType !== 3 || !(n.nodeValue || "").trim()) continue;
+        const range = document.createRange();
+        range.selectNodeContents(n);
+        for (const r of range.getClientRects()) {
+          const ix = Math.min(r.right, rect.right) - Math.max(r.left, rect.left);
+          const iy = Math.min(r.bottom, rect.bottom) - Math.max(r.top, rect.top);
+          if (ix > 0 && iy > 0) visibleArea += ix * iy;
+        }
+      }
+      if (visibleArea < 4) continue;
+    }
+    // Same rule one level up: a clipping ancestor whose box the element
+    // does not intersect (collapsed dropdown: height-0 overflow-hidden
+    // list; text-indent pushed past a clipping parent) hides the text.
+    let clippedByAncestor = false;
+    for (let p = el.parentElement; p && p !== document.documentElement; p = p.parentElement) {
+      const ps = getComputedStyle(p);
+      if (!/^(hidden|clip)$/.test(ps.overflowX) && !/^(hidden|clip)$/.test(ps.overflowY)) continue;
+      const pr = p.getBoundingClientRect();
+      const ix = Math.min(rect.right, pr.right) - Math.max(rect.left, pr.left);
+      const iy = Math.min(rect.bottom, pr.bottom) - Math.max(rect.top, pr.top);
+      if (ix < 2 || iy < 2) { clippedByAncestor = true; break; }
+    }
+    if (clippedByAncestor) continue;
+    let composite = false;
+    const chain = [];
+    for (let p = el; p; p = p.parentElement) {
+      const ps = getComputedStyle(p);
+      if (ps.backgroundImage !== "none") { composite = true; break; }
+      const c = parseColor(ps.backgroundColor);
+      if (c && c[3] > 0) chain.push(c);
+      if (c && c[3] >= 1) break;
+    }
+    if (composite) { skippedComposite++; continue; }
+    let bg = [255, 255, 255];
+    for (const c of chain.reverse()) bg = blend(bg, c);
+    let opacity = 1;
+    for (let p = el; p && p !== document.documentElement; p = p.parentElement) {
+      opacity *= parseFloat(getComputedStyle(p).opacity) || 1;
+    }
+    const fgColor = parseColor(style.color) || [0, 0, 0, 1];
+    const fg = blend(bg, [fgColor[0], fgColor[1], fgColor[2], fgColor[3] * opacity]);
+    const r = ratio(fg, bg);
+    if (r >= 3) continue;
+    candidates.push({
+      selector: stableSelector(el),
+      text: direct.replace(/\\s+/g, " ").trim().slice(0, 60),
+      ratio: Math.round(r * 100) / 100,
+      fg: "rgb(" + fg.map(Math.round).join(", ") + ")",
+      bg: "rgb(" + bg.map(Math.round).join(", ") + ")",
+      disabled: el.closest("[disabled], [aria-disabled='true']") != null,
+      shadowed: style.textShadow !== "none",
+    });
+  }
+  return { candidates, skippedComposite };
+})()`;
+
+export const COLLECT_ALIGN_GROUPS = `(() => {
+  ${STABLE_SELECTOR_FN}
+  const groups = [];
+  for (const parent of Array.from(document.querySelectorAll("body *"))) {
+    if (groups.length >= 40) break;
+    if (parent.children.length < 3) continue;
+    const byTag = new Map();
+    for (const child of Array.from(parent.children)) {
+      const cs = getComputedStyle(child);
+      if (cs.display === "none" || cs.visibility === "hidden") continue;
+      if (cs.position === "absolute" || cs.position === "fixed") continue;
+      const r = child.getBoundingClientRect();
+      if (r.width < 12 || r.height < 12) continue;
+      const key = child.tagName;
+      if (!byTag.has(key)) byTag.set(key, []);
+      byTag.get(key).push({
+        selector: stableSelector(child),
+        left: r.left,
+        right: r.right,
+        centerX: (r.left + r.right) / 2,
+        top: r.top,
+      });
+    }
+    for (const children of byTag.values()) {
+      if (children.length >= 3) groups.push({ parent: stableSelector(parent), children });
+    }
+  }
+  return groups;
+})()`;
+
 export const COLLECT_STYLE_FINGERPRINT = `(() => {
   const links = Array.from(document.querySelectorAll('link[rel~="stylesheet" i]'));
   const body = getComputedStyle(document.body);
@@ -905,6 +1275,22 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       const collapsed = judgeCollapsedContainers(collapseCandidates, viewport.width);
       push(collapsed.findings);
       exempted.push(...collapsed.exempted);
+
+      // A10 — container protrusion
+      const protrusionCandidates = await page.evaluate(COLLECT_PROTRUSIONS) as ProtrusionCandidate[];
+      const protrusions = judgeProtrusions(protrusionCandidates, viewport.width, options.maxFindings ?? 12);
+      push(protrusions.findings);
+      exempted.push(...protrusions.exempted);
+
+      // A11 — invisible / low-contrast text (solid backgrounds only)
+      const contrastSample = await page.evaluate(COLLECT_TEXT_CONTRAST) as { candidates: ContrastCandidate[]; skippedComposite: number };
+      const contrast = judgeTextContrast(contrastSample.candidates, contrastSample.skippedComposite, viewport.width, options.maxFindings ?? 12);
+      push(contrast.findings);
+      exempted.push(...contrast.exempted);
+
+      // A12 — near-misalignment among siblings sharing an edge
+      const alignGroups = await page.evaluate(COLLECT_ALIGN_GROUPS) as AlignmentGroup[];
+      push(judgeAlignment(alignGroups, viewport.width));
 
       // A7 — scan scroll delegation (page-overflow-x is a defect here)
       const scroll = await page.evaluate(COLLECT_SCROLL_SCRIPT) as Omit<ScrollScanInput, "source">;

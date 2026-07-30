@@ -21,7 +21,7 @@ test("all tools have a name, description, input schema, and runner", () => {
   }
   assert.deepEqual(
     TOOLS.map((t) => t.name).sort(),
-    ["build_page", "check_copy", "check_equivalence", "check_integrity", "check_interactions", "scan_handlers", "verify_flow", "verify_markup"],
+    ["build_page", "check_copy", "check_equivalence", "check_integrity", "check_interactions", "check_layout", "scan_handlers", "verify_flow", "verify_markup"],
   );
 });
 
@@ -82,7 +82,7 @@ test("verify_markup surfaces done=false as failed with a kickback", { timeout: 2
 test("tool set is the full deterministic surface", () => {
   assert.deepEqual(
     TOOLS.map((t) => t.name).sort(),
-    ["build_page", "check_copy", "check_equivalence", "check_integrity", "check_interactions", "scan_handlers", "verify_flow", "verify_markup"],
+    ["build_page", "check_copy", "check_equivalence", "check_integrity", "check_interactions", "check_layout", "scan_handlers", "verify_flow", "verify_markup"],
   );
 });
 
@@ -138,6 +138,22 @@ test("check_integrity MCP output equals the direct pure-function call", { timeou
   assert.equal(res.failed, direct.verdict !== "clean");
   assert.equal(res.failed, true); // js-error + page-overflow-x present
   assert.match(res.content[0]!.text, /check_integrity: DEFECTS/);
+});
+
+test("check_layout MCP output equals the direct pure-function call", { timeout: 240_000 }, async () => {
+  const source = join(REPO_ROOT, "fixtures/auto-markup-proof/creative/attempt-stress.html");
+  const contract = { rules: [
+    { selector: ".sidebar", at: 1280, width: 260 },
+    { selector: ".stat-cell", at: 768, perRow: 2 },
+  ] };
+  const { runLayoutVerify } = await import("@mizchi/vlmkit-markup/inspect/layout-contract.ts");
+  const direct = await runLayoutVerify({ source, contract });
+  const res = await tool("check_layout").run({ source, contract });
+  const s = res.structured as typeof direct;
+  assert.equal(s.done, direct.done);
+  assert.deepEqual(s.results.map((r) => r.passed), direct.results.map((r) => r.passed));
+  assert.equal(res.failed, !direct.done);
+  assert.match(res.content[0]!.text, /check_layout: (SATISFIED|VIOLATED)/);
 });
 
 test("verify_flow MCP tool runs a scripted flow and reports done/failed", { timeout: 120_000 }, async () => {

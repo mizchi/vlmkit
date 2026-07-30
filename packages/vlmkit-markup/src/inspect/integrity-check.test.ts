@@ -21,10 +21,13 @@ import { join } from "node:path";
 import {
   classifyRuntimeEvents,
   findTextCollisions,
+  judgeAlignment,
   judgeClippedText,
   judgeCollapsedContainers,
   judgeNetworkFailures,
+  judgeProtrusions,
   judgeRender,
+  judgeTextContrast,
   judgeUnstyled,
   measureInkRatio,
   runIntegrityCheck,
@@ -176,6 +179,53 @@ describe("pure judges", () => {
     assert.equal(judgeRender({ componentCount: 6, inkRatio: 0.2, textBlocks: 20 }, 1280), null);
   });
 
+  test("judgeProtrusions: in-flow fail, positioned badge and horizontal breakout exempt", () => {
+    const { findings, exempted } = judgeProtrusions([
+      { parent: ".card", child: "#wide-btn", amount: 40, positioned: false, negBreakout: false, axis: "horizontal" },
+      { parent: ".card", child: "#badge", amount: 8, positioned: true, negBreakout: false, axis: "horizontal" },
+      { parent: "article", child: "#bleed-img", amount: 24, positioned: false, negBreakout: true, axis: "horizontal" },
+      { parent: ".note", child: "(text)", amount: 60, positioned: false, negBreakout: false, axis: "horizontal" },
+    ], 1280);
+    assert.deepEqual(findings.map((f) => f.selector), ["#wide-btn out of .card", "(text) out of .note"]);
+    assert.ok(findings.every((f) => f.severity === "fail"));
+    assert.equal(exempted.length, 2);
+    assert.match(exempted[0]!.reason, /positioned overlay/);
+    assert.match(exempted[1]!.reason, /breakout/);
+  });
+
+  test("judgeTextContrast: invisible fail, low-contrast warn, disabled/shadow exempt, composite skip visible", () => {
+    const base = { text: "hello", fg: "rgb(255, 255, 255)", bg: "rgb(255, 255, 255)", disabled: false, shadowed: false };
+    const { findings, exempted } = judgeTextContrast([
+      { ...base, selector: "#ghost", ratio: 1.0 },
+      { ...base, selector: "#dim", ratio: 2.4, fg: "rgb(150, 150, 150)" },
+      { ...base, selector: "#off", ratio: 1.2, disabled: true },
+      { ...base, selector: "#shadow", ratio: 1.1, shadowed: true },
+    ], 5, 1280);
+    assert.deepEqual(findings.map((f) => `${f.kind}:${f.severity}`), ["invisible-text:fail", "low-contrast-text:warn"]);
+    assert.equal(exempted.length, 3); // disabled + shadowed + composite aggregate
+    assert.match(exempted[2]!.reason, /5 text block\(s\) skipped/);
+  });
+
+  test("judgeAlignment: 2-8px deviant flagged, exact and clearly-offset silent, other-axis alignment exempt", () => {
+    const child = (selector: string, left: number, top: number, width = 100) =>
+      ({ selector, left, right: left + width, centerX: left + width / 2, top });
+    // #c is 4px off a shared left edge -> flagged.
+    const flagged = judgeAlignment([{ parent: "#stack", children: [child("#a", 20, 0), child("#b", 20, 40), child("#c", 24, 80)] }], 1280);
+    assert.equal(flagged.length, 1);
+    assert.equal(flagged[0]!.selector, "#c");
+    assert.equal(flagged[0]!.severity, "warn");
+    // Deliberate stagger (>8px) and exact alignment: silent.
+    assert.equal(judgeAlignment([{ parent: "#s", children: [child("#a", 20, 0), child("#b", 60, 40), child("#c", 100, 80)] }], 1280).length, 0);
+    assert.equal(judgeAlignment([{ parent: "#s", children: [child("#a", 20, 0), child("#b", 20, 40), child("#c", 20, 80)] }], 1280).length, 0);
+    // Centered item in a left-aligned stack: off the left edge by 5px but
+    // exactly on the shared center line -> intentional, silent.
+    const centered = judgeAlignment([{
+      parent: "#mix",
+      children: [child("#a", 20, 0, 100), child("#b", 20, 40, 100), child("#c", 25, 80, 90)],
+    }], 1280);
+    assert.equal(centered.length, 0, JSON.stringify(centered));
+  });
+
   test("measureInkRatio: quarter-filled buffer measures ~0.25", () => {
     const w = 40, h = 40;
     const data = new Uint8Array(w * h * 4).fill(255);
@@ -279,6 +329,58 @@ describe("S14b mutation battery", () => {
     assert.ok(kinds(report).includes("failed-stylesheet"), `got: ${kinds(report)}`);
     const unstyled = report.findings.find((f) => f.kind === "unstyled-page");
     assert.equal(unstyled?.severity, "fail");
+  });
+
+  test("M10 in-flow child wider than its painted card: container-protrusion fail; badge exempt", { timeout: 120_000 }, async () => {
+    const file = page("m10.html", `
+      <div id="card" style="position:relative;width:300px;border:1px solid #cbd5e1;border-radius:8px;padding:16px;background:#fff">
+        <h3>Plan</h3>
+        <button id="cta" style="width:400px;display:block">Choose this plan and start today</button>
+        <span id="badge" style="position:absolute;top:-10px;right:-10px;background:#4f46e5;color:#fff;padding:2px 8px">New</span>
+      </div>
+      <div style="width:600px;height:150px;background:#456;margin-top:24px"></div>`);
+    const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+    const prot = report.findings.filter((f) => f.kind === "container-protrusion");
+    assert.equal(prot.length, 1, JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector}`)));
+    assert.match(prot[0]!.selector!, /#cta out of #card/);
+    assert.equal(prot[0]!.severity, "fail");
+    const ex = report.exempted.filter((e) => e.kind === "container-protrusion");
+    assert.ok(ex.some((e) => e.selector?.includes("#badge") && /positioned overlay/.test(e.reason)), JSON.stringify(ex));
+  });
+
+  test("M11 white-on-white text: invisible-text fail; gradient text skipped visibly", { timeout: 120_000 }, async () => {
+    const file = page("m11.html", `
+      <div style="background:#fff;padding:16px">
+        <p id="ghost" style="color:#fefefe">This sentence is invisible to every reader.</p>
+        <p id="fine">This one is fine.</p>
+      </div>
+      <div style="background:linear-gradient(#345,#123);padding:16px">
+        <p id="on-gradient" style="color:#89a">Composite background text.</p>
+      </div>
+      <div style="width:600px;height:150px;background:#456"></div>`);
+    const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+    const ghost = report.findings.find((f) => f.selector === "#ghost");
+    assert.equal(ghost?.kind, "invisible-text");
+    assert.equal(ghost?.severity, "fail");
+    assert.ok(report.exempted.some((e) => e.kind === "low-contrast-text" && /skipped/.test(e.reason)),
+      "composite-background skip is visible");
+    assert.ok(!report.findings.some((f) => f.selector === "#fine" || f.selector === "#on-gradient"));
+  });
+
+  test("M12 one card 5px off a shared edge: near-misalignment warn; exact grid silent", { timeout: 120_000 }, async () => {
+    const file = page("m12.html", `
+      <div id="stack" style="padding:20px">
+        <div style="width:300px;height:60px;background:#dbe2ea;margin:0 0 12px 0">Row one</div>
+        <div style="width:300px;height:60px;background:#dbe2ea;margin:0 0 12px 0">Row two</div>
+        <div id="off" style="width:300px;height:60px;background:#dbe2ea;margin:0 0 12px 5px">Row three</div>
+        <div style="width:300px;height:60px;background:#dbe2ea">Row four</div>
+      </div>`);
+    const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+    const near = report.findings.filter((f) => f.kind === "near-misalignment");
+    assert.equal(near.length, 1, JSON.stringify(near.map((f) => f.selector)));
+    assert.equal(near[0]!.selector, "#off");
+    assert.equal(near[0]!.severity, "warn");
+    assert.equal(report.verdict, "clean"); // warn does not flip the verdict
   });
 
   test("M9 375-only overflow: finding attributed to the 375 viewport", { timeout: 180_000 }, async () => {

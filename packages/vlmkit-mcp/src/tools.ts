@@ -244,6 +244,39 @@ const checkIntegrityTool: McpTool = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// check_layout (structural requirements as a machine-checkable contract)
+
+const checkLayoutTool: McpTool = {
+  name: "check_layout",
+  description:
+    "Layout contract: verifies a brief's STRUCTURAL requirements deterministically per viewport — element widths (±tolerance), matches per visual row (4-across at 1280 / 2x2 at 768 / stacked at 375), full-width collapse, stacking order (A above B), visibility, and counts. Turns 'the sidebar is 260px on desktop and collapses above the main column on tablet' into a machine-checkable spec the generation loop can run every round. Pure DOM math, no VLM. Complements check_integrity (defects) — this checks conformance to stated structure.",
+  inputSchema: {
+    source: z.string().describe("Path or URL of the page."),
+    contract: z.object({
+      rules: z.array(z.object({
+        selector: z.string(),
+        at: z.number().describe("Viewport width this rule is checked at."),
+        width: z.number().optional(),
+        tolerance: z.number().optional(),
+        minWidth: z.number().optional(),
+        maxWidth: z.number().optional(),
+        perRow: z.number().optional().describe("Modal number of matches per visual row."),
+        fullWidth: z.boolean().optional(),
+        above: z.string().optional().describe("Selector whose matches must all start below this rule's matches."),
+        count: z.number().optional(),
+        visible: z.boolean().optional(),
+      })).min(1),
+    }).describe("The layout contract."),
+  },
+  run: async (args) => {
+    const { runLayoutVerify } = await import("@mizchi/vlmkit-markup/inspect/layout-contract.ts");
+    const report = await runLayoutVerify({ source: args.source as string, contract: args.contract as never });
+    const summary = `check_layout: ${report.done ? "SATISFIED" : "VIOLATED"} (${report.passed}/${report.total} rules)`;
+    return result(summary, report, !report.done);
+  },
+};
+
 const verifyFlowTool: McpTool = {
   name: "verify_flow",
   description:
@@ -271,6 +304,7 @@ export const TOOLS: McpTool[] = [
   verifyFlowTool,
   verifyMarkupTool,
   checkIntegrityTool,
+  checkLayoutTool,
   checkInteractionsTool,
   scanHandlersTool,
   checkCopyTool,

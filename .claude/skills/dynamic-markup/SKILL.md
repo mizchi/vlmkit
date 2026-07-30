@@ -289,9 +289,17 @@ attempt, and as the PRIMARY gate when there is no reference at all
 (creative/zero-shot markup from a brief). It sweeps 1280/768/375 for
 defects that are unambiguous without a reference: construction-phase JS
 errors, empty/degenerate renders, broken images/stylesheets/scripts,
-same-layer text collisions, clipped text, collapsed containers,
-horizontal page overflow, and declared-but-unapplied styling. Findings
-carry selector attribution; a `fail` flips the verdict to DEFECTS.
+same-layer text collisions, clipped text, children protruding from
+painted containers, collapsed containers, horizontal page overflow,
+invisible/low-contrast text (solid backgrounds), 2-8px sibling
+misalignment, and declared-but-unapplied styling. Findings carry
+selector attribution; a `fail` flips the verdict to DEFECTS.
+
+When the brief states structural requirements ("sidebar is 260px on
+desktop", "stats are 2x2 at 768"), also encode them as a
+`check layout --contract contract.json` spec (width / perRow /
+fullWidth / above / count / visible per viewport) and run it every
+round — it is the machine-checkable form of the brief's layout section.
 
 - Intentional patterns (hero overlay, `text-overflow: ellipsis`,
   zero-height positioning anchors, `aria-hidden` decoration) are
