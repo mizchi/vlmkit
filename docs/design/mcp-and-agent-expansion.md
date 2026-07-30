@@ -48,6 +48,19 @@ Playwright もコーディングエージェントも MCP に収束した今、v
 4. `--handlers`/`--reference` 等のモードは MCP の boolean/optional 引数に
    一対一対応。CLI と MCP で挙動を分岐させない(単一の純関数)。
 
+### 実装状況(2026-07-30)
+**Part A は出荷済み**(`packages/vlmkit-mcp/`)。露出ツール 6 本:
+verify_markup / check_interactions(+reference 契約 +handlers)/
+scan_handlers / check_copy / **build_page** / **check_equivalence**(keyless
+advisory)。`vlmkit mcp`(stdio)で起動、JSON-RPC initialize/tools/list/
+tools-call を実サーバでスモーク済み、8 パッケージテストが MCP 出力=純関数
+出力を保証。
+- **意図的スキップ**: 単体の behavior ゲート(check_breakpoints /
+  scan_scroll / check_scroll / check_animation / check_motion)は
+  verify_markup が内部実行し gate 結果を返すため、MCP 標準ツールとしては
+  重複。ターゲット画像を持たず「挙動だけ」を見たい à-la-carte 需要が
+  実証されたら追加する(完成度の穴ではなく、需要待ちの判断)。
+
 ### 実装ステップ
 1. `@modelcontextprotocol/sdk`(stdio + streamable-http)を
    `packages/vlmkit-mcp/`(新規)に追加。Playwright 依存は tool 実行時

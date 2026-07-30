@@ -19,7 +19,10 @@ test("all tools have a name, description, input schema, and runner", () => {
   for (const t of TOOLS) {
     assert.ok(t.name && t.description.length > 40 && t.inputSchema && typeof t.run === "function");
   }
-  assert.deepEqual(TOOLS.map((t) => t.name).sort(), ["check_copy", "check_interactions", "scan_handlers", "verify_markup"]);
+  assert.deepEqual(
+    TOOLS.map((t) => t.name).sort(),
+    ["build_page", "check_copy", "check_equivalence", "check_interactions", "scan_handlers", "verify_markup"],
+  );
 });
 
 test("server registers every tool without throwing", () => {
@@ -74,4 +77,44 @@ test("verify_markup surfaces done=false as failed with a kickback", { timeout: 2
   const report = res.structured as { done: boolean };
   assert.equal(res.failed, !report.done);
   assert.match(res.content[0]!.text, /verify_markup: (DONE|NOT DONE)/);
+});
+
+test("tool set is the full deterministic surface", () => {
+  assert.deepEqual(
+    TOOLS.map((t) => t.name).sort(),
+    ["build_page", "check_copy", "check_equivalence", "check_interactions", "scan_handlers", "verify_markup"],
+  );
+});
+
+test("build_page MCP output equals the direct pure-function call", { timeout: 240_000 }, async () => {
+  const { loadPng, renderHtmlToPng, composePageDiff } = await import("@mizchi/vlmkit-markup/component/page-compose.ts");
+  const target = join(REPO_ROOT, "fixtures/auto-markup-proof/edit/target-desktop.png");
+  const current = join(REPO_ROOT, "fixtures/auto-markup-proof/edit/redesign.html");
+  const t = await loadPng(target);
+  const c = await renderHtmlToPng(current, t.width, t.height);
+  const direct = composePageDiff(t, c, {});
+  const res = await tool("build_page").run({ target, current });
+  const s = res.structured as typeof direct;
+  assert.deepEqual(s.matches.length, direct.matches.length);
+  assert.deepEqual(s.missing.length, direct.missing.length);
+  assert.equal(res.failed, direct.missing.length + direct.extra.length + direct.orderViolations.length > 0);
+});
+
+test("check_equivalence measures deltas, writes sheets, stays advisory (never hard-fails keyless)", { timeout: 120_000 }, async () => {
+  const { writeFileSync, mkdtempSync, existsSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { PNG } = await import("pngjs");
+  const dir = mkdtempSync(join(tmpdir(), "mcp-equiv-"));
+  // target PNG: solid gray 200x120
+  const png = new PNG({ width: 200, height: 120 });
+  for (let i = 0; i < 200 * 120; i++) { png.data[i*4]=180; png.data[i*4+1]=180; png.data[i*4+2]=180; png.data[i*4+3]=255; }
+  const target = join(dir, "target.png");
+  writeFileSync(target, PNG.sync.write(png));
+  const source = join(dir, "src.html");
+  writeFileSync(source, `<!doctype html><html><head><title>t</title><style>body{margin:0}#b{width:200px;height:120px;background:#b4b4b4}</style></head><body><div id="b"></div></body></html>`);
+  const res = await tool("check_equivalence").run({ source, target, regions: ["10,10,80x40"], outDir: join(dir, "out") });
+  const r = res.structured as { verdicts: { measuredDelta: number; pairImage: string }[] };
+  assert.equal(r.verdicts.length, 1);
+  assert.ok(existsSync(r.verdicts[0]!.pairImage), "pair image written");
+  assert.equal(res.failed, false); // advisory
 });

@@ -162,4 +162,64 @@ const checkCopyTool: McpTool = {
   },
 };
 
-export const TOOLS: McpTool[] = [verifyMarkupTool, checkInteractionsTool, scanHandlersTool, checkCopyTool];
+// ---------------------------------------------------------------------------
+// build_page
+
+const buildPageTool: McpTool = {
+  name: "build_page",
+  description:
+    "Composition diff between a target screenshot and a current attempt (HTML rendered at the target's viewport, or another PNG): matched components, missing, extra, ordering violations, stacking-gap deltas. This is the raw composition signal verify_markup runs internally — use it mid-loop when you only need 'what components are missing/misplaced' without the full done-condition verdict and dynamic gates. Deterministic pixel + connected-component math.",
+  inputSchema: {
+    target: z.string().describe("Target screenshot PNG path."),
+    current: z.string().describe("Current attempt: an HTML file (rendered at the target viewport) or a PNG."),
+  },
+  run: async (args) => {
+    const { loadPng, renderHtmlToPng, composePageDiff } = await import("@mizchi/vlmkit-markup/component/page-compose.ts");
+    const target = await loadPng(args.target as string);
+    const currentPath = args.current as string;
+    const current = /\.png$/i.test(currentPath)
+      ? await loadPng(currentPath)
+      : await renderHtmlToPng(currentPath, target.width, target.height);
+    const composition = composePageDiff(target, current, {});
+    const residuals = composition.missing.length + composition.extra.length + composition.orderViolations.length;
+    const summary = `build_page: matched ${composition.matches.length}, missing ${composition.missing.length}, extra ${composition.extra.length}, ordering ${composition.orderViolations.length}, gaps ${composition.gapDeltas.length}`;
+    return result(summary, composition, residuals > 0);
+  },
+};
+
+// ---------------------------------------------------------------------------
+// check_equivalence (keyless: measured delta + pair sheets for a second reader)
+
+const checkEquivalenceTool: McpTool = {
+  name: "check_equivalence",
+  description:
+    "Visual-equivalence judge for residual regions: crops each region from both the attempt render (or PNG) and the target into a stacked pair image, and measures the mean per-channel delta deterministically. Keyless mode (this tool) writes the pair images + measured deltas for a SECOND reader to judge — it does not itself decide same/different (that needs a VLM and must not be the author of the pixels). Use as the tie-breaker for residuals that pass/fail a gate but may be visually equivalent (a reflowed line, a sub-pixel metric drift). Region spec: \"x,y,WxH\" or a kickback-shaped \"(x,y) WxH\".",
+  inputSchema: {
+    source: z.string().describe("Attempt HTML or PNG."),
+    target: z.string().describe("Target screenshot PNG."),
+    regions: z.array(z.string()).min(1).describe("Region specs: \"x,y,WxH\" or \"(x,y) WxH\" (repeatable)."),
+    outDir: z.string().optional().describe("Where pair images are written."),
+  },
+  run: async (args) => {
+    const { runRegionJudge, parseRegionSpec } = await import("@mizchi/vlmkit-markup/inspect/region-judge.ts");
+    const regions = (args.regions as string[]).map(parseRegionSpec);
+    const report = await runRegionJudge({
+      source: args.source as string,
+      targetPath: args.target as string,
+      regions,
+      ...(args.outDir ? { outDir: args.outDir as string } : {}),
+    });
+    const summary = `check_equivalence: ${report.verdicts.length} region(s) measured (max delta ${Math.max(...report.verdicts.map((v) => v.measuredDelta)).toFixed(2)}); pair images written for a second reader`;
+    // Keyless: advisory only — never hard-fails (a human/VLM makes the call).
+    return result(summary, report, false);
+  },
+};
+
+export const TOOLS: McpTool[] = [
+  verifyMarkupTool,
+  checkInteractionsTool,
+  scanHandlersTool,
+  checkCopyTool,
+  buildPageTool,
+  checkEquivalenceTool,
+];
