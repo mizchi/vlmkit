@@ -25,6 +25,9 @@ Client config (stdio):
 | `check_interactions` | a11y-event state map; `reference` makes it a behavioral contract; `handlers` adds the wired-callback surface | `source`, `reference?`, `handlers?` |
 | `scan_handlers` | every wired callback + **pointer-only-control** detection | `source` |
 | `check_copy` | placeholder scan + `manifest` verification + `target`-image contact sheets | `source`, `manifest?`, `target?` |
+| `build_page` | raw composition diff (matched/missing/extra/ordering/gap) | `target`, `current` |
+| `check_equivalence` | measured per-channel delta + pair images for a second reader (keyless advisory) | `source`, `target`, `regions[]` |
+| `verify_flow` | scripted browser flow: action → deterministic post-condition assert; fails at first unmet | `source`, `flow` |
 
 ## Design
 

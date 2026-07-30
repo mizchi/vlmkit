@@ -21,7 +21,7 @@ test("all tools have a name, description, input schema, and runner", () => {
   }
   assert.deepEqual(
     TOOLS.map((t) => t.name).sort(),
-    ["build_page", "check_copy", "check_equivalence", "check_interactions", "scan_handlers", "verify_markup"],
+    ["build_page", "check_copy", "check_equivalence", "check_interactions", "scan_handlers", "verify_flow", "verify_markup"],
   );
 });
 
@@ -82,7 +82,7 @@ test("verify_markup surfaces done=false as failed with a kickback", { timeout: 2
 test("tool set is the full deterministic surface", () => {
   assert.deepEqual(
     TOOLS.map((t) => t.name).sort(),
-    ["build_page", "check_copy", "check_equivalence", "check_interactions", "scan_handlers", "verify_markup"],
+    ["build_page", "check_copy", "check_equivalence", "check_interactions", "scan_handlers", "verify_flow", "verify_markup"],
   );
 });
 
@@ -117,4 +117,19 @@ test("check_equivalence measures deltas, writes sheets, stays advisory (never ha
   assert.equal(r.verdicts.length, 1);
   assert.ok(existsSync(r.verdicts[0]!.pairImage), "pair image written");
   assert.equal(res.failed, false); // advisory
+});
+
+test("verify_flow MCP tool runs a scripted flow and reports done/failed", { timeout: 120_000 }, async () => {
+  const source = join(REPO_ROOT, "fixtures/auto-markup-proof/interactive/reference.html");
+  const ok = await tool("verify_flow").run({
+    source,
+    flow: { steps: [{ do: { action: "click", selector: "#shipping-toggle" }, expect: [{ assert: "attr", selector: "#shipping-toggle", name: "aria-expanded", equals: "true" }] }] },
+  });
+  assert.equal((ok.structured as { done: boolean }).done, true);
+  assert.equal(ok.failed, false);
+  const bad = await tool("verify_flow").run({
+    source,
+    flow: { steps: [{ do: { action: "click", selector: "#shipping-toggle" }, expect: [{ assert: "attr", selector: "#shipping-toggle", name: "aria-expanded", equals: "false" }] }] },
+  });
+  assert.equal(bad.failed, true);
 });

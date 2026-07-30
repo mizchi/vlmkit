@@ -215,7 +215,31 @@ const checkEquivalenceTool: McpTool = {
   },
 };
 
+const verifyFlowTool: McpTool = {
+  name: "verify_flow",
+  description:
+    "Verified scripted browser flow: runs a given list of steps (each an action + deterministic post-condition assertions on the live DOM) and FAILS at the first unmet post-condition. Unlike LLM-per-step browser agents, 'it did something' is not success — 'the asserted state actually holds' is. No LLM (the flow is provided; a planner may emit it later, the verification is deterministic). Assertions: attr / visible / hidden / focused / text / count.",
+  inputSchema: {
+    source: z.string().describe("Page HTML path or URL."),
+    flow: z.object({
+      viewport: z.object({ width: z.number(), height: z.number() }).optional(),
+      steps: z.array(z.object({
+        label: z.string().optional(),
+        do: z.record(z.unknown()).describe("Action: {action:'click'|'focus'|'hover', selector} | {action:'press', key, selector?} | {action:'fill'|'type', selector, value|text} | {action:'wait', ms}"),
+        expect: z.array(z.record(z.unknown())).optional().describe("Post-conditions: {assert:'attr', selector, name, equals} | {assert:'visible'|'hidden'|'focused', selector} | {assert:'text', selector, contains} | {assert:'count', selector, equals}"),
+      })),
+    }).describe("The flow to run."),
+  },
+  run: async (args) => {
+    const { runFlowVerify } = await import("@mizchi/vlmkit-markup/inspect/flow-verify.ts");
+    const report = await runFlowVerify({ source: args.source as string, flow: args.flow as never });
+    const summary = `verify_flow: ${report.done ? "DONE" : "FAILED"} (${report.passed}/${report.total} steps)`;
+    return result(summary, report, !report.done);
+  },
+};
+
 export const TOOLS: McpTool[] = [
+  verifyFlowTool,
   verifyMarkupTool,
   checkInteractionsTool,
   scanHandlersTool,

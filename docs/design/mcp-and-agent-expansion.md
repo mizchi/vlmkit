@@ -82,6 +82,15 @@ tools-call を実サーバでスモーク済み、8 パッケージテストが 
 
 ## パート B: browser-use 領域(遠い / 差別化前提)
 
+### 実装状況(2026-07-30, キー不要部分)
+**verified-execution エンジンは出荷済み**: `vlmkit verify flow`
+(`inspect/flow-verify.ts`)+ MCP `verify_flow`。スクリプト化フロー
+(action → 事後条件アサート: attr/visible/hidden/focused/text/count)を
+決定論検証し、最初の未達で FAIL する。「何かした」でなく「宣言した状態が
+成立した」をゲートする Part B の核が、LLM 無しで動く。残るのは
+**ゴール→フロー プランナ(要 LLM キー)**のみ — flow-verify がその
+出力の実行・検証層になる。足りないもの #2(事後条件言語)は完了。
+
 ### 何をもって「進出」とするか
 browser-use / Stagehand / Skyvern は **ゴール駆動のタスク自動化**
 (「ログインしてカートに入れる」)。ここに素で参入しても後発で勝てない。
