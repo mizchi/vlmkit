@@ -9,6 +9,9 @@ export default defineConfig([
     platform: "node",
     outDir: "dist",
     clean: true,
+    deps: {
+      alwaysBundle: [/^@mizchi\/vlmkit-/],
+    },
   },
   {
     entry: {

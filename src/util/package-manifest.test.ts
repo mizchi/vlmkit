@@ -113,14 +113,27 @@ describe("package manifest for publishable CLI", () => {
     assert.ok(files.includes("README.md"), "README should be published");
   });
 
-  it("ships the planner, generator, and healer needed by the drop-in markup loop", async () => {
+  it("keeps internal workspace packages as development links, not published runtime dependencies", async () => {
     const pkg = await readPackageJson();
     const dependencies = pkg.dependencies as Record<string, string> | undefined;
+    const devDependencies = pkg.devDependencies as Record<string, string> | undefined;
+    const internalPackages = [
+      "@mizchi/vlmkit-ai",
+      "@mizchi/vlmkit-capture",
+      "@mizchi/vlmkit-core",
+      "@mizchi/vlmkit-generate",
+      "@mizchi/vlmkit-heal",
+      "@mizchi/vlmkit-markup",
+      "@mizchi/vlmkit-mcp",
+      "@mizchi/vlmkit-plan",
+    ];
 
     assert.ok(dependencies, "package.json should define dependencies");
-    assert.equal(dependencies["@mizchi/vlmkit-plan"], "workspace:*");
-    assert.equal(dependencies["@mizchi/vlmkit-generate"], "workspace:*");
-    assert.equal(dependencies["@mizchi/vlmkit-heal"], "workspace:*");
+    assert.ok(devDependencies, "package.json should define devDependencies");
+    for (const name of internalPackages) {
+      assert.equal(dependencies[name], undefined, `${name} must be bundled into the CLI`);
+      assert.equal(devDependencies[name], "workspace:*", `${name} must remain available to source-level development`);
+    }
   });
 
   it("ships a complete LICENSE for every publishable workspace package", async () => {

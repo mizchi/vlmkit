@@ -1,9 +1,28 @@
 name: package-install-smoke
 
-# This release-quality check is manual until internal packages ship executable
-# JavaScript. See the follow-up issue created for the Node 24 node_modules
-# TypeScript restriction detected by this smoke (#96).
 on:
+  push:
+    paths:
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig*.json"
+      - "tsdown.config.ts"
+      - "src/**"
+      - "packages/**"
+      - "scripts/smoke-packed-markup-loop.mjs"
+      - ".github/workflows/package-install-smoke.yml"
+  pull_request:
+    paths:
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "tsconfig*.json"
+      - "tsdown.config.ts"
+      - "src/**"
+      - "packages/**"
+      - "scripts/smoke-packed-markup-loop.mjs"
+      - ".github/workflows/package-install-smoke.yml"
   workflow_dispatch:
 
 jobs:
