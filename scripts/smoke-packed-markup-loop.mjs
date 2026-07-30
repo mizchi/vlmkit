@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 /**
- * Packages the CLI and its internal runtime packages, then installs those
- * tarballs into a clean consumer. This intentionally avoids registry lookups
- * for the @mizchi/vlmkit namespace.
+ * Packages only the root CLI tarball, then installs it into a clean consumer.
+ * Internal workspace packages must be bundled into the CLI, not installed here.
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -14,17 +13,6 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const rootManifest = JSON.parse(await readFile(join(repoRoot, "package.json"), "utf8"));
-const packageDirectories = [
-  ".",
-  "packages/vlmkit-ai",
-  "packages/vlmkit-capture",
-  "packages/vlmkit-core",
-  "packages/vlmkit-generate",
-  "packages/vlmkit-heal",
-  "packages/vlmkit-markup",
-  "packages/vlmkit-mcp",
-  "packages/vlmkit-plan",
-];
 const internalDependencySections = ["dependencies", "optionalDependencies", "peerDependencies"];
 
 function fail(message) {
@@ -45,9 +33,6 @@ function run(command, args, options = {}) {
     const stderr = error.stderr?.toString() ?? "";
     if (stdout) process.stderr.write(stdout);
     if (stderr) process.stderr.write(stderr);
-    if (stderr.includes("ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING")) {
-      fail("installed packages execute TypeScript from node_modules, which Node 24 refuses to strip; publish JavaScript internal packages or bundle them before treating the root CLI as installable (follow-up: https://github.com/mizchi/vlmkit/issues/96)");
-    }
     throw error;
   }
 }
@@ -74,6 +59,66 @@ function assertOutput(output, expected, label) {
   if (!output.includes(expected)) fail(`${label} did not print ${JSON.stringify(expected)}\n${output}`);
 }
 
+async function readInstalledDistFiles(directory, prefix = "") {
+  const files = new Map();
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const relativePath = join(prefix, entry.name);
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) {
+      for (const [nestedPath, contents] of await readInstalledDistFiles(path, relativePath)) {
+        files.set(nestedPath, contents);
+      }
+    } else if (entry.isFile()) {
+      files.set(relativePath, await readFile(path, "utf8"));
+    }
+  }
+  return files;
+}
+
+function findInternalImportSpecifiers(source) {
+  const specifiers = new Set();
+  const dynamicImport = /\bimport\s*\(\s*["'](@mizchi\/vlmkit-[^"']+)["']\s*\)/g;
+  const staticImport = /\b(?:import|export)\s+(?:[^"'`;]*?\s+from\s+)?["'](@mizchi\/vlmkit-[^"']+)["']/g;
+  for (const pattern of [dynamicImport, staticImport]) {
+    for (const match of source.matchAll(pattern)) specifiers.add(match[1]);
+  }
+  return [...specifiers];
+}
+
+async function assertBundledMarkupLoopChunks(installed) {
+  const installedDist = join(installed, "dist");
+  const distFiles = await readInstalledDistFiles(installedDist);
+  const internalImports = [];
+  for (const [path, contents] of distFiles) {
+    for (const specifier of findInternalImportSpecifiers(contents)) internalImports.push(`${path}: ${specifier}`);
+  }
+  if (internalImports.length > 0) {
+    fail(`installed dist retains internal import specifiers:\n${internalImports.join("\n")}`);
+  }
+
+  const markupLoopEntry = [...distFiles].find(([, contents]) => contents.includes("runMarkupLoop"));
+  if (!markupLoopEntry) fail("installed dist does not contain the markup-loop command chunk");
+  const [markupLoopPath, markupLoopSource] = markupLoopEntry;
+  const chunks = [
+    ["plan", "runPlanCli", /runPlanCli\s*}\s*=\s*await import\(["'](\.[^"']+)["']\)/],
+    ["generate", "runGenerateCli", /runGenerateCli\s*}\s*=\s*await import\(["'](\.[^"']+)["']\)/],
+  ].map(([name, exportName, pattern]) => {
+    const match = markupLoopSource.match(pattern);
+    if (!match) fail(`installed markup-loop chunk does not load bundled ${name} implementation`);
+    const path = join(dirname(markupLoopPath), match[1]);
+    if (!distFiles.has(path)) fail(`installed markup-loop ${name} chunk is missing: ${path}`);
+    return { name, exportName, path };
+  });
+
+  for (const { name, exportName, path } of chunks) {
+    const source = distFiles.get(path);
+    if (!new RegExp(`\\bexport\\s*\\{[^}]*\\b${exportName}\\b`).test(source)) {
+      fail(`installed markup-loop ${name} chunk does not export ${exportName}`);
+    }
+  }
+  console.log("==> installed dist contains bundled plan/generate chunks and no internal package imports");
+}
+
 async function assertFile(path) {
   try {
     await access(path);
@@ -97,52 +142,41 @@ async function main() {
 
     console.log("==> building root package");
     run("pnpm", ["build"]);
+    console.log(`==> packing ${rootManifest.name}`);
+    run("pnpm", ["pack", "--pack-destination", tarballsDir]);
+    const tarballs = (await readdir(tarballsDir)).filter((file) => file.endsWith(".tgz"));
+    if (tarballs.length !== 1) fail(`expected one root tarball, found ${tarballs.join(", ") || "none"}`);
+    const tarball = join(tarballsDir, tarballs[0]);
 
-    const packed = new Map();
-    for (const directory of packageDirectories) {
-      const packageDir = resolve(repoRoot, directory);
-      const manifest = JSON.parse(await readFile(join(packageDir, "package.json"), "utf8"));
-      const before = new Set(await readdir(tarballsDir));
-      console.log(`==> packing ${manifest.name}`);
-      run("pnpm", ["pack", "--pack-destination", tarballsDir], { cwd: packageDir });
-      const created = (await readdir(tarballsDir)).filter((file) => file.endsWith(".tgz") && !before.has(file));
-      if (created.length !== 1) fail(`expected one tarball for ${manifest.name}, found ${created.join(", ") || "none"}`);
-      const tarball = join(tarballsDir, created[0]);
-      const packedManifest = readPackedManifest(tarball);
-      if (packedManifest.name !== manifest.name) fail(`tarball ${created[0]} has unexpected package name ${packedManifest.name}`);
-      for (const section of internalDependencySections) {
-        for (const [name, version] of Object.entries(packedManifest[section] ?? {})) {
-          if (name.startsWith("@mizchi/vlmkit-") && String(version).startsWith("workspace:")) {
-            fail(`${packedManifest.name} retains workspace protocol for ${name}`);
-          }
+    const packedManifest = readPackedManifest(tarball);
+    if (packedManifest.name !== rootManifest.name) fail(`tarball has unexpected package name ${packedManifest.name}`);
+    for (const section of internalDependencySections) {
+      for (const name of Object.keys(packedManifest[section] ?? {})) {
+        if (name.startsWith("@mizchi/vlmkit-")) {
+          fail(`${packedManifest.name} retains internal runtime dependency ${name} in ${section}`);
         }
       }
-      packed.set(manifest.name, tarball);
     }
 
-    const localDependencies = Object.fromEntries(
-      [...packed.entries()].map(([name, tarball]) => [name, `file:${relative(consumerDir, tarball)}`]),
-    );
+    const rootTarballReference = `file:${relative(consumerDir, tarball)}`;
     await writeFile(join(consumerDir, "package.json"), `${JSON.stringify({
       name: "vlmkit-packed-markup-loop-consumer",
       private: true,
       type: "module",
-      dependencies: localDependencies,
-      pnpm: { overrides: localDependencies },
+      dependencies: { [rootManifest.name]: rootTarballReference },
     }, null, 2)}\n`);
     await writeFile(join(consumerDir, "playwright.config.ts"), "export default {};\n");
+    await writeFile(join(consumerDir, "fixture.html"), "<style>@media (min-width: 640px) { body { color: red; } }</style>\n");
 
-    console.log("==> installing tarballs in isolated consumer");
+    console.log("==> installing root tarball in isolated consumer");
     run("pnpm", ["install", "--ignore-scripts"], { cwd: consumerDir });
     const lockfile = await readFile(join(consumerDir, "pnpm-lock.yaml"), "utf8");
-    for (const [name, tarball] of packed) {
-      const localReference = `file:${relative(consumerDir, tarball)}`;
-      if (!lockfile.includes(localReference)) fail(`lockfile does not resolve ${name} from ${localReference}`);
-      const installed = await realpath(join(consumerDir, "node_modules", ...name.split("/")));
-      if (!installed.includes(".pnpm") || !installed.includes("file+")) {
-        fail(`${name} did not resolve from a local tarball (${installed})`);
-      }
+    if (!lockfile.includes(rootTarballReference)) fail(`lockfile does not resolve root package from ${rootTarballReference}`);
+    const installed = await realpath(join(consumerDir, "node_modules", ...rootManifest.name.split("/")));
+    if (!installed.includes(".pnpm") || !installed.includes("file+")) {
+      fail(`${rootManifest.name} did not resolve from the root tarball (${installed})`);
     }
+    await assertBundledMarkupLoopChunks(installed);
 
     const bin = join(consumerDir, "node_modules", ".bin", "vlmkit");
     const version = run(bin, ["--version"], { cwd: consumerDir });
@@ -182,7 +216,9 @@ async function main() {
     await assertMissing(join(consumerDir, ".vlmkit/markup-loop/plan.json"));
     await assertMissing(join(consumerDir, "tests/vlmkit/checkout.spec.ts"));
 
-    run("node", ["--input-type=module", "--eval", "await Promise.all([import('@mizchi/vlmkit-plan/cli'), import('@mizchi/vlmkit-generate/cli'), import('@mizchi/vlmkit-heal')]);"], { cwd: consumerDir });
+    const scan = run(bin, ["scan", "breakpoints", "fixture.html"], { cwd: consumerDir });
+    assertOutput(scan, "Breakpoint Discovery", "bundled scan breakpoints");
+    assertOutput(scan, "640px", "bundled scan breakpoints");
     console.log("==> packed markup-loop smoke passed");
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
