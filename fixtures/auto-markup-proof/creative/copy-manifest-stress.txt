@@ -1,0 +1,33 @@
+Fieldnote Sync
+v2.11.0-rc.3+build.20260730
+Overview
+Endpoints
+Conflict model
+Limits
+Changelog
+Replication protocol specification
+How ten thousand devices stay in agreement without a central clock.
+12 ms
+median sync latency
+99.999%
+delivery guarantee
+4,096
+max concurrent replicas
+0
+bytes readable by our servers
+Replication endpoint
+sync://replication.fieldnote.example/v2/streams/primary?compression=zstd&frame=64KiB
+The endpoint identifier is immutable; treat it as an opaque capability URL.
+Every edit is a signed operation in a per-note log. Concurrent edits merge deterministically; the merge function is commutative, associative, and idempotent.
+The pathological case — simultaneous renames of the same note on offline devices — resolves by lexicographic device fingerprint, documented as Entscheidungsverfahrensdokumentation in the German compliance annex.
+Hard limits
+Maximum note size
+1 MiB
+Maximum attachment size
+25 MiB
+Log retention on free plan
+90 days
+Device fingerprint length
+128 hexadecimal characters
+2026-07-30 · rc.3 · frame negotiation hardened · zstd window capped
+© 2026 Fieldnote Labs · Status · Security disclosures
