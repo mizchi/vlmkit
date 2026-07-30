@@ -1,0 +1,23 @@
+name: package-install-smoke
+
+# This release-quality check is manual until internal packages ship executable
+# JavaScript. See the follow-up issue created for the Node 24 node_modules
+# TypeScript restriction detected by this smoke (#96).
+on:
+  workflow_dispatch:
+
+jobs:
+  package-install-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm smoke:pack:markup-loop
