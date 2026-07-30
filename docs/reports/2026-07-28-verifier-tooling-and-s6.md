@@ -660,3 +660,41 @@ examples.js を落として widget 初期化(FontFaceObserver 等)を壊し、
 **評価更新**: 「補助データが有意義か」に対する外部証拠が 2 パターン
 分入った(従来は帰属の統制 A/B のみ)。妥当性リスクは縮小したが、
 非自作・非同一レンダラでの網羅検証は依然として最大の残課題。
+
+## 追記13: S14a — 参照なし創造的マークアップ実走(2026-07-30)
+
+設計 `docs/design/creative-markup-eval.md` の最終レグ。target 画像も
+reference もなし — ブリーフ(全コピー逐語引用、copy manifest 兼用)だけを
+入力に、Haiku が `fixtures/auto-markup-proof/creative/attempt-haiku.html`
+をゼロから作成。done 条件 = `check integrity` CLEAN ×3 viewports +
+`check copy --manifest` missing 0。
+
+**結果: DONE(1 修正ラウンド、31.6k tokens、69 秒、ツール実行 9 回)**
+
+- run-ledger 監査: integrity は**初稿から clean**(fails 0 / warns 0 /
+  exempted 0)。修正を駆動したのは copy gate のみ — missing 2(折りたたみ
+  `<details>` 内の FAQ 回答 2 行)→ `open` 属性付与で 0。
+- 検証フェーズ(別の読み手): gate 独立再実行一致、3 幅スクリーンショット
+  目視 clean(hero overlay・Popular badge の意図的重なりも正しく機能)、
+  hero は position:relative/absolute の正規オーバーレイ実装、`verify flow`
+  で details の開閉動作を実証(2/2 DONE)。**gate 沈黙欠陥 0**。
+
+**観察(gate 設計への示唆)**:
+
+1. **copy gate が disclosure を「開かせる」インセンティブ**: check copy は
+   レンダリング済みテキストしか読めないため、エージェントは折りたたみ
+   コンテンツを open 既定にして通した。今回はブリーフが open を許す書き方
+   だったので正当だが、「閉じた状態が正」のページでは S11 の隠れ状態
+   キャリア問題の裏面(ゲートがページを曲げさせる)になる。状態別 copy
+   検証(details を開いてから照合するモード)が将来の穴埋め。
+2. **創造モードでは Haiku の壁が消えた**: 参照ありモードで Haiku を止めて
+   きた 1px エンドゲーム・fixed 座標系は、pixel target が存在しない創造
+   タスクには発生しない。integrity 初稿 clean は「ブリーフが平易だった」
+   ことも効いている(単純な 6 セクション LP)— 密度の高いブリーフで
+   A4/A5(衝突・切れ)を実際に踏ませる負荷試験は未実施。
+3. ブリーフ=copy manifest 兼用の形式は機能した(© 行の `·`、`$4/mo`、
+   em-dash まで逐語一致)。
+
+S14 バッテリー総括: S14b 9/9 検知、S14c 偽陽性 0(外部 dogfood で
+ルール 4 クラス修正後)、S14a 実走 DONE + 検証一致。Layer A は出荷状態。
+残るは Layer B(VLM ルーブリック + 反証、要キー環境)のみ。

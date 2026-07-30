@@ -290,9 +290,17 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   発見・修正(image replacement / sr-only が最重要 — 部分切れ vs 完全隠し
   の実測判別)。真の陽性 1 件(HN 横スクロール)。
   `docs/reports/2026-07-30-integrity-external-dogfood.md`。
-- [ ] **S14a 創造的実走** — ブリーフのみ(=copy manifest 兼用)から
-  Haiku 実走、`check integrity` ループ駆動、Sonnet 逐語ハンドオフ、
-  別読み手検証。rounds / kickback 追従率 / gate 沈黙欠陥数を計測。
+- [x] **S14a 創造的実走** — 2026-07-30 実施: Haiku DONE(1 修正ラウンド、
+  31.6k tokens、エスカレーション不要)。integrity 初稿 clean、copy gate が
+  唯一の修正駆動。別読み手検証で gate 沈黙欠陥 0。観察: copy gate が
+  disclosure を open 既定に誘導(状態別 copy 検証が将来の穴埋め)。
+  `docs/reports/2026-07-28-verifier-tooling-and-s6.md` 追記13。
+- [ ] **S14a 負荷版** — 密度の高いブリーフ(多段グリッド、狭幅制約、
+  長文コピー)で A4/A5(衝突・切れ)を実際に踏ませ、kickback 追従を計測
+  (今回のブリーフは integrity 初稿 clean で gate の修正誘導が未計測)。
+- [ ] **check copy 状態別検証モード** — details/タブ等を開いてから manifest
+  照合(S14a 観察: 現状はレンダリング済みテキストのみのため、エージェントが
+  折りたたみを open 既定に倒すインセンティブになる)。
 - [ ] **Layer B(VLM 視覚判定、advisory)** — 固定ルーブリック強制択一 +
   根拠領域指名、決定論反証(refutation)付き。キーなし環境はワークシート
   生成(check equivalence 方式)。VLM 直結ベンチは Issue #88 枠に相乗り。

@@ -19,7 +19,13 @@
 - 初回 dogfood: S8 edit fixture(1280 で DONE 検証済み)が 375 で 67px の
   実在オーバーフローを持つことを検出(`div.plans` 帰属) — 参照ありゲートの
   死角(target が無い幅)をそのまま裏付ける結果。
-- 未実施: S14c 外部ページ dogfood、S14a 創造的実走、Layer B ワークシート。
+- S14c 外部 dogfood 実施済み(同日): 5 実ページで免除ルール 4 クラスを
+  修正(image replacement / sr-only が最重要)。
+  `docs/reports/2026-07-30-integrity-external-dogfood.md`。
+- S14a 実走済み(同日): Haiku DONE(1 修正ラウンド)、検証フェーズで
+  gate 沈黙欠陥 0。`docs/reports/2026-07-28-verifier-tooling-and-s6.md`
+  追記13。派生課題: 高密度ブリーフの負荷版、check copy の状態別検証。
+- 未実施: Layer B ワークシート(VLM ルーブリック + 反証、要キー環境)。
 
 ## 背景と目的
 
