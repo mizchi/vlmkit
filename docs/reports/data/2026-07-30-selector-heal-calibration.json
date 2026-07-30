@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "collectedAt": "2026-07-30",
+  "description": "Labeled selector-healer failures measured against repository interact fixtures. expectedSelector is the intended repair; actualSelector is the top result returned by healSelector.",
+  "cases": [
+    {"fixture":"heal-all-demo/page.html","brokenSelector":"button.btn-prmary","expectedSelector":"button.btn-primary","actualSelector":"button.btn-primary","confidence":0.325,"label":"true-positive"},
+    {"fixture":"heal-all-demo/page.html","brokenSelector":"button.btn-primar","expectedSelector":"button.btn-primary","actualSelector":"button.btn-primary","confidence":0.475,"label":"true-positive"},
+    {"fixture":"heal-all-demo/page.html","brokenSelector":"button.btn-seconday","expectedSelector":"button.btn-secondary","actualSelector":"button.btn-primary","confidence":0.325,"label":"false-positive"},
+    {"fixture":"heal-all-demo/page.html","brokenSelector":"button.btn-secondar","expectedSelector":"button.btn-secondary","actualSelector":"button.btn-secondary","confidence":0.475,"label":"true-positive"},
+    {"fixture":"heal-all-demo/page.html","brokenSelector":".btn-prmary","expectedSelector":"button.btn-primary","actualSelector":"button.btn-primary","confidence":0.125,"label":"true-positive"},
+    {"fixture":"heal-all-demo/page.html","brokenSelector":".btn-seconday","expectedSelector":"button.btn-secondary","actualSelector":"button.btn-primary","confidence":0.125,"label":"false-positive"},
+    {"fixture":"heal-all-demo/page.html","brokenSelector":"button:has-text(\"Savee\")","expectedSelector":"button.btn-primary","actualSelector":"button.btn-primary","confidence":0.2,"label":"true-positive"},
+    {"fixture":"heal-all-demo/page.html","brokenSelector":"button:has-text(\"Cance\")","expectedSelector":"button.btn-secondary","actualSelector":"button.btn-secondary","confidence":0.5,"label":"true-positive"},
+    {"fixture":"dropdown-form/page.html","brokenSelector":"button.dropdown-triger","expectedSelector":"button.dropdown-trigger","actualSelector":"button.dropdown-trigger","confidence":0.2833333333333333,"label":"true-positive"},
+    {"fixture":"dropdown-form/page.html","brokenSelector":".dropdown-triger","expectedSelector":"button.dropdown-trigger","actualSelector":"button.dropdown-trigger","confidence":0.08333333333333333,"label":"true-positive"},
+    {"fixture":"dropdown-form/page.html","brokenSelector":"button:has-text(\"Region: United State\")","expectedSelector":"button.dropdown-trigger","actualSelector":"button.dropdown-trigger","confidence":0.6666666666666667,"label":"true-positive"},
+    {"fixture":"dropdown-form/page.html","brokenSelector":"input#emali","expectedSelector":"#email","actualSelector":"#email","confidence":0.2,"label":"true-positive"},
+    {"fixture":"dropdown-form/page.html","brokenSelector":"input#emal","expectedSelector":"#email","actualSelector":"#email","confidence":0.2,"label":"true-positive"},
+    {"fixture":"dropdown-form/page.html","brokenSelector":".submit-bt","expectedSelector":"button.submit-btn","actualSelector":"button.submit-btn","confidence":0.275,"label":"true-positive"},
+    {"fixture":"dropdown-form/page.html","brokenSelector":"button.submit-bt","expectedSelector":"button.submit-btn","actualSelector":"button.submit-btn","confidence":0.475,"label":"true-positive"},
+    {"fixture":"dropdown-form/page.html","brokenSelector":"button:has-text(\"Svae\")","expectedSelector":"button.submit-btn","actualSelector":"button.dropdown-trigger","confidence":0.2,"label":"false-positive"},
+    {"fixture":"dropdown-form/page.html","brokenSelector":".dropdown-trig","expectedSelector":"button.dropdown-trigger","actualSelector":"button.dropdown-trigger","confidence":0.23333333333333334,"label":"true-positive"},
+    {"fixture":"form-validation/page.html","brokenSelector":"input#emali","expectedSelector":"#email","actualSelector":"#email","confidence":0.2,"label":"true-positive"},
+    {"fixture":"form-validation/page.html","brokenSelector":"input#passwrod","expectedSelector":"#password","actualSelector":"#email","confidence":0.2,"label":"false-positive"},
+    {"fixture":"form-validation/page.html","brokenSelector":"button.submit-bt","expectedSelector":"#submit","actualSelector":"#submit","confidence":0.45000000000000007,"label":"true-positive"},
+    {"fixture":"form-validation/page.html","brokenSelector":"button:has-text(\"Create acount\")","expectedSelector":"#submit","actualSelector":"#submit","confidence":0.30000000000000004,"label":"true-positive"},
+    {"fixture":"form-validation/page.html","brokenSelector":".error-ms","expectedSelector":null,"actualSelector":null,"confidence":0,"label":"true-negative"},
+    {"fixture":"form-validation/page.html","brokenSelector":"#email-fiel","expectedSelector":"#email","actualSelector":"#email","confidence":0.1,"label":"true-positive"}
+  ]
+}
