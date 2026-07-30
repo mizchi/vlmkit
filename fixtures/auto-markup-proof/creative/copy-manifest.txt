@@ -1,0 +1,25 @@
+Fieldnote
+Features
+Pricing
+FAQ
+Notes that survive the field.
+Offline-first. Plain text. Yours forever.
+Start writing free
+Works offline
+Every note lives on your device first and syncs when you are.
+Plain-text core
+Markdown files you can grep, back up, and keep for decades.
+Instant search
+Find any note in under 50 milliseconds, even with 10,000 of them.
+Solo
+$0
+All features. One device.
+Everywhere
+$4/mo
+Unlimited devices. End-to-end encrypted sync.
+Popular
+Can I export my notes?
+Yes. Your notes are already plain Markdown files on disk — there is nothing to export.
+What happens if I stop paying?
+Sync stops. Every note stays on every device, fully readable and editable.
+© 2026 Fieldnote Labs · Privacy · Terms
