@@ -109,7 +109,7 @@ test("placeholder hidden inside a revealed state is still a suspect", () => {
   assert.match(report.issues[0]!.message, /revealed by tab "Details"/);
 });
 
-test("invisible-text gaming vectors are caught; sr-only and text-transform stay legitimate (E2E)", async () => {
+test("invisible-text gaming vectors are caught; text-transform and select stay legitimate (E2E)", async () => {
   const dir = await mkdtemp(join(tmpdir(), "copy-invisible-"));
   try {
     const html = `<!doctype html><body>
@@ -140,10 +140,59 @@ test("invisible-text gaming vectors are caught; sr-only and text-transform stay 
 
     const report = await runCopyCheck({ source: page, manifestPath: manifest });
     assert.equal(report.manifestLines, 8);
-    assert.deepEqual(report.invisibleLines, ["Packed hidden line", "Ghost opacity line", "Transparent ink line"]);
+    // sr-only counts as invisible BY POLICY since the 2026-07-31 silencing
+    // battery: manifest lines are the user-visible copy spec.
+    assert.deepEqual(report.invisibleLines, [
+      "Packed hidden line",
+      "Ghost opacity line",
+      "Transparent ink line",
+      "Screen reader only line",
+    ]);
     // display:none select text is absent from raw innerText too → plain missing
     assert.deepEqual(report.missingLines, ["Hidden select option"]);
-    assert.equal(report.issues.filter((i) => i.kind === "copy-invisible").length, 3);
+    assert.equal(report.issues.filter((i) => i.kind === "copy-invisible").length, 4);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("silencing battery: geometric hiding vectors are caught, reachable text stays visible (E2E)", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "copy-battery-"));
+  try {
+    // One case per hiding vector from the 2026-07-31 battery. Before the
+    // geometric reachability pass, 10 of 12 vectors silenced the gate.
+    const vectors: [string, string][] = [
+      [`<p style="position:absolute;left:-9999px">VEC offscreen left</p>`, "VEC offscreen left"],
+      [`<p style="position:fixed;top:-9999px">VEC offscreen fixed</p>`, "VEC offscreen fixed"],
+      [`<p style="text-indent:-9999px;white-space:nowrap">VEC text indent</p>`, "VEC text indent"],
+      [`<p style="transform:translateX(-9999px)">VEC transform translate</p>`, "VEC transform translate"],
+      [`<p style="transform:scale(0)">VEC transform scale</p>`, "VEC transform scale"],
+      [`<p style="position:absolute;clip:rect(0 0 0 0)">VEC clip rect</p>`, "VEC clip rect"],
+      [`<p style="clip-path:inset(100%)">VEC clip path inset</p>`, "VEC clip path inset"],
+      [`<div style="width:0;height:0;overflow:hidden"><p>VEC zero box</p></div>`, "VEC zero box"],
+      [`<div style="background:#fff"><p style="color:#fff">VEC camouflage</p></div>`, "VEC camouflage"],
+      [`<div style="overflow-x:hidden"><p style="position:relative;left:5000px;white-space:nowrap">VEC offscreen right</p></div>`, "VEC offscreen right"],
+      // The unclipped right-offscreen variant extends scrollWidth and is
+      // scan scroll's catch (page-overflow-x), not this gate's — see report.
+    ];
+    const legit: [string, string][] = [
+      [`<p>LEGIT plain</p>`, "LEGIT plain"],
+      [`<p style="margin-top:3000px">LEGIT below fold</p>`, "LEGIT below fold"],
+      [`<div style="height:60px;overflow-y:auto"><p style="margin-top:200px">LEGIT inner scrollport</p></div>`, "LEGIT inner scrollport"],
+      [`<div style="width:200px;overflow-x:auto"><p style="width:900px;padding-left:600px;white-space:nowrap">LEGIT h scrollport</p></div>`, "LEGIT h scrollport"],
+    ];
+    const all = [...vectors, ...legit];
+    const page = join(dir, "page.html");
+    const manifest = join(dir, "copy.txt");
+    await writeFile(page, `<!doctype html><body>\n${all.map(([h]) => h).join("\n")}\n</body>`);
+    await writeFile(manifest, all.map(([, line]) => line).join("\n"));
+
+    const report = await runCopyCheck({ source: page, manifestPath: manifest, exploreStates: false });
+    assert.deepEqual(report.invisibleLines.sort(), vectors.map(([, line]) => line).sort());
+    assert.deepEqual(report.missingLines, []);
+    for (const [, line] of legit) {
+      assert.ok(!report.invisibleLines.includes(line), `legit case flagged invisible: ${line}`);
+    }
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

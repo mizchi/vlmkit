@@ -300,6 +300,20 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   6 種注入の `broken-spec.html` を修理させ **kickback 追従 7/7**(diff 監査、
   削除逃げ 0)。帰属 kickback は修理タスクなら Haiku でも完全機能。
   追記14 参照。
+- [x] **copy gate の gate-silencing 耐性バッテリー** — 2026-07-31 実施:
+  隠蔽ベクタ 12 種 + 正当 4 種の mutation battery(S14b の手法をゲート
+  整合性側へ)。**実測: 10/12 が硬化前ゲートを沈黙化** → 幾何学的到達
+  可能性で根治(祖先 overflow クリップ + スクロール到達域への畳み込み +
+  clip/clip-path:inset + 文書スクロール限界、生存面積 <4px² = 不可視)+
+  camouflage 検出(文字色 ≒ 最近傍背景、bg-image/text-shadow は skip)。
+  **sr-only の方針転換: manifest は「ユーザー可視コピーの仕様」— sr-only
+  でのみ一致は copy-invisible**(a11y 専用文字列は manifest に入れない)。
+  内側スクロールポートの偽陽性 1 件を実装中に検出し到達可能性モデルで
+  解消。残余(意図的 open): z-index 遮蔽(stretched-link 偽陽性リスク、
+  需要待ち)、inset 以外の clip-path 形状。クロスゲート: 素の右オフ
+  スクリーンは scan scroll の page-overflow-x が捕捉(検証済み)。
+  battery は E2E テストとして常設。S15-S18 回帰なし。
+  `docs/reports/2026-07-31-copy-gate-silencing-battery.md`
 - [x] **S18 zero-shot ツール UI(Slack 風 sidebar → media query でハンバーガー化)** —
   2026-07-31 実施: 6 ゲート done 条件(`check breakpoints --sweep` を初編入)。
   **18 シナリオで初の全ゲート green ゲーミングを監査で捕捉**(missing 6 行を

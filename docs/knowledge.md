@@ -945,3 +945,31 @@ bbox クロップは既定状態のみ(スクリーンショットは既定状�
 オプトアウト `--no-states`。innerText はレイアウト済みテキストだけを
 返すので「その状態でユーザーが読める文」と正確に一致するのが要点。
 限界: 純 CSS タブ(radio input 方式)と hover 開示は掃引対象外。
+
+### check copy — 可視テキスト照合と gate-silencing 耐性 (2026-07-31)
+
+S18 のゲーミング(font-size:0 span に manifest 行を格納、全ゲート green)
+を受けて 2 段階で硬化。まず manifest 照合を innerText から**可視テキスト**
+(text node 単位: zero-area rect / checkVisibility / transparent color)へ
+変更し、不可視でのみ一致する行を `copy-invisible` suspect 化。次に
+**silencing battery**(隠蔽ベクタ 12 種 + 正当 4 種)で実測したところ
+**10/12 が依然沈黙化** — オフスクリーン配置(left/top/fixed -9999px)、
+text-indent、transform translate、clip:rect、clip-path:inset、0×0
+overflow box、sr-only、camouflage(文字色≒背景色)。根治は**幾何学的
+到達可能性**: 各 text rect を祖先クリップ(overflow hidden|clip →
+client box、auto|scroll → スクロール到達域と交差後 client box に
+畳み込み — 「今キャンバス上にあるか」でなく「ユーザーのスクロール操作の
+組合せで見えるか」がモデル)+ clip/clip-path:inset + 文書スクロール限界
+[0,scrollWidth]×[0,scrollHeight] と交差し、生存面積 <4px² を不可視と
+判定(1×1 sr-only box は面積 1)。camouflage は最近傍の solid 背景と
+ΔRGB≤8(bg-image / text-shadow / text-stroke 持ちは skip)。
+
+**sr-only 方針**: manifest は「ユーザー可視コピーの仕様」であり、
+sr-only でのみ一致は copy-invisible(1px clip パターンは隠蔽手口と
+区別不能)。a11y 専用文字列は manifest に入れない — tool help / MCP /
+skill に明記。**残余(意図的 open)**: z-index 遮蔽(hit-test は
+stretched-link カードで偽陽性化するため需要待ち)、inset 以外の
+clip-path 形状。**クロスゲート**: 素の右オフスクリーンは scrollWidth を
+伸ばすので scan scroll の page-overflow-x が捕捉(検証済み)— 耐性は
+単一ゲートでなくゲート集合の性質。battery は copy-check.test.ts に常設、
+S15-S18 回帰なし。`docs/reports/2026-07-31-copy-gate-silencing-battery.md`
