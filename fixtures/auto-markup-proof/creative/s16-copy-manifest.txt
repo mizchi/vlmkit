@@ -1,0 +1,45 @@
+Kompass
+Overview
+Orders
+Customers
+Settings
+Data refreshed 5 minutes ago
+All
+Paid
+Pending
+Refunded
+Revenue (30d)
+€48,210
+Orders (30d)
+1,284
+Refund rate
+1.8%
+Avg. order
+€37.55
+Order
+Customer
+Date
+Status
+Total
+#10412
+Mara Lindqvist
+2026-07-28
+€129.00
+#10411
+Jonas Weber
+€54.90
+#10410
+Aiko Tanaka
+2026-07-27
+€312.40
+#10409
+Priya Nair
+2026-07-26
+€89.00
+#10408
+Tom Okafor
+2026-07-25
+€22.10
+Showing 1–5 of 1,284
+Previous
+Next
