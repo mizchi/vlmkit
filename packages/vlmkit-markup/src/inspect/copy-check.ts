@@ -192,28 +192,136 @@ const AWAIT_RENDER_COMMIT = `new Promise((r) => requestAnimationFrame(() => requ
  * an `opacity: 0` block, or `color: transparent` text all survive it
  * (observed S18: an agent packed six manifest lines into one font-size:0
  * span and the gate passed). Per text node this excludes:
- *   - zero-area render boxes (font-size:0; display:none has no boxes at all),
+ *   - zero-area render boxes (font-size:0, transform:scale(0);
+ *     display:none has no boxes at all),
  *   - everything `Element.checkVisibility()` rejects: `visibility:
  *     hidden/collapse`, an ancestor opacity chain of 0, and
  *     content-visibility-skipped subtrees — the latter matters because
  *     Chromium hides closed `<details>` content and `hidden="until-found"`
  *     via `content-visibility: hidden` on a UA shadow slot, which still
  *     reports client rects (a manual ancestor walk misses it),
- *   - text painted with alpha < 0.02 (`color: transparent`).
- * Deliberately NOT excluded: sr-only / clip-rect patterns (their text
- * boxes keep a real size; assistive-tech copy stays legitimate), text
- * scrolled out of a scrollport, and `<option>` text inside a visible
- * `<select>` (the UA paints the selected option in the control and the
- * rest on open — option text nodes have no boxes of their own, which
- * false-positived S17's "Germany"). `text-transform` is applied so the
- * matched text is what the user reads.
+ *   - text painted with alpha < 0.02 (`color: transparent`),
+ *   - text a user cannot reach by scrolling (the 2026-07-31 silencing
+ *     battery: 10 of 12 hiding vectors passed the pre-geometric gate).
+ *     Each text rect is intersected with every ancestor's clip — overflow
+ *     hidden/clip clamps to the client box, overflow auto/scroll clamps
+ *     to the scrollable content span (so copy deep inside a scrollport
+ *     stays visible), `clip: rect(...)` and `clip-path: inset(...)`
+ *     clamp geometrically — and finally with the document's scrollable
+ *     bounds [0, scrollWidth] x [0, scrollHeight]. Kills off-screen
+ *     positioning (left/top -9999px, fixed off-viewport, off to the
+ *     right), text-indent:-9999px, transform translations, clip-rect,
+ *     clip-path inset, and zero-size overflow boxes. This also excludes
+ *     sr-only text BY POLICY: manifest lines are the user-visible copy
+ *     spec; assistive-tech-only strings do not belong in a manifest,
+ *   - camouflaged text: color within ~8 RGB of the nearest ancestor's
+ *     solid background (skipped when a background-image or text-shadow
+ *     could make it legible).
+ * Deliberately NOT excluded: `<option>` text inside a visible `<select>`
+ * (the UA paints the selected option in the control and the rest on
+ * open — option text nodes have no boxes of their own, which
+ * false-positived S17's "Germany"), and below-the-fold / inner-scrollport
+ * text (reachable by scrolling). Known residual vectors (documented in
+ * the battery report): z-index occlusion (hit-testing false-positives
+ * on stretched-link overlays) and non-inset clip-path shapes.
+ * `text-transform` is applied so the matched text is what the user reads.
+ * Positioned elements escaping an overflow-hidden ancestor via an
+ * outside containing block are approximated by the plain parent walk
+ * (may over-clip); acceptable because only zero-intersection flags.
  */
 export const COLLECT_VISIBLE_TEXT = `(() => {
-  const alphaOf = (color) => {
+  const rgbaOf = (color) => {
     const m = /rgba?\\(([^)]+)\\)/.exec(color || "");
-    if (!m) return 1;
-    const parts = m[1].split(",").map((p) => parseFloat(p));
-    return parts.length >= 4 ? parts[3] : 1;
+    if (!m) return null;
+    const p = m[1].split(",").map((s) => parseFloat(s));
+    return { r: p[0], g: p[1], b: p[2], a: p.length >= 4 ? p[3] : 1 };
+  };
+  const alphaOf = (color) => { const c = rgbaOf(color); return c ? c.a : 1; };
+  const intersect = (a, b) => ({
+    left: Math.max(a.left, b.left), top: Math.max(a.top, b.top),
+    right: Math.min(a.right, b.right), bottom: Math.min(a.bottom, b.bottom),
+  });
+  const areaOf = (r) => Math.max(0, r.right - r.left) * Math.max(0, r.bottom - r.top);
+  const parseLen = (v, ref) => {
+    const n = parseFloat(v);
+    if (!Number.isFinite(n)) return 0;
+    return v.trim().endsWith("%") ? (n / 100) * ref : n;
+  };
+  /** clip-path: inset(t r b l [round ...]) -> clip rect in viewport coords, else null. */
+  const clipPathRect = (cs, box) => {
+    const m = /^inset\\(([^)]+)\\)$/.exec((cs.clipPath || "").trim());
+    if (!m) return null;
+    const body = m[1].split(/\\s+round\\s+/)[0].trim().split(/\\s+/);
+    const t = parseLen(body[0] ?? "0", box.height);
+    const r = parseLen(body[1] ?? body[0] ?? "0", box.width);
+    const b = parseLen(body[2] ?? body[0] ?? "0", box.height);
+    const l = parseLen(body[3] ?? body[1] ?? body[0] ?? "0", box.width);
+    return { left: box.left + l, top: box.top + t, right: box.right - r, bottom: box.bottom - b };
+  };
+  /** clip: rect(t, r, b, l) (positioned elements) -> clip rect in viewport coords, else null. */
+  const clipRect = (cs, box) => {
+    const m = /^rect\\(([^)]+)\\)$/.exec((cs.clip || "").trim());
+    if (!m) return null;
+    const v = m[1].split(/[,\\s]+/).map((s) => s.trim());
+    const num = (s, fallback) => (s === "auto" || s === undefined) ? fallback : parseLen(s, 0);
+    return {
+      left: box.left + num(v[3], 0), top: box.top + num(v[0], 0),
+      right: box.left + num(v[1], box.right - box.left), bottom: box.top + num(v[2], box.bottom - box.top),
+    };
+  };
+  /** Does any of the node's rects survive every ancestor clip + the document's scrollable bounds? */
+  const reachableArea = (el, rects) => {
+    const de = document.documentElement;
+    const doc = { left: -de.scrollLeft, top: -de.scrollTop, right: -de.scrollLeft + de.scrollWidth, bottom: -de.scrollTop + de.scrollHeight };
+    let best = 0;
+    for (let r of rects) {
+      let rect = { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+      for (let p = el; p && p !== de; p = p.parentElement) {
+        const cs = getComputedStyle(p);
+        const box = p.getBoundingClientRect();
+        const cx = box.left + p.clientLeft, cy = box.top + p.clientTop;
+        const ox = cs.overflowX, oy = cs.overflowY;
+        if (p !== el) {
+          if (ox === "hidden" || ox === "clip") rect = intersect(rect, { left: cx, right: cx + p.clientWidth, top: -1e9, bottom: 1e9 });
+          else if (ox === "auto" || ox === "scroll") {
+            // Reachable iff inside the scrollable content span; the user can
+            // then scroll it anywhere in the client box, so collapse to it.
+            rect = intersect(rect, { left: cx - p.scrollLeft, right: cx - p.scrollLeft + p.scrollWidth, top: -1e9, bottom: 1e9 });
+            if (rect.right - rect.left > 0) { rect.left = cx; rect.right = cx + p.clientWidth; }
+          }
+          if (oy === "hidden" || oy === "clip") rect = intersect(rect, { top: cy, bottom: cy + p.clientHeight, left: -1e9, right: 1e9 });
+          else if (oy === "auto" || oy === "scroll") {
+            rect = intersect(rect, { top: cy - p.scrollTop, bottom: cy - p.scrollTop + p.scrollHeight, left: -1e9, right: 1e9 });
+            if (rect.bottom - rect.top > 0) { rect.top = cy; rect.bottom = cy + p.clientHeight; }
+          }
+        }
+        const cp = clipPathRect(cs, box);
+        if (cp) rect = intersect(rect, cp);
+        const cr = clipRect(cs, box);
+        if (cr) rect = intersect(rect, cr);
+        if (areaOf(rect) < 1) break;
+      }
+      best = Math.max(best, areaOf(intersect(rect, doc)));
+      if (best >= 4) return best;
+    }
+    return best;
+  };
+  /** Text color ~== the nearest solid ancestor background (no bg-image / text-shadow rescue). */
+  const camouflaged = (el, cs) => {
+    if ((cs.textShadow || "none") !== "none") return false;
+    if (parseFloat(cs.webkitTextStrokeWidth || "0") > 0) return false;
+    const fg = rgbaOf(cs.color);
+    if (!fg) return false;
+    for (let p = el; p; p = p.parentElement) {
+      const pcs = getComputedStyle(p);
+      if ((pcs.backgroundImage || "none") !== "none") return false;
+      const bg = rgbaOf(pcs.backgroundColor);
+      if (bg && bg.a >= 0.9) {
+        return Math.max(Math.abs(fg.r - bg.r), Math.abs(fg.g - bg.g), Math.abs(fg.b - bg.b)) <= 8;
+      }
+    }
+    const white = { r: 255, g: 255, b: 255 };
+    return Math.max(Math.abs(fg.r - white.r), Math.abs(fg.g - white.g), Math.abs(fg.b - white.b)) <= 8;
   };
   const root = document.body || document.documentElement;
   if (!root) return "";
@@ -236,9 +344,8 @@ export const COLLECT_VISIBLE_TEXT = `(() => {
     }
     const range = document.createRange();
     range.selectNodeContents(node);
-    let area = 0;
-    for (const r of range.getClientRects()) area = Math.max(area, r.width * r.height);
-    if (area < 1) continue;
+    const rects = Array.from(range.getClientRects()).filter((r) => r.width * r.height >= 1);
+    if (rects.length === 0) continue;
     const cs = getComputedStyle(el);
     if (typeof el.checkVisibility === "function") {
       if (!el.checkVisibility({ visibilityProperty: true, opacityProperty: true, contentVisibilityAuto: true })) continue;
@@ -252,6 +359,9 @@ export const COLLECT_VISIBLE_TEXT = `(() => {
       if (opacity < 0.02) continue;
     }
     if (alphaOf(cs.color) < 0.02) continue;
+    // Legible text needs a few px^2; a 1x1 sr-only box scores exactly 1.
+    if (reachableArea(el, rects) < 4) continue;
+    if (camouflaged(el, cs)) continue;
     let text = node.data;
     if (cs.textTransform === "uppercase") text = text.toUpperCase();
     else if (cs.textTransform === "lowercase") text = text.toLowerCase();
@@ -345,7 +455,7 @@ export function analyzeCopy(input: {
       issues.push({
         kind: "copy-invisible",
         severity: "suspect",
-        message: `Manifest line found ONLY in invisible text (zero-size, zero-opacity, or transparent — e.g. a font-size:0 span): "${line}". Invisible text does not satisfy the copy gate — render it visibly, or remove the hidden copy.`,
+        message: `Manifest line found ONLY in text a user cannot see (zero-size, zero-opacity, transparent, off-screen, clipped, camouflaged, or visually-hidden/sr-only): "${line}". Invisible text does not satisfy the copy gate — render it visibly, or remove the hidden copy.`,
       });
       continue;
     }
@@ -597,10 +707,14 @@ are clicked, so copy inside collapsed panels passes (with provenance)
 instead of reading as missing — no need to ship disclosures open just
 to satisfy the gate.
 
-Manifest lines must appear in the VISIBLY rendered text: copy that
-exists only at font-size:0, opacity:0, or transparent color is
-reported as copy-invisible, not as satisfied. Markdown headings in the
-manifest ("# Section") are organizing comments, not required lines.
+Manifest lines must appear in the VISIBLY rendered text: copy a user
+cannot actually see (font-size:0, opacity:0, transparent color,
+off-screen positioning, text-indent, transforms, clip/clip-path,
+zero-size overflow boxes, same-color camouflage, sr-only) is reported
+as copy-invisible, not as satisfied. The manifest is the user-visible
+copy spec — keep assistive-tech-only strings out of it. Markdown
+headings in the manifest ("# Section") are organizing comments, not
+required lines.
 
 Options:
   --manifest <file>   Copy manifest (plain text / markdown; one required line per row)
