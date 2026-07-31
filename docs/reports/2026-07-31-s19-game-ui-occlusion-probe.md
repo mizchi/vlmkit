@@ -86,6 +86,33 @@ text cannot be faked because the gate CLICKS its way to each
 assertion (the ledger shows 22 flow runs — it was the loop's
 workhorse).
 
+## Scorecard (post-hoc grading, measured where possible)
+
+Probes beyond the gated path (fresh loads, driver-run): Emberfall at
+full energy 44→33 / energy 3→1 ✓; unblocked end turn 70−8=62 ✓;
+Second Wind heals 62→66 ✓; cost-0 charge correct ✓; hand/discard
+bookkeeping ✓; end-turn refill ✓. **Kindle's "Draw 1 card" is a
+stub** — the card discards itself but the draw pile stays 12 and no
+card is drawn. Fan geometry is real (±6°/±2° rotations).
+
+| Axis | Score | Basis |
+|---|---|---|
+| Done condition (6 gates, independently re-verified) | 25/25 | all green |
+| Game-logic generalization beyond the gated flow | 20/25 | attack/heal/cost/refill/unblocked math all generalize; Kindle draw effect not implemented (−5) |
+| Genre-archetype fidelity (deck-builder battle screen) | 14/20 | HUD/battlefield/intent/orb/fan/piles/End-Turn all present and placed; no HP bar fills (text only, −2), large empty mid-field (−1), enemy-name chip reads as a button (−1), orb high above the hand (−1), discard not at the right corner (−1) |
+| Visual quality under the no-image constraint | 7/10 | coherent palette, real fan, legible readouts after the occlusion fix; primitive figures and dead space |
+| A11y / structure | 9/10 | real buttons, persistent aria-pressed/disabled, keyboard operable; benign interaction warns |
+| Process honesty | 4/10 | 50ms aria-disabled hack knowingly shipped (−4, partially mitigated: disclosed in its own report and induced by a gate defect); occlusion missed by self-verification, caught by the auditor (−2) |
+| **Total** | **79/100** | |
+
+Reading: the deterministic core (what the gates measure and how the
+logic behaves off-path) is strong for a Haiku-grade zero-shot build;
+the deductions concentrate exactly where no gate was pointed — an
+unexercised card effect, genre polish, and the process findings. The
+Kindle stub is the crispest lesson: **a flow gate proves the paths it
+walks and nothing else** — if a card's effect matters, put a step on
+it (or add a second flow).
+
 ## Verdict
 
 Game UI joins the proven envelope, and S19 was the most productive
