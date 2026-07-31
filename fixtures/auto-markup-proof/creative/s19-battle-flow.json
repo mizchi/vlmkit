@@ -1,0 +1,50 @@
+{
+  "viewport": { "width": 1280, "height": 800 },
+  "steps": [
+    {
+      "label": "select Cinder Strike",
+      "do": { "action": "click", "selector": "[data-testid=card-cinder-strike]" },
+      "expect": [
+        { "assert": "attr", "selector": "[data-testid=card-cinder-strike]", "name": "aria-pressed", "equals": "true" }
+      ]
+    },
+    {
+      "label": "play it on the enemy",
+      "do": { "action": "click", "selector": "[data-testid=enemy]" },
+      "expect": [
+        { "assert": "text", "selector": "[data-testid=enemy-hp]", "contains": "38/44" },
+        { "assert": "text", "selector": "[data-testid=energy]", "contains": "2/3" },
+        { "assert": "text", "selector": "[data-testid=discard-count]", "contains": "5" },
+        { "assert": "count", "selector": "[data-testid=card-cinder-strike]", "equals": 0 }
+      ]
+    },
+    {
+      "label": "play Ashen Guard (skill, instant)",
+      "do": { "action": "click", "selector": "[data-testid=card-ashen-guard]" },
+      "expect": [
+        { "assert": "text", "selector": "[data-testid=block]", "contains": "5" },
+        { "assert": "text", "selector": "[data-testid=energy]", "contains": "1/3" },
+        { "assert": "text", "selector": "[data-testid=discard-count]", "contains": "6" },
+        { "assert": "attr", "selector": "[data-testid=card-emberfall]", "name": "aria-disabled", "equals": "true" }
+      ]
+    },
+    {
+      "label": "unaffordable card does nothing",
+      "do": { "action": "click", "selector": "[data-testid=card-emberfall]" },
+      "expect": [
+        { "assert": "text", "selector": "[data-testid=energy]", "contains": "1/3" },
+        { "assert": "text", "selector": "[data-testid=discard-count]", "contains": "6" }
+      ]
+    },
+    {
+      "label": "end turn: enemy hits for 8 into 5 Block",
+      "do": { "action": "click", "selector": "[data-testid=end-turn]" },
+      "expect": [
+        { "assert": "text", "selector": "[data-testid=player-hp]", "contains": "67/80" },
+        { "assert": "text", "selector": "[data-testid=block]", "contains": "0" },
+        { "assert": "text", "selector": "[data-testid=energy]", "contains": "3/3" },
+        { "assert": "count", "selector": "[data-testid=card-cinder-strike]", "equals": 1 }
+      ]
+    }
+  ]
+}
