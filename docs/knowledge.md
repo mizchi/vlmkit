@@ -839,6 +839,7 @@ S5 で Haiku が missing/extra を残して 3 ラウンドで自己宣言停止�
 | S14a creative Haiku(参照なし) | 1 | 31,616 | 9 | 69s | —(target 不在) | **DONE — 参照なし創造モード初実証**(done 条件 = check integrity CLEAN×3 + copy manifest 0 missing)。integrity は初稿 clean、修正駆動は copy gate のみ(details 内 2 行)。検証フェーズ(別読み手: gate 再実行・3 幅目視・verify flow で details 開閉実証)で gate 沈黙欠陥 0。**pixel target が無い創造タスクでは Haiku の壁(1px エンドゲーム)が発生しない** |
 | S14a-stress creative Haiku(高密度ブリーフ) | 1 | 30,499 | 5 | 52s | —(target 不在) | **DONE — 負荷ブリーフ(固定サイドバー+3 段階規律+非分割トークン)でも初稿 CLEAN**。DOM 実測で全レイアウト規律充足を確認。結論: 作成ランでは kickback 追従を計測できない(明確なブリーフ+現行 Haiku は初稿 clean が定常) |
 | S14a-fix repair Haiku(既知欠陥 6 種の修理) | 2 | 29,616 | 10 | 57s | —(target 不在) | **CLEAN — kickback 追従 7/7**(diff 監査: 全修正が名指しセレクタ、削除逃げ 0、figure/caption 保全)。r2 で dedupe に隠れていた 375 図版オーバーフローが顕在化→修正。**帰属 kickback の決定論ナビゲーションは修理タスクなら Haiku でも完全に機能**(参照ありでは Sonnet 限定だった加速効果) |
+| S15 zero-shot product page Haiku(実世界パターン) | 2(自称)/ 5 iter(台帳) | 49,704 | 28 | 188s | —(target 不在) | **DONE — 5 ゲート同時達成を別読み手検証**(integrity CLEAN / copy 0 missing / scroll / handlers / interactions 各 0 suspect)。パンくず・セール価格・radio バリアント・ステッパー・ARIA タブ・閉 FAQ・375 sticky バー・スペック表を brief から一発実装。**disclosure-state sweep 初実戦: 30 行中 11 行が revealed-only で初稿から 0 missing — S14a で観測した open-既定誘導が消滅**。ラウンド自称 2 vs 台帳 5 iter の乖離あり(KPI は台帳から取ること)。gate 沈黙欠陥 0(sticky の fullPage 重なりは撮影アーティファクトと判別)。`docs/reports/2026-07-31-s15-zero-shot-product-page.md` |
 
 トークン計測は S5 が初(それ以前のランは usage を記録していなかった)。
 r2/r3 の tokens はセグメント合算 — 差し戻し(resume)はトランスクリプト

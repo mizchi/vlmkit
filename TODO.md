@@ -300,6 +300,14 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   6 種注入の `broken-spec.html` を修理させ **kickback 追従 7/7**(diff 監査、
   削除逃げ 0)。帰属 kickback は修理タスクなら Haiku でも完全機能。
   追記14 参照。
+- [x] **S15 zero-shot 実世界パターン実走(EC 商品詳細ページ)** — 2026-07-31
+  実施: brief-only Haiku がパンくず/セール価格/radio バリアント/ステッパー/
+  ARIA タブ/閉 FAQ/375 sticky カートバー/スペック表を一発実装、5 ゲート
+  (integrity/copy/scroll/handlers/interactions)同時 DONE を別読み手検証。
+  disclosure-state sweep 初実戦(11/30 行 revealed-only、初稿 0 missing —
+  open-既定誘導の消滅を実測)。ラウンド自称 2 vs 台帳 5 iter(KPI は台帳)。
+  gate 沈黙欠陥 0 継続。次候補: dashboard/表操作系、フォーム密 checkout。
+  `docs/reports/2026-07-31-s15-zero-shot-product-page.md`
 - [x] **check copy 状態別検証モード** — 2026-07-31 実装済み: 既定 ON の
   disclosure-state sweep(閉じた `<details>` を open、未選択 `[role=tab]` /
   `[aria-expanded=false]` をクリック → 各状態の innerText 捕捉、cap 30 +

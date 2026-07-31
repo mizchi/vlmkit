@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alpenrad Tourer X - Premium Touring Bike</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #fff;
+        }
+
+        /* Breadcrumb */
+        .breadcrumb {
+            padding: 16px 20px;
+            font-size: 14px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .breadcrumb a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+
+        .breadcrumb span {
+            margin: 0 8px;
+            color: #666;
+        }
+
+        /* Product Section */
+        .product-section {
+            padding: 24px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .product-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 32px;
+        }
+
+        @media (min-width: 768px) {
+            .product-container {
+                grid-template-columns: 1fr 1fr;
+                gap: 48px;
+            }
+        }
+
+        /* Gallery */
+        .gallery {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .main-visual {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.8);
+            transition: background 0.3s ease;
+        }
+
+        .main-visual.variant-white {
+            background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+            color: #666;
+        }
+
+        .main-visual.variant-grey {
+            background: linear-gradient(135deg, #707070 0%, #505050 100%);
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .main-visual.variant-orange {
+            background: linear-gradient(135deg, #ff9f43 0%, #ff6348 100%);
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .thumbnails {
+            display: flex;
+            gap: 8px;
+        }
+
+        .thumbnail {
+            width: 60px;
+            height: 60px;
+            border-radius: 6px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .thumbnail.white {
+            background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+        }
+
+        .thumbnail.grey {
+            background: linear-gradient(135deg, #707070 0%, #505050 100%);
+        }
+
+        .thumbnail.orange {
+            background: linear-gradient(135deg, #ff9f43 0%, #ff6348 100%);
+        }
+
+        .thumbnail.active {
+            border-color: #333;
+        }
+
+        .thumbnail:hover {
+            border-color: #999;
+        }
+
+        /* Info Column */
+        .info-column {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .product-title {
+            font-size: 28px;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+
+        .price-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .current-price {
+            font-size: 24px;
+            font-weight: 600;
+            color: #000;
+        }
+
+        .original-price {
+            font-size: 18px;
+            color: #666;
+            text-decoration: line-through;
+        }
+
+        .stock-badge {
+            font-size: 14px;
+            color: #00aa00;
+            font-weight: 500;
+        }
+
+        /* Variant Picker */
+        .variant-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .variant-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .variant-options {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .variant-input {
+            display: none;
+        }
+
+        .variant-label-custom {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .variant-input:checked + .variant-label-custom {
+            border-color: #333;
+            background: #f5f5f5;
+            font-weight: 500;
+        }
+
+        /* Quantity Stepper */
+        .quantity-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .quantity-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            min-width: 65px;
+        }
+
+        .stepper {
+            display: flex;
+            align-items: center;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .stepper button {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: #f9f9f9;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            transition: background 0.2s ease;
+        }
+
+        .stepper button:hover {
+            background: #e9e9e9;
+        }
+
+        .stepper button:active {
+            background: #ddd;
+        }
+
+        .stepper-value {
+            width: 40px;
+            text-align: center;
+            font-weight: 500;
+            user-select: none;
+        }
+
+        /* Add to Cart */
+        .add-to-cart {
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            background: #000;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .add-to-cart:hover {
+            background: #333;
+        }
+
+        .add-to-cart:active {
+            background: #000;
+        }
+
+        /* Tabs */
+        .tabs {
+            margin-top: 40px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .tab-list {
+            display: flex;
+            gap: 0;
+            list-style: none;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .tab-button {
+            padding: 16px 20px;
+            font-size: 14px;
+            font-weight: 500;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            color: #666;
+            transition: all 0.2s ease;
+        }
+
+        .tab-button[aria-selected="true"] {
+            color: #000;
+            border-bottom-color: #000;
+        }
+
+        .tab-button:hover {
+            color: #333;
+        }
+
+        .tab-panel {
+            display: none;
+            padding: 24px 0;
+            font-size: 14px;
+            line-height: 1.7;
+        }
+
+        .tab-panel[aria-hidden="false"] {
+            display: block;
+        }
+
+        .specs-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .specs-table td {
+            padding: 12px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .specs-table td:first-child {
+            font-weight: 500;
+            width: 150px;
+        }
+
+        .review-rating {
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .review-quote {
+            font-style: italic;
+            color: #555;
+            margin-bottom: 8px;
+        }
+
+        .review-author {
+            font-size: 13px;
+            color: #999;
+        }
+
+        /* FAQ */
+        .faq-section {
+            margin-top: 40px;
+            border-top: 1px solid #e0e0e0;
+            padding-top: 24px;
+        }
+
+        .faq-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        details {
+            border-bottom: 1px solid #e0e0e0;
+            padding: 16px 0 40px 0;
+            overflow: hidden;
+        }
+
+        details summary {
+            cursor: pointer;
+            font-weight: 500;
+            user-select: none;
+            padding: 8px 0;
+        }
+
+        details summary:hover {
+            color: #666;
+        }
+
+        details[open] summary {
+            margin-bottom: 12px;
+        }
+
+        details p {
+            color: #555;
+            margin: 12px 0 0 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        /* Mobile Cart Bar */
+        .mobile-cart {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 20px;
+            background: #fff;
+            border-top: 1px solid #e0e0e0;
+            position: sticky;
+            bottom: 0;
+            z-index: 100;
+        }
+
+        .mobile-cart-price {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .mobile-cart button {
+            flex: 1;
+            padding: 12px 16px;
+            font-size: 16px;
+            font-weight: 600;
+            color: white;
+            background: #000;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        @media (min-width: 768px) {
+            .mobile-cart {
+                display: none;
+            }
+        }
+
+        /* Footer */
+        footer {
+            margin-top: 60px;
+            padding: 40px 20px;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+            background: #f9f9f9;
+        }
+
+        footer a {
+            color: #0066cc;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 375px) {
+            .breadcrumb,
+            .product-section {
+                padding: 16px 16px;
+            }
+
+            .product-title {
+                font-size: 24px;
+            }
+
+            .current-price {
+                font-size: 20px;
+            }
+
+            .tab-button {
+                padding: 12px 16px;
+                font-size: 13px;
+            }
+
+            .tab-panel {
+                padding: 16px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb" aria-label="Breadcrumb">
+        <a href="#">Home</a>
+        <span>›</span>
+        <a href="#">Bikes</a>
+        <span>›</span>
+        <span>Alpenrad Tourer X</span>
+    </nav>
+
+    <!-- Product Section -->
+    <main class="product-section">
+        <div class="product-container">
+            <!-- Gallery -->
+            <div class="gallery">
+                <div id="mainVisual" class="main-visual variant-white">Alpenrad Tourer X</div>
+                <div class="thumbnails">
+                    <button class="thumbnail white active" data-variant="white" aria-label="Glacier White" title="Glacier White"></button>
+                    <button class="thumbnail grey" data-variant="grey" aria-label="Slate Grey" title="Slate Grey"></button>
+                    <button class="thumbnail orange" data-variant="orange" aria-label="Signal Orange" title="Signal Orange"></button>
+                </div>
+            </div>
+
+            <!-- Info Column -->
+            <div class="info-column">
+                <h1 class="product-title">Alpenrad Tourer X</h1>
+
+                <div class="price-row">
+                    <span class="current-price">€1,299</span>
+                    <span class="original-price">€1,499</span>
+                    <span class="stock-badge">In stock — ships in 2 days</span>
+                </div>
+
+                <!-- Variant Picker -->
+                <div class="variant-section">
+                    <label class="variant-label">Colour</label>
+                    <div class="variant-options" role="group" aria-labelledby="color-label">
+                        <input type="radio" id="color-white" name="color" value="Glacier White" class="variant-input" checked>
+                        <label for="color-white" class="variant-label-custom">Glacier White</label>
+
+                        <input type="radio" id="color-grey" name="color" value="Slate Grey" class="variant-input">
+                        <label for="color-grey" class="variant-label-custom">Slate Grey</label>
+
+                        <input type="radio" id="color-orange" name="color" value="Signal Orange" class="variant-input">
+                        <label for="color-orange" class="variant-label-custom">Signal Orange</label>
+                    </div>
+                </div>
+
+                <!-- Quantity Stepper -->
+                <div class="quantity-section">
+                    <label class="quantity-label">Quantity</label>
+                    <div class="stepper">
+                        <button id="decrementBtn" type="button" aria-label="Decrease quantity">−</button>
+                        <span class="stepper-value" id="quantityValue">1</span>
+                        <button id="incrementBtn" type="button" aria-label="Increase quantity">+</button>
+                    </div>
+                </div>
+
+                <!-- Add to Cart Button -->
+                <button class="add-to-cart" type="button">Add to cart</button>
+            </div>
+        </div>
+
+        <!-- Detail Tabs -->
+        <div class="tabs">
+            <div role="tablist" class="tab-list">
+                <button role="tab" id="tab-description" aria-selected="true" aria-controls="panel-description" class="tab-button">Description</button>
+                <button role="tab" id="tab-specs" aria-selected="false" aria-controls="panel-specs" class="tab-button">Specifications</button>
+                <button role="tab" id="tab-reviews" aria-selected="false" aria-controls="panel-reviews" class="tab-button">Reviews</button>
+            </div>
+
+            <div role="tabpanel" id="panel-description" aria-labelledby="tab-description" aria-hidden="false" class="tab-panel">
+                <p>Built for loaded touring: a triple-butted steel frame, 45mm tyre clearance, and mounts for everything you can bolt on.</p>
+            </div>
+
+            <div role="tabpanel" id="panel-specs" aria-labelledby="tab-specs" aria-hidden="true" class="tab-panel">
+                <table class="specs-table">
+                    <tr>
+                        <td>Frame</td>
+                        <td>Triple-butted chromoly steel</td>
+                    </tr>
+                    <tr>
+                        <td>Weight</td>
+                        <td>12.4 kg (size M)</td>
+                    </tr>
+                    <tr>
+                        <td>Gearing</td>
+                        <td>2×11 Shimano GRX</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div role="tabpanel" id="panel-reviews" aria-labelledby="tab-reviews" aria-hidden="true" class="tab-panel">
+                <div class="review-rating">4.6 out of 5 — 218 reviews</div>
+                <div class="review-quote">Crossed the Alps twice. The rack mounts alone are worth it.</div>
+                <div class="review-author">— Jonas K.</div>
+            </div>
+        </div>
+
+        <!-- Shipping FAQ -->
+        <section class="faq-section" aria-label="Shipping FAQ">
+            <h2 class="faq-title">Shipping & Returns</h2>
+            <details>
+                <summary>How long does delivery take?</summary>
+                <p>Assembled bikes ship in a wooden crate within 5 working days across the EU.</p>
+            </details>
+            <details>
+                <summary>Can I return the bike?</summary>
+                <p>30 days, free pickup, full refund — as long as the frame is unmarked.</p>
+            </details>
+        </section>
+    </main>
+
+    <!-- Mobile Cart Bar -->
+    <div class="mobile-cart">
+        <div class="mobile-cart-price">€1,299</div>
+        <button type="button" class="mobile-cart-add-to-cart">Add to cart</button>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <p>© 2026 Alpenrad GmbH · <a href="#">Imprint</a> · <a href="#">Shipping</a> · <a href="#">Returns</a></p>
+    </footer>
+
+    <script>
+        // Gallery thumbnails
+        const thumbnails = document.querySelectorAll('.thumbnail');
+        const mainVisual = document.getElementById('mainVisual');
+
+        thumbnails.forEach(thumb => {
+            thumb.addEventListener('click', () => {
+                const variant = thumb.getAttribute('data-variant');
+                thumbnails.forEach(t => t.classList.remove('active'));
+                thumb.classList.add('active');
+                mainVisual.className = 'main-visual variant-' + variant;
+            });
+        });
+
+        // Quantity stepper
+        const quantityValue = document.getElementById('quantityValue');
+        const decrementBtn = document.getElementById('decrementBtn');
+        const incrementBtn = document.getElementById('incrementBtn');
+        let quantity = 1;
+
+        decrementBtn.addEventListener('click', () => {
+            if (quantity > 1) {
+                quantity--;
+                quantityValue.textContent = quantity;
+            }
+        });
+
+        incrementBtn.addEventListener('click', () => {
+            quantity++;
+            quantityValue.textContent = quantity;
+        });
+
+        // Tabs
+        const tabButtons = document.querySelectorAll('[role="tab"]');
+        const tabPanels = document.querySelectorAll('[role="tabpanel"]');
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                tabButtons.forEach(b => b.setAttribute('aria-selected', 'false'));
+                tabPanels.forEach(p => p.setAttribute('aria-hidden', 'true'));
+                button.setAttribute('aria-selected', 'true');
+                const panelId = button.getAttribute('aria-controls');
+                document.getElementById(panelId).setAttribute('aria-hidden', 'false');
+            });
+
+            // Keyboard navigation
+            button.addEventListener('keydown', (e) => {
+                let targetButton = null;
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    const nextButton = button.nextElementSibling;
+                    if (nextButton && nextButton.hasAttribute('role') && nextButton.getAttribute('role') === 'tab') {
+                        targetButton = nextButton;
+                    } else {
+                        targetButton = tabButtons[0];
+                    }
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    const prevButton = button.previousElementSibling;
+                    if (prevButton && prevButton.hasAttribute('role') && prevButton.getAttribute('role') === 'tab') {
+                        targetButton = prevButton;
+                    } else {
+                        targetButton = tabButtons[tabButtons.length - 1];
+                    }
+                }
+                if (targetButton) {
+                    e.preventDefault();
+                    targetButton.click();
+                    targetButton.focus();
+                }
+            });
+        });
+
+        // Color variant updates
+        const colorRadios = document.querySelectorAll('input[name="color"]');
+        colorRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                const colorMap = {
+                    'Glacier White': 'white',
+                    'Slate Grey': 'grey',
+                    'Signal Orange': 'orange'
+                };
+                const variantClass = colorMap[radio.value];
+                mainVisual.className = 'main-visual variant-' + variantClass;
+                thumbnails.forEach(thumb => thumb.classList.remove('active'));
+                document.querySelector(`.thumbnail.${variantClass}`).classList.add('active');
+            });
+        });
+
+        // Cart buttons
+        document.querySelector('.add-to-cart').addEventListener('click', () => {
+            alert(`Added ${quantity} Alpenrad Tourer X to cart`);
+        });
+
+        document.querySelector('.mobile-cart-add-to-cart').addEventListener('click', () => {
+            alert(`Added ${quantity} Alpenrad Tourer X to cart`);
+        });
+    </script>
+</body>
+</html>
