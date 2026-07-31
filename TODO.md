@@ -300,6 +300,18 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   6 種注入の `broken-spec.html` を修理させ **kickback 追従 7/7**(diff 監査、
   削除逃げ 0)。帰属 kickback は修理タスクなら Haiku でも完全機能。
   追記14 参照。
+- [x] **決定論コマンド群の汎用マークアップ支援ツール化(整理・配布導線)** —
+  2026-07-31 実施: 文脈フリーの正典ガイド `docs/markup-assist.md`(導入
+  3 形態 = CLI `npx vlmkit` / MCP `.mcp.json` / skill コピー、タスク別
+  ルーティング表、ループ規律、done 条件レシピ、anti-gaming ルール、
+  key-free / `[key]` 区分)+ 汎用スキル `.claude/skills/markup-assist/`
+  (ワークフロー系 3 skill と別の generalist、任意リポジトリで自立)を
+  新設。README のコマンド群表を現状に同期(integrity/copy/layout/
+  interactions/equivalence、scan scroll/mock/handlers、build page、
+  verify/contract/heal/mcp を追補)+ markup-assist 節を先頭に。
+  vlmkit-mcp README に npx 設定スニペットと check_copy の sweep /
+  copy-invisible / allowInvisible を反映。全コマンド署名は --help で
+  実機検証済み。
 - [x] **copy-invisible の実サイト誤検知監査 + クラス別抑制(`--allow-invisible`)** —
   2026-07-31 実施: 実サイト 7 つ(MDN / Wikipedia / W3C APG / web.dev /
   HN / danluu / example)で不可視判定チャンクを全数監査 — **誤検知 0**

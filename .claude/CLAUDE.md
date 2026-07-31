@@ -224,6 +224,7 @@ The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need t
 
 | File | Contents |
 |---------|------|
+| `docs/markup-assist.md` | Context-free guide to the deterministic markup gates (CLI / MCP / skill install, task routing, done-condition recipes) |
 | `docs/knowledge.md` | Accumulated experiment findings (detection rates, VLM comparisons, fix patterns, etc.) |
 | `docs/api-design.md` | CLI / library API design |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |

@@ -24,21 +24,38 @@ npm install -g @mizchi/vlmkit
 pnpm install && pnpm build
 ```
 
+## Markup assistance (deterministic gates, no API key)
+
+The markup-assist toolset — `check integrity`, `check copy`,
+`check layout`, `check breakpoints --sweep`, `scan scroll`,
+`scan handlers`, `check interactions`, `verify markup`,
+`verify flow`, and friends — verifies generated or edited HTML/CSS
+deterministically and prints agent-ready kickbacks. It drops into any
+project three ways: the CLI (`npx vlmkit …`), the MCP server
+(`vlmkit mcp`, 9 gate tools), or the `markup-assist` agent skill.
+
+**Start here: [`docs/markup-assist.md`](./docs/markup-assist.md)** —
+task-routing table, done-condition recipes, install snippets, and the
+anti-gaming rules the gates enforce.
+
 The CLI is organized into verb groups. Run `vlmkit <group> --help`
 for options.
 
 | Group | Subcommands |
 |---|---|
-| `vlmkit diff` | `html`, `png`, `region`, `elements`, `browsers`, `agent`, `runs` |
-| `vlmkit check` | `a11y {contrast,touch,focus}`, `tokens`, `theme`, `perf`, `drift {component,pages}` |
+| `vlmkit diff` | `html`, `png`, `elements`, `browsers`, `agent`, `runs` (`region` is deprecated) |
+| `vlmkit check` | `integrity`, `copy`, `layout`, `interactions`, `equivalence`, `breakpoints`, `scroll`, `animation`, `motion`, `a11y {contrast,touch,focus}`, `palette`, `tokens`, `theme`, `perf`, `drift {component,pages}`, `crater` |
+| `vlmkit scan` | `component`, `breakpoints`, `scroll`, `mock`, `handlers` |
+| `vlmkit build` | `component`, `page` |
+| `vlmkit verify` | `markup`, `flow` |
+| `vlmkit contract` | `introspect`, `validate`, `scaffold` |
+| `vlmkit heal` | `selector`, `markup` |
 | `vlmkit inspect` | `interact`, `explore`, `smoke` |
 | `vlmkit stress` | `i18n`, `media` |
-| `vlmkit scan` | `component`, `breakpoints` |
-| `vlmkit build` | `component` |
 | `vlmkit snapshot` | `[<url>...]`, `approve`, `fix-prompt`, `stability`, `flipbook`, `report` |
 | `vlmkit migration` | `compare`, `blind`, `subagent` |
 | `vlmkit workflow` | `init`, `capture`, `verify`, `approve`, `graph`, `affected`, `introspect`, `spec-verify`, `expect` |
-| Standalone | `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
+| Standalone | `vlmkit mcp`, `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit markup-loop`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
 
 The single-token commands from 0.4.x (`vrt compare`, `vrt png-diff`,
 `vrt theme-parity`, …) remain as deprecation shims that forward to

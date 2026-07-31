@@ -4,6 +4,9 @@ MCP server exposing vlmkit's **deterministic** (no-VLM) verification
 gates as tools, so any MCP client / coding agent can gate generated or
 edited UI on them.
 
+Drop-in usage guide (routing table, done-condition recipes, CLI
+equivalents): [`docs/markup-assist.md`](../../docs/markup-assist.md).
+
 ## Run
 
 ```bash
@@ -11,10 +14,14 @@ vlmkit mcp                 # stdio server
 # or: node --experimental-strip-types packages/vlmkit-mcp/src/stdio.ts
 ```
 
-Client config (stdio):
+Client config (stdio) — e.g. `.mcp.json` in any project:
 
 ```json
-{ "command": "vlmkit", "args": ["mcp"] }
+{
+  "mcpServers": {
+    "vlmkit": { "command": "npx", "args": ["-y", "@mizchi/vlmkit", "mcp"] }
+  }
+}
 ```
 
 ## Tools
@@ -26,7 +33,7 @@ Client config (stdio):
 | `scan_handlers` | every wired callback + **pointer-only-control** detection | `source` |
 | `check_integrity` | reference-free defect gate: JS errors, empty render, broken resources, text collision/clipping/protrusion, collapsed containers, overflow, invisible text, near-misalignment, unstyled page (multi-viewport; intentional patterns reported in `exempted`) | `source`, `viewports?` |
 | `check_layout` | layout contract: widths, per-row counts, stacking order, visibility per viewport — a brief's structural requirements as a machine-checkable spec | `source`, `contract` |
-| `check_copy` | placeholder scan + `manifest` verification + `target`-image contact sheets | `source`, `manifest?`, `target?` |
+| `check_copy` | placeholder scan + `manifest` verification against VISIBLY rendered text (disclosure-state sweep; invisible matches report `copy-invisible` with a reason class, suppressible per class via `allowInvisible`) + `target`-image contact sheets | `source`, `manifest?`, `target?`, `allowInvisible?` |
 | `build_page` | raw composition diff (matched/missing/extra/ordering/gap) | `target`, `current` |
 | `check_equivalence` | measured per-channel delta + pair images for a second reader (keyless advisory) | `source`, `target`, `regions[]` |
 | `verify_flow` | scripted browser flow: action → deterministic post-condition assert; fails at first unmet | `source`, `flow` |
