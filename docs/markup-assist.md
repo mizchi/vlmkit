@@ -118,7 +118,7 @@ Sources are file paths or URLs throughout.
 
 | Need | Command |
 |---|---|
-| Broken-page scan: JS errors, empty render, failed resources, text collision/clipping/protrusion, collapsed containers, page overflow, invisible text, near-misalignment, unstyled page — across 3 viewports | `vlmkit check integrity page.html` |
+| Broken-page scan: JS errors, empty render, failed resources, text collision/clipping/protrusion, collapsed containers, page overflow, invisible text, text painted over by opaque elements (occlusion), near-misalignment, unstyled page — across 3 viewports | `vlmkit check integrity page.html` |
 | The exact copy is spec (spellings, casing, `€`, dates) | `vlmkit check copy page.html --manifest copy.txt` |
 | Structural requirements as a machine-checkable spec (widths, per-row counts, stacking order, per-viewport visibility) | `vlmkit check layout page.html --contract layout.json` |
 | Design-system conformance: hard-coded values vs a token scale | `vlmkit check tokens page.html` |

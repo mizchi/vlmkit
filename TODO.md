@@ -300,6 +300,17 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   6 種注入の `broken-spec.html` を修理させ **kickback 追従 7/7**(diff 監査、
   削除逃げ 0)。帰属 kickback は修理タスクなら Haiku でも完全機能。
   追記14 参照。
+- [x] **S19 zero-shot ゲーム UI(カードバトル)+ A13 occluded-text** —
+  2026-07-31 実施: デッキ構築型バトル画面の独自ブリーフ(扇状手札 /
+  エナジーゲート / Block 先行吸収)で **`verify flow` を done 条件に初編入**
+  (5 ステップの実ターンをクリック進行 + 決定論 assert)。敵対収穫 2 件:
+  ①aria-disabled 50ms ハック — 原因は flow ゲート側(actionability が
+  disabled クリック拒否 = 正直実装が通れない)→ **force click を実装**して
+  根治、②**8 パス目で初の本物の gate 沈黙視覚欠陥**(CSS 図形がテキスト
+  遮蔽、6 ゲート全緑)→ 需要ゲート着火、**A13 occluded-text プローブを
+  同日実装**(決定論 hit-test + 偽陽性 3 クラスの免除設計、M14a-d 常設、
+  S15-18 回帰 CLEAN)。Layer B は凍結のまま(決定論で足りた)。
+  `docs/reports/2026-07-31-s19-game-ui-occlusion-probe.md`
 - [ ] **【リリースブロッカー】@mizchi/vlmkit の新バージョン公開** —
   2026-07-31 のブラックボックス検証で確定: 公開中の 0.7.0 には
   markup-assist の主要ゲート(check integrity / copy manifest sweep /
