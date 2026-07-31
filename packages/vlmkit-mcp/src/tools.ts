@@ -141,7 +141,7 @@ const scanHandlersTool: McpTool = {
 const checkCopyTool: McpTool = {
   name: "check_copy",
   description:
-    "Copy-fidelity gate: an always-on placeholder-text scan (lorem-ipsum/TODO/TBD), plus optional manifest verification (every manifest line must appear in the rendered text, whitespace-normalized, case-sensitive) and optional target-image verification (crops every rendered text block's bbox out of the target screenshot into contact sheets for a second reader; the sheets catch a wrong year / missing separator / proper-noun typo that composition pairs happily and no pixel gate sees). Deterministic except optional VLM transcription (not exposed here).",
+    "Copy-fidelity gate: an always-on placeholder-text scan (lorem-ipsum/TODO/TBD), plus optional manifest verification (every manifest line must appear in the rendered text, whitespace-normalized, case-sensitive) and optional target-image verification (crops every rendered text block's bbox out of the target screenshot into contact sheets for a second reader; the sheets catch a wrong year / missing separator / proper-noun typo that composition pairs happily and no pixel gate sees). Manifest matching sweeps disclosure states (closed <details>, unselected tabs, aria-expanded=false controls) so collapsed copy passes with provenance — do not ship disclosures open just to satisfy this gate. Deterministic except optional VLM transcription (not exposed here).",
   inputSchema: {
     source: z.string().describe("Path or URL of the page."),
     manifest: z.string().optional().describe("Path to a copy manifest (one required line per row)."),
@@ -157,7 +157,7 @@ const checkCopyTool: McpTool = {
       ...(args.outDir ? { outDir: args.outDir as string } : {}),
     });
     const suspects = report.issues.filter((i) => i.severity === "suspect").length;
-    const summary = `check_copy: ${suspects === 0 ? "ok" : `${suspects} suspect issue(s)`} (missing ${report.missingLines.length}, placeholders ${report.placeholders.length}${report.imageReview ? `, ${report.imageReview.sheetFiles.length} review sheet(s)` : ""})`;
+    const summary = `check_copy: ${suspects === 0 ? "ok" : `${suspects} suspect issue(s)`} (missing ${report.missingLines.length}${report.revealedLines.length > 0 ? `, ${report.revealedLines.length} revealed-only` : ""}, placeholders ${report.placeholders.length}${report.imageReview ? `, ${report.imageReview.sheetFiles.length} review sheet(s)` : ""})`;
     return result(summary, report, suspects > 0);
   },
 };

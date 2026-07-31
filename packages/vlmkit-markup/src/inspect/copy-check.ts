@@ -21,12 +21,23 @@
  *      This is the gate for copy truth that exists ONLY in pixels (no
  *      manifest, no reference page) — the S9 class of bug.
  *
+ * Disclosure-state sweep (default on, `--no-states` to skip): before
+ * matching, closed `<details>` are opened and unselected `[role=tab]` /
+ * `[aria-expanded=false]` controls are clicked, capturing the text each
+ * state reveals. Manifest lines found only in a revealed state PASS
+ * (with provenance) instead of reading as missing. Without this the
+ * gate only saw default-state text, which incentivized agents to ship
+ * disclosures open-by-default just to satisfy the manifest (observed in
+ * the S14a creative run). Placeholder text hiding in a closed panel is
+ * still a suspect. The target-image check always uses the default state
+ * (the screenshot is of the default state).
+ *
  * Whitespace is normalized on both sides; comparison is case-sensitive
  * (casing is spec in copy). Checks 1-2 are deterministic; check 3 uses
  * vision only for READING — every coordinate is DOM/pixel math.
  *
  * CLI:
- *   vlmkit check copy <html-or-url> [--manifest <file>] [--target <png>] [--vlm [model]] [--json]
+ *   vlmkit check copy <html-or-url> [--manifest <file>] [--target <png>] [--vlm [model]] [--no-states] [--json]
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -67,11 +78,31 @@ export interface CopyImageReview {
   droppedBlocks: number;
 }
 
+/** Text captured after one disclosure-reveal action. */
+export interface StateText {
+  kind: "details" | "tab" | "expand";
+  /** Human-readable handle, e.g. `details "Shipping & returns"`. */
+  label: string;
+  /** Full body innerText while this state is active. */
+  text: string;
+}
+
+export interface StateSweep {
+  states: StateText[];
+  /** Reveal actions found beyond the action cap (never capped silently). */
+  droppedActions: number;
+}
+
 export interface CopyCheckReport {
   source: string;
   textLength: number;
   manifestLines: number;
   missingLines: string[];
+  /** Manifest lines satisfied only by a revealed disclosure state. */
+  revealedLines: { line: string; state: string }[];
+  /** Disclosure states explored (0 = nothing to reveal or sweep disabled). */
+  statesExplored: number;
+  droppedStates: number;
   placeholders: string[];
   imageReview?: CopyImageReview;
   issues: CopyIssue[];
@@ -104,12 +135,62 @@ export function parseCopyManifest(raw: string): string[] {
     .filter((line) => line.length > 0);
 }
 
+/** Reveal actions beyond this are dropped from the sweep (and counted, loudly). */
+const MAX_STATE_ACTIONS = 30;
+
+/**
+ * In-page disclosure-state sweep. Opens closed `<details>` (pure DOM
+ * property, cumulative), then clicks unselected `[role=tab]`s and
+ * `[aria-expanded=false]` controls (page JS decides what appears), and
+ * captures `body.innerText` after each action. innerText only reports
+ * laid-out text, so each capture is exactly "what a user in this state
+ * can read." Serialized for page.evaluate.
+ */
+export const COLLECT_STATE_TEXTS = `(() => {
+  const MAX = ${MAX_STATE_ACTIONS};
+  const short = (el) => {
+    const t = ((el && (el.innerText || el.textContent)) || "").replace(/\\s+/g, " ").trim();
+    return t.length > 60 ? t.slice(0, 57) + "…" : t;
+  };
+  const actions = [];
+  for (const d of document.querySelectorAll("details:not([open])")) {
+    actions.push({ kind: "details", el: d, label: 'details "' + short(d.querySelector("summary")) + '"' });
+  }
+  for (const t of document.querySelectorAll('[role="tab"]')) {
+    if (t.getAttribute("aria-selected") !== "true") {
+      actions.push({ kind: "tab", el: t, label: 'tab "' + short(t) + '"' });
+    }
+  }
+  for (const c of document.querySelectorAll('[aria-expanded="false"]')) {
+    actions.push({ kind: "expand", el: c, label: c.tagName.toLowerCase() + '[aria-expanded] "' + short(c) + '"' });
+  }
+  const seen = new Set();
+  const states = [];
+  let dropped = 0;
+  for (const a of actions) {
+    if (seen.has(a.el)) continue;
+    seen.add(a.el);
+    if (states.length >= MAX) { dropped++; continue; }
+    try {
+      if (a.kind === "details") a.el.open = true;
+      else a.el.click();
+    } catch { continue; }
+    states.push({ kind: a.kind, label: a.label, text: document.body ? document.body.innerText : "" });
+  }
+  return { states, droppedActions: dropped };
+})()`;
+
 export function analyzeCopy(input: {
   source: string;
   pageText: string;
   manifestLines?: string[];
+  stateSweep?: StateSweep;
 }): CopyCheckReport {
   const normalized = normalizeWhitespace(input.pageText);
+  const states = (input.stateSweep?.states ?? []).map((s) => ({
+    ...s,
+    normalized: normalizeWhitespace(s.text),
+  }));
   const issues: CopyIssue[] = [];
 
   const placeholders: string[] = [];
@@ -123,20 +204,39 @@ export function analyzeCopy(input: {
         severity: "suspect",
         message: `Placeholder "${label}" found in rendered text: "…${normalized.slice(at, m.index! + m[0].length + 30)}…" — replace with the real copy from the target.`,
       });
+      continue;
+    }
+    const hidden = states.find((s) => pattern.test(s.normalized));
+    if (hidden) {
+      placeholders.push(label);
+      issues.push({
+        kind: "placeholder-text",
+        severity: "suspect",
+        message: `Placeholder "${label}" found in text revealed by ${hidden.label} — hidden placeholder copy is still a bug.`,
+      });
     }
   }
 
   const manifestLines = input.manifestLines ?? [];
   const missingLines: string[] = [];
+  const revealedLines: { line: string; state: string }[] = [];
   for (const line of manifestLines) {
-    if (!normalized.includes(normalizeWhitespace(line))) {
-      missingLines.push(line);
-      issues.push({
-        kind: "copy-missing",
-        severity: "suspect",
-        message: `Manifest line not found in rendered text: "${line}" (comparison is whitespace-normalized, case-sensitive).`,
-      });
+    const needle = normalizeWhitespace(line);
+    if (normalized.includes(needle)) continue;
+    const state = states.find((s) => s.normalized.includes(needle));
+    if (state) {
+      revealedLines.push({ line, state: state.label });
+      continue;
     }
+    missingLines.push(line);
+    const scope = states.length > 0
+      ? `rendered text or any of ${states.length} revealed disclosure state(s)`
+      : "rendered text";
+    issues.push({
+      kind: "copy-missing",
+      severity: "suspect",
+      message: `Manifest line not found in ${scope}: "${line}" (comparison is whitespace-normalized, case-sensitive).`,
+    });
   }
 
   return {
@@ -144,6 +244,9 @@ export function analyzeCopy(input: {
     textLength: normalized.length,
     manifestLines: manifestLines.length,
     missingLines,
+    revealedLines,
+    statesExplored: states.length,
+    droppedStates: input.stateSweep?.droppedActions ?? 0,
     placeholders,
     issues,
   };
@@ -163,6 +266,8 @@ export interface CopyCheckOptions {
    * CLI's `--vlm`; injectable for tests. Absent = keyless agent mode.
    */
   readTargetText?: (cropPng: Buffer) => Promise<string>;
+  /** Disclosure-state sweep before matching. Default true (`--no-states`). */
+  exploreStates?: boolean;
 }
 
 function isUrl(source: string): boolean {
@@ -185,6 +290,7 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
   const browser = await chromium.launch();
   let pageText: string;
   let blocks: TextBlock[] = [];
+  let stateSweep: StateSweep | undefined;
   try {
     const page = await browser.newPage({ viewport });
     if (options.html !== undefined) {
@@ -199,6 +305,9 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
       blocks = (await page.evaluate(COLLECT_TEXT_BLOCKS) as TextBlock[])
         .filter((b) => b.y < target.height && b.x < target.width);
     }
+    if (options.exploreStates !== false) {
+      stateSweep = await page.evaluate(COLLECT_STATE_TEXTS) as StateSweep;
+    }
     await page.close();
   } finally {
     await browser.close();
@@ -211,6 +320,7 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
     source: options.source,
     pageText,
     ...(manifestLines ? { manifestLines } : {}),
+    ...(stateSweep ? { stateSweep } : {}),
   });
 
   if (target && options.targetPath) {
@@ -275,6 +385,9 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
       missing: report.missingLines.length,
       placeholders: report.placeholders.length,
       manifestLines: report.manifestLines,
+      ...(report.statesExplored > 0
+        ? { statesExplored: report.statesExplored, revealedOnly: report.revealedLines.length }
+        : {}),
       ...(report.imageReview
         ? {
           imageBlocks: report.imageReview.blocks,
@@ -298,8 +411,18 @@ export function formatCopyCheckReport(report: CopyCheckReport): string {
   lines.push("");
   lines.push(`status: ${status}`);
   lines.push(`rendered text: ${report.textLength} chars`);
+  if (report.statesExplored > 0) {
+    lines.push(`disclosure states: ${report.statesExplored} explored (details / tabs / aria-expanded)`);
+    if (report.droppedStates > 0) {
+      lines.push(`  ${YELLOW}! ${report.droppedStates} reveal action(s) beyond the cap were NOT explored${RESET}`);
+    }
+  }
   if (report.manifestLines > 0) {
-    lines.push(`manifest: ${report.manifestLines} line(s), missing ${report.missingLines.length}`);
+    const revealed = report.revealedLines.length > 0 ? `, ${report.revealedLines.length} revealed-only` : "";
+    lines.push(`manifest: ${report.manifestLines} line(s), missing ${report.missingLines.length}${revealed}`);
+    for (const r of report.revealedLines) {
+      lines.push(`  ${DIM}revealed: "${r.line}" ← ${r.state} (hidden by default is fine — do NOT ship it open just for this gate)${RESET}`);
+    }
   } else {
     lines.push(`manifest: none (pass --manifest, or --target <png> to verify copy against the target pixels)`);
   }
@@ -341,11 +464,18 @@ rendered text block's bbox out of the target screenshot; a VLM
 transcribes them with --vlm, or contact sheets are written for the
 agent's own vision without an API key).
 
+Manifest matching sweeps disclosure states by default: closed <details>
+are opened and unselected [role=tab] / [aria-expanded=false] controls
+are clicked, so copy inside collapsed panels passes (with provenance)
+instead of reading as missing — no need to ship disclosures open just
+to satisfy the gate.
+
 Options:
   --manifest <file>   Copy manifest (plain text / markdown; one required line per row)
   --target <png>      Target screenshot to verify copy against (bbox-cropped per text block)
   --out <dir>         Sheet/worksheet output dir (default: .vlmkit-copy-review next to the source)
   --vlm [model]       Transcribe crops with a VLM (default model: VRT_VLM_MODEL); requires API key
+  --no-states         Skip the disclosure-state sweep (default-state text only)
   --json              Print JSON report
   --fail-on-suspect   Exit non-zero when suspect issues are found`);
   process.exit(exitCode);
@@ -359,6 +489,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   let vlm: string | true | undefined;
   let json = false;
   let failOnSuspect = false;
+  let exploreStates = true;
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
@@ -368,7 +499,8 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     else if (arg === "--vlm") {
       const next = argv[i + 1];
       vlm = next && !next.startsWith("-") ? argv[++i]! : true;
-    } else if (arg === "--json") json = true;
+    } else if (arg === "--no-states") exploreStates = false;
+    else if (arg === "--json") json = true;
     else if (arg === "--fail-on-suspect") failOnSuspect = true;
     else if (!arg.startsWith("-")) positional.push(arg);
   }
@@ -398,6 +530,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     ...(targetPath ? { targetPath } : {}),
     ...(outDir ? { outDir } : {}),
     ...(readTargetText ? { readTargetText } : {}),
+    exploreStates,
   });
   if (json) console.log(JSON.stringify(report, null, 2));
   else console.log(formatCopyCheckReport(report));

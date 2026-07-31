@@ -924,3 +924,20 @@ wrong sibling. The corpus, exact scores, and reproduction command are in
   --contract`(ブリーフ構造要求の宣言照合、MCP 9 本目)。全ミラー+全
   fixture で偽陽性 0、attempt-stress の #changelog low-contrast warn
   (2.56:1)は真の陽性。バッテリー 31 テスト。
+
+### check copy — disclosure-state sweep (2026-07-31)
+
+S14a で観測した gate 誘導(copy manifest がレンダリング済みテキストのみ
+照合のため、`<details>` 内の必須 copy がエージェントに「open 既定で出荷」
+を選ばせる — 追記13)の根治。`check copy` は既定で開示状態を掃引する:
+閉じた `<details>` を open(DOM プロパティ、累積)、未選択 `[role=tab]`
+と `[aria-expanded=false]` をクリック(ページ JS が発火)し、各状態の
+`body.innerText` を捕捉(cap 30、超過は明示カウント)。manifest 行は
+既定表示 → 開示状態の順で照合し、開示状態でのみ見つかった行は
+**provenance 付き PASS**(`revealed: "…" ← details "Refund policy"`)+
+「この gate のために open 既定に倒すな」の行内注意。隠れ placeholder は
+suspect のまま(閉じたパネル内の lorem ipsum もバグ)。`--target` の
+bbox クロップは既定状態のみ(スクリーンショットは既定状態のため)。
+オプトアウト `--no-states`。innerText はレイアウト済みテキストだけを
+返すので「その状態でユーザーが読める文」と正確に一致するのが要点。
+限界: 純 CSS タブ(radio input 方式)と hover 開示は掃引対象外。

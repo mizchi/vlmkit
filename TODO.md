@@ -262,11 +262,11 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 ### Ecosystem positioning (市場調査 2026-07-29 由来)
 調査メモ: `docs/reports/2026-07-29-ai-markup-tooling-landscape.md` /
 設計: `docs/design/mcp-and-agent-expansion.md`
-- [ ] **MCP 露出(パート A、キー不要・低リスク・最優先)** — 決定論ゲート
-  (verify_markup / check_interactions / scan_handlers / build_page /
-  check_copy)を MCP tool 化。既存の純関数 + Hono/OpenAPI を再利用、
-  Playwright は dynamic import。`packages/vlmkit-mcp/` 新規 + `vlmkit mcp`
-  サブコマンド。統合面が MCP に収束した市場への刺し込み口。
+- [x] **MCP 露出(パート A、キー不要・低リスク・最優先)** — 2026-07-30
+  実装済み: `packages/vlmkit-mcp/` + `vlmkit mcp`(stdio)。決定論ゲート
+  10 本(verify_markup / check_interactions / scan_handlers / build_page /
+  check_copy / check_integrity ほか)を MCP tool 化、Playwright は
+  dynamic import。契約テスト常設(tools.test.ts)。
 - [ ] **verified browser agent(パート B、要 LLM キー・差別化前提)** —
   goal-runner の invariant + interaction-map の状態遷移語彙で「実行→事後
   条件検証→失敗ならロールバック/再計画」の検証付きループ(`vlmkit act`)。
@@ -300,9 +300,15 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   6 種注入の `broken-spec.html` を修理させ **kickback 追従 7/7**(diff 監査、
   削除逃げ 0)。帰属 kickback は修理タスクなら Haiku でも完全機能。
   追記14 参照。
-- [ ] **check copy 状態別検証モード** — details/タブ等を開いてから manifest
-  照合(S14a 観察: 現状はレンダリング済みテキストのみのため、エージェントが
-  折りたたみを open 既定に倒すインセンティブになる)。
+- [x] **check copy 状態別検証モード** — 2026-07-31 実装済み: 既定 ON の
+  disclosure-state sweep(閉じた `<details>` を open、未選択 `[role=tab]` /
+  `[aria-expanded=false]` をクリック → 各状態の innerText 捕捉、cap 30 +
+  超過は明示カウント)。manifest 行は「既定表示 → 開示状態」の順で照合し、
+  開示状態でのみ見つかった行は provenance 付き PASS(レポートに
+  「open 既定に倒すな」の注意書きを同梱)。隠れ placeholder は suspect の
+  まま。--target のクロップは既定状態のみ(スクリーンショットは既定状態の
+  ため)。CLI `--no-states` / MCP サマリに revealed-only 数。S14a で観測
+  された open-既定誘導の根治。E2E 含むテスト 9 本 green。
 - [ ] **Layer B(VLM 視覚判定、advisory)— 凍結、需要ゲート(2026-07-30)** —
   設計時 4 軸のうち B1 整列→A12、B2 コントラスト→A11、B4 構造→layout
   contract、B4 コピー→manifest と決定論側に移り、残るのは B3(破綻の
@@ -337,11 +343,13 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - 症状: 面積ランキング第 N 席の中身が target と current で食い違うと、実害のない ink 量差(見出し語断片 area 374 vs 330 等)が missing/extra/ordering として出る。エージェントは font-size 等で extractor の分割を合わせにいく(letter-spacing 2 件 + S13 h2 の計 3 例 — いずれも視覚等価方向だったが、gate を騙す方向にも使える手筋)。
   - 案: (1) top-N 境界 ±10% の面積帯にいる残差へ「ranking-boundary caveat」を行内表示、(2) ペアリング前に両側の component 集合を面積でなく位置グリッドで安定ソート、(3) 境界成分は pixel-presence で先に demote。
 
-- [ ] **LLM Stage-2 fix synthesis for the markup loop(kickback + セレクタ帰属 → CSS 修正案の自動適用)**(→ Issue #88)
-  - 前提: verify markup の kickback は 2026-07-28 から決定論のセレクタ帰属(`[rendered by ...]` / `[target box falls in your ...]`)と kind タグを持つ — LLM に渡す文脈はもう揃っている。
-  - 方法: fix-loop の実証済み 2 段構成を流用 — kickback(帰属付き)+ 該当セレクタの computed styles を LLM に渡し、CSS 編集案を JSON で受けて apply-and-rollback ゲート(qwen3-coder の過剰修正を吸収した実績のある形)で適用。verify markup の trend が REGRESSED なら自動ロールバック。
-  - 候補 LLM: `google/gemini-2.5-flash`(Stage-2 現行既定)から。API キー必須のため本環境では未着手。
-  - 期待効果: Haiku の壁(fixed 要素座標系、1px エンドゲーム)をモデル昇格なしで越える経路。エージェントレスの `verify markup --auto-fix` まで見えれば fix-loop と統合。
+- [x] **LLM Stage-2 fix synthesis for the markup loop(kickback + セレクタ帰属 → CSS 修正案の自動適用)**(→ Issue #88)
+  — 2026-07-30 実装済み(`vlmkit fix markup`): kickback(帰属付き)+ 該当
+  セレクタの computed styles を LLM に渡し、CSS 編集案 JSON を
+  apply-and-rollback ゲートで適用、verify markup trend REGRESSED で自動
+  ロールバック。fake-LLM E2E で全経路(適用/ロールバック/JSON 不正)を
+  実証済み。**残: 実 LLM レグ**(`google/gemini-2.5-flash` 想定)— API
+  キー必須のため本環境では未実施。キーが使える環境での初回実走が TODO。
 
 
 ### Infrastructure / Deploy
