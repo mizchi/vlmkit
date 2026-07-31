@@ -15,6 +15,10 @@ config, no API key:
 npx vlmkit check integrity http://localhost:3000/
 ```
 
+(If this prints `Unknown check subcommand: integrity`, your installed
+release predates the markup-assist gates — update `@mizchi/vlmkit` to
+the latest version.)
+
 ```
 verdict: DEFECTS (2 fail, 0 warn, 0 exempted)
 

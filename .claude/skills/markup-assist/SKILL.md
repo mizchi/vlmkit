@@ -98,6 +98,16 @@ the gate from memory. Iteration counts are recorded in
 
 ## Escalation
 
+**If the tool itself fails to run** (unknown subcommand, missing
+browser, install error), STOP and report the tool failure verbatim —
+do NOT silently substitute hand-rolled screenshot scripts and then
+claim the work was "verified". A hand-rolled check covers a fraction
+of what the gates measure (the black-box validation run that added
+this rule missed 2 of 5 seeded defects that way), and a report that
+hides the fallback is worse than a report that says "the tool didn't
+run". An "Unknown check subcommand" error usually means the installed
+release predates these gates — say so and ask for an update.
+
 If a gate keeps failing after 3 honest fix attempts on the same
 finding, stop and report: the finding, your attempts, and your best
 hypothesis — a stuck loop is information, not something to hide with

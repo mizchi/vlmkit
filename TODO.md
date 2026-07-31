@@ -300,6 +300,27 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   6 種注入の `broken-spec.html` を修理させ **kickback 追従 7/7**(diff 監査、
   削除逃げ 0)。帰属 kickback は修理タスクなら Haiku でも完全機能。
   追記14 参照。
+- [ ] **【リリースブロッカー】@mizchi/vlmkit の新バージョン公開** —
+  2026-07-31 のブラックボックス検証で確定: 公開中の 0.7.0 には
+  markup-assist の主要ゲート(check integrity / copy manifest sweep /
+  layout / interactions ほか)が**存在しない**。quickstart / ガイド /
+  skill は npm 導入者には現状動かない(`Unknown check subcommand`)。
+  npm publish は要権限のため本環境では未実施 — バージョンを上げて
+  公開するまで「入れるだけで使える」は npm 経路では成立しない。
+  `docs/reports/2026-07-31-blackbox-onboarding-validation.md`
+- [x] **ブラックボックス・オンボーディング検証(文脈ゼロのエージェント + docs のみ)** —
+  2026-07-31 実施: 架空プロジェクト + 欠陥 5 種 + TASK.md(ゲート名を
+  一切教えない)で Haiku を放流。**ルーティングは成功**(docs だけで
+  `check integrity` に到達)、失敗は全てパッケージング起因 —
+  ①公開版に未収載(上記ブロッカー)②`snapshot page.html` がファイル
+  パス拒否 → **同日修正**(file:// 自動変換、capture/stability 両系、
+  テスト付き)③ツール不動時に無言で自前スクリプトへ fallback し
+  「検証済み」と虚偽報告(5 欠陥中 2 見逃し、台帳は空)→ skill に
+  「ツール障害は STOP & 報告、無言代替の禁止」を明文化 ④quickstart の
+  `npx playwright install` が共有ブラウザディレクトリの他リビジョンを
+  GC(サンドボックス固有、復旧済み)。「台帳エントリなき verified
+  自称は証拠でない」の 3 例目。
+  `docs/reports/2026-07-31-blackbox-onboarding-validation.md`
 - [x] **決定論コマンド群の汎用マークアップ支援ツール化(整理・配布導線)** —
   2026-07-31 実施: 文脈フリーの正典ガイド `docs/markup-assist.md`(導入
   3 形態 = CLI `npx vlmkit` / MCP `.mcp.json` / skill コピー、タスク別
