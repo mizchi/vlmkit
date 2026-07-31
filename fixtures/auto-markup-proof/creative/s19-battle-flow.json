@@ -30,7 +30,7 @@
     },
     {
       "label": "unaffordable card does nothing",
-      "do": { "action": "click", "selector": "[data-testid=card-emberfall]" },
+      "do": { "action": "click", "selector": "[data-testid=card-emberfall]", "force": true },
       "expect": [
         { "assert": "text", "selector": "[data-testid=energy]", "contains": "1/3" },
         { "assert": "text", "selector": "[data-testid=discard-count]", "contains": "6" }
