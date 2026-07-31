@@ -496,3 +496,55 @@ describe("S14c false-positive audit", () => {
     assert.ok(report.viewports.every((v) => v.components > 0));
   });
 });
+
+// A13 — occluded text (first demanded by S19: a CSS figure's absolute part
+// painted over "Block 0" / enemy HP while every other probe stayed clean).
+test("M14 opaque sibling painted over text is occluded-text", { timeout: 120_000 }, async () => {
+  const file = page("m14.html", `
+    <div style="position:relative;width:600px;height:120px;background:#eee">
+      <p id="covered" style="position:absolute;left:20px;top:40px;color:#111">Covered readout text</p>
+      <div style="position:absolute;left:0;top:20px;width:280px;height:80px;background:#c94;z-index:2"></div>
+      <p id="clear" style="position:absolute;left:320px;top:40px;color:#111">Clear readout text</p>
+    </div>
+    <div style="width:600px;height:200px;background:#456;margin-top:12px"></div>`);
+  const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+  const hit = report.findings.find((f) => f.kind === "occluded-text" && f.selector === "#covered");
+  assert.ok(hit, JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector}`)));
+  assert.ok(!report.findings.some((f) => f.selector === "#clear"));
+});
+
+test("M14b transparent stretched-link overlay is NOT occluded-text", { timeout: 120_000 }, async () => {
+  const file = page("m14b.html", `
+    <div style="position:relative;width:400px;height:140px;background:#fff;border:1px solid #ccc;padding:16px">
+      <h2 style="margin:0;color:#111">Card title stays readable</h2>
+      <p style="color:#333">Body copy under a full-card link overlay.</p>
+      <a href="#x" style="position:absolute;inset:0;z-index:3" aria-label="Open card"></a>
+    </div>
+    <div style="width:600px;height:200px;background:#456;margin-top:12px"></div>`);
+  const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+  assert.ok(!report.findings.some((f) => f.kind === "occluded-text"), JSON.stringify(report.findings));
+});
+
+test("M14c fixed bottom bar over scrollable content is exempted, not failed", { timeout: 120_000 }, async () => {
+  const file = page("m14c.html", `
+    <main style="padding:16px">
+      ${Array.from({ length: 30 }, (_, i) => `<p style="color:#222">Paragraph ${i + 1} of scrollable content.</p>`).join("")}
+    </main>
+    <div style="position:fixed;left:0;right:0;bottom:0;height:64px;background:#14213d;color:#fff;padding:12px">Sticky cart bar</div>`);
+  const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+  assert.ok(!report.findings.some((f) => f.kind === "occluded-text"), JSON.stringify(report.findings));
+  assert.ok(report.exempted.some((e) => e.kind === "occluded-text" && /viewport-pinned bar/.test(e.reason)));
+});
+
+test("M14d aria-hidden decorative text under a figure is exempted", { timeout: 120_000 }, async () => {
+  const file = page("m14d.html", `
+    <div style="position:relative;width:400px;height:120px;background:#fff">
+      <span aria-hidden="true" style="position:absolute;left:10px;top:40px;color:#888">{ }</span>
+      <div style="position:absolute;left:0;top:0;width:200px;height:120px;background:#5155d6"></div>
+      <p style="position:absolute;left:220px;top:40px;color:#111">Visible label</p>
+    </div>
+    <div style="width:600px;height:200px;background:#456;margin-top:12px"></div>`);
+  const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+  assert.ok(!report.findings.some((f) => f.kind === "occluded-text"), JSON.stringify(report.findings));
+  assert.ok(report.exempted.some((e) => e.kind === "occluded-text" && /aria-hidden/.test(e.reason)));
+});
