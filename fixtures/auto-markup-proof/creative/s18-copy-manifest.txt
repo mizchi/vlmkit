@@ -1,0 +1,30 @@
+# Sidebar
+- Relay
+- Nordwind Team
+- Channels
+- # general
+- # design
+- # engineering
+- # random
+- Direct messages
+- Mara Lindqvist
+- Jonas Weber
+- Aiko Tanaka
+- Invite teammates
+
+# Channel header
+- Deploy notices and build talk
+- 12 members
+
+# Messages
+- Deploy 2026-07-31.2 is live on staging.
+- Nice — smoke suite is green on my end.
+- Heads up: the CDN purge takes about 5 minutes.
+- Rolling to production at 15:00 UTC.
+- 09:12
+- 09:15
+- 09:24
+- 09:31
+
+# Composer
+- Send
