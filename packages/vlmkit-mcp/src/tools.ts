@@ -141,7 +141,7 @@ const scanHandlersTool: McpTool = {
 const checkCopyTool: McpTool = {
   name: "check_copy",
   description:
-    "Copy-fidelity gate: an always-on placeholder-text scan (lorem-ipsum/TODO/TBD), plus optional manifest verification (every manifest line must appear in the rendered text, whitespace-normalized, case-sensitive) and optional target-image verification (crops every rendered text block's bbox out of the target screenshot into contact sheets for a second reader; the sheets catch a wrong year / missing separator / proper-noun typo that composition pairs happily and no pixel gate sees). Deterministic except optional VLM transcription (not exposed here).",
+    "Copy-fidelity gate: an always-on placeholder-text scan (lorem-ipsum/TODO/TBD), plus optional manifest verification (every manifest line must appear in the rendered text, whitespace-normalized, case-sensitive) and optional target-image verification (crops every rendered text block's bbox out of the target screenshot into contact sheets for a second reader; the sheets catch a wrong year / missing separator / proper-noun typo that composition pairs happily and no pixel gate sees). Manifest matching sweeps disclosure states (closed <details>, unselected tabs, aria-expanded=false controls) so collapsed copy passes with provenance — do not ship disclosures open just to satisfy this gate. Deterministic except optional VLM transcription (not exposed here).",
   inputSchema: {
     source: z.string().describe("Path or URL of the page."),
     manifest: z.string().optional().describe("Path to a copy manifest (one required line per row)."),
@@ -157,7 +157,7 @@ const checkCopyTool: McpTool = {
       ...(args.outDir ? { outDir: args.outDir as string } : {}),
     });
     const suspects = report.issues.filter((i) => i.severity === "suspect").length;
-    const summary = `check_copy: ${suspects === 0 ? "ok" : `${suspects} suspect issue(s)`} (missing ${report.missingLines.length}, placeholders ${report.placeholders.length}${report.imageReview ? `, ${report.imageReview.sheetFiles.length} review sheet(s)` : ""})`;
+    const summary = `check_copy: ${suspects === 0 ? "ok" : `${suspects} suspect issue(s)`} (missing ${report.missingLines.length}${report.revealedLines.length > 0 ? `, ${report.revealedLines.length} revealed-only` : ""}, placeholders ${report.placeholders.length}${report.imageReview ? `, ${report.imageReview.sheetFiles.length} review sheet(s)` : ""})`;
     return result(summary, report, suspects > 0);
   },
 };
@@ -215,6 +215,68 @@ const checkEquivalenceTool: McpTool = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// check_integrity (reference-free defect gate)
+
+const checkIntegrityTool: McpTool = {
+  name: "check_integrity",
+  description:
+    "Reference-free integrity gate for creative/zero-shot markup — no target image or manifest needed. Detects defects that are unambiguous without a reference: JS errors (construction-phase = fatal), empty/degenerate renders, broken images/stylesheets/scripts/fonts, same-layer text collisions, clipped text, collapsed containers, horizontal page overflow, and declared-but-unapplied styling, swept across multiple viewport widths. Deterministic (DOM + pixel math, no VLM). Intentional patterns (hero overlays, ellipsis truncation, positioning anchors) are exempted by tool-side rules and reported in `exempted` — audit the rule, don't re-litigate the finding. The kickback is a paste-ready, selector-attributed fix list.",
+  inputSchema: {
+    source: z.string().describe("Path or URL of the page to check."),
+    viewports: z.array(z.number()).optional().describe("Sweep widths (default 1280, 768, 375)."),
+    maxFindings: z.number().optional().describe("Per-class report cap (default 12)."),
+  },
+  run: async (args) => {
+    const { runIntegrityCheck } = await import("@mizchi/vlmkit-markup/inspect/integrity-check.ts");
+    const heights: Record<number, number> = { 1280: 800, 768: 900, 375: 700 };
+    const report = await runIntegrityCheck({
+      source: args.source as string,
+      ...(args.viewports
+        ? { viewports: (args.viewports as number[]).map((w) => ({ width: w, height: heights[w] ?? 800 })) }
+        : {}),
+      ...(args.maxFindings !== undefined ? { maxFindings: args.maxFindings as number } : {}),
+    });
+    const fails = report.findings.filter((f) => f.severity === "fail").length;
+    const warns = report.findings.length - fails;
+    const summary = `check_integrity: ${report.verdict === "clean" ? "CLEAN" : "DEFECTS"} (${fails} fail, ${warns} warn, ${report.exempted.length} exempted)`;
+    return result(summary, report, report.verdict !== "clean");
+  },
+};
+
+// ---------------------------------------------------------------------------
+// check_layout (structural requirements as a machine-checkable contract)
+
+const checkLayoutTool: McpTool = {
+  name: "check_layout",
+  description:
+    "Layout contract: verifies a brief's STRUCTURAL requirements deterministically per viewport — element widths (±tolerance), matches per visual row (4-across at 1280 / 2x2 at 768 / stacked at 375), full-width collapse, stacking order (A above B), visibility, and counts. Turns 'the sidebar is 260px on desktop and collapses above the main column on tablet' into a machine-checkable spec the generation loop can run every round. Pure DOM math, no VLM. Complements check_integrity (defects) — this checks conformance to stated structure.",
+  inputSchema: {
+    source: z.string().describe("Path or URL of the page."),
+    contract: z.object({
+      rules: z.array(z.object({
+        selector: z.string(),
+        at: z.number().describe("Viewport width this rule is checked at."),
+        width: z.number().optional(),
+        tolerance: z.number().optional(),
+        minWidth: z.number().optional(),
+        maxWidth: z.number().optional(),
+        perRow: z.number().optional().describe("Modal number of matches per visual row."),
+        fullWidth: z.boolean().optional(),
+        above: z.string().optional().describe("Selector whose matches must all start below this rule's matches."),
+        count: z.number().optional(),
+        visible: z.boolean().optional(),
+      })).min(1),
+    }).describe("The layout contract."),
+  },
+  run: async (args) => {
+    const { runLayoutVerify } = await import("@mizchi/vlmkit-markup/inspect/layout-contract.ts");
+    const report = await runLayoutVerify({ source: args.source as string, contract: args.contract as never });
+    const summary = `check_layout: ${report.done ? "SATISFIED" : "VIOLATED"} (${report.passed}/${report.total} rules)`;
+    return result(summary, report, !report.done);
+  },
+};
+
 const verifyFlowTool: McpTool = {
   name: "verify_flow",
   description:
@@ -241,6 +303,8 @@ const verifyFlowTool: McpTool = {
 export const TOOLS: McpTool[] = [
   verifyFlowTool,
   verifyMarkupTool,
+  checkIntegrityTool,
+  checkLayoutTool,
   checkInteractionsTool,
   scanHandlersTool,
   checkCopyTool,

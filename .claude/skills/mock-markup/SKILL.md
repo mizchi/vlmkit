@@ -52,7 +52,11 @@ treats lorem-ipsum-style filler as a suspect. Transcription of small
 `·`-style separators get silently mangled and no pixel gate will catch
 it. Zoom into a crop before transcribing fine print, and if the
 requester can supply a copy manifest, ask for one and verify with
-`check copy --manifest`. Either way, **once composition converges, run
+`check copy --manifest`. Manifest matching sweeps disclosure states
+(closed `<details>`, unselected tabs, `aria-expanded=false`) — copy
+inside a collapsed panel passes with provenance, so keep disclosures
+in their spec'd default state; never open them just to satisfy the
+gate. Either way, **once composition converges, run
 the pixel-side copy check**:
 
 ```bash

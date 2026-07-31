@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alpenrad Checkout</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      color: #1a1a1a;
+      background-color: #fafafa;
+    }
+
+    .checkout-container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    .page-title {
+      font-size: 2rem;
+      font-weight: 700;
+      margin-bottom: 2rem;
+      color: #1a1a1a;
+    }
+
+    .checkout-grid {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 2rem;
+    }
+
+    @media (max-width: 1024px) {
+      .checkout-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .form-section {
+      background-color: #ffffff;
+      padding: 2rem;
+      border-radius: 8px;
+      border: 1px solid #e5e5e5;
+    }
+
+    .order-summary {
+      background-color: #ffffff;
+      padding: 2rem;
+      border-radius: 8px;
+      border: 1px solid #e5e5e5;
+    }
+
+    @media (max-width: 1024px) {
+      .checkout-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .order-summary {
+        order: -1;
+      }
+    }
+
+    fieldset {
+      border: none;
+      padding: 0;
+      margin-bottom: 2rem;
+    }
+
+    fieldset:last-of-type {
+      margin-bottom: 2rem;
+    }
+
+    legend {
+      font-size: 1.125rem;
+      font-weight: 600;
+      margin-bottom: 1.25rem;
+      color: #1a1a1a;
+      padding: 0;
+    }
+
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    .form-group:last-child {
+      margin-bottom: 0;
+    }
+
+    label {
+      display: block;
+      font-size: 0.9375rem;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+      color: #333;
+    }
+
+    input[type="email"],
+    input[type="tel"],
+    input[type="text"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #d0d0d0;
+      border-radius: 4px;
+      font-size: 1rem;
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+
+    input[type="email"]:focus,
+    input[type="tel"]:focus,
+    input[type="text"]:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #0066cc;
+      box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+    }
+
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+    }
+
+    .radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .radio-option {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    input[type="radio"] {
+      cursor: pointer;
+      margin-right: 0.75rem;
+      width: 18px;
+      height: 18px;
+      accent-color: #0066cc;
+    }
+
+    input[type="radio"]:focus {
+      outline: 2px solid #0066cc;
+      outline-offset: 2px;
+    }
+
+    .radio-option label {
+      margin-bottom: 0;
+      font-weight: 400;
+      cursor: pointer;
+    }
+
+    .details-section {
+      margin-bottom: 2rem;
+    }
+
+    details {
+      border: 1px solid #d0d0d0;
+      border-radius: 4px;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    summary {
+      padding: 0.75rem;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.9375rem;
+      user-select: none;
+      display: block;
+      width: 100%;
+    }
+
+    summary:hover {
+      background-color: #f5f5f5;
+    }
+
+    details[open] summary {
+      border-bottom: 1px solid #d0d0d0;
+    }
+
+    details > .form-group {
+      padding: 1rem;
+      margin-bottom: 0;
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 1.5rem;
+      margin-top: 1.5rem;
+    }
+
+    input[type="checkbox"] {
+      margin-top: 0.25rem;
+      margin-right: 0.75rem;
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      flex-shrink: 0;
+      accent-color: #0066cc;
+    }
+
+    input[type="checkbox"]:focus {
+      outline: 2px solid #0066cc;
+      outline-offset: 2px;
+    }
+
+    input[type="checkbox"]:checked {
+      background-color: #0066cc;
+    }
+
+    .checkbox-group label {
+      margin-bottom: 0;
+      cursor: pointer;
+      font-weight: 400;
+      transition: color 0.2s;
+    }
+
+    input[type="checkbox"]:checked + label {
+      color: #0066cc;
+      font-weight: 500;
+    }
+
+    .button-group {
+      margin-top: 2rem;
+    }
+
+    button {
+      width: 100%;
+      padding: 1rem;
+      background-color: #0066cc;
+      color: white;
+      border: 2px solid #0066cc;
+      border-radius: 4px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s, border-color 0.2s;
+    }
+
+    button:hover:not(:disabled) {
+      background-color: #0052a3;
+      border-color: #0052a3;
+    }
+
+    button:focus {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+    }
+
+    button:disabled {
+      background-color: #e0e0e0;
+      border-color: #e0e0e0;
+      cursor: not-allowed;
+      color: #999;
+      opacity: 0.6;
+    }
+
+    button:enabled {
+      cursor: pointer;
+      opacity: 1;
+    }
+
+    .order-summary h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      color: #1a1a1a;
+    }
+
+    .order-item {
+      border-bottom: 1px solid #e5e5e5;
+      padding-bottom: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .item-name {
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: #1a1a1a;
+    }
+
+    .item-variant {
+      font-size: 0.9375rem;
+      color: #666;
+      margin-bottom: 0.75rem;
+    }
+
+    .item-price {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+
+    .cost-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .cost-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.9375rem;
+    }
+
+    .cost-row.total {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-top: 0.5rem;
+    }
+
+    .reassurance {
+      font-size: 0.875rem;
+      color: #666;
+      text-align: center;
+      margin-top: 1.5rem;
+    }
+
+    @media (max-width: 375px) {
+      .checkout-container {
+        padding: 1rem;
+      }
+
+      .page-title {
+        font-size: 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .form-section,
+      .order-summary {
+        padding: 1.5rem;
+      }
+
+      .checkout-grid {
+        gap: 1.5rem;
+      }
+
+      .radio-group {
+        gap: 0.75rem;
+      }
+
+      button {
+        padding: 0.875rem;
+        font-size: 0.9375rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="checkout-container">
+    <h1 class="page-title">Checkout</h1>
+
+    <div class="checkout-grid">
+      <div class="form-section">
+        <form id="checkout-form">
+          <fieldset>
+            <legend>Contact</legend>
+            <div class="form-group">
+              <label for="email">Email</label>
+              <input type="email" id="email" name="email" autocomplete="email" required>
+            </div>
+            <div class="form-group">
+              <label for="phone">Phone (optional)</label>
+              <input type="tel" id="phone" name="phone" autocomplete="tel">
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Shipping address</legend>
+            <div class="form-group">
+              <label for="full-name">Full name</label>
+              <input type="text" id="full-name" name="full-name" autocomplete="name" required>
+            </div>
+            <div class="form-group">
+              <label for="street">Street and number</label>
+              <input type="text" id="street" name="street" autocomplete="street-address" required>
+            </div>
+            <div class="form-group">
+              <label for="postal-code">Postal code</label>
+              <input type="text" id="postal-code" name="postal-code" autocomplete="postal-code" required>
+            </div>
+            <div class="form-group">
+              <label for="city">City</label>
+              <input type="text" id="city" name="city" autocomplete="address-level2" required>
+            </div>
+            <div class="form-group">
+              <label for="country">Country</label>
+              <select id="country" name="country" required>
+                <option value="de" selected>Germany</option>
+                <option value="at">Austria</option>
+                <option value="ch">Switzerland</option>
+                <option value="fr">France</option>
+                <option value="nl">Netherlands</option>
+                <option value="be">Belgium</option>
+                <option value="it">Italy</option>
+              </select>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Payment</legend>
+            <div class="radio-group">
+              <div class="radio-option">
+                <input type="radio" id="payment-card" name="payment" value="card" checked>
+                <label for="payment-card">Card</label>
+              </div>
+              <div class="radio-option">
+                <input type="radio" id="payment-paypal" name="payment" value="paypal">
+                <label for="payment-paypal">PayPal</label>
+              </div>
+              <div class="radio-option">
+                <input type="radio" id="payment-invoice" name="payment" value="invoice">
+                <label for="payment-invoice">Invoice — 14 days</label>
+              </div>
+            </div>
+          </fieldset>
+
+          <div class="details-section">
+            <details>
+              <summary>Add a delivery note</summary>
+              <div class="form-group">
+                <label for="delivery-note">Note for the courier</label>
+                <textarea id="delivery-note" name="delivery-note"></textarea>
+              </div>
+            </details>
+          </div>
+
+          <div class="checkbox-group">
+            <input type="checkbox" id="terms" name="terms" required aria-label="Accept terms">
+            <label for="terms">I accept the Terms of Service and the cancellation policy.</label>
+          </div>
+
+          <div class="button-group">
+            <button type="submit" id="submit-btn" disabled aria-disabled="true">Pay €1,335.89 now</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="order-summary">
+        <h2>Order summary</h2>
+
+        <div class="order-item">
+          <div class="item-name">Alpenrad Tourer X</div>
+          <div class="item-variant">Glacier White · 1</div>
+          <div class="item-price">€1,299.00</div>
+        </div>
+
+        <div class="cost-rows">
+          <div class="cost-row">
+            <span>Subtotal</span>
+            <span>€1,299.00</span>
+          </div>
+          <div class="cost-row">
+            <span>Shipping</span>
+            <span>€29.00</span>
+          </div>
+          <div class="cost-row">
+            <span>VAT (included)</span>
+            <span>€207.37</span>
+          </div>
+          <div class="cost-row total">
+            <span>Total</span>
+            <span>€1,335.89</span>
+          </div>
+        </div>
+
+        <div class="reassurance">30-day returns · Free pickup</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      const form = document.getElementById('checkout-form');
+      const termsCheckbox = document.getElementById('terms');
+      const submitBtn = document.getElementById('submit-btn');
+
+      function updateSubmitButtonState() {
+        const isChecked = termsCheckbox.checked;
+        submitBtn.disabled = !isChecked;
+        submitBtn.setAttribute('aria-disabled', String(!isChecked));
+      }
+
+      termsCheckbox.addEventListener('change', updateSubmitButtonState);
+
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+      });
+
+      updateSubmitButtonState();
+    })();
+  </script>
+</body>
+</html>

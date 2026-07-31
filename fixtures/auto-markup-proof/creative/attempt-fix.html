@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relay Metrics — internal dashboard</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, sans-serif; color: #1e293b; background: #f8fafc; }
+  header { background: #0f172a; color: #fff; padding: 20px 24px; }
+  main { padding: 24px; max-width: 1100px; margin: 0 auto; }
+  .lead { color: #475569; }
+  .kicker { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: #64748b; }
+  #headline { font-size: 34px; margin: 8px 0 4px; }
+  #subline { font-size: 18px; margin-top: 8px; width: 60%; }
+  #ship-note { width: 100%; max-width: 600px; height: auto; overflow: visible; white-space: normal; background: #fde68a; padding: 2px 4px; }
+  #card-row { margin: 24px 0; overflow: hidden; }
+  #card-row .card { float: left; width: 240px; height: 130px; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; margin-right: 16px; padding: 12px; }
+  .after-cards { }
+  #promo-banner { width: 100%; background: #4f46e5; color: #fff; padding: 14px 18px; border-radius: 8px; margin: 24px 0; }
+  figure { max-width: 100%; }
+  #topology { max-width: 100%; height: auto; }
+  footer { color: #64748b; padding: 24px; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <div class="kicker">Relay Metrics</div>
+</header>
+<main>
+  <h1 id="headline">Throughput stayed flat while retries doubled</h1>
+  <p id="subline" class="lead">Weekly relay digest for the ingestion cluster, calendar week 31.</p>
+
+  <div id="ship-note">Ship freeze starts Friday 18:00 UTC — no deploys until Monday.</div>
+
+  <div id="card-row">
+    <div class="card"><strong>Accepted</strong><p>18,204,551 events accepted across 14 relays.</p></div>
+    <div class="card"><strong>Retried</strong><p>402,118 deliveries needed at least one retry.</p></div>
+    <div class="card"><strong>Dropped</strong><p>1,208 events exceeded the retry budget.</p></div>
+  </div>
+  <p class="after-cards">Retry pressure is concentrated on the two relays behind the packet-shaping appliance.</p>
+
+  <div id="promo-banner">Grafana board 42 has the per-relay breakdown — bookmark it before the freeze.</div>
+
+  <figure>
+    <img id="topology" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='480' height='220'%3E%3Crect width='480' height='220' fill='%23f1f5f9'/%3E%3Ccircle cx='60' cy='110' r='30' fill='%23334155' stroke='%23475569' stroke-width='2'/%3E%3Ctext x='60' y='115' text-anchor='middle' fill='white' font-size='12'%3ERelay 1%3C/text%3E%3Ccircle cx='240' cy='110' r='30' fill='%23334155' stroke='%23475569' stroke-width='2'/%3E%3Ctext x='240' y='115' text-anchor='middle' fill='white' font-size='12'%3ERelay 2%3C/text%3E%3Ccircle cx='420' cy='110' r='30' fill='%23334155' stroke='%23475569' stroke-width='2'/%3E%3Ctext x='420' y='115' text-anchor='middle' fill='white' font-size='12'%3ERelay 3%3C/text%3E%3Cline x1='90' y1='110' x2='210' y2='110' stroke='%23475569' stroke-width='2'/%3E%3Cline x1='270' y1='110' x2='390' y2='110' stroke='%23475569' stroke-width='2'/%3E%3C/svg%3E" alt="Relay topology diagram" width="480" height="220">
+    <figcaption>Relay topology as of week 31.</figcaption>
+  </figure>
+</main>
+<footer>Relay Metrics · internal · week 31</footer>
+<script>
+  // Highlight the retried card on load.
+  document.querySelector("#card-row .card:nth-child(2)").style.borderColor = "#f59e0b";
+</script>
+</body>
+</html>

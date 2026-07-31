@@ -34,7 +34,7 @@ Static truth comes from pixels; behavior truth needs a carrier:
 | Animation | a **motion brief** (short text: what moves, duration, easing, iteration, reduced-motion policy) — or a frame strip |
 | Interactive states (visual) | hover/focus screenshots (see auto-markup §3.7) |
 | Interactive state CHANGES (disclosure, tabs, switches, menus) | a reference page (`check interactions --reference` makes its event→ARIA-transition inventory the contract) — or an **interaction brief**: one line per control naming role, accessible name, event, and expected transition (see B5). **Brief authors: copy that is only visible in a state needs its own carrier** — a panel no screenshot shows and no brief line quotes has none, and the agent will invent plausible text for it that no gate can catch (S11: an always-hidden tab panel shipped with fabricated copy; only the verifier's source diff found it). Quote every state's visible copy in the brief, or provide one screenshot per state |
-| Exact copy (spellings, casing) | a **copy manifest** (plain text, one required line per row) — verified by `check copy --manifest`; without one, `check copy` only runs its placeholder scan. **Brief authors: mandatory whenever the page carries real copy** — measured cost of omitting it: an S9 run went 18 rounds across two models with a wrong © year, missing `·` separators, and proper-noun typos (`Imlil`→`Imili`) that composition pairs happily and no gate can see. Vision transcription of ~14px text WILL introduce these. **No manifest available** (real mock, competitor capture): the target pixels themselves are the carrier — run `check copy attempt.html --target target.png` once composition has converged; it crops every rendered text block's bbox out of the target into contact sheets. All three S9 bugs are visible in a single sheet read — **but the sheets must be read by someone other than whoever transcribed the copy** (the driver/verifier, or `--vlm`): the eyes that misread `Imlil` as `Imili` at transcription time misread the review crop the same way (S9-fresh measured exactly this — the agent reviewed its own sheets, reported PASS, and the typo survived). Self-review of your own transcription is weak evidence |
+| Exact copy (spellings, casing) | a **copy manifest** (plain text, one required line per row) — verified by `check copy --manifest`; without one, `check copy` only runs its placeholder scan. Matching sweeps disclosure states (closed `<details>` / tabs / `aria-expanded=false`), so collapsed copy passes with provenance — never ship a disclosure open just to satisfy this gate. **Brief authors: mandatory whenever the page carries real copy** — measured cost of omitting it: an S9 run went 18 rounds across two models with a wrong © year, missing `·` separators, and proper-noun typos (`Imlil`→`Imili`) that composition pairs happily and no gate can see. Vision transcription of ~14px text WILL introduce these. **No manifest available** (real mock, competitor capture): the target pixels themselves are the carrier — run `check copy attempt.html --target target.png` once composition has converged; it crops every rendered text block's bbox out of the target into contact sheets. All three S9 bugs are visible in a single sheet read — **but the sheets must be read by someone other than whoever transcribed the copy** (the driver/verifier, or `--vlm`): the eyes that misread `Imlil` as `Imili` at transcription time misread the review crop the same way (S9-fresh measured exactly this — the agent reviewed its own sheets, reported PASS, and the typo survived). Self-review of your own transcription is weak evidence |
 
 Never invent behavior that has no carrier. No motion brief and no frame
 strip means **author zero animations** — say so in your report rather
@@ -223,10 +223,11 @@ directly off the B3 report:
 ## Optional VLM assist
 
 Your own vision suffices (Haiku-grade included — see the S1–S5 proofs
-in docs/reports/). With an `ANTHROPIC_API_KEY` / `OPENROUTER_API_KEY`,
-`vlmkit diff region --model anthropic/claude-haiku-4-5` can second-check
-color pairs; treat it as color naming only — structure and shift always
-come from the deterministic reports (see auto-markup §5 caveats).
+in docs/reports/). `vlmkit diff region` is **deprecated** (net-negative
+for agent repair in every controlled A/B; wrong attribution, fabricated
+deltas) — do not reach for it. For residual color/region questions use
+`check equivalence` (measured deltas + pair sheets for a second reader);
+structure and shift always come from the deterministic reports.
 
 ## KPIs — rounds and tokens
 
@@ -281,6 +282,36 @@ self-declaration once verdicts became explicit):
   revert your last change before trying anything else.
 - When some targets pass and others fail, the kickback says which to
   protect — scope fixes to the failing target's media regime.
+
+### B6. `check integrity attempt.html` (reference-free defect sweep)
+
+Needs NO target image or manifest — run it as the last gate on every
+attempt, and as the PRIMARY gate when there is no reference at all
+(creative/zero-shot markup from a brief). It sweeps 1280/768/375 for
+defects that are unambiguous without a reference: construction-phase JS
+errors, empty/degenerate renders, broken images/stylesheets/scripts,
+same-layer text collisions, clipped text, children protruding from
+painted containers, collapsed containers, horizontal page overflow,
+invisible/low-contrast text (solid backgrounds), 2-8px sibling
+misalignment, and declared-but-unapplied styling. Findings carry
+selector attribution; a `fail` flips the verdict to DEFECTS.
+
+When the brief states structural requirements ("sidebar is 260px on
+desktop", "stats are 2x2 at 768"), also encode them as a
+`check layout --contract contract.json` spec (width / perRow /
+fullWidth / above / count / visible per viewport) and run it every
+round — it is the machine-checkable form of the brief's layout section.
+
+- Intentional patterns (hero overlay, `text-overflow: ellipsis`,
+  zero-height positioning anchors, `aria-hidden` decoration) are
+  exempted by the TOOL and listed under `exempted` — same rule as
+  demotion: the exemption is the tool's judgment, not yours. If you
+  believe a `fail` is intentional, the fix is to express the intent in
+  CSS (positioned layer, ellipsis), not to argue with the report.
+- Measured value on our own fixtures: the S8 edit fixture — verified
+  DONE at 1280 — turned out to overflow 67px at 375 (`div.plans`),
+  invisible to every reference-full gate because no 375 target existed.
+  Multi-viewport integrity is exactly the net for that class.
 
 ## Budget & stopping
 

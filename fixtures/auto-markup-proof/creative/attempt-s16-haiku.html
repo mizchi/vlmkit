@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kompass Analytics - Orders Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f9fafb;
+            color: #1f2937;
+            line-height: 1.5;
+        }
+
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar styles */
+        .sidebar {
+            width: 240px;
+            background: #ffffff;
+            border-right: 1px solid #e5e7eb;
+            padding: 24px 0;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar-brand {
+            padding: 0 24px 32px;
+            font-size: 18px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .sidebar-nav {
+            list-style: none;
+        }
+
+        .sidebar-nav a {
+            display: block;
+            padding: 12px 24px;
+            text-decoration: none;
+            color: #6b7280;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .sidebar-nav a:hover {
+            color: #1f2937;
+            background: #f3f4f6;
+        }
+
+        .sidebar-nav a[aria-current="page"] {
+            color: #2563eb;
+            background: #eff6ff;
+            border-left: 3px solid #2563eb;
+            padding-left: 21px;
+        }
+
+        /* Mobile header */
+        .mobile-header {
+            display: none;
+            background: #ffffff;
+            border-bottom: 1px solid #e5e7eb;
+            padding: 16px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .mobile-header-brand {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .menu-button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            color: #1f2937;
+        }
+
+        .menu-button:hover {
+            background: #f3f4f6;
+            border-radius: 6px;
+        }
+
+        .mobile-nav {
+            display: none;
+            position: absolute;
+            top: 56px;
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            border-bottom: 1px solid #e5e7eb;
+            z-index: 999;
+        }
+
+        .mobile-nav.open {
+            display: block;
+        }
+
+        .mobile-nav a {
+            display: block;
+            padding: 12px 16px;
+            text-decoration: none;
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .mobile-nav a:hover {
+            background: #f3f4f6;
+        }
+
+        .mobile-nav a[aria-current="page"] {
+            color: #2563eb;
+            background: #eff6ff;
+        }
+
+        /* Main content */
+        .main-content {
+            flex: 1;
+            margin-left: 240px;
+            padding: 32px;
+        }
+
+        .page-header {
+            margin-bottom: 8px;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .page-subtitle {
+            font-size: 14px;
+            color: #6b7280;
+            margin-top: 4px;
+            margin-bottom: 24px;
+        }
+
+        /* Filter chips */
+        .filters {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+
+        .filter-chip {
+            background: #ffffff;
+            border: 1px solid #d1d5db;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            color: #6b7280;
+            font-weight: normal;
+        }
+
+        .filter-chip:hover {
+            background: #f3f4f6;
+        }
+
+        .filter-chip[aria-pressed="true"] {
+            background: #2563eb;
+            color: #ffffff;
+            border-color: #2563eb;
+        }
+
+        /* Stat tiles */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .stat-tile {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #6b7280;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        /* Table section */
+        .table-section {
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        thead {
+            background: #f9fafb;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        th {
+            padding: 12px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #6b7280;
+            font-size: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .sortable-header {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            color: #6b7280;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .sortable-header:hover {
+            color: #1f2937;
+        }
+
+        .sortable-header::after {
+            content: '⇅';
+            font-size: 12px;
+            opacity: 0.5;
+        }
+
+        th[aria-sort="ascending"] .sortable-header::after {
+            content: '↑';
+            opacity: 1;
+        }
+
+        th[aria-sort="descending"] .sortable-header::after {
+            content: '↓';
+            opacity: 1;
+        }
+
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        tbody tr:hover {
+            background: #f9fafb;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-paid {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .status-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-refunded {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* Pagination */
+        .pagination {
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .pagination-buttons {
+            margin-left: auto;
+            display: flex;
+            gap: 8px;
+        }
+
+        .pagination button {
+            background: #ffffff;
+            border: 1px solid #d1d5db;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #1f2937;
+            transition: all 0.2s;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background: #f3f4f6;
+            border-color: #9ca3af;
+        }
+
+        .pagination button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+            color: #9ca3af;
+        }
+
+        /* Responsive design */
+        @media (max-width: 767px) {
+            .sidebar {
+                display: none;
+            }
+
+            .mobile-header {
+                display: flex;
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding: 16px;
+            }
+
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+                margin-bottom: 24px;
+            }
+
+            .stat-tile {
+                padding: 16px;
+            }
+
+            .stat-value {
+                font-size: 20px;
+            }
+
+            .page-title {
+                font-size: 24px;
+            }
+
+            .filters {
+                margin-bottom: 20px;
+            }
+
+            .table-wrapper {
+                min-width: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Mobile Header -->
+    <div class="mobile-header">
+        <div class="mobile-header-brand">Kompass</div>
+        <button class="menu-button" id="menuBtn" aria-expanded="false">Menu</button>
+    </div>
+
+    <!-- Mobile Navigation -->
+    <nav class="mobile-nav" id="mobileNav">
+        <a href="#overview">Overview</a>
+        <a href="#orders" aria-current="page">Orders</a>
+        <a href="#customers">Customers</a>
+        <a href="#settings">Settings</a>
+    </nav>
+
+    <!-- Sidebar (Desktop) -->
+    <aside class="sidebar">
+        <div class="sidebar-brand">Kompass</div>
+        <nav class="sidebar-nav">
+            <a href="#overview">Overview</a>
+            <a href="#orders" aria-current="page">Orders</a>
+            <a href="#customers">Customers</a>
+            <a href="#settings">Settings</a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="page-header">
+            <h1 class="page-title">Orders</h1>
+            <p class="page-subtitle">Data refreshed 5 minutes ago</p>
+        </div>
+
+        <!-- Filter Chips -->
+        <div class="filters" role="group" aria-label="Filter orders by status">
+            <button class="filter-chip" aria-pressed="true" data-filter="all">All</button>
+            <button class="filter-chip" aria-pressed="false" data-filter="Paid">Paid</button>
+            <button class="filter-chip" aria-pressed="false" data-filter="Pending">Pending</button>
+            <button class="filter-chip" aria-pressed="false" data-filter="Refunded">Refunded</button>
+        </div>
+
+        <!-- Stat Tiles -->
+        <div class="stats">
+            <div class="stat-tile">
+                <div class="stat-label">Revenue (30d)</div>
+                <div class="stat-value">€48,210</div>
+            </div>
+            <div class="stat-tile">
+                <div class="stat-label">Orders (30d)</div>
+                <div class="stat-value">1,284</div>
+            </div>
+            <div class="stat-tile">
+                <div class="stat-label">Refund rate</div>
+                <div class="stat-value">1.8%</div>
+            </div>
+            <div class="stat-tile">
+                <div class="stat-label">Avg. order</div>
+                <div class="stat-value">€37.55</div>
+            </div>
+        </div>
+
+        <!-- Orders Table -->
+        <div class="table-section">
+            <div class="table-wrapper">
+                <table id="ordersTable" role="table">
+                    <thead>
+                        <tr>
+                            <th>Order</th>
+                            <th>Customer</th>
+                            <th aria-sort="none">
+                                <button class="sortable-header" data-sort="date" aria-sort="none">Date</button>
+                            </th>
+                            <th>Status</th>
+                            <th aria-sort="none">
+                                <button class="sortable-header" data-sort="total" aria-sort="none">Total</button>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr data-status="Paid" data-date="2026-07-28" data-total="129.00">
+                            <td>#10412</td>
+                            <td>Mara Lindqvist</td>
+                            <td>2026-07-28</td>
+                            <td><span class="status-badge status-paid">Paid</span></td>
+                            <td>€129.00</td>
+                        </tr>
+                        <tr data-status="Pending" data-date="2026-07-28" data-total="54.90">
+                            <td>#10411</td>
+                            <td>Jonas Weber</td>
+                            <td>2026-07-28</td>
+                            <td><span class="status-badge status-pending">Pending</span></td>
+                            <td>€54.90</td>
+                        </tr>
+                        <tr data-status="Paid" data-date="2026-07-27" data-total="312.40">
+                            <td>#10410</td>
+                            <td>Aiko Tanaka</td>
+                            <td>2026-07-27</td>
+                            <td><span class="status-badge status-paid">Paid</span></td>
+                            <td>€312.40</td>
+                        </tr>
+                        <tr data-status="Refunded" data-date="2026-07-26" data-total="89.00">
+                            <td>#10409</td>
+                            <td>Priya Nair</td>
+                            <td>2026-07-26</td>
+                            <td><span class="status-badge status-refunded">Refunded</span></td>
+                            <td>€89.00</td>
+                        </tr>
+                        <tr data-status="Paid" data-date="2026-07-25" data-total="22.10">
+                            <td>#10408</td>
+                            <td>Tom Okafor</td>
+                            <td>2026-07-25</td>
+                            <td><span class="status-badge status-paid">Paid</span></td>
+                            <td>€22.10</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination">
+                <span>Showing 1–5 of 1,284</span>
+                <div class="pagination-buttons">
+                    <button id="prevBtn" disabled>Previous</button>
+                    <button id="nextBtn">Next</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Mobile menu toggle
+        const menuBtn = document.getElementById('menuBtn');
+        const mobileNav = document.getElementById('mobileNav');
+
+        menuBtn.addEventListener('click', function() {
+            const isExpanded = this.getAttribute('aria-expanded') === 'true';
+            this.setAttribute('aria-expanded', !isExpanded);
+            mobileNav.classList.toggle('open');
+        });
+
+        // Close menu when clicking on a link
+        mobileNav.querySelectorAll('a').forEach(link => {
+            link.addEventListener('click', function() {
+                menuBtn.setAttribute('aria-expanded', 'false');
+                mobileNav.classList.remove('open');
+            });
+        });
+
+        // Filter functionality
+        const filterChips = document.querySelectorAll('.filter-chip');
+        const tableRows = document.querySelectorAll('tbody tr');
+
+        filterChips.forEach(chip => {
+            chip.addEventListener('click', function() {
+                // Update pressed state
+                filterChips.forEach(c => c.setAttribute('aria-pressed', 'false'));
+                this.setAttribute('aria-pressed', 'true');
+
+                const filter = this.getAttribute('data-filter');
+                const filterValue = filter === 'all' ? null : filter;
+
+                // Filter rows
+                tableRows.forEach(row => {
+                    if (filterValue === null) {
+                        row.style.display = '';
+                    } else {
+                        const status = row.getAttribute('data-status');
+                        row.style.display = status === filterValue ? '' : 'none';
+                    }
+                });
+            });
+
+            // Keyboard support
+            chip.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    const clickEvent = new MouseEvent('click', {
+                        bubbles: true,
+                        cancelable: true,
+                        view: window
+                    });
+                    this.dispatchEvent(clickEvent);
+                }
+            });
+        });
+
+        // Sorting functionality
+        const sortableHeaders = document.querySelectorAll('.sortable-header');
+        let sortOrder = {};
+
+        sortableHeaders.forEach(header => {
+            header.addEventListener('click', function() {
+                const sortType = this.getAttribute('data-sort');
+                const th = this.closest('th');
+                const currentSort = this.getAttribute('aria-sort');
+
+                // Determine new sort direction
+                let newSort;
+                if (currentSort === 'ascending') {
+                    newSort = 'descending';
+                } else if (currentSort === 'descending') {
+                    newSort = 'none';
+                } else {
+                    newSort = 'ascending';
+                }
+
+                // Reset other headers
+                document.querySelectorAll('.sortable-header[aria-sort]').forEach(h => {
+                    h.setAttribute('aria-sort', 'none');
+                    h.closest('th').setAttribute('aria-sort', 'none');
+                });
+
+                // Set current header sort
+                if (newSort !== 'none') {
+                    this.setAttribute('aria-sort', newSort);
+                    th.setAttribute('aria-sort', newSort);
+                    sortTable(sortType, newSort === 'ascending');
+                } else {
+                    this.setAttribute('aria-sort', 'none');
+                    th.setAttribute('aria-sort', 'none');
+                    // Reset to original order
+                    const tbody = document.querySelector('tbody');
+                    const rows = Array.from(tbody.querySelectorAll('tr'));
+                    rows.sort((a, b) => {
+                        return parseInt(a.querySelector('td').textContent) - parseInt(b.querySelector('td').textContent);
+                    });
+                    rows.forEach(row => tbody.appendChild(row));
+                }
+            });
+
+            // Keyboard support
+            header.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    const clickEvent = new MouseEvent('click', {
+                        bubbles: true,
+                        cancelable: true,
+                        view: window
+                    });
+                    this.dispatchEvent(clickEvent);
+                }
+            });
+        });
+
+        function sortTable(sortType, ascending) {
+            const tbody = document.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+
+            rows.sort((a, b) => {
+                let aValue, bValue;
+
+                if (sortType === 'date') {
+                    aValue = new Date(a.getAttribute('data-date'));
+                    bValue = new Date(b.getAttribute('data-date'));
+                } else if (sortType === 'total') {
+                    aValue = parseFloat(a.getAttribute('data-total'));
+                    bValue = parseFloat(b.getAttribute('data-total'));
+                }
+
+                if (ascending) {
+                    return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+                } else {
+                    return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+                }
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
+        }
+    </script>
+</body>
+</html>

@@ -50,7 +50,12 @@ pkf run vlm-bench -- <model1> <model2> <model3> --md
 See `docs/reports/2026-05-19-vlm-haiku-vs-uitars.md` for today's 2-way re-bench (haiku + UI-TARS, both FIXED r1);
 `docs/reports/2026-05-18-vlm-claude-vs-openrouter-vs-newcomers.md` for the 8-way bench from the prior week.
 
-### `vlm-region-diff` CLI Default (2026-05-23)
+### `vlm-region-diff` CLI Default (2026-05-23) — DEPRECATED 2026-07-30
+
+**`diff region` is deprecated**: net-negative for agent repair in every
+controlled A/B (2026-06-06), and its role is now covered deterministically
+by `diff png --elements-html`, `check integrity`, and `check equivalence`.
+The model notes below are kept as bench history only.
 
 The defaults above are for **fix-loop VLMs** (Stage-1 CHANGE list + Stage-2 LLM).
 `src/experiments/migration/vlm-region-diff.ts` is a different tool — it asks
@@ -212,6 +217,8 @@ This repository is a pnpm workspace.
 Cross-package imports use `@mizchi/vrt-<pkg>/<path>.ts` or the curated barrel `@mizchi/vrt-<pkg>`. Within a package, use relative imports. The barrel excludes Playwright-bound and CLI-entry modules — deep-import those.
 
 Run tests for a single package: `pnpm --filter @mizchi/vrt-core test`. From repo root, `pnpm test` runs all.
+
+The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need the `moon` CLI. If tests fail with `spawnSync moon ENOENT`, add it to PATH first (it is often installed but not on PATH in sandboxes): `export PATH="$HOME/.moon/bin:$PATH"`.
 
 ## Documentation Structure
 

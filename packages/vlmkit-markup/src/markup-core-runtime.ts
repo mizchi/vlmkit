@@ -1331,8 +1331,12 @@ function run(command: string, args: string[]): string {
     encoding: "utf8",
   });
   if (result.error) {
+    const enoent = (result.error as NodeJS.ErrnoException).code === "ENOENT";
+    const hint = enoent && command === "moon"
+      ? "\nThe MoonBit `moon` CLI is not on PATH. If installed, add ~/.moon/bin to PATH; otherwise install it: curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash"
+      : "";
     throw new Error(
-      `${command} ${args.join(" ")} failed: ${result.error.message}`,
+      `${command} ${args.join(" ")} failed: ${result.error.message}${hint}`,
     );
   }
   if (result.status !== 0) {

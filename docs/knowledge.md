@@ -836,6 +836,12 @@ S5 で Haiku が missing/extra を残して 3 ラウンドで自己宣言停止�
 | S13 widgets Haiku | 8 | 62,632 | 25 | 278s | 21.65% | 失敗(listbox 全幅レンダリング=合理化 7 例目をペア画像で反証)。composites+handlers standalone は ok だが **accessible name 契約が aria-labelledby 欠落を検出**(standalone・自己レビュー素通り) |
 | S13 widgets **Sonnet 継続レグ** | 4 | 138,205 | 68 | 979s | **1.52%** | **DONE — 静的 + interaction 契約 + surface 契約の三重達成は初**。extractor の top-8 ランキング席取りを読んで ordering 誤検出を解消(要ウォッチ 3 例目: 分割適合)。surface 契約の委譲偽陽性 1 件は検証者が即修正 |
 | S10 realshot **Sonnet** | 2 | 58,103 | — | — | 36%(advisory) | **done(劣化キャプチャ宣言モード初実証)**。dpr2+JPEG 実スクショ 1 枚入力。diff 36% は写真領域のグラデ近似による設計値 — 構図・コピー・パレットは目視一致 |
+| S14a creative Haiku(参照なし) | 1 | 31,616 | 9 | 69s | —(target 不在) | **DONE — 参照なし創造モード初実証**(done 条件 = check integrity CLEAN×3 + copy manifest 0 missing)。integrity は初稿 clean、修正駆動は copy gate のみ(details 内 2 行)。検証フェーズ(別読み手: gate 再実行・3 幅目視・verify flow で details 開閉実証)で gate 沈黙欠陥 0。**pixel target が無い創造タスクでは Haiku の壁(1px エンドゲーム)が発生しない** |
+| S14a-stress creative Haiku(高密度ブリーフ) | 1 | 30,499 | 5 | 52s | —(target 不在) | **DONE — 負荷ブリーフ(固定サイドバー+3 段階規律+非分割トークン)でも初稿 CLEAN**。DOM 実測で全レイアウト規律充足を確認。結論: 作成ランでは kickback 追従を計測できない(明確なブリーフ+現行 Haiku は初稿 clean が定常) |
+| S14a-fix repair Haiku(既知欠陥 6 種の修理) | 2 | 29,616 | 10 | 57s | —(target 不在) | **CLEAN — kickback 追従 7/7**(diff 監査: 全修正が名指しセレクタ、削除逃げ 0、figure/caption 保全)。r2 で dedupe に隠れていた 375 図版オーバーフローが顕在化→修正。**帰属 kickback の決定論ナビゲーションは修理タスクなら Haiku でも完全に機能**(参照ありでは Sonnet 限定だった加速効果) |
+| S15 zero-shot product page Haiku(実世界パターン) | 2(自称)/ 5 iter(台帳) | 49,704 | 28 | 188s | —(target 不在) | **DONE — 5 ゲート同時達成を別読み手検証**(integrity CLEAN / copy 0 missing / scroll / handlers / interactions 各 0 suspect)。パンくず・セール価格・radio バリアント・ステッパー・ARIA タブ・閉 FAQ・375 sticky バー・スペック表を brief から一発実装。**disclosure-state sweep 初実戦: 30 行中 11 行が revealed-only で初稿から 0 missing — S14a で観測した open-既定誘導が消滅**。ラウンド自称 2 vs 台帳 5 iter の乖離あり(KPI は台帳から取ること)。gate 沈黙欠陥 0(sticky の fullPage 重なりは撮影アーティファクトと判別)。`docs/reports/2026-07-31-s15-zero-shot-product-page.md` |
+| S16 zero-shot dashboard Haiku(表操作系) | 2 write(台帳) | 56,226 | 20 | 266s | —(target 不在) | **DONE — 5 ゲート + 実挙動プローブ全通過を別読み手検証**。ソートは実並び替え(aria-sort 昇降 + キーボード Enter)、aria-pressed フィルタは実絞り込み(Paid→3 行)、375 ハンバーガー drawer、**表はコンテナ内横スクロール(438>341px)でページ overflow 0** — 実世界の表パターン規律を保持。integrity は初稿 CLEAN、修正は copy 7→0 の 1 回のみ。エージェントの warn 解釈(「プローブは並び替えを観測できない」)は誤り — 再プローブで実挙動確認、**ツール内部についてのエージェント推論は鵜呑みにせず再測定**。gate 沈黙欠陥 0(5 パス連続)。`docs/reports/2026-07-31-s16-zero-shot-dashboard.md` |
+| S17 zero-shot checkout Haiku(フォーム密) | 2 write(台帳) | 59,654 | 29 | 301s | —(target 不在) | **DONE — 5 ゲート + フォーム実挙動を別読み手検証**(consent ゲートは実 disabled 属性の切替、未ラベル 0、autocomplete 6 種、native validation 有効、details 閉のまま copy PASS)。**発見: brief 作問の算術矛盾(Subtotal+Shipping≠Total、€7.89 ずれ)をエージェントは指摘せず「算術検証済み」と虚偽の式まで添えて申告** — copy 厳密一致が数値整合に勝ち、自己検証文言は証拠にならないの追証。数値整合はゲート化対象でなく作問チェックリスト側(brief の数値は単一ソースから生成)。3 レグ総括: **zero-shot 実世界パターン(EC/dashboard/checkout)は全て Haiku 圏内**(各 ~50-60k tokens、≤5 分、実質修正 ≤1 ラウンド)— pixel target が無ければ Haiku の壁は出ない。gate 沈黙欠陥 0(6 パス連続)。`docs/reports/2026-07-31-s17-zero-shot-checkout-and-axis-synthesis.md` |
 
 トークン計測は S5 が初(それ以前のランは usage を記録していなかった)。
 r2/r3 の tokens はセグメント合算 — 差し戻し(resume)はトランスクリプト
@@ -872,3 +878,69 @@ and **weak** ones at `>= 0.15`. These are precision-first thresholds: a
 fixture-derived corpus found that the former 0.30 strong cutoff promoted a
 wrong sibling. The corpus, exact scores, and reproduction command are in
 [`docs/reports/2026-07-30-selector-heal-calibration.md`](reports/2026-07-30-selector-heal-calibration.md).
+
+### check integrity — 参照なし欠陥ゲートの S14b/S14c 結果 (2026-07-30)
+
+設計: `docs/design/creative-markup-eval.md`。参照(target 画像・manifest)
+なしで判定可能な欠陥 9 クラスの決定論ゲート。
+
+- **S14b mutation 検知率: 9/9 (100%)** — JS 構築失敗 / post-load 例外 /
+  404 画像 / テキスト衝突(負マージン + 同層 absolute の両方)/ テキスト
+  切れ / 潰れコンテナ(float)/ page-overflow-x / 404 stylesheet
+  (+unstyled-page 連鎖)/ 375px 限定オーバーフローの viewport 帰属。
+  注入は自明ケースなので 100% が合格線(設計どおり)。
+- **S14c 偽陽性(自作分): 0** — hero オーバーレイ / ellipsis 切り詰め /
+  高さ 0 位置決めアンカー / aria-hidden 装飾は verdict clean のまま
+  `exempted` に理由付きで記録される(免除はツールの判定として可視)。
+- **実装知見**: Chromium は 404 の `<link rel=stylesheet>` にも空の
+  CSSStyleSheet を付ける(`link.sheet != null`)— DOM 側では死んだ
+  stylesheet を検知できず、wire(requestfailed / 非 OK response)が
+  唯一の信頼できる検知点。同様に、テキストのみのページはグリフが
+  minArea 未満で components 0 になるため、degenerate 判定は pixel 単独
+  でなく DOM textBlocks との AND が必要。
+- **初回 dogfood**: S8 edit fixture(1280 で DONE 検証済み)に 375px で
+  67px の実在オーバーフロー(`div.plans` 帰属)— 参照ありゲートは target
+  が存在しない幅に盲目、というこのゲートの存在理由をそのまま実証。
+- **S14c 外部 dogfood(同日)**: 5 実ページミラーで免除ルールの穴 4 クラス
+  を発見・修正 — ①image replacement / sr-only(csszengarden で 6 誤 fail;
+  判別軸は「部分切れ=欠陥 / 完全隠し=パターン」で、直下テキスト rects と
+  要素 box の交差面積を実測)、②scroll-scan 委譲が免除済みセレクタを
+  clipped-content で再報告、③cross-origin リソース失敗は warn(danluu の
+  CF beacon)、④総 CSS ルール数 <5 は意図的ミニマル(danluu)。真の陽性
+  1 件(HN の 36px 横スクロール @768)。詳細:
+  `docs/reports/2026-07-30-integrity-external-dogfood.md`。
+- S14a は同日実施済み(台帳参照)。Layer B は**凍結(需要ゲート)**:
+  決定論降格(A10-A12 + layout contract)で残余が B3 + 複合背景 + 美観
+  まで縮小し、S14a 全ランで gate 沈黙欠陥 0 のため、実観測を着手条件に
+  変更。同日、`unstyled-page` の UA 指紋 warn 分岐を撤去(真陽性 0 /
+  偽陽性 1 — danluu 特例ごと削除、wire 検知 fail 分岐が本命を担う)。
+  VLM 意味ラベリング bench も未実装のままクローズ(決定論 kind で需要
+  充足、消費者不在)。
+- **Layer A 第 2 陣(2026-07-30)**: B 軸から 4 判断を決定論降格 —
+  A10 container-protrusion(painted parent からの in-flow はみ出し;
+  positioned badge / 負マージン breakout は exempt)、A11 invisible-text /
+  low-contrast-text(単色背景のみ、αブレンド+累積 opacity、複合背景は
+  集約 exempt 行で明示スキップ;**視覚的に隠れたテキストは自要素+祖先
+  クリップ交差で除外** — zen garden の閉じたドロップダウン内白文字を
+  invisible と誤報した偽陽性 2 クラスを実測修正)、A12 near-misalignment
+  (兄弟が正確に揃う軸から 2-8px 外れ=事故、warn)、`check layout
+  --contract`(ブリーフ構造要求の宣言照合、MCP 9 本目)。全ミラー+全
+  fixture で偽陽性 0、attempt-stress の #changelog low-contrast warn
+  (2.56:1)は真の陽性。バッテリー 31 テスト。
+
+### check copy — disclosure-state sweep (2026-07-31)
+
+S14a で観測した gate 誘導(copy manifest がレンダリング済みテキストのみ
+照合のため、`<details>` 内の必須 copy がエージェントに「open 既定で出荷」
+を選ばせる — 追記13)の根治。`check copy` は既定で開示状態を掃引する:
+閉じた `<details>` を open(DOM プロパティ、累積)、未選択 `[role=tab]`
+と `[aria-expanded=false]` をクリック(ページ JS が発火)し、各状態の
+`body.innerText` を捕捉(cap 30、超過は明示カウント)。manifest 行は
+既定表示 → 開示状態の順で照合し、開示状態でのみ見つかった行は
+**provenance 付き PASS**(`revealed: "…" ← details "Refund policy"`)+
+「この gate のために open 既定に倒すな」の行内注意。隠れ placeholder は
+suspect のまま(閉じたパネル内の lorem ipsum もバグ)。`--target` の
+bbox クロップは既定状態のみ(スクリーンショットは既定状態のため)。
+オプトアウト `--no-states`。innerText はレイアウト済みテキストだけを
+返すので「その状態でユーザーが読める文」と正確に一致するのが要点。
+限界: 純 CSS タブ(radio input 方式)と hover 開示は掃引対象外。

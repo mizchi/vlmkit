@@ -533,7 +533,16 @@ export async function renderHtmlToPng(
     // fast-forwarded to completion, infinite ones at their initial state) —
     // otherwise an entrance animation is caught mid-flight and every fill /
     // IoU downstream reports phantom deltas (S5-r2 finding).
-    const buffer = await page.screenshot({ fullPage: false, animations: "disabled" });
+    // CI Chromium intermittently throws "Unable to capture screenshot"
+    // (transient Page.captureScreenshot protocol error); one bounded retry
+    // absorbs it without masking persistent failures.
+    let buffer: Buffer;
+    try {
+      buffer = await page.screenshot({ fullPage: false, animations: "disabled" });
+    } catch {
+      await page.waitForTimeout(250);
+      buffer = await page.screenshot({ fullPage: false, animations: "disabled" });
+    }
     const png = PNG.sync.read(buffer);
     return {
       data: new Uint8Array(png.data.buffer, png.data.byteOffset, png.data.byteLength),

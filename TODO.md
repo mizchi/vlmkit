@@ -262,16 +262,83 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 ### Ecosystem positioning (市場調査 2026-07-29 由来)
 調査メモ: `docs/reports/2026-07-29-ai-markup-tooling-landscape.md` /
 設計: `docs/design/mcp-and-agent-expansion.md`
-- [ ] **MCP 露出(パート A、キー不要・低リスク・最優先)** — 決定論ゲート
-  (verify_markup / check_interactions / scan_handlers / build_page /
-  check_copy)を MCP tool 化。既存の純関数 + Hono/OpenAPI を再利用、
-  Playwright は dynamic import。`packages/vlmkit-mcp/` 新規 + `vlmkit mcp`
-  サブコマンド。統合面が MCP に収束した市場への刺し込み口。
+- [x] **MCP 露出(パート A、キー不要・低リスク・最優先)** — 2026-07-30
+  実装済み: `packages/vlmkit-mcp/` + `vlmkit mcp`(stdio)。決定論ゲート
+  10 本(verify_markup / check_interactions / scan_handlers / build_page /
+  check_copy / check_integrity ほか)を MCP tool 化、Playwright は
+  dynamic import。契約テスト常設(tools.test.ts)。
 - [ ] **verified browser agent(パート B、要 LLM キー・差別化前提)** —
   goal-runner の invariant + interaction-map の状態遷移語彙で「実行→事後
   条件検証→失敗ならロールバック/再計画」の検証付きループ(`vlmkit act`)。
   browser-use/Stagehand との差別化軸は "verified success rate"(見た目 OK
   でなく宣言事後条件の充足)。MVP は自リポジトリ UI に閉じる。
+
+### 参照なし(創造的)マークアップ評価 — `check integrity` + S14(設計 2026-07-30)
+設計: `docs/design/creative-markup-eval.md`
+- [x] **`check integrity` gate(Layer A、キー不要)** — 2026-07-30 実装済み:
+  `inspect/integrity-check.ts`、欠陥 9 クラス + 免除の可視化(exempted)+
+  セレクタ帰属 kickback + 3-viewport 掃引。CLI `check integrity` + MCP
+  `check_integrity`(8 本目)。A3 は wire 検知(requestfailed / 非 OK
+  response) — `link.sheet` は 404 でも non-null と実測したため。
+- [x] **S14b mutation バッテリー + S14c 偽陽性監査(自作分)** — 2026-07-30:
+  9/9 クラス検知、意図的パターン(hero オーバーレイ / ellipsis / アンカー /
+  aria-hidden)は clean + exempted 記録。回帰テスト常設(20 テスト)。
+  初回 dogfood で S8 edit fixture の 375px 実在オーバーフロー(67px,
+  `div.plans`)を検出 — 参照ありゲートの死角の実証。
+- [x] **S14c 外部ページ dogfood** — 2026-07-30 実施(5 ページ: example /
+  danluu / csszengarden / HN / w3.org APG)。免除ルールの穴 4 クラスを
+  発見・修正(image replacement / sr-only が最重要 — 部分切れ vs 完全隠し
+  の実測判別)。真の陽性 1 件(HN 横スクロール)。
+  `docs/reports/2026-07-30-integrity-external-dogfood.md`。
+- [x] **S14a 創造的実走** — 2026-07-30 実施: Haiku DONE(1 修正ラウンド、
+  31.6k tokens、エスカレーション不要)。integrity 初稿 clean、copy gate が
+  唯一の修正駆動。別読み手検証で gate 沈黙欠陥 0。観察: copy gate が
+  disclosure を open 既定に誘導(状態別 copy 検証が将来の穴埋め)。
+  `docs/reports/2026-07-28-verifier-tooling-and-s6.md` 追記13。
+- [x] **S14a 負荷版 + 修理レグ** — 2026-07-30 実施。負荷ブリーフでも Haiku
+  初稿 CLEAN(作成ランでは追従を計測不能と確定)→ 計測器を転換: 既知欠陥
+  6 種注入の `broken-spec.html` を修理させ **kickback 追従 7/7**(diff 監査、
+  削除逃げ 0)。帰属 kickback は修理タスクなら Haiku でも完全機能。
+  追記14 参照。
+- [x] **S17 zero-shot checkout(フォーム密)+ 軸総括** — 2026-07-31 実施:
+  fieldset×3 / autocomplete / radio group / 閉 details / consent ゲート
+  (実 disabled 切替)/ native validation / 金額サマリ。5 ゲート DONE +
+  フォーム実挙動を別読み手検証。**brief 作問の算術矛盾をエージェントが
+  「検証済み」と虚偽申告 → 数値は単一ソース生成を作問チェックリスト化**。
+  軸総括: EC/dashboard/checkout 全て Haiku 圏内(~50-60k tokens、≤5 分)、
+  5 ゲート done 条件は 3 アーキタイプ共通で無改造、gate 沈黙欠陥 0(6 パス
+  連続、Layer B 凍結維持)。
+  `docs/reports/2026-07-31-s17-zero-shot-checkout-and-axis-synthesis.md`
+- [x] **S16 zero-shot dashboard(表操作系)** — 2026-07-31 実施: sidebar +
+  aria-expanded drawer / aria-pressed フィルタ(実絞り込み)/ sortable
+  table(実並び替え + aria-sort + キーボード)/ コンテナ内横スクロール
+  規律 / disabled pagination。5 ゲート DONE + 実挙動プローブを別読み手
+  検証。integrity 初稿 CLEAN、修正は copy 1 回。gate 沈黙欠陥 0(5 パス
+  連続)。`docs/reports/2026-07-31-s16-zero-shot-dashboard.md`
+- [x] **S15 zero-shot 実世界パターン実走(EC 商品詳細ページ)** — 2026-07-31
+  実施: brief-only Haiku がパンくず/セール価格/radio バリアント/ステッパー/
+  ARIA タブ/閉 FAQ/375 sticky カートバー/スペック表を一発実装、5 ゲート
+  (integrity/copy/scroll/handlers/interactions)同時 DONE を別読み手検証。
+  disclosure-state sweep 初実戦(11/30 行 revealed-only、初稿 0 missing —
+  open-既定誘導の消滅を実測)。ラウンド自称 2 vs 台帳 5 iter(KPI は台帳)。
+  gate 沈黙欠陥 0 継続。次候補: dashboard/表操作系、フォーム密 checkout。
+  `docs/reports/2026-07-31-s15-zero-shot-product-page.md`
+- [x] **check copy 状態別検証モード** — 2026-07-31 実装済み: 既定 ON の
+  disclosure-state sweep(閉じた `<details>` を open、未選択 `[role=tab]` /
+  `[aria-expanded=false]` をクリック → 各状態の innerText 捕捉、cap 30 +
+  超過は明示カウント)。manifest 行は「既定表示 → 開示状態」の順で照合し、
+  開示状態でのみ見つかった行は provenance 付き PASS(レポートに
+  「open 既定に倒すな」の注意書きを同梱)。隠れ placeholder は suspect の
+  まま。--target のクロップは既定状態のみ(スクリーンショットは既定状態の
+  ため)。CLI `--no-states` / MCP サマリに revealed-only 数。S14a で観測
+  された open-既定誘導の根治。E2E 含むテスト 9 本 green。
+- [ ] **Layer B(VLM 視覚判定、advisory)— 凍結、需要ゲート(2026-07-30)** —
+  設計時 4 軸のうち B1 整列→A12、B2 コントラスト→A11、B4 構造→layout
+  contract、B4 コピー→manifest と決定論側に移り、残るのは B3(破綻の
+  見落とし網)+ 複合背景コントラスト + 美観のみ。かつ S14a 全 3 ランで
+  gate 沈黙欠陥 0 — B3 が拾うべき欠陥がまだ一度も観測されていない。
+  **着手条件: gate 沈黙欠陥が実際に観測されたら、そのクラスを対象に建てる**
+  (存在しない欠陥クラスのために VLM ルーブリックを先行実装しない)。
 
 ### Benchmarks
 - [ ] **markup-agent モデル横断ベンチ: OpenRouter + pi でモデルごとの性能比較**(関連: Issue #88)
@@ -282,10 +349,13 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - 期待成果: skills の Model selection 節を Anthropic 2 モデルの表から多モデル表に更新、`docs/knowledge.md` に台帳行を追加、レポートを `docs/reports/` に保存(YYYY-MM-DD-markup-agent-model-bench-vN.md)。
   - 論点(設計時に決める): pi 側のツール権限(bash + read/write で十分か)、1px エンドゲームを完走できないモデルの打ち切り規準(トレンド横ばい 2 レグ相当)、vision 非対応モデルの扱い(除外 or scan component クロップ経由)。
 
-- [ ] **VLM 意味ラベリングのベンチ: コンポーネントクロップ分類(button/nav/card/badge...)**(→ Issue #88)
-  - 背景: 2026-07-28 に決定論の kind 分類(hairline/solid/text/image、bigJump 判別)を実装済み — ペアリングゲートと kickback ラベルはこれで賄えている。VLM が足せるのは**意味**の層(「これは CTA ボタン」「これは nav」)で、kickback の可読性がさらに上がる可能性がある。ただし本環境に API キーがなく未ベンチのため、実装はフックだけで見送り。
-  - 方法: 既存 fixture 群の抽出済みコンポーネントクロップ(数百個、正解ラベルは fixture HTML から機械的に得られる)を分類タスクとして与える。候補: `bytedance/ui-tars-1.5-7b`(UI ドメイン学習・ほぼ無料、ただし vlm-region-diff での色リテラル失敗の前科 — 分類は別スキルなので要実測)、`qwen/qwen3-vl-30b-a3b-instruct`、`anthropic/claude-haiku-4-5`。
-  - 判断基準: 精度 ≥90% かつレイテンシ ≤2s/クロップ(またはシートで一括)なら verify markup にオプトイン統合。それ未満なら決定論 kind のままで足りる(誤ラベルは誤アドバイスに直結するため、中途半端な精度はゼロより悪い)。
+- [x] ~~**VLM 意味ラベリングのベンチ: コンポーネントクロップ分類**(→ Issue #88)~~ —
+  **2026-07-30 クローズ(実装せず)**: 決定論 kind(hairline/solid/text/image、
+  bigJump 判別)がペアリングゲートと kickback 可読性の需要を実測で満たし
+  切り、S14 全レグでも意味ラベル不在が問題になった場面ゼロ。消費者の
+  いないベンチと判断。元 TODO 自身の判断基準「中途半端な精度はゼロより
+  悪い」どおり、決定論 kind を恒久解とする。再開条件: kickback の
+  誤読が意味ラベル不在に帰着する実例が観測されたら。
 
 - [x] **kickback 品質: matched ペアの粒度不一致と top-N 取りこぼし(S9 リプレイで発見)** — 2026-07-28 実装済み: kickback に presence プローブを接続し、(1) 大きな dSize でも render が target fill を target box 全面に持つ場合は「size-delta caveat(segmentation grouping の可能性)」を行内表示、(2) extra/missing の同 fill が ±24px 縦近傍にある場合は「near-miss(変位、move it instead)」を同ラウンドで表示。ユニットテスト 5 本(S9 リプレイの実ケース形状)+ DONE fixture 回帰 green。
   - (1) target 側が連結成分としてグループ化した箱(card 全体)と current 側の部分箱(image のみ)が matched になると、dSize が「伸ばせ/縮めろ」と読める誤誘導になる。案: matched ペアの両箱で pixel-presence 相互チェックを行い、片側だけ大きい場合は「grouping mismatch の可能性」を行内に明記する。
@@ -296,11 +366,13 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - 症状: 面積ランキング第 N 席の中身が target と current で食い違うと、実害のない ink 量差(見出し語断片 area 374 vs 330 等)が missing/extra/ordering として出る。エージェントは font-size 等で extractor の分割を合わせにいく(letter-spacing 2 件 + S13 h2 の計 3 例 — いずれも視覚等価方向だったが、gate を騙す方向にも使える手筋)。
   - 案: (1) top-N 境界 ±10% の面積帯にいる残差へ「ranking-boundary caveat」を行内表示、(2) ペアリング前に両側の component 集合を面積でなく位置グリッドで安定ソート、(3) 境界成分は pixel-presence で先に demote。
 
-- [ ] **LLM Stage-2 fix synthesis for the markup loop(kickback + セレクタ帰属 → CSS 修正案の自動適用)**(→ Issue #88)
-  - 前提: verify markup の kickback は 2026-07-28 から決定論のセレクタ帰属(`[rendered by ...]` / `[target box falls in your ...]`)と kind タグを持つ — LLM に渡す文脈はもう揃っている。
-  - 方法: fix-loop の実証済み 2 段構成を流用 — kickback(帰属付き)+ 該当セレクタの computed styles を LLM に渡し、CSS 編集案を JSON で受けて apply-and-rollback ゲート(qwen3-coder の過剰修正を吸収した実績のある形)で適用。verify markup の trend が REGRESSED なら自動ロールバック。
-  - 候補 LLM: `google/gemini-2.5-flash`(Stage-2 現行既定)から。API キー必須のため本環境では未着手。
-  - 期待効果: Haiku の壁(fixed 要素座標系、1px エンドゲーム)をモデル昇格なしで越える経路。エージェントレスの `verify markup --auto-fix` まで見えれば fix-loop と統合。
+- [x] **LLM Stage-2 fix synthesis for the markup loop(kickback + セレクタ帰属 → CSS 修正案の自動適用)**(→ Issue #88)
+  — 2026-07-30 実装済み(`vlmkit fix markup`): kickback(帰属付き)+ 該当
+  セレクタの computed styles を LLM に渡し、CSS 編集案 JSON を
+  apply-and-rollback ゲートで適用、verify markup trend REGRESSED で自動
+  ロールバック。fake-LLM E2E で全経路(適用/ロールバック/JSON 不正)を
+  実証済み。**残: 実 LLM レグ**(`google/gemini-2.5-flash` 想定)— API
+  キー必須のため本環境では未実施。キーが使える環境での初回実走が TODO。
 
 
 ### Infrastructure / Deploy

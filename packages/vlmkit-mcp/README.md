@@ -24,6 +24,8 @@ Client config (stdio):
 | `verify_markup` | done-condition verdict + paste-ready kickback (selector attribution, kind tags, near-miss, pixel-confirmed demotion) | `attempt`, `targets[]`, `reference?` |
 | `check_interactions` | a11y-event state map; `reference` makes it a behavioral contract; `handlers` adds the wired-callback surface | `source`, `reference?`, `handlers?` |
 | `scan_handlers` | every wired callback + **pointer-only-control** detection | `source` |
+| `check_integrity` | reference-free defect gate: JS errors, empty render, broken resources, text collision/clipping/protrusion, collapsed containers, overflow, invisible text, near-misalignment, unstyled page (multi-viewport; intentional patterns reported in `exempted`) | `source`, `viewports?` |
+| `check_layout` | layout contract: widths, per-row counts, stacking order, visibility per viewport — a brief's structural requirements as a machine-checkable spec | `source`, `contract` |
 | `check_copy` | placeholder scan + `manifest` verification + `target`-image contact sheets | `source`, `manifest?`, `target?` |
 | `build_page` | raw composition diff (matched/missing/extra/ordering/gap) | `target`, `current` |
 | `check_equivalence` | measured per-channel delta + pair images for a second reader (keyless advisory) | `source`, `target`, `regions[]` |

@@ -250,7 +250,8 @@ export function analyzeScrollSamples(
   };
 }
 
-const COLLECT_SCROLL_SCRIPT = `(() => {
+/** In-page collector shared with `check integrity` (A7 delegation). */
+export const COLLECT_SCROLL_SCRIPT = `(() => {
   function stableSelector(el) {
     const id = el.getAttribute && el.getAttribute("id");
     if (id) return "#" + CSS.escape(id);

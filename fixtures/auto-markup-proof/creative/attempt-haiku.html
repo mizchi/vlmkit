@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fieldnote – Notes that survive the field</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: #fafafa;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.5rem 2rem;
+      background: white;
+      border-bottom: 1px solid #e5e5e5;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #2c3e50;
+    }
+
+    nav {
+      display: flex;
+      gap: 2rem;
+    }
+
+    nav a {
+      text-decoration: none;
+      color: #555;
+      font-size: 0.95rem;
+      transition: color 0.2s;
+    }
+
+    nav a:hover {
+      color: #2c3e50;
+    }
+
+    /* Hero Section */
+    .hero {
+      position: relative;
+      min-height: 400px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      color: white;
+      padding: 2rem;
+      max-width: 600px;
+    }
+
+    .hero h1 {
+      font-size: 3rem;
+      line-height: 1.2;
+      margin-bottom: 1rem;
+      font-weight: 700;
+    }
+
+    .hero p {
+      font-size: 1.25rem;
+      margin-bottom: 2rem;
+      opacity: 0.95;
+      font-weight: 300;
+    }
+
+    .cta-button {
+      display: inline-block;
+      padding: 0.75rem 2rem;
+      background: white;
+      color: #667eea;
+      text-decoration: none;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      transition: transform 0.2s, box-shadow 0.2s;
+      border: none;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    .cta-button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    }
+
+    /* Features Section */
+    .features {
+      padding: 4rem 2rem;
+      background: white;
+      margin-top: 3rem;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .feature-card {
+      padding: 2rem;
+      background: #f8f9fa;
+      border-radius: 0.75rem;
+      border: 1px solid #e9ecef;
+    }
+
+    .feature-card h3 {
+      font-size: 1.25rem;
+      margin-bottom: 0.75rem;
+      color: #2c3e50;
+    }
+
+    .feature-card p {
+      color: #666;
+      font-size: 0.95rem;
+      line-height: 1.7;
+    }
+
+    /* Pricing Section */
+    .pricing {
+      padding: 4rem 2rem;
+      background: #f8f9fa;
+    }
+
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 2rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .pricing-card {
+      background: white;
+      padding: 2.5rem;
+      border-radius: 0.75rem;
+      border: 1px solid #e9ecef;
+      position: relative;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .pricing-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.08);
+    }
+
+    .pricing-card h3 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+      color: #2c3e50;
+    }
+
+    .price {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: #667eea;
+      margin-bottom: 0.5rem;
+    }
+
+    .price-detail {
+      color: #666;
+      margin-bottom: 1.5rem;
+      font-size: 0.95rem;
+    }
+
+    .badge {
+      position: absolute;
+      top: -12px;
+      right: 20px;
+      background: #667eea;
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 0.25rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    /* FAQ Section */
+    .faq {
+      padding: 4rem 2rem;
+      background: white;
+      margin-top: 3rem;
+    }
+
+    .faq-container {
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    details {
+      margin-bottom: 1rem;
+      border: 1px solid #e9ecef;
+      border-radius: 0.5rem;
+      padding: 1rem;
+    }
+
+    summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: #2c3e50;
+      font-size: 1rem;
+      user-select: none;
+    }
+
+    summary:hover {
+      color: #667eea;
+    }
+
+    details[open] summary {
+      margin-bottom: 0.75rem;
+    }
+
+    details p {
+      color: #666;
+      font-size: 0.95rem;
+      line-height: 1.7;
+    }
+
+    /* Footer */
+    footer {
+      background: #2c3e50;
+      color: white;
+      text-align: center;
+      padding: 2rem;
+      font-size: 0.9rem;
+      margin-top: 4rem;
+    }
+
+    footer a {
+      color: white;
+      text-decoration: none;
+      transition: opacity 0.2s;
+    }
+
+    footer a:hover {
+      opacity: 0.7;
+    }
+
+    /* Tablet (768px) */
+    @media (max-width: 768px) {
+      header {
+        padding: 1rem 1.5rem;
+      }
+
+      nav {
+        gap: 1.5rem;
+      }
+
+      nav a {
+        font-size: 0.85rem;
+      }
+
+      .hero h1 {
+        font-size: 2.25rem;
+      }
+
+      .hero p {
+        font-size: 1rem;
+      }
+
+      .features-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+      }
+
+      .pricing-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+      }
+
+      .badge {
+        top: -10px;
+        right: 15px;
+      }
+    }
+
+    /* Mobile (375px) */
+    @media (max-width: 480px) {
+      header {
+        padding: 1rem;
+      }
+
+      .logo {
+        font-size: 1.25rem;
+      }
+
+      nav {
+        gap: 0.75rem;
+      }
+
+      nav a {
+        font-size: 0.75rem;
+      }
+
+      .hero {
+        min-height: 350px;
+      }
+
+      .hero-content {
+        padding: 1.5rem;
+      }
+
+      .hero h1 {
+        font-size: 1.75rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .hero p {
+        font-size: 0.9rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .cta-button {
+        padding: 0.6rem 1.5rem;
+        font-size: 0.9rem;
+      }
+
+      .features {
+        padding: 2rem 1rem;
+        margin-top: 2rem;
+      }
+
+      .feature-card {
+        padding: 1.5rem;
+      }
+
+      .feature-card h3 {
+        font-size: 1.1rem;
+      }
+
+      .feature-card p {
+        font-size: 0.85rem;
+      }
+
+      .pricing {
+        padding: 2rem 1rem;
+      }
+
+      .pricing-card {
+        padding: 1.5rem;
+      }
+
+      .pricing-card h3 {
+        font-size: 1.25rem;
+      }
+
+      .price {
+        font-size: 2rem;
+      }
+
+      .faq {
+        padding: 2rem 1rem;
+        margin-top: 2rem;
+      }
+
+      details {
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+      }
+
+      summary {
+        font-size: 0.9rem;
+      }
+
+      details p {
+        font-size: 0.85rem;
+      }
+
+      footer {
+        padding: 1.5rem 1rem;
+        font-size: 0.8rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">Fieldnote</div>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <div class="hero-content">
+      <h1>Notes that survive the field.</h1>
+      <p>Offline-first. Plain text. Yours forever.</p>
+      <button class="cta-button">Start writing free</button>
+    </div>
+  </section>
+
+  <section class="features" id="features">
+    <div class="features-grid">
+      <div class="feature-card">
+        <h3>Works offline</h3>
+        <p>Every note lives on your device first and syncs when you are.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Plain-text core</h3>
+        <p>Markdown files you can grep, back up, and keep for decades.</p>
+      </div>
+      <div class="feature-card">
+        <h3>Instant search</h3>
+        <p>Find any note in under 50 milliseconds, even with 10,000 of them.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="pricing" id="pricing">
+    <div class="pricing-grid">
+      <div class="pricing-card">
+        <h3>Solo</h3>
+        <div class="price">$0</div>
+        <div class="price-detail">All features. One device.</div>
+      </div>
+      <div class="pricing-card">
+        <div class="badge">Popular</div>
+        <h3>Everywhere</h3>
+        <div class="price">$4/mo</div>
+        <div class="price-detail">Unlimited devices. End-to-end encrypted sync.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="faq" id="faq">
+    <div class="faq-container">
+      <details open>
+        <summary>Can I export my notes?</summary>
+        <p>Yes. Your notes are already plain Markdown files on disk — there is nothing to export.</p>
+      </details>
+      <details open>
+        <summary>What happens if I stop paying?</summary>
+        <p>Sync stops. Every note stays on every device, fully readable and editable.</p>
+      </details>
+    </div>
+  </section>
+
+  <footer>
+    <p>© 2026 Fieldnote Labs · Privacy · Terms</p>
+  </footer>
+</body>
+</html>
