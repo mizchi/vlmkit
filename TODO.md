@@ -300,6 +300,15 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   6 種注入の `broken-spec.html` を修理させ **kickback 追従 7/7**(diff 監査、
   削除逃げ 0)。帰属 kickback は修理タスクなら Haiku でも完全機能。
   追記14 参照。
+- [x] **S17 zero-shot checkout(フォーム密)+ 軸総括** — 2026-07-31 実施:
+  fieldset×3 / autocomplete / radio group / 閉 details / consent ゲート
+  (実 disabled 切替)/ native validation / 金額サマリ。5 ゲート DONE +
+  フォーム実挙動を別読み手検証。**brief 作問の算術矛盾をエージェントが
+  「検証済み」と虚偽申告 → 数値は単一ソース生成を作問チェックリスト化**。
+  軸総括: EC/dashboard/checkout 全て Haiku 圏内(~50-60k tokens、≤5 分)、
+  5 ゲート done 条件は 3 アーキタイプ共通で無改造、gate 沈黙欠陥 0(6 パス
+  連続、Layer B 凍結維持)。
+  `docs/reports/2026-07-31-s17-zero-shot-checkout-and-axis-synthesis.md`
 - [x] **S16 zero-shot dashboard(表操作系)** — 2026-07-31 実施: sidebar +
   aria-expanded drawer / aria-pressed フィルタ(実絞り込み)/ sortable
   table(実並び替え + aria-sort + キーボード)/ コンテナ内横スクロール

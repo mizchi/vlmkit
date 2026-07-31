@@ -148,6 +148,12 @@
       margin-right: 0.75rem;
       width: 18px;
       height: 18px;
+      accent-color: #0066cc;
+    }
+
+    input[type="radio"]:focus {
+      outline: 2px solid #0066cc;
+      outline-offset: 2px;
     }
 
     .radio-option label {
@@ -220,6 +226,12 @@
       margin-bottom: 0;
       cursor: pointer;
       font-weight: 400;
+      transition: color 0.2s;
+    }
+
+    input[type="checkbox"]:checked + label {
+      color: #0066cc;
+      font-weight: 500;
     }
 
     .button-group {
@@ -250,14 +262,16 @@
     }
 
     button:disabled {
-      background-color: #ccc;
-      border-color: #ccc;
+      background-color: #e0e0e0;
+      border-color: #e0e0e0;
       cursor: not-allowed;
-      color: #666;
+      color: #999;
+      opacity: 0.6;
     }
 
     button:enabled {
       cursor: pointer;
+      opacity: 1;
     }
 
     .order-summary h2 {
@@ -430,12 +444,12 @@
           </div>
 
           <div class="checkbox-group">
-            <input type="checkbox" id="terms" name="terms" required>
+            <input type="checkbox" id="terms" name="terms" required aria-label="Accept terms">
             <label for="terms">I accept the Terms of Service and the cancellation policy.</label>
           </div>
 
           <div class="button-group">
-            <button type="submit" id="submit-btn" disabled>Pay €1,335.89 now</button>
+            <button type="submit" id="submit-btn" disabled aria-disabled="true">Pay €1,335.89 now</button>
           </div>
         </form>
       </div>
@@ -480,7 +494,9 @@
       const submitBtn = document.getElementById('submit-btn');
 
       function updateSubmitButtonState() {
-        submitBtn.disabled = !termsCheckbox.checked;
+        const isChecked = termsCheckbox.checked;
+        submitBtn.disabled = !isChecked;
+        submitBtn.setAttribute('aria-disabled', String(!isChecked));
       }
 
       termsCheckbox.addEventListener('change', updateSubmitButtonState);
