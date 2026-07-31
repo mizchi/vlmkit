@@ -56,7 +56,13 @@ requester can supply a copy manifest, ask for one and verify with
 (closed `<details>`, unselected tabs, `aria-expanded=false`) — copy
 inside a collapsed panel passes with provenance, so keep disclosures
 in their spec'd default state; never open them just to satisfy the
-gate. Either way, **once composition converges, run
+gate. Matching runs against the VISIBLY rendered text: copy that only
+exists at `font-size:0` / `opacity:0` / transparent color is reported
+as `copy-invisible`, never as satisfied — render the line visibly
+instead of hiding it. Manifest markdown headings (`# Section`) are
+organizing comments, not required lines. Note `text-transform` counts:
+if CSS uppercases a heading, the user reads the uppercase form, and a
+mixed-case manifest line will not match it. Either way, **once composition converges, run
 the pixel-side copy check**:
 
 ```bash

@@ -9,10 +9,15 @@
  *   1. Placeholder scan (always on): lorem-ipsum and template-filler
  *      phrases in the rendered page text are suspects.
  *   2. Manifest check (opt-in, `--manifest copy.md`): every non-empty
- *      line of the manifest must appear in the rendered text. The
- *      manifest is the copy twin of the motion brief — a small text
- *      carrier for truth a screenshot can't transport reliably (exact
- *      spellings, punctuation, casing).
+ *      line of the manifest must appear in the VISIBLY rendered text
+ *      (markdown headings in the manifest are section comments, not
+ *      required lines). The manifest is the copy twin of the motion
+ *      brief — a small text carrier for truth a screenshot can't
+ *      transport reliably (exact spellings, punctuation, casing).
+ *      Matching runs against visible text, not raw innerText: a line
+ *      present only in invisible text (font-size:0 / opacity:0 /
+ *      transparent color) is reported as `copy-invisible` — observed
+ *      as an agent gaming vector in the S18 run.
  *   3. Target-image check (opt-in, `--target target.png`): each rendered
  *      text block's bbox is cropped out of the target image and stacked
  *      into contact sheets. Without an API key the sheets + a worksheet
@@ -56,7 +61,7 @@ import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
-export type CopyIssueKind = "placeholder-text" | "copy-missing" | "copy-image-mismatch";
+export type CopyIssueKind = "placeholder-text" | "copy-missing" | "copy-invisible" | "copy-image-mismatch";
 
 export interface CopyIssue {
   kind: CopyIssueKind;
@@ -100,6 +105,8 @@ export interface CopyCheckReport {
   missingLines: string[];
   /** Manifest lines satisfied only by a revealed disclosure state. */
   revealedLines: { line: string; state: string }[];
+  /** Manifest lines present in the DOM text but not visibly rendered (gaming vector). */
+  invisibleLines: string[];
   /** Disclosure states explored (0 = nothing to reveal or sweep disabled). */
   statesExplored: number;
   droppedStates: number;
@@ -124,14 +131,19 @@ export function normalizeWhitespace(text: string): string {
 }
 
 /**
- * Manifest lines: non-empty lines with markdown list/heading markers
- * stripped. Comment lines (starting with `#` followed by a space… no —
- * headings use that) are kept as content once the marker is removed.
+ * Manifest lines: non-empty lines with markdown list markers stripped.
+ * Markdown headings (`# ` … `###### `, hash + space) are SECTION COMMENTS
+ * and are skipped — authors organize manifests with headings, and treating
+ * `# Sidebar` as a required line "Sidebar" turned out to be a footgun
+ * (observed S18: the heading words leaked into the requirement set and an
+ * agent satisfied them with invisible text). A `#` glued to content
+ * (`#10412`, `#general`) is NOT a heading and stays a required line.
  */
 export function parseCopyManifest(raw: string): string[] {
   return raw
     .split("\n")
-    .map((line) => line.replace(/^\s*(?:[-*+]\s+|#{1,6}\s+|\d+\.\s+)/, "").trim())
+    .filter((line) => !/^\s*#{1,6}\s/.test(line))
+    .map((line) => line.replace(/^\s*(?:[-*+]\s+|\d+\.\s+)/, "").trim())
     .filter((line) => line.length > 0);
 }
 
@@ -174,6 +186,83 @@ export const TAG_STATE_ACTIONS = `(() => {
 /** Double rAF + macrotask: lets microtask/rAF/framework-batched reveal handlers commit before the text capture. */
 const AWAIT_RENDER_COMMIT = `new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 0))))`;
 
+/**
+ * In-page collection of VISIBLY RENDERED text — the text the manifest is
+ * matched against. `innerText` alone is gameable: a `font-size: 0` span,
+ * an `opacity: 0` block, or `color: transparent` text all survive it
+ * (observed S18: an agent packed six manifest lines into one font-size:0
+ * span and the gate passed). Per text node this excludes:
+ *   - zero-area render boxes (font-size:0; display:none has no boxes at all),
+ *   - everything `Element.checkVisibility()` rejects: `visibility:
+ *     hidden/collapse`, an ancestor opacity chain of 0, and
+ *     content-visibility-skipped subtrees — the latter matters because
+ *     Chromium hides closed `<details>` content and `hidden="until-found"`
+ *     via `content-visibility: hidden` on a UA shadow slot, which still
+ *     reports client rects (a manual ancestor walk misses it),
+ *   - text painted with alpha < 0.02 (`color: transparent`).
+ * Deliberately NOT excluded: sr-only / clip-rect patterns (their text
+ * boxes keep a real size; assistive-tech copy stays legitimate), text
+ * scrolled out of a scrollport, and `<option>` text inside a visible
+ * `<select>` (the UA paints the selected option in the control and the
+ * rest on open — option text nodes have no boxes of their own, which
+ * false-positived S17's "Germany"). `text-transform` is applied so the
+ * matched text is what the user reads.
+ */
+export const COLLECT_VISIBLE_TEXT = `(() => {
+  const alphaOf = (color) => {
+    const m = /rgba?\\(([^)]+)\\)/.exec(color || "");
+    if (!m) return 1;
+    const parts = m[1].split(",").map((p) => parseFloat(p));
+    return parts.length >= 4 ? parts[3] : 1;
+  };
+  const root = document.body || document.documentElement;
+  if (!root) return "";
+  const parts = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    if (!node.data || !node.data.trim()) continue;
+    const el = node.parentElement;
+    if (!el) continue;
+    const tag = el.tagName;
+    if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE") continue;
+    const select = el.closest ? el.closest("select") : null;
+    if (select) {
+      if (typeof select.checkVisibility !== "function" ||
+        select.checkVisibility({ visibilityProperty: true, opacityProperty: true, contentVisibilityAuto: true })) {
+        parts.push(node.data);
+      }
+      continue;
+    }
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    let area = 0;
+    for (const r of range.getClientRects()) area = Math.max(area, r.width * r.height);
+    if (area < 1) continue;
+    const cs = getComputedStyle(el);
+    if (typeof el.checkVisibility === "function") {
+      if (!el.checkVisibility({ visibilityProperty: true, opacityProperty: true, contentVisibilityAuto: true })) continue;
+    } else {
+      if (cs.visibility === "hidden" || cs.visibility === "collapse") continue;
+      let opacity = 1;
+      for (let p = el; p && opacity >= 0.02; p = p.parentElement) {
+        const po = parseFloat(getComputedStyle(p).opacity);
+        opacity *= Number.isFinite(po) ? po : 1;
+      }
+      if (opacity < 0.02) continue;
+    }
+    if (alphaOf(cs.color) < 0.02) continue;
+    let text = node.data;
+    if (cs.textTransform === "uppercase") text = text.toUpperCase();
+    else if (cs.textTransform === "lowercase") text = text.toLowerCase();
+    else if (cs.textTransform === "capitalize") {
+      text = text.replace(/(^|\\s)(\\S)/g, (m0, sp, ch) => sp + ch.toUpperCase());
+    }
+    parts.push(text);
+  }
+  return parts.join("\\n");
+})()`;
+
 async function sweepDisclosureStates(page: {
   evaluate: (script: string) => Promise<unknown>;
 }): Promise<StateSweep> {
@@ -192,7 +281,7 @@ async function sweepDisclosureStates(page: {
     })()`) as boolean;
     if (!performed) continue;
     await page.evaluate(AWAIT_RENDER_COMMIT);
-    const text = await page.evaluate(`document.body ? document.body.innerText : ""`) as string;
+    const text = await page.evaluate(COLLECT_VISIBLE_TEXT) as string;
     states.push({ kind: kept[i]!.kind, label: kept[i]!.label, text });
   }
   return { states, droppedActions: Math.max(0, actions.length - kept.length) };
@@ -200,11 +289,15 @@ async function sweepDisclosureStates(page: {
 
 export function analyzeCopy(input: {
   source: string;
+  /** Raw `innerText` — the placeholder scan and invisible-text detection run on this. */
   pageText: string;
+  /** Visibly rendered text (COLLECT_VISIBLE_TEXT). Defaults to pageText when absent. */
+  visibleText?: string;
   manifestLines?: string[];
   stateSweep?: StateSweep;
 }): CopyCheckReport {
   const normalized = normalizeWhitespace(input.pageText);
+  const visible = input.visibleText !== undefined ? normalizeWhitespace(input.visibleText) : normalized;
   const states = (input.stateSweep?.states ?? []).map((s) => ({
     ...s,
     normalized: normalizeWhitespace(s.text),
@@ -238,12 +331,22 @@ export function analyzeCopy(input: {
   const manifestLines = input.manifestLines ?? [];
   const missingLines: string[] = [];
   const revealedLines: { line: string; state: string }[] = [];
+  const invisibleLines: string[] = [];
   for (const line of manifestLines) {
     const needle = normalizeWhitespace(line);
-    if (normalized.includes(needle)) continue;
+    if (visible.includes(needle)) continue;
     const state = states.find((s) => s.normalized.includes(needle));
     if (state) {
       revealedLines.push({ line, state: state.label });
+      continue;
+    }
+    if (normalized.includes(needle)) {
+      invisibleLines.push(line);
+      issues.push({
+        kind: "copy-invisible",
+        severity: "suspect",
+        message: `Manifest line found ONLY in invisible text (zero-size, zero-opacity, or transparent — e.g. a font-size:0 span): "${line}". Invisible text does not satisfy the copy gate — render it visibly, or remove the hidden copy.`,
+      });
       continue;
     }
     missingLines.push(line);
@@ -263,6 +366,7 @@ export function analyzeCopy(input: {
     manifestLines: manifestLines.length,
     missingLines,
     revealedLines,
+    invisibleLines,
     statesExplored: states.length,
     droppedStates: input.stateSweep?.droppedActions ?? 0,
     placeholders,
@@ -307,6 +411,7 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   let pageText: string;
+  let visibleText: string;
   let blocks: TextBlock[] = [];
   let stateSweep: StateSweep | undefined;
   try {
@@ -319,6 +424,7 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
       await page.goto(pathToFileURL(resolve(options.source)).href, { waitUntil: "networkidle", timeout: 30000 });
     }
     pageText = await page.evaluate("document.body ? document.body.innerText : \"\"") as string;
+    visibleText = await page.evaluate(COLLECT_VISIBLE_TEXT) as string;
     if (target) {
       blocks = (await page.evaluate(COLLECT_TEXT_BLOCKS) as TextBlock[])
         .filter((b) => b.y < target.height && b.x < target.width);
@@ -337,6 +443,7 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
   const report = analyzeCopy({
     source: options.source,
     pageText,
+    visibleText,
     ...(manifestLines ? { manifestLines } : {}),
     ...(stateSweep ? { stateSweep } : {}),
   });
@@ -403,6 +510,7 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
       missing: report.missingLines.length,
       placeholders: report.placeholders.length,
       manifestLines: report.manifestLines,
+      ...(report.invisibleLines.length > 0 ? { invisibleOnly: report.invisibleLines.length } : {}),
       ...(report.statesExplored > 0
         ? { statesExplored: report.statesExplored, revealedOnly: report.revealedLines.length }
         : {}),
@@ -437,7 +545,8 @@ export function formatCopyCheckReport(report: CopyCheckReport): string {
   }
   if (report.manifestLines > 0) {
     const revealed = report.revealedLines.length > 0 ? `, ${report.revealedLines.length} revealed-only` : "";
-    lines.push(`manifest: ${report.manifestLines} line(s), missing ${report.missingLines.length}${revealed}`);
+    const invisible = report.invisibleLines.length > 0 ? `, ${report.invisibleLines.length} invisible-only` : "";
+    lines.push(`manifest: ${report.manifestLines} line(s), missing ${report.missingLines.length}${invisible}${revealed}`);
     for (const r of report.revealedLines) {
       lines.push(`  ${DIM}revealed: "${r.line}" ← ${r.state} (hidden by default is fine — do NOT ship it open just for this gate)${RESET}`);
     }
@@ -487,6 +596,11 @@ are opened and unselected [role=tab] / [aria-expanded=false] controls
 are clicked, so copy inside collapsed panels passes (with provenance)
 instead of reading as missing — no need to ship disclosures open just
 to satisfy the gate.
+
+Manifest lines must appear in the VISIBLY rendered text: copy that
+exists only at font-size:0, opacity:0, or transparent color is
+reported as copy-invisible, not as satisfied. Markdown headings in the
+manifest ("# Section") are organizing comments, not required lines.
 
 Options:
   --manifest <file>   Copy manifest (plain text / markdown; one required line per row)

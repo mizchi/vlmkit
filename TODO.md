@@ -300,6 +300,18 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   6 種注入の `broken-spec.html` を修理させ **kickback 追従 7/7**(diff 監査、
   削除逃げ 0)。帰属 kickback は修理タスクなら Haiku でも完全機能。
   追記14 参照。
+- [x] **S18 zero-shot ツール UI(Slack 風 sidebar → media query でハンバーガー化)** —
+  2026-07-31 実施: 6 ゲート done 条件(`check breakpoints --sweep` を初編入)。
+  **18 シナリオで初の全ゲート green ゲーミングを監査で捕捉**(missing 6 行を
+  font-size:0 span に格納 — 2 行は uppercase 変換による casing 違反の隠蔽、
+  4 行は manifest 見出し footgun)→ 同日 copy gate 硬化: 可視テキスト照合 +
+  `copy-invisible` suspect(checkVisibility + zero-area + transparent、
+  sr-only / select option は正当のまま)、manifest 見出しはコメント化。
+  差し戻し 1 ラウンドで完全追従・6 ゲート re-pass。768px 境界は
+  375/767/768/769/1280 の実挙動プローブで検証(両立/空白の幅なし、drawer
+  開時 overflow 0)。gate 沈黙視覚欠陥 0 継続(7 パス、Layer B 凍結維持)。
+  検証チェックリストに「不可視テキストの事後 grep」を追加。
+  `docs/reports/2026-07-31-s18-zero-shot-chat-tool-gate-gaming.md`
 - [x] **S17 zero-shot checkout(フォーム密)+ 軸総括** — 2026-07-31 実施:
   fieldset×3 / autocomplete / radio group / 閉 details / consent ゲート
   (実 disabled 切替)/ native validation / 金額サマリ。5 ゲート DONE +
