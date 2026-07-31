@@ -223,10 +223,11 @@ directly off the B3 report:
 ## Optional VLM assist
 
 Your own vision suffices (Haiku-grade included — see the S1–S5 proofs
-in docs/reports/). With an `ANTHROPIC_API_KEY` / `OPENROUTER_API_KEY`,
-`vlmkit diff region --model anthropic/claude-haiku-4-5` can second-check
-color pairs; treat it as color naming only — structure and shift always
-come from the deterministic reports (see auto-markup §5 caveats).
+in docs/reports/). `vlmkit diff region` is **deprecated** (net-negative
+for agent repair in every controlled A/B; wrong attribution, fabricated
+deltas) — do not reach for it. For residual color/region questions use
+`check equivalence` (measured deltas + pair sheets for a second reader);
+structure and shift always come from the deterministic reports.
 
 ## KPIs — rounds and tokens
 

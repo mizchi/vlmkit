@@ -23,7 +23,7 @@
  *   A5 text-clipped        text cut behind overflow:hidden (ellipsis exempt)
  *   A6 collapsed-container zero-height box with tall in-flow children
  *   A7 page-overflow-x / clipped-content / nested-scroll (scan scroll reuse)
- *   A8 unstyled-page       stylesheets declared but the page renders UA-default
+ *   A8 unstyled-page       every declared stylesheet failed to load (wire-detected)
  *   A9 all of the above swept across multiple viewports
  *   A10 container-protrusion  in-flow child sticks out of a painted parent
  *                             (positioned overlays and breakouts exempt)
@@ -559,14 +559,13 @@ export interface StyleFingerprint {
   loadedStylesheets: number;
   styleElements: number;
   inlineStyleAttrs: number;
-  /** Total accessible CSS rules across all sheets. */
-  cssRules: number;
-  uaFont: boolean;
-  uaMargin: boolean;
-  /** null when the page has no <a> to sample. */
-  uaLinkColor: boolean | null;
 }
 
+// The earlier UA-default-fingerprint warn branch (serif font + 8px body
+// margin + link blue despite loaded stylesheets) was retired 2026-07-30:
+// zero true positives since launch, one false positive (danluu.com's
+// deliberate 4-rule minimalism), and the class it aimed at is carried by
+// the wire-detected fail branch below.
 export function judgeUnstyled(fp: StyleFingerprint, viewport: number): IntegrityFinding | null {
   const declaredAny = fp.declaredStylesheets + fp.styleElements > 0;
   if (!declaredAny) return null; // intentionally bare page — not this gate's call
@@ -576,19 +575,6 @@ export function judgeUnstyled(fp: StyleFingerprint, viewport: number): Integrity
       severity: "fail",
       viewport,
       message: `All ${fp.declaredStylesheets} declared stylesheet(s) failed to load and there is no <style> fallback — the page renders with UA defaults.`,
-      evidence: { ...fp },
-    };
-  }
-  // A handful of rules that deliberately keep UA defaults (danluu.com:
-  // 4 rules) is a design choice, not an unapplied stylesheet.
-  if (fp.cssRules > 0 && fp.cssRules < 5) return null;
-  const uaSignals = [fp.uaFont, fp.uaMargin, fp.uaLinkColor !== false].filter(Boolean).length;
-  if (fp.uaFont && fp.uaMargin && uaSignals >= 3) {
-    return {
-      kind: "unstyled-page",
-      severity: "warn",
-      viewport,
-      message: `The page declares styling (${fp.declaredStylesheets} stylesheet(s), ${fp.styleElements} style element(s)) but renders with the UA-default fingerprint (serif default font, 8px body margin${fp.uaLinkColor === true ? ", default link blue" : ""}) — the CSS may not be reaching the elements.`,
       evidence: { ...fp },
     };
   }
@@ -1138,23 +1124,13 @@ export const COLLECT_ALIGN_GROUPS = `(() => {
 
 export const COLLECT_STYLE_FINGERPRINT = `(() => {
   const links = Array.from(document.querySelectorAll('link[rel~="stylesheet" i]'));
-  const body = getComputedStyle(document.body);
-  const a = document.querySelector("a[href]");
-  let cssRules = 0;
-  for (const sheet of Array.from(document.styleSheets)) {
-    try { cssRules += sheet.cssRules.length; } catch { cssRules += 1; }
-  }
   return {
     declaredStylesheets: links.length,
     // Placeholder: link.sheet is non-null even for a 404, so the runner
     // overwrites this from the wire-observed stylesheet failures.
     loadedStylesheets: links.length,
-    cssRules,
     styleElements: document.querySelectorAll("style").length,
     inlineStyleAttrs: document.querySelectorAll("[style]").length,
-    uaFont: /times/i.test(body.fontFamily),
-    uaMargin: body.marginLeft === "8px" && body.marginTop === "8px",
-    uaLinkColor: a ? getComputedStyle(a).color === "rgb(0, 0, 238)" : null,
   };
 })()`;
 

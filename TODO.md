@@ -303,9 +303,13 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 - [ ] **check copy 状態別検証モード** — details/タブ等を開いてから manifest
   照合(S14a 観察: 現状はレンダリング済みテキストのみのため、エージェントが
   折りたたみを open 既定に倒すインセンティブになる)。
-- [ ] **Layer B(VLM 視覚判定、advisory)** — 固定ルーブリック強制択一 +
-  根拠領域指名、決定論反証(refutation)付き。キーなし環境はワークシート
-  生成(check equivalence 方式)。VLM 直結ベンチは Issue #88 枠に相乗り。
+- [ ] **Layer B(VLM 視覚判定、advisory)— 凍結、需要ゲート(2026-07-30)** —
+  設計時 4 軸のうち B1 整列→A12、B2 コントラスト→A11、B4 構造→layout
+  contract、B4 コピー→manifest と決定論側に移り、残るのは B3(破綻の
+  見落とし網)+ 複合背景コントラスト + 美観のみ。かつ S14a 全 3 ランで
+  gate 沈黙欠陥 0 — B3 が拾うべき欠陥がまだ一度も観測されていない。
+  **着手条件: gate 沈黙欠陥が実際に観測されたら、そのクラスを対象に建てる**
+  (存在しない欠陥クラスのために VLM ルーブリックを先行実装しない)。
 
 ### Benchmarks
 - [ ] **markup-agent モデル横断ベンチ: OpenRouter + pi でモデルごとの性能比較**(関連: Issue #88)
@@ -316,10 +320,13 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - 期待成果: skills の Model selection 節を Anthropic 2 モデルの表から多モデル表に更新、`docs/knowledge.md` に台帳行を追加、レポートを `docs/reports/` に保存(YYYY-MM-DD-markup-agent-model-bench-vN.md)。
   - 論点(設計時に決める): pi 側のツール権限(bash + read/write で十分か)、1px エンドゲームを完走できないモデルの打ち切り規準(トレンド横ばい 2 レグ相当)、vision 非対応モデルの扱い(除外 or scan component クロップ経由)。
 
-- [ ] **VLM 意味ラベリングのベンチ: コンポーネントクロップ分類(button/nav/card/badge...)**(→ Issue #88)
-  - 背景: 2026-07-28 に決定論の kind 分類(hairline/solid/text/image、bigJump 判別)を実装済み — ペアリングゲートと kickback ラベルはこれで賄えている。VLM が足せるのは**意味**の層(「これは CTA ボタン」「これは nav」)で、kickback の可読性がさらに上がる可能性がある。ただし本環境に API キーがなく未ベンチのため、実装はフックだけで見送り。
-  - 方法: 既存 fixture 群の抽出済みコンポーネントクロップ(数百個、正解ラベルは fixture HTML から機械的に得られる)を分類タスクとして与える。候補: `bytedance/ui-tars-1.5-7b`(UI ドメイン学習・ほぼ無料、ただし vlm-region-diff での色リテラル失敗の前科 — 分類は別スキルなので要実測)、`qwen/qwen3-vl-30b-a3b-instruct`、`anthropic/claude-haiku-4-5`。
-  - 判断基準: 精度 ≥90% かつレイテンシ ≤2s/クロップ(またはシートで一括)なら verify markup にオプトイン統合。それ未満なら決定論 kind のままで足りる(誤ラベルは誤アドバイスに直結するため、中途半端な精度はゼロより悪い)。
+- [x] ~~**VLM 意味ラベリングのベンチ: コンポーネントクロップ分類**(→ Issue #88)~~ —
+  **2026-07-30 クローズ(実装せず)**: 決定論 kind(hairline/solid/text/image、
+  bigJump 判別)がペアリングゲートと kickback 可読性の需要を実測で満たし
+  切り、S14 全レグでも意味ラベル不在が問題になった場面ゼロ。消費者の
+  いないベンチと判断。元 TODO 自身の判断基準「中途半端な精度はゼロより
+  悪い」どおり、決定論 kind を恒久解とする。再開条件: kickback の
+  誤読が意味ラベル不在に帰着する実例が観測されたら。
 
 - [x] **kickback 品質: matched ペアの粒度不一致と top-N 取りこぼし(S9 リプレイで発見)** — 2026-07-28 実装済み: kickback に presence プローブを接続し、(1) 大きな dSize でも render が target fill を target box 全面に持つ場合は「size-delta caveat(segmentation grouping の可能性)」を行内表示、(2) extra/missing の同 fill が ±24px 縦近傍にある場合は「near-miss(変位、move it instead)」を同ラウンドで表示。ユニットテスト 5 本(S9 リプレイの実ケース形状)+ DONE fixture 回帰 green。
   - (1) target 側が連結成分としてグループ化した箱(card 全体)と current 側の部分箱(image のみ)が matched になると、dSize が「伸ばせ/縮めろ」と読める誤誘導になる。案: matched ペアの両箱で pixel-presence 相互チェックを行い、片側だけ大きい場合は「grouping mismatch の可能性」を行内に明記する。

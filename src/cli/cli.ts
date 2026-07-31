@@ -168,7 +168,7 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
   diff: {
     html: { spec: SPECS.migrationCompare, desc: "Compare two HTML files / URLs across viewports" },
     png: { spec: SPECS.pngDiff, desc: "Compare existing PNG screenshots directly" },
-    region: { spec: SPECS.vlmRegionDiff, desc: "VLM region diff from before/after PNGs" },
+    region: { spec: SPECS.vlmRegionDiff, desc: "[DEPRECATED] VLM region diff — measured net-negative for agent repair (wrong attribution, fabricated deltas); use `diff png --elements-html` or `check integrity`/`check equivalence` instead" },
     matrix: { spec: SPECS.presenceMatrix, desc: "Region × viewport presence matrix with media-query hints" },
     elements: { spec: SPECS.elementCompare, desc: "Element-level comparison with shift isolation" },
     component: { spec: SPECS.elementCompare, desc: "Component selector comparison with shift isolation" },

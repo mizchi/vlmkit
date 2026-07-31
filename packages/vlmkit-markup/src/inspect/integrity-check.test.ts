@@ -147,14 +147,12 @@ describe("pure judges", () => {
     assert.equal(exempted.length, 2);
   });
 
-  test("judgeUnstyled: all-failed is fail, UA fingerprint is warn, bare/minimal page is null", () => {
-    const base = { declaredStylesheets: 1, loadedStylesheets: 1, styleElements: 0, inlineStyleAttrs: 0, cssRules: 40, uaFont: false, uaMargin: false, uaLinkColor: false as boolean | null };
+  test("judgeUnstyled: all declared stylesheets failed is fail; loaded or bare pages are null", () => {
+    const base = { declaredStylesheets: 1, loadedStylesheets: 1, styleElements: 0, inlineStyleAttrs: 0 };
     assert.equal(judgeUnstyled({ ...base, loadedStylesheets: 0 }, 1280)?.severity, "fail");
-    assert.equal(judgeUnstyled({ ...base, uaFont: true, uaMargin: true, uaLinkColor: true }, 1280)?.severity, "warn");
-    assert.equal(judgeUnstyled({ ...base, declaredStylesheets: 0 }, 1280), null);
+    assert.equal(judgeUnstyled({ ...base, loadedStylesheets: 0, styleElements: 1 }, 1280), null); // <style> fallback exists
+    assert.equal(judgeUnstyled({ ...base, declaredStylesheets: 0 }, 1280), null); // intentionally bare
     assert.equal(judgeUnstyled({ ...base }, 1280), null);
-    // danluu.com: 4 deliberate rules keeping UA defaults — a design choice.
-    assert.equal(judgeUnstyled({ ...base, styleElements: 1, cssRules: 4, uaFont: true, uaMargin: true, uaLinkColor: true }, 1280), null);
   });
 
   test("judgeNetworkFailures: same-origin stylesheet/script fail, cross-origin (third-party) warn, font/xhr warn", () => {

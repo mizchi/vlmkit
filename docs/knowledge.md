@@ -906,7 +906,13 @@ wrong sibling. The corpus, exact scores, and reproduction command are in
   CF beacon)、④総 CSS ルール数 <5 は意図的ミニマル(danluu)。真の陽性
   1 件(HN の 36px 横スクロール @768)。詳細:
   `docs/reports/2026-07-30-integrity-external-dogfood.md`。
-- 未実施: S14a 創造的実走、Layer B(VLM ルーブリック + 反証)。
+- S14a は同日実施済み(台帳参照)。Layer B は**凍結(需要ゲート)**:
+  決定論降格(A10-A12 + layout contract)で残余が B3 + 複合背景 + 美観
+  まで縮小し、S14a 全ランで gate 沈黙欠陥 0 のため、実観測を着手条件に
+  変更。同日、`unstyled-page` の UA 指紋 warn 分岐を撤去(真陽性 0 /
+  偽陽性 1 — danluu 特例ごと削除、wire 検知 fail 分岐が本命を担う)。
+  VLM 意味ラベリング bench も未実装のままクローズ(決定論 kind で需要
+  充足、消費者不在)。
 - **Layer A 第 2 陣(2026-07-30)**: B 軸から 4 判断を決定論降格 —
   A10 container-protrusion(painted parent からの in-flow はみ出し;
   positioned badge / 負マージン breakout は exempt)、A11 invisible-text /

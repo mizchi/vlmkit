@@ -2,6 +2,16 @@
 /**
  * VLM-driven region diff helper.
  *
+ * DEPRECATED (2026-07-30): measured net-negative for agent-driven repair
+ * in every controlled A/B run that used it (wrong selector attribution,
+ * fabricated deltas — docs/reports/2026-06-06-ab-external-synthesis.md);
+ * the 2026-06-08 refutation gate only blunts the worst of it. Its role
+ * ("ask a VLM where and what changed") is now covered deterministically:
+ * `diff png --elements-html` for selector candidates + shift estimates,
+ * `check integrity` for reference-free defects, `check equivalence` for
+ * residual-region judgment with a second reader. Kept for bench history;
+ * do not reach for it in new loops.
+ *
  * Takes a baseline PNG + variant PNG (or a single triptych: baseline |
  * variant | heatmap), sends both via OpenRouter to a VLM with a strict
  * JSON prompt, and emits measured region differences plus downstream
