@@ -218,6 +218,8 @@ Cross-package imports use `@mizchi/vrt-<pkg>/<path>.ts` or the curated barrel `@
 
 Run tests for a single package: `pnpm --filter @mizchi/vrt-core test`. From repo root, `pnpm test` runs all.
 
+The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need the `moon` CLI. If tests fail with `spawnSync moon ENOENT`, add it to PATH first (it is often installed but not on PATH in sandboxes): `export PATH="$HOME/.moon/bin:$PATH"`.
+
 ## Documentation Structure
 
 | File | Contents |
