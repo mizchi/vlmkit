@@ -9,16 +9,19 @@ test("normalizeWhitespace collapses runs and trims", () => {
   assert.equal(normalizeWhitespace("  Ship\n  dashboards\tin  minutes "), "Ship dashboards in minutes");
 });
 
-test("parseCopyManifest strips list markers, headings, and blank lines", () => {
+test("parseCopyManifest strips list markers, skips heading comments and blank lines", () => {
   const lines = parseCopyManifest([
-    "# Hero",
+    "# Hero", // markdown heading = section comment, NOT a required line
     "- Ship dashboards in minutes",
     "* Start free",
     "3. Third item",
     "",
+    "## Footer",
     "Plain line",
+    "- #10412", // hash glued to content is NOT a heading
+    "#general",
   ].join("\n"));
-  assert.deepEqual(lines, ["Hero", "Ship dashboards in minutes", "Start free", "Third item", "Plain line"]);
+  assert.deepEqual(lines, ["Ship dashboards in minutes", "Start free", "Third item", "Plain line", "#10412", "#general"]);
 });
 
 test("placeholder text is a suspect even without a manifest", () => {
@@ -56,6 +59,21 @@ test("clean page with satisfied manifest reports no issues", () => {
   assert.deepEqual(report.issues, []);
 });
 
+test("manifest line present only in invisible text is a copy-invisible suspect", () => {
+  const report = analyzeCopy({
+    source: "x.html",
+    pageText: "Pulse. Start free. Hidden manifest words",
+    visibleText: "Pulse. Start free.",
+    manifestLines: ["Start free", "Hidden manifest words", "Changelog"],
+  });
+  assert.deepEqual(report.invisibleLines, ["Hidden manifest words"]);
+  assert.deepEqual(report.missingLines, ["Changelog"]);
+  const invisible = report.issues.filter((i) => i.kind === "copy-invisible");
+  assert.equal(invisible.length, 1);
+  assert.match(invisible[0]!.message, /does not satisfy the copy gate/);
+  assert.equal(invisible[0]!.severity, "suspect");
+});
+
 test("manifest line found only in a revealed state passes with provenance", () => {
   const report = analyzeCopy({
     source: "x.html",
@@ -89,6 +107,46 @@ test("placeholder hidden inside a revealed state is still a suspect", () => {
   });
   assert.ok(report.placeholders.includes("lorem ipsum"));
   assert.match(report.issues[0]!.message, /revealed by tab "Details"/);
+});
+
+test("invisible-text gaming vectors are caught; sr-only and text-transform stay legitimate (E2E)", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "copy-invisible-"));
+  try {
+    const html = `<!doctype html><body>
+      <h1>Pulse</h1>
+      <span style="font-size:0">Packed hidden line</span>
+      <div style="opacity:0">Ghost opacity line</div>
+      <p style="color:transparent">Transparent ink line</p>
+      <span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Screen reader only line</span>
+      <p style="text-transform:uppercase">shouted line</p>
+      <p>Plain visible line</p>
+      <select><option>Pick a country</option><option>Germany</option></select>
+      <select style="display:none"><option>Hidden select option</option></select>
+    </body>`;
+    const page = join(dir, "page.html");
+    const manifest = join(dir, "copy.md");
+    await writeFile(page, html);
+    await writeFile(manifest, [
+      "# Section heading is a comment",
+      "- Plain visible line",
+      "- Packed hidden line",
+      "- Ghost opacity line",
+      "- Transparent ink line",
+      "- Screen reader only line",
+      "- SHOUTED LINE",
+      "- Germany",
+      "- Hidden select option",
+    ].join("\n"));
+
+    const report = await runCopyCheck({ source: page, manifestPath: manifest });
+    assert.equal(report.manifestLines, 8);
+    assert.deepEqual(report.invisibleLines, ["Packed hidden line", "Ghost opacity line", "Transparent ink line"]);
+    // display:none select text is absent from raw innerText too → plain missing
+    assert.deepEqual(report.missingLines, ["Hidden select option"]);
+    assert.equal(report.issues.filter((i) => i.kind === "copy-invisible").length, 3);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test("disclosure-state sweep reveals details / tab / aria-expanded copy (E2E)", async () => {
