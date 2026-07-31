@@ -300,6 +300,12 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   6 種注入の `broken-spec.html` を修理させ **kickback 追従 7/7**(diff 監査、
   削除逃げ 0)。帰属 kickback は修理タスクなら Haiku でも完全機能。
   追記14 参照。
+- [x] **S16 zero-shot dashboard(表操作系)** — 2026-07-31 実施: sidebar +
+  aria-expanded drawer / aria-pressed フィルタ(実絞り込み)/ sortable
+  table(実並び替え + aria-sort + キーボード)/ コンテナ内横スクロール
+  規律 / disabled pagination。5 ゲート DONE + 実挙動プローブを別読み手
+  検証。integrity 初稿 CLEAN、修正は copy 1 回。gate 沈黙欠陥 0(5 パス
+  連続)。`docs/reports/2026-07-31-s16-zero-shot-dashboard.md`
 - [x] **S15 zero-shot 実世界パターン実走(EC 商品詳細ページ)** — 2026-07-31
   実施: brief-only Haiku がパンくず/セール価格/radio バリアント/ステッパー/
   ARIA タブ/閉 FAQ/375 sticky カートバー/スペック表を一発実装、5 ゲート
