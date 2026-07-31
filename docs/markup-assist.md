@@ -1,5 +1,65 @@
 # Markup assistance with vlmkit — deterministic gates for HTML/CSS work
 
+## Quickstart — visual analysis in 5 minutes, knowing nothing
+
+```bash
+npm install -D @mizchi/vlmkit
+npx playwright install chromium   # once, if you don't have a Playwright Chromium
+```
+
+**1. Point it at whatever you're working on** — a dev-server URL or an
+HTML file. This finds concrete visual defects with no reference, no
+config, no API key:
+
+```bash
+npx vlmkit check integrity http://localhost:3000/
+```
+
+```
+verdict: DEFECTS (2 fail, 0 warn, 0 exempted)
+
+Findings:
+  x [page-overflow-x] @768: The page scrolls horizontally by 156px at 768px
+    viewport width — sticking out: … > main > p:nth-of-type(1) (right edge 924px).
+  x [text-collision] @1280: "Total: €1,240" overlaps "Refunds: €80" by 52x17px —
+    same-layer text blocks must not overlap; check negative margins, absolute offsets…
+```
+
+Fix what it names, re-run, repeat until `verdict: CLEAN`. It checks 3
+viewports at once (JS errors, broken resources, overflow, text
+collision/clipping, invisible text, unstyled page, and more).
+
+**2. Track what your edits change visually.** First run captures a
+baseline; every run after that reports the pixel diff per viewport:
+
+```bash
+npx vlmkit snapshot http://localhost:3000/ --output .vlmkit/snapshots
+# …edit your CSS…
+npx vlmkit snapshot http://localhost:3000/ --output .vlmkit/snapshots
+```
+
+```
+  page (http://localhost:3000/)
+    desktop    13.11% (raw 0.06%, shift -55px)
+    mobile      6.57% (raw 59.80%, shift +55px)
+  Compared: 2 | Diff > 0: 2 (100.0%)
+```
+
+Diff images land next to the report — intended change? approve the new
+baseline (`npx vlmkit snapshot approve --output .vlmkit/snapshots`).
+Regression? the diff heatmap shows where.
+
+**3. Go deeper when you need it** (each one command, still key-free):
+exact copy present → `check copy page.html --manifest copy.txt` ·
+responsive boundaries → `check breakpoints page.html --sweep` ·
+keyboard operability → `check interactions page.html` · match a
+design screenshot → `verify markup attempt.html --target design.png`.
+The full routing table is below. Using a coding agent? Add the MCP
+server or the `markup-assist` skill (see Install) and the agent drives
+these itself.
+
+---
+
 This page is the self-contained guide to vlmkit's **markup-assist
 toolset**: deterministic verification gates (Playwright + DOM/pixel
 math) that tell you — or your coding agent — whether generated or
@@ -91,7 +151,7 @@ Sources are file paths or URLs throughout.
 
 | Need | Command |
 |---|---|
-| Are before/after visually equivalent (refactor, CSS-framework migration)? | `vlmkit migration compare` · `vlmkit diff html a.html b.html` · per-region: `vlmkit check equivalence attempt.html --target t.png --region "x,y,WxH"` |
+| Are before/after visually equivalent (refactor, CSS-framework migration)? | `vlmkit migration compare` · `vlmkit diff html a.html b.html` (both need the MoonBit `moon` CLI for region classification — the error message carries the one-line install) · per-region: `vlmkit check equivalence attempt.html --target t.png --region "x,y,WxH"` |
 | Pixel/element diff of two renders | `vlmkit diff png` / `vlmkit diff elements` |
 | A selector no longer matches after a refactor | `vlmkit heal selector page.html ".old-selector"` |
 | Turn a verify-markup kickback into gated CSS fixes automatically `[key]` | `vlmkit heal markup` (LLM; apply-and-rollback gated) |

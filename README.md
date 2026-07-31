@@ -24,19 +24,31 @@ npm install -g @mizchi/vlmkit
 pnpm install && pnpm build
 ```
 
-## Markup assistance (deterministic gates, no API key)
+## Quickstart — visual analysis with zero context
 
-The markup-assist toolset — `check integrity`, `check copy`,
-`check layout`, `check breakpoints --sweep`, `scan scroll`,
-`scan handlers`, `check interactions`, `verify markup`,
-`verify flow`, and friends — verifies generated or edited HTML/CSS
-deterministically and prints agent-ready kickbacks. It drops into any
-project three ways: the CLI (`npx vlmkit …`), the MCP server
-(`vlmkit mcp`, 9 gate tools), or the `markup-assist` agent skill.
+```bash
+npm install -D @mizchi/vlmkit
+npx playwright install chromium          # once
 
-**Start here: [`docs/markup-assist.md`](./docs/markup-assist.md)** —
-task-routing table, done-condition recipes, install snippets, and the
-anti-gaming rules the gates enforce.
+# 1. find concrete visual defects on the page you're working on
+#    (no reference, no config, no API key — 3 viewports at once)
+npx vlmkit check integrity http://localhost:3000/
+#    -> verdict: DEFECTS … [page-overflow-x] @768: … main > p (right edge 924px)
+#                          [text-collision] @1280: "Total: €1,240" overlaps "Refunds: €80"
+#    fix what it names, re-run until: verdict: CLEAN
+
+# 2. track what your edits change visually (1st run = baseline, then diffs)
+npx vlmkit snapshot http://localhost:3000/ --output .vlmkit/snapshots
+#    -> desktop 13.11% … mobile 6.57% + diff heatmaps next to the report
+#    intended? npx vlmkit snapshot approve --output .vlmkit/snapshots
+```
+
+From there: `check copy --manifest` (exact copy), `check breakpoints
+--sweep` (responsive boundaries), `check interactions` (keyboard
+operability), `verify markup --target design.png` (match a design) —
+the full task-routing table, done-condition recipes, and agent
+integration (MCP server + `markup-assist` skill) live in
+**[`docs/markup-assist.md`](./docs/markup-assist.md)**.
 
 The CLI is organized into verb groups. Run `vlmkit <group> --help`
 for options.
