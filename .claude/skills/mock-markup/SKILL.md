@@ -61,9 +61,12 @@ user cannot actually see — `font-size:0` / `opacity:0` / transparent
 color, off-screen positioning, `text-indent:-9999px`, transforms,
 `clip`/`clip-path:inset`, zero-size overflow boxes, same-color
 camouflage, or sr-only-style visually-hidden text — is reported as
-`copy-invisible`, never as satisfied. Render the line visibly instead
-of hiding it, and keep assistive-tech-only strings out of the
-manifest (it is the user-visible copy spec). Manifest markdown
+`copy-invisible` with a reason class, never as satisfied. Render the
+line visibly instead of hiding it, and keep assistive-tech-only
+strings out of the manifest (it is the user-visible copy spec). When
+an invisibility is genuinely deliberate, the requester can accept
+that class with `--allow-invisible <class>` (e.g. `visually-hidden`
+for sr-only) — accepted lines stay listed with their reason. Manifest markdown
 headings (`# Section`) are organizing comments, not required lines.
 Note `text-transform` counts: if CSS uppercases a heading, the user
 reads the uppercase form, and a mixed-case manifest line will not

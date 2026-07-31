@@ -973,3 +973,15 @@ clip-path 形状。**クロスゲート**: 素の右オフスクリーンは scr
 伸ばすので scan scroll の page-overflow-x が捕捉(検証済み)— 耐性は
 単一ゲートでなくゲート集合の性質。battery は copy-check.test.ts に常設、
 S15-S18 回帰なし。`docs/reports/2026-07-31-copy-gate-silencing-battery.md`
+
+**実サイト監査 + クラス別抑制 (2026-07-31 追補)**: 実サイト 7 つで
+不可視判定を全数監査し**誤検知 0**(skip link・閉メニュー・sr-only・
+装飾グリフ dup のみ)。検出は理由クラス付き(zero-size / hidden /
+transparent / visually-hidden / unreachable / camouflage / unknown)に
+なり、意図的不可視は `--allow-invisible <class>` でクラス単位に
+satisfied 化(許可行は provenance 付き列挙 + 台帳計上 — 監査可能な抑制、
+既定は全 suspect)。gate 境界の明文化: copy-invisible は「レンダリング
+されるが見えない」(raw innerText 内)限定、display:none 系は missing。
+skip link は実装手法によりクラスが割れる(MDN=unreachable、W3C=
+zero-size、web.dev=transparent、Wikipedia=visually-hidden)— そもそも
+manifest に入れない。`docs/reports/2026-07-31-copy-invisible-real-site-audit.md`

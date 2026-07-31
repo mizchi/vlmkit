@@ -300,6 +300,19 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   6 種注入の `broken-spec.html` を修理させ **kickback 追従 7/7**(diff 監査、
   削除逃げ 0)。帰属 kickback は修理タスクなら Haiku でも完全機能。
   追記14 参照。
+- [x] **copy-invisible の実サイト誤検知監査 + クラス別抑制(`--allow-invisible`)** —
+  2026-07-31 実施: 実サイト 7 つ(MDN / Wikipedia / W3C APG / web.dev /
+  HN / danluu / example)で不可視判定チャンクを全数監査 — **誤検知 0**
+  (skip link / 閉メニュー / sr-only / 装飾グリフの dup、全て実際に不可視)。
+  検出器は理由クラス付与に再構成(zero-size / hidden / transparent /
+  visually-hidden / unreachable / camouflage / unknown)し、意図的な
+  不可視は **`--allow-invisible <class>`**(CLI / MCP / API 同形)で
+  クラス単位に satisfied 化 — 許可行も provenance 付きで列挙 + 台帳
+  headline に計上(監査可能な抑制、既定は全 suspect)。境界を明文化:
+  copy-invisible は「innerText に載る(=レンダリングされる)が見えない」
+  テキスト限定、display:none 系は従来どおり missing(sweep の領分)。
+  分類純化 1 件(checkVisibility を rect 判定より先に)。
+  `docs/reports/2026-07-31-copy-invisible-real-site-audit.md`
 - [x] **copy gate の gate-silencing 耐性バッテリー** — 2026-07-31 実施:
   隠蔽ベクタ 12 種 + 正当 4 種の mutation battery(S14b の手法をゲート
   整合性側へ)。**実測: 10/12 が硬化前ゲートを沈黙化** → 幾何学的到達
