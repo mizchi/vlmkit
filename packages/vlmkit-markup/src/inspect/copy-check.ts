@@ -139,46 +139,64 @@ export function parseCopyManifest(raw: string): string[] {
 const MAX_STATE_ACTIONS = 30;
 
 /**
- * In-page disclosure-state sweep. Opens closed `<details>` (pure DOM
- * property, cumulative), then clicks unselected `[role=tab]`s and
- * `[aria-expanded=false]` controls (page JS decides what appears), and
- * captures `body.innerText` after each action. innerText only reports
- * laid-out text, so each capture is exactly "what a user in this state
- * can read." Serialized for page.evaluate.
+ * In-page action inventory for the disclosure-state sweep: tags each
+ * reveal candidate (closed `<details>`, unselected `[role=tab]`,
+ * `[aria-expanded=false]` control) with a `data-vlmkit-state` index and
+ * returns their descriptors. The RUNNER performs the actions one at a
+ * time and awaits a render commit between action and text capture —
+ * reveal handlers that go through a microtask, requestAnimationFrame,
+ * or a framework-batched render would otherwise update the DOM only
+ * after a single synchronous evaluate had captured every state.
  */
-export const COLLECT_STATE_TEXTS = `(() => {
-  const MAX = ${MAX_STATE_ACTIONS};
+export const TAG_STATE_ACTIONS = `(() => {
   const short = (el) => {
     const t = ((el && (el.innerText || el.textContent)) || "").replace(/\\s+/g, " ").trim();
     return t.length > 60 ? t.slice(0, 57) + "…" : t;
   };
   const actions = [];
+  const push = (kind, el, label) => {
+    if (el.hasAttribute("data-vlmkit-state")) return;
+    el.setAttribute("data-vlmkit-state", String(actions.length));
+    actions.push({ kind, label });
+  };
   for (const d of document.querySelectorAll("details:not([open])")) {
-    actions.push({ kind: "details", el: d, label: 'details "' + short(d.querySelector("summary")) + '"' });
+    push("details", d, 'details "' + short(d.querySelector("summary")) + '"');
   }
   for (const t of document.querySelectorAll('[role="tab"]')) {
-    if (t.getAttribute("aria-selected") !== "true") {
-      actions.push({ kind: "tab", el: t, label: 'tab "' + short(t) + '"' });
-    }
+    if (t.getAttribute("aria-selected") !== "true") push("tab", t, 'tab "' + short(t) + '"');
   }
   for (const c of document.querySelectorAll('[aria-expanded="false"]')) {
-    actions.push({ kind: "expand", el: c, label: c.tagName.toLowerCase() + '[aria-expanded] "' + short(c) + '"' });
+    push("expand", c, c.tagName.toLowerCase() + '[aria-expanded] "' + short(c) + '"');
   }
-  const seen = new Set();
-  const states = [];
-  let dropped = 0;
-  for (const a of actions) {
-    if (seen.has(a.el)) continue;
-    seen.add(a.el);
-    if (states.length >= MAX) { dropped++; continue; }
-    try {
-      if (a.kind === "details") a.el.open = true;
-      else a.el.click();
-    } catch { continue; }
-    states.push({ kind: a.kind, label: a.label, text: document.body ? document.body.innerText : "" });
-  }
-  return { states, droppedActions: dropped };
+  return actions;
 })()`;
+
+/** Double rAF + macrotask: lets microtask/rAF/framework-batched reveal handlers commit before the text capture. */
+const AWAIT_RENDER_COMMIT = `new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 0))))`;
+
+async function sweepDisclosureStates(page: {
+  evaluate: (script: string) => Promise<unknown>;
+}): Promise<StateSweep> {
+  const actions = await page.evaluate(TAG_STATE_ACTIONS) as { kind: StateText["kind"]; label: string }[];
+  const kept = actions.slice(0, MAX_STATE_ACTIONS);
+  const states: StateText[] = [];
+  for (let i = 0; i < kept.length; i++) {
+    const performed = await page.evaluate(`(() => {
+      const el = document.querySelector('[data-vlmkit-state="${i}"]');
+      if (!el) return false;
+      try {
+        if (el.tagName === "DETAILS") el.open = true;
+        else el.click();
+      } catch { return false; }
+      return true;
+    })()`) as boolean;
+    if (!performed) continue;
+    await page.evaluate(AWAIT_RENDER_COMMIT);
+    const text = await page.evaluate(`document.body ? document.body.innerText : ""`) as string;
+    states.push({ kind: kept[i]!.kind, label: kept[i]!.label, text });
+  }
+  return { states, droppedActions: Math.max(0, actions.length - kept.length) };
+}
 
 export function analyzeCopy(input: {
   source: string;
@@ -306,7 +324,7 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
         .filter((b) => b.y < target.height && b.x < target.width);
     }
     if (options.exploreStates !== false) {
-      stateSweep = await page.evaluate(COLLECT_STATE_TEXTS) as StateSweep;
+      stateSweep = await sweepDisclosureStates(page);
     }
     await page.close();
   } finally {

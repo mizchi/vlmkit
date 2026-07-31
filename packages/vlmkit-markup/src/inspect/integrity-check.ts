@@ -556,6 +556,8 @@ export function judgeCollapsedContainers(
 
 export interface StyleFingerprint {
   declaredStylesheets: number;
+  /** Resolved URLs of the declared <link rel=stylesheet> elements. */
+  declaredHrefs?: string[];
   loadedStylesheets: number;
   styleElements: number;
   inlineStyleAttrs: number;
@@ -1073,7 +1075,11 @@ export const COLLECT_TEXT_CONTRAST = `(() => {
     for (const c of chain.reverse()) bg = blend(bg, c);
     let opacity = 1;
     for (let p = el; p && p !== document.documentElement; p = p.parentElement) {
-      opacity *= parseFloat(getComputedStyle(p).opacity) || 1;
+      // parseFloat(...) || 1 would turn an ancestor's opacity: 0 into 1 —
+      // opacity is not inherited, so this chain is the only place a
+      // fully-transparent ancestor can be seen. Preserve finite zeros.
+      const po = parseFloat(getComputedStyle(p).opacity);
+      opacity *= Number.isFinite(po) ? po : 1;
     }
     const fgColor = parseColor(style.color) || [0, 0, 0, 1];
     const fg = blend(bg, [fgColor[0], fgColor[1], fgColor[2], fgColor[3] * opacity]);
@@ -1126,6 +1132,7 @@ export const COLLECT_STYLE_FINGERPRINT = `(() => {
   const links = Array.from(document.querySelectorAll('link[rel~="stylesheet" i]'));
   return {
     declaredStylesheets: links.length,
+    declaredHrefs: links.map((l) => l.href),
     // Placeholder: link.sheet is non-null even for a 404, so the runner
     // overwrites this from the wire-observed stylesheet failures.
     loadedStylesheets: links.length,
@@ -1228,7 +1235,13 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
         const fp = await page.evaluate(COLLECT_STYLE_FINGERPRINT) as StyleFingerprint;
         // link.sheet is non-null even for a 404 (see judgeNetworkFailures) —
         // the wire is authoritative for how many stylesheets actually loaded.
-        const stylesheetFailures = new Set(netFailures.filter((f) => f.resourceType === "stylesheet").map((f) => f.url)).size;
+        // Only count failures of the DECLARED link URLs: a failing @import
+        // inside a successfully loaded sheet is also wire-typed "stylesheet"
+        // and would otherwise zero out loadedStylesheets on a styled page.
+        const declaredUrls = new Set(fp.declaredHrefs ?? []);
+        const stylesheetFailures = new Set(
+          netFailures.filter((f) => f.resourceType === "stylesheet" && declaredUrls.has(f.url)).map((f) => f.url),
+        ).size;
         fp.loadedStylesheets = Math.max(0, fp.declaredStylesheets - stylesheetFailures);
         const unstyled = judgeUnstyled(fp, viewport.width);
         if (unstyled) push([unstyled]);
@@ -1236,7 +1249,12 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
 
       // A4
       const blocks = await page.evaluate(COLLECT_INTEGRITY_TEXT) as IntegrityTextBlock[];
-      const collisions = findTextCollisions(blocks, viewport.width, options.collision ?? {});
+      // The top-level cap applies to every finding class; an explicit
+      // per-class collision option still wins.
+      const collisions = findTextCollisions(blocks, viewport.width, {
+        ...(options.maxFindings !== undefined ? { maxFindings: options.maxFindings } : {}),
+        ...(options.collision ?? {}),
+      });
       push(collisions.findings);
       exempted.push(...collisions.exempted);
 

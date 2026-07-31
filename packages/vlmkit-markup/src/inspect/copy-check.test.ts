@@ -108,9 +108,13 @@ test("disclosure-state sweep reveals details / tab / aria-expanded copy (E2E)", 
       <script>
         for (const tab of document.querySelectorAll("[role=tab]")) {
           tab.addEventListener("click", () => {
-            for (const t of document.querySelectorAll("[role=tab]")) t.setAttribute("aria-selected", String(t === tab));
-            document.getElementById("p1").hidden = tab.dataset.panel !== "p1";
-            document.getElementById("p2").hidden = tab.dataset.panel !== "p2";
+            // rAF-batched reveal, like framework-scheduled renders: the DOM
+            // updates only after the click's synchronous context returns.
+            requestAnimationFrame(() => {
+              for (const t of document.querySelectorAll("[role=tab]")) t.setAttribute("aria-selected", String(t === tab));
+              document.getElementById("p1").hidden = tab.dataset.panel !== "p1";
+              document.getElementById("p2").hidden = tab.dataset.panel !== "p2";
+            });
           });
         }
         document.getElementById("more").addEventListener("click", (e) => {

@@ -441,6 +441,46 @@ describe("S14c false-positive audit", () => {
     assert.match(accident!.message, /no replacement signal/);
   });
 
+  test("M13 opacity:0 ancestor makes descendant text invisible-text (Codex #100 P1)", { timeout: 120_000 }, async () => {
+    const file = page("m13.html", `
+      <div style="opacity:0;background:#fff;padding:16px">
+        <p id="vanished" style="color:#111">Readable color, invisible ancestor.</p>
+      </div>
+      <p id="fine" style="color:#111">Visible control text.</p>
+      <div style="width:600px;height:150px;background:#456"></div>`);
+    const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+    const gone = report.findings.find((f) => f.selector === "#vanished");
+    assert.ok(gone, JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector}`)));
+    assert.equal(gone!.kind, "invisible-text");
+    assert.ok(!report.findings.some((f) => f.selector === "#fine"));
+  });
+
+  test("failing @import inside a loaded stylesheet is not unstyled-page (Codex #100 P2)", { timeout: 120_000 }, async () => {
+    const cssFile = join(DIR, "import-parent.css");
+    writeFileSync(cssFile, `@import url("./missing-child.css");\nbody{background:#eef;font-family:system-ui;margin:0;padding:16px}`);
+    const file = page("import-fail.html", `
+      <p style="color:#123">Styled body copy.</p>
+      <div style="width:600px;height:150px;background:#456"></div>`,
+      `<link rel="stylesheet" href="./import-parent.css">`);
+    const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+    assert.ok(!report.findings.some((f) => f.kind === "unstyled-page"),
+      `findings: ${JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector ?? ""}`))}`);
+    assert.ok(report.findings.some((f) => f.kind === "failed-stylesheet" && /missing-child/.test(f.message)),
+      `the missing @import child itself is still reported: ${JSON.stringify(report.findings.map((f) => `${f.kind} ${f.message}`))}`);
+  });
+
+  test("maxFindings caps text-collision rows (Codex #100 P2)", { timeout: 120_000 }, async () => {
+    const rows = Array.from({ length: 5 }, (_, i) =>
+      `<p style="position:absolute;top:${20 + i * 40}px;left:20px;width:220px;margin:0">Row ${i} left column text</p>
+       <p style="position:absolute;top:${20 + i * 40}px;left:120px;width:220px;margin:0">Row ${i} overlapping right text</p>`).join("");
+    const file = page("collision-cap.html", `${rows}<div style="position:absolute;top:260px;width:600px;height:120px;background:#456"></div>`);
+    const capped = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT, maxFindings: 1 });
+    const collisionRows = capped.findings.filter((f) => f.kind === "text-collision" && f.selector !== "(page)");
+    assert.equal(collisionRows.length, 1, JSON.stringify(capped.findings.map((f) => `${f.kind} ${f.selector}`)));
+    // The overflow is never silent: the cap summary row names the remainder.
+    assert.ok(capped.findings.some((f) => f.selector === "(page)" && /beyond the report cap/.test(f.message)));
+  });
+
   test("clean multi-viewport run stays clean and reports per-viewport stats", { timeout: 180_000 }, async () => {
     const file = page("clean-mv.html", `
       <header style="max-width:100%;padding:24px;background:#234;color:#fff"><h1>Site</h1></header>
