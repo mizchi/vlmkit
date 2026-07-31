@@ -60,7 +60,9 @@ export function validateGeneratedTestSource(
     diagnostics.push("generated source has excessive comments; keep only non-obvious comments");
   }
   const sourceFile = ts.createSourceFile("generated.spec.ts", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-  for (const parseDiagnostic of sourceFile.parseDiagnostics) {
+  // parseDiagnostics is a TypeScript-internal field not in the public SourceFile type.
+  const parseDiagnostics = (sourceFile as ts.SourceFile & { parseDiagnostics?: ts.DiagnosticWithLocation[] }).parseDiagnostics ?? [];
+  for (const parseDiagnostic of parseDiagnostics) {
     const message = ts.flattenDiagnosticMessageText(parseDiagnostic.messageText, " ");
     diagnostics.push(`typescript syntax error: ${message}`);
   }
