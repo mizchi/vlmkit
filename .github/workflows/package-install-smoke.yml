@@ -43,5 +43,6 @@ jobs:
         run: |
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm smoke:pack:workspaces
       - run: pnpm smoke:pack:markup-loop
