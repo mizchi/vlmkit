@@ -70,8 +70,10 @@ of work. What to expect before you install:
   enough to re-run ten times in a fix loop. Gate findings come in two
   severities: a **suspect** blocks (and fails CI with
   `--fail-on-suspect`); a **warn** is advisory.
-- Setup is `npm install` plus a one-time Playwright Chromium download
-  (a browser — expect on the order of 150 MB, a few minutes once).
+- Setup is two commands — `npm install -D @mizchi/vlmkit` and
+  `npx playwright install chromium` (a browser download — expect on
+  the order of 150 MB, a few minutes once). Every command in this
+  document runs after just that.
 - Point it at a file or at your dev server. It navigates and waits
   for network activity to go idle (30s cap), so React/Vue/
   anything-client-rendered is fine, CSS-in-JS included — styles are
@@ -141,8 +143,11 @@ model: both images are segmented into solid-fill regions by pixel
 connectivity, regions are paired across target and render by
 position/size/fill, and every unpaired or mismatched region is
 pixel-confirmed against the target before it's allowed to block.
-`scan mock` first normalizes a retina/Figma export to CSS pixels so
-the comparison is fair.
+That mechanism also sets the boundary: it's built for flat-fill UI
+comps (retina scaling and JPEG noise are handled), not photographic
+or gradient-heavy art, where regions segment coarsely and pair
+loosely. `scan mock` first normalizes a retina/Figma export to CSS
+pixels so the comparison is fair.
 
 **"Did today's change alter anything visually?"** — `snapshot` captures
 a baseline the first time and reports per-viewport pixel diffs (with
@@ -153,7 +158,10 @@ the rest. `diff-pr` does the same as a CI gate.
 say, character art from an image-generation model — before it enters a
 page slot: right aspect ratio, actually transparent background (not
 matted onto a rectangle), not near-empty, silhouette readable against
-the backdrop it will sit on, colors that don't clash with the page.
+the backdrop it will sit on, and palette harmony — the measured share
+of the asset's dominant colors sitting near the page's own palette; a
+low share is a warn, not a fail, because art direction stays a human
+call.
 
 As a copy-paste cheat sheet (with when you'd reach for each; only
 `verify flow` is missing, because it needs a page-specific flow
@@ -226,8 +234,11 @@ The operational questions a lead will ask, answered plainly:
 - **When do baselines get re-approved?** `snapshot` diffs against the
   stored baseline until someone runs `snapshot approve` — that's the
   deliberate, reviewable re-baseline step. Baselines are files in the
-  output directory you chose; version or ignore them per your team's
-  taste (they're plain PNGs + a JSON report, no service, no lock-in).
+  output directory you chose — plain PNGs + a JSON report, no
+  service, no lock-in. On ephemeral CI runners that means: commit the
+  baseline directory (or restore it from CI cache), and re-baseline
+  by running `snapshot approve` in the PR that intends the change, in
+  the same environment that runs the comparisons.
 - **What's the false-positive triage path?** Read the finding: if the
   gate itself recognized intent it's already under `exempted` (not a
   failure); if it's deliberately hidden copy, accept its class with
@@ -235,14 +246,18 @@ The operational questions a lead will ask, answered plainly:
   pattern integrity mis-flags, that's a tool issue — file it (that is
   exactly how the exemption set grew to date).
 - **Where does gate configuration live?** Contracts, flows, copy
-  manifests, and snapshot config (`vrt.config.json`) are files in
-  your repo. Everything else — which gates run per page, and any
-  `--allow-invisible` acceptances — is CLI flags, so the reviewed
-  source of truth is wherever you write the invocation: the CI yaml
-  or an npm script. That's deliberate but has a consequence worth
-  knowing: to see every active suppression, you grep the yaml, and
-  each run's verdict lands in the ledger. There is no central config
-  file that aggregates gate sets today.
+  manifests, and snapshot config (`vrt.config.json` — a second
+  naming fossil, from the visual-regression-testing origins) are
+  files in your repo. Everything else — which gates run per page,
+  and any `--allow-invisible` acceptances — is CLI flags, so the
+  reviewed source of truth is wherever you write the invocation; the
+  workable convention is one npm script per page as its canonical
+  gate set. The consequence worth knowing: to see every active
+  suppression, you grep those scripts — there is no central config
+  file that aggregates gate sets today. Separately, every run
+  appends one JSON line (timestamp, tool, verdict) to
+  `.vlmkit/run-ledger.jsonl` — that's local audit evidence, not
+  config: gitignore it. It matters most in the agent section below.
 - **Can we encode our own rules?** Yes — two of the gates are
   user-defined by design. `check layout --contract layout.json` turns
   structural rules into a machine-checked contract. This is the whole
@@ -264,9 +279,9 @@ The operational questions a lead will ask, answered plainly:
   tool code.
 - **What do agents get vs. juniors?** The same kickbacks. Juniors get
   named, measured CSS lessons; agents get a referee. The MCP server
-  exposes verify_markup, check_integrity, check_copy,
-  check_interactions, scan_handlers, build_page, check_layout,
-  check_equivalence, and verify_flow as tools.
+  exposes nine agent-callable tools — the main gates in this
+  document (check_integrity, check_copy, verify_flow, …) plus a page
+  builder.
 - **How does the manifest scale across pages?** Shared copy means
   shared updates: if a component's CTA text changes and it appears on
   five pages, five manifests change in that same PR — any page whose
@@ -275,14 +290,18 @@ The operational questions a lead will ask, answered plainly:
   Manifest updates go through the same review as any copy change.
 - **Will it flake in CI?** The geometry gates measure DOM layout in
   the same pinned Chromium on every run, so they are stable across
-  machines *except* where platform font metrics move text a pixel —
-  rare for suspects, which trigger on gross measurements (156px
-  overflow, 52px overlap), not 1px shifts. Pixel-exact `snapshot`
-  baselines are a different animal: generate them in the same
-  environment that compares them (in CI, or one shared container) —
-  a macOS-made baseline diffed on Linux will disagree about font
-  antialiasing, and that is the classic road to a gate everyone
-  ignores.
+  machines *except* where platform font metrics move text a pixel.
+  The suspect floors are measured, not vibes: page overflow counts
+  from 2px, a text collision needs a 6px overlap on both axes — and
+  real defects tend to overshoot those floors by tens of pixels, so
+  a 1px font-metric wobble rarely flips a verdict at the floor. A
+  gate that *errors* (the 30s idle cap, an unreachable URL) exits
+  non-zero — in CI that fails the step loudly; it never silently
+  passes. Pixel-exact `snapshot` baselines are a different animal:
+  generate them in the same environment that compares them (in CI,
+  or one shared container) — a macOS-made baseline diffed on Linux
+  will disagree about font antialiasing, and that is the classic
+  road to a gate everyone ignores.
 - **What does rollout look like?** Pilot on one page (run
   `check integrity`, expect it to surface existing debt), then add
   `--fail-on-suspect` gates to CI for your critical pages, then

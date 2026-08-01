@@ -30,6 +30,7 @@ three rounds had not covered.
 | 5 | 6/10 | — | 7/10 | all correct incl. round-4 fixes (triage path, manifest ownership, rollout order) |
 | 6 | 6.5/10 | — | 6/10 | all correct incl. round-5 restructure (section order, agent-section compression) |
 | 7 | 7/10 | — | 7/10 | all correct incl. round-6 fixes (minHeight every-match semantics, the 30px-button rule, contract example values) — both personas' best-ever scores |
+| 8 | 7/10 | — | 8/10 | all correct incl. round-7 fixes (name fossil, verify-markup mechanism, never-idle behavior, cross-OS baselines, Haiku attribution, suppression persistence) — first 8 of the loop |
 
 ## What each round changed
 
@@ -95,6 +96,24 @@ three rounds had not covered.
   a broken em-dash sentence in the copy-gate paragraph and the
   cheat sheet's silent omission of `check interactions` (added; only
   `verify flow` stays out, with the reason stated).
+
+- **Round 8 → 9**: the findings shrank a grade — no structural or
+  honesty complaints left, mostly reference hygiene and unpriced
+  operations. Fixed: the dangling forward-reference to the ledger
+  (now introduced in the team section with lifecycle guidance —
+  gitignore, one JSON line per run); `vrt.config.json` called out as
+  a second naming fossil; the unquantified "rare" flake claim
+  replaced with the real suspect floors (page overflow from 2px,
+  text collision needs 6px on both axes) plus the error-vs-suspect
+  CI behavior (errors exit non-zero — fail loudly, never silently
+  pass); an ephemeral-CI baseline recipe (commit or cache, approve
+  in the intending PR); `verify markup`'s applicability boundary
+  stated (flat-fill UI comps, not photographic art); `check asset`'s
+  "colors that don't clash" replaced with the measured
+  palette-harmony mechanism (dominant-color share near the page
+  palette, warn not fail); install commands made concrete in the
+  expectations block; the MCP roster de-enumerated (it was
+  first-introducing tools the doc never covers).
 
 ## Convergence call after round 3 (superseded — loop resumed)
 
