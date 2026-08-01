@@ -65,7 +65,7 @@ probe_help "diff agent"           "migration"              diff agent
 probe_help "diff png"             "PNG"                    diff png
 probe_help "migration compare"    "vrt compare"            migration compare
 probe_help "snapshot"             "snapshot"               snapshot
-probe_help "build component"      "component-from-image"   build component
+probe_help "build component"      "Usage: vlmkit build component" build component
 probe_help "scan component"       "component-extract"      scan component
 probe_help "check tokens"         "design-tokens"          check tokens
 probe_help "check theme"          "theme-parity"           check theme

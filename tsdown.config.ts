@@ -3,7 +3,7 @@ import { defineConfig } from "tsdown";
 export default defineConfig([
   {
     entry: {
-      vlmkit: "src/cli/vlmkit.ts",
+      vlmkit: "scripts/vlmkit-bundled.mjs",
     },
     format: ["esm"],
     platform: "node",

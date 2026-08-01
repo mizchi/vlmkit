@@ -167,6 +167,8 @@ async function main() {
     }, null, 2)}\n`);
     await writeFile(join(consumerDir, "playwright.config.ts"), "export default {};\n");
     await writeFile(join(consumerDir, "fixture.html"), "<style>@media (min-width: 640px) { body { color: red; } }</style>\n");
+    await writeFile(join(consumerDir, "before.html"), "<style>button { color: red; }</style><button>Save</button>\n");
+    await writeFile(join(consumerDir, "after.html"), "<style>button { color: blue; }</style><button>Save</button>\n");
 
     console.log("==> installing root tarball in isolated consumer");
     run("pnpm", ["install", "--ignore-scripts"], { cwd: consumerDir });
@@ -181,6 +183,9 @@ async function main() {
     const bin = join(consumerDir, "node_modules", ".bin", "vlmkit");
     const version = run(bin, ["--version"], { cwd: consumerDir });
     assertOutput(version, rootManifest.version, "vlmkit --version");
+
+    const compare = run(bin, ["diff", "html", "before.html", "after.html", "--output", "diff-output"], { cwd: consumerDir });
+    assertOutput(compare, "after", "bundled diff html");
 
     run(bin, ["markup-loop", "init", "--topic", "checkout", "--title", "Checkout Smoke", "--base-url", "http://127.0.0.1:4173", "--provider", "openrouter", "--playwright-config", "playwright.config.ts"], { cwd: consumerDir });
     for (const path of [

@@ -5,6 +5,32 @@ Dates are YYYY-MM-DD.
 
 ## Unreleased
 
+## 0.8.0 — 2026-08-01
+
+### Verified markup workflow
+
+- Add contract-driven page scaffolding and deterministic `build page` /
+  `verify markup` loops, including breakpoint, scroll, animation, copy,
+  integrity, layout, and visual-equivalence checks.
+- Add mock-image mode, stronger region pairing and presence analysis,
+  attributed kickback diagnostics, and guarded Stage-2 auto-fix support.
+- Harden markup verification against hidden text, occlusion, clipping,
+  overflow, interaction regressions, and intentional-pattern false positives.
+
+### Interaction verification and MCP
+
+- Add accessibility event-state maps, handler-surface checks, and verified
+  browser flows whose actions must satisfy explicit DOM post-conditions.
+- Expose the deterministic verification surface through the bundled
+  `vlmkit mcp` server while keeping the workspace MCP package internal.
+
+### Packaging and reliability
+
+- Bundle internal runtime packages into the root CLI and add a packed,
+  clean-install markup-loop smoke test.
+- Improve cold-start behavior, selector-heal calibration, package license
+  coverage, and OpenRouter model selection.
+
 ## 0.7.0 — 2026-07-01
 
 ### Markup loop

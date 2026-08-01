@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 
@@ -9,6 +10,9 @@ const VLMKIT_TS = resolve(
   "..",
   "vlmkit.ts",
 );
+const PACKAGE_VERSION = JSON.parse(
+  readFileSync(resolve(import.meta.dirname!, "..", "..", "package.json"), "utf8"),
+).version as string;
 
 function runVrt(args: string[]): { stdout: string; stderr: string; status: number } {
   const r = spawnSync(
@@ -27,7 +31,7 @@ describe("vrt CLI tree (cac-based)", () => {
   it("`vrt --version` matches the package release", () => {
     const r = runVrt(["--version"]);
     assert.equal(r.status, 0);
-    assert.match(r.stdout, /vlmkit\/0\.7\.0/);
+    assert.match(r.stdout, new RegExp(`vlmkit/${PACKAGE_VERSION.replaceAll(".", "\\.")}`));
   });
 
   it("`vrt --help` prints the use-case map", () => {

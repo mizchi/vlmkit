@@ -28,6 +28,7 @@ const runMarkupCoreCache = new Map<string, string>();
 const requireGenerated = createRequire(import.meta.url);
 const directArgSeparator = "\t";
 const directEmptyArg = "__VLMKIT_EMPTY_ARG__";
+const injectedDirectModuleKey = "__MIZCHI_VLMKIT_MARKUP_CORE_API__";
 let directModule: DirectMarkupCoreModule | undefined;
 let directModuleUnavailable = false;
 let runtimeBackend: "direct-js" | "spawn" = "spawn";
@@ -104,14 +105,19 @@ export interface RunMarkupCoreOptions {
 }
 
 export function runMarkupCore(args: string[], options?: RunMarkupCoreOptions): string {
-  ensureMarkupCoreCli();
   const useCache = options?.cache !== false;
   const cacheKey = useCache ? JSON.stringify(args) : null;
   if (cacheKey !== null) {
     const cached = runMarkupCoreCache.get(cacheKey);
     if (cached !== undefined) return cached;
   }
-  const directOutput = runMarkupCoreDirect(args);
+  let directOutput = runMarkupCoreDirect(args);
+  if (directOutput !== undefined) {
+    if (cacheKey !== null) runMarkupCoreCache.set(cacheKey, directOutput);
+    return directOutput;
+  }
+  ensureMarkupCoreCli();
+  directOutput = runMarkupCoreDirect(args);
   if (directOutput !== undefined) {
     if (cacheKey !== null) runMarkupCoreCache.set(cacheKey, directOutput);
     return directOutput;
@@ -150,6 +156,15 @@ function encodeDirectArgs(args: string[]): string | undefined {
 
 function loadMarkupCoreApi(): DirectMarkupCoreModule | undefined {
   if (directModule) return directModule;
+  const injected = (
+    globalThis as typeof globalThis & {
+      [injectedDirectModuleKey]?: Partial<DirectMarkupCoreModule>;
+    }
+  )[injectedDirectModuleKey];
+  if (typeof injected?.run_markup_core === "function") {
+    directModule = { run_markup_core: injected.run_markup_core };
+    return directModule;
+  }
   if (directModuleUnavailable) return undefined;
   try {
     const loaded = requireGenerated(apiPath) as Partial<DirectMarkupCoreModule>;
@@ -1291,6 +1306,7 @@ export function ensureMarkupCoreCli(): void {
     "js",
   ]);
   built = true;
+  directModuleUnavailable = false;
 }
 
 function doubleArg(value: number): string {
