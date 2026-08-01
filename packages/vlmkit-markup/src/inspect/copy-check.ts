@@ -58,6 +58,7 @@ import {
   type TextBlock,
 } from "./copy-target.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { applyGateExit } from "@mizchi/vlmkit-core/gate-exit.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
@@ -869,7 +870,7 @@ Options:
   --vlm [model]       Transcribe crops with a VLM (default model: VRT_VLM_MODEL); requires API key
   --no-states         Skip the disclosure-state sweep (default-state text only)
   --json              Print JSON report
-  --fail-on-suspect   Exit non-zero when suspect issues are found`);
+  --advisory          Print findings but exit 0 (default: a suspect exits 1)`);
   process.exit(exitCode);
 }
 
@@ -880,7 +881,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   let outDir: string | undefined;
   let vlm: string | true | undefined;
   let json = false;
-  let failOnSuspect = false;
+  let advisory = false;
   let storageState: string | undefined;
   let exploreStates = true;
   let allowInvisible: InvisibleReason[] | undefined;
@@ -903,7 +904,8 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
       }
       allowInvisible = classes as InvisibleReason[];
     } else if (arg === "--json") json = true;
-    else if (arg === "--fail-on-suspect") failOnSuspect = true;
+    else if (arg === "--fail-on-suspect") { /* accepted no-op: suspects already fail */ }
+    else if (arg === "--advisory") advisory = true;
     else if (arg === "--storage-state") storageState = argv[++i];
     else if (!arg.startsWith("-")) positional.push(arg);
   }
@@ -939,7 +941,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   });
   if (json) console.log(JSON.stringify(report, null, 2));
   else console.log(formatCopyCheckReport(report));
-  if (failOnSuspect && report.issues.some((i) => i.severity === "suspect")) process.exit(1);
+  applyGateExit(report.issues.some((i) => i.severity === "suspect"), { advisory });
 }
 
 const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "copy-check" ||

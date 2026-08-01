@@ -5,6 +5,53 @@ Dates are YYYY-MM-DD.
 
 ## Unreleased
 
+### Breaking
+
+- **A suspect finding now fails the command by default.** `check copy`,
+  `check asset`, `scan scroll`, `check scroll`, and `check breakpoints`
+  previously printed their suspects and exited 0 unless you passed
+  `--fail-on-suspect`, while `check integrity`, `check layout`,
+  `verify flow`, `verify markup`, `check interactions`, and
+  `scan handlers` already exited non-zero — two commands in the same
+  `scan` group disagreed. Every gate now shares one contract: a suspect
+  exits 1, a warn never affects the exit code, and `--advisory` opts back
+  into print-and-succeed for gates being piloted before they gate CI.
+  `--fail-on-suspect` is still accepted as a no-op, so existing scripts
+  keep working. **If you relied on a gate exiting 0 while reporting
+  defects, add `--advisory`.**
+
+### Added
+
+- Authenticated pages: `--storage-state <file>` on URL-capable gates, or
+  `VLMKIT_STORAGE_STATE=<file>` for all of them at once, accepting the
+  Playwright storage-state file that `playwright codegen --save-storage`
+  and `context.storageState()` produce. Validated eagerly — a missing,
+  malformed, or empty state throws with a capture hint rather than
+  silently measuring an unauthenticated page.
+
+### Fixed
+
+- Gates no longer report on a page they did not measure: a redirect away
+  from the requested URL (typically a login wall) is reported instead of
+  silently measured, which previously produced `verdict: CLEAN` for a
+  protected page that never rendered.
+- `check interactions` and `scan handlers` waited only for `load`, so on
+  client-rendered apps they inventoried the pre-render DOM — reporting
+  `interactive elements: 0` and `status: ok` on a page with real controls
+  and a pointer-only `<div>`. Both now settle before measuring.
+- Horizontal-overflow kickbacks name the element actually at fault. The
+  culprit is measured (neutralize its width, re-read `scrollWidth`)
+  rather than ranked by right edge, which in grid/flex shells promoted
+  stretched ancestors over the rigid child causing the overflow.
+- `check copy` sees text inside open shadow roots, so component-library
+  copy is no longer reported missing; hidden shadow copy is still
+  classified by reason (e.g. `zero-size`).
+- `check integrity` waits for `document.fonts.ready`, and detects text
+  occluded by `pointer-events: none` overlays.
+- `snapshot` and `scan breakpoints` now append to the run ledger.
+- `unprobed-handler-types` counts only element-specific handlers, so a
+  framework delegation root no longer lists ~80 event types as findings.
+
 ## 0.8.0 — 2026-08-01
 
 ### Verified markup workflow

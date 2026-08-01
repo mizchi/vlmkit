@@ -68,21 +68,21 @@ of work. What to expect before you install:
   `check breakpoints --sweep` renders every fuzz step, so those sit
   at the tens-of-seconds end on a breakpoint-heavy page — still cheap
   enough to re-run ten times in a fix loop. Gate findings come in two
-  severities — a **suspect** is a defect claim, a **warn** is
-  advisory. Exit codes, measured rather than assumed, split by what a
-  gate produces:
-  - **Verdict gates fail closed.** `check integrity` (DEFECTS),
-    `check layout` (VIOLATED), `verify flow` (FAILED),
-    `verify markup` (NOT DONE) exit non-zero on a bad verdict with no
-    flag needed. Warn-only integrity runs are CLEAN and exit zero.
-  - **Finding-list gates fail open.** `check copy`, `check asset`,
-    `scan scroll` print their suspects and still exit zero unless you
-    pass `--fail-on-suspect`. (`check interactions` and
-    `scan handlers` already exit non-zero on suspects — the contract
-    is not yet uniform across the group, so pass the flag everywhere
-    you mean to enforce and you get the strict behavior regardless.)
+  severities, and one exit-code contract covers every gate:
+  - **A suspect fails the command.** Any defect-level finding — a
+    DEFECTS / VIOLATED / FAILED / NOT DONE verdict, a missing copy
+    line, a pointer-only control — exits non-zero with no flag
+    needed. A verification tool whose default is "found a defect,
+    exiting 0" is a footgun, so the burden is on whoever wants
+    findings ignored.
+  - **A warn never affects the exit code**, under any flag.
+  - **`--advisory` opts back into print-and-succeed**, for piloting a
+    gate before it gates CI (the rollout order below).
   - **Errors always fail.** An unreachable URL, a missing file, or the
     30s idle timeout exits non-zero — never a silent pass.
+
+  (`--fail-on-suspect` is still accepted everywhere it used to be
+  needed; it is now a no-op because that behavior is the default.)
 - Setup is two commands — `npm install -D @mizchi/vlmkit` and
   `npx playwright install chromium` (a browser download — expect on
   the order of 150 MB, a few minutes once; CI containers add
@@ -99,8 +99,10 @@ of work. What to expect before you install:
   hits that 30s cap and the gate errors rather than measuring a
   half-settled page —
   point it at a locally rendered file or a route without the socket.
-  Same workaround for pages behind a login: a no-auth route or a
-  local file (there is no cookie/storage-state injection today).
+  For pages behind a login, hand the gate a session:
+  `--storage-state auth.json` (or `VLMKIT_STORAGE_STATE=auth.json` for
+  all gates at once), using the same Playwright storage-state file your
+  e2e suite already produces.
 
 ### How the interesting checks actually measure
 
@@ -222,12 +224,11 @@ script rather than a one-liner):
 # while editing — after any layout/CSS change:
 npx vlmkit check integrity page.html                         # anything broken?
 # before pushing — when the page carries spec'd copy:
-#   (--fail-on-suspect is what makes these EXIT non-zero on findings)
-npx vlmkit check copy page.html --manifest copy.txt --fail-on-suspect
+npx vlmkit check copy page.html --manifest copy.txt          # wording exact & visible?
 # before pushing — when the page is responsive:
-npx vlmkit check breakpoints page.html --sweep --fail-on-suspect
+npx vlmkit check breakpoints page.html --sweep               # boundaries hold?
 # before pushing — when the page has interactive controls:
-npx vlmkit check interactions page.html --fail-on-suspect
+npx vlmkit check interactions page.html                      # keyboard-operable?
 # while building against a design:
 npx vlmkit verify markup attempt.html --target design.png    # matches the design?
 # continuously / in CI — regression tracking:
@@ -247,12 +248,12 @@ knowing up front: copy matching is whitespace-normalized but
 `check breakpoints` renders one pixel below, at, and above every
 breakpoint your CSS declares, and `--sweep` additionally fuzzes the
 widths in between in 25px steps from 320px to 1280px;
-and in CI any gate becomes a failing step with `--fail-on-suspect`:
+and in CI any gate is already a failing step — a suspect exits non-zero:
 
 ```yaml
 # .github/workflows/ui-gates.yml (the relevant steps)
 - run: npm ci && npx playwright install chromium --with-deps
-- run: npx vlmkit check integrity dist/index.html --fail-on-suspect
+- run: npx vlmkit check integrity dist/index.html
 ```
 
 There is more: design-token conformance (hard-coded values that
@@ -312,8 +313,8 @@ The operational questions a lead will ask, answered plainly:
 
   ```json
   { "scripts": {
-    "gate:home":     "vlmkit check integrity http://localhost:3000/ && vlmkit check copy http://localhost:3000/ --manifest copy/home.txt --fail-on-suspect",
-    "gate:pricing":  "vlmkit check integrity http://localhost:3000/pricing/ && vlmkit check layout http://localhost:3000/pricing/ --contract layout/pricing.json --fail-on-suspect",
+    "gate:home":     "vlmkit check integrity http://localhost:3000/ && vlmkit check copy http://localhost:3000/ --manifest copy/home.txt",
+    "gate:pricing":  "vlmkit check integrity http://localhost:3000/pricing/ && vlmkit check layout http://localhost:3000/pricing/ --contract layout/pricing.json",
     "gate:all":      "npm run gate:home && npm run gate:pricing"
   } }
   ```
@@ -388,7 +389,8 @@ The operational questions a lead will ask, answered plainly:
   road to a gate everyone ignores.
 - **What does rollout look like?** Pilot on one page (run
   `check integrity`, expect it to surface existing debt), then add
-  `--fail-on-suspect` gates to CI for your critical pages, then
+  those gates to CI for your critical pages (they fail closed by
+  default; `--advisory` while piloting), then
   grow contracts and manifests where specs are stable. Agent
   integration is optional and can come last.
 
@@ -470,14 +472,14 @@ Trust lives in stated boundaries, so here are the ones that matter:
   The honest claim is "adversarially maintained," not "complete."
 - **A flow gate proves the paths it walks and nothing else.** If a
   behavior matters, put a step on it.
-- **Pages behind authentication are out of reach today.** There is
-  no cookie or storage-state injection; the workarounds are a
-  no-auth route, a locally rendered file, or a fixture page that
-  mounts the same components without the login wall. If your
-  highest-value pages are all behind auth, price that in before the
-  trial. Point a gate at an auth'd route and it will tell you: a
-  redirect away from the URL you asked about is reported as a defect,
-  never silently measured as if it were the page you wanted.
+- **Authenticated pages need a session file you supply.** Capture one
+  with `npx playwright codegen --save-storage=auth.json <login-url>`
+  (or `context.storageState()` in an existing e2e suite) and pass
+  `--storage-state auth.json`. There is no login automation inside
+  vlmkit — it replays a session, it does not obtain one, so an expired
+  state is your problem to re-capture. The failure mode is at least
+  legible: a redirect away from the URL you asked about is reported as
+  a defect, never silently measured as if it were the page you wanted.
 - **Fonts are your determinism boundary.** The Chromium build is
   pinned and the gates wait for `document.fonts.ready` (not just
   network idle — `font-display: swap` reflows text *after* idle), but

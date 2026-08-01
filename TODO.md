@@ -266,7 +266,11 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   `--allow-invisible` 承認を集約する reviewed config(現状は npm scripts
   慣行、~20 ページで破綻とドキュメントに明記済み)。suppression 棚卸しが
   grep 頼みなのが tech lead ペルソナの一貫した不満。
-- [ ] **cookie / storage-state 注入** — 認証付きページのゲート実行。
+- [x] **cookie / storage-state 注入** — 2026-08-01 完了:
+  `--storage-state <file>` + `VLMKIT_STORAGE_STATE`、URL 対応 9 ゲート
+  全部に配線。検証は事前に厳格(不在/不正 JSON/形状違い/空 state は
+  ヒント付きで throw)。実際の cookie セッションで E2E 検証済み。
+  旧記述(参考): 認証付きページのゲート実行。
   Playwright の storageState をそのまま受ける `--storage-state <json>`
   が最小案。現状の回避策(no-auth route / ローカルファイル)は checkout
   等の高価値ページで非答。
@@ -276,7 +280,11 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 - [ ] **クロス OS フォント決定論の実測レポート** — 2px/6px floor が
   macOS vs Linux 描画で維持されるかの検証(要 macOS 実機)。フォント
   同梱/未同梱の両条件。
-- [ ] **exit code コントラクトの統一(round-10 実測)** — 現状は不統一:
+- [x] **exit code コントラクトの統一(round-10 実測)** — 2026-08-01 完了:
+  `packages/vlmkit-core/src/gate-exit.ts` に統一。suspect は既定で
+  非ゼロ終了、warn は常に終了コードに影響しない、`--advisory` で
+  print-and-succeed にオプトアウト、`--fail-on-suspect` は受理される
+  no-op として後方互換。旧記述(参考): 現状は不統一:
   verdict 系(integrity DEFECTS / layout VIOLATED / flow FAILED /
   markup NOT DONE)はフラグ無しで非ゼロ、finding-list 系のうち
   copy / asset / scroll はゼロ、interactions / handlers は非ゼロ。

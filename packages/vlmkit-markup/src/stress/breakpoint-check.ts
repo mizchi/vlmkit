@@ -613,13 +613,14 @@ Options:
   --json                Print JSON report
   --height <px>         Render height (default: 900)
   --max-elements <n>    Elements sampled per width (default: 400)
-  --fail-on-suspect     Exit non-zero when suspect issues are found`);
+  --advisory            Print findings but exit 0 (default: a suspect exits 1)`);
   process.exit(exitCode);
 }
 
 function parseArgs(argv: string[]) {
   let json = false;
   let failOnSuspect = false;
+  let advisory = false;
   let breakpoints: number[] | undefined;
   let height: number | undefined;
   let maxElements: number | undefined;
@@ -630,7 +631,8 @@ function parseArgs(argv: string[]) {
     const arg = argv[i]!;
     if (arg === "--help" || arg === "-h" || arg === "help") printUsage(0);
     else if (arg === "--json") json = true;
-    else if (arg === "--fail-on-suspect") failOnSuspect = true;
+    else if (arg === "--fail-on-suspect") failOnSuspect = true; // accepted no-op
+    else if (arg === "--advisory") advisory = true;
     else if (arg === "--sweep") sweep = true;
     else if (arg === "--sweep-step") sweepStep = Number.parseInt(argv[++i] ?? "25", 10);
     else if (arg === "--breakpoints") {
@@ -640,7 +642,7 @@ function parseArgs(argv: string[]) {
     else positional.push(arg);
   }
   if (positional.length === 0) printUsage(1);
-  return { source: positional[0]!, json, failOnSuspect, breakpoints, height, maxElements, sweep, sweepStep };
+  return { source: positional[0]!, json, failOnSuspect, advisory, breakpoints, height, maxElements, sweep, sweepStep };
 }
 
 async function main(argv = process.argv.slice(2)): Promise<void> {
@@ -667,7 +669,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   } else {
     console.log(formatBreakpointCheckReport(report));
   }
-  if (parsed.failOnSuspect && report.issues.some((issue) => issue.severity === "suspect")) {
+  if (!parsed.advisory && report.issues.some((issue) => issue.severity === "suspect")) {
     process.exit(1);
   }
 }

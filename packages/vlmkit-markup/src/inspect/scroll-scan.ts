@@ -481,13 +481,14 @@ Options:
                         entries pasteable into a UI Contract)
   --viewport <WxH>      Viewport (default: 1280x720)
   --clip-threshold <n>  Hidden px below which clipping is ignored (default: 16)
-  --fail-on-suspect     Exit non-zero when suspect issues are found`);
+  --advisory            Print findings but exit 0 (default: a suspect exits 1)`);
   process.exit(exitCode);
 }
 
 function parseArgs(argv: string[]) {
   let json = false;
   let failOnSuspect = false;
+  let advisory = false;
   let clipThreshold: number | undefined;
   let viewport: { width: number; height: number } | undefined;
   const positional: string[] = [];
@@ -495,7 +496,8 @@ function parseArgs(argv: string[]) {
     const arg = argv[i]!;
     if (arg === "--help" || arg === "-h" || arg === "help") printUsage(0);
     else if (arg === "--json") json = true;
-    else if (arg === "--fail-on-suspect") failOnSuspect = true;
+    else if (arg === "--fail-on-suspect") failOnSuspect = true; // accepted no-op
+    else if (arg === "--advisory") advisory = true;
     else if (arg === "--clip-threshold") clipThreshold = Number.parseInt(argv[++i] ?? "16", 10);
     else if (arg === "--viewport") {
       const m = (argv[++i] ?? "").match(/^(\d+)x(\d+)$/);
@@ -504,7 +506,7 @@ function parseArgs(argv: string[]) {
     } else positional.push(arg);
   }
   if (positional.length === 0) printUsage(1);
-  return { source: positional[0]!, json, failOnSuspect, clipThreshold, viewport };
+  return { source: positional[0]!, json, failOnSuspect, advisory, clipThreshold, viewport };
 }
 
 async function main(argv = process.argv.slice(2)): Promise<void> {
@@ -528,7 +530,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   } else {
     console.log(formatScrollScanReport(report));
   }
-  if (parsed.failOnSuspect && report.issues.some((issue) => issue.severity === "suspect")) {
+  if (!parsed.advisory && report.issues.some((issue) => issue.severity === "suspect")) {
     process.exit(1);
   }
 }

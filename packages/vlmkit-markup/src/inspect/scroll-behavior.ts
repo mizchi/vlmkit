@@ -25,6 +25,7 @@
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { applyGateExit } from "@mizchi/vlmkit-core/gate-exit.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -354,20 +355,21 @@ inventory is \`vlmkit scan scroll\`.)
 Options:
   --viewport <WxH>    Viewport (default 1280x720)
   --json              Print JSON report
-  --fail-on-suspect   Exit non-zero when suspect issues are found`);
+  --advisory          Print findings but exit 0 (default: a suspect exits 1)`);
   process.exit(exitCode);
 }
 
 async function main(argv = process.argv.slice(2)): Promise<void> {
   if (argv.includes("--help") || argv.includes("-h")) printUsage(0);
   let json = false;
-  let failOnSuspect = false;
+  let advisory = false;
   let viewport: { width: number; height: number } | undefined;
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === "--json") json = true;
-    else if (arg === "--fail-on-suspect") failOnSuspect = true;
+    else if (arg === "--fail-on-suspect") { /* accepted no-op: suspects already fail */ }
+    else if (arg === "--advisory") advisory = true;
     else if (arg === "--viewport") {
       const m = (argv[++i] ?? "").match(/^(\d+)x(\d+)$/);
       if (m) viewport = { width: Number(m[1]), height: Number(m[2]) };
@@ -377,7 +379,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   const report = await runScrollBehavior({ source: positional[0]!, ...(viewport ? { viewport } : {}) });
   if (json) console.log(JSON.stringify(report, null, 2));
   else console.log(formatScrollBehaviorReport(report));
-  if (failOnSuspect && report.issues.some((i) => i.severity === "suspect")) process.exit(1);
+  applyGateExit(report.issues.some((i) => i.severity === "suspect"), { advisory });
 }
 
 const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "scroll-behavior" ||
