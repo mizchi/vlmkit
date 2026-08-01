@@ -139,7 +139,19 @@ npx vlmkit check asset sprite.png --slot 220x300 --expect-transparent   # usable
 ```
 
 Iterating is just re-running the same command after each edit (there
-is also `vlmkit watch` for a file-watching inner loop).
+is also `vlmkit watch` for a file-watching inner loop). A few
+mechanics worth knowing up front: copy matching is
+whitespace-normalized but **case-sensitive** substring matching
+(casing is treated as spec); `check breakpoints` renders one pixel
+below, at, and above every breakpoint your CSS declares, and
+`--sweep` additionally fuzzes the widths in between in 25px steps;
+and in CI any gate becomes a failing step with `--fail-on-suspect`:
+
+```yaml
+# .github/workflows/ui-gates.yml (the relevant steps)
+- run: npm ci && npx playwright install chromium --with-deps
+- run: npx vlmkit check integrity dist/index.html --fail-on-suspect
+```
 
 There is more: design-token conformance (hard-coded values that
 should be tokens), dark-theme parity, WCAG contrast/touch/focus
@@ -229,6 +241,21 @@ behind them. The gates have been adversarially tested against the
 exact population that will try hardest to fool them — and the
 receipts are one click away.
 
+## How is this different from screenshot-testing services?
+
+Hosted visual-testing products (and Playwright's own screenshot
+assertions) answer one question: *did the pixels change since the
+approved baseline?* vlmkit's `snapshot`/`diff-pr` covers that job
+locally. But most of this document is about a different question that
+baseline-diffing cannot ask: *is the page correct in the first
+place?* A baseline diff is blind on day one (there is nothing to
+compare against), blind to defects that were already in the baseline,
+and mute about causes — it shows you changed pixels, not "this
+element overflows by 156px, here is its selector." The gates are
+reference-free, name the defect, and are built to referee an agent's
+work loop. The two approaches compose: gates while building,
+baseline diffs to hold the line afterwards.
+
 ## Honest limits
 
 Trust lives in stated boundaries, so here are the ones that matter:
@@ -254,6 +281,13 @@ Trust lives in stated boundaries, so here are the ones that matter:
 - **Third-party CSS is checked as rendered.** If your UI library
   overflows at 375px, the gate reports it like any other defect —
   there is no per-origin scoping.
+- **Common intentional patterns, concretely**: sticky/fixed bars that
+  cover content while pinned are measured as scroll-escapable and
+  exempted; hero text-over-image overlays are exempted when the
+  backing is measured as such; dynamic content (tickers, timestamps)
+  is the `snapshot --mask ".selector"` story, not an integrity
+  concern. Transient states (open modals, hovering tooltips) are only
+  checked if a flow step opens them.
 
 ## What vlmkit is not
 
