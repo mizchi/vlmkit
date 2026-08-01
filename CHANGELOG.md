@@ -5,6 +5,18 @@ Dates are YYYY-MM-DD.
 
 ## Unreleased
 
+## 0.8.1 — 2026-08-01
+
+### Packaging hotfix
+
+- Publish compiled JavaScript and declarations for every public workspace
+  package instead of exposing raw TypeScript to Node.js consumers.
+- Preserve the existing deep-import contract, fix the `vlmkit-plan` and
+  `vlmkit-generate` executable targets, and include the generated MoonBit
+  runtime required by `@mizchi/vlmkit-markup`.
+- Add a clean-install smoke test that packs and exercises all seven public
+  workspace packages before release.
+
 ## 0.8.0 — 2026-08-01
 
 ### Verified markup workflow

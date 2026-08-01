@@ -1,6 +1,6 @@
 {
   "name": "@mizchi/vlmkit-markup",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "VLM-driven markup tooling for VRT: component extract, design-token / theme-parity / i18n-stress / palette checks, dep-graph, selector heal, smoke runner.",
   "license": "MIT",
   "author": "mizchi",
@@ -14,9 +14,15 @@
     "url": "https://github.com/mizchi/vlmkit/issues"
   },
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
-    "src/**/*.ts",
-    "!src/**/*.test.ts",
+    "dist/**",
+    "_build/js/debug/build/markup-core-api/markup-core-api.js",
     "moon.mod.json",
     "markup-core/**/*.mbt",
     "markup-core/moon.pkg",
@@ -28,13 +34,21 @@
     "LICENSE"
   ],
   "scripts": {
+    "build": "pnpm moon:build && pnpm --dir ../.. exec tsdown --config tsdown.packages.config.ts --filter @mizchi/vlmkit-markup",
+    "prepack": "pnpm build",
     "test": "node --test 'src/**/*.test.ts'",
     "moon:test": "moon test markup-core && moon check markup-core-api markup-core-cli",
     "moon:build": "moon build markup-core markup-core-api markup-core-cli --target js"
   },
   "exports": {
-    ".": "./src/index.ts",
-    "./*.ts": "./src/*.ts"
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./*.ts": {
+      "types": "./dist/*.d.mts",
+      "import": "./dist/*.mjs"
+    }
   },
   "dependencies": {
     "@mizchi/vlmkit-ai": "workspace:*",

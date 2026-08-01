@@ -7,10 +7,10 @@ on:
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "tsconfig*.json"
-      - "tsdown.config.ts"
+      - "tsdown*.config.ts"
       - "src/**"
       - "packages/**"
-      - "scripts/smoke-packed-markup-loop.mjs"
+      - "scripts/smoke-packed-*.mjs"
       - ".github/workflows/package-install-smoke.yml"
   pull_request:
     paths:
@@ -18,10 +18,10 @@ on:
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "tsconfig*.json"
-      - "tsdown.config.ts"
+      - "tsdown*.config.ts"
       - "src/**"
       - "packages/**"
-      - "scripts/smoke-packed-markup-loop.mjs"
+      - "scripts/smoke-packed-*.mjs"
       - ".github/workflows/package-install-smoke.yml"
   workflow_dispatch:
 
@@ -39,4 +39,5 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm smoke:pack:workspaces
       - run: pnpm smoke:pack:markup-loop
