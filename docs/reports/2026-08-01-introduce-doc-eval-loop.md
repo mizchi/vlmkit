@@ -1,4 +1,4 @@
-# introduce.md evaluation loop: three rounds of blind persona review (2026-08-01)
+# introduce.md evaluation loop: blind persona review rounds (2026-08-01)
 
 ## Method
 
@@ -13,13 +13,22 @@ agent operator burned by false "verified" claims, evaluating tools.
 The quiz is re-targeted each round at the previous round's fixes, so
 "did the fix land" is measured, not assumed.
 
+After round 3 the loop continued at the user's request. Persona B
+(agent operator) was retired at its 7/10 plateau — its remaining asks
+had crossed into operator-manual territory — and replaced from round 4
+by (C) a tech lead evaluating team adoption cost, a lens the first
+three rounds had not covered.
+
 ## Trajectory
 
-| Round | A (frontend dev) | B (agent operator) | Comprehension quiz |
-|---|---|---|---|
-| 1 | 6/10 | 5/10 | all correct (basics) |
-| 2 | 6/10 | 6/10 | all correct incl. round-1 fixes (gate def, speed, keys, ledger) |
-| 3 | 6/10 | 7/10 | all correct incl. round-2 fixes (limits, exemptions, false-negative count) — B additionally inferred an unstated ledger limitation |
+| Round | A (frontend dev) | B (agent operator) | C (tech lead) | Comprehension quiz |
+|---|---|---|---|---|
+| 1 | 6/10 | 5/10 | — | all correct (basics) |
+| 2 | 6/10 | 6/10 | — | all correct incl. round-1 fixes (gate def, speed, keys, ledger) |
+| 3 | 6/10 | 7/10 | — | all correct incl. round-2 fixes (limits, exemptions, false-negative count) — B additionally inferred an unstated ledger limitation |
+| 4 | 7/10 | retired | 6/10 | all correct incl. round-3 fixes (cheat-sheet when-annotations, SKILL.md excerpt, audit-site names) |
+| 5 | 6/10 | — | 7/10 | all correct incl. round-4 fixes (triage path, manifest ownership, rollout order) |
+| 6 | 6.5/10 | — | 6/10 | all correct incl. round-5 restructure (section order, agent-section compression) |
 
 ## What each round changed
 
@@ -35,12 +44,34 @@ The quiz is re-targeted each round at the previous round's fixes, so
   measured, no user exemption list for integrity yet, the real
   false-negative number — 1 in 19 scenarios, promoted to probe A13 —
   flow gates prove only walked paths, no third-party CSS scoping).
-- **Round 3 → final polish**: when-to-use annotations on the cheat
+- **Round 3 → 4**: when-to-use annotations on the cheat
   sheet + a `vlmkit watch` pointer, an actual SKILL.md excerpt
   (B's top ask two rounds running), the seven audit sites named
-  inline with a methodology link.
+  inline with a methodology link; a 2-line GitHub Actions snippet,
+  gate mechanics made concrete (case-sensitive copy matching, 25px
+  sweep steps), and a "how is this different from a screenshot
+  service" differentiation section.
+- **Round 4 → 5**: team-adoption answers for the new tech-lead lens —
+  who owns the copy manifest (same-PR rule), snapshot approve as the
+  intended-change path, a failure-triage path (real defect vs
+  intentional pattern vs tool limit), rollout order, MCP tool roster,
+  manifest scale guidance; plus claim-scoping ("proves only walked
+  paths") and concrete output examples.
+- **Round 5 → 6 (restructure, not accretion)**: round 5 showed
+  reviewer-driven accretion — the doc had grown 170 → 395 lines
+  across rounds and A's score *fell* 7 → 6 citing length. Fix was
+  structural: operations content moved before the agent section, the
+  agent section compressed ~35%, "What vlmkit is not" tightened
+  (395 → 371 lines). No new content added.
+- **Round 6 → 7**: both personas converged on one blocker — show a
+  real `layout.json`. Writing it exposed a **doc overclaim**: the
+  text said "buttons ≥ 48px tall on mobile" was encodable, but
+  `LayoutRule` had no height assertion. Resolution: implement
+  `minHeight` in the tool (every-visible-match semantics, reports the
+  shortest) rather than weaken the doc, then paste the E2E-verified
+  4-rule example into "Can we encode our own rules?".
 
-## Convergence call (loop ended after round 3)
+## Convergence call after round 3 (superseded — loop resumed)
 
 - **Comprehension saturated**: every quiz answer correct in rounds
   2–3, including the subtlest material (exemption mechanics, the
@@ -69,3 +100,21 @@ The quiz is re-targeted each round at the previous round's fixes, so
   convergence criterion that worked was "quiz saturated AND remaining
   asks are out-of-scope or fabrication-requiring," not a score
   threshold.
+- **The rubric guarantees findings.** "A review with no findings is a
+  failed review" is the right instruction for rigor, but it makes the
+  loop a structural ratchet: every round produces suggestions, so the
+  loop never self-terminates on an empty round. The stop signal has
+  to come from the *content* of the findings (out-of-scope, would
+  require fabrication, contradicts an earlier accepted trade), never
+  their existence.
+- **Reviewer-driven accretion is the loop's failure mode.** Each
+  round's fixes add lines; the persona that wanted a short intro then
+  scores the length down (A: 7 → 6 at round 5). Every few rounds the
+  right move is a restructure/compression pass that adds nothing —
+  treating "the doc got worse by getting more complete" as a real
+  finding.
+- **Evaluator pressure can find tool bugs, not just doc bugs.** The
+  round-6 demand for a concrete example forced the discovery that the
+  doc promised an assertion the tool didn't have (`minHeight`). A doc
+  loop over an honest document is partially a spec-conformance test
+  of the tool.
