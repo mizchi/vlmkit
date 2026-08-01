@@ -300,6 +300,20 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   6 種注入の `broken-spec.html` を修理させ **kickback 追従 7/7**(diff 監査、
   削除逃げ 0)。帰属 kickback は修理タスクなら Haiku でも完全機能。
   追記14 参照。
+- [x] **`check asset` — 生成画像アセットの決定論ゲート(S19 追補)** —
+  2026-07-31 実装: S19 の CSS 図形を画像生成モデル産アートへ差し替える
+  前段ゲート(ブラウザ不要の PNG 数学、~50ms)。slot アスペクト適合 /
+  透過 vs matte 背景(境界リング実測、matte 色報告)/ 占有率 + content
+  bbox / 図地コントラスト(輪郭画素 vs 配置先背景の WCAG 比)/ ページ
+  パレット調和(top-24 — アクセント色は 19-22 位に沈む実測を反映)。
+  差し替え後は既存ゲート(integrity A3/A13、layout、snapshot)が
+  そのまま統合検証。テスト 7 本 + S19 実ページで E2E 済み。設計:
+  `docs/design/generated-asset-eval.md`(slot 契約 + パイプライン)。
+- [ ] **画像生成レグ(要 生成モデルキー)**: S19 の player/enemy slot 向けに
+  N 候補生成 → `check asset --fail-on-suspect` を生存フィルタ →
+  swap → integrity/layout/snapshot で in-situ 検証。**ゲート通過率
+  そのものをモデル比較指標にする**(ルーブリック不要)。slot 契約と
+  手順は設計文書に確定済み。
 - [x] **S19 zero-shot ゲーム UI(カードバトル)+ A13 occluded-text** —
   2026-07-31 実施: デッキ構築型バトル画面の独自ブリーフ(扇状手札 /
   エナジーゲート / Block 先行吸収)で **`verify flow` を done 条件に初編入**
