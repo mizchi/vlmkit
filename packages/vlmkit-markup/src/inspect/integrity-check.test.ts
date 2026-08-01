@@ -494,6 +494,35 @@ describe("S14c false-positive audit", () => {
       `the missing @import child itself is still reported: ${JSON.stringify(report.findings.map((f) => `${f.kind} ${f.message}`))}`);
   });
 
+  // Found by fixtures/collision-fp-corpus (2026-08-01): the kicker/heading
+  // pull-up is idiomatic markup whose line BOXES overlap 7px while the
+  // glyphs keep a measured 2px gap — the box test called it a collision.
+  // Blocks are now shrunk to their measured ink band before the overlap
+  // test, which can only remove findings.
+  test("designed negative leading and pull-ups are not collisions; real overlap still is", { timeout: 120_000 }, async () => {
+    const pullUp = page("ink-pullup.html", `
+      <p class="kicker" style="font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#5b6270;margin:0">Quarterly report</p>
+      <h1 style="font-size:40px;margin:-0.18em 0 0.4em">Settlement volume grew nineteen percent</h1>
+      <p style="max-width:620px">A lede paragraph under the heading.</p>`);
+    const clean = await runIntegrityCheck({ source: pullUp, viewports: ONE_VIEWPORT });
+    assert.equal(
+      clean.findings.filter((f) => f.kind === "text-collision").length, 0,
+      JSON.stringify(clean.findings.map((f) => `${f.kind} ${f.selector}`)),
+    );
+
+    // The filter must not blind the gate: a genuine overlap still fails.
+    const real = page("ink-real.html", `
+      <div style="position:relative;height:60px;font:16px monospace">
+        <span style="position:absolute;left:0;top:20px">Total: 1,240,000 EUR</span>
+        <span style="position:absolute;left:60px;top:24px">Refunds: 80 EUR</span>
+      </div>`);
+    const dirty = await runIntegrityCheck({ source: real, viewports: ONE_VIEWPORT });
+    assert.ok(
+      dirty.findings.some((f) => f.kind === "text-collision"),
+      JSON.stringify(dirty.findings.map((f) => f.kind)),
+    );
+  });
+
   test("maxFindings caps text-collision rows (Codex #100 P2)", { timeout: 120_000 }, async () => {
     const rows = Array.from({ length: 5 }, (_, i) =>
       `<p style="position:absolute;top:${20 + i * 40}px;left:20px;width:220px;margin:0">Row ${i} left column text</p>

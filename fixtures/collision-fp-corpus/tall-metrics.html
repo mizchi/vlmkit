@@ -1,0 +1,14 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Tall font metrics</title>
+<style>
+  body { margin: 0; padding: 40px; background: #fff; }
+  /* Many webfonts have ascent+descent > 1em; at line-height:1 the line
+     boxes necessarily overlap even though glyphs do not. Must stay CLEAN. */
+  .stack { font-family: "Noto Sans", "DejaVu Sans", Verdana, sans-serif; font-size: 24px; line-height: 1; max-width: 560px; }
+  .stack p { margin: 0; }
+</style></head><body>
+  <div class="stack">
+    <p>Line one of a block set solid at line-height one.</p>
+    <p>Line two sits immediately beneath it with no leading.</p>
+    <p>Line three completes the stack of solid-set lines.</p>
+  </div>
+</body></html>

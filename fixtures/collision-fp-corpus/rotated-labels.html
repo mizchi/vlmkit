@@ -1,0 +1,15 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Rotated axis labels</title>
+<style>
+  body { margin: 0; padding: 40px 40px 120px; background: #fff; font-family: system-ui, sans-serif; }
+  /* Rotated chart labels: the AABB of each rotated string intersects its
+     neighbours heavily while the ink is well separated. Must stay CLEAN. */
+  .axis { display: flex; gap: 26px; margin-top: 30px; }
+  .axis span { transform: rotate(-45deg); transform-origin: left top; font-size: 13px; white-space: nowrap; color: #3a4050; }
+  .plot { height: 160px; background: linear-gradient(#eef3fe, #fff); border-bottom: 1px solid #c9d2e3; }
+</style></head><body>
+  <div class="plot"></div>
+  <div class="axis">
+    <span>2026-01 reconciliation</span><span>2026-02 reconciliation</span>
+    <span>2026-03 reconciliation</span><span>2026-04 reconciliation</span>
+  </div>
+</body></html>

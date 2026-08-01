@@ -307,7 +307,17 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   落としている。`diff png` も同じ閾値を共有(0.01% と報告)。
   量子化を色差ベースにするか、ΔRGB が小さい領域を別経路で拾う。
   Honest limits に既知の穴として明記済み。
-- [ ] **text-collision の ink extents 化(round-10 staff engineer 指摘)** —
+- [~] **text-collision の ink extents 化(round-10 staff engineer 指摘)** —
+  **2026-08-01: 半分完了。** 提案を独立な2つに分解した。(a) ink band への
+  縮小を既存 finding の *フィルタ* として使う = 指摘を減らすだけなので
+  cry-wolf リスクなし → **実装済み**。corpus 構築時に発覚した実在の偽陽性
+  (kicker + 見出しの負 margin 引き上げ、行ボックス 7px 重なり/実インク
+  2px 空き — ピクセル実測)を解消し、実衝突 133x8.8px は従来どおり検出。
+  副産物のバグも修正: 重なりを ink band で測りつつ面積比を *box* 面積で
+  割っていたため、実衝突が 0.32→0.19 に落ちて消えていた(単位の不一致)。
+  (b) 床自体を下げて細片を拾う方は **未着手・gate 継続**
+  (`fixtures/collision-fp-corpus/sliver-true-positive.html` が判定基準)。
+  旧記述:
   現行は text-block の bounding box 重なり(両軸 6px AND + 小さい側の面積
   25%)。細片重なり(縦 18px × 横 3px = 実際に壊れて見える)が床下で無報告。
   `Range.getClientRects()` / `measureText().actualBoundingBox*` による

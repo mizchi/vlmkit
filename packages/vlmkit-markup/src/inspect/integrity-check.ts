@@ -346,6 +346,15 @@ export interface IntegrityTextBlock {
   zIndex: number;
   /** Inside an aria-hidden="true" subtree (decorative). */
   ariaHidden: boolean;
+  /**
+   * Vertical slack (px) between this block's line box and the actual glyph
+   * ink inside it, per edge — half of (line-box height - (ascent+descent))
+   * from canvas font metrics. Used to shrink boxes to their ink band before
+   * the overlap test, which is what keeps a `line-height: 0.8` or negative
+   * `margin-bottom` pull-up from reading as a collision. Absent (0) when
+   * the metrics were unavailable.
+   */
+  inkInset?: number;
 }
 
 export interface TextCollisionOptions {
@@ -377,16 +386,33 @@ export function findTextCollisions(
       // One block containing the other is nesting (a wrapper block whose
       // own text and a child block both bucketed), not a collision.
       const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
-      const oy = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+      // Compare INK bands vertically, not line boxes. Designed negative
+      // leading (`line-height: 0.8`) and the kicker/heading pull-up
+      // (`margin-bottom: -0.15em`) overlap boxes by several px while the
+      // glyphs keep a clear gap — measured 2px on the kicker idiom, which
+      // this gate used to report as a collision. Shrinking each block to its
+      // measured ink band can only REMOVE findings, so it carries none of
+      // the cry-wolf risk of lowering the floor itself.
+      const aInk = a.inkInset ?? 0;
+      const bInk = b.inkInset ?? 0;
+      const aTop = a.y + aInk, aBottom = a.y + a.height - aInk;
+      const bTop = b.y + bInk, bBottom = b.y + b.height - bInk;
+      const oy = Math.min(aBottom, bBottom) - Math.max(aTop, bTop);
       if (ox < minPx || oy < minPx) continue;
       const contains = (o: IntegrityTextBlock, p: IntegrityTextBlock) =>
         o.x <= p.x && o.y <= p.y && o.x + o.width >= p.x + p.width && o.y + o.height >= p.y + p.height;
       if (contains(a, b) || contains(b, a)) continue;
       const area = ox * oy;
-      const smaller = Math.min(a.width * a.height, b.width * b.height);
+      // Both sides of the ratio must use the SAME units. Measuring overlap
+      // on the ink band while dividing by the box area silently tightened
+      // the gate (a real collision fell from 0.32 to 0.19 and vanished), so
+      // the denominator is the ink band too.
+      const aInkArea = a.width * Math.max(1, a.height - 2 * aInk);
+      const bInkArea = b.width * Math.max(1, b.height - 2 * bInk);
+      const smaller = Math.min(aInkArea, bInkArea);
       if (smaller <= 0 || area / smaller < minRatio) continue;
 
-      const pair = { a, b, ox, oy, area };
+      const pair = { a, b, ox, oy: Math.round(oy * 10) / 10, area };
       if (a.ariaHidden || b.ariaHidden) {
         exempted.push({
           kind: "text-collision",
@@ -970,6 +996,27 @@ export function findOccludedText(
 }
 
 export const COLLECT_INTEGRITY_TEXT = `(() => {
+  // Glyph ink is smaller than the line box it sits in. Measure the slack so
+  // the collision test can compare ink bands instead of boxes: a designed
+  // negative-leading or pull-up overlaps boxes while the glyphs keep a clear
+  // gap (measured 2px on the kicker/heading idiom, which the box test
+  // reported as a collision).
+  const inkCtx = (() => { try { return document.createElement("canvas").getContext("2d"); } catch { return null; } })();
+  const inkInsetOf = (el, text) => {
+    if (!inkCtx || !text) return 0;
+    try {
+      const cs = getComputedStyle(el);
+      inkCtx.font = [cs.fontStyle, cs.fontWeight, cs.fontSize, cs.fontFamily].filter(Boolean).join(" ");
+      const m = inkCtx.measureText(text.slice(0, 200));
+      const ink = (m.actualBoundingBoxAscent || 0) + (m.actualBoundingBoxDescent || 0);
+      if (!(ink > 0)) return 0;
+      const fontSize = parseFloat(cs.fontSize) || 0;
+      const lh = cs.lineHeight === "normal" ? fontSize * 1.2 : (parseFloat(cs.lineHeight) || fontSize);
+      // Never claim more slack than the box has, never negative (tight
+      // leading makes lh < ink, i.e. zero slack rather than anti-slack).
+      return Math.max(0, Math.min((lh - ink) / 2, fontSize * 0.5));
+    } catch { return 0; }
+  };
   ${STABLE_SELECTOR_FN}
   const SKIP = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE"]);
   const buckets = new Map();
@@ -1027,6 +1074,7 @@ export const COLLECT_INTEGRITY_TEXT = `(() => {
       overlay: b.overlay,
       zIndex: b.zIndex,
       ariaHidden: b.ariaHidden,
+      inkInset: inkInsetOf(b.el, b.parts.join(" ")),
     }))
     .filter((t) => t.text.length > 0 && t.width > 1 && t.height > 1)
     .sort((a, b) => a.y - b.y || a.x - b.x);

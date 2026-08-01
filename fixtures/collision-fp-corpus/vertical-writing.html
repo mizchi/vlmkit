@@ -1,0 +1,14 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Vertical writing mode</title>
+<style>
+  body { margin: 0; padding: 40px; background: #fff; font-family: system-ui, sans-serif; }
+  /* Vertical text: axis-aligned bounding boxes of adjacent columns overlap
+     horizontally under some metrics, though the columns are distinct.
+     Must stay CLEAN. */
+  .cols { writing-mode: vertical-rl; height: 380px; font-size: 18px; line-height: 1.1; display: flex; gap: 4px; }
+  .cols p { margin: 0; }
+</style></head><body>
+  <div class="cols">
+    <p>縦書きの列がならぶ組版で、行ボックスは重なりうる</p>
+    <p>けれども字面そのものは接触していない状態を作る</p>
+  </div>
+</body></html>
