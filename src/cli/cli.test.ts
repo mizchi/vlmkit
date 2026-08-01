@@ -30,13 +30,24 @@ describe("vrt CLI tree (cac-based)", () => {
     assert.match(r.stdout, /vlmkit\/0\.7\.0/);
   });
 
-  it("`vrt --help` prints top-level usage", () => {
+  it("`vrt --help` prints the use-case map", () => {
     const r = runVrt(["--help"]);
     assert.equal(r.status, 0);
-    assert.match(r.stdout, /vlmkit diff html\|png/);
-    assert.match(r.stdout, /vlmkit check a11y/);
-    assert.match(r.stdout, /vlmkit inspect/);
-    assert.match(r.stdout, /vlmkit markup-loop/);
+    // Use-case-first organization: every section header present.
+    assert.match(r.stdout, /CHECK THE PAGE YOU JUST WROTE OR EDITED/);
+    assert.match(r.stdout, /VERIFY BEHAVIOR, NOT PIXELS/);
+    assert.match(r.stdout, /MATCH A TARGET DESIGN/);
+    assert.match(r.stdout, /TRACK CHANGES OVER TIME/);
+    assert.match(r.stdout, /COMPARE TWO VERSIONS/);
+    assert.match(r.stdout, /AUDIT DESIGN QUALITY/);
+    assert.match(r.stdout, /IMAGE ASSETS/);
+    assert.match(r.stdout, /REPAIR/);
+    assert.match(r.stdout, /FOR CODING AGENTS AND PIPELINES/);
+    // A few load-bearing commands with their when-to-use context.
+    assert.match(r.stdout, /check integrity <page>/);
+    assert.match(r.stdout, /verify markup <page> --target <png>/);
+    assert.match(r.stdout, /markup-loop/);
+    assert.match(r.stdout, /docs\/markup-assist\.md/);
   });
 
   it("`vrt diff` (group, no leaf) prints group usage", () => {

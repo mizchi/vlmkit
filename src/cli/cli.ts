@@ -353,25 +353,59 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<vo
 
   cli.usage(`<command> [options]
 
-VLM-driven frontend toolkit. Visual regression (snapshot / diff /
-regression-watch) + markup synthesis + design audits + CSS auto-repair.
+Deterministic verification for frontend work: markup gates, visual
+regression, design audits, and repair tools. Everything below runs
+without an API key unless marked [key]. Sources are files or URLs.
 
-Common command groups:
-  vlmkit diff html|png|region|elements|component|browsers|agent|runs
-  vlmkit check a11y|palette|tokens|theme|motion|animation|breakpoints|scroll|copy|crater|perf|drift
-  vlmkit inspect interact|explore|smoke
-  vlmkit stress i18n|media
-  vlmkit scan component|breakpoints|scroll|mock
-  vlmkit build component|page
-  vlmkit contract introspect|validate|scaffold
-  vlmkit heal selector
-  vlmkit verify markup
-  vlmkit snapshot [<url>...]
-  vlmkit workflow <subcommand>
-  vlmkit markup-loop <command>
-  vlmkit bench / api / skill / report
+CHECK THE PAGE YOU JUST WROTE OR EDITED (no reference needed)
+  check integrity <page>              broken-page scan across 3 viewports: overflow,
+                                      text collision/clipping/occlusion, invisible text,
+                                      JS errors, failed resources, unstyled page
+  check copy <page> --manifest <txt>  required copy present, visibly, verbatim
+  check layout <page> --contract <js> structural spec (widths, rows, order) per viewport
+  scan scroll | scan handlers <page>  overflow inventory | clickable-<div> detection
 
-Run \`vlmkit <command> --help\` for command-specific options.`);
+VERIFY BEHAVIOR, NOT PIXELS
+  check breakpoints <page> --sweep    responsive boundaries exact, no width overflows
+  check interactions <page>           keyboard operability + ARIA state map
+  check scroll | check animation      sticky/fixed/snap hold | animations run & settle
+  verify flow <page> --flow <json>    scripted user flow, deterministic post-conditions
+
+MATCH A TARGET DESIGN
+  verify markup <page> --target <png> one-shot done verdict + paste-ready fix list
+  build page | build component        composition diff | converge one component
+  scan mock <png>                     normalize a @2x/@3x design export first
+
+TRACK CHANGES OVER TIME (visual regression)
+  snapshot <url> --output <dir>       baseline on first run, per-viewport diff after
+                                      (approve with: snapshot approve)
+  watch | diff-pr | baseline          local inner loop | PR CI gate | baseline admin
+
+COMPARE TWO VERSIONS
+  diff html|png|elements              pixel + computed-style + element diff
+  migration compare                   framework/CSS-swap visual equivalence
+  check equivalence --region          per-region judge for known residuals
+
+AUDIT DESIGN QUALITY
+  check tokens|theme|palette          token scale | dark parity | dominant colors
+  check a11y contrast|touch|focus     WCAG contrast, touch targets, focus order
+  check perf | check drift            Web Vitals | consistency across instances/pages
+  stress i18n | stress media          longer strings | media variants
+
+IMAGE ASSETS (e.g. generated sprites, before they enter a slot)
+  check asset <png> --slot WxH        aspect fit, cut-out background, silhouette
+                                      contrast vs backdrop, palette harmony vs page
+
+REPAIR
+  heal selector <page> <selector>     suggest replacements for a dead selector
+  heal markup                         [key] LLM auto-fix from a verify-markup kickback
+
+FOR CODING AGENTS AND PIPELINES
+  mcp                                 MCP server exposing the gates (stdio)
+  contract | workflow | markup-loop | api | bench | skill | report
+
+Run \`vlmkit <command> --help\` for options; most gates take --json and
+--fail-on-suspect. Task-routing guide with recipes: docs/markup-assist.md`);
 
   // Group commands — second-level dispatch happens in the action.
   for (const groupName of Object.keys(GROUPS)) {

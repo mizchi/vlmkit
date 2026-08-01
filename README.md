@@ -50,13 +50,33 @@ the full task-routing table, done-condition recipes, and agent
 integration (MCP server + `markup-assist` skill) live in
 **[`docs/markup-assist.md`](./docs/markup-assist.md)**.
 
+## When to use what
+
+`vlmkit --help` prints this same map. Everything is key-free unless
+marked `[key]`.
+
+| You want to… | Reach for |
+|---|---|
+| Check the page you just wrote/edited, no reference | `check integrity` (broken-page scan, 3 viewports) · `check copy --manifest` (copy present, visibly, verbatim) · `check layout --contract` · `scan scroll` / `scan handlers` |
+| Verify behavior, not pixels | `check breakpoints --sweep` · `check interactions` · `check scroll` / `check animation` · `verify flow --flow` |
+| Match a target design | `verify markup --target` (done verdict + fix list) · `build page` / `build component` · `scan mock` (normalize @2x exports) |
+| Track changes over time (VRT) | `snapshot` (baseline → per-viewport diff → `snapshot approve`) · `watch` · `diff-pr` · `baseline` |
+| Compare two versions | `diff html\|png\|elements` · `migration compare` · `check equivalence --region` |
+| Audit design quality | `check tokens\|theme\|palette` · `check a11y contrast\|touch\|focus` · `check perf` · `check drift` · `stress i18n\|media` |
+| Vet an image asset before it enters a slot | `check asset --slot --expect-transparent --against-bg --page-palette` |
+| Repair | `heal selector` (dead selector) · `heal markup` `[key]` (LLM auto-fix from a kickback) |
+| Wire into agents / pipelines | `mcp` (gate tools over stdio) · `contract` · `workflow` · `markup-loop` · `api` · `bench` · `skill` |
+
+Task-routing recipes and done-condition sets:
+[`docs/markup-assist.md`](./docs/markup-assist.md).
+
 The CLI is organized into verb groups. Run `vlmkit <group> --help`
 for options.
 
 | Group | Subcommands |
 |---|---|
 | `vlmkit diff` | `html`, `png`, `elements`, `browsers`, `agent`, `runs` (`region` is deprecated) |
-| `vlmkit check` | `integrity`, `copy`, `layout`, `interactions`, `equivalence`, `breakpoints`, `scroll`, `animation`, `motion`, `a11y {contrast,touch,focus}`, `palette`, `tokens`, `theme`, `perf`, `drift {component,pages}`, `crater` |
+| `vlmkit check` | `integrity`, `copy`, `layout`, `interactions`, `equivalence`, `asset`, `breakpoints`, `scroll`, `animation`, `motion`, `a11y {contrast,touch,focus}`, `palette`, `tokens`, `theme`, `perf`, `drift {component,pages}`, `crater` |
 | `vlmkit scan` | `component`, `breakpoints`, `scroll`, `mock`, `handlers` |
 | `vlmkit build` | `component`, `page` |
 | `vlmkit verify` | `markup`, `flow` |
