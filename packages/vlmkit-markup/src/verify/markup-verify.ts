@@ -39,6 +39,7 @@ import {
   type PageMatch,
 } from "../component/page-compose.ts";
 import { kindLabel } from "../component/component-classify.ts";
+import { detectBackground } from "../component/component-bbox.ts";
 import {
   captureRegionElementsFromHtml,
   matchRegionBboxToElement,
@@ -87,20 +88,42 @@ export interface TargetVerdict {
  * ring on one side (S7 endgame: three legs chased two "missing"
  * dividers whose pixels were correct all along). Before a missing or
  * extra blocks the verdict, sample the OTHER side's pixels at the
- * residual's own bbox (fill tolerance 25 — tight enough that white does
- * not pass for a light-gray hairline): if the fill is present there, the element
+ * residual's own bbox. The fill tolerance is clamped against the page
+ * background (see pixelPresence — a bare 25 let white pass for a
+ * light-gray fill): if the fill is present there, the element
  * exists and only the segmentation disagrees — report it, don't block
  * on it. Position still matters: the same line 30px away stays
  * blocking, because the bbox sample misses it.
+ */
+/**
+ * Share of the component's bbox whose pixels match its fill.
+ *
+ * `fillTolerance` absorbs JPEG ringing and antialiasing around a flat
+ * fill, but it must never be loose enough to swallow the page background:
+ * the 2026-08-01 hard-target audit found a `#f1f1f1` card "pixel-confirmed
+ * present" in a render where that area was plain white, because white sits
+ * only 14 units from the fill and the tolerance was 25. A presence test
+ * that cannot tell the fill from the background is vacuous, so pass
+ * `background` and the tolerance is clamped to stay strictly between them.
  */
 export function pixelPresence(
   image: { data: Uint8Array; width: number; height: number },
   component: Pick<PageComponent, "left" | "top" | "width" | "height" | "hex">,
   fillTolerance = 25,
+  background?: [number, number, number],
 ): number {
   const r0 = parseInt(component.hex.slice(1, 3), 16);
   const g0 = parseInt(component.hex.slice(3, 5), 16);
   const b0 = parseInt(component.hex.slice(5, 7), 16);
+  let tolerance = fillTolerance;
+  if (background) {
+    // Halve the fill-to-background distance and step inside it, so a
+    // background pixel can never be counted as the fill present.
+    const bgDist = Math.sqrt(
+      (background[0] - r0) ** 2 + (background[1] - g0) ** 2 + (background[2] - b0) ** 2,
+    );
+    if (bgDist > 0) tolerance = Math.max(1, Math.min(tolerance, Math.floor(bgDist / 2) - 1));
+  }
   let inside = 0;
   let matchingPixels = 0;
   for (let y = component.top; y < component.top + component.height; y++) {
@@ -112,7 +135,7 @@ export function pixelPresence(
       const dist = Math.sqrt(
         (image.data[i]! - r0) ** 2 + (image.data[i + 1]! - g0) ** 2 + (image.data[i + 2]! - b0) ** 2,
       );
-      if (dist <= fillTolerance) matchingPixels++;
+      if (dist <= tolerance) matchingPixels++;
     }
   }
   return inside === 0 ? 0 : matchingPixels / inside;
@@ -447,6 +470,9 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
     const composeOptions = degraded ? { minArea: 1400 } : {};
     const presenceRatio = degraded ? 0.45 : 0.6;
     const presenceFillTolerance = degraded ? 35 : 25;
+    // Clamp the presence tolerance against the page background so a bare
+    // background pixel can never be read as "the fill is present here".
+    const presenceBg = detectBackground(target.data, target.width, target.height);
     const current = await renderHtmlToPng(options.attempt, target.width, target.height);
     const composition = composePageDiff(target, current, composeOptions);
     const shot = await fullPageRestShot(options.attempt, target.width, Math.min(target.height, 800));
@@ -475,9 +501,9 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
       ownImage: { data: Uint8Array; width: number; height: number },
       otherImage: { data: Uint8Array; width: number; height: number },
     ): boolean => {
-      const self = pixelPresence(ownImage, component, presenceFillTolerance);
+      const self = pixelPresence(ownImage, component, presenceFillTolerance, presenceBg);
       if (self <= 0) return false;
-      return pixelPresence(otherImage, component, presenceFillTolerance) >= presenceRatio * self;
+      return pixelPresence(otherImage, component, presenceFillTolerance, presenceBg) >= presenceRatio * self;
     };
     const missingBlocking = composition.missing.filter((m) => !isSegmentationOnly(m, target, shot));
     const missingConfirmed = composition.missing.filter((m) => isSegmentationOnly(m, target, shot));
@@ -495,7 +521,7 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
         side: "target" | "current",
         box: { left: number; top: number; width: number; height: number },
         hex: string,
-      ): number => pixelPresence(side === "target" ? target : shot, { ...box, hex });
+      ): number => pixelPresence(side === "target" ? target : shot, { ...box, hex }, presenceFillTolerance, presenceBg);
       targetKickback.push(...kickbackForComposition(label, {
         ...composition,
         missing: missingBlocking,

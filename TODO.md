@@ -292,7 +292,15 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   fail-closed 統一(+ `--advisory` オプトアウト)が正しいが、既存 CI の
   挙動を反転させる破壊的変更なので CHANGELOG + minor bump 必須。
   docs/introduce.md には実測どおりの分岐を明記済み。
-- [ ] **verify markup: 低コントラスト塗りの取りこぼし(round-10 実測)** —
+- [x] **verify markup: 低コントラスト塗りの取りこぼし(round-10 実測)** —
+  2026-08-01 完了: 原因は 2 箇所の閾値。(1) 前景判定が固定 tolerance 12
+  で `#f4f4f4` on white(距離 11)を背景と分類 → 画像自身のノイズ床から
+  導出する `adaptiveBgTolerance`(クリーン描画 4 / ノイズ多い書き出しは
+  従来の 12 まで、上限は 12 なので従来より鈍くなることはない)。
+  (2) pixel-presence の fillTolerance 25 が白(距離 14)を「塗りあり」と
+  誤判定 → 背景色との距離の半分未満にクランプ。実測で `missing 0` →
+  `missing 2 (genuinely absent)`、同一ページは 4 件一致 0.00% で偽陽性なし。
+  旧記述(参考):
   `#f4f4f4` カードを `#ffffff` ページから 2 枚削除(実差分 2.12% px)
   しても `pixel diff 0.01%` / `DONE`。青に変えれば `missing 2` を正しく
   検出するので、セグメンテーションの量子化閾値が背景に近い塗りを
