@@ -38,6 +38,12 @@ styles, accessibility probes. No screenshots to squint at, no AI
 judgment call in the loop, and — apart from three clearly-marked
 optional extras listed near the end — **no API key**.
 
+(Yes, the name says VLM — vision-language model. The project started
+by asking VLMs to judge pages, measured them against ground truth,
+and found the VLM judge was the unreliable part. The measurements
+became the product; the VLM features were demoted to those optional
+key-gated extras. The name is the fossil record.)
+
 When a check fails, it doesn't just say "failed." It prints what this
 project calls a *kickback* — the defect, where it is (a CSS selector),
 the measured numbers, and usually the direction of the fix:
@@ -69,8 +75,12 @@ of work. What to expect before you install:
 - Point it at a file or at your dev server. It navigates and waits
   for network activity to go idle (30s cap), so React/Vue/
   anything-client-rendered is fine, CSS-in-JS included — styles are
-  measured after they exist. For pages behind a login, point it at a
-  route that doesn't need auth, or at a locally rendered file.
+  measured after they exist. The honest flip side: a page that
+  *never* goes idle (persistent polling, websockets) hits that 30s
+  cap and the gate errors rather than measuring a half-settled page —
+  point it at a locally rendered file or a route without the socket.
+  Same workaround for pages behind a login: a no-auth route or a
+  local file (there is no cookie/storage-state injection today).
 
 ## What you can do with it
 
@@ -83,17 +93,21 @@ elements, invisible text, collapsed containers, JS errors, resources
 that failed to load, a page that rendered unstyled. No reference
 design needed. Intentional patterns (screen-reader-only text, hero
 overlays, ellipsis truncation) are recognized and reported as exempt
-instead of failing.
+instead of failing. This gate has its own real-page false-positive
+audit: [five mirrored external sites](./reports/2026-07-30-integrity-external-dogfood.md)
+(example.com, danluu.com, CSS Zen Garden, Hacker News, W3C APG),
+which surfaced four false-positive classes — all fixed with standing
+regression tests — and one true positive (Hacker News really does
+scroll horizontally at 768px).
 
 **"Is the wording exactly right?"** — `check copy` takes a plain-text
 list of required copy and verifies every line is on the page,
 *visibly*, character-for-character. It opens collapsed accordions and
 unselected tabs (found via their ARIA attributes) so hidden-by-design
-copy passes — the report records which revealed state carried each
-line — but
-copy hidden by trickery — font-size 0, transparent color, off-screen
-positioning, text the same color as its background — is called out
-with a reason class. That invisibility detector (specifically — not
+copy passes, and the report records which revealed state carried each
+line. Copy hidden by trickery is a different story: font-size 0,
+transparent color, off-screen positioning, and text the same color as
+its background are each called out with a reason class. That invisibility detector (specifically — not
 all of copy matching) was audited against seven real websites (MDN,
 Wikipedia, W3C, web.dev, Hacker News, danluu.com, example.com) with
 zero false positives —
@@ -122,8 +136,13 @@ enemy's HP drop by exactly 6, spend the energy, end the turn, take
 **"Does it match the design?"** — `verify markup` compares your build
 against a target screenshot and returns one verdict plus the full fix
 list: which components are missing, misplaced, mis-sized, mis-ordered,
-with selectors attached. `scan mock` first normalizes a retina/Figma
-export to CSS pixels so the comparison is fair.
+with selectors attached. The mechanism is deterministic, not a vision
+model: both images are segmented into solid-fill regions by pixel
+connectivity, regions are paired across target and render by
+position/size/fill, and every unpaired or mismatched region is
+pixel-confirmed against the target before it's allowed to block.
+`scan mock` first normalizes a retina/Figma export to CSS pixels so
+the comparison is fair.
 
 **"Did today's change alter anything visually?"** — `snapshot` captures
 a baseline the first time and reports per-viewport pixel diffs (with
@@ -136,8 +155,9 @@ page slot: right aspect ratio, actually transparent background (not
 matted onto a rectangle), not near-empty, silhouette readable against
 the backdrop it will sit on, colors that don't clash with the page.
 
-The same six, as a copy-paste cheat sheet (with when you'd reach for
-each):
+As a copy-paste cheat sheet (with when you'd reach for each; only
+`verify flow` is missing, because it needs a page-specific flow
+script rather than a one-liner):
 
 ```bash
 # while editing — after any layout/CSS change:
@@ -146,6 +166,8 @@ npx vlmkit check integrity page.html                         # anything broken?
 npx vlmkit check copy page.html --manifest copy.txt          # wording exact & visible?
 # before pushing — when the page is responsive:
 npx vlmkit check breakpoints page.html --sweep               # boundaries hold?
+# before pushing — when the page has interactive controls:
+npx vlmkit check interactions page.html                      # keyboard-operable?
 # while building against a design:
 npx vlmkit verify markup attempt.html --target design.png    # matches the design?
 # continuously / in CI — regression tracking:
@@ -198,8 +220,9 @@ The operational questions a lead will ask, answered plainly:
 
 - **Who maintains the copy manifest?** It's a plain-text file in your
   repo, next to the page it specs. Treat it like the spec it is:
-  copy changes and manifest changes travel in the same PR, and the
-  copy gate in CI is what makes them impossible to forget.
+  copy changes and manifest changes travel in the same PR, and a
+  forgotten manifest update surfaces as a named failing line in the
+  CI copy gate instead of drifting silently.
 - **When do baselines get re-approved?** `snapshot` diffs against the
   stored baseline until someone runs `snapshot approve` — that's the
   deliberate, reviewable re-baseline step. Baselines are files in the
@@ -211,6 +234,15 @@ The operational questions a lead will ask, answered plainly:
   `--allow-invisible <class>`; if it's a genuinely novel intentional
   pattern integrity mis-flags, that's a tool issue — file it (that is
   exactly how the exemption set grew to date).
+- **Where does gate configuration live?** Contracts, flows, copy
+  manifests, and snapshot config (`vrt.config.json`) are files in
+  your repo. Everything else — which gates run per page, and any
+  `--allow-invisible` acceptances — is CLI flags, so the reviewed
+  source of truth is wherever you write the invocation: the CI yaml
+  or an npm script. That's deliberate but has a consequence worth
+  knowing: to see every active suppression, you grep the yaml, and
+  each run's verdict lands in the ledger. There is no central config
+  file that aggregates gate sets today.
 - **Can we encode our own rules?** Yes — two of the gates are
   user-defined by design. `check layout --contract layout.json` turns
   structural rules into a machine-checked contract. This is the whole
@@ -237,9 +269,20 @@ The operational questions a lead will ask, answered plainly:
   check_equivalence, and verify_flow as tools.
 - **How does the manifest scale across pages?** Shared copy means
   shared updates: if a component's CTA text changes and it appears on
-  five pages, five manifests change in that same PR — the copy gate
-  is what makes forgetting one impossible. Manifest updates go
-  through the same review as any copy change.
+  five pages, five manifests change in that same PR — any page whose
+  manifest was forgotten fails its copy gate, provided that page's
+  gate is actually wired into CI (that wiring is yours to maintain).
+  Manifest updates go through the same review as any copy change.
+- **Will it flake in CI?** The geometry gates measure DOM layout in
+  the same pinned Chromium on every run, so they are stable across
+  machines *except* where platform font metrics move text a pixel —
+  rare for suspects, which trigger on gross measurements (156px
+  overflow, 52px overlap), not 1px shifts. Pixel-exact `snapshot`
+  baselines are a different animal: generate them in the same
+  environment that compares them (in CI, or one shared container) —
+  a macOS-made baseline diffed on Linux will disagree about font
+  antialiasing, and that is the classic road to a gate everyone
+  ignores.
 - **What does rollout look like?** Pilot on one page (run
   `check integrity`, expect it to surface existing debt), then add
   `--fail-on-suspect` gates to CI for your critical pages, then
@@ -247,7 +290,7 @@ The operational questions a lead will ask, answered plainly:
   integration is optional and can come last.
 
 
-## For AI coding agents: a referee that can't be argued with
+## For AI coding agents: a referee with an audit trail
 
 (Not using coding agents? Skip ahead — everything above works
 standalone.)
@@ -263,7 +306,10 @@ write-ups in [`docs/reports/`](./reports/)) the working loop is:
    `check interactions` no suspects).
 2. The agent builds, runs the gates itself, reads the failure
    reports, fixes, repeats. Inexpensive models handle this fine — the
-   gates supply the precision the model lacks.
+   zero-shot scenario attempts linked above were driven by Claude
+   Haiku 4.5 and reached their gate done-conditions (some only after
+   audit-driven kickback rounds — the reports show which); the gates
+   supplied the precision the small model lacked.
 3. Every gate invocation is automatically appended to
    `.vlmkit/run-ledger.jsonl` (one JSON line per run: timestamp,
    tool, source, verdict). When an agent says "I verified it," you
@@ -342,7 +388,11 @@ Trust lives in stated boundaries, so here are the ones that matter:
   key: `heal markup`, `check copy --vlm`, and the CSS fix-loop
   experiments.
 
-vlmkit is MIT-licensed.
+vlmkit is MIT-licensed. It is also young — `@mizchi/vlmkit` 0.8.x,
+one maintainer, with the evaluation reports cited here dated within
+weeks of each other. The gates carry the receipts above, but nothing
+substitutes for running them on your own pages; the rollout advice
+(pilot advisory, gate CI later) is sized to that maturity.
 
 ## Try it
 

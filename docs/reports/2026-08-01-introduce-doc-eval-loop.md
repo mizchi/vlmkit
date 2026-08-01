@@ -29,6 +29,7 @@ three rounds had not covered.
 | 4 | 7/10 | retired | 6/10 | all correct incl. round-3 fixes (cheat-sheet when-annotations, SKILL.md excerpt, audit-site names) |
 | 5 | 6/10 | — | 7/10 | all correct incl. round-4 fixes (triage path, manifest ownership, rollout order) |
 | 6 | 6.5/10 | — | 6/10 | all correct incl. round-5 restructure (section order, agent-section compression) |
+| 7 | 7/10 | — | 7/10 | all correct incl. round-6 fixes (minHeight every-match semantics, the 30px-button rule, contract example values) — both personas' best-ever scores |
 
 ## What each round changed
 
@@ -70,6 +71,30 @@ three rounds had not covered.
   `minHeight` in the tool (every-visible-match semantics, reports the
   shortest) rather than weaken the doc, then paste the E2E-verified
   4-rule example into "Can we encode our own rules?".
+
+- **Round 7 → 8**: both personas converged again, this time on
+  honesty gaps rather than missing content: the section heading
+  "a referee that can't be argued with" was self-refuting (the doc
+  itself documents three successful gaming attempts) → retitled
+  "a referee with an audit trail"; "impossible to forget" (×2) →
+  detectability phrasing with the CI-wiring caveat made explicit;
+  cross-environment flakiness silence → a "Will it flake in CI?"
+  bullet (geometry gates stable, snapshot baselines must be
+  generated where they're compared); never-idle pages (polling/
+  websockets) → stated plainly that the gate errors at the 30s cap,
+  plus no-auth-injection admission; `verify markup`'s mechanism
+  (dev: "the one claim I flatly don't believe") → one sentence on
+  connectivity segmentation + region pairing + pixel confirmation;
+  "inexpensive models handle this fine" → named Haiku 4.5 with the
+  kickback-rounds caveat; the unexplained VLM-name tension → the
+  "name is the fossil record" note; suppression persistence → new
+  "Where does gate configuration live?" bullet admitting there is
+  no central config file; integrity FP-audit gap → linked the
+  2026-07-30 five-site external dogfood; project maturity → 0.8.x /
+  one-maintainer disclosure sized to the rollout advice. Also fixed
+  a broken em-dash sentence in the copy-gate paragraph and the
+  cheat sheet's silent omission of `check interactions` (added; only
+  `verify flow` stays out, with the reason stated).
 
 ## Convergence call after round 3 (superseded — loop resumed)
 
