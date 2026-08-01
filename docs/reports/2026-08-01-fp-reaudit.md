@@ -62,16 +62,47 @@ output.
 
 ## Results (valid run)
 
-See `ab-integrity.md` / `ab-copy.md` in the audit scratch directory for
-the per-page diff. Summary and classification below.
+Both arms were proven different before the results were read:
+
+- **copy canary** — MDN (the only corpus page with open shadow roots)
+  moved 11396 → 11482 chars; every other page identical.
+- **integrity canary** — Hacker News's overflow message changed from
+  `sticking out: #hnmain (right edge 804px), #hnmain > tbody:nth-of-type(1) …`
+  to `caused by: #hnmain (796px wide; constraining it removes 36px of the
+  overflow)`. Same finding, better attribution — and proof the integrity
+  code path differs between arms.
 
 ### `check integrity` — 8 pages × 3 viewports
 
-_Filled in from the valid run._
+| Page | before | after | exempted |
+|---|---|---|---|
+| apg-tabs | defects (36) | defects (36) | 0 → 0 |
+| danluu | clean (2 warns) | clean (2 warns) | 0 → 0 |
+| example | clean (0) | clean (0) | 0 → 0 |
+| hn | defects (7) | defects (7) | 0 → 0 |
+| mdn-flex | defects (77) | defects (77) | 9 → 9 |
+| webdev-lcp | defects (28) | defects (28) | 0 → 0 |
+| wikipedia-css | defects (25) | defects (25) | 0 → 0 |
+| zengarden | defects (24) | defects (24) | 25 → 25 |
+
+**0 new findings, 0 disappeared, 0 exemption changes** across 199
+findings and 34 exemptions. The unchanged exemption counts matter
+independently: an exempted-pattern turning into a finding is the
+false-positive signature for the intentional-pattern classes, and none
+occurred.
+
+The most load-bearing single result: **CSS Zen Garden reports 3
+`occluded-text` findings and they are the same 3 in both arms.** That
+page is a showcase of decorative absolutely-positioned art, exactly the
+material the `pointer-events` override could have turned into false
+occluders — and it did not.
 
 ### `check copy` visibility model
 
-_Filled in from the valid run._
+**0 new invisible-chunks, 0 new issues.** Visible-text length changed on
+one page only (MDN, +86 normalized chars), which is precisely the page
+with open shadow roots. The shadow traversal is a strict no-op where no
+open shadow root exists.
 
 ### Regression battery
 
@@ -95,3 +126,37 @@ So the new code path is exercised by exactly one page in this corpus.
 The synthetic regression test covers both halves (visible shadow copy
 satisfies the gate; `font-size: 0` shadow copy still does not), but
 real-site evidence for the shadow path is thin — one page, 81 chars.
+
+## What this corpus does and does not gate
+
+Defect-class coverage, measured (per-viewport counts on representative
+pages): `js-error` and `broken-font` / `broken-image` dominate and are
+mostly mirror artifacts — harmless here because they cancel across arms.
+The classes that carry real signal for this audit:
+
+| Class | Corpus coverage | Verdict for the changes under test |
+|---|---|---|
+| `occluded-text` | 3 (zengarden) | adequate — decorative-overlay-heavy page, no new findings |
+| `low-contrast-text` / `invisible-text` | 9 | adequate |
+| component extraction (via `verify markup`) | not exercised on real pages | **gap** — the adaptive-tolerance change is covered only by unit tests and the synthetic reproduction |
+| `text-collision` | **1** (apg-tabs) | **inadequate** |
+
+### The ink-extents upgrade is still NOT unblocked
+
+The backlog gated it on "a false-positive re-audit," and it would be
+convenient to read this audit as satisfying that. It does not. With a
+single `text-collision` finding in the whole corpus, this corpus cannot
+distinguish "the collision floor got looser without crying wolf" from
+"nothing happened to be near the floor."
+
+What that gate actually needs, now specified: a corpus of pages with
+dense text overlap — tight `line-height` (< 1) display type, negative
+`margin-bottom` heading patterns, fonts whose ascent+descent exceed 1em,
+`writing-mode: vertical-rl`, and rotated text — measured for
+`text-collision` findings before and after. The A/B harness built here
+is the right instrument for it; the corpus is not.
+
+What this audit *does* establish: the five threshold/behaviour changes
+shipped this session introduce zero false positives on real markup, and
+the harness plus the arm-isolation check are reusable for the next
+threshold change.

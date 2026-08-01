@@ -316,6 +316,13 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   22 本バッテリーでの FP 再監査を通すまで着手しない**(床を緩めるのが
   ゲート不信の典型経路)。docs/introduce.md の Honest limits に既知の
   盲点として明記済み。
+  **2026-08-01 追記(FP 再監査の結論)**: 実サイト8ページの A/B 監査
+  (`docs/reports/2026-08-01-fp-reaudit.md`)を実施したが、**この gate は
+  まだ開いていない**。corpus 全体で text-collision の検出が1件しかなく、
+  「床を緩めても誤報しない」と「たまたま床付近に何も無かった」を区別
+  できない。必要な corpus を特定済み: `line-height < 1` のディスプレイ
+  書体、見出しの負 margin-bottom、ascent+descent > 1em のフォント、
+  `writing-mode: vertical-rl`、回転テキスト。A/B ハーネス自体は再利用可。
 - [ ] **マルチページランナー** — glob 指定で全ページのゲートを並列
   実行(`vlmkit check integrity "routes/**.html"` 相当)。CI 時間予算
   の質問に答える sharding / 並列度の実測値も。
