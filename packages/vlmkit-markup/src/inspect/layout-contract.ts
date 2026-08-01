@@ -39,6 +39,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
@@ -212,6 +213,11 @@ function collectRects(selectors: string[]): Record<string, LayoutRect[]> {
 }
 
 export interface LayoutVerifyOptions {
+  /**
+   * Playwright storage-state file so gates can measure pages behind a
+   * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
+   */
+  storageState?: string;
   source: string;
   contract: LayoutContract;
   /** Height per viewport width (defaults match check integrity). */
@@ -231,7 +237,7 @@ export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<Lay
     const widths = [...new Set(options.contract.rules.map((r) => r.at))].sort((a, b) => b - a);
     for (const width of widths) {
       const height = options.heights?.[width] ?? DEFAULT_HEIGHTS[width] ?? 800;
-      const page = await browser.newPage({ viewport: { width, height } });
+      const page = await browser.newPage(withAuthState({ viewport: { width, height } }, options.storageState));
       await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
       const rules = options.contract.rules.filter((r) => r.at === width);
       const selectors = [...new Set(rules.flatMap((r) => r.above ? [r.selector, r.above] : [r.selector]))];

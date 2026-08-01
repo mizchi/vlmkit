@@ -58,6 +58,7 @@ import {
   type TextBlock,
 } from "./copy-target.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -591,6 +592,11 @@ export function analyzeCopy(input: {
 }
 
 export interface CopyCheckOptions {
+  /**
+   * Playwright storage-state file so gates can measure pages behind a
+   * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
+   */
+  storageState?: string;
   source: string;
   html?: string;
   manifestPath?: string;
@@ -639,7 +645,7 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
   let stateSweep: StateSweep | undefined;
   let redirectNote: string | null = null;
   try {
-    const page = await browser.newPage({ viewport });
+    const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
     if (options.html !== undefined) {
       await page.setContent(options.html, { waitUntil: "networkidle" });
     } else if (isUrl(options.source)) {
@@ -845,6 +851,9 @@ is the user-visible copy spec — keep assistive-tech-only strings out
 of it. Markdown headings in the manifest ("# Section") are organizing
 comments, not required lines.
 
+  --storage-state <file>  Playwright storage state for pages behind a login
+                          (or set VLMKIT_STORAGE_STATE)
+
 Reason classes: zero-size, hidden, transparent, visually-hidden
 (sr-only-style clip/1px box), unreachable (off-screen/clipped),
 camouflage, unknown. When an invisibility is deliberate, accept that
@@ -872,6 +881,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   let vlm: string | true | undefined;
   let json = false;
   let failOnSuspect = false;
+  let storageState: string | undefined;
   let exploreStates = true;
   let allowInvisible: InvisibleReason[] | undefined;
   const positional: string[] = [];
@@ -894,6 +904,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
       allowInvisible = classes as InvisibleReason[];
     } else if (arg === "--json") json = true;
     else if (arg === "--fail-on-suspect") failOnSuspect = true;
+    else if (arg === "--storage-state") storageState = argv[++i];
     else if (!arg.startsWith("-")) positional.push(arg);
   }
   if (positional.length === 0) printUsage(1);
@@ -918,6 +929,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 
   const report = await runCopyCheck({
     source: positional[0]!,
+    ...(storageState ? { storageState } : {}),
     ...(manifestPath ? { manifestPath } : {}),
     ...(targetPath ? { targetPath } : {}),
     ...(outDir ? { outDir } : {}),

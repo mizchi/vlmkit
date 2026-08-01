@@ -38,6 +38,7 @@ import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -1332,6 +1333,11 @@ export const COLLECT_STYLE_FINGERPRINT = `(() => {
 // Runner
 
 export interface IntegrityOptions {
+  /**
+   * Playwright storage-state file so gates can measure pages behind a
+   * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
+   */
+  storageState?: string;
   source: string;
   /** Sweep widths (default 1280, 768, 375). */
   viewports?: { width: number; height: number }[];
@@ -1379,7 +1385,7 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
     const url = isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
     for (let vi = 0; vi < viewports.length; vi++) {
       const viewport = viewports[vi]!;
-      const page = await browser.newPage({ viewport });
+      const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
       const events: RuntimeEvent[] = [];
       const netFailures: NetworkFailure[] = [];
       let loaded = false;
@@ -1608,6 +1614,8 @@ Options:
   --viewports <w,w,...>  Sweep widths (default: 1280,768,375)
   --max-findings <n>     Per-class report cap (default: 12)
   --json                 Print JSON report
+  --storage-state <file> Playwright storage state, to measure pages behind
+                         a login (or set VLMKIT_STORAGE_STATE)
 Exit code is non-zero when the verdict is "defects".`);
   process.exit(exitCode);
 }
@@ -1617,11 +1625,13 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   let json = false;
   let maxFindings: number | undefined;
   let widths: number[] | undefined;
+  let storageState: string | undefined;
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === "--json") json = true;
     else if (arg === "--max-findings") maxFindings = Number.parseInt(argv[++i] ?? "12", 10);
+    else if (arg === "--storage-state") storageState = argv[++i];
     else if (arg === "--viewports") {
       widths = (argv[++i] ?? "").split(",").map((w) => Number.parseInt(w, 10)).filter((w) => w > 0);
       if (widths.length === 0) printUsage(1);
@@ -1634,6 +1644,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     source,
     ...(widths ? { viewports: widths.map((w) => ({ width: w, height: heights[w] ?? 800 })) } : {}),
     ...(maxFindings !== undefined ? { maxFindings } : {}),
+    ...(storageState ? { storageState } : {}),
   });
   if (json) console.log(JSON.stringify(report, null, 2));
   else console.log(formatIntegrityReport(report));

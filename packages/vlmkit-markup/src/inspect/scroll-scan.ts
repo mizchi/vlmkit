@@ -26,6 +26,7 @@
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { UiExpectedScrollportContract } from "../contract/ui-contract.ts";
@@ -121,6 +122,11 @@ export interface ScrollScanReport {
 }
 
 export interface ScrollScanOptions {
+  /**
+   * Playwright storage-state file so gates can measure pages behind a
+   * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
+   */
+  storageState?: string;
   source: string;
   html?: string;
   viewport?: { width: number; height: number };
@@ -394,7 +400,7 @@ export async function runScrollScan(options: ScrollScanOptions): Promise<ScrollS
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({ viewport });
+    const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
     if (options.html !== undefined) {
       await page.setContent(options.html, { waitUntil: "networkidle" });
     } else if (isUrl(options.source)) {

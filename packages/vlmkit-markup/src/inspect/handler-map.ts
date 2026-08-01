@@ -33,6 +33,7 @@
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { DISCOVER_SCRIPT, settleAfterLoad } from "./interaction-map.ts";
@@ -161,11 +162,11 @@ const COLLECT_SURFACE_SCRIPT = `
 })()
 `;
 
-export async function buildHandlerSurface(options: { source: string }): Promise<HandlerSurface> {
+export async function buildHandlerSurface(options: { source: string; storageState?: string }): Promise<HandlerSurface> {
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    const page = await browser.newPage(withAuthState({ viewport: { width: 1280, height: 800 } }, options.storageState));
     await page.addInitScript(HANDLER_PATCH_SCRIPT);
     const url = /^(https?|file):\/\//.test(options.source)
       ? options.source

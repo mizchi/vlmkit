@@ -590,3 +590,54 @@ test("M14d aria-hidden decorative text under a figure is exempted", { timeout: 1
   assert.ok(!report.findings.some((f) => f.kind === "occluded-text"), JSON.stringify(report.findings));
   assert.ok(report.exempted.some((e) => e.kind === "occluded-text" && /aria-hidden/.test(e.reason)));
 });
+
+// Auth support (2026-08-01 hard-target audit). Before this, pointing a gate
+// at a session-protected route followed the 302 and reported the LOGIN page
+// as CLEAN — a green verdict for a page that never rendered. Now: no
+// session => reported as a defect; with a storage state => the real page is
+// measured, defects and all.
+test("storage state unlocks a session-protected page; without it the redirect is a defect", { timeout: 120_000 }, async () => {
+  const { createServer } = await import("node:http");
+  const server = createServer((req, res) => {
+    const authed = /sid=good/.test(req.headers.cookie || "");
+    if (req.url === "/private" && !authed) {
+      res.writeHead(302, { location: "/login" });
+      return res.end();
+    }
+    res.writeHead(200, { "content-type": "text/html" });
+    res.end(req.url === "/private"
+      ? `<!doctype html><body style="margin:0"><h1>Private figures</h1>
+         <div style="width:900px;background:#eef">wide protected panel</div></body>`
+      : `<!doctype html><body style="margin:0"><h1>Sign in</h1><p>Session required.</p></body>`);
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+  const port = (server.address() as { port: number }).port;
+  const url = `http://127.0.0.1:${port}/private`;
+  const stateFile = join(DIR, "auth-state.json");
+  writeFileSync(stateFile, JSON.stringify({
+    cookies: [{
+      name: "sid", value: "good", domain: "127.0.0.1", path: "/",
+      expires: -1, httpOnly: false, secure: false, sameSite: "Lax",
+    }],
+    origins: [],
+  }));
+  try {
+    const anon = await runIntegrityCheck({ source: url, viewports: [{ width: 375, height: 700 }] });
+    assert.equal(anon.verdict, "defects");
+    const redirect = anon.findings.find((f) => f.kind === "redirected");
+    assert.ok(redirect, `expected a redirected finding, got: ${kinds(anon)}`);
+    assert.match(redirect!.message, /login wall/i);
+
+    const authed = await runIntegrityCheck({
+      source: url,
+      viewports: [{ width: 375, height: 700 }],
+      storageState: stateFile,
+    });
+    // The real page was measured: no redirect finding, and its own defect shows.
+    assert.ok(!authed.findings.some((f) => f.kind === "redirected"), JSON.stringify(authed.findings));
+    const overflow = authed.findings.find((f) => f.kind === "page-overflow-x");
+    assert.ok(overflow, `expected the protected page's overflow, got: ${kinds(authed)}`);
+  } finally {
+    await new Promise<void>((r) => server.close(() => r()));
+  }
+});

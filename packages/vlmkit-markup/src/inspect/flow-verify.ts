@@ -27,6 +27,7 @@ import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Page } from "playwright";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
@@ -154,6 +155,11 @@ function evalAssertion(spec: FlowAssert): (s: FlowAssert) => [boolean, string] {
 }
 
 export interface FlowVerifyOptions {
+  /**
+   * Playwright storage-state file so gates can measure pages behind a
+   * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
+   */
+  storageState?: string;
   source: string;
   flow: Flow;
 }
@@ -163,7 +169,7 @@ export async function runFlowVerify(options: FlowVerifyOptions): Promise<FlowVer
   const browser = await chromium.launch();
   const steps: StepResult[] = [];
   try {
-    const page = await browser.newPage({ viewport: options.flow.viewport ?? { width: 1280, height: 800 } });
+    const page = await browser.newPage(withAuthState({ viewport: options.flow.viewport ?? { width: 1280, height: 800 } }, options.storageState));
     const url = /^(https?|file):\/\//.test(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
     await page.goto(url, { waitUntil: "load", timeout: 30000 });
 

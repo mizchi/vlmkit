@@ -40,6 +40,7 @@
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { Page } from "playwright";
@@ -647,6 +648,11 @@ function describeKey(key: string): string {
 // The probe driver
 
 export interface InteractionMapOptions {
+  /**
+   * Playwright storage-state file so gates can measure pages behind a
+   * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
+   */
+  storageState?: string;
   source: string;
   maxElements?: number;
   settleMs?: number;
@@ -692,7 +698,7 @@ export async function buildInteractionMap(options: InteractionMapOptions): Promi
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    const page = await browser.newPage(withAuthState({ viewport: { width: 1280, height: 800 } }, options.storageState));
     await gotoSource(page, options.source);
     const discovered = await page.evaluate(DISCOVER_SCRIPT) as DiscoveredElement[];
     const capped = Math.max(0, discovered.length - maxElements);
