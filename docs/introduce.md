@@ -57,17 +57,20 @@ vlmkit calls each of these checks a **gate**: it either passes or it
 blocks, and a fixed set of gates is how you define "done" for a piece
 of work. What to expect before you install:
 
-- A gate typically runs in a few seconds — one headless page render
-  plus math. Multi-viewport gates (`check integrity`,
-  `check breakpoints --sweep`) render several widths, so think
-  seconds, not minutes; re-running ten times in a fix loop is cheap.
+- A single-render gate runs in a few seconds. Multi-viewport gates
+  render several widths (`check integrity`: three) and
+  `check breakpoints --sweep` renders every fuzz step, so those sit
+  at the tens-of-seconds end on a breakpoint-heavy page — still cheap
+  enough to re-run ten times in a fix loop. Gate findings come in two
+  severities: a **suspect** blocks (and fails CI with
+  `--fail-on-suspect`); a **warn** is advisory.
 - Setup is `npm install` plus a one-time Playwright Chromium download
   (a browser — expect on the order of 150 MB, a few minutes once).
 - Point it at a file or at your dev server. It navigates and waits
   for network activity to go idle (30s cap), so React/Vue/
-  anything-client-rendered is fine. Pages behind a login are the
-  usual headless-browser story: point it at a route that doesn't
-  need auth, or at a locally rendered file.
+  anything-client-rendered is fine, CSS-in-JS included — styles are
+  measured after they exist. For pages behind a login, point it at a
+  route that doesn't need auth, or at a locally rendered file.
 
 ## What you can do with it
 
@@ -85,13 +88,26 @@ instead of failing.
 **"Is the wording exactly right?"** — `check copy` takes a plain-text
 list of required copy and verifies every line is on the page,
 *visibly*, character-for-character. It opens collapsed accordions and
-unselected tabs so hidden-by-design copy passes (with provenance), but
+unselected tabs (found via their ARIA attributes) so hidden-by-design
+copy passes — the report records which revealed state carried each
+line — but
 copy hidden by trickery — font-size 0, transparent color, off-screen
 positioning, text the same color as its background — is called out
-with a reason class. Audited against seven real websites (MDN,
+with a reason class. That invisibility detector (specifically — not
+all of copy matching) was audited against seven real websites (MDN,
 Wikipedia, W3C, web.dev, Hacker News, danluu.com, example.com) with
 zero false positives —
 [methodology and full results here](./reports/2026-07-31-copy-invisible-real-site-audit.md).
+The manifest itself is three lines of convention:
+
+```
+# copy.txt — one required line per row; "# " headings are comments
+Start your free trial
+Cancel anytime
+```
+
+Whitespace is normalized, matching is case-sensitive (casing is
+spec), and a line may match anywhere on the page.
 
 **"Does it actually behave?"** — `check breakpoints --sweep` proves
 your responsive boundary is exact (no width where the layout breaks,
@@ -180,7 +196,7 @@ run write-ups in [`docs/reports/`](./reports/)):
 2. The agent builds, runs the gates itself, reads the kickbacks, fixes,
    repeats. Inexpensive models handle this fine: the gates supply the
    precision the model lacks.
-3. Every gate invocation is appended to a local ledger
+3. Every gate invocation is automatically appended to a local ledger
    (`.vlmkit/run-ledger.jsonl`, one JSON line per run):
 
    ```json
@@ -256,6 +272,38 @@ reference-free, name the defect, and are built to referee an agent's
 work loop. The two approaches compose: gates while building,
 baseline diffs to hold the line afterwards.
 
+## Adopting in a team
+
+The operational questions a lead will ask, answered plainly:
+
+- **Who maintains the copy manifest?** It's a plain-text file in your
+  repo, next to the page it specs. Treat it like the spec it is:
+  copy changes and manifest changes travel in the same PR, and the
+  copy gate in CI is what makes them impossible to forget.
+- **When do baselines get re-approved?** `snapshot` diffs against the
+  stored baseline until someone runs `snapshot approve` — that's the
+  deliberate, reviewable re-baseline step. Baselines are files in the
+  output directory you chose; version or ignore them per your team's
+  taste (they're plain PNGs + a JSON report, no service, no lock-in).
+- **What's the false-positive triage path?** Read the finding: if the
+  gate itself recognized intent it's already under `exempted` (not a
+  failure); if it's deliberately hidden copy, accept its class with
+  `--allow-invisible <class>`; if it's a genuinely novel intentional
+  pattern integrity mis-flags, that's a tool issue — file it (that is
+  exactly how the exemption set grew to date).
+- **Can we encode our own rules?** Yes — two of the gates are
+  user-defined by design. `check layout --contract layout.json` turns
+  structural rules ("the sidebar is 260px at 1280", "stat cards are
+  2×2 at 768", "buttons ≥ 48px tall on mobile") into a machine-checked
+  contract, and `verify flow --flow flow.json` does the same for
+  behavior ("click X, then Y must show Z"). Your design-system rules
+  become gates without writing tool code.
+- **What do agents get vs. juniors?** The same kickbacks. Juniors get
+  named, measured CSS lessons; agents get a referee. The MCP server
+  exposes verify_markup, check_integrity, check_copy,
+  check_interactions, scan_handlers, build_page, check_layout,
+  check_equivalence, and verify_flow as tools.
+
 ## Honest limits
 
 Trust lives in stated boundaries, so here are the ones that matter:
@@ -285,8 +333,7 @@ Trust lives in stated boundaries, so here are the ones that matter:
   cover content while pinned are measured as scroll-escapable and
   exempted; hero text-over-image overlays are exempted when the
   backing is measured as such; dynamic content (tickers, timestamps)
-  is the `snapshot --mask ".selector"` story, not an integrity
-  concern. Transient states (open modals, hovering tooltips) are only
+  is handled by `snapshot --mask ".selector"`, not by integrity. Transient states (open modals, hovering tooltips) are only
   checked if a flow step opens them.
 
 ## What vlmkit is not
