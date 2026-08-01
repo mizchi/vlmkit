@@ -56,7 +56,18 @@ export interface ScrollPageSample {
   scrollWidth: number;
   scrollHeight: number;
   /** Elements whose border box sticks out past the right viewport edge. */
-  overflowOffenders: { selector: string; right: number; width: number }[];
+  overflowOffenders: {
+    selector: string;
+    right: number;
+    width: number;
+    /**
+     * Page overflow (px) that disappears when this element's own width /
+     * min-width rigidity is neutralized. High = this element is a cause;
+     * 0 = it was merely stretched by something else. Absent when the
+     * measurement was not run (only the top candidates are probed).
+     */
+    relieves?: number;
+  }[];
 }
 
 export interface ScrollScanInput {
@@ -184,15 +195,27 @@ export function analyzeScrollSamples(
 
   const issues: ScrollScanIssue[] = [];
   if (horizontalOverflow >= minOverflow) {
-    const offenders = input.page.overflowOffenders
+    // Lead with measured causes when we have them: constraining these is
+    // what actually removes the overflow. Fall back to the widest boxes
+    // when nothing was probed or nothing relieved anything.
+    const causes = input.page.overflowOffenders
+      // 10% keeps co-causes visible (two rigid siblings splitting the
+      // blame) without promoting rounding noise into a "cause".
+      .filter((o) => (o.relieves ?? 0) >= Math.max(minOverflow, horizontalOverflow * 0.1))
+      .sort((a, b) => (b.relieves ?? 0) - (a.relieves ?? 0))
+      .slice(0, 3);
+    const widest = input.page.overflowOffenders
       .slice(0, 3)
       .map((o) => `${o.selector} (right edge ${o.right}px)`)
       .join(", ");
+    const detail = causes.length > 0
+      ? ` — caused by: ${causes.map((o) => `${o.selector} (${o.width}px wide; constraining it removes ${o.relieves}px of the overflow)`).join(", ")}`
+      : (widest ? ` — sticking out: ${widest}` : "");
     issues.push({
       kind: "page-overflow-x",
       severity: "suspect",
       message: `The page scrolls horizontally by ${horizontalOverflow}px at ${input.page.viewportWidth}px viewport width` +
-        (offenders ? ` — sticking out: ${offenders}` : "") + ".",
+        detail + ".",
     });
   }
   for (const clip of clipped.slice(0, maxFindings)) {
@@ -310,13 +333,48 @@ export const COLLECT_SCROLL_SCRIPT = `(() => {
   const viewportWidth = window.innerWidth;
   const offenders = [];
   if (doc.scrollWidth > viewportWidth + 1) {
+    const cands = [];
     for (const el of Array.from(document.querySelectorAll("body *"))) {
       const rect = el.getBoundingClientRect();
       if (rect.right > viewportWidth + 1 && rect.width > 0) {
-        offenders.push({ selector: stableSelector(el), right: Math.round(rect.right), width: Math.round(rect.width) });
+        cands.push({ el, selector: stableSelector(el), right: Math.round(rect.right), width: Math.round(rect.width) });
       }
     }
-    offenders.sort((a, b) => b.right - a.right);
+    cands.sort((a, b) => b.right - a.right);
+    // Ranking by right edge names symptoms, not causes: in a grid/flex
+    // shell one rigid child stretches the track, so every stretched
+    // ancestor and sibling reports a larger right edge than the element
+    // actually at fault (2026-08-01 hard-target audit: a 760px table made
+    // the gate blame the sidebar and the page shell). So measure instead
+    // of ranking — neutralize each candidate's own rigidity and see how
+    // much page overflow disappears; that delta is the "relieves" value.
+    // Probe generously: the culprit is often ranked LOW by right edge
+    // (stretched ancestors and siblings outrank it), so a small window
+    // would reproduce the very bug this measurement exists to fix.
+    const baseline = doc.scrollWidth;
+    for (const c of cands.slice(0, 40)) {
+      const el = c.el;
+      const prevW = el.style.getPropertyValue("width");
+      const prevWP = el.style.getPropertyPriority("width");
+      const prevMin = el.style.getPropertyValue("min-width");
+      const prevMinP = el.style.getPropertyPriority("min-width");
+      el.style.setProperty("width", "0", "important");
+      el.style.setProperty("min-width", "0", "important");
+      const after = doc.scrollWidth;
+      if (prevW) el.style.setProperty("width", prevW, prevWP); else el.style.removeProperty("width");
+      if (prevMin) el.style.setProperty("min-width", prevMin, prevMinP); else el.style.removeProperty("min-width");
+      c.relieves = Math.max(0, baseline - after);
+    }
+    // Measured causes must survive the report's top-N slice, so order by
+    // how much overflow each element accounts for and fall back to right
+    // edge (which keeps the pre-measurement ordering when nothing relieved).
+    cands.sort((a, b) => ((b.relieves || 0) - (a.relieves || 0)) || (b.right - a.right));
+    for (const c of cands) {
+      offenders.push({
+        selector: c.selector, right: c.right, width: c.width,
+        ...(c.relieves !== undefined ? { relieves: c.relieves } : {}),
+      });
+    }
   }
 
   return {

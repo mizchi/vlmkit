@@ -320,6 +320,31 @@ describe("S14b mutation battery", () => {
     assert.equal(overflow?.severity, "fail");
   });
 
+  // 2026-08-01 hard-target audit: in a grid shell, one rigid child
+  // stretches the track, so every stretched ancestor and sibling outranks
+  // the culprit by right edge. The kickback named the sidebar and the page
+  // shell — three selectors, none of them the thing to edit. The cause is
+  // now measured (constrain the element, re-read scrollWidth) rather than
+  // guessed from box geometry.
+  test("M7b grid shell: overflow blames the rigid child, not the stretched shell", { timeout: 120_000 }, async () => {
+    const file = page("m7b.html", `
+      <div class="shell" style="display:grid;grid-template-columns:200px 1fr">
+        <nav class="side"><strong>Nav</strong></nav>
+        <main class="main" style="padding:20px">
+          <h1>Report</h1>
+          <p class="lede">Body copy that stretches to whatever the track allows.</p>
+          <div class="rigid" style="width:900px;background:#eef">fixed 900px wide</div>
+        </main>
+      </div>`);
+    const report = await runIntegrityCheck({ source: file, viewports: [{ width: 375, height: 700 }] });
+    const overflow = report.findings.find((f) => f.kind === "page-overflow-x");
+    assert.equal(overflow?.severity, "fail");
+    assert.match(overflow!.message, /caused by:/);
+    assert.match(overflow!.message, /\.rigid/);
+    // The stretched shell must not be presented as the thing to fix.
+    assert.doesNotMatch(overflow!.message, /caused by:[^.]*nav\.side/);
+  });
+
   test("M8 404 stylesheet with no fallback: failed-stylesheet + unstyled-page fail", { timeout: 120_000 }, async () => {
     const file = page("m8.html", `<h1>Heading</h1><p>Body text long enough to paint.</p><a href="#x">a link</a>`,
       `<link rel="stylesheet" href="./missing.css">`);

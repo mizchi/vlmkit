@@ -243,6 +243,47 @@ test("silencing battery: geometric hiding vectors are caught, reachable text sta
   }
 });
 
+// 2026-08-01 hard-target audit: a custom element's visible badge text was
+// reported copy-missing because innerText and a document-scoped TreeWalker
+// both stop at the shadow boundary. Design systems built on web components
+// keep ALL their copy there, so this was a first-day false positive.
+test("open shadow-root copy counts as visible; hidden shadow copy still caught (E2E)", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "copy-shadow-"));
+  try {
+    const html = `<!doctype html><body>
+      <h1>Ledger</h1>
+      <ledger-badge></ledger-badge>
+      <sneaky-badge></sneaky-badge>
+      <script>
+        customElements.define("ledger-badge", class extends HTMLElement {
+          connectedCallback() {
+            this.attachShadow({ mode: "open" }).innerHTML =
+              '<style>.b{font:600 13px system-ui;color:#1a7f42}</style><span class="b">Reconciled nightly</span>';
+          }
+        });
+        customElements.define("sneaky-badge", class extends HTMLElement {
+          connectedCallback() {
+            this.attachShadow({ mode: "open" }).innerHTML =
+              '<span style="font-size:0">Fees may apply</span>';
+          }
+        });
+      </script></body>`;
+    const page = join(dir, "page.html");
+    const manifest = join(dir, "copy.txt");
+    await writeFile(page, html);
+    await writeFile(manifest, ["Ledger", "Reconciled nightly", "Fees may apply"].join("\n"));
+
+    const report = await runCopyCheck({ source: page, manifestPath: manifest });
+    // Visible shadow text satisfies the gate...
+    assert.deepEqual(report.missingLines, [], JSON.stringify(report.issues));
+    // ...but hiding copy inside a shadow root is still not a way to pass.
+    assert.deepEqual(report.invisibleLines.map((l) => l.line), ["Fees may apply"]);
+    assert.equal(report.invisibleLines[0]!.reason, "zero-size");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("disclosure-state sweep reveals details / tab / aria-expanded copy (E2E)", async () => {
   const dir = await mkdtemp(join(tmpdir(), "copy-states-"));
   try {

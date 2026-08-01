@@ -39,6 +39,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
+import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { extractComponentsFromRgba } from "../component/component-bbox.ts";
 import { analyzeScrollSamples, COLLECT_SCROLL_SCRIPT, type ScrollScanInput } from "./scroll-scan.ts";
@@ -60,7 +61,8 @@ export type IntegrityFindingKind =
   | "invisible-text"
   | "low-contrast-text"
   | "near-misalignment"
-  | "occluded-text";
+  | "occluded-text"
+  | "redirected";
 
 export interface IntegrityFinding {
   kind: IntegrityFindingKind;
@@ -1408,6 +1410,18 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       // there are no webfonts (already-resolved promise).
       await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => undefined) : undefined));
       await page.waitForTimeout(250); // let post-load timers throw before judging
+
+      // Never report on a URL we did not measure. An auth-walled route
+      // 302s to /login and everything below would judge the login page —
+      // previously yielding a CLEAN verdict for a page that never
+      // rendered. Fail, don't warn: a green gate on the wrong page is the
+      // worst outcome this tool can produce.
+      if (vi === 0) {
+        const redirect = describeRedirect(url, page.url());
+        if (redirect) {
+          push([{ kind: "redirected", severity: "fail", viewport: viewport.width, message: redirect }]);
+        }
+      }
 
       // A1
       push(classifyRuntimeEvents(events, viewport.width));

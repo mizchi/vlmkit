@@ -93,9 +93,11 @@ of work. What to expect before you install:
 - Point it at a file or at your dev server. It navigates and waits
   for network activity to go idle (30s cap), so React/Vue/
   anything-client-rendered is fine, CSS-in-JS included — styles are
-  measured after they exist. The honest flip side: a page that
-  *never* goes idle (persistent polling, websockets) hits that 30s
-  cap and the gate errors rather than measuring a half-settled page —
+  measured after they exist — including client-rendered apps that paint
+  on a tick after `load`, which every gate now waits out. The honest flip
+  side: a page that *never* goes idle (persistent polling, websockets)
+  hits that 30s cap and the gate errors rather than measuring a
+  half-settled page —
   point it at a locally rendered file or a route without the socket.
   Same workaround for pages behind a login: a no-auth route or a
   local file (there is no cookie/storage-state injection today).
@@ -108,6 +110,8 @@ predict where each one is strong and where it will miss:
 | Check | Mechanism | Where it stops |
 |---|---|---|
 | text painted over | `elementFromPoint` sampled across each text range's glyph band; a point counts only when the hit element is unrelated *and* paints opaquely (background alpha ≥ 0.5, a background image, or a replaced element). Hit-testing is forced on page-wide while sampling, so `pointer-events: none` decorative art is still caught | canvas/video/cross-origin-iframe content, blend modes that ruin legibility without covering |
+| horizontal overflow | the culprit is **measured, not ranked**: each candidate's own `width`/`min-width` is neutralized and `scrollWidth` re-read, so the kickback names the rigid element rather than the ancestors it stretched | |
+| copy visibility | text nodes across the document **and every open shadow root** (component-library copy counts), each checked geometrically — see the copy section | closed shadow roots; text drawn into `<canvas>` |
 | invisible / low-contrast text | WCAG contrast of the computed fill against the resolved solid background; **composite backgrounds (gradients, images) are skipped and reported as skipped**, not guessed | gradient-text (`background-clip: text`) is skipped rather than judged |
 | text collision | pairwise overlap of text-block boxes: ≥ 6px on **both** axes *and* ≥ 25% of the smaller block's area; positioned layers and `aria-hidden` sides exempt | thin-sliver overlaps (see Honest limits) |
 | screen-reader-only exemption | geometric: fully clipped (zero-area / `clip` / `clip-path` inset) is intentional; partially cut is a defect | |
@@ -471,7 +475,9 @@ Trust lives in stated boundaries, so here are the ones that matter:
   no-auth route, a locally rendered file, or a fixture page that
   mounts the same components without the login wall. If your
   highest-value pages are all behind auth, price that in before the
-  trial.
+  trial. Point a gate at an auth'd route and it will tell you: a
+  redirect away from the URL you asked about is reported as a defect,
+  never silently measured as if it were the page you wanted.
 - **Fonts are your determinism boundary.** The Chromium build is
   pinned and the gates wait for `document.fonts.ready` (not just
   network idle — `font-display: swap` reflows text *after* idle), but

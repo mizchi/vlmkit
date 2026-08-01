@@ -665,6 +665,25 @@ interface DiscoveredElement {
 async function gotoSource(page: Page, source: string): Promise<void> {
   const url = /^(https?|file):\/\//.test(source) ? source : pathToFileURL(resolve(source)).href;
   await page.goto(url, { waitUntil: "load", timeout: 30000 });
+  await settleAfterLoad(page);
+}
+
+/**
+ * `load` fires before a client-rendered app paints: the 2026-08-01
+ * hard-target audit caught this gate reporting "interactive elements: 0"
+ * on a React page that has a button, two links and a scroller — it was
+ * measuring the "Loading…" placeholder. Wait for the network to go quiet
+ * and give the framework a commit tick.
+ *
+ * Both waits are bounded and swallowed on purpose: a page that never goes
+ * idle (polling, websockets) must not turn this into a 30s hang, and a
+ * static file must not pay for a long wait it does not need.
+ */
+export async function settleAfterLoad(page: Page, settleMs = 250): Promise<void> {
+  await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
+  await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => undefined) : undefined))
+    .catch(() => {});
+  await page.waitForTimeout(settleMs);
 }
 
 export async function buildInteractionMap(options: InteractionMapOptions): Promise<InteractionMapResult> {
