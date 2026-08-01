@@ -32,6 +32,7 @@ three rounds had not covered.
 | 7 | 7/10 | — | 7/10 | all correct incl. round-6 fixes (minHeight every-match semantics, the 30px-button rule, contract example values) — both personas' best-ever scores |
 | 8 | 7/10 | — | 8/10 | all correct incl. round-7 fixes (name fossil, verify-markup mechanism, never-idle behavior, cross-OS baselines, Haiku attribution, suppression persistence) — first 8 of the loop |
 | 9 | 7/10 | — | 7/10 | all correct incl. round-8 fixes (verify-markup boundary, palette-harmony mechanism, install commands, vrt.config.json fossil, suspect floors, error exit behavior) |
+| 10 | — | — | — | lens changed: (D) browser-internals engineer 6/10 + (E) executable-fidelity auditor — see below |
 
 ## What each round changed
 
@@ -133,7 +134,92 @@ three rounds had not covered.
   Honest-limits bullet; a worked npm-scripts block with an honest
   ~20-page scale ceiling.
 
-## Convergence call after round 9 (recommended stop)
+## Round 10 — changing the measurement axis (the loop's most productive round)
+
+Rounds 4–9 had converged on prose polish because the *instrument* was
+fixed: a persona reading the document. Round 10 changed the
+instrument instead of the document, running two evaluators that could
+contradict the source rather than only the wording:
+
+- **(D) a browser-internals staff engineer** — judges whether each
+  described mechanism is mechanically possible.
+- **(E) an executable-fidelity auditor** — runs every command in the
+  document and tests every behavioral claim empirically.
+
+Scores: D 6/10 (lowest since round 4 — correctly so; it scored
+mechanism opacity the prose personas could not see). E produced no
+score by design; it produced a table of VERIFIED / MISMATCH.
+
+### Real defects found (fixed, with tests)
+
+1. **A13 occlusion was blind to `pointer-events: none` occluders.**
+   Predicted by D from the mechanism alone, then confirmed
+   empirically: `elementFromPoint` returns the *text element itself*
+   when the occluder opts out of hit-testing, so `hit === el` short
+   -circuits and the S19 defect class plus one declaration escaped.
+   Fix: force hit-testing on page-wide while sampling, then restore;
+   the opaque-paint requirement keeps false positives closed
+   (transparent stretched-link test still green). Regression test
+   M14a2, verified failing-before/passing-after.
+2. **`check integrity` never awaited `document.fonts.ready`.** Only
+   network idle — but `font-display: swap` reflows text *after* idle,
+   so geometry probes measured fallback metrics on some runs. This
+   contradicted the determinism claim the doc had made two rounds
+   earlier.
+3. **The ledger did not cover `snapshot` or `scan breakpoints`** (E's
+   measurement: 0 lines appended). Since the doc pitches the ledger as
+   the audit backbone for "every gate invocation," the code was fixed
+   rather than the claim weakened — both now log, verified.
+
+### Doc claims E falsified (my errors, now corrected)
+
+- **The exit-code rule from round 9 was wrong.** I had written
+  "the other checks exit zero unless you pass `--fail-on-suspect`"
+  from reading `--fail-on-suspect` call sites. Measured reality:
+  `check layout`, `verify flow`, `verify markup`, `scan handlers`,
+  and `check interactions` all exit non-zero *without* the flag;
+  `check copy`, `check asset`, `scan scroll` exit zero. Independently
+  re-verified before rewriting. The doc now states the actual split
+  (verdict gates fail closed, finding-list gates fail open, errors
+  always fail) and names the inconsistency; unification is backlogged
+  as a breaking change.
+- **`check interactions` does not catch the clickable `<div>`** — a
+  `<div onclick>` page returns `status: ok`. That needs
+  `scan handlers` / `--handlers`. The doc had attributed the catch to
+  the wrong command, in both prose and the cheat sheet: the mismatch
+  most likely to produce a false "verified".
+- **`vlmkit watch` is not a gate re-runner** (it is the older
+  baseline/variant differ). The pointer implied the opposite.
+- **i18n inflation is 1.4× (40%), not the documented 30%.**
+- **`verify markup` misses low-contrast fills** inside its stated
+  sweet spot: two `#f4f4f4` cards removed from a `#ffffff` page =
+  2.12% of pixels differing, reported as `0.01%` and `DONE`.
+  Disclosed in Honest limits; threshold fix backlogged.
+
+### Method notes
+
+- **Changing the evaluator's lens beat iterating the same lens.** Nine
+  rounds of readers produced wording fixes; one round of a mechanism
+  critic plus an executing auditor produced three code fixes and five
+  falsified claims. The ratchet described below was a property of the
+  instrument, not of the document.
+- **An executing auditor is the only evaluator that can catch the
+  author's own source-reading errors.** Every wrong claim in this
+  round originated in *my* reading of the code (exit codes, i18n
+  factor, which command owns the clickable-div catch) — errors no
+  prose reviewer could see, and that I had introduced *while fixing
+  earlier review findings*. Doc rounds can inject defects.
+- **The auditor also caught its own setup error** (a `sed` had made
+  its "modified" fixture byte-identical to the target) and retracted
+  the finding. Instructing an auditor to distinguish "the doc is
+  wrong" from "I set it up wrong" is what made its report usable.
+- **One legitimate critique was deliberately not acted on.** D
+  correctly identified that the collision floor's both-axes AND
+  excludes thin slivers. Loosening a floor on one reviewer's
+  reasoning is how a gate starts crying wolf, so it is disclosed as a
+  known blind spot and backlogged behind a false-positive re-audit.
+
+## Convergence call after round 9 (superseded by round 10)
 
 Scores: dev 6, 6, 6, 7, 6, 6.5, 7, 7, 7 · operator 5, 6, 7 (retired)
 · lead 6, 7, 6, 7, 8, 7. The comprehension quiz has been perfect for

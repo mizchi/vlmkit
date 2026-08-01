@@ -12,6 +12,7 @@ import { dirname, join, resolve } from "node:path";
 import { compareScreenshots, generateDiffReport } from "@mizchi/vlmkit-core/heatmap.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { applyMask } from "@mizchi/vlmkit-core/mask.ts";
+import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { approveSnapshotsFromReport } from "./approve.ts";
 import { determineSnapshotExitCode, parseSnapshotCliArgs, parseSnapshotConfig, type SnapshotConfig } from "../../cli/commands/snapshot.ts";
 import {
@@ -644,6 +645,24 @@ async function main() {
     failOnDiff: parsed.failOnDiff,
     failOnNewBaseline: parsed.failOnNewBaseline,
     maxDiffRatio: parsed.maxDiffRatio,
+  });
+
+  // Ledger: snapshot is one of the headline tools, so a "verified" claim
+  // that rests on it has to be auditable like every other gate. The
+  // worst per-viewport diff is the headline; `verdict` mirrors the
+  // integrity gate's vocabulary so grepping one field works across tools.
+  const worstDiff = compared.reduce((max, r) => Math.max(max, r.diffRatio ?? 0), 0);
+  appendRunLedger({
+    tool: "snapshot",
+    source: urls.join(" "),
+    headline: {
+      verdict: exitStatus.exitCode === 0 ? "clean" : "defects",
+      captured: results.length,
+      newBaselines: newBaselines.length,
+      compared: compared.length,
+      changed: falsePositives.length,
+      worstDiffRatio: Number(worstDiff.toFixed(6)),
+    },
   });
 
   // Write JSON summary

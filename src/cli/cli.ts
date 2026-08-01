@@ -83,6 +83,12 @@ async function runDiscover(args: string[]): Promise<void> {
   console.log(`  \x1b[1mViewports (${result.viewports.length}):\x1b[0m`);
   for (const vp of result.viewports) console.log(`    ${String(vp.width).padStart(5)}px  ${vp.label.padEnd(16)} \x1b[2m${vp.reason}\x1b[0m`);
   console.log();
+  const { appendRunLedger } = await import("@mizchi/vlmkit-core/run-ledger.ts");
+  appendRunLedger({
+    tool: "scan-breakpoints",
+    source: file,
+    headline: { breakpoints: result.breakpoints.length, viewports: result.viewports.length },
+  });
 }
 
 async function runApiStatus(args: string[]): Promise<void> {

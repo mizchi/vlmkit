@@ -69,15 +69,20 @@ of work. What to expect before you install:
   at the tens-of-seconds end on a breakpoint-heavy page — still cheap
   enough to re-run ten times in a fix loop. Gate findings come in two
   severities — a **suspect** is a defect claim, a **warn** is
-  advisory — and the exit codes are worth knowing exactly:
-  `check integrity` exits non-zero whenever its verdict is DEFECTS
-  (warn-only runs are CLEAN and exit zero); the other checks exit
-  zero unless you pass `--fail-on-suspect`, which turns any suspect
-  into a non-zero exit; a run that *errors* always exits non-zero.
-  Read that second clause twice before wiring anything: the per-gate
-  default is **advisory**, so a pre-push or CI command without
-  `--fail-on-suspect` prints findings and still succeeds. Put the
-  flag on every gate you intend to enforce.
+  advisory. Exit codes, measured rather than assumed, split by what a
+  gate produces:
+  - **Verdict gates fail closed.** `check integrity` (DEFECTS),
+    `check layout` (VIOLATED), `verify flow` (FAILED),
+    `verify markup` (NOT DONE) exit non-zero on a bad verdict with no
+    flag needed. Warn-only integrity runs are CLEAN and exit zero.
+  - **Finding-list gates fail open.** `check copy`, `check asset`,
+    `scan scroll` print their suspects and still exit zero unless you
+    pass `--fail-on-suspect`. (`check interactions` and
+    `scan handlers` already exit non-zero on suspects — the contract
+    is not yet uniform across the group, so pass the flag everywhere
+    you mean to enforce and you get the strict behavior regardless.)
+  - **Errors always fail.** An unreachable URL, a missing file, or the
+    30s idle timeout exits non-zero — never a silent pass.
 - Setup is two commands — `npm install -D @mizchi/vlmkit` and
   `npx playwright install chromium` (a browser download — expect on
   the order of 150 MB, a few minutes once; CI containers add
@@ -160,8 +165,12 @@ verdict; the acceptance is a flag, not a silent pass.
 **"Does it actually behave?"** — `check breakpoints --sweep` proves
 your responsive boundary is exact (no width where the layout breaks,
 no off-by-one at 768px). `check interactions` presses keys at every
-control and maps the ARIA state transitions — the clickable-`<div>`
-problem is caught mechanically. `verify flow` runs a scripted user
+control and maps the ARIA state transitions, catching disclosures
+wired to nothing. Its sibling `scan handlers` (or
+`check interactions --handlers`) is what catches the
+clickable-`<div>`: a click handler with no role and no keyboard path.
+Run both — plain `check interactions` reports a `<div onclick>` page
+as `status: ok`. `verify flow` runs a scripted user
 journey and asserts each step's outcome on the live DOM: in one
 evaluation, a card-game screen had to survive "play a card, watch the
 enemy's HP drop by exactly 6, spend the energy, end the turn, take
@@ -225,13 +234,15 @@ npx vlmkit check asset sprite.png --slot 220x300 --expect-transparent \
   --against-bg "#1a1424" --page-palette page.png                        # usable?
 ```
 
-Iterating is just re-running the same command after each edit (there
-is also `vlmkit watch` for a file-watching inner loop). A few
-mechanics worth knowing up front: copy matching is
-whitespace-normalized but **case-sensitive** substring matching
-(casing is treated as spec); `check breakpoints` renders one pixel
-below, at, and above every breakpoint your CSS declares, and
-`--sweep` additionally fuzzes the widths in between in 25px steps;
+Iterating is just re-running the same command after each edit — the
+gates are the inner loop; there is no watch mode for them
+(`vlmkit watch` is a different, older tool that diffs a
+baseline/variant pair, not a gate re-runner). A few mechanics worth
+knowing up front: copy matching is whitespace-normalized but
+**case-sensitive** substring matching (casing is treated as spec);
+`check breakpoints` renders one pixel below, at, and above every
+breakpoint your CSS declares, and `--sweep` additionally fuzzes the
+widths in between in 25px steps from 320px to 1280px;
 and in CI any gate becomes a failing step with `--fail-on-suspect`:
 
 ```yaml
@@ -242,7 +253,7 @@ and in CI any gate becomes a failing step with `--fail-on-suspect`:
 
 There is more: design-token conformance (hard-coded values that
 should be tokens), dark-theme parity, WCAG contrast/touch/focus
-checks, layout survival under 30%-longer translated text, suggested
+checks, layout survival under 40%-longer translated text, suggested
 replacements when a refactor kills a CSS selector, and visual
 equivalence for framework migrations. The full map is in
 `vlmkit --help`, organized by exactly this kind of "you want to…"
@@ -307,9 +318,11 @@ The operational questions a lead will ask, answered plainly:
   you grep those scripts — there is no central config file that
   aggregates gate sets today, and past ~20 pages this convention
   gets heavy; that's the honest scale ceiling of the current design. Separately, every run
-  appends one JSON line (timestamp, tool, verdict) to
-  `.vlmkit/run-ledger.jsonl` — that's local audit evidence, not
-  config: gitignore it. It matters most in the agent section below.
+  appends one JSON line to `.vlmkit/run-ledger.jsonl` — timestamp,
+  tool, source, and a per-tool `headline` object (integrity and
+  snapshot carry `verdict`; the others carry their own numbers, e.g.
+  `{"missing":0}` for copy). That's local audit evidence, not config:
+  gitignore it. It matters most in the agent section below.
 - **Can we encode our own rules?** Yes — two of the gates are
   user-defined by design. `check layout --contract layout.json` turns
   structural rules into a machine-checked contract. This is the whole
@@ -398,8 +411,10 @@ write-ups in [`docs/reports/`](./reports/)) the working loop is:
    supplied the precision the small model lacked.
 3. Every gate invocation is automatically appended to
    `.vlmkit/run-ledger.jsonl` (one JSON line per run: timestamp,
-   tool, source, verdict). When an agent says "I verified it," you
-   grep the ledger; an empty ledger under a "verified" claim is
+   tool, source, and that tool's headline numbers). Grep by `tool`
+   rather than by a single verdict field — the headline shape is
+   per-tool. When an agent says "I verified it," you check the
+   ledger; an empty ledger under a "verified" claim is
    itself a finding — that exact catch happened in
    [the black-box onboarding run](./reports/2026-07-31-blackbox-onboarding-validation.md).
 
@@ -468,6 +483,16 @@ Trust lives in stated boundaries, so here are the ones that matter:
   configuration, same scrollbar mode, and same locale — a
   locale-formatted number that changes length changes where a line
   wraps.
+- **`verify markup` needs fill contrast, not just flat fills.** The
+  stated boundary (flat comps yes, photographic art no) is not the
+  whole story: segmentation quantizes, so components whose fill is
+  very close to the page background survive removal undetected. An
+  audit run removed two `#f4f4f4` cards from a `#ffffff` page —
+  2.12% of pixels actually differed, and the gate reported
+  `pixel diff 0.01%` and `DONE`. Recolor the same cards to a
+  distinct blue and it correctly reports `missing 2`. Treat
+  low-contrast-on-background regions as outside the gate's reach and
+  cover them with a layout contract instead.
 - **Thin-sliver collisions are a known blind spot.** The collision
   floor is 6px on *both* axes plus 25% of the smaller block's area,
   which is what keeps line-boxes with tight `line-height` or

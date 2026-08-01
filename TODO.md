@@ -276,6 +276,21 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 - [ ] **クロス OS フォント決定論の実測レポート** — 2px/6px floor が
   macOS vs Linux 描画で維持されるかの検証(要 macOS 実機)。フォント
   同梱/未同梱の両条件。
+- [ ] **exit code コントラクトの統一(round-10 実測)** — 現状は不統一:
+  verdict 系(integrity DEFECTS / layout VIOLATED / flow FAILED /
+  markup NOT DONE)はフラグ無しで非ゼロ、finding-list 系のうち
+  copy / asset / scroll はゼロ、interactions / handlers は非ゼロ。
+  同じ `scan` グループ内でも scroll と handlers が食い違う。
+  fail-closed 統一(+ `--advisory` オプトアウト)が正しいが、既存 CI の
+  挙動を反転させる破壊的変更なので CHANGELOG + minor bump 必須。
+  docs/introduce.md には実測どおりの分岐を明記済み。
+- [ ] **verify markup: 低コントラスト塗りの取りこぼし(round-10 実測)** —
+  `#f4f4f4` カードを `#ffffff` ページから 2 枚削除(実差分 2.12% px)
+  しても `pixel diff 0.01%` / `DONE`。青に変えれば `missing 2` を正しく
+  検出するので、セグメンテーションの量子化閾値が背景に近い塗りを
+  落としている。`diff png` も同じ閾値を共有(0.01% と報告)。
+  量子化を色差ベースにするか、ΔRGB が小さい領域を別経路で拾う。
+  Honest limits に既知の穴として明記済み。
 - [ ] **text-collision の ink extents 化(round-10 staff engineer 指摘)** —
   現行は text-block の bounding box 重なり(両軸 6px AND + 小さい側の面積
   25%)。細片重なり(縦 18px × 横 3px = 実際に壊れて見える)が床下で無報告。
