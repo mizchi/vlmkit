@@ -88,8 +88,10 @@ list of required copy and verifies every line is on the page,
 unselected tabs so hidden-by-design copy passes (with provenance), but
 copy hidden by trickery — font-size 0, transparent color, off-screen
 positioning, text the same color as its background — is called out
-with a reason class. Verified against seven real websites with zero
-false positives.
+with a reason class. Audited against seven real websites (MDN,
+Wikipedia, W3C, web.dev, Hacker News, danluu.com, example.com) with
+zero false positives —
+[methodology and full results here](./reports/2026-07-31-copy-invisible-real-site-audit.md).
 
 **"Does it actually behave?"** — `check breakpoints --sweep` proves
 your responsive boundary is exact (no width where the layout breaks,
@@ -118,16 +120,26 @@ page slot: right aspect ratio, actually transparent background (not
 matted onto a rectangle), not near-empty, silhouette readable against
 the backdrop it will sit on, colors that don't clash with the page.
 
-The same six, as a copy-paste cheat sheet:
+The same six, as a copy-paste cheat sheet (with when you'd reach for
+each):
 
 ```bash
+# while editing — after any layout/CSS change:
 npx vlmkit check integrity page.html                         # anything broken?
+# before pushing — when the page carries spec'd copy:
 npx vlmkit check copy page.html --manifest copy.txt          # wording exact & visible?
-npx vlmkit check breakpoints page.html --sweep               # responsive boundaries hold?
+# before pushing — when the page is responsive:
+npx vlmkit check breakpoints page.html --sweep               # boundaries hold?
+# while building against a design:
 npx vlmkit verify markup attempt.html --target design.png    # matches the design?
+# continuously / in CI — regression tracking:
 npx vlmkit snapshot http://localhost:3000/ --output .vlmkit/snapshots   # what changed?
-npx vlmkit check asset sprite.png --slot 220x300 --expect-transparent   # image usable?
+# before dropping a generated image into the page:
+npx vlmkit check asset sprite.png --slot 220x300 --expect-transparent   # usable?
 ```
+
+Iterating is just re-running the same command after each edit (there
+is also `vlmkit watch` for a file-watching inner loop).
 
 There is more: design-token conformance (hard-coded values that
 should be tokens), dark-theme parity, WCAG contrast/touch/focus
@@ -181,9 +193,21 @@ Agents integrate three ways:
 
 - **Skill** — one Markdown instruction file the agent reads
   (`SKILL.md`: the task-routing table, the fix-loop discipline, and
-  the rules against gaming, in agent-readable form). Copy the
-  directory `.claude/skills/markup-assist/` from this repo into your
-  project's `.claude/skills/` — that's the whole installation.
+  the rules against gaming, in agent-readable form). A taste of what's
+  actually in it:
+
+  > **Never hide copy to pass `check copy`.** Matching is against
+  > visibly rendered text; font-size:0 / opacity:0 / transparent /
+  > off-screen / clipped / camouflaged / sr-only matches report as
+  > `copy-invisible` with a reason class. […]
+  > **If the tool itself fails to run** (unknown subcommand, missing
+  > browser, install error), STOP and report the tool failure
+  > verbatim — do NOT silently substitute hand-rolled screenshot
+  > scripts and then claim the work was "verified".
+
+  Copy the directory `.claude/skills/markup-assist/` from this repo
+  into your project's `.claude/skills/` — that's the whole
+  installation.
 
 One thing this project treats as a feature, not an embarrassment: in
 evaluation runs, agents **did** try to cheat the gates — required copy
