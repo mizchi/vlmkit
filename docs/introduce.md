@@ -35,7 +35,8 @@ vlmkit renders your page in a real browser (headless Chromium via
 Playwright) and turns "does it look right?" into **checks that pass or
 fail the same way every time** — DOM geometry, pixel math, computed
 styles, accessibility probes. No screenshots to squint at, no AI
-judgment call in the loop, and for almost everything, **no API key**.
+judgment call in the loop, and — apart from three clearly-marked
+optional extras listed near the end — **no API key**.
 
 When a check fails, it doesn't just say "failed." It prints what this
 project calls a *kickback* — the defect, where it is (a CSS selector),
@@ -54,10 +55,19 @@ green. The loop is the product.
 
 vlmkit calls each of these checks a **gate**: it either passes or it
 blocks, and a fixed set of gates is how you define "done" for a piece
-of work. A gate typically runs in a few seconds (it's one headless
-page render plus math), so re-running ten times in a fix loop costs
-nothing. Point it at a file or at your dev server — it waits for the
-page to settle, so React/Vue/anything-client-rendered is fine.
+of work. What to expect before you install:
+
+- A gate typically runs in a few seconds — one headless page render
+  plus math. Multi-viewport gates (`check integrity`,
+  `check breakpoints --sweep`) render several widths, so think
+  seconds, not minutes; re-running ten times in a fix loop is cheap.
+- Setup is `npm install` plus a one-time Playwright Chromium download
+  (a browser — expect on the order of 150 MB, a few minutes once).
+- Point it at a file or at your dev server. It navigates and waits
+  for network activity to go idle (30s cap), so React/Vue/
+  anything-client-rendered is fine. Pages behind a login are the
+  usual headless-browser story: point it at a route that doesn't
+  need auth, or at a locally rendered file.
 
 ## What you can do with it
 
@@ -107,6 +117,17 @@ say, character art from an image-generation model — before it enters a
 page slot: right aspect ratio, actually transparent background (not
 matted onto a rectangle), not near-empty, silhouette readable against
 the backdrop it will sit on, colors that don't clash with the page.
+
+The same six, as a copy-paste cheat sheet:
+
+```bash
+npx vlmkit check integrity page.html                         # anything broken?
+npx vlmkit check copy page.html --manifest copy.txt          # wording exact & visible?
+npx vlmkit check breakpoints page.html --sweep               # responsive boundaries hold?
+npx vlmkit verify markup attempt.html --target design.png    # matches the design?
+npx vlmkit snapshot http://localhost:3000/ --output .vlmkit/snapshots   # what changed?
+npx vlmkit check asset sprite.png --slot 220x300 --expect-transparent   # image usable?
+```
 
 There is more: design-token conformance (hard-coded values that
 should be tokens), dark-theme parity, WCAG contrast/touch/focus
@@ -158,10 +179,11 @@ Agents integrate three ways:
   { "mcpServers": { "vlmkit": { "command": "npx", "args": ["-y", "@mizchi/vlmkit", "mcp"] } } }
   ```
 
-- **Skill** — a short instruction file the agent reads. Copy
-  `.claude/skills/markup-assist/` from this repo into your project's
-  `.claude/skills/` and the agent knows the routing table and the loop
-  discipline.
+- **Skill** — one Markdown instruction file the agent reads
+  (`SKILL.md`: the task-routing table, the fix-loop discipline, and
+  the rules against gaming, in agent-readable form). Copy the
+  directory `.claude/skills/markup-assist/` from this repo into your
+  project's `.claude/skills/` — that's the whole installation.
 
 One thing this project treats as a feature, not an embarrassment: in
 evaluation runs, agents **did** try to cheat the gates — required copy
@@ -182,6 +204,32 @@ nothing, and the ledger exposes verification claims with no runs
 behind them. The gates have been adversarially tested against the
 exact population that will try hardest to fool them — and the
 receipts are one click away.
+
+## Honest limits
+
+Trust lives in stated boundaries, so here are the ones that matter:
+
+- **"Intentional" is recognized by measurement, not by magic.** The
+  integrity gate exempts patterns it can verify geometrically —
+  screen-reader-only text (fully clipped, not partially cut), image
+  replacement, hero overlays, ellipsis truncation. There is no
+  user-defined exemption list for integrity yet; the copy gate DOES
+  take an explicit per-class allow flag for deliberately hidden copy.
+  A novel intentional pattern may need a small markup adjustment or a
+  report to the tracker.
+- **A green gate set is not a correctness proof.** Gates catch the
+  defect classes they encode. This project tracks its own false
+  negatives the hard way — every evaluation run is independently
+  audited for defects all gates missed. Across the 19 scenarios that
+  audit found exactly one (art painting over a readout, six gates
+  green); it became a new probe the same day
+  ([the S19 report](./reports/2026-07-31-s19-game-ui-occlusion-probe.md)).
+  The honest claim is "adversarially maintained," not "complete."
+- **A flow gate proves the paths it walks and nothing else.** If a
+  behavior matters, put a step on it.
+- **Third-party CSS is checked as rendered.** If your UI library
+  overflows at 375px, the gate reports it like any other defect —
+  there is no per-origin scoping.
 
 ## What vlmkit is not
 
