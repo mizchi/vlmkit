@@ -6,6 +6,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { access, mkdtemp, mkdir, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { gunzipSync } from "node:zlib";
 import { dirname, join, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -172,14 +173,18 @@ async function main() {
 
     console.log("==> installing root tarball in isolated consumer");
     run("pnpm", ["install", "--ignore-scripts"], { cwd: consumerDir });
-    console.log("==> installing the isolated consumer's Playwright browser");
-    run("pnpm", ["exec", "playwright", "install", "chromium"], { cwd: consumerDir });
     const lockfile = await readFile(join(consumerDir, "pnpm-lock.yaml"), "utf8");
     if (!lockfile.includes(rootTarballReference)) fail(`lockfile does not resolve root package from ${rootTarballReference}`);
     const installed = await realpath(join(consumerDir, "node_modules", ...rootManifest.name.split("/")));
     if (!installed.includes(".pnpm") || !installed.includes("file+")) {
       fail(`${rootManifest.name} did not resolve from the root tarball (${installed})`);
     }
+    const consumerRequire = createRequire(join(installed, "package.json"));
+    const playwrightManifestPath = consumerRequire.resolve("playwright/package.json");
+    const playwrightManifest = JSON.parse(await readFile(playwrightManifestPath, "utf8"));
+    const playwrightCli = join(dirname(playwrightManifestPath), "cli.js");
+    console.log(`==> installing isolated consumer Playwright ${playwrightManifest.version} browser`);
+    run(process.execPath, [playwrightCli, "install", "chromium"], { cwd: consumerDir });
     await assertBundledMarkupLoopChunks(installed);
 
     const bin = join(consumerDir, "node_modules", ".bin", "vlmkit");
