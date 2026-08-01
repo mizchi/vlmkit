@@ -325,13 +325,11 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   同日実装**(決定論 hit-test + 偽陽性 3 クラスの免除設計、M14a-d 常設、
   S15-18 回帰 CLEAN)。Layer B は凍結のまま(決定論で足りた)。
   `docs/reports/2026-07-31-s19-game-ui-occlusion-probe.md`
-- [ ] **【リリースブロッカー】@mizchi/vlmkit の新バージョン公開** —
-  2026-07-31 のブラックボックス検証で確定: 公開中の 0.7.0 には
-  markup-assist の主要ゲート(check integrity / copy manifest sweep /
-  layout / interactions ほか)が**存在しない**。quickstart / ガイド /
-  skill は npm 導入者には現状動かない(`Unknown check subcommand`)。
-  npm publish は要権限のため本環境では未実施 — バージョンを上げて
-  公開するまで「入れるだけで使える」は npm 経路では成立しない。
+- [x] **【解消 2026-08-01】リリースブロッカー: @mizchi/vlmkit の新バージョン公開** —
+  2026-07-31 のブラックボックス検証で「公開中の 0.7.0 に markup-assist の
+  主要ゲートが存在しない(`Unknown check subcommand`)」を確認しブロッカー
+  登録 → main の `release: 0.8.0`(24b0185)で解消。markup-assist ゲート群が
+  npm 導入者に届く。
   `docs/reports/2026-07-31-blackbox-onboarding-validation.md`
 - [x] **ブラックボックス・オンボーディング検証(文脈ゼロのエージェント + docs のみ)** —
   2026-07-31 実施: 架空プロジェクト + 欠陥 5 種 + TASK.md(ゲート名を
