@@ -172,6 +172,8 @@ async function main() {
 
     console.log("==> installing root tarball in isolated consumer");
     run("pnpm", ["install", "--ignore-scripts"], { cwd: consumerDir });
+    console.log("==> installing the isolated consumer's Playwright browser");
+    run("pnpm", ["exec", "playwright", "install", "chromium"], { cwd: consumerDir });
     const lockfile = await readFile(join(consumerDir, "pnpm-lock.yaml"), "utf8");
     if (!lockfile.includes(rootTarballReference)) fail(`lockfile does not resolve root package from ${rootTarballReference}`);
     const installed = await realpath(join(consumerDir, "node_modules", ...rootManifest.name.split("/")));
