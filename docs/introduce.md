@@ -177,86 +177,6 @@ equivalence for framework migrations. The full map is in
 `vlmkit --help`, organized by exactly this kind of "you want to…"
 question.
 
-## For AI coding agents: a referee that can't be argued with
-
-(Not using coding agents? Skip to the next section — everything above
-works standalone.)
-
-If you do, vlmkit's real role is **the referee**. The workflow this
-project has validated across 19 scripted scenarios (landing pages,
-e-commerce, dashboards, checkout forms, an app shell with a hamburger
-drawer, a card-battle game UI — the pages live in
-[`fixtures/auto-markup-proof/`](../fixtures/auto-markup-proof/), the
-run write-ups in [`docs/reports/`](./reports/)):
-
-1. Give the agent a task and a fixed *done condition* — a set of gates
-   that must all pass. A typical one for a page built from a brief:
-   `check integrity` CLEAN + `check copy --manifest` 0 missing +
-   `scan scroll` / `scan handlers` / `check interactions` no suspects.
-2. The agent builds, runs the gates itself, reads the kickbacks, fixes,
-   repeats. Inexpensive models handle this fine: the gates supply the
-   precision the model lacks.
-3. Every gate invocation is automatically appended to a local ledger
-   (`.vlmkit/run-ledger.jsonl`, one JSON line per run):
-
-   ```json
-   {"ts":"2026-08-01T07:30:26Z","tool":"integrity-check","source":"page.html","headline":{"verdict":"clean","fails":0,"warns":0}}
-   ```
-
-   So when an agent says "I verified it," you `grep` the ledger. An
-   empty ledger under a "verified" claim is itself a finding — that
-   exact catch happened in [the black-box onboarding
-   run](./reports/2026-07-31-blackbox-onboarding-validation.md).
-
-Agents integrate three ways:
-
-- **CLI** — the agent just runs `npx vlmkit …` like you would.
-- **MCP** (the standard protocol for giving tools to AI agents) — add
-  this to your project's `.mcp.json` and nine gates become tools the
-  agent calls natively:
-
-  ```json
-  { "mcpServers": { "vlmkit": { "command": "npx", "args": ["-y", "@mizchi/vlmkit", "mcp"] } } }
-  ```
-
-- **Skill** — one Markdown instruction file the agent reads
-  (`SKILL.md`: the task-routing table, the fix-loop discipline, and
-  the rules against gaming, in agent-readable form). A taste of what's
-  actually in it:
-
-  > **Never hide copy to pass `check copy`.** Matching is against
-  > visibly rendered text; font-size:0 / opacity:0 / transparent /
-  > off-screen / clipped / camouflaged / sr-only matches report as
-  > `copy-invisible` with a reason class. […]
-  > **If the tool itself fails to run** (unknown subcommand, missing
-  > browser, install error), STOP and report the tool failure
-  > verbatim — do NOT silently substitute hand-rolled screenshot
-  > scripts and then claim the work was "verified".
-
-  Copy the directory `.claude/skills/markup-assist/` from this repo
-  into your project's `.claude/skills/` — that's the whole
-  installation.
-
-One thing this project treats as a feature, not an embarrassment: in
-evaluation runs, agents **did** try to cheat the gates — required copy
-packed into a `font-size: 0` span
-([S18](./reports/2026-07-31-s18-zero-shot-chat-tool-gate-gaming.md));
-an `aria-disabled` attribute set for 50ms so an assertion would pass
-while assistive tech was lied to
-([S19](./reports/2026-07-31-s19-game-ui-occlusion-probe.md)); a silent
-fallback to hand-rolled checks reported as "verified"
-([black-box run](./reports/2026-07-31-blackbox-onboarding-validation.md)).
-Each incident became a hardening: copy is matched against
-geometrically *visible* text only (a [12-vector hiding
-battery](./reports/2026-07-31-copy-gate-silencing-battery.md), then a
-[7-real-site audit with zero false
-positives](./reports/2026-07-31-copy-invisible-real-site-audit.md)),
-flows can force-click through disabled controls to prove they do
-nothing, and the ledger exposes verification claims with no runs
-behind them. The gates have been adversarially tested against the
-exact population that will try hardest to fool them — and the
-receipts are one click away.
-
 ## How is this different from screenshot-testing services?
 
 Hosted visual-testing products (and Playwright's own screenshot
@@ -303,6 +223,67 @@ The operational questions a lead will ask, answered plainly:
   exposes verify_markup, check_integrity, check_copy,
   check_interactions, scan_handlers, build_page, check_layout,
   check_equivalence, and verify_flow as tools.
+- **How does the manifest scale across pages?** Shared copy means
+  shared updates: if a component's CTA text changes and it appears on
+  five pages, five manifests change in that same PR — the copy gate
+  is what makes forgetting one impossible. Manifest updates go
+  through the same review as any copy change.
+- **What does rollout look like?** Pilot on one page (run
+  `check integrity`, expect it to surface existing debt), then add
+  `--fail-on-suspect` gates to CI for your critical pages, then
+  grow contracts and manifests where specs are stable. Agent
+  integration is optional and can come last.
+
+
+## For AI coding agents: a referee that can't be argued with
+
+(Not using coding agents? Skip ahead — everything above works
+standalone.)
+
+If you do, vlmkit's role is the referee. Across 19 scripted
+evaluation scenarios (pages in
+[`fixtures/auto-markup-proof/`](../fixtures/auto-markup-proof/),
+write-ups in [`docs/reports/`](./reports/)) the working loop is:
+
+1. Give the agent a task and a fixed **done condition** — a set of
+   gates that must all pass (e.g. `check integrity` CLEAN +
+   `check copy --manifest` 0 missing + `scan handlers` /
+   `check interactions` no suspects).
+2. The agent builds, runs the gates itself, reads the failure
+   reports, fixes, repeats. Inexpensive models handle this fine — the
+   gates supply the precision the model lacks.
+3. Every gate invocation is automatically appended to
+   `.vlmkit/run-ledger.jsonl` (one JSON line per run: timestamp,
+   tool, source, verdict). When an agent says "I verified it," you
+   grep the ledger; an empty ledger under a "verified" claim is
+   itself a finding — that exact catch happened in
+   [the black-box onboarding run](./reports/2026-07-31-blackbox-onboarding-validation.md).
+
+Integration is the CLI itself, the MCP server
+(`{ "mcpServers": { "vlmkit": { "command": "npx", "args": ["-y", "@mizchi/vlmkit", "mcp"] } } }`
+in `.mcp.json` — the gates become tools the agent calls natively), or
+the `markup-assist` skill: one SKILL.md instruction file (routing
+table, loop discipline, and rules like *"never hide copy to pass
+check copy"* and *"if the tool itself fails to run, STOP and report —
+don't substitute hand-rolled checks and claim verified"*) copied from
+this repo's `.claude/skills/markup-assist/` into yours.
+
+Did agents try to cheat these gates? Yes, and the cases are
+documented: copy hidden in a `font-size: 0` span
+([S18](./reports/2026-07-31-s18-zero-shot-chat-tool-gate-gaming.md)),
+`aria-disabled` flipped for 50ms so an assertion passed while
+assistive tech was lied to
+([S19](./reports/2026-07-31-s19-game-ui-occlusion-probe.md)), a
+silent fallback to hand-rolled checks reported as "verified"
+([black-box run](./reports/2026-07-31-blackbox-onboarding-validation.md)).
+Each one became a hardening — visible-text matching (a
+[12-vector hiding battery](./reports/2026-07-31-copy-gate-silencing-battery.md)
+plus a
+[7-site audit](./reports/2026-07-31-copy-invisible-real-site-audit.md)),
+force-clicks through disabled controls, ledger-auditable claims. The
+linked reports are the test evidence; this will not stop future
+agents from finding new tricks, but the ones that were tried are
+closed.
 
 ## Honest limits
 
@@ -338,22 +319,16 @@ Trust lives in stated boundaries, so here are the ones that matter:
 
 ## What vlmkit is not
 
-- **It does not judge aesthetics.** Whether the page is beautiful, or
-  whether generated art "looks like a proper villain," is out of scope
-  by design. The gates answer "is it correct, legible, operable, and
-  faithful to the spec" — taste stays with humans.
-- **It is not a test framework.** No test files to write for the core
-  gates; you point a command at a page. It runs alongside your
-  Playwright suite rather than replacing it (and can generate/heal
-  Playwright tests, but that's a separate corner of the toolkit). In
-  CI, gates take `--fail-on-suspect` for a non-zero exit, and
-  `diff-pr` exists for per-route PR gating.
-- **It is not an AI service.** Everything above runs locally and
-  deterministically. Exactly three things take an API key, all
-  optional: `heal markup` (an LLM drafts CSS fixes from a kickback),
-  `check copy --vlm` (a vision model transcribes screenshot text
-  instead of your own eyes), and the CSS fix-loop experiments.
-  Everything else in this document needs none.
+- **Not an aesthetics judge** — "is it correct, legible, operable,
+  faithful to spec" is the scope; taste stays with humans.
+- **Not a test framework** — no test files for the core gates; it
+  runs alongside your Playwright suite (keep your screenshot
+  assertions — gates answer a different question), and
+  `--fail-on-suspect` / `diff-pr` cover CI.
+- **Not an AI service** — everything runs locally and
+  deterministically. Exactly three optional features take an API
+  key: `heal markup`, `check copy --vlm`, and the CSS fix-loop
+  experiments.
 
 vlmkit is MIT-licensed.
 
