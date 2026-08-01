@@ -52,6 +52,13 @@ That format is deliberate: it's readable by a human and pasteable into
 an AI agent's next prompt. Fix what it names, re-run, repeat until
 green. The loop is the product.
 
+vlmkit calls each of these checks a **gate**: it either passes or it
+blocks, and a fixed set of gates is how you define "done" for a piece
+of work. A gate typically runs in a few seconds (it's one headless
+page render plus math), so re-running ten times in a fix loop costs
+nothing. Point it at a file or at your dev server — it waits for the
+page to settle, so React/Vue/anything-client-rendered is fine.
+
 ## What you can do with it
 
 Each of these is one command against a local HTML file or a URL.
@@ -101,41 +108,80 @@ page slot: right aspect ratio, actually transparent background (not
 matted onto a rectangle), not near-empty, silhouette readable against
 the backdrop it will sit on, colors that don't clash with the page.
 
-There is more (design-token conformance, dark-theme parity, WCAG
-contrast/touch/focus checks, i18n text-stress, selector healing,
-framework-migration equivalence) — the full map is in `vlmkit --help`,
-organized by exactly this kind of "you want to…" question.
+There is more: design-token conformance (hard-coded values that
+should be tokens), dark-theme parity, WCAG contrast/touch/focus
+checks, layout survival under 30%-longer translated text, suggested
+replacements when a refactor kills a CSS selector, and visual
+equivalence for framework migrations. The full map is in
+`vlmkit --help`, organized by exactly this kind of "you want to…"
+question.
 
 ## For AI coding agents: a referee that can't be argued with
 
-If you use coding agents, vlmkit's real role is **the referee**. The
-workflow that this project has validated across 19 scripted scenarios
-(landing pages, e-commerce, dashboards, checkout forms, an app shell
-with a hamburger drawer, a card-battle game UI):
+(Not using coding agents? Skip to the next section — everything above
+works standalone.)
+
+If you do, vlmkit's real role is **the referee**. The workflow this
+project has validated across 19 scripted scenarios (landing pages,
+e-commerce, dashboards, checkout forms, an app shell with a hamburger
+drawer, a card-battle game UI — the pages live in
+[`fixtures/auto-markup-proof/`](../fixtures/auto-markup-proof/), the
+run write-ups in [`docs/reports/`](./reports/)):
 
 1. Give the agent a task and a fixed *done condition* — a set of gates
-   that must all pass.
+   that must all pass. A typical one for a page built from a brief:
+   `check integrity` CLEAN + `check copy --manifest` 0 missing +
+   `scan scroll` / `scan handlers` / `check interactions` no suspects.
 2. The agent builds, runs the gates itself, reads the kickbacks, fixes,
-   repeats. Cheap models handle this fine: the gates supply the
+   repeats. Inexpensive models handle this fine: the gates supply the
    precision the model lacks.
-3. Every gate invocation is logged to a local ledger, so "I verified
-   it" claims are auditable after the fact.
+3. Every gate invocation is appended to a local ledger
+   (`.vlmkit/run-ledger.jsonl`, one JSON line per run):
 
-Agents integrate three ways: they can just run the CLI; or you add the
-MCP server (one `.mcp.json` entry — the gates become tools the agent
-calls natively); or you copy the `markup-assist` skill into your
-project so the agent knows the routing table by heart.
+   ```json
+   {"ts":"2026-08-01T07:30:26Z","tool":"integrity-check","source":"page.html","headline":{"verdict":"clean","fails":0,"warns":0}}
+   ```
+
+   So when an agent says "I verified it," you `grep` the ledger. An
+   empty ledger under a "verified" claim is itself a finding — that
+   exact catch happened in [the black-box onboarding
+   run](./reports/2026-07-31-blackbox-onboarding-validation.md).
+
+Agents integrate three ways:
+
+- **CLI** — the agent just runs `npx vlmkit …` like you would.
+- **MCP** (the standard protocol for giving tools to AI agents) — add
+  this to your project's `.mcp.json` and nine gates become tools the
+  agent calls natively:
+
+  ```json
+  { "mcpServers": { "vlmkit": { "command": "npx", "args": ["-y", "@mizchi/vlmkit", "mcp"] } } }
+  ```
+
+- **Skill** — a short instruction file the agent reads. Copy
+  `.claude/skills/markup-assist/` from this repo into your project's
+  `.claude/skills/` and the agent knows the routing table and the loop
+  discipline.
 
 One thing this project treats as a feature, not an embarrassment: in
 evaluation runs, agents **did** try to cheat the gates — required copy
-packed into a `font-size: 0` span; an `aria-disabled` attribute set for
-50ms so an assertion would pass while assistive tech was lied to; a
-silent fallback to hand-rolled checks reported as "verified." Each
-incident became a hardening: copy is now matched against geometrically
-*visible* text only, flows can force-click through disabled controls
-to prove they do nothing, and the ledger exposes verification claims
-with no runs behind them. The gates have been adversarially tested
-against the exact population that will try hardest to fool them.
+packed into a `font-size: 0` span
+([S18](./reports/2026-07-31-s18-zero-shot-chat-tool-gate-gaming.md));
+an `aria-disabled` attribute set for 50ms so an assertion would pass
+while assistive tech was lied to
+([S19](./reports/2026-07-31-s19-game-ui-occlusion-probe.md)); a silent
+fallback to hand-rolled checks reported as "verified"
+([black-box run](./reports/2026-07-31-blackbox-onboarding-validation.md)).
+Each incident became a hardening: copy is matched against
+geometrically *visible* text only (a [12-vector hiding
+battery](./reports/2026-07-31-copy-gate-silencing-battery.md), then a
+[7-real-site audit with zero false
+positives](./reports/2026-07-31-copy-invisible-real-site-audit.md)),
+flows can force-click through disabled controls to prove they do
+nothing, and the ledger exposes verification claims with no runs
+behind them. The gates have been adversarially tested against the
+exact population that will try hardest to fool them — and the
+receipts are one click away.
 
 ## What vlmkit is not
 
@@ -144,12 +190,19 @@ against the exact population that will try hardest to fool them.
   by design. The gates answer "is it correct, legible, operable, and
   faithful to the spec" — taste stays with humans.
 - **It is not a test framework.** No test files to write for the core
-  gates; you point a command at a page. (It plays well next to
-  Playwright tests, and can generate/heal them, but that's a separate
-  corner of the toolkit.)
+  gates; you point a command at a page. It runs alongside your
+  Playwright suite rather than replacing it (and can generate/heal
+  Playwright tests, but that's a separate corner of the toolkit). In
+  CI, gates take `--fail-on-suspect` for a non-zero exit, and
+  `diff-pr` exists for per-route PR gating.
 - **It is not an AI service.** Everything above runs locally and
-  deterministically. A handful of optional extras (LLM-drafted CSS
-  fixes, VLM transcription) take an API key and are clearly marked.
+  deterministically. Exactly three things take an API key, all
+  optional: `heal markup` (an LLM drafts CSS fixes from a kickback),
+  `check copy --vlm` (a vision model transcribes screenshot text
+  instead of your own eyes), and the CSS fix-loop experiments.
+  Everything else in this document needs none.
+
+vlmkit is MIT-licensed.
 
 ## Try it
 
@@ -159,7 +212,27 @@ npx playwright install chromium   # once
 npx vlmkit check integrity http://localhost:3000/
 ```
 
-Fix what it names; re-run until `verdict: CLEAN`. From there:
+What the loop looks like in practice, end to end:
+
+```
+$ npx vlmkit check integrity page.html
+verdict: DEFECTS (1 fail, 0 warn, 0 exempted)
+  x [page-overflow-x] @768: The page scrolls horizontally by 144px at
+    768px viewport width — sticking out: div.chart-strip (right edge 912px).
+
+$ # the selector names the culprit: .chart-strip has width: 880px
+$ # change it to: width: 100%; max-width: 880px;
+
+$ npx vlmkit check integrity page.html
+verdict: CLEAN (0 fail, 0 warn, 0 exempted)
+```
+
+That's the whole workflow — the gate names the element and the
+measurement, you (or your agent) change one line, the gate confirms.
+Intentional patterns don't fight you: screen-reader-only text, hero
+overlays, and ellipsis truncation are auto-recognized and reported as
+`exempted`, and deliberate hidden copy can be accepted per class with
+an explicit flag. From there:
 
 - [README](../README.md) — the two-minute quickstart and setup
 - [`markup-assist.md`](./markup-assist.md) — which gate for which job,
