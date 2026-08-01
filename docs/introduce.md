@@ -213,11 +213,23 @@ The operational questions a lead will ask, answered plainly:
   exactly how the exemption set grew to date).
 - **Can we encode our own rules?** Yes — two of the gates are
   user-defined by design. `check layout --contract layout.json` turns
-  structural rules ("the sidebar is 260px at 1280", "stat cards are
-  2×2 at 768", "buttons ≥ 48px tall on mobile") into a machine-checked
-  contract, and `verify flow --flow flow.json` does the same for
-  behavior ("click X, then Y must show Z"). Your design-system rules
-  become gates without writing tool code.
+  structural rules into a machine-checked contract. This is the whole
+  format — a list of rules, each checked at a viewport width:
+
+  ```json
+  { "rules": [
+    { "selector": ".sidebar",   "at": 1280, "width": 260 },
+    { "selector": ".stat-card", "at": 768,  "perRow": 2, "count": 4 },
+    { "selector": "button",     "at": 375,  "minHeight": 48 },
+    { "selector": "header",     "at": 375,  "above": "main", "fullWidth": true }
+  ] }
+  ```
+
+  (`minHeight` checks every match — touch-target rules; `width`/
+  `perRow`/`above`/`count`/`visible` cover the rest.) `verify flow
+  --flow flow.json` does the same for behavior ("click X, then Y must
+  show Z"). Your design-system rules become gates without writing
+  tool code.
 - **What do agents get vs. juniors?** The same kickbacks. Juniors get
   named, measured CSS lessons; agents get a referee. The MCP server
   exposes verify_markup, check_integrity, check_copy,

@@ -78,3 +78,32 @@ describe("integration on the S14a-stress attempt", () => {
     assert.equal(broken.results[0]!.checks[0]!.measured, "260px");
   });
 });
+
+test("minHeight checks EVERY visible match (touch-target rule)", async () => {
+  const { mkdtemp, rm, writeFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "layout-minheight-"));
+  try {
+    const page = join(dir, "page.html");
+    await writeFile(page, `<!doctype html><body>
+      <button style="display:block;height:48px">OK</button>
+      <button style="display:block;height:30px">Too short</button>
+    </body>`);
+    const failing = await runLayoutVerify({
+      source: page,
+      contract: { rules: [{ selector: "button", at: 375, minHeight: 48 }] },
+    });
+    const check = failing.results[0]!.checks.find((c) => c.name === "minHeight")!;
+    assert.equal(check.passed, false);
+    assert.match(check.measured, /shortest 30px of 2/);
+
+    const passing = await runLayoutVerify({
+      source: page,
+      contract: { rules: [{ selector: "button", at: 375, minHeight: 24 }] },
+    });
+    assert.equal(passing.results[0]!.checks.find((c) => c.name === "minHeight")!.passed, true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

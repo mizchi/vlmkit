@@ -59,6 +59,12 @@ export interface LayoutRule {
   tolerance?: number;
   minWidth?: number;
   maxWidth?: number;
+  /**
+   * Minimum height (px) of EVERY visible match — unlike the width
+   * assertions (first match), this checks all matches because its use
+   * case is touch-target rules like "every button >= 48px tall".
+   */
+  minHeight?: number;
   /** Modal number of matches per visual row (tops clustered within 8px). */
   perRow?: number;
   /** First match spans >= 95% of the viewport width. */
@@ -151,6 +157,14 @@ export function evaluateLayoutRule(rule: LayoutRule, m: LayoutMeasurement): Layo
   if (rule.maxWidth !== undefined) {
     push("maxWidth", `<=${rule.maxWidth}px`, first ? `${Math.round(first.width)}px` : "(no match)",
       !!first && first.width <= rule.maxWidth);
+  }
+  if (rule.minHeight !== undefined) {
+    const shortest = m.rects.length > 0
+      ? m.rects.reduce((a, b) => (b.height < a.height ? b : a))
+      : undefined;
+    push("minHeight", `every match >=${rule.minHeight}px`,
+      shortest ? `shortest ${Math.round(shortest.height)}px of ${m.rects.length}` : "(no match)",
+      !!shortest && shortest.height >= rule.minHeight);
   }
   if (rule.fullWidth) {
     push("fullWidth", `>=${Math.round(m.viewport * 0.95)}px (95% of ${m.viewport})`,
