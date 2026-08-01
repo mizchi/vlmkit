@@ -31,6 +31,7 @@ three rounds had not covered.
 | 6 | 6.5/10 | — | 6/10 | all correct incl. round-5 restructure (section order, agent-section compression) |
 | 7 | 7/10 | — | 7/10 | all correct incl. round-6 fixes (minHeight every-match semantics, the 30px-button rule, contract example values) — both personas' best-ever scores |
 | 8 | 7/10 | — | 8/10 | all correct incl. round-7 fixes (name fossil, verify-markup mechanism, never-idle behavior, cross-OS baselines, Haiku attribution, suppression persistence) — first 8 of the loop |
+| 9 | 7/10 | — | 7/10 | all correct incl. round-8 fixes (verify-markup boundary, palette-harmony mechanism, install commands, vrt.config.json fossil, suspect floors, error exit behavior) |
 
 ## What each round changed
 
@@ -115,7 +116,49 @@ three rounds had not covered.
   expectations block; the MCP roster de-enumerated (it was
   first-introducing tools the doc never covers).
 
-## Convergence call after round 3 (superseded — loop resumed)
+- **Round 9 fixes**: the dev found the loop's last genuine spec
+  ambiguity — what exit code does a suspect produce *without*
+  `--fail-on-suspect`? Verified against source and stated exactly
+  (integrity fails always exit non-zero; suspect gates exit zero
+  without the flag; errors always non-zero). Also fixed: the
+  `check asset` cheat-sheet line now carries the `--against-bg` /
+  `--page-palette` arguments its prose promised; a real `flow.json`
+  example (from the S19 fixture) parallel to the layout example;
+  "Every command runs after just that" scoped to tooling (the
+  user-defined gates need their file written); the zero-FP claim
+  re-scoped to "in that seven-site sample"; fonts promoted to a
+  first-class determinism boundary (matched-font wobble ~1px vs
+  missing-font reflow crossing any floor) in both the flake bullet
+  and Honest limits; auth promoted from a parenthetical to its own
+  Honest-limits bullet; a worked npm-scripts block with an honest
+  ~20-page scale ceiling.
+
+## Convergence call after round 9 (recommended stop)
+
+Scores: dev 6, 6, 6, 7, 6, 6.5, 7, 7, 7 · operator 5, 6, 7 (retired)
+· lead 6, 7, 6, 7, 8, 7. The comprehension quiz has been perfect for
+eight consecutive rounds, each time re-targeted at the newest fixes —
+transmission is not the bottleneck and hasn't been since round 2.
+
+What distinguishes round 9's residue is its *category*: every
+remaining ask is (a) feature work, not doc work (central gate-config
+manifest, cookie/storage-state injection, user exemption list for
+integrity, monorepo glob runner, parallelism/sharding), (b) evidence
+that cannot be written into existence (external adopters, cross-OS
+validation runs on hardware this project doesn't have, issue-response
+track record for a young project), or (c) reference-manual content
+the intro deliberately links out to. The in-scope findings this round
+were real (exit-code semantics!) but they were the last of their
+kind: three consecutive rounds of fresh evaluators produced no new
+structural, honesty, or comprehension complaints.
+
+Per the standing criterion — **quiz saturated AND remaining asks
+out-of-scope or fabrication-requiring** — the loop should stop here.
+The feature asks it surfaced are recorded in TODO.md as backlog, which
+is the correct escalation: reviewer pressure on an honest document
+ends up producing a tool roadmap.
+
+## Original convergence call after round 3 (superseded — loop resumed)
 
 - **Comprehension saturated**: every quiz answer correct in rounds
   2–3, including the subtlest material (exemption mechanics, the

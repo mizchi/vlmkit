@@ -259,6 +259,27 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 
 ## Backlog (prioritize after evaluation)
 
+### introduce.md 評価ループ残渣(2026-08-01 rounds 4-9 由来)
+9 ラウンドのブラインドペルソナ評価で「ドキュメントでは解決できない」
+と分類された機能要求。レポート: `docs/reports/2026-08-01-introduce-doc-eval-loop.md`
+- [ ] **中央ゲート設定ファイル** — ページごとのゲートセット +
+  `--allow-invisible` 承認を集約する reviewed config(現状は npm scripts
+  慣行、~20 ページで破綻とドキュメントに明記済み)。suppression 棚卸しが
+  grep 頼みなのが tech lead ペルソナの一貫した不満。
+- [ ] **cookie / storage-state 注入** — 認証付きページのゲート実行。
+  Playwright の storageState をそのまま受ける `--storage-state <json>`
+  が最小案。現状の回避策(no-auth route / ローカルファイル)は checkout
+  等の高価値ページで非答。
+- [ ] **integrity のユーザー定義免除リスト** — 新規の意図的パターンが
+  誤検知されたとき、マークアップ改変か issue 報告しか選択肢がない。
+  copy ゲートの `--allow-invisible` に相当する承認可能な仕組み。
+- [ ] **クロス OS フォント決定論の実測レポート** — 2px/6px floor が
+  macOS vs Linux 描画で維持されるかの検証(要 macOS 実機)。フォント
+  同梱/未同梱の両条件。
+- [ ] **マルチページランナー** — glob 指定で全ページのゲートを並列
+  実行(`vlmkit check integrity "routes/**.html"` 相当)。CI 時間予算
+  の質問に答える sharding / 並列度の実測値も。
+
 ### Ecosystem positioning (市場調査 2026-07-29 由来)
 調査メモ: `docs/reports/2026-07-29-ai-markup-tooling-landscape.md` /
 設計: `docs/design/mcp-and-agent-expansion.md`

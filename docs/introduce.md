@@ -68,12 +68,19 @@ of work. What to expect before you install:
   `check breakpoints --sweep` renders every fuzz step, so those sit
   at the tens-of-seconds end on a breakpoint-heavy page — still cheap
   enough to re-run ten times in a fix loop. Gate findings come in two
-  severities: a **suspect** blocks (and fails CI with
-  `--fail-on-suspect`); a **warn** is advisory.
+  severities — a **suspect** is a defect claim, a **warn** is
+  advisory — and the exit codes are worth knowing exactly:
+  `check integrity` exits non-zero whenever its verdict is DEFECTS
+  (warn-only runs are CLEAN and exit zero); the other checks exit
+  zero unless you pass `--fail-on-suspect`, which turns any suspect
+  into a non-zero exit; a run that *errors* always exits non-zero.
 - Setup is two commands — `npm install -D @mizchi/vlmkit` and
   `npx playwright install chromium` (a browser download — expect on
-  the order of 150 MB, a few minutes once). Every command in this
-  document runs after just that.
+  the order of 150 MB, a few minutes once; CI containers add
+  `--with-deps` for system libraries). No further tooling is needed
+  for anything in this document — though the user-defined gates
+  (copy manifest, layout contract, flow script) need you to write
+  that file first.
 - Point it at a file or at your dev server. It navigates and waits
   for network activity to go idle (30s cap), so React/Vue/
   anything-client-rendered is fine, CSS-in-JS included — styles are
@@ -111,8 +118,8 @@ line. Copy hidden by trickery is a different story: font-size 0,
 transparent color, off-screen positioning, and text the same color as
 its background are each called out with a reason class. That invisibility detector (specifically — not
 all of copy matching) was audited against seven real websites (MDN,
-Wikipedia, W3C, web.dev, Hacker News, danluu.com, example.com) with
-zero false positives —
+Wikipedia, W3C, web.dev, Hacker News, danluu.com, example.com) —
+zero false positives in that seven-site sample —
 [methodology and full results here](./reports/2026-07-31-copy-invisible-real-site-audit.md).
 The manifest itself is three lines of convention:
 
@@ -180,8 +187,10 @@ npx vlmkit check interactions page.html                      # keyboard-operable
 npx vlmkit verify markup attempt.html --target design.png    # matches the design?
 # continuously / in CI — regression tracking:
 npx vlmkit snapshot http://localhost:3000/ --output .vlmkit/snapshots   # what changed?
-# before dropping a generated image into the page:
-npx vlmkit check asset sprite.png --slot 220x300 --expect-transparent   # usable?
+# before dropping a generated image into the page (the silhouette and
+# palette checks need the backdrop color and a page screenshot):
+npx vlmkit check asset sprite.png --slot 220x300 --expect-transparent \
+  --against-bg "#1a1424" --page-palette page.png                        # usable?
 ```
 
 Iterating is just re-running the same command after each edit (there
@@ -252,9 +261,20 @@ The operational questions a lead will ask, answered plainly:
   and any `--allow-invisible` acceptances — is CLI flags, so the
   reviewed source of truth is wherever you write the invocation; the
   workable convention is one npm script per page as its canonical
-  gate set. The consequence worth knowing: to see every active
-  suppression, you grep those scripts — there is no central config
-  file that aggregates gate sets today. Separately, every run
+  gate set:
+
+  ```json
+  { "scripts": {
+    "gate:home":     "vlmkit check integrity http://localhost:3000/ && vlmkit check copy http://localhost:3000/ --manifest copy/home.txt --fail-on-suspect",
+    "gate:pricing":  "vlmkit check integrity http://localhost:3000/pricing/ && vlmkit check layout http://localhost:3000/pricing/ --contract layout/pricing.json",
+    "gate:all":      "npm run gate:home && npm run gate:pricing"
+  } }
+  ```
+
+  The consequence worth knowing: to see every active suppression,
+  you grep those scripts — there is no central config file that
+  aggregates gate sets today, and past ~20 pages this convention
+  gets heavy; that's the honest scale ceiling of the current design. Separately, every run
   appends one JSON line (timestamp, tool, verdict) to
   `.vlmkit/run-ledger.jsonl` — that's local audit evidence, not
   config: gitignore it. It matters most in the agent section below.
@@ -274,8 +294,21 @@ The operational questions a lead will ask, answered plainly:
 
   (`minHeight` checks every match — touch-target rules; `width`/
   `perRow`/`above`/`count`/`visible` cover the rest.) `verify flow
-  --flow flow.json` does the same for behavior ("click X, then Y must
-  show Z"). Your design-system rules become gates without writing
+  --flow flow.json` does the same for behavior — each step performs
+  an action and asserts the resulting DOM state:
+
+  ```json
+  { "steps": [
+    { "label": "play the card",
+      "do": { "action": "click", "selector": "[data-testid=card-strike]" },
+      "expect": [
+        { "assert": "text", "selector": "[data-testid=enemy-hp]", "contains": "38/44" },
+        { "assert": "attr", "selector": "[data-testid=end-turn]", "name": "aria-disabled", "equals": "false" }
+      ] }
+  ] }
+  ```
+
+  Your design-system and behavior rules become gates without writing
   tool code.
 - **What do agents get vs. juniors?** The same kickbacks. Juniors get
   named, measured CSS lessons; agents get a referee. The MCP server
@@ -290,11 +323,13 @@ The operational questions a lead will ask, answered plainly:
   Manifest updates go through the same review as any copy change.
 - **Will it flake in CI?** The geometry gates measure DOM layout in
   the same pinned Chromium on every run, so they are stable across
-  machines *except* where platform font metrics move text a pixel.
-  The suspect floors are measured, not vibes: page overflow counts
-  from 2px, a text collision needs a 6px overlap on both axes — and
-  real defects tend to overshoot those floors by tens of pixels, so
-  a 1px font-metric wobble rarely flips a verdict at the floor. A
+  machines *when the fonts match*. Same-font metric wobble is ~1px;
+  the suspect floors are measured, not vibes — page overflow counts
+  from 2px, a text collision needs a 6px overlap on both axes, and
+  real defects overshoot those floors by tens of pixels — so matched
+  fonts rarely flip a verdict. A *missing* font is different: the
+  fallback reflows and can cross any floor, so ship your fonts with
+  the page or install them in the CI image (see Honest limits). A
   gate that *errors* (the 30s idle cap, an unreachable URL) exits
   non-zero — in CI that fails the step loudly; it never silently
   passes. Pixel-exact `snapshot` baselines are a different animal:
@@ -384,6 +419,18 @@ Trust lives in stated boundaries, so here are the ones that matter:
   The honest claim is "adversarially maintained," not "complete."
 - **A flow gate proves the paths it walks and nothing else.** If a
   behavior matters, put a step on it.
+- **Pages behind authentication are out of reach today.** There is
+  no cookie or storage-state injection; the workarounds are a
+  no-auth route, a locally rendered file, or a fixture page that
+  mounts the same components without the login wall. If your
+  highest-value pages are all behind auth, price that in before the
+  trial.
+- **Fonts are your determinism boundary.** The Chromium build is
+  pinned, but the fonts are the machine's: a CI container missing
+  your brand font falls back and reflows, which can move text well
+  past the suspect floors. Ship the fonts with the page (webfonts)
+  or install them in the CI image — the geometry gates are only as
+  portable as the fonts they measure.
 - **Third-party CSS is checked as rendered.** If your UI library
   overflows at 375px, the gate reports it like any other defect —
   there is no per-origin scoping.
