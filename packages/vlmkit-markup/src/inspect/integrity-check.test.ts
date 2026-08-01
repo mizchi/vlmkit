@@ -513,6 +513,23 @@ test("M14 opaque sibling painted over text is occluded-text", { timeout: 120_000
   assert.ok(!report.findings.some((f) => f.selector === "#clear"));
 });
 
+// The S19 class plus one declaration: decorative art that paints over text
+// but opts out of hit-testing. elementFromPoint skips pointer-events:none,
+// so the probe forces hit-testing back on page-wide while sampling.
+test("M14a2 pointer-events:none decorative overlay is still occluded-text", { timeout: 120_000 }, async () => {
+  const file = page("m14a2.html", `
+    <div style="position:relative;width:600px;height:120px;background:#eee">
+      <p id="covered" style="position:absolute;left:20px;top:40px;color:#111">Covered readout text</p>
+      <div style="position:absolute;left:0;top:20px;width:280px;height:80px;background:#c94;z-index:2;pointer-events:none"></div>
+      <p id="clear" style="position:absolute;left:320px;top:40px;color:#111">Clear readout text</p>
+    </div>
+    <div style="width:600px;height:200px;background:#456;margin-top:12px"></div>`);
+  const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+  const hit = report.findings.find((f) => f.kind === "occluded-text" && f.selector === "#covered");
+  assert.ok(hit, JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector}`)));
+  assert.ok(!report.findings.some((f) => f.selector === "#clear"));
+});
+
 test("M14b transparent stretched-link overlay is NOT occluded-text", { timeout: 120_000 }, async () => {
   const file = page("m14b.html", `
     <div style="position:relative;width:400px;height:140px;background:#fff;border:1px solid #ccc;padding:16px">

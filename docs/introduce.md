@@ -74,6 +74,10 @@ of work. What to expect before you install:
   (warn-only runs are CLEAN and exit zero); the other checks exit
   zero unless you pass `--fail-on-suspect`, which turns any suspect
   into a non-zero exit; a run that *errors* always exits non-zero.
+  Read that second clause twice before wiring anything: the per-gate
+  default is **advisory**, so a pre-push or CI command without
+  `--fail-on-suspect` prints findings and still succeeds. Put the
+  flag on every gate you intend to enforce.
 - Setup is two commands — `npm install -D @mizchi/vlmkit` and
   `npx playwright install chromium` (a browser download — expect on
   the order of 150 MB, a few minutes once; CI containers add
@@ -90,6 +94,19 @@ of work. What to expect before you install:
   point it at a locally rendered file or a route without the socket.
   Same workaround for pages behind a login: a no-auth route or a
   local file (there is no cookie/storage-state injection today).
+
+### How the interesting checks actually measure
+
+"Deterministic" is an adjective; these are the mechanisms, so you can
+predict where each one is strong and where it will miss:
+
+| Check | Mechanism | Where it stops |
+|---|---|---|
+| text painted over | `elementFromPoint` sampled across each text range's glyph band; a point counts only when the hit element is unrelated *and* paints opaquely (background alpha ≥ 0.5, a background image, or a replaced element). Hit-testing is forced on page-wide while sampling, so `pointer-events: none` decorative art is still caught | canvas/video/cross-origin-iframe content, blend modes that ruin legibility without covering |
+| invisible / low-contrast text | WCAG contrast of the computed fill against the resolved solid background; **composite backgrounds (gradients, images) are skipped and reported as skipped**, not guessed | gradient-text (`background-clip: text`) is skipped rather than judged |
+| text collision | pairwise overlap of text-block boxes: ≥ 6px on **both** axes *and* ≥ 25% of the smaller block's area; positioned layers and `aria-hidden` sides exempt | thin-sliver overlaps (see Honest limits) |
+| screen-reader-only exemption | geometric: fully clipped (zero-area / `clip` / `clip-path` inset) is intentional; partially cut is a defect | |
+| design match | connected-component segmentation of flat fills, pairing by position/size/fill, then cross-image pixel confirmation | photographic/gradient targets |
 
 ## What you can do with it
 
@@ -130,7 +147,15 @@ Cancel anytime
 ```
 
 Whitespace is normalized, matching is case-sensitive (casing is
-spec), and a line may match anywhere on the page.
+spec), and a line may match anywhere on the page. One case is worth
+settling up front, because the two gates look like they disagree: a
+string that exists *only* as screen-reader-only text (an accessible
+name on an icon-only button). Integrity exempts it — a fully clipped
+box is a recognized intentional pattern. If that same string is also
+a manifest line, the copy gate reports it as present-but-invisible
+with reason class `visually-hidden`, and you accept it explicitly
+with `--allow-invisible visually-hidden`. The copy gate owns the
+verdict; the acceptance is a flag, not a silent pass.
 
 **"Does it actually behave?"** — `check breakpoints --sweep` proves
 your responsive boundary is exact (no width where the layout breaks,
@@ -148,8 +173,14 @@ list: which components are missing, misplaced, mis-sized, mis-ordered,
 with selectors attached. The mechanism is deterministic, not a vision
 model: both images are segmented into solid-fill regions by pixel
 connectivity, regions are paired across target and render by
-position/size/fill, and every unpaired or mismatched region is
-pixel-confirmed against the target before it's allowed to block.
+position/size/fill, and every unpaired region is then cross-checked
+against the *other* image before it's allowed to block — a "missing"
+is demoted when its fill is actually present at that bbox in your
+render (the extractor merged it into a neighbor), an "extra" when the
+target has the same fill there. One caveat the format forces: a
+render-side region maps back to a DOM selector, but a *missing*
+region exists only in the target, so it is reported by bbox and fill,
+without a selector.
 That mechanism also sets the boundary: it's built for flat-fill UI
 comps (retina scaling and JPEG noise are handled), not photographic
 or gradient-heavy art, where regions segment coarsely and pair
@@ -178,11 +209,12 @@ script rather than a one-liner):
 # while editing — after any layout/CSS change:
 npx vlmkit check integrity page.html                         # anything broken?
 # before pushing — when the page carries spec'd copy:
-npx vlmkit check copy page.html --manifest copy.txt          # wording exact & visible?
+#   (--fail-on-suspect is what makes these EXIT non-zero on findings)
+npx vlmkit check copy page.html --manifest copy.txt --fail-on-suspect
 # before pushing — when the page is responsive:
-npx vlmkit check breakpoints page.html --sweep               # boundaries hold?
+npx vlmkit check breakpoints page.html --sweep --fail-on-suspect
 # before pushing — when the page has interactive controls:
-npx vlmkit check interactions page.html                      # keyboard-operable?
+npx vlmkit check interactions page.html --fail-on-suspect
 # while building against a design:
 npx vlmkit verify markup attempt.html --target design.png    # matches the design?
 # continuously / in CI — regression tracking:
@@ -266,7 +298,7 @@ The operational questions a lead will ask, answered plainly:
   ```json
   { "scripts": {
     "gate:home":     "vlmkit check integrity http://localhost:3000/ && vlmkit check copy http://localhost:3000/ --manifest copy/home.txt --fail-on-suspect",
-    "gate:pricing":  "vlmkit check integrity http://localhost:3000/pricing/ && vlmkit check layout http://localhost:3000/pricing/ --contract layout/pricing.json",
+    "gate:pricing":  "vlmkit check integrity http://localhost:3000/pricing/ && vlmkit check layout http://localhost:3000/pricing/ --contract layout/pricing.json --fail-on-suspect",
     "gate:all":      "npm run gate:home && npm run gate:pricing"
   } }
   ```
@@ -426,18 +458,33 @@ Trust lives in stated boundaries, so here are the ones that matter:
   highest-value pages are all behind auth, price that in before the
   trial.
 - **Fonts are your determinism boundary.** The Chromium build is
-  pinned, but the fonts are the machine's: a CI container missing
-  your brand font falls back and reflows, which can move text well
-  past the suspect floors. Ship the fonts with the page (webfonts)
-  or install them in the CI image — the geometry gates are only as
-  portable as the fonts they measure.
+  pinned and the gates wait for `document.fonts.ready` (not just
+  network idle — `font-display: swap` reflows text *after* idle), but
+  the fonts themselves are the machine's: a CI container missing your
+  brand font falls back and reflows, which can move text well past
+  the suspect floors. Ship the fonts with the page (webfonts) or
+  install them in the CI image. Being precise about the precondition:
+  portable means same font *files and versions*, same rasterizer
+  configuration, same scrollbar mode, and same locale — a
+  locale-formatted number that changes length changes where a line
+  wraps.
+- **Thin-sliver collisions are a known blind spot.** The collision
+  floor is 6px on *both* axes plus 25% of the smaller block's area,
+  which is what keeps line-boxes with tight `line-height` or
+  negative margins from crying wolf. The cost: a label grazing its
+  neighbor by 3px horizontally while overlapping 18px vertically is
+  below the floor and goes unreported. Boxes are also not ink — the
+  upgrade to glyph-ink extents is backlogged behind its own
+  false-positive audit, because loosening this floor is exactly how a
+  gate starts getting ignored.
 - **Third-party CSS is checked as rendered.** If your UI library
   overflows at 375px, the gate reports it like any other defect —
   there is no per-origin scoping.
 - **Common intentional patterns, concretely**: sticky/fixed bars that
   cover content while pinned are measured as scroll-escapable and
-  exempted; hero text-over-image overlays are exempted when the
-  backing is measured as such; dynamic content (tickers, timestamps)
+  exempted; text-over-image overlays are exempted when one of the two
+  blocks sits in a positioned (absolute/fixed) layer — deliberate
+  stacking, not flow collision; dynamic content (tickers, timestamps)
   is handled by `snapshot --mask ".selector"`, not by integrity. Transient states (open modals, hovering tooltips) are only
   checked if a flow step opens them.
 

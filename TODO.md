@@ -276,6 +276,15 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 - [ ] **クロス OS フォント決定論の実測レポート** — 2px/6px floor が
   macOS vs Linux 描画で維持されるかの検証(要 macOS 実機)。フォント
   同梱/未同梱の両条件。
+- [ ] **text-collision の ink extents 化(round-10 staff engineer 指摘)** —
+  現行は text-block の bounding box 重なり(両軸 6px AND + 小さい側の面積
+  25%)。細片重なり(縦 18px × 横 3px = 実際に壊れて見える)が床下で無報告。
+  `Range.getClientRects()` / `measureText().actualBoundingBox*` による
+  グリフインク範囲へ移行すれば拾えるが、`line-height < 1` / 負マージンの
+  行ボックス重なりが偽陽性に化けるリスクが高い。**7 サイト外部監査 +
+  22 本バッテリーでの FP 再監査を通すまで着手しない**(床を緩めるのが
+  ゲート不信の典型経路)。docs/introduce.md の Honest limits に既知の
+  盲点として明記済み。
 - [ ] **マルチページランナー** — glob 指定で全ページのゲートを並列
   実行(`vlmkit check integrity "routes/**.html"` 相当)。CI 時間予算
   の質問に答える sharding / 並列度の実測値も。

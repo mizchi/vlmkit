@@ -799,6 +799,16 @@ const STABLE_SELECTOR_FN = `
 // is what kept this probe demand-gated until a real case appeared.
 // Coverage note: samples only what is inside the viewport at load (no
 // scroll sweep), which matches how the defect class was observed.
+//
+// Hit-testing has one blind spot that has to be closed deliberately:
+// `elementFromPoint` skips `pointer-events: none` elements, and that is
+// exactly how decorative overlays are built (gradient scrims, absolutely
+// positioned SVG/CSS art, ::before washes). An occluder that paints over
+// text but opts out of hit-testing would be invisible to the probe — the
+// S19 defect class with one extra declaration. So sampling runs with
+// pointer-events forced back on page-wide, then restores. False positives
+// stay closed by the opaque-paint requirement: a transparent click-catcher
+// now hit-tests on top but still never flags.
 
 export interface OcclusionCandidate {
   selector: string;
@@ -834,6 +844,12 @@ export const COLLECT_OCCLUSIONS = `(() => {
     return alphaOf(cs.backgroundColor) >= 0.5;
   };
   const out = [];
+  // Force hit-testing back on so pointer-events:none overlays are visible
+  // to elementFromPoint (see the note above). Removed in the finally.
+  const peOverride = document.createElement("style");
+  peOverride.textContent = "*, *::before, *::after { pointer-events: auto !important; }";
+  document.head.appendChild(peOverride);
+  try {
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   let node;
   while ((node = walker.nextNode())) {
@@ -908,6 +924,9 @@ export const COLLECT_OCCLUSIONS = `(() => {
     }
   }
   return out;
+  } finally {
+    peOverride.remove();
+  }
 })()`;
 
 export function findOccludedText(
@@ -1382,6 +1401,12 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
         }
       });
       await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+      // Network idle is not font-ready: with `font-display: swap` the text
+      // reflows AFTER idle, so every geometry probe below would measure
+      // fallback metrics on some runs and webfont metrics on others — the
+      // exact non-determinism the gate promises not to have. Cheap when
+      // there are no webfonts (already-resolved promise).
+      await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => undefined) : undefined));
       await page.waitForTimeout(250); // let post-load timers throw before judging
 
       // A1
