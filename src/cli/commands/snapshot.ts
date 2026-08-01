@@ -1,7 +1,24 @@
+import { existsSync } from "node:fs";
+import { resolve as resolvePath } from "node:path";
+import { pathToFileURL } from "node:url";
+
 export interface SnapshotFailureOptions {
   failOnDiff?: boolean;
   failOnNewBaseline?: boolean;
   maxDiffRatio?: number;
+}
+
+/**
+ * Accept local file paths as snapshot sources: `vlmkit snapshot page.html`
+ * navigates to the file instead of dying on "Cannot navigate to invalid
+ * URL" (the first thing both a human and an agent tried in the black-box
+ * validation). Existing http(s)/file URLs pass through untouched; a
+ * non-URL that is not an existing file is also passed through so the
+ * browser error names the original input.
+ */
+export function toSnapshotUrl(source: string): string {
+  if (/^(https?|file):\/\//i.test(source)) return source;
+  return existsSync(source) ? pathToFileURL(resolvePath(source)).href : source;
 }
 
 export interface SnapshotFailureResult {
@@ -340,7 +357,7 @@ export function parseSnapshotCliArgs(
 
     return {
       mode: "stability",
-      urls: configuredStabilityUrls,
+      urls: configuredStabilityUrls.map(toSnapshotUrl),
       labels: stabilityLabels,
       outputDir,
       threshold,
@@ -439,7 +456,7 @@ export function parseSnapshotCliArgs(
 
   return {
     mode: "capture",
-    urls: configuredUrls,
+    urls: configuredUrls.map(toSnapshotUrl),
     labels,
     outputDir,
     threshold,

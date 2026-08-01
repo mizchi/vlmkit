@@ -106,7 +106,9 @@ export interface CopyCheckReport {
   /** Manifest lines satisfied only by a revealed disclosure state. */
   revealedLines: { line: string; state: string }[];
   /** Manifest lines present in the DOM text but not visibly rendered (gaming vector). */
-  invisibleLines: string[];
+  invisibleLines: { line: string; reason: InvisibleReason }[];
+  /** Invisible matches accepted via allowInvisible (deliberate, per-class suppression). */
+  allowedInvisibleLines: { line: string; reason: InvisibleReason }[];
   /** Disclosure states explored (0 = nothing to reveal or sweep disabled). */
   statesExplored: number;
   droppedStates: number;
@@ -229,7 +231,18 @@ const AWAIT_RENDER_COMMIT = `new Promise((r) => requestAnimationFrame(() => requ
  * outside containing block are approximated by the plain parent walk
  * (may over-clip); acceptable because only zero-intersection flags.
  */
-export const COLLECT_VISIBLE_TEXT = `(() => {
+export const INVISIBLE_REASONS = [
+  "zero-size",
+  "hidden",
+  "transparent",
+  "visually-hidden",
+  "unreachable",
+  "camouflage",
+  "unknown",
+] as const;
+export type InvisibleReason = (typeof INVISIBLE_REASONS)[number];
+
+export const COLLECT_TEXT_VISIBILITY = `(() => {
   const rgbaOf = (color) => {
     const m = /rgba?\\(([^)]+)\\)/.exec(color || "");
     if (!m) return null;
@@ -323,9 +336,23 @@ export const COLLECT_VISIBLE_TEXT = `(() => {
     const white = { r: 255, g: 255, b: 255 };
     return Math.max(Math.abs(fg.r - white.r), Math.abs(fg.g - white.g), Math.abs(fg.b - white.b)) <= 8;
   };
+  /** sr-only signature: a clip:rect ancestor clipping to ~nothing, or a <=2px overflow box. */
+  const visuallyHiddenAncestor = (el) => {
+    for (let p = el; p && p !== document.documentElement; p = p.parentElement) {
+      const cs = getComputedStyle(p);
+      const box = p.getBoundingClientRect();
+      const cr = clipRect(cs, box);
+      if (cr && areaOf(cr) <= 4) return true;
+      const clipsX = cs.overflowX === "hidden" || cs.overflowX === "clip";
+      const clipsY = cs.overflowY === "hidden" || cs.overflowY === "clip";
+      if (clipsX && clipsY && p.clientWidth <= 2 && p.clientHeight <= 2) return true;
+    }
+    return false;
+  };
   const root = document.body || document.documentElement;
-  if (!root) return "";
+  if (!root) return { visible: "", invisible: [] };
   const parts = [];
+  const invisible = [];
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let node;
   while ((node = walker.nextNode())) {
@@ -334,6 +361,13 @@ export const COLLECT_VISIBLE_TEXT = `(() => {
     if (!el) continue;
     const tag = el.tagName;
     if (tag === "SCRIPT" || tag === "STYLE" || tag === "NOSCRIPT" || tag === "TEMPLATE") continue;
+    const cs = getComputedStyle(el);
+    let text = node.data;
+    if (cs.textTransform === "uppercase") text = text.toUpperCase();
+    else if (cs.textTransform === "lowercase") text = text.toLowerCase();
+    else if (cs.textTransform === "capitalize") {
+      text = text.replace(/(^|\\s)(\\S)/g, (m0, sp, ch) => sp + ch.toUpperCase());
+    }
     const select = el.closest ? el.closest("select") : null;
     if (select) {
       if (typeof select.checkVisibility !== "function" ||
@@ -342,36 +376,38 @@ export const COLLECT_VISIBLE_TEXT = `(() => {
       }
       continue;
     }
-    const range = document.createRange();
-    range.selectNodeContents(node);
-    const rects = Array.from(range.getClientRects()).filter((r) => r.width * r.height >= 1);
-    if (rects.length === 0) continue;
-    const cs = getComputedStyle(el);
+    const drop = (reason) => invisible.push({ reason, text });
+    // checkVisibility before the rect check so display:none subtrees read
+    // "hidden" and "zero-size" stays rendered-but-zero (font-size:0, scale(0)).
     if (typeof el.checkVisibility === "function") {
-      if (!el.checkVisibility({ visibilityProperty: true, opacityProperty: true, contentVisibilityAuto: true })) continue;
+      if (!el.checkVisibility({ visibilityProperty: true, opacityProperty: true, contentVisibilityAuto: true })) { drop("hidden"); continue; }
     } else {
-      if (cs.visibility === "hidden" || cs.visibility === "collapse") continue;
+      if (cs.visibility === "hidden" || cs.visibility === "collapse") { drop("hidden"); continue; }
       let opacity = 1;
       for (let p = el; p && opacity >= 0.02; p = p.parentElement) {
         const po = parseFloat(getComputedStyle(p).opacity);
         opacity *= Number.isFinite(po) ? po : 1;
       }
-      if (opacity < 0.02) continue;
+      if (opacity < 0.02) { drop("hidden"); continue; }
     }
-    if (alphaOf(cs.color) < 0.02) continue;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    const rects = Array.from(range.getClientRects()).filter((r) => r.width * r.height >= 1);
+    if (rects.length === 0) { drop("zero-size"); continue; }
+    if (alphaOf(cs.color) < 0.02) { drop("transparent"); continue; }
     // Legible text needs a few px^2; a 1x1 sr-only box scores exactly 1.
-    if (reachableArea(el, rects) < 4) continue;
-    if (camouflaged(el, cs)) continue;
-    let text = node.data;
-    if (cs.textTransform === "uppercase") text = text.toUpperCase();
-    else if (cs.textTransform === "lowercase") text = text.toLowerCase();
-    else if (cs.textTransform === "capitalize") {
-      text = text.replace(/(^|\\s)(\\S)/g, (m0, sp, ch) => sp + ch.toUpperCase());
+    if (reachableArea(el, rects) < 4) {
+      drop(visuallyHiddenAncestor(el) ? "visually-hidden" : "unreachable");
+      continue;
     }
+    if (camouflaged(el, cs)) { drop("camouflage"); continue; }
     parts.push(text);
   }
-  return parts.join("\\n");
+  return { visible: parts.join("\\n"), invisible };
 })()`;
+
+/** The visible half of COLLECT_TEXT_VISIBILITY (the disclosure sweep only needs this). */
+export const COLLECT_VISIBLE_TEXT = `${COLLECT_TEXT_VISIBILITY}.visible`;
 
 async function sweepDisclosureStates(page: {
   evaluate: (script: string) => Promise<unknown>;
@@ -401,13 +437,24 @@ export function analyzeCopy(input: {
   source: string;
   /** Raw `innerText` — the placeholder scan and invisible-text detection run on this. */
   pageText: string;
-  /** Visibly rendered text (COLLECT_VISIBLE_TEXT). Defaults to pageText when absent. */
+  /** Visibly rendered text (COLLECT_TEXT_VISIBILITY.visible). Defaults to pageText when absent. */
   visibleText?: string;
+  /** Classified invisible text chunks (COLLECT_TEXT_VISIBILITY.invisible) for reason attribution. */
+  invisibleChunks?: { reason: string; text: string }[];
+  /** Invisible-match reasons to accept as satisfied (deliberate suppression, e.g. ["visually-hidden"]). */
+  allowInvisible?: InvisibleReason[];
   manifestLines?: string[];
   stateSweep?: StateSweep;
 }): CopyCheckReport {
   const normalized = normalizeWhitespace(input.pageText);
   const visible = input.visibleText !== undefined ? normalizeWhitespace(input.visibleText) : normalized;
+  const invisibleByReason = new Map<string, string>();
+  for (const chunk of input.invisibleChunks ?? []) {
+    invisibleByReason.set(chunk.reason, `${invisibleByReason.get(chunk.reason) ?? ""}\n${chunk.text}`);
+  }
+  const reasonBuckets = [...invisibleByReason.entries()]
+    .map(([reason, text]) => ({ reason: reason as InvisibleReason, normalized: normalizeWhitespace(text) }));
+  const allowInvisible = new Set(input.allowInvisible ?? []);
   const states = (input.stateSweep?.states ?? []).map((s) => ({
     ...s,
     normalized: normalizeWhitespace(s.text),
@@ -441,7 +488,8 @@ export function analyzeCopy(input: {
   const manifestLines = input.manifestLines ?? [];
   const missingLines: string[] = [];
   const revealedLines: { line: string; state: string }[] = [];
-  const invisibleLines: string[] = [];
+  const invisibleLines: { line: string; reason: InvisibleReason }[] = [];
+  const allowedInvisibleLines: { line: string; reason: InvisibleReason }[] = [];
   for (const line of manifestLines) {
     const needle = normalizeWhitespace(line);
     if (visible.includes(needle)) continue;
@@ -450,12 +498,23 @@ export function analyzeCopy(input: {
       revealedLines.push({ line, state: state.label });
       continue;
     }
-    if (normalized.includes(needle)) {
-      invisibleLines.push(line);
+    // copy-invisible is for text that IS rendered into the page (raw
+    // innerText carries it) but the user cannot see it. Text that never
+    // renders (display:none panels, hidden sections) stays plain missing —
+    // that's the sweep's territory, not a gaming signal.
+    const inRaw = normalized.includes(needle);
+    const bucket = inRaw ? reasonBuckets.find((b) => b.normalized.includes(needle)) : undefined;
+    const reason: InvisibleReason | undefined = inRaw ? (bucket?.reason ?? "unknown") : undefined;
+    if (reason !== undefined) {
+      if (allowInvisible.has(reason)) {
+        allowedInvisibleLines.push({ line, reason });
+        continue;
+      }
+      invisibleLines.push({ line, reason });
       issues.push({
         kind: "copy-invisible",
         severity: "suspect",
-        message: `Manifest line found ONLY in text a user cannot see (zero-size, zero-opacity, transparent, off-screen, clipped, camouflaged, or visually-hidden/sr-only): "${line}". Invisible text does not satisfy the copy gate — render it visibly, or remove the hidden copy.`,
+        message: `Manifest line found ONLY in text a user cannot see (reason: ${reason}): "${line}". Invisible text does not satisfy the copy gate — render it visibly or remove the hidden copy. If this invisibility is deliberate (e.g. assistive-tech-only copy), re-run with --allow-invisible ${reason}.`,
       });
       continue;
     }
@@ -477,6 +536,7 @@ export function analyzeCopy(input: {
     missingLines,
     revealedLines,
     invisibleLines,
+    allowedInvisibleLines,
     statesExplored: states.length,
     droppedStates: input.stateSweep?.droppedActions ?? 0,
     placeholders,
@@ -500,6 +560,12 @@ export interface CopyCheckOptions {
   readTargetText?: (cropPng: Buffer) => Promise<string>;
   /** Disclosure-state sweep before matching. Default true (`--no-states`). */
   exploreStates?: boolean;
+  /**
+   * Invisible-match reasons to accept as satisfied (CLI `--allow-invisible`).
+   * Per-class, deliberate suppression — e.g. ["visually-hidden"] when the
+   * team decides sr-only text may satisfy manifest lines. Default: none.
+   */
+  allowInvisible?: InvisibleReason[];
 }
 
 function isUrl(source: string): boolean {
@@ -522,6 +588,7 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
   const browser = await chromium.launch();
   let pageText: string;
   let visibleText: string;
+  let invisibleChunks: { reason: string; text: string }[];
   let blocks: TextBlock[] = [];
   let stateSweep: StateSweep | undefined;
   try {
@@ -534,7 +601,8 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
       await page.goto(pathToFileURL(resolve(options.source)).href, { waitUntil: "networkidle", timeout: 30000 });
     }
     pageText = await page.evaluate("document.body ? document.body.innerText : \"\"") as string;
-    visibleText = await page.evaluate(COLLECT_VISIBLE_TEXT) as string;
+    ({ visible: visibleText, invisible: invisibleChunks } =
+      await page.evaluate(COLLECT_TEXT_VISIBILITY) as { visible: string; invisible: { reason: string; text: string }[] });
     if (target) {
       blocks = (await page.evaluate(COLLECT_TEXT_BLOCKS) as TextBlock[])
         .filter((b) => b.y < target.height && b.x < target.width);
@@ -554,6 +622,8 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
     source: options.source,
     pageText,
     visibleText,
+    invisibleChunks,
+    ...(options.allowInvisible ? { allowInvisible: options.allowInvisible } : {}),
     ...(manifestLines ? { manifestLines } : {}),
     ...(stateSweep ? { stateSweep } : {}),
   });
@@ -621,6 +691,7 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
       placeholders: report.placeholders.length,
       manifestLines: report.manifestLines,
       ...(report.invisibleLines.length > 0 ? { invisibleOnly: report.invisibleLines.length } : {}),
+      ...(report.allowedInvisibleLines.length > 0 ? { allowedInvisible: report.allowedInvisibleLines.length } : {}),
       ...(report.statesExplored > 0
         ? { statesExplored: report.statesExplored, revealedOnly: report.revealedLines.length }
         : {}),
@@ -656,9 +727,13 @@ export function formatCopyCheckReport(report: CopyCheckReport): string {
   if (report.manifestLines > 0) {
     const revealed = report.revealedLines.length > 0 ? `, ${report.revealedLines.length} revealed-only` : "";
     const invisible = report.invisibleLines.length > 0 ? `, ${report.invisibleLines.length} invisible-only` : "";
-    lines.push(`manifest: ${report.manifestLines} line(s), missing ${report.missingLines.length}${invisible}${revealed}`);
+    const allowed = report.allowedInvisibleLines.length > 0 ? `, ${report.allowedInvisibleLines.length} invisible-allowed` : "";
+    lines.push(`manifest: ${report.manifestLines} line(s), missing ${report.missingLines.length}${invisible}${allowed}${revealed}`);
     for (const r of report.revealedLines) {
       lines.push(`  ${DIM}revealed: "${r.line}" ← ${r.state} (hidden by default is fine — do NOT ship it open just for this gate)${RESET}`);
+    }
+    for (const a of report.allowedInvisibleLines) {
+      lines.push(`  ${DIM}invisible-allowed: "${a.line}" (${a.reason} — accepted via --allow-invisible)${RESET}`);
     }
   } else {
     lines.push(`manifest: none (pass --manifest, or --target <png> to verify copy against the target pixels)`);
@@ -711,13 +786,21 @@ Manifest lines must appear in the VISIBLY rendered text: copy a user
 cannot actually see (font-size:0, opacity:0, transparent color,
 off-screen positioning, text-indent, transforms, clip/clip-path,
 zero-size overflow boxes, same-color camouflage, sr-only) is reported
-as copy-invisible, not as satisfied. The manifest is the user-visible
-copy spec — keep assistive-tech-only strings out of it. Markdown
-headings in the manifest ("# Section") are organizing comments, not
-required lines.
+as copy-invisible with a reason class, not as satisfied. The manifest
+is the user-visible copy spec — keep assistive-tech-only strings out
+of it. Markdown headings in the manifest ("# Section") are organizing
+comments, not required lines.
+
+Reason classes: zero-size, hidden, transparent, visually-hidden
+(sr-only-style clip/1px box), unreachable (off-screen/clipped),
+camouflage, unknown. When an invisibility is deliberate, accept that
+class with --allow-invisible; each accepted line is listed with its
+reason so the suppression stays auditable.
 
 Options:
   --manifest <file>   Copy manifest (plain text / markdown; one required line per row)
+  --allow-invisible <classes>  Comma-separated reason classes to accept as satisfied
+                      (e.g. --allow-invisible visually-hidden)
   --target <png>      Target screenshot to verify copy against (bbox-cropped per text block)
   --out <dir>         Sheet/worksheet output dir (default: .vlmkit-copy-review next to the source)
   --vlm [model]       Transcribe crops with a VLM (default model: VRT_VLM_MODEL); requires API key
@@ -736,6 +819,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   let json = false;
   let failOnSuspect = false;
   let exploreStates = true;
+  let allowInvisible: InvisibleReason[] | undefined;
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
@@ -746,7 +830,15 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
       const next = argv[i + 1];
       vlm = next && !next.startsWith("-") ? argv[++i]! : true;
     } else if (arg === "--no-states") exploreStates = false;
-    else if (arg === "--json") json = true;
+    else if (arg === "--allow-invisible") {
+      const classes = (argv[++i] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+      const bad = classes.filter((c) => !(INVISIBLE_REASONS as readonly string[]).includes(c));
+      if (classes.length === 0 || bad.length > 0) {
+        console.error(`--allow-invisible: unknown class(es) ${bad.map((b) => `"${b}"`).join(", ") || "(none given)"}. Valid: ${INVISIBLE_REASONS.join(", ")}`);
+        process.exit(1);
+      }
+      allowInvisible = classes as InvisibleReason[];
+    } else if (arg === "--json") json = true;
     else if (arg === "--fail-on-suspect") failOnSuspect = true;
     else if (!arg.startsWith("-")) positional.push(arg);
   }
@@ -776,6 +868,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     ...(targetPath ? { targetPath } : {}),
     ...(outDir ? { outDir } : {}),
     ...(readTargetText ? { readTargetText } : {}),
+    ...(allowInvisible ? { allowInvisible } : {}),
     exploreStates,
   });
   if (json) console.log(JSON.stringify(report, null, 2));

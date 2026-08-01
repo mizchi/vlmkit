@@ -59,7 +59,8 @@ export type IntegrityFindingKind =
   | "container-protrusion"
   | "invisible-text"
   | "low-contrast-text"
-  | "near-misalignment";
+  | "near-misalignment"
+  | "occluded-text";
 
 export interface IntegrityFinding {
   kind: IntegrityFindingKind;
@@ -781,6 +782,171 @@ const STABLE_SELECTOR_FN = `
 `;
 
 /** Text blocks with the stacking metadata the collision exemptions need. */
+// ---------------------------------------------------------------------------
+// A13 — occluded text (z-index / paint-order cover)
+//
+// Text painted OVER by an opaque non-related element. First observed in the
+// wild in S19 (game UI): a CSS figure's absolutely-positioned part covered
+// "Block 0" and half the enemy HP at 375px while every other probe stayed
+// clean — text-collision is text-vs-text, invisible-text is style-based,
+// and neither sees paint order. Detection is hit-testing: sample points on
+// each text rect's glyph band and ask elementFromPoint who actually paints
+// there. A point is occluded when the hit element is unrelated (not self,
+// ancestor, or descendant — whitespace points hit ancestors and stay fine)
+// AND the occluder paints opaquely (solid background-color alpha >= 0.5, a
+// background-image, or a replaced element). Transparent overlays — the
+// stretched-link card pattern, scrims under 0.5 alpha — never flag, which
+// is what kept this probe demand-gated until a real case appeared.
+// Coverage note: samples only what is inside the viewport at load (no
+// scroll sweep), which matches how the defect class was observed.
+
+export interface OcclusionCandidate {
+  selector: string;
+  text: string;
+  occluder: string;
+  /** occluded sample points / total sampled points, 0..1 */
+  coverage: number;
+  sampled: number;
+  ariaHidden: boolean;
+  /**
+   * The occluder is a viewport-pinned bar (position fixed / sticky) and the
+   * page has enough scroll range for this text to move out from under it —
+   * the standard bottom-bar-over-scrollable-content pattern (S15's mobile
+   * cart bar), readable after a scroll, so exempt rather than fail.
+   */
+  pinnedEscapable: boolean;
+}
+
+export const COLLECT_OCCLUSIONS = `(() => {
+  ${STABLE_SELECTOR_FN}
+  const SKIP = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE"]);
+  const alphaOf = (color) => {
+    const m = /rgba?\\(([^)]+)\\)/.exec(color || "");
+    if (!m) return 0;
+    const p = m[1].split(",").map((s) => parseFloat(s));
+    return p.length >= 4 ? p[3] : 1;
+  };
+  const OPAQUE_TAGS = new Set(["IMG", "CANVAS", "VIDEO", "SVG", "PICTURE"]);
+  const paintsOpaquely = (el) => {
+    if (OPAQUE_TAGS.has(el.tagName)) return true;
+    const cs = getComputedStyle(el);
+    if ((cs.backgroundImage || "none") !== "none") return true;
+    return alphaOf(cs.backgroundColor) >= 0.5;
+  };
+  const out = [];
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  let node;
+  while ((node = walker.nextNode())) {
+    if (!(node.nodeValue || "").trim()) continue;
+    const el = node.parentElement;
+    if (!el || SKIP.has(el.tagName)) continue;
+    const style = getComputedStyle(el);
+    if (style.visibility === "hidden" || style.display === "none" || style.opacity === "0") continue;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    const rects = Array.from(range.getClientRects()).filter((r) => r.width >= 4 && r.height >= 4);
+    if (rects.length === 0) continue;
+    // Occlusion is only meaningful where the glyphs are actually painted.
+    // Text clipped away by its own / an ancestor's overflow box (sr-only,
+    // Kellum image replacement, text-indent tricks) is the invisible-text
+    // probes' business — hit-testing those points would blame whatever
+    // happens to be painted there. Clamp sampling to the ancestor clip.
+    let clip = { left: 0, top: 0, right: innerWidth, bottom: innerHeight };
+    for (let p = el; p && p !== document.body; p = p.parentElement) {
+      const pcs = getComputedStyle(p);
+      const clipsX = pcs.overflowX !== "visible";
+      const clipsY = pcs.overflowY !== "visible";
+      if (!clipsX && !clipsY) continue;
+      const b = p.getBoundingClientRect();
+      if (clipsX) { clip.left = Math.max(clip.left, b.left); clip.right = Math.min(clip.right, b.right); }
+      if (clipsY) { clip.top = Math.max(clip.top, b.top); clip.bottom = Math.min(clip.bottom, b.bottom); }
+    }
+    if (clip.right - clip.left < 4 || clip.bottom - clip.top < 4) continue;
+    let sampled = 0;
+    let occluded = 0;
+    const hits = new Map();
+    for (const r of rects.slice(0, 3)) {
+      const y = r.top + r.height / 2;
+      if (y < clip.top || y >= clip.bottom) continue;
+      for (const fx of [0.125, 0.375, 0.625, 0.875]) {
+        const x = r.left + r.width * fx;
+        if (x < clip.left || x >= clip.right) continue;
+        sampled++;
+        const hit = document.elementFromPoint(x, y);
+        if (!hit || hit === el || el.contains(hit) || hit.contains(el)) continue;
+        if (!paintsOpaquely(hit)) continue;
+        occluded++;
+        hits.set(hit, (hits.get(hit) || 0) + 1);
+      }
+    }
+    if (sampled >= 3 && occluded >= 2 && occluded / sampled >= 0.5) {
+      let top = null;
+      for (const [h, n] of hits) if (!top || n > top[1]) top = [h, n];
+      let pinnedEscapable = false;
+      if (top) {
+        let pinned = null;
+        for (let p = top[0]; p && p !== document.body; p = p.parentElement) {
+          const pos = getComputedStyle(p).position;
+          if (pos === "fixed" || pos === "sticky") { pinned = p; break; }
+        }
+        if (pinned) {
+          const maxScroll = Math.max(0, document.documentElement.scrollHeight - innerHeight);
+          const textBottom = rects[0].bottom;
+          const barTop = pinned.getBoundingClientRect().top;
+          pinnedEscapable = maxScroll >= textBottom - barTop;
+        }
+      }
+      out.push({
+        selector: stableSelector(el),
+        text: (node.nodeValue || "").replace(/\\s+/g, " ").trim().slice(0, 60),
+        occluder: top ? stableSelector(top[0]) : "?",
+        coverage: occluded / sampled,
+        sampled,
+        ariaHidden: !!el.closest('[aria-hidden="true"]'),
+        pinnedEscapable,
+      });
+    }
+  }
+  return out;
+})()`;
+
+export function findOccludedText(
+  candidates: OcclusionCandidate[],
+  viewport: number,
+): { findings: IntegrityFinding[]; exempted: IntegrityExemption[] } {
+  const findings: IntegrityFinding[] = [];
+  const exempted: IntegrityExemption[] = [];
+  for (const c of candidates) {
+    if (c.ariaHidden) {
+      exempted.push({
+        kind: "occluded-text",
+        viewport,
+        selector: c.selector,
+        reason: "aria-hidden subtree — decorative text; being painted over is not a reading defect",
+      });
+      continue;
+    }
+    if (c.pinnedEscapable) {
+      exempted.push({
+        kind: "occluded-text",
+        viewport,
+        selector: c.selector,
+        reason: `under viewport-pinned bar ${c.occluder} — scrollable content moves out from beneath it (fixed/sticky bar pattern)`,
+      });
+      continue;
+    }
+    findings.push({
+      kind: "occluded-text",
+      severity: "fail",
+      viewport,
+      selector: c.selector,
+      message: `"${clip(c.text)}" (${c.selector}) is painted over by an opaque element ${c.occluder} @${viewport} — ${Math.round(c.coverage * 100)}% of sampled glyph points hit the occluder instead of the text. Move or shrink the covering element, or reorder the stacking so the text stays readable.`,
+      evidence: { text: c.text, occluder: c.occluder, coverage: c.coverage },
+    });
+  }
+  return { findings, exempted };
+}
+
 export const COLLECT_INTEGRITY_TEXT = `(() => {
   ${STABLE_SELECTOR_FN}
   const SKIP = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE"]);
@@ -1285,6 +1451,12 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       // A12 — near-misalignment among siblings sharing an edge
       const alignGroups = await page.evaluate(COLLECT_ALIGN_GROUPS) as AlignmentGroup[];
       push(judgeAlignment(alignGroups, viewport.width));
+
+      // A13 — occluded text (paint-order cover by an opaque unrelated element)
+      const occlusionCandidates = await page.evaluate(COLLECT_OCCLUSIONS) as OcclusionCandidate[];
+      const occlusions = findOccludedText(occlusionCandidates, viewport.width);
+      push(occlusions.findings);
+      exempted.push(...occlusions.exempted);
 
       // A7 — scan scroll delegation (page-overflow-x is a defect here)
       const scroll = await page.evaluate(COLLECT_SCROLL_SCRIPT) as Omit<ScrollScanInput, "source">;

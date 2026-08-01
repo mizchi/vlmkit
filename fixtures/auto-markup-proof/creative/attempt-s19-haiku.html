@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ember Spire - Card Battle</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #1a0f2e 0%, #2d1b4e 100%);
+      color: #e0e0e0;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* HUD Bar */
+    .hud {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 24px;
+      background: rgba(0, 0, 0, 0.4);
+      border-bottom: 1px solid rgba(255, 140, 0, 0.3);
+      flex-shrink: 0;
+    }
+
+    .hud-left {
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .hud-stats {
+      display: flex;
+      gap: 32px;
+      font-size: 14px;
+    }
+
+    /* Battlefield */
+    .battlefield {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 40px 60px;
+      position: relative;
+    }
+
+    .character {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .character-figure {
+      width: 100px;
+      height: 140px;
+      background: linear-gradient(135deg, #ff6b35 0%, #ff4500 100%);
+      border-radius: 50% 50% 40% 40%;
+      position: relative;
+      box-shadow: 0 10px 30px rgba(255, 107, 53, 0.4);
+    }
+
+    .character-figure::before {
+      content: '';
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      background: #fff;
+      border-radius: 50%;
+      top: 25px;
+      left: 20px;
+      box-shadow: 50px 0 0 #fff;
+    }
+
+    .character-figure::after {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 60px;
+      background: #ff6b35;
+      left: 40px;
+      top: 75px;
+      border-radius: 50% 50% 0 0;
+    }
+
+    .enemy-figure {
+      background: linear-gradient(135deg, #2a3f5f 0%, #1a2f4f 100%);
+      box-shadow: 0 10px 30px rgba(42, 63, 95, 0.6);
+    }
+
+    .character-info {
+      text-align: center;
+      font-size: 13px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 8px 12px;
+      border-radius: 6px;
+      backdrop-filter: blur(4px);
+    }
+
+    .character-info div {
+      margin: 4px 0;
+    }
+
+    .block-display {
+      font-weight: 600;
+      color: #4a9eff;
+      font-size: 16px;
+    }
+
+    .hp-display {
+      font-weight: 600;
+      color: #ff6b6b;
+      font-size: 16px;
+    }
+
+    .enemy-intent {
+      text-align: center;
+      padding: 8px 16px;
+      background: rgba(255, 107, 53, 0.2);
+      border-radius: 4px;
+      border: 1px solid rgba(255, 107, 53, 0.4);
+      font-size: 12px;
+      color: #ff8866;
+      margin-top: 8px;
+    }
+
+    /* Energy Orb */
+    .energy-orb {
+      position: absolute;
+      left: 24px;
+      top: 40px;
+      width: 70px;
+      height: 70px;
+      background: radial-gradient(circle at 30% 30%, #ffeb3b 0%, #ffc107 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      font-weight: bold;
+      font-size: 12px;
+      color: #000;
+      box-shadow: 0 0 20px rgba(255, 235, 59, 0.6), inset -2px -2px 8px rgba(0, 0, 0, 0.3);
+      border: 2px solid rgba(255, 200, 0, 0.5);
+    }
+
+    .energy-label {
+      font-size: 10px;
+      opacity: 0.7;
+    }
+
+    .energy-value {
+      font-size: 20px;
+    }
+
+    /* Hand area */
+    .hand-container {
+      padding: 20px 24px;
+      background: rgba(0, 0, 0, 0.3);
+      border-top: 1px solid rgba(255, 140, 0, 0.2);
+      flex-shrink: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 12px;
+      min-height: 200px;
+      pointer-events: auto;
+    }
+
+    .hand {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      pointer-events: auto;
+    }
+
+    .card {
+      width: 100px;
+      min-width: 100px;
+      padding: 12px;
+      background: linear-gradient(135deg, #2d1b4e 0%, #1a0f2e 100%);
+      border: 2px solid rgba(255, 140, 0, 0.5);
+      border-radius: 8px;
+      color: #e0e0e0;
+      cursor: pointer;
+      font-size: 11px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: opacity 0.2s ease;
+      font-weight: 500;
+      position: relative;
+      pointer-events: all !important;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    .card:nth-child(1) { transform: rotate(-6deg) translateY(0px); }
+    .card:nth-child(2) { transform: rotate(-2deg) translateY(2px); }
+    .card:nth-child(3) { transform: rotate(0deg) translateY(4px); }
+    .card:nth-child(4) { transform: rotate(2deg) translateY(2px); }
+    .card:nth-child(5) { transform: rotate(6deg) translateY(0px); }
+
+    .card:hover:not([aria-disabled="true"]) {
+      opacity: 1;
+      border-color: rgba(255, 200, 0, 0.8);
+      box-shadow: 0 8px 20px rgba(255, 140, 0, 0.4);
+    }
+
+    .card[aria-disabled="true"] {
+      opacity: 0.5;
+      cursor: not-allowed;
+      border-color: rgba(255, 140, 0, 0.2);
+    }
+
+    .card[aria-pressed="true"] {
+      border-color: #00ff00;
+      background: linear-gradient(135deg, #3d2b5e 0%, #2a1a3e 100%);
+      box-shadow: 0 0 20px rgba(0, 255, 0, 0.5), inset 0 0 10px rgba(0, 255, 0, 0.2);
+      transform: scale(1.08);
+    }
+
+    .card-name {
+      font-weight: 700;
+      color: #ffeb3b;
+      font-size: 12px;
+    }
+
+    .card-cost {
+      font-size: 10px;
+      color: #ffc107;
+      font-weight: 600;
+    }
+
+    .card-text {
+      font-size: 10px;
+      color: #bbb;
+      line-height: 1.2;
+    }
+
+    /* Bottom controls */
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 24px;
+      background: rgba(0, 0, 0, 0.5);
+      border-top: 1px solid rgba(255, 140, 0, 0.2);
+      flex-shrink: 0;
+    }
+
+    .piles {
+      display: flex;
+      gap: 40px;
+      font-size: 13px;
+    }
+
+    .pile {
+      text-align: center;
+    }
+
+    .end-turn-btn {
+      padding: 10px 24px;
+      background: linear-gradient(135deg, #ff6b35 0%, #ff4500 100%);
+      border: 2px solid #ff8850;
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .end-turn-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(255, 107, 53, 0.4);
+    }
+
+    .end-turn-btn:active {
+      transform: translateY(0);
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .hud {
+        padding: 12px 16px;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .hud-stats {
+        gap: 16px;
+        font-size: 12px;
+        order: 3;
+        width: 100%;
+      }
+
+      .battlefield {
+        padding: 20px 30px;
+      }
+
+      .character-figure {
+        width: 80px;
+        height: 120px;
+      }
+
+      .energy-orb {
+        width: 60px;
+        height: 60px;
+        left: 16px;
+        top: 60px;
+        font-size: 11px;
+      }
+
+      .card {
+        width: 85px;
+        padding: 10px;
+      }
+
+      .hand-container {
+        min-height: 160px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .battlefield {
+        flex-direction: column;
+        justify-content: center;
+        gap: 40px;
+        padding: 20px;
+      }
+
+      .character {
+        gap: 24px;
+      }
+
+      .character-figure {
+        width: 70px;
+        height: 100px;
+      }
+
+      .hand-container {
+        min-height: 140px;
+      }
+
+      .card {
+        width: 75px;
+        font-size: 10px;
+        padding: 8px;
+      }
+
+      .energy-orb {
+        left: 50%;
+        transform: translateX(-50%);
+        top: 10px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      body {
+        font-size: 12px;
+      }
+
+      .hud {
+        padding: 10px;
+        gap: 8px;
+      }
+
+      .hud-left {
+        font-size: 14px;
+      }
+
+      .hud-stats {
+        gap: 10px;
+        font-size: 11px;
+      }
+
+      .battlefield {
+        gap: 30px;
+        padding: 15px;
+      }
+
+      .character {
+        gap: 20px;
+      }
+
+      .character-figure {
+        width: 60px;
+        height: 90px;
+      }
+
+      .card {
+        width: 65px;
+        font-size: 9px;
+        padding: 6px;
+        gap: 4px;
+      }
+
+      .hand-container {
+        min-height: 120px;
+        gap: 8px;
+      }
+
+      .end-turn-btn {
+        padding: 8px 16px;
+        font-size: 12px;
+      }
+
+      .piles {
+        gap: 20px;
+        font-size: 11px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- HUD Bar -->
+  <div class="hud">
+    <div class="hud-left">The Wanderer</div>
+    <div class="hud-stats">
+      <div>HP 70/80</div>
+      <div>Gold 148</div>
+      <div>Floor 3</div>
+    </div>
+  </div>
+
+  <!-- Battlefield -->
+  <div class="battlefield">
+    <!-- Player -->
+    <div class="character">
+      <div class="character-figure"></div>
+      <div class="character-info">
+        <div class="block-display" data-testid="block">Block 0</div>
+        <div class="hp-display" data-testid="player-hp">70/80</div>
+      </div>
+    </div>
+
+    <!-- Energy Orb -->
+    <div class="energy-orb" data-testid="energy">
+      <div class="energy-label">Energy</div>
+      <div class="energy-value">3/3</div>
+    </div>
+
+    <!-- Enemy -->
+    <div class="character">
+      <div class="character-figure enemy-figure"></div>
+      <div class="character-info">
+        <div class="hp-display" data-testid="enemy-hp">44/44</div>
+        <div class="enemy-intent">Attacks for 8</div>
+      </div>
+      <button class="character-info" data-testid="enemy" style="border: none; background: none; cursor: pointer; padding: 0; color: inherit; font: inherit;">
+        <div style="padding: 8px 12px; background: rgba(42, 63, 95, 0.6); border-radius: 4px; border: 1px solid rgba(74, 158, 255, 0.3); font-size: 12px; color: #4a9eff; font-weight: 600; margin-top: 8px;">Gloom Warden</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- Hand -->
+  <div class="hand-container">
+    <div class="hand" id="hand"></div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <div class="piles">
+      <div class="pile">Draw 12</div>
+      <div class="pile">Discard <span data-testid="discard-count">4</span></div>
+    </div>
+    <button class="end-turn-btn" data-testid="end-turn">End Turn</button>
+  </div>
+
+  <script>
+    // Game state
+    const gameState = {
+      playerHP: 70,
+      playerMaxHP: 80,
+      playerBlock: 0,
+      enemyHP: 44,
+      enemyMaxHP: 44,
+      energy: 3,
+      maxEnergy: 3,
+      discardCount: 4,
+      selectedCard: null,
+    };
+
+    const cardData = [
+      { id: 'cinder-strike', name: 'Cinder Strike', cost: 1, text: 'Deal 6 damage.', type: 'attack', value: 6 },
+      { id: 'ashen-guard', name: 'Ashen Guard', cost: 1, text: 'Gain 5 Block.', type: 'skill', value: 5 },
+      { id: 'kindle', name: 'Kindle', cost: 0, text: 'Draw 1 card.', type: 'skill', value: 1 },
+      { id: 'emberfall', name: 'Emberfall', cost: 2, text: 'Deal 11 damage.', type: 'attack', value: 11 },
+      { id: 'second-wind', name: 'Second Wind', cost: 1, text: 'Heal 4 HP.', type: 'skill', value: 4 },
+    ];
+
+    const hand = document.getElementById('hand');
+    const enemyBtn = document.querySelector('[data-testid="enemy"]');
+
+    function createCard(cardDef) {
+      const button = document.createElement('button');
+      button.className = 'card';
+      button.dataset.testid = `card-${cardDef.id}`;
+      button.dataset.cardId = cardDef.id;
+      button.dataset.cardType = cardDef.type;
+      button.dataset.cardCost = cardDef.cost;
+      button.dataset.cardValue = cardDef.value;
+      button.setAttribute('type', 'button');
+
+      button.innerHTML = `
+        <div class="card-name">${cardDef.name}</div>
+        <div class="card-cost">Cost: ${cardDef.cost}</div>
+        <div class="card-text">${cardDef.text}</div>
+      `;
+
+      const clickHandler = function() {
+        handleCardClick(this);
+      };
+      button.addEventListener('click', clickHandler);
+      button.addEventListener('mousedown', clickHandler);
+      button.addEventListener('pointerdown', clickHandler);
+
+      return button;
+    }
+
+    function handleCardClick(button) {
+      const cardId = button.dataset.cardId;
+      const cardDef = cardData.find(c => c.id === cardId);
+      const isDisabled = button.getAttribute('aria-disabled') === 'true';
+
+      if (isDisabled) return;
+
+      if (cardDef.type === 'attack') {
+        // Toggle selection for attack cards
+        if (gameState.selectedCard === button) {
+          button.setAttribute('aria-pressed', 'false');
+          gameState.selectedCard = null;
+        } else {
+          // Deselect previous card
+          if (gameState.selectedCard) {
+            gameState.selectedCard.setAttribute('aria-pressed', 'false');
+          }
+          button.setAttribute('aria-pressed', 'true');
+          gameState.selectedCard = button;
+        }
+      } else {
+        // Skill cards play immediately
+        playCard(button, cardDef);
+      }
+    }
+
+    function playCard(button, cardDef) {
+      const cost = parseInt(button.dataset.cardCost);
+
+      if (cost > gameState.energy) return;
+
+      gameState.energy -= cost;
+      gameState.discardCount += 1;
+
+      if (cardDef.type === 'attack') {
+        gameState.enemyHP -= cardDef.value;
+        if (gameState.enemyHP < 0) gameState.enemyHP = 0;
+      } else if (cardDef.type === 'skill') {
+        if (cardDef.id === 'ashen-guard') {
+          gameState.playerBlock += cardDef.value;
+        } else if (cardDef.id === 'second-wind') {
+          gameState.playerHP += cardDef.value;
+          if (gameState.playerHP > gameState.playerMaxHP) gameState.playerHP = gameState.playerMaxHP;
+        }
+        // Kindle (draw card) - just counts for game logic
+      }
+
+      button.remove();
+      if (gameState.selectedCard === button) {
+        gameState.selectedCard = null;
+      }
+
+      updateUI();
+    }
+
+    function updateUI() {
+      // Update HUD
+      document.querySelectorAll('.hud-stats')[0].children[0].textContent = `HP ${gameState.playerHP}/${gameState.playerMaxHP}`;
+
+      // Update battlefield
+      const blockEl = document.querySelector('[data-testid="block"]');
+      blockEl.textContent = `Block ${gameState.playerBlock}`;
+
+      const playerHpEl = document.querySelector('[data-testid="player-hp"]');
+      playerHpEl.textContent = `${gameState.playerHP}/${gameState.playerMaxHP}`;
+
+      const enemyHpEl = document.querySelector('[data-testid="enemy-hp"]');
+      enemyHpEl.textContent = `${gameState.enemyHP}/${gameState.enemyMaxHP}`;
+
+      // Update energy
+      const energyEl = document.querySelector('[data-testid="energy"]');
+      energyEl.innerHTML = `
+        <div class="energy-label">Energy</div>
+        <div class="energy-value">${gameState.energy}/${gameState.maxEnergy}</div>
+      `;
+
+      // Update discard count
+      const discardEl = document.querySelector('[data-testid="discard-count"]');
+      discardEl.textContent = gameState.discardCount;
+
+      // Update card states
+      updateCardStates();
+    }
+
+    function updateCardStates() {
+      const cards = document.querySelectorAll('.card');
+      cards.forEach(card => {
+        const cost = parseInt(card.dataset.cardCost);
+        if (cost > gameState.energy) {
+          card.setAttribute('aria-disabled', 'true');
+        } else {
+          card.setAttribute('aria-disabled', 'false');
+        }
+      });
+    }
+
+    function endTurn() {
+      // Enemy attacks
+      let damage = 8;
+      const blockAbsorbed = Math.min(gameState.playerBlock, damage);
+      damage -= blockAbsorbed;
+      gameState.playerHP -= damage;
+
+      if (gameState.playerHP < 0) gameState.playerHP = 0;
+
+      // Reset block and energy
+      gameState.playerBlock = 0;
+      gameState.energy = gameState.maxEnergy;
+
+      // Refill hand
+      hand.innerHTML = '';
+      cardData.forEach(card => {
+        const cardBtn = createCard(card);
+        hand.appendChild(cardBtn);
+      });
+
+      gameState.selectedCard = null;
+      updateUI();
+    }
+
+    // Event listeners
+    enemyBtn.addEventListener('click', () => {
+      if (gameState.selectedCard) {
+        const cardDef = cardData.find(c => c.id === gameState.selectedCard.dataset.cardId);
+        playCard(gameState.selectedCard, cardDef);
+        gameState.selectedCard = null;
+      }
+    });
+
+    document.querySelector('[data-testid="end-turn"]').addEventListener('click', endTurn);
+
+
+    // Initial render
+    cardData.forEach(card => {
+      const cardBtn = createCard(card);
+      hand.appendChild(cardBtn);
+    });
+
+    updateUI();
+  </script>
+</body>
+</html>

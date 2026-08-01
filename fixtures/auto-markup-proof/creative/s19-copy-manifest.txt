@@ -1,0 +1,29 @@
+# HUD
+- The Wanderer
+- HP 70/80
+- Gold 148
+- Floor 3
+
+# Battlefield
+- Gloom Warden
+- 44/44
+- Attacks for 8
+- Block 0
+- Energy 3/3
+
+# Cards
+- Cinder Strike
+- Deal 6 damage.
+- Ashen Guard
+- Gain 5 Block.
+- Kindle
+- Draw 1 card.
+- Emberfall
+- Deal 11 damage.
+- Second Wind
+- Heal 4 HP.
+
+# Piles and controls
+- Draw 12
+- Discard 4
+- End Turn

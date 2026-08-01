@@ -31,7 +31,16 @@ import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 export type FlowAction =
-  | { action: "click"; selector: string }
+  /**
+   * `force` skips Playwright's actionability wait. Needed to assert that a
+   * genuinely disabled control DOES NOTHING when clicked: Playwright refuses
+   * to click `aria-disabled="true"` elements, so without force the honest
+   * implementation times out — and the S19 run showed an agent "fixing"
+   * that by making aria-disabled transient (set for 50ms, then removed),
+   * which passes the assert while lying to assistive tech. Force lets the
+   * flow author click through the disabled state instead.
+   */
+  | { action: "click"; selector: string; force?: boolean }
   | { action: "press"; selector?: string; key: string }
   | { action: "fill"; selector: string; value: string }
   | { action: "type"; selector: string; text: string }
@@ -79,7 +88,7 @@ export interface FlowVerifyReport {
 
 function describeAction(a: FlowAction): string {
   switch (a.action) {
-    case "click": return `click ${a.selector}`;
+    case "click": return `click ${a.selector}${a.force ? " (force)" : ""}`;
     case "press": return `press ${a.key}${a.selector ? ` on ${a.selector}` : ""}`;
     case "fill": return `fill ${a.selector}`;
     case "type": return `type into ${a.selector}`;
@@ -91,7 +100,7 @@ function describeAction(a: FlowAction): string {
 
 async function runAction(page: Page, a: FlowAction): Promise<void> {
   switch (a.action) {
-    case "click": await page.click(a.selector, { timeout: 5000 }); return;
+    case "click": await page.click(a.selector, { timeout: 5000, ...(a.force ? { force: true } : {}) }); return;
     case "press":
       if (a.selector) await page.press(a.selector, a.key, { timeout: 5000 });
       else await page.keyboard.press(a.key);
@@ -231,8 +240,11 @@ asserts a deterministic post-condition on the live DOM. FAILS at the
 first unmet post-condition — "it did something" is not success. No LLM.
 
 flow.json: { "viewport"?, "steps": [ { "label"?, "do": <action>, "expect": [<assert>...] } ] }
-  action:  {action:"click"|"focus"|"hover", selector} | {action:"press", key, selector?}
+  action:  {action:"click", selector, force?} | {action:"focus"|"hover", selector}
+           | {action:"press", key, selector?}
            | {action:"fill"|"type", selector, value|text} | {action:"wait", ms}
+           (force skips actionability — use it to click a disabled control
+            and assert that nothing changes)
   assert:  {assert:"attr", selector, name, equals} | {assert:"visible"|"hidden"|"focused", selector}
            | {assert:"text", selector, contains} | {assert:"count", selector, equals}
 

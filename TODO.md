@@ -300,6 +300,77 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   6 種注入の `broken-spec.html` を修理させ **kickback 追従 7/7**(diff 監査、
   削除逃げ 0)。帰属 kickback は修理タスクなら Haiku でも完全機能。
   追記14 参照。
+- [x] **`check asset` — 生成画像アセットの決定論ゲート(S19 追補)** —
+  2026-07-31 実装: S19 の CSS 図形を画像生成モデル産アートへ差し替える
+  前段ゲート(ブラウザ不要の PNG 数学、~50ms)。slot アスペクト適合 /
+  透過 vs matte 背景(境界リング実測、matte 色報告)/ 占有率 + content
+  bbox / 図地コントラスト(輪郭画素 vs 配置先背景の WCAG 比)/ ページ
+  パレット調和(top-24 — アクセント色は 19-22 位に沈む実測を反映)。
+  差し替え後は既存ゲート(integrity A3/A13、layout、snapshot)が
+  そのまま統合検証。テスト 7 本 + S19 実ページで E2E 済み。設計:
+  `docs/design/generated-asset-eval.md`(slot 契約 + パイプライン)。
+- [ ] **画像生成レグ(要 生成モデルキー)**: S19 の player/enemy slot 向けに
+  N 候補生成 → `check asset --fail-on-suspect` を生存フィルタ →
+  swap → integrity/layout/snapshot で in-situ 検証。**ゲート通過率
+  そのものをモデル比較指標にする**(ルーブリック不要)。slot 契約と
+  手順は設計文書に確定済み。
+- [x] **S19 zero-shot ゲーム UI(カードバトル)+ A13 occluded-text** —
+  2026-07-31 実施: デッキ構築型バトル画面の独自ブリーフ(扇状手札 /
+  エナジーゲート / Block 先行吸収)で **`verify flow` を done 条件に初編入**
+  (5 ステップの実ターンをクリック進行 + 決定論 assert)。敵対収穫 2 件:
+  ①aria-disabled 50ms ハック — 原因は flow ゲート側(actionability が
+  disabled クリック拒否 = 正直実装が通れない)→ **force click を実装**して
+  根治、②**8 パス目で初の本物の gate 沈黙視覚欠陥**(CSS 図形がテキスト
+  遮蔽、6 ゲート全緑)→ 需要ゲート着火、**A13 occluded-text プローブを
+  同日実装**(決定論 hit-test + 偽陽性 3 クラスの免除設計、M14a-d 常設、
+  S15-18 回帰 CLEAN)。Layer B は凍結のまま(決定論で足りた)。
+  `docs/reports/2026-07-31-s19-game-ui-occlusion-probe.md`
+- [ ] **【リリースブロッカー】@mizchi/vlmkit の新バージョン公開** —
+  2026-07-31 のブラックボックス検証で確定: 公開中の 0.7.0 には
+  markup-assist の主要ゲート(check integrity / copy manifest sweep /
+  layout / interactions ほか)が**存在しない**。quickstart / ガイド /
+  skill は npm 導入者には現状動かない(`Unknown check subcommand`)。
+  npm publish は要権限のため本環境では未実施 — バージョンを上げて
+  公開するまで「入れるだけで使える」は npm 経路では成立しない。
+  `docs/reports/2026-07-31-blackbox-onboarding-validation.md`
+- [x] **ブラックボックス・オンボーディング検証(文脈ゼロのエージェント + docs のみ)** —
+  2026-07-31 実施: 架空プロジェクト + 欠陥 5 種 + TASK.md(ゲート名を
+  一切教えない)で Haiku を放流。**ルーティングは成功**(docs だけで
+  `check integrity` に到達)、失敗は全てパッケージング起因 —
+  ①公開版に未収載(上記ブロッカー)②`snapshot page.html` がファイル
+  パス拒否 → **同日修正**(file:// 自動変換、capture/stability 両系、
+  テスト付き)③ツール不動時に無言で自前スクリプトへ fallback し
+  「検証済み」と虚偽報告(5 欠陥中 2 見逃し、台帳は空)→ skill に
+  「ツール障害は STOP & 報告、無言代替の禁止」を明文化 ④quickstart の
+  `npx playwright install` が共有ブラウザディレクトリの他リビジョンを
+  GC(サンドボックス固有、復旧済み)。「台帳エントリなき verified
+  自称は証拠でない」の 3 例目。
+  `docs/reports/2026-07-31-blackbox-onboarding-validation.md`
+- [x] **決定論コマンド群の汎用マークアップ支援ツール化(整理・配布導線)** —
+  2026-07-31 実施: 文脈フリーの正典ガイド `docs/markup-assist.md`(導入
+  3 形態 = CLI `npx vlmkit` / MCP `.mcp.json` / skill コピー、タスク別
+  ルーティング表、ループ規律、done 条件レシピ、anti-gaming ルール、
+  key-free / `[key]` 区分)+ 汎用スキル `.claude/skills/markup-assist/`
+  (ワークフロー系 3 skill と別の generalist、任意リポジトリで自立)を
+  新設。README のコマンド群表を現状に同期(integrity/copy/layout/
+  interactions/equivalence、scan scroll/mock/handlers、build page、
+  verify/contract/heal/mcp を追補)+ markup-assist 節を先頭に。
+  vlmkit-mcp README に npx 設定スニペットと check_copy の sweep /
+  copy-invisible / allowInvisible を反映。全コマンド署名は --help で
+  実機検証済み。
+- [x] **copy-invisible の実サイト誤検知監査 + クラス別抑制(`--allow-invisible`)** —
+  2026-07-31 実施: 実サイト 7 つ(MDN / Wikipedia / W3C APG / web.dev /
+  HN / danluu / example)で不可視判定チャンクを全数監査 — **誤検知 0**
+  (skip link / 閉メニュー / sr-only / 装飾グリフの dup、全て実際に不可視)。
+  検出器は理由クラス付与に再構成(zero-size / hidden / transparent /
+  visually-hidden / unreachable / camouflage / unknown)し、意図的な
+  不可視は **`--allow-invisible <class>`**(CLI / MCP / API 同形)で
+  クラス単位に satisfied 化 — 許可行も provenance 付きで列挙 + 台帳
+  headline に計上(監査可能な抑制、既定は全 suspect)。境界を明文化:
+  copy-invisible は「innerText に載る(=レンダリングされる)が見えない」
+  テキスト限定、display:none 系は従来どおり missing(sweep の領分)。
+  分類純化 1 件(checkVisibility を rect 判定より先に)。
+  `docs/reports/2026-07-31-copy-invisible-real-site-audit.md`
 - [x] **copy gate の gate-silencing 耐性バッテリー** — 2026-07-31 実施:
   隠蔽ベクタ 12 種 + 正当 4 種の mutation battery(S14b の手法をゲート
   整合性側へ)。**実測: 10/12 が硬化前ゲートを沈黙化** → 幾何学的到達

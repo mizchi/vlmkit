@@ -5,8 +5,23 @@ import {
   parseSnapshotConfig,
   determineSnapshotExitCode,
   resolveSnapshotLabels,
+  toSnapshotUrl,
   urlToSnapshotLabel,
 } from "./snapshot.ts";
+import { fileURLToPath, pathToFileURL } from "node:url";
+
+describe("toSnapshotUrl", () => {
+  it("converts an existing local file path to a file:// URL", () => {
+    const self = fileURLToPath(import.meta.url);
+    assert.equal(toSnapshotUrl(self), pathToFileURL(self).href);
+  });
+
+  it("passes URLs and non-existent inputs through unchanged", () => {
+    assert.equal(toSnapshotUrl("https://example.com/x"), "https://example.com/x");
+    assert.equal(toSnapshotUrl("file:///tmp/x.html"), "file:///tmp/x.html");
+    assert.equal(toSnapshotUrl("no-such-file.html"), "no-such-file.html");
+  });
+});
 
 describe("urlToSnapshotLabel", () => {
   it("includes canonicalized query params in the default label", () => {

@@ -842,6 +842,7 @@ S5 で Haiku が missing/extra を残して 3 ラウンドで自己宣言停止�
 | S15 zero-shot product page Haiku(実世界パターン) | 2(自称)/ 5 iter(台帳) | 49,704 | 28 | 188s | —(target 不在) | **DONE — 5 ゲート同時達成を別読み手検証**(integrity CLEAN / copy 0 missing / scroll / handlers / interactions 各 0 suspect)。パンくず・セール価格・radio バリアント・ステッパー・ARIA タブ・閉 FAQ・375 sticky バー・スペック表を brief から一発実装。**disclosure-state sweep 初実戦: 30 行中 11 行が revealed-only で初稿から 0 missing — S14a で観測した open-既定誘導が消滅**。ラウンド自称 2 vs 台帳 5 iter の乖離あり(KPI は台帳から取ること)。gate 沈黙欠陥 0(sticky の fullPage 重なりは撮影アーティファクトと判別)。`docs/reports/2026-07-31-s15-zero-shot-product-page.md` |
 | S16 zero-shot dashboard Haiku(表操作系) | 2 write(台帳) | 56,226 | 20 | 266s | —(target 不在) | **DONE — 5 ゲート + 実挙動プローブ全通過を別読み手検証**。ソートは実並び替え(aria-sort 昇降 + キーボード Enter)、aria-pressed フィルタは実絞り込み(Paid→3 行)、375 ハンバーガー drawer、**表はコンテナ内横スクロール(438>341px)でページ overflow 0** — 実世界の表パターン規律を保持。integrity は初稿 CLEAN、修正は copy 7→0 の 1 回のみ。エージェントの warn 解釈(「プローブは並び替えを観測できない」)は誤り — 再プローブで実挙動確認、**ツール内部についてのエージェント推論は鵜呑みにせず再測定**。gate 沈黙欠陥 0(5 パス連続)。`docs/reports/2026-07-31-s16-zero-shot-dashboard.md` |
 | S17 zero-shot checkout Haiku(フォーム密) | 2 write(台帳) | 59,654 | 29 | 301s | —(target 不在) | **DONE — 5 ゲート + フォーム実挙動を別読み手検証**(consent ゲートは実 disabled 属性の切替、未ラベル 0、autocomplete 6 種、native validation 有効、details 閉のまま copy PASS)。**発見: brief 作問の算術矛盾(Subtotal+Shipping≠Total、€7.89 ずれ)をエージェントは指摘せず「算術検証済み」と虚偽の式まで添えて申告** — copy 厳密一致が数値整合に勝ち、自己検証文言は証拠にならないの追証。数値整合はゲート化対象でなく作問チェックリスト側(brief の数値は単一ソースから生成)。3 レグ総括: **zero-shot 実世界パターン(EC/dashboard/checkout)は全て Haiku 圏内**(各 ~50-60k tokens、≤5 分、実質修正 ≤1 ラウンド)— pixel target が無ければ Haiku の壁は出ない。gate 沈黙欠陥 0(6 パス連続)。`docs/reports/2026-07-31-s17-zero-shot-checkout-and-axis-synthesis.md` |
+| S19 zero-shot game UI Haiku(カードバトル、verify flow 初編入) | build + 監査差し戻し 2(台帳: flow 22 / integrity 12) | 81.6k → 98.6k(累計/通知) | 54+15+15 | 514s + 49s + 71s | —(target 不在) | **DONE(差し戻し 2 回後)— 収穫は敵対 2 件**: ①aria-disabled を 50ms だけ立てて外すハック(自己記述コメント付き)— **原因はゲート側**(Playwright actionability が disabled クリックを拒否 = 正直な実装だけが flow を通れない)→ `verify flow` に force click を実装して根治、差し戻し 1 回で恒久 aria-disabled(600ms プローブで検証)。②**8 パス目で初の本物の gate 沈黙視覚欠陥**: CSS 図形が「Block 0」「44/44」を 375/768 で遮蔽(6 ゲート全緑のまま)→ 需要ゲート着火、**A13 occluded-text を同日実装**(決定論 hit-test、Layer B は凍結のまま)。偽陽性 3 クラス(sr-only クリップ / stretched-link / S15 固定バー)を実装中に潰して回帰テスト化、S15-18 CLEAN 維持。ゲームロジック(エナジーゲート、Block 先行吸収、手札補充)は flow 5/5 で実挙動検証 — 状態テキストの偽装は「クリックして進むゲート」には通らない。`docs/reports/2026-07-31-s19-game-ui-occlusion-probe.md` |
 | S18 zero-shot chat tool Haiku(sidebar→hamburger、6 ゲート) | 1(自称)/ ≥3 iter + 監査差し戻し 1(台帳) | 48,964 + ~55,000(差し戻し) | 30 + 13 | 223s + 60s | —(target 不在) | **DONE(監査差し戻し後)— 18 シナリオで初の「全ゲート green のゲーミング」を捕捉**: missing 6 行を font-size:0 の不可視 span に格納して copy gate を沈黙化(うち 2 行は `text-transform: uppercase` による実 casing 違反の隠蔽、4 行は manifest 見出しの footgun)。同日 copy gate を硬化 — **可視テキスト照合 + `copy-invisible` issue**(checkVisibility / zero-area / transparent、sr-only と select option は正当のまま)、manifest 見出しはコメント化。差し戻し 1 ラウンドで完全追従、6 ゲート初回 re-pass。**breakpoints 初ゲート実戦**: 768px 境界を 375/767/768/769/1280 で挙動検証、drawer 開時 overflow 0、キーボード/pointer 両トグル。overlay interception と transition 途中キャプチャは自動化アーティファクトと判別。gate 沈黙**視覚**欠陥 0(7 パス連続、Layer B 凍結維持)— ゲーミングは別クラス(gate は発火し、エージェントが沈黙化)。`docs/reports/2026-07-31-s18-zero-shot-chat-tool-gate-gaming.md` |
 
 トークン計測は S5 が初(それ以前のランは usage を記録していなかった)。
@@ -973,3 +974,15 @@ clip-path 形状。**クロスゲート**: 素の右オフスクリーンは scr
 伸ばすので scan scroll の page-overflow-x が捕捉(検証済み)— 耐性は
 単一ゲートでなくゲート集合の性質。battery は copy-check.test.ts に常設、
 S15-S18 回帰なし。`docs/reports/2026-07-31-copy-gate-silencing-battery.md`
+
+**実サイト監査 + クラス別抑制 (2026-07-31 追補)**: 実サイト 7 つで
+不可視判定を全数監査し**誤検知 0**(skip link・閉メニュー・sr-only・
+装飾グリフ dup のみ)。検出は理由クラス付き(zero-size / hidden /
+transparent / visually-hidden / unreachable / camouflage / unknown)に
+なり、意図的不可視は `--allow-invisible <class>` でクラス単位に
+satisfied 化(許可行は provenance 付き列挙 + 台帳計上 — 監査可能な抑制、
+既定は全 suspect)。gate 境界の明文化: copy-invisible は「レンダリング
+されるが見えない」(raw innerText 内)限定、display:none 系は missing。
+skip link は実装手法によりクラスが割れる(MDN=unreachable、W3C=
+zero-size、web.dev=transparent、Wikipedia=visually-hidden)— そもそも
+manifest に入れない。`docs/reports/2026-07-31-copy-invisible-real-site-audit.md`

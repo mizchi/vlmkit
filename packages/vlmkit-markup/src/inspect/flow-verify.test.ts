@@ -52,3 +52,37 @@ test("verify flow: focused / text / count assertions", { timeout: 120_000 }, asy
   const report = await runFlowVerify({ source: FIXTURE, flow });
   assert.equal(report.done, true);
 });
+
+test("verify flow: force click reaches an aria-disabled control (does-nothing assertion)", { timeout: 120_000 }, async () => {
+  const { mkdtemp, rm, writeFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const dir = await mkdtemp(join(tmpdir(), "flow-force-"));
+  try {
+    const page = join(dir, "page.html");
+    await writeFile(page, `<!doctype html><body>
+      <p id="counter">0</p>
+      <button id="locked" aria-disabled="true">Locked</button>
+      <script>
+        document.getElementById("locked").addEventListener("click", (e) => {
+          if (e.currentTarget.getAttribute("aria-disabled") === "true") return;
+          document.getElementById("counter").textContent = "1";
+        });
+      </script></body>`);
+    // Without force, Playwright's actionability refuses aria-disabled clicks.
+    const strict = await runFlowVerify({ source: page, flow: {
+      steps: [{ do: { action: "click", selector: "#locked" }, expect: [] }],
+    } });
+    assert.equal(strict.done, false);
+    assert.ok(strict.steps[0]!.actionError);
+    // With force, the click lands and the does-nothing post-condition holds.
+    const forced = await runFlowVerify({ source: page, flow: {
+      steps: [{
+        do: { action: "click", selector: "#locked", force: true },
+        expect: [{ assert: "text", selector: "#counter", contains: "0" }],
+      }],
+    } });
+    assert.equal(forced.done, true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

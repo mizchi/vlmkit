@@ -66,12 +66,39 @@ test("manifest line present only in invisible text is a copy-invisible suspect",
     visibleText: "Pulse. Start free.",
     manifestLines: ["Start free", "Hidden manifest words", "Changelog"],
   });
-  assert.deepEqual(report.invisibleLines, ["Hidden manifest words"]);
+  assert.deepEqual(report.invisibleLines, [{ line: "Hidden manifest words", reason: "unknown" }]);
   assert.deepEqual(report.missingLines, ["Changelog"]);
   const invisible = report.issues.filter((i) => i.kind === "copy-invisible");
   assert.equal(invisible.length, 1);
   assert.match(invisible[0]!.message, /does not satisfy the copy gate/);
+  assert.match(invisible[0]!.message, /--allow-invisible unknown/);
   assert.equal(invisible[0]!.severity, "suspect");
+});
+
+test("allowInvisible accepts matching reason classes as satisfied, with provenance", () => {
+  const base = {
+    source: "x.html",
+    pageText: "Pulse. Hidden a11y words",
+    visibleText: "Pulse.",
+    invisibleChunks: [{ reason: "visually-hidden", text: "Hidden a11y words" }],
+    manifestLines: ["Hidden a11y words"],
+  };
+  const strict = analyzeCopy(base);
+  assert.deepEqual(strict.invisibleLines, [{ line: "Hidden a11y words", reason: "visually-hidden" }]);
+  assert.equal(strict.issues.length, 1);
+
+  const relaxed = analyzeCopy({ ...base, allowInvisible: ["visually-hidden"] });
+  assert.deepEqual(relaxed.allowedInvisibleLines, [{ line: "Hidden a11y words", reason: "visually-hidden" }]);
+  assert.deepEqual(relaxed.invisibleLines, []);
+  assert.deepEqual(relaxed.issues, []);
+
+  // Allowing one class must not suppress a different class.
+  const other = analyzeCopy({
+    ...base,
+    invisibleChunks: [{ reason: "camouflage", text: "Hidden a11y words" }],
+    allowInvisible: ["visually-hidden"],
+  });
+  assert.deepEqual(other.invisibleLines, [{ line: "Hidden a11y words", reason: "camouflage" }]);
 });
 
 test("manifest line found only in a revealed state passes with provenance", () => {
@@ -141,16 +168,22 @@ test("invisible-text gaming vectors are caught; text-transform and select stay l
     const report = await runCopyCheck({ source: page, manifestPath: manifest });
     assert.equal(report.manifestLines, 8);
     // sr-only counts as invisible BY POLICY since the 2026-07-31 silencing
-    // battery: manifest lines are the user-visible copy spec.
+    // battery: manifest lines are the user-visible copy spec. Reasons are
+    // attributed per class so --allow-invisible can suppress selectively.
     assert.deepEqual(report.invisibleLines, [
-      "Packed hidden line",
-      "Ghost opacity line",
-      "Transparent ink line",
-      "Screen reader only line",
+      { line: "Packed hidden line", reason: "zero-size" },
+      { line: "Ghost opacity line", reason: "hidden" },
+      { line: "Transparent ink line", reason: "transparent" },
+      { line: "Screen reader only line", reason: "visually-hidden" },
     ]);
     // display:none select text is absent from raw innerText too → plain missing
     assert.deepEqual(report.missingLines, ["Hidden select option"]);
     assert.equal(report.issues.filter((i) => i.kind === "copy-invisible").length, 4);
+
+    // Re-run accepting the sr-only class: that line flips to allowed, others stay suspect.
+    const relaxed = await runCopyCheck({ source: page, manifestPath: manifest, allowInvisible: ["visually-hidden"] });
+    assert.deepEqual(relaxed.allowedInvisibleLines, [{ line: "Screen reader only line", reason: "visually-hidden" }]);
+    assert.equal(relaxed.issues.filter((i) => i.kind === "copy-invisible").length, 3);
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -188,10 +221,22 @@ test("silencing battery: geometric hiding vectors are caught, reachable text sta
     await writeFile(manifest, all.map(([, line]) => line).join("\n"));
 
     const report = await runCopyCheck({ source: page, manifestPath: manifest, exploreStates: false });
-    assert.deepEqual(report.invisibleLines.sort(), vectors.map(([, line]) => line).sort());
+    assert.deepEqual(
+      report.invisibleLines.map((i) => i.line).sort(),
+      vectors.map(([, line]) => line).sort(),
+    );
+    // Reason attribution: geometric vectors read unreachable; the classic
+    // hiding techniques get their specific class.
+    const reasonOf = Object.fromEntries(report.invisibleLines.map((i) => [i.line, i.reason]));
+    assert.equal(reasonOf["VEC offscreen left"], "unreachable");
+    assert.equal(reasonOf["VEC text indent"], "unreachable");
+    assert.equal(reasonOf["VEC transform scale"], "zero-size");
+    assert.equal(reasonOf["VEC clip rect"], "visually-hidden");
+    assert.equal(reasonOf["VEC zero box"], "visually-hidden");
+    assert.equal(reasonOf["VEC camouflage"], "camouflage");
     assert.deepEqual(report.missingLines, []);
     for (const [, line] of legit) {
-      assert.ok(!report.invisibleLines.includes(line), `legit case flagged invisible: ${line}`);
+      assert.ok(!report.invisibleLines.some((i) => i.line === line), `legit case flagged invisible: ${line}`);
     }
   } finally {
     await rm(dir, { recursive: true, force: true });
