@@ -110,6 +110,43 @@ Note `Name (A to Z)` matching is itself meaningful: it lives in the span
 under the invisible select, and the copy gate's geometric visibility model
 correctly counts it as visible.
 
+## Result 4: the rest of the gates on the authenticated app
+
+With `VLMKIT_STORAGE_STATE` set, run against the real inventory page:
+
+| Gate | Result |
+|---|---|
+| `check interactions` | `status: ok`, **23 interactive elements** discovered |
+| `scan handlers` | `status: ok` |
+| `check breakpoints --sweep` | `status: ok`, clean across 320-1280px, and it discovered the app's **five real breakpoints** (480, 640, 900, 960, 1060px) from its own CSS |
+| `scan scroll` | `status: ok` |
+
+**What I could not measure, and am not claiming.** The obvious follow-up
+was a before/after A/B on those 23 controls, to size the `settleAfterLoad`
+fix on a real SPA (it was 0 → 3 on my own fixture). Two attempts were
+confounded and neither is usable: the first ran after the demo session had
+expired, so both arms measured the *login* page (2 vs 3 controls); the
+second hit the 500s timeout, because `check interactions` reloads the page
+once per control probe and every load crosses the relay. So: 23 controls on
+the authenticated page is verified, the *delta* attributable to the settle
+fix on a real SPA is **not**.
+
+### Unplanned validation: an expired session fails loudly
+
+The confounded run turned into evidence for a claim the auth commit made
+but had not tested. When the Swag Labs session expired, the gate did not
+quietly measure the login page — it reported
+
+```
+verdict: DEFECTS
+  x [redirected] requested /inventory.html but measured http://127.0.0.1:8910/
+  1280x800: 6 text block(s)      <- login page, not the 31 of the authed page
+```
+
+An expired `--storage-state` is therefore a loud failure, not a silent
+wrong answer. That is the property that makes replaying a session safe to
+recommend at all.
+
 ## Findings classified
 
 | Finding | Class |
