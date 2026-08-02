@@ -556,6 +556,29 @@ describe("S14c false-positive audit", () => {
     );
   });
 
+  // Found by the real-page A/B for the graze gate (2026-08-01): MDN's
+  // collapsed sidebar keeps layout boxes for items inside a CLOSED <details>
+  // (measured 184x56 at y=9137), and stacked hidden items overlap perfectly.
+  // Self-style checks miss it because content-visibility skipping is not
+  // visibility/display/opacity; checkVisibility() is the test that catches it.
+  test("text inside a closed <details> is not a collision candidate", { timeout: 120_000 }, async () => {
+    const file = page("closed-details.html", `
+      <details>
+        <summary>Reference</summary>
+        <ul style="margin:0;padding:0;list-style:none">
+          <li><a href="#a">scroll-padding-block</a></li>
+          <li><a href="#b">scroll-padding-inline</a></li>
+          <li><a href="#c">scroll-margin-block</a></li>
+        </ul>
+      </details>
+      <p>Visible body copy under the collapsed section.</p>`);
+    const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+    assert.equal(
+      report.findings.filter((f) => f.kind === "text-collision").length, 0,
+      JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector}`)),
+    );
+  });
+
   test("maxFindings caps text-collision rows (Codex #100 P2)", { timeout: 120_000 }, async () => {
     const rows = Array.from({ length: 5 }, (_, i) =>
       `<p style="position:absolute;top:${20 + i * 40}px;left:20px;width:220px;margin:0">Row ${i} left column text</p>

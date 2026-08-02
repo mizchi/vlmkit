@@ -1061,6 +1061,13 @@ export const COLLECT_INTEGRITY_TEXT = `(() => {
     if (!el || SKIP.has(el.tagName)) continue;
     const style = getComputedStyle(el);
     if (style.visibility === "hidden" || style.display === "none" || style.opacity === "0") continue;
+    // Self-style checks miss content-visibility skipping, which is how a
+    // CLOSED <details> hides its subtree: the descendants keep layout boxes
+    // (measured 184x56 at y=9137 inside MDN's collapsed sidebar) while being
+    // invisible. Stacked hidden items overlap perfectly, so they read as
+    // collisions. checkVisibility() is the only reliable test for it.
+    if (typeof el.checkVisibility === "function"
+      && !el.checkVisibility({ visibilityProperty: true, opacityProperty: true, contentVisibilityAuto: true })) continue;
     let block = el;
     while (block && block !== document.body) {
       const d = getComputedStyle(block).display;
