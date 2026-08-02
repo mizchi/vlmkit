@@ -40,6 +40,12 @@ import { PNG } from "pngjs";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
+import {
+  ALLOW_HELP,
+  applyAllowRules,
+  type IntegrityAllowRule,
+  parseAllowRules,
+} from "./integrity-exemption.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { extractComponentsFromRgba } from "../component/component-bbox.ts";
@@ -100,6 +106,12 @@ export interface IntegrityViewportStats {
 export interface IntegrityReport {
   source: string;
   verdict: "clean" | "defects";
+  /**
+   * `--allow` rules that matched nothing this run. Surfaced so an exemption
+   * outliving the pattern it covered gets deleted instead of quietly widening
+   * the blind spot.
+   */
+  unusedAllowRules?: IntegrityAllowRule[];
   findings: IntegrityFinding[];
   exempted: IntegrityExemption[];
   viewports: IntegrityViewportStats[];
@@ -1430,6 +1442,11 @@ export interface IntegrityOptions {
   viewports?: { width: number; height: number }[];
   maxFindings?: number;
   collision?: TextCollisionOptions;
+  /**
+   * User-declared exemptions for intentional patterns. Matched findings move
+   * into `exempted` with the caller's reason; see integrity-exemption.ts.
+   */
+  allow?: readonly IntegrityAllowRule[];
 }
 
 export const DEFAULT_INTEGRITY_VIEWPORTS = [
@@ -1634,6 +1651,14 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
     await browser.close();
   }
 
+  // User exemptions apply BEFORE the verdict, and every exempted finding is
+  // moved into `exempted` rather than dropped — the suppression stays visible in
+  // the report and in --json.
+  const allowed = applyAllowRules(findings, options.allow ?? []);
+  findings.length = 0;
+  findings.push(...allowed.findings);
+  exempted.push(...allowed.exempted);
+
   const order: Record<"fail" | "warn", number> = { fail: 0, warn: 1 };
   findings.sort((a, b) => order[a.severity] - order[b.severity] || a.viewport - b.viewport);
   const kickback = findings.map((f) =>
@@ -1649,7 +1674,15 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       exempted: exempted.length,
     },
   });
-  return { source: options.source, verdict, findings, exempted, viewports: stats, kickback };
+  return {
+    source: options.source,
+    verdict,
+    findings,
+    exempted,
+    viewports: stats,
+    kickback,
+    ...(allowed.unusedRules.length > 0 ? { unusedAllowRules: allowed.unusedRules } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1678,12 +1711,31 @@ export function formatIntegrityReport(report: IntegrityReport): string {
     lines.push(`${GREEN}No integrity defects detected.${RESET}`);
   }
   if (report.exempted.length > 0) {
-    lines.push("");
-    lines.push(`Exempted candidates (the tool's call — audit the rule, not the page):`);
-    for (const e of report.exempted.slice(0, 15)) {
-      lines.push(`  ${DIM}- [${e.kind}] ${e.selector ?? ""} @${e.viewport}: ${e.reason}${RESET}`);
+    const user = report.exempted.filter((e) => e.reason.startsWith("user exemption"));
+    const tool = report.exempted.filter((e) => !e.reason.startsWith("user exemption"));
+    // Split by who decided. A reviewer auditing a tool exemption is checking the
+    // rule; auditing a user exemption is checking a colleague's judgement call,
+    // and conflating the two hides which is which.
+    for (const [label, rows] of [
+      ["Exempted candidates (the tool's call — audit the rule, not the page)", tool],
+      ["Exempted by --allow (your call — the finding was real and accepted)", user],
+    ] as const) {
+      if (rows.length === 0) continue;
+      lines.push("");
+      lines.push(`${label}:`);
+      for (const e of rows.slice(0, 15)) {
+        lines.push(`  ${DIM}- [${e.kind}] ${e.selector ?? ""} @${e.viewport}: ${e.reason}${RESET}`);
+      }
+      if (rows.length > 15) lines.push(`  ${DIM}… ${rows.length - 15} more${RESET}`);
     }
-    if (report.exempted.length > 15) lines.push(`  ${DIM}… ${report.exempted.length - 15} more${RESET}`);
+  }
+  if (report.unusedAllowRules && report.unusedAllowRules.length > 0) {
+    lines.push("");
+    lines.push(`${YELLOW}${report.unusedAllowRules.length} --allow rule(s) matched nothing${RESET}`);
+    for (const r of report.unusedAllowRules) {
+      lines.push(`  ${DIM}- ${r.raw}${RESET}`);
+    }
+    lines.push(`${DIM}Delete them: an exemption kept past the pattern it covered only widens the blind spot.${RESET}`);
   }
   return lines.join("\n");
 }
@@ -1703,6 +1755,7 @@ Options:
   --json                 Print JSON report
   --storage-state <file> Playwright storage state, to measure pages behind
                          a login (or set VLMKIT_STORAGE_STATE)
+${ALLOW_HELP}
 Exit code is non-zero when the verdict is "defects".`);
   process.exit(exitCode);
 }
@@ -1713,12 +1766,14 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   let maxFindings: number | undefined;
   let widths: number[] | undefined;
   let storageState: string | undefined;
+  const allowSpecs: string[] = [];
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === "--json") json = true;
     else if (arg === "--max-findings") maxFindings = Number.parseInt(argv[++i] ?? "12", 10);
     else if (arg === "--storage-state") storageState = argv[++i];
+    else if (arg === "--allow") allowSpecs.push(argv[++i] ?? "");
     else if (arg === "--viewports") {
       widths = (argv[++i] ?? "").split(",").map((w) => Number.parseInt(w, 10)).filter((w) => w > 0);
       if (widths.length === 0) printUsage(1);
@@ -1727,11 +1782,15 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   const source = positional[0];
   if (!source) printUsage(1);
   const heights: Record<number, number> = { 1280: 800, 768: 900, 375: 700 };
+  // Parsed before the browser starts, so a typo in an exemption fails in
+  // milliseconds instead of after a three-viewport sweep.
+  const allow = parseAllowRules(allowSpecs);
   const report = await runIntegrityCheck({
     source,
     ...(widths ? { viewports: widths.map((w) => ({ width: w, height: heights[w] ?? 800 })) } : {}),
     ...(maxFindings !== undefined ? { maxFindings } : {}),
     ...(storageState ? { storageState } : {}),
+    ...(allow.length > 0 ? { allow } : {}),
   });
   if (json) console.log(JSON.stringify(report, null, 2));
   else console.log(formatIntegrityReport(report));

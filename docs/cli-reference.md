@@ -237,6 +237,22 @@ vlmkit snapshot flipbook                       # Diff three-frame (baseline ↔ 
 vlmkit snapshot report                         # Render snapshot-report.json as Markdown
 ```
 
+### Integrity exemptions
+
+```bash
+# Accept an intentional pattern the tool does not recognise as one.
+# Reason is mandatory; `;` separates it (so `#` stays available for ID selectors).
+vlmkit check integrity page.html \
+  --allow "near-misalignment@.badge;icon is optically centred" \
+  --allow "text-collision@#refund@1280;deliberate graze, design sign-off DS-412"
+```
+
+An accepted finding is still printed, under "Exempted by --allow (your call)", and
+a rule that matched nothing is reported so dead config gets deleted. Kinds that
+mean the page is broken (`js-error`, `degenerate-render`, `unstyled-page`,
+`redirected`) cannot be exempted. Put the rule in `vlmkit.gates.json` when it
+needs an owner and an expiry — an expired suppression stops being applied.
+
 ### Check (gates: a11y / tokens / design / theme / perf / drift)
 
 ```bash

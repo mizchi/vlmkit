@@ -46,6 +46,14 @@
           "reason": "Payment-method tiles are deliberately styled per provider (brand requirement), so button styles do not consolidate here.",
           "owner": "payments",
           "expires": "2026-11-30"
+        },
+        {
+          "//": "An integrity exemption. The reason inside --allow explains the pattern; the reason here explains the approval. Both are printed.",
+          "gate": "check integrity",
+          "flag": "--allow \"near-misalignment@.provider-badge;provider logos are optically centred, not edge-aligned\"",
+          "reason": "Optical centring signed off with design; the 2px probe cannot express it.",
+          "owner": "payments",
+          "expires": "2026-11-30"
         }
       ]
     }

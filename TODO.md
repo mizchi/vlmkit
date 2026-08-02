@@ -312,9 +312,26 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   Playwright の storageState をそのまま受ける `--storage-state <json>`
   が最小案。現状の回避策(no-auth route / ローカルファイル)は checkout
   等の高価値ページで非答。
-- [ ] **integrity のユーザー定義免除リスト** — 新規の意図的パターンが
-  誤検知されたとき、マークアップ改変か issue 報告しか選択肢がない。
-  copy ゲートの `--allow-invisible` に相当する承認可能な仕組み。
+- [x] **integrity のユーザー定義免除リスト** — 2026-08-02 実装:
+  `check integrity --allow "<kind>[@<selector>][@<viewport>];<reason>"`
+  (`packages/vlmkit-markup/src/inspect/integrity-exemption.ts`、18 テスト)。
+  盲目化を防ぐ 3 つの規則:
+  (1) **理由が必須** — `;<reason>` が無いとパースエラー。
+  (2) **未知の kind はエラー**(有効な kind を列挙) — `low-contrast-txt` が
+  「何も黙らせないのに適用されたように見える」のが suppression フラグ最悪の挙動。
+  (3) **免除した finding はレポートに残る** — `exempted` に理由付きで移動し、
+  「あなたの判断」節としてツール側免除と分けて表示。さらに
+  **どの finding にもマッチしなかった rule を報告**(死んだ設定が
+  盲点を広げ続けるのを防ぐ)。
+  `js-error` / `degenerate-render` / `unstyled-page` / `redirected` は
+  免除不可(意図的デザインではなく「ページが壊れている/測定不能」の報告なので)。
+  ライフサイクル(owner / 期限 / 棚卸し)は `vlmkit.gates.json` 側に委譲 —
+  期限切れでフラグが適用されなくなりゲートが素で走ることを E2E で確認済み。
+  MCP の `check_integrity` にも `allow` を追加。
+  **設計上の失敗を 1 件記録**: 最初は理由の区切りを `#` にしていたため
+  ID セレクタ(`text-collision@#refund;...`)がセレクタ自身の `#` で分割され、
+  空セレクタ = 書いたより広い免除になっていた。`;` に変更
+  (CSS セレクタには現れない)。`#` を使った場合は専用のヒントを出す。
 - [~] **クロス OS フォント決定論の実測レポート** — 2026-08-02 計測器 +
   Linux 側実測完了、macOS 実機は未実施(1 コマンドで比較可能な状態にした)。
   `src/util/font-determinism-probe.ts`(12 テスト)は本番の

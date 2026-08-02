@@ -153,6 +153,7 @@ its relative stylesheets, images and scripts resolve — if your CSS lives in
 |---|---|
 | Broken-page scan: JS errors, empty render, failed resources, text collision/clipping/protrusion, collapsed containers, page overflow, invisible text, text painted over by opaque elements (occlusion), near-misalignment, unstyled page — across 3 viewports | `vlmkit check integrity page.html` |
 | The exact copy is spec (spellings, casing, `€`, dates) | `vlmkit check copy page.html --manifest copy.txt` |
+| An integrity finding is a deliberate pattern, not a defect | `vlmkit check integrity page.html --allow "near-misalignment@.badge;optically centred"` — reason mandatory, still listed as exempted |
 | Structural requirements as a machine-checkable spec (widths, per-row counts, stacking order, per-viewport visibility) | `vlmkit check layout page.html --contract layout.json` |
 | Design-system conformance: hard-coded values vs a token scale | `vlmkit check tokens page.html` |
 | No token file to check against: is the page consistent with *itself*? (one button style or six; spacing on the page's own scale) | `vlmkit check design page.html` |
