@@ -8,7 +8,7 @@ import { TOOLS } from "./tools.ts";
 
 export function createVlmkitMcpServer(): McpServer {
   const server = new McpServer(
-    { name: "vlmkit", version: "0.8.0" },
+    { name: "vlmkit", version: "0.9.0" },
     {
       instructions:
         "vlmkit exposes deterministic (no-VLM) verification gates for markup: verify_markup (done-condition verdict + kickback), check_interactions (a11y-event state map + optional --reference behavioral contract), scan_handlers (wired event surface + pointer-only-control detection), check_copy (copy fidelity). Use these to gate generated/edited UI: the kickback text is the next-fix list. A residual is real unless the tool itself marks it pixel-confirmed/demoted.",

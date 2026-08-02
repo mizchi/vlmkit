@@ -14,9 +14,9 @@
  * threshold.
  *
  * Usage:
- *   vrt a11y-touch <html-or-url>
- *   vrt a11y-touch <url> --level AAA   # 44x44 (default)
- *   vrt a11y-touch <url> --level AA    # 24x24
+ *   vlmkit check a11y touch <html-or-url>
+ *   vlmkit check a11y touch <url> --level AAA   # 44x44 (default)
+ *   vlmkit check a11y touch <url> --level AA    # 24x24
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
@@ -34,6 +34,14 @@ import {
 export type WcagTouchLevel = "AAA" | "AA";
 
 export interface TouchCheckOptions {
+  /**
+   * Suppress the human-readable console block. Set by `--json`: the console
+   * output caps its list at five rows, so mixing it into stdout ahead of the
+   * JSON left `--json` unparseable — while the truncation notice pointed the
+   * reader at exactly that stream. Shipped broken in 0.9.0-dev; caught by
+   * running the built CLI rather than the run function.
+   */
+  quiet?: boolean;
   /** HTML file path or http(s) URL. */
   source: string;
   outputDir: string;
@@ -262,21 +270,23 @@ export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchRep
   });
   await writeFile(reportPath, md);
 
-  console.log(`  ${BOLD}${CYAN}vrt a11y-touch${RESET}`);
-  console.log(`  ${DIM}source: ${options.source}  level: WCAG ${level} (${required}×${required} min)${RESET}`);
-  console.log(`  ${DIM}inspected ${byPath.size} interactive element(s)${RESET}`);
-  const icon = findings.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
-  console.log(`  ${icon} ${findings.length} undersized target(s)`);
-  const CONSOLE_ROWS = 5;
-  for (const f of findings.slice(0, CONSOLE_ROWS)) {
-    const cl = f.cluster ? " (clustered)" : "";
-    console.log(`    ${DIM}${f.path} — ${Math.round(f.bbox.width)}×${Math.round(f.bbox.height)}${cl} — "${f.text}"${RESET}`);
+  if (!options.quiet) {
+    console.log(`  ${BOLD}${CYAN}vlmkit check a11y touch${RESET}`);
+    console.log(`  ${DIM}source: ${options.source}  level: WCAG ${level} (${required}×${required} min)${RESET}`);
+    console.log(`  ${DIM}inspected ${byPath.size} interactive element(s)${RESET}`);
+    const icon = findings.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
+    console.log(`  ${icon} ${findings.length} undersized target(s)`);
+    const CONSOLE_ROWS = 5;
+    for (const f of findings.slice(0, CONSOLE_ROWS)) {
+      const cl = f.cluster ? " (clustered)" : "";
+      console.log(`    ${DIM}${f.path} — ${Math.round(f.bbox.width)}×${Math.round(f.bbox.height)}${cl} — "${f.text}"${RESET}`);
+    }
+    // See a11y-contrast: an undisclosed cut makes a partial list look complete.
+    if (findings.length > CONSOLE_ROWS) {
+      console.log(`    ${DIM}… ${findings.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
+    }
+    console.log(`  ${DIM}report: ${reportPath}${RESET}`);
   }
-  // See a11y-contrast: an undisclosed cut makes a partial list look complete.
-  if (findings.length > CONSOLE_ROWS) {
-    console.log(`    ${DIM}… ${findings.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
-  }
-  console.log(`  ${DIM}report: ${reportPath}${RESET}`);
 
   return {
     source: options.source, level, viewport, screenshot: screenshotPath,
@@ -324,7 +334,7 @@ function renderReport(r: Omit<TouchReport, "reportPath">): string {
     `\`min-width: ${r.failures[0]!.required}px; min-height: ${r.failures[0]!.required}px;\`.`);
   lines.push("   - For inline links, wrap them in a block with hit padding " +
     "and use `display: inline-block`.");
-  lines.push("2. Re-run `vrt a11y-touch`. The failure list should empty out.");
+  lines.push("2. Re-run `vlmkit check a11y touch`. The failure list should empty out.");
   lines.push("");
   return lines.join("\n");
 }
@@ -333,7 +343,7 @@ async function main(argv = process.argv.slice(2)) {
   if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, outputDir, report, level } = parseArgs(argv);
   if (positional.length === 0) {
-    console.log("Usage: vrt a11y-touch <html-or-url> [--level AAA|AA] [--output-dir dir]");
+    console.log("Usage: vlmkit check a11y touch <html-or-url> [--level AAA|AA] [--output-dir dir]");
     console.log("Options:");
     console.log("  --level AAA|AA    WCAG threshold — AAA=44px (default), AA=24px-with-spacing.");
     console.log("  --output-dir <dir> Default: ./test-results/a11y-touch");
@@ -345,13 +355,15 @@ async function main(argv = process.argv.slice(2)) {
 
   // the only view of the data — the truncation notices point here.
 
+  const json = argv.includes("--json");
   const result = await runA11yTouch({
     source: positional[0]!,
     outputDir: outputDir || join(process.cwd(), "test-results", "a11y-touch"),
     reportPath: report || undefined,
     level,
+    quiet: json,
   });
-  if (argv.includes("--json")) console.log(JSON.stringify(result, null, 2));
+  if (json) console.log(JSON.stringify(result, null, 2));
 }
 
 const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "a11y-touch" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);

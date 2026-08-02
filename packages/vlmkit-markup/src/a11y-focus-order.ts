@@ -16,12 +16,12 @@
  *      that should be reachable (e.g., custom button without
  *      `role="button"` + `tabindex="0"`).
  *
- * Pairs well with `vrt a11y-touch` (size) and `vrt a11y-contrast`
+ * Pairs well with `vlmkit check a11y touch` (size) and `vlmkit check a11y contrast`
  * (contrast) — those check static rendering, this checks the
  * keyboard journey.
  *
  * Usage:
- *   vrt a11y-focus-order <html-or-url>
+ *   vlmkit check a11y focus <html-or-url>
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -32,6 +32,14 @@ import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/
 import { classifyFocusOrderStep } from "./markup-core-a11y-focus-order.ts";
 
 export interface FocusOrderOptions {
+  /**
+   * Suppress the human-readable console block. Set by `--json`: the console
+   * output caps its list at five rows, so mixing it into stdout ahead of the
+   * JSON left `--json` unparseable — while the truncation notice pointed the
+   * reader at exactly that stream. Shipped broken in 0.9.0-dev; caught by
+   * running the built CLI rather than the run function.
+   */
+  quiet?: boolean;
   source: string;
   outputDir: string;
   reportPath?: string;
@@ -246,20 +254,22 @@ export async function runFocusOrder(
   });
   await writeFile(reportPath, md);
 
-  console.log(`  ${BOLD}${CYAN}vrt a11y-focus-order${RESET}`);
-  console.log(`  ${DIM}source: ${options.source}${RESET}`);
-  console.log(`  ${DIM}captured ${steps.length} focus step(s)${RESET}`);
-  const icon = findings.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
-  console.log(`  ${icon} ${findings.length} finding(s)`);
-  const CONSOLE_ROWS = 5;
-  for (const f of findings.slice(0, CONSOLE_ROWS)) {
-    console.log(`    ${DIM}[${f.kind}] ${f.message}${RESET}`);
+  if (!options.quiet) {
+    console.log(`  ${BOLD}${CYAN}vlmkit check a11y focus${RESET}`);
+    console.log(`  ${DIM}source: ${options.source}${RESET}`);
+    console.log(`  ${DIM}captured ${steps.length} focus step(s)${RESET}`);
+    const icon = findings.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
+    console.log(`  ${icon} ${findings.length} finding(s)`);
+    const CONSOLE_ROWS = 5;
+    for (const f of findings.slice(0, CONSOLE_ROWS)) {
+      console.log(`    ${DIM}[${f.kind}] ${f.message}${RESET}`);
+    }
+    // See a11y-contrast: an undisclosed cut makes a partial list look complete.
+    if (findings.length > CONSOLE_ROWS) {
+      console.log(`    ${DIM}… ${findings.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
+    }
+    console.log(`  ${DIM}report: ${reportPath}${RESET}`);
   }
-  // See a11y-contrast: an undisclosed cut makes a partial list look complete.
-  if (findings.length > CONSOLE_ROWS) {
-    console.log(`    ${DIM}… ${findings.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
-  }
-  console.log(`  ${DIM}report: ${reportPath}${RESET}`);
 
   return {
     source: options.source, viewport, screenshot: screenshotPath,
@@ -323,7 +333,7 @@ async function main(argv = process.argv.slice(2)) {
   if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, outputDir, report, maxSteps } = parseArgs(argv);
   if (positional.length === 0) {
-    console.log("Usage: vrt a11y-focus-order <html-or-url> [options]");
+    console.log("Usage: vlmkit check a11y focus <html-or-url> [options]");
     console.log("Options:");
     console.log("  --max-steps N        Maximum Tab presses (default: 64)");
     console.log("  --output-dir <dir>   Default: ./test-results/a11y-focus-order");
@@ -335,13 +345,15 @@ async function main(argv = process.argv.slice(2)) {
 
   // the only view of the data — the truncation notices point here.
 
+  const json = argv.includes("--json");
   const result = await runFocusOrder({
     source: positional[0]!,
     outputDir: outputDir || join(process.cwd(), "test-results", "a11y-focus-order"),
     reportPath: report || undefined,
     maxSteps,
+    quiet: json,
   });
-  if (argv.includes("--json")) console.log(JSON.stringify(result, null, 2));
+  if (json) console.log(JSON.stringify(result, null, 2));
 }
 
 const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "a11y-focus-order" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);

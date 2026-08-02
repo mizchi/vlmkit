@@ -5,6 +5,15 @@ Dates are YYYY-MM-DD.
 
 ## Unreleased
 
+## 0.9.0 — 2026-08-02
+
+The theme of this release is gates that were confidently wrong. Nine of
+them reported a defect in the page — or reported nothing at all — when
+the real problem was that they had measured the wrong document: an
+unstyled one, a login page, a pre-render placeholder. Each fix carries a
+differential regression test, because none of these were visible in a
+single run; every one needed two runs and a comparison.
+
 ### Breaking
 
 - **A suspect finding now fails the command by default.** `check copy`,
@@ -19,9 +28,43 @@ Dates are YYYY-MM-DD.
   `--fail-on-suspect` is still accepted as a no-op, so existing scripts
   keep working. **If you relied on a gate exiting 0 while reporting
   defects, add `--advisory`.**
+- **A malformed `verify flow` file is now a usage error.** An unknown
+  assert name used to be reported as an unmet post-condition
+  (`FAIL (unknown assert)`), and an unknown action was worse: the step
+  performed nothing, had no post-conditions to fail, and the run returned
+  `done: true`. Both are now rejected before a browser opens, naming the
+  offending step and listing the valid names. An empty `steps` array is
+  rejected too. **A flow that was silently passing on a typo'd action
+  will now error — that flow was never verifying anything.**
 
 ### Added
 
+- `check design` — coherence of the design system a page implies, with no
+  reference: spacing-scale and type-scale concentration, palette size,
+  and component-signature reuse. The `scale-outlier` rule is `info`, not
+  `warn`, because the study behind it showed spacing concentration
+  overlaps between designed and generated pages.
+- `vlmkit batch` — run gates over many pages with bounded concurrency,
+  stride sharding for CI matrices, and exit-code-as-verdict. Per-job logs
+  are named by a full-path slug plus a hash, so two pages with the same
+  basename cannot overwrite each other's output.
+- `vlmkit gates` + `vlmkit.gates.json` — one reviewed config for which
+  gates run against which pages, with `gates list | run | suppressions`.
+  A suppression must carry a reason, may carry an owner and an expiry,
+  and stops applying once expired. An empty gate list is a parse error
+  rather than a run that silently does nothing.
+- `check integrity --allow "<kind>[@<selector>][@<viewport>];<reason>"` —
+  accept an intentional pattern without editing the markup. A reason is
+  required, an unknown kind is an error listing the valid ones, exempted
+  findings stay in the report under `exempted`, and a rule that matched
+  nothing is reported so dead config gets deleted. Four kinds
+  (`js-error`, `degenerate-render`, `unstyled-page`, `redirected`) can
+  never be exempted — they mean the page is broken or unmeasurable.
+- `--json` on `check a11y contrast | touch | focus` and `stress i18n`.
+  These were the gates without it, and their console output caps its list,
+  so the full finding set had no machine-readable route out.
+- URL support on `check a11y contrast | touch | focus` and `check design`
+  — they previously accepted only local files.
 - Authenticated pages: `--storage-state <file>` on URL-capable gates, or
   `VLMKIT_STORAGE_STATE=<file>` for all of them at once, accepting the
   Playwright storage-state file that `playwright codegen --save-storage`
@@ -31,6 +74,68 @@ Dates are YYYY-MM-DD.
 
 ### Fixed
 
+- **Six gates were measuring an unstyled document.** They loaded local
+  HTML with `setContent(readFile(...))`, which gives the page an
+  `about:blank` base URL, so every relative `<link rel=stylesheet>`,
+  `<img>` and webfont silently failed to resolve. `check a11y contrast`
+  reported 0 failures where the same CSS inlined reported 1; worse,
+  `check a11y touch` *inverted* — an unstyled control keeps its intrinsic
+  size, so a CSS-shrunk tap target measured as passing. All six now
+  navigate to the file URL. (Injecting a `<base href>` was tried and does
+  not work: an opaque origin blocks `file://` subresources.)
+- **Five more gates reported success for a login page.** `check
+  breakpoints`, `check scroll` and `scan scroll` returned `status: ok`
+  for a route that 302s to `/login`, while `check layout` and
+  `verify flow` failed against the sign-in page and blamed the markup.
+  All five now report the redirect. The hint also stopped claiming
+  "vlmkit cannot inject a session", which had been false since
+  `--storage-state` landed.
+- **Six gates were reading the pre-render DOM.** `verify flow` reported
+  `count .card expected 2, measured 0` on a page where `check layout`
+  measured 2 at the same instant; `build page` screenshotted a candidate
+  at 5.3% of its settled ink, so every component came back missing; and
+  `scan contract` returned zero landmarks for a built SPA opened as a
+  file. Playwright actions auto-wait, but `page.evaluate`,
+  `page.screenshot` and `getBoundingClientRect` do not — and that is how
+  every gate measures.
+- `check integrity` findings were attributed to whichever viewport the
+  caller happened to list first, so `--allow "…@1280"` was silently
+  order-dependent and a page-wide defect could read as mobile-only. The
+  sweep is now sorted widest-first and records every width a finding was
+  seen at, which also makes "breaks at 1280/768 but not 375" expressible
+  for the first time.
+- `check a11y contrast | touch | focus` printed a headline count and then
+  five rows with no indication the list was cut — twelve findings looked
+  like five. The cap is now disclosed and `--json` carries every row.
+  `stress i18n` capped at six rows and is now disclosed too.
+- `--json` on those four gates prints **only** JSON. It was added in this
+  cycle and shipped emitting the human block first, so `JSON.parse` threw
+  on line 1 — while the truncation notice pointed the reader at exactly
+  that stream. Found by running the built CLI during release prep; the
+  original check had read `report.failures.length` from the run function,
+  which never touches stdout.
+- The four gates above no longer print `vrt` in their headers, usage
+  lines, or fix instructions. There is no `vrt` binary and the old
+  subcommand names are deprecated, so a fix instruction reading
+  "Re-run `vrt a11y-contrast`" was wrong twice over.
+- `check integrity` text-collision false positives: collisions are
+  compared on measured ink bands rather than line boxes, text inside a
+  closed `<details>` is not a collision candidate, and character-level
+  grazes are reported by ink-overlap fraction. An 8-page × 3-viewport A/B
+  against the previous revision found **0 new collisions and 16
+  disappeared** — every one a pre-existing false positive the old
+  area-ratio gate had been masking (MDN 14, from closed-`<details>`
+  content that keeps its layout boxes; APG 2, from an element paired with
+  its own inline descendant).
+- `check integrity` no longer treats an invisible overlay as an occluder —
+  found while running the gate against a real authenticated app.
+- `verify markup` scored low-contrast fills as clean instead of detecting
+  them.
+- Numeric CLI flags are validated in one place, which fixed five bugs
+  that had each been hand-rolled independently — including a `NaN`
+  concurrency that made the worker pool silently run nothing and return
+  holes, and `--min-reuse 2` printing `drift` next to a `COHERENT`
+  verdict. `--gate "check a11y contrast"` no longer splits on the space.
 - Gates no longer report on a page they did not measure: a redirect away
   from the requested URL (typically a login wall) is reported instead of
   silently measured, which previously produced `verdict: CLEAN` for a
@@ -51,6 +156,19 @@ Dates are YYYY-MM-DD.
 - `snapshot` and `scan breakpoints` now append to the run ledger.
 - `unprobed-handler-types` counts only element-specific handlers, so a
   framework delegation root no longer lists ~80 event types as findings.
+
+### Known issues
+
+- **Other commands still print `vrt` in their output.** The four gates
+  above were fixed because they were already in the release diff; a full
+  sweep found roughly 250 occurrences across ~80 distinct phrases in
+  user-facing strings (`vrt snapshot`, `vrt workflow`, `vrt diff-pr`,
+  `vrt baseline` …). Most need only the binary name changed, but some
+  refer to commands that no longer exist at all (`vrt compare`,
+  `vrt elements`, `vrt smoke`) and some are prose. Deliberately left for
+  its own change rather than folded into a release commit — a fix
+  instruction you cannot paste is a real defect, and it deserves a diff
+  someone can review.
 
 ## 0.8.0 — 2026-08-01
 

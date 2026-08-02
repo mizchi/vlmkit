@@ -21,7 +21,7 @@
  * this is purely visual — works on any page that renders text.
  *
  * Usage:
- *   vrt a11y-contrast <html>
+ *   vlmkit check a11y contrast <html>
  */
 import { writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -33,6 +33,14 @@ import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { evaluateA11yContrast } from "./markup-core-a11y-contrast.ts";
 
 export interface A11yContrastOptions {
+  /**
+   * Suppress the human-readable console block. Set by `--json`: the console
+   * output caps its list at five rows, so mixing it into stdout ahead of the
+   * JSON left `--json` unparseable — while the truncation notice pointed the
+   * reader at exactly that stream. Shipped broken in 0.9.0-dev; caught by
+   * running the built CLI rather than the run function.
+   */
+  quiet?: boolean;
   htmlPath: string;
   outputDir: string;
   reportPath?: string;
@@ -279,22 +287,24 @@ export async function runA11yContrast(
   });
   await writeFile(reportPath, md);
 
-  console.log(`  ${BOLD}${CYAN}vrt a11y-contrast${RESET}`);
-  console.log(`  ${DIM}html: ${htmlPath}${RESET}`);
-  console.log(`  ${DIM}inspected ${byPath.size} text-bearing element(s)${RESET}`);
-  const icon = findings.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
-  console.log(`  ${icon} ${findings.length} contrast failure(s)`);
-  const CONSOLE_ROWS = 5;
-  for (const f of findings.slice(0, CONSOLE_ROWS)) {
-    console.log(`    ${DIM}${f.path} — ${f.ratio.toFixed(2)}:1 (need ${f.requiredAA}) — \`${f.foreground.hex}\` on \`${f.background.hex}\` — "${f.text}"${RESET}`);
+  if (!options.quiet) {
+    console.log(`  ${BOLD}${CYAN}vlmkit check a11y contrast${RESET}`);
+    console.log(`  ${DIM}html: ${htmlPath}${RESET}`);
+    console.log(`  ${DIM}inspected ${byPath.size} text-bearing element(s)${RESET}`);
+    const icon = findings.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
+    console.log(`  ${icon} ${findings.length} contrast failure(s)`);
+    const CONSOLE_ROWS = 5;
+    for (const f of findings.slice(0, CONSOLE_ROWS)) {
+      console.log(`    ${DIM}${f.path} — ${f.ratio.toFixed(2)}:1 (need ${f.requiredAA}) — \`${f.foreground.hex}\` on \`${f.background.hex}\` — "${f.text}"${RESET}`);
+    }
+    // Disclose the cut: a headline count above a five-row list reads as "here they
+    // are", and a reader has no way to know seven more exist. Same wording as
+    // `check breakpoints` and `check integrity`.
+    if (findings.length > CONSOLE_ROWS) {
+      console.log(`    ${DIM}… ${findings.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
+    }
+    console.log(`  ${DIM}report: ${reportPath}${RESET}`);
   }
-  // Disclose the cut: a headline count above a five-row list reads as "here they
-  // are", and a reader has no way to know seven more exist. Same wording as
-  // `check breakpoints` and `check integrity`.
-  if (findings.length > CONSOLE_ROWS) {
-    console.log(`    ${DIM}… ${findings.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
-  }
-  console.log(`  ${DIM}report: ${reportPath}${RESET}`);
 
   return {
     html: htmlPath,
@@ -353,7 +363,7 @@ function renderReport(r: Omit<A11yContrastReport, "reportPath">): string {
       "toward black/white on a light/dark bg adds ratio.");
     lines.push("3. Common fix: muted-gray-on-white text (e.g. `#9ca3af` on `#ffffff` = 2.85:1) " +
       "→ try `#6b7280` (4.69:1) or darker.");
-    lines.push("4. Re-run `vrt a11y-contrast`. Failures should clear.");
+    lines.push("4. Re-run `vlmkit check a11y contrast`. Failures should clear.");
   }
   lines.push("");
   return lines.join("\n");
@@ -363,7 +373,7 @@ async function main(argv = process.argv.slice(2)) {
   if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, outputDir, report } = parseArgs(argv);
   if (positional.length === 0) {
-    console.log("Usage: vrt a11y-contrast <html> [--output-dir dir]");
+    console.log("Usage: vlmkit check a11y contrast <html> [--output-dir dir]");
     console.log("Options:");
     console.log("  --output-dir <dir>   Default: ./test-results/a11y-contrast");
     console.log("  --report <path>      Markdown report path");
@@ -374,12 +384,14 @@ async function main(argv = process.argv.slice(2)) {
 
   // the only view of the data — the truncation notices point here.
 
+  const json = argv.includes("--json");
   const result = await runA11yContrast({
     htmlPath: positional[0]!,
     outputDir: outputDir || join(process.cwd(), "test-results", "a11y-contrast"),
     reportPath: report || undefined,
+    quiet: json,
   });
-  if (argv.includes("--json")) console.log(JSON.stringify(result, null, 2));
+  if (json) console.log(JSON.stringify(result, null, 2));
 }
 
 const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "a11y-contrast" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);

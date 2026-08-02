@@ -565,6 +565,47 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   ドキュメントは「ゲートは --json を取る」と書いていたので一貫性の穴でもあった。
   回帰テスト: `packages/vlmkit-markup/src/output-consistency.test.ts`(6 件)。
 
+### 0.9.0 リリース準備(2026-08-02)
+- [x] **CHANGELOG が今日の作業を一切含んでいなかった** — Unreleased セクションは
+  `24b0185`(0.8.0)以降の前半分だけで、今日追加した `check design` / `batch` /
+  `gates` / `--allow` / `--json` / 外部アセット修正 / viewport 順序 / 認証壁 /
+  settle 修正がすべて欠けていた。0.9.0 として整理(破壊的変更があるので 0.x では minor)。
+- [x] **リリース検証でビルド済み CLI を叩いて欠陥 2 件を発見** — 関数の戻り値では
+  なく実際の成果物を動かして見つかったもの:
+  - **`--json` が壊れていた(今朝自分が入れた機能)** — 人間向けブロックを先に
+    stdout へ出していたので `JSON.parse` が 1 行目で落ちる。しかも切り詰め告知が
+    「`--json` で全件」とその壊れたストリームを指していた。原因は検証方法の誤り:
+    当時 `report.failures.length` を**関数から**確認しており、stdout を一度も見て
+    いなかった。`quiet` オプションを 4 ゲートに追加し、既存ゲートと同じ
+    `if (json) … else …` の排他にした。
+  - **`stress i18n` は 6 行で切って告知していなかった** — 今朝の切り詰め修正が
+    3 ゲートにしか当たっておらず、このゲートは `--json` だけ貰って告知を貰って
+    いなかった(告知が無いのに CLI コメントは「告知はここを指す」と書いていた)。
+  - 回帰テスト: `packages/vlmkit-markup/src/json-contract.test.ts`(14 件)。
+    **実際の CLI を spawn する** — 関数呼び出しでは今回の欠陥は原理的に検出できない。
+    修正前 14/14 fail、修正後 14/14 pass を確認。
+- [x] **自分のテストが空回りしていたのを検出して修正** — `\bvrt\s` は正しく見えて
+  無意味だった: ヘッダは `\x1b[36mvrt a11y-contrast` で、エスケープが `m`
+  (単語文字)で終わるため `vrt` の前に単語境界が無く、**拒否するために書いた出力に
+  対して pass** していた。ANSI を除去してから照合するよう修正。
+- [ ] **`vrt` 名の残存 ~250 箇所 / ~80 フレーズ(次の作業)** — 実測: 4 ゲートは
+  リリース diff に既に入っていたので直したが、全体は `vrt snapshot` /
+  `vrt workflow` / `vrt diff-pr` / `vrt baseline` など。`vrt` バイナリは存在せず
+  (`bin` は `vlmkit` のみ)、旧サブコマンド名は deprecated なので
+  `Re-run \`vrt a11y-contrast\`` は**二重に誤り**。大半はバイナリ名の置換だけで
+  済むが、`vrt compare` / `vrt elements` / `vrt smoke` は**すでに削除された
+  コマンド**への参照で、`vrt itself` / `vrt toolkit` のような散文も混ざる。
+  リリースコミットに 250 箇所の改名を混ぜず、レビュー可能な独立した diff にする。
+  正解表は `src/cli/cli.ts` の `newName` マップ(15 エントリ)。
+  CHANGELOG 0.9.0 の Known issues に明記済み。
+- [x] リリース検証: tsc クリーン / `pnpm test` 1813 pass / `smoke-dist.sh` 11 pass /
+  ビルド済みバイナリで `check design`・`batch`・`gates`・`--allow`(免除不可 kind の
+  エラー含む)・`--json` 4 本を実走。
+- [ ] **`npm publish` は未実行** — この環境に npm 認証が無い(`npm whoami` は
+  ENEEDAUTH、`NPM_TOKEN` 未設定)。バージョン確定・CHANGELOG・ビルド・スモークまで
+  完了しているので、認証のある環境で publish するだけ。0.8.0 は git tag が
+  打たれていない(タグは `v0.5.0` のみ)ので、タグ運用は現状に合わせて未実施。
+
 ### settle 監査 — 「waitUntil 水準合わせは装飾」が誤りだった(2026-08-02)
 レポート: `docs/reports/2026-08-02-settle-not-waituntil.md`
 - [x] **軸が `waitUntil` ではなく settle だった** — `goto(load)` の後に settle すれば
