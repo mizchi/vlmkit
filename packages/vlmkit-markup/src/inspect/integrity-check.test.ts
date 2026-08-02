@@ -584,6 +584,27 @@ test("M14a2 pointer-events:none decorative overlay is still occluded-text", { ti
   assert.ok(!report.findings.some((f) => f.selector === "#clear"));
 });
 
+// Found on a real authenticated app (2026-08-01 Swag Labs audit): the
+// styled-select pattern layers a native <select> at opacity 0.001 over a
+// visible span so the control keeps native keyboard/AT behaviour while the
+// span carries the styling. Its background-color alpha is 1, so an
+// alpha-only opacity test called that invisible overlay an opaque occluder.
+test("M14b2 an opacity:0.001 overlay (styled-select pattern) is NOT an occluder", { timeout: 120_000 }, async () => {
+  const file = page("m14b2.html", `
+    <div style="position:relative;width:300px;height:40px">
+      <span class="active_option" style="position:absolute;left:8px;top:10px;color:#111">Name (A to Z)</span>
+      <select class="sorter" style="position:absolute;inset:0;width:100%;opacity:0.001;background:#efefef">
+        <option>Name (A to Z)</option><option>Price (low to high)</option>
+      </select>
+    </div>
+    <div style="width:600px;height:200px;background:#456;margin-top:12px"></div>`);
+  const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+  assert.ok(
+    !report.findings.some((f) => f.kind === "occluded-text"),
+    JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector}`)),
+  );
+});
+
 test("M14b transparent stretched-link overlay is NOT occluded-text", { timeout: 120_000 }, async () => {
   const file = page("m14b.html", `
     <div style="position:relative;width:400px;height:140px;background:#fff;border:1px solid #ccc;padding:16px">

@@ -866,7 +866,25 @@ export const COLLECT_OCCLUSIONS = `(() => {
     return p.length >= 4 ? p[3] : 1;
   };
   const OPAQUE_TAGS = new Set(["IMG", "CANVAS", "VIDEO", "SVG", "PICTURE"]);
+  // Effective opacity: CSS opacity multiplies down the ancestor chain, and an
+  // element that paints nothing cannot occlude anything. Found on a real
+  // authenticated app (2026-08-01 Swag Labs audit): the styled-select pattern
+  // puts a native <select> with opacity 0.001 over a visible span, and its
+  // background-color alpha is 1 — so an alpha-only test called a deliberately
+  // invisible overlay an opaque occluder.
+  const effectiveOpacity = (el) => {
+    let o = 1;
+    for (let p = el; p && p.nodeType === 1; p = p.parentElement) {
+      const cs = getComputedStyle(p);
+      if (cs.visibility === "hidden" || cs.display === "none") return 0;
+      const v = parseFloat(cs.opacity);
+      if (Number.isFinite(v)) o *= v;
+      if (o < 0.05) return o;
+    }
+    return o;
+  };
   const paintsOpaquely = (el) => {
+    if (effectiveOpacity(el) < 0.5) return false;
     if (OPAQUE_TAGS.has(el.tagName)) return true;
     const cs = getComputedStyle(el);
     if ((cs.backgroundImage || "none") !== "none") return true;
