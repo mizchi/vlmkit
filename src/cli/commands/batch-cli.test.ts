@@ -8,6 +8,7 @@ import {
   type BatchSummary,
   buildJobs,
   formatBatchSummary,
+  jobLogName,
   parseShard,
   resolvePages,
   runBatch,
@@ -112,8 +113,52 @@ describe("runPool", () => {
     assert.deepEqual(finishOrder, [1, 2, 3, 0]);
   });
 
+  it("refuses an unusable limit instead of silently running nothing", async () => {
+    // A NaN limit made `Array.from({length: NaN})` build zero lanes: the pool
+    // ran nothing, returned holes, and read as success downstream.
+    await assert.rejects(runPool([1, 2], Number.NaN, async (x) => x), /concurrency limit >= 1, got NaN/);
+    await assert.rejects(runPool([1, 2], 0, async (x) => x), /concurrency limit >= 1, got 0/);
+  });
+
   it("handles an empty queue", async () => {
     assert.deepEqual(await runPool([], 4, async () => 1), []);
+  });
+});
+
+describe("jobLogName", () => {
+  it("distinguishes same-named pages in different directories", () => {
+    // `routes/a/index.html` and `routes/b/index.html` used to derive the same
+    // filename from their basename, so two concurrent writes raced and one
+    // page's failing report was lost.
+    const a = jobLogName({ gate: "check integrity", page: "routes/a/index.html" });
+    const b = jobLogName({ gate: "check integrity", page: "routes/b/index.html" });
+    assert.notEqual(a, b);
+    assert.match(a, /routes-a-index\.html/);
+  });
+
+  it("distinguishes same-path different-gate jobs, and same-path URLs", () => {
+    assert.notEqual(
+      jobLogName({ gate: "check integrity", page: "a.html" }),
+      jobLogName({ gate: "check design", page: "a.html" }),
+    );
+    assert.notEqual(
+      jobLogName({ gate: "check integrity", page: "https://x.test/checkout" }),
+      jobLogName({ gate: "check integrity", page: "https://y.test/checkout" }),
+    );
+  });
+
+  it("is stable for the same job and filesystem-safe", () => {
+    const job = { gate: "check copy --manifest c.txt", page: "https://x.test/a?b=1" };
+    assert.equal(jobLogName(job), jobLogName(job));
+    assert.match(jobLogName(job), /^[a-zA-Z0-9._-]+\.txt$/);
+  });
+
+  it("stays unique when two long paths truncate to the same prefix", () => {
+    const long = (tail: string) => `routes/${"deeply/nested/".repeat(8)}${tail}.html`;
+    assert.notEqual(
+      jobLogName({ gate: "check integrity", page: long("one") }),
+      jobLogName({ gate: "check integrity", page: long("two") }),
+    );
   });
 });
 

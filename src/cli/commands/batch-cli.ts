@@ -18,12 +18,21 @@
  * "did it pass" but "how long, and how do I shard it".
  */
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { glob } from "node:fs/promises";
 import { mkdir, writeFile } from "node:fs/promises";
 import { cpus } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import {
+  hasFlag,
+  readAll,
+  readFlag,
+  readInt,
+  readPositionals,
+  tokenizeCommand,
+} from "@mizchi/vlmkit-core/arg-reader.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
@@ -95,6 +104,9 @@ export async function resolvePages(patterns: string[], cwd = process.cwd()): Pro
   return [...out].sort();
 }
 
+/** Flags that consume the next argv entry, so positionals can be told apart. */
+const VALUE_FLAGS = ["gate", "concurrency", "shard", "output"];
+
 /** Flat job queue: every gate against every page. */
 export function buildJobs(gates: string[], pages: string[]): BatchJob[] {
   return pages.flatMap((page) => gates.map((gate) => ({ gate, page })));
@@ -111,6 +123,12 @@ export async function runPool<T, R>(
   worker: (item: T, index: number) => Promise<R>,
   onSettled?: (result: R, index: number) => void,
 ): Promise<R[]> {
+  // A NaN limit used to make `Array.from({length: NaN})` produce zero lanes, so
+  // the pool ran NOTHING and returned a list of holes — which then read as
+  // success downstream. Fail here instead of somewhere unrelated.
+  if (!Number.isFinite(limit) || limit < 1) {
+    throw new Error(`runPool needs a concurrency limit >= 1, got ${limit}`);
+  }
   const results = new Array<R>(items.length);
   let cursor = 0;
   const lanes = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
@@ -151,7 +169,10 @@ function cliEntryPath(explicit?: string): string {
 }
 
 function runJob(job: BatchJob, cliEntry: string): Promise<BatchJobResult> {
-  const args = [...process.execArgv, cliEntry, ...job.gate.split(/\s+/).filter(Boolean), job.page];
+  // Quote-aware: a gate flag can legitimately carry a value with spaces
+  // (`--manifest "copy/press kit.txt"`, `--mask ".hero, .promo"`), and a plain
+  // whitespace split would hand those to the gate as several arguments.
+  const args = [...process.execArgv, cliEntry, ...tokenizeCommand(job.gate), job.page];
   const started = Date.now();
   return new Promise((resolveJob) => {
     const child = spawn(process.execPath, args, {
@@ -178,6 +199,18 @@ function runJob(job: BatchJob, cliEntry: string): Promise<BatchJobResult> {
 }
 
 const slug = (s: string) => s.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+
+/**
+ * Per-job log filename. Uses the whole source path, not its basename: with
+ * `routes/a/index.html` and `routes/b/index.html` a basename-derived name
+ * collided, so two concurrent writes raced and one page's failing report was
+ * lost. The trailing hash keeps that guarantee when the 80-char cap truncates
+ * two long paths to the same prefix.
+ */
+export function jobLogName(job: BatchJob): string {
+  const hash = createHash("sha1").update(`${job.gate}\u0000${job.page}`).digest("hex").slice(0, 6);
+  return `${slug(job.gate)}--${slug(job.page)}-${hash}.txt`;
+}
 
 /**
  * Run an explicit job list. Split out from `runBatch` so a caller that already
@@ -214,9 +247,7 @@ export async function runJobs(
   };
   if (options.output) {
     await mkdir(options.output, { recursive: true });
-    await Promise.all(results.map((r) =>
-      writeFile(join(options.output!, `${slug(r.gate)}--${slug(basename(r.page))}.txt`), r.output)
-    ));
+    await Promise.all(results.map((r) => writeFile(join(options.output!, jobLogName(r)), r.output)));
     await writeFile(
       join(options.output, "batch-summary.json"),
       JSON.stringify({ ...summary, jobs: summary.jobs.map(({ output: _output, ...rest }) => rest) }, null, 2),
@@ -338,47 +369,29 @@ Examples:
 }
 
 async function main(argv = process.argv.slice(2)): Promise<void> {
-  if (argv.includes("--help") || argv.includes("-h")) printUsage(0);
-  const gates: string[] = [];
-  const patterns: string[] = [];
-  let concurrency: number | undefined;
-  let shard: { index: number; total: number } | undefined;
-  let output: string | undefined;
-  let json = false;
-  let quiet = false;
-  let showOutput = false;
-  let advisory = false;
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === "--gate") gates.push(argv[++i] ?? "");
-    else if (arg === "--concurrency") concurrency = Number.parseInt(argv[++i] ?? "", 10);
-    else if (arg === "--shard") shard = parseShard(argv[++i] ?? "");
-    else if (arg === "--output") output = argv[++i];
-    else if (arg === "--json") json = true;
-    else if (arg === "--quiet") quiet = true;
-    else if (arg === "--show-output") showOutput = true;
-    else if (arg === "--advisory") advisory = true;
-    else if (!arg.startsWith("-")) patterns.push(arg);
-  }
+  if (hasFlag(argv, "help") || hasFlag(argv, "-h")) printUsage(0);
+  const gates = readAll(argv, "gate");
+  const patterns = readPositionals(argv, VALUE_FLAGS);
+  const concurrency = readInt(argv, "concurrency", { min: 1 });
+  const shardSpec = readFlag(argv, "shard");
+  const output = readFlag(argv, "output");
+  const json = hasFlag(argv, "json");
   if (gates.length === 0 || gates.some((g) => !g.trim())) {
     console.error("At least one --gate is required, e.g. --gate \"check integrity\"\n");
     printUsage(1);
   }
   if (patterns.length === 0) printUsage(1);
-  if (concurrency !== undefined && (!Number.isFinite(concurrency) || concurrency < 1)) {
-    throw new Error(`--concurrency must be >= 1, got "${concurrency}"`);
-  }
   const summary = await runBatch({
     gates,
     patterns,
     ...(concurrency !== undefined ? { concurrency } : {}),
-    ...(shard ? { shard } : {}),
+    ...(shardSpec ? { shard: parseShard(shardSpec) } : {}),
     ...(output ? { output } : {}),
-    quiet,
+    quiet: hasFlag(argv, "quiet"),
   });
   if (json) console.log(JSON.stringify(summary, null, 2));
-  else console.log(formatBatchSummary(summary, { showOutput }));
-  if (summary.failed > 0 && !advisory) process.exitCode = 1;
+  else console.log(formatBatchSummary(summary, { showOutput: hasFlag(argv, "show-output") }));
+  if (summary.failed > 0 && !hasFlag(argv, "advisory")) process.exitCode = 1;
 }
 
 const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "batch" ||

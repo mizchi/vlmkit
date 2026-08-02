@@ -120,6 +120,10 @@ function parseSuppression(raw: unknown, path: string): GateSuppression {
 
 function parseGateList(raw: unknown, path: string): string[] {
   if (!Array.isArray(raw)) fail(path, "must be an array of gate command strings");
+  // An empty list is almost certainly a half-finished edit, and it is the worst
+  // possible outcome: `defaults: {gates: []}` used to validate and then run
+  // nothing for every page that relied on the defaults.
+  if (raw.length === 0) fail(path, "is empty — remove the key or list at least one gate");
   return raw.map((g, i) => {
     if (typeof g !== "string" || !g.trim()) fail(`${path}[${i}]`, "must be a non-empty string");
     return (g as string).trim();
@@ -214,6 +218,12 @@ export function resolveGatePlan(config: GateConfig, options: ResolveOptions = {}
     suppressions.push(...pageSuppressions);
     if (only.length > 0 && !only.some((o) => pageId.includes(o) || page.source.includes(o))) continue;
     const gates = [...(page.gates ?? defaultGates), ...(page.extraGates ?? [])];
+    if (gates.length === 0) {
+      throw new Error(
+        `Page "${pageId}" resolved to zero gates — set its \`gates\` or \`defaults.gates\`.`
+        + ` A page that silently runs nothing is worse than a config error.`,
+      );
+    }
     const candidates = [...defaultSuppressions, ...pageSuppressions];
     for (const baseGate of gates) {
       const applied = candidates.filter((s) => s.status !== "expired" && gateMatches(baseGate, s.gate));

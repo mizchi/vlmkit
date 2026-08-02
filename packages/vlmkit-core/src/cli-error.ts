@@ -9,12 +9,26 @@
  */
 import { statSync } from "node:fs";
 
+/**
+ * A bad flag or missing argument — the caller's typo, not a defect. Thrown by
+ * `arg-reader` and printed as one line, because a stack trace for
+ * `--concurrency abc` buries the one sentence that fixes it.
+ */
+export class UsageError extends Error {
+  override readonly name = "UsageError";
+}
+
 export function handleCliError(e: unknown): never {
   // Node fs errors carry the offending path on `.path`; that's more
   // reliable than parsing it out of `.message` (which sometimes
   // doesn't include the path at all, e.g. EISDIR from readFile).
   const err = e as { code?: string; message?: string; name?: string; path?: string };
   const msg = String(err?.message ?? e);
+
+  if (err?.name === "UsageError") {
+    process.stderr.write(`error: ${msg}\n`);
+    process.exit(1);
+  }
 
   // ENOENT — missing local file path.
   if (err?.code === "ENOENT") {

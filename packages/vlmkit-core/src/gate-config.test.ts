@@ -73,6 +73,19 @@ describe("parseGateConfig", () => {
     assert.throws(() => parseGateConfig(json({ pages: [] })), /pages: is empty/);
   });
 
+  it("refuses an empty gate list, which would silently gate nothing", () => {
+    // `defaults: {gates: []}` used to validate and then run zero jobs for every
+    // page relying on the defaults — a pass that checked nothing.
+    assert.throws(
+      () => parseGateConfig(json({ defaults: { gates: [] }, pages: [{ id: "a", source: "a.html", gates: ["g"] }] })),
+      /defaults\.gates: is empty/,
+    );
+    assert.throws(
+      () => parseGateConfig(json({ pages: [{ id: "a", source: "a.html", gates: [] }] })),
+      /pages\[0\]\.gates: is empty/,
+    );
+  });
+
   it("names the JSON path in every structural error", () => {
     assert.throws(() => parseGateConfig("{"), /not valid JSON/);
     assert.throws(() => parseGateConfig(json({ pages: "routes" })), /pages: must be an array/);

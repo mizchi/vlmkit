@@ -30,6 +30,7 @@
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { hasFlag, readFlag, readInt, readNumber, readPositionals } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { applyGateExit } from "@mizchi/vlmkit-core/gate-exit.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
@@ -96,6 +97,13 @@ export interface DesignPolicyReport {
   skipped: number;
   statefulSkipped: number;
   spacingValues: number;
+  /**
+   * Thresholds this run actually used. In the report because the role table
+   * has to flag the same rows the verdict counted: reading them from the
+   * module defaults made `--min-reuse 2` print `drift` next to a role while
+   * the verdict said COHERENT.
+   */
+  thresholds: { minReuse: number; minInstances: number };
   verdict: "coherent" | "drift";
 }
 
@@ -117,6 +125,9 @@ export interface DesignPolicyOptions {
   outlierMaxUses?: number;
   storageState?: string;
 }
+
+/** Flags that consume the next argv entry, so the source positional is found. */
+const VALUE_FLAGS = ["min-reuse", "min-instances", "storage-state"];
 
 const DEFAULT_MIN_REUSE = 3;
 const DEFAULT_MIN_INSTANCES = 3;
@@ -335,6 +346,7 @@ export function judgeDesignPolicy(
     skipped: input.skipped,
     statefulSkipped: input.statefulSkipped,
     spacingValues: spacingCounts.size,
+    thresholds: { minReuse, minInstances },
     // `info` rows do not move the verdict, and `redirected` is a navigation
     // problem rather than a design one (it still exits non-zero, being suspect).
     verdict: findings.some((f) => f.severity === "warn") ? "drift" : "coherent",
@@ -388,9 +400,13 @@ export function formatDesignReport(report: DesignPolicyReport): string {
     + ` skipped: ${report.skipped} (no inferable role), ${report.statefulSkipped} (non-resting state)${RESET}`);
   lines.push("");
   if (report.roles.length > 0) {
-    lines.push(`${BOLD}Role reuse${RESET} ${DIM}(instances / distinct styles)${RESET}`);
+    lines.push(
+      `${BOLD}Role reuse${RESET} ${DIM}(instances / distinct styles;`
+      + ` drift below ${report.thresholds.minReuse}x from ${report.thresholds.minInstances} instances)${RESET}`,
+    );
+    const { minReuse, minInstances } = report.thresholds;
     for (const r of report.roles.slice(0, 10)) {
-      const flag = r.instances >= DEFAULT_MIN_INSTANCES && r.reuse < DEFAULT_MIN_REUSE ? `${YELLOW}drift${RESET}` : `${GREEN}ok${RESET}`;
+      const flag = r.instances >= minInstances && r.reuse < minReuse ? `${YELLOW}drift${RESET}` : `${GREEN}ok${RESET}`;
       lines.push(`  ${r.role.padEnd(14)} ${String(r.instances).padStart(3)} inst  ${String(r.signatures).padStart(3)} styles`
         + `  reuse ${String(r.reuse).padStart(5)}x  ${r.singletons} one-off  ${flag}`);
     }
@@ -441,24 +457,15 @@ docs/design/design-policy-metrics.md`);
 }
 
 async function main(argv = process.argv.slice(2)): Promise<void> {
-  if (argv.includes("--help") || argv.includes("-h")) printUsage(0);
-  let json = false;
-  let advisory = false;
-  let minReuse: number | undefined;
-  let minInstances: number | undefined;
-  let storageState: string | undefined;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === "--json") json = true;
-    else if (arg === "--advisory") advisory = true;
-    else if (arg === "--fail-on-suspect") { /* accepted no-op: suspects already fail */ }
-    else if (arg === "--min-reuse") minReuse = Number.parseFloat(argv[++i] ?? "3");
-    else if (arg === "--min-instances") minInstances = Number.parseInt(argv[++i] ?? "3", 10);
-    else if (arg === "--storage-state") storageState = argv[++i];
-    else if (!arg.startsWith("-")) positional.push(arg);
-  }
-  const source = positional[0];
+  if (hasFlag(argv, "help") || hasFlag(argv, "-h")) printUsage(0);
+  // Validated at read time: `--min-reuse abc` used to become NaN, and since
+  // every `reuse >= NaN` comparison is false, the gate would have reported
+  // every role as drifting instead of saying the flag was wrong.
+  const minReuse = readNumber(argv, "min-reuse", { min: 0 });
+  const minInstances = readInt(argv, "min-instances", { min: 1 });
+  const storageState = readFlag(argv, "storage-state");
+  const json = hasFlag(argv, "json");
+  const source = readPositionals(argv, VALUE_FLAGS)[0];
   if (!source) printUsage(1);
   const report = await runDesignPolicyCheck({
     source,
@@ -468,7 +475,9 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   });
   if (json) console.log(JSON.stringify(report, null, 2));
   else console.log(formatDesignReport(report));
-  applyGateExit(report.findings.some((f) => f.severity === "suspect"), { advisory });
+  applyGateExit(report.findings.some((f) => f.severity === "suspect"), {
+    advisory: hasFlag(argv, "advisory"),
+  });
 }
 
 const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "design-policy" ||

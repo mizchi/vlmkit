@@ -19,6 +19,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { hasFlag, readAll, readFlag, readInt } from "@mizchi/vlmkit-core/arg-reader.ts";
 import {
   GATE_CONFIG_FILENAMES,
   type GateConfig,
@@ -113,8 +114,7 @@ export function formatPlan(plan: GatePlan, configPath: string): string {
   for (const job of plan.jobs) {
     if (job.pageId !== current) {
       current = job.pageId;
-      const source = plan.jobs.find((j) => j.pageId === current)!.source;
-      lines.push(`${BOLD}${current}${RESET}${source === current ? "" : ` ${DIM}${source}${RESET}`}`);
+      lines.push(`${BOLD}${current}${RESET}${job.source === current ? "" : ` ${DIM}${job.source}${RESET}`}`);
     }
     const suffix = job.appliedSuppressions.length > 0
       ? ` ${YELLOW}[+${job.appliedSuppressions.length} suppression]${RESET}`
@@ -189,12 +189,12 @@ export function formatExpiredNotice(expired: ResolvedSuppression[]): string {
 const STARTER_GATE = "check integrity";
 
 async function initConfig(args: string[]): Promise<void> {
-  const path = resolve(getFlag(args, "--path") ?? GATE_CONFIG_FILENAMES[0]!);
-  if (existsSync(path) && !args.includes("--force")) {
+  const path = resolve(readFlag(args, "path") ?? GATE_CONFIG_FILENAMES[0]!);
+  if (existsSync(path) && !hasFlag(args, "force")) {
     throw new Error(`${path} already exists (pass --force to overwrite)`);
   }
-  const patterns = args.filter((a, i) => args[i - 1] === "--pages");
-  const gates = args.filter((a, i) => args[i - 1] === "--gate");
+  const patterns = readAll(args, "pages");
+  const gates = readAll(args, "gate");
   const config: GateConfig = {
     defaults: { gates: gates.length > 0 ? gates : [STARTER_GATE] },
     pages: (patterns.length > 0 ? patterns : ["index.html"]).map((source) => ({ source })),
@@ -207,11 +207,6 @@ async function initConfig(args: string[]): Promise<void> {
   console.log(`  ${config.pages.length} page entr(ies), gates: ${config.defaults!.gates!.join(", ")}`);
   console.log(`\nNext: vlmkit gates list    (see what would run)`);
   console.log(`      vlmkit gates run     (run it)`);
-}
-
-function getFlag(args: string[], name: string): string | undefined {
-  const i = args.indexOf(name);
-  return i >= 0 ? args[i + 1] : undefined;
 }
 
 function printUsage(exitCode: number): never {
@@ -244,14 +239,14 @@ opts out.`);
 
 async function main(argv = process.argv.slice(2)): Promise<void> {
   const sub = argv[0];
-  if (!sub || argv.includes("--help") || argv.includes("-h")) printUsage(sub ? 0 : 1);
+  if (!sub || hasFlag(argv, "help") || hasFlag(argv, "-h")) printUsage(sub ? 0 : 1);
   const args = argv.slice(1);
-  const json = args.includes("--json");
+  const json = hasFlag(args, "json");
 
   if (sub === "init") return initConfig(args);
 
-  const { path, config } = await loadConfig(getFlag(args, "--config"));
-  const only = args.filter((a, i) => args[i - 1] === "--only");
+  const { path, config } = await loadConfig(readFlag(args, "config"));
+  const only = readAll(args, "only");
   const declared = resolveGatePlan(config, only.length > 0 ? { only } : {});
   // `suppressions` is an inventory of the config, so it must not depend on the
   // filesystem: a broken glob should not hide what has been silenced.
@@ -264,16 +259,16 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   }
 
   if (sub === "suppressions") {
-    const soon = Number.parseInt(getFlag(args, "--soon") ?? "30", 10);
+    const soon = readInt(args, "soon", { min: 0 }) ?? 30;
     const summary = summarizeSuppressions(plan.suppressions, soon);
     if (json) console.log(JSON.stringify({ config: path, ...summary }, null, 2));
     else console.log(formatSuppressions(plan.suppressions, soon));
-    const requireExpiry = args.includes("--require-expiry");
-    const requireOwner = args.includes("--require-owner");
+    const requireExpiry = hasFlag(args, "require-expiry");
+    const requireOwner = hasFlag(args, "require-owner");
     const problems = summary.expired
       + (requireExpiry ? summary.permanent : 0)
       + (requireOwner ? summary.unowned : 0);
-    if (problems > 0 && !args.includes("--advisory")) process.exitCode = 1;
+    if (problems > 0 && !hasFlag(args, "advisory")) process.exitCode = 1;
     return;
   }
 
@@ -282,7 +277,13 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     printUsage(1);
   }
 
-  const shard = args.includes("--shard") ? parseShard(getFlag(args, "--shard") ?? "") : undefined;
+  // Read every flag before doing any work or printing anything: a typo in
+  // --concurrency should not surface after the expiry notice, where it reads
+  // like part of the run rather than a usage error.
+  const shardSpec = readFlag(args, "shard");
+  const shard = shardSpec ? parseShard(shardSpec) : undefined;
+  const concurrency = readInt(args, "concurrency", { min: 1 });
+  const output = readFlag(args, "output");
   const sharded = shardPlan(plan, shard);
   if (sharded.jobs.length === 0) {
     throw new Error(
@@ -297,26 +298,25 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     console.error(formatExpiredNotice(sharded.expired));
     console.error("");
   }
-  const concurrencyFlag = getFlag(args, "--concurrency");
   const summary: BatchSummary = await runJobs(
     sharded.jobs.map((j) => ({ gate: j.gate, page: j.source })),
     {
-      ...(concurrencyFlag ? { concurrency: Number.parseInt(concurrencyFlag, 10) } : {}),
+      ...(concurrency !== undefined ? { concurrency } : {}),
       ...(shard ? { shard } : {}),
-      ...(getFlag(args, "--output") ? { output: getFlag(args, "--output")! } : {}),
-      quiet: args.includes("--quiet") || json,
+      ...(output ? { output } : {}),
+      quiet: hasFlag(args, "quiet") || json,
     },
   );
   const stale = sharded.expired.length;
   if (json) console.log(JSON.stringify({ config: path, expiredSuppressions: stale, ...summary }, null, 2));
   else {
-    console.log(formatBatchSummary(summary, { showOutput: args.includes("--show-output") }));
+    console.log(formatBatchSummary(summary, { showOutput: hasFlag(args, "show-output") }));
     if (stale > 0) {
       console.log("");
       console.log(`${RED}${stale} suppression(s) expired${RESET} — stale config fails the run even when the gates pass.`);
     }
   }
-  if ((summary.failed > 0 || stale > 0) && !args.includes("--advisory")) process.exitCode = 1;
+  if ((summary.failed > 0 || stale > 0) && !hasFlag(args, "advisory")) process.exitCode = 1;
 }
 
 const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "gates" ||

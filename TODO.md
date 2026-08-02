@@ -410,6 +410,32 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   出力は速度向上ではなく「平均同時実行数」を表示する
   (第一版は 5.9x と誤表示していた)。3 シャード x 並列2 は 7.8/7.8/7.6s。
 
+### セッション内リファクタ(2026-08-02)
+- [x] **共有 argv リーダー + 発見した実バグ 4 件の修正** —
+  `packages/vlmkit-core/src/arg-reader.ts`(21 テスト)。
+  `cli-args.ts` は import 時に `process.argv` を束縛しておりテスト不能・
+  ディスパッチャ経由のリーフから使えないため、argv を明示的に受ける
+  `readFlag` / `readAll` / `readNumber` / `readInt` / `readPositionals` /
+  `tokenizeCommand` を追加し、batch / gates / check design / font probe の
+  自前パーサ(4 箇所)を置換。値の欠落・次のフラグの誤食い・非数値は
+  読んだ場所で `UsageError` として失敗し、`handleCliError` が 1 行で表示する。
+  修正した実バグ:
+  (1) **NaN 並列度で何も実行せず成功扱い** — `Array.from({length: NaN})` が
+  0 レーンになり `runPool` が全ジョブを未実行のまま穴の配列を返していた。
+  `runPool` 自体でも限界値を検証。
+  (2) **`--output` のログ衝突** — basename 由来のファイル名だったため
+  `routes/a/index.html` と `routes/b/index.html` が同名になり、並行書き込みで
+  失敗レポートが片方消えていた。フルパス slug + ハッシュに変更(`jobLogName`)。
+  (3) **ゲートフラグの引用符無視** — `--manifest "copy/press kit.txt"` を
+  空白分割していたため複数引数に割れていた。`tokenizeCommand` で解決。
+  (4) **`--min-reuse` 指定時にロール表と verdict が矛盾** — 表がモジュール
+  既定値を見ていたため `COHERENT` の隣に `drift` と表示されていた。
+  実効しきい値を `report.thresholds` に載せた。
+  (5) **`defaults: {gates: []}` が検証を通り全ページ 0 ジョブ** — 空配列を
+  パースエラーにし、解決後 0 ゲートのページも例外にした。
+  `readInt("--concurrency")` が `2.5` を黙って 2 に切り捨てていた
+  parseInt バグも同時に修正(常に parseFloat で読み、整数性を別途検査)。
+
 ### Ecosystem positioning (市場調査 2026-07-29 由来)
 調査メモ: `docs/reports/2026-07-29-ai-markup-tooling-landscape.md` /
 設計: `docs/design/mcp-and-agent-expansion.md`

@@ -28,6 +28,8 @@
  * only outcome that matters; metric drift with margin to spare is noise.
  */
 import { writeFile } from "node:fs/promises";
+import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { hasFlag, readFlag, readInt, readNumber, readPositionals } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { glob } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import { resolve as resolvePath } from "node:path";
@@ -139,6 +141,9 @@ export function pairMargins(blocks: IntegrityTextBlock[], reported: Set<string>)
 }
 
 const round = (n: number) => Math.round(n * 100) / 100;
+
+/** Flags that consume the next argv entry, so fixture patterns are found. */
+const VALUE_FLAGS = ["label", "out", "font-stack", "font-face", "dpr", "viewport", "hinting"];
 
 export interface MeasureOptions {
   patterns: string[];
@@ -379,11 +384,11 @@ Examples:
 }
 
 async function main(argv = process.argv.slice(2)): Promise<void> {
-  if (argv.length === 0 || argv.includes("--help") || argv.includes("-h")) printUsage(argv.length === 0 ? 1 : 0);
+  if (argv.length === 0 || hasFlag(argv, "help") || hasFlag(argv, "-h")) printUsage(argv.length === 0 ? 1 : 0);
   const mode = argv[0];
   const rest = argv.slice(1);
   if (mode === "compare") {
-    const [fileA, fileB] = rest.filter((a) => !a.startsWith("-"));
+    const [fileA, fileB] = readPositionals(rest);
     if (!fileA || !fileB) printUsage(1);
     const { readFile } = await import("node:fs/promises");
     const a = JSON.parse(await readFile(fileA, "utf-8")) as ProbeFingerprint;
@@ -394,25 +399,16 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     return;
   }
   if (mode !== "measure") printUsage(1);
-  const patterns: string[] = [];
-  let label: string | undefined;
-  let out: string | undefined;
-  let fontStack: string | undefined;
-  let fontFace: string | undefined;
-  let dpr: number | undefined;
-  let hinting: "default" | "none" = "default";
-  let viewport: number | undefined;
-  for (let i = 0; i < rest.length; i++) {
-    const arg = rest[i]!;
-    if (arg === "--label") label = rest[++i];
-    else if (arg === "--out") out = rest[++i];
-    else if (arg === "--font-stack") fontStack = rest[++i];
-    else if (arg === "--font-face") fontFace = rest[++i];
-    else if (arg === "--dpr") dpr = Number.parseFloat(rest[++i] ?? "1");
-    else if (arg === "--hinting") hinting = (rest[++i] === "none" ? "none" : "default");
-    else if (arg === "--viewport") viewport = Number.parseInt(rest[++i] ?? "1280", 10);
-    else if (!arg.startsWith("-")) patterns.push(arg);
-  }
+  const patterns = readPositionals(rest, VALUE_FLAGS);
+  const label = readFlag(rest, "label");
+  const out = readFlag(rest, "out");
+  const fontStack = readFlag(rest, "font-stack");
+  const fontFace = readFlag(rest, "font-face");
+  // Validated, not coerced: a NaN dpr would silently render at the default and
+  // the fingerprint would claim a condition it never measured.
+  const dpr = readNumber(rest, "dpr", { min: 0.1, max: 4 });
+  const viewport = readInt(rest, "viewport", { min: 200, max: 8000 });
+  const hinting: "default" | "none" = readFlag(rest, "hinting") === "none" ? "none" : "default";
   if (patterns.length === 0) printUsage(1);
   const fingerprint = await measure({
     patterns,
@@ -440,9 +436,4 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 const isCliEntry = process.argv[1]
   ? resolvePath(process.argv[1]) === resolvePath(new URL(import.meta.url).pathname)
   : false;
-if (isCliEntry) {
-  main().catch((e) => {
-    console.error(e instanceof Error ? e.message : e);
-    process.exit(1);
-  });
-}
+if (isCliEntry) main().catch(handleCliError);
