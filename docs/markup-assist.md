@@ -141,7 +141,11 @@ the part a `grep` through npm scripts cannot give you.
 
 ## Pick your gate by task
 
-Sources are file paths or URLs throughout.
+Sources are file paths or URLs throughout. A file is loaded by navigation, so
+its relative stylesheets, images and scripts resolve — if your CSS lives in
+`style.css` next to the page, the gates measure the page as it actually renders
+(this was not true before 2026-08-02; see
+[`reports/2026-08-02-external-asset-load-defect.md`](./reports/2026-08-02-external-asset-load-defect.md)).
 
 ### I wrote or edited a page — find defects, no reference needed
 

@@ -30,6 +30,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, type Page } from "playwright";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 
 export interface DesignTokenConfig {
   radius?: number[];
@@ -234,7 +235,7 @@ export async function runDesignTokens(
     if (isUrl(options.source)) {
       await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
     } else {
-      await page.setContent(html!, { waitUntil: "networkidle" });
+      await page.goto(sourceToUrl(options.source), { waitUntil: "networkidle", timeout: 30000 });
     }
     samples = await page.evaluate(SAMPLE_SCRIPT) as RawSample[];
     await page.close();

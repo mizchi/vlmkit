@@ -23,10 +23,11 @@
  * Usage:
  *   vrt a11y-contrast <html>
  */
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { openSource } from "@mizchi/vlmkit-core/page-open.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { evaluateA11yContrast } from "./markup-core-a11y-contrast.ts";
@@ -210,7 +211,6 @@ export async function runA11yContrast(
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
   const htmlPath = resolve(options.htmlPath);
-  const html = await readFile(htmlPath, "utf-8");
   const viewport = options.viewport ?? { width: 1280, height: 900 };
   const minLen = options.minTextLength ?? 1;
 
@@ -218,8 +218,12 @@ export async function runA11yContrast(
   let samples: A11yContrastRawSample[];
   let screenshotPath: string;
   try {
-    const page = await browser.newPage({ viewport });
-    await page.setContent(html, { waitUntil: "networkidle" });
+    // Navigate rather than `setContent(readFile(...))`: the latter leaves the
+    // document on `about:blank`, so a relative `<link rel="stylesheet">` never
+    // loads and the gate measures unstyled markup. Measured on
+    // fixtures/external-assets: it reported 0 contrast failures where the same
+    // CSS inlined reported 1.
+    const { page } = await openSource(browser, htmlPath, { viewport, settleMs: 0 });
     await page.addStyleTag({
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });

@@ -29,6 +29,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, type Page } from "playwright";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { openSource } from "@mizchi/vlmkit-core/page-open.ts";
 
 export interface I18nStressOptions {
   htmlPath: string;
@@ -174,8 +175,9 @@ export async function runI18nStress(
 
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({ viewport });
-    await page.setContent(html, { waitUntil: "networkidle" });
+    // Navigate: inflating text on an unstyled document measured a layout that
+    // does not exist (card height 21->86 unstyled vs 95->185 styled).
+    const { page } = await openSource(browser, htmlPath, { viewport, settleMs: 0 });
     await page.addStyleTag({
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });

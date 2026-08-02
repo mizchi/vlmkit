@@ -24,6 +24,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, type Page } from "playwright";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, RED, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { openSource } from "@mizchi/vlmkit-core/page-open.ts";
 import {
   requiredTouchSide,
   touchTargetBelowRequired,
@@ -198,13 +199,12 @@ export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchRep
   let samples: A11yTouchRawSample[];
   let screenshotPath: string;
   try {
-    const page = await browser.newPage({ viewport });
-    if (isUrl(options.source)) {
-      await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
-    } else {
-      const html = await readFile(resolve(options.source), "utf-8");
-      await page.setContent(html, { waitUntil: "networkidle" });
-    }
+    // One load path for files and URLs. The file branch used to
+    // `setContent(readFile(...))`, which drops the document's base URL: on
+    // fixtures/external-assets that hid the 20x20 tap target entirely (the
+    // element gets its size from CSS) while reporting three styled-and-compliant
+    // buttons as failures at their unstyled sizes.
+    const { page } = await openSource(browser, options.source, { viewport, settleMs: 0 });
     await page.addStyleTag({
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });

@@ -456,6 +456,41 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   `vlmkit.ts` の catch も `handleCliError` 経由にし、リーフが
   モジュールスコープで argv を読む場合でも 1 行で表示されるようにした。
 
+### 共有ページオープン + 外部アセット未解決バグ(2026-08-02)
+- [x] **6 ゲートが「別のドキュメント」を測っていた** — リファクタ候補の
+  棚卸し中に発見。`page.setContent(await readFile(file))` は base URL が
+  `about:blank` になるため相対 `<link rel="stylesheet">` が一切読まれず、
+  実プロジェクト(CSS を外部ファイルに置く)では**無スタイルの DOM を測って
+  合格**していた。`page.goto(pathToFileURL(file))` との差。
+  ファイル一覧では 10 本だったが、実測すると壊れていたのは **6 本**
+  (a11y contrast / a11y touch / check tokens / check theme / stress i18n /
+  stress media)。残り 4 本(a11y focus / breakpoints / copy / design)は
+  元から正しく navigate していた — 仮定ではなく計測で確定させた。
+  特に 2 件は「件数が減る」では済まない:
+  **a11y touch は判定が反転** — CSS でサイズが付く 20x20 のタップ標的を
+  そもそも候補にできず(無スタイルでは 0 サイズの inline `<a>`)、
+  一方でスタイル適用後は準拠しているボタン 3 個を無スタイル寸法で
+  「小さすぎる」と報告していた。真の 1 件を見逃して偽の 3 件を作る状態。
+  **stress media は pass/fail が反転** — forced-colors が
+  無スタイルで `Δ 0.36% → 失敗`、CSS 適用で `Δ 1.46% → 合格`。
+  修正: `packages/vlmkit-core/src/page-open.ts`(`openSource` / `openHtml` /
+  `settlePage`、auth-state と redirect 記述も統合)。
+  `openHtml` は「`<base>` 注入」ではなく**先に navigate してから setContent**。
+  `<base>` 注入は実測で効かない(setContent のドキュメントは opaque origin で
+  Chromium が `file://` サブリソースを遮断 — 実測 rgb(0,0,0) vs rgb(4,5,6))ため、
+  効かないと計測できた技法は残さず削除した。
+  回帰ゲート: `fixtures/external-assets/`(全欠陥を `style.css` にのみ宣言)+
+  `packages/vlmkit-markup/src/external-assets.test.ts`(インライン化した双子と
+  同一 verdict を要求する差分アサーション)。
+  レポート: `docs/reports/2026-08-02-external-asset-load-defect.md`。
+  執筆中に踏んだ罠 2 件も記録: (a) `${o.selector}` が実際は `path` で
+  両辺 undefined になる**空アサーション**(tsc が検出、テスト実行では通る)、
+  (b) cwd 相対のフィクスチャパスで `pnpm --filter` 実行時にスイート全体が
+  ENOENT で落ちるのに**サマリは `0 fail` と表示**していた。
+- [ ] **ページオープン統一の残り半分** — `chromium.launch` は 44 箇所、
+  `waitUntil` は networkidle 72 / load 8 / domcontentloaded 1 のまま。
+  今回は「ロード方式が verdict を変えるゲート」だけを移行した。
+
 ### Ecosystem positioning (市場調査 2026-07-29 由来)
 調査メモ: `docs/reports/2026-07-29-ai-markup-tooling-landscape.md` /
 設計: `docs/design/mcp-and-agent-expansion.md`

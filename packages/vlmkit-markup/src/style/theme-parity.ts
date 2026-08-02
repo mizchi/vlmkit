@@ -27,6 +27,7 @@ import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
 import { chromium } from "playwright";
+import { openSource } from "@mizchi/vlmkit-core/page-open.ts";
 import { extractComponentsFromFile, type ComponentBbox } from "../component/component-bbox.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
@@ -129,8 +130,13 @@ export async function runThemeParity(
   const browser = await chromium.launch();
   try {
     // Light render.
-    const lightPage = await browser.newPage({ viewport, colorScheme: "light" });
-    await lightPage.setContent(html, { waitUntil: "networkidle" });
+    // Navigate, so an external stylesheet actually participates in the theme
+    // comparison — the whole point of the gate.
+    const { page: lightPage } = await openSource(browser, htmlPath, {
+      viewport,
+      colorScheme: "light",
+      settleMs: 0,
+    });
     // Disable transitions/animations for deterministic capture (cf.
     // Subagent H dogfood, same root cause as multi-state state diffs).
     await lightPage.addStyleTag({
@@ -144,8 +150,11 @@ export async function runThemeParity(
     await lightPage.close();
 
     // Dark render.
-    const darkPage = await browser.newPage({ viewport, colorScheme: "dark" });
-    await darkPage.setContent(html, { waitUntil: "networkidle" });
+    const { page: darkPage } = await openSource(browser, htmlPath, {
+      viewport,
+      colorScheme: "dark",
+      settleMs: 0,
+    });
     await darkPage.addStyleTag({
       content: `*, *::before, *::after {
         transition: none !important;
