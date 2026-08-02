@@ -240,13 +240,13 @@ vlmkit snapshot report                         # Render snapshot-report.json as 
 ### Check (gates: a11y / tokens / design / theme / perf / drift)
 
 ```bash
-vlmkit check a11y contrast <html>              # WCAG AA contrast scan
+vlmkit check a11y contrast <html|url>          # WCAG AA contrast scan
 vlmkit check a11y touch    <html|url>          # Touch target size (WCAG 2.5.5 / 2.5.8)
 vlmkit check a11y focus    <html|url>          # Tab order vs visual order
 vlmkit check palette       <target.png> [current.png]  # Dominant colors, or palette diff (missing/extra hex)
-vlmkit check tokens        <html>              # radius/spacing/z-index/shadow scale conformance (declared scale)
+vlmkit check tokens        <html|url>          # radius/spacing/z-index/shadow scale conformance (declared scale)
 vlmkit check design        <html|url>          # coherence of the scale the page itself implies (no config)
-vlmkit check theme         <html>              # prefers-color-scheme dark / unthemed components
+vlmkit check theme         <html|url>          # prefers-color-scheme dark / unthemed components
 vlmkit check perf          <html|url>          # Web Vitals (CLS / LCP / FCP)
 vlmkit check drift component <html> --selector .card
 vlmkit check drift pages     --selector .footer --files A.html B.html C.html

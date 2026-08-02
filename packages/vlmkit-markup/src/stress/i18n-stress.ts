@@ -23,13 +23,13 @@
  * Usage:
  *   vrt i18n-stress <html> [--inflate 1.4]
  */
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { writeFile, mkdir } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, type Page } from "playwright";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { openSource } from "@mizchi/vlmkit-core/page-open.ts";
+import { openSource, resolveSource } from "@mizchi/vlmkit-core/page-open.ts";
 
 export interface I18nStressOptions {
   htmlPath: string;
@@ -167,8 +167,9 @@ export async function runI18nStress(
 ): Promise<I18nStressReport> {
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
-  const htmlPath = resolve(options.htmlPath);
-  const html = await readFile(htmlPath, "utf-8");
+  // A URL is a valid source now that loading goes through `openSource`;
+  // `resolve()` would have turned it into `<cwd>/http:/host/page.html`.
+  const htmlPath = resolveSource(options.htmlPath);
   const inflateFactor = options.inflateFactor ?? 1.4;
   const viewport = options.viewport ?? { width: 1280, height: 900 };
   const wrapThreshold = options.wrapThreshold ?? 0.15;

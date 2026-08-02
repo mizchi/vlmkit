@@ -30,6 +30,18 @@ import { describeRedirect } from "./navigation-redirect.ts";
 
 export const isUrlSource = (source: string): boolean => /^https?:\/\//.test(source);
 
+/**
+ * Normalize a source for storage and display: an absolute path for a file, the
+ * URL untouched for a URL.
+ *
+ * `resolve()` alone mangles a URL into a path — `resolve("http://x/p.html")`
+ * yields `<cwd>/http:/x/p.html`, which then fails as "file not found" and tells
+ * the caller nothing about what actually went wrong.
+ */
+export function resolveSource(source: string): string {
+  return isUrlSource(source) ? source : resolve(source);
+}
+
 /** File path or URL → a URL Playwright can navigate to. */
 export function sourceToUrl(source: string): string {
   return isUrlSource(source) ? source : pathToFileURL(resolve(source)).href;

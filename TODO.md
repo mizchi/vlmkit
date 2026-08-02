@@ -487,6 +487,17 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   両辺 undefined になる**空アサーション**(tsc が検出、テスト実行では通る)、
   (b) cwd 相対のフィクスチャパスで `pnpm --filter` 実行時にスイート全体が
   ENOENT で落ちるのに**サマリは `0 fail` と表示**していた。
+- [x] **file:// と http:// の verdict 一致確認 + URL 対応の穴埋め** —
+  同一ページをローカル HTTP で配信して 10 ゲートを A/B、**全ゲート一致**
+  (このクラスは元からクリーンだった)。ただし副産物として
+  `check a11y contrast` / `check theme` / `check tokens`(＋`stress i18n`)が
+  URL を渡すと `resolve()` でパスに変形し
+  `<cwd>/http:/host/page.html` として「file not found」になる穴を発見。
+  `openSource` 移行で読み込みは既に URL 対応済みだったので、
+  `resolveSource()`(URL はそのまま / パスだけ resolve)を core に追加し、
+  移行で**デッドコードになっていた** `readFile` を削除して 4 ゲートを
+  URL 対応にした。`check a11y contrast http://localhost:.../page.html` が
+  1.92:1 を正しく報告することを確認。
 - [ ] **ページオープン統一の残り半分** — `chromium.launch` は 44 箇所、
   `waitUntil` は networkidle 72 / load 8 / domcontentloaded 1 のまま。
   今回は「ロード方式が verdict を変えるゲート」だけを移行した。

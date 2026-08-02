@@ -27,7 +27,7 @@ import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
 import { chromium } from "playwright";
-import { openSource } from "@mizchi/vlmkit-core/page-open.ts";
+import { openSource, resolveSource } from "@mizchi/vlmkit-core/page-open.ts";
 import { extractComponentsFromFile, type ComponentBbox } from "../component/component-bbox.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
@@ -122,8 +122,9 @@ export async function runThemeParity(
 ): Promise<ThemeParityReport> {
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
-  const htmlPath = resolve(options.htmlPath);
-  const html = await readFile(htmlPath, "utf-8");
+  // A URL is a valid source now that loading goes through `openSource`;
+  // `resolve()` would have turned it into `<cwd>/http:/host/page.html`.
+  const htmlPath = resolveSource(options.htmlPath);
   const viewport = options.viewport ?? { width: 1280, height: 900 };
   const unchangedThreshold = options.unchangedColorThreshold ?? 16;
 
