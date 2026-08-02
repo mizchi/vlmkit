@@ -259,6 +259,21 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 
 ## Backlog (prioritize after evaluation)
 
+### 美的/デザインポリシー指標(2026-08-01 feasibility study)
+検討記録: `docs/design/design-policy-metrics.md`、計測スクリプト:
+`src/util/design-policy-probe.mjs`
+- [ ] **`check design` — 推論したデザインシステムへの適合検査** —
+  実測で判明した唯一の強い判別軸は **component-signature uniformity**。
+  設計済みページは MDN 1署名/8ボタン、web.dev 1/5 に対し、
+  エージェント生成は s19 6/7、s15 3/6、s16 3/8。
+  逆に **4px グリッド適合は判別に使えない**(エージェントは 0.86-1.00 で
+  MDN 0.857 / web.dev 0.716 を上回る — LLM は丸い数字を必ず使うため)。
+  所見: 生成マークアップは「局所的には整っているが全体として不統一」。
+  findings 案: component-drift / scale-outlier / rail-drift /
+  type-scale-sprawl。既定は warn(taste を fail にしない)。
+  未解決: role 推論の範囲、signature の粒度(height を含めるか)、
+  最小インスタンス数の床、状態(disabled/pressed)の除外方法。
+
 ### introduce.md 評価ループ残渣(2026-08-01 rounds 4-9 由来)
 9 ラウンドのブラインドペルソナ評価で「ドキュメントでは解決できない」
 と分類された機能要求。レポート: `docs/reports/2026-08-01-introduce-doc-eval-loop.md`
