@@ -1,0 +1,53 @@
+{
+  "//": "Worked example for `vlmkit gates`. Copy to your repo root as vlmkit.gates.json. Docs: docs/cli-reference.md#gates-config",
+
+  "defaults": {
+    "//": "Gates every page gets unless it overrides `gates`. `extraGates` adds on top.",
+    "gates": [
+      "check integrity",
+      "check breakpoints --sweep",
+      "check design"
+    ],
+    "//suppressions": "Default-scope suppressions apply to every page. Use sparingly — a repo-wide exemption is the hardest kind to revisit.",
+    "suppressions": [
+      {
+        "gate": "check copy",
+        "flag": "--allow-invisible visually-hidden",
+        "reason": "Every page carries the same sr-only skip link; the manifest lists it because legal reviews the wording.",
+        "owner": "web-platform",
+        "expires": "2027-01-31"
+      }
+    ]
+  },
+
+  "pages": [
+    {
+      "id": "home",
+      "source": "routes/index.html",
+      "extraGates": ["check copy --manifest copy/home.txt"]
+    },
+    {
+      "//": "A glob expands to one entry per file; ids become `docs:routes/docs/a.html` so --only docs still selects the group.",
+      "id": "docs",
+      "source": "routes/docs/**/*.html",
+      "gates": ["check integrity", "check copy --manifest copy/docs.txt"]
+    },
+    {
+      "id": "checkout",
+      "source": "https://staging.example.com/checkout",
+      "extraGates": [
+        "check interactions",
+        "verify flow --flow flows/checkout.json"
+      ],
+      "suppressions": [
+        {
+          "gate": "check design",
+          "flag": "--min-reuse 2",
+          "reason": "Payment-method tiles are deliberately styled per provider (brand requirement), so button styles do not consolidate here.",
+          "owner": "payments",
+          "expires": "2026-11-30"
+        }
+      ]
+    }
+  ]
+}

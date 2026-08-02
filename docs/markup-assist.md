@@ -124,6 +124,21 @@ The verdict per page is that gate run's exit code, so anything with the
 standard exit contract is batchable. Measured concurrency / sharding budget:
 [`reports/2026-08-02-batch-runner-ci-budget.md`](./reports/2026-08-02-batch-runner-ci-budget.md).
 
+Past a handful of pages, put the plan in a file instead of in shell history:
+
+```bash
+vlmkit gates init --pages "routes/**/*.html" --gate "check integrity"
+vlmkit gates list            # what would run, exact commands
+vlmkit gates run --shard 1/3
+vlmkit gates suppressions    # every silenced check, with reason/owner/expiry
+```
+
+`vlmkit.gates.json` is also where suppressions belong (`--allow-invisible`,
+loosened thresholds). A suppression must carry a `reason`, and once its
+`expires` date passes it stops being applied — the gate runs unmuted and the
+run fails, so a stale exemption gets noticed instead of accumulating. That is
+the part a `grep` through npm scripts cannot give you.
+
 ## Pick your gate by task
 
 Sources are file paths or URLs throughout.

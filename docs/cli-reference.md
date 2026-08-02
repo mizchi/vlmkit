@@ -22,7 +22,7 @@ for options.
 | `vlmkit snapshot` | `[<url>...]`, `approve`, `fix-prompt`, `stability`, `flipbook`, `report` |
 | `vlmkit migration` | `compare`, `blind`, `subagent` |
 | `vlmkit workflow` | `init`, `capture`, `verify`, `approve`, `graph`, `affected`, `introspect`, `spec-verify`, `expect` |
-| Standalone | `vlmkit batch`, `vlmkit mcp`, `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit markup-loop`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
+| Standalone | `vlmkit batch`, `vlmkit gates`, `vlmkit mcp`, `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit markup-loop`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
 
 The single-token commands from 0.4.x (`vrt compare`, `vrt png-diff`,
 `vrt theme-parity`, …) remain as deprecation shims that forward to
@@ -269,6 +269,22 @@ vlmkit batch --gate "check integrity" "routes/**/*.html" --shard 2/3
 Measured concurrency / sharding numbers and the reason the summary reports
 "jobs in flight" rather than a speedup:
 [`docs/reports/2026-08-02-batch-runner-ci-budget.md`](./reports/2026-08-02-batch-runner-ci-budget.md).
+
+### Gates config (per-page gate sets + auditable suppressions)
+
+```bash
+vlmkit gates init --pages "routes/**/*.html" --gate "check integrity"
+vlmkit gates list            # resolved page x gate plan, exact commands, no run
+vlmkit gates run             # run it (same pool/sharding as `batch`)
+vlmkit gates suppressions    # every silenced check: reason, owner, expiry, days left
+```
+
+`vlmkit.gates.json` holds which gates run on which pages plus every
+suppression. Two rules make it reviewable: a suppression **must** carry a
+`reason` (parsing fails without one), and an **expired** suppression stops
+being applied — the gate it silenced runs unmuted and the run exits non-zero,
+because a stale entry is a config defect even when the page now passes.
+Worked example: [`examples/vlmkit.gates.json`](../examples/vlmkit.gates.json).
 
 ### Build / Scan / Inspect / Stress (markup-assistance)
 

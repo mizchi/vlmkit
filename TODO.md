@@ -284,10 +284,26 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 ### introduce.md 評価ループ残渣(2026-08-01 rounds 4-9 由来)
 9 ラウンドのブラインドペルソナ評価で「ドキュメントでは解決できない」
 と分類された機能要求。レポート: `docs/reports/2026-08-01-introduce-doc-eval-loop.md`
-- [ ] **中央ゲート設定ファイル** — ページごとのゲートセット +
-  `--allow-invisible` 承認を集約する reviewed config(現状は npm scripts
-  慣行、~20 ページで破綻とドキュメントに明記済み)。suppression 棚卸しが
-  grep 頼みなのが tech lead ペルソナの一貫した不満。
+- [x] **中央ゲート設定ファイル** — 2026-08-02 実装: `vlmkit.gates.json` +
+  `vlmkit gates init|list|run|suppressions`
+  (`packages/vlmkit-core/src/gate-config.ts` = 純粋なパース/解決、
+  `src/cli/commands/gates-cli.ts` = CLI、計 37 テスト)。
+  ページごとの gates / extraGates / suppressions を 1 ファイルに集約し、
+  実行は `batch` の `runJobs` を再利用(プール・計測・ログ・シャーディング共通)。
+  レビュー可能にするための決定 2 点:
+  (1) **suppression には reason 必須**(無いとパース失敗)。フラグだけでは
+  「何を黙らせたか」は残るが「なぜ」が残らず、1 年後に再承認される。
+  (2) **期限切れ suppression は適用しない** — 黙らせていたゲートが素で走り、
+  ページが通っても run は非ゼロ終了(stale なエントリ自体が config の欠陥)。
+  期限切れは実行**前**に別フォーマットで表示し、
+  「これは新規リグレッションではない」と明示する。
+  `gates suppressions` が grep 頼みの棚卸しへの回答(reason/owner/期限/残日数、
+  `--require-expiry` / `--require-owner` で締められる)。
+  glob source は 1 ファイル 1 ジョブに展開し、id は `docs:routes/a.html` の形で
+  config 名を保持(`--only` とページ単位シャーディングがそのまま効く)。
+  シャーディングはページ単位 — 同一ページのゲートを別ランナーに割ると
+  ログが 2 箇所に散るだけで得がない。
+  例: `examples/vlmkit.gates.json`。
 - [x] **cookie / storage-state 注入** — 2026-08-01 完了:
   `--storage-state <file>` + `VLMKIT_STORAGE_STATE`、URL 対応 9 ゲート
   全部に配線。検証は事前に厳格(不在/不正 JSON/形状違い/空 state は

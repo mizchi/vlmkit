@@ -179,15 +179,17 @@ function runJob(job: BatchJob, cliEntry: string): Promise<BatchJobResult> {
 
 const slug = (s: string) => s.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
 
-export async function runBatch(options: BatchOptions): Promise<BatchSummary> {
-  const pages = shardPages(await resolvePages(options.patterns), options.shard);
-  if (pages.length === 0) {
-    throw new Error(
-      `No pages matched: ${options.patterns.join(", ")}`
-      + (options.shard ? ` (after --shard ${options.shard.index}/${options.shard.total})` : ""),
-    );
-  }
-  const jobs = buildJobs(options.gates, pages);
+/**
+ * Run an explicit job list. Split out from `runBatch` so a caller that already
+ * knows its (gate, page) pairs — `vlmkit gates run`, where the pairing comes
+ * from a config file rather than a cross product — reuses the same pool,
+ * timing, log capture and summary instead of reimplementing them.
+ */
+export async function runJobs(
+  jobs: BatchJob[],
+  options: Omit<BatchOptions, "gates" | "patterns"> = {},
+): Promise<BatchSummary> {
+  if (jobs.length === 0) throw new Error("No jobs to run");
   const concurrency = options.concurrency ?? defaultConcurrency();
   const cliEntry = cliEntryPath(options.cliEntry);
   const started = Date.now();
@@ -222,16 +224,27 @@ export async function runBatch(options: BatchOptions): Promise<BatchSummary> {
   }
   appendRunLedger({
     tool: "batch",
-    source: options.patterns.join(" "),
+    source: [...new Set(jobs.map((j) => j.page))].join(" ").slice(0, 200),
     headline: {
-      gates: options.gates.length,
-      pages: pages.length,
+      gates: new Set(jobs.map((j) => j.gate)).size,
+      pages: new Set(jobs.map((j) => j.page)).size,
       failed: summary.failed,
       wallMs: summary.wallMs,
       concurrency,
     },
   });
   return summary;
+}
+
+export async function runBatch(options: BatchOptions): Promise<BatchSummary> {
+  const pages = shardPages(await resolvePages(options.patterns), options.shard);
+  if (pages.length === 0) {
+    throw new Error(
+      `No pages matched: ${options.patterns.join(", ")}`
+      + (options.shard ? ` (after --shard ${options.shard.index}/${options.shard.total})` : ""),
+    );
+  }
+  return runJobs(buildJobs(options.gates, pages), options);
 }
 
 export function formatBatchSummary(summary: BatchSummary, options: { showOutput?: boolean } = {}): string {

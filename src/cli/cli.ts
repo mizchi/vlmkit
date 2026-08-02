@@ -134,6 +134,7 @@ const SPECS: Record<string, Spec> = {
   presenceMatrix: spec("presence-matrix", () => import("./commands/presence-matrix-cli.ts")),
   compareRuns: spec("compare-runs-cli", () => import("./commands/compare-runs-cli.ts")),
   batch: spec("batch", () => import("./commands/batch-cli.ts")),
+  gates: spec("gates", () => import("./commands/gates-cli.ts")),
   componentFromImage: spec("component-from-image", () => import("@mizchi/vlmkit-markup/component/component-from-image.ts")),
   contractIntrospect: spec("contract-introspect", () => import("@mizchi/vlmkit-markup/contract/introspect-contract.ts")),
   contractValidate: spec("contract-validate", () => import("@mizchi/vlmkit-markup/contract/validate-contract.ts")),
@@ -423,6 +424,8 @@ REPAIR
 RUN GATES OVER A WHOLE SITE
   batch --gate "<gate>" <glob...>     every matched page in parallel; --shard i/n
                                       for CI runners, --output for per-job logs
+  gates init|list|run                 same, from one reviewed vlmkit.gates.json
+  gates suppressions                  every silenced check with reason/owner/expiry
 
 FOR CODING AGENTS AND PIPELINES
   mcp                                 MCP server exposing the gates (stdio)
@@ -541,6 +544,10 @@ Run \`vlmkit <command> --help\` for options; most gates take --json and
   cli.command("batch [...args]", "Run gates over many pages in parallel (glob, sharding, per-job timing)")
     .allowUnknownOptions()
     .action(async () => delegate(SPECS.batch, passThrough(argv, ["batch"])));
+
+  cli.command("gates [...args]", "One reviewed config for per-page gate sets + auditable suppressions")
+    .allowUnknownOptions()
+    .action(async () => delegate(SPECS.gates, passThrough(argv, ["gates"])));
 
   cli.command("manifest [...args]", "Author / edit approval.json manifests")
     .allowUnknownOptions()
