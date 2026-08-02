@@ -358,9 +358,22 @@ export interface IntegrityTextBlock {
 }
 
 export interface TextCollisionOptions {
-  /** Minimum overlap on each axis (px) before a pair is considered. Default 6. */
+  /** Minimum horizontal ink overlap (px) before a pair is considered. Default 6. */
   minOverlapPx?: number;
-  /** Overlap area / smaller-block area ratio to count as collision. Default 0.25. */
+  /**
+   * Vertical ink overlap as a fraction of the SHORTER block's ink height.
+   * Default 0.5 — the two glyph bands must genuinely sit on top of each
+   * other, not merely graze.
+   *
+   * This replaced an overlap-area / smaller-block-area ratio (0.25), which
+   * measured the wrong thing: the corpus in
+   * fixtures/collision-fp-corpus shows a real 25x12px graze scoring 0.172
+   * by area while a legitimate `line-height: 1` stack scores 0.077 and a
+   * designed pull-up 0.137 — overlapping populations. By ink fraction the
+   * same three are 1.000 / 0.077 / 0.137: a 7x gap around this threshold.
+   */
+  minInkOverlapFraction?: number;
+  /** @deprecated Superseded by minInkOverlapFraction; accepted and ignored. */
   minOverlapRatio?: number;
   maxFindings?: number;
 }
@@ -375,7 +388,7 @@ export function findTextCollisions(
   options: TextCollisionOptions = {},
 ): { findings: IntegrityFinding[]; exempted: IntegrityExemption[] } {
   const minPx = options.minOverlapPx ?? 6;
-  const minRatio = options.minOverlapRatio ?? 0.25;
+  const minInkFraction = options.minInkOverlapFraction ?? 0.5;
   const maxFindings = options.maxFindings ?? 12;
   const raw: { a: IntegrityTextBlock; b: IntegrityTextBlock; ox: number; oy: number; area: number }[] = [];
   const exempted: IntegrityExemption[] = [];
@@ -403,14 +416,15 @@ export function findTextCollisions(
         o.x <= p.x && o.y <= p.y && o.x + o.width >= p.x + p.width && o.y + o.height >= p.y + p.height;
       if (contains(a, b) || contains(b, a)) continue;
       const area = ox * oy;
-      // Both sides of the ratio must use the SAME units. Measuring overlap
-      // on the ink band while dividing by the box area silently tightened
-      // the gate (a real collision fell from 0.32 to 0.19 and vanished), so
-      // the denominator is the ink band too.
-      const aInkArea = a.width * Math.max(1, a.height - 2 * aInk);
-      const bInkArea = b.width * Math.max(1, b.height - 2 * bInk);
-      const smaller = Math.min(aInkArea, bInkArea);
-      if (smaller <= 0 || area / smaller < minRatio) continue;
+      // Require the glyph bands to genuinely intersect vertically, measured
+      // against the shorter block's ink height. An area ratio cannot express
+      // this: a real graze and a designed negative-leading stack land in the
+      // same range by area, but are 1.000 vs 0.077-0.137 by ink fraction.
+      const minInkHeight = Math.min(
+        Math.max(1, a.height - 2 * aInk),
+        Math.max(1, b.height - 2 * bInk),
+      );
+      if (oy < Math.max(2, minInkFraction * minInkHeight)) continue;
 
       const pair = { a, b, ox, oy: Math.round(oy * 10) / 10, area };
       if (a.ariaHidden || b.ariaHidden) {

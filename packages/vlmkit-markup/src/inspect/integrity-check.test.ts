@@ -523,6 +523,39 @@ describe("S14c false-positive audit", () => {
     );
   });
 
+  // The second half of the ink-extents work (fixtures/collision-fp-corpus):
+  // a graze — a few characters overlapping across the FULL ink height — was
+  // below the old overlap-area ratio (0.172 vs a 0.25 floor) and went
+  // unreported, while a legitimate line-height:1 stack scored 0.077 and a
+  // designed pull-up 0.137. By ink-overlap FRACTION the same three are
+  // 1.000 / 0.077 / 0.137, so the gate now measures that instead.
+  test("a character-level graze is reported; legitimate stacks stay clean", { timeout: 120_000 }, async () => {
+    const graze = page("ink-graze.html", `
+      <div style="position:relative;height:40px;font:16px ui-monospace,monospace">
+        <span style="position:absolute;left:0px;top:10px;white-space:nowrap">Total: 1,240,000 EUR</span>
+        <span style="position:absolute;left:168px;top:10px;white-space:nowrap">Refunds: 80 EUR</span>
+      </div>`);
+    const hit = await runIntegrityCheck({ source: graze, viewports: ONE_VIEWPORT });
+    assert.equal(
+      hit.findings.filter((f) => f.kind === "text-collision").length, 1,
+      JSON.stringify(hit.findings.map((f) => `${f.kind} ${f.selector}`)),
+    );
+
+    // A solid-set stack (line-height 1, tall metrics) overlaps line boxes by
+    // construction and must stay clean.
+    const solid = page("ink-solid.html", `
+      <div style="font:24px/1 'Noto Sans','DejaVu Sans',Verdana,sans-serif;max-width:560px">
+        <p style="margin:0">Line one of a block set solid.</p>
+        <p style="margin:0">Line two directly beneath it.</p>
+        <p style="margin:0">Line three completes the stack.</p>
+      </div>`);
+    const clean = await runIntegrityCheck({ source: solid, viewports: ONE_VIEWPORT });
+    assert.equal(
+      clean.findings.filter((f) => f.kind === "text-collision").length, 0,
+      JSON.stringify(clean.findings.map((f) => `${f.kind} ${f.selector}`)),
+    );
+  });
+
   test("maxFindings caps text-collision rows (Codex #100 P2)", { timeout: 120_000 }, async () => {
     const rows = Array.from({ length: 5 }, (_, i) =>
       `<p style="position:absolute;top:${20 + i * 40}px;left:20px;width:220px;margin:0">Row ${i} left column text</p>
