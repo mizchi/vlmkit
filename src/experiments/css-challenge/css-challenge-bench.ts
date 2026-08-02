@@ -76,7 +76,8 @@ import {
   type PrescannerTrialResolution,
 } from "@mizchi/vlmkit-capture/prescanner.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "@mizchi/vlmkit-core/terminal-colors.ts";
-import { args } from "@mizchi/vlmkit-core/cli-args.ts";
+import { getRawArgs } from "@mizchi/vlmkit-core/cli-args.ts";
+import { hasFlag, readAll, readFlag, readInt } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 
 // ---- Config ----
@@ -98,38 +99,30 @@ export interface CssChallengeBenchCliOptions {
   enableLlm: boolean;
 }
 
+/**
+ * A fourth hand-rolled copy of the same reader used to live here, and this one
+ * fed the bench's own `trials` / `start-seed`: `--trials abc` became `NaN`
+ * trials, i.e. a benchmark reporting numbers from a loop that never ran the
+ * requested count. It now goes through `arg-reader`, which rejects that.
+ */
 export function parseCssChallengeBenchArgs(cliArgs: string[]): CssChallengeBenchCliOptions {
-  function getCliArg(name: string, fallback: string): string {
-    const idx = cliArgs.indexOf(`--${name}`);
-    return idx >= 0 && cliArgs[idx + 1] ? cliArgs[idx + 1] : fallback;
-  }
-  function getCliArgValues(name: string): string[] {
-    const values: string[] = [];
-    for (let i = 0; i < cliArgs.length; i++) {
-      if (cliArgs[i] === `--${name}` && cliArgs[i + 1]) values.push(cliArgs[i + 1]);
-    }
-    return values;
-  }
-  function hasCliFlag(name: string): boolean {
-    return cliArgs.includes(`--${name}`);
-  }
-
+  const str = (name: string, fallback: string): string => readFlag(cliArgs, name) || fallback;
   return {
-    trials: parseInt(getCliArg("trials", "20"), 10),
-    startSeed: parseInt(getCliArg("start-seed", "1"), 10),
-    saveDb: !hasCliFlag("no-db"),
-    fixtureArgs: getCliArgValues("fixture"),
-    backend: getCliArg("backend", "chromium") as BenchBackend,
-    approvalPath: getCliArg("approval", ""),
-    strict: hasCliFlag("strict"),
-    suggestApproval: hasCliFlag("suggest-approval"),
-    outputRoot: getCliArg("output-root", CSS_BENCH_OUTPUT_ROOT),
-    mode: getCliArg("mode", "property") as ChallengeMode,
-    enableLlm: !hasCliFlag("no-llm"),
+    trials: readInt(cliArgs, "trials", { min: 1 }) ?? 20,
+    startSeed: readInt(cliArgs, "start-seed", { min: 0 }) ?? 1,
+    saveDb: !hasFlag(cliArgs, "no-db"),
+    fixtureArgs: readAll(cliArgs, "fixture"),
+    backend: str("backend", "chromium") as BenchBackend,
+    approvalPath: str("approval", ""),
+    strict: hasFlag(cliArgs, "strict"),
+    suggestApproval: hasFlag(cliArgs, "suggest-approval"),
+    outputRoot: str("output-root", CSS_BENCH_OUTPUT_ROOT),
+    mode: str("mode", "property") as ChallengeMode,
+    enableLlm: !hasFlag(cliArgs, "no-llm"),
   };
 }
 
-const CLI_OPTIONS = parseCssChallengeBenchArgs(args);
+const CLI_OPTIONS = parseCssChallengeBenchArgs(getRawArgs());
 const TRIALS = CLI_OPTIONS.trials;
 const START_SEED = CLI_OPTIONS.startSeed;
 const SAVE_DB = CLI_OPTIONS.saveDb;

@@ -14,10 +14,12 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { listModels, resolveModel, createVlmClient, type VlmModel, type VlmResponse } from "@mizchi/vlmkit-ai/vlm-client.ts";
-import { getArg, hasFlag, getPositionalArgs } from "@mizchi/vlmkit-core/cli-args.ts";
+import { getArg, getFloatArg, getIntArg, hasFlag, getPositionalArgs } from "@mizchi/vlmkit-core/cli-args.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
-const modelArgs = getPositionalArgs();
+// Named explicitly: argv cannot tell `--limit 30` from `--md model-name`,
+// and assuming every flag takes a value dropped a model after `--md`.
+const modelArgs = getPositionalArgs(["image", "max-cost", "limit"]);
 
 const IMAGE_PATH = getArg("image", "");
 const TMP = join(process.cwd(), "test-results", "vlm-bench");
@@ -32,8 +34,8 @@ function formatCost(costPer1k: number): string {
 // ---- List command ----
 
 async function runList() {
-  const maxCost = getArg("max-cost", "") ? parseFloat(getArg("max-cost", "999")) : undefined;
-  const limit = getArg("limit", "") ? parseInt(getArg("limit", "50"), 10) : 50;
+  const maxCost = getArg("max-cost", "") ? getFloatArg("max-cost", 999, { min: 0 }) : undefined;
+  const limit = getIntArg("limit", 50, { min: 1 });
   const models = await listModels({ maxCost, limit, includeGemini: true });
 
   console.log();

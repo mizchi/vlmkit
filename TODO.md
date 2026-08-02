@@ -435,6 +435,26 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   パースエラーにし、解決後 0 ゲートのページも例外にした。
   `readInt("--concurrency")` が `2.5` を黙って 2 に切り捨てていた
   parseInt バグも同時に修正(常に parseFloat で読み、整数性を別途検査)。
+- [x] **旧 `cli-args.ts` と残り 7 モジュールの移行(第一版の取りこぼし)** —
+  第一版は新モジュールを追加して今回書いた 4 CLI だけ移行し、
+  **同じ欠陥を持つ旧リーダーを生かしたまま**にしていた(core バレルから
+  export、7 モジュールが使用)。実害を再現: `fix-loop --seed --mode selector`
+  で `getArg("seed")` が `"--mode"` を返し `parseInt` が NaN seed を生成。
+  `cli-args.ts` を `arg-reader` 上の薄いファサードに書き換え(9 テスト)、
+  検証済みの `getIntArg` / `getFloatArg` を追加して
+  smoke-runner / css-challenge / fix-loop / vlm-bench の
+  `parseInt(getArg(...))` を置換。
+  さらに: argv を import 時ではなく呼び出しごとに読むようにし
+  (ディスパッチャ経由のリーフが自分の引数を見られる)、
+  `getPositionalArgs` は値を取るフラグ名を受け取るようにした
+  (旧実装は全フラグが値を取ると仮定し `--md model` の model を落としていた)。
+  `args` export は deprecated として残し、リポジトリ内の利用を
+  `getRawArgs()` に移行。
+  4 つ目の同型パーサ `parseCssChallengeBenchArgs` も移行 —
+  `--trials abc` が NaN trials になり「要求回数を回していないベンチが
+  数字を報告する」状態だった(回帰テスト 3 件追加)。
+  `vlmkit.ts` の catch も `handleCliError` 経由にし、リーフが
+  モジュールスコープで argv を読む場合でも 1 行で表示されるようにした。
 
 ### Ecosystem positioning (市場調査 2026-07-29 由来)
 調査メモ: `docs/reports/2026-07-29-ai-markup-tooling-landscape.md` /

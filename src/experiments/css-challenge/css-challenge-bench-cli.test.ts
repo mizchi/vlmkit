@@ -46,3 +46,25 @@ describe("parseCssChallengeBenchArgs", () => {
     assert.equal(options.enableLlm, true);
   });
 });
+
+describe("parseCssChallengeBenchArgs — numeric validation", () => {
+  it("rejects a non-numeric trials count instead of running NaN trials", () => {
+    // The inline reader this replaced produced NaN, so the bench reported
+    // numbers from a loop that never ran the requested count.
+    assert.throws(() => parseCssChallengeBenchArgs(["--trials", "abc"]), /--trials must be a number/);
+    assert.throws(() => parseCssChallengeBenchArgs(["--trials", "0"]), /--trials must be >= 1/);
+  });
+
+  it("rejects a flag swallowed as a value", () => {
+    assert.throws(
+      () => parseCssChallengeBenchArgs(["--trials", "--no-db"]),
+      /--trials needs a value, got the next flag --no-db/,
+    );
+  });
+
+  it("keeps the documented defaults", () => {
+    const options = parseCssChallengeBenchArgs([]);
+    assert.equal(options.trials, 20);
+    assert.equal(options.startSeed, 1);
+  });
+});
