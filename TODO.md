@@ -362,9 +362,19 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   できない。必要な corpus を特定済み: `line-height < 1` のディスプレイ
   書体、見出しの負 margin-bottom、ascent+descent > 1em のフォント、
   `writing-mode: vertical-rl`、回転テキスト。A/B ハーネス自体は再利用可。
-- [ ] **マルチページランナー** — glob 指定で全ページのゲートを並列
-  実行(`vlmkit check integrity "routes/**.html"` 相当)。CI 時間予算
-  の質問に答える sharding / 並列度の実測値も。
+- [x] **マルチページランナー** — 2026-08-02 実装: `vlmkit batch`
+  (`src/cli/commands/batch-cli.ts`、20 テスト)。
+  `--gate "<gate>"` を複数指定 x glob 展開したページで子プロセスを並列実行。
+  判定は**終了コード**のみ(gate-exit 契約の統一が前提)なので runner は
+  レポート形状を一切知らず、新規ゲートは追加当日から batch 可能
+  (`check design` は runner 側変更ゼロで動いた)。
+  `--shard i/n` は stride 分割(同一ディレクトリのページはコストが揃うため
+  連続分割は高コスト部分木を1シャードに寄せる)。
+  実測(4 コア / 9 ページ / check integrity、`docs/reports/2026-08-02-batch-runner-ci-budget.md`):
+  並列 1→34.9s、2→20.0s(1.75x)、4→13.1s(2.66x)、8→11.0s(3.17x)。
+  ジョブ単体時間は並列で膨らむ(合計 34.9s→64.9s)ため、
+  出力は速度向上ではなく「平均同時実行数」を表示する
+  (第一版は 5.9x と誤表示していた)。3 シャード x 並列2 は 7.8/7.8/7.6s。
 
 ### Ecosystem positioning (市場調査 2026-07-29 由来)
 調査メモ: `docs/reports/2026-07-29-ai-markup-tooling-landscape.md` /

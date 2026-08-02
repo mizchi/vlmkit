@@ -69,6 +69,7 @@ marked `[key]`.
 | Audit design quality | `check tokens\|theme\|palette` · `check design` (is the page consistent with itself — one button style or six) · `check a11y contrast\|touch\|focus` · `check perf` · `check drift` · `stress i18n\|media` |
 | Vet an image asset before it enters a slot | `check asset --slot --expect-transparent --against-bg --page-palette` |
 | Repair | `heal selector` (dead selector) · `heal markup` `[key]` (LLM auto-fix from a kickback) |
+| Run gates over a whole site | `batch --gate "check integrity" "routes/**/*.html"` (parallel, `--shard i/n`, per-job timing) |
 | Wire into agents / pipelines | `mcp` (gate tools over stdio) · `contract` · `workflow` · `markup-loop` · `api` · `bench` · `skill` |
 
 Task-routing recipes and done-condition sets:

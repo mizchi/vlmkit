@@ -22,7 +22,7 @@ for options.
 | `vlmkit snapshot` | `[<url>...]`, `approve`, `fix-prompt`, `stability`, `flipbook`, `report` |
 | `vlmkit migration` | `compare`, `blind`, `subagent` |
 | `vlmkit workflow` | `init`, `capture`, `verify`, `approve`, `graph`, `affected`, `introspect`, `spec-verify`, `expect` |
-| Standalone | `vlmkit mcp`, `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit markup-loop`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
+| Standalone | `vlmkit batch`, `vlmkit mcp`, `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit markup-loop`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
 
 The single-token commands from 0.4.x (`vrt compare`, `vrt png-diff`,
 `vrt theme-parity`, …) remain as deprecation shims that forward to
@@ -251,6 +251,24 @@ vlmkit check perf          <html|url>          # Web Vitals (CLS / LCP / FCP)
 vlmkit check drift component <html> --selector .card
 vlmkit check drift pages     --selector .footer --files A.html B.html C.html
 ```
+
+### Batch (many pages, one glob)
+
+```bash
+# Run a gate over every matched page; verdict per page is that run's exit code.
+vlmkit batch --gate "check integrity" "routes/**/*.html"
+
+# Several gates, wider pool, logs kept for CI.
+vlmkit batch --gate "check integrity" --gate "check design" "dist/**/*.html" \
+  --concurrency 4 --output ci-logs/
+
+# One shard of three runners (stride-sliced, so neighbouring pages split up).
+vlmkit batch --gate "check integrity" "routes/**/*.html" --shard 2/3
+```
+
+Measured concurrency / sharding numbers and the reason the summary reports
+"jobs in flight" rather than a speedup:
+[`docs/reports/2026-08-02-batch-runner-ci-budget.md`](./reports/2026-08-02-batch-runner-ci-budget.md).
 
 ### Build / Scan / Inspect / Stress (markup-assistance)
 

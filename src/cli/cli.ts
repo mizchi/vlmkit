@@ -20,6 +20,14 @@ import { reportDeprecation } from "./deprecation.ts";
 const HELP_SENTINEL = "__VRT_HELP_PASSTHROUGH__";
 
 /**
+ * The script this CLI was started from, captured at import time — `delegate`
+ * overwrites `process.argv` before any leaf runs, so a leaf that needs to spawn
+ * another gate (`vlmkit batch`) can no longer find it. Read at module scope,
+ * which runs before the first delegate call.
+ */
+const CLI_ENTRY = process.argv[1];
+
+/**
  * Each leaf is referenced as `{ name, loader }`. The loader is a
  * closure that returns the dynamic import — keeping the path as a
  * literal at the `import()` call site lets tsdown statically
@@ -50,6 +58,7 @@ async function delegate(s: Spec, args: string[]): Promise<void> {
   ];
   const prev = process.env.__VRT_DISPATCHER_LEAF__;
   process.env.__VRT_DISPATCHER_LEAF__ = s.name;
+  if (CLI_ENTRY) process.env.__VLMKIT_CLI_ENTRY__ = CLI_ENTRY;
   try {
     await s.loader();
   } finally {
@@ -124,6 +133,7 @@ const SPECS: Record<string, Spec> = {
   diffForAgent: spec("diff-for-agent-cli", () => import("./commands/diff-for-agent-cli.ts")),
   presenceMatrix: spec("presence-matrix", () => import("./commands/presence-matrix-cli.ts")),
   compareRuns: spec("compare-runs-cli", () => import("./commands/compare-runs-cli.ts")),
+  batch: spec("batch", () => import("./commands/batch-cli.ts")),
   componentFromImage: spec("component-from-image", () => import("@mizchi/vlmkit-markup/component/component-from-image.ts")),
   contractIntrospect: spec("contract-introspect", () => import("@mizchi/vlmkit-markup/contract/introspect-contract.ts")),
   contractValidate: spec("contract-validate", () => import("@mizchi/vlmkit-markup/contract/validate-contract.ts")),
@@ -396,6 +406,8 @@ COMPARE TWO VERSIONS
 
 AUDIT DESIGN QUALITY
   check tokens|theme|palette          token scale | dark parity | dominant colors
+  check design <page>                 is the page consistent with itself? component
+                                      styles reused, spacing on its own scale
   check a11y contrast|touch|focus     WCAG contrast, touch targets, focus order
   check perf | check drift            Web Vitals | consistency across instances/pages
   stress i18n | stress media          longer strings | media variants
@@ -407,6 +419,10 @@ IMAGE ASSETS (e.g. generated sprites, before they enter a slot)
 REPAIR
   heal selector <page> <selector>     suggest replacements for a dead selector
   heal markup                         [key] LLM auto-fix from a verify-markup kickback
+
+RUN GATES OVER A WHOLE SITE
+  batch --gate "<gate>" <glob...>     every matched page in parallel; --shard i/n
+                                      for CI runners, --output for per-job logs
 
 FOR CODING AGENTS AND PIPELINES
   mcp                                 MCP server exposing the gates (stdio)
@@ -521,6 +537,10 @@ Run \`vlmkit <command> --help\` for options; most gates take --json and
       const { runStdioServer } = await import("@mizchi/vlmkit-mcp/stdio.ts");
       await runStdioServer();
     });
+
+  cli.command("batch [...args]", "Run gates over many pages in parallel (glob, sharding, per-job timing)")
+    .allowUnknownOptions()
+    .action(async () => delegate(SPECS.batch, passThrough(argv, ["batch"])));
 
   cli.command("manifest [...args]", "Author / edit approval.json manifests")
     .allowUnknownOptions()

@@ -110,6 +110,20 @@ Nine gates become tools (`verify_markup`, `check_integrity`,
 the routing table below and the loop discipline, and assumes only
 that `npx vlmkit` runs.
 
+## Many pages at once
+
+Every recipe below takes one page. To run one over a whole route tree:
+
+```bash
+vlmkit batch --gate "check integrity" "routes/**/*.html"          # parallel, exit 1 if any page fails
+vlmkit batch --gate "check integrity" --gate "check design" "dist/**/*.html" --output ci-logs/
+vlmkit batch --gate "check integrity" "routes/**/*.html" --shard 2/3   # one of three CI runners
+```
+
+The verdict per page is that gate run's exit code, so anything with the
+standard exit contract is batchable. Measured concurrency / sharding budget:
+[`reports/2026-08-02-batch-runner-ci-budget.md`](./reports/2026-08-02-batch-runner-ci-budget.md).
+
 ## Pick your gate by task
 
 Sources are file paths or URLs throughout.
