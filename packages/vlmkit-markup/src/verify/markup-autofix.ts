@@ -38,6 +38,7 @@ import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
+import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import {
   computeTrend,
@@ -199,6 +200,10 @@ export async function captureComputedStyles(
   try {
     const page = await browser.newPage({ viewport });
     await page.goto(pathToFileURL(resolve(attemptPath)).href, { waitUntil: "load" });
+    // Computed styles are read via `page.evaluate`, which does not auto-wait:
+    // a selector whose element renders after `load` came back `styles: null`,
+    // indistinguishable from a selector that genuinely does not exist.
+    await settlePage(page);
     const result = await page.evaluate(
       ({ sels, props }: { sels: string[]; props: string[] }) =>
         sels.map((selector) => {

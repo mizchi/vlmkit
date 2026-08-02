@@ -15,6 +15,7 @@ import { existsSync } from "node:fs";
 import { chromium } from "playwright";
 import { healSelector } from "./selector-heal.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 
 function toUrl(input: string): string {
   if (/^https?:\/\//.test(input)) return input;
@@ -55,6 +56,10 @@ async function main(argv = process.argv.slice(2)) {
   try {
     const page = await browser.newPage({ viewport: { width, height } });
     await page.goto(toUrl(input), { waitUntil: "load" });
+    // Candidate selectors are harvested from the DOM as it stands. Without
+    // settling, a client-rendered page offers candidates from its placeholder,
+    // which is the opposite of useful when healing a selector that broke.
+    await settlePage(page);
 
     const alreadyMatches = await page.locator(brokenSelector).count().catch(() => 0);
     const candidates = await healSelector(page, brokenSelector, { maxCandidates });

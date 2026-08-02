@@ -565,6 +565,75 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   ドキュメントは「ゲートは --json を取る」と書いていたので一貫性の穴でもあった。
   回帰テスト: `packages/vlmkit-markup/src/output-consistency.test.ts`(6 件)。
 
+### settle 監査 — 「waitUntil 水準合わせは装飾」が誤りだった(2026-08-02)
+レポート: `docs/reports/2026-08-02-settle-not-waituntil.md`
+- [x] **軸が `waitUntil` ではなく settle だった** — `goto(load)` の後に settle すれば
+  networkidle は結局待たれるので、`load` 8 箇所 / `domcontentloaded` 2 箇所は
+  **settle していれば** `networkidle` 71 箇所と等価。水準合わせは何も変えなかった。
+  本当の分かれ目は**アクションと読み取り**: `click`/`fill`/`hover` は auto-wait するが
+  `page.evaluate` / `page.screenshot` / `getBoundingClientRect` はその瞬間の DOM を
+  サンプルする。全ゲートは後者で測っている。だから長く隠れていた。
+- [x] **`load` 後 350ms で描画されるページに対する実測** — 同一ページ・同一瞬間で
+  3 つの異なる誤答、すべて「マークアップの欠陥」として表現されていた:
+  ```
+  check layout   (networkidle + settle)  count .card = 2         ← 正
+  verify flow    (load, settle なし)     count .card = 0, FAIL   ← マークアップを責める
+  build page     (load, settle なし)     settle 後インクの 5.3%  ← 全コンポーネント missing
+  scan contract  (load, settle なし)     0 landmarks             ← settle すれば 4
+  ```
+- [x] **5 箇所に settle を追加** — `verify flow` / `build page` の `renderHtmlToPng` /
+  `fix markup` の computed-style 読み / `heal selector` / `region-selector-match`
+  (後者は `fonts.ready` だけ呼んでいた)。`interaction-map.ts` の `settleAfterLoad` は
+  `settlePage` とバイト単位で同一だったので削除し、根拠(React プレースホルダの
+  2026-08-01 事例)を `settlePage` の doc comment に移した。
+- [x] **`scan contract` はトレードオフが実在した唯一の箇所** — local file を `load` のみで
+  開くのは意図的な速度選択で、`docs/landmark-drilldown-design.md` が機能として謳っていた。
+  主張は真で、挙動は誤り: ビルド済み SPA を file で開くと 0 landmarks(241ms) vs
+  settle して 4 = banner/navigation/main/contentinfo(986ms)。0 は遅い答えではなく
+  **誤った答え**で、下流の contract コマンド全部が読む入力。設計文書は実測コストに更新。
+- [x] **安い primitive を試して却下(負の結果)** — Playwright の networkidle は 500ms 固定の
+  静止待ちなので static local file でも約 500ms かかる。そこで MutationObserver 静止 + rAF で
+  「DOM が変化を止めたか」を測る実装を書いたが両方向で失敗:
+  `static 128ms/landmarks=4`(速く正しい)、`late-render 125ms/landmarks=0`
+  (**描画開始前に settle 宣言**)、`chatty-poll 3025ms`(50ms interval で上限を焼く)。
+  100ms の静止窓は 350ms 遅延描画の最初の mutation より前に経過するので
+  「まだ変わっていない」と「もう変わらない」が区別できない。再発明防止のため記録。
+- [x] **probe 執筆中に見つかった 2 つ目の欠陥: フローファイルのタイポがページ欠陥として報告されていた** —
+  `{"assert":"visble"}` → `FAIL [visble: NO(unknown assert)]`。逆方向はもっと悪く
+  `{"action":"clik"}` → **`done: true`**(`runAction` の switch に default が無く、
+  未知のアクションは黙って落ちてステップは失敗する事後条件を持たないので**緑**)。
+  `validateFlow` がブラウザを開く前に両方を拒否し、該当ステップを名指し
+  (`step 1 ("open menu"), expect[0]`)、有効な名前を列挙し、
+  「これはページ欠陥ではなくフローファイルのエラー」と明言する。
+  `--allow` が未知の finding kind に対して既に適用しているルール。空の `steps` も拒否。
+- [x] **項目の残り 2/3 は実際に装飾だった(仮定ではなく確認)** —
+  (a) `chromium.launch` 47 箇所: 1 ファイルだけが 2 回 launch するが
+  (`src/diff-pr.ts` の `pin` とデフォルト実行 = 別サブコマンド)、残りは
+  1 ゲート起動 = 1 launch。プロセスごとに 1 ゲートを走らせる CLI では
+  それが正しい構造で、`batch` は既にサブプロセスを spawn するので
+  共有ブラウザは何も得ない。数であって浪費ではない。
+  (b) 残る `load` / `domcontentloaded` 10 箇所は settle するようになったので
+  `networkidle` と等価。そのまま残す。
+  意図的に settle しない `goto` が 2 箇所: `font-determinism-probe.ts` は
+  ナビゲーション**後**に style tag を注入するので意味のある唯一の時点で
+  `fonts.ready` を待つ(ネットワークの無い静的フィクスチャ専用)、
+  `vlmkit-generate` の `page.goto` は「呼ぶな」と指示するプロンプト文字列。
+- [x] **アクション / アサート語彙をドキュメント化** — 読者は 1 つの例から
+  アサート名を推測するしかなかった(`visble` はこうして生まれる)。
+  `introduce.md` / `introduce.ja.md` の両方に閉じた集合として記載。
+- [x] **`introduce.md` はコードより先を行っていた** — 「client-rendered app が
+  `load` の後の tick で描画しても **every gate now waits out**」と既に書いてあり、
+  この commit までは 6 ゲートで偽だった。今は真。検証の穴として記録:
+  午前のドキュメント検査は**コマンドとフラグの存在**を確認したが
+  **振る舞いの主張**は確認していなかった。
+- [x] 回帰テスト: `packages/vlmkit-markup/src/settle-consistency.test.ts`(11 件)。
+  空回りでないことをアブレーションで確認 — `page-compose` から `settlePage` を外すと
+  `build page` のテストだけが落ち、`flow-verify` から外すと `verify flow` の
+  2 件だけが落ちる。`scan contract` は件数ではなく role 列で固定(速度理由で
+  戻されやすい)。1 件は `flow-verify.ts` をパースして検証器の名前リストが
+  `FlowAction` / `FlowAssert` の型 union と一致することを主張する
+  (乖離すると**有効な**フローを弾き始める)。
+
 ### ドキュメント刷新(2026-08-02)
 - [x] **`docs/introduce.ja.md` が 7/27 の `vrt` 時代のまま(248 行)だった** —
   リネーム前のコマンド名で、**すでに削除されたコマンド**(`vrt compare` /

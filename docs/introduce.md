@@ -397,6 +397,14 @@ The operational questions a lead will ask, answered plainly:
   ] }
   ```
 
+  The vocabularies are closed sets, and a name outside them is a
+  usage error naming the offending step — not a failing
+  post-condition. Actions: `click` (`force` to click through a
+  disabled control), `press`, `fill`, `type`, `focus`, `hover`,
+  `wait`. Asserts: `attr`, `visible`, `hidden`, `focused`, `text`
+  (substring), `count`. You do not need a leading `wait` step for a
+  client-rendered page; the gate settles before the first assert.
+
   Your design-system and behavior rules become gates without writing
   tool code.
 - **What do agents get vs. juniors?** The same kickbacks. Juniors get

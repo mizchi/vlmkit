@@ -52,6 +52,28 @@ export function sourceToUrl(source: string): string {
  * one frame. Every part is best-effort — a page with a long-poll connection
  * never reaches network idle, and refusing to measure it would be worse than
  * measuring it slightly early.
+ *
+ * **A gate that navigates and does not call this measures the wrong document.**
+ * `load` fires before a client-rendered view paints, and the failure is never
+ * reported as "I looked too early" — it is reported as a defect in the page:
+ *
+ *   - 2026-08-01: `check interactions` said "interactive elements: 0" on a React
+ *     page with a button, two links and a scroller. It measured the "Loading…"
+ *     placeholder.
+ *   - 2026-08-02: `verify flow` failed `count .card expected 2, measured 0` on a
+ *     page where `check layout` measured 2 at the same instant, and
+ *     `build page` screenshotted a candidate at 5.3% of its settled ink — so
+ *     every component came back missing. Both blamed the markup.
+ *
+ * Playwright *actions* auto-wait, which is why this stayed hidden: a click on a
+ * late-rendered element is safe. Reads are not — `page.evaluate`,
+ * `page.screenshot` and `getBoundingClientRect` all sample the DOM at that
+ * instant.
+ *
+ * `waitUntil` is not the axis. `goto(load)` followed by this settle waits for
+ * network idle anyway, so the 8 `load` and 2 `domcontentloaded` call sites are
+ * equivalent to the 71 `networkidle` ones **provided they settle**. The
+ * difference that mattered was always the settle, never the load state.
  */
 export async function settlePage(page: Page, settleMs = 250): Promise<void> {
   await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});

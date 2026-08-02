@@ -35,8 +35,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
+import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
-import { DISCOVER_SCRIPT, settleAfterLoad } from "./interaction-map.ts";
+import { DISCOVER_SCRIPT } from "./interaction-map.ts";
 
 export interface HandlerSurfaceEntry {
   /** Handler types on ancestors that also carry handlers (delegation). */
@@ -173,8 +174,8 @@ export async function buildHandlerSurface(options: { source: string; storageStat
       : pathToFileURL(resolve(options.source)).href;
     await page.goto(url, { waitUntil: "load", timeout: 30000 });
     // Client-rendered pages register their handlers after `load` — without
-    // this the scan inventories the pre-render DOM (see settleAfterLoad).
-    await settleAfterLoad(page);
+    // this the scan inventories the pre-render DOM (see settlePage).
+    await settlePage(page);
     await page.evaluate(DISCOVER_SCRIPT); // stamp interactive elements for cross-referencing
     const raw = await page.evaluate(COLLECT_SURFACE_SCRIPT) as {
       elements: HandlerSurfaceEntry[];

@@ -194,9 +194,15 @@ evidence:
   kind, text length, and density;
 - `--profile` and `--profile-json` expose browser launch, navigation,
   landmark capture, and hint capture timing;
-- local file inputs wait for `load` instead of `networkidle`, which keeps
-  dogfood introspection under roughly a few hundred milliseconds after cold
-  browser start.
+- local file inputs navigate with `load` rather than `networkidle`, but **still
+  settle** (bounded network idle → webfonts → one frame) before capture. The
+  original no-settle fast path kept a cold-start introspection to a couple of
+  hundred milliseconds and was wrong on any page that renders after `load`:
+  measured 2026-08-02 on a built SPA opened as a file, `scan contract` returned
+  **0 landmarks** in 241ms versus 4 (`banner, navigation, main, contentinfo`) in
+  986ms settled. A cheaper DOM-quiescence primitive was tried and rejected —
+  MutationObserver-quiet + rAF runs in 128ms but declares a page settled before
+  a deferred render begins, and burns its whole cap on a page that polls.
 
 ## Next Generalization
 

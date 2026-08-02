@@ -382,6 +382,14 @@ vlmkit batch --gate "check integrity" "routes/**/*.html" --shard 2/3   # CI ラ�
   ] }
   ```
 
+  語彙は閉じた集合で、範囲外の名前は**該当ステップを名指しする usage
+  error** になります — 失敗した事後条件ではありません。アクション:
+  `click`（無効化されたコントロールを押し抜けるには `force`）/ `press` /
+  `fill` / `type` / `focus` / `hover` / `wait`。アサート: `attr` /
+  `visible` / `hidden` / `focused` / `text`（部分一致）/ `count`。
+  クライアントレンダリングのページに対して先頭の `wait` ステップは
+  不要です — ゲートが最初のアサートより前に settle します。
+
   ツールのコードを書かずに、デザインシステムと振る舞いの規則がゲートに
   なります。
 - **エージェントと新人で何が違う？** 同じ kickback です。新人は名指しで
