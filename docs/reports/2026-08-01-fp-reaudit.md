@@ -141,7 +141,24 @@ The classes that carry real signal for this audit:
 | component extraction (via `verify markup`) | not exercised on real pages | **gap** — the adaptive-tolerance change is covered only by unit tests and the synthetic reproduction |
 | `text-collision` | **1** (apg-tabs) | **inadequate** |
 
-### The ink-extents upgrade is still NOT unblocked
+### Update (later the same day): both halves shipped, gated by a purpose-built corpus
+
+`fixtures/collision-fp-corpus` was built to be the corpus this audit
+lacked, and it worked in both directions. It found a **live false
+positive** on its first run (the kicker/heading pull-up: 7px box overlap,
+2px measured ink gap), which shipped as half (a) — ink confirmation as a
+filter. Then the measured ink fractions (1.000 for a real graze vs
+0.077-0.137 for legitimate stacks) gave half (b) a threshold with a 7x
+margin instead of a guess.
+
+Re-running this audit's own 8-page A/B against the finished work:
+**0 new collisions, 16 disappeared** — every one of the 16 a pre-existing
+false positive the old area-ratio gate had been masking (MDN 14 -> 0 from
+closed-`<details>` content that keeps layout boxes; APG 2 -> 0 from
+element-vs-own-descendant pairs). The section below is kept as the record
+of what the gap was and why it blocked the work.
+
+### The ink-extents upgrade was NOT unblocked by THIS audit
 
 The backlog gated it on "a false-positive re-audit," and it would be
 convenient to read this audit as satisfying that. It does not. With a

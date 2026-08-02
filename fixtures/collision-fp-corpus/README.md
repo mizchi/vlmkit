@@ -77,7 +77,37 @@ band while dividing by the *box* area silently tightened the gate — a real
 collision fell from 0.32 to 0.19 of the smaller area and disappeared. Both
 sides of the ratio must use the same units.
 
-### Gate for half (b)
+### Half (b) SHIPPED too (2026-08-01, later the same day)
+
+Measuring this corpus showed the blocker was never the 6px floor — it was
+the **overlap-area ratio**. The graze scored 0.172 of the smaller block's
+area against a 0.25 gate, while a legitimate `line-height: 1` stack scored
+0.077 and the pull-up 0.137: overlapping populations, so area cannot
+separate them. By **vertical ink-overlap fraction** the same three are
+**1.000 / 0.077 / 0.137** — a 7x gap. The gate now requires
+`oy >= max(2px, 0.5 x the shorter block's ink height)`; the area ratio is
+retired (`minOverlapRatio` accepted and ignored, `minInkOverlapFraction`
+added).
+
+Gate criterion, met exactly: five legitimate pages **0**,
+`sliver-true-positive.html` **1**.
+
+Real-page A/B (8 mirrored pages x 3 viewports, pre-session revision vs
+current): **0 new collisions, 16 disappeared.** The 16 were all
+pre-existing false positives that the area ratio had been *masking* rather
+than avoiding:
+
+- **MDN 14 -> 0** — items inside a CLOSED `<details>` keep layout boxes
+  (measured 184x56 at y=9137, `checkVisibility() === false`) and stack
+  perfectly, so they scored a 1.0 ink fraction. The text-block collector
+  checked self `visibility`/`display`/`opacity`, none of which express
+  content-visibility skipping. Now filtered with `checkVisibility()`.
+- **APG 2 -> 0** — `li x li > kbd` pairs: an element paired with its own
+  inline descendant, never a collision.
+
+So the loosening added zero false positives on real markup and removed 16.
+
+### Gate for any future change here
 
 The upgrade passes only if:
 
