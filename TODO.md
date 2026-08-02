@@ -299,9 +299,27 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 - [ ] **integrity のユーザー定義免除リスト** — 新規の意図的パターンが
   誤検知されたとき、マークアップ改変か issue 報告しか選択肢がない。
   copy ゲートの `--allow-invisible` に相当する承認可能な仕組み。
-- [ ] **クロス OS フォント決定論の実測レポート** — 2px/6px floor が
-  macOS vs Linux 描画で維持されるかの検証(要 macOS 実機)。フォント
-  同梱/未同梱の両条件。
+- [~] **クロス OS フォント決定論の実測レポート** — 2026-08-02 計測器 +
+  Linux 側実測完了、macOS 実機は未実施(1 コマンドで比較可能な状態にした)。
+  `src/util/font-determinism-probe.ts`(12 テスト)は本番の
+  `COLLECT_INTEGRITY_TEXT` + `findTextCollisions` をそのまま駆動し、
+  ゲートが出さない「各候補ペアの床までの距離」を記録する。
+  ベースラインは `fixtures/collision-fp-corpus/fingerprints/linux-default.json`。
+  実測(20 ページ / 2154 テキストブロック / 121 候補ペア、
+  `docs/reports/2026-08-02-font-determinism-collision-floors.md`):
+  **6 条件すべてで threshold flip 0 件**。
+  同梱条件(同一フェイス・ラスタライザ差 = hinting/subpixel/LCD off)は
+  inkInset 差 max 0.51px / p95 0.00px、dpr2 でも max 1.00px。
+  未同梱条件(フォント置換 = DejaVu Serif / Liberation Sans / WenQuanYi /
+  Noto 同梱)は max 3.00px / p95 ≤1.5px で、それでも床を跨いだペアは 0。
+  差が出た 3 件は「重なり自体が消えた」geometry flip
+  (等幅→プロポーショナルで文字列幅が縮み、絶対配置ラベルが接触しなくなる)
+  であり、両方の描画でそれぞれ正しい判定。第一版はこれを instability と
+  誤報告していたため、tool 側で threshold flip と geometry flip を分離した。
+  **残る穴**: 床から ±2px 以内にいるペアが 121 中 **1 件**しかないため、
+  「摂動しても静か」と「そもそも床付近に何も無い」を分離できていない。
+  強い主張には(a) macOS 実機での `measure` + `compare`、
+  (b) margin ±0.5px に意図的に置いたフィクスチャが必要。
 - [x] **exit code コントラクトの統一(round-10 実測)** — 2026-08-01 完了:
   `packages/vlmkit-core/src/gate-exit.ts` に統一。suspect は既定で
   非ゼロ終了、warn は常に終了コードに影響しない、`--advisory` で

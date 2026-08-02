@@ -117,3 +117,33 @@ The upgrade passes only if:
 Use `src/util/ab-arm-setup.sh` to run it as a proper A/B against the
 pre-change revision — and heed its warning: prove the arms differ before
 reading any result.
+
+### Font-metric fingerprint (`fingerprints/linux-default.json`)
+
+The floors are functions of the resolved font's metrics, so the same page can
+in principle be judged differently on another OS. `fingerprints/` holds this
+corpus's baseline — every candidate pair's distance from its own floor, as
+measured on Linux with Playwright's bundled Chromium.
+
+To check another platform:
+
+```bash
+node --experimental-strip-types src/util/font-determinism-probe.ts measure \
+  "fixtures/collision-fp-corpus/*.html" "fixtures/auto-markup-proof/creative/*.html" \
+  --label macos-default --out macos.json
+node --experimental-strip-types src/util/font-determinism-probe.ts compare \
+  fixtures/collision-fp-corpus/fingerprints/linux-default.json macos.json
+```
+
+`compare` exits non-zero only on a **threshold flip** — the same overlap judged
+differently. A pair that stops overlapping entirely (font substitution changes
+text width, so absolutely-positioned labels can clear each other) is reported
+separately as a geometry difference, because both verdicts are then correct for
+their own rendering.
+
+Linux perturbation results — 6 font/rasterizer conditions, 0 threshold flips,
+ink drift ≤0.51px for a bundled face and ≤3px under whole-stack substitution:
+`docs/reports/2026-08-02-font-determinism-collision-floors.md`. That report is
+also explicit about what is still missing: only 1 of 121 pairs sits within 2px
+of its floor, so fixtures deliberately placed *at* the floor are the real
+prerequisite for a strong robustness claim.
