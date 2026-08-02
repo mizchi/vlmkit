@@ -40,6 +40,7 @@ import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
+import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
@@ -102,6 +103,13 @@ export interface LayoutReport {
   passed: number;
   total: number;
   done: boolean;
+  /**
+   * Set when the URL redirected — almost always a login wall. Measured
+   * 2026-08-02: against an auth-walled route this gate reported
+   * `VIOLATED: count expected 2, measured 0`, which reads as "your markup is
+   * wrong" when the real cause is that the session expired.
+   */
+  redirected?: string;
 }
 
 /** Cluster row tops (±8px) and return the modal row size. */
@@ -230,6 +238,7 @@ export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<Lay
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   const results: LayoutRuleResult[] = [];
+  let redirected: string | undefined;
   try {
     const url = /^(https?|file):\/\//.test(options.source)
       ? options.source
@@ -239,6 +248,9 @@ export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<Lay
       const height = options.heights?.[width] ?? DEFAULT_HEIGHTS[width] ?? 800;
       const page = await browser.newPage(withAuthState({ viewport: { width, height } }, options.storageState));
       await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+      redirected ??= /^https?:\/\//.test(options.source)
+        ? describeRedirect(options.source, page.url()) ?? undefined
+        : undefined;
       const rules = options.contract.rules.filter((r) => r.at === width);
       const selectors = [...new Set(rules.flatMap((r) => r.above ? [r.selector, r.above] : [r.selector]))];
       const rectMap = await page.evaluate(collectRects, selectors);
@@ -255,13 +267,23 @@ export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<Lay
     await browser.close();
   }
   const passed = results.filter((r) => r.passed).length;
-  const done = passed === results.length;
+  // A redirect cannot be `done`: the rules were evaluated against a page the
+  // caller did not ask for, so even "all passed" would be a claim about the
+  // login screen.
+  const done = passed === results.length && !redirected;
   appendRunLedger({
     tool: "layout-contract",
     source: options.source,
-    headline: { done, passed, total: results.length },
+    headline: { done, passed, total: results.length, ...(redirected ? { redirected: true } : {}) },
   });
-  return { source: options.source, results, passed, total: results.length, done };
+  return {
+    source: options.source,
+    results,
+    passed,
+    total: results.length,
+    done,
+    ...(redirected ? { redirected } : {}),
+  };
 }
 
 export function formatLayoutReport(report: LayoutReport): string {
@@ -270,6 +292,12 @@ export function formatLayoutReport(report: LayoutReport): string {
   lines.push(`${DIM}source: ${report.source}${RESET}`);
   lines.push("");
   lines.push(`verdict: ${report.done ? `${GREEN}SATISFIED${RESET}` : `${RED}VIOLATED${RESET}`} (${report.passed}/${report.total} rules)`);
+  if (report.redirected) {
+    // Ahead of the per-rule list: without this a stale session reads as
+    // "your cards are missing", sending the reader to debug their markup.
+    lines.push(`${RED}x ${report.redirected}${RESET}`);
+    lines.push(`${DIM}  Every rule below was evaluated against that page.${RESET}`);
+  }
   lines.push("");
   for (const r of report.results) {
     const mark = r.passed ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;

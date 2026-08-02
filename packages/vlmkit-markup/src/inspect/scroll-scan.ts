@@ -27,6 +27,7 @@ import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
+import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { UiExpectedScrollportContract } from "../contract/ui-contract.ts";
@@ -90,6 +91,13 @@ export interface ScrollContainer {
 }
 
 export type ScrollScanIssueKind =
+  /**
+   * A URL that redirected somewhere meaningful — almost always a login wall.
+   * Measured 2026-08-02: pointed at an auth-walled route with no session, this
+   * gate reported `status: ok` for the login page while naming the requested
+   * URL as its source. Reported as a suspect issue so the pass cannot be silent.
+   */
+  | "redirected"
   | "page-overflow-x"
   | "clipped-content"
   | "nested-scroll";
@@ -410,12 +418,22 @@ export async function runScrollScan(options: ScrollScanOptions): Promise<ScrollS
       // setContent gives the document an about:blank base URL.
       await page.goto(pathToFileURL(resolve(options.source)).href, { waitUntil: "networkidle", timeout: 30000 });
     }
+    // A redirect here is almost always a login wall. Without this the gate
+    // measured the login page and reported `status: ok` while naming the
+    // requested URL as its source (measured 2026-08-02).
+    const redirectNote = isUrl(options.source) ? describeRedirect(options.source, page.url()) : null;
     const collected = await page.evaluate(COLLECT_SCROLL_SCRIPT) as Omit<ScrollScanInput, "source">;
     await page.close();
-    return analyzeScrollSamples(
+    const report = analyzeScrollSamples(
       { source: options.source, ...collected },
       options,
     );
+    // Pushed as a suspect ISSUE, not just printed: the status line is derived
+    // from the issue list, so a note alone would have left `status: ok`.
+    if (redirectNote) {
+      report.issues.unshift({ kind: "redirected", severity: "suspect",  message: redirectNote });
+    }
+    return report;
   } finally {
     await browser.close();
   }

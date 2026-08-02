@@ -8,7 +8,11 @@ test("auth-wall redirect is called out as a login wall", () => {
   assert.match(msg!, /requested \/dashboard/);
   assert.match(msg!, /measured http:\/\/127\.0\.0\.1:8901\/login/);
   assert.match(msg!, /login wall/i);
-  assert.match(msg!, /cannot inject a session/i);
+  // Points at the fix the tool actually offers. This assertion previously
+  // pinned "cannot inject a session", which stopped being true when
+  // --storage-state landed — the test was holding the stale claim in place.
+  assert.match(msg!, /--storage-state/);
+  assert.doesNotMatch(msg!, /cannot inject a session/i);
 });
 
 test("non-auth cross-path redirect warns without the auth hint", () => {

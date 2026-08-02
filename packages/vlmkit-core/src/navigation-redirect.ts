@@ -46,7 +46,12 @@ export function describeRedirect(requested: string, final: string): string | nul
 
   const looksLikeAuth = /login|signin|sign-in|auth|sso|account\/login/i.test(b.pathname);
   const hint = looksLikeAuth
-    ? " This looks like a login wall: the gate measured the sign-in page, NOT the page you asked about. vlmkit cannot inject a session — point it at a route that does not need auth, or render the page to a local file."
+    // The hint used to end "vlmkit cannot inject a session", which stopped being
+    // true the day `--storage-state` landed. A hint that denies a feature the
+    // tool has sends the reader to the wrong fix.
+    ? " This looks like a login wall: the gate measured the sign-in page, NOT the page you asked about."
+      + " Pass a logged-in Playwright storage state (--storage-state <file>, or VLMKIT_STORAGE_STATE),"
+      + " or point the gate at a route that does not need auth."
     : " The gate measured the destination, not the URL you passed.";
   return `redirected: requested ${a.pathname}${a.search} but measured ${b.href}.${hint}`;
 }

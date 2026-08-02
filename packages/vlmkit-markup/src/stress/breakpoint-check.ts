@@ -35,6 +35,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { extractBreakpoints } from "@mizchi/vlmkit-capture/viewport-discovery.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
+import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
@@ -82,6 +83,13 @@ export interface BreakpointResult {
 }
 
 export type BreakpointCheckIssueKind =
+  /**
+   * A URL that redirected somewhere meaningful — almost always a login wall.
+   * Measured 2026-08-02: pointed at an auth-walled route with no session, this
+   * gate reported `status: ok` for the login page while naming the requested
+   * URL as its source. Reported as a suspect issue so the pass cannot be silent.
+   */
+  | "redirected"
   | "boundary-spike"
   | "boundary-gap"
   | "overflow-at-boundary"
@@ -401,6 +409,12 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
       await page.goto(pathToFileURL(resolve(options.source)).href, { waitUntil: "networkidle", timeout: 30000 });
     }
 
+
+    // A redirect here is almost always a login wall. Without this the gate
+    // measured the login page and reported `status: ok` while naming the
+    // requested URL as its source (measured 2026-08-02).
+    const redirectNote = isUrl(options.source) ? describeRedirect(options.source, page.url()) : null;
+
     let values: number[];
     let rawByValue = new Map<number, string[]>();
     let stylesheets: BreakpointCheckReport["stylesheets"];
@@ -537,7 +551,15 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
       checkedValues: values,
       ...(stylesheets ? { stylesheets } : {}),
       ...(sweep ? { sweep } : {}),
-      issues: [...deriveBreakpointIssues(results), ...(sweep ? deriveSweepIssues(sweep) : [])],
+      issues: [
+        // First, and suspect: the status line is derived from the issue list, so
+        // a printed note alone would have left `status: ok` on a login page.
+        ...(redirectNote
+          ? [{ kind: "redirected" as const, severity: "suspect" as const, message: redirectNote }]
+          : []),
+        ...deriveBreakpointIssues(results),
+        ...(sweep ? deriveSweepIssues(sweep) : []),
+      ],
     };
   } finally {
     await browser.close();
@@ -553,6 +575,12 @@ export function formatBreakpointCheckReport(report: BreakpointCheckReport): stri
   lines.push(`${DIM}source: ${report.source}${RESET}`);
   lines.push("");
   lines.push(`status: ${status}`);
+  // Before anything else, and before the sweep early-return below: a redirect
+  // means every number under it describes a different page. Without this the
+  // status flipped to `suspect` with no stated reason.
+  for (const issue of report.issues.filter((i) => i.kind === "redirected")) {
+    lines.push(`${RED}x ${issue.message}${RESET}`);
+  }
   if (report.stylesheets && report.stylesheets.fetched < report.stylesheets.crossOrigin) {
     lines.push(`${YELLOW}note: ${report.stylesheets.crossOrigin - report.stylesheets.fetched} of ${report.stylesheets.crossOrigin} cross-origin stylesheet(s) could not be read — their breakpoints are not covered${RESET}`);
   }

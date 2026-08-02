@@ -515,9 +515,30 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   移行で**デッドコードになっていた** `readFile` を削除して 4 ゲートを
   URL 対応にした。`check a11y contrast http://localhost:.../page.html` が
   1.92:1 を正しく報告することを確認。
-- [ ] **ページオープン統一の残り半分** — `chromium.launch` は 44 箇所、
-  `waitUntil` は networkidle 72 / load 8 / domcontentloaded 1 のまま。
-  今回は「ロード方式が verdict を変えるゲート」だけを移行した。
+- [x] **「残り半分は装飾」という自分のラベルが誤りだった(2026-08-02)** —
+  実測: `/app` が session cookie 無しで `/login` に 302 するローカルサーバを立て、
+  URL 対応かつ `--storage-state` を持つ(= 認証ページ向けに設計された)ゲートに
+  当てたところ、**redirect 検出を持たない 5 本が login ページを測っていた**:
+  `check breakpoints` / `check scroll` / `scan scroll` は **`status: ok`**
+  (静かな偽 pass)、`check layout` は `count: expected 2, measured 0` で
+  **マークアップのせいに見える失敗**、`verify flow` は全ステップが
+  「要素が見つからない」で落ちる。いずれもレポートの source 行には
+  要求した URL を表示していた。装飾ではなく、integrity / copy / design で
+  修正済みだった沈黙偽 pass と同じクラスを 5 本に残していた。
+  修正: 5 本に `describeRedirect` を配線し、**status/verdict を動かす**
+  (issue 系は `redirected` を suspect で unshift、`done` 系は
+  `done = ... && !redirected`)。理由も必ず印字する
+  (`check breakpoints` は sweep 無しで早期 return するため status だけ
+  変わって理由が出ない状態を別途修正)。
+  副産物: redirect メッセージが「vlmkit cannot inject a session」という
+  **`--storage-state` 追加後に偽になった文言**を保持しており、
+  それを固定するテストまで存在した。両方を修正。
+  回帰テスト: `packages/vlmkit-markup/src/auth-wall.test.ts`(7 件、
+  実際に 302 するサーバを立てる)。
+- [ ] **ページオープン統一の残り(純粋な整理)** — `chromium.launch` 44 箇所、
+  `waitUntil` は networkidle 72 / load 8 / domcontentloaded 1。
+  **verdict を変える差は上記で解消済み**。残るのは重複コードの削減と
+  fonts.ready 待ちの平準化で、こちらは実際に装飾。
 
 ### 差分監査 3 軸(2026-08-02)
 レポート: `docs/reports/2026-08-02-differential-audit-three-axes.md`

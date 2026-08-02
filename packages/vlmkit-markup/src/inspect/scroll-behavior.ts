@@ -27,6 +27,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { applyGateExit } from "@mizchi/vlmkit-core/gate-exit.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
+import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
@@ -65,6 +66,13 @@ export interface ScrollBehaviorInput {
 }
 
 export type ScrollBehaviorIssueKind =
+  /**
+   * A URL that redirected somewhere meaningful — almost always a login wall.
+   * Measured 2026-08-02: pointed at an auth-walled route with no session, this
+   * gate reported `status: ok` for the login page while naming the requested
+   * URL as its source. Reported as a suspect issue so the pass cannot be silent.
+   */
+  | "redirected"
   | "fixed-drifts"
   | "sticky-not-sticking"
   | "snap-not-snapping";
@@ -284,10 +292,19 @@ export async function runScrollBehavior(options: ScrollBehaviorOptions): Promise
     } else {
       await page.goto(pathToFileURL(resolve(options.source)).href, { waitUntil: "networkidle", timeout: 30000 });
     }
+    // A redirect here is almost always a login wall. Without this the gate
+    // measured the login page and reported `status: ok` while naming the
+    // requested URL as its source (measured 2026-08-02).
+    const redirectNote = isUrl(options.source) ? describeRedirect(options.source, page.url()) : null;
     const collected = await page.evaluate(COLLECT_SCRIPT(options.maxElements ?? 20)) as
       Omit<ScrollBehaviorInput, "source">;
     await page.close();
     const report = analyzeScrollBehavior({ source: options.source, ...collected }, options);
+    // Pushed as a suspect ISSUE, not just printed: the status line is derived
+    // from the issue list, so a note alone would have left `status: ok`.
+    if (redirectNote) {
+      report.issues.unshift({ kind: "redirected", severity: "suspect", selector: "", message: redirectNote });
+    }
     appendRunLedger({
       tool: "check-scroll",
       source: options.source,

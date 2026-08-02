@@ -28,6 +28,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Page } from "playwright";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
+import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
@@ -85,6 +86,12 @@ export interface FlowVerifyReport {
   passed: number;
   total: number;
   done: boolean;
+  /**
+   * Set when the URL redirected — almost always a login wall. A flow driven
+   * against a sign-in page fails on "element not found" for every step, which
+   * reads as a broken flow rather than a missing session.
+   */
+  redirected?: string;
 }
 
 function describeAction(a: FlowAction): string {
@@ -168,10 +175,14 @@ export async function runFlowVerify(options: FlowVerifyOptions): Promise<FlowVer
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   const steps: StepResult[] = [];
+  let redirected: string | undefined;
   try {
     const page = await browser.newPage(withAuthState({ viewport: options.flow.viewport ?? { width: 1280, height: 800 } }, options.storageState));
     const url = /^(https?|file):\/\//.test(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
     await page.goto(url, { waitUntil: "load", timeout: 30000 });
+    redirected = /^https?:\/\//.test(options.source)
+      ? describeRedirect(options.source, page.url()) ?? undefined
+      : undefined;
 
     for (let i = 0; i < options.flow.steps.length; i++) {
       const step = options.flow.steps[i]!;
@@ -202,19 +213,32 @@ export async function runFlowVerify(options: FlowVerifyOptions): Promise<FlowVer
     await browser.close();
   }
   const passed = steps.filter((s) => s.passed).length;
-  const done = steps.length === options.flow.steps.length && steps.every((s) => s.passed);
+  // Not `done` on a redirect: the flow ran against a page the caller did not
+  // ask for, so passing steps would be a claim about the sign-in screen.
+  const done = steps.length === options.flow.steps.length && steps.every((s) => s.passed) && !redirected;
   appendRunLedger({
     tool: "verify-flow",
     source: options.source,
-    headline: { done, passed, total: options.flow.steps.length },
+    headline: { done, passed, total: options.flow.steps.length, ...(redirected ? { redirected: true } : {}) },
   });
-  return { source: options.source, steps, passed, total: options.flow.steps.length, done };
+  return {
+    source: options.source,
+    steps,
+    passed,
+    total: options.flow.steps.length,
+    done,
+    ...(redirected ? { redirected } : {}),
+  };
 }
 
 export function formatFlowReport(report: FlowVerifyReport): string {
   const lines: string[] = [];
   lines.push(`${BOLD}${CYAN}vlmkit verify flow${RESET}`);
   lines.push(`${DIM}source: ${report.source}${RESET}`);
+  if (report.redirected) {
+    lines.push(`${RED}x ${report.redirected}${RESET}`);
+    lines.push(`${DIM}  Every step below ran against that page.${RESET}`);
+  }
   lines.push("");
   lines.push(`verdict: ${report.done ? `${GREEN}DONE${RESET}` : `${RED}FAILED${RESET}`} (${report.passed}/${report.total} steps)`);
   lines.push("");
