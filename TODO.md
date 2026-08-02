@@ -565,6 +565,31 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   ドキュメントは「ゲートは --json を取る」と書いていたので一貫性の穴でもあった。
   回帰テスト: `packages/vlmkit-markup/src/output-consistency.test.ts`(6 件)。
 
+### ドキュメント刷新(2026-08-02)
+- [x] **`docs/introduce.ja.md` が 7/27 の `vrt` 時代のまま(248 行)だった** —
+  リネーム前のコマンド名で、**すでに削除されたコマンド**(`vrt compare` /
+  `elements` / `smoke` / `serve` / `discover`)を手順として書いており、
+  ディレクトリ構成もフラットな `src/` のまま。読者が写して実行すると必ず失敗する
+  状態だったので、`introduce.md` と同じ構成の**独立した日本語版**として全面改稿。
+  同日追加分(`check design`、`batch` / `gates`、`--allow`、`--json`、
+  マルチ viewport 帰属、`file://` ナビゲーション、リダイレクト検知)を反映し、
+  Honest limits には同日の自己監査 3 レポートを引用。
+- [x] **`introduce.md` 側にも同日の作業で偽になった記述が 2 件あった** —
+  日本語版を書く前に英語版を先に修正した:
+  (a)「integrity にユーザー定義免除リストはまだ無い」→ `--allow
+  "<kind>[@<selector>][@<viewport>];<reason>"` の契約と免除不可 4 kind を明記、
+  (b) ゲート設定は npm script のみ → `vlmkit.gates.json` の例と
+  `gates list|run|suppressions`、reason 必須 / expiry 失効ルールを明記。
+  併せて `check design` の段落を追加。
+- [x] **文中の実行可能な主張を実測で検証** — 文章を信じずに走らせた:
+  `--allow` の構文が実際に `user exemption (...)` 行を出すこと、帰属が
+  `@1280,768,375` と印字されること、免除不可 4 kind が全てエラーになること、
+  `gates suppressions` が存在すること、`--json` が `failures` を持つこと、
+  JSON ブロック 3 つが全てパースでき gates.json ブロックが 3 ページ /
+  7 ゲート実行 / 1 suppression に解決すること、layout-contract と flow の
+  ブロックが各ゲートに受理されること、相対リンク 29 本(ja 17 / en 12)が
+  全て解決すること。
+
 ### Ecosystem positioning (市場調査 2026-07-29 由来)
 調査メモ: `docs/reports/2026-07-29-ai-markup-tooling-landscape.md` /
 設計: `docs/design/mcp-and-agent-expansion.md`

@@ -256,6 +256,20 @@ and in CI any gate is already a failing step — a suspect exits non-zero:
 - run: npx vlmkit check integrity dist/index.html
 ```
 
+**"Is the page consistent with itself?"** — `check design` needs no
+token file: it groups elements by an inferred role, computes each
+instance's rendered style signature, and reports a role whose styles
+are barely reused — "7 buttons render 3 distinct styles". That is the
+one measurement in this project that would have failed the agent work
+it shipped: every zero-shot fixture passed every functional gate while
+carrying three button styles. It is a *consistency* claim, never a
+taste one — it reports that 23px and 24px coexist and leaves the choice
+to you — and its findings are warn-level, so a drifting design system
+never fails a build. The thresholds come from measuring designed pages
+against generated ones ([the study](./design/design-policy-metrics.md));
+notably 4px-grid conformance was rejected as a signal, because
+LLM-written CSS scores *better* on it than MDN does.
+
 There is more: design-token conformance (hard-coded values that
 should be tokens), dark-theme parity, WCAG contrast/touch/focus
 checks, layout survival under 40%-longer translated text, suggested
@@ -305,11 +319,37 @@ The operational questions a lead will ask, answered plainly:
 - **Where does gate configuration live?** Contracts, flows, copy
   manifests, and snapshot config (`vrt.config.json` — a second
   naming fossil, from the visual-regression-testing origins) are
-  files in your repo. Everything else — which gates run per page,
-  and any `--allow-invisible` acceptances — is CLI flags, so the
-  reviewed source of truth is wherever you write the invocation; the
-  workable convention is one npm script per page as its canonical
-  gate set:
+  files in your repo. Which gates run per page, and every
+  suppression, belong in `vlmkit.gates.json`:
+
+  ```json
+  { "defaults": { "gates": ["check integrity", "check design"] },
+    "pages": [
+      { "id": "home", "source": "routes/index.html",
+        "extraGates": ["check copy --manifest copy/home.txt"] },
+      { "id": "docs", "source": "routes/docs/**/*.html" },
+      { "id": "checkout", "source": "https://staging.example.com/checkout",
+        "suppressions": [ {
+          "gate": "check copy",
+          "flag": "--allow-invisible visually-hidden",
+          "reason": "sr-only skip link; legal reviews the wording",
+          "owner": "web-platform",
+          "expires": "2027-01-31" } ] } ] }
+  ```
+
+  `vlmkit gates list` prints the exact command each page will run,
+  `gates run` runs them in parallel (`--shard i/n` for CI runners),
+  and `gates suppressions` is the inventory: every silenced check with
+  its reason, owner and days left, expired ones first. Two rules make
+  the file reviewable — a suppression must carry a `reason`, and once
+  `expires` passes it **stops being applied**: the gate runs unmuted
+  and the run fails, so a stale exemption gets noticed instead of
+  accumulating. For a one-off sweep without a config,
+  `vlmkit batch --gate "check integrity" "routes/**/*.html"` takes a
+  glob directly.
+
+  The older convention — one npm script per page — still works and is
+  fine for a handful of pages:
 
   ```json
   { "scripts": {
@@ -319,10 +359,9 @@ The operational questions a lead will ask, answered plainly:
   } }
   ```
 
-  The consequence worth knowing: to see every active suppression,
-  you grep those scripts — there is no central config file that
-  aggregates gate sets today, and past ~20 pages this convention
-  gets heavy; that's the honest scale ceiling of the current design. Separately, every run
+  Its consequence is why the config file exists: to see every active
+  suppression you grep those scripts, and past ~20 pages that gets
+  heavy. Separately, every run
   appends one JSON line to `.vlmkit/run-ledger.jsonl` — timestamp,
   tool, source, and a per-tool `headline` object (integrity and
   snapshot carry `verdict`; the others carry their own numbers, e.g.
@@ -458,10 +497,17 @@ Trust lives in stated boundaries, so here are the ones that matter:
   integrity gate exempts patterns it can verify geometrically —
   screen-reader-only text (fully clipped, not partially cut), image
   replacement, hero overlays, ellipsis truncation. There is no
-  user-defined exemption list for integrity yet; the copy gate DOES
-  take an explicit per-class allow flag for deliberately hidden copy.
-  A novel intentional pattern may need a small markup adjustment or a
-  report to the tracker.
+  user-defined exemption for a pattern it cannot verify: `--allow
+  "<kind>[@<selector>][@<viewport>];<reason>"`, repeatable. The reason
+  is mandatory (a rule without one is rejected), an unknown finding
+  kind is an error rather than a silent no-op, an accepted finding is
+  still listed under `exempted` with your reason, and a rule that
+  matched nothing is reported so dead exemptions get deleted. Four
+  kinds cannot be exempted at all — `js-error`, `degenerate-render`,
+  `unstyled-page`, `redirected` — because they report a broken or
+  unmeasurable page rather than a design decision. The copy gate has
+  the equivalent per-class `--allow-invisible` for deliberately hidden
+  copy.
 - **A green gate set is not a correctness proof.** Gates catch the
   defect classes they encode. This project tracks its own false
   negatives the hard way — every evaluation run is independently
