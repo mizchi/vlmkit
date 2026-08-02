@@ -284,8 +284,15 @@ export async function runA11yContrast(
   console.log(`  ${DIM}inspected ${byPath.size} text-bearing element(s)${RESET}`);
   const icon = findings.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
   console.log(`  ${icon} ${findings.length} contrast failure(s)`);
-  for (const f of findings.slice(0, 5)) {
+  const CONSOLE_ROWS = 5;
+  for (const f of findings.slice(0, CONSOLE_ROWS)) {
     console.log(`    ${DIM}${f.path} — ${f.ratio.toFixed(2)}:1 (need ${f.requiredAA}) — \`${f.foreground.hex}\` on \`${f.background.hex}\` — "${f.text}"${RESET}`);
+  }
+  // Disclose the cut: a headline count above a five-row list reads as "here they
+  // are", and a reader has no way to know seven more exist. Same wording as
+  // `check breakpoints` and `check integrity`.
+  if (findings.length > CONSOLE_ROWS) {
+    console.log(`    ${DIM}… ${findings.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
   }
   console.log(`  ${DIM}report: ${reportPath}${RESET}`);
 
@@ -327,6 +334,7 @@ function renderReport(r: Omit<A11yContrastReport, "reportPath">): string {
       const bgSwatch = `\`${f.background.hex}\``;
       lines.push(`| \`${f.path}\` (${f.fontSize.toFixed(0)}px${f.fontWeight >= 600 ? " b" : ""}) | \`${f.text}\` | ${fgSwatch} | ${bgSwatch} | **${f.ratio}:1** | ${f.requiredAA}:1 |`);
     }
+    if (r.failures.length > 20) lines.push(`\n_… ${r.failures.length - 20} more row(s) omitted; the JSON report has all of them._`);
     if (r.failures.length > 20) {
       lines.push(`| _…${r.failures.length - 20} more_ | | | | | |`);
     }
@@ -359,13 +367,19 @@ async function main(argv = process.argv.slice(2)) {
     console.log("Options:");
     console.log("  --output-dir <dir>   Default: ./test-results/a11y-contrast");
     console.log("  --report <path>      Markdown report path");
+    console.log("  --json               Print the full report as JSON (every row, no cut)");
     process.exit(1);
   }
-  await runA11yContrast({
+  // `--json` so the console/markdown row caps stay a display choice rather than
+
+  // the only view of the data — the truncation notices point here.
+
+  const result = await runA11yContrast({
     htmlPath: positional[0]!,
     outputDir: outputDir || join(process.cwd(), "test-results", "a11y-contrast"),
     reportPath: report || undefined,
   });
+  if (argv.includes("--json")) console.log(JSON.stringify(result, null, 2));
 }
 
 const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "a11y-contrast" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);

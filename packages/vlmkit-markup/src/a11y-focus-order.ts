@@ -251,8 +251,13 @@ export async function runFocusOrder(
   console.log(`  ${DIM}captured ${steps.length} focus step(s)${RESET}`);
   const icon = findings.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
   console.log(`  ${icon} ${findings.length} finding(s)`);
-  for (const f of findings.slice(0, 5)) {
+  const CONSOLE_ROWS = 5;
+  for (const f of findings.slice(0, CONSOLE_ROWS)) {
     console.log(`    ${DIM}[${f.kind}] ${f.message}${RESET}`);
+  }
+  // See a11y-contrast: an undisclosed cut makes a partial list look complete.
+  if (findings.length > CONSOLE_ROWS) {
+    console.log(`    ${DIM}… ${findings.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
   }
   console.log(`  ${DIM}report: ${reportPath}${RESET}`);
 
@@ -323,14 +328,20 @@ async function main(argv = process.argv.slice(2)) {
     console.log("  --max-steps N        Maximum Tab presses (default: 64)");
     console.log("  --output-dir <dir>   Default: ./test-results/a11y-focus-order");
     console.log("  --report <path>      Markdown report path");
+    console.log("  --json               Print the full report as JSON (every row, no cut)");
     process.exit(1);
   }
-  await runFocusOrder({
+  // `--json` so the console/markdown row caps stay a display choice rather than
+
+  // the only view of the data — the truncation notices point here.
+
+  const result = await runFocusOrder({
     source: positional[0]!,
     outputDir: outputDir || join(process.cwd(), "test-results", "a11y-focus-order"),
     reportPath: report || undefined,
     maxSteps,
   });
+  if (argv.includes("--json")) console.log(JSON.stringify(result, null, 2));
 }
 
 const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "a11y-focus-order" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);

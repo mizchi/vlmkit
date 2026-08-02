@@ -344,6 +344,7 @@ function renderReport(r: Omit<I18nStressReport, "reportPath">): string {
       const aw = `${o.after.width.toFixed(0)}×${o.after.height.toFixed(0)}`;
       lines.push(`| ${o.kind} | \`${o.path}\` | \`${o.text}\` | ${bw} | ${aw} | ${detail} |`);
     }
+    if (r.overflowing.length > 20) lines.push(`\n_… ${r.overflowing.length - 20} more row(s) omitted; the JSON report has all of them._`);
   }
   lines.push("");
   lines.push("## Suggested next step");
@@ -377,14 +378,20 @@ async function main(argv = process.argv.slice(2)) {
     console.log("  --inflate <N>        Word-length inflation factor. Default 1.4.");
     console.log("  --output-dir <dir>   Default: ./test-results/i18n-stress");
     console.log("  --report <path>      Markdown report path");
+    console.log("  --json               Print the full report as JSON (every row, no cut)");
     process.exit(1);
   }
-  await runI18nStress({
+  // `--json` so the console/markdown row caps stay a display choice rather than
+
+  // the only view of the data — the truncation notices point here.
+
+  const result = await runI18nStress({
     htmlPath: positional[0]!,
     outputDir: outputDir || join(process.cwd(), "test-results", "i18n-stress"),
     reportPath: report || undefined,
     inflateFactor: inflate,
   });
+  if (argv.includes("--json")) console.log(JSON.stringify(result, null, 2));
 }
 
 const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "i18n-stress" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);

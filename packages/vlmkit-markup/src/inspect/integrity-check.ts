@@ -75,8 +75,18 @@ export interface IntegrityFinding {
   kind: IntegrityFindingKind;
   /** fail = defect (flips the verdict); warn = suspicious but not conclusive. */
   severity: "fail" | "warn";
-  /** Viewport width the finding was first observed at. */
+  /**
+   * Canonical viewport width for this finding: the WIDEST width it was observed
+   * at. Widest rather than "first swept" because the sweep is sorted internally
+   * — attribution must not depend on the order the caller listed its widths in.
+   */
   viewport: number;
+  /**
+   * Every swept width where this finding appeared, widest first. A defect
+   * present everywhere reads very differently from a mobile-only one, and the
+   * single `viewport` field could not tell them apart.
+   */
+  viewports?: number[];
   selector?: string;
   message: string;
   evidence?: Record<string, unknown>;
@@ -1469,18 +1479,31 @@ function dedupeKey(f: IntegrityFinding): string {
 }
 
 export async function runIntegrityCheck(options: IntegrityOptions): Promise<IntegrityReport> {
-  const viewports = options.viewports ?? DEFAULT_INTEGRITY_VIEWPORTS;
+  // Sorted widest-first, whatever order the caller gave. Findings are deduped
+  // across the sweep, so the retained one used to be whichever width came
+  // first: `--viewports 375,768,1280` attributed a page-wide defect to 375 and
+  // `1280,768,375` to 1280. That made `--allow "...@1280"` silently
+  // order-dependent, and read as "mobile only" for something present everywhere.
+  const viewports = [...(options.viewports ?? DEFAULT_INTEGRITY_VIEWPORTS)]
+    .sort((a, b) => b.width - a.width);
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   const findings: IntegrityFinding[] = [];
   const exempted: IntegrityExemption[] = [];
   const stats: IntegrityViewportStats[] = [];
-  const seen = new Set<string>();
+  // key -> the retained finding, so a repeat at a narrower width records its
+  // width instead of being dropped without trace.
+  const seen = new Map<string, IntegrityFinding>();
   const push = (list: IntegrityFinding[]) => {
     for (const f of list) {
       const key = dedupeKey(f);
-      if (seen.has(key)) continue;
-      seen.add(key);
+      const existing = seen.get(key);
+      if (existing) {
+        existing.viewports ??= [existing.viewport];
+        if (!existing.viewports.includes(f.viewport)) existing.viewports.push(f.viewport);
+        continue;
+      }
+      seen.set(key, f);
       findings.push(f);
     }
   };
@@ -1662,7 +1685,9 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
   const order: Record<"fail" | "warn", number> = { fail: 0, warn: 1 };
   findings.sort((a, b) => order[a.severity] - order[b.severity] || a.viewport - b.viewport);
   const kickback = findings.map((f) =>
-    `[${f.kind}]${f.selector ? ` ${f.selector}` : ""} (viewport ${f.viewport}): ${f.message}`);
+    `[${f.kind}]${f.selector ? ` ${f.selector}` : ""} (viewport ${
+      f.viewports && f.viewports.length > 1 ? f.viewports.join(",") : f.viewport
+    }): ${f.message}`);
   const verdict = findings.some((f) => f.severity === "fail") ? "defects" : "clean";
   appendRunLedger({
     tool: "integrity-check",
@@ -1704,7 +1729,10 @@ export function formatIntegrityReport(report: IntegrityReport): string {
     lines.push("Findings:");
     for (const f of report.findings) {
       const icon = f.severity === "fail" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
-      lines.push(`  ${icon} [${f.kind}]${f.selector ? ` ${f.selector}` : ""} @${f.viewport}: ${f.message}`);
+      // Show every width it appeared at: "@1280" and "@1280,768,375" are
+      // different bugs to fix, and the caller cannot tell them apart otherwise.
+      const at = f.viewports && f.viewports.length > 1 ? f.viewports.join(",") : String(f.viewport);
+      lines.push(`  ${icon} [${f.kind}]${f.selector ? ` ${f.selector}` : ""} @${at}: ${f.message}`);
     }
   } else {
     lines.push("");

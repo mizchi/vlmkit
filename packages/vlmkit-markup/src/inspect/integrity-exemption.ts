@@ -127,7 +127,12 @@ export function parseAllowRules(specs: readonly string[]): IntegrityAllowRule[] 
 
 export function ruleMatches(rule: IntegrityAllowRule, finding: IntegrityFinding): boolean {
   if (rule.kind !== finding.kind) return false;
-  if (rule.viewport !== undefined && rule.viewport !== finding.viewport) return false;
+  if (rule.viewport !== undefined) {
+    // Against every width the finding appeared at, not just the canonical one:
+    // a finding present at 1280/768/375 must be exemptable by any of them.
+    const observed = finding.viewports ?? [finding.viewport];
+    if (!observed.includes(rule.viewport)) return false;
+  }
   if (rule.selector !== undefined) {
     // Substring, not an exact match: the finding's selector is a generated path
     // (`main>div.card>p.kicker`), so equality would break the moment an

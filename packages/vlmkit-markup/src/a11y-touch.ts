@@ -267,9 +267,14 @@ export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchRep
   console.log(`  ${DIM}inspected ${byPath.size} interactive element(s)${RESET}`);
   const icon = findings.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
   console.log(`  ${icon} ${findings.length} undersized target(s)`);
-  for (const f of findings.slice(0, 5)) {
+  const CONSOLE_ROWS = 5;
+  for (const f of findings.slice(0, CONSOLE_ROWS)) {
     const cl = f.cluster ? " (clustered)" : "";
     console.log(`    ${DIM}${f.path} — ${Math.round(f.bbox.width)}×${Math.round(f.bbox.height)}${cl} — "${f.text}"${RESET}`);
+  }
+  // See a11y-contrast: an undisclosed cut makes a partial list look complete.
+  if (findings.length > CONSOLE_ROWS) {
+    console.log(`    ${DIM}… ${findings.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
   }
   console.log(`  ${DIM}report: ${reportPath}${RESET}`);
 
@@ -306,6 +311,7 @@ function renderReport(r: Omit<TouchReport, "reportPath">): string {
     const sz = `${Math.round(f.bbox.width)}×${Math.round(f.bbox.height)}`;
     lines.push(`| \`${f.path}\` | \`${f.text}\` | ${sz} | **${f.minSide}** | ${f.required} | ${f.cluster ? "yes" : "no"} |`);
   }
+  if (r.failures.length > 30) lines.push(`\n_… ${r.failures.length - 30} more row(s) omitted; the JSON report has all of them._`);
   if (r.failures.length > 30) lines.push(`| _…${r.failures.length - 30} more_ | | | | | |`);
   lines.push("");
   lines.push("## Suggested next step");
@@ -332,14 +338,20 @@ async function main(argv = process.argv.slice(2)) {
     console.log("  --level AAA|AA    WCAG threshold — AAA=44px (default), AA=24px-with-spacing.");
     console.log("  --output-dir <dir> Default: ./test-results/a11y-touch");
     console.log("  --report <path>    Markdown report path");
+    console.log("  --json               Print the full report as JSON (every row, no cut)");
     process.exit(1);
   }
-  await runA11yTouch({
+  // `--json` so the console/markdown row caps stay a display choice rather than
+
+  // the only view of the data — the truncation notices point here.
+
+  const result = await runA11yTouch({
     source: positional[0]!,
     outputDir: outputDir || join(process.cwd(), "test-results", "a11y-touch"),
     reportPath: report || undefined,
     level,
   });
+  if (argv.includes("--json")) console.log(JSON.stringify(result, null, 2));
 }
 
 const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "a11y-touch" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);

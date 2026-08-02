@@ -519,6 +519,31 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   `waitUntil` は networkidle 72 / load 8 / domcontentloaded 1 のまま。
   今回は「ロード方式が verdict を変えるゲート」だけを移行した。
 
+### 差分監査 3 軸(2026-08-02)
+レポート: `docs/reports/2026-08-02-differential-audit-three-axes.md`
+- [x] **viewport 順序 — 欠陥あり、修正済み** — `check integrity` は sweep 全体で
+  finding を dedupe し「最初に観測した」ものを残すため、**呼び出し側が並べた順**で
+  帰属 viewport が変わっていた(`375,768,1280` なら 375、`1280,768,375` なら 1280)。
+  影響 2 点: (a) 数時間前に入れた `--allow "...@1280"` が順序依存で効いたり効かなかった、
+  (b) 全幅で出ている欠陥が「@375」= モバイル限定のように読めた。
+  修正: sweep を内部で**幅の降順にソート**し、狭い幅での再出現は捨てずに
+  `viewports: number[]` に記録。`--allow` は観測されたどの幅でもマッチ。
+  副産物として `btn-c は 1280/768 で崩れて 375 では崩れない` が読めるようになった
+  (以前は表現できなかった情報)。
+- [x] **dpr — 等価性の軸ではない** — `--dpr` を持つのは `build component` だけで、
+  そこでは retina ターゲットに合わせて**意図的に**描画を変える。ゲート側は dpr を
+  取らない。既存の実測(同日のフォント probe)では dpr2 で ink 差 ≤1.00px / flip 0。
+  「未知」として再オープンしないよう記録のみ。
+- [x] **人間向け出力とデータの一致 — 欠陥あり、修正済み** — `check a11y contrast` /
+  `touch` / `focus` は件数を出した後**先頭 5 件のみ表示し、切り詰めを告知していなかった**
+  (12 件が 5 件に見える)。markdown レポートも 20/30 行で無言カット。
+  `check breakpoints` / `check integrity` は既に `… N more` を出していたので同じ文言に統一。
+  **この修正中の自分の誤り**: 告知文に「`--json` で全件」と書いたが、
+  **これらのゲートには `--json` が存在しなかった**。文言を弱めるのではなく
+  4 ゲート(a11y 3 本 + `stress i18n`)に `--json` を追加して主張を真にした。
+  ドキュメントは「ゲートは --json を取る」と書いていたので一貫性の穴でもあった。
+  回帰テスト: `packages/vlmkit-markup/src/output-consistency.test.ts`(6 件)。
+
 ### Ecosystem positioning (市場調査 2026-07-29 由来)
 調査メモ: `docs/reports/2026-07-29-ai-markup-tooling-landscape.md` /
 設計: `docs/design/mcp-and-agent-expansion.md`
