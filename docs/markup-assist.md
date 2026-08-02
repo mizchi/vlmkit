@@ -122,6 +122,7 @@ Sources are file paths or URLs throughout.
 | The exact copy is spec (spellings, casing, `€`, dates) | `vlmkit check copy page.html --manifest copy.txt` |
 | Structural requirements as a machine-checkable spec (widths, per-row counts, stacking order, per-viewport visibility) | `vlmkit check layout page.html --contract layout.json` |
 | Design-system conformance: hard-coded values vs a token scale | `vlmkit check tokens page.html` |
+| No token file to check against: is the page consistent with *itself*? (one button style or six; spacing on the page's own scale) | `vlmkit check design page.html` |
 | Light/dark theme parity | `vlmkit check theme page.html` |
 | WCAG contrast / touch targets / focus order | `vlmkit check a11y contrast\|touch\|focus page.html` |
 | Layout survives 30% longer strings (i18n) | `vlmkit stress i18n page.html` |

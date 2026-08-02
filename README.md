@@ -66,7 +66,7 @@ marked `[key]`.
 | Match a target design | `verify markup --target` (done verdict + fix list) · `build page` / `build component` · `scan mock` (normalize @2x exports) |
 | Track changes over time (VRT) | `snapshot` (baseline → per-viewport diff → `snapshot approve`) · `watch` · `diff-pr` · `baseline` |
 | Compare two versions | `diff html\|png\|elements` · `migration compare` · `check equivalence --region` |
-| Audit design quality | `check tokens\|theme\|palette` · `check a11y contrast\|touch\|focus` · `check perf` · `check drift` · `stress i18n\|media` |
+| Audit design quality | `check tokens\|theme\|palette` · `check design` (is the page consistent with itself — one button style or six) · `check a11y contrast\|touch\|focus` · `check perf` · `check drift` · `stress i18n\|media` |
 | Vet an image asset before it enters a slot | `check asset --slot --expect-transparent --against-bg --page-palette` |
 | Repair | `heal selector` (dead selector) · `heal markup` `[key]` (LLM auto-fix from a kickback) |
 | Wire into agents / pipelines | `mcp` (gate tools over stdio) · `contract` · `workflow` · `markup-loop` · `api` · `bench` · `skill` |

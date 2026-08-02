@@ -11,7 +11,7 @@ for options.
 | Group | Subcommands |
 |---|---|
 | `vlmkit diff` | `html`, `png`, `elements`, `browsers`, `agent`, `runs` (`region` is deprecated) |
-| `vlmkit check` | `integrity`, `copy`, `layout`, `interactions`, `equivalence`, `asset`, `breakpoints`, `scroll`, `animation`, `motion`, `a11y {contrast,touch,focus}`, `palette`, `tokens`, `theme`, `perf`, `drift {component,pages}`, `crater` |
+| `vlmkit check` | `integrity`, `copy`, `layout`, `interactions`, `equivalence`, `asset`, `breakpoints`, `scroll`, `animation`, `motion`, `a11y {contrast,touch,focus}`, `palette`, `tokens`, `design`, `theme`, `perf`, `drift {component,pages}`, `crater` |
 | `vlmkit scan` | `component`, `breakpoints`, `scroll`, `mock`, `handlers` |
 | `vlmkit build` | `component`, `page` |
 | `vlmkit verify` | `markup`, `flow` |
@@ -237,14 +237,15 @@ vlmkit snapshot flipbook                       # Diff three-frame (baseline ↔ 
 vlmkit snapshot report                         # Render snapshot-report.json as Markdown
 ```
 
-### Check (gates: a11y / tokens / theme / perf / drift)
+### Check (gates: a11y / tokens / design / theme / perf / drift)
 
 ```bash
 vlmkit check a11y contrast <html>              # WCAG AA contrast scan
 vlmkit check a11y touch    <html|url>          # Touch target size (WCAG 2.5.5 / 2.5.8)
 vlmkit check a11y focus    <html|url>          # Tab order vs visual order
 vlmkit check palette       <target.png> [current.png]  # Dominant colors, or palette diff (missing/extra hex)
-vlmkit check tokens        <html>              # radius/spacing/z-index/shadow scale conformance
+vlmkit check tokens        <html>              # radius/spacing/z-index/shadow scale conformance (declared scale)
+vlmkit check design        <html|url>          # coherence of the scale the page itself implies (no config)
 vlmkit check theme         <html>              # prefers-color-scheme dark / unthemed components
 vlmkit check perf          <html|url>          # Web Vitals (CLS / LCP / FCP)
 vlmkit check drift component <html> --selector .card

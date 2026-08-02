@@ -143,6 +143,7 @@ const SPECS: Record<string, Spec> = {
   mediaVariants: spec("media-variants", () => import("@mizchi/vlmkit-markup/stress/media-variants.ts")),
   crossBrowser: spec("cross-browser", () => import("@mizchi/vlmkit-markup/stress/cross-browser.ts")),
   designTokens: spec("design-tokens", () => import("@mizchi/vlmkit-markup/style/design-tokens.ts")),
+  designPolicy: spec("design-policy", () => import("@mizchi/vlmkit-markup/style/design-policy.ts")),
   motionDetect: spec("motion-detect", () => import("@mizchi/vlmkit-markup/style/motion-detect.ts")),
   animationEval: spec("animation-eval", () => import("@mizchi/vlmkit-markup/style/animation-eval.ts")),
   scrollScan: spec("scroll-scan", () => import("@mizchi/vlmkit-markup/inspect/scroll-scan.ts")),
@@ -185,7 +186,8 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
   },
   check: {
     palette: { spec: SPECS.palette, desc: "Dominant colors of a PNG, or palette diff of two PNGs" },
-    tokens: { spec: SPECS.designTokens, desc: "Design-token scale conformance" },
+    tokens: { spec: SPECS.designTokens, desc: "Design-token scale conformance (against a scale YOU declare)" },
+    design: { spec: SPECS.designPolicy, desc: "Coherence of the design system the page itself implies (component/spacing consistency)" },
     theme: { spec: SPECS.themeParity, desc: "Theme parity (hard-coded color scan in dark mode)" },
     motion: { spec: SPECS.motionDetect, desc: "CSS motion detection (animation / transition / reduced-motion)" },
     animation: { spec: SPECS.animationEval, desc: "Frame-sampled animation evaluation (visible effect / settle / reduced-motion behavior)" },

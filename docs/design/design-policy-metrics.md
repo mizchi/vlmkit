@@ -132,18 +132,83 @@ policy (`--policy design.json` pinning expected signature counts per role).
   and why the gate is most useful on new/generated pages and design-system
   components, not on twenty years of accumulated wiki CSS.
 
-## Open questions before implementation
+## Implemented: `vlmkit check design`
 
-1. **Role inference quality.** `button` is easy; "card" and "panel" are
-   not. The gate should only group roles it can infer deterministically,
-   and say which elements it skipped (no silent coverage gaps).
-2. **Signature granularity.** Including rendered `height` catches real
-   drift but also flags a button that is taller only because its label
-   wrapped. Height may belong in a separate finding from the style tuple.
-3. **Threshold shape.** `signatures/instances` is scale-sensitive at small
-   n (1 button = 1 signature = perfect). Needs a minimum instance count
-   (≥3) before reporting, like the other probes' floors.
-4. **State confusion.** A `:disabled` or `aria-pressed` button legitimately
-   differs. Signatures should be computed per resting state, or states
-   detected and excluded — the interaction gate already knows how to find
-   them.
+`packages/vlmkit-markup/src/style/design-policy.ts`. Two of the four
+proposed findings shipped; `rail-drift` and `type-scale-sprawl` did not
+(A12 already covers near-misalignment per element, and font-size count
+turned out to be the same overlapping distribution as spacing — 5-13 on
+designed pages, 5-8 on agent pages).
+
+### How the open questions resolved
+
+1. **Role inference** — narrow by construction: explicit `role`, `button`,
+   `input:<type>`, `select`, `textarea`, `h1`-`h6`. Nothing else is grouped,
+   and both skip counts (`skipped`, `statefulSkipped`) are in the report and
+   the header line, so the coverage gap is never silent. `input`/`select`/
+   `textarea` are **separate** roles: grouping them as one "field" produced a
+   false drift signal, because the browser styles them differently by design.
+2. **Signature granularity** — rendered `height` is **excluded**. The
+   signature is padding×4 | radius | font-size | font-weight | border-width |
+   background-color. A button that is taller only because its label wrapped is
+   not a design inconsistency.
+3. **Threshold shape** — a role is judged only at ≥3 instances, and the
+   measure is reuse (instances / distinct signatures) rather than the inverse
+   ratio, with a floor of 3.
+4. **State confusion** — `:disabled`, `aria-disabled`, `aria-pressed`,
+   `aria-expanded`, `aria-current`, `aria-selected`, `:checked` are excluded
+   and counted separately. Measured impact: this alone took S19 from 6
+   apparent button signatures to 3 real ones.
+
+### `scale-outlier` needed four tightenings, and does not carry the verdict
+
+The first implementation reported `verdict: DRIFT` on **both MDN and
+web.dev** — the pages this study established as coherent. A metric that
+fires on its own reference set is not a metric. The rows were:
+
+- MDN: `2.5px`, `5px`, `6px` paddings on an inline `<code>` element.
+- web.dev: `21.4px` "just off" a common `21.3px` — two rem-derived
+  neighbours with no design content whatsoever.
+
+So the rule now requires: value **and** reference ≥8px (a spacing scale does
+not start at 2px), both **integral** (fractional computed values come from
+rem/em arithmetic, not from a decision), a gap within `max(2, 10%)` of the
+reference (23-vs-24 is drift; 12-vs-8 is a second step in the scale), and a
+reference used ≥4 times and ≥3× more often than the outlier (otherwise
+"off the page's own scale" asserts a scale that does not exist).
+
+Even tightened, one true row survives on MDN: an authored `43px` padding on
+one `summary` against twelve `40px`. It is a real one-off, so the gate keeps
+printing it — but the study already measured that spacing concentration
+**overlaps** between designed and generated pages (top-6 coverage 0.81-0.99
+in both groups), which means a spacing straggler cannot carry a verdict.
+`scale-outlier` is therefore emitted at `severity: "info"` under an
+"Informational (true, but does not carry the verdict)" heading, and only
+`component-drift` moves the verdict.
+
+### Measured after implementation
+
+Same page set, `vlmkit check design`, 1280px:
+
+| page | verdict | carried finding |
+|---|---|---|
+| MDN | COHERENT | — (1 informational) |
+| web.dev | COHERENT | — |
+| Hacker News | COHERENT | — |
+| danluu.com | COHERENT | — |
+| W3C APG tabs | COHERENT | — |
+| Wikipedia | DRIFT | `navigation` 8 instances / 4 styles |
+| CSS Zen Garden | DRIFT | `article` 6/6, `h3` 5/2 |
+| agent s15 | DRIFT | `button` 6/3 |
+| agent s16 | DRIFT | `button` 6/3 |
+| agent s17 | COHERENT | — (1 button: below the instance floor) |
+| agent s18 | COHERENT | — (2 buttons: below the floor) |
+| agent s19 | DRIFT | `button` 7/3 |
+
+The two designed pages that report DRIFT are the two the study predicted
+would: Wikipedia's `navigation` role was called out in advance as genuine
+organic drift, and Zen Garden makes every section deliberately unique. The
+two agent pages that pass do so honestly — they have one and two buttons,
+which is below the instance floor, so the gate says nothing rather than
+guessing. Findings are warn-level, so a drifting design system never fails
+a build; `check design` exits non-zero only on `redirected` (suspect).
