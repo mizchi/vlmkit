@@ -52,6 +52,18 @@ describe("buildGeneratePrompt", () => {
     assert.match(prompt, /button "Pay now"/);
     assert.match(prompt, /cart-count/);
   });
+
+  it("does not force an extra start snapshot when the rules require one goal baseline", () => {
+    const prompt = buildGeneratePrompt({
+      planMarkdown: "# Preferences\n\nCapture the persisted dark goal state.",
+      testFilePath: "tests/preferences.spec.ts",
+      rulesMarkdown: 'Finish with exactly one `toHaveScreenshot("goal.png")` assertion.',
+    });
+
+    assert.doesNotMatch(prompt, /checks for the start and goal states/);
+    assert.match(prompt, /required by the plan and additional generation rules/);
+    assert.match(prompt, /Do not invent extra snapshots/);
+  });
 });
 
 describe("extractTypescriptSource", () => {

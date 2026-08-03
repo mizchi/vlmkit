@@ -24,7 +24,9 @@ export function buildGeneratePrompt(input: GenerateInput): string {
     "- For live-region roles such as `status`, `alert`, and `log`, use `getByRole(\"status\")` and assert text separately; do not pass a `name` filter.",
     "- Keep comments sparse. Do not narrate obvious Playwright actions; comment only non-obvious locator or determinism constraints.",
     "- Every visual assertion must also have semantic assertions.",
-    requireScreenshots ? "- Include deterministic `toHaveScreenshot()` checks for the start and goal states." : undefined,
+    requireScreenshots
+      ? "- Include deterministic `toHaveScreenshot()` checks only for VRT states required by the plan and additional generation rules. Do not invent extra snapshots."
+      : undefined,
     input.locatorInventory ? formatLocatorInventory(input.locatorInventory) : undefined,
     "",
     input.rulesMarkdown?.trim() ? `Additional generation rules:\n${input.rulesMarkdown.trim()}` : undefined,

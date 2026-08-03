@@ -1,0 +1,39 @@
+# vlmkit intro page
+
+vlmkit 自身を紹介する、依存なしの静的ページです。このページ自体を vlmkit の
+markup loop、決定論的ゲート、Playwright VRT で検証します。ヘッダーから
+日本語・英語と Light・Dark を切り替えられ、選択は再読み込み後も維持されます。
+
+GitHub Pages: <https://mizchi.github.io/vlmkit/>
+
+まずリポジトリルートで vlmkit をビルドします。
+
+```sh
+pnpm build
+```
+
+サンプルのタスクは justfile にまとめています。
+
+```sh
+just --justfile examples/vlmkit-intro-page/justfile
+just --justfile examples/vlmkit-intro-page/justfile serve
+```
+
+決定論的ゲート、ページ単体のコントラクト、日本語Light・英語Darkの
+desktop/mobile VRT:
+
+```sh
+just --justfile examples/vlmkit-intro-page/justfile gates
+just --justfile examples/vlmkit-intro-page/justfile test
+just --justfile examples/vlmkit-intro-page/justfile pages
+```
+
+`main` にサンプルまたは Pages workflow の変更を push すると、契約テストを通過した
+実行時ファイルだけが GitHub Pages に自動デプロイされます。
+
+観測済み UI から plan・Playwright テスト生成・VRT をやり直す場合は
+`OPENROUTER_API_KEY` を設定して markup loop を実行します。
+
+```sh
+just --justfile examples/vlmkit-intro-page/justfile markup-loop
+```

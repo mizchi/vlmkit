@@ -8,7 +8,7 @@
     "type": "git",
     "url": "git+https://github.com/mizchi/vlmkit.git"
   },
-  "homepage": "https://github.com/mizchi/vlmkit#readme",
+  "homepage": "https://mizchi.github.io/vlmkit/",
   "bugs": {
     "url": "https://github.com/mizchi/vlmkit/issues"
   },
@@ -91,8 +91,7 @@
     "@types/ws": "^8.18.1",
     "three": "^0.184.0",
     "tsdown": "^0.21.7",
-    "tsx": "^4.22.4",
-    "typescript": "^6.0.2"
+    "tsx": "^4.22.4"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.12",
@@ -102,6 +101,7 @@
     "pixelmatch": "^7.1.0",
     "playwright": "^1.61.1",
     "pngjs": "^7.0.0",
+    "typescript": "^6.0.2",
     "ws": "^8.20.0"
   }
 }

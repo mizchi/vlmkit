@@ -14,6 +14,7 @@ export interface MarkupLoopConfig {
   scope: MarkupLoopScope;
   provider?: MarkupLoopProvider;
   model?: string;
+  maxTokens?: number;
   maxAttempts: number;
   runtimeGateRuns: number;
   screenshots: boolean;
@@ -38,6 +39,7 @@ export interface InitMarkupLoopOptions {
   title?: string;
   baseUrl?: string;
   provider?: MarkupLoopProvider;
+  maxTokens?: number;
   playwrightConfig?: string;
   force?: boolean;
 }
@@ -204,6 +206,7 @@ export function createDefaultMarkupLoopConfig(options: InitMarkupLoopOptions = {
     baseUrl,
     scope: "smoke",
     provider: options.provider ?? "openrouter",
+    maxTokens: options.maxTokens ?? 4096,
     maxAttempts: 3,
     runtimeGateRuns: 2,
     screenshots: true,
@@ -256,6 +259,7 @@ export function buildMarkupLoopCommands(config: MarkupLoopConfig): MarkupLoopCom
   ];
   if (config.provider) planArgs.push("--provider", config.provider);
   if (config.model) planArgs.push("--model", config.model);
+  if (config.maxTokens) planArgs.push("--max-tokens", String(config.maxTokens));
 
   const generateArgs = [
     "--plan", config.planFile,
@@ -272,6 +276,7 @@ export function buildMarkupLoopCommands(config: MarkupLoopConfig): MarkupLoopCom
   ];
   if (config.provider) generateArgs.push("--provider", config.provider);
   if (config.model) generateArgs.push("--model", config.model);
+  if (config.maxTokens) generateArgs.push("--max-tokens", String(config.maxTokens));
   if (!config.screenshots) generateArgs.push("--no-screenshots");
 
   return {
@@ -598,6 +603,7 @@ function parseInitArgs(argv: string[]): InitMarkupLoopOptions {
     else if (arg === "--title") options.title = requiredValue(argv, ++i, arg);
     else if (arg === "--base-url") options.baseUrl = requiredValue(argv, ++i, arg);
     else if (arg === "--provider") options.provider = parseProvider(requiredValue(argv, ++i, arg));
+    else if (arg === "--max-tokens") options.maxTokens = parsePositiveInt(requiredValue(argv, ++i, arg), arg);
     else if (arg === "--playwright-config") options.playwrightConfig = requiredValue(argv, ++i, arg);
     else if (arg === "--force") options.force = true;
     else throw new Error(`Unknown argument: ${arg}`);
