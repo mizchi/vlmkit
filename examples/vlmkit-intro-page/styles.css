@@ -311,9 +311,9 @@ dd {
 
 .hero h1 {
   max-width: 760px;
-  font-size: clamp(54px, 7.1vw, 106px);
+  font-size: clamp(50px, 6.4vw, 94px);
   line-height: 0.92;
-  letter-spacing: -0.075em;
+  letter-spacing: -0.045em;
   font-weight: 900;
 }
 
@@ -1283,7 +1283,7 @@ dd {
   }
 
   .hero h1 {
-    font-size: clamp(50px, 16vw, 72px);
+    font-size: clamp(46px, 14vw, 64px);
   }
 
   .hero-lead {
