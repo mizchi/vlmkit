@@ -44,8 +44,8 @@ npx playwright install chromium   # once
 
 - **Coding agents (MCP)** — `.mcp.json`:
   `{ "mcpServers": { "vlmkit": { "command": "npx", "args": ["-y", "@mizchi/vlmkit", "mcp"] } } }`
-- **Agent skill** — install the `markup-assist` skill with APM or the
-  open `skills` CLI (commands below).
+- **Agent skill** — install the automatic `vlmkit` router once with APM or the
+  open `skills` CLI (commands below), then ask for the result in natural language.
 - **API keys** — only for `[key]` features (`heal markup`,
   `check copy --vlm`, fix-loop): `OPENROUTER_API_KEY` /
   `GEMINI_API_KEY` / `ANTHROPIC_API_KEY`.
@@ -56,8 +56,10 @@ Full setup detail: [`docs/configuration.md`](./docs/configuration.md).
 
 ### Install agent skills
 
-Start with the root `vlmkit` meta skill when you want the agent to classify
-the task and select a focused workflow:
+Recommended: install the root `vlmkit` skill once. You do not choose a
+specialized skill; the agent classifies each frontend request, loads the
+matching bundled workflow, runs its deterministic gates, fixes failures, and
+reruns to green.
 
 ```bash
 # APM
@@ -67,9 +69,14 @@ apm install mizchi/vlmkit
 npx skills add mizchi/vlmkit
 ```
 
-For routine HTML/CSS verification, install `markup-assist` directly. It
-selects the right vlmkit gate, reads its kickback, fixes the page, and reruns
-until green:
+Then ask naturally: “implement this mock,” “check this page's responsive and
+keyboard behavior,” or “turn this story into stable Playwright tests.” There is
+no skill-selection step in the normal workflow. On first use, the agent detects
+the repository's package manager, reuses or adds `@mizchi/vlmkit` locally, and
+installs Chromium only if a selected gate reports it missing.
+
+Advanced: install `markup-assist` directly only when you intentionally want to
+pin the agent to routine HTML/CSS verification and bypass automatic routing:
 
 ```bash
 # APM

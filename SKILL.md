@@ -1,17 +1,60 @@
 ---
 name: vlmkit
-description: 'Meta entry point for vlmkit. Use when an agent needs to choose between general markup verification, screenshot-to-HTML creation, dynamic UI behavior, Playwright/VRT generation, visual comparison or monitoring, migration evaluation, CSS repair benchmarks, or agent-tool hardening; route to the smallest specialized skill and its matching CLI gates.'
+description: 'Automatic frontend quality router. Use automatically whenever the user asks to create, edit, debug, validate, test, compare, migrate, or repair a frontend UI, HTML/CSS, screenshot implementation, responsive or interactive behavior, Playwright/VRT, or a visual regression. The user does not need to mention vlmkit or choose a sub-skill. Classify the request, load the bundled workflow, run the smallest deterministic gates, fix failures, and rerun to green.'
 ---
 
 # vlmkit — Skill Router and CLI Guide
 
 ## Overview
 
-This is the meta entry for vlmkit's focused agent workflows and the reference
-for its Visual Regression Testing (VRT) and accessibility verification CLI.
+This is the single automatic entry for vlmkit's focused agent workflows and
+the reference for its Visual Regression Testing (VRT) and accessibility
+verification CLI. The user installs this skill once and describes the outcome
+they want in ordinary language.
 
 Automatically verifies that changes are visually and semantically (a11y) as intended,
 running a loop to detect and repair regressions.
+
+## Automatic routing contract
+
+1. **Do not ask the user to choose or name a specialized skill.** Infer the
+   workflow from their request, supplied artifacts, and files in scope.
+2. Resolve every workflow path below **relative to the directory containing
+   this `SKILL.md`**, not relative to the user's project. Read the selected
+   workflow's `SKILL.md` completely before editing or running its gates.
+3. Default to `markup-assist` for ordinary frontend work when there is no
+   stronger screenshot, behavior, test-generation, comparison, migration, or
+   benchmark signal.
+4. Select one primary workflow. Chain a second only when the first workflow's
+   output is genuinely the second workflow's input—for example, recreate a mock
+   with `mock-markup`, then prove an explicit motion brief with
+   `dynamic-markup`.
+5. Ask only for a missing task artifact that materially blocks the work (such
+   as the target screenshot), never for a skill-selection decision.
+6. Execute the selected workflow; do not stop after recommending a command.
+   Finish only when its stated deterministic done conditions are green, or
+   report concrete evidence that blocks them.
+
+## Automatic tool bootstrap
+
+The skill install is the user's setup step. When the selected workflow needs
+the CLI, prepare it as part of the task instead of sending the user a setup
+checklist:
+
+1. Reuse an existing `@mizchi/vlmkit` dependency when present. Otherwise,
+   detect the existing package manager from its lockfile and add
+   `@mizchi/vlmkit` as a development dependency with that package manager.
+   Do not install a second package manager or add a global CLI.
+2. Run the project-local binary (`pnpm exec vlmkit`, `npx vlmkit`, or the
+   equivalent for the detected package manager).
+3. Attempt the chosen gate first. Install Chromium only when Playwright reports
+   that it is missing, then rerun the gate. Do not perform unrelated browser or
+   system setup preemptively.
+4. In a consumer repository, translate source-repo invocations to the published
+   `vlmkit` binary. Use paths inside this bundled skill only for fixtures,
+   references, or an explicitly requested vlmkit benchmark.
+5. Treat dependency and lockfile edits as normal task changes: keep them scoped,
+   validate them, and report them in the final result.
 
 ## Skill routing
 
@@ -21,17 +64,17 @@ second only when the task genuinely crosses boundaries.
 
 | Task shape | Primary skill | Capability |
 |---|---|---|
-| Edited HTML/CSS; no reference design | `.claude/skills/markup-assist/SKILL.md` | Route to the smallest deterministic correctness gate and rerun to green |
-| Raw mock, retina export, or screenshot with no reference HTML | `.claude/skills/mock-markup/SKILL.md` | Normalize the image and recreate verified markup |
-| Target screenshot or UI Contract IR | `.claude/skills/auto-markup/SKILL.md` | Scaffold and converge page/component composition and decoration |
-| Responsive, scroll, interaction, or animation behavior | `.claude/skills/dynamic-markup/SKILL.md` | Extend static convergence with deterministic dynamic gates |
-| Natural-language story to browser test | `.claude/skills/spec-to-playwright/SKILL.md` | Generate reproducible Playwright/VRT and heal drift |
-| Need markup authoring signals | `.claude/skills/vrt-markup-synth/SKILL.md` | Measure components, tokens, theme parity, and i18n stress |
-| Compare two current renders | `.claude/skills/vrt-visual-diff/SKILL.md` | Explain pixel, section, viewport, and computed-style deltas |
-| Detect regressions across repeated CI runs | `.claude/skills/vrt-regression-watch/SKILL.md` | Persist summaries and fail when most viewports worsen |
-| Evaluate a framework/CSS/build migration | `.claude/skills/vrt-migration-eval/SKILL.md` | Judge visual equivalence despite large intentional rewrites |
-| Benchmark known CSS repair challenges | `.claude/skills/vrt-css-fix-loop/SKILL.md` | Measure VLM+LLM recovery, not production healing |
-| Harden an agent-facing CLI, SDK, or harness | `.claude/skills/agent-validation-loop/SKILL.md` | Turn fresh-agent friction into fixes and tracked evidence |
+| Edited HTML/CSS; no reference design | `./.claude/skills/markup-assist/SKILL.md` | Route to the smallest deterministic correctness gate and rerun to green |
+| Raw mock, retina export, or screenshot with no reference HTML | `./.claude/skills/mock-markup/SKILL.md` | Normalize the image and recreate verified markup |
+| Target screenshot or UI Contract IR | `./.claude/skills/auto-markup/SKILL.md` | Scaffold and converge page/component composition and decoration |
+| Responsive, scroll, interaction, or animation behavior | `./.claude/skills/dynamic-markup/SKILL.md` | Extend static convergence with deterministic dynamic gates |
+| Natural-language story to browser test | `./.claude/skills/spec-to-playwright/SKILL.md` | Generate reproducible Playwright/VRT and heal drift |
+| Need markup authoring signals | `./.claude/skills/vrt-markup-synth/SKILL.md` | Measure components, tokens, theme parity, and i18n stress |
+| Compare two current renders | `./.claude/skills/vrt-visual-diff/SKILL.md` | Explain pixel, section, viewport, and computed-style deltas |
+| Detect regressions across repeated CI runs | `./.claude/skills/vrt-regression-watch/SKILL.md` | Persist summaries and fail when most viewports worsen |
+| Evaluate a framework/CSS/build migration | `./.claude/skills/vrt-migration-eval/SKILL.md` | Judge visual equivalence despite large intentional rewrites |
+| Benchmark known CSS repair challenges | `./.claude/skills/vrt-css-fix-loop/SKILL.md` | Measure VLM+LLM recovery, not production healing |
+| Harden an agent-facing CLI, SDK, or harness | `./.claude/skills/agent-validation-loop/SKILL.md` | Turn fresh-agent friction into fixes and tracked evidence |
 
 The human-facing catalog, direct install commands, and category rationale are
 in [`.claude/skills/README.md`](.claude/skills/README.md).

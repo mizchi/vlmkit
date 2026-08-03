@@ -1,16 +1,17 @@
 # vlmkit agent skills
 
-vlmkit ships 11 specialized skills. They are workflows, not aliases for the
-same command: choose the smallest skill whose inputs and done condition match
-the task.
+vlmkit ships one automatic router backed by 11 specialized workflows.
+Install once, then describe the outcome you want in ordinary language. The
+agent picks the workflow whose inputs and done condition match the task.
 
 ## Start here
 
-### [`vlmkit`](../../SKILL.md) — meta entry
+### [`vlmkit`](../../SKILL.md) — automatic entry
 
-Use the root `vlmkit` skill when you do not yet know which workflow applies.
-It classifies the request, selects one primary specialized skill, and routes
-the agent to the matching deterministic gates.
+This is the recommended setup. You do not need to learn or name the skills
+below: the root `vlmkit` skill is discovered for frontend work, classifies the
+request, reads the matching bundled workflow, and runs its deterministic gates
+to green.
 
 ```bash
 # APM
@@ -20,8 +21,30 @@ apm install mizchi/vlmkit
 npx skills add mizchi/vlmkit
 ```
 
-For a routine HTML/CSS edit with no reference design, skip the meta step and
-use [`markup-assist`](./markup-assist/) directly.
+After that, ask naturally—for example:
+
+- “Implement this mock and make it responsive.”
+- “Check this page for broken layout, copy, and keyboard behavior.”
+- “Turn these acceptance criteria into stable Playwright tests.”
+
+The user does not select a skill. The agent routes these requests to
+`mock-markup` + `dynamic-markup`, `markup-assist`, and `spec-to-playwright`
+respectively.
+
+## How automatic routing works
+
+1. Agent skill discovery matches frontend work to the broad `vlmkit`
+   description.
+2. The root router selects one primary workflow from the request and artifacts.
+3. It loads that workflow from the files bundled inside the installed skill.
+4. On first use, it reuses or adds the project-local `@mizchi/vlmkit` CLI and
+   installs Chromium only if Playwright reports it missing.
+5. It executes the gates, fixes failures, and reruns until the workflow's done
+   condition is green.
+
+If no stronger signal exists, ordinary HTML/CSS work defaults to
+`markup-assist`. The router asks only for a genuinely missing artifact, never
+which skill the user wants.
 
 ## Skill classes
 
@@ -46,9 +69,10 @@ use [`markup-assist`](./markup-assist/) directly.
 - Known CSS deletion benchmark → `vrt-css-fix-loop`.
 - Agent-facing CLI or harness usability study → `agent-validation-loop`.
 
-## Install a specialized skill
+## Advanced: install a specialized skill directly
 
-Install only the workflow you want:
+Direct installation is optional. Use it only when you intentionally want to
+pin an agent to one workflow and bypass automatic routing:
 
 ```bash
 # APM example

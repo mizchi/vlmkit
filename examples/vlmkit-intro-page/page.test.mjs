@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
 const exampleDir = dirname(fileURLToPath(import.meta.url));
+const metaApmCommand = "apm install mizchi/vlmkit";
+const metaSkillsCliCommand = "npx skills add mizchi/vlmkit";
 const apmSkillCommand = "apm install mizchi/vlmkit/.claude/skills/markup-assist";
 const skillsCliCommand =
   "npx skills add https://github.com/mizchi/vlmkit/tree/main/.claude/skills/markup-assist";
@@ -46,21 +48,26 @@ test("the intro page has a stable semantic product story", async () => {
   assert.match(html, /https:\/\/github\.com\/mizchi\/vlmkit/);
 });
 
-test("README and page distribute markup-assist through APM and skills CLI", async () => {
-  const [html, readme, copyManifest] = await Promise.all([
+test("README and page distribute the automatic router through APM and skills CLI", async () => {
+  const [html, readme, catalog, copyManifest] = await Promise.all([
     read("index.html"),
     readFile(join(exampleDir, "../../README.md"), "utf8"),
+    readFile(join(exampleDir, "../../.claude/skills/README.md"), "utf8"),
     read("copy.txt"),
   ]);
 
   assert.match(html, /href="#skills"[^>]*data-i18n="nav\.skills"/);
   assert.match(html, /data-testid="skill-installers"/);
-  assert.ok(html.includes(apmSkillCommand));
-  assert.ok(html.includes(skillsCliCommand));
+  assert.ok(html.includes(metaApmCommand));
+  assert.ok(html.includes(metaSkillsCliCommand));
+  assert.ok(readme.includes(metaApmCommand));
+  assert.ok(readme.includes(metaSkillsCliCommand));
+  assert.ok(copyManifest.includes(metaApmCommand));
+  assert.ok(copyManifest.includes(metaSkillsCliCommand));
   assert.ok(readme.includes(apmSkillCommand));
   assert.ok(readme.includes(skillsCliCommand));
-  assert.ok(copyManifest.includes(apmSkillCommand));
-  assert.ok(copyManifest.includes(skillsCliCommand));
+  assert.ok(catalog.includes(apmSkillCommand));
+  assert.ok(catalog.includes(skillsCliCommand));
   assert.ok(copyManifest.includes("This site is generated and debugged with vlmkit itself."));
   assert.ok(copyManifest.includes("Don't just look."));
 });
@@ -92,6 +99,49 @@ test("the meta entry and catalog classify every specialized skill", async () => 
     assert.ok(catalog.includes(`./${skill}/`), `${skill} is missing from the catalog`);
     assert.ok(html.includes(`>${skill}<`), `${skill} is missing from the intro page`);
   }
+});
+
+test("one install lets the agent route natural-language UI work automatically", async () => {
+  const [html, readme, rootSkill, catalog, copyManifest] = await Promise.all([
+    read("index.html"),
+    readFile(join(exampleDir, "../../README.md"), "utf8"),
+    readFile(join(exampleDir, "../../SKILL.md"), "utf8"),
+    readFile(join(exampleDir, "../../.claude/skills/README.md"), "utf8"),
+    read("copy.txt"),
+  ]);
+
+  assert.match(
+    rootSkill,
+    /description:.*Use automatically whenever the user asks to create, edit, debug, validate, test, compare, migrate, or repair a frontend UI/,
+  );
+  assert.match(rootSkill, /## Automatic routing contract/);
+  assert.match(rootSkill, /Do not ask the user to choose or name a specialized skill/);
+  assert.match(rootSkill, /relative to the directory containing\s+this `SKILL\.md`/);
+  assert.match(rootSkill, /Default to `markup-assist`/);
+  assert.match(rootSkill, /## Automatic tool bootstrap/);
+  assert.match(rootSkill, /detect the existing package manager\s+from its lockfile/);
+  assert.match(rootSkill, /add\s+`@mizchi\/vlmkit` as a development dependency/);
+  assert.match(rootSkill, /Install Chromium only when Playwright reports\s+that it is missing/);
+  assert.match(rootSkill, /translate source-repo invocations to the published\s+`vlmkit` binary/);
+
+  for (const skill of specializedSkills) {
+    const bundledReference = `./.claude/skills/${skill}/SKILL.md`;
+    assert.ok(rootSkill.includes(bundledReference), `${skill} is not bundled in the router table`);
+    assert.match(
+      await readFile(join(exampleDir, "../..", bundledReference), "utf8"),
+      new RegExp(`name: ${skill}`),
+    );
+  }
+
+  for (const document of [html, readme, catalog, copyManifest]) {
+    assert.ok(document.includes(metaApmCommand));
+    assert.ok(document.includes(metaSkillsCliCommand));
+  }
+  assert.match(catalog, /Install once, then describe the outcome you want/);
+  assert.match(readme, /You do not choose a\s+specialized skill/);
+  assert.match(html, /data-testid="automatic-routing"/);
+  assert.ok(copyManifest.includes("Install once."));
+  assert.ok(copyManifest.includes("Ask naturally."));
 });
 
 test("the first visible message identifies the page as vlmkit dogfood", async () => {
@@ -163,6 +213,10 @@ test("locale content and display preferences have strict contracts", async () =>
   assert.equal(translate("en", "skills.apmLabel"), "Install with APM");
   assert.equal(translate("ja", "skills.metaLabel"), "メタエントリー");
   assert.equal(translate("en", "skills.metaLabel"), "Meta entry");
+  assert.equal(translate("ja", "skills.line1"), "一度入れたら、");
+  assert.equal(translate("ja", "skills.line2"), "あとは自然に頼むだけ。");
+  assert.equal(translate("en", "skills.line1"), "Install once.");
+  assert.equal(translate("en", "skills.line2"), "Ask naturally.");
   assert.equal(nextLocale("ja"), "en");
   assert.equal(nextTheme("light"), "dark");
   assert.equal(resolveLocale("unknown"), "en");
