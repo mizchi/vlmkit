@@ -64,20 +64,20 @@ second only when the task genuinely crosses boundaries.
 
 | Task shape | Primary skill | Capability |
 |---|---|---|
-| Edited HTML/CSS; no reference design | `./.claude/skills/markup-assist/SKILL.md` | Route to the smallest deterministic correctness gate and rerun to green |
-| Raw mock, retina export, or screenshot with no reference HTML | `./.claude/skills/mock-markup/SKILL.md` | Normalize the image and recreate verified markup |
-| Target screenshot or UI Contract IR | `./.claude/skills/auto-markup/SKILL.md` | Scaffold and converge page/component composition and decoration |
-| Responsive, scroll, interaction, or animation behavior | `./.claude/skills/dynamic-markup/SKILL.md` | Extend static convergence with deterministic dynamic gates |
-| Natural-language story to browser test | `./.claude/skills/spec-to-playwright/SKILL.md` | Generate reproducible Playwright/VRT and heal drift |
-| Need markup authoring signals | `./.claude/skills/vrt-markup-synth/SKILL.md` | Measure components, tokens, theme parity, and i18n stress |
-| Compare two current renders | `./.claude/skills/vrt-visual-diff/SKILL.md` | Explain pixel, section, viewport, and computed-style deltas |
-| Detect regressions across repeated CI runs | `./.claude/skills/vrt-regression-watch/SKILL.md` | Persist summaries and fail when most viewports worsen |
-| Evaluate a framework/CSS/build migration | `./.claude/skills/vrt-migration-eval/SKILL.md` | Judge visual equivalence despite large intentional rewrites |
-| Benchmark known CSS repair challenges | `./.claude/skills/vrt-css-fix-loop/SKILL.md` | Measure VLM+LLM recovery, not production healing |
-| Harden an agent-facing CLI, SDK, or harness | `./.claude/skills/agent-validation-loop/SKILL.md` | Turn fresh-agent friction into fixes and tracked evidence |
+| Edited HTML/CSS; no reference design | `./workflows/markup-assist/SKILL.md` | Route to the smallest deterministic correctness gate and rerun to green |
+| Raw mock, retina export, or screenshot with no reference HTML | `./workflows/mock-markup/SKILL.md` | Normalize the image and recreate verified markup |
+| Target screenshot or UI Contract IR | `./workflows/auto-markup/SKILL.md` | Scaffold and converge page/component composition and decoration |
+| Responsive, scroll, interaction, or animation behavior | `./workflows/dynamic-markup/SKILL.md` | Extend static convergence with deterministic dynamic gates |
+| Natural-language story to browser test | `./workflows/spec-to-playwright/SKILL.md` | Generate reproducible Playwright/VRT and heal drift |
+| Need markup authoring signals | `./workflows/vrt-markup-synth/SKILL.md` | Measure components, tokens, theme parity, and i18n stress |
+| Compare two current renders | `./workflows/vrt-visual-diff/SKILL.md` | Explain pixel, section, viewport, and computed-style deltas |
+| Detect regressions across repeated CI runs | `./workflows/vrt-regression-watch/SKILL.md` | Persist summaries and fail when most viewports worsen |
+| Evaluate a framework/CSS/build migration | `./workflows/vrt-migration-eval/SKILL.md` | Judge visual equivalence despite large intentional rewrites |
+| Benchmark known CSS repair challenges | `./workflows/vrt-css-fix-loop/SKILL.md` | Measure VLM+LLM recovery, not production healing |
+| Harden an agent-facing CLI, SDK, or harness | `./workflows/agent-validation-loop/SKILL.md` | Turn fresh-agent friction into fixes and tracked evidence |
 
 The human-facing catalog, direct install commands, and category rationale are
-in [`.claude/skills/README.md`](.claude/skills/README.md).
+in the [vlmkit skill catalog](https://github.com/mizchi/vlmkit/tree/main/.claude/skills).
 
 ## CLI Commands
 
@@ -244,7 +244,7 @@ semantics are likely broken.
 This repository is a pnpm workspace. See `.claude/CLAUDE.md` § Package Layout for the authoritative table.
 
 ```
-├── SKILL.md                   ← This file
+├── skills/vlmkit/SKILL.md     ← Public automatic skill entry
 ├── Taskfile.pkl               # Task runner (pkfire: `pkf run <task>`)
 ├── Spec.pkl / Test.pkl        # Specs + smoke gate (pkspec)
 ├── playwright.config.ts       # Playwright config for VRT

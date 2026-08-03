@@ -1,4 +1,4 @@
-{ pkgs, version ? "0.8.11" }:
+{ pkgs, version ? "0.27.0" }:
 
 let
   inherit (pkgs) lib stdenv fetchurl autoPatchelfHook makeWrapper;
@@ -7,19 +7,19 @@ let
   sources = {
     "x86_64-linux" = {
       suffix = "linux-x86_64";
-      sha256 = "b3f4ee5a933c89b97ce30fb7318d227e2c92060b64abd699a35a7e9c1998fe45";
+      sha256 = "be2d8a97ca8816636117ec26da85482d647ae3353213ea022fb1130c2dd3d3b0";
     };
     "aarch64-linux" = {
       suffix = "linux-arm64";
-      sha256 = "c49c5b3cdbbf7abe2a4ac630c2cd5706cd45e1576065449d847e4129efaa17c0";
+      sha256 = "7df6e64ca9540665367f07af0226077ba92820f6cc759c10a5ca37e038a500e4";
     };
     "x86_64-darwin" = {
       suffix = "darwin-x86_64";
-      sha256 = "1c48afad648781d02dbea5050b78a037a4f243b711b92d08d3f05257edb0aec9";
+      sha256 = "846b30055d96cbc6fa0fcf451f50d13f632b540ffdff344873a025bba607e25a";
     };
     "aarch64-darwin" = {
       suffix = "darwin-arm64";
-      sha256 = "d4d78cfa110d369601d53b1238e0b17a2772ae1ef0281e67eb4917f3525bc6b4";
+      sha256 = "4c68e5eaa3cfdb0b25734c316deb532835eaf3c3e2f7379a4c7c06918043a641";
     };
   };
 

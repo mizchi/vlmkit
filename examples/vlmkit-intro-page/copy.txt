@@ -46,6 +46,7 @@ Evaluation and hardening
 vrt-css-fix-loop
 agent-validation-loop
 Install with APM
+curl -sSL https://aka.ms/apm-unix | sh
 apm install mizchi/vlmkit
 Install with skills CLI
 npx skills add mizchi/vlmkit

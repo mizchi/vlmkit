@@ -1,0 +1,4 @@
+interface:
+  display_name: "vlmkit"
+  short_description: "Automatically build and verify frontend UI"
+  default_prompt: "Use $vlmkit to implement and verify this frontend request end to end."

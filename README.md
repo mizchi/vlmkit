@@ -56,18 +56,25 @@ Full setup detail: [`docs/configuration.md`](./docs/configuration.md).
 
 ### Install agent skills
 
-Recommended: install the root `vlmkit` skill once. You do not choose a
+Recommended: install the `vlmkit` skill package once. You do not choose a
 specialized skill; the agent classifies each frontend request, loads the
 matching bundled workflow, runs its deterministic gates, fixes failures, and
 reruns to green.
 
 ```bash
-# APM
+# Install or update APM (macOS / Linux)
+curl -sSL https://aka.ms/apm-unix | sh
+
+# Install vlmkit with APM
 apm install mizchi/vlmkit
 
-# skills CLI
+# Or install with the skills CLI (APM is not required)
 npx skills add mizchi/vlmkit
 ```
+
+The APM bootstrap above is the [official recommended installer](https://microsoft.github.io/apm/getting-started/installation/)
+and resolves the latest binary for the current platform. It avoids depending on
+a stale package-manager formula.
 
 Then ask naturally: “implement this mock,” “check this page's responsive and
 keyboard behavior,” or “turn this story into stable Playwright tests.” There is
@@ -75,16 +82,9 @@ no skill-selection step in the normal workflow. On first use, the agent detects
 the repository's package manager, reuses or adds `@mizchi/vlmkit` locally, and
 installs Chromium only if a selected gate reports it missing.
 
-Advanced: install `markup-assist` directly only when you intentionally want to
-pin the agent to routine HTML/CSS verification and bypass automatic routing:
-
-```bash
-# APM
-apm install mizchi/vlmkit/.claude/skills/markup-assist
-
-# skills CLI
-npx skills add https://github.com/mizchi/vlmkit/tree/main/.claude/skills/markup-assist
-```
+Both installers expose one visible `vlmkit` skill. The 11 specialized workflows
+are internal resources bundled under that entry, so the agent selects them
+without adding 11 separate skills or copying the vlmkit source repository.
 
 See the [agent skill catalog](./.claude/skills/README.md) for all 11
 specialized skills, grouped by general verification, UI creation, test

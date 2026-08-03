@@ -95,7 +95,8 @@ export const messages = Object.freeze({
       "既知の CSS 回帰に対する修復性能と、エージェント向けツール自体の使いやすさを検証。",
     "skills.catalogLink": "11スキルの詳しい選択ガイドを見る",
     "skills.apmLabel": "APM でインストール",
-    "skills.apmDescription": "自動ルーターをプロジェクトへひとつ追加します。",
+    "skills.apmDescription":
+      "公式 bootstrap で APM を導入または更新してから、自動ルーターをプロジェクトへひとつ追加します。",
     "skills.cliLabel": "skills CLI でインストール",
     "skills.cliDescription": "同じ自動ルーターを npx からひとつ追加します。",
     "start.line1": "まず、いまのページを",
@@ -201,7 +202,8 @@ export const messages = Object.freeze({
       "Measure repair performance on known CSS regressions and improve agent-facing tool usability.",
     "skills.catalogLink": "Open the detailed guide to all 11 skills",
     "skills.apmLabel": "Install with APM",
-    "skills.apmDescription": "Add the single automatic router with Agent Package Manager.",
+    "skills.apmDescription":
+      "Install or update APM with its official bootstrap, then add the single automatic router.",
     "skills.cliLabel": "Install with skills CLI",
     "skills.cliDescription": "Add the same automatic router directly through npx.",
     "start.line1": "Measure the page",
