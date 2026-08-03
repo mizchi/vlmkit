@@ -46,6 +46,19 @@ test("the intro page has a stable semantic product story", async () => {
   assert.match(html, /https:\/\/github\.com\/mizchi\/vlmkit/);
 });
 
+test("the hero display type keeps readable size and tracking", async () => {
+  const css = await read("styles.css");
+
+  assert.match(
+    css,
+    /\.hero h1 \{[\s\S]*?font-size: clamp\(50px, 6\.4vw, 94px\);[\s\S]*?letter-spacing: -0\.045em;/,
+  );
+  assert.match(
+    css,
+    /@media \(max-width: 640px\)[\s\S]*?\.hero h1 \{\s*font-size: clamp\(46px, 14vw, 64px\);/,
+  );
+});
+
 test("README and page distribute the automatic router through APM and skills CLI", async () => {
   const [html, readme, catalog, copyManifest] = await Promise.all([
     read("index.html"),
