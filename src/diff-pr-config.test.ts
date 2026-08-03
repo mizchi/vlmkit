@@ -15,7 +15,9 @@ describe("parseDiffPrConfig", () => {
     assert.equal(cfg.routes.length, 1);
     assert.equal(cfg.routes[0].name, "home");
     assert.equal(cfg.routes[0].url, "http://localhost:3000/");
-    assert.equal(cfg.baselineDir, ".vrt/baselines");
+    // `.vlmkit/baselines` unless a `.vrt/baselines` already exists in cwd —
+    // see legacy-names.test.ts for the fallback itself.
+    assert.equal(cfg.baselineDir, ".vlmkit/baselines");
   });
 
   it("honors thresholds at top level and per-route overrides", () => {

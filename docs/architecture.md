@@ -1,4 +1,4 @@
-# vrt — Architecture
+# vlmkit — Architecture
 
 ## CLI Command System
 

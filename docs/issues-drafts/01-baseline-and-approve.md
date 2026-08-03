@@ -3,9 +3,9 @@
 ## Context
 
 The 2026-05-15 design-md scenario (v1–v3) and its closed-loop validation
-runs showed that vrt's signal layer is good enough for fresh agents to
+runs showed that vlmkit's signal layer is good enough for fresh agents to
 reach near-pixel-perfect convergence on a new implementation. The piece
-that's missing for vrt to scale from "single-shot tool" to "real
+that's missing for vlmkit to scale from "single-shot tool" to "real
 project's regression net" is the **baseline lifecycle**:
 
 - Today's "golden" PNGs are scattered under `test-results/` or committed
@@ -17,7 +17,7 @@ project's regression net" is the **baseline lifecycle**:
   pixel deviation they couldn't act on — that's exactly the case
   approval should handle, but the only way to record it today is to
   hand-edit JSON.
-- Without these two pieces, a team can't onboard vrt to a real codebase
+- Without these two pieces, a team can't onboard vlmkit to a real codebase
   without ad-hoc tooling: who runs which command to update goldens?
   Where do PNGs live? How does a designer say "yes, that's the new
   intended look, accept it"?
@@ -96,7 +96,7 @@ support most of this; the gap is the CLI.
 
 ## Severity
 
-`major` — operational scaling blocker. Without baseline lifecycle, vrt
+`major` — operational scaling blocker. Without baseline lifecycle, vlmkit
 is a personal-developer tool, not a team-owned regression net.
 
 ## References

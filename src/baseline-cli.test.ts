@@ -51,7 +51,7 @@ describe("archiveRouteBaselines", () => {
   });
 });
 
-describe("vrt baseline approve", () => {
+describe("vlmkit baseline approve", () => {
   it("writes a selector approval rule with audit fields", async () => {
     const dir = await mkdtemp(join(tmpdir(), "vlmkit-approve-"));
     try {

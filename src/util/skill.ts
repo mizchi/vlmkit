@@ -42,7 +42,7 @@ import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/
 const SKILLS_DIR = ".vrt-skills";
 
 export interface SkillCheck {
-  /** Which vrt CLI to invoke. */
+  /** Which vlmkit CLI to invoke. */
   tool: string;
   /** Pass-through options. Keys map to CLI flags (`level` → `--level`). */
   [key: string]: unknown;

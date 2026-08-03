@@ -13,7 +13,7 @@ regression.
 
 ## Invocation
 
-The `vrt` CLI in this repo is invoked **from source**:
+The `vlmkit` CLI in this repo is invoked **from source**:
 
 ```bash
 node --experimental-strip-types src/cli/vrt.ts <command...>
@@ -205,7 +205,7 @@ disappears, the original signal was noise.
   selectors.
 - `--fail-on-regression` exits 1 but the banner says "0 viewports
   got worse" → there's a JSON-vs-Markdown drift bug; re-run with
-  `DEBUG_VRT=1` and file an issue.
+  `DEBUG_VLMKIT=1` and file an issue.
 - Stale summary from months ago → manually remove
   `.vrt/last-diff-for-agent.json` (or your custom path) and re-run.
 

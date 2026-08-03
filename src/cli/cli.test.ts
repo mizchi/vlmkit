@@ -27,7 +27,7 @@ function runVrt(args: string[]): { stdout: string; stderr: string; status: numbe
   };
 }
 
-describe("vrt CLI tree (cac-based)", () => {
+describe("vlmkit CLI tree (cac-based)", () => {
   it("`vrt --version` matches the package release", () => {
     const r = runVrt(["--version"]);
     assert.equal(r.status, 0);

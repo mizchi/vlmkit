@@ -1,4 +1,4 @@
-# vrt — CLI / Library API Design
+# vlmkit — CLI / Library API Design
 
 ## Current Problems
 
@@ -9,9 +9,9 @@
 
 ## Design Policy
 
-### CLI: `vrt` Subcommand System
+### CLI: `vlmkit` Subcommand System
 
-Hang subcommands off a single entry point (`vrt`).
+Hang subcommands off a single entry point (`vlmkit`).
 
 ```
 vlmkit diff html <before> <after>         # VRT comparison of 2 files
@@ -139,10 +139,10 @@ vlmkit scan breakpoints page.html
 Demo execution.
 
 ```bash
-vrt demo              # Basic demo
-vrt demo fix          # Fix loop
-vrt demo multi        # Multi-scenario
-vrt demo multistep    # Multi-step
+vlmkit demo              # Basic demo
+vlmkit demo fix          # Fix loop
+vlmkit demo multi        # Multi-scenario
+vlmkit demo multistep    # Multi-step
 ```
 
 ## Library API
@@ -410,7 +410,7 @@ needs:
 
 | | `vlmkit diff-pr` | `vlmkit workflow` |
 |---|---|---|
-| audience | external project's CI gate | vrt's own dogfooding e2e harness |
+| audience | external project's CI gate | vlmkit's own dogfooding e2e harness |
 | capture | direct `chromium.launch()` + `page.goto()` per route | Playwright spec at `e2e/vrt-capture.spec.ts` |
 | baseline layout | `<baselineDir>/<route>/<viewport>.png` | flat `baselines/*.png` keyed by spec testId |
 | approval | per-rule manifest (`vlmkit manifest add`) + per-viewport threshold | bulk `cp snapshots → baselines` |
@@ -419,10 +419,10 @@ needs:
 
 Rule of thumb:
 
-- Pulling vrt into a new project: use **`vlmkit diff-pr`** with a
+- Pulling vlmkit into a new project: use **`vlmkit diff-pr`** with a
   `vrt.config.json`. Pin on main, gate per PR. Author exceptions via
   `vlmkit manifest`.
-- Working inside the vrt repo (this codebase) or extending its
+- Working inside the vlmkit repo (this codebase) or extending its
   test harness: use **`vlmkit workflow`**. It owns the e2e Playwright
   spec and the a11y semantic check that `vlmkit diff-pr` doesn't.
 

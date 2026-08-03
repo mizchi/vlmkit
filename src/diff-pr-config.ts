@@ -18,8 +18,9 @@
  */
 
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, isAbsolute, resolve } from "node:path";
+import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { parseToml } from "./toml-min.ts";
+import { CONFIG_CANDIDATES, CONFIG_FILE, STATE_DIR, noteLegacyName, resolveStatePath } from "@mizchi/vlmkit-core/legacy-names.ts";
 
 export interface DiffPrRoute {
   name: string;
@@ -142,7 +143,17 @@ const DEFAULT_THRESHOLDS: Record<string, number> = {
   desktop: 0.005,
   wide: 0.005,
 };
-const DEFAULT_BASELINE_DIR = ".vrt/baselines";
+/**
+ * Default baseline directory, as the relative string the config format stores.
+ *
+ * Computed per call rather than as a module constant: a project whose approved
+ * baselines are still in `.vrt/baselines` must keep resolving there, and a
+ * hard-coded `.vlmkit/baselines` would point it at an empty directory and report
+ * every route as a new baseline.
+ */
+function defaultBaselineDir(): string {
+  return relative(process.cwd(), resolveStatePath(process.cwd(), "baselines")) || `${STATE_DIR}/baselines`;
+}
 
 export function parseDiffPrConfig(raw: string, configPath?: string): DiffPrConfig {
   const parsed = parseConfigSource(raw, configPath);
@@ -154,7 +165,7 @@ export function parseDiffPrConfig(raw: string, configPath?: string): DiffPrConfi
   const viewports = asOptionalStringArray(obj.viewports, "viewports");
   const tokens = asOptionalString(obj.tokens, "tokens");
   const approvalPath = asOptionalString(obj.approvalPath, "approvalPath");
-  const baselineDir = asOptionalString(obj.baselineDir, "baselineDir") ?? DEFAULT_BASELINE_DIR;
+  const baselineDir = asOptionalString(obj.baselineDir, "baselineDir") ?? defaultBaselineDir();
   const thresholds = parseThresholds(obj.thresholds);
 
   // Accept routes at top level or under capture.routes for parity
@@ -406,13 +417,19 @@ export function resolveThreshold(config: DiffPrConfig, route: DiffPrRoute, viewp
 export function findConfigPath(cwd: string, explicit?: string): string | undefined {
   if (explicit) {
     const abs = isAbsolute(explicit) ? explicit : resolve(cwd, explicit);
-    if (!existsSync(abs)) throw new Error(`vrt.config not found: ${abs}`);
+    if (!existsSync(abs)) throw new Error(`config not found: ${abs}`);
     return abs;
   }
-  // Prefer JSON when both exist (back-compat); otherwise pick up TOML.
-  for (const name of ["vrt.config.json", "vrt.config.toml"]) {
+  // New names first, then the pre-rename ones. JSON still wins over TOML when
+  // both are present. A project on `vrt.config.json` keeps working and is told
+  // once; renaming without this fallback would report "no config" to a project
+  // that has one.
+  for (const { name, legacy } of CONFIG_CANDIDATES) {
     const candidate = resolve(cwd, name);
-    if (existsSync(candidate)) return candidate;
+    if (existsSync(candidate)) {
+      if (legacy) noteLegacyName(name, CONFIG_FILE);
+      return candidate;
+    }
   }
   return undefined;
 }

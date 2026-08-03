@@ -9,7 +9,7 @@ describe("buildOpenApiSpec", () => {
     });
 
     assert.equal(spec.openapi, "3.1.0");
-    assert.equal(spec.info.title, "vrt HTTP API");
+    assert.equal(spec.info.title, "vlmkit HTTP API");
     assert.equal(spec.servers[0]?.url, "http://127.0.0.1:4567");
 
     assert.ok(spec.paths["/api/openapi.json"]);

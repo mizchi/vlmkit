@@ -95,11 +95,11 @@ async function probeVrtRegression() {
     );
     const baselineAfter = readFileSync(baseline);
     const baselineUntouched = Buffer.compare(baselineBefore, baselineAfter) === 0;
-    console.log("\n[B] vrt regression baseline protection");
+    console.log("\n[B] vlmkit regression baseline protection");
     console.log("    verdict           :", result.verdict);
     console.log("    baseline untouched:", baselineUntouched ? "yes" : "NO (unsafe)");
     const safe = result.verdict === "regression" && baselineUntouched;
-    return { name: "vrt regression protection", safe, detail: `${result.verdict}, baseline ${baselineUntouched ? "kept" : "OVERWRITTEN"}` };
+    return { name: "vlmkit regression protection", safe, detail: `${result.verdict}, baseline ${baselineUntouched ? "kept" : "OVERWRITTEN"}` };
   } finally {
     writeFileSync(pageFile, pageOriginal);
     writeFileSync(baseline, baselineBefore); // ensure baseline restored even if overwritten

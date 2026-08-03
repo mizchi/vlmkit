@@ -62,7 +62,7 @@ for the full old → new mapping.
 
 ## Quick Start
 
-The examples below assume the `vrt` command is already installed and available on your PATH.
+The examples below assume the `vlmkit` command is already installed and available on your PATH.
 
 ```bash
 pnpm install
@@ -138,7 +138,7 @@ vlmkit baseline pin                                       # on main
 vlmkit baseline verify                                    # in PR
 vlmkit baseline post --pr owner/repo#123                  # send summary.md as PR comment
 
-# Legacy internal-dogfood verification loop (vrt's own e2e suite)
+# Legacy internal-dogfood verification loop (vlmkit's own e2e suite)
 vlmkit workflow init
 vlmkit workflow capture
 vlmkit workflow verify
@@ -584,7 +584,7 @@ Workflow aliases are kept for ergonomics where they do not collide:
 #### Capture routes for external projects
 
 `vlmkit workflow init|capture` runs `e2e/vrt-capture.spec.ts`, which now resolves
-its route list from your project rather than hard-coding vrt's own pages.
+its route list from your project rather than hard-coding vlmkit's own pages.
 Drop a `vrt.config.json` next to your app with a `capture` block:
 
 ```json

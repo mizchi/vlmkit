@@ -82,7 +82,7 @@ async function main() {
   await mkdir(TMP, { recursive: true });
 
   console.log();
-  console.log(`${BOLD}${CYAN}vrt benchmark${RESET}`);
+  console.log(`${BOLD}${CYAN}vlmkit benchmark${RESET}`);
   console.log();
 
   const results: BenchResult[] = [];

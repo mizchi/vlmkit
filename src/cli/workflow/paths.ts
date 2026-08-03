@@ -1,6 +1,7 @@
 import { resolve, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
+import { readEnv } from "@mizchi/vlmkit-core/legacy-names.ts";
 
 /**
  * Shared paths for `vlmkit workflow` commands.
@@ -34,7 +35,7 @@ function findHarnessRoot(): string {
 }
 
 export const HARNESS_ROOT = findHarnessRoot();
-export const PROJECT_ROOT = resolve(process.env.VRT_PROJECT_ROOT ?? process.cwd());
+export const PROJECT_ROOT = resolve(readEnv("PROJECT_ROOT") ?? process.cwd());
 
 export const BASELINES_DIR = join(PROJECT_ROOT, "baselines");
 export const SNAPSHOTS_DIR = join(PROJECT_ROOT, "snapshots");

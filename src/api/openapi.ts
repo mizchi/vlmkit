@@ -53,7 +53,7 @@ export function buildOpenApiSpec(options: OpenApiSpecOptions = {}): OpenApiSpec 
   return {
     openapi: "3.1.0",
     info: {
-      title: "vrt HTTP API",
+      title: "vlmkit HTTP API",
       version: API_VERSION,
       description: "Visual regression testing, renderer comparison, reasoning, and smoke test endpoints.",
     },
@@ -77,7 +77,7 @@ export function buildOpenApiSpec(options: OpenApiSpecOptions = {}): OpenApiSpec 
                 "application/json": {
                   schema: {
                     type: "object",
-                    description: "The current OpenAPI document for the vrt HTTP API.",
+                    description: "The current OpenAPI document for the vlmkit HTTP API.",
                   },
                 },
               },

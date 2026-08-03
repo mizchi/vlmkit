@@ -102,7 +102,7 @@
 - [ ] **Build from natural-language description** ⊘ deprecated (minor) — verifies: A6
   > Marked out-of-scope in v2 matrix; preserved here for one-to-one matrix mapping.
   - contributes to: GOAL-MARKUP-FIDELITY
-  - deprecated: Out of scope per v2 matrix: no reference image means no vrt signal applies. The scenario stays here only so the matrix-row link is mechanical; no successor.
+  - deprecated: Out of scope per v2 matrix: no reference image means no vlmkit signal applies. The scenario stays here only so the matrix-row link is mechanical; no successor.
   - body: _not yet implemented_
 
 - [ ] **Build full page from design-spec document** (minor) [draft] — verifies: A5
@@ -118,7 +118,7 @@
 - [ ] **Bundle size analysis** ⊘ deprecated (minor) — verifies: G3
   > Preserved for matrix-row parity.
   - contributes to: GOAL-VARIANT-RESILIENCE
-  - deprecated: Out of scope per v2 matrix: bundle analyzers and Lighthouse cover this lane; vrt has no asset-pipeline integration.
+  - deprecated: Out of scope per v2 matrix: bundle analyzers and Lighthouse cover this lane; vlmkit has no asset-pipeline integration.
   - body: _not yet implemented_
 
 - [ ] **Bundled per-target check via skill run** — verifies: L5
@@ -168,7 +168,7 @@
   - body: _not yet implemented_
 
 - [ ] **Compare-runs aggregates multiple VRT runs** (minor) — verifies: MIG-004
-  >   `vlmkit diff runs` diffs two prior vrt runs against each other
+  >   `vlmkit diff runs` diffs two prior vlmkit runs against each other
   >   (e.g. iter 0 vs iter 1 of a fix loop) so progress per round is
   >   visible at a glance.
   - contributes to: GOAL-MIGRATION-VERIFICATION, GOAL-AGENT-ERGONOMICS
@@ -281,7 +281,7 @@
   >   /api/smoke-test, /api/status, /api/execution-results, /api/visual-diffs, /api/detection-series,
   >   /api/component-status-matrix, /api/approvals, /api/cloudflare/screenshot,
   >   /api/cloudflare/crawl, /api/crater/layout. Lets a browser extension or
-  >   editor plugin drive vrt without spawning a Node child.
+  >   editor plugin drive vlmkit without spawning a Node child.
   - contributes to: GOAL-API
   - body: partial implementation in `src/api/api-app.ts`; execution-result search and visual-diff display models are backed by Worker D1 artifact rows when available. Local `api serve` exposes detection-rate time-series points from `data/bench-history.jsonl`, component/label status matrices from snapshot reports, approval-manifest list/add/remove operations, Cloudflare Browser Run Quick Actions proxies when credentials are configured, and a layout-only Crater JS/WASM renderer when `VLMKIT_CRATER_WASM_MODULE` is set.
 
@@ -342,7 +342,7 @@
 - [ ] **Live monitoring of production regressions** ⊘ deprecated (minor) — verifies: L3
   > Preserved for matrix-row parity.
   - contributes to: GOAL-SNAPSHOT-WORKFLOW
-  - deprecated: Out of scope per v2 matrix: commercial VRT vendors own this lane; vrt is build-time / dev-loop.
+  - deprecated: Out of scope per v2 matrix: commercial VRT vendors own this lane; vlmkit is build-time / dev-loop.
   - body: _not yet implemented_
 
 - [ ] **Live snapshot of an agent session** (minor) [draft] — verifies: O10
@@ -463,7 +463,7 @@
   - body: _not yet implemented_
 
 - [ ] **Network-throttled rendering** (minor) [draft] — verifies: H4
-  > No throttle flag today; Playwright supports it but no vrt CLI surface yet.
+  > No throttle flag today; Playwright supports it but no vlmkit CLI surface yet.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
@@ -630,7 +630,7 @@
 - [ ] **Storybook story diff** ⊘ deprecated (minor) — verifies: J4
   > Preserved for matrix-row parity.
   - contributes to: GOAL-DESIGN-SYSTEM
-  - deprecated: Out of scope per v2 matrix: Chromatic and Loki cover this lane with Storybook-native integration vrt doesn't have.
+  - deprecated: Out of scope per v2 matrix: Chromatic and Loki cover this lane with Storybook-native integration vlmkit doesn't have.
   - body: _not yet implemented_
 
 - [ ] **Subtle font-render regression** (minor) [draft] — verifies: K7

@@ -28,7 +28,7 @@ node --experimental-strip-types src/vrt.ts compare \
 
 Result: **0.0 % on every viewport, "PASS, clean (3/3)"**.
 
-That diff is a lie. Three independent vrt bugs hit at once:
+That diff is a lie. Three independent vlmkit bugs hit at once:
 
 1. `vlmkit diff html` (file-mode) uses `page.setContent()` with no base URL, so
    relative `<link href="style.css">` never resolves in either side.
@@ -49,7 +49,7 @@ What I changed in response: workaround — copied my file to `variant.html`
 to dodge the name collision; switched to `--url file:///...` URL mode so
 playwright's `page.goto()` resolves relative CSS hrefs; inlined a copy of
 my CSS in a `<style>` block inside `page.html` as a belt-and-braces so
-**any** vrt path would see styled content.
+**any** vlmkit path would see styled content.
 
 ## Round 2 — real first diff
 
@@ -146,7 +146,7 @@ Result (after all four fixes applied together):
 ## Round 5 — final pass
 
 Synced `style.css` with the inline `<style>` block in `page.html` so
-the deliverable matches what vrt actually rendered. Deleted the
+the deliverable matches what vlmkit actually rendered. Deleted the
 `variant.html` workaround copy.
 
 Final diff:
@@ -159,6 +159,6 @@ Final diff:
 
 Remaining mobile delta is overwhelmingly text-rendering jitter inside
 the profile / stats cards (`profile-sub`, the `247 / 4.97` numbers).
-Not actionable from vrt's output without character-level shaping
+Not actionable from vlmkit's output without character-level shaping
 controls.
 

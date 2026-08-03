@@ -1,6 +1,6 @@
 ---
-name: vrt
-description: 'Reference for the `vrt` CLI — Visual Regression Testing combined with accessibility (a11y) semantic verification. Use when running `vrt-test` / `vrt` (Playwright VRT) / `vrt-update` / `vlmkit diff html` / `vlmkit snapshot`, configuring the fix-loop CSS challenge benchmark, or picking a VLM model for diff analysis.'
+name: vlmkit
+description: 'Reference for the `vlmkit` CLI — Visual Regression Testing combined with accessibility (a11y) semantic verification. Use when running `vrt-test` / `vlmkit` (Playwright VRT) / `vrt-update` / `vlmkit diff html` / `vlmkit snapshot`, configuring the fix-loop CSS challenge benchmark, or picking a VLM model for diff analysis.'
 ---
 
 # VRT + Semantic Verification — Agent Skill Guide
@@ -93,7 +93,7 @@ pkf run vrt-demo-multistep     # Multi-step
           │
           ▼
 ┌─────────────────────────────────────────────┐
-│ 3. pkf run vrt                              │
+│ 3. pkf run vlmkit                              │
 └─────────┬───────────────────────────────────┘
           │
      ┌────┴────────────────┐

@@ -1,16 +1,16 @@
-# flaker / vrt Integration Design
+# flaker / vlmkit Integration Design
 
 ## Background
 
 `flaker` excels at test selection / flaky detection / quarantine / history accumulation.
-`vrt` excels at VRT execution, approval, migration fix loop, and renderer diff analysis.
+`vlmkit` excels at VRT execution, approval, migration fix loop, and renderer diff analysis.
 
 Combining these two allows VRT to operate not as a one-off comparison tool but as a test suite with retry, quarantine, and trend analysis capabilities in CI.
 
 Target repositories:
 
 - `flaker`: [/Users/mz/ghq/github.com/mizchi/metric-ci](/Users/mz/ghq/github.com/mizchi/metric-ci)
-- `vrt`: [/Users/mz/ghq/github.com/mizchi/vrt](/Users/mz/ghq/github.com/mizchi/vrt)
+- `vlmkit`: [/Users/mz/ghq/github.com/mizchi/vrt](/Users/mz/ghq/github.com/mizchi/vrt)
 
 ## Goal
 
@@ -25,7 +25,7 @@ Target repositories:
 - Merging `approval.json` into `flaker.quarantine.json`
 - Adding a built-in runner to `flaker` itself from the start
 
-Initial implementation places the custom runner on the `vrt` side, called from `flaker` as an external command.
+Initial implementation places the custom runner on the `vlmkit` side, called from `flaker` as an external command.
 As of 2026-04-02, in addition to this custom runner, built-in `vrt-migration` / `vrt-bench` adapters on the `metric-ci` side and artifact collection workflows are implemented.
 
 ## Responsibility Boundary
@@ -40,7 +40,7 @@ As of 2026-04-02, in addition to this custom runner, built-in `vrt-migration` / 
 
 References: [docs/why-flaker.ja.md](/Users/mz/ghq/github.com/mizchi/metric-ci/docs/why-flaker.ja.md), [types.ts](/Users/mz/ghq/github.com/mizchi/metric-ci/packages/vlmkit-core/src/types.ts), [quarantine-manifest.ts](/Users/mz/ghq/github.com/mizchi/metric-ci/src/cli/quarantine-manifest.ts)
 
-### vrt's responsibilities
+### vlmkit's responsibilities
 
 - HTML/URL rendering comparison
 - pixel diff / paint tree diff / computed style diff
@@ -58,7 +58,7 @@ Therefore, the integration centers on the runner protocol, not an import adapter
 ```text
 flaker sample/run/quarantine
   -> custom runner
-    -> vrt migration-compare
+    -> vlmkit migration-compare
       -> report.json + test results
         -> flaker DuckDB
 ```
@@ -71,14 +71,14 @@ Top priority. `migration-compare` already outputs machine-readable reports, enab
 
 ### Phase 2: Playwright VRT import
 
-Analyze existing `playwright test`-based `vrt` via `flaker import --adapter playwright` or `collect`.
+Analyze existing `playwright test`-based `vlmkit` via `flaker import --adapter playwright` or `collect`.
 
 ### Phase 3: report import
 
 Add adapters to directly feed `migration-report.json` and `bench-report.json` into `flaker`.
 
-As of 2026-04-02, built-in `vrt-migration` and `vrt-bench` adapters exist on the `metric-ci` side, handling `migration-report.json` and `bench-report.json` directly via `import / collect / report summarize`. The `vrt`-side `src/experiments/flaker/flaker-vrt-report-adapter.ts` remains for custom adapter paths and legacy report supplementation.
-The `vrt` side has `.github/workflows/migration-report.yml`, running 1 scenario via `workflow_dispatch` and producing artifact name `migration-report`. To avoid conflicts with `metric-ci collect` defaults, initial operation fixes 1 run = 1 scenario.
+As of 2026-04-02, built-in `vrt-migration` and `vrt-bench` adapters exist on the `metric-ci` side, handling `migration-report.json` and `bench-report.json` directly via `import / collect / report summarize`. The `vlmkit`-side `src/experiments/flaker/flaker-vrt-report-adapter.ts` remains for custom adapter paths and legacy report supplementation.
+The `vlmkit` side has `.github/workflows/migration-report.yml`, running 1 scenario via `workflow_dispatch` and producing artifact name `migration-report`. To avoid conflicts with `metric-ci collect` defaults, initial operation fixes 1 run = 1 scenario.
 Similarly, `.github/workflows/bench-report.yml` runs 1 fixture of `css-challenge-bench` with Chromium backend, producing artifact name `bench-report`. Since the `vrt-bench` adapter expects a single `bench-report.json` in the artifact, this also fixes 1 run = 1 fixture.
 
 ## Why Start with Migration VRT
@@ -205,7 +205,7 @@ Reasons for not making `approved` a separate status:
 - `approved` is run metadata, not identity
 - Including `approved` in identity would fragment history
 
-`approved` details are preserved in `vrt`-side report artifacts.
+`approved` details are preserved in `vlmkit`-side report artifacts.
 
 ## Approval and Quarantine Separation
 
@@ -253,7 +253,7 @@ test-results/flaker-vrt/
     migration-reset-css-report.json
 ```
 
-`stdout` outputs the report path. Deep-dive by examining `vrt`'s artifacts.
+`stdout` outputs the report path. Deep-dive by examining `vlmkit`'s artifacts.
 
 ## flaker.toml example
 
@@ -284,7 +284,7 @@ flaky_rate_threshold = 30.0
 min_runs = 5
 ```
 
-When operating in the `vrt` standalone repository, the runner lives in this repo, and artifact collection uses `metric-ci`'s built-in `vrt-migration` adapter.
+When operating in the `vlmkit` standalone repository, the runner lives in this repo, and artifact collection uses `metric-ci`'s built-in `vrt-migration` adapter.
 
 ## Implementation Phases
 
@@ -327,7 +327,7 @@ As of 2026-04-02, all 3 items above are complete. What remains is not built-in r
 
 ### 1. Runner placement
 
-Initial implementation on the `vrt` side is fine. Reasons:
+Initial implementation on the `vlmkit` side is fine. Reasons:
 
 - Direct access to internal APIs like `runMigrationCompare()`
 - `metric-ci` side is currently rename/development in progress with a dirty worktree

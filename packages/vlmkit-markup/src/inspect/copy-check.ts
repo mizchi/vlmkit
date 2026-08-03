@@ -63,6 +63,7 @@ import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { readEnv } from "@mizchi/vlmkit-core/legacy-names.ts";
 
 export type CopyIssueKind = "placeholder-text" | "copy-missing" | "copy-invisible" | "copy-image-mismatch" | "redirected";
 
@@ -919,7 +920,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     }
     const { createVlmClient, resolveModel } = await import("@mizchi/vlmkit-ai/vlm-client.ts");
     const modelId = vlm === true
-      ? (process.env.VRT_VLM_MODEL ?? "bytedance/ui-tars-1.5-7b")
+      ? (readEnv("VLM_MODEL") ?? "bytedance/ui-tars-1.5-7b")
       : vlm;
     const model = await resolveModel(modelId);
     const client = await createVlmClient(model);

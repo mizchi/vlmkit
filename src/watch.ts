@@ -20,7 +20,8 @@
 
 import { watch as fsWatch } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, relative} from "node:path";
+import { STATE_DIR, resolveStatePath } from "@mizchi/vlmkit-core/legacy-names.ts";
 import { runMigrationCompare, parseMigrationCompareArgs, type MigrationCompareReport } from "./experiments/migration/migration-compare.ts";
 import {
   BOLD,
@@ -34,7 +35,10 @@ import {
 import type { WireframeFixSuggestion } from "./experiments/migration/wireframe-fix-candidates.ts";
 
 const DEBOUNCE_MS = 150;
-const WATCH_OUTPUT_DIR_DEFAULT = ".vrt/runs";
+// See legacy-names: an existing `.vrt/runs` keeps being used so a watch loop
+// mid-session does not start a second run history beside the first.
+const watchOutputDirDefault = (): string =>
+  relative(process.cwd(), resolveStatePath(process.cwd(), "runs")) || `${STATE_DIR}/runs`;
 
 export interface RoundSummary {
   timestamp: string;
@@ -282,7 +286,7 @@ export async function runWatch(rawArgs: string[]): Promise<void> {
   const baseline = compareArgs[0];
   const variant = compareArgs[1];
 
-  const outputDir = resolve(WATCH_OUTPUT_DIR_DEFAULT);
+  const outputDir = resolve(watchOutputDirDefault());
   await mkdir(outputDir, { recursive: true });
 
   // Pick what to watch. By default: the variant file + its parent dir

@@ -1,13 +1,13 @@
 /**
- * No command may tell the reader to run `vrt`.
+ * No command may tell the reader to run `vlmkit`.
  *
- * There is no `vrt` binary — `package.json` ships `bin: { vlmkit }` only — so
+ * There is no `vlmkit` binary — `package.json` ships `bin: { vlmkit }` only — so
  * every `vrt <something>` in help text, a usage line or a fix instruction was an
  * instruction the reader could not paste. `vrt a11y-contrast` was wrong twice
  * over: dead binary AND a deprecated subcommand name.
  *
  * This test also pins the *exceptions*, which is the more useful half. A sweep
- * of the whole tree found ~1670 occurrences of `vrt`, and they are not one
+ * of the whole tree found ~1670 occurrences of `vlmkit`, and they are not one
  * thing:
  *
  *   renamed here          `vrt <cmd>` in help/usage/comments -> `vlmkit <cmd>`
@@ -45,7 +45,7 @@ const COMMANDS = [
 ];
 
 /**
- * `vrt` spellings that name something real and must survive. Each is a live
+ * `vlmkit` spellings that name something real and must survive. Each is a live
  * value, not prose — see the header for why renaming them is a separate,
  * breaking change.
  */
@@ -77,7 +77,7 @@ function offenders(text: string): string[] {
   return [...t.matchAll(/vrt[\s-][\w-]*/g)].map((m) => m[0].trim());
 }
 
-describe("no command tells the reader to run `vrt`", () => {
+describe("no command tells the reader to run `vlmkit`", () => {
   it("package.json ships only the vlmkit binary — the premise of this test", () => {
     const pkg = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8")) as { bin: Record<string, string> };
     assert.deepEqual(Object.keys(pkg.bin), ["vlmkit"]);
@@ -112,5 +112,26 @@ describe("the allowlist is real, not slack", () => {
     for (const a of ALLOWED) {
       assert.ok(src.includes(a), `${a} is allowlisted but no longer appears in the source — drop it`);
     }
+  });
+});
+
+describe("a rename never leaves a definition and its reference disagreeing", () => {
+  it("every GitHub Actions step id referenced by `steps.<id>` is defined", () => {
+    // Caught during this rename: `- id: vrt` was renamed to `- id: vlmkit`
+    // while the `if: steps.vrt.outcome == 'failure'` that consumes it was NOT,
+    // because `steps.vrt.outcome` has `vrt` followed by a dot and did not match
+    // the sweep's pattern. The template still parsed — the review step just
+    // silently never ran.
+    const files = execFileSync("git", ["ls-files", "*.yml", "*.yaml"], { cwd: ROOT, encoding: "utf8" })
+      .split("\n").filter(Boolean);
+    const problems: string[] = [];
+    for (const f of files) {
+      const text = readFileSync(resolve(ROOT, f), "utf8");
+      const defined = new Set([...text.matchAll(/^\s*-?\s*id:\s*([\w-]+)/gm)].map((m) => m[1]!));
+      for (const m of text.matchAll(/steps\.([\w-]+)\./g)) {
+        if (!defined.has(m[1]!)) problems.push(`${f}: steps.${m[1]} is referenced but no step declares that id`);
+      }
+    }
+    assert.deepEqual(problems, [], problems.join("\n"));
   });
 });

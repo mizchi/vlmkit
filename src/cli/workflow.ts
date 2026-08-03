@@ -41,6 +41,7 @@ import {
 } from "./workflow/paths.ts";
 import { resolveCaptureRoutes } from "@mizchi/vlmkit-capture/capture-config.ts";
 import type { UnifiedAgentContext } from "@mizchi/vlmkit-core/types.ts";
+import { readEnv } from "@mizchi/vlmkit-core/legacy-names.ts";
 
 const NPX_COMMAND = process.platform === "win32" ? "npx.cmd" : "npx";
 
@@ -99,8 +100,8 @@ function buildCaptureEnv(mode: "baseline" | "capture", options: WorkflowCaptureO
   const routeSet = resolveCaptureRoutes({
     cwd: PROJECT_ROOT,
     configPath: options.configPath,
-    envConfigPath: process.env.VRT_CONFIG_PATH,
-    envBaseUrl: options.baseUrl ?? process.env.VRT_BASE_URL,
+    envConfigPath: readEnv("CONFIG_PATH"),
+    envBaseUrl: options.baseUrl ?? readEnv("BASE_URL"),
   });
 
   if (routeSet.configPath) {

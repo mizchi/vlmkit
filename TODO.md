@@ -87,7 +87,7 @@ Runs on Cloudflare Workers with Crater. WebUI is in a separate repo.
 - [x] `vlmkit snapshot` command (URL → multi-viewport capture + baseline diff)
 - [x] `vlmkit diff html --url / --current-url` URL mode (page.goto based)
 - [x] `--mask` selector masking (visibility: hidden to exclude dynamic content)
-- [x] Project rename: vrt-harness → vrt
+- [x] Project rename: vrt-harness → vlmkit
 
 ---
 
@@ -95,7 +95,7 @@ Runs on Cloudflare Workers with Crater. WebUI is in a separate repo.
 
 ### E1. Dogfooding on external projects
 
-Use vrt on real projects to verify practicality.
+Use vlmkit on real projects to verify practicality.
 
 - [x] Add `vlmkit snapshot` command (URL → multi-viewport capture + baseline diff)
 - [x] Add `vlmkit diff html --url` URL mode (page.goto based)
@@ -565,7 +565,7 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   ドキュメントは「ゲートは --json を取る」と書いていたので一貫性の穴でもあった。
   回帰テスト: `packages/vlmkit-markup/src/output-consistency.test.ts`(6 件)。
 
-### `vrt` → `vlmkit` リネーム(2026-08-02)
+### `vlmkit` → `vlmkit` リネーム(2026-08-02)
 - [x] **正解表は CLI 自身** — `vlmkit --help` が出す 33 件の deprecated エイリアス表
   (`a11y-contrast → check a11y contrast` など)を機械的に抽出して写像に使った。
   ソースの正規表現では 15 件しか拾えなかったので、推測ではなく実出力を使うのが正解。
@@ -595,7 +595,7 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   \`vlmkit check tokens\`」という自己言及になるので、**真の部分**
   (出力先が今も `test-results/design-tokens/`)に書き換えた。
 - [x] **回帰ゲート**: `src/cli/binary-name.test.ts`(28 件)。
-  全 24 コマンドの `--help` を実行して `vrt` を含まないことを検査し、
+  全 24 コマンドの `--help` を実行して `vlmkit` を含まないことを検査し、
   **例外リストも検査する**(許可した綴りが実際にソースに存在するか — 消えたら
   例外を削除すべきで、次の掃除が通り抜ける穴にしてはいけない)。
   アブレーション済み: `vrt design-tokens` を1つ戻すと落ちる。
@@ -604,17 +604,61 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 - [x] **以前の自分の主張の訂正** — introduce.ja.md のコミットで
   「`vrt compare` / `elements` / `smoke` / `serve` / `discover` は削除済み」と書いたが、
   実際は **deprecated エイリアスとして今も動く**(1.0.0 で削除予定)。
-  消えたのは `vrt` バイナリだけ。ドキュメント刷新自体は正しかったが理由が不正確だった。
-- [ ] **残り: 判断が必要(ユーザー確認待ち)**
+  消えたのは `vlmkit` バイナリだけ。ドキュメント刷新自体は正しかったが理由が不正確だった。
+- [x] **挙動に影響する 3 種を後方互換付きで改名(2026-08-02、ユーザー承認)** —
+  `packages/vlmkit-core/src/legacy-names.ts` に集約。旧名は動き続け、使うと
+  **1 行だけ**通知が出る(ループで連呼しないよう名前ごとに 1 回)。
+  - `.vrt/` → `.vlmkit/`。**サブパス単位**で判定する必要があった: `.vlmkit/` は
+    ゲートを 1 回でも走らせた repo には既に存在する(run-ledger / gates /
+    markup-loop / copy-review)ので、「`.vlmkit/` が無ければ `.vrt/`」だと
+    即座に新パスへ解決して `baselines` を取り落とす。判定は
+    `.vlmkit/baselines` vs `.vrt/baselines` の粒度。
+  - `vrt.config.json` / `.toml` → `vlmkit.config.*`。候補リストをデータとして
+    公開したのは、not-found メッセージで**全候補を名指し**する必要があるため
+    (新名だけ挙げると、動いている `vrt.config.json` を持つ repo に
+    「設定が無い」と言うことになる)。
+  - `VRT_*` → `VLMKIT_*`(8 種)。接尾辞だけ渡す API にして呼び出し側が
+    前後半を食い違わせられないようにした。空文字は未設定扱い(従来の `||` と同じ)。
+  - `DEBUG_VRT` → `DEBUG_VLMKIT` は接頭辞なので別関数。
+  - deprecation ログのパスも統一。**コメントは `vlmkit`、コードは `vrt`** と
+    元から食い違っていた。
+  - テスト: `packages/vlmkit-core/src/legacy-names.test.ts`(12 件)。
+    「`.vrt/baselines` がある repo では旧パスに解決する」= 失敗すると
+    全ルートが「新規ベースライン」に見える無音の事故なので、そこを固定。
+- [x] **素の製品名 128 行を機械的に置換(ユーザー選択)** — 業界一般語との衝突は
+  実測で自然に分離できた: **一般用法はすべて大文字 `VRT`**(`commercial VRT
+  vendors`)、製品は小文字 `vrt`。case-sensitive な置換で無害だった。
+  1 件だけ自分の TODO の説明文が置換されたので復元。
+- [x] **識別子の影響調査(ユーザー指示)— 安全に改名できたのは 1 つだけ**
+  - `data-vrt-state-marker` → `data-vlmkit-state-marker`: 設定・照会・削除が
+    `multi-state.ts` 1 モジュールに閉じているので改名済み。
+  - `data-vrt-action`: **公開 API**。ユーザーが自分の HTML に書く属性で
+    `inspect explore` が読む。改名は利用者のページを壊す → 据え置き。
+  - `vrt-page.html` / `vrt.spec.ts`(vlmkit-heal fixture): Playwright の
+    **コミット済みスクリーンショットベースラインのファイル名がスペック名から
+    導出される**。改名するとベースラインが無効化 → 据え置き。
+  - `apm.yml` の `name: vrt`: APM パッケージ識別子。消費者が固定しうる → 据え置き。
+  - GitHub Actions の `jobs: vrt:` / `- id: vrt`: 必須チェック名として参照され得る。
+    据え置き。**ここで自分が壊した**: `- id: vlmkit` にしたが参照側
+    `steps.vrt.outcome` は `vrt.` の形で置換パターンに合わず、`if:` 条件が
+    存在しない step を指す状態になった(テンプレートはパースできるので無音で
+    レビューステップが走らなくなる)。回帰ゲート追加:
+    `binary-name.test.ts` が全 yml の `steps.<id>` 参照に対応する `id:` 定義の
+    存在を検査。アブレーション済み。
+  - `markup-vrt-eval`: example ディレクトリ + package.json スクリプト名 +
+    ワークフローパス `.vrt/markup-vrt-eval/` の 3 箇所にまたがる → 据え置き。
+- [ ] **残り: 据え置き分(上記の理由により)**
   - **挙動に影響 128 箇所**: `.vrt/`(baselines / runs / last-diff-for-agent)、
     `.vrt-skills/`、`vrt.config.json` / `.toml`、`VRT_*` 環境変数(12 種以上)、
     `projectName: "vrt"`(Playwright プロジェクト名 = スナップショットパスに出る)、
     plan スキーマの `vrt?:` **フィールド名**(既存 plan ファイルが壊れる)、
     `"X-Title": "vrt"`(OpenRouter へ送る HTTP ヘッダ)、
-    `title: "vrt HTTP API"`(公開 OpenAPI)、
+    `title: "vlmkit HTTP API"`(公開 OpenAPI)、
     `~/.../vrt/deprecated.log`。改名は既存ユーザーの state / config / CI を孤児化する。
   - **素の製品名 404 箇所**: ただし **VRT は業界一般の略語**(Visual Regression
-    Testing)でもあり、「vrt vendors」「VRT service」は技術一般を指す。
+    Testing)でもあり、大文字の「VRT vendors」「VRT service」は技術一般を指す。
+    実測: 業界一般の用法はすべて大文字 `VRT`、製品を指すものは小文字 `vrt` だったので、
+    case-sensitive な置換で両者は自然に分離できた。
     機械的に置換すると意味が変わるので個別判断が必要。
   - **その他の識別子**: `vrt-eval`(53)、`vrt-diff`(27)、`vrt-action`(16)、
     `vrt-runner.ts`、`vrt-capture.spec.ts` — CI ジョブ名 / fixture 名 /
@@ -644,11 +688,11 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     修正前 14/14 fail、修正後 14/14 pass を確認。
 - [x] **自分のテストが空回りしていたのを検出して修正** — `\bvrt\s` は正しく見えて
   無意味だった: ヘッダは `\x1b[36mvrt a11y-contrast` で、エスケープが `m`
-  (単語文字)で終わるため `vrt` の前に単語境界が無く、**拒否するために書いた出力に
+  (単語文字)で終わるため `vlmkit` の前に単語境界が無く、**拒否するために書いた出力に
   対して pass** していた。ANSI を除去してから照合するよう修正。
-- [ ] **`vrt` 名の残存 ~250 箇所 / ~80 フレーズ(次の作業)** — 実測: 4 ゲートは
+- [ ] **`vlmkit` 名の残存 ~250 箇所 / ~80 フレーズ(次の作業)** — 実測: 4 ゲートは
   リリース diff に既に入っていたので直したが、全体は `vlmkit snapshot` /
-  `vlmkit workflow` / `vlmkit diff-pr` / `vlmkit baseline` など。`vrt` バイナリは存在せず
+  `vlmkit workflow` / `vlmkit diff-pr` / `vlmkit baseline` など。`vlmkit` バイナリは存在せず
   (`bin` は `vlmkit` のみ)、旧サブコマンド名は deprecated なので
   `Re-run \`vlmkit check a11y contrast\`` は**二重に誤り**。大半はバイナリ名の置換だけで
   済むが、`vlmkit diff html` / `vlmkit diff elements` / `vlmkit inspect smoke` は**すでに削除された
@@ -734,7 +778,7 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   (乖離すると**有効な**フローを弾き始める)。
 
 ### ドキュメント刷新(2026-08-02)
-- [x] **`docs/introduce.ja.md` が 7/27 の `vrt` 時代のまま(248 行)だった** —
+- [x] **`docs/introduce.ja.md` が 7/27 の `vlmkit` 時代のまま(248 行)だった** —
   リネーム前のコマンド名で、**すでに削除されたコマンド**(`vlmkit diff html` /
   `elements` / `smoke` / `serve` / `discover`)を手順として書いており、
   ディレクトリ構成もフラットな `src/` のまま。読者が写して実行すると必ず失敗する
@@ -1181,7 +1225,7 @@ evaluated incrementally.
   `:focus-visible` / `:active` via CDP `CSS.forcePseudoState`,
   diff per state. `packages/vlmkit-markup/src/stress/multi-state.ts` marks all interactive
   elements (`button`, `a[href]`, `[role=button]`, form controls)
-  with a `data-vrt-state-marker` attribute, opens a CDP session,
+  with a `data-vlmkit-state-marker` attribute, opens a CDP session,
   and calls `forcePseudoState` for each matched node. Pixelmatch
   threshold lowered to 0.03 for state diffs (the default 0.1
   filters hover's typical Δ10-30/channel color shifts). Opt-in
@@ -1281,7 +1325,7 @@ Two remaining single-item gaps from the scenario matrix:
   in Figma / Chrome devtools, then run with `--dpr 2` to verify
   the live render holds up.
 
-Both registered in the unified `vrt` dispatcher. Smoke 15/15 PASS.
+Both registered in the unified `vlmkit` dispatcher. Smoke 15/15 PASS.
 
 Scenario-matrix progress (HEAD → after this commit):
   ✅ 42 → 44 (+2: F3, D4)
@@ -1331,7 +1375,7 @@ In-scope full coverage now **44 / 85 = 52%**; full + partial =
   distinct shadows (allowed 5). Conformant elements (.ok-card,
   .btn-ok) pass cleanly.
 
-Both registered in `vrt` dispatcher. Smoke script updated to
+Both registered in `vlmkit` dispatcher. Smoke script updated to
 14/14 PASS.
 
 Per scenario matrix, this drops missing-scenario count further:
@@ -1380,7 +1424,7 @@ md`): forced-colors, reduced-motion, print, RTL, 200%-zoom.
       despite animation, no print rule, physical props) → **3 ✗ +
       1 ⚠ + 1 ✓** (zoom-200 still reflows fine)
 
-  Registered under `vrt` dispatcher; added to
+  Registered under `vlmkit` dispatcher; added to
   scripts/smoke-all-clis.sh (12/12 PASS).
 
 ### Survey Tier D — real-interaction sequences (2026-05-13)
@@ -1411,7 +1455,7 @@ md`): forced-colors, reduced-motion, print, RTL, 200%-zoom.
   surfaced, including the subtle 0.07% border-color shift on email
   validation.
 
-  Registered under the unified `vrt` dispatcher.
+  Registered under the unified `vlmkit` dispatcher.
 
 ### Survey Tier B / C / F follow-ups (2026-05-13)
 
@@ -1564,7 +1608,7 @@ Three concerns left open after the re-dogfood, all addressed:
 
 - [x] **CLI unification.** All six markup-assistance CLIs +
   `diff-for-agent` + `flipbook` + `compare-runs` now registered
-  under the unified `vrt` dispatcher
+  under the unified `vlmkit` dispatcher
   (src/cli/router.ts + src/cli/vrt.ts). Fixed a
   long-standing bug in the dispatcher: `process.argv[1]` was
   being set to a *relative* module path

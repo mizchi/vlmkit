@@ -45,13 +45,13 @@ gives real signal. I lost ~5 minutes of round 1 to this.
 ### Final
 - wide 1.8% / desktop 2.0% / mobile 10.3%
 
-## What vrt helped with
+## What vlmkit helped with
 - **Text-row Δy table** is gold — it gave me literal +/- pixel offsets per row, letting me reason about vertical spacing without guessing.
 - **Component bbox table with IoU** quickly flagged mobile layout as wrong-tree (IoU 0.18) vs desktop being wrong-position (IoU 0.7+, near-uniform Δ).
 - **Palette diff** caught the stat-card color in one shot — `#e4ecfc` missing → `#dce4f4` extra, with the explicit hex. I could pick the correct token directly.
 - **DOM equivalence warning** told me `Mia Carter` should be a heading, which I had as a `<p>`.
 
-## Where vrt was unhelpful / misleading
+## Where vlmkit was unhelpful / misleading
 - **`vlmkit diff html` silent failure with bare paths.** Returned 0.0% diff with no warning that stylesheet loading was broken. The only hint was a "failed-resource-load" warning about Google Fonts (which is a side issue) — nothing about my local `style.css`. This made me think round 1 was perfect.
 - **`--output` flag is silently ignored.** I passed `--output /tmp/agent-a-round-1` but report always went to `/home/user/vrt/test-results/migration/`. No error, no log line.
 - **The PNG saved as `page-desktop.png` was NOT the rendered variant** — it appeared to be the heatmap/diff overlay rendered against a blank canvas. The visual was completely unstyled, leading me to think my CSS was broken when really only the comparison apparatus was.
@@ -61,7 +61,7 @@ gives real signal. I lost ~5 minutes of round 1 to this.
 - **Color names not back-resolved.** Palette diff reports raw hex. I knew `#e4ecfc` ≈ `#e2e8f8` = `surface-container-high` only because I have the token table memorized in scratch. Auto-mapping to nearest DESIGN.md token name would be huge.
 - **No paint-tree backend.** Crater BiDi was unavailable; the entire "Paint Tree" section was dead in every report. So I had no DOM/computed-style data — only image features.
 
-## What I wished vrt had told me
+## What I wished vlmkit had told me
 - "Stylesheet failed to load on variant" (and on baseline). A render-sanity check for `<link rel=stylesheet>` 404s, with side-by-side flagging.
 - "Container top padding differs by ~24px across viewports — try increasing/decreasing one token step on `.container` or its first child."
 - A "spacing-token snap" suggestion: given a baseline Δy of +12px and my margin-top of `space-sm` (12px), it could say "try `space-md` (24px)" — token-aware suggestions.

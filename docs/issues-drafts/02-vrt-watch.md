@@ -12,10 +12,10 @@ JSON emit, full triptych compose.
 The data needed for fast iteration is already there — what's missing
 is two pieces of UX glue:
 
-1. **A file-watcher that re-runs vrt on save.** No tool today; users
+1. **A file-watcher that re-runs vlmkit on save.** No tool today; users
    alt-tab back to the terminal and re-type the compare command
    between every edit.
-2. **A round-vs-round diff.** vrt currently only compares variant vs
+2. **A round-vs-round diff.** vlmkit currently only compares variant vs
    golden. The agent's most-useful cognitive prompt during a long
    loop is "what did I just change that affected the diff in
    direction X?" — which requires variant-now vs variant-previous-run

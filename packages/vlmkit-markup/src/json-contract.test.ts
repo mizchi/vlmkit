@@ -47,7 +47,7 @@ const PAGE = (() => {
 /**
  * Colour codes have to come off before matching. `\bvrt\s` looked right and was
  * vacuous: the header is `\x1b[36mvrt a11y-contrast`, and the escape ends in
- * `m`, a word character — so there is no word boundary before `vrt` and the
+ * `m`, a word character — so there is no word boundary before `vlmkit` and the
  * assertion passed against the very output it was written to reject. (`NO_COLOR`
  * is set below and these helpers emit colour anyway, so stripping is the only
  * reliable route.)
@@ -117,7 +117,7 @@ describe("gate output names a command that exists", () => {
       // `vrt a11y-contrast` was wrong twice over. A fix instruction the reader
       // cannot paste is worse than none.
       const { stdout, stderr } = runGate(gate.module, []);
-      assert.doesNotMatch(stdout + stderr, /vrt[ -]/, "user-facing output still says vrt");
+      assert.doesNotMatch(stdout + stderr, /vrt[ -]/, "user-facing output still says vlmkit");
     });
   }
 });

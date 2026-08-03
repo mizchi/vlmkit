@@ -10,7 +10,8 @@
  */
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, relative} from "node:path";
+import { STATE_DIR, resolveStatePath } from "@mizchi/vlmkit-core/legacy-names.ts";
 import {
   buildPreviousRunSummary,
   detectRegression,
@@ -19,7 +20,11 @@ import {
   type PreviousRunSummary,
 } from "../../vrt/compare/diff-for-agent.ts";
 
-const DEFAULT_HISTORY_PATH = ".vrt/last-diff-for-agent.json";
+// See legacy-names: the run-vs-run comparison is worthless if the rename makes
+// it read an absent file and report "no previous run" forever.
+const defaultHistoryPath = (): string =>
+  relative(process.cwd(), resolveStatePath(process.cwd(), "last-diff-for-agent.json"))
+  || `${STATE_DIR}/last-diff-for-agent.json`;
 
 function usage(): string {
   return [
@@ -174,10 +179,10 @@ async function main() {
   //   --no-history: skip both load + write entirely (CI one-shots).
   //   default:      auto-load + auto-persist .vrt/last-diff-for-agent.json,
   //                 overridable via --previous / --persist-summary.
-  const historyPath = parsed.noHistory ? undefined : resolve(parsed.persistSummaryPath ?? DEFAULT_HISTORY_PATH);
+  const historyPath = parsed.noHistory ? undefined : resolve(parsed.persistSummaryPath ?? defaultHistoryPath());
   const previousPath = parsed.noHistory
     ? undefined
-    : resolve(parsed.previousPath ?? parsed.persistSummaryPath ?? DEFAULT_HISTORY_PATH);
+    : resolve(parsed.previousPath ?? parsed.persistSummaryPath ?? defaultHistoryPath());
   const previous = previousPath ? await loadPreviousSummary(previousPath) : undefined;
 
   const md = formatMigrationReportForAgent(report, {

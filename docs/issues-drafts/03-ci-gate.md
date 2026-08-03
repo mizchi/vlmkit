@@ -2,7 +2,7 @@
 
 ## Context
 
-Every vrt invocation today is a single `compare <a> <b>` call. CI
+Every vlmkit invocation today is a single `compare <a> <b>` call. CI
 workflows need to run a *suite* — every page / route a team cares
 about — and gate the build on regressions. There's no config to
 declare that suite, no policy layer for "hero must be 0% but admin
@@ -18,7 +18,7 @@ backing storage.
 
 ### `vrt.config.{json,toml,js}`
 
-Project-level config that declares the suite vrt should know about:
+Project-level config that declares the suite vlmkit should know about:
 
 ```json
 {
@@ -95,14 +95,14 @@ Behavior:
 
 - Should `vlmkit diff-pr` boot its own dev server, or strictly bring-
   your-own? Recommend BYO for v1 — CI runners already manage their
-  own services; vrt staying agnostic is simpler.
+  own services; vlmkit staying agnostic is simpler.
 - PR-comment integration: the markdown summary is the payload. The
   glue to actually post it (via `gh` CLI in a real project, or
   GitHub MCP in this harness) is a separate ticket once this lands.
 
 ## Severity
 
-`major` — productionization blocker. Without a CI mode, vrt's
+`major` — productionization blocker. Without a CI mode, vlmkit's
 regression-net story is "manually run a command and read the
 output" — which doesn't scale to multi-person codebases.
 
@@ -120,7 +120,7 @@ TOML config now also supported: `vrt.config.toml` is parsed by the
 minimal `toml-min.ts` reader (scalars / arrays / nested tables /
 `[[routes]]` arrays-of-tables with dotted sub-tables). Format is chosen
 by file extension; `findConfigPath` discovers `.json` then `.toml`. No new
-runtime dependency (the repo shares a pnpm store with the old `vrt`
+runtime dependency (the repo shares a pnpm store with the old `vlmkit`
 checkout, so a hand-rolled parser avoided a risky relink). Tests in
 `toml-min.test.ts` + `diff-pr-config.test.ts`. JS-format config remains
 out of scope.

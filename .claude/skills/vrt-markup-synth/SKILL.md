@@ -24,7 +24,7 @@ keys.
 
 ## Invocation
 
-The `vrt` CLI in this repo is invoked **from source**:
+The `vlmkit` CLI in this repo is invoked **from source**:
 
 ```bash
 node --experimental-strip-types src/cli/vrt.ts <command...>

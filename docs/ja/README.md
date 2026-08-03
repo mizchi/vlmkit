@@ -1,4 +1,4 @@
-# vrt
+# vlmkit
 
 Visual Regression Testing ツールキット — ピクセル差分、computed style 差分、a11y ツリー差分、AI による CSS 自動修正。
 

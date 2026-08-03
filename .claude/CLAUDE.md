@@ -1,4 +1,4 @@
-# vrt — Project Skills
+# vlmkit — Project Skills
 
 ## How to Update VLM Model Benchmarks
 
@@ -14,7 +14,7 @@ pkf run vlm-bench -- --list --max-cost 0.001 --limit 30
 
 2. **Run fix-loop with candidate models** (hard case: seed 11):
 ```bash
-VRT_VLM_MODEL="<model-id>" node --experimental-strip-types src/experiments/css-challenge/fix-loop.ts \
+VLMKIT_VLM_MODEL="<model-id>" node --experimental-strip-types src/experiments/css-challenge/fix-loop.ts \
   --fixture page --seed 11 --mode selector --max-rounds 2
 ```
 
@@ -182,20 +182,20 @@ pkf run fix-loop -- --fixture page --seed 42
 pkf run fix-loop -- --fixture page --seed 11 --mode selector --max-rounds 3
 
 # Specify a VLM model
-VRT_VLM_MODEL="bytedance/ui-tars-1.5-7b" pkf run fix-loop -- --fixture page --seed 11 --mode selector
+VLMKIT_VLM_MODEL="bytedance/ui-tars-1.5-7b" pkf run fix-loop -- --fixture page --seed 11 --mode selector
 ```
 
 ## Environment Variables
 
 | Variable | Purpose | Default |
 |------|------|----------|
-| `VRT_LLM_PROVIDER` | LLM provider | gemini |
-| `VRT_LLM_MODEL` | LLM model | Provider default |
-| `VRT_VLM_MODEL` | VLM model (OpenRouter / `gemini:` / `claude:`) | bytedance/ui-tars-1.5-7b |
+| `VLMKIT_LLM_PROVIDER` | LLM provider | gemini |
+| `VLMKIT_LLM_MODEL` | LLM model | Provider default |
+| `VLMKIT_VLM_MODEL` | VLM model (OpenRouter / `gemini:` / `claude:`) | bytedance/ui-tars-1.5-7b |
 | `OPENROUTER_API_KEY` | OpenRouter API key | — |
 | `GEMINI_API_KEY` | Google AI API key | — |
 | `ANTHROPIC_API_KEY` | Anthropic API key | — |
-| `DEBUG_VRT` | Enable debug logs | — |
+| `DEBUG_VLMKIT` | Enable debug logs | — |
 
 ## Package Layout
 

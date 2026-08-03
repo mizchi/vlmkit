@@ -131,7 +131,7 @@ Re-running on the same scenario lets you compare apples-to-apples.
 Each agent gets the same brief and budget; what changes is the tool.
 Convergence-by-version becomes the public metric.
 
-| agent | budget | result | what changed in vrt since prior |
+| agent | budget | result | what changed in vlmkit since prior |
 |---|---|---|---|
 | a | 5 rounds | 10.3% mobile | initial |
 | d | 5 rounds | 0.2% mobile | post-#22..#29 |

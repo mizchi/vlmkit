@@ -45,6 +45,7 @@ import {
 } from "@mizchi/vlmkit-core/computed-style-capture.ts";
 import { formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
 import type { A11yNode, VrtSnapshot, VrtDiff, VisualSemanticDiff, A11yDiff } from "@mizchi/vlmkit-core/types.ts";
+import { debugEnabled } from "@mizchi/vlmkit-core/legacy-names.ts";
 
 // ---- Types ----
 
@@ -403,7 +404,7 @@ export async function capturePageState(
       computedStyles.set(selector, props);
     }
   } catch (e) {
-    if (process.env.DEBUG_VRT) console.error("[capturePageState] computed style error:", e);
+    if (debugEnabled()) console.error("[capturePageState] computed style error:", e);
   }
 
   // Capture hover styles by temporarily activating :hover rules

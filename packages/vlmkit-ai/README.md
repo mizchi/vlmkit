@@ -3,7 +3,7 @@
 VLM / LLM clients and reasoning pipeline used by VRT to interpret diff
 images and natural-language intent.
 
-Part of the [`vrt`](https://github.com/mizchi/vrt) monorepo.
+Part of the [`vlmkit`](https://github.com/mizchi/vrt) monorepo.
 
 ## Install
 
