@@ -197,7 +197,9 @@ describe("workflows that run a src/ entrypoint build the packages first", () => 
       for (const job of text.split(/^ {2}(?=[\w-]+:$)/m)) {
         const name = /^([\w-]+):/.exec(job)?.[1] ?? "?";
         const runsSrc = /node (?:--experimental-strip-types )?src\//.test(job);
-        const builds = /build:packages|pnpm test\b/.test(job);
+        // `build:packages:js` counts: it emits the same dist, skipping only the
+        // MoonBit step, which is loaded at runtime rather than needed to build.
+        const builds = /build:packages(:js)?|pnpm test\b/.test(job);
         if (runsSrc && !builds) missing.push(`${f}:${name}`);
       }
     }
