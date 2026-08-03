@@ -25,6 +25,27 @@ test('VLMKit intro smoke: hero clarity, scenario switch, and install guidance', 
   await expect(page.getByRole('button', { name: 'Copy install command' })).toBeVisible();
 
   const skillInstallers = page.getByTestId('skill-installers');
+  const skillCatalog = page.getByTestId('skill-catalog');
+  const specializedSkills = [
+    'agent-validation-loop',
+    'auto-markup',
+    'dynamic-markup',
+    'markup-assist',
+    'mock-markup',
+    'spec-to-playwright',
+    'vrt-css-fix-loop',
+    'vrt-markup-synth',
+    'vrt-migration-eval',
+    'vrt-regression-watch',
+    'vrt-visual-diff',
+  ];
+
+  await expect(skillCatalog).toBeVisible();
+  await expect(skillCatalog).toContainText('Meta entry');
+  await expect(skillCatalog).toContainText('vlmkit');
+  for (const skill of specializedSkills) {
+    await expect(skillCatalog).toContainText(skill);
+  }
   await expect(skillInstallers).toBeVisible();
   await expect(skillInstallers).toContainText(
     'apm install mizchi/vlmkit/.claude/skills/markup-assist',

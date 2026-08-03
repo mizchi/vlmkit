@@ -1,17 +1,40 @@
 ---
 name: vlmkit
-description: 'Reference for the `vlmkit` CLI — Visual Regression Testing combined with accessibility (a11y) semantic verification. Use when running `vrt-test` / `vlmkit` (Playwright VRT) / `vrt-update` / `vlmkit diff html` / `vlmkit snapshot`, configuring the fix-loop CSS challenge benchmark, or picking a VLM model for diff analysis.'
+description: 'Meta entry point for vlmkit. Use when an agent needs to choose between general markup verification, screenshot-to-HTML creation, dynamic UI behavior, Playwright/VRT generation, visual comparison or monitoring, migration evaluation, CSS repair benchmarks, or agent-tool hardening; route to the smallest specialized skill and its matching CLI gates.'
 ---
 
-# VRT + Semantic Verification — Agent Skill Guide
+# vlmkit — Skill Router and CLI Guide
 
 ## Overview
 
-A quality assurance tool for coding agents that combines Visual Regression Testing (VRT)
-with accessibility semantics verification.
+This is the meta entry for vlmkit's focused agent workflows and the reference
+for its Visual Regression Testing (VRT) and accessibility verification CLI.
 
 Automatically verifies that changes are visually and semantically (a11y) as intended,
 running a loop to detect and repair regressions.
+
+## Skill routing
+
+Treat this root skill as the selector, not as a requirement to run every
+workflow. Classify the task, load one primary specialized skill, and add a
+second only when the task genuinely crosses boundaries.
+
+| Task shape | Primary skill | Capability |
+|---|---|---|
+| Edited HTML/CSS; no reference design | `.claude/skills/markup-assist/SKILL.md` | Route to the smallest deterministic correctness gate and rerun to green |
+| Raw mock, retina export, or screenshot with no reference HTML | `.claude/skills/mock-markup/SKILL.md` | Normalize the image and recreate verified markup |
+| Target screenshot or UI Contract IR | `.claude/skills/auto-markup/SKILL.md` | Scaffold and converge page/component composition and decoration |
+| Responsive, scroll, interaction, or animation behavior | `.claude/skills/dynamic-markup/SKILL.md` | Extend static convergence with deterministic dynamic gates |
+| Natural-language story to browser test | `.claude/skills/spec-to-playwright/SKILL.md` | Generate reproducible Playwright/VRT and heal drift |
+| Need markup authoring signals | `.claude/skills/vrt-markup-synth/SKILL.md` | Measure components, tokens, theme parity, and i18n stress |
+| Compare two current renders | `.claude/skills/vrt-visual-diff/SKILL.md` | Explain pixel, section, viewport, and computed-style deltas |
+| Detect regressions across repeated CI runs | `.claude/skills/vrt-regression-watch/SKILL.md` | Persist summaries and fail when most viewports worsen |
+| Evaluate a framework/CSS/build migration | `.claude/skills/vrt-migration-eval/SKILL.md` | Judge visual equivalence despite large intentional rewrites |
+| Benchmark known CSS repair challenges | `.claude/skills/vrt-css-fix-loop/SKILL.md` | Measure VLM+LLM recovery, not production healing |
+| Harden an agent-facing CLI, SDK, or harness | `.claude/skills/agent-validation-loop/SKILL.md` | Turn fresh-agent friction into fixes and tracked evidence |
+
+The human-facing catalog, direct install commands, and category rationale are
+in [`.claude/skills/README.md`](.claude/skills/README.md).
 
 ## CLI Commands
 

@@ -225,26 +225,88 @@
           <div class="skills-intro">
             <p class="section-number">04 / AGENT SKILL</p>
             <h2 id="skills-title">
-              <span data-i18n="skills.line1">Give the measurement loop</span><br />
-              <span data-i18n="skills.line2">to your coding agent.</span>
+              <span data-i18n="skills.line1">One entry.</span><br />
+              <span data-i18n="skills.line2">Eleven focused skills.</span>
             </h2>
-            <p data-i18n="skills.lead">markup-assist teaches an agent to choose the right gate, read its kickback, fix the page, and rerun until green.</p>
-            <p class="skills-note"><span>SKILL</span> <code>markup-assist</code> · <span data-i18n="skills.note">No API key required</span></p>
+            <p data-i18n="skills.lead">Start with the vlmkit meta skill when unsure. It classifies the task and routes the agent to the smallest focused workflow; use markup-assist directly for routine HTML/CSS edits.</p>
+            <p class="skills-note"><span>CATALOG</span> <span data-i18n="skills.note">1 meta entry · 11 specialized skills</span></p>
           </div>
 
-          <div class="skill-installers" data-testid="skill-installers">
-            <article class="skill-installer">
-              <p class="skill-manager">01 / APM</p>
-              <h3 data-i18n="skills.apmLabel">Install with APM</h3>
-              <p data-i18n="skills.apmDescription">Add the skill to your project with Agent Package Manager.</p>
-              <div class="skill-command"><span aria-hidden="true">$</span><code>apm install mizchi/vlmkit/.claude/skills/markup-assist</code></div>
-            </article>
-            <article class="skill-installer">
-              <p class="skill-manager">02 / SKILLS CLI</p>
-              <h3 data-i18n="skills.cliLabel">Install with skills CLI</h3>
-              <p data-i18n="skills.cliDescription">Run the open agent skills CLI directly through npx.</p>
-              <div class="skill-command"><span aria-hidden="true">$</span><code>npx skills add https://github.com/mizchi/vlmkit/tree/main/.claude/skills/markup-assist</code></div>
-            </article>
+          <div class="skills-directory">
+            <div class="skill-catalog" data-testid="skill-catalog">
+              <article class="skill-entry">
+                <div>
+                  <p class="skill-manager">00 / <span data-i18n="skills.metaLabel">Meta entry</span></p>
+                  <h3><code>vlmkit</code></h3>
+                  <p data-i18n="skills.metaDescription">Classifies the request and selects one specialized skill whose inputs and done condition match. It does not run every workflow.</p>
+                </div>
+                <div class="skill-entry-commands">
+                  <code>apm install mizchi/vlmkit</code>
+                  <code>npx skills add mizchi/vlmkit</code>
+                </div>
+              </article>
+
+              <p class="skill-class-label" data-i18n="skills.classLabel">Skill classes</p>
+              <div class="skill-classes">
+                <article class="skill-category">
+                  <div>
+                    <p class="skill-manager">01 / VERIFY</p>
+                    <h3 data-i18n="skills.verifyTitle">Everyday verification</h3>
+                    <p data-i18n="skills.verifyDescription">Check HTML/CSS with no reference design through integrity, copy, responsive, and interaction gates.</p>
+                  </div>
+                  <p class="skill-names"><code>markup-assist</code></p>
+                </article>
+                <article class="skill-category">
+                  <div>
+                    <p class="skill-manager">02 / CREATE</p>
+                    <h3 data-i18n="skills.createTitle">UI creation</h3>
+                    <p data-i18n="skills.createDescription">Recreate static or dynamic pages from mocks, references, UI Contracts, and behavior briefs.</p>
+                  </div>
+                  <p class="skill-names"><code>mock-markup</code><code>auto-markup</code><code>dynamic-markup</code></p>
+                </article>
+                <article class="skill-category">
+                  <div>
+                    <p class="skill-manager">03 / TEST</p>
+                    <h3 data-i18n="skills.testTitle">Test generation</h3>
+                    <p data-i18n="skills.testDescription">Turn natural-language specs into Playwright tests, reproducible VRT, and drift healing.</p>
+                  </div>
+                  <p class="skill-names"><code>spec-to-playwright</code></p>
+                </article>
+                <article class="skill-category">
+                  <div>
+                    <p class="skill-manager">04 / MONITOR</p>
+                    <h3 data-i18n="skills.monitorTitle">Comparison and monitoring</h3>
+                    <p data-i18n="skills.monitorDescription">Explain render deltas, watch recurring regressions, and judge visual equivalence after migrations.</p>
+                  </div>
+                  <p class="skill-names"><code>vrt-markup-synth</code><code>vrt-visual-diff</code><code>vrt-regression-watch</code><code>vrt-migration-eval</code></p>
+                </article>
+                <article class="skill-category">
+                  <div>
+                    <p class="skill-manager">05 / EVALUATE</p>
+                    <h3 data-i18n="skills.evaluateTitle">Evaluation and hardening</h3>
+                    <p data-i18n="skills.evaluateDescription">Measure repair performance on known CSS regressions and improve agent-facing tool usability.</p>
+                  </div>
+                  <p class="skill-names"><code>vrt-css-fix-loop</code><code>agent-validation-loop</code></p>
+                </article>
+              </div>
+
+              <a class="skill-catalog-link" href="https://github.com/mizchi/vlmkit/tree/main/.claude/skills"><span data-i18n="skills.catalogLink">Open the detailed guide to all 11 skills</span> <span aria-hidden="true">↗</span></a>
+            </div>
+
+            <div class="skill-installers" data-testid="skill-installers">
+              <article class="skill-installer">
+                <p class="skill-manager">DIRECT / APM</p>
+                <h3 data-i18n="skills.apmLabel">Install with APM</h3>
+                <p data-i18n="skills.apmDescription">Add the skill to your project with Agent Package Manager.</p>
+                <div class="skill-command"><span aria-hidden="true">$</span><code>apm install mizchi/vlmkit/.claude/skills/markup-assist</code></div>
+              </article>
+              <article class="skill-installer">
+                <p class="skill-manager">DIRECT / SKILLS CLI</p>
+                <h3 data-i18n="skills.cliLabel">Install with skills CLI</h3>
+                <p data-i18n="skills.cliDescription">Run the open agent skills CLI directly through npx.</p>
+                <div class="skill-command"><span aria-hidden="true">$</span><code>npx skills add https://github.com/mizchi/vlmkit/tree/main/.claude/skills/markup-assist</code></div>
+              </article>
+            </div>
           </div>
         </div>
       </section>

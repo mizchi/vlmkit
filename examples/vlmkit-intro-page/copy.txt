@@ -18,8 +18,29 @@ Don't trust AI.
 Measure the result.
 
 # Agent skill
-Give the measurement loop
-to your coding agent.
+One entry.
+Eleven focused skills.
+Meta entry
+vlmkit
+apm install mizchi/vlmkit
+npx skills add mizchi/vlmkit
+SKILL CLASSES
+Everyday verification
+markup-assist
+UI creation
+mock-markup
+auto-markup
+dynamic-markup
+Test generation
+spec-to-playwright
+Comparison and monitoring
+vrt-markup-synth
+vrt-visual-diff
+vrt-regression-watch
+vrt-migration-eval
+Evaluation and hardening
+vrt-css-fix-loop
+agent-validation-loop
 Install with APM
 apm install mizchi/vlmkit/.claude/skills/markup-assist
 Install with skills CLI

@@ -54,11 +54,22 @@ npx playwright install chromium   # once
 
 Full setup detail: [`docs/configuration.md`](./docs/configuration.md).
 
-### Install the agent skill
+### Install agent skills
 
-`markup-assist` teaches coding agents to select the right vlmkit gate,
-read its kickback, fix the page, and rerun until green. Install the same
-skill with either package manager:
+Start with the root `vlmkit` meta skill when you want the agent to classify
+the task and select a focused workflow:
+
+```bash
+# APM
+apm install mizchi/vlmkit
+
+# skills CLI
+npx skills add mizchi/vlmkit
+```
+
+For routine HTML/CSS verification, install `markup-assist` directly. It
+selects the right vlmkit gate, reads its kickback, fixes the page, and reruns
+until green:
 
 ```bash
 # APM
@@ -67,6 +78,10 @@ apm install mizchi/vlmkit/.claude/skills/markup-assist
 # skills CLI
 npx skills add https://github.com/mizchi/vlmkit/tree/main/.claude/skills/markup-assist
 ```
+
+See the [agent skill catalog](./.claude/skills/README.md) for all 11
+specialized skills, grouped by general verification, UI creation, test
+generation, comparison and monitoring, and evaluation and hardening.
 
 ## When to use what
 

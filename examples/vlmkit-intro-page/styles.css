@@ -11,12 +11,15 @@
   --line-dark: rgba(255, 255, 255, 0.18);
   --surface: #f1f0e8;
   --surface-2: #e7e5db;
+  --surface-3: #dcdacf;
   --surface-text: #10120f;
   --surface-muted: rgba(16, 18, 15, 0.58);
   --surface-muted-strong: rgba(16, 18, 15, 0.67);
   --chrome: #10120f;
   --chrome-soft: #1b1f1a;
   --chrome-text: #f1f0e8;
+  --chrome-muted: rgba(241, 240, 232, 0.68);
+  --chrome-line: rgba(255, 255, 255, 0.18);
   --green-text: #586e00;
   --max: 1240px;
   --gutter: clamp(20px, 4vw, 56px);
@@ -31,6 +34,7 @@ html[data-theme="dark"] {
   --line: rgba(241, 240, 232, 0.19);
   --surface: #121511;
   --surface-2: #1b2019;
+  --surface-3: #252b23;
   --surface-text: #f1f0e8;
   --surface-muted: rgba(241, 240, 232, 0.6);
   --surface-muted-strong: rgba(241, 240, 232, 0.72);
@@ -864,8 +868,121 @@ dd {
   font-weight: 900;
 }
 
+.skills-directory {
+  min-width: 0;
+}
+
+.skill-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.85fr);
+  gap: 28px;
+  padding: clamp(24px, 4vw, 38px);
+  background: var(--chrome);
+  color: var(--chrome-text);
+}
+
+.skill-entry .skill-manager {
+  color: var(--acid);
+}
+
+.skill-entry h3 {
+  margin-top: 10px;
+  font-size: clamp(26px, 3vw, 38px);
+  letter-spacing: -0.04em;
+}
+
+.skill-entry h3 code {
+  color: var(--chrome-text);
+}
+
+.skill-entry div:first-child > p:last-child {
+  margin-top: 10px;
+  color: var(--chrome-muted);
+  font-size: 13px;
+}
+
+.skill-entry-commands {
+  display: grid;
+  gap: 8px;
+  align-content: center;
+}
+
+.skill-entry-commands code {
+  padding: 12px 14px;
+  border: 1px solid var(--chrome-line);
+  color: var(--acid);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.skill-class-label {
+  margin-top: 34px;
+  color: var(--surface-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.skill-classes {
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.skill-category {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(190px, 0.8fr);
+  gap: 24px;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.skill-category h3 {
+  margin-top: 8px;
+  font-size: 18px;
+  letter-spacing: -0.025em;
+}
+
+.skill-category div > p:last-child {
+  margin-top: 7px;
+  color: var(--surface-muted);
+  font-size: 12px;
+}
+
+.skill-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-content: center;
+}
+
+.skill-names code {
+  padding: 6px 8px;
+  background: var(--surface-3);
+  color: var(--surface-muted-strong);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.skill-catalog-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 22px;
+  color: var(--surface-text);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+
 .skill-installers {
   display: grid;
+  margin-top: 40px;
   border-top: 1px solid var(--line);
 }
 
@@ -1090,6 +1207,11 @@ dd {
   .skills-layout {
     grid-template-columns: 1fr;
     gap: 56px;
+  }
+
+  .skill-entry,
+  .skill-category {
+    grid-template-columns: 1fr;
   }
 
   .start > div:first-child {
