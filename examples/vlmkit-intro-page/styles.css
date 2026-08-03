@@ -1033,6 +1033,10 @@ dd {
   font-size: 12px;
 }
 
+.skill-command + .skill-command {
+  margin-top: 8px;
+}
+
 .skill-command span {
   color: var(--acid);
 }

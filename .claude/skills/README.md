@@ -6,18 +6,21 @@ agent picks the workflow whose inputs and done condition match the task.
 
 ## Start here
 
-### [`vlmkit`](../../SKILL.md) — automatic entry
+### [`vlmkit`](../../skills/vlmkit/) — automatic entry
 
 This is the recommended setup. You do not need to learn or name the skills
-below: the root `vlmkit` skill is discovered for frontend work, classifies the
-request, reads the matching bundled workflow, and runs its deterministic gates
-to green.
+below: the public `vlmkit` package is discovered for frontend work, classifies
+the request, reads the matching bundled workflow, and runs its deterministic
+gates to green.
 
 ```bash
-# APM
+# Install or update APM (macOS / Linux)
+curl -sSL https://aka.ms/apm-unix | sh
+
+# Install vlmkit with APM
 apm install mizchi/vlmkit
 
-# skills CLI
+# Or install with the skills CLI (APM is not required)
 npx skills add mizchi/vlmkit
 ```
 
@@ -30,6 +33,10 @@ After that, ask naturally—for example:
 The user does not select a skill. The agent routes these requests to
 `mock-markup` + `dynamic-markup`, `markup-assist`, and `spec-to-playwright`
 respectively.
+
+Both installers expose only the `vlmkit` entry. The specialists below are
+bundled internal workflow resources, so they do not clutter the user's skill
+picker and are not installed separately.
 
 ## How automatic routing works
 
@@ -68,22 +75,3 @@ which skill the user wants.
 - Component, token, theme, or i18n authoring signal → `vrt-markup-synth`.
 - Known CSS deletion benchmark → `vrt-css-fix-loop`.
 - Agent-facing CLI or harness usability study → `agent-validation-loop`.
-
-## Advanced: install a specialized skill directly
-
-Direct installation is optional. Use it only when you intentionally want to
-pin an agent to one workflow and bypass automatic routing:
-
-```bash
-# APM example
-apm install mizchi/vlmkit/.claude/skills/markup-assist
-
-# skills CLI example
-npx skills add https://github.com/mizchi/vlmkit/tree/main/.claude/skills/markup-assist
-```
-
-The skills CLI can also discover the full specialist catalog:
-
-```bash
-npx skills add https://github.com/mizchi/vlmkit/tree/main/.claude/skills --list
-```

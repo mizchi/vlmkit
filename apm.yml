@@ -1,7 +1,8 @@
-name: vrt
-version: 0.5.0
-# vlmkit ships coding-agent skills via APM so other repos can `apm install`
-# them. The repo itself is a CC project, hence `targets: [claude]`.
+name: vlmkit
+version: 0.9.0
+# Publish only the lightweight automatic router and its bundled workflows.
+includes:
+  - .apm/skills/vlmkit/
 targets:
   - claude
 dependencies:

@@ -6,11 +6,9 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
 const exampleDir = dirname(fileURLToPath(import.meta.url));
+const apmBootstrapCommand = "curl -sSL https://aka.ms/apm-unix | sh";
 const metaApmCommand = "apm install mizchi/vlmkit";
 const metaSkillsCliCommand = "npx skills add mizchi/vlmkit";
-const apmSkillCommand = "apm install mizchi/vlmkit/.claude/skills/markup-assist";
-const skillsCliCommand =
-  "npx skills add https://github.com/mizchi/vlmkit/tree/main/.claude/skills/markup-assist";
 const skillCatalogUrl = "https://github.com/mizchi/vlmkit/tree/main/.claude/skills";
 const specializedSkills = [
   "agent-validation-loop",
@@ -64,10 +62,8 @@ test("README and page distribute the automatic router through APM and skills CLI
   assert.ok(readme.includes(metaSkillsCliCommand));
   assert.ok(copyManifest.includes(metaApmCommand));
   assert.ok(copyManifest.includes(metaSkillsCliCommand));
-  assert.ok(readme.includes(apmSkillCommand));
-  assert.ok(readme.includes(skillsCliCommand));
-  assert.ok(catalog.includes(apmSkillCommand));
-  assert.ok(catalog.includes(skillsCliCommand));
+  assert.match(readme, /Both installers expose one visible `vlmkit` skill/);
+  assert.match(catalog, /Both installers expose only the `vlmkit` entry/);
   assert.ok(copyManifest.includes("This site is generated and debugged with vlmkit itself."));
   assert.ok(copyManifest.includes("Don't just look."));
 });
@@ -76,7 +72,7 @@ test("the meta entry and catalog classify every specialized skill", async () => 
   const [html, readme, rootSkill, catalog, copyManifest, skillDirectories] = await Promise.all([
     read("index.html"),
     readFile(join(exampleDir, "../../README.md"), "utf8"),
-    readFile(join(exampleDir, "../../SKILL.md"), "utf8"),
+    readFile(join(exampleDir, "../../skills/vlmkit/SKILL.md"), "utf8"),
     readFile(join(exampleDir, "../../.claude/skills/README.md"), "utf8"),
     read("copy.txt"),
     readdir(join(exampleDir, "../../.claude/skills"), { withFileTypes: true }),
@@ -105,7 +101,7 @@ test("one install lets the agent route natural-language UI work automatically", 
   const [html, readme, rootSkill, catalog, copyManifest] = await Promise.all([
     read("index.html"),
     readFile(join(exampleDir, "../../README.md"), "utf8"),
-    readFile(join(exampleDir, "../../SKILL.md"), "utf8"),
+    readFile(join(exampleDir, "../../skills/vlmkit/SKILL.md"), "utf8"),
     readFile(join(exampleDir, "../../.claude/skills/README.md"), "utf8"),
     read("copy.txt"),
   ]);
@@ -125,17 +121,19 @@ test("one install lets the agent route natural-language UI work automatically", 
   assert.match(rootSkill, /translate source-repo invocations to the published\s+`vlmkit` binary/);
 
   for (const skill of specializedSkills) {
-    const bundledReference = `./.claude/skills/${skill}/SKILL.md`;
+    const bundledReference = `./workflows/${skill}/SKILL.md`;
     assert.ok(rootSkill.includes(bundledReference), `${skill} is not bundled in the router table`);
     assert.match(
-      await readFile(join(exampleDir, "../..", bundledReference), "utf8"),
+      await readFile(join(exampleDir, "../../skills/vlmkit", bundledReference), "utf8"),
       new RegExp(`name: ${skill}`),
     );
   }
 
   for (const document of [html, readme, catalog, copyManifest]) {
+    assert.ok(document.includes(apmBootstrapCommand));
     assert.ok(document.includes(metaApmCommand));
     assert.ok(document.includes(metaSkillsCliCommand));
+    assert.doesNotMatch(document, /brew install .*apm/i);
   }
   assert.match(catalog, /Install once, then describe the outcome you want/);
   assert.match(readme, /You do not choose a\s+specialized skill/);
