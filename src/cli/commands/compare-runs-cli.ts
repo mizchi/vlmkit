@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `vrt compare-runs <a.json> <b.json>` — pairwise diff of two
+ * `vlmkit diff runs <a.json> <b.json>` — pairwise diff of two
  * migration-compare reports. Validates "the patch did what I expected"
  * across two iterations.
  */
@@ -12,7 +12,7 @@ import { formatCompareRunsMarkdown, type CrReport } from "../../vrt/compare/comp
 function usage(): string {
   return [
     "Usage:",
-    "  vrt compare-runs <a-migration-report.json> <b-migration-report.json> [--out path] [--label-a name] [--label-b name]",
+    "  vlmkit diff runs <a-migration-report.json> <b-migration-report.json> [--out path] [--label-a name] [--label-b name]",
     "",
     "Diffs two migration-compare reports and prints per-viewport delta",
     "(IMPROVED / REGRESSED / UNCHANGED / ADDED / REMOVED) sorted by",

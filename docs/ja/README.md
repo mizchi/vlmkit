@@ -1,4 +1,4 @@
-# vrt
+# vlmkit
 
 Visual Regression Testing ツールキット — ピクセル差分、computed style 差分、a11y ツリー差分、AI による CSS 自動修正。
 
@@ -23,16 +23,16 @@ pnpm install
 pnpm test
 
 # 2つの HTML ファイルを比較
-vrt compare before.html after.html
+vlmkit diff html before.html after.html
 
 # 2つの URL を比較
-vrt compare --url http://localhost:3000/ --current-url http://localhost:8080/
+vlmkit diff html --url http://localhost:3000/ --current-url http://localhost:8080/
 
 # URL のスナップショット (初回は baseline 作成、以降は差分計測)
-vrt snapshot http://localhost:3000/ http://localhost:3000/about/ --output snapshots/
+vlmkit snapshot http://localhost:3000/ http://localhost:3000/about/ --output snapshots/
 
 # 動的コンテンツをマスク
-vrt snapshot http://localhost:3000/ --mask ".marquee-container,.hero-badge"
+vlmkit snapshot http://localhost:3000/ --mask ".marquee-container,.hero-badge"
 
 # CSS チャレンジベンチマーク
 pkf run css-bench -- --fixture page --trials 30
@@ -55,14 +55,14 @@ node examples/markup-loop-project/run.mjs
 ## CLI
 
 ```bash
-vrt compare <before.html> <after.html>     # Migration VRT (ファイルまたは URL)
-vrt snapshot <url1> [url2] ...             # 複数 viewport スナップショット + 差分
-vrt bench [options]                         # CSS チャレンジベンチマーク
-vrt report                                 # 検出パターンレポート
-vrt smoke <file-or-url>                    # A11y 駆動ランダム操作テスト
+vlmkit diff html <before.html> <after.html>     # Migration VRT (ファイルまたは URL)
+vlmkit snapshot <url1> [url2] ...             # 複数 viewport スナップショット + 差分
+vlmkit bench [options]                         # CSS チャレンジベンチマーク
+vlmkit report                                 # 検出パターンレポート
+vlmkit inspect smoke <file-or-url>                    # A11y 駆動ランダム操作テスト
 vlmkit markup-loop <init|observe|doctor|run> # plan/generate/VRT gate の導入用ループ
-vrt serve [--port 3456]                    # API サーバー
-vrt status [--url http://localhost:3456]   # サーバーヘルスチェック
+vlmkit api serve [--port 3456]                    # API サーバー
+vlmkit api status [--url http://localhost:3456]   # サーバーヘルスチェック
 ```
 
 ## 環境変数

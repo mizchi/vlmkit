@@ -34,7 +34,7 @@
   - body: _not yet implemented_
 
 - [ ] **Agent-friendly diff Markdown summary** — verifies: MIG-002
-  >   `vrt diff-for-agent <migration-report.json>` collapses a
+  >   `vlmkit diff agent <migration-report.json>` collapses a
   >   compare report into a worst-first table with selector +
   >   property aggregation. Default consumer is a subagent fix
   >   pass.
@@ -70,7 +70,7 @@
   - body: _not yet implemented_
 
 - [ ] **Build a card from a blank starter until diff under 3 percent** (critical) — verifies: FIDELITY-001
-  >   `vrt component-from-image` against the pricing-card target
+  >   `vlmkit build component` against the pricing-card target
   >   reports bbox / heatmap / palette / typography signals; iteration
   >   converges the diff under 3% in <5 rounds on a representative
   >   fixture.
@@ -85,7 +85,7 @@
   - body: _not yet implemented_
 
 - [ ] **Build component from PNG screenshot** — verifies: A1
-  > `vrt component-from-image` accepts a PNG target and renders the agent's HTML for pixel-diff iteration. Same engine drives A1-A4.
+  > `vlmkit build component` accepts a PNG target and renders the agent's HTML for pixel-diff iteration. Same engine drives A1-A4.
   - contributes to: GOAL-MARKUP-FIDELITY
   - body: _not yet implemented_
 
@@ -102,7 +102,7 @@
 - [ ] **Build from natural-language description** ⊘ deprecated (minor) — verifies: A6
   > Marked out-of-scope in v2 matrix; preserved here for one-to-one matrix mapping.
   - contributes to: GOAL-MARKUP-FIDELITY
-  - deprecated: Out of scope per v2 matrix: no reference image means no vrt signal applies. The scenario stays here only so the matrix-row link is mechanical; no successor.
+  - deprecated: Out of scope per v2 matrix: no reference image means no vlmkit signal applies. The scenario stays here only so the matrix-row link is mechanical; no successor.
   - body: _not yet implemented_
 
 - [ ] **Build full page from design-spec document** (minor) [draft] — verifies: A5
@@ -118,21 +118,21 @@
 - [ ] **Bundle size analysis** ⊘ deprecated (minor) — verifies: G3
   > Preserved for matrix-row parity.
   - contributes to: GOAL-VARIANT-RESILIENCE
-  - deprecated: Out of scope per v2 matrix: bundle analyzers and Lighthouse cover this lane; vrt has no asset-pipeline integration.
+  - deprecated: Out of scope per v2 matrix: bundle analyzers and Lighthouse cover this lane; vlmkit has no asset-pipeline integration.
   - body: _not yet implemented_
 
 - [ ] **Bundled per-target check via skill run** — verifies: L5
-  > `vrt skill run <name> --against <html|url>` aggregates all configured checks for the target into one report.
+  > `vlmkit skill run <name> --against <html|url>` aggregates all configured checks for the target into one report.
   - contributes to: GOAL-AGENT-ERGONOMICS
   - body: _not yet implemented_
 
 - [ ] **CLS detection via in-page PerformanceObserver** — verifies: K5
-  > `vrt perf` wires up a PerformanceObserver inside the page and reports CLS / LCP / FCP without depending on Lighthouse.
+  > `vlmkit check perf` wires up a PerformanceObserver inside the page and reports CLS / LCP / FCP without depending on Lighthouse.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
 - [x] **CSS challenge bench delete-and-detect** — verifies: BENCH-001
-  >   `vrt bench` (alias `pkf run css-bench`) randomly deletes a
+  >   `vlmkit bench` (alias `pkf run css-bench`) randomly deletes a
   >   CSS property or selector block, runs the chosen detection
   >   backend, and accumulates a per-trial pass/fail record into
   >   `data/*.jsonl`.
@@ -163,12 +163,12 @@
   - body: _not yet implemented_
 
 - [ ] **Color tokens conform to declared palette** — verifies: M1
-  > `vrt design-tokens` flags rendered colors that fall outside the declared palette — catches off-scale hex values before they leak into the token catalog.
+  > `vlmkit check tokens` flags rendered colors that fall outside the declared palette — catches off-scale hex values before they leak into the token catalog.
   - contributes to: GOAL-DESIGN-SYSTEM
   - body: _not yet implemented_
 
 - [ ] **Compare-runs aggregates multiple VRT runs** (minor) — verifies: MIG-004
-  >   `vrt compare-runs` diffs two prior vrt runs against each other
+  >   `vlmkit diff runs` diffs two prior vlmkit runs against each other
   >   (e.g. iter 0 vs iter 1 of a fix loop) so progress per round is
   >   visible at a glance.
   - contributes to: GOAL-MIGRATION-VERIFICATION, GOAL-AGENT-ERGONOMICS
@@ -177,33 +177,33 @@
 - [ ] **Computed style diff across hover and focus states** — verifies: CORE-002
   >   `getComputedStyle` capture for both rest and pseudo-states
   >   (`:hover`, `:focus`) plus per-property delta surfacing.
-  >   Embedded inside `vrt compare` rather than exposed as its own
+  >   Embedded inside `vlmkit diff html` rather than exposed as its own
   >   CLI; the report.md groups deltas by selector + property.
   - contributes to: GOAL-CORE-DIFF
   - body: _not yet implemented_
 
 - [ ] **Cross-browser parity across Chromium / Firefox / WebKit** — verifies: H1
-  > `vrt cross-browser` renders the same HTML in all three engines and reports per-engine pixel diff against Chromium. `--allow-skipped` keeps CI green when WebKit isn't installed.
+  > `vlmkit diff browsers` renders the same HTML in all three engines and reports per-engine pixel diff against Chromium. `--allow-skipped` keeps CI green when WebKit isn't installed.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
 - [ ] **Cross-page component drift** — verifies: J1
-  > `vrt multi-page-consistency` diffs the same component selector across N pages and surfaces the outlier.
+  > `vlmkit check drift pages` diffs the same component selector across N pages and surfaces the outlier.
   - contributes to: GOAL-DESIGN-SYSTEM
   - body: _not yet implemented_
 
 - [ ] **Cumulative Layout Shift measurement** — verifies: G1
-  > `vrt perf` reads CLS from an in-page PerformanceObserver.
+  > `vlmkit check perf` reads CLS from an in-page PerformanceObserver.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
 - [ ] **Dark mode parity: every component responds to color-scheme** (critical) — verifies: C1
-  > `vrt theme-parity` flips `prefers-color-scheme`, diffs every component, and surfaces ones that didn't update (forgot a `--var` or hard-coded a hex).
+  > `vlmkit check theme` flips `prefers-color-scheme`, diffs every component, and surfaces ones that didn't update (forgot a `--var` or hard-coded a hex).
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
 - [ ] **Detection report aggregates accumulated bench runs** (minor) — verifies: BENCH-002
-  >   `vrt report` reads the jsonl history and emits per-fixture +
+  >   `vlmkit report` reads the jsonl history and emits per-fixture +
   >   per-backend detection-rate tables. Last measured: 96.7% on
   >   the canonical fixture set (docs/knowledge.md).
   - contributes to: GOAL-CSS-CHALLENGE
@@ -226,11 +226,11 @@
   - body: _not yet implemented_
 
 - [x] **Element-level shift-isolated diff** — verifies: CORE-004
-  >   `vrt elements` diffs per-element bounding boxes after isolating
+  >   `vlmkit diff elements` diffs per-element bounding boxes after isolating
   >   cascading layout shift; useful when a single element moves and
   >   pixel diff would otherwise blame everything downstream.
   - contributes to: GOAL-CORE-DIFF
-  - body: implemented as `vrt diff elements` and `vrt diff component` in `packages/vlmkit-core/src/element-compare.ts`
+  - body: implemented as `vlmkit diff elements` and `vlmkit diff component` in `packages/vlmkit-core/src/element-compare.ts`
 
 - [ ] **Empty state** (minor) [draft] — verifies: E6
   > Scriptable via `interact` (set state then snapshot); no first-class empty-state CLI.
@@ -238,10 +238,10 @@
   - body: _not yet implemented_
 
 - [ ] **Extract a single component from a page screenshot** — verifies: A8
-  >   Given a full-page PNG, `vrt component-extract` finds the major
+  >   Given a full-page PNG, `vlmkit scan component` finds the major
   >   non-background components, classifies each (text / filled-rect /
   >   icon / image), and crops the chosen rank to a standalone PNG
-  >   suitable for use as a target in `vrt component-from-image`.
+  >   suitable for use as a target in `vlmkit build component`.
   - contributes to: GOAL-MARKUP-FIDELITY
   - body: _not yet implemented_
 
@@ -267,7 +267,7 @@
   - body: _not yet implemented_
 
 - [ ] **Form validation state diff from invalid to valid** — verifies: E5
-  >   `vrt interact` drives a form sequence through deliberate
+  >   `vlmkit inspect interact` drives a form sequence through deliberate
   >   invalid → valid transitions (bad email, short password, then
   >   corrections) and pixel-diffs each transition so reviewers can
   >   see the validation-state visuals (red borders, error messages,
@@ -276,12 +276,12 @@
   - body: _not yet implemented_
 
 - [x] **HTTP API server exposes compare / reason / smoke endpoints** (minor) — verifies: API-001
-  >   `vrt api serve [--port N]` starts a Hono server with
+  >   `vlmkit api serve [--port N]` starts a Hono server with
   >   /api/compare, /api/compare-renderers, /api/reason,
   >   /api/smoke-test, /api/status, /api/execution-results, /api/visual-diffs, /api/detection-series,
   >   /api/component-status-matrix, /api/approvals, /api/cloudflare/screenshot,
   >   /api/cloudflare/crawl, /api/crater/layout. Lets a browser extension or
-  >   editor plugin drive vrt without spawning a Node child.
+  >   editor plugin drive vlmkit without spawning a Node child.
   - contributes to: GOAL-API
   - body: partial implementation in `src/api/api-app.ts`; execution-result search and visual-diff display models are backed by Worker D1 artifact rows when available. Local `api serve` exposes detection-rate time-series points from `data/bench-history.jsonl`, component/label status matrices from snapshot reports, approval-manifest list/add/remove operations, Cloudflare Browser Run Quick Actions proxies when credentials are configured, and a layout-only Crater JS/WASM renderer when `VLMKIT_CRATER_WASM_MODULE` is set.
 
@@ -307,7 +307,7 @@
   - body: _not yet implemented_
 
 - [ ] **Inline-vs-component drift on a single page** — verifies: J2
-  > `vrt component-consistency` screenshots every selector match on the page and diffs each against the reference — catches the still-inline call site after a botched extract-to-component refactor.
+  > `vlmkit check drift component` screenshots every selector match on the page and diffs each against the reference — catches the still-inline call site after a botched extract-to-component refactor.
   - contributes to: GOAL-DESIGN-SYSTEM
   - body: _not yet implemented_
 
@@ -317,7 +317,7 @@
   - body: _not yet implemented_
 
 - [ ] **LCP and FCP measurement** — verifies: G2
-  > `vrt perf` reports both core paint timings from the same observer wiring as G1.
+  > `vlmkit check perf` reports both core paint timings from the same observer wiring as G1.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
@@ -342,7 +342,7 @@
 - [ ] **Live monitoring of production regressions** ⊘ deprecated (minor) — verifies: L3
   > Preserved for matrix-row parity.
   - contributes to: GOAL-SNAPSHOT-WORKFLOW
-  - deprecated: Out of scope per v2 matrix: commercial VRT vendors own this lane; vrt is build-time / dev-loop.
+  - deprecated: Out of scope per v2 matrix: commercial VRT vendors own this lane; vlmkit is build-time / dev-loop.
   - body: _not yet implemented_
 
 - [ ] **Live snapshot of an agent session** (minor) [draft] — verifies: O10
@@ -372,12 +372,12 @@
   - body: partial implementation in `packages/vlmkit-markup/src/inspect/smoke-runner.ts`
 
 - [ ] **Media variants: forced-colors / reduced-motion / print / RTL / zoom-200** — verifies: C2-C6
-  > `vrt media-variants` sweeps the five hostile-user-preference media queries in one command and reports per-variant diffs.
+  > `vlmkit stress media` sweeps the five hostile-user-preference media queries in one command and reports per-variant diffs.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
 - [ ] **Migration compare across viewports** (critical) — verifies: MIG-001
-  >   `vrt compare <before> <after>` (or `--dir + --baseline +
+  >   `vlmkit diff html <before> <after>` (or `--dir + --baseline +
   >   --variants`) sweeps every viewport, emits report.md, .json
   >   and per-viewport heatmaps. Smoke-tested via the
   >   `compare` entry in Test.pkl.
@@ -385,7 +385,7 @@
   - body: _not yet implemented_
 
 - [ ] **Migration: BEM to utility-first** — verifies: B8
-  > Same `vrt compare` engine with class-rename map.
+  > Same `vlmkit diff html` engine with class-rename map.
   - contributes to: GOAL-MIGRATION-VERIFICATION
   - body: _not yet implemented_
 
@@ -395,7 +395,7 @@
   - body: _not yet implemented_
 
 - [ ] **Migration: CSS-in-JS to CSS modules** — verifies: B2
-  > Same `vrt compare` engine; class-rename map maps auto-generated to semantic class names.
+  > Same `vlmkit diff html` engine; class-rename map maps auto-generated to semantic class names.
   - contributes to: GOAL-MIGRATION-VERIFICATION
   - body: _not yet implemented_
 
@@ -405,7 +405,7 @@
   - body: _not yet implemented_
 
 - [ ] **Migration: Tailwind to vanilla CSS** — verifies: B1
-  > `vrt compare` migration mode handles utility-first → vanilla CSS by ignoring class-name churn.
+  > `vlmkit diff html` migration mode handles utility-first → vanilla CSS by ignoring class-name churn.
   - contributes to: GOAL-MIGRATION-VERIFICATION
   - body: _not yet implemented_
 
@@ -415,7 +415,7 @@
   - body: _not yet implemented_
 
 - [ ] **Migration: custom to standardized component library** — verifies: B7
-  > `vrt compare` plus `component-consistency` catches missed instances.
+  > `vlmkit diff html` plus `component-consistency` catches missed instances.
   - contributes to: GOAL-MIGRATION-VERIFICATION
   - body: _not yet implemented_
 
@@ -430,7 +430,7 @@
   - body: _not yet implemented_
 
 - [ ] **Migration: inline styles to CSS classes** — verifies: B5
-  > Same `vrt compare` engine.
+  > Same `vlmkit diff html` engine.
   - contributes to: GOAL-MIGRATION-VERIFICATION
   - body: _not yet implemented_
 
@@ -445,7 +445,7 @@
   - body: _not yet implemented_
 
 - [ ] **Mobile tablet desktop breakpoint sweep** — verifies: D1
-  > `vrt compare` accepts per-viewport configs; `component-geometry` reports bbox shifts across breakpoints.
+  > `vlmkit diff html` accepts per-viewport configs; `component-geometry` reports bbox shifts across breakpoints.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
@@ -455,7 +455,7 @@
   - body: _not yet implemented_
 
 - [ ] **Multi-viewport snapshot baseline capture** (critical) — verifies: SNAP-001
-  >   `vrt snapshot <url1> [url2]` captures every URL across the
+  >   `vlmkit snapshot <url1> [url2]` captures every URL across the
   >   configured viewport set on first run; subsequent runs diff
   >   against the baseline. Masks via `--mask <selector,...>`
   >   exclude animated regions.
@@ -463,7 +463,7 @@
   - body: _not yet implemented_
 
 - [ ] **Network-throttled rendering** (minor) [draft] — verifies: H4
-  > No throttle flag today; Playwright supports it but no vrt CLI surface yet.
+  > No throttle flag today; Playwright supports it but no vlmkit CLI surface yet.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
@@ -478,24 +478,24 @@
   - body: _not yet implemented_
 
 - [ ] **Overflow or clipping detection** — verifies: K3
-  > `vrt i18n-stress` flags overflow / wrap regressions; `compare` plus heatmap catches generic clipping.
+  > `vlmkit stress i18n` flags overflow / wrap regressions; `compare` plus heatmap catches generic clipping.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
 - [ ] **PNG pixel diff with heatmap overlay** (critical) — verifies: CORE-001
-  >   `vrt png-diff <baseline> <current>` uses pixelmatch v7 plus a
+  >   `vlmkit diff png <baseline> <current>` uses pixelmatch v7 plus a
   >   heatmap renderer to report per-region intensity. Smoke test
   >   `png-diff` in Test.pkl exercises the identity (0%) path.
   - contributes to: GOAL-CORE-DIFF
   - body: _not yet implemented_
 
 - [ ] **PR visual diff** (minor) [draft] — verifies: L2
-  > Partial: `vrt compare-runs` diffs two prior runs; no first-class PR-comment integration.
+  > Partial: `vlmkit diff runs` diffs two prior runs; no first-class PR-comment integration.
   - contributes to: GOAL-SNAPSHOT-WORKFLOW
   - body: _not yet implemented_
 
 - [ ] **Page declares actions via window.__vrtActions / data-vrt-action** — verifies: O1
-  >   `vrt explore` auto-discovers actions the page advertises and
+  >   `vlmkit inspect explore` auto-discovers actions the page advertises and
   >   diffs each transition. Shaped like the WebMCP proposal but
   >   doesn't depend on the unfinished spec.
   - contributes to: GOAL-AGENT-ERGONOMICS
@@ -521,7 +521,7 @@
   - body: _not yet implemented_
 
 - [ ] **Pre-commit visual check** — verifies: L1
-  > `vrt compare` plus `vrt workflow approve` slot into a pre-commit hook for baseline-driven visual gating.
+  > `vlmkit diff html` plus `vlmkit workflow approve` slot into a pre-commit hook for baseline-driven visual gating.
   - contributes to: GOAL-SNAPSHOT-WORKFLOW
   - body: _not yet implemented_
 
@@ -536,7 +536,7 @@
   - body: implemented by `packages/vlmkit-markup/src/stress/media-variants.ts` and `packages/vlmkit-markup/src/style/motion-detect.ts`
 
 - [ ] **Reproduce user bug from screenshot** — verifies: K1
-  > `vrt component-extract` crops the bug region from the user-supplied screenshot; `vrt component-from-image` drives the rebuild loop.
+  > `vlmkit scan component` crops the bug region from the user-supplied screenshot; `vlmkit build component` drives the rebuild loop.
   - contributes to: GOAL-MARKUP-FIDELITY
   - body: _not yet implemented_
 
@@ -549,7 +549,7 @@
   - body: _not yet implemented_
 
 - [ ] **Retina 2x DPI rendering** (minor) — verifies: D4
-  > `vrt component-from-image --device-scale-factor 2` renders at 2× for retina parity.
+  > `vlmkit build component --device-scale-factor 2` renders at 2× for retina parity.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
@@ -564,7 +564,7 @@
   - deprecated: Out of scope per v2 matrix: requires assistive-technology integration; not a visual signal.
   - body: _not yet implemented_
 
-- [ ] **Selector miss in vrt interact triggers healer correction** — verifies: O2
+- [ ] **Selector miss in vlmkit inspect interact triggers healer correction** — verifies: O2
   > When a step selector fails to match, the healer scans the DOM for near-misses and prints `did you mean <selector>?` with confidence scores instead of a bare timeout.
   - contributes to: GOAL-AGENT-ERGONOMICS
   - body: _not yet implemented_
@@ -580,7 +580,7 @@
   - body: _not yet implemented_
 
 - [ ] **Skill playbook fans out N checks over one target** — verifies: O3-O5
-  > `vrt skill run <name> --against <html|url>` reads `.vrt-skills/<name>.json` and runs every check in the playbook against the target, aggregating into one report.
+  > `vlmkit skill run <name> --against <html|url>` reads `.vrt-skills/<name>.json` and runs every check in the playbook against the target, aggregating into one report.
   - contributes to: GOAL-AGENT-ERGONOMICS
   - body: _not yet implemented_
 
@@ -590,7 +590,7 @@
   - body: _not yet implemented_
 
 - [ ] **Snapshot approve workflow promotes current to baseline** — verifies: SNAP-002
-  >   `vrt snapshot approve` renames every `*-current.png` to
+  >   `vlmkit snapshot approve` renames every `*-current.png` to
   >   `*-baseline.png`. Used after an intentional UI change is
   >   reviewed.
   - contributes to: GOAL-SNAPSHOT-WORKFLOW
@@ -605,7 +605,7 @@
   - body: _not yet implemented_
 
 - [ ] **Snapshot stability measures false-positive rate** — verifies: SNAP-004
-  >   `vrt snapshot stability` re-runs the same snapshot N times
+  >   `vlmkit snapshot stability` re-runs the same snapshot N times
   >   against a single URL and reports the per-frame diff. Drives
   >   the mask-coverage tuning loop for sites with carousels or
   >   counters.
@@ -618,7 +618,7 @@
   - body: _not yet implemented_
 
 - [ ] **Spacing scale conformance** — verifies: M2
-  > `vrt design-tokens --spacing-scale` flags margin and padding values that fall outside the declared scale, e.g. a stray 5px on a 4px grid.
+  > `vlmkit check tokens --spacing-scale` flags margin and padding values that fall outside the declared scale, e.g. a stray 5px on a 4px grid.
   - contributes to: GOAL-DESIGN-SYSTEM
   - body: _not yet implemented_
 
@@ -630,7 +630,7 @@
 - [ ] **Storybook story diff** ⊘ deprecated (minor) — verifies: J4
   > Preserved for matrix-row parity.
   - contributes to: GOAL-DESIGN-SYSTEM
-  - deprecated: Out of scope per v2 matrix: Chromatic and Loki cover this lane with Storybook-native integration vrt doesn't have.
+  - deprecated: Out of scope per v2 matrix: Chromatic and Loki cover this lane with Storybook-native integration vlmkit doesn't have.
   - body: _not yet implemented_
 
 - [ ] **Subtle font-render regression** (minor) [draft] — verifies: K7
@@ -639,7 +639,7 @@
   - body: _not yet implemented_
 
 - [ ] **Tab order matches visual reading order** — verifies: F3
-  > `vrt a11y-focus-order` walks Tab traversal and compares against the bbox-sorted visual order.
+  > `vlmkit check a11y focus` walks Tab traversal and compares against the bbox-sorted visual order.
   - contributes to: GOAL-A11Y-COMPLIANCE
   - body: _not yet implemented_
 
@@ -660,7 +660,7 @@
   - body: _not yet implemented_
 
 - [ ] **Touch target size meets WCAG 2.5.5 AAA / 2.5.8 AA** (critical) — verifies: F2
-  > `vrt a11y-touch` flags interactive elements below the 24px AA / 44px AAA minimum hit area.
+  > `vlmkit check a11y touch` flags interactive elements below the 24px AA / 44px AAA minimum hit area.
   - contributes to: GOAL-A11Y-COMPLIANCE
   - body: _not yet implemented_
 
@@ -718,7 +718,7 @@
   - body: _not yet implemented_
 
 - [ ] **WCAG AA text contrast scan** (critical) — verifies: F1
-  > `vrt a11y-contrast` reports every text/background pair under the AA threshold, with the hex pair the agent can paste into a fix.
+  > `vlmkit check a11y contrast` reports every text/background pair under the AA threshold, with the hex pair the agent can paste into a fix.
   - contributes to: GOAL-A11Y-COMPLIANCE
   - body: _not yet implemented_
 
@@ -752,7 +752,7 @@
   - body: _not yet implemented_
 
 - [ ] **i18n text inflation: no overflow or wrap at 1.4x word length** — verifies: I1
-  > `vrt i18n-stress` substitutes button / link text with 1.4× longer strings and flags overflow or wrap-to-second-line.
+  > `vlmkit stress i18n` substitutes button / link text with 1.4× longer strings and flags overflow or wrap-to-second-line.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 
@@ -764,13 +764,13 @@
 ## Spec implementation index
 
 - **A1** — Build component from PNG screenshot
-  - code: `packages/vrt-markup/src/component/component-from-image.ts`
+  - code: `packages/vlmkit-markup/src/component/component-from-image.ts`
 - **A2** — Build component from Figma export
-  - code: `packages/vrt-markup/src/component/component-from-image.ts`
+  - code: `packages/vlmkit-markup/src/component/component-from-image.ts`
 - **A3** — Build component from hand-drawn wireframe
   - _No active implementation._
 - **A4** — Build component from competitor visual reference
-  - code: `packages/vrt-markup/src/component/component-from-image.ts`
+  - code: `packages/vlmkit-markup/src/component/component-from-image.ts`
 - **A5** — Build full page from design-spec document
   - _No active implementation._
 - **A6** — Build from natural-language description ⊘ deprecated
@@ -834,7 +834,7 @@
 - **CORE-003** — A11y tree diff between two renders
   - code: `src/experiments/migration/migration-compare.ts`
 - **CORE-004** — Element-level shift-isolated diff
-  - code: `packages/vrt-core/src/element-compare.ts`
+  - code: `packages/vlmkit-core/src/element-compare.ts`
 - **CORE-005** — Paint tree diff via Crater BiDi backend
   - code: `src/experiments/migration/migration-paint-tree.ts`
 - **D1** — Mobile tablet desktop breakpoint sweep
@@ -844,21 +844,21 @@
 - **D3** — Foldable or dual-screen rendering ⊘ deprecated
   - _No active implementation._
 - **D4** — Retina 2x DPI rendering
-  - code: `packages/vrt-markup/src/component/component-from-image.ts`
+  - code: `packages/vlmkit-markup/src/component/component-from-image.ts`
 - **D5** — Touchscreen-on-desktop affordances
   - _No active implementation._
 - **E1** — Hover state diff
-  - code: `packages/vrt-markup/src/component/component-from-image.ts`
+  - code: `packages/vlmkit-markup/src/component/component-from-image.ts`
 - **E10** — Accordion expand or collapse
-  - code: `packages/vrt-markup/src/inspect/interact.ts`
+  - code: `packages/vlmkit-markup/src/inspect/interact.ts`
 - **E11** — Tooltip on hover with delay
   - _No active implementation._
 - **E12** — Toast notification fade in or out ⊘ deprecated
   - _No active implementation._
 - **E13** — Tab switch
-  - code: `packages/vrt-markup/src/inspect/interact.ts`
+  - code: `packages/vlmkit-markup/src/inspect/interact.ts`
 - **E2** — Focus and focus-visible state
-  - code: `packages/vrt-markup/src/component/component-from-image.ts`
+  - code: `packages/vlmkit-markup/src/component/component-from-image.ts`
 - **E3** — Disabled state
   - _No active implementation._
 - **E4** — Loading state
@@ -868,9 +868,9 @@
 - **E6** — Empty state
   - _No active implementation._
 - **E7** — Dropdown or menu open
-  - code: `packages/vrt-markup/src/inspect/interact.ts`
+  - code: `packages/vlmkit-markup/src/inspect/interact.ts`
 - **E8** — Modal or dialog open
-  - code: `packages/vrt-markup/src/inspect/interact.ts`
+  - code: `packages/vlmkit-markup/src/inspect/interact.ts`
 - **E9** — Carousel or slider transitions ⊘ deprecated
   - _No active implementation._
 - **F1** — WCAG AA text contrast scan
@@ -886,13 +886,13 @@
 - **F5** — Screen-reader-only content ⊘ deprecated
   - _No active implementation._
 - **F6** — Keyboard navigation Tab Esc Enter
-  - code: `packages/vrt-markup/src/inspect/interact.ts`
+  - code: `packages/vlmkit-markup/src/inspect/interact.ts`
 - **F7** — Color blindness simulation
   - _No active implementation._
 - **F8** — 200 percent browser zoom usability
-  - code: `packages/vrt-markup/src/stress/media-variants.ts`
+  - code: `packages/vlmkit-markup/src/stress/media-variants.ts`
 - **F9** — Reduced motion compliance
-  - code: `packages/vrt-markup/src/stress/media-variants.ts`
+  - code: `packages/vlmkit-markup/src/stress/media-variants.ts`
 - **FIDELITY-001** — Build a card from a blank starter until diff under 3 percent
   - _No active implementation._
 - **G1** — Cumulative Layout Shift measurement
@@ -926,7 +926,7 @@
 - **I6** — Pluralization 1 item vs N items
   - _No active implementation._
 - **J1** — Cross-page component drift
-  - code: `packages/vrt-markup/src/stress/multi-page-consistency.ts`
+  - code: `packages/vlmkit-markup/src/stress/multi-page-consistency.ts`
 - **J2** — Inline-vs-component drift on a single page
   - _No active implementation._
 - **J3** — Variant rendering across props
@@ -936,11 +936,11 @@
 - **J5** — Slot composition
   - _No active implementation._
 - **K1** — Reproduce user bug from screenshot
-  - code: `packages/vrt-markup/src/component/component-extract.ts`
+  - code: `packages/vlmkit-markup/src/component/component-extract.ts`
 - **K2** — Off-by-one-pixel hunt
   - code: `src/compare.ts`
 - **K3** — Overflow or clipping detection
-  - code: `packages/vrt-markup/src/stress/i18n-stress.ts`
+  - code: `packages/vlmkit-markup/src/stress/i18n-stress.ts`
 - **K4** — Z-index stacking issues
   - _No active implementation._
 - **K5** — CLS detection via in-page PerformanceObserver
@@ -962,7 +962,7 @@
 - **M1** — Color tokens conform to declared palette
   - _No active implementation._
 - **M2** — Spacing scale conformance
-  - code: `packages/vrt-markup/src/style/design-tokens.ts`
+  - code: `packages/vlmkit-markup/src/style/design-tokens.ts`
 - **M3** — Typography scale compliance
   - code: `src/typography-hints.ts`
 - **M4-M6** — Radius / spacing / z-index / shadow-tier conformance
@@ -997,7 +997,7 @@
   - _No active implementation._
 - **O12** — LLM judgment on rendered output
   - _No active implementation._
-- **O2** — Selector miss in vrt interact triggers healer correction
+- **O2** — Selector miss in vlmkit inspect interact triggers healer correction
   - _No active implementation._
 - **O3-O5** — Skill playbook fans out N checks over one target
   - _No active implementation._
@@ -1016,7 +1016,7 @@
 - **SNAP-002** — Snapshot approve workflow promotes current to baseline
   - code: `src/cli/commands/snapshot.ts`
 - **SNAP-003** — Snapshot fix-prompt generates subagent-ready Markdown
-  - code: `packages/vrt-markup/src/heal/fix-prompt.ts`
+  - code: `packages/vlmkit-markup/src/heal/fix-prompt.ts`
 - **SNAP-004** — Snapshot stability measures false-positive rate
   - code: `src/vrt/snapshot/stability.ts`
 - **WORKFLOW-001** — Workflow init / capture / verify / approve loop

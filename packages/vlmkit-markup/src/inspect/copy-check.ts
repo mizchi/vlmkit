@@ -58,10 +58,14 @@ import {
   type TextBlock,
 } from "./copy-target.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { applyGateExit } from "@mizchi/vlmkit-core/gate-exit.ts";
+import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
+import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { readEnv } from "@mizchi/vlmkit-core/legacy-names.ts";
 
-export type CopyIssueKind = "placeholder-text" | "copy-missing" | "copy-invisible" | "copy-image-mismatch";
+export type CopyIssueKind = "placeholder-text" | "copy-missing" | "copy-invisible" | "copy-image-mismatch" | "redirected";
 
 export interface CopyIssue {
   kind: CopyIssueKind;
@@ -353,7 +357,21 @@ export const COLLECT_TEXT_VISIBILITY = `(() => {
   if (!root) return { visible: "", invisible: [] };
   const parts = [];
   const invisible = [];
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  // Open shadow roots hold real, on-screen text that innerText and a
+  // document-scoped TreeWalker both miss (2026-08-01 hard-target audit: a
+  // custom element's visible badge copy was reported copy-missing). Every
+  // component-library design system puts its text here, so walk into each
+  // open root. Closed roots stay unreachable by construction.
+  const roots = [root];
+  for (let ri = 0; ri < roots.length; ri++) {
+    const scope = roots[ri];
+    if (!scope.querySelectorAll) continue;
+    for (const host of scope.querySelectorAll("*")) {
+      if (host.shadowRoot) roots.push(host.shadowRoot);
+    }
+  }
+  for (const scope of roots) {
+  const walker = document.createTreeWalker(scope, NodeFilter.SHOW_TEXT);
   let node;
   while ((node = walker.nextNode())) {
     if (!node.data || !node.data.trim()) continue;
@@ -403,7 +421,38 @@ export const COLLECT_TEXT_VISIBILITY = `(() => {
     if (camouflaged(el, cs)) { drop("camouflage"); continue; }
     parts.push(text);
   }
+  }
   return { visible: parts.join("\\n"), invisible };
+})()`;
+
+/**
+ * Raw rendered text, shadow roots included.
+ *
+ * The reason-class boundary rule is "copy-invisible only for text that is
+ * present in raw innerText" — that is what keeps `display: none` content
+ * classified as missing rather than as deliberately hidden. innerText also
+ * stops at shadow boundaries, so hidden copy inside a web component used to
+ * land in the vaguer `copy-missing` bucket. Appending each open shadow
+ * root's children's innerText preserves the rule's semantics exactly:
+ * innerText still omits `display: none` subtrees but still includes
+ * `font-size: 0` text, which is what makes the zero-size class detectable.
+ */
+export const COLLECT_RAW_TEXT = `(() => {
+  const extra = [];
+  const walk = (root) => {
+    if (!root || !root.querySelectorAll) return;
+    for (const el of root.querySelectorAll("*")) {
+      if (!el.shadowRoot) continue;
+      for (const child of el.shadowRoot.children) {
+        if (child.tagName === "STYLE" || child.tagName === "SCRIPT") continue;
+        if (typeof child.innerText === "string") extra.push(child.innerText);
+      }
+      walk(el.shadowRoot);
+    }
+  };
+  const body = document.body;
+  walk(body || document);
+  return [body ? body.innerText : ""].concat(extra).join("\\n");
 })()`;
 
 /** The visible half of COLLECT_TEXT_VISIBILITY (the disclosure sweep only needs this). */
@@ -545,6 +594,11 @@ export function analyzeCopy(input: {
 }
 
 export interface CopyCheckOptions {
+  /**
+   * Playwright storage-state file so gates can measure pages behind a
+   * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
+   */
+  storageState?: string;
   source: string;
   html?: string;
   manifestPath?: string;
@@ -591,8 +645,9 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
   let invisibleChunks: { reason: string; text: string }[];
   let blocks: TextBlock[] = [];
   let stateSweep: StateSweep | undefined;
+  let redirectNote: string | null = null;
   try {
-    const page = await browser.newPage({ viewport });
+    const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
     if (options.html !== undefined) {
       await page.setContent(options.html, { waitUntil: "networkidle" });
     } else if (isUrl(options.source)) {
@@ -600,7 +655,7 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
     } else {
       await page.goto(pathToFileURL(resolve(options.source)).href, { waitUntil: "networkidle", timeout: 30000 });
     }
-    pageText = await page.evaluate("document.body ? document.body.innerText : \"\"") as string;
+    pageText = await page.evaluate(COLLECT_RAW_TEXT) as string;
     ({ visible: visibleText, invisible: invisibleChunks } =
       await page.evaluate(COLLECT_TEXT_VISIBILITY) as { visible: string; invisible: { reason: string; text: string }[] });
     if (target) {
@@ -610,6 +665,10 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
     if (options.exploreStates !== false) {
       stateSweep = await sweepDisclosureStates(page);
     }
+    // "Copy missing" on a page you never reached is a misleading verdict:
+    // an auth-walled route 302s to /login and every manifest line reads as
+    // absent. Surface the redirect so the real cause is legible.
+    if (isUrl(options.source)) redirectNote = describeRedirect(options.source, page.url());
     await page.close();
   } finally {
     await browser.close();
@@ -627,6 +686,9 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
     ...(manifestLines ? { manifestLines } : {}),
     ...(stateSweep ? { stateSweep } : {}),
   });
+  if (redirectNote) {
+    report.issues.unshift({ kind: "redirected", severity: "suspect", message: redirectNote });
+  }
 
   if (target && options.targetPath) {
     const droppedBlocks = Math.max(0, blocks.length - MAX_REVIEW_ROWS);
@@ -791,6 +853,9 @@ is the user-visible copy spec — keep assistive-tech-only strings out
 of it. Markdown headings in the manifest ("# Section") are organizing
 comments, not required lines.
 
+  --storage-state <file>  Playwright storage state for pages behind a login
+                          (or set VLMKIT_STORAGE_STATE)
+
 Reason classes: zero-size, hidden, transparent, visually-hidden
 (sr-only-style clip/1px box), unreachable (off-screen/clipped),
 camouflage, unknown. When an invisibility is deliberate, accept that
@@ -806,7 +871,7 @@ Options:
   --vlm [model]       Transcribe crops with a VLM (default model: VRT_VLM_MODEL); requires API key
   --no-states         Skip the disclosure-state sweep (default-state text only)
   --json              Print JSON report
-  --fail-on-suspect   Exit non-zero when suspect issues are found`);
+  --advisory          Print findings but exit 0 (default: a suspect exits 1)`);
   process.exit(exitCode);
 }
 
@@ -817,7 +882,8 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   let outDir: string | undefined;
   let vlm: string | true | undefined;
   let json = false;
-  let failOnSuspect = false;
+  let advisory = false;
+  let storageState: string | undefined;
   let exploreStates = true;
   let allowInvisible: InvisibleReason[] | undefined;
   const positional: string[] = [];
@@ -839,7 +905,9 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
       }
       allowInvisible = classes as InvisibleReason[];
     } else if (arg === "--json") json = true;
-    else if (arg === "--fail-on-suspect") failOnSuspect = true;
+    else if (arg === "--fail-on-suspect") { /* accepted no-op: suspects already fail */ }
+    else if (arg === "--advisory") advisory = true;
+    else if (arg === "--storage-state") storageState = argv[++i];
     else if (!arg.startsWith("-")) positional.push(arg);
   }
   if (positional.length === 0) printUsage(1);
@@ -852,7 +920,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     }
     const { createVlmClient, resolveModel } = await import("@mizchi/vlmkit-ai/vlm-client.ts");
     const modelId = vlm === true
-      ? (process.env.VRT_VLM_MODEL ?? "bytedance/ui-tars-1.5-7b")
+      ? (readEnv("VLM_MODEL") ?? "bytedance/ui-tars-1.5-7b")
       : vlm;
     const model = await resolveModel(modelId);
     const client = await createVlmClient(model);
@@ -864,6 +932,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 
   const report = await runCopyCheck({
     source: positional[0]!,
+    ...(storageState ? { storageState } : {}),
     ...(manifestPath ? { manifestPath } : {}),
     ...(targetPath ? { targetPath } : {}),
     ...(outDir ? { outDir } : {}),
@@ -873,7 +942,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   });
   if (json) console.log(JSON.stringify(report, null, 2));
   else console.log(formatCopyCheckReport(report));
-  if (failOnSuspect && report.issues.some((i) => i.severity === "suspect")) process.exit(1);
+  applyGateExit(report.issues.some((i) => i.severity === "suspect"), { advisory });
 }
 
 const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "copy-check" ||

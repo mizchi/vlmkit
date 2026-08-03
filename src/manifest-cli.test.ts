@@ -23,7 +23,7 @@ function cli(...argv: string[]): { stdout: string; stderr: string; status: numbe
   };
 }
 
-describe("vrt manifest CLI", () => {
+describe("vlmkit manifest CLI", () => {
   before(async () => {
     tmp = await mkdtemp(join(tmpdir(), "vrt-manifest-test-"));
     manifestPath = join(tmp, "approval.json");
@@ -137,7 +137,7 @@ describe("vrt manifest CLI", () => {
   it("help: shows usage when no subcommand given", () => {
     const r = cli();
     assert.equal(r.status, 0);
-    assert.match(r.stdout, /vrt manifest <command>/);
+    assert.match(r.stdout, /vlmkit manifest <command>/);
   });
 
   it("unknown subcommand: exits non-zero with usage", () => {
@@ -190,7 +190,7 @@ const FAKE_REPORT = {
   ],
 };
 
-describe("vrt manifest add --from-run", () => {
+describe("vlmkit manifest add --from-run", () => {
   let runDir: string;
   let manifestPathFromRun: string;
 

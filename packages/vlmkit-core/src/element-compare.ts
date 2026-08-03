@@ -6,9 +6,9 @@
  * compares individual DOM elements independently via locator.screenshot().
  *
  * Usage:
- *   vrt elements --url http://localhost:3000/ --current-url http://localhost:8080/ \
+ *   vlmkit diff elements --url http://localhost:3000/ --current-url http://localhost:8080/ \
  *     --selectors "header,main,footer"
- *   vrt elements before.html after.html --selectors "header,.content,.sidebar"
+ *   vlmkit diff elements before.html after.html --selectors "header,.content,.sidebar"
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -263,12 +263,12 @@ function parseArgs(args: string[]): ElementCompareOptions {
 function formatUsage(): string {
   return [
     "Usage:",
-    "  vrt diff component --url <baseline> --current-url <current> --selectors \"header,main,footer\"",
-    "  vrt diff component before.html after.html --selectors \"header,.content\"",
+    "  vlmkit diff component --url <baseline> --current-url <current> --selectors \"header,main,footer\"",
+    "  vlmkit diff component before.html after.html --selectors \"header,.content\"",
     "",
     "Aliases:",
-    "  vrt diff elements",
-    "  vrt elements",
+    "  vlmkit diff elements",
+    "  vlmkit diff elements",
     "",
     "Options:",
     "  --selectors <sel1,sel2,...>   CSS selectors to compare (required)",

@@ -1,0 +1,252 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { parseGateConfig, resolveGatePlan, resolveSuppression } from "@mizchi/vlmkit-core/gate-config.ts";
+import {
+  expandPlanSources,
+  findGateConfig,
+  formatExpiredNotice,
+  formatPlan,
+  formatSuppressions,
+  shardPlan,
+} from "./gates-cli.ts";
+
+const NOW = new Date("2026-08-02T12:00:00Z");
+const plain = (s: string) => s.replace(/\x1B\[\d+m/g, "");
+
+const planFor = (config: unknown, only?: string[]) =>
+  resolveGatePlan(parseGateConfig(JSON.stringify(config)), { now: NOW, ...(only ? { only } : {}) });
+
+describe("findGateConfig", () => {
+  it("finds the conventional filename, and reports absence rather than guessing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "gates-find-"));
+    assert.equal(findGateConfig(dir), null);
+    writeFileSync(join(dir, "vlmkit.gates.json"), "{}");
+    assert.equal(findGateConfig(dir), join(dir, "vlmkit.gates.json"));
+  });
+});
+
+describe("expandPlanSources", () => {
+  const dir = mkdtempSync(join(tmpdir(), "gates-glob-"));
+  for (const name of ["a.html", "b.html", "c.html"]) writeFileSync(join(dir, name), "<p>x");
+
+  it("turns one glob entry into one job per file", async () => {
+    const plan = await expandPlanSources(planFor({
+      pages: [{ id: "routes", source: `${dir}/*.html`, gates: ["check integrity"] }],
+    }));
+    assert.equal(plan.jobs.length, 3);
+    assert.deepEqual(plan.jobs.map((j) => j.source.replace(`${dir}/`, "")), ["a.html", "b.html", "c.html"]);
+  });
+
+  it("prefixes expanded ids with the config's own name so --only still addresses the group", async () => {
+    const plan = await expandPlanSources(planFor({
+      pages: [{ id: "routes", source: `${dir}/*.html`, gates: ["check integrity"] }],
+    }));
+    assert.ok(plan.jobs.every((j) => j.pageId.startsWith("routes:")));
+  });
+
+  it("leaves a single literal source's id alone", async () => {
+    const plan = await expandPlanSources(planFor({
+      pages: [{ id: "home", source: `${dir}/a.html`, gates: ["check integrity"] }],
+    }));
+    assert.deepEqual(plan.jobs.map((j) => j.pageId), ["home"]);
+  });
+
+  it("refuses a pattern that matches nothing instead of gating on nothing", async () => {
+    await assert.rejects(
+      expandPlanSources(planFor({ pages: [{ id: "x", source: `${dir}/*.md`, gates: ["check integrity"] }] })),
+      /source matched no files/,
+    );
+  });
+
+  it("keeps URLs as-is", async () => {
+    const plan = await expandPlanSources(planFor({
+      pages: [{ id: "prod", source: "https://example.com/", gates: ["check integrity"] }],
+    }));
+    assert.deepEqual(plan.jobs.map((j) => j.source), ["https://example.com/"]);
+  });
+});
+
+describe("shardPlan", () => {
+  const plan = planFor({
+    defaults: { gates: ["check integrity", "check design"] },
+    pages: [1, 2, 3, 4].map((n) => ({ id: `p${n}`, source: `p${n}.html` })),
+  });
+
+  it("keeps a page's gates together on one runner", () => {
+    // Sharding per job would split one page's integrity and design runs across
+    // machines, so a page's logs would land in two places for no gain.
+    const shard = shardPlan(plan, { index: 1, total: 2 });
+    const pages = [...new Set(shard.jobs.map((j) => j.pageId))];
+    assert.deepEqual(pages, ["p1", "p3"]);
+    assert.equal(shard.jobs.length, 4); // 2 pages x 2 gates
+  });
+
+  it("partitions pages across shards", () => {
+    const seen = [1, 2].flatMap((index) => shardPlan(plan, { index, total: 2 }).jobs.map((j) => j.pageId));
+    assert.equal(new Set(seen).size, 4);
+    assert.equal(seen.length, 8);
+  });
+
+  it("passes through without a shard", () => {
+    assert.equal(shardPlan(plan).jobs.length, 8);
+  });
+});
+
+describe("formatPlan", () => {
+  it("prints the exact command each page will run, with suppression flags visible", () => {
+    const text = plain(formatPlan(planFor({
+      defaults: { gates: ["check integrity"] },
+      pages: [{
+        id: "checkout",
+        source: "checkout.html",
+        extraGates: ["check copy --manifest c.txt"],
+        suppressions: [{ gate: "check copy", flag: "--allow-invisible visually-hidden", reason: "sr-only", expires: "2026-12-01" }],
+      }],
+    }), "vlmkit.gates.json"));
+    assert.match(text, /1 page\(s\), 2 gate run\(s\)/);
+    assert.match(text, /vlmkit check integrity checkout\.html/);
+    assert.match(text, /vlmkit check copy --manifest c\.txt --allow-invisible visually-hidden checkout\.html/);
+    assert.match(text, /\[\+1 suppression\]/);
+  });
+
+  it("flags an expired entry in the plan itself", () => {
+    const text = plain(formatPlan(planFor({
+      pages: [{
+        id: "game",
+        source: "game.html",
+        gates: ["check design"],
+        suppressions: [{ gate: "check design", flag: "--min-reuse 2", reason: "zones differ", expires: "2026-07-01" }],
+      }],
+    }), "cfg.json"));
+    assert.match(text, /1 expired suppression\(s\) NOT applied/);
+    assert.doesNotMatch(text, /--min-reuse 2/); // not applied, so not in the command
+  });
+});
+
+describe("formatSuppressions", () => {
+  const rows = [
+    { gate: "check design", flag: "--min-reuse 2", reason: "zones differ", expires: "2026-07-01" },
+    { gate: "check copy", flag: "--allow-invisible visually-hidden", reason: "sr-only nav", owner: "web-platform", expires: "2026-08-10" },
+    { gate: "check copy", flag: "--allow-invisible camouflage", reason: "brand watermark" },
+  ].map((s, i) => resolveSuppression(s, `page-${i}`, NOW));
+
+  it("is the inventory a grep cannot give you: reason, owner, expiry, per entry", () => {
+    const text = plain(formatSuppressions(rows, 30));
+    assert.match(text, /3 total: 1 active, 1 permanent \(no expiry\), 1 expired/);
+    assert.match(text, /EXPIRED 32d ago/);
+    assert.match(text, /8d left/);
+    assert.match(text, /permanent/);
+    assert.match(text, /zones differ/);
+    assert.match(text, /web-platform/);
+    assert.match(text, /\(no owner\)/);
+    assert.match(text, /expiring within 30d/);
+  });
+
+  it("explains what an expiry actually does", () => {
+    assert.match(plain(formatSuppressions(rows)), /not applied.*runs unmuted/s);
+  });
+
+  it("says so plainly when nothing is silenced", () => {
+    assert.match(plain(formatSuppressions([])), /No suppressions declared/);
+  });
+});
+
+describe("formatExpiredNotice", () => {
+  it("warns before the run that a failure may be stale config, not a regression", () => {
+    const text = plain(formatExpiredNotice([
+      resolveSuppression({ gate: "check design", flag: "--min-reuse 2", reason: "zones differ", expires: "2026-07-01" }, "game", NOW),
+    ]));
+    assert.match(text, /1 suppression\(s\) expired — the gate\(s\) below run unmuted/);
+    assert.match(text, /expired 32d ago: zones differ/);
+    assert.match(text, /may be this, not a new regression/);
+    // The full inventory's counts read wrong for a subset, so this is its own format.
+    assert.doesNotMatch(text, /total:/);
+  });
+
+  it("is empty when nothing expired", () => {
+    assert.equal(formatExpiredNotice([]), "");
+  });
+});
+
+describe("gates run (end to end)", () => {
+  const CLI = join(process.cwd(), "src/cli/vlmkit.ts");
+  const FIXTURE = join(process.cwd(), "fixtures/auto-markup-proof/creative/attempt-s18-haiku.html");
+
+  const runCli = async (args: string[], cwd: string) => {
+    const { spawn } = await import("node:child_process");
+    return new Promise<{ code: number; out: string }>((resolveRun) => {
+      const child = spawn(process.execPath, [...process.execArgv, CLI, ...args], { cwd, stdio: ["ignore", "pipe", "pipe"] });
+      let out = "";
+      child.stdout.on("data", (d) => { out += d; });
+      child.stderr.on("data", (d) => { out += d; });
+      child.on("close", (code) => resolveRun({ code: code ?? 1, out: plain(out) }));
+    });
+  };
+
+  const withConfig = (config: unknown): string => {
+    const dir = mkdtempSync(join(tmpdir(), "gates-e2e-"));
+    writeFileSync(join(dir, "vlmkit.gates.json"), JSON.stringify(config, null, 2));
+    return dir;
+  };
+
+  it("runs the configured gates and passes", async () => {
+    const dir = withConfig({
+      defaults: { gates: ["check design"] },
+      pages: [{ id: "tool-ui", source: FIXTURE }],
+    });
+    const { code, out } = await runCli(["gates", "run", "--concurrency", "1", "--quiet"], dir);
+    assert.equal(code, 0, out);
+    assert.match(out, /ALL PASS \(1\/1\)/);
+  });
+
+  it("fails on stale config even when every gate passes", async () => {
+    // The whole point of an expiry: a suppression nobody renewed is a defect in
+    // the config, and CI is where that gets noticed.
+    const dir = withConfig({
+      defaults: { gates: ["check design"] },
+      pages: [{
+        id: "tool-ui",
+        source: FIXTURE,
+        suppressions: [{ gate: "check design", flag: "--min-reuse 2", reason: "stale on purpose", expires: "2020-01-01" }],
+      }],
+    });
+    const { code, out } = await runCli(["gates", "run", "--concurrency", "1", "--quiet"], dir);
+    assert.match(out, /ALL PASS/);
+    assert.match(out, /suppression\(s\) expired/);
+    assert.equal(code, 1, out);
+  });
+
+  it("--advisory prints the same thing and exits 0", async () => {
+    const dir = withConfig({
+      defaults: { gates: ["check design"] },
+      pages: [{
+        id: "tool-ui",
+        source: FIXTURE,
+        suppressions: [{ gate: "check design", flag: "--min-reuse 2", reason: "stale on purpose", expires: "2020-01-01" }],
+      }],
+    });
+    const { code, out } = await runCli(["gates", "run", "--concurrency", "1", "--quiet", "--advisory"], dir);
+    assert.match(out, /suppression\(s\) expired/);
+    assert.equal(code, 0, out);
+  });
+
+  it("points at `gates init` when there is no config", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "gates-empty-"));
+    const { code, out } = await runCli(["gates", "list"], dir);
+    assert.equal(code, 1);
+    assert.match(out, /No gate config found/);
+    assert.match(out, /vlmkit gates init/);
+  });
+
+  it("init scaffolds a config its own parser accepts", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "gates-init-"));
+    const init = await runCli(["gates", "init", "--pages", FIXTURE, "--gate", "check design"], dir);
+    assert.equal(init.code, 0, init.out);
+    const list = await runCli(["gates", "list"], dir);
+    assert.equal(list.code, 0, list.out);
+    assert.match(list.out, /1 page\(s\), 1 gate run\(s\)/);
+  });
+});

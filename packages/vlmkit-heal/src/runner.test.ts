@@ -10,7 +10,7 @@ describe("classify", () => {
   it("detects timeouts", () => {
     assert.equal(classify("Timeout 5000ms exceeded"), "timeout");
   });
-  it("detects vrt diff failures", () => {
+  it("detects vlmkit diff failures", () => {
     assert.equal(classify("Error: Screenshot comparison failed"), "vrt-diff");
     assert.equal(classify("toHaveScreenshot() ... 1234 pixels differ"), "vrt-diff");
   });

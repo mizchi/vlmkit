@@ -1,6 +1,6 @@
 /**
  * Shared CLI error-prettifier. Recognizes common error shapes that
- * make `vrt` look user-hostile (ENOENT stack traces, Playwright
+ * make `vlmkit` look user-hostile (ENOENT stack traces, Playwright
  * navigation errors with absolute source paths) and rewrites them
  * to a one-line message.
  *
@@ -9,12 +9,26 @@
  */
 import { statSync } from "node:fs";
 
+/**
+ * A bad flag or missing argument — the caller's typo, not a defect. Thrown by
+ * `arg-reader` and printed as one line, because a stack trace for
+ * `--concurrency abc` buries the one sentence that fixes it.
+ */
+export class UsageError extends Error {
+  override readonly name = "UsageError";
+}
+
 export function handleCliError(e: unknown): never {
   // Node fs errors carry the offending path on `.path`; that's more
   // reliable than parsing it out of `.message` (which sometimes
   // doesn't include the path at all, e.g. EISDIR from readFile).
   const err = e as { code?: string; message?: string; name?: string; path?: string };
   const msg = String(err?.message ?? e);
+
+  if (err?.name === "UsageError") {
+    process.stderr.write(`error: ${msg}\n`);
+    process.exit(1);
+  }
 
   // ENOENT — missing local file path.
   if (err?.code === "ENOENT") {
@@ -25,7 +39,7 @@ export function handleCliError(e: unknown): never {
   // EISDIR — caller passed a directory where an HTML file (or other
   // single-file artifact) was expected. Surfaced repeatedly in
   // back-to-back cold-start dogfoods (2026-05-15) as the worst raw-
-  // stack-trace first impression in the toolkit. Almost every vrt
+  // stack-trace first impression in the toolkit. Almost every vlmkit
   // subcommand accepts `<html-or-url>` as its first positional, so
   // catching the directory case here covers all of them at once.
   // Node's fsPromises.readFile drops `err.path`, so we fall back to
@@ -69,7 +83,7 @@ export function handleCliError(e: unknown): never {
  * EISDIR fallback: Node's `fsPromises.readFile` doesn't attach `.path`
  * to the error, and the message string doesn't include the path
  * either. Scan argv for the first positional that exists as a
- * directory — close enough since most vrt subcommands take exactly
+ * directory — close enough since most vlmkit subcommands take exactly
  * one path argument and the failure happens during the initial read.
  */
 function findDirectoryArg(): string | undefined {

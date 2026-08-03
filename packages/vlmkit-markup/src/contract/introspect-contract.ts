@@ -34,6 +34,7 @@ import {
   type UiWidthPolicy,
 } from "./ui-contract.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 
 export interface LandmarkCapture {
   viewport: string;
@@ -362,6 +363,22 @@ export async function introspectUiContractFromHtml(
       const target = introspectionTarget(input);
       const navigateStart = performance.now();
       await page.goto(target, { waitUntil: waitUntilForIntrospectionInput(input) });
+      // The `load`-only fast path for local files was a deliberate speed
+      // choice (docs/landmark-drilldown-design.md), and it was measurably
+      // wrong. `scan contract` on a built SPA opened as a file, 2026-08-02:
+      //
+      //   load only  ->  0 landmarks []                                   241ms
+      //   settled    ->  4 [banner, navigation, main, contentinfo]         986ms
+      //
+      // Zero landmarks is not a slow answer, it is a wrong one — and it is the
+      // input every downstream contract command reads.
+      //
+      // A cheaper primitive was tried and rejected: waiting for the DOM to stop
+      // mutating (MutationObserver quiet + rAF) is 128ms instead of 775ms, but
+      // it declares a page settled *before* a deferred render starts (still 0
+      // landmarks at a 350ms render delay) and burns its whole cap on a page
+      // that polls. Network idle is slower and correct; that is the trade.
+      await settlePage(page);
       const navigateMs = performance.now() - navigateStart;
       const landmarkStart = performance.now();
       const landmarks = await captureLandmarkRegions(page, {

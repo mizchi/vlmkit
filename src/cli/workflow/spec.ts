@@ -27,7 +27,7 @@ async function listFiles(dir: string, suffix: string): Promise<string[]> {
 export async function runIntrospect(paths: SpecPaths) {
   const dir = existsSync(paths.snapshotsDir) ? paths.snapshotsDir : paths.baselinesDir;
   if (!existsSync(dir)) {
-    console.error("No snapshots or baselines found. Run `vrt workflow init` or `vrt workflow capture` first.");
+    console.error("No snapshots or baselines found. Run `vlmkit workflow init` or `vlmkit workflow capture` first.");
     process.exit(1);
   }
 
@@ -51,7 +51,7 @@ export async function runIntrospect(paths: SpecPaths) {
 
 export async function runSpecVerify(paths: SpecPaths) {
   if (!existsSync(paths.specPath)) {
-    console.error("No spec.json found. Run `vrt workflow introspect` first.");
+    console.error("No spec.json found. Run `vlmkit workflow introspect` first.");
     process.exit(1);
   }
 
@@ -122,11 +122,11 @@ export async function runExpect(paths: SpecPaths) {
   console.log("=== Generate expectation.json from current state ===\n");
 
   if (!existsSync(paths.baselinesDir)) {
-    console.error("No baselines found. Run `vrt workflow init` first.");
+    console.error("No baselines found. Run `vlmkit workflow init` first.");
     process.exit(1);
   }
   if (!existsSync(paths.snapshotsDir)) {
-    console.error("No snapshots found. Run `vrt workflow capture` first.");
+    console.error("No snapshots found. Run `vlmkit workflow capture` first.");
     process.exit(1);
   }
 
@@ -210,5 +210,5 @@ export async function runExpect(paths: SpecPaths) {
     const icon = !p.hasA11yDiff ? "  " : p.hasRegression ? "!!" : "~~";
     console.log(`  [${icon}] ${p.testId}: ${p.changes.length} change(s)`);
   }
-  console.log(`\nReview and edit as needed, then run: vrt workflow verify`);
+  console.log(`\nReview and edit as needed, then run: vlmkit workflow verify`);
 }

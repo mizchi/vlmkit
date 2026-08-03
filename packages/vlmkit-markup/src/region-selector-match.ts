@@ -10,6 +10,7 @@
  */
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { DOM_BBOX_BROWSER_SCRIPT } from "./shift-origin.ts";
 
 export interface RectBox {
@@ -255,11 +256,10 @@ export async function captureRegionElementsFromHtml(
       deviceScaleFactor: 1,
     });
     await page.goto(resolveRegionElementsTargetUrl(target), { waitUntil: "load" });
-    try {
-      await page.evaluate(() => document.fonts ? document.fonts.ready.then(() => undefined) : undefined);
-    } catch {
-      // Font readiness is best-effort; bbox capture should still work.
-    }
+    // Was a bare `fonts.ready` — the two thirds of settling it was missing
+    // (network idle, one frame) are what a client-rendered page needs before
+    // its element rects mean anything.
+    await settlePage(page);
     const raw = await page.evaluate(DOM_BBOX_BROWSER_SCRIPT);
     return parseRegionElementsJson(raw as string);
   } finally {

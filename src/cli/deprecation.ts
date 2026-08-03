@@ -7,8 +7,13 @@ import { homedir, platform } from "node:os";
  * log file. The log path is consulted before removing shims at 1.0.0.
  *
  * Log path:
- *   Linux/macOS: ${XDG_STATE_HOME ?? ~/.local/state}/vrt/deprecated.log
- *   Windows:     ${LOCALAPPDATA}\vrt\deprecated.log
+ *   Linux/macOS: ${XDG_STATE_HOME ?? ~/.local/state}/vlmkit/deprecated.log
+ *   Windows:     ${LOCALAPPDATA}\vlmkit\deprecated.log
+ *
+ * The doc comment already said `vlmkit` for Windows while the code wrote
+ * `vlmkit` on both platforms, so the two disagreed. Both now use `vlmkit`; the
+ * log is append-only local telemetry consulted before removing shims at
+ * 1.0.0, so an old file left at the previous path costs nothing.
  *
  * Failure modes (read-only FS, missing env vars, EACCES) fall through
  * to stderr-only — never crash the CLI.
@@ -40,8 +45,8 @@ function resolveLogPath(): string | null {
   if (platform() === "win32") {
     const localAppData = process.env.LOCALAPPDATA;
     if (!localAppData) return null;
-    return join(localAppData, "vrt", "deprecated.log");
+    return join(localAppData, "vlmkit", "deprecated.log");
   }
   const base = process.env.XDG_STATE_HOME ?? join(homedir(), ".local", "state");
-  return join(base, "vrt", "deprecated.log");
+  return join(base, "vlmkit", "deprecated.log");
 }

@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 /**
- * `vrt manifest` — author and inspect the approval manifest that
- * `vrt compare` already honors. The manifest format (#22's
+ * `vlmkit manifest` — author and inspect the approval manifest that
+ * `vlmkit diff html` already honors. The manifest format (#22's
  * `approval.json`) supports per-selector, per-property, and per-region
  * tolerance overrides plus an `expires` field, but until this CLI
  * existed there was no way to author entries except by hand-editing
  * JSON.
  *
  * Subcommands:
- *   vrt manifest list   [--path approval.json]
- *   vrt manifest add    --reason "..." [other selectors] [--path ...]
- *   vrt manifest rm     <index | selector> [--path ...]
- *   vrt manifest check  [--path ...]    (warns expired rules)
+ *   vlmkit manifest list   [--path approval.json]
+ *   vlmkit manifest add    --reason "..." [other selectors] [--path ...]
+ *   vlmkit manifest rm     <index | selector> [--path ...]
+ *   vlmkit manifest check  [--path ...]    (warns expired rules)
  *
  * The schema honored is the one validated by `validateApprovalManifest`
  * in `src/approval.ts`; this CLI is a thin facade so the consumer
@@ -263,7 +263,7 @@ async function cmdAddFromRun(args: string[], runDir: string, manifestPath: strin
     return;
   }
 
-  const baseReason = getArg(args, "reason") ?? "auto-acknowledged from vrt diff (rule needs a human-readable reason on next edit)";
+  const baseReason = getArg(args, "reason") ?? "auto-acknowledged from vlmkit diff (rule needs a human-readable reason on next edit)";
   const expires = getArg(args, "expires");
   const maxPx = getArg(args, "max-px");
   const tolerancePixels = maxPx ? Number(maxPx) : 2;
@@ -340,7 +340,7 @@ async function cmdRm(args: string[]): Promise<void> {
   }
   if (!target) {
     console.error(`${RED}error:${RESET} pass an index or selector`);
-    console.error(`Usage: vrt manifest rm <index | selector>`);
+    console.error(`Usage: vlmkit manifest rm <index | selector>`);
     process.exit(1);
   }
   const manifest = await loadManifestOrEmpty(path);
@@ -405,7 +405,7 @@ async function cmdCheck(args: string[]): Promise<void> {
 }
 
 function formatUsage(): string {
-  return `vrt manifest <command>
+  return `vlmkit manifest <command>
 
 Subcommands:
   list   [--path approval.json]
@@ -418,7 +418,7 @@ Subcommands:
          [--dry-run]
                               Author an approval rule.
                               --a11y-contrast / --a11y-touch suppress
-                              findings from the vrt diff-pr a11y gate
+                              findings from the vlmkit diff-pr a11y gate
                               instead of pixel/paint diffs. Both
                               require --selector (path substring matcher).
   add    --from-run <dir-or-json> [--auto-tiny | --top N | --all]
@@ -436,10 +436,10 @@ Subcommands:
                               (non-zero exit on expired)
 
 Examples:
-  vrt manifest add --selector .marquee --reason "animated content; intentionally dynamic"
-  vrt manifest add --selector .hero__body --max-px 2 --reason "sub-pixel AA artifact" --expires 2026-09-01
-  vrt manifest list
-  vrt manifest check        # CI hook: fail build if rules expired`;
+  vlmkit manifest add --selector .marquee --reason "animated content; intentionally dynamic"
+  vlmkit manifest add --selector .hero__body --max-px 2 --reason "sub-pixel AA artifact" --expires 2026-09-01
+  vlmkit manifest list
+  vlmkit manifest check        # CI hook: fail build if rules expired`;
 }
 
 async function main(argv = process.argv.slice(2)) {

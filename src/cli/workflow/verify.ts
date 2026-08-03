@@ -42,10 +42,10 @@ export async function runVerifyPipeline(paths: VerifyPaths): Promise<VerifyResul
   const { projectRoot, baselinesDir, snapshotsDir, outputDir, reportPath, expectationPath } = paths;
 
   if (!existsSync(baselinesDir)) {
-    throw new Error("No baselines found. Run `vrt init` first.");
+    throw new Error("No baselines found. Run `vlmkit workflow init` first.");
   }
   if (!existsSync(snapshotsDir)) {
-    throw new Error("No snapshots found. Run `vrt capture` first.");
+    throw new Error("No snapshots found. Run `vlmkit workflow capture` first.");
   }
 
   await mkdir(outputDir, { recursive: true });

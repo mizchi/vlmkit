@@ -10,6 +10,7 @@
  */
 import type { LLMProvider } from "./intent.ts";
 import { VrtConfigError } from "./errors.ts";
+import { readEnv } from "@mizchi/vlmkit-core/legacy-names.ts";
 
 // ---- Types ----
 
@@ -314,7 +315,7 @@ function resolveProviderConfig(options?: LLMClientOptions):
   | { ok: false; code: "INVALID_PROVIDER" | "MISSING_KEY"; message: string }
 {
   const rawProvider = options?.provider
-    ?? process.env.VRT_LLM_PROVIDER
+    ?? readEnv("LLM_PROVIDER")
     ?? "gemini";
 
   if (!VALID_PROVIDERS.has(rawProvider as LLMProviderName)) {
@@ -326,7 +327,7 @@ function resolveProviderConfig(options?: LLMClientOptions):
   }
   const provider = rawProvider as LLMProviderName;
 
-  const model = options?.model ?? process.env.VRT_LLM_MODEL ?? undefined;
+  const model = options?.model ?? readEnv("LLM_MODEL") ?? undefined;
 
   const keyMap: Record<LLMProviderName, string | undefined> = {
     gemini: process.env.GEMINI_API_KEY ?? process.env.GOOGLE_AI_API_KEY,

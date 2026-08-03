@@ -22,7 +22,7 @@ import { classifyVisualDiff } from "@mizchi/vlmkit-markup/visual-semantic.ts";
 import { diffA11yTrees, verifyA11yTree, parsePlaywrightA11ySnapshot } from "@mizchi/vlmkit-core/a11y-semantic.ts";
 import { createLLMProvider } from "@mizchi/vlmkit-ai/llm-client.ts";
 import type { A11yNode, VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
-import { getArg, hasFlag } from "@mizchi/vlmkit-core/cli-args.ts";
+import { getArg, getIntArg, hasFlag } from "@mizchi/vlmkit-core/cli-args.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 
@@ -30,8 +30,8 @@ import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 
 const TMP = join(import.meta.dirname!, "..", "..", "..", "test-results", "css-challenge");
 
-const SEED = parseInt(getArg("seed", String(Date.now())), 10);
-const MAX_ATTEMPTS = parseInt(getArg("max-attempts", "3"), 10);
+const SEED = getIntArg("seed", Date.now());
+const MAX_ATTEMPTS = getIntArg("max-attempts", 3, { min: 1 });
 const FIXTURE = getArg("fixture", "page");
 const HTML_PATH = getCssChallengeFixturePath(FIXTURE);
 const APPROVAL_PATH = getArg("approval", "");

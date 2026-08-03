@@ -26,6 +26,8 @@
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
+import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { UiExpectedScrollportContract } from "../contract/ui-contract.ts";
@@ -56,7 +58,18 @@ export interface ScrollPageSample {
   scrollWidth: number;
   scrollHeight: number;
   /** Elements whose border box sticks out past the right viewport edge. */
-  overflowOffenders: { selector: string; right: number; width: number }[];
+  overflowOffenders: {
+    selector: string;
+    right: number;
+    width: number;
+    /**
+     * Page overflow (px) that disappears when this element's own width /
+     * min-width rigidity is neutralized. High = this element is a cause;
+     * 0 = it was merely stretched by something else. Absent when the
+     * measurement was not run (only the top candidates are probed).
+     */
+    relieves?: number;
+  }[];
 }
 
 export interface ScrollScanInput {
@@ -78,6 +91,13 @@ export interface ScrollContainer {
 }
 
 export type ScrollScanIssueKind =
+  /**
+   * A URL that redirected somewhere meaningful — almost always a login wall.
+   * Measured 2026-08-02: pointed at an auth-walled route with no session, this
+   * gate reported `status: ok` for the login page while naming the requested
+   * URL as its source. Reported as a suspect issue so the pass cannot be silent.
+   */
+  | "redirected"
   | "page-overflow-x"
   | "clipped-content"
   | "nested-scroll";
@@ -110,6 +130,11 @@ export interface ScrollScanReport {
 }
 
 export interface ScrollScanOptions {
+  /**
+   * Playwright storage-state file so gates can measure pages behind a
+   * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
+   */
+  storageState?: string;
   source: string;
   html?: string;
   viewport?: { width: number; height: number };
@@ -184,15 +209,27 @@ export function analyzeScrollSamples(
 
   const issues: ScrollScanIssue[] = [];
   if (horizontalOverflow >= minOverflow) {
-    const offenders = input.page.overflowOffenders
+    // Lead with measured causes when we have them: constraining these is
+    // what actually removes the overflow. Fall back to the widest boxes
+    // when nothing was probed or nothing relieved anything.
+    const causes = input.page.overflowOffenders
+      // 10% keeps co-causes visible (two rigid siblings splitting the
+      // blame) without promoting rounding noise into a "cause".
+      .filter((o) => (o.relieves ?? 0) >= Math.max(minOverflow, horizontalOverflow * 0.1))
+      .sort((a, b) => (b.relieves ?? 0) - (a.relieves ?? 0))
+      .slice(0, 3);
+    const widest = input.page.overflowOffenders
       .slice(0, 3)
       .map((o) => `${o.selector} (right edge ${o.right}px)`)
       .join(", ");
+    const detail = causes.length > 0
+      ? ` — caused by: ${causes.map((o) => `${o.selector} (${o.width}px wide; constraining it removes ${o.relieves}px of the overflow)`).join(", ")}`
+      : (widest ? ` — sticking out: ${widest}` : "");
     issues.push({
       kind: "page-overflow-x",
       severity: "suspect",
       message: `The page scrolls horizontally by ${horizontalOverflow}px at ${input.page.viewportWidth}px viewport width` +
-        (offenders ? ` — sticking out: ${offenders}` : "") + ".",
+        detail + ".",
     });
   }
   for (const clip of clipped.slice(0, maxFindings)) {
@@ -310,13 +347,48 @@ export const COLLECT_SCROLL_SCRIPT = `(() => {
   const viewportWidth = window.innerWidth;
   const offenders = [];
   if (doc.scrollWidth > viewportWidth + 1) {
+    const cands = [];
     for (const el of Array.from(document.querySelectorAll("body *"))) {
       const rect = el.getBoundingClientRect();
       if (rect.right > viewportWidth + 1 && rect.width > 0) {
-        offenders.push({ selector: stableSelector(el), right: Math.round(rect.right), width: Math.round(rect.width) });
+        cands.push({ el, selector: stableSelector(el), right: Math.round(rect.right), width: Math.round(rect.width) });
       }
     }
-    offenders.sort((a, b) => b.right - a.right);
+    cands.sort((a, b) => b.right - a.right);
+    // Ranking by right edge names symptoms, not causes: in a grid/flex
+    // shell one rigid child stretches the track, so every stretched
+    // ancestor and sibling reports a larger right edge than the element
+    // actually at fault (2026-08-01 hard-target audit: a 760px table made
+    // the gate blame the sidebar and the page shell). So measure instead
+    // of ranking — neutralize each candidate's own rigidity and see how
+    // much page overflow disappears; that delta is the "relieves" value.
+    // Probe generously: the culprit is often ranked LOW by right edge
+    // (stretched ancestors and siblings outrank it), so a small window
+    // would reproduce the very bug this measurement exists to fix.
+    const baseline = doc.scrollWidth;
+    for (const c of cands.slice(0, 40)) {
+      const el = c.el;
+      const prevW = el.style.getPropertyValue("width");
+      const prevWP = el.style.getPropertyPriority("width");
+      const prevMin = el.style.getPropertyValue("min-width");
+      const prevMinP = el.style.getPropertyPriority("min-width");
+      el.style.setProperty("width", "0", "important");
+      el.style.setProperty("min-width", "0", "important");
+      const after = doc.scrollWidth;
+      if (prevW) el.style.setProperty("width", prevW, prevWP); else el.style.removeProperty("width");
+      if (prevMin) el.style.setProperty("min-width", prevMin, prevMinP); else el.style.removeProperty("min-width");
+      c.relieves = Math.max(0, baseline - after);
+    }
+    // Measured causes must survive the report's top-N slice, so order by
+    // how much overflow each element accounts for and fall back to right
+    // edge (which keeps the pre-measurement ordering when nothing relieved).
+    cands.sort((a, b) => ((b.relieves || 0) - (a.relieves || 0)) || (b.right - a.right));
+    for (const c of cands) {
+      offenders.push({
+        selector: c.selector, right: c.right, width: c.width,
+        ...(c.relieves !== undefined ? { relieves: c.relieves } : {}),
+      });
+    }
   }
 
   return {
@@ -336,7 +408,7 @@ export async function runScrollScan(options: ScrollScanOptions): Promise<ScrollS
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({ viewport });
+    const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
     if (options.html !== undefined) {
       await page.setContent(options.html, { waitUntil: "networkidle" });
     } else if (isUrl(options.source)) {
@@ -346,12 +418,22 @@ export async function runScrollScan(options: ScrollScanOptions): Promise<ScrollS
       // setContent gives the document an about:blank base URL.
       await page.goto(pathToFileURL(resolve(options.source)).href, { waitUntil: "networkidle", timeout: 30000 });
     }
+    // A redirect here is almost always a login wall. Without this the gate
+    // measured the login page and reported `status: ok` while naming the
+    // requested URL as its source (measured 2026-08-02).
+    const redirectNote = isUrl(options.source) ? describeRedirect(options.source, page.url()) : null;
     const collected = await page.evaluate(COLLECT_SCROLL_SCRIPT) as Omit<ScrollScanInput, "source">;
     await page.close();
-    return analyzeScrollSamples(
+    const report = analyzeScrollSamples(
       { source: options.source, ...collected },
       options,
     );
+    // Pushed as a suspect ISSUE, not just printed: the status line is derived
+    // from the issue list, so a note alone would have left `status: ok`.
+    if (redirectNote) {
+      report.issues.unshift({ kind: "redirected", severity: "suspect",  message: redirectNote });
+    }
+    return report;
   } finally {
     await browser.close();
   }
@@ -417,13 +499,14 @@ Options:
                         entries pasteable into a UI Contract)
   --viewport <WxH>      Viewport (default: 1280x720)
   --clip-threshold <n>  Hidden px below which clipping is ignored (default: 16)
-  --fail-on-suspect     Exit non-zero when suspect issues are found`);
+  --advisory            Print findings but exit 0 (default: a suspect exits 1)`);
   process.exit(exitCode);
 }
 
 function parseArgs(argv: string[]) {
   let json = false;
   let failOnSuspect = false;
+  let advisory = false;
   let clipThreshold: number | undefined;
   let viewport: { width: number; height: number } | undefined;
   const positional: string[] = [];
@@ -431,7 +514,8 @@ function parseArgs(argv: string[]) {
     const arg = argv[i]!;
     if (arg === "--help" || arg === "-h" || arg === "help") printUsage(0);
     else if (arg === "--json") json = true;
-    else if (arg === "--fail-on-suspect") failOnSuspect = true;
+    else if (arg === "--fail-on-suspect") failOnSuspect = true; // accepted no-op
+    else if (arg === "--advisory") advisory = true;
     else if (arg === "--clip-threshold") clipThreshold = Number.parseInt(argv[++i] ?? "16", 10);
     else if (arg === "--viewport") {
       const m = (argv[++i] ?? "").match(/^(\d+)x(\d+)$/);
@@ -440,7 +524,7 @@ function parseArgs(argv: string[]) {
     } else positional.push(arg);
   }
   if (positional.length === 0) printUsage(1);
-  return { source: positional[0]!, json, failOnSuspect, clipThreshold, viewport };
+  return { source: positional[0]!, json, failOnSuspect, advisory, clipThreshold, viewport };
 }
 
 async function main(argv = process.argv.slice(2)): Promise<void> {
@@ -464,7 +548,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   } else {
     console.log(formatScrollScanReport(report));
   }
-  if (parsed.failOnSuspect && report.issues.some((issue) => issue.severity === "suspect")) {
+  if (!parsed.advisory && report.issues.some((issue) => issue.severity === "suspect")) {
     process.exit(1);
   }
 }

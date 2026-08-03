@@ -1994,7 +1994,7 @@ export function formatMigrationReportForAgent(
         "has 6 bands, variant has 4), you're missing rows of content — add the " +
         "missing HTML elements before tweaking CSS.");
       lines.push("5. Write the missing HTML elements first (the bbox table tells " +
-        "you their target dimensions), then the CSS rules. Re-run `vrt compare` " +
+        "you their target dimensions), then the CSS rules. Re-run `vlmkit diff html` " +
         "and check that bbox deltas + heatmap regions + text-row Δy all shrink " +
         "toward zero.");
     } else {
@@ -2003,7 +2003,7 @@ export function formatMigrationReportForAgent(
       lines.push("2. Cross-check against the fix-candidate table — it identifies *which* " +
         "selectors differ but may name the wrong property; trust your eyes for the " +
         "actual property.");
-      lines.push("3. Write one CSS patch covering the deltas, re-run `vrt compare`, " +
+      lines.push("3. Write one CSS patch covering the deltas, re-run `vlmkit diff html`, " +
         "and check that the dominant category count drops to zero on every viewport.");
     }
     lines.push("");

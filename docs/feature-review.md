@@ -6,7 +6,7 @@
 
 vlmkit の中核は Visual Regression Testing で、そこに design audit、
 markup assistance、agent loop、API/server、benchmark lab が重なっている。
-現在の README は機能量をよく拾えている一方で、`vrt` 時代の名前、
+現在の README は機能量をよく拾えている一方で、`vlmkit` 時代の名前、
 実験機能、公開済みの安定機能が同じ粒度で並んでいるため、利用者には
 「まず何を使えばよいか」が見えにくい。
 
@@ -45,10 +45,10 @@ markup assistance、agent loop、API/server、benchmark lab が重なってい�
 
 ## 主要なズレ
 
-### 1. `vrt` と `vlmkit` の名前が混在
+### 1. `vlmkit` と `vlmkit` の名前が混在
 
 `README.md` は概ね `vlmkit` に寄っているが、`docs/architecture.md`,
-`docs/api-design.md`, `docs/ja/README.md`, package README には `vrt`
+`docs/api-design.md`, `docs/ja/README.md`, package README には `vlmkit`
 時代の名前が残っている。CLI shim として旧名を残すのは妥当だが、公開
 docs の主語は `vlmkit` に統一した方がよい。
 
@@ -110,7 +110,7 @@ README と OpenAPI では experimental label を付ける。長期的には
    - Crater / Cloudflare backend
 6. Package APIs
    - `core`, `capture`, `markup`, `ai`
-7. Migration from `vrt`
+7. Migration from `vlmkit`
    - 旧コマンドは shim として残るが、新規 docs は `vlmkit` を使う
 
 ## OpenAI image generation note

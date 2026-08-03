@@ -16,15 +16,15 @@ keys.
 
 | Command | Input | Output | What runs |
 |---|---|---|---|
-| `vrt build component <target.png> <current.html>` | Reference image + your current HTML | Markdown report at `test-results/component/report.md` (+ `component_heatmap.png` alongside): pixel diff + bbox + palette + heatmap + text-row signals | Playwright renders `current.html` at the target's viewport, pixel-diffs vs `target.png`, surfaces image-only signals. **No VLM.** Agent iterates `current.html`. Internal binary name: `vrt component-from-image` — the CLI banner uses the legacy name even when invoked as `vrt build component`. `--output` is **not** a destination path here — the report always lands at the fixed `test-results/component/` path; the flag is silently ignored. |
-| `vrt scan component <screenshot>` | Full-page PNG | `components/*.png` + `manifest.json` (bbox + role guess) | Bbox detection + clustering on the image. **No VLM.** |
-| `vrt check tokens <html-or-url>` | Page | Markdown table: violation + nearest-token | Playwright + computed-style scan; snaps to allowed scale within tolerance. **No VLM.** Internal binary name: `vrt design-tokens` — the dispatcher routes both, but **the CLI banner and the generated report still call it `vrt design-tokens`** (legacy). Both invocations work; don't get tripped up when the output names a command different from the one you typed. |
-| `vrt check theme <html>` | Page | Markdown report: "unthemed" bboxes (light/dark render same) | Playwright with `emulateMedia({ colorScheme: 'light' / 'dark' })`, per-bbox color sampling, identical-fill flag. **No VLM.** |
-| `vrt stress i18n <html>` | Page | Markdown report: selectors that overflow / wrap | Inflate every visible text node by a multiplier (synthetic `word → word + 'X'×k`), measure `scrollWidth > clientWidth` / height growth / right-edge overflow. **No VLM.** No translation dictionary. |
+| `vlmkit build component <target.png> <current.html>` | Reference image + your current HTML | Markdown report at `test-results/component/report.md` (+ `component_heatmap.png` alongside): pixel diff + bbox + palette + heatmap + text-row signals | Playwright renders `current.html` at the target's viewport, pixel-diffs vs `target.png`, surfaces image-only signals. **No VLM.** Agent iterates `current.html`. `--output` is **not** a destination path here — the report always lands at the fixed `test-results/component/` path; the flag is silently ignored. |
+| `vlmkit scan component <screenshot>` | Full-page PNG | `components/*.png` + `manifest.json` (bbox + role guess) | Bbox detection + clustering on the image. **No VLM.** |
+| `vlmkit check tokens <html-or-url>` | Page | Markdown table: violation + nearest-token | Playwright + computed-style scan; snaps to allowed scale within tolerance. **No VLM.** The banner names the command you typed, but the report still lands under the old directory name — `test-results/design-tokens/report.md`, not `check-tokens/`. |
+| `vlmkit check theme <html>` | Page | Markdown report: "unthemed" bboxes (light/dark render same) | Playwright with `emulateMedia({ colorScheme: 'light' / 'dark' })`, per-bbox color sampling, identical-fill flag. **No VLM.** |
+| `vlmkit stress i18n <html>` | Page | Markdown report: selectors that overflow / wrap | Inflate every visible text node by a multiplier (synthetic `word → word + 'X'×k`), measure `scrollWidth > clientWidth` / height growth / right-edge overflow. **No VLM.** No translation dictionary. |
 
 ## Invocation
 
-The `vrt` CLI in this repo is invoked **from source**:
+The `vlmkit` CLI in this repo is invoked **from source**:
 
 ```bash
 node --experimental-strip-types src/cli/vrt.ts <command...>
@@ -62,21 +62,21 @@ dist is stale — run `pnpm build` or use the source form. All
 # pixel signal each iteration. Agent (= you) edits current.html until
 # the diff converges. The report lands at test-results/component/report.md
 # (path is fixed — `--output` is ignored for this sub-tool).
-vrt build component design.png current.html
+vlmkit build component design.png current.html
 
 # Full screenshot → per-component crops
-vrt scan component dashboard.png --output components/
+vlmkit scan component dashboard.png --output components/
 
 # Token conformance (default scales — no --tokens needed for first pass)
-vrt check tokens src/index.html
+vlmkit check tokens src/index.html
 #   ↑ uses default spacing/radius/z-index scales + 0.5px tolerance.
 #   Pass --tokens design-tokens.json to override.
 
 # Theme parity (renders light + dark, flags identical fills)
-vrt check theme src/index.html --output-dir test-results/theme/
+vlmkit check theme src/index.html --output-dir test-results/theme/
 
 # i18n / overflow stress (synthetic inflate, default factor 1.4)
-vrt stress i18n src/index.html --inflate 1.4
+vlmkit stress i18n src/index.html --inflate 1.4
 ```
 
 ## Build component — what the report contains
@@ -97,7 +97,7 @@ auto-fix — the tool is the eyes, the agent is the hands.
 
 ## Check tokens — what counts as a violation
 
-`vrt check tokens` flags computed-style values that aren't on the
+`vlmkit check tokens` flags computed-style values that aren't on the
 allowed scale within tolerance. The default scales:
 
 | Property kind | Default scale |

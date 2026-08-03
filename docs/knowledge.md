@@ -399,7 +399,7 @@ Diff causes identified by agent:
 
 After fix application, below 1.3% across all viewports. Remaining differences are subtle at breakpoint boundaries (769/768/640px).
 
-## vrt + subagent Evaluation
+## vlmkit + subagent Evaluation
 
 **Demonstrated that the "VRT diff → agent analysis → fix code generation → re-verification" loop works practically.**
 
@@ -452,7 +452,7 @@ Generated vanilla CSS without seeing after.html, using only before.html (Tailwin
 | Loop rounds | 3 rounds to pixel-perfect |
 | Agent efficiency | 58 tool calls / 632s ≈ 10 min. Work that would take a human several hours |
 
-**vrt functions sufficiently as a foundation for "generating code that makes migration work".**
+**vlmkit functions sufficiently as a foundation for "generating code that makes migration work".**
 
 ### Reset CSS blind test (E3)
 
@@ -875,7 +875,7 @@ tokens 列を必ず含め、この節のベースライン表に 1 行追記す�
 
 ### Selector-heal calibration (2026-07-30)
 
-`vrt interact --heal-all` labels **strong** suggestions at confidence `>= 0.40`
+`vlmkit inspect interact --heal-all` labels **strong** suggestions at confidence `>= 0.40`
 and **weak** ones at `>= 0.15`. These are precision-first thresholds: a
 fixture-derived corpus found that the former 0.30 strong cutoff promoted a
 wrong sibling. The corpus, exact scores, and reproduction command are in

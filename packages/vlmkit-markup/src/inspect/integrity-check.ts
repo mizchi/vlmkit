@@ -38,7 +38,15 @@ import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
+import {
+  ALLOW_HELP,
+  applyAllowRules,
+  type IntegrityAllowRule,
+  parseAllowRules,
+} from "./integrity-exemption.ts";
+import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { extractComponentsFromRgba } from "../component/component-bbox.ts";
 import { analyzeScrollSamples, COLLECT_SCROLL_SCRIPT, type ScrollScanInput } from "./scroll-scan.ts";
@@ -60,14 +68,25 @@ export type IntegrityFindingKind =
   | "invisible-text"
   | "low-contrast-text"
   | "near-misalignment"
-  | "occluded-text";
+  | "occluded-text"
+  | "redirected";
 
 export interface IntegrityFinding {
   kind: IntegrityFindingKind;
   /** fail = defect (flips the verdict); warn = suspicious but not conclusive. */
   severity: "fail" | "warn";
-  /** Viewport width the finding was first observed at. */
+  /**
+   * Canonical viewport width for this finding: the WIDEST width it was observed
+   * at. Widest rather than "first swept" because the sweep is sorted internally
+   * — attribution must not depend on the order the caller listed its widths in.
+   */
   viewport: number;
+  /**
+   * Every swept width where this finding appeared, widest first. A defect
+   * present everywhere reads very differently from a mobile-only one, and the
+   * single `viewport` field could not tell them apart.
+   */
+  viewports?: number[];
   selector?: string;
   message: string;
   evidence?: Record<string, unknown>;
@@ -97,6 +116,12 @@ export interface IntegrityViewportStats {
 export interface IntegrityReport {
   source: string;
   verdict: "clean" | "defects";
+  /**
+   * `--allow` rules that matched nothing this run. Surfaced so an exemption
+   * outliving the pattern it covered gets deleted instead of quietly widening
+   * the blind spot.
+   */
+  unusedAllowRules?: IntegrityAllowRule[];
   findings: IntegrityFinding[];
   exempted: IntegrityExemption[];
   viewports: IntegrityViewportStats[];
@@ -343,12 +368,34 @@ export interface IntegrityTextBlock {
   zIndex: number;
   /** Inside an aria-hidden="true" subtree (decorative). */
   ariaHidden: boolean;
+  /**
+   * Vertical slack (px) between this block's line box and the actual glyph
+   * ink inside it, per edge — half of (line-box height - (ascent+descent))
+   * from canvas font metrics. Used to shrink boxes to their ink band before
+   * the overlap test, which is what keeps a `line-height: 0.8` or negative
+   * `margin-bottom` pull-up from reading as a collision. Absent (0) when
+   * the metrics were unavailable.
+   */
+  inkInset?: number;
 }
 
 export interface TextCollisionOptions {
-  /** Minimum overlap on each axis (px) before a pair is considered. Default 6. */
+  /** Minimum horizontal ink overlap (px) before a pair is considered. Default 6. */
   minOverlapPx?: number;
-  /** Overlap area / smaller-block area ratio to count as collision. Default 0.25. */
+  /**
+   * Vertical ink overlap as a fraction of the SHORTER block's ink height.
+   * Default 0.5 — the two glyph bands must genuinely sit on top of each
+   * other, not merely graze.
+   *
+   * This replaced an overlap-area / smaller-block-area ratio (0.25), which
+   * measured the wrong thing: the corpus in
+   * fixtures/collision-fp-corpus shows a real 25x12px graze scoring 0.172
+   * by area while a legitimate `line-height: 1` stack scores 0.077 and a
+   * designed pull-up 0.137 — overlapping populations. By ink fraction the
+   * same three are 1.000 / 0.077 / 0.137: a 7x gap around this threshold.
+   */
+  minInkOverlapFraction?: number;
+  /** @deprecated Superseded by minInkOverlapFraction; accepted and ignored. */
   minOverlapRatio?: number;
   maxFindings?: number;
 }
@@ -363,7 +410,7 @@ export function findTextCollisions(
   options: TextCollisionOptions = {},
 ): { findings: IntegrityFinding[]; exempted: IntegrityExemption[] } {
   const minPx = options.minOverlapPx ?? 6;
-  const minRatio = options.minOverlapRatio ?? 0.25;
+  const minInkFraction = options.minInkOverlapFraction ?? 0.5;
   const maxFindings = options.maxFindings ?? 12;
   const raw: { a: IntegrityTextBlock; b: IntegrityTextBlock; ox: number; oy: number; area: number }[] = [];
   const exempted: IntegrityExemption[] = [];
@@ -374,16 +421,34 @@ export function findTextCollisions(
       // One block containing the other is nesting (a wrapper block whose
       // own text and a child block both bucketed), not a collision.
       const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
-      const oy = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+      // Compare INK bands vertically, not line boxes. Designed negative
+      // leading (`line-height: 0.8`) and the kicker/heading pull-up
+      // (`margin-bottom: -0.15em`) overlap boxes by several px while the
+      // glyphs keep a clear gap — measured 2px on the kicker idiom, which
+      // this gate used to report as a collision. Shrinking each block to its
+      // measured ink band can only REMOVE findings, so it carries none of
+      // the cry-wolf risk of lowering the floor itself.
+      const aInk = a.inkInset ?? 0;
+      const bInk = b.inkInset ?? 0;
+      const aTop = a.y + aInk, aBottom = a.y + a.height - aInk;
+      const bTop = b.y + bInk, bBottom = b.y + b.height - bInk;
+      const oy = Math.min(aBottom, bBottom) - Math.max(aTop, bTop);
       if (ox < minPx || oy < minPx) continue;
       const contains = (o: IntegrityTextBlock, p: IntegrityTextBlock) =>
         o.x <= p.x && o.y <= p.y && o.x + o.width >= p.x + p.width && o.y + o.height >= p.y + p.height;
       if (contains(a, b) || contains(b, a)) continue;
       const area = ox * oy;
-      const smaller = Math.min(a.width * a.height, b.width * b.height);
-      if (smaller <= 0 || area / smaller < minRatio) continue;
+      // Require the glyph bands to genuinely intersect vertically, measured
+      // against the shorter block's ink height. An area ratio cannot express
+      // this: a real graze and a designed negative-leading stack land in the
+      // same range by area, but are 1.000 vs 0.077-0.137 by ink fraction.
+      const minInkHeight = Math.min(
+        Math.max(1, a.height - 2 * aInk),
+        Math.max(1, b.height - 2 * bInk),
+      );
+      if (oy < Math.max(2, minInkFraction * minInkHeight)) continue;
 
-      const pair = { a, b, ox, oy, area };
+      const pair = { a, b, ox, oy: Math.round(oy * 10) / 10, area };
       if (a.ariaHidden || b.ariaHidden) {
         exempted.push({
           kind: "text-collision",
@@ -799,6 +864,16 @@ const STABLE_SELECTOR_FN = `
 // is what kept this probe demand-gated until a real case appeared.
 // Coverage note: samples only what is inside the viewport at load (no
 // scroll sweep), which matches how the defect class was observed.
+//
+// Hit-testing has one blind spot that has to be closed deliberately:
+// `elementFromPoint` skips `pointer-events: none` elements, and that is
+// exactly how decorative overlays are built (gradient scrims, absolutely
+// positioned SVG/CSS art, ::before washes). An occluder that paints over
+// text but opts out of hit-testing would be invisible to the probe — the
+// S19 defect class with one extra declaration. So sampling runs with
+// pointer-events forced back on page-wide, then restores. False positives
+// stay closed by the opaque-paint requirement: a transparent click-catcher
+// now hit-tests on top but still never flags.
 
 export interface OcclusionCandidate {
   selector: string;
@@ -827,13 +902,37 @@ export const COLLECT_OCCLUSIONS = `(() => {
     return p.length >= 4 ? p[3] : 1;
   };
   const OPAQUE_TAGS = new Set(["IMG", "CANVAS", "VIDEO", "SVG", "PICTURE"]);
+  // Effective opacity: CSS opacity multiplies down the ancestor chain, and an
+  // element that paints nothing cannot occlude anything. Found on a real
+  // authenticated app (2026-08-01 Swag Labs audit): the styled-select pattern
+  // puts a native <select> with opacity 0.001 over a visible span, and its
+  // background-color alpha is 1 — so an alpha-only test called a deliberately
+  // invisible overlay an opaque occluder.
+  const effectiveOpacity = (el) => {
+    let o = 1;
+    for (let p = el; p && p.nodeType === 1; p = p.parentElement) {
+      const cs = getComputedStyle(p);
+      if (cs.visibility === "hidden" || cs.display === "none") return 0;
+      const v = parseFloat(cs.opacity);
+      if (Number.isFinite(v)) o *= v;
+      if (o < 0.05) return o;
+    }
+    return o;
+  };
   const paintsOpaquely = (el) => {
+    if (effectiveOpacity(el) < 0.5) return false;
     if (OPAQUE_TAGS.has(el.tagName)) return true;
     const cs = getComputedStyle(el);
     if ((cs.backgroundImage || "none") !== "none") return true;
     return alphaOf(cs.backgroundColor) >= 0.5;
   };
   const out = [];
+  // Force hit-testing back on so pointer-events:none overlays are visible
+  // to elementFromPoint (see the note above). Removed in the finally.
+  const peOverride = document.createElement("style");
+  peOverride.textContent = "*, *::before, *::after { pointer-events: auto !important; }";
+  document.head.appendChild(peOverride);
+  try {
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   let node;
   while ((node = walker.nextNode())) {
@@ -908,6 +1007,9 @@ export const COLLECT_OCCLUSIONS = `(() => {
     }
   }
   return out;
+  } finally {
+    peOverride.remove();
+  }
 })()`;
 
 export function findOccludedText(
@@ -948,6 +1050,27 @@ export function findOccludedText(
 }
 
 export const COLLECT_INTEGRITY_TEXT = `(() => {
+  // Glyph ink is smaller than the line box it sits in. Measure the slack so
+  // the collision test can compare ink bands instead of boxes: a designed
+  // negative-leading or pull-up overlaps boxes while the glyphs keep a clear
+  // gap (measured 2px on the kicker/heading idiom, which the box test
+  // reported as a collision).
+  const inkCtx = (() => { try { return document.createElement("canvas").getContext("2d"); } catch { return null; } })();
+  const inkInsetOf = (el, text) => {
+    if (!inkCtx || !text) return 0;
+    try {
+      const cs = getComputedStyle(el);
+      inkCtx.font = [cs.fontStyle, cs.fontWeight, cs.fontSize, cs.fontFamily].filter(Boolean).join(" ");
+      const m = inkCtx.measureText(text.slice(0, 200));
+      const ink = (m.actualBoundingBoxAscent || 0) + (m.actualBoundingBoxDescent || 0);
+      if (!(ink > 0)) return 0;
+      const fontSize = parseFloat(cs.fontSize) || 0;
+      const lh = cs.lineHeight === "normal" ? fontSize * 1.2 : (parseFloat(cs.lineHeight) || fontSize);
+      // Never claim more slack than the box has, never negative (tight
+      // leading makes lh < ink, i.e. zero slack rather than anti-slack).
+      return Math.max(0, Math.min((lh - ink) / 2, fontSize * 0.5));
+    } catch { return 0; }
+  };
   ${STABLE_SELECTOR_FN}
   const SKIP = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE"]);
   const buckets = new Map();
@@ -960,6 +1083,13 @@ export const COLLECT_INTEGRITY_TEXT = `(() => {
     if (!el || SKIP.has(el.tagName)) continue;
     const style = getComputedStyle(el);
     if (style.visibility === "hidden" || style.display === "none" || style.opacity === "0") continue;
+    // Self-style checks miss content-visibility skipping, which is how a
+    // CLOSED <details> hides its subtree: the descendants keep layout boxes
+    // (measured 184x56 at y=9137 inside MDN's collapsed sidebar) while being
+    // invisible. Stacked hidden items overlap perfectly, so they read as
+    // collisions. checkVisibility() is the only reliable test for it.
+    if (typeof el.checkVisibility === "function"
+      && !el.checkVisibility({ visibilityProperty: true, opacityProperty: true, contentVisibilityAuto: true })) continue;
     let block = el;
     while (block && block !== document.body) {
       const d = getComputedStyle(block).display;
@@ -1005,6 +1135,7 @@ export const COLLECT_INTEGRITY_TEXT = `(() => {
       overlay: b.overlay,
       zIndex: b.zIndex,
       ariaHidden: b.ariaHidden,
+      inkInset: inkInsetOf(b.el, b.parts.join(" ")),
     }))
     .filter((t) => t.text.length > 0 && t.width > 1 && t.height > 1)
     .sort((a, b) => a.y - b.y || a.x - b.x);
@@ -1311,11 +1442,21 @@ export const COLLECT_STYLE_FINGERPRINT = `(() => {
 // Runner
 
 export interface IntegrityOptions {
+  /**
+   * Playwright storage-state file so gates can measure pages behind a
+   * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
+   */
+  storageState?: string;
   source: string;
   /** Sweep widths (default 1280, 768, 375). */
   viewports?: { width: number; height: number }[];
   maxFindings?: number;
   collision?: TextCollisionOptions;
+  /**
+   * User-declared exemptions for intentional patterns. Matched findings move
+   * into `exempted` with the caller's reason; see integrity-exemption.ts.
+   */
+  allow?: readonly IntegrityAllowRule[];
 }
 
 export const DEFAULT_INTEGRITY_VIEWPORTS = [
@@ -1338,18 +1479,31 @@ function dedupeKey(f: IntegrityFinding): string {
 }
 
 export async function runIntegrityCheck(options: IntegrityOptions): Promise<IntegrityReport> {
-  const viewports = options.viewports ?? DEFAULT_INTEGRITY_VIEWPORTS;
+  // Sorted widest-first, whatever order the caller gave. Findings are deduped
+  // across the sweep, so the retained one used to be whichever width came
+  // first: `--viewports 375,768,1280` attributed a page-wide defect to 375 and
+  // `1280,768,375` to 1280. That made `--allow "...@1280"` silently
+  // order-dependent, and read as "mobile only" for something present everywhere.
+  const viewports = [...(options.viewports ?? DEFAULT_INTEGRITY_VIEWPORTS)]
+    .sort((a, b) => b.width - a.width);
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   const findings: IntegrityFinding[] = [];
   const exempted: IntegrityExemption[] = [];
   const stats: IntegrityViewportStats[] = [];
-  const seen = new Set<string>();
+  // key -> the retained finding, so a repeat at a narrower width records its
+  // width instead of being dropped without trace.
+  const seen = new Map<string, IntegrityFinding>();
   const push = (list: IntegrityFinding[]) => {
     for (const f of list) {
       const key = dedupeKey(f);
-      if (seen.has(key)) continue;
-      seen.add(key);
+      const existing = seen.get(key);
+      if (existing) {
+        existing.viewports ??= [existing.viewport];
+        if (!existing.viewports.includes(f.viewport)) existing.viewports.push(f.viewport);
+        continue;
+      }
+      seen.set(key, f);
       findings.push(f);
     }
   };
@@ -1358,7 +1512,7 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
     const url = isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
     for (let vi = 0; vi < viewports.length; vi++) {
       const viewport = viewports[vi]!;
-      const page = await browser.newPage({ viewport });
+      const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
       const events: RuntimeEvent[] = [];
       const netFailures: NetworkFailure[] = [];
       let loaded = false;
@@ -1382,7 +1536,25 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
         }
       });
       await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+      // Network idle is not font-ready: with `font-display: swap` the text
+      // reflows AFTER idle, so every geometry probe below would measure
+      // fallback metrics on some runs and webfont metrics on others — the
+      // exact non-determinism the gate promises not to have. Cheap when
+      // there are no webfonts (already-resolved promise).
+      await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => undefined) : undefined));
       await page.waitForTimeout(250); // let post-load timers throw before judging
+
+      // Never report on a URL we did not measure. An auth-walled route
+      // 302s to /login and everything below would judge the login page —
+      // previously yielding a CLEAN verdict for a page that never
+      // rendered. Fail, don't warn: a green gate on the wrong page is the
+      // worst outcome this tool can produce.
+      if (vi === 0) {
+        const redirect = describeRedirect(url, page.url());
+        if (redirect) {
+          push([{ kind: "redirected", severity: "fail", viewport: viewport.width, message: redirect }]);
+        }
+      }
 
       // A1
       push(classifyRuntimeEvents(events, viewport.width));
@@ -1502,10 +1674,20 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
     await browser.close();
   }
 
+  // User exemptions apply BEFORE the verdict, and every exempted finding is
+  // moved into `exempted` rather than dropped — the suppression stays visible in
+  // the report and in --json.
+  const allowed = applyAllowRules(findings, options.allow ?? []);
+  findings.length = 0;
+  findings.push(...allowed.findings);
+  exempted.push(...allowed.exempted);
+
   const order: Record<"fail" | "warn", number> = { fail: 0, warn: 1 };
   findings.sort((a, b) => order[a.severity] - order[b.severity] || a.viewport - b.viewport);
   const kickback = findings.map((f) =>
-    `[${f.kind}]${f.selector ? ` ${f.selector}` : ""} (viewport ${f.viewport}): ${f.message}`);
+    `[${f.kind}]${f.selector ? ` ${f.selector}` : ""} (viewport ${
+      f.viewports && f.viewports.length > 1 ? f.viewports.join(",") : f.viewport
+    }): ${f.message}`);
   const verdict = findings.some((f) => f.severity === "fail") ? "defects" : "clean";
   appendRunLedger({
     tool: "integrity-check",
@@ -1517,7 +1699,15 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       exempted: exempted.length,
     },
   });
-  return { source: options.source, verdict, findings, exempted, viewports: stats, kickback };
+  return {
+    source: options.source,
+    verdict,
+    findings,
+    exempted,
+    viewports: stats,
+    kickback,
+    ...(allowed.unusedRules.length > 0 ? { unusedAllowRules: allowed.unusedRules } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1539,19 +1729,41 @@ export function formatIntegrityReport(report: IntegrityReport): string {
     lines.push("Findings:");
     for (const f of report.findings) {
       const icon = f.severity === "fail" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
-      lines.push(`  ${icon} [${f.kind}]${f.selector ? ` ${f.selector}` : ""} @${f.viewport}: ${f.message}`);
+      // Show every width it appeared at: "@1280" and "@1280,768,375" are
+      // different bugs to fix, and the caller cannot tell them apart otherwise.
+      const at = f.viewports && f.viewports.length > 1 ? f.viewports.join(",") : String(f.viewport);
+      lines.push(`  ${icon} [${f.kind}]${f.selector ? ` ${f.selector}` : ""} @${at}: ${f.message}`);
     }
   } else {
     lines.push("");
     lines.push(`${GREEN}No integrity defects detected.${RESET}`);
   }
   if (report.exempted.length > 0) {
-    lines.push("");
-    lines.push(`Exempted candidates (the tool's call — audit the rule, not the page):`);
-    for (const e of report.exempted.slice(0, 15)) {
-      lines.push(`  ${DIM}- [${e.kind}] ${e.selector ?? ""} @${e.viewport}: ${e.reason}${RESET}`);
+    const user = report.exempted.filter((e) => e.reason.startsWith("user exemption"));
+    const tool = report.exempted.filter((e) => !e.reason.startsWith("user exemption"));
+    // Split by who decided. A reviewer auditing a tool exemption is checking the
+    // rule; auditing a user exemption is checking a colleague's judgement call,
+    // and conflating the two hides which is which.
+    for (const [label, rows] of [
+      ["Exempted candidates (the tool's call — audit the rule, not the page)", tool],
+      ["Exempted by --allow (your call — the finding was real and accepted)", user],
+    ] as const) {
+      if (rows.length === 0) continue;
+      lines.push("");
+      lines.push(`${label}:`);
+      for (const e of rows.slice(0, 15)) {
+        lines.push(`  ${DIM}- [${e.kind}] ${e.selector ?? ""} @${e.viewport}: ${e.reason}${RESET}`);
+      }
+      if (rows.length > 15) lines.push(`  ${DIM}… ${rows.length - 15} more${RESET}`);
     }
-    if (report.exempted.length > 15) lines.push(`  ${DIM}… ${report.exempted.length - 15} more${RESET}`);
+  }
+  if (report.unusedAllowRules && report.unusedAllowRules.length > 0) {
+    lines.push("");
+    lines.push(`${YELLOW}${report.unusedAllowRules.length} --allow rule(s) matched nothing${RESET}`);
+    for (const r of report.unusedAllowRules) {
+      lines.push(`  ${DIM}- ${r.raw}${RESET}`);
+    }
+    lines.push(`${DIM}Delete them: an exemption kept past the pattern it covered only widens the blind spot.${RESET}`);
   }
   return lines.join("\n");
 }
@@ -1569,6 +1781,9 @@ Options:
   --viewports <w,w,...>  Sweep widths (default: 1280,768,375)
   --max-findings <n>     Per-class report cap (default: 12)
   --json                 Print JSON report
+  --storage-state <file> Playwright storage state, to measure pages behind
+                         a login (or set VLMKIT_STORAGE_STATE)
+${ALLOW_HELP}
 Exit code is non-zero when the verdict is "defects".`);
   process.exit(exitCode);
 }
@@ -1578,11 +1793,15 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   let json = false;
   let maxFindings: number | undefined;
   let widths: number[] | undefined;
+  let storageState: string | undefined;
+  const allowSpecs: string[] = [];
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === "--json") json = true;
     else if (arg === "--max-findings") maxFindings = Number.parseInt(argv[++i] ?? "12", 10);
+    else if (arg === "--storage-state") storageState = argv[++i];
+    else if (arg === "--allow") allowSpecs.push(argv[++i] ?? "");
     else if (arg === "--viewports") {
       widths = (argv[++i] ?? "").split(",").map((w) => Number.parseInt(w, 10)).filter((w) => w > 0);
       if (widths.length === 0) printUsage(1);
@@ -1591,10 +1810,15 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   const source = positional[0];
   if (!source) printUsage(1);
   const heights: Record<number, number> = { 1280: 800, 768: 900, 375: 700 };
+  // Parsed before the browser starts, so a typo in an exemption fails in
+  // milliseconds instead of after a three-viewport sweep.
+  const allow = parseAllowRules(allowSpecs);
   const report = await runIntegrityCheck({
     source,
     ...(widths ? { viewports: widths.map((w) => ({ width: w, height: heights[w] ?? 800 })) } : {}),
     ...(maxFindings !== undefined ? { maxFindings } : {}),
+    ...(storageState ? { storageState } : {}),
+    ...(allow.length > 0 ? { allow } : {}),
   });
   if (json) console.log(JSON.stringify(report, null, 2));
   else console.log(formatIntegrityReport(report));

@@ -17,8 +17,8 @@
  * install hint — the tool stays useful in a Chromium-only sandbox.
  *
  * Usage:
- *   vrt cross-browser <html-or-url>
- *   vrt cross-browser <url> --engines chromium,firefox
+ *   vlmkit diff browsers <html-or-url>
+ *   vlmkit diff browsers <url> --engines chromium,firefox
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -230,7 +230,7 @@ export async function runCrossBrowser(
   const usable = engineResults.filter((r) => r.status === "ok").length;
   const skipped = engineResults.filter((r) => r.status === "skipped").length;
 
-  console.log(`  ${BOLD}${CYAN}vrt cross-browser${RESET}`);
+  console.log(`  ${BOLD}${CYAN}vlmkit diff browsers${RESET}`);
   console.log(`  ${DIM}source: ${options.source}${RESET}`);
   if (reference) {
     console.log(`  ${DIM}reference: ${reference}${RESET}`);
@@ -358,7 +358,7 @@ async function main(argv = process.argv.slice(2)) {
   if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, outputDir, report, engines, threshold, allowSkipped } = parseArgs(argv);
   if (positional.length === 0) {
-    console.log("Usage: vrt cross-browser <html-or-url> [options]");
+    console.log("Usage: vlmkit diff browsers <html-or-url> [options]");
     console.log("Options:");
     console.log("  --engines <list>    Comma-separated subset (default: chromium,firefox,webkit)");
     console.log("  --output-dir <dir>  Default: ./test-results/cross-browser");

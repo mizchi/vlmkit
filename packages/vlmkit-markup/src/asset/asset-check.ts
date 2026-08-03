@@ -39,6 +39,7 @@ import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
 import { extractPaletteFromFile, extractPaletteFromRgba, type PaletteColor } from "../style/palette-extract.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { applyGateExit } from "@mizchi/vlmkit-core/gate-exit.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
@@ -350,7 +351,7 @@ Options:
   --against-bg <#rrggbb>  Backdrop the asset will sit on (silhouette contrast check)
   --page-palette <png>    Page screenshot to check palette harmony against
   --json                  Print JSON report
-  --fail-on-suspect       Exit non-zero when suspect issues are found`);
+  --advisory              Print findings but exit 0 (default: a suspect exits 1)`);
   process.exit(exitCode);
 }
 
@@ -361,7 +362,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   let againstBg: string | undefined;
   let pagePalettePath: string | undefined;
   let json = false;
-  let failOnSuspect = false;
+  let advisory = false;
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
@@ -373,7 +374,8 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     else if (arg === "--against-bg") againstBg = argv[++i]!;
     else if (arg === "--page-palette") pagePalettePath = argv[++i]!;
     else if (arg === "--json") json = true;
-    else if (arg === "--fail-on-suspect") failOnSuspect = true;
+    else if (arg === "--fail-on-suspect") { /* accepted no-op: suspects already fail */ }
+    else if (arg === "--advisory") advisory = true;
     else if (!arg.startsWith("-")) positional.push(arg);
   }
   if (positional.length === 0) printUsage(1);
@@ -387,7 +389,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   });
   if (json) console.log(JSON.stringify(report, null, 2));
   else console.log(formatAssetCheckReport(report));
-  if (failOnSuspect && report.issues.some((i) => i.severity === "suspect")) process.exit(1);
+  applyGateExit(report.issues.some((i) => i.severity === "suspect"), { advisory });
 }
 
 const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "asset-check" ||

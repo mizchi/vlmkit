@@ -1,6 +1,6 @@
 {
   "name": "@mizchi/vlmkit",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "VLM-driven frontend toolkit: visual regression (snapshot / diff / regression-watch), markup synthesis from screenshots, design-token / theme / a11y / i18n audits, and a 2-stage VLM+LLM CSS auto-repair loop.",
   "license": "MIT",
   "author": "mizchi",
@@ -74,7 +74,8 @@
     "motion:kagura-runtime-calibrated:game-assets": "node design-runs/game-assets-20260520/tools/check-kagura-runtime-smokes.mjs --calibration-contract design-runs/game-assets-20260520/models/robot-voxel-motion/kagura-calibration-handoff.json",
     "motion:kagura-runtime-utils:game-assets": "node --test design-runs/game-assets-20260520/tools/game-asset-motion-core.test.mjs design-runs/game-assets-20260520/tools/kagura-runtime-smoke-utils.test.mjs design-runs/game-assets-20260520/tools/kagura-runtime-batch-utils.test.mjs",
     "vrt": "playwright test",
-    "vrt:update": "playwright test --update-snapshots"
+    "vrt:update": "playwright test --update-snapshots",
+    "build:packages:js": "pnpm --filter './packages/**' --filter '!@mizchi/vlmkit-mcp' --filter '!@mizchi/vlmkit-markup' --recursive run build && pnpm --filter @mizchi/vlmkit-markup run build:js"
   },
   "devDependencies": {
     "@mizchi/vlmkit-ai": "workspace:*",

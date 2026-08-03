@@ -43,15 +43,28 @@ agent the task routing and the fix-loop discipline (assumes only that
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
-| `VRT_LLM_PROVIDER` | LLM provider | gemini |
-| `VRT_LLM_MODEL` | LLM model | provider default |
-| `VRT_VLM_MODEL` | VLM model (OpenRouter) | qwen/qwen3-vl-8b-instruct |
+| `VLMKIT_LLM_PROVIDER` | LLM provider | gemini |
+| `VLMKIT_LLM_MODEL` | LLM model | provider default |
+| `VLMKIT_VLM_MODEL` | VLM model (OpenRouter) | qwen/qwen3-vl-8b-instruct |
+| `VLMKIT_BASE_URL` | Base URL for workflow capture | — |
+| `VLMKIT_CAPTURE_BACKEND` | Capture backend override | playwright |
+| `VLMKIT_CONFIG_PATH` / `VLMKIT_CONFIG_FILE` | Config path override | — |
+| `VLMKIT_PROJECT_ROOT` | Project root override | cwd |
 | `OPENROUTER_API_KEY` | OpenRouter API key | — |
 | `GEMINI_API_KEY` | Google AI API key | — |
 | `ANTHROPIC_API_KEY` | Anthropic API key | — |
 | `VLMKIT_CRATER_BIDI_URL` | Crater BiDi WebSocket URL, including `/session/...` when required | `ws://127.0.0.1:9222` |
 | `VLMKIT_CRATER_ROOT` | Crater checkout containing `.bidi-ws-url` from `just start-bidi-with-font` | — |
 | `VLMKIT_CRATER_WASM_MODULE` | Crater layout JS/WASM module path for `POST /api/crater/layout` | — |
+
+Every `VLMKIT_*` variable above is also read under its old `VRT_*` spelling
+(`VRT_LLM_PROVIDER`, `VRT_VLM_MODEL`, …). The new name wins when both are set;
+using an old one prints one line naming the replacement. Support for the `VRT_*`
+spellings ends in 1.0.0 — an existing CI keeps working until then without a
+change. The same holds for two other renamed names: the state directory moved
+from `.vrt/` to `.vlmkit/` and the config file from `vrt.config.json` to
+`vlmkit.config.json`, and in both cases an existing old path is still used, per
+entry, so approved baselines are never orphaned.
 
 
 ## Snapshot / CI configuration
@@ -85,7 +98,7 @@ apm install mizchi/vlmkit/.claude/skills/vrt-visual-diff
 | `dynamic-markup` | auto-markup + gates: `check breakpoints` / `scan scroll` / `check animation\|motion` | Markup whose spec includes breakpoints, scrollports, animations |
 | `agent-validation-loop` | disposable subagent runs → friction → fix → re-run | Harden a CLI/library by measuring whether agents can drive it |
 
-Each skill assumes the `vrt` CLI is on `$PATH` (this repo published as
+Each skill assumes the `vlmkit` CLI is on `$PATH` (this repo published as
 a Node package, or built from source) and Node 24+. VLM-using skills
 (`fix-loop`, `markup-synth`, `migration subagent`) additionally need
 one of `OPENROUTER_API_KEY` / `GEMINI_API_KEY` / `ANTHROPIC_API_KEY`

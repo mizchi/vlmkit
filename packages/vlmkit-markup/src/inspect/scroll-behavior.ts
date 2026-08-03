@@ -25,6 +25,9 @@
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { applyGateExit } from "@mizchi/vlmkit-core/gate-exit.ts";
+import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
+import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
@@ -63,6 +66,13 @@ export interface ScrollBehaviorInput {
 }
 
 export type ScrollBehaviorIssueKind =
+  /**
+   * A URL that redirected somewhere meaningful — almost always a login wall.
+   * Measured 2026-08-02: pointed at an auth-walled route with no session, this
+   * gate reported `status: ok` for the login page while naming the requested
+   * URL as its source. Reported as a suspect issue so the pass cannot be silent.
+   */
+  | "redirected"
   | "fixed-drifts"
   | "sticky-not-sticking"
   | "snap-not-snapping";
@@ -81,6 +91,11 @@ export interface ScrollBehaviorReport extends ScrollBehaviorInput {
 }
 
 export interface ScrollBehaviorOptions {
+  /**
+   * Playwright storage-state file so gates can measure pages behind a
+   * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
+   */
+  storageState?: string;
   source: string;
   html?: string;
   viewport?: { width: number; height: number };
@@ -269,7 +284,7 @@ export async function runScrollBehavior(options: ScrollBehaviorOptions): Promise
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({ viewport });
+    const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
     if (options.html !== undefined) {
       await page.setContent(options.html, { waitUntil: "networkidle" });
     } else if (isUrl(options.source)) {
@@ -277,10 +292,19 @@ export async function runScrollBehavior(options: ScrollBehaviorOptions): Promise
     } else {
       await page.goto(pathToFileURL(resolve(options.source)).href, { waitUntil: "networkidle", timeout: 30000 });
     }
+    // A redirect here is almost always a login wall. Without this the gate
+    // measured the login page and reported `status: ok` while naming the
+    // requested URL as its source (measured 2026-08-02).
+    const redirectNote = isUrl(options.source) ? describeRedirect(options.source, page.url()) : null;
     const collected = await page.evaluate(COLLECT_SCRIPT(options.maxElements ?? 20)) as
       Omit<ScrollBehaviorInput, "source">;
     await page.close();
     const report = analyzeScrollBehavior({ source: options.source, ...collected }, options);
+    // Pushed as a suspect ISSUE, not just printed: the status line is derived
+    // from the issue list, so a note alone would have left `status: ok`.
+    if (redirectNote) {
+      report.issues.unshift({ kind: "redirected", severity: "suspect", selector: "", message: redirectNote });
+    }
     appendRunLedger({
       tool: "check-scroll",
       source: options.source,
@@ -348,20 +372,21 @@ inventory is \`vlmkit scan scroll\`.)
 Options:
   --viewport <WxH>    Viewport (default 1280x720)
   --json              Print JSON report
-  --fail-on-suspect   Exit non-zero when suspect issues are found`);
+  --advisory          Print findings but exit 0 (default: a suspect exits 1)`);
   process.exit(exitCode);
 }
 
 async function main(argv = process.argv.slice(2)): Promise<void> {
   if (argv.includes("--help") || argv.includes("-h")) printUsage(0);
   let json = false;
-  let failOnSuspect = false;
+  let advisory = false;
   let viewport: { width: number; height: number } | undefined;
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === "--json") json = true;
-    else if (arg === "--fail-on-suspect") failOnSuspect = true;
+    else if (arg === "--fail-on-suspect") { /* accepted no-op: suspects already fail */ }
+    else if (arg === "--advisory") advisory = true;
     else if (arg === "--viewport") {
       const m = (argv[++i] ?? "").match(/^(\d+)x(\d+)$/);
       if (m) viewport = { width: Number(m[1]), height: Number(m[2]) };
@@ -371,7 +396,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   const report = await runScrollBehavior({ source: positional[0]!, ...(viewport ? { viewport } : {}) });
   if (json) console.log(JSON.stringify(report, null, 2));
   else console.log(formatScrollBehaviorReport(report));
-  if (failOnSuspect && report.issues.some((i) => i.severity === "suspect")) process.exit(1);
+  applyGateExit(report.issues.some((i) => i.severity === "suspect"), { advisory });
 }
 
 const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "scroll-behavior" ||

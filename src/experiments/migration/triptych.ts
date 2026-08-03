@@ -1,5 +1,5 @@
 /**
- * Triptych composer: stitches the three PNGs that `vrt compare` already
+ * Triptych composer: stitches the three PNGs that `vlmkit diff html` already
  * emits into a single `baseline | variant | heatmap` image with labeled
  * header bands. Cuts "read each PNG in turn" iteration cost in agent
  * loops (see 2026-05-15 design-md scenario report § F3).

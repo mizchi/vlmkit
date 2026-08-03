@@ -19,7 +19,7 @@
  * multiple pages).
  *
  * Usage:
- *   vrt component-consistency <html> --selector .card
+ *   vlmkit check drift component <html> --selector .card
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
@@ -166,7 +166,7 @@ export async function runComponentConsistency(
   const md = renderReport(htmlPath, options.selector, instances, reference.index, deltas);
   await writeFile(reportPath, md);
 
-  console.log(`  ${BOLD}${CYAN}vrt component-consistency${RESET}`);
+  console.log(`  ${BOLD}${CYAN}vlmkit check drift component${RESET}`);
   console.log(`  ${DIM}html: ${htmlPath}  selector: ${options.selector}${RESET}`);
   console.log(`  ${DIM}${instances.length} instance(s), reference = #${reference.index}${RESET}`);
   for (const d of deltas) {
@@ -245,7 +245,7 @@ async function main(argv = process.argv.slice(2)) {
   if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, selector, outputDir, report, threshold, referenceIndex } = parseArgs(argv);
   if (positional.length === 0 || !selector) {
-    console.log("Usage: vrt component-consistency <html> --selector <sel>");
+    console.log("Usage: vlmkit check drift component <html> --selector <sel>");
     console.log("Options:");
     console.log("  --selector <sel>           CSS selector matching ≥ 2 instances of the component.");
     console.log("  --reference-index <N>      Which match to use as the reference. Default 0.");

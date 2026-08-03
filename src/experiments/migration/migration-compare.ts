@@ -772,7 +772,7 @@ export interface MigrationCompareReport {
   /**
    * Wireframe-mode fix suggestions emitted by
    * `generateWireframeFixCandidates`. Persisted to the JSON report so
-   * `vrt watch` can compute "newly introduced vs resolved" deltas
+   * `vlmkit watch` can compute "newly introduced vs resolved" deltas
    * between rounds without re-deriving them.
    */
   wireframeFixSuggestions?: Array<{
@@ -852,10 +852,10 @@ async function main(cliArgs = process.argv.slice(2)) {
   const hasFileInput = options.baseline && options.variants.length > 0;
   const hasUrlInput = options.baselineUrl && options.variantUrls && options.variantUrls.length > 0;
   if (!hasFileInput && !hasUrlInput) {
-    console.log(`Usage: vrt compare <before.html> <after.html>`);
-    console.log(`       vrt compare --dir <dir> --baseline <file> --variants <file1> <file2> ...`);
-    console.log(`       vrt compare --url <baseline-url> --current-url <current-url>`);
-    console.log(`       vrt compare --url <baseline-url> --variant-urls <url1> <url2> ...`);
+    console.log(`Usage: vlmkit diff html <before.html> <after.html>`);
+    console.log(`       vlmkit diff html --dir <dir> --baseline <file> --variants <file1> <file2> ...`);
+    console.log(`       vlmkit diff html --url <baseline-url> --current-url <current-url>`);
+    console.log(`       vlmkit diff html --url <baseline-url> --variant-urls <url1> <url2> ...`);
     console.log();
     console.log(`Options: [--output-dir path] [--approval approval.json] [--strict]`);
     console.log(`         [--discover-backend auto|regex|crater] [--no-paint-tree] [--no-discover]`);

@@ -22,13 +22,13 @@ import { createReasoningPipeline } from "@mizchi/vlmkit-ai/reasoning-pipeline.ts
 import { resolveResolutionForViewport } from "@mizchi/vlmkit-core/image-resize.ts";
 import { getCssChallengeFixturePath } from "./css-challenge-fixtures.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "@mizchi/vlmkit-core/terminal-colors.ts";
-import { getArg } from "@mizchi/vlmkit-core/cli-args.ts";
+import { getArg, getIntArg } from "@mizchi/vlmkit-core/cli-args.ts";
 
 // ---- Config ----
 
 const FIXTURE = getArg("fixture", "page");
-const SEED = parseInt(getArg("seed", String(Date.now())), 10);
-const MAX_ROUNDS = parseInt(getArg("max-rounds", "3"), 10);
+const SEED = getIntArg("seed", Date.now());
+const MAX_ROUNDS = getIntArg("max-rounds", 3, { min: 1 });
 const MODE = getArg("mode", "property") as "property" | "selector";
 const VIEWPORT = { width: 1280, height: 900 };
 const TMP = join(process.cwd(), "test-results", "fix-loop");

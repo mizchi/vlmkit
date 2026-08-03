@@ -21,17 +21,26 @@
  * this is purely visual — works on any page that renders text.
  *
  * Usage:
- *   vrt a11y-contrast <html>
+ *   vlmkit check a11y contrast <html>
  */
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { openSource, resolveSource } from "@mizchi/vlmkit-core/page-open.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { evaluateA11yContrast } from "./markup-core-a11y-contrast.ts";
 
 export interface A11yContrastOptions {
+  /**
+   * Suppress the human-readable console block. Set by `--json`: the console
+   * output caps its list at five rows, so mixing it into stdout ahead of the
+   * JSON left `--json` unparseable — while the truncation notice pointed the
+   * reader at exactly that stream. Shipped broken in 0.9.0-dev; caught by
+   * running the built CLI rather than the run function.
+   */
+  quiet?: boolean;
   htmlPath: string;
   outputDir: string;
   reportPath?: string;
@@ -158,7 +167,7 @@ function toHex(c: { r: number; g: number; b: number }): string {
  * Build the list of contrast failures from raw samples (post-process
  * step extracted from `runA11yContrast`). Pure — no I/O — so it can
  * be invoked over Playwright pages owned by other modules (e.g. the
- * `vrt diff-pr` CI gate calls this without spinning up a second
+ * `vlmkit diff-pr` CI gate calls this without spinning up a second
  * browser instance per route).
  */
 export function analyzeA11yContrastSamples(samples: A11yContrastRawSample[]): ContrastFinding[] {
@@ -209,8 +218,9 @@ export async function runA11yContrast(
 ): Promise<A11yContrastReport> {
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
-  const htmlPath = resolve(options.htmlPath);
-  const html = await readFile(htmlPath, "utf-8");
+  // A URL is a valid source now that loading goes through `openSource`;
+  // `resolve()` would have turned it into `<cwd>/http:/host/page.html`.
+  const htmlPath = resolveSource(options.htmlPath);
   const viewport = options.viewport ?? { width: 1280, height: 900 };
   const minLen = options.minTextLength ?? 1;
 
@@ -218,8 +228,12 @@ export async function runA11yContrast(
   let samples: A11yContrastRawSample[];
   let screenshotPath: string;
   try {
-    const page = await browser.newPage({ viewport });
-    await page.setContent(html, { waitUntil: "networkidle" });
+    // Navigate rather than `setContent(readFile(...))`: the latter leaves the
+    // document on `about:blank`, so a relative `<link rel="stylesheet">` never
+    // loads and the gate measures unstyled markup. Measured on
+    // fixtures/external-assets: it reported 0 contrast failures where the same
+    // CSS inlined reported 1.
+    const { page } = await openSource(browser, htmlPath, { viewport, settleMs: 0 });
     await page.addStyleTag({
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });
@@ -273,15 +287,24 @@ export async function runA11yContrast(
   });
   await writeFile(reportPath, md);
 
-  console.log(`  ${BOLD}${CYAN}vrt a11y-contrast${RESET}`);
-  console.log(`  ${DIM}html: ${htmlPath}${RESET}`);
-  console.log(`  ${DIM}inspected ${byPath.size} text-bearing element(s)${RESET}`);
-  const icon = findings.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
-  console.log(`  ${icon} ${findings.length} contrast failure(s)`);
-  for (const f of findings.slice(0, 5)) {
-    console.log(`    ${DIM}${f.path} — ${f.ratio.toFixed(2)}:1 (need ${f.requiredAA}) — \`${f.foreground.hex}\` on \`${f.background.hex}\` — "${f.text}"${RESET}`);
+  if (!options.quiet) {
+    console.log(`  ${BOLD}${CYAN}vlmkit check a11y contrast${RESET}`);
+    console.log(`  ${DIM}html: ${htmlPath}${RESET}`);
+    console.log(`  ${DIM}inspected ${byPath.size} text-bearing element(s)${RESET}`);
+    const icon = findings.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
+    console.log(`  ${icon} ${findings.length} contrast failure(s)`);
+    const CONSOLE_ROWS = 5;
+    for (const f of findings.slice(0, CONSOLE_ROWS)) {
+      console.log(`    ${DIM}${f.path} — ${f.ratio.toFixed(2)}:1 (need ${f.requiredAA}) — \`${f.foreground.hex}\` on \`${f.background.hex}\` — "${f.text}"${RESET}`);
+    }
+    // Disclose the cut: a headline count above a five-row list reads as "here they
+    // are", and a reader has no way to know seven more exist. Same wording as
+    // `check breakpoints` and `check integrity`.
+    if (findings.length > CONSOLE_ROWS) {
+      console.log(`    ${DIM}… ${findings.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
+    }
+    console.log(`  ${DIM}report: ${reportPath}${RESET}`);
   }
-  console.log(`  ${DIM}report: ${reportPath}${RESET}`);
 
   return {
     html: htmlPath,
@@ -321,6 +344,7 @@ function renderReport(r: Omit<A11yContrastReport, "reportPath">): string {
       const bgSwatch = `\`${f.background.hex}\``;
       lines.push(`| \`${f.path}\` (${f.fontSize.toFixed(0)}px${f.fontWeight >= 600 ? " b" : ""}) | \`${f.text}\` | ${fgSwatch} | ${bgSwatch} | **${f.ratio}:1** | ${f.requiredAA}:1 |`);
     }
+    if (r.failures.length > 20) lines.push(`\n_… ${r.failures.length - 20} more row(s) omitted; the JSON report has all of them._`);
     if (r.failures.length > 20) {
       lines.push(`| _…${r.failures.length - 20} more_ | | | | | |`);
     }
@@ -339,7 +363,7 @@ function renderReport(r: Omit<A11yContrastReport, "reportPath">): string {
       "toward black/white on a light/dark bg adds ratio.");
     lines.push("3. Common fix: muted-gray-on-white text (e.g. `#9ca3af` on `#ffffff` = 2.85:1) " +
       "→ try `#6b7280` (4.69:1) or darker.");
-    lines.push("4. Re-run `vrt a11y-contrast`. Failures should clear.");
+    lines.push("4. Re-run `vlmkit check a11y contrast`. Failures should clear.");
   }
   lines.push("");
   return lines.join("\n");
@@ -349,17 +373,25 @@ async function main(argv = process.argv.slice(2)) {
   if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, outputDir, report } = parseArgs(argv);
   if (positional.length === 0) {
-    console.log("Usage: vrt a11y-contrast <html> [--output-dir dir]");
+    console.log("Usage: vlmkit check a11y contrast <html> [--output-dir dir]");
     console.log("Options:");
     console.log("  --output-dir <dir>   Default: ./test-results/a11y-contrast");
     console.log("  --report <path>      Markdown report path");
+    console.log("  --json               Print the full report as JSON (every row, no cut)");
     process.exit(1);
   }
-  await runA11yContrast({
+  // `--json` so the console/markdown row caps stay a display choice rather than
+
+  // the only view of the data — the truncation notices point here.
+
+  const json = argv.includes("--json");
+  const result = await runA11yContrast({
     htmlPath: positional[0]!,
     outputDir: outputDir || join(process.cwd(), "test-results", "a11y-contrast"),
     reportPath: report || undefined,
+    quiet: json,
   });
+  if (json) console.log(JSON.stringify(result, null, 2));
 }
 
 const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "a11y-contrast" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);

@@ -44,6 +44,11 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      # 0.8.1 made src/ entrypoints resolve deep imports through dist. The
+      # `:js` variant skips `moon:build` — the MoonBit output is loaded at
+      # runtime from `_build/js/`, not needed to emit JS + declarations — so
+      # this job does not have to install the MoonBit toolchain.
+      - run: pnpm build:packages:js
       - run: pnpm exec playwright install --with-deps chromium
 
       - name: Run VRT Compare
@@ -86,6 +91,11 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      # 0.8.1 made src/ entrypoints resolve deep imports through dist. The
+      # `:js` variant skips `moon:build` — the MoonBit output is loaded at
+      # runtime from `_build/js/`, not needed to emit JS + declarations — so
+      # this job does not have to install the MoonBit toolchain.
+      - run: pnpm build:packages:js
       - run: pnpm exec playwright install --with-deps chromium
 
       - name: Start static fixture server
@@ -143,6 +153,11 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      # 0.8.1 made src/ entrypoints resolve deep imports through dist. The
+      # `:js` variant skips `moon:build` — the MoonBit output is loaded at
+      # runtime from `_build/js/`, not needed to emit JS + declarations — so
+      # this job does not have to install the MoonBit toolchain.
+      - run: pnpm build:packages:js
       - run: pnpm exec playwright install --with-deps chromium
 
       - name: Smoke test fixtures
@@ -178,6 +193,9 @@ jobs:
         run: |
           curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
           echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      # After the MoonBit install above: `build:packages` runs `moon:build`.
+      - run: pnpm build:packages
 
       - name: Run CSS benchmark
         run: |

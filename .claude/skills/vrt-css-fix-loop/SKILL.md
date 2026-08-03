@@ -35,7 +35,7 @@ banner line `VLM=<id> | LLM=<id>` makes the two stages explicit.
 
 ## Invocation
 
-`fix-loop` is run directly from source (not via the `vrt` CLI):
+`fix-loop` is run directly from source (not via the `vlmkit` CLI):
 
 ```bash
 node --experimental-strip-types src/experiments/css-challenge/fix-loop.ts <flags>
@@ -151,7 +151,7 @@ for the 8-way bench from the prior week.
 | `OPENROUTER_API_KEY` | Unprefixed model id |
 | `GEMINI_API_KEY` | `gemini:` prefix |
 | `ANTHROPIC_API_KEY` | `claude:` prefix |
-| `DEBUG_VRT=1` | Verbose VLM round logging |
+| `DEBUG_VLMKIT=1` | Verbose VLM round logging |
 
 ## Reading the output
 
@@ -192,7 +192,7 @@ recall, property recall).
 
 A "stalled" run shows diffRatio holding steady across rounds — the
 VLM's proposals aren't parseable, or the LLM's emitted fixes aren't
-structurally valid CSS. Set `DEBUG_VRT=1` to see both stages' raw
+structurally valid CSS. Set `DEBUG_VLMKIT=1` to see both stages' raw
 output.
 
 At the end of the run, a summary table prints one row per round

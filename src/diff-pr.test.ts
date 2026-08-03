@@ -113,7 +113,7 @@ describe("buildMarkdownSummary", () => {
   });
 });
 
-describe("vrt diff-pr pin <route>...", () => {
+describe("vlmkit diff-pr pin <route>...", () => {
   let cwd: string;
 
   before(async () => {
@@ -181,7 +181,7 @@ describe("vrt diff-pr pin <route>...", () => {
   });
 });
 
-describe("vrt diff-pr a11y gate", () => {
+describe("vlmkit diff-pr a11y gate", () => {
   let cwd: string;
 
   before(async () => {
@@ -277,7 +277,7 @@ describe("vrt diff-pr a11y gate", () => {
   });
 });
 
-describe("vrt diff-pr post", () => {
+describe("vlmkit diff-pr post", () => {
   let cwd: string;
   let summaryPath: string;
 
@@ -285,7 +285,7 @@ describe("vrt diff-pr post", () => {
     cwd = await mkdtemp(join(tmpdir(), "vrt-diff-pr-post-"));
     summaryPath = join(cwd, ".vrt/runs/diff-pr/summary.md");
     await mkdir(join(cwd, ".vrt/runs/diff-pr"), { recursive: true });
-    await writeFile(summaryPath, "# vrt diff-pr summary\n\nStatus: **PASS**\n");
+    await writeFile(summaryPath, "# vlmkit diff-pr summary\n\nStatus: **PASS**\n");
   });
 
   after(async () => {

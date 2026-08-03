@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `vrt diff-for-agent <migration-report.json>` — emit a one-context-window
+ * `vlmkit diff agent <migration-report.json>` — emit a one-context-window
  * Markdown summary of an existing migration-compare report.
  *
  * Pairs with the dogfood findings in
@@ -10,7 +10,8 @@
  */
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, resolve, relative} from "node:path";
+import { STATE_DIR, resolveStatePath } from "@mizchi/vlmkit-core/legacy-names.ts";
 import {
   buildPreviousRunSummary,
   detectRegression,
@@ -19,15 +20,19 @@ import {
   type PreviousRunSummary,
 } from "../../vrt/compare/diff-for-agent.ts";
 
-const DEFAULT_HISTORY_PATH = ".vrt/last-diff-for-agent.json";
+// See legacy-names: the run-vs-run comparison is worthless if the rename makes
+// it read an absent file and report "no previous run" forever.
+const defaultHistoryPath = (): string =>
+  relative(process.cwd(), resolveStatePath(process.cwd(), "last-diff-for-agent.json"))
+  || `${STATE_DIR}/last-diff-for-agent.json`;
 
 function usage(): string {
   return [
     "Usage:",
-    "  vrt diff-for-agent <migration-report.json> [--out path] [--max-viewports 1] [--variant working.html] [--show-unverified] [--previous path] [--persist-summary path] [--no-history] [--fail-on-regression]",
+    "  vlmkit diff agent <migration-report.json> [--out path] [--max-viewports 1] [--variant working.html] [--show-unverified] [--previous path] [--persist-summary path] [--no-history] [--fail-on-regression]",
     "",
     "Reads an existing migration-compare report (the report.json written by",
-    "`vrt compare`) and prints a Markdown summary tailored for coding agents.",
+    "`vlmkit diff html`) and prints a Markdown summary tailored for coding agents.",
     "",
     "By default, heuristic fix-candidate rows marked ✗ (value already matches",
     "baseline) are hidden — pass --show-unverified to include them.",
@@ -174,10 +179,10 @@ async function main() {
   //   --no-history: skip both load + write entirely (CI one-shots).
   //   default:      auto-load + auto-persist .vrt/last-diff-for-agent.json,
   //                 overridable via --previous / --persist-summary.
-  const historyPath = parsed.noHistory ? undefined : resolve(parsed.persistSummaryPath ?? DEFAULT_HISTORY_PATH);
+  const historyPath = parsed.noHistory ? undefined : resolve(parsed.persistSummaryPath ?? defaultHistoryPath());
   const previousPath = parsed.noHistory
     ? undefined
-    : resolve(parsed.previousPath ?? parsed.persistSummaryPath ?? DEFAULT_HISTORY_PATH);
+    : resolve(parsed.previousPath ?? parsed.persistSummaryPath ?? defaultHistoryPath());
   const previous = previousPath ? await loadPreviousSummary(previousPath) : undefined;
 
   const md = formatMigrationReportForAgent(report, {

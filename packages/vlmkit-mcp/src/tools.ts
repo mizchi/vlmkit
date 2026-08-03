@@ -224,14 +224,18 @@ const checkEquivalenceTool: McpTool = {
 const checkIntegrityTool: McpTool = {
   name: "check_integrity",
   description:
-    "Reference-free integrity gate for creative/zero-shot markup — no target image or manifest needed. Detects defects that are unambiguous without a reference: JS errors (construction-phase = fatal), empty/degenerate renders, broken images/stylesheets/scripts/fonts, same-layer text collisions, clipped text, collapsed containers, horizontal page overflow, and declared-but-unapplied styling, swept across multiple viewport widths. Deterministic (DOM + pixel math, no VLM). Intentional patterns (hero overlays, ellipsis truncation, positioning anchors) are exempted by tool-side rules and reported in `exempted` — audit the rule, don't re-litigate the finding. The kickback is a paste-ready, selector-attributed fix list.",
+    "Reference-free integrity gate for creative/zero-shot markup — no target image or manifest needed. Detects defects that are unambiguous without a reference: JS errors (construction-phase = fatal), empty/degenerate renders, broken images/stylesheets/scripts/fonts, same-layer text collisions, clipped text, collapsed containers, horizontal page overflow, and declared-but-unapplied styling, swept across multiple viewport widths. Deterministic (DOM + pixel math, no VLM). Intentional patterns (hero overlays, ellipsis truncation, positioning anchors) are exempted by tool-side rules and reported in `exempted` — audit the rule, don't re-litigate the finding. A pattern the tool does not recognise as intentional can be accepted per finding via `allow` (syntax `<kind>[@<selector>][@<viewport>];<reason>`); a reason is mandatory, an unknown kind is an error, accepted findings are still listed in `exempted` with that reason, and a rule matching nothing comes back in `unusedAllowRules`. Kinds meaning the page is broken (js-error, degenerate-render, unstyled-page, redirected) cannot be accepted — fix the page. The kickback is a paste-ready, selector-attributed fix list.",
   inputSchema: {
     source: z.string().describe("Path or URL of the page to check."),
     viewports: z.array(z.number()).optional().describe("Sweep widths (default 1280, 768, 375)."),
     maxFindings: z.number().optional().describe("Per-class report cap (default 12)."),
+    allow: z.array(z.string()).optional().describe(
+      "Exempt intentional patterns: `<kind>[@<selector>][@<viewport>];<reason>`, e.g. \"near-misalignment@.badge;optically centred\". The reason is required.",
+    ),
   },
   run: async (args) => {
     const { runIntegrityCheck } = await import("@mizchi/vlmkit-markup/inspect/integrity-check.ts");
+    const { parseAllowRules } = await import("@mizchi/vlmkit-markup/inspect/integrity-exemption.ts");
     const heights: Record<number, number> = { 1280: 800, 768: 900, 375: 700 };
     const report = await runIntegrityCheck({
       source: args.source as string,
@@ -239,10 +243,14 @@ const checkIntegrityTool: McpTool = {
         ? { viewports: (args.viewports as number[]).map((w) => ({ width: w, height: heights[w] ?? 800 })) }
         : {}),
       ...(args.maxFindings !== undefined ? { maxFindings: args.maxFindings as number } : {}),
+      ...(args.allow ? { allow: parseAllowRules(args.allow as string[]) } : {}),
     });
     const fails = report.findings.filter((f) => f.severity === "fail").length;
     const warns = report.findings.length - fails;
-    const summary = `check_integrity: ${report.verdict === "clean" ? "CLEAN" : "DEFECTS"} (${fails} fail, ${warns} warn, ${report.exempted.length} exempted)`;
+    const stale = report.unusedAllowRules?.length ?? 0;
+    const summary = `check_integrity: ${report.verdict === "clean" ? "CLEAN" : "DEFECTS"}`
+      + ` (${fails} fail, ${warns} warn, ${report.exempted.length} exempted`
+      + `${stale > 0 ? `, ${stale} allow-rule(s) matched nothing` : ""})`;
     return result(summary, report, report.verdict !== "clean");
   },
 };

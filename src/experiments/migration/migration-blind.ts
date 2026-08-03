@@ -435,11 +435,11 @@ async function main() {
 function formatUsage(): string {
   return [
     "Usage:",
-    "  vrt migration blind <manifest.json> list",
-    "  vrt migration blind <manifest.json> show <scenario-id>",
-    "  vrt migration blind <manifest.json> prepare <scenario-id> [--output-dir path] [--packet path] [--format markdown|json] [--paint-tree]",
-    "  vrt migration blind <manifest.json> evaluate <scenario-id> --before-report before.json --after-report after.json --rounds n [--output path] [--format markdown|json]",
-    "  vrt migration blind <manifest.json> solo <scenario-id> [--output path] [--report-output-dir path] [--format markdown|json] [--paint-tree] [--check]",
+    "  vlmkit migration blind <manifest.json> list",
+    "  vlmkit migration blind <manifest.json> show <scenario-id>",
+    "  vlmkit migration blind <manifest.json> prepare <scenario-id> [--output-dir path] [--packet path] [--format markdown|json] [--paint-tree]",
+    "  vlmkit migration blind <manifest.json> evaluate <scenario-id> --before-report before.json --after-report after.json --rounds n [--output path] [--format markdown|json]",
+    "  vlmkit migration blind <manifest.json> solo <scenario-id> [--output path] [--report-output-dir path] [--format markdown|json] [--paint-tree] [--check]",
   ].join("\n");
 }
 

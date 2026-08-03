@@ -19,7 +19,7 @@ export function buildOfflineStructuredPlan() {
         "The Invoice Export row remains visible after the Blocked filter is applied.",
         "The detail panel shows Invoice Export and the compliance approval summary.",
       ],
-      vrt: {
+      vlmkit: {
         startState: "initial Release Queue view",
         goalState: "Blocked filter with Invoice Export detail selected",
       },

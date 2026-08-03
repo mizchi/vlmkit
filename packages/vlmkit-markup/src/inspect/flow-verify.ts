@@ -26,7 +26,10 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Page } from "playwright";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { handleCliError, UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
+import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
+import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
@@ -84,6 +87,59 @@ export interface FlowVerifyReport {
   passed: number;
   total: number;
   done: boolean;
+  /**
+   * Set when the URL redirected — almost always a login wall. A flow driven
+   * against a sign-in page fails on "element not found" for every step, which
+   * reads as a broken flow rather than a missing session.
+   */
+  redirected?: string;
+}
+
+export const FLOW_ACTIONS = ["click", "press", "fill", "type", "focus", "hover", "wait"] as const;
+export const FLOW_ASSERTS = ["attr", "visible", "hidden", "focused", "text", "count"] as const;
+
+/**
+ * Reject a malformed flow before opening a browser.
+ *
+ * Measured 2026-08-02, both directions were wrong:
+ *
+ *   {"assert":"visble"}  ->  FAIL (unknown assert)   — a flow-file typo read as
+ *                                                      a page defect
+ *   {"action":"clik"}    ->  done: true              — a flow that performed no
+ *                                                      action at all passed
+ *
+ * The second is the worse one: `runAction`'s switch had no default, so an
+ * unrecognised action fell through silently and the step's post-conditions (none
+ * given) all held. A green verdict from a flow that did nothing.
+ *
+ * `--allow` already refuses an unknown finding kind for exactly this reason. A
+ * gate that cannot tell "your page is wrong" from "your flow file is wrong" is
+ * worse than no gate.
+ */
+export function validateFlow(flow: Flow): void {
+  if (!Array.isArray(flow.steps) || flow.steps.length === 0) {
+    throw new UsageError(`flow has no steps. Expected { "steps": [ { "do": <action>, "expect": [<assert>...] } ] }.`);
+  }
+  flow.steps.forEach((step, i) => {
+    const where = `step ${i}${step.label ? ` ("${step.label}")` : ""}`;
+    const action = (step.do as { action?: string } | undefined)?.action;
+    if (!action) throw new UsageError(`${where} has no "do.action". Valid actions: ${FLOW_ACTIONS.join(", ")}.`);
+    if (!FLOW_ACTIONS.includes(action as (typeof FLOW_ACTIONS)[number])) {
+      throw new UsageError(`${where}: unknown action "${action}". Valid actions: ${FLOW_ACTIONS.join(", ")}.`);
+    }
+    (step.expect ?? []).forEach((spec, j) => {
+      const name = (spec as { assert?: string } | undefined)?.assert;
+      if (!name) {
+        throw new UsageError(`${where}, expect[${j}] has no "assert". Valid asserts: ${FLOW_ASSERTS.join(", ")}.`);
+      }
+      if (!FLOW_ASSERTS.includes(name as (typeof FLOW_ASSERTS)[number])) {
+        throw new UsageError(
+          `${where}, expect[${j}]: unknown assert "${name}". Valid asserts: ${FLOW_ASSERTS.join(", ")}.`
+          + ` This is a flow-file error, not a page defect — it used to be reported as a failing post-condition.`,
+        );
+      }
+    });
+  });
 }
 
 function describeAction(a: FlowAction): string {
@@ -154,18 +210,36 @@ function evalAssertion(spec: FlowAssert): (s: FlowAssert) => [boolean, string] {
 }
 
 export interface FlowVerifyOptions {
+  /**
+   * Playwright storage-state file so gates can measure pages behind a
+   * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
+   */
+  storageState?: string;
   source: string;
   flow: Flow;
 }
 
 export async function runFlowVerify(options: FlowVerifyOptions): Promise<FlowVerifyReport> {
+  validateFlow(options.flow);
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   const steps: StepResult[] = [];
+  let redirected: string | undefined;
   try {
-    const page = await browser.newPage({ viewport: options.flow.viewport ?? { width: 1280, height: 800 } });
+    const page = await browser.newPage(withAuthState({ viewport: options.flow.viewport ?? { width: 1280, height: 800 } }, options.storageState));
     const url = /^(https?|file):\/\//.test(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
     await page.goto(url, { waitUntil: "load", timeout: 30000 });
+    // Assertions read the DOM through `page.evaluate`, which — unlike a
+    // Playwright action — does not auto-wait. Without this settle a flow
+    // pointed at a client-rendered view asserts against the placeholder:
+    // measured 2026-08-02, `count .card expected 2, measured 0` on a page where
+    // `check layout` measured 2 at the same instant. The failure read as a
+    // markup defect, and the only workaround was for the flow author to guess
+    // at an explicit `{"action":"wait"}` first step.
+    await settlePage(page);
+    redirected = /^https?:\/\//.test(options.source)
+      ? describeRedirect(options.source, page.url()) ?? undefined
+      : undefined;
 
     for (let i = 0; i < options.flow.steps.length; i++) {
       const step = options.flow.steps[i]!;
@@ -196,19 +270,32 @@ export async function runFlowVerify(options: FlowVerifyOptions): Promise<FlowVer
     await browser.close();
   }
   const passed = steps.filter((s) => s.passed).length;
-  const done = steps.length === options.flow.steps.length && steps.every((s) => s.passed);
+  // Not `done` on a redirect: the flow ran against a page the caller did not
+  // ask for, so passing steps would be a claim about the sign-in screen.
+  const done = steps.length === options.flow.steps.length && steps.every((s) => s.passed) && !redirected;
   appendRunLedger({
     tool: "verify-flow",
     source: options.source,
-    headline: { done, passed, total: options.flow.steps.length },
+    headline: { done, passed, total: options.flow.steps.length, ...(redirected ? { redirected: true } : {}) },
   });
-  return { source: options.source, steps, passed, total: options.flow.steps.length, done };
+  return {
+    source: options.source,
+    steps,
+    passed,
+    total: options.flow.steps.length,
+    done,
+    ...(redirected ? { redirected } : {}),
+  };
 }
 
 export function formatFlowReport(report: FlowVerifyReport): string {
   const lines: string[] = [];
   lines.push(`${BOLD}${CYAN}vlmkit verify flow${RESET}`);
   lines.push(`${DIM}source: ${report.source}${RESET}`);
+  if (report.redirected) {
+    lines.push(`${RED}x ${report.redirected}${RESET}`);
+    lines.push(`${DIM}  Every step below ran against that page.${RESET}`);
+  }
   lines.push("");
   lines.push(`verdict: ${report.done ? `${GREEN}DONE${RESET}` : `${RED}FAILED${RESET}`} (${report.passed}/${report.total} steps)`);
   lines.push("");

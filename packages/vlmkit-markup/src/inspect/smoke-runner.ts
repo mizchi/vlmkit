@@ -17,15 +17,16 @@ import type {
   A11ySnapshot, A11yNodeCompact,
 } from "./smoke-types.ts";
 
-import { getArg, args } from "@mizchi/vlmkit-core/cli-args.ts";
+import { getArg, getIntArg, getRawArgs } from "@mizchi/vlmkit-core/cli-args.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 // ---- Config ----
 
 const URL_ARG = getArg("url", "");
-const FILE_ARG = getArg("file", args[0] && !args[0].startsWith("--") ? args[0] : "");
-const MAX_ACTIONS = parseInt(getArg("max-actions", "30"), 10);
-const SEED = parseInt(getArg("seed", String(Date.now())), 10);
+const rawArgs = getRawArgs();
+const FILE_ARG = getArg("file", rawArgs[0] && !rawArgs[0].startsWith("--") ? rawArgs[0] : "");
+const MAX_ACTIONS = getIntArg("max-actions", 30, { min: 1 });
+const SEED = getIntArg("seed", Date.now());
 const MODE = getArg("mode", "random") as "random" | "reasoning";
 const RECORD_VIDEO_DIR = getArg("record-video", "");
 const VIEWPORT = { width: 1280, height: 900 };

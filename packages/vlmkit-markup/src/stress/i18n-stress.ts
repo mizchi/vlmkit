@@ -21,14 +21,15 @@
  * exercise it.
  *
  * Usage:
- *   vrt i18n-stress <html> [--inflate 1.4]
+ *   vlmkit stress i18n <html> [--inflate 1.4]
  */
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { writeFile, mkdir } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, type Page } from "playwright";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { openSource, resolveSource } from "@mizchi/vlmkit-core/page-open.ts";
 
 export interface I18nStressOptions {
   htmlPath: string;
@@ -39,6 +40,13 @@ export interface I18nStressOptions {
   viewport?: { width: number; height: number };
   /** Min height delta % to count as "wrap induced". Default 0.15 (15%). */
   wrapThreshold?: number;
+  /**
+   * Suppress the human-readable console block. Set by `--json`: the console
+   * output caps its list, so mixing it into stdout ahead of the JSON left
+   * `--json` unparseable — while the truncation notice pointed the reader at
+   * exactly that stream.
+   */
+  quiet?: boolean;
 }
 
 export interface OverflowingElement {
@@ -166,16 +174,18 @@ export async function runI18nStress(
 ): Promise<I18nStressReport> {
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
-  const htmlPath = resolve(options.htmlPath);
-  const html = await readFile(htmlPath, "utf-8");
+  // A URL is a valid source now that loading goes through `openSource`;
+  // `resolve()` would have turned it into `<cwd>/http:/host/page.html`.
+  const htmlPath = resolveSource(options.htmlPath);
   const inflateFactor = options.inflateFactor ?? 1.4;
   const viewport = options.viewport ?? { width: 1280, height: 900 };
   const wrapThreshold = options.wrapThreshold ?? 0.15;
 
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({ viewport });
-    await page.setContent(html, { waitUntil: "networkidle" });
+    // Navigate: inflating text on an unstyled document measured a layout that
+    // does not exist (card height 21->86 unstyled vs 95->185 styled).
+    const { page } = await openSource(browser, htmlPath, { viewport, settleMs: 0 });
     await page.addStyleTag({
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });
@@ -273,19 +283,28 @@ export async function runI18nStress(
     });
     await writeFile(reportPath, md);
 
-    console.log(`  ${BOLD}${CYAN}vrt i18n-stress${RESET}`);
-    console.log(`  ${DIM}html: ${htmlPath}  inflate: ${inflateFactor}x${RESET}`);
-    const icon = filtered.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
-    console.log(`  ${icon} ${filtered.length} overflow / wrap issue(s) across ${before.length} inspected element(s)`);
-    for (const o of filtered.slice(0, 6)) {
-      const detail = o.kind === "horizontal-overflow"
-        ? `scrollW ${o.after.scrollWidth.toFixed(0)} > clientW ${o.after.clientWidth.toFixed(0)}`
-        : o.kind === "vertical-wrap"
-          ? `h ${o.before.height.toFixed(0)} → ${o.after.height.toFixed(0)}`
-          : "extends beyond parent right edge";
-      console.log(`    ${DIM}[${o.kind}] ${o.path} — ${detail}${RESET}`);
+    if (!options.quiet) {
+      console.log(`  ${BOLD}${CYAN}vlmkit stress i18n${RESET}`);
+      console.log(`  ${DIM}html: ${htmlPath}  inflate: ${inflateFactor}x${RESET}`);
+      const icon = filtered.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
+      console.log(`  ${icon} ${filtered.length} overflow / wrap issue(s) across ${before.length} inspected element(s)`);
+      const CONSOLE_ROWS = 6;
+      for (const o of filtered.slice(0, CONSOLE_ROWS)) {
+        const detail = o.kind === "horizontal-overflow"
+          ? `scrollW ${o.after.scrollWidth.toFixed(0)} > clientW ${o.after.clientWidth.toFixed(0)}`
+          : o.kind === "vertical-wrap"
+            ? `h ${o.before.height.toFixed(0)} → ${o.after.height.toFixed(0)}`
+            : "extends beyond parent right edge";
+        console.log(`    ${DIM}[${o.kind}] ${o.path} — ${detail}${RESET}`);
+      }
+      // This gate kept its silent cut when the other three were fixed: the
+      // 2026-08-02 truncation pass added `--json` here but not the notice, so a
+      // seventh issue still vanished without a trace.
+      if (filtered.length > CONSOLE_ROWS) {
+        console.log(`    ${DIM}… ${filtered.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
+      }
+      console.log(`  ${DIM}report: ${reportPath}${RESET}`);
     }
-    console.log(`  ${DIM}report: ${reportPath}${RESET}`);
 
     return {
       html: htmlPath,
@@ -341,6 +360,7 @@ function renderReport(r: Omit<I18nStressReport, "reportPath">): string {
       const aw = `${o.after.width.toFixed(0)}×${o.after.height.toFixed(0)}`;
       lines.push(`| ${o.kind} | \`${o.path}\` | \`${o.text}\` | ${bw} | ${aw} | ${detail} |`);
     }
+    if (r.overflowing.length > 20) lines.push(`\n_… ${r.overflowing.length - 20} more row(s) omitted; the JSON report has all of them._`);
   }
   lines.push("");
   lines.push("## Suggested next step");
@@ -359,7 +379,7 @@ function renderReport(r: Omit<I18nStressReport, "reportPath">): string {
     lines.push("4. For `extends-beyond-parent` rows: the element's content escapes its parent " +
       "via `position: absolute`, negative margins, or a `width: 100vw` that ignores " +
       "container constraints. Audit width-related declarations.");
-    lines.push("5. Re-run `vrt i18n-stress`. The overflow list should empty out.");
+    lines.push("5. Re-run `vlmkit stress i18n`. The overflow list should empty out.");
   }
   lines.push("");
   return lines.join("\n");
@@ -369,19 +389,27 @@ async function main(argv = process.argv.slice(2)) {
   if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, outputDir, report, inflate } = parseArgs(argv);
   if (positional.length === 0) {
-    console.log("Usage: vrt i18n-stress <html> [--inflate 1.4] [--output-dir dir]");
+    console.log("Usage: vlmkit stress i18n <html> [--inflate 1.4] [--output-dir dir]");
     console.log("Options:");
     console.log("  --inflate <N>        Word-length inflation factor. Default 1.4.");
     console.log("  --output-dir <dir>   Default: ./test-results/i18n-stress");
     console.log("  --report <path>      Markdown report path");
+    console.log("  --json               Print the full report as JSON (every row, no cut)");
     process.exit(1);
   }
-  await runI18nStress({
+  // `--json` so the console/markdown row caps stay a display choice rather than
+
+  // the only view of the data — the truncation notices point here.
+
+  const json = argv.includes("--json");
+  const result = await runI18nStress({
     htmlPath: positional[0]!,
     outputDir: outputDir || join(process.cwd(), "test-results", "i18n-stress"),
     reportPath: report || undefined,
     inflateFactor: inflate,
+    quiet: json,
   });
+  if (json) console.log(JSON.stringify(result, null, 2));
 }
 
 const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "i18n-stress" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);

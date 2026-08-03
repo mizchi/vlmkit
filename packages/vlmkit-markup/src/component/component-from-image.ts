@@ -11,7 +11,7 @@
  *      text-row) plus an optional multi-state pass.
  *   4. Agent iterates the HTML until the diff converges.
  *
- * Unlike `vrt compare` (migration mode), this scenario:
+ * Unlike `vlmkit diff html` (migration mode), this scenario:
  *   - has no DOM correspondence — the target is a static PNG.
  *   - runs at a single viewport sized to the target image.
  *   - skips paint-tree, DOM-equivalence, breakpoint-discovery, etc.

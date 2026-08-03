@@ -33,7 +33,9 @@
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
+import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { DISCOVER_SCRIPT } from "./interaction-map.ts";
 
@@ -161,16 +163,19 @@ const COLLECT_SURFACE_SCRIPT = `
 })()
 `;
 
-export async function buildHandlerSurface(options: { source: string }): Promise<HandlerSurface> {
+export async function buildHandlerSurface(options: { source: string; storageState?: string }): Promise<HandlerSurface> {
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    const page = await browser.newPage(withAuthState({ viewport: { width: 1280, height: 800 } }, options.storageState));
     await page.addInitScript(HANDLER_PATCH_SCRIPT);
     const url = /^(https?|file):\/\//.test(options.source)
       ? options.source
       : pathToFileURL(resolve(options.source)).href;
     await page.goto(url, { waitUntil: "load", timeout: 30000 });
+    // Client-rendered pages register their handlers after `load` — without
+    // this the scan inventories the pre-render DOM (see settlePage).
+    await settlePage(page);
     await page.evaluate(DISCOVER_SCRIPT); // stamp interactive elements for cross-referencing
     const raw = await page.evaluate(COLLECT_SURFACE_SCRIPT) as {
       elements: HandlerSurfaceEntry[];
@@ -198,7 +203,7 @@ const KEYBOARD_TYPES = new Set(["keydown", "keyup", "keypress"]);
 export const PROBED_TYPES = new Set(["click", "keydown", "keyup", "keypress", "focus", "blur"]);
 
 export interface HandlerIssue {
-  kind: "pointer-only-control" | "unprobed-handler-types";
+  kind: "pointer-only-control" | "unprobed-handler-types" | "delegated-handlers-opaque";
   severity: "warn" | "suspect";
   element: string;
   message: string;
@@ -218,8 +223,15 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
   for (const e of surface.elements) {
     const hasPointer = Object.keys(e.types).some((t) => POINTER_TYPES.has(t));
     const hasKeyboard = Object.keys(e.types).some((t) => KEYBOARD_TYPES.has(t));
-    for (const t of Object.keys(e.types)) {
-      if (!PROBED_TYPES.has(t)) unprobedTypes.add(t);
+    // A framework delegation root registers the ENTIRE event vocabulary
+    // (~80 types) up front, whether the app uses them or not. Listing those
+    // as "unprobed" buries the handful of authored types that a reader
+    // should actually check under a wall of noise, so only count types the
+    // page wired to a specific element.
+    if (Object.keys(e.types).length < 10 || !e.containsInteractive) {
+      for (const t of Object.keys(e.types)) {
+        if (!PROBED_TYPES.has(t)) unprobedTypes.add(t);
+      }
     }
     if (
       hasPointer && !hasKeyboard
@@ -235,6 +247,35 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
         message: `${e.path} "${e.text}" has a ${Object.keys(e.types).filter((t) => POINTER_TYPES.has(t)).join("/")} handler but no role, no keyboard handler, and no interactive descendant — mouse users can operate it, keyboard and assistive-tech users cannot. Give it a role + tabindex + key handling, or move the handler onto a real control.`,
       });
     }
+  }
+  // Disclose the blind spot instead of printing a clean bill of health.
+  // React-style root delegation registers pointer handlers on the
+  // container, not on the elements, so per-element attribution — the whole
+  // basis of pointer-only-control detection — is unavailable. The
+  // 2026-08-01 hard-target audit hit exactly this: a React page with a
+  // `<div onClick>` and no keyboard path reported `status: ok`. A gate that
+  // cannot see a defect class on this page must say so.
+  // React 18/19 attach to the ROOT CONTAINER element, not to document, so
+  // the signature is one element carrying a large, generic slab of event
+  // types while containing the real controls — not a `globals` entry.
+  const isDelegationRoot = (e: HandlerSurfaceEntry) =>
+    Object.keys(e.types).length >= 10 && e.containsInteractive;
+  const roots = surface.elements.filter(isDelegationRoot);
+  const ownPointerHandlers = surface.elements
+    .filter((e) => !isDelegationRoot(e) && Object.keys(e.types).some((t) => POINTER_TYPES.has(t))).length;
+  const delegatedPointerTypes = [
+    ...new Set([
+      ...Object.keys(surface.globals).filter((t) => POINTER_TYPES.has(t)),
+      ...roots.flatMap((r) => Object.keys(r.types).filter((t) => POINTER_TYPES.has(t))),
+    ]),
+  ];
+  if (ownPointerHandlers === 0 && delegatedPointerTypes.length > 0) {
+    issues.push({
+      kind: "delegated-handlers-opaque",
+      severity: "warn",
+      element: "(page)",
+      message: `Pointer handlers are registered only at the delegation root (${delegatedPointerTypes.sort().join(", ")}), with none on individual elements — the signature of framework root delegation (React and similar). Per-element attribution is unavailable, so pointer-only-control detection is BLIND on this page: a clean result here is not evidence that every control is keyboard-operable. Verify the interactive elements with 'check interactions' plus a 'verify flow' script that tabs to and activates them.`,
+    });
   }
   if (unprobedTypes.size > 0) {
     issues.push({

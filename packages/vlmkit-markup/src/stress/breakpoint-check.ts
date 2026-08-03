@@ -34,6 +34,8 @@ import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { extractBreakpoints } from "@mizchi/vlmkit-capture/viewport-discovery.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
+import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
@@ -81,6 +83,13 @@ export interface BreakpointResult {
 }
 
 export type BreakpointCheckIssueKind =
+  /**
+   * A URL that redirected somewhere meaningful — almost always a login wall.
+   * Measured 2026-08-02: pointed at an auth-walled route with no session, this
+   * gate reported `status: ok` for the login page while naming the requested
+   * URL as its source. Reported as a suspect issue so the pass cannot be silent.
+   */
+  | "redirected"
   | "boundary-spike"
   | "boundary-gap"
   | "overflow-at-boundary"
@@ -158,6 +167,11 @@ export interface BreakpointCheckReport {
 }
 
 export interface BreakpointCheckOptions {
+  /**
+   * Playwright storage-state file so gates can measure pages behind a
+   * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
+   */
+  storageState?: string;
   source: string;
   html?: string;
   /** Override discovered breakpoints (px values). */
@@ -383,7 +397,7 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   try {
-    const page = await browser.newPage({ viewport: { width: 1280, height } });
+    const page = await browser.newPage(withAuthState({ viewport: { width: 1280, height } }, options.storageState));
     if (options.html !== undefined) {
       await page.setContent(options.html, { waitUntil: "networkidle" });
     } else if (isUrl(options.source)) {
@@ -394,6 +408,12 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
       // unstyled page.
       await page.goto(pathToFileURL(resolve(options.source)).href, { waitUntil: "networkidle", timeout: 30000 });
     }
+
+
+    // A redirect here is almost always a login wall. Without this the gate
+    // measured the login page and reported `status: ok` while naming the
+    // requested URL as its source (measured 2026-08-02).
+    const redirectNote = isUrl(options.source) ? describeRedirect(options.source, page.url()) : null;
 
     let values: number[];
     let rawByValue = new Map<number, string[]>();
@@ -531,7 +551,15 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
       checkedValues: values,
       ...(stylesheets ? { stylesheets } : {}),
       ...(sweep ? { sweep } : {}),
-      issues: [...deriveBreakpointIssues(results), ...(sweep ? deriveSweepIssues(sweep) : [])],
+      issues: [
+        // First, and suspect: the status line is derived from the issue list, so
+        // a printed note alone would have left `status: ok` on a login page.
+        ...(redirectNote
+          ? [{ kind: "redirected" as const, severity: "suspect" as const, message: redirectNote }]
+          : []),
+        ...deriveBreakpointIssues(results),
+        ...(sweep ? deriveSweepIssues(sweep) : []),
+      ],
     };
   } finally {
     await browser.close();
@@ -547,6 +575,12 @@ export function formatBreakpointCheckReport(report: BreakpointCheckReport): stri
   lines.push(`${DIM}source: ${report.source}${RESET}`);
   lines.push("");
   lines.push(`status: ${status}`);
+  // Before anything else, and before the sweep early-return below: a redirect
+  // means every number under it describes a different page. Without this the
+  // status flipped to `suspect` with no stated reason.
+  for (const issue of report.issues.filter((i) => i.kind === "redirected")) {
+    lines.push(`${RED}x ${issue.message}${RESET}`);
+  }
   if (report.stylesheets && report.stylesheets.fetched < report.stylesheets.crossOrigin) {
     lines.push(`${YELLOW}note: ${report.stylesheets.crossOrigin - report.stylesheets.fetched} of ${report.stylesheets.crossOrigin} cross-origin stylesheet(s) could not be read — their breakpoints are not covered${RESET}`);
   }
@@ -607,13 +641,14 @@ Options:
   --json                Print JSON report
   --height <px>         Render height (default: 900)
   --max-elements <n>    Elements sampled per width (default: 400)
-  --fail-on-suspect     Exit non-zero when suspect issues are found`);
+  --advisory            Print findings but exit 0 (default: a suspect exits 1)`);
   process.exit(exitCode);
 }
 
 function parseArgs(argv: string[]) {
   let json = false;
   let failOnSuspect = false;
+  let advisory = false;
   let breakpoints: number[] | undefined;
   let height: number | undefined;
   let maxElements: number | undefined;
@@ -624,7 +659,8 @@ function parseArgs(argv: string[]) {
     const arg = argv[i]!;
     if (arg === "--help" || arg === "-h" || arg === "help") printUsage(0);
     else if (arg === "--json") json = true;
-    else if (arg === "--fail-on-suspect") failOnSuspect = true;
+    else if (arg === "--fail-on-suspect") failOnSuspect = true; // accepted no-op
+    else if (arg === "--advisory") advisory = true;
     else if (arg === "--sweep") sweep = true;
     else if (arg === "--sweep-step") sweepStep = Number.parseInt(argv[++i] ?? "25", 10);
     else if (arg === "--breakpoints") {
@@ -634,7 +670,7 @@ function parseArgs(argv: string[]) {
     else positional.push(arg);
   }
   if (positional.length === 0) printUsage(1);
-  return { source: positional[0]!, json, failOnSuspect, breakpoints, height, maxElements, sweep, sweepStep };
+  return { source: positional[0]!, json, failOnSuspect, advisory, breakpoints, height, maxElements, sweep, sweepStep };
 }
 
 async function main(argv = process.argv.slice(2)): Promise<void> {
@@ -661,7 +697,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   } else {
     console.log(formatBreakpointCheckReport(report));
   }
-  if (parsed.failOnSuspect && report.issues.some((issue) => issue.severity === "suspect")) {
+  if (!parsed.advisory && report.issues.some((issue) => issue.severity === "suspect")) {
     process.exit(1);
   }
 }

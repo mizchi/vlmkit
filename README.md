@@ -66,9 +66,11 @@ marked `[key]`.
 | Match a target design | `verify markup --target` (done verdict + fix list) · `build page` / `build component` · `scan mock` (normalize @2x exports) |
 | Track changes over time (VRT) | `snapshot` (baseline → per-viewport diff → `snapshot approve`) · `watch` · `diff-pr` · `baseline` |
 | Compare two versions | `diff html\|png\|elements` · `migration compare` · `check equivalence --region` |
-| Audit design quality | `check tokens\|theme\|palette` · `check a11y contrast\|touch\|focus` · `check perf` · `check drift` · `stress i18n\|media` |
+| Audit design quality | `check tokens\|theme\|palette` · `check design` (is the page consistent with itself — one button style or six) · `check a11y contrast\|touch\|focus` · `check perf` · `check drift` · `stress i18n\|media` |
 | Vet an image asset before it enters a slot | `check asset --slot --expect-transparent --against-bg --page-palette` |
 | Repair | `heal selector` (dead selector) · `heal markup` `[key]` (LLM auto-fix from a kickback) |
+| Run gates over a whole site | `batch --gate "check integrity" "routes/**/*.html"` (parallel, `--shard i/n`, per-job timing) · `gates run` (same, from one reviewed config) |
+| Audit what has been silenced | `gates suppressions` — every suppression with reason, owner, expiry; expired ones stop applying |
 | Wire into agents / pipelines | `mcp` (gate tools over stdio) · `contract` · `workflow` · `markup-loop` · `api` · `bench` · `skill` |
 
 Task-routing recipes and done-condition sets:
@@ -78,6 +80,7 @@ Task-routing recipes and done-condition sets:
 
 | Doc | Contents |
 |---|---|
+| [`docs/introduce.md`](./docs/introduce.md) | What is vlmkit? — narrative introduction assuming zero context |
 | [`docs/markup-assist.md`](./docs/markup-assist.md) | Task-routing guide: which gate for which job, done-condition recipes, anti-gaming rules |
 | [`docs/cli-reference.md`](./docs/cli-reference.md) | Complete command reference: all groups, examples, workflow/API/HTTP, architecture, project structure |
 | [`docs/configuration.md`](./docs/configuration.md) | Install, MCP/skill setup, environment variables, snapshot/CI config, agent skills catalog |

@@ -2,17 +2,17 @@
 
 ## Setup note (CRITICAL)
 
-`vrt compare <baseline.html> <variant.html>` with bare paths renders BOTH pages with
+`vlmkit diff html <baseline.html> <variant.html>` with bare paths renders BOTH pages with
 stylesheets effectively missing (Chromium loads them with `about:blank` base URL or
 file:// schema oddities). Diff reads **0.0%** on every viewport — a false PASS:
-both renderers are equally broken. Switching to `vrt compare --url file://... --current-url file://...`
+both renderers are equally broken. Switching to `vlmkit diff html --url file://... --current-url file://...`
 gives real signal. I lost ~5 minutes of round 1 to this.
 
 ## Rounds
 
 ### Round 1 — bare paths (false signal)
 - All viewports 0.0%. Heading mismatch warning: golden uses `<h2>` for "Mia Carter".
-- I confirmed via `vrt snapshot file:///...page.html` that my page actually rendered correctly. So the 0% diff was a lie.
+- I confirmed via `vlmkit snapshot file:///...page.html` that my page actually rendered correctly. So the 0% diff was a lie.
 
 ### Round 1b — `--url file://...` (real signal)
 - mobile 17.2%, desktop 3.1%, wide 2.8%
@@ -45,23 +45,23 @@ gives real signal. I lost ~5 minutes of round 1 to this.
 ### Final
 - wide 1.8% / desktop 2.0% / mobile 10.3%
 
-## What vrt helped with
+## What vlmkit helped with
 - **Text-row Δy table** is gold — it gave me literal +/- pixel offsets per row, letting me reason about vertical spacing without guessing.
 - **Component bbox table with IoU** quickly flagged mobile layout as wrong-tree (IoU 0.18) vs desktop being wrong-position (IoU 0.7+, near-uniform Δ).
 - **Palette diff** caught the stat-card color in one shot — `#e4ecfc` missing → `#dce4f4` extra, with the explicit hex. I could pick the correct token directly.
 - **DOM equivalence warning** told me `Mia Carter` should be a heading, which I had as a `<p>`.
 
-## Where vrt was unhelpful / misleading
-- **`vrt compare` silent failure with bare paths.** Returned 0.0% diff with no warning that stylesheet loading was broken. The only hint was a "failed-resource-load" warning about Google Fonts (which is a side issue) — nothing about my local `style.css`. This made me think round 1 was perfect.
+## Where vlmkit was unhelpful / misleading
+- **`vlmkit diff html` silent failure with bare paths.** Returned 0.0% diff with no warning that stylesheet loading was broken. The only hint was a "failed-resource-load" warning about Google Fonts (which is a side issue) — nothing about my local `style.css`. This made me think round 1 was perfect.
 - **`--output` flag is silently ignored.** I passed `--output /tmp/agent-a-round-1` but report always went to `/home/user/vrt/test-results/migration/`. No error, no log line.
 - **The PNG saved as `page-desktop.png` was NOT the rendered variant** — it appeared to be the heatmap/diff overlay rendered against a blank canvas. The visual was completely unstyled, leading me to think my CSS was broken when really only the comparison apparatus was.
-- **No way to view "variant render alone" from `compare`.** I had to fall back to `vrt snapshot` separately to see what my page actually looked like.
+- **No way to view "variant render alone" from `compare`.** I had to fall back to `vlmkit snapshot` separately to see what my page actually looked like.
 - **"Fix Candidates: no suggestions"** every round. The fix-candidate engine is documented as for DOM-correspondence cases, but the suggested-next-step section explicitly says "wireframe / from-screenshot mode — DOM-position-diff is empty." If that's known, the tool could still propose CSS guesses (e.g. "increase margin-top of nth section by Δy") instead of being silent.
 - **Heading-mismatch warning fires only on h1/h2/h3 etc.** Wasn't aware until output told me. The brief said `title-lg` (which has no semantic implication), so this was a stealth requirement.
 - **Color names not back-resolved.** Palette diff reports raw hex. I knew `#e4ecfc` ≈ `#e2e8f8` = `surface-container-high` only because I have the token table memorized in scratch. Auto-mapping to nearest DESIGN.md token name would be huge.
 - **No paint-tree backend.** Crater BiDi was unavailable; the entire "Paint Tree" section was dead in every report. So I had no DOM/computed-style data — only image features.
 
-## What I wished vrt had told me
+## What I wished vlmkit had told me
 - "Stylesheet failed to load on variant" (and on baseline). A render-sanity check for `<link rel=stylesheet>` 404s, with side-by-side flagging.
 - "Container top padding differs by ~24px across viewports — try increasing/decreasing one token step on `.container` or its first child."
 - A "spacing-token snap" suggestion: given a baseline Δy of +12px and my margin-top of `space-sm` (12px), it could say "try `space-md` (24px)" — token-aware suggestions.

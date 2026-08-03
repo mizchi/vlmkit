@@ -2,7 +2,7 @@
  * Convert a `snapshot-report.json` into structured fix tasks + a markdown
  * prompt that a coding subagent can act on.
  *
- * Bridges `vrt snapshot` detection output and "fix the diff" agent runs.
+ * Bridges `vlmkit snapshot` detection output and "fix the diff" agent runs.
  */
 import { existsSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
@@ -190,8 +190,8 @@ export function formatSnapshotFixPromptMarkdown(
   lines.push("1. Open each pair of baseline/current images to confirm the visual regression.");
   lines.push("2. If a heatmap is present, use it to localize the diff region.");
   lines.push("3. Map the affected DOM (from the captured HTML) back to source files.");
-  lines.push("4. Propose a minimal CSS or markup change and re-run `vrt snapshot` to verify.");
-  lines.push("5. Once green, run `vrt snapshot approve --label <label>` to promote the new baseline if the visual change is intentional.");
+  lines.push("4. Propose a minimal CSS or markup change and re-run `vlmkit snapshot` to verify.");
+  lines.push("5. Once green, run `vlmkit snapshot approve --label <label>` to promote the new baseline if the visual change is intentional.");
   lines.push("");
 
   return lines.join("\n");

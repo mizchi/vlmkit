@@ -1,0 +1,12 @@
+/* Every defect on this page lives HERE, not in the HTML.
+   A gate that loads the markup without resolving this file measures a
+   different document and passes. */
+body { margin: 0; padding: 32px; background: #ffffff; font: 16px/1.5 system-ui, sans-serif; }
+.low-contrast { color: #bbbbbb; }                      /* 1.92:1 on white — WCAG fail */
+.tiny-tap { display: inline-block; width: 20px; height: 20px; background: #444; }  /* 20x20 — below 24px */
+.hidden-copy { font-size: 0; }                          /* copy present in DOM, invisible */
+.off-scale { padding-top: 23px; }                       /* next to the 24px used elsewhere */
+.card { padding: 24px; border-radius: 8px; border: 1px solid #333; }
+.btn-a { padding: 12px 20px; border-radius: 8px; font-size: 14px; border: 1px solid #333; background: #fff; }
+.btn-b { padding: 10px 18px; border-radius: 6px; font-size: 13px; border: 2px solid #333; background: #eee; }
+.btn-c { padding: 14px 22px; border-radius: 0; font-size: 15px; border: 0; background: #ddd; }

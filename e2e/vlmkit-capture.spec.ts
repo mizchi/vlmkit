@@ -2,7 +2,7 @@
  * VRT キャプチャテスト
  *
  * スクリーンショット + A11y スナップショットを収集する。
- * `vrt init` / `vrt capture` コマンドから呼ばれる。
+ * `vlmkit workflow init` / `vlmkit workflow capture` コマンドから呼ばれる。
  */
 import { test, expect } from "@playwright/test";
 import { writeFile, mkdir } from "node:fs/promises";

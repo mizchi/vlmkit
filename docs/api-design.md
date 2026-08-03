@@ -1,4 +1,4 @@
-# vrt — CLI / Library API Design
+# vlmkit — CLI / Library API Design
 
 ## Current Problems
 
@@ -9,20 +9,20 @@
 
 ## Design Policy
 
-### CLI: `vrt` Subcommand System
+### CLI: `vlmkit` Subcommand System
 
-Hang subcommands off a single entry point (`vrt`).
+Hang subcommands off a single entry point (`vlmkit`).
 
 ```
-vrt compare <before> <after>         # VRT comparison of 2 files
-vrt compare --url <url> --current-url <url>  # URL mode
-vrt snapshot <url1> [url2] ...       # URL → multi-viewport capture + baseline diff
-vrt bench [options]                   # CSS challenge benchmark
-vrt report                           # Report on accumulated data
-vrt discover <file>                  # Breakpoint discovery + viewport suggestions
-vrt smoke <file-or-url>              # A11y-driven random operation test
-vrt serve [--port 3456]              # API server
-vrt status [--url ...]               # Server health check
+vlmkit diff html <before> <after>         # VRT comparison of 2 files
+vlmkit diff html --url <url> --current-url <url>  # URL mode
+vlmkit snapshot <url1> [url2] ...       # URL → multi-viewport capture + baseline diff
+vlmkit bench [options]                   # CSS challenge benchmark
+vlmkit report                           # Report on accumulated data
+vlmkit scan breakpoints <file>                  # Breakpoint discovery + viewport suggestions
+vlmkit inspect smoke <file-or-url>              # A11y-driven random operation test
+vlmkit api serve [--port 3456]              # API server
+vlmkit api status [--url ...]               # Server health check
 ```
 
 ### Library: 3-Layer Structure
@@ -30,7 +30,7 @@ vrt status [--url ...]               # Server health check
 ```
 ┌─────────────────────────────────────────────┐
 │  CLI Layer (src/cli/)                       │
-│  vrt compare, vrt bench, vrt report, ...    │
+│  vlmkit diff html, vlmkit bench, vlmkit report, ...    │
 └─────────────┬───────────────────────────────┘
               │
 ┌─────────────▼───────────────────────────────┐
@@ -58,22 +58,22 @@ vrt status [--url ...]               # Server health check
 
 ## CLI Details
 
-### `vrt compare`
+### `vlmkit diff html`
 
 Compare 2 HTML files (or URLs). Auto breakpoint discovery + multi-viewport.
 
 ```bash
 # File comparison
-vrt compare before.html after.html
+vlmkit diff html before.html after.html
 
 # Directory comparison (baseline + variants)
-vrt compare --baseline normalize.html --variants modern.html destyle.html
+vlmkit diff html --baseline normalize.html --variants modern.html destyle.html
 
 # URL comparison
-vrt compare --url http://localhost:3000/ --current-url http://localhost:8080/
+vlmkit diff html --url http://localhost:3000/ --current-url http://localhost:8080/
 
 # Options
-vrt compare before.html after.html \
+vlmkit diff html before.html after.html \
   --backend chromium           # chromium | crater | both
   --max-viewports 10           # Viewport limit
   --random-samples 2           # Random samples between breakpoints
@@ -83,48 +83,48 @@ vrt compare before.html after.html \
   --mask ".ads,.carousel"      # Selector masking (visibility: hidden)
 ```
 
-### `vrt snapshot`
+### `vlmkit snapshot`
 
 Capture URL at multiple viewports and auto-compare with previous baseline.
 
 ```bash
 # First run: create baseline. Subsequent runs: measure diff
-vrt snapshot http://localhost:3000/ http://localhost:3000/about/
+vlmkit snapshot http://localhost:3000/ http://localhost:3000/about/
 
 # Options
-vrt snapshot <url1> [url2] ... \
+vlmkit snapshot <url1> [url2] ... \
   --output snapshots/          # Output directory
   --mask ".marquee,.badge"     # Mask dynamic content
 ```
 
-### `vrt bench`
+### `vlmkit bench`
 
 CSS challenge benchmark. Delete 1 CSS line → measure detection rate.
 
 ```bash
-vrt bench                                    # Default (page fixture, 20 trials)
-vrt bench --fixture dashboard --trials 50    # Specify fixture + trial count
-vrt bench --backend crater                   # Crater backend
-vrt bench --all                              # All fixtures at once
-vrt bench --no-db                            # Don't save to DB
+vlmkit bench                                    # Default (page fixture, 20 trials)
+vlmkit bench --fixture dashboard --trials 50    # Specify fixture + trial count
+vlmkit bench --backend crater                   # Crater backend
+vlmkit bench --all                              # All fixtures at once
+vlmkit bench --no-db                            # Don't save to DB
 ```
 
-### `vrt report`
+### `vlmkit report`
 
 Analysis of accumulated data.
 
 ```bash
-vrt report                     # All data
-vrt report --fixture page      # By fixture
-vrt report --backend crater    # By backend
+vlmkit report                     # All data
+vlmkit report --fixture page      # By fixture
+vlmkit report --backend crater    # By backend
 ```
 
-### `vrt discover`
+### `vlmkit scan breakpoints`
 
 Discover breakpoints from HTML/CSS and suggest test viewports.
 
 ```bash
-vrt discover page.html
+vlmkit scan breakpoints page.html
 # Output:
 #   Breakpoints: min-width:640px, min-width:768px, min-width:1024px
 #   Suggested viewports (11):
@@ -139,10 +139,10 @@ vrt discover page.html
 Demo execution.
 
 ```bash
-vrt demo              # Basic demo
-vrt demo fix          # Fix loop
-vrt demo multi        # Multi-scenario
-vrt demo multistep    # Multi-step
+vlmkit demo              # Basic demo
+vlmkit demo fix          # Fix loop
+vlmkit demo multi        # Multi-scenario
+vlmkit demo multistep    # Multi-step
 ```
 
 ## Library API
@@ -233,11 +233,11 @@ Mapping from current files to new structure:
 | `src/experiments/css-challenge/css-challenge-core.ts` | Split: `core/css-parser.ts` + `core/diff.ts` + `backend/chromium.ts` + `backend/crater.ts` | Largest refactoring target |
 | `src/experiments/detection/detection-classify.ts` | `core/classify.ts` | Nearly as-is |
 | `src/experiments/detection/detection-db.ts` | `core/db.ts` | Nearly as-is |
-| `packages/vrt-capture/src/viewport-discovery.ts` | `core/viewport.ts` | Nearly as-is |
-| `packages/vrt-core/src/heatmap.ts` | `core/diff.ts` | Pixel diff portion |
-| `packages/vrt-core/src/a11y-semantic.ts` | `core/a11y.ts` | Nearly as-is |
-| `packages/vrt-capture/src/crater-client.ts` | `backend/crater.ts` | PaintNode/diff moves to `core/diff.ts` |
-| `packages/vrt-core/src/types.ts` | `core/types.ts` | Consolidate |
+| `packages/vlmkit-capture/src/viewport-discovery.ts` | `core/viewport.ts` | Nearly as-is |
+| `packages/vlmkit-core/src/heatmap.ts` | `core/diff.ts` | Pixel diff portion |
+| `packages/vlmkit-core/src/a11y-semantic.ts` | `core/a11y.ts` | Nearly as-is |
+| `packages/vlmkit-capture/src/crater-client.ts` | `backend/crater.ts` | PaintNode/diff moves to `core/diff.ts` |
+| `packages/vlmkit-core/src/types.ts` | `core/types.ts` | Consolidate |
 | `src/experiments/css-challenge/css-challenge.ts` | `cli/challenge.ts` | CLI entry |
 | `src/experiments/css-challenge/css-challenge-bench.ts` | `cli/bench.ts` | CLI entry |
 | `src/experiments/detection/detection-report.ts` | `cli/report.ts` | CLI entry |
@@ -256,14 +256,14 @@ Refactoring is deferred. First:
 
 Three subcommands now cover the full UI-implementation lifecycle.
 
-### Dev inner loop: `vrt compare` + `vrt watch`
+### Dev inner loop: `vlmkit diff html` + `vlmkit watch`
 
 ```
-vrt compare <baseline> <variant> [--tokens DESIGN.md]
-vrt watch   <baseline> <variant> [--tokens DESIGN.md]
+vlmkit diff html <baseline> <variant> [--tokens DESIGN.md]
+vlmkit watch   <baseline> <variant> [--tokens DESIGN.md]
 ```
 
-`vrt compare` does a one-shot diff and prints:
+`vlmkit diff html` does a one-shot diff and prints:
 
 - per-viewport diff %
 - **wireframe fix suggestions** with scope tags:
@@ -275,19 +275,19 @@ vrt watch   <baseline> <variant> [--tokens DESIGN.md]
 - triptych PNG per viewport (`baseline | variant | heatmap`)
 - token-snapped values when `--tokens` points at a DESIGN.md
 
-`vrt watch` wraps that in a file-watcher with debounce + a
+`vlmkit watch` wraps that in a file-watcher with debounce + a
 **round-vs-round delta**: when the developer or agent saves a file,
 the next run lists which suggestions became newly-introduced (= your
 last edit regressed something), resolved, or persisted.
 
-### Approval authoring: `vrt manifest`
+### Approval authoring: `vlmkit manifest`
 
 ```
-vrt manifest add    --reason "..." --selector .foo [--max-px 2] [--expires DATE]
-vrt manifest add    --from-run <output-dir> [--auto-tiny | --top N | --all]
-vrt manifest list   [--path approval.json]
-vrt manifest rm     <index | selector>
-vrt manifest check  # CI hook — exit non-zero on expired rules
+vlmkit manifest add    --reason "..." --selector .foo [--max-px 2] [--expires DATE]
+vlmkit manifest add    --from-run <output-dir> [--auto-tiny | --top N | --all]
+vlmkit manifest list   [--path approval.json]
+vlmkit manifest rm     <index | selector>
+vlmkit manifest check  # CI hook — exit non-zero on expired rules
 ```
 
 `add --from-run` synthesizes rules from a recent compare run's
@@ -296,11 +296,11 @@ from the suggestion's `candidates[0]`. Default filter is
 low-confidence ∧ |Δ|≤2px (sub-pixel AA jitter); use `--top N` to
 broaden.
 
-Manifest entries are consumed by the existing `vrt compare`
+Manifest entries are consumed by the existing `vlmkit diff html`
 `approvalManifest` plumbing — they're subtracted from the
 reported diff before the threshold gate fires.
 
-### A11y gate (folded into `vrt diff-pr`)
+### A11y gate (folded into `vlmkit diff-pr`)
 
 ```json
 {
@@ -330,11 +330,11 @@ Per-check thresholds and per-route overrides resolve the same way
 as the visual threshold (route value wins; project default fills
 the rest).
 
-Findings can be suppressed via `vrt manifest add --a11y-{contrast,
+Findings can be suppressed via `vlmkit manifest add --a11y-{contrast,
 touch,focus-order} --selector <substring> --reason "..." --expires
 <date>`. The substring matches the finding's `path` (or, for
 focus-order, the message text). Expired rules surface in
-`vrt manifest check` so the gate doesn't silently approve forever.
+`vlmkit manifest check` so the gate doesn't silently approve forever.
 
 Output (terminal):
 
@@ -353,11 +353,11 @@ Output (summary.md):
 - `focus` / mobile — **focus-order** 1 > 0: reverse (step 1→2)
 ```
 
-### CI gate: `vrt diff-pr`
+### CI gate: `vlmkit diff-pr`
 
 ```
-vrt diff-pr pin       # on main: capture baselines for every route
-vrt diff-pr           # in PR build: diff each route against pinned baseline
+vlmkit diff-pr pin       # on main: capture baselines for every route
+vlmkit diff-pr           # in PR build: diff each route against pinned baseline
 ```
 
 Reads `vrt.config.json`:
@@ -390,41 +390,41 @@ code is 0 on full pass / 1 on any uncovered breach.
 ```
      dev time                       CI time
      ──────────                     ────────
-   vrt compare ──────┐
+   vlmkit diff html ──────┐
      (rich signals)   │
                       │   on main:
-   vrt watch ─────────┤         vrt diff-pr pin
+   vlmkit watch ─────────┤         vlmkit diff-pr pin
      (round delta)    │              (seed baselines)
                       │
-   vrt manifest add ──┤   in PR:
-     (acknowledge)    │         vrt diff-pr
+   vlmkit manifest add ──┤   in PR:
+     (acknowledge)    │         vlmkit diff-pr
                       └→        (gate vs pinned)
                                     ↓
                                  summary.md  →  PR comment
 ```
 
-### `vrt diff-pr` vs `vrt workflow` — when to use which
+### `vlmkit diff-pr` vs `vlmkit workflow` — when to use which
 
 Two baseline workflows coexist intentionally; they serve different
 needs:
 
-| | `vrt diff-pr` | `vrt workflow` |
+| | `vlmkit diff-pr` | `vlmkit workflow` |
 |---|---|---|
-| audience | external project's CI gate | vrt's own dogfooding e2e harness |
+| audience | external project's CI gate | vlmkit's own dogfooding e2e harness |
 | capture | direct `chromium.launch()` + `page.goto()` per route | Playwright spec at `e2e/vrt-capture.spec.ts` |
 | baseline layout | `<baselineDir>/<route>/<viewport>.png` | flat `baselines/*.png` keyed by spec testId |
-| approval | per-rule manifest (`vrt manifest add`) + per-viewport threshold | bulk `cp snapshots → baselines` |
-| partial refresh | `vrt diff-pr pin <route>` (this commit) | not supported |
+| approval | per-rule manifest (`vlmkit manifest add`) + per-viewport threshold | bulk `cp snapshots → baselines` |
+| partial refresh | `vlmkit diff-pr pin <route>` (this commit) | not supported |
 | primary output | `summary.md` + per-route diff% | `output/report.json` with a11y deltas |
 
 Rule of thumb:
 
-- Pulling vrt into a new project: use **`vrt diff-pr`** with a
+- Pulling vlmkit into a new project: use **`vlmkit diff-pr`** with a
   `vrt.config.json`. Pin on main, gate per PR. Author exceptions via
-  `vrt manifest`.
-- Working inside the vrt repo (this codebase) or extending its
-  test harness: use **`vrt workflow`**. It owns the e2e Playwright
-  spec and the a11y semantic check that `vrt diff-pr` doesn't.
+  `vlmkit manifest`.
+- Working inside the vlmkit repo (this codebase) or extending its
+  test harness: use **`vlmkit workflow`**. It owns the e2e Playwright
+  spec and the a11y semantic check that `vlmkit diff-pr` doesn't.
 
 Unification under a single command surface is a future cleanup once
 both paths have settled. For now they share the same low-level
@@ -434,10 +434,10 @@ approval-manifest contract.
 ### PR comment glue
 
 ```
-vrt diff-pr post --pr <ref> [--summary <path>] [--marker <id>]
+vlmkit diff-pr post --pr <ref> [--summary <path>] [--marker <id>]
 ```
 
-After running `vrt diff-pr`, post the generated `summary.md` to a
+After running `vlmkit diff-pr`, post the generated `summary.md` to a
 PR via `gh pr comment`. If `gh` isn't on PATH the command prints
 the markdown with copy-paste instructions instead — useful for
 operators inspecting the gate output before committing to a

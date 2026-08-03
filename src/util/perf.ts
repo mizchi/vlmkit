@@ -15,8 +15,8 @@
  * Lighthouse's ~30s.
  *
  * Usage:
- *   vrt perf <url>
- *   vrt perf <html>           # local HTML supported via setContent
+ *   vlmkit check perf <url>
+ *   vlmkit check perf <html>           # local HTML supported via setContent
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -290,7 +290,7 @@ export async function runPerf(options: PerfOptions): Promise<PerfReport> {
   });
   await writeFile(reportPath, md);
 
-  console.log(`  ${BOLD}${CYAN}vrt perf${RESET}`);
+  console.log(`  ${BOLD}${CYAN}vlmkit check perf${RESET}`);
   console.log(`  ${DIM}source: ${options.source}  observed: ${observeMs}ms${RESET}`);
   const icon = (v: "good" | "needs-improvement" | "poor") =>
     v === "good" ? `${GREEN}✓${RESET}` : v === "needs-improvement" ? `${YELLOW}!${RESET}` : `${RED}✗${RESET}`;
@@ -380,7 +380,7 @@ function renderReport(r: Omit<PerfReport, "reportPath">): string {
 
   lines.push("## Note on scope");
   lines.push("");
-  lines.push("`vrt perf` covers visual-stability metrics (CLS, LCP) that overlap " +
+  lines.push("`vlmkit check perf` covers visual-stability metrics (CLS, LCP) that overlap " +
     "with the VRT toolkit's lane. For full Web Vitals analysis (TBT, INP, " +
     "JavaScript bundle size, network waterfall), run a dedicated tool like " +
     "Lighthouse, PageSpeed Insights, or WebPageTest. This tool's value is " +
@@ -395,7 +395,7 @@ async function main(argv = process.argv.slice(2)) {
   if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, outputDir, report, observeMs, strict } = parseArgs(argv);
   if (positional.length === 0) {
-    console.log("Usage: vrt perf <html-or-url> [options]");
+    console.log("Usage: vlmkit check perf <html-or-url> [options]");
     console.log("Options:");
     console.log("  --observe <ms>      Observation window after networkidle (default: 3000)");
     console.log("  --strict            Exit non-zero on any non-good verdict (CI gate mode)");

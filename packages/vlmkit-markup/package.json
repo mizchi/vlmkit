@@ -1,6 +1,6 @@
 {
   "name": "@mizchi/vlmkit-markup",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "description": "VLM-driven markup tooling for VRT: component extract, design-token / theme-parity / i18n-stress / palette checks, dep-graph, selector heal, smoke runner.",
   "license": "MIT",
   "author": "mizchi",
@@ -38,7 +38,8 @@
     "prepack": "pnpm build",
     "test": "node --test 'src/**/*.test.ts'",
     "moon:test": "moon test markup-core && moon check markup-core-api markup-core-cli",
-    "moon:build": "moon build markup-core markup-core-api markup-core-cli --target js"
+    "moon:build": "moon build markup-core markup-core-api markup-core-cli --target js",
+    "build:js": "pnpm --dir ../.. exec tsdown --config tsdown.packages.config.ts --filter @mizchi/vlmkit-markup"
   },
   "exports": {
     ".": {

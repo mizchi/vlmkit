@@ -21,7 +21,7 @@ export interface ApprovalRule {
   /**
    * Sub-categorizes the rule. Default ("visual") suppresses pixel /
    * paint diffs as before. "a11y-contrast" / "a11y-touch" suppress
-   * findings from the matching a11y checker (see `vrt diff-pr`'s
+   * findings from the matching a11y checker (see `vlmkit diff-pr`'s
    * a11y gate). The default keeps the schema backward-compatible —
    * existing manifests don't carry `kind`.
    */
@@ -41,7 +41,7 @@ export interface ApprovalRule {
   reason: string;
   issue?: string;
   expires?: string;
-  /** Audit trail: who signed off on this approval (vrt baseline approve). */
+  /** Audit trail: who signed off on this approval (vlmkit baseline approve). */
   acknowledgedBy?: string;
   /** Audit trail: when the rule was authored (ISO date or datetime). */
   createdAt?: string;

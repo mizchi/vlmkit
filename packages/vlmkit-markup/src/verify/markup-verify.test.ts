@@ -117,6 +117,31 @@ test("pixelPresence: full presence when the bbox holds the fill; zero when it do
   assert.equal(pixelPresence(img, { ...line, left: -20, top: -20 }), 0, "out-of-bounds bbox is absent");
 });
 
+// 2026-08-01 hard-target audit: a #f1f1f1 card was "pixel-confirmed
+// present" in a render where that area was plain white, because white is
+// only 14 units from the fill and the tolerance was 25. A presence test
+// that cannot separate the fill from the background is vacuous.
+test("pixelPresence: a low-contrast fill is not 'present' on a bare background", () => {
+  const white = { data: new Uint8Array(20 * 20 * 4).fill(255), width: 20, height: 20 };
+  const card = { left: 2, top: 2, width: 10, height: 10, hex: "#f1f1f1" };
+
+  // Without the background reference, plain white passes for the fill.
+  assert.equal(pixelPresence(white, card), 1, "documents the old, vacuous behavior");
+
+  // With it, the tolerance is clamped below the fill/background distance.
+  assert.equal(pixelPresence(white, card, 25, [255, 255, 255]), 0);
+
+  // And the fill itself is still detected where it genuinely is.
+  const withCard = { data: new Uint8Array(white.data), width: 20, height: 20 };
+  for (let y = 2; y < 12; y++) {
+    for (let x = 2; x < 12; x++) {
+      const i = (y * 20 + x) * 4;
+      withCard.data[i] = 241; withCard.data[i + 1] = 241; withCard.data[i + 2] = 241;
+    }
+  }
+  assert.equal(pixelPresence(withCard, card, 25, [255, 255, 255]), 1);
+});
+
 test("kickback near-miss: an extra whose fill sits 12px away in the target reads as displacement", () => {
   const hairline = component(3, 0, 645, 1280, 1, "#e7e5e4");
   const c = composition({ extra: [hairline] });

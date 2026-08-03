@@ -53,7 +53,12 @@ export interface ExtractComponentsOptions {
   minArea?: number;
   /** How many components to return after sorting by area. Default 8. */
   topN?: number;
-  /** Per-channel difference threshold for "foreground." Default 12. */
+  /**
+   * Per-channel difference threshold for "foreground." Defaults to a value
+   * derived from the image's own noise floor (4 on a clean render, up to 12
+   * on a noisy export) — see `adaptiveBgTolerance`. Pin it only when you
+   * need two extractions to use provably identical settings.
+   */
   bgTolerance?: number;
   /**
    * Explicit background color. When set, edge-based detection is skipped.
@@ -69,8 +74,11 @@ export interface ExtractComponentsOptions {
 const DEFAULT_MIN_AREA = 200;
 const DEFAULT_TOP_N = 8;
 const DEFAULT_BG_TOLERANCE = 12;
+/** Floor for the adaptive tolerance — below this, antialiasing halos start
+ * forming their own components on clean renders. */
+const MIN_BG_TOLERANCE = 4;
 
-function detectBackground(data: Uint8Array, width: number, height: number): [number, number, number] {
+export function detectBackground(data: Uint8Array, width: number, height: number): [number, number, number] {
   // Sample the corners + the middle of each edge. Most-frequent triple wins.
   const samples: Array<[number, number, number]> = [];
   const points = [
@@ -117,6 +125,54 @@ function inBackground(
   tol: number,
 ): boolean {
   return Math.abs(r - bgR) <= tol && Math.abs(g - bgG) <= tol && Math.abs(b - bgB) <= tol;
+}
+
+/**
+ * Pick the foreground tolerance from the image's own noise floor.
+ *
+ * A fixed tolerance of 12 was hiding a very ordinary UI surface: the
+ * 2026-08-01 hard-target audit removed two `#f4f4f4` cards from a
+ * `#ffffff` page — 2.12% of pixels genuinely different — and `verify
+ * markup` reported `pixel diff 0.01%` / DONE, because 255-244 = 11 falls
+ * *inside* 12, so the cards were never foreground to begin with. Most
+ * light-surface tokens land there (#fafafa 5, #f5f5f5 10, #f4f4f4 11).
+ *
+ * The tolerance exists for real reasons — JPEG ringing and antialiasing
+ * around a flat fill — so rather than lowering it blindly, measure how
+ * noisy this image actually is. Deviations are sampled only from pixels
+ * within a narrow band of the background: sensor/codec noise lives there,
+ * while a flat pale fill (deviation ~11) sits outside the band and so
+ * cannot inflate the estimate of itself.
+ *
+ * Clean PNG render -> median deviation 0 -> tolerance 4 (pale cards are
+ * found). Noisy JPEG export -> higher median -> tolerance climbs back
+ * toward the historical 12, which is also the cap: this can only make
+ * extraction more sensitive than before, never less.
+ */
+export function adaptiveBgTolerance(
+  data: Uint8Array,
+  width: number,
+  height: number,
+  bg: [number, number, number],
+): number {
+  const [bgR, bgG, bgB] = bg;
+  const BAND = 6; // above the noise we expect, below any real pale fill
+  const devs: number[] = [];
+  const step = Math.max(1, Math.floor(Math.sqrt((width * height) / 4000)));
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < width; x += step) {
+      const i = (y * width + x) * 4;
+      const dr = Math.abs(data[i]! - bgR);
+      const dg = Math.abs(data[i + 1]! - bgG);
+      const db = Math.abs(data[i + 2]! - bgB);
+      const dev = Math.max(dr, dg, db);
+      if (dev <= BAND) devs.push(dev);
+    }
+  }
+  if (devs.length === 0) return DEFAULT_BG_TOLERANCE;
+  devs.sort((a, b) => a - b);
+  const median = devs[Math.floor(devs.length / 2)]!;
+  return Math.min(DEFAULT_BG_TOLERANCE, Math.max(MIN_BG_TOLERANCE, MIN_BG_TOLERANCE + 3 * median));
 }
 
 /**
@@ -217,11 +273,13 @@ export function extractComponentsFromRgba(
 ): ComponentBbox[] {
   const minArea = options.minArea ?? DEFAULT_MIN_AREA;
   const topN = options.topN ?? DEFAULT_TOP_N;
-  const tol = options.bgTolerance ?? DEFAULT_BG_TOLERANCE;
 
   if (width <= 0 || height <= 0) return [];
 
   const [bgR, bgG, bgB] = options.background ?? detectBackground(data, width, height);
+  // Derived from this image's noise unless the caller pins it (see
+  // adaptiveBgTolerance: pale flat surfaces used to read as background).
+  const tol = options.bgTolerance ?? adaptiveBgTolerance(data, width, height, [bgR, bgG, bgB]);
 
   const mask = new Uint8Array(width * height);
   for (let y = 0; y < height; y++) {

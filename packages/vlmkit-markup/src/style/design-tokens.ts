@@ -20,9 +20,9 @@
  * flags or a JSON config file.
  *
  * Usage:
- *   vrt design-tokens <html-or-url>
- *   vrt design-tokens <url> --radius-scale 0,4,8,12,16,24
- *   vrt design-tokens <url> --config tokens.json
+ *   vlmkit check tokens <html-or-url>
+ *   vlmkit check tokens <url> --radius-scale 0,4,8,12,16,24
+ *   vlmkit check tokens <url> --config tokens.json
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -30,6 +30,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, type Page } from "playwright";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 
 export interface DesignTokenConfig {
   radius?: number[];
@@ -234,7 +235,7 @@ export async function runDesignTokens(
     if (isUrl(options.source)) {
       await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
     } else {
-      await page.setContent(html!, { waitUntil: "networkidle" });
+      await page.goto(sourceToUrl(options.source), { waitUntil: "networkidle", timeout: 30000 });
     }
     samples = await page.evaluate(SAMPLE_SCRIPT) as RawSample[];
     await page.close();
@@ -313,7 +314,7 @@ export async function runDesignTokens(
   });
   await writeFile(reportPath, md);
 
-  console.log(`  ${BOLD}${CYAN}vrt design-tokens${RESET}`);
+  console.log(`  ${BOLD}${CYAN}vlmkit check tokens${RESET}`);
   console.log(`  ${DIM}source: ${options.source}  inspected: ${byPath.size} element(s)${RESET}`);
   const byProperty = new Map<string, number>();
   for (const v of violations) byProperty.set(v.property, (byProperty.get(v.property) ?? 0) + 1);
@@ -396,7 +397,7 @@ function renderReport(r: Omit<DesignTokensReport, "reportPath">): string {
   lines.push("1. Replace each violating value with its nearest in-scale equivalent (the \"Nearest in-scale\" column).");
   lines.push("2. If a value needs to be off-scale (intentional outlier), document why in a comment — the violation is a code smell, not a hard ban.");
   lines.push("3. Consolidate `box-shadow` values into a small named tier set (e.g., `--shadow-sm`, `--shadow-md`, `--shadow-lg`) and reference the variables instead of inline values.");
-  lines.push("4. Re-run `vrt design-tokens`. The violation count should drop.");
+  lines.push("4. Re-run `vlmkit check tokens`. The violation count should drop.");
   lines.push("");
   return lines.join("\n");
 }
@@ -411,7 +412,7 @@ async function main(argv = process.argv.slice(2)) {
   if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, outputDir, report, configPath, strict, flagConfig } = parseArgs(argv);
   if (positional.length === 0) {
-    console.log("Usage: vrt design-tokens <html-or-url> [options]");
+    console.log("Usage: vlmkit check tokens <html-or-url> [options]");
     console.log("Options:");
     console.log("  --config <path>           JSON config: { radius, spacing, zIndex, shadowTiers, tolerance }");
     console.log("  --radius-scale a,b,c,...  Allowed border-radius values (default: 0,2,4,6,8,12,16,20,24,32,48,999)");

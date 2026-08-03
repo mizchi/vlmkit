@@ -1,11 +1,11 @@
 ---
 name: vrt-regression-watch
-description: Run vrt diff in a stateful loop where each run is compared against the previous run's persisted summary, surfacing a `⚠ REGRESSION` banner when the majority of viewports get worse. Designed for periodic CI gates (per-PR or scheduled) where you want "did this change make things worse" as a binary signal, not a one-shot snapshot. Stores summary at `.vrt/last-diff-for-agent.json` by default.
+description: Run vlmkit diff in a stateful loop where each run is compared against the previous run's persisted summary, surfacing a `⚠ REGRESSION` banner when the majority of viewports get worse. Designed for periodic CI gates (per-PR or scheduled) where you want "did this change make things worse" as a binary signal, not a one-shot snapshot. Stores summary at `.vrt/last-diff-for-agent.json` by default.
 ---
 
 # vrt-regression-watch
 
-The same `vrt diff agent` CLI exposes regression flags
+The same `vlmkit diff agent` CLI exposes regression flags
 (`--previous`, `--persist-summary`, `--no-history`,
 `--fail-on-regression`). This skill explains *how* to wire them into a
 recurring loop, what state lives where, and what counts as a
@@ -13,7 +13,7 @@ regression.
 
 ## Invocation
 
-The `vrt` CLI in this repo is invoked **from source**:
+The `vlmkit` CLI in this repo is invoked **from source**:
 
 ```bash
 node --experimental-strip-types src/cli/vrt.ts <command...>
@@ -45,7 +45,7 @@ these two forms.
 
 ## How regression is detected
 
-After each `vrt diff agent` run, the per-viewport diffRatio is written
+After each `vlmkit diff agent` run, the per-viewport diffRatio is written
 to `.vrt/last-diff-for-agent.json`. On the next run:
 
 1. Load that file as the comparison summary.
@@ -60,13 +60,13 @@ from triggering false alarms.
 
 ## Quickstart
 
-`--output <dir>` is a **directory** path; `vrt diff html` writes
+`--output <dir>` is a **directory** path; `vlmkit diff html` writes
 `<dir>/diff-report.json` into it. Pass that JSON file path — not
-the dir — to `vrt diff agent`. (`migration-report.json` is also
+the dir — to `vlmkit diff agent`. (`migration-report.json` is also
 written as a legacy alias; both files have identical content.)
 
 The filename is `migration-report.json` even when there's no migration
-involved because the writer is shared with `vrt migration compare`.
+involved because the writer is shared with `vlmkit migration compare`.
 Legacy name; tracked for rename in #50. Treat it as "the diff
 report" regardless of how you produced it.
 
@@ -78,14 +78,14 @@ wiring the workflow into CI.
 REPORT=reports/diff-report.json
 
 # First run: establishes baseline. No banner possible (no prior summary).
-vrt diff html before.html after.html --output reports/
-vrt diff agent "$REPORT" --persist-summary .vrt/baseline.json
+vlmkit diff html before.html after.html --output reports/
+vlmkit diff agent "$REPORT" --persist-summary .vrt/baseline.json
 
 # Subsequent runs: same baseline file for read AND write
 # (local-rolling idiom — passing the same path to --previous and
 # --persist-summary means "compare against last run, then overwrite").
-vrt diff html before.html after.html --output reports/
-vrt diff agent "$REPORT" \
+vlmkit diff html before.html after.html --output reports/
+vlmkit diff agent "$REPORT" \
   --previous .vrt/baseline.json \
   --persist-summary .vrt/baseline.json \
   --fail-on-regression
@@ -100,8 +100,8 @@ PR's previous run").
 
 | File | Written by | Read by | Lifetime |
 |---|---|---|---|
-| `.vrt/last-diff-for-agent.json` | `vrt diff agent` (auto, unless `--no-history`) | next `vrt diff agent` run | persists until manually removed |
-| `report.json` | `vrt diff html` / `vrt migration compare` | `vrt diff agent` | per-run; can discard after the Markdown is produced |
+| `.vrt/last-diff-for-agent.json` | `vlmkit diff agent` (auto, unless `--no-history`) | next `vlmkit diff agent` run | persists until manually removed |
+| `report.json` | `vlmkit diff html` / `vlmkit migration compare` | `vlmkit diff agent` | per-run; can discard after the Markdown is produced |
 
 Two retention strategies:
 
@@ -125,8 +125,8 @@ Two retention strategies:
 
 - name: Render current PR + diff
   run: |
-    vrt diff html main.html pr.html --output reports/
-    vrt diff agent reports/diff-report.json \
+    vlmkit diff html main.html pr.html --output reports/
+    vlmkit diff agent reports/diff-report.json \
       --previous .vrt/baseline.json \
       --persist-summary /tmp/pr-summary.json \
       --fail-on-regression \
@@ -190,7 +190,7 @@ breakage is the most likely user-visible regression.
 
 ## Combining with masks
 
-The same `--mask` arg from `vrt diff html` applies. **A regression
+The same `--mask` arg from `vlmkit diff html` applies. **A regression
 banner appearing on a viewport you don't actually care about (e.g.
 `wide`) usually means you forgot to mask a flapping element on that
 viewport.** Add the selector to `--mask` and re-run; if the banner
@@ -205,13 +205,13 @@ disappears, the original signal was noise.
   selectors.
 - `--fail-on-regression` exits 1 but the banner says "0 viewports
   got worse" → there's a JSON-vs-Markdown drift bug; re-run with
-  `DEBUG_VRT=1` and file an issue.
+  `DEBUG_VLMKIT=1` and file an issue.
 - Stale summary from months ago → manually remove
   `.vrt/last-diff-for-agent.json` (or your custom path) and re-run.
 
 ## Environment
 
-No additional env vars beyond what `vrt diff agent` needs (none for
+No additional env vars beyond what `vlmkit diff agent` needs (none for
 the pure pixel+CSD path).
 
 ## Related skills
@@ -219,4 +219,4 @@ the pure pixel+CSD path).
 - `vrt-visual-diff` — same CLI, no state. Use first to confirm the
   diff looks sensible before wiring it into a watch loop.
 - `vrt-migration-eval` — produces `report.json` files that
-  `vrt diff agent` can consume just like the html-diff path.
+  `vlmkit diff agent` can consume just like the html-diff path.

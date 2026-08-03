@@ -39,6 +39,8 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
+import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
@@ -59,6 +61,12 @@ export interface LayoutRule {
   tolerance?: number;
   minWidth?: number;
   maxWidth?: number;
+  /**
+   * Minimum height (px) of EVERY visible match — unlike the width
+   * assertions (first match), this checks all matches because its use
+   * case is touch-target rules like "every button >= 48px tall".
+   */
+  minHeight?: number;
   /** Modal number of matches per visual row (tops clustered within 8px). */
   perRow?: number;
   /** First match spans >= 95% of the viewport width. */
@@ -95,6 +103,13 @@ export interface LayoutReport {
   passed: number;
   total: number;
   done: boolean;
+  /**
+   * Set when the URL redirected — almost always a login wall. Measured
+   * 2026-08-02: against an auth-walled route this gate reported
+   * `VIOLATED: count expected 2, measured 0`, which reads as "your markup is
+   * wrong" when the real cause is that the session expired.
+   */
+  redirected?: string;
 }
 
 /** Cluster row tops (±8px) and return the modal row size. */
@@ -152,6 +167,14 @@ export function evaluateLayoutRule(rule: LayoutRule, m: LayoutMeasurement): Layo
     push("maxWidth", `<=${rule.maxWidth}px`, first ? `${Math.round(first.width)}px` : "(no match)",
       !!first && first.width <= rule.maxWidth);
   }
+  if (rule.minHeight !== undefined) {
+    const shortest = m.rects.length > 0
+      ? m.rects.reduce((a, b) => (b.height < a.height ? b : a))
+      : undefined;
+    push("minHeight", `every match >=${rule.minHeight}px`,
+      shortest ? `shortest ${Math.round(shortest.height)}px of ${m.rects.length}` : "(no match)",
+      !!shortest && shortest.height >= rule.minHeight);
+  }
   if (rule.fullWidth) {
     push("fullWidth", `>=${Math.round(m.viewport * 0.95)}px (95% of ${m.viewport})`,
       first ? `${Math.round(first.width)}px` : "(no match)",
@@ -198,6 +221,11 @@ function collectRects(selectors: string[]): Record<string, LayoutRect[]> {
 }
 
 export interface LayoutVerifyOptions {
+  /**
+   * Playwright storage-state file so gates can measure pages behind a
+   * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
+   */
+  storageState?: string;
   source: string;
   contract: LayoutContract;
   /** Height per viewport width (defaults match check integrity). */
@@ -210,6 +238,7 @@ export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<Lay
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   const results: LayoutRuleResult[] = [];
+  let redirected: string | undefined;
   try {
     const url = /^(https?|file):\/\//.test(options.source)
       ? options.source
@@ -217,8 +246,11 @@ export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<Lay
     const widths = [...new Set(options.contract.rules.map((r) => r.at))].sort((a, b) => b - a);
     for (const width of widths) {
       const height = options.heights?.[width] ?? DEFAULT_HEIGHTS[width] ?? 800;
-      const page = await browser.newPage({ viewport: { width, height } });
+      const page = await browser.newPage(withAuthState({ viewport: { width, height } }, options.storageState));
       await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+      redirected ??= /^https?:\/\//.test(options.source)
+        ? describeRedirect(options.source, page.url()) ?? undefined
+        : undefined;
       const rules = options.contract.rules.filter((r) => r.at === width);
       const selectors = [...new Set(rules.flatMap((r) => r.above ? [r.selector, r.above] : [r.selector]))];
       const rectMap = await page.evaluate(collectRects, selectors);
@@ -235,13 +267,23 @@ export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<Lay
     await browser.close();
   }
   const passed = results.filter((r) => r.passed).length;
-  const done = passed === results.length;
+  // A redirect cannot be `done`: the rules were evaluated against a page the
+  // caller did not ask for, so even "all passed" would be a claim about the
+  // login screen.
+  const done = passed === results.length && !redirected;
   appendRunLedger({
     tool: "layout-contract",
     source: options.source,
-    headline: { done, passed, total: results.length },
+    headline: { done, passed, total: results.length, ...(redirected ? { redirected: true } : {}) },
   });
-  return { source: options.source, results, passed, total: results.length, done };
+  return {
+    source: options.source,
+    results,
+    passed,
+    total: results.length,
+    done,
+    ...(redirected ? { redirected } : {}),
+  };
 }
 
 export function formatLayoutReport(report: LayoutReport): string {
@@ -250,6 +292,12 @@ export function formatLayoutReport(report: LayoutReport): string {
   lines.push(`${DIM}source: ${report.source}${RESET}`);
   lines.push("");
   lines.push(`verdict: ${report.done ? `${GREEN}SATISFIED${RESET}` : `${RED}VIOLATED${RESET}`} (${report.passed}/${report.total} rules)`);
+  if (report.redirected) {
+    // Ahead of the per-rule list: without this a stale session reads as
+    // "your cards are missing", sending the reader to debug their markup.
+    lines.push(`${RED}x ${report.redirected}${RESET}`);
+    lines.push(`${DIM}  Every rule below was evaluated against that page.${RESET}`);
+  }
   lines.push("");
   for (const r of report.results) {
     const mark = r.passed ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;

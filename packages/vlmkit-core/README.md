@@ -3,7 +3,7 @@
 VRT diff engine and shared types. Pure-TypeScript image / DOM / a11y / visual
 comparison primitives — no Playwright required for the lightweight surface.
 
-Part of the [`vrt`](https://github.com/mizchi/vrt) monorepo.
+Part of the [`vlmkit`](https://github.com/mizchi/vrt) monorepo.
 
 ## Install
 

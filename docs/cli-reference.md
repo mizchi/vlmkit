@@ -11,7 +11,7 @@ for options.
 | Group | Subcommands |
 |---|---|
 | `vlmkit diff` | `html`, `png`, `elements`, `browsers`, `agent`, `runs` (`region` is deprecated) |
-| `vlmkit check` | `integrity`, `copy`, `layout`, `interactions`, `equivalence`, `asset`, `breakpoints`, `scroll`, `animation`, `motion`, `a11y {contrast,touch,focus}`, `palette`, `tokens`, `theme`, `perf`, `drift {component,pages}`, `crater` |
+| `vlmkit check` | `integrity`, `copy`, `layout`, `interactions`, `equivalence`, `asset`, `breakpoints`, `scroll`, `animation`, `motion`, `a11y {contrast,touch,focus}`, `palette`, `tokens`, `design`, `theme`, `perf`, `drift {component,pages}`, `crater` |
 | `vlmkit scan` | `component`, `breakpoints`, `scroll`, `mock`, `handlers` |
 | `vlmkit build` | `component`, `page` |
 | `vlmkit verify` | `markup`, `flow` |
@@ -22,7 +22,7 @@ for options.
 | `vlmkit snapshot` | `[<url>...]`, `approve`, `fix-prompt`, `stability`, `flipbook`, `report` |
 | `vlmkit migration` | `compare`, `blind`, `subagent` |
 | `vlmkit workflow` | `init`, `capture`, `verify`, `approve`, `graph`, `affected`, `introspect`, `spec-verify`, `expect` |
-| Standalone | `vlmkit mcp`, `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit markup-loop`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
+| Standalone | `vlmkit batch`, `vlmkit gates`, `vlmkit mcp`, `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit markup-loop`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
 
 The single-token commands from 0.4.x (`vrt compare`, `vrt png-diff`,
 `vrt theme-parity`, …) remain as deprecation shims that forward to
@@ -62,7 +62,7 @@ for the full old → new mapping.
 
 ## Quick Start
 
-The examples below assume the `vrt` command is already installed and available on your PATH.
+The examples below assume the `vlmkit` command is already installed and available on your PATH.
 
 ```bash
 pnpm install
@@ -138,7 +138,7 @@ vlmkit baseline pin                                       # on main
 vlmkit baseline verify                                    # in PR
 vlmkit baseline post --pr owner/repo#123                  # send summary.md as PR comment
 
-# Legacy internal-dogfood verification loop (vrt's own e2e suite)
+# Legacy internal-dogfood verification loop (vlmkit's own e2e suite)
 vlmkit workflow init
 vlmkit workflow capture
 vlmkit workflow verify
@@ -237,19 +237,70 @@ vlmkit snapshot flipbook                       # Diff three-frame (baseline ↔ 
 vlmkit snapshot report                         # Render snapshot-report.json as Markdown
 ```
 
-### Check (gates: a11y / tokens / theme / perf / drift)
+### Integrity exemptions
 
 ```bash
-vlmkit check a11y contrast <html>              # WCAG AA contrast scan
+# Accept an intentional pattern the tool does not recognise as one.
+# Reason is mandatory; `;` separates it (so `#` stays available for ID selectors).
+vlmkit check integrity page.html \
+  --allow "near-misalignment@.badge;icon is optically centred" \
+  --allow "text-collision@#refund@1280;deliberate graze, design sign-off DS-412"
+```
+
+An accepted finding is still printed, under "Exempted by --allow (your call)", and
+a rule that matched nothing is reported so dead config gets deleted. Kinds that
+mean the page is broken (`js-error`, `degenerate-render`, `unstyled-page`,
+`redirected`) cannot be exempted. Put the rule in `vlmkit.gates.json` when it
+needs an owner and an expiry — an expired suppression stops being applied.
+
+### Check (gates: a11y / tokens / design / theme / perf / drift)
+
+```bash
+vlmkit check a11y contrast <html|url>          # WCAG AA contrast scan
 vlmkit check a11y touch    <html|url>          # Touch target size (WCAG 2.5.5 / 2.5.8)
 vlmkit check a11y focus    <html|url>          # Tab order vs visual order
 vlmkit check palette       <target.png> [current.png]  # Dominant colors, or palette diff (missing/extra hex)
-vlmkit check tokens        <html>              # radius/spacing/z-index/shadow scale conformance
-vlmkit check theme         <html>              # prefers-color-scheme dark / unthemed components
+vlmkit check tokens        <html|url>          # radius/spacing/z-index/shadow scale conformance (declared scale)
+vlmkit check design        <html|url>          # coherence of the scale the page itself implies (no config)
+vlmkit check theme         <html|url>          # prefers-color-scheme dark / unthemed components
 vlmkit check perf          <html|url>          # Web Vitals (CLS / LCP / FCP)
 vlmkit check drift component <html> --selector .card
 vlmkit check drift pages     --selector .footer --files A.html B.html C.html
 ```
+
+### Batch (many pages, one glob)
+
+```bash
+# Run a gate over every matched page; verdict per page is that run's exit code.
+vlmkit batch --gate "check integrity" "routes/**/*.html"
+
+# Several gates, wider pool, logs kept for CI.
+vlmkit batch --gate "check integrity" --gate "check design" "dist/**/*.html" \
+  --concurrency 4 --output ci-logs/
+
+# One shard of three runners (stride-sliced, so neighbouring pages split up).
+vlmkit batch --gate "check integrity" "routes/**/*.html" --shard 2/3
+```
+
+Measured concurrency / sharding numbers and the reason the summary reports
+"jobs in flight" rather than a speedup:
+[`docs/reports/2026-08-02-batch-runner-ci-budget.md`](./reports/2026-08-02-batch-runner-ci-budget.md).
+
+### Gates config (per-page gate sets + auditable suppressions)
+
+```bash
+vlmkit gates init --pages "routes/**/*.html" --gate "check integrity"
+vlmkit gates list            # resolved page x gate plan, exact commands, no run
+vlmkit gates run             # run it (same pool/sharding as `batch`)
+vlmkit gates suppressions    # every silenced check: reason, owner, expiry, days left
+```
+
+`vlmkit.gates.json` holds which gates run on which pages plus every
+suppression. Two rules make it reviewable: a suppression **must** carry a
+`reason` (parsing fails without one), and an **expired** suppression stops
+being applied — the gate it silenced runs unmuted and the run exits non-zero,
+because a stale entry is a config defect even when the page now passes.
+Worked example: [`examples/vlmkit.gates.json`](../examples/vlmkit.gates.json).
 
 ### Build / Scan / Inspect / Stress (markup-assistance)
 
@@ -533,7 +584,7 @@ Workflow aliases are kept for ergonomics where they do not collide:
 #### Capture routes for external projects
 
 `vlmkit workflow init|capture` runs `e2e/vrt-capture.spec.ts`, which now resolves
-its route list from your project rather than hard-coding vrt's own pages.
+its route list from your project rather than hard-coding vlmkit's own pages.
 Drop a `vrt.config.json` next to your app with a `capture` block:
 
 ```json

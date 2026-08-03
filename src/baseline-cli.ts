@@ -1,49 +1,49 @@
 #!/usr/bin/env node
 /**
- * `vrt baseline` — unified baseline surface that dispatches to the
+ * `vlmkit baseline` — unified baseline surface that dispatches to the
  * appropriate underlying flow.
  *
  * Two flows coexist intentionally:
  *
- *   - `vrt diff-pr` is the CI gate for an external project. Uses
+ *   - `vlmkit diff-pr` is the CI gate for an external project. Uses
  *     direct Playwright per route + per-route thresholds + manifest
  *     suppression. Baselines live at
  *     `<baselineDir>/<route>/<viewport>.png`.
  *
- *   - `vrt workflow` is vrt's own e2e dogfood harness. Uses a
+ *   - `vlmkit workflow` is vlmkit's own e2e dogfood harness. Uses a
  *     Playwright spec (`e2e/vlmkit-capture.spec.ts`) + bulk approval.
  *     Baselines live at `<VRT_ROOT>/baselines/*.png`.
  *
- * `vrt baseline` is the canonical name for the diff-pr flow —
+ * `vlmkit baseline` is the canonical name for the diff-pr flow —
  * the one external projects should pick first. The legacy
- * `vrt workflow {init,capture,verify,approve}` and `vrt diff-pr
+ * `vlmkit workflow {init,capture,verify,approve}` and `vlmkit diff-pr
  * {pin,run,post}` surfaces continue to work; this command is a
  * mnemonic alias.
  *
  * Subcommands:
- *   vrt baseline pin [route...] [--config vrt.config.json]
+ *   vlmkit baseline pin [route...] [--config vrt.config.json]
  *     Capture / refresh baseline PNGs for declared routes. Equivalent
- *     to `vrt diff-pr pin`.
+ *     to `vlmkit diff-pr pin`.
  *
- *   vrt baseline verify [--config vrt.config.json] [--output <dir>]
+ *   vlmkit baseline verify [--config vrt.config.json] [--output <dir>]
  *                       [--against-previous <dir>]
  *     Diff current rendering against pinned baselines + a11y +
- *     media-variants gates. Equivalent to `vrt diff-pr`.
+ *     media-variants gates. Equivalent to `vlmkit diff-pr`.
  *
- *   vrt baseline post --pr <ref> [--summary <path>] [--marker <id>]
+ *   vlmkit baseline post --pr <ref> [--summary <path>] [--marker <id>]
  *     Post a previously-generated summary.md as a PR comment.
- *     Equivalent to `vrt diff-pr post`.
+ *     Equivalent to `vlmkit diff-pr post`.
  *
- *   vrt baseline list [--config vrt.config.json]
+ *   vlmkit baseline list [--config vrt.config.json]
  *     Show all pinned baselines, last-modified timestamp, and which
  *     route they correspond to.
  *
- *   vrt baseline rm <route> [--config vrt.config.json]
+ *   vlmkit baseline rm <route> [--config vrt.config.json]
  *     Remove a single route's baselines.
  *
- * Internal-dogfood note: `vrt workflow` (legacy) still works and is
+ * Internal-dogfood note: `vlmkit workflow` (legacy) still works and is
  * the right call inside this repository for end-to-end testing of
- * vrt itself. It uses a Playwright spec + bulk approval.
+ * vlmkit itself. It uses a Playwright spec + bulk approval.
  */
 
 import { existsSync } from "node:fs";
@@ -84,11 +84,11 @@ async function cmdList(args: string[]): Promise<number> {
   }
   const config = loadDiffPrConfig(configPath);
   const baselineRoot = resolve(configBaseDirFor(config), config.baselineDir);
-  console.log(`${BOLD}${CYAN}vrt baseline list${RESET}  ${DIM}${configPath}${RESET}`);
+  console.log(`${BOLD}${CYAN}vlmkit baseline list${RESET}  ${DIM}${configPath}${RESET}`);
   console.log(`${DIM}  ${baselineRoot}${RESET}`);
   console.log();
   if (!existsSync(baselineRoot)) {
-    console.log(`  ${DIM}(no baselines yet — run \`vrt baseline pin\`)${RESET}`);
+    console.log(`  ${DIM}(no baselines yet — run \`vlmkit baseline pin\`)${RESET}`);
     return 0;
   }
   for (const route of config.routes) {
@@ -157,7 +157,7 @@ async function cmdRm(args: string[]): Promise<number> {
 
 /**
  * Move a route's current baseline PNGs into `_history/<timestamp>/` so a
- * re-pin (`vrt baseline update`) is reversible. Returns the number of files
+ * re-pin (`vlmkit baseline update`) is reversible. Returns the number of files
  * archived. Pure file IO — no Playwright — so it is unit-testable.
  */
 export async function archiveRouteBaselines(
@@ -271,7 +271,7 @@ async function cmdApprove(args: string[]): Promise<number> {
   const reason = getArg(args, "reason");
   if ((!selector && !regionRaw) || !reason) {
     console.error(`${RED}error:${RESET} a --selector or --region, plus --reason, are required`);
-    console.error(`\n  vrt baseline approve (--selector <css> | --region "x=,y=,w=,h=[,viewport=]") --reason <text> [--max-px N] [--max-ratio R] [--expires YYYY-MM-DD] [--acknowledged-by name] [--kind visual] [--manifest approval.json] [--dry-run]`);
+    console.error(`\n  vlmkit baseline approve (--selector <css> | --region "x=,y=,w=,h=[,viewport=]") --reason <text> [--max-px N] [--max-ratio R] [--expires YYYY-MM-DD] [--acknowledged-by name] [--kind visual] [--manifest approval.json] [--dry-run]`);
     return 1;
   }
   const maxPxRaw = getArg(args, "max-px");
@@ -310,7 +310,7 @@ async function cmdApprove(args: string[]): Promise<number> {
   const json = JSON.stringify(merged, null, 2) + "\n";
 
   if (dryRun) {
-    console.log(`${BOLD}${CYAN}vrt baseline approve${RESET} ${DIM}(dry-run — ${manifestPath})${RESET}`);
+    console.log(`${BOLD}${CYAN}vlmkit baseline approve${RESET} ${DIM}(dry-run — ${manifestPath})${RESET}`);
     console.log(json);
     return 0;
   }
@@ -322,17 +322,17 @@ async function cmdApprove(args: string[]): Promise<number> {
 }
 
 function formatUsage(): string {
-  return `vrt baseline <command>
+  return `vlmkit baseline <command>
 
 Subcommands:
   pin     [route...] [--config vrt.config.json]
                               Capture / refresh baseline PNGs for
-                              declared routes. Alias for \`vrt diff-pr pin\`.
+                              declared routes. Alias for \`vlmkit diff-pr pin\`.
   verify  [--config vrt.config.json] [--output <dir>]
                               Diff current rendering against pinned
-                              baselines. Alias for \`vrt diff-pr\`.
+                              baselines. Alias for \`vlmkit diff-pr\`.
   post    --pr <ref>          Post the most recent summary.md to a PR.
-                              Alias for \`vrt diff-pr post\`.
+                              Alias for \`vlmkit diff-pr post\`.
   update  [route...] [--config vrt.config.json]
                               Archive current baselines to _history/<ts>/
                               and re-pin (reversible golden refresh).
@@ -349,9 +349,9 @@ Subcommands:
                               (any diff inside it is accepted; audit fields
                               recorded).
 
-\`vrt workflow {init,capture,verify,approve}\` is the legacy vrt-
+\`vlmkit workflow {init,capture,verify,approve}\` is the legacy vlmkit-
 internal dogfood path (uses a Playwright spec + bulk approval).
-\`vrt baseline\` is the canonical surface for external projects.`;
+\`vlmkit baseline\` is the canonical surface for external projects.`;
 }
 
 async function main(argv = process.argv.slice(2)): Promise<void> {

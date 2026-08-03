@@ -3,7 +3,7 @@
 Playwright / Crater capture infrastructure for VRT — viewport discovery,
 multi-route capture, prescanner integration.
 
-Part of the [`vrt`](https://github.com/mizchi/vrt) monorepo.
+Part of the [`vlmkit`](https://github.com/mizchi/vrt) monorepo.
 
 ## Install
 

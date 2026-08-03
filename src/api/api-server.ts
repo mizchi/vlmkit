@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * vrt API server
+ * vlmkit API server
  *
  * Built with Hono. For local Node.js execution.
  * Structured to share the same app factory with Cloudflare Workers.

@@ -30,7 +30,7 @@
  *   - A markdown report showing the sequence + delta table
  *
  * Usage:
- *   vrt interact <html-or-url> --sequence <path-to-sequence.json>
+ *   vlmkit inspect interact <html-or-url> --sequence <path-to-sequence.json>
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
@@ -364,7 +364,7 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
   });
   await writeFile(reportPath, md);
 
-  console.log(`  ${BOLD}${CYAN}vrt interact${RESET}`);
+  console.log(`  ${BOLD}${CYAN}vlmkit inspect interact${RESET}`);
   console.log(`  ${DIM}source: ${options.source}  sequence: ${options.sequencePath}${RESET}`);
   console.log(`  ${DIM}captured ${snapshots.length} snapshot(s), ${transitions.length} transition(s)${RESET}`);
   for (const t of transitions) {
@@ -508,7 +508,7 @@ async function main(argv = process.argv.slice(2)) {
   if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, sequence, outputDir, report, threshold, healAll } = parseArgs(argv);
   if (positional.length === 0 || !sequence) {
-    console.log("Usage: vrt interact <html-or-url> --sequence <path.json> [options]");
+    console.log("Usage: vlmkit inspect interact <html-or-url> --sequence <path.json> [options]");
     console.log("Options:");
     console.log("  --sequence <path>   JSON file describing the action sequence.");
     console.log("  --output-dir <dir>  Default: ./test-results/interact");

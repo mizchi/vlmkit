@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  adaptiveBgTolerance,
   extractComponentsFromRgba,
   matchComponents,
   type ComponentBbox,
@@ -129,5 +130,51 @@ describe("matchComponents", () => {
 
   it("returns empty on empty input", () => {
     assert.deepEqual(matchComponents([], []), []);
+  });
+});
+
+// 2026-08-01 hard-target audit: a fixed tolerance of 12 classified
+// #f4f4f4-on-white cards (per-channel distance 11) as BACKGROUND, so they
+// were never extracted and `verify markup` scored their removal as a 0.01%
+// diff. Most light-surface tokens sit under 12 (#fafafa 5, #f5f5f5 10).
+describe("adaptive background tolerance", () => {
+  const fill = (w: number, h: number, rgb: [number, number, number]) => {
+    const data = new Uint8Array(w * h * 4);
+    for (let i = 0; i < w * h; i++) {
+      data[i * 4] = rgb[0]; data[i * 4 + 1] = rgb[1]; data[i * 4 + 2] = rgb[2]; data[i * 4 + 3] = 255;
+    }
+    return data;
+  };
+
+  it("a clean render gets a tight tolerance; a noisy one keeps the permissive default", () => {
+    const clean = fill(80, 80, [255, 255, 255]);
+    assert.equal(adaptiveBgTolerance(clean, 80, 80, [255, 255, 255]), 4);
+
+    // Noise of +-4/channel around white: the estimate climbs back toward 12.
+    const noisy = fill(80, 80, [255, 255, 255]);
+    for (let i = 0; i < 80 * 80; i++) {
+      const d = (i % 5) - 2 + ((i % 3) - 1); // small, varied deviations
+      const v = 255 - Math.abs(d) * 2;
+      noisy[i * 4] = v; noisy[i * 4 + 1] = v; noisy[i * 4 + 2] = v;
+    }
+    assert.ok(adaptiveBgTolerance(noisy, 80, 80, [255, 255, 255]) > 4);
+  });
+
+  it("extracts a pale #f4f4f4 card on white that the fixed tolerance of 12 missed", () => {
+    const w = 120, h = 120;
+    const data = fill(w, h, [255, 255, 255]);
+    for (let y = 10; y < 60; y++) {
+      for (let x = 10; x < 90; x++) {
+        const i = (y * w + x) * 4;
+        data[i] = 244; data[i + 1] = 244; data[i + 2] = 244;
+      }
+    }
+    const found = extractComponentsFromRgba(data, w, h);
+    assert.equal(found.length, 1, JSON.stringify(found));
+    assert.equal(found[0]!.width, 80);
+    assert.equal(found[0]!.height, 50);
+
+    // Pinning the old tolerance reproduces the miss, documenting the cause.
+    assert.equal(extractComponentsFromRgba(data, w, h, { bgTolerance: 12 }).length, 0);
   });
 });

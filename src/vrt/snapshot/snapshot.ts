@@ -3,8 +3,8 @@
  * VRT Snapshot -- capture URLs at multiple viewports, auto-compare with previous
  *
  * Usage:
- *   vrt snapshot http://localhost:4156/todomvc --output snapshots/luna/
- *   vrt snapshot http://localhost:3000/ http://localhost:3000/luna/ --output snapshots/sol/
+ *   vlmkit snapshot http://localhost:4156/todomvc --output snapshots/luna/
+ *   vlmkit snapshot http://localhost:3000/ http://localhost:3000/luna/ --output snapshots/sol/
  */
 import { existsSync } from "node:fs";
 import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
@@ -12,6 +12,7 @@ import { dirname, join, resolve } from "node:path";
 import { compareScreenshots, generateDiffReport } from "@mizchi/vlmkit-core/heatmap.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { applyMask } from "@mizchi/vlmkit-core/mask.ts";
+import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { approveSnapshotsFromReport } from "./approve.ts";
 import { determineSnapshotExitCode, parseSnapshotCliArgs, parseSnapshotConfig, type SnapshotConfig } from "../../cli/commands/snapshot.ts";
 import {
@@ -54,11 +55,11 @@ interface SnapshotResult {
 function formatSnapshotUsage(): string {
   return [
     "Usage:",
-    "  vrt snapshot <url1> [url2] ... [--output dir] [--label name] [--threshold 0.1] [--fail-on-diff] [--fail-on-new-baseline] [--max-diff-ratio n] [--backend local|cloudflare] [--config vrt.config.json]",
-    "  vrt snapshot approve [--output dir] [--label name] [--config vrt.config.json]",
-    "  vrt snapshot fix-prompt [--output dir] [--label name] [--format markdown|json] [--limit n] [--min-diff 0.01] [--out path] [--config vrt.config.json]",
-    "  vrt snapshot stability <url1> [url2]... [--iterations 3] [--output dir] [--threshold 0.1] [--fp-threshold 0] [--fail-above-rate 0.05] [--config vrt.config.json]",
-    "  vrt snapshot stability-history <stability-report.json>... [--out path]",
+    "  vlmkit snapshot <url1> [url2] ... [--output dir] [--label name] [--threshold 0.1] [--fail-on-diff] [--fail-on-new-baseline] [--max-diff-ratio n] [--backend local|cloudflare] [--config vrt.config.json]",
+    "  vlmkit snapshot approve [--output dir] [--label name] [--config vrt.config.json]",
+    "  vlmkit snapshot fix-prompt [--output dir] [--label name] [--format markdown|json] [--limit n] [--min-diff 0.01] [--out path] [--config vrt.config.json]",
+    "  vlmkit snapshot stability <url1> [url2]... [--iterations 3] [--output dir] [--threshold 0.1] [--fp-threshold 0] [--fail-above-rate 0.05] [--config vrt.config.json]",
+    "  vlmkit snapshot stability-history <stability-report.json>... [--out path]",
   ].join("\n");
 }
 
@@ -105,7 +106,7 @@ async function approve(options: {
     result = await approveSnapshotsFromReport(reportPath, options.labels);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new Error(`No snapshot report found at ${reportPath}. Run \`vrt snapshot <url...>\` first.`);
+      throw new Error(`No snapshot report found at ${reportPath}. Run \`vlmkit snapshot <url...>\` first.`);
     }
     throw error;
   }
@@ -141,7 +142,7 @@ async function runFixPrompt(options: {
     raw = await readFile(reportPath, "utf-8");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new Error(`No snapshot report found at ${reportPath}. Run \`vrt snapshot <url...>\` first.`);
+      throw new Error(`No snapshot report found at ${reportPath}. Run \`vlmkit snapshot <url...>\` first.`);
     }
     throw error;
   }
@@ -390,7 +391,7 @@ async function runDiffFlipbook(options: {
     raw = await readFile(reportPath, "utf-8");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new Error(`No snapshot report found at ${reportPath}. Run \`vrt snapshot <url...>\` first.`);
+      throw new Error(`No snapshot report found at ${reportPath}. Run \`vlmkit snapshot <url...>\` first.`);
     }
     throw error;
   }
@@ -644,6 +645,24 @@ async function main() {
     failOnDiff: parsed.failOnDiff,
     failOnNewBaseline: parsed.failOnNewBaseline,
     maxDiffRatio: parsed.maxDiffRatio,
+  });
+
+  // Ledger: snapshot is one of the headline tools, so a "verified" claim
+  // that rests on it has to be auditable like every other gate. The
+  // worst per-viewport diff is the headline; `verdict` mirrors the
+  // integrity gate's vocabulary so grepping one field works across tools.
+  const worstDiff = compared.reduce((max, r) => Math.max(max, r.diffRatio ?? 0), 0);
+  appendRunLedger({
+    tool: "snapshot",
+    source: urls.join(" "),
+    headline: {
+      verdict: exitStatus.exitCode === 0 ? "clean" : "defects",
+      captured: results.length,
+      newBaselines: newBaselines.length,
+      compared: compared.length,
+      changed: falsePositives.length,
+      worstDiffRatio: Number(worstDiff.toFixed(6)),
+    },
   });
 
   // Write JSON summary

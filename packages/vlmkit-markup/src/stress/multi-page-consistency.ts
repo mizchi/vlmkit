@@ -23,8 +23,8 @@
  *     surrounding content unique to each page.
  *
  * Usage:
- *   vrt multi-page-consistency --selector .footer --urls URL1 URL2 ...
- *   vrt multi-page-consistency --selector .footer --files A.html B.html ...
+ *   vlmkit check drift pages --selector .footer --urls URL1 URL2 ...
+ *   vlmkit check drift pages --selector .footer --files A.html B.html ...
  */
 import { readFile, writeFile, mkdir, copyFile } from "node:fs/promises";
 import { basename, join, resolve, extname } from "node:path";
@@ -256,7 +256,7 @@ export async function runMultiPageConsistency(
   await writeFile(reportPath, md);
 
   // Console summary.
-  console.log(`  ${BOLD}${CYAN}vrt multi-page-consistency${RESET}`);
+  console.log(`  ${BOLD}${CYAN}vlmkit check drift pages${RESET}`);
   console.log(`  ${DIM}selector: ${options.selector}${RESET}`);
   console.log(`  ${DIM}reference: ${reference.label}${RESET}`);
   for (const d of deltas) {
@@ -319,8 +319,8 @@ async function main(argv = process.argv.slice(2)) {
   if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { selector, urls, files, outputDir, report, threshold } = parseArgs(argv);
   if (!selector || (urls.length === 0 && files.length === 0)) {
-    console.log("Usage: vrt multi-page-consistency --selector <sel> --urls URL1 URL2 ...");
-    console.log("       vrt multi-page-consistency --selector <sel> --files A.html B.html ...");
+    console.log("Usage: vlmkit check drift pages --selector <sel> --urls URL1 URL2 ...");
+    console.log("       vlmkit check drift pages --selector <sel> --files A.html B.html ...");
     console.log("Options:");
     console.log("  --output-dir <dir>       Output directory (default: ./test-results/consistency)");
     console.log("  --report <path>          Markdown report path");

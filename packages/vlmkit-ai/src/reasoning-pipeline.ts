@@ -13,6 +13,7 @@ import { createUnifiedLLMClient } from "./llm-client.ts";
 import { createVlmClient, resolveModel, type VlmClient } from "./vlm-client.ts";
 import { VrtConfigError } from "./errors.ts";
 import { resizeBase64Png, type ResolutionPreset } from "@mizchi/vlmkit-core/image-resize.ts";
+import { readEnv } from "@mizchi/vlmkit-core/legacy-names.ts";
 
 // ---- Types ----
 
@@ -244,7 +245,7 @@ export function createReasoningPipeline(config?: PipelineConfig): ReasoningPipel
   const throwIfMissing = config?.throwIfMissing ?? true;
   // Stage 1: VLM
   let vlmClient: VlmClient | null = null;
-  let vlmModelId = config?.vlmModel ?? process.env.VRT_VLM_MODEL ?? "bytedance/ui-tars-1.5-7b";
+  let vlmModelId = config?.vlmModel ?? readEnv("VLM_MODEL") ?? "bytedance/ui-tars-1.5-7b";
 
   // Stage 2: LLM (try configured, then fallback). Always non-throwing here
   // — we synthesize a single ConfigError below if everything fails.

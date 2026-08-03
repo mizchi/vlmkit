@@ -35,6 +35,7 @@ import { PNG } from "pngjs";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { readEnv } from "@mizchi/vlmkit-core/legacy-names.ts";
 
 export interface JudgeRegion {
   left: number;
@@ -326,7 +327,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   if (vlm !== undefined) {
     const { createVlmClient, resolveModel } = await import("@mizchi/vlmkit-ai/vlm-client.ts");
     const modelId = vlm === true
-      ? (process.env.VRT_VLM_MODEL ?? "anthropic/claude-haiku-4-5")
+      ? (readEnv("VLM_MODEL") ?? "anthropic/claude-haiku-4-5")
       : vlm;
     const model = await resolveModel(modelId);
     const client = await createVlmClient(model);

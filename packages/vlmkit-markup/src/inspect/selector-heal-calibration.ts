@@ -1,4 +1,4 @@
-/** Empirically calibrated reporting thresholds for `vrt interact --heal-all`.
+/** Empirically calibrated reporting thresholds for `vlmkit inspect interact --heal-all`.
  *
  * See docs/reports/data/2026-07-30-selector-heal-calibration.json.
  * The strong cutoff intentionally favours precision: the corpus has no false

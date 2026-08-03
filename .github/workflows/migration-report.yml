@@ -32,6 +32,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build workspace packages
+        # 0.8.1 made src/ entrypoints resolve deep imports through dist.
+        run: pnpm build:packages:js
+
       - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 

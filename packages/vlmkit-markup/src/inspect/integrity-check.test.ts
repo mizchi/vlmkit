@@ -320,6 +320,31 @@ describe("S14b mutation battery", () => {
     assert.equal(overflow?.severity, "fail");
   });
 
+  // 2026-08-01 hard-target audit: in a grid shell, one rigid child
+  // stretches the track, so every stretched ancestor and sibling outranks
+  // the culprit by right edge. The kickback named the sidebar and the page
+  // shell — three selectors, none of them the thing to edit. The cause is
+  // now measured (constrain the element, re-read scrollWidth) rather than
+  // guessed from box geometry.
+  test("M7b grid shell: overflow blames the rigid child, not the stretched shell", { timeout: 120_000 }, async () => {
+    const file = page("m7b.html", `
+      <div class="shell" style="display:grid;grid-template-columns:200px 1fr">
+        <nav class="side"><strong>Nav</strong></nav>
+        <main class="main" style="padding:20px">
+          <h1>Report</h1>
+          <p class="lede">Body copy that stretches to whatever the track allows.</p>
+          <div class="rigid" style="width:900px;background:#eef">fixed 900px wide</div>
+        </main>
+      </div>`);
+    const report = await runIntegrityCheck({ source: file, viewports: [{ width: 375, height: 700 }] });
+    const overflow = report.findings.find((f) => f.kind === "page-overflow-x");
+    assert.equal(overflow?.severity, "fail");
+    assert.match(overflow!.message, /caused by:/);
+    assert.match(overflow!.message, /\.rigid/);
+    // The stretched shell must not be presented as the thing to fix.
+    assert.doesNotMatch(overflow!.message, /caused by:[^.]*nav\.side/);
+  });
+
   test("M8 404 stylesheet with no fallback: failed-stylesheet + unstyled-page fail", { timeout: 120_000 }, async () => {
     const file = page("m8.html", `<h1>Heading</h1><p>Body text long enough to paint.</p><a href="#x">a link</a>`,
       `<link rel="stylesheet" href="./missing.css">`);
@@ -469,6 +494,91 @@ describe("S14c false-positive audit", () => {
       `the missing @import child itself is still reported: ${JSON.stringify(report.findings.map((f) => `${f.kind} ${f.message}`))}`);
   });
 
+  // Found by fixtures/collision-fp-corpus (2026-08-01): the kicker/heading
+  // pull-up is idiomatic markup whose line BOXES overlap 7px while the
+  // glyphs keep a measured 2px gap — the box test called it a collision.
+  // Blocks are now shrunk to their measured ink band before the overlap
+  // test, which can only remove findings.
+  test("designed negative leading and pull-ups are not collisions; real overlap still is", { timeout: 120_000 }, async () => {
+    const pullUp = page("ink-pullup.html", `
+      <p class="kicker" style="font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#5b6270;margin:0">Quarterly report</p>
+      <h1 style="font-size:40px;margin:-0.18em 0 0.4em">Settlement volume grew nineteen percent</h1>
+      <p style="max-width:620px">A lede paragraph under the heading.</p>`);
+    const clean = await runIntegrityCheck({ source: pullUp, viewports: ONE_VIEWPORT });
+    assert.equal(
+      clean.findings.filter((f) => f.kind === "text-collision").length, 0,
+      JSON.stringify(clean.findings.map((f) => `${f.kind} ${f.selector}`)),
+    );
+
+    // The filter must not blind the gate: a genuine overlap still fails.
+    const real = page("ink-real.html", `
+      <div style="position:relative;height:60px;font:16px monospace">
+        <span style="position:absolute;left:0;top:20px">Total: 1,240,000 EUR</span>
+        <span style="position:absolute;left:60px;top:24px">Refunds: 80 EUR</span>
+      </div>`);
+    const dirty = await runIntegrityCheck({ source: real, viewports: ONE_VIEWPORT });
+    assert.ok(
+      dirty.findings.some((f) => f.kind === "text-collision"),
+      JSON.stringify(dirty.findings.map((f) => f.kind)),
+    );
+  });
+
+  // The second half of the ink-extents work (fixtures/collision-fp-corpus):
+  // a graze — a few characters overlapping across the FULL ink height — was
+  // below the old overlap-area ratio (0.172 vs a 0.25 floor) and went
+  // unreported, while a legitimate line-height:1 stack scored 0.077 and a
+  // designed pull-up 0.137. By ink-overlap FRACTION the same three are
+  // 1.000 / 0.077 / 0.137, so the gate now measures that instead.
+  test("a character-level graze is reported; legitimate stacks stay clean", { timeout: 120_000 }, async () => {
+    const graze = page("ink-graze.html", `
+      <div style="position:relative;height:40px;font:16px ui-monospace,monospace">
+        <span style="position:absolute;left:0px;top:10px;white-space:nowrap">Total: 1,240,000 EUR</span>
+        <span style="position:absolute;left:168px;top:10px;white-space:nowrap">Refunds: 80 EUR</span>
+      </div>`);
+    const hit = await runIntegrityCheck({ source: graze, viewports: ONE_VIEWPORT });
+    assert.equal(
+      hit.findings.filter((f) => f.kind === "text-collision").length, 1,
+      JSON.stringify(hit.findings.map((f) => `${f.kind} ${f.selector}`)),
+    );
+
+    // A solid-set stack (line-height 1, tall metrics) overlaps line boxes by
+    // construction and must stay clean.
+    const solid = page("ink-solid.html", `
+      <div style="font:24px/1 'Noto Sans','DejaVu Sans',Verdana,sans-serif;max-width:560px">
+        <p style="margin:0">Line one of a block set solid.</p>
+        <p style="margin:0">Line two directly beneath it.</p>
+        <p style="margin:0">Line three completes the stack.</p>
+      </div>`);
+    const clean = await runIntegrityCheck({ source: solid, viewports: ONE_VIEWPORT });
+    assert.equal(
+      clean.findings.filter((f) => f.kind === "text-collision").length, 0,
+      JSON.stringify(clean.findings.map((f) => `${f.kind} ${f.selector}`)),
+    );
+  });
+
+  // Found by the real-page A/B for the graze gate (2026-08-01): MDN's
+  // collapsed sidebar keeps layout boxes for items inside a CLOSED <details>
+  // (measured 184x56 at y=9137), and stacked hidden items overlap perfectly.
+  // Self-style checks miss it because content-visibility skipping is not
+  // visibility/display/opacity; checkVisibility() is the test that catches it.
+  test("text inside a closed <details> is not a collision candidate", { timeout: 120_000 }, async () => {
+    const file = page("closed-details.html", `
+      <details>
+        <summary>Reference</summary>
+        <ul style="margin:0;padding:0;list-style:none">
+          <li><a href="#a">scroll-padding-block</a></li>
+          <li><a href="#b">scroll-padding-inline</a></li>
+          <li><a href="#c">scroll-margin-block</a></li>
+        </ul>
+      </details>
+      <p>Visible body copy under the collapsed section.</p>`);
+    const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+    assert.equal(
+      report.findings.filter((f) => f.kind === "text-collision").length, 0,
+      JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector}`)),
+    );
+  });
+
   test("maxFindings caps text-collision rows (Codex #100 P2)", { timeout: 120_000 }, async () => {
     const rows = Array.from({ length: 5 }, (_, i) =>
       `<p style="position:absolute;top:${20 + i * 40}px;left:20px;width:220px;margin:0">Row ${i} left column text</p>
@@ -513,6 +623,44 @@ test("M14 opaque sibling painted over text is occluded-text", { timeout: 120_000
   assert.ok(!report.findings.some((f) => f.selector === "#clear"));
 });
 
+// The S19 class plus one declaration: decorative art that paints over text
+// but opts out of hit-testing. elementFromPoint skips pointer-events:none,
+// so the probe forces hit-testing back on page-wide while sampling.
+test("M14a2 pointer-events:none decorative overlay is still occluded-text", { timeout: 120_000 }, async () => {
+  const file = page("m14a2.html", `
+    <div style="position:relative;width:600px;height:120px;background:#eee">
+      <p id="covered" style="position:absolute;left:20px;top:40px;color:#111">Covered readout text</p>
+      <div style="position:absolute;left:0;top:20px;width:280px;height:80px;background:#c94;z-index:2;pointer-events:none"></div>
+      <p id="clear" style="position:absolute;left:320px;top:40px;color:#111">Clear readout text</p>
+    </div>
+    <div style="width:600px;height:200px;background:#456;margin-top:12px"></div>`);
+  const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+  const hit = report.findings.find((f) => f.kind === "occluded-text" && f.selector === "#covered");
+  assert.ok(hit, JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector}`)));
+  assert.ok(!report.findings.some((f) => f.selector === "#clear"));
+});
+
+// Found on a real authenticated app (2026-08-01 Swag Labs audit): the
+// styled-select pattern layers a native <select> at opacity 0.001 over a
+// visible span so the control keeps native keyboard/AT behaviour while the
+// span carries the styling. Its background-color alpha is 1, so an
+// alpha-only opacity test called that invisible overlay an opaque occluder.
+test("M14b2 an opacity:0.001 overlay (styled-select pattern) is NOT an occluder", { timeout: 120_000 }, async () => {
+  const file = page("m14b2.html", `
+    <div style="position:relative;width:300px;height:40px">
+      <span class="active_option" style="position:absolute;left:8px;top:10px;color:#111">Name (A to Z)</span>
+      <select class="sorter" style="position:absolute;inset:0;width:100%;opacity:0.001;background:#efefef">
+        <option>Name (A to Z)</option><option>Price (low to high)</option>
+      </select>
+    </div>
+    <div style="width:600px;height:200px;background:#456;margin-top:12px"></div>`);
+  const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+  assert.ok(
+    !report.findings.some((f) => f.kind === "occluded-text"),
+    JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector}`)),
+  );
+});
+
 test("M14b transparent stretched-link overlay is NOT occluded-text", { timeout: 120_000 }, async () => {
   const file = page("m14b.html", `
     <div style="position:relative;width:400px;height:140px;background:#fff;border:1px solid #ccc;padding:16px">
@@ -547,4 +695,55 @@ test("M14d aria-hidden decorative text under a figure is exempted", { timeout: 1
   const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
   assert.ok(!report.findings.some((f) => f.kind === "occluded-text"), JSON.stringify(report.findings));
   assert.ok(report.exempted.some((e) => e.kind === "occluded-text" && /aria-hidden/.test(e.reason)));
+});
+
+// Auth support (2026-08-01 hard-target audit). Before this, pointing a gate
+// at a session-protected route followed the 302 and reported the LOGIN page
+// as CLEAN — a green verdict for a page that never rendered. Now: no
+// session => reported as a defect; with a storage state => the real page is
+// measured, defects and all.
+test("storage state unlocks a session-protected page; without it the redirect is a defect", { timeout: 120_000 }, async () => {
+  const { createServer } = await import("node:http");
+  const server = createServer((req, res) => {
+    const authed = /sid=good/.test(req.headers.cookie || "");
+    if (req.url === "/private" && !authed) {
+      res.writeHead(302, { location: "/login" });
+      return res.end();
+    }
+    res.writeHead(200, { "content-type": "text/html" });
+    res.end(req.url === "/private"
+      ? `<!doctype html><body style="margin:0"><h1>Private figures</h1>
+         <div style="width:900px;background:#eef">wide protected panel</div></body>`
+      : `<!doctype html><body style="margin:0"><h1>Sign in</h1><p>Session required.</p></body>`);
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+  const port = (server.address() as { port: number }).port;
+  const url = `http://127.0.0.1:${port}/private`;
+  const stateFile = join(DIR, "auth-state.json");
+  writeFileSync(stateFile, JSON.stringify({
+    cookies: [{
+      name: "sid", value: "good", domain: "127.0.0.1", path: "/",
+      expires: -1, httpOnly: false, secure: false, sameSite: "Lax",
+    }],
+    origins: [],
+  }));
+  try {
+    const anon = await runIntegrityCheck({ source: url, viewports: [{ width: 375, height: 700 }] });
+    assert.equal(anon.verdict, "defects");
+    const redirect = anon.findings.find((f) => f.kind === "redirected");
+    assert.ok(redirect, `expected a redirected finding, got: ${kinds(anon)}`);
+    assert.match(redirect!.message, /login wall/i);
+
+    const authed = await runIntegrityCheck({
+      source: url,
+      viewports: [{ width: 375, height: 700 }],
+      storageState: stateFile,
+    });
+    // The real page was measured: no redirect finding, and its own defect shows.
+    assert.ok(!authed.findings.some((f) => f.kind === "redirected"), JSON.stringify(authed.findings));
+    const overflow = authed.findings.find((f) => f.kind === "page-overflow-x");
+    assert.ok(overflow, `expected the protected page's overflow, got: ${kinds(authed)}`);
+  } finally {
+    await new Promise<void>((r) => server.close(() => r()));
+  }
 });

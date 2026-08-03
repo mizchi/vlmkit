@@ -1,0 +1,1556 @@
+{
+  "label": "linux-default",
+  "platform": "linux-x64",
+  "browserVersion": "149.0.7827.55",
+  "dpr": 1,
+  "fontStack": null,
+  "hinting": "default",
+  "fixtures": [
+    {
+      "fixture": "fixtures/auto-markup-proof/creative/attempt-fix.html",
+      "blocks": [
+        {
+          "selector": "div.kicker",
+          "height": 15,
+          "inkInset": 1.3
+        },
+        {
+          "selector": "#headline",
+          "height": 40,
+          "inkInset": 3.9
+        },
+        {
+          "selector": "#subline",
+          "height": 21,
+          "inkInset": 1.8
+        },
+        {
+          "selector": "#ship-note",
+          "height": 19,
+          "inkInset": 2.1
+        },
+        {
+          "selector": "#card-row > div:nth-of-type(1)",
+          "height": 19,
+          "inkInset": 2.1
+        },
+        {
+          "selector": "#card-row > div:nth-of-type(2)",
+          "height": 19,
+          "inkInset": 3.6
+        },
+        {
+          "selector": "#card-row > div:nth-of-type(3)",
+          "height": 19,
+          "inkInset": 2.1
+        },
+        {
+          "selector": "#card-row > div:nth-of-type(1) > p:nth-of-type(1)",
+          "height": 38,
+          "inkInset": 2.1
+        },
+        {
+          "selector": "#card-row > div:nth-of-type(2) > p:nth-of-type(1)",
+          "height": 38,
+          "inkInset": 2.1
+        },
+        {
+          "selector": "#card-row > div:nth-of-type(3) > p:nth-of-type(1)",
+          "height": 38,
+          "inkInset": 2.1
+        },
+        {
+          "selector": "p.after-cards",
+          "height": 19,
+          "inkInset": 2.1
+        },
+        {
+          "selector": "#promo-banner",
+          "height": 19,
+          "inkInset": 2.1
+        },
+        {
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > figure:nth-of-type(1) > figcaption:nth-of-type(1)",
+          "height": 19,
+          "inkInset": 2.1
+        },
+        {
+          "selector": "html > body:nth-of-type(1) > footer:nth-of-type(1)",
+          "height": 19,
+          "inkInset": 2.1
+        }
+      ],
+      "pairs": [],
+      "findings": 0,
+      "reportedPairs": []
+    },
+    {
+      "fixture": "fixtures/auto-markup-proof/creative/attempt-haiku.html",
+      "blocks": [
+        {
+          "selector": "div.logo",
+          "height": 27,
+          "inkInset": 10.2
+        },
+        {
+          "selector": "html > body:nth-of-type(1) > header:nth-of-type(1) > nav:nth-of-type(1) > a:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 7.16
+        },
+        {
+          "selector": "html > body:nth-of-type(1) > header:nth-of-type(1) > nav:nth-of-type(1) > a:nth-of-type(2)",
+          "height": 17,
+          "inkInset": 5.16
+        },
+        {
+          "selector": "html > body:nth-of-type(1) > header:nth-of-type(1) > nav:nth-of-type(1) > a:nth-of-type(3)",
+          "height": 17,
+          "inkInset": 5.66
+        },
+        {
+          "selector": "div.hero-content > h1:nth-of-type(1)",
+          "height": 111,
+          "inkInset": 11.3
+        },
+        {
+          "selector": "div.hero-content > p:nth-of-type(1)",
+          "height": 22,
+          "inkInset": 8.5
+        },
+        {
+          "selector": "button.cta-button",
+          "height": 17,
+          "inkInset": 2.1
+        },
+        {
+          "selector": "div.features-grid > div:nth-of-type(1) > h3:nth-of-type(1)",
+          "height": 22,
+          "inkInset": 8.5
+        },
+        {
+          "selector": "div.features-grid > div:nth-of-type(2) > h3:nth-of-type(1)",
+          "height": 22,
+          "inkInset": 8.5
+        },
+        {
+          "selector": "div.features-grid > div:nth-of-type(3) > h3:nth-of-type(1)",
+          "height": 22,
+          "inkInset": 8.5
+        },
+        {
+          "selector": "div.features-grid > div:nth-of-type(1) > p:nth-of-type(1)",
+          "height": 43,
+          "inkInset": 5.92
+        },
+        {
+          "selector": "div.features-grid > div:nth-of-type(2) > p:nth-of-type(1)",
+          "height": 43,
+          "inkInset": 5.92
+        },
+        {
+          "selector": "div.features-grid > div:nth-of-type(3) > p:nth-of-type(1)",
+          "height": 43,
+          "inkInset": 5.92
+        },
+        {
+          "selector": "div.badge",
+          "height": 15,
+          "inkInset": 4.24
+        },
+        {
+          "selector": "div.pricing-grid > div:nth-of-type(1) > h3:nth-of-type(1)",
+          "height": 27,
+          "inkInset": 10.2
+        },
+        {
+          "selector": "div.pricing-grid > div:nth-of-type(2) > h3:nth-of-type(1)",
+          "height": 27,
+          "inkInset": 7.7
+        },
+        {
+          "selector": "div.pricing-grid > div:nth-of-type(1) > div:nth-of-type(1)",
+          "height": 44,
+          "inkInset": 15
+        },
+        {
+          "selector": "div.pricing-grid > div:nth-of-type(2) > div:nth-of-type(2)",
+          "height": 44,
+          "inkInset": 15
+        },
+        {
+          "selector": "div.pricing-grid > div:nth-of-type(1) > div:nth-of-type(2)",
+          "height": 17,
+          "inkInset": 6.66
+        },
+        {
+          "selector": "div.pricing-grid > div:nth-of-type(2) > div:nth-of-type(3)",
+          "height": 17,
+          "inkInset": 5.16
+        },
+        {
+          "selector": "div.faq-container > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 5.3
+        },
+        {
+          "selector": "div.faq-container > details:nth-of-type(1) > p:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 5.92
+        },
+        {
+          "selector": "div.faq-container > details:nth-of-type(2) > summary:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 5.3
+        },
+        {
+          "selector": "div.faq-container > details:nth-of-type(2) > p:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 5.92
+        },
+        {
+          "selector": "html > body:nth-of-type(1) > footer:nth-of-type(1) > p:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 4.52
+        }
+      ],
+      "pairs": [],
+      "findings": 0,
+      "reportedPairs": []
+    },
+    {
+      "fixture": "fixtures/auto-markup-proof/creative/attempt-s15-haiku.html",
+      "blocks": [
+        {
+          "selector": "nav.breadcrumb",
+          "height": 16,
+          "inkInset": 4.2
+        },
+        {
+          "selector": "h1.product-title",
+          "height": 31,
+          "inkInset": 3.8
+        },
+        {
+          "selector": "span.current-price",
+          "height": 27,
+          "inkInset": 8.7
+        },
+        {
+          "selector": "span.original-price",
+          "height": 20,
+          "inkInset": 6.4
+        },
+        {
+          "selector": "span.stock-badge",
+          "height": 16,
+          "inkInset": 4.2
+        },
+        {
+          "selector": "label.variant-label",
+          "height": 16,
+          "inkInset": 5.7
+        },
+        {
+          "selector": "div.variant-options > label:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 5.7
+        },
+        {
+          "selector": "div.variant-options > label:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 4.2
+        },
+        {
+          "selector": "div.variant-options > label:nth-of-type(3)",
+          "height": 16,
+          "inkInset": 4.2
+        },
+        {
+          "selector": "#decrementBtn",
+          "height": 17,
+          "inkInset": 8
+        },
+        {
+          "selector": "#quantityValue",
+          "height": 17,
+          "inkInset": 6.8
+        },
+        {
+          "selector": "#incrementBtn",
+          "height": 17,
+          "inkInset": 5.1
+        },
+        {
+          "selector": "label.quantity-label",
+          "height": 16,
+          "inkInset": 4.2
+        },
+        {
+          "selector": "#mainVisual",
+          "height": 16,
+          "inkInset": 4.2
+        },
+        {
+          "selector": "button.add-to-cart",
+          "height": 17,
+          "inkInset": 3.6
+        },
+        {
+          "selector": "#tab-description",
+          "height": 16,
+          "inkInset": 1.4
+        },
+        {
+          "selector": "#tab-specs",
+          "height": 16,
+          "inkInset": 1.4
+        },
+        {
+          "selector": "#tab-reviews",
+          "height": 16,
+          "inkInset": 2.9
+        },
+        {
+          "selector": "#panel-description > p:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 4.9
+        },
+        {
+          "selector": "h2.faq-title",
+          "height": 20,
+          "inkInset": 5.9
+        },
+        {
+          "selector": "section.faq-section > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 5.3
+        },
+        {
+          "selector": "section.faq-section > details:nth-of-type(2) > summary:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 6.8
+        },
+        {
+          "selector": "html > body:nth-of-type(1) > footer:nth-of-type(1) > p:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 4.2
+        }
+      ],
+      "pairs": [],
+      "findings": 0,
+      "reportedPairs": []
+    },
+    {
+      "fixture": "fixtures/auto-markup-proof/creative/attempt-s16-haiku.html",
+      "blocks": [
+        {
+          "selector": "div.sidebar-brand",
+          "height": 20,
+          "inkInset": 5
+        },
+        {
+          "selector": "h1.page-title",
+          "height": 31,
+          "inkInset": 11
+        },
+        {
+          "selector": "p.page-subtitle",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "nav.sidebar-nav > a:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 5
+        },
+        {
+          "selector": "div.filters > button:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 2.9
+        },
+        {
+          "selector": "div.filters > button:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 2.9
+        },
+        {
+          "selector": "div.filters > button:nth-of-type(3)",
+          "height": 16,
+          "inkInset": 1.4
+        },
+        {
+          "selector": "div.filters > button:nth-of-type(4)",
+          "height": 16,
+          "inkInset": 2.9
+        },
+        {
+          "selector": "nav.sidebar-nav > a:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 5
+        },
+        {
+          "selector": "nav.sidebar-nav > a:nth-of-type(3)",
+          "height": 16,
+          "inkInset": 5.5
+        },
+        {
+          "selector": "div.stats > div:nth-of-type(1) > div:nth-of-type(1)",
+          "height": 14,
+          "inkInset": 3
+        },
+        {
+          "selector": "div.stats > div:nth-of-type(2) > div:nth-of-type(1)",
+          "height": 14,
+          "inkInset": 3
+        },
+        {
+          "selector": "div.stats > div:nth-of-type(3) > div:nth-of-type(1)",
+          "height": 14,
+          "inkInset": 4.5
+        },
+        {
+          "selector": "div.stats > div:nth-of-type(4) > div:nth-of-type(1)",
+          "height": 14,
+          "inkInset": 3
+        },
+        {
+          "selector": "nav.sidebar-nav > a:nth-of-type(4)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "div.stats > div:nth-of-type(1) > div:nth-of-type(2)",
+          "height": 27,
+          "inkInset": 7.5
+        },
+        {
+          "selector": "div.stats > div:nth-of-type(2) > div:nth-of-type(2)",
+          "height": 27,
+          "inkInset": 7.5
+        },
+        {
+          "selector": "div.stats > div:nth-of-type(3) > div:nth-of-type(2)",
+          "height": 27,
+          "inkInset": 9.5
+        },
+        {
+          "selector": "div.stats > div:nth-of-type(4) > div:nth-of-type(2)",
+          "height": 27,
+          "inkInset": 9.5
+        },
+        {
+          "selector": "#ordersTable > thead:nth-of-type(1) > tr:nth-of-type(1) > th:nth-of-type(1)",
+          "height": 14,
+          "inkInset": 4.5
+        },
+        {
+          "selector": "#ordersTable > thead:nth-of-type(1) > tr:nth-of-type(1) > th:nth-of-type(2)",
+          "height": 14,
+          "inkInset": 4.5
+        },
+        {
+          "selector": "#ordersTable > thead:nth-of-type(1) > tr:nth-of-type(1) > th:nth-of-type(3) > button:nth-of-type(1)",
+          "height": 14,
+          "inkInset": 2.7
+        },
+        {
+          "selector": "#ordersTable > thead:nth-of-type(1) > tr:nth-of-type(1) > th:nth-of-type(4)",
+          "height": 14,
+          "inkInset": 4.5
+        },
+        {
+          "selector": "#ordersTable > thead:nth-of-type(1) > tr:nth-of-type(1) > th:nth-of-type(5) > button:nth-of-type(1)",
+          "height": 14,
+          "inkInset": 2.7
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 5.5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(3)",
+          "height": 16,
+          "inkInset": 5.5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(5)",
+          "height": 16,
+          "inkInset": 5.5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(4) > span:nth-of-type(1)",
+          "height": 14,
+          "inkInset": 4.5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 5.5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(3)",
+          "height": 16,
+          "inkInset": 5.5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(5)",
+          "height": 16,
+          "inkInset": 5.5
+        },
+        {
+          "selector": "span.status-badge.status-pending",
+          "height": 14,
+          "inkInset": 3
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 5.5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(3)",
+          "height": 16,
+          "inkInset": 5.5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(5)",
+          "height": 16,
+          "inkInset": 5.5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(4) > span:nth-of-type(1)",
+          "height": 14,
+          "inkInset": 4.5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(4) > td:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 5.5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(4) > td:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(4) > td:nth-of-type(3)",
+          "height": 16,
+          "inkInset": 5.5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(4) > td:nth-of-type(5)",
+          "height": 16,
+          "inkInset": 5.5
+        },
+        {
+          "selector": "span.status-badge.status-refunded",
+          "height": 14,
+          "inkInset": 4.5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(5) > td:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 5.5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(5) > td:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(5) > td:nth-of-type(3)",
+          "height": 16,
+          "inkInset": 5.5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(5) > td:nth-of-type(5)",
+          "height": 16,
+          "inkInset": 5.5
+        },
+        {
+          "selector": "#ordersTable > tbody:nth-of-type(1) > tr:nth-of-type(5) > td:nth-of-type(4) > span:nth-of-type(1)",
+          "height": 14,
+          "inkInset": 4.5
+        },
+        {
+          "selector": "div.pagination > span:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "#prevBtn",
+          "height": 16,
+          "inkInset": 2.9
+        },
+        {
+          "selector": "#nextBtn",
+          "height": 16,
+          "inkInset": 3.4
+        }
+      ],
+      "pairs": [],
+      "findings": 0,
+      "reportedPairs": []
+    },
+    {
+      "fixture": "fixtures/auto-markup-proof/creative/attempt-s17-haiku.html",
+      "blocks": [
+        {
+          "selector": "h1.page-title",
+          "height": 36,
+          "inkInset": 12.5
+        },
+        {
+          "selector": "#checkout-form > fieldset:nth-of-type(1) > legend:nth-of-type(1)",
+          "height": 20,
+          "inkInset": 7
+        },
+        {
+          "selector": "div.order-summary > h2:nth-of-type(1)",
+          "height": 22,
+          "inkInset": 5.5
+        },
+        {
+          "selector": "#checkout-form > fieldset:nth-of-type(1) > div:nth-of-type(1) > label:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 5.75
+        },
+        {
+          "selector": "div.item-name",
+          "height": 17,
+          "inkInset": 4.5
+        },
+        {
+          "selector": "div.item-variant",
+          "height": 17,
+          "inkInset": 5.75
+        },
+        {
+          "selector": "div.item-price",
+          "height": 20,
+          "inkInset": 5.5
+        },
+        {
+          "selector": "#checkout-form > fieldset:nth-of-type(1) > div:nth-of-type(2) > label:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 4.25
+        },
+        {
+          "selector": "div.cost-rows > div:nth-of-type(1) > span:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 5.75
+        },
+        {
+          "selector": "div.cost-rows > div:nth-of-type(1) > span:nth-of-type(2)",
+          "height": 17,
+          "inkInset": 5.25
+        },
+        {
+          "selector": "div.cost-rows > div:nth-of-type(2) > span:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 4.25
+        },
+        {
+          "selector": "div.cost-rows > div:nth-of-type(2) > span:nth-of-type(2)",
+          "height": 17,
+          "inkInset": 6.25
+        },
+        {
+          "selector": "#checkout-form > fieldset:nth-of-type(2) > legend:nth-of-type(1)",
+          "height": 20,
+          "inkInset": 5
+        },
+        {
+          "selector": "div.cost-rows > div:nth-of-type(3) > span:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 4.25
+        },
+        {
+          "selector": "div.cost-rows > div:nth-of-type(3) > span:nth-of-type(2)",
+          "height": 17,
+          "inkInset": 6.25
+        },
+        {
+          "selector": "#checkout-form > fieldset:nth-of-type(2) > div:nth-of-type(1) > label:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 5.75
+        },
+        {
+          "selector": "div.cost-row.total > span:nth-of-type(1)",
+          "height": 20,
+          "inkInset": 7
+        },
+        {
+          "selector": "div.cost-row.total > span:nth-of-type(2)",
+          "height": 20,
+          "inkInset": 5.5
+        },
+        {
+          "selector": "#checkout-form > fieldset:nth-of-type(2) > div:nth-of-type(2) > label:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 5.75
+        },
+        {
+          "selector": "div.reassurance",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "#checkout-form > fieldset:nth-of-type(2) > div:nth-of-type(3) > label:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 5.75
+        },
+        {
+          "selector": "#checkout-form > fieldset:nth-of-type(2) > div:nth-of-type(4) > label:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 4.25
+        },
+        {
+          "selector": "#checkout-form > fieldset:nth-of-type(2) > div:nth-of-type(5) > label:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 4.75
+        },
+        {
+          "selector": "#checkout-form > fieldset:nth-of-type(3) > legend:nth-of-type(1)",
+          "height": 20,
+          "inkInset": 5
+        },
+        {
+          "selector": "div.radio-group > div:nth-of-type(1) > label:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 5.75
+        },
+        {
+          "selector": "div.radio-group > div:nth-of-type(2) > label:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 4.25
+        },
+        {
+          "selector": "div.radio-group > div:nth-of-type(3) > label:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 4.25
+        },
+        {
+          "selector": "div.details-section > details:nth-of-type(1) > summary:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 4.25
+        },
+        {
+          "selector": "div.checkbox-group > label:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 4.25
+        },
+        {
+          "selector": "#submit-btn",
+          "height": 17,
+          "inkInset": 2.1
+        }
+      ],
+      "pairs": [],
+      "findings": 0,
+      "reportedPairs": []
+    },
+    {
+      "fixture": "fixtures/auto-markup-proof/creative/attempt-s18-haiku.html",
+      "blocks": [
+        {
+          "selector": "div.workspace-name",
+          "height": 17,
+          "inkInset": 4.5
+        },
+        {
+          "selector": "div.channel-title",
+          "height": 22,
+          "inkInset": 5.5
+        },
+        {
+          "selector": "div.team-name",
+          "height": 15,
+          "inkInset": 5.25
+        },
+        {
+          "selector": "div.channel-topic",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "div.channel-members",
+          "height": 15,
+          "inkInset": 5.25
+        },
+        {
+          "selector": "aside.sidebar > div:nth-of-type(2) > h2:nth-of-type(1)",
+          "height": 14,
+          "inkInset": 4.5
+        },
+        {
+          "selector": "aside.sidebar > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(1) > a:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "div.message-list-container > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "div.message-list-container > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(2)",
+          "height": 14,
+          "inkInset": 4.5
+        },
+        {
+          "selector": "aside.sidebar > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(2) > a:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "span.unread-badge",
+          "height": 14,
+          "inkInset": 4.5
+        },
+        {
+          "selector": "div.message-list-container > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "aside.sidebar > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(3) > a:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "div.message-list-container > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 5
+        },
+        {
+          "selector": "div.message-list-container > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(2)",
+          "height": 14,
+          "inkInset": 4.5
+        },
+        {
+          "selector": "aside.sidebar > div:nth-of-type(2) > ul:nth-of-type(1) > li:nth-of-type(4) > a:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 5
+        },
+        {
+          "selector": "div.message-list-container > div:nth-of-type(2) > div:nth-of-type(2) > div:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "div.message-list-container > div:nth-of-type(3) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 5
+        },
+        {
+          "selector": "div.message-list-container > div:nth-of-type(3) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(2)",
+          "height": 14,
+          "inkInset": 4.5
+        },
+        {
+          "selector": "aside.sidebar > div:nth-of-type(3) > h2:nth-of-type(1)",
+          "height": 14,
+          "inkInset": 3
+        },
+        {
+          "selector": "div.message-list-container > div:nth-of-type(3) > div:nth-of-type(2) > div:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "aside.sidebar > div:nth-of-type(3) > ul:nth-of-type(1) > li:nth-of-type(1) > a:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "div.message-list-container > div:nth-of-type(4) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "div.message-list-container > div:nth-of-type(4) > div:nth-of-type(2) > div:nth-of-type(1) > span:nth-of-type(2)",
+          "height": 14,
+          "inkInset": 4.5
+        },
+        {
+          "selector": "aside.sidebar > div:nth-of-type(3) > ul:nth-of-type(1) > li:nth-of-type(2) > a:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 5
+        },
+        {
+          "selector": "div.message-list-container > div:nth-of-type(4) > div:nth-of-type(2) > div:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "aside.sidebar > div:nth-of-type(3) > ul:nth-of-type(1) > li:nth-of-type(3) > a:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 5
+        },
+        {
+          "selector": "button.invite-button",
+          "height": 16,
+          "inkInset": 2.9
+        },
+        {
+          "selector": "button.send-button",
+          "height": 16,
+          "inkInset": 2.9
+        }
+      ],
+      "pairs": [],
+      "findings": 0,
+      "reportedPairs": []
+    },
+    {
+      "fixture": "fixtures/auto-markup-proof/creative/attempt-s19-haiku.html",
+      "blocks": [
+        {
+          "selector": "div.hud-left",
+          "height": 20,
+          "inkInset": 4.3
+        },
+        {
+          "selector": "div.hud-stats > div:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 2.9
+        },
+        {
+          "selector": "div.hud-stats > div:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 2.9
+        },
+        {
+          "selector": "div.hud-stats > div:nth-of-type(3)",
+          "height": 16,
+          "inkInset": 2.9
+        },
+        {
+          "selector": "div.energy-label",
+          "height": 11,
+          "inkInset": 1
+        },
+        {
+          "selector": "div.energy-value",
+          "height": 22,
+          "inkInset": 4.5
+        },
+        {
+          "selector": "div.battlefield > div:nth-of-type(3) > div:nth-of-type(2) > div:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 3.6
+        },
+        {
+          "selector": "div.enemy-intent",
+          "height": 14,
+          "inkInset": 2.7
+        },
+        {
+          "selector": "div.block-display",
+          "height": 17,
+          "inkInset": 3.6
+        },
+        {
+          "selector": "div.battlefield > div:nth-of-type(1) > div:nth-of-type(2) > div:nth-of-type(2)",
+          "height": 17,
+          "inkInset": 3.6
+        },
+        {
+          "selector": "button.character-info > div:nth-of-type(1)",
+          "height": 14,
+          "inkInset": 2.7
+        },
+        {
+          "selector": "#hand > button:nth-of-type(1) > div:nth-of-type(1)",
+          "height": 32,
+          "inkInset": 2.7
+        },
+        {
+          "selector": "#hand > button:nth-of-type(5) > div:nth-of-type(1)",
+          "height": 32,
+          "inkInset": 2.7
+        },
+        {
+          "selector": "#hand > button:nth-of-type(2) > div:nth-of-type(1)",
+          "height": 29,
+          "inkInset": 2.7
+        },
+        {
+          "selector": "#hand > button:nth-of-type(4) > div:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 2.7
+        },
+        {
+          "selector": "#hand > button:nth-of-type(3) > div:nth-of-type(1)",
+          "height": 14,
+          "inkInset": 2.7
+        },
+        {
+          "selector": "#hand > button:nth-of-type(4) > div:nth-of-type(2)",
+          "height": 12,
+          "inkInset": 2
+        },
+        {
+          "selector": "#hand > button:nth-of-type(1) > div:nth-of-type(2)",
+          "height": 14,
+          "inkInset": 2
+        },
+        {
+          "selector": "#hand > button:nth-of-type(5) > div:nth-of-type(2)",
+          "height": 14,
+          "inkInset": 2
+        },
+        {
+          "selector": "#hand > button:nth-of-type(2) > div:nth-of-type(2)",
+          "height": 12,
+          "inkInset": 2
+        },
+        {
+          "selector": "#hand > button:nth-of-type(3) > div:nth-of-type(2)",
+          "height": 11,
+          "inkInset": 2
+        },
+        {
+          "selector": "#hand > button:nth-of-type(4) > div:nth-of-type(3)",
+          "height": 24,
+          "inkInset": 1
+        },
+        {
+          "selector": "#hand > button:nth-of-type(1) > div:nth-of-type(3)",
+          "height": 18,
+          "inkInset": 1
+        },
+        {
+          "selector": "#hand > button:nth-of-type(5) > div:nth-of-type(3)",
+          "height": 16,
+          "inkInset": 2
+        },
+        {
+          "selector": "#hand > button:nth-of-type(2) > div:nth-of-type(3)",
+          "height": 13,
+          "inkInset": 2
+        },
+        {
+          "selector": "#hand > button:nth-of-type(3) > div:nth-of-type(3)",
+          "height": 11,
+          "inkInset": 2
+        },
+        {
+          "selector": "button.end-turn-btn",
+          "height": 16,
+          "inkInset": 2.9
+        },
+        {
+          "selector": "div.piles > div:nth-of-type(1)",
+          "height": 15,
+          "inkInset": 3.3
+        },
+        {
+          "selector": "div.piles > div:nth-of-type(2)",
+          "height": 15,
+          "inkInset": 3.3
+        }
+      ],
+      "pairs": [
+        {
+          "pair": "#hand > button:nth-of-type(1) > div:nth-of-type(2) x #hand > button:nth-of-type(1) > div:nth-of-type(3)",
+          "ox": 35,
+          "oy": -4,
+          "threshold": 6,
+          "margin": -10,
+          "reported": false
+        },
+        {
+          "pair": "div.energy-label x div.energy-value",
+          "ox": 28,
+          "oy": -5.5,
+          "threshold": 6,
+          "margin": -11.5,
+          "reported": false
+        },
+        {
+          "pair": "#hand > button:nth-of-type(5) > div:nth-of-type(2) x #hand > button:nth-of-type(5) > div:nth-of-type(3)",
+          "ox": 35,
+          "oy": -6,
+          "threshold": 6,
+          "margin": -12,
+          "reported": false
+        },
+        {
+          "pair": "#hand > button:nth-of-type(1) > div:nth-of-type(1) x #hand > button:nth-of-type(1) > div:nth-of-type(2)",
+          "ox": 34,
+          "oy": -6.7,
+          "threshold": 6,
+          "margin": -12.7,
+          "reported": false
+        },
+        {
+          "pair": "#hand > button:nth-of-type(5) > div:nth-of-type(1) x #hand > button:nth-of-type(5) > div:nth-of-type(2)",
+          "ox": 35,
+          "oy": -6.7,
+          "threshold": 6,
+          "margin": -12.7,
+          "reported": false
+        },
+        {
+          "pair": "#hand > button:nth-of-type(4) > div:nth-of-type(2) x #hand > button:nth-of-type(4) > div:nth-of-type(3)",
+          "ox": 34,
+          "oy": -8,
+          "threshold": 6,
+          "margin": -14,
+          "reported": false
+        }
+      ],
+      "findings": 0,
+      "reportedPairs": []
+    },
+    {
+      "fixture": "fixtures/auto-markup-proof/creative/attempt-stress.html",
+      "blocks": [
+        {
+          "selector": "div.sidebar-mark",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "div.title-block > h1:nth-of-type(1)",
+          "height": 36,
+          "inkInset": 4.2
+        },
+        {
+          "selector": "div.sidebar-version",
+          "height": 31,
+          "inkInset": 3.9
+        },
+        {
+          "selector": "p.lead",
+          "height": 20,
+          "inkInset": 5.9
+        },
+        {
+          "selector": "ul.sidebar-nav > li:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 6
+        },
+        {
+          "selector": "ul.sidebar-nav > li:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 4.5
+        },
+        {
+          "selector": "div.stats > div:nth-of-type(1) > div:nth-of-type(1)",
+          "height": 31,
+          "inkInset": 7.3
+        },
+        {
+          "selector": "div.stats > div:nth-of-type(2) > div:nth-of-type(1)",
+          "height": 31,
+          "inkInset": 7.3
+        },
+        {
+          "selector": "div.stats > div:nth-of-type(3) > div:nth-of-type(1)",
+          "height": 31,
+          "inkInset": 4.8
+        },
+        {
+          "selector": "div.stats > div:nth-of-type(4) > div:nth-of-type(1)",
+          "height": 31,
+          "inkInset": 7.3
+        },
+        {
+          "selector": "ul.sidebar-nav > li:nth-of-type(3)",
+          "height": 16,
+          "inkInset": 6
+        },
+        {
+          "selector": "div.stats > div:nth-of-type(1) > div:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "div.stats > div:nth-of-type(2) > div:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "div.stats > div:nth-of-type(3) > div:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "div.stats > div:nth-of-type(4) > div:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "ul.sidebar-nav > li:nth-of-type(4)",
+          "height": 16,
+          "inkInset": 6
+        },
+        {
+          "selector": "ul.sidebar-nav > li:nth-of-type(5)",
+          "height": 16,
+          "inkInset": 4.5
+        },
+        {
+          "selector": "div.card-title",
+          "height": 17,
+          "inkInset": 4.5
+        },
+        {
+          "selector": "div.endpoint-string",
+          "height": 16,
+          "inkInset": 4.2
+        },
+        {
+          "selector": "div.card-note",
+          "height": 16,
+          "inkInset": 4.2
+        },
+        {
+          "selector": "#conflict",
+          "height": 27,
+          "inkInset": 5.4
+        },
+        {
+          "selector": "div.section-content > p:nth-of-type(1)",
+          "height": 44,
+          "inkInset": 6.1
+        },
+        {
+          "selector": "div.section-content > p:nth-of-type(2)",
+          "height": 44,
+          "inkInset": 6.1
+        },
+        {
+          "selector": "#limits",
+          "height": 27,
+          "inkInset": 5.4
+        },
+        {
+          "selector": "table.limits-table > thead:nth-of-type(1) > tr:nth-of-type(1) > th:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 5
+        },
+        {
+          "selector": "table.limits-table > thead:nth-of-type(1) > tr:nth-of-type(1) > th:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 5
+        },
+        {
+          "selector": "table.limits-table > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 5
+        },
+        {
+          "selector": "table.limits-table > tbody:nth-of-type(1) > tr:nth-of-type(1) > td:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 5
+        },
+        {
+          "selector": "table.limits-table > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 5
+        },
+        {
+          "selector": "table.limits-table > tbody:nth-of-type(1) > tr:nth-of-type(2) > td:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 5
+        },
+        {
+          "selector": "table.limits-table > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "table.limits-table > tbody:nth-of-type(1) > tr:nth-of-type(3) > td:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "table.limits-table > tbody:nth-of-type(1) > tr:nth-of-type(4) > td:nth-of-type(1)",
+          "height": 16,
+          "inkInset": 3.5
+        },
+        {
+          "selector": "table.limits-table > tbody:nth-of-type(1) > tr:nth-of-type(4) > td:nth-of-type(2)",
+          "height": 16,
+          "inkInset": 5
+        },
+        {
+          "selector": "#changelog",
+          "height": 14,
+          "inkInset": 3
+        },
+        {
+          "selector": "footer.footer",
+          "height": 16,
+          "inkInset": 3.5
+        }
+      ],
+      "pairs": [],
+      "findings": 0,
+      "reportedPairs": []
+    },
+    {
+      "fixture": "fixtures/auto-markup-proof/creative/broken-spec.html",
+      "blocks": [
+        {
+          "selector": "div.kicker",
+          "height": 15,
+          "inkInset": 1.3
+        },
+        {
+          "selector": "#headline",
+          "height": 40,
+          "inkInset": 3.9
+        },
+        {
+          "selector": "#subline",
+          "height": 21,
+          "inkInset": 1.8
+        },
+        {
+          "selector": "#ship-note",
+          "height": 19,
+          "inkInset": 2.1
+        },
+        {
+          "selector": "p.after-cards",
+          "height": 57,
+          "inkInset": 2.1
+        },
+        {
+          "selector": "#card-row > div:nth-of-type(1)",
+          "height": 19,
+          "inkInset": 2.1
+        },
+        {
+          "selector": "#card-row > div:nth-of-type(2)",
+          "height": 19,
+          "inkInset": 3.6
+        },
+        {
+          "selector": "#card-row > div:nth-of-type(3)",
+          "height": 19,
+          "inkInset": 2.1
+        },
+        {
+          "selector": "#card-row > div:nth-of-type(1) > p:nth-of-type(1)",
+          "height": 38,
+          "inkInset": 2.1
+        },
+        {
+          "selector": "#card-row > div:nth-of-type(2) > p:nth-of-type(1)",
+          "height": 38,
+          "inkInset": 2.1
+        },
+        {
+          "selector": "#card-row > div:nth-of-type(3) > p:nth-of-type(1)",
+          "height": 38,
+          "inkInset": 2.1
+        },
+        {
+          "selector": "#promo-banner",
+          "height": 38,
+          "inkInset": 2.1
+        },
+        {
+          "selector": "html > body:nth-of-type(1) > main:nth-of-type(1) > figure:nth-of-type(1) > figcaption:nth-of-type(1)",
+          "height": 19,
+          "inkInset": 2.1
+        },
+        {
+          "selector": "html > body:nth-of-type(1) > footer:nth-of-type(1)",
+          "height": 19,
+          "inkInset": 2.1
+        }
+      ],
+      "pairs": [],
+      "findings": 0,
+      "reportedPairs": []
+    },
+    {
+      "fixture": "fixtures/collision-fp-corpus/negative-margin-heading.html",
+      "blocks": [
+        {
+          "selector": "p.kicker",
+          "height": 15,
+          "inkInset": 1.3
+        },
+        {
+          "selector": "html > body:nth-of-type(1) > h1:nth-of-type(1)",
+          "height": 46,
+          "inkInset": 4
+        },
+        {
+          "selector": "p.lede",
+          "height": 21,
+          "inkInset": 1.8
+        }
+      ],
+      "pairs": [
+        {
+          "pair": "p.kicker x html > body:nth-of-type(1) > h1:nth-of-type(1)",
+          "ox": 148,
+          "oy": 1.7,
+          "threshold": 6.2,
+          "margin": -4.5,
+          "reported": false
+        }
+      ],
+      "findings": 0,
+      "reportedPairs": []
+    },
+    {
+      "fixture": "fixtures/collision-fp-corpus/rotated-labels.html",
+      "blocks": [
+        {
+          "selector": "div.axis > span:nth-of-type(1)",
+          "height": 114,
+          "inkInset": 2.8
+        },
+        {
+          "selector": "div.axis > span:nth-of-type(2)",
+          "height": 114,
+          "inkInset": 2.8
+        },
+        {
+          "selector": "div.axis > span:nth-of-type(3)",
+          "height": 114,
+          "inkInset": 2.8
+        },
+        {
+          "selector": "div.axis > span:nth-of-type(4)",
+          "height": 114,
+          "inkInset": 2.8
+        }
+      ],
+      "pairs": [],
+      "findings": 0,
+      "reportedPairs": []
+    },
+    {
+      "fixture": "fixtures/collision-fp-corpus/sliver-true-positive.html",
+      "blocks": [
+        {
+          "selector": "#total",
+          "height": 19,
+          "inkInset": 2.6
+        },
+        {
+          "selector": "#refund",
+          "height": 19,
+          "inkInset": 3.6
+        }
+      ],
+      "pairs": [
+        {
+          "pair": "#total x #refund",
+          "ox": 25,
+          "oy": 11.8,
+          "threshold": 6,
+          "margin": 5.8,
+          "reported": true
+        }
+      ],
+      "findings": 1,
+      "reportedPairs": [
+        "#total x #refund"
+      ]
+    },
+    {
+      "fixture": "fixtures/collision-fp-corpus/tall-metrics.html",
+      "blocks": [
+        {
+          "selector": "div.stack > p:nth-of-type(1)",
+          "height": 52,
+          "inkInset": 0
+        },
+        {
+          "selector": "div.stack > p:nth-of-type(2)",
+          "height": 52,
+          "inkInset": 0
+        },
+        {
+          "selector": "div.stack > p:nth-of-type(3)",
+          "height": 52,
+          "inkInset": 0
+        }
+      ],
+      "pairs": [
+        {
+          "pair": "div.stack > p:nth-of-type(1) x div.stack > p:nth-of-type(2)",
+          "ox": 502,
+          "oy": 4,
+          "threshold": 26,
+          "margin": -22,
+          "reported": false
+        },
+        {
+          "pair": "div.stack > p:nth-of-type(2) x div.stack > p:nth-of-type(3)",
+          "ox": 511,
+          "oy": 4,
+          "threshold": 26,
+          "margin": -22,
+          "reported": false
+        }
+      ],
+      "findings": 0,
+      "reportedPairs": []
+    },
+    {
+      "fixture": "fixtures/collision-fp-corpus/tight-leading.html",
+      "blocks": [
+        {
+          "selector": "h1.display",
+          "height": 149,
+          "inkInset": 0
+        },
+        {
+          "selector": "html > body:nth-of-type(1) > p:nth-of-type(1)",
+          "height": 17,
+          "inkInset": 4.8
+        }
+      ],
+      "pairs": [],
+      "findings": 0,
+      "reportedPairs": []
+    },
+    {
+      "fixture": "fixtures/collision-fp-corpus/vertical-writing.html",
+      "blocks": [
+        {
+          "selector": "div.cols > p:nth-of-type(1)",
+          "height": 183,
+          "inkInset": 0.4
+        },
+        {
+          "selector": "div.cols > p:nth-of-type(2)",
+          "height": 167,
+          "inkInset": 0
+        }
+      ],
+      "pairs": [],
+      "findings": 0,
+      "reportedPairs": []
+    }
+  ]
+}

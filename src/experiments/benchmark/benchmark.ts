@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * vrt benchmark
+ * vlmkit benchmark
  *
  * Measure performance of deterministic APIs (no LLM).
  * Record results as baselines for tracking improvements.
@@ -82,7 +82,7 @@ async function main() {
   await mkdir(TMP, { recursive: true });
 
   console.log();
-  console.log(`${BOLD}${CYAN}vrt benchmark${RESET}`);
+  console.log(`${BOLD}${CYAN}vlmkit benchmark${RESET}`);
   console.log();
 
   const results: BenchResult[] = [];

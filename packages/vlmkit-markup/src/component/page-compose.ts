@@ -33,6 +33,7 @@ import {
 import { classifyRegion, kindsCanPair, type ComponentKindInfo } from "./component-classify.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
+import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 
 export interface PageComponent extends ComponentBbox {
   /** Index in the extraction order (area-desc) of its own side. */
@@ -526,6 +527,11 @@ export async function renderHtmlToPng(
   try {
     const page = await browser.newPage({ viewport: { width, height } });
     await page.goto(pathToFileURL(resolve(htmlPath)).href, { waitUntil: "load" });
+    // A screenshot samples the DOM at that instant. Measured 2026-08-02 on a
+    // candidate that renders its cards 350ms after `load`: this capture held
+    // 5.3% of the settled ink — the "Loading…" placeholder — so every component
+    // came back missing and the kickback blamed the markup.
+    await settlePage(page);
     // Viewport-only, like `build component`: the target screenshot is bounded
     // by the requested viewport, so a full-page capture of a taller candidate
     // would report below-the-fold content as extra components.

@@ -1,4 +1,4 @@
-# vrt — Project Skills
+# vlmkit — Project Skills
 
 ## How to Update VLM Model Benchmarks
 
@@ -14,7 +14,7 @@ pkf run vlm-bench -- --list --max-cost 0.001 --limit 30
 
 2. **Run fix-loop with candidate models** (hard case: seed 11):
 ```bash
-VRT_VLM_MODEL="<model-id>" node --experimental-strip-types src/experiments/css-challenge/fix-loop.ts \
+VLMKIT_VLM_MODEL="<model-id>" node --experimental-strip-types src/experiments/css-challenge/fix-loop.ts \
   --fixture page --seed 11 --mode selector --max-rounds 2
 ```
 
@@ -140,23 +140,23 @@ pkf run migration-tailwind
 pkf run migration-reset
 
 # File comparison
-vrt compare before.html after.html
+vlmkit diff html before.html after.html
 
 # URL comparison
-vrt compare --url http://localhost:3000/ --current-url http://localhost:8080/
+vlmkit diff html --url http://localhost:3000/ --current-url http://localhost:8080/
 
 # With masks (exclude dynamic content)
-vrt compare --url http://localhost:3000/ --current-url http://localhost:8080/ --mask ".marquee-container,.hero-badge"
+vlmkit diff html --url http://localhost:3000/ --current-url http://localhost:8080/ --mask ".marquee-container,.hero-badge"
 ```
 
 ## Snapshot (URL → multi-viewport capture)
 
 ```bash
 # First run: create baseline. Subsequent runs: baseline + diff
-vrt snapshot http://localhost:3000/ http://localhost:3000/about/ --output snapshots/
+vlmkit snapshot http://localhost:3000/ http://localhost:3000/about/ --output snapshots/
 
 # With masks (exclude animated/dynamic elements)
-vrt snapshot http://localhost:3000/ --mask ".marquee-container,.hero-badge"
+vlmkit snapshot http://localhost:3000/ --mask ".marquee-container,.hero-badge"
 ```
 
 ## Dogfooding
@@ -182,20 +182,20 @@ pkf run fix-loop -- --fixture page --seed 42
 pkf run fix-loop -- --fixture page --seed 11 --mode selector --max-rounds 3
 
 # Specify a VLM model
-VRT_VLM_MODEL="bytedance/ui-tars-1.5-7b" pkf run fix-loop -- --fixture page --seed 11 --mode selector
+VLMKIT_VLM_MODEL="bytedance/ui-tars-1.5-7b" pkf run fix-loop -- --fixture page --seed 11 --mode selector
 ```
 
 ## Environment Variables
 
 | Variable | Purpose | Default |
 |------|------|----------|
-| `VRT_LLM_PROVIDER` | LLM provider | gemini |
-| `VRT_LLM_MODEL` | LLM model | Provider default |
-| `VRT_VLM_MODEL` | VLM model (OpenRouter / `gemini:` / `claude:`) | bytedance/ui-tars-1.5-7b |
+| `VLMKIT_LLM_PROVIDER` | LLM provider | gemini |
+| `VLMKIT_LLM_MODEL` | LLM model | Provider default |
+| `VLMKIT_VLM_MODEL` | VLM model (OpenRouter / `gemini:` / `claude:`) | bytedance/ui-tars-1.5-7b |
 | `OPENROUTER_API_KEY` | OpenRouter API key | — |
 | `GEMINI_API_KEY` | Google AI API key | — |
 | `ANTHROPIC_API_KEY` | Anthropic API key | — |
-| `DEBUG_VRT` | Enable debug logs | — |
+| `DEBUG_VLMKIT` | Enable debug logs | — |
 
 ## Package Layout
 
@@ -203,10 +203,10 @@ This repository is a pnpm workspace.
 
 | Path | Contents |
 |------|----------|
-| `packages/vrt-core/` | Image / CSS / DOM / a11y diff engine + shared types and CLI helpers. No Playwright or AI deps required to import core types. |
-| `packages/vrt-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
-| `packages/vrt-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
-| `packages/vrt-markup/` | VLM-driven markup tooling: component extract / from-image, design tokens, theme parity, i18n stress, palette, dep-graph, selector-heal, smoke-runner. |
+| `packages/vlmkit-core/` | Image / CSS / DOM / a11y diff engine + shared types and CLI helpers. No Playwright or AI deps required to import core types. |
+| `packages/vlmkit-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
+| `packages/vlmkit-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
+| `packages/vlmkit-markup/` | VLM-driven markup tooling: component extract / from-image, design tokens, theme parity, i18n stress, palette, dep-graph, selector-heal, smoke-runner. |
 | `src/cli/` | CLI entry + router + workflow command implementations (split per-command under `cli/workflow/`). |
 | `src/api/` | HTTP API server (deep-imports vrt-markup smoke-runner + experiments/css-challenge). |
 | `src/experiments/` | migration, css-challenge, detection, benchmark, flaker. |
@@ -216,7 +216,7 @@ This repository is a pnpm workspace.
 
 Cross-package imports use `@mizchi/vrt-<pkg>/<path>.ts` or the curated barrel `@mizchi/vrt-<pkg>`. Within a package, use relative imports. The barrel excludes Playwright-bound and CLI-entry modules — deep-import those.
 
-Run tests for a single package: `pnpm --filter @mizchi/vrt-core test`. From repo root, `pnpm test` runs all.
+Run tests for a single package: `pnpm --filter @mizchi/vlmkit-core test`. From repo root, `pnpm test` runs all.
 
 The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need the `moon` CLI. If tests fail with `spawnSync moon ENOENT`, add it to PATH first (it is often installed but not on PATH in sandboxes): `export PATH="$HOME/.moon/bin:$PATH"`.
 

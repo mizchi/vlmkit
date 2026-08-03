@@ -1,10 +1,10 @@
 # crater breakpoint discovery design
 
-As of 2026-04-02, crater core / BiDi / `vrt` integration is implemented; what remains unfinished is the v2 scope such as external stylesheet discovery.
+As of 2026-04-02, crater core / BiDi / `vlmkit` integration is implemented; what remains unfinished is the v2 scope such as external stylesheet discovery.
 
 ## Background
 
-The original `vrt` had the idea of treating breakpoints as boundary values for quickcheck, but extraction was regex-based and only looked at `<style>`.
+The original `vlmkit` had the idea of treating breakpoints as boundary values for quickcheck, but extraction was regex-based and only looked at `<style>`.
 
 Now `migration-compare --discover-backend auto|regex|crater` is available, and the default `auto` prefers crater's `getResponsiveBreakpoints`, falling back to regex discovery only when unavailable.
 
@@ -14,12 +14,12 @@ Meanwhile, `crater` already has:
 - stylesheet parser
 - BiDi extensions (`capturePaintTree`, `setViewport`)
 
-Therefore, it's natural to consolidate breakpoint discovery normalization and contracts on the `crater` side, limiting `vrt` to the responsibility of converting them into test inputs.
+Therefore, it's natural to consolidate breakpoint discovery normalization and contracts on the `crater` side, limiting `vlmkit` to the responsibility of converting them into test inputs.
 
 ## Goal
 
 - Extract responsive breakpoint candidates from CSS media queries via parser-based approach
-- Enable `vrt` to convert them into viewport sets as quickcheck boundary values
+- Enable `vlmkit` to convert them into viewport sets as quickcheck boundary values
 - Enable `migration-compare` to union breakpoints from baseline / variant
 - Fix the contract upfront for easy future extension to external stylesheets and container queries
 
@@ -40,7 +40,7 @@ Therefore, it's natural to consolidate breakpoint discovery normalization and co
 - Return breakpoint candidates from the current document
 - Return non-width conditions and unsupported conditions as diagnostics
 
-### vrt's responsibilities
+### vlmkit's responsibilities
 
 - Union breakpoint sets from baseline / variant
 - Expand `>= N` to `N-1, N` etc., converting to quickcheck boundary inputs
@@ -53,7 +53,7 @@ What `crater` returns is `canonical responsive breakpoints`, not `suggested view
 
 Reasons:
 
-- Viewport generation is `vrt`'s test policy
+- Viewport generation is `vlmkit`'s test policy
 - `maxViewports` and `randomSamples` change based on harness / CI needs
 - Systems like `flaker` that require stable identities need fixed viewports
 - `crater` is more reusable when it acts as the CSS semantics authority
@@ -67,7 +67,7 @@ crater core
 crater BiDi
   -> browsingContext.getResponsiveBreakpoints
 
-vrt
+vlmkit
   -> union breakpoints
   -> generateViewports(...)
 ```
@@ -259,7 +259,7 @@ Since the current `SessionState` is thin and doesn't directly hold browser state
 
 ## vrt-side integration point
 
-`packages/vrt-capture/src/viewport-discovery.ts` has regex extraction and viewport generation tightly coupled.
+`packages/vlmkit-capture/src/viewport-discovery.ts` has regex extraction and viewport generation tightly coupled.
 When introducing crater, make the generation logic the proper API and make the extraction source swappable.
 
 Expected:
@@ -297,7 +297,7 @@ Minimum Red:
 - `no such frame` on invalid context
 - Unsupported conditions appear in diagnostics
 
-### vrt tests
+### vlmkit tests
 
 - Can pass crater breakpoints to `generateViewports()`
 - Can take union of baseline / variant
@@ -310,7 +310,7 @@ Minimum Red:
 
 - crater core: `discover_responsive_breakpoints(html)`
 - crater BiDi: `browsingContext.getResponsiveBreakpoints`
-- vrt: crater client method
+- vlmkit: crater client method
 
 ### Phase 2
 
@@ -324,7 +324,7 @@ Minimum Red:
 - External stylesheet support
 - Breakpoint prioritization by `ruleCount`
 - Phased support for `height`, `orientation`, `prefers-color-scheme`
-- Add crater backend to `vrt discover` CLI
+- Add crater backend to `vlmkit scan breakpoints` CLI
 
 ## open questions
 
@@ -348,7 +348,7 @@ However, v1 provides sufficient value with just inline/live styles.
 With this design:
 
 - `crater` is the authority on CSS / media semantics
-- `vrt` is the authority on quickcheck input generation
+- `vlmkit` is the authority on quickcheck input generation
 
 This role separation holds.
 Since v1 can be cut narrow, we can deliver parser-based discovery value quickly while safely extending to external CSS and multi-axis discovery.

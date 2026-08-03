@@ -101,7 +101,7 @@ export async function applyForcedPseudoState(
       const bboxes: Array<{ x: number; y: number; width: number; height: number }> = [];
       for (let i = 0; i < capped.length; i++) {
         const el = capped[i] as HTMLElement;
-        el.setAttribute("data-vrt-state-marker", String(i));
+        el.setAttribute("data-vlmkit-state-marker", String(i));
         const tag = el.tagName.toLowerCase();
         const cls = el.className && typeof el.className === "string"
           ? `.${el.className.trim().split(/\s+/).slice(0, 3).join(".")}`
@@ -141,7 +141,7 @@ export async function applyForcedPseudoState(
   const { root } = await cdp.send("DOM.getDocument", { depth: -1, pierce: true });
   const { nodeIds } = await cdp.send("DOM.querySelectorAll", {
     nodeId: root.nodeId,
-    selector: "[data-vrt-state-marker]",
+    selector: "[data-vlmkit-state-marker]",
   });
   let forcedCount = 0;
   for (const nodeId of nodeIds) {
@@ -165,13 +165,13 @@ export async function applyForcedPseudoState(
 }
 
 /**
- * Remove the `data-vrt-state-marker` attributes left behind by
+ * Remove the `data-vlmkit-state-marker` attributes left behind by
  * `applyForcedPseudoState`. Call before re-running the same probe in
  * a different state.
  */
 export async function clearStateMarkers(page: Page): Promise<void> {
   await page.evaluate(() => {
-    document.querySelectorAll("[data-vrt-state-marker]")
-      .forEach((el) => el.removeAttribute("data-vrt-state-marker"));
+    document.querySelectorAll("[data-vlmkit-state-marker]")
+      .forEach((el) => el.removeAttribute("data-vlmkit-state-marker"));
   });
 }

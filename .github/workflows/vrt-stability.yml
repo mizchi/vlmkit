@@ -29,6 +29,8 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      # `:js` skips moon:build — this job has no MoonBit toolchain.
+      - run: pnpm build:packages:js
       - run: pnpm exec playwright install --with-deps chromium
 
       - name: Serve fixtures

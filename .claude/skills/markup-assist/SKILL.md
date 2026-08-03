@@ -25,6 +25,7 @@ paths or URLs. All commands support `--json` and most support
 | Is the required copy present, exactly? | `vlmkit check copy page.html --manifest copy.txt` |
 | Does the structure match the brief? (widths, per-row counts, order, per-viewport visibility) | `vlmkit check layout page.html --contract layout.json` |
 | Tokens / theme / a11y / long-text survival | `check tokens` · `check theme` · `check a11y contrast\|touch\|focus` · `stress i18n` |
+| Is the page consistent with itself? (no tokens file needed — component styles reused, spacing on its own scale) | `vlmkit check design page.html` |
 
 **Behavior:**
 

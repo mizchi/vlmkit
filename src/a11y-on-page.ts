@@ -1,7 +1,7 @@
 /**
  * Run the existing a11y checks (contrast + touch-target) on a
  * Playwright `Page` the caller already owns, without launching a
- * separate browser. Used by `vrt diff-pr` to fold a11y into its
+ * separate browser. Used by `vlmkit diff-pr` to fold a11y into its
  * per-route CI gate.
  *
  * The sample scripts and post-processors live in the existing

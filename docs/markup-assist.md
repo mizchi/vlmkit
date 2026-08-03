@@ -110,9 +110,42 @@ Nine gates become tools (`verify_markup`, `check_integrity`,
 the routing table below and the loop discipline, and assumes only
 that `npx vlmkit` runs.
 
+## Many pages at once
+
+Every recipe below takes one page. To run one over a whole route tree:
+
+```bash
+vlmkit batch --gate "check integrity" "routes/**/*.html"          # parallel, exit 1 if any page fails
+vlmkit batch --gate "check integrity" --gate "check design" "dist/**/*.html" --output ci-logs/
+vlmkit batch --gate "check integrity" "routes/**/*.html" --shard 2/3   # one of three CI runners
+```
+
+The verdict per page is that gate run's exit code, so anything with the
+standard exit contract is batchable. Measured concurrency / sharding budget:
+[`reports/2026-08-02-batch-runner-ci-budget.md`](./reports/2026-08-02-batch-runner-ci-budget.md).
+
+Past a handful of pages, put the plan in a file instead of in shell history:
+
+```bash
+vlmkit gates init --pages "routes/**/*.html" --gate "check integrity"
+vlmkit gates list            # what would run, exact commands
+vlmkit gates run --shard 1/3
+vlmkit gates suppressions    # every silenced check, with reason/owner/expiry
+```
+
+`vlmkit.gates.json` is also where suppressions belong (`--allow-invisible`,
+loosened thresholds). A suppression must carry a `reason`, and once its
+`expires` date passes it stops being applied — the gate runs unmuted and the
+run fails, so a stale exemption gets noticed instead of accumulating. That is
+the part a `grep` through npm scripts cannot give you.
+
 ## Pick your gate by task
 
-Sources are file paths or URLs throughout.
+Sources are file paths or URLs throughout. A file is loaded by navigation, so
+its relative stylesheets, images and scripts resolve — if your CSS lives in
+`style.css` next to the page, the gates measure the page as it actually renders
+(this was not true before 2026-08-02; see
+[`reports/2026-08-02-external-asset-load-defect.md`](./reports/2026-08-02-external-asset-load-defect.md)).
 
 ### I wrote or edited a page — find defects, no reference needed
 
@@ -120,8 +153,10 @@ Sources are file paths or URLs throughout.
 |---|---|
 | Broken-page scan: JS errors, empty render, failed resources, text collision/clipping/protrusion, collapsed containers, page overflow, invisible text, text painted over by opaque elements (occlusion), near-misalignment, unstyled page — across 3 viewports | `vlmkit check integrity page.html` |
 | The exact copy is spec (spellings, casing, `€`, dates) | `vlmkit check copy page.html --manifest copy.txt` |
+| An integrity finding is a deliberate pattern, not a defect | `vlmkit check integrity page.html --allow "near-misalignment@.badge;optically centred"` — reason mandatory, still listed as exempted |
 | Structural requirements as a machine-checkable spec (widths, per-row counts, stacking order, per-viewport visibility) | `vlmkit check layout page.html --contract layout.json` |
 | Design-system conformance: hard-coded values vs a token scale | `vlmkit check tokens page.html` |
+| No token file to check against: is the page consistent with *itself*? (one button style or six; spacing on the page's own scale) | `vlmkit check design page.html` |
 | Light/dark theme parity | `vlmkit check theme page.html` |
 | WCAG contrast / touch targets / focus order | `vlmkit check a11y contrast\|touch\|focus page.html` |
 | Layout survives 30% longer strings (i18n) | `vlmkit stress i18n page.html` |

@@ -1,0 +1,16 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Sliver graze</title>
+<style>
+  body { margin: 0; padding: 40px; background: #fff; font-family: ui-monospace, monospace; }
+  /* The counterpart case: two absolutely-positioned labels that GRAZE —
+     a few px horizontally across the full line height. Visually broken,
+     currently BELOW the both-axes floor and therefore unreported.
+     An ink-extents upgrade is expected to start reporting exactly this. */
+  .row { position: relative; height: 40px; font-size: 16px; }
+  #total  { position: absolute; left: 0px;   top: 10px; white-space: nowrap; }
+  #refund { position: absolute; left: 168px; top: 10px; white-space: nowrap; }
+</style></head><body>
+  <div class="row">
+    <span id="total">Total: 1,240,000 EUR</span>
+    <span id="refund">Refunds: 80 EUR</span>
+  </div>
+</body></html>
