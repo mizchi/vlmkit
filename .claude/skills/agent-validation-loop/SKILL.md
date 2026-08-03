@@ -339,7 +339,7 @@ This skill was distilled from the
 - 9 agent runs (a → i) on a single DESIGN.md → HTML/CSS reproduction
   scenario.
 - 18 GitHub issues filed and closed (#22 – #36) + 3 drafts shipped as
-  CLIs (`vrt manifest` / `vrt watch` / `vrt diff-pr`).
+  CLIs (`vlmkit manifest` / `vlmkit watch` / `vlmkit diff-pr`).
 - Closed-loop floor moved from 10.3% → 0.2% (5-round budget) and to
   3.45% (3-round budget).
 - 38 commits, 183 tests across 32 suites.

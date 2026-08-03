@@ -602,8 +602,8 @@ function parseSnapshotReportEvaluateCliArgs(args: string[]): ParsedSnapshotRepor
 export function formatSnapshotReportUsage(exitCode = 1): string {
   const body = [
     "Usage:",
-    "  vrt snapshot report <snapshot-report.json> [--format markdown|json] [--max-false-positive-rate n] [--max-diff-ratio n] [--github-step-summary path]",
-    "  vrt snapshot report evaluate --before-report before.json --after-report after.json [--format markdown|json] [--output path] [--min-success-rate n] [--min-improvement-rate n]",
+    "  vlmkit snapshot report <snapshot-report.json> [--format markdown|json] [--max-false-positive-rate n] [--max-diff-ratio n] [--github-step-summary path]",
+    "  vlmkit snapshot report evaluate --before-report before.json --after-report after.json [--format markdown|json] [--output path] [--min-success-rate n] [--min-improvement-rate n]",
   ].join("\n");
   return exitCode === 0 ? body : `${body}\n`;
 }

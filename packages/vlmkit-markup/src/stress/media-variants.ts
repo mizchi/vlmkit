@@ -27,8 +27,8 @@
  * and "animation correctly suppressed" yield identical screenshots.
  *
  * Usage:
- *   vrt media-variants <html-or-url>
- *   vrt media-variants <url> --variants forced-colors,print,rtl
+ *   vlmkit stress media <html-or-url>
+ *   vlmkit stress media <url> --variants forced-colors,print,rtl
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -353,7 +353,7 @@ export async function runMediaVariants(
   });
   await writeFile(reportPath, md);
 
-  console.log(`  ${BOLD}${CYAN}vrt media-variants${RESET}`);
+  console.log(`  ${BOLD}${CYAN}vlmkit stress media${RESET}`);
   console.log(`  ${DIM}source: ${options.source}${RESET}`);
   for (const v of variantResults) {
     const icon = v.verdict === "ok" ? `${GREEN}✓${RESET}`
@@ -437,7 +437,7 @@ async function main(argv = process.argv.slice(2)) {
   if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, outputDir, report, variants, threshold } = parseArgs(argv);
   if (positional.length === 0) {
-    console.log("Usage: vrt media-variants <html-or-url> [options]");
+    console.log("Usage: vlmkit stress media <html-or-url> [options]");
     console.log("Options:");
     console.log("  --variants <list>   Comma-separated subset (default: all 5)");
     console.log(`                      Available: ${ALL_VARIANTS.join(", ")}`);

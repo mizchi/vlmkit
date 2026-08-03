@@ -8,7 +8,7 @@ import { homedir, platform } from "node:os";
  *
  * Log path:
  *   Linux/macOS: ${XDG_STATE_HOME ?? ~/.local/state}/vrt/deprecated.log
- *   Windows:     ${LOCALAPPDATA}\vrt\deprecated.log
+ *   Windows:     ${LOCALAPPDATA}\vlmkit\deprecated.log
  *
  * Failure modes (read-only FS, missing env vars, EACCES) fall through
  * to stderr-only — never crash the CLI.

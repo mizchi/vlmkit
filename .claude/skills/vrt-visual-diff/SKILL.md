@@ -7,9 +7,9 @@ description: Compare two rendered pages (URL pairs or local HTML) and produce a 
 
 Two-step workflow:
 
-1. `vrt diff html <baseline> <variant>` — Playwright-driven capture +
+1. `vlmkit diff html <baseline> <variant>` — Playwright-driven capture +
    pixel diff + computed-style snapshot. Writes `report.json`.
-2. `vrt diff agent report.json` — formats the JSON into one Markdown
+2. `vlmkit diff agent report.json` — formats the JSON into one Markdown
    summary an agent can read in a single context window.
 
 The Markdown report layers signal hierarchies so a fresh agent can skim
@@ -66,36 +66,36 @@ skill assume one of these two forms.
 
 `--output <dir>` is a **directory** path; the diff writes
 `<dir>/diff-report.json` (+ per-viewport PNGs) into it. Feed that
-JSON path — not the dir — to `vrt diff agent`. (`migration-report.json`
+JSON path — not the dir — to `vlmkit diff agent`. (`migration-report.json`
 is still written alongside as a legacy alias for callers pinning
 the old name; the two files are byte-identical.)
 
 The filename is `migration-report.json` even on this non-migration
-path because the writer is shared with `vrt migration compare`. The
+path because the writer is shared with `vlmkit migration compare`. The
 name is legacy — treat it as "the diff report" regardless of whether
 you came here via `diff html` or `migration compare`. (Tracked for
 rename in #50.)
 
 ```bash
 # Local HTML pair → writes reports/diff-report.json
-vrt diff html before.html after.html --output reports/
-vrt diff agent reports/diff-report.json > reports/diff.md
+vlmkit diff html before.html after.html --output reports/
+vlmkit diff agent reports/diff-report.json > reports/diff.md
 
 # URL pair (e.g. before/after a code change on the dev server)
-vrt diff html \
+vlmkit diff html \
   --url http://localhost:3000/ \
   --current-url http://localhost:8080/ \
   --output reports/
-vrt diff agent reports/diff-report.json
+vlmkit diff agent reports/diff-report.json
 
 # Mask dynamic regions. The value is one quoted, comma-separated CSS
 # selector list — shell-quoting is required so commas don't split args.
-vrt diff html before.html after.html \
+vlmkit diff html before.html after.html \
   --mask ".marquee-container,.hero-badge,[data-testid='live-counter']" \
   --output reports/
 ```
 
-## Useful flags on `vrt diff agent`
+## Useful flags on `vlmkit diff agent`
 
 | Flag | Purpose |
 |---|---|
@@ -111,7 +111,7 @@ exposes them but the watch skill explains the persistence model.
 
 ## How to read the report
 
-The actual Markdown emitted by `vrt diff agent` opens with these
+The actual Markdown emitted by `vlmkit diff agent` opens with these
 sections, in this order (excerpt from a real run on
 `fixtures/element-compare/`):
 
@@ -167,7 +167,7 @@ ambiguous.
 
 ## Masking is load-bearing
 
-`vrt diff html` re-runs the page in headless Chromium; any animation,
+`vlmkit diff html` re-runs the page in headless Chromium; any animation,
 clock, marquee, ad slot, or hash-randomized class will flap on every
 run. Pass `--mask <css-selectors>` for everything that isn't
 deterministic. Diff% < 0.05 on a clean page with no mask is rare —
@@ -177,20 +177,20 @@ treat unexpected baseline noise as a missing mask, not a real diff.
 
 No env vars required for pixel + CSD path. The report is purely
 deterministic — no VLM / LLM is involved unless the migration-compare
-upstream invokes it (which `vrt diff html` does not by default).
+upstream invokes it (which `vlmkit diff html` does not by default).
 
 ## Outputs at a glance
 
 | File | Source | Consumer |
 |---|---|---|
-| `report.json` | `vrt diff html` | machine input to `vrt diff agent` |
-| Markdown (stdout or `--out`) | `vrt diff agent` | the calling agent |
-| `diff-<viewport>.png` | `vrt diff html` | linked in markdown for direct `Read` |
-| `.vrt/last-diff-for-agent.json` | `vrt diff agent` | next run, for regression detection (skip with `--no-history`) |
+| `report.json` | `vlmkit diff html` | machine input to `vlmkit diff agent` |
+| Markdown (stdout or `--out`) | `vlmkit diff agent` | the calling agent |
+| `diff-<viewport>.png` | `vlmkit diff html` | linked in markdown for direct `Read` |
+| `.vrt/last-diff-for-agent.json` | `vlmkit diff agent` | next run, for regression detection (skip with `--no-history`) |
 
 ## Failure modes
 
-- `vrt diff html` errors with "browser not found" → run
+- `vlmkit diff html` errors with "browser not found" → run
   `npx playwright install chromium` once.
 - Report shows 0 deltas but the agent expected changes → check the
   variant URL is actually the new build (build cache hits are common).

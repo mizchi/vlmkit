@@ -1,5 +1,5 @@
 /**
- * cac-based command tree for `vrt` (0.5.0+).
+ * cac-based command tree for `vlmkit` (0.5.0+).
  *
  * cac doesn't natively support multi-token command names, so we use a
  * two-level routing strategy: cac matches the top-level verb
@@ -9,7 +9,7 @@
  * `process.argv` swap — individual command files don't need to migrate
  * to a function-style API in this PR.
  *
- * Old top-level commands (`vrt compare`, `vrt a11y-touch`, etc.) remain
+ * Old top-level commands (`vlmkit diff html`, `vlmkit check a11y touch`, etc.) remain
  * as deprecation shims at the top level (still single-token, so cac
  * matches them directly).
  */
@@ -32,7 +32,7 @@ const CLI_ENTRY = process.argv[1];
  * closure that returns the dynamic import — keeping the path as a
  * literal at the `import()` call site lets tsdown statically
  * discover the leaf and code-split it into a chunk that ships with
- * `dist/vrt.mjs`.
+ * `dist/vlmkit.mjs`.
  *
  * The `name` is a per-leaf identifier set into `__VRT_DISPATCHER_LEAF__`
  * around the await. Each leaf's CLI-entry guard checks that the env
@@ -440,7 +440,7 @@ Run \`vlmkit <command> --help\` for options; most gates take --json and
       .allowUnknownOptions()
       .action(async () => {
         const groupArgs = passThrough(argv, [groupName]);
-        // `vrt diff --help` (no leaf, just help) → group usage.
+        // `vlmkit diff --help` (no leaf, just help) → group usage.
         // passThrough rewrites --help/-h to HELP_SENTINEL so cac
         // doesn't intercept; we restore the semantics here.
         if (
@@ -465,7 +465,7 @@ Run \`vlmkit <command> --help\` for options; most gates take --json and
   }
 
   // Snapshot / workflow / bench / api / report / skill (single-token).
-  // `vrt snapshot flipbook ...` is special-cased to delegate directly
+  // `vlmkit snapshot flipbook ...` is special-cased to delegate directly
   // to the flipbook CLI (snapshot.ts doesn't have a `flipbook` mode).
   cli.command("snapshot [...args]", "Multi-viewport snapshot baseline + diff")
     .allowUnknownOptions()
@@ -621,7 +621,10 @@ Run \`vlmkit <command> --help\` for options; most gates take --json and
   // Mask --help/-h so cac doesn't intercept; passThrough restores it.
   const maskedArgv = argv.map((a) => (a === "--help" || a === "-h" ? HELP_SENTINEL : a));
 
-  cli.parse(["node", "vrt", ...maskedArgv], { run: false });
+  // argv[1] is a placeholder — cac reads from index 2 and takes its display
+  // name from `cac("vlmkit")` above — but leaving the old binary name here
+  // invites the next reader to think the program is still called vrt.
+  cli.parse(["node", "vlmkit", ...maskedArgv], { run: false });
   if (cli.matchedCommand) {
     await cli.runMatchedCommand();
   } else {

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `vrt watch` — dev inner-loop wrapper around `vrt compare`.
+ * `vlmkit watch` — dev inner-loop wrapper around `vlmkit diff html`.
  *
  * Watches the variant file (and the dir of its referenced
  * stylesheets), re-runs the compare on every save, and surfaces a
@@ -275,7 +275,7 @@ async function runOnce(compareArgs: string[], outputDir: string): Promise<RoundS
 export async function runWatch(rawArgs: string[]): Promise<void> {
   const { compareArgs, watchPathOverride } = parseWatchArgs(rawArgs);
   if (compareArgs.length < 2) {
-    console.error("Usage: vrt watch <baseline> <variant> [vrt compare flags...]");
+    console.error("Usage: vlmkit watch <baseline> <variant> [vlmkit diff html flags...]");
     console.error("       (or --url + --current-url for URL mode)");
     process.exit(1);
   }
@@ -292,7 +292,7 @@ export async function runWatch(rawArgs: string[]): Promise<void> {
     ? resolve(watchPathOverride)
     : dirname(resolve(variant));
 
-  console.log(`${BOLD}${CYAN}vrt watch${RESET}`);
+  console.log(`${BOLD}${CYAN}vlmkit watch${RESET}`);
   console.log(`  ${DIM}baseline${RESET} ${baseline}`);
   console.log(`  ${DIM}variant ${RESET} ${variant}`);
   console.log(`  ${DIM}watching${RESET} ${watchPath}`);

@@ -3,8 +3,8 @@
  * VRT Snapshot -- capture URLs at multiple viewports, auto-compare with previous
  *
  * Usage:
- *   vrt snapshot http://localhost:4156/todomvc --output snapshots/luna/
- *   vrt snapshot http://localhost:3000/ http://localhost:3000/luna/ --output snapshots/sol/
+ *   vlmkit snapshot http://localhost:4156/todomvc --output snapshots/luna/
+ *   vlmkit snapshot http://localhost:3000/ http://localhost:3000/luna/ --output snapshots/sol/
  */
 import { existsSync } from "node:fs";
 import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
@@ -55,11 +55,11 @@ interface SnapshotResult {
 function formatSnapshotUsage(): string {
   return [
     "Usage:",
-    "  vrt snapshot <url1> [url2] ... [--output dir] [--label name] [--threshold 0.1] [--fail-on-diff] [--fail-on-new-baseline] [--max-diff-ratio n] [--backend local|cloudflare] [--config vrt.config.json]",
-    "  vrt snapshot approve [--output dir] [--label name] [--config vrt.config.json]",
-    "  vrt snapshot fix-prompt [--output dir] [--label name] [--format markdown|json] [--limit n] [--min-diff 0.01] [--out path] [--config vrt.config.json]",
-    "  vrt snapshot stability <url1> [url2]... [--iterations 3] [--output dir] [--threshold 0.1] [--fp-threshold 0] [--fail-above-rate 0.05] [--config vrt.config.json]",
-    "  vrt snapshot stability-history <stability-report.json>... [--out path]",
+    "  vlmkit snapshot <url1> [url2] ... [--output dir] [--label name] [--threshold 0.1] [--fail-on-diff] [--fail-on-new-baseline] [--max-diff-ratio n] [--backend local|cloudflare] [--config vrt.config.json]",
+    "  vlmkit snapshot approve [--output dir] [--label name] [--config vrt.config.json]",
+    "  vlmkit snapshot fix-prompt [--output dir] [--label name] [--format markdown|json] [--limit n] [--min-diff 0.01] [--out path] [--config vrt.config.json]",
+    "  vlmkit snapshot stability <url1> [url2]... [--iterations 3] [--output dir] [--threshold 0.1] [--fp-threshold 0] [--fail-above-rate 0.05] [--config vrt.config.json]",
+    "  vlmkit snapshot stability-history <stability-report.json>... [--out path]",
   ].join("\n");
 }
 
@@ -106,7 +106,7 @@ async function approve(options: {
     result = await approveSnapshotsFromReport(reportPath, options.labels);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new Error(`No snapshot report found at ${reportPath}. Run \`vrt snapshot <url...>\` first.`);
+      throw new Error(`No snapshot report found at ${reportPath}. Run \`vlmkit snapshot <url...>\` first.`);
     }
     throw error;
   }
@@ -142,7 +142,7 @@ async function runFixPrompt(options: {
     raw = await readFile(reportPath, "utf-8");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new Error(`No snapshot report found at ${reportPath}. Run \`vrt snapshot <url...>\` first.`);
+      throw new Error(`No snapshot report found at ${reportPath}. Run \`vlmkit snapshot <url...>\` first.`);
     }
     throw error;
   }
@@ -391,7 +391,7 @@ async function runDiffFlipbook(options: {
     raw = await readFile(reportPath, "utf-8");
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new Error(`No snapshot report found at ${reportPath}. Run \`vrt snapshot <url...>\` first.`);
+      throw new Error(`No snapshot report found at ${reportPath}. Run \`vlmkit snapshot <url...>\` first.`);
     }
     throw error;
   }

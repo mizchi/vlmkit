@@ -16,9 +16,9 @@ boxes and computed-style deltas to surface only the deltas that matter.
 
 | Mode | Cmd | What it does | Use when |
 |---|---|---|---|
-| **compare** | `vrt migration compare` | Deterministic: capture both, pixel diff + per-section bbox + computed-style diff per viewport | Baseline + variant are both rendered, you want a numeric verdict |
-| **blind** | `vrt migration blind` | Variant agent never sees baseline pixels — only structural hints. Forces agent to converge from spec text alone | Stress-test the migration: "can the new stack reproduce the layout from scratch?" |
-| **subagent** | `vrt migration subagent` | Dispatched subagent runs `compare` + writes a structured verdict | You want a fresh, unbiased read inside a longer chain |
+| **compare** | `vlmkit migration compare` | Deterministic: capture both, pixel diff + per-section bbox + computed-style diff per viewport | Baseline + variant are both rendered, you want a numeric verdict |
+| **blind** | `vlmkit migration blind` | Variant agent never sees baseline pixels — only structural hints. Forces agent to converge from spec text alone | Stress-test the migration: "can the new stack reproduce the layout from scratch?" |
+| **subagent** | `vlmkit migration subagent` | Dispatched subagent runs `compare` + writes a structured verdict | You want a fresh, unbiased read inside a longer chain |
 
 Default to **compare**. Use blind / subagent when you're auditing the
 toolchain itself, not the migration.
@@ -29,7 +29,7 @@ toolchain itself, not the migration.
 If you cannot fill in both sides (e.g. "Tailwind → vanilla CSS",
 "reset-css `eric-meyer` → `modern-normalize`", "Vite → Rspack
 pipeline"), this is the wrong skill — stop and use `vrt-visual-diff`
-instead. The Quickstart's `vrt migration compare baseline.html
+instead. The Quickstart's `vlmkit migration compare baseline.html
 variant.html` command shape matches *any* two-file pair, so it's
 easy to fall into. The named-migration check is the gate.
 
@@ -65,24 +65,24 @@ the dist is stale — run `pnpm build` or use the source form. All
 
 `--output <dir>` is a **directory** path; the engine writes
 `<dir>/diff-report.json` (+ per-viewport PNGs) into it. Pass that
-JSON file — not the dir — to `vrt diff agent`. (`migration-report.json`
+JSON file — not the dir — to `vlmkit diff agent`. (`migration-report.json`
 is also written as a legacy alias; both files have identical
 content.)
 
 ```bash
 # Two HTML files, side by side → writes reports/diff-report.json
-vrt migration compare baseline.html variant.html \
+vlmkit migration compare baseline.html variant.html \
   --output reports/
 
 # Two URLs (different dev servers / preview deploys)
-vrt migration compare \
+vlmkit migration compare \
   --url http://localhost:3000/ \
   --current-url http://localhost:8080/ \
   --mask ".marquee-container,.hero-badge" \
   --output reports/
 
 # Then format for the agent
-vrt diff agent reports/diff-report.json
+vlmkit diff agent reports/diff-report.json
 ```
 
 ## Computed-style diff is the load-bearing signal
@@ -99,13 +99,13 @@ report surfaces:
 - **Breakpoint-gated pairs**: selectors that differ on a viewport
   subset. Almost always "missing or wrong `@media` rule."
 
-`vrt diff agent` renders these as two subtables under "Verified
+`vlmkit diff agent` renders these as two subtables under "Verified
 deltas (computed-style) × viewport" — read top-to-bottom.
 
 ## Mode: blind
 
 ```bash
-vrt migration blind <baseline-url> <variant-url> --rounds 3
+vlmkit migration blind <baseline-url> <variant-url> --rounds 3
 ```
 
 The variant builder agent gets:
@@ -122,10 +122,10 @@ ergonomics are.
 ## Mode: subagent
 
 ```bash
-vrt migration subagent baseline.html variant.html
+vlmkit migration subagent baseline.html variant.html
 ```
 
-Spawns a fresh CC subagent that runs `vrt migration compare`, reads
+Spawns a fresh CC subagent that runs `vlmkit migration compare`, reads
 the Markdown report, and writes a verdict. Useful inside a longer
 chain where you want one unbiased opinion ("is this migration done?")
 without the caller's context bleeding in.
@@ -135,7 +135,7 @@ without the caller's context bleeding in.
 Migration diffs include cosmetic differences in non-deterministic
 content (timestamps, marquee animations, generated IDs). Always pass
 `--mask <selectors>` for any selector whose content isn't
-controlled. The `vrt diff html` quickstart in `vrt-visual-diff` shows
+controlled. The `vlmkit diff html` quickstart in `vrt-visual-diff` shows
 the syntax — `migration compare` accepts the same flag.
 
 ## Environment
@@ -150,7 +150,7 @@ the syntax — `migration compare` accepts the same flag.
 
 | File | Mode | Purpose |
 |---|---|---|
-| `migration.json` | compare | machine input to `vrt diff agent` |
+| `migration.json` | compare | machine input to `vlmkit diff agent` |
 | `migration-<vp>.png` | compare | pixel diff per viewport |
 | Markdown verdict | subagent | structured agent reply |
 | `rounds/<N>/` | blind | per-round capture + diff trail |

@@ -1,5 +1,5 @@
 /**
- * vrt TypeScript Client SDK
+ * vlmkit TypeScript Client SDK
  *
  * Type-safe client for all API server endpoints.
  * Works in Node.js / Deno / browsers.

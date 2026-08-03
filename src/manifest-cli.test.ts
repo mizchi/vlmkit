@@ -137,7 +137,7 @@ describe("vrt manifest CLI", () => {
   it("help: shows usage when no subcommand given", () => {
     const r = cli();
     assert.equal(r.status, 0);
-    assert.match(r.stdout, /vrt manifest <command>/);
+    assert.match(r.stdout, /vlmkit manifest <command>/);
   });
 
   it("unknown subcommand: exits non-zero with usage", () => {

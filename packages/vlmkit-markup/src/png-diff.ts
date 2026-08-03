@@ -48,7 +48,7 @@ class PngDiffCliError extends Error {
 }
 
 export function formatPngDiffUsage(): string {
-  return `vrt png-diff <baseline.png> <current.png>
+  return `vlmkit diff png <baseline.png> <current.png>
 
 Compare two existing PNG screenshots without launching Playwright.
 

@@ -228,8 +228,8 @@ async function main() {
 function formatMigrationSubagentUsage(): string {
   return [
     "Usage:",
-    "  vrt migration subagent prepare --report path/to/migration-report.json [--variant variant] [--output path] [--format markdown|json]",
-    "  vrt migration subagent evaluate --before-report before.json --after-report after.json [--output path] [--format markdown|json] [--min-success-rate n] [--min-improvement-rate n]",
+    "  vlmkit migration subagent prepare --report path/to/migration-report.json [--variant variant] [--output path] [--format markdown|json]",
+    "  vlmkit migration subagent evaluate --before-report before.json --after-report after.json [--output path] [--format markdown|json] [--min-success-rate n] [--min-improvement-rate n]",
   ].join("\n");
 }
 

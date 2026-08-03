@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * vrt benchmark
+ * vlmkit benchmark
  *
  * Measure performance of deterministic APIs (no LLM).
  * Record results as baselines for tracking improvements.

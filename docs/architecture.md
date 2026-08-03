@@ -5,15 +5,15 @@
 Entry point: `src/cli/vrt.ts`
 
 ```
-vrt compare <before> <after>           # HTML/URL VRT comparison
-vrt compare --url <url> --current-url <url>  # URL mode
-vrt snapshot <url1> [url2] ...         # URL → multi-viewport capture + baseline diff
-vrt bench [options]                    # CSS challenge benchmark
-vrt report                             # Report on accumulated data
-vrt discover <file>                    # Breakpoint discovery + viewport suggestions
-vrt smoke <file-or-url>                # A11y-driven random operation test
-vrt serve [--port 3456]                # API server
-vrt status [--url ...]                 # Server health check
+vlmkit diff html <before> <after>           # HTML/URL VRT comparison
+vlmkit diff html --url <url> --current-url <url>  # URL mode
+vlmkit snapshot <url1> [url2] ...         # URL → multi-viewport capture + baseline diff
+vlmkit bench [options]                    # CSS challenge benchmark
+vlmkit report                             # Report on accumulated data
+vlmkit scan breakpoints <file>                    # Breakpoint discovery + viewport suggestions
+vlmkit inspect smoke <file-or-url>                # A11y-driven random operation test
+vlmkit api serve [--port 3456]                # API server
+vlmkit api status [--url ...]                 # Server health check
 ```
 
 ## Module Structure
@@ -117,8 +117,8 @@ Heatmap (PNG) + CSS text diff
 Prevent false positives from dynamic content (animations, counters, external data).
 
 ```bash
-vrt snapshot http://localhost:3000/ --mask ".marquee-container,.hero-badge"
-vrt compare --url http://a.com --current-url http://b.com --mask ".ads"
+vlmkit snapshot http://localhost:3000/ --mask ".marquee-container,.hero-badge"
+vlmkit diff html --url http://a.com --current-url http://b.com --mask ".ads"
 ```
 
 Mechanism: inject `visibility: hidden !important` via `page.addStyleTag()`.

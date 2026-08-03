@@ -198,19 +198,19 @@ async function verify() {
   const result = await runVerifyPipeline(paths);
 
   if (!result.passed) {
-    console.log("\nFAILED — Fix the issues and run `vrt workflow capture && vrt workflow verify` again.");
+    console.log("\nFAILED — Fix the issues and run `vlmkit workflow capture && vlmkit workflow verify` again.");
     console.log("Details: " + REPORT_PATH);
     process.exit(1);
   } else if (result.needsReview) {
-    console.log("\nWARNING — Some changes need review. Run `vrt workflow report` for details.");
-    console.log("If changes are intentional, run `vrt workflow approve` to update baselines.");
+    console.log("\nWARNING — Some changes need review. Run `vlmkit workflow report` for details.");
+    console.log("If changes are intentional, run `vlmkit workflow approve` to update baselines.");
     process.exit(0);
   } else if (result.vrtDiffs.length === 0 && result.a11yDiffs.length === 0) {
     console.log("\nPASS — No visual or semantic changes detected.");
     process.exit(0);
   } else {
     console.log("\nPASS — All changes approved.");
-    console.log("Run `vrt workflow approve` to update baselines.");
+    console.log("Run `vlmkit workflow approve` to update baselines.");
     process.exit(0);
   }
 }
@@ -219,7 +219,7 @@ async function approve() {
   console.log("=== VRT Approve: Updating baselines ===\n");
 
   if (!existsSync(SNAPSHOTS_DIR)) {
-    console.error("No snapshots found. Run `vrt workflow capture` first.");
+    console.error("No snapshots found. Run `vlmkit workflow capture` first.");
     process.exit(1);
   }
 
@@ -236,7 +236,7 @@ async function approve() {
 
 async function report() {
   if (!existsSync(REPORT_PATH)) {
-    console.error("No report found. Run `vrt workflow verify` first.");
+    console.error("No report found. Run `vlmkit workflow verify` first.");
     process.exit(1);
   }
 

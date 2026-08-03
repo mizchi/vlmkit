@@ -4,8 +4,8 @@ VLM-driven markup-assistance tooling — component extraction, design-token
 conformance, theme parity, i18n stress, palette diff, dep-graph, selector heal.
 
 Part of the [`vrt`](https://github.com/mizchi/vrt) monorepo. Most modules
-double as CLI commands routed by the `vrt` CLI (`vrt scan component`,
-`vrt check theme`, `vrt check tokens`, `vrt stress i18n|media`, …).
+double as CLI commands routed by the `vrt` CLI (`vlmkit scan component`,
+`vlmkit check theme`, `vlmkit check tokens`, `vlmkit stress i18n|media`, …).
 
 ## Install
 
@@ -45,7 +45,7 @@ home.contrast.json
 home.responsive.json
 ```
 
-`home.contrast.json` may be the `vrt a11y-contrast` report shape:
+`home.contrast.json` may be the `vlmkit check a11y contrast` report shape:
 
 ```json
 { "totalText": 2, "failures": [] }

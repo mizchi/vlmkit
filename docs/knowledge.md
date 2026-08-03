@@ -875,7 +875,7 @@ tokens 列を必ず含め、この節のベースライン表に 1 行追記す�
 
 ### Selector-heal calibration (2026-07-30)
 
-`vrt interact --heal-all` labels **strong** suggestions at confidence `>= 0.40`
+`vlmkit inspect interact --heal-all` labels **strong** suggestions at confidence `>= 0.40`
 and **weak** ones at `>= 0.15`. These are precision-first thresholds: a
 fixture-derived corpus found that the former 0.30 strong cutoff promoted a
 wrong sibling. The corpus, exact scores, and reproduction command are in

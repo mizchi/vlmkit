@@ -59,11 +59,11 @@ probe_exec() {
 
 echo "==> smoke-dist: $(node "$DIST" --version 2>&1)"
 
-# Top-level subcommand surface (matches the new vrt 0.5.0 group structure).
+# Top-level subcommand surface (matches the new vlmkit 0.5.0 group structure).
 probe_help "diff html"            "Usage:"                 diff html
 probe_help "diff agent"           "migration"              diff agent
 probe_help "diff png"             "PNG"                    diff png
-probe_help "migration compare"    "vrt compare"            migration compare
+probe_help "migration compare"    "vlmkit diff html"            migration compare
 probe_help "snapshot"             "snapshot"               snapshot
 probe_help "build component"      "Usage: vlmkit build component" build component
 probe_help "scan component"       "component-extract"      scan component

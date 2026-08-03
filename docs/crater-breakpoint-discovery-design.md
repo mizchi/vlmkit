@@ -259,7 +259,7 @@ Since the current `SessionState` is thin and doesn't directly hold browser state
 
 ## vrt-side integration point
 
-`packages/vrt-capture/src/viewport-discovery.ts` has regex extraction and viewport generation tightly coupled.
+`packages/vlmkit-capture/src/viewport-discovery.ts` has regex extraction and viewport generation tightly coupled.
 When introducing crater, make the generation logic the proper API and make the extraction source swappable.
 
 Expected:
@@ -324,7 +324,7 @@ Minimum Red:
 - External stylesheet support
 - Breakpoint prioritization by `ruleCount`
 - Phased support for `height`, `orientation`, `prefers-color-scheme`
-- Add crater backend to `vrt discover` CLI
+- Add crater backend to `vlmkit scan breakpoints` CLI
 
 ## open questions
 

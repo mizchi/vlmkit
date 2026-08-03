@@ -167,7 +167,7 @@ function toHex(c: { r: number; g: number; b: number }): string {
  * Build the list of contrast failures from raw samples (post-process
  * step extracted from `runA11yContrast`). Pure — no I/O — so it can
  * be invoked over Playwright pages owned by other modules (e.g. the
- * `vrt diff-pr` CI gate calls this without spinning up a second
+ * `vlmkit diff-pr` CI gate calls this without spinning up a second
  * browser instance per route).
  */
 export function analyzeA11yContrastSamples(samples: A11yContrastRawSample[]): ContrastFinding[] {

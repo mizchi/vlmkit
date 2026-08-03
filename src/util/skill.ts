@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Skill playbooks for the vrt toolkit.
+ * Skill playbooks for the vlmkit toolkit.
  *
  * Adopts the per-domain skill pattern from browser-use/browser-harness:
  * accumulate repeated per-page or per-component configuration as
@@ -25,10 +25,10 @@
  *   }
  *
  * Usage:
- *   vrt skill list                     List skills in .vrt-skills/
- *   vrt skill show <name>              Print the skill file
- *   vrt skill init <name>              Create a starter skill file
- *   vrt skill run <name> --against <html|url>
+ *   vlmkit skill list                     List skills in .vrt-skills/
+ *   vlmkit skill show <name>              Print the skill file
+ *   vlmkit skill init <name>              Create a starter skill file
+ *   vlmkit skill run <name> --against <html|url>
  *                                      Execute every check in the skill
  *                                      against the target.
  */
@@ -174,7 +174,7 @@ export async function runSkill(
   const outputDir = resolve(outputBase, `skill-${skill.name}`);
   await mkdir(outputDir, { recursive: true });
 
-  console.log(`  ${BOLD}${CYAN}vrt skill run ${name}${RESET}`);
+  console.log(`  ${BOLD}${CYAN}vlmkit skill run ${name}${RESET}`);
   console.log(`  ${DIM}target: ${target}${RESET}`);
   console.log(`  ${DIM}${skill.checks.length} check(s):${RESET}`);
 
@@ -235,7 +235,7 @@ async function commandList() {
   const skills = await listSkills();
   if (skills.length === 0) {
     console.log(`${DIM}No skills found in ./${SKILLS_DIR}/.${RESET}`);
-    console.log(`Create one with: vrt skill init <name>`);
+    console.log(`Create one with: vlmkit skill init <name>`);
     return;
   }
   console.log(`Skills in ${SKILLS_DIR}/:`);
@@ -281,7 +281,7 @@ async function main(argv = process.argv.slice(2)) {
   const sub = argv[0];
   const rest = argv.slice(1);
   if (!sub || sub === "--help" || sub === "-h") {
-    console.log("Usage: vrt skill <command>");
+    console.log("Usage: vlmkit skill <command>");
     console.log("");
     console.log("Commands:");
     console.log("  list                            List skills in .vrt-skills/");
@@ -290,7 +290,7 @@ async function main(argv = process.argv.slice(2)) {
     console.log("  run <name> --against <target>   Execute every check in the skill");
     console.log("");
     console.log("Skill files live at .vrt-skills/<name>.json and declare a list of");
-    console.log("checks (vrt commands + their flags) to run against a target.");
+    console.log("checks (vlmkit commands + their flags) to run against a target.");
     process.exit(sub ? 0 : 1);
   }
   if (sub === "list") { await commandList(); return; }

@@ -3,13 +3,13 @@ import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 
 /**
- * Shared paths for `vrt workflow` commands.
+ * Shared paths for `vlmkit workflow` commands.
  *
- * - `HARNESS_ROOT` is the installed vrt package root (used to locate
+ * - `HARNESS_ROOT` is the installed vlmkit package root (used to locate
  *   `dist/e2e/vrt-capture.spec.mjs` or `e2e/vrt-capture.spec.ts`).
  *   Resolved by walking up from the CLI entry until a `package.json` is
  *   found, so it works in both the source layout (`src/cli/vlmkit.ts`) and
- *   the bundled CLI (`dist/vrt.mjs`).
+ *   the bundled CLI (`dist/vlmkit.mjs`).
  * - `PROJECT_ROOT` is the *target* project — where baselines, snapshots,
  *   output, and report files land. Overridable via `VRT_PROJECT_ROOT`;
  *   defaults to the caller's cwd.

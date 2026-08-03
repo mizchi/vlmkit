@@ -30,7 +30,7 @@ Result: **0.0 % on every viewport, "PASS, clean (3/3)"**.
 
 That diff is a lie. Three independent vrt bugs hit at once:
 
-1. `vrt compare` (file-mode) uses `page.setContent()` with no base URL, so
+1. `vlmkit diff html` (file-mode) uses `page.setContent()` with no base URL, so
    relative `<link href="style.css">` never resolves in either side.
 2. Both files happen to be named `page.html`, so `baselineName` and
    `variantName` both serialize to `"page"`. The variant screenshot

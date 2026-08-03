@@ -1,9 +1,9 @@
-# Dev inner loop: `vrt watch` + round-vs-round diff for fast iteration
+# Dev inner loop: `vlmkit watch` + round-vs-round diff for fast iteration
 
 ## Context
 
 The 2026-05-15 closed-loop validation runs (agent-a … agent-d) each
-took 45–146 tool calls × ~10 seconds per `vrt compare`. That's an
+took 45–146 tool calls × ~10 seconds per `vlmkit diff html`. That's an
 acceptable cost for a one-shot convergence loop, but it's far too
 slow for a developer-or-agent actively writing CSS. Today every
 re-run starts cold: full browser launch, full diff pipeline, full
@@ -23,17 +23,17 @@ is two pieces of UX glue:
 
 ## What's needed
 
-### `vrt watch <baseline> <variant>`
+### `vlmkit watch <baseline> <variant>`
 
 ```
-vrt watch fixtures/golden/page.html src/page.html \
+vlmkit watch fixtures/golden/page.html src/page.html \
   --tokens DESIGN.md \
   --output .vrt/runs/
 ```
 
 - Watches the variant's HTML + its referenced stylesheets (resolved
   via the same file-mode `page.goto(file://)` machinery that powers
-  `vrt compare`).
+  `vlmkit diff html`).
 - Debounce: ~150 ms after the last write event to coalesce burst
   saves.
 - Mutex: one compare runs at a time. New file events during a run
@@ -70,7 +70,7 @@ that they only discovered on the *next* round.
 
 ## Done when
 
-- [ ] `vrt watch` enters a stable loop with debounced re-runs.
+- [ ] `vlmkit watch` enters a stable loop with debounced re-runs.
 - [ ] Inter-run diff produces `latest-delta.md` with the four
       sections above.
 - [ ] Tests:
@@ -94,7 +94,7 @@ round trips break flow.
 
 ## Open question
 
-Do we wire `vrt watch` to the existing snapshot baseline machinery,
+Do we wire `vlmkit watch` to the existing snapshot baseline machinery,
 or keep it as a two-file compare wrapper for v1? Recommend the latter
 to ship quickly; baselines integration is in the baseline-and-approve
 ticket.

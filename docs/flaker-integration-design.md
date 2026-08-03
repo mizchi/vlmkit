@@ -38,7 +38,7 @@ As of 2026-04-02, in addition to this custom runner, built-in `vrt-migration` / 
 - Quarantine
 - Per-variant trend analysis
 
-References: [docs/why-flaker.ja.md](/Users/mz/ghq/github.com/mizchi/metric-ci/docs/why-flaker.ja.md), [types.ts](/Users/mz/ghq/github.com/mizchi/metric-ci/packages/vrt-core/src/types.ts), [quarantine-manifest.ts](/Users/mz/ghq/github.com/mizchi/metric-ci/src/cli/quarantine-manifest.ts)
+References: [docs/why-flaker.ja.md](/Users/mz/ghq/github.com/mizchi/metric-ci/docs/why-flaker.ja.md), [types.ts](/Users/mz/ghq/github.com/mizchi/metric-ci/packages/vlmkit-core/src/types.ts), [quarantine-manifest.ts](/Users/mz/ghq/github.com/mizchi/metric-ci/src/cli/quarantine-manifest.ts)
 
 ### vrt's responsibilities
 

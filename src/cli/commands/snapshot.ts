@@ -328,7 +328,7 @@ export function parseSnapshotCliArgs(
 
   if (positional[0] === "approve") {
     if (positional.length > 1) {
-      throw new Error("`vrt snapshot approve` does not accept positional URLs");
+      throw new Error("`vlmkit snapshot approve` does not accept positional URLs");
     }
     return {
       mode: "approve",
@@ -378,7 +378,7 @@ export function parseSnapshotCliArgs(
   if (positional[0] === "stability-history") {
     const reportPaths = positional.slice(1);
     if (reportPaths.length === 0) {
-      throw new Error("`vrt snapshot stability-history` requires one or more stability-report.json paths");
+      throw new Error("`vlmkit snapshot stability-history` requires one or more stability-report.json paths");
     }
     return {
       mode: "stability-history",
@@ -399,7 +399,7 @@ export function parseSnapshotCliArgs(
 
   if (positional[0] === "flipbook") {
     if (positional.length > 1) {
-      throw new Error("`vrt snapshot flipbook` does not accept positional URLs");
+      throw new Error("`vlmkit snapshot flipbook` does not accept positional URLs");
     }
     return {
       mode: "flipbook",
@@ -421,7 +421,7 @@ export function parseSnapshotCliArgs(
 
   if (positional[0] === "fix-prompt") {
     if (positional.length > 1) {
-      throw new Error("`vrt snapshot fix-prompt` does not accept positional URLs");
+      throw new Error("`vlmkit snapshot fix-prompt` does not accept positional URLs");
     }
     return {
       mode: "fix-prompt",

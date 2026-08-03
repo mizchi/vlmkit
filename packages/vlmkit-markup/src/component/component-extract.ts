@@ -8,22 +8,22 @@
  * dominant color + content-kind classification, and optionally
  * crops a selected one to a standalone PNG.
  *
- * Pairs with `vrt component-from-image`: given a full-page
+ * Pairs with `vlmkit build component`: given a full-page
  * screenshot (e.g. a Figma export, competitor mockup, or user-
  * reported bug screenshot), extract the component you want, then
  * feed the cropped PNG to `component-from-image` as the target.
  *
  * Usage:
- *   vrt component-extract <screenshot.png>
+ *   vlmkit scan component <screenshot.png>
  *     # list components ranked by area
  *
- *   vrt component-extract <screenshot.png> --crop 0
+ *   vlmkit scan component <screenshot.png> --crop 0
  *     # crop the largest (rank 0) component to <output-dir>/component-0.png
  *
- *   vrt component-extract <screenshot.png> --crop-all
+ *   vlmkit scan component <screenshot.png> --crop-all
  *     # crop every component into separate PNGs
  *
- *   vrt component-extract <screenshot.png> --at 640,320
+ *   vlmkit scan component <screenshot.png> --at 640,320
  *     # crop the component containing the given (x, y) point
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
@@ -194,7 +194,7 @@ export async function runComponentExtract(
   });
   await writeFile(reportPath, md);
 
-  console.log(`  ${BOLD}${CYAN}vrt component-extract${RESET}`);
+  console.log(`  ${BOLD}${CYAN}vlmkit scan component${RESET}`);
   console.log(`  ${DIM}source: ${sourcePath} (${sourcePng.width}×${sourcePng.height})${RESET}`);
   console.log(`  ${DIM}found ${components.length} component(s)${RESET}`);
   for (const c of components.slice(0, 8)) {
@@ -244,9 +244,9 @@ function renderReport(r: Omit<ComponentExtractReport, "reportPath">): string {
   lines.push("");
   lines.push("1. Visually verify the rank → component mapping (open the source PNG, " +
     "compare against the bbox column).");
-  lines.push("2. Crop the component you want as a target: `vrt component-extract " +
+  lines.push("2. Crop the component you want as a target: `vlmkit scan component " +
     "<src> --crop <rank>` (or `--at x,y` to crop by point).");
-  lines.push("3. Feed the cropped PNG to `vrt component-from-image <cropped> <your.html>` " +
+  lines.push("3. Feed the cropped PNG to `vlmkit build component <cropped> <your.html>` " +
     "to iterate against just that component.");
   lines.push("");
   return lines.join("\n");
@@ -256,7 +256,7 @@ async function main(argv = process.argv.slice(2)) {
   if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, outputDir, report, cropRank, cropAll, pointXY, cropPadding, minArea } = parseArgs(argv);
   if (positional.length === 0) {
-    console.log("Usage: vrt component-extract <screenshot.png> [options]");
+    console.log("Usage: vlmkit scan component <screenshot.png> [options]");
     console.log("Options:");
     console.log("  --crop <rank>           Crop the rank-N component (e.g. --crop 0)");
     console.log("  --crop-all              Crop every detected component");

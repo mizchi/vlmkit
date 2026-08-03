@@ -140,23 +140,23 @@ pkf run migration-tailwind
 pkf run migration-reset
 
 # File comparison
-vrt compare before.html after.html
+vlmkit diff html before.html after.html
 
 # URL comparison
-vrt compare --url http://localhost:3000/ --current-url http://localhost:8080/
+vlmkit diff html --url http://localhost:3000/ --current-url http://localhost:8080/
 
 # With masks (exclude dynamic content)
-vrt compare --url http://localhost:3000/ --current-url http://localhost:8080/ --mask ".marquee-container,.hero-badge"
+vlmkit diff html --url http://localhost:3000/ --current-url http://localhost:8080/ --mask ".marquee-container,.hero-badge"
 ```
 
 ## Snapshot (URL → multi-viewport capture)
 
 ```bash
 # First run: create baseline. Subsequent runs: baseline + diff
-vrt snapshot http://localhost:3000/ http://localhost:3000/about/ --output snapshots/
+vlmkit snapshot http://localhost:3000/ http://localhost:3000/about/ --output snapshots/
 
 # With masks (exclude animated/dynamic elements)
-vrt snapshot http://localhost:3000/ --mask ".marquee-container,.hero-badge"
+vlmkit snapshot http://localhost:3000/ --mask ".marquee-container,.hero-badge"
 ```
 
 ## Dogfooding
@@ -203,10 +203,10 @@ This repository is a pnpm workspace.
 
 | Path | Contents |
 |------|----------|
-| `packages/vrt-core/` | Image / CSS / DOM / a11y diff engine + shared types and CLI helpers. No Playwright or AI deps required to import core types. |
-| `packages/vrt-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
-| `packages/vrt-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
-| `packages/vrt-markup/` | VLM-driven markup tooling: component extract / from-image, design tokens, theme parity, i18n stress, palette, dep-graph, selector-heal, smoke-runner. |
+| `packages/vlmkit-core/` | Image / CSS / DOM / a11y diff engine + shared types and CLI helpers. No Playwright or AI deps required to import core types. |
+| `packages/vlmkit-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
+| `packages/vlmkit-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
+| `packages/vlmkit-markup/` | VLM-driven markup tooling: component extract / from-image, design tokens, theme parity, i18n stress, palette, dep-graph, selector-heal, smoke-runner. |
 | `src/cli/` | CLI entry + router + workflow command implementations (split per-command under `cli/workflow/`). |
 | `src/api/` | HTTP API server (deep-imports vrt-markup smoke-runner + experiments/css-challenge). |
 | `src/experiments/` | migration, css-challenge, detection, benchmark, flaker. |
@@ -216,7 +216,7 @@ This repository is a pnpm workspace.
 
 Cross-package imports use `@mizchi/vrt-<pkg>/<path>.ts` or the curated barrel `@mizchi/vrt-<pkg>`. Within a package, use relative imports. The barrel excludes Playwright-bound and CLI-entry modules — deep-import those.
 
-Run tests for a single package: `pnpm --filter @mizchi/vrt-core test`. From repo root, `pnpm test` runs all.
+Run tests for a single package: `pnpm --filter @mizchi/vlmkit-core test`. From repo root, `pnpm test` runs all.
 
 The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need the `moon` CLI. If tests fail with `spawnSync moon ENOENT`, add it to PATH first (it is often installed but not on PATH in sandboxes): `export PATH="$HOME/.moon/bin:$PATH"`.
 

@@ -20,7 +20,7 @@
  * `prefers-color-scheme` media query.
  *
  * Usage:
- *   vrt theme-parity <html> [--output-dir dir]
+ *   vlmkit check theme <html> [--output-dir dir]
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
@@ -214,7 +214,7 @@ export async function runThemeParity(
     });
     await writeFile(reportPath, md);
 
-    console.log(`  ${BOLD}${CYAN}vrt theme-parity${RESET}`);
+    console.log(`  ${BOLD}${CYAN}vlmkit check theme${RESET}`);
     console.log(`  ${DIM}html: ${htmlPath}${RESET}`);
     const pct = (themePixelDelta * 100).toFixed(1);
     const themeIcon = themePixelDelta < 0.02 ? `${YELLOW}!${RESET}` : `${GREEN}✓${RESET}`;
@@ -291,7 +291,7 @@ function renderReport(r: Omit<ThemeParityReport, "reportPath">): string {
     lines.push("2. Replace the hard-coded color values in the CSS for those elements with " +
       "either a `var(--token)` reference, or matching dark-mode overrides via " +
       "`@media (prefers-color-scheme: dark)`.");
-    lines.push("3. Re-run `vrt theme-parity`. Unthemed count should drop to 0.");
+    lines.push("3. Re-run `vlmkit check theme`. Unthemed count should drop to 0.");
   } else {
     lines.push("Every detected component changed fill between themes. Page is theme-clean.");
   }
@@ -303,7 +303,7 @@ async function main(argv = process.argv.slice(2)) {
   if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, outputDir, report, threshold } = parseArgs(argv);
   if (positional.length === 0) {
-    console.log("Usage: vrt theme-parity <html> [--output-dir dir]");
+    console.log("Usage: vlmkit check theme <html> [--output-dir dir]");
     console.log("Options:");
     console.log("  --output-dir <dir>   Default: ./test-results/theme-parity");
     console.log("  --report <path>      Markdown report path");

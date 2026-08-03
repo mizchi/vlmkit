@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `vrt flipbook <pngs...>` — assemble an arbitrary PNG sequence into a
+ * `vlmkit snapshot flipbook <pngs...>` — assemble an arbitrary PNG sequence into a
  * self-contained HTML flipbook.
  *
  * Use cases:
@@ -8,7 +8,7 @@
  *   - Ad-hoc demos: any ordered PNG series
  *
  * Snapshot/stability outputs have their own integrated flipbook commands
- * (`vrt snapshot flipbook`) that auto-discover the right frames.
+ * (`vlmkit snapshot flipbook`) that auto-discover the right frames.
  */
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
@@ -18,11 +18,11 @@ import { DIM, RESET, GREEN, CYAN, BOLD } from "@mizchi/vlmkit-core/terminal-colo
 function usage(): string {
   return [
     "Usage:",
-    "  vrt flipbook <frame1.png> [frame2.png ...] [--out flipbook.html] [--title \"…\"] [--delay 700] [--label A --label B] [--no-loop] [--no-autoplay]",
+    "  vlmkit snapshot flipbook <frame1.png> [frame2.png ...] [--out flipbook.html] [--title \"…\"] [--delay 700] [--label A --label B] [--no-loop] [--no-autoplay]",
     "",
     "Examples:",
-    "  vrt flipbook round-0.png round-1.png round-2.png --out fix-loop.html --title 'Fix-loop convergence'",
-    "  vrt flipbook *.png --delay 1200 --out demo.html",
+    "  vlmkit snapshot flipbook round-0.png round-1.png round-2.png --out fix-loop.html --title 'Fix-loop convergence'",
+    "  vlmkit snapshot flipbook *.png --delay 1200 --out demo.html",
   ].join("\n");
 }
 

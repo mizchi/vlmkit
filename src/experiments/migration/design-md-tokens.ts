@@ -1,7 +1,7 @@
 /**
  * Lightweight loader for the YAML-ish front matter Google's
  * `design.md` examples use. Goal: surface spacing + color tokens to
- * `vrt`'s fix-candidate and palette-diff layers so an agent can be told
+ * `vlmkit`'s fix-candidate and palette-diff layers so an agent can be told
  * "swap `surface-variant` → `surface-container-high`" instead of
  * staring at two hex strings.
  *

@@ -127,7 +127,7 @@ export const A11Y_FOCUS_ORDER_SAMPLE_SCRIPT = `
 
 /**
  * Walk Tab focus on an already-navigated Playwright Page and return
- * the focus sequence. Pulled out of `runFocusOrder` so `vrt diff-pr`
+ * the focus sequence. Pulled out of `runFocusOrder` so `vlmkit diff-pr`
  * can reuse it without launching a second browser. The page is left
  * in whatever focus state Tab ended in — callers that need the
  * pristine page should clone it first.

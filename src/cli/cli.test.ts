@@ -88,7 +88,7 @@ describe("vrt CLI tree (cac-based)", () => {
   it("`vrt diff png --help` delegates to the png-diff module's help", () => {
     const r = runVrt(["diff", "png", "--help"]);
     // png-diff exits 0 after printing help
-    assert.match(r.stdout, /vrt png-diff <baseline\.png> <current\.png>/);
+    assert.match(r.stdout, /vlmkit diff png <baseline\.png> <current\.png>/);
   });
 
   it("`vrt diff region --help` delegates to the VLM region-diff helper", () => {
@@ -105,14 +105,16 @@ describe("vrt CLI tree (cac-based)", () => {
   it("`vrt diff component --help` delegates to element-level comparison help", () => {
     const r = runVrt(["diff", "component", "--help"]);
     assert.equal(r.status, 0);
-    assert.match(r.stdout, /vrt diff component/);
+    assert.match(r.stdout, /vlmkit diff component/);
     assert.match(r.stdout, /--selectors/);
   });
 
   it("deprecated `vrt png-diff` warns and delegates", () => {
     const r = runVrt(["png-diff", "--help"]);
     assert.match(r.stderr, /\[vlmkit deprecated\] 'png-diff' → 'vlmkit diff png'/);
-    assert.match(r.stdout, /vrt png-diff <baseline\.png>/);
+    // The alias still routes, and the help it lands on names the CURRENT
+    // command — the old usage line was the thing being fixed.
+    assert.match(r.stdout, /vlmkit diff png <baseline\.png>/);
   });
 
   it("deprecated workflow alias `vrt init` warns (without actually running init)", () => {

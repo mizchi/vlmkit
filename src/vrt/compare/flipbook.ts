@@ -7,8 +7,8 @@
  * embedded in a PR description via attachment.
  *
  * Used by:
- *   - `vrt snapshot flipbook` (diff three-frame + stability iterations)
- *   - `vrt flipbook <pngs...>`   (free-form sequence, e.g. fix-loop rounds)
+ *   - `vlmkit snapshot flipbook` (diff three-frame + stability iterations)
+ *   - `vlmkit snapshot flipbook <pngs...>`   (free-form sequence, e.g. fix-loop rounds)
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";

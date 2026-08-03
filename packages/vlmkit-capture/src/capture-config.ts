@@ -1,5 +1,5 @@
 /**
- * Capture configuration loader for `vrt workflow init|capture`.
+ * Capture configuration loader for `vlmkit workflow init|capture`.
  *
  * Allows external projects to drive `e2e/vrt-capture.spec.ts` without
  * editing the spec by sourcing routes from `vrt.config.json` (or any
@@ -30,7 +30,7 @@ export const DEFAULT_CAPTURE_BASE_URL = "http://127.0.0.1:4174";
 
 /**
  * Built-in fallback used when no config or env override is provided.
- * Kept for vrt's own development workflow; external projects should
+ * Kept for vlmkit's own development workflow; external projects should
  * supply their own routes via `vrt.config.json`.
  */
 export const DEFAULT_CAPTURE_ROUTES: CaptureRoute[] = [

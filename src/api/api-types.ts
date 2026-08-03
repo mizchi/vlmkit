@@ -1,5 +1,5 @@
 /**
- * vrt API type definitions
+ * vlmkit API type definitions
  *
  * Shared types for CLI, server (Hono), Cloudflare Workers, and Client SDK.
  * This is the source of truth for all interfaces.

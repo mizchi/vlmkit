@@ -1,6 +1,6 @@
 ---
 name: vrt
-description: 'Reference for the `vrt` CLI — Visual Regression Testing combined with accessibility (a11y) semantic verification. Use when running `vrt-test` / `vrt` (Playwright VRT) / `vrt-update` / `vrt compare` / `vrt snapshot`, configuring the fix-loop CSS challenge benchmark, or picking a VLM model for diff analysis.'
+description: 'Reference for the `vrt` CLI — Visual Regression Testing combined with accessibility (a11y) semantic verification. Use when running `vrt-test` / `vrt` (Playwright VRT) / `vrt-update` / `vlmkit diff html` / `vlmkit snapshot`, configuring the fix-loop CSS challenge benchmark, or picking a VLM model for diff analysis.'
 ---
 
 # VRT + Semantic Verification — Agent Skill Guide

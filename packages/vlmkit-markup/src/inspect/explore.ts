@@ -2,8 +2,8 @@
 /**
  * Auto-discovered interaction exploration.
  *
- * Where `vrt interact` requires the test author to hand-write a
- * `sequence.json`, `vrt explore` reads the *page's* declaration of
+ * Where `vlmkit inspect interact` requires the test author to hand-write a
+ * `sequence.json`, `vlmkit inspect explore` reads the *page's* declaration of
  * what's interactive. Shaped like Chrome's proposed WebMCP without
  * depending on the spec — opt-in via two complementary mechanisms:
  *
@@ -21,14 +21,14 @@
  *      <details><summary data-vrt-action="disclose-faq">FAQ</summary>…</details>
  *
  * For each discovered action: snapshot baseline, invoke the action,
- * snapshot after, diff. Same downstream signal as `vrt interact` —
+ * snapshot after, diff. Same downstream signal as `vlmkit inspect interact` —
  * pixel diff + heatmap regions + dead-action flag — but the
  * sequence is auto-derived. When WebMCP ships, swap the discovery
  * layer to read its tool registry instead.
  *
  * Usage:
- *   vrt explore <html|url>
- *   vrt explore <html|url> --wait 500    # delay after action before snapshot
+ *   vlmkit inspect explore <html|url>
+ *   vlmkit inspect explore <html|url> --wait 500    # delay after action before snapshot
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -346,7 +346,7 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
   });
   await writeFile(reportPath, md);
 
-  console.log(`  ${BOLD}${CYAN}vrt explore${RESET}`);
+  console.log(`  ${BOLD}${CYAN}vlmkit inspect explore${RESET}`);
   console.log(`  ${DIM}source: ${options.source}${RESET}`);
   console.log(`  ${DIM}discovered ${actions.length} action(s)${RESET}`);
   let deadCount = 0;
@@ -489,7 +489,7 @@ function renderReport(r: Omit<ExploreReport, "reportPath">): string {
 }
 
 function printUsage(): void {
-  console.log("Usage: vrt explore <html-or-url> [options]");
+  console.log("Usage: vlmkit inspect explore <html-or-url> [options]");
   console.log("Options:");
   console.log("  --wait <ms>          Delay after each action before snapshot (default: 200)");
   console.log("  --threshold <0..1>   Pixel diff threshold (default: 0.03)");

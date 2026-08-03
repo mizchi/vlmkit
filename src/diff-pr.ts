@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 /**
- * `vrt diff-pr` — CI-mode runner. Walks the declared route set,
+ * `vlmkit diff-pr` — CI-mode runner. Walks the declared route set,
  * compares each route's current rendering against a pinned baseline
  * PNG, applies the per-route diff-ratio policy, and exits non-zero on
  * any uncovered breach.
  *
  * Two subcommands:
- *   vrt diff-pr pin [--config vrt.config.json]
+ *   vlmkit diff-pr pin [--config vrt.config.json]
  *     Capture baselines for every declared route into
  *     <baselineDir>/<route>/<viewport>.png. Run once on main when the
  *     design is intended; downstream PRs gate against these PNGs.
  *
- *   vrt diff-pr [--config vrt.config.json] [--output <dir>]
+ *   vlmkit diff-pr [--config vrt.config.json] [--output <dir>]
  *     For each route, render the current state at every viewport,
  *     pixel-diff against the pinned PNG, apply the per-route policy.
  *     Emit a markdown summary suitable for pasting into a PR comment.
@@ -20,7 +20,7 @@
  * Stays narrow: uses Playwright directly + the existing
  * `compareScreenshots` helper, NOT the full migration-compare
  * pipeline. The richer wireframe-suggestions / palette-diff signals
- * are still available via `vrt compare` / `vrt watch` for the
+ * are still available via `vlmkit diff html` / `vlmkit watch` for the
  * development loop; this is the policy gate.
  */
 
@@ -215,7 +215,7 @@ async function cmdPin(args: string[]): Promise<void> {
     routesToPin = config.routes.filter((r) => requestedRouteNames.includes(r.name));
   }
 
-  console.log(`${BOLD}${CYAN}vrt diff-pr pin${RESET}  ${DIM}${configPath}${RESET}`);
+  console.log(`${BOLD}${CYAN}vlmkit diff-pr pin${RESET}  ${DIM}${configPath}${RESET}`);
   const scopeNote = routesToPin.length === config.routes.length
     ? `pinning ${routesToPin.length} route(s)`
     : `pinning ${routesToPin.length} of ${config.routes.length} route(s) (${routesToPin.map((r) => r.name).join(", ")}); other baselines untouched`;
@@ -236,7 +236,7 @@ async function cmdPin(args: string[]): Promise<void> {
       for (const vp of viewports) {
         try {
           // a11y is intentionally NOT computed during `pin` — the
-          // baseline PNG is what we care about. CI's `vrt diff-pr`
+          // baseline PNG is what we care about. CI's `vlmkit diff-pr`
           // (no pin) runs the a11y checks against the live render.
           await renderViewport(browser, route.url, vp.width, vp.height, join(dir, `${vp.label}.png`), route.waitFor);
           success++;
@@ -250,7 +250,7 @@ async function cmdPin(args: string[]): Promise<void> {
     await browser.close();
   }
   console.log();
-  console.log(`${DIM}Baselines pinned. Run \`vrt diff-pr\` in CI to gate against them.${RESET}`);
+  console.log(`${DIM}Baselines pinned. Run \`vlmkit diff-pr\` in CI to gate against them.${RESET}`);
 }
 
 async function cmdRun(args: string[]): Promise<number> {
@@ -277,7 +277,7 @@ async function cmdRun(args: string[]): Promise<number> {
     }
   }
 
-  console.log(`${BOLD}${CYAN}vrt diff-pr${RESET}  ${DIM}${configPath}${RESET}`);
+  console.log(`${BOLD}${CYAN}vlmkit diff-pr${RESET}  ${DIM}${configPath}${RESET}`);
   console.log(`${DIM}  ${config.routes.length} route(s); thresholds ${JSON.stringify(config.thresholds)}${RESET}`);
   if (manifest) console.log(`${DIM}  approval manifest: ${manifest.rules.length} rule(s)${RESET}`);
   console.log();
@@ -290,7 +290,7 @@ async function cmdRun(args: string[]): Promise<number> {
     for (const route of config.routes) {
       const baselineDir = baselineDirForRoute(config, route);
       if (!existsSync(baselineDir)) {
-        console.log(`  ${route.name.padEnd(20)} ${RED}no baseline${RESET} ${DIM}(${baselineDir} — run \`vrt diff-pr pin\` first)${RESET}`);
+        console.log(`  ${route.name.padEnd(20)} ${RED}no baseline${RESET} ${DIM}(${baselineDir} — run \`vlmkit diff-pr pin\` first)${RESET}`);
         results.push({ route, viewports: [], failed: true, error: `no baseline at ${baselineDir}` });
         continue;
       }
@@ -339,7 +339,7 @@ async function cmdRun(args: string[]): Promise<number> {
         const rawDiff = await compareScreenshots(snap, { outputDir: routeOut });
         // Suppress diffs covered by an approval before gating. Without a DOM
         // here, selector rules can't bind, but region-bbox rules (the zone
-        // matcher) do — that's the CI consumer of `vrt baseline approve
+        // matcher) do — that's the CI consumer of `vlmkit baseline approve
         // --region` (A/B epic 01).
         const diff = rawDiff && manifest
           ? filterApprovedVrtRegions(rawDiff, manifest, [], { viewport: vp.label }).diff
@@ -527,7 +527,7 @@ async function cmdRun(args: string[]): Promise<number> {
 
 export function buildMarkdownSummary(config: DiffPrConfig, results: PerRouteResult[]): string {
   const lines: string[] = [];
-  lines.push("# vrt diff-pr summary");
+  lines.push("# vlmkit diff-pr summary");
   lines.push("");
   const totalRoutes = results.length;
   const failed = results.filter((r) => r.failed).length;
@@ -683,7 +683,7 @@ interface PostPrOptions {
 async function postPrComment(opts: PostPrOptions): Promise<number> {
   if (!existsSync(opts.summaryPath)) {
     console.error(`${RED}error:${RESET} no summary at ${opts.summaryPath}`);
-    console.error(`Run \`vrt diff-pr\` first to produce the summary, or pass --summary <path>.`);
+    console.error(`Run \`vlmkit diff-pr\` first to produce the summary, or pass --summary <path>.`);
     return 1;
   }
   const summary = await readFile(opts.summaryPath, "utf-8");
@@ -740,7 +740,7 @@ async function cmdPost(args: string[]): Promise<number> {
 }
 
 function formatUsage(): string {
-  return `vrt diff-pr <command>
+  return `vlmkit diff-pr <command>
 
 Subcommands:
   pin    [route...] [--config vrt.config.json]

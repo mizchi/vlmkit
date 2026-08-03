@@ -84,8 +84,8 @@ Runs on Cloudflare Workers with Crater. WebUI is in a separate repo.
 - [x] Playwright page reuse (fix-loop), PNG IHDR header reading, Gemini SDK init optimization
 
 ### Snapshot / URL Compare
-- [x] `vrt snapshot` command (URL → multi-viewport capture + baseline diff)
-- [x] `vrt compare --url / --current-url` URL mode (page.goto based)
+- [x] `vlmkit snapshot` command (URL → multi-viewport capture + baseline diff)
+- [x] `vlmkit diff html --url / --current-url` URL mode (page.goto based)
 - [x] `--mask` selector masking (visibility: hidden to exclude dynamic content)
 - [x] Project rename: vrt-harness → vrt
 
@@ -97,35 +97,35 @@ Runs on Cloudflare Workers with Crater. WebUI is in a separate repo.
 
 Use vrt on real projects to verify practicality.
 
-- [x] Add `vrt snapshot` command (URL → multi-viewport capture + baseline diff)
-- [x] Add `vrt compare --url` URL mode (page.goto based)
+- [x] Add `vlmkit snapshot` command (URL → multi-viewport capture + baseline diff)
+- [x] Add `vlmkit diff html --url` URL mode (page.goto based)
 - [x] luna.mbt dogfooding: false positive rate 0% (6 pages × 2 viewports)
 - [x] sol.mbt dogfooding: false positive rate 20% (dynamic content on root page)
 - [x] Record results in `docs/reports/2026-04-05-dogfood-luna-sol.md`
 - [x] sample-webapp-2026 dogfood で出た snapshot UX を改善する
   - `snapshot` の label 生成が query string を見ないため、`/` と `/?severity=critical` が同じ baseline に潰れる
   - `--label` / route manifest / query-aware label のどれかで URL ごとの identity を安定化したい
-- [x] `vrt snapshot` に CI 向け fail 条件を持たせる
+- [x] `vlmkit snapshot` に CI 向け fail 条件を持たせる
   - sample では `snapshot-report.json` を読んで回帰判定する `scripts/vrt-snapshot.mjs` が必要だった
   - `--fail-on-diff`, `--fail-on-new-baseline`, `--max-diff-ratio` を CLI に持たせたい
 - [x] `snapshot` 系の baseline approve を first-class にする
   - sample では `scripts/vrt-approve.mjs` で `*-current.png` を `*-baseline.png` にコピーしている
-  - `vrt snapshot approve` もしくは `vrt snapshot --approve` が欲しい
+  - `vlmkit snapshot approve` もしくは `vlmkit snapshot --approve` が欲しい
 - [x] 外部プロジェクト向けに `workflow` の route/spec coupling を外す
   - `e2e/vrt-capture.spec.ts` が `vrt.config.json` (`capture.routes`) / `VRT_CONFIG_PATH` / `VRT_CAPTURE_ROUTES` から routes を読むようになった
-  - `vrt workflow init|capture --config <path> --base-url <url>` で外部プロジェクトから差し込み可能
-- [x] `vrt snapshot` の config file を公式サポートする
+  - `vlmkit workflow init|capture --config <path> --base-url <url>` で外部プロジェクトから差し込み可能
+- [x] `vlmkit snapshot` の config file を公式サポートする
   - sample では `vrt.config.json` に `baseUrl`, `routes`, `outputDir`, `threshold` を寄せて wrapper で解釈している
   - JSON/TOML の config を直接読めると導入がかなり軽くなる
 - [x] Run VRT in CI per PR, measure false positive rate
-  - `vrt snapshot stability <urls> --iterations N --fail-above-rate R` measures the FP rate by capturing N times against a locked baseline.
+  - `vlmkit snapshot stability <urls> --iterations N --fail-above-rate R` measures the FP rate by capturing N times against a locked baseline.
   - `.github/workflows/vrt-stability.yml` runs the measurement nightly on the migration fixtures and uploads `stability-report.json` as an artifact.
-  - `vrt snapshot stability-history <stability-report.json>... [--out path]` aggregates multiple runs over time and reports latest/best/worst FP rate plus run-to-run deltas.
+  - `vlmkit snapshot stability-history <stability-report.json>... [--out path]` aggregates multiple runs over time and reports latest/best/worst FP rate plus run-to-run deltas.
   - Real downstream rollout still requires adopting the workflow in each project, but vlmkit now has the measurement and aggregation primitives.
 - [x] Pass diff report to subagent for fix code generation, measure success rate
-  - `vrt snapshot fix-prompt` ships a markdown / JSON task descriptor (URL, viewport, diff ratio with shift compensation, baseline/current/heatmap/HTML paths) ready to feed to a subagent.
-  - `vrt snapshot report evaluate --before-report before.json --after-report after.json` compares pre/post fix `snapshot-report.json` files and reports resolved/improved rates for the changed label+viewport targets.
-  - `vrt migration subagent prepare` (and the `migration-subagent-prepare` task) produces a subagent packet from `migration-report.json`; `vrt migration blind` provides reproducible blind scenarios.
+  - `vlmkit snapshot fix-prompt` ships a markdown / JSON task descriptor (URL, viewport, diff ratio with shift compensation, baseline/current/heatmap/HTML paths) ready to feed to a subagent.
+  - `vlmkit snapshot report evaluate --before-report before.json --after-report after.json` compares pre/post fix `snapshot-report.json` files and reports resolved/improved rates for the changed label+viewport targets.
+  - `vlmkit migration subagent prepare` (and the `migration-subagent-prepare` task) produces a subagent packet from `migration-report.json`; `vlmkit migration blind` provides reproducible blind scenarios.
   - Real PR measurement still requires an LLM API key and repeated downstream runs, but vlmkit now has the report packet and success-rate evaluation primitives.
 
 ### E2. Crater prescanner tracking
@@ -250,7 +250,7 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - Fixture scaffolding done: `after-reference.html` archived, `after-blank.html` provides minimal reset starting point.
   - Baseline diff measured at 19.6%–58.4% across 10 viewports (35 layout-shift, 19 color-change, 4 typography).
   - `fixtures/migration/blind-scenarios.json` + `migration-blind.ts` (`prepare` / `solo` / `evaluate`) now reproduce + score the shadcn→luna scenario deterministically.
-  - 2026-05-22: `vrt migration blind ... solo shadcn-to-luna --check` passes the reference repair at 0.0% across 7 auto-discovered viewports; actual LLM blind loop still pending.
+  - 2026-05-22: `vlmkit migration blind ... solo shadcn-to-luna --check` passes the reference repair at 0.0% across 7 auto-discovered viewports; actual LLM blind loop still pending.
   - Loop run itself requires an LLM API key — see `docs/reports/2026-05-11-e3-shadcn-luna-blind-scaffold.md`.
 - [x] Blind test with Reset CSS switch — see `docs/reports/2026-04-04-e3-reset-css-blind-test.md` (0.0% in 1 round)
 - [ ] Success criteria: diff < 1% within 3 rounds
@@ -565,6 +565,64 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   ドキュメントは「ゲートは --json を取る」と書いていたので一貫性の穴でもあった。
   回帰テスト: `packages/vlmkit-markup/src/output-consistency.test.ts`(6 件)。
 
+### `vrt` → `vlmkit` リネーム(2026-08-02)
+- [x] **正解表は CLI 自身** — `vlmkit --help` が出す 33 件の deprecated エイリアス表
+  (`a11y-contrast → check a11y contrast` など)を機械的に抽出して写像に使った。
+  ソースの正規表現では 15 件しか拾えなかったので、推測ではなく実出力を使うのが正解。
+- [x] **一斉置換は 3 回失敗した** — 学びとして記録:
+  1. 最初の版は**自分が直前に書いたコメントを破壊**した。
+     `` `vrt a11y-contrast` was wrong twice over `` は「誤った名前」を意図的に
+     引用している文で、置換すると意味不明になる。
+  2. 「意図的引用」検出を `→`/`->` 込みで書いたら、
+     `vrt snapshot <url1> # URL → multi-viewport capture` のような**機能説明の矢印**まで
+     保護してしまった。
+  3. `deprecated` で検出したら `deprecation`(語幹違い)が漏れ、
+     `The single-token commands from 0.4.x (\`vrt compare\`, …) remain as
+     deprecation shims` が破壊された。
+  結論: **散文は正規表現で守れない**。ソースと markdown を別パスにし、
+  markdown は差分を目視レビューした。
+- [x] **ソース 207 箇所 + コメント内の製品名 16 箇所** — テストは掃除対象から**外した**。
+  アサーションが検証役として機能するように。結果 4 件が落ち(旧 usage 文字列を
+  アサートしていた)、実体に合わせて修正。これが正しい信号の出方。
+- [x] **markdown 371 箇所** — 副産物としてリンク破損が **43 → 11 に減少**(32 件修復、
+  `packages/vrt-core/` → `packages/vlmkit-core/` が実体に一致したため)。
+  自分が新たに壊した 3 件(`grid-ratio` / `region-classify` / `shift-origin` は
+  `vlmkit-core` ではなく `vlmkit-markup` にある)は before/after 比較で検出して修正。
+  残る 11 件はすべて既存(`src/compare.ts` など分割前のパス)。
+- [x] **偽になった caveat 2 件を削除** — SKILL.md が「CLI バナーは旧名を出す」と
+  書いていたが、バナーを直したので偽になった。改名すると
+  「Internal binary name: \`vlmkit check tokens\` — ... still call it
+  \`vlmkit check tokens\`」という自己言及になるので、**真の部分**
+  (出力先が今も `test-results/design-tokens/`)に書き換えた。
+- [x] **回帰ゲート**: `src/cli/binary-name.test.ts`(28 件)。
+  全 24 コマンドの `--help` を実行して `vrt` を含まないことを検査し、
+  **例外リストも検査する**(許可した綴りが実際にソースに存在するか — 消えたら
+  例外を削除すべきで、次の掃除が通り抜ける穴にしてはいけない)。
+  アブレーション済み: `vrt design-tokens` を1つ戻すと落ちる。
+  自分の初版は**エントリを間違えていた**(`cli.ts` ではなく `src/cli/vlmkit.ts` が
+  エイリアス dispatch を持つ)ため、エイリアスのケースが空出力で「pass」していた。
+- [x] **以前の自分の主張の訂正** — introduce.ja.md のコミットで
+  「`vrt compare` / `elements` / `smoke` / `serve` / `discover` は削除済み」と書いたが、
+  実際は **deprecated エイリアスとして今も動く**(1.0.0 で削除予定)。
+  消えたのは `vrt` バイナリだけ。ドキュメント刷新自体は正しかったが理由が不正確だった。
+- [ ] **残り: 判断が必要(ユーザー確認待ち)**
+  - **挙動に影響 128 箇所**: `.vrt/`(baselines / runs / last-diff-for-agent)、
+    `.vrt-skills/`、`vrt.config.json` / `.toml`、`VRT_*` 環境変数(12 種以上)、
+    `projectName: "vrt"`(Playwright プロジェクト名 = スナップショットパスに出る)、
+    plan スキーマの `vrt?:` **フィールド名**(既存 plan ファイルが壊れる)、
+    `"X-Title": "vrt"`(OpenRouter へ送る HTTP ヘッダ)、
+    `title: "vrt HTTP API"`(公開 OpenAPI)、
+    `~/.../vrt/deprecated.log`。改名は既存ユーザーの state / config / CI を孤児化する。
+  - **素の製品名 404 箇所**: ただし **VRT は業界一般の略語**(Visual Regression
+    Testing)でもあり、「vrt vendors」「VRT service」は技術一般を指す。
+    機械的に置換すると意味が変わるので個別判断が必要。
+  - **その他の識別子**: `vrt-eval`(53)、`vrt-diff`(27)、`vrt-action`(16)、
+    `vrt-runner.ts`、`vrt-capture.spec.ts` — CI ジョブ名 / fixture 名 /
+    spec ファイル名。
+  - **歴史的記録 488 箇所**: `docs/reports/` / `CHANGELOG.md` /
+    `docs/migration-0.5.md` は日付付きの記録および old→new 対応表そのもの。
+    書き換えは記録の改竄なので**対象外のまま**。
+
 ### 0.9.0 リリース準備(2026-08-02)
 - [x] **CHANGELOG が今日の作業を一切含んでいなかった** — Unreleased セクションは
   `24b0185`(0.8.0)以降の前半分だけで、今日追加した `check design` / `batch` /
@@ -589,11 +647,11 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   (単語文字)で終わるため `vrt` の前に単語境界が無く、**拒否するために書いた出力に
   対して pass** していた。ANSI を除去してから照合するよう修正。
 - [ ] **`vrt` 名の残存 ~250 箇所 / ~80 フレーズ(次の作業)** — 実測: 4 ゲートは
-  リリース diff に既に入っていたので直したが、全体は `vrt snapshot` /
-  `vrt workflow` / `vrt diff-pr` / `vrt baseline` など。`vrt` バイナリは存在せず
+  リリース diff に既に入っていたので直したが、全体は `vlmkit snapshot` /
+  `vlmkit workflow` / `vlmkit diff-pr` / `vlmkit baseline` など。`vrt` バイナリは存在せず
   (`bin` は `vlmkit` のみ)、旧サブコマンド名は deprecated なので
-  `Re-run \`vrt a11y-contrast\`` は**二重に誤り**。大半はバイナリ名の置換だけで
-  済むが、`vrt compare` / `vrt elements` / `vrt smoke` は**すでに削除された
+  `Re-run \`vlmkit check a11y contrast\`` は**二重に誤り**。大半はバイナリ名の置換だけで
+  済むが、`vlmkit diff html` / `vlmkit diff elements` / `vlmkit inspect smoke` は**すでに削除された
   コマンド**への参照で、`vrt itself` / `vrt toolkit` のような散文も混ざる。
   リリースコミットに 250 箇所の改名を混ぜず、レビュー可能な独立した diff にする。
   正解表は `src/cli/cli.ts` の `newName` マップ(15 エントリ)。
@@ -677,7 +735,7 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 
 ### ドキュメント刷新(2026-08-02)
 - [x] **`docs/introduce.ja.md` が 7/27 の `vrt` 時代のまま(248 行)だった** —
-  リネーム前のコマンド名で、**すでに削除されたコマンド**(`vrt compare` /
+  リネーム前のコマンド名で、**すでに削除されたコマンド**(`vlmkit diff html` /
   `elements` / `smoke` / `serve` / `discover`)を手順として書いており、
   ディレクトリ構成もフラットな `src/` のまま。読者が写して実行すると必ず失敗する
   状態だったので、`introduce.md` と同じ構成の**独立した日本語版**として全面改稿。
@@ -912,7 +970,7 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 
 
 ### Infrastructure / Deploy
-- [x] Cloudflare Browser Run CDP backend (`vrt snapshot --backend cloudflare`) — connects via `chromium.connectOverCDP` to `wss://api.cloudflare.com/.../browser-rendering/devtools/browser`. See `examples/vrt-snapshot-cloudflare.workflow.yml`.
+- [x] Cloudflare Browser Run CDP backend (`vlmkit snapshot --backend cloudflare`) — connects via `chromium.connectOverCDP` to `wss://api.cloudflare.com/.../browser-rendering/devtools/browser`. See `examples/vrt-snapshot-cloudflare.workflow.yml`.
 - [x] Cloudflare Workers entry point (`worker/`) — `worker/index.ts` re-exports `createApiApp()` from `src/api/api-app.ts`. `env.BROWSER` wiring still pending.
 - [x] Cloudflare Quick Actions REST backend (`/screenshot`, `/crawl` for route discovery)
   - `@mizchi/vlmkit-capture` now includes a Browser Run Quick Actions client for `/screenshot` and `/crawl`, route extraction from crawl results, and Hono API proxy endpoints under `/api/cloudflare/*`.
@@ -941,7 +999,7 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 
 ### Feature Extensions
 - [x] Component (selector) level comparison
-  - `vrt diff component` / `vrt diff elements` run selector-scoped screenshots and compare components independently from full-page layout shift noise.
+  - `vlmkit diff component` / `vlmkit diff elements` run selector-scoped screenshots and compare components independently from full-page layout shift noise.
 - [x] Enhanced diff classification (layout shift / color change / text change / element added/removed)
   - `classifyVisualDiff` now trusts `DiffRegion.regionType === "shift"` as layout shift and uses sampled baseline/current colors to distinguish element-added vs element-removed when a region changes to/from a page-surface color.
 - [x] Smoke test: Crater BiDi backend
@@ -967,7 +1025,7 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 From `docs/reports/2026-05-12-dogfood-shadcn-luna.md`. Each item is a
 small wrapper around already-built primitives, not a new subsystem.
 
-- [x] `vrt diff-for-agent <migration-report.json>` — one-context-window
+- [x] `vlmkit diff agent <migration-report.json>` — one-context-window
   Markdown summary combining diff %, dominant categories, fix candidates
   aggregated by `(selector, property)` with viewport coverage, and
   absolute paths to baseline/current/heatmap PNGs for the worst N
@@ -984,11 +1042,11 @@ small wrapper around already-built primitives, not a new subsystem.
   image into ~240px-tall horizontal bands and runs mean-subtracted
   cross-correlation per band, gated by a peak-sharpness confidence
   metric. Surfaced in `MigrationCompareResult.shiftRegions` and
-  printed by `vrt diff-for-agent` as e.g.
+  printed by `vlmkit diff agent` as e.g.
   `[480–720]:+22px [720–960]:-94px [960–1348]:+32px`, replacing the
   single-line global average with localized per-section offsets.
   Verified on the 2026-05-12 dogfood Pass B iter 1 data.
-- [x] `vrt compare-runs <a.json> <b.json>` — pairwise migration-report
+- [x] `vlmkit diff runs <a.json> <b.json>` — pairwise migration-report
   diff sorted by absolute movement, with IMPROVED/REGRESSED/UNCHANGED/
   ADDED/REMOVED status per viewport and a category-summary "before →
   after" column. Verified on the 2026-05-12 dogfood data: shows
@@ -1000,7 +1058,7 @@ small wrapper around already-built primitives, not a new subsystem.
   before, after)` list plus by-property + by-selector aggregates.
   Surfaced in `migration-report.json` under `computedStyleDiff` and
   rendered as a "Top properties / Top selectors" section in
-  `vrt diff-for-agent`. Verified on dogfood Pass B iter 1: catches 46
+  `vlmkit diff agent`. Verified on dogfood Pass B iter 1: catches 46
   tuples (border colors, radius, font-family, font-size on
   `#notes/#owner/#title`) that pixel diff alone surfaced only as
   generic `layout-shift`.
@@ -1015,7 +1073,7 @@ verified-pair gate) gave zero signal on this scenario.
 
 The wireframe mode needs visual-only diagnostics:
 
-- [x] **Component bbox extraction.** `packages/vrt-markup/src/component/component-bbox.ts` runs
+- [x] **Component bbox extraction.** `packages/vlmkit-markup/src/component/component-bbox.ts` runs
   on the captured PNGs (no DOM required): detect background via
   edge-pixel mode, build foreground mask, label connected
   components (two-pass union-find, 4-connectivity), filter
@@ -1023,7 +1081,7 @@ The wireframe mode needs visual-only diagnostics:
   ↔ variant by rank-after-sort and reports per-axis Δ + IoU.
   Wired into `migration-compare` (always on; `--no-component-bbox`
   to disable) — surfaces a "Component bbox diff" section in
-  `vrt diff-for-agent`. 10 unit tests cover synthetic backgrounds
+  `vlmkit diff agent`. 10 unit tests cover synthetic backgrounds
   + multi-component sorting + min-area filtering. Verified on
   both wireframe (Subagent F's exact scenario: baseline 343×370,
   variant 311×243, Δ -32W / -127H reported on one row) and
@@ -1031,17 +1089,17 @@ The wireframe mode needs visual-only diagnostics:
 - [x] **Per-viewport geometry diff** without DOM access — "baseline
   card shrinks 18px between desktop and mobile but variant
   doesn't" inferred purely from screenshot dimensions.
-  `packages/vrt-markup/src/component/component-geometry.ts` composes on top of `MatchedBbox[]`
+  `packages/vlmkit-markup/src/component/component-geometry.ts` composes on top of `MatchedBbox[]`
   and flags `responsiveMismatch` when one side's per-axis spread
   exceeds the other's by ≥30px. Rendered as "Cross-viewport
-  geometry profile" in `vrt diff-for-agent`. 5 unit tests +
+  geometry profile" in `vlmkit diff agent`. 5 unit tests +
   verified on shadcn→blank (8 responsive-mismatch flags
   surfaced).
 - [x] **Heatmap region clustering** — group connected hot pixels
   in `*_heatmap.png` into named regions and report per-region
   shift instead of horizontal bands. Bands of bands lose
   resolution; region clusters preserve "this text run shifted up
-  4px" granularity. `packages/vrt-core/src/heatmap-regions.ts` reuses the
+  4px" granularity. `packages/vlmkit-core/src/heatmap-regions.ts` reuses the
   union-find CC labeller from `component-bbox.ts` against a
   hot-red mask (red − max(g,b) ≥ 60). 5 unit tests + verified on
   shadcn→blank (24 region clusters) and wireframe pricing-card
@@ -1050,7 +1108,7 @@ The wireframe mode needs visual-only diagnostics:
 - [x] **Text-row y-position extraction** from rendered PNGs via
   luminance-profile peak detection — exposes "the `$24` text row
   is 4px higher in the variant" without needing DOM correspondence.
-  `packages/vrt-core/src/text-rows.ts` computes per-row mean luminance, treats rows
+  `packages/vlmkit-core/src/text-rows.ts` computes per-row mean luminance, treats rows
   ≥12 below the median as dark, and groups runs into bands.
   `matchTextRows` pairs by ordered index and emits Δy. Surfaces
   "Bands B / V" count mismatches even when no rows can be paired
@@ -1072,7 +1130,7 @@ The wireframe mode needs visual-only diagnostics:
 Three more scenarios, each as a dedicated CLI to keep
 migration-compare lean.
 
-- [x] **Theme parity** (`vrt theme-parity`). Renders the same HTML
+- [x] **Theme parity** (`vlmkit check theme`). Renders the same HTML
   twice via Playwright's `emulateMedia({ colorScheme: light/dark })`,
   extracts component bboxes, samples each bbox's dominant fill in
   both renders, and flags components whose fill is identical across
@@ -1083,7 +1141,7 @@ migration-compare lean.
   540×43 matching the buggy `.alert`. Theme pixel delta 97.9%
   (page does respond broadly).
 
-- [x] **i18n / variable-length text stress** (`vrt i18n-stress`).
+- [x] **i18n / variable-length text stress** (`vlmkit stress i18n`).
   Inflates every text node by a configurable factor (default 1.4×
   ≈ German), then samples per-element layout before vs after.
   Classifies overflow as `horizontal-overflow` (scrollWidth >
@@ -1094,7 +1152,7 @@ migration-compare lean.
   and `width: 120px` button: caught both overflows + classified
   the paragraph wrap as the harmless `vertical-wrap` case.
 
-- [x] **Inline → componentized refactor** (`vrt component-consistency`).
+- [x] **Inline → componentized refactor** (`vlmkit check drift component`).
   Single-page-multi-instance sibling of `multi-page-consistency`:
   captures every selector match on one page via
   `locator.screenshot()`, compares each to instance #0 (or
@@ -1108,9 +1166,9 @@ Beyond the migration / wireframe scenarios, the tool can serve
 adjacent markup-authoring workflows. Each scenario is built and
 evaluated incrementally.
 
-- [x] **Design token / palette compliance.** `packages/vrt-markup/src/style/palette-extract.ts`
+- [x] **Design token / palette compliance.** `packages/vlmkit-markup/src/style/palette-extract.ts`
   stride-samples the rendered PNG into a 5-bit-per-channel histogram
-  and returns the top-K dominant colors. `packages/vrt-markup/src/style/palette-diff.ts`
+  and returns the top-K dominant colors. `packages/vlmkit-markup/src/style/palette-diff.ts`
   greedy-matches baseline vs variant by RGB-Euclidean distance
   (≤12 → match) and surfaces *missing* (in baseline target but
   not the variant — agent forgot a token) and *extra* (in variant
@@ -1121,7 +1179,7 @@ evaluated incrementally.
   color, surfaced as a single hex the agent can paste).
 - [x] **Multi-state capture** — capture `:hover` / `:focus` /
   `:focus-visible` / `:active` via CDP `CSS.forcePseudoState`,
-  diff per state. `packages/vrt-markup/src/stress/multi-state.ts` marks all interactive
+  diff per state. `packages/vlmkit-markup/src/stress/multi-state.ts` marks all interactive
   elements (`button`, `a[href]`, `[role=button]`, form controls)
   with a `data-vrt-state-marker` attribute, opens a CDP session,
   and calls `forcePseudoState` for each matched node. Pixelmatch
@@ -1136,7 +1194,7 @@ evaluated incrementally.
   hover +0.37%/+0.42%/0.00%, focus-visible +0.26%/+0.29%/+1.11%.
 - [x] **Component-from-screenshot** — single-component subset of
   wireframe mode: small viewport, one bbox, multi-state. New CLI
-  subcommand. `packages/vrt-markup/src/component/component-from-image.ts` takes a target PNG +
+  subcommand. `packages/vlmkit-markup/src/component/component-from-image.ts` takes a target PNG +
   current HTML, renders the HTML at the PNG's exact dimensions,
   pixel-diffs, and runs every image-only signal (bbox, heatmap,
   text-row, palette) plus an optional `--states` pass. Emits a
@@ -1193,7 +1251,7 @@ be CSS transitions, not the threshold. Fixes applied:
 
 Two remaining single-item gaps from the scenario matrix:
 
-- [x] **F3 — `vrt a11y-focus-order`**. Drives `Tab` through the
+- [x] **F3 — `vlmkit check a11y focus`**. Drives `Tab` through the
   page via `page.keyboard.press`, captures `document.activeElement`
   after each press, builds an ordered sequence of focus steps.
   Detects three classes of bug:
@@ -1234,7 +1292,7 @@ In-scope full coverage now **44 / 85 = 52%**; full + partial =
 
 ### Scenario-matrix Clusters 2 & 3 — cross-browser + design-tokens (2026-05-13)
 
-- [x] **Cluster 2: `vrt cross-browser`** — launches chromium /
+- [x] **Cluster 2: `vlmkit diff browsers`** — launches chromium /
   firefox / webkit in sequence, diffs each against the first
   successful engine (typically chromium = reference). Engines
   not installed in the local Playwright cache auto-skip with an
@@ -1245,7 +1303,7 @@ In-scope full coverage now **44 / 85 = 52%**; full + partial =
   text subpixel shifts on Firefox). Closes scenario matrix
   items H1, H2, H3.
 
-- [x] **Cluster 3: `vrt design-tokens`** — scale-conformance
+- [x] **Cluster 3: `vlmkit check tokens`** — scale-conformance
   check. Renders the page, walks visible elements, samples
   computed-style `borderRadius`, `padding`, `margin`,
   `zIndex`, `boxShadow`. Per-property scale check (`isOnScale`
@@ -1289,7 +1347,7 @@ Single command covering 5 of the 24 missing scenarios from the
 scenario-coverage matrix (`docs/reports/2026-05-13-scenario-matrix.
 md`): forced-colors, reduced-motion, print, RTL, 200%-zoom.
 
-- [x] **`vrt media-variants`** — renders an HTML / URL under each
+- [x] **`vlmkit stress media`** — renders an HTML / URL under each
   variant emulation and pixel-diffs against the default. Five
   emulations (Playwright primitives + small overrides):
     - `forced-colors` via `emulateMedia({ forcedColors: 'active' })`
@@ -1327,7 +1385,7 @@ md`): forced-colors, reduced-motion, print, RTL, 200%-zoom.
 
 ### Survey Tier D — real-interaction sequences (2026-05-13)
 
-- [x] **`vrt interact`** — declarative scripted-sequence VRT. The
+- [x] **`vlmkit inspect interact`** — declarative scripted-sequence VRT. The
   agent describes a sequence of Playwright actions in JSON; the
   tool drives the page through them and pixel-diffs each transition.
   Closes the "we can't see UI bugs hidden behind clicks / forms /
@@ -1360,7 +1418,7 @@ md`): forced-colors, reduced-motion, print, RTL, 200%-zoom.
 Three of the ROI-ranked items from `docs/reports/2026-05-13-
 capability-survey.md`, shipped together.
 
-- [x] **B. Region content-type classifier.** `packages/vrt-core/src/region-classify.ts`:
+- [x] **B. Region content-type classifier.** `packages/vlmkit-markup/src/region-classify.ts`:
   `classifyRegion(rgba, w, h, bbox)` returns one of `text` /
   `filled-rect` / `icon` / `image` / `unknown` with a confidence
   score. Features: quantized color count, luma std dev, horizontal
@@ -1392,7 +1450,7 @@ capability-survey.md`, shipped together.
   the agent maps each comment back to whichever element matches the
   described region or row.
 
-- [x] **F. Touch-target size check** (`vrt a11y-touch`). New CLI
+- [x] **F. Touch-target size check** (`vlmkit check a11y touch`). New CLI
   that scans visible interactive elements (`button`, `a[href]`,
   form controls, `[role=button]`, `[tabindex≥0]`, `summary`) and
   reports those whose bbox `min(w, h)` is below the WCAG threshold
@@ -1492,7 +1550,7 @@ Three concerns left open after the re-dogfood, all addressed:
 
 ### Tier 3 + CLI unification + re-dogfood (2026-05-13)
 
-- [x] **A11y contrast scan** (`vrt a11y-contrast`). Renders the
+- [x] **A11y contrast scan** (`vlmkit check a11y contrast`). Renders the
   HTML in Playwright, walks every visible text node via an
   in-browser `TreeWalker`, samples computed-style foreground +
   effective ancestor background, classifies font size for the
@@ -1516,7 +1574,7 @@ Three concerns left open after the re-dogfood, all addressed:
   silently fail in dev mode. Now resolved to absolute via
   `fileURLToPath(new URL(modulePath, import.meta.url))` —
   every command runs correctly from `node src/cli/vrt.ts <cmd>`
-  AND from the built `dist/vrt.mjs`.
+  AND from the built `dist/vlmkit.mjs`.
 
 - [x] **Re-dogfood — component-from-image v2.** Blank pricing-card →
   target ran with the new Backgrounds + heatmap Fill + raw/perceptual
@@ -1577,7 +1635,7 @@ Three concerns left open after the re-dogfood, all addressed:
 
 - [x] **Multi-page consistency** — same component on N pages must
   render identically. Cross-page bbox / computed-style diff.
-  `packages/vrt-markup/src/stress/multi-page-consistency.ts` renders N URLs (or HTML files)
+  `packages/vlmkit-markup/src/stress/multi-page-consistency.ts` renders N URLs (or HTML files)
   in Playwright, screenshots each `--selector` match via
   `locator.screenshot()` (auto-crops to the element's bbox), and
   compares all candidates against the first one (the reference).
@@ -1598,7 +1656,7 @@ fixture series. The remaining 4-viewport floor at 2.67–3.52%
 comes from a single unexplained +152px / +239px universal shift
 band at viewports ≥ 1024.
 
-- [x] **Vertical-shift origin diagnostic.** `packages/vrt-core/src/shift-origin.ts`
+- [x] **Vertical-shift origin diagnostic.** `packages/vlmkit-markup/src/shift-origin.ts`
   captures per-element bounding boxes via a new
   `DOM_BBOX_BROWSER_SCRIPT`, then matches by DOM path against the
   per-band shifts already produced by `detectBandShifts`.
@@ -1608,7 +1666,7 @@ band at viewports ≥ 1024.
   responsible element (path, baseline / variant class, Δtop,
   suspect axis: `height` / `margin/padding-above` / `y-position`).
   Surfaced as a new "Shift-origin diagnostics" table in
-  `vrt diff-for-agent`, populated automatically when
+  `vlmkit diff agent`, populated automatically when
   `--dom-position-diff` is on. Verified on dogfood Pass B iter 1:
   42 origin rows across 10 viewports — e.g. mobile `[720-960]
   Δ-94px → card-header / luna-panel-head, suspect: height`,
@@ -1616,13 +1674,13 @@ band at viewports ≥ 1024.
   suspect: height`. The exact symptom Subagent D plateaued on
   (`+152px shift band with no DOM-position delta`) now has a named
   origin. 9 unit tests cover the algorithm.
-- [x] **Drop ✗ heuristic candidates from `vrt diff-for-agent`.**
+- [x] **Drop ✗ heuristic candidates from `vlmkit diff agent`.**
   `--show-unverified` (default off) controls the visibility.
   Default output now drops rows whose computed value matches
   baseline; replaced with `_N unverified candidate(s) hidden_`
   note so the agent knows what was suppressed. Dogfood Pass B
   iter 1: table shrunk from 5 rows (2 ✓ + 3 ✗) to just 2 ✓.
-- [x] **Grid `fr`-ratio inference.** `packages/vrt-core/src/grid-ratio.ts` walks per-
+- [x] **Grid `fr`-ratio inference.** `packages/vlmkit-markup/src/grid-ratio.ts` walks per-
   viewport bboxes, finds containers whose direct children have a
   non-uniform width distribution differing between baseline and
   variant, then suggests both a decimal ratio and a low-integer
@@ -1632,7 +1690,7 @@ band at viewports ≥ 1024.
   (default 1.3) drops column-stacked containers where children fill
   100% width and per-child widths are content-driven (not a grid
   ratio). Surfaced as a new "Grid `fr`-ratio suggestions" section
-  in `vrt diff-for-agent`. Dogfood Pass B iter 1: the workspace at
+  in `vlmkit diff agent`. Dogfood Pass B iter 1: the workspace at
   768px reports `393/299 → 1.316 : 1.000 → 13fr 10fr` — the exact
   case Subagent D guessed manually as "1.316fr 1fr".
 - [x] **`display` context note for flex items.** A pill with
@@ -1643,7 +1701,7 @@ band at viewports ≥ 1024.
 - [x] **Unit-normalized property reporting.** `DpEntry` now carries
   `baselineEm` / `variantEm` for `letter-spacing`, `word-spacing`,
   `line-height` — values divided by the element's own font-size.
-  `vrt diff-for-agent` renders a dedicated "Em-relative properties"
+  `vlmkit diff agent` renders a dedicated "Em-relative properties"
   sub-section in the per-viewport DOM-position table that exposes
   cases like "5 elements show `line-height` 18/21/24/28.5/40px but
   all five normalize to `1.5em`" — one rule, not five different
@@ -1661,13 +1719,13 @@ band at viewports ≥ 1024.
   by N.
 
 - [x] **DOM-position-based selector alignment** in a new
-  `packages/vrt-core/src/dom-position-styles.ts`. `migration-compare --dom-position-diff`
+  `packages/vlmkit-core/src/dom-position-styles.ts`. `migration-compare --dom-position-diff`
   captures per-element `(path, tag, classes, styles)` for every
   element with a `class` attribute or semantic tag, then matches
   baseline ↔ variant by tree position (`main[0]>section[0]>span[0]`),
   which is invariant under class renames. Surfaced as a new
   "Verified deltas by DOM position (class-rename-aware)" section in
-  `vrt diff-for-agent`. Verified on the dogfood Pass B iter 1
+  `vlmkit diff agent`. Verified on the dogfood Pass B iter 1
   fixture: produces 872 property tuples across 60 element
   positions, naming both class names per row (e.g. baseline
   `eyebrow` ↔ variant `luna-pill`, baseline `dialog-card` ↔
@@ -1677,7 +1735,7 @@ band at viewports ≥ 1024.
   now captures the DOM-position styles at *every* discovered
   viewport (not just the first) and surfaces a new "Verified
   deltas by DOM position × viewport (catches media-query gaps)"
-  section in `vrt diff-for-agent`. Output splits into:
+  section in `vlmkit diff agent`. Output splits into:
     - **Universal deltas** — `(path, property)` pairs that differ
       on every viewport (a base CSS rule).
     - **Breakpoint-gated deltas** — pairs that differ on only a
@@ -1696,7 +1754,7 @@ band at viewports ≥ 1024.
   table such as `.metric → .luna-metric` `-9px × 4 = -36px`
   plus `.panel-title → .luna-panel-title` `-1.5px × 3 = -4.5px`.
 - [x] **Class-rename map as a header summary table** lands at the
-  top of each variant section in `vrt diff-for-agent`, before the
+  top of each variant section in `vlmkit diff agent`, before the
   diff-by-viewport table. Aggregated from `domPositionDiff[Per
   Viewport]` and de-duped per `(baseline-class, variant-class)`
   pair. On the dogfood Pass B iter 1 fixture: 12 pairs (e.g.
@@ -1762,7 +1820,7 @@ band at viewports ≥ 1024.
   the "missing CSS rule" diagnostic is added.
 
 - [x] Heuristic fix-candidate ranking now reconciles with computed-style.
-  `vrt diff-for-agent` renames the heuristic table to "Heuristic fix
+  `vlmkit diff agent` renames the heuristic table to "Heuristic fix
   candidates" with a per-row `Verified?` column (✓ when the
   property appears in the computed-style diff, — when it doesn't),
   and exposes the new authoritative "Verified deltas (computed-style)"
@@ -2242,7 +2300,7 @@ has been closed (commits `ef95260`, `2656786`, `f934122`, `4e6d45d`,
 - [x] Visual diff display (heatmap, side-by-side, overlay)
   - Worker storage now infers baseline/current/heatmap/triptych artifact groups and `/api/visual-diffs` exposes dashboard-ready display modes.
 - [x] Interactive approval operations
-  - `/api/approvals` now exposes approval-manifest list/add/remove operations for dashboard review flows, backed by the same `approval.json` schema as `vrt manifest`.
+  - `/api/approvals` now exposes approval-manifest list/add/remove operations for dashboard review flows, backed by the same `approval.json` schema as `vlmkit manifest`.
 - [x] Detection rate time-series graph
   - `bench-history` now builds chart-ready detection-rate series, and local `/api/detection-series` exposes filtered points by backend/fixture/limit for dashboard clients.
 - [x] Component-level status matrix

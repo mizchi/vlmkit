@@ -133,7 +133,7 @@ export interface A11yTouchRawSample {
 
 /**
  * Build the list of touch-target failures from raw samples. Pure
- * post-process so the `vrt diff-pr` CI gate can reuse it on its
+ * post-process so the `vlmkit diff-pr` CI gate can reuse it on its
  * own Playwright page without spinning up a new browser.
  */
 export function analyzeA11yTouchSamples(

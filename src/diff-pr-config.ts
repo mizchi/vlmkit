@@ -1,5 +1,5 @@
 /**
- * Config loader for `vrt diff-pr` — extends the existing
+ * Config loader for `vlmkit diff-pr` — extends the existing
  * `vrt.config.json` shape (parsed by capture-config.ts for the
  * workflow path) with policy-layer fields:
  *
@@ -102,14 +102,14 @@ export interface DiffPrConfig {
   baselineDir: string;
   a11y?: A11yPolicy;
   /**
-   * When present, `vrt diff-pr` runs the media-variants emulation
+   * When present, `vlmkit diff-pr` runs the media-variants emulation
    * suite (forced-colors / reduced-motion / print / rtl / zoom-200)
    * per route at the default viewport and gates on the per-route
    * verdict counts. Omit to skip media variants entirely.
    */
   mediaVariants?: MediaVariantsPolicy;
   /**
-   * When present, `vrt diff-pr` renders each route in chromium /
+   * When present, `vlmkit diff-pr` renders each route in chromium /
    * firefox / webkit and diffs the screenshots; engines that exceed
    * the threshold count toward the route's pass/fail. Omit to skip.
    */

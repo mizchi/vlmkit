@@ -15,7 +15,7 @@ CSS from scratch.
 ## Files
 
 - `reference.html` — the answer. **Do not show to the agent during
-  the run.** Used by `vrt compare` as the diff target.
+  the run.** Used by `vlmkit diff html` as the diff target.
 - `target-mobile.png`, `target-desktop.png` — pre-rendered
   screenshots of `reference.html` at 375 / 1280 viewports. These
   are what the agent gets to look at.
@@ -33,7 +33,7 @@ ls fixtures/wireframe/pricing-card/target-*.png
 cp fixtures/wireframe/pricing-card/blank.html \
    fixtures/wireframe/pricing-card/working.html
 
-# 3. Run vrt compare. --no-dom-equivalence because the agent may
+# 3. Run vlmkit diff html. --no-dom-equivalence because the agent may
 #    have invented different tags / class names from the reference.
 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers \
   node --experimental-strip-types src/migration-compare.ts \
@@ -59,5 +59,5 @@ position." This scenario tests the tools when:
 - The signal must come from per-band shifts + heatmaps + raw
   per-element bbox / style data without selector hints
 
-Use it to validate that `vrt diff-for-agent` remains useful when
+Use it to validate that `vlmkit diff agent` remains useful when
 the DOM-position alignment is broken.
