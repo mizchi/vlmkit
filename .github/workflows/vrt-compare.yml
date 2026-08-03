@@ -44,6 +44,7 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build:packages   # 0.8.1 made src/ entrypoints need built packages
       - run: pnpm exec playwright install --with-deps chromium
 
       - name: Run VRT Compare
@@ -86,6 +87,7 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build:packages   # 0.8.1 made src/ entrypoints need built packages
       - run: pnpm exec playwright install --with-deps chromium
 
       - name: Start static fixture server
@@ -143,6 +145,7 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build:packages   # 0.8.1 made src/ entrypoints need built packages
       - run: pnpm exec playwright install --with-deps chromium
 
       - name: Smoke test fixtures
@@ -170,6 +173,7 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build:packages   # 0.8.1 made src/ entrypoints need built packages
       - run: pnpm exec playwright install --with-deps chromium
 
       # The bench builds the MoonBit `markup-core` package, so it needs the

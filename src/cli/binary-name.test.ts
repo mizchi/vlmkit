@@ -178,3 +178,29 @@ describe("the rename did not invert text that is about the old name", () => {
     assert.match(self, /`vrt a11y-contrast` was wrong twice over/);
   });
 });
+
+describe("workflows that run a src/ entrypoint build the packages first", () => {
+  it("no job invokes src/ without pnpm build:packages", () => {
+    // 0.8.1 made the workspace packages publish compiled JS, so their `exports`
+    // map deep imports to `./dist/*` and `node src/cli/vlmkit.ts` cannot resolve
+    // `@mizchi/vlmkit-core/cli-error.ts` until the packages are built. Four
+    // workflows were never updated, and the failure is a bare
+    // ERR_MODULE_NOT_FOUND that says nothing about a missing build step.
+    // Reproduced on a clean `origin/main` checkout, so this is not branch-local.
+    //
+    // `pnpm test` counts as satisfying it — `pretest` runs build:packages.
+    const files = execFileSync("git", ["ls-files", ".github/workflows/*.yml"], { cwd: ROOT, encoding: "utf8" })
+      .split("\n").filter(Boolean);
+    const missing: string[] = [];
+    for (const f of files) {
+      const text = readFileSync(resolve(ROOT, f), "utf8");
+      for (const job of text.split(/^ {2}(?=[\w-]+:$)/m)) {
+        const name = /^([\w-]+):/.exec(job)?.[1] ?? "?";
+        const runsSrc = /node (?:--experimental-strip-types )?src\//.test(job);
+        const builds = /build:packages|pnpm test\b/.test(job);
+        if (runsSrc && !builds) missing.push(`${f}:${name}`);
+      }
+    }
+    assert.deepEqual(missing, [], `these jobs will fail with ERR_MODULE_NOT_FOUND: ${missing.join(", ")}`);
+  });
+});

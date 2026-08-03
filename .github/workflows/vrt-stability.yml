@@ -29,6 +29,7 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      - run: pnpm build:packages   # 0.8.1 made src/ entrypoints need built packages
       - run: pnpm exec playwright install --with-deps chromium
 
       - name: Serve fixtures
