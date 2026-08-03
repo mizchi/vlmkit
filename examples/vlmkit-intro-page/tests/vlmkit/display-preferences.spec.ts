@@ -21,7 +21,9 @@ test('display preferences smoke: EN defaults, JA toggle, and dark persist', asyn
   await expect(html).toHaveAttribute('lang', 'ja');
   await expect(page.getByRole('heading', { name: '「見た」ではなく、 「測った」を。' })).toBeVisible();
   await expect(dogfoodNotice).toContainText('このサイトは vlmkit 自身で生成、デバッグされています。');
-  await expect(page.getByRole('heading', { name: '測定ループを、 エージェントに配る。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '入口はひとつ。 仕事別に11のスキル。' })).toBeVisible();
+  await expect(page.getByTestId('skill-catalog')).toContainText('メタエントリー');
+  await expect(page.getByTestId('skill-catalog')).toContainText('作成');
   await expect(page.getByTestId('skill-installers')).toContainText('skills CLI でインストール');
 
   const githubLinkJa = page.getByRole('link', { name: 'GitHub で vlmkit を見る' });

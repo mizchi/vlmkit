@@ -9,6 +9,20 @@ const exampleDir = dirname(fileURLToPath(import.meta.url));
 const apmSkillCommand = "apm install mizchi/vlmkit/.claude/skills/markup-assist";
 const skillsCliCommand =
   "npx skills add https://github.com/mizchi/vlmkit/tree/main/.claude/skills/markup-assist";
+const skillCatalogUrl = "https://github.com/mizchi/vlmkit/tree/main/.claude/skills";
+const specializedSkills = [
+  "agent-validation-loop",
+  "auto-markup",
+  "dynamic-markup",
+  "markup-assist",
+  "mock-markup",
+  "spec-to-playwright",
+  "vrt-css-fix-loop",
+  "vrt-markup-synth",
+  "vrt-migration-eval",
+  "vrt-regression-watch",
+  "vrt-visual-diff",
+];
 
 async function read(name) {
   return readFile(join(exampleDir, name), "utf8");
@@ -49,6 +63,35 @@ test("README and page distribute markup-assist through APM and skills CLI", asyn
   assert.ok(copyManifest.includes(skillsCliCommand));
   assert.ok(copyManifest.includes("This site is generated and debugged with vlmkit itself."));
   assert.ok(copyManifest.includes("Don't just look."));
+});
+
+test("the meta entry and catalog classify every specialized skill", async () => {
+  const [html, readme, rootSkill, catalog, copyManifest, skillDirectories] = await Promise.all([
+    read("index.html"),
+    readFile(join(exampleDir, "../../README.md"), "utf8"),
+    readFile(join(exampleDir, "../../SKILL.md"), "utf8"),
+    readFile(join(exampleDir, "../../.claude/skills/README.md"), "utf8"),
+    read("copy.txt"),
+    readdir(join(exampleDir, "../../.claude/skills"), { withFileTypes: true }),
+  ]);
+
+  assert.deepEqual(
+    skillDirectories.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort(),
+    specializedSkills,
+  );
+  assert.match(rootSkill, /name: vlmkit/);
+  assert.match(rootSkill, /## Skill routing/);
+  assert.match(catalog, /## Start here/);
+  assert.match(catalog, /## Skill classes/);
+  assert.ok(readme.includes("./.claude/skills/README.md"));
+  assert.match(html, /data-testid="skill-catalog"/);
+  assert.ok(html.includes(`href="${skillCatalogUrl}"`));
+  assert.ok(copyManifest.includes("Meta entry"));
+
+  for (const skill of specializedSkills) {
+    assert.ok(catalog.includes(`./${skill}/`), `${skill} is missing from the catalog`);
+    assert.ok(html.includes(`>${skill}<`), `${skill} is missing from the intro page`);
+  }
 });
 
 test("the first visible message identifies the page as vlmkit dogfood", async () => {
@@ -118,6 +161,8 @@ test("locale content and display preferences have strict contracts", async () =>
   );
   assert.equal(translate("ja", "skills.apmLabel"), "APM でインストール");
   assert.equal(translate("en", "skills.apmLabel"), "Install with APM");
+  assert.equal(translate("ja", "skills.metaLabel"), "メタエントリー");
+  assert.equal(translate("en", "skills.metaLabel"), "Meta entry");
   assert.equal(nextLocale("ja"), "en");
   assert.equal(nextTheme("light"), "dark");
   assert.equal(resolveLocale("unknown"), "en");

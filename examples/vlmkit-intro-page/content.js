@@ -66,11 +66,31 @@ export const messages = Object.freeze({
     "principle.shared.title": "人とエージェント共通",
     "principle.shared.description":
       "CLI、Playwright、MCP、CI。どの入口でも同じ終了コードの契約。",
-    "skills.line1": "測定ループを、",
-    "skills.line2": "エージェントに配る。",
+    "skills.line1": "入口はひとつ。",
+    "skills.line2": "仕事別に11のスキル。",
     "skills.lead":
-      "markup-assist は、タスクに合うゲートを選び、kickback を読んで、緑になるまで直す手順をエージェントに追加します。",
-    "skills.note": "API キー不要",
+      "迷ったらメタスキル vlmkit から。タスクを分類し、必要最小限の専門スキルへ案内します。日常の HTML/CSS 編集は markup-assist を直接使えます。",
+    "skills.note": "1 メタエントリー · 11 専門スキル",
+    "skills.metaLabel": "メタエントリー",
+    "skills.metaDescription":
+      "依頼を分類し、入力と完了条件に合う専門スキルをひとつ選びます。全部のワークフローを走らせるものではありません。",
+    "skills.classLabel": "スキル分類",
+    "skills.verifyTitle": "日常の検証",
+    "skills.verifyDescription":
+      "参照デザインなしの HTML/CSS を、整合性・コピー・レスポンシブ・操作性のゲートで確認。",
+    "skills.createTitle": "UI の作成",
+    "skills.createDescription":
+      "モック、参照画像、UI Contract、動作要件から静的・動的なページを再現。",
+    "skills.testTitle": "テスト生成",
+    "skills.testDescription":
+      "自然言語の仕様から Playwright と再現可能な VRT を生成し、ドリフトを修復。",
+    "skills.monitorTitle": "比較と監視",
+    "skills.monitorDescription":
+      "描画差分を説明し、継続的な回帰やフレームワーク移行の視覚的同等性を判定。",
+    "skills.evaluateTitle": "評価と改善",
+    "skills.evaluateDescription":
+      "既知の CSS 回帰に対する修復性能と、エージェント向けツール自体の使いやすさを検証。",
+    "skills.catalogLink": "11スキルの詳しい選択ガイドを見る",
     "skills.apmLabel": "APM でインストール",
     "skills.apmDescription": "agent package manager でプロジェクトへ追加します。",
     "skills.cliLabel": "skills CLI でインストール",
@@ -149,11 +169,31 @@ export const messages = Object.freeze({
     "principle.shared.title": "Shared by people and agents",
     "principle.shared.description":
       "CLI, Playwright, MCP, or CI: every entry point follows the same exit-code contract.",
-    "skills.line1": "Give the measurement loop",
-    "skills.line2": "to your coding agent.",
+    "skills.line1": "One entry.",
+    "skills.line2": "Eleven focused skills.",
     "skills.lead":
-      "markup-assist teaches an agent to choose the right gate, read its kickback, fix the page, and rerun until green.",
-    "skills.note": "No API key required",
+      "Start with the vlmkit meta skill when unsure. It classifies the task and routes the agent to the smallest focused workflow; use markup-assist directly for routine HTML/CSS edits.",
+    "skills.note": "1 meta entry · 11 specialized skills",
+    "skills.metaLabel": "Meta entry",
+    "skills.metaDescription":
+      "Classifies the request and selects one specialized skill whose inputs and done condition match. It does not run every workflow.",
+    "skills.classLabel": "Skill classes",
+    "skills.verifyTitle": "Everyday verification",
+    "skills.verifyDescription":
+      "Check HTML/CSS with no reference design through integrity, copy, responsive, and interaction gates.",
+    "skills.createTitle": "UI creation",
+    "skills.createDescription":
+      "Recreate static or dynamic pages from mocks, references, UI Contracts, and behavior briefs.",
+    "skills.testTitle": "Test generation",
+    "skills.testDescription":
+      "Turn natural-language specs into Playwright tests, reproducible VRT, and drift healing.",
+    "skills.monitorTitle": "Comparison and monitoring",
+    "skills.monitorDescription":
+      "Explain render deltas, watch recurring regressions, and judge visual equivalence after migrations.",
+    "skills.evaluateTitle": "Evaluation and hardening",
+    "skills.evaluateDescription":
+      "Measure repair performance on known CSS regressions and improve agent-facing tool usability.",
+    "skills.catalogLink": "Open the detailed guide to all 11 skills",
     "skills.apmLabel": "Install with APM",
     "skills.apmDescription": "Add the skill to your project with Agent Package Manager.",
     "skills.cliLabel": "Install with skills CLI",
