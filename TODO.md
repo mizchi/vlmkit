@@ -647,6 +647,19 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     存在を検査。アブレーション済み。
   - `markup-vrt-eval`: example ディレクトリ + package.json スクリプト名 +
     ワークフローパス `.vrt/markup-vrt-eval/` の 3 箇所にまたがる → 据え置き。
+- [x] **同じ失敗の4回目を自分でやっていた(2026-08-02)** — 製品名の掃除が
+  `binary-name.test.ts`(**リネームそのものを説明するファイル**)を裏返していた:
+  「There is no \`vrt\` binary」→「There is no \`vlmkit\` binary」、
+  「~1670 occurrences of \`vrt\`」→「…of \`vlmkit\`」、
+  `json-contract.test.ts` の「no word boundary before \`vrt\`」→「…before \`vlmkit\`」。
+  tsc も他のテストも通り、**自信のあるドキュメントとして読めるまま真逆のことを言う**。
+  最初の3回は差分を読んで気づいたが、4回目は commit・push 後に気づいた。
+  汎用の検出ゲートを追加: **出荷しているバイナリが存在しないと主張するファイルは無い**
+  (`no \`vlmkit\` binary` を全 .ts/.md で検査)。除外は狭く定義した —
+  引用符付きの旧→新の図示形のみ。「矢印を含む行を全部除外」は、
+  このゲートが対象にしている失敗そのものの繰り返しになる。
+  アブレーション済み。加えて `binary-name.test.ts` 自身が旧名の引用を
+  保持していることも検査(消えると例外リストの根拠が失われる)。
 - [ ] **残り: 据え置き分(上記の理由により)**
   - **挙動に影響 128 箇所**: `.vrt/`(baselines / runs / last-diff-for-agent)、
     `.vrt-skills/`、`vrt.config.json` / `.toml`、`VRT_*` 環境変数(12 種以上)、

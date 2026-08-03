@@ -1,13 +1,13 @@
 /**
- * No command may tell the reader to run `vlmkit`.
+ * No command may tell the reader to run `vrt`.
  *
- * There is no `vlmkit` binary — `package.json` ships `bin: { vlmkit }` only — so
+ * There is no `vrt` binary — `package.json` ships `bin: { vlmkit }` only — so
  * every `vrt <something>` in help text, a usage line or a fix instruction was an
  * instruction the reader could not paste. `vrt a11y-contrast` was wrong twice
  * over: dead binary AND a deprecated subcommand name.
  *
  * This test also pins the *exceptions*, which is the more useful half. A sweep
- * of the whole tree found ~1670 occurrences of `vlmkit`, and they are not one
+ * of the whole tree found ~1670 occurrences of `vrt`, and they are not one
  * thing:
  *
  *   renamed here          `vrt <cmd>` in help/usage/comments -> `vlmkit <cmd>`
@@ -45,7 +45,7 @@ const COMMANDS = [
 ];
 
 /**
- * `vlmkit` spellings that name something real and must survive. Each is a live
+ * `vrt` spellings that name something real and must survive. Each is a live
  * value, not prose — see the header for why renaming them is a separate,
  * breaking change.
  */
@@ -77,7 +77,7 @@ function offenders(text: string): string[] {
   return [...t.matchAll(/vrt[\s-][\w-]*/g)].map((m) => m[0].trim());
 }
 
-describe("no command tells the reader to run `vlmkit`", () => {
+describe("no command tells the reader to run `vrt`", () => {
   it("package.json ships only the vlmkit binary — the premise of this test", () => {
     const pkg = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8")) as { bin: Record<string, string> };
     assert.deepEqual(Object.keys(pkg.bin), ["vlmkit"]);
@@ -133,5 +133,48 @@ describe("a rename never leaves a definition and its reference disagreeing", () 
       }
     }
     assert.deepEqual(problems, [], problems.join("\n"));
+  });
+});
+
+describe("the rename did not invert text that is about the old name", () => {
+  /**
+   * Fourth instance of the same failure in one day, and the first three were
+   * only caught by reading the diff. A sweep that replaces `vrt` with `vlmkit`
+   * corrupts any sentence whose subject IS the old name, and the corruption is
+   * invisible to tsc and to every other test:
+   *
+   *   "There is no `vrt` binary"        -> "There is no `vlmkit` binary"
+   *   "~1670 occurrences of `vrt`"      -> "~1670 occurrences of `vlmkit`"
+   *   "no word boundary before `vrt`"   -> "… before `vlmkit`"
+   *
+   * Each reads as confident documentation and says the opposite of the truth.
+   * This is a cheap, general detector: the shipped binary exists, so no file may
+   * claim it does not.
+   */
+  it("no file claims the shipped binary does not exist", () => {
+    const files = execFileSync("git", ["ls-files", "*.ts", "*.md"], { cwd: ROOT, encoding: "utf8" })
+      .split("\n").filter(Boolean);
+    const claims: string[] = [];
+    for (const f of files) {
+      const text = readFileSync(resolve(ROOT, f), "utf8");
+      text.split("\n").forEach((line, i) => {
+        if (!/\bno\s+`?vlmkit`?\s+binary\b/i.test(line)) return;
+        // An old -> new illustration is not a claim. Narrowly defined: a line
+        // that shows a quoted before AND a quoted after, separated by an arrow —
+        // the shape the comment above uses. Excluding every line with an arrow
+        // would repeat the mistake this whole gate is about.
+        if (/".*`vrt`.*"\s*(?:->|→)\s*".*`vlmkit`.*"/.test(line)) return;
+        claims.push(`${f}:${i + 1}: ${line.trim()}`);
+      });
+    }
+    assert.deepEqual(claims, [], claims.join("\n"));
+  });
+
+  it("this file still quotes the old name it exists to talk about", () => {
+    // If a future sweep erases `vrt` from here, the header stops explaining why
+    // the allowlist exists and the exceptions look arbitrary.
+    const self = readFileSync(resolve(ROOT, "src", "cli", "binary-name.test.ts"), "utf8");
+    assert.match(self, /There is no `vrt` binary/);
+    assert.match(self, /`vrt a11y-contrast` was wrong twice over/);
   });
 });
