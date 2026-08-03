@@ -225,28 +225,29 @@
           <div class="skills-intro">
             <p class="section-number">04 / AGENT SKILL</p>
             <h2 id="skills-title">
-              <span data-i18n="skills.line1">One entry.</span><br />
-              <span data-i18n="skills.line2">Eleven focused skills.</span>
+              <span data-i18n="skills.line1">Install once.</span><br />
+              <span data-i18n="skills.line2">Ask naturally.</span>
             </h2>
-            <p data-i18n="skills.lead">Start with the vlmkit meta skill when unsure. It classifies the task and routes the agent to the smallest focused workflow; use markup-assist directly for routine HTML/CSS edits.</p>
-            <p class="skills-note"><span>CATALOG</span> <span data-i18n="skills.note">1 meta entry · 11 specialized skills</span></p>
+            <p data-i18n="skills.lead">Add vlmkit once—there are no skill names to learn. Describe the outcome, and the AI classifies the request and artifacts, loads the right workflow, and runs it until the checks pass.</p>
+            <p class="skills-note"><span>ROUTER</span> <span data-i18n="skills.note">1 install · automatic routing · 11 workflows</span></p>
           </div>
 
           <div class="skills-directory">
             <div class="skill-catalog" data-testid="skill-catalog">
-              <article class="skill-entry">
+              <article class="skill-entry" data-testid="automatic-routing">
                 <div>
                   <p class="skill-manager">00 / <span data-i18n="skills.metaLabel">Meta entry</span></p>
                   <h3><code>vlmkit</code></h3>
-                  <p data-i18n="skills.metaDescription">Classifies the request and selects one specialized skill whose inputs and done condition match. It does not run every workflow.</p>
+                  <p data-i18n="skills.metaDescription">Activates automatically for frontend work and selects the matching workflow. It never asks you to pick a skill, and prepares the CLI and Chromium only when needed.</p>
                 </div>
-                <div class="skill-entry-commands">
-                  <code>apm install mizchi/vlmkit</code>
-                  <code>npx skills add mizchi/vlmkit</code>
-                </div>
+                <ul class="routing-examples">
+                  <li><span data-i18n="skills.exampleMock">“Implement this mock.”</span><code>mock-markup</code></li>
+                  <li><span data-i18n="skills.exampleResponsive">“Check responsiveness and interactions.”</span><code>dynamic-markup</code></li>
+                  <li><span data-i18n="skills.exampleTest">“Turn this spec into stable tests.”</span><code>spec-to-playwright</code></li>
+                </ul>
               </article>
 
-              <p class="skill-class-label" data-i18n="skills.classLabel">Skill classes</p>
+              <p class="skill-class-label" data-i18n="skills.classLabel">What the AI can choose</p>
               <div class="skill-classes">
                 <article class="skill-category">
                   <div>
@@ -295,16 +296,16 @@
 
             <div class="skill-installers" data-testid="skill-installers">
               <article class="skill-installer">
-                <p class="skill-manager">DIRECT / APM</p>
+                <p class="skill-manager">ONE INSTALL / APM</p>
                 <h3 data-i18n="skills.apmLabel">Install with APM</h3>
-                <p data-i18n="skills.apmDescription">Add the skill to your project with Agent Package Manager.</p>
-                <div class="skill-command"><span aria-hidden="true">$</span><code>apm install mizchi/vlmkit/.claude/skills/markup-assist</code></div>
+                <p data-i18n="skills.apmDescription">Add the single automatic router with Agent Package Manager.</p>
+                <div class="skill-command"><span aria-hidden="true">$</span><code>apm install mizchi/vlmkit</code></div>
               </article>
               <article class="skill-installer">
-                <p class="skill-manager">DIRECT / SKILLS CLI</p>
+                <p class="skill-manager">ONE INSTALL / SKILLS CLI</p>
                 <h3 data-i18n="skills.cliLabel">Install with skills CLI</h3>
-                <p data-i18n="skills.cliDescription">Run the open agent skills CLI directly through npx.</p>
-                <div class="skill-command"><span aria-hidden="true">$</span><code>npx skills add https://github.com/mizchi/vlmkit/tree/main/.claude/skills/markup-assist</code></div>
+                <p data-i18n="skills.cliDescription">Add the same automatic router directly through npx.</p>
+                <div class="skill-command"><span aria-hidden="true">$</span><code>npx skills add mizchi/vlmkit</code></div>
               </article>
             </div>
           </div>

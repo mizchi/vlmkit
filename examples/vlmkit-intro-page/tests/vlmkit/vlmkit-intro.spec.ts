@@ -26,6 +26,7 @@ test('VLMKit intro smoke: hero clarity, scenario switch, and install guidance', 
 
   const skillInstallers = page.getByTestId('skill-installers');
   const skillCatalog = page.getByTestId('skill-catalog');
+  const automaticRouting = page.getByTestId('automatic-routing');
   const specializedSkills = [
     'agent-validation-loop',
     'auto-markup',
@@ -41,18 +42,24 @@ test('VLMKit intro smoke: hero clarity, scenario switch, and install guidance', 
   ];
 
   await expect(skillCatalog).toBeVisible();
+  await expect(automaticRouting).toBeVisible();
+  await expect(automaticRouting).toContainText('never asks you to pick a skill');
+  await expect(automaticRouting).toContainText('prepares the CLI and Chromium only when needed');
+  await expect(automaticRouting).toContainText('“Implement this mock.”mock-markup');
+  await expect(automaticRouting).toContainText(
+    '“Check responsiveness and interactions.”dynamic-markup',
+  );
+  await expect(automaticRouting).toContainText(
+    '“Turn this spec into stable tests.”spec-to-playwright',
+  );
   await expect(skillCatalog).toContainText('Meta entry');
   await expect(skillCatalog).toContainText('vlmkit');
   for (const skill of specializedSkills) {
     await expect(skillCatalog).toContainText(skill);
   }
   await expect(skillInstallers).toBeVisible();
-  await expect(skillInstallers).toContainText(
-    'apm install mizchi/vlmkit/.claude/skills/markup-assist',
-  );
-  await expect(skillInstallers).toContainText(
-    'npx skills add https://github.com/mizchi/vlmkit/tree/main/.claude/skills/markup-assist',
-  );
+  await expect(skillInstallers).toContainText('apm install mizchi/vlmkit');
+  await expect(skillInstallers).toContainText('npx skills add mizchi/vlmkit');
 
   const scenarioTablist = page.getByLabel('Verification scenarios');
   const tabBreakage = scenarioTablist.getByText('01 Measure breakage');

@@ -901,18 +901,28 @@ dd {
   font-size: 13px;
 }
 
-.skill-entry-commands {
+.routing-examples {
   display: grid;
   gap: 8px;
   align-content: center;
+  list-style: none;
 }
 
-.skill-entry-commands code {
+.routing-examples li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
   padding: 12px 14px;
   border: 1px solid var(--chrome-line);
+  color: var(--chrome-muted);
+  font-size: 11px;
+}
+
+.routing-examples code {
   color: var(--acid);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 11px;
+  font-size: 10px;
   overflow-wrap: anywhere;
 }
 

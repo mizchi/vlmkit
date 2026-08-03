@@ -29,6 +29,10 @@ gates:
 vrt:
     pnpm exec playwright test --config playwright.config.ts tests/vlmkit
 
+# 意図した表示変更を desktop/mobile の VRT ベースラインへ反映する
+vrt-update:
+    pnpm exec playwright test --config playwright.config.ts tests/vlmkit --update-snapshots
+
 # 観測から plan・テスト生成・VRT まで markup-loop を再実行する
 markup-loop:
     node ../../dist/vlmkit.mjs markup-loop run

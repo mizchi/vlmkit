@@ -18,13 +18,17 @@ Don't trust AI.
 Measure the result.
 
 # Agent skill
-One entry.
-Eleven focused skills.
+Install once.
+Ask naturally.
 Meta entry
 vlmkit
-apm install mizchi/vlmkit
-npx skills add mizchi/vlmkit
-SKILL CLASSES
+“Implement this mock.”
+mock-markup
+“Check responsiveness and interactions.”
+dynamic-markup
+“Turn this spec into stable tests.”
+spec-to-playwright
+WHAT THE AI CAN CHOOSE
 Everyday verification
 markup-assist
 UI creation
@@ -42,9 +46,9 @@ Evaluation and hardening
 vrt-css-fix-loop
 agent-validation-loop
 Install with APM
-apm install mizchi/vlmkit/.claude/skills/markup-assist
+apm install mizchi/vlmkit
 Install with skills CLI
-npx skills add https://github.com/mizchi/vlmkit/tree/main/.claude/skills/markup-assist
+npx skills add mizchi/vlmkit
 
 # Start
 Measure the page
