@@ -1,0 +1,37 @@
+# 利用できるタスクを表示する
+default:
+    @just --list
+
+# 紹介ページを http://127.0.0.1:4190 で起動する
+serve:
+    node server.mjs
+
+# HTML・CSS・シナリオ定義の静的コントラクトを検証する
+contract:
+    node --test page.test.mjs
+
+# GitHub Pages にアップロードする静的成果物だけを .pages に生成する
+pages:
+    node build-pages.mjs
+
+# ローカルサーバーを起動して key-free な vlmkit ゲートを実行する
+gates:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    node server.mjs &
+    sample_server_pid=$!
+    trap 'kill "$sample_server_pid"' EXIT
+    node ../../dist/vlmkit.mjs check integrity http://127.0.0.1:4190
+    node ../../dist/vlmkit.mjs check copy http://127.0.0.1:4190 --manifest copy.txt
+    node ../../dist/vlmkit.mjs check design http://127.0.0.1:4190
+
+# desktop/mobile の Playwright VRT を実行する
+vrt:
+    pnpm exec playwright test --config playwright.config.ts tests/vlmkit
+
+# 観測から plan・テスト生成・VRT まで markup-loop を再実行する
+markup-loop:
+    node ../../dist/vlmkit.mjs markup-loop run
+
+# サンプルの静的コントラクトと VRT をまとめて実行する
+test: contract pages vrt

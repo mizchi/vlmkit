@@ -3,7 +3,7 @@
  * Packages only the root CLI tarball, then installs it into a clean consumer.
  * Internal workspace packages must be bundled into the CLI, not installed here.
  */
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { access, mkdtemp, mkdir, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
@@ -227,6 +227,19 @@ async function main() {
     await assertMissing(join(consumerDir, ".vlmkit/markup-loop/plan.md"));
     await assertMissing(join(consumerDir, ".vlmkit/markup-loop/plan.json"));
     await assertMissing(join(consumerDir, "tests/vlmkit/checkout.spec.ts"));
+
+    const noKeyRun = spawnSync(bin, ["markup-loop", "run"], {
+      cwd: consumerDir,
+      encoding: "utf8",
+      env: dryRunEnvironment,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const noKeyOutput = `${noKeyRun.stdout ?? ""}\n${noKeyRun.stderr ?? ""}`;
+    if (noKeyRun.status === 0) fail("markup-loop run unexpectedly succeeded without a provider key");
+    assertOutput(noKeyOutput, "OPENROUTER_API_KEY is required", "bundled markup-loop planner import");
+    if (noKeyOutput.includes("__filename is not defined")) {
+      fail("bundled markup-loop imported the CommonJS TypeScript runtime as ESM");
+    }
 
     const scan = run(bin, ["scan", "breakpoints", "fixture.html"], { cwd: consumerDir });
     assertOutput(scan, "Breakpoint Discovery", "bundled scan breakpoints");

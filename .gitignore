@@ -42,3 +42,4 @@ result-*
 # heal flaky-test counter (transient)
 _flaky_count.txt
 .vlmkit/
+/examples/vlmkit-intro-page/.pages/

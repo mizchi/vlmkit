@@ -138,6 +138,23 @@ describe("package manifest for publishable CLI", () => {
     }
   });
 
+  it("keeps TypeScript external when the bundled CLI loads vlmkit-generate", async () => {
+    const pkg = await readPackageJson();
+    const dependencies = pkg.dependencies as Record<string, string> | undefined;
+    const tsdownConfig = await readFile(resolve(repoRoot, "tsdown.config.ts"), "utf-8");
+
+    assert.match(
+      dependencies?.typescript ?? "",
+      /^\^?\d+\.\d+\.\d+/,
+      "the root CLI must install the TypeScript runtime used by bundled vlmkit-generate",
+    );
+    assert.match(
+      tsdownConfig,
+      /neverBundle:\s*\[\s*["']typescript["']\s*\]/,
+      "TypeScript is CommonJS and must stay external to the root ESM bundle",
+    );
+  });
+
   it("ships a complete LICENSE for every publishable workspace package", async () => {
     const rootLicense = await readFile(resolve(repoRoot, "LICENSE"), "utf-8");
     const manifests = await readWorkspacePackageManifests();

@@ -11,6 +11,7 @@ export default defineConfig([
     clean: true,
     deps: {
       alwaysBundle: [/^@mizchi\/vlmkit-/],
+      neverBundle: ["typescript"],
     },
   },
   {

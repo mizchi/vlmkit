@@ -42,6 +42,7 @@ describe("markup-loop drop-in config", () => {
       assert.equal(config.baseUrl, "http://127.0.0.1:5173");
       assert.equal(config.generatedTestFile, "tests/vlmkit/checkout.spec.ts");
       assert.equal(config.helperImport, "./support/goto-app");
+      assert.equal(config.maxTokens, 4096);
       assert.equal(config.runtimeGateRuns, 2);
 
       const agentRunbook = await readFile(join(cwd, ".vlmkit/markup-loop/AGENT.md"), "utf8");
@@ -67,8 +68,10 @@ describe("markup-loop drop-in config", () => {
     assert.match(commands.plan.display, /--request-file \.vlmkit\/markup-loop\/request\.md/);
     assert.match(commands.plan.display, /--structured-out \.vlmkit\/markup-loop\/plan\.json/);
     assert.match(commands.plan.display, /--locator-inventory-out \.vlmkit\/markup-loop\/locators\.json/);
+    assert.match(commands.plan.display, /--max-tokens 4096/);
     assert.match(commands.generate.display, /vlmkit-generate --plan \.vlmkit\/markup-loop\/plan\.md/);
     assert.match(commands.generate.display, /--helper-import \.\/support\/goto-app/);
+    assert.match(commands.generate.display, /--max-tokens 4096/);
     assert.match(commands.generate.display, /--runtime-gate-runs 2/);
     assert.match(commands.generate.display, /--gate-command "pnpm exec playwright test --config playwright\.config\.ts tests\/vlmkit\/settings\.spec\.ts --update-snapshots"/);
   });
