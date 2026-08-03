@@ -21,6 +21,8 @@ test('display preferences smoke: JA/light to EN/dark persists after reload', asy
   await expect(html).toHaveAttribute('lang', 'en');
   await expect(page.getByRole('heading', { name: "Don't just look. Measure it." })).toBeVisible();
   await expect(dogfoodNotice).toContainText('This site is generated and debugged with vlmkit itself.');
+  await expect(page.getByRole('heading', { name: 'Give the measurement loop to your coding agent.' })).toBeVisible();
+  await expect(page.getByTestId('skill-installers')).toContainText('Install with skills CLI');
 
   const githubLinkEn = page.getByRole('link', { name: 'View vlmkit on GitHub' });
   await expect(githubLinkEn).toBeVisible();

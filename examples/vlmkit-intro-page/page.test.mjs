@@ -6,6 +6,9 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
 const exampleDir = dirname(fileURLToPath(import.meta.url));
+const apmSkillCommand = "apm install mizchi/vlmkit/.claude/skills/markup-assist";
+const skillsCliCommand =
+  "npx skills add https://github.com/mizchi/vlmkit/tree/main/.claude/skills/markup-assist";
 
 async function read(name) {
   return readFile(join(exampleDir, name), "utf8");
@@ -20,12 +23,30 @@ test("the intro page has a stable semantic product story", async () => {
   assert.match(html, /data-i18n="hero\.line2">「測った」を。<\/span>/);
   assert.match(html, /id="workflow"/);
   assert.match(html, /id="commands"/);
+  assert.match(html, /id="skills"/);
   assert.match(html, /id="start"/);
   assert.match(html, /data-testid="hero-status"/);
   assert.match(html, /data-testid="install-command"/);
   assert.match(html, /data-testid="gate-matrix"/);
   assert.match(html, /npm install -D @mizchi\/vlmkit/);
   assert.match(html, /https:\/\/github\.com\/mizchi\/vlmkit/);
+});
+
+test("README and page distribute markup-assist through APM and skills CLI", async () => {
+  const [html, readme, copyManifest] = await Promise.all([
+    read("index.html"),
+    readFile(join(exampleDir, "../../README.md"), "utf8"),
+    read("copy.txt"),
+  ]);
+
+  assert.match(html, /href="#skills"[^>]*data-i18n="nav\.skills"/);
+  assert.match(html, /data-testid="skill-installers"/);
+  assert.ok(html.includes(apmSkillCommand));
+  assert.ok(html.includes(skillsCliCommand));
+  assert.ok(readme.includes(apmSkillCommand));
+  assert.ok(readme.includes(skillsCliCommand));
+  assert.ok(copyManifest.includes(apmSkillCommand));
+  assert.ok(copyManifest.includes(skillsCliCommand));
 });
 
 test("the first visible message identifies the page as vlmkit dogfood", async () => {
@@ -88,6 +109,8 @@ test("locale content and display preferences have strict contracts", async () =>
     translate("en", "dogfood.message"),
     "This site is generated and debugged with vlmkit itself.",
   );
+  assert.equal(translate("ja", "skills.apmLabel"), "APM でインストール");
+  assert.equal(translate("en", "skills.apmLabel"), "Install with APM");
   assert.equal(nextLocale("ja"), "en");
   assert.equal(nextTheme("light"), "dark");
   assert.equal(resolveLocale("unknown"), "ja");

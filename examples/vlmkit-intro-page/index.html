@@ -27,6 +27,7 @@
       <nav class="site-nav" aria-label="メインナビゲーション" data-i18n-aria-label="nav.label">
         <a href="#workflow" data-i18n="nav.workflow">仕組み</a>
         <a href="#commands" data-i18n="nav.commands">コマンド</a>
+        <a href="#skills" data-i18n="nav.skills">スキル</a>
         <a href="#start" data-i18n="nav.start">はじめる</a>
       </nav>
       <div class="header-actions">
@@ -219,9 +220,38 @@
         </div>
       </section>
 
+      <section class="skills section" id="skills" aria-labelledby="skills-title">
+        <div class="skills-layout">
+          <div class="skills-intro">
+            <p class="section-number">04 / AGENT SKILL</p>
+            <h2 id="skills-title">
+              <span data-i18n="skills.line1">測定ループを、</span><br />
+              <span data-i18n="skills.line2">エージェントに配る。</span>
+            </h2>
+            <p data-i18n="skills.lead">markup-assist は、タスクに合うゲートを選び、kickback を読んで、緑になるまで直す手順をエージェントに追加します。</p>
+            <p class="skills-note"><span>SKILL</span> <code>markup-assist</code> · <span data-i18n="skills.note">API キー不要</span></p>
+          </div>
+
+          <div class="skill-installers" data-testid="skill-installers">
+            <article class="skill-installer">
+              <p class="skill-manager">01 / APM</p>
+              <h3 data-i18n="skills.apmLabel">APM でインストール</h3>
+              <p data-i18n="skills.apmDescription">agent package manager でプロジェクトへ追加します。</p>
+              <div class="skill-command"><span aria-hidden="true">$</span><code>apm install mizchi/vlmkit/.claude/skills/markup-assist</code></div>
+            </article>
+            <article class="skill-installer">
+              <p class="skill-manager">02 / SKILLS CLI</p>
+              <h3 data-i18n="skills.cliLabel">skills CLI でインストール</h3>
+              <p data-i18n="skills.cliDescription">npx からオープンな agent skills CLI を直接実行します。</p>
+              <div class="skill-command"><span aria-hidden="true">$</span><code>npx skills add https://github.com/mizchi/vlmkit/tree/main/.claude/skills/markup-assist</code></div>
+            </article>
+          </div>
+        </div>
+      </section>
+
       <section class="start section" id="start" aria-labelledby="start-title">
         <div>
-          <p class="section-number section-number-dark">04 / START NOW</p>
+          <p class="section-number section-number-dark">05 / START NOW</p>
           <h2 id="start-title">
             <span data-i18n="start.line1">まず、いまのページを</span><br />
             <span data-i18n="start.line2">測ってみる。</span>

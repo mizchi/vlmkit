@@ -24,6 +24,15 @@ test('VLMKit intro smoke: hero clarity, scenario switch, and install guidance', 
   await expect(installCommand).toContainText('npm install -D @mizchi/vlmkit');
   await expect(page.getByRole('button', { name: 'インストールコマンドをコピー' })).toBeVisible();
 
+  const skillInstallers = page.getByTestId('skill-installers');
+  await expect(skillInstallers).toBeVisible();
+  await expect(skillInstallers).toContainText(
+    'apm install mizchi/vlmkit/.claude/skills/markup-assist',
+  );
+  await expect(skillInstallers).toContainText(
+    'npx skills add https://github.com/mizchi/vlmkit/tree/main/.claude/skills/markup-assist',
+  );
+
   const scenarioTablist = page.getByLabel('検証シナリオ');
   const tabBreakage = scenarioTablist.getByText('01 壊れ方を測る');
   const tabTrackChanges = scenarioTablist.getByText('02 変化を追う');

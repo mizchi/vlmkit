@@ -17,6 +17,14 @@ vlmkit は、ページの崩れ・コピー・振る舞い・ピクセル差分�
 AIを信じない。
 結果を測る。
 
+# Agent skill
+測定ループを、
+エージェントに配る。
+APM でインストール
+apm install mizchi/vlmkit/.claude/skills/markup-assist
+skills CLI でインストール
+npx skills add https://github.com/mizchi/vlmkit/tree/main/.claude/skills/markup-assist
+
 # Start
 まず、いまのページを
 測ってみる。
