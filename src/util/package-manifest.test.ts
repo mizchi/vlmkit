@@ -73,7 +73,9 @@ describe("package manifest for publishable CLI", () => {
 
     assert.ok(scripts, "package.json should define scripts");
     assert.equal(scripts["smoke:pack:markup-loop"], "node scripts/smoke-packed-markup-loop.mjs");
+    assert.equal(scripts["smoke:pack:workspaces"], "node scripts/smoke-packed-workspaces.mjs");
     assert.doesNotMatch(scripts.test, /smoke:pack:markup-loop|smoke-packed-markup-loop/);
+    assert.doesNotMatch(scripts.test, /smoke:pack:workspaces|smoke-packed-workspaces/);
   });
 
   it("exports the published client entrypoint", async () => {
@@ -151,6 +153,41 @@ describe("package manifest for publishable CLI", () => {
         rootLicense,
         `${pkg.name as string} should ship the canonical root MIT license text`,
       );
+    }
+  });
+
+  it("publishes runnable JavaScript for every public workspace package", async () => {
+    const manifests = await readWorkspacePackageManifests();
+
+    for (const { pkg } of manifests) {
+      if (pkg.private === true) continue;
+
+      const name = pkg.name as string;
+      const scripts = pkg.scripts as Record<string, string> | undefined;
+      const engines = pkg.engines as Record<string, string> | undefined;
+      const publishConfig = pkg.publishConfig as Record<string, string> | undefined;
+      const files = pkg.files as string[] | undefined;
+      const exports = pkg.exports as Record<string, unknown> | undefined;
+      const bin = pkg.bin as Record<string, string> | undefined;
+
+      assert.match(scripts?.build ?? "", /\btsdown\b/, `${name} should build JavaScript with tsdown`);
+      assert.equal(scripts?.prepack, "pnpm build", `${name} should build before packing`);
+      assert.deepEqual(engines, { node: ">=24" }, `${name} should declare its Node runtime`);
+      assert.deepEqual(publishConfig, { access: "public" }, `${name} should publish publicly`);
+      assert.ok(files?.some((file) => file === "dist" || file.startsWith("dist/")), `${name} should publish dist`);
+      assert.ok(!files?.some((file) => file.startsWith("src/")), `${name} should not publish raw TypeScript sources`);
+      assert.ok(exports, `${name} should declare exports`);
+
+      for (const [subpath, target] of Object.entries(exports!)) {
+        assert.equal(typeof target, "object", `${name} ${subpath} should use conditional exports`);
+        const conditions = target as Record<string, string>;
+        assert.match(conditions.types ?? "", /^\.\/dist\/.*\.d\.mts$/, `${name} ${subpath} should export declarations`);
+        assert.match(conditions.import ?? "", /^\.\/dist\/.*\.mjs$/, `${name} ${subpath} should export JavaScript`);
+      }
+
+      for (const [command, target] of Object.entries(bin ?? {})) {
+        assert.match(target, /^\.\/dist\/.*\.mjs$/, `${name} bin ${command} should execute built JavaScript`);
+      }
     }
   });
 });

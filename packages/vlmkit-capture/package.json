@@ -14,18 +14,31 @@
     "url": "https://github.com/mizchi/vlmkit/issues"
   },
   "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
-    "src/**/*.ts",
-    "!src/**/*.test.ts",
+    "dist/**",
     "README.md",
     "LICENSE"
   ],
   "scripts": {
+    "build": "pnpm --dir ../.. exec tsdown --config tsdown.packages.config.ts --filter @mizchi/vlmkit-capture",
+    "prepack": "pnpm build",
     "test": "node --test 'src/**/*.test.ts'"
   },
   "exports": {
-    ".": "./src/index.ts",
-    "./*.ts": "./src/*.ts"
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./*.ts": {
+      "types": "./dist/*.d.mts",
+      "import": "./dist/*.mjs"
+    }
   },
   "dependencies": {
     "@mizchi/vlmkit-core": "workspace:*",
