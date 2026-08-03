@@ -1,44 +1,44 @@
 <!doctype html>
-<html lang="ja" data-theme="light">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="vlmkit は、フロントエンドの見た目と振る舞いを実ブラウザで決定論的に検証するツールキットです。"
+      content="vlmkit deterministically verifies frontend visuals and behavior in a real browser."
     />
-    <title>vlmkit — 見るのではなく、測る</title>
+    <title>vlmkit — Don't just look. Measure.</title>
     <link rel="stylesheet" href="./styles.css" />
     <script type="module" src="./app.js"></script>
   </head>
   <body>
-    <a class="skip-link" href="#main" data-i18n="skip.main">本文へスキップ</a>
+    <a class="skip-link" href="#main" data-i18n="skip.main">Skip to main content</a>
 
     <div class="dogfood-notice" data-testid="dogfood-notice">
       <span class="dogfood-kicker" data-i18n="dogfood.kicker">DOGFOOD / VERIFIED LIVE</span>
-      <span class="dogfood-message" data-i18n="dogfood.message">このサイトは vlmkit 自身で生成、デバッグされています。</span>
+      <span class="dogfood-message" data-i18n="dogfood.message">This site is generated and debugged with vlmkit itself.</span>
     </div>
 
     <header class="site-header">
-      <a class="brand" href="#top" aria-label="vlmkit ホーム" data-i18n-aria-label="brand.home">
+      <a class="brand" href="#top" aria-label="vlmkit home" data-i18n-aria-label="brand.home">
         <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
         <span>vlmkit</span>
       </a>
-      <nav class="site-nav" aria-label="メインナビゲーション" data-i18n-aria-label="nav.label">
-        <a href="#workflow" data-i18n="nav.workflow">仕組み</a>
-        <a href="#commands" data-i18n="nav.commands">コマンド</a>
-        <a href="#skills" data-i18n="nav.skills">スキル</a>
-        <a href="#start" data-i18n="nav.start">はじめる</a>
+      <nav class="site-nav" aria-label="Main navigation" data-i18n-aria-label="nav.label">
+        <a href="#workflow" data-i18n="nav.workflow">How it works</a>
+        <a href="#commands" data-i18n="nav.commands">Commands</a>
+        <a href="#skills" data-i18n="nav.skills">Skill</a>
+        <a href="#start" data-i18n="nav.start">Get started</a>
       </nav>
       <div class="header-actions">
-        <div class="display-controls" role="group" aria-label="表示設定" data-i18n-aria-label="controls.label">
+        <div class="display-controls" role="group" aria-label="Display preferences" data-i18n-aria-label="controls.label">
           <button
             class="preference-toggle locale-toggle"
             type="button"
             data-testid="locale-toggle"
             data-locale-toggle
-            data-active-locale="ja"
-            aria-label="English に切り替える"
+            data-active-locale="en"
+            aria-label="Switch to Japanese"
           >
             <span data-locale-option="ja">JA</span><i aria-hidden="true">/</i><span data-locale-option="en">EN</span>
           </button>
@@ -49,7 +49,7 @@
             data-theme-toggle
             role="switch"
             aria-checked="false"
-            aria-label="ダークテーマに切り替える"
+            aria-label="Switch to dark theme"
           >
             <span class="theme-symbol" data-theme-symbol aria-hidden="true">◐</span>
             <span data-theme-label>DARK</span>
@@ -58,7 +58,7 @@
         <a
           class="header-link"
           href="https://github.com/mizchi/vlmkit"
-          aria-label="GitHub で vlmkit を見る"
+          aria-label="View vlmkit on GitHub"
           data-i18n-aria-label="github.label"
         >GitHub <span aria-hidden="true">↗</span></a>
       </div>
@@ -70,17 +70,17 @@
           <div class="hero-copy">
             <p class="eyebrow"><span>FRONTEND VERIFICATION</span><span>NODE 24+</span><span>v0.9.0</span></p>
             <h1 id="hero-title">
-              <span data-i18n="hero.line1">「見た」ではなく、</span><br />
-              <span data-i18n="hero.line2">「測った」を。</span>
+              <span data-i18n="hero.line1">Don't just look.</span><br />
+              <span data-i18n="hero.line2">Measure it.</span>
             </h1>
-            <p class="hero-lead" data-i18n="hero.lead">vlmkit は、ページの崩れ・コピー・振る舞い・ピクセル差分を実ブラウザで測る検証ツールキット。人にも、コードを書くエージェントにも。</p>
+            <p class="hero-lead" data-i18n="hero.lead">vlmkit measures broken layouts, copy, behavior, and pixel diffs in a real browser—for people and coding agents alike.</p>
             <div class="hero-actions">
-              <a class="button button-primary" href="#start"><span data-i18n="hero.start">2分ではじめる</span> <span aria-hidden="true">↓</span></a>
-              <a class="button button-ghost" href="#workflow" data-i18n="hero.workflow">仕組みを見る</a>
+              <a class="button button-primary" href="#start"><span data-i18n="hero.start">Start in 2 minutes</span> <span aria-hidden="true">↓</span></a>
+              <a class="button button-ghost" href="#workflow" data-i18n="hero.workflow">See how it works</a>
             </div>
             <div class="hero-status" data-testid="hero-status">
               <span class="pulse" aria-hidden="true"></span>
-              <span><strong>KEY-FREE BY DEFAULT</strong> — <span data-i18n="hero.status">ほとんどのゲートは API キー不要</span></span>
+              <span><strong>KEY-FREE BY DEFAULT</strong> — <span data-i18n="hero.status">most gates need no API key</span></span>
             </div>
           </div>
 
@@ -90,7 +90,7 @@
               <span>00:03.42</span>
             </figcaption>
             <div class="console-command"><span aria-hidden="true">$</span> vlmkit check integrity ./page.html</div>
-            <div class="viewport-map" aria-label="3つのビューポートで検証済み" data-i18n-aria-label="hero.viewportLabel">
+            <div class="viewport-map" aria-label="Verified across three viewports" data-i18n-aria-label="hero.viewportLabel">
               <div class="viewport viewport-wide"><span>1280</span><i></i></div>
               <div class="viewport viewport-mid"><span>768</span><i></i></div>
               <div class="viewport viewport-small"><span>375</span><i></i></div>
@@ -105,7 +105,7 @@
           </figure>
         </div>
 
-        <ul class="measurement-strip" aria-label="vlmkit の測定レイヤー" data-i18n-aria-label="hero.measurementLabel">
+        <ul class="measurement-strip" aria-label="vlmkit measurement layers" data-i18n-aria-label="hero.measurementLabel">
           <li><span>01</span> DOM GEOMETRY</li>
           <li><span>02</span> PIXEL MATH</li>
           <li><span>03</span> COMPUTED STYLE</li>
@@ -117,13 +117,13 @@
         <div class="section-heading">
           <p class="section-number">01 / THE LOOP</p>
           <h2 id="workflow-title">
-            <span data-i18n="workflow.line1">目視の感想を、</span><br />
-            <span data-i18n="workflow.line2">修正できる事実へ。</span>
+            <span data-i18n="workflow.line1">Turn visual opinions</span><br />
+            <span data-i18n="workflow.line2">into fixable facts.</span>
           </h2>
           <p>
-            <span data-i18n="workflow.leadBefore">壊れた場所と測定値を返す</span>
+            <span data-i18n="workflow.leadBefore">A</span>
             <em>kickback</em>
-            <span data-i18n="workflow.leadAfter">が、次の一手を具体化します。直して、再実行して、緑になるまで。</span>
+            <span data-i18n="workflow.leadAfter">returns the broken location and measurements. Fix it, run again, and keep going until green.</span>
           </p>
         </div>
 
@@ -132,24 +132,24 @@
             <span class="loop-index">01</span>
             <div>
               <p class="loop-label">MEASURE</p>
-              <h3 data-i18n="workflow.measure.title">実ブラウザで測る</h3>
-              <p data-i18n="workflow.measure.description">DOM、描画ピクセル、computed style、アクセシビリティ状態を、同じ条件で採取。</p>
+              <h3 data-i18n="workflow.measure.title">Measure in a real browser</h3>
+              <p data-i18n="workflow.measure.description">Capture DOM geometry, rendered pixels, computed styles, and accessibility states under identical conditions.</p>
             </div>
           </li>
           <li>
             <span class="loop-index">02</span>
             <div>
               <p class="loop-label">KICK BACK</p>
-              <h3 data-i18n="workflow.kick.title">直す場所を返す</h3>
-              <p data-i18n="workflow.kick.description">「失敗」だけで終わらず、viewport、selector、差分量、修正方向を出力。</p>
+              <h3 data-i18n="workflow.kick.title">Return the exact location</h3>
+              <p data-i18n="workflow.kick.description">Go beyond “failed” with the viewport, selector, diff size, and a concrete direction for the fix.</p>
             </div>
           </li>
           <li>
             <span class="loop-index">03</span>
             <div>
               <p class="loop-label">PROVE</p>
-              <h3 data-i18n="workflow.prove.title">もう一度、証明する</h3>
-              <p data-i18n="workflow.prove.description">人とエージェントが同じゲートを再実行。終了コードで「完了」を共有。</p>
+              <h3 data-i18n="workflow.prove.title">Prove it again</h3>
+              <p data-i18n="workflow.prove.description">People and agents rerun the same gates and share a single exit-code contract for done.</p>
             </div>
           </li>
         </ol>
@@ -159,22 +159,22 @@
         <div class="commands-intro">
           <p class="section-number section-number-light">02 / ROUTE THE TASK</p>
           <h2 id="commands-title">
-            <span data-i18n="commands.line1">やりたいことから、</span><br />
-            <span data-i18n="commands.line2">ひとつのコマンドへ。</span>
+            <span data-i18n="commands.line1">Route the task</span><br />
+            <span data-i18n="commands.line2">with one command.</span>
           </h2>
-          <p data-i18n="commands.lead">参照画像がなくても、変化を追いたくても、出荷条件をまとめたくても。入口は短く、結果は機械可読です。</p>
+          <p data-i18n="commands.lead">No reference image? Tracking change? Defining release conditions? The entry point stays short and the result stays machine-readable.</p>
         </div>
 
         <div class="command-deck" data-testid="gate-matrix">
-          <div class="command-tabs" role="tablist" aria-label="検証シナリオ" data-i18n-aria-label="commands.tablist">
+          <div class="command-tabs" role="tablist" aria-label="Verification scenarios" data-i18n-aria-label="commands.tablist">
             <button type="button" role="tab" aria-selected="true" data-command-tab="inspect">
-              <span class="tab-index">01</span> <span data-i18n="commands.inspect">壊れ方を測る</span>
+              <span class="tab-index">01</span> <span data-i18n="commands.inspect">Measure breakage</span>
             </button>
             <button type="button" role="tab" aria-selected="false" data-command-tab="snapshot" tabindex="-1">
-              <span class="tab-index">02</span> <span data-i18n="commands.snapshot">変化を追う</span>
+              <span class="tab-index">02</span> <span data-i18n="commands.snapshot">Track change</span>
             </button>
             <button type="button" role="tab" aria-selected="false" data-command-tab="ship" tabindex="-1">
-              <span class="tab-index">03</span> <span data-i18n="commands.ship">完了を定義する</span>
+              <span class="tab-index">03</span> <span data-i18n="commands.ship">Define done</span>
             </button>
           </div>
 
@@ -190,32 +190,32 @@
         <p class="section-number">03 / PRINCIPLE</p>
         <div class="principle-grid">
           <h2 id="principle-title">
-            <span data-i18n="principle.line1">AIを信じない。</span><br />
-            <span data-i18n="principle.line2">結果を測る。</span>
+            <span data-i18n="principle.line1">Don't trust AI.</span><br />
+            <span data-i18n="principle.line2">Measure the result.</span>
           </h2>
           <div class="principle-copy">
-            <p data-i18n="principle.lead">エージェントが「できた」と言うことと、ページが正しいことは別です。vlmkit は、見た目の主張を再現可能な測定へ変えます。</p>
+            <p data-i18n="principle.lead">An agent saying “done” does not make the page correct. vlmkit turns visual claims into reproducible measurements.</p>
             <blockquote>
               <p>“The loop is the product.”</p>
-              <footer data-i18n="principle.quoteFooter">測る → 直す → もう一度証明する</footer>
+              <footer data-i18n="principle.quoteFooter">Measure → fix → prove it again</footer>
             </blockquote>
           </div>
         </div>
         <div class="proof-grid">
           <article>
             <span class="proof-mark" aria-hidden="true">◎</span>
-            <h3 data-i18n="principle.deterministic.title">決定論的</h3>
-            <p data-i18n="principle.deterministic.description">同じ入力には同じ判定。VLM の感想ではなく、幾何とピクセルの測定。</p>
+            <h3 data-i18n="principle.deterministic.title">Deterministic</h3>
+            <p data-i18n="principle.deterministic.description">The same input gets the same verdict—geometry and pixels, not a VLM's opinion.</p>
           </article>
           <article>
             <span class="proof-mark" aria-hidden="true">↯</span>
-            <h3 data-i18n="principle.actionable.title">修正可能</h3>
-            <p data-i18n="principle.actionable.description">viewport と selector を含む kickback。失敗から次の編集へ直結。</p>
+            <h3 data-i18n="principle.actionable.title">Actionable</h3>
+            <p data-i18n="principle.actionable.description">Kickback includes the viewport and selector, connecting each failure to the next edit.</p>
           </article>
           <article>
             <span class="proof-mark" aria-hidden="true">⇄</span>
-            <h3 data-i18n="principle.shared.title">人とエージェント共通</h3>
-            <p data-i18n="principle.shared.description">CLI、Playwright、MCP、CI。どの入口でも同じ終了コードの契約。</p>
+            <h3 data-i18n="principle.shared.title">Shared by people and agents</h3>
+            <p data-i18n="principle.shared.description">CLI, Playwright, MCP, or CI: every entry point follows the same exit-code contract.</p>
           </article>
         </div>
       </section>
@@ -225,24 +225,24 @@
           <div class="skills-intro">
             <p class="section-number">04 / AGENT SKILL</p>
             <h2 id="skills-title">
-              <span data-i18n="skills.line1">測定ループを、</span><br />
-              <span data-i18n="skills.line2">エージェントに配る。</span>
+              <span data-i18n="skills.line1">Give the measurement loop</span><br />
+              <span data-i18n="skills.line2">to your coding agent.</span>
             </h2>
-            <p data-i18n="skills.lead">markup-assist は、タスクに合うゲートを選び、kickback を読んで、緑になるまで直す手順をエージェントに追加します。</p>
-            <p class="skills-note"><span>SKILL</span> <code>markup-assist</code> · <span data-i18n="skills.note">API キー不要</span></p>
+            <p data-i18n="skills.lead">markup-assist teaches an agent to choose the right gate, read its kickback, fix the page, and rerun until green.</p>
+            <p class="skills-note"><span>SKILL</span> <code>markup-assist</code> · <span data-i18n="skills.note">No API key required</span></p>
           </div>
 
           <div class="skill-installers" data-testid="skill-installers">
             <article class="skill-installer">
               <p class="skill-manager">01 / APM</p>
-              <h3 data-i18n="skills.apmLabel">APM でインストール</h3>
-              <p data-i18n="skills.apmDescription">agent package manager でプロジェクトへ追加します。</p>
+              <h3 data-i18n="skills.apmLabel">Install with APM</h3>
+              <p data-i18n="skills.apmDescription">Add the skill to your project with Agent Package Manager.</p>
               <div class="skill-command"><span aria-hidden="true">$</span><code>apm install mizchi/vlmkit/.claude/skills/markup-assist</code></div>
             </article>
             <article class="skill-installer">
               <p class="skill-manager">02 / SKILLS CLI</p>
-              <h3 data-i18n="skills.cliLabel">skills CLI でインストール</h3>
-              <p data-i18n="skills.cliDescription">npx からオープンな agent skills CLI を直接実行します。</p>
+              <h3 data-i18n="skills.cliLabel">Install with skills CLI</h3>
+              <p data-i18n="skills.cliDescription">Run the open agent skills CLI directly through npx.</p>
               <div class="skill-command"><span aria-hidden="true">$</span><code>npx skills add https://github.com/mizchi/vlmkit/tree/main/.claude/skills/markup-assist</code></div>
             </article>
           </div>
@@ -253,10 +253,10 @@
         <div>
           <p class="section-number section-number-dark">05 / START NOW</p>
           <h2 id="start-title">
-            <span data-i18n="start.line1">まず、いまのページを</span><br />
-            <span data-i18n="start.line2">測ってみる。</span>
+            <span data-i18n="start.line1">Measure the page</span><br />
+            <span data-i18n="start.line2">you have now.</span>
           </h2>
-          <p class="start-note" data-i18n="start.note">Node.js 24+。Chromium の準備は最初の一度だけ。</p>
+          <p class="start-note" data-i18n="start.note">Node.js 24+. Chromium setup is required only once.</p>
         </div>
         <div class="install-panel">
           <p>INSTALL</p>
@@ -265,7 +265,7 @@
             <button
               type="button"
               data-copy-install="npm install -D @mizchi/vlmkit"
-              aria-label="インストールコマンドをコピー"
+              aria-label="Copy install command"
               data-i18n-aria-label="start.copyLabel"
             >COPY</button>
           </div>
@@ -274,7 +274,7 @@
             <code>npx playwright install chromium</code>
           </div>
           <p class="copy-status" data-copy-status aria-live="polite"></p>
-          <a class="button button-dark" href="https://github.com/mizchi/vlmkit"><span data-i18n="start.docs">GitHub でドキュメントを読む</span> <span aria-hidden="true">↗</span></a>
+          <a class="button button-dark" href="https://github.com/mizchi/vlmkit"><span data-i18n="start.docs">Read the docs on GitHub</span> <span aria-hidden="true">↗</span></a>
         </div>
       </section>
     </main>
@@ -284,7 +284,7 @@
         <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
         <span>vlmkit</span>
       </a>
-      <p data-i18n="footer.tagline">ページを測る。事実を直す。証拠とともに出荷する。</p>
+      <p data-i18n="footer.tagline">Measure the page. Fix the fact. Ship with proof.</p>
       <p>MIT · mizchi</p>
     </footer>
   </body>

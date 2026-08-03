@@ -1,3 +1,5 @@
+import { defaultLocale } from "./preferences.js";
+
 export const messages = Object.freeze({
   ja: Object.freeze({
     "page.title": "vlmkit — 見るのではなく、測る",
@@ -167,6 +169,7 @@ export const messages = Object.freeze({
 });
 
 export function translate(locale, key) {
-  const catalog = messages[locale] ?? messages.ja;
-  return catalog[key] ?? messages.ja[key] ?? key;
+  const fallbackCatalog = messages[defaultLocale];
+  const catalog = messages[locale] ?? fallbackCatalog;
+  return catalog[key] ?? fallbackCatalog[key] ?? key;
 }
