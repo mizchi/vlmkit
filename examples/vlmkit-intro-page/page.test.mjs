@@ -17,10 +17,10 @@ async function read(name) {
 test("the intro page has a stable semantic product story", async () => {
   const html = await read("index.html");
 
-  assert.match(html, /<html lang="ja"[^>]*>/);
-  assert.match(html, /<title>vlmkit/);
-  assert.match(html, /data-i18n="hero\.line1">「見た」ではなく、<\/span>/);
-  assert.match(html, /data-i18n="hero\.line2">「測った」を。<\/span>/);
+  assert.match(html, /<html lang="en"[^>]*>/);
+  assert.match(html, /<title>vlmkit — Don't just look\. Measure\.<\/title>/);
+  assert.match(html, /data-i18n="hero\.line1">Don't just look\.<\/span>/);
+  assert.match(html, /data-i18n="hero\.line2">Measure it\.<\/span>/);
   assert.match(html, /id="workflow"/);
   assert.match(html, /id="commands"/);
   assert.match(html, /id="skills"/);
@@ -47,6 +47,8 @@ test("README and page distribute markup-assist through APM and skills CLI", asyn
   assert.ok(readme.includes(skillsCliCommand));
   assert.ok(copyManifest.includes(apmSkillCommand));
   assert.ok(copyManifest.includes(skillsCliCommand));
+  assert.ok(copyManifest.includes("This site is generated and debugged with vlmkit itself."));
+  assert.ok(copyManifest.includes("Don't just look."));
 });
 
 test("the first visible message identifies the page as vlmkit dogfood", async () => {
@@ -54,7 +56,7 @@ test("the first visible message identifies the page as vlmkit dogfood", async ()
 
   assert.match(
     html,
-    /data-testid="dogfood-notice"[^>]*>[\s\S]*このサイトは vlmkit 自身で生成、デバッグされています。/,
+    /data-testid="dogfood-notice"[^>]*>[\s\S]*This site is generated and debugged with vlmkit itself\./,
   );
   assert.ok(
     html.indexOf('data-testid="dogfood-notice"') < html.indexOf('<header class="site-header">'),
@@ -65,6 +67,8 @@ test("the header exposes language, theme, and GitHub controls", async () => {
   const html = await read("index.html");
 
   assert.match(html, /data-testid="locale-toggle"/);
+  assert.match(html, /data-active-locale="en"/);
+  assert.match(html, /aria-label="Switch to Japanese"/);
   assert.match(html, /data-testid="theme-toggle"/);
   assert.match(html, /data-theme="light"/);
   assert.match(html, /href="https:\/\/github\.com\/mizchi\/vlmkit"/);
@@ -97,9 +101,12 @@ test("the command deck exposes deterministic scenarios", async () => {
 });
 
 test("locale content and display preferences have strict contracts", async () => {
-  const [{ messages, translate }, { nextLocale, nextTheme, resolveLocale, resolveTheme }] =
-    await Promise.all([import("./content.js"), import("./preferences.js")]);
+  const [
+    { messages, translate },
+    { defaultLocale, nextLocale, nextTheme, resolveLocale, resolveTheme },
+  ] = await Promise.all([import("./content.js"), import("./preferences.js")]);
 
+  assert.equal(defaultLocale, "en");
   assert.deepEqual(Object.keys(messages.ja).sort(), Object.keys(messages.en).sort());
   assert.equal(
     translate("ja", "dogfood.message"),
@@ -113,7 +120,11 @@ test("locale content and display preferences have strict contracts", async () =>
   assert.equal(translate("en", "skills.apmLabel"), "Install with APM");
   assert.equal(nextLocale("ja"), "en");
   assert.equal(nextTheme("light"), "dark");
-  assert.equal(resolveLocale("unknown"), "ja");
+  assert.equal(resolveLocale("unknown"), "en");
+  assert.equal(
+    translate("unknown", "dogfood.message"),
+    "This site is generated and debugged with vlmkit itself.",
+  );
   assert.equal(resolveTheme("unknown"), "light");
 });
 

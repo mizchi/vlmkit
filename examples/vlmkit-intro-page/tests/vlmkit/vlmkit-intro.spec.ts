@@ -5,9 +5,9 @@ test('VLMKit intro smoke: hero clarity, scenario switch, and install guidance', 
   await gotoApp(page);
 
   await expect(page.getByTestId('dogfood-notice')).toContainText(
-    'このサイトは vlmkit 自身で生成、デバッグされています。',
+    'This site is generated and debugged with vlmkit itself.',
   );
-  const heroHeading = page.getByRole('heading', { name: '「見た」ではなく、 「測った」を。' });
+  const heroHeading = page.getByRole('heading', { name: "Don't just look. Measure it." });
   const heroStatus = page.getByTestId('hero-status');
   const gateMatrix = page.getByTestId('gate-matrix');
 
@@ -15,14 +15,14 @@ test('VLMKit intro smoke: hero clarity, scenario switch, and install guidance', 
   await expect(heroStatus).toBeVisible();
   await expect(heroStatus).toContainText('KEY-FREE BY DEFAULT');
   await expect(
-    page.getByText('KEY-FREE BY DEFAULT — ほとんどのゲートは API キー不要'),
+    page.getByText('KEY-FREE BY DEFAULT — most gates need no API key'),
   ).toBeVisible();
   await expect(gateMatrix).toBeVisible();
 
   const installCommand = page.getByTestId('install-command');
   await expect(installCommand).toBeVisible();
   await expect(installCommand).toContainText('npm install -D @mizchi/vlmkit');
-  await expect(page.getByRole('button', { name: 'インストールコマンドをコピー' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Copy install command' })).toBeVisible();
 
   const skillInstallers = page.getByTestId('skill-installers');
   await expect(skillInstallers).toBeVisible();
@@ -33,9 +33,9 @@ test('VLMKit intro smoke: hero clarity, scenario switch, and install guidance', 
     'npx skills add https://github.com/mizchi/vlmkit/tree/main/.claude/skills/markup-assist',
   );
 
-  const scenarioTablist = page.getByLabel('検証シナリオ');
-  const tabBreakage = scenarioTablist.getByText('01 壊れ方を測る');
-  const tabTrackChanges = scenarioTablist.getByText('02 変化を追う');
+  const scenarioTablist = page.getByLabel('Verification scenarios');
+  const tabBreakage = scenarioTablist.getByText('01 Measure breakage');
+  const tabTrackChanges = scenarioTablist.getByText('02 Track change');
 
   await expect(scenarioTablist).toBeVisible();
   await expect(tabBreakage).toBeVisible();

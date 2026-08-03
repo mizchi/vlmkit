@@ -1,4 +1,5 @@
 export const supportedLocales = Object.freeze(["ja", "en"]);
+export const defaultLocale = "en";
 export const supportedThemes = Object.freeze(["light", "dark"]);
 export const preferenceStorageKeys = Object.freeze({
   locale: "vlmkit-intro-locale",
@@ -6,7 +7,7 @@ export const preferenceStorageKeys = Object.freeze({
 });
 
 export function resolveLocale(value) {
-  return supportedLocales.includes(value) ? value : "ja";
+  return supportedLocales.includes(value) ? value : defaultLocale;
 }
 
 export function nextLocale(locale) {

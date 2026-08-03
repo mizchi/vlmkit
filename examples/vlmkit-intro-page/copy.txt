@@ -1,31 +1,31 @@
 # Dogfood notice
-このサイトは vlmkit 自身で生成、デバッグされています。
+This site is generated and debugged with vlmkit itself.
 
 # Hero
-「見た」ではなく、
-「測った」を。
-vlmkit は、ページの崩れ・コピー・振る舞い・ピクセル差分を実ブラウザで測る検証ツールキット。人にも、コードを書くエージェントにも。
+Don't just look.
+Measure it.
+vlmkit measures broken layouts, copy, behavior, and pixel diffs in a real browser—for people and coding agents alike.
 
 # Workflow
-目視の感想を、
-修正できる事実へ。
-実ブラウザで測る
-直す場所を返す
-もう一度、証明する
+Turn visual opinions
+into fixable facts.
+Measure in a real browser
+Return the exact location
+Prove it again
 
 # Principle
-AIを信じない。
-結果を測る。
+Don't trust AI.
+Measure the result.
 
 # Agent skill
-測定ループを、
-エージェントに配る。
-APM でインストール
+Give the measurement loop
+to your coding agent.
+Install with APM
 apm install mizchi/vlmkit/.claude/skills/markup-assist
-skills CLI でインストール
+Install with skills CLI
 npx skills add https://github.com/mizchi/vlmkit/tree/main/.claude/skills/markup-assist
 
 # Start
-まず、いまのページを
-測ってみる。
+Measure the page
+you have now.
 npm install -D @mizchi/vlmkit
