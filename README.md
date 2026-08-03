@@ -44,8 +44,8 @@ npx playwright install chromium   # once
 
 - **Coding agents (MCP)** — `.mcp.json`:
   `{ "mcpServers": { "vlmkit": { "command": "npx", "args": ["-y", "@mizchi/vlmkit", "mcp"] } } }`
-- **Agent skill** — copy `.claude/skills/markup-assist/` into your
-  project's `.claude/skills/`.
+- **Agent skill** — install the `markup-assist` skill with APM or the
+  open `skills` CLI (commands below).
 - **API keys** — only for `[key]` features (`heal markup`,
   `check copy --vlm`, fix-loop): `OPENROUTER_API_KEY` /
   `GEMINI_API_KEY` / `ANTHROPIC_API_KEY`.
@@ -53,6 +53,20 @@ npx playwright install chromium   # once
   via `vlmkit workflow init`.
 
 Full setup detail: [`docs/configuration.md`](./docs/configuration.md).
+
+### Install the agent skill
+
+`markup-assist` teaches coding agents to select the right vlmkit gate,
+read its kickback, fix the page, and rerun until green. Install the same
+skill with either package manager:
+
+```bash
+# APM
+apm install mizchi/vlmkit/.claude/skills/markup-assist
+
+# skills CLI
+npx skills add https://github.com/mizchi/vlmkit/tree/main/.claude/skills/markup-assist
+```
 
 ## When to use what
 

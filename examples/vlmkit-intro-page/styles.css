@@ -575,6 +575,7 @@ dd {
 .section-heading h2,
 .commands-intro h2,
 .principle h2,
+.skills h2,
 .start h2 {
   font-size: clamp(42px, 5.6vw, 78px);
   line-height: 1.02;
@@ -827,6 +828,92 @@ dd {
   font-size: 13px;
 }
 
+.skills {
+  background: var(--surface-2);
+  color: var(--surface-text);
+}
+
+.skills-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.82fr) minmax(460px, 1.18fr);
+  gap: clamp(50px, 9vw, 130px);
+  max-width: var(--max);
+  margin: 0 auto;
+  align-items: start;
+}
+
+.skills-intro > p:not(.section-number, .skills-note) {
+  max-width: 570px;
+  margin-top: 28px;
+  color: var(--surface-muted-strong);
+  font-size: 16px;
+}
+
+.skills-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 28px;
+  color: var(--surface-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+
+.skills-note span:first-child {
+  color: var(--green-text);
+  font-weight: 900;
+}
+
+.skill-installers {
+  display: grid;
+  border-top: 1px solid var(--line);
+}
+
+.skill-installer {
+  padding: clamp(26px, 4vw, 40px) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.skill-manager {
+  color: var(--green-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.skill-installer h3 {
+  margin-top: 10px;
+  font-size: clamp(22px, 2vw, 30px);
+  letter-spacing: -0.04em;
+}
+
+.skill-installer > p:not(.skill-manager) {
+  margin-top: 7px;
+  color: var(--surface-muted);
+  font-size: 13px;
+}
+
+.skill-command {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 20px;
+  padding: 16px 18px;
+  background: var(--chrome);
+  color: var(--chrome-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.skill-command span {
+  color: var(--acid);
+}
+
+.skill-command code {
+  overflow-wrap: anywhere;
+}
+
 .start {
   display: grid;
   grid-template-columns: minmax(0, 0.85fr) minmax(450px, 1.15fr);
@@ -971,6 +1058,7 @@ dd {
   .hero-grid,
   .workflow,
   .principle-grid,
+  .skills-layout,
   .start {
     grid-template-columns: 1fr;
   }
@@ -997,6 +1085,11 @@ dd {
 
   .principle-grid {
     gap: 44px;
+  }
+
+  .skills-layout {
+    grid-template-columns: 1fr;
+    gap: 56px;
   }
 
   .start > div:first-child {
