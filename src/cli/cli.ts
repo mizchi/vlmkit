@@ -345,7 +345,7 @@ async function runGroupLeaf(
 
 export async function runCli(argv: string[] = process.argv.slice(2)): Promise<void> {
   const cli = cac("vlmkit");
-  cli.version("0.9.0");
+  cli.version("0.9.1");
 
   cli.usage(`<command> [options]
 

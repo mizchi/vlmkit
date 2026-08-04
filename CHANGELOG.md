@@ -5,6 +5,14 @@ Dates are YYYY-MM-DD.
 
 ## Unreleased
 
+## 0.9.1 — 2026-08-04
+
+This release makes vlmkit easier to adopt in existing frontend repositories:
+the installed skill selects the relevant workflow, browser-backed gates work
+with long-lived and replayed network traffic, and Playwright is shared with
+the consumer instead of duplicated. The project site now demonstrates the
+same screenshot-to-implementation and verification loop that vlmkit provides.
+
 ### Breaking
 
 - Removed the deprecated top-level CLI aliases and workflow aliases. Use the
@@ -25,6 +33,9 @@ Dates are YYYY-MM-DD.
 
 - `vlmkit -h` is now a compact command index. Detailed subcommands, options,
   and examples live under `vlmkit <command> --help`.
+- The GitHub Pages introduction now leads with `apm install` and `npx skills`,
+  shows real target, implementation, and diff artifacts, and presents the
+  VLM-assisted implementation and deterministic browser checks as one loop.
 
 ### Added
 
@@ -39,6 +50,8 @@ Dates are YYYY-MM-DD.
 
 ### Fixed
 
+- `check a11y contrast` now exits with status 1 when it reports WCAG contrast
+  failures, so CI cannot silently pass an inaccessible page.
 - The distributed `spec-to-playwright` seed template no longer has a filename
   collected by consumer Vitest/Jest defaults; it is copied from
   `seed.spec.template.ts` to `tests/seed.spec.ts` only when the workflow is
