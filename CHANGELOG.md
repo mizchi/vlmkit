@@ -52,6 +52,8 @@ same screenshot-to-implementation and verification loop that vlmkit provides.
 
 - `check a11y contrast` now exits with status 1 when it reports WCAG contrast
   failures, so CI cannot silently pass an inaccessible page.
+- The Pages dogfood workflow installs the MoonBit toolchain required by the
+  contrast gate instead of failing before it can evaluate the page.
 - The distributed `spec-to-playwright` seed template no longer has a filename
   collected by consumer Vitest/Jest defaults; it is copied from
   `seed.spec.template.ts` to `tests/seed.spec.ts` only when the workflow is

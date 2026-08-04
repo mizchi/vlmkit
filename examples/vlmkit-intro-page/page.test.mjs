@@ -372,10 +372,18 @@ test("the dogfood gate covers every locale and theme before Pages deploys", asyn
     ]);
   }
   assert.match(tasks, /gates run --config vlmkit\.gates\.json/);
+  assert.match(workflow, /name: Install MoonBit/);
+  assert.match(workflow, /cli\.moonbitlang\.com\/install\/unix\.sh/);
+  assert.match(workflow, /\.moon\/bin.*GITHUB_PATH/);
   assert.match(workflow, /Run vlmkit dogfood state matrix/);
   assert.match(
     workflow,
     /gates run[\s\\]+--config examples\/vlmkit-intro-page\/vlmkit\.gates\.json/,
+  );
+  assert.ok(
+    workflow.indexOf("Install MoonBit")
+      < workflow.indexOf("Run vlmkit dogfood state matrix"),
+    "MoonBit must be available before the contrast gate runs",
   );
   assert.ok(
     workflow.indexOf("Run vlmkit dogfood state matrix")
