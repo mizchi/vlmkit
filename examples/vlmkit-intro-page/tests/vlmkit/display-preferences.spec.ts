@@ -19,7 +19,10 @@ test('display preferences smoke: EN defaults, JA toggle, and dark persist', asyn
   await page.getByTestId('locale-toggle').click();
 
   await expect(html).toHaveAttribute('lang', 'ja');
-  await expect(page.getByRole('heading', { name: '「見た」ではなく、 「測った」を。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'VLMで実装し、 ブラウザで検証する。' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '実際の出力を、 数値で確認する。' })).toBeVisible();
+  await expect(page.getByTestId('hero-skill-installers')).toContainText('AI が最適な UI ワークフローを選んで実行します');
+  await expect(page.getByTestId('proof-gallery')).toContainText('エージェントの実装');
   await expect(dogfoodNotice).toContainText('このサイトは vlmkit 自身で生成、デバッグされています。');
   await expect(page.getByRole('heading', { name: '一度入れたら、 あとは自然に頼むだけ。' })).toBeVisible();
   await expect(page.getByTestId('skill-catalog')).toContainText('メタエントリー');
@@ -42,13 +45,13 @@ test('display preferences smoke: EN defaults, JA toggle, and dark persist', asyn
 
   const lowerHeading = page.getByRole('heading', { name: 'Measure the page you have now.' });
   await expect(lowerHeading).toBeVisible();
-  await expect(lowerHeading).toHaveCSS('color', 'rgb(16, 18, 15)');
+  await expect(lowerHeading).toHaveCSS('color', 'rgb(232, 237, 233)');
 
   await page.reload();
 
   await expect(html).toHaveAttribute('lang', 'en');
   await expect(html).toHaveAttribute('data-theme', 'dark');
-  await expect(page.getByRole('heading', { name: "Don't just look. Measure it." })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'VLM-assisted UI. Verified in the browser.' })).toBeVisible();
   await expect(dogfoodNotice).toContainText('This site is generated and debugged with vlmkit itself.');
   await expect(githubLinkEn).toBeVisible();
   await expect(githubLinkEn).toHaveAttribute('href', 'https://github.com/mizchi/vlmkit');

@@ -1,0 +1,37 @@
+{
+  "defaults": {
+    "gates": [
+      "check integrity"
+    ]
+  },
+  "pages": [
+    {
+      "id": "en-light",
+      "source": "http://127.0.0.1:4190/?lang=en&theme=light",
+      "extraGates": [
+        "check a11y contrast --output-dir test-results/a11y-contrast/en-light"
+      ]
+    },
+    {
+      "id": "en-dark",
+      "source": "http://127.0.0.1:4190/?lang=en&theme=dark",
+      "extraGates": [
+        "check a11y contrast --output-dir test-results/a11y-contrast/en-dark"
+      ]
+    },
+    {
+      "id": "ja-light",
+      "source": "http://127.0.0.1:4190/?lang=ja&theme=light",
+      "extraGates": [
+        "check a11y contrast --output-dir test-results/a11y-contrast/ja-light"
+      ]
+    },
+    {
+      "id": "ja-dark",
+      "source": "http://127.0.0.1:4190/?lang=ja&theme=dark",
+      "extraGates": [
+        "check a11y contrast --output-dir test-results/a11y-contrast/ja-dark"
+      ]
+    }
+  ]
+}

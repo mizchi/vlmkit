@@ -32,10 +32,11 @@ test("the intro page has a stable semantic product story", async () => {
   const html = await read("index.html");
 
   assert.match(html, /<html lang="en"[^>]*>/);
-  assert.match(html, /<title>vlmkit — Don't just look\. Measure\.<\/title>/);
-  assert.match(html, /data-i18n="hero\.line1">Don't just look\.<\/span>/);
-  assert.match(html, /data-i18n="hero\.line2">Measure it\.<\/span>/);
+  assert.match(html, /<title>vlmkit — VLM-assisted UI verification<\/title>/);
+  assert.match(html, /data-i18n="hero\.line1">VLM-assisted UI\.<\/span>/);
+  assert.match(html, /data-i18n="hero\.line2">Verified in the browser\.<\/span>/);
   assert.match(html, /id="workflow"/);
+  assert.match(html, /id="proof"/);
   assert.match(html, /id="commands"/);
   assert.match(html, /id="skills"/);
   assert.match(html, /id="start"/);
@@ -46,17 +47,60 @@ test("the intro page has a stable semantic product story", async () => {
   assert.match(html, /https:\/\/github\.com\/mizchi\/vlmkit/);
 });
 
+test("the first product path installs the automatic VLM workflow", async () => {
+  const html = await read("index.html");
+  const heroInstallers = html.indexOf('data-testid="hero-skill-installers"');
+  const workflow = html.indexOf('id="workflow"');
+
+  assert.ok(heroInstallers > 0, "hero skill installers are missing");
+  assert.ok(heroInstallers < workflow, "skill installation must appear before feature detail");
+  assert.match(html, /data-i18n="hero\.vlmLead"/);
+  assert.match(html, /data-i18n="hero\.installLead"/);
+  assert.ok(html.slice(heroInstallers, workflow).includes(metaApmCommand));
+  assert.ok(html.slice(heroInstallers, workflow).includes(metaSkillsCliCommand));
+});
+
+test("the page proves the VLM loop with real screenshots and measured outcomes", async () => {
+  const html = await read("index.html");
+
+  assert.match(html, /data-testid="proof-gallery"/);
+  assert.match(html, /src="\.\/proof-target\.png"/);
+  assert.match(html, /src="\.\/proof-implementation\.png"/);
+  assert.match(html, /src="\.\/proof-diff\.png"/);
+  assert.match(html, /data-i18n="proof\.targetLabel"/);
+  assert.match(html, /data-i18n="proof\.implementationLabel"/);
+  assert.match(html, /data-i18n="proof\.diffLabel"/);
+  assert.match(html, /1\.40%/);
+  assert.match(html, /6\/6/);
+  assert.match(html, /13px/);
+  assert.match(html, /29px/);
+  assert.match(html, /0\.0%/);
+  assert.match(html, /7 viewports/);
+  assert.match(html, /docs\/reports\/2026-07-27-auto-markup-skill-haiku-proof\.md/);
+  assert.match(html, /docs\/reports\/2026-04-01-tailwind-migration-blind-test\.md/);
+});
+
 test("the hero display type keeps readable size and tracking", async () => {
   const css = await read("styles.css");
 
   assert.match(
     css,
-    /\.hero h1 \{[\s\S]*?font-size: clamp\(50px, 6\.4vw, 94px\);[\s\S]*?letter-spacing: -0\.045em;/,
+    /\.hero h1 \{[\s\S]*?font-size: clamp\(44px, 5\.2vw, 68px\);[\s\S]*?letter-spacing: -0\.035em;/,
   );
   assert.match(
     css,
-    /@media \(max-width: 640px\)[\s\S]*?\.hero h1 \{\s*font-size: clamp\(46px, 14vw, 64px\);/,
+    /@media \(max-width: 640px\)[\s\S]*?\.hero h1 \{\s*font-size: clamp\(38px, 11\.5vw, 52px\);/,
   );
+});
+
+test("the visual system stays quiet and documentation-like", async () => {
+  const css = await read("styles.css");
+
+  assert.match(css, /--accent: #9cc9c2;/);
+  assert.match(css, /--section-space: clamp\(72px, 9vw, 118px\);/);
+  assert.match(css, /\.hero-real-run::before \{[\s\S]*?background: transparent;/);
+  assert.doesNotMatch(css, /--acid: #d8ff45;/);
+  assert.doesNotMatch(css, /box-shadow: 18px 18px 0/);
 });
 
 test("README and page distribute the automatic router through APM and skills CLI", async () => {
@@ -78,7 +122,7 @@ test("README and page distribute the automatic router through APM and skills CLI
   assert.match(readme, /Both installers expose one visible `vlmkit` skill/);
   assert.match(catalog, /Both installers expose only the `vlmkit` entry/);
   assert.ok(copyManifest.includes("This site is generated and debugged with vlmkit itself."));
-  assert.ok(copyManifest.includes("Don't just look."));
+  assert.ok(copyManifest.includes("VLM-assisted UI."));
 });
 
 test("the meta entry and catalog classify every specialized skill", async () => {
@@ -193,6 +237,10 @@ test("the local server exposes every browser module as JavaScript", async () => 
   for (const moduleName of ["app.js", "content.js", "preferences.js", "scenarios.js"]) {
     assert.match(server, new RegExp(`\\["/${moduleName.replace(".", "\\.")}"`));
   }
+  for (const imageName of ["proof-target.png", "proof-implementation.png", "proof-diff.png"]) {
+    assert.match(server, new RegExp(`\\["/${imageName.replace(".", "\\.")}"`));
+  }
+  assert.match(server, /image\/png/);
 });
 
 test("the command deck exposes deterministic scenarios", async () => {
@@ -251,6 +299,9 @@ test("the Pages build publishes only browser runtime assets", async (context) =>
     "content.js",
     "index.html",
     "preferences.js",
+    "proof-diff.png",
+    "proof-implementation.png",
+    "proof-target.png",
     "scenarios.js",
     "styles.css",
   ]);
@@ -260,12 +311,15 @@ test("the Pages build publishes only browser runtime assets", async (context) =>
     "content.js",
     "index.html",
     "preferences.js",
+    "proof-diff.png",
+    "proof-implementation.png",
+    "proof-target.png",
     "scenarios.js",
     "styles.css",
   ]);
 
   for (const asset of pageAssets) {
-    assert.equal(await readFile(join(outputDir, asset), "utf8"), await read(asset));
+    assert.deepEqual(await readFile(join(outputDir, asset)), await readFile(join(exampleDir, asset)));
   }
   assert.equal(await readFile(join(outputDir, ".nojekyll"), "utf8"), "");
 });
@@ -292,4 +346,40 @@ test("the GitHub Pages workflow validates and deploys the isolated site", async 
   assert.match(workflow, /needs: build/);
   assert.match(workflow, /if: github\.event_name != 'pull_request'/);
   assert.match(workflow, /actions\/deploy-pages@v4/);
+});
+
+test("the dogfood gate covers every locale and theme before Pages deploys", async () => {
+  const [configSource, tasks, workflow] = await Promise.all([
+    read("vlmkit.gates.json"),
+    read("justfile"),
+    readFile(join(exampleDir, "../../.github/workflows/deploy-pages.yml"), "utf8"),
+  ]);
+  const config = JSON.parse(configSource);
+
+  assert.deepEqual(config.defaults?.gates, ["check integrity"]);
+  assert.deepEqual(
+    config.pages.map(({ id, source }) => ({ id, source })),
+    [
+      { id: "en-light", source: "http://127.0.0.1:4190/?lang=en&theme=light" },
+      { id: "en-dark", source: "http://127.0.0.1:4190/?lang=en&theme=dark" },
+      { id: "ja-light", source: "http://127.0.0.1:4190/?lang=ja&theme=light" },
+      { id: "ja-dark", source: "http://127.0.0.1:4190/?lang=ja&theme=dark" },
+    ],
+  );
+  for (const page of config.pages) {
+    assert.deepEqual(page.extraGates, [
+      `check a11y contrast --output-dir test-results/a11y-contrast/${page.id}`,
+    ]);
+  }
+  assert.match(tasks, /gates run --config vlmkit\.gates\.json/);
+  assert.match(workflow, /Run vlmkit dogfood state matrix/);
+  assert.match(
+    workflow,
+    /gates run[\s\\]+--config examples\/vlmkit-intro-page\/vlmkit\.gates\.json/,
+  );
+  assert.ok(
+    workflow.indexOf("Run vlmkit dogfood state matrix")
+      < workflow.indexOf("Build isolated Pages artifact"),
+    "the state matrix must block artifact creation",
+  );
 });

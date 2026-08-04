@@ -7,7 +7,7 @@ test('VLMKit intro smoke: hero clarity, scenario switch, and install guidance', 
   await expect(page.getByTestId('dogfood-notice')).toContainText(
     'This site is generated and debugged with vlmkit itself.',
   );
-  const heroHeading = page.getByRole('heading', { name: "Don't just look. Measure it." });
+  const heroHeading = page.getByRole('heading', { name: 'VLM-assisted UI. Verified in the browser.' });
   const heroStatus = page.getByTestId('hero-status');
   const gateMatrix = page.getByTestId('gate-matrix');
 
@@ -17,6 +17,25 @@ test('VLMKit intro smoke: hero clarity, scenario switch, and install guidance', 
   await expect(
     page.getByText('KEY-FREE BY DEFAULT — most gates need no API key'),
   ).toBeVisible();
+  await expect(page.getByText("vlmkit connects an AI agent's VLM vision")).toBeVisible();
+
+  const heroInstallers = page.getByTestId('hero-skill-installers');
+  await expect(heroInstallers).toBeVisible();
+  await expect(heroInstallers).toContainText('apm install mizchi/vlmkit');
+  await expect(heroInstallers).toContainText('npx skills add mizchi/vlmkit');
+
+  const proofGallery = page.getByTestId('proof-gallery');
+  await expect(proofGallery).toBeVisible();
+  await expect(proofGallery).toContainText('Reference screenshot');
+  await expect(proofGallery).toContainText('Agent implementation');
+  await expect(proofGallery).toContainText('Measured residual');
+  for (const image of await proofGallery.locator('img').all()) {
+    await expect(image).toHaveJSProperty('complete', true);
+    expect(await image.evaluate((node) => node.naturalWidth)).toBe(1024);
+  }
+  await expect(page.getByTestId('proof-metrics')).toContainText('1.40%pixel diff after 4 rounds');
+  await expect(page.getByText('page-overflow-x · 375px · +13px')).toBeVisible();
+  await expect(page.getByText('button:nth-of-type(5) · +29px')).toBeVisible();
   await expect(gateMatrix).toBeVisible();
 
   const installCommand = page.getByTestId('install-command');

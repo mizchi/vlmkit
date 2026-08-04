@@ -2,9 +2,24 @@
 This site is generated and debugged with vlmkit itself.
 
 # Hero
-Don't just look.
-Measure it.
-vlmkit measures broken layouts, copy, behavior, and pixel diffs in a real browser—for people and coding agents alike.
+VLM-assisted UI.
+Verified in the browser.
+vlmkit connects an AI agent's VLM vision to real-browser measurements, so it can implement UI from screenshots, find breakage, fix it, and prove the result.
+Install one skill. The AI picks and runs the right UI workflow.
+apm install mizchi/vlmkit
+npx skills add mizchi/vlmkit
+
+# Real output
+Actual output,
+measured.
+Reference screenshot
+Agent implementation
+Measured residual
+6/6 components matched
+1.40% pixel diff after 4 rounds
+A small model rebuilt the page from pixels alone.
+It found defects the existing VRT suite missed.
+A visual migration reached zero drift.
 
 # Workflow
 Turn visual opinions
@@ -14,8 +29,8 @@ Return the exact location
 Prove it again
 
 # Principle
-Don't trust AI.
-Measure the result.
+Vision proposes.
+Measurements decide.
 
 # Agent skill
 Install once.

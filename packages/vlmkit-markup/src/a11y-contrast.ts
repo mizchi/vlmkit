@@ -392,6 +392,7 @@ async function main(argv = process.argv.slice(2)) {
     quiet: json,
   });
   if (json) console.log(JSON.stringify(result, null, 2));
+  if (result.failures.length > 0) process.exitCode = 1;
 }
 
 const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "a11y-contrast" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);

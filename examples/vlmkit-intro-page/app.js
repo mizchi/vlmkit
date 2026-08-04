@@ -70,6 +70,9 @@ function applyLocale(next) {
   for (const element of document.querySelectorAll("[data-i18n-aria-label]")) {
     element.setAttribute("aria-label", translate(locale, element.dataset.i18nAriaLabel));
   }
+  for (const element of document.querySelectorAll("[data-i18n-alt]")) {
+    element.setAttribute("alt", translate(locale, element.dataset.i18nAlt));
+  }
 
   if (localeToggle) {
     localeToggle.dataset.activeLocale = locale;

@@ -121,3 +121,15 @@ describe("gate output names a command that exists", () => {
     });
   }
 });
+
+describe("blocking checks return a blocking exit code", () => {
+  it("check a11y contrast exits non-zero when WCAG AA failures exist", () => {
+    const result = runGate("a11y-contrast.ts", ["--json"]);
+
+    assert.ok(
+      (JSON.parse(result.stdout) as { failures: unknown[] }).failures.length > 0,
+      "fixture must contain contrast failures",
+    );
+    assert.equal(result.status, 1);
+  });
+});

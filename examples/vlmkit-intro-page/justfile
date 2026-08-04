@@ -21,7 +21,7 @@ gates:
     node server.mjs &
     sample_server_pid=$!
     trap 'kill "$sample_server_pid"' EXIT
-    node ../../dist/vlmkit.mjs check integrity http://127.0.0.1:4190
+    node ../../dist/vlmkit.mjs gates run --config vlmkit.gates.json
     node ../../dist/vlmkit.mjs check copy http://127.0.0.1:4190 --manifest copy.txt
     node ../../dist/vlmkit.mjs check design http://127.0.0.1:4190
 

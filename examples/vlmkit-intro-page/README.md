@@ -28,6 +28,10 @@ just --justfile examples/vlmkit-intro-page/justfile test
 just --justfile examples/vlmkit-intro-page/justfile pages
 ```
 
+`gates` は `vlmkit.gates.json` に宣言した英語／日本語 × Light／Dark の4状態を
+すべて `check integrity` と `check a11y contrast` で検証します。テーマ切替後だけ
+発生する低コントラストも、このマトリクスを通らない限り公開できません。
+
 `main` にサンプルまたは Pages workflow の変更を push すると、契約テストを通過した
 実行時ファイルだけが GitHub Pages に自動デプロイされます。
 

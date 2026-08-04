@@ -10,6 +10,9 @@ export const pageAssets = Object.freeze([
   "content.js",
   "index.html",
   "preferences.js",
+  "proof-diff.png",
+  "proof-implementation.png",
+  "proof-target.png",
   "scenarios.js",
   "styles.css",
 ]);

@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="vlmkit deterministically verifies frontend visuals and behavior in a real browser."
+      content="vlmkit connects AI vision with deterministic browser verification to build UI with proof."
     />
-    <title>vlmkit — Don't just look. Measure.</title>
+    <title>vlmkit — VLM-assisted UI verification</title>
     <link rel="stylesheet" href="./styles.css" />
     <script type="module" src="./app.js"></script>
   </head>
@@ -25,10 +25,9 @@
         <span>vlmkit</span>
       </a>
       <nav class="site-nav" aria-label="Main navigation" data-i18n-aria-label="nav.label">
+        <a href="#proof" data-i18n="nav.proof">Real results</a>
         <a href="#workflow" data-i18n="nav.workflow">How it works</a>
-        <a href="#commands" data-i18n="nav.commands">Commands</a>
         <a href="#skills" data-i18n="nav.skills">Skill</a>
-        <a href="#start" data-i18n="nav.start">Get started</a>
       </nav>
       <div class="header-actions">
         <div class="display-controls" role="group" aria-label="Display preferences" data-i18n-aria-label="controls.label">
@@ -68,14 +67,28 @@
       <section class="hero" id="top" aria-labelledby="hero-title">
         <div class="hero-grid">
           <div class="hero-copy">
-            <p class="eyebrow"><span>FRONTEND VERIFICATION</span><span>NODE 24+</span><span>v0.9.0</span></p>
+            <p class="eyebrow"><span>vlmkit / UI verification</span><span>Node.js 24+</span><span>v0.9.0</span></p>
             <h1 id="hero-title">
-              <span data-i18n="hero.line1">Don't just look.</span><br />
-              <span data-i18n="hero.line2">Measure it.</span>
+              <span data-i18n="hero.line1">VLM-assisted UI.</span><br />
+              <span data-i18n="hero.line2">Verified in the browser.</span>
             </h1>
-            <p class="hero-lead" data-i18n="hero.lead">vlmkit measures broken layouts, copy, behavior, and pixel diffs in a real browser—for people and coding agents alike.</p>
+            <p class="hero-lead" data-i18n="hero.vlmLead">vlmkit connects an AI agent's VLM vision to real-browser measurements, so it can implement UI from screenshots, find breakage, fix it, and prove the result.</p>
+            <div class="hero-skill-installers" data-testid="hero-skill-installers">
+              <p data-i18n="hero.installLead">Install one skill. The AI picks and runs the right UI workflow.</p>
+              <div class="hero-install-grid">
+                <article>
+                  <span>APM / RECOMMENDED</span>
+                  <code>apm install mizchi/vlmkit</code>
+                </article>
+                <article>
+                  <span>SKILLS CLI / NPX</span>
+                  <code>npx skills add mizchi/vlmkit</code>
+                </article>
+              </div>
+              <p class="hero-bootstrap"><span data-i18n="hero.apmBootstrap">Need APM first?</span> <code>curl -sSL https://aka.ms/apm-unix | sh</code></p>
+            </div>
             <div class="hero-actions">
-              <a class="button button-primary" href="#start"><span data-i18n="hero.start">Start in 2 minutes</span> <span aria-hidden="true">↓</span></a>
+              <a class="button button-primary" href="#proof"><span data-i18n="hero.start">See real results</span> <span aria-hidden="true">↓</span></a>
               <a class="button button-ghost" href="#workflow" data-i18n="hero.workflow">See how it works</a>
             </div>
             <div class="hero-status" data-testid="hero-status">
@@ -84,38 +97,91 @@
             </div>
           </div>
 
-          <figure class="hero-console" aria-labelledby="console-caption">
+          <figure class="hero-console hero-real-run" aria-labelledby="console-caption">
             <figcaption id="console-caption">
-              <span>FIELD LOG / INTEGRITY</span>
-              <span>00:03.42</span>
+              <span>REAL RUN / SCREENSHOT → HTML</span>
+              <span>HAIKU / 4 ROUNDS</span>
             </figcaption>
-            <div class="console-command"><span aria-hidden="true">$</span> vlmkit check integrity ./page.html</div>
-            <div class="viewport-map" aria-label="Verified across three viewports" data-i18n-aria-label="hero.viewportLabel">
-              <div class="viewport viewport-wide"><span>1280</span><i></i></div>
-              <div class="viewport viewport-mid"><span>768</span><i></i></div>
-              <div class="viewport viewport-small"><span>375</span><i></i></div>
+            <div class="hero-run-image">
+              <img src="./proof-implementation.png" width="1024" height="768" alt="UI generated from the reference screenshot" data-i18n-alt="hero.runAlt" />
+              <span>AGENT OUTPUT</span>
             </div>
             <dl class="console-results">
-              <div><dt>overflow-x</dt><dd>PASS</dd></div>
-              <div><dt>text collision</dt><dd>PASS</dd></div>
-              <div><dt>failed resources</dt><dd>PASS</dd></div>
-              <div><dt>interactive surface</dt><dd>PASS</dd></div>
+              <div><dt>structure</dt><dd>6 / 6</dd></div>
+              <div><dt>component IoU</dt><dd>0.97–0.99</dd></div>
+              <div><dt>pixel diff</dt><dd>1.40%</dd></div>
             </dl>
-            <p class="console-verdict"><span aria-hidden="true">✓</span> VERDICT: CLEAN</p>
+            <p class="console-verdict"><span aria-hidden="true">✓</span> VERIFIED BY VLMKIT</p>
           </figure>
         </div>
 
         <ul class="measurement-strip" aria-label="vlmkit measurement layers" data-i18n-aria-label="hero.measurementLabel">
-          <li><span>01</span> DOM GEOMETRY</li>
-          <li><span>02</span> PIXEL MATH</li>
-          <li><span>03</span> COMPUTED STYLE</li>
-          <li><span>04</span> A11Y PROBES</li>
+          <li><span>01</span> VLM VISION</li>
+          <li><span>02</span> DOM GEOMETRY</li>
+          <li><span>03</span> PIXEL DIFF</li>
+          <li><span>04</span> BEHAVIOR GATES</li>
         </ul>
+      </section>
+
+      <section class="proof section" id="proof" aria-labelledby="proof-title">
+        <div class="proof-heading">
+          <p class="section-number">01 / REAL OUTPUT</p>
+          <div>
+            <h2 id="proof-title">
+              <span data-i18n="proof.line1">Actual output,</span><br />
+              <span data-i18n="proof.line2">measured.</span>
+            </h2>
+            <p data-i18n="proof.lead">The VLM reads visual intent. vlmkit turns the result into measurements an agent can act on, then reruns the browser until the implementation converges.</p>
+          </div>
+        </div>
+
+        <div class="proof-gallery" data-testid="proof-gallery">
+          <figure>
+            <div class="proof-shot"><img src="./proof-target.png" width="1024" height="768" loading="lazy" alt="Reference screenshot supplied to the agent" data-i18n-alt="proof.targetAlt" /></div>
+            <figcaption><span>01</span><strong data-i18n="proof.targetLabel">Reference screenshot</strong><small data-i18n="proof.targetNote">The only implementation input</small></figcaption>
+          </figure>
+          <figure>
+            <div class="proof-shot"><img src="./proof-implementation.png" width="1024" height="768" loading="lazy" alt="HTML and CSS generated by the agent" data-i18n-alt="proof.implementationAlt" /></div>
+            <figcaption><span>02</span><strong data-i18n="proof.implementationLabel">Agent implementation</strong><small data-i18n="proof.implementationNote">Generated HTML/CSS, unedited</small></figcaption>
+          </figure>
+          <figure>
+            <div class="proof-shot proof-shot-diff"><img src="./proof-diff.png" width="1024" height="768" loading="lazy" alt="Measured pixel heatmap between reference and implementation" data-i18n-alt="proof.diffAlt" /></div>
+            <figcaption><span>03</span><strong data-i18n="proof.diffLabel">Measured residual</strong><small data-i18n="proof.diffNote">Heatmap gives the next edit</small></figcaption>
+          </figure>
+        </div>
+
+        <div class="proof-metrics" data-testid="proof-metrics" aria-label="Recorded proof run metrics" data-i18n-aria-label="proof.metricsLabel">
+          <article><strong>6/6</strong><span data-i18n="proof.metricStructure">components matched</span></article>
+          <article><strong>≤2px</strong><span data-i18n="proof.metricPosition">maximum position drift</span></article>
+          <article><strong>1.40%</strong><span data-i18n="proof.metricPixels">pixel diff after 4 rounds</span></article>
+          <article><strong>112s</strong><span data-i18n="proof.metricTime">small-model completion</span></article>
+        </div>
+
+        <div class="case-studies">
+          <article class="case-study case-primary">
+            <p class="case-kicker">CASE 01 / VLM IMPLEMENTATION</p>
+            <h3 data-i18n="proof.caseBuildTitle">A small model rebuilt the page from pixels alone.</h3>
+            <p data-i18n="proof.caseBuildBody">Haiku used its vision with vlmkit's deterministic signals. Four rounds produced all copy, all six regions, the five-color palette, and 0.97–0.99 component IoU.</p>
+            <a href="https://github.com/mizchi/vlmkit/blob/main/docs/reports/2026-07-27-auto-markup-skill-haiku-proof.md"><span data-i18n="proof.readRun">Read the full run</span> <span aria-hidden="true">↗</span></a>
+          </article>
+          <article class="case-study">
+            <p class="case-kicker">CASE 02 / ADOPTION FEEDBACK</p>
+            <h3 data-i18n="proof.caseDefectTitle">It found defects the existing VRT suite missed.</h3>
+            <p data-i18n="proof.caseDefectBody">At 375px, integrity found 13px of page overflow. During the fix it caught a new button protruding 29px past its parent—with the selector and exact delta. Four captured states moved from DEFECTS to CLEAN.</p>
+            <div class="case-terminal"><code>page-overflow-x · 375px · +13px</code><code>button:nth-of-type(5) · +29px</code></div>
+          </article>
+          <article class="case-study">
+            <p class="case-kicker">CASE 03 / MIGRATION</p>
+            <h3 data-i18n="proof.caseMigrationTitle">A visual migration reached zero drift.</h3>
+            <p data-i18n="proof.caseMigrationBody">An agent migrated Tailwind markup to vanilla CSS using only VRT feedback, reaching 0.0% pixel diff across 7 viewports in 3 rounds.</p>
+            <a href="https://github.com/mizchi/vlmkit/blob/main/docs/reports/2026-04-01-tailwind-migration-blind-test.md"><span data-i18n="proof.readMigration">Read the migration report</span> <span aria-hidden="true">↗</span></a>
+          </article>
+        </div>
       </section>
 
       <section class="workflow section" id="workflow" aria-labelledby="workflow-title">
         <div class="section-heading">
-          <p class="section-number">01 / THE LOOP</p>
+          <p class="section-number">02 / THE LOOP</p>
           <h2 id="workflow-title">
             <span data-i18n="workflow.line1">Turn visual opinions</span><br />
             <span data-i18n="workflow.line2">into fixable facts.</span>
@@ -157,7 +223,7 @@
 
       <section class="commands section" id="commands" aria-labelledby="commands-title">
         <div class="commands-intro">
-          <p class="section-number section-number-light">02 / ROUTE THE TASK</p>
+          <p class="section-number section-number-light">03 / ROUTE THE TASK</p>
           <h2 id="commands-title">
             <span data-i18n="commands.line1">Route the task</span><br />
             <span data-i18n="commands.line2">with one command.</span>
@@ -187,11 +253,11 @@
       </section>
 
       <section class="principle section" aria-labelledby="principle-title">
-        <p class="section-number">03 / PRINCIPLE</p>
+        <p class="section-number">04 / PRINCIPLE</p>
         <div class="principle-grid">
           <h2 id="principle-title">
-            <span data-i18n="principle.line1">Don't trust AI.</span><br />
-            <span data-i18n="principle.line2">Measure the result.</span>
+            <span data-i18n="principle.line1">Vision proposes.</span><br />
+            <span data-i18n="principle.line2">Measurements decide.</span>
           </h2>
           <div class="principle-copy">
             <p data-i18n="principle.lead">An agent saying “done” does not make the page correct. vlmkit turns visual claims into reproducible measurements.</p>
@@ -223,7 +289,7 @@
       <section class="skills section" id="skills" aria-labelledby="skills-title">
         <div class="skills-layout">
           <div class="skills-intro">
-            <p class="section-number">04 / AGENT SKILL</p>
+            <p class="section-number">05 / AGENT SKILL</p>
             <h2 id="skills-title">
               <span data-i18n="skills.line1">Install once.</span><br />
               <span data-i18n="skills.line2">Ask naturally.</span>
@@ -315,7 +381,7 @@
 
       <section class="start section" id="start" aria-labelledby="start-title">
         <div>
-          <p class="section-number section-number-dark">05 / START NOW</p>
+          <p class="section-number section-number-dark">06 / START NOW</p>
           <h2 id="start-title">
             <span data-i18n="start.line1">Measure the page</span><br />
             <span data-i18n="start.line2">you have now.</span>

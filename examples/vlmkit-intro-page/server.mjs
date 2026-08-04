@@ -12,6 +12,9 @@ const assets = new Map([
   ["/app.js", ["app.js", "text/javascript; charset=utf-8"]],
   ["/content.js", ["content.js", "text/javascript; charset=utf-8"]],
   ["/preferences.js", ["preferences.js", "text/javascript; charset=utf-8"]],
+  ["/proof-target.png", ["proof-target.png", "image/png"]],
+  ["/proof-implementation.png", ["proof-implementation.png", "image/png"]],
+  ["/proof-diff.png", ["proof-diff.png", "image/png"]],
   ["/scenarios.js", ["scenarios.js", "text/javascript; charset=utf-8"]],
 ]);
 

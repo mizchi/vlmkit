@@ -23,14 +23,47 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          package-manager-cache: false
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build JavaScript packages
+        run: pnpm build:packages:js
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Verify page contracts
         run: node --test examples/vlmkit-intro-page/page.test.mjs
+
+      - name: Run vlmkit dogfood state matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          node examples/vlmkit-intro-page/server.mjs &
+          sample_server_pid=$!
+          trap 'kill "$sample_server_pid"' EXIT
+          for _ in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4190/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:4190/ >/dev/null
+          node --experimental-strip-types src/cli/vlmkit.ts gates run \
+            --config examples/vlmkit-intro-page/vlmkit.gates.json \
+            --output test-results/vlmkit-intro-page-gates \
+            --show-output
 
       - name: Build isolated Pages artifact
         run: node examples/vlmkit-intro-page/build-pages.mjs
