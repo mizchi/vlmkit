@@ -74,7 +74,7 @@ Planner scope defaults to `smoke`, which keeps output to one primary scenario.
 Use `focused` for at most two scenarios, or `full` when the request explicitly
 needs broader coverage.
 
-When `provider` is omitted, vlmkit-plan uses `VRT_LLM_PROVIDER` first, then
+When `provider` is omitted, vlmkit-plan uses `VLMKIT_LLM_PROVIDER` first, then
 available API keys in this order: Anthropic, OpenRouter, Gemini. With no key
 signals it falls back to OpenRouter.
 

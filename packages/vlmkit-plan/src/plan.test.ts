@@ -562,9 +562,9 @@ Use role locators.
 });
 
 describe("resolvePlannerModelOptions", () => {
-  it("uses VRT_LLM_PROVIDER before API-key based defaults", () => {
+  it("uses VLMKIT_LLM_PROVIDER before API-key based defaults", () => {
     assert.deepEqual(resolvePlannerModelOptions(undefined, {
-      VRT_LLM_PROVIDER: "openrouter",
+      VLMKIT_LLM_PROVIDER: "openrouter",
       ANTHROPIC_API_KEY: "anthropic-key",
       OPENROUTER_API_KEY: "openrouter-key",
     }), {
@@ -586,7 +586,7 @@ describe("resolvePlannerModelOptions", () => {
 
   it("preserves an explicit model for any provider", () => {
     assert.deepEqual(resolvePlannerModelOptions({ provider: "anthropic", model: "claude-test", maxTokens: 1234 }, {
-      VRT_LLM_PROVIDER: "openrouter",
+      VLMKIT_LLM_PROVIDER: "openrouter",
     }), {
       provider: "anthropic",
       model: "claude-test",

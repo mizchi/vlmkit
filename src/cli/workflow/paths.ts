@@ -1,7 +1,7 @@
 import { resolve, join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
-import { readEnv } from "@mizchi/vlmkit-core/legacy-names.ts";
+import { readEnv } from "@mizchi/vlmkit-core/project-config.ts";
 
 /**
  * Shared paths for `vlmkit workflow` commands.
@@ -12,10 +12,10 @@ import { readEnv } from "@mizchi/vlmkit-core/legacy-names.ts";
  *   found, so it works in both the source layout (`src/cli/vlmkit.ts`) and
  *   the bundled CLI (`dist/vlmkit.mjs`).
  * - `PROJECT_ROOT` is the *target* project — where baselines, snapshots,
- *   output, and report files land. Overridable via `VRT_PROJECT_ROOT`;
+ *   output, and report files land. Overridable via `VLMKIT_PROJECT_ROOT`;
  *   defaults to the caller's cwd.
  *
- * The two were previously conflated under a single `VRT_ROOT`, which
+ * The two were previously conflated under a single project-root setting, which
  * broke for the packaged CLI: `paths.ts` sat several directories deep
  * and `resolve(import.meta.dirname, "..", "..", "..")` skipped past
  * the package root after tsdown flattened everything into `dist/`.

@@ -14,6 +14,7 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const rootManifest = JSON.parse(await readFile(join(repoRoot, "package.json"), "utf8"));
+const consumerPlaywrightVersion = "1.61.0";
 const internalDependencySections = ["dependencies", "optionalDependencies", "peerDependencies"];
 
 function fail(message) {
@@ -136,10 +137,12 @@ async function main() {
   const tempRoot = await mkdtemp(join(tmpdir(), "vlmkit-packed-markup-loop-"));
   const tarballsDir = join(tempRoot, "tarballs");
   const consumerDir = join(tempRoot, "consumer");
+  const standaloneConsumerDir = join(tempRoot, "standalone-consumer");
 
   try {
     await mkdir(tarballsDir);
     await mkdir(consumerDir);
+    await mkdir(standaloneConsumerDir);
 
     console.log("==> building root package");
     run("pnpm", ["build"]);
@@ -158,13 +161,44 @@ async function main() {
         }
       }
     }
+    if (packedManifest.dependencies?.playwright || packedManifest.dependencies?.["@playwright/test"]) {
+      fail("root package must not install a private Playwright copy");
+    }
+    if (packedManifest.peerDependencies?.playwright !== ">=1.61 <2") {
+      fail(`unexpected Playwright peer range: ${packedManifest.peerDependencies?.playwright ?? "missing"}`);
+    }
+    if (packedManifest.peerDependencies?.["@playwright/test"] !== ">=1.61 <2"
+      || packedManifest.peerDependenciesMeta?.["@playwright/test"]?.optional !== true) {
+      fail("@playwright/test must be an optional peer");
+    }
 
     const rootTarballReference = `file:${relative(consumerDir, tarball)}`;
+    const standaloneTarballReference = `file:${relative(standaloneConsumerDir, tarball)}`;
+    await writeFile(join(standaloneConsumerDir, "package.json"), `${JSON.stringify({
+      name: "vlmkit-packed-standalone-consumer",
+      private: true,
+      type: "module",
+      dependencies: { [rootManifest.name]: standaloneTarballReference },
+    }, null, 2)}\n`);
+    console.log("==> installing root tarball without a pre-existing Playwright");
+    run("pnpm", ["install", "--ignore-scripts"], { cwd: standaloneConsumerDir });
+    const standaloneInstalled = await realpath(join(
+      standaloneConsumerDir,
+      "node_modules",
+      ...rootManifest.name.split("/"),
+    ));
+    const standaloneRequire = createRequire(join(standaloneInstalled, "package.json"));
+    const standalonePlaywright = standaloneRequire.resolve("playwright/package.json");
+    if (!standalonePlaywright) fail("required Playwright peer was not installed for a standalone consumer");
+
     await writeFile(join(consumerDir, "package.json"), `${JSON.stringify({
       name: "vlmkit-packed-markup-loop-consumer",
       private: true,
       type: "module",
-      dependencies: { [rootManifest.name]: rootTarballReference },
+      dependencies: {
+        "@playwright/test": consumerPlaywrightVersion,
+        [rootManifest.name]: rootTarballReference,
+      },
     }, null, 2)}\n`);
     await writeFile(join(consumerDir, "playwright.config.ts"), "export default {};\n");
     await writeFile(join(consumerDir, "fixture.html"), "<style>@media (min-width: 640px) { body { color: red; } }</style>\n");
@@ -181,6 +215,15 @@ async function main() {
     }
     const consumerRequire = createRequire(join(installed, "package.json"));
     const playwrightManifestPath = consumerRequire.resolve("playwright/package.json");
+    const projectRequire = createRequire(join(consumerDir, "package.json"));
+    const testManifestPath = projectRequire.resolve("@playwright/test/package.json");
+    const testRequire = createRequire(testManifestPath);
+    const projectPlaywrightManifestPath = testRequire.resolve("playwright/package.json");
+    if (await realpath(playwrightManifestPath) !== await realpath(projectPlaywrightManifestPath)) {
+      const vlmkitVersion = JSON.parse(await readFile(playwrightManifestPath, "utf8")).version;
+      const projectVersion = JSON.parse(await readFile(projectPlaywrightManifestPath, "utf8")).version;
+      fail(`consumer and vlmkit resolved different Playwrights (${projectVersion} vs ${vlmkitVersion})`);
+    }
     const playwrightManifest = JSON.parse(await readFile(playwrightManifestPath, "utf8"));
     const playwrightCli = join(dirname(playwrightManifestPath), "cli.js");
     console.log(`==> installing isolated consumer Playwright ${playwrightManifest.version} browser`);

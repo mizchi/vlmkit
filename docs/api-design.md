@@ -1,5 +1,8 @@
 # vlmkit — CLI / Library API Design
 
+> Historical design record. Code samples in this document describe the
+> pre-1.0 API exploration and are not a current compatibility contract.
+
 ## Current Problems
 
 - 8 CLIs exist but naming is inconsistent (`css-challenge`, `migration-compare`, `demo`, `vrt-demo-fix` ...)
@@ -360,7 +363,7 @@ vlmkit diff-pr pin       # on main: capture baselines for every route
 vlmkit diff-pr           # in PR build: diff each route against pinned baseline
 ```
 
-Reads `vrt.config.json`:
+Reads `vlmkit.config.json`:
 
 ```json
 {
@@ -368,7 +371,7 @@ Reads `vrt.config.json`:
   "thresholds": { "mobile": 0.01, "desktop": 0.005, "wide": 0.005 },
   "tokens": "./DESIGN.md",
   "approvalPath": "./approval.json",
-  "baselineDir": ".vrt/baselines",
+  "baselineDir": ".vlmkit/baselines",
   "routes": [
     "/",
     { "name": "admin", "path": "/admin",
@@ -420,7 +423,7 @@ needs:
 Rule of thumb:
 
 - Pulling vlmkit into a new project: use **`vlmkit diff-pr`** with a
-  `vrt.config.json`. Pin on main, gate per PR. Author exceptions via
+  `vlmkit.config.json`. Pin on main, gate per PR. Author exceptions via
   `vlmkit manifest`.
 - Working inside the vlmkit repo (this codebase) or extending its
   test harness: use **`vlmkit workflow`**. It owns the e2e Playwright

@@ -625,6 +625,9 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - テスト: `packages/vlmkit-core/src/legacy-names.test.ts`(12 件)。
     「`.vrt/baselines` がある repo では旧パスに解決する」= 失敗すると
     全ルートが「新規ベースライン」に見える無音の事故なので、そこを固定。
+- [x] **1.0 向け互換 cutoff (2026-08-04、ユーザー承認)** — 上記の旧 CLI
+  alias、`.vrt/`、`vrt.config.*`、`VRT_*`、deprecated 公開 API、
+  `migration-report.json` の二重出力を削除。現行名だけを受理する回帰ゲートを追加。
 - [x] **素の製品名 128 行を機械的に置換(ユーザー選択)** — 業界一般語との衝突は
   実測で自然に分離できた: **一般用法はすべて大文字 `VRT`**(`commercial VRT
   vendors`)、製品は小文字 `vrt`。case-sensitive な置換で無害だった。

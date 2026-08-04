@@ -96,9 +96,10 @@ of work. What to expect before you install:
   measured after they exist — including client-rendered apps that paint
   on a tick after `load`, which every gate now waits out. The honest flip
   side: a page that *never* goes idle (persistent polling, websockets)
-  hits that 30s cap and the gate errors rather than measuring a
-  half-settled page —
-  point it at a locally rendered file or a route without the socket.
+  hits that 30s cap by default. For `check integrity` and `check design`, use
+  `--wait-until domcontentloaded|load` and `--timeout <ms>` to choose the
+  readiness contract explicitly. Add `--har <file>` when third-party responses
+  must be replayed rather than fetched live.
   For pages behind a login, hand the gate a session:
   `--storage-state auth.json` (or `VLMKIT_STORAGE_STATE=auth.json` for
   all gates at once), using the same Playwright storage-state file your
@@ -317,8 +318,7 @@ The operational questions a lead will ask, answered plainly:
   pattern integrity mis-flags, that's a tool issue — file it (that is
   exactly how the exemption set grew to date).
 - **Where does gate configuration live?** Contracts, flows, copy
-  manifests, and snapshot config (`vrt.config.json` — a second
-  naming fossil, from the visual-regression-testing origins) are
+  manifests, and snapshot config (`vlmkit.config.json`) are
   files in your repo. Which gates run per page, and every
   suppression, belong in `vlmkit.gates.json`:
 

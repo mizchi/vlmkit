@@ -18,7 +18,7 @@ function sampleReport(over: Partial<DfaReport> = {}): DfaReport {
       { label: "mobile", width: 375 },
       { label: "desktop", width: 1280 },
     ],
-    reportPath: "/work/fix/out/migration-report.json",
+    reportPath: "/work/fix/out/diff-report.json",
     results: [
       {
         variant: "working", variantFile: "working.html",

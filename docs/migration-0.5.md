@@ -1,5 +1,8 @@
 # Migration: 0.4.x → 0.5.0
 
+> Historical document. The compatibility aliases and deprecation logging
+> described below have been removed from the current development branch.
+
 Internal migration notes for the API reorganization landed in
 `feat/0.5.0` (proposal: `docs/api-reorganization-proposal.md`).
 

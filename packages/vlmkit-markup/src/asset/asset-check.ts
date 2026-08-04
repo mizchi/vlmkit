@@ -392,7 +392,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   applyGateExit(report.issues.some((i) => i.severity === "suspect"), { advisory });
 }
 
-const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "asset-check" ||
+const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "asset-check" ||
   (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch(handleCliError);

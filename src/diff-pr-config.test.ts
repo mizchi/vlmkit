@@ -15,8 +15,7 @@ describe("parseDiffPrConfig", () => {
     assert.equal(cfg.routes.length, 1);
     assert.equal(cfg.routes[0].name, "home");
     assert.equal(cfg.routes[0].url, "http://localhost:3000/");
-    // `.vlmkit/baselines` unless a `.vrt/baselines` already exists in cwd —
-    // see legacy-names.test.ts for the fallback itself.
+    // `.vlmkit/baselines` in the current project.
     assert.equal(cfg.baselineDir, ".vlmkit/baselines");
   });
 
@@ -38,7 +37,7 @@ describe("parseDiffPrConfig", () => {
     const toml = `
 baseUrl = "http://localhost:3000"
 viewports = ["mobile", "desktop", "wide"]
-baselineDir = ".vrt/goldens"
+baselineDir = ".vlmkit/goldens"
 
 [thresholds]
 mobile = 0.01
@@ -60,11 +59,11 @@ mobile = 0.03
 desktop = 0.02
 wide = 0.02
 `;
-    const cfg = parseDiffPrConfig(toml, "/tmp/vrt.config.toml");
+    const cfg = parseDiffPrConfig(toml, "/tmp/vlmkit.config.toml");
     assert.equal(cfg.routes.length, 2);
     assert.equal(cfg.routes[0].name, "home");
     assert.equal(cfg.routes[0].url, "http://localhost:3000/");
-    assert.equal(cfg.baselineDir, ".vrt/goldens");
+    assert.equal(cfg.baselineDir, ".vlmkit/goldens");
     assert.deepEqual(cfg.viewports, ["mobile", "desktop", "wide"]);
     assert.equal(cfg.a11y?.level, "AAA");
     assert.equal(resolveThreshold(cfg, cfg.routes[0], "mobile"), 0.01);
@@ -75,7 +74,7 @@ wide = 0.02
   it("still parses JSON when the path is not .toml", () => {
     const cfg = parseDiffPrConfig(
       JSON.stringify({ routes: [{ name: "home", url: "http://x/" }] }),
-      "/tmp/vrt.config.json",
+      "/tmp/vlmkit.config.json",
     );
     assert.equal(cfg.routes[0].name, "home");
   });

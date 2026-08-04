@@ -384,7 +384,7 @@ function formatSizeDelta(value: number): string {
   return value > 0 ? `+${value}` : String(value);
 }
 
-if (process.env.__VRT_DISPATCHER_LEAF__ === "png-diff" || process.argv[1]?.endsWith("png-diff.ts")) {
+if (process.env.__VLMKIT_DISPATCHER_LEAF__ === "png-diff" || process.argv[1]?.endsWith("png-diff.ts")) {
   runPngDiffCli().catch((error) => {
     console.error(error);
     process.exit(1);

@@ -10,17 +10,17 @@ import { join } from "node:path";
 import { resolveCaptureRoutes, type CaptureRoute } from "@mizchi/vlmkit-capture/capture-config.ts";
 
 const routeSet = resolveCaptureRoutes({
-  cwd: process.env.VRT_PROJECT_ROOT ?? process.cwd(),
-  configPath: process.env.VRT_CONFIG_PATH,
-  envConfigPath: process.env.VRT_CONFIG_PATH,
-  envRoutes: process.env.VRT_CAPTURE_ROUTES,
-  envBaseUrl: process.env.VRT_BASE_URL,
+  cwd: process.env.VLMKIT_PROJECT_ROOT ?? process.cwd(),
+  configPath: process.env.VLMKIT_CONFIG_PATH,
+  envConfigPath: process.env.VLMKIT_CONFIG_PATH,
+  envRoutes: process.env.VLMKIT_CAPTURE_ROUTES,
+  envBaseUrl: process.env.VLMKIT_BASE_URL,
 });
 
 const BASE_URL = routeSet.baseUrl;
 // CLI passes this env var; defaults to vrt/ root (not test-results/)
-const OUTPUT_DIR = process.env.VRT_OUTPUT_DIR ?? process.cwd();
-const MODE = process.env.VRT_MODE ?? "capture"; // "capture" | "baseline"
+const OUTPUT_DIR = process.env.VLMKIT_OUTPUT_DIR ?? process.cwd();
+const MODE = process.env.VLMKIT_MODE ?? "capture"; // "capture" | "baseline"
 
 const routes: CaptureRoute[] = routeSet.routes;
 

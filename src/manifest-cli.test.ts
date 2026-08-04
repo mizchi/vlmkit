@@ -196,7 +196,7 @@ describe("vlmkit manifest add --from-run", () => {
 
   before(async () => {
     runDir = await mkdtemp(join(tmpdir(), "vrt-manifest-fromrun-"));
-    await writeFile(join(runDir, "migration-report.json"), JSON.stringify(FAKE_REPORT, null, 2));
+    await writeFile(join(runDir, "diff-report.json"), JSON.stringify(FAKE_REPORT, null, 2));
     manifestPathFromRun = join(runDir, "manifest.json");
   });
 
@@ -240,11 +240,11 @@ describe("vlmkit manifest add --from-run", () => {
     assert.throws(() => readFileSyncOrEmpty(fresh));
   });
 
-  it("errors when migration-report.json is missing", () => {
+  it("errors when diff-report.json is missing", () => {
     const r = cli("add", "--from-run", "/nonexistent/path",
       "--path", manifestPathFromRun);
     assert.equal(r.status, 1);
-    assert.match(r.stderr, /no migration-report\.json/);
+    assert.match(r.stderr, /no diff-report\.json/);
   });
 });
 

@@ -1,4 +1,4 @@
-# Example GitHub Actions workflow that runs `vrt snapshot` against Cloudflare
+# Example GitHub Actions workflow that runs `vlmkit snapshot` against Cloudflare
 # Browser Run. Compared to the local-Chromium template, this skips the
 # `playwright install` step entirely and offloads concurrency to Cloudflare.
 #
@@ -16,7 +16,7 @@ on:
     paths:
       - "src/**"
       - "public/**"
-      - "vrt.config.json"
+      - "vlmkit.config.json"
       - ".github/workflows/vrt-snapshot-cloudflare.yml"
 
 jobs:
@@ -53,7 +53,7 @@ jobs:
         run: |
           npx vlmkit snapshot \
             --backend cloudflare \
-            --config vrt.config.json
+            --config vlmkit.config.json
 
       - name: Upload diff artifacts
         if: always()

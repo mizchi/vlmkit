@@ -7,7 +7,9 @@
  * Use:
  *   main().catch(handleCliError);
  */
-import { statSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 
 /**
  * A bad flag or missing argument — the caller's typo, not a defect. Thrown by
@@ -16,6 +18,45 @@ import { statSync } from "node:fs";
  */
 export class UsageError extends Error {
   override readonly name = "UsageError";
+}
+
+export interface PlaywrightInstallTarget {
+  version: string;
+  cliPath: string;
+  nodePath: string;
+}
+
+function shellArg(value: string): string {
+  return /^[A-Za-z0-9_./:@+-]+$/.test(value) ? value : JSON.stringify(value);
+}
+
+function resolvePlaywrightInstallTarget(): PlaywrightInstallTarget | null {
+  try {
+    const require = createRequire(import.meta.url);
+    const manifestPath = require.resolve("playwright/package.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { version?: string };
+    if (!manifest.version) return null;
+    return {
+      version: manifest.version,
+      cliPath: join(dirname(manifestPath), "cli.js"),
+      nodePath: process.execPath,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function formatMissingPlaywrightBrowserError(
+  error: unknown,
+  target: PlaywrightInstallTarget | null = resolvePlaywrightInstallTarget(),
+): string | null {
+  const message = String((error as { message?: string })?.message ?? error);
+  if (!/browserType\.launch:[\s\S]*Executable doesn't exist at/i.test(message)) return null;
+  if (!target) {
+    return "error: Playwright browser executable is not installed; reinstall the browser for vlmkit's resolved Playwright.";
+  }
+  const command = [target.nodePath, target.cliPath, "install", "chromium"].map(shellArg).join(" ");
+  return `error: Playwright ${target.version} browser executable is not installed.\n       run: ${command}`;
 }
 
 export function handleCliError(e: unknown): never {
@@ -51,6 +92,11 @@ export function handleCliError(e: unknown): never {
       ? "       hint: pass the path to a specific .html file."
       : `       hint: pass the path to a specific .html file inside it (e.g. ${path}/page.html).`;
     process.stderr.write(`error: expected an HTML file, got a directory: ${path}\n${hint}\n`);
+    process.exit(1);
+  }
+  const missingBrowser = formatMissingPlaywrightBrowserError(e);
+  if (missingBrowser) {
+    process.stderr.write(`${missingBrowser}\n`);
     process.exit(1);
   }
   // Playwright navigation failure (DNS / connection refused / SSL).

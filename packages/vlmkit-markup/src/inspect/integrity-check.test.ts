@@ -697,6 +697,63 @@ test("M14d aria-hidden decorative text under a figure is exempted", { timeout: 1
   assert.ok(report.exempted.some((e) => e.kind === "occluded-text" && /aria-hidden/.test(e.reason)));
 });
 
+test("domcontentloaded can gate a page whose background request never becomes idle", { timeout: 40_000 }, async () => {
+  const { createServer } = await import("node:http");
+  const server = createServer((req, res) => {
+    if (req.url === "/pending") return;
+    res.writeHead(200, { "content-type": "text/html" });
+    res.end(`<!doctype html><style>body{margin:0}main{padding:24px;background:#eef}</style>
+      <main><h1>Live data</h1><p>The rendered shell is ready.</p></main>
+      <script>fetch('/pending').catch(() => {});</script>`);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = (server.address() as { port: number }).port;
+  const started = Date.now();
+  try {
+    const report = await runIntegrityCheck({
+      source: `http://127.0.0.1:${port}/`,
+      viewports: ONE_VIEWPORT,
+      waitUntil: "domcontentloaded",
+      timeout: 1_000,
+    });
+    assert.equal(report.source, `http://127.0.0.1:${port}/`);
+    assert.ok(Date.now() - started < 8_000, `gate took ${Date.now() - started}ms`);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
+test("HAR replay gates a URL after its backing server is offline", { timeout: 40_000 }, async () => {
+  const { createServer } = await import("node:http");
+  const server = createServer((_req, res) => {
+    res.writeHead(200, { "content-type": "text/html" });
+    res.end(`<!doctype html><style>body{margin:0}main{width:640px;height:320px;background:#eef}</style>
+      <main><h1>Recorded data</h1><p>This response comes from a HAR.</p></main>`);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = (server.address() as { port: number }).port;
+  const url = `http://127.0.0.1:${port}/`;
+  const har = join(DIR, "offline-replay.har");
+  const { chromium } = await import("playwright");
+  const browser = await chromium.launch();
+  const context = await browser.newContext({ recordHar: { path: har } });
+  const recorder = await context.newPage();
+  await recorder.goto(url, { waitUntil: "load" });
+  await context.close();
+  await browser.close();
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+
+  const report = await runIntegrityCheck({
+    source: url,
+    viewports: ONE_VIEWPORT,
+    waitUntil: "load",
+    timeout: 1_000,
+    har,
+  });
+  assert.equal(report.source, url);
+});
+
 // Auth support (2026-08-01 hard-target audit). Before this, pointing a gate
 // at a session-protected route followed the 302 and reported the LOGIN page
 // as CLEAN — a green verdict for a page that never rendered. Now: no

@@ -14,7 +14,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { diffA11yTrees, parsePlaywrightA11ySnapshot, checkA11yTree } from "@mizchi/vlmkit-core/a11y-semantic.ts";
+import { diffA11yTrees, parsePlaywrightA11ySnapshot, verifyA11yTree } from "@mizchi/vlmkit-core/a11y-semantic.ts";
 import { matchA11yExpectation, crossValidateWithExpectation, scoreLoop } from "../vrt/snapshot/expectation.ts";
 import { introspectToSpec, verifySpec } from "@mizchi/vlmkit-markup/inspect/introspect.ts";
 import type {
@@ -199,7 +199,7 @@ describe("Scenario: accidental label breakage", () => {
     assert.ok(diff.changes.length > 0, "Should detect changes");
 
     // Without expectation for label removal → a11y issues
-    const issues = checkA11yTree(snapshot);
+    const issues = verifyA11yTree(snapshot);
     const labelIssues = issues.filter((i) => i.rule === "label-missing");
     assert.ok(labelIssues.length >= 3, `Should find unlabeled elements: ${labelIssues.length}`);
   });

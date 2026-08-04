@@ -184,7 +184,7 @@ export async function runPresenceMatrixCli(argv = process.argv.slice(2)): Promis
 }
 
 if (
-  process.env.__VRT_DISPATCHER_LEAF__ === "presence-matrix" ||
+  process.env.__VLMKIT_DISPATCHER_LEAF__ === "presence-matrix" ||
   process.argv[1]?.endsWith("presence-matrix-cli.ts")
 ) {
   runPresenceMatrixCli().catch((error) => {

@@ -1,41 +1,12 @@
-#!/usr/bin/env node
 /**
- * VLM-driven region diff helper.
- *
- * DEPRECATED (2026-07-30): measured net-negative for agent-driven repair
- * in every controlled A/B run that used it (wrong selector attribution,
- * fabricated deltas — docs/reports/2026-06-06-ab-external-synthesis.md);
- * the 2026-06-08 refutation gate only blunts the worst of it. Its role
- * ("ask a VLM where and what changed") is now covered deterministically:
- * `diff png --elements-html` for selector candidates + shift estimates,
- * `check integrity` for reference-free defects, `check equivalence` for
- * residual-region judgment with a second reader. Kept for bench history;
- * do not reach for it in new loops.
- *
- * Takes a baseline PNG + variant PNG (or a single triptych: baseline |
- * variant | heatmap), sends both via OpenRouter to a VLM with a strict
- * JSON prompt, and emits measured region differences plus downstream
- * CHANGE records. With `--elements-json`, it can join VLM bboxes to DOM
- * element rects and attach a concrete selector candidate. Property,
- * measured colors, bbox, and delta are structured so a coding agent
- * (or the operator) can target gradients, image sources, or sub-color
- * literals that computedStyleDiff misses.
- *
- * Usage:
- *   node src/experiments/migration/vlm-region-diff.ts \
- *     --baseline target.png --variant current.html.png \
- *     [--model anthropic/claude-haiku-4-5] [--out path] [--max-tokens 600]
- *
- *   # Triptych mode (baseline | variant | heatmap concatenated):
- *   node src/experiments/migration/vlm-region-diff.ts \
- *     --triptych ./diff/wide-triptych.png [--model ...]
+ * VLM-backed analysis used only by the opt-in migration comparison handoff.
+ * The public standalone command was removed; normal repair loops use the
+ * deterministic `diff png`, `check integrity`, and `check equivalence` gates.
  */
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { readPngDimensions, resizePngBuffer } from "@mizchi/vlmkit-core/image-resize.ts";
 import {
-  captureRegionElementsFromHtml,
   matchRegionBboxToElement,
   parseRegionElementsJson,
   parseRegionElementsViewport,
@@ -146,96 +117,13 @@ interface RunRegionDiffAnalysisOptions {
   apiKey?: string;
 }
 
-interface CliArgs {
+interface RegionDiffRequestArgs {
   baseline: string | null;
   variant: string | null;
   triptych: string | null;
-  elementsJson: string | null;
-  elementsHtml: string | null;
-  elementsViewport: RegionElementsViewport | null;
   model: string;
-  out: string | null;
-  format: "json" | "markdown";
   maxTokens: number;
   maxImageEdge: number;
-  dryRun: boolean;
-}
-
-function parseArgs(argv: string[]): CliArgs {
-  const args: CliArgs = {
-    baseline: null,
-    variant: null,
-    triptych: null,
-    elementsJson: null,
-    elementsHtml: null,
-    elementsViewport: null,
-    model: DEFAULT_REGION_DIFF_MODEL,
-    out: null,
-    format: "json",
-    maxTokens: DEFAULT_REGION_DIFF_MAX_TOKENS,
-    maxImageEdge: DEFAULT_REGION_DIFF_MAX_IMAGE_EDGE,
-    dryRun: false,
-  };
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === "--baseline") args.baseline = resolve(argv[++i] ?? "");
-    else if (arg === "--variant") args.variant = resolve(argv[++i] ?? "");
-    else if (arg === "--triptych") args.triptych = resolve(argv[++i] ?? "");
-    else if (arg === "--elements-json") args.elementsJson = resolve(argv[++i] ?? "");
-    else if (arg === "--elements-html") args.elementsHtml = argv[++i] ?? "";
-    else if (arg === "--elements-viewport") args.elementsViewport = parseRegionElementsViewport(argv[++i] ?? "");
-    else if (arg === "--model") args.model = argv[++i] ?? args.model;
-    else if (arg === "--out") args.out = resolve(argv[++i] ?? "");
-    else if (arg === "--format") {
-      const value = argv[++i] ?? "json";
-      if (value !== "json" && value !== "markdown") {
-        throw new Error(`--format must be json|markdown, got ${value}`);
-      }
-      args.format = value;
-    }
-    else if (arg === "--max-tokens") {
-      args.maxTokens = Number.parseInt(argv[++i] ?? "", 10) || DEFAULT_REGION_DIFF_MAX_TOKENS;
-    }
-    else if (arg === "--max-image-edge") {
-      args.maxImageEdge = Number.parseInt(argv[++i] ?? "", 10) || DEFAULT_REGION_DIFF_MAX_IMAGE_EDGE;
-    }
-    else if (arg === "--dry-run") args.dryRun = true;
-    else if (arg === "--help" || arg === "-h") {
-      console.log(`Usage:
-  vlmkit diff region --baseline <png> --variant <png> [--model id]
-  vlmkit diff region --triptych <png> [--model id]
-
-Options:
-  --baseline <path>   Baseline (target) PNG
-  --variant  <path>   Variant (current) PNG
-  --triptych <path>   Single PNG: [baseline | variant | heatmap]
-  --elements-json <path>
-                      Optional DOM bbox JSON for the variant screenshot;
-                      accepts an array or { "elements": [...] } where each
-                      row has path/tag/classes/top/left/width/height
-  --elements-html <path-or-url>
-                      Capture DOM bbox JSON from the variant/current HTML or URL.
-                      Ignored when --elements-json is supplied.
-  --elements-viewport <size>
-                      Viewport for --elements-html, e.g. 1280x900.
-                      Defaults to the variant PNG dimensions in split mode.
-  --model    <id>     OpenRouter VLM model (default: anthropic/claude-haiku-4-5;
-                      see docs/reports/2026-05-23-vlm-region-diff-bakeoff.md)
-  --out      <path>   Write result to this file (default: stdout)
-  --format <kind>     json|markdown (default: json)
-  --max-tokens <n>    OpenRouter max_tokens (default: 1500; auto-retries
-                      once with doubled tokens when the response is
-                      truncated)
-  --max-image-edge <px>
-                      Downscale images so no edge exceeds this before the
-                      VLM call (default: 7500; Anthropic rejects >8000px).
-                      Region bboxes are mapped back to original pixels.
-  --dry-run           Build the request but skip the API call
-`);
-      process.exit(0);
-    }
-  }
-  return args;
 }
 
 const DEFAULT_REGION_DIFF_MODEL = "anthropic/claude-haiku-4-5";
@@ -336,13 +224,6 @@ function downscaleForVlm(buffer: Buffer, scale: number): Buffer {
   });
 }
 
-function ensureArgs(args: CliArgs): void {
-  if (args.triptych) return;
-  if (!args.baseline || !args.variant) {
-    throw new Error("vlm-region-diff: either --triptych or both --baseline + --variant are required");
-  }
-}
-
 const SYSTEM_PROMPT = `You are a visual regression analyst. The user shows you two rendered PNG screenshots: a baseline (target) and a variant (current). Identify regions whose visible color, gradient, or fill differs between the two.
 
 Strict JSON output:
@@ -365,7 +246,7 @@ Rules:
 - If you cannot identify a precise color, set the field to null instead of guessing.
 - Limit to the top 5 regions by perceptual impact.`;
 
-function buildPrompt(args: CliArgs): string {
+function buildPrompt(args: RegionDiffRequestArgs): string {
   return args.triptych
     ? "The single image below is a triptych — baseline (left) | variant (middle) | diff heatmap (right). Compare baseline and variant. Ignore the heatmap pixel intensity; use it only as a hint of where to look."
     : "The two images below are baseline (first) and variant (second). Compare them and list visible color/region differences.";
@@ -377,7 +258,7 @@ interface RegionDiffRequest {
   imageScale: number;
 }
 
-async function buildRegionDiffRequest(args: CliArgs): Promise<RegionDiffRequest> {
+async function buildRegionDiffRequest(args: RegionDiffRequestArgs): Promise<RegionDiffRequest> {
   const userContent: Array<Record<string, unknown>> = [
     { type: "text", text: buildPrompt(args) },
   ];
@@ -428,7 +309,7 @@ async function buildRegionDiffRequest(args: CliArgs): Promise<RegionDiffRequest>
   };
 }
 
-async function buildRequestBody(args: CliArgs): Promise<Record<string, unknown>> {
+async function buildRequestBody(args: RegionDiffRequestArgs): Promise<Record<string, unknown>> {
   return (await buildRegionDiffRequest(args)).body;
 }
 
@@ -798,41 +679,17 @@ function clampRgb(value: number): number {
   return Math.max(0, Math.min(255, Math.round(value)));
 }
 
-async function resolveRegionElementsForArgs(
-  args: CliArgs,
-  variantPng: PNG | null,
-): Promise<RegionElementRect[] | undefined> {
-  if (args.triptych) return undefined;
-  if (args.elementsJson) {
-    return parseRegionElementsJson(await readFile(args.elementsJson, "utf-8"));
-  }
-  if (!args.elementsHtml) return undefined;
-  const viewport = args.elementsViewport ?? (
-    variantPng ? { width: variantPng.width, height: variantPng.height } : null
-  );
-  if (!viewport) {
-    throw new Error("--elements-html requires --elements-viewport when variant PNG dimensions are unavailable");
-  }
-  return captureRegionElementsFromHtml(args.elementsHtml, viewport);
-}
-
 async function runRegionDiffAnalysis(
   options: RunRegionDiffAnalysisOptions,
 ): Promise<RegionDiffOutput> {
   const model = options.model ?? DEFAULT_REGION_DIFF_MODEL;
-  const args: CliArgs = {
+  const args: RegionDiffRequestArgs = {
     baseline: resolve(options.baseline),
     variant: resolve(options.variant),
     triptych: null,
-    elementsJson: null,
-    elementsHtml: null,
-    elementsViewport: null,
     model,
-    out: null,
-    format: "json",
     maxTokens: options.maxTokens ?? DEFAULT_REGION_DIFF_MAX_TOKENS,
     maxImageEdge: DEFAULT_REGION_DIFF_MAX_IMAGE_EDGE,
-    dryRun: false,
   };
   const { body, imageScale } = await buildRegionDiffRequest(args);
   const apiKey = options.apiKey ?? process.env.OPENROUTER_API_KEY;
@@ -1018,66 +875,6 @@ export {
   type VlmReviewResult,
 };
 
-async function main(argv = process.argv.slice(2)): Promise<void> {
-  const args = parseArgs(argv);
-  ensureArgs(args);
-  const { body, imageScale } = await buildRegionDiffRequest(args);
-  if (args.dryRun) {
-    const payload = { dryRun: true, model: args.model, mode: args.triptych ? "triptych" : "split" };
-    if (args.out) {
-      const out = resolve(args.out);
-      await mkdir(dirname(out), { recursive: true });
-      await writeFile(out, JSON.stringify(payload, null, 2) + "\n");
-    } else {
-      process.stdout.write(JSON.stringify(payload, null, 2) + "\n");
-    }
-    return;
-  }
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    throw new Error("OPENROUTER_API_KEY is required (or pass --dry-run to skip the call)");
-  }
-  const { data, content } = await callRegionDiffWithTruncationRetry(body, apiKey, args.maxTokens);
-  let parsed = scaleRegionBboxesToOriginal(parseVlmResponse(content), imageScale);
-  let variantPng: PNG | null = null;
-  if (!args.triptych && args.baseline && args.variant) {
-    const [baselinePng, loadedVariantPng] = await Promise.all([
-      readPng(args.baseline),
-      readPng(args.variant),
-    ]);
-    variantPng = loadedVariantPng;
-    parsed = enrichRegionColorsWithBboxSamples(parsed, baselinePng, variantPng);
-  }
-  const elements = await resolveRegionElementsForArgs(args, variantPng);
-  const mode: RegionDiffOutputMode = args.triptych ? "triptych" : "split";
-  const result: RegionDiffOutput = {
-    model: args.model,
-    mode,
-    usage: data.usage ?? null,
-    ...parsed,
-    changes: buildStructuredRegionChanges(parsed, { elements }),
-    rawContent: content,
-  };
-  const text = args.format === "markdown"
-    ? formatRegionDiffMarkdown(result)
-    : JSON.stringify(result, null, 2);
-  if (args.out) {
-    const out = resolve(args.out);
-    await mkdir(dirname(out), { recursive: true });
-    await writeFile(out, text + "\n");
-    console.error(`Wrote ${out}`);
-  } else {
-    process.stdout.write(text + "\n");
-  }
-}
-
 async function readPng(path: string): Promise<PNG> {
   return PNG.sync.read(await readFile(path));
-}
-
-if (
-  process.env.__VRT_DISPATCHER_LEAF__ === "vlm-region-diff"
-  || process.argv[1]?.endsWith("vlm-region-diff.ts")
-) {
-  main().catch(handleCliError);
 }

@@ -152,11 +152,13 @@ its relative stylesheets, images and scripts resolve — if your CSS lives in
 | Need | Command |
 |---|---|
 | Broken-page scan: JS errors, empty render, failed resources, text collision/clipping/protrusion, collapsed containers, page overflow, invisible text, text painted over by opaque elements (occlusion), near-misalignment, unstyled page — across 3 viewports | `vlmkit check integrity page.html` |
+| A URL keeps polling and never reaches network idle | `vlmkit check integrity URL --wait-until domcontentloaded --timeout 60000`; add `--har fixtures/app.har` to replay network responses deterministically |
 | The exact copy is spec (spellings, casing, `€`, dates) | `vlmkit check copy page.html --manifest copy.txt` |
 | An integrity finding is a deliberate pattern, not a defect | `vlmkit check integrity page.html --allow "near-misalignment@.badge;optically centred"` — reason mandatory, still listed as exempted |
 | Structural requirements as a machine-checkable spec (widths, per-row counts, stacking order, per-viewport visibility) | `vlmkit check layout page.html --contract layout.json` |
 | Design-system conformance: hard-coded values vs a token scale | `vlmkit check tokens page.html` |
 | No token file to check against: is the page consistent with *itself*? (one button style or six; spacing on the page's own scale) | `vlmkit check design page.html` |
+| A vendor widget injects DOM outside the app's design system | `vlmkit check design page.html --exclude ".maplibregl-ctrl"`; excluded and unmatched selectors remain visible in the report |
 | Light/dark theme parity | `vlmkit check theme page.html` |
 | WCAG contrast / touch targets / focus order | `vlmkit check a11y contrast\|touch\|focus page.html` |
 | Layout survives 30% longer strings (i18n) | `vlmkit stress i18n page.html` |
@@ -276,9 +278,6 @@ These rules exist because agents tried it and got caught:
   clip-path shapes are documented residuals of the copy gate;
   unclipped off-screen-right text is `scan scroll`'s catch
   (page-overflow-x). Resistance is a property of the gate *set*.
-- `vlmkit diff region` (VLM region judgment) is deprecated — measured
-  net-negative for agent repair; use `diff png --elements-html`,
-  `check integrity`, and `check equivalence` instead.
 - Everything above renders in headless Chromium. URL sources work
   wherever Chromium has network access.
 

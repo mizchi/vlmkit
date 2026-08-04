@@ -21,7 +21,7 @@ export type VrtConfigErrorCode =
   | "INVALID_MODEL"
   /** Model substring matches more than one candidate. */
   | "MULTIPLE_MATCHES"
-  /** `VRT_LLM_PROVIDER` value is not one of the known providers. */
+  /** `VLMKIT_LLM_PROVIDER` value is not one of the known providers. */
   | "INVALID_PROVIDER"
   /** No provider in the fallback chain has an API key configured. */
   | "NO_PROVIDER_AVAILABLE"

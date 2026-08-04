@@ -15,7 +15,7 @@
 - `.claude/skills/spec-to-playwright/SKILL.md` — workflow body + frontmatter
 - `.claude/skills/spec-to-playwright/README.md` — overview (sibling-skill style)
 - `.claude/skills/spec-to-playwright/assets/_helpers.ts` — gotoApp determinism layer
-- `.claude/skills/spec-to-playwright/assets/seed.spec.ts` — generic seed template
+- `.claude/skills/spec-to-playwright/assets/seed.spec.template.ts` — generic seed template
 - `.claude/skills/spec-to-playwright/assets/_generation-rules.md` — generator rules
 - `.claude/skills/spec-to-playwright/assets/playwright.config.preset.ts` — deterministic config
 - `.claude/skills/spec-to-playwright/assets/baseline-linux.sh` — linux baseline container script
@@ -45,7 +45,7 @@ export async function gotoApp(page: Page): Promise<void> {
 }
 ```
 
-- [ ] **Step 2: assets/seed.spec.ts** (generalized template)
+- [ ] **Step 2: assets/seed.spec.template.ts** (generalized template)
 
 ```ts
 import { test, expect } from "@playwright/test";

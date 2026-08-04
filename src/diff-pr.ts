@@ -6,12 +6,12 @@
  * any uncovered breach.
  *
  * Two subcommands:
- *   vlmkit diff-pr pin [--config vrt.config.json]
+ *   vlmkit diff-pr pin [--config vlmkit.config.json]
  *     Capture baselines for every declared route into
  *     <baselineDir>/<route>/<viewport>.png. Run once on main when the
  *     design is intended; downstream PRs gate against these PNGs.
  *
- *   vlmkit diff-pr [--config vrt.config.json] [--output <dir>]
+ *   vlmkit diff-pr [--config vlmkit.config.json] [--output <dir>]
  *     For each route, render the current state at every viewport,
  *     pixel-diff against the pinned PNG, apply the per-route policy.
  *     Emit a markdown summary suitable for pasting into a PR comment.
@@ -69,7 +69,7 @@ interface PerViewportResult {
   variantPath?: string;
   heatmapPath?: string;
   /**
-   * Populated when the project's vrt.config declares an `a11y` block
+   * Populated when the project's vlmkit config declares an `a11y` block
    * (or the route overrides). Undefined for visual-only gating.
    */
   a11y?: {
@@ -187,7 +187,7 @@ async function cmdPin(args: string[]): Promise<void> {
   const cwd = process.cwd();
   const configPath = findConfigPath(cwd, getArg(args, "config"));
   if (!configPath) {
-    console.error(`${RED}error:${RESET} no vrt.config.json found (and --config not given)`);
+    console.error(`${RED}error:${RESET} no vlmkit.config.json found (and --config not given)`);
     process.exit(1);
   }
   const config = loadDiffPrConfig(configPath);
@@ -257,11 +257,11 @@ async function cmdRun(args: string[]): Promise<number> {
   const cwd = process.cwd();
   const configPath = findConfigPath(cwd, getArg(args, "config"));
   if (!configPath) {
-    console.error(`${RED}error:${RESET} no vrt.config.json found (and --config not given)`);
+    console.error(`${RED}error:${RESET} no vlmkit.config.json found (and --config not given)`);
     return 1;
   }
   const config = loadDiffPrConfig(configPath);
-  const outputDir = resolve(cwd, getArg(args, "output") ?? ".vrt/runs/diff-pr");
+  const outputDir = resolve(cwd, getArg(args, "output") ?? ".vlmkit/runs/diff-pr");
   await mkdir(outputDir, { recursive: true });
 
   // Optional approval manifest — suppresses both visual (existing
@@ -734,7 +734,7 @@ async function cmdPost(args: string[]): Promise<number> {
   const summaryFlag = getArg(args, "summary");
   const summaryPath = summaryFlag
     ? resolve(cwd, summaryFlag)
-    : resolve(cwd, ".vrt/runs/diff-pr/summary.md");
+    : resolve(cwd, ".vlmkit/runs/diff-pr/summary.md");
   const marker = getArg(args, "marker") ?? "vrt-diff-pr-summary";
   return postPrComment({ prRef, summaryPath, marker });
 }
@@ -743,7 +743,7 @@ function formatUsage(): string {
   return `vlmkit diff-pr <command>
 
 Subcommands:
-  pin    [route...] [--config vrt.config.json]
+  pin    [route...] [--config vlmkit.config.json]
                               Capture baseline PNGs for declared routes.
                               No positional args → pin every route.
                               Positional names → pin only those, leave
@@ -753,17 +753,17 @@ Subcommands:
                               via gh CLI. Falls back to printing the
                               markdown with copy-paste instructions
                               when gh is not on PATH.
-  (none) [--config vrt.config.json] [--output <dir>]
+  (none) [--config vlmkit.config.json] [--output <dir>]
                               Diff every route's current rendering
                               against its pinned baseline; apply
                               per-route thresholds; emit markdown.
                               Exit non-zero on any breach.
 
-Config (vrt.config.json):
+Config (vlmkit.config.json):
   {
     "baseUrl": "http://localhost:3000",
     "thresholds": { "mobile": 0.01, "desktop": 0.005, "wide": 0.005 },
-    "baselineDir": ".vrt/baselines",
+    "baselineDir": ".vlmkit/baselines",
     "routes": [
       "/",
       { "name": "admin", "path": "/admin",
@@ -792,7 +792,7 @@ async function main(argv = process.argv.slice(2)) {
   if (code !== 0) process.exit(code);
 }
 
-const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "diff-pr" || (process.argv[1]
+const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "diff-pr" || (process.argv[1]
   && new URL(import.meta.url).pathname === process.argv[1]);
 if (isCliEntry) {
   main().catch((err) => {

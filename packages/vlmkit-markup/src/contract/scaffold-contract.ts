@@ -773,7 +773,7 @@ async function main(argv = process.argv.slice(2)) {
   }
 }
 
-const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "contract-scaffold"
+const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "contract-scaffold"
   || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch(handleCliError);

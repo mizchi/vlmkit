@@ -81,7 +81,7 @@ node --experimental-strip-types src/experiments/css-challenge/fix-loop.ts \
 # Run with a specific VLM model (any OpenRouter id, `gemini:*`, or `claude:*`).
 # The Stage-2 LLM is held constant across VLM swaps so VLM quality
 # can be compared apples-to-apples.
-VRT_VLM_MODEL="bytedance/ui-tars-1.5-7b" \
+VLMKIT_VLM_MODEL="bytedance/ui-tars-1.5-7b" \
   node --experimental-strip-types src/experiments/css-challenge/fix-loop.ts \
   --fixture page --seed 11 --mode selector
 ```
@@ -103,7 +103,7 @@ VLM benchmarks.
 
 ## VLM model selection
 
-The harness honours `VRT_VLM_MODEL`. Prefix selects the provider:
+The harness honours `VLMKIT_VLM_MODEL`. Prefix selects the provider:
 
 | Prefix | Provider | Example |
 |---|---|---|
@@ -149,7 +149,7 @@ for the 8-way bench from the prior week.
 
 | Variable | Required when |
 |---|---|
-| `VRT_VLM_MODEL` | Always (defaults if unset). Provider auto-detected from prefix |
+| `VLMKIT_VLM_MODEL` | Always (defaults if unset). Provider auto-detected from prefix |
 | `OPENROUTER_API_KEY` | Unprefixed model id |
 | `GEMINI_API_KEY` | `gemini:` prefix |
 | `ANTHROPIC_API_KEY` | `claude:` prefix |

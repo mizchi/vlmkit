@@ -69,9 +69,9 @@ vlmkit api status [--url http://localhost:3456]   # サーバーヘルスチェ�
 
 | 変数 | 用途 | デフォルト |
 |------|------|----------|
-| `VRT_LLM_PROVIDER` | LLM プロバイダ | gemini |
-| `VRT_LLM_MODEL` | LLM モデル | プロバイダのデフォルト |
-| `VRT_VLM_MODEL` | VLM モデル (OpenRouter) | qwen/qwen3-vl-8b-instruct |
+| `VLMKIT_LLM_PROVIDER` | LLM プロバイダ | gemini |
+| `VLMKIT_LLM_MODEL` | LLM モデル | プロバイダのデフォルト |
+| `VLMKIT_VLM_MODEL` | VLM モデル (OpenRouter) | qwen/qwen3-vl-8b-instruct |
 | `OPENROUTER_API_KEY` | OpenRouter API キー | — |
 | `GEMINI_API_KEY` | Google AI API キー | — |
 | `ANTHROPIC_API_KEY` | Anthropic API キー | — |

@@ -67,7 +67,7 @@ the dist is stale — run `pnpm build` or use the source form. All
 
 `--output <dir>` is a **directory** path; the engine writes
 `<dir>/diff-report.json` (+ per-viewport PNGs) into it. Pass that
-JSON file — not the dir — to `vlmkit diff agent`. (`migration-report.json`
+JSON file — not the dir — to `vlmkit diff agent`. (`diff-report.json`
 is also written as a legacy alias; both files have identical
 content.)
 
@@ -144,8 +144,8 @@ the syntax — `migration compare` accepts the same flag.
 
 | Variable | Purpose |
 |---|---|
-| `VRT_LLM_PROVIDER` | `gemini` (default) / `openrouter` — only the `subagent` mode invokes an LLM |
-| `VRT_LLM_MODEL` | Override the model (e.g. `claude-haiku-4-5`) |
+| `VLMKIT_LLM_PROVIDER` | `gemini` (default) / `openrouter` — only the `subagent` mode invokes an LLM |
+| `VLMKIT_LLM_MODEL` | Override the model (e.g. `claude-haiku-4-5`) |
 | `GEMINI_API_KEY` / `OPENROUTER_API_KEY` | Required for `subagent` mode only |
 
 ## Outputs

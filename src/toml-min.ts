@@ -1,5 +1,5 @@
 /**
- * Minimal TOML parser — just enough for `vrt.config.toml`.
+ * Minimal TOML parser — just enough for `vlmkit.config.toml`.
  *
  * Supports: comments (`#`), bare/quoted keys, string ("..." / '...'),
  * integer / float / boolean values, single-line arrays of scalars, nested

@@ -570,6 +570,6 @@ async function main() {
 }
 
 // Run CLI only when executed directly
-if (process.env.__VRT_DISPATCHER_LEAF__ === "smoke-runner" || process.argv[1]?.endsWith("smoke-runner.ts")) {
+if (process.env.__VLMKIT_DISPATCHER_LEAF__ === "smoke-runner" || process.argv[1]?.endsWith("smoke-runner.ts")) {
   main().catch((e) => { console.error(e); process.exit(1); });
 }

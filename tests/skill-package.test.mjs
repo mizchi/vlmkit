@@ -77,6 +77,16 @@ test("the APM package is an exact, bounded mirror of the skills CLI package", as
   assert.ok(bytes < 512 * 1024, `APM skill package is unexpectedly large: ${bytes} bytes`);
 });
 
+test("the installed skill bundle does not contain test-runner-discoverable assets", async () => {
+  const testAssetPattern = /(?:^|\/)[^/]+\.(?:test|spec)\.[cm]?[jt]sx?$/;
+  const discovered = (await listFiles(skillsPackage)).filter((file) => testAssetPattern.test(file));
+  assert.deepEqual(
+    discovered,
+    [],
+    `template assets must not be collected by consumer Vitest/Jest defaults: ${discovered.join(", ")}`,
+  );
+});
+
 test("apm.yml explicitly publishes only the vlmkit package", async () => {
   const manifest = await readFile(join(repoRoot, "apm.yml"), "utf8");
   assert.match(manifest, /^name: vlmkit$/m);

@@ -1,21 +1,3 @@
-export function buildVlmRegionDiffArgs({
-  baseline,
-  actual,
-  elementsJson,
-  out,
-  maxTokens = "900",
-}) {
-  return [
-    "node", "src/cli/vlmkit.ts", "diff", "region",
-    "--baseline", baseline,
-    "--variant", actual,
-    "--elements-json", elementsJson,
-    "--out", out,
-    "--format", "json",
-    "--max-tokens", String(maxTokens),
-  ];
-}
-
 export function summarizeVlmRegionDiff(doc) {
   if (!doc || typeof doc !== "object") {
     return { available: false, summary: null, changeCount: 0, changes: [] };

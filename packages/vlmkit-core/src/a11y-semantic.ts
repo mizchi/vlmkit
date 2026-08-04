@@ -291,18 +291,12 @@ function isInteractive(node: A11yNode): boolean {
  * Walks the tree and returns issues such as missing labels on
  * interactive elements and missing alt text on images.
  *
- * @since 0.5.0 — replaces `checkA11yTree`.
  */
 export function verifyA11yTree(tree: A11yNode): A11yIssue[] {
   const issues: A11yIssue[] = [];
   walkTree(tree, "", issues);
   return issues;
 }
-
-/**
- * @deprecated since 0.5.0 — use `verifyA11yTree` instead. Removed in 1.0.0.
- */
-export const checkA11yTree = verifyA11yTree;
 
 export interface A11yIssue {
   path: string;

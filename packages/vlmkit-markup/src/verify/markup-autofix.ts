@@ -447,7 +447,7 @@ kickback + computed styles into CSS override blocks; a deterministic
 trend gate accepts or rolls back each round. The original file is not
 modified unless --in-place is given (default output: <attempt>.autofix.html).
 
-Requires an LLM API key (VRT_LLM_PROVIDER / GEMINI_API_KEY / OPENROUTER_API_KEY /
+Requires an LLM API key (VLMKIT_LLM_PROVIDER / GEMINI_API_KEY / OPENROUTER_API_KEY /
 ANTHROPIC_API_KEY — see vlmkit-ai llm-client). Use --dry-run without one.
 
 Options:
@@ -507,7 +507,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   const { createLLMProvider } = await import("@mizchi/vlmkit-ai/llm-client.ts");
   const llm = createLLMProvider({ throwIfMissing: false });
   if (!llm) {
-    console.error(`${RED}No LLM API key configured.${RESET} Set GEMINI_API_KEY / OPENROUTER_API_KEY / ANTHROPIC_API_KEY (see VRT_LLM_PROVIDER), or use --dry-run to inspect the context pack.`);
+    console.error(`${RED}No LLM API key configured.${RESET} Set GEMINI_API_KEY / OPENROUTER_API_KEY / ANTHROPIC_API_KEY (see VLMKIT_LLM_PROVIDER), or use --dry-run to inspect the context pack.`);
     process.exit(1);
   }
   const propose: ProposeFixes = async (context) => parseFixProposals(await llm.complete(buildFixPrompt(context)));
@@ -525,7 +525,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   if (!report.done) process.exit(1);
 }
 
-const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "markup-autofix" ||
+const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "markup-autofix" ||
   (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch(handleCliError);

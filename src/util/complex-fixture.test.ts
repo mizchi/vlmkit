@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { diffA11yTrees, checkA11yTree, parsePlaywrightA11ySnapshot } from "@mizchi/vlmkit-core/a11y-semantic.ts";
+import { diffA11yTrees, verifyA11yTree, parsePlaywrightA11ySnapshot } from "@mizchi/vlmkit-core/a11y-semantic.ts";
 import { introspectToSpec, verifySpec } from "@mizchi/vlmkit-markup/inspect/introspect.ts";
 import { reasonAboutChanges } from "@mizchi/vlmkit-ai/reasoning.ts";
 import type { A11yNode, A11ySnapshot, ChangeIntent, PageExpectation } from "@mizchi/vlmkit-core/types.ts";
@@ -27,7 +27,7 @@ describe("GitHub repo page fixtures", () => {
   describe("desktop baseline - a11y quality", () => {
     it("should have no a11y issues on baseline", async () => {
       const tree = await loadTree("github-repo", "baseline-desktop.a11y.json");
-      const issues = checkA11yTree(tree);
+      const issues = verifyA11yTree(tree);
       assert.equal(issues.length, 0, `Unexpected issues: ${issues.map((i) => `${i.rule}: ${i.message}`).join(", ")}`);
     });
 
@@ -117,7 +117,7 @@ describe("GitHub repo page fixtures", () => {
   describe("regression detection - nav broken", () => {
     it("should detect many label-missing issues", async () => {
       const broken = await loadTree("github-repo", "regression-nav-broken.a11y.json");
-      const issues = checkA11yTree(broken);
+      const issues = verifyA11yTree(broken);
       const labelMissing = issues.filter((i) => i.rule === "label-missing");
       // Broken: buttons/links/img without names
       assert.ok(labelMissing.length >= 5, `expected >=5 label-missing issues, got ${labelMissing.length}`);
@@ -125,7 +125,7 @@ describe("GitHub repo page fixtures", () => {
 
     it("should detect image without alt", async () => {
       const broken = await loadTree("github-repo", "regression-nav-broken.a11y.json");
-      const issues = checkA11yTree(broken);
+      const issues = verifyA11yTree(broken);
       assert.ok(issues.some((i) => i.rule === "img-alt-missing"), "should detect img without alt");
     });
 
@@ -207,7 +207,7 @@ describe("Google search page fixtures", () => {
   describe("desktop baseline - a11y quality", () => {
     it("should have no a11y issues on baseline", async () => {
       const tree = await loadTree("google-search", "baseline-desktop.a11y.json");
-      const issues = checkA11yTree(tree);
+      const issues = verifyA11yTree(tree);
       assert.equal(issues.length, 0, `Unexpected issues: ${issues.map((i) => `${i.rule}: ${i.message}`).join(", ")}`);
     });
 
@@ -291,7 +291,7 @@ describe("Google search page fixtures", () => {
   describe("regression detection - search results broken", () => {
     it("should detect many a11y issues", async () => {
       const broken = await loadTree("google-search", "regression-results-broken.a11y.json");
-      const issues = checkA11yTree(broken);
+      const issues = verifyA11yTree(broken);
       assert.ok(issues.length >= 5, `expected >=5 issues, got ${issues.length}`);
     });
 

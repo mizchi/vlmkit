@@ -22,6 +22,9 @@ npx vlmkit check integrity http://localhost:3000/
 #                          [text-collision] @1280: "Total: €1,240" overlaps "Refunds: €80"
 #    fix what it names, re-run until: verdict: CLEAN
 
+#    long-polling page: choose an earlier navigation milestone
+npx vlmkit check integrity http://localhost:3000/ --wait-until domcontentloaded
+
 # 2. track what your edits change visually (1st run = baseline, then diffs)
 npx vlmkit snapshot http://localhost:3000/ --output .vlmkit/snapshots
 #    -> desktop 13.11% … mobile 6.57% + diff heatmaps next to the report
@@ -42,6 +45,10 @@ npm install -D @mizchi/vlmkit     # or -g
 npx playwright install chromium   # once
 ```
 
+vlmkit declares `playwright` as a peer and `@playwright/test` as an optional
+peer, reusing the versions already selected by the project instead of
+installing a second browser build.
+
 - **Coding agents (MCP)** — `.mcp.json`:
   `{ "mcpServers": { "vlmkit": { "command": "npx", "args": ["-y", "@mizchi/vlmkit", "mcp"] } } }`
 - **Agent skill** — install the automatic `vlmkit` router once with APM or the
@@ -49,7 +56,7 @@ npx playwright install chromium   # once
 - **API keys** — only for `[key]` features (`heal markup`,
   `check copy --vlm`, fix-loop): `OPENROUTER_API_KEY` /
   `GEMINI_API_KEY` / `ANTHROPIC_API_KEY`.
-- **Snapshot / CI config** — `vrt.config.json` (routes, thresholds)
+- **Snapshot / CI config** — `vlmkit.config.json` (routes, thresholds)
   via `vlmkit workflow init`.
 
 Full setup detail: [`docs/configuration.md`](./docs/configuration.md).

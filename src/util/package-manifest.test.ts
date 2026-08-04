@@ -138,6 +138,33 @@ describe("package manifest for publishable CLI", () => {
     }
   });
 
+  it("reuses one consumer-owned Playwright across browser-facing packages", async () => {
+    const root = await readPackageJson();
+    const workspaces = await readWorkspacePackageManifests();
+    const browserFacing = new Set([
+      "@mizchi/vlmkit-core",
+      "@mizchi/vlmkit-capture",
+      "@mizchi/vlmkit-markup",
+      "@mizchi/vlmkit-heal",
+    ]);
+    const assertPeer = (pkg: Record<string, unknown>) => {
+      const dependencies = pkg.dependencies as Record<string, string> | undefined;
+      const peers = pkg.peerDependencies as Record<string, string> | undefined;
+      assert.equal(dependencies?.playwright, undefined);
+      assert.equal(dependencies?.["@playwright/test"], undefined);
+      assert.equal(peers?.playwright, ">=1.61 <2");
+    };
+
+    assertPeer(root);
+    const rootPeers = root.peerDependencies as Record<string, string> | undefined;
+    const rootPeerMeta = root.peerDependenciesMeta as Record<string, { optional?: boolean }> | undefined;
+    assert.equal(rootPeers?.["@playwright/test"], ">=1.61 <2");
+    assert.equal(rootPeerMeta?.["@playwright/test"]?.optional, true);
+    for (const { pkg } of workspaces) {
+      if (browserFacing.has(String(pkg.name))) assertPeer(pkg);
+    }
+  });
+
   it("keeps TypeScript external when the bundled CLI loads vlmkit-generate", async () => {
     const pkg = await readPackageJson();
     const dependencies = pkg.dependencies as Record<string, string> | undefined;

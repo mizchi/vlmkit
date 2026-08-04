@@ -15,6 +15,41 @@ Requires Node 24+. Every gate is deterministic and key-free; only the
 `[key]`-marked features (LLM/VLM assists such as `heal markup` or
 `check copy --vlm`) need one of the API keys below.
 
+vlmkit uses the project's `playwright` through a required peer dependency and
+accepts an existing `@playwright/test` through an optional peer. In a project
+that already has the test runner, the CLI resolves its Playwright installation
+and browser build. If the browser is missing, the error names the resolved
+Playwright version and prints a command targeting that installation directly.
+
+## URL loading and deterministic network replay
+
+`check integrity` and `check design` default to a 30-second `networkidle`
+navigation. Data-driven pages with polling or a long-lived request can choose a
+different milestone and timeout:
+
+```bash
+npx vlmkit check integrity http://localhost:3000/ \
+  --wait-until domcontentloaded --timeout 60000
+```
+
+For reproducible third-party responses, record a HAR with Playwright and replay
+it during the gate. Requests absent from the HAR are aborted rather than sent to
+the live network:
+
+```bash
+npx vlmkit check integrity http://localhost:3000/ --har fixtures/app.har
+npx vlmkit check design http://localhost:3000/ --har fixtures/app.har
+```
+
+`check design` can omit vendor-owned DOM before it computes component reuse and
+spacing. Exclusions are repeatable and remain visible in text and JSON reports;
+a selector that matches nothing is warned as stale:
+
+```bash
+npx vlmkit check design http://localhost:3000/ \
+  --exclude ".maplibregl-ctrl" --exclude ".third-party-player"
+```
+
 ## MCP server (for Claude Code / any MCP client)
 
 `.mcp.json` in your project:
@@ -57,20 +92,14 @@ agent the task routing and the fix-loop discipline (assumes only that
 | `VLMKIT_CRATER_ROOT` | Crater checkout containing `.bidi-ws-url` from `just start-bidi-with-font` | — |
 | `VLMKIT_CRATER_WASM_MODULE` | Crater layout JS/WASM module path for `POST /api/crater/layout` | — |
 
-Every `VLMKIT_*` variable above is also read under its old `VRT_*` spelling
-(`VRT_LLM_PROVIDER`, `VRT_VLM_MODEL`, …). The new name wins when both are set;
-using an old one prints one line naming the replacement. Support for the `VRT_*`
-spellings ends in 1.0.0 — an existing CI keeps working until then without a
-change. The same holds for two other renamed names: the state directory moved
-from `.vrt/` to `.vlmkit/` and the config file from `vrt.config.json` to
-`vlmkit.config.json`, and in both cases an existing old path is still used, per
-entry, so approved baselines are never orphaned.
-
+Only the `VLMKIT_*` names are supported. Project state is written below
+`.vlmkit/`, and snapshot/workflow configuration is loaded from
+`vlmkit.config.json` or `vlmkit.config.toml`.
 
 ## Snapshot / CI configuration
 
 Snapshot targets, thresholds, and per-route CI gates live in
-`vrt.config.json` (`vlmkit workflow init` scaffolds one); approval
+`vlmkit.config.json` (`vlmkit workflow init` scaffolds one); approval
 rules for intentional deviations live in `approval.json`
 (`vlmkit manifest`). See the [CLI reference](./cli-reference.md) for
 the snapshot, workflow, and diff-pr sections.
@@ -102,7 +131,6 @@ Each skill assumes the `vlmkit` CLI is on `$PATH` (this repo published as
 a Node package, or built from source) and Node 24+. VLM-using skills
 (`fix-loop`, `markup-synth`, `migration subagent`) additionally need
 one of `OPENROUTER_API_KEY` / `GEMINI_API_KEY` / `ANTHROPIC_API_KEY`
-depending on the model selected via `VRT_VLM_MODEL`. `auto-markup` and
+depending on the model selected via `VLMKIT_VLM_MODEL`. `auto-markup` and
 `dynamic-markup` need no key: the driving agent's own vision is the VLM
 and every measurement tool is deterministic (Playwright + pixel math).
-

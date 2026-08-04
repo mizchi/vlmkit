@@ -32,10 +32,10 @@ disabled = false
   it("ignores comments and blank lines", () => {
     const obj = parseToml(`
 # a comment
-baselineDir = ".vrt/baselines"   # trailing comment
+baselineDir = ".vlmkit/baselines"   # trailing comment
 
 `);
-    assert.equal(obj.baselineDir, ".vrt/baselines");
+    assert.equal(obj.baselineDir, ".vlmkit/baselines");
   });
 
   it("parses nested tables", () => {

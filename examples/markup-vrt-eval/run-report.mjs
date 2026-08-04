@@ -440,8 +440,8 @@ function renderGuardrailContext({ report, guardrailSources }) {
 }
 
 function toHtmlArtifactPath(path) {
-  return path.startsWith(".vrt/markup-vrt-eval/")
-    ? path.slice(".vrt/markup-vrt-eval/".length)
+  return path.startsWith(".vlmkit/markup-vrt-eval/")
+    ? path.slice(".vlmkit/markup-vrt-eval/".length)
     : path;
 }
 

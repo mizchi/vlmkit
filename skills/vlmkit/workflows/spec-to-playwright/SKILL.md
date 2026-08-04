@@ -55,7 +55,7 @@ The determinism layer and rules are what matter; the agents/CLIs are just automa
 
 ## Setup (once per repo)
 
-Always needed: `_helpers.ts`, `seed.spec.ts`, `_generation-rules.md`, the
+Always needed: `_helpers.ts`, `seed.spec.template.ts`, `_generation-rules.md`, the
 deterministic `playwright.config` merge. Conditional: `init-agents` (only if you
 drive the official agents — skip when hand-writing), `@mizchi/vlmkit-heal` (only
 for the heal step), `ci.yml` + `update-baselines.yml` (only when you keep VRT
@@ -80,7 +80,7 @@ there on demand. Developers never run Docker.
 
 2. Copy the determinism assets into the repo:
    - `assets/_helpers.ts` → `tests/_helpers.ts`
-   - `assets/seed.spec.ts` → `tests/seed.spec.ts` (adjust the initial-state assertion)
+   - `assets/seed.spec.template.ts` → `tests/seed.spec.ts` (adjust the initial-state assertion)
    - `assets/_generation-rules.md` → `specs/_generation-rules.md`
    - merge `assets/playwright.config.preset.ts` into your `playwright.config.ts`
    - `assets/ci.yml` → `.github/workflows/ci.yml` (verifies against committed baselines)

@@ -274,7 +274,7 @@ export interface MigrationCompareOptions {
    */
   tokensPath?: string;
   /**
-   * Path to a previous run's output dir (or migration-report.json
+   * Path to a previous run's output dir (or diff-report.json
    * directly). When provided, after the main compare a "Since
    * previous run:" section shows per-viewport diff% delta and
    * cross-round sign-flips so an agent on a tight budget can tell
@@ -1682,7 +1682,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         const perVp = diffPositionStylesAcrossViewports(baselineDomPositionByVp, variantDomPositionByVp);
         // Cap entries (used as a rolled-up backup) and byPathProperty
         // (the actual signal source for diff-for-agent) so
-        // migration-report.json stays under ~1 MB even with many
+        // diff-report.json stays under ~1 MB even with many
         // viewports.
         const trimmedPerVp = {
           ...perVp,
@@ -1770,7 +1770,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       if (csdEnabled && baselineComputedStyles && variantComputedStyles) {
         const variantFileLabel = variant.url || variant.file;
         const result = diffComputedStyles(baselineComputedStyles, variantComputedStyles);
-        // Trim entries to keep migration-report.json size sane while still
+        // Trim entries to keep diff-report.json size sane while still
       // surfacing the top diffs to diff-for-agent.
       const trimmedResult = { ...result, entries: result.entries.slice(0, 100) };
       computedStyleDiffReports.push({ variantFile: variantFileLabel, result: trimmedResult });
@@ -1800,7 +1800,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
           }
           if (perViewportDiffs.length > 0) {
             const perViewportResult = aggregateCsdByViewport(perViewportDiffs);
-            // Cap bySelectorProperty to keep migration-report.json under
+            // Cap bySelectorProperty to keep diff-report.json under
             // budget on fixtures with many tiny per-element diffs.
             const trimmedPerViewport: CsdPerViewportResult = {
               ...perViewportResult,
@@ -2387,13 +2387,8 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     }
     console.log();
 
-    // Save JSON report. The canonical name is `diff-report.json`;
-    // `migration-report.json` is kept as a legacy alias (same content)
-    // so callers pinning the old filename continue to work. Track the
-    // rename completion under issue #50 — once no consumer references
-    // the legacy name, the second write can drop.
+    // Save the canonical JSON report.
     const reportPath = join(outputDir, "diff-report.json");
-    const legacyReportPath = join(outputDir, "migration-report.json");
     const report: MigrationCompareReport = {
       dir,
       baseline,
@@ -2431,7 +2426,6 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     const convergence = summarizeMigrationReportConvergence(report);
     const reportJson = JSON.stringify(report, null, 2);
     await writeFile(reportPath, reportJson);
-    await writeFile(legacyReportPath, reportJson);
     console.log(`  ${BOLD}Convergence${RESET}`);
     for (const variant of convergence.variants) {
       console.log(`    ${variant.variant.padEnd(18)} ${formatMigrationConvergenceSummary(variant.status, variant)}`);
@@ -2448,15 +2442,10 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     if (options.againstPreviousPath) {
       try {
         const { diffWatchRuns, formatWatchDelta, summarizeReport } = await import("../../watch.ts");
-        // Accept a direct .json path; otherwise try the canonical
-        // `diff-report.json` first, falling back to the legacy
-        // `migration-report.json` for previous runs from before the
-        // rename in #50.
+        // Accept a direct .json path or resolve the canonical report in a run directory.
         let prevPath = options.againstPreviousPath;
         if (!prevPath.endsWith(".json")) {
-          const canonical = join(options.againstPreviousPath, "diff-report.json");
-          const legacy = join(options.againstPreviousPath, "migration-report.json");
-          prevPath = existsSync(canonical) ? canonical : legacy;
+          prevPath = join(options.againstPreviousPath, "diff-report.json");
         }
         const prevRaw = await readFile(prevPath, "utf-8");
         const prevReport = JSON.parse(prevRaw) as MigrationCompareReport;
@@ -2764,7 +2753,7 @@ function formatResponsiveBreakpoint(breakpoint: ResponsiveBreakpoint): string {
   return `width${opLabel}${breakpoint.valuePx}px`;
 }
 
-const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "migration-compare" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
+const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "migration-compare" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 
 if (isCliEntry) {
   main().catch((error) => {

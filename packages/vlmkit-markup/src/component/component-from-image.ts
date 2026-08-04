@@ -109,7 +109,6 @@ import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 
 export {
   deriveComponentContractPlan,
-  deriveComponentContractRuntime,
   type ComponentContractPlan,
   type ComponentContractRuntime,
   type ComponentProbeState,
@@ -1861,7 +1860,7 @@ async function main(argv = process.argv.slice(2)) {
   });
 }
 
-const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "component-from-image" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
+const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "component-from-image" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch(handleCliError);
 }

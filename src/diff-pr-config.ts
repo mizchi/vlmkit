@@ -1,6 +1,6 @@
 /**
  * Config loader for `vlmkit diff-pr` — extends the existing
- * `vrt.config.json` shape (parsed by capture-config.ts for the
+ * `vlmkit.config.json` shape (parsed by capture-config.ts for the
  * workflow path) with policy-layer fields:
  *
  *   - thresholds: per-viewport `maxDiffRatio` allowed
@@ -9,10 +9,10 @@
  *   - approvalPath (default approval.json)
  *   - baselineDir (where pinned PNGs live)
  *
- * Backward-compatible: a vrt.config that the workflow already uses
+ * A vlmkit config that the workflow already uses
  * remains valid here; the new fields are all optional.
  *
- * Formats: `vrt.config.json` (default) and `vrt.config.toml` (parsed by
+ * Formats: `vlmkit.config.json` (default) and `vlmkit.config.toml` (parsed by
  * the minimal TOML reader in `toml-min.ts`). Format is chosen by the file
  * extension; JSON is preferred when both files exist.
  */
@@ -20,7 +20,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { parseToml } from "./toml-min.ts";
-import { CONFIG_CANDIDATES, CONFIG_FILE, STATE_DIR, noteLegacyName, resolveStatePath } from "@mizchi/vlmkit-core/legacy-names.ts";
+import { CONFIG_CANDIDATES, STATE_DIR, resolveStatePath } from "@mizchi/vlmkit-core/project-config.ts";
 
 export interface DiffPrRoute {
   name: string;
@@ -128,13 +128,13 @@ function parseConfigSource(raw: string, configPath?: string): unknown {
     try {
       return parseToml(raw);
     } catch (error) {
-      throw new Error(`Invalid vrt.config TOML: ${String(error)}`);
+      throw new Error(`Invalid vlmkit.config TOML: ${String(error)}`);
     }
   }
   try {
     return JSON.parse(raw);
   } catch (error) {
-    throw new Error(`Invalid vrt.config JSON: ${String(error)}`);
+    throw new Error(`Invalid vlmkit.config JSON: ${String(error)}`);
   }
 }
 
@@ -146,10 +146,8 @@ const DEFAULT_THRESHOLDS: Record<string, number> = {
 /**
  * Default baseline directory, as the relative string the config format stores.
  *
- * Computed per call rather than as a module constant: a project whose approved
- * baselines are still in `.vrt/baselines` must keep resolving there, and a
- * hard-coded `.vlmkit/baselines` would point it at an empty directory and report
- * every route as a new baseline.
+ * Computed per call so callers that change cwd during a test or batch run get
+ * the state directory belonging to that project.
  */
 function defaultBaselineDir(): string {
   return relative(process.cwd(), resolveStatePath(process.cwd(), "baselines")) || `${STATE_DIR}/baselines`;
@@ -158,7 +156,7 @@ function defaultBaselineDir(): string {
 export function parseDiffPrConfig(raw: string, configPath?: string): DiffPrConfig {
   const parsed = parseConfigSource(raw, configPath);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("vrt.config must be an object");
+    throw new Error("vlmkit.config must be an object");
   }
   const obj = parsed as Record<string, unknown>;
   const baseUrl = asOptionalString(obj.baseUrl, "baseUrl");
@@ -175,10 +173,10 @@ export function parseDiffPrConfig(raw: string, configPath?: string): DiffPrConfi
     : null;
   const rawRoutes = captureSection?.routes ?? obj.routes;
   if (!Array.isArray(rawRoutes)) {
-    throw new Error("vrt.config must declare `routes` (top-level or under `capture`)");
+    throw new Error("vlmkit.config must declare `routes` (top-level or under `capture`)");
   }
   if (rawRoutes.length === 0) {
-    throw new Error("vrt.config.routes must declare at least one route");
+    throw new Error("vlmkit.config.routes must declare at least one route");
   }
   const routes = rawRoutes.map((r, i) => parseRoute(r, i, baseUrl));
 
@@ -420,14 +418,10 @@ export function findConfigPath(cwd: string, explicit?: string): string | undefin
     if (!existsSync(abs)) throw new Error(`config not found: ${abs}`);
     return abs;
   }
-  // New names first, then the pre-rename ones. JSON still wins over TOML when
-  // both are present. A project on `vrt.config.json` keeps working and is told
-  // once; renaming without this fallback would report "no config" to a project
-  // that has one.
-  for (const { name, legacy } of CONFIG_CANDIDATES) {
+  // JSON wins over TOML when both canonical files are present.
+  for (const name of CONFIG_CANDIDATES) {
     const candidate = resolve(cwd, name);
     if (existsSync(candidate)) {
-      if (legacy) noteLegacyName(name, CONFIG_FILE);
       return candidate;
     }
   }

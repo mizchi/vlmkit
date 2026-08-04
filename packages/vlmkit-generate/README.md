@@ -81,7 +81,7 @@ The optional second argument to `buildPlaywrightRuntimeGate` repeats the runtime
 gate, which is useful for routing, filters, hydration, and other timing-sensitive
 UI where a single run can miss a race.
 
-When `provider` is omitted, vlmkit-generate uses `VRT_LLM_PROVIDER` first, then
+When `provider` is omitted, vlmkit-generate uses `VLMKIT_LLM_PROVIDER` first, then
 available API keys in this order: Anthropic, OpenRouter, Gemini. With no key
 signals it falls back to OpenRouter.
 

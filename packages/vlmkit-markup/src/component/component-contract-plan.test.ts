@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   deriveComponentContractPlan,
-  deriveComponentContractRuntime,
   isComponentProbeState,
   isForcedPseudoState,
   mergeComponentProbeStates,
@@ -67,8 +66,4 @@ test("component probe state guards delegate to markup-core policy", () => {
   assert.equal(isComponentProbeState("selected"), false);
   assert.equal(isForcedPseudoState("focus-visible"), true);
   assert.equal(isForcedPseudoState("scrolled"), false);
-});
-
-test("deriveComponentContractRuntime remains a compatibility alias", () => {
-  assert.equal(deriveComponentContractRuntime({ version: 1, screens: [] }).probes.states.length, 0);
 });

@@ -179,7 +179,7 @@ function runJob(job: BatchJob, cliEntry: string): Promise<BatchJobResult> {
       stdio: ["ignore", "pipe", "pipe"],
       // The child is one more gate run; it must not inherit the marker that
       // tells a leaf module "you are the CLI entry".
-      env: { ...process.env, __VRT_DISPATCHER_LEAF__: "" },
+      env: { ...process.env, __VLMKIT_DISPATCHER_LEAF__: "" },
     });
     let output = "";
     child.stdout.on("data", (d) => { output += d; });
@@ -394,6 +394,6 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   if (summary.failed > 0 && !hasFlag(argv, "advisory")) process.exitCode = 1;
 }
 
-const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "batch" ||
+const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "batch" ||
   (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) main().catch(handleCliError);

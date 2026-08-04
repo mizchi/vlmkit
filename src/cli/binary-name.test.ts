@@ -11,9 +11,7 @@
  * thing:
  *
  *   renamed here          `vrt <cmd>` in help/usage/comments -> `vlmkit <cmd>`
- *   NOT renamed           `.vrt/`, `.vrt-skills/`, `vrt.config.json`, `VRT_*`
- *                         — live paths, filenames and env vars; renaming them
- *                         orphans existing baselines, configs and CI
+ *   NOT renamed           `.vrt-skills/` — the current skill store name
  *   NOT renamed           `src/vrt/` — a real source directory
  *   NOT renamed           `.claude/skills/vrt-*` — real skill directory names
  *   NOT renamed           `"X-Title": "vrt"`, `projectName: "vrt"`, the plan
@@ -28,13 +26,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dirname!, "..", "..");
-// The real entry: `cli.ts` prints help but the deprecation shims that route
-// an alias to its leaf live in `vlmkit.ts`, so pointing at cli.ts made the
-// alias case return empty output and "pass" for the wrong reason.
 const ENTRY = resolve(ROOT, "src", "cli", "vlmkit.ts");
 
 /** Every top-level command the CLI advertises as current (not a deprecated alias). */
@@ -51,10 +46,6 @@ const COMMANDS = [
  */
 const ALLOWED = [
   ".vrt-skills",      // state directory `vlmkit skill` reads
-  ".vrt/",            // state directory (baselines, runs, last-diff-for-agent)
-  "vrt.config.json",  // default config filename `diff-pr` / `baseline` resolve
-  "vrt.config.toml",
-  "VRT_",             // environment variables
 ];
 
 const strip = (s: string): string => s.replace(/\x1b\[[0-9;]*m/g, "");
@@ -89,17 +80,21 @@ describe("no command tells the reader to run `vrt`", () => {
 
   for (const cmd of COMMANDS) {
     it(`\`vlmkit ${cmd} --help\` is clean`, () => {
-      const found = offenders(help([cmd, "--help"]));
+      const text = help([cmd, "--help"]);
+      assert.match(
+        text,
+        /Subcommands:|Commands:|Options:|Usage:|vlmkit \w+ </,
+        `${cmd} --help must describe its own usage`,
+      );
+      const found = offenders(text);
       assert.deepEqual(found, [], `${cmd} --help still says: ${found.join(", ")}`);
     });
   }
 
-  it("a deprecated alias still routes, and lands on help naming the CURRENT command", () => {
-    // The alias is kept on purpose (removed in 1.0.0). What was broken is that
-    // the help it delegates to described itself by the dead name.
+  it("removed aliases no longer route", () => {
     const text = help(["png-diff", "--help"]);
-    assert.match(text, /vlmkit diff png/);
-    assert.deepEqual(offenders(text), []);
+    assert.match(text, /Unknown command/);
+    assert.doesNotMatch(text, /deprecated/);
   });
 });
 
@@ -126,7 +121,9 @@ describe("a rename never leaves a definition and its reference disagreeing", () 
       .split("\n").filter(Boolean);
     const problems: string[] = [];
     for (const f of files) {
-      const text = readFileSync(resolve(ROOT, f), "utf8");
+      const path = resolve(ROOT, f);
+      if (!existsSync(path)) continue;
+      const text = readFileSync(path, "utf8");
       const defined = new Set([...text.matchAll(/^\s*-?\s*id:\s*([\w-]+)/gm)].map((m) => m[1]!));
       for (const m of text.matchAll(/steps\.([\w-]+)\./g)) {
         if (!defined.has(m[1]!)) problems.push(`${f}: steps.${m[1]} is referenced but no step declares that id`);
@@ -156,7 +153,12 @@ describe("the rename did not invert text that is about the old name", () => {
       .split("\n").filter(Boolean);
     const claims: string[] = [];
     for (const f of files) {
-      const text = readFileSync(resolve(ROOT, f), "utf8");
+      const path = resolve(ROOT, f);
+      // `git ls-files` keeps an unstaged deletion in the index. Renames are a
+      // normal state while this test runs locally, so inspect only paths that
+      // still exist in the worktree; CI sees the committed destination.
+      if (!existsSync(path)) continue;
+      const text = readFileSync(path, "utf8");
       text.split("\n").forEach((line, i) => {
         if (!/\bno\s+`?vlmkit`?\s+binary\b/i.test(line)) return;
         // An old -> new illustration is not a claim. Narrowly defined: a line
@@ -193,7 +195,9 @@ describe("workflows that run a src/ entrypoint build the packages first", () => 
       .split("\n").filter(Boolean);
     const missing: string[] = [];
     for (const f of files) {
-      const text = readFileSync(resolve(ROOT, f), "utf8");
+      const path = resolve(ROOT, f);
+      if (!existsSync(path)) continue;
+      const text = readFileSync(path, "utf8");
       for (const job of text.split(/^ {2}(?=[\w-]+:$)/m)) {
         const name = /^([\w-]+):/.exec(job)?.[1] ?? "?";
         const runsSrc = /node (?:--experimental-strip-types )?src\//.test(job);

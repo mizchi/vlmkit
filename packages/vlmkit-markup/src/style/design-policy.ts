@@ -30,7 +30,7 @@
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { hasFlag, readFlag, readInt, readNumber, readPositionals } from "@mizchi/vlmkit-core/arg-reader.ts";
+import { hasFlag, readAll, readChoice, readFlag, readInt, readNumber, readPositionals } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { applyGateExit } from "@mizchi/vlmkit-core/gate-exit.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
@@ -63,6 +63,10 @@ export interface DesignPolicyInput {
   skipped: number;
   /** Elements skipped for being in a non-resting state. */
   statefulSkipped: number;
+  /** Auditable root matches for caller-owned subtree exclusions. */
+  exclusions?: { selector: string; matches: number }[];
+  /** Unique elements omitted because they belong to an excluded subtree. */
+  excludedElements?: number;
 }
 
 export type DesignFindingKind = "component-drift" | "scale-outlier" | "redirected";
@@ -96,6 +100,9 @@ export interface DesignPolicyReport {
   findings: DesignFinding[];
   skipped: number;
   statefulSkipped: number;
+  exclusions: { selector: string; matches: number }[];
+  excludedElements: number;
+  unusedExcludes: string[];
   spacingValues: number;
   /**
    * Thresholds this run actually used. In the report because the role table
@@ -109,6 +116,14 @@ export interface DesignPolicyReport {
 
 export interface DesignPolicyOptions {
   source: string;
+  /** Vendor-owned subtrees omitted before component and spacing collection. */
+  exclude?: readonly string[];
+  /** Playwright navigation milestone. Defaults to networkidle. */
+  waitUntil?: "domcontentloaded" | "load" | "networkidle";
+  /** Navigation timeout in milliseconds. Defaults to 30000. */
+  timeout?: number;
+  /** Replay network responses from a Playwright HAR for deterministic URL gates. */
+  har?: string;
   /**
    * Minimum times a signature must be reused before the role counts as
    * systematic. Default 3 — measured: designed roles sit at 5-42, drifting
@@ -127,7 +142,7 @@ export interface DesignPolicyOptions {
 }
 
 /** Flags that consume the next argv entry, so the source positional is found. */
-const VALUE_FLAGS = ["min-reuse", "min-instances", "storage-state"];
+const VALUE_FLAGS = ["min-reuse", "min-instances", "storage-state", "exclude", "timeout", "wait-until", "har"];
 
 const DEFAULT_MIN_REUSE = 3;
 const DEFAULT_MIN_INSTANCES = 3;
@@ -171,6 +186,14 @@ const scaleWindow = (reference: number): number => Math.max(2, Math.round(refere
  * apparent signatures to 3 real ones.
  */
 export const COLLECT_DESIGN_SAMPLES = `(() => {
+  const excludedSelectors = [];
+  const exclusions = excludedSelectors.map((selector) => {
+    try {
+      return { selector, matches: document.querySelectorAll(selector).length };
+    } catch (error) {
+      throw new Error('invalid --exclude selector "' + selector + '": ' + error.message);
+    }
+  });
   const visible = (el) => typeof el.checkVisibility === "function"
     ? el.checkVisibility({ visibilityProperty: true, opacityProperty: true, contentVisibilityAuto: true })
     : getComputedStyle(el).display !== "none" && getComputedStyle(el).visibility !== "hidden";
@@ -200,8 +223,12 @@ export const COLLECT_DESIGN_SAMPLES = `(() => {
     return null;
   };
   const samples = [], spacing = [];
-  let skipped = 0, statefulSkipped = 0;
+  let skipped = 0, statefulSkipped = 0, excludedElements = 0;
   for (const el of document.querySelectorAll("body *")) {
+    if (excludedSelectors.some((selector) => el.closest(selector))) {
+      excludedElements++;
+      continue;
+    }
     if (!visible(el)) continue;
     const rect = el.getBoundingClientRect();
     if (rect.width < 2 || rect.height < 2) continue;
@@ -228,8 +255,15 @@ export const COLLECT_DESIGN_SAMPLES = `(() => {
         + ", " + sig[5] + "px/" + sig[6] + ", border " + sig[7] + ", bg " + sig[8],
     });
   }
-  return { samples, spacing, skipped, statefulSkipped };
+  return { samples, spacing, skipped, statefulSkipped, exclusions, excludedElements };
 })()`;
+
+export function buildDesignSampleScript(excludeSelectors: readonly string[] = []): string {
+  return COLLECT_DESIGN_SAMPLES.replace(
+    "const excludedSelectors = [];",
+    `const excludedSelectors = ${JSON.stringify([...excludeSelectors])};`,
+  );
+}
 
 /**
  * Judge role coherence. Pure so the thresholds are unit-testable without a
@@ -345,6 +379,9 @@ export function judgeDesignPolicy(
     findings,
     skipped: input.skipped,
     statefulSkipped: input.statefulSkipped,
+    exclusions: input.exclusions ?? [],
+    excludedElements: input.excludedElements ?? 0,
+    unusedExcludes: (input.exclusions ?? []).filter((entry) => entry.matches === 0).map((entry) => entry.selector),
     spacingValues: spacingCounts.size,
     thresholds: { minReuse, minInstances },
     // `info` rows do not move the verdict, and `redirected` is a navigation
@@ -358,13 +395,19 @@ export async function runDesignPolicyCheck(options: DesignPolicyOptions): Promis
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage(withAuthState({ viewport: { width: 1280, height: 900 } }, options.storageState));
+    if (options.har) {
+      await page.routeFromHAR(resolve(options.har), { notFound: "abort" });
+    }
     const isUrl = /^https?:\/\//.test(options.source);
     const url = isUrl ? options.source : pathToFileURL(resolve(options.source)).href;
-    await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+    await page.goto(url, {
+      waitUntil: options.waitUntil ?? "networkidle",
+      timeout: options.timeout ?? 30000,
+    });
     await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => undefined) : undefined));
     await page.waitForTimeout(250);
     const redirect = isUrl ? describeRedirect(options.source, page.url()) : null;
-    const input = await page.evaluate(COLLECT_DESIGN_SAMPLES) as DesignPolicyInput;
+    const input = await page.evaluate(buildDesignSampleScript(options.exclude)) as DesignPolicyInput;
     const judged = judgeDesignPolicy(input, options);
     if (redirect) {
       judged.findings.unshift({ kind: "redirected", severity: "suspect", message: redirect });
@@ -412,6 +455,17 @@ export function formatDesignReport(report: DesignPolicyReport): string {
     }
     lines.push("");
   }
+  if (report.exclusions.length > 0) {
+    lines.push(`${BOLD}Excluded subtrees${RESET} ${DIM}(${report.excludedElements} unique element(s) omitted)${RESET}`);
+    for (const exclusion of report.exclusions) {
+      const marker = exclusion.matches === 0 ? `${YELLOW}!${RESET}` : `${DIM}-${RESET}`;
+      lines.push(`  ${marker} ${exclusion.selector}: ${exclusion.matches} root match(es)`);
+    }
+    if (report.unusedExcludes.length > 0) {
+      lines.push(`${YELLOW}${report.unusedExcludes.length} --exclude selector(s) matched nothing; remove stale exclusions.${RESET}`);
+    }
+    lines.push("");
+  }
   if (report.findings.length === 0) {
     lines.push(`${GREEN}No design drift detected.${RESET}`);
     return lines.join("\n");
@@ -446,6 +500,10 @@ INCONSISTENCY, never which value is correct — taste stays with humans.
 Options:
   --min-reuse <n>         Times each style must be reused (default 3)
   --min-instances <n>     Instances before a role is judged (default 3)
+  --exclude <selector>    Exclude a vendor-owned subtree (repeatable, audited)
+  --timeout <ms>          Page navigation timeout (default: 30000)
+  --wait-until <state>    domcontentloaded, load, or networkidle (default)
+  --har <file>            Replay network responses from a Playwright HAR
   --json                  Print JSON report
   --storage-state <file>  Playwright storage state for pages behind a login
   --advisory              Print findings but exit 0 (default: suspects exit 1)
@@ -464,6 +522,14 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   const minReuse = readNumber(argv, "min-reuse", { min: 0 });
   const minInstances = readInt(argv, "min-instances", { min: 1 });
   const storageState = readFlag(argv, "storage-state");
+  const har = readFlag(argv, "har");
+  const exclude = readAll(argv, "exclude");
+  const timeout = readInt(argv, "timeout", { min: 1 });
+  const waitUntil = readChoice(
+    argv,
+    "wait-until",
+    ["domcontentloaded", "load", "networkidle"] as const,
+  );
   const json = hasFlag(argv, "json");
   const source = readPositionals(argv, VALUE_FLAGS)[0];
   if (!source) printUsage(1);
@@ -472,6 +538,10 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     ...(minReuse !== undefined ? { minReuse } : {}),
     ...(minInstances !== undefined ? { minInstances } : {}),
     ...(storageState ? { storageState } : {}),
+    ...(exclude.length > 0 ? { exclude } : {}),
+    ...(timeout !== undefined ? { timeout } : {}),
+    ...(waitUntil ? { waitUntil } : {}),
+    ...(har ? { har } : {}),
   });
   if (json) console.log(JSON.stringify(report, null, 2));
   else console.log(formatDesignReport(report));
@@ -480,6 +550,6 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   });
 }
 
-const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "design-policy" ||
+const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "design-policy" ||
   (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) main().catch(handleCliError);

@@ -61,13 +61,13 @@ test("observe release queue UI", async ({ page }) => {
     ]
   }];
 
-  await mkdir(".vrt/markup-vrt-eval/specs", { recursive: true });
+  await mkdir(".vlmkit/markup-vrt-eval/specs", { recursive: true });
   await writeFile(
-    ".vrt/markup-vrt-eval/specs/release-queue.observations.json",
+    ".vlmkit/markup-vrt-eval/specs/release-queue.observations.json",
     JSON.stringify(observations, null, 2) + "\n",
   );
   await writeFile(
-    ".vrt/markup-vrt-eval/specs/release-queue.visual-context.json",
+    ".vlmkit/markup-vrt-eval/specs/release-queue.visual-context.json",
     JSON.stringify({
       viewport: stableVisualContext.viewport,
       elements: stableVisualContext.elements,

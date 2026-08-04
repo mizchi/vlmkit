@@ -126,7 +126,7 @@ flags.
 ## Environment
 
 **No API keys are required for any sub-tool in this skill.** The
-"VLM" / `VRT_VLM_MODEL` env vars listed in other VRT skills do not
+"VLM" / `VLMKIT_VLM_MODEL` env vars listed in other VRT skills do not
 apply here.
 
 The only prerequisite is Playwright with chromium installed

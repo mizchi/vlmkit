@@ -2,8 +2,8 @@
  * Capture configuration loader for `vlmkit workflow init|capture`.
  *
  * Allows external projects to drive `e2e/vrt-capture.spec.ts` without
- * editing the spec by sourcing routes from `vrt.config.json` (or any
- * file pointed at by `--config` / `VRT_CONFIG_PATH`).
+ * editing the spec by sourcing routes from `vlmkit.config.json` (or any
+ * file pointed at by `--config` / `VLMKIT_CONFIG_PATH`).
  */
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
@@ -31,7 +31,7 @@ export const DEFAULT_CAPTURE_BASE_URL = "http://127.0.0.1:4174";
 /**
  * Built-in fallback used when no config or env override is provided.
  * Kept for vlmkit's own development workflow; external projects should
- * supply their own routes via `vrt.config.json`.
+ * supply their own routes via `vlmkit.config.json`.
  */
 export const DEFAULT_CAPTURE_ROUTES: CaptureRoute[] = [
   { name: "home", path: "/", waitFor: "main" },
@@ -41,7 +41,7 @@ export const DEFAULT_CAPTURE_ROUTES: CaptureRoute[] = [
   { name: "pulls", path: "/pulls", waitFor: "main" },
 ];
 
-export const DEFAULT_CAPTURE_CONFIG_FILE = "vrt.config.json";
+export const DEFAULT_CAPTURE_CONFIG_FILE = "vlmkit.config.json";
 
 export function parseCaptureConfig(raw: string): CaptureConfig {
   let parsed: unknown;
@@ -140,9 +140,9 @@ export interface LoadCaptureConfigOptions {
  * Resolve the route set to use for a capture run.
  *
  * Precedence (highest first):
- *   1. `VRT_CAPTURE_ROUTES` env var (JSON-encoded array)
- *   2. Explicit config path (CLI / `VRT_CONFIG_PATH`)
- *   3. `vrt.config.json` discovered in `cwd`
+ *   1. `VLMKIT_CAPTURE_ROUTES` env var (JSON-encoded array)
+ *   2. Explicit config path (CLI / `VLMKIT_CONFIG_PATH`)
+ *   3. `vlmkit.config.json` discovered in `cwd`
  *   4. Built-in defaults
  */
 export function resolveCaptureRoutes(options: LoadCaptureConfigOptions = {}): CaptureRouteSet {

@@ -33,7 +33,7 @@ import { resolveCaptureBackend, type CaptureBackend } from "@mizchi/vlmkit-captu
 import { writeFlipbook, type FlipbookFrame } from "../compare/flipbook.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 
-const DEFAULT_SNAPSHOT_CONFIG_FILE = "vrt.config.json";
+const DEFAULT_SNAPSHOT_CONFIG_FILE = "vlmkit.config.json";
 const VIEWPORTS = [
   { width: 1280, height: 900, label: "desktop" },
   { width: 375, height: 812, label: "mobile" },
@@ -55,10 +55,10 @@ interface SnapshotResult {
 function formatSnapshotUsage(): string {
   return [
     "Usage:",
-    "  vlmkit snapshot <url1> [url2] ... [--output dir] [--label name] [--threshold 0.1] [--fail-on-diff] [--fail-on-new-baseline] [--max-diff-ratio n] [--backend local|cloudflare] [--config vrt.config.json]",
-    "  vlmkit snapshot approve [--output dir] [--label name] [--config vrt.config.json]",
-    "  vlmkit snapshot fix-prompt [--output dir] [--label name] [--format markdown|json] [--limit n] [--min-diff 0.01] [--out path] [--config vrt.config.json]",
-    "  vlmkit snapshot stability <url1> [url2]... [--iterations 3] [--output dir] [--threshold 0.1] [--fp-threshold 0] [--fail-above-rate 0.05] [--config vrt.config.json]",
+    "  vlmkit snapshot <url1> [url2] ... [--output dir] [--label name] [--threshold 0.1] [--fail-on-diff] [--fail-on-new-baseline] [--max-diff-ratio n] [--backend local|cloudflare] [--config vlmkit.config.json]",
+    "  vlmkit snapshot approve [--output dir] [--label name] [--config vlmkit.config.json]",
+    "  vlmkit snapshot fix-prompt [--output dir] [--label name] [--format markdown|json] [--limit n] [--min-diff 0.01] [--out path] [--config vlmkit.config.json]",
+    "  vlmkit snapshot stability <url1> [url2]... [--iterations 3] [--output dir] [--threshold 0.1] [--fp-threshold 0] [--fail-above-rate 0.05] [--config vlmkit.config.json]",
     "  vlmkit snapshot stability-history <stability-report.json>... [--out path]",
   ].join("\n");
 }
@@ -194,7 +194,7 @@ async function runStability(options: {
   flipbookDelayMs?: number;
 }) {
   if (options.urls.length === 0) {
-    throw new Error("No URLs provided for stability run. Pass URLs directly or configure routes in vrt.config.json.");
+    throw new Error("No URLs provided for stability run. Pass URLs directly or configure routes in vlmkit.config.json.");
   }
 
   await mkdir(options.outputDir, { recursive: true });
@@ -516,7 +516,7 @@ async function main() {
   const urls = parsed.urls;
   if (urls.length === 0) {
     console.log(formatSnapshotUsage());
-    throw new Error("No snapshot URLs provided. Pass URLs directly or configure routes in vrt.config.json.");
+    throw new Error("No snapshot URLs provided. Pass URLs directly or configure routes in vlmkit.config.json.");
   }
   const labels = parsed.labels;
 
@@ -697,6 +697,6 @@ async function main() {
   console.log();
 }
 
-if (process.env.__VRT_DISPATCHER_LEAF__ === "snapshot" || process.argv[1]?.endsWith("snapshot.ts")) {
+if (process.env.__VLMKIT_DISPATCHER_LEAF__ === "snapshot" || process.argv[1]?.endsWith("snapshot.ts")) {
   main().catch((e) => { console.error(e); process.exit(1); });
 }

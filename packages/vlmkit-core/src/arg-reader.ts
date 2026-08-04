@@ -39,6 +39,20 @@ export function readFlag(argv: readonly string[], name: string): string | undefi
   return value;
 }
 
+/** Read a string flag whose public contract is a closed set of values. */
+export function readChoice<const T extends readonly string[]>(
+  argv: readonly string[],
+  name: string,
+  choices: T,
+): T[number] | undefined {
+  const value = readFlag(argv, name);
+  if (value === undefined) return undefined;
+  if ((choices as readonly string[]).includes(value)) return value as T[number];
+  throw new UsageError(
+    `${flagName(name)} must be one of ${choices.join(", ")}, got ${JSON.stringify(value)}`,
+  );
+}
+
 /** Every occurrence, for repeatable flags (`--gate`, `--only`, `--pages`). */
 export function readAll(argv: readonly string[], name: string): string[] {
   const flag = flagName(name);

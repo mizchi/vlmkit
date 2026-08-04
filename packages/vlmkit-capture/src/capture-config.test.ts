@@ -85,10 +85,10 @@ describe("resolveCaptureRoutes", () => {
     }
   });
 
-  it("loads routes from vrt.config.json in cwd", async () => {
+  it("loads routes from vlmkit.config.json in cwd", async () => {
     const dir = await mkdtemp(join(tmpdir(), "vrt-capture-"));
     try {
-      await writeFile(join(dir, "vrt.config.json"), JSON.stringify({
+      await writeFile(join(dir, "vlmkit.config.json"), JSON.stringify({
         baseUrl: "http://localhost:5173",
         capture: {
           routes: [{ name: "home", path: "/", waitFor: "main" }],
@@ -99,7 +99,7 @@ describe("resolveCaptureRoutes", () => {
       assert.equal(result.source, "config");
       assert.equal(result.baseUrl, "http://localhost:5173");
       assert.deepEqual(result.routes, [{ name: "home", path: "/", waitFor: "main" }]);
-      assert.equal(result.configPath, join(dir, "vrt.config.json"));
+      assert.equal(result.configPath, join(dir, "vlmkit.config.json"));
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -112,7 +112,7 @@ describe("resolveCaptureRoutes", () => {
       await writeFile(explicit, JSON.stringify({
         capture: { routes: [{ path: "/custom" }] },
       }));
-      await writeFile(join(dir, "vrt.config.json"), JSON.stringify({
+      await writeFile(join(dir, "vlmkit.config.json"), JSON.stringify({
         capture: { routes: [{ path: "/default" }] },
       }));
 
@@ -124,10 +124,10 @@ describe("resolveCaptureRoutes", () => {
     }
   });
 
-  it("VRT_CAPTURE_ROUTES env var overrides config files", async () => {
+  it("VLMKIT_CAPTURE_ROUTES env var overrides config files", async () => {
     const dir = await mkdtemp(join(tmpdir(), "vrt-capture-"));
     try {
-      await writeFile(join(dir, "vrt.config.json"), JSON.stringify({
+      await writeFile(join(dir, "vlmkit.config.json"), JSON.stringify({
         capture: { routes: [{ path: "/from-config" }] },
       }));
       const result = resolveCaptureRoutes({
@@ -147,7 +147,7 @@ describe("resolveCaptureRoutes", () => {
   it("env base URL overrides config baseUrl", async () => {
     const dir = await mkdtemp(join(tmpdir(), "vrt-capture-"));
     try {
-      await writeFile(join(dir, "vrt.config.json"), JSON.stringify({
+      await writeFile(join(dir, "vlmkit.config.json"), JSON.stringify({
         baseUrl: "http://config-base:3000",
         capture: { routes: [{ path: "/" }] },
       }));
@@ -163,7 +163,7 @@ describe("resolveCaptureRoutes", () => {
 
   it("throws when an explicit config path is missing", () => {
     assert.throws(
-      () => resolveCaptureRoutes({ configPath: "/nonexistent/vrt.config.json" }),
+      () => resolveCaptureRoutes({ configPath: "/nonexistent/vlmkit.config.json" }),
       /Capture config not found/i,
     );
   });

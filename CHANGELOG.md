@@ -5,6 +5,50 @@ Dates are YYYY-MM-DD.
 
 ## Unreleased
 
+### Breaking
+
+- Removed the deprecated top-level CLI aliases and workflow aliases. Use the
+  canonical grouped commands such as `vlmkit diff png`, `vlmkit check theme`,
+  and `vlmkit workflow capture`.
+- Removed `vlmkit diff region`; use deterministic `diff png --elements-html`,
+  `check integrity`, and `check equivalence` signals instead.
+- Removed deprecated public APIs (`checkA11yTree`,
+  `evaluateDomEquivalence`, and `deriveComponentContractRuntime`) and the
+  ignored `minOverlapRatio` option.
+- Removed legacy `.vrt/`, `vrt.config.*`, and `VRT_*` discovery. Project state,
+  configuration, and environment variables now use only `.vlmkit/`,
+  `vlmkit.config.*`, and `VLMKIT_*`.
+- Migration tooling now reads and writes only `diff-report.json`; the
+  `migration-report.json` duplicate and fallback are gone.
+
+### Changed
+
+- `vlmkit -h` is now a compact command index. Detailed subcommands, options,
+  and examples live under `vlmkit <command> --help`.
+
+### Added
+
+- `check integrity` and `check design` accept `--timeout`, `--wait-until`, and
+  `--har`. Long-polling pages can be measured after `domcontentloaded` or
+  `load`, while HAR replay makes third-party data deterministic and aborts
+  unrecorded requests.
+- `check design --exclude <selector>` removes vendor-owned subtrees before
+  component-reuse and spacing measurement. Repeatable exclusions report their
+  root match counts, total omitted elements, and stale selectors that matched
+  nothing.
+
+### Fixed
+
+- The distributed `spec-to-playwright` seed template no longer has a filename
+  collected by consumer Vitest/Jest defaults; it is copied from
+  `seed.spec.template.ts` to `tests/seed.spec.ts` only when the workflow is
+  adopted.
+- Public vlmkit packages reuse the consumer's Playwright through a required
+  `>=1.61 <2` peer instead of installing an independently resolved browser
+  build; the root package also accepts `@playwright/test` as an optional peer.
+  Missing-browser errors name the resolved version and invoke its exact CLI
+  path.
+
 ## 0.9.0 — 2026-08-02
 
 The theme of this release is gates that were confidently wrong. Nine of

@@ -5,7 +5,8 @@
  * TypeScript or files omitted from the published package.
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { dirname, join, relative, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -20,6 +21,12 @@ const packageDirectories = [
   "vlmkit-markup",
   "vlmkit-heal",
 ];
+const playwrightPeerPackages = new Set([
+  "@mizchi/vlmkit-core",
+  "@mizchi/vlmkit-capture",
+  "@mizchi/vlmkit-markup",
+  "@mizchi/vlmkit-heal",
+]);
 
 function fail(message) {
   throw new Error(`packed workspace smoke: ${message}`);
@@ -83,6 +90,12 @@ async function main() {
       if (entries.some((entry) => /^package\/src\/.*\.ts$/.test(entry))) {
         fail(`${manifest.name} tarball contains raw TypeScript sources`);
       }
+      if (playwrightPeerPackages.has(manifest.name)) {
+        if (manifest.dependencies?.playwright) fail(`${manifest.name} retains a private Playwright dependency`);
+        if (manifest.peerDependencies?.playwright !== ">=1.61 <2") {
+          fail(`${manifest.name} has unexpected Playwright peer range`);
+        }
+      }
       tarballs.set(manifest.name, tarball);
     }
 
@@ -93,7 +106,7 @@ async function main() {
       name: "vlmkit-packed-workspaces-consumer",
       private: true,
       type: "module",
-      dependencies: localReferences,
+      dependencies: { "@playwright/test": "1.61.0", ...localReferences },
       pnpm: { overrides: localReferences },
     }, null, 2)}\n`);
     await writeFile(join(consumerDir, "smoke.mjs"), `
@@ -124,6 +137,17 @@ console.log("workspace package imports passed");
 
     console.log("==> installing tarballs in isolated consumer");
     run("pnpm", ["install", "--ignore-scripts"], { cwd: consumerDir });
+    const projectRequire = createRequire(join(consumerDir, "package.json"));
+    const testRequire = createRequire(projectRequire.resolve("@playwright/test/package.json"));
+    const projectPlaywright = await realpath(testRequire.resolve("playwright/package.json"));
+    for (const name of playwrightPeerPackages) {
+      const installedManifest = await realpath(join(consumerDir, "node_modules", ...name.split("/"), "package.json"));
+      const packageRequire = createRequire(installedManifest);
+      const packagePlaywright = await realpath(packageRequire.resolve("playwright/package.json"));
+      if (packagePlaywright !== projectPlaywright) {
+        fail(`${name} did not reuse the consumer's Playwright installation`);
+      }
+    }
     run(process.execPath, ["smoke.mjs"], { cwd: consumerDir });
     assertCliHelp(join(consumerDir, "node_modules", ".bin", "vlmkit-plan"), consumerDir);
     assertCliHelp(join(consumerDir, "node_modules", ".bin", "vlmkit-generate"), consumerDir);

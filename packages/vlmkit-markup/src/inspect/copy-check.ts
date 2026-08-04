@@ -63,7 +63,7 @@ import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
-import { readEnv } from "@mizchi/vlmkit-core/legacy-names.ts";
+import { readEnv } from "@mizchi/vlmkit-core/project-config.ts";
 
 export type CopyIssueKind = "placeholder-text" | "copy-missing" | "copy-invisible" | "copy-image-mismatch" | "redirected";
 
@@ -868,7 +868,7 @@ Options:
                       (e.g. --allow-invisible visually-hidden)
   --target <png>      Target screenshot to verify copy against (bbox-cropped per text block)
   --out <dir>         Sheet/worksheet output dir (default: .vlmkit-copy-review next to the source)
-  --vlm [model]       Transcribe crops with a VLM (default model: VRT_VLM_MODEL); requires API key
+  --vlm [model]       Transcribe crops with a VLM (default model: VLMKIT_VLM_MODEL); requires API key
   --no-states         Skip the disclosure-state sweep (default-state text only)
   --json              Print JSON report
   --advisory          Print findings but exit 0 (default: a suspect exits 1)`);
@@ -945,7 +945,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   applyGateExit(report.issues.some((i) => i.severity === "suspect"), { advisory });
 }
 
-const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "copy-check" ||
+const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "copy-check" ||
   (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch(handleCliError);

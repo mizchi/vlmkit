@@ -41,7 +41,7 @@ import {
 } from "./workflow/paths.ts";
 import { resolveCaptureRoutes } from "@mizchi/vlmkit-capture/capture-config.ts";
 import type { UnifiedAgentContext } from "@mizchi/vlmkit-core/types.ts";
-import { readEnv } from "@mizchi/vlmkit-core/legacy-names.ts";
+import { readEnv } from "@mizchi/vlmkit-core/project-config.ts";
 
 const NPX_COMMAND = process.platform === "win32" ? "npx.cmd" : "npx";
 
@@ -50,7 +50,7 @@ const EXEC_OPTS: ExecSyncOptions = {
   stdio: "inherit",
   env: {
     ...process.env,
-    VRT_OUTPUT_DIR: PROJECT_ROOT,
+    VLMKIT_OUTPUT_DIR: PROJECT_ROOT,
   },
 };
 
@@ -93,10 +93,10 @@ function resolveCaptureSpecPath(): string {
 }
 
 function buildCaptureEnv(mode: "baseline" | "capture", options: WorkflowCaptureOptions) {
-  const env: NodeJS.ProcessEnv = { ...EXEC_OPTS.env, VRT_MODE: mode };
+  const env: NodeJS.ProcessEnv = { ...EXEC_OPTS.env, VLMKIT_MODE: mode };
 
   // Resolve config + routes against PROJECT_ROOT (user's working directory),
-  // so external projects can drop a vrt.config.json next to their app.
+  // so external projects can drop a vlmkit.config.json next to their app.
   const routeSet = resolveCaptureRoutes({
     cwd: PROJECT_ROOT,
     configPath: options.configPath,
@@ -105,16 +105,16 @@ function buildCaptureEnv(mode: "baseline" | "capture", options: WorkflowCaptureO
   });
 
   if (routeSet.configPath) {
-    env.VRT_CONFIG_PATH = routeSet.configPath;
+    env.VLMKIT_CONFIG_PATH = routeSet.configPath;
   }
-  env.VRT_BASE_URL = routeSet.baseUrl;
-  env.VRT_PROJECT_ROOT = PROJECT_ROOT;
+  env.VLMKIT_BASE_URL = routeSet.baseUrl;
+  env.VLMKIT_PROJECT_ROOT = PROJECT_ROOT;
 
   if (routeSet.source === "config" && routeSet.configPath) {
     console.log(`  (using capture config: ${routeSet.configPath})`);
     console.log(`  (routes: ${routeSet.routes.map((r) => r.path).join(", ")})`);
   } else if (routeSet.source === "default") {
-    console.log(`  (using default vrt routes — pass --config or create vrt.config.json to customize)`);
+    console.log(`  (using default routes — pass --config or create vlmkit.config.json to customize)`);
   }
 
   return env;
@@ -146,7 +146,7 @@ async function init(options: WorkflowCaptureOptions = {}) {
     const captured = await listFiles(BASELINES_DIR, ".png");
     if (captured.length === 0) {
       console.error("Playwright capture failed. Is the server running?");
-      console.error("Start your target app and set VRT_BASE_URL if it is not http://127.0.0.1:4174");
+      console.error("Start your target app and set VLMKIT_BASE_URL if it is not http://127.0.0.1:4174");
       process.exit(1);
     }
     console.log("  (some tests had warnings, but captures completed)");
@@ -174,7 +174,7 @@ async function capture(options: WorkflowCaptureOptions = {}) {
     const captured = await listFiles(SNAPSHOTS_DIR, ".png");
     if (captured.length === 0) {
       console.error("Playwright capture failed. Is the server running?");
-      console.error("Start your target app and set VRT_BASE_URL if it is not http://127.0.0.1:4174");
+      console.error("Start your target app and set VLMKIT_BASE_URL if it is not http://127.0.0.1:4174");
       process.exit(1);
     }
     console.log("  (some tests had warnings, but captures completed)");
@@ -328,7 +328,7 @@ Commands:
   spec-verify  Verify spec.json invariants against current state
   expect       Auto-generate expectation.json from baseline vs snapshot diff
 
-Capture config (vrt.config.json):
+Capture config (vlmkit.config.json):
   {
     "baseUrl": "http://localhost:3000",
     "capture": {
@@ -340,9 +340,9 @@ Capture config (vrt.config.json):
   }
 
 Routes can also be supplied via env vars:
-  VRT_CONFIG_PATH   Path to capture config file
-  VRT_BASE_URL      Override the base URL
-  VRT_CAPTURE_ROUTES JSON-encoded array of routes`;
+  VLMKIT_CONFIG_PATH    Path to capture config file
+  VLMKIT_BASE_URL       Override the base URL
+  VLMKIT_CAPTURE_ROUTES JSON-encoded array of routes`;
 }
 
 export async function runWorkflowCli(argv = process.argv.slice(2)) {

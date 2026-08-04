@@ -200,7 +200,7 @@ describe("formatMigrationSubagentEvaluationMarkdown", () => {
     const markdown = formatMigrationSubagentEvaluationMarkdown(
       summarizeMigrationSubagentEvaluation(createBeforeReport(), createAfterReport()),
       {
-        beforeReportPath: "test-results/migration/migration-report.json",
+        beforeReportPath: "test-results/migration/diff-report.json",
         afterReportPath: "test-results/migration/migration-report.after.json",
       },
     );

@@ -76,10 +76,10 @@ describe("resolveCaptureBackend", () => {
     }
   });
 
-  it("falls back to VRT_CAPTURE_BACKEND env var", () => {
+  it("falls back to VLMKIT_CAPTURE_BACKEND env var", () => {
     const r = resolveCaptureBackend({
       env: {
-        VRT_CAPTURE_BACKEND: "cloudflare",
+        VLMKIT_CAPTURE_BACKEND: "cloudflare",
         CLOUDFLARE_ACCOUNT_ID: "abc",
         CLOUDFLARE_API_TOKEN: "tok",
       },

@@ -22,9 +22,9 @@ test("buildReport owns expected-change approval and repair image artifact mappin
   assert.equal(report.expectedChangeApproval.approved, true);
   assert.deepEqual(report.expectedChangeApproval.reasons, []);
   assert.deepEqual(report.repair.artifacts, {
-    expectedPng: ".vrt/markup-vrt-eval/test-results/expected.png",
-    actualPng: ".vrt/markup-vrt-eval/test-results/actual.png",
-    diffPng: ".vrt/markup-vrt-eval/test-results/diff.png",
+    expectedPng: ".vlmkit/markup-vrt-eval/test-results/expected.png",
+    actualPng: ".vlmkit/markup-vrt-eval/test-results/actual.png",
+    diffPng: ".vlmkit/markup-vrt-eval/test-results/diff.png",
   });
 });
 
@@ -80,7 +80,7 @@ test("renderMarkdown includes VLM rows and omits null artifacts", () => {
   const { markdown } = renderReportArtifacts({
     report: makeReport({
       artifacts: {
-        reportPath: ".vrt/markup-vrt-eval/report.json",
+        reportPath: ".vlmkit/markup-vrt-eval/report.json",
         vlmRegionDiffPath: null,
       },
     }),
@@ -89,7 +89,7 @@ test("renderMarkdown includes VLM rows and omits null artifacts", () => {
 
   assert.match(markdown, /### VLM Region Diff/);
   assert.match(markdown, /\.pill: background-color `#fee` -> `#eff` \(high\)/);
-  assert.match(markdown, /reportPath: `\.vrt\/markup-vrt-eval\/report\.json`/);
+  assert.match(markdown, /reportPath: `\.vlmkit\/markup-vrt-eval\/report\.json`/);
   assert.doesNotMatch(markdown, /vlmRegionDiffPath/);
 });
 
@@ -99,7 +99,7 @@ test("renderReportArtifacts escapes HTML data and uses report-contained image ar
       scenario: "<script>alert(1)</script>",
       repair: {
         artifacts: {
-          expectedPng: ".vrt/markup-vrt-eval/test-results/expected.png",
+          expectedPng: ".vlmkit/markup-vrt-eval/test-results/expected.png",
           actualPng: null,
           diffPng: null,
         },
@@ -172,7 +172,7 @@ function makeReportInput(overrides = {}) {
     vlmRegionDiffStatus: "written",
     vlmRegionSummary: makeVlmRegionSummary(),
     artifacts: {
-      reportPath: ".vrt/markup-vrt-eval/report.json",
+      reportPath: ".vlmkit/markup-vrt-eval/report.json",
     },
   };
   return {
@@ -257,9 +257,9 @@ function makeRepairContext() {
       changed: false,
     },
     artifacts: {
-      expectedPng: ".vrt/markup-vrt-eval/test-results/expected.png",
-      actualPng: ".vrt/markup-vrt-eval/test-results/actual.png",
-      diffPng: ".vrt/markup-vrt-eval/test-results/diff.png",
+      expectedPng: ".vlmkit/markup-vrt-eval/test-results/expected.png",
+      actualPng: ".vlmkit/markup-vrt-eval/test-results/actual.png",
+      diffPng: ".vlmkit/markup-vrt-eval/test-results/diff.png",
     },
   };
 }
@@ -314,16 +314,16 @@ function makeReport(overrides = {}) {
         score: 8.3,
       }],
       artifacts: {
-        expectedPng: ".vrt/markup-vrt-eval/test-results/expected.png",
-        actualPng: ".vrt/markup-vrt-eval/test-results/actual.png",
-        diffPng: ".vrt/markup-vrt-eval/test-results/diff.png",
+        expectedPng: ".vlmkit/markup-vrt-eval/test-results/expected.png",
+        actualPng: ".vlmkit/markup-vrt-eval/test-results/actual.png",
+        diffPng: ".vlmkit/markup-vrt-eval/test-results/diff.png",
       },
       semanticChanged: false,
       hints: ["Inspect .metric min-height."],
     },
     vlmRegionSummary: makeVlmRegionSummary(),
     artifacts: {
-      reportPath: ".vrt/markup-vrt-eval/report.json",
+      reportPath: ".vlmkit/markup-vrt-eval/report.json",
     },
   };
   return {

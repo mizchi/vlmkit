@@ -151,7 +151,7 @@ run "skill-pricing-card" "report.md" \
     --output-dir "$OUT_BASE"
 
 # Migration mode (existing) — uses the shadcn fixture
-run "compare" "migration-report.json" \
+run "compare" "diff-report.json" \
   node --experimental-strip-types src/cli/vlmkit.ts compare \
     --dir fixtures/migration/shadcn-to-luna \
     --baseline before.html --variants after-blank.html \

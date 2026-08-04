@@ -34,7 +34,7 @@ vlmkit-generate --plan specs/<topic>.md --rules specs/_generation-rules.md \
 ## Assets
 
 - `assets/_helpers.ts` - deterministic `gotoApp()` helper for VRT.
-- `assets/seed.spec.ts` - seed test template for planner context.
+- `assets/seed.spec.template.ts` - seed test template for planner context; rename it to `seed.spec.ts` when copying.
 - `assets/_generation-rules.md` - rules the generator must obey.
 - `assets/playwright.config.preset.ts` - deterministic Playwright config preset.
 - `assets/ci.yml` - CI verification workflow.

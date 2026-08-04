@@ -12,7 +12,7 @@ import { formatCompareRunsMarkdown, type CrReport } from "../../vrt/compare/comp
 function usage(): string {
   return [
     "Usage:",
-    "  vlmkit diff runs <a-migration-report.json> <b-migration-report.json> [--out path] [--label-a name] [--label-b name]",
+    "  vlmkit diff runs <a-diff-report.json> <b-diff-report.json> [--out path] [--label-a name] [--label-b name]",
     "",
     "Diffs two migration-compare reports and prints per-viewport delta",
     "(IMPROVED / REGRESSED / UNCHANGED / ADDED / REMOVED) sorted by",
@@ -67,7 +67,7 @@ function parseArgs(argv: string[]): Args {
   }
 
   if (positional.length !== 2) {
-    throw new Error("Pass exactly two migration-report.json paths (A then B)");
+    throw new Error("Pass exactly two diff-report.json paths (A then B)");
   }
   return { a: positional[0]!, b: positional[1]!, outPath, labelA, labelB };
 }
@@ -106,7 +106,7 @@ async function main() {
   }
 }
 
-if (process.env.__VRT_DISPATCHER_LEAF__ === "compare-runs-cli" || (process.argv[1] && (process.argv[1].endsWith("compare-runs-cli.ts") || process.argv[1].endsWith("compare-runs-cli.mjs")))) {
+if (process.env.__VLMKIT_DISPATCHER_LEAF__ === "compare-runs-cli" || (process.argv[1] && (process.argv[1].endsWith("compare-runs-cli.ts") || process.argv[1].endsWith("compare-runs-cli.mjs")))) {
   main().catch((err) => {
     console.error(String(err?.message ?? err));
     process.exit(1);

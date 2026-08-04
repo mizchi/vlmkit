@@ -3,12 +3,30 @@ import { describe, it } from "node:test";
 import {
   hasFlag,
   readAll,
+  readChoice,
   readFlag,
   readInt,
   readNumber,
   readPositionals,
   tokenizeCommand,
 } from "./arg-reader.ts";
+
+describe("readChoice", () => {
+  it("accepts one of the declared values", () => {
+    assert.equal(
+      readChoice(["--wait-until", "domcontentloaded"], "wait-until", ["domcontentloaded", "load", "networkidle"]),
+      "domcontentloaded",
+    );
+    assert.equal(readChoice([], "wait-until", ["load", "networkidle"]), undefined);
+  });
+
+  it("rejects an unsupported value and lists the contract", () => {
+    assert.throws(
+      () => readChoice(["--wait-until", "commit"], "wait-until", ["domcontentloaded", "load", "networkidle"]),
+      /--wait-until must be one of domcontentloaded, load, networkidle, got "commit"/,
+    );
+  });
+});
 
 describe("readFlag", () => {
   it("reads a value, or nothing when the flag is absent", () => {

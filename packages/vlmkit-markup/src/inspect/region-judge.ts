@@ -35,7 +35,7 @@ import { PNG } from "pngjs";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
-import { readEnv } from "@mizchi/vlmkit-core/legacy-names.ts";
+import { readEnv } from "@mizchi/vlmkit-core/project-config.ts";
 
 export interface JudgeRegion {
   left: number;
@@ -296,7 +296,7 @@ Options:
   --target <png>      Target screenshot (defines the viewport for HTML sources)
   --region <spec>     Region "x,y,WxH" (repeatable; kickback "(x,y) WxH" also accepted)
   --out <dir>         Pair-image output dir (default: .vlmkit-region-judge next to the source)
-  --vlm [model]       Judge with a VLM (default model: VRT_VLM_MODEL); requires API key
+  --vlm [model]       Judge with a VLM (default model: VLMKIT_VLM_MODEL); requires API key
   --json              Print JSON report`);
   process.exit(exitCode);
 }
@@ -349,7 +349,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   }
 }
 
-const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "region-judge" ||
+const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "region-judge" ||
   (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch(handleCliError);

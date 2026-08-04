@@ -21,7 +21,7 @@
 import { watch as fsWatch } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve, relative} from "node:path";
-import { STATE_DIR, resolveStatePath } from "@mizchi/vlmkit-core/legacy-names.ts";
+import { STATE_DIR, resolveStatePath } from "@mizchi/vlmkit-core/project-config.ts";
 import { runMigrationCompare, parseMigrationCompareArgs, type MigrationCompareReport } from "./experiments/migration/migration-compare.ts";
 import {
   BOLD,
@@ -35,8 +35,6 @@ import {
 import type { WireframeFixSuggestion } from "./experiments/migration/wireframe-fix-candidates.ts";
 
 const DEBOUNCE_MS = 150;
-// See legacy-names: an existing `.vrt/runs` keeps being used so a watch loop
-// mid-session does not start a second run history beside the first.
 const watchOutputDirDefault = (): string =>
   relative(process.cwd(), resolveStatePath(process.cwd(), "runs")) || `${STATE_DIR}/runs`;
 
@@ -354,7 +352,7 @@ function stripAnsi(s: string): string {
   return s.replace(/\x1b\[[0-9;]*m/g, "");
 }
 
-const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "watch" || (process.argv[1]
+const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "watch" || (process.argv[1]
   && new URL(import.meta.url).pathname === process.argv[1]);
 if (isCliEntry) {
   runWatch(process.argv.slice(2)).catch((err) => {

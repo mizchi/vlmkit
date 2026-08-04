@@ -12,7 +12,7 @@
  *
  *   - `vlmkit workflow` is vlmkit's own e2e dogfood harness. Uses a
  *     Playwright spec (`e2e/vlmkit-capture.spec.ts`) + bulk approval.
- *     Baselines live at `<VRT_ROOT>/baselines/*.png`.
+ *     Baselines live under `.vlmkit/baselines/*.png`.
  *
  * `vlmkit baseline` is the canonical name for the diff-pr flow —
  * the one external projects should pick first. The legacy
@@ -21,11 +21,11 @@
  * mnemonic alias.
  *
  * Subcommands:
- *   vlmkit baseline pin [route...] [--config vrt.config.json]
+ *   vlmkit baseline pin [route...] [--config vlmkit.config.json]
  *     Capture / refresh baseline PNGs for declared routes. Equivalent
  *     to `vlmkit diff-pr pin`.
  *
- *   vlmkit baseline verify [--config vrt.config.json] [--output <dir>]
+ *   vlmkit baseline verify [--config vlmkit.config.json] [--output <dir>]
  *                       [--against-previous <dir>]
  *     Diff current rendering against pinned baselines + a11y +
  *     media-variants gates. Equivalent to `vlmkit diff-pr`.
@@ -34,11 +34,11 @@
  *     Post a previously-generated summary.md as a PR comment.
  *     Equivalent to `vlmkit diff-pr post`.
  *
- *   vlmkit baseline list [--config vrt.config.json]
+ *   vlmkit baseline list [--config vlmkit.config.json]
  *     Show all pinned baselines, last-modified timestamp, and which
  *     route they correspond to.
  *
- *   vlmkit baseline rm <route> [--config vrt.config.json]
+ *   vlmkit baseline rm <route> [--config vlmkit.config.json]
  *     Remove a single route's baselines.
  *
  * Internal-dogfood note: `vlmkit workflow` (legacy) still works and is
@@ -79,7 +79,7 @@ async function cmdList(args: string[]): Promise<number> {
   const cwd = process.cwd();
   const configPath = findConfigPath(cwd, getArg(args, "config"));
   if (!configPath) {
-    console.error(`${RED}error:${RESET} no vrt.config.json found (and --config not given)`);
+    console.error(`${RED}error:${RESET} no vlmkit.config.json found (and --config not given)`);
     return 1;
   }
   const config = loadDiffPrConfig(configPath);
@@ -115,7 +115,7 @@ async function cmdRm(args: string[]): Promise<number> {
   const cwd = process.cwd();
   const configPath = findConfigPath(cwd, getArg(args, "config"));
   if (!configPath) {
-    console.error(`${RED}error:${RESET} no vrt.config.json found (and --config not given)`);
+    console.error(`${RED}error:${RESET} no vlmkit.config.json found (and --config not given)`);
     return 1;
   }
   const config = loadDiffPrConfig(configPath);
@@ -184,7 +184,7 @@ async function cmdUpdate(args: string[]): Promise<number> {
   const cwd = process.cwd();
   const configPath = findConfigPath(cwd, getArg(args, "config"));
   if (!configPath) {
-    console.error(`${RED}error:${RESET} no vrt.config.json found (and --config not given)`);
+    console.error(`${RED}error:${RESET} no vlmkit.config.json found (and --config not given)`);
     return 1;
   }
   const config = loadDiffPrConfig(configPath);
@@ -325,18 +325,18 @@ function formatUsage(): string {
   return `vlmkit baseline <command>
 
 Subcommands:
-  pin     [route...] [--config vrt.config.json]
+  pin     [route...] [--config vlmkit.config.json]
                               Capture / refresh baseline PNGs for
                               declared routes. Alias for \`vlmkit diff-pr pin\`.
-  verify  [--config vrt.config.json] [--output <dir>]
+  verify  [--config vlmkit.config.json] [--output <dir>]
                               Diff current rendering against pinned
                               baselines. Alias for \`vlmkit diff-pr\`.
   post    --pr <ref>          Post the most recent summary.md to a PR.
                               Alias for \`vlmkit diff-pr post\`.
-  update  [route...] [--config vrt.config.json]
+  update  [route...] [--config vlmkit.config.json]
                               Archive current baselines to _history/<ts>/
                               and re-pin (reversible golden refresh).
-  list    [--config vrt.config.json]
+  list    [--config vlmkit.config.json]
                               Show all pinned baselines.
   rm      <route...>          Remove one or more routes' baselines.
   approve (--selector <css> | --region "x=,y=,w=,h=[,viewport=]")
@@ -393,7 +393,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   }
 }
 
-const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "baseline-cli" || (process.argv[1]
+const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "baseline-cli" || (process.argv[1]
   && new URL(import.meta.url).pathname === process.argv[1]);
 if (isCliEntry) {
   main().catch((err) => {

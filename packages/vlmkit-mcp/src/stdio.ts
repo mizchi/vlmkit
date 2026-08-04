@@ -13,7 +13,7 @@ export async function runStdioServer(): Promise<void> {
   await server.connect(transport);
 }
 
-const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "mcp-stdio" ||
+const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "mcp-stdio" ||
   (process.argv[1] ? process.argv[1].endsWith("stdio.ts") || process.argv[1].endsWith("stdio.js") : false);
 if (isCliEntry) {
   runStdioServer().catch((err) => {

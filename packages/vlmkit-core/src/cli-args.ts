@@ -68,9 +68,3 @@ export function getPositionalArgs(valueFlags: readonly string[] = []): string[] 
 export function getRawArgs(): string[] {
   return argv();
 }
-
-/**
- * @deprecated Captured at import time, so it is empty or stale in a leaf loaded
- * through the dispatcher. Use `getRawArgs()`.
- */
-export const args = argv();

@@ -227,13 +227,13 @@ interface MigrationReport {
 }
 
 async function cmdAddFromRun(args: string[], runDir: string, manifestPath: string): Promise<void> {
-  // Locate the migration-report.json — accept either the file or
+  // Locate the diff-report.json — accept either the file or
   // the dir that contains it.
   const reportPath = runDir.endsWith(".json")
     ? resolve(runDir)
-    : resolve(runDir, "migration-report.json");
+    : resolve(runDir, "diff-report.json");
   if (!existsSync(reportPath)) {
-    console.error(`${RED}error:${RESET} no migration-report.json at ${reportPath}`);
+    console.error(`${RED}error:${RESET} no diff-report.json at ${reportPath}`);
     process.exit(1);
   }
   const report = JSON.parse(await readFile(reportPath, "utf-8")) as MigrationReport;
@@ -469,7 +469,7 @@ async function main(argv = process.argv.slice(2)) {
   }
 }
 
-const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "manifest-cli" || (process.argv[1]
+const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "manifest-cli" || (process.argv[1]
   && new URL(import.meta.url).pathname === process.argv[1]);
 if (isCliEntry) {
   main().catch((err) => {

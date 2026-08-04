@@ -349,6 +349,6 @@ async function main() {
   console.log();
 }
 
-if (process.env.__VRT_DISPATCHER_LEAF__ === "element-compare" || process.argv[1]?.endsWith("element-compare.ts")) {
+if (process.env.__VLMKIT_DISPATCHER_LEAF__ === "element-compare" || process.argv[1]?.endsWith("element-compare.ts")) {
   main().catch((e) => { console.error(e); process.exit(1); });
 }

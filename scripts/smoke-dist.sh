@@ -6,7 +6,7 @@
 # `import.meta.resolve(<source-path-string>)`, so leaves couldn't
 # resolve from the bundled artifact. That has been fixed — the
 # dispatcher now uses `() => import("literal-path")` factory functions
-# and a `__VRT_DISPATCHER__` env sentinel, both bundler-friendly. This
+# and a `__VLMKIT_DISPATCHER__` env sentinel, both bundler-friendly. This
 # script now runs strict by default and any FAIL is a real regression.
 #
 # Pass `--lenient` to exit 0 even on failure (useful for local

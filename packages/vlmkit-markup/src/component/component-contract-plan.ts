@@ -51,9 +51,6 @@ export function deriveComponentContractPlan(contract: UiContract): ComponentCont
   return deriveComponentPlanFromScreen(screen);
 }
 
-/** @deprecated Use deriveComponentContractPlan. */
-export const deriveComponentContractRuntime = deriveComponentContractPlan;
-
 export async function loadComponentContractPlan(path: string | undefined): Promise<ComponentContractPlan> {
   if (!path) return emptyComponentContractPlan();
   const contractPath = resolve(path);

@@ -40,7 +40,7 @@ Name: `spec-to-playwright` (describes the workflow; VRT is one part, so no
 ├── README.md                         # overview, matching the existing skills' style
 └── assets/
     ├── _helpers.ts                   # gotoApp() determinism layer
-    ├── seed.spec.ts                  # environment bootstrap seed template
+    ├── seed.spec.template.ts         # environment bootstrap seed template
     ├── _generation-rules.md          # generator's mandatory rules
     ├── playwright.config.preset.ts   # deterministic config (fixed viewport/locale/tz, build→preview)
     ├── baseline-linux.sh             # linux baseline via the official Playwright container
@@ -63,7 +63,7 @@ tests to reproduce in CI.
    for one-off test tweaks.
 2. **Setup (once)**
    - `npx playwright init-agents --loop=codex` (planner/generator/healer + MCP config; use the matching loop for other runtimes)
-   - copy assets: `_helpers.ts` / `seed.spec.ts` / `_generation-rules.md` →
+   - copy assets: `_helpers.ts` / `seed.spec.template.ts` / `_generation-rules.md` →
      `tests/`+`specs/`; merge the deterministic `playwright.config` settings;
      wire `baseline-linux.sh` as an npm script; drop in `ci.yml`
    - `pnpm add -D @mizchi/vlmkit-heal`

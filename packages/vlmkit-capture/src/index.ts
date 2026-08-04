@@ -6,7 +6,7 @@
  * intentionally NOT in the barrel — deep-import when you need it.
  */
 
-// ---- Capture config (vrt.config.json + route resolution) ----
+// ---- Capture config (vlmkit.config.json + route resolution) ----
 export {
   parseCaptureConfig,
   resolveCaptureRoutes,

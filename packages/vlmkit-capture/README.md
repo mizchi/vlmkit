@@ -3,7 +3,7 @@
 Playwright / Crater capture infrastructure for VRT — viewport discovery,
 multi-route capture, prescanner integration.
 
-Part of the [`vlmkit`](https://github.com/mizchi/vrt) monorepo.
+Part of the [`vlmkit`](https://github.com/mizchi/vlmkit) monorepo.
 
 ## Install
 
@@ -24,7 +24,7 @@ const { viewports, breakpoints } = discoverViewports(html, {
 
 const routeSet = resolveCaptureRoutes({
   cwd: process.cwd(),
-  configPath: "vrt.config.json",
+  configPath: "vlmkit.config.json",
 });
 ```
 
@@ -39,7 +39,7 @@ import { capturePage } from "@mizchi/vlmkit-capture/capturer.ts";
 
 | Module | Purpose |
 |---|---|
-| `capture-config` | `vrt.config.json` resolution + route schema. |
+| `capture-config` | `vlmkit.config.json` resolution + route schema. |
 | `viewport-discovery` | Parse CSS media queries to suggest test viewports. |
 | `crater-client` | Bidi-protocol client for the Crater browser engine. |
 | `playwright-analyzer` | Auto-detect Playwright config from project. |

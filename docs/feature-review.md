@@ -61,7 +61,7 @@ experimental のラベルを付けると導入判断が速くなる。
 
 ### 3. AI provider の説明が「VLM-driven」に対して曖昧
 
-現状の環境変数は `VRT_VLM_MODEL` が OpenRouter、`VRT_LLM_PROVIDER` が
+現状の環境変数は `VLMKIT_VLM_MODEL` が OpenRouter、`VLMKIT_LLM_PROVIDER` が
 Gemini/Anthropic 中心。OpenAI の GPT Image 2 や GPT-5.5 の image
 generation tool は vlmkit にはまだ直接つながっていない。OpenAI を使うなら
 次のどちらかを明示的に設計する必要がある。

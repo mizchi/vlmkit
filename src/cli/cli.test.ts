@@ -18,7 +18,7 @@ function runVrt(args: string[]): { stdout: string; stderr: string; status: numbe
   const r = spawnSync(
     process.execPath,
     ["--experimental-strip-types", VLMKIT_TS, ...args],
-    { encoding: "utf-8", env: { ...process.env, NO_COLOR: "1" } },
+    { encoding: "utf-8", env: { ...process.env, NO_COLOR: "1" }, timeout: 5_000 },
   );
   return {
     stdout: r.stdout ?? "",
@@ -34,24 +34,14 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.match(r.stdout, new RegExp(`vlmkit/${PACKAGE_VERSION.replaceAll(".", "\\.")}`));
   });
 
-  it("`vrt --help` prints the use-case map", () => {
+  it("`vlmkit --help` stays a compact command index", () => {
     const r = runVrt(["--help"]);
     assert.equal(r.status, 0);
-    // Use-case-first organization: every section header present.
-    assert.match(r.stdout, /CHECK THE PAGE YOU JUST WROTE OR EDITED/);
-    assert.match(r.stdout, /VERIFY BEHAVIOR, NOT PIXELS/);
-    assert.match(r.stdout, /MATCH A TARGET DESIGN/);
-    assert.match(r.stdout, /TRACK CHANGES OVER TIME/);
-    assert.match(r.stdout, /COMPARE TWO VERSIONS/);
-    assert.match(r.stdout, /AUDIT DESIGN QUALITY/);
-    assert.match(r.stdout, /IMAGE ASSETS/);
-    assert.match(r.stdout, /REPAIR/);
-    assert.match(r.stdout, /FOR CODING AGENTS AND PIPELINES/);
-    // A few load-bearing commands with their when-to-use context.
-    assert.match(r.stdout, /check integrity <page>/);
-    assert.match(r.stdout, /verify markup <page> --target <png>/);
-    assert.match(r.stdout, /markup-loop/);
-    assert.match(r.stdout, /docs\/markup-assist\.md/);
+    assert.ok(r.stdout.split("\n").length <= 60, "root help should fit in one terminal screen");
+    assert.doesNotMatch(r.stdout, /CHECK THE PAGE YOU JUST WROTE OR EDITED/);
+    assert.match(r.stdout, /Run `vlmkit <command> --help`/);
+    assert.match(r.stdout, /check/);
+    assert.match(r.stdout, /snapshot/);
   });
 
   it("`vrt diff` (group, no leaf) prints group usage", () => {
@@ -60,7 +50,7 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.match(r.stdout, /vlmkit diff <subcommand>/);
     assert.match(r.stdout, /html.*Compare two HTML/);
     assert.match(r.stdout, /png.*Compare existing PNG/);
-    assert.match(r.stdout, /region.*VLM region diff/);
+    assert.doesNotMatch(r.stdout, /region.*VLM region diff/);
     assert.match(r.stdout, /matrix.*presence matrix/);
     assert.match(r.stdout, /component.*selector comparison/);
   });
@@ -85,21 +75,36 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.match(r.stdout, /crater/);
   });
 
+  it("single-token command help lists its own subcommands", () => {
+    const api = runVrt(["api", "--help"]);
+    assert.equal(api.status, 0);
+    assert.match(api.stdout, /serve/);
+    assert.match(api.stdout, /status/);
+
+    const migration = runVrt(["migration", "--help"]);
+    assert.equal(migration.status, 0);
+    assert.match(migration.stdout, /compare/);
+    assert.match(migration.stdout, /blind/);
+    assert.match(migration.stdout, /subagent/);
+  });
+
+  it("standalone command help exits before doing command work", () => {
+    const bench = runVrt(["bench", "--help"]);
+    assert.equal(bench.status, 0);
+    assert.match(bench.stdout, /vlmkit bench/);
+    assert.match(bench.stdout, /--trials/);
+  });
+
   it("`vrt diff png --help` delegates to the png-diff module's help", () => {
     const r = runVrt(["diff", "png", "--help"]);
     // png-diff exits 0 after printing help
     assert.match(r.stdout, /vlmkit diff png <baseline\.png> <current\.png>/);
   });
 
-  it("`vrt diff region --help` delegates to the VLM region-diff helper", () => {
+  it("removed `diff region` is rejected", () => {
     const r = runVrt(["diff", "region", "--help"]);
-    assert.equal(r.status, 0);
-    assert.match(r.stdout, /vlmkit diff region --baseline <png> --variant <png>/);
-    assert.match(r.stdout, /--triptych <path>/);
-    assert.match(r.stdout, /--elements-json <path>/);
-    assert.match(r.stdout, /--elements-html <path-or-url>/);
-    assert.match(r.stdout, /--elements-viewport <size>/);
-    assert.match(r.stdout, /--format <kind>/);
+    assert.equal(r.status, 1);
+    assert.match(r.stderr, /Unknown diff subcommand: region/);
   });
 
   it("`vrt diff component --help` delegates to element-level comparison help", () => {
@@ -109,20 +114,13 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.match(r.stdout, /--selectors/);
   });
 
-  it("deprecated `vrt png-diff` warns and delegates", () => {
-    const r = runVrt(["png-diff", "--help"]);
-    assert.match(r.stderr, /\[vlmkit deprecated\] 'png-diff' → 'vlmkit diff png'/);
-    // The alias still routes, and the help it lands on names the CURRENT
-    // command — the old usage line was the thing being fixed.
-    assert.match(r.stdout, /vlmkit diff png <baseline\.png>/);
-  });
-
-  it("deprecated workflow alias `vrt init` warns (without actually running init)", () => {
-    // We can only check that the deprecation warning is printed — running
-    // `init` itself would try to launch Playwright. Use `vrt help` which
-    // exits cleanly inside the workflow runner.
-    const r = runVrt(["graph", "--help"]);
-    assert.match(r.stderr, /\[vlmkit deprecated\] 'graph' → 'vlmkit workflow graph'/);
+  it("removed top-level aliases are rejected", () => {
+    for (const alias of ["png-diff", "graph", "flipbook", "serve", "status", "discover"]) {
+      const r = runVrt([alias, "--help"]);
+      assert.equal(r.status, 1, alias);
+      assert.match(r.stderr, /Unknown command/, alias);
+      assert.doesNotMatch(r.stderr, /deprecated/, alias);
+    }
   });
 
   it("unknown command exits 1", () => {
@@ -161,16 +159,8 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.match(r.stdout, /a11y contrast/);
   });
 
-  it("`vrt flipbook` deprecation shim wires to flipbook-cli (regression: SPECS.flipbook unregistered)", () => {
-    const r = runVrt(["flipbook", "--help"]);
-    assert.match(r.stderr, /\[vlmkit deprecated\] 'flipbook' → 'vlmkit snapshot flipbook'/);
-    // flipbook-cli prints its own usage on --help
-    assert.notEqual(r.status, undefined);
-  });
-
   it("`vrt snapshot flipbook` routes to flipbook-cli (not snapshot.ts)", () => {
     const r = runVrt(["snapshot", "flipbook", "--help"]);
-    // No deprecation warning here — this is the new canonical path
     assert.doesNotMatch(r.stderr, /\[vlmkit deprecated\]/);
   });
 

@@ -9,9 +9,9 @@ const ENV_KEYS = [
   "GOOGLE_AI_API_KEY",
   "ANTHROPIC_API_KEY",
   "OPENROUTER_API_KEY",
-  "VRT_LLM_PROVIDER",
-  "VRT_LLM_MODEL",
-  "VRT_VLM_MODEL",
+  "VLMKIT_LLM_PROVIDER",
+  "VLMKIT_LLM_MODEL",
+  "VLMKIT_VLM_MODEL",
 ] as const;
 
 function withCleanEnv(
@@ -57,8 +57,8 @@ describe("createUnifiedLLMClient", () => {
     });
   });
 
-  it("throws INVALID_PROVIDER for unknown VRT_LLM_PROVIDER", () => {
-    withCleanEnv({ VRT_LLM_PROVIDER: "gpt5" }, () => {
+  it("throws INVALID_PROVIDER for unknown VLMKIT_LLM_PROVIDER", () => {
+    withCleanEnv({ VLMKIT_LLM_PROVIDER: "gpt5" }, () => {
       assert.throws(
         () => createUnifiedLLMClient(),
         (err: Error) => err instanceof VrtConfigError && err.code === "INVALID_PROVIDER",
@@ -108,7 +108,7 @@ describe("createLLMProvider", () => {
 
   it("falls back across providers", () => {
     // anthropic key set; default provider is gemini → falls back
-    withCleanEnv({ ANTHROPIC_API_KEY: "test", VRT_LLM_PROVIDER: "gemini" }, () => {
+    withCleanEnv({ ANTHROPIC_API_KEY: "test", VLMKIT_LLM_PROVIDER: "gemini" }, () => {
       const provider = createLLMProvider();
       assert.notEqual(provider, null);
     });

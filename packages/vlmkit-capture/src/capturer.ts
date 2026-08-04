@@ -90,7 +90,7 @@ export interface ResolvedCaptureBackend {
 /**
  * Resolution order:
  *   1. Explicit `--backend` flag
- *   2. `VRT_CAPTURE_BACKEND` env var
+ *   2. `VLMKIT_CAPTURE_BACKEND` env var
  *   3. Default local
  *
  * For the Cloudflare backend, credentials come from env (`CLOUDFLARE_ACCOUNT_ID`
@@ -102,7 +102,7 @@ export function resolveCaptureBackend(
 ): ResolvedCaptureBackend {
   const env = options.env ?? process.env;
   const explicit = options.backendFlag?.trim().toLowerCase();
-  const envChoice = env.VRT_CAPTURE_BACKEND?.trim().toLowerCase();
+  const envChoice = env.VLMKIT_CAPTURE_BACKEND?.trim().toLowerCase();
 
   const choice = explicit || envChoice || "local";
   const source: ResolvedCaptureBackend["source"] = explicit

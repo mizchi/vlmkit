@@ -222,15 +222,6 @@ directly off the B3 report:
    which is why authoring motion *after* static convergence is the
    default order.
 
-## Optional VLM assist
-
-Your own vision suffices (Haiku-grade included — see the S1–S5 proofs
-in docs/reports/). `vlmkit diff region` is **deprecated** (net-negative
-for agent repair in every controlled A/B; wrong attribution, fabricated
-deltas) — do not reach for it. For residual color/region questions use
-`check equivalence` (measured deltas + pair sheets for a second reader);
-structure and shift always come from the deterministic reports.
-
 ## KPIs — rounds and tokens
 
 Every run is scored on two KPIs (ledger: `docs/knowledge.md`

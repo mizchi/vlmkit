@@ -32,7 +32,7 @@ const config = parseDiffPrConfig(JSON.stringify({
     "/",
     { name: "admin", path: "/admin", thresholds: { mobile: 0.03, desktop: 0.02, wide: 0.02 } },
   ],
-}), "/example/vrt.config.json");
+}), "/example/vlmkit.config.json");
 
 describe("buildMarkdownSummary", () => {
   it("declares PASS when every route is within threshold", () => {
@@ -80,7 +80,7 @@ describe("buildMarkdownSummary", () => {
         route: config.routes[0],
         viewports: [],
         failed: true,
-        error: "no baseline at /tmp/.vrt/baselines/home",
+        error: "no baseline at /tmp/.vlmkit/baselines/home",
       },
     ]);
     assert.match(md, /no baseline at/);
@@ -129,13 +129,13 @@ describe("vlmkit diff-pr pin <route>...", () => {
     );
     const cfg = {
       thresholds: { mobile: 0.005, desktop: 0.002, wide: 0.002 },
-      baselineDir: ".vrt/baselines",
+      baselineDir: ".vlmkit/baselines",
       routes: [
         { name: "home", url: `file://${join(cwd, "pages", "home.html")}` },
         { name: "about", url: `file://${join(cwd, "pages", "about.html")}` },
       ],
     };
-    await writeFile(join(cwd, "vrt.config.json"), JSON.stringify(cfg, null, 2));
+    await writeFile(join(cwd, "vlmkit.config.json"), JSON.stringify(cfg, null, 2));
     // Seed both baselines.
     const r = cli(cwd, "pin");
     assert.equal(r.status, 0, `seed pin failed: ${r.stderr}`);
@@ -146,37 +146,37 @@ describe("vlmkit diff-pr pin <route>...", () => {
   });
 
   it("with no positional args refreshes every route (sanity baseline)", async () => {
-    const before = await readFile(join(cwd, ".vrt/baselines/about/mobile.png"));
+    const before = await readFile(join(cwd, ".vlmkit/baselines/about/mobile.png"));
     const r = cli(cwd, "pin");
     assert.equal(r.status, 0);
-    const after = await readFile(join(cwd, ".vrt/baselines/about/mobile.png"));
+    const after = await readFile(join(cwd, ".vlmkit/baselines/about/mobile.png"));
     assert.equal(after.length, before.length); // same content → identical PNG bytes
   });
 
   it("with a positional route refreshes only that route", async () => {
-    const aboutBefore = await readFile(join(cwd, ".vrt/baselines/about/mobile.png"));
+    const aboutBefore = await readFile(join(cwd, ".vlmkit/baselines/about/mobile.png"));
     // Modify home.html so the new pin produces different bytes.
     await writeFile(
       join(cwd, "pages", "home.html"),
       "<!doctype html><html><body style='margin:0;padding:48px;background:#f9f9ff;font:18px sans-serif'><h1>Home modified</h1></body></html>",
     );
-    const homeBeforePin = await readFile(join(cwd, ".vrt/baselines/home/mobile.png"));
+    const homeBeforePin = await readFile(join(cwd, ".vlmkit/baselines/home/mobile.png"));
     const r = cli(cwd, "pin", "home");
     assert.equal(r.status, 0);
     assert.match(r.stdout, /pinning 1 of 2 route\(s\) \(home\)/);
-    const homeAfter = await readFile(join(cwd, ".vrt/baselines/home/mobile.png"));
-    const aboutAfter = await readFile(join(cwd, ".vrt/baselines/about/mobile.png"));
+    const homeAfter = await readFile(join(cwd, ".vlmkit/baselines/home/mobile.png"));
+    const aboutAfter = await readFile(join(cwd, ".vlmkit/baselines/about/mobile.png"));
     assert.ok(!homeBeforePin.equals(homeAfter), "home baseline should have changed");
     assert.ok(aboutBefore.equals(aboutAfter), "about baseline should be untouched");
   });
 
   it("errors on unknown route name without touching any baseline", async () => {
-    const aboutBefore = await readFile(join(cwd, ".vrt/baselines/about/mobile.png"));
+    const aboutBefore = await readFile(join(cwd, ".vlmkit/baselines/about/mobile.png"));
     const r = cli(cwd, "pin", "frobnicate");
     assert.equal(r.status, 1);
     assert.match(r.stderr, /unknown route\(s\): frobnicate/);
     assert.match(r.stderr, /Known routes: home, about/);
-    const aboutAfter = await readFile(join(cwd, ".vrt/baselines/about/mobile.png"));
+    const aboutAfter = await readFile(join(cwd, ".vlmkit/baselines/about/mobile.png"));
     assert.ok(aboutBefore.equals(aboutAfter));
   });
 });
@@ -211,7 +211,7 @@ describe("vlmkit diff-pr a11y gate", () => {
       </body></html>`);
     const cfg = {
       thresholds: { mobile: 0.5, desktop: 0.5, wide: 0.5 },
-      baselineDir: ".vrt/baselines",
+      baselineDir: ".vlmkit/baselines",
       approvalPath: "./approval.json",
       a11y: {
         level: "AA",
@@ -224,7 +224,7 @@ describe("vlmkit diff-pr a11y gate", () => {
         { name: "bad", url: `file://${join(cwd, "pages", "bad.html")}` },
       ],
     };
-    await writeFile(join(cwd, "vrt.config.json"), JSON.stringify(cfg, null, 2));
+    await writeFile(join(cwd, "vlmkit.config.json"), JSON.stringify(cfg, null, 2));
     const r = cli(cwd, "pin");
     assert.equal(r.status, 0, `pin failed: ${r.stderr}`);
   });
@@ -283,8 +283,8 @@ describe("vlmkit diff-pr post", () => {
 
   before(async () => {
     cwd = await mkdtemp(join(tmpdir(), "vrt-diff-pr-post-"));
-    summaryPath = join(cwd, ".vrt/runs/diff-pr/summary.md");
-    await mkdir(join(cwd, ".vrt/runs/diff-pr"), { recursive: true });
+    summaryPath = join(cwd, ".vlmkit/runs/diff-pr/summary.md");
+    await mkdir(join(cwd, ".vlmkit/runs/diff-pr"), { recursive: true });
     await writeFile(summaryPath, "# vlmkit diff-pr summary\n\nStatus: **PASS**\n");
   });
 

@@ -319,6 +319,6 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   if ((summary.failed > 0 || stale > 0) && !hasFlag(args, "advisory")) process.exitCode = 1;
 }
 
-const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "gates" ||
+const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "gates" ||
   (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) main().catch(handleCliError);

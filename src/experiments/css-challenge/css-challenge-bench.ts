@@ -122,6 +122,26 @@ export function parseCssChallengeBenchArgs(cliArgs: string[]): CssChallengeBench
   };
 }
 
+function printCssChallengeBenchHelp(): void {
+  console.log(`vlmkit bench [options]
+
+Run the CSS recovery benchmark across deterministic mutation seeds.
+
+Options:
+  --fixture <name>       Fixture to benchmark; repeatable, or use "all"
+  --trials <n>           Number of trials per fixture (default: 20)
+  --start-seed <n>       First deterministic mutation seed (default: 1)
+  --mode <kind>          Mutation mode: property|selector (default: property)
+  --backend <name>       chromium|crater|prescanner (default: chromium)
+  --approval <path>      Approval manifest for intentional differences
+  --suggest-approval     Write suggested approval rules
+  --output-root <path>   Benchmark artifact directory
+  --strict               Fail on approval warnings
+  --no-llm               Skip LLM recovery attempts
+  --no-db                Do not append benchmark history
+  -h, --help             Show this help`);
+}
+
 const CLI_OPTIONS = parseCssChallengeBenchArgs(getRawArgs());
 const TRIALS = CLI_OPTIONS.trials;
 const START_SEED = CLI_OPTIONS.startSeed;
@@ -1043,6 +1063,11 @@ async function runFixtureBenchmark(fixture: string) {
 }
 
 async function main() {
+  const cliArgs = getRawArgs();
+  if (hasFlag(cliArgs, "help") || hasFlag(cliArgs, "-h")) {
+    printCssChallengeBenchHelp();
+    return;
+  }
   const availableFixtures = await listCssChallengeFixtureNames();
   const fixtures = normalizeCssChallengeFixtureSelection(FIXTURE_ARGS, availableFixtures);
 
@@ -1077,7 +1102,7 @@ function fmtRateCompact(count: number, total: number, inverse = false): string {
   return `${color}${pct}%${RESET}`;
 }
 
-const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "css-challenge-bench" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
+const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "css-challenge-bench" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch((error) => {
     if (isPlaywrightSandboxRestrictionError(error)) {

@@ -6,7 +6,7 @@ describe("parseFlakerVrtReportAdapterArgs", () => {
   it("parses file path and overrides", () => {
     const args = parseFlakerVrtReportAdapterArgs([
       "--file",
-      "test-results/migration/migration-report.json",
+      "test-results/migration/diff-report.json",
       "--scenario-id",
       "migration/reset-css",
       "--backend",
@@ -15,7 +15,7 @@ describe("parseFlakerVrtReportAdapterArgs", () => {
       "/repo",
     ]);
 
-    assert.equal(args.filePath, "test-results/migration/migration-report.json");
+    assert.equal(args.filePath, "test-results/migration/diff-report.json");
     assert.equal(args.scenarioId, "migration/reset-css");
     assert.equal(args.backend, "prescanner");
     assert.equal(args.cwd, "/repo");

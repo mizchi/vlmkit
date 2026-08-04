@@ -4,13 +4,13 @@ import { fileURLToPath } from "node:url";
 
 const exampleDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(exampleDir, "../..");
-const outRoot = resolve(repoRoot, ".vrt/markup-vrt-eval");
+const outRoot = resolve(repoRoot, ".vlmkit/markup-vrt-eval");
 
 export default defineConfig({
   testDir: repoRoot,
   testMatch: [
     "examples/markup-vrt-eval/tests/**/*.spec.ts",
-    ".vrt/markup-vrt-eval/generated/**/*.spec.ts",
+    ".vlmkit/markup-vrt-eval/generated/**/*.spec.ts",
   ],
   timeout: 45_000,
   fullyParallel: false,

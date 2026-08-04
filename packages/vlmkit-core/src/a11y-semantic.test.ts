@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { diffA11yTrees, verifyA11yTree, checkA11yTree } from "./a11y-semantic.ts";
+import { diffA11yTrees, verifyA11yTree } from "./a11y-semantic.ts";
 import type { A11ySnapshot, A11yNode } from "./types.ts";
 
 function snap(tree: A11yNode): A11ySnapshot {
@@ -157,14 +157,4 @@ describe("verifyA11yTree", () => {
     assert.equal(issues.length, 0);
   });
 
-  it("`checkA11yTree` deprecation alias delegates to verifyA11yTree", () => {
-    const tree: A11yNode = {
-      role: "main",
-      name: "",
-      children: [{ role: "button", name: "" }],
-    };
-    const viaAlias = checkA11yTree(tree);
-    const direct = verifyA11yTree(tree);
-    assert.deepEqual(viaAlias, direct);
-  });
 });

@@ -13,7 +13,7 @@
  *
  * Both pure helpers (sequence diff) and a browser-side capture script live
  * here; migration-compare evaluates the script with `page.evaluate()`
- * and feeds the results into `evaluateDomEquivalence`.
+ * and feeds the results into `verifyDomEquivalence`.
  */
 
 export interface DomFingerprint {
@@ -82,7 +82,6 @@ const ELEMENT_COUNT_DRIFT_THRESHOLD = 0.05;
 /**
  * Verify structural DOM equivalence between two captured fingerprints.
  *
- * @since 0.5.0 — replaces `evaluateDomEquivalence`.
  */
 export function verifyDomEquivalence(
   baseline: DomFingerprint,
@@ -151,8 +150,3 @@ export const DOM_FINGERPRINT_BROWSER_SCRIPT = `(() => {
   const elementCount = document.querySelectorAll("*").length;
   return { headingTexts, buttonTexts, inputValues, elementCount };
 })()`;
-
-/**
- * @deprecated since 0.5.0 — use `verifyDomEquivalence` instead. Removed in 1.0.0.
- */
-export const evaluateDomEquivalence = verifyDomEquivalence;

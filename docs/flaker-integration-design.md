@@ -10,7 +10,7 @@ Combining these two allows VRT to operate not as a one-off comparison tool but a
 Target repositories:
 
 - `flaker`: [/Users/mz/ghq/github.com/mizchi/metric-ci](/Users/mz/ghq/github.com/mizchi/metric-ci)
-- `vlmkit`: [/Users/mz/ghq/github.com/mizchi/vrt](/Users/mz/ghq/github.com/mizchi/vrt)
+- `vlmkit`: [/Users/mz/ghq/github.com/mizchi/vlmkit](/Users/mz/ghq/github.com/mizchi/vlmkit)
 
 ## Goal
 
@@ -47,7 +47,7 @@ References: [docs/why-flaker.ja.md](/Users/mz/ghq/github.com/mizchi/metric-ci/do
 - Known diff filtering via approval
 - migration compare report and fix loop
 
-References: [migration-compare.ts](/Users/mz/ghq/github.com/mizchi/vrt/src/experiments/migration/migration-compare.ts), [approval.ts](/Users/mz/ghq/github.com/mizchi/vrt/src/vrt/snapshot/approval.ts), [migration-fix-loop-core.ts](/Users/mz/ghq/github.com/mizchi/vrt/src/experiments/migration/migration-fix-loop-core.ts)
+References: [migration-compare.ts](/Users/mz/ghq/github.com/mizchi/vlmkit/src/experiments/migration/migration-compare.ts), [approval.ts](/Users/mz/ghq/github.com/mizchi/vlmkit/src/vrt/snapshot/approval.ts), [migration-fix-loop-core.ts](/Users/mz/ghq/github.com/mizchi/vlmkit/src/experiments/migration/migration-fix-loop-core.ts)
 
 ## Core Policy
 
@@ -75,9 +75,9 @@ Analyze existing `playwright test`-based `vlmkit` via `flaker import --adapter p
 
 ### Phase 3: report import
 
-Add adapters to directly feed `migration-report.json` and `bench-report.json` into `flaker`.
+Add adapters to directly feed `diff-report.json` and `bench-report.json` into `flaker`.
 
-As of 2026-04-02, built-in `vrt-migration` and `vrt-bench` adapters exist on the `metric-ci` side, handling `migration-report.json` and `bench-report.json` directly via `import / collect / report summarize`. The `vlmkit`-side `src/experiments/flaker/flaker-vrt-report-adapter.ts` remains for custom adapter paths and legacy report supplementation.
+As of 2026-04-02, built-in `vrt-migration` and `vrt-bench` adapters exist on the `metric-ci` side, handling `diff-report.json` and `bench-report.json` directly via `import / collect / report summarize`. The `vlmkit`-side `src/experiments/flaker/flaker-vrt-report-adapter.ts` remains for custom adapter paths and legacy report supplementation.
 The `vlmkit` side has `.github/workflows/migration-report.yml`, running 1 scenario via `workflow_dispatch` and producing artifact name `migration-report`. To avoid conflicts with `metric-ci collect` defaults, initial operation fixes 1 run = 1 scenario.
 Similarly, `.github/workflows/bench-report.yml` runs 1 fixture of `css-challenge-bench` with Chromium backend, producing artifact name `bench-report`. Since the `vrt-bench` adapter expects a single `bench-report.json` in the artifact, this also fixes 1 run = 1 fixture.
 
@@ -87,7 +87,7 @@ Similarly, `.github/workflows/bench-report.yml` runs 1 fixture of `css-challenge
 - `fixedViewports` can be passed, making it easy to run only the test subset specified by `flaker`
 - Convergence concepts of `clean / approved / remaining` already exist
 
-References: [migration-compare.ts](/Users/mz/ghq/github.com/mizchi/vrt/src/experiments/migration/migration-compare.ts), [migration-fix-loop-core.ts](/Users/mz/ghq/github.com/mizchi/vrt/src/experiments/migration/migration-fix-loop-core.ts)
+References: [migration-compare.ts](/Users/mz/ghq/github.com/mizchi/vlmkit/src/experiments/migration/migration-compare.ts), [migration-fix-loop-core.ts](/Users/mz/ghq/github.com/mizchi/vlmkit/src/experiments/migration/migration-fix-loop-core.ts)
 
 ## Stable Test Identity
 
@@ -219,7 +219,7 @@ Examples:
 - reset CSS diff
 - tiny spacing drift
 
-Reference: [approval.ts](/Users/mz/ghq/github.com/mizchi/vrt/src/vrt/snapshot/approval.ts)
+Reference: [approval.ts](/Users/mz/ghq/github.com/mizchi/vlmkit/src/vrt/snapshot/approval.ts)
 
 ### quarantine
 
@@ -317,7 +317,7 @@ Completion criteria:
 
 ### Phase 3: Additional integration
 
-- `migration-report.json` import adapter
+- `diff-report.json` import adapter
 - Playwright VRT import README pipeline
 - `css-bench` summary import
 

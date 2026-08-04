@@ -1,6 +1,6 @@
 ---
 name: vrt-regression-watch
-description: Run vlmkit diff in a stateful loop where each run is compared against the previous run's persisted summary, surfacing a `⚠ REGRESSION` banner when the majority of viewports get worse. Designed for periodic CI gates (per-PR or scheduled) where you want "did this change make things worse" as a binary signal, not a one-shot snapshot. Stores summary at `.vrt/last-diff-for-agent.json` by default.
+description: Run vlmkit diff in a stateful loop where each run is compared against the previous run's persisted summary, surfacing a `⚠ REGRESSION` banner when the majority of viewports get worse. Designed for periodic CI gates (per-PR or scheduled) where you want "did this change make things worse" as a binary signal, not a one-shot snapshot. Stores summary at `.vlmkit/last-diff-for-agent.json` by default.
 metadata:
   internal: true
 ---
@@ -48,7 +48,7 @@ these two forms.
 ## How regression is detected
 
 After each `vlmkit diff agent` run, the per-viewport diffRatio is written
-to `.vrt/last-diff-for-agent.json`. On the next run:
+to `.vlmkit/last-diff-for-agent.json`. On the next run:
 
 1. Load that file as the comparison summary.
 2. Compare each viewport's current diffRatio against its prior value.
@@ -64,10 +64,10 @@ from triggering false alarms.
 
 `--output <dir>` is a **directory** path; `vlmkit diff html` writes
 `<dir>/diff-report.json` into it. Pass that JSON file path — not
-the dir — to `vlmkit diff agent`. (`migration-report.json` is also
+the dir — to `vlmkit diff agent`. (`diff-report.json` is also
 written as a legacy alias; both files have identical content.)
 
-The filename is `migration-report.json` even when there's no migration
+The filename is `diff-report.json` even when there's no migration
 involved because the writer is shared with `vlmkit migration compare`.
 Legacy name; tracked for rename in #50. Treat it as "the diff
 report" regardless of how you produced it.
@@ -81,20 +81,20 @@ REPORT=reports/diff-report.json
 
 # First run: establishes baseline. No banner possible (no prior summary).
 vlmkit diff html before.html after.html --output reports/
-vlmkit diff agent "$REPORT" --persist-summary .vrt/baseline.json
+vlmkit diff agent "$REPORT" --persist-summary .vlmkit/baseline.json
 
 # Subsequent runs: same baseline file for read AND write
 # (local-rolling idiom — passing the same path to --previous and
 # --persist-summary means "compare against last run, then overwrite").
 vlmkit diff html before.html after.html --output reports/
 vlmkit diff agent "$REPORT" \
-  --previous .vrt/baseline.json \
-  --persist-summary .vrt/baseline.json \
+  --previous .vlmkit/baseline.json \
+  --persist-summary .vlmkit/baseline.json \
   --fail-on-regression
 ```
 
-The default state path is `.vrt/last-diff-for-agent.json`; the example
-uses an explicit `.vrt/baseline.json` to show how to keep a stable
+The default state path is `.vlmkit/last-diff-for-agent.json`; the example
+uses an explicit `.vlmkit/baseline.json` to show how to keep a stable
 reference (e.g. "diff against main's last good run, not against the
 PR's previous run").
 
@@ -102,12 +102,12 @@ PR's previous run").
 
 | File | Written by | Read by | Lifetime |
 |---|---|---|---|
-| `.vrt/last-diff-for-agent.json` | `vlmkit diff agent` (auto, unless `--no-history`) | next `vlmkit diff agent` run | persists until manually removed |
+| `.vlmkit/last-diff-for-agent.json` | `vlmkit diff agent` (auto, unless `--no-history`) | next `vlmkit diff agent` run | persists until manually removed |
 | `report.json` | `vlmkit diff html` / `vlmkit migration compare` | `vlmkit diff agent` | per-run; can discard after the Markdown is produced |
 
 Two retention strategies:
 
-- **Local-rolling**: let `.vrt/last-diff-for-agent.json` rewrite each
+- **Local-rolling**: let `.vlmkit/last-diff-for-agent.json` rewrite each
   run. Catches per-PR regressions ("did this commit make it worse
   than the previous commit").
 - **Branch-stable**: commit a snapshot of the JSON (or store it in
@@ -122,14 +122,14 @@ Two retention strategies:
 - name: Restore main's baseline
   uses: actions/cache@v4
   with:
-    path: .vrt/baseline.json
+    path: .vlmkit/baseline.json
     key: vrt-baseline-${{ github.base_ref }}
 
 - name: Render current PR + diff
   run: |
     vlmkit diff html main.html pr.html --output reports/
     vlmkit diff agent reports/diff-report.json \
-      --previous .vrt/baseline.json \
+      --previous .vlmkit/baseline.json \
       --persist-summary /tmp/pr-summary.json \
       --fail-on-regression \
       --out reports/diff.md
@@ -156,7 +156,7 @@ be ignored and no regression detection would happen.
 | `--fail-on-regression` | Exit 1 when regression is detected. |
 
 Default behaviour (none of the above): auto-load and auto-persist
-`.vrt/last-diff-for-agent.json` — i.e. local-rolling.
+`.vlmkit/last-diff-for-agent.json` — i.e. local-rolling.
 
 **`--no-history` is the master switch — it skips BOTH load and
 write.** Concretely: when `--no-history` is set, `--previous` and
@@ -209,7 +209,7 @@ disappears, the original signal was noise.
   got worse" → there's a JSON-vs-Markdown drift bug; re-run with
   `DEBUG_VLMKIT=1` and file an issue.
 - Stale summary from months ago → manually remove
-  `.vrt/last-diff-for-agent.json` (or your custom path) and re-run.
+  `.vlmkit/last-diff-for-agent.json` (or your custom path) and re-run.
 
 ## Environment
 

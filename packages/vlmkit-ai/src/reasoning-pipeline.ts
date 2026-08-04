@@ -13,7 +13,7 @@ import { createUnifiedLLMClient } from "./llm-client.ts";
 import { createVlmClient, resolveModel, type VlmClient } from "./vlm-client.ts";
 import { VrtConfigError } from "./errors.ts";
 import { resizeBase64Png, type ResolutionPreset } from "@mizchi/vlmkit-core/image-resize.ts";
-import { readEnv } from "@mizchi/vlmkit-core/legacy-names.ts";
+import { readEnv } from "@mizchi/vlmkit-core/project-config.ts";
 
 // ---- Types ----
 
@@ -55,7 +55,7 @@ export interface FixSuggestion {
 export interface PipelineConfig {
   /** Stage 1: VLM for image analysis (default: qwen3-vl-8b via OpenRouter) */
   vlmModel?: string;
-  /** Stage 2: LLM for code generation (default: from VRT_LLM_PROVIDER) */
+  /** Stage 2: LLM for code generation (default: from VLMKIT_LLM_PROVIDER) */
   llmProvider?: "gemini" | "anthropic" | "openrouter";
   llmModel?: string;
   /** Image resolution (default: medium = 400x300) */

@@ -45,7 +45,7 @@ import {
 } from "@mizchi/vlmkit-core/computed-style-capture.ts";
 import { formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
 import type { A11yNode, VrtSnapshot, VrtDiff, VisualSemanticDiff, A11yDiff } from "@mizchi/vlmkit-core/types.ts";
-import { debugEnabled } from "@mizchi/vlmkit-core/legacy-names.ts";
+import { debugEnabled } from "@mizchi/vlmkit-core/project-config.ts";
 
 // ---- Types ----
 

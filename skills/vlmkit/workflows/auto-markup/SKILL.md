@@ -189,18 +189,6 @@ vlmkit check animation current.html                  # if you authored animation
 look nondeterministic: an `infinite-animation` issue names the selector to
 `--mask` during captures.
 
-### 5. Optional VLM assist — `diff region` is DEPRECATED
-
-`vlmkit diff region` is deprecated (2026-07-30): net-negative for
-agent-driven repair in every controlled A/B run that used it — wrong
-selector attribution, fabricated deltas (docs/reports/
-2026-06-06-ab-external-synthesis.md; triptych fabrication in
-2026-07-27-vlm-haiku-region-diff-agent-harness.md). Do not reach for
-it. For residual color/region questions use `check equivalence`
-(measured per-channel deltas + pair sheets read by someone other than
-the pixel author). Structure and shift always come from `build page` /
-`diff png`.
-
 ## Budget & stopping
 
 - 3-5 rounds of step 2 + step 3 combined is normally enough for a

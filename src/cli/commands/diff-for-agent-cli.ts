@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `vlmkit diff agent <migration-report.json>` — emit a one-context-window
+ * `vlmkit diff agent <diff-report.json>` — emit a one-context-window
  * Markdown summary of an existing migration-compare report.
  *
  * Pairs with the dogfood findings in
@@ -11,7 +11,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve, relative} from "node:path";
-import { STATE_DIR, resolveStatePath } from "@mizchi/vlmkit-core/legacy-names.ts";
+import { STATE_DIR, resolveStatePath } from "@mizchi/vlmkit-core/project-config.ts";
 import {
   buildPreviousRunSummary,
   detectRegression,
@@ -20,8 +20,6 @@ import {
   type PreviousRunSummary,
 } from "../../vrt/compare/diff-for-agent.ts";
 
-// See legacy-names: the run-vs-run comparison is worthless if the rename makes
-// it read an absent file and report "no previous run" forever.
 const defaultHistoryPath = (): string =>
   relative(process.cwd(), resolveStatePath(process.cwd(), "last-diff-for-agent.json"))
   || `${STATE_DIR}/last-diff-for-agent.json`;
@@ -29,7 +27,7 @@ const defaultHistoryPath = (): string =>
 function usage(): string {
   return [
     "Usage:",
-    "  vlmkit diff agent <migration-report.json> [--out path] [--max-viewports 1] [--variant working.html] [--show-unverified] [--previous path] [--persist-summary path] [--no-history] [--fail-on-regression]",
+    "  vlmkit diff agent <diff-report.json> [--out path] [--max-viewports 1] [--variant working.html] [--show-unverified] [--previous path] [--persist-summary path] [--no-history] [--fail-on-regression]",
     "",
     "Reads an existing migration-compare report (the report.json written by",
     "`vlmkit diff html`) and prints a Markdown summary tailored for coding agents.",
@@ -38,7 +36,7 @@ function usage(): string {
     "baseline) are hidden — pass --show-unverified to include them.",
     "",
     "Regression detection:",
-    "  - On each run the per-viewport diffRatio is written to .vrt/last-diff-for-agent.json",
+    "  - On each run the per-viewport diffRatio is written to .vlmkit/last-diff-for-agent.json",
     "  - On the next run that file is loaded as the comparison baseline",
     "  - If the majority of viewports got worse, a ⚠ REGRESSION banner appears",
     "  - --previous <path>        explicit comparison source",
@@ -128,7 +126,7 @@ function parseArgs(argv: string[]): Args {
   }
 
   if (positional.length !== 1) {
-    throw new Error("Pass exactly one migration-report.json path");
+    throw new Error("Pass exactly one diff-report.json path");
   }
   return {
     reportPath: positional[0]!,
@@ -177,7 +175,7 @@ async function main() {
 
   // History resolution. Two modes:
   //   --no-history: skip both load + write entirely (CI one-shots).
-  //   default:      auto-load + auto-persist .vrt/last-diff-for-agent.json,
+  //   default:      auto-load + auto-persist .vlmkit/last-diff-for-agent.json,
   //                 overridable via --previous / --persist-summary.
   const historyPath = parsed.noHistory ? undefined : resolve(parsed.persistSummaryPath ?? defaultHistoryPath());
   const previousPath = parsed.noHistory
@@ -225,7 +223,7 @@ async function main() {
   }
 }
 
-if (process.env.__VRT_DISPATCHER_LEAF__ === "diff-for-agent-cli" || (process.argv[1] && (process.argv[1].endsWith("diff-for-agent-cli.ts") || process.argv[1].endsWith("diff-for-agent-cli.mjs")))) {
+if (process.env.__VLMKIT_DISPATCHER_LEAF__ === "diff-for-agent-cli" || (process.argv[1] && (process.argv[1].endsWith("diff-for-agent-cli.ts") || process.argv[1].endsWith("diff-for-agent-cli.mjs")))) {
   main().catch((err) => {
     console.error(String(err?.message ?? err));
     process.exit(1);

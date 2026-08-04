@@ -312,9 +312,9 @@ test("bad", async ({ page }) => { await page.goto("/"); });
 });
 
 describe("resolveGeneratorModelOptions", () => {
-  it("uses VRT_LLM_PROVIDER before API-key based defaults", () => {
+  it("uses VLMKIT_LLM_PROVIDER before API-key based defaults", () => {
     assert.deepEqual(resolveGeneratorModelOptions(undefined, {
-      VRT_LLM_PROVIDER: "openrouter",
+      VLMKIT_LLM_PROVIDER: "openrouter",
       ANTHROPIC_API_KEY: "anthropic-key",
       OPENROUTER_API_KEY: "openrouter-key",
     }), {
@@ -336,7 +336,7 @@ describe("resolveGeneratorModelOptions", () => {
 
   it("preserves an explicit model for any provider", () => {
     assert.deepEqual(resolveGeneratorModelOptions({ provider: "anthropic", model: "claude-test", maxTokens: 1234 }, {
-      VRT_LLM_PROVIDER: "openrouter",
+      VLMKIT_LLM_PROVIDER: "openrouter",
     }), {
       provider: "anthropic",
       model: "claude-test",

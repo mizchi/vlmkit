@@ -10,7 +10,7 @@
  */
 import type { LLMProvider } from "./intent.ts";
 import { VrtConfigError } from "./errors.ts";
-import { readEnv } from "@mizchi/vlmkit-core/legacy-names.ts";
+import { readEnv } from "@mizchi/vlmkit-core/project-config.ts";
 
 // ---- Types ----
 
@@ -304,8 +304,8 @@ const VALID_PROVIDERS: ReadonlySet<LLMProviderName> = new Set([
 /**
  * Resolve provider and key from environment variables.
  *
- * VRT_LLM_PROVIDER: gemini (default) | anthropic | openrouter
- * VRT_LLM_MODEL: model ID (defaults to provider's default)
+ * VLMKIT_LLM_PROVIDER: gemini (default) | anthropic | openrouter
+ * VLMKIT_LLM_MODEL: model ID (defaults to provider's default)
  *
  * Returns a config, or describes why no config was available. The
  * factory decides whether to throw based on `throwIfMissing`.
@@ -322,7 +322,7 @@ function resolveProviderConfig(options?: LLMClientOptions):
     return {
       ok: false,
       code: "INVALID_PROVIDER",
-      message: `Unknown VRT_LLM_PROVIDER "${rawProvider}". Expected: gemini | anthropic | openrouter.`,
+      message: `Unknown VLMKIT_LLM_PROVIDER "${rawProvider}". Expected: gemini | anthropic | openrouter.`,
     };
   }
   const provider = rawProvider as LLMProviderName;
@@ -355,7 +355,7 @@ function resolveProviderConfig(options?: LLMClientOptions):
 /**
  * Create a unified LLM client.
  *
- * Provider is set via `VRT_LLM_PROVIDER` env var (default: `gemini`).
+ * Provider is set via `VLMKIT_LLM_PROVIDER` env var (default: `gemini`).
  *
  * Throws `VrtConfigError` when the resolved provider has no API key
  * (`code: "MISSING_KEY"`) or the provider value is unknown
@@ -392,7 +392,7 @@ export interface CreateLLMProviderOptions {
 
 /**
  * Backwards-compatible: returns the existing `LLMProvider` interface.
- * Uses the provider specified by `VRT_LLM_PROVIDER`. Falls back to
+ * Uses the provider specified by `VLMKIT_LLM_PROVIDER`. Falls back to
  * other providers if the requested key is missing.
  *
  * Throws `VrtConfigError` (`code: "NO_PROVIDER_AVAILABLE"`) when no

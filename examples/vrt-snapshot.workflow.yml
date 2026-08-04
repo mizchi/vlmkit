@@ -1,8 +1,8 @@
-# Example GitHub Actions workflow for running `vrt snapshot` on every PR.
+# Example GitHub Actions workflow for running `vlmkit snapshot` on every PR.
 # Copy to .github/workflows/ in your project and adjust the start-app step
 # for your stack (Next.js, Vite, etc.).
 #
-# Pair with a `vrt.config.json` at the repo root that defines `baseUrl`,
+# Pair with a `vlmkit.config.json` at the repo root that defines `baseUrl`,
 # `routes`, `mask`, and (optionally) `failOnDiff` / `maxDiffRatio`.
 
 name: VRT Snapshot
@@ -12,7 +12,7 @@ on:
     paths:
       - "src/**"
       - "public/**"
-      - "vrt.config.json"
+      - "vlmkit.config.json"
       - ".github/workflows/vrt-snapshot.yml"
 
 jobs:
@@ -46,7 +46,7 @@ jobs:
           npx wait-on http://localhost:3000 --timeout 60000
 
       - name: Run VRT snapshot
-        run: npx vrt snapshot --config vrt.config.json
+        run: npx vlmkit snapshot --config vlmkit.config.json
 
       - name: Upload diff artifacts
         if: always()

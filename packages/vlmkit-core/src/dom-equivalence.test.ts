@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { evaluateDomEquivalence, verifyDomEquivalence, type DomFingerprint } from "./dom-equivalence.ts";
+import { verifyDomEquivalence, type DomFingerprint } from "./dom-equivalence.ts";
 
 function fp(over: Partial<DomFingerprint> = {}): DomFingerprint {
   return {
@@ -13,11 +13,6 @@ function fp(over: Partial<DomFingerprint> = {}): DomFingerprint {
 }
 
 describe("verifyDomEquivalence", () => {
-  it("`evaluateDomEquivalence` deprecation alias delegates to verifyDomEquivalence", () => {
-    assert.equal(evaluateDomEquivalence, verifyDomEquivalence);
-  });
-
-
   it("returns ok when fingerprints match exactly", () => {
     const r = verifyDomEquivalence(fp(), fp());
     assert.equal(r.ok, true);

@@ -356,7 +356,7 @@ export interface DfaOptions {
   showUnverified?: boolean;
   /**
    * Previous run's per-viewport diffRatio (from
-   * `.vrt/last-diff-for-agent.json` or any callable source). When
+   * `.vlmkit/last-diff-for-agent.json` or any callable source). When
    * supplied, the report includes a regression banner if the majority
    * of viewports got worse since the previous run.
    */
@@ -374,14 +374,14 @@ export interface DfaOptions {
 
 /**
  * Per-viewport diffRatio recorded at the end of one diff-for-agent run.
- * The CLI persists this to `.vrt/last-diff-for-agent.json` and the next
+ * The CLI persists this to `.vlmkit/last-diff-for-agent.json` and the next
  * invocation passes it as `DfaOptions.previous` to drive the regression
  * banner.
  */
 export interface PreviousRunSummary {
   /** ISO timestamp of the previous run, if known. */
   timestamp?: string;
-  /** Absolute path of the previous migration-report.json. */
+  /** Absolute path of the previous diff-report.json. */
   reportPath?: string;
   /** variantFile → viewport label → diffRatio at the previous run. */
   byVariant: Record<string, Record<string, number>>;

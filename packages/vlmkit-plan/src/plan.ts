@@ -620,10 +620,10 @@ function normalizeMaxAttempts(value: number | undefined): number {
 }
 
 function resolveDefaultProvider(env: Record<string, string | undefined>): NonNullable<PlannerModelOptions["provider"]> {
-  const fromEnv = env.VRT_LLM_PROVIDER;
+  const fromEnv = env.VLMKIT_LLM_PROVIDER;
   if (fromEnv) {
     if (fromEnv === "anthropic" || fromEnv === "gemini" || fromEnv === "openrouter") return fromEnv;
-    throw new Error(`Invalid VRT_LLM_PROVIDER: ${fromEnv}`);
+    throw new Error(`Invalid VLMKIT_LLM_PROVIDER: ${fromEnv}`);
   }
   if (env.ANTHROPIC_API_KEY) return "anthropic";
   if (env.OPENROUTER_API_KEY) return "openrouter";

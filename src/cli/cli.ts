@@ -9,15 +9,11 @@
  * `process.argv` swap — individual command files don't need to migrate
  * to a function-style API in this PR.
  *
- * Old top-level commands (`vlmkit diff html`, `vlmkit check a11y touch`, etc.) remain
- * as deprecation shims at the top level (still single-token, so cac
- * matches them directly).
  */
 
 import { cac } from "cac";
-import { reportDeprecation } from "./deprecation.ts";
 
-const HELP_SENTINEL = "__VRT_HELP_PASSTHROUGH__";
+const HELP_SENTINEL = "__VLMKIT_HELP_PASSTHROUGH__";
 
 /**
  * The script this CLI was started from, captured at import time — `delegate`
@@ -34,7 +30,7 @@ const CLI_ENTRY = process.argv[1];
  * discover the leaf and code-split it into a chunk that ships with
  * `dist/vlmkit.mjs`.
  *
- * The `name` is a per-leaf identifier set into `__VRT_DISPATCHER_LEAF__`
+ * The `name` is a per-leaf identifier set into `__VLMKIT_DISPATCHER_LEAF__`
  * around the await. Each leaf's CLI-entry guard checks that the env
  * var matches *its* name, so static cross-leaf imports (e.g.
  * `diff-pr.ts` importing `cross-browser.ts` for shared types) do not
@@ -56,16 +52,16 @@ async function delegate(s: Spec, args: string[]): Promise<void> {
     "(vrt-dispatcher)",
     ...args.map((a) => (a === HELP_SENTINEL ? "--help" : a)),
   ];
-  const prev = process.env.__VRT_DISPATCHER_LEAF__;
-  process.env.__VRT_DISPATCHER_LEAF__ = s.name;
+  const prev = process.env.__VLMKIT_DISPATCHER_LEAF__;
+  process.env.__VLMKIT_DISPATCHER_LEAF__ = s.name;
   if (CLI_ENTRY) process.env.__VLMKIT_CLI_ENTRY__ = CLI_ENTRY;
   try {
     await s.loader();
   } finally {
     if (prev === undefined) {
-      delete process.env.__VRT_DISPATCHER_LEAF__;
+      delete process.env.__VLMKIT_DISPATCHER_LEAF__;
     } else {
-      process.env.__VRT_DISPATCHER_LEAF__ = prev;
+      process.env.__VLMKIT_DISPATCHER_LEAF__ = prev;
     }
   }
 }
@@ -126,7 +122,6 @@ const SPECS: Record<string, Spec> = {
   snapshotReport: spec("snapshot-report", () => import("../vrt/snapshot/snapshot-report.ts")),
   migrationBlind: spec("migration-blind", () => import("../experiments/migration/migration-blind.ts")),
   migrationSubagent: spec("migration-subagent", () => import("../experiments/migration/migration-subagent.ts")),
-  vlmRegionDiff: spec("vlm-region-diff", () => import("../experiments/migration/vlm-region-diff.ts")),
   elementCompare: spec("element-compare", () => import("@mizchi/vlmkit-core/element-compare.ts")),
   smokeRunner: spec("smoke-runner", () => import("@mizchi/vlmkit-markup/inspect/smoke-runner.ts")),
   flipbook: spec("flipbook-cli", () => import("./commands/flipbook-cli.ts")),
@@ -187,7 +182,6 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
   diff: {
     html: { spec: SPECS.migrationCompare, desc: "Compare two HTML files / URLs across viewports" },
     png: { spec: SPECS.pngDiff, desc: "Compare existing PNG screenshots directly" },
-    region: { spec: SPECS.vlmRegionDiff, desc: "[DEPRECATED] VLM region diff — measured net-negative for agent repair (wrong attribution, fabricated deltas); use `diff png --elements-html` or `check integrity`/`check equivalence` instead" },
     matrix: { spec: SPECS.presenceMatrix, desc: "Region × viewport presence matrix with media-query hints" },
     elements: { spec: SPECS.elementCompare, desc: "Element-level comparison with shift isolation" },
     component: { spec: SPECS.elementCompare, desc: "Component selector comparison with shift isolation" },
@@ -259,38 +253,6 @@ const CHECK_DRIFT: Record<string, { spec: Spec; desc: string }> = {
   pages: { spec: SPECS.multiPageConsistency, desc: "Drift of one selector across N pages" },
 };
 
-const DEPRECATED_TOP_LEVEL: Record<string, { newName: string; spec: Spec }> = {
-  compare: { newName: "diff html", spec: SPECS.migrationCompare },
-  "png-diff": { newName: "diff png", spec: SPECS.pngDiff },
-  elements: { newName: "diff elements", spec: SPECS.elementCompare },
-  "cross-browser": { newName: "diff browsers", spec: SPECS.crossBrowser },
-  "diff-for-agent": { newName: "diff agent", spec: SPECS.diffForAgent },
-  "compare-runs": { newName: "diff runs", spec: SPECS.compareRuns },
-  "a11y-contrast": { newName: "check a11y contrast", spec: SPECS.a11yContrast },
-  "a11y-touch": { newName: "check a11y touch", spec: SPECS.a11yTouch },
-  "a11y-focus-order": { newName: "check a11y focus", spec: SPECS.a11yFocusOrder },
-  "design-tokens": { newName: "check tokens", spec: SPECS.designTokens },
-  "theme-parity": { newName: "check theme", spec: SPECS.themeParity },
-  perf: { newName: "check perf", spec: SPECS.perf },
-  "component-consistency": { newName: "check drift component", spec: SPECS.componentConsistency },
-  "multi-page-consistency": { newName: "check drift pages", spec: SPECS.multiPageConsistency },
-  interact: { newName: "inspect interact", spec: SPECS.interact },
-  explore: { newName: "inspect explore", spec: SPECS.explore },
-  smoke: { newName: "inspect smoke", spec: SPECS.smokeRunner },
-  "i18n-stress": { newName: "stress i18n", spec: SPECS.i18nStress },
-  "media-variants": { newName: "stress media", spec: SPECS.mediaVariants },
-  "component-extract": { newName: "scan component", spec: SPECS.componentExtract },
-  "component-from-image": { newName: "build component", spec: SPECS.componentFromImage },
-  flipbook: { newName: "snapshot flipbook", spec: SPECS.flipbook },
-};
-// "verify" is NOT in this list: it is a real command group now
-// (`vlmkit verify markup`); the group handler keeps the old
-// `verify → workflow verify` deprecation shim for non-leaf usage.
-const WORKFLOW_ALIASES = [
-  "init", "capture", "approve",
-  "graph", "affected", "introspect", "spec-verify", "expect",
-];
-
 function printGroupHelp(groupName: string): void {
   const group = GROUPS[groupName];
   if (groupName === "check") {
@@ -311,6 +273,29 @@ function printGroupHelp(groupName: string): void {
   for (const [name, info] of Object.entries(group)) {
     console.log(`  ${name.padEnd(16)}${info.desc}`);
   }
+}
+
+function printRootHelp(): void {
+  console.log(`vlmkit <command> [options]
+
+Deterministic verification for frontend work.
+
+Command groups:
+  check                         Inspect accessibility, layout, and design quality
+  diff                          Compare HTML, images, runs, and components
+  inspect                       Explore browser behavior and page structure
+  scan                          Inventory components, scrolling, and breakpoints
+  stress                        Exercise responsive and cross-browser variants
+  build / contract              Build and validate UI contract artifacts
+  verify / heal                 Gate markup and repair actionable failures
+
+Workflows:
+  snapshot / baseline / watch   Capture and manage visual baselines
+  diff-pr / batch / gates       Run repeatable local and CI gates
+  workflow / markup-loop        Drive agent-oriented verification loops
+  api / mcp                     Expose vlmkit to other tools
+
+Run \`vlmkit <command> --help\` for subcommands, options, and examples.`);
 }
 
 async function runGroupLeaf(
@@ -348,14 +333,6 @@ async function runGroupLeaf(
   }
   const entry = GROUPS[groupName]?.[leafName];
   if (!entry) {
-    // Back-compat: `vlmkit verify <anything-but-a-leaf>` was the deprecated
-    // single-word alias for `vlmkit workflow verify` before the verify group
-    // existed; keep that shim for unknown leaves.
-    if (groupName === "verify") {
-      reportDeprecation("verify", "vlmkit workflow verify");
-      await runWorkflow(["verify", leafName === HELP_SENTINEL ? "--help" : leafName, ...rest]);
-      return;
-    }
     console.error(`Unknown ${groupName} subcommand: ${leafName}`);
     process.exit(1);
   }
@@ -372,67 +349,8 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<vo
 
   cli.usage(`<command> [options]
 
-Deterministic verification for frontend work: markup gates, visual
-regression, design audits, and repair tools. Everything below runs
-without an API key unless marked [key]. Sources are files or URLs.
-
-CHECK THE PAGE YOU JUST WROTE OR EDITED (no reference needed)
-  check integrity <page>              broken-page scan across 3 viewports: overflow,
-                                      text collision/clipping/occlusion, invisible text,
-                                      JS errors, failed resources, unstyled page
-  check copy <page> --manifest <txt>  required copy present, visibly, verbatim
-  check layout <page> --contract <js> structural spec (widths, rows, order) per viewport
-  scan scroll | scan handlers <page>  overflow inventory | clickable-<div> detection
-
-VERIFY BEHAVIOR, NOT PIXELS
-  check breakpoints <page> --sweep    responsive boundaries exact, no width overflows
-  check interactions <page>           keyboard operability + ARIA state map
-  check scroll | check animation      sticky/fixed/snap hold | animations run & settle
-  verify flow <page> --flow <json>    scripted user flow, deterministic post-conditions
-
-MATCH A TARGET DESIGN
-  verify markup <page> --target <png> one-shot done verdict + paste-ready fix list
-  build page | build component        composition diff | converge one component
-  scan mock <png>                     normalize a @2x/@3x design export first
-
-TRACK CHANGES OVER TIME (visual regression)
-  snapshot <url> --output <dir>       baseline on first run, per-viewport diff after
-                                      (approve with: snapshot approve)
-  watch | diff-pr | baseline          local inner loop | PR CI gate | baseline admin
-
-COMPARE TWO VERSIONS
-  diff html|png|elements              pixel + computed-style + element diff
-  migration compare                   framework/CSS-swap visual equivalence
-  check equivalence --region          per-region judge for known residuals
-
-AUDIT DESIGN QUALITY
-  check tokens|theme|palette          token scale | dark parity | dominant colors
-  check design <page>                 is the page consistent with itself? component
-                                      styles reused, spacing on its own scale
-  check a11y contrast|touch|focus     WCAG contrast, touch targets, focus order
-  check perf | check drift            Web Vitals | consistency across instances/pages
-  stress i18n | stress media          longer strings | media variants
-
-IMAGE ASSETS (e.g. generated sprites, before they enter a slot)
-  check asset <png> --slot WxH        aspect fit, cut-out background, silhouette
-                                      contrast vs backdrop, palette harmony vs page
-
-REPAIR
-  heal selector <page> <selector>     suggest replacements for a dead selector
-  heal markup                         [key] LLM auto-fix from a verify-markup kickback
-
-RUN GATES OVER A WHOLE SITE
-  batch --gate "<gate>" <glob...>     every matched page in parallel; --shard i/n
-                                      for CI runners, --output for per-job logs
-  gates init|list|run                 same, from one reviewed vlmkit.gates.json
-  gates suppressions                  every silenced check with reason/owner/expiry
-
-FOR CODING AGENTS AND PIPELINES
-  mcp                                 MCP server exposing the gates (stdio)
-  contract | workflow | markup-loop | api | bench | skill | report
-
-Run \`vlmkit <command> --help\` for options; most gates take --json and
---fail-on-suspect. Task-routing guide with recipes: docs/markup-assist.md`);
+Deterministic verification for frontend work.
+Run \`vlmkit <command> --help\` for subcommands, options, and examples.`);
 
   // Group commands — second-level dispatch happens in the action.
   for (const groupName of Object.keys(GROUPS)) {
@@ -447,15 +365,6 @@ Run \`vlmkit <command> --help\` for options; most gates take --json and
           groupArgs.length === 0 ||
           (groupArgs.length === 1 && groupArgs[0] === HELP_SENTINEL)
         ) {
-          // Bare `vlmkit verify` was the documented legacy alias for
-          // `workflow verify` — printing group help and exiting 0 here
-          // would let CI scripts silently skip verification (Codex #86).
-          // Only the explicit `verify --help` form gets the group help.
-          if (groupName === "verify" && groupArgs.length === 0) {
-            reportDeprecation("verify", "vlmkit workflow verify");
-            await runWorkflow(["verify"]);
-            return;
-          }
           printGroupHelp(groupName);
           return;
         }
@@ -487,7 +396,9 @@ Run \`vlmkit <command> --help\` for options; most gates take --json and
     .action(async () => {
       const rest = passThrough(argv, ["migration"]);
       const sub = rest[0];
-      if (sub === "compare") {
+      if (!sub || sub === HELP_SENTINEL) {
+        console.log("vlmkit migration <compare|blind|subagent>");
+      } else if (sub === "compare") {
         await delegate(SPECS.migrationCompare, rest.slice(1));
       } else if (sub === "blind") {
         await delegate(SPECS.migrationBlind, rest.slice(1));
@@ -495,7 +406,7 @@ Run \`vlmkit <command> --help\` for options; most gates take --json and
         await delegate(SPECS.migrationSubagent, rest.slice(1));
       } else {
         console.log("vlmkit migration <compare|blind|subagent>");
-        if (sub) process.exitCode = 1;
+        process.exitCode = 1;
       }
     });
 
@@ -509,7 +420,19 @@ Run \`vlmkit <command> --help\` for options; most gates take --json and
 
   cli.command("report [...args]", "Detection pattern report (CSS challenge)")
     .allowUnknownOptions()
-    .action(async () => delegate(SPECS.detectionReport, passThrough(argv, ["report"])));
+    .action(async () => {
+      const rest = passThrough(argv, ["report"]);
+      if (rest.length === 1 && rest[0] === HELP_SENTINEL) {
+        console.log(`vlmkit report
+
+Render the aggregate CSS benchmark detection report from local JSONL history.
+
+Options:
+  -h, --help  Show this help`);
+        return;
+      }
+      await delegate(SPECS.detectionReport, rest);
+    });
 
   cli.command("skill [...args]", "Per-project skill playbooks")
     .allowUnknownOptions()
@@ -524,19 +447,31 @@ Run \`vlmkit <command> --help\` for options; most gates take --json and
     .action(async () => {
       const rest = passThrough(argv, ["api"]);
       const sub = rest[0];
-      if (sub === "serve") {
+      if (!sub || sub === HELP_SENTINEL) {
+        console.log("vlmkit api <serve|status>");
+      } else if (sub === "serve") {
         await delegate(SPECS.apiServer, rest.slice(1));
       } else if (sub === "status") {
         await runApiStatus(rest.slice(1));
       } else {
         console.log("vlmkit api <serve|status>");
-        if (sub) process.exitCode = 1;
+        process.exitCode = 1;
       }
     });
 
   cli.command("mcp [...args]", "MCP server exposing the deterministic verification gates (stdio)")
     .allowUnknownOptions()
     .action(async () => {
+      const rest = passThrough(argv, ["mcp"]);
+      if (rest.length === 1 && rest[0] === HELP_SENTINEL) {
+        console.log(`vlmkit mcp
+
+Start the Model Context Protocol server over stdio.
+
+Options:
+  -h, --help  Show this help`);
+        return;
+      }
       const { runStdioServer } = await import("@mizchi/vlmkit-mcp/stdio.ts");
       await runStdioServer();
     });
@@ -565,52 +500,13 @@ Run \`vlmkit <command> --help\` for options; most gates take --json and
     .allowUnknownOptions()
     .action(async () => delegate(SPECS.baseline, passThrough(argv, ["baseline"])));
 
-  // Deprecated top-level command shims.
-  for (const [oldName, { newName, spec }] of Object.entries(DEPRECATED_TOP_LEVEL)) {
-    cli.command(`${oldName} [...args]`, `[deprecated] Use 'vlmkit ${newName}'`)
-      .allowUnknownOptions()
-      .action(async () => {
-        reportDeprecation(oldName, `vlmkit ${newName}`);
-        await delegate(spec, passThrough(argv, [oldName]));
-      });
-  }
-
-  // Workflow single-word aliases — deprecation shims.
-  for (const alias of WORKFLOW_ALIASES) {
-    cli.command(`${alias} [...args]`, `[deprecated] Use 'vlmkit workflow ${alias}'`)
-      .allowUnknownOptions()
-      .action(async () => {
-        reportDeprecation(alias, `vlmkit workflow ${alias}`);
-        await runWorkflow([alias, ...passThrough(argv, [alias])]);
-      });
-  }
-
-  // serve / status — legacy top-level aliases for api.
-  cli.command("serve [...args]", "[deprecated] Use 'vlmkit api serve'")
-    .allowUnknownOptions()
-    .action(async () => {
-      reportDeprecation("serve", "vlmkit api serve");
-      await delegate(SPECS.apiServer, passThrough(argv, ["serve"]));
-    });
-  cli.command("status [...args]", "[deprecated] Use 'vlmkit api status'")
-    .allowUnknownOptions()
-    .action(async () => {
-      reportDeprecation("status", "vlmkit api status");
-      await runApiStatus(passThrough(argv, ["status"]));
-    });
-
-  cli.command("discover <file>", "[deprecated] Use 'vlmkit scan breakpoints'")
-    .action(async (file: string) => {
-      reportDeprecation("discover", "vlmkit scan breakpoints");
-      await runDiscover([file]);
-    });
-
-  // Top-level --help / -h / help: print cac usage.
+  // Keep top-level help as a compact index. Detailed usage belongs to each
+  // command or command group so the first screen remains easy to scan.
   const isTopLevelHelp =
     argv.length === 0 ||
     (argv.length === 1 && (argv[0] === "--help" || argv[0] === "-h" || argv[0] === "help"));
   if (isTopLevelHelp) {
-    cli.outputHelp();
+    printRootHelp();
     return;
   }
   if (argv[0] === "--version" || argv[0] === "-v") {
@@ -629,7 +525,7 @@ Run \`vlmkit <command> --help\` for options; most gates take --json and
     await cli.runMatchedCommand();
   } else {
     process.stderr.write(`Unknown command: ${argv.join(" ")}\n\n`);
-    cli.outputHelp();
+    printRootHelp();
     process.exitCode = 1;
   }
 }

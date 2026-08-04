@@ -37,6 +37,7 @@
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
+import { readChoice, readFlag, readInt } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
@@ -395,8 +396,6 @@ export interface TextCollisionOptions {
    * same three are 1.000 / 0.077 / 0.137: a 7x gap around this threshold.
    */
   minInkOverlapFraction?: number;
-  /** @deprecated Superseded by minInkOverlapFraction; accepted and ignored. */
-  minOverlapRatio?: number;
   maxFindings?: number;
 }
 
@@ -1448,6 +1447,12 @@ export interface IntegrityOptions {
    */
   storageState?: string;
   source: string;
+  /** Playwright navigation milestone. Defaults to networkidle. */
+  waitUntil?: "domcontentloaded" | "load" | "networkidle";
+  /** Navigation timeout in milliseconds. Defaults to 30000. */
+  timeout?: number;
+  /** Replay network responses from a Playwright HAR for deterministic URL gates. */
+  har?: string;
   /** Sweep widths (default 1280, 768, 375). */
   viewports?: { width: number; height: number }[];
   maxFindings?: number;
@@ -1513,6 +1518,9 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
     for (let vi = 0; vi < viewports.length; vi++) {
       const viewport = viewports[vi]!;
       const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
+      if (options.har) {
+        await page.routeFromHAR(resolve(options.har), { notFound: "abort" });
+      }
       const events: RuntimeEvent[] = [];
       const netFailures: NetworkFailure[] = [];
       let loaded = false;
@@ -1535,7 +1543,10 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
           netFailures.push({ url: res.url(), resourceType: res.request().resourceType(), reason: `HTTP ${res.status()}`, crossOrigin: originOf(res.url()) !== pageOrigin });
         }
       });
-      await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+      await page.goto(url, {
+        waitUntil: options.waitUntil ?? "networkidle",
+        timeout: options.timeout ?? 30000,
+      });
       // Network idle is not font-ready: with `font-display: swap` the text
       // reflows AFTER idle, so every geometry probe below would measure
       // fallback metrics on some runs and webfont metrics on others — the
@@ -1780,6 +1791,9 @@ intentional-pattern exemptions are reported, not silently dropped.
 Options:
   --viewports <w,w,...>  Sweep widths (default: 1280,768,375)
   --max-findings <n>     Per-class report cap (default: 12)
+  --timeout <ms>         Page navigation timeout (default: 30000)
+  --wait-until <state>   domcontentloaded, load, or networkidle (default)
+  --har <file>           Replay network responses from a Playwright HAR
   --json                 Print JSON report
   --storage-state <file> Playwright storage state, to measure pages behind
                          a login (or set VLMKIT_STORAGE_STATE)
@@ -1793,14 +1807,21 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   let json = false;
   let maxFindings: number | undefined;
   let widths: number[] | undefined;
-  let storageState: string | undefined;
+  const storageState = readFlag(argv, "storage-state");
+  const har = readFlag(argv, "har");
+  const timeout = readInt(argv, "timeout", { min: 1 });
+  const waitUntil = readChoice(
+    argv,
+    "wait-until",
+    ["domcontentloaded", "load", "networkidle"] as const,
+  );
   const allowSpecs: string[] = [];
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === "--json") json = true;
     else if (arg === "--max-findings") maxFindings = Number.parseInt(argv[++i] ?? "12", 10);
-    else if (arg === "--storage-state") storageState = argv[++i];
+    else if (arg === "--storage-state" || arg === "--har" || arg === "--timeout" || arg === "--wait-until") i++;
     else if (arg === "--allow") allowSpecs.push(argv[++i] ?? "");
     else if (arg === "--viewports") {
       widths = (argv[++i] ?? "").split(",").map((w) => Number.parseInt(w, 10)).filter((w) => w > 0);
@@ -1818,6 +1839,9 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     ...(widths ? { viewports: widths.map((w) => ({ width: w, height: heights[w] ?? 800 })) } : {}),
     ...(maxFindings !== undefined ? { maxFindings } : {}),
     ...(storageState ? { storageState } : {}),
+    ...(timeout !== undefined ? { timeout } : {}),
+    ...(waitUntil ? { waitUntil } : {}),
+    ...(har ? { har } : {}),
     ...(allow.length > 0 ? { allow } : {}),
   });
   if (json) console.log(JSON.stringify(report, null, 2));
@@ -1825,7 +1849,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   if (report.verdict !== "clean") process.exit(1);
 }
 
-const isCliEntry = process.env.__VRT_DISPATCHER_LEAF__ === "integrity-check" ||
+const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "integrity-check" ||
   (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
 if (isCliEntry) {
   main().catch(handleCliError);

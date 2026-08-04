@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { introspectToSpec, verifySpec } from "@mizchi/vlmkit-markup/inspect/introspect.ts";
-import { checkA11yTree } from "@mizchi/vlmkit-core/a11y-semantic.ts";
+import { verifyA11yTree } from "@mizchi/vlmkit-core/a11y-semantic.ts";
 import type { A11yNode, UiSpec } from "@mizchi/vlmkit-core/types.ts";
 
 const FIXTURES = join(import.meta.dirname!, "..", "..", "fixtures", "react-sample");
@@ -165,9 +165,9 @@ describe("Round-trip: introspect → spec → verify", () => {
     assert.equal(landmarkFails.length, 0, "Existing landmarks should still pass");
   });
 
-  it("should detect a11y quality issues via checkA11yTree", async () => {
+  it("should detect a11y quality issues via verifyA11yTree", async () => {
     const broken = await loadTree("snapshot-label-broken.a11y.json");
-    const issues = checkA11yTree(broken);
+    const issues = verifyA11yTree(broken);
     assert.ok(issues.length >= 3, `Should find 3+ issues: ${issues.length}`);
     assert.ok(issues.every((i) => i.rule === "label-missing"), "All should be label-missing");
   });

@@ -169,7 +169,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 }
 
 if (
-  process.env.__VRT_DISPATCHER_LEAF__ === "migration-aggregate"
+  process.env.__VLMKIT_DISPATCHER_LEAF__ === "migration-aggregate"
   || process.argv[1]?.endsWith("aggregate-fix-summaries.ts")
 ) {
   main().catch(handleCliError);

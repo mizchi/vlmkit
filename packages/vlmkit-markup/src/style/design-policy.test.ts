@@ -7,6 +7,8 @@ import {
   type DesignPolicyInput,
   type DesignSample,
   type DesignSpacingSample,
+  COLLECT_DESIGN_SAMPLES,
+  buildDesignSampleScript,
   formatDesignReport,
   judgeDesignPolicy,
   runDesignPolicyCheck,
@@ -27,6 +29,8 @@ const input = (over: Partial<DesignPolicyInput> = {}): DesignPolicyInput => ({
   spacing: [],
   skipped: 0,
   statefulSkipped: 0,
+  exclusions: [],
+  excludedElements: 0,
   ...over,
 });
 
@@ -183,6 +187,15 @@ describe("judgeDesignPolicy — coverage reporting", () => {
   });
 });
 
+describe("design sample collector", () => {
+  it("keeps the exported default script executable and safely injects exclusions", () => {
+    assert.doesNotThrow(() => new Function(`return ${COLLECT_DESIGN_SAMPLES}`));
+    const script = buildDesignSampleScript([`.vendor[data-owner="third-party"]`]);
+    assert.doesNotThrow(() => new Function(`return ${script}`));
+    assert.match(script, /third-party/);
+  });
+});
+
 describe("formatDesignReport", () => {
   it("separates verdict-carrying findings from informational ones", () => {
     const judged = judgeDesignPolicy(input({
@@ -202,6 +215,16 @@ describe("formatDesignReport", () => {
     const text = formatDesignReport({ source: "fixture.html", ...judged });
     assert.match(text, /COHERENT/);
     assert.match(text, /No design drift detected/);
+  });
+
+  it("keeps stale subtree exclusions visible", () => {
+    const judged = judgeDesignPolicy(input({
+      exclusions: [{ selector: ".removed-widget", matches: 0 }],
+    }));
+    assert.deepEqual(judged.unusedExcludes, [".removed-widget"]);
+    const text = formatDesignReport({ source: "fixture.html", ...judged });
+    assert.match(text, /\.removed-widget: 0 root match/);
+    assert.match(text, /matched nothing; remove stale exclusions/);
   });
 });
 
@@ -278,5 +301,27 @@ describe("runDesignPolicyCheck (browser collection)", () => {
     const file = page("skips", `<main><div><span>a</span><p>b</p></div><button>Go</button></main>`);
     const report = await runDesignPolicyCheck({ source: file });
     assert.ok(report.skipped >= 3, `expected skipped >= 3, got ${report.skipped}`);
+  });
+
+  it("excludes a vendor-owned subtree before computing role reuse", async () => {
+    const file = page(
+      "vendor-subtree",
+      `<main>${Array.from({ length: 4 }, () => '<button class="app">App</button>').join("")}
+       <div class="vendor-map">
+         <button class="zoom-in">+</button><button class="zoom-out">-</button><button class="locate">@</button>
+       </div></main>`,
+      `.vendor-map .zoom-in { padding: 2px; border-radius: 0; font-size: 10px; }
+       .vendor-map .zoom-out { padding: 3px; border-radius: 2px; font-size: 11px; }
+       .vendor-map .locate { padding: 4px; border-radius: 4px; font-size: 12px; }`,
+    );
+
+    const unscoped = await runDesignPolicyCheck({ source: file });
+    assert.equal(unscoped.verdict, "drift");
+
+    const scoped = await runDesignPolicyCheck({ source: file, exclude: [".vendor-map"] });
+    assert.equal(scoped.verdict, "coherent");
+    assert.deepEqual(scoped.exclusions, [{ selector: ".vendor-map", matches: 1 }]);
+    assert.equal(scoped.excludedElements, 4);
+    assert.deepEqual(scoped.unusedExcludes, []);
   });
 });

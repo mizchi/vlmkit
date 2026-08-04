@@ -96,9 +96,10 @@ vlmkit はこれらのチェックを **gate（ゲート）** と呼びます。
   DOM を測って合格を出していました** — 後述の Honest limits と
   [レポート](./reports/2026-08-02-external-asset-load-defect.md)）。
   正直な裏面: **決してアイドルにならない**ページ（常時ポーリング、
-  WebSocket）は 30 秒上限に当たり、半端に落ち着いたページを測るのではなく
-  ゲートがエラーになります — ローカルに描画したファイルか、ソケットの無い
-  ルートに向けてください。
+  WebSocket）は既定では30秒上限に当たります。`check integrity`と
+  `check design`では`--wait-until domcontentloaded|load`と`--timeout <ms>`で
+  準備完了条件を明示できます。外部レスポンスをlive取得せず再現したい場合は
+  `--har <file>`を追加します。
   ログインの内側のページには、セッションを渡します:
   `--storage-state auth.json`（全ゲートまとめてなら
   `VLMKIT_STORAGE_STATE=auth.json`）。e2e スイートが既に作っている
@@ -313,7 +314,7 @@ vlmkit batch --gate "check integrity" "routes/**/*.html" --shard 2/3   # CI ラ�
   受理します（下の Honest limits に構文）。それでもツール側の問題だと
   思うなら報告してください — 免除セットは実際にそうやって育ちました。
 - **ゲート設定はどこに置く？** contract、flow、copy manifest、snapshot 設定
-  （`vrt.config.json` — これも visual-regression-testing 由来の命名化石）は
+  （`vlmkit.config.json`）は
   リポジトリ内のファイルです。**どのページにどのゲートを走らせるか**と
   **すべての suppression** は `vlmkit.gates.json` に置きます:
 

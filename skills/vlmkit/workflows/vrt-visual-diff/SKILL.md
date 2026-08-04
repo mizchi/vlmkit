@@ -60,7 +60,7 @@ skill assume one of these two forms.
 ## When NOT to use
 
 - Running on a schedule with no prior diff: use `vrt-regression-watch`
-  instead (handles `.vrt/last-diff-for-agent.json` lifecycle).
+  instead (handles `.vlmkit/last-diff-for-agent.json` lifecycle).
 - Component synthesis from screenshots: use `vrt-markup-synth`.
 - CSS auto-repair loop: use `vrt-css-fix-loop`.
 
@@ -68,11 +68,11 @@ skill assume one of these two forms.
 
 `--output <dir>` is a **directory** path; the diff writes
 `<dir>/diff-report.json` (+ per-viewport PNGs) into it. Feed that
-JSON path — not the dir — to `vlmkit diff agent`. (`migration-report.json`
+JSON path — not the dir — to `vlmkit diff agent`. (`diff-report.json`
 is still written alongside as a legacy alias for callers pinning
 the old name; the two files are byte-identical.)
 
-The filename is `migration-report.json` even on this non-migration
+The filename is `diff-report.json` even on this non-migration
 path because the writer is shared with `vlmkit migration compare`. The
 name is legacy — treat it as "the diff report" regardless of whether
 you came here via `diff html` or `migration compare`. (Tracked for
@@ -105,7 +105,7 @@ vlmkit diff html before.html after.html \
 | `--max-viewports N` | Show top-N worst viewports inline (default 1) |
 | `--variant <file>` | Restrict report to one variant when comparing N variants |
 | `--show-unverified` | Include heuristic fix rows whose value already matches baseline (✗ rows). Default hides them. |
-| `--no-history` | Don't load or persist `.vrt/last-diff-for-agent.json` (one-shot mode for CI) |
+| `--no-history` | Don't load or persist `.vlmkit/last-diff-for-agent.json` (one-shot mode for CI) |
 
 For regression tracking flags (`--previous`, `--persist-summary`,
 `--fail-on-regression`), use `vrt-regression-watch` — the same CLI
@@ -188,7 +188,7 @@ upstream invokes it (which `vlmkit diff html` does not by default).
 | `report.json` | `vlmkit diff html` | machine input to `vlmkit diff agent` |
 | Markdown (stdout or `--out`) | `vlmkit diff agent` | the calling agent |
 | `diff-<viewport>.png` | `vlmkit diff html` | linked in markdown for direct `Read` |
-| `.vrt/last-diff-for-agent.json` | `vlmkit diff agent` | next run, for regression detection (skip with `--no-history`) |
+| `.vlmkit/last-diff-for-agent.json` | `vlmkit diff agent` | next run, for regression detection (skip with `--no-history`) |
 
 ## Failure modes
 

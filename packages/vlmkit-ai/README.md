@@ -3,7 +3,7 @@
 VLM / LLM clients and reasoning pipeline used by VRT to interpret diff
 images and natural-language intent.
 
-Part of the [`vlmkit`](https://github.com/mizchi/vrt) monorepo.
+Part of the [`vlmkit`](https://github.com/mizchi/vlmkit) monorepo.
 
 ## Install
 
@@ -41,9 +41,9 @@ const reasoning = await runReasoning({ /* diff context */ });
 
 | Variable | Purpose |
 |---|---|
-| `VRT_LLM_PROVIDER` | `gemini` (default) \| `anthropic` |
-| `VRT_LLM_MODEL` | Override provider default model |
-| `VRT_VLM_MODEL` | OpenRouter VLM model id |
+| `VLMKIT_LLM_PROVIDER` | `gemini` (default) \| `anthropic` |
+| `VLMKIT_LLM_MODEL` | Override provider default model |
+| `VLMKIT_VLM_MODEL` | OpenRouter VLM model id |
 | `OPENROUTER_API_KEY` | VLM access |
 | `GEMINI_API_KEY` | Gemini LLM access |
 | `ANTHROPIC_API_KEY` | Anthropic LLM access |

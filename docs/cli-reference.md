@@ -10,7 +10,7 @@ for options.
 
 | Group | Subcommands |
 |---|---|
-| `vlmkit diff` | `html`, `png`, `elements`, `browsers`, `agent`, `runs` (`region` is deprecated) |
+| `vlmkit diff` | `html`, `png`, `matrix`, `elements`, `component`, `browsers`, `agent`, `runs` |
 | `vlmkit check` | `integrity`, `copy`, `layout`, `interactions`, `equivalence`, `asset`, `breakpoints`, `scroll`, `animation`, `motion`, `a11y {contrast,touch,focus}`, `palette`, `tokens`, `design`, `theme`, `perf`, `drift {component,pages}`, `crater` |
 | `vlmkit scan` | `component`, `breakpoints`, `scroll`, `mock`, `handlers` |
 | `vlmkit build` | `component`, `page` |
@@ -23,11 +23,6 @@ for options.
 | `vlmkit migration` | `compare`, `blind`, `subagent` |
 | `vlmkit workflow` | `init`, `capture`, `verify`, `approve`, `graph`, `affected`, `introspect`, `spec-verify`, `expect` |
 | Standalone | `vlmkit batch`, `vlmkit gates`, `vlmkit mcp`, `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit markup-loop`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
-
-The single-token commands from 0.4.x (`vrt compare`, `vrt png-diff`,
-`vrt theme-parity`, …) remain as deprecation shims that forward to
-the new names and print a one-line hint. See the [CHANGELOG](./CHANGELOG.md)
-for the full old → new mapping.
 
 ## Features
 
@@ -79,10 +74,6 @@ vlmkit diff agent reports/diff-report.json > reports/diff.md
 # Compare two existing PNG screenshots without Playwright
 vlmkit diff png baselines/home.png snapshots/home.png
 
-# Ask a VLM to name changed regions, then emit measured colors and CHANGE records
-vlmkit diff region --baseline baselines/home.png --variant snapshots/home.png \
-  --elements-html http://localhost:3000/ --format markdown
-
 # Compare two URLs
 vlmkit diff html --url http://localhost:3000/ --current-url http://localhost:8080/ \
   --output reports/
@@ -99,7 +90,7 @@ vlmkit snapshot http://localhost:3000/ --fail-on-diff --fail-on-new-baseline --m
 # Promote accepted snapshot diffs to the new baseline
 vlmkit snapshot approve --output snapshots/
 
-# Load snapshot targets from vrt.config.json
+# Load snapshot targets from vlmkit.config.json
 vlmkit snapshot
 
 # Dev inner loop with rich signal output (token-aware + cross-round)
@@ -130,10 +121,10 @@ node examples/markup-loop-project/run.mjs
 # Author approval rules (sub-pixel deviations, intentional design exceptions, etc.)
 vlmkit manifest add --selector .hero__body --max-px 2 --reason "AA artifact" --expires 2026-08-15
 vlmkit manifest add --a11y-contrast --selector "button" --reason "decorative" --expires 2026-08-15
-vlmkit manifest add --from-run .vrt/runs/diff-pr/  # auto-acknowledge sub-pixel deltas
+vlmkit manifest add --from-run .vlmkit/runs/diff-pr/  # auto-acknowledge sub-pixel deltas
 vlmkit manifest list
 
-# CI gate — declare routes in vrt.config.json, pin baselines, gate per PR
+# CI gate — declare routes in vlmkit.config.json, pin baselines, gate per PR
 vlmkit baseline pin                                       # on main
 vlmkit baseline verify                                    # in PR
 vlmkit baseline post --pr owner/repo#123                  # send summary.md as PR comment
@@ -144,24 +135,24 @@ vlmkit workflow capture
 vlmkit workflow verify
 
 # Workflow loop with external-project routes/config
-vlmkit workflow init --config ./vrt.config.json
-vlmkit workflow capture --config ./vrt.config.json
+vlmkit workflow init --config ./vlmkit.config.json
+vlmkit workflow capture --config ./vlmkit.config.json
 
 # Prepare a migration diff packet for an external fixer
-pkf run migration-subagent-prepare -- --report test-results/migration/migration-report.json --output test-results/migration/subagent-task.md
+pkf run migration-subagent-prepare -- --report test-results/migration/diff-report.json --output test-results/migration/subagent-task.md
 
 # Attach VLM region-diff JSON/Markdown handoff files to a migration compare report
 vlmkit migration compare before.html after.html --region-diff --region-diff-format both
 
 # Measure success rate from before/after migration reports
-pkf run migration-subagent-evaluate -- --before-report test-results/migration/migration-report.json --after-report test-results/migration/migration-report.after.json
+pkf run migration-subagent-evaluate -- --before-report test-results/migration/diff-report.json --after-report test-results/migration/diff-report.after.json
 
 # Inspect blind migration scenarios
 pkf run migration-blind-list
 pkf run migration-blind-show --scenario shadcn-to-luna
 pkf run migration-blind-prepare --scenario shadcn-to-luna -- --packet test-results/migration/blind/shadcn-to-luna/task.md
 pkf run migration-blind-solo --scenario shadcn-to-luna -- --output test-results/migration/blind/shadcn-to-luna/solo/after-blind.html --report-output-dir test-results/migration/blind/shadcn-to-luna/solo-report
-pkf run migration-blind-evaluate --scenario shadcn-to-luna -- --before-report test-results/migration/blind/shadcn-to-luna/migration-report.json --after-report test-results/migration/blind/shadcn-to-luna/solo-report/migration-report.json --rounds 1
+pkf run migration-blind-evaluate --scenario shadcn-to-luna -- --before-report test-results/migration/blind/shadcn-to-luna/diff-report.json --after-report test-results/migration/blind/shadcn-to-luna/solo-report/diff-report.json --rounds 1
 
 # Mask dynamic content
 vlmkit snapshot http://localhost:3000/ --mask ".marquee-container,.hero-badge"
@@ -220,7 +211,6 @@ vlmkit diff png <baseline.png> <current.png>   # Direct PNG pixel diff + heatmap
   # per region: measured colorSamples, translation estimate (shift dx/dy),
   # image-size delta; add --elements-html <url> for a deterministic DOM
   # selector candidate per region (no VLM, no API key)
-vlmkit diff region --baseline a.png --variant b.png [--elements-html current.html|url] [--format markdown] # VLM region diff + selector hints
 vlmkit diff elements [options]                 # Element-level diff with shift isolation
 vlmkit diff browsers <html|url>                # chromium / firefox / webkit parity
 vlmkit diff runs <dir...>                      # Aggregate multiple VRT runs into one table
@@ -253,6 +243,15 @@ mean the page is broken (`js-error`, `degenerate-render`, `unstyled-page`,
 `redirected`) cannot be exempted. Put the rule in `vlmkit.gates.json` when it
 needs an owner and an expiry — an expired suppression stops being applied.
 
+For a URL that never reaches network idle, select a navigation milestone and
+timeout explicitly. A HAR makes third-party responses reproducible and aborts
+requests not present in the recording:
+
+```bash
+vlmkit check integrity http://localhost:3000/ \
+  --wait-until domcontentloaded --timeout 60000 --har fixtures/app.har
+```
+
 ### Check (gates: a11y / tokens / design / theme / perf / drift)
 
 ```bash
@@ -266,6 +265,14 @@ vlmkit check theme         <html|url>          # prefers-color-scheme dark / unt
 vlmkit check perf          <html|url>          # Web Vitals (CLS / LCP / FCP)
 vlmkit check drift component <html> --selector .card
 vlmkit check drift pages     --selector .footer --files A.html B.html C.html
+```
+
+Exclude vendor-owned subtrees before `check design` computes role reuse and
+spacing. Every selector and root match count is reported; unmatched selectors
+are warned:
+
+```bash
+vlmkit check design <html|url> --exclude ".maplibregl-ctrl" --exclude ".embed"
 ```
 
 ### Batch (many pages, one glob)
@@ -373,7 +380,7 @@ Snapshot labels are query-aware by default, so `/issues` and `/issues?severity=c
 Use repeated `--label` flags to override labels explicitly when needed.
 The same `--label` flag can be used with `vlmkit snapshot approve` to approve only selected labels.
 
-Minimal `vrt.config.json`:
+Minimal `vlmkit.config.json`:
 
 ```json
 {
@@ -392,7 +399,7 @@ Minimal `vrt.config.json`:
 }
 ```
 
-When `vrt.config.json` exists in the current directory, `vlmkit snapshot` loads it automatically. Use `--config <path>` to point at another file, and pass URLs or flags directly when you want CLI values to override config defaults.
+When `vlmkit.config.json` exists in the current directory, `vlmkit snapshot` loads it automatically. Use `--config <path>` to point at another file, and pass URLs or flags directly when you want CLI values to override config defaults.
 `vlmkit workflow init` and `vlmkit workflow capture` also auto-load the same file, reuse `baseUrl`/`routes`, and accept `workflow.captureSpec` or `--capture-spec <path>` when you want a custom Playwright entrypoint.
 
 #### Subagent-ready fix prompt
@@ -452,7 +459,7 @@ CLOUDFLARE_ACCOUNT_ID=... CLOUDFLARE_API_TOKEN=... \
 Resolution order for the backend selector:
 
 1. `--backend <local|cloudflare>` CLI flag
-2. `VRT_CAPTURE_BACKEND` env var
+2. `VLMKIT_CAPTURE_BACKEND` env var
 3. Default `local`
 
 For the Cloudflare backend, additional env vars are required:
@@ -549,7 +556,7 @@ one context window.
 
 These commands manage state under the current project root: `baselines/`, `snapshots/`, `output/`, `vrt-report.json`, `expectation.json`, and `spec.json`.
 
-Before running them, start the target app and point `VRT_BASE_URL` at it when needed.
+Before running them, start the target app and point `VLMKIT_BASE_URL` at it when needed.
 The built-in capture workflow defaults to `http://127.0.0.1:4174`.
 `vlmkit workflow verify` itself only compares the PNG and `.a11y.json` artifacts already present under `baselines/` and `snapshots/`; it does not launch Playwright.
 
@@ -566,18 +573,13 @@ vlmkit workflow spec-verify
 vlmkit workflow expect
 ```
 
-If `vrt.config.json` defines `routes`, the built-in capture spec uses those routes instead of the repo-local defaults.
+If `vlmkit.config.json` defines `routes`, the built-in capture spec uses those routes instead of the repo-local defaults.
 
 The PR workflow also runs a deterministic snapshot false-positive check against `fixtures/css-challenge` using `.github/vrt-snapshot-ci.config.json`.
 It creates baselines once, re-runs the same URLs, and summarizes `test-results/snapshots/ci/snapshot-report.json` with `vlmkit snapshot report`.
 
-For migration workflows, `vlmkit migration subagent` packages the highest-impact diff per variant into a prompt for an external fixer, then compares before/after `migration-report.json` files to measure resolved/improved success rates.
+For migration workflows, `vlmkit migration subagent` packages the highest-impact diff per variant into a prompt for an external fixer, then compares before/after `diff-report.json` files to measure resolved/improved success rates.
 Blind migration scenarios are declared in `fixtures/migration/blind-scenarios.json`, including the existing reset-css blind target and a scaffolded `shadcn-to-luna/after-blind.html` target for reproducible E3 runs. `vlmkit migration blind` supports `list`, `show`, `prepare`, `solo`, and `evaluate` so the blind run can emit a fresh compare report, generate a fixer packet, run a deterministic reference-CSS repair, and check the `diff < 1% within 3 rounds` contract without hand-assembling paths.
-
-Workflow aliases are kept for ergonomics where they do not collide:
-
-- `vlmkit init`, `vlmkit capture`, `vlmkit verify`, `vlmkit approve`
-- `vlmkit graph`, `vlmkit affected`, `vlmkit introspect`, `vlmkit spec-verify`, `vlmkit expect`
 
 `vlmkit report` remains the detection pattern report, so verification output lives under `vlmkit workflow report`.
 
@@ -585,7 +587,7 @@ Workflow aliases are kept for ergonomics where they do not collide:
 
 `vlmkit workflow init|capture` runs `e2e/vrt-capture.spec.ts`, which now resolves
 its route list from your project rather than hard-coding vlmkit's own pages.
-Drop a `vrt.config.json` next to your app with a `capture` block:
+Drop a `vlmkit.config.json` next to your app with a `capture` block:
 
 ```json
 {
@@ -603,15 +605,15 @@ Drop a `vrt.config.json` next to your app with a `capture` block:
 Each route accepts `name` (defaults to a sanitized form of `path`), `path`, and
 an optional `waitFor` CSS selector. Resolution order:
 
-1. `VRT_CAPTURE_ROUTES` env var (JSON-encoded array)
-2. `--config <path>` flag or `VRT_CONFIG_PATH` env var
-3. `vrt.config.json` auto-discovered in the working directory
+1. `VLMKIT_CAPTURE_ROUTES` env var (JSON-encoded array)
+2. `--config <path>` flag or `VLMKIT_CONFIG_PATH` env var
+3. `vlmkit.config.json` auto-discovered in the working directory
 4. Built-in defaults (vlmkit's own UI — useful only when developing vlmkit itself)
 
 ```bash
 # External project usage
-vlmkit workflow init --config ./vrt.config.json --base-url http://localhost:5173
-vlmkit workflow capture --config ./vrt.config.json
+vlmkit workflow init --config ./vlmkit.config.json --base-url http://localhost:5173
+vlmkit workflow capture --config ./vlmkit.config.json
 vlmkit workflow verify
 ```
 
@@ -737,4 +739,3 @@ docs/
   knowledge.md              # Accumulated experimental findings
   reports/                  # Dated experiment reports
 ```
-

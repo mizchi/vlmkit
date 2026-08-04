@@ -86,22 +86,31 @@
     "@mizchi/vlmkit-markup": "workspace:*",
     "@mizchi/vlmkit-plan": "workspace:*",
     "@mizchi/vlmkit-mcp": "workspace:*",
+    "@playwright/test": "1.61.1",
     "@types/node": "^25.5.2",
     "@types/pngjs": "^6.0.5",
     "@types/ws": "^8.18.1",
     "three": "^0.184.0",
     "tsdown": "^0.21.7",
-    "tsx": "^4.22.4"
+    "tsx": "^4.22.4",
+    "playwright": "1.61.1"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.12",
-    "@playwright/test": "^1.61.1",
     "cac": "^7.0.0",
     "hono": "^4.12.10",
     "pixelmatch": "^7.1.0",
-    "playwright": "^1.61.1",
     "pngjs": "^7.0.0",
     "typescript": "^6.0.2",
     "ws": "^8.20.0"
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.61 <2",
+    "playwright": ">=1.61 <2"
+  },
+  "peerDependenciesMeta": {
+    "@playwright/test": {
+      "optional": true
+    }
   }
 }

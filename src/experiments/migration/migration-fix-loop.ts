@@ -25,7 +25,7 @@ import {
 import { getArg, hasFlag } from "@mizchi/vlmkit-core/cli-args.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 
-const REPORT_PATH = resolve(getArg("report", join(process.cwd(), "test-results", "migration", "migration-report.json")));
+const REPORT_PATH = resolve(getArg("report", join(process.cwd(), "test-results", "migration", "diff-report.json")));
 const VARIANT_FILTER = getArg("variant");
 const OUTPUT_PATH = getArg("output");
 const PROMPT_OUT = getArg("prompt-out");

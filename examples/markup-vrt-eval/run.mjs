@@ -13,12 +13,12 @@ import {
   buildReport,
   renderReportArtifacts,
 } from "./run-report.mjs";
-import { buildVlmRegionDiffArgs, summarizeVlmRegionDiff } from "./run-utils.mjs";
+import { summarizeVlmRegionDiff } from "./run-utils.mjs";
 
 const root = process.cwd();
 const offline = process.env.MARKUP_EVAL_OFFLINE === "1";
 const provider = offline ? "offline" : process.env.PROVIDER ?? "anthropic";
-const outRoot = ".vrt/markup-vrt-eval";
+const outRoot = ".vlmkit/markup-vrt-eval";
 const specRoot = `${outRoot}/specs`;
 const generatedRoot = `${outRoot}/generated`;
 const planPath = `${specRoot}/release-queue.plan.md`;
@@ -32,7 +32,6 @@ const repairContextMarkdownPath = `${outRoot}/repair-context.md`;
 const guardrailContextPath = `${outRoot}/guardrail-context.md`;
 const githubStepSummaryPath = `${outRoot}/github-step-summary.md`;
 const htmlReportPath = `${outRoot}/report.html`;
-const vlmRegionDiffPath = `${outRoot}/vlm-region-diff.json`;
 const configPath = "examples/markup-vrt-eval/playwright.config.ts";
 const requestPath = "examples/markup-vrt-eval/specs/release-queue.request.md";
 const rulesPath = "examples/markup-vrt-eval/specs/_generation-rules.md";
@@ -136,10 +135,8 @@ const repairContext = await buildRepairContext({
 });
 await writeFile(repairContextPath, JSON.stringify(repairContext, null, 2) + "\n");
 await writeFile(repairContextMarkdownPath, renderRepairContextMarkdown(repairContext));
-const vlmRegionDiffStatus = await maybeRunVlmRegionDiff(repairContext);
-const vlmRegionSummary = vlmRegionDiffStatus === "written"
-  ? summarizeVlmRegionDiff(JSON.parse(await readFile(vlmRegionDiffPath, "utf8")))
-  : summarizeVlmRegionDiff(null);
+const vlmRegionDiffStatus = "not-run";
+const vlmRegionSummary = summarizeVlmRegionDiff(null);
 const report = buildReport({
   provider,
   scenario: "Release Queue blocked filter and detail panel VRT smoke",
@@ -167,7 +164,6 @@ const report = buildReport({
     guardrailContextPath,
     githubStepSummaryPath,
     htmlReportPath,
-    vlmRegionDiffPath: vlmRegionDiffStatus === "written" ? vlmRegionDiffPath : null,
   },
 });
 const reportArtifacts = renderReportArtifacts({
@@ -251,19 +247,4 @@ function run(args, extraEnv) {
     });
     child.on("close", (exitCode) => resolveRun({ exitCode: exitCode ?? 1, stdout, stderr }));
   });
-}
-
-async function maybeRunVlmRegionDiff(repairContext) {
-  if (process.env.MARKUP_EVAL_VLM_REGION_DIFF !== "1") return "skipped";
-  if (!process.env.OPENROUTER_API_KEY) return "skipped-no-openrouter-key";
-  const baseline = repairContext.artifacts.expectedPng;
-  const actual = repairContext.artifacts.actualPng;
-  if (!baseline || !actual) return "skipped-missing-vrt-artifacts";
-  const result = await timed("vlm-region-diff", buildVlmRegionDiffArgs({
-    baseline,
-    actual,
-    elementsJson: visualContextPath,
-    out: vlmRegionDiffPath,
-  }), {}, { allowFailure: true });
-  return result.exitCode === 0 ? "written" : "failed";
 }

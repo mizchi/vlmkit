@@ -11,9 +11,6 @@ importers:
       '@hono/node-server':
         specifier: ^1.19.12
         version: 1.19.12(hono@4.12.10)
-      '@playwright/test':
-        specifier: ^1.61.1
-        version: 1.61.1
       cac:
         specifier: ^7.0.0
         version: 7.0.0
@@ -23,9 +20,6 @@ importers:
       pixelmatch:
         specifier: ^7.1.0
         version: 7.1.0
-      playwright:
-        specifier: ^1.61.1
-        version: 1.61.1
       pngjs:
         specifier: ^7.0.0
         version: 7.0.0
@@ -60,6 +54,9 @@ importers:
       '@mizchi/vlmkit-plan':
         specifier: workspace:*
         version: link:packages/vlmkit-plan
+      '@playwright/test':
+        specifier: 1.61.1
+        version: 1.61.1
       '@types/node':
         specifier: ^25.5.2
         version: 25.5.2
@@ -69,6 +66,9 @@ importers:
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
+      playwright:
+        specifier: 1.61.1
+        version: 1.61.1
       three:
         specifier: ^0.184.0
         version: 0.184.0
@@ -94,7 +94,7 @@ importers:
         specifier: workspace:*
         version: link:../vlmkit-core
       playwright:
-        specifier: ^1.61.1
+        specifier: '>=1.61 <2'
         version: 1.61.1
       pngjs:
         specifier: ^7.0.0
@@ -109,7 +109,7 @@ importers:
         specifier: ^7.1.0
         version: 7.1.0
       playwright:
-        specifier: ^1.61.1
+        specifier: '>=1.61 <2'
         version: 1.61.1
       pngjs:
         specifier: ^7.0.0
@@ -136,7 +136,7 @@ importers:
         specifier: workspace:*
         version: link:../vlmkit-core
       playwright:
-        specifier: ^1.61.1
+        specifier: '>=1.61 <2'
         version: 1.61.1
 
   packages/vlmkit-markup:
@@ -154,7 +154,7 @@ importers:
         specifier: ^7.1.0
         version: 7.1.0
       playwright:
-        specifier: ^1.61.1
+        specifier: '>=1.61 <2'
         version: 1.61.1
       pngjs:
         specifier: ^7.0.0
