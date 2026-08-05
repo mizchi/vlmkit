@@ -30,8 +30,17 @@ export interface LoadGateRegistryOptions {
 export async function loadGateRegistry(options: LoadGateRegistryOptions = {}): Promise<GateRegistry> {
   if (cached && !options.cwd && !options.builtinsOnly) return cached;
   const cwd = options.cwd ?? process.cwd();
-  const { markupGatesPlugin } = await import("@mizchi/vlmkit-markup/gates/index.ts");
-  const plugins: VlmkitPlugin[] = [markupGatesPlugin];
+  // Three built-in plugins, from three places: two published packages and the
+  // app itself (`check perf`'s measurement lives in `src/util/`). That is the
+  // point — gate definitions live next to the measurement code they wrap, and
+  // the registry composes them with exactly the operation a third-party plugin
+  // goes through. No location is privileged.
+  const [{ markupGatesPlugin }, { captureGatesPlugin }, { appGatesPlugin }] = await Promise.all([
+    import("@mizchi/vlmkit-markup/gates/index.ts"),
+    import("@mizchi/vlmkit-capture/gates/crater.gate.ts"),
+    import("../gates/perf.gate.ts"),
+  ]);
+  const plugins: VlmkitPlugin[] = [markupGatesPlugin, captureGatesPlugin, appGatesPlugin];
   if (!options.builtinsOnly) {
     const { specifiers } = readPluginSpecifiers(cwd);
     if (specifiers.length > 0) {

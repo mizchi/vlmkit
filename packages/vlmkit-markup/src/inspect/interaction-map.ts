@@ -38,10 +38,8 @@
  *   vlmkit check interactions <html> [--reference <html>] [--max-elements 30] [--json]
  */
 import { resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
-import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { Page } from "playwright";
@@ -891,88 +889,9 @@ export function formatInteractionReport(
   return lines.join("\n");
 }
 
-function printUsage(exitCode: number): never {
-  console.log(`Usage: vlmkit check interactions <html-or-url> [options]
-
-A11y-event state map: discovers interactive elements, probes their
-canonical keyboard events (Tab / Enter / Space / arrows / Escape), and
-records the resulting state changes as ARIA transitions + layout
-deltas. With --reference, the reference's inventory is the behavioral
-contract and every response mismatch is reported.
-
-Options:
-  --reference <html>    Reference page defining the interaction contract
-  --max-elements <n>    Probe cap (default 30; the report says when capped)
-  --handlers            Also enumerate the wired event-callback surface (scan handlers) and cross-check it
-  --json                Print JSON report`);
-  process.exit(exitCode);
-}
-
-async function main(argv = process.argv.slice(2)): Promise<void> {
-  if (argv.includes("--help") || argv.includes("-h")) printUsage(0);
-  let reference: string | undefined;
-  let maxElements = 30;
-  let json = false;
-  let handlers = false;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === "--reference") reference = argv[++i]!;
-    else if (arg === "--max-elements") maxElements = Number(argv[++i]!);
-    else if (arg === "--json") json = true;
-    else if (arg === "--handlers") handlers = true;
-    else if (!arg.startsWith("-")) positional.push(arg);
-  }
-  const source = positional[0];
-  if (!source) printUsage(1);
-
-  const map = await buildInteractionMap({ source, maxElements });
-  const issues = deriveInteractionIssues(map);
-  let comparison: InteractionComparison | undefined;
-  if (reference) {
-    const refMap = await buildInteractionMap({ source: reference, maxElements });
-    comparison = compareInteractionMaps(refMap, map);
-  }
-  let handlerBlock = "";
-  let handlerSuspects = 0;
-  if (handlers) {
-    const { buildHandlerSurface, compareHandlerSurfaces, deriveHandlerIssues, formatHandlerSurface } = await import("./handler-map.ts");
-    const surface = await buildHandlerSurface({ source });
-    const handlerIssues = deriveHandlerIssues(surface);
-    handlerSuspects = handlerIssues.filter((i) => i.severity === "suspect").length;
-    handlerBlock = "\n\n" + formatHandlerSurface(surface, handlerIssues);
-    if (reference) {
-      const refSurface = await buildHandlerSurface({ source: reference });
-      const surfaceMismatches = compareHandlerSurfaces(refSurface, surface);
-      handlerBlock += "\n\nSurface vs reference:";
-      if (surfaceMismatches.length === 0) handlerBlock += `\n  ${GREEN}event vocabulary matches${RESET}`;
-      for (const m of surfaceMismatches) handlerBlock += `\n  ${YELLOW}warn${RESET} ${m.message}`;
-    }
-  }
-
-  appendRunLedger({
-    tool: "check-interactions",
-    source,
-    ...(reference ? { target: reference } : {}),
-    headline: {
-      elements: map.elements.length,
-      suspects: issues.filter((i) => i.severity === "suspect").length
-        + (comparison ? comparison.missing.length + comparison.mismatches.filter((m) => m.severity === "suspect").length : 0),
-      warns: issues.filter((i) => i.severity === "warn").length
-        + (comparison ? comparison.extra.length + comparison.mismatches.filter((m) => m.severity === "warn").length : 0),
-    },
-  });
-
-  if (json) console.log(JSON.stringify({ map, issues, comparison }, null, 2));
-  else console.log(formatInteractionReport(map, issues, comparison) + handlerBlock);
-  const failing = issues.some((i) => i.severity === "suspect")
-    || handlerSuspects > 0
-    || (comparison && (comparison.missing.length > 0 || comparison.mismatches.some((m) => m.severity === "suspect")));
-  if (failing) process.exit(1);
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "interaction-map" ||
-  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `check interactions` is declared in `../gates/interactions.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */

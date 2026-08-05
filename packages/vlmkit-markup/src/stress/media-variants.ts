@@ -80,25 +80,6 @@ export interface MediaVariantsReport {
 
 function isUrl(s: string): boolean { return /^(https?|file):\/\//.test(s); }
 
-function parseArgs(argv: string[]) {
-  let outputDir = "";
-  let report = "";
-  let variants: MediaVariant[] | undefined;
-  let threshold = 0.03;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--output-dir") outputDir = argv[++i];
-    else if (a === "--report") report = argv[++i];
-    else if (a === "--threshold") threshold = parseFloat(argv[++i] ?? "0.03");
-    else if (a === "--variants") {
-      variants = (argv[++i] ?? "").split(",").map((v) => v.trim()).filter((v) =>
-        ALL_VARIANTS.includes(v as MediaVariant)) as MediaVariant[];
-    } else positional.push(a);
-  }
-  return { positional, outputDir, report, variants, threshold };
-}
-
 /**
  * Always navigate. The file branch used to `setContent` the read bytes, which
  * leaves the document without a base URL so an external stylesheet never loads
@@ -353,21 +334,31 @@ export async function runMediaVariants(
   });
   await writeFile(reportPath, md);
 
-  console.log(`  ${BOLD}${CYAN}vlmkit stress media${RESET}`);
-  console.log(`  ${DIM}source: ${options.source}${RESET}`);
-  for (const v of variantResults) {
-    const icon = v.verdict === "ok" ? `${GREEN}✓${RESET}`
-      : v.verdict === "warn" ? `${YELLOW}!${RESET}`
-      : v.verdict === "suspect" ? `${RED}✗${RESET}`
-      : `${DIM}-${RESET}`;
-    console.log(`  ${icon} ${v.variant.padEnd(16)} Δ ${(v.deltaRatio * 100).toFixed(2).padStart(6)}%  ${DIM}${v.note}${RESET}`);
-  }
-  console.log(`  ${DIM}report: ${reportPath}${RESET}`);
 
   return {
     source: options.source, viewport, defaultScreenshot,
     variants: variantResults, reportPath,
   };
+}
+
+/**
+ * Terminal summary, extracted from the measurement function. A gate's `run`
+ * must not print — the core runner owns output and decides between prose and
+ * `--json`.
+ */
+export function formatMediaVariantsReport(report: MediaVariantsReport): string {
+  const lines: string[] = [];
+  lines.push(`  ${BOLD}${CYAN}vlmkit stress media${RESET}`);
+  lines.push(`  ${DIM}source: ${report.source}${RESET}`);
+  for (const v of report.variants) {
+    const icon = v.verdict === "ok" ? `${GREEN}✓${RESET}`
+      : v.verdict === "warn" ? `${YELLOW}!${RESET}`
+      : v.verdict === "suspect" ? `${RED}✗${RESET}`
+      : `${DIM}-${RESET}`;
+    lines.push(`  ${icon} ${v.variant.padEnd(16)} Δ ${(v.deltaRatio * 100).toFixed(2).padStart(6)}%  ${DIM}${v.note}${RESET}`);
+  }
+  lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
+  return lines.join("\n");
 }
 
 function renderReport(r: Omit<MediaVariantsReport, "reportPath">): string {
@@ -433,29 +424,9 @@ function renderReport(r: Omit<MediaVariantsReport, "reportPath">): string {
   return lines.join("\n");
 }
 
-async function main(argv = process.argv.slice(2)) {
-  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
-  const { positional, outputDir, report, variants, threshold } = parseArgs(argv);
-  if (positional.length === 0) {
-    console.log("Usage: vlmkit stress media <html-or-url> [options]");
-    console.log("Options:");
-    console.log("  --variants <list>   Comma-separated subset (default: all 5)");
-    console.log(`                      Available: ${ALL_VARIANTS.join(", ")}`);
-    console.log("  --output-dir <dir>  Default: ./test-results/media-variants");
-    console.log("  --report <path>     Markdown report path");
-    console.log("  --threshold <0..1>  Pixel diff threshold (default: 0.03)");
-    process.exit(1);
-  }
-  await runMediaVariants({
-    source: positional[0]!,
-    outputDir: outputDir || join(process.cwd(), "test-results", "media-variants"),
-    reportPath: report || undefined,
-    variants,
-    threshold,
-  });
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "media-variants" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `stress media` is declared in `../gates/stress.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */

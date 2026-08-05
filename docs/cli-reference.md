@@ -338,12 +338,21 @@ config error rather than a line that silences nothing. Suppressed findings are
 reported as suppressed next to the verdict — a gate that passes because three
 rules were turned off says so.
 
-Every registry-driven gate also shares one exit-code contract and one `--json`
-envelope: a suspect exits 1, `--advisory` prints and exits 0,
-`--fail-on-suspect` is an accepted no-op.
+Every gate shares one exit-code contract and one `--json` envelope: a suspect
+exits 1, `--advisory` prints and exits 0, `--fail-on-suspect` is an accepted
+no-op, and the JSON is always
 
-Not every gate is registry-driven yet — `vlmkit rules` lists exactly the ones
-that are. The rest keep their existing flags.
+```jsonc
+{ "gate": "check.integrity", "command": "check integrity",
+  "verdict": "fail", "counts": { "suspect": 2, "warn": 1, "info": 0 },
+  "findings": [ … ], "suppressed": [ … ], "retuned": [ … ],
+  "report": { /* the gate's own report, verbatim */ } }
+```
+
+so a client gates on `verdict` / `counts` without knowing which gate ran. All
+26 gates are registry-driven; `vlmkit rules` lists them. Commands that produce
+artifacts rather than verdicts (`diff`, `build`, `contract`, `snapshot`, …) are
+not gates and keep their own flags.
 
 ### Custom gates (plugins)
 
@@ -358,6 +367,10 @@ bundled one: it appears in group help and `vlmkit rules`, dispatches as
 `vlmkit <group> <leaf>`, and inherits the shared `--json` / `--advisory` /
 `--rule` behaviour, the run-ledger entry, and `vlmkit.gates.json` validation.
 Relative specifiers resolve against the config's directory, not the cwd.
+
+The bundled gates load the same way, from three plugins — `@mizchi/vlmkit-markup`
+(24 gates), `@mizchi/vlmkit-capture` (`check crater`) and the app itself
+(`check perf`) — so there is no privileged built-in path to diverge from.
 
 Worked example: [`examples/gate-plugin/house-gates.ts`](../examples/gate-plugin/house-gates.ts).
 Design and migration status: [`docs/design/gate-plugin-architecture.md`](design/gate-plugin-architecture.md).

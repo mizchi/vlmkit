@@ -30,12 +30,9 @@
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
-import { readEnv } from "@mizchi/vlmkit-core/project-config.ts";
 
 export interface JudgeRegion {
   left: number;
@@ -281,76 +278,9 @@ export function formatRegionJudgeReport(report: RegionJudgeReport): string {
   return lines.join("\n");
 }
 
-function printUsage(exitCode: number): never {
-  console.log(`Usage: vlmkit check equivalence <attempt.html|png> --target <png> --region "x,y,WxH" [options]
-
-Visual equivalence judge for residual regions. Crops the region from
-both sides into a stacked pair image, measures the mean per-channel
-delta deterministically, and (with --vlm) cross-checks a forced-choice
-SAME/DIFFERENT read against that measurement: hallucinated differences
-below the refutation floor (${REFUTE_FLOOR}) are REFUTED; missed differences above
-the ceiling (${CONTRADICT_CEILING}) are CONTRADICTED. Without a key, pair images are
-written for a second reader.
-
-Options:
-  --target <png>      Target screenshot (defines the viewport for HTML sources)
-  --region <spec>     Region "x,y,WxH" (repeatable; kickback "(x,y) WxH" also accepted)
-  --out <dir>         Pair-image output dir (default: .vlmkit-region-judge next to the source)
-  --vlm [model]       Judge with a VLM (default model: VLMKIT_VLM_MODEL); requires API key
-  --json              Print JSON report`);
-  process.exit(exitCode);
-}
-
-async function main(argv = process.argv.slice(2)): Promise<void> {
-  if (argv.includes("--help") || argv.includes("-h")) printUsage(0);
-  const regions: JudgeRegion[] = [];
-  let targetPath: string | undefined;
-  let outDir: string | undefined;
-  let vlm: string | true | undefined;
-  let json = false;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === "--target") targetPath = argv[++i]!;
-    else if (arg === "--region") regions.push(parseRegionSpec(argv[++i]!));
-    else if (arg === "--out") outDir = argv[++i]!;
-    else if (arg === "--vlm") {
-      const next = argv[i + 1];
-      vlm = next && !next.startsWith("-") ? argv[++i]! : true;
-    } else if (arg === "--json") json = true;
-    else if (!arg.startsWith("-")) positional.push(arg);
-  }
-  const source = positional[0];
-  if (!source || !targetPath || regions.length === 0) printUsage(1);
-
-  let readPair: ((pairPng: Buffer) => Promise<string>) | undefined;
-  if (vlm !== undefined) {
-    const { createVlmClient, resolveModel } = await import("@mizchi/vlmkit-ai/vlm-client.ts");
-    const modelId = vlm === true
-      ? (readEnv("VLM_MODEL") ?? "anthropic/claude-haiku-4-5")
-      : vlm;
-    const model = await resolveModel(modelId);
-    const client = await createVlmClient(model);
-    readPair = async (pairPng: Buffer) =>
-      (await client!.analyzeImage(pairPng.toString("base64"), JUDGE_PROMPT, { maxTokens: 200 })).content;
-  }
-
-  const report = await runRegionJudge({
-    source,
-    targetPath,
-    regions,
-    ...(outDir ? { outDir } : {}),
-    ...(readPair ? { readPair } : {}),
-  });
-  if (json) console.log(JSON.stringify(report, null, 2));
-  else console.log(formatRegionJudgeReport(report));
-  if (report.verdicts.some((v) => v.outcome === "different" || v.outcome === "contradicted")) {
-    process.exit(1);
-  }
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "region-judge" ||
-  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `check equivalence` is declared in `../gates/equivalence.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */

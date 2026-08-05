@@ -35,11 +35,8 @@
  */
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
 import { extractPaletteFromFile, extractPaletteFromRgba, type PaletteColor } from "../style/palette-extract.ts";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { applyGateExit } from "@mizchi/vlmkit-core/gate-exit.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
@@ -334,66 +331,9 @@ export function formatAssetCheckReport(report: AssetCheckReport): string {
   return lines.join("\n");
 }
 
-function printUsage(exitCode: number): never {
-  console.log(`Usage: vlmkit check asset <asset.png> [options]
-
-Deterministic PNG gate for image assets headed into markup slots
-(generated sprites/portraits/hero art): slot aspect fit, transparent
-vs matted background (border-ring measurement), occupancy + content
-bbox, figure-ground contrast against the target backdrop, and palette
-harmony vs a page screenshot. Browser-free pixel math — run it BEFORE
-swapping the asset in; after the swap, check integrity / check layout
-gate the page itself.
-
-Options:
-  --slot <WxH>            Target slot size, e.g. 220x300 (aspect + upscale checks)
-  --expect-transparent    The asset must be a cut-out (transparent border ring)
-  --against-bg <#rrggbb>  Backdrop the asset will sit on (silhouette contrast check)
-  --page-palette <png>    Page screenshot to check palette harmony against
-  --json                  Print JSON report
-  --advisory              Print findings but exit 0 (default: a suspect exits 1)`);
-  process.exit(exitCode);
-}
-
-async function main(argv = process.argv.slice(2)): Promise<void> {
-  if (argv.includes("--help") || argv.includes("-h")) printUsage(0);
-  let slot: { w: number; h: number } | undefined;
-  let expectTransparent = false;
-  let againstBg: string | undefined;
-  let pagePalettePath: string | undefined;
-  let json = false;
-  let advisory = false;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === "--slot") {
-      const m = /^(\d+)x(\d+)$/.exec(argv[++i] ?? "");
-      if (!m) { console.error("--slot expects WxH, e.g. 220x300"); process.exit(1); }
-      slot = { w: Number(m[1]), h: Number(m[2]) };
-    } else if (arg === "--expect-transparent") expectTransparent = true;
-    else if (arg === "--against-bg") againstBg = argv[++i]!;
-    else if (arg === "--page-palette") pagePalettePath = argv[++i]!;
-    else if (arg === "--json") json = true;
-    else if (arg === "--fail-on-suspect") { /* accepted no-op: suspects already fail */ }
-    else if (arg === "--advisory") advisory = true;
-    else if (!arg.startsWith("-")) positional.push(arg);
-  }
-  if (positional.length === 0) printUsage(1);
-
-  const report = await runAssetCheck({
-    source: positional[0]!,
-    ...(slot ? { slot } : {}),
-    ...(expectTransparent ? { expectTransparent: true } : {}),
-    ...(againstBg ? { againstBg } : {}),
-    ...(pagePalettePath ? { pagePalettePath } : {}),
-  });
-  if (json) console.log(JSON.stringify(report, null, 2));
-  else console.log(formatAssetCheckReport(report));
-  applyGateExit(report.issues.some((i) => i.severity === "suspect"), { advisory });
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "asset-check" ||
-  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `check asset` is declared in `../gates/asset.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */

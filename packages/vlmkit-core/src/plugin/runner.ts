@@ -123,7 +123,7 @@ export async function runGate<Report, Options>(
   const report = await gate.run(parsed, ctx);
 
   const settings: RuleSettings = { ...options.rules, ...shared.ruleOverrides };
-  const rules = applyRuleSettings(gate, gate.findings(report), settings);
+  const rules = applyRuleSettings(gate, gate.findings(report, parsed), settings);
   const counts = countFindings(rules.findings);
   const verdict = counts.suspect > 0 ? "fail" : "pass";
 
@@ -261,17 +261,22 @@ export function formatGateHelp(gate: AnyGateDefinition): string {
 }
 
 function flagLabel(input: NonNullable<AnyGateDefinition["inputs"]>[number]): string {
+  // `placeholder` wins for flags too: the documented usage says
+  // `--manifest <file>` and `--frames <dir>`, which tell a reader more than
+  // the generic `<path>` the kind would produce.
   const value = input.kind === "boolean"
     ? ""
-    : input.kind === "number"
-      ? " <n>"
-      : input.kind === "number-list" || input.kind === "string-list"
-        ? " <list>"
-        : input.kind === "path" || input.kind === "path-or-url"
-          ? " <path>"
-          : input.choices
-            ? ` <${input.choices.join("|")}>`
-            : " <value>";
+    : input.placeholder
+      ? ` <${input.placeholder}>`
+      : input.kind === "number"
+        ? " <n>"
+        : input.kind === "number-list" || input.kind === "string-list"
+          ? " <list>"
+          : input.kind === "path" || input.kind === "path-or-url"
+            ? " <path>"
+            : input.choices
+              ? ` <${input.choices.join("|")}>`
+              : " <value>";
   return `--${input.name}${value}${input.repeatable ? " (repeatable)" : ""}`;
 }
 

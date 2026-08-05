@@ -200,19 +200,6 @@ export function analyzeA11yContrastSamples(samples: A11yContrastRawSample[]): Co
   return findings;
 }
 
-function parseArgs(argv: string[]) {
-  let outputDir = "";
-  let report = "";
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--output-dir") outputDir = argv[++i];
-    else if (a === "--report") report = argv[++i];
-    else positional.push(a);
-  }
-  return { positional, outputDir, report };
-}
-
 export async function runA11yContrast(
   options: A11yContrastOptions,
 ): Promise<A11yContrastReport> {
@@ -287,24 +274,7 @@ export async function runA11yContrast(
   });
   await writeFile(reportPath, md);
 
-  if (!options.quiet) {
-    console.log(`  ${BOLD}${CYAN}vlmkit check a11y contrast${RESET}`);
-    console.log(`  ${DIM}html: ${htmlPath}${RESET}`);
-    console.log(`  ${DIM}inspected ${byPath.size} text-bearing element(s)${RESET}`);
-    const icon = findings.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
-    console.log(`  ${icon} ${findings.length} contrast failure(s)`);
-    const CONSOLE_ROWS = 5;
-    for (const f of findings.slice(0, CONSOLE_ROWS)) {
-      console.log(`    ${DIM}${f.path} — ${f.ratio.toFixed(2)}:1 (need ${f.requiredAA}) — \`${f.foreground.hex}\` on \`${f.background.hex}\` — "${f.text}"${RESET}`);
-    }
-    // Disclose the cut: a headline count above a five-row list reads as "here they
-    // are", and a reader has no way to know seven more exist. Same wording as
-    // `check breakpoints` and `check integrity`.
-    if (findings.length > CONSOLE_ROWS) {
-      console.log(`    ${DIM}… ${findings.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
-    }
-    console.log(`  ${DIM}report: ${reportPath}${RESET}`);
-  }
+
 
   return {
     html: htmlPath,
@@ -314,6 +284,32 @@ export async function runA11yContrast(
     failures: findings,
     reportPath,
   };
+}
+
+/**
+ * Terminal summary, extracted from the `!options.quiet` block inside the
+ * measurement function. A gate's `run` must not print: the core runner owns
+ * output, and `--json` is its decision to make, not the measurement's.
+ */
+export function formatA11yContrastReport(report: A11yContrastReport): string {
+  const lines: string[] = [];
+  lines.push(`  ${BOLD}${CYAN}vlmkit check a11y contrast${RESET}`);
+  lines.push(`  ${DIM}html: ${report.html}${RESET}`);
+  lines.push(`  ${DIM}inspected ${report.totalText} text-bearing element(s)${RESET}`);
+  const icon = report.failures.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
+  lines.push(`  ${icon} ${report.failures.length} contrast failure(s)`);
+  const CONSOLE_ROWS = 5;
+  for (const f of report.failures.slice(0, CONSOLE_ROWS)) {
+    lines.push(`    ${DIM}${f.path} — ${f.ratio.toFixed(2)}:1 (need ${f.requiredAA}) — \`${f.foreground.hex}\` on \`${f.background.hex}\` — "${f.text}"${RESET}`);
+  }
+  // Disclose the cut: a headline count above a five-row list reads as "here they
+  // are", and a reader has no way to know seven more exist. Same wording as
+  // `check breakpoints` and `check integrity`.
+  if (report.failures.length > CONSOLE_ROWS) {
+    lines.push(`    ${DIM}… ${report.failures.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
+  }
+  lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
+  return lines.join("\n");
 }
 
 function renderReport(r: Omit<A11yContrastReport, "reportPath">): string {
@@ -369,33 +365,9 @@ function renderReport(r: Omit<A11yContrastReport, "reportPath">): string {
   return lines.join("\n");
 }
 
-async function main(argv = process.argv.slice(2)) {
-  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
-  const { positional, outputDir, report } = parseArgs(argv);
-  if (positional.length === 0) {
-    console.log("Usage: vlmkit check a11y contrast <html> [--output-dir dir]");
-    console.log("Options:");
-    console.log("  --output-dir <dir>   Default: ./test-results/a11y-contrast");
-    console.log("  --report <path>      Markdown report path");
-    console.log("  --json               Print the full report as JSON (every row, no cut)");
-    process.exit(1);
-  }
-  // `--json` so the console/markdown row caps stay a display choice rather than
-
-  // the only view of the data — the truncation notices point here.
-
-  const json = argv.includes("--json");
-  const result = await runA11yContrast({
-    htmlPath: positional[0]!,
-    outputDir: outputDir || join(process.cwd(), "test-results", "a11y-contrast"),
-    reportPath: report || undefined,
-    quiet: json,
-  });
-  if (json) console.log(JSON.stringify(result, null, 2));
-  if (result.failures.length > 0) process.exitCode = 1;
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "a11y-contrast" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `check a11y contrast` is declared in `./gates/a11y.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */

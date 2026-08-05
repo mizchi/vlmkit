@@ -137,32 +137,11 @@ const SPECS: Record<string, Spec> = {
   contractScaffold: spec("contract-scaffold", () => import("@mizchi/vlmkit-markup/contract/scaffold-contract.ts")),
   selectorHeal: spec("selector-heal-cli", () => import("@mizchi/vlmkit-markup/heal/selector-heal-cli.ts")),
   palette: spec("palette-cli", () => import("@mizchi/vlmkit-markup/style/palette-cli.ts")),
-  assetCheck: spec("asset-check", () => import("@mizchi/vlmkit-markup/asset/asset-check.ts")),
   pageCompose: spec("page-compose", () => import("@mizchi/vlmkit-markup/component/page-compose.ts")),
-  multiPageConsistency: spec("multi-page-consistency", () => import("@mizchi/vlmkit-markup/stress/multi-page-consistency.ts")),
-  componentConsistency: spec("component-consistency", () => import("@mizchi/vlmkit-markup/component/component-consistency.ts")),
-  themeParity: spec("theme-parity", () => import("@mizchi/vlmkit-markup/style/theme-parity.ts")),
-  i18nStress: spec("i18n-stress", () => import("@mizchi/vlmkit-markup/stress/i18n-stress.ts")),
-  a11yContrast: spec("a11y-contrast", () => import("@mizchi/vlmkit-markup/a11y-contrast.ts")),
-  a11yTouch: spec("a11y-touch", () => import("@mizchi/vlmkit-markup/a11y-touch.ts")),
-  a11yFocusOrder: spec("a11y-focus-order", () => import("@mizchi/vlmkit-markup/a11y-focus-order.ts")),
   interact: spec("interact", () => import("@mizchi/vlmkit-markup/inspect/interact.ts")),
-  mediaVariants: spec("media-variants", () => import("@mizchi/vlmkit-markup/stress/media-variants.ts")),
   crossBrowser: spec("cross-browser", () => import("@mizchi/vlmkit-markup/stress/cross-browser.ts")),
-  designTokens: spec("design-tokens", () => import("@mizchi/vlmkit-markup/style/design-tokens.ts")),
-  designPolicy: spec("design-policy", () => import("@mizchi/vlmkit-markup/style/design-policy.ts")),
-  animationEval: spec("animation-eval", () => import("@mizchi/vlmkit-markup/style/animation-eval.ts")),
-  scrollScan: spec("scroll-scan", () => import("@mizchi/vlmkit-markup/inspect/scroll-scan.ts")),
-  markupVerify: spec("markup-verify", () => import("@mizchi/vlmkit-markup/verify/markup-verify.ts")),
-  flowVerify: spec("flow-verify", () => import("@mizchi/vlmkit-markup/inspect/flow-verify.ts")),
   markupAutofix: spec("markup-autofix", () => import("@mizchi/vlmkit-markup/verify/markup-autofix.ts")),
-  regionJudge: spec("region-judge", () => import("@mizchi/vlmkit-markup/inspect/region-judge.ts")),
-  interactionMap: spec("interaction-map", () => import("@mizchi/vlmkit-markup/inspect/interaction-map.ts")),
-  handlerMap: spec("handler-map", () => import("@mizchi/vlmkit-markup/inspect/handler-map.ts")),
-  copyCheck: spec("copy-check", () => import("@mizchi/vlmkit-markup/inspect/copy-check.ts")),
   mockScan: spec("mock-scan", () => import("@mizchi/vlmkit-markup/inspect/mock-scan.ts")),
-  craterSmoke: spec("crater-smoke", () => import("@mizchi/vlmkit-capture/crater-smoke.ts")),
-  perf: spec("perf", () => import("../util/perf.ts")),
   explore: spec("explore", () => import("@mizchi/vlmkit-markup/inspect/explore.ts")),
   skill: spec("skill", () => import("../util/skill.ts")),
   markupLoop: spec("markup-loop", () => import("../util/markup-loop.ts")),
@@ -187,32 +166,16 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
   },
   check: {
     palette: { spec: SPECS.palette, desc: "Dominant colors of a PNG, or palette diff of two PNGs" },
-    tokens: { spec: SPECS.designTokens, desc: "Design-token scale conformance (against a scale YOU declare)" },
-    design: { spec: SPECS.designPolicy, desc: "Coherence of the design system the page itself implies (component/spacing consistency)" },
-    theme: { spec: SPECS.themeParity, desc: "Theme parity (hard-coded color scan in dark mode)" },
-    animation: { spec: SPECS.animationEval, desc: "Frame-sampled animation evaluation (visible effect / settle / reduced-motion behavior)" },
-    copy: { spec: SPECS.copyCheck, desc: "Copy fidelity: placeholder scan + --manifest verification + --target image check (VLM or agent-vision sheets)" },
-    equivalence: { spec: SPECS.regionJudge, desc: "Visual equivalence judge for residual regions (measured delta + refutation-gated VLM or pair sheets)" },
-    interactions: { spec: SPECS.interactionMap, desc: "A11y-event state map: keyboard probes -> ARIA transitions; --reference makes it a behavioral contract" },
-    asset: { spec: SPECS.assetCheck, desc: "Generated-asset gate (browser-free PNG math): slot aspect fit, transparent vs matted background, occupancy, figure-ground contrast vs backdrop, palette harmony vs page" },
-    crater: { spec: SPECS.craterSmoke, desc: "Crater BiDi backend smoke check" },
-    perf: { spec: SPECS.perf, desc: "Web Vitals thresholds (CLS / LCP / FCP)" },
   },
   inspect: {
     interact: { spec: SPECS.interact, desc: "Scripted UI interaction sequence" },
     explore: { spec: SPECS.explore, desc: "Auto-discover declared actions and diff each" },
     smoke: { spec: SPECS.smokeRunner, desc: "A11y-driven exploratory smoke test" },
   },
-  stress: {
-    i18n: { spec: SPECS.i18nStress, desc: "Inflate text content; detect overflow / wrap bugs" },
-    media: { spec: SPECS.mediaVariants, desc: "Forced-colors / reduced-motion / print / RTL / 200% zoom" },
-  },
   scan: {
     component: { spec: SPECS.componentExtract, desc: "Detect components in a screenshot; crop to standalone PNGs" },
     breakpoints: { run: runDiscover, desc: "Discover responsive breakpoints from HTML/CSS (verify them with `check breakpoints`)" },
-    scroll: { spec: SPECS.scrollScan, desc: "Annotation-free scroll inventory: containers, page overflow-x, clipped content" },
     mock: { spec: SPECS.mockScan, desc: "Mock-image intake: infer @2x/@3x scale, write normalized @1x target, extraction sanity" },
-    handlers: { spec: SPECS.handlerMap, desc: "Event-callback surface: every wired listener + pointer-only-control cross-check (experimental)" },
   },
   build: {
     component: { spec: SPECS.componentFromImage, desc: "Build a component from a target screenshot" },
@@ -227,21 +190,6 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
     selector: { spec: SPECS.selectorHeal, desc: "Suggest replacements for a selector that no longer matches" },
     markup: { spec: SPECS.markupAutofix, desc: "Stage-2 auto-fix: LLM turns the verify-markup kickback into gated CSS overrides" },
   },
-  verify: {
-    markup: { spec: SPECS.markupVerify, desc: "One-shot done-condition verdict: composition per target + gates + pixel diff + kickback list with selector attribution" },
-    flow: { spec: SPECS.flowVerify, desc: "Verified scripted browser flow: action -> deterministic post-condition assert (no LLM)" },
-  },
-};
-
-// Two-segment subcommands inside `check` (a11y, drift).
-const CHECK_A11Y: Record<string, { spec: Spec; desc: string }> = {
-  contrast: { spec: SPECS.a11yContrast, desc: "WCAG AA contrast scan" },
-  touch: { spec: SPECS.a11yTouch, desc: "Touch-target size check" },
-  focus: { spec: SPECS.a11yFocusOrder, desc: "Focus order / trap check" },
-};
-const CHECK_DRIFT: Record<string, { spec: Spec; desc: string }> = {
-  component: { spec: SPECS.componentConsistency, desc: "Drift across N selector instances on one page" },
-  pages: { spec: SPECS.multiPageConsistency, desc: "Drift of one selector across N pages" },
 };
 
 /**
@@ -262,16 +210,14 @@ async function groupLeaves(groupName: string): Promise<{ name: string; desc: str
 async function printGroupHelp(groupName: string): Promise<void> {
   const leaves = await groupLeaves(groupName);
   if (groupName === "check") {
+    // `a11y *` and `drift *` used to be printed by hand here because they were
+    // not in any table. They are registry gates now, so they arrive in
+    // `leaves` with everything else and the hand-written lines are gone.
     console.log(`vlmkit check <subcommand>\n`);
     console.log("Subcommands:");
-    console.log("  a11y contrast <html>          WCAG AA contrast scan");
-    console.log("  a11y touch <html>             Touch-target size check");
-    console.log("  a11y focus <html>             Focus order / trap check");
     for (const leaf of leaves) {
       console.log(`  ${leaf.name.padEnd(30)}${leaf.desc}`);
     }
-    console.log("  drift component <html>        Drift across N selector instances on one page");
-    console.log("  drift pages --urls/--files    Drift of one selector across N pages");
     console.log(`\nRun \`vlmkit rules\` to list the rules each gate can tune.`);
     return;
   }
@@ -344,47 +290,23 @@ async function runGroupLeaf(
   leafName: string,
   rest: string[],
 ): Promise<void> {
-  if (groupName === "check" && leafName === "a11y") {
-    const sub = rest[0];
-    if (!sub || sub === HELP_SENTINEL) {
-      console.log("vlmkit check a11y <contrast|touch|focus> <html>");
-      return;
-    }
-    const entry = CHECK_A11Y[sub];
-    if (!entry) {
-      console.error(`Unknown a11y check: ${sub}`);
-      process.exit(1);
-    }
-    await delegate(entry.spec, rest.slice(1));
-    return;
-  }
-  if (groupName === "check" && leafName === "drift") {
-    const sub = rest[0];
-    if (!sub || sub === HELP_SENTINEL) {
-      console.log("vlmkit check drift <component|pages> <html>");
-      return;
-    }
-    const entry = CHECK_DRIFT[sub];
-    if (!entry) {
-      console.error(`Unknown drift check: ${sub}`);
-      process.exit(1);
-    }
-    await delegate(entry.spec, rest.slice(1));
-    return;
-  }
-  // Legacy table first, registry second — and the order matters for a
-  // non-obvious reason. A `delegate`d leaf runs its work in module *evaluation*
-  // (`if (isCliEntry) main()`), so it only runs the first time that module is
-  // imported. Composing the registry imports the migrated gates' measurement
-  // modules, and those transitively import other leaves (`integrity-check`
-  // pulls in `scroll-scan`). Consulting the registry first therefore warmed
-  // the module cache for `scan scroll` and made `vlmkit scan scroll --help`
-  // print nothing at all. A migrated gate is absent from `GROUPS`, so it still
-  // reaches the registry; an unmigrated one never triggers the import.
+  // `check a11y` / `check drift` used to be hand-written two-segment branches
+  // here, each with its own sub-table and its own "unknown X" error. They are
+  // three-token gates now (`["check","a11y","contrast"]`) and the registry
+  // resolves by longest prefix, so the branches are gone. A bare
+  // `vlmkit check a11y` falls through to the suggestion path below, which
+  // names the three real commands.
+  // Legacy table first, registry second. The remaining `GROUPS` entries are
+  // artifact producers (`diff`, `build`, `contract`, `scan component`, …), not
+  // gates, and they still work the old way: their `main()` runs as a side
+  // effect of module *evaluation*.
   //
-  // This asymmetry disappears with the last migration — which is precisely the
-  // hazard the plugin contract removes: a gate is data plus functions, not a
-  // module whose import has side effects.
+  // That side effect is why the order matters. Composing the registry imports
+  // the gate modules, which transitively import other leaves; consulting the
+  // registry first therefore warmed the module cache for a `delegate`d leaf and
+  // made `vlmkit <that leaf> --help` print nothing at all. Checking `GROUPS`
+  // first means a legacy command never triggers the import. Every gate is
+  // absent from `GROUPS`, so gates still reach the registry.
   const entry = GROUPS[groupName]?.[leafName];
   if (entry) {
     if (entry.run) await entry.run(rest);
@@ -415,6 +337,15 @@ async function runGroupLeaf(
 }
 
 export async function runCli(argv: string[] = process.argv.slice(2)): Promise<void> {
+  // Answered before anything else so the compact index — the most common
+  // invocation — never pays for loading the gate registry.
+  const isTopLevelHelp = argv.length === 0
+    || (argv.length === 1 && (argv[0] === "--help" || argv[0] === "-h" || argv[0] === "help"));
+  if (isTopLevelHelp) {
+    printRootHelp();
+    return;
+  }
+
   const cli = cac("vlmkit");
   cli.version("0.9.1");
 
@@ -423,8 +354,20 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<vo
 Deterministic verification for frontend work.
 Run \`vlmkit <command> --help\` for subcommands, options, and examples.`);
 
+  if (argv[0] === "--version" || argv[0] === "-v") {
+    cli.outputVersion();
+    return;
+  }
+
   // Group commands — second-level dispatch happens in the action.
-  for (const groupName of Object.keys(GROUPS)) {
+  //
+  // The verb list is the union of the legacy `GROUPS` table and the registry's
+  // groups, because some verbs now exist ONLY in the registry: every gate under
+  // `stress` and `verify` is registry-driven, so those keys are gone from
+  // `GROUPS` entirely. Reading only one source silently dropped
+  // `vlmkit verify markup` as an unknown command.
+  const registryGroups = [...(await loadGateRegistry()).groups().keys()];
+  for (const groupName of [...new Set([...Object.keys(GROUPS), ...registryGroups])]) {
     cli.command(`${groupName} [...args]`, `${groupName} group`)
       .allowUnknownOptions()
       .action(async () => {
@@ -574,20 +517,6 @@ Options:
   cli.command("baseline [...args]", "Approve / inspect snapshot baselines")
     .allowUnknownOptions()
     .action(async () => delegate(SPECS.baseline, passThrough(argv, ["baseline"])));
-
-  // Keep top-level help as a compact index. Detailed usage belongs to each
-  // command or command group so the first screen remains easy to scan.
-  const isTopLevelHelp =
-    argv.length === 0 ||
-    (argv.length === 1 && (argv[0] === "--help" || argv[0] === "-h" || argv[0] === "help"));
-  if (isTopLevelHelp) {
-    printRootHelp();
-    return;
-  }
-  if (argv[0] === "--version" || argv[0] === "-v") {
-    cli.outputVersion();
-    return;
-  }
 
   // Mask --help/-h so cac doesn't intercept; passThrough restores it.
   const maskedArgv = argv.map((a) => (a === "--help" || a === "-h" ? HELP_SENTINEL : a));

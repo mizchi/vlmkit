@@ -31,10 +31,8 @@
  *   vlmkit check interactions <html> --handlers   (adds surface + cross-check issues)
  */
 import { resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
-import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { DISCOVER_SCRIPT } from "./interaction-map.ts";
@@ -401,48 +399,9 @@ export function formatHandlerSurface(surface: HandlerSurface, issues: HandlerIss
   return lines.join("\n");
 }
 
-function printUsage(exitCode: number): never {
-  console.log(`Usage: vlmkit scan handlers <html-or-url> [options]
-
-Enumerates every event callback wired on the page (addEventListener
-via an init-script patch + on* attributes/properties) into a
-per-element event surface, and cross-checks it against the a11y
-interaction discovery. Headline detection: pointer-only controls —
-click handlers on role-less elements no keyboard user can operate.
-
-Framework caveat: React-style root delegation appears as one listener
-on the delegation root; per-element granularity is a vanilla/Web
-Components property.
-
-Options:
-  --json    Print JSON report`);
-  process.exit(exitCode);
-}
-
-async function main(argv = process.argv.slice(2)): Promise<void> {
-  if (argv.includes("--help") || argv.includes("-h")) printUsage(0);
-  const json = argv.includes("--json");
-  const source = argv.find((a) => !a.startsWith("-"));
-  if (!source) printUsage(1);
-
-  const surface = await buildHandlerSurface({ source });
-  const issues = deriveHandlerIssues(surface);
-  appendRunLedger({
-    tool: "scan-handlers",
-    source,
-    headline: {
-      registrations: surface.totalRegistrations,
-      elements: surface.elements.length,
-      suspects: issues.filter((i) => i.severity === "suspect").length,
-    },
-  });
-  if (json) console.log(JSON.stringify({ surface, issues }, null, 2));
-  else console.log(formatHandlerSurface(surface, issues));
-  if (issues.some((i) => i.severity === "suspect")) process.exit(1);
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "handler-map" ||
-  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `scan handlers` is declared in `../gates/handlers.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */

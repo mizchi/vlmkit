@@ -168,8 +168,15 @@ export interface GateDefinition<Report = unknown, Options = unknown> {
   parse: (argv: readonly string[], ctx: GateContext) => Options;
   /** Do the measurement. No printing, no exit codes. */
   run: (options: Options, ctx: GateContext) => Promise<Report> | Report;
-  /** Project the report onto the normalized finding list. */
-  findings: (report: Report) => readonly Finding[];
+  /**
+   * Project the report onto the normalized finding list.
+   *
+   * `options` is passed because a flag can legitimately decide a finding's
+   * severity: `check crater --require` promotes an unreachable backend from
+   * `info` to `suspect`, which is the whole purpose of the flag. Most gates
+   * ignore the second argument.
+   */
+  findings: (report: Report, options: Options) => readonly Finding[];
   /** Human output. The runner decides whether it is called at all (`--json`). */
   format: (report: Report) => string;
   /**

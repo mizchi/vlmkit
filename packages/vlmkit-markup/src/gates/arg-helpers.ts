@@ -56,6 +56,20 @@ export function numberList(argv: readonly string[], name: string): number[] | un
   return values;
 }
 
+/**
+ * Like `numberList`, but for scales that are legitimately fractional
+ * (`--tolerance`-adjacent flags such as `--radius-scale 0,2,4.5`).
+ */
+export function numberListFloat(argv: readonly string[], name: string): number[] | undefined {
+  const raw = readFlag(argv, name);
+  if (raw === undefined) return undefined;
+  return raw.split(",").map((part) => part.trim()).filter(Boolean).map((part) => {
+    const n = Number.parseFloat(part);
+    if (!Number.isFinite(n)) throw new UsageError(`--${name}: "${part}" is not a number`);
+    return n;
+  });
+}
+
 /** `--viewport 1280x720` → `{width, height}`. */
 export function viewportFlag(
   argv: readonly string[],
@@ -74,4 +88,19 @@ export function optionalInt(
   options: { min?: number } = {},
 ): number | undefined {
   return readInt(argv, name, options);
+}
+
+/**
+ * `--vlm` (use the default model) or `--vlm <model-id>`. Returns `undefined`
+ * when the flag is absent, which is the "stay deterministic" default —
+ * every gate that accepts a VLM works without one.
+ *
+ * `readFlag` cannot express this: the value is optional, so a bare `--vlm`
+ * followed by another flag must not consume it.
+ */
+export function vlmFlag(argv: readonly string[], name = "vlm"): string | true | undefined {
+  const index = argv.lastIndexOf(`--${name}`);
+  if (index < 0) return undefined;
+  const next = argv[index + 1];
+  return next !== undefined && !next.startsWith("-") ? next : true;
 }

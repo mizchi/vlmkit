@@ -28,10 +28,7 @@
  *   vlmkit check design <html-or-url> [--min-reuse 3] [--json] [--advisory]
  */
 import { resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { hasFlag, readAll, readChoice, readFlag, readInt, readNumber, readPositionals } from "@mizchi/vlmkit-core/arg-reader.ts";
-import { applyGateExit } from "@mizchi/vlmkit-core/gate-exit.ts";
+import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
@@ -142,7 +139,6 @@ export interface DesignPolicyOptions {
 }
 
 /** Flags that consume the next argv entry, so the source positional is found. */
-const VALUE_FLAGS = ["min-reuse", "min-instances", "storage-state", "exclude", "timeout", "wait-until", "har"];
 
 const DEFAULT_MIN_REUSE = 3;
 const DEFAULT_MIN_INSTANCES = 3;
@@ -490,66 +486,9 @@ export function formatDesignReport(report: DesignPolicyReport): string {
   return lines.join("\n");
 }
 
-function printUsage(exitCode: number): never {
-  console.log(`Usage: vlmkit check design <html-or-url> [options]
-
-Conformance to the design system the page itself implies: are components
-styled consistently, and does spacing stay on the page's own scale? Reports
-INCONSISTENCY, never which value is correct — taste stays with humans.
-
-Options:
-  --min-reuse <n>         Times each style must be reused (default 3)
-  --min-instances <n>     Instances before a role is judged (default 3)
-  --exclude <selector>    Exclude a vendor-owned subtree (repeatable, audited)
-  --timeout <ms>          Page navigation timeout (default: 30000)
-  --wait-until <state>    domcontentloaded, load, or networkidle (default)
-  --har <file>            Replay network responses from a Playwright HAR
-  --json                  Print JSON report
-  --storage-state <file>  Playwright storage state for pages behind a login
-  --advisory              Print findings but exit 0 (default: suspects exit 1)
-
-Findings are warn-level by design; a drifting design system is information,
-not a broken page. Study behind the thresholds:
-docs/design/design-policy-metrics.md`);
-  process.exit(exitCode);
-}
-
-async function main(argv = process.argv.slice(2)): Promise<void> {
-  if (hasFlag(argv, "help") || hasFlag(argv, "-h")) printUsage(0);
-  // Validated at read time: `--min-reuse abc` used to become NaN, and since
-  // every `reuse >= NaN` comparison is false, the gate would have reported
-  // every role as drifting instead of saying the flag was wrong.
-  const minReuse = readNumber(argv, "min-reuse", { min: 0 });
-  const minInstances = readInt(argv, "min-instances", { min: 1 });
-  const storageState = readFlag(argv, "storage-state");
-  const har = readFlag(argv, "har");
-  const exclude = readAll(argv, "exclude");
-  const timeout = readInt(argv, "timeout", { min: 1 });
-  const waitUntil = readChoice(
-    argv,
-    "wait-until",
-    ["domcontentloaded", "load", "networkidle"] as const,
-  );
-  const json = hasFlag(argv, "json");
-  const source = readPositionals(argv, VALUE_FLAGS)[0];
-  if (!source) printUsage(1);
-  const report = await runDesignPolicyCheck({
-    source,
-    ...(minReuse !== undefined ? { minReuse } : {}),
-    ...(minInstances !== undefined ? { minInstances } : {}),
-    ...(storageState ? { storageState } : {}),
-    ...(exclude.length > 0 ? { exclude } : {}),
-    ...(timeout !== undefined ? { timeout } : {}),
-    ...(waitUntil ? { waitUntil } : {}),
-    ...(har ? { har } : {}),
-  });
-  if (json) console.log(JSON.stringify(report, null, 2));
-  else console.log(formatDesignReport(report));
-  applyGateExit(report.findings.some((f) => f.severity === "suspect"), {
-    advisory: hasFlag(argv, "advisory"),
-  });
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "design-policy" ||
-  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) main().catch(handleCliError);
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `check design` is declared in `../gates/design.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */

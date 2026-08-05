@@ -41,7 +41,7 @@ inventory is \`vlmkit scan scroll\`.)`,
   ],
   inputs: [
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check", positional: 0, required: true },
-    { name: "viewport", kind: "string", description: "Viewport as <width>x<height>", defaultDescription: "1280x720" },
+    { name: "viewport", placeholder: "WxH", kind: "string", description: "Viewport", defaultDescription: "1280x720" },
   ],
   parse: (argv) => {
     const source = firstPositional(argv, "vlmkit check scroll <html-or-url>");

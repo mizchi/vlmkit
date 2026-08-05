@@ -46,6 +46,12 @@ export interface LayoutShiftSource {
 export interface PerfReport {
   source: string;
   viewport: { width: number; height: number };
+  /**
+   * Observation window after networkidle, in ms. On the report because CLS is
+   * only meaningful relative to how long it was measured for — a reader
+   * comparing two runs needs to know the windows matched.
+   */
+  observeMs: number;
   /** Cumulative Layout Shift score (CLS). Good ≤ 0.1, poor > 0.25. */
   cls: number;
   /** Largest Contentful Paint (ms). Good ≤ 2500, poor > 4000. */
@@ -71,40 +77,6 @@ export interface PerfReport {
 
 function isUrl(s: string): boolean { return /^https?:\/\//.test(s); }
 
-function parseArgs(argv: string[]) {
-  let outputDir = "";
-  let report = "";
-  let observeMs = 3000;
-  let strict = false;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--output-dir") outputDir = argv[++i];
-    else if (a === "--report") report = argv[++i];
-    else if (a === "--observe") observeMs = parseInt(argv[++i] ?? "3000", 10);
-    else if (a === "--strict") strict = true;
-    else positional.push(a);
-  }
-  return { positional, outputDir, report, observeMs, strict };
-}
-
-// Browser-side instrumentation. Installs three PerformanceObservers
-// (layout-shift, largest-contentful-paint, paint) and stores results
-// on a global slot the outer page.evaluate() picks up after a fixed
-// observation window. We don't await individual metrics because the
-// Web Vitals timing is best-effort — some pages never fire LCP if
-// they have no contentful element at all, and CLS only stabilizes
-// when the page is fully idle.
-//
-// Note on `hadRecentInput`: real Chrome's CLS calculation skips
-// shifts within 500ms of user input. In a one-shot Playwright capture
-// there is no real user input — yet Chromium occasionally flags the
-// first auto-injected shifts as `hadRecentInput: true` (especially
-// for setContent-loaded pages where the synthetic data: URL
-// navigation is treated as an input event). For a static-capture
-// tool the safest behavior is to include all shifts in CLS; the
-// per-entry `hadRecentInput` is still recorded on each source row
-// in case the agent wants to filter.
 const PERF_INSTALL_SCRIPT = `
 (function installPerf() {
   const data = { cls: 0, shifts: [], shiftEvents: 0, lcp: 0, fcp: 0, ttfb: 0, lcpEl: null };
@@ -283,30 +255,40 @@ export async function runPerf(options: PerfOptions): Promise<PerfReport> {
 
   const reportPath = options.reportPath ?? join(outputDir, "report.md");
   const md = renderReport({
-    source: options.source, viewport,
+    source: options.source, viewport, observeMs,
     cls, lcp, fcp, ttfb,
     shiftSources, shiftEvents: raw.shiftEvents,
     lcpElement: raw.lcpEl ?? undefined, verdicts,
   });
   await writeFile(reportPath, md);
 
-  console.log(`  ${BOLD}${CYAN}vlmkit check perf${RESET}`);
-  console.log(`  ${DIM}source: ${options.source}  observed: ${observeMs}ms${RESET}`);
-  const icon = (v: "good" | "needs-improvement" | "poor") =>
-    v === "good" ? `${GREEN}✓${RESET}` : v === "needs-improvement" ? `${YELLOW}!${RESET}` : `${RED}✗${RESET}`;
-  console.log(`  ${icon(verdicts.cls)} CLS  ${cls.toString().padStart(6)}  ${DIM}(good ≤ 0.1, poor > 0.25)${RESET}`);
-  console.log(`  ${icon(verdicts.lcp)} LCP  ${lcp.toString().padStart(6)}  ${DIM}ms (good ≤ 2500, poor > 4000)${RESET}`);
-  console.log(`  ${icon(verdicts.fcp)} FCP  ${fcp.toString().padStart(6)}  ${DIM}ms (good ≤ 1800, poor > 3000)${RESET}`);
-  if (shiftSources.length > 0) {
-    console.log(`  ${DIM}top shift source: ${shiftSources[0]!.path} (${shiftSources[0]!.value.toFixed(4)})${RESET}`);
-  }
-  console.log(`  ${DIM}report: ${reportPath}${RESET}`);
 
   return {
-    source: options.source, viewport,
+    source: options.source, viewport, observeMs,
     cls, lcp, fcp, ttfb, shiftSources, shiftEvents: raw.shiftEvents,
     lcpElement: raw.lcpEl ?? undefined, verdicts, reportPath,
   };
+}
+
+/**
+ * Terminal summary, extracted from the measurement function. A gate's `run`
+ * must not print — the core runner owns output and decides between prose and
+ * `--json`.
+ */
+export function formatPerfReport(report: PerfReport): string {
+  const lines: string[] = [];
+  lines.push(`  ${BOLD}${CYAN}vlmkit check perf${RESET}`);
+  lines.push(`  ${DIM}source: ${report.source}  observed: ${report.observeMs}ms${RESET}`);
+  const icon = (v: "good" | "needs-improvement" | "poor") =>
+    v === "good" ? `${GREEN}✓${RESET}` : v === "needs-improvement" ? `${YELLOW}!${RESET}` : `${RED}✗${RESET}`;
+  lines.push(`  ${icon(report.verdicts.cls)} CLS  ${report.cls.toString().padStart(6)}  ${DIM}(good ≤ 0.1, poor > 0.25)${RESET}`);
+  lines.push(`  ${icon(report.verdicts.lcp)} LCP  ${report.lcp.toString().padStart(6)}  ${DIM}ms (good ≤ 2500, poor > 4000)${RESET}`);
+  lines.push(`  ${icon(report.verdicts.fcp)} FCP  ${report.fcp.toString().padStart(6)}  ${DIM}ms (good ≤ 1800, poor > 3000)${RESET}`);
+  if (report.shiftSources.length > 0) {
+    lines.push(`  ${DIM}top shift source: ${report.shiftSources[0]!.path} (${report.shiftSources[0]!.value.toFixed(4)})${RESET}`);
+  }
+  lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
+  return lines.join("\n");
 }
 
 function renderReport(r: Omit<PerfReport, "reportPath">): string {
@@ -391,35 +373,9 @@ function renderReport(r: Omit<PerfReport, "reportPath">): string {
   return lines.join("\n");
 }
 
-async function main(argv = process.argv.slice(2)) {
-  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
-  const { positional, outputDir, report, observeMs, strict } = parseArgs(argv);
-  if (positional.length === 0) {
-    console.log("Usage: vlmkit check perf <html-or-url> [options]");
-    console.log("Options:");
-    console.log("  --observe <ms>      Observation window after networkidle (default: 3000)");
-    console.log("  --strict            Exit non-zero on any non-good verdict (CI gate mode)");
-    console.log("  --output-dir <dir>  Default: ./test-results/perf");
-    console.log("  --report <path>     Markdown report path");
-    process.exit(1);
-  }
-  const result = await runPerf({
-    source: positional[0]!,
-    outputDir: outputDir || join(process.cwd(), "test-results", "perf"),
-    reportPath: report || undefined,
-    observeMs,
-  });
-  // CI gating: when --strict, exit non-zero if any verdict isn't
-  // "good". Use 1 for "poor" (hard fail), 2 for "needs-improvement"
-  // (warning — page works but a metric is borderline).
-  if (strict) {
-    const verdicts = [result.verdicts.cls, result.verdicts.lcp, result.verdicts.fcp];
-    if (verdicts.includes("poor")) process.exitCode = 1;
-    else if (verdicts.includes("needs-improvement")) process.exitCode = 2;
-  }
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "perf" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `check perf` is declared in `../gates/perf.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */

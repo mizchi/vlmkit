@@ -678,53 +678,9 @@ export function formatMarkupVerifyReport(report: MarkupVerifyReport): string {
   return lines.join("\n");
 }
 
-function printUsage(exitCode: number): never {
-  console.log(`Usage: vlmkit verify markup <attempt.html> --target <png> [--target <png> ...] [options]
-
-One-shot done-condition verdict: composition per target viewport +
-dynamic gates + rest-pose pixel diff, with a paste-ready kickback
-listing every residual. Add --reference to print the calibration floor.
-
-Options:
-  --target <png>       Target screenshot (repeatable; width/height define the render viewport)
-  --reference <html>   Reference page measured against the same targets (calibration floor)
-  --no-fix-context     Skip selector attribution on kickback residuals (saves one page load)
-  --json               Print JSON report`);
-  process.exit(exitCode);
-}
-
-async function main(argv = process.argv.slice(2)): Promise<void> {
-  if (argv.includes("--help") || argv.includes("-h")) printUsage(0);
-  const targets: string[] = [];
-  let reference: string | undefined;
-  let json = false;
-  let fixContext = true;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === "--target") targets.push(argv[++i]!);
-    else if (arg === "--reference") reference = argv[++i]!;
-    else if (arg === "--json") json = true;
-    else if (arg === "--no-fix-context") fixContext = false;
-    else if (!arg.startsWith("-")) positional.push(arg);
-  }
-  const attempt = positional[0];
-  if (!attempt || targets.length === 0) printUsage(1);
-  if (!existsSync(attempt)) throw new Error(`Attempt not found: ${attempt}`);
-  for (const t of targets) if (!existsSync(t)) throw new Error(`Target not found: ${t}`);
-  if (reference && !existsSync(reference)) throw new Error(`Reference not found: ${reference}`);
-
-  const report = await runMarkupVerify({ attempt, targets, fixContext, ...(reference ? { reference } : {}) });
-  if (json) {
-    console.log(JSON.stringify(report, null, 2));
-  } else {
-    console.log(formatMarkupVerifyReport(report));
-  }
-  if (!report.done) process.exit(1);
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "markup-verify" ||
-  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `verify markup` is declared in `../gates/verify.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */

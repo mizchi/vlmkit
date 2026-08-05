@@ -79,21 +79,6 @@ export interface FocusOrderReport {
 
 function isUrl(s: string): boolean { return /^https?:\/\//.test(s); }
 
-function parseArgs(argv: string[]) {
-  let outputDir = "";
-  let report = "";
-  let maxSteps = 64;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--output-dir") outputDir = argv[++i];
-    else if (a === "--report") report = argv[++i];
-    else if (a === "--max-steps") maxSteps = parseInt(argv[++i] ?? "64", 10);
-    else positional.push(a);
-  }
-  return { positional, outputDir, report, maxSteps };
-}
-
 export const A11Y_FOCUS_ORDER_SAMPLE_SCRIPT = `
 (function focused() {
   const el = document.activeElement;
@@ -254,27 +239,36 @@ export async function runFocusOrder(
   });
   await writeFile(reportPath, md);
 
-  if (!options.quiet) {
-    console.log(`  ${BOLD}${CYAN}vlmkit check a11y focus${RESET}`);
-    console.log(`  ${DIM}source: ${options.source}${RESET}`);
-    console.log(`  ${DIM}captured ${steps.length} focus step(s)${RESET}`);
-    const icon = findings.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
-    console.log(`  ${icon} ${findings.length} finding(s)`);
-    const CONSOLE_ROWS = 5;
-    for (const f of findings.slice(0, CONSOLE_ROWS)) {
-      console.log(`    ${DIM}[${f.kind}] ${f.message}${RESET}`);
-    }
-    // See a11y-contrast: an undisclosed cut makes a partial list look complete.
-    if (findings.length > CONSOLE_ROWS) {
-      console.log(`    ${DIM}… ${findings.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
-    }
-    console.log(`  ${DIM}report: ${reportPath}${RESET}`);
-  }
+
 
   return {
     source: options.source, viewport, screenshot: screenshotPath,
     steps, findings, reportPath,
   };
+}
+
+/**
+ * Terminal summary, extracted from the `!options.quiet` block inside the
+ * measurement function. A gate's `run` must not print: the core runner owns
+ * output, and `--json` is its decision to make, not the measurement's.
+ */
+export function formatFocusOrderReport(report: FocusOrderReport): string {
+  const lines: string[] = [];
+  lines.push(`  ${BOLD}${CYAN}vlmkit check a11y focus${RESET}`);
+  lines.push(`  ${DIM}source: ${report.source}${RESET}`);
+  lines.push(`  ${DIM}captured ${report.steps.length} focus step(s)${RESET}`);
+  const icon = report.findings.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
+  lines.push(`  ${icon} ${report.findings.length} finding(s)`);
+  const CONSOLE_ROWS = 5;
+  for (const f of report.findings.slice(0, CONSOLE_ROWS)) {
+    lines.push(`    ${DIM}[${f.kind}] ${f.message}${RESET}`);
+  }
+  // See a11y-contrast: an undisclosed cut makes a partial list look complete.
+  if (report.findings.length > CONSOLE_ROWS) {
+    lines.push(`    ${DIM}… ${report.findings.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
+  }
+  lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
+  return lines.join("\n");
 }
 
 function renderReport(r: Omit<FocusOrderReport, "reportPath">): string {
@@ -329,34 +323,9 @@ function renderReport(r: Omit<FocusOrderReport, "reportPath">): string {
   return lines.join("\n");
 }
 
-async function main(argv = process.argv.slice(2)) {
-  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
-  const { positional, outputDir, report, maxSteps } = parseArgs(argv);
-  if (positional.length === 0) {
-    console.log("Usage: vlmkit check a11y focus <html-or-url> [options]");
-    console.log("Options:");
-    console.log("  --max-steps N        Maximum Tab presses (default: 64)");
-    console.log("  --output-dir <dir>   Default: ./test-results/a11y-focus-order");
-    console.log("  --report <path>      Markdown report path");
-    console.log("  --json               Print the full report as JSON (every row, no cut)");
-    process.exit(1);
-  }
-  // `--json` so the console/markdown row caps stay a display choice rather than
-
-  // the only view of the data — the truncation notices point here.
-
-  const json = argv.includes("--json");
-  const result = await runFocusOrder({
-    source: positional[0]!,
-    outputDir: outputDir || join(process.cwd(), "test-results", "a11y-focus-order"),
-    reportPath: report || undefined,
-    maxSteps,
-    quiet: json,
-  });
-  if (json) console.log(JSON.stringify(result, null, 2));
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "a11y-focus-order" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `check a11y focus` is declared in `./gates/a11y.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */

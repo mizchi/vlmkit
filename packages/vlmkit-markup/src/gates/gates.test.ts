@@ -17,7 +17,32 @@ describe("markup gate plugin", () => {
     const registry = createGateRegistry([markupGatesPlugin]);
     assert.deepEqual(
       registry.list().map(({ gate }) => gate.command.join(" ")).sort(),
-      ["check breakpoints", "check integrity", "check layout", "check motion", "check scroll"],
+      [
+        "check a11y contrast",
+        "check a11y focus",
+        "check a11y touch",
+        "check animation",
+        "check asset",
+        "check breakpoints",
+        "check copy",
+        "check design",
+        "check drift component",
+        "check drift pages",
+        "check equivalence",
+        "check integrity",
+        "check interactions",
+        "check layout",
+        "check motion",
+        "check scroll",
+        "check theme",
+        "check tokens",
+        "scan handlers",
+        "scan scroll",
+        "stress i18n",
+        "stress media",
+        "verify flow",
+        "verify markup",
+      ],
     );
   });
 
@@ -33,12 +58,21 @@ describe("markup gate plugin", () => {
     }
   });
 
-  it("declares a source positional and a summary for every gate", () => {
+  it("declares inputs and a real summary for every gate", () => {
     for (const gate of markupGatesPlugin.gates) {
       assert.ok(gate.summary.length > 20, `${gate.id} needs a real summary`);
+      assert.ok((gate.inputs ?? []).length > 0, `${gate.id} declares no inputs`);
       const positional = (gate.inputs ?? []).find((i) => i.positional === 0);
-      assert.ok(positional, `${gate.id} declares no primary positional`);
-      assert.equal(positional!.placeholder, "html-or-url", `${gate.id} should use the documented placeholder`);
+      // `check drift pages` genuinely has no positional — its pages arrive via
+      // repeatable --urls / --files — so a positional is not universal. When
+      // there is one it must carry a placeholder, because the usage line reads
+      // `<html-or-url>` rather than the option key `<source>`.
+      if (positional) {
+        assert.ok(positional.placeholder, `${gate.id} should declare a positional placeholder`);
+      }
+      for (const input of gate.inputs ?? []) {
+        assert.ok(input.description.length > 3, `${gate.id}/${input.name} needs a description`);
+      }
     }
   });
 
@@ -47,7 +81,11 @@ describe("markup gate plugin", () => {
       const help = formatGateHelp(gate);
       assert.match(help, /--advisory/, `${gate.id} help omits --advisory`);
       assert.match(help, /--rule <ref>=<setting>/, `${gate.id} help omits --rule`);
-      assert.match(help, new RegExp(`Usage: vlmkit ${gate.command.join(" ")} <html-or-url>`));
+      const positional = (gate.inputs ?? []).find((i) => i.positional === 0);
+      const expected = positional
+        ? `Usage: vlmkit ${gate.command.join(" ")} <${escapeRegExp(positional.placeholder!)}>`
+        : `Usage: vlmkit ${gate.command.join(" ")} \\[options\\]`;
+      assert.match(help, new RegExp(expected));
     }
   });
 
@@ -61,6 +99,10 @@ describe("markup gate plugin", () => {
     }
   });
 });
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
 describe("gate argument parsing", () => {
   const ctx = { cwd: process.cwd(), argv: [] as string[], json: false };
@@ -133,7 +175,7 @@ describe("finding projection", () => {
       exempted: [],
       viewports: [],
       kickback: [],
-    });
+    }, { source: "page.html" });
     assert.deepEqual(findings.map((f) => [f.rule, f.severity]), [
       ["text-collision", "suspect"],
       ["broken-font", "warn"],
@@ -161,7 +203,7 @@ describe("finding projection", () => {
           ],
         },
       ],
-    });
+    }, { source: "page.html", contractPath: "c.json" });
     assert.deepEqual(findings.map((f) => f.rule), ["width", "per-row"]);
     assert.equal(findings[0]!.selector, ".sidebar");
     assert.equal(findings[0]!.viewport, 1280);
@@ -176,7 +218,7 @@ describe("finding projection", () => {
       done: false,
       results: [],
       redirected: "requested /dash, landed on /login",
-    });
+    }, { source: "https://app.example.com/dash", contractPath: "c.json" });
     assert.deepEqual(findings.map((f) => f.rule), ["redirected"]);
   });
 

@@ -66,6 +66,12 @@ export interface TouchTargetFinding {
 export interface TouchReport {
   source: string;
   level: WcagTouchLevel;
+  /**
+   * Required minimum side in px for `level`. On the report so the formatter
+   * stays pure: deriving it needs `requiredTouchSide`, which runs the MoonBit
+   * policy — real work, and a formatter that does real work can fail.
+   */
+  required: number;
   viewport: { width: number; height: number };
   screenshot: string;
   inspectedCount: number;
@@ -175,27 +181,6 @@ export function analyzeA11yTouchSamples(
   return findings;
 }
 
-function parseArgs(argv: string[]) {
-  let outputDir = "";
-  let report = "";
-  let level: WcagTouchLevel = "AAA";
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--output-dir") outputDir = argv[++i];
-    else if (a === "--report") report = argv[++i];
-    else if (a === "--level") {
-      const v = argv[++i];
-      if (v === "AA" || v === "AAA") level = v;
-    } else positional.push(a);
-  }
-  return { positional, outputDir, report, level };
-}
-
-function isUrl(s: string): boolean {
-  return /^https?:\/\//.test(s);
-}
-
 export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchReport> {
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
@@ -263,6 +248,7 @@ export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchRep
   const md = renderReport({
     source: options.source,
     level,
+    required,
     viewport,
     screenshot: screenshotPath,
     inspectedCount: byPath.size,
@@ -270,28 +256,40 @@ export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchRep
   });
   await writeFile(reportPath, md);
 
-  if (!options.quiet) {
-    console.log(`  ${BOLD}${CYAN}vlmkit check a11y touch${RESET}`);
-    console.log(`  ${DIM}source: ${options.source}  level: WCAG ${level} (${required}×${required} min)${RESET}`);
-    console.log(`  ${DIM}inspected ${byPath.size} interactive element(s)${RESET}`);
-    const icon = findings.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
-    console.log(`  ${icon} ${findings.length} undersized target(s)`);
-    const CONSOLE_ROWS = 5;
-    for (const f of findings.slice(0, CONSOLE_ROWS)) {
-      const cl = f.cluster ? " (clustered)" : "";
-      console.log(`    ${DIM}${f.path} — ${Math.round(f.bbox.width)}×${Math.round(f.bbox.height)}${cl} — "${f.text}"${RESET}`);
-    }
-    // See a11y-contrast: an undisclosed cut makes a partial list look complete.
-    if (findings.length > CONSOLE_ROWS) {
-      console.log(`    ${DIM}… ${findings.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
-    }
-    console.log(`  ${DIM}report: ${reportPath}${RESET}`);
-  }
+
 
   return {
-    source: options.source, level, viewport, screenshot: screenshotPath,
+    source: options.source, level, required, viewport, screenshot: screenshotPath,
     inspectedCount: byPath.size, failures: findings, reportPath,
   };
+}
+
+/**
+ * Terminal summary, extracted from the `!options.quiet` block inside the
+ * measurement function. A gate's `run` must not print: the core runner owns
+ * output, and `--json` is its decision to make, not the measurement's.
+ */
+export function formatA11yTouchReport(report: TouchReport): string {
+  const lines: string[] = [];
+  lines.push(`  ${BOLD}${CYAN}vlmkit check a11y touch${RESET}`);
+  lines.push(
+    `  ${DIM}source: ${report.source}  level: WCAG ${report.level}`
+    + ` (${report.required}×${report.required} min)${RESET}`,
+  );
+  lines.push(`  ${DIM}inspected ${report.inspectedCount} interactive element(s)${RESET}`);
+  const icon = report.failures.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
+  lines.push(`  ${icon} ${report.failures.length} undersized target(s)`);
+  const CONSOLE_ROWS = 5;
+  for (const f of report.failures.slice(0, CONSOLE_ROWS)) {
+    const cl = f.cluster ? " (clustered)" : "";
+    lines.push(`    ${DIM}${f.path} — ${Math.round(f.bbox.width)}×${Math.round(f.bbox.height)}${cl} — "${f.text}"${RESET}`);
+  }
+  // See a11y-contrast: an undisclosed cut makes a partial list look complete.
+  if (report.failures.length > CONSOLE_ROWS) {
+    lines.push(`    ${DIM}… ${report.failures.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
+  }
+  lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
+  return lines.join("\n");
 }
 
 function renderReport(r: Omit<TouchReport, "reportPath">): string {
@@ -339,34 +337,9 @@ function renderReport(r: Omit<TouchReport, "reportPath">): string {
   return lines.join("\n");
 }
 
-async function main(argv = process.argv.slice(2)) {
-  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
-  const { positional, outputDir, report, level } = parseArgs(argv);
-  if (positional.length === 0) {
-    console.log("Usage: vlmkit check a11y touch <html-or-url> [--level AAA|AA] [--output-dir dir]");
-    console.log("Options:");
-    console.log("  --level AAA|AA    WCAG threshold — AAA=44px (default), AA=24px-with-spacing.");
-    console.log("  --output-dir <dir> Default: ./test-results/a11y-touch");
-    console.log("  --report <path>    Markdown report path");
-    console.log("  --json               Print the full report as JSON (every row, no cut)");
-    process.exit(1);
-  }
-  // `--json` so the console/markdown row caps stay a display choice rather than
-
-  // the only view of the data — the truncation notices point here.
-
-  const json = argv.includes("--json");
-  const result = await runA11yTouch({
-    source: positional[0]!,
-    outputDir: outputDir || join(process.cwd(), "test-results", "a11y-touch"),
-    reportPath: report || undefined,
-    level,
-    quiet: json,
-  });
-  if (json) console.log(JSON.stringify(result, null, 2));
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "a11y-touch" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `check a11y touch` is declared in `./gates/a11y.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */
