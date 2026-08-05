@@ -186,6 +186,47 @@ export function formatExpiredNotice(expired: ResolvedSuppression[]): string {
   return lines.join("\n");
 }
 
+/**
+ * Check the config's gate commands and rule references against the registry.
+ *
+ * This is the payoff for having a catalog at all. `check integrit page.html`
+ * used to parse cleanly and then fail as a child process exiting non-zero,
+ * which reads like a page defect; `"rules": { "text-colision": "off" }` used
+ * to be impossible to state and, once possible, easy to misspell into a line
+ * that silences nothing. Both now fail before a browser starts.
+ *
+ * Unmigrated gates are not yet in the registry, so an unresolvable command
+ * cannot be an error — a false rejection of a working gate would be worse
+ * than a late failure. It is reported only when it is a near miss of a
+ * registered command, which is the case that is almost certainly a typo.
+ * Rule references resolve against a declared table, so those are hard errors.
+ */
+async function validateAgainstRegistry(plan: GatePlan, configPath: string): Promise<void> {
+  const { loadGateRegistry } = await import("../gate-registry.ts");
+  const { validateGateCommands, validateRuleSettings } = await import("@mizchi/vlmkit-core/plugin/registry.ts");
+  const registry = await loadGateRegistry();
+
+  const ruleProblems: string[] = [];
+  for (const job of plan.jobs) {
+    if (Object.keys(job.rules).length === 0) continue;
+    const gate = registry.resolve(job.baseGate.split(/\s+/).filter(Boolean))?.gate;
+    ruleProblems.push(
+      ...validateRuleSettings(registry, job.rules, gate).map((p) => `${job.pageId} / ${job.baseGate}: ${p}`),
+    );
+  }
+  if (ruleProblems.length > 0) {
+    throw new Error(
+      `${configPath}: invalid rule setting(s):\n${[...new Set(ruleProblems)].map((p) => `  - ${p}`).join("\n")}`,
+    );
+  }
+
+  const nearMisses = validateGateCommands(registry, [...new Set(plan.jobs.map((j) => j.baseGate))])
+    .filter(({ command }) => registry.suggest(command.trim().split(/\s+/)).length > 0);
+  for (const problem of nearMisses) {
+    console.error(`${YELLOW}warning${RESET} ${configPath}: ${problem.message}`);
+  }
+}
+
 const STARTER_GATE = "check integrity";
 
 async function initConfig(args: string[]): Promise<void> {
@@ -248,6 +289,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   const { path, config } = await loadConfig(readFlag(args, "config"));
   const only = readAll(args, "only");
   const declared = resolveGatePlan(config, only.length > 0 ? { only } : {});
+  await validateAgainstRegistry(declared, path);
   // `suppressions` is an inventory of the config, so it must not depend on the
   // filesystem: a broken glob should not hide what has been silenced.
   const plan = sub === "suppressions" ? declared : await expandPlanSources(declared);

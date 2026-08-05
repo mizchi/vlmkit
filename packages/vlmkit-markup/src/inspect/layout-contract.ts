@@ -37,8 +37,7 @@
  */
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
@@ -310,43 +309,9 @@ export function formatLayoutReport(report: LayoutReport): string {
   return lines.join("\n");
 }
 
-function printUsage(exitCode: number): never {
-  console.log(`Usage: vlmkit check layout <html-or-url> --contract <contract.json> [--json]
-
-Deterministic verification of a brief's structural requirements:
-widths, per-row counts, stacking order, visibility — per viewport.
-Turns "sidebar is 260px at 1280, stats are 2x2 at 768" into a
-machine-checkable contract (DOM math, no VLM).
-
-Options:
-  --contract <file>  Contract JSON (required): { "rules": [ { selector, at, ...assertions } ] }
-  --json             Print JSON report
-Exit code is non-zero when any rule is violated.`);
-  process.exit(exitCode);
-}
-
-async function main(argv = process.argv.slice(2)): Promise<void> {
-  if (argv.includes("--help") || argv.includes("-h")) printUsage(0);
-  let contractPath: string | undefined;
-  let json = false;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === "--contract") contractPath = argv[++i]!;
-    else if (arg === "--json") json = true;
-    else if (!arg.startsWith("-")) positional.push(arg);
-  }
-  const source = positional[0];
-  if (!source || !contractPath) printUsage(1);
-  const contract = JSON.parse(await readFile(contractPath, "utf8")) as LayoutContract;
-  const report = await runLayoutVerify({ source, contract });
-  if (json) console.log(JSON.stringify(report, null, 2));
-  else console.log(formatLayoutReport(report));
-  if (!report.done) process.exit(1);
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "layout-contract" ||
-  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `check layout` is declared in `../gates/layout.gate.ts` and driven by the core
+ * runner (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument
+ * parsing, `--json`, `--advisory`, the run ledger and the exit code.
+ */

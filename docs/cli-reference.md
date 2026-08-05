@@ -22,7 +22,7 @@ for options.
 | `vlmkit snapshot` | `[<url>...]`, `approve`, `fix-prompt`, `stability`, `flipbook`, `report` |
 | `vlmkit migration` | `compare`, `blind`, `subagent` |
 | `vlmkit workflow` | `init`, `capture`, `verify`, `approve`, `graph`, `affected`, `introspect`, `spec-verify`, `expect` |
-| Standalone | `vlmkit batch`, `vlmkit gates`, `vlmkit mcp`, `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit markup-loop`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
+| Standalone | `vlmkit batch`, `vlmkit gates`, `vlmkit rules`, `vlmkit mcp`, `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit markup-loop`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
 
 ## Features
 
@@ -308,6 +308,59 @@ suppression. Two rules make it reviewable: a suppression **must** carry a
 being applied — the gate it silenced runs unmuted and the run exits non-zero,
 because a stale entry is a config defect even when the page now passes.
 Worked example: [`examples/vlmkit.gates.json`](../examples/vlmkit.gates.json).
+
+### Rules (tune or disable one rule, not one whole gate)
+
+```bash
+vlmkit rules                      # every registry-driven gate + its rule count
+vlmkit rules check integrity      # that gate's rule ids, default severities, docs
+vlmkit check integrity page.html --rule check.integrity/near-misalignment=off
+vlmkit check breakpoints page.html --rules   # same table, from the gate itself
+```
+
+A gate declares its rules, so a rule is addressable: `<gateId>/<ruleId>` set to
+`off`, `suspect`, `warn` or `info`. Persist the decision under `"rules"` in
+`vlmkit.gates.json`, at `defaults` scope or per page (page keys merge over
+defaults):
+
+```jsonc
+{
+  "defaults": { "rules": { "check.breakpoints/overflow-at-boundary": "suspect" } },
+  "pages": [
+    { "id": "docs", "source": "routes/docs/**/*.html",
+      "rules": { "check.integrity/near-misalignment": "off" } }
+  ]
+}
+```
+
+References are validated against the declared table, so a misspelled rule is a
+config error rather than a line that silences nothing. Suppressed findings are
+reported as suppressed next to the verdict — a gate that passes because three
+rules were turned off says so.
+
+Every registry-driven gate also shares one exit-code contract and one `--json`
+envelope: a suspect exits 1, `--advisory` prints and exits 0,
+`--fail-on-suspect` is an accepted no-op.
+
+Not every gate is registry-driven yet — `vlmkit rules` lists exactly the ones
+that are. The rest keep their existing flags.
+
+### Custom gates (plugins)
+
+```jsonc
+// vlmkit.config.json
+{ "plugins": ["./tools/house-gates.ts", "@acme/vlmkit-brand-gates"] }
+```
+
+A plugin module default-exports `definePlugin({ name, gates })`, where each
+gate comes from `defineGate({...})`. A plugin gate is indistinguishable from a
+bundled one: it appears in group help and `vlmkit rules`, dispatches as
+`vlmkit <group> <leaf>`, and inherits the shared `--json` / `--advisory` /
+`--rule` behaviour, the run-ledger entry, and `vlmkit.gates.json` validation.
+Relative specifiers resolve against the config's directory, not the cwd.
+
+Worked example: [`examples/gate-plugin/house-gates.ts`](../examples/gate-plugin/house-gates.ts).
+Design and migration status: [`docs/design/gate-plugin-architecture.md`](design/gate-plugin-architecture.md).
 
 ### Build / Scan / Inspect / Stress (markup-assistance)
 

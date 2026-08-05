@@ -8,6 +8,12 @@
       "check breakpoints --sweep",
       "check design"
     ],
+    "//rules": "Rule-granular settings, checked against each gate's declared rule table (`vlmkit rules <gate>`). off|suspect|warn|info. Unlike a suppression, this needs no per-gate flag to exist and a typo is a config error. See `vlmkit rules`.",
+    "rules": {
+      "check.breakpoints/overflow-at-boundary": "suspect",
+      "check.motion/running-animation": "off"
+    },
+
     "//suppressions": "Default-scope suppressions apply to every page. Use sparingly — a repo-wide exemption is the hardest kind to revisit.",
     "suppressions": [
       {
@@ -30,7 +36,11 @@
       "//": "A glob expands to one entry per file; ids become `docs:routes/docs/a.html` so --only docs still selects the group.",
       "id": "docs",
       "source": "routes/docs/**/*.html",
-      "gates": ["check integrity", "check copy --manifest copy/docs.txt"]
+      "gates": ["check integrity", "check copy --manifest copy/docs.txt"],
+      "//rules": "Page rules merge over defaults.rules, key by key. Generated API pages carry near-miss alignment the 2px probe cannot approve of; nothing else about integrity is relaxed.",
+      "rules": {
+        "check.integrity/near-misalignment": "off"
+      }
     },
     {
       "id": "checkout",

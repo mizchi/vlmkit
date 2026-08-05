@@ -12,6 +12,7 @@
  */
 
 import { cac } from "cac";
+import { loadGateRegistry } from "./gate-registry.ts";
 
 const HELP_SENTINEL = "__VLMKIT_HELP_PASSTHROUGH__";
 
@@ -150,12 +151,8 @@ const SPECS: Record<string, Spec> = {
   crossBrowser: spec("cross-browser", () => import("@mizchi/vlmkit-markup/stress/cross-browser.ts")),
   designTokens: spec("design-tokens", () => import("@mizchi/vlmkit-markup/style/design-tokens.ts")),
   designPolicy: spec("design-policy", () => import("@mizchi/vlmkit-markup/style/design-policy.ts")),
-  motionDetect: spec("motion-detect", () => import("@mizchi/vlmkit-markup/style/motion-detect.ts")),
   animationEval: spec("animation-eval", () => import("@mizchi/vlmkit-markup/style/animation-eval.ts")),
   scrollScan: spec("scroll-scan", () => import("@mizchi/vlmkit-markup/inspect/scroll-scan.ts")),
-  integrityCheck: spec("integrity-check", () => import("@mizchi/vlmkit-markup/inspect/integrity-check.ts")),
-  layoutContract: spec("layout-contract", () => import("@mizchi/vlmkit-markup/inspect/layout-contract.ts")),
-  breakpointCheck: spec("breakpoint-check", () => import("@mizchi/vlmkit-markup/stress/breakpoint-check.ts")),
   markupVerify: spec("markup-verify", () => import("@mizchi/vlmkit-markup/verify/markup-verify.ts")),
   flowVerify: spec("flow-verify", () => import("@mizchi/vlmkit-markup/inspect/flow-verify.ts")),
   markupAutofix: spec("markup-autofix", () => import("@mizchi/vlmkit-markup/verify/markup-autofix.ts")),
@@ -163,7 +160,6 @@ const SPECS: Record<string, Spec> = {
   interactionMap: spec("interaction-map", () => import("@mizchi/vlmkit-markup/inspect/interaction-map.ts")),
   handlerMap: spec("handler-map", () => import("@mizchi/vlmkit-markup/inspect/handler-map.ts")),
   copyCheck: spec("copy-check", () => import("@mizchi/vlmkit-markup/inspect/copy-check.ts")),
-  scrollBehavior: spec("scroll-behavior", () => import("@mizchi/vlmkit-markup/inspect/scroll-behavior.ts")),
   mockScan: spec("mock-scan", () => import("@mizchi/vlmkit-markup/inspect/mock-scan.ts")),
   craterSmoke: spec("crater-smoke", () => import("@mizchi/vlmkit-capture/crater-smoke.ts")),
   perf: spec("perf", () => import("../util/perf.ts")),
@@ -194,16 +190,11 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
     tokens: { spec: SPECS.designTokens, desc: "Design-token scale conformance (against a scale YOU declare)" },
     design: { spec: SPECS.designPolicy, desc: "Coherence of the design system the page itself implies (component/spacing consistency)" },
     theme: { spec: SPECS.themeParity, desc: "Theme parity (hard-coded color scan in dark mode)" },
-    motion: { spec: SPECS.motionDetect, desc: "CSS motion detection (animation / transition / reduced-motion)" },
     animation: { spec: SPECS.animationEval, desc: "Frame-sampled animation evaluation (visible effect / settle / reduced-motion behavior)" },
-    breakpoints: { spec: SPECS.breakpointCheck, desc: "Boundary quickcheck: render at B-1/B/B+1 per breakpoint, flag spikes/gaps/overflow (--sweep fuzzes widths in between)" },
-    scroll: { spec: SPECS.scrollBehavior, desc: "Scroll behavior: fixed holds position, engaged sticky sticks, mandatory snap lands on a child edge" },
     copy: { spec: SPECS.copyCheck, desc: "Copy fidelity: placeholder scan + --manifest verification + --target image check (VLM or agent-vision sheets)" },
     equivalence: { spec: SPECS.regionJudge, desc: "Visual equivalence judge for residual regions (measured delta + refutation-gated VLM or pair sheets)" },
     interactions: { spec: SPECS.interactionMap, desc: "A11y-event state map: keyboard probes -> ARIA transitions; --reference makes it a behavioral contract" },
-    integrity: { spec: SPECS.integrityCheck, desc: "Reference-free defect gate: JS errors, empty render, broken resources, text collision/clipping/protrusion, collapsed containers, overflow, invisible text, occluded text, near-misalignment, unstyled page (multi-viewport)" },
     asset: { spec: SPECS.assetCheck, desc: "Generated-asset gate (browser-free PNG math): slot aspect fit, transparent vs matted background, occupancy, figure-ground contrast vs backdrop, palette harmony vs page" },
-    layout: { spec: SPECS.layoutContract, desc: "Layout contract: verify a brief's structural requirements (widths, per-row counts, stacking order) per viewport — deterministic DOM math" },
     crater: { spec: SPECS.craterSmoke, desc: "Crater BiDi backend smoke check" },
     perf: { spec: SPECS.perf, desc: "Web Vitals thresholds (CLS / LCP / FCP)" },
   },
@@ -253,26 +244,75 @@ const CHECK_DRIFT: Record<string, { spec: Spec; desc: string }> = {
   pages: { spec: SPECS.multiPageConsistency, desc: "Drift of one selector across N pages" },
 };
 
-function printGroupHelp(groupName: string): void {
-  const group = GROUPS[groupName];
+/**
+ * Leaves of a group, merging the registry's gates with the legacy `GROUPS`
+ * table. Group help has to read from both while the migration is in
+ * progress, and merging here — rather than duplicating each migrated gate's
+ * description back into `GROUPS` — is what keeps the definition the only
+ * place a gate's summary is written.
+ */
+async function groupLeaves(groupName: string): Promise<{ name: string; desc: string }[]> {
+  const legacy = Object.entries(GROUPS[groupName] ?? {}).map(([name, info]) => ({ name, desc: info.desc }));
+  const registry = await loadGateRegistry();
+  const registered = (registry.groups().get(groupName) ?? [])
+    .map(({ gate }) => ({ name: gate.command.slice(1).join(" "), desc: gate.summary }));
+  return [...legacy, ...registered].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function printGroupHelp(groupName: string): Promise<void> {
+  const leaves = await groupLeaves(groupName);
   if (groupName === "check") {
     console.log(`vlmkit check <subcommand>\n`);
     console.log("Subcommands:");
     console.log("  a11y contrast <html>          WCAG AA contrast scan");
     console.log("  a11y touch <html>             Touch-target size check");
     console.log("  a11y focus <html>             Focus order / trap check");
-    for (const [name, info] of Object.entries(group)) {
-      console.log(`  ${name.padEnd(30)}${info.desc}`);
+    for (const leaf of leaves) {
+      console.log(`  ${leaf.name.padEnd(30)}${leaf.desc}`);
     }
     console.log("  drift component <html>        Drift across N selector instances on one page");
     console.log("  drift pages --urls/--files    Drift of one selector across N pages");
+    console.log(`\nRun \`vlmkit rules\` to list the rules each gate can tune.`);
     return;
   }
   console.log(`vlmkit ${groupName} <subcommand>\n`);
   console.log("Subcommands:");
-  for (const [name, info] of Object.entries(group)) {
-    console.log(`  ${name.padEnd(16)}${info.desc}`);
+  for (const leaf of leaves) {
+    console.log(`  ${leaf.name.padEnd(16)}${leaf.desc}`);
   }
+}
+
+/**
+ * `vlmkit rules` / `vlmkit rules <gate>` — what the registry knows, and what
+ * of it can be tuned. Without this the rule ids are only discoverable by
+ * reading source, which would make rule settings a feature nobody finds.
+ */
+async function runRules(args: string[]): Promise<void> {
+  const registry = await loadGateRegistry();
+  const { formatRuleTable } = await import("@mizchi/vlmkit-core/plugin/runner.ts");
+  const wanted = args.filter((a) => !a.startsWith("-") && a !== HELP_SENTINEL);
+  if (wanted.length > 0) {
+    const gate = registry.byCommand(wanted) ?? registry.byId(wanted.join(" "));
+    if (!gate) {
+      const suggestions = registry.suggest(wanted);
+      console.error(
+        `Unknown gate: ${wanted.join(" ")}`
+        + (suggestions.length > 0 ? ` — did you mean ${suggestions.map((s) => `"${s}"`).join(", ")}?` : ""),
+      );
+      process.exitCode = 1;
+      return;
+    }
+    console.log(formatRuleTable(gate));
+    return;
+  }
+  console.log(`\nvlmkit rules — tunable rules per registry-driven gate\n`);
+  for (const { gate, plugin } of registry.list()) {
+    console.log(`  ${gate.command.join(" ").padEnd(20)} ${String(gate.rules.length).padStart(2)} rule(s)  ${gate.id}  [${plugin}]`);
+  }
+  console.log(`\nDetail:   vlmkit rules <gate>`);
+  console.log(`Tune:     vlmkit <gate> <source> --rule <gateId>/<ruleId>=off|suspect|warn|info`);
+  console.log(`Persist:  "rules" in vlmkit.gates.json`);
+  console.log(`Extend:   "plugins": ["./tools/house-gates.ts"] in vlmkit.config.json\n`);
 }
 
 function printRootHelp(): void {
@@ -292,6 +332,7 @@ Command groups:
 Workflows:
   snapshot / baseline / watch   Capture and manage visual baselines
   diff-pr / batch / gates       Run repeatable local and CI gates
+  rules                         List gates and the rules each one can tune
   workflow / markup-loop        Drive agent-oriented verification loops
   api / mcp                     Expose vlmkit to other tools
 
@@ -331,16 +372,46 @@ async function runGroupLeaf(
     await delegate(entry.spec, rest.slice(1));
     return;
   }
+  // Legacy table first, registry second — and the order matters for a
+  // non-obvious reason. A `delegate`d leaf runs its work in module *evaluation*
+  // (`if (isCliEntry) main()`), so it only runs the first time that module is
+  // imported. Composing the registry imports the migrated gates' measurement
+  // modules, and those transitively import other leaves (`integrity-check`
+  // pulls in `scroll-scan`). Consulting the registry first therefore warmed
+  // the module cache for `scan scroll` and made `vlmkit scan scroll --help`
+  // print nothing at all. A migrated gate is absent from `GROUPS`, so it still
+  // reaches the registry; an unmigrated one never triggers the import.
+  //
+  // This asymmetry disappears with the last migration — which is precisely the
+  // hazard the plugin contract removes: a gate is data plus functions, not a
+  // module whose import has side effects.
   const entry = GROUPS[groupName]?.[leafName];
-  if (!entry) {
-    console.error(`Unknown ${groupName} subcommand: ${leafName}`);
-    process.exit(1);
+  if (entry) {
+    if (entry.run) await entry.run(rest);
+    else if (entry.spec) await delegate(entry.spec, rest);
+    return;
   }
-  if (entry.run) {
-    await entry.run(rest);
-  } else if (entry.spec) {
-    await delegate(entry.spec, rest);
+
+  const registry = await loadGateRegistry();
+  const resolved = registry.resolve([groupName, leafName, ...rest]);
+  if (resolved) {
+    const { runGateCli } = await import("@mizchi/vlmkit-core/plugin/runner.ts");
+    const { readGateRuleSettings } = await import("./gate-rules.ts");
+    // `resolved.rest` rather than `rest`: a three-token gate consumed one of
+    // them, and handing that token back as a positional would look like a
+    // second source argument.
+    const gateArgv = resolved.rest.map((a) => (a === HELP_SENTINEL ? "--help" : a));
+    const code = await runGateCli(resolved.gate, gateArgv, { rules: readGateRuleSettings() });
+    if (code !== 0) process.exitCode = code;
+    return;
   }
+
+  const suggestions = registry.suggest([groupName, leafName]);
+  console.error(
+    `Unknown ${groupName} subcommand: ${leafName}`
+    + (suggestions.length > 0 ? ` — did you mean ${suggestions.map((s) => `"vlmkit ${s}"`).join(", ")}?` : ""),
+  );
+  process.exit(1);
 }
 
 export async function runCli(argv: string[] = process.argv.slice(2)): Promise<void> {
@@ -365,7 +436,7 @@ Run \`vlmkit <command> --help\` for subcommands, options, and examples.`);
           groupArgs.length === 0 ||
           (groupArgs.length === 1 && groupArgs[0] === HELP_SENTINEL)
         ) {
-          printGroupHelp(groupName);
+          await printGroupHelp(groupName);
           return;
         }
         const [leaf, ...rest] = groupArgs;
@@ -483,6 +554,10 @@ Options:
   cli.command("gates [...args]", "One reviewed config for per-page gate sets + auditable suppressions")
     .allowUnknownOptions()
     .action(async () => delegate(SPECS.gates, passThrough(argv, ["gates"])));
+
+  cli.command("rules [...args]", "List registry-driven gates and the rules each one can tune")
+    .allowUnknownOptions()
+    .action(async () => runRules(passThrough(argv, ["rules"])));
 
   cli.command("manifest [...args]", "Author / edit approval.json manifests")
     .allowUnknownOptions()

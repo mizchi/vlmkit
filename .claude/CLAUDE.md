@@ -204,6 +204,8 @@ This repository is a pnpm workspace.
 | Path | Contents |
 |------|----------|
 | `packages/vlmkit-core/` | Image / CSS / DOM / a11y diff engine + shared types and CLI helpers. No Playwright or AI deps required to import core types. |
+| `packages/vlmkit-core/src/plugin/` | **Gate plugin runtime**: the contract (`defineGate` / `definePlugin`), rule tables and settings, the registry, and the core runner that owns `--help` / `--json` / `--advisory` / the run ledger / the exit code. Core never imports a gate — definitions are handed to it. |
+| `packages/vlmkit-markup/src/gates/` | Gate definitions for the migrated gates (`*.gate.ts`) + the built-in plugin (`index.ts`). Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
 | `packages/vlmkit-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
 | `packages/vlmkit-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
 | `packages/vlmkit-markup/` | VLM-driven markup tooling: component extract / from-image, design tokens, theme parity, i18n stress, palette, dep-graph, selector-heal, smoke-runner. |
@@ -229,6 +231,7 @@ The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need t
 | `docs/configuration.md` | Setup detail moved out of README (install, MCP/skill, env vars, snapshot/CI config, APM skills catalog) |
 | `docs/knowledge.md` | Accumulated experiment findings (detection rates, VLM comparisons, fix patterns, etc.) |
 | `docs/api-design.md` | CLI / library API design |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, migration status and order for the remaining gates |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |
 | `docs/reports/` | Individual experiment reports (dated) |

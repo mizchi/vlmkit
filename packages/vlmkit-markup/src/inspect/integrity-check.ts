@@ -35,17 +35,13 @@
  *   vlmkit check integrity <html-or-url> [--viewports 1280,768,375] [--json]
  */
 import { resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
-import { readChoice, readFlag, readInt } from "@mizchi/vlmkit-core/arg-reader.ts";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import {
-  ALLOW_HELP,
   applyAllowRules,
   type IntegrityAllowRule,
-  parseAllowRules,
 } from "./integrity-exemption.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -1779,78 +1775,9 @@ export function formatIntegrityReport(report: IntegrityReport): string {
   return lines.join("\n");
 }
 
-function printUsage(exitCode: number): never {
-  console.log(`Usage: vlmkit check integrity <html-or-url> [options]
-
-Reference-free integrity gate for creative/zero-shot markup: JS
-construction failures, empty renders, broken resources, colliding or
-clipped text, collapsed containers, page overflow, and unstyled pages —
-swept across multiple viewports. Deterministic (DOM + pixels, no VLM);
-intentional-pattern exemptions are reported, not silently dropped.
-
-Options:
-  --viewports <w,w,...>  Sweep widths (default: 1280,768,375)
-  --max-findings <n>     Per-class report cap (default: 12)
-  --timeout <ms>         Page navigation timeout (default: 30000)
-  --wait-until <state>   domcontentloaded, load, or networkidle (default)
-  --har <file>           Replay network responses from a Playwright HAR
-  --json                 Print JSON report
-  --storage-state <file> Playwright storage state, to measure pages behind
-                         a login (or set VLMKIT_STORAGE_STATE)
-${ALLOW_HELP}
-Exit code is non-zero when the verdict is "defects".`);
-  process.exit(exitCode);
-}
-
-async function main(argv = process.argv.slice(2)): Promise<void> {
-  if (argv.includes("--help") || argv.includes("-h")) printUsage(0);
-  let json = false;
-  let maxFindings: number | undefined;
-  let widths: number[] | undefined;
-  const storageState = readFlag(argv, "storage-state");
-  const har = readFlag(argv, "har");
-  const timeout = readInt(argv, "timeout", { min: 1 });
-  const waitUntil = readChoice(
-    argv,
-    "wait-until",
-    ["domcontentloaded", "load", "networkidle"] as const,
-  );
-  const allowSpecs: string[] = [];
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === "--json") json = true;
-    else if (arg === "--max-findings") maxFindings = Number.parseInt(argv[++i] ?? "12", 10);
-    else if (arg === "--storage-state" || arg === "--har" || arg === "--timeout" || arg === "--wait-until") i++;
-    else if (arg === "--allow") allowSpecs.push(argv[++i] ?? "");
-    else if (arg === "--viewports") {
-      widths = (argv[++i] ?? "").split(",").map((w) => Number.parseInt(w, 10)).filter((w) => w > 0);
-      if (widths.length === 0) printUsage(1);
-    } else if (!arg.startsWith("-")) positional.push(arg);
-  }
-  const source = positional[0];
-  if (!source) printUsage(1);
-  const heights: Record<number, number> = { 1280: 800, 768: 900, 375: 700 };
-  // Parsed before the browser starts, so a typo in an exemption fails in
-  // milliseconds instead of after a three-viewport sweep.
-  const allow = parseAllowRules(allowSpecs);
-  const report = await runIntegrityCheck({
-    source,
-    ...(widths ? { viewports: widths.map((w) => ({ width: w, height: heights[w] ?? 800 })) } : {}),
-    ...(maxFindings !== undefined ? { maxFindings } : {}),
-    ...(storageState ? { storageState } : {}),
-    ...(timeout !== undefined ? { timeout } : {}),
-    ...(waitUntil ? { waitUntil } : {}),
-    ...(har ? { har } : {}),
-    ...(allow.length > 0 ? { allow } : {}),
-  });
-  if (json) console.log(JSON.stringify(report, null, 2));
-  else console.log(formatIntegrityReport(report));
-  if (report.verdict !== "clean") process.exit(1);
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "integrity-check" ||
-  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `check integrity` is declared in `../gates/integrity.gate.ts` and driven by the core
+ * runner (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument
+ * parsing, `--json`, `--advisory`, the run ledger and the exit code.
+ */

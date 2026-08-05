@@ -19,6 +19,9 @@
  *      working after it passes is a comment, not a deadline.
  */
 
+import type { RuleSettings } from "./plugin/rules.ts";
+import { parseRuleSettings } from "./plugin/rules.ts";
+
 export interface GateSuppression {
   /**
    * Gate this applies to, as a prefix of the gate command: `check copy`
@@ -45,12 +48,23 @@ export interface GatePage {
   /** Extra gates for this page on top of the defaults. */
   extraGates?: string[];
   suppressions?: GateSuppression[];
+  /**
+   * Rule-granular settings for this page, merged over `defaults.rules`.
+   *
+   * The narrow instrument next to `suppressions`. A suppression appends a
+   * flag the gate had to think to implement; a rule setting works on every
+   * registry-driven gate uniformly and is validated against the gate's
+   * declared rule table, so a typo is a config error rather than a line
+   * that quietly does nothing.
+   */
+  rules?: RuleSettings;
 }
 
 export interface GateConfig {
   defaults?: {
     gates?: string[];
     suppressions?: GateSuppression[];
+    rules?: RuleSettings;
   };
   pages: GatePage[];
 }
@@ -66,11 +80,13 @@ export interface ResolvedSuppression extends GateSuppression {
 export interface GateJob {
   pageId: string;
   source: string;
-  /** Gate command with any active suppression flags already appended. */
+  /** Gate command with active suppression flags and rule settings appended. */
   gate: string;
   /** The gate as written in the config, before suppression flags. */
   baseGate: string;
   appliedSuppressions: ResolvedSuppression[];
+  /** Rule settings in effect, defaults merged with the page's. */
+  rules: RuleSettings;
 }
 
 export interface GatePlan {
@@ -149,6 +165,7 @@ export function parseGateConfig(raw: string): GateConfig {
       if (!Array.isArray(d.suppressions)) fail("defaults.suppressions", "must be an array");
       defaults.suppressions = d.suppressions.map((s, i) => parseSuppression(s, `defaults.suppressions[${i}]`));
     }
+    if (d.rules !== undefined) defaults.rules = parseRuleSettings(d.rules, "defaults.rules");
   }
   if (!Array.isArray(root.pages)) fail("pages", "must be an array");
   if (root.pages.length === 0) fail("pages", "is empty — nothing would run");
@@ -168,6 +185,7 @@ export function parseGateConfig(raw: string): GateConfig {
       if (!Array.isArray(p.suppressions)) fail(`${at}.suppressions`, "must be an array");
       page.suppressions = p.suppressions.map((s, j) => parseSuppression(s, `${at}.suppressions[${j}]`));
     }
+    if (p.rules !== undefined) page.rules = parseRuleSettings(p.rules, `${at}.rules`);
     if (!page.gates && !page.extraGates && !defaults.gates) {
       fail(at, `no gates: set ${at}.gates or defaults.gates`);
     }
@@ -225,18 +243,30 @@ export function resolveGatePlan(config: GateConfig, options: ResolveOptions = {}
       );
     }
     const candidates = [...defaultSuppressions, ...pageSuppressions];
+    // Page settings win over defaults, key by key — the same precedence a
+    // page's `gates` has over `defaults.gates`.
+    const rules: RuleSettings = { ...config.defaults?.rules, ...page.rules };
     for (const baseGate of gates) {
       const applied = candidates.filter((s) => s.status !== "expired" && gateMatches(baseGate, s.gate));
       jobs.push({
         pageId,
         source: page.source,
         baseGate,
-        gate: [baseGate, ...applied.map((s) => s.flag)].join(" "),
+        // Rule settings travel as `--rule` flags so the spawned gate needs no
+        // config access of its own: whatever the plan says is exactly what
+        // the child receives, and `gates list` shows the real command line.
+        gate: [baseGate, ...applied.map((s) => s.flag), ...ruleFlags(rules)].join(" "),
         appliedSuppressions: applied,
+        rules,
       });
     }
   }
   return { jobs, suppressions, expired: suppressions.filter((s) => s.status === "expired") };
+}
+
+/** `{ "check.integrity/text-collision": "off" }` → `["--rule", "check.integrity/text-collision=off"]`. */
+export function ruleFlags(rules: RuleSettings): string[] {
+  return Object.entries(rules).flatMap(([ref, setting]) => ["--rule", `${ref}=${setting}`]);
 }
 
 /**
