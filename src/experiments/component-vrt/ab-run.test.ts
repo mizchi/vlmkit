@@ -22,10 +22,14 @@ import { fileURLToPath } from "node:url";
 import {
   COMPONENTS,
   COMPOSES,
+  PAGES,
+  SEED_CLASSES,
   applySeed,
   componentClass,
   declarationsIn,
   expectedChanged,
+  isEffective,
+  mutateValue,
   planSeed,
   visionTokens,
 } from "./ab-run.ts";
@@ -37,11 +41,18 @@ const CSS = readFileSync(
 
 describe("declarationsIn", () => {
   it("reads every declaration of a multi-line rule block", () => {
-    // The bug this replaces found 5 declarations in the whole file. Each of the
-    // six component blocks has at least four.
+    // The bug this replaces found 5 declarations in the whole FILE. The invariant
+    // is derived from the CSS rather than asserted as a magic minimum: a count of
+    // "at least four" happened to be wrong for `.c-table`, which legitimately has
+    // three, and a hardcoded floor tests the fixture rather than the parser.
     for (const name of COMPONENTS) {
-      const found = declarationsIn(CSS, componentClass(name));
-      assert.ok(found.length >= 4, `${name}: only ${found.length} declarations`);
+      const selector = componentClass(name);
+      const found = declarationsIn(CSS, selector);
+      const block = new RegExp(`^\\s*${selector.replace(".", "\\.")}\\s*\\{([^}]*)\\}`, "m").exec(CSS);
+      assert.ok(block, `${name}: ${selector} not found in the fixture CSS`);
+      const semicolons = (block![1]!.match(/;/g) ?? []).length;
+      assert.equal(found.length, semicolons, `${name}: parsed ${found.length} of ${semicolons} declarations`);
+      assert.ok(found.length > 0, `${name}: parsed nothing`);
       for (const d of found) {
         assert.ok(d.property.length > 0 && d.value.length > 0, `${name}: empty ${JSON.stringify(d)}`);
         assert.doesNotMatch(d.property, /[{}]/, `${name}: brace leaked into a property name`);
@@ -62,61 +73,129 @@ describe("declarationsIn", () => {
   });
 });
 
-describe("seed planning", () => {
-  it("covers every component across seeds 1..6, one each", () => {
-    // Deterministic by index rather than by RNG: `seededRandom`'s first draw put
-    // seeds 1-6 all on `Avatar`, which would have left five components unmeasured
-    // while looking like a six-seed run.
-    const picked = [1, 2, 3, 4, 5, 6].map((seed) => planSeed(CSS, seed).component);
-    assert.deepEqual([...picked].sort(), [...COMPONENTS].sort());
-  });
+const req = (over: Partial<Parameters<typeof planSeed>[1]> = {}) => ({
+  seed: 1,
+  page: "flat" as const,
+  seedClass: "delete" as const,
+  component: "Button" as const,
+  ...over,
+});
 
-  it("is reproducible for the same seed", () => {
-    for (const seed of [1, 4, 9]) {
-      assert.deepEqual(planSeed(CSS, seed), planSeed(CSS, seed));
+describe("seed planning", () => {
+  it("plans a trial for every component in every class it can support", () => {
+    // Not every component has a colour declaration of its own, and that is fine.
+    // What matters is that a layout trial exists for ALL of them — a component
+    // silently absent from the corpus is how the result narrows without anyone
+    // noticing.
+    for (const component of COMPONENTS) {
+      for (const seedClass of ["delete", "value"] as const) {
+        const plan = planSeed(CSS, req({ component, seedClass }));
+        assert.equal(plan.component, component);
+        assert.equal(plan.selector, componentClass(component));
+      }
     }
   });
 
-  it("only ever picks a layout-affecting property", () => {
-    // A colour-only mutation does not reflow, so the cascade the experiment is
-    // about would not appear and the two arms would be compared on a regression
-    // neither one is interesting for.
-    for (let seed = 1; seed <= 24; seed++) {
-      const plan = planSeed(CSS, seed);
-      assert.match(
-        plan.property,
-        /^(padding|width|height|border|gap|font|display|letter-spacing)/,
-        `seed ${seed} picked ${plan.property}`,
-      );
+  it("is reproducible for the same request", () => {
+    for (const seed of [1, 4, 9]) {
+      assert.deepEqual(planSeed(CSS, req({ seed })), planSeed(CSS, req({ seed })));
+    }
+  });
+
+  it("picks a layout property for delete/value and a colour for colour", () => {
+    for (const component of COMPONENTS) {
+      for (const seedClass of SEED_CLASSES) {
+        let plan;
+        try {
+          plan = planSeed(CSS, req({ component, seedClass }));
+        } catch {
+          continue; // no candidate of that class; the runner reports these
+        }
+        if (seedClass === "colour") {
+          assert.match(plan.property, /^(background|color|border-color)/, `${component}: ${plan.property}`);
+          // And it must be a real colour value, not a colour hiding in a
+          // shorthand — otherwise "colour-only" would not mean no-reflow.
+          assert.match(plan.value, /#|rgb|var\(|linear-gradient/);
+        } else {
+          assert.match(
+            plan.property,
+            /^(padding|width|height|border|gap|font|display|letter-spacing)/,
+            `${component}/${seedClass}: ${plan.property}`,
+          );
+        }
+      }
     }
   });
 
   it("mutates only the named component's own block", () => {
-    for (let seed = 1; seed <= 12; seed++) {
-      const plan = planSeed(CSS, seed);
-      assert.equal(plan.selector, componentClass(plan.component));
+    for (const component of COMPONENTS) {
+      const plan = planSeed(CSS, req({ component }));
       const own = declarationsIn(CSS, plan.selector).map((d) => d.property);
       assert.ok(own.includes(plan.property), `${plan.property} is not in ${plan.selector}`);
     }
   });
+
+  it("names the page variant and class it was planned for", () => {
+    for (const page of PAGES) {
+      const plan = planSeed(CSS, req({ page }));
+      assert.equal(plan.page, page);
+    }
+  });
+});
+
+describe("mutateValue", () => {
+  it("deletes for the delete class", () => {
+    assert.equal(mutateValue("padding", "10px 18px", "delete"), "");
+  });
+
+  it("scales the first length for the value class", () => {
+    // A wrong-but-present value is the commoner real regression than a missing
+    // declaration, and it is harder for a differ — testing only deletion would
+    // overstate both arms.
+    assert.equal(mutateValue("padding", "10px 18px", "value"), "22px 18px"); // 10*1.8+4
+    assert.equal(mutateValue("width", "40px", "value"), "76px");
+  });
+
+  it("swaps a display keyword when there is no length to scale", () => {
+    assert.equal(mutateValue("display", "inline-flex", "value"), "block");
+  });
+
+  it("changes only the colour for the colour class", () => {
+    assert.equal(mutateValue("background", "#eef3fd", "colour"), "#8a5cf6");
+    assert.match(mutateValue("background", "linear-gradient(120deg, #eef3fd, #f7f9fc)", "colour"), /linear-gradient/);
+    assert.equal(mutateValue("color", "var(--brand)", "colour"), "#8a5cf6");
+  });
+
+  it("leaves a value it cannot perturb unchanged, so the trial is skippable", () => {
+    // The runner drops these via isEffective rather than running a clean-vs-clean
+    // comparison and scoring it as "both arms found nothing".
+    const plan = { property: "font", value: "sans-serif", replacement: mutateValue("font", "sans-serif", "value") };
+    assert.equal(plan.replacement, plan.value);
+    assert.equal(isEffective(plan as Parameters<typeof isEffective>[0]), false);
+  });
 });
 
 describe("applySeed", () => {
-  it("removes exactly one declaration and nothing else", () => {
-    const plan = planSeed(CSS, 1);
+  it("removes exactly one declaration for the delete class", () => {
+    const plan = planSeed(CSS, req({ component: "Button", seedClass: "delete" }));
     const mutated = applySeed(CSS, plan);
     assert.equal(CSS.length - mutated.length, `${plan.property}: ${plan.value};`.length);
-    const before = declarationsIn(CSS, plan.selector);
     const after = declarationsIn(mutated, plan.selector);
-    assert.equal(after.length, before.length - 1);
     assert.ok(!after.some((d) => d.property === plan.property));
   });
 
+  it("keeps the declaration but changes its value for the value class", () => {
+    const plan = planSeed(CSS, req({ component: "Card", seedClass: "value" }));
+    const after = declarationsIn(applySeed(CSS, plan), plan.selector);
+    const found = after.find((d) => d.property === plan.property);
+    assert.ok(found, `${plan.property} should still be present`);
+    assert.equal(found!.value, plan.replacement);
+    assert.notEqual(found!.value, plan.value);
+  });
+
   it("throws rather than silently no-op when the declaration is absent", () => {
-    // A silent no-op would produce a "clean vs clean" comparison reported as a
-    // successful trial with zero diff — the worst possible failure for a bench.
     assert.throws(
-      () => applySeed(CSS, { ...planSeed(CSS, 1), property: "no-such-prop", value: "1px" }),
+      () => applySeed(CSS, { ...planSeed(CSS, req()), property: "no-such-prop", value: "1px" }),
       /could not find/,
     );
   });

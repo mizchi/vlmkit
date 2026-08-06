@@ -95,3 +95,33 @@ body {
   background: #f7f9fc;
   width: 300px;
 }
+
+/* --- Hero: deliberately large. A component-scoped shot of this is nearly a
+       page-scoped shot, which is the adversarial case for the whole thesis. --- */
+.c-hero {
+  width: 1160px;
+  padding: 56px 48px;
+  border-radius: 12px;
+  background: linear-gradient(120deg, #eef3fd, #f7f9fc);
+  border: 1px solid var(--line);
+}
+.c-hero__title { margin: 0 0 12px; font-size: 34px; line-height: 1.15; }
+.c-hero__sub { margin: 0; font-size: 16px; color: var(--muted); max-width: 46ch; }
+
+/* --- DataTable: wide and tall, the other large shape. --- */
+.c-table {
+  width: 720px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.c-table th {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 2px solid var(--line);
+  color: var(--muted);
+  font-weight: 600;
+}
+.c-table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+}

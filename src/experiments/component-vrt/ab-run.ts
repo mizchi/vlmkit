@@ -50,12 +50,23 @@ const FIXTURE = join(here, "fixture");
 const CLI = resolve(here, "../../cli/vlmkit.ts");
 
 /** Components in the fixture, in the order the page lays them out. */
-export const COMPONENTS = ["Button", "Badge", "Avatar", "Card", "Alert", "Toolbar"] as const;
+export const COMPONENTS = [
+  "Button", "Badge", "Avatar", "Card", "Alert", "Toolbar",
+  // Large on purpose. With only small components, "a component shot is far
+  // smaller than a page shot" is true by construction rather than by finding —
+  // these two exist so the thesis can fail.
+  "Hero", "DataTable",
+] as const;
 export type ComponentName = (typeof COMPONENTS)[number];
 
-/** `.c-button` ← `Button`. The fixture keeps one rule prefix per component. */
+/**
+ * `.c-button` ← `Button`. One rule prefix per component, so a mutation is
+ * attributable. `DataTable` is spelled `.c-table` in the CSS, hence the map
+ * rather than a blind lowercase.
+ */
+const CLASS_OVERRIDES: Partial<Record<ComponentName, string>> = { DataTable: ".c-table" };
 export function componentClass(name: ComponentName): string {
-  return `.c-${name.toLowerCase()}`;
+  return CLASS_OVERRIDES[name] ?? `.c-${name.toLowerCase()}`;
 }
 
 /**
@@ -110,13 +121,39 @@ export function declarationsIn(css: string, selector: string): { property: strin
     .filter((d) => d.property && d.value);
 }
 
+/**
+ * Page compositions the same components are measured in.
+ *
+ * Varying the page rather than the component set keeps the fairness condition
+ * (both arms render from one CSS and one markup module) while exercising the
+ * thing that actually drives page-arm cost: how big the page is and how many
+ * times a component appears in it.
+ */
+export const PAGES = ["flat", "hero", "list"] as const;
+export type PageVariant = (typeof PAGES)[number];
+
+/**
+ * Regression classes.
+ *
+ * `colour` is here to be adversarial: a colour change does not reflow, so the
+ * page arm's pixel diff stays tight around the component and the cascade that
+ * favours the component arm never happens. A result that only holds for
+ * reflowing mutations is a result about reflow, not about scoping.
+ */
+export const SEED_CLASSES = ["delete", "value", "colour"] as const;
+export type SeedClass = (typeof SEED_CLASSES)[number];
+
 export interface Seed {
   seed: number;
+  page: PageVariant;
+  seedClass: SeedClass;
   component: ComponentName;
-  /** The declaration removed, for the report. */
   selector: string;
   property: string;
+  /** Original value. */
   value: string;
+  /** What it becomes. Empty string means the declaration is deleted. */
+  replacement: string;
 }
 
 /**
@@ -126,35 +163,97 @@ export interface Seed {
  * unambiguous — a mutation to `:root` or `body` would change every component and
  * make "did the signal localize it" meaningless.
  */
-export function planSeed(css: string, seed: number): Seed {
-  const rand = seededRandom(seed);
-  // Component chosen by seed index, not by the RNG. `seededRandom`'s first draw
-  // is strongly correlated with small seeds — seeds 1-6 all selected `Avatar` —
-  // and for an experiment this small even coverage is what is wanted anyway:
-  // seeds 1..6 hit all six components, so no component's result is missing and
-  // none is double-weighted. The RNG still picks WHICH property to remove.
-  const component = COMPONENTS[(seed - 1) % COMPONENTS.length]!;
-  const prefix = componentClass(component);
-  // Layout-affecting only: a pure colour change does not reflow, so the cascade
-  // this experiment is about would not appear at all. Both arms see the same
-  // class of regression either way.
-  const LAYOUT = ["padding", "width", "height", "border", "gap", "font", "display", "letter-spacing"];
-  const candidates = declarationsIn(css, prefix).filter(
-    (d) => LAYOUT.some((p) => d.property === p || d.property.startsWith(`${p}-`)),
-  );
-  if (candidates.length === 0) {
-    throw new Error(`no layout-affecting declaration found for ${prefix} — fixture changed?`);
-  }
-  const picked = candidates[Math.floor(rand() * candidates.length)]!;
-  return { seed, component, selector: prefix, property: picked.property, value: picked.value };
+export interface SeedRequest {
+  seed: number;
+  page: PageVariant;
+  seedClass: SeedClass;
+  /** Component to mutate. Passed explicitly so a run can cover a chosen set. */
+  component: ComponentName;
 }
 
-/** Remove exactly the planned declaration, leaving the rest of the file byte-identical. */
+/** Properties whose change reflows layout, and those that only repaint. */
+const LAYOUT_PROPS = ["padding", "width", "height", "border", "gap", "font", "display", "letter-spacing"];
+const COLOUR_PROPS = ["background", "color", "border-color"];
+
+/** Plan one mutation. Deterministic in `seed` for the property choice. */
+export function planSeed(css: string, request: SeedRequest): Seed {
+  const rand = seededRandom(request.seed);
+  const prefix = componentClass(request.component);
+  const declarations = declarationsIn(css, prefix);
+  const wants = request.seedClass === "colour" ? COLOUR_PROPS : LAYOUT_PROPS;
+  const candidates = declarations.filter(
+    (d) => wants.some((prop) => d.property === prop || d.property.startsWith(`${prop}-`))
+      // A colour hiding inside a shorthand (`border: 1px solid x`) is not a
+      // colour-only mutation — changing it would also be a no-op or a reflow
+      // depending on the shorthand, so the class would not mean what it says.
+      && (request.seedClass !== "colour" || /#|rgb|var\(|linear-gradient/.test(d.value)),
+  );
+  if (candidates.length === 0) {
+    throw new Error(
+      `no ${request.seedClass} candidate in ${prefix}`
+      + ` (has: ${declarations.map((d) => d.property).join(", ") || "nothing"})`,
+    );
+  }
+  const picked = candidates[Math.floor(rand() * candidates.length)]!;
+  return {
+    seed: request.seed,
+    page: request.page,
+    seedClass: request.seedClass,
+    component: request.component,
+    selector: prefix,
+    property: picked.property,
+    value: picked.value,
+    replacement: mutateValue(picked.property, picked.value, request.seedClass),
+  };
+}
+
+/**
+ * What the declaration becomes.
+ *
+ * `value` perturbs rather than deletes, because a wrong-but-present value is the
+ * more common real regression — someone edits `padding: 10px` to `padding: 16px`.
+ * Deletion is the easier case for any differ, so testing only deletion would
+ * overstate both arms.
+ */
+export function mutateValue(property: string, value: string, seedClass: SeedClass): string {
+  if (seedClass === "delete") return "";
+  if (seedClass === "colour") {
+    // A visible but modest shift: large enough to exceed any threshold, small
+    // enough that it is a plausible mistake rather than a smoke test.
+    if (/linear-gradient/.test(value)) return "linear-gradient(120deg, #f6ecff, #fbf7ff)";
+    if (/var\(/.test(value)) return value.replace(/var\([^)]+\)/, "#8a5cf6");
+    return value.replace(/#[0-9a-fA-F]{3,8}|rgba?\([^)]*\)/, "#8a5cf6");
+  }
+  // `value`: scale the first length found. Falls back to a keyword swap when the
+  // value carries no length at all.
+  const length = /(-?\d*\.?\d+)(px|em|rem|%)/.exec(value);
+  if (length) {
+    const scaled = Math.max(1, Math.round(Number(length[1]) * 1.8 + 4));
+    return value.replace(length[0], `${scaled}${length[2]}`);
+  }
+  if (value.trim() === "inline-flex") return "block";
+  if (value.trim() === "inline-block") return "block";
+  if (value.trim() === "flex") return "block";
+  return `${value} `.trim(); // no safe perturbation; caller filters these out
+}
+
+/** Apply the plan: delete the declaration, or replace its value. */
 export function applySeed(css: string, plan: Seed): string {
   const line = `${plan.property}: ${plan.value};`;
   const index = css.indexOf(line);
-  if (index < 0) throw new Error(`could not find "${line}" to remove`);
-  return `${css.slice(0, index)}${css.slice(index + line.length)}`;
+  if (index < 0) throw new Error(`could not find "${line}" to mutate`);
+  const replacement = plan.replacement === ""
+    ? ""
+    : `${plan.property}: ${plan.replacement};`;
+  return `${css.slice(0, index)}${replacement}${css.slice(index + line.length)}`;
+}
+
+/**
+ * A plan that would not change any pixel is not a trial — it would score as
+ * "both arms found nothing" and quietly dilute every average.
+ */
+export function isEffective(plan: Seed): boolean {
+  return plan.replacement !== plan.value;
 }
 
 function pngSize(path: string): { width: number; height: number } {
@@ -208,10 +307,11 @@ export interface SeedResult {
  */
 function pageArm(workdir: string, plan: Seed): ArmResult {
   const out = join(workdir, "page-signal");
+  const pageFile = `page-${plan.page}.html`;
   run([
     "diff", "html",
-    join(workdir, "clean", "page.html"),
-    join(workdir, "dirty", "page.html"),
+    join(workdir, "clean", pageFile),
+    join(workdir, "dirty", pageFile),
     "--output-dir", out,
   ], workdir);
 
@@ -305,17 +405,23 @@ function storyArm(workdir: string, plan: Seed): ArmResult {
   };
 }
 
-export function runSeed(seed: number, root: string): SeedResult {
-  const workdir = join(root, `seed-${seed}`);
+export function runSeed(request: SeedRequest, root: string): SeedResult | null {
+  const workdir = join(root, `${request.page}-${request.seedClass}-${request.component}-${request.seed}`);
   rmSync(workdir, { recursive: true, force: true });
   for (const variant of ["clean", "dirty"]) {
     mkdirSync(join(workdir, variant), { recursive: true });
     cpSync(FIXTURE, join(workdir, variant), { recursive: true });
+    // Baselines from a previous run must not travel with the fixture copy.
+    rmSync(join(workdir, variant, ".vlmkit"), { recursive: true, force: true });
   }
 
   const cssPath = join(workdir, "dirty", "components.css");
   const css = readFileSync(cssPath, "utf8");
-  const plan = planSeed(css, seed);
+  const plan = planSeed(css, request);
+  if (!isEffective(plan)) {
+    rmSync(workdir, { recursive: true, force: true });
+    return null;
+  }
   writeFileSync(cssPath, applySeed(css, plan));
 
   return { plan, page: pageArm(workdir, plan), story: storyArm(workdir, plan) };
@@ -323,95 +429,143 @@ export function runSeed(seed: number, root: string): SeedResult {
 
 const ratio = (a: number, b: number) => (b === 0 ? "—" : `${(a / b).toFixed(1)}x`);
 
+const sumBy = (rows: readonly SeedResult[], pick: (r: SeedResult) => number) =>
+  rows.reduce((n, r) => n + pick(r), 0);
+
+function falsePositives(arm: ArmResult, plan: Seed): number {
+  const expected = expectedChanged(plan.component) as string[];
+  return arm.implicated.filter((c) => !expected.includes(c)).length;
+}
+function missed(arm: ArmResult, plan: Seed): number {
+  return expectedChanged(plan.component).filter((c) => !arm.implicated.includes(c)).length;
+}
+
+/** One comparison row for an arbitrary slice of the results. */
+function sliceRow(label: string, rows: readonly SeedResult[]): string {
+  if (rows.length === 0) return `| ${label} | — | — | — | — | — |`;
+  const pageBytes = sumBy(rows, (r) => r.page.signalBytes);
+  const storyBytes = sumBy(rows, (r) => r.story.signalBytes);
+  const pageImg = sumBy(rows, (r) => r.page.imageTokens);
+  const storyImg = sumBy(rows, (r) => r.story.imageTokens);
+  const expected = rows.reduce((n, r) => n + expectedChanged(r.plan.component).length, 0);
+  return `| ${label} | ${rows.length} | ${ratio(pageBytes, storyBytes)} | **${ratio(pageImg, storyImg)}** |`
+    + ` ${sumBy(rows, (r) => missed(r.page, r.plan))}/${expected}`
+    + ` vs ${sumBy(rows, (r) => missed(r.story, r.plan))}/${expected} |`
+    + ` ${sumBy(rows, (r) => falsePositives(r.page, r.plan))}`
+    + ` vs ${sumBy(rows, (r) => falsePositives(r.story, r.plan))} |`;
+}
+
 export function formatReport(results: readonly SeedResult[]): string {
   const lines: string[] = [];
-  lines.push("## Per seed");
+
+  lines.push("## By page composition");
   lines.push("");
-  lines.push("| seed | mutated component | removed | page bytes | story bytes | page img tokens | story img tokens |");
-  lines.push("|---|---|---|--:|--:|--:|--:|");
+  lines.push("| slice | trials | bytes ratio | image-token ratio | missed (page vs story) | false pos (page vs story) |");
+  lines.push("|---|--:|--:|--:|--:|--:|");
+  for (const page of PAGES) lines.push(sliceRow(`page: \`${page}\``, results.filter((r) => r.plan.page === page)));
+  lines.push(sliceRow("**all**", results));
+
+  lines.push("");
+  lines.push("## By regression class");
+  lines.push("");
+  lines.push("| slice | trials | bytes ratio | image-token ratio | missed (page vs story) | false pos (page vs story) |");
+  lines.push("|---|--:|--:|--:|--:|--:|");
+  for (const cls of SEED_CLASSES) {
+    lines.push(sliceRow(`class: \`${cls}\``, results.filter((r) => r.plan.seedClass === cls)));
+  }
+
+  lines.push("");
+  lines.push("## By component size");
+  lines.push("");
+  lines.push(
+    "The adversarial cut. `Hero` and `DataTable` are large, so a component-scoped shot"
+    + " of them approaches a page-scoped shot. If the advantage survives here it is not"
+    + " an artefact of picking small components.",
+  );
+  lines.push("");
+  lines.push("| slice | trials | bytes ratio | image-token ratio | missed (page vs story) | false pos (page vs story) |");
+  lines.push("|---|--:|--:|--:|--:|--:|");
+  const LARGE: readonly string[] = ["Hero", "DataTable"];
+  lines.push(sliceRow("small components", results.filter((r) => !LARGE.includes(r.plan.component))));
+  lines.push(sliceRow("**large components**", results.filter((r) => LARGE.includes(r.plan.component))));
+
+  lines.push("");
+  lines.push("## Every trial");
+  lines.push("");
+  lines.push("| page | class | component | mutation | page bytes | story bytes | page img tok | story img tok |");
+  lines.push("|---|---|---|---|--:|--:|--:|--:|");
   for (const r of results) {
+    const mutation = r.plan.replacement === ""
+      ? `\`${r.plan.property}\` deleted`
+      : `\`${r.plan.property}\` → ${r.plan.replacement.slice(0, 22)}`;
     lines.push(
-      `| ${r.plan.seed} | \`${r.plan.component}\` | \`${r.plan.property}\` |`
+      `| ${r.plan.page} | ${r.plan.seedClass} | \`${r.plan.component}\` | ${mutation} |`
       + ` ${r.page.signalBytes.toLocaleString()} | ${r.story.signalBytes.toLocaleString()} |`
       + ` ${r.page.imageTokens.toLocaleString()} | ${r.story.imageTokens.toLocaleString()} |`,
     );
   }
 
-  const sum = (pick: (r: SeedResult) => number) => results.reduce((n, r) => n + pick(r), 0);
-  const pageBytes = sum((r) => r.page.signalBytes);
-  const storyBytes = sum((r) => r.story.signalBytes);
-  const pageImg = sum((r) => r.page.imageTokens);
-  const storyImg = sum((r) => r.story.imageTokens);
-
-  lines.push("");
-  lines.push("## Totals");
-  lines.push("");
-  lines.push("| metric | page-scoped | component-scoped | ratio |");
-  lines.push("|---|--:|--:|--:|");
-  lines.push(`| signal bytes | ${pageBytes.toLocaleString()} | ${storyBytes.toLocaleString()} | **${ratio(pageBytes, storyBytes)}** |`);
-  lines.push(`| image tokens (approx) | ${pageImg.toLocaleString()} | ${storyImg.toLocaleString()} | **${ratio(pageImg, storyImg)}** |`);
-  lines.push(
-    `| localized the right component | ${results.filter((r) => r.page.localized).length}/${results.length}`
-    + ` | ${results.filter((r) => r.story.localized).length}/${results.length} | |`,
-  );
-  // Scored against the expected blast radius, not against the mutated component
-  // alone — see COMPOSES for why the naive version was wrong.
-  const falsePos = (arm: ArmResult, plan: Seed) => {
-    const expected = expectedChanged(plan.component) as string[];
-    return arm.implicated.filter((c) => !expected.includes(c)).length;
-  };
-  const missed = (arm: ArmResult, plan: Seed) =>
-    expectedChanged(plan.component).filter((c) => !arm.implicated.includes(c)).length;
-  lines.push(
-    `| false positives (outside blast radius) | ${sum((r) => falsePos(r.page, r.plan))}`
-    + ` | ${sum((r) => falsePos(r.story, r.plan))} | |`,
-  );
-  lines.push(
-    `| missed changes (inside blast radius) | ${sum((r) => missed(r.page, r.plan))}`
-    + ` | ${sum((r) => missed(r.story, r.plan))} | |`,
-  );
-
-  lines.push("");
-  lines.push("## Localization detail");
-  lines.push("");
-  lines.push("| seed | expected (blast radius) | page implicates | story implicates |");
-  lines.push("|---|---|---|---|");
-  for (const r of results) {
-    lines.push(
-      `| ${r.plan.seed} | ${expectedChanged(r.plan.component).map((c) => `\`${c}\``).join(", ")} |`
-      + ` ${r.page.implicated.map((c) => `\`${c}\``).join(", ") || "—"} |`
-      + ` ${r.story.implicated.map((c) => `\`${c}\``).join(", ") || "—"} |`,
-    );
-  }
   lines.push("");
   lines.push(
-    "Image tokens use Anthropic's documented `w*h/750` approximation, applied to the"
-    + " PNG dimensions actually emitted. Output tokens and retake counts are absent"
-    + " on purpose: both require a repair agent in the loop, and estimating them"
-    + " would be fabrication.",
+    "Image tokens use Anthropic's documented `w*h/750` approximation on the PNG"
+    + " dimensions actually emitted. Output tokens and retake counts are absent on"
+    + " purpose: both need a repair agent in the loop, and estimating them would be"
+    + " fabrication.",
   );
   return lines.join("\n");
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
-  const seedArg = process.argv.indexOf("--seeds");
-  const seeds = seedArg >= 0
-    ? process.argv[seedArg + 1]!.split(",").map((s) => Number(s.trim()))
-    : [1, 2, 3];
+  const arg = (name: string) => {
+    const i = process.argv.indexOf(`--${name}`);
+    return i >= 0 ? process.argv[i + 1] : undefined;
+  };
+  const pages = (arg("pages")?.split(",") ?? [...PAGES]) as PageVariant[];
+  const classes = (arg("classes")?.split(",") ?? [...SEED_CLASSES]) as SeedClass[];
+  const components = (arg("components")?.split(",") ?? [...COMPONENTS]) as ComponentName[];
+
   const root = join(process.cwd(), "test-results", "component-vrt-ab");
   mkdirSync(root, { recursive: true });
 
   const results: SeedResult[] = [];
-  for (const seed of seeds) {
-    process.stderr.write(`seed ${seed}… `);
-    const result = runSeed(seed, root);
-    process.stderr.write(`${result.plan.component}/${result.plan.property}\n`);
-    results.push(result);
+  const skipped: string[] = [];
+  let seed = 0;
+  for (const page of pages) {
+    for (const seedClass of classes) {
+      for (const component of components) {
+        seed++;
+        const label = `${page}/${seedClass}/${component}`;
+        let result: SeedResult | null = null;
+        try {
+          result = runSeed({ seed, page, seedClass, component }, root);
+        } catch (e) {
+          // A component with no colour declaration of its own has no `colour`
+          // trial, and that is fine — but it must be REPORTED, because a silently
+          // shrinking corpus is how a bench starts flattering itself.
+          skipped.push(`${label}: ${e instanceof Error ? e.message : String(e)}`);
+          process.stderr.write(`skip ${label}\n`);
+          continue;
+        }
+        if (!result) {
+          skipped.push(`${label}: mutation would not change any pixel`);
+          process.stderr.write(`skip ${label} (no-op)\n`);
+          continue;
+        }
+        process.stderr.write(`${label} — ${result.plan.property}\n`);
+        results.push(result);
+      }
+    }
   }
-  const report = formatReport(results);
+
+  let report = formatReport(results);
+  if (skipped.length > 0) {
+    report += `\n\n## Skipped trials (${skipped.length})\n\n`
+      + skipped.map((s) => `- ${s}`).join("\n")
+      + "\n\nListed rather than dropped: a corpus that quietly shrinks is how a"
+      + " benchmark starts agreeing with whoever wrote it.\n";
+  }
   console.log(report);
-  const outPath = join(root, "report.md");
-  writeFileSync(outPath, `${report}\n`);
+  writeFileSync(join(root, "report.md"), `${report}\n`);
   writeFileSync(join(root, "results.json"), `${JSON.stringify(results, null, 2)}\n`);
-  process.stderr.write(`\nwritten: ${outPath}\n`);
+  process.stderr.write(`\n${results.length} trials, ${skipped.length} skipped\n`);
 }

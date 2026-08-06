@@ -19,4 +19,14 @@ globalThis.COMPONENTS = {
     `<div class="c-toolbar">${globalThis.COMPONENTS.Avatar({})}`
     + `${globalThis.COMPONENTS.Badge({ label: "Pro" })}`
     + `${globalThis.COMPONENTS.Button({ title: "Share" })}</div>`,
+  Hero: (p = {}) =>
+    `<div class="c-hero"><h1 class="c-hero__title">${p.title ?? "Ship the interface you designed"}</h1>`
+    + `<p class="c-hero__sub">${p.sub ?? "Deterministic checks for the parts a screenshot cannot tell you."}</p></div>`,
+  DataTable: (p = {}) => {
+    const rows = (p.rows ?? 6);
+    const body = Array.from({ length: rows }, (_, i) =>
+      `<tr><td>row-${i + 1}</td><td>${(i * 37) % 100}</td><td>${i % 2 ? "active" : "idle"}</td></tr>`).join("");
+    return `<table class="c-table"><thead><tr><th>Name</th><th>Score</th><th>State</th></tr></thead>`
+      + `<tbody>${body}</tbody></table>`;
+  },
 };
