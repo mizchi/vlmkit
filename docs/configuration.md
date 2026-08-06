@@ -106,7 +106,7 @@ the snapshot, workflow, and diff-pr sections.
 
 ## Agent Skills (APM)
 
-vlmkit ships twelve coding-agent skills under `.claude/skills/`. They wrap
+vlmkit ships thirteen coding-agent skills under `.claude/skills/`. They wrap
 the most common workflows as standalone, agent-readable playbooks.
 Other repos can install them via [APM](https://agentskills.io):
 
@@ -127,6 +127,7 @@ apm install mizchi/vlmkit/.claude/skills/vrt-visual-diff
 | `spec-to-playwright` | `init-agents` or `@mizchi/vlmkit-plan/generate` → deterministic VRT → `@mizchi/vlmkit-heal` | Spec → Playwright test with stable VRT + self-healing |
 | `auto-markup` | `check palette` → `contract scaffold` → `build page\|component` loop | Rebuild a page from a target screenshot, agent-as-VLM, no API key |
 | `dynamic-markup` | auto-markup + gates: `check breakpoints` / `scan scroll` / `check animation\|motion` | Markup whose spec includes breakpoints, scrollports, animations |
+| `markup-decompose` | routes `contract introspect` → `auto-markup` → `check story` | Whole screen: decide the component split, then freeze each part as a baseline |
 | `component-vrt` | `vlmkit check story --gallery <url>` | Repair one component with a component-sized diff; includes gallery templates (vanilla / React / Vue) |
 | `agent-validation-loop` | disposable subagent runs → friction → fix → re-run | Harden a CLI/library by measuring whether agents can drive it |
 

@@ -58,7 +58,7 @@ which skill the user wants.
 | Class | Choose it when… | Skills | What it can do |
 |---|---|---|---|
 | General verification | You edited HTML/CSS and need a fast correctness loop | [`markup-assist`](./markup-assist/), [`component-vrt`](./component-vrt/) | Select an integrity, copy, layout, responsive, interaction, a11y, or design gate; read kickback; fix; rerun to green — or scope the diff to one mounted component when a page diff is too noisy |
-| UI creation | The task starts from an image, reference, contract, or behavior brief | [`mock-markup`](./mock-markup/), [`auto-markup`](./auto-markup/), [`dynamic-markup`](./dynamic-markup/) | Normalize raw mock exports; recreate static HTML/CSS; verify responsive, scrolling, interaction, and motion behavior |
+| UI creation | The task starts from an image, reference, contract, or behavior brief | [`mock-markup`](./mock-markup/), [`auto-markup`](./auto-markup/), [`dynamic-markup`](./dynamic-markup/), [`markup-decompose`](./markup-decompose/) | Normalize raw mock exports; recreate static HTML/CSS; verify responsive, scrolling, interaction, and motion behavior |
 | Test generation | A natural-language story must become a reproducible browser test | [`spec-to-playwright`](./spec-to-playwright/) | Explore the app, generate Playwright tests, stabilize VRT, run CI gates, and heal drift |
 | Comparison and monitoring | Two renders or repeated runs must be compared | [`vrt-markup-synth`](./vrt-markup-synth/), [`vrt-visual-diff`](./vrt-visual-diff/), [`vrt-regression-watch`](./vrt-regression-watch/), [`vrt-migration-eval`](./vrt-migration-eval/) | Produce deterministic authoring signals, explain visual deltas, detect regressions over time, and evaluate framework/CSS migrations |
 | Evaluation and hardening | You are measuring the repair system or the agent-facing tool itself | [`vrt-css-fix-loop`](./vrt-css-fix-loop/), [`agent-validation-loop`](./agent-validation-loop/) | Benchmark VLM+LLM CSS recovery on known fixtures and improve tool ergonomics with fresh-agent validation loops |
@@ -66,6 +66,7 @@ which skill the user wants.
 ## Selection rules
 
 - No reference, just edited markup → `markup-assist`.
+- Whole screen or feature that needs splitting into components first → `markup-decompose`.
 - Raw Figma export, retina screenshot, or competitor capture → `mock-markup`.
 - Target screenshot or UI Contract IR → `auto-markup`.
 - Responsive, scroll, interaction, or animation requirements → `dynamic-markup`.

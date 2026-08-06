@@ -16,6 +16,7 @@ const specializedSkills = [
   "component-vrt",
   "dynamic-markup",
   "markup-assist",
+  "markup-decompose",
   "mock-markup",
   "spec-to-playwright",
   "vrt-css-fix-loop",
