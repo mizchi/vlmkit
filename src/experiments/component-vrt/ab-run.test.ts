@@ -23,11 +23,13 @@ import {
   COMPONENTS,
   COMPOSES,
   PAGES,
+  PAGE_CONTAINS,
   SEED_CLASSES,
   applySeed,
   componentClass,
   declarationsIn,
   expectedChanged,
+  isComparable,
   isEffective,
   mutateValue,
   planSeed,
@@ -262,5 +264,47 @@ describe("visionTokens", () => {
     // A component box against a desktop viewport: the ratio is what the report
     // reports, so a regression here would silently flatter one arm.
     assert.ok(visionTokens(1280, 900) > visionTokens(88, 36) * 100);
+  });
+});
+
+describe("trial comparability", () => {
+  it("only compares arms on a component the page actually renders", () => {
+    // The fairness bug this fixes: `page-flat` has no Hero, so a Hero mutation is
+    // invisible there — yet the page arm was scored as having missed it while the
+    // story arm saw it, because the gallery mounts any component regardless of
+    // page. That is not a measurement, it is a category error.
+    assert.equal(isComparable("flat", "Hero"), false);
+    assert.equal(isComparable("list", "DataTable"), false);
+    assert.equal(isComparable("hero", "Hero"), true);
+    assert.equal(isComparable("flat", "Button"), true);
+  });
+
+  it("treats a composite as rendering its parts", () => {
+    // `page-list` draws a Toolbar but no bare Avatar; mutating Avatar still
+    // changes what that page shows, so the trial is valid.
+    assert.ok(PAGE_CONTAINS.list.includes("Toolbar"));
+    assert.equal(isComparable("list", "Avatar"), true);
+  });
+
+  it("keeps PAGE_CONTAINS in step with what each page file renders", async () => {
+    // A stale map would silently re-introduce the unfair trials.
+    const { readFile } = await import("node:fs/promises");
+    for (const page of PAGES) {
+      const html = await readFile(
+        join(dirname(fileURLToPath(import.meta.url)), "fixture", `page-${page}.html`),
+        "utf8",
+      );
+      for (const component of PAGE_CONTAINS[page]) {
+        assert.match(html, new RegExp(`C\\.${component}\\b`), `page-${page}.html does not render ${component}`);
+      }
+      for (const component of COMPONENTS) {
+        if (PAGE_CONTAINS[page].includes(component)) continue;
+        assert.doesNotMatch(
+          html,
+          new RegExp(`C\\.${component}\\b`),
+          `page-${page}.html renders ${component} but PAGE_CONTAINS omits it`,
+        );
+      }
+    }
   });
 });

@@ -133,6 +133,39 @@ export const PAGES = ["flat", "hero", "list"] as const;
 export type PageVariant = (typeof PAGES)[number];
 
 /**
+ * Which components each page variant actually renders.
+ *
+ * This exists because the second run was unfair to the page arm. `page-flat` does
+ * not render `Hero`, so a Hero mutation changes nothing on it — and the page arm
+ * was still scored as having "missed" the change it could not possibly see, while
+ * the story arm saw it because the gallery mounts any component regardless of
+ * page. Eight of the page arm's twelve large-component misses were that artefact;
+ * on `page-hero`, where Hero is present, it localized 4 of 4.
+ *
+ * Trials for a component the page does not contain are not valid comparisons and
+ * are skipped with that reason stated.
+ */
+export const PAGE_CONTAINS: Record<PageVariant, readonly ComponentName[]> = {
+  flat: ["Button", "Badge", "Avatar", "Card", "Alert", "Toolbar"],
+  hero: ["Hero", "DataTable", "Button"],
+  // Directly rendered only. Avatar/Badge/Button reach this page THROUGH Toolbar,
+  // and `isComparable` expands composites — listing them here as well made the
+  // map disagree with the page file, which the test caught.
+  list: ["Toolbar", "Card", "Alert"],
+};
+
+/** True when both arms can actually observe a mutation to this component. */
+export function isComparable(page: PageVariant, component: ComponentName): boolean {
+  // A composite counts as rendering its parts, since mutating a part changes the
+  // composite the page draws.
+  const rendered = new Set<ComponentName>(PAGE_CONTAINS[page]);
+  for (const parent of PAGE_CONTAINS[page]) {
+    for (const part of COMPOSES[parent] ?? []) rendered.add(part);
+  }
+  return rendered.has(component);
+}
+
+/**
  * Regression classes.
  *
  * `colour` is here to be adversarial: a colour change does not reflow, so the
@@ -560,6 +593,11 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import
       for (const component of components) {
         seed++;
         const label = `${page}/${seedClass}/${component}`;
+        if (!isComparable(page, component)) {
+          skipped.push(`${label}: page-${page}.html does not render ${component}, so the page arm cannot observe it`);
+          process.stderr.write(`skip ${label} (not on this page)\n`);
+          continue;
+        }
         let result: SeedResult | null = null;
         try {
           result = runSeed({ seed, page, seedClass, component }, root);
