@@ -312,11 +312,20 @@ Worked example: [`examples/vlmkit.gates.json`](../examples/vlmkit.gates.json).
 ### Rules (tune or disable one rule, not one whole gate)
 
 ```bash
-vlmkit rules                      # every registry-driven gate + its rule count
+vlmkit rules                      # every gate, grouped by the kind of question it answers
+vlmkit rules --json               # the whole catalog, machine-readable
 vlmkit rules check integrity      # that gate's rule ids, default severities, docs
 vlmkit check integrity page.html --rule check.integrity/near-misalignment=off
 vlmkit check breakpoints page.html --rules   # same table, from the gate itself
 ```
+
+`vlmkit rules` groups by **category** — `correctness`, `behavior`,
+`design-system`, `verdict`, `infrastructure` — not by CLI verb, because
+`check`/`scan`/`stress` says how a command is spelled and a category says what a
+failure means (`scan scroll` and `check breakpoints` answer the same kind of
+question). `--json` emits `{ categories, gates: [{ id, command, title, summary,
+category, plugin, rules }] }`, which is what a job that wants "fail the build if
+a gate appears un-triaged" should read.
 
 A gate declares its rules, so a rule is addressable: `<gateId>/<ruleId>` set to
 `off`, `suspect`, `warn` or `info`. Persist the decision under `"rules"` in
@@ -372,7 +381,15 @@ The bundled gates load the same way, from three plugins — `@mizchi/vlmkit-mark
 (24 gates), `@mizchi/vlmkit-capture` (`check crater`) and the app itself
 (`check perf`) — so there is no privileged built-in path to diverge from.
 
-Worked example: [`examples/gate-plugin/house-gates.ts`](../examples/gate-plugin/house-gates.ts).
+**Adding your own metric: [`docs/authoring-gates.md`](authoring-gates.md)** —
+the contract field by field, choosing severities and a category, reading project
+config, measuring in a browser, testing, and publishing.
+
+Runnable examples: [`examples/gate-plugin/`](../examples/gate-plugin/) — a
+project with its own `vlmkit.config.json` and two gates,
+[`house-gates.ts`](../examples/gate-plugin/house-gates.ts) (the smallest useful
+one) and [`dom-budget.gate.ts`](../examples/gate-plugin/dom-budget.gate.ts) (the
+shape a real house metric takes: render, measure, compare against budgets).
 Design and migration status: [`docs/design/gate-plugin-architecture.md`](design/gate-plugin-architecture.md).
 
 ### Build / Scan / Inspect / Stress (markup-assistance)

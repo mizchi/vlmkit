@@ -208,3 +208,91 @@ describe("a project-declared plugin gate", { timeout: 120_000 }, () => {
     assert.match(stderr, /failed to load gate plugin "\.\/missing-plugin\.ts"/);
   });
 });
+
+/**
+ * The example directory run as its own project, exactly as its README tells a
+ * reader to run it.
+ *
+ * These cases use `examples/gate-plugin` as the cwd rather than a temp copy,
+ * and that is deliberate: the copy would not resolve
+ * `@mizchi/vlmkit-core/plugin/contract.ts`, so it would prove the plugin loads
+ * from a place no reader will ever put it. The tradeoff is that the assertions
+ * below are assertions about the committed fixtures — which is the point, since
+ * every command in the README is one of them.
+ *
+ * `check dom-budget` launches a browser, hence the wider timeout.
+ */
+describe("examples/gate-plugin as a project", { timeout: 240_000 }, () => {
+  const EXAMPLE = join(REPO_ROOT, "examples/gate-plugin");
+
+  const example = (args: string[]) => {
+    const r = spawnSync(process.execPath, ["--experimental-strip-types", CLI, ...args], {
+      cwd: EXAMPLE,
+      encoding: "utf8",
+      // No ledger: a test must not leave a file in the checkout it ran from.
+      env: { ...process.env, NO_COLOR: "1", VLMKIT_NO_LEDGER: "1" },
+    });
+    return { stdout: plain(r.stdout ?? ""), stderr: plain(r.stderr ?? ""), status: r.status };
+  };
+
+  it("registers both gates from one plugin", () => {
+    const { stdout, status } = example(["rules"]);
+    assert.equal(status, 0);
+    assert.match(stdout, /check house-brand\s+2 rule\(s\)\s+check\.house-brand\s+\[house-gates\]/);
+    assert.match(stdout, /check dom-budget\s+3 rule\(s\)\s+check\.dom-budget\s+\[house-gates\]/);
+    // Both declare `category: "design-system"`, so both land in that bucket
+    // rather than under "other".
+    const designSystem = stdout.slice(stdout.indexOf("design-system"));
+    assert.match(designSystem.slice(0, designSystem.indexOf("\n\n")), /house-brand[\s\S]*dom-budget/);
+  });
+
+  it("passes on the conforming fixture and fails on the offending one", () => {
+    assert.equal(example(["check", "house-brand", "page.html"]).status, 0);
+    const broken = example(["check", "house-brand", "page-broken.html"]);
+    assert.equal(broken.status, 1);
+    assert.match(broken.stdout, /Comic Sans MS/);
+  });
+
+  it("reads its budgets from the project config, and says where each came from", () => {
+    // The `origin` record exists so nobody has to argue about whether a budget
+    // was ever configured. `maxStylesheetBytes` is absent from the config, so
+    // the same report shows both sources at once.
+    const { stdout, status } = example(["check", "dom-budget", "page.html"]);
+    assert.equal(status, 0);
+    assert.match(stdout, /nesting depth\s+\d+ \/\s+6\s+\(config\)/);
+    assert.match(stdout, /inline style bytes\s+\d+ \/\s+250000\s+\(default\)/);
+  });
+
+  it("lets a flag beat the config", () => {
+    const { stdout } = example(["check", "dom-budget", "page-broken.html", "--max-depth", "20"]);
+    assert.match(stdout, /nesting depth\s+\d+ \/\s+20\s+\(flag\)/);
+  });
+
+  it("reports the depth overrun as a warn — findings without a failing exit code", () => {
+    const { stdout, status } = example(["check", "dom-budget", "page-broken.html", "--json"]);
+    assert.equal(status, 0, "a warn must not fail the command");
+    const parsed = JSON.parse(stdout) as {
+      verdict: string;
+      counts: Record<string, number>;
+      findings: { rule: string; severity: string; evidence: Record<string, unknown> }[];
+    };
+    assert.equal(parsed.verdict, "pass");
+    assert.deepEqual(parsed.counts, { suspect: 0, warn: 1, info: 0 });
+    const [finding] = parsed.findings;
+    assert.equal(finding?.rule, "depth-over-budget");
+    assert.equal(finding?.severity, "warn");
+    // The numbers travel structurally, so a client never parses the message.
+    assert.equal(finding?.evidence.budget, 6);
+    assert.equal(finding?.evidence.over, (finding?.evidence.value as number) - 6);
+    assert.match(String(finding?.evidence.deepestPath), /^body>div/);
+  });
+
+  it("promotes that same warn to a failure with one --rule", () => {
+    // The claim every `warn` rule's docs make: one config line from enforced.
+    const { status } = example([
+      "check", "dom-budget", "page-broken.html",
+      "--rule", "check.dom-budget/depth-over-budget=suspect",
+    ]);
+    assert.equal(status, 1);
+  });
+});

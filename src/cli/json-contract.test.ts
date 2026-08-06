@@ -164,3 +164,50 @@ describe("blocking checks return a blocking exit code", () => {
     assert.match(result.stdout, /finding\(s\) suppressed by rule settings/);
   });
 });
+
+describe("`vlmkit rules --json` is the machine-readable catalog", () => {
+  /** No fixture page and no --output-dir: this asks about the catalog, not a run. */
+  function rules(args: string[]): { stdout: string; status: number | null } {
+    const r = spawnSync(process.execPath, ["--experimental-strip-types", CLI, "rules", ...args], {
+      encoding: "utf8",
+      env: { ...process.env, NO_COLOR: "1" },
+    });
+    return { stdout: plain(r.stdout ?? ""), status: r.status };
+  }
+
+  it("prints nothing but JSON, with the category glossary alongside the gates", () => {
+    // A CI job that wants "fail the build if a gate appears un-triaged" reads
+    // this. Scraping the prose listing is not an answer, so the shape is a
+    // contract: categories are a map so a consumer can label a bucket without
+    // hardcoding the descriptions.
+    const { stdout, status } = rules(["--json"]);
+    assert.equal(status, 0);
+    const parsed = JSON.parse(stdout) as {
+      categories: Record<string, string>;
+      gates: { id: string; command: string; category: string | null; plugin: string; rules: unknown[] }[];
+    };
+    assert.deepEqual(Object.keys(parsed.categories), [
+      "correctness", "behavior", "design-system", "verdict", "infrastructure",
+    ]);
+    assert.ok(parsed.gates.length >= 26, `only ${parsed.gates.length} gates in the catalog`);
+    for (const gate of parsed.gates) {
+      assert.deepEqual(Object.keys(gate), [
+        "id", "command", "title", "summary", "category", "plugin", "rules",
+      ], `${gate.id} has the wrong keys`);
+      // `category` is nullable in the shape — a third-party gate may decline to
+      // pick one — but every gate the catalog ships must name a known bucket.
+      assert.ok(gate.category && gate.category in parsed.categories, `${gate.id}: ${gate.category}`);
+      assert.ok(gate.plugin, `${gate.id} has no plugin`);
+      assert.ok(gate.rules.length > 0, `${gate.id} has no rules`);
+    }
+  });
+
+  it("narrows to one gate, with the same shape", () => {
+    const { stdout, status } = rules(["check", "integrity", "--json"]);
+    assert.equal(status, 0);
+    const parsed = JSON.parse(stdout) as { id: string; command: string; rules: { id: string }[] };
+    assert.equal(parsed.id, "check.integrity");
+    assert.equal(parsed.command, "check integrity");
+    assert.ok(parsed.rules.some((rule) => rule.id === "text-collision"));
+  });
+});

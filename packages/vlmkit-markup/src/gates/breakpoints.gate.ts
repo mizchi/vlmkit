@@ -26,6 +26,7 @@ export const breakpointsGate = defineGate<BreakpointCheckReport, BreakpointCheck
   title: "Breakpoint boundary quickcheck",
   summary:
     "Boundary quickcheck: render at B-1/B/B+1 per breakpoint, flag spikes/gaps/overflow (--sweep fuzzes widths in between)",
+  category: "behavior",
   usage: `Boundary quickcheck: render at B-1 / B / B+1 for every discovered media
 query breakpoint and verify each discrete style property at B matches
 one of its neighbors. Catches off-by-one boundaries (768px styled by

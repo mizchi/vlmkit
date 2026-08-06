@@ -12,6 +12,7 @@
  */
 
 import { cac } from "cac";
+import { BOLD, CYAN, DIM, RESET } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { loadGateRegistry } from "./gate-registry.ts";
 
 const HELP_SENTINEL = "__VLMKIT_HELP_PASSTHROUGH__";
@@ -236,7 +237,10 @@ async function printGroupHelp(groupName: string): Promise<void> {
 async function runRules(args: string[]): Promise<void> {
   const registry = await loadGateRegistry();
   const { formatRuleTable } = await import("@mizchi/vlmkit-core/plugin/runner.ts");
+  const { GATE_CATEGORIES } = await import("@mizchi/vlmkit-core/plugin/contract.ts");
+  const json = args.includes("--json");
   const wanted = args.filter((a) => !a.startsWith("-") && a !== HELP_SENTINEL);
+
   if (wanted.length > 0) {
     const gate = registry.byCommand(wanted) ?? registry.byId(wanted.join(" "));
     if (!gate) {
@@ -248,17 +252,66 @@ async function runRules(args: string[]): Promise<void> {
       process.exitCode = 1;
       return;
     }
+    if (json) {
+      console.log(JSON.stringify({ ...describeGate(gate, registry), rules: gate.rules }, null, 2));
+      return;
+    }
     console.log(formatRuleTable(gate));
     return;
   }
-  console.log(`\nvlmkit rules — tunable rules per registry-driven gate\n`);
-  for (const { gate, plugin } of registry.list()) {
-    console.log(`  ${gate.command.join(" ").padEnd(20)} ${String(gate.rules.length).padStart(2)} rule(s)  ${gate.id}  [${plugin}]`);
+
+  if (json) {
+    // The whole catalog, machine-readable: what exists, what it answers, and
+    // every tunable rule. A CI job that wants "fail the build if a new gate
+    // appears un-triaged" needs this, and scraping the prose is not an answer.
+    const gates = registry.list().map(({ gate }) => ({
+      ...describeGate(gate, registry),
+      rules: gate.rules,
+    }));
+    console.log(JSON.stringify({ categories: GATE_CATEGORIES, gates }, null, 2));
+    return;
   }
-  console.log(`\nDetail:   vlmkit rules <gate>`);
+
+  // Grouped by what kind of question each gate answers, not by CLI verb. A
+  // reader choosing what to run is asking "what can go wrong with my page",
+  // and `check`/`scan`/`stress`/`verify` does not answer that — `scan scroll`
+  // and `check breakpoints` are spelled differently and answer the same thing.
+  console.log(`\nvlmkit rules — every gate, by the kind of question it answers\n`);
+  for (const [category, entries] of registry.categories()) {
+    const description = category === "other"
+      ? "Uncategorized (a plugin gate that declared no category)."
+      : GATE_CATEGORIES[category];
+    console.log(`${BOLD}${category}${RESET}  ${DIM}${description}${RESET}`);
+    for (const { gate, plugin } of entries) {
+      console.log(
+        `  ${gate.command.join(" ").padEnd(21)}${String(gate.rules.length).padStart(2)} rule(s)`
+        + `  ${DIM}${gate.id}${RESET}${plugin.startsWith("@mizchi/") || plugin === "vlmkit-app" ? "" : `  ${CYAN}[${plugin}]${RESET}`}`,
+      );
+    }
+    console.log("");
+  }
+  const total = registry.list().reduce((n, { gate }) => n + gate.rules.length, 0);
+  console.log(`${registry.list().length} gates, ${total} tunable rules, ${registry.plugins.length} plugin(s)\n`);
+  console.log(`Detail:   vlmkit rules <gate>            (--json for the machine-readable catalog)`);
   console.log(`Tune:     vlmkit <gate> <source> --rule <gateId>/<ruleId>=off|suspect|warn|info`);
   console.log(`Persist:  "rules" in vlmkit.gates.json`);
-  console.log(`Extend:   "plugins": ["./tools/house-gates.ts"] in vlmkit.config.json\n`);
+  console.log(`Extend:   "plugins": ["./tools/house-gates.ts"] in vlmkit.config.json`);
+  console.log(`          docs/authoring-gates.md walks through writing one.\n`);
+}
+
+/** The shared shape of a gate in `--json` output. */
+function describeGate(
+  gate: { id: string; command: readonly string[]; title: string; summary: string; category?: string },
+  registry: { list(): readonly { gate: { id: string }; plugin: string }[] },
+): Record<string, unknown> {
+  return {
+    id: gate.id,
+    command: gate.command.join(" "),
+    title: gate.title,
+    summary: gate.summary,
+    category: gate.category ?? null,
+    plugin: registry.list().find((entry) => entry.gate.id === gate.id)?.plugin ?? null,
+  };
 }
 
 function printRootHelp(): void {

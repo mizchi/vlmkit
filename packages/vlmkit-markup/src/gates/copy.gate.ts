@@ -38,6 +38,7 @@ export const copyGate = defineGate<CopyCheckReport, CopyGateOptions>({
   title: "Copy fidelity",
   summary:
     "Copy fidelity: placeholder scan + --manifest verification + --target image check (VLM or agent-vision sheets)",
+  category: "correctness",
   usage: `Copy fidelity gate: placeholder-text scan (always on), optional manifest
 verification, and optional target-image verification (crops every
 rendered text block's bbox out of the target screenshot; a VLM

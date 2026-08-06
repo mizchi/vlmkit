@@ -49,6 +49,7 @@ export const driftComponentGate = defineGate<ComponentConsistencyReport, Compone
   command: ["check", "drift", "component"],
   title: "Component drift across instances",
   summary: "Drift across N selector instances on one page",
+  category: "design-system",
   usage: `Crops every match of --selector out of one render, picks one as the
 reference, and pixel-diffs the rest against it. Catches the same component
 styled differently in two places on the same page — a copy-paste divergence
@@ -118,6 +119,7 @@ export const driftPagesGate = defineGate<MultiPageConsistencyReport, PageDriftGa
   command: ["check", "drift", "pages"],
   title: "Selector drift across pages",
   summary: "Drift of one selector across N pages",
+  category: "design-system",
   usage: `Crops the same selector out of several pages and diffs each against the
 first. Catches a shared header, footer or card that quietly diverged on one
 route.

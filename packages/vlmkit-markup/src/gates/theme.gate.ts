@@ -30,6 +30,7 @@ export const themeGate = defineGate<ThemeParityReport, ThemeParityOptions>({
   command: ["check", "theme"],
   title: "Theme parity",
   summary: "Theme parity (hard-coded color scan in dark mode)",
+  category: "design-system",
   usage: `Renders the page twice — prefers-color-scheme light and dark — and
 reports components whose dominant fill did not change. Those carry
 hard-coded colors instead of theme variables, which is the classic

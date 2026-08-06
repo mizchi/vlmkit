@@ -38,6 +38,7 @@ export const equivalenceGate = defineGate<RegionJudgeReport, EquivalenceGateOpti
   title: "Visual equivalence judge",
   summary:
     "Visual equivalence judge for residual regions (measured delta + refutation-gated VLM or pair sheets)",
+  category: "verdict",
   usage: `Visual equivalence judge for residual regions. Crops the region from
 both sides into a stacked pair image, measures the mean per-channel
 delta deterministically, and (with --vlm) cross-checks a forced-choice

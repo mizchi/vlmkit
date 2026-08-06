@@ -54,6 +54,7 @@ export const tokensGate = defineGate<DesignTokensReport, TokensGateOptions>({
   command: ["check", "tokens"],
   title: "Design-token scale conformance",
   summary: "Design-token scale conformance (against a scale YOU declare)",
+  category: "design-system",
   usage: `Checks every visible element's border-radius, padding, margin, z-index and
 box-shadow against the scales you declare, and writes a markdown report
 naming the nearest in-scale value for each violation.

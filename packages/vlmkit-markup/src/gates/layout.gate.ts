@@ -63,6 +63,7 @@ export const layoutGate = defineGate<LayoutReport, LayoutGateOptions>({
   title: "Layout contract verification",
   summary:
     "Layout contract: verify a brief's structural requirements (widths, per-row counts, stacking order) per viewport — deterministic DOM math",
+  category: "correctness",
   usage: `Deterministic verification of a brief's structural requirements:
 widths, per-row counts, stacking order, visibility — per viewport.
 Turns "sidebar is 260px at 1280, stats are 2x2 at 768" into a

@@ -72,6 +72,7 @@ export const a11yContrastGate = defineGate<A11yContrastReport, A11yContrastOptio
   command: ["check", "a11y", "contrast"],
   title: "WCAG AA contrast scan",
   summary: "WCAG AA contrast scan",
+  category: "correctness",
   usage: `Measures the computed contrast ratio of every text-bearing element
 against its effective background and reports each pair below the WCAG AA
 threshold for its font size and weight.`,
@@ -112,6 +113,7 @@ export const a11yTouchGate = defineGate<TouchReport, TouchCheckOptions>({
   command: ["check", "a11y", "touch"],
   title: "Touch-target size check",
   summary: "Touch-target size check",
+  category: "correctness",
   usage: `Measures every interactive element's rendered box and reports targets
 below the WCAG minimum — AAA is 44x44, AA is 24x24 with spacing. Clustered
 targets (within 24px of a sibling) are flagged, because adjacency is what
@@ -169,6 +171,7 @@ export const a11yFocusGate = defineGate<FocusOrderReport, FocusOrderOptions>({
   command: ["check", "a11y", "focus"],
   title: "Focus order / trap check",
   summary: "Focus order / trap check",
+  category: "correctness",
   usage: `Walks Tab focus through the page and compares the visual position of
 each stop against the previous one: focus that returns to the same element,
 moves backward, or jumps several visual rows at a time is reported.`,

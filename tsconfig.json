@@ -14,6 +14,12 @@
     "lib": ["ES2024"],
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "packages/*/src/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "packages/*/src/**/*.ts",
+    // The gate-plugin example is what docs/authoring-gates.md tells readers to
+    // copy, so it is typechecked with everything else rather than left to rot.
+    "examples/gate-plugin/*.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

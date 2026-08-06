@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gate plugin example — offending page</title>
+<!--
+  Trips one rule in each example gate:
+    check house-brand/forbidden-font    suspect → exit 1
+    check dom-budget/depth-over-budget  warn    → exit 0 on its own
+  Run both and the run fails on the font, with the depth reported alongside.
+-->
+<style>
+  body { font-family: "Comic Sans MS", Inter, sans-serif; margin: 2rem; }
+  .wrap { padding: 4px; }
+</style>
+</head>
+<body>
+  <h1>Offending page</h1>
+  <!-- Nine levels of wrapper, against a depth budget of 6. -->
+  <div class="wrap"><div class="wrap"><div class="wrap"><div class="wrap"><div class="wrap"><div class="wrap"><div class="wrap"><div class="wrap"><div class="wrap">
+    <p>Deeply nested for no reason.</p>
+  </div></div></div></div></div></div></div></div></div>
+</body>
+</html>

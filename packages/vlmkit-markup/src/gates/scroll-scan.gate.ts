@@ -22,6 +22,7 @@ export const scrollScanGate = defineGate<ScrollScanReport, ScrollScanOptions>({
   command: ["scan", "scroll"],
   title: "Scroll inventory",
   summary: "Annotation-free scroll inventory: containers, page overflow-x, clipped content",
+  category: "behavior",
   usage: `Annotation-free scroll inventory: every element that actually scrolls
 (selector, axis, overflow px, bbox), unintended page-level horizontal
 scroll with the sticking-out offenders, overflow:hidden cut-off

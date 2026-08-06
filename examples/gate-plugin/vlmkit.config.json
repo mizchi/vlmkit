@@ -1,0 +1,7 @@
+{
+  "plugins": ["./index.ts"],
+  "domBudget": {
+    "maxNodes": 60,
+    "maxDepth": 6
+  }
+}

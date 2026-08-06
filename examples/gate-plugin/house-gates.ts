@@ -80,6 +80,10 @@ export const houseBrandGate = defineGate<HouseBrandReport, HouseBrandOptions>({
   command: ["check", "house-brand"],
   title: "House brand conformance",
   summary: "Font allowlist + !important budget for this project's house style",
+  // Which of the five kinds of question this answers. `vlmkit rules` groups by
+  // this, so a gate that declares none lands under "other" — correct but
+  // unhelpful to whoever is deciding what to run.
+  category: "design-system",
   usage: `Fails when a page declares a font-family outside the house allowlist.
 Reports \`!important\` usage as an advisory count.
 

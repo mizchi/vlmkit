@@ -33,6 +33,7 @@ export const craterGate = defineGate<CraterSmokeReport, CraterGateOptions>({
   command: ["check", "crater"],
   title: "Crater BiDi backend smoke check",
   summary: "Crater BiDi backend smoke check",
+  category: "infrastructure",
   usage: `Exercises the Crater BiDi backend end to end: connect, navigate,
 screenshot, and (with --deep) the heavier v0.18.0 APIs.
 

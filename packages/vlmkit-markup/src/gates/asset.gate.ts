@@ -24,6 +24,7 @@ export const assetGate = defineGate<AssetCheckReport, AssetCheckOptions>({
   title: "Generated-asset gate",
   summary:
     "Generated-asset gate (browser-free PNG math): slot aspect fit, transparent vs matted background, occupancy, figure-ground contrast vs backdrop, palette harmony vs page",
+  category: "design-system",
   usage: `Deterministic PNG gate for image assets headed into markup slots
 (generated sprites/portraits/hero art): slot aspect fit, transparent
 vs matted background (border-ring measurement), occupancy + content

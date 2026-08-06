@@ -37,6 +37,7 @@ export const verifyMarkupGate = defineGate<MarkupVerifyReport, MarkupVerifyOptio
   title: "Markup done-condition verdict",
   summary:
     "One-shot done-condition verdict: composition per target + gates + pixel diff + kickback list with selector attribution",
+  category: "verdict",
   usage: `One-shot done-condition verdict: composition per target viewport +
 dynamic gates + rest-pose pixel diff, with a paste-ready kickback
 listing every residual. Add --reference to print the calibration floor.`,
@@ -152,6 +153,7 @@ export const verifyFlowGate = defineGate<FlowVerifyReport, FlowGateOptions>({
   command: ["verify", "flow"],
   title: "Verified scripted flow",
   summary: "Verified scripted browser flow: action -> deterministic post-condition assert (no LLM)",
+  category: "verdict",
   usage: `Verified scripted browser flow: each step performs an action and
 asserts a deterministic post-condition on the live DOM. FAILS at the
 first unmet post-condition — "it did something" is not success. No LLM.

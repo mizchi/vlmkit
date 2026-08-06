@@ -36,6 +36,7 @@ export const i18nStressGate = defineGate<I18nStressReport, I18nStressOptions>({
   command: ["stress", "i18n"],
   title: "Inflated-text stress",
   summary: "Inflate text content; detect overflow / wrap bugs",
+  category: "behavior",
   usage: `Re-renders the page with every text run lengthened by --inflate and
 reports elements that then overflow their box, wrap to a new line, or extend
 past their parent. Approximates translation into a longer language without
@@ -107,6 +108,7 @@ export const mediaVariantsGate = defineGate<MediaVariantsReport, MediaVariantsOp
   command: ["stress", "media"],
   title: "Media-variant stress",
   summary: "Forced-colors / reduced-motion / print / RTL / 200% zoom",
+  category: "behavior",
   usage: `Renders the page once per media variant and diffs each against the
 default render. A variant that changes nothing usually means the page ignores
 it; a variant that changes drastically usually means it broke the layout. The

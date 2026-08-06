@@ -133,6 +133,39 @@ export interface GateContext {
 }
 
 /**
+ * What kind of question a gate answers.
+ *
+ * These are not CLI groups. `check`/`scan`/`stress`/`verify` say how a command
+ * is spelled; a category says what a failure MEANS, which is what a reader
+ * picking gates for a project actually needs. `scan scroll` and `check
+ * breakpoints` are spelled differently and answer the same kind of question.
+ *
+ * Kept small on purpose. A taxonomy with a bucket per gate classifies nothing,
+ * and the useful cut is the one a person makes when deciding what to run:
+ * "is the page broken", "does it behave", "does it look like our system",
+ * "is it done", "is my tooling working".
+ */
+export const GATE_CATEGORIES = {
+  correctness: "Is the page broken, on its own terms? No reference needed.",
+  behavior: "Does it respond correctly to size, scroll, motion and input?",
+  "design-system": "Does it conform to the design language the project declares?",
+  verdict: "Is this attempt done? Aggregates other signals into one answer.",
+  infrastructure: "Is the measurement toolchain itself working?",
+} as const;
+
+export type GateCategory = keyof typeof GATE_CATEGORIES;
+
+export const GATE_CATEGORY_ORDER: readonly GateCategory[] = [
+  // Roughly the order a project adopts them: stop shipping broken pages, then
+  // broken behavior, then drift, then gate the whole thing.
+  "correctness",
+  "behavior",
+  "design-system",
+  "verdict",
+  "infrastructure",
+];
+
+/**
  * A gate definition.
  *
  * `Report` is the gate's existing report type — migration wraps the
@@ -155,6 +188,22 @@ export interface GateDefinition<Report = unknown, Options = unknown> {
   title: string;
   /** One-line capability summary — CLI group help, MCP tool description. */
   summary: string;
+  /**
+   * What KIND of question this gate answers. See `GATE_CATEGORIES`.
+   *
+   * Deliberately separate from the plugin a gate ships in. A plugin is a unit
+   * of distribution — it is where the code lives and what a project installs.
+   * A category is a unit of meaning: `check crater` ships in `vlmkit-capture`
+   * because that is where the Crater client is, and it is `infrastructure`
+   * because that is the question it answers. One plugin may hold gates in
+   * several categories, and one category spans plugins — so collapsing the two
+   * would force a wrong choice on anyone adding a gate.
+   *
+   * Optional, and uncategorized gates are listed under "other" rather than
+   * rejected: a project's first house gate should not have to pick a taxonomy
+   * before it can run.
+   */
+  category?: GateCategory;
   /** Full `--help` body, minus the shared flags the runner appends. */
   usage?: string;
   /** Rule table. Every `Finding.rule` a gate emits must appear here. */

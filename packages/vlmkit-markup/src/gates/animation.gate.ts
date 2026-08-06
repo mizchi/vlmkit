@@ -24,6 +24,7 @@ export const animationGate = defineGate<AnimationEvalReport, AnimationEvalOption
   title: "Frame-sampled animation evaluation",
   summary:
     "Frame-sampled animation evaluation (visible effect / settle / reduced-motion behavior)",
+  category: "behavior",
   usage: `Frame-sampled animation evaluation: pause every animation, seek through
 deterministic sample points, and verify each one visibly moves pixels,
 when the page settles, and whether prefers-reduced-motion is honored.`,

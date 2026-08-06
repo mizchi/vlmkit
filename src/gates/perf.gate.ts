@@ -40,6 +40,7 @@ export const perfGate = defineGate<PerfReport, PerfOptions>({
   command: ["check", "perf"],
   title: "Web Vitals thresholds",
   summary: "Web Vitals thresholds (CLS / LCP / FCP)",
+  category: "infrastructure",
   usage: `Loads the page, observes for --observe ms after networkidle, and reports
 Cumulative Layout Shift, Largest Contentful Paint and First Contentful Paint
 against the standard Web Vitals thresholds. Names the top layout-shift source,

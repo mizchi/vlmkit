@@ -29,6 +29,7 @@ export const handlersGate = defineGate<HandlersGateReport, { source: string }>({
   command: ["scan", "handlers"],
   title: "Event-callback surface",
   summary: "Event-callback surface: every wired listener + pointer-only-control cross-check (experimental)",
+  category: "behavior",
   usage: `Enumerates every event callback wired on the page (addEventListener
 via an init-script patch + on* attributes/properties) into a
 per-element event surface, and cross-checks it against the a11y

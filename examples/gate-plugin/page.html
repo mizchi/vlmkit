@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Gate plugin example — conforming page</title>
+<!--
+  Passes both example gates:
+    check house-brand  every font-family is on the allowlist
+    check dom-budget   under 60 nodes, no deeper than 6 (the budgets in
+                       vlmkit.config.json), small inline stylesheet
+-->
+<style>
+  body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; margin: 2rem; }
+  code { font-family: monospace; }
+  .card { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; }
+</style>
+</head>
+<body>
+  <h1>Conforming page</h1>
+  <p>Both example gates pass on this page.</p>
+  <div class="card">
+    <h2>House brand</h2>
+    <p>Fonts are <code>Inter</code> and <code>monospace</code>, both on the allowlist.</p>
+  </div>
+  <div class="card">
+    <h2>DOM budget</h2>
+    <p>Shallow, small, and cheap to lay out.</p>
+  </div>
+</body>
+</html>

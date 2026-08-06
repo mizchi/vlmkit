@@ -58,6 +58,7 @@ export const interactionsGate = defineGate<InteractionsGateReport, InteractionsG
   title: "A11y-event state map",
   summary:
     "A11y-event state map: keyboard probes -> ARIA transitions; --reference makes it a behavioral contract",
+  category: "behavior",
   usage: `A11y-event state map: discovers interactive elements, probes their
 canonical keyboard events (Tab / Enter / Space / arrows / Escape), and
 records the resulting state changes as ARIA transitions + layout

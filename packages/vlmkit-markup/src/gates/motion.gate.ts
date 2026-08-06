@@ -27,6 +27,7 @@ export const motionGate = defineGate<MotionDetectionReport, MotionDetectionOptio
   command: ["check", "motion"],
   title: "CSS motion detection",
   summary: "CSS motion detection (animation / transition / reduced-motion)",
+  category: "behavior",
   usage: `Static motion inventory: which elements declare animations or
 transitions, which animations are actually running, and whether the page
 honors prefers-reduced-motion. (Frame-sampled behavior — does the motion

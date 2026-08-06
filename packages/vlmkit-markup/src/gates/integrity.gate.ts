@@ -39,6 +39,7 @@ export const integrityGate = defineGate<IntegrityReport, IntegrityOptions>({
   title: "Reference-free integrity gate",
   summary:
     "Reference-free defect gate: JS errors, empty render, broken resources, text collision/clipping/protrusion, collapsed containers, overflow, invisible text, occluded text, near-misalignment, unstyled page (multi-viewport)",
+  category: "correctness",
   usage: `Reference-free integrity gate for creative/zero-shot markup: JS
 construction failures, empty renders, broken resources, colliding or
 clipped text, collapsed containers, page overflow, and unstyled pages —

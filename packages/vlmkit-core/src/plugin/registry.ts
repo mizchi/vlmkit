@@ -15,8 +15,8 @@
  * than a config typo.
  */
 
-import type { AnyGateDefinition, VlmkitPlugin } from "./contract.ts";
-import { gateCommandString } from "./contract.ts";
+import type { AnyGateDefinition, GateCategory, VlmkitPlugin } from "./contract.ts";
+import { GATE_CATEGORY_ORDER, gateCommandString } from "./contract.ts";
 import type { RuleSettings } from "./rules.ts";
 import { validateGateDefinition } from "./rules.ts";
 
@@ -46,6 +46,14 @@ export interface GateRegistry {
   resolve(argv: readonly string[]): GateResolution | undefined;
   /** Command tokens grouped by first token, for help output. */
   groups(): ReadonlyMap<string, readonly RegisteredGate[]>;
+  /**
+   * Gates grouped by what KIND of question they answer, in adoption order,
+   * with uncategorized gates last under `other`.
+   *
+   * Separate from `groups()`, which groups by CLI verb. A reader choosing what
+   * to run wants the former; a reader typing a command wants the latter.
+   */
+  categories(): ReadonlyMap<GateCategory | "other", readonly RegisteredGate[]>;
   /** Near-miss command strings for a "did you mean" line. */
   suggest(command: string | readonly string[], limit?: number): string[];
 }
@@ -124,6 +132,19 @@ class Registry implements GateRegistry {
       if (bucket) bucket.push(entry);
       else out.set(group, [entry]);
     }
+    return out;
+  }
+
+  categories(): ReadonlyMap<GateCategory | "other", readonly RegisteredGate[]> {
+    const out = new Map<GateCategory | "other", RegisteredGate[]>();
+    // Seeded in declaration order so the map iterates in adoption order rather
+    // than in whichever order gates happened to register.
+    for (const category of GATE_CATEGORY_ORDER) {
+      const members = this.gates.filter((entry) => entry.gate.category === category);
+      if (members.length > 0) out.set(category, members);
+    }
+    const uncategorized = this.gates.filter((entry) => entry.gate.category === undefined);
+    if (uncategorized.length > 0) out.set("other", uncategorized);
     return out;
   }
 

@@ -26,6 +26,7 @@ export const designGate = defineGate<DesignPolicyReport, DesignPolicyOptions>({
   title: "Design-system coherence",
   summary:
     "Coherence of the design system the page itself implies (component/spacing consistency)",
+  category: "design-system",
   usage: `Conformance to the design system the page itself implies: are components
 styled consistently, and does spacing stay on the page's own scale? Reports
 INCONSISTENCY, never which value is correct — taste stays with humans.

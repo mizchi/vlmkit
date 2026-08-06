@@ -223,10 +223,58 @@ The module default-exports `definePlugin({ name, gates })`. Relative specifiers
 resolve against the config's directory, not the process cwd — a plugin path that
 only works from the repo root is a CI trap.
 
-A worked example lives at `examples/gate-plugin/house-gates.ts`. Verified end
-to end: it appears in `vlmkit rules`, dispatches as `vlmkit check house-brand`,
-honours `--json` / `--advisory` / `--rule check.house-brand/forbidden-font=off`,
-and writes its ledger entry — with no change to vlmkit itself.
+`examples/gate-plugin/` is a runnable project — its own `vlmkit.config.json`,
+two fixtures, two gates. `house-gates.ts` is the smallest useful gate (read a
+file, match strings, no browser) and stays the one-gate plugin the docs point a
+first config at; `dom-budget.gate.ts` is the shape a real house metric takes
+(render, measure numbers, compare against budgets that resolve flag > config >
+default, reporting the *source* of each number). `index.ts` bundles both, which
+is what the example's own config loads.
+
+Verified end to end: they appear in `vlmkit rules` under `design-system`,
+dispatch as `vlmkit check house-brand` / `vlmkit check dom-budget`, honour
+`--json` / `--advisory` / `--rule`, read `"domBudget"` out of the project config,
+and write ledger entries — with no change to vlmkit itself.
+
+The user-facing how-to is `docs/authoring-gates.md`. This document is the record
+of *why* the architecture is shaped this way; that one is the field-by-field
+guide for someone adding a metric, and it is what `vlmkit rules` points at.
+
+### Categories: what a gate answers, vs. where it ships
+
+`vlmkit rules` groups by `GateDefinition.category`, one of five:
+
+| Category | The question | Built-ins |
+|---|---|---|
+| `correctness` | Is the page broken, on its own terms? No reference needed. | 6 |
+| `behavior` | Does it respond correctly to size, scroll, motion and input? | 9 |
+| `design-system` | Does it conform to the design language the project declares? | 6 |
+| `verdict` | Is this attempt done? Aggregates other signals into one answer. | 3 |
+| `infrastructure` | Is the measurement toolchain itself working? | 2 |
+
+The CLI verb was the obvious axis and is the wrong one: `check`/`scan`/`stress`
+says how a command is *spelled*, and `scan scroll` and `check breakpoints` are
+spelled differently while answering the same kind of question. A reader deciding
+what to adopt is asking "what can go wrong with my page", so the listing answers
+that and `groups()` (by verb) stays for help output, where the reader is typing a
+command instead.
+
+Category is deliberately **not** derived from the plugin. A plugin is a unit of
+distribution — `check crater` ships in `vlmkit-capture` because that is where the
+Crater client lives — and a category is a unit of meaning. Both directions are
+many-to-many in the built-ins already (`infrastructure` spans `vlmkit-capture`
+and the app; `vlmkit-markup` spans four categories), so collapsing the axes would
+force a wrong answer on the next person adding a gate. `gate-registry.test.ts`
+asserts that many-to-many-ness precisely so nobody "simplifies" it away.
+
+The taxonomy is small on purpose — a bucket per gate classifies nothing — and
+`category` is optional, listing under `other`, because a project's first house
+gate should not have to pick a taxonomy before it can run. Built-ins have no such
+excuse and a test requires all of them to declare one.
+
+`vlmkit rules --json` emits the glossary alongside the catalog
+(`{ categories, gates: [...] }`) so a consumer can label a bucket without
+hardcoding the descriptions.
 
 The built-ins load through the same `createGateRegistry([...])` call. If the
 contract were not sufficient for them it would not be sufficient for anyone
@@ -427,14 +475,20 @@ the JSON path and the fix.
   hand-written tool could get that backwards (`--target a,b` is one nonexistent
   file) and only fail on a real page.
 - `src/cli/plugin-e2e.test.ts` — spawns the real CLI against
-  `examples/gate-plugin/house-gates.ts` and asserts what a plugin author
+  `examples/gate-plugin/` and asserts what a plugin author
   actually cares about: the gate appears in `vlmkit rules` and in group help,
   dispatches, gets the shared `--json` envelope and exit contract, honours
   `--rule` (and rejects a misspelled one against its own table), writes a
   ledger entry, and is validated by `vlmkit gates`. This was hand-verified
   while building the feature, which is the kind of verification that stops
   being true later — and it means a broken example fails a test rather than a
-  reader's first attempt.
+  reader's first attempt. A second suite runs the example *as its own project*
+  (its committed config, its committed fixtures), so every command in its README
+  is an assertion — including that a flag beats a config budget and that one
+  `--rule` promotes its `warn` to a failure, the claim every warn rule's docs
+  make. That suite uses the checkout as cwd rather than a temp copy on purpose:
+  a copy would not resolve `@mizchi/vlmkit-core`, so it would only prove the
+  plugin loads from a place no reader will put it.
 - `src/cli/json-contract.test.ts` — spawns the real CLI and asserts the
   `--json`/prose mutual exclusion, the envelope shape, the exit code, and that
   `--rule ...=off` takes a failing run green and says so. Moved here from

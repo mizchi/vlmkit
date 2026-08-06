@@ -54,6 +54,28 @@ suppression works per *rule* instead of per whole gate.
 - **`vlmkit rules`** lists every gate with its rule count and plugin;
   **`vlmkit rules <gate>`** prints that gate's rules, default severities and
   docs. 115 rules across 26 gates.
+- **Gate categories.** Every gate declares what *kind* of question it answers —
+  `correctness`, `behavior`, `design-system`, `verdict`, `infrastructure` — and
+  `vlmkit rules` groups by that rather than by CLI verb, because
+  `check`/`scan`/`stress` says how a command is spelled while a category says
+  what a failure means. Deliberately independent of which plugin a gate ships
+  in: a plugin is a unit of distribution, a category a unit of meaning.
+- **`vlmkit rules --json`** emits the whole catalog —
+  `{ categories, gates: [{ id, command, title, summary, category, plugin, rules }] }`
+  — so a job that wants "fail the build if a gate appears un-triaged" reads
+  structure instead of scraping the listing. `vlmkit rules <gate> --json` is the
+  same shape for one gate.
+- **[`docs/authoring-gates.md`](docs/authoring-gates.md)** — the user-facing
+  guide to adding your own metric: the contract field by field, choosing
+  severities and a category, reading budgets out of `vlmkit.config.json`,
+  measuring in a browser, testing, and publishing a plugin.
+- **`examples/gate-plugin/` is now a runnable project** with its own
+  `vlmkit.config.json`, two fixtures and two gates: `house-gates.ts` (the
+  smallest useful gate) and `dom-budget.gate.ts` (the shape a real house metric
+  takes — render, measure, compare against budgets that resolve flag > config >
+  default, with the source of each number reported). Both are covered by
+  `src/cli/plugin-e2e.test.ts` against the real CLI, so a broken example fails a
+  test rather than a reader's first attempt.
 - **Rule settings.** `--rule <gateId>/<ruleId>=off|suspect|warn|info` re-tunes
   or disables one rule for a run; a `"rules"` block in `vlmkit.gates.json`
   (at `defaults` scope or per page) persists it. References are validated

@@ -19,6 +19,7 @@ export const scrollGate = defineGate<ScrollBehaviorReport, ScrollBehaviorOptions
   title: "Scroll behavior verification",
   summary:
     "Scroll behavior: fixed holds position, engaged sticky sticks, mandatory snap lands on a child edge",
+  category: "behavior",
   usage: `Scroll behavior verification: fixed elements must hold their viewport
 position, engaged sticky elements must stick at their top offset, and
 mandatory snap containers must land on a child snap edge. (Existence /

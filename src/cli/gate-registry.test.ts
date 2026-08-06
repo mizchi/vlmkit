@@ -85,4 +85,44 @@ describe("composed built-in registry", () => {
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
     assert.equal(total, 115);
   });
+
+  it("gives every built-in gate a category", async () => {
+    // `category` is optional in the contract — a project's first house gate
+    // must not have to pick a taxonomy before it can run. Built-ins have no
+    // such excuse: `vlmkit rules` groups by category, so an uncategorized
+    // built-in lands under "other", which tells a reader deciding what to run
+    // nothing at all.
+    const uncategorized = (await registry()).list()
+      .filter(({ gate }) => gate.category === undefined)
+      .map(({ gate }) => gate.id);
+    assert.deepEqual(uncategorized, []);
+  });
+
+  it("groups by category in adoption order, not registration order", async () => {
+    const r = await registry();
+    assert.deepEqual(
+      [...r.categories().keys()],
+      ["correctness", "behavior", "design-system", "verdict", "infrastructure"],
+    );
+    // No "other" bucket, since every built-in is categorized — and the buckets
+    // partition the catalog rather than sampling it.
+    const grouped = [...r.categories().values()].reduce((n, entries) => n + entries.length, 0);
+    assert.equal(grouped, r.list().length);
+  });
+
+  it("spans plugins within a category and categories within a plugin", async () => {
+    // The point of keeping the two axes separate. If either direction were
+    // one-to-one, category could have been derived from the plugin instead.
+    const r = await registry();
+    const infrastructure = r.categories().get("infrastructure") ?? [];
+    assert.deepEqual(
+      infrastructure.map((entry) => entry.plugin).sort(),
+      ["@mizchi/vlmkit-capture", "vlmkit-app"],
+      "expected `infrastructure` to span two plugins",
+    );
+    const markupCategories = new Set(
+      r.list().filter((e) => e.plugin === "@mizchi/vlmkit-markup").map((e) => e.gate.category),
+    );
+    assert.ok(markupCategories.size > 1, "expected one plugin to span several categories");
+  });
 });
