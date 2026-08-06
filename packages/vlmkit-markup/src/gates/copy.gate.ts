@@ -23,7 +23,7 @@ import {
   runCopyCheck,
 } from "../inspect/copy-check.ts";
 import { TRANSCRIBE_PROMPT } from "../inspect/copy-target.ts";
-import { firstPositional, vlmFlag } from "./arg-helpers.ts";
+import { firstPositional, vlmFlag, withoutOptionalValue } from "./arg-helpers.ts";
 
 /** Options plus the unresolved `--vlm` request; `run` turns it into a reader. */
 export interface CopyGateOptions extends CopyCheckOptions {
@@ -94,7 +94,13 @@ listed with its reason so the suppression stays auditable.`,
     { name: "storage-state", placeholder: "file", kind: "path", description: "Playwright storage state for pages behind a login" },
   ],
   parse: (argv) => {
-    const source = firstPositional(argv, "vlmkit check copy <html-or-url>", COPY_VALUE_FLAGS);
+    // `--vlm` is optionally-valued, so its model id cannot be excluded via
+    // COPY_VALUE_FLAGS — see `withoutOptionalValue`.
+    const source = firstPositional(
+      withoutOptionalValue(argv, "vlm"),
+      "vlmkit check copy <html-or-url>",
+      COPY_VALUE_FLAGS,
+    );
     const manifestPath = readFlag(argv, "manifest");
     const targetPath = readFlag(argv, "target");
     const outDir = readFlag(argv, "out");

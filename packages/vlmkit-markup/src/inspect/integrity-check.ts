@@ -38,7 +38,6 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
-import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import {
   applyAllowRules,
   type IntegrityAllowRule,
@@ -1696,16 +1695,11 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       f.viewports && f.viewports.length > 1 ? f.viewports.join(",") : f.viewport
     }): ${f.message}`);
   const verdict = findings.some((f) => f.severity === "fail") ? "defects" : "clean";
-  appendRunLedger({
-    tool: "integrity-check",
-    source: options.source,
-    headline: {
-      verdict,
-      fails: findings.filter((f) => f.severity === "fail").length,
-      warns: findings.filter((f) => f.severity === "warn").length,
-      exempted: exempted.length,
-    },
-  });
+  // No ledger append here. `integrityGate.ledger` writes the row, so the
+  // runner owns it — which is what makes `--json`-only callers, the MCP
+  // server, and `verify markup`'s folded-in gates all record once and obey
+  // VLMKIT_NO_LEDGER. This function appended a second `integrity-check` row
+  // on top of the gate's `check-integrity` one, double-counting run history.
   return {
     source: options.source,
     verdict,

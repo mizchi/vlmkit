@@ -469,6 +469,19 @@ the JSON path and the fix.
   *declarations* and argument parsing, with no browser: a malformed rule table,
   a clashing command, a missing placeholder or a flag that swallows the next
   flag used to be discoverable only by running the gate against a real page.
+  Two classes of migration bug live here because review found both in this PR:
+  **flags placed before the positional** (`firstPositional` only skips the flags
+  it is told about, and `check copy` / `check equivalence` lost `--target`,
+  `--out` and `--vlm`, so the gate opened a flag's value as the page — or
+  compared the target with itself), and **run-ledger double-ownership**
+  (a gate declaring `ledger` while its measurement module also appends, which
+  wrote two rows per run and bypassed `VLMKIT_NO_LEDGER` and `ledger: false`).
+  The ledger check is static and keyed off what each `.gate.ts` *declares*, not
+  off its filename: `scan scroll` lives in `scroll-scan.gate.ts` and the three
+  `check a11y *` gates share one file, so deriving a path from a command reads
+  the wrong file and passes vacuously. Six gates legitimately opt out with
+  `ledger: () => null` and keep their module's append — their row carries values
+  the report does not expose — so what the test forbids is *both* at once.
 - `packages/vlmkit-mcp/src/gate-tool.test.ts` — the derivation, without a
   browser: camelCasing, required-vs-optional, `omit` / `aliases` / `invert`, and
   the argv distinction between a repeatable flag and a comma-joined list. A

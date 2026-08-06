@@ -140,6 +140,11 @@ ${ALLOW_HELP}`,
     headline: {
       verdict: report.verdict,
       findings: report.findings.length,
+      // `fails` / `warns` kept split. `runIntegrityCheck` used to append its own
+      // row carrying that split; removing it (the runner owns the ledger) would
+      // otherwise have quietly coarsened what the ledger records.
+      fails: report.findings.filter((f) => f.severity === "fail").length,
+      warns: report.findings.filter((f) => f.severity === "warn").length,
       exempted: report.exempted.length,
       viewports: report.viewports.length,
     },

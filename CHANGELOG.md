@@ -116,6 +116,22 @@ suppression works per *rule* instead of per whole gate.
 
 ### Fixed
 
+- **`check integrity` and `check scroll` wrote two ledger rows per run.** Their
+  measurement functions still called `appendRunLedger` themselves after the
+  migration gave their gates a `ledger`, so every run double-counted — and for
+  `check scroll` both rows carried the same `tool` name, so no summary could tell
+  them apart. It also bypassed `VLMKIT_NO_LEDGER` and the runner's
+  `ledger: false`, which is how `verify markup` keeps its folded-in gates out of
+  the ledger. The runner is the only owner now; `check-integrity`'s entry keeps
+  the `fails` / `warns` split the removed row carried.
+- **Value-taking flags placed before the positional could steal the source.**
+  `vlmkit check equivalence --target t.png --region 0,0,10x10 attempt.html`
+  parsed `t.png` as the attempt and compared the target with itself, and
+  `vlmkit check copy --vlm <model> page.html` tried to open the model id as the
+  page. `firstPositional` only skips the flags it is told about, and the migration
+  from the hand-written parsers dropped `--target`, `--out` and `--vlm`. `--vlm`
+  is optionally-valued so it needs `withoutOptionalValue`, which follows
+  `vlmFlag`'s own rule — the two cannot disagree about which token is the model.
 - **Two CI jobs were running commands that no longer exist.** The `compare` job
   invoked `vlmkit compare`, removed in 0.9.1 in favour of `vlmkit diff html`, so
   it failed with "Unknown command" and uploaded an empty artifact — which reads

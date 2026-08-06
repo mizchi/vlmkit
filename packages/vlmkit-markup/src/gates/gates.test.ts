@@ -230,3 +230,131 @@ describe("finding projection", () => {
     }
   });
 });
+
+/**
+ * Flag order. Every one of these was a real regression from the migration:
+ * the hand-written parsers consumed their value-taking flags before collecting
+ * positionals, and `firstPositional` only skips the flags it is told about.
+ * Forgetting one does not fail loudly — the gate opens a flag's value as the
+ * page, which surfaces as "no such file" or, worse, as a comparison of the
+ * target against itself.
+ */
+describe("value-taking flags before the positional", () => {
+  const gate = (id: string) => markupGatesPlugin.gates.find((g) => g.id === id)!;
+  const ctx = { cwd: process.cwd(), argv: [] as string[], json: false };
+
+  it("check copy: a --vlm model id is not the source", () => {
+    const options = gate("check.copy").parse(
+      ["--vlm", "bytedance/ui-tars-1.5-7b", "page.html", "--target", "t.png"],
+      ctx,
+    ) as { source: string; vlm: string | true };
+    assert.equal(options.source, "page.html");
+    assert.equal(options.vlm, "bytedance/ui-tars-1.5-7b");
+  });
+
+  it("check copy: a bare --vlm before the source is an error, not a silent swap", () => {
+    // `--vlm page.html` is genuinely ambiguous — `vlmFlag` reads page.html as
+    // the model id, so there is no source left. Failing with the usage line is
+    // the honest outcome; parsing page.html as both was not.
+    assert.throws(
+      () => gate("check.copy").parse(["--vlm", "page.html", "--target", "t.png"], ctx),
+      (e: unknown) => e instanceof UsageError && /missing required argument/.test((e as Error).message),
+    );
+  });
+
+  it("check copy: --vlm after the source still resolves both", () => {
+    const options = gate("check.copy").parse(
+      ["page.html", "--target", "t.png", "--vlm", "some/model"],
+      ctx,
+    ) as { source: string; vlm: string | true };
+    assert.equal(options.source, "page.html");
+    assert.equal(options.vlm, "some/model");
+  });
+
+  it("check equivalence: --target / --region / --out before the source", () => {
+    // Before the fix this returned `t.png` as the attempt and compared the
+    // target with itself — a gate reporting "same" for the wrong reason.
+    for (const argv of [
+      ["--target", "t.png", "--region", "0,0,10x10", "attempt.html"],
+      ["--out", "pairs", "--target", "t.png", "--region", "0,0,10x10", "attempt.html"],
+      ["--vlm", "some/model", "--target", "t.png", "--region", "0,0,10x10", "attempt.html"],
+      ["attempt.html", "--target", "t.png", "--region", "0,0,10x10"],
+    ]) {
+      const options = gate("check.equivalence").parse(argv, ctx) as { source: string; targetPath: string };
+      assert.equal(options.source, "attempt.html", `argv: ${argv.join(" ")}`);
+      assert.equal(options.targetPath, "t.png", `argv: ${argv.join(" ")}`);
+    }
+  });
+});
+
+/**
+ * The run ledger has exactly one owner per gate.
+ *
+ * `runIntegrityCheck` and `runScrollBehavior` called `appendRunLedger`
+ * themselves *and* their gates declared a `ledger`, so one `check integrity`
+ * run wrote two rows and one `check scroll` run wrote two rows under the same
+ * `tool` name — doubling any count taken over the ledger. It also bypassed both
+ * `VLMKIT_NO_LEDGER` and the runner's `ledger: false`, which is how
+ * `verify markup` keeps its folded-in gates out of the ledger.
+ *
+ * Static, because the alternative is launching a browser per gate. Six gates
+ * legitimately opt out with `ledger: () => null` and leave the append in their
+ * measurement module — their row carries values the report does not expose —
+ * so what is forbidden is *both* at once, not the module append itself.
+ */
+describe("run-ledger ownership", () => {
+  it("no gate that owns a ledger row imports a module that appends its own", async () => {
+    const { readFile, readdir } = await import("node:fs/promises");
+    const { fileURLToPath } = await import("node:url");
+    const { dirname, join, resolve } = await import("node:path");
+    const here = dirname(fileURLToPath(import.meta.url));
+
+    /**
+     * Probed rather than read off the source: an opt-out ignores its arguments
+     * and returns null, while a real implementation reads report fields and
+     * throws on an empty object. The throw is the signal, not a failure.
+     */
+    const ownsLedger = (gate: typeof markupGatesPlugin.gates[number]) => {
+      if (!gate.ledger) return false;
+      try {
+        return gate.ledger({} as never, {} as never) !== null;
+      } catch {
+        return true;
+      }
+    };
+    const owners = new Set(markupGatesPlugin.gates.filter(ownsLedger).map((g) => g.id));
+    // Guard on the probe itself. If it classified every gate as an opt-out this
+    // test would pass while checking nothing — the exact failure mode it exists
+    // to catch elsewhere.
+    assert.ok(owners.size >= 3, `expected several ledger-owning gates, found ${[...owners]}`);
+
+    const offenders: string[] = [];
+    // Keyed off what each file *declares*, not off its name: `scan scroll` lives
+    // in scroll-scan.gate.ts and `check a11y contrast` shares a11y.gate.ts with
+    // two siblings, so deriving a filename from a command silently reads the
+    // wrong file.
+    for (const entry of await readdir(here)) {
+      if (!entry.endsWith(".gate.ts")) continue;
+      const source = await readFile(join(here, entry), "utf8");
+      const declared = [...source.matchAll(/^  id: "([^"]+)"/gm)].map((m) => m[1]!);
+      if (!declared.some((id) => owners.has(id))) continue;
+      for (const match of source.matchAll(/from "(\.\.?\/[^"]+\.ts)"/g)) {
+        let body: string;
+        try {
+          body = await readFile(resolve(here, match[1]!), "utf8");
+        } catch {
+          continue;
+        }
+        if (/\bappendRunLedger\(/.test(body)) {
+          offenders.push(`${entry} (${declared.filter((id) => owners.has(id)).join(", ")}) -> ${match[1]}`);
+        }
+      }
+    }
+    assert.deepEqual(
+      offenders,
+      [],
+      "each of these records twice per run — remove the module's append, or give"
+      + ` the gate \`ledger: () => null\`: ${offenders.join("; ")}`,
+    );
+  });
+});

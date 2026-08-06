@@ -26,7 +26,6 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
-import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 export interface StickyFixedSample {
@@ -303,16 +302,9 @@ export async function runScrollBehavior(options: ScrollBehaviorOptions): Promise
     if (redirectNote) {
       report.issues.unshift({ kind: "redirected", severity: "suspect", selector: "", message: redirectNote });
     }
-    appendRunLedger({
-      tool: "check-scroll",
-      source: options.source,
-      headline: {
-        stickyFixed: report.stickyFixed.length,
-        engagedSticky: report.engagedSticky,
-        snaps: report.snaps.length,
-        issues: report.issues.length,
-      },
-    });
+    // No ledger append here — `scrollGate.ledger` writes the row. This one
+    // used the same `tool: "check-scroll"` name as the gate's, so a run left
+    // two indistinguishable entries and any count over the ledger doubled.
     return report;
   } finally {
     await browser.close();

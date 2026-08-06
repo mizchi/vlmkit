@@ -44,6 +44,37 @@ export function firstPositional(
   return first;
 }
 
+/**
+ * Drop an optionally-valued flag and whatever value it consumed.
+ *
+ * `readPositionals` takes a list of flags that *always* take a value, which
+ * cannot express `--vlm` (bare = default model, or `--vlm <id>`). Listing it
+ * would make bare `--vlm page.html` eat the source; omitting it made
+ * `--vlm <model> page.html` return the model id AS the source — the gate then
+ * tried to open `bytedance/ui-tars-1.5-7b` as a file. Both `check copy` and
+ * `check equivalence` shipped the second bug.
+ *
+ * The rule here is `vlmFlag`'s rule, so the two cannot disagree about which
+ * token is the model: the next token is the value iff it does not start with
+ * `-`. With that token removed, `--vlm page.html --target t.png` has no
+ * positional left and fails with the usage line, which is the honest outcome
+ * for a genuinely ambiguous command line.
+ */
+export function withoutOptionalValue(argv: readonly string[], name: string): string[] {
+  const flag = `--${name}`;
+  const out: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg !== flag) {
+      out.push(arg);
+      continue;
+    }
+    const next = argv[i + 1];
+    if (next !== undefined && !next.startsWith("-")) i++;
+  }
+  return out;
+}
+
 /** `--breakpoints 768,1024` → `[768, 1024]`. Absent flag → `undefined`. */
 export function numberList(argv: readonly string[], name: string): number[] | undefined {
   const raw = readFlag(argv, name);

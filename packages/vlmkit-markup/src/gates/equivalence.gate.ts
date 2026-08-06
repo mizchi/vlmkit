@@ -26,7 +26,7 @@ import {
   parseRegionSpec,
   runRegionJudge,
 } from "../inspect/region-judge.ts";
-import { firstPositional, vlmFlag } from "./arg-helpers.ts";
+import { firstPositional, vlmFlag, withoutOptionalValue } from "./arg-helpers.ts";
 
 export interface EquivalenceGateOptions extends RegionJudgeOptions {
   vlm?: string | true;
@@ -79,7 +79,15 @@ written for a second reader.`,
     { name: "vlm", placeholder: "model", kind: "string", description: "Judge with a VLM (optional model id); requires an API key" },
   ],
   parse: (argv) => {
-    const source = firstPositional(argv, 'vlmkit check equivalence <attempt.html|png> --target <png> --region "x,y,WxH"', ["--region"]);
+    // Every value-taking flag has to be listed, or a caller who puts the flags
+    // first loses the source: `--target t.png --region 0,0,10x10 attempt.html`
+    // used to parse `t.png` as the attempt and silently compare it to itself.
+    // `--vlm` is optionally-valued and needs the other treatment.
+    const source = firstPositional(
+      withoutOptionalValue(argv, "vlm"),
+      'vlmkit check equivalence <attempt.html|png> --target <png> --region "x,y,WxH"',
+      ["--region", "--target", "--out"],
+    );
     const targetPath = readFlag(argv, "target");
     if (!targetPath) throw new UsageError("--target <png> is required");
     const specs = readAll(argv, "region");
