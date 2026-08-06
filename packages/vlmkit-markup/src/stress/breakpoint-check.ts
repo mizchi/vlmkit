@@ -33,10 +33,8 @@
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { extractBreakpoints } from "@mizchi/vlmkit-capture/viewport-discovery.ts";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
-import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 /** Discrete computed properties compared across boundary widths. */
@@ -624,86 +622,9 @@ export function formatBreakpointCheckReport(report: BreakpointCheckReport): stri
   return lines.join("\n");
 }
 
-function printUsage(exitCode: number): never {
-  console.log(`Usage: vlmkit check breakpoints <html-or-url> [options]
-
-Boundary quickcheck: render at B-1 / B / B+1 for every discovered media
-query breakpoint and verify each discrete style property at B matches
-one of its neighbors. Catches off-by-one boundaries (768px styled by
-neither/both regimes), elements that vanish exactly on the boundary,
-and horizontal overflow at boundary widths.
-
-Options:
-  --breakpoints <list>  Comma-separated px values (default: discovered from CSS)
-  --sweep               Also fuzz the whole width range for horizontal overflow
-                        (widths between breakpoints that B±1 never renders)
-  --sweep-step <px>     Sweep step (default: 25)
-  --json                Print JSON report
-  --height <px>         Render height (default: 900)
-  --max-elements <n>    Elements sampled per width (default: 400)
-  --advisory            Print findings but exit 0 (default: a suspect exits 1)`);
-  process.exit(exitCode);
-}
-
-function parseArgs(argv: string[]) {
-  let json = false;
-  let failOnSuspect = false;
-  let advisory = false;
-  let breakpoints: number[] | undefined;
-  let height: number | undefined;
-  let maxElements: number | undefined;
-  let sweep = false;
-  let sweepStep: number | undefined;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === "--help" || arg === "-h" || arg === "help") printUsage(0);
-    else if (arg === "--json") json = true;
-    else if (arg === "--fail-on-suspect") failOnSuspect = true; // accepted no-op
-    else if (arg === "--advisory") advisory = true;
-    else if (arg === "--sweep") sweep = true;
-    else if (arg === "--sweep-step") sweepStep = Number.parseInt(argv[++i] ?? "25", 10);
-    else if (arg === "--breakpoints") {
-      breakpoints = (argv[++i] ?? "").split(",").map((v) => Number.parseInt(v.trim(), 10)).filter((v) => Number.isFinite(v));
-    } else if (arg === "--height") height = Number.parseInt(argv[++i] ?? "900", 10);
-    else if (arg === "--max-elements") maxElements = Number.parseInt(argv[++i] ?? "400", 10);
-    else positional.push(arg);
-  }
-  if (positional.length === 0) printUsage(1);
-  return { source: positional[0]!, json, failOnSuspect, advisory, breakpoints, height, maxElements, sweep, sweepStep };
-}
-
-async function main(argv = process.argv.slice(2)): Promise<void> {
-  const parsed = parseArgs(argv);
-  const report = await runBreakpointCheck({
-    source: parsed.source,
-    ...(parsed.breakpoints ? { breakpoints: parsed.breakpoints } : {}),
-    ...(parsed.height !== undefined ? { height: parsed.height } : {}),
-    ...(parsed.maxElements !== undefined ? { maxElements: parsed.maxElements } : {}),
-    ...(parsed.sweep ? { sweep: true } : {}),
-    ...(parsed.sweepStep !== undefined ? { sweepStep: parsed.sweepStep } : {}),
-  });
-  appendRunLedger({
-    tool: "check-breakpoints",
-    source: parsed.source,
-    headline: {
-      breakpoints: report.checkedValues.length,
-      issues: report.issues.length,
-      sweepRanges: report.sweep?.overflowRanges.length ?? null,
-    },
-  });
-  if (parsed.json) {
-    console.log(JSON.stringify(report, null, 2));
-  } else {
-    console.log(formatBreakpointCheckReport(report));
-  }
-  if (!parsed.advisory && report.issues.some((issue) => issue.severity === "suspect")) {
-    process.exit(1);
-  }
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "breakpoint-check" ||
-  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `check breakpoints` is declared in `../gates/breakpoints.gate.ts` and driven by the core
+ * runner (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument
+ * parsing, `--json`, `--advisory`, the run ledger and the exit code.
+ */

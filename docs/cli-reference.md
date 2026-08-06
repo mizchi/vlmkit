@@ -22,7 +22,7 @@ for options.
 | `vlmkit snapshot` | `[<url>...]`, `approve`, `fix-prompt`, `stability`, `flipbook`, `report` |
 | `vlmkit migration` | `compare`, `blind`, `subagent` |
 | `vlmkit workflow` | `init`, `capture`, `verify`, `approve`, `graph`, `affected`, `introspect`, `spec-verify`, `expect` |
-| Standalone | `vlmkit batch`, `vlmkit gates`, `vlmkit mcp`, `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit markup-loop`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
+| Standalone | `vlmkit batch`, `vlmkit gates`, `vlmkit rules`, `vlmkit mcp`, `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit markup-loop`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
 
 ## Features
 
@@ -308,6 +308,126 @@ suppression. Two rules make it reviewable: a suppression **must** carry a
 being applied — the gate it silenced runs unmuted and the run exits non-zero,
 because a stale entry is a config defect even when the page now passes.
 Worked example: [`examples/vlmkit.gates.json`](../examples/vlmkit.gates.json).
+
+### Rules (tune or disable one rule, not one whole gate)
+
+```bash
+vlmkit rules                      # every gate, grouped by the kind of question it answers
+vlmkit rules --json               # the whole catalog, machine-readable
+vlmkit rules check integrity      # that gate's rule ids, default severities, docs
+vlmkit check integrity page.html --rule check.integrity/near-misalignment=off
+vlmkit check breakpoints page.html --rules   # same table, from the gate itself
+```
+
+`vlmkit rules` groups by **category** — `correctness`, `behavior`,
+`design-system`, `verdict`, `infrastructure` — not by CLI verb, because
+`check`/`scan`/`stress` says how a command is spelled and a category says what a
+failure means (`scan scroll` and `check breakpoints` answer the same kind of
+question). `--json` emits `{ categories, gates: [{ id, command, title, summary,
+category, plugin, rules }] }`, which is what a job that wants "fail the build if
+a gate appears un-triaged" should read.
+
+A gate declares its rules, so a rule is addressable: `<gateId>/<ruleId>` set to
+`off`, `suspect`, `warn` or `info`. Persist the decision under `"rules"` in
+`vlmkit.gates.json`, at `defaults` scope or per page (page keys merge over
+defaults):
+
+```jsonc
+{
+  "defaults": { "rules": { "check.breakpoints/overflow-at-boundary": "suspect" } },
+  "pages": [
+    { "id": "docs", "source": "routes/docs/**/*.html",
+      "rules": { "check.integrity/near-misalignment": "off" } }
+  ]
+}
+```
+
+References are validated against the declared table, so a misspelled rule is a
+config error rather than a line that silences nothing. Suppressed findings are
+reported as suppressed next to the verdict — a gate that passes because three
+rules were turned off says so.
+
+Every gate shares one exit-code contract and one `--json` envelope: a suspect
+exits 1, `--advisory` prints and exits 0, `--fail-on-suspect` is an accepted
+no-op, and the JSON is always
+
+```jsonc
+{ "gate": "check.integrity", "command": "check integrity",
+  "verdict": "fail", "counts": { "suspect": 2, "warn": 1, "info": 0 },
+  "findings": [ … ], "suppressed": [ … ], "retuned": [ … ],
+  "report": { /* the gate's own report, verbatim */ } }
+```
+
+so a client gates on `verdict` / `counts` without knowing which gate ran. All
+26 gates are registry-driven; `vlmkit rules` lists them. Commands that produce
+artifacts rather than verdicts (`diff`, `build`, `contract`, `snapshot`, …) are
+not gates and keep their own flags.
+
+### Cost (which gates and rules your CI is paying for)
+
+```bash
+vlmkit check integrity page.html --timing        # per-phase ms for one run
+vlmkit bench gates page.html                    # every page gate, ranked by cost
+vlmkit bench gates a.html b.html --repeat 5 --probe-suppression --md
+vlmkit bench gates page.html --category behavior
+vlmkit bench gates page.html --gate "check breakpoints --sweep"
+```
+
+`--timing` splits a run into `parse` / `run` / `findings` / `rules` / `format` /
+`ledger`. It is opt-in even under `--json`, so the envelope stays byte-stable for
+equal inputs.
+
+`vlmkit bench gates` runs every gate that works from a bare page — its positional
+input is a page and nothing else is required, which is 18 of the 26 — and reports
+cost next to yield: median/min/max, the measurement's share of the total,
+findings, rules fired out of rules declared, and ms per finding. Name the other
+eight explicitly with `--gate`, arguments included.
+
+**Per-rule cost is attributed, not isolated.** A gate performs one measurement and
+every rule it declares reads that same report, so rules are not separately
+executed and cannot be separately timed — measured on this repo, `run` is ~100% of
+a gate's wall clock and the projection across all 18 gates totals under a
+millisecond. Two things follow, both easy to guess wrong:
+
+- **`--rule x=off` does not make a run faster.** Rule settings apply to the
+  findings *after* the measurement, by design, so a silenced finding can still be
+  reported as silenced. `--probe-suppression` measures this instead of asserting
+  it.
+- **The cost unit is the gate.** To spend less, drop a gate or narrow its inputs
+  (fewer viewports, no `--sweep`, a shorter `--observe`). Pruning rules buys
+  clarity, not time.
+
+Measured baseline: [`docs/reports/2026-08-06-gate-rule-cost-bench.md`](reports/2026-08-06-gate-rule-cost-bench.md)
+— a full sweep is ~30s serial per page and four gates are 60% of it.
+
+### Custom gates (plugins)
+
+```jsonc
+// vlmkit.config.json
+{ "plugins": ["./tools/house-gates.ts", "@acme/vlmkit-brand-gates"] }
+```
+
+A plugin module default-exports `definePlugin({ name, gates })`, where each
+gate comes from `defineGate({...})`. A plugin gate is indistinguishable from a
+bundled one: it appears in group help and `vlmkit rules`, dispatches as
+`vlmkit <group> <leaf>`, and inherits the shared `--json` / `--advisory` /
+`--rule` behaviour, the run-ledger entry, and `vlmkit.gates.json` validation.
+Relative specifiers resolve against the config's directory, not the cwd.
+
+The bundled gates load the same way, from three plugins — `@mizchi/vlmkit-markup`
+(24 gates), `@mizchi/vlmkit-capture` (`check crater`) and the app itself
+(`check perf`) — so there is no privileged built-in path to diverge from.
+
+**Adding your own metric: [`docs/authoring-gates.md`](authoring-gates.md)** —
+the contract field by field, choosing severities and a category, reading project
+config, measuring in a browser, testing, and publishing.
+
+Runnable examples: [`examples/gate-plugin/`](../examples/gate-plugin/) — a
+project with its own `vlmkit.config.json` and two gates,
+[`house-gates.ts`](../examples/gate-plugin/house-gates.ts) (the smallest useful
+one) and [`dom-budget.gate.ts`](../examples/gate-plugin/dom-budget.gate.ts) (the
+shape a real house metric takes: render, measure, compare against budgets).
+Design and migration status: [`docs/design/gate-plugin-architecture.md`](design/gate-plugin-architecture.md).
 
 ### Build / Scan / Inspect / Stress (markup-assistance)
 

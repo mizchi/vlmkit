@@ -28,10 +28,8 @@
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 export interface AnimationTimingSample {
@@ -627,97 +625,9 @@ export function formatAnimationEvalReport(report: AnimationEvalReport): string {
   return lines.join("\n");
 }
 
-function printUsage(exitCode: number): never {
-  console.log(`Usage: vlmkit check animation <html-or-url> [options]
-
-Frame-sampled animation evaluation: pause every animation, seek through
-deterministic sample points, and verify each one visibly moves pixels,
-when the page settles, and whether prefers-reduced-motion is honored.
-
-Options:
-  --json                    Print JSON report
-  --viewport <WxH>          Viewport (default: 1280x720)
-  --samples <n>             Sample points per animation (default: 4)
-  --max-animations <n>      Max animations to frame-evaluate (default: 8)
-  --frames <dir>            Write each sampled frame PNG into <dir>
-  --settle-threshold <ms>   long-settle threshold (default: 3000)
-  --skip-reduced-motion     Skip the reduced-motion emulation pass
-  --fail-on-suspect         Exit non-zero when suspect issues are found`);
-  process.exit(exitCode);
-}
-
-function parseArgs(argv: string[]) {
-  let json = false;
-  let failOnSuspect = false;
-  let skipReducedMotion = false;
-  let samples: number | undefined;
-  let maxAnimations: number | undefined;
-  let settleThresholdMs: number | undefined;
-  let framesDir: string | undefined;
-  let viewport: { width: number; height: number } | undefined;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === "--help" || arg === "-h" || arg === "help") printUsage(0);
-    else if (arg === "--json") json = true;
-    else if (arg === "--fail-on-suspect") failOnSuspect = true;
-    else if (arg === "--skip-reduced-motion") skipReducedMotion = true;
-    else if (arg === "--samples") samples = Number.parseInt(argv[++i] ?? "4", 10);
-    else if (arg === "--max-animations") maxAnimations = Number.parseInt(argv[++i] ?? "8", 10);
-    else if (arg === "--settle-threshold") settleThresholdMs = Number.parseInt(argv[++i] ?? "3000", 10);
-    else if (arg === "--frames") framesDir = argv[++i];
-    else if (arg === "--viewport") {
-      const m = (argv[++i] ?? "").match(/^(\d+)x(\d+)$/);
-      if (!m) printUsage(1);
-      viewport = { width: Number(m[1]), height: Number(m[2]) };
-    } else positional.push(arg);
-  }
-  if (positional.length === 0) printUsage(1);
-  return {
-    source: positional[0]!,
-    json,
-    failOnSuspect,
-    skipReducedMotion,
-    samples,
-    maxAnimations,
-    settleThresholdMs,
-    framesDir,
-    viewport,
-  };
-}
-
-async function main(argv = process.argv.slice(2)): Promise<void> {
-  const parsed = parseArgs(argv);
-  const report = await runAnimationEval({
-    source: parsed.source,
-    skipReducedMotion: parsed.skipReducedMotion,
-    ...(parsed.samples !== undefined ? { samples: parsed.samples } : {}),
-    ...(parsed.maxAnimations !== undefined ? { maxAnimations: parsed.maxAnimations } : {}),
-    ...(parsed.settleThresholdMs !== undefined ? { settleThresholdMs: parsed.settleThresholdMs } : {}),
-    ...(parsed.framesDir ? { framesDir: parsed.framesDir } : {}),
-    ...(parsed.viewport ? { viewport: parsed.viewport } : {}),
-  });
-  appendRunLedger({
-    tool: "check-animation",
-    source: parsed.source,
-    headline: {
-      animations: report.animationCount,
-      settleMs: report.settleMs,
-      issues: report.issues.length,
-    },
-  });
-  if (parsed.json) {
-    console.log(JSON.stringify(report, null, 2));
-  } else {
-    console.log(formatAnimationEvalReport(report));
-  }
-  if (parsed.failOnSuspect && report.issues.some((issue) => issue.severity === "suspect")) {
-    process.exit(1);
-  }
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "animation-eval" ||
-  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `check animation` is declared in `../gates/animation.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */

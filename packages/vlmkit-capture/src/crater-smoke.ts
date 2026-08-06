@@ -6,9 +6,7 @@
  * connection, viewport/content load, PNG capture, paint tree capture,
  * computed-style capture, and responsive breakpoint discovery.
  */
-import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import {
   CraterClient,
@@ -283,54 +281,30 @@ export function formatCraterSmokeReport(report: CraterSmokeReport): string {
   return lines.join("\n");
 }
 
-function printUsage(exitCode: number): never {
-  console.log("Usage: vlmkit check crater [options]");
-  console.log("Options:");
-  console.log("  --url <ws-url>       Crater BiDi URL (default: ws://127.0.0.1:9222)");
-  console.log("  --require            Fail if Crater is unavailable");
-  console.log("  --deep               Exercise heavier v0.18.0 APIs (batchRender)");
-  console.log("  --json               Print JSON report");
-  process.exit(exitCode);
-}
-
+/**
+ * Read this gate's own flags. `--help` and `--json` are no longer handled
+ * here: the core gate runner owns both, and a parser that called
+ * `process.exit(0)` for help could not be used by anything but a CLI.
+ */
 export function parseCraterSmokeArgs(
-  argv: string[],
+  argv: readonly string[],
   env: NodeJS.ProcessEnv | Partial<NodeJS.ProcessEnv> = process.env,
-) {
+): { url: string; requireAvailable: boolean; deep: boolean } {
   let url = resolveCraterBidiUrl({ env });
   let requireAvailable = false;
   let deep = false;
-  let json = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === "--help" || arg === "-h" || arg === "help") printUsage(0);
-    else if (arg === "--url") url = argv[++i] ?? DEFAULT_BIDI_URL;
+    if (arg === "--url") url = argv[++i] ?? DEFAULT_BIDI_URL;
     else if (arg === "--require") requireAvailable = true;
     else if (arg === "--deep") deep = true;
-    else if (arg === "--json") json = true;
   }
-  return { url, requireAvailable, deep, json };
+  return { url, requireAvailable, deep };
 }
 
-async function main(argv = process.argv.slice(2)): Promise<void> {
-  const args = parseCraterSmokeArgs(argv);
-  const report = await runCraterBidiSmoke({
-    url: args.url,
-    requireAvailable: args.requireAvailable,
-    deep: args.deep,
-  });
-  if (args.json) {
-    console.log(JSON.stringify(report, null, 2));
-  } else {
-    console.log(formatCraterSmokeReport(report));
-  }
-  if (report.status === "fail" || (args.requireAvailable && report.status === "skip")) {
-    process.exit(1);
-  }
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "crater-smoke" ||
-  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `check crater` is declared in `./gates/crater.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */

@@ -319,50 +319,9 @@ export function formatFlowReport(report: FlowVerifyReport): string {
   return lines.join("\n");
 }
 
-function printUsage(exitCode: number): never {
-  console.log(`Usage: vlmkit verify flow <html-or-url> --flow <flow.json> [--json]
-
-Verified scripted browser flow: each step performs an action and
-asserts a deterministic post-condition on the live DOM. FAILS at the
-first unmet post-condition — "it did something" is not success. No LLM.
-
-flow.json: { "viewport"?, "steps": [ { "label"?, "do": <action>, "expect": [<assert>...] } ] }
-  action:  {action:"click", selector, force?} | {action:"focus"|"hover", selector}
-           | {action:"press", key, selector?}
-           | {action:"fill"|"type", selector, value|text} | {action:"wait", ms}
-           (force skips actionability — use it to click a disabled control
-            and assert that nothing changes)
-  assert:  {assert:"attr", selector, name, equals} | {assert:"visible"|"hidden"|"focused", selector}
-           | {assert:"text", selector, contains} | {assert:"count", selector, equals}
-
-Options:
-  --flow <file>   Flow JSON (required)
-  --json          Print JSON report`);
-  process.exit(exitCode);
-}
-
-async function main(argv = process.argv.slice(2)): Promise<void> {
-  if (argv.includes("--help") || argv.includes("-h")) printUsage(0);
-  let flowPath: string | undefined;
-  let json = false;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === "--flow") flowPath = argv[++i]!;
-    else if (arg === "--json") json = true;
-    else if (!arg.startsWith("-")) positional.push(arg);
-  }
-  const source = positional[0];
-  if (!source || !flowPath) printUsage(1);
-  const flow = JSON.parse(await readFile(flowPath, "utf8")) as Flow;
-  const report = await runFlowVerify({ source, flow });
-  if (json) console.log(JSON.stringify(report, null, 2));
-  else console.log(formatFlowReport(report));
-  if (!report.done) process.exit(1);
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "flow-verify" ||
-  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `verify flow` is declared in `../gates/verify.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */

@@ -180,7 +180,7 @@ its relative stylesheets, images and scripts resolve — if your CSS lives in
 
 | Need | Command |
 |---|---|
-| Responsive boundaries are exact (no off-by-one at 768px, no width with horizontal overflow) | `vlmkit check breakpoints page.html --sweep --fail-on-suspect` |
+| Responsive boundaries are exact (no off-by-one at 768px, no width with horizontal overflow) | `vlmkit check breakpoints page.html --sweep` |
 | Discover which breakpoints the CSS declares | `vlmkit scan breakpoints page.html` |
 | Scroll inventory: containers, page overflow-x, clipped content | `vlmkit scan scroll page.html` |
 | Sticky sticks / fixed holds / snap lands | `vlmkit check scroll page.html` |
@@ -214,8 +214,18 @@ The gates are built for a fix loop, human or agent:
 
 Every gate invocation is appended to `.vlmkit/run-ledger.jsonl`
 (tool, source, headline result) — audit iteration counts from the
-ledger, not from an agent's self-report. All gates support `--json`
-for machine consumption and `--fail-on-suspect` for CI exit codes.
+ledger, not from an agent's self-report.
+
+Every gate shares four flags. `--json` prints one envelope shape —
+`{gate, command, verdict, counts, findings, suppressed, retuned,
+report}` — so you can gate on `verdict` without knowing which gate
+ran. A suspect exits 1 by default; `--advisory` prints and exits 0
+for piloting a gate before it gates CI. `--rules` lists what the gate
+can tune, and `--rule <gateId>/<ruleId>=off|warn|suspect` re-tunes one
+rule for a run (persist it under `"rules"` in `vlmkit.gates.json`).
+Suppressed findings are still reported, next to the verdict.
+(`--fail-on-suspect` is accepted and does nothing — failing on a
+suspect is the default.)
 
 ## Done-condition recipes
 
@@ -230,7 +240,7 @@ vlmkit scan scroll page.html                             # no page-overflow-x
 vlmkit scan handlers page.html                           # no pointer-only controls
 vlmkit check interactions page.html                      # no suspects
 # + when the brief specifies responsive behavior:
-vlmkit check breakpoints page.html --sweep --fail-on-suspect
+vlmkit check breakpoints page.html --sweep
 ```
 
 **Screenshot-faithful build**: `verify markup` against the target(s),

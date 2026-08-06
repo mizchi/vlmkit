@@ -154,21 +154,6 @@ interface ElementSample {
   scrollWidth: number;
 }
 
-function parseArgs(argv: string[]) {
-  let outputDir = "";
-  let report = "";
-  let inflate: number | undefined;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--output-dir") outputDir = argv[++i];
-    else if (a === "--report") report = argv[++i];
-    else if (a === "--inflate") inflate = parseFloat(argv[++i] ?? "1.4");
-    else positional.push(a);
-  }
-  return { positional, outputDir, report, inflate };
-}
-
 export async function runI18nStress(
   options: I18nStressOptions,
 ): Promise<I18nStressReport> {
@@ -283,28 +268,7 @@ export async function runI18nStress(
     });
     await writeFile(reportPath, md);
 
-    if (!options.quiet) {
-      console.log(`  ${BOLD}${CYAN}vlmkit stress i18n${RESET}`);
-      console.log(`  ${DIM}html: ${htmlPath}  inflate: ${inflateFactor}x${RESET}`);
-      const icon = filtered.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
-      console.log(`  ${icon} ${filtered.length} overflow / wrap issue(s) across ${before.length} inspected element(s)`);
-      const CONSOLE_ROWS = 6;
-      for (const o of filtered.slice(0, CONSOLE_ROWS)) {
-        const detail = o.kind === "horizontal-overflow"
-          ? `scrollW ${o.after.scrollWidth.toFixed(0)} > clientW ${o.after.clientWidth.toFixed(0)}`
-          : o.kind === "vertical-wrap"
-            ? `h ${o.before.height.toFixed(0)} → ${o.after.height.toFixed(0)}`
-            : "extends beyond parent right edge";
-        console.log(`    ${DIM}[${o.kind}] ${o.path} — ${detail}${RESET}`);
-      }
-      // This gate kept its silent cut when the other three were fixed: the
-      // 2026-08-02 truncation pass added `--json` here but not the notice, so a
-      // seventh issue still vanished without a trace.
-      if (filtered.length > CONSOLE_ROWS) {
-        console.log(`    ${DIM}… ${filtered.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
-      }
-      console.log(`  ${DIM}report: ${reportPath}${RESET}`);
-    }
+
 
     return {
       html: htmlPath,
@@ -318,6 +282,35 @@ export async function runI18nStress(
   } finally {
     await browser.close();
   }
+}
+
+/**
+ * Terminal summary, extracted from the `!options.quiet` block inside
+ * `runI18nStress`. A gate's `run` must not print — the core runner owns output.
+ */
+export function formatI18nStressReport(report: I18nStressReport): string {
+  const lines: string[] = [];
+  lines.push(`  ${BOLD}${CYAN}vlmkit stress i18n${RESET}`);
+  lines.push(`  ${DIM}html: ${report.html}  inflate: ${report.inflateFactor}x${RESET}`);
+  const icon = report.overflowing.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
+  lines.push(`  ${icon} ${report.overflowing.length} overflow / wrap issue(s) across ${report.totalInspected} inspected element(s)`);
+  const CONSOLE_ROWS = 6;
+  for (const o of report.overflowing.slice(0, CONSOLE_ROWS)) {
+    const detail = o.kind === "horizontal-overflow"
+      ? `scrollW ${o.after.scrollWidth.toFixed(0)} > clientW ${o.after.clientWidth.toFixed(0)}`
+      : o.kind === "vertical-wrap"
+        ? `h ${o.before.height.toFixed(0)} → ${o.after.height.toFixed(0)}`
+        : "extends beyond parent right edge";
+    lines.push(`    ${DIM}[${o.kind}] ${o.path} — ${detail}${RESET}`);
+  }
+  // This gate kept its silent cut when the other three were fixed: the
+  // 2026-08-02 truncation pass added `--json` here but not the notice, so a
+  // seventh issue still vanished without a trace.
+  if (report.overflowing.length > CONSOLE_ROWS) {
+    lines.push(`    ${DIM}… ${report.overflowing.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
+  }
+  lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
+  return lines.join("\n");
 }
 
 function renderReport(r: Omit<I18nStressReport, "reportPath">): string {
@@ -385,34 +378,9 @@ function renderReport(r: Omit<I18nStressReport, "reportPath">): string {
   return lines.join("\n");
 }
 
-async function main(argv = process.argv.slice(2)) {
-  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
-  const { positional, outputDir, report, inflate } = parseArgs(argv);
-  if (positional.length === 0) {
-    console.log("Usage: vlmkit stress i18n <html> [--inflate 1.4] [--output-dir dir]");
-    console.log("Options:");
-    console.log("  --inflate <N>        Word-length inflation factor. Default 1.4.");
-    console.log("  --output-dir <dir>   Default: ./test-results/i18n-stress");
-    console.log("  --report <path>      Markdown report path");
-    console.log("  --json               Print the full report as JSON (every row, no cut)");
-    process.exit(1);
-  }
-  // `--json` so the console/markdown row caps stay a display choice rather than
-
-  // the only view of the data — the truncation notices point here.
-
-  const json = argv.includes("--json");
-  const result = await runI18nStress({
-    htmlPath: positional[0]!,
-    outputDir: outputDir || join(process.cwd(), "test-results", "i18n-stress"),
-    reportPath: report || undefined,
-    inflateFactor: inflate,
-    quiet: json,
-  });
-  if (json) console.log(JSON.stringify(result, null, 2));
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "i18n-stress" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `stress i18n` is declared in `../gates/stress.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */

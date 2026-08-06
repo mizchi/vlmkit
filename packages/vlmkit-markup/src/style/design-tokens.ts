@@ -153,34 +153,6 @@ interface RawSample {
   boxShadow: string;
 }
 
-function parseArgs(argv: string[]) {
-  let outputDir = "";
-  let report = "";
-  let configPath = "";
-  let strict = false;
-  const flagConfig: DesignTokenConfig = {};
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--output-dir") outputDir = argv[++i];
-    else if (a === "--report") report = argv[++i];
-    else if (a === "--config") configPath = argv[++i];
-    else if (a === "--strict") strict = true;
-    else if (a === "--radius-scale") flagConfig.radius = parseScale(argv[++i]);
-    else if (a === "--spacing-scale") flagConfig.spacing = parseScale(argv[++i]);
-    else if (a === "--z-scale") flagConfig.zIndex = parseScale(argv[++i]);
-    else if (a === "--shadow-tiers") flagConfig.shadowTiers = parseInt(argv[++i] ?? "5", 10);
-    else if (a === "--tolerance") flagConfig.tolerance = parseFloat(argv[++i] ?? "0.5");
-    else positional.push(a);
-  }
-  return { positional, outputDir, report, configPath, strict, flagConfig };
-}
-
-function parseScale(s: string | undefined): number[] {
-  if (!s) return [];
-  return s.split(",").map((x) => parseFloat(x.trim())).filter((x) => Number.isFinite(x));
-}
-
 function isUrl(s: string): boolean { return /^https?:\/\//.test(s); }
 
 function nearestOnScale(value: number, scale: number[]): number {
@@ -314,26 +286,39 @@ export async function runDesignTokens(
   });
   await writeFile(reportPath, md);
 
-  console.log(`  ${BOLD}${CYAN}vlmkit check tokens${RESET}`);
-  console.log(`  ${DIM}source: ${options.source}  inspected: ${byPath.size} element(s)${RESET}`);
-  const byProperty = new Map<string, number>();
-  for (const v of violations) byProperty.set(v.property, (byProperty.get(v.property) ?? 0) + 1);
-  const shadowOver = distinctShadows.size > config.shadowTiers;
-  const totalFindings = violations.length + (shadowOver ? 1 : 0);
-  const icon = totalFindings === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
-  console.log(`  ${icon} ${totalFindings} finding(s)`);
-  for (const [prop, n] of byProperty) {
-    console.log(`    ${DIM}${prop.padEnd(15)} ${n} violation(s)${RESET}`);
-  }
-  if (shadowOver) {
-    console.log(`    ${DIM}box-shadow      ${distinctShadows.size} distinct (allowed: ${config.shadowTiers})${RESET}`);
-  }
-  console.log(`  ${DIM}report: ${reportPath}${RESET}`);
-
   return {
     source: options.source, viewport, config,
     inspectedCount: byPath.size, violations, shadow, reportPath,
   };
+}
+
+/**
+ * Terminal summary. Extracted from `runDesignTokens`, which used to
+ * `console.log` from inside the measurement — that made the function unusable
+ * from the MCP server or a test without capturing stdout, and it is why the
+ * gate contract keeps `run` and `format` apart.
+ */
+export function formatDesignTokensReport(report: DesignTokensReport): string {
+  const lines: string[] = [];
+  lines.push(`  ${BOLD}${CYAN}vlmkit check tokens${RESET}`);
+  lines.push(`  ${DIM}source: ${report.source}  inspected: ${report.inspectedCount} element(s)${RESET}`);
+  const byProperty = new Map<string, number>();
+  for (const v of report.violations) byProperty.set(v.property, (byProperty.get(v.property) ?? 0) + 1);
+  const shadowOver = report.shadow.distinctShadows.length > report.shadow.allowedTiers;
+  const totalFindings = report.violations.length + (shadowOver ? 1 : 0);
+  const icon = totalFindings === 0 ? `${GREEN}\u2713${RESET}` : `${RED}\u2717${RESET}`;
+  lines.push(`  ${icon} ${totalFindings} finding(s)`);
+  for (const [prop, n] of byProperty) {
+    lines.push(`    ${DIM}${prop.padEnd(15)} ${n} violation(s)${RESET}`);
+  }
+  if (shadowOver) {
+    lines.push(
+      `    ${DIM}box-shadow      ${report.shadow.distinctShadows.length} distinct`
+      + ` (allowed: ${report.shadow.allowedTiers})${RESET}`,
+    );
+  }
+  lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
+  return lines.join("\n");
 }
 
 function renderReport(r: Omit<DesignTokensReport, "reportPath">): string {
@@ -408,37 +393,9 @@ async function loadConfig(path: string | undefined): Promise<DesignTokenConfig |
   return JSON.parse(raw) as DesignTokenConfig;
 }
 
-async function main(argv = process.argv.slice(2)) {
-  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
-  const { positional, outputDir, report, configPath, strict, flagConfig } = parseArgs(argv);
-  if (positional.length === 0) {
-    console.log("Usage: vlmkit check tokens <html-or-url> [options]");
-    console.log("Options:");
-    console.log("  --config <path>           JSON config: { radius, spacing, zIndex, shadowTiers, tolerance }");
-    console.log("  --radius-scale a,b,c,...  Allowed border-radius values (default: 0,2,4,6,8,12,16,20,24,32,48,999)");
-    console.log("  --spacing-scale ...       Allowed padding/margin values (default: 0,2,4,8,12,16,20,24,32,40,48,64,80,96)");
-    console.log("  --z-scale ...             Allowed z-index values (default: 0,1,10,100,1000,9999)");
-    console.log("  --shadow-tiers N          Max distinct box-shadow values (default: 5)");
-    console.log("  --tolerance px            Snap tolerance in px (default: 0.5)");
-    console.log("  --strict                  Exit non-zero if any violations or shadow-tier excess");
-    console.log("  --output-dir <dir>        Default: ./test-results/design-tokens");
-    console.log("  --report <path>           Markdown report path");
-    process.exit(1);
-  }
-  const fileConfig = await loadConfig(configPath);
-  const result = await runDesignTokens({
-    source: positional[0]!,
-    outputDir: outputDir || join(process.cwd(), "test-results", "design-tokens"),
-    reportPath: report || undefined,
-    config: { ...fileConfig, ...flagConfig },
-  });
-  if (strict) {
-    const shadowOver = result.shadow.distinctShadows.length > result.shadow.allowedTiers;
-    if (result.violations.length > 0 || shadowOver) process.exitCode = 1;
-  }
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "design-tokens" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `check tokens` is declared in `../gates/tokens.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */

@@ -23,12 +23,9 @@
  *   vlmkit check scroll <html-or-url> [--json]
  */
 import { resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { applyGateExit } from "@mizchi/vlmkit-core/gate-exit.ts";
+import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
-import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 export interface StickyFixedSample {
@@ -305,16 +302,9 @@ export async function runScrollBehavior(options: ScrollBehaviorOptions): Promise
     if (redirectNote) {
       report.issues.unshift({ kind: "redirected", severity: "suspect", selector: "", message: redirectNote });
     }
-    appendRunLedger({
-      tool: "check-scroll",
-      source: options.source,
-      headline: {
-        stickyFixed: report.stickyFixed.length,
-        engagedSticky: report.engagedSticky,
-        snaps: report.snaps.length,
-        issues: report.issues.length,
-      },
-    });
+    // No ledger append here — `scrollGate.ledger` writes the row. This one
+    // used the same `tool: "check-scroll"` name as the gate's, so a run left
+    // two indistinguishable entries and any count over the ledger doubled.
     return report;
   } finally {
     await browser.close();
@@ -361,46 +351,9 @@ export function formatScrollBehaviorReport(report: ScrollBehaviorReport): string
   return lines.join("\n");
 }
 
-function printUsage(exitCode: number): never {
-  console.log(`Usage: vlmkit check scroll <html-or-url> [options]
-
-Scroll behavior verification: fixed elements must hold their viewport
-position, engaged sticky elements must stick at their top offset, and
-mandatory snap containers must land on a child snap edge. (Existence /
-inventory is \`vlmkit scan scroll\`.)
-
-Options:
-  --viewport <WxH>    Viewport (default 1280x720)
-  --json              Print JSON report
-  --advisory          Print findings but exit 0 (default: a suspect exits 1)`);
-  process.exit(exitCode);
-}
-
-async function main(argv = process.argv.slice(2)): Promise<void> {
-  if (argv.includes("--help") || argv.includes("-h")) printUsage(0);
-  let json = false;
-  let advisory = false;
-  let viewport: { width: number; height: number } | undefined;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === "--json") json = true;
-    else if (arg === "--fail-on-suspect") { /* accepted no-op: suspects already fail */ }
-    else if (arg === "--advisory") advisory = true;
-    else if (arg === "--viewport") {
-      const m = (argv[++i] ?? "").match(/^(\d+)x(\d+)$/);
-      if (m) viewport = { width: Number(m[1]), height: Number(m[2]) };
-    } else if (!arg.startsWith("-")) positional.push(arg);
-  }
-  if (positional.length === 0) printUsage(1);
-  const report = await runScrollBehavior({ source: positional[0]!, ...(viewport ? { viewport } : {}) });
-  if (json) console.log(JSON.stringify(report, null, 2));
-  else console.log(formatScrollBehaviorReport(report));
-  applyGateExit(report.issues.some((i) => i.severity === "suspect"), { advisory });
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "scroll-behavior" ||
-  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `check scroll` is declared in `../gates/scroll.gate.ts` and driven by the core
+ * runner (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument
+ * parsing, `--json`, `--advisory`, the run ledger and the exit code.
+ */

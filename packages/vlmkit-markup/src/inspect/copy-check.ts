@@ -46,7 +46,7 @@
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import {
   buildContactSheets,
@@ -57,13 +57,10 @@ import {
   TRANSCRIBE_PROMPT,
   type TextBlock,
 } from "./copy-target.ts";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { applyGateExit } from "@mizchi/vlmkit-core/gate-exit.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
-import { readEnv } from "@mizchi/vlmkit-core/project-config.ts";
 
 export type CopyIssueKind = "placeholder-text" | "copy-missing" | "copy-invisible" | "copy-image-mismatch" | "redirected";
 
@@ -829,124 +826,9 @@ export function formatCopyCheckReport(report: CopyCheckReport): string {
   return lines.join("\n");
 }
 
-function printUsage(exitCode: number): never {
-  console.log(`Usage: vlmkit check copy <html-or-url> [options]
-
-Copy fidelity gate: placeholder-text scan (always on), optional manifest
-verification, and optional target-image verification (crops every
-rendered text block's bbox out of the target screenshot; a VLM
-transcribes them with --vlm, or contact sheets are written for the
-agent's own vision without an API key).
-
-Manifest matching sweeps disclosure states by default: closed <details>
-are opened and unselected [role=tab] / [aria-expanded=false] controls
-are clicked, so copy inside collapsed panels passes (with provenance)
-instead of reading as missing — no need to ship disclosures open just
-to satisfy the gate.
-
-Manifest lines must appear in the VISIBLY rendered text: copy a user
-cannot actually see (font-size:0, opacity:0, transparent color,
-off-screen positioning, text-indent, transforms, clip/clip-path,
-zero-size overflow boxes, same-color camouflage, sr-only) is reported
-as copy-invisible with a reason class, not as satisfied. The manifest
-is the user-visible copy spec — keep assistive-tech-only strings out
-of it. Markdown headings in the manifest ("# Section") are organizing
-comments, not required lines.
-
-  --storage-state <file>  Playwright storage state for pages behind a login
-                          (or set VLMKIT_STORAGE_STATE)
-
-Reason classes: zero-size, hidden, transparent, visually-hidden
-(sr-only-style clip/1px box), unreachable (off-screen/clipped),
-camouflage, unknown. When an invisibility is deliberate, accept that
-class with --allow-invisible; each accepted line is listed with its
-reason so the suppression stays auditable.
-
-Options:
-  --manifest <file>   Copy manifest (plain text / markdown; one required line per row)
-  --allow-invisible <classes>  Comma-separated reason classes to accept as satisfied
-                      (e.g. --allow-invisible visually-hidden)
-  --target <png>      Target screenshot to verify copy against (bbox-cropped per text block)
-  --out <dir>         Sheet/worksheet output dir (default: .vlmkit-copy-review next to the source)
-  --vlm [model]       Transcribe crops with a VLM (default model: VLMKIT_VLM_MODEL); requires API key
-  --no-states         Skip the disclosure-state sweep (default-state text only)
-  --json              Print JSON report
-  --advisory          Print findings but exit 0 (default: a suspect exits 1)`);
-  process.exit(exitCode);
-}
-
-async function main(argv = process.argv.slice(2)): Promise<void> {
-  if (argv.includes("--help") || argv.includes("-h")) printUsage(0);
-  let manifestPath: string | undefined;
-  let targetPath: string | undefined;
-  let outDir: string | undefined;
-  let vlm: string | true | undefined;
-  let json = false;
-  let advisory = false;
-  let storageState: string | undefined;
-  let exploreStates = true;
-  let allowInvisible: InvisibleReason[] | undefined;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === "--manifest") manifestPath = argv[++i]!;
-    else if (arg === "--target") targetPath = argv[++i]!;
-    else if (arg === "--out") outDir = argv[++i]!;
-    else if (arg === "--vlm") {
-      const next = argv[i + 1];
-      vlm = next && !next.startsWith("-") ? argv[++i]! : true;
-    } else if (arg === "--no-states") exploreStates = false;
-    else if (arg === "--allow-invisible") {
-      const classes = (argv[++i] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-      const bad = classes.filter((c) => !(INVISIBLE_REASONS as readonly string[]).includes(c));
-      if (classes.length === 0 || bad.length > 0) {
-        console.error(`--allow-invisible: unknown class(es) ${bad.map((b) => `"${b}"`).join(", ") || "(none given)"}. Valid: ${INVISIBLE_REASONS.join(", ")}`);
-        process.exit(1);
-      }
-      allowInvisible = classes as InvisibleReason[];
-    } else if (arg === "--json") json = true;
-    else if (arg === "--fail-on-suspect") { /* accepted no-op: suspects already fail */ }
-    else if (arg === "--advisory") advisory = true;
-    else if (arg === "--storage-state") storageState = argv[++i];
-    else if (!arg.startsWith("-")) positional.push(arg);
-  }
-  if (positional.length === 0) printUsage(1);
-
-  let readTargetText: ((cropPng: Buffer) => Promise<string>) | undefined;
-  if (vlm !== undefined) {
-    if (!targetPath) {
-      console.error("--vlm requires --target <png>");
-      process.exit(1);
-    }
-    const { createVlmClient, resolveModel } = await import("@mizchi/vlmkit-ai/vlm-client.ts");
-    const modelId = vlm === true
-      ? (readEnv("VLM_MODEL") ?? "bytedance/ui-tars-1.5-7b")
-      : vlm;
-    const model = await resolveModel(modelId);
-    const client = await createVlmClient(model);
-    readTargetText = async (cropPng: Buffer) => {
-      const res = await client!.analyzeImage(cropPng.toString("base64"), TRANSCRIBE_PROMPT, { maxTokens: 256 });
-      return res.content;
-    };
-  }
-
-  const report = await runCopyCheck({
-    source: positional[0]!,
-    ...(storageState ? { storageState } : {}),
-    ...(manifestPath ? { manifestPath } : {}),
-    ...(targetPath ? { targetPath } : {}),
-    ...(outDir ? { outDir } : {}),
-    ...(readTargetText ? { readTargetText } : {}),
-    ...(allowInvisible ? { allowInvisible } : {}),
-    exploreStates,
-  });
-  if (json) console.log(JSON.stringify(report, null, 2));
-  else console.log(formatCopyCheckReport(report));
-  applyGateExit(report.issues.some((i) => i.severity === "suspect"), { advisory });
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "copy-check" ||
-  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `check copy` is declared in `../gates/copy.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */

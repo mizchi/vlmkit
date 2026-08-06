@@ -108,6 +108,34 @@ Full bench: `docs/reports/2026-05-22-vlm-llm-coverage-bench.md`.
 - `moonshotai/kimi-k2.5`, `moonshotai/kimi-k2.6` — return 0 fixes despite VLM CHANGE list (emits prose-only, not structured JSON). LLM latency 40-100s also disqualifies them.
 - `qwen/qwen3-coder` — generates plausible-looking fixes that over-correct the whole page (diff 4.1% → 46.7%); apply-and-rollback catches it but the loop never recovers.
 
+## Measuring Gate / Rule Execution Cost
+
+```bash
+# One run, per-phase split (parse / run / findings / rules / format / ledger)
+vlmkit check integrity page.html --timing
+
+# Every gate that works from a bare page (18 of 26), ranked by cost, with yield
+vlmkit bench gates fixtures/css-challenge/page.html --repeat 3
+
+# Full corpus + the "does turning rules off save time" probe, as markdown
+vlmkit bench gates fixtures/css-challenge/{page,dashboard,form-app}.html \
+  --repeat 3 --probe-suppression --md --out docs/reports/YYYY-MM-DD-gate-bench.md
+```
+
+**Per-rule cost is attributed, not isolated, and that is structural.** A gate does
+one measurement (`run`) and every rule it declares reads that same report, so
+`run` is ~100% of wall clock and the projection is under a millisecond across all
+18 gates. Consequences worth remembering before optimizing anything:
+
+- `--rule x=off` does **not** speed up a run (settings apply after the
+  measurement). Measured at +0.4% — noise.
+- The cost unit is the **gate**. Spend less by dropping a gate or narrowing its
+  inputs (fewer viewports, no `--sweep`, shorter `--observe`).
+- Four gates are ~60% of a full sweep: `check interactions`, `stress media`,
+  `check perf`, `check integrity`. `check interactions` varies 5x by page.
+
+Baseline: `docs/reports/2026-08-06-gate-rule-cost-bench.md`.
+
 ## Running CSS Challenge Benchmarks
 
 ### Cross-fixture Matrix
@@ -204,6 +232,9 @@ This repository is a pnpm workspace.
 | Path | Contents |
 |------|----------|
 | `packages/vlmkit-core/` | Image / CSS / DOM / a11y diff engine + shared types and CLI helpers. No Playwright or AI deps required to import core types. |
+| `packages/vlmkit-core/src/plugin/` | **Gate plugin runtime**: the contract (`defineGate` / `definePlugin`), rule tables and settings, the registry, and the core runner that owns `--help` / `--json` / `--advisory` / the run ledger / the exit code. Core never imports a gate — definitions are handed to it. |
+| `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 24 of the 26 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
+| `packages/vlmkit-capture/src/gates/`, `src/gates/` | The other two built-in plugins: `check crater` (capture) and `check perf` (app-side). Composed by `src/cli/gate-registry.ts` alongside any `vlmkit.config.json` `"plugins"`. |
 | `packages/vlmkit-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
 | `packages/vlmkit-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
 | `packages/vlmkit-markup/` | VLM-driven markup tooling: component extract / from-image, design tokens, theme parity, i18n stress, palette, dep-graph, selector-heal, smoke-runner. |
@@ -218,7 +249,11 @@ Cross-package imports use `@mizchi/vrt-<pkg>/<path>.ts` or the curated barrel `@
 
 Run tests for a single package: `pnpm --filter @mizchi/vlmkit-core test`. From repo root, `pnpm test` runs all.
 
-The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need the `moon` CLI. If tests fail with `spawnSync moon ENOENT`, add it to PATH first (it is often installed but not on PATH in sandboxes): `export PATH="$HOME/.moon/bin:$PATH"`.
+The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need the `moon` CLI. If tests fail with `spawnSync moon ENOENT`, add it to PATH first (it is often installed but not on PATH in sandboxes): `export PATH="$HOME/.moon/bin:$PATH"`. If it is not installed at all: `curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash`. Without it ~138 tests fail on the toolchain rather than on anything real, so install it before trusting a red suite.
+
+**After editing anything under `.claude/skills/`, run `pnpm sync:skills`.** The content lives there once and is copied into two installer packages (`skills/vlmkit/workflows/`, `.apm/skills/vlmkit/`); `tests/skill-package.test.mjs` fails if the three drift, and hand-editing a copy is the wrong repair.
+
+**Commands invoked from `.github/workflows/` are checked by `tests/workflow-commands.test.mjs`.** Renaming or removing a CLI verb fails that test rather than a 15-minute browser job — or, worse, than nothing at all when the workflow step ends in `|| true`.
 
 ## Documentation Structure
 
@@ -229,6 +264,9 @@ The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need t
 | `docs/configuration.md` | Setup detail moved out of README (install, MCP/skill, env vars, snapshot/CI config, APM skills catalog) |
 | `docs/knowledge.md` | Accumulated experiment findings (detection rates, VLM comparisons, fix patterns, etc.) |
 | `docs/api-design.md` | CLI / library API design |
+| `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
+| `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 26 gates + 115 rules, behavior changes, what is deliberately not a gate |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |
 | `docs/reports/` | Individual experiment reports (dated) |

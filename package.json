@@ -48,6 +48,7 @@
     "build:packages": "pnpm --filter './packages/**' --filter '!@mizchi/vlmkit-mcp' --recursive run build",
     "prepack": "pnpm build",
     "pretest": "pnpm build:packages",
+    "sync:skills": "node scripts/sync-skill-package.mjs",
     "smoke:dist": "pnpm build && bash scripts/smoke-dist.sh",
     "smoke:dist:strict": "pnpm build && bash scripts/smoke-dist.sh --strict",
     "smoke:pack:markup-loop": "node scripts/smoke-packed-markup-loop.mjs",

@@ -14,8 +14,12 @@ the loop: run → read kickback → fix the reported thing → re-run.
 
 Prereqs: Node 24+, Playwright Chromium. If `vlmkit` is not installed:
 `npm i -D @mizchi/vlmkit`, then use `npx vlmkit …`. Sources are file
-paths or URLs. All commands support `--json` and most support
-`--fail-on-suspect` (non-zero exit) for scripting.
+paths or URLs. Every gate supports `--json` (one envelope shape:
+`{gate, command, verdict, counts, findings, report}`), exits 1 on a
+suspect, takes `--advisory` to print and exit 0, and takes
+`--rule <gateId>/<ruleId>=off|warn|suspect` to re-tune one rule
+(`--rules` lists them). `--fail-on-suspect` is accepted and does
+nothing — failing on a suspect is the default.
 
 ## Route by task
 
@@ -33,7 +37,7 @@ paths or URLs. All commands support `--json` and most support
 
 | Question | Gate |
 |---|---|
-| Responsive boundaries exact, no overflow at any width | `vlmkit check breakpoints page.html --sweep --fail-on-suspect` |
+| Responsive boundaries exact, no overflow at any width | `vlmkit check breakpoints page.html --sweep` |
 | Scroll containers / page overflow-x inventory | `vlmkit scan scroll page.html` |
 | Sticky/fixed/snap actually behave | `vlmkit check scroll page.html` |
 | Animations visibly run, settle, respect reduced-motion | `vlmkit check animation page.html` |

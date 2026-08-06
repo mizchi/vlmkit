@@ -41,7 +41,7 @@ import {
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 
 export interface MultiPageConsistencyOptions {
   /** CSS selector identifying the shared component on every page. */
@@ -89,28 +89,6 @@ export interface MultiPageConsistencyReport {
   reportPath: string;
 }
 
-function parseArgs(argv: string[]) {
-  const urls: string[] = [];
-  const files: string[] = [];
-  let selector = "";
-  let outputDir = "";
-  let report = "";
-  let threshold = 0.03;
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--selector") selector = argv[++i];
-    else if (a === "--output-dir") outputDir = argv[++i];
-    else if (a === "--report") report = argv[++i];
-    else if (a === "--threshold") threshold = parseFloat(argv[++i] ?? "0.03");
-    else if (a === "--urls") {
-      while (i + 1 < argv.length && !argv[i + 1].startsWith("--")) urls.push(argv[++i]);
-    } else if (a === "--files") {
-      while (i + 1 < argv.length && !argv[i + 1].startsWith("--")) files.push(argv[++i]);
-    }
-  }
-  return { selector, urls, files, outputDir, report, threshold };
-}
-
 async function captureElement(
   page: Page,
   selector: string,
@@ -129,12 +107,12 @@ export async function runMultiPageConsistency(
   options: MultiPageConsistencyOptions,
 ): Promise<MultiPageConsistencyReport> {
   if (!options.selector) {
-    throw new Error("--selector is required");
+    throw new UsageError("--selector is required");
   }
   const urls = options.urls ?? [];
   const files = (options.files ?? []).map((f) => resolve(f));
   if (urls.length + files.length < 2) {
-    throw new Error("at least two --urls or --files are required");
+    throw new UsageError("at least two --urls or --files are required");
   }
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
@@ -170,7 +148,7 @@ export async function runMultiPageConsistency(
   }
 
   if (pages.length === 0 || !pages[0]!.matched) {
-    throw new Error(`Selector \`${options.selector}\` did not match on the reference page (${pages[0]?.label ?? "<none>"})`);
+    throw new UsageError(`Selector \`${options.selector}\` did not match on the reference page (${pages[0]?.label ?? "<none>"})`);
   }
 
   const reference = pages[0]!;
@@ -256,19 +234,29 @@ export async function runMultiPageConsistency(
   await writeFile(reportPath, md);
 
   // Console summary.
-  console.log(`  ${BOLD}${CYAN}vlmkit check drift pages${RESET}`);
-  console.log(`  ${DIM}selector: ${options.selector}${RESET}`);
-  console.log(`  ${DIM}reference: ${reference.label}${RESET}`);
-  for (const d of deltas) {
+
+  return { selector: options.selector, pages, reference: reference.label, deltas, reportPath };
+}
+
+/**
+ * Terminal summary, extracted from the measurement function. A gate's `run`
+ * must not print — the core runner owns output and decides between prose and
+ * `--json`.
+ */
+export function formatMultiPageConsistencyReport(report: MultiPageConsistencyReport): string {
+  const lines: string[] = [];
+  lines.push(`  ${BOLD}${CYAN}vlmkit check drift pages${RESET}`);
+  lines.push(`  ${DIM}selector: ${report.selector}${RESET}`);
+  lines.push(`  ${DIM}reference: ${report.reference}${RESET}`);
+  for (const d of report.deltas) {
     const pct = Number.isNaN(d.diffRatio) ? "n/a" : (d.diffRatio * 100).toFixed(2) + "%";
     const icon = Number.isNaN(d.diffRatio)
       ? `${YELLOW}!${RESET}`
       : d.diffRatio === 0 ? `${GREEN}✓${RESET}` : d.diffRatio < 0.01 ? `${YELLOW}~${RESET}` : `${RED}✗${RESET}`;
-    console.log(`  ${icon} ${d.candidate.padEnd(40)} ${pct}`);
+    lines.push(`  ${icon} ${d.candidate.padEnd(40)} ${pct}`);
   }
-  console.log(`  ${DIM}report: ${reportPath}${RESET}`);
-
-  return { selector: options.selector, pages, reference: reference.label, deltas, reportPath };
+  lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
+  return lines.join("\n");
 }
 
 function renderReport(selector: string, reference: PageEntry, pages: PageEntry[], deltas: PageDelta[]): string {
@@ -315,29 +303,9 @@ function renderReport(selector: string, reference: PageEntry, pages: PageEntry[]
   return lines.join("\n");
 }
 
-async function main(argv = process.argv.slice(2)) {
-  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
-  const { selector, urls, files, outputDir, report, threshold } = parseArgs(argv);
-  if (!selector || (urls.length === 0 && files.length === 0)) {
-    console.log("Usage: vlmkit check drift pages --selector <sel> --urls URL1 URL2 ...");
-    console.log("       vlmkit check drift pages --selector <sel> --files A.html B.html ...");
-    console.log("Options:");
-    console.log("  --output-dir <dir>       Output directory (default: ./test-results/consistency)");
-    console.log("  --report <path>          Markdown report path");
-    console.log("  --threshold <0..1>       Pixel diff threshold (default: 0.03)");
-    process.exit(1);
-  }
-  await runMultiPageConsistency({
-    selector,
-    urls: urls.length > 0 ? urls : undefined,
-    files: files.length > 0 ? files : undefined,
-    outputDir: outputDir || join(process.cwd(), "test-results", "consistency"),
-    reportPath: report || undefined,
-    threshold,
-  });
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "multi-page-consistency" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `check drift pages` is declared in `../gates/drift.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */

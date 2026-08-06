@@ -7,6 +7,16 @@ import { test } from "node:test";
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const skillsPackage = join(repoRoot, "skills/vlmkit");
 const apmPackage = join(repoRoot, ".apm/skills/vlmkit");
+
+/**
+ * The skill content lives once in `.claude/skills/` and is copied into two
+ * installer packages. `scripts/sync-skill-package.mjs` does the copying, so a
+ * failure here is always "you edited the source and did not re-sync" — but the
+ * assertion used to report it as a 10 KB buffer diff with no hint of the fix.
+ * Editing one of the three copies by hand and re-running is the wrong repair,
+ * and a byte-diff invites exactly that.
+ */
+const FIX = "run `pnpm sync:skills`";
 const workflows = [
   "agent-validation-loop",
   "auto-markup",
@@ -49,12 +59,12 @@ test("the repository exposes one lightweight public vlmkit skill", async () => {
     const sourceRoot = join(repoRoot, ".claude/skills", workflow);
     const bundledRoot = join(skillsPackage, "workflows", workflow);
     const sourceFiles = (await listFiles(sourceRoot)).filter((file) => file !== "README.md");
-    assert.deepEqual(await listFiles(bundledRoot), sourceFiles, `${workflow} bundle is stale`);
+    assert.deepEqual(await listFiles(bundledRoot), sourceFiles, `${workflow} bundle is stale — ${FIX}`);
     for (const file of sourceFiles) {
       assert.deepEqual(
         await readFile(join(bundledRoot, file)),
         await readFile(join(sourceRoot, file)),
-        `${workflow}/${file} bundle is stale`,
+        `${workflow}/${file} bundle is stale — ${FIX}`,
       );
     }
   }
@@ -63,7 +73,7 @@ test("the repository exposes one lightweight public vlmkit skill", async () => {
 test("the APM package is an exact, bounded mirror of the skills CLI package", async () => {
   const skillsFiles = await listFiles(skillsPackage);
   const apmFiles = await listFiles(apmPackage);
-  assert.deepEqual(apmFiles, skillsFiles);
+  assert.deepEqual(apmFiles, skillsFiles, `installer file lists differ — ${FIX}`);
 
   let bytes = 0;
   for (const file of skillsFiles) {
@@ -71,7 +81,7 @@ test("the APM package is an exact, bounded mirror of the skills CLI package", as
       readFile(join(skillsPackage, file)),
       readFile(join(apmPackage, file)),
     ]);
-    assert.deepEqual(apmContent, skillsContent, `${file} differs between installers`);
+    assert.deepEqual(apmContent, skillsContent, `${file} differs between installers — ${FIX}`);
     bytes += (await stat(join(apmPackage, file))).size;
   }
   assert.ok(bytes < 512 * 1024, `APM skill package is unexpectedly large: ${bytes} bytes`);

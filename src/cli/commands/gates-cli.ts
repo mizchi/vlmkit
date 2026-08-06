@@ -18,7 +18,7 @@ import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { UsageError, handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { hasFlag, readAll, readFlag, readInt } from "@mizchi/vlmkit-core/arg-reader.ts";
 import {
   GATE_CONFIG_FILENAMES,
@@ -50,12 +50,12 @@ export function findGateConfig(cwd = process.cwd()): string | null {
 async function loadConfig(explicit?: string): Promise<{ path: string; config: GateConfig }> {
   const path = explicit ? resolve(explicit) : findGateConfig();
   if (!path) {
-    throw new Error(
+    throw new UsageError(
       `No gate config found (looked for ${GATE_CONFIG_FILENAMES.join(", ")}).`
       + ` Create one with: vlmkit gates init --pages "routes/**/*.html"`,
     );
   }
-  if (!existsSync(path)) throw new Error(`Gate config not found: ${path}`);
+  if (!existsSync(path)) throw new UsageError(`Gate config not found: ${path}`);
   return { path, config: parseGateConfig(await readFile(path, "utf-8")) };
 }
 
@@ -78,7 +78,7 @@ export async function expandPlanSources(plan: GatePlan): Promise<GatePlan> {
   for (const job of plan.jobs) {
     const files = expansions.get(job.source)!;
     if (files.length === 0) {
-      throw new Error(
+      throw new UsageError(
         `Page "${job.pageId}": source matched no files: ${job.source}`
         + ` — fix the pattern or remove the entry rather than letting the gate run on nothing.`,
       );
@@ -186,12 +186,65 @@ export function formatExpiredNotice(expired: ResolvedSuppression[]): string {
   return lines.join("\n");
 }
 
+/**
+ * Check the config's gate commands and rule references against the registry.
+ *
+ * This is the payoff for having a catalog at all. `check integrit page.html`
+ * used to parse cleanly and then fail as a child process exiting non-zero,
+ * which reads like a page defect; `"rules": { "text-colision": "off" }` used
+ * to be impossible to state and, once possible, easy to misspell into a line
+ * that silences nothing. Both now fail before a browser starts.
+ *
+ * An unresolvable command inside a gate group is now a hard error, not a
+ * warning. While gates were still migrating it had to be a warning — the
+ * registry did not know every gate, so rejecting an unknown string would have
+ * rejected working configs. Every gate is registered now, so within the groups
+ * the registry owns (`check`, `scan`, `stress`, `verify`) an unresolved command
+ * cannot be anything but a mistake, and reporting it as a warning would leave
+ * the run to fail later as a child process exiting non-zero — the failure mode
+ * this whole check exists to remove.
+ *
+ * Groups the registry does not own stay unvalidated: `diff`, `build`,
+ * `contract` and friends are artifact producers, not gates, and a config may
+ * legitimately list one.
+ */
+async function validateAgainstRegistry(plan: GatePlan, configPath: string): Promise<void> {
+  const { loadGateRegistry } = await import("../gate-registry.ts");
+  const { validateGateCommands, validateRuleSettings } = await import("@mizchi/vlmkit-core/plugin/registry.ts");
+  const registry = await loadGateRegistry();
+
+  const ruleProblems: string[] = [];
+  for (const job of plan.jobs) {
+    if (Object.keys(job.rules).length === 0) continue;
+    const gate = registry.resolve(job.baseGate.split(/\s+/).filter(Boolean))?.gate;
+    ruleProblems.push(
+      ...validateRuleSettings(registry, job.rules, gate).map((p) => `${job.pageId} / ${job.baseGate}: ${p}`),
+    );
+  }
+  if (ruleProblems.length > 0) {
+    throw new UsageError(
+      `${configPath}: invalid rule setting(s):\n${[...new Set(ruleProblems)].map((p) => `  - ${p}`).join("\n")}`,
+    );
+  }
+
+  const gateGroups = registry.groups();
+  const unresolved = validateGateCommands(registry, [...new Set(plan.jobs.map((j) => j.baseGate))])
+    .filter(({ command }) => gateGroups.has(command.trim().split(/\s+/)[0] ?? ""));
+  if (unresolved.length > 0) {
+    throw new UsageError(
+      `${configPath}: ${unresolved.length} unknown gate command(s):\n`
+      + unresolved.map((p) => `  - ${p.message}`).join("\n")
+      + `\n\nRun \`vlmkit rules\` for the full list.`,
+    );
+  }
+}
+
 const STARTER_GATE = "check integrity";
 
 async function initConfig(args: string[]): Promise<void> {
   const path = resolve(readFlag(args, "path") ?? GATE_CONFIG_FILENAMES[0]!);
   if (existsSync(path) && !hasFlag(args, "force")) {
-    throw new Error(`${path} already exists (pass --force to overwrite)`);
+    throw new UsageError(`${path} already exists (pass --force to overwrite)`);
   }
   const patterns = readAll(args, "pages");
   const gates = readAll(args, "gate");
@@ -248,6 +301,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   const { path, config } = await loadConfig(readFlag(args, "config"));
   const only = readAll(args, "only");
   const declared = resolveGatePlan(config, only.length > 0 ? { only } : {});
+  await validateAgainstRegistry(declared, path);
   // `suppressions` is an inventory of the config, so it must not depend on the
   // filesystem: a broken glob should not hide what has been silenced.
   const plan = sub === "suppressions" ? declared : await expandPlanSources(declared);
@@ -286,7 +340,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   const output = readFlag(args, "output");
   const sharded = shardPlan(plan, shard);
   if (sharded.jobs.length === 0) {
-    throw new Error(
+    throw new UsageError(
       `No gate runs selected`
       + (only.length > 0 ? ` by --only ${only.join(", ")}` : "")
       + (shard ? ` in shard ${shard.index}/${shard.total}` : ""),

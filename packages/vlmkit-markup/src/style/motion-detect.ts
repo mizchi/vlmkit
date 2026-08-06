@@ -16,10 +16,8 @@
  *   vlmkit check motion <html-or-url> --json
  */
 import { resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 export interface MotionComputedSample {
@@ -280,59 +278,9 @@ export function formatMotionDetectionReport(report: MotionDetectionReport): stri
   return lines.join("\n");
 }
 
-function printUsage(exitCode: number): never {
-  console.log("Usage: vlmkit check motion <html-or-url> [options]");
-  console.log("Options:");
-  console.log("  --json              Print JSON report");
-  console.log("  --max-samples <n>   Max motion elements to sample (default: 100)");
-  console.log("  --fail-on-suspect   Exit non-zero when suspect issues are found");
-  process.exit(exitCode);
-}
-
-function parseArgs(argv: string[]) {
-  let json = false;
-  let failOnSuspect = false;
-  let maxSamples = 100;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (arg === "--help" || arg === "-h" || arg === "help") printUsage(0);
-    else if (arg === "--json") json = true;
-    else if (arg === "--fail-on-suspect") failOnSuspect = true;
-    else if (arg === "--max-samples") maxSamples = Number.parseInt(argv[++i] ?? "100", 10);
-    else positional.push(arg);
-  }
-  if (positional.length === 0) printUsage(1);
-  return { source: positional[0]!, json, failOnSuspect, maxSamples };
-}
-
-async function main(argv = process.argv.slice(2)): Promise<void> {
-  const parsed = parseArgs(argv);
-  const report = await runMotionDetection({
-    source: parsed.source,
-    maxSamples: parsed.maxSamples,
-  });
-  appendRunLedger({
-    tool: "check-motion",
-    source: parsed.source,
-    headline: {
-      activeAnimations: report.activeAnimationCount,
-      running: report.runningAnimationCount,
-      issues: report.issues.length,
-    },
-  });
-  if (parsed.json) {
-    console.log(JSON.stringify(report, null, 2));
-  } else {
-    console.log(formatMotionDetectionReport(report));
-  }
-  if (parsed.failOnSuspect && report.issues.some((issue) => issue.severity === "suspect")) {
-    process.exit(1);
-  }
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "motion-detect" ||
-  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `check motion` is declared in `../gates/motion.gate.ts` and driven by the core
+ * runner (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument
+ * parsing, `--json`, `--advisory`, the run ledger and the exit code.
+ */

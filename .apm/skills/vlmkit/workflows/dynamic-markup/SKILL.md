@@ -98,8 +98,9 @@ Proves the scroll requirements are real:
   (`--viewport 375x740`).
 - `clipped-content` catches `overflow: hidden` swallowing rows you
   meant to make scrollable.
-- `--json` emits `expectedScrollports` entries — paste into the UI
-  Contract if the project keeps one.
+- `--json` emits `expectedScrollports` under `.report` (every gate's JSON
+  is `{verdict, counts, findings, report}`) — paste into the UI Contract
+  if the project keeps one.
 
 ### B3. `check animation attempt.html`
 

@@ -51,10 +51,37 @@ function kindTag(c: PageComponent): string {
   const label = kindLabel(c.kind);
   return label ? `${label} ` : "";
 }
-import { runBreakpointCheck } from "../stress/breakpoint-check.ts";
-import { runScrollScan } from "../inspect/scroll-scan.ts";
-import { runAnimationEval } from "../style/animation-eval.ts";
-import { runMotionDetection } from "../style/motion-detect.ts";
+import type { AnyGateDefinition } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { gateCommandString } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import type { RuleSettings } from "@mizchi/vlmkit-core/plugin/rules.ts";
+import { runGate } from "@mizchi/vlmkit-core/plugin/runner.ts";
+import { animationGate } from "../gates/animation.gate.ts";
+import { breakpointsGate } from "../gates/breakpoints.gate.ts";
+import { motionGate } from "../gates/motion.gate.ts";
+import { scrollScanGate } from "../gates/scroll-scan.gate.ts";
+
+/**
+ * The gates this verdict folds in, as gate definitions rather than as four
+ * hand-written calls.
+ *
+ * Before the plugin contract this was four `runX(...)` calls, four bespoke
+ * `push(...)` adapters that recounted suspects by string-matching severity, a
+ * `gate: "breakpoints" | "scroll" | "animation" | "motion"` union, and a
+ * `gate === "scroll" ? "scan scroll" : \`check ${gate}\`` special case to
+ * name the command in the kickback. All four facts were the same fact, stated
+ * four times and able to disagree.
+ *
+ * Importing the definitions creates no cycle: a `*.gate.ts` imports its
+ * measurement module, never this one. (`gates/index.ts` imports
+ * `verify.gate.ts` which imports this file — but nothing here imports
+ * `gates/index.ts`.)
+ */
+export const DEFAULT_VERIFY_GATES: readonly AnyGateDefinition[] = [
+  breakpointsGate,
+  scrollScanGate,
+  animationGate,
+  motionGate,
+];
 
 export interface TargetVerdict {
   target: string;
@@ -142,7 +169,14 @@ export function pixelPresence(
 }
 
 export interface GateVerdict {
-  gate: "breakpoints" | "scroll" | "animation" | "motion";
+  /**
+   * The gate's CLI command, e.g. `check breakpoints` / `scan scroll` — so the
+   * kickback can name a command the reader can paste without a special case
+   * per gate. Was a four-value union of bare leaf names.
+   */
+  gate: string;
+  /** Stable machine id, for a client that wants to look the gate up. */
+  gateId: string;
   suspects: number;
   warns: number;
   summary: string;
@@ -429,6 +463,14 @@ export interface MarkupVerifyOptions {
    * costs one extra page load per distinct target width.
    */
   fixContext?: boolean;
+  /**
+   * Gates to fold into the verdict. Defaults to `DEFAULT_VERIFY_GATES`.
+   * Overridable because "which gates does done mean" is a project decision,
+   * and it stopped being a hardcoded four the moment they became definitions.
+   */
+  gates?: readonly AnyGateDefinition[];
+  /** Rule settings handed to each folded-in gate, as the CLI would. */
+  rules?: RuleSettings;
 }
 
 export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<MarkupVerifyReport> {
@@ -575,26 +617,35 @@ export async function runMarkupVerify(options: MarkupVerifyOptions): Promise<Mar
     });
   }
 
+  // Each folded-in gate runs through the same core runner the CLI uses, so its
+  // suspect/warn counts come from the shared rule table rather than from a
+  // severity string compared by hand here — and a project's rule settings
+  // apply, which they previously did not.
+  //
+  // `--advisory` is not passed on: this is not those gates' exit code, it is
+  // one input to this gate's verdict. The runner returns the verdict
+  // regardless, so nothing is lost.
   const gates: GateVerdict[] = [];
-  const push = (gate: GateVerdict["gate"], issues: { severity: string; kind: string }[], summary: string) => {
+  for (const gate of options.gates ?? DEFAULT_VERIFY_GATES) {
+    const argv = [options.attempt, ...(gate.id === "check.animation" ? ["--viewport", `${widest}x720`] : [])];
+    const outcome = await runGate(gate, argv, { ...(options.rules ? { rules: options.rules } : {}), ledger: false });
     gates.push({
-      gate,
-      suspects: issues.filter((i) => i.severity === "suspect").length,
-      warns: issues.filter((i) => i.severity === "warn").length,
-      summary,
+      gate: gateCommandString(gate),
+      gateId: gate.id,
+      suspects: outcome.counts.suspect,
+      warns: outcome.counts.warn,
+      summary: gate.headline?.(outcome.report)
+        ?? `${outcome.counts.suspect} suspect, ${outcome.counts.warn} warn`,
     });
-  };
-  const bp = await runBreakpointCheck({ source: options.attempt });
-  push("breakpoints", bp.issues, `checked ${bp.checkedValues.join(", ") || "none"}px`);
-  const scroll = await runScrollScan({ source: options.attempt });
-  push("scroll", scroll.issues, `${scroll.containers.length} container(s), page overflow-x ${scroll.page.horizontalOverflow}px`);
-  const anim = await runAnimationEval({ source: options.attempt, viewport: { width: widest, height: 720 } });
-  push("animation", anim.issues, `${anim.animationCount} animation(s), settle ${anim.settleMs === null ? "never" : Math.round(anim.settleMs) + "ms"}, reduced-motion ${anim.reducedMotion ? (anim.reducedMotion.remainingCount === 0 ? "honored" : "IGNORED") : "n/a"}`);
-  const motion = await runMotionDetection({ source: options.attempt });
-  push("motion", motion.issues, `running ${motion.runningAnimationCount}, reduced-motion rule ${motion.hasReducedMotionRule ? "yes" : "no"}`);
+  }
 
   for (const g of gates) {
-    if (g.suspects > 0) kickback.push(`gate ${g.gate}: ${g.suspects} suspect issue(s) — run \`vlmkit ${g.gate === "scroll" ? "scan scroll" : `check ${g.gate}`}\` for detail and fix them.`);
+    if (g.suspects > 0) {
+      kickback.push(
+        `gate ${g.gate}: ${g.suspects} suspect issue(s) —`
+        + ` run \`vlmkit ${g.gate}\` for detail and fix them.`,
+      );
+    }
   }
 
   // Passing targets are an asset to protect: when only some targets fail,
@@ -678,53 +729,9 @@ export function formatMarkupVerifyReport(report: MarkupVerifyReport): string {
   return lines.join("\n");
 }
 
-function printUsage(exitCode: number): never {
-  console.log(`Usage: vlmkit verify markup <attempt.html> --target <png> [--target <png> ...] [options]
-
-One-shot done-condition verdict: composition per target viewport +
-dynamic gates + rest-pose pixel diff, with a paste-ready kickback
-listing every residual. Add --reference to print the calibration floor.
-
-Options:
-  --target <png>       Target screenshot (repeatable; width/height define the render viewport)
-  --reference <html>   Reference page measured against the same targets (calibration floor)
-  --no-fix-context     Skip selector attribution on kickback residuals (saves one page load)
-  --json               Print JSON report`);
-  process.exit(exitCode);
-}
-
-async function main(argv = process.argv.slice(2)): Promise<void> {
-  if (argv.includes("--help") || argv.includes("-h")) printUsage(0);
-  const targets: string[] = [];
-  let reference: string | undefined;
-  let json = false;
-  let fixContext = true;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === "--target") targets.push(argv[++i]!);
-    else if (arg === "--reference") reference = argv[++i]!;
-    else if (arg === "--json") json = true;
-    else if (arg === "--no-fix-context") fixContext = false;
-    else if (!arg.startsWith("-")) positional.push(arg);
-  }
-  const attempt = positional[0];
-  if (!attempt || targets.length === 0) printUsage(1);
-  if (!existsSync(attempt)) throw new Error(`Attempt not found: ${attempt}`);
-  for (const t of targets) if (!existsSync(t)) throw new Error(`Target not found: ${t}`);
-  if (reference && !existsSync(reference)) throw new Error(`Reference not found: ${reference}`);
-
-  const report = await runMarkupVerify({ attempt, targets, fixContext, ...(reference ? { reference } : {}) });
-  if (json) {
-    console.log(JSON.stringify(report, null, 2));
-  } else {
-    console.log(formatMarkupVerifyReport(report));
-  }
-  if (!report.done) process.exit(1);
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "markup-verify" ||
-  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `verify markup` is declared in `../gates/verify.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */

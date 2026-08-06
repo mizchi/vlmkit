@@ -5,6 +5,181 @@ Dates are YYYY-MM-DD.
 
 ## Unreleased
 
+The gates became a plugin architecture. A gate is now a declaration — id,
+command, rule table, inputs, and four functions — handed to one core runner
+that owns `--help`, `--json`, `--advisory`, the run ledger, the verdict and
+the exit code. Every one of the 26 gates goes through it, including the two
+that live outside `vlmkit-markup`, and a project can add its own gate with the
+same standing as a bundled one. See
+[`docs/design/gate-plugin-architecture.md`](docs/design/gate-plugin-architecture.md).
+
+The visible payoff is that the exit-code contract `gate-exit.ts` has documented
+all along is now true of every gate rather than of six of them, and that
+suppression works per *rule* instead of per whole gate.
+
+### Breaking
+
+- **Nine gates now fail on a suspect.** `check motion` and `check animation`
+  previously required `--fail-on-suspect`; `check a11y touch`, `check a11y
+  focus`, `check drift component`, `check drift pages`, `stress i18n`,
+  `stress media` and `scan scroll` had no exit logic at all. They follow the
+  documented contract now — a suspect exits 1, `--advisory` prints and exits 0,
+  `--fail-on-suspect` is an accepted no-op. `check theme` and `check tokens`
+  were migrated the same way but keep exiting 0, because their findings are
+  `warn` by default (the design doc explains that split).
+- **`check perf` no longer exits 2.** It used exit 2 for a
+  `needs-improvement` verdict and 1 for `poor`, under `--strict`. The shared
+  contract has two outcomes, so the third state moved into the findings:
+  `poor` is a suspect (exit 1) and `needs-improvement` is a warn (exit 0). A
+  script branching on exit code 2 should read `counts.warn` from `--json`.
+  `--strict` is an accepted no-op, since `poor` now fails by default.
+- **`--json` returns one envelope for every gate**:
+  `{ gate, command, verdict, counts, findings, suppressed, retuned, report }`.
+  A gate's previous JSON is `report`, verbatim — clients reading it need one
+  `.report` hop, and in exchange can gate on `verdict` / `counts` without
+  knowing which gate produced them. MCP tool results are unchanged.
+- **Gate measurement modules are no longer executable.** `node
+  path/to/a11y-contrast.ts` did something before and does nothing now; the
+  module is measurement code, and `vlmkit check a11y contrast` is the command.
+  Library imports (`runA11yContrast` and friends) are unaffected.
+- `vlmkit gates` now **fails** on a gate command that does not resolve inside
+  `check` / `scan` / `stress` / `verify`, with a did-you-mean. It previously
+  ran the command anyway and reported the child process exiting non-zero,
+  which read like a page defect rather than a typo.
+- `parseCraterSmokeArgs` no longer handles `--help` or returns `json`; the core
+  runner owns both.
+
+### Added
+
+- **`vlmkit rules`** lists every gate with its rule count and plugin;
+  **`vlmkit rules <gate>`** prints that gate's rules, default severities and
+  docs. 115 rules across 26 gates.
+- **`vlmkit bench gates`** — where a ruleset spends its time. Runs every gate that
+  works from a bare page (18 of the 26; the set is derived from each gate's
+  declared `inputs`, not from a list) and reports cost beside yield: median /
+  min / max, the measurement's share of the total, findings, rules fired out of
+  rules declared, and ms per finding. Plus an attributed per-rule table and the
+  list of rules that never fired. `--category`, `--repeat`, `--gate "<command>"`,
+  `--md` / `--json`, `--out`.
+
+  Per-rule cost is **attributed, not isolated**: a gate performs one measurement
+  and every rule reads that same report, so rules cannot be timed separately —
+  `run` is ~100% of a gate's wall clock and the projection across all 18 gates
+  totals under a millisecond. `--probe-suppression` measures the consequence
+  rather than asserting it: turning every rule off changes the runtime by 0.4%,
+  i.e. nothing, because settings apply to the findings after the measurement.
+  Baseline report: `docs/reports/2026-08-06-gate-rule-cost-bench.md`.
+- **`--timing`** on every gate splits a run into `parse` / `run` / `findings` /
+  `rules` / `format` / `ledger`. Opt-in even under `--json`, so the envelope stays
+  byte-stable for equal inputs; `GateOutcome.timing` is always populated for
+  in-process callers.
+- **Gate categories.** Every gate declares what *kind* of question it answers —
+  `correctness`, `behavior`, `design-system`, `verdict`, `infrastructure` — and
+  `vlmkit rules` groups by that rather than by CLI verb, because
+  `check`/`scan`/`stress` says how a command is spelled while a category says
+  what a failure means. Deliberately independent of which plugin a gate ships
+  in: a plugin is a unit of distribution, a category a unit of meaning.
+- **`vlmkit rules --json`** emits the whole catalog —
+  `{ categories, gates: [{ id, command, title, summary, category, plugin, rules }] }`
+  — so a job that wants "fail the build if a gate appears un-triaged" reads
+  structure instead of scraping the listing. `vlmkit rules <gate> --json` is the
+  same shape for one gate.
+- **[`docs/authoring-gates.md`](docs/authoring-gates.md)** — the user-facing
+  guide to adding your own metric: the contract field by field, choosing
+  severities and a category, reading budgets out of `vlmkit.config.json`,
+  measuring in a browser, testing, and publishing a plugin.
+- **`examples/gate-plugin/` is now a runnable project** with its own
+  `vlmkit.config.json`, two fixtures and two gates: `house-gates.ts` (the
+  smallest useful gate) and `dom-budget.gate.ts` (the shape a real house metric
+  takes — render, measure, compare against budgets that resolve flag > config >
+  default, with the source of each number reported). Both are covered by
+  `src/cli/plugin-e2e.test.ts` against the real CLI, so a broken example fails a
+  test rather than a reader's first attempt.
+- **Rule settings.** `--rule <gateId>/<ruleId>=off|suspect|warn|info` re-tunes
+  or disables one rule for a run; a `"rules"` block in `vlmkit.gates.json`
+  (at `defaults` scope or per page) persists it. References are validated
+  against the gate's declared rule table, so a misspelled rule is a config
+  error rather than a line that silences nothing — and suppressed findings are
+  reported *as suppressed* next to the verdict, so a gate that passes because
+  three rules were turned off says so.
+- **Custom gates.** `"plugins": ["./tools/house-gates.ts"]` in
+  `vlmkit.config.json` loads a module whose default export is
+  `definePlugin({ name, gates })`. A plugin gate is indistinguishable from a
+  bundled one: same help, same `--json`, same exit contract, same ledger entry,
+  same config validation. Worked example in `examples/gate-plugin/`.
+- Every gate accepts `--rule`, `--rules`, `--advisory` and `--json`, and writes
+  a `.vlmkit/run-ledger.jsonl` entry. Several had one or more of these missing.
+- `check integrity` accepts `--advisory`. `check integrity` and `check layout`
+  accept `--storage-state` uniformly. The MCP `check_integrity` tool exposes
+  `timeout` and `waitUntil`, which the gate always supported.
+- Terminal summaries for `check tokens`, `check theme`, `check perf`,
+  `check a11y *`, `check drift *`, `stress *` are now exported functions
+  (`formatDesignTokensReport` and siblings) instead of `console.log` blocks
+  inside the measurement. `TouchReport.required` and `PerfReport.observeMs`
+  are on their reports for the same reason.
+
+### Changed
+
+- `verify markup` runs the gates it folds into its verdict through the core
+  runner, so **a project's rule settings now affect that verdict** — they did
+  not before. Its `GateVerdict.gate` is the gate's command (`scan scroll`)
+  rather than a bare leaf name, plus a `gateId`, and the kickback names a
+  command that can be pasted. The folded-in set is overridable.
+- `vlmkit check --help` (and every group's help) is generated from the
+  registry, so a gate appears in it by existing.
+- `numeric flags reject a flag-shaped value` across all gates:
+  `--max-findings --json` was `NaN` before, which failed silently.
+- Configuration errors — bad `vlmkit.gates.json`, bad rule reference, a
+  `check drift` selector matching too few elements — print one line instead of
+  a stack trace.
+
+### Fixed
+
+- **`check integrity` and `check scroll` wrote two ledger rows per run.** Their
+  measurement functions still called `appendRunLedger` themselves after the
+  migration gave their gates a `ledger`, so every run double-counted — and for
+  `check scroll` both rows carried the same `tool` name, so no summary could tell
+  them apart. It also bypassed `VLMKIT_NO_LEDGER` and the runner's
+  `ledger: false`, which is how `verify markup` keeps its folded-in gates out of
+  the ledger. The runner is the only owner now; `check-integrity`'s entry keeps
+  the `fails` / `warns` split the removed row carried.
+- **Value-taking flags placed before the positional could steal the source.**
+  `vlmkit check equivalence --target t.png --region 0,0,10x10 attempt.html`
+  parsed `t.png` as the attempt and compared the target with itself, and
+  `vlmkit check copy --vlm <model> page.html` tried to open the model id as the
+  page. `firstPositional` only skips the flags it is told about, and the migration
+  from the hand-written parsers dropped `--target`, `--out` and `--vlm`. `--vlm`
+  is optionally-valued so it needs `withoutOptionalValue`, which follows
+  `vlmFlag`'s own rule — the two cannot disagree about which token is the model.
+- **Two CI jobs were running commands that no longer exist.** The `compare` job
+  invoked `vlmkit compare`, removed in 0.9.1 in favour of `vlmkit diff html`, so
+  it failed with "Unknown command" and uploaded an empty artifact — which reads
+  like a broken fixture rather than a stale workflow. The `smoke-test` job
+  invoked `vlmkit smoke` (now `vlmkit inspect smoke`) and, because that step ends
+  in `|| true`, reported success while running nothing. `tests/workflow-commands.test.mjs`
+  now resolves every `vlmkit` command the workflows invoke against the real
+  dispatcher, so a rename fails a five-second test instead of a fifteen-minute
+  browser job — or instead of nothing.
+- The `compare` job now installs the MoonBit toolchain. `diff html` classifies
+  diff regions through `markup-core`, which is loaded at runtime and is not
+  produced by the `:js` build, so the job would have died on
+  `spawnSync moon ENOENT` immediately after the command name was fixed.
+- The `vrt-compare` report artifact points at `diff-report.json`. 0.9.1 removed
+  the `migration-report.json` duplicate but the workflow still asked for it.
+- `vlmkit inspect smoke` with no target printed
+  `Usage: node src/smoke-runner.ts …` — a module path that has not been runnable
+  since the dispatcher took over. It prints the command now.
+- `pnpm sync:skills` exposes the skill-package sync that already existed as a
+  script, and the drift assertions in `tests/skill-package.test.mjs` name it.
+  The failure was a 10 KB buffer diff with no hint that a generator owns those
+  files, which invites hand-editing one of the three copies.
+- `check breakpoints` no longer calls `process.exit(1)`, which could truncate
+  its own buffered output.
+- A stale legacy dispatch entry for `check tokens` shadowed the gate; combined
+  with the module no longer being executable, the command silently did nothing.
+  `src/cli/gate-registry.test.ts` now asserts the composed registry so a
+  shadowed or dropped gate fails a test rather than a user's run.
+
 ## 0.9.1 — 2026-08-04
 
 This release makes vlmkit easier to adopt in existing frontend repositories:

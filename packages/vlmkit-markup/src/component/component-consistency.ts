@@ -30,7 +30,7 @@ import { extractPaletteFromFile } from "../style/palette-extract.ts";
 import { diffPalettes } from "../style/palette-diff.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 
 export interface ComponentConsistencyOptions {
   htmlPath: string;
@@ -69,29 +69,10 @@ export interface ComponentConsistencyReport {
   reportPath: string;
 }
 
-function parseArgs(argv: string[]) {
-  let selector = "";
-  let outputDir = "";
-  let report = "";
-  let threshold = 0.03;
-  let referenceIndex = 0;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--selector") selector = argv[++i];
-    else if (a === "--output-dir") outputDir = argv[++i];
-    else if (a === "--report") report = argv[++i];
-    else if (a === "--threshold") threshold = parseFloat(argv[++i] ?? "0.03");
-    else if (a === "--reference-index") referenceIndex = parseInt(argv[++i] ?? "0", 10);
-    else positional.push(a);
-  }
-  return { positional, selector, outputDir, report, threshold, referenceIndex };
-}
-
 export async function runComponentConsistency(
   options: ComponentConsistencyOptions,
 ): Promise<ComponentConsistencyReport> {
-  if (!options.selector) throw new Error("--selector is required");
+  if (!options.selector) throw new UsageError("--selector is required");
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
   const htmlPath = resolve(options.htmlPath);
@@ -111,7 +92,7 @@ export async function runComponentConsistency(
     const locator = page.locator(options.selector);
     const count = await locator.count();
     if (count === 0) {
-      throw new Error(`Selector \`${options.selector}\` matched zero elements on ${htmlPath}`);
+      throw new UsageError(`Selector \`${options.selector}\` matched zero elements on ${htmlPath}`);
     }
     for (let i = 0; i < count; i++) {
       const inst = locator.nth(i);
@@ -127,7 +108,7 @@ export async function runComponentConsistency(
   }
 
   if (instances.length < 2) {
-    throw new Error(`Selector matched ${instances.length} element(s); need at least 2 to check consistency.`);
+    throw new UsageError(`Selector matched ${instances.length} element(s); need at least 2 to check consistency.`);
   }
 
   const reference = instances[referenceIndex] ?? instances[0]!;
@@ -166,16 +147,6 @@ export async function runComponentConsistency(
   const md = renderReport(htmlPath, options.selector, instances, reference.index, deltas);
   await writeFile(reportPath, md);
 
-  console.log(`  ${BOLD}${CYAN}vlmkit check drift component${RESET}`);
-  console.log(`  ${DIM}html: ${htmlPath}  selector: ${options.selector}${RESET}`);
-  console.log(`  ${DIM}${instances.length} instance(s), reference = #${reference.index}${RESET}`);
-  for (const d of deltas) {
-    const pct = (d.diffRatio * 100).toFixed(2);
-    const icon = d.diffRatio === 0 ? `${GREEN}✓${RESET}` : d.diffRatio < 0.01 ? `${YELLOW}~${RESET}` : `${RED}✗${RESET}`;
-    const whDelta = `Δ ${d.bboxDeltas.width > 0 ? "+" : ""}${d.bboxDeltas.width} / ${d.bboxDeltas.height > 0 ? "+" : ""}${d.bboxDeltas.height}`;
-    console.log(`  ${icon} instance #${d.candidateIndex}  ${pct.padStart(6)}%  ${DIM}${whDelta}${RESET}`);
-  }
-  console.log(`  ${DIM}report: ${reportPath}${RESET}`);
 
   return {
     html: htmlPath,
@@ -186,6 +157,26 @@ export async function runComponentConsistency(
     deltas,
     reportPath,
   };
+}
+
+/**
+ * Terminal summary, extracted from the measurement function. A gate's `run`
+ * must not print — the core runner owns output and decides between prose and
+ * `--json`.
+ */
+export function formatComponentConsistencyReport(report: ComponentConsistencyReport): string {
+  const lines: string[] = [];
+  lines.push(`  ${BOLD}${CYAN}vlmkit check drift component${RESET}`);
+  lines.push(`  ${DIM}html: ${report.html}  selector: ${report.selector}${RESET}`);
+  lines.push(`  ${DIM}${report.instanceCount} instance(s), reference = #${report.referenceIndex}${RESET}`);
+  for (const d of report.deltas) {
+    const pct = (d.diffRatio * 100).toFixed(2);
+    const icon = d.diffRatio === 0 ? `${GREEN}✓${RESET}` : d.diffRatio < 0.01 ? `${YELLOW}~${RESET}` : `${RED}✗${RESET}`;
+    const whDelta = `Δ ${d.bboxDeltas.width > 0 ? "+" : ""}${d.bboxDeltas.width} / ${d.bboxDeltas.height > 0 ? "+" : ""}${d.bboxDeltas.height}`;
+    lines.push(`  ${icon} instance #${d.candidateIndex}  ${pct.padStart(6)}%  ${DIM}${whDelta}${RESET}`);
+  }
+  lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
+  return lines.join("\n");
 }
 
 function renderReport(
@@ -241,29 +232,9 @@ function renderReport(
   return lines.join("\n");
 }
 
-async function main(argv = process.argv.slice(2)) {
-  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
-  const { positional, selector, outputDir, report, threshold, referenceIndex } = parseArgs(argv);
-  if (positional.length === 0 || !selector) {
-    console.log("Usage: vlmkit check drift component <html> --selector <sel>");
-    console.log("Options:");
-    console.log("  --selector <sel>           CSS selector matching ≥ 2 instances of the component.");
-    console.log("  --reference-index <N>      Which match to use as the reference. Default 0.");
-    console.log("  --output-dir <dir>         Default: ./test-results/component-consistency");
-    console.log("  --threshold <0..1>         Pixel diff threshold. Default 0.03.");
-    process.exit(1);
-  }
-  await runComponentConsistency({
-    htmlPath: positional[0]!,
-    selector,
-    outputDir: outputDir || join(process.cwd(), "test-results", "component-consistency"),
-    reportPath: report || undefined,
-    threshold,
-    referenceIndex,
-  });
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "component-consistency" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `check drift component` is declared in `../gates/drift.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */

@@ -102,21 +102,6 @@ function dist(a: { r: number; g: number; b: number }, b: { r: number; g: number;
   return Math.sqrt(dr * dr + dg * dg + db * db);
 }
 
-function parseArgs(argv: string[]) {
-  let outputDir = "";
-  let report = "";
-  let threshold: number | undefined;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a === "--output-dir") outputDir = argv[++i];
-    else if (a === "--report") report = argv[++i];
-    else if (a === "--threshold") threshold = parseFloat(argv[++i] ?? "16");
-    else positional.push(a);
-  }
-  return { positional, outputDir, report, threshold };
-}
-
 export async function runThemeParity(
   options: ThemeParityOptions,
 ): Promise<ThemeParityReport> {
@@ -214,18 +199,6 @@ export async function runThemeParity(
     });
     await writeFile(reportPath, md);
 
-    console.log(`  ${BOLD}${CYAN}vlmkit check theme${RESET}`);
-    console.log(`  ${DIM}html: ${htmlPath}${RESET}`);
-    const pct = (themePixelDelta * 100).toFixed(1);
-    const themeIcon = themePixelDelta < 0.02 ? `${YELLOW}!${RESET}` : `${GREEN}✓${RESET}`;
-    console.log(`  ${themeIcon} theme pixel delta: ${pct}% (page ${themePixelDelta < 0.02 ? "barely" : "broadly"} responds to color scheme)`);
-    const unthemedIcon = unthemed.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
-    console.log(`  ${unthemedIcon} unthemed components: ${unthemed.length} of ${totalMatched}`);
-    for (const u of unthemed.slice(0, 5)) {
-      console.log(`    ${DIM}#${u.rank} ${u.bbox.left},${u.bbox.top} ${u.bbox.width}×${u.bbox.height} fill ${u.lightFill.hex} (Δ ${u.fillDelta.toFixed(1)})${RESET}`);
-    }
-    console.log(`  ${DIM}report: ${reportPath}${RESET}`);
-
     return {
       html: htmlPath,
       viewport,
@@ -239,6 +212,31 @@ export async function runThemeParity(
   } finally {
     await browser.close();
   }
+}
+
+/** Terminal summary, extracted from `runThemeParity` so `run` stops printing. */
+export const THEME_INERT_DELTA = 0.02;
+
+export function formatThemeParityReport(report: ThemeParityReport): string {
+  const lines: string[] = [];
+  lines.push(`  ${BOLD}${CYAN}vlmkit check theme${RESET}`);
+  lines.push(`  ${DIM}html: ${report.html}${RESET}`);
+  const pct = (report.themePixelDelta * 100).toFixed(1);
+  const inert = report.themePixelDelta < THEME_INERT_DELTA;
+  lines.push(
+    `  ${inert ? `${YELLOW}!${RESET}` : `${GREEN}\u2713${RESET}`} theme pixel delta: ${pct}%`
+    + ` (page ${inert ? "barely" : "broadly"} responds to color scheme)`,
+  );
+  const unthemedIcon = report.unthemed.length === 0 ? `${GREEN}\u2713${RESET}` : `${RED}\u2717${RESET}`;
+  lines.push(`  ${unthemedIcon} unthemed components: ${report.unthemed.length} of ${report.totalMatched}`);
+  for (const u of report.unthemed.slice(0, 5)) {
+    lines.push(
+      `    ${DIM}#${u.rank} ${u.bbox.left},${u.bbox.top} ${u.bbox.width}\u00d7${u.bbox.height}`
+      + ` fill ${u.lightFill.hex} (\u0394 ${u.fillDelta.toFixed(1)})${RESET}`,
+    );
+  }
+  lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
+  return lines.join("\n");
 }
 
 function renderReport(r: Omit<ThemeParityReport, "reportPath">): string {
@@ -299,26 +297,9 @@ function renderReport(r: Omit<ThemeParityReport, "reportPath">): string {
   return lines.join("\n");
 }
 
-async function main(argv = process.argv.slice(2)) {
-  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
-  const { positional, outputDir, report, threshold } = parseArgs(argv);
-  if (positional.length === 0) {
-    console.log("Usage: vlmkit check theme <html> [--output-dir dir]");
-    console.log("Options:");
-    console.log("  --output-dir <dir>   Default: ./test-results/theme-parity");
-    console.log("  --report <path>      Markdown report path");
-    console.log("  --threshold <N>      RGB Euclidean distance below which a fill is 'unchanged'. Default 16.");
-    process.exit(1);
-  }
-  await runThemeParity({
-    htmlPath: positional[0]!,
-    outputDir: outputDir || join(process.cwd(), "test-results", "theme-parity"),
-    reportPath: report || undefined,
-    unchangedColorThreshold: threshold,
-  });
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "theme-parity" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `check theme` is declared in `../gates/theme.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */

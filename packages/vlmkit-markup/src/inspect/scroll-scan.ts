@@ -24,11 +24,9 @@
  *   vlmkit scan scroll <html-or-url> --json
  */
 import { resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
-import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { UiExpectedScrollportContract } from "../contract/ui-contract.ts";
 
@@ -486,75 +484,9 @@ export function formatScrollScanReport(report: ScrollScanReport): string {
   return lines.join("\n");
 }
 
-function printUsage(exitCode: number): never {
-  console.log(`Usage: vlmkit scan scroll <html-or-url> [options]
-
-Annotation-free scroll inventory: every element that actually scrolls
-(selector, axis, overflow px, bbox), unintended page-level horizontal
-scroll with the sticking-out offenders, overflow:hidden cut-off
-suspects, declared-but-dead scrollports, and nested scrolling.
-
-Options:
-  --json                Print JSON report (includes expectedScrollports
-                        entries pasteable into a UI Contract)
-  --viewport <WxH>      Viewport (default: 1280x720)
-  --clip-threshold <n>  Hidden px below which clipping is ignored (default: 16)
-  --advisory            Print findings but exit 0 (default: a suspect exits 1)`);
-  process.exit(exitCode);
-}
-
-function parseArgs(argv: string[]) {
-  let json = false;
-  let failOnSuspect = false;
-  let advisory = false;
-  let clipThreshold: number | undefined;
-  let viewport: { width: number; height: number } | undefined;
-  const positional: string[] = [];
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === "--help" || arg === "-h" || arg === "help") printUsage(0);
-    else if (arg === "--json") json = true;
-    else if (arg === "--fail-on-suspect") failOnSuspect = true; // accepted no-op
-    else if (arg === "--advisory") advisory = true;
-    else if (arg === "--clip-threshold") clipThreshold = Number.parseInt(argv[++i] ?? "16", 10);
-    else if (arg === "--viewport") {
-      const m = (argv[++i] ?? "").match(/^(\d+)x(\d+)$/);
-      if (!m) printUsage(1);
-      viewport = { width: Number(m[1]), height: Number(m[2]) };
-    } else positional.push(arg);
-  }
-  if (positional.length === 0) printUsage(1);
-  return { source: positional[0]!, json, failOnSuspect, advisory, clipThreshold, viewport };
-}
-
-async function main(argv = process.argv.slice(2)): Promise<void> {
-  const parsed = parseArgs(argv);
-  const report = await runScrollScan({
-    source: parsed.source,
-    ...(parsed.clipThreshold !== undefined ? { clipThreshold: parsed.clipThreshold } : {}),
-    ...(parsed.viewport ? { viewport: parsed.viewport } : {}),
-  });
-  appendRunLedger({
-    tool: "scan-scroll",
-    source: parsed.source,
-    headline: {
-      containers: report.containers.length,
-      overflowX: report.page.horizontalOverflow,
-      issues: report.issues.length,
-    },
-  });
-  if (parsed.json) {
-    console.log(JSON.stringify(report, null, 2));
-  } else {
-    console.log(formatScrollScanReport(report));
-  }
-  if (!parsed.advisory && report.issues.some((issue) => issue.severity === "suspect")) {
-    process.exit(1);
-  }
-}
-
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "scroll-scan" ||
-  (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
-}
+/**
+ * CLI entry removed: this module is measurement code now, not a command.
+ * `scan scroll` is declared in `../gates/scroll-scan.gate.ts` and driven by the core runner
+ * (`@mizchi/vlmkit-core/plugin/runner.ts`), which owns argument parsing,
+ * `--json`, `--advisory`, the run ledger and the exit code.
+ */
