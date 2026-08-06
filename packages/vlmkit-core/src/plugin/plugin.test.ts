@@ -372,6 +372,31 @@ describe("runGate", () => {
     assert.match(outcome.text, /bad-thing x1/);
   });
 
+  it("rejects a --rule naming this gate and a rule it does not have", async () => {
+    // A typo that silences nothing is the exact failure mode rule settings
+    // exist to remove, so it fails the run rather than being ignored.
+    await assert.rejects(
+      () => runGate(fakeGate(), ["page.html", "--rule", "check.fake/bad-thng=off"], { ledger: false }),
+      /--rule check\.fake\/bad-thng: check\.fake has no rule "bad-thng"\. Known: bad-thing, odd-thing/,
+    );
+  });
+
+  it("accepts a --rule for another gate, and a bare rule id", async () => {
+    // `vlmkit gates` appends every `--rule` from `defaults.rules` to every job,
+    // so a gate legitimately receives references meant for its neighbours.
+    // Erroring on those would make a shared default impossible to express.
+    const other = await runGate(fakeGate(), ["page.html", "--rule", "check.other/whatever=off"], { ledger: false });
+    assert.equal(other.verdict, "pass");
+    const bare = await runGate(fakeGate(), ["page.html", "--strict", "--rule", "bad-thing=off"], { ledger: false });
+    assert.equal(bare.verdict, "pass");
+  });
+
+  it("accepts a gate-wide wildcard reference", async () => {
+    const outcome = await runGate(fakeGate(), ["page.html", "--strict", "--rule", "check.fake/*=off"], { ledger: false });
+    assert.equal(outcome.verdict, "pass");
+    assert.equal(outcome.rules.suppressed.length, 2);
+  });
+
   it("--rule beats a project setting for the same reference", async () => {
     const outcome = await runGate(fakeGate(), ["page.html", "--strict", "--rule", "check.fake/bad-thing=suspect"], {
       ledger: false,

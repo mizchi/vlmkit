@@ -161,6 +161,15 @@ Keys resolve most-specific-first: `<gateId>/<ruleId>` → bare `<ruleId>` (insid
 a gate-scoped block) → `<gateId>/*` → `<gateId>`. Specificity beats declaration
 order, so narrowing after a broad downgrade means the narrow line.
 
+A `--rule` that names a gate and a rule that gate does not have fails the run,
+with the known ids listed. A typo that silences nothing is the failure mode
+this layer exists to remove, so it cannot be silent. Only that exact shape is
+checked at run time: a key naming *another* gate, or a bare rule id, passes
+quietly, because `vlmkit gates` appends every `--rule` from `defaults.rules` to
+every job and a gate legitimately receives references meant for its
+neighbours. Registry-wide validation is `validateRuleSettings`'s job, where the
+whole catalog is in view.
+
 `resolveGatePlan` appends them to each job as `--rule <ref>=<setting>` flags, so
 a spawned gate needs no config access and `vlmkit gates list` shows the real
 command line. `--rule` on the command line wins over the config.
@@ -417,6 +426,15 @@ the JSON path and the fix.
   the argv distinction between a repeatable flag and a comma-joined list. A
   hand-written tool could get that backwards (`--target a,b` is one nonexistent
   file) and only fail on a real page.
+- `src/cli/plugin-e2e.test.ts` — spawns the real CLI against
+  `examples/gate-plugin/house-gates.ts` and asserts what a plugin author
+  actually cares about: the gate appears in `vlmkit rules` and in group help,
+  dispatches, gets the shared `--json` envelope and exit contract, honours
+  `--rule` (and rejects a misspelled one against its own table), writes a
+  ledger entry, and is validated by `vlmkit gates`. This was hand-verified
+  while building the feature, which is the kind of verification that stops
+  being true later — and it means a broken example fails a test rather than a
+  reader's first attempt.
 - `src/cli/json-contract.test.ts` — spawns the real CLI and asserts the
   `--json`/prose mutual exclusion, the envelope shape, the exit code, and that
   `--rule ...=off` takes a failing run green and says so. Moved here from

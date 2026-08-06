@@ -82,6 +82,30 @@ export function stripSharedFlags(argv: readonly string[]): string[] {
   return out;
 }
 
+/**
+ * A `--rule` that names THIS gate and a rule it does not have is a typo, and a
+ * typo that silences nothing is precisely the failure rule settings exist to
+ * remove — so it fails the run instead of being ignored.
+ *
+ * Only that exact shape is checked. A key naming another gate, or a bare rule
+ * id, must pass silently: `vlmkit gates` appends every `--rule` flag from
+ * `defaults.rules` to every job, so a gate legitimately receives references
+ * meant for its neighbours. Registry-wide validation of the config is
+ * `validateRuleSettings`'s job, where the whole catalog is in view.
+ */
+function assertKnownRuleOverrides(gate: AnyGateDefinition, overrides: RuleSettings): void {
+  const prefix = `${gate.id}/`;
+  for (const key of Object.keys(overrides)) {
+    if (!key.startsWith(prefix)) continue;
+    const ruleId = key.slice(prefix.length);
+    if (ruleId === "*" || gate.rules.some((rule) => rule.id === ruleId)) continue;
+    throw new UsageError(
+      `--rule ${key}: ${gate.id} has no rule "${ruleId}".`
+      + ` Known: ${gate.rules.map((rule) => rule.id).join(", ")}`,
+    );
+  }
+}
+
 export interface GateOutcome<Report = unknown> {
   gateId: string;
   command: string;
@@ -123,6 +147,7 @@ export async function runGate<Report, Options>(
   const report = await gate.run(parsed, ctx);
 
   const settings: RuleSettings = { ...options.rules, ...shared.ruleOverrides };
+  assertKnownRuleOverrides(gate, shared.ruleOverrides);
   const rules = applyRuleSettings(gate, gate.findings(report, parsed), settings);
   const counts = countFindings(rules.findings);
   const verdict = counts.suspect > 0 ? "fail" : "pass";

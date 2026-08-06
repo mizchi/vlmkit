@@ -123,7 +123,8 @@ Two consequences:
 - Verify deterministically that the panel actually scrolls:
   `vlmkit scan scroll attempt.html` inventories every real scroll
   container (axis + overflow px) with no annotations needed, and its
-  `--json` output includes ready `expectedScrollports` entries; it also
+  `--json` report includes ready `expectedScrollports` entries (under
+  `.report`, alongside the shared `verdict`/`counts` envelope); it also
   flags unintended page-level horizontal scroll and overflow:hidden
   cut-offs. (`vlmkit contract introspect` still works when the markup
   carries `data-scrollport` annotations.) A panel that merely *looks*
