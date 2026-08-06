@@ -70,20 +70,29 @@ downstream. Write the list of components explicitly before touching markup.
 - Appears more than once, **or** is something you expect to edit repeatedly. A
   once-used block you will never touch again does not earn a story.
 
-**Size matters, measurably.** The per-component loop's advantage comes from the
-component being small relative to the page, and it decays as the component grows:
+**Size matters, and it is measured** (65 trials, three page shapes, three
+regression classes — [the report](https://github.com/mizchi/vlmkit/blob/main/docs/reports/2026-08-06-component-vs-page-vrt-signal.md)):
 
-- A small component (button, badge, avatar) gets the full benefit — its image is a
-  rounding error against a page shot.
-- A **large** component (hero, wide data table) gets much less. Its own shot
-  approaches a page shot, so the saving shrinks toward the page arm's.
-- Worse, a *ratio* threshold gets coarse as area grows. A few hundred changed
-  pixels is over a percent on a 3.5k-pixel button and about a tenth of a percent
-  on a 250k-pixel hero — so the same default that catches a button regression can
-  **miss** a corner-radius change on a hero. Do not assume the default protects
-  large components. `build gallery` derives a per-story threshold from a pixel
-  budget for this reason; if you write thresholds by hand, do the same arithmetic
-  rather than reusing one number.
+- **Small components get the full benefit**: 267x fewer image tokens than a page
+  diff, 6/79 expected changes missed against the page diff's 15/79, and no false
+  positives.
+- **Large components get much less, and lose on precision.** 40x on cost — still
+  large — but the story arm missed **6 of 12** changes on a 1258x203 hero where
+  the page diff missed **0**. Splitting a large block into parts that render
+  standalone is therefore a *detection* decision, not a tidiness one.
+- Half of those misses are the threshold unit: a corner-radius change moves ~60
+  pixels, which is over 1.6% of a button and 0.02% of that hero, so the 0.5%
+  default catches one and not the other. `build gallery` derives a per-story
+  threshold from a pixel budget for exactly this; if you write thresholds by hand,
+  do the same arithmetic instead of reusing one number.
+- The other half no threshold can fix: a pale-palette shift moved 96% of the
+  hero's pixels by ≤8/255 per channel, which the pixel comparator scores as **0%
+  changed**. `diff html` catches it through its computed-style diff; `check story`
+  is a pixel instrument and has no equivalent.
+
+**So do not retire the page diff.** Per-component stories are the cheap,
+precise instrument for small components; a page-level `diff html` still covers
+large blocks and sub-perceptual style drift. Keep both in the done conditions.
 
 So prefer splitting a large block into its parts over keeping it whole, when the
 parts render standalone. Not for tidiness — for detection.
@@ -158,7 +167,12 @@ not make its neighbours report.
 - **Every component has a committed story baseline**, and
   `vlmkit check story <all> --gallery <url>` exits 0.
 - Behaviour verified where the task specified it (`dynamic-markup`'s gates).
-- Large components carry an explicit `--threshold`, not the default.
+- Large components carry a derived `--threshold`, not the gate default (`build
+  gallery` prints one per story).
+- **A page-level `vlmkit diff html` still runs.** Measured: story baselines miss
+  half the changes on a large component, and miss sub-perceptual style drift
+  entirely. Story VRT narrows what the page diff has to catch; it does not
+  replace it.
 
 ## What this skill does not solve
 

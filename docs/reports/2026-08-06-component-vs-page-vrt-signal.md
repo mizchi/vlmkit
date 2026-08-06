@@ -1,136 +1,206 @@
 # Component-scoped vs page-scoped VRT: signal cost and precision
 
 Date: 2026-08-06. Harness: `src/experiments/component-vrt/ab-run.ts`
-(`node --experimental-strip-types src/experiments/component-vrt/ab-run.ts --seeds 1,2,3,4,5,6`).
+(`node --experimental-strip-types src/experiments/component-vrt/ab-run.ts`).
+65 trials. Raw output: `test-results/component-vrt-ab/report.md`.
 
 ## The question
 
 When an agent repairs **one component**, is a component-scoped VRT signal
 (`vlmkit check story`) cheaper and more precise than diffing the whole page that
-component lives on?
+component lives on (`vlmkit diff html`)?
 
 ## Answer, in one line each
 
-- **Cheaper: yes, decisively.** 11.6x fewer signal bytes, **152.6x fewer image
-  tokens**.
-- **More precise at localizing: no — this was my hypothesis and it is refuted.**
-  Both arms named the mutated component in 6/6 seeds.
-- **Better at catching the blast radius: yes.** The page arm missed 2 of 9
-  expected changes; the component arm missed 0.
-- **Fewer retakes / fewer output tokens: not measured.** See the limits section —
-  this needs a repair agent in the loop, and no number is offered for it.
+- **Cheaper: yes, decisively, and it holds under every cut.** 9.5x fewer signal
+  bytes, **147.7x fewer image tokens** over 65 trials.
+- **More precise at localizing on small components: yes.** 6/79 expected changes
+  missed against the page arm's 15/79, and 0 false positives against 3.
+- **On large components it is the page arm that is more precise, decisively.**
+  The story arm missed **6 of 12**; the page arm missed **0**. This is the
+  headline finding, and it is the opposite of the pitch for component-scoped VRT.
+- **Those 6 misses have two different causes, not one**, and only one of them is
+  fixable by configuration. Verified case by case below.
+- **Fewer retakes / fewer output tokens: not measured.** This needs a repair agent
+  in the loop. No number is offered.
+
+The two arms are **complements, not substitutes**. That conclusion is forced by
+the failure analysis, not a diplomatic reading of it.
 
 ## Setup
 
-Six components (`Button`, `Badge`, `Avatar`, `Card`, `Alert`, `Toolbar`) defined
-once in `fixture/components.css` and `fixture/_markup.js`, rendered by **two
-hosts off the same files**: `page.html` composes them into a page,
-`gallery.html` mounts them as stories. Sharing the sources is the fairness
-condition — with a copy per host the two arms would be measuring two different
-regressions.
+Eight components — `Button`, `Badge`, `Avatar`, `Card`, `Alert`, `Toolbar`, plus
+the deliberately large `Hero` and `DataTable` — defined once in
+`fixture/components.css` and `fixture/_markup.js`, rendered by **two hosts off
+the same files**: the page files compose them into a page, `gallery.html` mounts
+them as stories. Sharing the sources is the fairness condition; with a copy per
+host the two arms would be measuring two different regressions.
 
-`Toolbar` deliberately renders an Avatar, a Badge and a Button, so the corpus
-contains a composite whose blast radius is larger than itself.
+`Toolbar` renders an Avatar, a Badge and a Button, so the corpus contains a
+composite whose blast radius is larger than itself.
 
-Six seeds, one per component, each deleting one layout-affecting declaration
-from that component's own rule block (so ground truth is unambiguous). Seed 1
-removes `.c-button { padding }`, seed 4 removes `.c-card { border }`, and so on.
+Three axes, crossed:
 
-**The page arm is given its strongest signal, not a convenient one.** It runs
-`vlmkit diff html`, whose computed-style diff localizes by selector — not merely
-the pixel path. That matters: measured on its own, the pixel path attributes a
-Button padding deletion to a 320x672 region on `.page`, the wrapper, because
-removing the padding reflows every section below it. Had I compared against
-*that*, the localization result would have been manufactured.
+| axis | values | what it guards against |
+|---|---|---|
+| page composition | `flat` (many small blocks), `hero` (one dominant block), `list` (long repeated rows) | a result that only holds for one page shape |
+| regression class | `delete` a declaration, change a `value`, change a `colour` | a result that only holds for layout-breaking changes |
+| component size | small (6) vs large (`Hero`, `DataTable`) | **the advantage being an artefact of picking small components** |
 
-## Measurements
+Every page renders every component, differing in instance count and height, so
+the size cut has real N on all three pages rather than only where a large
+component happened to appear.
 
-## Per seed
+**The page arm is given its strongest signal, not a convenient one.** `diff html`
+localizes by selector through its computed-style and authored-style diffs, not
+merely the pixel path. That matters: on its own, the pixel path attributes a
+Button padding deletion to a wrapper region on `.page`, because removing the
+padding reflows everything below it. Comparing against *that* would have
+manufactured the localization result.
 
-
-| seed | mutated component | removed | page bytes | story bytes | page img tokens | story img tokens |
-|---|---|---|--:|--:|--:|--:|
-| 1 | `Button` | `padding` | 129,513 | 7,925 | 3,714 | 28 |
-| 2 | `Badge` | `letter-spacing` | 25,367 | 7,850 | 3,714 | 28 |
-| 3 | `Avatar` | `height` | 105,860 | 7,662 | 3,714 | 26 |
-| 4 | `Card` | `border` | 96,843 | 5,942 | 3,714 | 34 |
-| 5 | `Alert` | `padding` | 63,839 | 5,948 | 3,714 | 13 |
-| 6 | `Toolbar` | `padding` | 52,608 | 5,562 | 3,714 | 17 |
-
-## Totals
+## Cost
 
 | metric | page-scoped | component-scoped | ratio |
 |---|--:|--:|--:|
-| signal bytes | 474,030 | 40,889 | **11.6x** |
-| image tokens (approx) | 22,284 | 146 | **152.6x** |
-| localized the right component | 6/6 | 6/6 | |
-| false positives (outside blast radius) | 0 | 0 | |
-| missed changes (inside blast radius) | 2 | 0 | |
+| signal bytes | 5,034,921 | 531,507 | **9.5x** |
+| image tokens (approx) | 400,788 | 2,713 | **147.7x** |
+| images an agent opens | 186 | 79 | 2.4x |
 
-## Localization detail
+Image tokens use Anthropic's documented `w*h/750` approximation on the PNG
+dimensions actually emitted.
 
-| seed | expected (blast radius) | page implicates | story implicates |
-|---|---|---|---|
-| 1 | `Button`, `Toolbar` | `Button` | `Button`, `Toolbar` |
-| 2 | `Badge`, `Toolbar` | `Badge` | `Badge`, `Toolbar` |
-| 3 | `Avatar`, `Toolbar` | `Avatar`, `Toolbar` | `Avatar`, `Toolbar` |
-| 4 | `Card` | `Card` | `Card` |
-| 5 | `Alert` | `Alert` | `Alert` |
-| 6 | `Toolbar` | `Toolbar` | `Toolbar` |
+Two effects compound. The obvious one is that a component's box is a fraction of
+a viewport. The larger one is **selectivity**: the component arm emits an image
+only for the stories that actually changed, so most components cost nothing to
+look at, while a page heatmap covers everything whether it changed or not. That
+is why the image count falls 2.4x but the token count falls 147.7x.
 
-Image tokens use Anthropic's documented `w*h/750` approximation, applied to the PNG dimensions actually emitted. Output tokens and retake counts are absent on purpose: both require a repair agent in the loop, and estimating them would be fabrication.
+### The cost advantage grows with the page, and shrinks with the component
 
+| slice | trials | bytes | image tokens |
+|---|--:|--:|--:|
+| page `flat` | 22 | 10.4x | 86.5x |
+| page `hero` | 22 | 9.2x | 169.0x |
+| page `list` | 21 | 8.8x | 241.8x |
+| class `delete` | 24 | 12.8x | 104.7x |
+| class `value` | 20 | 9.0x | 168.6x |
+| class `colour` | 21 | 5.7x | 248.0x |
+| **small components** | 53 | 8.7x | **266.8x** |
+| **large components** | 12 | 13.0x | **40.4x** |
 
-## Where the 152x comes from
+Both directions are mechanical rather than surprising, which is why they are
+worth stating: the page arm's cost scales with page area and the story arm's does
+not, so a taller page widens the gap (86x → 242x); and a story of a large
+component approaches a page shot, so the gap narrows (267x → 40x). **40x is still
+40x** — the advantage decays but does not disappear, which is what the
+anti-overfitting cut was there to test.
 
-Per seed, the page arm emits three heatmaps because it sweeps three viewports:
+## Precision
 
-| arm | images an agent opens | tokens (approx) |
-|---|---|--:|
-| page | 1280x900, 375x900, 1440x900 | 1536 + 450 + 1728 = **3714** |
-| component | 64x19 (Button), 326x58 (Toolbar) | 2 + 26 = **28** |
+| slice | missed (page vs story) | false positives (page vs story) |
+|---|--:|--:|
+| small components | 15/79 vs **6/79** | **3** vs 0 |
+| large components | **0/12** vs 6/12 | 0 vs 0 |
+| all | 15/91 vs 12/91 | 3 vs 0 |
 
-Two effects compound. The obvious one is that a component box is a fraction of a
-viewport. The less obvious and larger one is **selectivity**: the component arm
-only produces an image for the stories that actually changed, so five of six
-components cost nothing to look at. The page arm has no such option — a page
-heatmap covers everything whether it changed or not.
+On small components the story arm is better at the **blast radius** — "what else
+did I just break". The Toolbar renders a Button, so deleting the Button's padding
+really does change the Toolbar; the page arm's selector-level signal misses it
+because the Toolbar's *own* computed styles are unchanged and only its child
+moved, while the story arm re-renders and re-diffs the Toolbar as its own story.
 
-Signal bytes tell the same story with less drama: 25-130 KB per page-arm report
-against a steady 5.5-8 KB for the component arm. The page arm's variance is
-itself informative — its report grows with how much of the page reflowed, so the
-regressions that are hardest to localize are also the ones that cost the most to
-read.
+The aggregate row (15 vs 12) is nearly a tie and is the least informative number
+in this report — it averages two opposite effects. Read the two size rows, not
+the total.
 
-## What refuted my hypothesis
+## The 6 large-component misses, case by case
 
-I expected the component arm to localize better. It did not: **6/6 for both**.
-`diff html`'s computed-style diff names `.c-button`, `.c-badge` and so on
-reliably, because a deleted declaration changes that selector's computed styles
-whatever else reflows around it. The page arm is not blind, and the pitch for
-component-scoped VRT should not claim it is.
+All 6 are `Hero`, the largest component (1258x203 = 256,632px as a story). Each
+was re-run at a threshold of 1e-7 to recover the diff the default suppressed:
 
-Where the arms genuinely differ is the **blast radius**:
+| trial | mutation | changed pixels | ratio | default 0.005 | derived 0.0002 |
+|---|---|--:|--:|---|---|
+| `hero/value` | `border-radius` → 26px | 71 / 256,632 | 0.028% | missed | **caught** |
+| `list/value` | `border-radius` → 26px | 71 / 256,632 | 0.028% | missed | **caught** |
+| `list/delete` | `border-radius` deleted | 52 / 256,632 | 0.020% | missed | **caught** |
+| `flat/colour` | `background` gradient shift | 0 / 256,632 | 0.000% | missed | still missed |
+| `hero/colour` | `background` gradient shift | 0 / 256,632 | 0.000% | missed | still missed |
+| `list/colour` | `background` gradient shift | 0 / 256,632 | 0.000% | missed | still missed |
 
-| seed | expected to change | page arm reports | component arm reports |
-|---|---|---|---|
-| 1 | `Button`, `Toolbar` | `Button` | `Button`, `Toolbar` |
-| 2 | `Badge`, `Toolbar` | `Badge` | `Badge`, `Toolbar` |
+**Cause 1 (3 of 6): a ratio threshold is the wrong unit.** A corner-radius change
+moves 52-71 pixels. On an 88x36 button that would be over 1.6% and fail
+instantly; on a 256,632-pixel hero it is 0.02%, and `check story`'s 0.5% default
+lets it through. Nothing is wrong with the measurement — the threshold is
+expressed in a unit that coarsens as area grows.
 
-The Toolbar renders a Button, so deleting the Button's padding really does change
-the Toolbar. The page arm's selector-level signal misses it — the Toolbar's *own*
-computed styles are unchanged; only its child moved — while the component arm
-catches it, because it re-renders and re-diffs the Toolbar as its own story.
-Neither arm produced a false positive outside the blast radius.
+This is what `vlmkit build gallery` now derives per story: a **pixel budget**
+(default 24px) converted to a ratio for each component's actual area, clamped
+between a renderer-noise floor (0.0002) and the gate's own default, so it can
+only tighten a gate and never loosen one. At the floor value the three
+border-radius trials are caught, verified above. The margin is not large — 52
+pixels against a floor equivalent to 51 — so the floor, not the budget, is what
+saves the smallest of the three. A project that wants headroom on components this
+size should pass a smaller `--noise-pixels` and accept the flake risk knowingly.
 
-For a component-library change, that is the more useful property of the two: it
-answers "what else did I just break" rather than only "where did I break it".
+**Cause 2 (3 of 6): the pixel comparator's perceptual threshold, which no ratio
+can reach.** The gradient mutation is real —
+`linear-gradient(120deg, #eef3fd, #f7f9fc)` → `(120deg, #f6ecff, #fbf7ff)`, a
+blue tint to a purple one. Measured directly on the two PNGs:
 
-**This metric was wrong in my first run.** The harness scored `Toolbar` as a
-false positive for a Button mutation, which made the component arm look
-*imprecise* when it had in fact caught a real change the other arm missed —
-the exact inverse of the truth. `COMPOSES` in the harness now encodes the
-composition, and a test keeps it in step with what the fixture actually renders.
+- **246,914 of 256,632 pixels (96%) differ.**
+- **Maximum per-channel delta: 8/255. Mean: 5.7.**
+
+pixelmatch's perceptual threshold counts none of them as changed, so the diff
+ratio is exactly 0. There is no threshold setting that catches a 0% diff. The
+page arm catches all three because `diff html` reads **computed styles**, not
+only pixels, and a changed `background-image` declaration is visible there
+whatever the pixels do.
+
+That is an architectural limit of component-scoped VRT as it exists, not a
+tuning problem: `check story` is a pixel instrument and pale-palette drift is
+below pixel sensitivity. It is also the clearest argument in this report against
+treating `check story` as a replacement for `diff html`.
+
+## The 3 page-arm false positives, and why they may not be errors
+
+All three are the same shape: changing `Badge`'s `letter-spacing` makes the page
+arm implicate `Avatar`, which the harness's blast-radius definition
+(`{Badge, Toolbar}`) does not include.
+
+The Avatar sits next to the Badge inside the Toolbar, so widening the Badge's
+text really does move it. The page arm reports a component that **moved**; the
+story arm reports that the Avatar itself is **unchanged**, which it is — mounted
+standalone it cannot move. Both are correct about different questions, and which
+one you want depends on whether "did I break the Avatar" means its own rendering
+or its position on the page.
+
+Counted strictly against the declared ground truth these are false positives, and
+they are reported that way above rather than quietly reclassified. But a reader
+should not take "3 vs 0" as evidence that the page arm hallucinates.
+
+## Two earlier runs of this bench were void. Their numbers appear nowhere here
+
+Recorded because a benchmark's credibility depends on its failures being visible:
+
+1. **Seeder bug.** `applySeed` located declarations by whole-file `indexOf`, and
+   `body { background: #fff }` precedes `.c-card`, so a Card mutation repainted
+   the page background and produced 15 unearned false positives. Fixed with
+   block-scoped replacement plus a regression test.
+2. **Fairness bug.** `page-flat` did not render `Hero`, so the page arm was
+   scored as missing changes it could not observe. Fixed with a
+   comparability check; the fixture now renders every component on every page.
+3. **Insufficient N on the cut that mattered.** The large-component slice had 4
+   trials. It now has 12.
+4. **A broken environment scored as data.** In the fourth run both tools failed
+   for the last 19 of 65 trials, and each such trial recorded 0 bytes and a miss
+   for *both* arms — so the run produced a table that read as complete. The cause
+   was operator error: rebuilding `vlmkit-markup` (whose build wipes `dist`)
+   while the harness shelled out to a CLI that loads the gate registry from it.
+   The harness now aborts the run, writes no report, and names the cause; a trial
+   where the tool did not run is not a trial where the tool missed something.
+
+The numbers in this document come from a single clean run of 65 trials, 7 skipped
+and listed, 0 trials with a non-reporting arm.
 
 ## Limits, stated plainly
 
@@ -139,21 +209,27 @@ composition, and a test keeps it in step with what the fixture actually renders.
   this environment (`OPENROUTER_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`
   all unset), so the loop could not make a call. The harness produces exactly the
   inputs that arm would consume, so it can be added without changing anything
-  here.
-- **N = 6, one fixture, one machine.** Enough to establish direction and order of
-  magnitude, not a statistical claim. The seed classes are all single-declaration
-  deletions; value mutations and multi-property regressions are untested.
-- **The fixture page is ~1280x900.** Real application pages are commonly several
-  times taller, and the page arm's cost scales with page area while the component
-  arm's does not — so 152x is a floor for realistic pages, not a ceiling.
+  else.
+- **One fixture, one machine, one renderer.** Three page shapes and three
+  regression classes establish that the direction is not an artefact of a single
+  layout; they do not make it a statistical claim.
+- **The comparator is pixelmatch at its default sensitivity in both arms.** The
+  perceptual-threshold finding above is a property of that configuration. A
+  different comparator would move those three trials.
 - **Both arms are deterministic here.** No claim is made about how a model
   *behaves* given either signal; only about what each signal costs and contains.
-- The component arm requires a gallery. That setup cost is real and is not
-  amortized in these numbers.
+- **The story arm requires a gallery.** `vlmkit build gallery` reduces that setup
+  cost but does not remove it, and none of it is amortized into these numbers.
 
-## What would settle the unanswered half
+## What would settle the two open questions
 
-One controlled agent A/B, same shape as `2026-06-06-ab-external-synthesis.md`:
-fresh disposable agents, fixed round budget, same seeds, one arm given the page
-signal and one the story signal, scoring rounds-to-green and wrong-edit count.
-That measures retakes directly instead of inferring them from signal size.
+1. **Retakes.** One controlled agent A/B, same shape as
+   `2026-06-06-ab-external-synthesis.md`: fresh disposable agents, fixed round
+   budget, same seeds, one arm given the page signal and one the story signal,
+   scoring rounds-to-green and wrong-edit count.
+2. **The perceptual blind spot.** `check story` reports a diff ratio and nothing
+   about magnitude, so a uniform 8/255 shift across 96% of a component is
+   indistinguishable from no change at all. Reporting max/mean channel delta
+   beside the ratio would make that case legible without changing the verdict
+   logic — and would tell a reader which of the two failure causes they are
+   looking at.

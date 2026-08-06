@@ -26,6 +26,27 @@ story that did not change stays green when a shared stylesheet does.
 | Natural-language spec → browser test | `spec-to-playwright` |
 | Edited markup, no reference, want correctness gates | `markup-assist` |
 
+### Two cases where a story diff is the *weaker* instrument
+
+Measured over 65 trials
+([report](https://github.com/mizchi/vlmkit/blob/main/docs/reports/2026-08-06-component-vs-page-vrt-signal.md)).
+Both are about `check story` being a **pixel** instrument, while `diff html` also
+reads computed styles:
+
+1. **A large component with the default threshold.** On a 1258x203 hero, story
+   diffs missed 6 of 12 seeded changes where `diff html` missed 0. A corner-radius
+   change moves ~60 pixels — over 1.6% of a button, 0.02% of that hero, under the
+   0.5% default. Get a per-story threshold from
+   `vlmkit build gallery`, or compute one; do not reuse the default on a big
+   component.
+2. **Sub-perceptual style drift.** A pale-palette shift moved 96% of that hero's
+   pixels by ≤8/255 per channel, which the comparator scores as **0% changed** —
+   no threshold reaches that. `diff html` catches it from the changed
+   `background-image` declaration.
+
+So story VRT narrows what a page diff has to catch; **it does not replace it.**
+Keep a page-level `diff html` in the suite.
+
 ## Prerequisite: does the project have a gallery?
 
 A **gallery** is one page exposing `window.mount({ story, props })` /
@@ -125,6 +146,9 @@ Three rules, and the difference between the first two decides what you do next.
   `--update-baseline` and the new baseline is committed.
 - No `mount-failed` findings.
 - `vlmkit check story <stories> --gallery <url>` exits 0 without `--advisory`.
+- Any story over ~50,000px carries a derived `--threshold` rather than the
+  default, and a page-level `diff html` still covers what story diffs cannot see
+  (see above).
 
 ## Persisting the set
 
