@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>component-vrt experiment — page arm</title>
+<link rel="stylesheet" href="./components.css">
+<style>
+  /* Page-level layout only. Deliberately generous vertical rhythm: a realistic
+     page is tall, and the height is what makes a full-page diff expensive. */
+  .page { padding: 32px; display: flex; flex-direction: column; gap: 40px; }
+  .row { display: flex; align-items: flex-start; gap: 24px; }
+  h2 { font: 600 13px/1 Inter, sans-serif; color: #8b97a3; margin: 0 0 12px; text-transform: uppercase; letter-spacing: .06em; }
+</style>
+</head>
+<body>
+<div class="page">
+  <section><h2>Actions</h2><div class="row" id="s-button"></div></section>
+  <section><h2>Status</h2><div class="row" id="s-badge"></div></section>
+  <section><h2>Identity</h2><div class="row" id="s-avatar"></div></section>
+  <section><h2>Content</h2><div class="row" id="s-card"></div></section>
+  <section><h2>Messaging</h2><div class="row" id="s-alert"></div></section>
+  <section><h2>Composite</h2><div class="row" id="s-toolbar"></div></section>
+</div>
+<script src="./_markup.js"></script>
+<script>
+  const C = globalThis.COMPONENTS;
+  document.getElementById("s-button").innerHTML = C.Button({});
+  document.getElementById("s-badge").innerHTML = C.Badge({});
+  document.getElementById("s-avatar").innerHTML = C.Avatar({});
+  document.getElementById("s-card").innerHTML = C.Card({});
+  document.getElementById("s-alert").innerHTML = C.Alert({});
+  document.getElementById("s-toolbar").innerHTML = C.Toolbar();
+</script>
+</body>
+</html>
