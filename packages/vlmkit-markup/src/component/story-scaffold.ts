@@ -221,9 +221,11 @@ export function discoverStoryCandidates(
     // A modifier on any class, not only the primary one: `btn btn--ghost` puts
     // the variant on the second token, which is the common BEM spelling.
     const modifier = classes.map(variantFromClass).find(Boolean);
-    const variant = element.states.length > 0
-      ? element.states.map(titleCase).join("")
-      : modifier ?? "Default";
+    // Modifier AND state, composed. Keeping only the state would collide
+    // `btn--ghost[disabled]` with `btn[disabled]` into one story whose markup is
+    // whichever the sort happened to pick — two components' worth of pixels
+    // behind one baseline.
+    const variant = [modifier, ...element.states.map(titleCase)].filter(Boolean).join("") || "Default";
     const key = `${component}/${variant}`;
     const group = groups.get(key);
     if (group) group.members.push(element);

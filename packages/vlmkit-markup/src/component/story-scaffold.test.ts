@@ -120,6 +120,20 @@ describe("discoverStoryCandidates", () => {
     assert.deepEqual([...new Set(found.map((c) => c.selector))], [".btn"]);
   });
 
+  it("composes a modifier and a state, so two variants do not collide", () => {
+    // Keeping only the state would put btn--ghost[disabled] and btn[disabled]
+    // behind one baseline whose markup is whichever the sort picked.
+    const found = discoverStoryCandidates(
+      [
+        element({ className: "btn btn--ghost", index: 0, states: ["disabled"], outerHtml: "<ghost-disabled/>" }),
+        element({ className: "btn", index: 1, states: ["disabled"], outerHtml: "<plain-disabled/>" }),
+      ],
+      { viewport: VIEWPORT },
+    );
+    assert.deepEqual(found.map((c) => c.variant).sort(), ["Disabled", "GhostDisabled"]);
+    assert.equal(found.every((c) => c.instances === 1), true, "the two must not be grouped");
+  });
+
   it("turns a DOM state attribute into its own story", () => {
     // The "a story per named state" half of the handoff, derived rather than
     // remembered.
