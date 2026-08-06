@@ -1,0 +1,27 @@
+<!doctype html>
+<!--
+  Host page for the framework galleries. Serve this at the URL you use as both
+  your Playwright `baseURL` and `vlmkit check story --gallery`, e.g.
+  http://localhost:5173/playwright/gallery/index.html
+
+  Deliberately bare: the gallery must contribute no layout of its own, or the
+  component's own box — which is what gets screenshotted — inherits padding and
+  centring that are not the component's.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>component gallery</title>
+<style>
+  html, body { margin: 0; padding: 0; }
+  /* inline-block so #root shrink-wraps the component. A block-level #root
+     would be viewport-width, and the screenshot would be too. */
+  #root { display: inline-block; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<!-- Point this at your gallery entry after copying it out of assets/. -->
+<script type="module" src="./main.tsx"></script>
+</body>
+</html>

@@ -70,6 +70,7 @@ second only when the task genuinely crosses boundaries.
 | Responsive, scroll, interaction, or animation behavior | `./workflows/dynamic-markup/SKILL.md` | Extend static convergence with deterministic dynamic gates |
 | Natural-language story to browser test | `./workflows/spec-to-playwright/SKILL.md` | Generate reproducible Playwright/VRT and heal drift |
 | Need markup authoring signals | `./workflows/vrt-markup-synth/SKILL.md` | Measure components, tokens, theme parity, and i18n stress |
+| Repair or restyle ONE component; page diff too noisy | `./workflows/component-vrt/SKILL.md` | Mount one story and diff only that component, at component size |
 | Compare two current renders | `./workflows/vrt-visual-diff/SKILL.md` | Explain pixel, section, viewport, and computed-style deltas |
 | Detect regressions across repeated CI runs | `./workflows/vrt-regression-watch/SKILL.md` | Persist summaries and fail when most viewports worsen |
 | Evaluate a framework/CSS/build migration | `./workflows/vrt-migration-eval/SKILL.md` | Judge visual equivalence despite large intentional rewrites |

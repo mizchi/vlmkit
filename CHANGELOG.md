@@ -54,6 +54,18 @@ suppression works per *rule* instead of per whole gate.
 - **`vlmkit rules`** lists every gate with its rule count and plugin;
   **`vlmkit rules <gate>`** prints that gate's rules, default severities and
   docs. 118 rules across 27 gates.
+- **`component-vrt` skill**, with copyable gallery reference implementations.
+  Playwright's docs are explicit that the gallery is framework-specific and yours
+  to own with **no template to copy**, which makes it the one part of the setup an
+  agent cannot just be told to do. `.claude/skills/component-vrt/assets/` now ships
+  it: a zero-dependency vanilla gallery that runs over `file://`, React and Vue
+  galleries with `import.meta.glob` story discovery, the host page, a story file
+  showing the hidden-form state pattern, the contract as a reference doc, and the
+  1.62 CT config preset for projects that also want behavioural specs. Every
+  template awaits layout (not just render) and freezes animation, because those are
+  the two things that make a component screenshot flake. The vanilla gallery is
+  byte-identical to `examples/story-gallery/index.html` and a test enforces that,
+  so the installable copy cannot rot while the runnable example stays green.
 - **`vlmkit check story`** — VRT scoped to one mounted component, for the repair
   loop where a full-page diff is the wrong instrument. Mounts a story in your
   Playwright component-testing gallery and screenshots only that component:

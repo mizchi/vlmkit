@@ -57,7 +57,7 @@ which skill the user wants.
 
 | Class | Choose it when… | Skills | What it can do |
 |---|---|---|---|
-| General verification | You edited HTML/CSS and need a fast correctness loop | [`markup-assist`](./markup-assist/) | Select an integrity, copy, layout, responsive, interaction, a11y, or design gate; read kickback; fix; rerun to green |
+| General verification | You edited HTML/CSS and need a fast correctness loop | [`markup-assist`](./markup-assist/), [`component-vrt`](./component-vrt/) | Select an integrity, copy, layout, responsive, interaction, a11y, or design gate; read kickback; fix; rerun to green — or scope the diff to one mounted component when a page diff is too noisy |
 | UI creation | The task starts from an image, reference, contract, or behavior brief | [`mock-markup`](./mock-markup/), [`auto-markup`](./auto-markup/), [`dynamic-markup`](./dynamic-markup/) | Normalize raw mock exports; recreate static HTML/CSS; verify responsive, scrolling, interaction, and motion behavior |
 | Test generation | A natural-language story must become a reproducible browser test | [`spec-to-playwright`](./spec-to-playwright/) | Explore the app, generate Playwright tests, stabilize VRT, run CI gates, and heal drift |
 | Comparison and monitoring | Two renders or repeated runs must be compared | [`vrt-markup-synth`](./vrt-markup-synth/), [`vrt-visual-diff`](./vrt-visual-diff/), [`vrt-regression-watch`](./vrt-regression-watch/), [`vrt-migration-eval`](./vrt-migration-eval/) | Produce deterministic authoring signals, explain visual deltas, detect regressions over time, and evaluate framework/CSS migrations |
@@ -70,6 +70,7 @@ which skill the user wants.
 - Target screenshot or UI Contract IR → `auto-markup`.
 - Responsive, scroll, interaction, or animation requirements → `dynamic-markup`.
 - Natural-language acceptance criteria → `spec-to-playwright`.
+- Repairing ONE component, page diff too noisy or cascading → `component-vrt`.
 - One baseline/variant comparison → `vrt-visual-diff`; recurring CI history → `vrt-regression-watch`.
 - Framework, CSS-library, or build-system swap → `vrt-migration-eval`.
 - Component, token, theme, or i18n authoring signal → `vrt-markup-synth`.

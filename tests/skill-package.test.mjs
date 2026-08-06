@@ -20,6 +20,7 @@ const FIX = "run `pnpm sync:skills`";
 const workflows = [
   "agent-validation-loop",
   "auto-markup",
+  "component-vrt",
   "dynamic-markup",
   "markup-assist",
   "mock-markup",

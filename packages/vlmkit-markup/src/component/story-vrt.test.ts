@@ -48,6 +48,22 @@ describe("the shipped example gallery", () => {
     assert.match(html, /window\.unmount\s*=/, "gallery must define window.unmount");
     assert.match(html, /id="root"/, "the contract renders into #root");
   });
+
+  it("is byte-identical to the copy the component-vrt skill ships", () => {
+    // The same gallery lives in two places for two reasons: `examples/` is a
+    // runnable project, and the skill's `assets/` is what an agent copies into a
+    // consumer repo. Only the example is exercised by the browser tests below,
+    // so without this the skill's copy could rot into a broken template while
+    // every test stayed green.
+    const asset = resolve(here, "../../../../.claude/skills/component-vrt/assets/gallery.vanilla.html");
+    assert.ok(existsSync(asset), `${asset} is missing`);
+    assert.equal(
+      readFileSync(asset, "utf8"),
+      readFileSync(EXAMPLE, "utf8"),
+      "the skill's gallery.vanilla.html has drifted from examples/story-gallery/index.html"
+        + " — copy the example over it, then run `pnpm sync:skills`",
+    );
+  });
 });
 
 describe("story VRT against a real gallery", { timeout: 240_000 }, () => {

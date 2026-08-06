@@ -128,7 +128,7 @@ export const messages = Object.freeze({
     "skills.evaluateTitle": "評価と改善",
     "skills.evaluateDescription":
       "既知の CSS 回帰に対する修復性能と、エージェント向けツール自体の使いやすさを検証。",
-    "skills.catalogLink": "11スキルの詳しい選択ガイドを見る",
+    "skills.catalogLink": "12スキルの詳しい選択ガイドを見る",
     "skills.apmLabel": "APM でインストール",
     "skills.apmDescription":
       "公式 bootstrap で APM を導入または更新してから、自動ルーターをプロジェクトへひとつ追加します。",
@@ -257,7 +257,7 @@ export const messages = Object.freeze({
     "skills.classLabel": "What the AI can choose",
     "skills.verifyTitle": "Everyday verification",
     "skills.verifyDescription":
-      "Check HTML/CSS with no reference design through integrity, copy, responsive, and interaction gates.",
+      "Check HTML/CSS with no reference design through integrity, copy, responsive, and interaction gates, or scope a diff to one component.",
     "skills.createTitle": "UI creation",
     "skills.createDescription":
       "Recreate static or dynamic pages from mocks, references, UI Contracts, and behavior briefs.",
@@ -270,7 +270,7 @@ export const messages = Object.freeze({
     "skills.evaluateTitle": "Evaluation and hardening",
     "skills.evaluateDescription":
       "Measure repair performance on known CSS regressions and improve agent-facing tool usability.",
-    "skills.catalogLink": "Open the detailed guide to all 11 skills",
+    "skills.catalogLink": "Open the detailed guide to all 12 skills",
     "skills.apmLabel": "Install with APM",
     "skills.apmDescription":
       "Install or update APM with its official bootstrap, then add the single automatic router.",
