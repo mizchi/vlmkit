@@ -12,16 +12,21 @@
 </style>
 </head>
 <body>
-<!-- One component repeated many times. A page diff sees N regions for one rule change; a story diff still sees one story. Tests whether repetition changes the picture. -->
+<!-- Repeated components (12 Cards, 4 Alerts). The tallest page: one rule change yields many page regions but still one story. -->
 <div class="page" id="page"></div>
 <script src="./_markup.js"></script>
 <script>
   const C = globalThis.COMPONENTS;
   const section = (label, html) => `<section><h2>${label}</h2><div class="row">${html}</div></section>`;
   document.getElementById("page").innerHTML = [
-    section("Toolbar", C.Toolbar()),
+    section("Hero", C.Hero({})),
+    section("Composite", C.Toolbar()),
     section("Cards", Array.from({ length: 12 }, (_, i) => C.Card({ title: `Item ${i + 1}` })).join("")),
     section("Notices", Array.from({ length: 4 }, () => C.Alert({})).join("")),
+    section("Actions", C.Button({})),
+    section("Status", C.Badge({})),
+    section("Identity", C.Avatar({})),
+    section("Table", C.DataTable({ rows: 6 })),
   ].join("");
 </script>
 </body>

@@ -146,12 +146,13 @@ export type PageVariant = (typeof PAGES)[number];
  * are skipped with that reason stated.
  */
 export const PAGE_CONTAINS: Record<PageVariant, readonly ComponentName[]> = {
-  flat: ["Button", "Badge", "Avatar", "Card", "Alert", "Toolbar"],
-  hero: ["Hero", "DataTable", "Button"],
-  // Directly rendered only. Avatar/Badge/Button reach this page THROUGH Toolbar,
-  // and `isComparable` expands composites — listing them here as well made the
-  // map disagree with the page file, which the test caught.
-  list: ["Toolbar", "Card", "Alert"],
+  // Every page renders every component now. They differ by instance count and
+  // page height instead, which is the axis that actually drives page-arm cost —
+  // and it means the adversarial large-component cut gets trials on all three
+  // pages rather than the four it had when only `hero` drew them.
+  flat: [...COMPONENTS],
+  hero: [...COMPONENTS],
+  list: [...COMPONENTS],
 };
 
 /** True when both arms can actually observe a mutation to this component. */

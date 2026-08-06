@@ -12,7 +12,7 @@
 </style>
 </head>
 <body>
-<!-- ADVERSARIAL on purpose: this page is dominated by two LARGE components. When a mutation lands on Hero or DataTable the component-scoped shot is nearly page-sized, so the size advantage should collapse. If it does not collapse here, the earlier result was an artefact of only using small components. -->
+<!-- Dominated by the two LARGE components (a 14-row table). Adversarial: a component-scoped shot of Hero or DataTable approaches a page-scoped shot. -->
 <div class="page" id="page"></div>
 <script src="./_markup.js"></script>
 <script>
@@ -20,8 +20,13 @@
   const section = (label, html) => `<section><h2>${label}</h2><div class="row">${html}</div></section>`;
   document.getElementById("page").innerHTML = [
     section("Hero", C.Hero({})),
-    section("Table", C.DataTable({ rows: 8 })),
+    section("Table", C.DataTable({ rows: 14 })),
     section("Actions", C.Button({})),
+    section("Status", C.Badge({})),
+    section("Identity", C.Avatar({})),
+    section("Content", C.Card({})),
+    section("Messaging", C.Alert({})),
+    section("Composite", C.Toolbar()),
   ].join("");
 </script>
 </body>

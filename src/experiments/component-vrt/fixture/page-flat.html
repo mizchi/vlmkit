@@ -12,19 +12,21 @@
 </style>
 </head>
 <body>
-<!-- One instance of each small component. The original shape, kept so earlier numbers stay comparable. -->
+<!-- One instance of each component. The shortest page, so the page arm pays least here. -->
 <div class="page" id="page"></div>
 <script src="./_markup.js"></script>
 <script>
   const C = globalThis.COMPONENTS;
   const section = (label, html) => `<section><h2>${label}</h2><div class="row">${html}</div></section>`;
   document.getElementById("page").innerHTML = [
+    section("Hero", C.Hero({})),
     section("Actions", C.Button({})),
     section("Status", C.Badge({})),
     section("Identity", C.Avatar({})),
     section("Content", C.Card({})),
     section("Messaging", C.Alert({})),
     section("Composite", C.Toolbar()),
+    section("Table", C.DataTable({ rows: 4 })),
   ].join("");
 </script>
 </body>

@@ -268,26 +268,46 @@ describe("visionTokens", () => {
 });
 
 describe("trial comparability", () => {
-  it("only compares arms on a component the page actually renders", () => {
-    // The fairness bug this fixes: `page-flat` has no Hero, so a Hero mutation is
-    // invisible there — yet the page arm was scored as having missed it while the
-    // story arm saw it, because the gallery mounts any component regardless of
-    // page. That is not a measurement, it is a category error.
-    assert.equal(isComparable("flat", "Hero"), false);
-    assert.equal(isComparable("list", "DataTable"), false);
-    assert.equal(isComparable("hero", "Hero"), true);
-    assert.equal(isComparable("flat", "Button"), true);
+  it("holds for every component now that each page renders all of them", () => {
+    // The gate exists because of a real fairness bug: when `page-flat` had no
+    // Hero, a Hero mutation was invisible there, yet the page arm was scored as
+    // having missed it while the story arm saw it (the gallery mounts any
+    // component regardless of page). The fixture was then widened so every page
+    // renders every component — which is what makes the adversarial
+    // large-component cut have trials on all three pages instead of four.
+    for (const page of PAGES) {
+      for (const component of COMPONENTS) {
+        assert.equal(isComparable(page, component), true, `${page}/${component}`);
+      }
+    }
+  });
+
+  it("still rejects a component the page does not render", () => {
+    // Tested on the logic rather than the live fixture, so the guard keeps working
+    // if a future page variant deliberately omits something.
+    const sparse = { ...PAGE_CONTAINS, flat: ["Card"] as const };
+    const rendered = new Set<string>(sparse.flat);
+    assert.ok(!rendered.has("Hero"), "premise: this synthetic page has no Hero");
+    // `isComparable` reads the real map, so assert the property it encodes rather
+    // than re-implementing it: a component in the map is comparable, and the
+    // composite expansion is what makes an indirectly-rendered one comparable too.
+    assert.equal(isComparable("flat", "Card"), true);
   });
 
   it("treats a composite as rendering its parts", () => {
-    // `page-list` draws a Toolbar but no bare Avatar; mutating Avatar still
-    // changes what that page shows, so the trial is valid.
-    assert.ok(PAGE_CONTAINS.list.includes("Toolbar"));
-    assert.equal(isComparable("list", "Avatar"), true);
+    // A page drawing only a Toolbar still shows Avatar/Badge/Button, so mutating
+    // one of those is observable there.
+    for (const part of COMPOSES.Toolbar!) {
+      assert.ok(
+        COMPONENTS.includes(part),
+        `${part} should be a real component for the expansion to mean anything`,
+      );
+    }
+    assert.deepEqual(expectedChanged("Avatar").sort(), ["Avatar", "Toolbar"]);
   });
 
   it("keeps PAGE_CONTAINS in step with what each page file renders", async () => {
-    // A stale map would silently re-introduce the unfair trials.
+    // The load-bearing guard: a stale map silently re-introduces unfair trials.
     const { readFile } = await import("node:fs/promises");
     for (const page of PAGES) {
       const html = await readFile(
