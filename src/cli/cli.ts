@@ -481,9 +481,26 @@ Run \`vlmkit <command> --help\` for subcommands, options, and examples.`);
     .allowUnknownOptions()
     .action(async () => runWorkflow(passThrough(argv, ["workflow"])));
 
-  cli.command("bench [...args]", "CSS challenge benchmark")
+  cli.command("bench [...args]", "CSS challenge benchmark, or `bench gates` for gate/rule cost")
     .allowUnknownOptions()
-    .action(async () => delegate(SPECS.cssBench, passThrough(argv, ["bench"])));
+    .action(async () => {
+      const rest = passThrough(argv, ["bench"]);
+      // `bench` was a single delegated command before `bench gates` existed, so
+      // the subcommand is intercepted here rather than turning `bench` into a
+      // group — every other `bench` invocation must keep reaching the CSS
+      // benchmark unchanged, including its own flags.
+      if (rest[0] === "gates") {
+        const gateArgs = rest.slice(1);
+        const { benchGatesCli, benchGatesUsage } = await import("./workflow/bench-gates.ts");
+        if (gateArgs.includes(HELP_SENTINEL) || gateArgs.length === 0) {
+          console.log(benchGatesUsage());
+          return;
+        }
+        await benchGatesCli(gateArgs);
+        return;
+      }
+      await delegate(SPECS.cssBench, rest);
+    });
 
   cli.command("report [...args]", "Detection pattern report (CSS challenge)")
     .allowUnknownOptions()

@@ -472,6 +472,69 @@ describe("runGate", () => {
   });
 });
 
+/**
+ * The phase split exists so `vlmkit bench gates` can say where a gate's time
+ * goes, and so the claim "rules are not separately executed" is measured rather
+ * than asserted. These check the accounting, not the durations.
+ */
+describe("runGate timing", () => {
+  it("reports every phase, and they account for the total", async () => {
+    const outcome = await runGate(fakeGate(), ["page.html", "--strict"], { ledger: false });
+    const t = outcome.timing;
+    for (const [phase, ms] of Object.entries(t)) {
+      assert.equal(typeof ms, "number", `${phase} is not a number`);
+      assert.ok(Number.isFinite(ms) && ms >= 0, `${phase} is ${ms}`);
+    }
+    const parts = t.parseMs + t.runMs + t.findingsMs + t.rulesMs + t.formatMs + t.ledgerMs;
+    // The parts cannot exceed the total; the slack is the runner's own overhead.
+    assert.ok(parts <= t.totalMs + 1, `parts ${parts} exceed total ${t.totalMs}`);
+  });
+
+  it("charges a slow measurement to run, not to the projection", async () => {
+    // The property `bench gates` depends on. A gate whose `run` sleeps must show
+    // that time under `runMs` — if it leaked into `findingsMs` the report would
+    // claim per-rule work costs something.
+    const slow = fakeGate({
+      run: async (options) => {
+        await new Promise((r) => setTimeout(r, 30));
+        return { source: options.source, hits: [] };
+      },
+    });
+    const { timing } = await runGate(slow, ["page.html"], { ledger: false });
+    assert.ok(timing.runMs >= 25, `runMs was ${timing.runMs}`);
+    assert.ok(timing.findingsMs < 5, `findingsMs was ${timing.findingsMs}`);
+  });
+
+  it("keeps timing out of the --json envelope unless asked", async () => {
+    // The envelope is a published contract that clients diff and cache against.
+    // A field that changes every run would make equal inputs produce unequal
+    // output, so `--timing` is opt-in even here.
+    const plain = await runGate(fakeGate(), ["page.html", "--json"], { ledger: false });
+    const parsed = JSON.parse(plain.text) as Record<string, unknown>;
+    assert.deepEqual(Object.keys(parsed), [
+      "gate", "command", "verdict", "counts", "findings", "suppressed", "retuned", "report",
+    ]);
+    assert.ok(plain.timing.totalMs > 0, "the outcome still carries timing in-process");
+
+    const asked = await runGate(fakeGate(), ["page.html", "--json", "--timing"], { ledger: false });
+    const withTiming = JSON.parse(asked.text) as { timing: Record<string, number> };
+    assert.equal(typeof withTiming.timing.runMs, "number");
+    assert.ok(withTiming.timing.totalMs > 0, "serialized totalMs must not be a placeholder zero");
+  });
+
+  it("does not let --timing reach the gate's own parser", async () => {
+    const seen: string[][] = [];
+    const gate = fakeGate({
+      parse: (argv) => {
+        seen.push([...argv]);
+        return { source: "page.html", strict: false };
+      },
+    });
+    await runGate(gate, ["page.html", "--timing"], { ledger: false });
+    assert.deepEqual(seen, [["page.html"]]);
+  });
+});
+
 describe("runGateCli", () => {
   it("prints composed help and exits 0 without measuring", async () => {
     const lines: string[] = [];

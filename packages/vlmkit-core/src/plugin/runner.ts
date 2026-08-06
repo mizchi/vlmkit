@@ -26,7 +26,7 @@ import type { AppliedRules, FindingCounts, RuleSettings } from "./rules.ts";
 import { RULE_SETTINGS, applyRuleSettings, countFindings } from "./rules.ts";
 
 /** Flags the runner owns. A gate's `parse` never sees these as its own. */
-export const SHARED_GATE_FLAGS = ["--json", "--advisory", "--fail-on-suspect", "--rule", "--rules", "--help", "-h"] as const;
+export const SHARED_GATE_FLAGS = ["--json", "--advisory", "--fail-on-suspect", "--rule", "--rules", "--timing", "--help", "-h"] as const;
 
 export interface SharedFlags {
   json: boolean;
@@ -36,6 +36,13 @@ export interface SharedFlags {
   listRules: boolean;
   /** `--rule <ref>=<setting>`, repeatable — a one-off override for this run. */
   ruleOverrides: RuleSettings;
+  /**
+   * `--timing`: include the per-phase breakdown in the output.
+   *
+   * Opt-in rather than always-on because the numbers differ every run, and
+   * `--json` is a contract other tools diff and cache against.
+   */
+  timing: boolean;
 }
 
 /**
@@ -63,6 +70,7 @@ export function parseSharedFlags(argv: readonly string[]): SharedFlags {
     advisory: argv.includes("--advisory"),
     help: argv.includes("--help") || argv.includes("-h"),
     listRules: argv.includes("--rules"),
+    timing: argv.includes("--timing"),
     ruleOverrides,
   };
 }
@@ -106,6 +114,35 @@ function assertKnownRuleOverrides(gate: AnyGateDefinition, overrides: RuleSettin
   }
 }
 
+/**
+ * Wall-clock ms per contract phase.
+ *
+ * The split exists to answer "where does a gate's time actually go", and the
+ * answer shapes how a ruleset should be tuned. `run` is one measurement shared
+ * by every rule the gate declares; `findings` is the only phase where per-rule
+ * work happens, and it is a projection over an in-memory report. So the cost
+ * unit is the **gate**, not the rule — which is exactly why `--rule x=off`
+ * cannot make a run faster, and why `vlmkit bench gates` reports *attributed*
+ * per-rule cost rather than pretending each rule was timed on its own.
+ *
+ * Always collected: five `performance.now()` reads are far below the noise
+ * floor of a browser launch. Reported only when asked, because a timing field
+ * is nondeterministic and `--json` has to stay byte-stable for equal inputs.
+ */
+export interface GateTiming {
+  parseMs: number;
+  runMs: number;
+  /** `gate.findings` — the projection. Per-rule work lives here. */
+  findingsMs: number;
+  /** `applyRuleSettings` — suppression and re-tuning. */
+  rulesMs: number;
+  /** `gate.format`, or the JSON serialization when `--json` is set. */
+  formatMs: number;
+  ledgerMs: number;
+  /** Everything above plus the runner's own overhead. */
+  totalMs: number;
+}
+
 export interface GateOutcome<Report = unknown> {
   gateId: string;
   command: string;
@@ -119,6 +156,7 @@ export interface GateOutcome<Report = unknown> {
   exitCode: 0 | 1;
   /** Rendered output (prose or JSON), ready to write. */
   text: string;
+  timing: GateTiming;
 }
 
 export interface RunGateOptions {
@@ -140,22 +178,51 @@ export async function runGate<Report, Options>(
   options: RunGateOptions = {},
 ): Promise<GateOutcome<Report>> {
   const cwd = options.cwd ?? process.cwd();
+  const t0 = performance.now();
   const shared = parseSharedFlags(argv);
   const gateArgv = stripSharedFlags(argv);
   const ctx: GateContext = { cwd, argv: gateArgv, json: shared.json };
+
+  const tParse = performance.now();
   const parsed = gate.parse(gateArgv, ctx);
+  const tRun = performance.now();
   const report = await gate.run(parsed, ctx);
+  const tFindings = performance.now();
 
   const settings: RuleSettings = { ...options.rules, ...shared.ruleOverrides };
   assertKnownRuleOverrides(gate, shared.ruleOverrides);
-  const rules = applyRuleSettings(gate, gate.findings(report, parsed), settings);
+  const projected = gate.findings(report, parsed);
+  const tRules = performance.now();
+  const rules = applyRuleSettings(gate, projected, settings);
   const counts = countFindings(rules.findings);
   const verdict = counts.suspect > 0 ? "fail" : "pass";
+  const tLedger = performance.now();
 
   if (options.ledger !== false && gate.ledger) {
     const entry = gate.ledger(report, parsed);
     if (entry) appendRunLedger(entry, cwd);
   }
+  const tFormat = performance.now();
+
+  // `timing` is opt-in even under --json: it changes on every run, and the
+  // envelope has to stay byte-stable for equal inputs so golden-file diffs and
+  // cache keys keep working. Callers in-process always get it on the outcome.
+  const timing: GateTiming = {
+    parseMs: round(tRun - tParse),
+    runMs: round(tFindings - tRun),
+    findingsMs: round(tRules - tFindings),
+    rulesMs: round(tLedger - tRules),
+    ledgerMs: round(tFormat - tLedger),
+    formatMs: 0,
+    totalMs: 0,
+  };
+
+  // Prose is rendered first either way, so `formatMs` and `totalMs` hold real
+  // numbers by the time the JSON payload is serialized. Under --json the prose
+  // is not built at all, and `formatMs` then covers the serialization instead.
+  const prose = shared.json ? "" : [gate.format(report), formatRuleNotes(gate, rules)].filter(Boolean).join("\n");
+  timing.formatMs = round(performance.now() - tFormat);
+  timing.totalMs = round(performance.now() - t0);
 
   const text = shared.json
     ? JSON.stringify(
@@ -168,11 +235,12 @@ export async function runGate<Report, Options>(
         suppressed: rules.suppressed,
         retuned: rules.retuned,
         report,
+        ...(shared.timing ? { timing } : {}),
       },
       null,
       2,
     )
-    : [gate.format(report), formatRuleNotes(gate, rules)].filter(Boolean).join("\n");
+    : prose;
 
   return {
     gateId: gate.id,
@@ -184,7 +252,13 @@ export async function runGate<Report, Options>(
     rules,
     exitCode: verdict === "fail" && !shared.advisory ? 1 : 0,
     text,
+    timing,
   };
+}
+
+/** Sub-microsecond precision is noise at this scale and makes tables unreadable. */
+function round(ms: number): number {
+  return Math.round(ms * 1000) / 1000;
 }
 
 /**
@@ -277,6 +351,7 @@ export function formatGateHelp(gate: AnyGateDefinition): string {
   lines.push("  --advisory              Print findings but exit 0 (default: a suspect exits 1)");
   lines.push("  --rule <ref>=<setting>  Re-tune or disable one rule (off|suspect|warn|info), repeatable");
   lines.push("  --rules                 List this gate's rules and exit");
+  lines.push("  --timing                Add the per-phase ms breakdown to the output");
   // Listed rather than hidden: it appears in published docs and in scripts, so
   // a reader who finds it needs to be told it no longer does anything — the
   // failing default it used to opt into is now the default.
@@ -331,7 +406,36 @@ export async function runGateCli<Report, Options>(
   }
   const outcome = await runGate(gate, argv, options);
   out(outcome.text);
+  // Under --json the breakdown is already inside the envelope; appending it to
+  // stdout as prose would put non-JSON on a stream a client is parsing.
+  if (shared.timing && !shared.json) out(formatGateTiming(outcome));
   return outcome.exitCode;
+}
+
+/**
+ * The phase breakdown as one block.
+ *
+ * Shows `run` as a share of the total because that share is the actionable
+ * number: it says whether a slow gate is slow at measuring (nothing to tune
+ * but the page) or slow at everything else (a formatter doing real work — the
+ * defect `formatA11yTouchReport` had, where a "formatter" ran a policy).
+ */
+export function formatGateTiming(outcome: GateOutcome): string {
+  const t = outcome.timing;
+  const share = t.totalMs > 0 ? (t.runMs / t.totalMs) * 100 : 0;
+  const row = (label: string, ms: number) =>
+    `  ${label.padEnd(10)} ${`${ms.toFixed(1)}ms`.padStart(9)}`;
+  return [
+    "",
+    `${BOLD}${CYAN}timing${RESET} ${DIM}${outcome.command}${RESET}`,
+    row("parse", t.parseMs),
+    `${row("run", t.runMs)}  ${DIM}${share.toFixed(1)}% of total — the measurement, shared by every rule${RESET}`,
+    `${row("findings", t.findingsMs)}  ${DIM}the projection; the only per-rule phase${RESET}`,
+    row("rules", t.rulesMs),
+    row("format", t.formatMs),
+    row("ledger", t.ledgerMs),
+    `  ${BOLD}${"total".padEnd(10)}${`${t.totalMs.toFixed(1)}ms`.padStart(9)}${RESET}`,
+  ].join("\n");
 }
 
 /** One-line verdict for aggregate runners (`verify markup`, `batch`, MCP). */

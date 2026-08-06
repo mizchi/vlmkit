@@ -54,6 +54,25 @@ suppression works per *rule* instead of per whole gate.
 - **`vlmkit rules`** lists every gate with its rule count and plugin;
   **`vlmkit rules <gate>`** prints that gate's rules, default severities and
   docs. 115 rules across 26 gates.
+- **`vlmkit bench gates`** — where a ruleset spends its time. Runs every gate that
+  works from a bare page (18 of the 26; the set is derived from each gate's
+  declared `inputs`, not from a list) and reports cost beside yield: median /
+  min / max, the measurement's share of the total, findings, rules fired out of
+  rules declared, and ms per finding. Plus an attributed per-rule table and the
+  list of rules that never fired. `--category`, `--repeat`, `--gate "<command>"`,
+  `--md` / `--json`, `--out`.
+
+  Per-rule cost is **attributed, not isolated**: a gate performs one measurement
+  and every rule reads that same report, so rules cannot be timed separately —
+  `run` is ~100% of a gate's wall clock and the projection across all 18 gates
+  totals under a millisecond. `--probe-suppression` measures the consequence
+  rather than asserting it: turning every rule off changes the runtime by 0.4%,
+  i.e. nothing, because settings apply to the findings after the measurement.
+  Baseline report: `docs/reports/2026-08-06-gate-rule-cost-bench.md`.
+- **`--timing`** on every gate splits a run into `parse` / `run` / `findings` /
+  `rules` / `format` / `ledger`. Opt-in even under `--json`, so the envelope stays
+  byte-stable for equal inputs; `GateOutcome.timing` is always populated for
+  in-process callers.
 - **Gate categories.** Every gate declares what *kind* of question it answers —
   `correctness`, `behavior`, `design-system`, `verdict`, `infrastructure` — and
   `vlmkit rules` groups by that rather than by CLI verb, because

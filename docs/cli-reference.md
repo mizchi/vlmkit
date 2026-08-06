@@ -363,6 +363,43 @@ so a client gates on `verdict` / `counts` without knowing which gate ran. All
 artifacts rather than verdicts (`diff`, `build`, `contract`, `snapshot`, …) are
 not gates and keep their own flags.
 
+### Cost (which gates and rules your CI is paying for)
+
+```bash
+vlmkit check integrity page.html --timing        # per-phase ms for one run
+vlmkit bench gates page.html                    # every page gate, ranked by cost
+vlmkit bench gates a.html b.html --repeat 5 --probe-suppression --md
+vlmkit bench gates page.html --category behavior
+vlmkit bench gates page.html --gate "check breakpoints --sweep"
+```
+
+`--timing` splits a run into `parse` / `run` / `findings` / `rules` / `format` /
+`ledger`. It is opt-in even under `--json`, so the envelope stays byte-stable for
+equal inputs.
+
+`vlmkit bench gates` runs every gate that works from a bare page — its positional
+input is a page and nothing else is required, which is 18 of the 26 — and reports
+cost next to yield: median/min/max, the measurement's share of the total,
+findings, rules fired out of rules declared, and ms per finding. Name the other
+eight explicitly with `--gate`, arguments included.
+
+**Per-rule cost is attributed, not isolated.** A gate performs one measurement and
+every rule it declares reads that same report, so rules are not separately
+executed and cannot be separately timed — measured on this repo, `run` is ~100% of
+a gate's wall clock and the projection across all 18 gates totals under a
+millisecond. Two things follow, both easy to guess wrong:
+
+- **`--rule x=off` does not make a run faster.** Rule settings apply to the
+  findings *after* the measurement, by design, so a silenced finding can still be
+  reported as silenced. `--probe-suppression` measures this instead of asserting
+  it.
+- **The cost unit is the gate.** To spend less, drop a gate or narrow its inputs
+  (fewer viewports, no `--sweep`, a shorter `--observe`). Pruning rules buys
+  clarity, not time.
+
+Measured baseline: [`docs/reports/2026-08-06-gate-rule-cost-bench.md`](reports/2026-08-06-gate-rule-cost-bench.md)
+— a full sweep is ~30s serial per page and four gates are 60% of it.
+
 ### Custom gates (plugins)
 
 ```jsonc

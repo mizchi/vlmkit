@@ -23,6 +23,7 @@ This page is the how-to. For *why* the architecture is shaped this way, see
 - [Choosing a category](#choosing-a-category)
 - [Reading configuration](#reading-configuration)
 - [Measuring in a browser](#measuring-in-a-browser)
+- [Knowing what your gate costs](#knowing-what-your-gate-costs)
 - [Testing your gate](#testing-your-gate)
 - [Shipping it to other projects](#shipping-it-to-other-projects)
 - [Worked examples](#worked-examples)
@@ -402,6 +403,36 @@ nobody launched.
 Accept both a path and a URL for the positional if the measurement can work
 either way — every bundled gate does, and readers expect it.
 
+## Knowing what your gate costs
+
+Your `run` *is* your gate's cost. Measured across the 18 bundled gates that take
+a bare page, `run` is ~100% of wall clock and everything else — parse,
+projection, prose — totals under a millisecond. So:
+
+```bash
+vlmkit check my-gate page.html --timing     # parse / run / findings / rules / format / ledger
+vlmkit bench gates page.html --gate "check my-gate"   # ranked against the built-ins, with yield
+```
+
+Two things this changes about how you write a gate:
+
+- **One measurement, many rules.** Launch the browser once and derive every rule
+  from one report. A gate that navigates per rule pays the navigation per rule,
+  and nothing in the contract will stop you.
+- **Adding a rule is free; adding a gate is not.** Rules are a projection over a
+  report you already have, so a gate with eighteen rules costs the same as one
+  with two. If a new check can read the report you already collect, it is a rule
+  on an existing gate, not a new gate.
+
+And one thing it changes about what you tell users: `--rule x=off` does not make
+runs faster. Suppression is applied to the findings after the measurement, by
+design, so a silenced finding can still be reported as silenced. If your gate's
+`usage` implies otherwise, fix the wording.
+
+`vlmkit bench gates` will pick your gate up automatically if its positional input
+is a page (`kind: "path-or-url"`) and nothing else is required; otherwise name it
+with `--gate "check my-gate <args>"`.
+
 ## Testing your gate
 
 Extract the judgment from the I/O and unit-test the judgment. In the worked
@@ -506,6 +537,7 @@ same contract.
 - [ ] `parse` throws `UsageError` and never calls `process.exit`
 - [ ] `readPositionals` knows every value-taking flag
 - [ ] `run` does no printing; Playwright imported inside it
+- [ ] one measurement shared by every rule — check the split with `--timing`
 - [ ] every `Finding.rule` exists in the rule table
 - [ ] numbers are in `evidence`, not only in the message
 - [ ] `format` is pure prose and computes nothing that matters

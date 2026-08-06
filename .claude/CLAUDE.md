@@ -108,6 +108,34 @@ Full bench: `docs/reports/2026-05-22-vlm-llm-coverage-bench.md`.
 - `moonshotai/kimi-k2.5`, `moonshotai/kimi-k2.6` — return 0 fixes despite VLM CHANGE list (emits prose-only, not structured JSON). LLM latency 40-100s also disqualifies them.
 - `qwen/qwen3-coder` — generates plausible-looking fixes that over-correct the whole page (diff 4.1% → 46.7%); apply-and-rollback catches it but the loop never recovers.
 
+## Measuring Gate / Rule Execution Cost
+
+```bash
+# One run, per-phase split (parse / run / findings / rules / format / ledger)
+vlmkit check integrity page.html --timing
+
+# Every gate that works from a bare page (18 of 26), ranked by cost, with yield
+vlmkit bench gates fixtures/css-challenge/page.html --repeat 3
+
+# Full corpus + the "does turning rules off save time" probe, as markdown
+vlmkit bench gates fixtures/css-challenge/{page,dashboard,form-app}.html \
+  --repeat 3 --probe-suppression --md --out docs/reports/YYYY-MM-DD-gate-bench.md
+```
+
+**Per-rule cost is attributed, not isolated, and that is structural.** A gate does
+one measurement (`run`) and every rule it declares reads that same report, so
+`run` is ~100% of wall clock and the projection is under a millisecond across all
+18 gates. Consequences worth remembering before optimizing anything:
+
+- `--rule x=off` does **not** speed up a run (settings apply after the
+  measurement). Measured at +0.4% — noise.
+- The cost unit is the **gate**. Spend less by dropping a gate or narrowing its
+  inputs (fewer viewports, no `--sweep`, shorter `--observe`).
+- Four gates are ~60% of a full sweep: `check interactions`, `stress media`,
+  `check perf`, `check integrity`. `check interactions` varies 5x by page.
+
+Baseline: `docs/reports/2026-08-06-gate-rule-cost-bench.md`.
+
 ## Running CSS Challenge Benchmarks
 
 ### Cross-fixture Matrix
@@ -236,6 +264,7 @@ The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need t
 | `docs/configuration.md` | Setup detail moved out of README (install, MCP/skill, env vars, snapshot/CI config, APM skills catalog) |
 | `docs/knowledge.md` | Accumulated experiment findings (detection rates, VLM comparisons, fix patterns, etc.) |
 | `docs/api-design.md` | CLI / library API design |
+| `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
 | `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 26 gates + 115 rules, behavior changes, what is deliberately not a gate |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
