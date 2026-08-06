@@ -178,6 +178,15 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.match(r.stdout, /vlmkit contract introspect <html-file-or-url>/);
   });
 
+  it("`vrt build gallery --help` delegates to the story-gallery scaffolder", () => {
+    const r = runVrt(["build", "gallery", "--help"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vlmkit build gallery <html-file-or-url>/);
+    // The two flags that make the output reviewable rather than magic.
+    assert.match(r.stdout, /--selector/);
+    assert.match(r.stdout, /--noise-pixels/);
+  });
+
   it("`vrt check motion --help` delegates to motion detection help", () => {
     const r = runVrt(["check", "motion", "--help"]);
     assert.equal(r.status, 0);

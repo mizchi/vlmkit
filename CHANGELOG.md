@@ -82,6 +82,41 @@ suppression works per *rule* instead of per whole gate.
   Several stories share one browser. `--props`, `--viewport`, `--threshold`,
   `--root`, `--settle`, `--update-baseline`. Runnable example and a React + Vite
   gallery to copy: `examples/story-gallery/`.
+- **`vlmkit build gallery`** — the construction → maintenance handoff, which had
+  been a manual checklist. `build component` converges markup toward a target it
+  does not yet match; `check story` asks whether an edit broke a component that
+  was already correct. Nothing converted one into the other, so a component that
+  converged had no protection against the next edit unless someone remembered to
+  hand-write a gallery, a story per component and per state, and a threshold.
+
+  Point it at the page that just converged and it derives all of that:
+  per-component rendered markup plus the page's CSS captured into a gallery
+  implementing `window.mount` / `window.unmount`, `stories.json`, the
+  `vlmkit.gates.json` fragment, and the `check story` commands to run.
+  Deterministic — no VLM. BEM modifiers become variants of one component rather
+  than separate components, and DOM state attributes (`disabled`,
+  `aria-expanded`) become their own stories, so "a story per named state" comes
+  from the page instead of from memory.
+
+  **Each story gets its own `--threshold`, derived from a pixel budget rather
+  than a shared ratio.** A ratio coarsens as area grows: 0.5% of an 88x36 button
+  is 16 pixels, 0.5% of a 1216x203 hero is 1,234, so the default that catches a
+  button regression misses a corner-radius change on a hero. `--noise-pixels`
+  (default 24) is converted per story, clamped between a renderer-noise floor and
+  the gate's own default — it will not loosen a gate, only tighten one.
+
+  Discovery **proposes**: it groups by class, which is not the same as finding the
+  boundaries a codebase wants, so every candidate carries its evidence (instance
+  count, size, what it contains) and rejected ones say why. `--selector`
+  (repeatable) overrides it; `--include-all` keeps the rejects. A stylesheet the
+  browser will not expose is re-fetched by URL, and one that still cannot be read
+  is reported loudly rather than skipped — a gallery missing its CSS produces a
+  baseline that looks fine and is wrong.
+
+  Captured markup is frozen, and the generated gallery says so: `props` are
+  accepted and ignored, behaviour is not exercised. It answers "did this CSS or
+  token edit change how the component looks". Prop- or runtime-state-varying
+  stories still want a hand-written gallery — `component-vrt`'s `assets/`.
 - **`vlmkit bench gates`** — where a ruleset spends its time. Runs every gate that
   works from a bare page (18 of the 26; the set is derived from each gate's
   declared `inputs`, not from a list) and reports cost beside yield: median /

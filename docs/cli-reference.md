@@ -496,6 +496,26 @@ vlmkit build page <target.png> <current.html|current.png> [--crop dir/] [--json]
   # stacking-gap deltas. --crop writes target/current crop pairs so each
   # component can be drilled into with `build component`.
 
+# Converged page -> story gallery: the construction -> maintenance handoff.
+vlmkit build gallery <html|url> [--out dir/] [--selector .c-card] [--include-all] [--json]
+  # Deterministic (no VLM). Captures each component's rendered markup plus the
+  # page's CSS into a gallery implementing window.mount/unmount, writes
+  # stories.json, and prints the vlmkit.gates.json fragment plus the
+  # `check story` commands to run.
+  #
+  # Two things worth knowing before using the output:
+  #   - Discovery groups by class and PROPOSES. Every candidate carries its
+  #     evidence (instances, size, what it contains); rejects say why.
+  #     --selector overrides it, --include-all keeps the rejects.
+  #   - Each story gets its own --threshold, derived from a pixel budget
+  #     (--noise-pixels, default 24) rather than one ratio for every component:
+  #     0.5% of a button is a few pixels, 0.5% of a hero is over a thousand, so
+  #     a single ratio protects small components and not large ones.
+  #
+  # Captured markup is frozen: --props do nothing and behaviour is not
+  # exercised. For prop- or state-varying stories, hand-write the gallery from
+  # the component-vrt skill's templates.
+
 # Detect components in a screenshot.
 vlmkit scan component <screenshot.png>         # Crop to standalone PNGs
 vlmkit scan breakpoints <html-file>            # Discover responsive breakpoints

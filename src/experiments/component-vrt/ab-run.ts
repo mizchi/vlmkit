@@ -47,7 +47,12 @@ import { seededRandom } from "../css-challenge/css-challenge-core.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const FIXTURE = join(here, "fixture");
-const CLI = resolve(here, "../../cli/vlmkit.ts");
+/**
+ * Overridable so the abort path can be tested: pointing this at a script that
+ * emits nothing is the only way to exercise "the tool under measurement did not
+ * run" without breaking the real CLI.
+ */
+const CLI = process.env.VLMKIT_AB_CLI ?? resolve(here, "../../cli/vlmkit.ts");
 
 /** Components in the fixture, in the order the page lays them out. */
 export const COMPONENTS = [
@@ -330,14 +335,43 @@ export function visionTokens(width: number, height: number): number {
   return Math.ceil((width * height) / 750);
 }
 
-function run(args: string[], cwd: string): { stdout: string; status: number | null } {
+function run(args: string[], cwd: string): { stdout: string; stderr: string; status: number | null } {
   const r = spawnSync(process.execPath, ["--experimental-strip-types", CLI, ...args], {
     cwd,
     encoding: "utf8",
     env: { ...process.env, NO_COLOR: "1", VLMKIT_NO_LEDGER: "1" },
     maxBuffer: 64 * 1024 * 1024,
   });
-  return { stdout: r.stdout ?? "", status: r.status };
+  return { stdout: r.stdout ?? "", stderr: r.stderr ?? "", status: r.status };
+}
+
+/**
+ * A tool under measurement produced nothing — no report, no JSON.
+ *
+ * Distinct from a skip, and fatal to the whole run rather than to one trial.
+ * The distinction is the same one `check story`'s rule table draws between
+ * `story-drift` and `mount-failed`: drift is a finding, a rejected mount means
+ * nothing was measured. A trial where neither arm ran is not evidence that both
+ * arms missed the regression, but that is exactly how it scores if it stays in
+ * the corpus — and 19 such rows nearly shipped as a result, because the
+ * environment broke mid-run (a dependency rebuilt underneath the harness) and
+ * every remaining trial silently recorded 0 bytes and a miss for both arms.
+ *
+ * Aborting is the right response, not skipping: once the environment is broken,
+ * every later trial is suspect too, so the run has no partial value worth
+ * salvaging into a table that reads as complete.
+ */
+class ToolFailure extends Error {
+  constructor(tool: string, detail: string) {
+    super(
+      `${tool} produced no output — the environment is broken, so the run is void.\n`
+      + `  This is not a data point: a trial where the tool did not run is not a trial where the tool missed something.\n`
+      + `  Do not rebuild packages/vlmkit-markup (or any package the CLI loads) while this harness runs;\n`
+      + `  its dist is wiped by \`clean: true\` and every subprocess then fails to import the gate registry.\n`
+      + (detail ? `  tool stderr: ${detail.trim().split("\n").slice(-3).join(" / ")}` : ""),
+    );
+    this.name = "ToolFailure";
+  }
 }
 
 export interface ArmResult {
@@ -367,7 +401,7 @@ export interface SeedResult {
 function pageArm(workdir: string, plan: Seed): ArmResult {
   const out = join(workdir, "page-signal");
   const pageFile = `page-${plan.page}.html`;
-  run([
+  const diffed = run([
     "diff", "html",
     join(workdir, "clean", pageFile),
     join(workdir, "dirty", pageFile),
@@ -376,9 +410,7 @@ function pageArm(workdir: string, plan: Seed): ArmResult {
 
   const reportPath = join(out, "diff-report.json");
   const notes: string[] = [];
-  if (!existsSync(reportPath)) {
-    return { arm: "page", signalBytes: 0, images: [], imageTokens: 0, localized: false, implicated: [], notes: ["diff html produced no report"] };
-  }
+  if (!existsSync(reportPath)) throw new ToolFailure("diff html", diffed.stderr);
   const raw = readFileSync(reportPath, "utf8");
 
   // Which component classes does the report name at all? The computed-style and
@@ -436,7 +468,7 @@ function storyArm(workdir: string, plan: Seed): ArmResult {
   try {
     parsed = JSON.parse(compared.stdout) as typeof parsed;
   } catch {
-    return { arm: "story", signalBytes: 0, images: [], imageTokens: 0, localized: false, implicated: [], notes: ["check story produced no JSON"] };
+    throw new ToolFailure("check story", compared.stderr);
   }
 
   const changed = parsed.report.results.filter((r) => r.outcome === "changed");
@@ -589,6 +621,12 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import
   const results: SeedResult[] = [];
   const skipped: string[] = [];
   let seed = 0;
+  /** Set by the abort path; suppresses the report, which would be a lie. */
+  let voided = false;
+  // Labelled so a ToolFailure deep in the innermost loop can leave all three at
+  // once. This block is module top level, not a function, so `return` is not
+  // available here.
+  trials:
   for (const page of pages) {
     for (const seedClass of classes) {
       for (const component of components) {
@@ -603,6 +641,15 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import
         try {
           result = runSeed({ seed, page, seedClass, component }, root);
         } catch (e) {
+          // A broken environment is not a skip. Skipping it would keep the run
+          // going and emit a table that looks complete, which is what happened
+          // on 2026-08-06 and cost a whole run.
+          if (e instanceof ToolFailure) {
+            process.stderr.write(`\nABORT at ${label} (trial ${seed}): ${e.message}\n`);
+            process.exitCode = 1;
+            voided = true;
+            break trials;
+          }
           // A component with no colour declaration of its own has no `colour`
           // trial, and that is fine — but it must be REPORTED, because a silently
           // shrinking corpus is how a bench starts flattering itself.
@@ -619,6 +666,16 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import
         results.push(result);
       }
     }
+  }
+
+  if (voided) {
+    // No report, no results.json. A partial corpus written to the same paths as
+    // a complete one is how a void run gets quoted a week later.
+    process.stderr.write(
+      `\n${results.length} trial(s) completed before the abort. Not written:`
+      + ` fix the environment and re-run from the start.\n`,
+    );
+    process.exit(1);
   }
 
   let report = formatReport(results);

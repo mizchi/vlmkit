@@ -80,8 +80,10 @@ component being small relative to the page, and it decays as the component grows
 - Worse, a *ratio* threshold gets coarse as area grows. A few hundred changed
   pixels is over a percent on a 3.5k-pixel button and about a tenth of a percent
   on a 250k-pixel hero — so the same default that catches a button regression can
-  **miss** a corner-radius change on a hero. Give large components an explicit
-  tighter `--threshold`, and do not assume the default protects them.
+  **miss** a corner-radius change on a hero. Do not assume the default protects
+  large components. `build gallery` derives a per-story threshold from a pixel
+  budget for this reason; if you write thresholds by hand, do the same arithmetic
+  rather than reusing one number.
 
 So prefer splitting a large block into its parts over keeping it whole, when the
 parts render standalone. Not for tidiness — for detection.
@@ -98,30 +100,48 @@ page whose components are still wrong; you will fix the same pixels twice.
 For behaviour, hand the component to `dynamic-markup` once its static form is
 converged.
 
-## Phase 3 — Freeze (the handoff, currently manual)
+## Phase 3 — Freeze (the handoff)
 
 **This is the phase people skip, and it is what makes the rest durable.** A
 component that converged once has no protection against the next edit unless its
 correct state is recorded.
 
 `build component` and `check story` are different tools for different phases —
-construction versus maintenance — and nothing yet converts one into the other. Do
-it by hand:
+construction versus maintenance. `build gallery` is the conversion between them:
+point it at the page that just converged and it derives the gallery, the story
+list, and a per-story threshold.
 
-1. Make sure the project has a gallery. If not, copy one from
-   `component-vrt`'s `assets/` (vanilla / React / Vue templates are there,
-   because Playwright ships none).
-2. Add a story per component **and per named state** from Phase 1.
-3. Write the baseline once the component is converged, not before:
-   ```bash
-   vlmkit check story components/Button/Primary --gallery "$G"   # writes it
-   vlmkit check story components/Button/Primary --gallery "$G"   # confirms clean
-   ```
-4. Record the set in `vlmkit.gates.json` so CI runs it and the story ids stop
+```bash
+vlmkit build gallery dist/index.html --out .vlmkit/gallery
+```
+
+It captures each component's rendered markup plus the page's CSS, writes
+`gallery.html` (implementing `window.mount` / `window.unmount`) and
+`stories.json`, and prints the `vlmkit.gates.json` fragment and the
+`check story` commands to run. Then:
+
+1. **Read the candidate list before trusting it.** Discovery groups by class, so
+   it proposes; you decide. Each candidate carries its evidence (instance count,
+   size, what it contains) and rejected ones say why. `--selector .c-card`
+   (repeatable) overrides discovery entirely, `--include-all` keeps the rejects.
+2. **Open the gallery and check it renders what you expect.** If it warns that a
+   stylesheet could not be read, stop — a baseline that looks fine and is wrong
+   is worse than no baseline.
+3. **Write baselines once each component is converged, not before**, using the
+   printed commands (they carry the derived `--threshold`).
+4. **Record the set in `vlmkit.gates.json`** so CI runs it and the story ids stop
    drifting (baselines are keyed on the id **as written**).
-5. Commit the baselines.
+5. **Commit the baselines.**
 
 A converged component with no baseline is an undone task, not a finished one.
+
+### What the generated gallery is not
+
+It captures markup, so the stories are frozen: `props` are accepted and ignored,
+and behaviour is not exercised. It answers "did my CSS or token edit change how
+this looks", which is the maintenance question. A component whose stories need to
+vary by prop, or whose states only exist at runtime, wants a hand-written gallery
+— `component-vrt`'s `assets/` has React / Vue / vanilla templates.
 
 ## Phase 4 — Maintain
 
@@ -146,8 +166,10 @@ Stated so you do not go looking:
 
 - **No keyframe extraction.** Motion cannot be read out of a reference by any tool
   here; it comes from a brief or from you.
-- **No automatic story generation.** Phase 3 is manual. The outline from Phase 0
-  contains the information needed to emit story definitions, and closing that gap
-  is the obvious next tool — but it does not exist yet, so do not look for a flag
-  that does it.
-- **The gallery is the project's to own.** Templates exist; a drop-in does not.
+- **No story generation from a *contract*.** `build gallery` works from a
+  rendered page, so it needs markup that already exists. There is no path from a
+  UI Contract IR (or a screenshot) straight to story definitions — during
+  construction, before any markup, Phase 3 has nothing to read.
+- **No prop or behaviour coverage in a generated gallery.** See above; a
+  hand-written gallery is the answer, and templates for one are in
+  `component-vrt`'s `assets/`.

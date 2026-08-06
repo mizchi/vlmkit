@@ -52,6 +52,18 @@ Check in this order:
    project's story layout. That glob is the only non-portable line.
 3. **No stories either** — `assets/button.story.template.tsx` shows the shape,
    including the hidden-form pattern for state.
+4. **The components are already built and rendered on a page, and you only want
+   VRT over them** — generate the gallery from that page instead of writing one:
+
+   ```bash
+   vlmkit build gallery dist/index.html --out .vlmkit/gallery
+   ```
+
+   It captures each component's markup and the page's CSS, and prints the
+   `check story` commands with a per-story threshold derived from each
+   component's area. The tradeoff: captured markup is frozen, so `props` do
+   nothing and behaviour is not exercised. Take option 2 over this whenever the
+   component's states matter.
 
 **Do not add a Playwright version bump for this.** The `mount` *fixture* is
 1.62+, but `check story` does not use it — it drives the page-side contract via

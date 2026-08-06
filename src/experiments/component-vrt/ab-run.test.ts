@@ -328,3 +328,52 @@ describe("trial comparability", () => {
     }
   });
 });
+
+describe("a broken environment", () => {
+  /**
+   * The failure that cost the fourth run: a dependency was rebuilt underneath
+   * the harness, every subprocess then failed to import the gate registry, and
+   * both arms recorded 0 bytes and a miss for 19 trials. A trial where the tool
+   * did not run is not a trial where the tool missed something, so the run has
+   * to abort rather than produce a table that reads as complete.
+   */
+  it("aborts the run instead of scoring trials the tools never measured", async () => {
+    const { mkdtemp, writeFile } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { spawnSync } = await import("node:child_process");
+
+    const dir = await mkdtemp(join(tmpdir(), "ab-abort-"));
+    // A stand-in CLI that exits 0 and writes nothing — the shape of the real
+    // failure, where the command ran but its output never appeared.
+    const silentCli = join(dir, "silent-cli.ts");
+    await writeFile(silentCli, "process.exit(0);\n");
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        "--experimental-strip-types",
+        join(dirname(fileURLToPath(import.meta.url)), "ab-run.ts"),
+        "--pages",
+        "flat",
+        "--classes",
+        "delete",
+        "--components",
+        "Button",
+      ],
+      {
+        encoding: "utf8",
+        env: { ...process.env, VLMKIT_AB_CLI: silentCli },
+        cwd: dir,
+        maxBuffer: 16 * 1024 * 1024,
+      },
+    );
+
+    assert.equal(result.status, 1, "a void run must not exit 0");
+    assert.match(result.stderr, /ABORT at flat\/delete\/Button/);
+    assert.match(result.stderr, /the run is void/);
+    // The distinction that makes the abort correct, stated where an operator sees it.
+    assert.match(result.stderr, /not a trial where the tool missed something/);
+    // And no report, because there is nothing to report.
+    assert.doesNotMatch(result.stdout, /## By page composition/);
+  });
+});
