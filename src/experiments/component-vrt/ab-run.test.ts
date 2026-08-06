@@ -193,6 +193,29 @@ describe("applySeed", () => {
     assert.notEqual(found!.value, plan.value);
   });
 
+  it("edits the planned block, not an identical declaration earlier in the file", () => {
+    // The bug this pins down: `body { background: #fff }` precedes
+    // `.c-card { background: #fff }`, and a whole-file indexOf hit `body` first.
+    // A Card mutation therefore repainted the entire page, so every story in the
+    // gallery reported changed and the component arm was scored with 15 false
+    // positives it had not earned.
+    const plan = {
+      seed: 1, page: "flat" as const, seedClass: "colour" as const, component: "Card" as const,
+      selector: ".c-card", property: "background", value: "#fff", replacement: "#8a5cf6",
+    };
+    const mutated = applySeed(CSS, plan);
+    assert.equal(
+      declarationsIn(mutated, ".c-card").find((d) => d.property === "background")?.value,
+      "#8a5cf6",
+      ".c-card's background should be the one that changed",
+    );
+    assert.equal(
+      declarationsIn(mutated, "body").find((d) => d.property === "background")?.value,
+      "#fff",
+      "body's background must be untouched — it is what makes every story change",
+    );
+  });
+
   it("throws rather than silently no-op when the declaration is absent", () => {
     assert.throws(
       () => applySeed(CSS, { ...planSeed(CSS, req()), property: "no-such-prop", value: "1px" }),

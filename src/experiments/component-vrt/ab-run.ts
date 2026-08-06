@@ -237,14 +237,39 @@ export function mutateValue(property: string, value: string, seedClass: SeedClas
   return `${value} `.trim(); // no safe perturbation; caller filters these out
 }
 
-/** Apply the plan: delete the declaration, or replace its value. */
+/**
+ * Locate the `{ ... }` span of one rule block, so an edit can be confined to it.
+ */
+function blockSpan(css: string, selector: string): { start: number; end: number } {
+  const match = new RegExp(`^\\s*${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*\\{`, "m").exec(css);
+  if (!match) throw new Error(`rule block ${selector} not found`);
+  const start = match.index + match[0].length;
+  const end = css.indexOf("}", start);
+  if (end < 0) throw new Error(`rule block ${selector} is unterminated`);
+  return { start, end };
+}
+
+/**
+ * Apply the plan: delete the declaration, or replace its value — **inside the
+ * planned selector's block only**.
+ *
+ * The block scoping is the whole point. An earlier version searched the entire
+ * file with `indexOf("background: #fff;")`, and `body { background: #fff }`
+ * appears before `.c-card { background: #fff }` — so a mutation planned for the
+ * Card silently repainted the page background instead, turning every story in the
+ * gallery purple. That produced 15 "false positives" for the component arm which
+ * were not the arm's fault at all: the fixture really had changed everywhere.
+ * Ground truth is only ground truth if the mutation lands where the plan says.
+ */
 export function applySeed(css: string, plan: Seed): string {
+  const { start, end } = blockSpan(css, plan.selector);
   const line = `${plan.property}: ${plan.value};`;
-  const index = css.indexOf(line);
-  if (index < 0) throw new Error(`could not find "${line}" to mutate`);
-  const replacement = plan.replacement === ""
-    ? ""
-    : `${plan.property}: ${plan.replacement};`;
+  const within = css.slice(start, end).indexOf(line);
+  if (within < 0) {
+    throw new Error(`could not find "${line}" inside ${plan.selector} to mutate`);
+  }
+  const index = start + within;
+  const replacement = plan.replacement === "" ? "" : `${plan.property}: ${plan.replacement};`;
   return `${css.slice(0, index)}${replacement}${css.slice(index + line.length)}`;
 }
 
