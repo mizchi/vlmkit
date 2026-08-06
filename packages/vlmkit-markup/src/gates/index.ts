@@ -38,6 +38,7 @@ import { interactionsGate } from "./interactions.gate.ts";
 import { layoutGate } from "./layout.gate.ts";
 import { motionGate } from "./motion.gate.ts";
 import { scrollGate } from "./scroll.gate.ts";
+import { storyGate } from "./story.gate.ts";
 import { scrollScanGate } from "./scroll-scan.gate.ts";
 import { i18nStressGate, mediaVariantsGate } from "./stress.gate.ts";
 import { themeGate } from "./theme.gate.ts";
@@ -64,6 +65,7 @@ export {
   mediaVariantsGate,
   motionGate,
   scrollGate,
+  storyGate,
   scrollScanGate,
   themeGate,
   tokensGate,
@@ -86,6 +88,7 @@ export const markupGatesPlugin = definePlugin({
     // Responsive / dynamic behavior.
     breakpointsGate,
     scrollGate,
+  storyGate,
     scrollScanGate,
     handlersGate,
     motionGate,

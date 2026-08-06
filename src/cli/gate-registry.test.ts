@@ -33,7 +33,7 @@ describe("composed built-in registry", () => {
     // createGateRegistry throws on a conflict, so reaching this line is the
     // assertion; the count guards against a plugin silently dropping out.
     const r = await registry();
-    assert.equal(r.list().length, 26);
+    assert.equal(r.list().length, 27);
   });
 
   it("keeps each gate id in step with its command path", async () => {
@@ -79,11 +79,11 @@ describe("composed built-in registry", () => {
     }
   });
 
-  it("declares 115 tunable rules in total", async () => {
+  it("declares 118 tunable rules in total", async () => {
     // A canary, not a target: a gate losing its rule table to a bad merge is
     // otherwise invisible until someone tries to tune it.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 115);
+    assert.equal(total, 118);
   });
 
   it("gives every built-in gate a category", async () => {

@@ -359,9 +359,61 @@ no-op, and the JSON is always
 ```
 
 so a client gates on `verdict` / `counts` without knowing which gate ran. All
-26 gates are registry-driven; `vlmkit rules` lists them. Commands that produce
+27 gates are registry-driven; `vlmkit rules` lists them. Commands that produce
 artifacts rather than verdicts (`diff`, `build`, `contract`, `snapshot`, …) are
 not gates and keep their own flags.
+
+### Component-focused VRT (`check story`)
+
+```bash
+# Mount one story from your Playwright component-testing gallery and diff
+# ONLY that component. First run writes the baseline.
+vlmkit check story components/Button/Primary --gallery http://localhost:5173/playwright/gallery/index.html
+
+# Several stories, one browser.
+vlmkit check story components/Button/Primary components/Card/Default --gallery "$G"
+
+# Props, a smaller viewport, a looser threshold, a different mount root.
+vlmkit check story components/Button/WithTitle --gallery "$G" --props '{"title":"Hello"}'
+vlmkit check story components/Button/Primary --gallery "$G" --viewport 400x300 --threshold 0.02
+vlmkit check story components/Button/Primary --gallery "$G" --update-baseline
+```
+
+For repairing one component, a full-page diff is the wrong instrument: the image
+is large, it cascades (nudge a header and every row below reports as changed), and
+the part under repair is buried in the part that is not. `check story` screenshots
+the mounted component only — measured on `examples/story-gallery/`, 30,448px
+across three stories against 1,440,000px for the same count of full-viewport
+shots, **47x smaller** — and an unrelated story stays clean when a shared
+stylesheet changes.
+
+It drives the **gallery's page-side contract** directly, via `page.evaluate`, the
+same way Playwright's own `mount` fixture does:
+
+```js
+window.mount({ story, props })   // renders into #root, rejects on failure
+window.unmount()
+```
+
+So it needs no spec files, no config dialect, and no particular Playwright
+version — the `mount` *fixture* is 1.62+, this is not, and vlmkit keeps Playwright
+as a peer dependency it does not force forward. It does require those two
+functions on `window`: a page that merely renders one component per URL is not
+enough (Storybook exposes no `window.mount` and would need a shim).
+
+Three rules, and the distinction between the first two matters: `story-drift` is
+the finding you asked for, while `mount-failed` means *nothing was measured* — an
+unknown story id, a render throw, a page that is not a gallery. `new-baseline` is
+a `warn` rather than a pass, because a gate that accepts whatever it first sees
+cannot fail on the run that matters.
+
+Baselines live in `.vlmkit/stories/<story>/<viewport>.png`, keyed on the story id
+**as written** (the gallery owns resolution and the contract offers no way to ask
+what an id resolved to, so `Button/Primary` and `components/Button/Primary` get
+separate baselines — pick one spelling and list it in `vlmkit.gates.json`).
+
+Runnable example plus a React + Vite gallery to copy:
+[`examples/story-gallery/`](../examples/story-gallery/).
 
 ### Cost (which gates and rules your CI is paying for)
 

@@ -8,7 +8,7 @@ Dates are YYYY-MM-DD.
 The gates became a plugin architecture. A gate is now a declaration — id,
 command, rule table, inputs, and four functions — handed to one core runner
 that owns `--help`, `--json`, `--advisory`, the run ledger, the verdict and
-the exit code. Every one of the 26 gates goes through it, including the two
+the exit code. Every one of the 27 gates goes through it, including the two
 that live outside `vlmkit-markup`, and a project can add its own gate with the
 same standing as a bundled one. See
 [`docs/design/gate-plugin-architecture.md`](docs/design/gate-plugin-architecture.md).
@@ -53,7 +53,23 @@ suppression works per *rule* instead of per whole gate.
 
 - **`vlmkit rules`** lists every gate with its rule count and plugin;
   **`vlmkit rules <gate>`** prints that gate's rules, default severities and
-  docs. 115 rules across 26 gates.
+  docs. 118 rules across 27 gates.
+- **`vlmkit check story`** — VRT scoped to one mounted component, for the repair
+  loop where a full-page diff is the wrong instrument. Mounts a story in your
+  Playwright component-testing gallery and screenshots only that component:
+  measured on `examples/story-gallery/`, 30,448px across three stories against
+  1,440,000px for the same count of full-viewport shots (**47x smaller**), and an
+  unrelated story stays clean when a shared stylesheet changes. Reports region
+  geometry and shift estimates so a ratio becomes an edit.
+
+  It drives the gallery's **page-side contract** (`window.mount({ story, props })`
+  / `window.unmount()` into `#root`) through `page.evaluate`, the same way
+  Playwright's own `mount` fixture does — so it needs no spec files, no config
+  dialect, and no Playwright version bump. The fixture itself is 1.62+; this is
+  not, and Playwright stays a peer dependency vlmkit does not force forward.
+  Several stories share one browser. `--props`, `--viewport`, `--threshold`,
+  `--root`, `--settle`, `--update-baseline`. Runnable example and a React + Vite
+  gallery to copy: `examples/story-gallery/`.
 - **`vlmkit bench gates`** — where a ruleset spends its time. Runs every gate that
   works from a bare page (18 of the 26; the set is derived from each gate's
   declared `inputs`, not from a list) and reports cost beside yield: median /

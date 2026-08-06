@@ -1,6 +1,6 @@
 # Gate plugin architecture — core runner + rule definitions
 
-Status: **landed**. All 26 gates are registry-driven; the MCP tools,
+Status: **landed**. All 27 gates are registry-driven; the MCP tools,
 `verify markup`'s folded-in gates and `vlmkit gates` validation all read from
 the registry.
 Date: 2026-08-05.
@@ -74,7 +74,7 @@ packages/vlmkit-core/src/plugin/
   runner.ts     the runner: help/--json/--advisory/ledger/exit code
   load.ts       third-party plugin loading
 
-packages/vlmkit-markup/src/gates/   24 gates + the built-in plugin
+packages/vlmkit-markup/src/gates/   25 gates + the built-in plugin
 packages/vlmkit-capture/src/gates/  check crater
 src/gates/                          check perf (app-side)
 src/cli/gate-registry.ts            composes all of the above + user plugins
@@ -248,7 +248,7 @@ guide for someone adding a metric, and it is what `vlmkit rules` points at.
 |---|---|---|
 | `correctness` | Is the page broken, on its own terms? No reference needed. | 6 |
 | `behavior` | Does it respond correctly to size, scroll, motion and input? | 9 |
-| `design-system` | Does it conform to the design language the project declares? | 6 |
+| `design-system` | Does it conform to the design language the project declares? | 7 |
 | `verdict` | Is this attempt done? Aggregates other signals into one answer. | 3 |
 | `infrastructure` | Is the measurement toolchain itself working? | 2 |
 
@@ -280,7 +280,7 @@ The built-ins load through the same `createGateRegistry([...])` call. If the
 contract were not sufficient for them it would not be sufficient for anyone
 else, and making them its first consumer is the only way to keep that honest.
 
-## The 26 gates (115 tunable rules)
+## The 27 gates (118 tunable rules)
 
 | Gate | Rules | Plugin |
 |---|---|---|
@@ -301,6 +301,7 @@ else, and making them its first consumer is the only way to keep that honest.
 | `stress media` | 2 | markup |
 | `check tokens` | 2 | markup |
 | `check design` | 3 | markup |
+| `check story` | 3 | markup |
 | `check theme` | 2 | markup |
 | `check asset` | 7 | markup |
 | `check drift component` | 1 | markup |
