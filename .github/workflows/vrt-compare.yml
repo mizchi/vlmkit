@@ -44,25 +44,32 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-      # 0.8.1 made src/ entrypoints resolve deep imports through dist. The
-      # `:js` variant skips `moon:build` — the MoonBit output is loaded at
-      # runtime from `_build/js/`, not needed to emit JS + declarations — so
-      # this job does not have to install the MoonBit toolchain.
-      - run: pnpm build:packages:js
+
+      # `diff html` classifies each diff region through the MoonBit
+      # `markup-core` policy, which is loaded at runtime from `_build/js/` —
+      # not produced by the `:js` build and not committed. Without `moon` on
+      # PATH the run dies with `spawnSync moon ENOENT` mid-compare, so this
+      # job installs the toolchain and uses the full `build:packages`.
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - run: pnpm build:packages
       - run: pnpm exec playwright install --with-deps chromium
 
       - name: Run VRT Compare
         run: |
           if [ -n "${{ inputs.before }}" ] && [ -n "${{ inputs.after }}" ]; then
-            node --experimental-strip-types src/cli/vlmkit.ts compare \
+            node --experimental-strip-types src/cli/vlmkit.ts diff html \
               "${{ inputs.before }}" "${{ inputs.after }}"
           elif [ "${{ inputs.scenario }}" = "reset-css" ]; then
-            node --experimental-strip-types src/cli/vlmkit.ts compare \
+            node --experimental-strip-types src/cli/vlmkit.ts diff html \
               --dir fixtures/migration/reset-css \
               --baseline normalize.html \
               --variants modern-normalize.html destyle.html no-reset.html
           else
-            node --experimental-strip-types src/cli/vlmkit.ts compare \
+            node --experimental-strip-types src/cli/vlmkit.ts diff html \
               fixtures/migration/tailwind-to-vanilla/before.html \
               fixtures/migration/tailwind-to-vanilla/after.html
           fi
@@ -72,7 +79,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: vrt-compare-report
-          path: test-results/migration/migration-report.json
+          path: test-results/migration/diff-report.json
           if-no-files-found: warn
 
   snapshot-false-positive:
@@ -160,11 +167,15 @@ jobs:
       - run: pnpm build:packages:js
       - run: pnpm exec playwright install --with-deps chromium
 
+      # `|| true` because exploration finding a real issue is a finding, not a
+      # CI failure — but it also swallows "Unknown command", which is how this
+      # step kept passing after `vlmkit smoke` became `vlmkit inspect smoke`.
+      # `tests/workflow-commands.test.mjs` now checks the command resolves.
       - name: Smoke test fixtures
         run: |
           for fixture in page dashboard form-app; do
             echo "=== Smoke test: $fixture ==="
-            node --experimental-strip-types src/cli/vlmkit.ts smoke \
+            node --experimental-strip-types src/cli/vlmkit.ts inspect smoke \
               "fixtures/css-challenge/$fixture.html" \
               --max-actions 15 --seed 42 || true
           done

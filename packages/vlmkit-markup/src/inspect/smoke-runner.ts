@@ -6,9 +6,9 @@
  * performs random actions within the site, and detects crashes.
  *
  * Usage:
- *   node src/smoke-runner.ts <url-or-file>
- *   node src/smoke-runner.ts --url https://example.com --max-actions 20
- *   node src/smoke-runner.ts --file fixtures/css-challenge/page.html --seed 42
+ *   vlmkit inspect smoke <url-or-file>
+ *   vlmkit inspect smoke --url https://example.com --max-actions 20
+ *   vlmkit inspect smoke --file fixtures/css-challenge/page.html --seed 42
  */
 import { mkdir, readFile } from "node:fs/promises";
 import { chromium, type Page, type Browser } from "playwright";
@@ -508,9 +508,12 @@ ACTION: click ROLE: button NAME: Submit`;
 
 async function main() {
   if (!URL_ARG && !FILE_ARG) {
-    console.log("Usage: node src/smoke-runner.ts <file-or-url>");
-    console.log("       node src/smoke-runner.ts --url https://example.com --max-actions 20");
-    console.log("       node src/smoke-runner.ts --file page.html --seed 42");
+    // The command, not the module path. `node src/smoke-runner.ts` has not
+    // been a way to run this since the dispatcher took over, so printing it
+    // hands the reader an instruction that cannot be pasted.
+    console.log("Usage: vlmkit inspect smoke <file-or-url>");
+    console.log("       vlmkit inspect smoke --url https://example.com --max-actions 20");
+    console.log("       vlmkit inspect smoke --file page.html --seed 42");
     process.exit(1);
   }
 

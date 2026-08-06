@@ -116,6 +116,28 @@ suppression works per *rule* instead of per whole gate.
 
 ### Fixed
 
+- **Two CI jobs were running commands that no longer exist.** The `compare` job
+  invoked `vlmkit compare`, removed in 0.9.1 in favour of `vlmkit diff html`, so
+  it failed with "Unknown command" and uploaded an empty artifact — which reads
+  like a broken fixture rather than a stale workflow. The `smoke-test` job
+  invoked `vlmkit smoke` (now `vlmkit inspect smoke`) and, because that step ends
+  in `|| true`, reported success while running nothing. `tests/workflow-commands.test.mjs`
+  now resolves every `vlmkit` command the workflows invoke against the real
+  dispatcher, so a rename fails a five-second test instead of a fifteen-minute
+  browser job — or instead of nothing.
+- The `compare` job now installs the MoonBit toolchain. `diff html` classifies
+  diff regions through `markup-core`, which is loaded at runtime and is not
+  produced by the `:js` build, so the job would have died on
+  `spawnSync moon ENOENT` immediately after the command name was fixed.
+- The `vrt-compare` report artifact points at `diff-report.json`. 0.9.1 removed
+  the `migration-report.json` duplicate but the workflow still asked for it.
+- `vlmkit inspect smoke` with no target printed
+  `Usage: node src/smoke-runner.ts …` — a module path that has not been runnable
+  since the dispatcher took over. It prints the command now.
+- `pnpm sync:skills` exposes the skill-package sync that already existed as a
+  script, and the drift assertions in `tests/skill-package.test.mjs` name it.
+  The failure was a 10 KB buffer diff with no hint that a generator owns those
+  files, which invites hand-editing one of the three copies.
 - `check breakpoints` no longer calls `process.exit(1)`, which could truncate
   its own buffered output.
 - A stale legacy dispatch entry for `check tokens` shadowed the gate; combined
