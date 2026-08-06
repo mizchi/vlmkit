@@ -1,169 +1,132 @@
 /**
- * MCP tool definitions — thin JSON-in/out wrappers over vlmkit's
- * deterministic verification gates.
+ * MCP tool definitions — JSON-in/out over vlmkit's deterministic gates.
  *
  * Design (from docs/design/mcp-and-agent-expansion.md):
- *   - Reuse the SAME pure functions the CLI calls; no behavior fork.
- *   - Path inputs only (no base64 round-trips); Playwright is
- *     dynamic-imported inside the pure functions, so importing this
- *     module stays cheap.
- *   - Vision is never asked for coordinates/sizes/colors — these gates
- *     are pixel + DOM math. The tools inherit that guarantee.
- *   - Every result carries the structured report AND a plain-text
- *     one-line verdict, so an MCP client can gate on `ok`/`done`
- *     without parsing, and the kickback (with selector attribution /
- *     kind tags / near-miss / pixel-confirmed demotion flags) travels
- *     verbatim as the "what to do next" payload.
+ *   - Reuse the SAME code the CLI calls; no behavior fork.
+ *   - Path inputs only (no base64 round-trips); Playwright is dynamic-imported
+ *     inside the gate's `run`, so importing this module stays cheap.
+ *   - Vision is never asked for coordinates/sizes/colors — these gates are
+ *     pixel + DOM math. The tools inherit that guarantee.
+ *   - Every result carries the structured report AND a plain-text one-line
+ *     verdict, so an MCP client can gate on `failed` without parsing.
+ *
+ * Most tools are now one `gateTool(gate, { description })` call: the name,
+ * input schema, invocation and failure decision are derived from the gate
+ * definition, so this file cannot drift from the CLI's view of a gate. What
+ * stays hand-written is the `description` — it is a prompt for a model
+ * choosing between tools, not a restatement of `gate.summary`. See
+ * `gate-tool.ts`.
+ *
+ * Two tools are not `gateTool` calls, for stated reasons:
+ *   - `build_page` is not a gate. It returns a composition diff (an artifact),
+ *     has no findings and no verdict.
+ *   - `verify_flow` and `check_layout` take their flow / contract INLINE as an
+ *     object. The gates take `--flow <path>` / `--contract <path>`, which is
+ *     right for a CLI and wrong for an MCP client that would have to write a
+ *     temp file to call it. Both still take their verdict line from the gate's
+ *     `headline`, so the two surfaces cannot describe one report differently.
  */
 import { z } from "zod";
+import type { McpTool, McpToolResult } from "./tool-result.ts";
+import { toolResult as result } from "./tool-result.ts";
+import { gateTool } from "./gate-tool.ts";
+import {
+  copyGate,
+  equivalenceGate,
+  handlersGate,
+  integrityGate,
+  interactionsGate,
+  layoutGate,
+  verifyFlowGate,
+  verifyMarkupGate,
+} from "@mizchi/vlmkit-markup/gates/index.ts";
 
-export interface McpToolResult {
-  /** Human/agent-readable one-liner + the report, as MCP text content. */
-  content: Array<{ type: "text"; text: string }>;
-  /** True when the gate failed (verdict NOT ok/done). Surfaced to isError. */
-  failed: boolean;
-  /** The raw structured report, for tests and structured-content clients. */
-  structured: unknown;
-}
+export type { McpTool, McpToolResult };
 
-function result(summary: string, structured: unknown, failed: boolean): McpToolResult {
-  return {
-    content: [{ type: "text", text: `${summary}\n\n${JSON.stringify(structured, null, 2)}` }],
-    failed,
-    structured,
-  };
-}
-
-export interface McpTool {
-  name: string;
-  description: string;
-  inputSchema: z.ZodRawShape;
-  run: (args: Record<string, unknown>) => Promise<McpToolResult>;
-}
-
-// ---------------------------------------------------------------------------
-// verify_markup
-
-const verifyMarkupTool: McpTool = {
-  name: "verify_markup",
+const verifyMarkupTool = gateTool(verifyMarkupGate, {
+  // Published names, kept stable: the gate's repeatable `--target` has always
+  // been `targets` here, and `--no-fix-context` has always been `fixContext`.
+  aliases: { target: "targets" },
+  invert: { "no-fix-context": "fixContext" },
   description:
     "One-shot done-condition verdict for a markup attempt: composition per target viewport (missing/extra/ordering/gap), dynamic gates (breakpoints/scroll/animation/motion), and a rest-pose pixel diff. Returns a machine verdict plus a paste-ready kickback listing every residual with deterministic selector attribution, kind tags, and near-miss/pixel-confirmed flags. Deterministic (pixels + Playwright, no VLM). Use to decide whether a generated/edited page is actually done, and to get the next fix list when it is not.",
+});
+
+const checkIntegrityTool = gateTool(integrityGate, {
+  description:
+    "Reference-free integrity gate for creative/zero-shot markup — no target image or manifest needed. Detects defects that are unambiguous without a reference: JS errors (construction-phase = fatal), empty/degenerate renders, broken images/stylesheets/scripts/fonts, same-layer text collisions, clipped text, collapsed containers, horizontal page overflow, and declared-but-unapplied styling, swept across multiple viewport widths. Deterministic (DOM + pixel math, no VLM). Intentional patterns (hero overlays, ellipsis truncation, positioning anchors) are exempted by tool-side rules and reported in `exempted` — audit the rule, don't re-litigate the finding. A pattern the tool does not recognise as intentional can be accepted per finding via `allow` (syntax `<kind>[@<selector>][@<viewport>];<reason>`); a reason is mandatory, an unknown kind is an error, accepted findings are still listed in `exempted` with that reason, and a rule matching nothing comes back in `unusedAllowRules`. Kinds meaning the page is broken (js-error, degenerate-render, unstyled-page, redirected) cannot be accepted — fix the page. The kickback is a paste-ready, selector-attributed fix list.",
+  // The sweep widths, the HAR replay and the storage state are CLI-shaped
+  // operational flags; an MCP client points at a page and reads findings.
+  omit: ["har", "storage-state"],
+});
+
+/**
+ * `check_layout` takes its contract INLINE, like `verify_flow` takes its flow.
+ * The gate takes `--contract <path>`, which is right for a CLI and wrong for a
+ * client that would have to write a temp file to call it — so the schema and
+ * invocation stay hand-written here. Everything else still comes from the gate.
+ */
+const checkLayoutTool: McpTool = {
+  name: "check_layout",
+  description:
+    "Layout contract: verifies a brief's STRUCTURAL requirements deterministically per viewport — element widths (±tolerance), matches per visual row (4-across at 1280 / 2x2 at 768 / stacked at 375), full-width collapse, stacking order (A above B), visibility, and counts. Turns 'the sidebar is 260px on desktop and collapses above the main column on tablet' into a machine-checkable spec the generation loop can run every round. Pure DOM math, no VLM. Complements check_integrity (defects) — this checks conformance to stated structure.",
   inputSchema: {
-    attempt: z.string().describe("Path to the attempt HTML file."),
-    targets: z.array(z.string()).min(1).describe("Target screenshot PNG path(s); each defines a render viewport."),
-    reference: z.string().optional().describe("Optional reference HTML measured against the same targets to print the calibration floor."),
-    fixContext: z.boolean().optional().describe("Attach selector attribution to kickback residuals (default true)."),
+    source: z.string().describe("Path or URL of the page."),
+    contract: z.object({
+      rules: z.array(z.object({
+        selector: z.string(),
+        at: z.number().describe("Viewport width this rule is checked at."),
+        width: z.number().optional(),
+        tolerance: z.number().optional(),
+        minWidth: z.number().optional(),
+        maxWidth: z.number().optional(),
+        perRow: z.number().optional().describe("Modal number of matches per visual row."),
+        fullWidth: z.boolean().optional(),
+        above: z.string().optional().describe("Selector whose matches must all start below this rule's matches."),
+        count: z.number().optional(),
+        visible: z.boolean().optional(),
+      })).min(1),
+    }).describe("The layout contract."),
   },
   run: async (args) => {
-    const { runMarkupVerify } = await import("@mizchi/vlmkit-markup/verify/markup-verify.ts");
-    const report = await runMarkupVerify({
-      attempt: args.attempt as string,
-      targets: args.targets as string[],
-      ...(args.reference ? { reference: args.reference as string } : {}),
-      ...(args.fixContext !== undefined ? { fixContext: args.fixContext as boolean } : {}),
-    });
-    const passed = report.targets.filter((t) => t.pass).length;
-    const summary = `verify_markup: ${report.done ? "DONE" : "NOT DONE"} (${passed}/${report.targets.length} targets passed, ${report.kickback.length} kickback item(s))`;
+    const { runLayoutVerify } = await import("@mizchi/vlmkit-markup/inspect/layout-contract.ts");
+    const report = await runLayoutVerify({ source: args.source as string, contract: args.contract as never });
+    // Verdict line from the gate's own `headline`, so this tool and
+    // `vlmkit check layout` cannot describe the same report differently.
+    const summary = `check_layout: ${layoutGate.headline!(report)}`;
     return result(summary, report, !report.done);
   },
 };
 
-// ---------------------------------------------------------------------------
-// check_interactions
-
-const checkInteractionsTool: McpTool = {
-  name: "check_interactions",
+const checkInteractionsTool = gateTool(interactionsGate, {
   description:
     "A11y-event state map: discovers interactive elements (roles + implicit semantics), probes their canonical keyboard events (Tab/Enter/Space/arrows/Escape) and records the resulting ARIA transitions, popup patterns (dialog focus-trap, menu focus/arrows/Escape-return), composite navigation (listbox activedescendant, grid roving), and live-region announcements. With `reference`, the reference's inventory becomes the behavioral contract matched by (role, accessible name) — this fails pages that match every screenshot but respond wrongly to keyboard events. Deterministic, no VLM.",
-  inputSchema: {
-    source: z.string().describe("Path or URL of the page to probe."),
-    reference: z.string().optional().describe("Optional reference page whose interaction inventory is the behavioral contract."),
-    handlers: z.boolean().optional().describe("Also enumerate the wired event-callback surface and cross-check it (pointer-only-control detection + event-vocabulary contract)."),
-    maxElements: z.number().optional().describe("Probe cap (default 30; the report says when capped)."),
-  },
-  run: async (args) => {
-    const { buildInteractionMap, deriveInteractionIssues, compareInteractionMaps } = await import(
-      "@mizchi/vlmkit-markup/inspect/interaction-map.ts"
-    );
-    const opts = { source: args.source as string, ...(args.maxElements !== undefined ? { maxElements: args.maxElements as number } : {}) };
-    const map = await buildInteractionMap(opts);
-    const issues = deriveInteractionIssues(map);
-    const out: Record<string, unknown> = { map, issues };
-    let suspects = issues.filter((i) => i.severity === "suspect").length;
-    if (args.reference) {
-      const refMap = await buildInteractionMap({ source: args.reference as string, ...(args.maxElements !== undefined ? { maxElements: args.maxElements as number } : {}) });
-      const comparison = compareInteractionMaps(refMap, map);
-      out.comparison = comparison;
-      suspects += comparison.missing.length + comparison.mismatches.filter((m) => m.severity === "suspect").length;
-    }
-    if (args.handlers) {
-      const { buildHandlerSurface, deriveHandlerIssues, compareHandlerSurfaces } = await import(
-        "@mizchi/vlmkit-markup/inspect/handler-map.ts"
-      );
-      const surface = await buildHandlerSurface({ source: args.source as string });
-      const handlerIssues = deriveHandlerIssues(surface);
-      out.handlerSurface = surface;
-      out.handlerIssues = handlerIssues;
-      suspects += handlerIssues.filter((i) => i.severity === "suspect").length;
-      if (args.reference) {
-        const refSurface = await buildHandlerSurface({ source: args.reference as string });
-        out.surfaceMismatches = compareHandlerSurfaces(refSurface, surface);
-      }
-    }
-    const summary = `check_interactions: ${suspects === 0 ? "ok" : `${suspects} suspect issue(s)`} (${map.elements.length} interactive element(s)${map.capped > 0 ? `, +${map.capped} beyond cap` : ""})`;
-    return result(summary, out, suspects > 0);
-  },
-};
+});
 
-// ---------------------------------------------------------------------------
-// scan_handlers
-
-const scanHandlersTool: McpTool = {
-  name: "scan_handlers",
+const scanHandlersTool = gateTool(handlersGate, {
   description:
     "Enumerates every event callback actually wired on the page (an addEventListener init-script patch + on* attribute/property sweep) into a per-element event surface, cross-checked against the a11y discovery. Headline detection the role-driven map cannot make: the pointer-only control — a visible element with a click/pointer handler but no role, no keyboard handler, and no delegation excuse, operable by mouse but not keyboard/AT. Deterministic, no VLM. (React-style root delegation shows as one listener on the root; per-element granularity is a vanilla/Web-Components property.)",
-  inputSchema: {
-    source: z.string().describe("Path or URL of the page to scan."),
-  },
-  run: async (args) => {
-    const { buildHandlerSurface, deriveHandlerIssues } = await import("@mizchi/vlmkit-markup/inspect/handler-map.ts");
-    const surface = await buildHandlerSurface({ source: args.source as string });
-    const issues = deriveHandlerIssues(surface);
-    const suspects = issues.filter((i) => i.severity === "suspect").length;
-    const summary = `scan_handlers: ${suspects === 0 ? "ok" : `${suspects} suspect issue(s)`} (${surface.totalRegistrations} registration(s) across ${surface.elements.length} element(s))`;
-    return result(summary, { surface, issues }, suspects > 0);
-  },
-};
+});
 
-// ---------------------------------------------------------------------------
-// check_copy
-
-const checkCopyTool: McpTool = {
-  name: "check_copy",
+const checkCopyTool = gateTool(copyGate, {
   description:
     "Copy-fidelity gate: an always-on placeholder-text scan (lorem-ipsum/TODO/TBD), plus optional manifest verification (every manifest line must appear in the VISIBLY rendered text, whitespace-normalized, case-sensitive; markdown headings in the manifest are section comments, not required lines) and optional target-image verification (crops every rendered text block's bbox out of the target screenshot into contact sheets for a second reader; the sheets catch a wrong year / missing separator / proper-noun typo that composition pairs happily and no pixel gate sees). Manifest matching sweeps disclosure states (closed <details>, unselected tabs, aria-expanded=false controls) so collapsed copy passes with provenance — do not ship disclosures open just to satisfy this gate. Copy that is not actually user-visible is reported as copy-invisible with a reason class, not as satisfied — do not hide manifest lines to pass. Detection is geometric (2026-07-31 silencing battery): font-size:0 / opacity:0 / transparent color, off-screen positioning (left/top -9999px, fixed off-viewport), text-indent, transform translate/scale(0), clip:rect / clip-path:inset, zero-size overflow boxes, color-on-same-color camouflage, and sr-only text (manifest lines are the user-VISIBLE copy spec; keep assistive-tech-only strings out of the manifest). Deliberate invisibility can be accepted per class via allowInvisible (reasons: zero-size, hidden, transparent, visually-hidden, unreachable, camouflage, unknown); accepted lines are listed with their reason so the suppression stays auditable. Deterministic except optional VLM transcription (not exposed here).",
-  inputSchema: {
-    source: z.string().describe("Path or URL of the page."),
-    manifest: z.string().optional().describe("Path to a copy manifest (one required line per row)."),
-    target: z.string().optional().describe("Target screenshot PNG to crop text-block bboxes from for review."),
-    outDir: z.string().optional().describe("Where contact sheets + worksheet are written (target mode)."),
-    allowInvisible: z.array(z.enum(["zero-size", "hidden", "transparent", "visually-hidden", "unreachable", "camouflage", "unknown"])).optional()
-      .describe("Invisible-match reason classes to accept as satisfied (deliberate suppression, e.g. [\"visually-hidden\"] to let sr-only text satisfy manifest lines)."),
-  },
-  run: async (args) => {
-    const { runCopyCheck } = await import("@mizchi/vlmkit-markup/inspect/copy-check.ts");
-    const report = await runCopyCheck({
-      source: args.source as string,
-      ...(args.manifest ? { manifestPath: args.manifest as string } : {}),
-      ...(args.target ? { targetPath: args.target as string } : {}),
-      ...(args.outDir ? { outDir: args.outDir as string } : {}),
-      ...(args.allowInvisible ? { allowInvisible: args.allowInvisible as import("@mizchi/vlmkit-markup/inspect/copy-check.ts").InvisibleReason[] } : {}),
-    });
-    const suspects = report.issues.filter((i) => i.severity === "suspect").length;
-    const summary = `check_copy: ${suspects === 0 ? "ok" : `${suspects} suspect issue(s)`} (missing ${report.missingLines.length}${report.invisibleLines.length > 0 ? `, ${report.invisibleLines.length} invisible-only` : ""}${report.revealedLines.length > 0 ? `, ${report.revealedLines.length} revealed-only` : ""}, placeholders ${report.placeholders.length}${report.imageReview ? `, ${report.imageReview.sheetFiles.length} review sheet(s)` : ""})`;
-    return result(summary, report, suspects > 0);
-  },
-};
+  // `--vlm` needs an API key and this surface is the keyless one; `--out`
+  // and `--no-states` are operator knobs, not things a model should pick.
+  omit: ["vlm", "no-states", "storage-state"],
+  aliases: { out: "outDir" },
+});
+
+const checkEquivalenceTool = gateTool(equivalenceGate, {
+  description:
+    "Visual-equivalence judge for residual regions: crops each region from both the attempt render (or PNG) and the target into a stacked pair image, and measures the mean per-channel delta deterministically. Keyless mode (this tool) writes the pair images + measured deltas for a SECOND reader to judge — it does not itself decide same/different (that needs a VLM and must not be the author of the pixels). Use as the tie-breaker for residuals that pass/fail a gate but may be visually equivalent (a reflowed line, a sub-pixel metric drift). Region spec: \"x,y,WxH\" or a kickback-shaped \"(x,y) WxH\".",
+  // Keyless by construction: without `--vlm` the gate writes pair images and
+  // measured deltas for a second reader instead of deciding same/different
+  // itself — which it must not, being the author of the pixels.
+  omit: ["vlm"],
+  // Published names since it shipped; the gate's flags are `--region`/`--out`.
+  aliases: { region: "regions", out: "outDir" },
+});
 
 // ---------------------------------------------------------------------------
 // build_page
@@ -190,103 +153,6 @@ const buildPageTool: McpTool = {
   },
 };
 
-// ---------------------------------------------------------------------------
-// check_equivalence (keyless: measured delta + pair sheets for a second reader)
-
-const checkEquivalenceTool: McpTool = {
-  name: "check_equivalence",
-  description:
-    "Visual-equivalence judge for residual regions: crops each region from both the attempt render (or PNG) and the target into a stacked pair image, and measures the mean per-channel delta deterministically. Keyless mode (this tool) writes the pair images + measured deltas for a SECOND reader to judge — it does not itself decide same/different (that needs a VLM and must not be the author of the pixels). Use as the tie-breaker for residuals that pass/fail a gate but may be visually equivalent (a reflowed line, a sub-pixel metric drift). Region spec: \"x,y,WxH\" or a kickback-shaped \"(x,y) WxH\".",
-  inputSchema: {
-    source: z.string().describe("Attempt HTML or PNG."),
-    target: z.string().describe("Target screenshot PNG."),
-    regions: z.array(z.string()).min(1).describe("Region specs: \"x,y,WxH\" or \"(x,y) WxH\" (repeatable)."),
-    outDir: z.string().optional().describe("Where pair images are written."),
-  },
-  run: async (args) => {
-    const { runRegionJudge, parseRegionSpec } = await import("@mizchi/vlmkit-markup/inspect/region-judge.ts");
-    const regions = (args.regions as string[]).map(parseRegionSpec);
-    const report = await runRegionJudge({
-      source: args.source as string,
-      targetPath: args.target as string,
-      regions,
-      ...(args.outDir ? { outDir: args.outDir as string } : {}),
-    });
-    const summary = `check_equivalence: ${report.verdicts.length} region(s) measured (max delta ${Math.max(...report.verdicts.map((v) => v.measuredDelta)).toFixed(2)}); pair images written for a second reader`;
-    // Keyless: advisory only — never hard-fails (a human/VLM makes the call).
-    return result(summary, report, false);
-  },
-};
-
-// ---------------------------------------------------------------------------
-// check_integrity (reference-free defect gate)
-
-const checkIntegrityTool: McpTool = {
-  name: "check_integrity",
-  description:
-    "Reference-free integrity gate for creative/zero-shot markup — no target image or manifest needed. Detects defects that are unambiguous without a reference: JS errors (construction-phase = fatal), empty/degenerate renders, broken images/stylesheets/scripts/fonts, same-layer text collisions, clipped text, collapsed containers, horizontal page overflow, and declared-but-unapplied styling, swept across multiple viewport widths. Deterministic (DOM + pixel math, no VLM). Intentional patterns (hero overlays, ellipsis truncation, positioning anchors) are exempted by tool-side rules and reported in `exempted` — audit the rule, don't re-litigate the finding. A pattern the tool does not recognise as intentional can be accepted per finding via `allow` (syntax `<kind>[@<selector>][@<viewport>];<reason>`); a reason is mandatory, an unknown kind is an error, accepted findings are still listed in `exempted` with that reason, and a rule matching nothing comes back in `unusedAllowRules`. Kinds meaning the page is broken (js-error, degenerate-render, unstyled-page, redirected) cannot be accepted — fix the page. The kickback is a paste-ready, selector-attributed fix list.",
-  inputSchema: {
-    source: z.string().describe("Path or URL of the page to check."),
-    viewports: z.array(z.number()).optional().describe("Sweep widths (default 1280, 768, 375)."),
-    maxFindings: z.number().optional().describe("Per-class report cap (default 12)."),
-    allow: z.array(z.string()).optional().describe(
-      "Exempt intentional patterns: `<kind>[@<selector>][@<viewport>];<reason>`, e.g. \"near-misalignment@.badge;optically centred\". The reason is required.",
-    ),
-  },
-  run: async (args) => {
-    const { runIntegrityCheck } = await import("@mizchi/vlmkit-markup/inspect/integrity-check.ts");
-    const { parseAllowRules } = await import("@mizchi/vlmkit-markup/inspect/integrity-exemption.ts");
-    const heights: Record<number, number> = { 1280: 800, 768: 900, 375: 700 };
-    const report = await runIntegrityCheck({
-      source: args.source as string,
-      ...(args.viewports
-        ? { viewports: (args.viewports as number[]).map((w) => ({ width: w, height: heights[w] ?? 800 })) }
-        : {}),
-      ...(args.maxFindings !== undefined ? { maxFindings: args.maxFindings as number } : {}),
-      ...(args.allow ? { allow: parseAllowRules(args.allow as string[]) } : {}),
-    });
-    const fails = report.findings.filter((f) => f.severity === "fail").length;
-    const warns = report.findings.length - fails;
-    const stale = report.unusedAllowRules?.length ?? 0;
-    const summary = `check_integrity: ${report.verdict === "clean" ? "CLEAN" : "DEFECTS"}`
-      + ` (${fails} fail, ${warns} warn, ${report.exempted.length} exempted`
-      + `${stale > 0 ? `, ${stale} allow-rule(s) matched nothing` : ""})`;
-    return result(summary, report, report.verdict !== "clean");
-  },
-};
-
-// ---------------------------------------------------------------------------
-// check_layout (structural requirements as a machine-checkable contract)
-
-const checkLayoutTool: McpTool = {
-  name: "check_layout",
-  description:
-    "Layout contract: verifies a brief's STRUCTURAL requirements deterministically per viewport — element widths (±tolerance), matches per visual row (4-across at 1280 / 2x2 at 768 / stacked at 375), full-width collapse, stacking order (A above B), visibility, and counts. Turns 'the sidebar is 260px on desktop and collapses above the main column on tablet' into a machine-checkable spec the generation loop can run every round. Pure DOM math, no VLM. Complements check_integrity (defects) — this checks conformance to stated structure.",
-  inputSchema: {
-    source: z.string().describe("Path or URL of the page."),
-    contract: z.object({
-      rules: z.array(z.object({
-        selector: z.string(),
-        at: z.number().describe("Viewport width this rule is checked at."),
-        width: z.number().optional(),
-        tolerance: z.number().optional(),
-        minWidth: z.number().optional(),
-        maxWidth: z.number().optional(),
-        perRow: z.number().optional().describe("Modal number of matches per visual row."),
-        fullWidth: z.boolean().optional(),
-        above: z.string().optional().describe("Selector whose matches must all start below this rule's matches."),
-        count: z.number().optional(),
-        visible: z.boolean().optional(),
-      })).min(1),
-    }).describe("The layout contract."),
-  },
-  run: async (args) => {
-    const { runLayoutVerify } = await import("@mizchi/vlmkit-markup/inspect/layout-contract.ts");
-    const report = await runLayoutVerify({ source: args.source as string, contract: args.contract as never });
-    const summary = `check_layout: ${report.done ? "SATISFIED" : "VIOLATED"} (${report.passed}/${report.total} rules)`;
-    return result(summary, report, !report.done);
-  },
-};
 
 const verifyFlowTool: McpTool = {
   name: "verify_flow",
@@ -306,7 +172,9 @@ const verifyFlowTool: McpTool = {
   run: async (args) => {
     const { runFlowVerify } = await import("@mizchi/vlmkit-markup/inspect/flow-verify.ts");
     const report = await runFlowVerify({ source: args.source as string, flow: args.flow as never });
-    const summary = `verify_flow: ${report.done ? "DONE" : "FAILED"} (${report.passed}/${report.total} steps)`;
+    // The verdict line comes from the gate's own `headline`, so this tool and
+    // `vlmkit verify flow` cannot describe the same report differently.
+    const summary = `verify_flow: ${verifyFlowGate.headline!(report)}`;
     return result(summary, report, !report.done);
   },
 };

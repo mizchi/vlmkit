@@ -1,6 +1,8 @@
 # Gate plugin architecture — core runner + rule definitions
 
-Status: **landed**. All 26 gates are registry-driven.
+Status: **landed**. All 26 gates are registry-driven; the MCP tools,
+`verify markup`'s folded-in gates and `vlmkit gates` validation all read from
+the registry.
 Date: 2026-08-05.
 
 ## The problem this solved
@@ -76,6 +78,7 @@ packages/vlmkit-markup/src/gates/   24 gates + the built-in plugin
 packages/vlmkit-capture/src/gates/  check crater
 src/gates/                          check perf (app-side)
 src/cli/gate-registry.ts            composes all of the above + user plugins
+packages/vlmkit-mcp/src/gate-tool.ts  turns a gate into an MCP tool
 ```
 
 **Core never imports a gate.** Gate definitions live in the package that owns
@@ -101,6 +104,7 @@ export const motionGate = defineGate<MotionDetectionReport, MotionDetectionOptio
   run:      (options) => report,        // measurement only, no printing
   findings: (report, options) => [],    // projection onto the normal form
   format:   (report) => string,         // prose only
+  headline: (report) => string,         // one line: what was measured
   ledger:   (report, options) => entry, // or null to opt out
 });
 ```
@@ -310,21 +314,92 @@ Deliberate, and each one aligns a straggler with the documented contract:
 - **`vlmkit rules` / `vlmkit rules <gate>`** are new. Without a way to list rule
   ids, rule settings would be a feature nobody could find.
 
+## Follow-ups, now closed
+
+The three items this document listed as open have landed.
+
+### `verify markup` drives its sub-gates through the registry
+
+`GateVerdict.gate` was `"breakpoints" | "scroll" | "animation" | "motion"`,
+next to four hand-written `runX(...)` calls, four bespoke adapters that
+recounted suspects by comparing severity strings, and a
+`gate === "scroll" ? "scan scroll" : \`check ${gate}\`` special case to name the
+command in the kickback. All four were the same fact stated four times.
+
+Now `DEFAULT_VERIFY_GATES` is a list of gate definitions and each runs through
+`runGate`. Three consequences worth stating:
+
+- **A project's rule settings apply to the folded-in gates.** They did not
+  before — `verify markup` read raw issue severities, so
+  `"check.animation/long-settle": "off"` changed `vlmkit check animation` and
+  not the verdict that gate feeds.
+- **The kickback names a pasteable command** (`vlmkit scan scroll`) without a
+  per-gate string branch.
+- **The set is overridable** (`options.gates`). "Which gates does done mean" is
+  a project decision, and it stopped being a hardcoded four the moment they
+  became definitions.
+
+`--advisory` is deliberately not passed down: a sub-gate's exit code is not
+this gate's exit code, it is one input to this gate's verdict.
+
+### MCP tools are derived from the registry
+
+`packages/vlmkit-mcp/src/tools.ts` went from 324 lines to ~150. Seven of the
+nine tools are now one `gateTool(gate, { description })` call — name, input
+schema, invocation and failure decision all derived — and the adapter builds
+argv so the MCP path exercises the *same parser and the same validation* as the
+CLI. A malformed argument now fails identically in both.
+
+Two things stayed hand-written, both on purpose:
+
+- **The `description`.** It looks like `gate.summary` and is not: it is a prompt
+  for a model choosing between tools, carrying when-to-use-this-instead-of-that,
+  what the gate refuses to do, and which silencing tricks it detects. Deriving
+  it from `summary` would delete real work.
+- **`verify_flow` and `check_layout`.** Both take their flow / contract *inline
+  as an object*; the gates take `--flow <path>` / `--contract <path>`, which is
+  right for a CLI and wrong for a client that would have to write a temp file.
+  They keep their own schema and invocation but take their verdict line from
+  the gate's `headline`, so the two surfaces cannot describe one report
+  differently. (`build_page` is not a gate at all — it returns a composition
+  diff.)
+
+Verified against the published schemas: no argument name was dropped or
+renamed. Three needed pinning — `verify_markup`'s `targets` and `fixContext`
+(the gate's flags are `--target` and `--no-fix-context`) and the `outDir` of
+`check_copy` / `check_equivalence` — which is what `aliases` and `invert` are
+for. `check_integrity` gained `timeout` and `waitUntil`, which it always
+supported and the hand-written schema had simply never exposed.
+
+This also added `GateDefinition.headline`: one line describing *what was
+measured*, which neither `format` (too long) nor the findings (a clean run has
+none) can supply. Two consumers needed exactly it.
+
+### `vlmkit gates` rejects an unknown gate command
+
+Was a warning, because the registry did not yet know every gate and rejecting
+an unknown string would have rejected working configs. Now a command that does
+not resolve inside a group the registry owns (`check`, `scan`, `stress`,
+`verify`) is an error, with a did-you-mean. Groups it does not own stay
+unvalidated — a config may legitimately list `diff html`.
+
+Config errors also became `UsageError` throughout `gate-config.ts`,
+`plugin/rules.ts` and `gates-cli.ts`. They were plain `Error`s, so
+`handleCliError` printed a stack trace under a message that had already named
+the JSON path and the fix.
+
 ## Still open
 
-1. **MCP tools.** `packages/vlmkit-mcp/src/tools.ts` re-states each gate's
-   description and Zod schema by hand for ten gates. `GateInput` is declarative
-   precisely so the schema can be derived; those ten should collapse to a loop
-   over `registry.list()`.
-2. **`markup-verify`'s gate union.** `GateVerdict.gate` is still a hardcoded
-   `"breakpoints" | "scroll" | "animation" | "motion"`, and the CLI command it
-   prints in the kickback is built by a string special-case. All four are
-   registry gates now, so that union should become a registry lookup — which
-   also makes the set of gates `verify markup` folds in configurable.
-3. **`vlmkit gates` command validation** currently warns rather than errors on
-   an unresolvable gate string, because unmigrated non-gate commands were still
-   possible. Every gate is in the registry now, so a `check`/`scan`/`stress`/
-   `verify` command that does not resolve could be a hard error.
+- **`verify markup`'s composition half** still lives entirely inside
+  `markup-verify.ts`. Only the four dynamic gates it folds in are registry
+  driven; the per-target composition, gap and pixel-diff logic is not a gate
+  and probably should not become one, but the line between "this gate's own
+  measurement" and "gates it aggregates" is worth revisiting if a second
+  aggregate gate ever appears.
+- **`gateTool` cannot express an inline-object input**, which is why two tools
+  stay hand-written. A `--flow`-style path input that also accepts an inline
+  object (writing a temp file) would close that, at the cost of a side effect
+  inside an adapter — not obviously worth it for two call sites.
 
 ## Testing
 
@@ -337,6 +412,11 @@ Deliberate, and each one aligns a straggler with the documented contract:
   *declarations* and argument parsing, with no browser: a malformed rule table,
   a clashing command, a missing placeholder or a flag that swallows the next
   flag used to be discoverable only by running the gate against a real page.
+- `packages/vlmkit-mcp/src/gate-tool.test.ts` — the derivation, without a
+  browser: camelCasing, required-vs-optional, `omit` / `aliases` / `invert`, and
+  the argv distinction between a repeatable flag and a comma-joined list. A
+  hand-written tool could get that backwards (`--target a,b` is one nonexistent
+  file) and only fail on a real page.
 - `src/cli/json-contract.test.ts` — spawns the real CLI and asserts the
   `--json`/prose mutual exclusion, the envelope shape, the exit code, and that
   `--rule ...=off` takes a failing run green and says so. Moved here from

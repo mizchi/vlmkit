@@ -126,6 +126,13 @@ ${ALLOW_HELP}`,
       ...(finding.evidence ? { evidence: finding.evidence } : {}),
     })),
   format: formatIntegrityReport,
+  headline: (report) => {
+    const fails = report.findings.filter((f) => f.severity === "fail").length;
+    const warns = report.findings.length - fails;
+    return `${report.verdict === "clean" ? "CLEAN" : "DEFECTS"}`
+      + ` (${fails} fail, ${warns} warn, ${report.exempted.length} exempted`
+      + `, ${report.viewports.length} viewport(s))`;
+  },
   ledger: (report, options) => ({
     tool: "check-integrity",
     source: options.source,

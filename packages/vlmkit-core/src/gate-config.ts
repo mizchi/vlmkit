@@ -19,6 +19,7 @@
  *      working after it passes is a comment, not a deadline.
  */
 
+import { UsageError } from "./cli-error.ts";
 import type { RuleSettings } from "./plugin/rules.ts";
 import { parseRuleSettings } from "./plugin/rules.ts";
 
@@ -105,7 +106,9 @@ const DAY_MS = 86400000;
 export const GATE_CONFIG_FILENAMES = ["vlmkit.gates.json", ".vlmkit/gates.json"];
 
 function fail(path: string, message: string): never {
-  throw new Error(`${path}: ${message}`);
+  // UsageError so `handleCliError` prints one line: the message already names
+  // the JSON path and the fix, and a stack trace only buries it.
+  throw new UsageError(`${path}: ${message}`);
 }
 
 function parseSuppression(raw: unknown, path: string): GateSuppression {
@@ -152,7 +155,7 @@ export function parseGateConfig(raw: string): GateConfig {
   try {
     data = JSON.parse(raw);
   } catch (e) {
-    throw new Error(`gate config is not valid JSON: ${e instanceof Error ? e.message : e}`);
+    throw new UsageError(`gate config is not valid JSON: ${e instanceof Error ? e.message : e}`);
   }
   if (typeof data !== "object" || data === null) fail("config", "must be a JSON object");
   const root = data as Record<string, unknown>;
@@ -237,7 +240,7 @@ export function resolveGatePlan(config: GateConfig, options: ResolveOptions = {}
     if (only.length > 0 && !only.some((o) => pageId.includes(o) || page.source.includes(o))) continue;
     const gates = [...(page.gates ?? defaultGates), ...(page.extraGates ?? [])];
     if (gates.length === 0) {
-      throw new Error(
+      throw new UsageError(
         `Page "${pageId}" resolved to zero gates — set its \`gates\` or \`defaults.gates\`.`
         + ` A page that silently runs nothing is worse than a config error.`,
       );

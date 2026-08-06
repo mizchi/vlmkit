@@ -149,6 +149,8 @@ machine-checkable contract (DOM math, no VLM).`,
     return findings;
   },
   format: formatLayoutReport,
+  headline: (report) =>
+    `${report.done ? "SATISFIED" : "VIOLATED"} (${report.passed}/${report.total} rules)`,
   // See the module docstring: runLayoutVerify already appends its own entry.
   ledger: () => null,
 });

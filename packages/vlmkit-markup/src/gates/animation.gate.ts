@@ -83,6 +83,14 @@ when the page settles, and whether prefers-reduced-motion is honored.`,
       ...(issue.selector ? { selector: issue.selector } : {}),
     })),
   format: formatAnimationEvalReport,
+  headline: (report) =>
+    `${report.animationCount} animation(s),`
+    + ` settle ${report.settleMs === null ? "never" : `${Math.round(report.settleMs)}ms`},`
+    + ` reduced-motion ${
+      report.reducedMotion
+        ? (report.reducedMotion.remainingCount === 0 ? "honored" : "IGNORED")
+        : "n/a"
+    }`,
   ledger: (report, options) => ({
     tool: "check-animation",
     source: options.source,

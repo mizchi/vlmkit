@@ -99,6 +99,7 @@ and horizontal overflow at boundary widths.`,
       ...(issue.breakpoint !== undefined ? { viewport: issue.breakpoint } : {}),
     })),
   format: formatBreakpointCheckReport,
+  headline: (report) => `checked ${report.checkedValues.join(", ") || "none"}px`,
   ledger: (report, options) => ({
     tool: "check-breakpoints",
     source: options.source,

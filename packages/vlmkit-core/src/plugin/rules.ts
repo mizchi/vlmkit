@@ -18,6 +18,7 @@
  * suppressed and what it re-tuned, so the runner can print both.
  */
 
+import { UsageError } from "../cli-error.ts";
 import type { AnyGateDefinition, Finding, FindingSeverity, RuleDefinition } from "./contract.ts";
 import { FINDING_SEVERITIES, ruleRef } from "./contract.ts";
 
@@ -86,13 +87,13 @@ function isRuleSetting(value: unknown): value is RuleSetting {
  */
 export function parseRuleSettings(raw: unknown, path: string): RuleSettings {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-    throw new Error(`${path}: must be an object mapping rule references to settings`);
+    throw new UsageError(`${path}: must be an object mapping rule references to settings`);
   }
   const out: Record<string, RuleSetting> = {};
   for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-    if (!key.trim()) throw new Error(`${path}: rule reference must be a non-empty string`);
+    if (!key.trim()) throw new UsageError(`${path}: rule reference must be a non-empty string`);
     if (!isRuleSetting(value)) {
-      throw new Error(
+      throw new UsageError(
         `${path}["${key}"]: must be one of ${RULE_SETTINGS.join(", ")}, got ${JSON.stringify(value)}`,
       );
     }

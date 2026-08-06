@@ -68,6 +68,8 @@ suspects, declared-but-dead scrollports, and nested scrolling.
       ...(issue.selector ? { selector: issue.selector } : {}),
     })),
   format: formatScrollScanReport,
+  headline: (report) =>
+    `${report.containers.length} container(s), page overflow-x ${report.page.horizontalOverflow}px`,
   ledger: (report, options) => ({
     tool: "scan-scroll",
     source: options.source,

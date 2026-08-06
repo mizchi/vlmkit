@@ -2,12 +2,13 @@
  * The two `verify *` gates: markup (the one-shot done-condition verdict) and
  * flow (scripted action + deterministic post-condition).
  *
- * `verify markup` is the aggregate gate — it *runs other gates* (breakpoints,
- * scroll, animation, motion) and folds their suspects into its verdict. Its
- * `GateVerdict.gate` field is still a hardcoded four-value union inside
- * `markup-verify.ts`; now that those four are registry gates, that union is
- * the next thing to replace with a registry lookup. Doing it here would mean
- * changing measurement code, which this migration deliberately does not.
+ * `verify markup` is the aggregate gate — it *runs other gates* and folds their
+ * suspects into its verdict. Which gates is `DEFAULT_VERIFY_GATES` in
+ * `markup-verify.ts` (check breakpoints / scan scroll / check animation /
+ * check motion), overridable per call. They are driven through the same core
+ * runner the CLI uses, so their counts come from the shared rule table and a
+ * project's rule settings apply to them — which they did not when this was
+ * four hand-written calls behind a four-value union.
  */
 
 import { readFile } from "node:fs/promises";
@@ -50,7 +51,7 @@ listing every residual. Add --reference to print the calibration floor.`,
       id: "gate-suspect",
       title: "A dynamic gate reported suspects",
       severity: "suspect",
-      docs: "breakpoints / scroll / animation / motion. Run that gate directly for detail.",
+      docs: "One of DEFAULT_VERIFY_GATES. The kickback names the command to run for detail.",
     },
     {
       id: "regressed",
@@ -124,12 +125,16 @@ listing every residual. Add --reference to print the calibration floor.`,
         rule: "gate-suspect",
         severity: "suspect",
         message: `gate ${gate.gate}: ${gate.suspects} suspect issue(s) — ${gate.summary}`,
-        evidence: { gate: gate.gate, suspects: gate.suspects, warns: gate.warns },
+        evidence: { gate: gate.gate, gateId: gate.gateId, suspects: gate.suspects, warns: gate.warns },
       });
     }
     return findings;
   },
   format: formatMarkupVerifyReport,
+  headline: (report) =>
+    `${report.done ? "DONE" : "NOT DONE"}`
+    + ` (${report.targets.filter((t) => t.pass).length}/${report.targets.length} targets passed,`
+    + ` ${report.kickback.length} kickback item(s))`,
   // runMarkupVerify appends its own entry — and the trend it reports is read
   // back out of that ledger, so a second write would corrupt the next run's
   // comparison.
@@ -215,6 +220,7 @@ flow.json: { "viewport"?, "steps": [ { "label"?, "do": <action>, "expect": [<ass
     return findings;
   },
   format: formatFlowReport,
+  headline: (report) => `${report.done ? "DONE" : "FAILED"} (${report.passed}/${report.total} steps)`,
   // runFlowVerify appends its own entry.
   ledger: () => null,
 });

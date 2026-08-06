@@ -180,6 +180,18 @@ export interface GateDefinition<Report = unknown, Options = unknown> {
   /** Human output. The runner decides whether it is called at all (`--json`). */
   format: (report: Report) => string;
   /**
+   * One line describing what was measured — not what was wrong. The findings
+   * already say what was wrong; this says the context needed to read them
+   * ("checked 768, 1024px", "3 container(s), page overflow-x 0px").
+   *
+   * Two consumers need exactly this and cannot get it from `format` (too long)
+   * or from the findings (a clean run has none): `verify markup`, which folds
+   * other gates into its verdict and names them in its kickback, and the MCP
+   * server's one-line verdict. Optional — the runner falls back to the finding
+   * counts, which is correct but tells a reader less.
+   */
+  headline?: (report: Report) => string;
+  /**
    * Ledger headline. Returning `null` opts a gate out. The runner does the
    * appending, so `VLMKIT_NO_LEDGER` and failure-swallowing stay in one place.
    */

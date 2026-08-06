@@ -63,6 +63,9 @@ have a visible effect, does it settle — is \`vlmkit check animation\`.)`,
       ...(issue.selector ? { selector: issue.selector } : {}),
     })),
   format: formatMotionDetectionReport,
+  headline: (report) =>
+    `running ${report.runningAnimationCount},`
+    + ` reduced-motion rule ${report.hasReducedMotionRule ? "yes" : "no"}`,
   ledger: (report, options) => ({
     tool: "check-motion",
     source: options.source,
