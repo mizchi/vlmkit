@@ -4,5 +4,5 @@ import {
 }
 
 options(
-  link: { "js": { "exports": [ "run_markup_core" ], "format": "esm" } },
+  link: { "js": { "exports": [ "run_markup_core", "run_markup_core_json", "markup_core_json_commands" ], "format": "esm" } },
 )

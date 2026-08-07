@@ -11,6 +11,14 @@ fn main {
 ///|
 fn main_err() -> Unit raise {
   let args = command_args(@env.args())
+  // The JSON boundary, checked before the positional table. Two arguments always,
+  // so it cannot collide with a positional command name. The dispatch itself is in
+  // `@core`, shared with the direct-JS entry point, so the two backends answer
+  // identically by construction rather than by both being edited correctly.
+  if args.length() == 3 && args[0] == "--json" {
+    println(@core.run_json(args[1], args[2]))
+    return
+  }
   match args {
     [
       "component-goal-status",
@@ -674,6 +682,10 @@ fn command_args(raw : Array[String]) -> Array[String] {
 
 ///|
 fn is_command(value : String) -> Bool {
+  // `command_args` slices argv from the first token this recognises, so the JSON
+  // boundary's marker has to be listed or the slice starts at the script path and
+  // args[0] is never "--json".
+  value == "--json" ||
   value == "component-goal-status" ||
   value == "is-component-probe-state" ||
   value == "is-forced-pseudo-state" ||

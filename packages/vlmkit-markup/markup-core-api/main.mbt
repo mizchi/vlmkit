@@ -11,6 +11,21 @@ pub fn run_markup_core(command : String, encoded_args : String) -> String raise 
 }
 
 ///|
+/// The JSON boundary. One line here because the dispatch lives in `@core`, shared
+/// with the CLI entry point — see the comment on `@core.run_json` for why the
+/// positional path below is not built that way.
+pub fn run_markup_core_json(command : String, payload : String) -> String raise {
+  @core.run_json(command, payload)
+}
+
+///|
+/// Commands the JSON boundary accepts, so a TypeScript test can assert its table
+/// matches this one rather than finding a typo at the first call.
+pub fn markup_core_json_commands() -> String {
+  @core.json_commands().to_json().stringify()
+}
+
+///|
 fn dispatch(args : Array[String]) -> String raise {
   match args {
     [
