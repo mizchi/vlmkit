@@ -162,8 +162,16 @@ Three habits that keep such a handler honest:
 ## Not done
 
 - **The 61 positional commands are not migrated.** Deliberate: it is a separate
-  change with its own risk, and the two paths coexist without interacting. The
-  positional dispatch also still has no test that its two tables agree.
+  change with its own risk, and the two paths coexist without interacting. The two
+  tables are now checked for drift (`src/markup-core-dispatch.test.ts`): command
+  names in full, behaviour on a sample chosen for shape. Full behavioural
+  equivalence across 61 commands would need a fixture corpus, not a test.
+
+  That test also documented a cost the design doc had missed: the direct entry
+  point takes one tab-joined string, so an **empty argument is unrepresentable** —
+  `["cmd", ""]` and `["cmd"]` encode identically. Production substitutes
+  `__VLMKIT_EMPTY_ARG__` and MoonBit substitutes it back. A legal value that has to
+  be escaped because the encoding has no room for it.
 - **No typed-array boundary**, so pixel work stays in TypeScript.
 - `component-goal-status` still takes 36 positional arguments. It is the most
   valuable migration and the one most likely to break something quietly, so it
