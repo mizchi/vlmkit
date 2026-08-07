@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeTrend, heightToleranceFor, kickbackForComposition, pixelPresence } from "./markup-verify.ts";
+import { computeTrend, heightToleranceFor, pixelPresence } from "./markup-verify.ts";
+import { kickbackForComposition } from "./markup-verify-report.ts";
 import type { PageComposition, PageComponent, PageMatch } from "../component/page-compose.ts";
 
 test("computeTrend: fewer passing targets is a regression", () => {
