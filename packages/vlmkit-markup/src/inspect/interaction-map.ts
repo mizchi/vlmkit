@@ -42,6 +42,7 @@ import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { callMarkupCoreJson } from "../markup-core-runtime.ts";
 import type { Page } from "playwright";
 
 // ---------------------------------------------------------------------------
@@ -421,112 +422,113 @@ export function ariaDelta(before: AriaSnapshot, after: AriaSnapshot): Record<str
 
 const ROVING_ROLES = new Set(["tab", "radio", "menuitem", "option"]);
 
+/**
+ * The wording for each issue kind.
+ *
+ * Separated from the rules because the two change for different reasons and at
+ * different rates: a rule changing is a behaviour change that needs review, while
+ * rewording a diagnostic is editorial. The rules now live in MoonBit
+ * (`markup-core/interaction_issues.mbt`) and return ids; this table turns an id
+ * plus the element's label into the sentence a reader sees, so rewording does not
+ * mean rebuilding MoonBit.
+ */
+const ISSUE_MESSAGE: Record<
+  InteractionIssueKind,
+  (label: string, evidence: { key?: string; popupRole?: string; brokenControlsId?: string }) => string
+> = {
+  "dead-disclosure": (label, e) =>
+    `${label} declares aria-expanded but activating it (${describeKey(e.key ?? "")}) changes neither the attribute nor the layout — the disclosure is wired to nothing.`,
+  "broken-aria-controls": (label, e) =>
+    `${label} has aria-controls="${e.brokenControlsId}" but no element carries that id.`,
+  "inert-control": (label, e) =>
+    `${label} shows no observable response to ${describeKey(e.key ?? "")} — no ARIA change, no layout change. Dead control, or its response is outside this probe.`,
+  "no-focus-indicator": (label) =>
+    `${label} paints NO visible focus indicator on keyboard focus (outline/box-shadow/border/background all unchanged) — keyboard users cannot see where they are.`,
+  "not-tab-reachable": (label) =>
+    `${label} was never reached by Tab — keyboard users cannot operate it.`,
+  "popup-no-focus-move": (label, e) =>
+    `${label} opens a ${e.popupRole} but keyboard focus stays on the trigger — the ${e.popupRole} pattern moves focus into the popup.`,
+  "focus-escapes-trap": (label) =>
+    `${label} opens a modal dialog whose Tab focus ESCAPES the dialog — a modal must trap focus while open.`,
+  "composite-arrows-dead": (label, e) =>
+    `${label}: ${e.key} produces no selection change and no focus movement inside the composite — arrow navigation is not wired.`,
+  "popup-arrows-dead": (label, e) =>
+    `${label} opens a ${e.popupRole} but ArrowDown does not move focus within it — menu/listbox items must be arrow-navigable.`,
+  "focus-not-returned": (label) =>
+    `${label}: Escape closes its popup but focus does NOT return to the trigger — keyboard users are dropped at the document root.`,
+  "escape-stuck": (label) => `${label} opened a popup that Escape does not close.`,
+};
+
+/**
+ * Keyboard-interaction issues implied by a probe run.
+ *
+ * The rules are in MoonBit. This assembles the payload they read, and turns the
+ * ids they return into messages.
+ *
+ * The payload is deliberately **narrower than the map**: `ariaDelta` is a
+ * `Record<string, [string | null, string | null]>` and the rules only ask whether
+ * it is empty and whether it mentions `expanded`, so those two facts cross the
+ * boundary instead of the map. Sending the whole structure because it exists would
+ * make every future change to it a change in MoonBit too.
+ */
 export function deriveInteractionIssues(map: InteractionMapResult): InteractionIssue[] {
-  const issues: InteractionIssue[] = [];
-  // Roving-tabindex composites (tablists, radio groups, menus) expose
-  // ONE tab stop by design; the arrows reach the rest. An unreachable
-  // member whose same-role sibling IS reachable is the pattern working,
-  // not a defect.
-  const reachableRoles = new Set(map.elements.filter((e) => e.tabReachable).map((e) => e.role));
-  for (const el of map.elements) {
-    const label = `${el.role} "${el.name}" (${el.path})`;
-    if (el.hasAriaExpanded && el.activation && !("expanded" in el.activation.ariaDelta) && !el.activation.layoutChanged) {
-      issues.push({
-        kind: "dead-disclosure",
-        severity: "suspect",
-        element: label,
-        message: `${label} declares aria-expanded but activating it (${el.activation.key === " " ? "Space" : el.activation.key}) changes neither the attribute nor the layout — the disclosure is wired to nothing.`,
-      });
-    }
-    if (el.activation?.brokenControlsId) {
-      issues.push({
-        kind: "broken-aria-controls",
-        severity: "suspect",
-        element: label,
-        message: `${label} has aria-controls="${el.activation.brokenControlsId}" but no element carries that id.`,
-      });
-    }
-    if (el.activation && el.activation.key !== "ArrowRight" && el.activation.key !== "ArrowDown"
-      && Object.keys(el.activation.ariaDelta).length === 0
-      && !el.activation.layoutChanged
-      && el.activation.focusMovedTo === null
-      && !el.hasAriaExpanded) {
-      issues.push({
-        kind: "inert-control",
-        severity: "warn",
-        element: label,
-        message: `${label} shows no observable response to ${el.activation.key === " " ? "Space" : el.activation.key} — no ARIA change, no layout change. Dead control, or its response is outside this probe.`,
-      });
-    }
-    if (el.tabReachable && el.focusIndicator === false) {
-      issues.push({
-        kind: "no-focus-indicator",
-        severity: "warn",
-        element: label,
-        message: `${label} paints NO visible focus indicator on keyboard focus (outline/box-shadow/border/background all unchanged) — keyboard users cannot see where they are.`,
-      });
-    }
-    if (!el.tabReachable && !(ROVING_ROLES.has(el.role) && reachableRoles.has(el.role))) {
-      issues.push({
-        kind: "not-tab-reachable",
-        severity: "warn",
-        element: label,
-        message: `${label} was never reached by Tab — keyboard users cannot operate it.`,
-      });
-    }
-    if (el.activation?.popupRole && (el.activation.popupRole === "dialog" || el.activation.popupRole === "menu" || el.activation.popupRole === "listbox")
-      && el.activation.focusMovedIntoPopup === false) {
-      issues.push({
-        kind: "popup-no-focus-move",
-        severity: "warn",
-        element: label,
-        message: `${label} opens a ${el.activation.popupRole} but keyboard focus stays on the trigger — the ${el.activation.popupRole} pattern moves focus into the popup.`,
-      });
-    }
-    if (el.activation?.focusTrapped === false) {
-      issues.push({
-        kind: "focus-escapes-trap",
-        severity: "suspect",
-        element: label,
-        message: `${label} opens a modal dialog whose Tab focus ESCAPES the dialog — a modal must trap focus while open.`,
-      });
-    }
-    if ((el.role === "grid" || el.role === "listbox") && el.activation
-      && Object.keys(el.activation.ariaDelta).length === 0
-      && !el.activation.focusMovedWithin && el.activation.focusMovedTo === null) {
-      issues.push({
-        kind: "composite-arrows-dead",
-        severity: "warn",
-        element: label,
-        message: `${label}: ${el.activation.key} produces no selection change and no focus movement inside the composite — arrow navigation is not wired.`,
-      });
-    }
-    if (el.activation?.popupArrowCycles === false) {
-      issues.push({
-        kind: "popup-arrows-dead",
-        severity: "warn",
-        element: label,
-        message: `${label} opens a ${el.activation.popupRole} but ArrowDown does not move focus within it — menu/listbox items must be arrow-navigable.`,
-      });
-    }
-    if (el.activation?.escapeCloses === true && el.activation.focusReturnsToOpener === false) {
-      issues.push({
-        kind: "focus-not-returned",
-        severity: "warn",
-        element: label,
-        message: `${label}: Escape closes its popup but focus does NOT return to the trigger — keyboard users are dropped at the document root.`,
-      });
-    }
-    if ((el.hasPopup || el.role === "combobox") && el.activation?.escapeCloses === false) {
-      issues.push({
-        kind: "escape-stuck",
-        severity: "warn",
-        element: label,
-        message: `${label} opened a popup that Escape does not close.`,
-      });
-    }
-  }
-  return issues;
+  const payload = {
+    elements: map.elements.map((el) => ({
+      role: el.role,
+      has_aria_expanded: el.hasAriaExpanded,
+      has_popup: el.hasPopup,
+      tab_reachable: el.tabReachable,
+      focus_indicator: el.focusIndicator ?? undefined,
+      activation: el.activation
+        ? {
+          key: el.activation.key,
+          aria_delta_empty: Object.keys(el.activation.ariaDelta).length === 0,
+          aria_delta_has_expanded: "expanded" in el.activation.ariaDelta,
+          layout_changed: el.activation.layoutChanged,
+          // The rules ask "did focus move", not where to. `focusMovedTo` is a
+          // discovery index and 0 is a valid one, so this must compare to null
+          // rather than test truthiness.
+          focus_moved: el.activation.focusMovedTo !== null,
+          focus_moved_within: el.activation.focusMovedWithin === true,
+          broken_controls_id: el.activation.brokenControlsId,
+          popup_role: el.activation.popupRole,
+          focus_moved_into_popup: el.activation.focusMovedIntoPopup,
+          focus_trapped: el.activation.focusTrapped,
+          popup_arrow_cycles: el.activation.popupArrowCycles,
+          escape_closes: el.activation.escapeCloses,
+          focus_returns_to_opener: el.activation.focusReturnsToOpener,
+        }
+        : undefined,
+    })),
+  };
+
+  const raised = callMarkupCoreJson<{
+    kind: InteractionIssueKind;
+    severity: "warn" | "suspect";
+    /** Position in the array above — not `el.index`, which callers may reuse. */
+    element_position: number;
+    key?: string;
+    popup_role?: string;
+    broken_controls_id?: string;
+  }[]>("interaction-issues", payload);
+
+  return raised.map((issue) => {
+    // By position. Keying on `el.index` looked equivalent and was not: the field is
+    // a discovery index a caller can legitimately repeat, and doing so labelled
+    // every finding with the last element that shared the value.
+    const el = map.elements[issue.element_position];
+    const label = el ? `${el.role} "${el.name}" (${el.path})` : `element ${issue.element_position}`;
+    return {
+      kind: issue.kind,
+      severity: issue.severity,
+      element: label,
+      message: ISSUE_MESSAGE[issue.kind](label, {
+        key: issue.key,
+        popupRole: issue.popup_role,
+        brokenControlsId: issue.broken_controls_id,
+      }),
+    };
+  });
 }
 
 export interface InteractionMismatch {

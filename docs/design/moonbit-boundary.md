@@ -123,11 +123,35 @@ thresholds, verdict decisions. Exhaustive matching earns its keep where a silent
 TypeScript mistake is most expensive, and these are cheap to pass. Every existing
 `compute*IssueIds` is this shape.
 
+Also good, and only reachable now: rules over an **array of records**.
+`interaction-issues` is eleven keyboard-a11y rules over the probe's element list
+with its optional nested activation record — a shape the positional encoding had
+no way to express, so those rules stayed in TypeScript regardless of where they
+belonged. It is the concrete demonstration that the boundary changed what can
+move, not just how it is spelled.
+
+Three habits that keep such a handler honest:
+
+- **Return ids, not prose.** `interaction_issues` returns the issue id, the
+  severity, the element's position and the two or three values the wording
+  interpolates. The sentences live in a TypeScript table, so rewording a
+  diagnostic is not a MoonBit rebuild. Rules and wording change for different
+  reasons and at different rates.
+- **Send what the rules read, not the whole structure.** The probe's `ariaDelta`
+  is a `Record<string, [string | null, string | null]>`; the rules only ask
+  whether it is empty and whether it mentions `expanded`, so those two booleans
+  cross the boundary. Mirroring the type because it exists would make every future
+  change to it a change in MoonBit too.
+- **Identify elements by position, not by a field they carry.** Reporting the
+  element's own `index` looked equivalent and was not: it is a discovery index a
+  caller may legitimately repeat, and a test that did labelled every finding with
+  the last element sharing the value.
+
 **Poor fits, stated so the obvious targets are not attempted first:**
 
-- **String formatting.** `renderReportMarkdown` in `component-from-image.ts` is
-  485 lines and the largest pure block in the repo — and among the worst
-  candidates. Marshalling the whole report across the boundary costs more than
+- **String formatting.** `renderReportMarkdown` (now in
+  `component-report-format.ts`) is 485 lines and the largest pure block in the
+  repo — and among the worst candidates. Marshalling the whole report across the boundary costs more than
   the logic, and the wording is presentation, which is why handlers return issue
   *ids* and TypeScript owns the messages.
 - **Pixel loops.** `analyzeAssetPng`, `extractTextRowsFromRgba`,

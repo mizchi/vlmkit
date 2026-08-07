@@ -137,7 +137,7 @@ describe("markup-core JSON boundary", { timeout: 240_000 }, () => {
   it("the TypeScript view of the command list matches MoonBit's", () => {
     // A typo in a command name is otherwise found at the first call, in whatever
     // code path happens to reach it.
-    assert.deepEqual(markupCoreJsonCommands(), [COMMAND]);
+    assert.deepEqual(markupCoreJsonCommands(), [COMMAND, "interaction-issues"]);
   });
 
   it("both backends answer identically", async () => {

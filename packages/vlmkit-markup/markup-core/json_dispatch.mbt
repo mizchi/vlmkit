@@ -113,6 +113,10 @@ pub fn run_json(command : String, payload : String) -> String raise {
       let input : LayoutPolicyInput = @json.from_json(json)
       layout_policy_issue_ids(input).to_json().stringify()
     }
+    "interaction-issues" => {
+      let input : InteractionIssuesInput = @json.from_json(json)
+      interaction_issues(input).to_json().stringify()
+    }
     _ => raise Failure("unknown markup-core JSON command: \{command}")
   }
 }
@@ -121,5 +125,5 @@ pub fn run_json(command : String, payload : String) -> String raise {
 /// Commands `run_json` accepts, so the TypeScript side can assert the two agree
 /// instead of discovering a typo at the first call.
 pub fn json_commands() -> Array[String] {
-  ["layout-policy-issue-ids"]
+  ["layout-policy-issue-ids", "interaction-issues"]
 }
