@@ -35,6 +35,8 @@ Client config (stdio) — e.g. `.mcp.json` in any project:
 | `check_layout` | layout contract: widths, per-row counts, stacking order, visibility per viewport — a brief's structural requirements as a machine-checkable spec | `source`, `contract` |
 | `check_copy` | placeholder scan + `manifest` verification against VISIBLY rendered text (disclosure-state sweep; invisible matches report `copy-invisible` with a reason class, suppressible per class via `allowInvisible`) + `target`-image contact sheets | `source`, `manifest?`, `target?`, `allowInvisible?` |
 | `build_page` | raw composition diff (matched/missing/extra/ordering/gap) | `target`, `current` |
+| `build_gallery` | converged page → story gallery + per-story threshold derived from each component's area; the construction → maintenance handoff. Discovery proposes (evidence per candidate); `selectors` overrides it | `source`, `out?`, `selectors[]?` |
+| `check_story` | one mounted component vs its approved baseline — a component-sized diff that does not cascade to neighbours. Needs a gallery (`build_gallery` makes one) | `story`, `gallery`, `threshold?` |
 | `check_equivalence` | measured per-channel delta + pair images for a second reader (keyless advisory) | `source`, `target`, `regions[]` |
 | `verify_flow` | scripted browser flow: action → deterministic post-condition assert; fails at first unmet | `source`, `flow` |
 

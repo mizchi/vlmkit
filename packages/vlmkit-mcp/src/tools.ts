@@ -17,9 +17,13 @@
  * choosing between tools, not a restatement of `gate.summary`. See
  * `gate-tool.ts`.
  *
- * Two tools are not `gateTool` calls, for stated reasons:
- *   - `build_page` is not a gate. It returns a composition diff (an artifact),
- *     has no findings and no verdict.
+ * Some tools are not `gateTool` calls, for stated reasons:
+ *   - `build_page` and `build_gallery` are not gates. They return artifacts (a
+ *     composition diff; a generated gallery), have no rule table and no verdict.
+ *     `build_gallery` still decides `failed`, on the two outcomes that leave the
+ *     caller worse off than before: no stories written, or a stylesheet that
+ *     could not be read — the second because a gallery missing its CSS produces
+ *     baselines that look right and are wrong.
  *   - `verify_flow` and `check_layout` take their flow / contract INLINE as an
  *     object. The gates take `--flow <path>` / `--contract <path>`, which is
  *     right for a CLI and wrong for an MCP client that would have to write a
@@ -37,6 +41,7 @@ import {
   integrityGate,
   interactionsGate,
   layoutGate,
+  storyGate,
   verifyFlowGate,
   verifyMarkupGate,
 } from "@mizchi/vlmkit-markup/gates/index.ts";
@@ -154,6 +159,71 @@ const buildPageTool: McpTool = {
 };
 
 
+const checkStoryTool = gateTool(storyGate, {
+  // `--out` is a CLI-shaped operational flag; an MCP client wants the project's
+  // default baseline directory, since a different one per call would silently
+  // create a fresh baseline instead of comparing against the committed one.
+  omit: ["out"],
+  description:
+    "Component-scoped VRT: mounts one story in a Playwright component-testing gallery and diffs ONLY that component against its approved baseline. Use this instead of a page diff when repairing or restyling ONE component — the diff is a component-sized image (measured: 20-160x fewer pixels than a viewport shot) and a change to one component does not make its neighbours report. Requires a gallery exposing window.mount({story,props}) / window.unmount(); generate one from an existing page with build_gallery. Deterministic (pixels, no VLM). First run writes a baseline and reports new-baseline rather than passing. Two limits worth knowing, both measured: on a LARGE component the default 0.5% threshold is coarse enough to miss a corner-radius change (pass the per-story threshold build_gallery derives), and a uniform low-amplitude recolour scores 0.0% because the comparator has a perceptual threshold — that case surfaces as the sub-perceptual-drift warn, and check_equivalence or a page diff is what actually catches it. So this narrows what a page-level diff must cover; it does not replace it.",
+});
+
+const buildGalleryTool: McpTool = {
+  name: "build_gallery",
+  description:
+    "Turn a converged page into a story gallery check_story can maintain: captures each component's rendered markup plus the page's CSS into a gallery implementing the Playwright component-testing contract, and derives a per-story diff threshold from each component's area. Use after a page matches its target, to stop the NEXT edit from breaking it per component instead of per page — this is the handoff from construction (build_page / build_component) to maintenance (check_story). Deterministic, no VLM. Discovery groups by CSS class and PROPOSES: every candidate carries its evidence (instance count, size, what it contains) and rejected ones say why, so read the list before trusting it; pass `selectors` to name components explicitly. The captured markup is frozen — props do nothing and behaviour is not exercised — so a component whose stories must vary by prop needs a hand-written gallery instead.",
+  inputSchema: {
+    source: z.string().describe("Page HTML path or URL — the converged page to capture from."),
+    out: z.string().optional().describe("Output directory for gallery.html and stories.json. Default: .vlmkit/gallery"),
+    selectors: z.array(z.string()).min(1).optional()
+      .describe("Class selectors (e.g. '.c-card') to turn into stories. Bypasses discovery entirely."),
+    prefix: z.string().optional().describe("Story id prefix. Default: components"),
+    viewport: z.string().optional().describe("Viewport to render the source page at, as WxH. Default: 1280x800"),
+    noisePixels: z.number().optional()
+      .describe("Pixel budget converted to each story's ratio threshold. Default: 24. Lower is stricter."),
+    includeAll: z.boolean().optional().describe("Also write the candidates discovery did not recommend."),
+  },
+  run: async (args) => {
+    const { scaffoldStoryGallery, buildGatesConfigSnippet } = await import(
+      "@mizchi/vlmkit-markup/component/story-scaffold.ts"
+    );
+    const raw = (args.viewport as string | undefined) ?? "1280x800";
+    const match = /^(\d+)x(\d+)$/.exec(raw.trim());
+    if (!match) {
+      return result(`build_gallery: viewport expects <width>x<height>, got ${JSON.stringify(raw)}`, { error: raw }, true);
+    }
+    const report = await scaffoldStoryGallery({
+      source: args.source as string,
+      outDir: (args.out as string | undefined) ?? ".vlmkit/gallery",
+      viewport: { width: Number(match[1]), height: Number(match[2]) },
+      ...(args.selectors ? { selectors: args.selectors as string[] } : {}),
+      ...(args.prefix ? { prefix: args.prefix as string } : {}),
+      ...(args.noisePixels !== undefined ? { noisePixels: args.noisePixels as number } : {}),
+      includeAll: args.includeAll === true,
+    });
+    const gallery = `file://${report.galleryPath}`;
+    // The gates fragment travels with the report: an MCP client that has to
+    // reconstruct per-story thresholds from the story list will reach for one
+    // number for every component, which is the mistake the derivation exists to
+    // prevent.
+    const structured = {
+      ...report,
+      gallery,
+      gatesConfig: buildGatesConfigSnippet(report.stories, gallery),
+    };
+    // Zero stories is a failure: the caller asked for a gallery and has none.
+    // A stylesheet that could not be read is also a failure rather than a note,
+    // because a gallery missing its CSS yields baselines that look right and are
+    // wrong — the one outcome worse than no baseline at all.
+    const failed = report.stories.length === 0 || report.unreadableStylesheets.length > 0;
+    const summary = report.stories.length === 0
+      ? "build_gallery: no stories written — pass `selectors` to name components explicitly, or `includeAll` to see what discovery rejected"
+      : `build_gallery: ${report.stories.length} story/stories, ${report.skipped.length} not recommended`
+        + `${report.unreadableStylesheets.length > 0 ? `, ${report.unreadableStylesheets.length} UNREADABLE stylesheet(s) — baselines from this gallery are not trustworthy` : ""}`;
+    return result(summary, structured, failed);
+  },
+};
+
 const verifyFlowTool: McpTool = {
   name: "verify_flow",
   description:
@@ -188,5 +258,7 @@ export const TOOLS: McpTool[] = [
   scanHandlersTool,
   checkCopyTool,
   buildPageTool,
+  buildGalleryTool,
+  checkStoryTool,
   checkEquivalenceTool,
 ];

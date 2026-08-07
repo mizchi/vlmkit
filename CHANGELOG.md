@@ -131,6 +131,23 @@ suppression works per *rule* instead of per whole gate.
   accepted and ignored, behaviour is not exercised. It answers "did this CSS or
   token edit change how the component looks". Prop- or runtime-state-varying
   stories still want a hand-written gallery — `component-vrt`'s `assets/`.
+- **`check_story` and `build_gallery` MCP tools**, so component-scoped VRT is
+  reachable from an MCP client and not only from the CLI. `check_story` is a
+  `gateTool()` call (`--out` omitted: a per-call baseline directory would silently
+  write a fresh baseline instead of comparing against the committed one).
+  `build_gallery` is hand-written like `build_page`, because it returns an
+  artifact rather than findings — but it still decides `failed`, on the two
+  outcomes that leave the caller worse off than before: no stories written, or a
+  stylesheet that could not be read. The gates-config fragment travels in the
+  structured result so a client does not re-derive per-story thresholds and reach
+  for one number for every component.
+- **A `Component VRT` CI job** that runs the loop for real: generate a gallery
+  from a committed page, write baselines, prove a clean re-run, then break one
+  component and require a non-zero exit with no cascade to its neighbours. Both
+  assertions are properties of a *different machine* than the one that wrote the
+  baselines, which is the only way to know the render is reproducible in CI — and
+  a suite that only ever sees passes cannot tell a working gate from one that
+  always passes. Keyless and deterministic.
 - **`vlmkit bench gates`** — where a ruleset spends its time. Runs every gate that
   works from a bare page (18 of the 26; the set is derived from each gate's
   declared `inputs`, not from a list) and reports cost beside yield: median /

@@ -62,9 +62,9 @@ npx vlmkit check design http://localhost:3000/ \
 }
 ```
 
-Nine gates become tools (`verify_markup`, `check_integrity`,
-`check_copy`, `check_interactions`, `scan_handlers`, `build_page`,
-`check_layout`, `check_equivalence`, `verify_flow`). Tool table:
+Eleven tools (`verify_markup`, `check_integrity`, `check_copy`,
+`check_interactions`, `scan_handlers`, `build_page`, `build_gallery`,
+`check_story`, `check_layout`, `check_equivalence`, `verify_flow`). Tool table:
 [`packages/vlmkit-mcp/README.md`](../packages/vlmkit-mcp/README.md).
 
 ## Agent skill

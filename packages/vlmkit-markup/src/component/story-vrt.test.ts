@@ -111,6 +111,17 @@ describe("story VRT against a real gallery", { timeout: 240_000 }, () => {
     );
   });
 
+  it("reports an unreachable gallery as mount-failed, not as a stack trace", async () => {
+    // The likeliest mistake with this command. Playwright's raw error arrives as
+    // a stack plus an internal call log, which reads like a vlmkit crash rather
+    // than a wrong flag; nothing was measured, so it is a mount failure.
+    const report = await runStoryVrt(options({ gallery: "file:///definitely/not/here.html" }));
+    assert.equal(report.results[0]!.outcome, "mount-failed");
+    assert.match(report.results[0]!.error!, /could not open the gallery/);
+    assert.match(report.results[0]!.error!, /--gallery/);
+    assert.doesNotMatch(report.results[0]!.error!, /\n\s+at /, "must not carry a stack");
+  });
+
   it("reports unchanged on a second run, then drift after an edit — without cascading", async () => {
     // Baselines from the previous case are reused deliberately: the sequence IS
     // the loop being tested.

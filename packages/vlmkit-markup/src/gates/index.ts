@@ -88,7 +88,7 @@ export const markupGatesPlugin = definePlugin({
     // Responsive / dynamic behavior.
     breakpointsGate,
     scrollGate,
-  storyGate,
+    storyGate,
     scrollScanGate,
     handlersGate,
     motionGate,

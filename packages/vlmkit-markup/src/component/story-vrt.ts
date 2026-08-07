@@ -230,7 +230,21 @@ async function captureStory(
   // Navigate per story. The contract notes each mount "navigates fresh, so tests
   // are already isolated" — carrying one story's DOM into the next would make a
   // stale render look like a match.
-  await page.goto(options.gallery, { waitUntil: "networkidle", timeout: 30_000 });
+  try {
+    await page.goto(options.gallery, { waitUntil: "networkidle", timeout: 30_000 });
+  } catch (e) {
+    // A wrong --gallery is the single likeliest mistake with this command, and
+    // Playwright's raw error arrives as a stack trace plus an internal call log.
+    // It is the same class of outcome as a rejected mount — nothing was measured
+    // — so it reports as one, with the URL that failed and no stack.
+    return {
+      story,
+      outcome: "mount-failed",
+      error: `could not open the gallery at ${options.gallery}`
+        + ` — ${(e instanceof Error ? e.message : String(e)).split("\n")[0]}`
+        + ". Check --gallery: a local file needs a file:// URL, a dev server needs to be running.",
+    };
+  }
   const mounted = await page.evaluate(mountInPage, { story, props: options.props ?? {} });
   if (!mounted.ok) {
     return { story, outcome: "mount-failed", error: mounted.error };
