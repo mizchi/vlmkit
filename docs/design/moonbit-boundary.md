@@ -1,10 +1,33 @@
 # The TypeScript ↔ MoonBit boundary
 
-Status: **JSON boundary landed alongside the positional one.** New logic should use
-the JSON path. All 61 positional arms still exist and still work; three commands now
-reach MoonBit through JSON instead — `layout-policy-issue-ids`, `interaction-issues`
-(new logic, previously inexpressible) and `goal-status` (the 36-argument worst case,
-migrated behind a differential test).
+Status: **JSON boundary landed alongside the positional one, and the commands that
+carried real risk are migrated.** All 61 positional arms still exist and still work.
+
+## Which commands were migrated, and why not all of them
+
+A blanket sweep would have been work without benefit, so the set was chosen by
+measurement. Two positional arguments can only be confused when they have the same
+type, so the risk a command carries is how many mutually swappable positions it has:
+
+| | commands |
+|---|--:|
+| ≥2 mutually swappable positions | **32** |
+| 0–1 arguments, or all argument types distinct | 29 |
+
+The 29 gain nothing from a struct: `is-component-probe-state(value)` takes one
+`String`, and there is no wiring bug available to make. They stay positional, and
+`src/markup-core-dispatch.test.ts` covers the duplication concern that applies to
+them.
+
+Of the 32, **14 are migrated** — `goal-status` (36 arguments), the 12
+`ui-contract-*-issue-ids` with swappable positions, and `layout-policy-issue-ids`.
+`interaction-issues` is new logic with no positional twin. The remaining 18 are
+listed under "Not done".
+
+**Deleting the positional dispatch entirely is a separate goal** and would require
+all 61, including the 29 with nothing to gain. Worth doing for the 1,487 lines and
+the empty-argument sentinel it would remove — but that is a uniformity argument, not
+a risk one, and it should be made explicitly rather than arrived at by drift.
 
 ## What the positional boundary costs
 
@@ -187,7 +210,19 @@ Three habits that keep such a handler honest:
   because the rule reads the pair symmetrically — "the test missed it" and "there is
   nothing to miss" look identical from outside, and only the first is a defect.
 
-- **The other 60 positional commands are not migrated.** Deliberate: it is a separate
+- **18 risky commands remain**: `visual-classify-region` (12 args, 10 swappable),
+  `landscape-cell-score` (10/10), `a11y-contrast-evaluate` (8/6),
+  `landscape-diff-summary`, `region-classify-kind`, `focus-order-classify`,
+  `a11y-touch-in-cluster`, `visual-is-likely-page-surface`,
+  `semantic-drilldown-select-index`, `landscape-cell-hex`, `semantic-drilldown-policy`,
+  `grid-arrays-close`, `shift-classify-suspect`, `quality-error-state-kind`,
+  `quality-coverage-passed`, `merge-component-probe-states`, `landscape-default-grid`,
+  `grid-gcd`. Each is mechanical now that the harness exists: add a struct, an arm,
+  a spec row in `markup-core-migration.test.ts`.
+
+- **The 29 zero-risk commands are deliberately not migrated.** See above.
+
+- ~~The other 60 positional commands are not migrated.~~ Superseded: it is a separate
   change with its own risk, and the two paths coexist without interacting. The two
   tables are now checked for drift (`src/markup-core-dispatch.test.ts`): command
   names in full, behaviour on a sample chosen for shape. Full behavioural

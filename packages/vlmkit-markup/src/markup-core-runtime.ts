@@ -605,14 +605,13 @@ export function computeUiContractScreenIssueIds(input: {
   goal?: string;
   sourceOfTruth?: string;
 }): MarkupCoreUiContractScreenIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-screen-issue-ids",
-    input.id,
-    input.pattern ?? "",
-    input.goal ?? "",
-    input.sourceOfTruth ?? "",
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("screen-issue-ids", {
+    id: input.id,
+    pattern: input.pattern ?? "",
+    goal: input.goal ?? "",
+    source_of_truth: input.sourceOfTruth ?? "",
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractScreenIssueId(issueId)) {
       return issueId;
     }
@@ -630,16 +629,15 @@ export function computeUiContractViewportIssueIds(input: {
   dprPresent: boolean;
   dpr: number;
 }): MarkupCoreUiContractViewportIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-viewport-issue-ids",
-    input.label,
-    boolArg(input.duplicateLabel),
-    doubleArg(input.width),
-    doubleArg(input.height),
-    boolArg(input.dprPresent),
-    doubleArg(input.dpr),
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("viewport-issue-ids", {
+    label: input.label,
+    duplicate_label: input.duplicateLabel,
+    width: input.width,
+    height: input.height,
+    // The present/value pair collapses: absent is absent, not 0.
+    dpr: input.dprPresent ? input.dpr : undefined,
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractViewportIssueId(issueId)) {
       return issueId;
     }
@@ -656,15 +654,14 @@ export function computeUiContractLandmarkIssueIds(input: {
   parentIdPresent: boolean;
   parentKnown: boolean;
 }): MarkupCoreUiContractLandmarkIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-landmark-issue-ids",
-    input.id,
-    input.role,
-    input.name,
-    boolArg(input.parentIdPresent),
-    boolArg(input.parentKnown),
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("landmark-issue-ids", {
+    id: input.id,
+    role: input.role,
+    name: input.name,
+    parent_id_present: input.parentIdPresent,
+    parent_known: input.parentKnown,
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractLandmarkIssueId(issueId)) {
       return issueId;
     }
@@ -701,18 +698,18 @@ export function computeUiContractPatternEvidenceIssueIds(input: {
   hasCanvasStateHook: boolean;
   canvasRequiredStateFields: string[];
 }): MarkupCoreUiContractPatternEvidenceIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-pattern-evidence-issue-ids",
-    input.pattern ?? "",
-    joinList(input.markerKinds),
-    joinList(input.requiredStateKinds),
-    joinList(input.stateKinds),
-    intArg(input.expectedScrollportCount),
-    boolArg(input.hasComposition),
-    boolArg(input.hasCanvasStateHook),
-    joinList(input.canvasRequiredStateFields),
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("pattern-evidence-issue-ids", {
+    pattern: input.pattern ?? "",
+    // Arrays, not a pipe-joined string: no element can now break the encoding.
+    marker_kinds: input.markerKinds,
+    required_state_kinds: input.requiredStateKinds,
+    state_kinds: input.stateKinds,
+    expected_scrollport_count: input.expectedScrollportCount,
+    has_composition: input.hasComposition,
+    has_canvas_state_hook: input.hasCanvasStateHook,
+    canvas_required_state_fields: input.canvasRequiredStateFields,
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractPatternEvidenceIssueId(issueId)) {
       return issueId;
     }
@@ -727,15 +724,14 @@ export function computeUiContractMarkerIssueIds(input: {
   hasAttribute: boolean;
   hasTarget: boolean;
 }): MarkupCoreUiContractMarkerIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-marker-issue-ids",
-    input.kind,
-    boolArg(input.required),
-    boolArg(input.hasSelector),
-    boolArg(input.hasAttribute),
-    boolArg(input.hasTarget),
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("marker-issue-ids", {
+    kind: input.kind,
+    required: input.required,
+    has_selector: input.hasSelector,
+    has_attribute: input.hasAttribute,
+    has_target: input.hasTarget,
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractMarkerIssueId(issueId)) {
       return issueId;
     }
@@ -867,15 +863,14 @@ export function computeUiContractCompositionLayerIssueIds(input: {
   zPresent: boolean;
   zFinite: boolean;
 }): MarkupCoreUiContractCompositionLayerIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-composition-layer-issue-ids",
-    input.id,
-    input.role,
-    boolArg(input.duplicateId),
-    boolArg(input.zPresent),
-    boolArg(input.zFinite),
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("composition-layer-issue-ids", {
+    id: input.id,
+    role: input.role,
+    duplicate_id: input.duplicateId,
+    // Absent means no z declared at all; `false` means one was and is not finite.
+    z_finite: input.zPresent ? input.zFinite : undefined,
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractCompositionLayerIssueId(issueId)) {
       return issueId;
     }
@@ -888,13 +883,12 @@ export function computeUiContractCompositionShapeIssueIds(input: {
   kind: string;
   duplicateId: boolean;
 }): MarkupCoreUiContractCompositionShapeIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-composition-shape-issue-ids",
-    input.id,
-    input.kind,
-    boolArg(input.duplicateId),
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("composition-shape-issue-ids", {
+    id: input.id,
+    kind: input.kind,
+    duplicate_id: input.duplicateId,
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractCompositionShapeIssueId(issueId)) {
       return issueId;
     }
@@ -910,16 +904,14 @@ export function computeUiContractCompositionMotionIssueIds(input: {
   durationPresent: boolean;
   durationMs: number;
 }): MarkupCoreUiContractCompositionMotionIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-composition-motion-issue-ids",
-    input.id,
-    input.trigger,
-    input.effect,
-    boolArg(input.duplicateId),
-    boolArg(input.durationPresent),
-    doubleArg(input.durationMs),
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("composition-motion-issue-ids", {
+    id: input.id,
+    trigger: input.trigger,
+    effect: input.effect,
+    duplicate_id: input.duplicateId,
+    duration_ms: input.durationPresent ? input.durationMs : undefined,
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractCompositionMotionIssueId(issueId)) {
       return issueId;
     }
@@ -986,12 +978,11 @@ export function computeUiContractDecorationPaletteIssueIds(input: {
   role: string;
   value?: string;
 }): MarkupCoreUiContractDecorationPaletteIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-decoration-palette-issue-ids",
-    input.role,
-    input.value ?? "",
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("decoration-palette-issue-ids", {
+    role: input.role,
+    value: input.value,
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractDecorationPaletteIssueId(issueId)) {
       return issueId;
     }
@@ -1089,15 +1080,14 @@ export function computeUiContractStateIssueIds(input: {
   hasSelector: boolean;
   hasTrigger: boolean;
 }): MarkupCoreUiContractStateIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-state-issue-ids",
-    input.id,
-    input.kind,
-    boolArg(input.required),
-    boolArg(input.hasSelector),
-    boolArg(input.hasTrigger),
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("state-issue-ids", {
+    id: input.id,
+    kind: input.kind,
+    required: input.required,
+    has_selector: input.hasSelector,
+    has_trigger: input.hasTrigger,
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractStateIssueId(issueId)) {
       return issueId;
     }
@@ -1115,18 +1105,16 @@ export function computeUiContractRequiredStateIssueIds(input: {
   minChangeRatioPresent: boolean;
   minChangeRatio: number;
 }): MarkupCoreUiContractRequiredStateIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-required-state-issue-ids",
-    input.id,
-    input.kind,
-    boolArg(input.required),
-    boolArg(input.hasSelector),
-    boolArg(input.hasTrigger),
-    boolArg(input.duplicateId),
-    boolArg(input.minChangeRatioPresent),
-    doubleArg(input.minChangeRatio),
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("required-state-issue-ids", {
+    id: input.id,
+    kind: input.kind,
+    required: input.required,
+    has_selector: input.hasSelector,
+    has_trigger: input.hasTrigger,
+    duplicate_id: input.duplicateId,
+    min_change_ratio: input.minChangeRatioPresent ? input.minChangeRatio : undefined,
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractRequiredStateIssueId(issueId)) {
       return issueId;
     }
@@ -1145,19 +1133,17 @@ export function computeUiContractExpectedScrollportIssueIds(input: {
   minOverflowPresent: boolean;
   minOverflow: number;
 }): MarkupCoreUiContractExpectedScrollportIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-expected-scrollport-issue-ids",
-    input.id,
-    input.axis,
-    boolArg(input.required),
-    boolArg(input.hasSelector),
-    boolArg(input.hasName),
-    boolArg(input.hasLandmarkId),
-    boolArg(input.duplicateId),
-    boolArg(input.minOverflowPresent),
-    doubleArg(input.minOverflow),
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("expected-scrollport-issue-ids", {
+    id: input.id,
+    axis: input.axis,
+    required: input.required,
+    has_selector: input.hasSelector,
+    has_name: input.hasName,
+    has_landmark_id: input.hasLandmarkId,
+    duplicate_id: input.duplicateId,
+    min_overflow: input.minOverflowPresent ? input.minOverflow : undefined,
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractExpectedScrollportIssueId(issueId)) {
       return issueId;
     }
