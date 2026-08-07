@@ -1,4 +1,5 @@
 import {
   "moonbitlang/core/string" @string,
   "moonbitlang/core/math" @math,
+  "moonbitlang/core/json" @json,
 }

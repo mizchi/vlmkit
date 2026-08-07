@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { describeMoonBitError } from "./markup-core-error.ts";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,6 +36,9 @@ let runtimeBackend: "direct-js" | "spawn" = "spawn";
 
 interface DirectMarkupCoreModule {
   run_markup_core: (command: string, encodedArgs: string) => unknown;
+  /** Optional so a stale build without the JSON boundary falls back rather than crashing. */
+  run_markup_core_json?: (command: string, payload: string) => unknown;
+  markup_core_json_commands?: () => unknown;
 }
 
 export function computeComponentGoalStatus(input: {
@@ -132,6 +136,89 @@ export function getMarkupCoreRuntimeBackend(): "direct-js" | "spawn" {
   return runtimeBackend;
 }
 
+/**
+ * The JSON boundary to markup-core. Prefer this for new logic.
+ *
+ * `runMarkupCore` above encodes tab-separated positional strings, which is why
+ * exposing one pure function costs a hand-written encoder here plus an arm in two
+ * MoonBit dispatch tables. It also cannot express a record or an array, and with
+ * 36 positional arguments in the largest command, two same-typed arguments in the
+ * wrong order is a silent behaviour change no compiler on either side can see.
+ *
+ * Here the argument is one object and MoonBit's `derive(FromJson)` generates the
+ * decoder, so a wrong field name or type raises with the field's JSON path.
+ *
+ * **Absent means omitted, not null.** MoonBit decodes an `Option` field from a
+ * missing key; explicit `null` fails with "expected number". `JSON.stringify`
+ * already drops `undefined`, but a lot of TypeScript spells absence as `null`, so
+ * nulls are stripped here rather than at every call site — otherwise the first
+ * caller to write `null` gets a decode error about a field they did supply. An
+ * explicitly-null value for a *required* field still fails, just as a missing one
+ * would.
+ */
+export function callMarkupCoreJson<TOut>(command: string, input: unknown): TOut {
+  const payload = JSON.stringify(stripAbsent(input));
+  const output = runMarkupCoreJsonRaw(command, payload);
+  try {
+    return JSON.parse(output) as TOut;
+  } catch (e) {
+    throw new Error(
+      `markup-core ${command} returned output that is not JSON: ${JSON.stringify(output.slice(0, 200))}`
+      + ` (${e instanceof Error ? e.message : String(e)})`,
+    );
+  }
+}
+
+/** Recursively drop `null` / `undefined`, so absence reaches MoonBit as omission. */
+function stripAbsent(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stripAbsent);
+  if (value === null || typeof value !== "object") return value;
+  const out: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if (item === null || item === undefined) continue;
+    out[key] = stripAbsent(item);
+  }
+  return out;
+}
+
+/**
+ * Same two-backend fallback as `runMarkupCore`: the direct JS module when it
+ * loads, a build-then-retry, then the spawned CLI. Both backends dispatch through
+ * one table in `markup-core`, so they cannot disagree about a command.
+ *
+ * Not cached, unlike the positional path. That cache is keyed on the argument
+ * array and these payloads can be large, so caching them would grow a map that
+ * nothing evicts for calls that are already sub-millisecond.
+ */
+function runMarkupCoreJsonRaw(command: string, payload: string): string {
+  const direct = () => {
+    const api = loadMarkupCoreApi();
+    if (!api?.run_markup_core_json) return undefined;
+    runtimeBackend = "direct-js";
+    return unwrapMoonBitResult(api.run_markup_core_json(command, payload)).trim();
+  };
+  const first = direct();
+  if (first !== undefined) return first;
+  ensureMarkupCoreCli();
+  const second = direct();
+  if (second !== undefined) return second;
+  runtimeBackend = "spawn";
+  return run(process.execPath, [cliPath, "--json", command, payload]).trim();
+}
+
+/** Commands the MoonBit side accepts, for a test that the two views agree. */
+export function markupCoreJsonCommands(): string[] {
+  const api = loadMarkupCoreApi();
+  if (!api?.markup_core_json_commands) {
+    ensureMarkupCoreCli();
+  }
+  const loaded = loadMarkupCoreApi();
+  if (!loaded?.markup_core_json_commands) {
+    throw new Error("markup-core JSON API is unavailable; run `moon build` in packages/vlmkit-markup");
+  }
+  return JSON.parse(unwrapMoonBitResult(loaded.markup_core_json_commands()).trim()) as string[];
+}
+
 function runMarkupCoreDirect(args: string[]): string | undefined {
   const command = args[0];
   if (!command) return undefined;
@@ -154,6 +241,28 @@ function encodeDirectArgs(args: string[]): string | undefined {
   return encoded.join(directArgSeparator);
 }
 
+/**
+ * Copy the entry points we know about, rather than holding the whole generated
+ * module.
+ *
+ * This used to inline `{ run_markup_core }`, which silently dropped every other
+ * export — so the JSON boundary's functions were invisible and every JSON call
+ * fell through to spawning the CLI while appearing to work. Listing the names is
+ * what keeps that from recurring unnoticed: a new export has to be added here, and
+ * `markup-core-json.test.ts` asserts the direct backend is the one actually used.
+ */
+function pickDirectApi(source: Partial<DirectMarkupCoreModule>): DirectMarkupCoreModule {
+  return {
+    run_markup_core: source.run_markup_core!,
+    ...(typeof source.run_markup_core_json === "function"
+      ? { run_markup_core_json: source.run_markup_core_json }
+      : {}),
+    ...(typeof source.markup_core_json_commands === "function"
+      ? { markup_core_json_commands: source.markup_core_json_commands }
+      : {}),
+  };
+}
+
 function loadMarkupCoreApi(): DirectMarkupCoreModule | undefined {
   if (directModule) return directModule;
   const injected = (
@@ -162,14 +271,14 @@ function loadMarkupCoreApi(): DirectMarkupCoreModule | undefined {
     }
   )[injectedDirectModuleKey];
   if (typeof injected?.run_markup_core === "function") {
-    directModule = { run_markup_core: injected.run_markup_core };
+    directModule = pickDirectApi(injected);
     return directModule;
   }
   if (directModuleUnavailable) return undefined;
   try {
     const loaded = requireGenerated(apiPath) as Partial<DirectMarkupCoreModule>;
     if (typeof loaded.run_markup_core === "function") {
-      directModule = { run_markup_core: loaded.run_markup_core };
+      directModule = pickDirectApi(loaded);
       return directModule;
     }
   } catch {
@@ -185,7 +294,12 @@ function unwrapMoonBitResult(value: unknown): string {
     if (value.$tag === 1) {
       return String(value._0);
     }
-    throw new Error(`markup-core direct call failed: ${String(value._0)}`);
+    // `String(value._0)` was `[object Object]` for every error MoonBit's stdlib
+    // raises, which meant the JSON boundary's whole selling point — a decode error
+    // that names the field — was invisible on the default backend.
+    throw new Error(
+      `markup-core direct call failed: ${describeMoonBitError(value._0) ?? String(value._0)}`,
+    );
   }
   return String(value);
 }
@@ -927,20 +1041,23 @@ export function computeUiContractLayoutIssueIds(input: {
   displayColumnsCount?: number;
   displayRowsCount?: number;
 }): MarkupCoreUiContractLayoutIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-layout-issue-ids",
-    input.widthKind ?? "",
-    boolArg(input.widthMinPresent),
-    boolArg(input.widthMaxPresent),
-    doubleArg(input.widthValue ?? 0),
-    input.heightKind ?? "",
-    doubleArg(input.heightValue ?? 0),
-    doubleArg(input.heightMax ?? 0),
-    input.displayKind ?? "",
-    intArg(input.displayColumnsCount),
-    intArg(input.displayRowsCount),
-  ]);
-  return splitList(output).map((issueId) => {
+  // First caller on the JSON boundary. Ten positional strings became one record,
+  // and the two "present?" + "value" argument pairs the positional form needed
+  // collapsed into optional fields — so "unspecified" and "zero" are no longer the
+  // same thing on the wire, which they were when an absent width became `0`.
+  const issueIds = callMarkupCoreJson<string[]>("layout-policy-issue-ids", {
+    width_kind: input.widthKind ?? "",
+    width_min: input.widthMinPresent ? 1 : undefined,
+    width_max: input.widthMaxPresent ? 1 : undefined,
+    width_value: input.widthValue,
+    height_kind: input.heightKind ?? "",
+    height_value: input.heightValue,
+    height_max: input.heightMax,
+    display_kind: input.displayKind ?? "",
+    display_columns_count: input.displayColumnsCount ?? 0,
+    display_rows_count: input.displayRowsCount ?? 0,
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractLayoutIssueId(issueId)) {
       return issueId;
     }
