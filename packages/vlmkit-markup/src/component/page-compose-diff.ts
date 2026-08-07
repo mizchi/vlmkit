@@ -12,7 +12,6 @@
  * `page-compose.ts` remains the CLI entry point and re-exports these, so existing
  * imports and `vlmkit build page` are unaffected.
  */
-import { join } from "node:path";
 import {
   extractComponentsFromRgba,
   type ComponentBbox,

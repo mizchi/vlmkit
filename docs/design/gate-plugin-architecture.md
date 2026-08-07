@@ -372,6 +372,43 @@ Deliberate, and each one aligns a straggler with the documented contract:
 - **`vlmkit rules` / `vlmkit rules <gate>`** are new. Without a way to list rule
   ids, rule settings would be a feature nobody could find.
 
+## A constraint the registry imposes on everything else
+
+**No gate may statically import a CLI-entry module.** `src/cli/gate-entry-isolation.test.ts`
+enforces it; here is why it is not a style preference.
+
+The legacy leaf commands — `build page`, `diff html`, `scan component`, the 22 in
+`GROUPS` with a `spec` — have no handler the router calls. `delegate` sets
+`__VLMKIT_DISPATCHER_LEAF__` and imports the leaf's module, whose top-level guard reads
+that variable and calls `main()`. **The command is the module's evaluation.**
+
+`runCli` composes the registry on *every* invocation, to enumerate its verbs for the
+command table. So every module a gate statically reaches is evaluated before any leaf
+can dispatch — and if that module is a leaf, its guard has already read an unset
+variable. `delegate`'s later import is an ESM cache hit that runs nothing. The command
+prints nothing and exits **0**.
+
+That happened. `verify.gate.ts` → `markup-verify.ts` → `page-compose.ts` made
+`vlmkit build page` a silent no-op for any arguments, `--help` included. It
+type-checked, every test of its internals passed, and the command was gone. `runGroupLeaf`
+already consults the legacy table before the registry with a comment explaining this
+exact hazard — and it was not enough, because the registry is loaded earlier still, at
+command registration. The fix was to move the two functions `markup-verify` actually
+needed into `page-render.ts`, which has no guard.
+
+Two notes for anyone adding a gate:
+
+- **A dynamic `await import()` of a CLI-entry module is fine** and is what the escape
+  hatch is for — nothing is evaluated until the call runs. `region-judge.ts` reaches
+  `renderHtmlToPng` that way. The test only walks static edges.
+- **Spawning the CLI cannot catch this**, which is why the check is structural. Run
+  from source, a leaf's relative import and `delegate`'s package specifier resolve to
+  different URLs, so Node holds two module instances and the guard fires on the second;
+  the collision exists only after the bundler merges them into one chunk. A spawn test
+  passes with the bug present — verified. `src/cli/cli-leaf-help.test.ts` spawns each
+  leaf anyway, for the coarser failures (moved file, throwing top-level, unresolvable
+  spec), and says so in its header.
+
 ## Follow-ups, now closed
 
 The three items this document listed as open have landed.

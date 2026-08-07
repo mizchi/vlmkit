@@ -22,29 +22,26 @@
  *   vlmkit verify markup <attempt.html> --target <t1.png> [--target <t2.png> ...]
  *     [--reference <reference.html>] [--json]
  */
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import pixelmatch from "pixelmatch";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
-import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+// NOT from `page-compose.ts`, which is a CLI entry: this module is in
+// `verify.gate.ts`'s static graph, `runCli` composes the registry on every
+// invocation, and a static import from here evaluated that entry's
+// `__VLMKIT_DISPATCHER_LEAF__` guard before the dispatcher could set it — which
+// made `vlmkit build page` a no-op that printed nothing and exited 0. See
+// `page-render.ts`.
+import { loadPng, renderHtmlToPng } from "../component/page-render.ts";
 import {
   composePageDiff,
-  loadPng,
-  renderHtmlToPng,
   type PageComposition,
   type PageComponent,
-  type PageMatch,
-} from "../component/page-compose.ts";
-import { kindLabel } from "../component/component-classify.ts";
+} from "../component/page-compose-diff.ts";
 import { detectBackground } from "../component/component-bbox.ts";
-import {
-  captureRegionElementsFromHtml,
-  matchRegionBboxToElement,
-  type RegionElementRect,
-} from "../region-selector-match.ts";
+import { captureRegionElementsFromHtml, type RegionElementRect } from "../region-selector-match.ts";
 // The kickback text and the terminal report live in `markup-verify-report.ts`:
 // pure string building, and previously stuck behind this module's 627ms of
 // orchestrator imports. Re-exported because callers and tests resolve them here.

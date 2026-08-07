@@ -210,6 +210,35 @@ Three habits that keep such a handler honest:
   because the rule reads the pair symmetrically — "the test missed it" and "there is
   nothing to miss" look identical from outside, and only the first is a defect.
 
+- **The differential harness had two blind spots, and both were found by review
+  rather than by a failing test.** Worth recording because both are the same mistake:
+  a test that exempts the case it exists to check.
+
+  1. **An `=absent` exemption skipped every disagreement on an omitted optional**, on
+     the stated grounds that the positional form "cannot say absent and sends the zero
+     value". That is false for every migrated command — each carries an explicit
+     `*_present` argument (`core.mbt:439`, `:676`, `:718`, `:838`, `:901`, `:928`) and
+     the harness already sent it. So the two sides *should* agree on absence, and the
+     skip exempted the migration's only genuinely new logic: the `is Some(_)` /
+     `unwrap_or` reconstruction. Mutating `viewport`'s reconstruction to a constant
+     `true` was caught by nothing until the skip came out.
+  2. **The number set was `[0, 2.5]`**, chosen for the `> 0` guard — but
+     `min_overflow < 0`, `duration_ms < 0` and `min_change_ratio < 0 || > 1` reject
+     values that set never produces. Inverting `expected-scrollport`'s presence
+     reconstruction was undetectable until `-1` joined the set.
+
+  The general form: a value set is only as good as the guards it straddles, and a
+  justified-looking `continue` in a differential test is where a migration's real
+  logic goes to hide. Both fixes are mutation-verified — each mutation now fails, and
+  failed nothing before.
+
+  One related defect the same review caught: `layout_policy_issue_ids` was **written
+  out inline** rather than delegating to `ui_contract_layout_issue_ids`. It was the
+  first command through the boundary, before the pattern existed, and the copy read as
+  equivalent. But with two copies of the rules a disagreement is no longer necessarily
+  a wiring bug, which is the entire property the differential test rests on. It
+  delegates now, like every other handler.
+
 - **18 risky commands remain**: `visual-classify-region` (12 args, 10 swappable),
   `landscape-cell-score` (10/10), `a11y-contrast-evaluate` (8/6),
   `landscape-diff-summary`, `region-classify-kind`, `focus-order-classify`,

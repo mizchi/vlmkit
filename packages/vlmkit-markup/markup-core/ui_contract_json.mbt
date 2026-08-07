@@ -16,11 +16,14 @@
 /// still take both, so this file reconstructs them — that reconstruction is the
 /// only place the old convention survives, instead of every call site.
 ///
-/// **Three pipe-joined lists become arrays.** `marker_kinds`,
+/// **Four pipe-joined lists become arrays at the boundary.** `marker_kinds`,
 /// `required_state_kinds`, `state_kinds` and `canvas_required_state_fields` were
-/// `String` holding `"a|b|c"`, which means no element could ever contain a pipe and
-/// nothing enforced that. `Array[String]` has no such hazard, and the rule
-/// functions keep taking the joined form so the join happens once, here.
+/// `String` holding `"a|b|c"`, so no element could contain a pipe and nothing
+/// enforced that. `Array[String]` gives the *caller* a shape that cannot lose an
+/// element boundary. It does not remove the hazard from the rules: they still take
+/// the joined form, so `join_issue_ids` re-introduces it here, and an element
+/// containing a pipe would still split. That is one place instead of every call
+/// site, and it becomes a real fix only when the rule functions take arrays too.
 ///
 /// **Ids stop being positional.** `ui-contract-required-state-issue-ids` took
 /// eight arguments of which five were `Bool` — `required`, `has_selector`,
@@ -253,8 +256,11 @@ pub fn composition_motion_issue_ids(
 ///|
 pub struct DecorationPaletteIssuesInput {
   role : String
-  /// Absent when the palette entry declares no value at all, which the rule treats
-  /// differently from an empty string.
+  /// Optional so a caller can omit it rather than inventing `""`. The rule does NOT
+  /// currently distinguish the two — absent is folded to `""` below, and
+  /// `contrast-palette-value-required` fires either way. Kept as `String?` because
+  /// that is what the contract's shape actually is; if the rule ever needs to tell
+  /// "no value declared" from "declared empty", the information is already here.
   value : String?
 } derive(FromJson, ToJson)
 

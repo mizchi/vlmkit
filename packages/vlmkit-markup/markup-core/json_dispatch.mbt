@@ -68,33 +68,31 @@ pub struct LayoutPolicyInput {
 ///|
 /// Layout-policy issue ids for a UI Contract landmark.
 ///
-/// Same rules as the positional `ui_contract_layout_issue_ids`, expressed against
-/// the typed input. Returns ids rather than messages: the message wording is a
-/// presentation concern and lives in TypeScript, so changing it does not require
-/// rebuilding MoonBit.
+/// Unpacks the typed input and calls the positional `ui_contract_layout_issue_ids`
+/// unchanged, like every other handler on this boundary. This one was originally
+/// written out inline — it was the first command through, before the pattern existed
+/// — and the duplicate read as equivalent while quietly breaking the property the
+/// differential test depends on: with two copies of the rules, a disagreement is no
+/// longer necessarily a wiring bug, and editing one rule silently changes behaviour
+/// on one path only.
+///
+/// Returns ids rather than messages: the wording is a presentation concern and lives
+/// in TypeScript, so changing it does not require rebuilding MoonBit.
 pub fn layout_policy_issue_ids(input : LayoutPolicyInput) -> Array[String] {
-  let issues : Array[String] = []
-  if input.width_kind == "fluid" && input.width_min is None && input.width_max is None {
-    issues.push("layout-width-fluid-bounds")
-  }
-  if input.width_kind == "fixed" && input.width_value.unwrap_or(0.0) <= 0.0 {
-    issues.push("layout-width-fixed-positive")
-  }
-  if input.height_kind == "fixed" && input.height_value.unwrap_or(0.0) <= 0.0 {
-    issues.push("layout-height-fixed-positive")
-  }
-  if input.height_kind == "scrollport" && input.height_max.unwrap_or(0.0) <= 0.0 {
-    issues.push("layout-height-scrollport-max-positive")
-  }
-  if input.display_kind == "grid" {
-    if input.display_columns_count <= 0 {
-      issues.push("layout-grid-columns")
-    }
-    if input.display_rows_count <= 0 {
-      issues.push("layout-grid-rows")
-    }
-  }
-  issues
+  split_issue_ids(
+    ui_contract_layout_issue_ids(
+      input.width_kind,
+      input.width_min is Some(_),
+      input.width_max is Some(_),
+      input.width_value.unwrap_or(0.0),
+      input.height_kind,
+      input.height_value.unwrap_or(0.0),
+      input.height_max.unwrap_or(0.0),
+      input.display_kind,
+      input.display_columns_count,
+      input.display_rows_count,
+    ),
+  )
 }
 
 ///|

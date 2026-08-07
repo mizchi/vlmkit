@@ -63,19 +63,19 @@ export function computeComponentGoalStatus(input: {
   // and nothing else would notice.
   const output = callMarkupCoreJson<string>("goal-status", {
     goal: input.goal,
-    pixel_diff_ratio: input.pixelDiffRatio,
-    landscape_diff_ratio: input.landscapeDiffRatio,
-    pass: { landscape: input.pass.landscape, pixel: input.pass.pixel },
-    review: { landscape: input.review.landscape, pixel: input.review.pixel },
+    pixel_diff_ratio: finiteOr(input.pixelDiffRatio),
+    landscape_diff_ratio: finiteOr(input.landscapeDiffRatio),
+    pass: { landscape: optionalFinite(input.pass.landscape), pixel: optionalFinite(input.pass.pixel) },
+    review: { landscape: optionalFinite(input.review.landscape), pixel: optionalFinite(input.review.pixel) },
     scrollports: input.scrollports && {
-      total: input.scrollports.total ?? 0,
-      broken: input.scrollports.broken ?? 0,
-      empty: input.scrollports.empty ?? 0,
+      total: intOr(input.scrollports.total),
+      broken: intOr(input.scrollports.broken),
+      empty: intOr(input.scrollports.empty),
       expected: input.scrollports.expected && {
-        total: input.scrollports.expected.total ?? 0,
-        missing: input.scrollports.expected.missing ?? 0,
-        broken: input.scrollports.expected.broken ?? 0,
-        empty: input.scrollports.expected.empty ?? 0,
+        total: intOr(input.scrollports.expected.total),
+        missing: intOr(input.scrollports.expected.missing),
+        broken: intOr(input.scrollports.expected.broken),
+        empty: intOr(input.scrollports.expected.empty),
       },
     },
     landing: input.landing && {
@@ -85,7 +85,7 @@ export function computeComponentGoalStatus(input: {
       media_slot_visible: Boolean(input.landing.mediaSlotVisible),
     },
     canvas: input.canvas && {
-      canvas_count: input.canvas.canvasCount ?? 0,
+      canvas_count: intOr(input.canvas.canvasCount),
       nonblank: Boolean(input.canvas.nonblank),
       frame_delta: Boolean(input.canvas.frameDelta),
       input_responsive: input.canvas.inputResponsive,
@@ -95,17 +95,17 @@ export function computeComponentGoalStatus(input: {
       state_hook_present: input.canvas.stateHook
         ? input.canvas.stateHookPresent !== false
         : undefined,
-      missing_state_fields: input.canvas.missingStateFields?.length ?? 0,
+      missing_state_fields: intOr(input.canvas.missingStateFields?.length),
     },
     expressive_menu: input.expressiveMenu && {
-      composition_layers: input.expressiveMenu.compositionLayers ?? 0,
-      composition_shapes: input.expressiveMenu.compositionShapes ?? 0,
+      composition_layers: intOr(input.expressiveMenu.compositionLayers),
+      composition_shapes: intOr(input.expressiveMenu.compositionShapes),
       selected_visible: Boolean(input.expressiveMenu.selectedVisible),
-      focusable_item_count: input.expressiveMenu.focusableItemCount ?? 0,
+      focusable_item_count: intOr(input.expressiveMenu.focusableItemCount),
       semantic_menu_text: Boolean(input.expressiveMenu.semanticMenuText),
       diagonal_evidence: Boolean(input.expressiveMenu.diagonalEvidence),
       high_contrast: Boolean(input.expressiveMenu.highContrast),
-      low_contrast_item_count: input.expressiveMenu.lowContrastItemCount ?? 0,
+      low_contrast_item_count: intOr(input.expressiveMenu.lowContrastItemCount),
       hover_changed: input.expressiveMenu.hoverChanged,
       focus_visible_changed: input.expressiveMenu.focusVisibleChanged,
     },
@@ -184,6 +184,59 @@ export function callMarkupCoreJson<TOut>(command: string, input: unknown): TOut 
       + ` (${e instanceof Error ? e.message : String(e)})`,
     );
   }
+}
+
+/**
+ * Normalising a value on its way to the JSON boundary.
+ *
+ * The positional encoders these replaced did this and it was load-bearing, which
+ * only became clear after removing them: `doubleArg` mapped anything non-finite to
+ * `0`, `intArg` truncated and defaulted to `0`, `boolArg` mapped `undefined` to
+ * `false`. Dropping that turned a malformed input from "the rule reports the
+ * problem" into "the decoder raises before the rule runs".
+ *
+ * That matters most where it is worst: `vlmkit contract validate` does
+ * `JSON.parse(file) as UiContract` with no runtime schema check, so arbitrary user
+ * JSON reaches these wrappers. A contract whose viewport omits `width` used to
+ * report `viewport-size-positive`; without these helpers it aborted with
+ * `Missing field width`. **The one input a validator has to survive is an invalid
+ * document.**
+ *
+ * This is normalisation, not coercion: a missing number becomes the same `0` the
+ * old wire sent, so the rule sees what it always saw and reports what it always
+ * reported. Nothing is silently reinterpreted — a string `"1280"` becomes `0` and
+ * is reported as non-positive, exactly as before.
+ */
+function finiteOr(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+/** Like `finiteOr`, but absent stays absent — for fields typed `Double?` in MoonBit. */
+function optionalFinite(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+/** `intArg`'s truncation, kept because MoonBit's `Int` would reject a fraction. */
+function intOr(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : fallback;
+}
+
+/** `boolArg`: anything not a boolean was `false` on the wire. */
+function flag(value: unknown): boolean {
+  return value === true;
+}
+
+/**
+ * A string array with non-strings dropped.
+ *
+ * The old path joined on `|` and MoonBit's `split_list` discarded empty segments,
+ * so `[null, "mode"]` arrived as `["mode"]`. `stripAbsent` cannot do this: it walks
+ * object properties, and a `null` *inside* an array survives to be rejected by
+ * `Array[String]`. Reachable through a contract's `canvas.requiredStateFields`,
+ * which nothing validates elementwise.
+ */
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
 /** Recursively drop `null` / `undefined`, so absence reaches MoonBit as omission. */
@@ -631,11 +684,11 @@ export function computeUiContractViewportIssueIds(input: {
 }): MarkupCoreUiContractViewportIssueId[] {
   const issueIds = callMarkupCoreJson<string[]>("viewport-issue-ids", {
     label: input.label,
-    duplicate_label: input.duplicateLabel,
-    width: input.width,
-    height: input.height,
+    duplicate_label: flag(input.duplicateLabel),
+    width: finiteOr(input.width),
+    height: finiteOr(input.height),
     // The present/value pair collapses: absent is absent, not 0.
-    dpr: input.dprPresent ? input.dpr : undefined,
+    dpr: input.dprPresent ? finiteOr(input.dpr) : undefined,
   });
   return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractViewportIssueId(issueId)) {
@@ -658,8 +711,8 @@ export function computeUiContractLandmarkIssueIds(input: {
     id: input.id,
     role: input.role,
     name: input.name,
-    parent_id_present: input.parentIdPresent,
-    parent_known: input.parentKnown,
+    parent_id_present: flag(input.parentIdPresent),
+    parent_known: flag(input.parentKnown),
   });
   return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractLandmarkIssueId(issueId)) {
@@ -701,13 +754,13 @@ export function computeUiContractPatternEvidenceIssueIds(input: {
   const issueIds = callMarkupCoreJson<string[]>("pattern-evidence-issue-ids", {
     pattern: input.pattern ?? "",
     // Arrays, not a pipe-joined string: no element can now break the encoding.
-    marker_kinds: input.markerKinds,
-    required_state_kinds: input.requiredStateKinds,
-    state_kinds: input.stateKinds,
-    expected_scrollport_count: input.expectedScrollportCount,
-    has_composition: input.hasComposition,
-    has_canvas_state_hook: input.hasCanvasStateHook,
-    canvas_required_state_fields: input.canvasRequiredStateFields,
+    marker_kinds: stringList(input.markerKinds),
+    required_state_kinds: stringList(input.requiredStateKinds),
+    state_kinds: stringList(input.stateKinds),
+    expected_scrollport_count: intOr(input.expectedScrollportCount),
+    has_composition: flag(input.hasComposition),
+    has_canvas_state_hook: flag(input.hasCanvasStateHook),
+    canvas_required_state_fields: stringList(input.canvasRequiredStateFields),
   });
   return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractPatternEvidenceIssueId(issueId)) {
@@ -726,10 +779,10 @@ export function computeUiContractMarkerIssueIds(input: {
 }): MarkupCoreUiContractMarkerIssueId[] {
   const issueIds = callMarkupCoreJson<string[]>("marker-issue-ids", {
     kind: input.kind,
-    required: input.required,
-    has_selector: input.hasSelector,
-    has_attribute: input.hasAttribute,
-    has_target: input.hasTarget,
+    required: flag(input.required),
+    has_selector: flag(input.hasSelector),
+    has_attribute: flag(input.hasAttribute),
+    has_target: flag(input.hasTarget),
   });
   return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractMarkerIssueId(issueId)) {
@@ -866,9 +919,9 @@ export function computeUiContractCompositionLayerIssueIds(input: {
   const issueIds = callMarkupCoreJson<string[]>("composition-layer-issue-ids", {
     id: input.id,
     role: input.role,
-    duplicate_id: input.duplicateId,
+    duplicate_id: flag(input.duplicateId),
     // Absent means no z declared at all; `false` means one was and is not finite.
-    z_finite: input.zPresent ? input.zFinite : undefined,
+    z_finite: input.zPresent ? flag(input.zFinite) : undefined,
   });
   return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractCompositionLayerIssueId(issueId)) {
@@ -886,7 +939,7 @@ export function computeUiContractCompositionShapeIssueIds(input: {
   const issueIds = callMarkupCoreJson<string[]>("composition-shape-issue-ids", {
     id: input.id,
     kind: input.kind,
-    duplicate_id: input.duplicateId,
+    duplicate_id: flag(input.duplicateId),
   });
   return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractCompositionShapeIssueId(issueId)) {
@@ -908,8 +961,8 @@ export function computeUiContractCompositionMotionIssueIds(input: {
     id: input.id,
     trigger: input.trigger,
     effect: input.effect,
-    duplicate_id: input.duplicateId,
-    duration_ms: input.durationPresent ? input.durationMs : undefined,
+    duplicate_id: flag(input.duplicateId),
+    duration_ms: input.durationPresent ? finiteOr(input.durationMs) : undefined,
   });
   return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractCompositionMotionIssueId(issueId)) {
@@ -1057,13 +1110,13 @@ export function computeUiContractLayoutIssueIds(input: {
     width_kind: input.widthKind ?? "",
     width_min: input.widthMinPresent ? 1 : undefined,
     width_max: input.widthMaxPresent ? 1 : undefined,
-    width_value: input.widthValue,
+    width_value: optionalFinite(input.widthValue),
     height_kind: input.heightKind ?? "",
-    height_value: input.heightValue,
-    height_max: input.heightMax,
+    height_value: optionalFinite(input.heightValue),
+    height_max: optionalFinite(input.heightMax),
     display_kind: input.displayKind ?? "",
-    display_columns_count: input.displayColumnsCount ?? 0,
-    display_rows_count: input.displayRowsCount ?? 0,
+    display_columns_count: intOr(input.displayColumnsCount),
+    display_rows_count: intOr(input.displayRowsCount),
   });
   return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractLayoutIssueId(issueId)) {
@@ -1083,9 +1136,9 @@ export function computeUiContractStateIssueIds(input: {
   const issueIds = callMarkupCoreJson<string[]>("state-issue-ids", {
     id: input.id,
     kind: input.kind,
-    required: input.required,
-    has_selector: input.hasSelector,
-    has_trigger: input.hasTrigger,
+    required: flag(input.required),
+    has_selector: flag(input.hasSelector),
+    has_trigger: flag(input.hasTrigger),
   });
   return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractStateIssueId(issueId)) {
@@ -1108,11 +1161,11 @@ export function computeUiContractRequiredStateIssueIds(input: {
   const issueIds = callMarkupCoreJson<string[]>("required-state-issue-ids", {
     id: input.id,
     kind: input.kind,
-    required: input.required,
-    has_selector: input.hasSelector,
-    has_trigger: input.hasTrigger,
-    duplicate_id: input.duplicateId,
-    min_change_ratio: input.minChangeRatioPresent ? input.minChangeRatio : undefined,
+    required: flag(input.required),
+    has_selector: flag(input.hasSelector),
+    has_trigger: flag(input.hasTrigger),
+    duplicate_id: flag(input.duplicateId),
+    min_change_ratio: input.minChangeRatioPresent ? finiteOr(input.minChangeRatio) : undefined,
   });
   return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractRequiredStateIssueId(issueId)) {
@@ -1136,12 +1189,12 @@ export function computeUiContractExpectedScrollportIssueIds(input: {
   const issueIds = callMarkupCoreJson<string[]>("expected-scrollport-issue-ids", {
     id: input.id,
     axis: input.axis,
-    required: input.required,
-    has_selector: input.hasSelector,
-    has_name: input.hasName,
-    has_landmark_id: input.hasLandmarkId,
-    duplicate_id: input.duplicateId,
-    min_overflow: input.minOverflowPresent ? input.minOverflow : undefined,
+    required: flag(input.required),
+    has_selector: flag(input.hasSelector),
+    has_name: flag(input.hasName),
+    has_landmark_id: flag(input.hasLandmarkId),
+    duplicate_id: flag(input.duplicateId),
+    min_overflow: input.minOverflowPresent ? finiteOr(input.minOverflow) : undefined,
   });
   return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractExpectedScrollportIssueId(issueId)) {
@@ -1433,12 +1486,6 @@ function doubleArg(value: number): string {
   return String(Number.isFinite(value) ? value : 0);
 }
 
-function optionalDoubleArg(value: number | undefined): string {
-  return typeof value === "number" && Number.isFinite(value)
-    ? String(value)
-    : "null";
-}
-
 function intArg(value: number | undefined): string {
   return typeof value === "number" && Number.isFinite(value)
     ? String(Math.trunc(value))
@@ -1447,10 +1494,6 @@ function intArg(value: number | undefined): string {
 
 function boolArg(value: boolean | undefined): string {
   return value ? "true" : "false";
-}
-
-function optionalBoolArg(value: boolean | null | undefined): string {
-  return typeof value === "boolean" ? String(value) : "null";
 }
 
 function joinList(values: string[]): string {

@@ -196,6 +196,27 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
 };
 
 /**
+ * Every `<group> <leaf>` that runs by **module evaluation** — `delegate` sets
+ * `__VLMKIT_DISPATCHER_LEAF__` and imports the module, whose top-level guard calls
+ * `main()`.
+ *
+ * Exported for `cli-leaf-help.test.ts`, which spawns each one. That mechanism fails
+ * silently in a specific way: if anything imports the leaf's module earlier in the
+ * process, the guard reads a not-yet-set env var, and `delegate`'s import is an ESM
+ * cache hit that runs nothing — the command prints nothing and exits 0. It happened
+ * to `vlmkit build page` via `verify.gate.ts` → `markup-verify.ts` →
+ * `page-compose.ts`, and neither the compiler nor any test noticed. Deriving the list
+ * here rather than restating it in the test means a new leaf is covered by default.
+ */
+export function legacySpecLeaves(): [string, string][] {
+  return Object.entries(GROUPS).flatMap(([group, leaves]) =>
+    Object.entries(leaves)
+      .filter(([, info]) => info.spec !== undefined)
+      .map(([leaf]): [string, string] => [group, leaf]),
+  );
+}
+
+/**
  * Leaves of a group, merging the registry's gates with the legacy `GROUPS`
  * table. Group help has to read from both while the migration is in
  * progress, and merging here — rather than duplicating each migrated gate's

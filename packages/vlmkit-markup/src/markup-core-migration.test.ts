@@ -15,11 +15,21 @@
  * produces a different result from the reference for at least one value — unless
  * the rule reads them symmetrically, in which case there is nothing to detect.
  *
- * Crucially the value sets **straddle the guards rules actually use**: `0` and
- * non-zero for numbers, both booleans, present and absent for optionals. That was
- * the lesson from the goal-status test — a swap behind `x > 0` is invisible unless
- * a case sits on each side of it, and the reference implementation cannot express
- * "absent" at all, so absence is checked separately.
+ * Crucially the value sets **straddle the guards rules actually use**: zero,
+ * positive, negative and above-one for numbers, both booleans, present and absent
+ * for optionals. That was the lesson from the goal-status test — a swap behind
+ * `x > 0` is invisible unless a case sits on each side of it.
+ *
+ * **The absent cases are compared, not exempted.** An earlier version skipped every
+ * disagreement whose label ended `=absent`, on the stated grounds that the
+ * positional form "cannot say absent and sends the zero value". That is false for
+ * every command here: each one carries an explicit `*_present` argument
+ * (`core.mbt:439`, `:676`, `:718`, `:838`, `:901`, `:928`) and `encode` sends it. So
+ * the two sides *should* agree on absence, and skipping them exempted the migration's
+ * only genuinely new logic — the `is Some(_)` / `unwrap_or` reconstruction in
+ * `ui_contract_json.mbt`, which is where a wiring mistake would actually live.
+ * Mutating `viewport`'s reconstruction to a constant `true` was caught by no sweep
+ * case until the skip came out.
  *
  * ## Scope
  *
@@ -30,7 +40,13 @@
  */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { callMarkupCoreJson, runMarkupCore } from "./markup-core-runtime.ts";
+import {
+  callMarkupCoreJson,
+  computeUiContractMarkerIssueIds,
+  computeUiContractPatternEvidenceIssueIds,
+  computeUiContractViewportIssueIds,
+  runMarkupCore,
+} from "./markup-core-runtime.ts";
 
 type ArgKind = "string" | "number" | "int" | "bool" | "list";
 
@@ -72,8 +88,15 @@ interface CommandSpec {
 
 const STRINGS = ["", "x"] as const;
 const BOOLS = [false, true] as const;
-/** Zero and non-zero, because `> 0` is the guard these rules almost always use. */
-const NUMBERS = [0, 2.5] as const;
+/**
+ * Zero, positive, negative, and above one — because `> 0` is not the only guard
+ * these rules use. `min_overflow < 0`, `duration_ms < 0` and `min_change_ratio < 0
+ * || > 1` all reject values a `[0, 2.5]` set never produces, so a swap or a
+ * mis-reconstructed presence flag behind one of them stayed invisible: mutating
+ * `expected-scrollport`'s presence reconstruction to a constant `true` was caught
+ * by nothing until `-1` was in the set.
+ */
+const NUMBERS = [0, 2.5, -1, 1.5] as const;
 const INTS = [0, 3] as const;
 
 const s = (field: string, values: readonly string[] = STRINGS): ArgSpec => ({ kind: "string", field, values });
@@ -330,10 +353,6 @@ describe("migrated commands match their positional arms", { timeout: 240_000 }, 
         const migrated = callMarkupCoreJson<string[]>(command.json, payloadFor(command, values));
         const referenceList = reference === "" ? [] : reference.split("|");
         if (JSON.stringify(referenceList) !== JSON.stringify(migrated)) {
-          // An absent optional legitimately differs: the positional form cannot say
-          // "absent" and sends the zero value, so a rule that distinguishes them
-          // SHOULD disagree. That is the improvement, not a bug.
-          if (label.endsWith("=absent")) continue;
           disagreements.push(`${label}: positional=${JSON.stringify(referenceList)} json=${JSON.stringify(migrated)}`);
         }
         results.add(JSON.stringify(migrated));
@@ -344,4 +363,104 @@ describe("migrated commands match their positional arms", { timeout: 240_000 }, 
       assert.ok(results.size >= 2, `${command.json}: every case returned ${[...results][0]}`);
     });
   }
+});
+
+/**
+ * Malformed input, which is where the first version of this file was blind.
+ *
+ * Every case the sweep above generates is well-formed by construction: no missing
+ * fields, no nulls, no wrong types, no non-finite numbers. That is exactly the
+ * input space a real regression lived in — the positional encoders normalised all
+ * of it (`doubleArg` mapped anything non-finite to `0`, `boolArg` mapped
+ * `undefined` to `false`) and the JSON path initially did not, so a contract whose
+ * viewport omitted `width` stopped reporting `viewport-size-positive` and started
+ * raising `Missing field width`.
+ *
+ * It matters because of who the caller is: `vlmkit contract validate` does
+ * `JSON.parse(file) as UiContract` with no runtime schema check, so arbitrary user
+ * JSON reaches these wrappers. **The one input a validator has to survive is an
+ * invalid document.** A sweep over well-formed values can never say that.
+ *
+ * These go through the public wrappers rather than `callMarkupCoreJson`, because the
+ * normalisation lives in the wrappers and testing below it would test nothing.
+ */
+describe("migrated wrappers survive malformed input", { timeout: 240_000 }, () => {
+  const viewport = (width: unknown) =>
+    computeUiContractViewportIssueIds({
+      label: "d",
+      duplicateLabel: false,
+      width: width as number,
+      height: 800,
+      dprPresent: false,
+      dpr: 0,
+    });
+
+  it("reports the issue instead of raising when a number is missing or unusable", () => {
+    // Each of these used to abort the whole validation run.
+    for (const [label, value] of [
+      ["omitted", undefined],
+      ["null", null],
+      ["a string", "1280"],
+      ["NaN", Number.NaN],
+      ["Infinity", Number.POSITIVE_INFINITY],
+    ] as const) {
+      assert.deepEqual(
+        viewport(value),
+        ["viewport-size-positive"],
+        `width ${label} must report the issue, not raise`,
+      );
+    }
+  });
+
+  it("still distinguishes a usable number, so the normalisation is not blanket", () => {
+    assert.deepEqual(viewport(0), ["viewport-size-positive"]);
+    assert.deepEqual(viewport(1280), []);
+  });
+
+  it("treats a missing boolean as false, as the old wire did", () => {
+    assert.deepEqual(
+      computeUiContractMarkerIssueIds({
+        kind: "primary-cta",
+        required: true,
+        hasSelector: undefined as unknown as boolean,
+        hasAttribute: undefined as unknown as boolean,
+        hasTarget: undefined as unknown as boolean,
+      }),
+      ["marker-target-required"],
+    );
+  });
+
+  it("drops a non-string inside a list field", () => {
+    // `stripAbsent` walks object properties, so a null INSIDE an array survived to
+    // be rejected by MoonBit's `Array[String]`. The old path joined on "|" and
+    // MoonBit's split dropped the empty segment, so `[null, "mode"]` arrived as
+    // `["mode"]` — reachable through a contract's `canvas.requiredStateFields`,
+    // which nothing validates elementwise.
+    const issues = computeUiContractPatternEvidenceIssueIds({
+      pattern: "canvas",
+      markerKinds: [],
+      requiredStateKinds: [],
+      stateKinds: [],
+      expectedScrollportCount: 0,
+      hasComposition: false,
+      hasCanvasStateHook: false,
+      canvasRequiredStateFields: [null as unknown as string, "mode"],
+    });
+    // "mode" survived the filter, so its issue is absent while the others fire.
+    assert.ok(!issues.includes("canvas-state-field-mode"), issues.join(", "));
+    assert.ok(issues.includes("canvas-state-field-frame"), issues.join(", "));
+  });
+
+  it("agrees with the positional arm on every malformed case", () => {
+    // The differential property, applied to the inputs the generated sweep cannot
+    // produce. The positional argv is what the old encoders would have emitted.
+    for (const value of [undefined, null, "1280", Number.NaN]) {
+      assert.deepEqual(
+        viewport(value),
+        runMarkupCore(["ui-contract-viewport-issue-ids", "d", "false", "0", "800", "false", "0"])
+          .split("|")
+          .filter(Boolean),
+      );
+    }
+  });
 });
