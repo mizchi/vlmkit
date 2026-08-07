@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>component-vrt experiment — story arm</title>
+<link rel="stylesheet" href="./components.css">
+<style>
+  html, body { margin: 0; padding: 0; }
+  /* inline-block so #root shrink-wraps the component: a block-level root would
+     be viewport-width and the screenshot with it, which would erase the very
+     size difference this experiment measures. */
+  #root { display: inline-block; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="./_markup.js"></script>
+<script>
+  const root = document.getElementById("root");
+  const ids = Object.fromEntries(
+    Object.keys(globalThis.COMPONENTS).map((name) => [`components/${name}/Default`, name]),
+  );
+
+  window.mount = async ({ story, props }) => {
+    const name = ids[story]
+      ?? ids[Object.keys(ids).find((id) => id.endsWith(`/${story}`)) ?? ""];
+    if (!name) throw new Error(`unknown story "${story}". Known: ${Object.keys(ids).join(", ")}`);
+    root.innerHTML = globalThis.COMPONENTS[name](props ?? {});
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  };
+  window.unmount = async () => { root.innerHTML = ""; };
+</script>
+</body>
+</html>

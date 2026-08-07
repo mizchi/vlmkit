@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>vlmkit story gallery example</title>
+<!--
+  A minimal Playwright component-testing gallery, implemented in plain JS.
+
+  The gallery contract is small and framework-agnostic — quoting Playwright's
+  own spec, the gallery is "a single page, served by your dev server at the URL
+  you set as baseURL" that exposes:
+
+      window.mount({ story, props })   render into #root, reject on failure
+      window.unmount()                 unmount the current story
+
+  Real projects resolve stories out of `*.story.tsx` files (e.g. with
+  `import.meta.glob`) and render with React/Vue/Svelte. This file hard-codes a
+  handful of vanilla-JS stories instead, which is why it needs no dev server,
+  no bundler and no framework: `vlmkit check story` can drive it straight off
+  the filesystem. That keeps it usable as both a runnable example and a test
+  fixture.
+
+  Try it:
+    vlmkit check story components/Button/Primary --gallery file://$PWD/index.html
+-->
+<style>
+  /* Deliberately plain. This is a gallery, not a page — no layout of its own,
+     so the component's own box is what gets screenshotted. */
+  body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+  #root { display: inline-block; }
+
+  /* --- the "components" under test --- */
+  .btn {
+    font: 500 14px/1 Inter, ui-sans-serif, system-ui, sans-serif;
+    padding: 10px 18px;
+    border-radius: 6px;
+    border: 1px solid #2f6feb;
+    background: #2f6feb;
+    color: #fff;
+    cursor: pointer;
+  }
+  .btn[disabled] { background: #c9d3e0; border-color: #c9d3e0; color: #6b7684; cursor: not-allowed; }
+  .btn--ghost { background: transparent; color: #2f6feb; }
+
+  .card { width: 240px; border: 1px solid #dde3ea; border-radius: 8px; padding: 16px; background: #fff; }
+  .card h3 { margin: 0 0 6px; font-size: 15px; }
+  .card p { margin: 0; font-size: 13px; color: #5b6773; }
+</style>
+</head>
+<body>
+<!-- The contract: render into #root. `mount` returns a locator for this
+     element, so it is also exactly what gets screenshotted. -->
+<div id="root"></div>
+
+<script>
+  /**
+   * Story registry. Keys follow the recommended id grammar from the spec —
+   * `<path under src, without the .story.* extension>/<ExportName>` — so
+   * `components/Button/Primary` is what a real gallery would resolve from
+   * `src/components/Button.story.tsx` export `Primary`.
+   */
+  const STORIES = {
+    "components/Button/Primary": (props) => {
+      const el = document.createElement("button");
+      el.className = "btn";
+      el.textContent = props.title ?? "Submit";
+      return el;
+    },
+    "components/Button/Disabled": (props) => {
+      const el = document.createElement("button");
+      el.className = "btn";
+      el.disabled = true;
+      el.textContent = props.title ?? "Submit";
+      return el;
+    },
+    "components/Button/Ghost": (props) => {
+      const el = document.createElement("button");
+      el.className = "btn btn--ghost";
+      el.textContent = props.title ?? "Cancel";
+      return el;
+    },
+    "components/Card/Default": (props) => {
+      const el = document.createElement("div");
+      el.className = "card";
+      const h = document.createElement("h3");
+      h.textContent = props.title ?? "Card title";
+      const p = document.createElement("p");
+      p.textContent = props.body ?? "Supporting copy that wraps onto a second line.";
+      el.append(h, p);
+      return el;
+    },
+  };
+
+  /**
+   * "Any unique trailing suffix resolves too" — the spec's recommended grammar,
+   * so `Button/Primary` finds `components/Button/Primary`. Ambiguity is an
+   * error rather than a first-match guess: silently picking one of two stories
+   * would make a diff impossible to trust.
+   */
+  function resolveStory(id) {
+    if (STORIES[id]) return STORIES[id];
+    const matches = Object.keys(STORIES).filter((key) => key === id || key.endsWith(`/${id}`));
+    if (matches.length === 1) return STORIES[matches[0]];
+    if (matches.length > 1) {
+      throw new Error(`story id "${id}" is ambiguous: ${matches.join(", ")}`);
+    }
+    throw new Error(`unknown story "${id}". Known: ${Object.keys(STORIES).join(", ")}`);
+  }
+
+  const root = document.getElementById("root");
+
+  window.mount = async ({ story, props }) => {
+    // Rejecting here is the contract's only failure channel — "there is no
+    // HTTP-status or DOM-attribute signalling" — and it is what turns a typo'd
+    // story id into a real message instead of a blank screenshot.
+    const render = resolveStory(story);
+    root.replaceChildren(render(props ?? {}));
+    // Real galleries await the framework's commit here (React's `flushSync` /
+    // Vue's `nextTick`). Two rAFs is the vanilla equivalent: resolve only once
+    // the browser has actually laid the component out, so a screenshot taken
+    // immediately after mount is not of an empty box.
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  };
+
+  window.unmount = async () => {
+    root.replaceChildren();
+  };
+</script>
+</body>
+</html>

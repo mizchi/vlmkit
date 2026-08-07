@@ -34,6 +34,7 @@ describe("markup gate plugin", () => {
         "check layout",
         "check motion",
         "check scroll",
+        "check story",
         "check theme",
         "check tokens",
         "scan handlers",
@@ -356,5 +357,75 @@ describe("run-ledger ownership", () => {
       "each of these records twice per run — remove the module's append, or give"
       + ` the gate \`ledger: () => null\`: ${offenders.join("; ")}`,
     );
+  });
+});
+
+/**
+ * `check story`'s parser carries more validation than most, because every one of
+ * its inputs has a wrong form that would otherwise fail deep inside a browser:
+ * a missing gallery, a `--props` that is not an object, a malformed viewport.
+ */
+describe("check story argument parsing", () => {
+  const gate = markupGatesPlugin.gates.find((g) => g.id === "check.story")!;
+  const ctx = { cwd: process.cwd(), argv: [] as string[], json: false };
+
+  it("takes every positional as a story id", () => {
+    // Several stories per run is the efficient shape: the gallery is one page
+    // and the browser launch is nearly all of the cost.
+    const parsed = gate.parse(
+      ["components/Button/Primary", "Card/Default", "--gallery", "http://localhost:5173/g/"],
+      ctx,
+    ) as Record<string, unknown>;
+    assert.deepEqual(parsed.stories, ["components/Button/Primary", "Card/Default"]);
+    assert.equal(parsed.gallery, "http://localhost:5173/g/");
+  });
+
+  it("requires a gallery, and says what a gallery is", () => {
+    assert.throws(
+      () => gate.parse(["components/Button/Primary"], ctx),
+      /--gallery <url> is required.*baseURL/s,
+    );
+  });
+
+  it("does not read a flag value as a story id", () => {
+    const parsed = gate.parse(
+      ["--gallery", "http://x/", "--viewport", "400x300", "--threshold", "0.02", "Button/Primary"],
+      ctx,
+    ) as Record<string, unknown>;
+    assert.deepEqual(parsed.stories, ["Button/Primary"]);
+    assert.deepEqual(parsed.viewport, { width: 400, height: 300 });
+    assert.equal(parsed.threshold, 0.02);
+  });
+
+  it("rejects props that are not a JSON object", () => {
+    const base = ["Button/Primary", "--gallery", "http://x/"];
+    // The contract requires "plain serializable data" for props, and an array or
+    // a bare scalar would reach `window.mount` as something the gallery cannot
+    // spread onto a component.
+    for (const bad of ["title=1", "[1,2]", '"a string"', "null"]) {
+      assert.throws(
+        () => gate.parse([...base, "--props", bad], ctx),
+        /--props must be a JSON object/,
+        `--props ${bad} should have been rejected`,
+      );
+    }
+    const parsed = gate.parse([...base, "--props", '{"title":"Hi"}'], ctx) as Record<string, unknown>;
+    assert.deepEqual(parsed.props, { title: "Hi" });
+  });
+
+  it("rejects a malformed viewport", () => {
+    assert.throws(
+      () => gate.parse(["Button/Primary", "--gallery", "http://x/", "--viewport", "400"], ctx),
+      /expects <width>x<height>/,
+    );
+  });
+
+  it("defaults to a component-sized threshold, not a page-sized one", () => {
+    // Component shots are small, so a handful of stray pixels is a much larger
+    // ratio than it would be on a full page.
+    const parsed = gate.parse(["Button/Primary", "--gallery", "http://x/"], ctx) as Record<string, unknown>;
+    assert.equal(parsed.threshold, 0.005);
+    assert.equal(parsed.root, "#root");
+    assert.equal(parsed.updateBaseline, false);
   });
 });

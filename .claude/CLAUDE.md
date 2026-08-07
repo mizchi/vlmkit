@@ -108,6 +108,33 @@ Full bench: `docs/reports/2026-05-22-vlm-llm-coverage-bench.md`.
 - `moonshotai/kimi-k2.5`, `moonshotai/kimi-k2.6` — return 0 fixes despite VLM CHANGE list (emits prose-only, not structured JSON). LLM latency 40-100s also disqualifies them.
 - `qwen/qwen3-coder` — generates plausible-looking fixes that over-correct the whole page (diff 4.1% → 46.7%); apply-and-rollback catches it but the loop never recovers.
 
+## Component-focused VRT (fixing one component with a small image)
+
+```bash
+# Runnable example: a plain-JS gallery, no dev server or bundler needed.
+cd examples/story-gallery
+G="file://$PWD/index.html"
+vlmkit check story components/Button/Primary Card/Default --gallery "$G"   # writes baselines
+vlmkit check story components/Button/Primary Card/Default --gallery "$G"   # compares
+vlmkit check story components/Button/Primary --gallery "$G" --update-baseline
+```
+
+Use this instead of `diff html` when repairing ONE component: the shot is the
+component's own box (~47x fewer pixels than the viewport on the example), and a
+change to one component does not make its neighbours report.
+
+`check story` drives the Playwright **gallery contract** — `window.mount({ story,
+props })` / `window.unmount()` rendering into `#root` — via `page.evaluate`, which
+is how Playwright's own `mount` fixture works. Consequences:
+
+- **No Playwright version floor.** The `mount` fixture is 1.62+; the repo pins
+  1.61 and this does not use the fixture. Do not add a peer-dep bump for it.
+- The gallery is framework-specific and the project's to own; `examples/story-gallery/README.md`
+  carries a React + Vite one to copy. Storybook needs a shim (no `window.mount`).
+- Baselines are keyed on the story id **as written**, so `Button/Primary` and
+  `components/Button/Primary` get separate baselines. List the canonical spelling
+  in `vlmkit.gates.json`.
+
 ## Measuring Gate / Rule Execution Cost
 
 ```bash
@@ -233,7 +260,7 @@ This repository is a pnpm workspace.
 |------|----------|
 | `packages/vlmkit-core/` | Image / CSS / DOM / a11y diff engine + shared types and CLI helpers. No Playwright or AI deps required to import core types. |
 | `packages/vlmkit-core/src/plugin/` | **Gate plugin runtime**: the contract (`defineGate` / `definePlugin`), rule tables and settings, the registry, and the core runner that owns `--help` / `--json` / `--advisory` / the run ledger / the exit code. Core never imports a gate — definitions are handed to it. |
-| `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 24 of the 26 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
+| `packages/vlmkit-markup/src/gates/` | Gate definitions (`*.gate.ts`) + the main built-in plugin (`index.ts`) — 25 of the 27 gates. Wraps existing measurement code; adding a gate is `defineGate` + one line in `index.ts`. |
 | `packages/vlmkit-capture/src/gates/`, `src/gates/` | The other two built-in plugins: `check crater` (capture) and `check perf` (app-side). Composed by `src/cli/gate-registry.ts` alongside any `vlmkit.config.json` `"plugins"`. |
 | `packages/vlmkit-capture/` | Playwright / Crater capture infrastructure, viewport discovery, prescanner. |
 | `packages/vlmkit-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
@@ -266,7 +293,7 @@ The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need t
 | `docs/api-design.md` | CLI / library API design |
 | `docs/reports/2026-08-06-gate-rule-cost-bench.md` | Measured gate/rule execution cost: where a ruleset's time goes, why per-rule cost is attributed rather than isolated, why suppression saves nothing |
 | `docs/authoring-gates.md` | **User-facing how-to for adding a metric**: the contract field by field, choosing severities/categories, reading project config, browser measurement, testing, publishing. Runnable examples in `examples/gate-plugin/` |
-| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 26 gates + 115 rules, behavior changes, what is deliberately not a gate |
+| `docs/design/gate-plugin-architecture.md` | Gate plugin contract, rule settings, the 27 gates + 118 rules, behavior changes, what is deliberately not a gate |
 | `docs/crater-css-status.md` | Crater CSS rendering verification status |
 | `docs/reset-css-comparison.md` | Reset CSS domain knowledge |
 | `docs/reports/` | Individual experiment reports (dated) |

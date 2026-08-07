@@ -13,8 +13,10 @@ const skillCatalogUrl = "https://github.com/mizchi/vlmkit/tree/main/.claude/skil
 const specializedSkills = [
   "agent-validation-loop",
   "auto-markup",
+  "component-vrt",
   "dynamic-markup",
   "markup-assist",
+  "markup-decompose",
   "mock-markup",
   "spec-to-playwright",
   "vrt-css-fix-loop",

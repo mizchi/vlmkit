@@ -175,6 +175,7 @@ its relative stylesheets, images and scripts resolve — if your CSS lives in
 | Crop a full-page screenshot into per-component PNGs | `vlmkit scan component page.png` |
 | Verify copy against the target's pixels (no manifest available) | `vlmkit check copy attempt.html --target target.png` — writes contact sheets a second reader checks |
 | Scaffold from a UI Contract IR (or infer one from existing HTML) | `vlmkit contract scaffold\|introspect\|validate` |
+| It matches now — stop the *next* edit from breaking it, per component | `vlmkit build gallery page.html --out .vlmkit/gallery`, then the `vlmkit check story` commands it prints |
 
 ### Behavior, not pixels
 

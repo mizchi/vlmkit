@@ -1,0 +1,154 @@
+name: Component VRT
+
+# The construction → maintenance loop, run for real: generate a gallery from a
+# committed page, write baselines, prove a clean re-run, then break one component
+# and prove the gate fails.
+#
+# Why a job rather than a unit test: the two assertions that matter here are
+# properties of a *different machine*. `check story` compares screenshots, so a
+# baseline written on this container and compared on the next run is the only
+# thing that shows the render is reproducible in CI — and if it is not, every
+# consumer's story baselines are flaky and the unit tests would never say so.
+# The second assertion is that the gate actually exits non-zero on a real
+# regression; a suite that only ever sees passes cannot tell a working gate from
+# a gate that always passes.
+#
+# Deterministic and keyless: no VLM, no API key, no dev server. The fixture page
+# links its stylesheet, which also exercises the re-fetch path for stylesheets
+# Chromium refuses to expose over file://.
+
+on:
+  pull_request:
+    paths:
+      - "packages/vlmkit-markup/src/component/**"
+      - "packages/vlmkit-markup/src/gates/story.gate.ts"
+      - "packages/vlmkit-core/src/png-utils.ts"
+      - "src/experiments/component-vrt/fixture/**"
+      - "examples/story-gallery/**"
+      - ".github/workflows/component-vrt.yml"
+  push:
+    branches: [main]
+    paths:
+      - "packages/vlmkit-markup/src/component/**"
+      - "packages/vlmkit-markup/src/gates/story.gate.ts"
+      - "packages/vlmkit-core/src/png-utils.ts"
+      - "src/experiments/component-vrt/fixture/**"
+      - "examples/story-gallery/**"
+      - ".github/workflows/component-vrt.yml"
+  workflow_dispatch:
+
+jobs:
+  story-loop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PAGE: src/experiments/component-vrt/fixture/page-flat.html
+    steps:
+      - uses: actions/checkout@v4
+
+      # Set here rather than in the job's `env:` block: the `runner` context is
+      # not available there (only github / needs / strategy / matrix / vars /
+      # secrets / inputs), and using it makes the whole workflow file invalid —
+      # GitHub then rejects it at validation and reports a zero-second failed run
+      # with no jobs, which looks nothing like a syntax error.
+      #
+      # Both directories live outside the checkout, so a stray baseline cannot be
+      # committed by accident.
+      - name: Resolve output paths
+        run: |
+          echo "GALLERY_DIR=$RUNNER_TEMP/gallery" >> "$GITHUB_ENV"
+          echo "BASELINE_DIR=$RUNNER_TEMP/story-baselines" >> "$GITHUB_ENV"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+
+      - run: pnpm build:packages
+
+      - name: Generate the gallery from a converged page
+        run: |
+          node --experimental-strip-types src/cli/vlmkit.ts build gallery "$PAGE" \
+            --out "$GALLERY_DIR" --json > "$RUNNER_TEMP/gallery.json"
+          node -e '
+            const r = JSON.parse(require("fs").readFileSync(process.env.RUNNER_TEMP + "/gallery.json", "utf8"));
+            if (r.stories.length === 0) throw new Error("no stories written");
+            // A gallery missing its CSS renders wrong, and its baselines look
+            // fine while being wrong — the one outcome worse than no baseline.
+            if (r.unreadableStylesheets.length > 0) {
+              throw new Error("unreadable stylesheets: " + r.unreadableStylesheets.join(", "));
+            }
+            // Per-story thresholds are the point; one shared number is the bug.
+            const t = new Set(r.stories.map((s) => s.threshold));
+            if (t.size < 2) throw new Error("expected differing per-story thresholds, got " + [...t].join(","));
+            console.log(r.stories.length + " stories, thresholds: " + [...t].sort().join(", "));
+          '
+
+      - name: Write baselines
+        run: |
+          node --experimental-strip-types src/cli/vlmkit.ts check story \
+            components/Card/Default components/Hero/Default components/Button/Default \
+            --gallery "file://$GALLERY_DIR/gallery.html" --out "$BASELINE_DIR"
+
+      - name: Re-run must be clean — this is the determinism check
+        run: |
+          node --experimental-strip-types src/cli/vlmkit.ts check story \
+            components/Card/Default components/Hero/Default components/Button/Default \
+            --gallery "file://$GALLERY_DIR/gallery.html" --out "$BASELINE_DIR" \
+            --rule check.story/new-baseline=off
+
+      - name: Break one component; the gate must fail
+        run: |
+          # Card only. The Hero and Button stories must stay clean, which is the
+          # no-cascade property a page diff cannot offer.
+          node -e '
+            const fs = require("fs");
+            const p = process.env.GALLERY_DIR + "/gallery.html";
+            const before = fs.readFileSync(p, "utf8");
+            const after = before.replace(".c-card {", ".c-card { padding: 40px !important;");
+            if (after === before) throw new Error("fixture changed: .c-card rule not found in the generated gallery");
+            fs.writeFileSync(p, after);
+          '
+          set +e
+          node --experimental-strip-types src/cli/vlmkit.ts check story \
+            components/Card/Default components/Hero/Default components/Button/Default \
+            --gallery "file://$GALLERY_DIR/gallery.html" --out "$BASELINE_DIR" \
+            --rule check.story/new-baseline=off --json > "$RUNNER_TEMP/broken.json"
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "check story exited 0 on a real regression — the gate is not gating"
+            exit 1
+          fi
+          node -e '
+            const r = JSON.parse(require("fs").readFileSync(process.env.RUNNER_TEMP + "/broken.json", "utf8"));
+            const changed = r.report.results.filter((x) => x.outcome === "changed").map((x) => x.story);
+            if (!changed.some((s) => s.includes("/Card/"))) throw new Error("Card did not report: " + changed.join(","));
+            const collateral = changed.filter((s) => !s.includes("/Card/"));
+            if (collateral.length > 0) throw new Error("a Card edit cascaded to: " + collateral.join(", "));
+            console.log("Card reported, " + (r.report.results.length - 1) + " neighbour(s) stayed clean");
+          '
+
+      - name: Upload story artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: component-vrt-stories
+          path: |
+            ${{ runner.temp }}/gallery.json
+            ${{ runner.temp }}/broken.json
+            ${{ runner.temp }}/gallery/stories.json
+            ${{ runner.temp }}/story-baselines/**
+          if-no-files-found: warn

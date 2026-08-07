@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>component-vrt experiment — repeated-component list page</title>
+<link rel="stylesheet" href="./components.css">
+<style>
+  /* Page-level layout only; the components style themselves. */
+  .page { padding: 32px; display: flex; flex-direction: column; gap: 40px; }
+  .row { display: flex; align-items: flex-start; gap: 24px; flex-wrap: wrap; }
+  h2 { font: 600 13px/1 Inter, sans-serif; color: #8b97a3; margin: 0 0 12px; text-transform: uppercase; letter-spacing: .06em; }
+</style>
+</head>
+<body>
+<!-- Repeated components (12 Cards, 4 Alerts). The tallest page: one rule change yields many page regions but still one story. -->
+<div class="page" id="page"></div>
+<script src="./_markup.js"></script>
+<script>
+  const C = globalThis.COMPONENTS;
+  const section = (label, html) => `<section><h2>${label}</h2><div class="row">${html}</div></section>`;
+  document.getElementById("page").innerHTML = [
+    section("Hero", C.Hero({})),
+    section("Composite", C.Toolbar()),
+    section("Cards", Array.from({ length: 12 }, (_, i) => C.Card({ title: `Item ${i + 1}` })).join("")),
+    section("Notices", Array.from({ length: 4 }, () => C.Alert({})).join("")),
+    section("Actions", C.Button({})),
+    section("Status", C.Badge({})),
+    section("Identity", C.Avatar({})),
+    section("Table", C.DataTable({ rows: 6 })),
+  ].join("");
+</script>
+</body>
+</html>

@@ -13,6 +13,69 @@ export interface PngData {
 }
 
 /**
+ * How far two images differ in *magnitude*, independent of any perceptual
+ * threshold.
+ *
+ * A pixel-diff ratio answers "how many pixels changed enough to count", and a
+ * comparator with a perceptual threshold can legitimately answer *none* while
+ * every pixel in the image has moved. Measured on a 1258x203 hero whose
+ * background gradient went from a blue tint to a purple one: 246,914 of 256,632
+ * pixels differed, by at most 8/255 per channel, and pixelmatch scored the diff
+ * at 0.0%. A gate that reports only the ratio cannot distinguish that from an
+ * identical render, which is the difference between a caught regression and a
+ * silent one.
+ *
+ * Alpha is deliberately excluded. A screenshot of an opaque element is fully
+ * opaque, so an alpha delta here would mean the two images were cropped
+ * differently — a size mismatch, not a colour change, and one the caller should
+ * see as such rather than folded into a colour statistic.
+ */
+export interface ChangeMagnitude {
+  /** Pixels with any non-zero channel delta, however small. */
+  changedPixels: number;
+  totalPixels: number;
+  /** Fraction of pixels that moved at all. 1.0 means the whole box shifted. */
+  changedFraction: number;
+  /** Largest single-channel delta anywhere, 0-255. */
+  maxChannelDelta: number;
+  /** Mean per-pixel max-channel delta over the whole image, 0-255. */
+  meanChannelDelta: number;
+}
+
+export function measureChangeMagnitude(a: PngData, b: PngData): ChangeMagnitude {
+  // Compare only the overlapping box. Differently-sized images are a real case
+  // (a reflow changed the component's height) and throwing here would turn a
+  // finding into a crash.
+  const width = Math.min(a.width, b.width);
+  const height = Math.min(a.height, b.height);
+  let changedPixels = 0;
+  let sum = 0;
+  let maxChannelDelta = 0;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const ia = (y * a.width + x) * 4;
+      const ib = (y * b.width + x) * 4;
+      const delta = Math.max(
+        Math.abs(a.data[ia]! - b.data[ib]!),
+        Math.abs(a.data[ia + 1]! - b.data[ib + 1]!),
+        Math.abs(a.data[ia + 2]! - b.data[ib + 2]!),
+      );
+      if (delta > 0) changedPixels += 1;
+      if (delta > maxChannelDelta) maxChannelDelta = delta;
+      sum += delta;
+    }
+  }
+  const totalPixels = width * height;
+  return {
+    changedPixels,
+    totalPixels,
+    changedFraction: totalPixels === 0 ? 0 : changedPixels / totalPixels,
+    maxChannelDelta,
+    meanChannelDelta: totalPixels === 0 ? 0 : sum / totalPixels,
+  };
+}
+
+/**
  * Crop or pad an image to the target dimensions.
  * Only handles the common region; overflow is zero-filled.
  */

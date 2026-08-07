@@ -8,7 +8,7 @@ Dates are YYYY-MM-DD.
 The gates became a plugin architecture. A gate is now a declaration — id,
 command, rule table, inputs, and four functions — handed to one core runner
 that owns `--help`, `--json`, `--advisory`, the run ledger, the verdict and
-the exit code. Every one of the 26 gates goes through it, including the two
+the exit code. Every one of the 27 gates goes through it, including the two
 that live outside `vlmkit-markup`, and a project can add its own gate with the
 same standing as a bundled one. See
 [`docs/design/gate-plugin-architecture.md`](docs/design/gate-plugin-architecture.md).
@@ -53,7 +53,101 @@ suppression works per *rule* instead of per whole gate.
 
 - **`vlmkit rules`** lists every gate with its rule count and plugin;
   **`vlmkit rules <gate>`** prints that gate's rules, default severities and
-  docs. 115 rules across 26 gates.
+  docs. 119 rules across 27 gates.
+- **`component-vrt` skill**, with copyable gallery reference implementations.
+  Playwright's docs are explicit that the gallery is framework-specific and yours
+  to own with **no template to copy**, which makes it the one part of the setup an
+  agent cannot just be told to do. `.claude/skills/component-vrt/assets/` now ships
+  it: a zero-dependency vanilla gallery that runs over `file://`, React and Vue
+  galleries with `import.meta.glob` story discovery, the host page, a story file
+  showing the hidden-form state pattern, the contract as a reference doc, and the
+  1.62 CT config preset for projects that also want behavioural specs. Every
+  template awaits layout (not just render) and freezes animation, because those are
+  the two things that make a component screenshot flake. The vanilla gallery is
+  byte-identical to `examples/story-gallery/index.html` and a test enforces that,
+  so the installable copy cannot rot while the runnable example stays green.
+- **`vlmkit check story`** — VRT scoped to one mounted component, for the repair
+  loop where a full-page diff is the wrong instrument. Mounts a story in your
+  Playwright component-testing gallery and screenshots only that component:
+  measured on `examples/story-gallery/`, 30,448px across three stories against
+  1,440,000px for the same count of full-viewport shots (**47x smaller**), and an
+  unrelated story stays clean when a shared stylesheet changes. Reports region
+  geometry and shift estimates so a ratio becomes an edit.
+
+  It drives the gallery's **page-side contract** (`window.mount({ story, props })`
+  / `window.unmount()` into `#root`) through `page.evaluate`, the same way
+  Playwright's own `mount` fixture does — so it needs no spec files, no config
+  dialect, and no Playwright version bump. The fixture itself is 1.62+; this is
+  not, and Playwright stays a peer dependency vlmkit does not force forward.
+  Several stories share one browser. `--props`, `--viewport`, `--threshold`,
+  `--root`, `--settle`, `--update-baseline`. Runnable example and a React + Vite
+  gallery to copy: `examples/story-gallery/`.
+
+  It also reports a `sub-perceptual-drift` warn, which exists because the A/B
+  measurement found the gate's one blind spot. A story diff is pixels only, and a
+  comparator with a perceptual threshold scores a uniform low-amplitude recolour
+  at 0.0%: measured on a hero whose gradient went from a blue tint to a purple
+  one, **246,914 of 256,632 pixels differed, by at most 8/255 per channel**, and
+  the ratio was zero. `diff html` catches that from its computed-style diff; a
+  story diff has no equivalent, so the honest fix is to say what the pixels did.
+  The rule keys on **coverage** (≥50% of pixels moved, max delta ≥2), because
+  antialiasing moves edges while a recolour moves everything. It is a warn, so the
+  comparator still owns the verdict — promote it in `vlmkit.gates.json` if tint
+  drift is a regression for your project. This does not make `check story` a
+  replacement for a page diff; see
+  `docs/reports/2026-08-06-component-vs-page-vrt-signal.md`.
+- **`vlmkit build gallery`** — the construction → maintenance handoff, which had
+  been a manual checklist. `build component` converges markup toward a target it
+  does not yet match; `check story` asks whether an edit broke a component that
+  was already correct. Nothing converted one into the other, so a component that
+  converged had no protection against the next edit unless someone remembered to
+  hand-write a gallery, a story per component and per state, and a threshold.
+
+  Point it at the page that just converged and it derives all of that:
+  per-component rendered markup plus the page's CSS captured into a gallery
+  implementing `window.mount` / `window.unmount`, `stories.json`, the
+  `vlmkit.gates.json` fragment, and the `check story` commands to run.
+  Deterministic — no VLM. BEM modifiers become variants of one component rather
+  than separate components, and DOM state attributes (`disabled`,
+  `aria-expanded`) become their own stories, so "a story per named state" comes
+  from the page instead of from memory.
+
+  **Each story gets its own `--threshold`, derived from a pixel budget rather
+  than a shared ratio.** A ratio coarsens as area grows: 0.5% of an 88x36 button
+  is 16 pixels, 0.5% of a 1216x203 hero is 1,234, so the default that catches a
+  button regression misses a corner-radius change on a hero. `--noise-pixels`
+  (default 24) is converted per story, clamped between a renderer-noise floor and
+  the gate's own default — it will not loosen a gate, only tighten one.
+
+  Discovery **proposes**: it groups by class, which is not the same as finding the
+  boundaries a codebase wants, so every candidate carries its evidence (instance
+  count, size, what it contains) and rejected ones say why. `--selector`
+  (repeatable) overrides it; `--include-all` keeps the rejects. A stylesheet the
+  browser will not expose is re-fetched by URL, and one that still cannot be read
+  is reported loudly rather than skipped — a gallery missing its CSS produces a
+  baseline that looks fine and is wrong.
+
+  Captured markup is frozen, and the generated gallery says so: `props` are
+  accepted and ignored, behaviour is not exercised. It answers "did this CSS or
+  token edit change how the component looks". Prop- or runtime-state-varying
+  stories still want a hand-written gallery — `component-vrt`'s `assets/`.
+- **`check_story` and `build_gallery` MCP tools**, so component-scoped VRT is
+  reachable from an MCP client and not only from the CLI. `check_story` is a
+  `gateTool()` call (`--out` omitted: a per-call baseline directory would silently
+  write a fresh baseline instead of comparing against the committed one).
+  `build_gallery` is hand-written like `build_page`, because it returns an
+  artifact rather than findings — but it still decides `failed`, on the two
+  outcomes that leave the caller worse off than before: no stories written, or a
+  stylesheet that could not be read. The gates-config fragment travels in the
+  structured result so a client does not re-derive per-story thresholds and reach
+  for one number for every component.
+- **A `Component VRT` CI job** that runs the loop for real: generate a gallery
+  from a committed page, write baselines, prove a clean re-run, then break one
+  component and require a non-zero exit with no cascade to its neighbours. Both
+  assertions are properties of a *different machine* than the one that wrote the
+  baselines, which is the only way to know the render is reproducible in CI — and
+  a suite that only ever sees passes cannot tell a working gate from one that
+  always passes. Keyless and deterministic.
 - **`vlmkit bench gates`** — where a ruleset spends its time. Runs every gate that
   works from a bare page (18 of the 26; the set is derived from each gate's
   declared `inputs`, not from a list) and reports cost beside yield: median /

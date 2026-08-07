@@ -133,6 +133,7 @@ const SPECS: Record<string, Spec> = {
   batch: spec("batch", () => import("./commands/batch-cli.ts")),
   gates: spec("gates", () => import("./commands/gates-cli.ts")),
   componentFromImage: spec("component-from-image", () => import("@mizchi/vlmkit-markup/component/component-from-image.ts")),
+  buildGallery: spec("build-gallery", () => import("@mizchi/vlmkit-markup/component/story-scaffold.ts")),
   contractIntrospect: spec("contract-introspect", () => import("@mizchi/vlmkit-markup/contract/introspect-contract.ts")),
   contractValidate: spec("contract-validate", () => import("@mizchi/vlmkit-markup/contract/validate-contract.ts")),
   contractScaffold: spec("contract-scaffold", () => import("@mizchi/vlmkit-markup/contract/scaffold-contract.ts")),
@@ -181,6 +182,7 @@ const GROUPS: Record<string, Record<string, { spec?: Spec; run?: (args: string[]
   build: {
     component: { spec: SPECS.componentFromImage, desc: "Build a component from a target screenshot" },
     page: { spec: SPECS.pageCompose, desc: "Page-level multi-component composition diff" },
+    gallery: { spec: SPECS.buildGallery, desc: "Turn a converged page into a story gallery `check story` can maintain" },
   },
   contract: {
     introspect: { spec: SPECS.contractIntrospect, desc: "Infer UI Contract IR from existing HTML / URL" },

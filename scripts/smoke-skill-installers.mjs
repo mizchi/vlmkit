@@ -10,19 +10,24 @@ const sourcePackage = join(repoRoot, "skills/vlmkit");
 const apmInvocation = process.env.VLMKIT_APM_PACKAGE
   ? { command: "uvx", prefix: ["--from", process.env.VLMKIT_APM_PACKAGE, "apm"] }
   : { command: process.env.VLMKIT_APM_BIN || "apm", prefix: [] };
-const expectedWorkflows = [
-  "agent-validation-loop",
-  "auto-markup",
-  "dynamic-markup",
-  "markup-assist",
-  "mock-markup",
-  "spec-to-playwright",
-  "vrt-css-fix-loop",
-  "vrt-markup-synth",
-  "vrt-migration-eval",
-  "vrt-regression-watch",
-  "vrt-visual-diff",
-];
+/**
+ * What the package ships, read from the package — not a second hardcoded list.
+ *
+ * This was a literal array and it went stale the moment a skill was added: two
+ * new workflows shipped and both APM matrix legs failed on a list nobody had
+ * thought to edit, which reads like a broken installer rather than a stale
+ * constant.
+ *
+ * The two checks divide cleanly and this is the half that should be derived:
+ * `tests/skill-package.test.mjs` keeps an explicit list, because its job is to
+ * notice when the package's *contents* change unexpectedly. This script's job is
+ * narrower — did the installer faithfully install what the package ships — and
+ * for that, the package is the correct source of truth.
+ */
+async function shippedWorkflows() {
+  const entries = await readdir(join(sourcePackage, "workflows"), { withFileTypes: true });
+  return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort();
+}
 
 function run(command, args, cwd) {
   const result = spawnSync(command, args, {
@@ -87,8 +92,8 @@ async function verifyInstalledPackage(consumerRoot, installer) {
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name)
       .sort(),
-    expectedWorkflows,
-    `${installer} did not install all workflows`,
+    await shippedWorkflows(),
+    `${installer} did not install every workflow the package ships`,
   );
   assert.deepEqual(
     await readFile(join(installed, "SKILL.md")),

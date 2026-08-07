@@ -62,9 +62,9 @@ npx vlmkit check design http://localhost:3000/ \
 }
 ```
 
-Nine gates become tools (`verify_markup`, `check_integrity`,
-`check_copy`, `check_interactions`, `scan_handlers`, `build_page`,
-`check_layout`, `check_equivalence`, `verify_flow`). Tool table:
+Eleven tools (`verify_markup`, `check_integrity`, `check_copy`,
+`check_interactions`, `scan_handlers`, `build_page`, `build_gallery`,
+`check_story`, `check_layout`, `check_equivalence`, `verify_flow`). Tool table:
 [`packages/vlmkit-mcp/README.md`](../packages/vlmkit-mcp/README.md).
 
 ## Agent skill
@@ -106,7 +106,7 @@ the snapshot, workflow, and diff-pr sections.
 
 ## Agent Skills (APM)
 
-vlmkit ships nine coding-agent skills under `.claude/skills/`. They wrap
+vlmkit ships thirteen coding-agent skills under `.claude/skills/`. They wrap
 the most common workflows as standalone, agent-readable playbooks.
 Other repos can install them via [APM](https://agentskills.io):
 
@@ -117,6 +117,8 @@ apm install mizchi/vlmkit/.claude/skills/vrt-visual-diff
 
 | Skill | Entry workflow | Use when |
 |---|---|---|
+| `markup-assist` | `vlmkit check integrity\|copy\|layout\|breakpoints\|…` | Generalist: edited markup, no reference, want the smallest correctness gate |
+| `mock-markup` | `vlmkit scan mock` → `verify markup` loop | Implement from a Figma export or retina screenshot with no reference HTML |
 | `vrt-visual-diff` | `vlmkit diff html` → `vlmkit diff agent` | One-shot "did this CSS edit visibly change something?" |
 | `vrt-migration-eval` | `vlmkit migration compare\|blind\|subagent` | Framework / CSS-lib / build-system swap audit |
 | `vrt-css-fix-loop` | `fix-loop.ts` (VLM-driven) | Closed-loop CSS auto-repair benchmark |
@@ -125,6 +127,8 @@ apm install mizchi/vlmkit/.claude/skills/vrt-visual-diff
 | `spec-to-playwright` | `init-agents` or `@mizchi/vlmkit-plan/generate` → deterministic VRT → `@mizchi/vlmkit-heal` | Spec → Playwright test with stable VRT + self-healing |
 | `auto-markup` | `check palette` → `contract scaffold` → `build page\|component` loop | Rebuild a page from a target screenshot, agent-as-VLM, no API key |
 | `dynamic-markup` | auto-markup + gates: `check breakpoints` / `scan scroll` / `check animation\|motion` | Markup whose spec includes breakpoints, scrollports, animations |
+| `markup-decompose` | routes `contract introspect` → `auto-markup` → `check story` | Whole screen: decide the component split, then freeze each part as a baseline |
+| `component-vrt` | `vlmkit check story --gallery <url>` | Repair one component with a component-sized diff; includes gallery templates (vanilla / React / Vue) |
 | `agent-validation-loop` | disposable subagent runs → friction → fix → re-run | Harden a CLI/library by measuring whether agents can drive it |
 
 Each skill assumes the `vlmkit` CLI is on `$PATH` (this repo published as
