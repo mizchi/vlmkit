@@ -42,7 +42,10 @@ reads computed styles:
 2. **Sub-perceptual style drift.** A pale-palette shift moved 96% of that hero's
    pixels by ≤8/255 per channel, which the comparator scores as **0% changed** —
    no threshold reaches that. `diff html` catches it from the changed
-   `background-image` declaration.
+   `background-image` declaration. `check story` now *reports* it as
+   `sub-perceptual-drift` (a warn, so the verdict is unchanged) rather than
+   letting it read as a clean pass — but the comparator still passes it, so a
+   project that treats tint drift as a regression must promote the rule.
 
 So story VRT narrows what a page diff has to catch; **it does not replace it.**
 Keep a page-level `diff html` in the suite.
@@ -138,6 +141,7 @@ Three rules, and the difference between the first two decides what you do next.
 |---|---|---|
 | `story-drift` | The component changed vs its baseline | The finding you asked for. Read regions, fix, or `--update-baseline` if intended. |
 | `mount-failed` | **Nothing was measured** — unknown story id, render throw, page is not a gallery | Fix the id or the gallery. **Never** `--rule check.story/mount-failed=off` to reach green: that makes a typo'd story id read as a passing component. |
+| `sub-perceptual-drift` | The story **passed**, but most of its pixels moved by less than the comparator counts — the signature of a palette / gradient / opacity change, not of antialiasing | Look at it. This is the one blind spot a story diff has that a page `diff html` does not (it reads computed styles). Promote to `suspect` in `vlmkit.gates.json` if your project treats tint drift as a regression. |
 | `new-baseline` | No baseline existed, so one was written | Re-run to actually compare. Commit the baseline. |
 
 ## Done conditions

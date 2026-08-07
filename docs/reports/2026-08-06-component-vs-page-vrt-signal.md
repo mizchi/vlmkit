@@ -227,9 +227,17 @@ and listed, 0 trials with a non-reporting arm.
    `2026-06-06-ab-external-synthesis.md`: fresh disposable agents, fixed round
    budget, same seeds, one arm given the page signal and one the story signal,
    scoring rounds-to-green and wrong-edit count.
-2. **The perceptual blind spot.** `check story` reports a diff ratio and nothing
-   about magnitude, so a uniform 8/255 shift across 96% of a component is
-   indistinguishable from no change at all. Reporting max/mean channel delta
-   beside the ratio would make that case legible without changing the verdict
-   logic — and would tell a reader which of the two failure causes they are
-   looking at.
+2. **The perceptual blind spot — addressed, not closed.** `check story` now
+   measures magnitude alongside the ratio and raises `sub-perceptual-drift` when
+   most of a component's pixels moved by less than the comparator counts
+   (coverage ≥50%, max channel delta ≥2 — coverage is the discriminator, because
+   antialiasing moves edges and a recolour moves everything). Verified end to end
+   on a pale recolour of the example gallery's card: 99% of pixels moved by at
+   most 9/255, diff ratio 0.00%, and the row now says so instead of reading as a
+   clean pass.
+
+   It is a **warn**, so the verdict is unchanged: the comparator still decides
+   pass/fail, and a project that treats tint drift as a regression promotes the
+   rule in `vlmkit.gates.json`. That makes the case *legible*; it does not make
+   `check story` catch what `diff html`'s computed-style diff catches. The
+   complement conclusion above stands.

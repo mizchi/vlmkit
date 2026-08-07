@@ -25,6 +25,7 @@ import {
   type StoryVrtOptions,
   type StoryVrtReport,
   formatStoryVrtReport,
+  isSubPerceptualDrift,
   runStoryVrt,
 } from "../component/story-vrt.ts";
 
@@ -83,6 +84,18 @@ in vlmkit.gates.json is the durable way to do that.`,
         "Nothing was measured — an unknown story id, a render throw, or a gallery that does not"
         + " implement the contract. Never downgrade this to reach a green run: it would let a"
         + " typo'd story id read as a passing component.",
+    },
+    {
+      id: "sub-perceptual-drift",
+      title: "Most of the component's pixels moved, by less than the comparator counts",
+      severity: "warn",
+      docs:
+        "The diff ratio is at or below the threshold, but most pixels differ by a small amount —"
+        + " the signature of a palette, gradient, opacity or filter change rather than of antialiasing."
+        + " Measured case: a hero's gradient went from a blue tint to a purple one, 96% of pixels"
+        + " differed by at most 8/255, and the ratio was 0.00%. `diff html` catches this from its"
+        + " computed-style diff; a story diff is pixels only, so this rule is the whole signal."
+        + " Promote it to suspect in vlmkit.gates.json if you want it to fail the run.",
     },
     {
       id: "new-baseline",
@@ -179,6 +192,28 @@ in vlmkit.gates.json is the durable way to do that.`,
           severity: "warn",
           message: `${result.story}: no baseline existed, wrote ${result.baselinePath}`,
           evidence: { story: result.story, width: result.width, height: result.height },
+        });
+        continue;
+      }
+      if (isSubPerceptualDrift(result)) {
+        const m = result.magnitude!;
+        findings.push({
+          rule: "sub-perceptual-drift",
+          severity: "warn",
+          message:
+            `${result.story}: ${(m.changedFraction * 100).toFixed(0)}% of pixels differ`
+            + ` (max ${m.maxChannelDelta}/255, mean ${m.meanChannelDelta.toFixed(1)}/255)`
+            + ` but the diff ratio is ${(result.diffRatio! * 100).toFixed(2)}%`
+            + ` — below the comparator's perceptual threshold, so this did not fail`,
+          evidence: {
+            story: result.story,
+            changedFraction: m.changedFraction,
+            maxChannelDelta: m.maxChannelDelta,
+            meanChannelDelta: m.meanChannelDelta,
+            diffRatio: result.diffRatio,
+            baseline: result.baselinePath,
+            current: result.screenshotPath,
+          },
         });
         continue;
       }

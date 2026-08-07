@@ -21,7 +21,13 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pathToFileURL } from "node:url";
-import { type StoryVrtOptions, runStoryVrt, storySlug } from "./story-vrt.ts";
+import {
+  type StoryResult,
+  type StoryVrtOptions,
+  isSubPerceptualDrift,
+  runStoryVrt,
+  storySlug,
+} from "./story-vrt.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const EXAMPLE = resolve(here, "../../../../examples/story-gallery/index.html");
@@ -168,5 +174,65 @@ describe("story VRT against a real gallery", { timeout: 240_000 }, () => {
       long.results[0]!.width! > short.results[0]!.width!,
       `expected the longer label to render wider: ${short.results[0]!.width} vs ${long.results[0]!.width}`,
     );
+  });
+});
+
+describe("isSubPerceptualDrift", () => {
+  const result = (overrides: Partial<StoryResult> = {}): StoryResult => ({
+    story: "components/Hero/Default",
+    outcome: "unchanged",
+    diffRatio: 0,
+    magnitude: {
+      changedPixels: 246_914,
+      totalPixels: 256_632,
+      changedFraction: 246_914 / 256_632,
+      maxChannelDelta: 8,
+      meanChannelDelta: 5.69,
+    },
+    ...overrides,
+  });
+
+  it("fires on the measured case: 96% of pixels moved, none by more than 8/255", () => {
+    assert.equal(isSubPerceptualDrift(result()), true);
+  });
+
+  it("stays quiet when only edges moved, which is what antialiasing looks like", () => {
+    // Coverage is the discriminator, not magnitude: a big delta on a few percent
+    // of pixels is glyph hinting, not a recolour.
+    assert.equal(
+      isSubPerceptualDrift(result({
+        magnitude: {
+          changedPixels: 400,
+          totalPixels: 256_632,
+          changedFraction: 400 / 256_632,
+          maxChannelDelta: 255,
+          meanChannelDelta: 0.4,
+        },
+      })),
+      false,
+    );
+  });
+
+  it("ignores a one-level delta, which PNG re-encoding alone can produce", () => {
+    assert.equal(
+      isSubPerceptualDrift(result({
+        magnitude: {
+          changedPixels: 256_632,
+          totalPixels: 256_632,
+          changedFraction: 1,
+          maxChannelDelta: 1,
+          meanChannelDelta: 1,
+        },
+      })),
+      false,
+    );
+  });
+
+  it("says nothing about a story that already failed, or that has no baseline", () => {
+    // The rule exists to explain a PASS. On a `changed` row `story-drift` already
+    // carries the finding, and reporting both would double-count one regression.
+    assert.equal(isSubPerceptualDrift(result({ outcome: "changed" })), false);
+    assert.equal(isSubPerceptualDrift(result({ outcome: "new-baseline" })), false);
+    assert.equal(isSubPerceptualDrift(result({ magnitude: undefined })), false);
   });
 });

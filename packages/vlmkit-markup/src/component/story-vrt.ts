@@ -46,6 +46,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
+import { decodePng, measureChangeMagnitude, type ChangeMagnitude } from "@mizchi/vlmkit-core/png-utils.ts";
 import { STATE_DIR } from "@mizchi/vlmkit-core/project-config.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { DiffRegion } from "@mizchi/vlmkit-core/types.ts";
@@ -83,6 +84,16 @@ export interface StoryResult {
   diffRatio?: number;
   diffPixels?: number;
   totalPixels?: number;
+  /**
+   * How far the pixels moved, independent of the comparator's threshold.
+   *
+   * Present whenever a baseline was compared against. `diffRatio` can be 0 while
+   * every pixel in the component has shifted by a few levels — measured on a
+   * hero whose gradient changed tint: 96% of pixels differed, none by more than
+   * 8/255, ratio 0.0%. Without this the two cases are indistinguishable in the
+   * report.
+   */
+  magnitude?: ChangeMagnitude;
   heatmapPath?: string;
   regions?: DiffRegion[];
   /** Rejection message from `window.mount`, verbatim. */
@@ -98,6 +109,42 @@ export interface StoryVrtReport {
   pagePixels: number;
   /** Pixels actually captured across every story. */
   storyPixels: number;
+}
+
+/**
+ * Fraction of pixels that must have moved for a below-threshold diff to be
+ * called drift rather than noise.
+ *
+ * The discriminator is *coverage*, not magnitude. Antialiasing and font hinting
+ * differ on glyph and border edges — a small minority of a component's pixels.
+ * A palette, gradient, opacity or filter change moves nearly all of them. Half
+ * is comfortably above what edges can account for on any real component.
+ */
+const SUB_PERCEPTUAL_COVERAGE = 0.5;
+
+/**
+ * Ignore a one-level delta. A single level can come from PNG rounding, and
+ * treating it as drift would make the check fire on re-encoding alone.
+ */
+const SUB_PERCEPTUAL_MIN_DELTA = 2;
+
+/**
+ * Did the whole component shift by an amount the comparator ignored?
+ *
+ * This is the blind spot the component-vs-page measurement found: `check story`
+ * is a pixel instrument, and a comparator with a perceptual threshold reports
+ * 0.0% for a uniform low-amplitude recolour. `diff html` catches the same change
+ * from its computed-style diff; a story diff has no equivalent, so the only
+ * honest fix is to say what the pixels did.
+ *
+ * Deliberately not a verdict change. The comparator's threshold is still what
+ * decides pass/fail — this reports, and a project that wants it to fail promotes
+ * the rule in `vlmkit.gates.json`.
+ */
+export function isSubPerceptualDrift(result: StoryResult): boolean {
+  if (result.outcome !== "unchanged" || !result.magnitude) return false;
+  const { changedFraction, maxChannelDelta } = result.magnitude;
+  return changedFraction >= SUB_PERCEPTUAL_COVERAGE && maxChannelDelta >= SUB_PERCEPTUAL_MIN_DELTA;
 }
 
 /** Filesystem-safe, and still readable: `components/Button/Primary` → `components-Button-Primary`. */
@@ -241,6 +288,12 @@ async function captureStory(
   if (!diff) {
     return { story, outcome: "mount-failed", error: "pixel comparison produced no result", ...size };
   }
+  // A second decode of two component-sized PNGs, so the report can say how far
+  // the pixels moved and not only how many of them the comparator counted.
+  const magnitude = measureChangeMagnitude(
+    await decodePng(baselinePath),
+    await decodePng(currentPath),
+  );
   return {
     story,
     outcome: diff.diffRatio <= options.threshold ? "unchanged" : "changed",
@@ -250,6 +303,7 @@ async function captureStory(
     diffRatio: diff.diffRatio,
     diffPixels: diff.diffPixels,
     totalPixels: diff.totalPixels,
+    magnitude,
     ...(diff.heatmapPath ? { heatmapPath: diff.heatmapPath } : {}),
     regions: diff.regions,
   };
@@ -274,7 +328,13 @@ export function formatStoryVrtReport(report: StoryVrtReport): string {
     const detail = r.outcome === "changed"
       ? `${RED}${(r.diffRatio! * 100).toFixed(2)}% diff${RESET} ${DIM}(${r.diffPixels}/${r.totalPixels}px)${RESET}`
       : r.outcome === "unchanged"
-      ? `${DIM}${(r.diffRatio! * 100).toFixed(2)}% <= ${(report.threshold * 100).toFixed(2)}%${RESET}`
+      ? isSubPerceptualDrift(r)
+        // Loud on an "unchanged" row, because that is the point: the comparator
+        // passed it and the pixels say otherwise.
+        ? `${YELLOW}${(r.magnitude!.changedFraction * 100).toFixed(0)}% of pixels moved`
+          + ` (max ${r.magnitude!.maxChannelDelta}/255)${RESET}`
+          + ` ${DIM}but diff is ${(r.diffRatio! * 100).toFixed(2)}% <= ${(report.threshold * 100).toFixed(2)}%${RESET}`
+        : `${DIM}${(r.diffRatio! * 100).toFixed(2)}% <= ${(report.threshold * 100).toFixed(2)}%${RESET}`
       : r.outcome === "mount-failed"
       ? `${RED}${r.error}${RESET}`
       : r.outcome === "new-baseline"

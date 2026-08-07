@@ -53,7 +53,7 @@ suppression works per *rule* instead of per whole gate.
 
 - **`vlmkit rules`** lists every gate with its rule count and plugin;
   **`vlmkit rules <gate>`** prints that gate's rules, default severities and
-  docs. 118 rules across 27 gates.
+  docs. 119 rules across 27 gates.
 - **`component-vrt` skill**, with copyable gallery reference implementations.
   Playwright's docs are explicit that the gallery is framework-specific and yours
   to own with **no template to copy**, which makes it the one part of the setup an
@@ -82,6 +82,20 @@ suppression works per *rule* instead of per whole gate.
   Several stories share one browser. `--props`, `--viewport`, `--threshold`,
   `--root`, `--settle`, `--update-baseline`. Runnable example and a React + Vite
   gallery to copy: `examples/story-gallery/`.
+
+  It also reports a `sub-perceptual-drift` warn, which exists because the A/B
+  measurement found the gate's one blind spot. A story diff is pixels only, and a
+  comparator with a perceptual threshold scores a uniform low-amplitude recolour
+  at 0.0%: measured on a hero whose gradient went from a blue tint to a purple
+  one, **246,914 of 256,632 pixels differed, by at most 8/255 per channel**, and
+  the ratio was zero. `diff html` catches that from its computed-style diff; a
+  story diff has no equivalent, so the honest fix is to say what the pixels did.
+  The rule keys on **coverage** (≥50% of pixels moved, max delta ≥2), because
+  antialiasing moves edges while a recolour moves everything. It is a warn, so the
+  comparator still owns the verdict — promote it in `vlmkit.gates.json` if tint
+  drift is a regression for your project. This does not make `check story` a
+  replacement for a page diff; see
+  `docs/reports/2026-08-06-component-vs-page-vrt-signal.md`.
 - **`vlmkit build gallery`** — the construction → maintenance handoff, which had
   been a manual checklist. `build component` converges markup toward a target it
   does not yet match; `check story` asks whether an edit broke a component that

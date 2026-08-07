@@ -79,11 +79,11 @@ describe("composed built-in registry", () => {
     }
   });
 
-  it("declares 118 tunable rules in total", async () => {
+  it("declares 119 tunable rules in total", async () => {
     // A canary, not a target: a gate losing its rule table to a bad merge is
     // otherwise invisible until someone tries to tune it.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 118);
+    assert.equal(total, 119);
   });
 
   it("gives every built-in gate a category", async () => {
