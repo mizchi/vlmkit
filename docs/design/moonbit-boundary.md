@@ -1,7 +1,10 @@
 # The TypeScript ↔ MoonBit boundary
 
-Status: **JSON boundary landed alongside the positional one.** New logic should
-use the JSON path; the 61 positional commands are untouched and keep working.
+Status: **JSON boundary landed alongside the positional one.** New logic should use
+the JSON path. All 61 positional arms still exist and still work; three commands now
+reach MoonBit through JSON instead — `layout-policy-issue-ids`, `interaction-issues`
+(new logic, previously inexpressible) and `goal-status` (the 36-argument worst case,
+migrated behind a differential test).
 
 ## What the positional boundary costs
 
