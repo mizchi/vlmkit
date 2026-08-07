@@ -52,47 +52,64 @@ export function computeComponentGoalStatus(input: {
   canvas?: ComponentCanvasEvidence;
   expressiveMenu?: ComponentExpressiveMenuEvidence;
 }): ComponentGoalStatus {
-  const output = runMarkupCore([
-    "component-goal-status",
-    input.goal,
-    doubleArg(input.pixelDiffRatio),
-    doubleArg(input.landscapeDiffRatio),
-    optionalDoubleArg(input.pass.landscape),
-    optionalDoubleArg(input.pass.pixel),
-    optionalDoubleArg(input.review.landscape),
-    optionalDoubleArg(input.review.pixel),
-    intArg(input.scrollports?.total),
-    intArg(input.scrollports?.broken),
-    intArg(input.scrollports?.empty),
-    intArg(input.scrollports?.expected?.total),
-    intArg(input.scrollports?.expected?.missing),
-    intArg(input.scrollports?.expected?.broken),
-    intArg(input.scrollports?.expected?.empty),
-    boolArg(Boolean(input.landing)),
-    boolArg(input.landing?.heroVisible),
-    boolArg(input.landing?.primaryCtaVisible),
-    boolArg(input.landing?.nextSectionHintVisible),
-    boolArg(input.landing?.mediaSlotVisible),
-    intArg(input.canvas?.canvasCount),
-    boolArg(input.canvas?.nonblank),
-    boolArg(input.canvas?.frameDelta),
-    optionalBoolArg(input.canvas?.inputResponsive),
-    optionalBoolArg(
-      input.canvas?.stateHook ? input.canvas.stateHookPresent !== false : undefined,
-    ),
-    intArg(input.canvas?.missingStateFields?.length),
-    boolArg(Boolean(input.expressiveMenu)),
-    intArg(input.expressiveMenu?.compositionLayers),
-    intArg(input.expressiveMenu?.compositionShapes),
-    boolArg(input.expressiveMenu?.selectedVisible),
-    intArg(input.expressiveMenu?.focusableItemCount),
-    boolArg(input.expressiveMenu?.semanticMenuText),
-    boolArg(input.expressiveMenu?.diagonalEvidence),
-    boolArg(input.expressiveMenu?.highContrast),
-    intArg(input.expressiveMenu?.lowContrastItemCount),
-    optionalBoolArg(input.expressiveMenu?.hoverChanged),
-    optionalBoolArg(input.expressiveMenu?.focusVisibleChanged),
-  ]);
+  // 36 positional strings became one nested record — the shape this function's
+  // caller already held, flattened only because the wire could not carry it. Three
+  // arguments disappeared with the flattening: `landing_present`,
+  // `expressive_present` and the canvas hook's presence flag each existed to say
+  // whether the *following* arguments meant anything, which `Option` says already.
+  //
+  // `markup-core-goal-status.test.ts` compares this decoder against the positional
+  // one over a deterministic sweep, because a mis-wired field here changes a verdict
+  // and nothing else would notice.
+  const output = callMarkupCoreJson<string>("goal-status", {
+    goal: input.goal,
+    pixel_diff_ratio: input.pixelDiffRatio,
+    landscape_diff_ratio: input.landscapeDiffRatio,
+    pass: { landscape: input.pass.landscape, pixel: input.pass.pixel },
+    review: { landscape: input.review.landscape, pixel: input.review.pixel },
+    scrollports: input.scrollports && {
+      total: input.scrollports.total ?? 0,
+      broken: input.scrollports.broken ?? 0,
+      empty: input.scrollports.empty ?? 0,
+      expected: input.scrollports.expected && {
+        total: input.scrollports.expected.total ?? 0,
+        missing: input.scrollports.expected.missing ?? 0,
+        broken: input.scrollports.expected.broken ?? 0,
+        empty: input.scrollports.expected.empty ?? 0,
+      },
+    },
+    landing: input.landing && {
+      hero_visible: Boolean(input.landing.heroVisible),
+      primary_cta_visible: Boolean(input.landing.primaryCtaVisible),
+      next_section_hint_visible: Boolean(input.landing.nextSectionHintVisible),
+      media_slot_visible: Boolean(input.landing.mediaSlotVisible),
+    },
+    canvas: input.canvas && {
+      canvas_count: input.canvas.canvasCount ?? 0,
+      nonblank: Boolean(input.canvas.nonblank),
+      frame_delta: Boolean(input.canvas.frameDelta),
+      input_responsive: input.canvas.inputResponsive,
+      // Presence of the hook, not its value: the positional form sent "null" when
+      // the contract declared no hook and "false" when it declared one that was
+      // missing, and those mean different things to the rule.
+      state_hook_present: input.canvas.stateHook
+        ? input.canvas.stateHookPresent !== false
+        : undefined,
+      missing_state_fields: input.canvas.missingStateFields?.length ?? 0,
+    },
+    expressive_menu: input.expressiveMenu && {
+      composition_layers: input.expressiveMenu.compositionLayers ?? 0,
+      composition_shapes: input.expressiveMenu.compositionShapes ?? 0,
+      selected_visible: Boolean(input.expressiveMenu.selectedVisible),
+      focusable_item_count: input.expressiveMenu.focusableItemCount ?? 0,
+      semantic_menu_text: Boolean(input.expressiveMenu.semanticMenuText),
+      diagonal_evidence: Boolean(input.expressiveMenu.diagonalEvidence),
+      high_contrast: Boolean(input.expressiveMenu.highContrast),
+      low_contrast_item_count: input.expressiveMenu.lowContrastItemCount ?? 0,
+      hover_changed: input.expressiveMenu.hoverChanged,
+      focus_visible_changed: input.expressiveMenu.focusVisibleChanged,
+    },
+  });
   if (output === "pass" || output === "review" || output === "fail") {
     return output;
   }

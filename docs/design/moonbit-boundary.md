@@ -164,7 +164,27 @@ Three habits that keep such a handler honest:
 
 ## Not done
 
-- **The 61 positional commands are not migrated.** Deliberate: it is a separate
+- **`component-goal-status` is migrated**, the 36-argument worst case. The rules
+  were not rewritten: the JSON handler unpacks a typed record and calls the same
+  `component_goal_status`, so a differential test can compare the two decoders over
+  a deterministic sweep and any disagreement is a wiring bug rather than a
+  behaviour change to argue about.
+
+  Three arguments disappeared with the nesting: `landing_present`,
+  `expressive_present` and the canvas hook's presence flag each existed to say
+  whether the *following* arguments meant anything, which `Option` says already.
+
+  **Writing that test was harder than the migration, and the lesson generalises.**
+  A field swap behind a `> 0` guard is invisible unless a case straddles the guard
+  AND reaches it. Three rounds of fixtures were needed: equal values made swaps
+  no-ops; distinct-but-both-non-zero let the first guard fire either way; and the
+  first straddling variants carried an `expected` sub-record, which
+  `app_shell_status` short-circuits on before reading the fields under test. The
+  test now records which swaps it catches and which are genuinely undetectable
+  because the rule reads the pair symmetrically — "the test missed it" and "there is
+  nothing to miss" look identical from outside, and only the first is a defect.
+
+- **The other 60 positional commands are not migrated.** Deliberate: it is a separate
   change with its own risk, and the two paths coexist without interacting. The two
   tables are now checked for drift (`src/markup-core-dispatch.test.ts`): command
   names in full, behaviour on a sample chosen for shape. Full behavioural
