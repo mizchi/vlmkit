@@ -202,12 +202,18 @@ export function callMarkupCoreJson<TOut>(command: string, input: unknown): TOut 
  * `Missing field width`. **The one input a validator has to survive is an invalid
  * document.**
  *
+ * Exported because the per-domain wrapper modules (`markup-core-a11y-*`,
+ * `markup-core-landscape.ts`, …) each had their own private copy of the old
+ * `doubleArg` / `intArg`. Those normalised on the way to a string; on the JSON path
+ * the normalisation has to happen before serializing instead, and having six
+ * near-identical private copies is how one of them ends up different.
+ *
  * This is normalisation, not coercion: a missing number becomes the same `0` the
  * old wire sent, so the rule sees what it always saw and reports what it always
  * reported. Nothing is silently reinterpreted — a string `"1280"` becomes `0` and
  * is reported as non-positive, exactly as before.
  */
-function finiteOr(value: unknown, fallback = 0): number {
+export function finiteOr(value: unknown, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
@@ -217,12 +223,12 @@ function optionalFinite(value: unknown): number | undefined {
 }
 
 /** `intArg`'s truncation, kept because MoonBit's `Int` would reject a fraction. */
-function intOr(value: unknown, fallback = 0): number {
+export function intOr(value: unknown, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : fallback;
 }
 
 /** `boolArg`: anything not a boolean was `false` on the wire. */
-function flag(value: unknown): boolean {
+export function flag(value: unknown): boolean {
   return value === true;
 }
 

@@ -2,15 +2,11 @@
  * Thin TS wrapper over the MoonBit `grid-*` commands.
  * Used by `landscape-diff`'s neighbour `grid-ratio.ts`.
  */
-import { runMarkupCore } from "./markup-core-runtime.ts";
+import { callMarkupCoreJson, finiteOr, intOr, runMarkupCore } from "./markup-core-runtime.ts";
 
 export function computeGridGcd(a: number, b: number): number {
-  const out = runMarkupCore(["grid-gcd", intArg(a), intArg(b)]);
-  const parsed = Number(out);
-  if (!Number.isInteger(parsed)) {
-    throw new Error(`markup-core grid-gcd returned non-integer: ${out}`);
-  }
-  return parsed;
+  // MoonBit returns an `Int`, so there is nothing to parse or re-check.
+  return callMarkupCoreJson<number>("grid-gcd", { a: intOr(a), b: intOr(b) });
 }
 
 export function computeGridAllEqual(widths: number[], tolerance: number): boolean {
@@ -23,13 +19,14 @@ export function computeGridAllEqual(widths: number[], tolerance: number): boolea
 }
 
 export function computeGridArraysClose(a: number[], b: number[], tolerance: number): boolean {
-  const out = runMarkupCore([
-    "grid-arrays-close",
-    encodeWidths(a),
-    encodeWidths(b),
-    doubleArg(tolerance),
-  ]);
-  return parseBool("grid-arrays-close", out);
+  // Numbers, not CSV. The comma-joined form could not carry a value containing a
+  // comma, needed a parser on the MoonBit side, and made "different lengths" —
+  // which the rule treats as not-close — look like a malformed string.
+  return callMarkupCoreJson<boolean>("grid-arrays-close", {
+    a: a.map((value) => finiteOr(value)),
+    b: b.map((value) => finiteOr(value)),
+    tolerance: finiteOr(tolerance),
+  });
 }
 
 export function computeGridRatiosToDecimal(widths: number[]): string {

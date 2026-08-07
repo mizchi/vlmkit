@@ -1,7 +1,7 @@
 /**
  * Thin TS wrapper over the MoonBit `quality-*` policy commands.
  */
-import { runMarkupCore } from "./markup-core-runtime.ts";
+import { callMarkupCoreJson, finiteOr, intOr, runMarkupCore } from "./markup-core-runtime.ts";
 
 export type QualityErrorStateKind = "error" | "warning" | "none";
 
@@ -9,24 +9,19 @@ export function computeQualityErrorStateKind(
   redRatio: number,
   yellowRatio: number,
 ): QualityErrorStateKind {
-  const out = runMarkupCore([
-    "quality-error-state-kind",
-    doubleArg(redRatio),
-    doubleArg(yellowRatio),
-  ]);
+  const out = callMarkupCoreJson<string>("quality-error-state-kind", {
+    red_ratio: finiteOr(redRatio),
+    yellow_ratio: finiteOr(yellowRatio),
+  });
   if (out === "error" || out === "warning" || out === "none") return out;
   throw new Error(`markup-core quality-error-state-kind unexpected: ${out}`);
 }
 
 export function computeQualityCoveragePassed(covered: number, total: number): boolean {
-  const out = runMarkupCore([
-    "quality-coverage-passed",
-    intArg(covered),
-    intArg(total),
-  ]);
-  if (out === "true") return true;
-  if (out === "false") return false;
-  throw new Error(`markup-core quality-coverage-passed unexpected: ${out}`);
+  return callMarkupCoreJson<boolean>("quality-coverage-passed", {
+    covered: intOr(covered),
+    total: intOr(total),
+  });
 }
 
 export type QualityDiffSeverity = "large" | "small";
@@ -44,6 +39,3 @@ function doubleArg(value: number): string {
   return String(Number.isFinite(value) ? value : 0);
 }
 
-function intArg(value: number): string {
-  return String(Number.isFinite(value) ? Math.trunc(value) : 0);
-}

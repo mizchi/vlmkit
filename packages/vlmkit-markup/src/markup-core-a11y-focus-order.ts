@@ -1,7 +1,7 @@
 /**
  * Thin TS wrapper over the MoonBit `focus-order-*` policy commands.
  */
-import { runMarkupCore } from "./markup-core-runtime.ts";
+import { callMarkupCoreJson, finiteOr, flag } from "./markup-core-runtime.ts";
 
 export type FocusOrderTransition =
   | "trap"
@@ -15,14 +15,11 @@ export function classifyFocusOrderStep(input: {
   prev: { x: number; y: number };
   cur: { x: number; y: number };
 }): FocusOrderTransition {
-  const out = runMarkupCore([
-    "focus-order-classify",
-    input.samePath ? "true" : "false",
-    doubleArg(input.prev.x),
-    doubleArg(input.prev.y),
-    doubleArg(input.cur.x),
-    doubleArg(input.cur.y),
-  ]);
+  const out = callMarkupCoreJson<string>("focus-order-classify", {
+    same_path: flag(input.samePath),
+    previous: { x: finiteOr(input.prev.x), y: finiteOr(input.prev.y) },
+    current: { x: finiteOr(input.cur.x), y: finiteOr(input.cur.y) },
+  });
   if (isFocusOrderTransition(out)) return out;
   throw new Error(`markup-core focus-order-classify unexpected: ${out}`);
 }
@@ -37,6 +34,3 @@ function isFocusOrderTransition(value: string): value is FocusOrderTransition {
   );
 }
 
-function doubleArg(value: number): string {
-  return String(Number.isFinite(value) ? value : 0);
-}

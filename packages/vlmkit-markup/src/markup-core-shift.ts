@@ -1,7 +1,7 @@
 /**
  * Thin TS wrapper over the MoonBit `shift-*` policy commands.
  */
-import { runMarkupCore } from "./markup-core-runtime.ts";
+import { callMarkupCoreJson, finiteOr, runMarkupCore } from "./markup-core-runtime.ts";
 
 export function computeShiftRoundDelta(value: number): number {
   const out = runMarkupCore(["shift-round-delta", doubleArg(value)]);
@@ -18,11 +18,10 @@ export function computeShiftClassifySuspect(
   absHeightDelta: number,
   absTopDelta: number,
 ): ShiftSuspectedAxis {
-  const out = runMarkupCore([
-    "shift-classify-suspect",
-    doubleArg(absHeightDelta),
-    doubleArg(absTopDelta),
-  ]);
+  const out = callMarkupCoreJson<string>("shift-classify-suspect", {
+    abs_height_delta: finiteOr(absHeightDelta),
+    abs_top_delta: finiteOr(absTopDelta),
+  });
   if (out === "height" || out === "margin/padding-above" || out === "y-position") {
     return out;
   }

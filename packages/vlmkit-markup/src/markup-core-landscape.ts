@@ -5,7 +5,7 @@
  * MoonBit ABI); MoonBit owns the cell-score formula, default grid
  * geometry, threshold counting, and top-N ranking.
  */
-import { runMarkupCore } from "./markup-core-runtime.ts";
+import { callMarkupCoreJson, finiteOr, intOr, runMarkupCore } from "./markup-core-runtime.ts";
 
 export interface LandscapeGrid {
   cols: number;
@@ -42,28 +42,41 @@ export interface LandscapeDiffSummary {
   topIndices: LandscapeDiffSummaryEntry[];
 }
 
-const STAT_SEPARATOR = "|";
-const FIELD_SEPARATOR = ",";
+/**
+ * One cell, as a record.
+ *
+ * This replaced `"r,g,b,luma,ink"` joined by "," inside a list joined by "|" inside a
+ * tab-delimited argument — five positional fields, two nested delimiters, and a
+ * hand-written `idx == 0 / 1 / 2 / 3 / 4` parser on the MoonBit side. No cell value
+ * could contain a comma or a pipe, and nothing enforced that at any level.
+ */
+function cellPayload(cell: LandscapeCellStat): { r: number; g: number; b: number; l: number; ink: number } {
+  return {
+    r: finiteOr(cell.r),
+    g: finiteOr(cell.g),
+    b: finiteOr(cell.b),
+    // `luma` here, `l` across the boundary — the MoonBit rule's field name. Spelled out
+    // once, in the one place that knows both.
+    l: finiteOr(cell.luma),
+    ink: finiteOr(cell.ink),
+  };
+}
 
 export function computeLandscapeDefaultGrid(width: number, height: number): LandscapeGrid {
-  const out = runMarkupCore([
-    "landscape-default-grid",
-    intArg(width),
-    intArg(height),
-  ]);
-  const [cols, rows] = out.split("|");
-  const c = Number(cols);
-  const r = Number(rows);
-  if (!Number.isInteger(c) || !Number.isInteger(r)) {
-    throw new Error(`markup-core landscape-default-grid returned unparseable output: ${out}`);
-  }
-  return { cols: c, rows: r };
+  // `"cols|rows"` was two integers in a string. MoonBit types them, so the split and
+  // the two `Number.isInteger` re-checks are gone.
+  return callMarkupCoreJson<LandscapeGrid>("landscape-default-grid", {
+    width: intOr(width),
+    height: intOr(height),
+  });
 }
 
 export function computeLandscapeClampByte(value: number): number {
+  // Still positional, deliberately: one argument of one type, so there is no wiring
+  // bug available to make and a struct would buy nothing.
   const out = runMarkupCore([
     "landscape-clamp-byte",
-    doubleArg(value),
+    String(finiteOr(value)),
   ]);
   const parsed = Number(out);
   if (!Number.isInteger(parsed)) {
@@ -73,33 +86,20 @@ export function computeLandscapeClampByte(value: number): number {
 }
 
 export function computeLandscapeCellScore(baseline: LandscapeCellStat, current: LandscapeCellStat): number {
-  const out = runMarkupCore([
-    "landscape-cell-score",
-    doubleArg(baseline.r),
-    doubleArg(baseline.g),
-    doubleArg(baseline.b),
-    doubleArg(baseline.luma),
-    doubleArg(baseline.ink),
-    doubleArg(current.r),
-    doubleArg(current.g),
-    doubleArg(current.b),
-    doubleArg(current.luma),
-    doubleArg(current.ink),
-  ]);
-  const parsed = Number(out);
-  if (!Number.isFinite(parsed)) {
-    throw new Error(`markup-core landscape-cell-score returned non-finite: ${out}`);
-  }
-  return parsed;
+  // Ten mutually swappable Doubles were two five-field samples. Nesting removes the
+  // entire class of mistake — this was the worst case in the batch by that measure.
+  return callMarkupCoreJson<number>("landscape-cell-score", {
+    baseline: cellPayload(baseline),
+    current: cellPayload(current),
+  });
 }
 
 export function computeLandscapeCellHex(r: number, g: number, b: number): string {
-  return runMarkupCore([
-    "landscape-cell-hex",
-    doubleArg(r),
-    doubleArg(g),
-    doubleArg(b),
-  ]);
+  return callMarkupCoreJson<string>("landscape-cell-hex", {
+    r: finiteOr(r),
+    g: finiteOr(g),
+    b: finiteOr(b),
+  });
 }
 
 export function computeLandscapeDiffSummary(input: LandscapeDiffSummaryInput): LandscapeDiffSummary {
@@ -112,81 +112,31 @@ export function computeLandscapeDiffSummary(input: LandscapeDiffSummaryInput): L
       `markup-core landscape-diff-summary expected ${total} cells, got baseline=${input.baseline.length}, current=${input.current.length}`,
     );
   }
-  const out = runMarkupCore(
-    [
-      "landscape-diff-summary",
-      intArg(input.cols),
-      intArg(input.rows),
-      doubleArg(input.changedThreshold),
-      intArg(input.topN),
-      encodeStats(input.baseline),
-      encodeStats(input.current),
-    ],
-    { cache: false },
-  );
-  return parseSummary(out, total);
+  const summary = callMarkupCoreJson<{
+    mean: number;
+    similarity: number;
+    changed: number;
+    total: number;
+    top: { index: number; score: number }[];
+  }>("landscape-diff-summary", {
+    cols: intOr(input.cols),
+    rows: intOr(input.rows),
+    changed_threshold: finiteOr(input.changedThreshold),
+    top_n: intOr(input.topN),
+    baseline: input.baseline.map(cellPayload),
+    current: input.current.map(cellPayload),
+  });
+  // `parseSummary` was 36 lines and six distinct throw sites — a `|` split, four
+  // `Number()` coercions, a total-count cross-check, then a second split on ":" per top
+  // entry with two more validity checks. MoonBit typed all of it; none of it survives.
+  // A cell-count mismatch now raises from the handler and names the counts, instead of
+  // arriving as a `"mismatch|…"` string in the same shape as a successful result.
+  return {
+    score: summary.mean,
+    similarity: summary.similarity,
+    changedCells: summary.changed,
+    totalCells: summary.total,
+    topIndices: summary.top,
+  };
 }
 
-function parseSummary(raw: string, expectedTotal: number): LandscapeDiffSummary {
-  const parts = raw.split("|");
-  if (parts[0] === "mismatch") {
-    throw new Error(`markup-core landscape-diff-summary length mismatch: ${raw}`);
-  }
-  if (parts.length < 4) {
-    throw new Error(`markup-core landscape-diff-summary malformed output: ${raw}`);
-  }
-  const [scoreStr, similarityStr, changedStr, totalStr, ...rest] = parts;
-  const score = Number(scoreStr);
-  const similarity = Number(similarityStr);
-  const changedCells = Number(changedStr);
-  const totalCells = Number(totalStr);
-  if (![score, similarity, changedCells, totalCells].every(Number.isFinite)) {
-    throw new Error(`markup-core landscape-diff-summary non-finite scalars: ${raw}`);
-  }
-  if (totalCells !== expectedTotal) {
-    throw new Error(
-      `markup-core landscape-diff-summary total mismatch: expected=${expectedTotal}, got=${totalCells}`,
-    );
-  }
-  const topIndices: LandscapeDiffSummaryEntry[] = [];
-  for (const entry of rest) {
-    if (!entry) continue;
-    const sep = entry.indexOf(":");
-    if (sep < 0) {
-      throw new Error(`markup-core landscape-diff-summary malformed top entry: ${entry}`);
-    }
-    const idx = Number(entry.slice(0, sep));
-    const s = Number(entry.slice(sep + 1));
-    if (!Number.isInteger(idx) || !Number.isFinite(s)) {
-      throw new Error(`markup-core landscape-diff-summary unparseable top entry: ${entry}`);
-    }
-    topIndices.push({ index: idx, score: s });
-  }
-  return { score, similarity, changedCells, totalCells, topIndices };
-}
-
-function encodeStats(stats: LandscapeCellStat[]): string {
-  const out: string[] = [];
-  for (const cell of stats) {
-    out.push(
-      [
-        doubleArg(cell.r),
-        doubleArg(cell.g),
-        doubleArg(cell.b),
-        doubleArg(cell.luma),
-        doubleArg(cell.ink),
-      ].join(FIELD_SEPARATOR),
-    );
-  }
-  return out.join(STAT_SEPARATOR);
-}
-
-function doubleArg(value: number): string {
-  return String(Number.isFinite(value) ? value : 0);
-}
-
-function intArg(value: number | undefined): string {
-  return typeof value === "number" && Number.isFinite(value)
-    ? String(Math.trunc(value))
-    : "0";
-}

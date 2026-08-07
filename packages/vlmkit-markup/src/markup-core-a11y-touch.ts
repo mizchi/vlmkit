@@ -1,7 +1,7 @@
 /**
  * Thin TS wrapper over the MoonBit `a11y-touch-*` policy commands.
  */
-import { runMarkupCore } from "./markup-core-runtime.ts";
+import { callMarkupCoreJson, finiteOr, runMarkupCore } from "./markup-core-runtime.ts";
 
 export type WcagTouchLevel = "AAA" | "AA";
 
@@ -22,16 +22,15 @@ export function touchTargetBelowRequired(minSide: number, level: WcagTouchLevel)
 }
 
 export function touchTargetInCluster(a: { x: number; y: number }, b: { x: number; y: number }): boolean {
-  const out = runMarkupCore([
-    "a11y-touch-in-cluster",
-    doubleArg(a.x),
-    doubleArg(a.y),
-    doubleArg(b.x),
-    doubleArg(b.y),
-  ]);
+  // Two named points. `ax ay bx by` as four positional Doubles has 12 wrong
+  // orderings that all parse and most of which still return a plausible answer.
+  const out = callMarkupCoreJson<string>("touch-in-cluster", {
+    a: { x: finiteOr(a.x), y: finiteOr(a.y) },
+    b: { x: finiteOr(b.x), y: finiteOr(b.y) },
+  });
   if (out === "true") return true;
   if (out === "false") return false;
-  throw new Error(`markup-core a11y-touch-in-cluster unexpected: ${out}`);
+  throw new Error(`markup-core touch-in-cluster unexpected: ${out}`);
 }
 
 function doubleArg(value: number): string {
