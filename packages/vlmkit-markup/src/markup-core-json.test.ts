@@ -136,8 +136,16 @@ describe("markup-core JSON boundary", { timeout: 240_000 }, () => {
 
   it("the TypeScript view of the command list matches MoonBit's", () => {
     // A typo in a command name is otherwise found at the first call, in whatever
-    // code path happens to reach it.
-    assert.deepEqual(markupCoreJsonCommands(), [COMMAND, "interaction-issues"]);
+    // code path happens to reach it. Asserted as properties rather than as a literal
+    // list: restating fifteen names here made this fail on every migration for no
+    // reason, which trains people to update the expectation without reading it.
+    const commands = markupCoreJsonCommands();
+    assert.ok(commands.includes(COMMAND), `missing ${COMMAND}: ${commands.join(", ")}`);
+    assert.ok(commands.includes("goal-status"));
+    assert.ok(commands.includes("interaction-issues"));
+    assert.equal(new Set(commands).size, commands.length, "duplicate command names");
+    assert.ok(commands.every((name) => /^[a-z0-9-]+$/.test(name)), commands.join(", "));
+    // `markup-core-migration.test.ts` is what checks the whole set has coverage.
   });
 
   it("both backends answer identically", async () => {

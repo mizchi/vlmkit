@@ -52,47 +52,64 @@ export function computeComponentGoalStatus(input: {
   canvas?: ComponentCanvasEvidence;
   expressiveMenu?: ComponentExpressiveMenuEvidence;
 }): ComponentGoalStatus {
-  const output = runMarkupCore([
-    "component-goal-status",
-    input.goal,
-    doubleArg(input.pixelDiffRatio),
-    doubleArg(input.landscapeDiffRatio),
-    optionalDoubleArg(input.pass.landscape),
-    optionalDoubleArg(input.pass.pixel),
-    optionalDoubleArg(input.review.landscape),
-    optionalDoubleArg(input.review.pixel),
-    intArg(input.scrollports?.total),
-    intArg(input.scrollports?.broken),
-    intArg(input.scrollports?.empty),
-    intArg(input.scrollports?.expected?.total),
-    intArg(input.scrollports?.expected?.missing),
-    intArg(input.scrollports?.expected?.broken),
-    intArg(input.scrollports?.expected?.empty),
-    boolArg(Boolean(input.landing)),
-    boolArg(input.landing?.heroVisible),
-    boolArg(input.landing?.primaryCtaVisible),
-    boolArg(input.landing?.nextSectionHintVisible),
-    boolArg(input.landing?.mediaSlotVisible),
-    intArg(input.canvas?.canvasCount),
-    boolArg(input.canvas?.nonblank),
-    boolArg(input.canvas?.frameDelta),
-    optionalBoolArg(input.canvas?.inputResponsive),
-    optionalBoolArg(
-      input.canvas?.stateHook ? input.canvas.stateHookPresent !== false : undefined,
-    ),
-    intArg(input.canvas?.missingStateFields?.length),
-    boolArg(Boolean(input.expressiveMenu)),
-    intArg(input.expressiveMenu?.compositionLayers),
-    intArg(input.expressiveMenu?.compositionShapes),
-    boolArg(input.expressiveMenu?.selectedVisible),
-    intArg(input.expressiveMenu?.focusableItemCount),
-    boolArg(input.expressiveMenu?.semanticMenuText),
-    boolArg(input.expressiveMenu?.diagonalEvidence),
-    boolArg(input.expressiveMenu?.highContrast),
-    intArg(input.expressiveMenu?.lowContrastItemCount),
-    optionalBoolArg(input.expressiveMenu?.hoverChanged),
-    optionalBoolArg(input.expressiveMenu?.focusVisibleChanged),
-  ]);
+  // 36 positional strings became one nested record — the shape this function's
+  // caller already held, flattened only because the wire could not carry it. Three
+  // arguments disappeared with the flattening: `landing_present`,
+  // `expressive_present` and the canvas hook's presence flag each existed to say
+  // whether the *following* arguments meant anything, which `Option` says already.
+  //
+  // `markup-core-goal-status.test.ts` compares this decoder against the positional
+  // one over a deterministic sweep, because a mis-wired field here changes a verdict
+  // and nothing else would notice.
+  const output = callMarkupCoreJson<string>("goal-status", {
+    goal: input.goal,
+    pixel_diff_ratio: finiteOr(input.pixelDiffRatio),
+    landscape_diff_ratio: finiteOr(input.landscapeDiffRatio),
+    pass: { landscape: optionalFinite(input.pass.landscape), pixel: optionalFinite(input.pass.pixel) },
+    review: { landscape: optionalFinite(input.review.landscape), pixel: optionalFinite(input.review.pixel) },
+    scrollports: input.scrollports && {
+      total: intOr(input.scrollports.total),
+      broken: intOr(input.scrollports.broken),
+      empty: intOr(input.scrollports.empty),
+      expected: input.scrollports.expected && {
+        total: intOr(input.scrollports.expected.total),
+        missing: intOr(input.scrollports.expected.missing),
+        broken: intOr(input.scrollports.expected.broken),
+        empty: intOr(input.scrollports.expected.empty),
+      },
+    },
+    landing: input.landing && {
+      hero_visible: Boolean(input.landing.heroVisible),
+      primary_cta_visible: Boolean(input.landing.primaryCtaVisible),
+      next_section_hint_visible: Boolean(input.landing.nextSectionHintVisible),
+      media_slot_visible: Boolean(input.landing.mediaSlotVisible),
+    },
+    canvas: input.canvas && {
+      canvas_count: intOr(input.canvas.canvasCount),
+      nonblank: Boolean(input.canvas.nonblank),
+      frame_delta: Boolean(input.canvas.frameDelta),
+      input_responsive: input.canvas.inputResponsive,
+      // Presence of the hook, not its value: the positional form sent "null" when
+      // the contract declared no hook and "false" when it declared one that was
+      // missing, and those mean different things to the rule.
+      state_hook_present: input.canvas.stateHook
+        ? input.canvas.stateHookPresent !== false
+        : undefined,
+      missing_state_fields: intOr(input.canvas.missingStateFields?.length),
+    },
+    expressive_menu: input.expressiveMenu && {
+      composition_layers: intOr(input.expressiveMenu.compositionLayers),
+      composition_shapes: intOr(input.expressiveMenu.compositionShapes),
+      selected_visible: Boolean(input.expressiveMenu.selectedVisible),
+      focusable_item_count: intOr(input.expressiveMenu.focusableItemCount),
+      semantic_menu_text: Boolean(input.expressiveMenu.semanticMenuText),
+      diagonal_evidence: Boolean(input.expressiveMenu.diagonalEvidence),
+      high_contrast: Boolean(input.expressiveMenu.highContrast),
+      low_contrast_item_count: intOr(input.expressiveMenu.lowContrastItemCount),
+      hover_changed: input.expressiveMenu.hoverChanged,
+      focus_visible_changed: input.expressiveMenu.focusVisibleChanged,
+    },
+  });
   if (output === "pass" || output === "review" || output === "fail") {
     return output;
   }
@@ -167,6 +184,59 @@ export function callMarkupCoreJson<TOut>(command: string, input: unknown): TOut 
       + ` (${e instanceof Error ? e.message : String(e)})`,
     );
   }
+}
+
+/**
+ * Normalising a value on its way to the JSON boundary.
+ *
+ * The positional encoders these replaced did this and it was load-bearing, which
+ * only became clear after removing them: `doubleArg` mapped anything non-finite to
+ * `0`, `intArg` truncated and defaulted to `0`, `boolArg` mapped `undefined` to
+ * `false`. Dropping that turned a malformed input from "the rule reports the
+ * problem" into "the decoder raises before the rule runs".
+ *
+ * That matters most where it is worst: `vlmkit contract validate` does
+ * `JSON.parse(file) as UiContract` with no runtime schema check, so arbitrary user
+ * JSON reaches these wrappers. A contract whose viewport omits `width` used to
+ * report `viewport-size-positive`; without these helpers it aborted with
+ * `Missing field width`. **The one input a validator has to survive is an invalid
+ * document.**
+ *
+ * This is normalisation, not coercion: a missing number becomes the same `0` the
+ * old wire sent, so the rule sees what it always saw and reports what it always
+ * reported. Nothing is silently reinterpreted — a string `"1280"` becomes `0` and
+ * is reported as non-positive, exactly as before.
+ */
+function finiteOr(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+/** Like `finiteOr`, but absent stays absent — for fields typed `Double?` in MoonBit. */
+function optionalFinite(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+/** `intArg`'s truncation, kept because MoonBit's `Int` would reject a fraction. */
+function intOr(value: unknown, fallback = 0): number {
+  return typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : fallback;
+}
+
+/** `boolArg`: anything not a boolean was `false` on the wire. */
+function flag(value: unknown): boolean {
+  return value === true;
+}
+
+/**
+ * A string array with non-strings dropped.
+ *
+ * The old path joined on `|` and MoonBit's `split_list` discarded empty segments,
+ * so `[null, "mode"]` arrived as `["mode"]`. `stripAbsent` cannot do this: it walks
+ * object properties, and a `null` *inside* an array survives to be rejected by
+ * `Array[String]`. Reachable through a contract's `canvas.requiredStateFields`,
+ * which nothing validates elementwise.
+ */
+function stringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
 /** Recursively drop `null` / `undefined`, so absence reaches MoonBit as omission. */
@@ -588,14 +658,13 @@ export function computeUiContractScreenIssueIds(input: {
   goal?: string;
   sourceOfTruth?: string;
 }): MarkupCoreUiContractScreenIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-screen-issue-ids",
-    input.id,
-    input.pattern ?? "",
-    input.goal ?? "",
-    input.sourceOfTruth ?? "",
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("screen-issue-ids", {
+    id: input.id,
+    pattern: input.pattern ?? "",
+    goal: input.goal ?? "",
+    source_of_truth: input.sourceOfTruth ?? "",
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractScreenIssueId(issueId)) {
       return issueId;
     }
@@ -613,16 +682,15 @@ export function computeUiContractViewportIssueIds(input: {
   dprPresent: boolean;
   dpr: number;
 }): MarkupCoreUiContractViewportIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-viewport-issue-ids",
-    input.label,
-    boolArg(input.duplicateLabel),
-    doubleArg(input.width),
-    doubleArg(input.height),
-    boolArg(input.dprPresent),
-    doubleArg(input.dpr),
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("viewport-issue-ids", {
+    label: input.label,
+    duplicate_label: flag(input.duplicateLabel),
+    width: finiteOr(input.width),
+    height: finiteOr(input.height),
+    // The present/value pair collapses: absent is absent, not 0.
+    dpr: input.dprPresent ? finiteOr(input.dpr) : undefined,
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractViewportIssueId(issueId)) {
       return issueId;
     }
@@ -639,15 +707,14 @@ export function computeUiContractLandmarkIssueIds(input: {
   parentIdPresent: boolean;
   parentKnown: boolean;
 }): MarkupCoreUiContractLandmarkIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-landmark-issue-ids",
-    input.id,
-    input.role,
-    input.name,
-    boolArg(input.parentIdPresent),
-    boolArg(input.parentKnown),
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("landmark-issue-ids", {
+    id: input.id,
+    role: input.role,
+    name: input.name,
+    parent_id_present: flag(input.parentIdPresent),
+    parent_known: flag(input.parentKnown),
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractLandmarkIssueId(issueId)) {
       return issueId;
     }
@@ -684,18 +751,18 @@ export function computeUiContractPatternEvidenceIssueIds(input: {
   hasCanvasStateHook: boolean;
   canvasRequiredStateFields: string[];
 }): MarkupCoreUiContractPatternEvidenceIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-pattern-evidence-issue-ids",
-    input.pattern ?? "",
-    joinList(input.markerKinds),
-    joinList(input.requiredStateKinds),
-    joinList(input.stateKinds),
-    intArg(input.expectedScrollportCount),
-    boolArg(input.hasComposition),
-    boolArg(input.hasCanvasStateHook),
-    joinList(input.canvasRequiredStateFields),
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("pattern-evidence-issue-ids", {
+    pattern: input.pattern ?? "",
+    // Arrays, not a pipe-joined string: no element can now break the encoding.
+    marker_kinds: stringList(input.markerKinds),
+    required_state_kinds: stringList(input.requiredStateKinds),
+    state_kinds: stringList(input.stateKinds),
+    expected_scrollport_count: intOr(input.expectedScrollportCount),
+    has_composition: flag(input.hasComposition),
+    has_canvas_state_hook: flag(input.hasCanvasStateHook),
+    canvas_required_state_fields: stringList(input.canvasRequiredStateFields),
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractPatternEvidenceIssueId(issueId)) {
       return issueId;
     }
@@ -710,15 +777,14 @@ export function computeUiContractMarkerIssueIds(input: {
   hasAttribute: boolean;
   hasTarget: boolean;
 }): MarkupCoreUiContractMarkerIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-marker-issue-ids",
-    input.kind,
-    boolArg(input.required),
-    boolArg(input.hasSelector),
-    boolArg(input.hasAttribute),
-    boolArg(input.hasTarget),
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("marker-issue-ids", {
+    kind: input.kind,
+    required: flag(input.required),
+    has_selector: flag(input.hasSelector),
+    has_attribute: flag(input.hasAttribute),
+    has_target: flag(input.hasTarget),
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractMarkerIssueId(issueId)) {
       return issueId;
     }
@@ -850,15 +916,14 @@ export function computeUiContractCompositionLayerIssueIds(input: {
   zPresent: boolean;
   zFinite: boolean;
 }): MarkupCoreUiContractCompositionLayerIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-composition-layer-issue-ids",
-    input.id,
-    input.role,
-    boolArg(input.duplicateId),
-    boolArg(input.zPresent),
-    boolArg(input.zFinite),
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("composition-layer-issue-ids", {
+    id: input.id,
+    role: input.role,
+    duplicate_id: flag(input.duplicateId),
+    // Absent means no z declared at all; `false` means one was and is not finite.
+    z_finite: input.zPresent ? flag(input.zFinite) : undefined,
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractCompositionLayerIssueId(issueId)) {
       return issueId;
     }
@@ -871,13 +936,12 @@ export function computeUiContractCompositionShapeIssueIds(input: {
   kind: string;
   duplicateId: boolean;
 }): MarkupCoreUiContractCompositionShapeIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-composition-shape-issue-ids",
-    input.id,
-    input.kind,
-    boolArg(input.duplicateId),
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("composition-shape-issue-ids", {
+    id: input.id,
+    kind: input.kind,
+    duplicate_id: flag(input.duplicateId),
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractCompositionShapeIssueId(issueId)) {
       return issueId;
     }
@@ -893,16 +957,14 @@ export function computeUiContractCompositionMotionIssueIds(input: {
   durationPresent: boolean;
   durationMs: number;
 }): MarkupCoreUiContractCompositionMotionIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-composition-motion-issue-ids",
-    input.id,
-    input.trigger,
-    input.effect,
-    boolArg(input.duplicateId),
-    boolArg(input.durationPresent),
-    doubleArg(input.durationMs),
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("composition-motion-issue-ids", {
+    id: input.id,
+    trigger: input.trigger,
+    effect: input.effect,
+    duplicate_id: flag(input.duplicateId),
+    duration_ms: input.durationPresent ? finiteOr(input.durationMs) : undefined,
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractCompositionMotionIssueId(issueId)) {
       return issueId;
     }
@@ -969,12 +1031,11 @@ export function computeUiContractDecorationPaletteIssueIds(input: {
   role: string;
   value?: string;
 }): MarkupCoreUiContractDecorationPaletteIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-decoration-palette-issue-ids",
-    input.role,
-    input.value ?? "",
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("decoration-palette-issue-ids", {
+    role: input.role,
+    value: input.value,
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractDecorationPaletteIssueId(issueId)) {
       return issueId;
     }
@@ -1049,13 +1110,13 @@ export function computeUiContractLayoutIssueIds(input: {
     width_kind: input.widthKind ?? "",
     width_min: input.widthMinPresent ? 1 : undefined,
     width_max: input.widthMaxPresent ? 1 : undefined,
-    width_value: input.widthValue,
+    width_value: optionalFinite(input.widthValue),
     height_kind: input.heightKind ?? "",
-    height_value: input.heightValue,
-    height_max: input.heightMax,
+    height_value: optionalFinite(input.heightValue),
+    height_max: optionalFinite(input.heightMax),
     display_kind: input.displayKind ?? "",
-    display_columns_count: input.displayColumnsCount ?? 0,
-    display_rows_count: input.displayRowsCount ?? 0,
+    display_columns_count: intOr(input.displayColumnsCount),
+    display_rows_count: intOr(input.displayRowsCount),
   });
   return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractLayoutIssueId(issueId)) {
@@ -1072,15 +1133,14 @@ export function computeUiContractStateIssueIds(input: {
   hasSelector: boolean;
   hasTrigger: boolean;
 }): MarkupCoreUiContractStateIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-state-issue-ids",
-    input.id,
-    input.kind,
-    boolArg(input.required),
-    boolArg(input.hasSelector),
-    boolArg(input.hasTrigger),
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("state-issue-ids", {
+    id: input.id,
+    kind: input.kind,
+    required: flag(input.required),
+    has_selector: flag(input.hasSelector),
+    has_trigger: flag(input.hasTrigger),
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractStateIssueId(issueId)) {
       return issueId;
     }
@@ -1098,18 +1158,16 @@ export function computeUiContractRequiredStateIssueIds(input: {
   minChangeRatioPresent: boolean;
   minChangeRatio: number;
 }): MarkupCoreUiContractRequiredStateIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-required-state-issue-ids",
-    input.id,
-    input.kind,
-    boolArg(input.required),
-    boolArg(input.hasSelector),
-    boolArg(input.hasTrigger),
-    boolArg(input.duplicateId),
-    boolArg(input.minChangeRatioPresent),
-    doubleArg(input.minChangeRatio),
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("required-state-issue-ids", {
+    id: input.id,
+    kind: input.kind,
+    required: flag(input.required),
+    has_selector: flag(input.hasSelector),
+    has_trigger: flag(input.hasTrigger),
+    duplicate_id: flag(input.duplicateId),
+    min_change_ratio: input.minChangeRatioPresent ? finiteOr(input.minChangeRatio) : undefined,
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractRequiredStateIssueId(issueId)) {
       return issueId;
     }
@@ -1128,19 +1186,17 @@ export function computeUiContractExpectedScrollportIssueIds(input: {
   minOverflowPresent: boolean;
   minOverflow: number;
 }): MarkupCoreUiContractExpectedScrollportIssueId[] {
-  const output = runMarkupCore([
-    "ui-contract-expected-scrollport-issue-ids",
-    input.id,
-    input.axis,
-    boolArg(input.required),
-    boolArg(input.hasSelector),
-    boolArg(input.hasName),
-    boolArg(input.hasLandmarkId),
-    boolArg(input.duplicateId),
-    boolArg(input.minOverflowPresent),
-    doubleArg(input.minOverflow),
-  ]);
-  return splitList(output).map((issueId) => {
+  const issueIds = callMarkupCoreJson<string[]>("expected-scrollport-issue-ids", {
+    id: input.id,
+    axis: input.axis,
+    required: flag(input.required),
+    has_selector: flag(input.hasSelector),
+    has_name: flag(input.hasName),
+    has_landmark_id: flag(input.hasLandmarkId),
+    duplicate_id: flag(input.duplicateId),
+    min_overflow: input.minOverflowPresent ? finiteOr(input.minOverflow) : undefined,
+  });
+  return issueIds.map((issueId) => {
     if (isMarkupCoreUiContractExpectedScrollportIssueId(issueId)) {
       return issueId;
     }
@@ -1430,12 +1486,6 @@ function doubleArg(value: number): string {
   return String(Number.isFinite(value) ? value : 0);
 }
 
-function optionalDoubleArg(value: number | undefined): string {
-  return typeof value === "number" && Number.isFinite(value)
-    ? String(value)
-    : "null";
-}
-
 function intArg(value: number | undefined): string {
   return typeof value === "number" && Number.isFinite(value)
     ? String(Math.trunc(value))
@@ -1444,10 +1494,6 @@ function intArg(value: number | undefined): string {
 
 function boolArg(value: boolean | undefined): string {
   return value ? "true" : "false";
-}
-
-function optionalBoolArg(value: boolean | null | undefined): string {
-  return typeof value === "boolean" ? String(value) : "null";
 }
 
 function joinList(values: string[]): string {

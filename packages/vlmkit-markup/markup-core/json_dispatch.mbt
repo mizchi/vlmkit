@@ -68,33 +68,31 @@ pub struct LayoutPolicyInput {
 ///|
 /// Layout-policy issue ids for a UI Contract landmark.
 ///
-/// Same rules as the positional `ui_contract_layout_issue_ids`, expressed against
-/// the typed input. Returns ids rather than messages: the message wording is a
-/// presentation concern and lives in TypeScript, so changing it does not require
-/// rebuilding MoonBit.
+/// Unpacks the typed input and calls the positional `ui_contract_layout_issue_ids`
+/// unchanged, like every other handler on this boundary. This one was originally
+/// written out inline — it was the first command through, before the pattern existed
+/// — and the duplicate read as equivalent while quietly breaking the property the
+/// differential test depends on: with two copies of the rules, a disagreement is no
+/// longer necessarily a wiring bug, and editing one rule silently changes behaviour
+/// on one path only.
+///
+/// Returns ids rather than messages: the wording is a presentation concern and lives
+/// in TypeScript, so changing it does not require rebuilding MoonBit.
 pub fn layout_policy_issue_ids(input : LayoutPolicyInput) -> Array[String] {
-  let issues : Array[String] = []
-  if input.width_kind == "fluid" && input.width_min is None && input.width_max is None {
-    issues.push("layout-width-fluid-bounds")
-  }
-  if input.width_kind == "fixed" && input.width_value.unwrap_or(0.0) <= 0.0 {
-    issues.push("layout-width-fixed-positive")
-  }
-  if input.height_kind == "fixed" && input.height_value.unwrap_or(0.0) <= 0.0 {
-    issues.push("layout-height-fixed-positive")
-  }
-  if input.height_kind == "scrollport" && input.height_max.unwrap_or(0.0) <= 0.0 {
-    issues.push("layout-height-scrollport-max-positive")
-  }
-  if input.display_kind == "grid" {
-    if input.display_columns_count <= 0 {
-      issues.push("layout-grid-columns")
-    }
-    if input.display_rows_count <= 0 {
-      issues.push("layout-grid-rows")
-    }
-  }
-  issues
+  split_issue_ids(
+    ui_contract_layout_issue_ids(
+      input.width_kind,
+      input.width_min is Some(_),
+      input.width_max is Some(_),
+      input.width_value.unwrap_or(0.0),
+      input.height_kind,
+      input.height_value.unwrap_or(0.0),
+      input.height_max.unwrap_or(0.0),
+      input.display_kind,
+      input.display_columns_count,
+      input.display_rows_count,
+    ),
+  )
 }
 
 ///|
@@ -113,9 +111,61 @@ pub fn run_json(command : String, payload : String) -> String raise {
       let input : LayoutPolicyInput = @json.from_json(json)
       layout_policy_issue_ids(input).to_json().stringify()
     }
+    "goal-status" => {
+      let input : GoalStatusInput = @json.from_json(json)
+      goal_status(input).to_json().stringify()
+    }
     "interaction-issues" => {
       let input : InteractionIssuesInput = @json.from_json(json)
       interaction_issues(input).to_json().stringify()
+    }
+    "screen-issue-ids" => {
+      let input : ScreenIssuesInput = @json.from_json(json)
+      screen_issue_ids(input).to_json().stringify()
+    }
+    "viewport-issue-ids" => {
+      let input : ViewportIssuesInput = @json.from_json(json)
+      viewport_issue_ids(input).to_json().stringify()
+    }
+    "landmark-issue-ids" => {
+      let input : LandmarkIssuesInput = @json.from_json(json)
+      landmark_issue_ids(input).to_json().stringify()
+    }
+    "marker-issue-ids" => {
+      let input : MarkerIssuesInput = @json.from_json(json)
+      marker_issue_ids(input).to_json().stringify()
+    }
+    "state-issue-ids" => {
+      let input : StateIssuesInput = @json.from_json(json)
+      state_issue_ids(input).to_json().stringify()
+    }
+    "required-state-issue-ids" => {
+      let input : RequiredStateIssuesInput = @json.from_json(json)
+      required_state_issue_ids(input).to_json().stringify()
+    }
+    "expected-scrollport-issue-ids" => {
+      let input : ExpectedScrollportIssuesInput = @json.from_json(json)
+      expected_scrollport_issue_ids(input).to_json().stringify()
+    }
+    "composition-layer-issue-ids" => {
+      let input : CompositionLayerIssuesInput = @json.from_json(json)
+      composition_layer_issue_ids(input).to_json().stringify()
+    }
+    "composition-shape-issue-ids" => {
+      let input : CompositionShapeIssuesInput = @json.from_json(json)
+      composition_shape_issue_ids(input).to_json().stringify()
+    }
+    "composition-motion-issue-ids" => {
+      let input : CompositionMotionIssuesInput = @json.from_json(json)
+      composition_motion_issue_ids(input).to_json().stringify()
+    }
+    "decoration-palette-issue-ids" => {
+      let input : DecorationPaletteIssuesInput = @json.from_json(json)
+      decoration_palette_issue_ids(input).to_json().stringify()
+    }
+    "pattern-evidence-issue-ids" => {
+      let input : PatternEvidenceIssuesInput = @json.from_json(json)
+      pattern_evidence_issue_ids(input).to_json().stringify()
     }
     _ => raise Failure("unknown markup-core JSON command: \{command}")
   }
@@ -125,5 +175,21 @@ pub fn run_json(command : String, payload : String) -> String raise {
 /// Commands `run_json` accepts, so the TypeScript side can assert the two agree
 /// instead of discovering a typo at the first call.
 pub fn json_commands() -> Array[String] {
-  ["layout-policy-issue-ids", "interaction-issues"]
+  [
+    "layout-policy-issue-ids",
+    "interaction-issues",
+    "goal-status",
+    "screen-issue-ids",
+    "viewport-issue-ids",
+    "landmark-issue-ids",
+    "marker-issue-ids",
+    "state-issue-ids",
+    "required-state-issue-ids",
+    "expected-scrollport-issue-ids",
+    "composition-layer-issue-ids",
+    "composition-shape-issue-ids",
+    "composition-motion-issue-ids",
+    "decoration-palette-issue-ids",
+    "pattern-evidence-issue-ids",
+  ]
 }

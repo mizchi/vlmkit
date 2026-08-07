@@ -5,7 +5,7 @@ import {
   dominantPageColor,
   matchPageComponents,
   type PageComponent,
-} from "./page-compose.ts";
+} from "./page-compose-diff.ts";
 
 /** White canvas with solid-color rects. */
 function makePage(
