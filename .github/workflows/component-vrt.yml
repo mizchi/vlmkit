@@ -43,11 +43,21 @@ jobs:
     timeout-minutes: 15
     env:
       PAGE: src/experiments/component-vrt/fixture/page-flat.html
-      # Outside the checkout, so a stray baseline cannot be committed by accident.
-      GALLERY_DIR: ${{ runner.temp }}/gallery
-      BASELINE_DIR: ${{ runner.temp }}/story-baselines
     steps:
       - uses: actions/checkout@v4
+
+      # Set here rather than in the job's `env:` block: the `runner` context is
+      # not available there (only github / needs / strategy / matrix / vars /
+      # secrets / inputs), and using it makes the whole workflow file invalid —
+      # GitHub then rejects it at validation and reports a zero-second failed run
+      # with no jobs, which looks nothing like a syntax error.
+      #
+      # Both directories live outside the checkout, so a stray baseline cannot be
+      # committed by accident.
+      - name: Resolve output paths
+        run: |
+          echo "GALLERY_DIR=$RUNNER_TEMP/gallery" >> "$GITHUB_ENV"
+          echo "BASELINE_DIR=$RUNNER_TEMP/story-baselines" >> "$GITHUB_ENV"
 
       - uses: pnpm/action-setup@v4
         with:
