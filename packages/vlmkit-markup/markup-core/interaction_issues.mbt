@@ -10,8 +10,8 @@
 ///
 /// Rules in, **issue ids out** — never messages. The prose is presentation and
 /// stays in TypeScript, so rewording a diagnostic does not mean rebuilding
-/// MoonBit. What comes back is the id, the severity, the element index, and the
-/// couple of values the wording needs to interpolate.
+/// MoonBit. What comes back is the id, the severity, the element's POSITION in the
+/// input array, and the couple of values the wording needs to interpolate.
 ///
 /// The input is also *reduced* rather than mirrored. The TypeScript type carries
 /// `ariaDelta : Record<String, [String?, String?]>`, and these rules only ever ask
