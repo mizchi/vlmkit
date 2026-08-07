@@ -13,13 +13,16 @@ Measured before changing anything:
 | positional string arguments, total | 233 |
 | worst single command (`component-goal-status`) | 36 |
 | dispatch tables that must agree | 2 |
+| ...of which a legal value needs escaping (`""`) | 1 sentinel |
 | lines of hand-written parsing across them | 1,487 |
 | commands using JSON | 0 |
 
 The shape is `run_markup_core("cmd", "a\tb\tc")`, dispatched by
 `match args { ["cmd", a, b, c, …] }` in **both** `markup-core-api/main.mbt` (the
 direct-JS entry point) and `markup-core-cli/main.mbt` (the spawned one). The two
-tables carry the same 61 commands and nothing checked that they stayed in step.
+tables carry the same 61 commands. Nothing checked that they stayed in step until
+`src/markup-core-dispatch.test.ts`, which compares them — see "Not done" for what
+that test does and does not cover.
 
 Three costs follow, all structural:
 
