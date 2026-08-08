@@ -1,7 +1,7 @@
 /**
  * Thin TS wrapper over the MoonBit `region-classify-*` policy commands.
  */
-import { runMarkupCore } from "./markup-core-runtime.ts";
+import { callMarkupCoreJson, finiteOr, intOr } from "./markup-core-runtime.ts";
 
 export type RegionKind = "text" | "filled-rect" | "icon" | "image" | "unknown";
 
@@ -17,14 +17,13 @@ export function regionClassifyKind(input: {
   colorCount: number;
   stripeRows: number;
 }): RegionKindResult {
-  const out = runMarkupCore([
-    "region-classify-kind",
-    intArg(input.area),
-    doubleArg(input.aspect),
-    doubleArg(input.lumaStd),
-    intArg(input.colorCount),
-    intArg(input.stripeRows),
-  ]);
+  const out = callMarkupCoreJson<string>("region-classify-kind", {
+    area: intOr(input.area),
+    aspect: finiteOr(input.aspect),
+    luma_std: finiteOr(input.lumaStd),
+    color_count: intOr(input.colorCount),
+    stripe_rows: intOr(input.stripeRows),
+  });
   const [kind, confidence] = out.split("|");
   const parsed = Number(confidence);
   if (!isRegionKind(kind) || !Number.isFinite(parsed)) {
@@ -43,10 +42,3 @@ function isRegionKind(value: string): value is RegionKind {
   );
 }
 
-function intArg(value: number): string {
-  return String(Number.isFinite(value) ? Math.trunc(value) : 0);
-}
-
-function doubleArg(value: number): string {
-  return String(Number.isFinite(value) ? value : 0);
-}

@@ -1,7 +1,7 @@
 /**
  * Thin TS wrapper over the MoonBit `a11y-contrast-*` policy commands.
  */
-import { runMarkupCore } from "./markup-core-runtime.ts";
+import { callMarkupCoreJson, finiteOr, intOr } from "./markup-core-runtime.ts";
 
 export type WcagContrastLevel = "AAA" | "AA" | "AA-large" | "fail";
 
@@ -17,34 +17,27 @@ export function evaluateA11yContrast(input: {
   fontSize: number;
   fontWeight: number;
 }): A11yContrastEvaluation {
-  const out = runMarkupCore([
-    "a11y-contrast-evaluate",
-    intArg(input.foreground.r),
-    intArg(input.foreground.g),
-    intArg(input.foreground.b),
-    intArg(input.background.r),
-    intArg(input.background.g),
-    intArg(input.background.b),
-    doubleArg(input.fontSize),
-    intArg(input.fontWeight),
-  ]);
-  const [ratioStr, requiredStr, level] = out.split("|");
-  const ratio = Number(ratioStr);
-  const requiredAA = Number(requiredStr);
-  if (!Number.isFinite(ratio) || !Number.isFinite(requiredAA) || !isWcagLevel(level)) {
-    throw new Error(`markup-core a11y-contrast-evaluate unexpected: ${out}`);
+  // Two named colours, not six positional Ints. `fr fg fb br bg bb` could be
+  // exchanged in either direction and still parse, and contrast is symmetric enough
+  // that many swapped cases return the same answer while the ones that matter do not.
+  const out = callMarkupCoreJson<{ ratio: number; required_aa: number; level: string }>(
+    "contrast-evaluate",
+    {
+      foreground: { r: intOr(input.foreground.r), g: intOr(input.foreground.g), b: intOr(input.foreground.b) },
+      background: { r: intOr(input.background.r), g: intOr(input.background.g), b: intOr(input.background.b) },
+      font_size: finiteOr(input.fontSize),
+      font_weight: intOr(input.fontWeight),
+    },
+  );
+  // `level` is still checked: MoonBit types it `String`, so the literal union is a
+  // TypeScript-side claim either way. The two numbers are no longer parsed from text.
+  if (!isWcagLevel(out.level)) {
+    throw new Error(`markup-core contrast-evaluate unexpected level: ${JSON.stringify(out)}`);
   }
-  return { ratio, requiredAA, level };
+  return { ratio: out.ratio, requiredAA: out.required_aa, level: out.level };
 }
 
 function isWcagLevel(value: string): value is WcagContrastLevel {
   return value === "AAA" || value === "AA" || value === "AA-large" || value === "fail";
 }
 
-function intArg(value: number): string {
-  return String(Number.isFinite(value) ? Math.trunc(value) : 0);
-}
-
-function doubleArg(value: number): string {
-  return String(Number.isFinite(value) ? value : 0);
-}

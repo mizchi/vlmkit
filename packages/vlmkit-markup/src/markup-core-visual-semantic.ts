@@ -1,7 +1,7 @@
 /**
  * Thin TS wrapper over the MoonBit `visual-*` policy commands.
  */
-import { runMarkupCore } from "./markup-core-runtime.ts";
+import { callMarkupCoreJson, intOr, runMarkupCore } from "./markup-core-runtime.ts";
 import type { VisualChangeType } from "@mizchi/vlmkit-core/types.ts";
 
 export interface VisualClassifyInput {
@@ -22,23 +22,23 @@ export interface VisualClassifyResult {
 }
 
 export function classifyRegionPolicy(input: VisualClassifyInput): VisualClassifyResult {
-  const baseline = input.colorSample?.baseline ?? { r: 0, g: 0, b: 0 };
-  const current = input.colorSample?.current ?? { r: 0, g: 0, b: 0 };
-  const out = runMarkupCore([
-    "visual-classify-region",
-    input.regionType === "shift" ? "shift" : "",
-    intArg(input.width),
-    intArg(input.height),
-    intArg(input.diffPixelCount),
-    intArg(input.totalPixels),
-    boolArg(Boolean(input.colorSample)),
-    intArg(baseline.r),
-    intArg(baseline.g),
-    intArg(baseline.b),
-    intArg(current.r),
-    intArg(current.g),
-    intArg(current.b),
-  ]);
+  // `colorSample` is already optional in this interface, and the positional wire
+  // flattened it into `has_color_sample` plus six numbers that meant nothing when the
+  // flag was false. `Rgb?` carries the same thing the TypeScript type always said.
+  const rgb = (c: { r: number; g: number; b: number }) => ({ r: intOr(c.r), g: intOr(c.g), b: intOr(c.b) });
+  const out = callMarkupCoreJson<string>("visual-classify-region", {
+    region_type: input.regionType === "shift" ? "shift" : "",
+    width: intOr(input.width),
+    height: intOr(input.height),
+    diff_pixel_count: intOr(input.diffPixelCount),
+    total_pixels: intOr(input.totalPixels),
+    ...(input.colorSample
+      ? {
+        baseline_color: rgb(input.colorSample.baseline),
+        current_color: rgb(input.colorSample.current),
+      }
+      : {}),
+  });
   const [type, confidence] = out.split("|");
   const parsed = Number(confidence);
   if (!isVisualChangeType(type) || !Number.isFinite(parsed)) {
@@ -48,12 +48,11 @@ export function classifyRegionPolicy(input: VisualClassifyInput): VisualClassify
 }
 
 export function isLikelyPageSurface(color: { r: number; g: number; b: number }): boolean {
-  const out = runMarkupCore([
-    "visual-is-likely-page-surface",
-    intArg(color.r),
-    intArg(color.g),
-    intArg(color.b),
-  ]);
+  const out = callMarkupCoreJson<string>("visual-is-likely-page-surface", {
+    r: intOr(color.r),
+    g: intOr(color.g),
+    b: intOr(color.b),
+  });
   if (out === "true") return true;
   if (out === "false") return false;
   throw new Error(`markup-core visual-is-likely-page-surface unexpected: ${out}`);
@@ -83,10 +82,4 @@ function isVisualChangeType(value: string): value is VisualChangeType {
   );
 }
 
-function intArg(value: number): string {
-  return String(Number.isFinite(value) ? Math.trunc(value) : 0);
-}
 
-function boolArg(value: boolean): string {
-  return value ? "true" : "false";
-}

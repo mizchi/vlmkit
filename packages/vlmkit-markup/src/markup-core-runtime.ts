@@ -31,6 +31,17 @@ const directArgSeparator = "\t";
 const directEmptyArg = "__VLMKIT_EMPTY_ARG__";
 const injectedDirectModuleKey = "__MIZCHI_VLMKIT_MARKUP_CORE_API__";
 let directModule: DirectMarkupCoreModule | undefined;
+/**
+ * Where `directModule` came from, which decides what a MISSING entry point means.
+ *
+ * From `"generated"` (this workspace, read off disk) a missing function can be a stale
+ * `_build`, and building then retrying is the right response. From `"injected"` — the
+ * bundled CLI handing over its statically-imported bridge — it cannot be stale: it is
+ * whatever the bundle contains, there is no MoonBit toolchain to rebuild with, and
+ * `moon build` is precisely what the injection exists to avoid. Conflating the two is
+ * what let a broken JSON boundary ship looking healthy.
+ */
+let directModuleSource: "injected" | "generated" | undefined;
 let directModuleUnavailable = false;
 let runtimeBackend: "direct-js" | "spawn" = "spawn";
 
@@ -202,12 +213,18 @@ export function callMarkupCoreJson<TOut>(command: string, input: unknown): TOut 
  * `Missing field width`. **The one input a validator has to survive is an invalid
  * document.**
  *
+ * Exported because the per-domain wrapper modules (`markup-core-a11y-*`,
+ * `markup-core-landscape.ts`, …) each had their own private copy of the old
+ * `doubleArg` / `intArg`. Those normalised on the way to a string; on the JSON path
+ * the normalisation has to happen before serializing instead, and having six
+ * near-identical private copies is how one of them ends up different.
+ *
  * This is normalisation, not coercion: a missing number becomes the same `0` the
  * old wire sent, so the rule sees what it always saw and reports what it always
  * reported. Nothing is silently reinterpreted — a string `"1280"` becomes `0` and
  * is reported as non-positive, exactly as before.
  */
-function finiteOr(value: unknown, fallback = 0): number {
+export function finiteOr(value: unknown, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
@@ -217,12 +234,12 @@ function optionalFinite(value: unknown): number | undefined {
 }
 
 /** `intArg`'s truncation, kept because MoonBit's `Int` would reject a fraction. */
-function intOr(value: unknown, fallback = 0): number {
+export function intOr(value: unknown, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? Math.trunc(value) : fallback;
 }
 
 /** `boolArg`: anything not a boolean was `false` on the wire. */
-function flag(value: unknown): boolean {
+export function flag(value: unknown): boolean {
   return value === true;
 }
 
@@ -269,6 +286,20 @@ function runMarkupCoreJsonRaw(command: string, payload: string): string {
   };
   const first = direct();
   if (first !== undefined) return first;
+  // An injected API that lacks the JSON entry point is a PACKAGING bug, and the two
+  // fallbacks below are both wrong for it: `moon build` needs a toolchain the injection
+  // exists to avoid, and the spawned CLI needs a `_build` the root package does not ship.
+  // Silently trying them is how this shipped broken — the CLI kept answering positional
+  // commands, so only a JSON command failed, and only outside the workspace. Say what is
+  // actually wrong instead.
+  if (directModuleSource === "injected") {
+    throw new Error(
+      `markup-core JSON command "${command}" is unavailable: the injected markup-core API `
+      + "has no run_markup_core_json. The bundled entrypoint (scripts/vlmkit-bundled.mjs) "
+      + "must hand over the whole generated bridge, and the bridge must be rebuilt after "
+      + "adding a JSON entry point. This is a build/packaging fault, not a bad payload.",
+    );
+  }
   ensureMarkupCoreCli();
   const second = direct();
   if (second !== undefined) return second;
@@ -279,7 +310,7 @@ function runMarkupCoreJsonRaw(command: string, payload: string): string {
 /** Commands the MoonBit side accepts, for a test that the two views agree. */
 export function markupCoreJsonCommands(): string[] {
   const api = loadMarkupCoreApi();
-  if (!api?.markup_core_json_commands) {
+  if (!api?.markup_core_json_commands && directModuleSource !== "injected") {
     ensureMarkupCoreCli();
   }
   const loaded = loadMarkupCoreApi();
@@ -342,6 +373,7 @@ function loadMarkupCoreApi(): DirectMarkupCoreModule | undefined {
   )[injectedDirectModuleKey];
   if (typeof injected?.run_markup_core === "function") {
     directModule = pickDirectApi(injected);
+    directModuleSource = "injected";
     return directModule;
   }
   if (directModuleUnavailable) return undefined;
@@ -349,6 +381,7 @@ function loadMarkupCoreApi(): DirectMarkupCoreModule | undefined {
     const loaded = requireGenerated(apiPath) as Partial<DirectMarkupCoreModule>;
     if (typeof loaded.run_markup_core === "function") {
       directModule = pickDirectApi(loaded);
+      directModuleSource = "generated";
       return directModule;
     }
   } catch {

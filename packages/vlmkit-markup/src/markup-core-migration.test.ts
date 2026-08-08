@@ -333,17 +333,6 @@ function casesFor(command: CommandSpec): { label: string; values: (string | numb
 }
 
 describe("migrated commands match their positional arms", { timeout: 240_000 }, () => {
-  it("covers every command the JSON boundary claims, except the two with no positional twin", async () => {
-    // `interaction-issues` is new logic with no positional arm, and `goal-status`
-    // has its own dedicated differential test. Everything else must be here, or a
-    // migration could land with no comparison at all.
-    const { markupCoreJsonCommands } = await import("./markup-core-runtime.ts");
-    const covered = new Set(COMMANDS.map((c) => c.json));
-    const exempt = new Set(["interaction-issues", "goal-status"]);
-    const uncovered = markupCoreJsonCommands().filter((name) => !covered.has(name) && !exempt.has(name));
-    assert.deepEqual(uncovered, [], `migrated with no differential coverage: ${uncovered.join(", ")}`);
-  });
-
   for (const command of COMMANDS) {
     it(`${command.json} (${casesFor(command).length} cases)`, () => {
       const disagreements: string[] = [];
@@ -384,6 +373,454 @@ describe("migrated commands match their positional arms", { timeout: 240_000 }, 
  * These go through the public wrappers rather than `callMarkupCoreJson`, because the
  * normalisation lives in the wrappers and testing below it would test nothing.
  */
+/**
+ * The eighteen commands whose JSON form is NESTED, and therefore does not fit the flat
+ * `ArgSpec` table above.
+ *
+ * `{foreground: {r,g,b}, background: {r,g,b}}` is the entire point of migrating
+ * `a11y-contrast-evaluate` — six same-typed `Int`s in a row become two named colours —
+ * so a harness that could only describe flat payloads would have had to skip exactly the
+ * commands that most needed checking. Rather than bend `ArgSpec` into a path language,
+ * each command here owns its two encoders and reuses the same case generation. The
+ * `layout-policy` special case above set that precedent.
+ *
+ * `normalize` exists because several of these changed their OUTPUT shape too: the
+ * positional arms returned `"4.53|4.5|AA"`, `"cols|rows"`, `"flow|priority|reason"`, and
+ * the JSON handlers return records. Comparing them means saying, once and explicitly, how
+ * the record maps back to the joined string. That mapping is the migration's claim; if it
+ * is wrong, the test says so.
+ */
+interface NestedCommandSpec {
+  positional: string;
+  json: string;
+  /** Flat, for case generation only — the encoders below place the values. */
+  args: ArgSpec[];
+  toArgv(values: CaseValues): string[];
+  toPayload(values: CaseValues): unknown;
+  /** JSON result → the string the positional arm returns. Identity when unchanged. */
+  normalize(result: unknown): string;
+}
+
+type CaseValues = (string | number | boolean | readonly string[] | undefined)[];
+
+const num = (v: unknown): string => String(Number.isFinite(v as number) ? v : 0);
+const int = (v: unknown): string => String(Number.isFinite(v as number) ? Math.trunc(v as number) : 0);
+const asIs = (result: unknown): string => String(result);
+
+/** Colour channels sweep across the clamp boundaries the rules actually test. */
+const CHANNELS = [0, 128, 255] as const;
+const ch = (field: string): ArgSpec => ({ kind: "int", field, values: CHANNELS });
+
+const NESTED_COMMANDS: NestedCommandSpec[] = [
+  {
+    positional: "a11y-contrast-evaluate",
+    json: "contrast-evaluate",
+    args: [
+      ch("fr"), ch("fg"), ch("fb"), ch("br"), ch("bg"), ch("bb"),
+      { kind: "number", field: "font_size", values: [0, 13, 14, 18, 24] },
+      { kind: "int", field: "font_weight", values: [400, 700] },
+    ],
+    toArgv: (v) => ["a11y-contrast-evaluate", int(v[0]), int(v[1]), int(v[2]), int(v[3]), int(v[4]), int(v[5]), num(v[6]), int(v[7])],
+    toPayload: (v) => ({
+      foreground: { r: v[0], g: v[1], b: v[2] },
+      background: { r: v[3], g: v[4], b: v[5] },
+      font_size: v[6],
+      font_weight: v[7],
+    }),
+    normalize: (r) => {
+      const o = r as { ratio: number; required_aa: number; level: string };
+      // The positional arm formats to 2dp / 1dp before joining; compare on the
+      // formatted form rather than asserting the float round-trips exactly.
+      return `${o.ratio.toFixed(2)}|${o.required_aa.toFixed(1)}|${o.level}`;
+    },
+  },
+  {
+    positional: "a11y-touch-in-cluster",
+    json: "touch-in-cluster",
+    // Not `n(...)`: every NUMBERS value sits inside the cluster radius, so all 17
+    // cases returned "true" and the vacuity assertion caught it. These straddle it.
+    args: [
+      { kind: "number", field: "ax", values: [0, 5, 200] },
+      { kind: "number", field: "ay", values: [0, 5, 200] },
+      { kind: "number", field: "bx", values: [0, 5, 200] },
+      { kind: "number", field: "by", values: [0, 5, 200] },
+    ],
+    toArgv: (v) => ["a11y-touch-in-cluster", num(v[0]), num(v[1]), num(v[2]), num(v[3])],
+    toPayload: (v) => ({ a: { x: v[0], y: v[1] }, b: { x: v[2], y: v[3] } }),
+    normalize: asIs,
+  },
+  {
+    positional: "focus-order-classify",
+    json: "focus-order-classify",
+    args: [b("same_path"), n("prev_x"), n("prev_y"), n("cur_x"), n("cur_y")],
+    toArgv: (v) => ["focus-order-classify", String(v[0]), num(v[1]), num(v[2]), num(v[3]), num(v[4])],
+    toPayload: (v) => ({ same_path: v[0], previous: { x: v[1], y: v[2] }, current: { x: v[3], y: v[4] } }),
+    normalize: asIs,
+  },
+  {
+    positional: "grid-arrays-close",
+    json: "grid-arrays-close",
+    args: [
+      { kind: "list", field: "a", values: [[], ["10"], ["10", "20"], ["10", "20", "30"]] },
+      { kind: "list", field: "b", values: [[], ["10"], ["10", "20.05"], ["10", "99"]] },
+      n("tolerance"),
+    ],
+    // The positional form is CSV, not pipe-joined — a different sub-encoding again.
+    toArgv: (v) => ["grid-arrays-close", (v[0] as string[]).join(","), (v[1] as string[]).join(","), num(v[2])],
+    toPayload: (v) => ({
+      a: (v[0] as string[]).map(Number),
+      b: (v[1] as string[]).map(Number),
+      tolerance: v[2],
+    }),
+    normalize: asIs,
+  },
+  {
+    positional: "grid-gcd",
+    json: "grid-gcd",
+    args: [{ kind: "int", field: "a", values: [0, 1, 24, -36] }, { kind: "int", field: "b", values: [0, 1, 36, -24] }],
+    toArgv: (v) => ["grid-gcd", int(v[0]), int(v[1])],
+    toPayload: (v) => ({ a: v[0], b: v[1] }),
+    normalize: asIs,
+  },
+  {
+    positional: "shift-classify-suspect",
+    json: "shift-classify-suspect",
+    // Base first, and non-degenerate: with 0 first, both deltas sat at 0 in every case
+    // and the rule returned one class throughout.
+    args: [
+      { kind: "number", field: "abs_height_delta", values: [20, 0, 3, 1.5] },
+      { kind: "number", field: "abs_top_delta", values: [3, 0, 20, 1.5] },
+    ],
+    toArgv: (v) => ["shift-classify-suspect", num(v[0]), num(v[1])],
+    toPayload: (v) => ({ abs_height_delta: v[0], abs_top_delta: v[1] }),
+    normalize: asIs,
+  },
+  {
+    positional: "quality-error-state-kind",
+    json: "quality-error-state-kind",
+    args: [
+      { kind: "number", field: "red_ratio", values: [0, 0.005, 0.05, 0.5] },
+      { kind: "number", field: "yellow_ratio", values: [0, 0.005, 0.05, 0.5] },
+    ],
+    toArgv: (v) => ["quality-error-state-kind", num(v[0]), num(v[1])],
+    toPayload: (v) => ({ red_ratio: v[0], yellow_ratio: v[1] }),
+    normalize: asIs,
+  },
+  {
+    positional: "quality-coverage-passed",
+    json: "quality-coverage-passed",
+    args: [
+      { kind: "int", field: "covered", values: [0, 7, 8, 10] },
+      { kind: "int", field: "total", values: [0, 10] },
+    ],
+    toArgv: (v) => ["quality-coverage-passed", int(v[0]), int(v[1])],
+    toPayload: (v) => ({ covered: v[0], total: v[1] }),
+    normalize: asIs,
+  },
+  {
+    positional: "landscape-cell-score",
+    json: "landscape-cell-score",
+    args: [n("r1"), n("g1"), n("b1"), n("l1"), n("i1"), n("r2"), n("g2"), n("b2"), n("l2"), n("i2")],
+    toArgv: (v) => ["landscape-cell-score", ...v.map(num)],
+    toPayload: (v) => ({
+      baseline: { r: v[0], g: v[1], b: v[2], l: v[3], ink: v[4] },
+      current: { r: v[5], g: v[6], b: v[7], l: v[8], ink: v[9] },
+    }),
+    normalize: asIs,
+  },
+  {
+    positional: "landscape-cell-hex",
+    json: "landscape-cell-hex",
+    args: [
+      { kind: "number", field: "r", values: [-5, 0, 128, 255, 300] },
+      { kind: "number", field: "g", values: [-5, 0, 128, 255, 300] },
+      { kind: "number", field: "b", values: [-5, 0, 128, 255, 300] },
+    ],
+    toArgv: (v) => ["landscape-cell-hex", num(v[0]), num(v[1]), num(v[2])],
+    toPayload: (v) => ({ r: v[0], g: v[1], b: v[2] }),
+    normalize: asIs,
+  },
+  {
+    positional: "landscape-default-grid",
+    json: "landscape-default-grid",
+    args: [
+      // Non-zero FIRST. The rule returns 0|0 unless both dimensions are positive, and
+      // single-argument variation holds the other at the base — so a 0 base made every
+      // case return 0|0 and tested nothing.
+      { kind: "int", field: "width", values: [1280, 0, 720] },
+      { kind: "int", field: "height", values: [720, 0, 1280] },
+    ],
+    toArgv: (v) => ["landscape-default-grid", int(v[0]), int(v[1])],
+    toPayload: (v) => ({ width: v[0], height: v[1] }),
+    normalize: (r) => {
+      const o = r as { cols: number; rows: number };
+      return `${o.cols}|${o.rows}`;
+    },
+  },
+  {
+    positional: "visual-classify-region",
+    json: "visual-classify-region",
+    args: [
+      disc("region_type", ["text", "block", "unknown"]),
+      { kind: "int", field: "width", values: [0, 20, 100] },
+      { kind: "int", field: "height", values: [0, 20, 100] },
+      { kind: "int", field: "diff_pixel_count", values: [0, 50, 2000] },
+      { kind: "int", field: "total_pixels", values: [0, 2000] },
+      { kind: "bool", field: "has_color_sample", values: BOOLS },
+      ch("baseline_r"), ch("baseline_g"), ch("baseline_b"),
+      ch("current_r"), ch("current_g"), ch("current_b"),
+    ],
+    toArgv: (v) => ["visual-classify-region", String(v[0]), int(v[1]), int(v[2]), int(v[3]), int(v[4]),
+      String(v[5]), int(v[6]), int(v[7]), int(v[8]), int(v[9]), int(v[10]), int(v[11])],
+    toPayload: (v) => ({
+      region_type: v[0],
+      width: v[1],
+      height: v[2],
+      diff_pixel_count: v[3],
+      total_pixels: v[4],
+      // `has_color_sample` becomes the presence of the two colours — the reconstruction
+      // this migration introduced, so the sweep must cross it with both values.
+      ...(v[5]
+        ? {
+          baseline_color: { r: v[6], g: v[7], b: v[8] },
+          current_color: { r: v[9], g: v[10], b: v[11] },
+        }
+        : {}),
+    }),
+    normalize: asIs,
+  },
+  {
+    positional: "visual-is-likely-page-surface",
+    json: "visual-is-likely-page-surface",
+    args: [ch("r"), ch("g"), ch("b")],
+    toArgv: (v) => ["visual-is-likely-page-surface", int(v[0]), int(v[1]), int(v[2])],
+    toPayload: (v) => ({ r: v[0], g: v[1], b: v[2] }),
+    normalize: asIs,
+  },
+  {
+    positional: "region-classify-kind",
+    json: "region-classify-kind",
+    args: [
+      { kind: "int", field: "area", values: [0, 200, 5000] },
+      { kind: "number", field: "aspect", values: [0.2, 1, 4.5] },
+      { kind: "number", field: "luma_std", values: [0, 20, 60] },
+      { kind: "int", field: "color_count", values: [0, 2, 12] },
+      { kind: "int", field: "stripe_rows", values: [0, 3] },
+    ],
+    toArgv: (v) => ["region-classify-kind", int(v[0]), num(v[1]), num(v[2]), int(v[3]), int(v[4])],
+    toPayload: (v) => ({ area: v[0], aspect: v[1], luma_std: v[2], color_count: v[3], stripe_rows: v[4] }),
+    normalize: asIs,
+  },
+  {
+    positional: "semantic-drilldown-select-index",
+    json: "semantic-drilldown-select-index",
+    // Three index-correlated parallel arrays became one array of records. The values
+    // below keep them the same length, because a length mismatch is the bug the record
+    // form makes unrepresentable rather than a behaviour to compare.
+    args: [
+      // Populated FIRST: with `[]` at base, every single-argument variation had at least
+      // one empty array, `Math.min` truncated the candidate list to zero, and the rule
+      // never chose anything.
+      { kind: "list", field: "flows", values: [["layout", "decoration"], [], ["layout"], ["decoration", "layout"]] },
+      { kind: "list", field: "priority_scores", values: [["0.2", "0.9"], [], ["0.2"], ["0.9", "0.2"]] },
+      { kind: "list", field: "orders", values: [["1", "0"], [], ["0"], ["0", "1"]] },
+    ],
+    toArgv: (v) => ["semantic-drilldown-select-index",
+      (v[0] as string[]).join("|"), (v[1] as string[]).join("|"), (v[2] as string[]).join("|")],
+    toPayload: (v) => {
+      const flows = v[0] as string[];
+      const scores = v[1] as string[];
+      const orders = v[2] as string[];
+      const length = Math.min(flows.length, scores.length, orders.length);
+      return {
+        candidates: Array.from({ length }, (_, i) => ({
+          flow: flows[i],
+          priority_score: Number(scores[i]),
+          order: Number(orders[i]),
+        })),
+      };
+    },
+    normalize: asIs,
+  },
+  {
+    positional: "semantic-drilldown-policy",
+    json: "semantic-drilldown-policy",
+    args: [
+      { kind: "number", field: "layout_score", values: [0, 0.3, 0.8] },
+      { kind: "number", field: "decoration_score", values: [0, 0.2, 0.9] },
+      { kind: "int", field: "heatmap_kind_count", values: [0, 1, 3] },
+    ],
+    toArgv: (v) => ["semantic-drilldown-policy", num(v[0]), num(v[1]), int(v[2])],
+    toPayload: (v) => ({ layout_score: v[0], decoration_score: v[1], heatmap_kind_count: v[2] }),
+    normalize: (r) => {
+      const o = r as { flow: string; priority_score: number; reason_id: string };
+      return `${o.flow}|${o.priority_score}|${o.reason_id}`;
+    },
+  },
+  {
+    positional: "merge-component-probe-states",
+    json: "merge-component-probe-states",
+    args: [
+      { kind: "list", field: "explicit", values: [[], ["hover"], ["hover", "focus"]] },
+      { kind: "list", field: "injected", values: [[], ["hover"], ["scrolled", "hover"]] },
+    ],
+    toArgv: (v) => ["merge-component-probe-states", (v[0] as string[]).join("|"), (v[1] as string[]).join("|")],
+    toPayload: (v) => ({ explicit: v[0], injected: v[1] }),
+    normalize: (r) => (r as string[]).join("|"),
+  },
+];
+
+describe("nested-payload commands match their positional arms", { timeout: 300_000 }, () => {
+  it("covers every nested command the JSON boundary claims", async () => {
+    const { markupCoreJsonCommands } = await import("./markup-core-runtime.ts");
+    const covered = new Set([
+      ...COMMANDS.map((c) => c.json),
+      ...NESTED_COMMANDS.map((c) => c.json),
+    ]);
+    // `landscape-diff-summary` has its own test: its positional twin takes a
+    // sub-encoded stat blob and returns a "mismatch|..." sentinel instead of raising,
+    // so the two are not comparable case-for-case. See below.
+    const exempt = new Set(["interaction-issues", "goal-status", "landscape-diff-summary"]);
+    const uncovered = markupCoreJsonCommands().filter((name) => !covered.has(name) && !exempt.has(name));
+    assert.deepEqual(uncovered, [], `migrated with no differential coverage: ${uncovered.join(", ")}`);
+  });
+
+  for (const command of NESTED_COMMANDS) {
+    const cases = casesFor(command as unknown as CommandSpec);
+    it(`${command.json} (${cases.length} cases)`, () => {
+      const disagreements: string[] = [];
+      const results = new Set<string>();
+      for (const { label, values } of cases) {
+        const reference = runMarkupCore(command.toArgv(values));
+        const migrated = callMarkupCoreJson<unknown>(command.json, command.toPayload(values));
+        const normalized = command.normalize(migrated);
+        if (reference !== normalized) {
+          disagreements.push(`${label}: positional=${JSON.stringify(reference)} json=${JSON.stringify(normalized)}`);
+        }
+        results.add(normalized);
+      }
+      assert.deepEqual(disagreements, []);
+      assert.ok(results.size >= 2, `${command.json}: every case returned ${[...results][0]}`);
+    });
+  }
+});
+
+/**
+ * `landscape-diff-summary`, which needs its own comparison for two reasons.
+ *
+ * **Its input carried a second positional encoding.** `baseline_stats` was one string
+ * holding `"r,g,b,l,ink|r,g,b,l,ink|…"` — five positional fields per cell, comma
+ * delimited, inside a pipe-delimited list, inside a tab-delimited argument list, parsed
+ * by an `idx == 0 / 1 / 2 / 3 / 4` chain. So the generic table's `toArgv` / `toPayload`
+ * pair is not a re-ordering here, it is a whole encoder, and the cases have to be built
+ * from cell records rather than from scalar sweeps.
+ *
+ * **Its error path changed deliberately.** The positional arm returns
+ * `"mismatch|<total>|<base>|<curr>"` — a success-shaped string a caller must sniff — with
+ * a comment saying it does so "rather than raising, so the FFI surface stays string-only".
+ * The JSON handler raises. That is the one intended behaviour difference in this batch, so
+ * it is asserted rather than swept: agreement on well-formed input, and a raise where the
+ * old form returned a sentinel.
+ */
+describe("landscape-diff-summary matches its positional arm", { timeout: 120_000 }, () => {
+  interface Cell { r: number; g: number; b: number; l: number; ink: number }
+
+  const encodeStats = (cells: Cell[]): string =>
+    cells.map((c) => [c.r, c.g, c.b, c.l, c.ink].join(",")).join("|");
+
+  /** Deterministic cells; `seed` shifts them so baseline and current differ per case. */
+  const cellsFor = (count: number, seed: number): Cell[] =>
+    Array.from({ length: count }, (_, i) => ({
+      r: (i * 37 + seed * 11) % 256,
+      g: (i * 53 + seed * 29) % 256,
+      b: (i * 71 + seed * 17) % 256,
+      l: (i * 43 + seed * 23) % 256,
+      ink: ((i * 13 + seed * 7) % 100) / 100,
+    }));
+
+  const GRIDS = [
+    { cols: 1, rows: 1 },
+    { cols: 2, rows: 1 },
+    { cols: 4, rows: 4 },
+    { cols: 3, rows: 5 },
+  ];
+  const THRESHOLDS = [0, 0.05, 0.5, 1];
+  const TOP_NS = [0, 1, 3, 100];
+
+  it("agrees on mean, similarity, changed, total and the top-cell list", () => {
+    const disagreements: string[] = [];
+    let compared = 0;
+    for (const { cols, rows } of GRIDS) {
+      for (const threshold of THRESHOLDS) {
+        for (const topN of TOP_NS) {
+          const total = cols * rows;
+          const baseline = cellsFor(total, 1);
+          const current = cellsFor(total, 5);
+          const reference = runMarkupCore([
+            "landscape-diff-summary",
+            String(cols), String(rows), String(threshold), String(topN),
+            encodeStats(baseline), encodeStats(current),
+          ], { cache: false });
+          const migrated = callMarkupCoreJson<{
+            mean: number; similarity: number; changed: number; total: number;
+            top: { index: number; score: number }[];
+          }>("landscape-diff-summary", {
+            cols, rows, changed_threshold: threshold, top_n: topN, baseline, current,
+          });
+          // Rebuild the joined form the positional arm returns. Stated here rather than
+          // hidden in a helper, because this mapping IS the migration's output claim.
+          const normalized = [
+            String(migrated.mean),
+            String(migrated.similarity),
+            String(migrated.changed),
+            String(migrated.total),
+            ...migrated.top.map((cell) => `${cell.index}:${cell.score}`),
+          ].join("|");
+          compared++;
+          if (reference !== normalized) {
+            disagreements.push(
+              `${cols}x${rows} threshold=${threshold} top=${topN}: positional=${reference} json=${normalized}`,
+            );
+          }
+        }
+      }
+    }
+    assert.deepEqual(disagreements, []);
+    assert.equal(compared, GRIDS.length * THRESHOLDS.length * TOP_NS.length);
+  });
+
+  it("raises on a cell-count mismatch where the positional arm returned a sentinel", () => {
+    const short = cellsFor(3, 1);
+    const reference = runMarkupCore([
+      "landscape-diff-summary", "2", "2", "0.1", "2",
+      encodeStats(short), encodeStats(cellsFor(4, 2)),
+    ], { cache: false });
+    // The old contract: an error delivered as data, in the same shape as a result.
+    assert.match(reference, /^mismatch\|4\|3\|4$/);
+
+    assert.throws(
+      () => callMarkupCoreJson("landscape-diff-summary", {
+        cols: 2, rows: 2, changed_threshold: 0.1, top_n: 2,
+        baseline: short, current: cellsFor(4, 2),
+      }),
+      /cell count mismatch: expected 4 \(2x2\), baseline has 3, current has 4/,
+      "the raise must name the counts — the sentinel's only virtue was carrying them",
+    );
+  });
+
+  it("returns the empty-grid result for a zero-cell grid, as the positional arm does", () => {
+    const reference = runMarkupCore([
+      "landscape-diff-summary", "0", "0", "0.1", "2", "", "",
+    ], { cache: false });
+    assert.equal(reference, "1|0|0|0");
+    const migrated = callMarkupCoreJson<{ mean: number; similarity: number; changed: number; total: number }>(
+      "landscape-diff-summary",
+      { cols: 0, rows: 0, changed_threshold: 0.1, top_n: 2, baseline: [], current: [] },
+    );
+    assert.deepEqual(migrated, { mean: 1, similarity: 0, changed: 0, total: 0, top: [] });
+  });
+});
+
 describe("migrated wrappers survive malformed input", { timeout: 240_000 }, () => {
   const viewport = (width: unknown) =>
     computeUiContractViewportIssueIds({

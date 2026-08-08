@@ -1,7 +1,9 @@
 # The TypeScript ↔ MoonBit boundary
 
-Status: **JSON boundary landed alongside the positional one, and the commands that
-carried real risk are migrated.** All 61 positional arms still exist and still work.
+Status: **JSON boundary landed alongside the positional one, and every command that
+carried swap risk is migrated — 32 of 61.** All 61 positional arms still exist and still
+work; the 29 that remain the only caller of are single-argument or all-distinct-type, so
+a struct would buy them nothing.
 
 ## Which commands were migrated, and why not all of them
 
@@ -19,10 +21,11 @@ The 29 gain nothing from a struct: `is-component-probe-state(value)` takes one
 `src/markup-core-dispatch.test.ts` covers the duplication concern that applies to
 them.
 
-Of the 32, **14 are migrated** — `goal-status` (36 arguments), the 12
-`ui-contract-*-issue-ids` with swappable positions, and `layout-policy-issue-ids`.
-`interaction-issues` is new logic with no positional twin. The remaining 18 are
-listed under "Not done".
+**All 32 are migrated** — `goal-status` (36 arguments), the 12
+`ui-contract-*-issue-ids` with swappable positions, `layout-policy-issue-ids`, and the
+final 18 (landscape, visual/semantic, a11y, grid, shift and quality policies).
+`interaction-issues` is new logic with no positional twin. What each of the last 18
+bought beyond a rename is under "Not done".
 
 **Deleting the positional dispatch entirely is a separate goal** and would require
 all 61, including the 29 with nothing to gain. Worth doing for the 1,487 lines and
@@ -134,13 +137,61 @@ markup-core direct call failed: Double::from_json: expected number (at /width_va
 markup-core direct call failed: unknown markup-core JSON command: nope
 ```
 
-Related: `loadMarkupCoreApi` rebuilt a narrow object holding only
-`run_markup_core`, silently dropping every other export — so the JSON entry
-points were invisible and every JSON call fell through to spawning a node
-process while appearing to work. A boundary built to make MoonBit cheap to call
-had become the expensive path. `markup-core-json.test.ts` asserts
-`getMarkupCoreRuntimeBackend() === "direct-js"`, which is what would have caught
-it.
+### The same bug, twice, in two places
+
+**First:** `loadMarkupCoreApi` rebuilt a narrow object holding only `run_markup_core`,
+silently dropping every other export — so the JSON entry points were invisible and every
+JSON call fell through to spawning a node process while appearing to work. A boundary
+built to make MoonBit cheap to call had become the expensive path.
+`markup-core-json.test.ts` asserts `getMarkupCoreRuntimeBackend() === "direct-js"`,
+which is what would have caught it.
+
+**Then again, in the shipped CLI.** `scripts/vlmkit-bundled.mjs` injects the generated
+bridge through a global so npm consumers need no MoonBit toolchain — and it listed
+`run_markup_core` by hand, from before the JSON boundary existed. Adding the boundary did
+not update it. In `dist/`, `loadMarkupCoreApi` found the global, `run_markup_core_json`
+read as `undefined`, and every JSON command fell through to `ensureMarkupCoreCli()`,
+which shells out to `moon build` — the one thing an npm consumer is guaranteed not to
+have. **Positional commands kept working, so the CLI looked healthy.**
+
+It survived because nothing tests that layout. The suite runs from source, where the
+runtime resolves the bridge through `apiPath` and never reads the global at all; the
+`direct-js` assertion above is true from source for the same reason; and type checking
+cannot help, because the global is assigned in a `.mjs` file to a
+`Partial<DirectMarkupCoreModule>`, where absent is legal.
+
+Both instances are one mistake: **a hand-written list of entry points that has to agree
+with an interface, with nothing checking it.** The lesson generalises past this file — it
+is the same shape as the two duplicated positional dispatch tables, and the same shape as
+the `build page` defect, where source and bundle disagreed and only the bundle was wrong.
+
+### How it is connected now
+
+Three changes, because a test alone would have left the list in place:
+
+1. **No list.** `scripts/vlmkit-bundled.mjs` hands over a **namespace import** of the
+   bridge, so every export crosses by construction. Adding an entry point in
+   `markup-core-api/main.mbt` connects it without anyone remembering to. `pickDirectApi`
+   selects what it understands and ignores the rest.
+2. **No silent degradation.** The runtime records whether the direct API was `injected`
+   or read off disk as `generated`. A missing function from `generated` can be a stale
+   `_build`, so build-and-retry stays right. From `injected` it cannot be stale — there is
+   no toolchain to rebuild with and the root package ships no `_build` for the spawned CLI
+   either — so it **raises**, naming the packaging fault. Both old fallbacks were
+   guaranteed to fail there; trying them quietly is what turned a build fault into a
+   mystery.
+3. **A smoke in the consumer's environment.** `pnpm smoke:bundled-json` runs the built CLI
+   with `moon` removed from PATH and requires a JSON-boundary gate to succeed, so no
+   fallback can pretend to work. It first asserts `moon` is genuinely unreachable, because
+   otherwise the check passes vacuously. In `package-install-smoke`.
+
+Every safety net that existed was in a different room, which is the part worth keeping:
+`pnpm test` runs from source (the runtime finds the bridge through `apiPath` and never
+reads the global); `smoke:pack:workspaces` installs the **library** packages, and
+`@mizchi/vlmkit-markup` *does* ship `_build/.../markup-core-api.js`; and the type checker
+sees a `Partial<DirectMarkupCoreModule>` in a `.mjs` file, where absent is legal. Only the
+root package — `dist/**` and nothing else — depended on the hand-off, and nothing ran the
+root package the way a consumer does.
 
 ## What belongs in MoonBit — and what does not
 
@@ -239,15 +290,36 @@ Three habits that keep such a handler honest:
   a wiring bug, which is the entire property the differential test rests on. It
   delegates now, like every other handler.
 
-- **18 risky commands remain**: `visual-classify-region` (12 args, 10 swappable),
-  `landscape-cell-score` (10/10), `a11y-contrast-evaluate` (8/6),
-  `landscape-diff-summary`, `region-classify-kind`, `focus-order-classify`,
-  `a11y-touch-in-cluster`, `visual-is-likely-page-surface`,
-  `semantic-drilldown-select-index`, `landscape-cell-hex`, `semantic-drilldown-policy`,
-  `grid-arrays-close`, `shift-classify-suspect`, `quality-error-state-kind`,
-  `quality-coverage-passed`, `merge-component-probe-states`, `landscape-default-grid`,
-  `grid-gcd`. Each is mechanical now that the harness exists: add a struct, an arm,
-  a spec row in `markup-core-migration.test.ts`.
+- **All 32 risky commands are migrated.** The last 18 went over together, because by
+  then the harness made each one a struct, a dispatch arm and a spec row. Three of them
+  were worth more than their argument count suggested:
+
+  - **`landscape-diff-summary` carried a second positional encoding inside a positional
+    argument.** `baseline_stats` was a `String` holding `"r,g,b,l,ink|r,g,b,l,ink|…"`:
+    five positional fields per cell, comma-delimited, inside a pipe-delimited list,
+    inside a tab-delimited argument list, parsed by a hand-written
+    `idx == 0 / 1 / 2 / 3 / 4` chain. No value at any level could contain a comma or a
+    pipe and nothing enforced it. It also returned `"mismatch|<total>|<base>|<curr>"` on
+    a cell-count error — an error in the same shape as a result, with a comment saying it
+    did that "rather than raising, so the FFI surface stays string-only". It raises now.
+    On the TypeScript side `parseSummary` was 36 lines and six throw sites; none of it
+    survives.
+
+  - **`semantic-drilldown-select-index` took three index-correlated parallel arrays** —
+    `flows`, `priority_scores`, `orders` — with nothing tying them together. Filter one
+    and not the others and you get a well-typed call that scores the wrong candidate. One
+    `Array[DrilldownCandidate]` makes that unrepresentable, the same reason
+    `interaction-issues` went over as an array of records.
+
+  - **`landscape-cell-score` and `a11y-contrast-evaluate` were the swap-risk worst
+    cases** (10 of 10 and 6 of 8 positions mutually swappable) and both were *pairs of
+    samples*: two 5-field cells, two RGB triples. Nesting removes the class outright
+    rather than renaming it.
+
+  Four commands also stopped returning composites as strings. `"cols|rows"`,
+  `"ratio|required|level"`, `"flow|priority|reason_id"` and the diff summary each had a
+  TypeScript reader that split, coerced and hand-validated against a literal union.
+  `derive(ToJson)` over a record deletes both halves of that.
 
 - **The 29 zero-risk commands are deliberately not migrated.** See above.
 

@@ -167,6 +167,78 @@ pub fn run_json(command : String, payload : String) -> String raise {
       let input : PatternEvidenceIssuesInput = @json.from_json(json)
       pattern_evidence_issue_ids(input).to_json().stringify()
     }
+    "contrast-evaluate" => {
+      let input : ContrastEvaluateInput = @json.from_json(json)
+      contrast_evaluate(input).to_json().stringify()
+    }
+    "touch-in-cluster" => {
+      let input : TouchClusterInput = @json.from_json(json)
+      touch_in_cluster(input).to_json().stringify()
+    }
+    "focus-order-classify" => {
+      let input : FocusOrderInput = @json.from_json(json)
+      focus_order_classification(input).to_json().stringify()
+    }
+    "grid-arrays-close" => {
+      let input : GridArraysCloseInput = @json.from_json(json)
+      grid_arrays_close_json(input).to_json().stringify()
+    }
+    "grid-gcd" => {
+      let input : GridGcdInput = @json.from_json(json)
+      grid_gcd_json(input).to_json().stringify()
+    }
+    "shift-classify-suspect" => {
+      let input : ShiftSuspectInput = @json.from_json(json)
+      shift_suspect(input).to_json().stringify()
+    }
+    "quality-error-state-kind" => {
+      let input : ErrorStateInput = @json.from_json(json)
+      error_state_kind(input).to_json().stringify()
+    }
+    "quality-coverage-passed" => {
+      let input : CoverageInput = @json.from_json(json)
+      coverage_passed(input).to_json().stringify()
+    }
+    "landscape-cell-score" => {
+      let input : LandscapeCellScoreInput = @json.from_json(json)
+      landscape_cell_score_json(input).to_json().stringify()
+    }
+    "landscape-cell-hex" => {
+      let input : LandscapeCellHexInput = @json.from_json(json)
+      landscape_cell_hex_json(input).to_json().stringify()
+    }
+    "landscape-default-grid" => {
+      let input : LandscapeGridInput = @json.from_json(json)
+      landscape_default_grid_json(input).to_json().stringify()
+    }
+    "landscape-diff-summary" => {
+      let input : LandscapeDiffInput = @json.from_json(json)
+      landscape_diff(input).to_json().stringify()
+    }
+    "visual-classify-region" => {
+      let input : ClassifyRegionInput = @json.from_json(json)
+      classify_region(input).to_json().stringify()
+    }
+    "visual-is-likely-page-surface" => {
+      let input : Rgb = @json.from_json(json)
+      is_likely_page_surface(input).to_json().stringify()
+    }
+    "region-classify-kind" => {
+      let input : RegionKindInput = @json.from_json(json)
+      region_kind(input).to_json().stringify()
+    }
+    "semantic-drilldown-select-index" => {
+      let input : DrilldownSelectInput = @json.from_json(json)
+      drilldown_select_index(input).to_json().stringify()
+    }
+    "semantic-drilldown-policy" => {
+      let input : DrilldownPolicyInput = @json.from_json(json)
+      drilldown_policy(input).to_json().stringify()
+    }
+    "merge-component-probe-states" => {
+      let input : MergeProbeStatesInput = @json.from_json(json)
+      merge_probe_states(input).to_json().stringify()
+    }
     _ => raise Failure("unknown markup-core JSON command: \{command}")
   }
 }
@@ -191,5 +263,23 @@ pub fn json_commands() -> Array[String] {
     "composition-motion-issue-ids",
     "decoration-palette-issue-ids",
     "pattern-evidence-issue-ids",
+    "contrast-evaluate",
+    "touch-in-cluster",
+    "focus-order-classify",
+    "grid-arrays-close",
+    "grid-gcd",
+    "shift-classify-suspect",
+    "quality-error-state-kind",
+    "quality-coverage-passed",
+    "landscape-cell-score",
+    "landscape-cell-hex",
+    "landscape-default-grid",
+    "landscape-diff-summary",
+    "visual-classify-region",
+    "visual-is-likely-page-surface",
+    "region-classify-kind",
+    "semantic-drilldown-select-index",
+    "semantic-drilldown-policy",
+    "merge-component-probe-states",
   ]
 }
