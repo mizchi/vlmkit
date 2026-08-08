@@ -70,12 +70,14 @@ export async function compareScreenshots(
     threshold?: number;
     outputDir?: string;
     skipHeatmap?: boolean;
+    /** Override the adaptive grid. See `adaptiveRegionCellSize`. */
+    regionCellSize?: number;
   } = {}
 ): Promise<VrtDiff | null> {
   if (!snapshot.baselinePath) return null;
 
   const r = await runPixelDiff(snapshot.baselinePath, snapshot.screenshotPath, snapshot.testId, opts);
-  const regions = detectDiffRegions(r.diffOutput, r.width, r.height);
+  const regions = detectDiffRegions(r.diffOutput, r.width, r.height, opts.regionCellSize);
   attachRegionColorSamples(regions, r.resizedBaseline, r.resizedCurrent);
   attachRegionShiftEstimates(regions, r.resizedBaseline, r.resizedCurrent);
 
@@ -90,6 +92,33 @@ export async function compareScreenshots(
 }
 
 /**
+ * Cell size for region detection, scaled to the image.
+ *
+ * A fixed 32px grid is right for a page screenshot and wrong for a game frame, and the
+ * failure is not cosmetic — it changes which element gets blamed. Measured on a 640x360
+ * HUD whose only change was an HP bar's fill (`(106,16) 90x20`, vlmkit#117): the reported
+ * region was `(96,0) 128x64`, larger than the `200x20` element that caused it, and
+ * attribution then scored the full-frame ancestor at 0.391 against the real cause at
+ * 0.385. The ancestor won by 0.006.
+ *
+ * That near-tie is a *symptom*, not a second bug. `regionCoverage` is the dominant term
+ * (weight 0.7), and a region coarser than the element hands the ancestor a free 1.0 while
+ * starving the leaf. At a 16px grid the same case scores 0.590 for the leaf against 0.388
+ * for the ancestor — no change to the scoring function required.
+ *
+ * So: keep 32 wherever it has been working, and refine only the small frames where it
+ * cannot be right. Bucketed rather than continuous (`min/40` or similar) because a
+ * continuous function would shift region geometry on nearly every existing image, and
+ * region bboxes appear in baselines, approvals and reports.
+ */
+export function adaptiveRegionCellSize(width: number, height: number): number {
+  const shortSide = Math.min(width, height);
+  if (shortSide >= 720) return 32;
+  if (shortSide >= 480) return 16;
+  return 8;
+}
+
+/**
  * Grid-based diff region detection.
  * Splits image into cells and clusters cells exceeding the diff threshold.
  */
@@ -97,7 +126,7 @@ function detectDiffRegions(
   diffData: Uint8Array,
   width: number,
   height: number,
-  cellSize: number = 32
+  cellSize: number = adaptiveRegionCellSize(width, height)
 ): DiffRegion[] {
   const cols = Math.ceil(width / cellSize);
   const rows = Math.ceil(height / cellSize);
@@ -569,12 +598,14 @@ export async function generateDiffReport(
     outputDir?: string;
     skipHeatmap?: boolean;
     detectShift?: boolean;
+    /** Override the adaptive grid. See `adaptiveRegionCellSize`. */
+    regionCellSize?: number;
   } = {},
 ): Promise<DiffReport | null> {
   if (!snapshot.baselinePath) return null;
 
   const r = await runPixelDiff(snapshot.baselinePath, snapshot.screenshotPath, snapshot.testId, opts);
-  const regions = detectDiffRegions(r.diffOutput, r.width, r.height);
+  const regions = detectDiffRegions(r.diffOutput, r.width, r.height, opts.regionCellSize);
 
   // Shift detection
   let globalShift = 0;

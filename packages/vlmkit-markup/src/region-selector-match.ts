@@ -54,14 +54,53 @@ export interface RegionElementsViewport {
   height: number;
 }
 
+/**
+ * How close two scores must be before box size decides between them.
+ *
+ * The weights above (0.7 / 0.3) and the 0.55 ancestor penalty are heuristics tuned to one
+ * decimal place, so a gap of a few thousandths is not signal — but the exact-equality
+ * tie-break in `compareSelectorMatches` only fires at 0. On the vlmkit#117 HUD the
+ * full-frame ancestor scored 0.391 against the real cause at 0.385 and won by 0.006.
+ *
+ * When the scores are that close, the smaller box is the more useful answer: an ancestor
+ * that merely *contains* the diff region repeats what the region already said, while a
+ * leaf that overlaps most of it names something to go and change.
+ */
+const SCORE_TIE_MARGIN = 0.02;
+
+/**
+ * How much smaller a box must be for the near-tie rule to prefer it.
+ *
+ * Deliberately not "any smaller": among same-scale siblings a few thousandths of score
+ * really is the only thing distinguishing them, and reordering those would be arbitrary
+ * churn. This targets the ancestor-versus-leaf case the rule exists for.
+ */
+const TIE_AREA_RATIO = 0.5;
+
 export function matchRegionBboxToElement(
   region: RectBox,
   elements: RegionElementRect[],
 ): RegionSelectorMatch | null {
-  const regionArea = areaOfBbox(region);
-  if (regionArea <= 0) return null;
+  return matchRegionBboxToElements(region, elements, 1)[0] ?? null;
+}
 
-  let best: (RegionSelectorMatch & { sortTop: number; sortLeft: number }) | null = null;
+/**
+ * Ranked attribution candidates, best first.
+ *
+ * `matchRegionBboxToElement` returns only the winner, and when the winner is wrong the
+ * evidence for every alternative is gone — the report says `.hud-root` and the reader has
+ * no way to see that `.hp-bar` was 0.006 behind. Returning the runners-up costs nothing
+ * (they are already computed) and turns a wrong answer into a short list.
+ */
+export function matchRegionBboxToElements(
+  region: RectBox,
+  elements: RegionElementRect[],
+  limit = 3,
+): RegionSelectorMatch[] {
+  const regionArea = areaOfBbox(region);
+  if (regionArea <= 0 || limit <= 0) return [];
+
+  const ranked: (RegionSelectorMatch & { sortTop: number; sortLeft: number })[] = [];
   for (const element of elements) {
     const selector = selectorForElement(element);
     if (!selector || element.width <= 0 || element.height <= 0) continue;
@@ -104,25 +143,33 @@ export function matchRegionBboxToElement(
       sortTop: element.top,
       sortLeft: element.left,
     };
-    if (!best || compareSelectorMatches(match, best) < 0) {
-      best = match;
-    }
+    ranked.push(match);
   }
-  if (!best || best.evidence.regionCoverage < 0.15) return null;
-  const { sortTop: _sortTop, sortLeft: _sortLeft, ...out } = best;
-  return out;
+  ranked.sort(compareSelectorMatches);
+  return ranked
+    // Same floor as before: a candidate covering under 15% of the region is not an
+    // explanation for it, and was never returned.
+    .filter((match) => match.evidence.regionCoverage >= 0.15)
+    .slice(0, limit)
+    .map(({ sortTop: _sortTop, sortLeft: _sortLeft, ...out }) => out);
 }
 
 function compareSelectorMatches(
   left: RegionSelectorMatch & { sortTop: number; sortLeft: number },
   right: RegionSelectorMatch & { sortTop: number; sortLeft: number },
 ): number {
+  const leftArea = areaOfBbox(left.evidence.bbox);
+  const rightArea = areaOfBbox(right.evidence.bbox);
+  // Near-tie: prefer the substantially smaller box. Before the exact-score comparison,
+  // because the whole point is that these scores are not meaningfully different.
+  if (Math.abs(left.evidence.score - right.evidence.score) <= SCORE_TIE_MARGIN) {
+    if (leftArea <= rightArea * TIE_AREA_RATIO) return -1;
+    if (rightArea <= leftArea * TIE_AREA_RATIO) return 1;
+  }
   if (left.evidence.score !== right.evidence.score) return right.evidence.score - left.evidence.score;
   if (left.evidence.regionCoverage !== right.evidence.regionCoverage) {
     return right.evidence.regionCoverage - left.evidence.regionCoverage;
   }
-  const leftArea = areaOfBbox(left.evidence.bbox);
-  const rightArea = areaOfBbox(right.evidence.bbox);
   if (leftArea !== rightArea) return leftArea - rightArea;
   if (left.sortTop !== right.sortTop) return left.sortTop - right.sortTop;
   if (left.sortLeft !== right.sortLeft) return left.sortLeft - right.sortLeft;

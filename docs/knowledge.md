@@ -986,3 +986,43 @@ satisfied 化(許可行は provenance 付き列挙 + 台帳計上 — 監査可�
 skip link は実装手法によりクラスが割れる(MDN=unreachable、W3C=
 zero-size、web.dev=transparent、Wikipedia=visually-hidden)— そもそも
 manifest に入れない。`docs/reports/2026-07-31-copy-invisible-real-site-audit.md`
+
+## Diff-region granularity drives attribution (2026-08-08)
+
+Reported as two problems (vlmkit#117) on a 640x360 canvas HUD whose only change was an
+HP bar's fill, `(106,16) 90x20`:
+
+1. the region came back `(96,0) 128x64` — **larger than the 200x20 element that caused it**
+2. attribution named `.hud-root` (the whole frame) instead of `.hp-bar`
+
+**They are one problem.** `regionCoverage` carries weight 0.7 in
+`matchRegionBboxToElement`, so a region coarser than the element hands a containing
+ancestor a free `1.0` while starving the leaf. Measured on that case:
+
+| grid | region | `.hud-root` | `.hp-bar` |
+|--:|---|--:|--:|
+| 32 | 128x64 | **0.391** (penalised) | 0.385 |
+| 16 | 128x32 | 0.388 | **0.590** |
+| 8 | 96x24 | 0.387 | **0.727** |
+
+The ancestor won by 0.006 at grid 32 and loses decisively at 16 — with **no change to the
+scoring function**. So the near-tie was a symptom; the cell size was the cause.
+
+Consequences worth remembering:
+
+- `detectDiffRegions`' cell size is now `adaptiveRegionCellSize(w, h)`: 32 at short side
+  ≥720, 16 at ≥480, else 8. **Bucketed, not continuous** — a continuous function would
+  move region bboxes on nearly every existing image, and those bboxes appear in baselines,
+  approvals and reports. Override with `diff png --region-grid <px>`.
+- Keyed on the **short side**, not area: a 2000x300 strip is small in the dimension that
+  matters.
+- A near-tie rule (within 0.02, and the winner at most half the area) is second-line
+  insurance for when the grid cannot be fine enough. It deliberately does not reorder
+  same-scale siblings.
+- `--elements-top N` reports runners-up. They were always computed and discarded, and a
+  wrong winner otherwise hides every alternative.
+
+**None of this had test coverage before.** `heatmap-regions.test.ts` covers
+`findHeatmapRegionsFromRgba`, a different function; nothing exercised `detectDiffRegions`'
+grid, so the full suite stayed green through both the defect and the fix. See
+`packages/vlmkit-markup/src/region-attribution.test.ts`.

@@ -209,8 +209,11 @@ vlmkit diff html <baseline> <variant>          # HTML/URL pair → multi-viewpor
 vlmkit diff agent <report.json>                # Render report.json as agent-friendly Markdown
 vlmkit diff png <baseline.png> <current.png>   # Direct PNG pixel diff + heatmap
   # per region: measured colorSamples, translation estimate (shift dx/dy),
-  # image-size delta; add --elements-html <url> for a deterministic DOM
-  # selector candidate per region (no VLM, no API key)
+  # image-size delta; add --elements-html <url> (or --elements-json <path>) for a
+  # deterministic DOM selector candidate per region (no VLM, no API key)
+  # --region-grid <px>   region-detection cell size; default adapts to the image
+  #                      (32 at >=720px short side, 16 at >=480, else 8)
+  # --elements-top <N>   report N attribution candidates per region, not just the winner
 vlmkit diff elements [options]                 # Element-level diff with shift isolation
 vlmkit diff browsers <html|url>                # chromium / firefox / webkit parity
 vlmkit diff runs <dir...>                      # Aggregate multiple VRT runs into one table

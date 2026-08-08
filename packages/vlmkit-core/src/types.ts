@@ -100,6 +100,15 @@ export interface DiffRegionSelectorCandidate {
   tag: string;
   regionCoverage: number;
   elementCoverage: number;
+  /**
+   * Runners-up, best first — present only when more than one candidate was requested
+   * (`diff png --elements-top N`), so the default JSON shape is unchanged.
+   *
+   * Attribution picks one element out of several overlapping ones, and when it picks
+   * wrong the alternatives are what a reader needs; without them the report asserts a
+   * cause with no way to see what it beat.
+   */
+  alternates?: Omit<DiffRegionSelectorCandidate, "alternates">[];
 }
 
 export interface DiffRegionColor {
