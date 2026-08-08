@@ -28,7 +28,12 @@ import {
   runIntegrityCheck,
 } from "../inspect/integrity-check.ts";
 import { ALLOW_HELP, parseAllowRules } from "../inspect/integrity-exemption.ts";
-import { firstPositional, numberList, optionalInt } from "./arg-helpers.ts";
+import {
+  IMAGE_MODE_SKIPPED_RULES,
+  type IntegrityImageReport,
+  runImageIntegrityCheck,
+} from "../inspect/integrity-image.ts";
+import { firstPositional, firstPositionalOrUndefined, numberList, optionalInt } from "./arg-helpers.ts";
 
 /** Heights the CLI has always paired with its default sweep widths. */
 const VIEWPORT_HEIGHTS: Record<number, number> = { 1280: 800, 768: 900, 375: 700 };
@@ -68,7 +73,19 @@ ${ALLOW_HELP}`,
     { id: "redirected", title: "Requested URL redirected elsewhere", severity: "suspect" },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check", positional: 0, required: true },
+    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check (omit when using --image/--elements)", positional: 0 },
+    {
+      name: "elements",
+      placeholder: "elements.json",
+      kind: "path",
+      description: "Element rects instead of a DOM — canvas/WebGPU, native, Flutter (no browser)",
+    },
+    {
+      name: "image",
+      placeholder: "frame.png",
+      kind: "path",
+      description: "Frame PNG for --elements mode; enables the ink-based empty-render rule",
+    },
     { name: "viewports", placeholder: "w,w,...", kind: "number-list", description: "Sweep widths", defaultDescription: "1280,768,375" },
     { name: "max-findings", kind: "number", description: "Per-class report cap", defaultDescription: "12" },
     { name: "timeout", placeholder: "ms", kind: "number", description: "Page navigation timeout", defaultDescription: "30000" },
@@ -88,7 +105,32 @@ ${ALLOW_HELP}`,
     { name: "allow", kind: "string", description: "Exempt an intentional pattern (see below)", repeatable: true },
   ],
   parse: (argv) => {
-    const source = firstPositional(argv, "vlmkit check integrity <html-or-url>");
+    const elements = readFlag(argv, "elements");
+    const image = readFlag(argv, "image");
+    if (elements) {
+      // Image mode. Deliberately mutually exclusive with a page source rather than
+      // "source wins" or "both are measured": the two paths evaluate different rule sets,
+      // so a run that quietly picked one would make its verdict ambiguous.
+      if (firstPositionalOrUndefined(argv)) {
+        throw new UsageError(
+          "check integrity takes either a page source or --elements, not both. The two modes "
+          + "evaluate different rule sets, so a combined run's verdict would be ambiguous.",
+        );
+      }
+      const maxFindingsForImage = optionalInt(argv, "max-findings", { min: 1 });
+      return {
+        source: image ?? elements,
+        imageMode: {
+          elementsPath: elements,
+          ...(image ? { imagePath: image } : {}),
+          ...(maxFindingsForImage !== undefined ? { maxFindings: maxFindingsForImage } : {}),
+        },
+      };
+    }
+    if (image) {
+      throw new UsageError("--image needs --elements: a PNG alone carries no element rects to judge.");
+    }
+    const source = firstPositional(argv, "vlmkit check integrity <html-or-url> | --elements <elements.json> [--image <frame.png>]");
     const widths = numberList(argv, "viewports");
     if (widths && widths.some((w) => w <= 0)) {
       throw new UsageError("--viewports must be positive px widths, e.g. --viewports 1280,768,375");
@@ -114,7 +156,9 @@ ${ALLOW_HELP}`,
       ...(allow.length > 0 ? { allow } : {}),
     };
   },
-  run: (options) => runIntegrityCheck(options),
+  run: (options) => (options.imageMode
+    ? runImageIntegrityCheck(options.imageMode)
+    : runIntegrityCheck(options)),
   findings: (report): Finding[] =>
     report.findings.map((finding) => ({
       rule: finding.kind,
@@ -130,9 +174,18 @@ ${ALLOW_HELP}`,
   headline: (report) => {
     const fails = report.findings.filter((f) => f.severity === "fail").length;
     const warns = report.findings.length - fails;
+    const image = report as IntegrityImageReport;
+    // In image mode the count of rules that did NOT run belongs in the headline, not
+    // buried in the report body. `CLEAN` covering six of eighteen rules is a different
+    // claim from `CLEAN` covering all of them, and the difference has to be visible at
+    // the point someone reads the verdict.
+    const coverage = image.skippedRules
+      ? ` [image mode: ${IMAGE_MODE_SKIPPED_RULES.length} rule(s) not evaluable`
+        + `${image.inertRules?.length ? `, ${image.inertRules.length} inert` : ""}]`
+      : "";
     return `${report.verdict === "clean" ? "CLEAN" : "DEFECTS"}`
       + ` (${fails} fail, ${warns} warn, ${report.exempted.length} exempted`
-      + `, ${report.viewports.length} viewport(s))`;
+      + `, ${report.viewports.length} viewport(s))${coverage}`;
   },
   ledger: (report, options) => ({
     tool: "check-integrity",

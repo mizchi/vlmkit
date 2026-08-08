@@ -1437,6 +1437,20 @@ export const COLLECT_STYLE_FINGERPRINT = `(() => {
 
 export interface IntegrityOptions {
   /**
+   * Set when the gate ran in image mode (`--elements`, optionally `--image`): no DOM, no
+   * browser, rules judged from element rects and frame pixels. See `integrity-image.ts`.
+   *
+   * Declared here rather than as a separate options type because the gate has one
+   * `parse` and one `run`, and splitting the type would mean two gates in the registry
+   * for what is one command with two input adapters.
+   */
+  imageMode?: {
+    elementsPath: string;
+    imagePath?: string;
+    maxFindings?: number;
+    viewport?: number;
+  };
+  /**
    * Playwright storage-state file so gates can measure pages behind a
    * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
    */
@@ -1738,6 +1752,32 @@ export function formatIntegrityReport(report: IntegrityReport): string {
   } else {
     lines.push("");
     lines.push(`${GREEN}No integrity defects detected.${RESET}`);
+  }
+  // Image mode evaluates 6 of 18 rules. A bare "No integrity defects detected." would let
+  // that read as full coverage, which is the one way this feature could do harm: the value
+  // of a gate is what a clean result rules out, and a clean result over a third of the
+  // rules rules out a third as much. Printed next to the verdict, not in a footnote.
+  const coverage = report as Partial<{
+    skippedRules: { rule: string; reason: string }[];
+    inertRules: { rule: string; reason: string }[];
+  }>;
+  if (coverage.skippedRules && coverage.skippedRules.length > 0) {
+    lines.push("");
+    lines.push(
+      `${YELLOW}Coverage: image mode — ${coverage.skippedRules.length} rule(s) cannot be`
+      + ` evaluated without a DOM${RESET}`,
+    );
+    for (const skipped of coverage.skippedRules) {
+      lines.push(`${DIM}  - ${skipped.rule}: ${skipped.reason}${RESET}`);
+    }
+    if (coverage.inertRules && coverage.inertRules.length > 0) {
+      lines.push(
+        `${DIM}  ${coverage.inertRules.length} rule(s) ran with no input to judge:${RESET}`,
+      );
+      for (const inert of coverage.inertRules) {
+        lines.push(`${DIM}  - ${inert.rule}: ${inert.reason}${RESET}`);
+      }
+    }
   }
   if (report.exempted.length > 0) {
     const user = report.exempted.filter((e) => e.reason.startsWith("user exemption"));

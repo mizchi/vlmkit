@@ -255,6 +255,39 @@ vlmkit check integrity http://localhost:3000/ \
   --wait-until domcontentloaded --timeout 60000 --har fixtures/app.har
 ```
 
+#### Without a DOM: canvas / WebGPU / native renderers
+
+A canvas UI has one `<canvas>` element, so every `getBoundingClientRect` rule finds
+nothing and the gate reports `clean` on a frame that may be visibly broken. Pass element
+rects instead of a page — no browser, no DOM:
+
+```bash
+vlmkit check integrity --elements elements.json --image frame.png
+```
+
+`elements.json` is the same schema `diff png --elements-json` accepts (`path`, `tag`,
+`top`, `left`, `width`, `height`), plus optional fields that each unlock one rule:
+
+| field | unlocks |
+|---|---|
+| `text` | `text-collision` |
+| `text_measured: {width,height}` + `clip: {top,left,width,height}` | `text-clipped` |
+| `overlay`, `z_index`, `aria_hidden` | excludes layered / decorative text from collisions |
+
+Containment comes from `path` prefixes (`hud[0]>bar[0]`), so protrusion, collapsed
+containers and near-misalignment need no extra fields. Because the capture may omit
+uninteresting nodes, findings name the **nearest recorded ancestor** rather than claiming
+a parent.
+
+**Six of eighteen rules are evaluable this way**, and the report lists the other twelve
+with the reason each needs a DOM. That is deliberate: a `clean` verdict is only worth
+what it rules out, so the gap is printed next to the verdict rather than left implicit.
+`--elements` and a page source are mutually exclusive — the two modes evaluate different
+rule sets, so a combined run's verdict would be ambiguous.
+
+Text drawn wider than its box is **not** reported as clipped unless a `clip` rect says so:
+on a canvas that overdraws, which the collision and protrusion rules cover.
+
 ### Check (gates: a11y / tokens / design / theme / perf / drift)
 
 ```bash
