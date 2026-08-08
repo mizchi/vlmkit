@@ -2,39 +2,35 @@
 /**
  * Distribution-only CLI entrypoint.
  *
- * The source workspace can compile MoonBit lazily, but npm consumers should
- * not need the MoonBit toolchain. Import the generated JS bridge statically so
- * tsdown bundles it, then inject that implementation before loading the CLI.
+ * The root package ships `dist/**` and nothing else — no `_build`, no `.mbt` sources —
+ * so an npm consumer of the `vlmkit` CLI has no MoonBit toolchain and no generated
+ * bridge on disk to find. (The `@mizchi/vlmkit-markup` *library* package does ship
+ * `_build/js/debug/build/markup-core-api/markup-core-api.js`, which is why importing it
+ * directly has always worked. Only the CLI depends on what happens below.)
  *
- * ## Every entry point, not just the positional one
+ * So: import the generated bridge statically, which makes the bundler include it, and
+ * hand it to the runtime through a global before the CLI loads.
  *
- * This file listed only `run_markup_core` for as long as that was the only entry
- * point, and adding the JSON boundary did not update it. The consequence was
- * invisible in the workspace and total in the shipped CLI: `loadMarkupCoreApi` found
- * the injected global, `api.run_markup_core_json` was `undefined`, and every JSON
- * command fell through to `ensureMarkupCoreCli()` — which runs `moon build`, the one
- * thing an npm consumer is guaranteed not to have. Positional commands kept working,
- * so the CLI looked healthy.
+ * ## Why this is a namespace import
  *
- * Nothing caught it because the tests run from source, where the runtime finds the
- * generated bridge through `apiPath` and never consults this global at all. The
- * bundled layout is the only place these two lines matter.
+ * It used to name its exports: `import { run_markup_core }`, then
+ * `globalThis.… = { run_markup_core }`. That is a hand-written list which has to agree
+ * with `DirectMarkupCoreModule` in `markup-core-runtime.ts`, and when the JSON boundary
+ * added two entry points, nobody updated it. The result was invisible in the workspace
+ * and total in the shipped CLI: `loadMarkupCoreApi` found this global,
+ * `run_markup_core_json` read as `undefined`, and every JSON command fell through to
+ * `ensureMarkupCoreCli()` — which shells out to `moon build`, the one thing this file
+ * exists to make unnecessary. Positional commands kept working, so nothing looked wrong.
  *
- * **Adding an entry point to `DirectMarkupCoreModule` means adding it here.**
- * `markup-core-injection.test.ts` fails if the two drift, because the whole
- * failure mode is a name that is missing rather than wrong.
+ * A namespace import has no list to forget. Every export of the bridge crosses over,
+ * so adding an entry point on the MoonBit side connects it here by construction rather
+ * than by remembering. `pickDirectApi` on the other side selects what it understands and
+ * ignores the rest, and the runtime now raises rather than silently degrading if
+ * something it needs is missing — see `runMarkupCoreJsonRaw`.
  */
-import {
-  markup_core_json_commands,
-  run_markup_core,
-  run_markup_core_json,
-} from "../packages/vlmkit-markup/_build/js/debug/build/markup-core-api/markup-core-api.js";
+import * as markupCoreApi from "../packages/vlmkit-markup/_build/js/debug/build/markup-core-api/markup-core-api.js";
 
-globalThis.__MIZCHI_VLMKIT_MARKUP_CORE_API__ = {
-  run_markup_core,
-  run_markup_core_json,
-  markup_core_json_commands,
-};
+globalThis.__MIZCHI_VLMKIT_MARKUP_CORE_API__ = markupCoreApi;
 
 const { runCli } = await import("../src/cli/cli.ts");
 

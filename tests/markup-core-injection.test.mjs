@@ -1,85 +1,118 @@
 /**
- * The bundled CLI must inject every markup-core entry point the runtime can use.
+ * The bundled CLI must hand the runtime a *complete* markup-core API.
  *
- * `scripts/vlmkit-bundled.mjs` exists because npm consumers have no MoonBit toolchain:
- * it imports the generated JS bridge so the bundler includes it, and hands it to the
- * runtime through a global. The runtime prefers that global over its on-disk lookup.
+ * The root package ships `dist/**` only — no `_build`, no `.mbt` sources — so the CLI's
+ * one route to MoonBit is `scripts/vlmkit-bundled.mjs`, which statically imports the
+ * generated bridge and puts it on a global before the CLI loads. If anything the runtime
+ * needs is missing from that hand-off, the CLI has no way to recover: `moon build` needs a
+ * toolchain npm consumers do not have, and the spawned CLI needs a `_build` the package
+ * does not ship.
  *
- * The failure mode is a **missing name**, and it is silent in a specific way. When the
- * JSON boundary landed, this file still injected only `run_markup_core`. In the shipped
- * CLI `loadMarkupCoreApi` therefore returned an API whose `run_markup_core_json` was
- * `undefined`, so every JSON command fell through to `ensureMarkupCoreCli()` — which
- * shells out to `moon build`. Positional commands kept working, so nothing looked
- * broken until a gate that used a JSON command was run from `dist/`.
+ * That is exactly what happened. The file used to name its exports —
+ * `import { run_markup_core }` then `globalThis.… = { run_markup_core }` — a hand-written
+ * list that had to agree with `DirectMarkupCoreModule`, and the JSON boundary landed
+ * without updating it. In `dist/`, `run_markup_core_json` read as `undefined` and every
+ * JSON command silently fell back to shelling out. Positional commands kept working.
  *
- * No existing test could see it:
+ * Nothing could catch it: the suite runs from source, where the runtime finds the bridge
+ * on disk through `apiPath` and never reads the global; the existing `direct-js` backend
+ * assertion is true from source for the same reason; and the global is assigned in a
+ * `.mjs` file to a `Partial<DirectMarkupCoreModule>`, where a missing field is legal.
  *
- *  - Unit and integration tests run from **source**, where the runtime resolves the
- *    generated bridge through `apiPath` and never reads this global.
- *  - `markup-core-json.test.ts` asserts the backend is `direct-js`, which is true from
- *    source for the same reason.
- *  - Type checking cannot help: the global is assigned in a `.mjs` file to a
- *    `Partial<DirectMarkupCoreModule>`, where absent is legal.
+ * So this checks the two halves of "always connected" separately:
  *
- * So this compares the two lists as text: the entry points the runtime declares, and
- * the ones the bundled entrypoint injects. Reading source rather than executing is
- * deliberate — the bug lives in the bundled layout, and reproducing that in a test
- * would mean depending on build order.
+ *  1. **Structural** — the hand-off is a namespace import, so there is no list to drift.
+ *     A named-import version is rejected even if it currently happens to be complete,
+ *     because completeness by remembering is the thing that failed.
+ *  2. **Behavioural** — the generated bridge really does export every entry point the
+ *     runtime declares, and a run against the injected global actually answers a JSON
+ *     command. Reading source alone would pass against a bridge that was never rebuilt.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 
 const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..");
 const RUNTIME = resolve(REPO_ROOT, "packages/vlmkit-markup/src/markup-core-runtime.ts");
 const BUNDLED = resolve(REPO_ROOT, "scripts/vlmkit-bundled.mjs");
+const BRIDGE = resolve(
+  REPO_ROOT,
+  "packages/vlmkit-markup/_build/js/debug/build/markup-core-api/markup-core-api.js",
+);
 
 /** Field names of `interface DirectMarkupCoreModule`. */
 function declaredEntryPoints() {
   const source = readFileSync(RUNTIME, "utf8");
   const start = source.indexOf("interface DirectMarkupCoreModule {");
-  assert.notEqual(start, -1, "DirectMarkupCoreModule interface not found — did it move or get renamed?");
+  assert.notEqual(start, -1, "DirectMarkupCoreModule not found — did it move or get renamed?");
   const body = source.slice(start, source.indexOf("\n}", start));
-  return [...body.matchAll(/^\s{2}(\w+)\??:/gm)].map((m) => m[1]).sort();
+  const fields = [...body.matchAll(/^\s{2}(\w+)\??:/gm)].map((m) => m[1]).sort();
+  assert.ok(fields.length >= 3, `expected at least 3 entry points, parsed ${fields.join(", ")}`);
+  return fields;
 }
 
-/** Property names assigned to the injected global. */
-function injectedEntryPoints() {
-  const source = readFileSync(BUNDLED, "utf8");
-  const start = source.indexOf("globalThis.__MIZCHI_VLMKIT_MARKUP_CORE_API__");
-  assert.notEqual(start, -1, "the injection assignment is gone — the bundled CLI would have no direct API at all");
-  const body = source.slice(start, source.indexOf("};", start));
-  // `{ run_markup_core, run_markup_core_json }` shorthand, one per line.
-  return [...body.matchAll(/^\s{2}(\w+),?$/gm)].map((m) => m[1]).sort();
-}
+describe("bundled CLI is structurally connected to markup-core", () => {
+  it("hands over the whole bridge as a namespace, with no per-name list", () => {
+    const source = readFileSync(BUNDLED, "utf8");
+    assert.match(
+      source,
+      /import \* as (\w+) from "[^"]*markup-core-api\.js";/,
+      "the bridge must be imported as a namespace — a named-import list is what drifted",
+    );
+    const namespaceName = source.match(/import \* as (\w+) from "[^"]*markup-core-api\.js";/)[1];
+    assert.match(
+      source,
+      new RegExp(`globalThis\\.__MIZCHI_VLMKIT_MARKUP_CORE_API__ = ${namespaceName};`),
+      "the namespace must be assigned directly; rebuilding an object re-introduces the list",
+    );
+    // The specific regression: no `{ a, b }` object literal standing in for the bridge.
+    const assignment = source.slice(source.indexOf("globalThis.__MIZCHI_VLMKIT_MARKUP_CORE_API__"));
+    assert.doesNotMatch(
+      assignment.split("\n")[0],
+      /\{/,
+      "assigning an object literal means naming entry points by hand again",
+    );
+  });
+});
 
-describe("bundled CLI injects the whole markup-core API", () => {
-  it("injects every entry point the runtime declares", () => {
-    const declared = declaredEntryPoints();
-    const injected = injectedEntryPoints();
-    assert.ok(declared.length >= 3, `expected at least 3 entry points, parsed ${declared.join(", ")}`);
+describe("the generated bridge exports every entry point the runtime declares", () => {
+  it("exports all of them", async (t) => {
+    if (!existsSync(BRIDGE)) {
+      t.skip("generated bridge absent — run `moon build` in packages/vlmkit-markup");
+      return;
+    }
+    const bridge = await import(BRIDGE);
+    const missing = declaredEntryPoints().filter((name) => typeof bridge[name] !== "function");
     assert.deepEqual(
-      injected,
-      declared,
-      "scripts/vlmkit-bundled.mjs must inject every field of DirectMarkupCoreModule. A missing one "
-      + "does not fail loudly: the runtime finds the global, the missing function reads as undefined, "
-      + "and that command silently falls back to spawning `moon build` — which npm consumers do not have.",
+      missing,
+      [],
+      `the bridge is missing ${missing.join(", ")}. A namespace import cannot fix an export `
+      + "that does not exist: markup-core-api/main.mbt must expose it, and _build must be rebuilt.",
     );
   });
 
-  it("imports those names from the generated bridge", () => {
-    // Injecting a name that was never imported yields `undefined` with no error, which
-    // is the same silent failure by a different route.
-    const source = readFileSync(BUNDLED, "utf8");
-    const importBlock = source.slice(source.indexOf("import {"), source.indexOf("markup-core-api.js"));
-    for (const name of injectedEntryPoints()) {
-      assert.match(
-        importBlock,
-        new RegExp(`\\b${name}\\b`),
-        `${name} is injected but never imported — it would be injected as undefined`,
+  it("answers a JSON command through the injected global, not a fallback", async (t) => {
+    if (!existsSync(BRIDGE)) {
+      t.skip("generated bridge absent");
+      return;
+    }
+    // Drive the runtime the way the bundled CLI does — global first, then load — and
+    // assert it reports `direct-js`. If the hand-off were incomplete this now raises a
+    // packaging error rather than quietly spawning, which is the behaviour under test.
+    const bridge = await import(BRIDGE);
+    globalThis.__MIZCHI_VLMKIT_MARKUP_CORE_API__ = bridge;
+    try {
+      const runtime = await import("@mizchi/vlmkit-markup/markup-core-runtime.ts");
+      assert.equal(
+        runtime.callMarkupCoreJson("grid-gcd", { a: 24, b: 36 }),
+        12,
+        "a JSON command must answer from the injected bridge",
       );
+      assert.equal(runtime.getMarkupCoreRuntimeBackend(), "direct-js");
+    } finally {
+      delete globalThis.__MIZCHI_VLMKIT_MARKUP_CORE_API__;
     }
   });
 });

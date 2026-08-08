@@ -51,6 +51,7 @@
     "sync:skills": "node scripts/sync-skill-package.mjs",
     "smoke:dist": "pnpm build && bash scripts/smoke-dist.sh",
     "smoke:dist:strict": "pnpm build && bash scripts/smoke-dist.sh --strict",
+    "smoke:bundled-json": "node scripts/smoke-bundled-json.mjs",
     "smoke:pack:markup-loop": "node scripts/smoke-packed-markup-loop.mjs",
     "smoke:pack:workspaces": "node scripts/smoke-packed-workspaces.mjs",
     "test": "node --test 'src/**/*.test.ts' 'packages/*/src/**/*.test.ts' 'worker/**/*.test.ts' 'examples/**/*.test.mjs' 'tests/**/*.test.mjs'",

@@ -46,3 +46,11 @@ jobs:
       - run: pnpm exec playwright install-deps chromium
       - run: pnpm smoke:pack:workspaces
       - run: pnpm smoke:pack:markup-loop
+      # The bundled CLI's route to MoonBit is a global set by
+      # scripts/vlmkit-bundled.mjs, and nothing above exercises it: the packed
+      # smokes install the *library* packages, which ship the generated bridge on
+      # disk. The root package ships dist/** only. This runs the built CLI with
+      # `moon` removed from PATH, so a JSON-boundary command has to work through
+      # the injected bridge or fail — which is how it shipped broken once.
+      - run: pnpm build
+      - run: pnpm smoke:bundled-json

@@ -31,6 +31,17 @@ const directArgSeparator = "\t";
 const directEmptyArg = "__VLMKIT_EMPTY_ARG__";
 const injectedDirectModuleKey = "__MIZCHI_VLMKIT_MARKUP_CORE_API__";
 let directModule: DirectMarkupCoreModule | undefined;
+/**
+ * Where `directModule` came from, which decides what a MISSING entry point means.
+ *
+ * From `"generated"` (this workspace, read off disk) a missing function can be a stale
+ * `_build`, and building then retrying is the right response. From `"injected"` — the
+ * bundled CLI handing over its statically-imported bridge — it cannot be stale: it is
+ * whatever the bundle contains, there is no MoonBit toolchain to rebuild with, and
+ * `moon build` is precisely what the injection exists to avoid. Conflating the two is
+ * what let a broken JSON boundary ship looking healthy.
+ */
+let directModuleSource: "injected" | "generated" | undefined;
 let directModuleUnavailable = false;
 let runtimeBackend: "direct-js" | "spawn" = "spawn";
 
@@ -275,6 +286,20 @@ function runMarkupCoreJsonRaw(command: string, payload: string): string {
   };
   const first = direct();
   if (first !== undefined) return first;
+  // An injected API that lacks the JSON entry point is a PACKAGING bug, and the two
+  // fallbacks below are both wrong for it: `moon build` needs a toolchain the injection
+  // exists to avoid, and the spawned CLI needs a `_build` the root package does not ship.
+  // Silently trying them is how this shipped broken — the CLI kept answering positional
+  // commands, so only a JSON command failed, and only outside the workspace. Say what is
+  // actually wrong instead.
+  if (directModuleSource === "injected") {
+    throw new Error(
+      `markup-core JSON command "${command}" is unavailable: the injected markup-core API `
+      + "has no run_markup_core_json. The bundled entrypoint (scripts/vlmkit-bundled.mjs) "
+      + "must hand over the whole generated bridge, and the bridge must be rebuilt after "
+      + "adding a JSON entry point. This is a build/packaging fault, not a bad payload.",
+    );
+  }
   ensureMarkupCoreCli();
   const second = direct();
   if (second !== undefined) return second;
@@ -285,7 +310,7 @@ function runMarkupCoreJsonRaw(command: string, payload: string): string {
 /** Commands the MoonBit side accepts, for a test that the two views agree. */
 export function markupCoreJsonCommands(): string[] {
   const api = loadMarkupCoreApi();
-  if (!api?.markup_core_json_commands) {
+  if (!api?.markup_core_json_commands && directModuleSource !== "injected") {
     ensureMarkupCoreCli();
   }
   const loaded = loadMarkupCoreApi();
@@ -348,6 +373,7 @@ function loadMarkupCoreApi(): DirectMarkupCoreModule | undefined {
   )[injectedDirectModuleKey];
   if (typeof injected?.run_markup_core === "function") {
     directModule = pickDirectApi(injected);
+    directModuleSource = "injected";
     return directModule;
   }
   if (directModuleUnavailable) return undefined;
@@ -355,6 +381,7 @@ function loadMarkupCoreApi(): DirectMarkupCoreModule | undefined {
     const loaded = requireGenerated(apiPath) as Partial<DirectMarkupCoreModule>;
     if (typeof loaded.run_markup_core === "function") {
       directModule = pickDirectApi(loaded);
+      directModuleSource = "generated";
       return directModule;
     }
   } catch {

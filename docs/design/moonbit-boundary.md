@@ -161,10 +161,37 @@ cannot help, because the global is assigned in a `.mjs` file to a
 `Partial<DirectMarkupCoreModule>`, where absent is legal.
 
 Both instances are one mistake: **a hand-written list of entry points that has to agree
-with an interface, with nothing checking it.** `tests/markup-core-injection.test.mjs`
-compares the two lists as text now. The lesson generalises past this file — it is the
-same shape as the two duplicated positional dispatch tables, and the same shape as the
-`build page` defect, where source and bundle disagreed and only the bundle was wrong.
+with an interface, with nothing checking it.** The lesson generalises past this file — it
+is the same shape as the two duplicated positional dispatch tables, and the same shape as
+the `build page` defect, where source and bundle disagreed and only the bundle was wrong.
+
+### How it is connected now
+
+Three changes, because a test alone would have left the list in place:
+
+1. **No list.** `scripts/vlmkit-bundled.mjs` hands over a **namespace import** of the
+   bridge, so every export crosses by construction. Adding an entry point in
+   `markup-core-api/main.mbt` connects it without anyone remembering to. `pickDirectApi`
+   selects what it understands and ignores the rest.
+2. **No silent degradation.** The runtime records whether the direct API was `injected`
+   or read off disk as `generated`. A missing function from `generated` can be a stale
+   `_build`, so build-and-retry stays right. From `injected` it cannot be stale — there is
+   no toolchain to rebuild with and the root package ships no `_build` for the spawned CLI
+   either — so it **raises**, naming the packaging fault. Both old fallbacks were
+   guaranteed to fail there; trying them quietly is what turned a build fault into a
+   mystery.
+3. **A smoke in the consumer's environment.** `pnpm smoke:bundled-json` runs the built CLI
+   with `moon` removed from PATH and requires a JSON-boundary gate to succeed, so no
+   fallback can pretend to work. It first asserts `moon` is genuinely unreachable, because
+   otherwise the check passes vacuously. In `package-install-smoke`.
+
+Every safety net that existed was in a different room, which is the part worth keeping:
+`pnpm test` runs from source (the runtime finds the bridge through `apiPath` and never
+reads the global); `smoke:pack:workspaces` installs the **library** packages, and
+`@mizchi/vlmkit-markup` *does* ship `_build/.../markup-core-api.js`; and the type checker
+sees a `Partial<DirectMarkupCoreModule>` in a `.mjs` file, where absent is legal. Only the
+root package — `dist/**` and nothing else — depended on the hand-off, and nothing ran the
+root package the way a consumer does.
 
 ## What belongs in MoonBit — and what does not
 
