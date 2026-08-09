@@ -146,8 +146,14 @@ export function gateTool(gate: AnyGateDefinition, options: GateToolOptions): Mcp
       continue;
     }
     const schema = zodFor(input);
+    // `required` only. `|| input.positional === 0` used to be here, and it was redundant
+    // for 24 of the 25 positional-0 inputs in the registry — every one of them already
+    // sets `required: true`. The 25th is `check integrity`, whose source became optional
+    // when image mode (`--elements`) landed: with the shortcut, an MCP client was forced
+    // to send a page it must not send, so image mode was unreachable over MCP while
+    // working fine on the CLI. `gate-tool.test.ts` asserts the 24 stayed required.
     inputSchema[options.aliases?.[input.name] ?? camel(input.name)] =
-      input.required === true || input.positional === 0 ? schema : schema.optional();
+      input.required === true ? schema : schema.optional();
   }
   return {
     name: gateToolName(gate),

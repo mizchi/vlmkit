@@ -158,3 +158,54 @@ describe("the published tool surface", () => {
     }
   });
 });
+
+/**
+ * Required-ness comes from `required`, not from being positional.
+ *
+ * `gateTool` used to mark an input required when `required === true` **or**
+ * `positional === 0`. That shortcut was redundant — 24 of the 25 positional-0 inputs in
+ * the registry set `required: true` themselves — and it became actively wrong for the
+ * 25th: `check integrity`'s source is optional now that `--elements` supplies element
+ * rects instead of a page. With the shortcut, the MCP schema demanded a page the gate
+ * would then reject as mutually exclusive, so image mode was reachable from the CLI and
+ * unreachable over MCP.
+ *
+ * Both halves are asserted, because dropping the clause is only safe if the 24 really do
+ * declare themselves required. Reading the live registry rather than a fixture: the claim
+ * is about every gate that ships, and a fixture would answer a different question.
+ */
+describe("required-ness follows `required`, not `positional`", () => {
+  it("keeps every other gate's positional source required", async () => {
+    const { loadGateRegistry } = await import("../../../src/cli/gate-registry.ts");
+    const registry = await loadGateRegistry({ builtinsOnly: true });
+    const notRequired: string[] = [];
+    for (const { gate } of registry.list()) {
+      for (const input of gate.inputs ?? []) {
+        if (input.positional !== 0) continue;
+        if (input.required === true) continue;
+        notRequired.push(`${gate.command.join(" ")} :: ${input.name}`);
+      }
+    }
+    // `check integrity` is the intended exception. Anything else appearing here means a
+    // gate is relying on the removed shortcut and its MCP schema just went optional.
+    assert.deepEqual(
+      notRequired,
+      ["check integrity :: source"],
+      "a positional-0 input without `required: true` is now OPTIONAL in the MCP schema — "
+      + "add `required: true` unless it is genuinely optional",
+    );
+  });
+
+  it("leaves check integrity's source optional so image mode is callable", async () => {
+    const { integrityGate } = await import("@mizchi/vlmkit-markup/gates/integrity.gate.ts");
+    const tool = gateTool(integrityGate, { description: "x" });
+    assert.equal(tool.inputSchema.source!.isOptional(), true, "source must be optional");
+    assert.equal(tool.inputSchema.elements!.isOptional(), true);
+    assert.equal(tool.inputSchema.image!.isOptional(), true);
+    // And the argv it builds for image mode must carry neither a positional nor a page.
+    assert.deepEqual(
+      gateToolArgv(integrityGate, { elements: "e.json", image: "f.png" }, { description: "" }),
+      ["--elements", "e.json", "--image", "f.png"],
+    );
+  });
+});

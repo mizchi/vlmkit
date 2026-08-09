@@ -5,7 +5,7 @@ import { readPngDimensions } from "@mizchi/vlmkit-core/image-resize.ts";
 import { classifyVisualDiff } from "./visual-semantic.ts";
 import {
   captureRegionElementsFromHtml,
-  matchRegionBboxToElement,
+  matchRegionBboxToElements,
   parseRegionElementsJson,
   parseRegionElementsViewport,
   type RegionElementRect,
@@ -28,6 +28,18 @@ export interface PngDiffCliOptions {
   elementsViewport?: RegionElementsViewport;
   /** Directory to write one baseline/current/diff crop triple per region. */
   cropRegions?: string;
+  /**
+   * Region-detection grid in pixels. Omitted means adaptive — see
+   * `adaptiveRegionCellSize`. Set it when the default bucket is wrong for your frames.
+   */
+  regionGrid?: number;
+  /**
+   * How many attribution candidates to report per region (default 1).
+   *
+   * Worth raising when a report blames something implausible: the runners-up are already
+   * computed, and one wrong winner otherwise hides every alternative.
+   */
+  elementsTop?: number;
 }
 
 export interface PngDiffRegionCrop {
@@ -66,7 +78,13 @@ Options:
   --elements-viewport <WxH>
                         Viewport for --elements-html (default: current PNG size)
   --crop-regions <dir>  Write a baseline/current/diff crop triple per region
-                        into <dir> for direct inspection (no VLM)`;
+                        into <dir> for direct inspection (no VLM)
+  --region-grid <px>    Region-detection cell size. Default adapts to the image
+                        (32 at >=720px short side, 16 at >=480, else 8) because a
+                        region coarser than the element that changed misattributes
+                        the cause. Lower it for small frames with fine detail.
+  --elements-top <N>    Report the top N attribution candidates per region
+                        (default 1) instead of only the winner`;
 }
 
 export function parsePngDiffArgs(args: string[]): PngDiffCliOptions {
@@ -76,6 +94,8 @@ export function parsePngDiffArgs(args: string[]): PngDiffCliOptions {
   let skipHeatmap = false;
   let json = false;
   let elementsJson: string | undefined;
+  let regionGrid: number | undefined;
+  let elementsTop: number | undefined;
   let elementsHtml: string | undefined;
   let elementsViewport: RegionElementsViewport | undefined;
   let cropRegions: string | undefined;
@@ -99,6 +119,24 @@ export function parsePngDiffArgs(args: string[]): PngDiffCliOptions {
         const value = args[++i];
         if (!value) throw new PngDiffCliError(`Missing value for ${arg}\n\n${formatPngDiffUsage()}`, 1);
         elementsHtml = value;
+        break;
+      }
+      case "--region-grid": {
+        const value = args[++i];
+        const parsed = Number(value);
+        if (!value || !Number.isInteger(parsed) || parsed < 1) {
+          throw new PngDiffCliError(`--region-grid requires a positive integer, got: ${value ?? "(missing)"}`, 2);
+        }
+        regionGrid = parsed;
+        break;
+      }
+      case "--elements-top": {
+        const value = args[++i];
+        const parsed = Number(value);
+        if (!value || !Number.isInteger(parsed) || parsed < 1) {
+          throw new PngDiffCliError(`--elements-top requires a positive integer, got: ${value ?? "(missing)"}`, 2);
+        }
+        elementsTop = parsed;
         break;
       }
       case "--elements-viewport": {
@@ -157,6 +195,8 @@ export function parsePngDiffArgs(args: string[]): PngDiffCliOptions {
     ...(elementsHtml ? { elementsHtml } : {}),
     ...(elementsViewport ? { elementsViewport } : {}),
     ...(cropRegions ? { cropRegions } : {}),
+    ...(regionGrid !== undefined ? { regionGrid } : {}),
+    ...(elementsTop !== undefined ? { elementsTop } : {}),
   };
 }
 
@@ -176,12 +216,18 @@ async function resolveElements(
   return null;
 }
 
-function attachSelectorCandidates(regions: DiffRegion[], elements: RegionElementRect[]): void {
+function attachSelectorCandidates(
+  regions: DiffRegion[],
+  elements: RegionElementRect[],
+  limit = 1,
+): void {
   for (const region of regions) {
-    const match = matchRegionBboxToElement(
+    const matches = matchRegionBboxToElements(
       { left: region.x, top: region.y, width: region.width, height: region.height },
       elements,
+      limit,
     );
+    const [match, ...runnersUp] = matches;
     if (!match) continue;
     region.selectorCandidate = {
       selector: match.selector,
@@ -190,6 +236,20 @@ function attachSelectorCandidates(regions: DiffRegion[], elements: RegionElement
       tag: match.evidence.tag,
       regionCoverage: match.evidence.regionCoverage,
       elementCoverage: match.evidence.elementCoverage,
+      // Only when asked for: the field is absent at the default limit of 1, so existing
+      // JSON consumers see exactly the shape they saw before.
+      ...(runnersUp.length > 0
+        ? {
+          alternates: runnersUp.map((alternate) => ({
+            selector: alternate.selector,
+            confidence: alternate.confidence,
+            path: alternate.evidence.path,
+            tag: alternate.evidence.tag,
+            regionCoverage: alternate.evidence.regionCoverage,
+            elementCoverage: alternate.evidence.elementCoverage,
+          })),
+        }
+        : {}),
     };
   }
 }
@@ -212,6 +272,7 @@ export async function runPngDiff(options: PngDiffCliOptions) {
     outputDir: options.skipHeatmap ? undefined : options.outputDir,
     skipHeatmap: options.skipHeatmap,
     threshold: options.threshold,
+    ...(options.regionGrid !== undefined ? { regionCellSize: options.regionGrid } : {}),
   });
   if (!diff) {
     throw new Error("PNG diff requires both baseline and current screenshot paths");
@@ -230,7 +291,7 @@ export async function runPngDiff(options: PngDiffCliOptions) {
 
   const elements = await resolveElements(options, currentSize);
   if (elements && elements.length > 0) {
-    attachSelectorCandidates(diff.regions, elements);
+    attachSelectorCandidates(diff.regions, elements, options.elementsTop ?? 1);
   }
 
   const semantic = classifyVisualDiff(diff);

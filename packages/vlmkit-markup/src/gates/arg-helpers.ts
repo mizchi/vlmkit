@@ -31,6 +31,11 @@ const COMMON_VALUE_FLAGS = [
   "--storage-state",
   "--allow",
   "--contract",
+  // `check integrity --elements <json> --image <png>`: without these, the flag values
+  // would be read as the positional page source and image mode would look like it had
+  // been given a page.
+  "--elements",
+  "--image",
 ] as const;
 
 export function firstPositional(
@@ -38,10 +43,23 @@ export function firstPositional(
   usage: string,
   valueFlags: readonly string[] = [],
 ): string {
-  const positionals = readPositionals(argv, [...COMMON_VALUE_FLAGS, ...valueFlags]);
-  const first = positionals[0];
+  const first = firstPositionalOrUndefined(argv, valueFlags);
   if (!first) throw new UsageError(`missing required argument. Usage: ${usage}`);
   return first;
+}
+
+/**
+ * The first positional, or `undefined` when there is none.
+ *
+ * For gates whose source is optional because another flag supplies the input — the
+ * distinction `check integrity` needs in order to *reject* being given both a page and
+ * `--elements` rather than silently preferring one.
+ */
+export function firstPositionalOrUndefined(
+  argv: readonly string[],
+  valueFlags: readonly string[] = [],
+): string | undefined {
+  return readPositionals(argv, [...COMMON_VALUE_FLAGS, ...valueFlags])[0];
 }
 
 /**
