@@ -129,6 +129,11 @@ vlmkit baseline pin                                       # on main
 vlmkit baseline verify                                    # in PR
 vlmkit baseline post --pr owner/repo#123                  # send summary.md as PR comment
 
+# No URL to open? Start from PNGs — native renderers, or a broken headless capture.
+vlmkit baseline pin    --from-dir captures/                # no browser launched
+vlmkit baseline verify --from-dir current/                 # thresholds + summary + approvals
+vlmkit baseline pin    --from-png f.png --route hud --viewport desktop
+
 # Legacy internal-dogfood verification loop (vlmkit's own e2e suite)
 vlmkit workflow init
 vlmkit workflow capture
@@ -255,6 +260,46 @@ requests not present in the recording:
 vlmkit check integrity http://localhost:3000/ \
   --wait-until domcontentloaded --timeout 60000 --har fixtures/app.har
 ```
+
+#### Baselines from PNGs, with no URL (`--from-dir` / `--from-png`)
+
+For the case where the frames exist but a page cannot be opened: a native renderer writing
+PNGs, or a headless canvas capture that does not work (the reporter's Linux/Dawn build never
+completes `copyTextureToBuffer` + `mapAsync`, and canvas screenshots come back transparent).
+`diff png` already compares two files, but that is a one-shot — it has no per-route
+thresholds, no markdown summary and no region-level approvals. `--from-dir` puts PNG-only
+callers inside the real `baseline verify` workflow instead.
+
+**File → route mapping.** Identity on disk is already the pair `(route.name, viewport
+label)`, so nothing new was invented. A file matches only if its path equals one of these
+for a **declared** pair:
+
+| form | when |
+|---|---|
+| `<route>/<viewport>.png` | canonical — identical to the pinned layout, so `--from-dir <baselineDir>` round-trips |
+| `<route>-<viewport>.png` | flat; the separator `snapshot.ts` already uses |
+| `<route>.png` | only when exactly one viewport is declared, since otherwise the viewport is unknowable |
+
+Matching is against the declared cross-product rather than by splitting on `-`, which is
+what makes the flat form safe: `"form-app-mobile".split("-")` gives route `form`, while
+comparing against `` `${route.name}-${vp}` `` does not. A stem two pairs both claim is
+reported ambiguous, never guessed. Any disagreement is an error naming both sides — an
+unmapped file, two files for one pair, or a declared pair with no file — and nothing is
+pinned. Arbitrary renderer filenames use the single-file escape hatch
+(`--from-png f.png --route r --viewport v`, both halves required); there is no sidecar
+manifest to version.
+
+**What verify can and cannot do from PNGs.** Working: pixel diff, per-route and per-viewport
+thresholds, markdown summary, worst offenders, region-bbox approvals from `approval.json`,
+exit code, run dir with heatmaps. Not possible without a page, and **reported as not
+evaluated rather than passed**: a11y (contrast / touch / focus-order / semantic),
+media-variants, cross-browser. A run that names one route prints
+`**Partial run**: 1 of 2 declared route(s) checked` rather than letting the others show an
+empty green row.
+
+**File mode honours the viewport label as declared**, so `"viewports": ["frame"]` works — a
+supplied PNG carries its own dimensions. The browser path still intersects labels with its
+three built-ins; changing that would need real dimensions per custom label.
 
 #### `check copy` without a DOM
 

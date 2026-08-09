@@ -1084,3 +1084,23 @@ Ignored pixels leave both the diff count and region detection: masking only the 
 leaves a region with `diffPixelCount: 0` that `--elements-json` would then attribute to an
 element. `0/0` returns `0`, not `NaN` — `NaN` serialises to `null` and compares false
 against every threshold, so a gate would silently pass.
+
+## `baseline pin` destroyed the archive `baseline update` had just written (2026-08-09)
+
+Found while adding `--from-dir` (vlmkit#118), pre-existing on `main` and affecting the
+**browser path too**, not only the new file mode.
+
+`baseline update` is documented as a reversible golden refresh: it archives the current
+baselines to `<routeDir>/_history/<ts>/` and then re-pins. But `pin` cleared the route with
+`rm(routeDir, { recursive: true })` — and `_history` lives *inside* the route dir, so the
+archive it had written one step earlier was deleted in the same command. Reproduced directly:
+after the `rm -r`, `find baselines/hud` returns nothing.
+
+So "reversible" was false for the entire life of the feature, and nothing detected it because
+the archive's absence only matters at the moment someone tries to roll back. `pin` now removes
+only top-level `.png` files, which also makes a partial pin non-destructive to the rest of the
+route.
+
+The general shape is worth keeping: **a cleanup step whose blast radius is a directory, where
+something else stores durable state in that same directory.** The two features were written at
+different times and each is locally correct.
