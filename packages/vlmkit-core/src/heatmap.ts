@@ -1,6 +1,112 @@
-import type { VrtDiff, VrtSnapshot, DiffRegion, DiffRegionType, DiffReport, ShiftRegion, DiffRegionColor, DiffRegionColorSample, DiffRegionColorPair } from "./types.ts";
+import type { VrtDiff, VrtSnapshot, DiffRegion, DiffRegionType, DiffReport, ShiftRegion, DiffRegionColor, DiffRegionColorSample, DiffRegionColorPair, DiffIgnoreRegion, DiffIgnoredRegionReport, DiffMaskSummary } from "./types.ts";
 import { type PngData, cropImage, decodePng, encodePng } from "./png-utils.ts";
 import { estimateRegionShift } from "./region-shift.ts";
+
+// ---- Ignore regions ----
+
+/**
+ * Colour written into the heatmap over ignored pixels.
+ *
+ * Not white: white means "these pixels matched", and a reader who opens the
+ * heatmap to check a suspiciously clean result must be able to see the hole.
+ * Chosen so neither downstream hot-pixel test fires on it — `detectDiffRegions`
+ * and `generateCompact` want green < 128 (this is 200), and
+ * `findHeatmapRegionsFromRgba` wants red − max(green, blue) >= 60 (this is
+ * −85).
+ */
+const IGNORED_HEATMAP_RGB: readonly [number, number, number] = [170, 200, 255];
+
+/**
+ * Parse `"<x>,<y>,<w>x<h>"` (e.g. `"0,300,640x60"`) into an ignore rect.
+ *
+ * This spelling, rather than `baseline approve --region`'s `x=,y=,w=,h=`,
+ * because it is the spelling `diff png` already *prints* regions in — the
+ * round-trip from "the report says `(0,300) 640x60`" to "ignore that" should be
+ * copy-paste, not translation.
+ *
+ * Zero-area rects are rejected: `"0,0,0x0"` masks nothing, so accepting it
+ * would only ever mean the caller mistyped and got silence.
+ */
+export function parseIgnoreRegionSpec(value: string): DiffIgnoreRegion {
+  const match = /^\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(\d+)\s*[xX*]\s*(\d+)\s*$/.exec(value);
+  if (!match) {
+    throw new Error(
+      `invalid ignore region "${value}" — expected "<x>,<y>,<w>x<h>", e.g. "0,300,640x60"`,
+    );
+  }
+  const [x, y, width, height] = match.slice(1, 5).map(Number) as [number, number, number, number];
+  if (width <= 0 || height <= 0) {
+    throw new Error(
+      `invalid ignore region "${value}" — width and height must be positive, got ${width}x${height}`,
+    );
+  }
+  return { x, y, width, height };
+}
+
+/**
+ * Blank ignored pixels out of the pixelmatch output and account for what was lost.
+ *
+ * Both halves of "never measured" happen here, and deliberately in one place:
+ * the pixels stop counting toward `diffPixels` *and* they disappear from the
+ * buffer `detectDiffRegions` clusters, so a noisy strip produces neither a
+ * ratio contribution nor a phantom region. Doing only the first would leave a
+ * region whose `diffPixelCount` is 0 — worse than useless for attribution.
+ *
+ * The `covered` bitmap exists so overlapping rects are counted once. Without it
+ * two rects that overlap by 100px would report 100 more ignored pixels than
+ * exist, and `imagePixels - ignoredPixels === totalPixels` would stop holding —
+ * which is the one identity a reader can use to audit the number.
+ *
+ * Known limitation: region *bboxes* are cell-aligned, so a diff cell touching a
+ * mask edge still yields a region whose box overlaps the mask, and that box's
+ * `colorSample` / `shift` are sampled from the source images, not from this
+ * buffer. Colours for a region abutting a mask can therefore still be tinted by
+ * ignored pixels. The mask governs what counts as a difference, not what a
+ * surviving region's colours are averaged over.
+ */
+function applyIgnoreRegions(
+  diffOutput: Uint8Array,
+  width: number,
+  height: number,
+  regions: DiffIgnoreRegion[],
+): DiffMaskSummary {
+  const covered = new Uint8Array(width * height);
+  const reported: DiffIgnoredRegionReport[] = [];
+
+  for (const region of regions) {
+    const left = Math.max(0, Math.trunc(region.x));
+    const top = Math.max(0, Math.trunc(region.y));
+    const right = Math.min(width, Math.trunc(region.x) + Math.trunc(region.width));
+    const bottom = Math.min(height, Math.trunc(region.y) + Math.trunc(region.height));
+    let pixels = 0;
+    let diffPixels = 0;
+    for (let y = top; y < bottom; y++) {
+      for (let x = left; x < right; x++) {
+        const index = y * width + x;
+        pixels++;
+        if (diffOutput[index * 4 + 1]! < 128) diffPixels++;
+        covered[index] = 1;
+      }
+    }
+    reported.push({ ...region, pixels, diffPixels });
+  }
+
+  let ignoredPixels = 0;
+  let ignoredDiffPixels = 0;
+  const [mr, mg, mb] = IGNORED_HEATMAP_RGB;
+  for (let index = 0; index < covered.length; index++) {
+    if (!covered[index]) continue;
+    ignoredPixels++;
+    const offset = index * 4;
+    if (diffOutput[offset + 1]! < 128) ignoredDiffPixels++;
+    diffOutput[offset] = mr;
+    diffOutput[offset + 1] = mg;
+    diffOutput[offset + 2] = mb;
+    diffOutput[offset + 3] = 255;
+  }
+
+  return { regions: reported, ignoredPixels, ignoredDiffPixels, imagePixels: width * height };
+}
 
 // ---- Shared diff pipeline ----
 
@@ -13,13 +119,19 @@ interface PixelDiffResult {
   threshold: number;
   resizedBaseline: PngData;
   resizedCurrent: PngData;
+  mask?: DiffMaskSummary;
 }
 
 async function runPixelDiff(
   baselinePath: string,
   screenshotPath: string,
   testId: string,
-  opts: { threshold?: number; outputDir?: string; skipHeatmap?: boolean },
+  opts: {
+    threshold?: number;
+    outputDir?: string;
+    skipHeatmap?: boolean;
+    ignoreRegions?: DiffIgnoreRegion[];
+  },
 ): Promise<PixelDiffResult & { heatmapPath?: string }> {
   const pixelmatch = (await import("pixelmatch")).default;
   const baseline = await decodePng(baselinePath);
@@ -41,22 +153,54 @@ async function runPixelDiff(
 
   const width = resizedBaseline.width;
   const height = resizedBaseline.height;
-  const totalPixels = width * height + overflowPixels;
   const diffOutput = new Uint8Array(width * height * 4);
   const threshold = opts.threshold ?? 0.1;
 
-  const diffPixels = overflowPixels + pixelmatch(
+  const rawDiffPixels = pixelmatch(
     resizedBaseline.data, resizedCurrent.data, diffOutput, width, height, { threshold },
   );
 
+  // Masks are applied to the *compared* area only. Overflow from a size mismatch
+  // is counted whole into both numerator and denominator and is not maskable —
+  // a 640x360 baseline against a 640x420 current contributes 38400 diff pixels
+  // that no rect inside the common 640x360 box can reach. Say so rather than
+  // pretend, because "I ignored the bottom strip and the ratio didn't move" has
+  // exactly this cause.
+  const mask = opts.ignoreRegions && opts.ignoreRegions.length > 0
+    ? applyIgnoreRegions(diffOutput, width, height, opts.ignoreRegions)
+    : undefined;
+
+  const ignoredPixels = mask?.ignoredPixels ?? 0;
+  const totalPixels = width * height - ignoredPixels + overflowPixels;
+  const diffPixels = overflowPixels + rawDiffPixels - (mask?.ignoredDiffPixels ?? 0);
+
   let heatmapPath: string | undefined;
-  if (opts.outputDir && diffPixels > 0 && !opts.skipHeatmap) {
+  // A fully-masked frame still gets a heatmap when anything was ignored, so the
+  // one artefact a reader can open shows the hole rather than nothing at all.
+  if (opts.outputDir && (diffPixels > 0 || ignoredPixels > 0) && !opts.skipHeatmap) {
     const safeName = testId.replace(/[/\\:]/g, "_");
     heatmapPath = `${opts.outputDir}/${safeName}_heatmap.png`;
     await encodePng(heatmapPath, { width, height, data: diffOutput });
   }
 
-  return { diffOutput, width, height, diffPixels, totalPixels, threshold, resizedBaseline, resizedCurrent, heatmapPath };
+  return {
+    diffOutput, width, height, diffPixels, totalPixels, threshold,
+    resizedBaseline, resizedCurrent, heatmapPath,
+    ...(mask ? { mask } : {}),
+  };
+}
+
+/**
+ * `diffPixels / totalPixels`, with the degenerate case named.
+ *
+ * A mask covering the whole compared area leaves nothing measured, and 0/0 must
+ * not surface as `NaN` — it serialises to `null` in JSON and compares false
+ * against every threshold, so a gate would silently pass. 0 with a mask summary
+ * saying `ignoredPixels === imagePixels` is the honest reading: nothing changed
+ * *of what was looked at*, and nothing was looked at.
+ */
+function safeDiffRatio(diffPixels: number, totalPixels: number): number {
+  return totalPixels > 0 ? diffPixels / totalPixels : 0;
 }
 
 // ---- Public API ----
@@ -72,6 +216,14 @@ export async function compareScreenshots(
     skipHeatmap?: boolean;
     /** Override the adaptive grid. See `adaptiveRegionCellSize`. */
     regionCellSize?: number;
+    /**
+     * Rectangles that are non-deterministic by construction (particles, a
+     * timer readout) and should never be measured. Distinct from an approval:
+     * nothing is recorded, nothing expires, and there is nothing for a
+     * suppression stocktake to list. See `applyIgnoreRegions` and
+     * `DiffMaskSummary` for the effect on `diffRatio`.
+     */
+    ignoreRegions?: DiffIgnoreRegion[];
   } = {}
 ): Promise<VrtDiff | null> {
   if (!snapshot.baselinePath) return null;
@@ -85,9 +237,10 @@ export async function compareScreenshots(
     snapshot,
     diffPixels: r.diffPixels,
     totalPixels: r.totalPixels,
-    diffRatio: r.diffPixels / r.totalPixels,
+    diffRatio: safeDiffRatio(r.diffPixels, r.totalPixels),
     heatmapPath: r.heatmapPath,
     regions,
+    ...(r.mask ? { mask: r.mask } : {}),
   };
 }
 
@@ -574,7 +727,7 @@ function generateCompact(
     }
   }
 
-  const matchPct = ((1 - diffPixels / totalPixels) * 100).toFixed(0);
+  const matchPct = ((1 - safeDiffRatio(diffPixels, totalPixels)) * 100).toFixed(0);
   const lines = [`diff:${diffPixels}/${totalPixels}(${matchPct}%match)`];
   const cellTotal = cellW * cellH;
   for (let gy = 0; gy < gridSize; gy++) {
@@ -600,6 +753,8 @@ export async function generateDiffReport(
     detectShift?: boolean;
     /** Override the adaptive grid. See `adaptiveRegionCellSize`. */
     regionCellSize?: number;
+    /** See `compareScreenshots`. Shift detection is NOT masked — see below. */
+    ignoreRegions?: DiffIgnoreRegion[];
   } = {},
 ): Promise<DiffReport | null> {
   if (!snapshot.baselinePath) return null;
@@ -607,7 +762,13 @@ export async function generateDiffReport(
   const r = await runPixelDiff(snapshot.baselinePath, snapshot.screenshotPath, snapshot.testId, opts);
   const regions = detectDiffRegions(r.diffOutput, r.width, r.height, opts.regionCellSize);
 
-  // Shift detection
+  // Shift detection reads the source images through a per-row luminance profile,
+  // not the masked diff buffer, so `globalShift` / `shiftRegions` /
+  // `compensatedDiffCount` still see ignored pixels. Masking them out of a row
+  // average would change what the correlation is computed over and silently
+  // alter shift numbers on unmasked rows too; leaving it measured and saying so
+  // is the smaller lie. A mask over an animated band therefore still perturbs
+  // the shift estimate for the rows it covers.
   let globalShift = 0;
   let shiftRegions: ShiftRegion[] = [];
   let compensated = r.diffPixels;
@@ -635,8 +796,9 @@ export async function generateDiffReport(
   return {
     diffPixels: r.diffPixels,
     totalPixels: r.totalPixels,
-    diffRatio: r.diffPixels / r.totalPixels,
+    diffRatio: safeDiffRatio(r.diffPixels, r.totalPixels),
     regions,
+    ...(r.mask ? { mask: r.mask } : {}),
     shiftOnly,
     contentChangeCount,
     globalShift,

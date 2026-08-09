@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { parsePngDiffArgs, runPngDiff } from "./png-diff.ts";
+import { parsePngDiffArgs, runPngDiff, runPngDiffCli } from "./png-diff.ts";
 import { encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
 
 const TMP = join(import.meta.dirname!, "..", "..", "..", "test-results", "png-diff-test");
@@ -41,6 +41,202 @@ function createPalettePng(
 
   return { width, height, data };
 }
+
+/**
+ * A flat frame with one rectangle painted a different colour — the shape of a
+ * game frame whose only variance is a particle burst or a timer readout
+ * (vlmkit#118). 160px short side puts `adaptiveRegionCellSize` on the 8px grid,
+ * and every rect used below is 8px-aligned so the detected region bbox is
+ * exactly the painted rect and the assertions are on real numbers, not on
+ * whatever the grid rounded to.
+ */
+function createFramePng(
+  width: number,
+  height: number,
+  background: [number, number, number],
+  rect?: { x: number; y: number; w: number; h: number; color: [number, number, number] },
+): { width: number; height: number; data: Uint8Array } {
+  const data = new Uint8Array(width * height * 4);
+  for (let i = 0; i < width * height; i++) {
+    data[i * 4] = background[0];
+    data[i * 4 + 1] = background[1];
+    data[i * 4 + 2] = background[2];
+    data[i * 4 + 3] = 255;
+  }
+  if (rect) {
+    for (let y = rect.y; y < rect.y + rect.h; y++) {
+      for (let x = rect.x; x < rect.x + rect.w; x++) {
+        const offset = (y * width + x) * 4;
+        data[offset] = rect.color[0];
+        data[offset + 1] = rect.color[1];
+        data[offset + 2] = rect.color[2];
+      }
+    }
+  }
+  return { width, height, data };
+}
+
+const NOISY = { x: 96, y: 112, w: 32, h: 32 } as const;
+const FRAME = 160;
+const FRAME_PIXELS = FRAME * FRAME;
+const NOISY_PIXELS = NOISY.w * NOISY.h;
+
+/** Two 160x160 frames differing only inside NOISY. */
+async function writeNoisyFramePair(dir: string): Promise<{ baselinePath: string; currentPath: string }> {
+  const baselinePath = join(dir, "frame-baseline.png");
+  const currentPath = join(dir, "frame-current.png");
+  await encodePng(baselinePath, createFramePng(FRAME, FRAME, [30, 30, 30], { ...NOISY, color: [30, 30, 30] }));
+  await encodePng(currentPath, createFramePng(FRAME, FRAME, [30, 30, 30], { ...NOISY, color: [220, 40, 40] }));
+  return { baselinePath, currentPath };
+}
+
+describe("png-diff --ignore-region", () => {
+  it("parses repeated --ignore-region into rects", () => {
+    const options = parsePngDiffArgs([
+      "a.png", "b.png",
+      "--ignore-region", "0,300,640x60",
+      "--ignore-region", " 12 , 4 , 8x8 ",
+    ]);
+    assert.deepEqual(options.ignoreRegions, [
+      { x: 0, y: 300, width: 640, height: 60 },
+      { x: 12, y: 4, width: 8, height: 8 },
+    ]);
+  });
+
+  it("rejects malformed --ignore-region values with exit code 2", () => {
+    for (const bad of ["0,300,640", "0,300,640x0", "abc", "0,300x640,60", ""]) {
+      assert.throws(
+        () => parsePngDiffArgs(["a.png", "b.png", "--ignore-region", bad]),
+        (error: Error & { exitCode?: number }) => {
+          assert.equal(error.exitCode, 2, `"${bad}" should be a usage error, not a silent no-mask`);
+          assert.match(error.message, /--ignore-region/);
+          return true;
+        },
+        `"${bad}" should be rejected`,
+      );
+    }
+  });
+
+  it("reports the diff without a mask, and drops it when the noisy rect is ignored", async () => {
+    await rm(TMP, { recursive: true, force: true });
+    await mkdir(TMP, { recursive: true });
+    try {
+      const { baselinePath, currentPath } = await writeNoisyFramePair(TMP);
+      const base = { baselinePath, currentPath, outputDir: TMP, threshold: 0.1, skipHeatmap: true, json: false };
+
+      const unmasked = await runPngDiff(base);
+      assert.equal(unmasked.diff.diffPixels, NOISY_PIXELS);
+      assert.equal(unmasked.diff.totalPixels, FRAME_PIXELS);
+      assert.equal(unmasked.diff.mask, undefined, "no mask key without --ignore-region");
+      assert.equal(unmasked.diff.regions.length, 1);
+      assert.deepEqual(
+        { x: unmasked.diff.regions[0]!.x, y: unmasked.diff.regions[0]!.y },
+        { x: NOISY.x, y: NOISY.y },
+      );
+
+      const masked = await runPngDiff({
+        ...base,
+        ignoreRegions: [{ x: NOISY.x, y: NOISY.y, width: NOISY.w, height: NOISY.h }],
+      });
+      // Both halves: no diff pixels left, and no region either. A region with
+      // diffPixelCount 0 would still be attributed to an element downstream.
+      assert.equal(masked.diff.diffPixels, 0);
+      assert.equal(masked.diff.regions.length, 0);
+      assert.equal(masked.diff.diffRatio, 0);
+      // Denominator excludes the ignored area: imagePixels - ignoredPixels.
+      assert.equal(masked.diff.totalPixels, FRAME_PIXELS - NOISY_PIXELS);
+      assert.equal(masked.diff.mask!.ignoredPixels, NOISY_PIXELS);
+      assert.equal(masked.diff.mask!.ignoredDiffPixels, NOISY_PIXELS);
+      assert.equal(masked.diff.mask!.imagePixels, FRAME_PIXELS);
+      assert.deepEqual(masked.diff.mask!.regions, [
+        { x: NOISY.x, y: NOISY.y, width: NOISY.w, height: NOISY.h, pixels: NOISY_PIXELS, diffPixels: NOISY_PIXELS },
+      ]);
+    } finally {
+      await rm(TMP, { recursive: true, force: true });
+    }
+  });
+
+  it("leaves the diff alone when an unrelated rect is ignored, and does not dilute the ratio", async () => {
+    await rm(TMP, { recursive: true, force: true });
+    await mkdir(TMP, { recursive: true });
+    try {
+      const { baselinePath, currentPath } = await writeNoisyFramePair(TMP);
+      const result = await runPngDiff({
+        baselinePath, currentPath, outputDir: TMP, threshold: 0.1, skipHeatmap: true, json: false,
+        ignoreRegions: [{ x: 0, y: 0, width: 32, height: 32 }],
+      });
+
+      assert.equal(result.diff.diffPixels, NOISY_PIXELS, "a mask elsewhere must not hide this change");
+      assert.equal(result.diff.regions.length, 1);
+      assert.equal(result.diff.mask!.ignoredDiffPixels, 0, "the mask swallowed nothing — say so");
+      assert.equal(result.diff.mask!.regions[0]!.diffPixels, 0);
+      // The point of shrinking the denominator: masking a quiet corner must not
+      // make an unrelated regression read as *less* severe than it did before.
+      assert.ok(
+        result.diff.diffRatio > NOISY_PIXELS / FRAME_PIXELS,
+        `ratio ${result.diff.diffRatio} should exceed the full-frame ratio ${NOISY_PIXELS / FRAME_PIXELS}`,
+      );
+      assert.equal(result.diff.totalPixels, FRAME_PIXELS - 32 * 32);
+    } finally {
+      await rm(TMP, { recursive: true, force: true });
+    }
+  });
+
+  it("counts overlapping rects once and reports an off-frame rect as masking nothing", async () => {
+    await rm(TMP, { recursive: true, force: true });
+    await mkdir(TMP, { recursive: true });
+    try {
+      const { baselinePath, currentPath } = await writeNoisyFramePair(TMP);
+      const result = await runPngDiff({
+        baselinePath, currentPath, outputDir: TMP, threshold: 0.1, skipHeatmap: true, json: false,
+        ignoreRegions: [
+          { x: NOISY.x, y: NOISY.y, width: NOISY.w, height: NOISY.h },
+          { x: NOISY.x + 16, y: NOISY.y, width: NOISY.w, height: NOISY.h }, // half overlaps the first
+          { x: 1000, y: 1000, width: 50, height: 50 }, // entirely off-frame
+        ],
+      });
+
+      const mask = result.diff.mask!;
+      // Union: all 1024 of the first rect plus the 512 px of the second that lie
+      // outside it. Per-rect diff counts sum to 1536 — the deduplicated total is
+      // 1024, which is what keeps imagePixels - ignoredPixels === totalPixels.
+      assert.equal(mask.ignoredPixels, NOISY_PIXELS + 16 * 32);
+      assert.equal(mask.ignoredDiffPixels, NOISY_PIXELS);
+      assert.equal(mask.regions[0]!.diffPixels + mask.regions[1]!.diffPixels, NOISY_PIXELS + 16 * 32);
+      assert.equal(result.diff.totalPixels, mask.imagePixels - mask.ignoredPixels);
+      assert.deepEqual(
+        { pixels: mask.regions[2]!.pixels, diffPixels: mask.regions[2]!.diffPixels },
+        { pixels: 0, diffPixels: 0 },
+        "an off-frame rect masks nothing and must report so rather than look applied",
+      );
+    } finally {
+      await rm(TMP, { recursive: true, force: true });
+    }
+  });
+
+  it("prints the masked-pixel accounting next to the verdict, not only in --json", async () => {
+    await rm(TMP, { recursive: true, force: true });
+    await mkdir(TMP, { recursive: true });
+    const lines: string[] = [];
+    const original = console.log;
+    console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+    try {
+      const { baselinePath, currentPath } = await writeNoisyFramePair(TMP);
+      await runPngDiffCli([
+        baselinePath, currentPath, "--no-heatmap",
+        "--ignore-region", `${NOISY.x},${NOISY.y},${NOISY.w}x${NOISY.h}`,
+      ]);
+      const text = lines.join("\n");
+      assert.match(text, /diff:\s+0\.00% \(0 \/ 24576 px measured\)/);
+      assert.match(text, /ignored:\s+1 region\(s\), 1024 px \(4\.0% of the 25600 px compared area\) — never measured/);
+      assert.match(text, /\(96,112\) 32x32 — 1024 px, 1024 of them differed/);
+      assert.match(text, /1024 diff px discarded; denominator 25600 - 1024 = 24576/);
+    } finally {
+      console.log = original;
+      await rm(TMP, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("png-diff", () => {
   it("parses CLI flags for direct PNG comparison", () => {

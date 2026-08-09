@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { detectWhiteout, detectEmptyContent } from "./heatmap.ts";
+import { detectWhiteout, detectEmptyContent, parseIgnoreRegionSpec } from "./heatmap.ts";
 
 function makePngData(
   width: number,
@@ -16,6 +16,21 @@ function makePngData(
   }
   return { width, height, data };
 }
+
+describe("parseIgnoreRegionSpec", () => {
+  it("accepts the spelling `diff png` prints regions in", () => {
+    assert.deepEqual(parseIgnoreRegionSpec("0,300,640x60"), { x: 0, y: 300, width: 640, height: 60 });
+    // Negative origins are legal — a rect that hangs off the top-left is clamped
+    // when applied, and rejecting it would make "mask the whole HUD" fiddly.
+    assert.deepEqual(parseIgnoreRegionSpec("-8,-8,16X16"), { x: -8, y: -8, width: 16, height: 16 });
+  });
+
+  it("rejects anything it cannot apply, rather than defaulting to no mask", () => {
+    for (const bad of ["0,300,640", "0,300,640x0", "0,300,0x60", "0,300,-4x60", "x", "1,2,3,4"]) {
+      assert.throws(() => parseIgnoreRegionSpec(bad), /invalid ignore region/, `"${bad}"`);
+    }
+  });
+});
 
 describe("detectWhiteout", () => {
   it("should detect all-white image", () => {
