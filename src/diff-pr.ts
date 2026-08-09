@@ -182,6 +182,28 @@ function positionalRouteNames(args: string[]): string[] {
 }
 
 /**
+ * Viewport labels for file mode.
+ *
+ * `viewportSpecsFor` resolves a declared label to pixel dimensions and so
+ * silently drops anything that is not mobile/desktop/wide — measured with the
+ * built CLI: `"viewports": ["frame"]` produced `declared viewports: mobile,
+ * desktop, wide`. That fallback is correct for the browser path, which has to
+ * know what to resize the page to, and wrong here: a supplied PNG carries its
+ * own dimensions, and `thresholds` already accepts arbitrary keys. So a canvas
+ * engine can declare `"viewports": ["frame"]` and pin `hud/frame.png`.
+ *
+ * Limit worth stating: baselines pinned under a label the browser path does
+ * not know are reachable only from file mode. For a project whose renders
+ * cannot be produced by Playwright at all, that is the only mode anyway.
+ */
+function fileModeViewportSpecs(config: DiffPrConfig): Array<{ label: string; width: number; height: number }> {
+  if (!config.viewports || config.viewports.length === 0) return viewportSpecsFor(config);
+  return config.viewports.map((label) =>
+    DEFAULT_VIEWPORTS.find((v) => v.label === label) ?? { label, width: 0, height: 0 }
+  );
+}
+
+/**
  * Gates that need a live page and therefore cannot run in file mode. Reported
  * rather than silently skipped: a config that declares `a11y` and gets a PASS
  * must not read as "a11y passed".
@@ -254,7 +276,7 @@ async function pinFromFiles(
   routesToPin: DiffPrRoute[],
   files: FileSourceFlags,
 ): Promise<number> {
-  const viewports = viewportSpecsFor(config).map((v) => v.label);
+  const viewports = fileModeViewportSpecs(config).map((v) => v.label);
   let sources: PngSource[];
   try {
     sources = await resolvePngSources({
@@ -386,7 +408,7 @@ async function cmdRun(args: string[]): Promise<number> {
   // File mode: the "current" side comes from PNGs on disk rather than a
   // render. Resolved up front so a bad mapping fails before any work.
   const files = fileSourceFlags(args);
-  const viewports = viewportSpecsFor(config);
+  const viewports = files.active ? fileModeViewportSpecs(config) : viewportSpecsFor(config);
   let fileSources: Map<string, string> | null = null;
   let skippedGates: string[] = [];
   if (files.active) {

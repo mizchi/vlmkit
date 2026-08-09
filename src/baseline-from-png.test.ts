@@ -335,6 +335,36 @@ describe("baseline pin --from-dir / --from-png", () => {
   });
 });
 
+describe("custom viewport labels in file mode", () => {
+  it("honors a declared label the browser path cannot resize to (a game frame)", async () => {
+    // The browser path maps a viewport label to pixel dimensions and drops
+    // anything that is not mobile/desktop/wide. A supplied PNG carries its own
+    // dimensions, so file mode takes the label as declared — which is what
+    // lets a 640x360 canvas frame be called `frame`.
+    const proj = await makeProject({
+      viewports: ["frame"],
+      thresholds: { frame: 0.01 },
+      routes: [{ name: "hud", path: "/hud" }],
+    });
+    try {
+      await writePng(join(proj, "captures", "hud", "frame.png"), { width: 640, height: 360 });
+      const pin = runBaseline(["pin", "--from-dir", "captures"], proj);
+      assert.equal(pin.status, 0, pin.stdout + pin.stderr);
+      assert.ok(existsSync(join(proj, "baselines", "hud", "frame.png")));
+
+      await writePng(join(proj, "current", "hud", "frame.png"), { width: 640, height: 360, blockSize: 100 });
+      const r = runBaseline(["verify", "--from-dir", "current", "--output", "run"], proj);
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      // 100x100 changed out of 640x360 = 4.34%.
+      assert.match(r.stdout, /hud\s+FAIL\s+frame=4\.34%/);
+      const md = await readFile(join(proj, "run", "summary.md"), "utf-8");
+      assert.match(md, /\| `hud` \| frame \| 4\.34% \| 1\.00% \| ❌ \|/);
+    } finally {
+      await rm(proj, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("baseline update --from-dir", () => {
   it("archives the old baselines to _history/ and re-pins from files", async () => {
     // Regression guard: pin used to `rm -r` the whole route dir, which deleted
