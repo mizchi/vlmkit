@@ -49,9 +49,21 @@ export interface MatchedBbox {
 }
 
 export interface ExtractComponentsOptions {
-  /** Minimum filled-pixel count for a component to be kept. Default 200 (≈ 15×15). */
+  /**
+   * Minimum filled-pixel count for a component to be kept. Default 200
+   * (≈ 15×15). Only binds below roughly 640×360, and only once `topN` has been
+   * raised — see `EXTRACT_PRESETS`.
+   */
   minArea?: number;
-  /** How many components to return after sorting by area. Default 8. */
+  /**
+   * How many components to return after sorting by area. Default 8.
+   *
+   * This is the binding constraint on element-dense frames at *every* size, not
+   * a display nicety: a 16-element HUD reports 6 of them at 320×240 and 6 at
+   * 1280×720 until it is raised. Because the list is sorted by area descending,
+   * raising it can only append smaller components — it never displaces one that
+   * the old cap already returned.
+   */
   topN?: number;
   /**
    * Per-channel difference threshold for "foreground." Defaults to a value
@@ -71,9 +83,62 @@ export interface ExtractComponentsOptions {
   background?: [number, number, number];
 }
 
-const DEFAULT_MIN_AREA = 200;
-const DEFAULT_TOP_N = 8;
+export const DEFAULT_MIN_AREA = 200;
+export const DEFAULT_TOP_N = 8;
 const DEFAULT_BG_TOLERANCE = 12;
+
+/**
+ * Named threshold bundles for frames the defaults were not calibrated on.
+ *
+ * `game-ui` comes from vlmkit#118 §4: a canvas/WebGPU engine reported that a
+ * 320x240 pixel-art HUD "makes elements hard to detect" and asked for a preset.
+ * Measured on a 16-element synthetic HUD (`component-extract.test.ts` builds the
+ * same one), counting an element as detected at bbox IoU >= 0.5:
+ *
+ *   320x240   defaults (minArea 200, topN 8)  ->  6/16
+ *             minArea 24 alone                ->  6/16   (no change at all)
+ *             topN 24 alone                   ->  9/16
+ *             minArea 24 + topN 24            -> 14/16
+ *   1280x720  defaults                        ->  6/16
+ *             topN 24 alone                   -> 14/16   (minArea never binds)
+ *
+ * Two things that reading the issue would not predict. First, `minArea` — the
+ * threshold the report names — is worth nothing by itself: `topN` is the binding
+ * constraint, and it binds at *every* frame size, not just small ones. Second,
+ * `minArea` only starts to matter once `topN` is lifted, and only below roughly
+ * 640x360 (13/14 of the reachable ceiling at 640x360 on the historical 200,
+ * 9/14 at 320x240).
+ *
+ * 14/16 is the ceiling, not a shortfall: the two misses are glyph-run labels,
+ * and 4-connectivity cannot merge separated glyphs into one component at any
+ * threshold. The same 2 are missed at minArea 1.
+ *
+ * This is a preset rather than a size-adaptive default. `adaptiveRegionCellSize`
+ * (`@mizchi/vlmkit-core/heatmap.ts`) set the precedent for bucketing a default
+ * by image size, and its reasoning — a continuous function shifts geometry on
+ * nearly every existing image, and that geometry appears in baselines and
+ * reports — applies here with more force, because component *rank* feeds
+ * `page-compose-diff`'s top-N seats and the markup-verify calibrations keyed on
+ * them. And the measured counter-example is concrete: on a real 480x240 card
+ * render (`packages/vlmkit-heal/fixtures/.../dashboard-chromium-darwin.png`)
+ * dropping minArea to 50 adds 4 components that are all glyph blobs of the word
+ * "Dashboard" (areas 114-166 px) — indistinguishable by area from the 100-144 px
+ * icons the HUD case needs found. Frame size alone cannot separate the two, so
+ * the caller says which one they have.
+ */
+export const EXTRACT_PRESETS = {
+  /** Low-resolution, high-contrast frames with many small elements. */
+  "game-ui": { minArea: 24, topN: 24 },
+} as const satisfies Record<string, Pick<ExtractComponentsOptions, "minArea"> & { topN: number }>;
+
+export type ExtractPresetName = keyof typeof EXTRACT_PRESETS;
+
+export function isExtractPresetName(name: string): name is ExtractPresetName {
+  return Object.hasOwn(EXTRACT_PRESETS, name);
+}
+
+export const EXTRACT_PRESET_NAMES = Object.keys(EXTRACT_PRESETS) as ExtractPresetName[];
+
 /** Floor for the adaptive tolerance — below this, antialiasing halos start
  * forming their own components on clean renders. */
 const MIN_BG_TOLERANCE = 4;

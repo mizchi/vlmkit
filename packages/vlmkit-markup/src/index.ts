@@ -18,9 +18,15 @@ export {
   extractComponentsFromRgba,
   extractComponentsFromFile,
   matchComponents,
+  DEFAULT_MIN_AREA,
+  DEFAULT_TOP_N,
+  EXTRACT_PRESETS,
+  EXTRACT_PRESET_NAMES,
+  isExtractPresetName,
   type ComponentBbox,
   type MatchedBbox,
   type ExtractComponentsOptions,
+  type ExtractPresetName,
   type MatchComponentsOptions,
 } from "./component/component-bbox.ts";
 export {
