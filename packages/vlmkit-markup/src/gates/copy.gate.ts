@@ -7,6 +7,12 @@
  * usage error before any API key is resolved. The `--allow-invisible` reason
  * classes stay as they are — like integrity's `--allow`, that flag exempts a
  * *reason* and reports each accepted line, which rule settings do not replace.
+ *
+ * `--elements` selects element-rect mode (`../inspect/copy-image.ts`, vlmkit#118): text and
+ * bboxes come from the renderer instead of the DOM, so canvas/WebGPU and native UIs can be
+ * checked at all. It is mutually exclusive with a page source, for the reason image-mode
+ * `check integrity` gives: the two paths evaluate different rule sets, so a run that quietly
+ * picked one would make its verdict ambiguous.
  */
 
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
@@ -22,22 +28,75 @@ import {
   formatCopyCheckReport,
   runCopyCheck,
 } from "../inspect/copy-check.ts";
+import {
+  COPY_IMAGE_SKIPPED_RULES,
+  type CopyImageOptions,
+  runImageCopyCheck,
+} from "../inspect/copy-image.ts";
 import { TRANSCRIBE_PROMPT } from "../inspect/copy-target.ts";
-import { firstPositional, vlmFlag, withoutOptionalValue } from "./arg-helpers.ts";
+import {
+  firstPositional,
+  firstPositionalOrUndefined,
+  vlmFlag,
+  withoutOptionalValue,
+} from "./arg-helpers.ts";
 
 /** Options plus the unresolved `--vlm` request; `run` turns it into a reader. */
 export interface CopyGateOptions extends CopyCheckOptions {
   vlm?: string | true;
+  /** Set by `--elements`: check the renderer's text instead of a page's DOM. */
+  imageMode?: CopyImageOptions;
 }
 
 const COPY_VALUE_FLAGS = ["--manifest", "--target", "--out", "--allow-invisible"];
+
+/**
+ * Flags that promise a check element-rect mode does not perform.
+ *
+ * Rejected rather than ignored: `--target`'s whole output is crops of a reference screenshot
+ * reviewed by a VLM or an agent, and `--storage-state` only means anything to a browser
+ * navigation. Accepting either would let a caller believe a check ran that did not — the
+ * failure mode this feature's coverage reporting exists to prevent, so silently swallowing
+ * the flags would undo it at the front door.
+ */
+const NOT_IN_ELEMENTS_MODE: { flag: string; because: string }[] = [
+  {
+    flag: "--target",
+    because: "it crops a reference screenshot per rendered text block and reviews the crops"
+      + " (VLM or contact sheets); element-rect mode has no such comparison wired",
+  },
+  { flag: "--vlm", because: "it only drives --target's transcription" },
+  { flag: "--storage-state", because: "nothing is navigated, so there is no session to restore" },
+  { flag: "--out", because: "no sheets or worksheet are written" },
+];
+
+/**
+ * `--allow-invisible a,b` → validated reason classes, or `undefined` when absent.
+ *
+ * Shared by both modes: element-rect mode can produce `zero-size` and `unpainted` matches,
+ * and a project that has decided one of those is deliberate needs the same suppression the
+ * DOM path offers. Validating here keeps a typo a millisecond-fast usage error.
+ */
+function allowInvisibleFrom(argv: readonly string[]): InvisibleReason[] | undefined {
+  const raw = readFlag(argv, "allow-invisible");
+  if (raw === undefined) return undefined;
+  const classes = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  const bad = classes.filter((c) => !(INVISIBLE_REASONS as readonly string[]).includes(c));
+  if (classes.length === 0 || bad.length > 0) {
+    throw new UsageError(
+      `--allow-invisible: unknown class(es) ${bad.map((b) => `"${b}"`).join(", ") || "(none given)"}.`
+      + ` Valid: ${INVISIBLE_REASONS.join(", ")}`,
+    );
+  }
+  return classes as InvisibleReason[];
+}
 
 export const copyGate = defineGate<CopyCheckReport, CopyGateOptions>({
   id: "check.copy",
   command: ["check", "copy"],
   title: "Copy fidelity",
   summary:
-    "Copy fidelity: placeholder scan + --manifest verification + --target image check (VLM or agent-vision sheets)",
+    "Copy fidelity: placeholder scan + --manifest verification + --target image check (VLM or agent-vision sheets); --elements checks renderer text instead of a DOM (canvas/WebGPU)",
   category: "correctness",
   usage: `Copy fidelity gate: placeholder-text scan (always on), optional manifest
 verification, and optional target-image verification (crops every
@@ -60,9 +119,26 @@ is the user-visible copy spec — keep assistive-tech-only strings out
 of it. Markdown headings in the manifest ("# Section") are organizing
 comments, not required lines.
 
-Reason classes: ${INVISIBLE_REASONS.join(", ")}. When an invisibility is
-deliberate, accept that class with --allow-invisible; each accepted line is
-listed with its reason so the suppression stays auditable.`,
+Reason classes:
+  ${INVISIBLE_REASONS.join(", ")}
+When an invisibility is deliberate, accept that class with --allow-invisible;
+each accepted line is listed with its reason so the suppression stays
+auditable. (unpainted is --elements mode only, see below.)
+
+--elements <json> checks the RENDERER's text instead of a DOM, for canvas /
+WebGPU / native UIs where the DOM holds one <canvas> and every text rule
+finds nothing. Each row carries {path, tag, top, left, width, height, text}
+plus optional {textMeasured, clip} — the same schema as
+"check integrity --elements". No browser is started. Mutually exclusive with
+a page source. With --image <frame.png> each text bbox is also checked for
+ink, so a string the renderer reports but never painted (missing font,
+alpha 0, skipped draw call) reads as copy-invisible (reason: unpainted)
+instead of passing.
+
+${COPY_IMAGE_SKIPPED_RULES.length} rule(s) cannot run in element-rect mode and
+copy-invisible covers 2 of its 7 reason classes there; every gap is printed
+under "Coverage" next to the verdict, because a clean result is worth what it
+rules out.`,
   rules: [
     {
       id: "placeholder-text",
@@ -76,11 +152,39 @@ listed with its reason so the suppression stays auditable.`,
       severity: "suspect",
       docs: "Accept a specific reason class with --allow-invisible rather than disabling the rule.",
     },
+    {
+      id: "copy-truncated",
+      title: "Drawn text runs past its clip rect, so it renders cut off",
+      severity: "suspect",
+      docs: "--elements mode only: needs a text extent the renderer measured (`textMeasured`) and a"
+        + " `clip` rect. In the DOM, check integrity's text-clipped covers this.",
+    },
     { id: "copy-image-mismatch", title: "Rendered copy differs from the target image", severity: "suspect" },
     { id: "redirected", title: "Requested URL redirected elsewhere", severity: "suspect" },
   ],
   inputs: [
-    { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check", positional: 0, required: true },
+    {
+      name: "source",
+      placeholder: "html-or-url",
+      kind: "path-or-url",
+      description: "Page to check (omit when using --elements)",
+      positional: 0,
+      // No `required: true`, deliberately: --elements supplies the text instead. Keep it off
+      // or the MCP schema demands a page that the gate then rejects as mutually exclusive,
+      // which is how image-mode integrity ended up CLI-only (commit e9a1bec).
+    },
+    {
+      name: "elements",
+      placeholder: "elements.json",
+      kind: "path",
+      description: "Text + rects from the renderer instead of a DOM — canvas/WebGPU, native, Flutter",
+    },
+    {
+      name: "image",
+      placeholder: "frame.png",
+      kind: "path",
+      description: "Frame PNG for --elements mode; enables the ink check (text reported but never painted)",
+    },
     { name: "manifest", placeholder: "file", kind: "path", description: "Copy manifest (plain text / markdown; one required line per row)" },
     {
       name: "allow-invisible",
@@ -96,9 +200,42 @@ listed with its reason so the suppression stays auditable.`,
   parse: (argv) => {
     // `--vlm` is optionally-valued, so its model id cannot be excluded via
     // COPY_VALUE_FLAGS — see `withoutOptionalValue`.
+    const positionalArgv = withoutOptionalValue(argv, "vlm");
+    const elements = readFlag(argv, "elements");
+    const image = readFlag(argv, "image");
+    if (elements) {
+      if (firstPositionalOrUndefined(positionalArgv, COPY_VALUE_FLAGS)) {
+        throw new UsageError(
+          "check copy takes either a page source or --elements, not both. The two modes "
+          + "evaluate different rule sets, so a combined run's verdict would be ambiguous.",
+        );
+      }
+      for (const { flag, because } of NOT_IN_ELEMENTS_MODE) {
+        if (argv.includes(flag)) {
+          throw new UsageError(
+            `${flag} does not apply with --elements: ${because}.`
+            + " Drop it rather than have the run imply a check it did not perform.",
+          );
+        }
+      }
+      const elementsManifest = readFlag(argv, "manifest");
+      const elementsAllow = allowInvisibleFrom(argv);
+      return {
+        source: image ?? elements,
+        imageMode: {
+          elementsPath: elements,
+          ...(image ? { imagePath: image } : {}),
+          ...(elementsManifest ? { manifestPath: elementsManifest } : {}),
+          ...(elementsAllow ? { allowInvisible: elementsAllow } : {}),
+        },
+      };
+    }
+    if (image) {
+      throw new UsageError("--image needs --elements: a PNG alone carries no text to check.");
+    }
     const source = firstPositional(
-      withoutOptionalValue(argv, "vlm"),
-      "vlmkit check copy <html-or-url>",
+      positionalArgv,
+      "vlmkit check copy <html-or-url> | --elements <elements.json> [--image <frame.png>]",
       COPY_VALUE_FLAGS,
     );
     const manifestPath = readFlag(argv, "manifest");
@@ -107,19 +244,7 @@ listed with its reason so the suppression stays auditable.`,
     const storageState = readFlag(argv, "storage-state");
     const vlm = vlmFlag(argv);
     if (vlm !== undefined && !targetPath) throw new UsageError("--vlm requires --target <png>");
-    const rawAllow = readFlag(argv, "allow-invisible");
-    let allowInvisible: InvisibleReason[] | undefined;
-    if (rawAllow !== undefined) {
-      const classes = rawAllow.split(",").map((s) => s.trim()).filter(Boolean);
-      const bad = classes.filter((c) => !(INVISIBLE_REASONS as readonly string[]).includes(c));
-      if (classes.length === 0 || bad.length > 0) {
-        throw new UsageError(
-          `--allow-invisible: unknown class(es) ${bad.map((b) => `"${b}"`).join(", ") || "(none given)"}.`
-          + ` Valid: ${INVISIBLE_REASONS.join(", ")}`,
-        );
-      }
-      allowInvisible = classes as InvisibleReason[];
-    }
+    const allowInvisible = allowInvisibleFrom(argv);
     return {
       source,
       exploreStates: !argv.includes("--no-states"),
@@ -131,7 +256,10 @@ listed with its reason so the suppression stays auditable.`,
       ...(vlm !== undefined ? { vlm } : {}),
     };
   },
-  run: async ({ vlm, ...options }) => {
+  run: async ({ vlm, imageMode, ...options }) => {
+    // Element-rect mode never starts a browser, which is the point for a caller whose UI is
+    // a canvas: there is nothing for Playwright to read.
+    if (imageMode) return runImageCopyCheck(imageMode);
     if (vlm === undefined) return runCopyCheck(options);
     const { createVlmClient, resolveModel } = await import("@mizchi/vlmkit-ai/vlm-client.ts");
     const modelId = vlm === true ? (readEnv("VLM_MODEL") ?? "bytedance/ui-tars-1.5-7b") : vlm;

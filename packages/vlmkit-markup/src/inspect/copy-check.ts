@@ -62,7 +62,19 @@ import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
-export type CopyIssueKind = "placeholder-text" | "copy-missing" | "copy-invisible" | "copy-image-mismatch" | "redirected";
+export type CopyIssueKind =
+  | "placeholder-text"
+  | "copy-missing"
+  | "copy-invisible"
+  /**
+   * Element-rect mode only (`copy-image.ts`): the renderer says the string is drawn but its
+   * measured extent runs past its own clip rect, so the user reads a cut-off version. Needs
+   * a text extent only the renderer can measure, which is why the DOM path has no equivalent
+   * — there, `check integrity`'s `text-clipped` covers it from `scrollWidth - clientWidth`.
+   */
+  | "copy-truncated"
+  | "copy-image-mismatch"
+  | "redirected";
 
 export interface CopyIssue {
   kind: CopyIssueKind;
@@ -239,6 +251,12 @@ export const INVISIBLE_REASONS = [
   "visually-hidden",
   "unreachable",
   "camouflage",
+  // Element-rect mode only (`copy-image.ts`): the renderer reports text at a bbox the frame
+  // PNG shows as a flat, ink-free region — a missing font, alpha 0, or a skipped draw call.
+  // Its own class rather than `transparent`, because the DOM path's `transparent` is a
+  // measured `color` alpha and this is a measured pixel spread; collapsing them would make
+  // `--allow-invisible transparent` silence two different pieces of evidence.
+  "unpainted",
   "unknown",
 ] as const;
 export type InvisibleReason = (typeof INVISIBLE_REASONS)[number];
@@ -772,11 +790,29 @@ export function formatCopyCheckReport(report: CopyCheckReport): string {
   const status = report.issues.some((i) => i.severity === "suspect") ? "suspect"
     : report.issues.length > 0 ? "warn"
     : "ok";
+  // Element-rect mode (`copy-image.ts`) attaches its coverage fields to the same report
+  // shape. Read structurally rather than through an import so this module keeps its one
+  // direction of dependency — copy-image imports copy-check, never the reverse.
+  const coverage = report as Partial<{
+    skippedRules: { rule: string; reason: string }[];
+    inertRules: { rule: string; reason: string }[];
+    coverageNotes: string[];
+    elements: number;
+    textElements: number;
+  }>;
+  const imageMode = coverage.skippedRules !== undefined;
   lines.push(`${BOLD}${CYAN}vlmkit check copy${RESET}`);
   lines.push(`${DIM}source: ${report.source}${RESET}`);
   lines.push("");
   lines.push(`status: ${status}`);
-  lines.push(`rendered text: ${report.textLength} chars`);
+  if (imageMode) {
+    lines.push(
+      `elements: ${coverage.elements ?? 0} (${coverage.textElements ?? 0} carrying text),`
+      + ` ${report.textLength} chars`,
+    );
+  } else {
+    lines.push(`rendered text: ${report.textLength} chars`);
+  }
   if (report.statesExplored > 0) {
     lines.push(`disclosure states: ${report.statesExplored} explored (details / tabs / aria-expanded)`);
     if (report.droppedStates > 0) {
@@ -794,6 +830,8 @@ export function formatCopyCheckReport(report: CopyCheckReport): string {
     for (const a of report.allowedInvisibleLines) {
       lines.push(`  ${DIM}invisible-allowed: "${a.line}" (${a.reason} — accepted via --allow-invisible)${RESET}`);
     }
+  } else if (imageMode) {
+    lines.push(`manifest: none (pass --manifest; --target is not available in --elements mode)`);
   } else {
     lines.push(`manifest: none (pass --manifest, or --target <png> to verify copy against the target pixels)`);
   }
@@ -822,6 +860,29 @@ export function formatCopyCheckReport(report: CopyCheckReport): string {
   } else {
     lines.push("");
     lines.push(`${GREEN}No copy issues detected.${RESET}`);
+  }
+  // Element-rect mode evaluates 3 of 5 rules, one of them partially. A bare "No copy issues
+  // detected." would let that read as full coverage, which is the one way this feature can do
+  // harm: what a clean result is worth is what it rules out. Printed next to the verdict, not
+  // in a footnote — the same call `formatIntegrityReport` makes for image-mode integrity.
+  if (coverage.skippedRules && coverage.skippedRules.length > 0) {
+    lines.push("");
+    lines.push(
+      `${YELLOW}Coverage: element-rect mode — ${coverage.skippedRules.length} rule(s) cannot be`
+      + ` evaluated without a DOM${RESET}`,
+    );
+    for (const skipped of coverage.skippedRules) {
+      lines.push(`${DIM}  - ${skipped.rule}: ${skipped.reason}${RESET}`);
+    }
+    if (coverage.inertRules && coverage.inertRules.length > 0) {
+      lines.push(`${DIM}  ${coverage.inertRules.length} rule(s) ran with no input to judge:${RESET}`);
+      for (const inert of coverage.inertRules) {
+        lines.push(`${DIM}  - ${inert.rule}: ${inert.reason}${RESET}`);
+      }
+    }
+    for (const note of coverage.coverageNotes ?? []) {
+      lines.push(`${DIM}  * ${note}${RESET}`);
+    }
   }
   return lines.join("\n");
 }

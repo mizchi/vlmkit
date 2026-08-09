@@ -186,11 +186,12 @@ describe("required-ness follows `required`, not `positional`", () => {
         notRequired.push(`${gate.command.join(" ")} :: ${input.name}`);
       }
     }
-    // `check integrity` is the intended exception. Anything else appearing here means a
-    // gate is relying on the removed shortcut and its MCP schema just went optional.
+    // `check integrity` and `check copy` are the intended exceptions — both take element
+    // rects via `--elements` instead of a page. Anything else appearing here means a gate is
+    // relying on the removed shortcut and its MCP schema just went optional.
     assert.deepEqual(
-      notRequired,
-      ["check integrity :: source"],
+      notRequired.sort(),
+      ["check copy :: source", "check integrity :: source"],
       "a positional-0 input without `required: true` is now OPTIONAL in the MCP schema — "
       + "add `required: true` unless it is genuinely optional",
     );
@@ -206,6 +207,24 @@ describe("required-ness follows `required`, not `positional`", () => {
     assert.deepEqual(
       gateToolArgv(integrityGate, { elements: "e.json", image: "f.png" }, { description: "" }),
       ["--elements", "e.json", "--image", "f.png"],
+    );
+  });
+
+  it("leaves check copy's source optional so element-rect mode is callable", async () => {
+    // Same trap, same fix, one gate later: `check copy --elements` (vlmkit#118) would be
+    // CLI-only if its source declared itself required, because the gate rejects a page
+    // alongside `--elements` as mutually exclusive.
+    const { copyGate } = await import("@mizchi/vlmkit-markup/gates/copy.gate.ts");
+    const tool = gateTool(copyGate, { description: "x" });
+    assert.equal(tool.inputSchema.source!.isOptional(), true, "source must be optional");
+    assert.equal(tool.inputSchema.elements!.isOptional(), true);
+    assert.deepEqual(
+      gateToolArgv(
+        copyGate,
+        { elements: "e.json", image: "f.png", manifest: "copy.txt" },
+        { description: "" },
+      ),
+      ["--elements", "e.json", "--image", "f.png", "--manifest", "copy.txt"],
     );
   });
 });
