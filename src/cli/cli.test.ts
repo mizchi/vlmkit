@@ -18,7 +18,18 @@ function runVrt(args: string[]): { stdout: string; stderr: string; status: numbe
   const r = spawnSync(
     process.execPath,
     ["--experimental-strip-types", VLMKIT_TS, ...args],
-    { encoding: "utf-8", env: { ...process.env, NO_COLOR: "1" }, timeout: 5_000 },
+    // 30s, not 5s. Every case here spawns a real `node` that loads the CLI, and a help
+    // path measures ~900ms on an idle machine — a 5x margin, which sounds ample and is not.
+    // `node --test` runs this file alongside ~540 other suites, so the spawn competes with
+    // dozens of processes: adding 62 tests to the suite was enough to start breaching it,
+    // with a DIFFERENT subtest timing out each run and all 29 passing in isolation.
+    //
+    // The failure mode is what makes the low number wrong rather than merely tight: a
+    // timeout here reports as an ordinary assertion failure on a help command, which reads
+    // like a broken CLI verb. That sends the next person hunting a defect that is not there.
+    // These cases assert command *wiring*, so they have no business being sensitive to how
+    // busy the machine is.
+    { encoding: "utf-8", env: { ...process.env, NO_COLOR: "1" }, timeout: 30_000 },
   );
   return {
     stdout: r.stdout ?? "",
