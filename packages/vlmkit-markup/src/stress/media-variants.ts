@@ -39,6 +39,7 @@ import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { type PageLoadOptions, navigatePage } from "@mizchi/vlmkit-core/page-load.ts";
 
 export type MediaVariant = "forced-colors" | "reduced-motion" | "print" | "rtl" | "zoom-200";
 
@@ -50,7 +51,7 @@ export const ALL_VARIANTS: MediaVariant[] = [
   "zoom-200",
 ];
 
-export interface MediaVariantsOptions {
+export interface MediaVariantsOptions extends PageLoadOptions {
   source: string;
   outputDir: string;
   reportPath?: string;
@@ -88,8 +89,11 @@ function isUrl(s: string): boolean { return /^(https?|file):\/\//.test(s); }
  * forced-colors read `Delta 0.36% -> fails` unstyled and `Delta 1.46% -> passes`
  * with the CSS actually applied.
  */
-async function loadPage(page: Page, source: string): Promise<void> {
-  await page.goto(sourceToUrl(source), { waitUntil: "networkidle", timeout: 30000 });
+async function loadPage(page: Page, source: string, pageLoad: PageLoadOptions = {}): Promise<void> {
+  // Every variant pass (default + forced-colors + print + ...) goes through
+  // here, so the load options apply uniformly. A variant loaded under different
+  // rules than the baseline would diff two different documents.
+  await navigatePage(page, sourceToUrl(source), pageLoad);
 }
 
 /** Read all of the page's stylesheet text. Falls back to empty on errors. */
@@ -133,7 +137,7 @@ export async function runMediaVariants(
     // intentionally NOT disabled here because the reduced-motion
     // variant needs a fair comparison.
     const defaultPage = await browser.newPage({ viewport });
-    await loadPage(defaultPage, options.source);
+    await loadPage(defaultPage, options.source, options);
     defaultScreenshot = join(outputDir, "default.png");
     await defaultPage.screenshot({ path: defaultScreenshot, fullPage: false });
     // Read all stylesheets — used for reduced-motion static check.
@@ -161,7 +165,7 @@ export async function runMediaVariants(
         } else if (variant === "print") {
           await page.emulateMedia({ media: "print" });
         }
-        await loadPage(page, options.source);
+        await loadPage(page, options.source, options);
         if (variant === "rtl") {
           await page.evaluate(() => { document.documentElement.dir = "rtl"; });
           await page.waitForLoadState("networkidle").catch(() => {});

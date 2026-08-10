@@ -7,6 +7,7 @@
  * `scan` for the first half; a gate because of the second.
  */
 
+import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import {
@@ -49,6 +50,7 @@ suspects, declared-but-dead scrollports, and nested scrolling.
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to scan", positional: 0, required: true },
     { name: "viewport", placeholder: "WxH", kind: "string", description: "Viewport", defaultDescription: "1280x720" },
     { name: "clip-threshold", placeholder: "px", kind: "number", description: "Hidden px below which clipping is ignored", defaultDescription: "16" },
+    ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const source = firstPositional(argv, "vlmkit scan scroll <html-or-url>", ["--clip-threshold"]);
@@ -58,6 +60,7 @@ suspects, declared-but-dead scrollports, and nested scrolling.
       source,
       ...(clipThreshold !== undefined ? { clipThreshold } : {}),
       ...(viewport ? { viewport } : {}),
+      ...parsePageLoad(argv),
     };
   },
   run: (options) => runScrollScan(options),

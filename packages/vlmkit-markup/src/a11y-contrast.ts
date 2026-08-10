@@ -27,12 +27,13 @@ import { writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { type PageLoadOptions, pickPageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { openSource, resolveSource } from "@mizchi/vlmkit-core/page-open.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { evaluateA11yContrast } from "./markup-core-a11y-contrast.ts";
 
-export interface A11yContrastOptions {
+export interface A11yContrastOptions extends PageLoadOptions {
   /**
    * Suppress the human-readable console block. Set by `--json`: the console
    * output caps its list at five rows, so mixing it into stdout ahead of the
@@ -220,7 +221,7 @@ export async function runA11yContrast(
     // loads and the gate measures unstyled markup. Measured on
     // fixtures/external-assets: it reported 0 contrast failures where the same
     // CSS inlined reported 1.
-    const { page } = await openSource(browser, htmlPath, { viewport, settleMs: 0 });
+    const { page } = await openSource(browser, htmlPath, { viewport, settleMs: 0, ...pickPageLoad(options) });
     await page.addStyleTag({
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });

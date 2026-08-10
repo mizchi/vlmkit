@@ -23,6 +23,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { type PageLoadWaitUntil, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 export interface PerfOptions {
@@ -32,6 +33,23 @@ export interface PerfOptions {
   viewport?: { width: number; height: number };
   /** Wait time (ms) after page load before reading metrics. Default 3000. */
   observeMs?: number;
+  /**
+   * Navigation milestone. Defaults to `networkidle`.
+   *
+   * Lowering it moves the START of the observation window, not its length: the
+   * `--observe` timer begins at whichever milestone is reached, so
+   * `--wait-until domcontentloaded --observe 3000` observes the first 3s of an
+   * SPA's own rendering rather than 3s after it goes quiet. Both are legitimate
+   * measurements; they are not the same measurement, which is why this is a
+   * flag and not a default.
+   */
+  waitUntil?: PageLoadWaitUntil;
+  /** Navigation timeout in milliseconds. Defaults to 30000. */
+  timeout?: number;
+  // Deliberately NO `har`. HAR replay serves every response off local disk, so
+  // TTFB / LCP / FCP would measure disk reads — the exact numbers this gate
+  // exists to report, silently made meaningless. `check perf` therefore does
+  // not declare --har; the URL gates that only read geometry do.
 }
 
 export interface LayoutShiftSource {
@@ -196,7 +214,7 @@ export async function runPerf(options: PerfOptions): Promise<PerfReport> {
     //     HTML's <head> before passing to setContent.
     if (isUrl(options.source)) {
       await page.addInitScript(PERF_INSTALL_SCRIPT);
-      await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
+      await page.goto(options.source, navigationOptions(options));
     } else {
       let html = await readFile(resolve(options.source), "utf-8");
       const installTag = `<script>${PERF_INSTALL_SCRIPT}</script>`;
@@ -209,7 +227,7 @@ export async function runPerf(options: PerfOptions): Promise<PerfReport> {
       } else {
         html = `${installTag}${html}`;
       }
-      await page.setContent(html, { waitUntil: "networkidle" });
+      await page.setContent(html, navigationOptions(options));
     }
     // Observe for the requested window — layout shifts often happen
     // late as fonts / images / lazy-loaded content settle.

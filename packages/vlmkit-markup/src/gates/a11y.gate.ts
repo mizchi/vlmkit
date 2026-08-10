@@ -20,6 +20,7 @@
 
 import { join } from "node:path";
 import { readChoice, readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
+import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import {
@@ -87,10 +88,12 @@ threshold for its font size and weight.`,
   inputs: [
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to scan", positional: 0, required: true },
     ...REPORT_INPUTS("a11y-contrast"),
+    ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => ({
     htmlPath: firstPositional(argv, "vlmkit check a11y contrast <html-or-url>", A11Y_VALUE_FLAGS),
     ...reportFlags(argv, "a11y-contrast"),
+    ...parsePageLoad(argv),
   }),
   run: (options) => runA11yContrast(options),
   findings: (report): Finding[] =>
@@ -136,11 +139,13 @@ makes an undersized target unusable.`,
       defaultDescription: "AAA",
     },
     ...REPORT_INPUTS("a11y-touch"),
+    ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => ({
     source: firstPositional(argv, "vlmkit check a11y touch <html-or-url>", A11Y_VALUE_FLAGS),
     level: (readChoice(argv, "level", ["AAA", "AA"] as const) ?? "AAA") as WcagTouchLevel,
     ...reportFlags(argv, "a11y-touch"),
+    ...parsePageLoad(argv),
   }),
   run: (options) => runA11yTouch(options),
   findings: (report): Finding[] =>
@@ -189,6 +194,7 @@ moves backward, or jumps several visual rows at a time is reported.`,
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to walk", positional: 0, required: true },
     { name: "max-steps", placeholder: "n", kind: "number", description: "Maximum Tab presses", defaultDescription: "64" },
     ...REPORT_INPUTS("a11y-focus-order"),
+    ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const maxSteps = optionalInt(argv, "max-steps", { min: 1 });
@@ -196,6 +202,7 @@ moves backward, or jumps several visual rows at a time is reported.`,
       source: firstPositional(argv, "vlmkit check a11y focus <html-or-url>", A11Y_VALUE_FLAGS),
       ...(maxSteps !== undefined ? { maxSteps } : {}),
       ...reportFlags(argv, "a11y-focus-order"),
+      ...parsePageLoad(argv),
     };
   },
   run: (options) => runFocusOrder(options),

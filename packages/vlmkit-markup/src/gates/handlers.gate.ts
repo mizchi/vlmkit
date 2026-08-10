@@ -8,6 +8,7 @@
  * pointer-only control is a real defect), so it is a gate.
  */
 
+import { PAGE_LOAD_INPUTS, type PageLoadOptions, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import {
@@ -24,7 +25,7 @@ export interface HandlersGateReport {
   issues: HandlerIssue[];
 }
 
-export const handlersGate = defineGate<HandlersGateReport, { source: string }>({
+export const handlersGate = defineGate<HandlersGateReport, PageLoadOptions & { source: string }>({
   id: "scan.handlers",
   command: ["scan", "handlers"],
   title: "Event-callback surface",
@@ -56,10 +57,14 @@ Components property.`,
   ],
   inputs: [
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to scan", positional: 0, required: true },
+    ...PAGE_LOAD_INPUTS,
   ],
-  parse: (argv) => ({ source: firstPositional(argv, "vlmkit scan handlers <html-or-url>") }),
-  run: async ({ source }) => {
-    const surface = await buildHandlerSurface({ source });
+  parse: (argv) => ({
+    source: firstPositional(argv, "vlmkit scan handlers <html-or-url>"),
+    ...parsePageLoad(argv),
+  }),
+  run: async ({ source, ...pageLoad }) => {
+    const surface = await buildHandlerSurface({ source, ...pageLoad });
     return { surface, issues: deriveHandlerIssues(surface) };
   },
   findings: ({ issues }): Finding[] =>

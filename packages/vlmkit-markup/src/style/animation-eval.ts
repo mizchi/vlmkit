@@ -31,6 +31,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 
 export interface AnimationTimingSample {
   /** Index into the page's animation list at capture time. */
@@ -151,7 +152,7 @@ export interface AnimationEvalReport {
   framePaths?: string[];
 }
 
-export interface AnimationEvalOptions {
+export interface AnimationEvalOptions extends PageLoadOptions {
   source: string;
   html?: string;
   viewport?: { width: number; height: number };
@@ -422,11 +423,14 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
   const pageUrl = options.html !== undefined
     ? undefined
     : isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
+  // Both passes (normal + reduced-motion emulation) go through this, so
+  // --timeout / --wait-until / --har apply to both. Loading the two under
+  // different rules would make the reduced-motion comparison meaningless.
   const loadPage = async (p: import("playwright").Page) => {
     if (options.html !== undefined) {
-      await p.setContent(options.html, { waitUntil: "networkidle" });
+      await p.setContent(options.html, navigationOptions(options));
     } else {
-      await p.goto(pageUrl!, { waitUntil: "networkidle", timeout: 30000 });
+      await navigatePage(p, pageUrl!, options);
     }
   };
 

@@ -60,6 +60,7 @@ import {
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
+import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 export type CopyIssueKind =
@@ -608,7 +609,7 @@ export function analyzeCopy(input: {
   };
 }
 
-export interface CopyCheckOptions {
+export interface CopyCheckOptions extends PageLoadOptions {
   /**
    * Playwright storage-state file so gates can measure pages behind a
    * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
@@ -664,11 +665,10 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
   try {
     const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
     if (options.html !== undefined) {
-      await page.setContent(options.html, { waitUntil: "networkidle" });
-    } else if (isUrl(options.source)) {
-      await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
+      await page.setContent(options.html, navigationOptions(options));
     } else {
-      await page.goto(pathToFileURL(resolve(options.source)).href, { waitUntil: "networkidle", timeout: 30000 });
+      const url = isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
+      await navigatePage(page, url, options);
     }
     pageText = await page.evaluate(COLLECT_RAW_TEXT) as string;
     ({ visible: visibleText, invisible: invisibleChunks } =

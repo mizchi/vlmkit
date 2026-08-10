@@ -16,6 +16,7 @@
 import { join } from "node:path";
 import { readAll, readFlag, readInt, readNumber } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import {
@@ -44,6 +45,7 @@ export interface PageDriftGateOptions extends MultiPageConsistencyOptions {
   threshold: number;
 }
 
+
 export const driftComponentGate = defineGate<ComponentConsistencyReport, ComponentDriftGateOptions>({
   id: "check.drift.component",
   command: ["check", "drift", "component"],
@@ -53,7 +55,13 @@ export const driftComponentGate = defineGate<ComponentConsistencyReport, Compone
   usage: `Crops every match of --selector out of one render, picks one as the
 reference, and pixel-diffs the rest against it. Catches the same component
 styled differently in two places on the same page — a copy-paste divergence
-no single-element check can see.`,
+no single-element check can see.
+
+Local files only, despite the <html-or-url> spelling: the measurement reads
+the bytes and setContent()s them, so nothing is navigated. That is also why
+this is the one URL-shaped gate with no --timeout / --wait-until / --har —
+there is no navigation to time out, no load milestone to wait for and no
+network to replay. Pass a URL and it fails as a missing file.`,
   rules: [
     {
       id: "instance-drift",
@@ -114,6 +122,13 @@ no single-element check can see.`,
   }),
 });
 
+/**
+ * `check drift pages` takes its URLs through `--urls`, not through a
+ * `path-or-url` positional, which is why it was not in the 2026-08-10 audit's
+ * list of URL gates. It navigates them all the same, so it takes the same three
+ * page-load flags. (`--files` goes through `setContent`, so `--har` has no
+ * document request to intercept on that branch.)
+ */
 export const driftPagesGate = defineGate<MultiPageConsistencyReport, PageDriftGateOptions>({
   id: "check.drift.pages",
   command: ["check", "drift", "pages"],
@@ -140,6 +155,7 @@ Pass either --urls or --files, each repeatable.`,
     { name: "threshold", placeholder: "0..1", kind: "number", description: "Pixel diff threshold", defaultDescription: String(DEFAULT_THRESHOLD) },
     { name: "output-dir", placeholder: "dir", kind: "path", description: "Output directory", defaultDescription: "./test-results/consistency" },
     { name: "report", placeholder: "path", kind: "path", description: "Markdown report path" },
+    ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const selector = readFlag(argv, "selector");
@@ -159,6 +175,7 @@ Pass either --urls or --files, each repeatable.`,
       ...(urls.length > 0 ? { urls } : {}),
       ...(files.length > 0 ? { files } : {}),
       ...(reportPath ? { reportPath } : {}),
+      ...parsePageLoad(argv),
     };
   },
   run: (options) => runMultiPageConsistency(options),

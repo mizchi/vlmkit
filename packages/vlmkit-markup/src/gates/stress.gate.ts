@@ -13,6 +13,7 @@
 import { join } from "node:path";
 import { readFlag, readNumber } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import {
@@ -64,6 +65,7 @@ needing translations.`,
     { name: "inflate", placeholder: "n", kind: "number", description: "Word-length inflation factor", defaultDescription: "1.4" },
     { name: "output-dir", placeholder: "dir", kind: "path", description: "Output directory", defaultDescription: "./test-results/i18n-stress" },
     { name: "report", placeholder: "path", kind: "path", description: "Markdown report path" },
+    ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const htmlPath = firstPositional(argv, "vlmkit stress i18n <html-or-url>", ["--inflate", "--output-dir", "--report"]);
@@ -77,6 +79,7 @@ needing translations.`,
       quiet: true,
       ...(inflateFactor !== undefined ? { inflateFactor } : {}),
       ...(reportPath ? { reportPath } : {}),
+      ...parsePageLoad(argv),
     };
   },
   run: (options) => runI18nStress(options),
@@ -141,6 +144,7 @@ Available variants: ${ALL_VARIANTS.join(", ")}.`,
     { name: "threshold", placeholder: "0..1", kind: "number", description: "Pixel diff threshold", defaultDescription: "0.03" },
     { name: "output-dir", placeholder: "dir", kind: "path", description: "Output directory", defaultDescription: "./test-results/media-variants" },
     { name: "report", placeholder: "path", kind: "path", description: "Markdown report path" },
+    ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const source = firstPositional(argv, "vlmkit stress media <html-or-url>", ["--variants", "--threshold", "--output-dir", "--report"]);
@@ -166,6 +170,7 @@ Available variants: ${ALL_VARIANTS.join(", ")}.`,
       ...(variants ? { variants } : {}),
       ...(threshold !== undefined ? { threshold } : {}),
       ...(reportPath ? { reportPath } : {}),
+      ...parsePageLoad(argv),
     };
   },
   run: (options) => runMediaVariants(options),

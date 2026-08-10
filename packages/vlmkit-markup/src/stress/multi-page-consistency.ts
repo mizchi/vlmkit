@@ -42,8 +42,9 @@ import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vlmkit-c
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 
-export interface MultiPageConsistencyOptions {
+export interface MultiPageConsistencyOptions extends PageLoadOptions {
   /** CSS selector identifying the shared component on every page. */
   selector: string;
   /** List of URLs to fetch (one of urls/files must be set). */
@@ -124,7 +125,7 @@ export async function runMultiPageConsistency(
     let idx = 0;
     for (const url of urls) {
       const page = await browser.newPage({ viewport });
-      await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+      await navigatePage(page, url, options);
       const label = url;
       const safeLabel = `page-${idx++}-${basename(url).replace(/[^a-z0-9.-]+/gi, "_") || "root"}`;
       const screenshotPath = join(outputDir, `${safeLabel}.png`);
@@ -135,7 +136,9 @@ export async function runMultiPageConsistency(
     for (const file of files) {
       const page = await browser.newPage({ viewport });
       const html = await readFile(file, "utf-8");
-      await page.setContent(html, { waitUntil: "networkidle" });
+      // --files reads the bytes and setContent()s them, so --har has no document
+      // request to intercept here; --wait-until / --timeout still apply.
+      await page.setContent(html, navigationOptions(options));
       const label = basename(file);
       const safeLabel = `page-${idx++}-${label.replace(/[^a-z0-9.-]+/gi, "_")}`;
       const screenshotPath = join(outputDir, `${safeLabel}.png`);

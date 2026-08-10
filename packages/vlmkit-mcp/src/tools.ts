@@ -105,12 +105,17 @@ const checkLayoutTool: McpTool = {
 
 const checkInteractionsTool = gateTool(interactionsGate, {
   description:
-    "A11y-event state map: discovers interactive elements (roles + implicit semantics), probes their canonical keyboard events (Tab/Enter/Space/arrows/Escape) and records the resulting ARIA transitions, popup patterns (dialog focus-trap, menu focus/arrows/Escape-return), composite navigation (listbox activedescendant, grid roving), and live-region announcements. With `reference`, the reference's inventory becomes the behavioral contract matched by (role, accessible name) — this fails pages that match every screenshot but respond wrongly to keyboard events. Deterministic, no VLM.",
+    "A11y-event state map: discovers interactive elements (roles + implicit semantics), probes their canonical keyboard events (Tab/Enter/Space/arrows/Escape) and records the resulting ARIA transitions, popup patterns (dialog focus-trap, menu focus/arrows/Escape-return), composite navigation (listbox activedescendant, grid roving), and live-region announcements. With `reference`, the reference's inventory becomes the behavioral contract matched by (role, accessible name) — this fails pages that match every screenshot but respond wrongly to keyboard events. Deterministic, no VLM. `waitUntil: \"domcontentloaded\"` gates an SPA dev server whose background requests never reach network idle.",
+  // `har` omitted for the same reason as on check_integrity: recording one is a
+  // CLI/CI operation. `timeout` / `waitUntil` stay — pointing at a dev server
+  // that never goes idle is exactly what an MCP client does.
+  omit: ["har"],
 });
 
 const scanHandlersTool = gateTool(handlersGate, {
   description:
     "Enumerates every event callback actually wired on the page (an addEventListener init-script patch + on* attribute/property sweep) into a per-element event surface, cross-checked against the a11y discovery. Headline detection the role-driven map cannot make: the pointer-only control — a visible element with a click/pointer handler but no role, no keyboard handler, and no delegation excuse, operable by mouse but not keyboard/AT. Deterministic, no VLM. (React-style root delegation shows as one listener on the root; per-element granularity is a vanilla/Web-Components property.)",
+  omit: ["har"],
 });
 
 const checkCopyTool = gateTool(copyGate, {
@@ -118,7 +123,7 @@ const checkCopyTool = gateTool(copyGate, {
     "Copy-fidelity gate: an always-on placeholder-text scan (lorem-ipsum/TODO/TBD), plus optional manifest verification (every manifest line must appear in the VISIBLY rendered text, whitespace-normalized, case-sensitive; markdown headings in the manifest are section comments, not required lines) and optional target-image verification (crops every rendered text block's bbox out of the target screenshot into contact sheets for a second reader; the sheets catch a wrong year / missing separator / proper-noun typo that composition pairs happily and no pixel gate sees). Manifest matching sweeps disclosure states (closed <details>, unselected tabs, aria-expanded=false controls) so collapsed copy passes with provenance — do not ship disclosures open just to satisfy this gate. Copy that is not actually user-visible is reported as copy-invisible with a reason class, not as satisfied — do not hide manifest lines to pass. Detection is geometric (2026-07-31 silencing battery): font-size:0 / opacity:0 / transparent color, off-screen positioning (left/top -9999px, fixed off-viewport), text-indent, transform translate/scale(0), clip:rect / clip-path:inset, zero-size overflow boxes, color-on-same-color camouflage, and sr-only text (manifest lines are the user-VISIBLE copy spec; keep assistive-tech-only strings out of the manifest). Deliberate invisibility can be accepted per class via allowInvisible (reasons: zero-size, hidden, transparent, visually-hidden, unreachable, camouflage, unknown); accepted lines are listed with their reason so the suppression stays auditable. Deterministic except optional VLM transcription (not exposed here).",
   // `--vlm` needs an API key and this surface is the keyless one; `--out`
   // and `--no-states` are operator knobs, not things a model should pick.
-  omit: ["vlm", "no-states", "storage-state"],
+  omit: ["vlm", "no-states", "storage-state", "har"],
   aliases: { out: "outDir" },
 });
 

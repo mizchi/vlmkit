@@ -24,6 +24,7 @@ import { fileURLToPath } from "node:url";
 import { chromium, type Page } from "playwright";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, RED, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { type PageLoadOptions, pickPageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { openSource } from "@mizchi/vlmkit-core/page-open.ts";
 import {
   requiredTouchSide,
@@ -33,7 +34,7 @@ import {
 
 export type WcagTouchLevel = "AAA" | "AA";
 
-export interface TouchCheckOptions {
+export interface TouchCheckOptions extends PageLoadOptions {
   /**
    * Suppress the human-readable console block. Set by `--json`: the console
    * output caps its list at five rows, so mixing it into stdout ahead of the
@@ -197,7 +198,7 @@ export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchRep
     // fixtures/external-assets that hid the 20x20 tap target entirely (the
     // element gets its size from CSS) while reporting three styled-and-compliant
     // buttons as failures at their unstyled sizes.
-    const { page } = await openSource(browser, options.source, { viewport, settleMs: 0 });
+    const { page } = await openSource(browser, options.source, { viewport, settleMs: 0, ...pickPageLoad(options) });
     await page.addStyleTag({
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });

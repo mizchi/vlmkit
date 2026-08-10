@@ -31,6 +31,7 @@ import { chromium, type Page } from "playwright";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
+import { type PageLoadOptions, navigatePage } from "@mizchi/vlmkit-core/page-load.ts";
 
 export interface DesignTokenConfig {
   radius?: number[];
@@ -50,7 +51,7 @@ const DEFAULT_CONFIG: Required<Omit<DesignTokenConfig, "tolerance">> & { toleran
   tolerance: 0.5,
 };
 
-export interface DesignTokensOptions {
+export interface DesignTokensOptions extends PageLoadOptions {
   source: string;
   outputDir: string;
   reportPath?: string;
@@ -204,11 +205,9 @@ export async function runDesignTokens(
   let samples: RawSample[];
   try {
     const page = await browser.newPage({ viewport });
-    if (isUrl(options.source)) {
-      await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
-    } else {
-      await page.goto(sourceToUrl(options.source), { waitUntil: "networkidle", timeout: 30000 });
-    }
+    // `sourceToUrl` is identity for a URL, so the two branches were the same
+    // call; one navigation now, honouring --timeout / --wait-until / --har.
+    await navigatePage(page, sourceToUrl(options.source), options);
     samples = await page.evaluate(SAMPLE_SCRIPT) as RawSample[];
     await page.close();
   } finally {

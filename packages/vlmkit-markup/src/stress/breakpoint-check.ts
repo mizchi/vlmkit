@@ -35,6 +35,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { extractBreakpoints } from "@mizchi/vlmkit-capture/viewport-discovery.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
+import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 /** Discrete computed properties compared across boundary widths. */
@@ -164,7 +165,7 @@ export interface BreakpointCheckReport {
   issues: BreakpointCheckIssue[];
 }
 
-export interface BreakpointCheckOptions {
+export interface BreakpointCheckOptions extends PageLoadOptions {
   /**
    * Playwright storage-state file so gates can measure pages behind a
    * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
@@ -397,14 +398,13 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
   try {
     const page = await browser.newPage(withAuthState({ viewport: { width: 1280, height } }, options.storageState));
     if (options.html !== undefined) {
-      await page.setContent(options.html, { waitUntil: "networkidle" });
-    } else if (isUrl(options.source)) {
-      await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
+      await page.setContent(options.html, navigationOptions(options));
     } else {
       // file: URL navigation so relative stylesheets resolve — setContent
       // gives the document an about:blank base URL and we'd analyze an
       // unstyled page.
-      await page.goto(pathToFileURL(resolve(options.source)).href, { waitUntil: "networkidle", timeout: 30000 });
+      const url = isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
+      await navigatePage(page, url, options);
     }
 
 

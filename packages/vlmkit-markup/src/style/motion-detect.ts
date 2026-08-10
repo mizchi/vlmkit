@@ -19,6 +19,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 
 export interface MotionComputedSample {
   selector: string;
@@ -61,7 +62,7 @@ export interface MotionDetectionReport {
   issues: MotionIssue[];
 }
 
-export interface MotionDetectionOptions {
+export interface MotionDetectionOptions extends PageLoadOptions {
   source: string;
   html?: string;
   maxSamples?: number;
@@ -153,14 +154,13 @@ export async function runMotionDetection(
   try {
     const page = await browser.newPage({ viewport });
     if (options.html !== undefined) {
-      await page.setContent(options.html, { waitUntil: "networkidle" });
-    } else if (isUrl(options.source)) {
-      await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
+      await page.setContent(options.html, navigationOptions(options));
     } else {
       // file: URL navigation so relative stylesheets resolve — setContent
       // gives the document an about:blank base URL (same fix as the other
       // page-loading checks).
-      await page.goto(pathToFileURL(resolve(options.source)).href, { waitUntil: "networkidle", timeout: 30000 });
+      const url = isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
+      await navigatePage(page, url, options);
     }
 
     const result = await page.evaluate((limit) => {

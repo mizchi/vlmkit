@@ -40,6 +40,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
+import { type PageLoadOptions, navigatePage } from "@mizchi/vlmkit-core/page-load.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
@@ -219,7 +220,7 @@ function collectRects(selectors: string[]): Record<string, LayoutRect[]> {
   return out;
 }
 
-export interface LayoutVerifyOptions {
+export interface LayoutVerifyOptions extends PageLoadOptions {
   /**
    * Playwright storage-state file so gates can measure pages behind a
    * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
@@ -246,7 +247,7 @@ export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<Lay
     for (const width of widths) {
       const height = options.heights?.[width] ?? DEFAULT_HEIGHTS[width] ?? 800;
       const page = await browser.newPage(withAuthState({ viewport: { width, height } }, options.storageState));
-      await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+      await navigatePage(page, url, options);
       redirected ??= /^https?:\/\//.test(options.source)
         ? describeRedirect(options.source, page.url()) ?? undefined
         : undefined;

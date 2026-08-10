@@ -29,6 +29,7 @@ import type { Page } from "playwright";
 import { handleCliError, UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
+import { type PageLoadOptions, applyHar, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -209,7 +210,7 @@ function evalAssertion(spec: FlowAssert): (s: FlowAssert) => [boolean, string] {
   };
 }
 
-export interface FlowVerifyOptions {
+export interface FlowVerifyOptions extends PageLoadOptions {
   /**
    * Playwright storage-state file so gates can measure pages behind a
    * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
@@ -228,7 +229,11 @@ export async function runFlowVerify(options: FlowVerifyOptions): Promise<FlowVer
   try {
     const page = await browser.newPage(withAuthState({ viewport: options.flow.viewport ?? { width: 1280, height: 800 } }, options.storageState));
     const url = /^(https?|file):\/\//.test(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
-    await page.goto(url, { waitUntil: "load", timeout: 30000 });
+    await applyHar(page, options.har);
+    // `load` stays this gate's default milestone — the settle below already
+    // bounds a network-idle wait, which is why a flow survives a page that
+    // never reaches idle. `--wait-until` can still lower it.
+    await page.goto(url, navigationOptions(options, "load"));
     // Assertions read the DOM through `page.evaluate`, which — unlike a
     // Playwright action — does not auto-wait. Without this settle a flow
     // pointed at a client-rendered view asserts against the placeholder:

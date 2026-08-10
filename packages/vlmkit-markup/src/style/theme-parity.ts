@@ -27,12 +27,13 @@ import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
 import { chromium } from "playwright";
+import { type PageLoadOptions, pickPageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { openSource, resolveSource } from "@mizchi/vlmkit-core/page-open.ts";
 import { extractComponentsFromFile, type ComponentBbox } from "../component/component-bbox.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 
-export interface ThemeParityOptions {
+export interface ThemeParityOptions extends PageLoadOptions {
   htmlPath: string;
   outputDir: string;
   reportPath?: string;
@@ -122,6 +123,10 @@ export async function runThemeParity(
       viewport,
       colorScheme: "light",
       settleMs: 0,
+      // Both renders load under identical rules: comparing a settled light
+      // render against an early dark one would report the difference as a
+      // theme defect.
+      ...pickPageLoad(options),
     });
     // Disable transitions/animations for deterministic capture (cf.
     // Subagent H dogfood, same root cause as multi-state state diffs).
@@ -140,6 +145,7 @@ export async function runThemeParity(
       viewport,
       colorScheme: "dark",
       settleMs: 0,
+      ...pickPageLoad(options),
     });
     await darkPage.addStyleTag({
       content: `*, *::before, *::after {

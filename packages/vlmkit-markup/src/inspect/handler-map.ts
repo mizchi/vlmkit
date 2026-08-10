@@ -33,6 +33,7 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
+import { type PageLoadOptions, applyHar, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { DISCOVER_SCRIPT } from "./interaction-map.ts";
@@ -161,7 +162,12 @@ const COLLECT_SURFACE_SCRIPT = `
 })()
 `;
 
-export async function buildHandlerSurface(options: { source: string; storageState?: string }): Promise<HandlerSurface> {
+export interface HandlerSurfaceOptions extends PageLoadOptions {
+  source: string;
+  storageState?: string;
+}
+
+export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promise<HandlerSurface> {
   const { chromium } = await import("playwright");
   const browser = await chromium.launch();
   try {
@@ -170,7 +176,11 @@ export async function buildHandlerSurface(options: { source: string; storageStat
     const url = /^(https?|file):\/\//.test(options.source)
       ? options.source
       : pathToFileURL(resolve(options.source)).href;
-    await page.goto(url, { waitUntil: "load", timeout: 30000 });
+    await applyHar(page, options.har);
+    // `load` remains the default here (not networkidle): the settle below waits
+    // for network idle with a bound, so this gate already survives a page that
+    // never reaches it. `--wait-until` can still lower it.
+    await page.goto(url, navigationOptions(options, "load"));
     // Client-rendered pages register their handlers after `load` — without
     // this the scan inventories the pre-render DOM (see settlePage).
     await settlePage(page);

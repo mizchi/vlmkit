@@ -16,6 +16,7 @@
  */
 
 import { readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
+import { PAGE_LOAD_INPUTS, type PageLoadOptions, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { GREEN, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -36,7 +37,7 @@ import {
 } from "../inspect/handler-map.ts";
 import { firstPositional, optionalInt } from "./arg-helpers.ts";
 
-export interface InteractionsGateOptions {
+export interface InteractionsGateOptions extends PageLoadOptions {
   source: string;
   reference?: string;
   maxElements: number;
@@ -110,29 +111,39 @@ contract and every response mismatch is reported.`,
       kind: "boolean",
       description: "Also enumerate the wired event-callback surface (scan handlers) and cross-check it",
     },
+    ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const source = firstPositional(argv, "vlmkit check interactions <html-or-url>", ["--reference", "--max-elements"]);
     const reference = readFlag(argv, "reference");
     const maxElements = optionalInt(argv, "max-elements", { min: 1 }) ?? 30;
-    return { source, maxElements, handlers: argv.includes("--handlers"), ...(reference ? { reference } : {}) };
+    return {
+      source,
+      maxElements,
+      handlers: argv.includes("--handlers"),
+      ...(reference ? { reference } : {}),
+      ...parsePageLoad(argv),
+    };
   },
-  run: async ({ source, reference, maxElements, handlers }) => {
-    const map = await buildInteractionMap({ source, maxElements });
+  run: async ({ source, reference, maxElements, handlers, ...pageLoad }) => {
+    const map = await buildInteractionMap({ source, maxElements, ...pageLoad });
     const report: InteractionsGateReport = { map, issues: deriveInteractionIssues(map) };
     if (reference) {
-      const refMap = await buildInteractionMap({ source: reference, maxElements });
+      // The reference is measured with the same load options: comparing a
+      // settled attempt against an early-read reference would report the
+      // reference's placeholder as the contract.
+      const refMap = await buildInteractionMap({ source: reference, maxElements, ...pageLoad });
       report.comparison = compareInteractionMaps(refMap, map);
     }
     if (handlers) {
       const { buildHandlerSurface, compareHandlerSurfaces, deriveHandlerIssues } = await import(
         "../inspect/handler-map.ts"
       );
-      const surface = await buildHandlerSurface({ source });
+      const surface = await buildHandlerSurface({ source, ...pageLoad });
       report.handlerSurface = surface;
       report.handlerIssues = deriveHandlerIssues(surface);
       if (reference) {
-        const refSurface = await buildHandlerSurface({ source: reference });
+        const refSurface = await buildHandlerSurface({ source: reference, ...pageLoad });
         report.surfaceMismatches = compareHandlerSurfaces(refSurface, surface);
       }
     }

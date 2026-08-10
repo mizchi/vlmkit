@@ -82,6 +82,36 @@ export async function settlePage(page: Page, settleMs = 250): Promise<void> {
   if (settleMs > 0) await page.waitForTimeout(settleMs);
 }
 
+/**
+ * Install HAR replay on a page, when the caller asked for it.
+ *
+ * `notFound: "abort"` rather than Playwright's default `"fallback"`, and that is
+ * a real trade the caller has to know about:
+ *
+ *   - `abort` is what makes `--har` solve the problem it was added for. The hang
+ *     in issue #112 was a third-party request that never settles; `fallback`
+ *     would let that same request through to the network and the run would hang
+ *     exactly as before. `abort` is also what makes a HAR run reproducible
+ *     offline, which is the other reason to record one.
+ *   - The cost: an *incomplete* HAR turns every un-recorded subresource into a
+ *     failed request. On gates that judge resources — `check integrity`'s
+ *     `broken-image` / `failed-stylesheet` / `broken-font` rules — that reads as
+ *     a defect in the page rather than as a gap in the recording, so HAR
+ *     completeness silently becomes part of the verdict. Record with
+ *     `browser.newContext({ recordHar: { path } })` over the same navigation the
+ *     gate will perform, and treat new findings under `--har` as suspect until
+ *     the recording has been refreshed.
+ *
+ * This was already the behaviour at `check integrity`'s and `check design`'s own
+ * goto sites (both hardcoded `notFound: "abort"`); it lives here so the trade is
+ * documented once and the gates that have since adopted `--har` cannot disagree
+ * about it.
+ */
+export async function applyHar(page: Page, har?: string): Promise<void> {
+  if (!har) return;
+  await page.routeFromHAR(resolve(har), { notFound: "abort" });
+}
+
 export interface OpenPageOptions {
   viewport?: ViewportSize;
   deviceScaleFactor?: number;
@@ -91,6 +121,12 @@ export interface OpenPageOptions {
   storageState?: string;
   waitUntil?: "load" | "domcontentloaded" | "networkidle" | "commit";
   timeout?: number;
+  /**
+   * Replay network responses from a Playwright HAR. Applied before navigation,
+   * so the document request itself comes from the recording. See `applyHar` for
+   * why un-recorded requests are aborted rather than passed through.
+   */
+  har?: string;
   /** Extra quiet time after load. 0 skips it. */
   settleMs?: number;
   /** Skip settling entirely (a gate that measures load timing does its own). */
@@ -124,6 +160,7 @@ export async function openSource(
   options: OpenPageOptions = {},
 ): Promise<OpenedPage> {
   const page = await browser.newPage(pageOptions(options));
+  await applyHar(page, options.har);
   await page.goto(sourceToUrl(source), {
     waitUntil: options.waitUntil ?? "networkidle",
     timeout: options.timeout ?? 30000,
@@ -170,6 +207,7 @@ export async function openHtml(
   options: OpenHtmlOptions = {},
 ): Promise<Page> {
   const page = await browser.newPage(pageOptions(options));
+  await applyHar(page, options.har);
   if (options.baseSource) {
     await page.goto(sourceToUrl(options.baseSource), {
       waitUntil: "domcontentloaded",

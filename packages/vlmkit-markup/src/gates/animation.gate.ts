@@ -7,6 +7,7 @@
  * fails the command and `--advisory` is the opt-out, per `gate-exit.ts`.
  */
 
+import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
@@ -57,6 +58,7 @@ when the page settles, and whether prefers-reduced-motion is honored.`,
     { name: "frames", placeholder: "dir", kind: "path", description: "Write each sampled frame PNG into this directory" },
     { name: "settle-threshold", placeholder: "ms", kind: "number", description: "long-settle threshold", defaultDescription: "3000" },
     { name: "skip-reduced-motion", kind: "boolean", description: "Skip the reduced-motion emulation pass" },
+    ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const source = firstPositional(argv, "vlmkit check animation <html-or-url>", ["--samples", "--max-animations", "--settle-threshold", "--frames"]);
@@ -73,6 +75,7 @@ when the page settles, and whether prefers-reduced-motion is honored.`,
       ...(settleThresholdMs !== undefined ? { settleThresholdMs } : {}),
       ...(framesDir ? { framesDir } : {}),
       ...(viewport ? { viewport } : {}),
+      ...parsePageLoad(argv),
     };
   },
   run: (options) => runAnimationEval(options),

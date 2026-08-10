@@ -28,10 +28,11 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, type Page } from "playwright";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { classifyFocusOrderStep } from "./markup-core-a11y-focus-order.ts";
 
-export interface FocusOrderOptions {
+export interface FocusOrderOptions extends PageLoadOptions {
   /**
    * Suppress the human-readable console block. Set by `--json`: the console
    * output caps its list at five rows, so mixing it into stdout ahead of the
@@ -202,9 +203,12 @@ export async function runFocusOrder(
   try {
     const page = await browser.newPage({ viewport });
     if (isUrl(options.source)) {
-      await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
+      await navigatePage(page, options.source, options);
     } else {
-      await page.setContent(html!, { waitUntil: "networkidle" });
+      // File mode still reads the bytes and `setContent`s them, so `--har` has
+      // nothing to intercept for the document itself (subresources still route
+      // through it). `--wait-until` / `--timeout` do apply to setContent.
+      await page.setContent(html!, navigationOptions(options));
     }
     await page.addStyleTag({
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,

@@ -19,6 +19,7 @@ import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { readFlag, readNumber } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { PAGE_LOAD_INPUTS, type PageLoadOptions, parsePageLoad, pickPageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import {
@@ -29,7 +30,7 @@ import {
 } from "../style/design-tokens.ts";
 import { firstPositional, numberListFloat, optionalInt } from "./arg-helpers.ts";
 
-export interface TokensGateOptions {
+export interface TokensGateOptions extends PageLoadOptions {
   source: string;
   outputDir: string;
   reportPath?: string;
@@ -87,6 +88,7 @@ suspect for one run; "rules" in vlmkit.gates.json does it permanently.`,
     { name: "strict", kind: "boolean", description: "Treat violations as suspects (exit 1)" },
     { name: "output-dir", placeholder: "dir", kind: "path", description: "Output directory", defaultDescription: "./test-results/design-tokens" },
     { name: "report", placeholder: "path", kind: "path", description: "Markdown report path" },
+    ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const source = firstPositional(argv, "vlmkit check tokens <html-or-url>", TOKENS_VALUE_FLAGS);
@@ -114,6 +116,7 @@ suspect for one run; "rules" in vlmkit.gates.json does it permanently.`,
       },
       ...(reportPath ? { reportPath } : {}),
       ...(configPath ? { configPath } : {}),
+      ...parsePageLoad(argv),
     };
   },
   run: async (options) => {
@@ -127,6 +130,7 @@ suspect for one run; "rules" in vlmkit.gates.json does it permanently.`,
       outputDir: options.outputDir,
       ...(options.reportPath ? { reportPath: options.reportPath } : {}),
       config: { ...fileConfig, ...options.config },
+      ...pickPageLoad(options),
     });
   },
   findings: (report, options): Finding[] => {
