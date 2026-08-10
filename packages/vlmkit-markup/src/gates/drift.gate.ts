@@ -65,9 +65,17 @@ network to replay. Pass a URL and it fails as a missing file.`,
   rules: [
     {
       id: "instance-drift",
-      title: "Instance differs from the reference beyond the threshold",
+      title: "Instance is styled differently from the reference",
       severity: "suspect",
       docs: "Raise the pass line with --threshold rather than disabling the rule. `--threshold` does not change the measured ratio; `--pixel-tolerance` does.",
+    },
+    {
+      id: "instance-content-differs",
+      title: "Instance differs in pixels but not in any tracked computed style",
+      severity: "info",
+      docs: `Informational by design: two instances of one component holding different copy differ in
+pixels and in height, and that is not drift. Raised instead of \`instance-drift\` whenever every
+tracked style property matches, so the gate can pass on a page with real content.`,
     },
   ],
   inputs: [
@@ -99,19 +107,45 @@ network to replay. Pass a URL and it fails as a missing file.`,
     };
   },
   run: (options) => runComponentConsistency(options),
+  // Drift is a difference in *styling*, and pixels alone cannot tell that from a
+  // difference in copy. A dogfood agent could not get this gate to pass on a page
+  // with real content: "It raw-pixel-diffs crops, so two identically-styled cards
+  // with different copy read `4.86% Δ 0 / 0` — above the 3% default. Proved it: same
+  // styling + identical text = `0.00%`. The message […] claims drift where none
+  // exists, and the report's remedy ('Replace the inline markup with the shared
+  // component invocation') is unfollowable — the markup is already identical."
+  //
+  // So the computed style decides, and the pixel ratio only gates whether the
+  // difference is worth mentioning at all. Measured on the dogfood page: the featured
+  // card reports 9 style deltas naming `padding-*` and `border-top-color`; the
+  // same-styled card with different copy reports 0 despite 3.37% of pixels.
   findings: (report, options): Finding[] =>
     report.deltas
       .filter((d) => d.diffRatio > options.threshold)
-      .map((d) => ({
-        rule: "instance-drift",
-        severity: "suspect",
-        message:
-          `instance #${d.candidateIndex} differs from reference #${report.referenceIndex}`
-          + ` by ${(d.diffRatio * 100).toFixed(2)}% (threshold ${(options.threshold * 100).toFixed(2)}%)`
-          + `, size delta ${d.bboxDeltas.width}x${d.bboxDeltas.height}px`,
-        selector: report.selector,
-        evidence: { diffRatio: d.diffRatio, bboxDeltas: d.bboxDeltas },
-      })),
+      .map((d) => d.styleDeltas.length > 0
+        ? {
+          rule: "instance-drift",
+          severity: "suspect" as const,
+          message:
+            `instance #${d.candidateIndex} is styled differently from reference #${report.referenceIndex}`
+            + ` — ${d.styleDeltas.length} computed propert${d.styleDeltas.length === 1 ? "y" : "ies"} differ:`
+            + ` ${d.styleDeltas.slice(0, 4).map((s) => `${s.property} ${s.reference} → ${s.candidate}`).join("; ")}`
+            + `${d.styleDeltas.length > 4 ? `; and ${d.styleDeltas.length - 4} more` : ""}`
+            + ` (${(d.diffRatio * 100).toFixed(2)}% of pixels, size delta ${d.bboxDeltas.width}x${d.bboxDeltas.height}px)`,
+          selector: report.selector,
+          evidence: { diffRatio: d.diffRatio, bboxDeltas: d.bboxDeltas, styleDeltas: d.styleDeltas },
+        }
+        : {
+          rule: "instance-content-differs",
+          severity: "info" as const,
+          message:
+            `instance #${d.candidateIndex} differs from reference #${report.referenceIndex}`
+            + ` by ${(d.diffRatio * 100).toFixed(2)}% of pixels, but every tracked computed style property`
+            + ` matches — this is different content in the same component, not drift.`
+            + ` Size delta ${d.bboxDeltas.width}x${d.bboxDeltas.height}px is what the copy costs.`,
+          selector: report.selector,
+          evidence: { diffRatio: d.diffRatio, bboxDeltas: d.bboxDeltas },
+        }),
   format: formatComponentConsistencyReport,
   ledger: (report, options) => ({
     tool: "check-drift-component",

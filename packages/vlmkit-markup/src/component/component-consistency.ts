@@ -26,12 +26,25 @@ import { join, resolve } from "node:path";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { resolveSource, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
+import { TRACKED_PROPERTIES } from "@mizchi/vlmkit-core/computed-style-capture.ts";
 import { extractPaletteFromFile } from "../style/palette-extract.ts";
 import { diffPalettes } from "../style/palette-diff.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 
+
+/**
+ * The properties that say "this is the same component", with `width` and `height`
+ * deliberately left out.
+ *
+ * Two instances of one component holding different copy have different computed
+ * heights — the text wraps — and that is not drift. The size difference is already
+ * reported as `bboxDeltas`, where a reader can see it and judge; folding it into the
+ * style comparison would put the content difference straight back into the verdict
+ * this exists to keep it out of.
+ */
+const STYLE_PROPERTIES = TRACKED_PROPERTIES.filter((prop) => prop !== "width" && prop !== "height");
 export interface ComponentConsistencyOptions {
   htmlPath: string;
   selector: string;
@@ -54,9 +67,14 @@ export interface ComponentConsistencyOptions {
   referenceIndex?: number;
 }
 
+/** Computed style of one instance, over the properties that describe its styling. */
+export type InstanceStyle = Record<string, string>;
+
 export interface InstanceEntry {
   index: number;
   screenshotPath: string;
+  /** Computed styling, for telling drift apart from different copy. */
+  style?: InstanceStyle;
   bbox: { x: number; y: number; width: number; height: number };
 }
 
@@ -68,6 +86,11 @@ export interface InstanceDelta {
   bboxDeltas: { width: number; height: number };
   paletteOnlyInRef: number;
   paletteOnlyInCand: number;
+  /**
+   * Computed-style properties that differ from the reference. Empty means the two
+   * instances are styled identically and the pixel difference is their content.
+   */
+  styleDeltas: { property: string; reference: string; candidate: string }[];
 }
 
 export interface ComponentConsistencyReport {
@@ -127,7 +150,13 @@ export async function runComponentConsistency(
       if (!bbox) continue;
       const screenshotPath = join(outputDir, `instance-${i}.png`);
       await inst.screenshot({ path: screenshotPath });
-      instances.push({ index: i, screenshotPath, bbox });
+      const style = await inst.evaluate((el, props) => {
+        const computed = getComputedStyle(el as Element);
+        const out: Record<string, string> = {};
+        for (const prop of props as string[]) out[prop] = computed.getPropertyValue(prop);
+        return out;
+      }, STYLE_PROPERTIES);
+      instances.push({ index: i, screenshotPath, bbox, style });
     }
     await page.close();
   });
@@ -165,6 +194,13 @@ export async function runComponentConsistency(
       },
       paletteOnlyInRef: paletteDiff.onlyInBaseline.length,
       paletteOnlyInCand: paletteDiff.onlyInVariant.length,
+      styleDeltas: STYLE_PROPERTIES.flatMap((property) => {
+        const ref = reference.style?.[property];
+        const value = cand.style?.[property];
+        return ref !== undefined && value !== undefined && ref !== value
+          ? [{ property, reference: ref, candidate: value }]
+          : [];
+      }),
     });
   }
 
@@ -196,9 +232,30 @@ export function formatComponentConsistencyReport(report: ComponentConsistencyRep
   lines.push(`  ${DIM}${report.instanceCount} instance(s), reference = #${report.referenceIndex}${RESET}`);
   for (const d of report.deltas) {
     const pct = (d.diffRatio * 100).toFixed(2);
-    const icon = d.diffRatio === 0 ? `${GREEN}✓${RESET}` : d.diffRatio < 0.01 ? `${YELLOW}~${RESET}` : `${RED}✗${RESET}`;
+    // The icon follows the computed style, not the pixel count. A pixel ratio cannot
+    // tell "this instance is styled differently" from "this instance holds different
+    // copy", and marking the second one ✗ is what made this gate unpassable on a page
+    // with real content.
+    const icon = d.styleDeltas.length > 0
+      ? `${RED}✗${RESET}`
+      : d.diffRatio === 0
+        ? `${GREEN}✓${RESET}`
+        : `${YELLOW}~${RESET}`;
     const whDelta = `Δ ${d.bboxDeltas.width > 0 ? "+" : ""}${d.bboxDeltas.width} / ${d.bboxDeltas.height > 0 ? "+" : ""}${d.bboxDeltas.height}`;
     lines.push(`  ${icon} instance #${d.candidateIndex}  ${pct.padStart(6)}%  ${DIM}${whDelta}${RESET}`);
+    if (d.styleDeltas.length > 0) {
+      // The properties are the actionable part: an agent told to "replace the inline
+      // markup with the shared component invocation" on markup that was already
+      // identical had nothing to act on.
+      for (const s of d.styleDeltas.slice(0, 6)) {
+        lines.push(`      ${DIM}${s.property}: ${s.reference} → ${s.candidate}${RESET}`);
+      }
+      if (d.styleDeltas.length > 6) {
+        lines.push(`      ${DIM}and ${d.styleDeltas.length - 6} more propert${d.styleDeltas.length - 6 === 1 ? "y" : "ies"}${RESET}`);
+      }
+    } else if (d.diffRatio > 0) {
+      lines.push(`      ${DIM}every tracked computed style matches — different content, not drift${RESET}`);
+    }
   }
   lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
   return lines.join("\n");
