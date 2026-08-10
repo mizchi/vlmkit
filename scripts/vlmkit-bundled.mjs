@@ -29,12 +29,21 @@
  * something it needs is missing — see `runMarkupCoreJsonRaw`.
  */
 import * as markupCoreApi from "../packages/vlmkit-markup/_build/js/debug/build/markup-core-api/markup-core-api.js";
+import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 
 globalThis.__MIZCHI_VLMKIT_MARKUP_CORE_API__ = markupCoreApi;
 
 const { runCli } = await import("../src/cli/cli.ts");
 
-runCli().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+// `handleCliError`, not `console.error` — and this is the file that matters.
+//
+// `src/cli/vlmkit.ts` has always ended in `.catch(handleCliError)`, but that is
+// the *workspace* entry. `tsdown.config.ts` builds the published `bin` from this
+// file, which used to dump the raw error object. Every prettifier in
+// `cli-error.ts` — ENOENT, EISDIR, the missing-browser diagnosis — was therefore
+// dead in the shipped CLI while looking alive in the repo. That is exactly what
+// issue #112 reported: `pnpm exec vlmkit check integrity page.html` printed
+// Playwright's own "run `pnpm exec playwright install`" box, because vlmkit
+// never got a chance to say anything. Reproduced 2026-08-10 with
+// `PLAYWRIGHT_BROWSERS_PATH` pointed at an empty directory.
+runCli().catch(handleCliError);

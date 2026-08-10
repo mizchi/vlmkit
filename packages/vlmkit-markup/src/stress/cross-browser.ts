@@ -28,7 +28,11 @@ import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
 import { annotateHeatmapRegionKinds } from "../heatmap-region-kinds.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import {
+  handleCliError,
+  playwrightInstallCommand,
+  resolvePlaywrightInstallTarget,
+} from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 export type EngineName = "chromium" | "firefox" | "webkit";
@@ -97,6 +101,31 @@ function parseArgs(argv: string[]) {
   return { positional, outputDir, report, engines, threshold, allowSkipped };
 }
 
+/**
+ * The install command for the engines we failed to launch, aimed at the
+ * Playwright *this process resolved*.
+ *
+ * Was `npx playwright install <engines>`, which has the issue-#112 defect: with
+ * two Playwright versions in the tree `npx` resolves the project's copy and
+ * downloads its browser build, not the one this module imported — so the advice
+ * runs, reports success, and the launch still fails. Falls back to the `npx`
+ * form only when resolution fails, since a vague hint still beats none.
+ *
+ * This gate is also the reason `formatMissingPlaywrightBrowserError` reads the
+ * engine off the error path instead of assuming chromium: it is the one launch
+ * site in the repo that launches firefox and webkit.
+ */
+export function engineInstallCommand(...engines: EngineName[]): string {
+  if (engines.length === 0) engines = [...ALL_ENGINES];
+  const target = resolvePlaywrightInstallTarget();
+  if (!target) return `npx playwright install ${engines.join(" ")}`;
+  // `playwrightInstallCommand` takes one engine; append the rest, since the
+  // Playwright CLI accepts a list.
+  const [first, ...rest] = engines;
+  const base = playwrightInstallCommand(target, first);
+  return rest.length > 0 ? `${base} ${rest.join(" ")}` : base;
+}
+
 async function captureWithEngine(
   engine: EngineName,
   source: string,
@@ -114,7 +143,7 @@ async function captureWithEngine(
     // "Please install" — surface a clean instruction instead of
     // the full stack.
     if (/Executable doesn't exist|Please install|Failed to launch.*didn't exist/i.test(msg)) {
-      return { ok: false, reason: "not-installed", message: `${engine} not installed — run \`npx playwright install ${engine}\`` };
+      return { ok: false, reason: "not-installed", message: `${engine} not installed — run \`${engineInstallCommand(engine)}\`` };
     }
     return { ok: false, reason: "error", message: msg };
   }
@@ -236,7 +265,7 @@ export async function runCrossBrowser(
     console.log(`  ${DIM}reference: ${reference}${RESET}`);
   }
   if (usable < 2) {
-    console.log(`  ${YELLOW}!${RESET} Only ${usable} engine(s) usable — no cross-engine comparison performed. Install missing engines with \`npx playwright install firefox webkit\`.`);
+    console.log(`  ${YELLOW}!${RESET} Only ${usable} engine(s) usable — no cross-engine comparison performed. Install missing engines with \`${engineInstallCommand("firefox", "webkit")}\`.`);
     // Set a warning exit code so CI matrices using cross-browser as a
     // gate don't silently pass on an under-configured runner. Use 2
     // (warning) not 1 (hard fail) — the run *did* succeed, just on
@@ -278,7 +307,7 @@ function renderReport(r: Omit<CrossBrowserReport, "reportPath">): string {
 
   const skipped = r.engines.filter((e) => e.status === "skipped");
   if (skipped.length > 0) {
-    lines.push(`⚠ **${skipped.length} engine(s) skipped** — install with \`npx playwright install ${skipped.map((s) => s.engine).join(" ")}\` to get full parity coverage.`);
+    lines.push(`⚠ **${skipped.length} engine(s) skipped** — install with \`${engineInstallCommand(...skipped.map((s) => s.engine))}\` to get full parity coverage.`);
     lines.push("");
   }
   const usable = r.engines.filter((e) => e.status === "ok").length;
@@ -347,7 +376,7 @@ function renderReport(r: Omit<CrossBrowserReport, "reportPath">): string {
     lines.push("");
     lines.push("To get full coverage, install the missing engines and re-run:");
     lines.push("```");
-    lines.push(`npx playwright install ${skipped.map((s) => s.engine).join(" ")}`);
+    lines.push(engineInstallCommand(...skipped.map((s) => s.engine)));
     lines.push("```");
   }
   lines.push("");

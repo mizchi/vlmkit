@@ -6,8 +6,14 @@
  *
  * Use:
  *   main().catch(handleCliError);
+ *
+ * Every CLI entry must go through it, *including* `scripts/vlmkit-bundled.mjs`
+ * — that is the one `tsdown.config.ts` builds into the published `bin`. It used
+ * to `console.error(error)` instead, which made everything below dead code in
+ * the shipped CLI while it kept working in the workspace (issue #112, item 2).
+ * `tests/playwright-peer-contract.test.mjs` guards that.
  */
-import { readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
@@ -20,8 +26,21 @@ export class UsageError extends Error {
   override readonly name = "UsageError";
 }
 
+/**
+ * The `playwright` peer range. Duplicated from this package's own
+ * `peerDependencies` because the shipped bundle has no reliable path back to
+ * its manifest (tsdown flattens `dist/`, and the root CLI bundle inlines this
+ * module into a hashed chunk). `tests/playwright-peer-contract.test.mjs` reads
+ * the manifest and fails if the two drift, so the duplication cannot rot
+ * silently.
+ */
+export const PLAYWRIGHT_PEER_RANGE = ">=1.61 <2";
+
+/** Playwright install target: which `playwright` *this* process resolved. */
 export interface PlaywrightInstallTarget {
   version: string;
+  /** Directory of the resolved `playwright` package — the identity the reporter of #112 could not see. */
+  packageDir: string;
   cliPath: string;
   nodePath: string;
 }
@@ -30,20 +49,63 @@ function shellArg(value: string): string {
   return /^[A-Za-z0-9_./:@+-]+$/.test(value) ? value : JSON.stringify(value);
 }
 
+/**
+ * Resolve the `playwright` that vlmkit itself imports, not the one a package
+ * manager would pick for `pnpm exec`.
+ *
+ * Issue #112 (item 2): with two Playwright versions in the tree, the launch
+ * failure told the user to run `pnpm exec playwright install`, which resolves
+ * from the *project* root and downloads that Playwright's browser build. In the
+ * report that was build 1228 while vlmkit's own Playwright wanted 1234, so the
+ * advice never fixed anything. `createRequire(import.meta.url)` resolves from
+ * this module's location, i.e. from inside vlmkit's own package — the same
+ * lookup the `import { chromium } from "playwright"` at the 51 launch sites
+ * performs — so the command we print targets the installation that failed.
+ */
 function resolvePlaywrightInstallTarget(): PlaywrightInstallTarget | null {
   try {
     const require = createRequire(import.meta.url);
     const manifestPath = require.resolve("playwright/package.json");
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { version?: string };
     if (!manifest.version) return null;
+    const packageDir = dirname(manifestPath);
     return {
       version: manifest.version,
-      cliPath: join(dirname(manifestPath), "cli.js"),
+      packageDir,
+      cliPath: join(packageDir, "cli.js"),
       nodePath: process.execPath,
     };
   } catch {
     return null;
   }
+}
+
+/**
+ * Which engine to reinstall, read off the executable path Playwright printed.
+ *
+ * Hardcoding `chromium` was wrong for `stress cross-browser`, which launches
+ * firefox and webkit too. Playwright names the download directory after the
+ * engine (`firefox-1490/`, `webkit-2247/`, `chromium_headless_shell-1228/`), so
+ * the missing path is itself the answer. Both chromium flavours map to
+ * `chromium`: `playwright install chromium` fetches the headless shell as well
+ * (verified against the 1.61.1 CLI, which lists both under that one name).
+ */
+export function playwrightEngineFromLaunchError(message: string): "chromium" | "firefox" | "webkit" {
+  if (/\bwebkit[-_]/i.test(message)) return "webkit";
+  if (/\bfirefox[-_]/i.test(message)) return "firefox";
+  return "chromium";
+}
+
+/** `node <resolved playwright>/cli.js install <engine>` — quoted for a shell. */
+export function playwrightInstallCommand(
+  target: PlaywrightInstallTarget,
+  engine: "chromium" | "firefox" | "webkit" = "chromium",
+): string {
+  return [target.nodePath, target.cliPath, "install", engine].map(shellArg).join(" ");
+}
+
+function missingExecutablePath(message: string): string | null {
+  return message.match(/Executable doesn't exist at\s+(\S+)/i)?.[1] ?? null;
 }
 
 export function formatMissingPlaywrightBrowserError(
@@ -52,12 +114,71 @@ export function formatMissingPlaywrightBrowserError(
 ): string | null {
   const message = String((error as { message?: string })?.message ?? error);
   if (!/browserType\.launch:[\s\S]*Executable doesn't exist at/i.test(message)) return null;
+  const engine = playwrightEngineFromLaunchError(message);
   if (!target) {
-    return "error: Playwright browser executable is not installed; reinstall the browser for vlmkit's resolved Playwright.";
+    // `playwright` is loaded (it threw the launch error) but we could not
+    // resolve its manifest from here — a bundling accident rather than a user
+    // error. Say what is missing without inventing a command that may be wrong.
+    return `error: Playwright has no ${engine} browser executable installed, and vlmkit could not resolve`
+      + ` its own playwright package to name the install command.`;
   }
-  const command = [target.nodePath, target.cliPath, "install", "chromium"].map(shellArg).join(" ");
-  return `error: Playwright ${target.version} browser executable is not installed.\n       run: ${command}`;
+  const missing = missingExecutablePath(message);
+  const lines = [
+    `error: Playwright ${target.version} has no ${engine} browser executable installed.`,
+    ...(missing ? [`       missing:  ${missing}`] : []),
+    `       resolved: playwright@${target.version} at ${target.packageDir}`,
+    `       run:      ${playwrightInstallCommand(target, engine)}`,
+    // The whole point of the diagnosis. `pnpm exec playwright install` resolves
+    // the *project's* playwright, which in a tree with two versions downloads a
+    // different browser build and leaves this error in place.
+    `       (\`npx/pnpm exec playwright install\` may resolve a different playwright and download a different build)`,
+  ];
+  return lines.join("\n");
 }
+
+/**
+ * `playwright` absent entirely, rather than present-but-browserless.
+ *
+ * It is a **required** peer, deliberately — the argument and its measurement
+ * live in `tests/playwright-peer-contract.test.mjs`, because a JSON manifest
+ * cannot hold a comment. Short version: the gate registry statically imports
+ * `perf.gate`, which statically imports `playwright`, so even the pixel-only
+ * commands fault at module load without it. Measured 2026-08-10: in a tree with
+ * the package removed, `vlmkit diff png --help` dies with ERR_MODULE_NOT_FOUND
+ * before printing usage. That raw stack is what this turns into one sentence.
+ */
+export function formatMissingPlaywrightModuleError(error: unknown): string | null {
+  const err = error as { code?: string; message?: string };
+  const message = String(err?.message ?? error);
+  const isModuleNotFound = err?.code === "ERR_MODULE_NOT_FOUND"
+    || /ERR_MODULE_NOT_FOUND/.test(message)
+    || /Cannot find (?:package|module)/i.test(message);
+  if (!isModuleNotFound) return null;
+  if (!/Cannot find (?:package|module) ['"]playwright['"]/i.test(message)) return null;
+  const importer = message.match(/imported from\s+(\S+)/i)?.[1] ?? null;
+  return [
+    `error: the \`playwright\` package is not installed.`,
+    `       vlmkit declares it as a required peer dependency (${PLAYWRIGHT_PEER_RANGE}). Every`,
+    `       command loads it, the pixel-only ones included, because the gate`,
+    `       registry imports the browser gates eagerly.`,
+    ...(importer ? [`       imported by: ${importer}`] : []),
+    `       run: npm install --save-dev playwright  (or pnpm add -D / yarn add -D)`,
+    `       then install its browsers with that installation's own CLI:`,
+    `            node node_modules/playwright/cli.js install chromium`,
+  ].join("\n");
+}
+
+/**
+ * Best-effort sanity check used by tests: does the resolved playwright actually
+ * have a `cli.js` to invoke? Kept exported so the happy-path test can assert the
+ * command we print is runnable rather than merely well-formed.
+ */
+export function resolvedPlaywrightHasCli(): boolean {
+  const target = resolvePlaywrightInstallTarget();
+  return target !== null && existsSync(target.cliPath);
+}
+
+export { resolvePlaywrightInstallTarget };
 
 export function handleCliError(e: unknown): never {
   // Node fs errors carry the offending path on `.path`; that's more
@@ -97,6 +218,14 @@ export function handleCliError(e: unknown): never {
   const missingBrowser = formatMissingPlaywrightBrowserError(e);
   if (missingBrowser) {
     process.stderr.write(`${missingBrowser}\n`);
+    process.exit(1);
+  }
+  // Checked after ENOENT above on purpose: a missing `playwright` package
+  // surfaces as ERR_MODULE_NOT_FOUND from the ESM resolver, which carries no
+  // `.code === "ENOENT"`, so the two cannot collide.
+  const missingModule = formatMissingPlaywrightModuleError(e);
+  if (missingModule) {
+    process.stderr.write(`${missingModule}\n`);
     process.exit(1);
   }
   // Playwright navigation failure (DNS / connection refused / SSL).
