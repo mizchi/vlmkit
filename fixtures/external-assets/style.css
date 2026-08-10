@@ -10,3 +10,18 @@ body { margin: 0; padding: 32px; background: #ffffff; font: 16px/1.5 system-ui, 
 .btn-a { padding: 12px 20px; border-radius: 8px; font-size: 14px; border: 1px solid #333; background: #fff; }
 .btn-b { padding: 10px 18px; border-radius: 6px; font-size: 13px; border: 2px solid #333; background: #eee; }
 .btn-c { padding: 14px 22px; border-radius: 0; font-size: 15px; border: 0; background: #ddd; }
+
+/* --- focus order: the geometry the classifier reads exists only here.
+   Without this file every button sits in DOM order at the left margin, so the
+   reverse-left violation has nothing to detect. --- */
+.focus-row { position: relative; height: 60px; }
+#focus-a { position: absolute; left: 700px; top: 0; }
+#focus-b { position: absolute; left: 20px;  top: 0; }
+#focus-c { position: absolute; left: 360px; top: 0; }
+.focus-row button { width: 120px; height: 40px; }
+
+/* --- component consistency: `check drift component --selector .tile`.
+   Unstyled, all three tiles are identical full-width boxes differing only by
+   their glyphs, so the gate reports ~1% and a size delta of 0. --- */
+.tile { width: 200px; padding: 12px; border: 2px solid #333; background: #fff; margin: 8px; }
+.tile--wrong { padding: 28px; background: #ffdddd; border-color: #cc0000; }

@@ -15,7 +15,11 @@
  * `check a11y contrast` as **0 failures**, because the gate measured unstyled
  * markup. Inlining the same CSS in a `<style>` block made the same gate report
  * the failure correctly. Ten gates read a user's file and pushed it through
- * `setContent` with no base URL.
+ * `setContent` with no base URL. All ten now navigate; the last two —
+ * `check a11y focus` and `check drift component` — went across on 2026-08-10,
+ * and they were the worst of the set because both read geometry rather than a
+ * style value, so unstyled markup did not degrade the measurement, it inverted
+ * it. `fixtures/external-assets/README.md` carries the before/after numbers.
  *
  * So: load by navigation whenever the bytes on disk are what we want, and when
  * a gate must mutate the HTML first (inflate text for i18n, force a theme,

@@ -23,13 +23,12 @@
  * Usage:
  *   vlmkit check a11y focus <html-or-url>
  */
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { chromium, type Page } from "playwright";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
-import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { type PageLoadOptions, navigatePage } from "@mizchi/vlmkit-core/page-load.ts";
+import { sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
+import { DIM, RESET, GREEN, RED, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { classifyFocusOrderStep } from "./markup-core-a11y-focus-order.ts";
 
 export interface FocusOrderOptions extends PageLoadOptions {
@@ -78,7 +77,6 @@ export interface FocusOrderReport {
   reportPath: string;
 }
 
-function isUrl(s: string): boolean { return /^https?:\/\//.test(s); }
 
 export const A11Y_FOCUS_ORDER_SAMPLE_SCRIPT = `
 (function focused() {
@@ -195,21 +193,27 @@ export async function runFocusOrder(
   await mkdir(outputDir, { recursive: true });
   const viewport = options.viewport ?? { width: 1280, height: 720 };
   const maxSteps = options.maxSteps ?? 64;
-  const html = isUrl(options.source) ? null : await readFile(resolve(options.source), "utf-8");
-
   const steps: FocusStep[] = [];
   let screenshotPath: string;
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage({ viewport });
-    if (isUrl(options.source)) {
-      await navigatePage(page, options.source, options);
-    } else {
-      // File mode still reads the bytes and `setContent`s them, so `--har` has
-      // nothing to intercept for the document itself (subresources still route
-      // through it). `--wait-until` / `--timeout` do apply to setContent.
-      await page.setContent(html!, navigationOptions(options));
-    }
+    // Always navigate — a file gets a `file://` URL, not `setContent`.
+    //
+    // This gate classifies each focus step by the element's x/y, so an external
+    // stylesheet that never loads does not merely degrade the result, it inverts it:
+    // with no CSS every element sits in DOM order at the left margin, and the
+    // reverse/skip-row classifications have nothing to detect. Measured on a fixture
+    // whose layout lives only in `layout.css` (buttons at x=700 / x=20 / x=360, DOM
+    // order a,b,c — a textbook `reverse-left`): `setContent` reported **0 findings,
+    // exit 0**, and the identical layout with the CSS inlined reported the
+    // `reverse` finding and exit 1. An accessibility gate calling a real WCAG
+    // violation clean is the worst failure available to it.
+    //
+    // Same mechanism `page-open.ts` documents for `check a11y contrast` (a 1.92:1
+    // contrast failure read as 0 failures), and the same conversion
+    // `stress media`'s `loadPage` already made.
+    await navigatePage(page, sourceToUrl(options.source), options);
     await page.addStyleTag({
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });

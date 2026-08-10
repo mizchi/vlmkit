@@ -21,11 +21,11 @@
  * Usage:
  *   vlmkit check drift component <html> --selector .card
  */
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { basename, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { writeFile, mkdir } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { chromium } from "playwright";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
+import { resolveSource, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { extractPaletteFromFile } from "../style/palette-extract.ts";
 import { diffPalettes } from "../style/palette-diff.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
@@ -75,8 +75,10 @@ export async function runComponentConsistency(
   if (!options.selector) throw new UsageError("--selector is required");
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
-  const htmlPath = resolve(options.htmlPath);
-  const html = await readFile(htmlPath, "utf-8");
+  // `resolveSource`, not `resolve`: the latter turns "http://x/p.html" into
+  // "<cwd>/http:/x/p.html", which then fails as "file not found" and tells the caller
+  // nothing. The gate's input has always been spelled `<html-or-url>`.
+  const htmlPath = resolveSource(options.htmlPath);
   const viewport = options.viewport ?? { width: 1280, height: 900 };
   const referenceIndex = options.referenceIndex ?? 0;
   const threshold = options.threshold ?? 0.03;
@@ -85,7 +87,19 @@ export async function runComponentConsistency(
   const instances: InstanceEntry[] = [];
   try {
     const page = await browser.newPage({ viewport });
-    await page.setContent(html, { waitUntil: "networkidle" });
+    // Navigate; do not `setContent` bytes read off disk.
+    //
+    // This gate screenshots each instance and compares pixels, so a document with no
+    // base URL does not merely lose styling — it makes the numbers describe a page that
+    // does not exist. Measured on a fixture whose `.card--wrong` modifier lives only in
+    // `card.css` (padding 28px vs 12px): `setContent` reported instance deltas of 1.06%
+    // and 1.32% with `Δ 0 / 0`, i.e. it saw three same-sized unstyled boxes and
+    // attributed the difference to the glyphs "Alpha" / "Beta" / "Gamma". The modifier
+    // that actually makes one instance inconsistent was invisible.
+    //
+    // Same mechanism `page-open.ts` documents for `check a11y contrast`; converting this
+    // also makes the `<html-or-url>` spelling true for the first time.
+    await page.goto(sourceToUrl(htmlPath), { waitUntil: "networkidle" });
     await page.addStyleTag({
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });
