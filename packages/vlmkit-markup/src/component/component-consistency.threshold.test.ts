@@ -3,7 +3,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
-import { runComponentConsistency } from "./component-consistency.ts";
+import { formatComponentConsistencyReport, runComponentConsistency } from "./component-consistency.ts";
 
 /**
  * `--threshold` is the pass line, and a pass line must not change what it is
@@ -135,5 +135,70 @@ describe("check drift component: styling decides, content does not", () => {
     const delta = report.deltas.find((d) => d.candidateIndex === 1)!;
     assert.ok(delta.bboxDeltas.height !== 0, "the wrapped card is taller");
     assert.deepEqual(delta.styleDeltas.map((s) => s.property), [], "and that is not a style delta");
+  });
+});
+
+/**
+ * The gate must not overclaim, and it must look at the accent it can already see.
+ *
+ * A v2 dogfood agent got past the style comparison by moving a deliberate variant
+ * accent somewhere the comparison did not look: "Passing `--selector .card` while
+ * honoring the brief's 'stays visually distinguishable' required moving the accent to
+ * `outline` + a descendant selector — neither is tracked. The tool then reports `every
+ * tracked computed style matches — different content, not drift`, which is **false**:
+ * it is a styling difference the gate can't see." And separately: "The passing
+ * report's summary table shows `Extra palette: 1` for the featured card — the tool
+ * *does* see the blue accent — while the verdict ignores that column."
+ */
+describe("check drift component: the scope of the check, stated honestly", () => {
+  it("sees an outline, which used to pass as content", { timeout: 180_000 }, async () => {
+    const report = await runComponentConsistency({
+      htmlPath: await page(
+        `<div class="card">Alpha</div><div class="card card--featured">Alpha</div>`,
+        `.card--featured { outline: 3px solid #2255cc; outline-offset: -6px; }`,
+      ),
+      selector: ".card",
+      outputDir: await mkdtemp(join(tmpdir(), "vlmkit-drift-out-")),
+    });
+    const properties = report.deltas[0]!.styleDeltas.map((s) => s.property);
+    assert.ok(properties.includes("outline-style"), `expected outline in ${properties.join(",")}`);
+    assert.ok(properties.includes("outline-color"), `expected outline colour in ${properties.join(",")}`);
+  });
+
+  it("flags a descendant-only difference through the palette instead of calling it content", { timeout: 180_000 }, async () => {
+    // The comparison is the instance root, so `.card--accent h2 { color }` is outside
+    // it. The palette diff already saw the colour; now the wording does too.
+    const report = await runComponentConsistency({
+      htmlPath: await page(
+        `<div class="card"><h2>Alpha</h2></div><div class="card card--accent"><h2>Alpha</h2></div>`,
+        `.card--accent h2 { color: #2255cc; }`,
+      ),
+      selector: ".card",
+      outputDir: await mkdtemp(join(tmpdir(), "vlmkit-drift-out-")),
+    });
+    const delta = report.deltas[0]!;
+    assert.deepEqual(delta.styleDeltas, [], "the root really is styled identically");
+    assert.ok(
+      delta.paletteOnlyInCand + delta.paletteOnlyInRef > 0,
+      "but the accent colour is visible in the palette",
+    );
+    const formatted = formatComponentConsistencyReport(report);
+    assert.match(formatted, /colour\(s\) appear in/);
+    // The sentence that was false: it must not be reachable when the palettes disagree.
+    assert.doesNotMatch(formatted, /this looks like different content/);
+  });
+
+  it("says 'this looks like' rather than 'not drift' when everything it checked matches", { timeout: 180_000 }, async () => {
+    const report = await runComponentConsistency({
+      htmlPath: await page(
+        `<div class="card">Alpha one</div><div class="card">Beta two</div>`,
+      ),
+      selector: ".card",
+      outputDir: await mkdtemp(join(tmpdir(), "vlmkit-drift-out-")),
+    });
+    const formatted = formatComponentConsistencyReport(report);
+    assert.match(formatted, /every property on the instance root matches/);
+    // No claim about what the difference *is not*.
+    assert.doesNotMatch(formatted, /not drift/);
   });
 });

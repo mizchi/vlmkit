@@ -42,9 +42,9 @@ import {
   formatFocusOrderReport,
   runFocusOrder,
 } from "../a11y-focus-order.ts";
-import { firstPositional, optionalInt } from "./arg-helpers.ts";
+import { firstPositional, optionalInt, viewportFlag } from "./arg-helpers.ts";
 
-const A11Y_VALUE_FLAGS = ["--output-dir", "--report", "--level", "--max-steps"];
+const A11Y_VALUE_FLAGS = ["--output-dir", "--report", "--level", "--max-steps", "--viewport"];
 
 /** Flags every a11y gate shares. `quiet` is forced: the runner owns output. */
 function reportFlags(argv: readonly string[], defaultDir: string) {
@@ -193,14 +193,21 @@ moves backward, or jumps several visual rows at a time is reported.`,
   inputs: [
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to walk", positional: 0, required: true },
     { name: "max-steps", placeholder: "n", kind: "number", description: "Maximum Tab presses", defaultDescription: "64" },
+    // Focus order is judged from each stop's x/y, so the width is part of the
+    // question. A dogfood agent: "`check a11y focus` has no `--viewport` flag while
+    // `check animation` does — focus order is only checkable at one unnamed width,
+    // even though the wrapped toolbar changes visual order at 375px."
+    { name: "viewport", placeholder: "WxH", kind: "string", description: "Viewport", defaultDescription: "1280x720" },
     ...REPORT_INPUTS("a11y-focus-order"),
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const maxSteps = optionalInt(argv, "max-steps", { min: 1 });
+    const viewport = viewportFlag(argv);
     return {
       source: firstPositional(argv, "vlmkit check a11y focus <html-or-url>", A11Y_VALUE_FLAGS),
       ...(maxSteps !== undefined ? { maxSteps } : {}),
+      ...(viewport ? { viewport } : {}),
       ...reportFlags(argv, "a11y-focus-order"),
       ...parsePageLoad(argv),
     };

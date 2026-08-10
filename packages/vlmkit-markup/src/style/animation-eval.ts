@@ -33,6 +33,7 @@ import { PNG } from "pngjs";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { composeFilmstrip } from "@mizchi/vlmkit-core/filmstrip.ts";
 import { cropRegion, encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
 import { encodeWebp, imageFormatForPath } from "@mizchi/vlmkit-core/webp.ts";
@@ -161,6 +162,8 @@ export interface AnimationEvalReport {
     rows: number;
     /** Evaluated animations left out because they moved no pixels. */
     omitted: number;
+    /** Evaluated animations left out because `--strip-selector` did not match them. */
+    outOfScope: number;
     /** Page-timeline span the columns cover, in ms. */
     windowMs: number;
     /** The instant each column was taken at, in ms from the animations' start. */
@@ -202,10 +205,16 @@ export interface AnimationEvalOptions extends PageLoadOptions {
   /** Cap the strip's width, downscaling frames to fit. Default 1600. */
   stripMaxWidth?: number;
   /**
-   * Page-timeline span the strip's columns cover, in ms. Defaults to one iteration
-   * of the slowest animation, so a stagger lands in the early columns.
+   * Page-timeline span the strip's columns cover, in ms. Defaults to when the last
+   * finite animation ends, so the columns cover the part someone is reviewing rather
+   * than an infinite animation's period.
    */
   stripWindowMs?: number;
+  /**
+   * Restrict the strip's rows to animations whose target matches this CSS selector.
+   * The gate still evaluates and reports every animation; this only scopes the image.
+   */
+  stripSelector?: string;
 }
 
 interface RgbaFrame {
@@ -739,13 +748,55 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       // animation to each instant, and take one screenshot per column.
       //
       // Cheaper too: `samples` screenshots instead of `samples x animations`.
-      const rows = evaluated.filter((a) => a.motionBbox);
-      // Through one iteration of the slowest thing on the page, so a stagger sits in
-      // the early columns and an infinite animation still turns. `--strip-window`
-      // overrides it; the chosen value is reported, because a timebase the reader
-      // cannot see is a timebase they will guess wrong.
+      // Scoped rows, because a sheet made for a reviewer should hold the thing under
+      // review. The same agent: "No flag to scope the strip to one animation or
+      // selector. I expected `--selector .card` or `--only`; neither exists. So row 4
+      // is six 34px spinners plus a ~90px dead grey band [...] ~20% of the sheet is
+      // noise." `--max-animations` is not the answer and they said why: it truncates
+      // in document order, which on that page starts with a dead `h1` keyframe.
+      const wanted = options.stripSelector;
+      // Matched in the page against each animation's own effect target, not against
+      // the reported selector string: `stableSelector` emits whatever is unique
+      // (`article:nth-of-type(1)` for one card, `article.card.card--featured` for
+      // another), so string matching would hit some rows and miss their siblings.
+      const matched = wanted === undefined ? null : new Set(await page.evaluate((selector) => {
+        const anims = (window as unknown as { __vlmkitAnims?: Animation[] }).__vlmkitAnims ?? [];
+        const hits: number[] = [];
+        anims.forEach((anim, index) => {
+          const target = (anim.effect as KeyframeEffect | null)?.target as Element | null;
+          if (target && target.matches(selector)) hits.push(index);
+        });
+        return hits;
+      }, wanted));
+      const rows = evaluated.filter((a) => a.motionBbox && (matched === null || matched.has(a.index)));
+      if (matched !== null && rows.length === 0) {
+        throw new UsageError(
+          `--strip-selector \`${wanted}\` matched no animated element.`
+          + ` Animated elements on this page: ${evaluated.map((a) => a.selector).join(", ")}`,
+        );
+      }
+      // When anything finite runs, the window is when the last of those ends — not
+      // one iteration of the slowest animation on the page.
+      //
+      // "One iteration of the slowest" was the first attempt, and a dogfood agent
+      // showed it picks the wrong clock in the ordinary case: "the default
+      // `--strip-window` is actively misleading here. 'One iteration of the slowest
+      // animation' picks the *infinite spinner*, so the default sheet spends 75% of
+      // its columns on a settled page." Measured on that fixture: the infinite
+      // spinner is 900ms while every finite animation ends by 400ms, so five of six
+      // columns showed a page that had stopped moving.
+      //
+      // A permanent animation has no interesting instant, so it does not get to set
+      // the timebase for the entrance animations someone is reviewing. Only when
+      // *everything* is infinite does one iteration of the longest become the window,
+      // because then there is nothing else to go on.
+      const finiteEnds = evaluated
+        .filter((a) => a.iterations !== null)
+        .map((a) => a.delayMs + a.durationMs * (a.iterations ?? 1));
       const windowMs = options.stripWindowMs
-        ?? Math.max(1, ...evaluated.map((a) => a.delayMs + a.durationMs));
+        ?? (finiteEnds.length > 0
+          ? Math.max(1, ...finiteEnds)
+          : Math.max(1, ...evaluated.map((a) => a.delayMs + a.durationMs)));
       const times = Array.from({ length: samples }, (_, i) => Math.round((windowMs * (i + 1)) / samples));
 
       const PAD = 8;
@@ -794,7 +845,12 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         path: resolve(options.stripPath),
         columns: sheet.layout.columns,
         rows: sheet.layout.rows,
-        omitted: evaluated.length - rows.length,
+        // Counted by reason, not lumped together. `omitted: evaluated.length -
+        // rows.length` called a row dropped by `--strip-selector` a no-visible-effect,
+        // which is a false statement of the same kind this whole line exists to avoid.
+        omitted: evaluated.filter((a) => !a.motionBbox
+          && (matched === null || matched.has(a.index))).length,
+        outOfScope: matched === null ? 0 : evaluated.filter((a) => !matched.has(a.index)).length,
         windowMs,
         times,
         rowSelectors: rows.map((a) => a.selector),
@@ -929,7 +985,8 @@ export function formatAnimationEvalReport(report: AnimationEvalReport): string {
     // out of 5 with "no finding, no warning, no hint" and called that the real bug.
     lines.push(
       `Strip: ${s.path} (${s.width}x${s.height}, ${s.rows} animation(s) x ${s.columns} sample(s)`
-      + `${s.omitted > 0 ? `; ${s.omitted} omitted as no-visible-effect` : ""})`,
+      + `${s.omitted > 0 ? `; ${s.omitted} omitted as no-visible-effect` : ""}`
+      + `${s.outOfScope > 0 ? `; ${s.outOfScope} outside --strip-selector` : ""})`,
     );
     // A caption, because the image carries no text and the same agent said so:
     // "no labels at all — no row selector, no time per cell; that data is

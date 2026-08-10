@@ -44,7 +44,14 @@ import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
  * style comparison would put the content difference straight back into the verdict
  * this exists to keep it out of.
  */
-const STYLE_PROPERTIES = TRACKED_PROPERTIES.filter((prop) => prop !== "width" && prop !== "height");
+const STYLE_PROPERTIES = [
+  ...TRACKED_PROPERTIES.filter((prop) => prop !== "width" && prop !== "height"),
+  // `outline` is not in the shared list, and its absence was load-bearing: a dogfood
+  // agent distinguished a variant with `outline: 3px solid #2255cc` and the gate
+  // answered "every tracked computed style matches — different content, not drift" at
+  // a 12.50% pixel difference. It is a styling difference; it just was not looked at.
+  "outline-width", "outline-style", "outline-color", "outline-offset",
+];
 export interface ComponentConsistencyOptions {
   htmlPath: string;
   selector: string;
@@ -254,7 +261,18 @@ export function formatComponentConsistencyReport(report: ComponentConsistencyRep
         lines.push(`      ${DIM}and ${d.styleDeltas.length - 6} more propert${d.styleDeltas.length - 6 === 1 ? "y" : "ies"}${RESET}`);
       }
     } else if (d.diffRatio > 0) {
-      lines.push(`      ${DIM}every tracked computed style matches — different content, not drift${RESET}`);
+      // Deliberately NOT "not drift". The comparison is 64 computed properties on the
+      // instance root, so a styling difference on a descendant or in an untracked
+      // property is invisible to it, and the same agent caught the overclaim: the
+      // verdict read "different content, not drift" for a variant whose accent lived
+      // on a child `h2`. State the scope of the check instead of the conclusion.
+      const palette = d.paletteOnlyInCand + d.paletteOnlyInRef;
+      lines.push(palette > 0
+        ? `      ${YELLOW}every property on the instance root matches, but ${palette} colour(s) appear in`
+          + ` one instance and not the other — a styling difference on a descendant or in an`
+          + ` untracked property, not necessarily content${RESET}`
+        : `      ${DIM}every property on the instance root matches and the palettes agree —`
+          + ` this looks like different content${RESET}`);
     }
   }
   lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
@@ -299,9 +317,19 @@ function renderReport(
   lines.push("");
   lines.push("## Suggested next step");
   lines.push("");
-  const drifters = deltas.filter((d) => d.diffRatio > 0.005);
+  // Keyed on style deltas, not on the pixel ratio. On a run the gate passed, this
+  // section told an agent "2 instance(s) differ from the reference [...] Replace the
+  // inline markup with the shared component invocation" — a refactor that did not
+  // apply, on markup that was already identical.
+  const drifters = deltas.filter((d) => d.styleDeltas.length > 0);
+  const contentOnly = deltas.filter((d) => d.styleDeltas.length === 0 && d.diffRatio > 0.005);
   if (drifters.length === 0) {
-    lines.push("All instances render identically to the reference — refactor is consistent.");
+    lines.push(contentOnly.length === 0
+      ? "All instances render identically to the reference — refactor is consistent."
+      : `No instance differs in any tracked style property. ${contentOnly.length} differ(s) in pixels,`
+        + " which is what different copy costs — compare the screenshots if you want to confirm that is"
+        + " all it is, since a difference on a descendant or in an untracked property would look the same"
+        + " from here.");
   } else {
     lines.push(`${drifters.length} instance(s) differ from the reference. For each:`);
     lines.push("1. Open the candidate screenshot next to the reference; identify the visible delta.");

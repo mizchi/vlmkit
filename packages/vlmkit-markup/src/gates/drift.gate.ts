@@ -13,7 +13,8 @@
  * preference, here the two renders are supposed to agree.
  */
 
-import { join } from "node:path";
+import { createHash } from "node:crypto";
+import { basename, join, resolve } from "node:path";
 import { readAll, readFlag, readInt, readNumber } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
@@ -34,6 +35,19 @@ import {
 import { firstPositional } from "./arg-helpers.ts";
 
 const DEFAULT_THRESHOLD = 0.03;
+/**
+ * A short, stable directory name for one (source, selector) pair.
+ *
+ * Stable so a re-run overwrites its own previous report — which is what a caller
+ * comparing two runs of the same check wants — and distinct so a different check does
+ * not land on top of it.
+ */
+function runSlug(source: string, selector: string): string {
+  const name = basename(source).replace(/\.[^.]+$/, "") || "page";
+  const hash = createHash("sha1").update(`${resolve(source)}\u0000${selector}`).digest("hex").slice(0, 8);
+  return `${name.replace(/[^A-Za-z0-9._-]+/g, "-")}-${hash}`;
+}
+
 const DRIFT_VALUE_FLAGS = ["--selector", "--output-dir", "--report", "--threshold", "--pixel-tolerance", "--reference-index"];
 
 /** Options plus the threshold, which the verdict needs and the report lacks. */
@@ -101,7 +115,19 @@ tracked style property matches, so the gate can pass on a page with real content
       selector,
       threshold,
       ...(pixelTolerance !== undefined ? { pixelTolerance } : {}),
-      outputDir: outputDir ?? join(process.cwd(), "test-results", "component-consistency"),
+      // Per (source, selector), not one global directory. A dogfood agent read a
+      // report file that belonged to somebody else's run: "`cat
+      // test-results/component-consistency/report.md` returned a *different* run —
+      // `Selector: .card:not(.card--featured)`, 2 instances, a different HTML path —
+      // while my terminal showed `.card`, 3 instances. A parallel agent had clobbered
+      // it. I trusted the terminal." Two invocations that measure different things
+      // must not write to the same path.
+      outputDir: outputDir ?? join(
+        process.cwd(),
+        "test-results",
+        "component-consistency",
+        runSlug(htmlPath, selector),
+      ),
       ...(referenceIndex !== undefined ? { referenceIndex } : {}),
       ...(reportPath ? { reportPath } : {}),
     };

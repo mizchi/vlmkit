@@ -3,23 +3,34 @@ h1 { font-size: 22px; margin: 0 0 20px; }
 h2 { font-size: 16px; margin: 0 0 6px; }
 p { margin: 0; font-size: 14px; color: #444; }
 
-.toolbar { position: relative; height: 56px; margin-bottom: 24px; }
-.btn { position: absolute; top: 8px; width: 130px; height: 36px; border: 1px solid #333; border-radius: 6px; background: #fff; font-size: 14px; }
-#publish { left: 660px; }
-#save    { left: 20px; }
-#discard { left: 340px; }
+/* Toolbar: laid out in flow so visual order == DOM order (Publish, Save,
+   Discard). The previous absolute `left` offsets put Publish visually last,
+   which made Tab focus jump backwards, and pushed the page 46px wider than a
+   768px viewport. */
+.toolbar { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+.btn { width: 130px; height: 36px; border: 1px solid #333; border-radius: 6px; background: #fff; font-size: 14px; }
 
 .cards { display: flex; gap: 16px; }
 .card { width: 220px; padding: 16px; border: 2px solid #333; border-radius: 8px; background: #fff; }
-.card--featured { padding: 30px; background: #eef3ff; border-color: #2255cc; }
+/* Featured variant: distinguished with an inset outline + accent heading.
+   Box geometry, padding, border and background stay identical to the other
+   cards so the variant is not a styling drift. */
+.card--featured { outline: 3px solid #2255cc; outline-offset: -6px; }
+.card--featured h2 { color: #2255cc; }
 
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 .card { animation: rise 250ms ease-out; }
 .card:nth-child(2) { animation-delay: 60ms; }
 .card:nth-child(3) { animation-delay: 120ms; }
 
+/* Finite iteration count so the page actually settles and can be used as a
+   VRT baseline. It was `infinite`, which meant no screenshot was ever stable. */
 @keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
-.spinner { width: 28px; height: 28px; margin-top: 24px; border: 3px solid #ddd; border-top-color: #2255cc; border-radius: 50%; animation: spin 900ms linear infinite; }
+.spinner { width: 28px; height: 28px; margin-top: 24px; border: 3px solid #ddd; border-top-color: #2255cc; border-radius: 50%; animation: spin 900ms linear 2; }
 
-@keyframes bump { from { z-index: 1; } to { z-index: 4; } }
-h1 { animation: bump 400ms linear; }
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .card:nth-child(2),
+  .card:nth-child(3),
+  .spinner { animation: none; }
+}

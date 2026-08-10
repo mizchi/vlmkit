@@ -569,3 +569,94 @@ test("runAnimationEval: a delayed animation has not started at an instant inside
     `the delayed element must look different at 100ms and 400ms, got ${moved.changedFraction}`,
   );
 });
+
+/**
+ * The strip's default window follows the finite animations, and its rows can be
+ * scoped. Both from the v2 dogfood run, which reached a good artifact and then said
+ * what it had to work around to get there.
+ */
+test("runAnimationEval: an infinite animation does not set the strip's timebase", { timeout: 120_000 }, async () => {
+  // "the default `--strip-window` is actively misleading here. 'One iteration of the
+  // slowest animation' picks the *infinite spinner*, so the default sheet spends 75%
+  // of its columns on a settled page." Measured on the dogfood fixture: spinner 900ms,
+  // every finite animation done by 400ms.
+  const { mkdtemp } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const source = await animPage(
+    `#a { animation: slide 200ms linear 1 forwards; }
+     #spin { width: 20px; height: 20px; background: #333; animation: slide 3000ms linear infinite; }`,
+    '<div id="a"></div><div id="spin"></div>',
+  );
+  const report = await runAnimationEval({
+    source,
+    samples: 4,
+    stripPath: join(await mkdtemp(join(tmpdir(), "vlmkit-win-")), "strip.png"),
+  });
+  // The finite animation ends at 200ms; the infinite one runs for 3s and must not win.
+  assert.equal(report.strip?.windowMs, 200);
+  assert.deepEqual(report.strip?.times, [50, 100, 150, 200]);
+});
+
+test("runAnimationEval: with everything infinite, one iteration of the longest is the window", { timeout: 120_000 }, async () => {
+  const { mkdtemp } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const source = await animPage(
+    `#a { animation: slide 500ms linear infinite; }
+     #b { width: 40px; height: 40px; background: #333; animation: slide 800ms linear infinite; }`,
+    '<div id="a"></div><div id="b"></div>',
+  );
+  const report = await runAnimationEval({
+    source,
+    samples: 2,
+    stripPath: join(await mkdtemp(join(tmpdir(), "vlmkit-win-")), "strip.png"),
+  });
+  assert.equal(report.strip?.windowMs, 800, "nothing finite to go on, so the longest period");
+});
+
+test("runAnimationEval: --strip-selector scopes the rows and the counts say why", { timeout: 120_000 }, async () => {
+  // "No flag to scope the strip to one animation or selector. I expected
+  // `--selector .card` or `--only`; neither exists. So row 4 is six 34px spinners plus
+  // a ~90px dead grey band [...] ~20% of the sheet is noise."
+  const { mkdtemp } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const source = await animPage(
+    `@keyframes dead { from { z-index: 1; } to { z-index: 9; } }
+     .card { width: 80px; height: 30px; background: #248; animation: slide 300ms linear 1 forwards; }
+     #noise { width: 20px; height: 20px; background: #a22; animation: slide 300ms linear 1 forwards; }
+     #a { animation: dead 300ms linear 1 forwards; }`,
+    '<div id="a"></div><div class="card"></div><div class="card"></div><div id="noise"></div>',
+  );
+  const report = await runAnimationEval({
+    source,
+    samples: 3,
+    stripSelector: ".card",
+    stripPath: join(await mkdtemp(join(tmpdir(), "vlmkit-scope-")), "strip.png"),
+  });
+  assert.equal(report.evaluated.length, 4, "every animation is still evaluated and reported");
+  assert.equal(report.strip?.rows, 2, "only the two cards get rows");
+  // Counted by reason: calling a selector-excluded row a no-visible-effect would be a
+  // false statement of exactly the kind these lines exist to avoid.
+  assert.equal(report.strip?.outOfScope, 2, "#a and #noise are out of scope");
+  assert.equal(report.strip?.omitted, 0, "and neither of the in-scope rows is dead");
+  assert.match(formatAnimationEvalReport(report), /2 outside --strip-selector/);
+});
+
+test("runAnimationEval: a --strip-selector matching nothing animated says what is animated", { timeout: 120_000 }, async () => {
+  const { mkdtemp } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const source = await animPage("#a { animation: slide 200ms linear 1 forwards; }");
+  const stripPath = join(await mkdtemp(join(tmpdir(), "vlmkit-scope-")), "strip.png");
+  await assert.rejects(
+    () => runAnimationEval({ source, stripSelector: ".nope", stripPath }),
+    (error: Error) => {
+      assert.match(error.message, /--strip-selector `\.nope` matched no animated element/);
+      // The way out is in the message, not in a second command.
+      assert.match(error.message, /Animated elements on this page: #a/);
+      return true;
+    },
+  );
+});
