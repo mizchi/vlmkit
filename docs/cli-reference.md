@@ -933,6 +933,28 @@ each cell is the whole viewport, so a small animated element yields near-identic
 screenshots — on `fixtures/css-challenge/dashboard.html` cropping took the sheet
 from 1448x422 to 890x232 and made each row show only its own element.
 
+**Columns are shared instants on the page timeline**, not each animation's own
+0→1 progress. That is what makes a stagger visible: three cards with 0/60/120ms
+delays read as a diagonal cascade rather than as three identical rows. The window
+defaults to one iteration of the slowest animation, and `--strip-window <ms>` narrows
+it to the part under review:
+
+```bash
+vlmkit check animation page.html --samples 6 --strip-window 380 --strip cards.png
+# → Strip: cards.png (1496x484, 4 animation(s) x 6 sample(s); 1 omitted as no-visible-effect)
+#   caption: columns are 63ms / 127ms / 190ms / 253ms / 317ms / 380ms on the page
+#   timeline (window 380ms, one shared clock); rows top to bottom are …
+```
+
+The caption is printed rather than drawn into the image: text in the sheet would make
+the output depend on font rendering, which is the class of platform-dependent pixel
+this toolkit exists to catch. Paste it under the image.
+
+Animations that moved no pixels get no row — they are already reported as
+`no-visible-effect`, and a row showing nothing would size the uniform cell for every
+other row. The count is named in the output (`1 omitted as no-visible-effect`) rather
+than dropped silently.
+
 ##### WebP output
 
 A `.webp` output extension encodes lossless WebP, which needs the optional
