@@ -16,6 +16,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /**
  * A bad flag or missing argument — the caller's typo, not a defect. Thrown by
@@ -180,23 +181,33 @@ export function resolvedPlaywrightHasCli(): boolean {
 
 export { resolvePlaywrightInstallTarget };
 
-export function handleCliError(e: unknown): never {
+/**
+ * The one-line diagnosis for an error, or `null` when there isn't one.
+ *
+ * Split out of `handleCliError` so the branches are testable. They were not:
+ * the only entry point ended in `process.exit`, so covering a branch meant
+ * spawning a child process, and in practice nothing covered any of them. That
+ * is how the `ERR_FILE_NOT_FOUND` gap below reached a release — the ENOENT
+ * branch it duplicates has printed the right line since 2026-05-15, and no test
+ * noticed when ten gates stopped reaching it.
+ *
+ * `null` rather than a generic string on purpose: an unrecognized error should
+ * reach the developer whole, stack and all. A prettifier that invents a summary
+ * for everything is worse than one that admits it has nothing to add.
+ */
+export function formatCliError(e: unknown): string | null {
   // Node fs errors carry the offending path on `.path`; that's more
   // reliable than parsing it out of `.message` (which sometimes
   // doesn't include the path at all, e.g. EISDIR from readFile).
   const err = e as { code?: string; message?: string; name?: string; path?: string };
   const msg = String(err?.message ?? e);
 
-  if (err?.name === "UsageError") {
-    process.stderr.write(`error: ${msg}\n`);
-    process.exit(1);
-  }
+  if (err?.name === "UsageError") return `error: ${msg}`;
 
   // ENOENT — missing local file path.
   if (err?.code === "ENOENT") {
     const path = err.path ?? msg.match(/ENOENT: no such file or directory[^']*'([^']+)'/)?.[1] ?? "?";
-    process.stderr.write(`error: file not found: ${path}\n`);
-    process.exit(1);
+    return `error: file not found: ${path}`;
   }
   // EISDIR — caller passed a directory where an HTML file (or other
   // single-file artifact) was expected. Surfaced repeatedly in
@@ -212,26 +223,38 @@ export function handleCliError(e: unknown): never {
     const hint = path === "?"
       ? "       hint: pass the path to a specific .html file."
       : `       hint: pass the path to a specific .html file inside it (e.g. ${path}/page.html).`;
-    process.stderr.write(`error: expected an HTML file, got a directory: ${path}\n${hint}\n`);
-    process.exit(1);
+    return `error: expected an HTML file, got a directory: ${path}\n${hint}`;
   }
   const missingBrowser = formatMissingPlaywrightBrowserError(e);
-  if (missingBrowser) {
-    process.stderr.write(`${missingBrowser}\n`);
-    process.exit(1);
-  }
+  if (missingBrowser) return missingBrowser;
   // Checked after ENOENT above on purpose: a missing `playwright` package
   // surfaces as ERR_MODULE_NOT_FOUND from the ESM resolver, which carries no
   // `.code === "ENOENT"`, so the two cannot collide.
   const missingModule = formatMissingPlaywrightModuleError(e);
-  if (missingModule) {
-    process.stderr.write(`${missingModule}\n`);
-    process.exit(1);
+  if (missingModule) return missingModule;
+  // A missing local file, reported by the browser rather than by `fs`.
+  //
+  // Deliberately handled next to the ENOENT branch above and worded identically,
+  // because the two are the *same user error* reached by two different loaders.
+  // The base-URL refactor moved ten gates off `readFile` + `setContent` onto
+  // `page.goto(pathToFileURL(file))` — see `page-open.ts` for why — and in doing
+  // so it silently traded this message for a stack trace. Measured on the same
+  // missing path in the same tree (2026-08-10):
+  //
+  //   vlmkit diff html nope.html ...  ->  error: file not found: /abs/nope.html
+  //   vlmkit check a11y focus nope.html  ->  14 lines of `page.goto:` + Call log
+  //                                          + `at runFocusOrder (…/dist/…)`
+  //
+  // A typo'd path is the most common way to invoke any of these commands wrong,
+  // so it is the message that most needs to be one line.
+  if (/net::ERR_FILE_NOT_FOUND/i.test(msg)) {
+    return `error: file not found: ${navigationTargetPath(msg)}`;
   }
-  // Playwright navigation failure (DNS / connection refused / SSL).
+  // Playwright navigation failure (DNS / connection refused / unsafe port / SSL).
   if (
     /net::ERR_NAME_NOT_RESOLVED/i.test(msg)
     || /net::ERR_CONNECTION_REFUSED/i.test(msg)
+    || /net::ERR_UNSAFE_PORT/i.test(msg)
     || /Cannot navigate to invalid URL/i.test(msg)
   ) {
     const url = msg.match(/Navigating to ([^,]+)/i)?.[1]
@@ -240,18 +263,59 @@ export function handleCliError(e: unknown): never {
     let reason = "failed to load";
     if (/ERR_NAME_NOT_RESOLVED/i.test(msg)) reason = "host could not be resolved (check the URL)";
     else if (/ERR_CONNECTION_REFUSED/i.test(msg)) reason = "connection refused (is the server running?)";
-    else if (/invalid URL/i.test(msg)) reason = "not a valid URL";
-    process.stderr.write(`error: cannot load ${url}: ${reason}\n`);
-    process.exit(1);
+    // Not a defect in the page or the server: Chromium keeps a blocklist of
+    // ports it refuses to fetch over HTTP (1, 7, 22, 25, 6000, …), so a URL on
+    // one of them fails before any request leaves the browser. Worth naming,
+    // because the generic "failed to load" sends the reader to check a server
+    // that was never contacted.
+    else if (/ERR_UNSAFE_PORT/i.test(msg)) {
+      reason = "Chromium refuses to fetch this port (it is on the blocked-port list) — try another port";
+    } else if (/invalid URL/i.test(msg)) reason = "not a valid URL";
+    return `error: cannot load ${url}: ${reason}`;
   }
   // Playwright timeout.
   if (/Timeout \d+ms exceeded/i.test(msg)) {
-    process.stderr.write(`error: page load timed out (${msg.match(/Timeout \d+ms exceeded[^.]*/i)?.[0] ?? msg})\n`);
+    return `error: page load timed out (${msg.match(/Timeout \d+ms exceeded[^.]*/i)?.[0] ?? msg})`;
+  }
+  return null;
+}
+
+export function handleCliError(e: unknown): never {
+  const diagnosis = formatCliError(e);
+  if (diagnosis !== null) {
+    process.stderr.write(`${diagnosis}\n`);
     process.exit(1);
   }
   // Default: full error for the developer.
   console.error(e);
   process.exit(1);
+}
+
+/**
+ * The path a failed `page.goto` was aiming at, as an ordinary filesystem path.
+ *
+ * Playwright reports `net::ERR_FILE_NOT_FOUND at file:///abs/nope.html`, and a
+ * `file://` URL is the wrong thing to echo back: the caller typed a path, and a
+ * percent-encoded URL of it is harder to compare against what they typed. This
+ * decodes it so the message matches the ENOENT branch's exactly.
+ *
+ * Falls back to the raw match, then to scanning argv, because a message shape
+ * that changes with a Playwright upgrade should degrade to a worse path rather
+ * than to no message at all.
+ */
+function navigationTargetPath(msg: string): string {
+  const url = msg.match(/(file:\/\/\/[^\s"']+)/)?.[1];
+  if (url) {
+    try {
+      return fileURLToPath(url);
+    } catch {
+      return url;
+    }
+  }
+  for (const arg of process.argv.slice(2)) {
+    if (!arg.startsWith("-") && /\.html?$/i.test(arg)) return arg;
+  }
+  return "?";
 }
 
 /**

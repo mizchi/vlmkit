@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { describe, it } from "node:test";
 import {
+  UsageError,
+  formatCliError,
   formatMissingPlaywrightBrowserError,
   formatMissingPlaywrightModuleError,
   playwrightEngineFromLaunchError,
@@ -152,5 +154,110 @@ describe("resolvePlaywrightInstallTarget (real resolution)", () => {
     assert.ok(existsSync(target.cliPath), `${target.cliPath} should exist`);
     assert.equal(resolvedPlaywrightHasCli(), true);
     assert.match(playwrightInstallCommand(target), /cli\.js install chromium$/);
+  });
+});
+
+/**
+ * The branches themselves, which were untestable until `formatCliError` was
+ * split out of `handleCliError` (the latter ends in `process.exit`, so covering
+ * a branch meant spawning a child, and nothing did).
+ *
+ * The error strings are Playwright's own, copied from real runs in this repo
+ * rather than paraphrased — every one of these is a message shape a Playwright
+ * upgrade could change, and a paraphrase would keep passing after it did.
+ */
+describe("formatCliError", () => {
+  it("reports a browser-reported missing file exactly like an fs-reported one", () => {
+    // The regression this pair exists for: the base-URL refactor moved ten gates
+    // from `readFile` (ENOENT) to `page.goto` (net::ERR_FILE_NOT_FOUND) on the
+    // same user typo. If the two lines ever diverge again, the CLI answers the
+    // most common invocation error two different ways depending on the gate.
+    const fromFs = formatCliError(
+      Object.assign(new Error("ENOENT: no such file or directory, open '/repo/nope.html'"), {
+        code: "ENOENT",
+        path: "/repo/nope.html",
+      }),
+    );
+    const fromBrowser = formatCliError(
+      new Error(
+        `page.goto: net::ERR_FILE_NOT_FOUND at file:///repo/nope.html\n`
+          + `Call log:\n  - navigating to "file:///repo/nope.html", waiting until "networkidle"\n`,
+      ),
+    );
+    assert.equal(fromFs, "error: file not found: /repo/nope.html");
+    assert.equal(fromBrowser, fromFs);
+  });
+
+  it("decodes a percent-encoded file URL back to the path the caller typed", () => {
+    const text = formatCliError(
+      new Error("page.goto: net::ERR_FILE_NOT_FOUND at file:///repo/my%20pages/a%2Bb.html"),
+    );
+    assert.equal(text, "error: file not found: /repo/my pages/a+b.html");
+  });
+
+  it("falls back to an argv path when the message shape stops matching", () => {
+    // A Playwright upgrade that reworded the message must degrade to a worse
+    // path, never to a raw stack. Simulated by omitting the `file://` URL.
+    const argv = process.argv;
+    process.argv = ["node", "vlmkit", "check", "integrity", "typo.html", "--json"];
+    try {
+      assert.equal(formatCliError(new Error("net::ERR_FILE_NOT_FOUND")), "error: file not found: typo.html");
+    } finally {
+      process.argv = argv;
+    }
+  });
+
+  it("names a blocked port rather than blaming the server", () => {
+    // Chromium refuses ports 1, 7, 22, 25, 6000 … before any request is sent, so
+    // "connection refused (is the server running?)" would send the reader to
+    // check a server that was never contacted.
+    const text = formatCliError(
+      new Error(
+        `page.goto: net::ERR_UNSAFE_PORT at http://127.0.0.1:1/x.html\n`
+          + `Call log:\n  - navigating to "http://127.0.0.1:1/x.html", waiting until "networkidle"\n`,
+      ),
+    ) ?? "";
+    assert.match(text, /blocked-port list/);
+    assert.doesNotMatch(text, /is the server running/);
+  });
+
+  it("distinguishes DNS failure, refused connection and an invalid URL", () => {
+    const dns = formatCliError(new Error("page.goto: net::ERR_NAME_NOT_RESOLVED at http://nope.invalid/")) ?? "";
+    const refused = formatCliError(new Error("page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:9999/")) ?? "";
+    const invalid = formatCliError(new Error("page.goto: Cannot navigate to invalid URL")) ?? "";
+    assert.match(dns, /host could not be resolved/);
+    assert.match(refused, /connection refused \(is the server running\?\)/);
+    assert.match(invalid, /not a valid URL/);
+    // No URL in the invalid-URL message to quote, and inventing one would be
+    // worse than the placeholder.
+    assert.match(invalid, /cannot load the URL/);
+  });
+
+  it("prints a UsageError as one line without a stack", () => {
+    assert.equal(formatCliError(new UsageError("--concurrency expects a number, got \"abc\"")),
+      'error: --concurrency expects a number, got "abc"');
+  });
+
+  it("adds the directory hint for EISDIR", () => {
+    const text = formatCliError(
+      Object.assign(new Error("EISDIR: illegal operation on a directory, read"), {
+        code: "EISDIR",
+        path: "/repo/fixtures",
+      }),
+    ) ?? "";
+    assert.match(text, /expected an HTML file, got a directory: \/repo\/fixtures/);
+    assert.match(text, /e\.g\. \/repo\/fixtures\/page\.html/);
+  });
+
+  it("summarizes a navigation timeout", () => {
+    const text = formatCliError(new Error("page.goto: Timeout 30000ms exceeded.")) ?? "";
+    assert.match(text, /page load timed out \(Timeout 30000ms exceeded\)/);
+  });
+
+  it("returns null for an error it has nothing to add to", () => {
+    // Not a generic summary: an unrecognized error must reach the developer with
+    // its stack intact, which is what `handleCliError` does with a null.
+    assert.equal(formatCliError(new Error("Cannot read properties of undefined (reading 'x')")), null);
+    assert.equal(formatCliError(new TypeError("boom")), null);
   });
 });
