@@ -37,7 +37,18 @@ export interface ComponentConsistencyOptions {
   selector: string;
   outputDir: string;
   reportPath?: string;
+  /**
+   * Pass line on the measured diff ratio. **Not** the comparator's per-pixel colour
+   * tolerance — that is `pixelTolerance`.
+   *
+   * The two were one flag until a dogfood agent found that raising it moved the
+   * measurement as well as the bar: "instance #1 reports 95.5% at 0.05 and 9.65% at
+   * 0.06. I first read the drop as my fix working." A pass line that changes what it
+   * is compared against is not a pass line.
+   */
   threshold?: number;
+  /** Comparator per-pixel colour tolerance, 0-1. Default 0.1, as everywhere else. */
+  pixelTolerance?: number;
   viewport?: { width: number; height: number };
   /** Which instance to use as the reference. Default 0 (first match). */
   referenceIndex?: number;
@@ -82,6 +93,7 @@ export async function runComponentConsistency(
   const viewport = options.viewport ?? { width: 1280, height: 900 };
   const referenceIndex = options.referenceIndex ?? 0;
   const threshold = options.threshold ?? 0.03;
+  const pixelTolerance = options.pixelTolerance ?? 0.1;
 
   const instances: InstanceEntry[] = [];
   // `withBrowser`: the zero-match `UsageError` below is thrown from inside this
@@ -136,7 +148,7 @@ export async function runComponentConsistency(
       baselinePath: reference.screenshotPath,
       status: "changed",
     };
-    const diff = await compareScreenshots(snap, { outputDir, threshold });
+    const diff = await compareScreenshots(snap, { outputDir, threshold: pixelTolerance });
     const [refPalette, candPalette] = await Promise.all([
       extractPaletteFromFile(reference.screenshotPath).catch(() => []),
       extractPaletteFromFile(cand.screenshotPath).catch(() => []),

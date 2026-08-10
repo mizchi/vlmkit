@@ -34,7 +34,7 @@ import {
 import { firstPositional } from "./arg-helpers.ts";
 
 const DEFAULT_THRESHOLD = 0.03;
-const DRIFT_VALUE_FLAGS = ["--selector", "--output-dir", "--report", "--threshold", "--reference-index"];
+const DRIFT_VALUE_FLAGS = ["--selector", "--output-dir", "--report", "--threshold", "--pixel-tolerance", "--reference-index"];
 
 /** Options plus the threshold, which the verdict needs and the report lacks. */
 export interface ComponentDriftGateOptions extends ComponentConsistencyOptions {
@@ -67,14 +67,15 @@ network to replay. Pass a URL and it fails as a missing file.`,
       id: "instance-drift",
       title: "Instance differs from the reference beyond the threshold",
       severity: "suspect",
-      docs: "Raise the tolerance with --threshold rather than disabling the rule.",
+      docs: "Raise the pass line with --threshold rather than disabling the rule. `--threshold` does not change the measured ratio; `--pixel-tolerance` does.",
     },
   ],
   inputs: [
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page containing the instances", positional: 0, required: true },
     { name: "selector", placeholder: "sel", kind: "string", description: "CSS selector matching >=2 instances", required: true },
     { name: "reference-index", placeholder: "n", kind: "number", description: "Which match is the reference", defaultDescription: "0" },
-    { name: "threshold", placeholder: "0..1", kind: "number", description: "Pixel diff threshold", defaultDescription: String(DEFAULT_THRESHOLD) },
+    { name: "threshold", placeholder: "0..1", kind: "number", description: "Pass line on the measured diff ratio (does not change the measurement)", defaultDescription: String(DEFAULT_THRESHOLD) },
+    { name: "pixel-tolerance", placeholder: "0..1", kind: "number", description: "Comparator per-pixel colour tolerance", defaultDescription: "0.1" },
     { name: "output-dir", placeholder: "dir", kind: "path", description: "Output directory", defaultDescription: "./test-results/component-consistency" },
     { name: "report", placeholder: "path", kind: "path", description: "Markdown report path" },
   ],
@@ -83,6 +84,7 @@ network to replay. Pass a URL and it fails as a missing file.`,
     const selector = readFlag(argv, "selector");
     if (!selector) throw new UsageError("--selector <sel> is required (it must match at least two instances)");
     const threshold = readNumber(argv, "threshold", { min: 0, max: 1 }) ?? DEFAULT_THRESHOLD;
+    const pixelTolerance = readNumber(argv, "pixel-tolerance", { min: 0, max: 1 });
     const referenceIndex = readInt(argv, "reference-index", { min: 0 });
     const outputDir = readFlag(argv, "output-dir");
     const reportPath = readFlag(argv, "report");
@@ -90,6 +92,7 @@ network to replay. Pass a URL and it fails as a missing file.`,
       htmlPath,
       selector,
       threshold,
+      ...(pixelTolerance !== undefined ? { pixelTolerance } : {}),
       outputDir: outputDir ?? join(process.cwd(), "test-results", "component-consistency"),
       ...(referenceIndex !== undefined ? { referenceIndex } : {}),
       ...(reportPath ? { reportPath } : {}),
@@ -145,14 +148,15 @@ Pass either --urls or --files, each repeatable.`,
       id: "page-drift",
       title: "Selector renders differently on this page than on the reference",
       severity: "suspect",
-      docs: "Raise the tolerance with --threshold rather than disabling the rule.",
+      docs: "Raise the pass line with --threshold rather than disabling the rule. `--threshold` does not change the measured ratio; `--pixel-tolerance` does.",
     },
   ],
   inputs: [
     { name: "selector", placeholder: "sel", kind: "string", description: "CSS selector present on every page", required: true },
     { name: "urls", placeholder: "url", kind: "string", description: "Page URL", repeatable: true },
     { name: "files", placeholder: "path", kind: "string", description: "Page file", repeatable: true },
-    { name: "threshold", placeholder: "0..1", kind: "number", description: "Pixel diff threshold", defaultDescription: String(DEFAULT_THRESHOLD) },
+    { name: "threshold", placeholder: "0..1", kind: "number", description: "Pass line on the measured diff ratio (does not change the measurement)", defaultDescription: String(DEFAULT_THRESHOLD) },
+    { name: "pixel-tolerance", placeholder: "0..1", kind: "number", description: "Comparator per-pixel colour tolerance", defaultDescription: "0.1" },
     { name: "output-dir", placeholder: "dir", kind: "path", description: "Output directory", defaultDescription: "./test-results/consistency" },
     { name: "report", placeholder: "path", kind: "path", description: "Markdown report path" },
     ...PAGE_LOAD_INPUTS,
@@ -166,11 +170,13 @@ Pass either --urls or --files, each repeatable.`,
       throw new UsageError("pass --urls <url> or --files <path> (each repeatable) — at least two pages");
     }
     const threshold = readNumber(argv, "threshold", { min: 0, max: 1 }) ?? DEFAULT_THRESHOLD;
+    const pixelTolerance = readNumber(argv, "pixel-tolerance", { min: 0, max: 1 });
     const outputDir = readFlag(argv, "output-dir");
     const reportPath = readFlag(argv, "report");
     return {
       selector,
       threshold,
+      ...(pixelTolerance !== undefined ? { pixelTolerance } : {}),
       outputDir: outputDir ?? join(process.cwd(), "test-results", "consistency"),
       ...(urls.length > 0 ? { urls } : {}),
       ...(files.length > 0 ? { files } : {}),
