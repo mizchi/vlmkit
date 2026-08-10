@@ -205,12 +205,21 @@ export function formatCliError(e: unknown): string | null {
   if (err?.name === "UsageError") return `error: ${msg}`;
 
   // `browser-launch.ts` already ran the diagnosis at the launch (so library
-  // callers get it too, not only the CLI) and put the finished text — "error: "
-  // prefix and all — in `message`. Returned verbatim: re-prefixing would give
-  // "error: error: …", and returning null would print a stack where this should
-  // print two lines. Matched by name rather than `instanceof` so this module
-  // keeps its zero Playwright imports.
-  if (err?.name === "BrowserLaunchError") return msg;
+  // callers get it too, not only the CLI) and put the finished text in
+  // `message`. Matched by name rather than `instanceof` so this module keeps its
+  // zero Playwright imports.
+  //
+  // Prefixed only when the text does not already start with "error: ", because
+  // the two diagnoses that reach here disagree about it:
+  // `formatMissingPlaywrightBrowserError` builds its own "error: …" first line,
+  // while `diagnoseSandboxLaunchFailure` (vlmkit-capture) returns "Playwright
+  // browser launch is blocked by a Codex/macOS sandbox…" with no prefix — and
+  // its exact text is asserted by its own tests, so normalizing belongs here and
+  // not there. Assuming the prefix was present made the sandbox failure the one
+  // diagnostic in the CLI that does not begin like the others.
+  if (err?.name === "BrowserLaunchError") {
+    return msg.startsWith("error: ") ? msg : `error: ${msg}`;
+  }
 
   // ENOENT — missing local file path.
   if (err?.code === "ENOENT") {

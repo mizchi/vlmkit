@@ -675,7 +675,7 @@ export function buildBaselineValueIndex(
         // the matching `@media (...)` wrapper when written back. The
         // viewport-variant detector below also wouldn't recognize them
         // because they aren't keyed by viewport label.
-        const dedupeKey = `${mediaCondition} ${selector} ${e.property}`;
+        const dedupeKey = `${mediaCondition}\u0000${selector}\u0000${e.property}`;
         if (authoredSeen.has(dedupeKey)) continue;
         authoredSeen.add(dedupeKey);
         authoredMediaScoped.push({

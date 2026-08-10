@@ -34,7 +34,7 @@ import {
 } from "./ui-contract.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
-import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { launchBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export interface LandmarkCapture {
   viewport: string;
@@ -343,16 +343,27 @@ export async function introspectUiContractFromHtml(
   const input = options.input;
   const screenId = options.screenId ?? (basename(input).replace(/\.[^.]+$/, "") || "screen");
   const profileStart = performance.now();
-  const launchStart = performance.now();
   const profile: UiContractIntrospectionProfile = {
     totalMs: 0,
-    browserLaunchMs: performance.now() - launchStart,
+    browserLaunchMs: 0,
     browserCloseMs: 0,
     viewports: [],
   };
   const captures: LandmarkCapture[] = [];
   let hints: UiContractDomHints | undefined;
-  await withBrowser(async (browser) => {
+  // `launchBrowser` + an explicit `finally`, not `withBrowser`: this function
+  // *measures* the launch and the close, and a helper that owns both hides the
+  // two instants it needs. `withBrowser` did briefly land here, and the result
+  // was a profile reporting `browserLaunchMs 0.01`, `browserCloseMs 0` and
+  // `totalMs 0` for a run whose single viewport took 2562ms — the assignments
+  // lived in the `finally` the conversion removed, and `launchStart` ended up
+  // measuring the `basename()` above instead of a browser launch.
+  // `src/experiments/benchmark/introspect-bench.ts` records these numbers, so
+  // the failure mode is a benchmark reporting that launching Chromium is free.
+  const launchStart = performance.now();
+  const browser = await launchBrowser();
+  profile.browserLaunchMs = performance.now() - launchStart;
+  try {
     for (const viewport of viewports) {
       const viewportStart = performance.now();
       const page = await browser.newPage({
@@ -404,7 +415,12 @@ export async function introspectUiContractFromHtml(
         landmarks: landmarks.length,
       });
     }
-  });
+  } finally {
+    const closeStart = performance.now();
+    await browser.close();
+    profile.browserCloseMs = performance.now() - closeStart;
+    profile.totalMs = performance.now() - profileStart;
+  }
   options.onProfile?.(profile);
   return landmarkRegionsToUiContract({
     screenId,

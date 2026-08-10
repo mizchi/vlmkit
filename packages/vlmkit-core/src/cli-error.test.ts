@@ -233,6 +233,21 @@ describe("formatCliError", () => {
     assert.match(invalid, /cannot load the URL/);
   });
 
+  it("gives a BrowserLaunchError exactly one `error: ` prefix", () => {
+    // The two diagnoses that reach this branch disagree about the prefix:
+    // core's missing-browser text builds its own, vlmkit-capture's sandbox text
+    // does not. Both must come out looking like every other line the CLI prints.
+    const prefixed = new Error("error: Playwright 1.61.0 has no chromium browser executable installed.");
+    prefixed.name = "BrowserLaunchError";
+    assert.equal(formatCliError(prefixed), prefixed.message, "must not become `error: error: …`");
+
+    const bare = new Error("Playwright browser launch is blocked by a Codex/macOS sandbox restriction.");
+    bare.name = "BrowserLaunchError";
+    const out = formatCliError(bare) ?? "";
+    assert.equal(out, `error: ${bare.message}`);
+    assert.doesNotMatch(out, /error: error:/);
+  });
+
   it("prints a UsageError as one line without a stack", () => {
     assert.equal(formatCliError(new UsageError("--concurrency expects a number, got \"abc\"")),
       'error: --concurrency expects a number, got "abc"');

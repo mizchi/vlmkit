@@ -23,7 +23,7 @@
  */
 import { writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { chromium } from "playwright";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { resolveSource, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { extractPaletteFromFile } from "../style/palette-extract.ts";
@@ -83,9 +83,10 @@ export async function runComponentConsistency(
   const referenceIndex = options.referenceIndex ?? 0;
   const threshold = options.threshold ?? 0.03;
 
-  const browser = await chromium.launch();
   const instances: InstanceEntry[] = [];
-  try {
+  // `withBrowser`: the zero-match `UsageError` below is thrown from inside this
+  // scope, and on the straight-line form that throw skipped the close entirely.
+  await withBrowser(async (browser) => {
     const page = await browser.newPage({ viewport });
     // Navigate; do not `setContent` bytes read off disk.
     //
@@ -117,9 +118,7 @@ export async function runComponentConsistency(
       instances.push({ index: i, screenshotPath, bbox });
     }
     await page.close();
-  } finally {
-    await browser.close();
-  }
+  });
 
   if (instances.length < 2) {
     throw new UsageError(`Selector matched ${instances.length} element(s); need at least 2 to check consistency.`);

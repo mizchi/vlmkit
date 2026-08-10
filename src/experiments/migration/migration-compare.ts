@@ -13,7 +13,7 @@ import { existsSync } from "node:fs";
 import { readFile, writeFile, mkdir, access } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { chromium, type Browser } from "playwright";
+import { type Browser } from "playwright";
 import {
   collectApprovalWarnings,
   filterApprovedPaintTreeChanges,

@@ -25,7 +25,8 @@
  */
 import { writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { chromium, type Page } from "playwright";
+import { type Page } from "playwright";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { type PageLoadOptions, navigatePage } from "@mizchi/vlmkit-core/page-load.ts";
 import { sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { DIM, RESET, GREEN, RED, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -194,9 +195,11 @@ export async function runFocusOrder(
   const viewport = options.viewport ?? { width: 1280, height: 720 };
   const maxSteps = options.maxSteps ?? 64;
   const steps: FocusStep[] = [];
-  let screenshotPath: string;
-  const browser = await chromium.launch();
-  try {
+  // `withBrowser`, so a throw anywhere in the sweep below still closes the
+  // browser. The `screenshotPath` comes out of the callback rather than an outer
+  // `let`, because TypeScript's definite-assignment analysis does not follow an
+  // assignment made in a closure.
+  const screenshotPath = await withBrowser(async (browser) => {
     const page = await browser.newPage({ viewport });
     // Always navigate — a file gets a `file://` URL, not `setContent`.
     //
@@ -217,8 +220,8 @@ export async function runFocusOrder(
     await page.addStyleTag({
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });
-    screenshotPath = join(outputDir, "page.png");
-    await page.screenshot({ path: screenshotPath, fullPage: false });
+    const shot = join(outputDir, "page.png");
+    await page.screenshot({ path: shot, fullPage: false });
 
     // Start from the document. The first Tab moves focus to the
     // earliest focusable element. We capture activeElement after
@@ -234,9 +237,8 @@ export async function runFocusOrder(
       steps.push({ tabIndex: i, ...sample });
     }
     await page.close();
-  } finally {
-    await browser.close();
-  }
+    return shot;
+  });
 
   // Detect findings via the shared MoonBit-backed classifier.
   const findings: FocusOrderFinding[] = analyzeFocusOrderSteps(steps);
