@@ -38,7 +38,16 @@ have a visible effect, does it settle — is \`vlmkit check animation\`.)`,
       id: "missing-reduced-motion",
       title: "Page animates but declares no prefers-reduced-motion rule",
       severity: "suspect",
-      docs: "Set to warn if the rule legitimately lives in a stylesheet this page does not load itself.",
+      docs: "Raised only when every stylesheet was readable. When one was not, `unreadable-stylesheet` is raised instead.",
+    },
+    {
+      id: "unreadable-stylesheet",
+      title: "No prefers-reduced-motion rule in the CSS this gate could read, and a stylesheet it could not",
+      severity: "warn",
+      docs: `A warn rather than a suspect because absence is unproven. Reading \`cssRules\` of a linked
+stylesheet throws SecurityError for a file:// document, so the caller re-reads it from disk or over
+the context's own client; anything still unreadable lands here. \`check animation\` measures the
+behaviour under emulation and does not depend on CSS text.`,
     },
     {
       id: "running-animation",
