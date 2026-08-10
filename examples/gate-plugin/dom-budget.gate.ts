@@ -38,6 +38,7 @@ import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 /** Defaults, deliberately generous. A budget nobody can meet gets disabled. */
 const DEFAULT_BUDGET = { maxNodes: 1500, maxDepth: 20, maxStylesheetBytes: 250_000 } as const;
@@ -183,17 +184,13 @@ docs/authoring-gates.md.`,
   run: async ({ source, budget, origin }) => {
     // Imported here, not at module scope: declaring this plugin should not
     // load Playwright for someone running `vlmkit rules`.
-    const { chromium } = await import("playwright");
-    const browser = await chromium.launch();
-    try {
+    return await withBrowser(async (browser) => {
       const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
       const url = /^(https?|file):\/\//.test(source) ? source : pathToFileURL(resolve(source)).href;
       await page.goto(url, { waitUntil: "networkidle", timeout: 30_000 });
       const measured = await page.evaluate(MEASURE) as Omit<DomBudgetReport, "source" | "budget" | "origin">;
       return { source, budget, origin, ...measured };
-    } finally {
-      await browser.close();
-    }
+    });
   },
   findings: (report): Finding[] => {
     const findings: Finding[] = [];

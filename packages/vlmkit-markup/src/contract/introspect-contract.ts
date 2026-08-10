@@ -1,7 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
-import { chromium } from "playwright";
 import {
   captureLandmarkRegions,
   type LandmarkLayoutContract,
@@ -35,6 +34,7 @@ import {
 } from "./ui-contract.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export interface LandmarkCapture {
   viewport: string;
@@ -344,7 +344,6 @@ export async function introspectUiContractFromHtml(
   const screenId = options.screenId ?? (basename(input).replace(/\.[^.]+$/, "") || "screen");
   const profileStart = performance.now();
   const launchStart = performance.now();
-  const browser = await chromium.launch();
   const profile: UiContractIntrospectionProfile = {
     totalMs: 0,
     browserLaunchMs: performance.now() - launchStart,
@@ -353,7 +352,7 @@ export async function introspectUiContractFromHtml(
   };
   const captures: LandmarkCapture[] = [];
   let hints: UiContractDomHints | undefined;
-  try {
+  await withBrowser(async (browser) => {
     for (const viewport of viewports) {
       const viewportStart = performance.now();
       const page = await browser.newPage({
@@ -405,12 +404,7 @@ export async function introspectUiContractFromHtml(
         landmarks: landmarks.length,
       });
     }
-  } finally {
-    const closeStart = performance.now();
-    await browser.close();
-    profile.browserCloseMs = performance.now() - closeStart;
-    profile.totalMs = performance.now() - profileStart;
-  }
+  });
   options.onProfile?.(profile);
   return landmarkRegionsToUiContract({
     screenId,

@@ -12,10 +12,10 @@
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync } from "node:fs";
-import { chromium } from "playwright";
 import { healSelector } from "./selector-heal.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 function toUrl(input: string): string {
   if (/^https?:\/\//.test(input)) return input;
@@ -52,8 +52,7 @@ async function main(argv = process.argv.slice(2)) {
   const [width, height] = (flag("--viewport") ?? "1280x800").split("x").map(Number);
   const json = argv.includes("--json");
 
-  const browser = await chromium.launch();
-  try {
+  return await withBrowser(async (browser) => {
     const page = await browser.newPage({ viewport: { width, height } });
     await page.goto(toUrl(input), { waitUntil: "load" });
     // Candidate selectors are harvested from the DOM as it stands. Without
@@ -84,9 +83,7 @@ async function main(argv = process.argv.slice(2)) {
         `| ${index + 1} | \`${candidate.selector}\` | ${(candidate.confidence * 100).toFixed(0)}% | ${text} | ${candidate.reasons.join("; ")} |`,
       );
     });
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "selector-heal-cli"

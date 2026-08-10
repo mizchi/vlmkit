@@ -32,6 +32,7 @@ import { pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export interface AnimationTimingSample {
   /** Index into the page's animation list at capture time. */
@@ -434,9 +435,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
     }
   };
 
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
-  try {
+  return await withBrowser(async (browser) => {
     const page = await browser.newPage({ viewport });
     await loadPage(page);
 
@@ -566,9 +565,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       issues,
       ...(framePaths.length > 0 ? { framePaths } : {}),
     };
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 export function formatAnimationEvalReport(report: AnimationEvalReport): string {

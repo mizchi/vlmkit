@@ -23,7 +23,8 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium, firefox, webkit, type Browser, type BrowserType } from "playwright";
+import { type Browser } from "playwright";
+import { ALL_BROWSER_ENGINES, BROWSER_ENGINES, type BrowserEngine } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
 import { annotateHeatmapRegionKinds } from "../heatmap-region-kinds.ts";
@@ -35,13 +36,9 @@ import {
 } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
-export type EngineName = "chromium" | "firefox" | "webkit";
+export type EngineName = BrowserEngine;
 
-export const ALL_ENGINES: EngineName[] = ["chromium", "firefox", "webkit"];
-
-const ENGINE_BY_NAME: Record<EngineName, BrowserType> = {
-  chromium, firefox, webkit,
-};
+export const ALL_ENGINES: EngineName[] = [...ALL_BROWSER_ENGINES];
 
 export interface CrossBrowserOptions {
   source: string;
@@ -134,8 +131,23 @@ async function captureWithEngine(
   outputPath: string,
 ): Promise<{ ok: true; userAgent: string } | { ok: false; reason: "not-installed" | "error"; message: string }> {
   let browser: Browser | null = null;
+  // The only multi-engine launch in the repo, and the only one that deliberately
+  // does NOT go through `withBrowser` / `launchBrowser`: a launch failure here is
+  // not an error, it is a *skipped engine row*. This gate is the one caller that
+  // wants to CLASSIFY the failure rather than report it — `reason:
+  // "not-installed"` becomes a `skipped` row (tolerated, `--allow-skipped`),
+  // anything else becomes `failed` (a warning exit). `launchBrowser` would throw
+  // a `BrowserLaunchError` carrying core's multi-line operator diagnosis, which
+  // the marker regex below does not match, so every missing engine would turn
+  // from skipped into failed.
+  //
+  // Not because of the engine name: `formatMissingPlaywrightBrowserError` reads
+  // the engine off the executable path (see `engineInstallCommand` above), so it
+  // would name firefox correctly. The reason is the classification, and it is why
+  // this site keeps its own launch while sharing core's engine table — so there
+  // is one such table in the repo, not two.
   try {
-    browser = await ENGINE_BY_NAME[engine].launch();
+    browser = await BROWSER_ENGINES[engine].launch();
   } catch (error) {
     const msg = String(error);
     // Playwright's "browser not installed" errors include

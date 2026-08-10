@@ -43,7 +43,8 @@ import {
   type InteractionTargetPlan,
   waitForInteractionStylesInDom,
 } from "@mizchi/vlmkit-core/computed-style-capture.ts";
-import { formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
+import { diagnoseSandboxLaunchFailure, formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
+import { launchBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import type { A11yNode, VrtSnapshot, VrtDiff, VisualSemanticDiff, A11yDiff } from "@mizchi/vlmkit-core/types.ts";
 import { debugEnabled } from "@mizchi/vlmkit-core/project-config.ts";
 
@@ -364,14 +365,11 @@ export type RenderBackend = "chromium" | "crater";
 
 export async function createBrowser(viewport = { width: 1280, height: 900 }): Promise<{ browser: Browser; viewport: { width: number; height: number } }> {
   let browser: Browser;
-  try {
-    browser = await chromium.launch();
-  } catch (error) {
-    if (isPlaywrightSandboxRestrictionError(error)) {
-      throw new Error(formatPlaywrightLaunchError(error, { commandHint: "in your local terminal or in CI" }));
-    }
-    throw error;
-  }
+  // The sandbox diagnosis now travels with the launch instead of being copied
+  // around it: `diagnoseSandboxLaunchFailure` declines anything that is not the
+  // Codex/macOS case, so core's missing-browser message still applies and an
+  // unrecognized failure is rethrown untouched.
+  browser = await launchBrowser({ diagnose: diagnoseSandboxLaunchFailure });
   return { browser, viewport };
 }
 

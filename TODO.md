@@ -535,9 +535,28 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   それを固定するテストまで存在した。両方を修正。
   回帰テスト: `packages/vlmkit-markup/src/auth-wall.test.ts`(7 件、
   実際に 302 するサーバを立てる)。
-- [ ] **ページオープン統一の残り(純粋な整理)** — `chromium.launch` 44 箇所、
-  `waitUntil` は networkidle 72 / load 8 / domcontentloaded 1。
-  **verdict を変える差は上記で解消済み**。残るのは重複コードの削減と
+- [x] **launch 統一 — 完了(2026-08-10)** — 計測した実数は 65 箇所
+  (`.ts` 57 + 使い捨て `.mjs` 8)。引数別: bare 60 / `{args}` 4 /
+  `{headless}` 1。close 別: `finally` 51 / 直線 9(throw で必ずリーク)/
+  クローズ無し 4 / `return launch()` 1。
+  `packages/vlmkit-core/src/browser-launch.ts` に choke point を新設し、
+  **52 箇所を変換**(`withBrowser` 44 / `launchBrowser` 8)。
+  意図的に据え置いたもの: `stress/cross-browser.ts`(launch 失敗を *skip 行*に
+  **分類する**唯一の呼び出し元。`launchBrowser` は core の複数行診断を
+  `BrowserLaunchError` で投げるが、この gate のマーカー正規表現は
+  それに一致しないので、未インストールの engine が skip から failed に
+  変わってしまう。engine 名の問題ではない —
+  `formatMissingPlaywrightBrowserError` は実行ファイルパスから engine を
+  読むので firefox を正しく名指しする)、`snapshot.ts` x2
+  (`CaptureBackend` 抽象。backend 自体は `launchBrowser` 経由になった)、
+  使い捨てスクリプト 8 本。
+  **launch 側に付けた理由**: 診断が `handleCliError` の中にしか無かったので
+  ライブラリ呼び出し(MCP / API / 直接 import)には一度も届いていなかった。
+  出荷 bin が `console.error(error)` していた問題は別件で、issue #112 item 2
+  として既に修正済み(`tests/cli-entry-parity.test.mjs` が守っている)。
+- [ ] **ページオープン統一の残り(純粋な整理)** — `waitUntil` は
+  networkidle 72 / load 8 / domcontentloaded 1。
+  **verdict を変える差は上記で解消済み**。残るのは
   fonts.ready 待ちの平準化で、こちらは実際に装飾。
 
 ### 差分監査 3 軸(2026-08-02)

@@ -21,6 +21,25 @@ export function isPlaywrightSandboxRestrictionError(error: unknown): boolean {
     );
 }
 
+/**
+ * The `diagnose` hook for `launchBrowser` / `withBrowser`.
+ *
+ * Core owns the launch but cannot own this check: the sandbox signals live in
+ * `@mizchi/vlmkit-capture`, and capture depends on core, so the direction only
+ * works as a hook the caller passes in. Returns `null` — declining — for
+ * anything that is not the sandbox case, which leaves core's own missing-browser
+ * diagnosis and every existing `handleCliError` branch untouched.
+ *
+ * Replaces the identical 5-line `if (isPlaywrightSandboxRestrictionError(e))
+ * throw new Error(formatPlaywrightLaunchError(e, …))` block that had been copied
+ * to 4 launch sites (css-challenge x2, css-challenge-core, migration-compare).
+ */
+export function diagnoseSandboxLaunchFailure(error: unknown): string | null {
+  return isPlaywrightSandboxRestrictionError(error)
+    ? formatPlaywrightLaunchError(error, { commandHint: "in your local terminal or in CI" })
+    : null;
+}
+
 export function formatPlaywrightLaunchError(
   error: unknown,
   options: { commandHint?: string } = {},

@@ -17,9 +17,9 @@
  */
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { chromium } from "playwright";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export interface MotionComputedSample {
   selector: string;
@@ -150,8 +150,7 @@ export async function runMotionDetection(
 ): Promise<MotionDetectionReport> {
   const viewport = options.viewport ?? { width: 1280, height: 720 };
   const maxSamples = options.maxSamples ?? 100;
-  const browser = await chromium.launch();
-  try {
+  return await withBrowser(async (browser) => {
     const page = await browser.newPage({ viewport });
     if (options.html !== undefined) {
       await page.setContent(options.html, navigationOptions(options));
@@ -234,9 +233,7 @@ export async function runMotionDetection(
       cssText: result.cssText,
       samples: result.samples,
     });
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 export function formatMotionDetectionReport(report: MotionDetectionReport): string {

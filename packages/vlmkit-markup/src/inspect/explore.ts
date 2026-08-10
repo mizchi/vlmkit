@@ -33,13 +33,14 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium, type Page } from "playwright";
+import { type Page } from "playwright";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
 import { annotateHeatmapRegionKinds } from "../heatmap-region-kinds.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export interface ExploreOptions {
   source: string;
@@ -204,8 +205,7 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
   const findings: ExploreFinding[] = [];
   let actions: DiscoveredAction[] = [];
 
-  const browser = await chromium.launch();
-  try {
+  await withBrowser(async (browser) => {
     const page = await browser.newPage({ viewport });
     if (isUrl(options.source)) {
       await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
@@ -335,9 +335,7 @@ export async function runExplore(options: ExploreOptions): Promise<ExploreReport
       });
     }
     await page.close();
-  } finally {
-    await browser.close();
-  }
+  });
 
   const reportPath = options.reportPath ?? join(outputDir, "report.md");
   const md = renderReport({

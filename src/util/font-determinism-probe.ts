@@ -38,6 +38,7 @@ import {
   findTextCollisions,
   type IntegrityTextBlock,
 } from "@mizchi/vlmkit-markup/inspect/integrity-check.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 /** Mirrors the gate's constants; asserted against the gate's own output below. */
 const MIN_OVERLAP_PX = 6;
@@ -158,17 +159,14 @@ export interface MeasureOptions {
 }
 
 export async function measure(options: MeasureOptions): Promise<ProbeFingerprint> {
-  const { chromium } = await import("playwright");
   const hinting = options.hinting ?? "default";
-  const browser = await chromium.launch({
-    args: hinting === "none"
-      ? ["--font-render-hinting=none", "--disable-font-subpixel-positioning", "--disable-lcd-text"]
-      : [],
-  });
   const dpr = options.dpr ?? 1;
   const width = options.viewport ?? 1280;
   const fixtures: FixtureFingerprint[] = [];
-  try {
+  // One of only 4 sites repo-wide that pass `args`, and the whole point of this
+  // probe is what those flags do to glyph rasterization — `launch` forwards the
+  // object to `browserType.launch()` untouched so the rendering is unchanged.
+  return await withBrowser(async (browser) => {
     const files: string[] = [];
     for (const pattern of options.patterns) {
       if (/[*?[\]{}]/.test(pattern)) {
@@ -220,9 +218,13 @@ export async function measure(options: MeasureOptions): Promise<ProbeFingerprint
       hinting,
       fixtures,
     };
-  } finally {
-    await browser.close();
-  }
+  }, {
+    launch: {
+      args: hinting === "none"
+        ? ["--font-render-hinting=none", "--disable-font-subpixel-positioning", "--disable-lcd-text"]
+        : [],
+    },
+  });
 }
 
 export interface ComparisonRow {

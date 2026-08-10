@@ -25,6 +25,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export async function loadPng(path: string): Promise<{ data: Uint8Array; width: number; height: number }> {
   const png = PNG.sync.read(await readFile(path));
@@ -40,9 +41,7 @@ export async function renderHtmlToPng(
   width: number,
   height: number,
 ): Promise<{ data: Uint8Array; width: number; height: number; screenshotPath: string }> {
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
-  try {
+  return await withBrowser(async (browser) => {
     const page = await browser.newPage({ viewport: { width, height } });
     await page.goto(pathToFileURL(resolve(htmlPath)).href, { waitUntil: "load" });
     // A screenshot samples the DOM at that instant. Measured 2026-08-02 on a
@@ -74,7 +73,5 @@ export async function renderHtmlToPng(
       height: png.height,
       screenshotPath: "",
     };
-  } finally {
-    await browser.close();
-  }
+  });
 }

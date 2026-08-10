@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { resolve, join } from "node:path";
 import { mkdir, readFile } from "node:fs/promises";
-import { chromium } from "playwright";
+import { withBrowser } from "./browser-launch.ts";
 import { generateDiffReport } from "./heatmap.ts";
 import type { VrtSnapshot, DiffReport } from "./types.ts";
 
@@ -11,12 +11,12 @@ const OUTPUT_DIR = resolve(process.cwd(), "test-results", "shift-detection-test"
 
 async function captureHtml(htmlPath: string, outputPng: string) {
   const html = await readFile(htmlPath, "utf-8");
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
-  await page.setContent(html, { waitUntil: "networkidle" });
-  await page.screenshot({ path: outputPng, fullPage: true });
-  await page.close();
-  await browser.close();
+  await withBrowser(async (browser) => {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+    await page.setContent(html, { waitUntil: "networkidle" });
+    await page.screenshot({ path: outputPng, fullPage: true });
+    await page.close();
+  });
 }
 
 async function getDiffReport(

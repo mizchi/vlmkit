@@ -10,6 +10,7 @@
  * `browser.newPage({viewport})` style.
  */
 import { chromium, type Browser } from "playwright";
+import { launchBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export type CaptureBackendKind = "local" | "cloudflare-cdp";
 
@@ -42,7 +43,13 @@ export function createLocalCapturer(): CaptureBackend {
     kind: "local",
     label: "local chromium",
     async launch() {
-      return chromium.launch();
+      // `launchBrowser`, not `withBrowser`: the whole point of `CaptureBackend` is
+      // to hand a Browser to a caller who decides its lifetime (`snapshot.ts`
+      // keeps one across every route x viewport), so there is no scope to close
+      // at. It still routes through the choke point, so a missing browser is
+      // diagnosed here instead of surfacing as a raw Playwright stack — which is
+      // what a library consumer of the snapshot API used to get.
+      return launchBrowser();
     },
     async close(browser) {
       await browser.close();

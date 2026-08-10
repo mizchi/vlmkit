@@ -18,6 +18,7 @@ import { test, describe } from "node:test";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import {
   classifyRuntimeEvents,
   findTextCollisions,
@@ -735,13 +736,14 @@ test("HAR replay gates a URL after its backing server is offline", { timeout: 40
   const port = (server.address() as { port: number }).port;
   const url = `http://127.0.0.1:${port}/`;
   const har = join(DIR, "offline-replay.har");
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
-  const context = await browser.newContext({ recordHar: { path: har } });
-  const recorder = await context.newPage();
-  await recorder.goto(url, { waitUntil: "load" });
-  await context.close();
-  await browser.close();
+  await withBrowser(async (browser) => {
+    const context = await browser.newContext({ recordHar: { path: har } });
+    const recorder = await context.newPage();
+    await recorder.goto(url, { waitUntil: "load" });
+    // The HAR is only flushed by `context.close()`, so this stays inside the
+    // callback; `withBrowser` adds the browser close it previously did by hand.
+    await context.close();
+  });
   await new Promise<void>((resolve) => server.close(() => resolve()));
 
   const report = await runIntegrityCheck({

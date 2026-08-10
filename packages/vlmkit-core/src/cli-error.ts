@@ -204,6 +204,14 @@ export function formatCliError(e: unknown): string | null {
 
   if (err?.name === "UsageError") return `error: ${msg}`;
 
+  // `browser-launch.ts` already ran the diagnosis at the launch (so library
+  // callers get it too, not only the CLI) and put the finished text — "error: "
+  // prefix and all — in `message`. Returned verbatim: re-prefixing would give
+  // "error: error: …", and returning null would print a stack where this should
+  // print two lines. Matched by name rather than `instanceof` so this module
+  // keeps its zero Playwright imports.
+  if (err?.name === "BrowserLaunchError") return msg;
+
   // ENOENT — missing local file path.
   if (err?.code === "ENOENT") {
     const path = err.path ?? msg.match(/ENOENT: no such file or directory[^']*'([^']+)'/)?.[1] ?? "?";

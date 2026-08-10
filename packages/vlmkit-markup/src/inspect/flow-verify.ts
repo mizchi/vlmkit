@@ -33,6 +33,7 @@ import { type PageLoadOptions, applyHar, navigationOptions } from "@mizchi/vlmki
 import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export type FlowAction =
   /**
@@ -222,11 +223,9 @@ export interface FlowVerifyOptions extends PageLoadOptions {
 
 export async function runFlowVerify(options: FlowVerifyOptions): Promise<FlowVerifyReport> {
   validateFlow(options.flow);
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
   const steps: StepResult[] = [];
   let redirected: string | undefined;
-  try {
+  await withBrowser(async (browser) => {
     const page = await browser.newPage(withAuthState({ viewport: options.flow.viewport ?? { width: 1280, height: 800 } }, options.storageState));
     const url = /^(https?|file):\/\//.test(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
     await applyHar(page, options.har);
@@ -271,9 +270,7 @@ export async function runFlowVerify(options: FlowVerifyOptions): Promise<FlowVer
       steps.push(res);
       if (!res.passed) break; // stop at the first unmet post-condition
     }
-  } finally {
-    await browser.close();
-  }
+  });
   const passed = steps.filter((s) => s.passed).length;
   // Not `done` on a redirect: the flow ran against a page the caller did not
   // ask for, so passing steps would be a claim about the sign-in screen.

@@ -28,7 +28,8 @@ import { readFile, writeFile, mkdir, copyFile } from "node:fs/promises";
 import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
-import { chromium, type Page } from "playwright";
+import { type Page } from "playwright";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 /**
  * Seek every WAAPI-visible animation to its rest pose: running finite
@@ -446,8 +447,7 @@ export async function runComponentFromImage(
     ? { width: Math.round(viewport.width / dpr), height: Math.round(viewport.height / dpr) }
     : viewport;
 
-  const browser = await chromium.launch();
-  try {
+  return await withBrowser(async (browser) => {
     const page = await browser.newPage({
       viewport: cssViewport,
       deviceScaleFactor: dpr,
@@ -837,9 +837,7 @@ export async function runComponentFromImage(
     console.log(`  ${DIM}report json: ${jsonReportPath}${RESET}`);
 
     return result;
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 async function captureLandingEvidence(page: Page): Promise<ComponentLandingEvidence | undefined> {

@@ -27,11 +27,12 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium, type Page } from "playwright";
+import { type Page } from "playwright";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { type PageLoadOptions, navigatePage } from "@mizchi/vlmkit-core/page-load.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export interface DesignTokenConfig {
   radius?: number[];
@@ -199,20 +200,17 @@ export async function runDesignTokens(
     ...options.config,
   };
 
-  const html = isUrl(options.source) ? null : await readFile(resolve(options.source), "utf-8");
-
-  const browser = await chromium.launch();
-  let samples: RawSample[];
-  try {
+  // Returned out of the callback, not assigned into an outer `let` — TypeScript's
+  // definite-assignment analysis does not follow an assignment made in a closure.
+  const samples = await withBrowser(async (browser) => {
     const page = await browser.newPage({ viewport });
     // `sourceToUrl` is identity for a URL, so the two branches were the same
     // call; one navigation now, honouring --timeout / --wait-until / --har.
     await navigatePage(page, sourceToUrl(options.source), options);
-    samples = await page.evaluate(SAMPLE_SCRIPT) as RawSample[];
+    const collected = await page.evaluate(SAMPLE_SCRIPT) as RawSample[];
     await page.close();
-  } finally {
-    await browser.close();
-  }
+    return collected;
+  });
 
   // Per-element scale checks. Dedupe by path (same element captured
   // once even if reported by multiple text nodes).

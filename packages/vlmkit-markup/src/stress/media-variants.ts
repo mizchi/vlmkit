@@ -30,16 +30,17 @@
  *   vlmkit stress media <html-or-url>
  *   vlmkit stress media <url> --variants forced-colors,print,rtl
  */
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium, type Page } from "playwright";
+import { type Page } from "playwright";
 import { sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { type PageLoadOptions, navigatePage } from "@mizchi/vlmkit-core/page-load.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export type MediaVariant = "forced-colors" | "reduced-motion" | "print" | "rtl" | "zoom-200";
 
@@ -126,19 +127,20 @@ export async function runMediaVariants(
   const threshold = options.threshold ?? 0.03;
   const variants = options.variants ?? ALL_VARIANTS;
 
-  const html = isUrl(options.source) ? null : await readFile(resolve(options.source), "utf-8");
-
-  const browser = await chromium.launch();
-  let defaultScreenshot: string;
+  // Read both inside the callback (as the diff baseline) and after it (in the
+  // report), so it can be neither callback-local nor a bare `let` assigned in the
+  // closure — TypeScript's definite-assignment analysis does not follow the
+  // latter. It only ever depended on `outputDir`, so hoisting the join is the
+  // same string computed a few lines earlier.
+  const defaultScreenshot = join(outputDir, "default.png");
   let allCss = "";
   const variantResults: VariantResult[] = [];
-  try {
+  await withBrowser(async (browser) => {
     // Default render — used as the baseline for diffs. Transitions
     // intentionally NOT disabled here because the reduced-motion
     // variant needs a fair comparison.
     const defaultPage = await browser.newPage({ viewport });
     await loadPage(defaultPage, options.source, options);
-    defaultScreenshot = join(outputDir, "default.png");
     await defaultPage.screenshot({ path: defaultScreenshot, fullPage: false });
     // Read all stylesheets — used for reduced-motion static check.
     allCss = await readAllStylesheets(defaultPage);
@@ -325,9 +327,7 @@ export async function runMediaVariants(
         verdict, note,
       });
     }
-  } finally {
-    await browser.close();
-  }
+  });
 
   const reportPath = options.reportPath ?? join(outputDir, "report.md");
   const md = renderReport({
@@ -337,7 +337,6 @@ export async function runMediaVariants(
     variants: variantResults,
   });
   await writeFile(reportPath, md);
-
 
   return {
     source: options.source, viewport, defaultScreenshot,
