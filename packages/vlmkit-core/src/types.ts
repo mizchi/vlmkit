@@ -63,10 +63,60 @@ export interface VrtSnapshot {
 export interface VrtDiff {
   snapshot: VrtSnapshot;
   diffPixels: number;
+  /**
+   * The `diffRatio` denominator: pixels that were actually measured. Equals the
+   * compared image area unless `mask` is present, in which case the ignored
+   * pixels are subtracted. See `DiffMaskSummary` for why.
+   */
   totalPixels: number;
   diffRatio: number;
   heatmapPath?: string;
   regions: DiffRegion[];
+  /** Present only when the caller passed ignore regions. */
+  mask?: DiffMaskSummary;
+}
+
+/** A rectangle the caller declared permanently non-deterministic. */
+export interface DiffIgnoreRegion {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface DiffIgnoredRegionReport extends DiffIgnoreRegion {
+  /**
+   * Pixels this rect actually covered inside the compared area — less than
+   * `width * height` when the rect hangs off the edge, and 0 when it misses the
+   * frame entirely (a typo'd mask that silences nothing should be visible, not
+   * inferred).
+   */
+  pixels: number;
+  /**
+   * Diff pixels that fell inside this rect and were discarded. This is the
+   * number that says how much the mask is doing: 0 means it changed nothing.
+   * Per-rect counts double-count where rects overlap; `ignoredDiffPixels` is
+   * the de-duplicated total.
+   */
+  diffPixels: number;
+}
+
+/**
+ * What a set of ignore regions removed from the measurement.
+ *
+ * Always reported alongside the verdict, never only in `--json`: the failure
+ * mode of this feature is a mask over half the frame and a gate that then says
+ * 0.1%. `imagePixels - ignoredPixels === totalPixels` is the arithmetic a
+ * reader can check.
+ */
+export interface DiffMaskSummary {
+  regions: DiffIgnoredRegionReport[];
+  /** De-duplicated count of pixels inside at least one ignore region. */
+  ignoredPixels: number;
+  /** De-duplicated count of *differing* pixels that were discarded. */
+  ignoredDiffPixels: number;
+  /** The compared area before masking (excludes size-mismatch overflow). */
+  imagePixels: number;
 }
 
 export type DiffRegionType = "shift" | "content" | "edge";
@@ -146,9 +196,12 @@ export interface ShiftRegion {
 
 export interface DiffReport {
   diffPixels: number;
+  /** Measured pixels — see `VrtDiff.totalPixels`. */
   totalPixels: number;
   diffRatio: number;
   regions: DiffRegion[];
+  /** Present only when the caller passed ignore regions. */
+  mask?: DiffMaskSummary;
   shiftOnly: boolean;
   contentChangeCount: number;
   globalShift: number;

@@ -41,6 +41,7 @@ export {
   compareScreenshots,
   detectBandShifts,
   generateDiffReport,
+  parseIgnoreRegionSpec,
   detectWhiteout,
   detectEmptyContent,
 } from "./heatmap.ts";

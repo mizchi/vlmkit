@@ -25,14 +25,27 @@
  *
  *   vlmkit scan component <screenshot.png> --at 640,320
  *     # crop the component containing the given (x, y) point
+ *
+ *   vlmkit scan component <hud.png> --preset game-ui
+ *     # low-resolution / high-contrast frames with many small elements
+ *     # (see EXTRACT_PRESETS in component-bbox.ts for the measurements)
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { basename, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
-import { extractComponentsFromFile, type ComponentBbox } from "./component-bbox.ts";
+import {
+  extractComponentsFromFile,
+  DEFAULT_MIN_AREA,
+  DEFAULT_TOP_N,
+  EXTRACT_PRESETS,
+  EXTRACT_PRESET_NAMES,
+  isExtractPresetName,
+  type ComponentBbox,
+  type ExtractPresetName,
+} from "./component-bbox.ts";
 import { classifyRegion } from "../region-classify.ts";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { handleCliError, UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 export interface ComponentExtractOptions {
@@ -49,6 +62,17 @@ export interface ComponentExtractOptions {
   cropPadding?: number;
   /** Minimum area for a component to be reported. Default inherits from extractor. */
   minArea?: number;
+  /**
+   * Cap on how many components are reported, sorted by area desc. Default
+   * inherits from the extractor (8). The single biggest lever on element-dense
+   * frames — see `EXTRACT_PRESETS`.
+   */
+  topN?: number;
+  /**
+   * Named threshold bundle (`game-ui`). Explicit `minArea` / `topN` win over
+   * the preset, so `--preset game-ui --top-n 40` is a legal widening.
+   */
+  preset?: ExtractPresetName;
 }
 
 export interface ExtractedComponent {
@@ -64,8 +88,32 @@ export interface ExtractedComponent {
 export interface ComponentExtractReport {
   source: string;
   imageSize: { width: number; height: number };
+  /** Thresholds actually applied, after preset resolution. */
+  settings: { minArea: number; topN: number; preset?: ExtractPresetName };
   components: ExtractedComponent[];
+  /**
+   * Present when the frame is small enough that the default thresholds are
+   * measurably leaving elements behind. See `probeSmallFrame`.
+   */
+  smallFrameHint?: SmallFrameHint;
   reportPath: string;
+}
+
+export interface SmallFrameHint {
+  /** Components the `game-ui` preset finds that the applied settings did not. */
+  extraComponents: number;
+  /** Filled-pixel area of the largest component the applied `minArea` excluded. */
+  largestExcludedArea: number;
+  preset: ExtractPresetName;
+}
+
+/** `--min-area abc` used to reach the extractor as NaN, which filters everything out. */
+function positiveInt(flag: string, raw: string | undefined): number {
+  const n = Number.parseInt(raw ?? "", 10);
+  if (!Number.isFinite(n) || n < 1) {
+    throw new UsageError(`${flag} expects a positive integer, got "${raw ?? ""}".`);
+  }
+  return n;
 }
 
 function parseArgs(argv: string[]) {
@@ -76,6 +124,8 @@ function parseArgs(argv: string[]) {
   let pointXY: { x: number; y: number } | undefined;
   let cropPadding = 0;
   let minArea: number | undefined;
+  let topN: number | undefined;
+  let preset: ExtractPresetName | undefined;
   const positional: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -84,15 +134,61 @@ function parseArgs(argv: string[]) {
     else if (a === "--crop") cropRank = parseInt(argv[++i] ?? "0", 10);
     else if (a === "--crop-all") cropAll = true;
     else if (a === "--crop-padding") cropPadding = parseInt(argv[++i] ?? "0", 10);
-    else if (a === "--min-area") minArea = parseInt(argv[++i] ?? "0", 10);
-    else if (a === "--at") {
+    else if (a === "--min-area") minArea = positiveInt(a, argv[++i]);
+    else if (a === "--top-n") topN = positiveInt(a, argv[++i]);
+    else if (a === "--preset") {
+      const name = argv[++i] ?? "";
+      if (!isExtractPresetName(name)) {
+        throw new UsageError(
+          `Unknown --preset "${name}". Available: ${EXTRACT_PRESET_NAMES.join(", ")}.`,
+        );
+      }
+      preset = name;
+    } else if (a === "--at") {
       const parts = (argv[++i] ?? "").split(",").map((s) => parseInt(s.trim(), 10));
       if (parts.length === 2 && parts.every(Number.isFinite)) {
         pointXY = { x: parts[0]!, y: parts[1]! };
       }
     } else positional.push(a);
   }
-  return { positional, outputDir, report, cropRank, cropAll, pointXY, cropPadding, minArea };
+  return { positional, outputDir, report, cropRank, cropAll, pointXY, cropPadding, minArea, topN, preset };
+}
+
+/** Long side at or below which `probeSmallFrame` is worth running. */
+const SMALL_FRAME_LONG_SIDE = 640;
+/** Only advise the preset when it would find at least this many more components. */
+const HINT_MIN_EXTRA = 4;
+
+/**
+ * Would the `game-ui` preset find materially more on this frame?
+ *
+ * The defaults cannot be made size-adaptive without mislabelling small page
+ * renders (see `EXTRACT_PRESETS`), so instead of silently changing geometry the
+ * tool measures the gap and says so. Gated on the long side because that is
+ * what separates a game frame from a page screenshot — a full-page shot is tall
+ * even when it is narrow (the repo's mobile fixture is 378x3919) — and because
+ * the second extraction pass only costs anything on a large image. At 320x240 it
+ * is 77k pixels, i.e. free.
+ */
+async function probeSmallFrame(
+  sourcePath: string,
+  width: number,
+  height: number,
+  applied: { minArea: number; topN: number },
+  returnedCount: number,
+): Promise<SmallFrameHint | undefined> {
+  if (Math.max(width, height) > SMALL_FRAME_LONG_SIDE) return undefined;
+  const preset = "game-ui" satisfies ExtractPresetName;
+  const p = EXTRACT_PRESETS[preset];
+  if (applied.minArea <= p.minArea && applied.topN >= p.topN) return undefined;
+  const probed = await extractComponentsFromFile(sourcePath, p);
+  const extraComponents = probed.length - returnedCount;
+  if (extraComponents < HINT_MIN_EXTRA) return undefined;
+  const largestExcludedArea = Math.max(
+    0,
+    ...probed.filter((c) => c.area < applied.minArea).map((c) => c.area),
+  );
+  return { extraComponents, largestExcludedArea, preset };
 }
 
 function findContainingRank(components: ComponentBbox[], x: number, y: number): number | undefined {
@@ -139,9 +235,21 @@ export async function runComponentExtract(
   const sourceBuf = await readFile(sourcePath);
   const sourcePng = PNG.sync.read(sourceBuf);
 
+  // Preset first, explicit flags on top: `--preset game-ui --top-n 40` widens
+  // the preset rather than being rejected as a conflict.
+  const presetValues = options.preset ? EXTRACT_PRESETS[options.preset] : undefined;
+  const settings = {
+    minArea: options.minArea ?? presetValues?.minArea ?? DEFAULT_MIN_AREA,
+    topN: options.topN ?? presetValues?.topN ?? DEFAULT_TOP_N,
+    ...(options.preset ? { preset: options.preset } : {}),
+  };
   const rawComponents = await extractComponentsFromFile(sourcePath, {
-    minArea: options.minArea,
+    minArea: settings.minArea,
+    topN: settings.topN,
   });
+  const smallFrameHint = await probeSmallFrame(
+    sourcePath, sourcePng.width, sourcePng.height, settings, rawComponents.length,
+  );
 
   // Determine which rank(s) to crop.
   const ranksToCrop = new Set<number>();
@@ -190,12 +298,15 @@ export async function runComponentExtract(
   const md = renderReport({
     source: sourcePath,
     imageSize: { width: sourcePng.width, height: sourcePng.height },
+    settings,
     components,
+    smallFrameHint,
   });
   await writeFile(reportPath, md);
 
   console.log(`  ${BOLD}${CYAN}vlmkit scan component${RESET}`);
   console.log(`  ${DIM}source: ${sourcePath} (${sourcePng.width}×${sourcePng.height})${RESET}`);
+  console.log(`  ${DIM}settings: --min-area ${settings.minArea} --top-n ${settings.topN}${settings.preset ? ` (--preset ${settings.preset})` : ""}${RESET}`);
   console.log(`  ${DIM}found ${components.length} component(s)${RESET}`);
   for (const c of components.slice(0, 8)) {
     const fill = c.dominantColor?.hex ?? "—";
@@ -204,13 +315,27 @@ export async function runComponentExtract(
     console.log(`  ${DIM}#${c.rank}  ${c.bbox.left},${c.bbox.top} ${c.bbox.width}×${c.bbox.height}  fill ${fill}  ${kind}${RESET}${cropped}`);
   }
   if (components.length > 8) console.log(`  ${DIM}…${components.length - 8} more${RESET}`);
+  if (smallFrameHint) console.log(`  ${DIM}${smallFrameHintLine(smallFrameHint, settings)}${RESET}`);
   console.log(`  ${DIM}report: ${reportPath}${RESET}`);
 
   return {
     source: sourcePath,
     imageSize: { width: sourcePng.width, height: sourcePng.height },
-    components, reportPath,
+    settings,
+    components,
+    ...(smallFrameHint ? { smallFrameHint } : {}),
+    reportPath,
   };
+}
+
+function smallFrameHintLine(
+  hint: SmallFrameHint,
+  settings: { minArea: number; topN: number },
+): string {
+  const excluded = hint.largestExcludedArea > 0
+    ? `; largest region below --min-area ${settings.minArea} is ${hint.largestExcludedArea}px`
+    : "";
+  return `small frame: --preset ${hint.preset} finds ${hint.extraComponents} more component(s)${excluded}`;
 }
 
 function renderReport(r: Omit<ComponentExtractReport, "reportPath">): string {
@@ -219,12 +344,16 @@ function renderReport(r: Omit<ComponentExtractReport, "reportPath">): string {
   lines.push("");
   lines.push(`Source: \`${r.source}\` (${r.imageSize.width}×${r.imageSize.height})`);
   lines.push("");
+  lines.push(`Settings: \`--min-area ${r.settings.minArea} --top-n ${r.settings.topN}\`` +
+    (r.settings.preset ? ` (\`--preset ${r.settings.preset}\`)` : ""));
+  lines.push("");
   if (r.components.length === 0) {
     lines.push("## No components detected");
     lines.push("");
     lines.push("Either the image has no foreground content the connected-component " +
       "extractor recognizes, or every detected region was below the `--min-area` " +
       "threshold.");
+    if (r.smallFrameHint) lines.push("", ...smallFrameHintSection(r.smallFrameHint, r.settings));
     return lines.join("\n");
   }
   lines.push(`Detected **${r.components.length}** component(s), ranked by area.`);
@@ -240,6 +369,7 @@ function renderReport(r: Omit<ComponentExtractReport, "reportPath">): string {
   }
   if (r.components.length > 30) lines.push(`| _…${r.components.length - 30} more_ | | | | |`);
   lines.push("");
+  if (r.smallFrameHint) lines.push(...smallFrameHintSection(r.smallFrameHint, r.settings), "");
   lines.push("## Suggested next step");
   lines.push("");
   lines.push("1. Visually verify the rank → component mapping (open the source PNG, " +
@@ -252,9 +382,32 @@ function renderReport(r: Omit<ComponentExtractReport, "reportPath">): string {
   return lines.join("\n");
 }
 
+export function smallFrameHintSection(
+  hint: SmallFrameHint,
+  settings: { minArea: number; topN: number },
+): string[] {
+  const p = EXTRACT_PRESETS[hint.preset];
+  const lines = [
+    `## Small frame — \`--preset ${hint.preset}\` finds ${hint.extraComponents} more`,
+    "",
+    `This frame is small enough that the default thresholds are the limit, not the ` +
+    `image. \`--preset ${hint.preset}\` (\`--min-area ${p.minArea} --top-n ${p.topN}\`) ` +
+    `returns ${hint.extraComponents} component(s) beyond the ${settings.minArea}/${settings.topN} ` +
+    `run above.`,
+  ];
+  if (hint.largestExcludedArea > 0) {
+    lines.push("", `The largest region excluded by \`--min-area ${settings.minArea}\` fills ` +
+      `${hint.largestExcludedArea}px — for reference, a 12×12 HUD icon fills 144px and a ` +
+      `10×10 one fills 100px.`);
+  }
+  lines.push("", "Ignore this if the frame is a page render rather than a game/pixel-art " +
+    "frame: at page scale the extra components are usually individual glyphs.");
+  return lines;
+}
+
 async function main(argv = process.argv.slice(2)) {
   if (argv[0] === "--help" || argv[0] === "-h") argv = [];
-  const { positional, outputDir, report, cropRank, cropAll, pointXY, cropPadding, minArea } = parseArgs(argv);
+  const { positional, outputDir, report, cropRank, cropAll, pointXY, cropPadding, minArea, topN, preset } = parseArgs(argv);
   if (positional.length === 0) {
     console.log("Usage: vlmkit scan component <screenshot.png> [options]");
     console.log("Options:");
@@ -262,7 +415,12 @@ async function main(argv = process.argv.slice(2)) {
     console.log("  --crop-all              Crop every detected component");
     console.log("  --at <x>,<y>            Crop the component containing the point");
     console.log("  --crop-padding <px>     Expand each crop bbox by N pixels (default 0)");
-    console.log("  --min-area <px>         Minimum area for a component to be reported");
+    console.log(`  --min-area <px>         Minimum filled area per component (default ${DEFAULT_MIN_AREA})`);
+    console.log(`  --top-n <n>             Cap on reported components (default ${DEFAULT_TOP_N});`);
+    console.log("                          the binding limit on element-dense frames");
+    console.log(`  --preset <name>         Threshold bundle: ${EXTRACT_PRESET_NAMES.join(", ")}.`);
+    console.log(`                          game-ui = --min-area ${EXTRACT_PRESETS["game-ui"].minArea} --top-n ${EXTRACT_PRESETS["game-ui"].topN},`);
+    console.log("                          for low-resolution / high-contrast frames");
     console.log("  --output-dir <dir>      Default: ./test-results/component-extract");
     console.log("  --report <path>         Markdown report path");
     process.exit(1);
@@ -271,7 +429,7 @@ async function main(argv = process.argv.slice(2)) {
     source: positional[0]!,
     outputDir: outputDir || join(process.cwd(), "test-results", "component-extract"),
     reportPath: report || undefined,
-    cropRank, cropAll, pointXY, cropPadding, minArea,
+    cropRank, cropAll, pointXY, cropPadding, minArea, topN, preset,
   });
 }
 

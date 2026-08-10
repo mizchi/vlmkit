@@ -30,6 +30,12 @@
  *     Diff current rendering against pinned baselines + a11y +
  *     media-variants gates. Equivalent to `vlmkit diff-pr`.
  *
+ *   `pin` / `verify` / `update` also accept `--from-dir <dir>` and
+ *   `--from-png <file>`: the PNGs are taken as-is and no browser is
+ *   launched, for projects whose frames exist as files but have no
+ *   openable URL. See `baseline-from-png.ts` for the file→route rule and
+ *   for which gates that path cannot cover.
+ *
  *   vlmkit baseline post --pr <ref> [--summary <path>] [--marker <id>]
  *     Post a previously-generated summary.md as a PR comment.
  *     Equivalent to `vlmkit diff-pr post`.
@@ -222,8 +228,15 @@ async function cmdUpdate(args: string[]): Promise<number> {
   console.log();
 
   // Re-pin via the diff-pr pin path (the same capture machinery `pin` uses).
+  // Forward the file-source flags too, so `update --from-dir` refreshes from
+  // PNGs instead of falling back to a browser the caller may not have.
+  const forwarded: string[] = [];
+  for (const flag of ["config", "from-dir", "from-png", "route", "viewport"]) {
+    const value = getArg(args, flag);
+    if (value !== undefined) forwarded.push(`--${flag}`, value);
+  }
   const { main: diffPrMain } = await import("./diff-pr.ts");
-  await diffPrMain(["pin", ...targets, ...(getArg(args, "config") ? ["--config", getArg(args, "config")!] : [])]);
+  await diffPrMain(["pin", ...targets, ...forwarded]);
   return 0;
 }
 
@@ -328,14 +341,31 @@ Subcommands:
   pin     [route...] [--config vlmkit.config.json]
                               Capture / refresh baseline PNGs for
                               declared routes. Alias for \`vlmkit diff-pr pin\`.
+          [--from-dir <dir> | --from-png <file> [--route <r> --viewport <v>]]
+                              Pin already-rendered PNGs — no URL opened,
+                              no browser launched. For engines whose
+                              frames exist as files (canvas / WebGPU /
+                              native renderers). Names must match the
+                              baseline layout: <route>/<viewport>.png,
+                              <route>-<viewport>.png, or <route>.png when
+                              a single viewport is declared.
   verify  [--config vlmkit.config.json] [--output <dir>]
+          [--from-dir <dir> | --from-png <file> [--route <r> --viewport <v>]]
                               Diff current rendering against pinned
                               baselines. Alias for \`vlmkit diff-pr\`.
+                              --from-dir/--from-png reads the current
+                              side from PNGs; per-route thresholds,
+                              markdown summary and region approvals all
+                              still apply, but a11y / media-variants /
+                              cross-browser cannot run without a page and
+                              are reported as not evaluated.
   post    --pr <ref>          Post the most recent summary.md to a PR.
                               Alias for \`vlmkit diff-pr post\`.
   update  [route...] [--config vlmkit.config.json]
+          [--from-dir <dir> | --from-png <file> [--route <r> --viewport <v>]]
                               Archive current baselines to _history/<ts>/
                               and re-pin (reversible golden refresh).
+                              File-source flags are forwarded to \`pin\`.
   list    [--config vlmkit.config.json]
                               Show all pinned baselines.
   rm      <route...>          Remove one or more routes' baselines.

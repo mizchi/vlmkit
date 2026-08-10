@@ -17,6 +17,11 @@
  *     Emit a markdown summary suitable for pasting into a PR comment.
  *     Exit non-zero on any uncovered breach.
  *
+ * Both accept `--from-png <file>` / `--from-dir <dir>` in place of the
+ * browser render, for projects whose frames exist as PNGs but have no
+ * openable URL (canvas/WebGPU engines — see baseline-from-png.ts for the
+ * file→route rule and what the no-browser path cannot do).
+ *
  * Stays narrow: uses Playwright directly + the existing
  * `compareScreenshots` helper, NOT the full migration-compare
  * pipeline. The richer wireframe-suggestions / palette-diff signals
@@ -26,7 +31,7 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { chromium, type Browser } from "playwright";
 import {
@@ -38,6 +43,7 @@ import {
   type DiffPrConfig,
   type DiffPrRoute,
 } from "./diff-pr-config.ts";
+import { clearRouteBaselinePngs, pinPngSources, resolvePngSources, type PngSource } from "./baseline-from-png.ts";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { runA11yOnPage } from "./a11y-on-page.ts";
 import { runMediaVariants, type VariantResult, type MediaVariant } from "@mizchi/vlmkit-markup/stress/media-variants.ts";
@@ -134,6 +140,82 @@ function baselineDirForRoute(config: DiffPrConfig, route: DiffPrRoute): string {
   return resolve(configBaseDir(config), config.baselineDir, route.name);
 }
 
+function baselineRootFor(config: DiffPrConfig): string {
+  return resolve(configBaseDir(config), config.baselineDir);
+}
+
+/**
+ * The `--from-png` / `--from-dir` flag set, shared by `pin` and the diff run.
+ * `active` is what both commands branch on to skip Playwright entirely — the
+ * reporting project's browser cannot produce a usable canvas frame at all, so
+ * launching one would only cost time and then fail.
+ */
+interface FileSourceFlags {
+  active: boolean;
+  fromDir?: string;
+  fromPng?: string;
+  routeOverride?: string;
+  viewportOverride?: string;
+}
+
+function fileSourceFlags(args: string[]): FileSourceFlags {
+  const fromDir = getArg(args, "from-dir");
+  const fromPng = getArg(args, "from-png");
+  return {
+    active: Boolean(fromDir || fromPng),
+    fromDir,
+    fromPng,
+    routeOverride: getArg(args, "route"),
+    viewportOverride: getArg(args, "viewport"),
+  };
+}
+
+/** Positional route names, with `--flag value` pairs stripped out. */
+function positionalRouteNames(args: string[]): string[] {
+  const flaggedValues = new Set<string>();
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith("--") && i + 1 < args.length && !args[i + 1].startsWith("--")) {
+      flaggedValues.add(args[i + 1]);
+    }
+  }
+  return args.filter((a) => !a.startsWith("--")).filter((a) => !flaggedValues.has(a));
+}
+
+/**
+ * Viewport labels for file mode.
+ *
+ * `viewportSpecsFor` resolves a declared label to pixel dimensions and so
+ * silently drops anything that is not mobile/desktop/wide — measured with the
+ * built CLI: `"viewports": ["frame"]` produced `declared viewports: mobile,
+ * desktop, wide`. That fallback is correct for the browser path, which has to
+ * know what to resize the page to, and wrong here: a supplied PNG carries its
+ * own dimensions, and `thresholds` already accepts arbitrary keys. So a canvas
+ * engine can declare `"viewports": ["frame"]` and pin `hud/frame.png`.
+ *
+ * Limit worth stating: baselines pinned under a label the browser path does
+ * not know are reachable only from file mode. For a project whose renders
+ * cannot be produced by Playwright at all, that is the only mode anyway.
+ */
+function fileModeViewportSpecs(config: DiffPrConfig): Array<{ label: string; width: number; height: number }> {
+  if (!config.viewports || config.viewports.length === 0) return viewportSpecsFor(config);
+  return config.viewports.map((label) =>
+    DEFAULT_VIEWPORTS.find((v) => v.label === label) ?? { label, width: 0, height: 0 }
+  );
+}
+
+/**
+ * Gates that need a live page and therefore cannot run in file mode. Reported
+ * rather than silently skipped: a config that declares `a11y` and gets a PASS
+ * must not read as "a11y passed".
+ */
+function skippedGatesForFileMode(config: DiffPrConfig): string[] {
+  const skipped: string[] = [];
+  if (config.a11y || config.routes.some((r) => r.a11y)) skipped.push("a11y");
+  if (config.mediaVariants) skipped.push("media-variants");
+  if (config.crossBrowser) skipped.push("cross-browser");
+  return skipped;
+}
+
 function viewportSpecsFor(config: DiffPrConfig): Array<{ label: string; width: number; height: number }> {
   if (!config.viewports || config.viewports.length === 0) return DEFAULT_VIEWPORTS;
   const out: Array<{ label: string; width: number; height: number }> = [];
@@ -183,6 +265,52 @@ async function renderViewport(
   }
 }
 
+/**
+ * `pin --from-png/--from-dir`: copy already-rendered PNGs into the baseline
+ * layout instead of driving a browser. No Playwright is launched — that is the
+ * point of the flag, not an optimization.
+ */
+async function pinFromFiles(
+  config: DiffPrConfig,
+  configPath: string,
+  routesToPin: DiffPrRoute[],
+  files: FileSourceFlags,
+): Promise<number> {
+  const viewports = fileModeViewportSpecs(config).map((v) => v.label);
+  let sources: PngSource[];
+  try {
+    sources = await resolvePngSources({
+      routes: routesToPin,
+      viewports,
+      fromDir: files.fromDir,
+      fromPng: files.fromPng,
+      routeOverride: files.routeOverride,
+      viewportOverride: files.viewportOverride,
+      cwd: process.cwd(),
+      // A dir claims to be the whole capture set; a single file claims one pair.
+      requireFullCoverage: Boolean(files.fromDir),
+    });
+  } catch (err) {
+    console.error(`${RED}error:${RESET} ${err instanceof Error ? err.message : String(err)}`);
+    return 1;
+  }
+
+  const origin = files.fromDir ?? files.fromPng!;
+  console.log(`${BOLD}${CYAN}vlmkit diff-pr pin${RESET}  ${DIM}${configPath}${RESET}`);
+  console.log(`${DIM}  from ${origin} (no browser) → ${config.baselineDir}/${RESET}`);
+  console.log();
+  const written = await pinPngSources(baselineRootFor(config), sources, {
+    wipeRouteDirs: Boolean(files.fromDir),
+  });
+  for (let i = 0; i < sources.length; i++) {
+    const s = sources[i];
+    console.log(`  ${s.route.name.padEnd(20)} ${s.viewport.padEnd(10)} ${GREEN}ok${RESET} ${DIM}${s.file} → ${written[i]} (${s.matchedAs})${RESET}`);
+  }
+  console.log();
+  console.log(`${DIM}Pinned ${written.length} PNG(s). Run \`vlmkit baseline verify --from-dir <dir>\` to gate against them.${RESET}`);
+  return 0;
+}
+
 async function cmdPin(args: string[]): Promise<void> {
   const cwd = process.cwd();
   const configPath = findConfigPath(cwd, getArg(args, "config"));
@@ -195,15 +323,7 @@ async function cmdPin(args: string[]): Promise<void> {
   // Filter to specific routes if any positional arguments were given.
   // Unknown route names are an error so a typo doesn't silently
   // refresh nothing.
-  const requested = args.filter((a) => !a.startsWith("--"));
-  // Strip --flag value pairs from `requested`.
-  const flaggedValues = new Set<string>();
-  for (let i = 0; i < args.length; i++) {
-    if (args[i].startsWith("--") && i + 1 < args.length && !args[i + 1].startsWith("--")) {
-      flaggedValues.add(args[i + 1]);
-    }
-  }
-  const requestedRouteNames = requested.filter((r) => !flaggedValues.has(r));
+  const requestedRouteNames = positionalRouteNames(args);
   let routesToPin = config.routes;
   if (requestedRouteNames.length > 0) {
     const unknown = requestedRouteNames.filter((n) => !config.routes.some((r) => r.name === n));
@@ -213,6 +333,13 @@ async function cmdPin(args: string[]): Promise<void> {
       process.exit(1);
     }
     routesToPin = config.routes.filter((r) => requestedRouteNames.includes(r.name));
+  }
+
+  const files = fileSourceFlags(args);
+  if (files.active) {
+    const code = await pinFromFiles(config, configPath, routesToPin, files);
+    if (code !== 0) process.exit(code);
+    return;
   }
 
   console.log(`${BOLD}${CYAN}vlmkit diff-pr pin${RESET}  ${DIM}${configPath}${RESET}`);
@@ -228,9 +355,10 @@ async function cmdPin(args: string[]): Promise<void> {
     for (const route of routesToPin) {
       process.stdout.write(`  ${route.name.padEnd(20)} ${DIM}${route.url}${RESET} ...`);
       const dir = baselineDirForRoute(config, route);
-      // Clean only this route's dir so other routes' baselines stay
-      // untouched (the partial-pin use case).
-      if (existsSync(dir)) await rm(dir, { recursive: true });
+      // Clean only this route's PNGs, so other routes' baselines stay
+      // untouched (the partial-pin use case) and `_history/` survives (the
+      // archive `baseline update` writes just before calling us).
+      await clearRouteBaselinePngs(dir);
       await mkdir(dir, { recursive: true });
       let success = 0;
       for (const vp of viewports) {
@@ -277,17 +405,69 @@ async function cmdRun(args: string[]): Promise<number> {
     }
   }
 
+  // File mode: the "current" side comes from PNGs on disk rather than a
+  // render. Resolved up front so a bad mapping fails before any work.
+  const files = fileSourceFlags(args);
+  const viewports = files.active ? fileModeViewportSpecs(config) : viewportSpecsFor(config);
+  let fileSources: Map<string, string> | null = null;
+  let skippedGates: string[] = [];
+  if (files.active) {
+    let sources: PngSource[];
+    try {
+      sources = await resolvePngSources({
+        routes: config.routes,
+        viewports: viewports.map((v) => v.label),
+        fromDir: files.fromDir,
+        fromPng: files.fromPng,
+        routeOverride: files.routeOverride,
+        viewportOverride: files.viewportOverride,
+        cwd,
+        requireFullCoverage: Boolean(files.fromDir),
+      });
+    } catch (err) {
+      console.error(`${RED}error:${RESET} ${err instanceof Error ? err.message : String(err)}`);
+      return 1;
+    }
+    fileSources = new Map(sources.map((s) => [`${s.route.name}/${s.viewport}`, s.file]));
+    skippedGates = skippedGatesForFileMode(config);
+  }
+
+  // `--from-png` names exactly one route/viewport, so the other declared
+  // routes are out of scope. Drop them from the run rather than letting them
+  // report an empty `pass` — a route with no viewport rows reads as green in
+  // both the terminal line and the markdown table, which is the silent
+  // partial run this feature is supposed to make impossible.
+  const routesToRun = fileSources
+    ? config.routes.filter((r) => viewports.some((vp) => fileSources!.has(`${r.name}/${vp.label}`)))
+    : config.routes;
+  const outOfScope = config.routes.filter((r) => !routesToRun.includes(r)).map((r) => r.name);
+  const scopeNote = outOfScope.length > 0
+    ? `${routesToRun.length} of ${config.routes.length} declared route(s) checked ` +
+      `(no PNG supplied for: ${outOfScope.join(", ")})`
+    : undefined;
+
   console.log(`${BOLD}${CYAN}vlmkit diff-pr${RESET}  ${DIM}${configPath}${RESET}`);
   console.log(`${DIM}  ${config.routes.length} route(s); thresholds ${JSON.stringify(config.thresholds)}${RESET}`);
   if (manifest) console.log(`${DIM}  approval manifest: ${manifest.rules.length} rule(s)${RESET}`);
+  if (fileSources) {
+    console.log(`${DIM}  current side from ${files.fromDir ?? files.fromPng} (no browser): ${fileSources.size} PNG(s)${RESET}`);
+    if (skippedGates.length > 0) {
+      // Loud, because these gates are declared in config and a PASS here does
+      // not cover them. They need a live page; a PNG cannot supply a DOM,
+      // media-emulation, or a second engine.
+      console.log(`${YELLOW}  warn: skipped (need a browser): ${skippedGates.join(", ")}${RESET}`);
+    }
+    if (scopeNote) console.log(`${YELLOW}  warn: ${scopeNote}${RESET}`);
+  }
   console.log();
 
-  const viewports = viewportSpecsFor(config);
   const results: PerRouteResult[] = [];
-  const browser = await chromium.launch();
+  // Do not launch chromium at all in file mode — the reporting project's
+  // headless canvas capture is exactly what does not work there.
+  const browser = fileSources ? null : await chromium.launch();
 
   try {
-    for (const route of config.routes) {
+    for (const route of routesToRun) {
       const baselineDir = baselineDirForRoute(config, route);
       if (!existsSync(baselineDir)) {
         console.log(`  ${route.name.padEnd(20)} ${RED}no baseline${RESET} ${DIM}(${baselineDir} — run \`vlmkit diff-pr pin\` first)${RESET}`);
@@ -304,18 +484,33 @@ async function cmdRun(args: string[]): Promise<number> {
       const routeOut = resolve(outputDir, route.name);
       await mkdir(routeOut, { recursive: true });
 
-      const a11yPolicy = resolveA11yPolicy(config, route);
+      // a11y needs a page; in file mode the policy is reported as skipped
+      // above and not evaluated here.
+      const a11yPolicy = fileSources ? undefined : resolveA11yPolicy(config, route);
       const perVp: PerViewportResult[] = [];
       for (const vp of viewports) {
         const baselinePath = join(baselineDir, `${vp.label}.png`);
         if (!existsSync(baselinePath)) continue;
+        const suppliedFile = fileSources?.get(`${route.name}/${vp.label}`);
+        // In file mode a viewport with no supplied PNG is out of scope
+        // (--from-png names exactly one pair); --from-dir already enforced
+        // full coverage, so this only skips what the caller narrowed away.
+        if (fileSources && !suppliedFile) continue;
         const variantPath = join(routeOut, `${vp.label}.png`);
         let renderRes: RenderResult;
         try {
-          renderRes = await renderViewport(
-            browser, route.url, vp.width, vp.height,
-            variantPath, route.waitFor, a11yPolicy,
-          );
+          if (suppliedFile) {
+            // Copy rather than diff in place, so the run dir stays
+            // self-contained (heatmap lands beside the variant) and the
+            // caller's capture dir is never written to.
+            await copyFile(suppliedFile, variantPath);
+            renderRes = { contrastFailures: [], touchFailures: [], focusOrderFailures: [], semanticFailures: [] };
+          } else {
+            renderRes = await renderViewport(
+              browser!, route.url, vp.width, vp.height,
+              variantPath, route.waitFor, a11yPolicy,
+            );
+          }
         } catch (err) {
           perVp.push({
             viewport: vp.label,
@@ -325,7 +520,8 @@ async function cmdRun(args: string[]): Promise<number> {
             threshold: resolveThreshold(config, route, vp.label),
             pass: false,
           });
-          console.log(`  ${route.name.padEnd(20)} ${vp.label} ${RED}render error: ${String(err)}${RESET}`);
+          const what = suppliedFile ? "copy" : "render";
+          console.log(`  ${route.name.padEnd(20)} ${vp.label} ${RED}${what} error: ${String(err)}${RESET}`);
           continue;
         }
         const snap: VrtSnapshot = {
@@ -408,7 +604,7 @@ async function cmdRun(args: string[]): Promise<number> {
       // viewport when `mediaVariants` is declared. Each variant
       // counts toward the route's pass/fail.
       let mediaVariantsResult: PerRouteResult["mediaVariants"];
-      if (config.mediaVariants) {
+      if (config.mediaVariants && !fileSources) {
         const mvDir = resolve(routeOut, "media-variants");
         const variants = config.mediaVariants.variants as MediaVariant[] | undefined;
         const maxSuspects = config.mediaVariants.maxSuspects ?? 0;
@@ -446,7 +642,7 @@ async function cmdRun(args: string[]): Promise<number> {
       // /webkit on minimal CI runners) auto-skip; allowSkipped=true
       // by default so missing engines don't fail the build.
       let crossBrowserResult: PerRouteResult["crossBrowser"];
-      if (config.crossBrowser) {
+      if (config.crossBrowser && !fileSources) {
         const xbDir = resolve(routeOut, "cross-browser");
         const threshold = config.crossBrowser.threshold ?? 0.03;
         const maxOver = config.crossBrowser.maxOver ?? 0;
@@ -507,10 +703,14 @@ async function cmdRun(args: string[]): Promise<number> {
       });
     }
   } finally {
-    await browser.close();
+    await browser?.close();
   }
 
-  const summary = buildMarkdownSummary(config, results);
+  const summary = buildMarkdownSummary(config, results, {
+    source: fileSources ? (files.fromDir ?? files.fromPng) : undefined,
+    skippedGates,
+    scopeNote,
+  });
   const summaryPath = resolve(outputDir, "summary.md");
   await writeFile(summaryPath, summary);
 
@@ -525,7 +725,20 @@ async function cmdRun(args: string[]): Promise<number> {
   return 0;
 }
 
-export function buildMarkdownSummary(config: DiffPrConfig, results: PerRouteResult[]): string {
+export interface MarkdownSummaryOptions {
+  /** `--from-dir`/`--from-png` origin, when the current side came from files. */
+  source?: string;
+  /** Declared gates that were not evaluated because there was no browser. */
+  skippedGates?: string[];
+  /** Set when the run covered fewer routes than the config declares. */
+  scopeNote?: string;
+}
+
+export function buildMarkdownSummary(
+  config: DiffPrConfig,
+  results: PerRouteResult[],
+  options: MarkdownSummaryOptions = {},
+): string {
   const lines: string[] = [];
   lines.push("# vlmkit diff-pr summary");
   lines.push("");
@@ -534,6 +747,13 @@ export function buildMarkdownSummary(config: DiffPrConfig, results: PerRouteResu
   const overall = failed === 0 ? "**PASS**" : `**FAIL** (${failed} of ${totalRoutes} route(s))`;
   lines.push(`Status: ${overall}`);
   if (config.configPath) lines.push(`Config: \`${config.configPath}\``);
+  if (options.source) lines.push(`Current side: pre-rendered PNGs from \`${options.source}\` (no browser)`);
+  if (options.scopeNote) lines.push(`**Partial run**: ${options.scopeNote}`);
+  if (options.skippedGates && options.skippedGates.length > 0) {
+    // The PASS above covers pixels only. Saying so in the artifact matters
+    // more than in the terminal — the markdown is what gets pasted into a PR.
+    lines.push(`**Not evaluated** (declared in config, needs a live page): ${options.skippedGates.join(", ")}`);
+  }
   lines.push("");
   const anyA11y = results.some((r) => r.viewports.some((v) => v.a11y));
   if (anyA11y) {
@@ -748,16 +968,31 @@ Subcommands:
                               No positional args → pin every route.
                               Positional names → pin only those, leave
                               the rest untouched (partial refresh).
+         [--from-dir <dir> | --from-png <file> [--route <r> --viewport <v>]]
+                              Take already-rendered PNGs instead of
+                              opening a URL (no browser launched). Files
+                              map to routes by name:
+                                <route>/<viewport>.png   (canonical)
+                                <route>-<viewport>.png   (flat)
+                                <route>.png              (1 viewport only)
+                              --from-dir must cover every declared
+                              route × viewport; unmapped or missing
+                              files are an error, never a partial pin.
   post   --pr <ref> [--summary <path>] [--marker <id>]
                               Post the most recent summary.md to a PR
                               via gh CLI. Falls back to printing the
                               markdown with copy-paste instructions
                               when gh is not on PATH.
   (none) [--config vlmkit.config.json] [--output <dir>]
+         [--from-dir <dir> | --from-png <file> [--route <r> --viewport <v>]]
                               Diff every route's current rendering
                               against its pinned baseline; apply
                               per-route thresholds; emit markdown.
                               Exit non-zero on any breach.
+                              With --from-dir/--from-png the current side
+                              is read from PNGs instead of rendered;
+                              a11y / media-variants / cross-browser are
+                              then skipped and reported as not evaluated.
 
 Config (vlmkit.config.json):
   {

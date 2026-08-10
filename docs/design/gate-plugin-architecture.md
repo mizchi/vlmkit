@@ -280,13 +280,13 @@ The built-ins load through the same `createGateRegistry([...])` call. If the
 contract were not sufficient for them it would not be sufficient for anyone
 else, and making them its first consumer is the only way to keep that honest.
 
-## The 27 gates (119 tunable rules)
+## The 27 gates (120 tunable rules)
 
 | Gate | Rules | Plugin |
 |---|---|---|
 | `check integrity` | 18 | markup |
 | `check layout` | 11 | markup |
-| `check copy` | 5 | markup |
+| `check copy` | 6 | markup |
 | `check interactions` | 15 | markup |
 | `check a11y contrast` | 1 | markup |
 | `check a11y touch` | 1 | markup |

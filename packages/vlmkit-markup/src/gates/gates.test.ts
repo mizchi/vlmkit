@@ -156,6 +156,65 @@ describe("gate argument parsing", () => {
     assert.throws(() => gateFor("check integrity").parse(["page.html", "--allow", "no-such-kind;why"], ctx));
   });
 
+  /**
+   * `check copy --elements` (vlmkit#118). The parse-time rules are the ones that decide
+   * whether a caller can trust the verdict, so they are asserted without a browser:
+   *
+   *  - a page source AND `--elements` is refused, not silently resolved. The two modes
+   *    evaluate different rule sets; picking one quietly makes the verdict ambiguous.
+   *  - flags that only mean something to the browser path are refused too. Accepting
+   *    `--target` and reviewing nothing is the exact failure the coverage reporting exists to
+   *    prevent, and swallowing the flag would undo it before the run even starts.
+   */
+  it("check copy takes element rects instead of a page", () => {
+    const parsed = gateFor("check copy").parse(
+      ["--elements", "e.json", "--image", "f.png", "--manifest", "copy.txt"],
+      ctx,
+    ) as { source: string; imageMode: Record<string, unknown> };
+    assert.equal(parsed.source, "f.png");
+    assert.deepEqual(parsed.imageMode, {
+      elementsPath: "e.json",
+      imagePath: "f.png",
+      manifestPath: "copy.txt",
+    });
+  });
+
+  it("check copy refuses a page source alongside --elements", () => {
+    assert.throws(
+      () => gateFor("check copy").parse(["page.html", "--elements", "e.json"], ctx),
+      /either a page source or --elements, not both/,
+    );
+    assert.throws(
+      () => gateFor("check copy").parse(["--image", "f.png", "--manifest", "copy.txt"], ctx),
+      /--image needs --elements/,
+    );
+  });
+
+  it("check copy refuses browser-only flags in --elements mode", () => {
+    for (const [flag, value] of [["--target", "t.png"], ["--out", "sheets"], ["--storage-state", "s.json"]]) {
+      assert.throws(
+        () => gateFor("check copy").parse(["--elements", "e.json", flag!, value!], ctx),
+        new RegExp(`\\${flag} does not apply with --elements`),
+      );
+    }
+    assert.throws(
+      () => gateFor("check copy").parse(["--elements", "e.json", "--vlm"], ctx),
+      /--vlm does not apply with --elements/,
+    );
+  });
+
+  it("check copy validates --allow-invisible in element-rect mode too", () => {
+    const parsed = gateFor("check copy").parse(
+      ["--elements", "e.json", "--allow-invisible", "unpainted"],
+      ctx,
+    ) as { imageMode: { allowInvisible: string[] } };
+    assert.deepEqual(parsed.imageMode.allowInvisible, ["unpainted"]);
+    assert.throws(
+      () => gateFor("check copy").parse(["--elements", "e.json", "--allow-invisible", "nope"], ctx),
+      /unknown class\(es\) "nope"/,
+    );
+  });
+
   it("check layout requires a contract", () => {
     assert.throws(() => gateFor("check layout").parse(["page.html"], ctx), /--contract <contract\.json> is required/);
     const parsed = gateFor("check layout").parse(["page.html", "--contract", "c.json"], ctx) as Record<string, unknown>;

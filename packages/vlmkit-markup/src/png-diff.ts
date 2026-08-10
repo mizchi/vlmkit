@@ -1,6 +1,6 @@
 import { mkdir, readFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
+import { compareScreenshots, parseIgnoreRegionSpec } from "@mizchi/vlmkit-core/heatmap.ts";
 import { readPngDimensions } from "@mizchi/vlmkit-core/image-resize.ts";
 import { classifyVisualDiff } from "./visual-semantic.ts";
 import {
@@ -11,7 +11,7 @@ import {
   type RegionElementRect,
   type RegionElementsViewport,
 } from "./region-selector-match.ts";
-import type { DiffRegion, VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
+import type { DiffIgnoreRegion, DiffRegion, VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 
 export interface PngDiffCliOptions {
   baselinePath: string;
@@ -40,6 +40,19 @@ export interface PngDiffCliOptions {
    * computed, and one wrong winner otherwise hides every alternative.
    */
   elementsTop?: number;
+  /**
+   * Rectangles that change every frame by construction — particles, noise, a
+   * timer readout (vlmkit#118, a canvas/WebGPU engine).
+   *
+   * Deliberately not `baseline approve --region`: approval records a decision
+   * with a reason, an approver and an expiry, and shows up in the
+   * `gates suppressions` stocktake. A permanently non-deterministic area routed
+   * through approval re-pollutes that history on every run and turns the
+   * stocktake into noise. These rects are *never measured* instead: nothing is
+   * recorded, nothing expires, and nothing is forgiven — there is no finding to
+   * forgive.
+   */
+  ignoreRegions?: DiffIgnoreRegion[];
 }
 
 export interface PngDiffRegionCrop {
@@ -84,7 +97,16 @@ Options:
                         region coarser than the element that changed misattributes
                         the cause. Lower it for small frames with fine detail.
   --elements-top <N>    Report the top N attribution candidates per region
-                        (default 1) instead of only the winner`;
+                        (default 1) instead of only the winner
+  --ignore-region "<x>,<y>,<w>x<h>"
+                        Never measure this rectangle. Repeatable. For areas that
+                        are non-deterministic by construction (particles, noise,
+                        a timer readout) — unlike "baseline approve --region"
+                        nothing is recorded or forgiven, and it does not appear
+                        in the suppression stocktake. Ignored pixels leave BOTH
+                        the diff count and the diffRatio denominator, so the
+                        ratio stays "fraction of what was measured". The masked
+                        area and the diff pixels it swallowed are always printed`;
 }
 
 export function parsePngDiffArgs(args: string[]): PngDiffCliOptions {
@@ -99,10 +121,24 @@ export function parsePngDiffArgs(args: string[]): PngDiffCliOptions {
   let elementsHtml: string | undefined;
   let elementsViewport: RegionElementsViewport | undefined;
   let cropRegions: string | undefined;
+  const ignoreRegions: DiffIgnoreRegion[] = [];
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!;
     switch (arg) {
+      case "--ignore-region": {
+        const value = args[++i];
+        if (!value) throw new PngDiffCliError(`Missing value for ${arg}\n\n${formatPngDiffUsage()}`, 2);
+        try {
+          ignoreRegions.push(parseIgnoreRegionSpec(value));
+        } catch (error) {
+          // Exit 2 like --region-grid / --elements-top: a malformed rect is a
+          // usage error, and it must never degrade to "no mask applied" — that
+          // would report a diff the caller believes they excluded.
+          throw new PngDiffCliError(`--ignore-region: ${(error as Error).message}`, 2);
+        }
+        break;
+      }
       case "--crop-regions": {
         const value = args[++i];
         if (!value) throw new PngDiffCliError(`Missing value for ${arg}\n\n${formatPngDiffUsage()}`, 1);
@@ -197,6 +233,7 @@ export function parsePngDiffArgs(args: string[]): PngDiffCliOptions {
     ...(cropRegions ? { cropRegions } : {}),
     ...(regionGrid !== undefined ? { regionGrid } : {}),
     ...(elementsTop !== undefined ? { elementsTop } : {}),
+    ...(ignoreRegions.length > 0 ? { ignoreRegions } : {}),
   };
 }
 
@@ -273,6 +310,7 @@ export async function runPngDiff(options: PngDiffCliOptions) {
     skipHeatmap: options.skipHeatmap,
     threshold: options.threshold,
     ...(options.regionGrid !== undefined ? { regionCellSize: options.regionGrid } : {}),
+    ...(options.ignoreRegions ? { ignoreRegions: options.ignoreRegions } : {}),
   });
   if (!diff) {
     throw new Error("PNG diff requires both baseline and current screenshot paths");
@@ -367,6 +405,7 @@ export async function runPngDiffCli(cliArgs = process.argv.slice(2)) {
       diffPixels: result.diff.diffPixels,
       totalPixels: result.diff.totalPixels,
       diffRatio: result.diff.diffRatio,
+      ...(result.diff.mask ? { mask: result.diff.mask } : {}),
       regions: result.diff.regions,
       heatmapPath: result.diff.heatmapPath,
       summary: result.semantic.summary,
@@ -394,7 +433,39 @@ export async function runPngDiffCli(cliArgs = process.argv.slice(2)) {
         `  note:     height differs by ${formatSizeDelta(output.sizeDelta.height)}px — content reflow likely (an element gained or lost vertical space)`,
       );
     }
-    console.log(`  diff:     ${(output.diffRatio * 100).toFixed(2)}% (${output.diffPixels} / ${output.totalPixels} px)`);
+    console.log(
+      `  diff:     ${(output.diffRatio * 100).toFixed(2)}% (${output.diffPixels} / ${output.totalPixels} px`
+      + `${output.mask ? " measured" : ""})`,
+    );
+    // Printed immediately under the ratio, not in a footer and not only in
+    // --json, following `formatIntegrityReport`'s coverage block: the dangerous
+    // failure mode of this flag is a mask over half the frame and a verdict of
+    // "0.10%". A clean result has to be auditable from the same three lines a
+    // reader already looks at.
+    if (output.mask) {
+      const m = output.mask;
+      const share = m.imagePixels > 0 ? (m.ignoredPixels / m.imagePixels) * 100 : 0;
+      console.log(
+        `  ignored:  ${m.regions.length} region(s), ${m.ignoredPixels} px`
+        + ` (${share.toFixed(1)}% of the ${m.imagePixels} px compared area) — never measured`,
+      );
+      for (const region of m.regions) {
+        const covered = region.pixels === 0
+          ? "0 px — outside the compared area, masks nothing"
+          : `${region.pixels} px, ${region.diffPixels} of them differed`;
+        console.log(`    (${region.x},${region.y}) ${region.width}x${region.height} — ${covered}`);
+      }
+      // Spell out the denominator. `totalPixels` also carries size-mismatch
+      // overflow, which no rect inside the compared area can mask, so show that
+      // term rather than print arithmetic that does not add up.
+      const overflow = output.totalPixels - (m.imagePixels - m.ignoredPixels);
+      console.log(
+        `    ${m.ignoredDiffPixels} diff px discarded; denominator`
+        + ` ${m.imagePixels} - ${m.ignoredPixels}`
+        + (overflow !== 0 ? ` + ${overflow} unmaskable size-mismatch px` : "")
+        + ` = ${output.totalPixels}`,
+      );
+    }
     console.log(`  regions:  ${output.regions.length}`);
     if (output.regions.length > 0) {
       for (const region of output.regions.slice(0, 15)) {

@@ -1026,3 +1026,81 @@ Consequences worth remembering:
 `findHeatmapRegionsFromRgba`, a different function; nothing exercised `detectDiffRegions`'
 grid, so the full suite stayed green through both the defect and the fix. See
 `packages/vlmkit-markup/src/region-attribution.test.ts`.
+
+## `scan component` on small frames: the binding constraint is `--top-n`, not `--min-area` (2026-08-09)
+
+Reported (vlmkit#118) as "with a 320x240 pixel-art HUD the default `--min-area` makes
+elements hard to detect". **Measured, that diagnosis is wrong.** On a 16-element HUD:
+
+| setting | detected (of 16) |
+|---|--:|
+| defaults (`minArea 200 / topN 8`) | 8 |
+| `--min-area 24` alone | **8 — no change at all** |
+| `--top-n 24` alone | 12 |
+| both | 16 |
+
+`topN: 8` was the binding limit, `scan component` **exposed no `--top-n` flag**, and the
+cap binds identically at 1280x720 (also 6/16 on the agent's fixture). So when someone says
+"elements are hard to detect", `--top-n` is the first thing to try regardless of
+resolution. `--min-area` only starts to matter once the cap is lifted, and only below
+roughly 640x360.
+
+Manual floors, measured as the value that first reaches the detection ceiling with the cap
+lifted: 320x240 → 40, 480x270 → 48, 640x360 → 80, 720x480 → 100, ≥800x600 → 200
+(unchanged). Or just `--preset game-ui` (`--min-area 24 --top-n 24`).
+
+**Do not go below ~24.** On real page content downscaled to game-frame size, `minArea 24`
+roughly doubles the component count versus 40 (15 → 25) and 12 doubles it again (→ 31–50);
+the extras are glyph fragments. On a full 1280x1091 page, `minArea 200` yields 16
+components and `minArea 50` yields 168, nearly all glyphs.
+
+**Why a preset and not a size-adaptive default.** The adaptive candidate (bucket the floor
+by long side) was built and run against all 179 PNGs in the repo: 178 unchanged, 1 changed
+— a real 480x240 card render, where it adds 4 glyph blobs of the word "Dashboard" at areas
+114/121/143/166px. Those are **indistinguishable by area** from the 100–144px icons the HUD
+case needs found, so frame size alone cannot separate "12x12 HUD icon = signal" from
+"12x17 glyph = noise". The caller has to say which they have. `adaptiveRegionCellSize`'s
+reasoning applies with more force here, because component *rank* feeds `page-compose-diff`'s
+top-N seats.
+
+**Ceiling worth stating to users:** text runs never come back as one component. Labelling
+is 4-connectivity with no dilation, so an N-glyph label is N components or none, at every
+threshold. 14 of 16 was the maximum any setting reached — the 2 misses are both labels.
+Don't let anyone chase the last 2.
+
+## `diff png --ignore-region`: the denominator has to shrink (2026-08-09)
+
+For permanently non-deterministic areas (particles, timers), requested in vlmkit#118 as
+distinct from `baseline approve --region`: **never measured**, not measured-and-forgiven, so
+it writes no state and stays out of the `gates suppressions` stocktake.
+
+`diffRatio` denominator is `imagePixels − ignoredPixels`. Measured justification: masking a
+38400px particle band on a 640x360 frame takes a real HUD recolor from 1.84% to **2.08%**;
+under a full-frame denominator the same regression reads **1.74%** — adding a mask would
+have made an unrelated regression look *better than before the mask existed*. That is the
+silent-shrink failure the flag risks, so the denominator is chosen not to cause it.
+
+Ignored pixels leave both the diff count and region detection: masking only the count
+leaves a region with `diffPixelCount: 0` that `--elements-json` would then attribute to an
+element. `0/0` returns `0`, not `NaN` — `NaN` serialises to `null` and compares false
+against every threshold, so a gate would silently pass.
+
+## `baseline pin` destroyed the archive `baseline update` had just written (2026-08-09)
+
+Found while adding `--from-dir` (vlmkit#118), pre-existing on `main` and affecting the
+**browser path too**, not only the new file mode.
+
+`baseline update` is documented as a reversible golden refresh: it archives the current
+baselines to `<routeDir>/_history/<ts>/` and then re-pins. But `pin` cleared the route with
+`rm(routeDir, { recursive: true })` — and `_history` lives *inside* the route dir, so the
+archive it had written one step earlier was deleted in the same command. Reproduced directly:
+after the `rm -r`, `find baselines/hud` returns nothing.
+
+So "reversible" was false for the entire life of the feature, and nothing detected it because
+the archive's absence only matters at the moment someone tries to roll back. `pin` now removes
+only top-level `.png` files, which also makes a partial pin non-destructive to the rest of the
+route.
+
+The general shape is worth keeping: **a cleanup step whose blast radius is a directory, where
+something else stores durable state in that same directory.** The two features were written at
+different times and each is locally correct.

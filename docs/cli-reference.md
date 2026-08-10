@@ -129,6 +129,11 @@ vlmkit baseline pin                                       # on main
 vlmkit baseline verify                                    # in PR
 vlmkit baseline post --pr owner/repo#123                  # send summary.md as PR comment
 
+# No URL to open? Start from PNGs — native renderers, or a broken headless capture.
+vlmkit baseline pin    --from-dir captures/                # no browser launched
+vlmkit baseline verify --from-dir current/                 # thresholds + summary + approvals
+vlmkit baseline pin    --from-png f.png --route hud --viewport desktop
+
 # Legacy internal-dogfood verification loop (vlmkit's own e2e suite)
 vlmkit workflow init
 vlmkit workflow capture
@@ -214,6 +219,7 @@ vlmkit diff png <baseline.png> <current.png>   # Direct PNG pixel diff + heatmap
   # --region-grid <px>   region-detection cell size; default adapts to the image
   #                      (32 at >=720px short side, 16 at >=480, else 8)
   # --elements-top <N>   report N attribution candidates per region, not just the winner
+  # --ignore-region "<x>,<y>,<w>x<h>"   repeatable; area never measured
 vlmkit diff elements [options]                 # Element-level diff with shift isolation
 vlmkit diff browsers <html|url>                # chromium / firefox / webkit parity
 vlmkit diff runs <dir...>                      # Aggregate multiple VRT runs into one table
@@ -254,6 +260,125 @@ requests not present in the recording:
 vlmkit check integrity http://localhost:3000/ \
   --wait-until domcontentloaded --timeout 60000 --har fixtures/app.har
 ```
+
+#### Baselines from PNGs, with no URL (`--from-dir` / `--from-png`)
+
+For the case where the frames exist but a page cannot be opened: a native renderer writing
+PNGs, or a headless canvas capture that does not work (the reporter's Linux/Dawn build never
+completes `copyTextureToBuffer` + `mapAsync`, and canvas screenshots come back transparent).
+`diff png` already compares two files, but that is a one-shot — it has no per-route
+thresholds, no markdown summary and no region-level approvals. `--from-dir` puts PNG-only
+callers inside the real `baseline verify` workflow instead.
+
+**File → route mapping.** Identity on disk is already the pair `(route.name, viewport
+label)`, so nothing new was invented. A file matches only if its path equals one of these
+for a **declared** pair:
+
+| form | when |
+|---|---|
+| `<route>/<viewport>.png` | canonical — identical to the pinned layout, so `--from-dir <baselineDir>` round-trips |
+| `<route>-<viewport>.png` | flat; the separator `snapshot.ts` already uses |
+| `<route>.png` | only when exactly one viewport is declared, since otherwise the viewport is unknowable |
+
+Matching is against the declared cross-product rather than by splitting on `-`, which is
+what makes the flat form safe: `"form-app-mobile".split("-")` gives route `form`, while
+comparing against `` `${route.name}-${vp}` `` does not. A stem two pairs both claim is
+reported ambiguous, never guessed. Any disagreement is an error naming both sides — an
+unmapped file, two files for one pair, or a declared pair with no file — and nothing is
+pinned. Arbitrary renderer filenames use the single-file escape hatch
+(`--from-png f.png --route r --viewport v`, both halves required); there is no sidecar
+manifest to version.
+
+**What verify can and cannot do from PNGs.** Working: pixel diff, per-route and per-viewport
+thresholds, markdown summary, worst offenders, region-bbox approvals from `approval.json`,
+exit code, run dir with heatmaps. Not possible without a page, and **reported as not
+evaluated rather than passed**: a11y (contrast / touch / focus-order / semantic),
+media-variants, cross-browser. A run that names one route prints
+`**Partial run**: 1 of 2 declared route(s) checked` rather than letting the others show an
+empty green row.
+
+**File mode honours the viewport label as declared**, so `"viewports": ["frame"]` works — a
+supplied PNG carries its own dimensions. The browser path still intersects labels with its
+three built-ins; changing that would need real dimensions per custom label.
+
+#### `check copy` without a DOM
+
+Same input as image-only `check integrity`, for the same reason: canvas-drawn strings are
+invisible to the DOM text-block walk, so the gate finds nothing to compare a manifest
+against.
+
+```bash
+vlmkit check copy --elements elements.json --manifest copy.txt      # + optional --image frame.png
+```
+
+Each element's `text` is what the renderer drew; element order is treated as reading order
+(top, then left) so a manifest line can span two adjacent drawn strings the way it spans two
+text nodes in the DOM.
+
+Three of the five copy rules run here; `redirected` and `copy-image-mismatch` need a
+navigation result and a reference screenshot, and are named in the report's coverage block.
+`copy-invisible` covers 2 of its 7 reason classes — `zero-size` and, with `--image`,
+`unpainted` (a text bbox the frame shows as flat means the glyphs were never drawn: missing
+font, alpha 0, skipped draw call). The other five need computed styles.
+
+One rule is new and only fires here: **`copy-truncated`**. It needs `textMeasured` and a
+`clip` rect, and it exists because the manifest matches the string the *renderer* reports —
+so `Score: 1234567890` reads as satisfied while the user sees `Score: 12345…`. As in image
+mode for `check integrity`, text wider than its box with no clip rect *overdraws* rather
+than truncating, so a `clip` is required rather than assumed.
+
+`--target`, `--vlm`, `--out` and `--storage-state` are **rejected** in this mode rather than
+ignored, and there is no disclosure-state sweep (opening `<details>` and clicking tabs needs
+a live page), which the coverage block states.
+
+#### Masking areas that change every frame (`--ignore-region`)
+
+Particles, noise and timer readouts change by construction. `baseline approve --region`
+is the wrong instrument for them: it is an *approval*, so a permanently-noisy area
+pollutes the approval history on every run and shows up in the `gates suppressions`
+stocktake. `--ignore-region` is the other concept — **never measured**, rather than
+measured and forgiven — and it writes no state, so it is absent from that stocktake by
+construction.
+
+```bash
+vlmkit diff png base.png cur.png --ignore-region "0,300,640x60" --ignore-region "16,16,200x20"
+```
+
+**The ratio's denominator shrinks with the mask.** `diffRatio` is "the fraction of the
+pixels that were actually measured which changed", i.e.
+`imagePixels − ignoredPixels`. This is deliberate and it is the non-obvious part: with a
+full-frame denominator, adding a mask would make every *unrelated* regression look less
+severe than it did before the mask existed. Measured on a 640x360 frame — masking a
+38400px particle band takes a real HUD recolor from 1.84% to 2.08%; under a full-frame
+denominator the same regression would have read 1.74%, i.e. *better* than unmasked. The
+trade-off is that a masked run's ratio is not directly comparable to an unmasked one's,
+which is why the mask block always prints.
+
+Ignored pixels leave both the diff count **and** region detection. Masking only the count
+would leave a detected region with `diffPixelCount: 0`, which `--elements-json` would
+then confidently attribute to an element.
+
+Every masked run prints its own accounting, because a silently-shrunk diff is the
+dangerous failure here:
+
+```
+  diff:     0.00% (0 / 226400 px measured)
+  ignored:  1 region(s), 4000 px (1.7% of the 230400 px compared area) — never measured
+    (16,16) 200x20 — 4000 px, 1800 of them differed
+    1800 diff px discarded; denominator 230400 - 4000 = 226400
+```
+
+Note the last two lines: a mask that swallowed the entire finding still says how many
+diff pixels it swallowed, and the denominator arithmetic is spelled out so
+`compared − ignored = measured` is checkable. A rect that misses the frame prints
+`0 px — outside the compared area, masks nothing` rather than looking applied. In the
+heatmap PNG ignored pixels are painted pale blue, not white, so the hole is visible.
+
+Not masked, deliberately: shift detection (`globalShift` / `shiftRegions`) reads per-row
+luminance from the source images, and masking rows out of a row average would perturb the
+numbers on unmasked rows too. A surviving region's `colorSample` also averages over the
+source pixels — the mask governs what counts as a *difference*, not what a region's
+colours are.
 
 #### Without a DOM: canvas / WebGPU / native renderers
 
@@ -554,6 +679,9 @@ vlmkit build gallery <html|url> [--out dir/] [--selector .c-card] [--include-all
 
 # Detect components in a screenshot.
 vlmkit scan component <screenshot.png>         # Crop to standalone PNGs
+  # --top-n <N>          max components returned (default 8) — see the note below
+  # --min-area <px>      min filled px per component (default 200)
+  # --preset game-ui     = --min-area 24 --top-n 24, for small high-contrast frames
 vlmkit scan breakpoints <html-file>            # Discover responsive breakpoints
 vlmkit scan scroll <html|url>                  # Annotation-free scroll inventory: real scroll containers
                                                # (axis / overflow px / bbox), unintended page overflow-x

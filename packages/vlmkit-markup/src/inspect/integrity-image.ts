@@ -416,7 +416,7 @@ function alignmentGroups(
  * through `diff png --elements-json` or here. Falls back to the path, which is always
  * present and always unique.
  */
-function describe(element: IntegrityImageElement): string {
+export function describe(element: IntegrityImageElement): string {
   const className = (element.classes ?? "").split(/\s+/).find((token) => /^-?[A-Za-z_][\w-]*$/.test(token));
   if (className) return `.${className}`;
   if (element.id && /^-?[A-Za-z_][\w-]*$/.test(element.id)) return `#${element.id}`;
