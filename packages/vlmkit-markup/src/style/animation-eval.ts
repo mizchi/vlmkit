@@ -155,7 +155,15 @@ export interface AnimationEvalReport {
   /** Written sample frames (when --frames was passed). */
   framePaths?: string[];
   /** Written when `stripPath` was given: one image holding every sampled frame. */
-  strip?: { path: string; columns: number; rows: number; width: number; height: number };
+  strip?: {
+    path: string;
+    columns: number;
+    rows: number;
+    /** Evaluated animations left out because they moved no pixels. */
+    omitted: number;
+    width: number;
+    height: number;
+  };
 }
 
 export interface AnimationEvalOptions extends PageLoadOptions {
@@ -303,7 +311,7 @@ export function deriveAnimationIssues(
       kind: "infinite-animation",
       severity: "warn",
       selector: anim.selector,
-      message: `${anim.selector} animation \`${anim.name}\` runs forever — the page never settles. For VRT capture, mask it (\`--mask "${anim.selector}"\`) or pause animations before screenshots.`,
+      message: `${anim.selector} animation \`${anim.name}\` runs forever — the page never settles. For VRT capture, mask it with \`vlmkit snapshot <url> --mask "${anim.selector}"\` (that flag belongs to \`snapshot\` / \`diff html\`, not to this gate) or pause animations before screenshots.`,
     });
   }
 
@@ -433,6 +441,13 @@ const RECORD_ANIMATION_STARTS_SCRIPT = `(() => {
 ${ANIMATION_HELPERS_JS}
   const started = [];
   window.__vlmkitStarted = started;
+  // Held here as well as recorded. A finite animation is otherwise gone from
+  // document.getAnimations() by the time the evaluator looks, and a record alone
+  // cannot be seeked -- so the strip showed one animation of five, and the four it
+  // dropped were the ones under review. Pausing at the start keeps every animation
+  // alive and seekable; the author's own play state is read BEFORE the pause, which
+  // is what keeps "the page paused this" distinguishable from "we paused it".
+  window.__vlmkitHeld = [];
   const record = (event) => {
     const target = event.target;
     if (!target || !target.getAnimations) return;
@@ -440,6 +455,7 @@ ${ANIMATION_HELPERS_JS}
       const name = animationName(anim);
       if (event.animationName !== undefined && name !== event.animationName) continue;
       const timing = describeTiming(anim);
+      const authorPlayState = anim.playState;
       started.push({
         selector: stableSelector(anim.effect && anim.effect.target ? anim.effect.target : target),
         type: animationKind(anim),
@@ -449,7 +465,10 @@ ${ANIMATION_HELPERS_JS}
         iterations: Number.isFinite(timing.iterations) ? timing.iterations : null,
         direction: timing.direction || "normal",
         palindromic: isPalindromic(anim),
+        authorPlayState,
       });
+      window.__vlmkitHeld.push(anim);
+      anim.pause();
       return;
     }
   };
@@ -470,7 +489,14 @@ ${ANIMATION_HELPERS_JS}
     // Record the author-visible state BEFORE pausing for evaluation — an
     // animation the page itself holds paused is visually static and must
     // not be reported as running/never-settling.
-    const playState = anim.playState;
+    //
+    // The init script may already have paused this one at animationstart, in which
+    // case the live playState is ours and useless. It stashed the author's state
+    // alongside; prefer that. Without this every animation would read "paused" and
+    // the settle / never-settles / reduced-motion answers would all invert.
+    const held = (window.__vlmkitStarted || []).find((r) =>
+      r.name === name && r.selector === stableSelector(target));
+    const playState = held ? held.authorPlayState : anim.playState;
     const currentTimeMs = typeof anim.currentTime === "number" ? anim.currentTime : 0;
     anim.pause();
     return {
@@ -701,9 +727,14 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       // motion the row exists to show — the same reason cells are aligned
       // top-left rather than centred in `composeFilmstrip`.
       const PAD = 8;
+      // An animation that moved nothing has no motion bbox, and giving it a row
+      // meant giving it the *whole viewport* — which then sized the uniform cell for
+      // every other row. On the dogfood fixture one dead `z-index` keyframe on `h1`
+      // turned a tight sheet into 1592x768 of mostly grey. It is already reported as
+      // `no-visible-effect`; a row showing nothing is not evidence, it is padding.
       const cropped = stripRows.flatMap((rowFrames, row) => {
         const bbox = evaluated[row]?.motionBbox;
-        if (!bbox) return rowFrames;
+        if (!bbox) return [];
         return rowFrames.map((frame) => cropRegion(
           frame,
           Math.max(0, bbox.x - PAD),
@@ -712,6 +743,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
           bbox.height + PAD * 2,
         ));
       });
+      const withMotion = stripRows.filter((_, row) => evaluated[row]?.motionBbox).length;
       const sheet = composeFilmstrip(cropped, {
         columns: samples,
         maxWidth: options.stripMaxWidth ?? 1600,
@@ -727,6 +759,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         path: resolve(options.stripPath),
         columns: sheet.layout.columns,
         rows: sheet.layout.rows,
+        omitted: stripRows.length - withMotion,
         width: sheet.width,
         height: sheet.height,
       };
@@ -852,7 +885,12 @@ export function formatAnimationEvalReport(report: AnimationEvalReport): string {
     lines.push("");
     // The column count is the reading instruction: without it a 3x4 sheet could
     // be four animations of three samples just as easily as three of four.
-    lines.push(`Strip: ${s.path} (${s.width}x${s.height}, ${s.rows} animation(s) x ${s.columns} sample(s))`);
+    // The omission is named, not silent: a dogfood agent got a strip of 1 animation
+    // out of 5 with "no finding, no warning, no hint" and called that the real bug.
+    lines.push(
+      `Strip: ${s.path} (${s.width}x${s.height}, ${s.rows} animation(s) x ${s.columns} sample(s)`
+      + `${s.omitted > 0 ? `; ${s.omitted} omitted as no-visible-effect` : ""})`,
+    );
   }
   return lines.join("\n");
 }

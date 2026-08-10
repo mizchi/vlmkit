@@ -405,6 +405,25 @@ async function runGroupLeaf(
     return;
   }
 
+  // `check a11y` / `check drift` name a namespace, not a gate: their gates are
+  // `check a11y focus`, `check drift component`, and so on. A dogfood agent hit the
+  // dead end — "`check a11y --help` / `check drift --help` -> `Unknown check
+  // subcommand: a11y`. Two-word subcommands have no help routing; I had to guess
+  // `check --help` to discover `a11y focus` exists." List what is under it instead.
+  const prefix = `${groupName} ${leafName} `;
+  const underPrefix = registry.list()
+    .map((entry) => ({ command: entry.gate.command.join(" "), gate: entry.gate }))
+    .filter((entry) => entry.command.startsWith(prefix));
+  if (underPrefix.length > 0) {
+    const width = Math.max(...underPrefix.map((e) => e.command.length));
+    console.log(`Usage: vlmkit ${groupName} ${leafName} <subcommand> [options]\n`);
+    for (const entry of underPrefix) {
+      console.log(`  vlmkit ${entry.command.padEnd(width)}  ${entry.gate.summary ?? ""}`);
+    }
+    console.log(`\nRun any of them with --help for its options.`);
+    return;
+  }
+
   const suggestions = registry.suggest([groupName, leafName]);
   console.error(
     `Unknown ${groupName} subcommand: ${leafName}`

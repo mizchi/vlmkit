@@ -409,3 +409,66 @@ test("runAnimationEval: honouring reduced-motion keeps the gate silent", { timeo
   assert.equal(shortened.reducedMotion?.remainingCount, 0);
   assert.ok(!shortened.issues.some((i) => i.kind === "reduced-motion-ignored"));
 });
+
+/**
+ * Every animation gets frame-sampled, not only the ones still running when the
+ * evaluator happens to look.
+ *
+ * Two dogfood agents hit the same wall independently. One was asked to show a
+ * reviewer how the cards animate and reported: "the silent drop is the real bug.
+ * `evaluated 1` of 5 with no finding, no warning, no hint" — and the one row it did
+ * keep was a 28px spinner rather than the cards under review. The other, repairing
+ * the page, noted "the dead `z-index` keyframe I removed was never flagged, because
+ * short entrance animations finish before sampling."
+ *
+ * Fixed by holding every animation at `animationstart` instead of merely recording
+ * it, with the author's own play state read before the pause — which is what keeps
+ * the `page-paused` case above working.
+ */
+test("runAnimationEval: frame-samples short fill:none animations, not just the survivors", { timeout: 120_000 }, async () => {
+  // No `forwards`: the animation is removed from `getAnimations()` the moment it
+  // finishes, which is well before the ~765ms the evaluator reads at.
+  const report = await evaluate(
+    `#a { animation: slide 200ms linear 1; }
+     #b { width: 60px; height: 30px; background: #c52; animation: slide 220ms linear 1; }`,
+    '<div id="a"></div><div id="b"></div>',
+  );
+  assert.equal(report.animationCount, 2);
+  assert.equal(report.evaluated.length, 2, "both must be sampled, not only a survivor");
+  assert.ok(report.evaluated.every((a) => a.visible), "both move 300px; both must read as visible");
+});
+
+test("runAnimationEval: the sampled set is the same on two consecutive runs", { timeout: 180_000 }, async () => {
+  const css = "#a { animation: slide 200ms linear 1; }";
+  const [first, second] = [await evaluate(css), await evaluate(css)];
+  assert.deepEqual(
+    first.evaluated.map((a) => a.name),
+    second.evaluated.map((a) => a.name),
+    "which animations get sampled must not depend on load timing",
+  );
+});
+
+test("runAnimationEval: the strip leaves out animations that moved nothing, and says how many", { timeout: 120_000 }, async () => {
+  // An animation with no motion bbox used to get a row cropped to the whole
+  // viewport, which then sized the uniform cell for every other row: one dead
+  // keyframe turned a tight sheet into 1592x768 of mostly grey.
+  const { mkdtemp } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const source = await animPage(
+    `@keyframes dead { from { z-index: 1; } to { z-index: 9; } }
+     #a { animation: slide 300ms linear 1 forwards; }
+     #b { animation: dead 300ms linear 1 forwards; }`,
+    '<div id="a"></div><div id="b">b</div>',
+  );
+  const dir = await mkdtemp(join(tmpdir(), "vlmkit-strip-"));
+  const stripPath = join(dir, "strip.png");
+  const report = await runAnimationEval({ source, stripPath });
+
+  assert.equal(report.evaluated.length, 2, "both are still evaluated and reported");
+  assert.ok(report.strip, "a strip was requested");
+  assert.equal(report.strip.omitted, 1, "the dead one contributes no row");
+  assert.equal(report.strip.rows, 1);
+  const formatted = formatAnimationEvalReport(report);
+  assert.match(formatted, /1 omitted as no-visible-effect/, "the omission must be named, never silent");
+});

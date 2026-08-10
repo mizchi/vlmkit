@@ -24,11 +24,15 @@ export const animationGate = defineGate<AnimationEvalReport, AnimationEvalOption
   command: ["check", "animation"],
   title: "Frame-sampled animation evaluation",
   summary:
-    "Frame-sampled animation evaluation (visible effect / settle / reduced-motion behavior)",
+    "Frame-sampled animation evaluation (visible effect / settle / reduced-motion), and a filmstrip image with --strip",
   category: "behavior",
   usage: `Frame-sampled animation evaluation: pause every animation, seek through
 deterministic sample points, and verify each one visibly moves pixels,
-when the page settles, and whether prefers-reduced-motion is honored.`,
+when the page settles, and whether prefers-reduced-motion is honored.
+
+\`--strip out.png\` (or \`.webp\`) writes the sampled frames as ONE image, a row per
+animation, cropped to the motion each one produced — the form to paste into a
+review. \`--frames dir\` writes them as separate files instead.`,
   rules: [
     {
       id: "no-visible-effect",

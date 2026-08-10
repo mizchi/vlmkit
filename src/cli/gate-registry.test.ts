@@ -79,12 +79,14 @@ describe("composed built-in registry", () => {
     }
   });
 
-  it("declares 120 tunable rules in total", async () => {
+  it("declares 121 tunable rules in total", async () => {
     // A canary, not a target: a gate losing its rule table to a bad merge is
     // otherwise invisible until someone tries to tune it.
     // 119 → 120 when `check copy` gained `copy-truncated` (element-rect mode, vlmkit#118).
+    // 120 → 121 when `check motion` gained `unreadable-stylesheet`, so that "no
+    // prefers-reduced-motion rule" stops being asserted over CSS it could not read.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 120);
+    assert.equal(total, 121);
   });
 
   it("gives every built-in gate a category", async () => {
