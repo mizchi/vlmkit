@@ -472,3 +472,100 @@ test("runAnimationEval: the strip leaves out animations that moved nothing, and 
   const formatted = formatAnimationEvalReport(report);
   assert.match(formatted, /1 omitted as no-visible-effect/, "the omission must be named, never silent");
 });
+
+/**
+ * The strip is sampled on ONE shared clock, so a stagger is visible.
+ *
+ * A dogfood agent asked to show a reviewer the card entrance: "each row is sampled
+ * over its *own* 0→1 progress and cropped to its own element, so the 0/60/120ms
+ * stagger is invisible and the image reads as 'all three cards animate
+ * simultaneously' — wrong on exactly the property under review."
+ */
+test("runAnimationEval: strip columns are shared instants on the page timeline", { timeout: 120_000 }, async () => {
+  const { mkdtemp } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const source = await animPage(
+    `#a { animation: slide 200ms linear 1 forwards; }
+     #b { width: 120px; height: 60px; background: #2255cc; animation: slide 200ms linear 200ms 1 forwards; }`,
+    '<div id="a"></div><div id="b"></div>',
+  );
+  const dir = await mkdtemp(join(tmpdir(), "vlmkit-shared-"));
+  const report = await runAnimationEval({
+    source,
+    samples: 4,
+    stripWindowMs: 400,
+    stripPath: join(dir, "strip.png"),
+  });
+  assert.ok(report.strip);
+  // One clock: the instants are a property of the page, not of a row.
+  assert.deepEqual(report.strip.times, [100, 200, 300, 400]);
+  assert.equal(report.strip.windowMs, 400);
+  assert.equal(report.strip.rows, 2);
+  // And the caption carries what the image cannot.
+  const formatted = formatAnimationEvalReport(report);
+  assert.match(formatted, /columns are 100ms \/ 200ms \/ 300ms \/ 400ms/);
+  assert.match(formatted, /one shared clock/);
+  assert.match(formatted, /rows top to bottom are #a, #b/);
+});
+
+test("runAnimationEval: the strip window defaults to one iteration of the slowest animation", { timeout: 120_000 }, async () => {
+  const { mkdtemp } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const source = await animPage(
+    `#a { animation: slide 200ms linear 1 forwards; }
+     #b { width: 120px; height: 60px; background: #2255cc; animation: slide 500ms linear 300ms 1 forwards; }`,
+    '<div id="a"></div><div id="b"></div>',
+  );
+  const report = await runAnimationEval({
+    source,
+    samples: 2,
+    stripPath: join(await mkdtemp(join(tmpdir(), "vlmkit-shared-")), "strip.png"),
+  });
+  // 300ms delay + 500ms duration is the last thing to finish.
+  assert.equal(report.strip?.windowMs, 800);
+  assert.deepEqual(report.strip?.times, [400, 800]);
+});
+
+test("runAnimationEval: a delayed animation has not started at an instant inside its delay", { timeout: 120_000 }, async () => {
+  // The behavioural half. At t=100ms the undelayed element is mid-fade and the one
+  // with a 200ms delay has not moved at all — which is the difference the sheet has
+  // to be able to show, and could not when each row ran on its own clock.
+  const { mkdtemp, readFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { cropRegion, measureChangeMagnitude } = await import("@mizchi/vlmkit-core/png-utils.ts");
+  const { PNG } = await import("pngjs");
+
+  const source = await animPage(
+    `#a { animation: slide 200ms linear 1 forwards; }
+     #b { width: 120px; height: 60px; background: #2255cc; animation: slide 200ms linear 200ms 1 forwards; }`,
+    '<div id="a"></div><div id="b"></div>',
+  );
+  const dir = await mkdtemp(join(tmpdir(), "vlmkit-stagger-"));
+  const report = await runAnimationEval({
+    source,
+    samples: 4,
+    stripWindowMs: 400,
+    stripPath: join(dir, "strip.png"),
+    framesDir: dir,
+  });
+
+  const decode = async (name: string) => {
+    const png = PNG.sync.read(await readFile(join(dir, name)));
+    return { width: png.width, height: png.height, data: new Uint8Array(png.data) };
+  };
+  const early = await decode("t-100ms.png");
+  const late = await decode("t-400ms.png");
+  const delayed = report.evaluated.find((a) => a.selector === "#b");
+  assert.ok(delayed?.motionBbox, "the delayed animation must still be evaluated");
+  const box = delayed.motionBbox;
+  const region = (frame: Awaited<ReturnType<typeof decode>>) =>
+    cropRegion(frame, box.x, box.y, box.width, box.height);
+  const moved = measureChangeMagnitude(region(early), region(late));
+  assert.ok(
+    moved.changedFraction > 0.05,
+    `the delayed element must look different at 100ms and 400ms, got ${moved.changedFraction}`,
+  );
+});

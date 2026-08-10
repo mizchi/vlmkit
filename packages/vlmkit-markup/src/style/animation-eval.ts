@@ -161,7 +161,13 @@ export interface AnimationEvalReport {
     rows: number;
     /** Evaluated animations left out because they moved no pixels. */
     omitted: number;
-    width: number;
+    /** Page-timeline span the columns cover, in ms. */
+    windowMs: number;
+    /** The instant each column was taken at, in ms from the animations' start. */
+    times: number[];
+    /** Row order, top to bottom. */
+    rowSelectors: string[];
+  width: number;
     height: number;
   };
 }
@@ -195,6 +201,11 @@ export interface AnimationEvalOptions extends PageLoadOptions {
   stripPath?: string;
   /** Cap the strip's width, downscaling frames to fit. Default 1600. */
   stripMaxWidth?: number;
+  /**
+   * Page-timeline span the strip's columns cover, in ms. Defaults to one iteration
+   * of the slowest animation, so a stagger lands in the early columns.
+   */
+  stripWindowMs?: number;
 }
 
 interface RgbaFrame {
@@ -710,32 +721,56 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         maxFrameRatio: Number(maxFrameRatio.toFixed(4)),
       });
     }
-    await page.close();
-
     let strip: AnimationEvalReport["strip"];
-    if (options.stripPath && stripRows.length > 0) {
-      // Crop each row to the motion this animation produced, padded a little.
+    if (options.stripPath && evaluated.some((a) => a.motionBbox)) {
+      // The strip is sampled on ONE shared clock, unlike the per-animation
+      // evaluation above. That is not a detail — a dogfood agent asked to show a
+      // reviewer the card entrance wrote:
       //
-      // Without it every cell is the whole viewport, so a small animated element
-      // on a 1280x720 page yields five near-identical screenshots and the sheet
-      // shows nothing. Measured on a three-animation fixture at 560x260: cropped
-      // rows made the sheet 1448x422 -> 890x232, and each row now shows only its
-      // own element.
+      //   "each row is sampled over its *own* 0->1 progress and cropped to its own
+      //    element, so the 0/60/120ms stagger is invisible and the image reads as
+      //    'all three cards animate simultaneously' — wrong on exactly the property
+      //    under review."
       //
-      // Every cell in a row shares ONE crop rect. Cropping each cell to its own
-      // frame delta would re-centre the element per cell and subtract the very
-      // motion the row exists to show — the same reason cells are aligned
-      // top-left rather than centred in `composeFilmstrip`.
+      // Per-animation progress is the right axis for "does this animation move
+      // pixels", which is what `evaluated` answers. It is the wrong axis for "what
+      // does this look like over time", which is what an image for a reviewer is
+      // for. So: pick sample instants on the page's own timeline, seek EVERY
+      // animation to each instant, and take one screenshot per column.
+      //
+      // Cheaper too: `samples` screenshots instead of `samples x animations`.
+      const rows = evaluated.filter((a) => a.motionBbox);
+      // Through one iteration of the slowest thing on the page, so a stagger sits in
+      // the early columns and an infinite animation still turns. `--strip-window`
+      // overrides it; the chosen value is reported, because a timebase the reader
+      // cannot see is a timebase they will guess wrong.
+      const windowMs = options.stripWindowMs
+        ?? Math.max(1, ...evaluated.map((a) => a.delayMs + a.durationMs));
+      const times = Array.from({ length: samples }, (_, i) => Math.round((windowMs * (i + 1)) / samples));
+
       const PAD = 8;
-      // An animation that moved nothing has no motion bbox, and giving it a row
-      // meant giving it the *whole viewport* — which then sized the uniform cell for
-      // every other row. On the dogfood fixture one dead `z-index` keyframe on `h1`
-      // turned a tight sheet into 1592x768 of mostly grey. It is already reported as
-      // `no-visible-effect`; a row showing nothing is not evidence, it is padding.
-      const cropped = stripRows.flatMap((rowFrames, row) => {
-        const bbox = evaluated[row]?.motionBbox;
-        if (!bbox) return [];
-        return rowFrames.map((frame) => cropRegion(
+      const columns: RgbaFrame[] = [];
+      for (const timeMs of times) {
+        // Every animation to the same instant. Clamped 1ms inside its own end so a
+        // `fill: none` animation does not snap back to its start keyframe, and left
+        // at its delay while it has not begun — which is what makes the stagger show.
+        for (const anim of evaluated) {
+          if (anim.index < 0) continue;
+          const end = anim.iterations === null
+            ? timeMs
+            : Math.min(timeMs, anim.delayMs + anim.durationMs * anim.iterations - 1);
+          await seek(anim.index, Math.max(anim.delayMs, end));
+        }
+        columns.push(await shot(`t-${timeMs}ms`));
+      }
+
+      // Crop each row out of those shared frames. Every cell in a row shares ONE
+      // rect: cropping per cell would re-centre the element and subtract the motion
+      // the row exists to show, the same reason `composeFilmstrip` aligns top-left.
+      // Row-major, so `columns: samples` puts one animation per row.
+      const cells = rows.flatMap((anim) => {
+        const bbox = anim.motionBbox!;
+        return columns.map((frame) => cropRegion(
           frame,
           Math.max(0, bbox.x - PAD),
           Math.max(0, bbox.y - PAD),
@@ -743,8 +778,8 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
           bbox.height + PAD * 2,
         ));
       });
-      const withMotion = stripRows.filter((_, row) => evaluated[row]?.motionBbox).length;
-      const sheet = composeFilmstrip(cropped, {
+
+      const sheet = composeFilmstrip(cells, {
         columns: samples,
         maxWidth: options.stripMaxWidth ?? 1600,
       });
@@ -759,11 +794,16 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         path: resolve(options.stripPath),
         columns: sheet.layout.columns,
         rows: sheet.layout.rows,
-        omitted: stripRows.length - withMotion,
+        omitted: evaluated.length - rows.length,
+        windowMs,
+        times,
+        rowSelectors: rows.map((a) => a.selector),
         width: sheet.width,
         height: sheet.height,
       };
     }
+
+    await page.close();
 
     // Behavioral reduced-motion pass: emulate and re-render, then count the
     // animations that still run with a non-trivial duration. Duration-zero
@@ -891,6 +931,15 @@ export function formatAnimationEvalReport(report: AnimationEvalReport): string {
       `Strip: ${s.path} (${s.width}x${s.height}, ${s.rows} animation(s) x ${s.columns} sample(s)`
       + `${s.omitted > 0 ? `; ${s.omitted} omitted as no-visible-effect` : ""})`,
     );
+    // A caption, because the image carries no text and the same agent said so:
+    // "no labels at all — no row selector, no time per cell; that data is
+    // terminal-only." Labels are not drawn into the sheet on purpose — that would
+    // make the output depend on font rendering, which is the class of
+    // platform-dependent pixel this toolkit exists to catch. So it is emitted in the
+    // form a reviewer actually needs it: next to the image, ready to paste.
+    lines.push(`${DIM}  caption: columns are ${s.times.map((ms) => `${ms}ms`).join(" / ")}`
+      + ` on the page timeline (window ${s.windowMs}ms, one shared clock);`
+      + ` rows top to bottom are ${s.rowSelectors.join(", ")}${RESET}`);
   }
   return lines.join("\n");
 }

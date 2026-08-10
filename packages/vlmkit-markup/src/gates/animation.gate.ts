@@ -62,18 +62,20 @@ review. \`--frames dir\` writes them as separate files instead.`,
     { name: "frames", placeholder: "dir", kind: "path", description: "Write each sampled frame PNG into this directory" },
     { name: "strip", placeholder: "file.png", kind: "path", description: "Composite every sampled frame into one image (row per animation)" },
     { name: "strip-max-width", placeholder: "px", kind: "number", description: "Cap the strip width, downscaling to fit", defaultDescription: "1600" },
+    { name: "strip-window", placeholder: "ms", kind: "number", description: "Page-timeline span the strip's columns cover", defaultDescription: "one iteration of the slowest animation" },
     { name: "settle-threshold", placeholder: "ms", kind: "number", description: "long-settle threshold", defaultDescription: "3000" },
     { name: "skip-reduced-motion", kind: "boolean", description: "Skip the reduced-motion emulation pass" },
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
-    const source = firstPositional(argv, "vlmkit check animation <html-or-url>", ["--samples", "--max-animations", "--settle-threshold", "--frames", "--strip", "--strip-max-width"]);
+    const source = firstPositional(argv, "vlmkit check animation <html-or-url>", ["--samples", "--max-animations", "--settle-threshold", "--frames", "--strip", "--strip-max-width", "--strip-window"]);
     const samples = optionalInt(argv, "samples", { min: 1 });
     const maxAnimations = optionalInt(argv, "max-animations", { min: 1 });
     const settleThresholdMs = optionalInt(argv, "settle-threshold", { min: 0 });
     const framesDir = readFlag(argv, "frames");
     const stripPath = readFlag(argv, "strip");
     const stripMaxWidth = optionalInt(argv, "strip-max-width", { min: 1 });
+    const stripWindowMs = optionalInt(argv, "strip-window", { min: 1 });
     const viewport = viewportFlag(argv);
     return {
       source,
@@ -84,6 +86,7 @@ review. \`--frames dir\` writes them as separate files instead.`,
       ...(framesDir ? { framesDir } : {}),
       ...(stripPath ? { stripPath } : {}),
       ...(stripMaxWidth !== undefined ? { stripMaxWidth } : {}),
+      ...(stripWindowMs !== undefined ? { stripWindowMs } : {}),
       ...(viewport ? { viewport } : {}),
       ...parsePageLoad(argv),
     };
