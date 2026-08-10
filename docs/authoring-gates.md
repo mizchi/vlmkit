@@ -190,6 +190,28 @@ Set `placeholder` whenever the help prompt should differ from the option key
 (`<html-or-url>` reads better than `<source>`). `defaultDescription` is help
 text only — put the actual default in `parse`.
 
+**If your gate opens a page, spread the shared page-load inputs.** Twenty gates take
+`--timeout`, `--wait-until` and `--har`, and they come from one declaration so they cannot
+drift apart:
+
+```ts
+import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
+
+inputs: [
+  { name: "source", placeholder: "html-or-url", kind: "path-or-url", positional: 0, required: true },
+  ...PAGE_LOAD_INPUTS,
+],
+parse: (argv) => ({ source: firstPositional(argv, "..."), ...parsePageLoad(argv) }),
+```
+
+`parsePageLoad` returns **absent keys**, never `undefined` values, so spreading it cannot
+clobber a default your gate sets itself. `src/cli/gate-page-load.test.ts` walks the live
+registry and fails a navigating gate that skips this — and it also fails a gate that *declares*
+a flag and forgets it in `parse`, because a flag that parses and is then dropped is worse than
+no flag. If your gate genuinely cannot honour one of the three, leave that one out and say why
+in its `usage`; the test's exception table requires the stated reason to appear in the gate's
+own prose.
+
 ### `parse`
 
 ```ts

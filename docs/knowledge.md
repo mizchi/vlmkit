@@ -1104,3 +1104,78 @@ route.
 The general shape is worth keeping: **a cleanup step whose blast radius is a directory, where
 something else stores durable state in that same directory.** The two features were written at
 different times and each is locally correct.
+
+## `check design` counted fonts nobody can see (2026-08-10)
+
+From vlmkit#112: a MapLibre map SPA restyled the vendor's zoom controls to match their design
+system exactly — same padding, radius, border, background — and `check design` stayed `DRIFT`,
+naming those controls as deviating. The style signature included `font-size`/`font-weight`
+unconditionally, and the controls contain only SVG icons, so their inherited `12px/400` was a
+distinct style **for a reason nobody can see and no styling change can fix.**
+
+Measured on that shape (3 primary + 2 secondary app buttons + 2 icon controls matching primary):
+
+| | verdict | button |
+|---|---|---|
+| before | drift | 7 inst / 3 styles, reuse 2.33 |
+| after | coherent | 7 inst / 2 styles, reuse 3.5 |
+
+The signature is now split into a **box** half (padding×4, radius, border-width, background)
+and a **font** half. A text-free element groups into the largest text-bearing style whose *box*
+it matches; with no such host, text-free elements group with each other by box. So the fold
+forgives an unobservable font and **never** an unobservable box — a 2px-padding vendor control
+against the app's 8/16 is still drift. Verified independently: `.vendor` with matching box →
+coherent (1 style); with `padding:2px 3px` → still drift, 0 folded.
+
+Three traps a "paints no text" test has to survive, each with a test:
+
+- **`input[type=button]` paints its `value`**; a text input paints value/placeholder; a select
+  paints the chosen option — and `textContent` is `""` for all three. A textContent-only test
+  would strip font from exactly the elements whose entire box *is* text. Form controls always
+  count as text-bearing.
+- **SVG `<title>`/`<desc>` are never painted.** MapLibre's buttons carry `<title>Zoom in</title>`;
+  counting that as text defeats the whole fix.
+- **An icon-font glyph in `::before` content does scale with font-size**, so generated text
+  content keeps the font observable (`url()` / gradient content does not).
+
+Across all 9 `fixtures/css-challenge/*.html` the output is **byte-identical** to before — 3
+text-free elements found, 0 folded, because their boxes match nothing. The change only fires
+where a vendor's box already agrees.
+
+**`--allow` was rejected for this gate, for a structural reason.** `check integrity`'s
+`--allow` works because its findings are per-element with a selector. `check design` attributes
+findings to a **role** and its message is an aggregate ("7 buttons render 4 distinct styles"),
+so there is nothing for a selector pattern to match and the only available granularity is the
+whole role — `--allow` would forgive the app's own buttons too. `--exclude` removes the 2 vendor
+buttons and keeps judging the remaining 5, which is strictly better. The reporter's instinct
+("scoping is the more natural fit") was right for structural reasons, not stylistic ones.
+
+Related threshold trap, not fixed: excluding a vendor subtree *lowers* the instance count, so a
+small app can fall under `--min-reuse` for having fewer buttons. That is a small-sample
+question, not a scoping one.
+
+## The bundled CLI entry has now diverged from its twin three times (2026-08-10)
+
+`scripts/vlmkit-bundled.mjs` is what `tsdown.config.ts` builds into the published `bin`;
+`src/cli/vlmkit.ts` is what the workspace runs. The bundled one exists only to inject the
+generated MoonBit bridge. Each divergence was **invisible in the repo and total in the shipped
+CLI**:
+
+1. It injected only `run_markup_core`, so every JSON-boundary command in the published CLI fell
+   back to shelling out to `moon build` — which npm consumers do not have.
+2. It caught errors with a bare `console.error(error); process.exit(1)`, so every prettifier in
+   `cli-error.ts` (ENOENT, EISDIR, missing-browser) was dead in the published CLI. **This is
+   what #112 reported**: `pnpm exec vlmkit check integrity page.html` printed Playwright's own
+   install box because vlmkit never got a chance to speak.
+3. Both were live simultaneously, and whoever fixed (1) was editing the lines carrying (2).
+
+Each got a regression test *after* it bit, which accumulates guards for failures already found
+and none for the next. `tests/cli-entry-parity.test.mjs` asserts the invariant instead:
+whatever the workspace entry does with `runCli`, the bundled entry does the same, with the
+injection as the one sanctioned difference.
+
+**Adjacent correction worth recording:** "the pixel-only gates need no browser" is true at
+*runtime* and false at *module load* — the gate registry composes all built-in plugins eagerly
+and `perf.gate` statically imports `playwright`, so in a tree without that package even
+`vlmkit diff png --help` dies in the ESM resolver. That is why `playwright` stays a **required**
+peer while `@playwright/test` is optional.

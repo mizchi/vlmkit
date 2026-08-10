@@ -261,6 +261,47 @@ vlmkit check integrity http://localhost:3000/ \
   --wait-until domcontentloaded --timeout 60000 --har fixtures/app.har
 ```
 
+#### Every gate that navigates takes these three
+
+`--timeout`, `--wait-until` and `--har` are on **all 20 gates that open a page**, not just
+`check integrity`. They come from one shared declaration (`PAGE_LOAD_INPUTS` /
+`parsePageLoad` in `@mizchi/vlmkit-core/page-load.ts`), so a new URL gate gets them by
+spreading it — and `src/cli/gate-page-load.test.ts` fails if it doesn't.
+
+**An SPA that never reaches network idle can now be gated directly.** That was the reported
+blocker: a page renders in ~480ms but one third-party request stays in flight forever, so
+`networkidle` never fires and every URL gate timed out before running a single check. A slow
+tile server does the same.
+
+```bash
+vlmkit check a11y touch http://localhost:5173/ --wait-until domcontentloaded --timeout 10000
+```
+
+**Lowering the milestone still waits for the render.** `domcontentloaded` alone would hand a
+gate the pre-render DOM, and it would report the "loading…" placeholder as the page — so a
+lowered milestone gets a bounded settle (idle wait, webfonts, one frame) before measuring.
+That is what the hand-rolled capture harnesses were doing, and it is why you no longer need
+one: serializing to static HTML first was lossy for canvas content and script-driven state.
+
+Two exceptions, both deliberate:
+
+- **`check perf` takes `--timeout` and `--wait-until` but rejects `--har`**, with a reason.
+  Replay serves every response off local disk, so TTFB / LCP / FCP would measure disk reads —
+  precisely the numbers the gate exists to produce, silently made meaningless. Note also that
+  lowering its milestone moves the *start* of the `--observe` window, so the two numbers are
+  not comparable across settings.
+- **`check drift component` takes none of them.** It reads the file and sets content; nothing
+  is navigated. Its input is spelled `<html-or-url>` and a URL has never worked — the `--help`
+  now says so rather than leaving it to be discovered.
+
+**`--har` aborts what it did not record**, deliberately: `fallback` would let the
+never-settling request through and the run would hang exactly as before. The cost is that an
+**incomplete HAR turns every un-recorded subresource into a failed request**, and on
+`check integrity` that surfaces as `broken-image` / `failed-stylesheet` / `broken-font` — a
+gap in the recording reading as a defect in the page. On the geometry and style gates it
+changes the measurement rather than inventing a finding, which is subtler but the same class
+of problem. Record completely, or leave `--har` off and use `--wait-until`.
+
 #### Baselines from PNGs, with no URL (`--from-dir` / `--from-png`)
 
 For the case where the frames exist but a page cannot be opened: a native renderer writing
