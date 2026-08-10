@@ -26,11 +26,11 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
-import { chromium } from "playwright";
 import { openSource, resolveSource } from "@mizchi/vlmkit-core/page-open.ts";
 import { extractComponentsFromFile, type ComponentBbox } from "../component/component-bbox.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export interface ThemeParityOptions {
   htmlPath: string;
@@ -113,8 +113,7 @@ export async function runThemeParity(
   const viewport = options.viewport ?? { width: 1280, height: 900 };
   const unchangedThreshold = options.unchangedColorThreshold ?? 16;
 
-  const browser = await chromium.launch();
-  try {
+  return await withBrowser(async (browser) => {
     // Light render.
     // Navigate, so an external stylesheet actually participates in the theme
     // comparison — the whole point of the gate.
@@ -209,9 +208,7 @@ export async function runThemeParity(
       totalMatched,
       reportPath,
     };
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 /** Terminal summary, extracted from `runThemeParity` so `run` stops printing. */

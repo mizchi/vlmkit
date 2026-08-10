@@ -29,6 +29,7 @@ import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { UiExpectedScrollportContract } from "../contract/ui-contract.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export type ScrollAxis = "x" | "y" | "both";
 
@@ -403,9 +404,7 @@ export const COLLECT_SCROLL_SCRIPT = `(() => {
 
 export async function runScrollScan(options: ScrollScanOptions): Promise<ScrollScanReport> {
   const viewport = options.viewport ?? { width: 1280, height: 720 };
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
-  try {
+  return await withBrowser(async (browser) => {
     const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
     if (options.html !== undefined) {
       await page.setContent(options.html, { waitUntil: "networkidle" });
@@ -432,9 +431,7 @@ export async function runScrollScan(options: ScrollScanOptions): Promise<ScrollS
       report.issues.unshift({ kind: "redirected", severity: "suspect",  message: redirectNote });
     }
     return report;
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 export function formatScrollScanReport(report: ScrollScanReport): string {

@@ -6,6 +6,7 @@ import type {
   ViewportResult,
 } from "../api-types.ts";
 import { resolveHtmlSource } from "./helpers.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export function registerCompareRoute(app: Hono): void {
   app.post("/api/compare", async (c) => {
@@ -32,7 +33,6 @@ export function registerCompareRoute(app: Hono): void {
       return c.json({ error: "Failed to resolve baseline or current HTML" }, 400);
     }
 
-    const { chromium } = await import("playwright");
     const { compareScreenshots } = await import("@mizchi/vlmkit-core/heatmap.ts");
     const { discoverViewports } = await import("@mizchi/vlmkit-capture/viewport-discovery.ts");
     const { mkdir, rm } = await import("node:fs/promises");
@@ -50,11 +50,10 @@ export function registerCompareRoute(app: Hono): void {
       return discovery.viewports;
     })();
 
-    const browser = await chromium.launch();
     const startTime = Date.now();
     const viewportResults: ViewportResult[] = [];
 
-    try {
+    await withBrowser(async (browser) => {
       for (const vp of viewports) {
         const width = vp.width;
         const height = vp.height ?? 900;
@@ -119,9 +118,7 @@ export function registerCompareRoute(app: Hono): void {
           status: pixelDiff.diffRatio === 0 ? "pass" : "fail",
         });
       }
-    } finally {
-      await browser.close();
-    }
+    });
 
     const response: CompareResponse = {
       status: viewportResults.every((result) => result.status === "pass") ? "pass" : "fail",

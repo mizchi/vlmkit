@@ -27,7 +27,7 @@ export function registerCompareRenderersRoute(
       return c.json({ error: "Crater BiDi server not available on ws://127.0.0.1:9222" }, 503);
     }
 
-    const { chromium: pw } = await import("playwright");
+    const { withBrowser } = await import("@mizchi/vlmkit-core/browser-launch.ts");
     const { compareScreenshots } = await import("@mizchi/vlmkit-core/heatmap.ts");
     const { discoverViewports } = await import("@mizchi/vlmkit-capture/viewport-discovery.ts");
     const { CraterClient } = await import("@mizchi/vlmkit-capture/crater-client.ts");
@@ -46,7 +46,14 @@ export function registerCompareRenderersRoute(
       paintTreeChanges: number;
     }> = [];
 
-    const browser = await pw.launch();
+    // Two resources, and the close order (crater, then browser) is preserved:
+    // crater's `finally` is inside the callback, `withBrowser`'s runs after it.
+    //
+    // This also closes a real leak rather than a theoretical one. `crater.connect()`
+    // used to sit *between* the launch and the `try`, so a Crater server that was
+    // not running left a Chromium behind — inside the long-lived HTTP API process,
+    // once per request, with nothing to reap it.
+    await withBrowser(async (browser) => {
     const crater = new CraterClient();
     await crater.connect();
 
@@ -87,8 +94,8 @@ export function registerCompareRenderersRoute(
       }
     } finally {
       await crater.close();
-      await browser.close();
     }
+    });
 
     await rm(tmpDir, { recursive: true, force: true }).catch(() => {});
     return c.json({

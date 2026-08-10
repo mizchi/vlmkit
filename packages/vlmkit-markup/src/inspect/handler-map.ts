@@ -36,6 +36,7 @@ import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { DISCOVER_SCRIPT } from "./interaction-map.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export interface HandlerSurfaceEntry {
   /** Handler types on ancestors that also carry handlers (delegation). */
@@ -162,9 +163,7 @@ const COLLECT_SURFACE_SCRIPT = `
 `;
 
 export async function buildHandlerSurface(options: { source: string; storageState?: string }): Promise<HandlerSurface> {
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
-  try {
+  return await withBrowser(async (browser) => {
     const page = await browser.newPage(withAuthState({ viewport: { width: 1280, height: 800 } }, options.storageState));
     await page.addInitScript(HANDLER_PATCH_SCRIPT);
     const url = /^(https?|file):\/\//.test(options.source)
@@ -186,9 +185,7 @@ export async function buildHandlerSurface(options: { source: string; storageStat
       globals: raw.globals,
       totalRegistrations: raw.total,
     };
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -21,7 +21,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium, type Page } from "playwright";
+import { type Page } from "playwright";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, RED, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { openSource } from "@mizchi/vlmkit-core/page-open.ts";
@@ -30,6 +30,7 @@ import {
   touchTargetBelowRequired,
   touchTargetInCluster,
 } from "./markup-core-a11y-touch.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export type WcagTouchLevel = "AAA" | "AA";
 
@@ -188,10 +189,9 @@ export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchRep
   const level = options.level ?? "AAA";
   const required = level === "AAA" ? 44 : 24;
 
-  const browser = await chromium.launch();
-  let samples: A11yTouchRawSample[];
-  let screenshotPath: string;
-  try {
+  // Returned out of the callback, not assigned into outer `let`s — TypeScript's
+  // definite-assignment analysis does not follow an assignment made in a closure.
+  const { samples, screenshotPath } = await withBrowser(async (browser) => {
     // One load path for files and URLs. The file branch used to
     // `setContent(readFile(...))`, which drops the document's base URL: on
     // fixtures/external-assets that hid the 20x20 tap target entirely (the
@@ -201,13 +201,12 @@ export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchRep
     await page.addStyleTag({
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });
-    samples = await page.evaluate(A11Y_TOUCH_SAMPLE_SCRIPT) as A11yTouchRawSample[];
-    screenshotPath = join(outputDir, "page.png");
+    const samples = await page.evaluate(A11Y_TOUCH_SAMPLE_SCRIPT) as A11yTouchRawSample[];
+    const screenshotPath = join(outputDir, "page.png");
     await page.screenshot({ path: screenshotPath, fullPage: false });
     await page.close();
-  } finally {
-    await browser.close();
-  }
+    return { samples, screenshotPath };
+  });
 
   // Dedupe by path.
   const byPath = new Map<string, A11yTouchRawSample>();

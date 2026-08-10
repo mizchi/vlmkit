@@ -42,6 +42,7 @@ import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export interface LayoutRect {
   left: number;
@@ -234,11 +235,9 @@ export interface LayoutVerifyOptions {
 const DEFAULT_HEIGHTS: Record<number, number> = { 1280: 800, 768: 900, 375: 700 };
 
 export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<LayoutReport> {
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
   const results: LayoutRuleResult[] = [];
   let redirected: string | undefined;
-  try {
+  await withBrowser(async (browser) => {
     const url = /^(https?|file):\/\//.test(options.source)
       ? options.source
       : pathToFileURL(resolve(options.source)).href;
@@ -262,9 +261,7 @@ export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<Lay
       }
       await page.close();
     }
-  } finally {
-    await browser.close();
-  }
+  });
   const passed = results.filter((r) => r.passed).length;
   // A redirect cannot be `done`: the rules were evaluated against a page the
   // caller did not ask for, so even "all passed" would be a claim about the

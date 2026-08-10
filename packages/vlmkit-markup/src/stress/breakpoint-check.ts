@@ -36,6 +36,7 @@ import { extractBreakpoints } from "@mizchi/vlmkit-capture/viewport-discovery.ts
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 /** Discrete computed properties compared across boundary widths. */
 export interface ElementStyleSample {
@@ -392,9 +393,7 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
   const maxElements = options.maxElements ?? 400;
   const maxBreakpoints = options.maxBreakpoints ?? 8;
 
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
-  try {
+  return await withBrowser(async (browser) => {
     const page = await browser.newPage(withAuthState({ viewport: { width: 1280, height } }, options.storageState));
     if (options.html !== undefined) {
       await page.setContent(options.html, { waitUntil: "networkidle" });
@@ -559,9 +558,7 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
         ...(sweep ? deriveSweepIssues(sweep) : []),
       ],
     };
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 export function formatBreakpointCheckReport(report: BreakpointCheckReport): string {

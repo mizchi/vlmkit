@@ -8,17 +8,20 @@ import type { VrtSnapshot } from "./types.ts";
 const FIXTURE_DIR = resolve(import.meta.dirname!, "../../../fixtures/element-compare");
 const OUTPUT_DIR = resolve(process.cwd(), "test-results", "heatmap-report-test");
 
-import { chromium } from "playwright";
+import { withBrowser } from "./browser-launch.ts";
 
 async function captureFixture(htmlFile: string, outputPath: string) {
   const { readFile } = await import("node:fs/promises");
   const html = await readFile(htmlFile, "utf-8");
-  const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
-  await page.setContent(html, { waitUntil: "networkidle" });
-  await page.screenshot({ path: outputPath, fullPage: true });
-  await page.close();
-  await browser.close();
+  // `withBrowser` rather than launch-then-close: this used to close on the
+  // straight line, so a screenshot failure left a Chromium running for the rest
+  // of the suite. One of 9 such sites measured on 2026-08-10.
+  await withBrowser(async (browser) => {
+    const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+    await page.setContent(html, { waitUntil: "networkidle" });
+    await page.screenshot({ path: outputPath, fullPage: true });
+    await page.close();
+  });
 }
 
 describe("generateDiffReport", () => {

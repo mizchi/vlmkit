@@ -35,6 +35,7 @@ import { runLayoutVerify } from "./inspect/layout-contract.ts";
 import { buildHandlerSurface } from "./inspect/handler-map.ts";
 import { renderHtmlToPng } from "./component/page-compose.ts";
 import { introspectUiContractFromHtml } from "./contract/introspect-contract.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 const RENDER_DELAY_MS = 350;
 
@@ -141,9 +142,7 @@ describe("gates settle before reading a client-rendered page", () => {
     };
     const rendered = inkOf(shot.data);
 
-    const { chromium } = await import("playwright");
-    const browser = await chromium.launch();
-    try {
+    return await withBrowser(async (browser) => {
       const page = await browser.newPage({ viewport: { width: 900, height: 500 } });
       await page.goto(`file://${file}`, { waitUntil: "networkidle" });
       await page.waitForTimeout(RENDER_DELAY_MS + 250);
@@ -153,9 +152,7 @@ describe("gates settle before reading a client-rendered page", () => {
         rendered > settled * 0.9,
         `rendered ${rendered} px of ink vs ${settled} settled — the capture is still early`,
       );
-    } finally {
-      await browser.close();
-    }
+    });
   });
 
   it("scan contract finds the landmarks of a built SPA opened as a file", async () => {

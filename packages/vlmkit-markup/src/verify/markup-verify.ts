@@ -28,6 +28,7 @@ import { pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import pixelmatch from "pixelmatch";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 // NOT from `page-compose.ts`, which is a CLI entry: this module is in
 // `verify.gate.ts`'s static graph, `runCli` composes the registry on every
 // invocation, and a static import from here evaluated that entry's
@@ -252,17 +253,13 @@ async function fullPageRestShot(
   width: number,
   nominalViewportHeight: number,
 ): Promise<{ data: Uint8Array; width: number; height: number }> {
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
-  try {
+  return await withBrowser(async (browser) => {
     const page = await browser.newPage({ viewport: { width, height: nominalViewportHeight } });
     await page.goto(pathToFileURL(resolve(htmlPath)).href, { waitUntil: "networkidle", timeout: 30000 });
     const buffer = await page.screenshot({ fullPage: true, animations: "disabled" });
     const png = PNG.sync.read(buffer);
     return { data: new Uint8Array(png.data.buffer, png.data.byteOffset, png.data.byteLength), width: png.width, height: png.height };
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 function paddedDiff(

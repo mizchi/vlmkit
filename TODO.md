@@ -535,9 +535,27 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   それを固定するテストまで存在した。両方を修正。
   回帰テスト: `packages/vlmkit-markup/src/auth-wall.test.ts`(7 件、
   実際に 302 するサーバを立てる)。
-- [ ] **ページオープン統一の残り(純粋な整理)** — `chromium.launch` 44 箇所、
-  `waitUntil` は networkidle 72 / load 8 / domcontentloaded 1。
-  **verdict を変える差は上記で解消済み**。残るのは重複コードの削減と
+- [x] **launch 統一 — 完了(2026-08-10)** — 計測した実数は 65 箇所
+  (`.ts` 57 + 使い捨て `.mjs` 8)。引数別: bare 60 / `{args}` 4 /
+  `{headless}` 1。close 別: `finally` 51 / 直線 9(throw で必ずリーク)/
+  クローズ無し 4 / `return launch()` 1。
+  `packages/vlmkit-core/src/browser-launch.ts` に choke point を新設し、
+  **52 箇所を変換**(`withBrowser` 44 / `launchBrowser` 8)。
+  意図的に据え置いたもの: `stress/cross-browser.ts`(launch 失敗を
+  *skip 行*に変える。core の診断は `install chromium` 固定なので
+  firefox に誤った指示を出す)、`snapshot.ts` x2(`CaptureBackend` 抽象。
+  backend 自体は `launchBrowser` 経由になった)、使い捨てスクリプト 8 本、
+  および親セッションが同時編集中の 2 ファイル。
+  **判明したこと**: missing-browser 診断は「CLI では効いていた」わけでは
+  なかった。出荷 bin (`scripts/vlmkit-bundled.mjs`) は `handleCliError` を
+  通さず `console.error(error)` するだけなので、ゲート系コマンドは
+  一度も診断を受け取っていない。launch 側に付けたことで CLI と
+  ライブラリ呼び出しの両方に届くようになった。
+  → 残る follow-up は出荷 bin を `handleCliError` に通すこと(全エラー種の
+  出力が変わるため、この refactor とは別判断)。
+- [ ] **ページオープン統一の残り(純粋な整理)** — `waitUntil` は
+  networkidle 72 / load 8 / domcontentloaded 1。
+  **verdict を変える差は上記で解消済み**。残るのは
   fonts.ready 待ちの平準化で、こちらは実際に装飾。
 
 ### 差分監査 3 軸(2026-08-02)

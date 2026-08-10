@@ -13,7 +13,8 @@
 import { readFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { chromium } from "playwright";
-import { formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
+import { diagnoseSandboxLaunchFailure, formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
+import { launchBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { applyApprovalToVrtDiff, collectApprovalWarnings, inferApprovalChangeType, loadApprovalManifest } from "../../vrt/snapshot/approval.ts";
 import { getCssChallengeFixturePath } from "./css-challenge-fixtures.ts";
 import { categorizeProperty, escapeRegex } from "./css-challenge-core.ts";
@@ -135,14 +136,11 @@ function removeCssLine(css: string, declaration: CssLine): string {
 
 async function capturePageState(html: string, screenshotPath: string): Promise<{ a11yTree: A11yNode; screenshotPath: string }> {
   let browser;
-  try {
-    browser = await chromium.launch();
-  } catch (error) {
-    if (isPlaywrightSandboxRestrictionError(error)) {
-      throw new Error(formatPlaywrightLaunchError(error, { commandHint: "in your local terminal or in CI" }));
-    }
-    throw error;
-  }
+  // The sandbox diagnosis now travels with the launch instead of being copied
+  // around it: `diagnoseSandboxLaunchFailure` declines anything that is not the
+  // Codex/macOS case, so core's missing-browser message still applies and an
+  // unrecognized failure is rethrown untouched.
+  browser = await launchBrowser({ diagnose: diagnoseSandboxLaunchFailure });
   const page = await browser.newPage({ viewport: VIEWPORT });
   await page.setContent(html, { waitUntil: "networkidle" });
   await page.screenshot({ path: screenshotPath, fullPage: true });

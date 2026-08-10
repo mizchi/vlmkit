@@ -2,13 +2,13 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { chromium } from "playwright";
 import { healSelector } from "../heal/selector-heal.ts";
 import {
   classifyHealTier,
   STRONG_HEAL_THRESHOLD,
   WEAK_HEAL_THRESHOLD,
 } from "./selector-heal-calibration.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 type CalibrationCase = {
   fixture: string;
@@ -25,8 +25,7 @@ test("selector-heal calibration corpus has 20+ labeled real fixture cases", asyn
   const corpus = JSON.parse(await readFile(corpusPath, "utf8")) as { cases: CalibrationCase[] };
   assert.ok(corpus.cases.length >= 20);
 
-  const browser = await chromium.launch();
-  try {
+  return await withBrowser(async (browser) => {
     const page = await browser.newPage();
     for (const entry of corpus.cases) {
       await page.goto(`file://${fileURLToPath(new URL(`../../../../fixtures/interact/${entry.fixture}`, import.meta.url))}`);
@@ -36,9 +35,7 @@ test("selector-heal calibration corpus has 20+ labeled real fixture cases", asyn
       assert.equal(entry.actualSelector === entry.expectedSelector, entry.label !== "false-positive", entry.brokenSelector);
     }
     await page.close();
-  } finally {
-    await browser.close();
-  }
+  });
 });
 
 test("calibrated tiers suppress the measured 10-13% noise and keep strong precision", () => {

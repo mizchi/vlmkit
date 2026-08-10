@@ -69,7 +69,8 @@ import {
   type ResponsiveBreakpoint,
   type ViewportSpec,
 } from "@mizchi/vlmkit-capture/viewport-discovery.ts";
-import { formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
+import { diagnoseSandboxLaunchFailure, formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
+import { launchBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import type { ShiftRegion, VrtDiff, VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { applyMask, parseMaskSelectors } from "@mizchi/vlmkit-core/mask.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr as _hr } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -1034,14 +1035,11 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
   };
 
   try {
-    try {
-      browser = await chromium.launch();
-    } catch (error) {
-      if (isPlaywrightSandboxRestrictionError(error)) {
-        throw new Error(formatPlaywrightLaunchError(error, { commandHint: "in your local terminal or in CI" }));
-      }
-      throw error;
-    }
+    // The sandbox diagnosis now travels with the launch instead of being copied
+    // around it: `diagnoseSandboxLaunchFailure` declines anything that is not the
+    // Codex/macOS case, so core's missing-browser message still applies and an
+    // unrecognized failure is rethrown untouched.
+    browser = await launchBrowser({ diagnose: diagnoseSandboxLaunchFailure });
     const baselineScreenshots = new Map<string, string>();
 
     if (enablePaintTree) {

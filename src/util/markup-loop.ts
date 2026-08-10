@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export type MarkupLoopProvider = "anthropic" | "gemini" | "openrouter";
 export type MarkupLoopScope = "smoke" | "focused" | "full";
@@ -338,10 +339,8 @@ export async function observeMarkupLoop(
 }
 
 export async function captureMarkupObservation(url: string, options: ObserveMarkupLoopOptions = {}): Promise<MarkupLoopObservation> {
-  const { chromium } = await import("playwright");
   const timeout = options.timeoutMs ?? 15_000;
-  const browser = await chromium.launch({ headless: options.headless ?? true });
-  try {
+  return await withBrowser(async (browser) => {
     const page = await browser.newPage();
     page.setDefaultTimeout(timeout);
     await page.goto(url, { waitUntil: "domcontentloaded", timeout });
@@ -352,9 +351,7 @@ export async function captureMarkupObservation(url: string, options: ObserveMark
       // SPAs often keep connections open; DOM observations are still useful after domcontentloaded.
     }
     return await page.evaluate(OBSERVE_SCRIPT) as MarkupLoopObservation;
-  } finally {
-    await browser.close();
-  }
+  }, { launch: { headless: options.headless ?? true } });
 }
 
 async function doctor(configPath = DEFAULT_CONFIG_PATH): Promise<number> {

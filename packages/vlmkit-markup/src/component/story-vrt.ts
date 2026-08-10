@@ -50,6 +50,7 @@ import { decodePng, measureChangeMagnitude, type ChangeMagnitude } from "@mizchi
 import { STATE_DIR } from "@mizchi/vlmkit-core/project-config.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { DiffRegion } from "@mizchi/vlmkit-core/types.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export interface StoryVrtOptions {
   /** Gallery URL — the `baseURL` from the Playwright config. */
@@ -187,11 +188,9 @@ async function mountInPage(
 
 export async function runStoryVrt(options: StoryVrtOptions): Promise<StoryVrtReport> {
   const outputDir = resolve(options.outputDir ?? join(process.cwd(), STATE_DIR, "stories"));
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
   const results: StoryResult[] = [];
 
-  try {
+  await withBrowser(async (browser) => {
     // One context and one page for every story: the gallery is a single page and
     // the browser launch is ~all of the cost, so N stories should not mean N
     // launches. Playwright's own config sets `reuseContext: true` for the same
@@ -200,9 +199,7 @@ export async function runStoryVrt(options: StoryVrtOptions): Promise<StoryVrtRep
     for (const story of options.stories) {
       results.push(await captureStory(page, story, options, outputDir));
     }
-  } finally {
-    await browser.close();
-  }
+  });
 
   const storyPixels = results.reduce((n, r) => n + (r.width ?? 0) * (r.height ?? 0), 0);
   return {

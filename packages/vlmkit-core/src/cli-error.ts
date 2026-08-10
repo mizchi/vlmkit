@@ -71,6 +71,17 @@ export function handleCliError(e: unknown): never {
     process.exit(1);
   }
 
+  // `browser-launch.ts` already ran the diagnosis at the launch (so library
+  // callers get it too, not only the CLI) and put the finished text — "error: "
+  // prefix and all — in `message`. Write it verbatim: re-prefixing would give
+  // "error: error: …", and falling through to `console.error(e)` would print a
+  // stack where this used to print two lines. Matched by name rather than
+  // `instanceof` so this module keeps its zero Playwright imports.
+  if (err?.name === "BrowserLaunchError") {
+    process.stderr.write(`${msg}\n`);
+    process.exit(1);
+  }
+
   // ENOENT — missing local file path.
   if (err?.code === "ENOENT") {
     const path = err.path ?? msg.match(/ENOENT: no such file or directory[^']*'([^']+)'/)?.[1] ?? "?";

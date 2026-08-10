@@ -29,7 +29,7 @@
 import { readFile, writeFile, mkdir, copyFile } from "node:fs/promises";
 import { basename, join, resolve, extname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium, type Page } from "playwright";
+import { type Page } from "playwright";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { extractPaletteFromFile } from "../style/palette-extract.ts";
 import { diffPalettes, type PaletteDiff } from "../style/palette-diff.ts";
@@ -42,6 +42,7 @@ import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vlmkit-c
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export interface MultiPageConsistencyOptions {
   /** CSS selector identifying the shared component on every page. */
@@ -118,9 +119,8 @@ export async function runMultiPageConsistency(
   await mkdir(outputDir, { recursive: true });
   const viewport = options.viewport ?? { width: 1280, height: 900 };
 
-  const browser = await chromium.launch();
   const pages: PageEntry[] = [];
-  try {
+  await withBrowser(async (browser) => {
     let idx = 0;
     for (const url of urls) {
       const page = await browser.newPage({ viewport });
@@ -143,9 +143,7 @@ export async function runMultiPageConsistency(
       await page.close();
       pages.push({ label, screenshotPath, bbox, matched });
     }
-  } finally {
-    await browser.close();
-  }
+  });
 
   if (pages.length === 0 || !pages[0]!.matched) {
     throw new UsageError(`Selector \`${options.selector}\` did not match on the reference page (${pages[0]?.label ?? "<none>"})`);

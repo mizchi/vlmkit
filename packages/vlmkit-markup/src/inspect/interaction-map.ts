@@ -44,6 +44,7 @@ import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { callMarkupCoreJson } from "../markup-core-runtime.ts";
 import type { Page } from "playwright";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -678,9 +679,7 @@ async function gotoSource(page: Page, source: string): Promise<void> {
 export async function buildInteractionMap(options: InteractionMapOptions): Promise<InteractionMapResult> {
   const maxElements = options.maxElements ?? 30;
   const settleMs = options.settleMs ?? 120;
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
-  try {
+  return await withBrowser(async (browser) => {
     const page = await browser.newPage(withAuthState({ viewport: { width: 1280, height: 800 } }, options.storageState));
     await gotoSource(page, options.source);
     const discovered = await page.evaluate(DISCOVER_SCRIPT) as DiscoveredElement[];
@@ -816,9 +815,7 @@ export async function buildInteractionMap(options: InteractionMapOptions): Promi
       });
     }
     return { source: options.source, elements, capped };
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 // ---------------------------------------------------------------------------

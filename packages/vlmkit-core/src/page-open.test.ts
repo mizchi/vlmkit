@@ -6,6 +6,7 @@ import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Browser } from "playwright";
 import { isUrlSource, openHtml, openSource, sourceToUrl } from "./page-open.ts";
+import { launchBrowser } from "./browser-launch.ts";
 
 describe("isUrlSource / sourceToUrl", () => {
   it("distinguishes URLs from paths", () => {
@@ -32,8 +33,7 @@ describe("openSource / openHtml (real browser)", () => {
   let browser: Browser | undefined;
   const getBrowser = async (): Promise<Browser> => {
     if (!browser) {
-      const { chromium } = await import("playwright");
-      browser = await chromium.launch();
+      browser = await launchBrowser();
     }
     return browser;
   };

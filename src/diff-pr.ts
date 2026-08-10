@@ -33,7 +33,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { chromium, type Browser } from "playwright";
+import { type Browser } from "playwright";
 import {
   configBaseDir,
   findConfigPath,
@@ -55,6 +55,7 @@ import type { ContrastFinding } from "@mizchi/vlmkit-markup/a11y-contrast.ts";
 import type { TouchTargetFinding } from "@mizchi/vlmkit-markup/a11y-touch.ts";
 import type { FocusOrderFinding } from "@mizchi/vlmkit-markup/a11y-focus-order.ts";
 import type { SemanticFinding } from "./a11y-semantic-checks.ts";
+import { launchBrowser, withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 // Same defaults as migration-compare's STATIC_VIEWPORTS so a baseline
 // pinned with one CLI is comparable with the other.
@@ -350,8 +351,7 @@ async function cmdPin(args: string[]): Promise<void> {
   console.log();
 
   const viewports = viewportSpecsFor(config);
-  const browser = await chromium.launch();
-  try {
+  await withBrowser(async (browser) => {
     for (const route of routesToPin) {
       process.stdout.write(`  ${route.name.padEnd(20)} ${DIM}${route.url}${RESET} ...`);
       const dir = baselineDirForRoute(config, route);
@@ -374,9 +374,7 @@ async function cmdPin(args: string[]): Promise<void> {
       }
       console.log(` ${GREEN}ok${RESET} ${DIM}(${success}/${viewports.length} viewport(s))${RESET}`);
     }
-  } finally {
-    await browser.close();
-  }
+  });
   console.log();
   console.log(`${DIM}Baselines pinned. Run \`vlmkit diff-pr\` in CI to gate against them.${RESET}`);
 }
@@ -464,7 +462,11 @@ async function cmdRun(args: string[]): Promise<number> {
   const results: PerRouteResult[] = [];
   // Do not launch chromium at all in file mode — the reporting project's
   // headless canvas capture is exactly what does not work there.
-  const browser = fileSources ? null : await chromium.launch();
+  // `launchBrowser`, not `withBrowser`: in file mode there is no browser at all,
+  // and a scope helper cannot express "maybe don't launch". The `finally` below
+  // stays this function's job — `browser?.close()` on a nullable handle is exactly
+  // the case `withBrowser` does not cover.
+  const browser = fileSources ? null : await launchBrowser();
 
   try {
     for (const route of routesToRun) {
