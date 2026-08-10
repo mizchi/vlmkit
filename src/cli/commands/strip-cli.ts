@@ -17,11 +17,12 @@
  * them explicitly.
  */
 import { existsSync } from "node:fs";
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { composeFilmstrip } from "@mizchi/vlmkit-core/filmstrip.ts";
 import { decodePng, encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
+import { encodeWebp, imageFormatForPath } from "@mizchi/vlmkit-core/webp.ts";
 import { BOLD, CYAN, DIM, GREEN, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 function usage(): string {
@@ -35,6 +36,9 @@ function usage(): string {
     "  --gap <px>          Gap between cells (default 8)",
     "  --scale <n>         Downscale every frame by this factor",
     "  --max-width <px>    Cap the sheet width, downscaling to fit (default 1600; 0 disables)",
+    "  --quality <0-100>   Lossy WebP quality; omit for lossless (smaller for UI screenshots)",
+    "",
+    "  A `.webp` output extension encodes WebP (needs the optional @jsquash/webp).",
     "",
     "Examples:",
     "  vlmkit snapshot strip frames/anim-*.png --out strip.png",
@@ -49,6 +53,8 @@ interface StripArgs {
   gap?: number;
   scale?: number;
   maxWidth?: number;
+  /** Lossy WebP quality. Omitted means lossless, which is smaller here anyway. */
+  quality?: number;
 }
 
 function readNumber(argv: string[], index: number, flag: string): number {
@@ -67,6 +73,7 @@ function parseArgs(argv: string[]): StripArgs {
   let gap: number | undefined;
   let scale: number | undefined;
   let maxWidth: number | undefined;
+  let quality: number | undefined;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
@@ -87,6 +94,9 @@ function parseArgs(argv: string[]): StripArgs {
       case "--max-width":
         maxWidth = readNumber(argv, ++i, "--max-width");
         break;
+      case "--quality":
+        quality = readNumber(argv, ++i, "--quality");
+        break;
       case "-h":
       case "--help":
         console.log(usage());
@@ -105,6 +115,7 @@ function parseArgs(argv: string[]): StripArgs {
     ...(gap !== undefined ? { gap } : {}),
     ...(scale !== undefined ? { scale } : {}),
     ...(maxWidth !== undefined ? { maxWidth } : {}),
+    ...(quality !== undefined ? { quality } : {}),
   };
 }
 
@@ -172,13 +183,19 @@ async function main(): Promise<void> {
   });
 
   await mkdir(dirname(resolve(parsed.out)), { recursive: true });
-  await encodePng(resolve(parsed.out), sheet);
+  // The extension picks the format, so `--out strip.webp` needs no second flag.
+  const format = imageFormatForPath(parsed.out);
+  if (format === "webp") {
+    await writeFile(resolve(parsed.out), await encodeWebp(sheet, parsed.quality === undefined ? {} : { quality: parsed.quality }));
+  } else {
+    await encodePng(resolve(parsed.out), sheet);
+  }
 
   const sizes = new Set(frames.map((f) => `${f.width}x${f.height}`));
   console.log();
   console.log(`${BOLD}${CYAN}Strip${RESET}`);
   console.log(`  ${DIM}Frames: ${frames.length} (${sheet.layout.rows} row(s) x ${sheet.layout.columns} column(s))${RESET}`);
-  console.log(`  ${DIM}Sheet:  ${sheet.width}x${sheet.height}${RESET}`);
+  console.log(`  ${DIM}Sheet:  ${sheet.width}x${sheet.height} ${format}${RESET}`);
   if (sheet.layout.scale !== 1) {
     console.log(`  ${DIM}Scale:  1/${sheet.layout.scale} to fit ${cap}px${RESET}`);
   }

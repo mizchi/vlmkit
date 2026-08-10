@@ -35,6 +35,7 @@ import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/v
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { composeFilmstrip } from "@mizchi/vlmkit-core/filmstrip.ts";
 import { cropRegion, encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
+import { encodeWebp, imageFormatForPath } from "@mizchi/vlmkit-core/webp.ts";
 
 export interface AnimationTimingSample {
   /** Index into the page's animation list at capture time. */
@@ -716,7 +717,12 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         maxWidth: options.stripMaxWidth ?? 1600,
       });
       await mkdir(dirname(resolve(options.stripPath)), { recursive: true });
-      await encodePng(resolve(options.stripPath), sheet);
+      // `--strip strip.webp` encodes WebP; the extension is the whole switch.
+      if (imageFormatForPath(options.stripPath) === "webp") {
+        await writeFile(resolve(options.stripPath), await encodeWebp(sheet));
+      } else {
+        await encodePng(resolve(options.stripPath), sheet);
+      }
       strip = {
         path: resolve(options.stripPath),
         columns: sheet.layout.columns,

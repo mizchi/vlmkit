@@ -933,10 +933,38 @@ each cell is the whole viewport, so a small animated element yields near-identic
 screenshots — on `fixtures/css-challenge/dashboard.html` cropping took the sheet
 from 1448x422 to 890x232 and made each row show only its own element.
 
-PNG only. A 6-sample x 4-animation sheet of that fixture is 107 KB and an uncapped
-2-up full-viewport sheet is 165 KB, so an animated- or lossy-format encoder is not
-worth a new dependency for this content (the tree carries `pngjs` and nothing else
-for images).
+##### WebP output
+
+A `.webp` output extension encodes lossless WebP, which needs the optional
+`@jsquash/webp` peer (`npm install --save-dev @jsquash/webp`). Without it, PNG works
+with no extra dependency and the error names the two ways forward.
+
+```bash
+vlmkit check animation page.html --strip strip.webp
+vlmkit snapshot strip frames/*.png --out sheet.webp
+vlmkit snapshot strip frames/*.png --out sheet.webp --quality 75   # lossy; see below
+```
+
+Measured on the real sheets this writes:
+
+| | 1526x492 sheet | 2584x736 sheet |
+|---|---|---|
+| PNG | 106.8 KB | 165.3 KB |
+| WebP lossless | **24.0 KB** | **39.3 KB** |
+| WebP quality 90 | 55.9 KB | 72.6 KB |
+| WebP quality 75 | 36.7 KB | 47.3 KB |
+
+Lossless is the default because on flat UI screenshots it is both smaller *and*
+artifact-free — lossy first adds noise it then has to encode, so quality 90 is more
+than twice the size of lossless here. `--quality` exists for photographic content.
+
+Three encoders were measured for this. `@jsquash/webp` (libwebp as WASM, 1.1 MB
+installed) and `sharp` (libvips, 29 MB installed) produce byte-identical output, so
+the light one is the peer. `mizchi/image` 0.4.3 would have added no npm dependency
+at all — it is MoonBit, which this repo already builds — but its `encode_webp`
+emits a valid VP8L stream (verified: decodes to 1526x492 in Chromium) that is
+**6.6x larger than the PNG it replaces**, i.e. 29x libwebp. A correct minimal
+encoder, not a competitive one.
 
 #### Visualizing the VRT process — flipbooks + video
 
