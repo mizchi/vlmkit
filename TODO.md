@@ -1013,6 +1013,47 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   **着手条件: gate 沈黙欠陥が実際に観測されたら、そのクラスを対象に建てる**
   (存在しない欠陥クラスのために VLM ルーブリックを先行実装しない)。
 
+### 連番画像 / strip の残件(2026-08-10)
+
+- [ ] **animated WebP 出力(`snapshot strip --animated` / `check animation --strip x.webp --animated`)**
+  - 目的: 現在の strip は**静止シート**(1 枚に並べる)。「連番アニメーションを 1 枚に」の
+    もう一方の解として、実際に動く 1 ファイルが欲しい場面がある(PR に貼って再生させる、
+    flipbook の HTML を配れない文脈)。
+  - **現状の 3 案は全て静止画のみ**(2026-08-10 実測、`docs/cli-reference.md` の表と
+    `packages/vlmkit-core/src/webp.ts` ヘッダに記録):
+    `@jsquash/webp` は libwebp の still encode のみ、`sharp` の `.webp()` も入力が
+    アニメーションでなければ単ページ、`mizchi/image` 0.4.3 は GIF も単一フレーム。
+  - 唯一の現実的な経路: **sharp の `pageHeight` トリック** — N フレームを縦連結した raw
+    バッファを `sharp(buf, { raw, pages: n, pageHeight: h })` で多ページ画像として扱わせ、
+    `.webp({ loop, delay })` で animated WebP を書く。
+  - **コスト**: sharp は installed **29 MB**(libvips 18 MB + wasm32 fallback 8.7 MB)。
+    現行の `@jsquash/webp` は 1.1 MB で、静止 webp では**バイト単位で同一出力**。
+    つまり animated のためだけに 26 倍の依存を optional peer に増やす判断になる。
+  - 着手条件: **静止シートで足りない具体的な場面が実際に出てきたら**。現状の strip は
+    `check animation --strip` が行ごとに motion bbox でクロップするので、静止でも動きが
+    読める(dashboard.html の fadeIn が 6 サンプルで opacity/translateY の進行として見える)。
+    静止で読めない実例(例: 速いイージングの差、長いタイムライン)が観測されるまでは、
+    29 MB を飲む理由が測定で立たない。
+  - 代替案(依存ゼロ): animated GIF を自前 mux する / `snapshot flipbook`(既存の HTML
+    プレイヤー)で足りるならそれ。前者は品質と実装量が見合わない見込み。
+
+- [ ] **`check animation` の `evaluated` が時刻依存(2026-08-10 に判明、コードにも明記)**
+  - `fill: none` の短いアニメは終了と同時に `getAnimations()` から消えるため、開始時記録
+    (`RECORD_ANIMATION_STARTS_SCRIPT`)で `animationCount` / `settleMs` / reduced-motion は
+    決定的になったが、**フレーム標本化できるのは収集時点で生存しているものだけ**。
+    dashboard.html は `animationCount` が 4 で固定される一方 `evaluated` は 0 か 1 で揺れ、
+    `no-visible-effect` もそれに従う。
+  - 正しい直し方: 記録ではなく**開始位置で保持**する(init script で `animationstart` 時に
+    pause)。ただし `playState` の「作者が止めたのか我々が止めたのか」の区別が消え、
+    `restTimeForAnimation` がそれに依存しているので、フィルタ変更ではなく再設計。
+  - 着手条件: `no-visible-effect` の揺れが実際に誤判定を生んだら。
+
+- [ ] **filmstrip の均一セル → ragged レイアウト(cosmetic)**
+  - `composeFilmstrip` はシート全体で最大サイズのセルを使うため、1 行だけ motion bbox が
+    広いと他の行の右側に灰色余白が出る(3 アニメ fixture で実測)。行ごとに独立幅にすると
+    詰まるが、現在の「均一グリッド」という単純さを崩す。読みやすさは損なわれていないので
+    優先度低。
+
 ### Benchmarks
 - [ ] **markup-agent モデル横断ベンチ: OpenRouter + pi でモデルごとの性能比較**(関連: Issue #88)
   - 目的: S7-fresh A/B(Haiku 4.5 vs Sonnet — `docs/reports/2026-07-28-verifier-tooling-and-s6.md` 追記3)を Anthropic 外のモデルへ拡張し、markup-agent ループの model×cost 表を作る。既存の vlm-bench(Stage-1 VLM 比較)とは別物 — こちらは**エージェント本体**(vision 読み + CSS 執筆 + verify markup ループ運転)の比較。
