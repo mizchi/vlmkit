@@ -40,6 +40,24 @@ export interface DesignSample {
   selector: string;
   /** Style tuple that defines "the same component", rendered. */
   signature: string;
+  /**
+   * `signature` with the two font fields dropped: padding, radius, border
+   * width and background only. The comparison space for an element that paints
+   * no text — see `textFree`.
+   */
+  boxSignature?: string;
+  /**
+   * The element paints nothing whose size or weight the font controls: no text
+   * node, no generated `::before`/`::after` content, and not a form control
+   * that renders its own `value`/`placeholder`.
+   *
+   * Issue #112: a MapLibre widget's zoom controls were restyled to match the
+   * host app's padding/radius/border/background exactly and `check design`
+   * still reported DRIFT, because the buttons contain only an SVG icon and
+   * inherit `12px/400` where the app's buttons are `14px/600`. Nobody can see
+   * that difference and no styling change removes it, so it cannot be evidence.
+   */
+  textFree?: boolean;
   /** Human-readable form of the signature for kickbacks. */
   described: string;
 }
@@ -60,8 +78,14 @@ export interface DesignPolicyInput {
   skipped: number;
   /** Elements skipped for being in a non-resting state. */
   statefulSkipped: number;
-  /** Auditable root matches for caller-owned subtree exclusions. */
-  exclusions?: { selector: string; matches: number }[];
+  /**
+   * Per-selector audit of caller-owned subtree exclusions: how many roots the
+   * selector matched, and how many elements that actually removed. Both,
+   * because they answer different questions — `matches: 0` means the selector
+   * is wrong or the widget is gone, while `matches: 1, elements: 0` means it
+   * matched something outside the measured tree.
+   */
+  exclusions?: { selector: string; matches: number; elements: number }[];
   /** Unique elements omitted because they belong to an excluded subtree. */
   excludedElements?: number;
 }
@@ -97,9 +121,17 @@ export interface DesignPolicyReport {
   findings: DesignFinding[];
   skipped: number;
   statefulSkipped: number;
-  exclusions: { selector: string; matches: number }[];
+  exclusions: { selector: string; matches: number; elements: number }[];
   excludedElements: number;
   unusedExcludes: string[];
+  /** Elements judged on their box alone because they paint no text. */
+  textFreeSamples: number;
+  /**
+   * Of those, how many joined a style the text-bearing elements had already
+   * established. Reported so the fold is auditable rather than invisible: it is
+   * the one place this gate deliberately compares less than it measured.
+   */
+  textFreeFolded: number;
   spacingValues: number;
   /**
    * Thresholds this run actually used. In the report because the role table
@@ -185,7 +217,7 @@ export const COLLECT_DESIGN_SAMPLES = `(() => {
   const excludedSelectors = [];
   const exclusions = excludedSelectors.map((selector) => {
     try {
-      return { selector, matches: document.querySelectorAll(selector).length };
+      return { selector, matches: document.querySelectorAll(selector).length, elements: 0 };
     } catch (error) {
       throw new Error('invalid --exclude selector "' + selector + '": ' + error.message);
     }
@@ -205,6 +237,36 @@ export const COLLECT_DESIGN_SAMPLES = `(() => {
     }
     return parts.join(">");
   };
+  // Text the browser paints that the DOM does not expose as a child text node:
+  // input[type=button] paints its \`value\`, a text input paints its value and
+  // placeholder, a select paints the chosen option. textContent is "" for all
+  // three, so a textContent-only test would drop the font comparison from
+  // exactly the elements whose entire box is text.
+  const IMPLICIT_TEXT = "input,select,textarea";
+  // <title>/<desc> inside an SVG are tooltip and a11y metadata, never painted.
+  // MapLibre's zoom buttons carry <title>Zoom in</title>, which would otherwise
+  // make every icon-only control read as text-bearing and defeat the whole fix.
+  const UNPAINTED_TEXT = "script,style,template,title,desc,metadata";
+  const paintsText = (el) => {
+    if (el.matches && el.matches(IMPLICIT_TEXT)) return true;
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (!node.nodeValue || !node.nodeValue.trim()) continue;
+      if (node.parentElement && node.parentElement.closest(UNPAINTED_TEXT)) continue;
+      return true;
+    }
+    // An icon-FONT glyph lives in generated content and scales with font-size,
+    // so \`content: "\\f00c"\` makes the font observable even with no child text.
+    // A url()/gradient \`content\` is an image and does not.
+    for (const pseudo of ["::before", "::after"]) {
+      const content = getComputedStyle(el, pseudo).content;
+      if (!content || content === "none" || content === "normal") continue;
+      if (/^(url|image|image-set|linear-gradient|radial-gradient|conic-gradient|element)\\(/.test(content)) continue;
+      if (/^["']\\s*["']$/.test(content)) continue;
+      return true;
+    }
+    return false;
+  };
   const roleOf = (el) => {
     const explicit = el.getAttribute("role");
     if (explicit) return explicit.trim();
@@ -221,7 +283,12 @@ export const COLLECT_DESIGN_SAMPLES = `(() => {
   const samples = [], spacing = [];
   let skipped = 0, statefulSkipped = 0, excludedElements = 0;
   for (const el of document.querySelectorAll("body *")) {
-    if (excludedSelectors.some((selector) => el.closest(selector))) {
+    // The FIRST matching selector owns the element, so the per-selector counts
+    // sum to \`excludedElements\` even when two exclusions nest. A report whose
+    // rows disagree with its own total is worse than no rows.
+    const owner = excludedSelectors.findIndex((selector) => el.closest(selector));
+    if (owner >= 0) {
+      exclusions[owner].elements++;
       excludedElements++;
       continue;
     }
@@ -238,17 +305,24 @@ export const COLLECT_DESIGN_SAMPLES = `(() => {
     if (el.matches && el.matches(STATE)) { statefulSkipped++; continue; }
     // Rendered height is deliberately NOT in the signature: a button that is
     // taller only because its label wrapped is not a design inconsistency.
-    const sig = [
+    //
+    // Split into box and font halves so the judge can compare a text-free
+    // element on the box alone; the joined string is still the signature.
+    const box = [
       px(cs.paddingTop), px(cs.paddingRight), px(cs.paddingBottom), px(cs.paddingLeft),
-      px(cs.borderTopLeftRadius), px(cs.fontSize), cs.fontWeight,
-      px(cs.borderTopWidth), cs.backgroundColor,
+      px(cs.borderTopLeftRadius), px(cs.borderTopWidth), cs.backgroundColor,
     ];
+    const font = [px(cs.fontSize), cs.fontWeight];
+    const textFree = !paintsText(el);
     samples.push({
       role,
       selector: path(el),
-      signature: sig.join("|"),
-      described: "padding " + sig.slice(0, 4).join("/") + ", radius " + sig[4]
-        + ", " + sig[5] + "px/" + sig[6] + ", border " + sig[7] + ", bg " + sig[8],
+      boxSignature: box.join("|"),
+      signature: box.concat(font).join("|"),
+      textFree,
+      described: "padding " + box.slice(0, 4).join("/") + ", radius " + box[4]
+        + ", " + (textFree ? "no painted text" : font[0] + "px/" + font[1])
+        + ", border " + box[5] + ", bg " + box[6],
     });
   }
   return { samples, spacing, skipped, statefulSkipped, exclusions, excludedElements };
@@ -282,13 +356,46 @@ export function judgeDesignPolicy(
 
   const roles: DesignPolicyReport["roles"] = [];
   const findings: DesignFinding[] = [];
+  const textFreeSamples = input.samples.filter((s) => s.textFree && s.boxSignature).length;
+  let textFreeFolded = 0;
 
   for (const [role, list] of [...byRole.entries()].sort((a, b) => b[1].length - a[1].length)) {
     const counts = new Map<string, DesignSample[]>();
+    // Which signature owns each box, so a text-free element can be folded into
+    // the style its visible properties already match (issue #112).
+    const boxOfSignature = new Map<string, string>();
+    const deferred: DesignSample[] = [];
     for (const s of list) {
+      if (s.textFree && s.boxSignature) {
+        deferred.push(s);
+        continue;
+      }
       const same = counts.get(s.signature) ?? [];
       same.push(s);
       counts.set(s.signature, same);
+      boxOfSignature.set(s.signature, s.boxSignature ?? s.signature);
+    }
+    // Resolved from the TEXT-BEARING groups only, and before any folding, so the
+    // result does not depend on the order the text-free elements arrive in.
+    // Largest group wins; the key breaks ties so two equal groups are stable.
+    const hostByBox = new Map<string, string>();
+    for (const [key, members] of counts) {
+      const box = boxOfSignature.get(key)!;
+      const held = hostByBox.get(box);
+      const heldSize = held === undefined ? -1 : counts.get(held)!.length;
+      if (members.length > heldSize || (members.length === heldSize && key < held!)) hostByBox.set(box, key);
+    }
+    for (const s of deferred) {
+      // No host means no text-bearing element shares this box — an unmatched
+      // BOX is visible drift and stays counted. Text-free elements then group
+      // with each other by box, keyed on the 7-field box string, which can
+      // never collide with a 9-field signature.
+      const host = hostByBox.get(s.boxSignature!);
+      const key = host ?? s.boxSignature!;
+      if (host !== undefined) textFreeFolded++;
+      const same = counts.get(key) ?? [];
+      same.push(s);
+      counts.set(key, same);
     }
     const signatures = counts.size;
     const reuse = Math.round((list.length / signatures) * 100) / 100;
@@ -377,7 +484,12 @@ export function judgeDesignPolicy(
     statefulSkipped: input.statefulSkipped,
     exclusions: input.exclusions ?? [],
     excludedElements: input.excludedElements ?? 0,
-    unusedExcludes: (input.exclusions ?? []).filter((entry) => entry.matches === 0).map((entry) => entry.selector),
+    // Judged on elements REMOVED, not on root matches: `--exclude head` matches
+    // a root and removes nothing, and a selector that removes nothing is dead
+    // config however many roots it found.
+    unusedExcludes: (input.exclusions ?? []).filter((entry) => entry.elements === 0).map((entry) => entry.selector),
+    textFreeSamples,
+    textFreeFolded,
     spacingValues: spacingCounts.size,
     thresholds: { minReuse, minInstances },
     // `info` rows do not move the verdict, and `redirected` is a navigation
@@ -431,12 +543,23 @@ export function formatDesignReport(report: DesignPolicyReport): string {
   lines.push(`${DIM}source: ${report.source}${RESET}`);
   lines.push("");
   const bad = report.findings.filter((f) => f.severity === "suspect").length;
+  // The size of the blind spot goes ON the verdict line, the way `check
+  // integrity` prints `(2 fail, 1 warn, 5 exempted)`. A reader deciding how much
+  // a COHERENT verdict is worth has to see how much of the page it covered
+  // without scrolling for it.
   lines.push(
     `verdict: ${report.verdict === "coherent" ? `${GREEN}COHERENT${RESET}` : `${YELLOW}DRIFT${RESET}`}`
-    + ` (${report.findings.length} finding(s)${bad > 0 ? `, ${bad} suspect` : ""})`,
+    + ` (${report.findings.length} finding(s)${bad > 0 ? `, ${bad} suspect` : ""}`
+    + `${report.excludedElements > 0 ? `, ${report.excludedElements} element(s) excluded` : ""})`,
   );
   lines.push(`${DIM}  roles judged: ${report.roles.length}, spacing values: ${report.spacingValues},`
     + ` skipped: ${report.skipped} (no inferable role), ${report.statefulSkipped} (non-resting state)${RESET}`);
+  if (report.textFreeSamples > 0) {
+    lines.push(
+      `${DIM}  text-free: ${report.textFreeSamples} (${report.textFreeFolded} judged on box alone —`
+      + ` font-size/weight is not observable without painted text)${RESET}`,
+    );
+  }
   lines.push("");
   if (report.roles.length > 0) {
     lines.push(
@@ -454,11 +577,18 @@ export function formatDesignReport(report: DesignPolicyReport): string {
   if (report.exclusions.length > 0) {
     lines.push(`${BOLD}Excluded subtrees${RESET} ${DIM}(${report.excludedElements} unique element(s) omitted)${RESET}`);
     for (const exclusion of report.exclusions) {
-      const marker = exclusion.matches === 0 ? `${YELLOW}!${RESET}` : `${DIM}-${RESET}`;
-      lines.push(`  ${marker} ${exclusion.selector}: ${exclusion.matches} root match(es)`);
+      // Root matches AND elements removed, because they fail differently: 0
+      // roots means the selector is wrong or the widget is gone, while roots
+      // with 0 elements means it matched outside the measured tree.
+      const marker = exclusion.elements === 0 ? `${YELLOW}!${RESET}` : `${DIM}-${RESET}`;
+      lines.push(
+        `  ${marker} ${exclusion.selector}: ${exclusion.matches} root match(es),`
+        + ` ${exclusion.elements} element(s) removed`,
+      );
     }
     if (report.unusedExcludes.length > 0) {
-      lines.push(`${YELLOW}${report.unusedExcludes.length} --exclude selector(s) matched nothing; remove stale exclusions.${RESET}`);
+      lines.push(`${YELLOW}${report.unusedExcludes.length} --exclude selector(s) removed nothing${RESET}`);
+      lines.push(`${DIM}Delete them: an exclusion kept past the widget it covered only widens the blind spot.${RESET}`);
     }
     lines.push("");
   }

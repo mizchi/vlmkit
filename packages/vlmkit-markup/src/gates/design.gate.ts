@@ -1,6 +1,6 @@
 /**
- * `check design` as a gate definition. Measurement code in
- * `../style/design-policy.ts` is untouched.
+ * `check design` as a gate definition. Measurement lives in
+ * `../style/design-policy.ts`; this file only declares the surface.
  *
  * This gate deliberately emits nothing above `warn` for its own two rules —
  * a drifting design system is information, not a broken page, and the gate
@@ -53,7 +53,18 @@ docs/design/design-policy-metrics.md`,
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check", positional: 0, required: true },
     { name: "min-reuse", kind: "number", description: "Times each style must be reused", defaultDescription: "3" },
     { name: "min-instances", kind: "number", description: "Instances before a role is judged", defaultDescription: "3" },
-    { name: "exclude", placeholder: "selector", kind: "string", description: "Exclude a vendor-owned subtree (audited)", repeatable: true },
+    {
+      name: "exclude",
+      placeholder: "selector",
+      kind: "string",
+      // No `--allow` twin here on purpose: this gate's findings attribute to a
+      // ROLE, not a selector, so forgiving one would forgive the whole role and
+      // delete the signal for the caller's own components too. Scoping the
+      // measurement is the only granularity the metric has. Every exclusion is
+      // reported with its element count, and one that removes nothing warns.
+      description: "Exclude a vendor-owned subtree; each is reported with what it removed",
+      repeatable: true,
+    },
     { name: "timeout", placeholder: "ms", kind: "number", description: "Page navigation timeout", defaultDescription: "30000" },
     {
       name: "wait-until",
