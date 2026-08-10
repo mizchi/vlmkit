@@ -1,5 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   computeOscillation,
   computeSettleMs,
@@ -7,6 +10,7 @@ import {
   formatAnimationEvalReport,
   frameDelta,
   restTimeForAnimation,
+  runAnimationEval,
   unionBbox,
   type AnimationEvalReport,
   type AnimationTimingSample,
@@ -309,4 +313,101 @@ test("formatAnimationEvalReport surfaces uncontrolled motion", () => {
   const text = formatAnimationEvalReport(report);
   assert.match(text, /uncontrolled motion: 900px at \(40,200\) 360x60/);
   assert.match(text, /uncontrolled-motion/);
+});
+
+/**
+ * `runAnimationEval` itself — the orchestrator, which had no test at all while
+ * every pure helper above did. That gap is not incidental: the two defects these
+ * tests pin were invisible to unit tests precisely because the helpers were fed
+ * hand-written samples and the code that *builds* those samples never ran.
+ *
+ * Both defects came from one line of reasoning: `playState` was read once, at
+ * whatever instant the collector happened to run, and animations reading
+ * `finished` were dropped as "visually static". Measured on a bare local file,
+ * `goto` returns at ~509ms and the settle finishes at ~765ms, so every animation
+ * shorter than that was already finished before anything was read.
+ *
+ * Ground truth in these tests is the CSS, not a previous run's output: a
+ * `200ms` animation with one iteration and no delay settles at exactly 200.
+ */
+
+async function animPage(css: string, body = '<div id="a"></div>'): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "vlmkit-anim-"));
+  const path = join(dir, "page.html");
+  await writeFile(path, `<!doctype html><html><head><meta charset="utf-8"><style>
+    body { margin: 0; padding: 20px; background: #fff; }
+    @keyframes slide { from { transform: translateX(0); } to { transform: translateX(300px); } }
+    #a { width: 120px; height: 60px; background: #2255cc; }
+    ${css}
+  </style></head><body>${body}</body></html>`);
+  return path;
+}
+
+async function evaluate(css: string, body?: string) {
+  const source = await animPage(css, body);
+  const outputDir = await mkdtemp(join(tmpdir(), "vlmkit-anim-out-"));
+  return runAnimationEval({ source, outputDir });
+}
+
+test("runAnimationEval: settleMs is the declared duration, not zero for a finished animation", { timeout: 120_000 }, async () => {
+  // Reported 0 before the fix, for the same page, because a 200ms animation has
+  // finished by the ~765ms the collector runs. `computeSettleMs` computes
+  // `delay + duration x iterations` — a from-load number — so filtering its input
+  // by "still moving right now" mixed two clocks.
+  const report = await evaluate("#a { animation: slide 200ms linear 1 forwards; }");
+  assert.equal(report.settleMs, 200);
+});
+
+test("runAnimationEval: settleMs takes the delay and iteration count from the CSS", { timeout: 120_000 }, async () => {
+  // 300ms delay + 400ms x 2 iterations = 1100.
+  const report = await evaluate("#a { animation: slide 400ms linear 300ms 2 forwards; }");
+  assert.equal(report.settleMs, 1100);
+});
+
+test("runAnimationEval: an infinite animation makes settleMs null and is listed", { timeout: 120_000 }, async () => {
+  const report = await evaluate("#a { animation: slide 500ms linear infinite; }");
+  assert.equal(report.settleMs, null);
+  assert.deepEqual(report.infinite.map((i) => i.name), ["slide"]);
+});
+
+test("runAnimationEval: a page-paused animation counts as neither motion nor never-settling", { timeout: 120_000 }, async () => {
+  // The one exclusion that is about the page's own choice rather than about when
+  // we looked: `animation-play-state: paused` is visually static by construction.
+  const report = await evaluate("#a { animation: slide 500ms linear infinite; animation-play-state: paused; }");
+  assert.equal(report.settleMs, 0, "a paused animation must not contribute to settle");
+  assert.deepEqual(report.infinite, [], "a paused infinite animation never runs, so it is not a never-settles");
+  assert.equal(report.animationCount, 1, "it is still reported as an animation on the page");
+});
+
+test("runAnimationEval: a short animation with no reduced-motion rule is still reported", { timeout: 120_000 }, async () => {
+  // The severe one. Before the fix this page — which honours the preference
+  // nowhere — came back "No animation issues detected" with exit 0 at 150ms,
+  // 200ms and 400ms, and only started reporting at 800ms. The cutoff was not a
+  // threshold anyone chose; it was the instant the collector ran.
+  const report = await evaluate("#a { animation: slide 200ms linear 1 forwards; }");
+  assert.equal(report.reducedMotion?.remainingCount, 1);
+  assert.equal(report.reducedMotion?.remaining[0]?.durationMs, 200);
+  assert.ok(
+    report.issues.some((i) => i.kind === "reduced-motion-ignored"),
+    `expected reduced-motion-ignored, got ${JSON.stringify(report.issues.map((i) => i.kind))}`,
+  );
+});
+
+test("runAnimationEval: honouring reduced-motion keeps the gate silent", { timeout: 120_000 }, async () => {
+  // The inverse, without which the fix above would just be a stuck alarm. Both
+  // spellings a page actually uses: removing the animation, and the
+  // duration-zero trick the reduced-motion floor is there to accept.
+  const removed = await evaluate(`
+    #a { animation: slide 200ms linear 1 forwards; }
+    @media (prefers-reduced-motion: reduce) { #a { animation: none; } }
+  `);
+  assert.equal(removed.reducedMotion?.remainingCount, 0);
+  assert.ok(!removed.issues.some((i) => i.kind === "reduced-motion-ignored"));
+
+  const shortened = await evaluate(`
+    #a { animation: slide 200ms linear 1 forwards; }
+    @media (prefers-reduced-motion: reduce) { #a { animation-duration: 0.01ms !important; } }
+  `);
+  assert.equal(shortened.reducedMotion?.remainingCount, 0);
+  assert.ok(!shortened.issues.some((i) => i.kind === "reduced-motion-ignored"));
 });

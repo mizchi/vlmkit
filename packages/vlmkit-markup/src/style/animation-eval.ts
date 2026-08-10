@@ -326,7 +326,12 @@ export function deriveAnimationIssues(
   return issues;
 }
 
-const COLLECT_ANIMATIONS_SCRIPT = `(() => {
+/**
+ * Shared browser-side helpers. Kept as one string used by both scripts below,
+ * because a recorded animation and a live one must be described identically or
+ * the dedupe between them silently fails.
+ */
+const ANIMATION_HELPERS_JS = `
   function stableSelector(el) {
     if (!el || !el.tagName) return "(no target)";
     const id = el.getAttribute && el.getAttribute("id");
@@ -342,9 +347,7 @@ const COLLECT_ANIMATIONS_SCRIPT = `(() => {
     return el.tagName.toLowerCase() + ":nth-of-type(" + (siblings.indexOf(el) + 1) + ")";
   }
 
-  const anims = document.getAnimations ? document.getAnimations({ subtree: true }) : [];
-  window.__vlmkitAnims = anims;
-  return anims.map((anim, index) => {
+  function describeTiming(anim) {
     let timing = { duration: 0, delay: 0, iterations: 1, direction: "normal" };
     try {
       const computed = anim.effect && anim.effect.getComputedTiming ? anim.effect.getComputedTiming() : null;
@@ -357,28 +360,98 @@ const COLLECT_ANIMATIONS_SCRIPT = `(() => {
         };
       }
     } catch {}
-    // Palindrome detection: the first and last keyframes agree on every
-    // animated property while some keyframe in between differs — one
-    // iteration visually sweeps out and back (same effective motion as
-    // alternate, at twice the frequency).
-    let palindromic = false;
+    return timing;
+  }
+
+  // Palindrome detection: the first and last keyframes agree on every
+  // animated property while some keyframe in between differs — one
+  // iteration visually sweeps out and back (same effective motion as
+  // alternate, at twice the frequency).
+  function isPalindromic(anim) {
     try {
       const keyframes = anim.effect && anim.effect.getKeyframes ? anim.effect.getKeyframes() : [];
-      if (keyframes.length >= 3) {
-        const skip = new Set(["offset", "computedOffset", "easing", "composite"]);
-        const first = keyframes[0];
-        const last = keyframes[keyframes.length - 1];
-        const props = Object.keys(first).filter((k) => !skip.has(k));
-        palindromic = props.length > 0
-          && props.every((k) => k in last && String(first[k]) === String(last[k]))
-          && keyframes.slice(1, -1).some((mid) =>
-            props.some((k) => k in mid && String(mid[k]) !== String(first[k]))
-          );
-      }
+      if (keyframes.length < 3) return false;
+      const skip = new Set(["offset", "computedOffset", "easing", "composite"]);
+      const first = keyframes[0];
+      const last = keyframes[keyframes.length - 1];
+      const props = Object.keys(first).filter((k) => !skip.has(k));
+      return props.length > 0
+        && props.every((k) => k in last && String(first[k]) === String(last[k]))
+        && keyframes.slice(1, -1).some((mid) =>
+          props.some((k) => k in mid && String(mid[k]) !== String(first[k]))
+        );
     } catch {}
+    return false;
+  }
+
+  function animationKind(anim) {
     const ctor = anim.constructor ? anim.constructor.name : "";
-    const type = ctor === "CSSAnimation" ? "css-animation" : ctor === "CSSTransition" ? "css-transition" : "waapi";
-    const name = anim.animationName || anim.transitionProperty || anim.id || "(anonymous)";
+    return ctor === "CSSAnimation" ? "css-animation" : ctor === "CSSTransition" ? "css-transition" : "waapi";
+  }
+
+  function animationName(anim) {
+    return anim.animationName || anim.transitionProperty || anim.id || "(anonymous)";
+  }
+`;
+
+/**
+ * Record every animation as it STARTS, before the page's own scripts run.
+ *
+ * `document.getAnimations()` only reports animations that still exist, and a
+ * finished CSS animation with no `fill` mode — `animation: fadeIn 0.3s ease-out`,
+ * the ordinary spelling for an entrance animation — is removed outright. Watched
+ * on this repo's own `fixtures/css-challenge/dashboard.html` (four `.stat-card`
+ * fade-ins, 300ms, delays to 150ms), polling from navigation start:
+ *
+ *   47ms:4  151ms:4  255ms:4  358ms:3  462ms:1  564ms:0  668ms:0  771ms:0
+ *
+ * The collector runs at ~765ms, so it saw **zero animations** on a page with
+ * four, and reported `animationCount 0`, `settle 0ms` and no reduced-motion
+ * finding. `fill: forwards` stayed at 1 for the whole window, which is why the
+ * defect hid: every fixture written to test this gate used `forwards`.
+ *
+ * `animationstart` fires once per animation per iteration-zero and bubbles to
+ * the document, and the Animation object is alive when it does — so the timing
+ * can be read then and survives the object's removal. Animations still live at
+ * collection time are deduped against these records by (selector, name).
+ */
+const RECORD_ANIMATION_STARTS_SCRIPT = `(() => {
+${ANIMATION_HELPERS_JS}
+  const started = [];
+  window.__vlmkitStarted = started;
+  const record = (event) => {
+    const target = event.target;
+    if (!target || !target.getAnimations) return;
+    for (const anim of target.getAnimations()) {
+      const name = animationName(anim);
+      if (event.animationName !== undefined && name !== event.animationName) continue;
+      const timing = describeTiming(anim);
+      started.push({
+        selector: stableSelector(anim.effect && anim.effect.target ? anim.effect.target : target),
+        type: animationKind(anim),
+        name,
+        durationMs: timing.duration,
+        delayMs: timing.delay,
+        iterations: Number.isFinite(timing.iterations) ? timing.iterations : null,
+        direction: timing.direction || "normal",
+        palindromic: isPalindromic(anim),
+      });
+      return;
+    }
+  };
+  document.addEventListener("animationstart", record, true);
+  document.addEventListener("transitionstart", record, true);
+})()`;
+
+const COLLECT_ANIMATIONS_SCRIPT = `(() => {
+${ANIMATION_HELPERS_JS}
+  const anims = document.getAnimations ? document.getAnimations({ subtree: true }) : [];
+  window.__vlmkitAnims = anims;
+  return anims.map((anim, index) => {
+    const timing = describeTiming(anim);
+    const palindromic = isPalindromic(anim);
+    const type = animationKind(anim);
+    const name = animationName(anim);
     const target = anim.effect && anim.effect.target ? anim.effect.target : null;
     // Record the author-visible state BEFORE pausing for evaluation — an
     // animation the page itself holds paused is visually static and must
@@ -411,6 +484,42 @@ function pngFromBuffer(buffer: Buffer): RgbaFrame {
   };
 }
 
+/**
+ * Every animation the page ran: the ones still live at this instant, plus the ones
+ * that started and were already removed.
+ *
+ * A recorded-but-gone animation gets `index: -1` — there is no `Animation` object
+ * left to seek, so it cannot be frame-sampled — and `playState: "finished"`,
+ * which is what it is. It still counts for `animationCount`, `settleMs`,
+ * `infinite` and the reduced-motion verdict, all of which are questions about
+ * what the page did rather than about what it is doing right now.
+ *
+ * Deduped on (selector, name): the same animation appears in both sets when it is
+ * long enough to still be running, and `animationstart` also fires for each
+ * animation of a multi-name shorthand.
+ */
+async function collectAnimations(page: import("playwright").Page): Promise<AnimationTimingSample[]> {
+  const live = await page.evaluate(COLLECT_ANIMATIONS_SCRIPT) as AnimationTimingSample[];
+  const started = await page.evaluate(
+    "window.__vlmkitStarted || []",
+  ) as Omit<AnimationTimingSample, "index" | "playState" | "currentTimeMs">[];
+  const seen = new Set(live.map((t) => `${t.selector}\u0000${t.name}`));
+  const finished: AnimationTimingSample[] = [];
+  for (const record of started) {
+    const key = `${record.selector}\u0000${record.name}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    finished.push({
+      ...record,
+      index: -1,
+      playState: "finished",
+      // Its rest pose is its end, which is where it already sits.
+      currentTimeMs: record.delayMs + record.durationMs * (record.iterations ?? 1),
+    });
+  }
+  return [...live, ...finished];
+}
+
 export async function runAnimationEval(options: AnimationEvalOptions): Promise<AnimationEvalReport> {
   const viewport = options.viewport ?? { width: 1280, height: 720 };
   const samples = Math.max(1, options.samples ?? 4);
@@ -428,6 +537,10 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
   // --timeout / --wait-until / --har apply to both. Loading the two under
   // different rules would make the reduced-motion comparison meaningless.
   const loadPage = async (p: import("playwright").Page) => {
+    // Before anything the document does: an animation with no `fill` mode is
+    // removed from `getAnimations()` the moment it finishes, so it has to be
+    // caught as it starts. See RECORD_ANIMATION_STARTS_SCRIPT.
+    await p.addInitScript(RECORD_ANIMATION_STARTS_SCRIPT);
     if (options.html !== undefined) {
       await p.setContent(options.html, navigationOptions(options));
     } else {
@@ -439,13 +552,27 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
     const page = await browser.newPage({ viewport });
     await loadPage(page);
 
-    const timings = await page.evaluate(COLLECT_ANIMATIONS_SCRIPT) as AnimationTimingSample[];
-    // Settle / never-settles are about motion the page performs on its own:
-    // animations the page itself holds paused (or already finished) are
-    // visually static and must not count.
-    const runningTimings = timings.filter((t) => t.playState === "running");
-    const settleMs = computeSettleMs(runningTimings);
-    const infinite = runningTimings
+    const timings = await collectAnimations(page);
+    // Settle / never-settles are about motion the page performs on its own, so a
+    // paused animation does not count. `finished` used to be excluded here too,
+    // on the reasoning that it is "visually static" — which quietly made the
+    // whole report a race against page-load timing.
+    //
+    // `playState` is sampled once, at whatever instant the collector runs.
+    // Measured on a bare local file: `goto` returns at ~509ms and the settle
+    // finishes at ~765ms, so an animation shorter than that has already
+    // completed before anything is read. Four identical runs of one fixture
+    // disagreed with each other (`#dead` came back `running` three times and
+    // `finished` once).
+    //
+    // `computeSettleMs` computes `delay + duration x iterations` — a duration
+    // measured from the animation's own start, i.e. from load. Feeding it a set
+    // filtered by "is it still moving right now" mixed two different clocks.
+    // From-load is also the number a caller can use: a VRT harness waits from
+    // load, never from an arbitrary instant in the middle of one.
+    const selfDriven = timings.filter((t) => t.playState !== "paused" && t.playState !== "idle");
+    const settleMs = computeSettleMs(selfDriven);
+    const infinite = selfDriven
       .filter((t) => t.iterations === null)
       .map((t) => ({ selector: t.selector, name: t.name }));
 
@@ -478,8 +605,22 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
     // Seeking everything to 0 instead would put entrance animations at their
     // *start* keyframe (often `opacity: 0`), hiding descendant animations
     // under evaluation behind a transparent ancestor.
-    for (const t of timings) await seek(t.index, restTimeForAnimation(t));
-    const evaluable = timings.filter((t) => t.durationMs > 0).slice(0, maxAnimations);
+    for (const t of timings) if (t.index >= 0) await seek(t.index, restTimeForAnimation(t));
+    // `index >= 0`: a recorded-but-removed animation has no object to seek, so it
+    // cannot be frame-sampled. The formatter already prints
+    // `animations: N (evaluated M, ...)`, so the difference stays visible rather
+    // than reading as if every animation had been checked.
+    //
+    // Known limitation, and the honest bound on this fix: which animations are
+    // still live at this instant is timing-dependent, so `evaluated` — and with it
+    // `no-visible-effect` — varies run to run on a page of short `fill: none`
+    // animations (dashboard.html reports `evaluated 0` or `1` across runs while
+    // `animationCount` now stays at 4). Everything derived from declared timing is
+    // stable; only the pixel-sampled half is not. Making that half deterministic
+    // means holding animations at their start instead of merely recording them,
+    // which would erase the author-vs-us distinction in `playState` that
+    // `restTimeForAnimation` depends on — a redesign, not a filter change.
+    const evaluable = timings.filter((t) => t.index >= 0 && t.durationMs > 0).slice(0, maxAnimations);
 
     // Two back-to-back rest captures with nothing seeked in between: the
     // second becomes the evaluation baseline, and their delta exposes motion
@@ -534,10 +675,26 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       const rmPage = await browser.newPage({ viewport });
       await rmPage.emulateMedia({ reducedMotion: "reduce" });
       await loadPage(rmPage);
-      const rmTimings = await rmPage.evaluate(COLLECT_ANIMATIONS_SCRIPT) as AnimationTimingSample[];
+      const rmTimings = await collectAnimations(rmPage);
       await rmPage.close();
+      // Not `playState === "running"`. The question here is not "is it moving at
+      // this instant" but "did this page run motion for someone who asked for
+      // none", and an animation that has already finished ran. Requiring
+      // `running` made this — the gate's most consequential finding — blind to
+      // every animation shorter than the page-load settle, which is to say blind
+      // to entrance animations, the most common kind. Measured before the fix, on
+      // a page with one `slide` animation and no `prefers-reduced-motion` rule
+      // anywhere:
+      //
+      //   150ms / 200ms / 400ms  ->  exit 0, "No animation issues detected"
+      //   800ms and above        ->  exit 1, reduced-motion-ignored
+      //
+      // The cutoff is not a threshold anyone chose; it is the ~765ms the collector
+      // happens to run at. The 200ms animation still reported `durationMs: 200`
+      // and `currentTime: 200` under emulation — the page plainly ignored the
+      // preference and the evidence was in hand when it was discarded.
       const remaining = rmTimings
-        .filter((t) => t.playState === "running" && t.durationMs >= durationFloor)
+        .filter((t) => t.playState !== "paused" && t.playState !== "idle" && t.durationMs >= durationFloor)
         .map((t) => ({ selector: t.selector, name: t.name, durationMs: t.durationMs }));
       reducedMotion = { remainingCount: remaining.length, remaining };
     }
