@@ -19,7 +19,7 @@ for options.
 | `vlmkit heal` | `selector`, `markup` |
 | `vlmkit inspect` | `interact`, `explore`, `smoke` |
 | `vlmkit stress` | `i18n`, `media` |
-| `vlmkit snapshot` | `[<url>...]`, `approve`, `fix-prompt`, `stability`, `flipbook`, `report` |
+| `vlmkit snapshot` | `[<url>...]`, `approve`, `fix-prompt`, `stability`, `flipbook`, `strip`, `report` |
 | `vlmkit migration` | `compare`, `blind`, `subagent` |
 | `vlmkit workflow` | `init`, `capture`, `verify`, `approve`, `graph`, `affected`, `introspect`, `spec-verify`, `expect` |
 | Standalone | `vlmkit batch`, `vlmkit gates`, `vlmkit rules`, `vlmkit mcp`, `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit markup-loop`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
@@ -896,6 +896,47 @@ generated session URL to BiDi clients with either `VLMKIT_CRATER_BIDI_URL` or
 ```bash
 VLMKIT_CRATER_ROOT=../crater vlmkit bench --backend prescanner
 ```
+
+#### One image instead of a sequence — `snapshot strip`
+
+A flipbook animates; a strip has to be readable **as a still** — pasted into an
+issue, diffed by eye, or handed to a model, which sees one image and cannot press
+play. Same input, different job:
+
+```bash
+# A numbered sequence into one PNG (single row by default)
+vlmkit snapshot strip round-0.png round-1.png round-2.png --out rounds.png
+
+# Wrap into a grid, cap the sheet width (default 1600; 0 disables)
+vlmkit snapshot strip frames/*.png --columns 4 --max-width 1200 --out sheet.png
+```
+
+Frames are composited **in the order given**, and a glob expands
+lexicographically — so `anim-0-100.png` lands before `anim-0-20.png` and the strip
+reads backwards. The command detects that and prints the numeric order it would
+have used; zero-pad the names or list them explicitly.
+
+Frames of different sizes are placed top-left inside a uniform cell, never
+centred: a `translateX` strip is read by comparing where the element sits from
+cell to cell, and centring would subtract exactly that offset.
+
+`check animation` writes one directly, cropped per animation to the motion it
+produced:
+
+```bash
+vlmkit check animation page.html --samples 6 --strip strip.png
+# → Strip: strip.png (1526x492, 4 animation(s) x 6 sample(s))
+```
+
+One row per animation, every cell in a row sharing one crop rect. Without the crop
+each cell is the whole viewport, so a small animated element yields near-identical
+screenshots — on `fixtures/css-challenge/dashboard.html` cropping took the sheet
+from 1448x422 to 890x232 and made each row show only its own element.
+
+PNG only. A 6-sample x 4-animation sheet of that fixture is 107 KB and an uncapped
+2-up full-viewport sheet is 165 KB, so an animated- or lossy-format encoder is not
+worth a new dependency for this content (the tree carries `pngjs` and nothing else
+for images).
 
 #### Visualizing the VRT process — flipbooks + video
 

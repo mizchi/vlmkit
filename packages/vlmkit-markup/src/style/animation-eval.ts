@@ -27,12 +27,14 @@
  *   vlmkit check animation <html-or-url> --json --frames out/frames
  */
 import { mkdir, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { composeFilmstrip } from "@mizchi/vlmkit-core/filmstrip.ts";
+import { cropRegion, encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
 
 export interface AnimationTimingSample {
   /** Index into the page's animation list at capture time. */
@@ -151,6 +153,8 @@ export interface AnimationEvalReport {
   issues: AnimationEvalIssue[];
   /** Written sample frames (when --frames was passed). */
   framePaths?: string[];
+  /** Written when `stripPath` was given: one image holding every sampled frame. */
+  strip?: { path: string; columns: number; rows: number; width: number; height: number };
 }
 
 export interface AnimationEvalOptions extends PageLoadOptions {
@@ -173,6 +177,15 @@ export interface AnimationEvalOptions extends PageLoadOptions {
   skipReducedMotion?: boolean;
   /** Write each sampled frame PNG into this directory. */
   framesDir?: string;
+  /**
+   * Composite every sampled frame into ONE image at this path, one row per
+   * animation. `--frames` writes N files a reader has to open in order; this
+   * writes the sequence a reader (or a model, which cannot press play) can take
+   * in at a glance.
+   */
+  stripPath?: string;
+  /** Cap the strip's width, downscaling frames to fit. Default 1600. */
+  stripMaxWidth?: number;
 }
 
 interface RgbaFrame {
@@ -634,8 +647,12 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
     const uncontrolledMotion = restDelta.changedPixels >= minChangedPixels ? restDelta : undefined;
 
     const evaluated: EvaluatedAnimation[] = [];
+    // Grouped per animation, not one flat list: each row is cropped to its own
+    // motion bbox below, and composing needs the rows still separable.
+    const stripRows: RgbaFrame[][] = [];
     for (const timing of evaluable) {
       const frames: AnimationFrameStat[] = [];
+      const rowFrames: RgbaFrame[] = [];
       let previous = baseline;
       let motionBbox: EvaluatedAnimation["motionBbox"] = null;
       let totalChangedPixels = 0;
@@ -647,6 +664,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         const timeMs = timing.delayMs + Math.min(timing.durationMs * fraction, timing.durationMs - 1);
         await seek(timing.index, Math.max(timing.delayMs, timeMs));
         const frame = await shot(`anim-${timing.index}-${Math.round(fraction * 100)}`);
+        if (options.stripPath) rowFrames.push(frame);
         const delta = frameDelta(previous, frame, tolerance);
         frames.push({ fraction, ...delta });
         motionBbox = unionBbox(motionBbox, delta.bbox);
@@ -655,6 +673,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         previous = frame;
       }
       await seek(timing.index, restTimeForAnimation(timing));
+      if (options.stripPath && rowFrames.length > 0) stripRows.push(rowFrames);
       evaluated.push({
         ...timing,
         frames,
@@ -665,6 +684,47 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       });
     }
     await page.close();
+
+    let strip: AnimationEvalReport["strip"];
+    if (options.stripPath && stripRows.length > 0) {
+      // Crop each row to the motion this animation produced, padded a little.
+      //
+      // Without it every cell is the whole viewport, so a small animated element
+      // on a 1280x720 page yields five near-identical screenshots and the sheet
+      // shows nothing. Measured on a three-animation fixture at 560x260: cropped
+      // rows made the sheet 1448x422 -> 890x232, and each row now shows only its
+      // own element.
+      //
+      // Every cell in a row shares ONE crop rect. Cropping each cell to its own
+      // frame delta would re-centre the element per cell and subtract the very
+      // motion the row exists to show — the same reason cells are aligned
+      // top-left rather than centred in `composeFilmstrip`.
+      const PAD = 8;
+      const cropped = stripRows.flatMap((rowFrames, row) => {
+        const bbox = evaluated[row]?.motionBbox;
+        if (!bbox) return rowFrames;
+        return rowFrames.map((frame) => cropRegion(
+          frame,
+          Math.max(0, bbox.x - PAD),
+          Math.max(0, bbox.y - PAD),
+          bbox.width + PAD * 2,
+          bbox.height + PAD * 2,
+        ));
+      });
+      const sheet = composeFilmstrip(cropped, {
+        columns: samples,
+        maxWidth: options.stripMaxWidth ?? 1600,
+      });
+      await mkdir(dirname(resolve(options.stripPath)), { recursive: true });
+      await encodePng(resolve(options.stripPath), sheet);
+      strip = {
+        path: resolve(options.stripPath),
+        columns: sheet.layout.columns,
+        rows: sheet.layout.rows,
+        width: sheet.width,
+        height: sheet.height,
+      };
+    }
 
     // Behavioral reduced-motion pass: emulate and re-render, then count the
     // animations that still run with a non-trivial duration. Duration-zero
@@ -721,6 +781,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       ...(uncontrolledMotion ? { uncontrolledMotion } : {}),
       issues,
       ...(framePaths.length > 0 ? { framePaths } : {}),
+      ...(strip ? { strip } : {}),
     };
   });
 }
@@ -779,6 +840,13 @@ export function formatAnimationEvalReport(report: AnimationEvalReport): string {
   if (report.framePaths && report.framePaths.length > 0) {
     lines.push("");
     lines.push(`Frames: ${report.framePaths.length} written`);
+  }
+  if (report.strip) {
+    const s = report.strip;
+    lines.push("");
+    // The column count is the reading instruction: without it a 3x4 sheet could
+    // be four animations of three samples just as easily as three of four.
+    lines.push(`Strip: ${s.path} (${s.width}x${s.height}, ${s.rows} animation(s) x ${s.columns} sample(s))`);
   }
   return lines.join("\n");
 }

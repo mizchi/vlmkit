@@ -344,9 +344,7 @@ async function animPage(css: string, body = '<div id="a"></div>'): Promise<strin
 }
 
 async function evaluate(css: string, body?: string) {
-  const source = await animPage(css, body);
-  const outputDir = await mkdtemp(join(tmpdir(), "vlmkit-anim-out-"));
-  return runAnimationEval({ source, outputDir });
+  return runAnimationEval({ source: await animPage(css, body) });
 }
 
 test("runAnimationEval: settleMs is the declared duration, not zero for a finished animation", { timeout: 120_000 }, async () => {
