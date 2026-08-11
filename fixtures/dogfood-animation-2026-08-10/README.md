@@ -25,5 +25,24 @@ Success criterion for an attempt: `check animation`, `check a11y focus` and
 `check drift component --selector .card` all exit 0 on the attempt's copy, with
 `check integrity` still CLEAN and the brief's constraints intact.
 
+**That criterion is not fully satisfiable, and the flaw is the scenario's, not the
+tool's.** The brief requires `.card--featured` to stay visually distinguishable; since
+2026-08-10 `check drift component` judges drift from the computed style, so a
+distinguishable variant *is* a style difference and `--selector .card` cannot pass. Two
+attempts hit it — one reported "It also flags `.card--featured` at 95.87%, which the
+brief *requires* to look different", the other got past it by moving the accent into a
+property the gate did not then track, which is what put `outline-*` on the tracked list.
+
+The tool's answer is to point the gate at the instances that are meant to match:
+
+```
+vlmkit check drift component page/index.html --selector ".card:not(.card--featured)"
+# → ~ instance #1  3.37%  every property on the instance root matches …   exit 0
+```
+
+Later runs are scored on the other three gates plus that narrowed selector. The
+`--selector .card` form is kept in the criterion above as the record of what two agents
+were held to.
+
 `attempts/<letter>/` holds each agent's copy and log. Reports live in
 `docs/reports/2026-08-10-dogfood-animation-v*.md`.

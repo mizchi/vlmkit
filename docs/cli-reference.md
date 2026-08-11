@@ -946,9 +946,23 @@ vlmkit check animation page.html --samples 6 --strip-window 380 --strip cards.pn
 #   timeline (window 380ms, one shared clock); rows top to bottom are …
 ```
 
+The window defaults to **when the last finite animation ends**, not to one iteration of
+the slowest animation on the page — an infinite spinner would otherwise set the
+timebase for the entrance animations under review and most columns would show a
+settled page.
+
+`--strip-selector <css>` restricts the rows to animations on matching elements, which
+is how you keep a permanent spinner out of a sheet about card entrances. The gate still
+evaluates and reports every animation; only the image is scoped. A selector matching
+nothing animated fails with the list of what is animated.
+
 The caption is printed rather than drawn into the image: text in the sheet would make
 the output depend on font rendering, which is the class of platform-dependent pixel
 this toolkit exists to catch. Paste it under the image.
+
+Writing a strip does not change the verdict — a page with real defects still exits 1,
+which surprises a caller whose only goal was the attachment. Add `--advisory` when the
+image is the point and the exit code is not.
 
 Animations that moved no pixels get no row — they are already reported as
 `no-visible-effect`, and a row showing nothing would size the uniform cell for every
