@@ -357,6 +357,18 @@ export function formatGateHelp(gate: AnyGateDefinition): string {
   // failing default it used to opt into is now the default.
   lines.push("  --fail-on-suspect       Accepted no-op (a suspect already exits 1)");
   lines.push("  -h, --help              Show this help");
+  // Every gate's help said how to persist a *rule setting* and nothing about the
+  // flags above it, so a fix that lived in a flag read as unrepeatable. v4's repair
+  // agent, who reached green with two `--allow` declarations: "my fix lives in a
+  // shell command that a CI job would have to duplicate. I do not know whether an
+  // exemption can be committed alongside the page, and the output does not say." It
+  // can — a `"gates"` entry is a full command, tokenized quote-aware — which makes
+  // this a documentation gap rather than a missing feature.
+  lines.push("");
+  lines.push("Persisting: a `\"gates\"` entry in vlmkit.gates.json is the whole command, so any");
+  lines.push("flag above belongs there and is committed with the page. Quoted values survive:");
+  lines.push(`  "gates": ["${gateCommandString(gate)} --some-flag \\"a value with spaces\\""]`);
+  lines.push("Rule settings also have their own `\"rules\"` block.");
   return lines.join("\n");
 }
 
