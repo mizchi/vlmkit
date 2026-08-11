@@ -27,6 +27,12 @@ import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { resolveSource, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { TRACKED_PROPERTIES } from "@mizchi/vlmkit-core/computed-style-capture.ts";
+import {
+  applyDriftAllowRules,
+  parseDriftAllowRules,
+  type DriftAllowRule,
+  type ExemptedStyleDelta,
+} from "./drift-exemption.ts";
 import { extractPaletteFromFile } from "../style/palette-extract.ts";
 import { diffPalettes } from "../style/palette-diff.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
@@ -69,6 +75,11 @@ export interface ComponentConsistencyOptions {
   threshold?: number;
   /** Comparator per-pixel colour tolerance, 0-1. Default 0.1, as everywhere else. */
   pixelTolerance?: number;
+  /**
+   * `--allow` specs declaring which style differences are deliberate, e.g.
+   * `"background-color@.card--featured;variant accent"`. See `drift-exemption.ts`.
+   */
+  allow?: string[];
   viewport?: { width: number; height: number };
   /** Which instance to use as the reference. Default 0 (first match). */
   referenceIndex?: number;
@@ -82,6 +93,8 @@ export interface InstanceEntry {
   screenshotPath: string;
   /** Computed styling, for telling drift apart from different copy. */
   style?: InstanceStyle;
+  /** `class` attribute, which is what an `--allow` rule's selector part matches. */
+  classList?: string;
   bbox: { x: number; y: number; width: number; height: number };
 }
 
@@ -98,9 +111,21 @@ export interface InstanceDelta {
    * instances are styled identically and the pixel difference is their content.
    */
   styleDeltas: { property: string; reference: string; candidate: string }[];
+  /**
+   * Differences an `--allow` rule declared deliberate. Still listed — an exemption
+   * a reader cannot see is a blind spot rather than a decision.
+   */
+  exemptedStyleDeltas: ExemptedStyleDelta[];
 }
 
 export interface ComponentConsistencyReport {
+  /**
+   * `--allow` rules that matched nothing on any instance. Reported so a rule kept
+   * alive past the variant it covered gets deleted rather than quietly widening the
+   * blind spot — the property the adoption report singled out about
+   * `check integrity --allow`.
+   */
+  unusedAllowRules?: string[];
   html: string;
   selector: string;
   instanceCount: number;
@@ -124,6 +149,7 @@ export async function runComponentConsistency(
   const referenceIndex = options.referenceIndex ?? 0;
   const threshold = options.threshold ?? 0.03;
   const pixelTolerance = options.pixelTolerance ?? 0.1;
+  const allowRules = parseDriftAllowRules(options.allow ?? []);
 
   const instances: InstanceEntry[] = [];
   // `withBrowser`: the zero-match `UsageError` below is thrown from inside this
@@ -163,7 +189,14 @@ export async function runComponentConsistency(
         for (const prop of props as string[]) out[prop] = computed.getPropertyValue(prop);
         return out;
       }, STYLE_PROPERTIES);
-      instances.push({ index: i, screenshotPath, bbox, style });
+      const classList = await inst.evaluate((el) => {
+        const element = el as Element;
+        // Prefixed with `.` per class so `@.card--featured` matches as a substring the
+        // way an author writes it, and the tag name is included so `@article` works too.
+        const classes = Array.from(element.classList).map((c) => `.${c}`).join("");
+        return `${element.tagName.toLowerCase()}${classes}`;
+      });
+      instances.push({ index: i, screenshotPath, bbox, style, classList });
     }
     await page.close();
   });
@@ -174,6 +207,7 @@ export async function runComponentConsistency(
 
   const reference = instances[referenceIndex] ?? instances[0]!;
   const deltas: InstanceDelta[] = [];
+  const usedAllowRules = new Set<string>();
   for (const cand of instances) {
     if (cand.index === reference.index) continue;
     const snap: VrtSnapshot = {
@@ -201,13 +235,7 @@ export async function runComponentConsistency(
       },
       paletteOnlyInRef: paletteDiff.onlyInBaseline.length,
       paletteOnlyInCand: paletteDiff.onlyInVariant.length,
-      styleDeltas: STYLE_PROPERTIES.flatMap((property) => {
-        const ref = reference.style?.[property];
-        const value = cand.style?.[property];
-        return ref !== undefined && value !== undefined && ref !== value
-          ? [{ property, reference: ref, candidate: value }]
-          : [];
-      }),
+      ...splitDeltas(cand, reference, allowRules, usedAllowRules),
     });
   }
 
@@ -224,6 +252,9 @@ export async function runComponentConsistency(
     instances,
     deltas,
     reportPath,
+    ...(allowRules.length > 0
+      ? { unusedAllowRules: allowRules.filter((r) => !usedAllowRules.has(r.raw)).map((r) => r.raw) }
+      : {}),
   };
 }
 
@@ -260,7 +291,14 @@ export function formatComponentConsistencyReport(report: ComponentConsistencyRep
       if (d.styleDeltas.length > 6) {
         lines.push(`      ${DIM}and ${d.styleDeltas.length - 6} more propert${d.styleDeltas.length - 6 === 1 ? "y" : "ies"}${RESET}`);
       }
-    } else if (d.diffRatio > 0) {
+    }
+    for (const e of d.exemptedStyleDeltas.slice(0, 4)) {
+      lines.push(`      ${DIM}exempted ${e.property}: ${e.reference} → ${e.candidate} — ${e.reason}${RESET}`);
+    }
+    if (d.exemptedStyleDeltas.length > 4) {
+      lines.push(`      ${DIM}and ${d.exemptedStyleDeltas.length - 4} more exempted${RESET}`);
+    }
+    if (d.styleDeltas.length === 0 && d.diffRatio > 0) {
       // Deliberately NOT "not drift". The comparison is 64 computed properties on the
       // instance root, so a styling difference on a descendant or in an untracked
       // property is invisible to it, and the same agent caught the overclaim: the
@@ -275,8 +313,38 @@ export function formatComponentConsistencyReport(report: ComponentConsistencyRep
           + ` this looks like different content${RESET}`);
     }
   }
+  if (report.unusedAllowRules && report.unusedAllowRules.length > 0) {
+    // A rule that matched nothing is either stale or misspelled, and either way it is
+    // widening the blind spot for a defect that is no longer there.
+    lines.push(`  ${YELLOW}! ${report.unusedAllowRules.length} --allow rule(s) matched nothing:`
+      + ` ${report.unusedAllowRules.join(", ")}${RESET}`);
+  }
   lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
   return lines.join("\n");
+}
+
+/**
+ * Style differences split into the ones that count and the ones an `--allow` rule
+ * declared deliberate. Records which rules fired so an unused one can be reported.
+ */
+function splitDeltas(
+  cand: InstanceEntry,
+  reference: InstanceEntry,
+  rules: readonly DriftAllowRule[],
+  used: Set<string>,
+): Pick<InstanceDelta, "styleDeltas" | "exemptedStyleDeltas"> {
+  const all = STYLE_PROPERTIES.flatMap((property) => {
+    const ref = reference.style?.[property];
+    const value = cand.style?.[property];
+    return ref !== undefined && value !== undefined && ref !== value
+      ? [{ property, reference: ref, candidate: value }]
+      : [];
+  });
+  // Matched against the instance's own tag + classes rather than the gate's
+  // `--selector`, so `@.card--featured` can pick out one instance of several.
+  const applied = applyDriftAllowRules(all, cand.classList ?? "", rules);
+  for (const raw of applied.usedRaw) used.add(raw);
+  return { styleDeltas: applied.styleDeltas, exemptedStyleDeltas: applied.exempted };
 }
 
 function renderReport(

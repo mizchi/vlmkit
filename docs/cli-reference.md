@@ -897,6 +897,36 @@ generated session URL to BiDi clients with either `VLMKIT_CRATER_BIDI_URL` or
 VLMKIT_CRATER_ROOT=../crater vlmkit bench --backend prescanner
 ```
 
+#### Declaring a variant deliberate — `check drift component --allow`
+
+`check drift component` asks "these instances should look the same", and a design
+system's variants are the standing exception. Without a way to say so the gate is
+permanently red on any page with one:
+
+```bash
+vlmkit check drift component page.html --selector .card \
+  --allow "background-color@.card--featured;variant accent" \
+  --allow "border-*-color@.card--featured;variant accent"
+```
+
+```
+✗ instance #1   18.40%  Δ +28 / 0
+    padding-top: 16px → 30px            ← still fails: not declared
+    exempted border-top-color: … — user exemption (border-*-color@.card--featured): variant accent
+```
+
+Same syntax and the same two properties as `check integrity --allow`, which is the
+point: an exempted difference is **still listed** with the reason recorded, and a rule
+that matched nothing is reported (`! 1 --allow rule(s) matched nothing: …`) so a rule
+kept past the variant it covered gets deleted rather than quietly widening the blind
+spot.
+
+The unit is a **property**, not a whole instance — `"this variant may differ in its
+background and border"` is the shape of the real permission, and blessing an instance
+wholesale would hide the geometry mistake sitting next to the intentional colour. `*`
+covers a family (`padding-*`, `border-*-color`); a bare `*` is refused, because that is
+`--rule instance-drift=off` and should be written as such.
+
 #### One image instead of a sequence — `snapshot strip`
 
 A flipbook animates; a strip has to be readable **as a still** — pasted into an

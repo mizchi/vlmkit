@@ -18,6 +18,7 @@ import { basename, join, resolve } from "node:path";
 import { readAll, readFlag, readInt, readNumber } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
+import { DRIFT_ALLOW_HELP } from "../component/drift-exemption.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import {
@@ -48,7 +49,7 @@ function runSlug(source: string, selector: string): string {
   return `${name.replace(/[^A-Za-z0-9._-]+/g, "-")}-${hash}`;
 }
 
-const DRIFT_VALUE_FLAGS = ["--selector", "--output-dir", "--report", "--threshold", "--pixel-tolerance", "--reference-index"];
+const DRIFT_VALUE_FLAGS = ["--selector", "--output-dir", "--report", "--threshold", "--pixel-tolerance", "--reference-index", "--allow"];
 
 /** Options plus the threshold, which the verdict needs and the report lacks. */
 export interface ComponentDriftGateOptions extends ComponentConsistencyOptions {
@@ -98,6 +99,7 @@ tracked style property matches, so the gate can pass on a page with real content
     { name: "reference-index", placeholder: "n", kind: "number", description: "Which match is the reference", defaultDescription: "0" },
     { name: "threshold", placeholder: "0..1", kind: "number", description: "Pass line on the measured diff ratio (does not change the measurement)", defaultDescription: String(DEFAULT_THRESHOLD) },
     { name: "pixel-tolerance", placeholder: "0..1", kind: "number", description: "Comparator per-pixel colour tolerance", defaultDescription: "0.1" },
+    { name: "allow", placeholder: "<property>[@<selector>];<reason>", kind: "string", repeatable: true, description: DRIFT_ALLOW_HELP },
     { name: "output-dir", placeholder: "dir", kind: "path", description: "Output directory", defaultDescription: "./test-results/component-consistency" },
     { name: "report", placeholder: "path", kind: "path", description: "Markdown report path" },
   ],
@@ -107,6 +109,7 @@ tracked style property matches, so the gate can pass on a page with real content
     if (!selector) throw new UsageError("--selector <sel> is required (it must match at least two instances)");
     const threshold = readNumber(argv, "threshold", { min: 0, max: 1 }) ?? DEFAULT_THRESHOLD;
     const pixelTolerance = readNumber(argv, "pixel-tolerance", { min: 0, max: 1 });
+    const allow = readAll(argv, "allow");
     const referenceIndex = readInt(argv, "reference-index", { min: 0 });
     const outputDir = readFlag(argv, "output-dir");
     const reportPath = readFlag(argv, "report");
@@ -115,6 +118,7 @@ tracked style property matches, so the gate can pass on a page with real content
       selector,
       threshold,
       ...(pixelTolerance !== undefined ? { pixelTolerance } : {}),
+      ...(allow.length > 0 ? { allow } : {}),
       // Per (source, selector), not one global directory. A dogfood agent read a
       // report file that belonged to somebody else's run: "`cat
       // test-results/component-consistency/report.md` returned a *different* run —
