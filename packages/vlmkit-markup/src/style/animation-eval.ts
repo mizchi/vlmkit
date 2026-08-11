@@ -334,7 +334,18 @@ export function deriveAnimationIssues(
       kind: "infinite-animation",
       severity: "warn",
       selector: anim.selector,
-      message: `${anim.selector} animation \`${anim.name}\` runs forever — the page never settles. For VRT capture, mask it with \`vlmkit snapshot <url> --mask "${anim.selector}"\` (that flag belongs to \`snapshot\` / \`diff html\`, not to this gate) or pause animations before screenshots.`,
+      // Both original suggestions changed the *harness*, which is the one thing a
+      // "fix the page" task is not allowed to do. A dogfood agent put it plainly:
+      // "the report was 'it never holds still long enough to screenshot' — so the
+      // finding's own advice is the one thing I was not allowed to do. It never
+      // mentions the CSS-level option (bound the iteration count), which is what I
+      // did." The page-side fix goes first now; the harness ones stay for the case
+      // where the animation is meant to run forever.
+      message: `${anim.selector} animation \`${anim.name}\` runs forever — the page never settles.`
+        + ` To fix the page, give it a bounded \`animation-iteration-count\` (or stop it once its work is done).`
+        + ` If it is meant to run forever, the capture side has to absorb it instead:`
+        + ` mask it with \`vlmkit snapshot <url> --mask "${anim.selector}"\` (that flag belongs to \`snapshot\` / \`diff html\`, not to this gate)`
+        + ` or pause animations before screenshots.`,
     });
   }
 
@@ -953,14 +964,37 @@ export function formatAnimationEvalReport(report: AnimationEvalReport): string {
   lines.push("");
   lines.push(`status: ${status}`);
   lines.push(`animations: ${report.animationCount} (evaluated ${report.evaluated.length}, infinite ${report.infinite.length})`);
-  lines.push(`settle: ${report.settleMs === null ? "never (infinite animation)" : `${Math.round(report.settleMs)}ms`}`);
+  // The status block reads like the most important part of the output, so a line in
+  // it that carries no rule id sends the reader hunting. A dogfood agent: "`settle:
+  // never` and `reduced-motion: …` are status lines, not findings. They read like the
+  // most important facts in the output but carry no rule id, no severity, and no
+  // remedy of their own. I had to scroll to the `Issues:` block and re-derive which
+  // status line mapped to which rule." Each line now names the rule that carries it —
+  // and says so explicitly when nothing does, which is the `settle: never` case
+  // (`long-settle` compares a number, and there is no number when it is infinite).
+  const firedKinds = new Set(report.issues.map((issue) => issue.kind));
+  const ruleTag = (kind: AnimationEvalIssueKind) => firedKinds.has(kind) ? ` ${DIM}[${kind}]${RESET}` : "";
+  if (report.settleMs === null) {
+    lines.push(
+      `settle: never (infinite animation)`
+      + (firedKinds.has("infinite-animation")
+        ? ` ${DIM}[infinite-animation]${RESET}`
+        : ` ${DIM}(no rule covers this — \`long-settle\` needs a settle time to compare)${RESET}`),
+    );
+  } else {
+    lines.push(`settle: ${Math.round(report.settleMs)}ms${ruleTag("long-settle")}`);
+  }
   if (report.reducedMotion) {
-    lines.push(`reduced-motion: ${report.reducedMotion.remainingCount === 0 ? "honored" : `${report.reducedMotion.remainingCount} animation(s) still running`}`);
+    lines.push(
+      report.reducedMotion.remainingCount === 0
+        ? `reduced-motion: honored`
+        : `reduced-motion: ${report.reducedMotion.remainingCount} animation(s) still running${ruleTag("reduced-motion-ignored")}`,
+    );
   }
   if (report.uncontrolledMotion) {
     const m = report.uncontrolledMotion;
     const where = m.bbox ? ` at (${m.bbox.x},${m.bbox.y}) ${m.bbox.width}x${m.bbox.height}` : "";
-    lines.push(`uncontrolled motion: ${m.changedPixels}px${where} (rAF / video / GIF — frame deltas may be contaminated)`);
+    lines.push(`uncontrolled motion: ${m.changedPixels}px${where} (rAF / video / GIF — frame deltas may be contaminated)${ruleTag("uncontrolled-motion")}`);
   }
   if (report.evaluated.length > 0) {
     lines.push("");
