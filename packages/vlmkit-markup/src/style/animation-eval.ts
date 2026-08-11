@@ -310,9 +310,12 @@ export interface DeriveIssuesInput {
 
 export function deriveAnimationIssues(
   input: DeriveIssuesInput,
-  options: { settleThresholdMs?: number } = {},
+  options: { settleThresholdMs?: number; reducedMotionDurationFloorMs?: number } = {},
 ): AnimationEvalIssue[] {
   const settleThreshold = options.settleThresholdMs ?? 3000;
+  // Quoted in the reduced-motion remedy, so the number the caller is told to get under
+  // is the number the gate actually measures against.
+  const durationFloor = options.reducedMotionDurationFloorMs ?? 100;
   const issues: AnimationEvalIssue[] = [];
 
   for (const anim of input.evaluated) {
@@ -359,9 +362,17 @@ export function deriveAnimationIssues(
       kind: "reduced-motion-ignored",
       severity: "suspect",
       ...(sample ? { selector: sample.selector } : {}),
-      message: `${input.reducedMotion.remainingCount} animation(s) still run under \`prefers-reduced-motion: reduce\` emulation` +
-        (sample ? ` (e.g. ${sample.selector} \`${sample.name}\` ${sample.durationMs}ms)` : "") +
-        " — motion is not reduced for users who requested it.",
+      // Names every animation it can and says what would satisfy it. A dogfood agent:
+      // "`reduced-motion-ignored` is attributed to an arbitrary element
+      // (`h1:nth-of-type(1)`, 'e.g.') for a page-wide problem, and never says what would
+      // satisfy it — I guessed a global media query." The guess was right; it should not
+      // have been a guess.
+      message: `${input.reducedMotion.remainingCount} animation(s) still run under \`prefers-reduced-motion: reduce\` emulation: `
+        + `${input.reducedMotion.remaining.slice(0, 4).map((r) => `${r.selector} \`${r.name}\` ${Math.round(r.durationMs)}ms`).join(", ")}`
+        + `${input.reducedMotion.remaining.length > 4 ? `, and ${input.reducedMotion.remaining.length - 4} more` : ""}`
+        + ` — motion is not reduced for users who requested it.`
+        + ` Add \`@media (prefers-reduced-motion: reduce)\` and either set \`animation: none\` on them`
+        + ` or shorten each duration below ${durationFloor}ms.`,
     });
   }
 
@@ -790,13 +801,21 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
       // the timebase for the entrance animations someone is reviewing. Only when
       // *everything* is infinite does one iteration of the longest become the window,
       // because then there is nothing else to go on.
-      const finiteEnds = evaluated
+      // Over `rows`, not `evaluated`: the window has to be about the animations the
+      // sheet actually shows. v2 fixed an infinite animation setting the timebase; v3
+      // found the same mistake one level in — a *dead* finite animation still setting
+      // it. The gate printed "h1 `bump` (400ms) produced no visible pixel change" and
+      // then used that 400ms as the window, while the three rows it drew ended at 250,
+      // 310 and 370ms, so the last column was a duplicate of the settled state and the
+      // agent computed 370 out of the CSS by hand: "Window = when the last *selected,
+      // visible* animation ends is information it has and did not use."
+      const finiteEnds = rows
         .filter((a) => a.iterations !== null)
         .map((a) => a.delayMs + a.durationMs * (a.iterations ?? 1));
       const windowMs = options.stripWindowMs
         ?? (finiteEnds.length > 0
           ? Math.max(1, ...finiteEnds)
-          : Math.max(1, ...evaluated.map((a) => a.delayMs + a.durationMs)));
+          : Math.max(1, ...rows.map((a) => a.delayMs + a.durationMs)));
       const times = Array.from({ length: samples }, (_, i) => Math.round((windowMs * (i + 1)) / samples));
 
       const PAD = 8;
@@ -902,7 +921,10 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         ...(reducedMotion ? { reducedMotion } : {}),
         ...(uncontrolledMotion ? { uncontrolledMotion } : {}),
       },
-      { settleThresholdMs: options.settleThresholdMs },
+      {
+        settleThresholdMs: options.settleThresholdMs,
+        reducedMotionDurationFloorMs: options.reducedMotionDurationFloorMs,
+      },
     );
 
     return {

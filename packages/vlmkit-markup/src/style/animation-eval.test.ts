@@ -660,3 +660,50 @@ test("runAnimationEval: a --strip-selector matching nothing animated says what i
     },
   );
 });
+
+test("runAnimationEval: a dead animation does not set the strip's window either", { timeout: 120_000 }, async () => {
+  // v2 stopped an infinite animation from setting the timebase; v3 found the same
+  // mistake one level in. The gate printed "h1 `bump` (400ms) produced no visible pixel
+  // change" and then used that 400ms as the window, while the rows it drew ended at
+  // 370ms — so the last column duplicated the settled state and the agent computed 370
+  // out of the CSS by hand: "Window = when the last *selected, visible* animation ends
+  // is information it has and did not use."
+  const { mkdtemp } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const source = await animPage(
+    `@keyframes dead { from { z-index: 1; } to { z-index: 9; } }
+     #a { animation: slide 200ms linear 1 forwards; }
+     #corpse { animation: dead 900ms linear 1 forwards; }`,
+    '<div id="a"></div><div id="corpse">x</div>',
+  );
+  const report = await runAnimationEval({
+    source,
+    samples: 2,
+    stripPath: join(await mkdtemp(join(tmpdir(), "vlmkit-deadwin-")), "strip.png"),
+  });
+  assert.ok(
+    report.evaluated.some((a) => a.name === "dead" && !a.visible),
+    "the dead animation is still evaluated and reported",
+  );
+  assert.equal(report.strip?.rows, 1, "but it gets no row");
+  assert.equal(report.strip?.windowMs, 200, "and it does not set the window either");
+});
+
+test("runAnimationEval: --strip-selector also narrows the window to the selected rows", { timeout: 120_000 }, async () => {
+  const { mkdtemp } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const source = await animPage(
+    `.pick { width: 60px; height: 30px; background: #248; animation: slide 200ms linear 1 forwards; }
+     #other { width: 60px; height: 30px; background: #a22; animation: slide 900ms linear 1 forwards; }`,
+    '<div class="pick"></div><div id="other"></div>',
+  );
+  const report = await runAnimationEval({
+    source,
+    samples: 2,
+    stripSelector: ".pick",
+    stripPath: join(await mkdtemp(join(tmpdir(), "vlmkit-scopewin-")), "strip.png"),
+  });
+  assert.equal(report.strip?.windowMs, 200, "the 900ms animation is out of scope, so out of the window");
+});

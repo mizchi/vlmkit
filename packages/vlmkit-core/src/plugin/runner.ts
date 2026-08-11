@@ -406,6 +406,24 @@ export async function runGateCli<Report, Options>(
   }
   const outcome = await runGate(gate, argv, options);
   out(outcome.text);
+  // Say when warns did not fail the command, and name the flag that makes one fail.
+  //
+  // A dogfood agent working to a "these gates exit 0" criterion nearly shipped the very
+  // defect it was sent to fix: "`check animation` exits 0 while printing `settle: never
+  // (infinite animation)`. That is verbatim the reported bug […] demoted to `warn`. Had
+  // I trusted the success criterion I'd have shipped it broken. There is
+  // `--fail-on-suspect` (documented as `Accepted no-op`) but no `--fail-on-warn`."
+  //
+  // The escalation existed the whole time — `--rule <id>=suspect` exits 1 — and was
+  // findable only by reading the rule-settings docs. A passing run that is hiding a warn
+  // should say so on the spot, not in a document.
+  if (outcome.exitCode === 0 && outcome.counts.warn > 0 && !shared.json) {
+    const ids = [...new Set(outcome.findings.filter((f) => f.severity === "warn").map((f) => f.rule))];
+    out(
+      `${DIM}  ${outcome.counts.warn} warn(s) did not fail this command.`
+      + ` To gate on one: --rule ${ids[0]}=suspect${ids.length > 1 ? ` (also: ${ids.slice(1).join(", ")})` : ""}${RESET}`,
+    );
+  }
   // Under --json the breakdown is already inside the envelope; appending it to
   // stdout as prose would put non-JSON on a stream a client is parsing.
   if (shared.timing && !shared.json) out(formatGateTiming(outcome));

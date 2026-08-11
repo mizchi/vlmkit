@@ -223,7 +223,15 @@ export function analyzeScrollSamples(
       .map((o) => `${o.selector} (right edge ${o.right}px)`)
       .join(", ");
     const detail = causes.length > 0
-      ? ` — caused by: ${causes.map((o) => `${o.selector} (${o.width}px wide; constraining it removes ${o.relieves}px of the overflow)`).join(", ")}`
+      // Where the element ENDS, and both terms that put it there. The message used to
+      // read "(130px wide; constraining it removes 46px of the overflow)", which is
+      // arithmetically true and diagnostically wrong: a dogfood agent noted "The cause
+      // was `left: 660px`, not the width. Shrinking the button as instructed would have
+      // 'fixed' integrity and left the tab order broken." Naming only the width
+      // prescribes the one change that is usually not the fix.
+      ? ` — caused by: ${causes.map((o) =>
+        `${o.selector} (extends to x=${o.right}px: starts at ${Math.round(o.right - o.width)}px, ${o.width}px wide;`
+        + ` shrinking or moving it removes ${o.relieves}px of the overflow)`).join(", ")}`
       : (widest ? ` — sticking out: ${widest}` : "");
     issues.push({
       kind: "page-overflow-x",
