@@ -382,7 +382,10 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   const stale = sharded.expired.length;
   if (json) console.log(JSON.stringify({ config: path, expiredSuppressions: stale, ...summary }, null, 2));
   else {
-    console.log(formatBatchSummary(summary, { showOutput: hasFlag(args, "show-output") }));
+    console.log(formatBatchSummary(summary, {
+      showOutput: hasFlag(args, "show-output"),
+      ...(output ? { outputDir: output } : {}),
+    }));
     if (stale > 0) {
       console.log("");
       console.log(`${RED}${stale} suppression(s) expired${RESET} — stale config fails the run even when the gates pass.`);

@@ -162,6 +162,9 @@ describe("jobLogName", () => {
   });
 });
 
+/** ANSI out, so an assertion matches the words rather than the colour codes. */
+const strip = (t: string) => t.replace(/\x1B\[[0-9;]*m/g, "");
+
 describe("formatBatchSummary", () => {
   const job = (over: Partial<BatchJobResult> = {}): BatchJobResult => ({
     gate: "check design",
@@ -206,6 +209,54 @@ describe("formatBatchSummary", () => {
       { showOutput: true },
     );
     assert.match(text, /verdict: DEFECTS/);
+  });
+
+  it("separates a gate that found defects from one that never ran", () => {
+    // v5's CI agent, on four gates that all died in navigation: "`verdict: 4 FAILED
+    // (0 passed)` with zero reasons and no distinction between 'gate found defects'
+    // and 'gate never ran'. CI cannot tell a broken page from a broken harness."
+    const text = strip(formatBatchSummary(summary([
+      job({ page: "ok.html" }),
+      job({ page: "bad.html", exitCode: 1, output: "verdict: DEFECTS (1 fail)" }),
+      job({
+        page: "http://localhost:1/",
+        exitCode: 1,
+        output: "error: page load timed out after 30000ms waiting for `networkidle`\n  1 request(s) still open:",
+      }),
+    ])));
+    assert.match(text, /1 FAILED, 1 DID NOT RUN \(1 passed\)/);
+    // And the reason is inline, because re-running to find out why the harness broke
+    // is a whole extra cycle and in CI there may not be one.
+    assert.match(text, /did not run: error: page load timed out after 30000ms/);
+  });
+
+  it("keeps the plain FAILED count when every failure is a real report", () => {
+    const text = strip(formatBatchSummary(summary([
+      job({ page: "bad.html", exitCode: 1, output: "status: suspect\n\nIssues:" }),
+    ])));
+    assert.match(text, /1 FAILED \(0 passed\)/);
+    assert.doesNotMatch(text, /DID NOT RUN/);
+  });
+
+  it("counts a --json report as having run, since a report needs no prose", () => {
+    const text = strip(formatBatchSummary(summary([
+      job({ page: "bad.html", exitCode: 1, output: '{"findings":[{"kind":"page-overflow-x"}]}' }),
+    ])));
+    assert.doesNotMatch(text, /DID NOT RUN/);
+    // Truncated JSON is not a report.
+    const cut = strip(formatBatchSummary(summary([
+      job({ page: "bad.html", exitCode: 1, output: '{"findings":[' }),
+    ])));
+    assert.match(cut, /DID NOT RUN/);
+  });
+
+  it("points at the log directory instead of offering the flag that was just passed", () => {
+    const text = strip(formatBatchSummary(
+      summary([job({ page: "bad.html", exitCode: 1, output: "verdict: DEFECTS" })]),
+      { outputDir: "/tmp/logs" },
+    ));
+    assert.match(text, /Full logs: \/tmp\/logs/);
+    assert.doesNotMatch(text, /pass --output <dir>/);
   });
 
   it("surfaces the slowest jobs, which is what sharding has to balance", () => {
