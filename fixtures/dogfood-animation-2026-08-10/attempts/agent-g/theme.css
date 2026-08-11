@@ -3,23 +3,35 @@ h1 { font-size: 22px; margin: 0 0 20px; }
 h2 { font-size: 16px; margin: 0 0 6px; }
 p { margin: 0; font-size: 14px; color: #444; }
 
-.toolbar { position: relative; height: 56px; margin-bottom: 24px; }
-.btn { position: absolute; top: 8px; width: 130px; height: 36px; border: 1px solid #333; border-radius: 6px; background: #fff; font-size: 14px; }
-#publish { left: 660px; }
-#save    { left: 20px; }
-#discard { left: 340px; }
+/* Toolbar: laid out in flow so the visual left-to-right order matches the DOM
+   order (Publish, Save draft, Discard). The previous absolute `left:` values
+   put Publish (first in the DOM) at x=660 and Save at x=20, so keyboard focus
+   jumped right-to-left, and Publish pushed the page 46px past a 768px
+   viewport. Flex items shrink, so nothing overflows at 375px either. */
+.toolbar { display: flex; align-items: center; gap: 12px; min-height: 56px; margin-bottom: 24px; }
+.btn { width: 130px; height: 36px; border: 1px solid #333; border-radius: 6px; background: #fff; font-size: 14px; }
 
 .cards { display: flex; gap: 16px; }
 .card { width: 220px; padding: 16px; border: 2px solid #333; border-radius: 8px; background: #fff; }
-.card--featured { padding: 30px; background: #eef3ff; border-color: #2255cc; }
+/* Featured card stays distinguishable by colour (tinted fill + accent border)
+   but keeps the other two cards' box geometry, so it is not a layout drift. */
+.card--featured { background: #eef3ff; border-color: #2255cc; }
 
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 .card { animation: rise 250ms ease-out; }
 .card:nth-child(2) { animation-delay: 60ms; }
 .card:nth-child(3) { animation-delay: 120ms; }
 
+/* The spinner used to run `infinite`, so the page never settled and could not
+   be used as a VRT baseline. A bounded run still reads as "loading" but lets
+   the page go still. */
 @keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
-.spinner { width: 28px; height: 28px; margin-top: 24px; border: 3px solid #ddd; border-top-color: #2255cc; border-radius: 50%; animation: spin 900ms linear infinite; }
+.spinner { width: 28px; height: 28px; margin-top: 24px; border: 3px solid #ddd; border-top-color: #2255cc; border-radius: 50%; animation: spin 900ms linear 2; }
 
-@keyframes bump { from { z-index: 1; } to { z-index: 4; } }
-h1 { animation: bump 400ms linear; }
+/* `h1 { animation: bump }` animated only `z-index`, which paints nothing here:
+   a declared animation that moves no pixels. Removed rather than "fixed",
+   since the brief only asks for an entrance animation on the cards. */
+
+@media (prefers-reduced-motion: reduce) {
+  .card, .card:nth-child(2), .card:nth-child(3), .spinner { animation: none; }
+}
