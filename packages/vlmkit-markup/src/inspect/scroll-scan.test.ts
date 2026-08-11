@@ -140,3 +140,64 @@ test("formatScrollScanReport renders inventory and issues", () => {
   assert.match(text, /page-overflow-x/);
   assert.match(text, /expectedScrollports/);
 });
+
+test("names the shortfall when the measured cause explains only part of the overflow", () => {
+  // Two rigid siblings in one row: probed individually, neutralizing either leaves the
+  // other overflowing, so both measure 0 and no single element can be blamed. Reporting
+  // only the named cause made a 77-of-439px answer read as the whole story, and v4's
+  // repair agent had to work the remainder out from flex-shrink by hand.
+  const report = analyzeScrollSamples(input({
+    page: {
+      viewportWidth: 375,
+      viewportHeight: 720,
+      scrollWidth: 814,
+      scrollHeight: 900,
+      overflowOffenders: [
+        { selector: "#publish", right: 814, width: 130, relieves: 77 },
+        { selector: ".card:nth-of-type(2)", right: 500, width: 220, relieves: 0 },
+        { selector: ".card:nth-of-type(3)", right: 760, width: 220, relieves: 0 },
+      ],
+    },
+  }));
+  const issue = report.issues.find((i) => i.kind === "page-overflow-x");
+  assert.ok(issue);
+  assert.match(issue!.message, /#publish/);
+  // 439 total minus the 77 the named cause relieves.
+  assert.match(issue!.message, /leaves 362px, which no single element relieves/);
+  assert.match(issue!.message, /2 other element\(s\) past the edge were probed individually/);
+});
+
+test("stays quiet about a shortfall when the named cause accounts for all of it", () => {
+  const report = analyzeScrollSamples(input({
+    page: {
+      viewportWidth: 768,
+      viewportHeight: 720,
+      scrollWidth: 814,
+      scrollHeight: 900,
+      overflowOffenders: [{ selector: "#publish", right: 814, width: 130, relieves: 46 }],
+    },
+  }));
+  const issue = report.issues.find((i) => i.kind === "page-overflow-x");
+  assert.ok(issue);
+  assert.doesNotMatch(issue!.message, /no single element relieves/);
+});
+
+test("does not sum overlapping relief into a claim larger than the overflow", () => {
+  // Two independently positioned elements can each relieve the same overflow, so the
+  // accounted figure is the best single fix, not the total.
+  const report = analyzeScrollSamples(input({
+    page: {
+      viewportWidth: 375,
+      viewportHeight: 720,
+      scrollWidth: 475,
+      scrollHeight: 900,
+      overflowOffenders: [
+        { selector: ".a", right: 475, width: 200, relieves: 100 },
+        { selector: ".b", right: 470, width: 200, relieves: 100 },
+      ],
+    },
+  }));
+  const issue = report.issues.find((i) => i.kind === "page-overflow-x");
+  assert.ok(issue);
+  assert.doesNotMatch(issue!.message, /no single element relieves/);
+});
