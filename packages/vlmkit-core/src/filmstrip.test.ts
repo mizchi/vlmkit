@@ -126,3 +126,72 @@ describe("filmstrip compositing", () => {
     assert.throws(() => composeFilmstrip([]), /at least one frame/);
   });
 });
+
+describe("filmstrip labels", () => {
+  const RED2: [number, number, number] = [255, 0, 0];
+
+  it("reserves a band instead of drawing over the frames", () => {
+    // A label composited on top of a cell would cover the pixels the sheet exists to
+    // show. It has to cost height, not content.
+    const frames = [solid(10, 10, RED2), solid(10, 10, RED2)];
+    const bare = composeFilmstrip(frames, { gap: 0, padding: 0 });
+    const labelled = composeFilmstrip(frames, { gap: 0, padding: 0, columnLabels: ["0ms", "1ms"] });
+    assert.equal(labelled.width, bare.width, "a column label must not widen the sheet");
+    assert.ok(labelled.height > bare.height, "a column label must reserve height");
+    assert.equal(labelled.layout.columnLabelBand, labelled.height - bare.height);
+    // Every frame pixel still reads as the frame, shifted down by the band.
+    assert.deepEqual(pixel(labelled, 0, labelled.layout.positions[0]!.y), [255, 0, 0, 255]);
+  });
+
+  it("shifts every row by its own label band, so a row label never overlaps the row above", () => {
+    const frames = Array.from({ length: 4 }, () => solid(10, 10, RED2));
+    const sheet = composeFilmstrip(frames, {
+      columns: 2,
+      gap: 0,
+      padding: 0,
+      rowLabels: ["a", "b"],
+    });
+    const band = sheet.layout.rowLabelBand;
+    assert.ok(band > 0);
+    assert.equal(sheet.layout.positions[0]!.y, band);
+    assert.equal(sheet.layout.positions[2]!.y, band + sheet.layout.cell.height + band);
+    assert.equal(sheet.height, (sheet.layout.cell.height + band) * 2);
+  });
+
+  it("draws no band when no labels are given, so existing sheets are byte-identical", () => {
+    const frames = [solid(6, 6, RED2)];
+    const sheet = composeFilmstrip(frames, { gap: 0, padding: 0 });
+    assert.equal(sheet.layout.columnLabelBand, 0);
+    assert.equal(sheet.layout.rowLabelBand, 0);
+    assert.equal(sheet.width, 6);
+    assert.equal(sheet.height, 6);
+  });
+
+  it("writes ink into the label band", () => {
+    const sheet = composeFilmstrip([solid(40, 10, RED2)], {
+      gap: 0,
+      padding: 0,
+      columnLabels: ["250ms"],
+      labelColor: [0, 255, 0],
+    });
+    let green = 0;
+    for (let y = 0; y < sheet.layout.columnLabelBand; y++) {
+      for (let x = 0; x < sheet.width; x++) {
+        const [r, g, b] = pixel(sheet, x, y);
+        if (r === 0 && g === 255 && b === 0) green++;
+      }
+    }
+    assert.ok(green > 0, "the label band contains no label ink");
+  });
+
+  it("ignores labels beyond the grid rather than throwing", () => {
+    const sheet = composeFilmstrip([solid(8, 8, RED2)], {
+      gap: 0,
+      padding: 0,
+      columnLabels: ["a", "b", "c"],
+      rowLabels: ["r1", "r2"],
+    });
+    assert.equal(sheet.layout.columns, 1);
+    assert.equal(sheet.layout.rows, 1);
+  });
+});

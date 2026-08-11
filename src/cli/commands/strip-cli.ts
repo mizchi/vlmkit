@@ -37,12 +37,16 @@ function usage(): string {
     "  --scale <n>         Downscale every frame by this factor",
     "  --max-width <px>    Cap the sheet width, downscaling to fit (default 1600; 0 disables)",
     "  --quality <0-100>   Lossy WebP quality; omit for lossless (smaller for UI screenshots)",
+    "  --label <text>      Column label, repeatable, in order. Drawn into the image itself",
+    "  --row-label <text>  Row label, repeatable, in order (needs --columns)",
+    "  --label-scale <n>   Label size, 1 unit = 5x7px (default 2)",
     "",
     "  A `.webp` output extension encodes WebP (needs the optional @jsquash/webp).",
     "",
     "Examples:",
     "  vlmkit snapshot strip frames/anim-*.png --out strip.png",
     "  vlmkit snapshot strip round-0.png round-1.png round-2.png --columns 3 --out rounds.png",
+    "  vlmkit snapshot strip f-0.png f-1.png --label 0ms --label 250ms --out strip.png",
   ].join("\n");
 }
 
@@ -55,6 +59,13 @@ interface StripArgs {
   maxWidth?: number;
   /** Lossy WebP quality. Omitted means lossless, which is smaller here anyway. */
   quality?: number;
+  /**
+   * Labels drawn into the sheet. A strip is made to be pasted somewhere the terminal
+   * is not, so what a cell means has to travel with the pixels.
+   */
+  labels: string[];
+  rowLabels: string[];
+  labelScale?: number;
 }
 
 function readNumber(argv: string[], index: number, flag: string): number {
@@ -74,6 +85,9 @@ function parseArgs(argv: string[]): StripArgs {
   let scale: number | undefined;
   let maxWidth: number | undefined;
   let quality: number | undefined;
+  const labels: string[] = [];
+  const rowLabels: string[] = [];
+  let labelScale: number | undefined;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
@@ -97,6 +111,15 @@ function parseArgs(argv: string[]): StripArgs {
       case "--quality":
         quality = readNumber(argv, ++i, "--quality");
         break;
+      case "--label":
+        labels.push(argv[++i] ?? "");
+        break;
+      case "--row-label":
+        rowLabels.push(argv[++i] ?? "");
+        break;
+      case "--label-scale":
+        labelScale = readNumber(argv, ++i, "--label-scale");
+        break;
       case "-h":
       case "--help":
         console.log(usage());
@@ -116,6 +139,9 @@ function parseArgs(argv: string[]): StripArgs {
     ...(scale !== undefined ? { scale } : {}),
     ...(maxWidth !== undefined ? { maxWidth } : {}),
     ...(quality !== undefined ? { quality } : {}),
+    labels,
+    rowLabels,
+    ...(labelScale !== undefined ? { labelScale } : {}),
   };
 }
 
@@ -180,6 +206,9 @@ async function main(): Promise<void> {
     ...(parsed.gap !== undefined ? { gap: parsed.gap } : {}),
     ...(parsed.scale !== undefined ? { scale: parsed.scale } : {}),
     ...(cap > 0 ? { maxWidth: cap } : {}),
+    ...(parsed.labels.length > 0 ? { columnLabels: parsed.labels } : {}),
+    ...(parsed.rowLabels.length > 0 ? { rowLabels: parsed.rowLabels } : {}),
+    ...(parsed.labelScale !== undefined ? { labelScale: parsed.labelScale } : {}),
   });
 
   await mkdir(dirname(resolve(parsed.out)), { recursive: true });

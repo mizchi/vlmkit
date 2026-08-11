@@ -7,12 +7,16 @@
  * at a glance without opening anything, and a sequence you want to hand to a
  * model, which sees one image and cannot press play.
  *
- * Pure pixel arithmetic — no browser, no fonts, no I/O. That is deliberate:
- * rendering the sheet in Chromium would give labels for free and make the output
- * depend on font rendering, which is precisely the kind of platform-dependent
- * pixel this toolkit exists to catch elsewhere.
+ * Pure pixel arithmetic — no browser, no I/O. That is deliberate: rendering the
+ * sheet in Chromium would give labels for free and make the output depend on font
+ * rendering, which is precisely the kind of platform-dependent pixel this toolkit
+ * exists to catch elsewhere. Labels still happen, from `bitmap-font.ts` — glyphs
+ * we own, identical on every platform — because a sheet with no labels is only
+ * readable next to the terminal that produced it, and its whole job is to be
+ * pasted somewhere else.
  */
 import type { PngData } from "./png-utils.ts";
+import { drawText, fitText, textHeight } from "./bitmap-font.ts";
 
 export interface FilmstripOptions {
   /**
@@ -43,6 +47,21 @@ export interface FilmstripOptions {
    * A 4-sample strip of 1280x720 frames is 5192px wide untouched.
    */
   maxWidth?: number;
+  /**
+   * One label per column, drawn in a band above the grid. For a shared-clock strip
+   * these are the sample times, which is the axis the sheet is read along.
+   */
+  columnLabels?: readonly string[];
+  /**
+   * One label per row, drawn in a band above that row's cells — above rather than
+   * in a left gutter, because a row label is a CSS selector and a gutter wide
+   * enough for one would dominate a sheet of 200px cells.
+   */
+  rowLabels?: readonly string[];
+  /** Integer pixel size of one font unit. Default 2, i.e. 10x14 glyphs. */
+  labelScale?: number;
+  /** Label ink, RGB. Default near-white, for the default grey sheet. */
+  labelColor?: readonly [number, number, number];
 }
 
 export interface FilmstripLayout {
@@ -54,9 +73,16 @@ export interface FilmstripLayout {
   positions: readonly { x: number; y: number }[];
   /** Scale actually applied, after `maxWidth` was taken into account. */
   scale: number;
+  /** Height reserved above the grid for column labels; 0 when there are none. */
+  columnLabelBand: number;
+  /** Height reserved above each row for its label; 0 when there are none. */
+  rowLabelBand: number;
 }
 
 const DEFAULT_BACKGROUND = [96, 96, 96] as const;
+const DEFAULT_LABEL_COLOR = [240, 240, 240] as const;
+/** Breathing room under a label band, so ink does not touch the frame below it. */
+const LABEL_PAD = 3;
 
 /** Nearest-neighbour, matching `image-resize.ts`: hard edges stay legible small. */
 function scalePngData(src: PngData, factor: number): PngData {
@@ -114,11 +140,21 @@ export function filmstripLayout(
     height: Math.max(...scaled.map((s) => s.height)),
   };
 
-  const positions = frames.map((_, i) => ({
-    x: padding + (i % columns) * (cell.width + gap),
-    y: padding + Math.floor(i / columns) * (cell.height + gap),
-  }));
-  return { cell, columns, rows, positions, scale };
+  // Label bands are part of the geometry, not an overlay: text drawn on top of a
+  // frame would cover the pixels the sheet exists to show.
+  const labelScale = Math.max(1, Math.round(options.labelScale ?? 2));
+  const band = textHeight(labelScale) + LABEL_PAD;
+  const columnLabelBand = options.columnLabels && options.columnLabels.length > 0 ? band : 0;
+  const rowLabelBand = options.rowLabels && options.rowLabels.length > 0 ? band : 0;
+
+  const positions = frames.map((_, i) => {
+    const row = Math.floor(i / columns);
+    return {
+      x: padding + (i % columns) * (cell.width + gap),
+      y: padding + columnLabelBand + row * (cell.height + gap + rowLabelBand) + rowLabelBand,
+    };
+  });
+  return { cell, columns, rows, positions, scale, columnLabelBand, rowLabelBand };
 }
 
 /**
@@ -141,7 +177,8 @@ export function composeFilmstrip(
   const [bgR, bgG, bgB] = options.background ?? DEFAULT_BACKGROUND;
 
   const width = padding * 2 + layout.columns * layout.cell.width + gap * (layout.columns - 1);
-  const height = padding * 2 + layout.rows * layout.cell.height + gap * (layout.rows - 1);
+  const height = padding * 2 + layout.columnLabelBand
+    + layout.rows * (layout.cell.height + layout.rowLabelBand) + gap * (layout.rows - 1);
   const data = new Uint8Array(width * height * 4);
   for (let i = 0; i < data.length; i += 4) {
     data[i] = bgR;
@@ -174,6 +211,29 @@ export function composeFilmstrip(
       }
     }
   });
+
+  // Labels last, so nothing composited over them. Each is clipped to its own cell
+  // width: a selector longer than its column truncates rather than running into the
+  // next one, which would make two labels read as one.
+  const sheet = { width, height, data };
+  const labelScale = Math.max(1, Math.round(options.labelScale ?? 2));
+  const ink = options.labelColor ?? DEFAULT_LABEL_COLOR;
+  if (layout.columnLabelBand > 0) {
+    options.columnLabels!.slice(0, layout.columns).forEach((label, col) => {
+      const x = padding + col * (layout.cell.width + gap);
+      drawText(sheet, fitText(label, layout.cell.width, labelScale), x, padding, ink, labelScale);
+    });
+  }
+  if (layout.rowLabelBand > 0) {
+    // Row labels get the full sheet width, not one cell: a row label names the whole
+    // row, and there is nothing to its right to collide with.
+    const rowWidth = width - padding * 2;
+    options.rowLabels!.slice(0, layout.rows).forEach((label, row) => {
+      const y = padding + layout.columnLabelBand
+        + row * (layout.cell.height + gap + layout.rowLabelBand);
+      drawText(sheet, fitText(label, rowWidth, labelScale), padding, y, ink, labelScale);
+    });
+  }
 
   return { width, height, data, layout };
 }

@@ -986,9 +986,25 @@ is how you keep a permanent spinner out of a sheet about card entrances. The gat
 evaluates and reports every animation; only the image is scoped. A selector matching
 nothing animated fails with the list of what is animated.
 
-The caption is printed rather than drawn into the image: text in the sheet would make
-the output depend on font rendering, which is the class of platform-dependent pixel
-this toolkit exists to catch. Paste it under the image.
+**The sheet labels itself**: sample times across the top, `selector animation-name`
+above each row, drawn from a built-in 5x7 bitmap font rather than a system one. The
+worry that stopped this earlier was that text makes output depend on font rendering —
+true for a VRT baseline, but a strip is an attachment, nothing pixel-compares it, and a
+sheet whose rows are identified only in the terminal is unreadable the moment it is
+pasted anywhere else. Owning the glyphs keeps both: identical bytes on every platform,
+no fontconfig, no web font to race the screenshot. A row label longer than the sheet
+truncates with `..` from the end, so the head that maps it back to the terminal survives.
+
+The fuller caption — window, sample list, omission counts — is still printed rather than
+drawn, since it is prose. Paste it under the image.
+
+`snapshot strip` takes labels explicitly, `--label` per column and `--row-label` per
+row, both repeatable and in order, with `--label-scale <n>` for size (1 unit = 5x7px,
+default 2):
+
+```bash
+vlmkit snapshot strip f-0.png f-1.png f-2.png --label 0ms --label 125ms --label 250ms --out strip.png
+```
 
 Writing a strip does not change the verdict — a page with real defects still exits 1,
 which surprises a caller whose only goal was the attachment. Add `--advisory` when the

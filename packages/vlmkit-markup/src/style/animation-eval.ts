@@ -860,9 +860,17 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         ));
       });
 
+      // Labels in the image, because the terminal does not travel with it. v1 found
+      // this ("no labels at all — no row selector, no time per cell; that data is
+      // terminal-only") and v4's evidence agent named it the one thing left to change:
+      // "this artifact is *not* a baseline — it is an attachment whose whole job is to
+      // be read by a human out of context." Column labels are the shared-clock times,
+      // which is the axis the whole sheet is read along.
       const sheet = composeFilmstrip(cells, {
         columns: samples,
         maxWidth: options.stripMaxWidth ?? 1600,
+        columnLabels: times.map((t) => `${t}ms`),
+        rowLabels: rows.map((anim) => `${anim.selector} ${anim.name}`),
       });
       await mkdir(dirname(resolve(options.stripPath)), { recursive: true });
       // `--strip strip.webp` encodes WebP; the extension is the whole switch.
