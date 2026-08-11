@@ -82,7 +82,13 @@ network to replay. Pass a URL and it fails as a missing file.`,
       id: "instance-drift",
       title: "Instance is styled differently from the reference",
       severity: "suspect",
-      docs: "Raise the pass line with --threshold rather than disabling the rule. `--threshold` does not change the measured ratio; `--pixel-tolerance` does.",
+      // `--allow` leads, because this rule fires on tracked computed style and
+      // `--threshold` is a pass line on the pixel ratio — a different number. v4's
+      // repair agent was sent the wrong way by the old wording: "`Raise the pass line
+      // with --threshold rather than disabling the rule` actively pointed me toward the
+      // wrong lever — `--threshold` would have been a blunt fudge; `--allow` was the
+      // correct, reviewable one."
+      docs: "For a deliberate variant, declare the properties with --allow \"<property>[@<selector>];<reason>\" — the difference stays listed and a stale rule is reported. --threshold is a pass line on the *pixel ratio*, which is not what this rule reads. `--threshold` does not change the measured ratio; `--pixel-tolerance` does.",
     },
     {
       id: "instance-content-differs",

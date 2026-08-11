@@ -126,6 +126,8 @@ export interface ComponentConsistencyReport {
    * `check integrity --allow`.
    */
   unusedAllowRules?: string[];
+  /** How many `--allow` rules the run was given, so the report can offer the flag to someone who has not used it. */
+  allowRuleCount: number;
   html: string;
   selector: string;
   instanceCount: number;
@@ -252,6 +254,7 @@ export async function runComponentConsistency(
     instances,
     deltas,
     reportPath,
+    allowRuleCount: allowRules.length,
     ...(allowRules.length > 0
       ? { unusedAllowRules: allowRules.filter((r) => !usedAllowRules.has(r.raw)).map((r) => r.raw) }
       : {}),
@@ -268,6 +271,12 @@ export function formatComponentConsistencyReport(report: ComponentConsistencyRep
   lines.push(`  ${BOLD}${CYAN}vlmkit check drift component${RESET}`);
   lines.push(`  ${DIM}html: ${report.html}  selector: ${report.selector}${RESET}`);
   lines.push(`  ${DIM}${report.instanceCount} instance(s), reference = #${report.referenceIndex}${RESET}`);
+  // Said once, at the top, because the pixel percentage is the number a reader's eye
+  // lands on and it is not the number that gates. v4's repair agent proved how far
+  // that goes wrong: "instance #1 read `9.15%` while instance #2 read `4.45%` — yet #1
+  // was ✗ and #2 was ~. […] After `--allow`, instance #1 still prints `9.15%` and now
+  // passes, so the same number means 'fail' and 'pass' in two runs."
+  lines.push(`  ${DIM}verdict is set by tracked computed style; the pixel % is context, not the pass line${RESET}`);
   for (const d of report.deltas) {
     const pct = (d.diffRatio * 100).toFixed(2);
     // The icon follows the computed style, not the pixel count. A pixel ratio cannot
@@ -279,8 +288,17 @@ export function formatComponentConsistencyReport(report: ComponentConsistencyRep
       : d.diffRatio === 0
         ? `${GREEN}✓${RESET}`
         : `${YELLOW}~${RESET}`;
+    // And the verdict in words next to the icon, so the row states its own reason
+    // rather than leaving the reader to infer it from which number moved.
+    const verdict = d.styleDeltas.length > 0
+      ? `${d.styleDeltas.length} tracked propert${d.styleDeltas.length === 1 ? "y" : "ies"} differ`
+      : d.exemptedStyleDeltas.length > 0
+        ? `all ${d.exemptedStyleDeltas.length} difference(s) exempted`
+        : d.diffRatio === 0
+          ? "identical"
+          : "no tracked property differs";
     const whDelta = `Δ ${d.bboxDeltas.width > 0 ? "+" : ""}${d.bboxDeltas.width} / ${d.bboxDeltas.height > 0 ? "+" : ""}${d.bboxDeltas.height}`;
-    lines.push(`  ${icon} instance #${d.candidateIndex}  ${pct.padStart(6)}%  ${DIM}${whDelta}${RESET}`);
+    lines.push(`  ${icon} instance #${d.candidateIndex}  ${verdict.padEnd(30)}  ${DIM}${pct.padStart(6)}% px  ${whDelta}${RESET}`);
     if (d.styleDeltas.length > 0) {
       // The properties are the actionable part: an agent told to "replace the inline
       // markup with the shared component invocation" on markup that was already
@@ -313,6 +331,18 @@ export function formatComponentConsistencyReport(report: ComponentConsistencyRep
           + ` this looks like different content${RESET}`);
     }
   }
+  // The escape hatch was documented only in `--help`, which is not where a reader of a
+  // failing run is looking. v4's repair agent found it there and said what it cost:
+  // "Nothing in the four gates' default output hints that an intentional-variant escape
+  // hatch exists. […] The failing output itself says nothing like 'if this difference is
+  // intentional, declare it with `--allow`' — which is where an agent would actually
+  // read it." It was also pointed at the wrong lever: the rule's docs offered
+  // `--threshold`, a blunt fudge, where `--allow` is the reviewable answer.
+  const failing = report.deltas.find((d) => d.styleDeltas.length > 0);
+  if (failing && report.allowRuleCount === 0) {
+    lines.push(`  ${DIM}if a difference is intentional, declare it — it stays listed and a stale rule is reported:${RESET}`);
+    lines.push(`  ${DIM}  --allow "${failing.styleDeltas[0].property}${variantScope(report, failing.candidateIndex)};<why>"${RESET}`);
+  }
   if (report.unusedAllowRules && report.unusedAllowRules.length > 0) {
     // A rule that matched nothing is either stale or misspelled, and either way it is
     // widening the blind spot for a defect that is no longer there.
@@ -321,6 +351,22 @@ export function formatComponentConsistencyReport(report: ComponentConsistencyRep
   }
   lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
   return lines.join("\n");
+}
+
+/**
+ * The `@<selector>` part of a suggested `--allow`, scoped to what actually makes this
+ * instance a variant: a class it has and the reference does not. Without one the
+ * suggestion is left unscoped rather than guessed, since an over-broad exemption is
+ * exactly the failure mode `--allow` is built to avoid.
+ */
+function variantScope(report: ComponentConsistencyReport, candidateIndex: number): string {
+  // `classList` here is the instance's selector — `article.card.card--featured` — so the
+  // classes are `.`-separated and the first segment is the tag name, not a class.
+  const classesOf = (index: number) =>
+    (report.instances.find((i) => i.index === index)?.classList ?? "").split(".").slice(1).filter(Boolean);
+  const refClasses = new Set(classesOf(report.referenceIndex));
+  const only = classesOf(candidateIndex).find((c) => !refClasses.has(c));
+  return only ? `@.${only}` : "";
 }
 
 /**
