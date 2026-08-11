@@ -41,6 +41,15 @@ export interface BatchJob {
   gate: string;
   /** One page: a file path or a URL. */
   page: string;
+  /**
+   * Working directory for the gate process. Defaults to this process's.
+   *
+   * `vlmkit gates run` sets it to the config file's own directory, so a relative
+   * path inside the config (`--har dashboard.har`, a `source` glob) resolves
+   * against the config rather than against wherever the command was typed. See
+   * the note on `runJobs`.
+   */
+  cwd?: string;
 }
 
 export interface BatchJobResult extends BatchJob {
@@ -176,6 +185,7 @@ function runJob(job: BatchJob, cliEntry: string): Promise<BatchJobResult> {
   const started = Date.now();
   return new Promise((resolveJob) => {
     const child = spawn(process.execPath, args, {
+      ...(job.cwd ? { cwd: job.cwd } : {}),
       stdio: ["ignore", "pipe", "pipe"],
       // The child is one more gate run; it must not inherit the marker that
       // tells a leaf module "you are the CLI entry".

@@ -16,7 +16,7 @@
  */
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { UsageError, handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { hasFlag, readAll, readFlag, readInt } from "@mizchi/vlmkit-core/arg-reader.ts";
@@ -68,11 +68,14 @@ async function loadConfig(explicit?: string): Promise<{ path: string; config: Ga
  * (`routes:routes/about.html`), so `--only` and per-page sharding still address
  * the group by the name the config gave it.
  */
-export async function expandPlanSources(plan: GatePlan): Promise<GatePlan> {
+export async function expandPlanSources(plan: GatePlan, baseDir?: string): Promise<GatePlan> {
   const expansions = new Map<string, string[]>();
   for (const job of plan.jobs) {
     if (expansions.has(job.source)) continue;
-    expansions.set(job.source, await resolvePages([job.source]));
+    // Globs expand against the CONFIG's directory when one is given, matching
+    // where the gate processes will run. Omitted (library callers, tests) keeps
+    // the process cwd.
+    expansions.set(job.source, await resolvePages([job.source], baseDir));
   }
   const jobs: GatePlan["jobs"] = [];
   for (const job of plan.jobs) {
@@ -304,7 +307,22 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   await validateAgainstRegistry(declared, path);
   // `suppressions` is an inventory of the config, so it must not depend on the
   // filesystem: a broken glob should not hide what has been silenced.
-  const plan = sub === "suppressions" ? declared : await expandPlanSources(declared);
+  // Everything relative inside the config — a `source` glob, a `--har` or
+  // `--manifest` path on a gate string — resolves against the CONFIG FILE, not
+  // against wherever the command was typed. v5's CI agent hit the old behaviour on
+  // the exact invocation this repo's own workflows use:
+  //
+  //   "`gates run --config fixtures/.../vlmkit.gates.json` from repo root dies with
+  //    `page.routeFromHAR: ENOENT … open '/home/user/vlmkit/dashboard.har'` and a
+  //    Playwright stack trace, not a config error. A committed config whose paths
+  //    work from only one directory is not committed."
+  //
+  // Its workaround was `cd "$(dirname "$0")"` in a wrapper script, documented in
+  // the script as a workaround. For a config at the repo root — where nearly all
+  // of them live — this changes nothing, since the base and the cwd are the same
+  // directory.
+  const baseDir = dirname(resolve(path));
+  const plan = sub === "suppressions" ? declared : await expandPlanSources(declared, baseDir);
 
   if (sub === "list") {
     if (json) console.log(JSON.stringify({ config: path, ...plan }, null, 2));
@@ -353,7 +371,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     console.error("");
   }
   const summary: BatchSummary = await runJobs(
-    sharded.jobs.map((j) => ({ gate: j.gate, page: j.source })),
+    sharded.jobs.map((j) => ({ gate: j.gate, page: j.source, cwd: baseDir })),
     {
       ...(concurrency !== undefined ? { concurrency } : {}),
       ...(shard ? { shard } : {}),

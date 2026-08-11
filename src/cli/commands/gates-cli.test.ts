@@ -40,6 +40,28 @@ describe("expandPlanSources", () => {
     assert.deepEqual(plan.jobs.map((j) => j.source.replace(`${dir}/`, "")), ["a.html", "b.html", "c.html"]);
   });
 
+  it("expands a relative glob against the config's directory, not the process cwd", async () => {
+    // v5's CI agent, on the exact invocation this repo's own workflows use:
+    // "`gates run --config fixtures/.../vlmkit.gates.json` from repo root dies with
+    //  `ENOENT … open '/home/user/vlmkit/dashboard.har'` … A committed config whose
+    //  paths work from only one directory is not committed." Sources are the same
+    // class of relative path as that `--har`, so they resolve from the same base.
+    const plan = await expandPlanSources(
+      planFor({ pages: [{ id: "routes", source: "*.html", gates: ["check integrity"] }] }),
+      dir,
+    );
+    assert.deepEqual(plan.jobs.map((j) => j.source), ["a.html", "b.html", "c.html"]);
+  });
+
+  it("keeps resolving against the process cwd when no base is given", async () => {
+    // Library callers and `gates suppressions` pass none; that path must not start
+    // silently resolving somewhere else.
+    await assert.rejects(
+      expandPlanSources(planFor({ pages: [{ id: "x", source: "definitely-not-here-*.html", gates: ["check integrity"] }] })),
+      /matched no files/,
+    );
+  });
+
   it("prefixes expanded ids with the config's own name so --only still addresses the group", async () => {
     const plan = await expandPlanSources(planFor({
       pages: [{ id: "routes", source: `${dir}/*.html`, gates: ["check integrity"] }],
