@@ -178,3 +178,112 @@ describe("launch-failure diagnosis at the helper", () => {
     }
   });
 });
+
+/**
+ * The fourth property, added after two dogfood agents independently reported the
+ * navigation timeout as a dead end: a page opened by this helper explains its own
+ * timeout. Instrumenting at the launch rather than at `navigatePage` is deliberate
+ * — there are 42 `.goto(` call sites and three of them hand-roll the same options
+ * object, so a fix at one navigation helper reaches a fraction of them.
+ */
+describe("navigation timeout diagnosis", () => {
+  /** A stub page whose `goto` fails the way Playwright's does. */
+  function stubBrowser(gotoError: Error, requests: string[] = []) {
+    const handlers = new Map<string, ((r: { url(): string }) => void)[]>();
+    const page = {
+      on(event: string, fn: (r: { url(): string }) => void) {
+        handlers.set(event, [...(handlers.get(event) ?? []), fn]);
+      },
+      async goto(_url: string, _options?: unknown) {
+        // Fire the request events the real browser would have fired before the
+        // navigation gave up, so the pending set is non-empty.
+        for (const url of requests) {
+          for (const fn of handlers.get("request") ?? []) fn({ url: () => url });
+        }
+        throw gotoError;
+      },
+    };
+    return { close: async () => {}, newPage: async () => page };
+  }
+
+  async function timeoutMessage(gotoOptions: unknown, requests: string[]): Promise<string> {
+    const original = BROWSER_ENGINES.chromium;
+    BROWSER_ENGINES.chromium = {
+      launch: async () => stubBrowser(new Error("Timeout 30000ms exceeded"), requests),
+    } as never;
+    try {
+      return await withBrowser(async (browser) => {
+        const page = await browser.newPage();
+        try {
+          await page.goto("http://localhost:1/", gotoOptions as never);
+          return "did not throw";
+        } catch (e) {
+          return e instanceof Error ? e.message : String(e);
+        }
+      });
+    } finally {
+      BROWSER_ENGINES.chromium = original;
+    }
+  }
+
+  it("names the milestone, the open requests, and the flag that ends the wait", async () => {
+    const message = await timeoutMessage(
+      { waitUntil: "networkidle", timeout: 30_000 },
+      ["http://localhost:1/api/live", "http://localhost:1/api/poll"],
+    );
+    assert.match(message, /waiting for `networkidle`/);
+    assert.match(message, /2 request\(s\) still open/);
+    assert.match(message, /api\/live/);
+    // The way out has to be in the failure, not only in `--help`: that is the
+    // whole finding.
+    assert.match(message, /--wait-until load/);
+    assert.match(message, /--har/);
+    // And the one thing that does NOT help, said so nobody spends a round on it.
+    assert.match(message, /Raising `--timeout` will not help/);
+  });
+
+  it("does not offer the networkidle advice when a different milestone timed out", async () => {
+    const message = await timeoutMessage({ waitUntil: "load", timeout: 5000 }, []);
+    assert.match(message, /waiting for `load`/);
+    assert.match(message, /after 5000ms/);
+    assert.doesNotMatch(message, /networkidle needs every connection/);
+    assert.match(message, /Raise `--timeout <ms>`/);
+  });
+
+  it("names Playwright's own default milestone when the call site passed none", async () => {
+    // 42 call sites; some pass nothing. The message must still say what it waited
+    // on rather than inventing `networkidle`.
+    const message = await timeoutMessage(undefined, []);
+    assert.match(message, /waiting for `load`/);
+  });
+
+  it("leaves a non-timeout navigation error untouched, so the other branches still diagnose it", async () => {
+    const original = BROWSER_ENGINES.chromium;
+    const refused = new Error("net::ERR_CONNECTION_REFUSED at http://localhost:1/");
+    BROWSER_ENGINES.chromium = { launch: async () => stubBrowser(refused) } as never;
+    try {
+      const thrown = await withBrowser(async (browser) => {
+        const page = await browser.newPage();
+        try {
+          await page.goto("http://localhost:1/");
+          return null;
+        } catch (e) {
+          return e;
+        }
+      });
+      assert.equal(thrown, refused, "the original error object must reach cli-error.ts unwrapped");
+    } finally {
+      BROWSER_ENGINES.chromium = original;
+    }
+  });
+
+  it("survives a backend that does not implement newPage", async () => {
+    const original = BROWSER_ENGINES.chromium;
+    BROWSER_ENGINES.chromium = { launch: async () => ({ close: async () => {} }) } as never;
+    try {
+      assert.equal(await withBrowser(async () => "ran"), "ran");
+    } finally {
+      BROWSER_ENGINES.chromium = original;
+    }
+  });
+});

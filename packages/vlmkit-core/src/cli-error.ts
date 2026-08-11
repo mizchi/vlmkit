@@ -290,7 +290,13 @@ export function formatCliError(e: unknown): string | null {
     } else if (/invalid URL/i.test(msg)) reason = "not a valid URL";
     return `error: cannot load ${url}: ${reason}`;
   }
-  // Playwright timeout.
+  // Already diagnosed by `navigatePage`, which knows the milestone it waited on and
+  // what was still in flight. Pass it through whole rather than re-deriving a worse
+  // version of it from the string — and match before the bare-timeout branch below,
+  // since the enriched message deliberately does not contain Playwright's wording.
+  if (/^page load timed out after \d+ms waiting for/.test(msg)) return `error: ${msg}`;
+  // Playwright timeout from a call site that has not been routed through
+  // `navigatePage` yet. Kept as the floor, not the goal.
   if (/Timeout \d+ms exceeded/i.test(msg)) {
     return `error: page load timed out (${msg.match(/Timeout \d+ms exceeded[^.]*/i)?.[0] ?? msg})`;
   }

@@ -269,6 +269,23 @@ describe("formatCliError", () => {
     assert.match(text, /page load timed out \(Timeout 30000ms exceeded\)/);
   });
 
+  it("passes through a diagnosis navigatePage already made, rather than re-deriving a worse one", () => {
+    // `browser-launch.ts` names the milestone, the still-open requests and the flag
+    // that ends the wait. That message deliberately does not contain Playwright's
+    // "Timeout 30000ms exceeded" wording, so this branch has to match first or the
+    // whole explanation is replaced by one line — or dumped as a stack trace.
+    const explained = new Error(
+      "page load timed out after 30000ms waiting for `networkidle`\n"
+      + "  1 request(s) still open:\n"
+      + "    http://localhost:5199/api/live (open 30.0s)\n"
+      + "  Try `--wait-until load`",
+    );
+    const text = formatCliError(explained);
+    assert.ok(text?.startsWith("error: page load timed out after 30000ms waiting for `networkidle`"));
+    assert.match(text!, /api\/live/);
+    assert.match(text!, /--wait-until load/);
+  });
+
   it("returns null for an error it has nothing to add to", () => {
     // Not a generic summary: an unrecognized error must reach the developer with
     // its stack intact, which is what `handleCliError` does with a null.
