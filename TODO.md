@@ -1054,6 +1054,22 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     詰まるが、現在の「均一グリッド」という単純さを崩す。読みやすさは損なわれていないので
     優先度低。
 
+- [ ] **strip は行ごとに切り出すので「要素の空間的な並び」が消える(2026-08-10 dogfood v4)**
+  - agent-h の指摘: 「3 枚のカードが**横並び**であるという事実がシートから失われる。
+    キャプションがなければ各行は『1 列の 3 状態』と読める」。行ごとの motion bbox クロップ
+    が正しく働いた結果で、バグではない — クロップを外すと 1 セルがビューポート全体になり、
+    小さな要素は 6 枚のほぼ同一スクリーンショットになる(v1 で実測、1448x422 → 890x232)。
+  - 直すなら: 「時間軸 × 行」と「空間配置」の両方を 1 枚に収める別レイアウト
+    (例: 各列をビューポート全体の縮小 + 行を motion bbox クロップの 2 段組)。
+    現行のグリッドの拡張ではなく新しい構図。
+  - 着手条件: レビュアーが実際に空間配置を読み違えた事例が出たら。
+
+- [ ] **dogfood の次ラウンドは別ページで(2026-08-10 v4 の結論)**
+  - v4 で「測定が間違っている」系の指摘が **0 件**になり、残る 6 件はすべて出力の読みやすさ。
+    ただし 6 件全部が**同じ 4 ゲート・同じページ**由来で、シナリオが新しい種類の欠陥を
+    産まなくなった。予算をさらに絞るより、別のページ(別の欠陥クラス)で回すべき。
+  - 詳細: `docs/reports/2026-08-10-dogfood-animation-v4.md` の「Has it converged?」
+
 ### Benchmarks
 - [ ] **markup-agent モデル横断ベンチ: OpenRouter + pi でモデルごとの性能比較**(関連: Issue #88)
   - 目的: S7-fresh A/B(Haiku 4.5 vs Sonnet — `docs/reports/2026-07-28-verifier-tooling-and-s6.md` 追記3)を Anthropic 外のモデルへ拡張し、markup-agent ループの model×cost 表を作る。既存の vlm-bench(Stage-1 VLM 比較)とは別物 — こちらは**エージェント本体**(vision 読み + CSS 執筆 + verify markup ループ運転)の比較。
