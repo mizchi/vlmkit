@@ -58,9 +58,22 @@ async function runGate(gate: AnyGateDefinition, argv: string[]): Promise<unknown
   return gate.run(gate.parse(argv, ctx), ctx);
 }
 
-/** True when the failure is the navigation timeout, not something unrelated. */
+/**
+ * True when the failure is the navigation timeout, not something unrelated — and
+ * when it explains itself.
+ *
+ * This used to match Playwright's raw `Timeout 1500ms exceeded`. Two dogfood agents
+ * called that message a dead end (it names neither the milestone waited on nor the
+ * request still open), so `browser-launch.ts` now replaces it at the launch. Matching
+ * the enriched shape here is what proves the replacement reaches gate code paths and
+ * not just a unit test: these cases drive real gates through their own parse/run.
+ */
 function isNavigationTimeout(error: unknown): boolean {
-  return /Timeout .*exceeded/.test(String((error as Error)?.message ?? error));
+  const message = String((error as Error)?.message ?? error);
+  if (!/page load timed out after \d+ms waiting for `\w+`/.test(message)) return false;
+  // The way out has to travel with the failure. `networkidle` is what every one of
+  // these cases waits on, so the relaxation advice must be present.
+  return /--wait-until load/.test(message) && /--har/.test(message);
 }
 
 describe("--wait-until / --timeout reach the browser on a never-idle page", () => {
