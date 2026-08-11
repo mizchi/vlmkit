@@ -340,6 +340,63 @@ export function buildDesignSampleScript(excludeSelectors: readonly string[] = []
  * Judge role coherence. Pure so the thresholds are unit-testable without a
  * browser.
  */
+/**
+ * The signature's fields, in the order the collector joins them. Kept next to the
+ * only consumer that needs to name them, so a field added to the collector without
+ * a label here shows up as `field 9` rather than as a silently wrong name.
+ */
+const SIGNATURE_FIELDS = [
+  "padding-top", "padding-right", "padding-bottom", "padding-left",
+  "border-radius", "border-width", "background-color",
+  "font-size", "font-weight",
+] as const;
+
+/**
+ * Which signature terms differ between two samples, as property names.
+ *
+ * `described` collapses several fields into one phrase (`border 1` is the width
+ * only, `bg` is the colour), so two styles can print the same words while differing
+ * in a property neither phrase mentions. This compares the raw signature instead.
+ *
+ * A text-free element is compared on the box alone, matching how it was grouped —
+ * otherwise the answer would name `font-size` on an icon button whose inherited font
+ * paints nothing, which is the #112 false positive this gate already refuses to make.
+ */
+function describeSignatureDelta(reference: DesignSample, candidate: DesignSample): string {
+  const textFree = reference.textFree === true || candidate.textFree === true;
+  const a = ((textFree ? reference.boxSignature : reference.signature) ?? "").split("|");
+  const b = ((textFree ? candidate.boxSignature : candidate.signature) ?? "").split("|");
+  const differing: string[] = [];
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if (a[i] === b[i]) continue;
+    differing.push(`${SIGNATURE_FIELDS[i] ?? `field ${i}`} ${a[i] ?? "-"} → ${b[i] ?? "-"}`);
+  }
+  // Capped: the question this answers is "one property or several?", and a style
+  // that differs in everything answers it with the count. Listing all nine terms
+  // buries the narrow case that made this worth printing.
+  const NAMED = 3;
+  if (differing.length <= NAMED) return differing.join(", ");
+  return `${differing.slice(0, NAMED).join(", ")} and ${differing.length - NAMED} more`;
+}
+
+/**
+ * Does this style have the shape of a third-party widget's own controls?
+ *
+ * No painted text, no padding, no radius, no background — a bare icon box. An app's
+ * own button role practically never looks like this, and when such a style becomes
+ * the DOMINANT one it means vendor DOM outnumbered the page's own components, which
+ * is #112 item 4 exactly. Used only to decide whether to mention `--exclude`, so a
+ * false positive costs one sentence.
+ */
+function looksLikeVendorChrome(sample: DesignSample): boolean {
+  if (sample.textFree !== true) return false;
+  const box = (sample.boxSignature ?? "").split("|");
+  const zeroPadding = box.slice(0, 4).every((v) => v === "0");
+  const noRadius = box[4] === "0";
+  const noBackground = /rgba\(0, 0, 0, 0\)|transparent/.test(box[6] ?? "");
+  return zeroPadding && noRadius && noBackground;
+}
+
 export function judgeDesignPolicy(
   input: DesignPolicyInput,
   options: Pick<DesignPolicyOptions, "minReuse" | "minInstances" | "outlierMaxUses"> = {},
@@ -409,20 +466,45 @@ export function judgeDesignPolicy(
     const ranked = [...counts.entries()].sort((a, b) => b[1].length - a[1].length);
     const dominant = ranked[0]!;
     const minority = ranked.slice(1);
-    const examples = minority.slice(0, 3).map(([, els]) =>
-      `${els[0]!.selector} (${els[0]!.described})`
-    );
+    // Name the properties that actually differ from the dominant style, not just both
+    // fingerprints. Two of them can print identical terms — `border 1` on each side
+    // while the real delta is `border-color` — and a dogfood agent had to open the
+    // stylesheet to find out: "Both styles print `border 1`; the actual delta is
+    // `background` *and* `border-color`, and border-color is never shown. I opened
+    // the stylesheet to learn whether the deviation was one property or two."
+    const examples = minority.slice(0, 3).map(([, els]) => {
+      const differing = describeSignatureDelta(dominant[1][0]!, els[0]!);
+      return `${els[0]!.selector} (${els[0]!.described})`
+        + (differing ? ` — differs in ${differing}` : "");
+    });
     findings.push({
       kind: "component-drift",
       severity: "warn",
       role,
       message:
         `${list.length} "${role}" elements render ${signatures} distinct styles `
-        + `(each style reused only ${reuse}x; a system reuses each style ${minReuse}x or more). `
+        // `reuse` is instances/styles — an average, and it used to be printed as
+        // "each style reused only 1.5x", which contradicted the very next sentence
+        // ("Dominant style, used 2x") and described a count no style had. The same
+        // agent: "No style is used 1.5 times. […] I could not tune the gate into
+        // agreement with itself, and had to reverse-engineer the formula."
+        + `(used ${ranked.map(([, els]) => `${els.length}x`).slice(0, 4).join(", ")}`
+        + `${ranked.length > 4 ? ", …" : ""}; `
+        + `a system reuses each style ${minReuse}x or more, and this role averages ${reuse}x). `
         + `Dominant style, used ${dominant[1].length}x: ${dominant[1][0]!.described}. `
         + `Deviating: ${examples.join("; ")}`
         + (minority.length > 3 ? ` and ${minority.length - 3} more.` : ".")
-        + ` This reports inconsistency, not which style is correct.`,
+        + ` This reports inconsistency, not which style is correct.`
+        // The escape hatch #112 asked for, offered where the problem appears. Two
+        // agents found `--exclude` only by opening `--help`, and one of them pointed
+        // out that the gate has the evidence to suggest it: a dominant style that
+        // paints no text in a zero-padding, zero-radius, transparent box is vendor
+        // chrome, not a design decision.
+        + (looksLikeVendorChrome(dominant[1][0]!)
+          ? ` The dominant style paints no text and has no padding, radius or background`
+            + ` — that shape is usually a third-party widget's own controls. If it is not yours,`
+            + ` exclude its subtree: --exclude "<selector>" (the exclusion is reported, not silent).`
+          : ""),
     });
   }
 
