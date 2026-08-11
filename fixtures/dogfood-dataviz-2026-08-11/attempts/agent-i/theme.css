@@ -25,7 +25,10 @@ body {
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(3, 240px);
+  /* Fluid track count: never demands more width than the viewport has, so the
+     page does not scroll horizontally at tablet width (was: repeat(3, 240px),
+     which needed 816px and overflowed by 24px at 768px). */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 240px));
   gap: 24px;
   padding: 24px;
 }
@@ -43,7 +46,8 @@ body {
 .status {
   margin: 0;
   font-size: 13px;
-  color: #a8a8a8;
+  /* #a8a8a8 on #fff was 2.38:1. #595959 is 7.0:1 — passes AA for body text. */
+  color: #595959;
 }
 
 .vendorchart-ctrl-group {

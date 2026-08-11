@@ -1,0 +1,33 @@
+{
+  "jobs": [
+    {
+      "gate": "check integrity --wait-until domcontentloaded --timeout 15000 --har dashboard.har",
+      "page": "http://localhost:5202/",
+      "exitCode": 1,
+      "durationMs": 2518
+    },
+    {
+      "gate": "check copy --wait-until domcontentloaded --timeout 15000 --har dashboard.har",
+      "page": "http://localhost:5202/",
+      "exitCode": 1,
+      "durationMs": 1568
+    },
+    {
+      "gate": "check breakpoints --wait-until domcontentloaded --timeout 15000 --har dashboard.har",
+      "page": "http://localhost:5202/",
+      "exitCode": 0,
+      "durationMs": 1719
+    },
+    {
+      "gate": "check design --wait-until domcontentloaded --timeout 15000 --har dashboard.har --exclude \".vendorchart-ctrl-group\"",
+      "page": "http://localhost:5202/",
+      "exitCode": 0,
+      "durationMs": 1200
+    }
+  ],
+  "passed": 2,
+  "failed": 2,
+  "wallMs": 2776,
+  "serialMs": 7005,
+  "concurrency": 3
+}

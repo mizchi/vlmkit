@@ -1,0 +1,13 @@
+[1m[36mvlmkit check integrity[0m
+[2msource: http://localhost:5202/[0m
+
+verdict: [31mDEFECTS[0m (1 fail, 3 warn, 0 exempted)
+[2m  1280x800: 8 component(s), ink 2.3%, 14 text block(s)[0m
+[2m  768x900: 8 component(s), ink 3.2%, 14 text block(s)[0m
+[2m  375x700: 8 component(s), ink 7.7%, 14 text block(s)[0m
+
+Findings:
+  [31mx[0m [page-overflow-x] @768: The page scrolls horizontally by 24px at 768px viewport width — caused by: main.grid > section:nth-of-type(3) (extends to x=792px: starts at 552px, 240px wide; shrinking or moving it removes 24px of the overflow); 3 other element(s) past the edge were probed and each accounts for 0px or less.
+  [33m![0m [low-contrast-text] main.grid > section:nth-of-type(1) > p:nth-of-type(2) @1280,768,375: main.grid > section:nth-of-type(1) > p:nth-of-type(2) renders "Above the alert line since 09:12" at contrast 2.38:1 (rgb(168, 168, 168) on rgb(255, 255, 255)) — below the 3:1 floor even for large text.
+  [33m![0m [low-contrast-text] main.grid > section:nth-of-type(2) > p:nth-of-type(2) @1280,768,375: main.grid > section:nth-of-type(2) > p:nth-of-type(2) renders "Within budget" at contrast 2.38:1 (rgb(168, 168, 168) on rgb(255, 255, 255)) — below the 3:1 floor even for large text.
+  [33m![0m [low-contrast-text] main.grid > section:nth-of-type(3) > p:nth-of-type(2) @1280,768,375: main.grid > section:nth-of-type(3) > p:nth-of-type(2) renders "TODO: confirm the denominator with the …" at contrast 2.38:1 (rgb(168, 168, 168) on rgb(255, 255, 255)) — below the 3:1 floor even for large text.
