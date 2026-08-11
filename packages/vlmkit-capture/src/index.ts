@@ -49,6 +49,7 @@ export {
 export {
   isPlaywrightSandboxRestrictionError,
   formatPlaywrightLaunchError,
+  diagnoseSandboxLaunchFailure,
 } from "./playwright-launch-error.ts";
 
 // ---- Cloudflare Browser Run Quick Actions ----

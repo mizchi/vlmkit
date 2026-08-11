@@ -21,9 +21,10 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { type PageLoadWaitUntil, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export interface PerfOptions {
   source: string;
@@ -32,6 +33,23 @@ export interface PerfOptions {
   viewport?: { width: number; height: number };
   /** Wait time (ms) after page load before reading metrics. Default 3000. */
   observeMs?: number;
+  /**
+   * Navigation milestone. Defaults to `networkidle`.
+   *
+   * Lowering it moves the START of the observation window, not its length: the
+   * `--observe` timer begins at whichever milestone is reached, so
+   * `--wait-until domcontentloaded --observe 3000` observes the first 3s of an
+   * SPA's own rendering rather than 3s after it goes quiet. Both are legitimate
+   * measurements; they are not the same measurement, which is why this is a
+   * flag and not a default.
+   */
+  waitUntil?: PageLoadWaitUntil;
+  /** Navigation timeout in milliseconds. Defaults to 30000. */
+  timeout?: number;
+  // Deliberately NO `har`. HAR replay serves every response off local disk, so
+  // TTFB / LCP / FCP would measure disk reads — the exact numbers this gate
+  // exists to report, silently made meaningless. `check perf` therefore does
+  // not declare --har; the URL gates that only read geometry do.
 }
 
 export interface LayoutShiftSource {
@@ -170,23 +188,30 @@ function classify(value: number, good: number, poor: number): "good" | "needs-im
   return "poor";
 }
 
+/**
+ * What the in-page observers hand back.
+ *
+ * Named rather than inlined on a `let raw: {…}` because the value now comes out
+ * of the `withBrowser` callback, and the in-page cast used to spell its type
+ * `typeof raw` — which stops resolving once `raw` is the callback's result.
+ */
+type PerfRaw = {
+  cls: number;
+  shifts: Array<{ path: string; tag: string; value: number; hadRecentInput: boolean }>;
+  shiftEvents: number;
+  lcp: number;
+  fcp: number;
+  ttfb: number;
+  lcpEl: { path: string; tag: string; text: string } | null;
+};
+
 export async function runPerf(options: PerfOptions): Promise<PerfReport> {
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
   const viewport = options.viewport ?? { width: 1280, height: 720 };
   const observeMs = options.observeMs ?? 3000;
 
-  const browser = await chromium.launch();
-  let raw: {
-    cls: number;
-    shifts: Array<{ path: string; tag: string; value: number; hadRecentInput: boolean }>;
-    shiftEvents: number;
-    lcp: number;
-    fcp: number;
-    ttfb: number;
-    lcpEl: { path: string; tag: string; text: string } | null;
-  };
-  try {
+  const raw = await withBrowser(async (browser) => {
     const page = await browser.newPage({ viewport });
     // Install observers BEFORE the page loads. Two paths:
     //   - URL mode: `page.addInitScript` fires before any author
@@ -196,7 +221,7 @@ export async function runPerf(options: PerfOptions): Promise<PerfReport> {
     //     HTML's <head> before passing to setContent.
     if (isUrl(options.source)) {
       await page.addInitScript(PERF_INSTALL_SCRIPT);
-      await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
+      await page.goto(options.source, navigationOptions(options));
     } else {
       let html = await readFile(resolve(options.source), "utf-8");
       const installTag = `<script>${PERF_INSTALL_SCRIPT}</script>`;
@@ -209,7 +234,7 @@ export async function runPerf(options: PerfOptions): Promise<PerfReport> {
       } else {
         html = `${installTag}${html}`;
       }
-      await page.setContent(html, { waitUntil: "networkidle" });
+      await page.setContent(html, navigationOptions(options));
     }
     // Observe for the requested window — layout shifts often happen
     // late as fonts / images / lazy-loaded content settle.
@@ -223,14 +248,13 @@ export async function runPerf(options: PerfOptions): Promise<PerfReport> {
       await page.evaluate(PERF_INSTALL_SCRIPT);
       await page.waitForTimeout(Math.min(observeMs, 1500));
     }
-    raw = await page.evaluate(() => {
-      const w = window as unknown as { __vrtPerf?: typeof raw };
+    const measured = await page.evaluate(() => {
+      const w = window as unknown as { __vrtPerf?: PerfRaw };
       return w.__vrtPerf ?? { cls: 0, shifts: [], shiftEvents: 0, lcp: 0, fcp: 0, ttfb: 0, lcpEl: null };
-    });
+    }) as PerfRaw;
     await page.close();
-  } finally {
-    await browser.close();
-  }
+    return measured;
+  });
 
   // Aggregate per-element shift contributions; sort by largest.
   const byElement = new Map<string, LayoutShiftSource>();

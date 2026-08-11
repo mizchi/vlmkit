@@ -94,21 +94,23 @@ async function runBench(modelIds: string[]) {
   } else {
     console.log(`  ${DIM}Generating test heatmap...${RESET}`);
     const { compareScreenshots } = await import("@mizchi/vlmkit-core/heatmap.ts");
-    const { chromium } = await import("playwright");
-    const browser = await chromium.launch();
-
+    const { withBrowser } = await import("@mizchi/vlmkit-core/browser-launch.ts");
+    const basePath = join(TMP, "baseline.png");
+    const curPath = join(TMP, "current.png");
+    // Was launch-then-close on the straight line: a screenshot failure here left a
+    // Chromium behind for the rest of the bench run, which then sat next to every
+    // model measurement it was supposed to be timing.
+    await withBrowser(async (browser) => {
     const before = await browser.newPage({ viewport: { width: 800, height: 600 } });
     await before.setContent('<html><body style="font-family:sans-serif;padding:24px;background:#fff"><h1 style="color:#333">Dashboard</h1><p style="color:#666;margin:8px 0">Welcome back, Alice.</p><div style="display:flex;gap:16px;margin-top:16px"><div style="padding:16px;background:#f0f0f0;border-radius:8px;flex:1;border:1px solid #ddd"><strong>Users</strong><br>12,345</div><div style="padding:16px;background:#f0f0f0;border-radius:8px;flex:1;border:1px solid #ddd"><strong>Revenue</strong><br>$48,290</div></div><table style="width:100%;margin-top:24px;border-collapse:collapse"><tr style="background:#f9f9f9"><th style="text-align:left;padding:8px;border-bottom:1px solid #eee">Name</th><th style="text-align:left;padding:8px;border-bottom:1px solid #eee">Status</th></tr><tr><td style="padding:8px;border-bottom:1px solid #eee">Alice</td><td style="padding:8px;border-bottom:1px solid #eee"><span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:12px;font-size:12px">Active</span></td></tr><tr><td style="padding:8px">Bob</td><td style="padding:8px"><span style="background:#fef9c3;color:#854d0e;padding:2px 8px;border-radius:12px;font-size:12px">Pending</span></td></tr></table></body></html>');
-    const basePath = join(TMP, "baseline.png");
     await before.screenshot({ path: basePath });
     await before.close();
 
     const after = await browser.newPage({ viewport: { width: 800, height: 600 } });
     await after.setContent('<html><body style="font-family:sans-serif;padding:24px;background:#fff"><h1 style="color:#111;font-size:28px">Dashboard</h1><p style="color:#888;margin:12px 0">Welcome back, Alice.</p><div style="display:flex;gap:8px;margin-top:24px"><div style="padding:12px;background:#eff6ff;border-radius:12px;flex:1;border:1px solid #bfdbfe"><strong>Users</strong><br>12,345</div><div style="padding:12px;background:#fef2f2;border-radius:12px;flex:1;border:1px solid #fecaca"><strong>Revenue</strong><br>$48,290</div></div><table style="width:100%;margin-top:24px;border-collapse:collapse"><tr style="background:#f1f5f9"><th style="text-align:left;padding:10px;border-bottom:2px solid #e2e8f0;font-size:13px;text-transform:uppercase;color:#64748b">Name</th><th style="text-align:left;padding:10px;border-bottom:2px solid #e2e8f0;font-size:13px;text-transform:uppercase;color:#64748b">Status</th></tr><tr><td style="padding:10px;border-bottom:1px solid #f1f5f9">Alice</td><td style="padding:10px;border-bottom:1px solid #f1f5f9"><span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:12px;font-size:12px">Active</span></td></tr><tr><td style="padding:10px">Bob</td><td style="padding:10px"><span style="background:#fef9c3;color:#854d0e;padding:2px 8px;border-radius:12px;font-size:12px">Pending</span></td></tr></table></body></html>');
-    const curPath = join(TMP, "current.png");
     await after.screenshot({ path: curPath });
     await after.close();
-    await browser.close();
+    });
 
     const diff = await compareScreenshots({
       testId: "vlm-test", testTitle: "vlm-test", projectName: "vlm",

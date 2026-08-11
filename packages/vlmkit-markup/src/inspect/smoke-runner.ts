@@ -11,7 +11,8 @@
  *   vlmkit inspect smoke --file fixtures/css-challenge/page.html --seed 42
  */
 import { mkdir, readFile } from "node:fs/promises";
-import { chromium, type Page, type Browser } from "playwright";
+import { type Page, type Browser } from "playwright";
+import { launchBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import type {
   SmokeTestRequest, SmokeTestResponse, SmokeAction, SmokeError,
   A11ySnapshot, A11yNodeCompact,
@@ -234,7 +235,11 @@ export async function runSmokeTest(
 
   let browser: Browser;
   try {
-    browser = await chromium.launch();
+    // Routed through the choke point so the `message` below carries the diagnosis
+    // (which Playwright browser is missing, and the install command for the
+    // *resolved* installation) instead of a raw stack. This runner is called from
+    // the HTTP API, where there is no `handleCliError` to prettify anything.
+    browser = await launchBrowser();
   } catch (e) {
     return {
       status: "error",

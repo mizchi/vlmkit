@@ -26,12 +26,14 @@
 import { writeFile, mkdir } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium, type Page } from "playwright";
+import { type Page } from "playwright";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { type PageLoadOptions, pickPageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { openSource, resolveSource } from "@mizchi/vlmkit-core/page-open.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
-export interface I18nStressOptions {
+export interface I18nStressOptions extends PageLoadOptions {
   htmlPath: string;
   outputDir: string;
   reportPath?: string;
@@ -166,11 +168,10 @@ export async function runI18nStress(
   const viewport = options.viewport ?? { width: 1280, height: 900 };
   const wrapThreshold = options.wrapThreshold ?? 0.15;
 
-  const browser = await chromium.launch();
-  try {
+  return await withBrowser(async (browser) => {
     // Navigate: inflating text on an unstyled document measured a layout that
     // does not exist (card height 21->86 unstyled vs 95->185 styled).
-    const { page } = await openSource(browser, htmlPath, { viewport, settleMs: 0 });
+    const { page } = await openSource(browser, htmlPath, { viewport, settleMs: 0, ...pickPageLoad(options) });
     await page.addStyleTag({
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });
@@ -279,9 +280,7 @@ export async function runI18nStress(
       totalInspected: before.length,
       reportPath,
     };
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 /**

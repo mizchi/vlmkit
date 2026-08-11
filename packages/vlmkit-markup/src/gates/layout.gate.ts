@@ -19,6 +19,7 @@
 import { readFile } from "node:fs/promises";
 import { readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { PAGE_LOAD_INPUTS, type PageLoadOptions, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import {
@@ -51,7 +52,7 @@ const CHECK_RULE_IDS: Record<string, string> = {
  * IO) and the read happens in `run`, where a missing file is a measurement
  * failure rather than a usage error.
  */
-export interface LayoutGateOptions {
+export interface LayoutGateOptions extends PageLoadOptions {
   source: string;
   contractPath: string;
   storageState?: string;
@@ -106,15 +107,16 @@ machine-checkable contract (DOM math, no VLM).`,
       kind: "path",
       description: "Playwright storage state, to measure pages behind a login",
     },
+    ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const source = firstPositional(argv, "vlmkit check layout <html-or-url> --contract <contract.json>");
     const contractPath = readFlag(argv, "contract");
     if (!contractPath) throw new UsageError("--contract <contract.json> is required");
     const storageState = readFlag(argv, "storage-state");
-    return { source, contractPath, ...(storageState ? { storageState } : {}) };
+    return { source, contractPath, ...(storageState ? { storageState } : {}), ...parsePageLoad(argv) };
   },
-  run: async ({ source, contractPath, storageState }) => {
+  run: async ({ source, contractPath, storageState, ...pageLoad }) => {
     let contract: LayoutContract;
     try {
       contract = JSON.parse(await readFile(contractPath, "utf8")) as LayoutContract;
@@ -127,7 +129,12 @@ machine-checkable contract (DOM math, no VLM).`,
     if (!Array.isArray(contract?.rules) || contract.rules.length === 0) {
       throw new UsageError(`--contract ${contractPath}: "rules" must be a non-empty array`);
     }
-    const options: LayoutVerifyOptions = { source, contract, ...(storageState ? { storageState } : {}) };
+    const options: LayoutVerifyOptions = {
+      source,
+      contract,
+      ...(storageState ? { storageState } : {}),
+      ...pageLoad,
+    };
     return runLayoutVerify(options);
   },
   findings: (report): Finding[] => {

@@ -26,7 +26,9 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
+import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export interface StickyFixedSample {
   selector: string;
@@ -87,7 +89,7 @@ export interface ScrollBehaviorReport extends ScrollBehaviorInput {
   issues: ScrollBehaviorIssue[];
 }
 
-export interface ScrollBehaviorOptions {
+export interface ScrollBehaviorOptions extends PageLoadOptions {
   /**
    * Playwright storage-state file so gates can measure pages behind a
    * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
@@ -278,16 +280,13 @@ function isUrl(source: string): boolean {
 
 export async function runScrollBehavior(options: ScrollBehaviorOptions): Promise<ScrollBehaviorReport> {
   const viewport = options.viewport ?? { width: 1280, height: 720 };
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
-  try {
+  return await withBrowser(async (browser) => {
     const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
     if (options.html !== undefined) {
-      await page.setContent(options.html, { waitUntil: "networkidle" });
-    } else if (isUrl(options.source)) {
-      await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
+      await page.setContent(options.html, navigationOptions(options));
     } else {
-      await page.goto(pathToFileURL(resolve(options.source)).href, { waitUntil: "networkidle", timeout: 30000 });
+      const url = isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
+      await navigatePage(page, url, options);
     }
     // A redirect here is almost always a login wall. Without this the gate
     // measured the login page and reported `status: ok` while naming the
@@ -306,9 +305,7 @@ export async function runScrollBehavior(options: ScrollBehaviorOptions): Promise
     // used the same `tool: "check-scroll"` name as the gate's, so a run left
     // two indistinguishable entries and any count over the ledger doubled.
     return report;
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 export function formatScrollBehaviorReport(report: ScrollBehaviorReport): string {

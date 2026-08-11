@@ -12,6 +12,7 @@
  * `--fail-on-suspect` keeps parsing for the scripts that pass it.
  */
 
+import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import {
@@ -37,7 +38,16 @@ have a visible effect, does it settle — is \`vlmkit check animation\`.)`,
       id: "missing-reduced-motion",
       title: "Page animates but declares no prefers-reduced-motion rule",
       severity: "suspect",
-      docs: "Set to warn if the rule legitimately lives in a stylesheet this page does not load itself.",
+      docs: "Raised only when every stylesheet was readable. When one was not, `unreadable-stylesheet` is raised instead.",
+    },
+    {
+      id: "unreadable-stylesheet",
+      title: "No prefers-reduced-motion rule in the CSS this gate could read, and a stylesheet it could not",
+      severity: "warn",
+      docs: `A warn rather than a suspect because absence is unproven. Reading \`cssRules\` of a linked
+stylesheet throws SecurityError for a file:// document, so the caller re-reads it from disk or over
+the context's own client; anything still unreadable lands here. \`check animation\` measures the
+behaviour under emulation and does not depend on CSS text.`,
     },
     {
       id: "running-animation",
@@ -49,11 +59,12 @@ have a visible effect, does it settle — is \`vlmkit check animation\`.)`,
   inputs: [
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check", positional: 0, required: true },
     { name: "max-samples", kind: "number", description: "Max motion elements to sample", defaultDescription: "100" },
+    ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const source = firstPositional(argv, "vlmkit check motion <html-or-url>");
     const maxSamples = optionalInt(argv, "max-samples", { min: 1 });
-    return { source, ...(maxSamples !== undefined ? { maxSamples } : {}) };
+    return { source, ...(maxSamples !== undefined ? { maxSamples } : {}), ...parsePageLoad(argv) };
   },
   run: (options) => runMotionDetection(options),
   findings: (report): Finding[] =>

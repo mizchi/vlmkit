@@ -10,6 +10,7 @@
  */
 
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import {
@@ -71,6 +72,7 @@ and horizontal overflow at boundary widths.`,
     { name: "sweep-step", placeholder: "px", kind: "number", description: "Sweep step", defaultDescription: "25" },
     { name: "height", placeholder: "px", kind: "number", description: "Render height", defaultDescription: "900" },
     { name: "max-elements", kind: "number", description: "Elements sampled per width", defaultDescription: "400" },
+    ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const source = firstPositional(argv, "vlmkit check breakpoints <html-or-url>");
@@ -88,6 +90,7 @@ and horizontal overflow at boundary widths.`,
       ...(maxElements !== undefined ? { maxElements } : {}),
       ...(argv.includes("--sweep") ? { sweep: true } : {}),
       ...(sweepStep !== undefined ? { sweepStep } : {}),
+      ...parsePageLoad(argv),
     };
   },
   run: (options) => runBreakpointCheck(options),

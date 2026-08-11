@@ -60,7 +60,9 @@ import {
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
+import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export type CopyIssueKind =
   | "placeholder-text"
@@ -608,7 +610,7 @@ export function analyzeCopy(input: {
   };
 }
 
-export interface CopyCheckOptions {
+export interface CopyCheckOptions extends PageLoadOptions {
   /**
    * Playwright storage-state file so gates can measure pages behind a
    * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
@@ -653,26 +655,24 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
       ? { width: target.width, height: Math.min(target.height, 4000) }
       : { width: 1280, height: 720 });
 
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
-  let pageText: string;
-  let visibleText: string;
-  let invisibleChunks: { reason: string; text: string }[];
   let blocks: TextBlock[] = [];
   let stateSweep: StateSweep | undefined;
   let redirectNote: string | null = null;
-  try {
+  // The three texts come back out of the callback rather than being assigned into
+  // outer `let`s: TypeScript's definite-assignment analysis does not follow an
+  // assignment made inside a closure. The three above keep their outer `let`
+  // because they have initializers, so no such error arises for them.
+  const { pageText, visibleText, invisibleChunks } = await withBrowser(async (browser) => {
     const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
     if (options.html !== undefined) {
-      await page.setContent(options.html, { waitUntil: "networkidle" });
-    } else if (isUrl(options.source)) {
-      await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
+      await page.setContent(options.html, navigationOptions(options));
     } else {
-      await page.goto(pathToFileURL(resolve(options.source)).href, { waitUntil: "networkidle", timeout: 30000 });
+      const url = isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
+      await navigatePage(page, url, options);
     }
-    pageText = await page.evaluate(COLLECT_RAW_TEXT) as string;
-    ({ visible: visibleText, invisible: invisibleChunks } =
-      await page.evaluate(COLLECT_TEXT_VISIBILITY) as { visible: string; invisible: { reason: string; text: string }[] });
+    const pageText = await page.evaluate(COLLECT_RAW_TEXT) as string;
+    const { visible: visibleText, invisible: invisibleChunks } =
+      await page.evaluate(COLLECT_TEXT_VISIBILITY) as { visible: string; invisible: { reason: string; text: string }[] };
     if (target) {
       blocks = (await page.evaluate(COLLECT_TEXT_BLOCKS) as TextBlock[])
         .filter((b) => b.y < target.height && b.x < target.width);
@@ -685,9 +685,8 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
     // absent. Surface the redirect so the real cause is legible.
     if (isUrl(options.source)) redirectNote = describeRedirect(options.source, page.url());
     await page.close();
-  } finally {
-    await browser.close();
-  }
+    return { pageText, visibleText, invisibleChunks };
+  });
 
   const manifestLines = options.manifestPath
     ? parseCopyManifest(await readFile(options.manifestPath, "utf8"))

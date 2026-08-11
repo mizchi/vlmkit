@@ -21,6 +21,21 @@ const sample = (role: string, signature: string, selector = `.${role}-${signatur
   described: `style ${signature}`,
 });
 
+/** A styled element with the box and the font halves separable, as the collector emits them. */
+const styled = (
+  role: string,
+  box: string,
+  font: string,
+  options: { textFree?: boolean; selector?: string } = {},
+): DesignSample => ({
+  role,
+  selector: options.selector ?? `.${role}-${box}-${font}`,
+  boxSignature: box,
+  signature: `${box}|${font}`,
+  ...(options.textFree ? { textFree: true } : {}),
+  described: `box ${box}, ${options.textFree ? "icon-only" : font}`,
+});
+
 const spacing = (value: number, uses: number, property = "paddingTop"): DesignSpacingSample[] =>
   Array.from({ length: uses }, (_, i) => ({ selector: `.s${value}-${i}`, property, value }));
 
@@ -179,6 +194,75 @@ describe("judgeDesignPolicy — scale outliers", () => {
   });
 });
 
+describe("judgeDesignPolicy — text-free elements", () => {
+  // Issue #112: a vendor widget restyled its icon controls to match the app's
+  // padding/radius/border/background exactly and the verdict stayed DRIFT,
+  // because those buttons paint no text and inherit 12px/400 where the app's
+  // buttons are 14px/600. No styling change converges them.
+  const twoAppStyles = [
+    styled("button", "boxA", "14|600"), styled("button", "boxA", "14|600"), styled("button", "boxA", "14|600"),
+    styled("button", "boxB", "14|400"), styled("button", "boxB", "14|400"), styled("button", "boxB", "14|400"),
+  ];
+
+  it("folds an icon-only element into the established style its box matches", () => {
+    const report = judgeDesignPolicy(input({
+      samples: [
+        ...twoAppStyles,
+        styled("button", "boxA", "12|400", { textFree: true, selector: ".vendor .zoom-in" }),
+        styled("button", "boxA", "12|400", { textFree: true, selector: ".vendor .zoom-out" }),
+      ],
+    }));
+    const role = report.roles.find((r) => r.role === "button")!;
+    assert.equal(role.instances, 8);
+    assert.equal(role.signatures, 2, "the icon buttons must not add a third style");
+    assert.equal(report.verdict, "coherent");
+    assert.equal(report.textFreeFolded, 2);
+    assert.equal(report.textFreeSamples, 2);
+  });
+
+  it("still counts an icon-only element whose box matches nothing", () => {
+    // The fold forgives an unobservable font, never an unobservable box: a
+    // 2px-padding vendor control against the app's 8/16 IS visible drift.
+    const report = judgeDesignPolicy(input({
+      samples: [
+        ...twoAppStyles,
+        styled("button", "boxVendor", "12|400", { textFree: true }),
+        styled("button", "boxVendor", "12|400", { textFree: true }),
+      ],
+    }));
+    assert.equal(report.roles.find((r) => r.role === "button")!.signatures, 3);
+    assert.equal(report.textFreeFolded, 0);
+    assert.equal(report.textFreeSamples, 2);
+    assert.equal(report.verdict, "drift");
+  });
+
+  it("keeps font comparison for elements that DO paint text", () => {
+    // The over-reach guard: same boxes, deviant fonts, text present. Folding
+    // these would delete the signal the metric exists for.
+    const report = judgeDesignPolicy(input({
+      samples: [
+        ...twoAppStyles,
+        styled("button", "boxA", "10|300"), styled("button", "boxA", "9|200"),
+      ],
+    }));
+    assert.equal(report.roles.find((r) => r.role === "button")!.signatures, 4);
+    assert.equal(report.textFreeFolded, 0);
+    assert.equal(report.verdict, "drift");
+  });
+
+  it("groups icon-only elements with each other by box when no text style hosts them", () => {
+    const report = judgeDesignPolicy(input({
+      samples: [
+        styled("button", "boxIcon", "12|400", { textFree: true, selector: ".a" }),
+        styled("button", "boxIcon", "16|700", { textFree: true, selector: ".b" }),
+        styled("button", "boxIcon", "20|100", { textFree: true, selector: ".c" }),
+      ],
+    }));
+    assert.equal(report.roles.find((r) => r.role === "button")!.signatures, 1);
+    assert.equal(report.verdict, "coherent");
+  });
+});
+
 describe("judgeDesignPolicy — coverage reporting", () => {
   it("carries skip counts through so coverage gaps are never silent", () => {
     const report = judgeDesignPolicy(input({ skipped: 1490, statefulSkipped: 4 }));
@@ -219,12 +303,44 @@ describe("formatDesignReport", () => {
 
   it("keeps stale subtree exclusions visible", () => {
     const judged = judgeDesignPolicy(input({
-      exclusions: [{ selector: ".removed-widget", matches: 0 }],
+      exclusions: [{ selector: ".removed-widget", matches: 0, elements: 0 }],
     }));
     assert.deepEqual(judged.unusedExcludes, [".removed-widget"]);
     const text = formatDesignReport({ source: "fixture.html", ...judged });
     assert.match(text, /\.removed-widget: 0 root match/);
-    assert.match(text, /matched nothing; remove stale exclusions/);
+    assert.match(text, /removed nothing/);
+    // Integrity's nudge, verbatim in spirit: dead config gets deleted, not kept.
+    assert.match(text, /widens the blind spot/);
+  });
+
+  it("reports how many elements each --exclude removed, next to the verdict", () => {
+    const judged = judgeDesignPolicy(input({
+      samples: Array.from({ length: 5 }, () => sample("button", "a")),
+      exclusions: [
+        { selector: ".maplibregl-ctrl", matches: 2, elements: 11 },
+        { selector: ".chartjs-tooltip", matches: 1, elements: 3 },
+      ],
+      excludedElements: 14,
+    }));
+    assert.deepEqual(judged.unusedExcludes, []);
+    const text = formatDesignReport({ source: "fixture.html", ...judged });
+    // Mirrors `check integrity`'s `(2 fail, 1 warn, 5 exempted)`: the size of
+    // the blind spot belongs on the verdict line, not in a footer.
+    assert.match(text, /verdict:.*14 element\(s\) excluded/);
+    assert.match(text, /\.maplibregl-ctrl: 2 root match\(es\), 11 element\(s\) removed/);
+    assert.match(text, /\.chartjs-tooltip: 1 root match\(es\), 3 element\(s\) removed/);
+  });
+
+  it("says a text-free element was judged on its box alone", () => {
+    const judged = judgeDesignPolicy(input({
+      samples: [
+        styled("button", "boxA", "14|600"), styled("button", "boxA", "14|600"), styled("button", "boxA", "14|600"),
+        styled("button", "boxA", "12|400", { textFree: true }),
+      ],
+    }));
+    const text = formatDesignReport({ source: "fixture.html", ...judged });
+    assert.match(text, /text-free: 1 \(1 judged on box alone/);
+    assert.match(text, /not observable without painted text/);
   });
 });
 
@@ -320,8 +436,118 @@ describe("runDesignPolicyCheck (browser collection)", () => {
 
     const scoped = await runDesignPolicyCheck({ source: file, exclude: [".vendor-map"] });
     assert.equal(scoped.verdict, "coherent");
-    assert.deepEqual(scoped.exclusions, [{ selector: ".vendor-map", matches: 1 }]);
+    assert.deepEqual(scoped.exclusions, [{ selector: ".vendor-map", matches: 1, elements: 4 }]);
     assert.equal(scoped.excludedElements, 4);
     assert.deepEqual(scoped.unusedExcludes, []);
+  });
+
+  it("attributes each excluded element to exactly one selector when subtrees overlap", async () => {
+    // Per-selector counts have to sum to the total, or "12 elements excluded"
+    // and the rows under it disagree and neither can be trusted.
+    const file = page(
+      "overlapping-exclusions",
+      `<main><button>App</button>
+       <div class="widget"><div class="widget-inner"><button>a</button><button>b</button></div></div></main>`,
+    );
+    const report = await runDesignPolicyCheck({
+      source: file,
+      exclude: [".widget", ".widget-inner"],
+    });
+    assert.equal(report.exclusions[0]!.elements + report.exclusions[1]!.elements, report.excludedElements);
+    // `.widget` is listed first, so it owns the whole subtree and the narrower
+    // selector is left with nothing — which is exactly what gets reported.
+    assert.deepEqual(report.unusedExcludes, [".widget-inner"]);
+  });
+});
+
+describe("runDesignPolicyCheck — font properties on text-free elements", () => {
+  /** The app's own system: `boxApp` at 14px/600, plus a second reused style. */
+  const APP_CSS = `button { padding: 8px 16px; border-radius: 6px; border: 1px solid #333;
+                            background: #fff; font-size: 14px; font-weight: 600; }
+                   .secondary { padding: 6px 12px; border-radius: 4px; font-weight: 400; }`;
+
+  it("no longer counts an unobservable inherited font as a distinct style", async () => {
+    // Issue #112 reproduction. The vendor matched every visible property and
+    // only the inherited 12px/400 differed; the buttons paint nothing but an
+    // SVG icon, so there is no styling change that converges them.
+    const file = page(
+      "icon-only-vendor",
+      `<main><button>Save</button><button>Cancel</button><button>Publish</button>
+       <button class="secondary">Back</button><button class="secondary">Skip</button>
+       <button class="secondary">More</button>
+       <div class="vendor-ctrl">
+         <button><svg viewBox="0 0 10 10"><title>Zoom in</title><rect width="10" height="10"/></svg></button>
+         <button><svg viewBox="0 0 10 10"><title>Zoom out</title><rect width="10" height="10"/></svg></button>
+       </div></main>`,
+      `${APP_CSS}
+       .vendor-ctrl button { padding: 8px 16px; border-radius: 6px; border: 1px solid #333;
+                             background: #fff; font-size: 12px; font-weight: 400; }
+       .vendor-ctrl svg { width: 14px; height: 14px; display: block; }`,
+    );
+    const report = await runDesignPolicyCheck({ source: file });
+    const role = report.roles.find((r) => r.role === "button")!;
+    assert.equal(role.instances, 8);
+    assert.equal(role.signatures, 2, `expected 2 styles, got ${role.signatures}`);
+    assert.equal(report.textFreeSamples, 2);
+    assert.equal(report.textFreeFolded, 2);
+    assert.equal(report.verdict, "coherent");
+  });
+
+  it("keeps judging the font of an input, whose text is its `value`", async () => {
+    // The trap: `input[type=button]` paints its `value` and a text input paints
+    // its value/placeholder, yet textContent is "" for both. Reading textContent
+    // alone would drop font from exactly the elements whose whole box is text.
+    const file = page(
+      "input-value-text",
+      `<main><button>Save</button><button>Cancel</button><button>Publish</button>
+       <input type="button" class="tiny" value="Go">
+       <input type="button" class="tiny" value="Stop"></main>`,
+      `${APP_CSS}
+       .tiny { padding: 8px 16px; border-radius: 6px; border: 1px solid #333;
+               background: #fff; font-size: 9px; font-weight: 200; }`,
+    );
+    const report = await runDesignPolicyCheck({ source: file });
+    const role = report.roles.find((r) => r.role === "button")!;
+    assert.equal(role.instances, 5);
+    assert.equal(role.signatures, 2, "a 9px input value is visible drift, not an unobservable font");
+    assert.equal(report.textFreeSamples, 0);
+  });
+
+  it("keeps judging the font behind an icon-font glyph in ::before", async () => {
+    // A `content: "\\f00c"` glyph is painted text that scales with font-size,
+    // so an element with no child text still has an observable font.
+    const file = page(
+      "icon-font-pseudo",
+      `<main><button>Save</button><button>Cancel</button><button>Publish</button>
+       <button class="glyph"></button><button class="glyph"></button></main>`,
+      `${APP_CSS}
+       .glyph { padding: 8px 16px; border-radius: 6px; border: 1px solid #333;
+                background: #fff; font-size: 28px; font-weight: 400; }
+       .glyph::before { content: "\\2713"; }`,
+    );
+    const report = await runDesignPolicyCheck({ source: file });
+    const role = report.roles.find((r) => r.role === "button")!;
+    assert.equal(role.instances, 5);
+    assert.equal(role.signatures, 2, "a 28px icon-font glyph is observable");
+    assert.equal(report.textFreeSamples, 0);
+  });
+
+  it("still reports drift when an icon-only control's box does not match", async () => {
+    const file = page(
+      "icon-only-box-drift",
+      `<main><button>Save</button><button>Cancel</button><button>Publish</button>
+       <div class="vendor-ctrl">
+         <button><svg viewBox="0 0 10 10"><rect width="10" height="10"/></svg></button>
+         <button><svg viewBox="0 0 10 10"><rect width="10" height="10"/></svg></button>
+       </div></main>`,
+      `${APP_CSS}
+       .vendor-ctrl button { padding: 2px; border-radius: 0; }
+       .vendor-ctrl svg { width: 14px; height: 14px; display: block; }`,
+    );
+    const report = await runDesignPolicyCheck({ source: file, minReuse: 3 });
+    const role = report.roles.find((r) => r.role === "button")!;
+    assert.equal(role.signatures, 2);
+    assert.equal(report.textFreeFolded, 0);
+    assert.equal(report.verdict, "drift");
   });
 });

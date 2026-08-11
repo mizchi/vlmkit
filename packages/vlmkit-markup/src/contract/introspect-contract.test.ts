@@ -1,10 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { resolve } from "node:path";
 import {
   formatIntrospectionProfile,
+  introspectUiContractFromHtml,
   landmarkRegionsToUiContract,
   layoutContractToUiLayout,
   waitUntilForIntrospectionInput,
+  type UiContractIntrospectionProfile,
 } from "./introspect-contract.ts";
 import type { LandmarkRegion } from "../component/semantic-drilldown.ts";
 import { validateUiContract } from "./ui-contract.ts";
@@ -389,4 +392,44 @@ test("waitUntilForIntrospectionInput avoids networkidle for local files", () => 
   assert.equal(waitUntilForIntrospectionInput("file:///tmp/page.html"), "load");
   assert.equal(waitUntilForIntrospectionInput("https://example.com/page.html"), "networkidle");
   assert.equal(waitUntilForIntrospectionInput("http://example.com/page.html"), "networkidle");
+});
+
+/**
+ * The producer, not the formatter.
+ *
+ * `formatIntrospectionProfile` above is fed hand-written numbers, and that is
+ * precisely how a regression got through: a refactor moved the browser launch
+ * and close inside a helper that owns both, the three assignments that lived in
+ * the deleted `finally` went with it, and the profile started reporting
+ * `browserLaunchMs 0.01 / browserCloseMs 0 / totalMs 0` for a run whose single
+ * viewport took 2562ms. The formatter test stayed green because it never asks
+ * anything to produce a profile.
+ *
+ * Asserted as invariants rather than durations: a wall-clock threshold would be
+ * flaky on a loaded machine, but `totalMs` cannot be *smaller* than a phase it
+ * contains no matter how fast or slow the host is.
+ */
+test("introspectUiContractFromHtml populates the profile it hands to onProfile", { timeout: 120_000 }, async () => {
+  let profile: UiContractIntrospectionProfile | undefined;
+  await introspectUiContractFromHtml({
+    input: resolve(import.meta.dirname!, "../../../../fixtures/external-assets/page.html"),
+    viewports: [{ label: "desktop", width: 1280, height: 800 }],
+    onProfile: (p) => { profile = p; },
+  });
+  assert.ok(profile, "onProfile was never called");
+  const viewportTotal = profile.viewports[0]?.totalMs ?? 0;
+  assert.ok(viewportTotal > 0, `viewport totalMs should be measured, got ${viewportTotal}`);
+  // The assertion the regression fails on: it reported total 0 against a
+  // viewport of 2562ms.
+  assert.ok(
+    profile.totalMs >= viewportTotal,
+    `totalMs (${profile.totalMs}) must contain the viewport it measured (${viewportTotal})`,
+  );
+  // Launching and closing a real Chromium is never free. Both were zero.
+  assert.ok(profile.browserLaunchMs > 0, `browserLaunchMs should be measured, got ${profile.browserLaunchMs}`);
+  assert.ok(profile.browserCloseMs > 0, `browserCloseMs should be measured, got ${profile.browserCloseMs}`);
+  assert.ok(
+    profile.totalMs >= profile.browserLaunchMs + profile.browserCloseMs,
+    "totalMs must contain the launch and close it measured",
+  );
 });

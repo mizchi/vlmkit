@@ -19,6 +19,7 @@
 
 import { readFlag, readInt, readNumber, readPositionals } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import {
@@ -29,7 +30,21 @@ import {
   runStoryVrt,
 } from "../component/story-vrt.ts";
 
-const VALUE_FLAGS = ["--gallery", "--props", "--viewport", "--threshold", "--out", "--root", "--settle"];
+const VALUE_FLAGS = [
+  "--gallery",
+  "--props",
+  "--viewport",
+  "--threshold",
+  "--out",
+  "--root",
+  "--settle",
+  // Every positional here is a story id, so a page-load flag value must not
+  // be mistaken for one — `--wait-until load Button/Primary` would otherwise
+  // try to mount a story called "load".
+  "--timeout",
+  "--wait-until",
+  "--har",
+];
 
 /** Default threshold. Component-scoped shots are small, so a stray pixel is a larger ratio. */
 const DEFAULT_THRESHOLD = 0.005;
@@ -123,6 +138,7 @@ in vlmkit.gates.json is the durable way to do that.`,
     { name: "root", placeholder: "selector", kind: "string", description: "Element the gallery renders into", defaultDescription: "#root" },
     { name: "settle", placeholder: "ms", kind: "number", description: "Wait after mount resolves, for entry transitions", defaultDescription: "0" },
     { name: "out", placeholder: "dir", kind: "path", description: "Baseline / artifact directory", defaultDescription: ".vlmkit/stories" },
+    ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const stories = readPositionals(argv, VALUE_FLAGS);
@@ -171,6 +187,7 @@ in vlmkit.gates.json is the durable way to do that.`,
       ...(outputDir ? { outputDir } : {}),
       root: readFlag(argv, "root") ?? "#root",
       settleMs: readInt(argv, "settle", { min: 0 }) ?? 0,
+      ...parsePageLoad(argv),
     };
   },
   run: (options) => runStoryVrt(options),

@@ -12,11 +12,12 @@
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { chromium, type Page } from "playwright";
+import { type Page } from "playwright";
 import { compareScreenshots } from "./heatmap.ts";
 import { applyMask, parseMaskSelectors } from "./mask.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "./terminal-colors.ts";
 import type { VrtSnapshot } from "./types.ts";
+import { withBrowser } from "./browser-launch.ts";
 
 // ---- Types ----
 
@@ -105,11 +106,10 @@ export async function runElementCompare(
 
   await mkdir(outputDir, { recursive: true });
 
-  const browser = await chromium.launch();
   const results: ElementDiffResult[] = [];
   let fullPageDiffRatio: number | undefined;
 
-  try {
+  await withBrowser(async (browser) => {
     // Setup baseline page
     const baselinePage = await browser.newPage({ viewport });
     if (options.baselineUrl) {
@@ -193,9 +193,7 @@ export async function runElementCompare(
 
     await baselinePage.close();
     await currentPage.close();
-  } finally {
-    await browser.close();
-  }
+  });
 
   // Build summary
   const matched = results.filter((r) => r.found.baseline && r.found.current);

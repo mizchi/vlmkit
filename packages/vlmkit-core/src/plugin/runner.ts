@@ -357,6 +357,18 @@ export function formatGateHelp(gate: AnyGateDefinition): string {
   // failing default it used to opt into is now the default.
   lines.push("  --fail-on-suspect       Accepted no-op (a suspect already exits 1)");
   lines.push("  -h, --help              Show this help");
+  // Every gate's help said how to persist a *rule setting* and nothing about the
+  // flags above it, so a fix that lived in a flag read as unrepeatable. v4's repair
+  // agent, who reached green with two `--allow` declarations: "my fix lives in a
+  // shell command that a CI job would have to duplicate. I do not know whether an
+  // exemption can be committed alongside the page, and the output does not say." It
+  // can — a `"gates"` entry is a full command, tokenized quote-aware — which makes
+  // this a documentation gap rather than a missing feature.
+  lines.push("");
+  lines.push("Persisting: a `\"gates\"` entry in vlmkit.gates.json is the whole command, so any");
+  lines.push("flag above belongs there and is committed with the page. Quoted values survive:");
+  lines.push(`  "gates": ["${gateCommandString(gate)} --some-flag \\"a value with spaces\\""]`);
+  lines.push("Rule settings also have their own `\"rules\"` block.");
   return lines.join("\n");
 }
 
@@ -406,6 +418,24 @@ export async function runGateCli<Report, Options>(
   }
   const outcome = await runGate(gate, argv, options);
   out(outcome.text);
+  // Say when warns did not fail the command, and name the flag that makes one fail.
+  //
+  // A dogfood agent working to a "these gates exit 0" criterion nearly shipped the very
+  // defect it was sent to fix: "`check animation` exits 0 while printing `settle: never
+  // (infinite animation)`. That is verbatim the reported bug […] demoted to `warn`. Had
+  // I trusted the success criterion I'd have shipped it broken. There is
+  // `--fail-on-suspect` (documented as `Accepted no-op`) but no `--fail-on-warn`."
+  //
+  // The escalation existed the whole time — `--rule <id>=suspect` exits 1 — and was
+  // findable only by reading the rule-settings docs. A passing run that is hiding a warn
+  // should say so on the spot, not in a document.
+  if (outcome.exitCode === 0 && outcome.counts.warn > 0 && !shared.json) {
+    const ids = [...new Set(outcome.findings.filter((f) => f.severity === "warn").map((f) => f.rule))];
+    out(
+      `${DIM}  ${outcome.counts.warn} warn(s) did not fail this command.`
+      + ` To gate on one: --rule ${ids[0]}=suspect${ids.length > 1 ? ` (also: ${ids.slice(1).join(", ")})` : ""}${RESET}`,
+    );
+  }
   // Under --json the breakdown is already inside the envelope; appending it to
   // stdout as prose would put non-JSON on a stream a client is parsing.
   if (shared.timing && !shared.json) out(formatGateTiming(outcome));

@@ -12,8 +12,8 @@
  */
 import { readFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { chromium } from "playwright";
-import { formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
+import { diagnoseSandboxLaunchFailure, formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { applyApprovalToVrtDiff, collectApprovalWarnings, inferApprovalChangeType, loadApprovalManifest } from "../../vrt/snapshot/approval.ts";
 import { getCssChallengeFixturePath } from "./css-challenge-fixtures.ts";
 import { categorizeProperty, escapeRegex } from "./css-challenge-core.ts";
@@ -134,32 +134,35 @@ function removeCssLine(css: string, declaration: CssLine): string {
 // ---- Playwright capture ----
 
 async function capturePageState(html: string, screenshotPath: string): Promise<{ a11yTree: A11yNode; screenshotPath: string }> {
-  let browser;
-  try {
-    browser = await chromium.launch();
-  } catch (error) {
-    if (isPlaywrightSandboxRestrictionError(error)) {
-      throw new Error(formatPlaywrightLaunchError(error, { commandHint: "in your local terminal or in CI" }));
+  // `withBrowser`, not `launchBrowser`: this is one straight-line scope with no
+  // handoff and no early exit, and it is called once per round of a benchmark
+  // loop — so a throw before the close leaks a Chromium *inside a process that
+  // keeps running*. Measured on this exact shape with an unwritable screenshot
+  // path: three throws left six extra Chromium processes alive, and the probe
+  // itself could not exit because of them.
+  //
+  // The sandbox diagnosis travels with the launch instead of being copied around
+  // it: `diagnoseSandboxLaunchFailure` declines anything that is not the
+  // Codex/macOS case, so core's missing-browser message still applies and an
+  // unrecognized failure is rethrown untouched.
+  return withBrowser(async (browser) => {
+    const page = await browser.newPage({ viewport: VIEWPORT });
+    await page.setContent(html, { waitUntil: "networkidle" });
+    await page.screenshot({ path: screenshotPath, fullPage: true });
+
+    // Capture a11y tree via CDP
+    let a11yTree: A11yNode = { role: "document", name: "", children: [] };
+    try {
+      const client = await page.context().newCDPSession(page);
+      const result = await client.send("Accessibility.getFullAXTree");
+      a11yTree = cdpNodesToTree(result.nodes) as A11yNode;
+      await client.detach();
+    } catch {
+      // Fallback: minimal tree
     }
-    throw error;
-  }
-  const page = await browser.newPage({ viewport: VIEWPORT });
-  await page.setContent(html, { waitUntil: "networkidle" });
-  await page.screenshot({ path: screenshotPath, fullPage: true });
 
-  // Capture a11y tree via CDP
-  let a11yTree: A11yNode = { role: "document", name: "", children: [] };
-  try {
-    const client = await page.context().newCDPSession(page);
-    const result = await client.send("Accessibility.getFullAXTree");
-    a11yTree = cdpNodesToTree(result.nodes) as A11yNode;
-    await client.detach();
-  } catch {
-    // Fallback: minimal tree
-  }
-  await browser.close();
-
-  return { a11yTree, screenshotPath };
+    return { a11yTree, screenshotPath };
+  }, { diagnose: diagnoseSandboxLaunchFailure });
 }
 
 function cdpNodesToTree(nodes: Array<{

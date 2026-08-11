@@ -19,6 +19,7 @@ import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { readEnv } from "@mizchi/vlmkit-core/project-config.ts";
 import {
   type CopyCheckOptions,
@@ -68,6 +69,14 @@ const NOT_IN_ELEMENTS_MODE: { flag: string; because: string }[] = [
   { flag: "--vlm", because: "it only drives --target's transcription" },
   { flag: "--storage-state", because: "nothing is navigated, so there is no session to restore" },
   { flag: "--out", because: "no sheets or worksheet are written" },
+  // Same reasoning as --storage-state, and the same reason they are rejected
+  // rather than ignored: element-rect mode reads a JSON file, so there is no
+  // navigation to time out, no load milestone to wait for and no network to
+  // replay. Accepting them would let a caller believe `--timeout 120000` bought
+  // them something on a run that never opened a browser.
+  { flag: "--timeout", because: "no page is navigated, so there is no navigation to time out" },
+  { flag: "--wait-until", because: "no page is navigated, so there is no load milestone to wait for" },
+  { flag: "--har", because: "no requests are made, so there is nothing to replay from a recording" },
 ];
 
 /**
@@ -196,6 +205,7 @@ rules out.`,
     { name: "vlm", placeholder: "model", kind: "string", description: "Transcribe crops with a VLM (optional model id); requires an API key" },
     { name: "no-states", kind: "boolean", description: "Skip the disclosure-state sweep (default-state text only)" },
     { name: "storage-state", placeholder: "file", kind: "path", description: "Playwright storage state for pages behind a login" },
+    ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     // `--vlm` is optionally-valued, so its model id cannot be excluded via
@@ -254,6 +264,7 @@ rules out.`,
       ...(storageState ? { storageState } : {}),
       ...(allowInvisible ? { allowInvisible } : {}),
       ...(vlm !== undefined ? { vlm } : {}),
+      ...parsePageLoad(argv),
     };
   },
   run: async ({ vlm, imageMode, ...options }) => {

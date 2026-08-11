@@ -15,10 +15,12 @@
  *   vlmkit check motion <html-or-url>
  *   vlmkit check motion <html-or-url> --json
  */
+import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
-import { chromium } from "playwright";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export interface MotionComputedSample {
   selector: string;
@@ -34,6 +36,7 @@ export interface MotionComputedSample {
 
 export type MotionIssueKind =
   | "missing-reduced-motion"
+  | "unreadable-stylesheet"
   | "running-animation";
 
 export interface MotionIssue {
@@ -46,6 +49,11 @@ export interface MotionIssue {
 export interface MotionDetectionInput {
   source: string;
   cssText: string;
+  /**
+   * Stylesheets that could not be read at all, by the page or by the caller.
+   * Non-empty means "no rule found" is not a claim this gate is entitled to make.
+   */
+  unreadableStylesheets?: string[];
   samples: MotionComputedSample[];
 }
 
@@ -61,7 +69,7 @@ export interface MotionDetectionReport {
   issues: MotionIssue[];
 }
 
-export interface MotionDetectionOptions {
+export interface MotionDetectionOptions extends PageLoadOptions {
   source: string;
   html?: string;
   maxSamples?: number;
@@ -113,13 +121,28 @@ export function analyzeMotionSamples(input: MotionDetectionInput): MotionDetecti
     sample.animationPlayState.split(",").some((state) => state.trim() === "paused")
   );
 
+  const unreadable = input.unreadableStylesheets ?? [];
   const issues: MotionIssue[] = [];
   if (!hasReducedMotionRule && (activeAnimationSamples.length > 0 || activeTransitionSamples.length > 0)) {
-    issues.push({
-      kind: "missing-reduced-motion",
-      severity: "suspect",
-      message: "Active animation or transition declarations exist, but no `prefers-reduced-motion: reduce` rule was found.",
-    });
+    // With an unread stylesheet in the page, absence of the rule is unproven. Say
+    // that instead of asserting it: `check animation` reads the *behaviour* under
+    // emulation and does not depend on CSS text, so a dogfood run got
+    // `missing-reduced-motion` from here and `reduced-motion: honored` from there
+    // on one file, with no way to tell which to trust.
+    issues.push(unreadable.length === 0
+      ? {
+        kind: "missing-reduced-motion",
+        severity: "suspect",
+        message: "Active animation or transition declarations exist, but no `prefers-reduced-motion: reduce` rule was found.",
+      }
+      : {
+        kind: "unreadable-stylesheet",
+        severity: "warn",
+        message: `Active animation or transition declarations exist and no \`prefers-reduced-motion: reduce\` rule was found`
+          + ` in the CSS this gate could read — but ${unreadable.length} stylesheet(s) could not be read`
+          + ` (${unreadable.slice(0, 3).join(", ")}), so the rule may be in one of them.`
+          + ` \`check animation\` measures the behaviour under emulation instead and does not depend on CSS text.`,
+      });
   }
 
   for (const sample of runningAnimationSamples.slice(0, 10)) {
@@ -149,18 +172,16 @@ export async function runMotionDetection(
 ): Promise<MotionDetectionReport> {
   const viewport = options.viewport ?? { width: 1280, height: 720 };
   const maxSamples = options.maxSamples ?? 100;
-  const browser = await chromium.launch();
-  try {
+  return await withBrowser(async (browser) => {
     const page = await browser.newPage({ viewport });
     if (options.html !== undefined) {
-      await page.setContent(options.html, { waitUntil: "networkidle" });
-    } else if (isUrl(options.source)) {
-      await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
+      await page.setContent(options.html, navigationOptions(options));
     } else {
       // file: URL navigation so relative stylesheets resolve — setContent
       // gives the document an about:blank base URL (same fix as the other
       // page-loading checks).
-      await page.goto(pathToFileURL(resolve(options.source)).href, { waitUntil: "networkidle", timeout: 30000 });
+      const url = isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
+      await navigatePage(page, url, options);
     }
 
     const result = await page.evaluate((limit) => {
@@ -194,13 +215,21 @@ export async function runMotionDetection(
       }
 
       const cssText: string[] = [];
+      const unreadable: string[] = [];
       for (const sheet of Array.from(document.styleSheets)) {
         try {
           const rules = sheet.cssRules;
           if (!rules) continue;
           for (const rule of Array.from(rules)) cssText.push(rule.cssText || "");
         } catch {
-          // Cross-origin stylesheet; skip.
+          // NOT merely "cross-origin; skip". Reading `cssRules` of a linked
+          // stylesheet throws `SecurityError` for a `file://` document too, because
+          // Chromium gives every file an opaque origin — so on the most common way
+          // this gate is invoked, a local HTML file, every linked sheet lands here.
+          // Swallowing it and then reporting "no `prefers-reduced-motion` rule was
+          // found" asserts something the page never got to look at. The href goes
+          // back to the caller, which reads it another way.
+          if (sheet.href) unreadable.push(sheet.href);
         }
       }
 
@@ -225,18 +254,36 @@ export async function runMotionDetection(
         if (hasAnimation || hasTransition) samples.push(sample);
         if (samples.length >= limit) break;
       }
-      return { cssText: cssText.join("\n"), samples };
+      return { cssText: cssText.join("\n"), unreadable, samples };
     }, maxSamples);
 
+    // Fetch what the page was not allowed to read. `page.request` is the browser
+    // context's own client, so it is not bound by the document's opaque origin;
+    // a `file:` URL is read from disk, which `fetch()` inside the page cannot do
+    // either.
+    const recovered: string[] = [];
+    const stillUnreadable: string[] = [];
+    for (const href of result.unreadable) {
+      try {
+        if (href.startsWith("file://")) {
+          recovered.push(await readFile(fileURLToPath(href), "utf8"));
+        } else {
+          const response = await page.request.get(href);
+          if (!response.ok()) throw new Error(`HTTP ${response.status()}`);
+          recovered.push(await response.text());
+        }
+      } catch {
+        stillUnreadable.push(href);
+      }
+    }
     await page.close();
     return analyzeMotionSamples({
       source: options.source,
-      cssText: result.cssText,
+      cssText: [result.cssText, ...recovered].join("\n"),
+      unreadableStylesheets: stillUnreadable,
       samples: result.samples,
     });
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 export function formatMotionDetectionReport(report: MotionDetectionReport): string {

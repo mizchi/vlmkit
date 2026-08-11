@@ -26,13 +26,14 @@
 import { writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
+import { type PageLoadOptions, pickPageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { openSource, resolveSource } from "@mizchi/vlmkit-core/page-open.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { evaluateA11yContrast } from "./markup-core-a11y-contrast.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
-export interface A11yContrastOptions {
+export interface A11yContrastOptions extends PageLoadOptions {
   /**
    * Suppress the human-readable console block. Set by `--json`: the console
    * output caps its list at five rows, so mixing it into stdout ahead of the
@@ -211,26 +212,26 @@ export async function runA11yContrast(
   const viewport = options.viewport ?? { width: 1280, height: 900 };
   const minLen = options.minTextLength ?? 1;
 
-  const browser = await chromium.launch();
-  let samples: A11yContrastRawSample[];
-  let screenshotPath: string;
-  try {
+  // Returned out of the callback rather than assigned into outer `let`s:
+  // TypeScript's definite-assignment analysis does not follow an assignment made
+  // inside a closure, so `let samples: T[]` + assign-in-callback reads as
+  // "used before being assigned" at every later use.
+  const { samples, screenshotPath } = await withBrowser(async (browser) => {
     // Navigate rather than `setContent(readFile(...))`: the latter leaves the
     // document on `about:blank`, so a relative `<link rel="stylesheet">` never
     // loads and the gate measures unstyled markup. Measured on
     // fixtures/external-assets: it reported 0 contrast failures where the same
     // CSS inlined reported 1.
-    const { page } = await openSource(browser, htmlPath, { viewport, settleMs: 0 });
+    const { page } = await openSource(browser, htmlPath, { viewport, settleMs: 0, ...pickPageLoad(options) });
     await page.addStyleTag({
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });
-    samples = await page.evaluate(`(${A11Y_CONTRAST_SAMPLE_SCRIPT})(${minLen})`) as A11yContrastRawSample[];
-    screenshotPath = join(outputDir, "page.png");
+    const samples = await page.evaluate(`(${A11Y_CONTRAST_SAMPLE_SCRIPT})(${minLen})`) as A11yContrastRawSample[];
+    const screenshotPath = join(outputDir, "page.png");
     await page.screenshot({ path: screenshotPath, fullPage: false });
     await page.close();
-  } finally {
-    await browser.close();
-  }
+    return { samples, screenshotPath };
+  });
 
   // Dedupe by path — many text nodes from the same element produce
   // identical findings.

@@ -535,9 +535,28 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   それを固定するテストまで存在した。両方を修正。
   回帰テスト: `packages/vlmkit-markup/src/auth-wall.test.ts`(7 件、
   実際に 302 するサーバを立てる)。
-- [ ] **ページオープン統一の残り(純粋な整理)** — `chromium.launch` 44 箇所、
-  `waitUntil` は networkidle 72 / load 8 / domcontentloaded 1。
-  **verdict を変える差は上記で解消済み**。残るのは重複コードの削減と
+- [x] **launch 統一 — 完了(2026-08-10)** — 計測した実数は 65 箇所
+  (`.ts` 57 + 使い捨て `.mjs` 8)。引数別: bare 60 / `{args}` 4 /
+  `{headless}` 1。close 別: `finally` 51 / 直線 9(throw で必ずリーク)/
+  クローズ無し 4 / `return launch()` 1。
+  `packages/vlmkit-core/src/browser-launch.ts` に choke point を新設し、
+  **52 箇所を変換**(`withBrowser` 44 / `launchBrowser` 8)。
+  意図的に据え置いたもの: `stress/cross-browser.ts`(launch 失敗を *skip 行*に
+  **分類する**唯一の呼び出し元。`launchBrowser` は core の複数行診断を
+  `BrowserLaunchError` で投げるが、この gate のマーカー正規表現は
+  それに一致しないので、未インストールの engine が skip から failed に
+  変わってしまう。engine 名の問題ではない —
+  `formatMissingPlaywrightBrowserError` は実行ファイルパスから engine を
+  読むので firefox を正しく名指しする)、`snapshot.ts` x2
+  (`CaptureBackend` 抽象。backend 自体は `launchBrowser` 経由になった)、
+  使い捨てスクリプト 8 本。
+  **launch 側に付けた理由**: 診断が `handleCliError` の中にしか無かったので
+  ライブラリ呼び出し(MCP / API / 直接 import)には一度も届いていなかった。
+  出荷 bin が `console.error(error)` していた問題は別件で、issue #112 item 2
+  として既に修正済み(`tests/cli-entry-parity.test.mjs` が守っている)。
+- [ ] **ページオープン統一の残り(純粋な整理)** — `waitUntil` は
+  networkidle 72 / load 8 / domcontentloaded 1。
+  **verdict を変える差は上記で解消済み**。残るのは
   fonts.ready 待ちの平準化で、こちらは実際に装飾。
 
 ### 差分監査 3 軸(2026-08-02)
@@ -993,6 +1012,63 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   gate 沈黙欠陥 0 — B3 が拾うべき欠陥がまだ一度も観測されていない。
   **着手条件: gate 沈黙欠陥が実際に観測されたら、そのクラスを対象に建てる**
   (存在しない欠陥クラスのために VLM ルーブリックを先行実装しない)。
+
+### 連番画像 / strip の残件(2026-08-10)
+
+- [ ] **animated WebP 出力(`snapshot strip --animated` / `check animation --strip x.webp --animated`)**
+  - 目的: 現在の strip は**静止シート**(1 枚に並べる)。「連番アニメーションを 1 枚に」の
+    もう一方の解として、実際に動く 1 ファイルが欲しい場面がある(PR に貼って再生させる、
+    flipbook の HTML を配れない文脈)。
+  - **現状の 3 案は全て静止画のみ**(2026-08-10 実測、`docs/cli-reference.md` の表と
+    `packages/vlmkit-core/src/webp.ts` ヘッダに記録):
+    `@jsquash/webp` は libwebp の still encode のみ、`sharp` の `.webp()` も入力が
+    アニメーションでなければ単ページ、`mizchi/image` 0.4.3 は GIF も単一フレーム。
+  - 唯一の現実的な経路: **sharp の `pageHeight` トリック** — N フレームを縦連結した raw
+    バッファを `sharp(buf, { raw, pages: n, pageHeight: h })` で多ページ画像として扱わせ、
+    `.webp({ loop, delay })` で animated WebP を書く。
+  - **コスト**: sharp は installed **29 MB**(libvips 18 MB + wasm32 fallback 8.7 MB)。
+    現行の `@jsquash/webp` は 1.1 MB で、静止 webp では**バイト単位で同一出力**。
+    つまり animated のためだけに 26 倍の依存を optional peer に増やす判断になる。
+  - 着手条件: **静止シートで足りない具体的な場面が実際に出てきたら**。現状の strip は
+    `check animation --strip` が行ごとに motion bbox でクロップするので、静止でも動きが
+    読める(dashboard.html の fadeIn が 6 サンプルで opacity/translateY の進行として見える)。
+    静止で読めない実例(例: 速いイージングの差、長いタイムライン)が観測されるまでは、
+    29 MB を飲む理由が測定で立たない。
+  - 代替案(依存ゼロ): animated GIF を自前 mux する / `snapshot flipbook`(既存の HTML
+    プレイヤー)で足りるならそれ。前者は品質と実装量が見合わない見込み。
+
+- [ ] **`check animation` の `evaluated` が時刻依存(2026-08-10 に判明、コードにも明記)**
+  - `fill: none` の短いアニメは終了と同時に `getAnimations()` から消えるため、開始時記録
+    (`RECORD_ANIMATION_STARTS_SCRIPT`)で `animationCount` / `settleMs` / reduced-motion は
+    決定的になったが、**フレーム標本化できるのは収集時点で生存しているものだけ**。
+    dashboard.html は `animationCount` が 4 で固定される一方 `evaluated` は 0 か 1 で揺れ、
+    `no-visible-effect` もそれに従う。
+  - 正しい直し方: 記録ではなく**開始位置で保持**する(init script で `animationstart` 時に
+    pause)。ただし `playState` の「作者が止めたのか我々が止めたのか」の区別が消え、
+    `restTimeForAnimation` がそれに依存しているので、フィルタ変更ではなく再設計。
+  - 着手条件: `no-visible-effect` の揺れが実際に誤判定を生んだら。
+
+- [ ] **filmstrip の均一セル → ragged レイアウト(cosmetic)**
+  - `composeFilmstrip` はシート全体で最大サイズのセルを使うため、1 行だけ motion bbox が
+    広いと他の行の右側に灰色余白が出る(3 アニメ fixture で実測)。行ごとに独立幅にすると
+    詰まるが、現在の「均一グリッド」という単純さを崩す。読みやすさは損なわれていないので
+    優先度低。
+
+- [ ] **strip は行ごとに切り出すので「要素の空間的な並び」が消える(2026-08-10 dogfood v4)**
+  - agent-h の指摘: 「3 枚のカードが**横並び**であるという事実がシートから失われる。
+    キャプションがなければ各行は『1 列の 3 状態』と読める」。行ごとの motion bbox クロップ
+    が正しく働いた結果で、バグではない — クロップを外すと 1 セルがビューポート全体になり、
+    小さな要素は 6 枚のほぼ同一スクリーンショットになる(v1 で実測、1448x422 → 890x232)。
+  - 直すなら: 「時間軸 × 行」と「空間配置」の両方を 1 枚に収める別レイアウト
+    (例: 各列をビューポート全体の縮小 + 行を motion bbox クロップの 2 段組)。
+    現行のグリッドの拡張ではなく新しい構図。
+  - 着手条件: レビュアーが実際に空間配置を読み違えた事例が出たら。
+
+- [ ] **dogfood の次ラウンドは別ページで(2026-08-10 v4 の結論)**
+  - v4 で「測定が間違っている」系の指摘が **0 件**になり、残る 6 件はすべて出力の読みやすさ。
+    ただし 6 件全部が**同じ 4 ゲート・同じページ**由来で、シナリオが新しい種類の欠陥を
+    産まなくなった。予算をさらに絞るより、別のページ(別の欠陥クラス)で回すべき。
+  - 詳細: `docs/reports/2026-08-10-dogfood-animation-v4.md` の「Has it converged?」
 
 ### Benchmarks
 - [ ] **markup-agent モデル横断ベンチ: OpenRouter + pi でモデルごとの性能比較**(関連: Issue #88)

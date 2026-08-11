@@ -12,6 +12,18 @@
       <p class="hidden-copy">Refunds processed within 14 days.</p>
       <p class="off-scale">Padding one pixel off the page's own scale.</p>
     </div>
+    <!-- Focus order: DOM order is a, b, c; style.css positions them at
+         x=700 / x=20 / x=360, so tabbing goes rightmost, far-left, middle. -->
+    <div class="focus-row">
+      <button id="focus-a">First in DOM, rightmost on screen</button>
+      <button id="focus-b">Second in DOM, leftmost on screen</button>
+      <button id="focus-c">Third in DOM, middle on screen</button>
+    </div>
+    <!-- Component consistency: the modifier that makes one instance inconsistent
+         (padding 28px against 12px) exists only in style.css. -->
+    <div class="tile">Alpha</div>
+    <div class="tile tile--wrong">Beta</div>
+    <div class="tile">Gamma</div>
     <div class="card">
       <button class="btn-a">Buy</button>
       <button class="btn-a">Save</button>

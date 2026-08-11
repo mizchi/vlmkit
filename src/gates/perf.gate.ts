@@ -20,6 +20,7 @@
 
 import { join } from "node:path";
 import { readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
+import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate, definePlugin } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { readInt, readPositionals } from "@mizchi/vlmkit-core/arg-reader.ts";
@@ -41,10 +42,19 @@ export const perfGate = defineGate<PerfReport, PerfOptions>({
   title: "Web Vitals thresholds",
   summary: "Web Vitals thresholds (CLS / LCP / FCP)",
   category: "infrastructure",
-  usage: `Loads the page, observes for --observe ms after networkidle, and reports
+  usage: `Loads the page, observes for --observe ms after the navigation
+milestone (networkidle unless --wait-until lowers it), and reports
 Cumulative Layout Shift, Largest Contentful Paint and First Contentful Paint
 against the standard Web Vitals thresholds. Names the top layout-shift source,
 which is usually the actionable part.
+
+--wait-until moves the START of that window, not its length: with
+domcontentloaded you measure the first --observe ms of the page's own
+rendering rather than --observe ms after it goes quiet. Use it for an app
+that never reaches network idle; the two numbers are not comparable.
+
+No --har: replaying responses off local disk would make TTFB / LCP / FCP
+report disk-read times, so the flag is refused rather than ignored.
 
 A "poor" verdict fails the command; "needs-improvement" is a warn. (Before
 0.9.2 this needed --strict and used exit code 2 for needs-improvement.)`,
@@ -63,14 +73,29 @@ A "poor" verdict fails the command; "needs-improvement" is a warn. (Before
   ],
   inputs: [
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to measure", positional: 0, required: true },
-    { name: "observe", placeholder: "ms", kind: "number", description: "Observation window after networkidle", defaultDescription: "3000" },
+    { name: "observe", placeholder: "ms", kind: "number", description: "Observation window after the navigation milestone", defaultDescription: "3000" },
     { name: "strict", kind: "boolean", description: "Accepted no-op (a poor verdict already exits 1)" },
     { name: "output-dir", placeholder: "dir", kind: "path", description: "Output directory", defaultDescription: "./test-results/perf" },
     { name: "report", placeholder: "path", kind: "path", description: "Markdown report path" },
+    // `--har` is deliberately absent — see the comment on `PerfOptions`.
+    ...PAGE_LOAD_INPUTS.filter((input) => input.name !== "har"),
   ],
   parse: (argv) => {
-    const source = readPositionals(argv, ["--observe", "--output-dir", "--report"])[0];
+    const source = readPositionals(argv, [
+      "--observe",
+      "--output-dir",
+      "--report",
+      "--timeout",
+      "--wait-until",
+    ])[0];
     if (!source) throw new UsageError("missing required argument. Usage: vlmkit check perf <html-or-url>");
+    if (argv.includes("--har")) {
+      throw new UsageError(
+        "check perf does not accept --har: replaying responses from a recording serves them "
+        + "off local disk, so TTFB / LCP / FCP would measure disk reads rather than the page. "
+        + "Use --timeout / --wait-until to survive a slow or never-idle page instead.",
+      );
+    }
     const observeMs = readInt(argv, "observe", { min: 0 });
     const outputDir = readFlag(argv, "output-dir");
     const reportPath = readFlag(argv, "report");
@@ -79,6 +104,7 @@ A "poor" verdict fails the command; "needs-improvement" is a warn. (Before
       outputDir: outputDir ?? join(process.cwd(), "test-results", "perf"),
       ...(observeMs !== undefined ? { observeMs } : {}),
       ...(reportPath ? { reportPath } : {}),
+      ...parsePageLoad(argv),
     };
   },
   run: (options) => runPerf(options),

@@ -50,8 +50,10 @@ import { decodePng, measureChangeMagnitude, type ChangeMagnitude } from "@mizchi
 import { STATE_DIR } from "@mizchi/vlmkit-core/project-config.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { DiffRegion } from "@mizchi/vlmkit-core/types.ts";
+import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
-export interface StoryVrtOptions {
+export interface StoryVrtOptions extends PageLoadOptions {
   /** Gallery URL — the `baseURL` from the Playwright config. */
   gallery: string;
   /** Story ids to mount, in order. One browser, one navigation per story. */
@@ -187,11 +189,9 @@ async function mountInPage(
 
 export async function runStoryVrt(options: StoryVrtOptions): Promise<StoryVrtReport> {
   const outputDir = resolve(options.outputDir ?? join(process.cwd(), STATE_DIR, "stories"));
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
   const results: StoryResult[] = [];
 
-  try {
+  await withBrowser(async (browser) => {
     // One context and one page for every story: the gallery is a single page and
     // the browser launch is ~all of the cost, so N stories should not mean N
     // launches. Playwright's own config sets `reuseContext: true` for the same
@@ -200,9 +200,7 @@ export async function runStoryVrt(options: StoryVrtOptions): Promise<StoryVrtRep
     for (const story of options.stories) {
       results.push(await captureStory(page, story, options, outputDir));
     }
-  } finally {
-    await browser.close();
-  }
+  });
 
   const storyPixels = results.reduce((n, r) => n + (r.width ?? 0) * (r.height ?? 0), 0);
   return {
@@ -231,7 +229,10 @@ async function captureStory(
   // are already isolated" — carrying one story's DOM into the next would make a
   // stale render look like a match.
   try {
-    await page.goto(options.gallery, { waitUntil: "networkidle", timeout: 30_000 });
+    // The gallery is normally a framework dev server (the Playwright baseURL),
+    // which is exactly the shape that never reaches network idle — so the flags
+    // apply here per story navigation, not only to the page gates.
+    await navigatePage(page, options.gallery, options);
   } catch (e) {
     // A wrong --gallery is the single likeliest mistake with this command, and
     // Playwright's raw error arrives as a stack trace plus an internal call log.

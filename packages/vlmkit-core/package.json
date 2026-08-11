@@ -1,7 +1,7 @@
 {
   "name": "@mizchi/vlmkit-core",
   "version": "0.9.1",
-  "description": "VRT diff engine + shared types — pure image / DOM / a11y / visual comparison primitives.",
+  "description": "VRT diff engine + shared types \u2014 pure image / DOM / a11y / visual comparison primitives.",
   "license": "MIT",
   "author": "mizchi",
   "repository": {
@@ -45,6 +45,12 @@
     "pngjs": "^7.0.0"
   },
   "peerDependencies": {
-    "playwright": ">=1.61 <2"
+    "playwright": ">=1.61 <2",
+    "@jsquash/webp": "^1"
+  },
+  "peerDependenciesMeta": {
+    "@jsquash/webp": {
+      "optional": true
+    }
   }
 }

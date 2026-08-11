@@ -40,8 +40,10 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
+import { type PageLoadOptions, navigatePage } from "@mizchi/vlmkit-core/page-load.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export interface LayoutRect {
   left: number;
@@ -219,7 +221,7 @@ function collectRects(selectors: string[]): Record<string, LayoutRect[]> {
   return out;
 }
 
-export interface LayoutVerifyOptions {
+export interface LayoutVerifyOptions extends PageLoadOptions {
   /**
    * Playwright storage-state file so gates can measure pages behind a
    * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
@@ -234,11 +236,9 @@ export interface LayoutVerifyOptions {
 const DEFAULT_HEIGHTS: Record<number, number> = { 1280: 800, 768: 900, 375: 700 };
 
 export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<LayoutReport> {
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
   const results: LayoutRuleResult[] = [];
   let redirected: string | undefined;
-  try {
+  await withBrowser(async (browser) => {
     const url = /^(https?|file):\/\//.test(options.source)
       ? options.source
       : pathToFileURL(resolve(options.source)).href;
@@ -246,7 +246,7 @@ export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<Lay
     for (const width of widths) {
       const height = options.heights?.[width] ?? DEFAULT_HEIGHTS[width] ?? 800;
       const page = await browser.newPage(withAuthState({ viewport: { width, height } }, options.storageState));
-      await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+      await navigatePage(page, url, options);
       redirected ??= /^https?:\/\//.test(options.source)
         ? describeRedirect(options.source, page.url()) ?? undefined
         : undefined;
@@ -262,9 +262,7 @@ export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<Lay
       }
       await page.close();
     }
-  } finally {
-    await browser.close();
-  }
+  });
   const passed = results.filter((r) => r.passed).length;
   // A redirect cannot be `done`: the rules were evaluated against a page the
   // caller did not ask for, so even "all passed" would be a claim about the

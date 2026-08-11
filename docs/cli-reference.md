@@ -19,7 +19,7 @@ for options.
 | `vlmkit heal` | `selector`, `markup` |
 | `vlmkit inspect` | `interact`, `explore`, `smoke` |
 | `vlmkit stress` | `i18n`, `media` |
-| `vlmkit snapshot` | `[<url>...]`, `approve`, `fix-prompt`, `stability`, `flipbook`, `report` |
+| `vlmkit snapshot` | `[<url>...]`, `approve`, `fix-prompt`, `stability`, `flipbook`, `strip`, `report` |
 | `vlmkit migration` | `compare`, `blind`, `subagent` |
 | `vlmkit workflow` | `init`, `capture`, `verify`, `approve`, `graph`, `affected`, `introspect`, `spec-verify`, `expect` |
 | Standalone | `vlmkit batch`, `vlmkit gates`, `vlmkit rules`, `vlmkit mcp`, `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit markup-loop`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
@@ -260,6 +260,47 @@ requests not present in the recording:
 vlmkit check integrity http://localhost:3000/ \
   --wait-until domcontentloaded --timeout 60000 --har fixtures/app.har
 ```
+
+#### Every gate that navigates takes these three
+
+`--timeout`, `--wait-until` and `--har` are on **all 20 gates that open a page**, not just
+`check integrity`. They come from one shared declaration (`PAGE_LOAD_INPUTS` /
+`parsePageLoad` in `@mizchi/vlmkit-core/page-load.ts`), so a new URL gate gets them by
+spreading it — and `src/cli/gate-page-load.test.ts` fails if it doesn't.
+
+**An SPA that never reaches network idle can now be gated directly.** That was the reported
+blocker: a page renders in ~480ms but one third-party request stays in flight forever, so
+`networkidle` never fires and every URL gate timed out before running a single check. A slow
+tile server does the same.
+
+```bash
+vlmkit check a11y touch http://localhost:5173/ --wait-until domcontentloaded --timeout 10000
+```
+
+**Lowering the milestone still waits for the render.** `domcontentloaded` alone would hand a
+gate the pre-render DOM, and it would report the "loading…" placeholder as the page — so a
+lowered milestone gets a bounded settle (idle wait, webfonts, one frame) before measuring.
+That is what the hand-rolled capture harnesses were doing, and it is why you no longer need
+one: serializing to static HTML first was lossy for canvas content and script-driven state.
+
+Two exceptions, both deliberate:
+
+- **`check perf` takes `--timeout` and `--wait-until` but rejects `--har`**, with a reason.
+  Replay serves every response off local disk, so TTFB / LCP / FCP would measure disk reads —
+  precisely the numbers the gate exists to produce, silently made meaningless. Note also that
+  lowering its milestone moves the *start* of the `--observe` window, so the two numbers are
+  not comparable across settings.
+- **`check drift component` takes none of them.** It reads the file and sets content; nothing
+  is navigated. Its input is spelled `<html-or-url>` and a URL has never worked — the `--help`
+  now says so rather than leaving it to be discovered.
+
+**`--har` aborts what it did not record**, deliberately: `fallback` would let the
+never-settling request through and the run would hang exactly as before. The cost is that an
+**incomplete HAR turns every un-recorded subresource into a failed request**, and on
+`check integrity` that surfaces as `broken-image` / `failed-stylesheet` / `broken-font` — a
+gap in the recording reading as a defect in the page. On the geometry and style gates it
+changes the measurement rather than inventing a finding, which is subtler but the same class
+of problem. Record completely, or leave `--har` off and use `--wait-until`.
 
 #### Baselines from PNGs, with no URL (`--from-dir` / `--from-png`)
 
@@ -855,6 +896,157 @@ generated session URL to BiDi clients with either `VLMKIT_CRATER_BIDI_URL` or
 ```bash
 VLMKIT_CRATER_ROOT=../crater vlmkit bench --backend prescanner
 ```
+
+#### Declaring a variant deliberate — `check drift component --allow`
+
+`check drift component` asks "these instances should look the same", and a design
+system's variants are the standing exception. Without a way to say so the gate is
+permanently red on any page with one:
+
+```bash
+vlmkit check drift component page.html --selector .card \
+  --allow "background-color@.card--featured;variant accent" \
+  --allow "border-*-color@.card--featured;variant accent"
+```
+
+```
+✗ instance #1   18.40%  Δ +28 / 0
+    padding-top: 16px → 30px            ← still fails: not declared
+    exempted border-top-color: … — user exemption (border-*-color@.card--featured): variant accent
+```
+
+Same syntax and the same two properties as `check integrity --allow`, which is the
+point: an exempted difference is **still listed** with the reason recorded, and a rule
+that matched nothing is reported (`! 1 --allow rule(s) matched nothing: …`) so a rule
+kept past the variant it covered gets deleted rather than quietly widening the blind
+spot.
+
+The unit is a **property**, not a whole instance — `"this variant may differ in its
+background and border"` is the shape of the real permission, and blessing an instance
+wholesale would hide the geometry mistake sitting next to the intentional colour. `*`
+covers a family (`padding-*`, `border-*-color`); a bare `*` is refused, because that is
+`--rule instance-drift=off` and should be written as such.
+
+#### One image instead of a sequence — `snapshot strip`
+
+A flipbook animates; a strip has to be readable **as a still** — pasted into an
+issue, diffed by eye, or handed to a model, which sees one image and cannot press
+play. Same input, different job:
+
+```bash
+# A numbered sequence into one PNG (single row by default)
+vlmkit snapshot strip round-0.png round-1.png round-2.png --out rounds.png
+
+# Wrap into a grid, cap the sheet width (default 1600; 0 disables)
+vlmkit snapshot strip frames/*.png --columns 4 --max-width 1200 --out sheet.png
+```
+
+Frames are composited **in the order given**, and a glob expands
+lexicographically — so `anim-0-100.png` lands before `anim-0-20.png` and the strip
+reads backwards. The command detects that and prints the numeric order it would
+have used; zero-pad the names or list them explicitly.
+
+Frames of different sizes are placed top-left inside a uniform cell, never
+centred: a `translateX` strip is read by comparing where the element sits from
+cell to cell, and centring would subtract exactly that offset.
+
+`check animation` writes one directly, cropped per animation to the motion it
+produced:
+
+```bash
+vlmkit check animation page.html --samples 6 --strip strip.png
+# → Strip: strip.png (1526x492, 4 animation(s) x 6 sample(s))
+```
+
+One row per animation, every cell in a row sharing one crop rect. Without the crop
+each cell is the whole viewport, so a small animated element yields near-identical
+screenshots — on `fixtures/css-challenge/dashboard.html` cropping took the sheet
+from 1448x422 to 890x232 and made each row show only its own element.
+
+**Columns are shared instants on the page timeline**, not each animation's own
+0→1 progress. That is what makes a stagger visible: three cards with 0/60/120ms
+delays read as a diagonal cascade rather than as three identical rows. The window
+defaults to one iteration of the slowest animation, and `--strip-window <ms>` narrows
+it to the part under review:
+
+```bash
+vlmkit check animation page.html --samples 6 --strip-window 380 --strip cards.png
+# → Strip: cards.png (1496x484, 4 animation(s) x 6 sample(s); 1 omitted as no-visible-effect)
+#   caption: columns are 63ms / 127ms / 190ms / 253ms / 317ms / 380ms on the page
+#   timeline (window 380ms, one shared clock); rows top to bottom are …
+```
+
+The window defaults to **when the last finite animation ends**, not to one iteration of
+the slowest animation on the page — an infinite spinner would otherwise set the
+timebase for the entrance animations under review and most columns would show a
+settled page.
+
+`--strip-selector <css>` restricts the rows to animations on matching elements, which
+is how you keep a permanent spinner out of a sheet about card entrances. The gate still
+evaluates and reports every animation; only the image is scoped. A selector matching
+nothing animated fails with the list of what is animated.
+
+**The sheet labels itself**: sample times across the top, `selector animation-name`
+above each row, drawn from a built-in 5x7 bitmap font rather than a system one. The
+worry that stopped this earlier was that text makes output depend on font rendering —
+true for a VRT baseline, but a strip is an attachment, nothing pixel-compares it, and a
+sheet whose rows are identified only in the terminal is unreadable the moment it is
+pasted anywhere else. Owning the glyphs keeps both: identical bytes on every platform,
+no fontconfig, no web font to race the screenshot. A row label longer than the sheet
+truncates with `..` from the end, so the head that maps it back to the terminal survives.
+
+The fuller caption — window, sample list, omission counts — is still printed rather than
+drawn, since it is prose. Paste it under the image.
+
+`snapshot strip` takes labels explicitly, `--label` per column and `--row-label` per
+row, both repeatable and in order, with `--label-scale <n>` for size (1 unit = 5x7px,
+default 2):
+
+```bash
+vlmkit snapshot strip f-0.png f-1.png f-2.png --label 0ms --label 125ms --label 250ms --out strip.png
+```
+
+Writing a strip does not change the verdict — a page with real defects still exits 1,
+which surprises a caller whose only goal was the attachment. Add `--advisory` when the
+image is the point and the exit code is not.
+
+Animations that moved no pixels get no row — they are already reported as
+`no-visible-effect`, and a row showing nothing would size the uniform cell for every
+other row. The count is named in the output (`1 omitted as no-visible-effect`) rather
+than dropped silently.
+
+##### WebP output
+
+A `.webp` output extension encodes lossless WebP, which needs the optional
+`@jsquash/webp` peer (`npm install --save-dev @jsquash/webp`). Without it, PNG works
+with no extra dependency and the error names the two ways forward.
+
+```bash
+vlmkit check animation page.html --strip strip.webp
+vlmkit snapshot strip frames/*.png --out sheet.webp
+vlmkit snapshot strip frames/*.png --out sheet.webp --quality 75   # lossy; see below
+```
+
+Measured on the real sheets this writes:
+
+| | 1526x492 sheet | 2584x736 sheet |
+|---|---|---|
+| PNG | 106.8 KB | 165.3 KB |
+| WebP lossless | **24.0 KB** | **39.3 KB** |
+| WebP quality 90 | 55.9 KB | 72.6 KB |
+| WebP quality 75 | 36.7 KB | 47.3 KB |
+
+Lossless is the default because on flat UI screenshots it is both smaller *and*
+artifact-free — lossy first adds noise it then has to encode, so quality 90 is more
+than twice the size of lossless here. `--quality` exists for photographic content.
+
+Three encoders were measured for this. `@jsquash/webp` (libwebp as WASM, 1.1 MB
+installed) and `sharp` (libvips, 29 MB installed) produce byte-identical output, so
+the light one is the peer. `mizchi/image` 0.4.3 would have added no npm dependency
+at all — it is MoonBit, which this repo already builds — but its `encode_webp`
+emits a valid VP8L stream (verified: decodes to 1526x492 in Chromium) that is
+**6.6x larger than the PNG it replaces**, i.e. 29x libwebp. A correct minimal
+encoder, not a competitive one.
 
 #### Visualizing the VRT process — flipbooks + video
 

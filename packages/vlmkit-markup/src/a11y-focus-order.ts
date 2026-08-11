@@ -23,15 +23,16 @@
  * Usage:
  *   vlmkit check a11y focus <html-or-url>
  */
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { chromium, type Page } from "playwright";
-import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { type Page } from "playwright";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { type PageLoadOptions, navigatePage } from "@mizchi/vlmkit-core/page-load.ts";
+import { sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
+import { DIM, RESET, GREEN, RED, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { classifyFocusOrderStep } from "./markup-core-a11y-focus-order.ts";
 
-export interface FocusOrderOptions {
+export interface FocusOrderOptions extends PageLoadOptions {
   /**
    * Suppress the human-readable console block. Set by `--json`: the console
    * output caps its list at five rows, so mixing it into stdout ahead of the
@@ -77,7 +78,6 @@ export interface FocusOrderReport {
   reportPath: string;
 }
 
-function isUrl(s: string): boolean { return /^https?:\/\//.test(s); }
 
 export const A11Y_FOCUS_ORDER_SAMPLE_SCRIPT = `
 (function focused() {
@@ -194,23 +194,34 @@ export async function runFocusOrder(
   await mkdir(outputDir, { recursive: true });
   const viewport = options.viewport ?? { width: 1280, height: 720 };
   const maxSteps = options.maxSteps ?? 64;
-  const html = isUrl(options.source) ? null : await readFile(resolve(options.source), "utf-8");
-
   const steps: FocusStep[] = [];
-  let screenshotPath: string;
-  const browser = await chromium.launch();
-  try {
+  // `withBrowser`, so a throw anywhere in the sweep below still closes the
+  // browser. The `screenshotPath` comes out of the callback rather than an outer
+  // `let`, because TypeScript's definite-assignment analysis does not follow an
+  // assignment made in a closure.
+  const screenshotPath = await withBrowser(async (browser) => {
     const page = await browser.newPage({ viewport });
-    if (isUrl(options.source)) {
-      await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
-    } else {
-      await page.setContent(html!, { waitUntil: "networkidle" });
-    }
+    // Always navigate — a file gets a `file://` URL, not `setContent`.
+    //
+    // This gate classifies each focus step by the element's x/y, so an external
+    // stylesheet that never loads does not merely degrade the result, it inverts it:
+    // with no CSS every element sits in DOM order at the left margin, and the
+    // reverse/skip-row classifications have nothing to detect. Measured on a fixture
+    // whose layout lives only in `layout.css` (buttons at x=700 / x=20 / x=360, DOM
+    // order a,b,c — a textbook `reverse-left`): `setContent` reported **0 findings,
+    // exit 0**, and the identical layout with the CSS inlined reported the
+    // `reverse` finding and exit 1. An accessibility gate calling a real WCAG
+    // violation clean is the worst failure available to it.
+    //
+    // Same mechanism `page-open.ts` documents for `check a11y contrast` (a 1.92:1
+    // contrast failure read as 0 failures), and the same conversion
+    // `stress media`'s `loadPage` already made.
+    await navigatePage(page, sourceToUrl(options.source), options);
     await page.addStyleTag({
       content: `*, *::before, *::after { transition: none !important; animation: none !important; }`,
     });
-    screenshotPath = join(outputDir, "page.png");
-    await page.screenshot({ path: screenshotPath, fullPage: false });
+    const shot = join(outputDir, "page.png");
+    await page.screenshot({ path: shot, fullPage: false });
 
     // Start from the document. The first Tab moves focus to the
     // earliest focusable element. We capture activeElement after
@@ -226,9 +237,8 @@ export async function runFocusOrder(
       steps.push({ tabIndex: i, ...sample });
     }
     await page.close();
-  } finally {
-    await browser.close();
-  }
+    return shot;
+  });
 
   // Detect findings via the shared MoonBit-backed classifier.
   const findings: FocusOrderFinding[] = analyzeFocusOrderSteps(steps);

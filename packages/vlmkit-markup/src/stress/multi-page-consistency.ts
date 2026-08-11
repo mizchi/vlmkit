@@ -29,7 +29,7 @@
 import { readFile, writeFile, mkdir, copyFile } from "node:fs/promises";
 import { basename, join, resolve, extname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium, type Page } from "playwright";
+import { type Page } from "playwright";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { extractPaletteFromFile } from "../style/palette-extract.ts";
 import { diffPalettes, type PaletteDiff } from "../style/palette-diff.ts";
@@ -42,8 +42,10 @@ import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vlmkit-c
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
-export interface MultiPageConsistencyOptions {
+export interface MultiPageConsistencyOptions extends PageLoadOptions {
   /** CSS selector identifying the shared component on every page. */
   selector: string;
   /** List of URLs to fetch (one of urls/files must be set). */
@@ -53,8 +55,18 @@ export interface MultiPageConsistencyOptions {
   outputDir: string;
   /** Markdown report path. Default: `${outputDir}/report.md`. */
   reportPath?: string;
-  /** Pixel-diff threshold. Default 0.03. */
+  /**
+   * Pass line on the measured diff ratio. **Not** the comparator's per-pixel colour
+   * tolerance — that is `pixelTolerance`.
+   *
+   * The two were one flag until a dogfood agent found that raising it moved the
+   * measurement as well as the bar: "instance #1 reports 95.5% at 0.05 and 9.65% at
+   * 0.06. I first read the drop as my fix working." A pass line that changes what it
+   * is compared against is not a pass line.
+   */
   threshold?: number;
+  /** Comparator per-pixel colour tolerance, 0-1. Default 0.1, as everywhere else. */
+  pixelTolerance?: number;
   /** Viewport for rendering. Default { width: 1280, height: 900 }. */
   viewport?: { width: number; height: number };
 }
@@ -118,13 +130,12 @@ export async function runMultiPageConsistency(
   await mkdir(outputDir, { recursive: true });
   const viewport = options.viewport ?? { width: 1280, height: 900 };
 
-  const browser = await chromium.launch();
   const pages: PageEntry[] = [];
-  try {
+  await withBrowser(async (browser) => {
     let idx = 0;
     for (const url of urls) {
       const page = await browser.newPage({ viewport });
-      await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
+      await navigatePage(page, url, options);
       const label = url;
       const safeLabel = `page-${idx++}-${basename(url).replace(/[^a-z0-9.-]+/gi, "_") || "root"}`;
       const screenshotPath = join(outputDir, `${safeLabel}.png`);
@@ -135,7 +146,9 @@ export async function runMultiPageConsistency(
     for (const file of files) {
       const page = await browser.newPage({ viewport });
       const html = await readFile(file, "utf-8");
-      await page.setContent(html, { waitUntil: "networkidle" });
+      // --files reads the bytes and setContent()s them, so --har has no document
+      // request to intercept here; --wait-until / --timeout still apply.
+      await page.setContent(html, navigationOptions(options));
       const label = basename(file);
       const safeLabel = `page-${idx++}-${label.replace(/[^a-z0-9.-]+/gi, "_")}`;
       const screenshotPath = join(outputDir, `${safeLabel}.png`);
@@ -143,9 +156,7 @@ export async function runMultiPageConsistency(
       await page.close();
       pages.push({ label, screenshotPath, bbox, matched });
     }
-  } finally {
-    await browser.close();
-  }
+  });
 
   if (pages.length === 0 || !pages[0]!.matched) {
     throw new UsageError(`Selector \`${options.selector}\` did not match on the reference page (${pages[0]?.label ?? "<none>"})`);
@@ -181,7 +192,7 @@ export async function runMultiPageConsistency(
     };
     const diff = await compareScreenshots(snap, {
       outputDir,
-      threshold: options.threshold ?? 0.03,
+      threshold: options.pixelTolerance ?? 0.1,
     });
     const diffPixels = diff?.diffPixels ?? 0;
     const totalPixels = diff?.totalPixels ?? 0;

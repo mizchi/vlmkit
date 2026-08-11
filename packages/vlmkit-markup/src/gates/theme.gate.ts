@@ -12,6 +12,7 @@
 
 import { join } from "node:path";
 import { readFlag, readNumber } from "@mizchi/vlmkit-core/arg-reader.ts";
+import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import {
@@ -64,6 +65,7 @@ promote them in vlmkit.gates.json to gate CI on theme parity.`,
       description: "RGB distance below which a fill counts as unchanged",
       defaultDescription: "16",
     },
+    ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const htmlPath = firstPositional(argv, "vlmkit check theme <html-or-url>", THEME_VALUE_FLAGS);
@@ -75,6 +77,7 @@ promote them in vlmkit.gates.json to gate CI on theme parity.`,
       outputDir: outputDir ?? join(process.cwd(), "test-results", "theme-parity"),
       ...(reportPath ? { reportPath } : {}),
       ...(threshold !== undefined ? { unchangedColorThreshold: threshold } : {}),
+      ...parsePageLoad(argv),
     };
   },
   run: (options) => runThemeParity(options),

@@ -42,6 +42,7 @@ import { fileURLToPath } from "node:url";
 import { handleCliError, UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { hasFlag, readAll, readFlag, readInt, readNumber } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { BOLD, CYAN, DIM, GREEN, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 /**
  * A pixel budget rather than a ratio: how many differing pixels a story may
@@ -599,9 +600,7 @@ async function refetchStylesheets(
 }
 
 export async function scaffoldStoryGallery(options: StoryScaffoldOptions): Promise<StoryScaffoldResult> {
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
-  try {
+  return await withBrowser(async (browser) => {
     const page = await browser.newPage({ viewport: options.viewport });
     const url = options.source.includes("://")
       ? options.source
@@ -665,9 +664,7 @@ export async function scaffoldStoryGallery(options: StoryScaffoldOptions): Promi
       refetchedStylesheets: collected.unreadable.filter((href) => !refetched.failed.includes(href)),
       cssBytes: css.length,
     };
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 export function formatStoryScaffoldResult(result: StoryScaffoldResult): string {

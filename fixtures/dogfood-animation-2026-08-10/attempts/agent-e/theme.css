@@ -1,0 +1,39 @@
+body { margin: 0; padding: 24px; background: #ffffff; font: 16px/1.5 system-ui, sans-serif; color: #111; }
+h1 { font-size: 22px; margin: 0 0 20px; }
+h2 { font-size: 16px; margin: 0 0 6px; }
+p { margin: 0; font-size: 14px; color: #444; }
+
+/* Toolbar: laid out in flow so the visual left-to-right order is the same as
+   the DOM order (Publish, Save draft, Discard). The previous absolute
+   positioning put Publish visually last, so tab order jumped backwards, and
+   #publish at left:660px pushed the page 46px wide at 768px. */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; min-height: 56px; margin-bottom: 24px; }
+.btn { width: 130px; height: 36px; border: 1px solid #333; border-radius: 6px; background: #fff; font-size: 14px; }
+
+.cards { display: flex; flex-wrap: wrap; gap: 16px; }
+.card { width: 220px; padding: 16px; border: 2px solid #333; border-radius: 8px; background: #fff; }
+/* Featured card stays distinguishable by colour, but shares the others' box
+   metrics — the 30px padding made it a different size/inset from its siblings,
+   which is the "doesn't match" nobody could name. */
+.card--featured { background: #eef3ff; border-color: #2255cc; }
+
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.card { animation: rise 250ms ease-out; }
+.card:nth-child(2) { animation-delay: 60ms; }
+.card:nth-child(3) { animation-delay: 120ms; }
+
+@keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+/* 3 turns, not `infinite`: the page has to reach a settled state or it can
+   never be screenshotted as a VRT baseline. */
+.spinner { width: 28px; height: 28px; margin-top: 24px; border: 3px solid #ddd; border-top-color: #2255cc; border-radius: 50%; animation: spin 900ms linear 3; }
+
+/* Honour an OS-level reduced-motion request: no entrance animation, no
+   spinning. The static end state is what gets rendered. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+  }
+}

@@ -12,6 +12,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { DOM_BBOX_BROWSER_SCRIPT } from "./shift-origin.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export interface RectBox {
   left: number;
@@ -295,9 +296,7 @@ export async function captureRegionElementsFromHtml(
   target: string,
   viewport: RegionElementsViewport,
 ): Promise<RegionElementRect[]> {
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
-  try {
+  return await withBrowser(async (browser) => {
     const page = await browser.newPage({
       viewport,
       deviceScaleFactor: 1,
@@ -309,7 +308,5 @@ export async function captureRegionElementsFromHtml(
     await settlePage(page);
     const raw = await page.evaluate(DOM_BBOX_BROWSER_SCRIPT);
     return parseRegionElementsJson(raw as string);
-  } finally {
-    await browser.close();
-  }
+  });
 }

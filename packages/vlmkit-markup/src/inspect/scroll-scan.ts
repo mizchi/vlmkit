@@ -27,8 +27,10 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
+import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { UiExpectedScrollportContract } from "../contract/ui-contract.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export type ScrollAxis = "x" | "y" | "both";
 
@@ -127,7 +129,7 @@ export interface ScrollScanReport {
   issues: ScrollScanIssue[];
 }
 
-export interface ScrollScanOptions {
+export interface ScrollScanOptions extends PageLoadOptions {
   /**
    * Playwright storage-state file so gates can measure pages behind a
    * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
@@ -221,13 +223,52 @@ export function analyzeScrollSamples(
       .map((o) => `${o.selector} (right edge ${o.right}px)`)
       .join(", ");
     const detail = causes.length > 0
-      ? ` — caused by: ${causes.map((o) => `${o.selector} (${o.width}px wide; constraining it removes ${o.relieves}px of the overflow)`).join(", ")}`
+      // Where the element ENDS, and both terms that put it there. The message used to
+      // read "(130px wide; constraining it removes 46px of the overflow)", which is
+      // arithmetically true and diagnostically wrong: a dogfood agent noted "The cause
+      // was `left: 660px`, not the width. Shrinking the button as instructed would have
+      // 'fixed' integrity and left the tab order broken." Naming only the width
+      // prescribes the one change that is usually not the fix.
+      ? ` — caused by: ${causes.map((o) =>
+        `${o.selector} (extends to x=${o.right}px: starts at ${Math.round(o.right - o.width)}px, ${o.width}px wide;`
+        + ` shrinking or moving it removes ${o.relieves}px of the overflow)`).join(", ")}`
       : (widest ? ` — sticking out: ${widest}` : "");
+    // Say how many other candidates were probed and cleared. The measurement already
+    // neutralizes up to 40 elements past the edge, but the report named only the
+    // survivors, so a reader could not tell an exhaustive probe from a first-match
+    // guess. v4's repair agent, on a card row that was wider than its container and
+    // went unmentioned because flex shrank it: "I could not tell from the output
+    // whether integrity had *analysed and cleared* the cards row or simply attributed
+    // all overflow to the single worst offender and stopped. I had to reason about
+    // flex-shrink myself to trust the fix."
+    const cleared = input.page.overflowOffenders.filter((o) =>
+      o.relieves !== undefined && !causes.some((c) => c.selector === o.selector));
+    // The best single fix, not the sum: `relieves` is measured by neutralizing one
+    // element at a time, so two elements can each report the same overflow and adding
+    // them up would claim more than exists.
+    const accounted = Math.max(0, ...causes.map((o) => o.relieves ?? 0));
+    const unaccounted = horizontalOverflow - accounted;
+    const clearedNote = causes.length === 0
+      ? ""
+      // A shortfall is the more useful half of the answer, and this is how it showed
+      // up: on the scenario at 375px the gate reports 439px of overflow and the named
+      // cause relieves 77px. The other elements past the edge are rigid siblings in one
+      // row, and since each is probed alone, neutralizing either leaves the other
+      // overflowing — so both measure 0 and no single element can be blamed. Stating
+      // the remainder is what stops the named cause reading as the whole story.
+      : (unaccounted >= minOverflow
+        ? `; fixing that leaves ${unaccounted}px, which no single element relieves`
+          + ` — look for siblings that are each rigid (a fixed-width row, a min-width grid track).`
+          + ` ${cleared.length} other element(s) past the edge were probed individually`
+        : cleared.length > 0
+          ? `; ${cleared.length} other element(s) past the edge were probed and each accounts for`
+            + ` ${Math.max(0, ...cleared.map((o) => o.relieves ?? 0))}px or less`
+          : "");
     issues.push({
       kind: "page-overflow-x",
       severity: "suspect",
       message: `The page scrolls horizontally by ${horizontalOverflow}px at ${input.page.viewportWidth}px viewport width` +
-        detail + ".",
+        detail + clearedNote + ".",
     });
   }
   for (const clip of clipped.slice(0, maxFindings)) {
@@ -403,18 +444,15 @@ export const COLLECT_SCROLL_SCRIPT = `(() => {
 
 export async function runScrollScan(options: ScrollScanOptions): Promise<ScrollScanReport> {
   const viewport = options.viewport ?? { width: 1280, height: 720 };
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
-  try {
+  return await withBrowser(async (browser) => {
     const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
     if (options.html !== undefined) {
-      await page.setContent(options.html, { waitUntil: "networkidle" });
-    } else if (isUrl(options.source)) {
-      await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
+      await page.setContent(options.html, navigationOptions(options));
     } else {
       // file: URL navigation so relative stylesheets/scripts/images resolve —
       // setContent gives the document an about:blank base URL.
-      await page.goto(pathToFileURL(resolve(options.source)).href, { waitUntil: "networkidle", timeout: 30000 });
+      const url = isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
+      await navigatePage(page, url, options);
     }
     // A redirect here is almost always a login wall. Without this the gate
     // measured the login page and reported `status: ok` while naming the
@@ -432,9 +470,7 @@ export async function runScrollScan(options: ScrollScanOptions): Promise<ScrollS
       report.issues.unshift({ kind: "redirected", severity: "suspect",  message: redirectNote });
     }
     return report;
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 export function formatScrollScanReport(report: ScrollScanReport): string {

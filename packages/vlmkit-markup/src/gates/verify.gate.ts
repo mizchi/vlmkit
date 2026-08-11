@@ -15,6 +15,7 @@ import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { readAll, readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { PAGE_LOAD_INPUTS, type PageLoadOptions, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import {
@@ -142,7 +143,7 @@ listing every residual. Add --reference to print the calibration floor.`,
   ledger: () => null,
 });
 
-export interface FlowGateOptions {
+export interface FlowGateOptions extends PageLoadOptions {
   source: string;
   flowPath: string;
   storageState?: string;
@@ -184,15 +185,16 @@ flow.json: { "viewport"?, "steps": [ { "label"?, "do": <action>, "expect": [<ass
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to drive", positional: 0, required: true },
     { name: "flow", placeholder: "file", kind: "path", description: "Flow JSON", required: true },
     { name: "storage-state", placeholder: "file", kind: "path", description: "Playwright storage state for pages behind a login" },
+    ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const source = firstPositional(argv, "vlmkit verify flow <html-or-url> --flow <flow.json>", ["--flow"]);
     const flowPath = readFlag(argv, "flow");
     if (!flowPath) throw new UsageError("--flow <flow.json> is required");
     const storageState = readFlag(argv, "storage-state");
-    return { source, flowPath, ...(storageState ? { storageState } : {}) };
+    return { source, flowPath, ...(storageState ? { storageState } : {}), ...parsePageLoad(argv) };
   },
-  run: async ({ source, flowPath, storageState }) => {
+  run: async ({ source, flowPath, storageState, ...pageLoad }) => {
     let flow: Flow;
     try {
       flow = JSON.parse(await readFile(flowPath, "utf8")) as Flow;
@@ -203,7 +205,7 @@ flow.json: { "viewport"?, "steps": [ { "label"?, "do": <action>, "expect": [<ass
     if (!Array.isArray(flow?.steps) || flow.steps.length === 0) {
       throw new UsageError(`--flow ${flowPath}: "steps" must be a non-empty array`);
     }
-    return runFlowVerify({ source, flow, ...(storageState ? { storageState } : {}) });
+    return runFlowVerify({ source, flow, ...(storageState ? { storageState } : {}), ...pageLoad });
   },
   findings: (report): Finding[] => {
     const findings: Finding[] = [];

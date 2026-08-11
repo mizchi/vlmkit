@@ -30,15 +30,17 @@
  *   vlmkit stress media <html-or-url>
  *   vlmkit stress media <url> --variants forced-colors,print,rtl
  */
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { writeFile, mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium, type Page } from "playwright";
+import { type Page } from "playwright";
 import { sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { type PageLoadOptions, navigatePage } from "@mizchi/vlmkit-core/page-load.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export type MediaVariant = "forced-colors" | "reduced-motion" | "print" | "rtl" | "zoom-200";
 
@@ -50,7 +52,7 @@ export const ALL_VARIANTS: MediaVariant[] = [
   "zoom-200",
 ];
 
-export interface MediaVariantsOptions {
+export interface MediaVariantsOptions extends PageLoadOptions {
   source: string;
   outputDir: string;
   reportPath?: string;
@@ -88,8 +90,11 @@ function isUrl(s: string): boolean { return /^(https?|file):\/\//.test(s); }
  * forced-colors read `Delta 0.36% -> fails` unstyled and `Delta 1.46% -> passes`
  * with the CSS actually applied.
  */
-async function loadPage(page: Page, source: string): Promise<void> {
-  await page.goto(sourceToUrl(source), { waitUntil: "networkidle", timeout: 30000 });
+async function loadPage(page: Page, source: string, pageLoad: PageLoadOptions = {}): Promise<void> {
+  // Every variant pass (default + forced-colors + print + ...) goes through
+  // here, so the load options apply uniformly. A variant loaded under different
+  // rules than the baseline would diff two different documents.
+  await navigatePage(page, sourceToUrl(source), pageLoad);
 }
 
 /** Read all of the page's stylesheet text. Falls back to empty on errors. */
@@ -122,19 +127,20 @@ export async function runMediaVariants(
   const threshold = options.threshold ?? 0.03;
   const variants = options.variants ?? ALL_VARIANTS;
 
-  const html = isUrl(options.source) ? null : await readFile(resolve(options.source), "utf-8");
-
-  const browser = await chromium.launch();
-  let defaultScreenshot: string;
+  // Read both inside the callback (as the diff baseline) and after it (in the
+  // report), so it can be neither callback-local nor a bare `let` assigned in the
+  // closure — TypeScript's definite-assignment analysis does not follow the
+  // latter. It only ever depended on `outputDir`, so hoisting the join is the
+  // same string computed a few lines earlier.
+  const defaultScreenshot = join(outputDir, "default.png");
   let allCss = "";
   const variantResults: VariantResult[] = [];
-  try {
+  await withBrowser(async (browser) => {
     // Default render — used as the baseline for diffs. Transitions
     // intentionally NOT disabled here because the reduced-motion
     // variant needs a fair comparison.
     const defaultPage = await browser.newPage({ viewport });
-    await loadPage(defaultPage, options.source);
-    defaultScreenshot = join(outputDir, "default.png");
+    await loadPage(defaultPage, options.source, options);
     await defaultPage.screenshot({ path: defaultScreenshot, fullPage: false });
     // Read all stylesheets — used for reduced-motion static check.
     allCss = await readAllStylesheets(defaultPage);
@@ -161,7 +167,7 @@ export async function runMediaVariants(
         } else if (variant === "print") {
           await page.emulateMedia({ media: "print" });
         }
-        await loadPage(page, options.source);
+        await loadPage(page, options.source, options);
         if (variant === "rtl") {
           await page.evaluate(() => { document.documentElement.dir = "rtl"; });
           await page.waitForLoadState("networkidle").catch(() => {});
@@ -321,9 +327,7 @@ export async function runMediaVariants(
         verdict, note,
       });
     }
-  } finally {
-    await browser.close();
-  }
+  });
 
   const reportPath = options.reportPath ?? join(outputDir, "report.md");
   const md = renderReport({
@@ -333,7 +337,6 @@ export async function runMediaVariants(
     variants: variantResults,
   });
   await writeFile(reportPath, md);
-
 
   return {
     source: options.source, viewport, defaultScreenshot,

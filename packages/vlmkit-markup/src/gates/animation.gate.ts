@@ -7,6 +7,7 @@
  * fails the command and `--advisory` is the opt-out, per `gate-exit.ts`.
  */
 
+import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
@@ -23,11 +24,15 @@ export const animationGate = defineGate<AnimationEvalReport, AnimationEvalOption
   command: ["check", "animation"],
   title: "Frame-sampled animation evaluation",
   summary:
-    "Frame-sampled animation evaluation (visible effect / settle / reduced-motion behavior)",
+    "Frame-sampled animation evaluation (visible effect / settle / reduced-motion), and a filmstrip image with --strip",
   category: "behavior",
   usage: `Frame-sampled animation evaluation: pause every animation, seek through
 deterministic sample points, and verify each one visibly moves pixels,
-when the page settles, and whether prefers-reduced-motion is honored.`,
+when the page settles, and whether prefers-reduced-motion is honored.
+
+\`--strip out.png\` (or \`.webp\`) writes the sampled frames as ONE image, a row per
+animation, cropped to the motion each one produced — the form to paste into a
+review. \`--frames dir\` writes them as separate files instead.`,
   rules: [
     {
       id: "no-visible-effect",
@@ -55,15 +60,24 @@ when the page settles, and whether prefers-reduced-motion is honored.`,
     { name: "samples", kind: "number", description: "Sample points per animation", defaultDescription: "4" },
     { name: "max-animations", kind: "number", description: "Max animations to frame-evaluate", defaultDescription: "8" },
     { name: "frames", placeholder: "dir", kind: "path", description: "Write each sampled frame PNG into this directory" },
+    { name: "strip", placeholder: "file.png", kind: "path", description: "Composite every sampled frame into one image (row per animation)" },
+    { name: "strip-max-width", placeholder: "px", kind: "number", description: "Cap the strip width, downscaling to fit", defaultDescription: "1600" },
+    { name: "strip-window", placeholder: "ms", kind: "number", description: "Page-timeline span the strip's columns cover", defaultDescription: "when the last finite animation ends" },
+    { name: "strip-selector", placeholder: "css", kind: "string", description: "Restrict the strip's rows to animations on elements matching this selector" },
     { name: "settle-threshold", placeholder: "ms", kind: "number", description: "long-settle threshold", defaultDescription: "3000" },
     { name: "skip-reduced-motion", kind: "boolean", description: "Skip the reduced-motion emulation pass" },
+    ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
-    const source = firstPositional(argv, "vlmkit check animation <html-or-url>", ["--samples", "--max-animations", "--settle-threshold", "--frames"]);
+    const source = firstPositional(argv, "vlmkit check animation <html-or-url>", ["--samples", "--max-animations", "--settle-threshold", "--frames", "--strip", "--strip-max-width", "--strip-window", "--strip-selector"]);
     const samples = optionalInt(argv, "samples", { min: 1 });
     const maxAnimations = optionalInt(argv, "max-animations", { min: 1 });
     const settleThresholdMs = optionalInt(argv, "settle-threshold", { min: 0 });
     const framesDir = readFlag(argv, "frames");
+    const stripPath = readFlag(argv, "strip");
+    const stripMaxWidth = optionalInt(argv, "strip-max-width", { min: 1 });
+    const stripWindowMs = optionalInt(argv, "strip-window", { min: 1 });
+    const stripSelector = readFlag(argv, "strip-selector");
     const viewport = viewportFlag(argv);
     return {
       source,
@@ -72,7 +86,12 @@ when the page settles, and whether prefers-reduced-motion is honored.`,
       ...(maxAnimations !== undefined ? { maxAnimations } : {}),
       ...(settleThresholdMs !== undefined ? { settleThresholdMs } : {}),
       ...(framesDir ? { framesDir } : {}),
+      ...(stripPath ? { stripPath } : {}),
+      ...(stripMaxWidth !== undefined ? { stripMaxWidth } : {}),
+      ...(stripWindowMs !== undefined ? { stripWindowMs } : {}),
+      ...(stripSelector ? { stripSelector } : {}),
       ...(viewport ? { viewport } : {}),
+      ...parsePageLoad(argv),
     };
   },
   run: (options) => runAnimationEval(options),

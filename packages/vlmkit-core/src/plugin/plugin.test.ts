@@ -552,6 +552,44 @@ describe("runGateCli", () => {
     assert.match(text, /--advisory {14}Print findings but exit 0/);
   });
 
+  it("says when warns did not fail the command, and names the flag that makes one fail", async () => {
+    // A dogfood agent working to a "these gates exit 0" criterion nearly shipped the
+    // defect it was sent to fix: "`check animation` exits 0 while printing `settle:
+    // never (infinite animation)`. That is verbatim the reported bug […] demoted to
+    // `warn`. Had I trusted the success criterion I'd have shipped it broken." The
+    // escalation existed — `--rule <id>=suspect` — and was findable only in a document.
+    const lines: string[] = [];
+    const gate = fakeGate({
+      run: () => ({ source: "p.html", hits: [{ rule: "odd-thing", severity: "warn" as const, message: "odd but not fatal" }] }),
+      findings: (report) => report.hits,
+    });
+    const code = await runGateCli(gate, ["p.html"], { out: (t) => lines.push(t), ledger: false });
+    assert.equal(code, 0, "a warn does not fail the command");
+    const text = lines.join("\n");
+    assert.match(text, /1 warn\(s\) did not fail this command/);
+    assert.match(text, /--rule odd-thing=suspect/);
+  });
+
+  it("stays quiet about warns when there are none, and under --json", async () => {
+    const clean: string[] = [];
+    await runGateCli(fakeGate({ run: () => ({ source: "p.html", hits: [] }), findings: () => [] }),
+      ["p.html"], { out: (t) => clean.push(t), ledger: false });
+    assert.doesNotMatch(clean.join("\n"), /did not fail this command/);
+
+    // Under --json the hint would put prose on a stream a client is parsing.
+    const json: string[] = [];
+    await runGateCli(
+      fakeGate({
+        run: () => ({ source: "p.html", hits: [{ rule: "odd-thing", severity: "warn" as const, message: "odd but not fatal" }] }),
+        findings: (report) => report.hits,
+      }),
+      ["p.html", "--json"],
+      { out: (t) => json.push(t), ledger: false },
+    );
+    assert.doesNotMatch(json.join("\n"), /did not fail this command/);
+    JSON.parse(json.join("\n"));
+  });
+
   it("prints the rule table for --rules", async () => {
     const lines: string[] = [];
     const code = await runGateCli(fakeGate(), ["--rules"], { out: (t) => lines.push(t), ledger: false });

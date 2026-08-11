@@ -46,6 +46,8 @@ export {
   detectEmptyContent,
 } from "./heatmap.ts";
 export { findHeatmapRegionsFromFile, findHeatmapRegionsFromRgba } from "./heatmap-regions.ts";
+export { composeFilmstrip, filmstripLayout, type FilmstripLayout, type FilmstripOptions } from "./filmstrip.ts";
+export { encodeWebp, imageFormatForPath, webpEncoderAvailable, type WebpEncodeOptions } from "./webp.ts";
 export {
   createScopedVrtDiff,
   normalizeVrtDiffRegions,

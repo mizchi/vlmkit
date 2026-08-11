@@ -11,7 +11,7 @@
  */
 import { readFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { chromium } from "playwright";
+import { launchBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { compareScreenshots, generateDiffReport } from "@mizchi/vlmkit-core/heatmap.ts";
 import {
   parseCssDeclarations, removeCssProperty, extractCss, replaceCss,
@@ -82,7 +82,7 @@ async function main() {
   console.log();
 
   // ---- Capture baseline ----
-  const browser = await chromium.launch();
+  const browser = await launchBrowser();
   const baselinePath = join(TMP, "baseline.png");
   const loopPage = await browser.newPage({ viewport: VIEWPORT });
   await loopPage.setContent(htmlRaw, { waitUntil: "networkidle" });

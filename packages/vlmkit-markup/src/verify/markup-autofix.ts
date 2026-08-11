@@ -46,6 +46,7 @@ import {
   type MarkupVerifyReport,
   type VerifyTrendPoint,
 } from "./markup-verify.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 // ---------------------------------------------------------------------------
 // Fix proposals
@@ -195,9 +196,7 @@ export async function captureComputedStyles(
   viewport: { width: number; height: number },
 ): Promise<SelectorStyles[]> {
   if (selectors.length === 0) return [];
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
-  try {
+  return await withBrowser(async (browser) => {
     const page = await browser.newPage({ viewport });
     await page.goto(pathToFileURL(resolve(attemptPath)).href, { waitUntil: "load" });
     // Computed styles are read via `page.evaluate`, which does not auto-wait:
@@ -217,9 +216,7 @@ export async function captureComputedStyles(
       { sels: selectors, props: COMPUTED_SUBSET },
     );
     return result as SelectorStyles[];
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 export function extractStyleText(html: string): string {

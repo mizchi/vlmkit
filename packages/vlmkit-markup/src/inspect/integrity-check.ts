@@ -46,6 +46,7 @@ import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { extractComponentsFromRgba } from "../component/component-bbox.ts";
 import { analyzeScrollSamples, COLLECT_SCROLL_SCRIPT, type ScrollScanInput } from "./scroll-scan.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export type IntegrityFindingKind =
   | "js-error"
@@ -1500,8 +1501,6 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
   // order-dependent, and read as "mobile only" for something present everywhere.
   const viewports = [...(options.viewports ?? DEFAULT_INTEGRITY_VIEWPORTS)]
     .sort((a, b) => b.width - a.width);
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
   const findings: IntegrityFinding[] = [];
   const exempted: IntegrityExemption[] = [];
   const stats: IntegrityViewportStats[] = [];
@@ -1522,7 +1521,7 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
     }
   };
 
-  try {
+  await withBrowser(async (browser) => {
     const url = isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
     for (let vi = 0; vi < viewports.length; vi++) {
       const viewport = viewports[vi]!;
@@ -1690,9 +1689,7 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       });
       await page.close();
     }
-  } finally {
-    await browser.close();
-  }
+  });
 
   // User exemptions apply BEFORE the verdict, and every exempted finding is
   // moved into `exempted` rather than dropped — the suppression stays visible in

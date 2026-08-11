@@ -1,0 +1,37 @@
+body { margin: 0; padding: 24px; background: #ffffff; font: 16px/1.5 system-ui, sans-serif; color: #111; }
+h1 { font-size: 22px; margin: 0 0 20px; }
+h2 { font-size: 16px; margin: 0 0 6px; }
+p { margin: 0; font-size: 14px; color: #444; }
+
+/* Toolbar laid out in flow so visual L-to-R order == DOM order
+   (Publish, Save draft, Discard). The previous absolute `left` values put
+   Publish last visually, which made focus jump backwards, and pushed the
+   page 46px wider than a 768px viewport. */
+.toolbar { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+.btn { width: 130px; height: 36px; border: 1px solid #333; border-radius: 6px; background: #fff; font-size: 14px; }
+
+.cards { display: flex; gap: 16px; }
+.card { width: 220px; padding: 16px; border: 2px solid #333; border-radius: 8px; background: #fff; }
+/* Featured stays distinguishable by colour only — same box metrics as its
+   siblings, so it is no longer a *size* outlier among .card instances. */
+.card--featured { background: #eef3ff; border-color: #2255cc; }
+
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.card { animation: rise 250ms ease-out; }
+.card:nth-child(2) { animation-delay: 60ms; }
+.card:nth-child(3) { animation-delay: 120ms; }
+
+@keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+.spinner { width: 28px; height: 28px; margin-top: 24px; border: 3px solid #ddd; border-top-color: #2255cc; border-radius: 50%; animation: spin 900ms linear infinite; }
+
+/* Honour an OS-level reduced-motion request: no entrance animation, no
+   perpetual spinner. The entrance animation above is unchanged for everyone
+   who has not asked for reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .card:nth-child(2),
+  .card:nth-child(3),
+  .spinner {
+    animation: none;
+  }
+}

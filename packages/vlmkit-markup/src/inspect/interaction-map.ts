@@ -40,10 +40,12 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
+import { type PageLoadOptions, applyHar, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { callMarkupCoreJson } from "../markup-core-runtime.ts";
 import type { Page } from "playwright";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -648,7 +650,7 @@ function describeKey(key: string): string {
 // ---------------------------------------------------------------------------
 // The probe driver
 
-export interface InteractionMapOptions {
+export interface InteractionMapOptions extends PageLoadOptions {
   /**
    * Playwright storage-state file so gates can measure pages behind a
    * login. Falls back to VLMKIT_STORAGE_STATE. See auth-state.ts.
@@ -669,20 +671,25 @@ interface DiscoveredElement {
   blurredStyle: string;
 }
 
-async function gotoSource(page: Page, source: string): Promise<void> {
+/**
+ * `load` stays this gate's default milestone, not `networkidle`: the settle
+ * below already waits for network idle with a bound, which is why this gate
+ * survives a page that never reaches it. `--wait-until` can still lower it to
+ * `domcontentloaded` for an app whose first paint is what matters.
+ */
+async function gotoSource(page: Page, source: string, pageLoad: PageLoadOptions = {}): Promise<void> {
   const url = /^(https?|file):\/\//.test(source) ? source : pathToFileURL(resolve(source)).href;
-  await page.goto(url, { waitUntil: "load", timeout: 30000 });
+  await applyHar(page, pageLoad.har);
+  await page.goto(url, navigationOptions(pageLoad, "load"));
   await settlePage(page);
 }
 
 export async function buildInteractionMap(options: InteractionMapOptions): Promise<InteractionMapResult> {
   const maxElements = options.maxElements ?? 30;
   const settleMs = options.settleMs ?? 120;
-  const { chromium } = await import("playwright");
-  const browser = await chromium.launch();
-  try {
+  return await withBrowser(async (browser) => {
     const page = await browser.newPage(withAuthState({ viewport: { width: 1280, height: 800 } }, options.storageState));
-    await gotoSource(page, options.source);
+    await gotoSource(page, options.source, options);
     const discovered = await page.evaluate(DISCOVER_SCRIPT) as DiscoveredElement[];
     const capped = Math.max(0, discovered.length - maxElements);
     const kept = discovered.slice(0, maxElements);
@@ -714,7 +721,7 @@ export async function buildInteractionMap(options: InteractionMapOptions): Promi
       const key = activationKeyForRole(d.role);
       let activation: ActivationResult | undefined;
       if (key) {
-        await gotoSource(page, options.source);
+        await gotoSource(page, options.source, options);
         await page.evaluate(DISCOVER_SCRIPT);
         const before = await page.evaluate(ariaSnapshotScript(d.index)) as AriaSnapshot | null;
         if (before) {
@@ -816,9 +823,7 @@ export async function buildInteractionMap(options: InteractionMapOptions): Promi
       });
     }
     return { source: options.source, elements, capped };
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 // ---------------------------------------------------------------------------

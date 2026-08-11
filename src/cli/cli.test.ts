@@ -175,6 +175,15 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.doesNotMatch(r.stderr, /\[vlmkit deprecated\]/);
   });
 
+  it("`vrt snapshot strip` routes to strip-cli", () => {
+    // The still-image sibling of `flipbook`; both are special-cased under
+    // `snapshot` because snapshot.ts has no such mode.
+    const r = runVrt(["snapshot", "strip", "--help"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vlmkit snapshot strip <frame1\.png>/);
+    assert.doesNotMatch(r.stderr, /\[vlmkit deprecated\]/);
+  });
+
   it("`vrt contract` prints contract group usage", () => {
     const r = runVrt(["contract"]);
     assert.equal(r.status, 0);

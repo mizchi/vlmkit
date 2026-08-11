@@ -127,6 +127,7 @@ const SPECS: Record<string, Spec> = {
   elementCompare: spec("element-compare", () => import("@mizchi/vlmkit-core/element-compare.ts")),
   smokeRunner: spec("smoke-runner", () => import("@mizchi/vlmkit-markup/inspect/smoke-runner.ts")),
   flipbook: spec("flipbook-cli", () => import("./commands/flipbook-cli.ts")),
+  strip: spec("strip-cli", () => import("./commands/strip-cli.ts")),
   diffForAgent: spec("diff-for-agent-cli", () => import("./commands/diff-for-agent-cli.ts")),
   presenceMatrix: spec("presence-matrix", () => import("./commands/presence-matrix-cli.ts")),
   compareRuns: spec("compare-runs-cli", () => import("./commands/compare-runs-cli.ts")),
@@ -404,6 +405,25 @@ async function runGroupLeaf(
     return;
   }
 
+  // `check a11y` / `check drift` name a namespace, not a gate: their gates are
+  // `check a11y focus`, `check drift component`, and so on. A dogfood agent hit the
+  // dead end — "`check a11y --help` / `check drift --help` -> `Unknown check
+  // subcommand: a11y`. Two-word subcommands have no help routing; I had to guess
+  // `check --help` to discover `a11y focus` exists." List what is under it instead.
+  const prefix = `${groupName} ${leafName} `;
+  const underPrefix = registry.list()
+    .map((entry) => ({ command: entry.gate.command.join(" "), gate: entry.gate }))
+    .filter((entry) => entry.command.startsWith(prefix));
+  if (underPrefix.length > 0) {
+    const width = Math.max(...underPrefix.map((e) => e.command.length));
+    console.log(`Usage: vlmkit ${groupName} ${leafName} <subcommand> [options]\n`);
+    for (const entry of underPrefix) {
+      console.log(`  vlmkit ${entry.command.padEnd(width)}  ${entry.gate.summary ?? ""}`);
+    }
+    console.log(`\nRun any of them with --help for its options.`);
+    return;
+  }
+
   const suggestions = registry.suggest([groupName, leafName]);
   console.error(
     `Unknown ${groupName} subcommand: ${leafName}`
@@ -472,6 +492,11 @@ Run \`vlmkit <command> --help\` for subcommands, options, and examples.`);
       const rest = passThrough(argv, ["snapshot"]);
       if (rest[0] === "flipbook") {
         await delegate(SPECS.flipbook, rest.slice(1));
+        return;
+      }
+      // The still-image sibling of `flipbook`: one PNG instead of an HTML player.
+      if (rest[0] === "strip") {
+        await delegate(SPECS.strip, rest.slice(1));
         return;
       }
       if (rest[0] === "report") {

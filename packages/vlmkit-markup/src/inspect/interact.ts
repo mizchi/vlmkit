@@ -35,7 +35,7 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium, type Page } from "playwright";
+import { type Page } from "playwright";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
 import { annotateHeatmapRegionKinds } from "../heatmap-region-kinds.ts";
@@ -44,6 +44,7 @@ import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { classifyHealTier } from "./selector-heal-calibration.ts";
+import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export type SequenceAction =
   | { action: "snapshot"; name: string }
@@ -226,11 +227,10 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
     throw new Error("Sequence must contain at least one `snapshot` step.");
   }
 
-  const browser = await chromium.launch();
   const snapshots: SnapshotEntry[] = [];
   const healAllFindings: HealAllFinding[] = [];
   let pendingActions: SequenceAction[] = [];
-  try {
+  await withBrowser(async (browser) => {
     const page = await browser.newPage({ viewport });
     if (isUrl(options.source)) {
       await page.goto(options.source, { waitUntil: "networkidle", timeout: 30000 });
@@ -315,9 +315,7 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
       }
     }
     await page.close();
-  } finally {
-    await browser.close();
-  }
+  });
 
   // Pixel-diff consecutive snapshots. Each transition surfaces the
   // delta induced by the actions between them.
