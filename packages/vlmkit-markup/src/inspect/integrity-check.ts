@@ -706,6 +706,12 @@ export interface ContrastCandidate {
   disabled: boolean;
   /** text-shadow present — may carry the contrast the fill lacks. */
   shadowed: boolean;
+  /** Computed font-size in px, so the message can say which WCAG floor applied. */
+  fontSizePx?: number;
+  /** WCAG "large text": >=24px, or >=18.66px at weight 700+. */
+  large?: boolean;
+  /** The applicable floor: 3 for large text, 4.5 otherwise. */
+  floor?: number;
 }
 
 export function judgeTextContrast(
@@ -741,8 +747,22 @@ export function judgeTextContrast(
         severity: "warn",
         viewport,
         selector: c.selector,
-        message: `${c.selector} renders "${clip(c.text)}" at contrast ${c.ratio.toFixed(2)}:1 (${c.fg} on ${c.bg}) — below the 3:1 floor even for large text.`,
-        evidence: { ratio: c.ratio, fg: c.fg, bg: c.bg },
+        // Name the floor that applied and why, rather than the old "below the 3:1
+        // floor even for large text" — which was true, read as the contrast
+        // verdict, and quietly meant that 13px text at 3.03:1 was never mentioned.
+        message: `${c.selector} renders "${clip(c.text)}" at contrast ${c.ratio.toFixed(2)}:1 (${c.fg} on ${c.bg})`
+          + ` — below the ${(c.floor ?? 3).toString()}:1 WCAG AA floor`
+          + (c.fontSizePx !== undefined
+            ? ` for ${c.fontSizePx}px ${c.large ? "large" : "body"} text`
+            : "")
+          + `.`,
+        evidence: {
+          ratio: c.ratio,
+          fg: c.fg,
+          bg: c.bg,
+          ...(c.floor !== undefined ? { floor: c.floor } : {}),
+          ...(c.fontSizePx !== undefined ? { fontSizePx: c.fontSizePx } : {}),
+        },
       });
     }
   }
@@ -1376,7 +1396,19 @@ export const COLLECT_TEXT_CONTRAST = `(() => {
     const fgColor = parseColor(style.color) || [0, 0, 0, 1];
     const fg = blend(bg, [fgColor[0], fgColor[1], fgColor[2], fgColor[3] * opacity]);
     const r = ratio(fg, bg);
-    if (r >= 3) continue;
+    // WCAG's floor depends on the text's size, and this used to be a flat 3:1 —
+    // which is the LARGE-text floor applied to everything. A dogfood agent found
+    // what that means in practice: 13px body text at 3.03:1 is a WCAG AA failure,
+    // \`check a11y contrast\` reports it as "3.03:1 (need 4.5)", and this gate said
+    // CLEAN and exited 0. "Fixing only to satisfy criterion 1 would have left the
+    // low-vision reporter failed with a green gate."
+    //
+    // Large = 24px, or 18.66px at weight 700+ (WCAG 2.2's 18pt / 14pt bold).
+    const fontSizePx = parseFloat(style.fontSize) || 16;
+    const weight = parseFloat(style.fontWeight) || (/bold/i.test(style.fontWeight) ? 700 : 400);
+    const large = fontSizePx >= 24 || (fontSizePx >= 18.66 && weight >= 700);
+    const floor = large ? 3 : 4.5;
+    if (r >= floor) continue;
     candidates.push({
       selector: stableSelector(el),
       text: direct.replace(/\\s+/g, " ").trim().slice(0, 60),
@@ -1385,6 +1417,9 @@ export const COLLECT_TEXT_CONTRAST = `(() => {
       bg: "rgb(" + bg.map(Math.round).join(", ") + ")",
       disabled: el.closest("[disabled], [aria-disabled='true']") != null,
       shadowed: style.textShadow !== "none",
+      fontSizePx: Math.round(fontSizePx * 10) / 10,
+      large: large,
+      floor: floor,
     });
   }
   return { candidates, skippedComposite };

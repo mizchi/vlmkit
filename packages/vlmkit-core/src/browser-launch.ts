@@ -123,10 +123,116 @@ function diagnoseLaunchFailure(error: unknown, options: LaunchBrowserOptions): u
 export async function launchBrowser(options: LaunchBrowserOptions = {}): Promise<Browser> {
   const engine = BROWSER_ENGINES[options.engine ?? "chromium"];
   try {
-    return await engine.launch(options.launch);
+    return instrumentNavigation(await engine.launch(options.launch));
   } catch (error) {
     throw diagnoseLaunchFailure(error, options);
   }
+}
+
+/** How many still-pending requests to name in a timeout. Enough to see a pattern, not a log dump. */
+const NAMED_PENDING_REQUESTS = 3;
+
+/**
+ * Make every page this browser opens explain its own navigation timeouts.
+ *
+ * Done at the launch rather than at the navigation because there are **42
+ * `.goto(` call sites across 20 files**, three of which hand-roll the same
+ * `{ waitUntil: options.waitUntil ?? "networkidle", timeout: options.timeout ?? 30000 }`
+ * — so a fix applied to `navigatePage` reaches one of them and looks finished.
+ * Wrapping `newPage` here is the only edit that covers all 42.
+ *
+ * The whole failure used to be one line — `error: page load timed out (Timeout
+ * 30000ms exceeded)` — and two dogfood agents working on separate tasks
+ * independently called it the worst thing they hit:
+ *
+ *   "It doesn't say the default wait state is `networkidle`, doesn't say
+ *    `--wait-until` exists, doesn't say a request is still open, doesn't name it.
+ *    The tool *knows* the milestone it was waiting on and that `/api/live` is in
+ *    flight."
+ *
+ *   "Dead end as guidance, useful as evidence. Reproduced the reported symptom;
+ *    told me nothing about how to proceed."
+ *
+ * It is #112's item 1 restated: "the timeout error reads like the tool can't
+ * handle the page rather than like a hint to change approach". Everything needed
+ * is present at the moment of failure; it just was not said.
+ */
+function instrumentNavigation(browser: Browser): Browser {
+  // A test double or a custom backend need not implement `newPage`, and the
+  // diagnosis is not worth turning a missing optional method into a TypeError at
+  // launch — the caller loses a browser either way.
+  if (typeof browser?.newPage !== "function") return browser;
+  const originalNewPage = browser.newPage.bind(browser);
+  browser.newPage = async (...args: Parameters<Browser["newPage"]>) => {
+    const page = await originalNewPage(...args);
+    const inflight = new Map<string, number>();
+    page.on("request", (r) => inflight.set(r.url(), Date.now()));
+    page.on("requestfinished", (r) => inflight.delete(r.url()));
+    page.on("requestfailed", (r) => inflight.delete(r.url()));
+    const originalGoto = page.goto.bind(page);
+    page.goto = async (url, gotoOptions) => {
+      try {
+        return await originalGoto(url, gotoOptions);
+      } catch (error) {
+        throw explainNavigationTimeout(error, gotoOptions, inflight);
+      }
+    };
+    return page;
+  };
+  return browser;
+}
+
+/**
+ * Restate a navigation timeout as the three things the caller needs: which
+ * milestone was waited on, what was still open, and which flag ends the wait.
+ *
+ * Any other error passes through untouched — `cli-error.ts` already has branches
+ * for a refused connection, an unresolvable host and a blocked port, and this
+ * must not shadow them.
+ */
+function explainNavigationTimeout(
+  error: unknown,
+  gotoOptions: { waitUntil?: string; timeout?: number } | undefined,
+  inflight: ReadonlyMap<string, number>,
+): unknown {
+  const message = error instanceof Error ? error.message : String(error);
+  if (!/Timeout \d+ms exceeded/i.test(message)) return error;
+
+  // Playwright's own defaults, named so the message can state what it waited on
+  // even when the call site passed nothing.
+  const waitUntil = gotoOptions?.waitUntil ?? "load";
+  const timeout = gotoOptions?.timeout ?? Number(message.match(/Timeout (\d+)ms/i)?.[1] ?? 30_000);
+
+  const now = Date.now();
+  const pending = [...inflight.entries()]
+    .sort((a, b) => a[1] - b[1])
+    .map(([requestUrl, at]) => `${requestUrl} (open ${((now - at) / 1000).toFixed(1)}s)`);
+
+  const lines = [`page load timed out after ${timeout}ms waiting for \`${waitUntil}\``];
+  if (pending.length > 0) {
+    // The pending list is the evidence that the page itself is fine: a held-open
+    // stream is not a page that failed to render.
+    lines.push(
+      `  ${pending.length} request(s) still open:`,
+      ...pending.slice(0, NAMED_PENDING_REQUESTS).map((p) => `    ${p}`),
+      ...(pending.length > NAMED_PENDING_REQUESTS ? [`    and ${pending.length - NAMED_PENDING_REQUESTS} more`] : []),
+    );
+  }
+  if (waitUntil === "networkidle") {
+    // Only worth saying when `networkidle` is what is being waited on: it is the
+    // one milestone a single long-lived connection blocks forever, and it is the
+    // default every gate uses, so this is the common case.
+    lines.push(
+      "  The page may have rendered long before this — `networkidle` needs every connection to close,",
+      "  which a stream or a poll never does. Try `--wait-until load` (or `domcontentloaded`),",
+      "  or pin the network with `--har <file>`. Raising `--timeout` will not help an endpoint that never closes.",
+    );
+  } else {
+    lines.push("  Raise `--timeout <ms>`, or relax `--wait-until` further.");
+  }
+  const explained = new Error(lines.join("\n"));
+  explained.cause = error;
+  return explained;
 }
 
 /**

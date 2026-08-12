@@ -21,6 +21,7 @@ import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { readAll, readChoice, readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import {
   type IntegrityOptions,
   type IntegrityReport,
@@ -88,21 +89,17 @@ ${ALLOW_HELP}`,
     },
     { name: "viewports", placeholder: "w,w,...", kind: "number-list", description: "Sweep widths", defaultDescription: "1280,768,375" },
     { name: "max-findings", kind: "number", description: "Per-class report cap", defaultDescription: "12" },
-    { name: "timeout", placeholder: "ms", kind: "number", description: "Page navigation timeout", defaultDescription: "30000" },
-    {
-      name: "wait-until",
-      kind: "string",
-      description: "Navigation wait state",
-      choices: ["domcontentloaded", "load", "networkidle"],
-      defaultDescription: "networkidle",
-    },
-    { name: "har", placeholder: "file", kind: "path", description: "Replay network responses from a Playwright HAR" },
     {
       name: "storage-state",
       kind: "path",
       description: "Playwright storage state, to measure pages behind a login (or set VLMKIT_STORAGE_STATE)",
     },
     { name: "allow", kind: "string", description: "Exempt an intentional pattern (see below)", repeatable: true },
+    // Spread, not re-declared. Hand-written copies of these three drifted from the
+    // fragment: v5's CI agent found the `--wait-until` hint present on `check copy`
+    // and `check breakpoints` and absent here — "and integrity is the gate you reach
+    // for first."
+    ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const elements = readFlag(argv, "elements");
@@ -136,10 +133,11 @@ ${ALLOW_HELP}`,
       throw new UsageError("--viewports must be positive px widths, e.g. --viewports 1280,768,375");
     }
     const maxFindings = optionalInt(argv, "max-findings", { min: 1 });
-    const timeout = optionalInt(argv, "timeout", { min: 1 });
-    const waitUntil = readChoice(argv, "wait-until", ["domcontentloaded", "load", "networkidle"] as const);
+    const pageLoad = parsePageLoad(argv);
+    const timeout = pageLoad.timeout;
+    const waitUntil = pageLoad.waitUntil;
     const storageState = readFlag(argv, "storage-state");
-    const har = readFlag(argv, "har");
+    const har = pageLoad.har;
     // Parsed before the browser starts, so a typo in an exemption fails in
     // milliseconds instead of after a three-viewport sweep.
     const allow = parseAllowRules(readAll(argv, "allow"));

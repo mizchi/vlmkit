@@ -1,0 +1,14 @@
+{
+  "pages": [
+    {
+      "id": "ops-dashboard",
+      "source": "http://localhost:5201/",
+      "gates": [
+        "check integrity --wait-until load",
+        "check copy --wait-until load",
+        "check breakpoints --wait-until load --rule overflow-at-boundary=suspect",
+        "check design --wait-until load --exclude \".vendorchart-ctrl-group\""
+      ]
+    }
+  ]
+}

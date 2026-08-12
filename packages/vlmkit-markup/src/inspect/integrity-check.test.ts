@@ -205,6 +205,37 @@ describe("pure judges", () => {
     assert.match(exempted[2]!.reason, /5 text block\(s\) skipped/);
   });
 
+  test("judgeTextContrast: the message names the WCAG floor that applied and the size that chose it", () => {
+    // The old wording was "below the 3:1 floor even for large text" for every
+    // candidate, because the collector cut at a flat 3:1 — the LARGE-text floor
+    // applied to everything. A dogfood agent found what that cost: 13px body text
+    // at 3.03:1 is a WCAG AA failure, `check a11y contrast` says "3.03:1 (need
+    // 4.5)", and `check integrity` said CLEAN and exited 0. Reporting it is only
+    // half the fix; the message has to say which floor and why, or a reader cannot
+    // tell whether 3.03:1 is acceptable here.
+    const base = { text: "Within budget", fg: "rgb(148, 148, 148)", bg: "rgb(255, 255, 255)", disabled: false, shadowed: false };
+    const { findings } = judgeTextContrast([
+      { ...base, selector: "#body", ratio: 3.03, fontSizePx: 13, large: false, floor: 4.5 },
+      { ...base, selector: "#heading", ratio: 2.9, fontSizePx: 32, large: true, floor: 3 },
+    ], 0, 1280);
+    assert.match(findings[0]!.message, /below the 4\.5:1 WCAG AA floor for 13px body text/);
+    assert.match(findings[1]!.message, /below the 3:1 WCAG AA floor for 32px large text/);
+    // The floor travels in the evidence too, so a --json consumer can group by it.
+    assert.equal(findings[0]!.evidence?.floor, 4.5);
+    assert.equal(findings[1]!.evidence?.floor, 3);
+  });
+
+  test("judgeTextContrast: a candidate carrying no size still reports, at the old floor", () => {
+    // Forward compatibility in the other direction: the fields are optional, so a
+    // caller that has not been updated must not produce `below the undefined:1`.
+    const { findings } = judgeTextContrast(
+      [{ selector: "#x", text: "t", fg: "rgb(1,1,1)", bg: "rgb(2,2,2)", disabled: false, shadowed: false, ratio: 2.0 }],
+      0,
+      1280,
+    );
+    assert.match(findings[0]!.message, /below the 3:1 WCAG AA floor\./);
+  });
+
   test("judgeAlignment: 2-8px deviant flagged, exact and clearly-offset silent, other-axis alignment exempt", () => {
     const child = (selector: string, left: number, top: number, width = 100) =>
       ({ selector, left, right: left + width, centerX: left + width / 2, top });

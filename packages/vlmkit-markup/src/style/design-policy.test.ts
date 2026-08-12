@@ -50,6 +50,83 @@ const input = (over: Partial<DesignPolicyInput> = {}): DesignPolicyInput => ({
 });
 
 describe("judgeDesignPolicy — component drift", () => {
+  it("states per-style counts instead of an average dressed as a per-style claim", () => {
+    // The old wording was "each style reused only 1.5x", which contradicted its own
+    // next sentence ("Dominant style, used 2x") and named a count no style had. v5's
+    // repair agent: "No style is used 1.5 times. […] I could not tune the gate into
+    // agreement with itself, and had to reverse-engineer the formula."
+    const report = judgeDesignPolicy(input({
+      samples: [
+        styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "#save" }),
+        styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "#snooze" }),
+        styled("button", "10|18|10|18|8|1|blue", "16|400", { selector: "#acknowledge" }),
+      ],
+    }));
+    const message = report.findings.find((f) => f.kind === "component-drift")!.message;
+    assert.match(message, /used 2x, 1x/);
+    assert.match(message, /this role averages 1\.5x/);
+    assert.doesNotMatch(message, /each style reused only/);
+  });
+
+  it("names the property that actually differs, not just both fingerprints", () => {
+    // "Both styles print `border 1`; the actual delta is `background` […] I opened the
+    // stylesheet to learn whether the deviation was one property or two."
+    const report = judgeDesignPolicy(input({
+      samples: [
+        styled("button", "10|18|10|18|8|1|rgb(255, 255, 255)", "16|400", { selector: "#save" }),
+        styled("button", "10|18|10|18|8|1|rgb(255, 255, 255)", "16|400", { selector: "#snooze" }),
+        styled("button", "10|18|10|18|8|1|rgb(34, 85, 204)", "16|400", { selector: "#acknowledge" }),
+      ],
+    }));
+    const message = report.findings.find((f) => f.kind === "component-drift")!.message;
+    assert.match(message, /differs in background-color rgb\(255, 255, 255\) → rgb\(34, 85, 204\)/);
+    // One property, and the message says so — that was the whole question.
+    assert.doesNotMatch(message, /and \d+ more/);
+  });
+
+  it("caps the differing-property list, since a style that differs in everything answers by count", () => {
+    const report = judgeDesignPolicy(input({
+      samples: [
+        styled("button", "0|0|0|0|0|0|transparent", "16|400", { selector: "#a" }),
+        styled("button", "0|0|0|0|0|0|transparent", "16|400", { selector: "#b" }),
+        styled("button", "10|18|10|18|8|1|white", "20|700", { selector: "#c" }),
+      ],
+    }));
+    const message = report.findings.find((f) => f.kind === "component-drift")!.message;
+    assert.match(message, /and \d+ more/);
+  });
+
+  it("offers --exclude when the dominant style has the shape of vendor chrome", () => {
+    // #112 item 4: three icon-only zoom buttons outvoted the app's own three, so the
+    // app's buttons were reported as the deviants. Two agents found `--exclude` only
+    // by opening `--help`; the gate has the evidence to mention it here.
+    const report = judgeDesignPolicy(input({
+      samples: [
+        styled("button", "0|0|0|0|0|0|rgba(0, 0, 0, 0)", "12|400", { textFree: true, selector: ".vendor-zoom-in" }),
+        styled("button", "0|0|0|0|0|0|rgba(0, 0, 0, 0)", "12|400", { textFree: true, selector: ".vendor-zoom-out" }),
+        styled("button", "0|0|0|0|0|0|rgba(0, 0, 0, 0)", "12|400", { textFree: true, selector: ".vendor-reset" }),
+        styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "#save" }),
+        styled("button", "10|18|10|18|8|1|blue", "16|400", { selector: "#acknowledge" }),
+      ],
+    }));
+    const message = report.findings.find((f) => f.kind === "component-drift")!.message;
+    assert.match(message, /--exclude/);
+    assert.match(message, /third-party widget/);
+  });
+
+  it("does not offer --exclude when the dominant style is the page's own component", () => {
+    // A false positive here costs a sentence, but it must not appear on every page.
+    const report = judgeDesignPolicy(input({
+      samples: [
+        styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "#save" }),
+        styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "#snooze" }),
+        styled("button", "10|18|10|18|8|1|blue", "16|400", { selector: "#acknowledge" }),
+      ],
+    }));
+    const message = report.findings.find((f) => f.kind === "component-drift")!.message;
+    assert.doesNotMatch(message, /--exclude/);
+  });
+
   it("reports a role whose styles are barely reused", () => {
     // Agent fixture shape: 6 buttons, 3 styles, reuse 2.0.
     const report = judgeDesignPolicy(input({

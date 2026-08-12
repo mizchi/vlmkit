@@ -41,6 +41,15 @@ export interface BatchJob {
   gate: string;
   /** One page: a file path or a URL. */
   page: string;
+  /**
+   * Working directory for the gate process. Defaults to this process's.
+   *
+   * `vlmkit gates run` sets it to the config file's own directory, so a relative
+   * path inside the config (`--har dashboard.har`, a `source` glob) resolves
+   * against the config rather than against wherever the command was typed. See
+   * the note on `runJobs`.
+   */
+  cwd?: string;
 }
 
 export interface BatchJobResult extends BatchJob {
@@ -176,6 +185,7 @@ function runJob(job: BatchJob, cliEntry: string): Promise<BatchJobResult> {
   const started = Date.now();
   return new Promise((resolveJob) => {
     const child = spawn(process.execPath, args, {
+      ...(job.cwd ? { cwd: job.cwd } : {}),
       stdio: ["ignore", "pipe", "pipe"],
       // The child is one more gate run; it must not inherit the marker that
       // tells a leaf module "you are the CLI entry".
@@ -278,7 +288,47 @@ export async function runBatch(options: BatchOptions): Promise<BatchSummary> {
   return runJobs(buildJobs(options.gates, pages), options);
 }
 
-export function formatBatchSummary(summary: BatchSummary, options: { showOutput?: boolean } = {}): string {
+/**
+ * Did this job's gate actually measure the page, or die before it started?
+ *
+ * CI has to tell those apart and the summary used to make them identical. v5's CI
+ * agent, on four gates that all died in navigation:
+ *
+ *   "`verdict: 4 FAILED (0 passed)` with zero reasons and no distinction between
+ *    'gate found defects' and 'gate never ran'. CI cannot tell a broken page from a
+ *    broken harness."
+ *
+ * The signal is in the output the child already produced: every gate prints a
+ * `verdict:` or `status:` line, or a JSON report under `--json`. A harness failure
+ * prints an `error:` line and nothing else.
+ */
+export function gateReported(output: string): boolean {
+  if (/^\s*(verdict|status):/m.test(output)) return true;
+  // `--json` in the gate string: a report is a report even without prose.
+  const trimmed = output.trim();
+  if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+    try {
+      JSON.parse(trimmed);
+      return true;
+    } catch {
+      // A truncated report is not a report.
+    }
+  }
+  return false;
+}
+
+/** The one line worth putting in the summary for a job that never ran. */
+export function gateFailureReason(output: string): string {
+  const lines = output.split("\n").map((l) => l.replace(/\x1B\[[0-9;]*m/g, "").trimEnd()).filter((l) => l.trim());
+  // `error: …` is what `handleCliError` prints; fall back to the first line, which
+  // for an unhandled throw is the exception message.
+  return (lines.find((l) => /^error:/i.test(l)) ?? lines[0] ?? "no output").slice(0, 300);
+}
+
+export function formatBatchSummary(
+  summary: BatchSummary,
+  options: { showOutput?: boolean; outputDir?: string } = {},
+): string {
   const lines: string[] = [];
   const pages = new Set(summary.jobs.map((j) => j.page));
   const gates = [...new Set(summary.jobs.map((j) => j.gate))];
@@ -291,10 +341,16 @@ export function formatBatchSummary(summary: BatchSummary, options: { showOutput?
     + `${RESET}`,
   );
   lines.push("");
+  // Split the failure count, because "the page is broken" and "the run is broken"
+  // call for different actions and used to print as one number.
+  const neverRan = summary.jobs.filter((j) => j.exitCode !== 0 && !gateReported(j.output));
   lines.push(
     summary.failed === 0
       ? `verdict: ${GREEN}ALL PASS${RESET} (${summary.passed}/${summary.jobs.length})`
-      : `verdict: ${RED}${summary.failed} FAILED${RESET} (${summary.passed} passed)`,
+      : neverRan.length === 0
+        ? `verdict: ${RED}${summary.failed} FAILED${RESET} (${summary.passed} passed)`
+        : `verdict: ${RED}${summary.failed - neverRan.length} FAILED${RESET},`
+          + ` ${YELLOW}${neverRan.length} DID NOT RUN${RESET} (${summary.passed} passed)`,
   );
   const wall = summary.wallMs / 1000;
   const busy = summary.serialMs / 1000;
@@ -315,7 +371,12 @@ export function formatBatchSummary(summary: BatchSummary, options: { showOutput?
   if (failures.length > 0) {
     lines.push(`${BOLD}Failures${RESET}`);
     for (const f of failures) {
-      lines.push(`  ${RED}x${RESET} ${f.gate} ${f.page} ${DIM}(exit ${f.exitCode}, ${(f.durationMs / 1000).toFixed(1)}s)${RESET}`);
+      const ran = gateReported(f.output);
+      const mark = ran ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
+      lines.push(`  ${mark} ${f.gate} ${f.page} ${DIM}(exit ${f.exitCode}, ${(f.durationMs / 1000).toFixed(1)}s)${RESET}`);
+      // The reason goes inline for a job that never ran. Re-running to find out why
+      // the harness broke is a whole extra cycle, and in CI there may not be one.
+      if (!ran) lines.push(`      ${YELLOW}did not run:${RESET} ${gateFailureReason(f.output)}`);
     }
     lines.push("");
     if (options.showOutput) {
@@ -324,6 +385,11 @@ export function formatBatchSummary(summary: BatchSummary, options: { showOutput?
         lines.push(f.output.trimEnd());
         lines.push("");
       }
+    } else if (options.outputDir) {
+      // The old text offered `--output <dir>` even when `--output <dir>` had just
+      // been passed, which reads as "your flag did nothing".
+      lines.push(`${DIM}Full logs: ${options.outputDir}${RESET}`);
+      lines.push("");
     } else {
       lines.push(`${DIM}Re-run one to see its report, or pass --output <dir> to keep every log:${RESET}`);
       lines.push(`  vlmkit ${failures[0]!.gate} ${failures[0]!.page}`);
@@ -390,7 +456,10 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     quiet: hasFlag(argv, "quiet"),
   });
   if (json) console.log(JSON.stringify(summary, null, 2));
-  else console.log(formatBatchSummary(summary, { showOutput: hasFlag(argv, "show-output") }));
+  else console.log(formatBatchSummary(summary, {
+      showOutput: hasFlag(argv, "show-output"),
+      ...(output ? { outputDir: output } : {}),
+    }));
   if (summary.failed > 0 && !hasFlag(argv, "advisory")) process.exitCode = 1;
 }
 

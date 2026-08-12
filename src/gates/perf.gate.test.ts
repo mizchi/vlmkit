@@ -62,9 +62,15 @@ describe("check perf page-load flags", () => {
     // 1500ms navigation timeout fires. If --timeout were dropped this would
     // instead sit for 30s and the test would time out — which is also a failure,
     // just a slower one.
+    // The message shape is the enriched one from `browser-launch.ts`, which names the
+    // milestone and the flag that ends the wait — Playwright's bare `Timeout 1500ms
+    // exceeded` was reported as a dead end by two dogfood agents. Asserting the
+    // enriched form keeps this gate covered by that fix rather than pinning the old
+    // wording it replaced.
     await assert.rejects(
       async () => perfGate.run(perfGate.parse(argv([]), ctx), ctx),
-      (e: Error) => /Timeout .*exceeded/.test(e.message),
+      (e: Error) => /page load timed out after 1500ms waiting for `networkidle`/.test(e.message)
+        && /--wait-until load/.test(e.message),
     );
     const report = await perfGate.run(
       perfGate.parse(argv(["--wait-until", "domcontentloaded"]), ctx),

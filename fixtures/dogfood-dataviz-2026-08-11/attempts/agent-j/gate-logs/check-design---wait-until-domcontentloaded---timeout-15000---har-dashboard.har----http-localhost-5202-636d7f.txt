@@ -1,0 +1,21 @@
+
+[1m[36mvlmkit check design[0m
+[2msource: http://localhost:5202/[0m
+
+verdict: [33mDRIFT[0m (2 finding(s), 11 element(s) excluded)
+[2m  roles judged: 3, spacing values: 6, skipped: 13 (no inferable role), 0 (non-resting state)[0m
+
+[1mRole reuse[0m [2m(instances / distinct styles; drift below 3x from 3 instances)[0m
+  h2               3 inst    1 styles  reuse     3x  0 one-off  [32mok[0m
+  button           3 inst    2 styles  reuse   1.5x  1 one-off  [33mdrift[0m
+  h1               1 inst    1 styles  reuse     1x  1 one-off  [32mok[0m
+
+[1mExcluded subtrees[0m [2m(11 unique element(s) omitted)[0m
+  [2m-[0m .vendorchart-ctrl-group: 1 root match(es), 11 element(s) removed
+
+[1mFindings[0m
+  [33m![0m [component-drift] button: 3 "button" elements render 2 distinct styles (each style reused only 1.5x; a system reuses each style 3x or more). Dominant style, used 2x: padding 10/18/10/18, radius 8, 16px/400, border 1, bg rgb(255, 255, 255). Deviating: button#acknowledge (padding 10/18/10/18, radius 8, 16px/400, border 1, bg rgb(34, 85, 204)). This reports inconsistency, not which style is correct.
+
+[1mInformational[0m [2m(true, but does not carry the verdict)[0m
+  [2mi[0m [scale-outlier]: 1 spacing value(s) sit just off the page's own scale: 20px (2x) next to 18px (6x) — header.topbar paddingTop. Snap them to the established value or add them deliberately.
+[2m  1 warn(s) did not fail this command. To gate on one: --rule component-drift=suspect[0m

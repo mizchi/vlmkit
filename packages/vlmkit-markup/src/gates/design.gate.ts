@@ -11,6 +11,7 @@
 
 import { readAll, readChoice, readFlag, readInt, readNumber } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import {
   type DesignPolicyOptions,
@@ -65,16 +66,9 @@ docs/design/design-policy-metrics.md`,
       description: "Exclude a vendor-owned subtree; each is reported with what it removed",
       repeatable: true,
     },
-    { name: "timeout", placeholder: "ms", kind: "number", description: "Page navigation timeout", defaultDescription: "30000" },
-    {
-      name: "wait-until",
-      kind: "string",
-      description: "Navigation wait state",
-      choices: ["domcontentloaded", "load", "networkidle"],
-      defaultDescription: "networkidle",
-    },
-    { name: "har", placeholder: "file", kind: "path", description: "Replay network responses from a Playwright HAR" },
     { name: "storage-state", placeholder: "file", kind: "path", description: "Playwright storage state for pages behind a login" },
+    // Spread, not re-declared — see the note in `integrity.gate.ts`.
+    ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const source = firstPositional(argv, "vlmkit check design <html-or-url>", ["--min-reuse", "--min-instances", "--exclude"]);
@@ -83,10 +77,11 @@ docs/design/design-policy-metrics.md`,
     // as drifting instead of saying the flag was wrong.
     const minReuse = readNumber(argv, "min-reuse", { min: 0 });
     const minInstances = readInt(argv, "min-instances", { min: 1 });
-    const timeout = readInt(argv, "timeout", { min: 1 });
-    const waitUntil = readChoice(argv, "wait-until", ["domcontentloaded", "load", "networkidle"] as const);
+    const pageLoad = parsePageLoad(argv);
+    const timeout = pageLoad.timeout;
+    const waitUntil = pageLoad.waitUntil;
     const storageState = readFlag(argv, "storage-state");
-    const har = readFlag(argv, "har");
+    const har = pageLoad.har;
     const exclude = readAll(argv, "exclude");
     return {
       source,

@@ -31,6 +31,7 @@ import { join } from "node:path";
 import { describe, it } from "node:test";
 import type { AnyGateDefinition, GateInput } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { loadGateRegistry, resetGateRegistryCache } from "./gate-registry.ts";
+import { PAGE_LOAD_INPUTS } from "@mizchi/vlmkit-core/page-load.ts";
 
 const PAGE_LOAD_FLAGS = ["timeout", "wait-until", "har"] as const;
 
@@ -108,6 +109,37 @@ const inputNames = (gate: AnyGateDefinition) => new Set((gate.inputs ?? []).map(
 const argvFor = (gate: AnyGateDefinition) => BASE_ARGV[command(gate)]?.() ?? ["page.html"];
 
 describe("page-load options on the gates that navigate", () => {
+  it("declares them from the shared fragment, not from a hand-written copy", async () => {
+    // The module header claimed a test asserted this; none did. It checked the flags
+    // EXIST and WORK, which two hand-written copies also satisfy — so `check
+    // integrity` and `check design` quietly kept an older description while the
+    // fragment gained a hint. v5's CI agent found it from the outside:
+    //
+    //   "the fix exists only in `--help`, and *only in 2 of the 4 gates' help text*
+    //    — `check integrity` and `check design` print the same flag without the 'SPA
+    //    that never reaches network idle' hint, and integrity is the gate you reach
+    //    for first."
+    //
+    // Identity, not just presence: a copy that starts out identical is still a copy,
+    // and the next edit to the fragment is what makes it wrong.
+    const fragment = new Map(PAGE_LOAD_INPUTS.map((i) => [i.name, i]));
+    const divergent: string[] = [];
+    for (const gate of await navigatingGates()) {
+      for (const input of gate.inputs ?? []) {
+        const shared = fragment.get(input.name);
+        if (!shared) continue;
+        if (input !== shared) {
+          divergent.push(
+            `${command(gate)} declares its own --${input.name}`
+            + (input.description === shared.description ? " (identical today, and still a copy)" : ` ("${input.description}")`),
+          );
+        }
+      }
+    }
+    assert.deepEqual(divergent, [], `spread ...PAGE_LOAD_INPUTS instead:\n  ${divergent.join("\n  ")}`);
+  });
+
+
   it("covers every one of them, with the exceptions named and justified", async () => {
     const gates = await navigatingGates();
     // 23 as of 2026-08-10: 21 with a `path-or-url` source plus the two that take

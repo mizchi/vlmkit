@@ -1,0 +1,24 @@
+{
+  "//": "CI gate plan for the ops dashboard. Reviewed config; the CI job is one command. See ci.sh / log.md in this directory.",
+  "//run": "node serve.mjs 5202 &   then:   vlmkit gates run --output gate-logs --show-output",
+
+  "defaults": {
+    "//1-wait-until": "MANDATORY for this page. /api/live is an EventSource the deployment holds open for the life of the page, so the default `networkidle` milestone never fires: every gate burns its full 30s navigation budget and exits 1 with `page load timed out` WITHOUT running a single check (measured: 4 gates, 63s wall, zero findings). `domcontentloaded` still gets a bounded settle (idle wait, webfonts, one frame) before measuring, so it is not the pre-render DOM. Kept even though --har alone also unblocks navigation, so the plan still completes if the HAR is ever missing or stale.",
+    "//2-timeout": "Navigation budget in ms. The page paints in well under 1s; 15000 fails fast instead of burning the 30s default when the server is down.",
+    "//3-har": "REPRODUCIBILITY. The dashboard reads /api/metrics live and the numbers move between loads. --har replays the recorded responses off disk and aborts anything not in the recording, so every run measures the same pixels and the same strings. Re-record with `node record-har.mjs http://localhost:5202/ dashboard.har` whenever the page starts using a NEW endpoint — an endpoint missing from the HAR is aborted, which surfaces as a broken-resource defect rather than as a stale-fixture warning. The recording is keyed on the full URL, so it is port-bound: it only replays for localhost:5202.",
+    "//4-exclude": "check design only. The charting library renders .vendorchart-ctrl-group at runtime and we do not own that markup. Its three 24x24 zero-padding icon buttons outnumber our own three .btn buttons, so without this they become the `button` role's DOMINANT style and our own buttons are reported as the deviation forever — which is why the design number never moved no matter what got restyled. The gate prints an `Excluded subtrees` block with the element count and warns if the selector stops matching, so the exclusion stays auditable.",
+    "gates": [
+      "check integrity --wait-until domcontentloaded --timeout 15000 --har dashboard.har",
+      "check copy --wait-until domcontentloaded --timeout 15000 --har dashboard.har",
+      "check breakpoints --wait-until domcontentloaded --timeout 15000 --har dashboard.har",
+      "check design --wait-until domcontentloaded --timeout 15000 --har dashboard.har --exclude \".vendorchart-ctrl-group\""
+    ]
+  },
+
+  "pages": [
+    {
+      "id": "dashboard",
+      "source": "http://localhost:5202/"
+    }
+  ]
+}

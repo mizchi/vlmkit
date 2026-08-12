@@ -1064,6 +1064,46 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     現行のグリッドの拡張ではなく新しい構図。
   - 着手条件: レビュアーが実際に空間配置を読み違えた事例が出たら。
 
+### dogfood v5 の残件(2026-08-11、ops dashboard シナリオ)
+
+修正済み6件は `docs/reports/2026-08-11-dogfood-dataviz-v5.md`。以下は**未修正・記録のみ**。
+どれも実在するが、測定の誤りではない。
+
+- [ ] **`--har` に recorder がない(v5 で最も呼ばれた「機能」要望)**
+  - `docs/configuration.md` が「Playwright で HAR を録って replay しろ」と言うだけなので、
+    どのプロジェクトも同じ20行スクリプトを書く。CI エージェントは実際に `record-har.mjs` を
+    自作してタスクを完了させた。「知識がシェル履歴に住む」問題の一段下。
+  - 答えは `vlmkit snapshot record-har` 相当。修正ではなく機能追加なので別途。
+
+- [ ] **HAR に陳腐化シグナルがなく、ポートに縛られる(残件の中で最も重い)**
+  - 録音に無いエンドポイントは *abort* され、それが **broken-resource の「欠陥」**として
+    出る。「フィクスチャが古い」ではなく「ページが壊れている」と報告される = 所見の種類が
+    間違っている。
+  - 録音は完全 URL がキーなので、ポートを変えると黙ってマッチしなくなる。
+  - 着手条件: 所見の種類が違うのは実害なので、v6 を待たずに直す価値がある。
+
+- [ ] **`gates init` が「必ずタイムアウトする設定」を出力する**
+  - `http://` の source を渡すと、全ゲートが navigation で死ぬ plan を生成する。
+    URL を持っているのだから `--wait-until` を足すか警告できる。
+
+- [ ] **入力が pin されていないことを、どのゲートも言わない**
+  - 4ゲートが live URL を叩いて verdict を返すが、再実行で変わり得ることを示す表示がゼロ。
+    CI エージェントは jitter サーバを自作して出力を diff して答えを出した。
+  - 本人の提案: `gates run --repeat 2 --require-stable` が1コマンドで答える。
+
+- [ ] **`check breakpoints` が幅ごとに再フェッチする**
+  - 1 run で `/api/metrics` を6回叩くので、B-1/B/B+1 の比較が3つの異なるデータセットを
+    またぐ。データ由来の `boundary-spike` が構造的にあり得て、CSS バグと見分けがつかない。
+    `--har` が副作用で直すが、何も警告しない。
+
+- [ ] **verdict の語が自分のカウントと矛盾し得る**
+  - `verdict: DRIFT` + exit 0、そして F2 の修正後は `CLEAN (0 fail, 3 warn)`。
+    解決する行(`N warn(s) did not fail this command`)は findings の下、最後に出る。
+    修理エージェント曰く「CI ではコイントス」。
+  - 直し方の候補: verdict 行自体に exit 意図を載せる(`DRIFT (1 finding) — exit 0`)。
+
+- [ ] **`check a11y contrast` の report がリポジトリルートの `test-results/` に出る**(バグではないが、対象ページの隣ではない)
+
 - [ ] **dogfood の次ラウンドは別ページで(2026-08-10 v4 の結論)**
   - v4 で「測定が間違っている」系の指摘が **0 件**になり、残る 6 件はすべて出力の読みやすさ。
     ただし 6 件全部が**同じ 4 ゲート・同じページ**由来で、シナリオが新しい種類の欠陥を
