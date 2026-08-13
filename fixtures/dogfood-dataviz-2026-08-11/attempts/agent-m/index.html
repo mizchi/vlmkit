@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ops dashboard</title>
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+<header class="topbar">
+  <h1>Ops dashboard</h1>
+  <p class="region">Region: apne1</p>
+</header>
+
+<main class="grid">
+  <section class="panel">
+    <h2>Queue depth</h2>
+    <p class="metric" id="queue">148</p>
+    <p class="status">Above the alert line since 09:12</p>
+  </section>
+
+  <section class="panel">
+    <h2>Latency p95</h2>
+    <p class="metric" id="p95">412 ms</p>
+    <p class="status">Within budget</p>
+  </section>
+
+  <section class="panel">
+    <h2>Error rate</h2>
+    <p class="metric" id="err">3.1%</p>
+    <p class="status">TODO: confirm the denominator with the platform team</p>
+  </section>
+</main>
+
+<!-- Rendered by the charting library at runtime; we do not own this markup.
+     Kept in the page as-is so it behaves the way it does in production. -->
+<div class="vendorchart-ctrl-group">
+  <div class="vendorchart-ctrl">
+    <button class="vendorchart-ctrl-zoom-in" aria-label="Zoom in">
+      <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+    </button>
+    <button class="vendorchart-ctrl-zoom-out" aria-label="Zoom out">
+      <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M1 6h10" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+    </button>
+    <button class="vendorchart-ctrl-reset" aria-label="Reset view">
+      <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="4" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+    </button>
+  </div>
+</div>
+
+<footer class="actions">
+  <button class="btn btn--primary" id="acknowledge">Acknowledge</button>
+  <button class="btn" id="snooze">Snooze 1h</button>
+  <button class="btn" id="escalate">Escalate</button>
+</footer>
+
+<script>
+  // The live feed the deployment keeps open. Not decorative: closing it is what
+  // the page is for.
+  new EventSource("/api/live");
+  fetch("/api/metrics").then((r) => r.json()).then((m) => {
+    document.getElementById("queue").textContent = String(m.queueDepth);
+    document.getElementById("p95").textContent = m.p95Ms + " ms";
+    document.getElementById("err").textContent = (m.errorRate * 100).toFixed(1) + "%";
+  });
+</script>
+</body>
+</html>
