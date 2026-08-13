@@ -267,6 +267,24 @@ export function analyzeScrollSamples(
     issues.push({
       kind: "page-overflow-x",
       severity: "suspect",
+      // The blamed element travels as the SELECTOR, not only inside the prose.
+      //
+      // v7's agent-l tried to scope an exemption to the one element the message
+      // named and could not: "`--allow` can't scope `page-overflow-x`. `@table.orders`
+      // → `1 --allow rule(s) matched nothing` though the message says *"caused by:
+      // table.orders"*; there's no `selector` in the JSON. […] So the only working
+      // form is page-wide — I added a 1400px panel and got `NO DEFECTS … EXIT=0`.
+      // CI is now blind to new overflow."
+      //
+      // That is the worst shape a suppression can have: the only expressible form
+      // silenced the whole rule, so accepting one known overflow meant accepting
+      // every future one. With the selector attached, an exemption names one element
+      // and a NEW offender has a different selector, so it still reports.
+      //
+      // Only when a single element was actually blamed. When no element relieves the
+      // overflow (rigid siblings in one row), there is nothing honest to put here and
+      // the `unaccounted` note already says so.
+      ...(causes[0]?.selector ? { selector: causes[0].selector } : {}),
       message: `The page scrolls horizontally by ${horizontalOverflow}px at ${input.page.viewportWidth}px viewport width` +
         detail + clearedNote + ".",
     });
