@@ -243,6 +243,37 @@ async function validateAgainstRegistry(plan: GatePlan, configPath: string): Prom
     );
   }
 
+  // Required FLAGS, not just known commands. v7's agent-l: "`gates list` prints
+  // plans that cannot run. It listed `check layout … http://localhost:5311/` as job
+  // 4 of 7; only `gates run` revealed `did not run: error: --contract
+  // <contract.json> is required`. `list` validates rule names but not required
+  // flags." Seven gates declare one, and `check equivalence` declares two.
+  //
+  // Checked against `job.gate` — the resolved command line, suppression flags and
+  // all — so a suppression that supplies the flag counts as supplying it.
+  const missingFlags: string[] = [];
+  for (const job of plan.jobs) {
+    const gate = registry.resolve(job.baseGate.split(/\s+/).filter(Boolean))?.gate;
+    if (!gate) continue;
+    const tokens = new Set(job.gate.split(/\s+/));
+    for (const input of gate.inputs ?? []) {
+      if (input.positional !== undefined || input.required !== true) continue;
+      if (tokens.has(`--${input.name}`)) continue;
+      missingFlags.push(
+        `${job.pageId} / ${job.baseGate}: --${input.name} is required`
+        + `${input.placeholder ? ` <${input.placeholder}>` : ""} — ${input.description}`,
+      );
+    }
+  }
+  if (missingFlags.length > 0) {
+    throw new UsageError(
+      `${configPath}: ${missingFlags.length} gate(s) cannot run as configured:\n`
+      + [...new Set(missingFlags)].map((p) => `  - ${p}`).join("\n")
+      + `\nA plan that lists a job it cannot start is worse than a config error —`
+      + ` the failure would otherwise arrive after the browser work, as "did not run".`,
+    );
+  }
+
   const gateGroups = registry.groups();
   const unresolved = validateGateCommands(registry, [...new Set(plan.jobs.map((j) => j.baseGate))])
     .filter(({ command }) => gateGroups.has(command.trim().split(/\s+/)[0] ?? ""));
@@ -279,12 +310,30 @@ export const URL_SCAFFOLD_FLAGS = "--wait-until load --timeout 15000";
 export function scaffoldConfig(
   patterns: readonly string[],
   gates: readonly string[],
-): { config: GateConfig; urlSources: string[] } {
+): { config: GateConfig; urlSources: string[]; localSources: string[] } {
   const sources = patterns.length > 0 ? [...patterns] : ["index.html"];
   const urlSources = sources.filter((source) => /^https?:\/\//.test(source));
+  // A localhost source means a dev server has to be running for the config to work
+  // at all — the same reasoning that already scaffolds the page-load flags for a URL.
+  // v7's agent-l: "`gates init` diagnosed the `networkidle` trap for me but didn't
+  // scaffold `webServer` for a localhost URL."
+  //
+  // The command is left as a placeholder rather than guessed. `npm run dev` is the
+  // common case but a wrong command that LOOKS configured is worse than an obvious
+  // blank: the run would start something unrelated and gate whatever answered.
+  const localSources = urlSources.filter((source) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(source));
   const declared = gates.length > 0 ? [...gates] : [STARTER_GATE];
   return {
     config: {
+      ...(localSources[0]
+        ? {
+          webServer: {
+            command: "npm run dev",
+            url: localSources[0],
+            timeout: 60000,
+          },
+        }
+        : {}),
       defaults: {
         gates: urlSources.length > 0
           ? declared.map((gate) => `${gate} ${URL_SCAFFOLD_FLAGS}`)
@@ -293,6 +342,7 @@ export function scaffoldConfig(
       pages: sources.map((source) => ({ source })),
     },
     urlSources,
+    localSources,
   };
 }
 
@@ -335,7 +385,7 @@ async function initConfig(args: string[]): Promise<void> {
   }
   const patterns = readAll(args, "pages");
   const gates = readAll(args, "gate");
-  const { config, urlSources } = scaffoldConfig(patterns, gates);
+  const { config, urlSources, localSources } = scaffoldConfig(patterns, gates);
   // Parse what we are about to write: a scaffold that its own validator
   // rejects would be a rough first impression.
   parseGateConfig(JSON.stringify(config));
@@ -359,6 +409,17 @@ async function initConfig(args: string[]): Promise<void> {
   if (ignored.length > 0) {
     console.log(`\n  Added to .gitignore: ${ignored.join(", ")} — a run writes gate reports`);
     console.log(`  under test-results/ and appends one line per gate to .vlmkit/run-ledger.jsonl.`);
+  }
+  if (localSources.length > 0) {
+    console.log(
+      `\n  Added a webServer block because ${localSources[0]} is local: a config that says`
+      + ` which URLs to gate but not how to bring them up needs a wrapper script to run at all.`,
+    );
+    console.log(
+      `  ${YELLOW}Replace its \`command\`${RESET} — the scaffold says \`npm run dev\` because guessing`
+      + ` wrong is worse than an obvious blank: the run would start something unrelated and`
+      + ` gate whatever answered. Delete the block if the server is already up in CI.`,
+    );
   }
   console.log(`\nNext: vlmkit gates list    (see what would run)`);
   console.log(`      vlmkit gates run     (run it)`);
