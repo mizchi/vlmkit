@@ -34,6 +34,7 @@ import {
   resolveGatePlan,
   summarizeSuppressions,
 } from "@mizchi/vlmkit-core/gate-config.ts";
+import type { RuleSettings } from "@mizchi/vlmkit-core/plugin/rules.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { formatWebServerPlan, withWebServer } from "./web-server.ts";
 import {
@@ -224,17 +225,72 @@ export function formatExpiredNotice(expired: ResolvedSuppression[]): string {
  * `contract` and friends are artifact producers, not gates, and a config may
  * legitimately list one.
  */
-async function validateAgainstRegistry(plan: GatePlan, configPath: string): Promise<void> {
-  const { loadGateRegistry } = await import("../gate-registry.ts");
-  const { validateGateCommands, validateRuleSettings } = await import("@mizchi/vlmkit-core/plugin/registry.ts");
-  const registry = await loadGateRegistry();
+/**
+ * Which rule settings belong on one gate's command line.
+ *
+ * Every setting was appended to every gate, so `check copy` carried
+ * `--rule check.a11y.touch/target-undersized=off` and a typo'd key printed the
+ * same config error once per gate. Both v7 agents reported it independently:
+ * "rule settings are broadcast to every gate."
+ *
+ * A key belongs when it names this gate (`<gateId>` or `<gateId>/<ruleId>`) or is
+ * a bare rule id this gate declares. Anything unresolvable is PASSED THROUGH
+ * rather than dropped: a key naming no known gate is a config error that
+ * `validateRuleSettings` reports with the whole catalog in view, and silently
+ * dropping it here would turn that error into a setting that quietly does nothing
+ * — the exact failure rule settings exist to remove.
+ */
+export function rulesForGateFactory(
+  registry: { resolve: (argv: readonly string[]) => { gate: { id: string; rules: readonly { id: string }[] } } | null | undefined },
+): (baseGate: string, rules: RuleSettings) => RuleSettings {
+  return (baseGate, rules) => {
+    const gate = registry.resolve(baseGate.split(/\s+/).filter(Boolean))?.gate;
+    if (!gate) return rules;
+    const declared = new Set(gate.rules.map((r) => r.id));
+    const out: Record<string, RuleSettings[string]> = {};
+    for (const [key, setting] of Object.entries(rules)) {
+      const slash = key.indexOf("/");
+      if (slash > 0) {
+        if (key.slice(0, slash) === gate.id) out[key] = setting;
+        continue;
+      }
+      // A bare key is either a gate id (this gate or another) or a rule id.
+      if (key === gate.id || declared.has(key)) out[key] = setting;
+      else if (!key.includes(".")) out[key] = setting; // unknown bare id: let the gate rule on it
+    }
+    return out;
+  };
+}
 
+async function validateAgainstRegistry(
+  plan: GatePlan,
+  configPath: string,
+  registry: Awaited<ReturnType<typeof import("../gate-registry.ts")["loadGateRegistry"]>>,
+): Promise<void> {
+  const { validateGateCommands, validateRuleSettings } = await import("@mizchi/vlmkit-core/plugin/registry.ts");
+
+  // A QUALIFIED key (`<gateId>/<ruleId>`) or a gate-id key is a config-level fact:
+  // whether it names a real rule has nothing to do with which page carries it. It
+  // used to be validated once per job, so one typo printed the same error once per
+  // gate — v7's agent-l: "the typo test printed the same config error six times —
+  // once per gate — for one key."
+  //
+  // A BARE rule id is different: it means "this rule, on whichever gate receives
+  // this settings block", so it can only be judged against a gate. Those stay
+  // per-job, and the job is named because it is the thing that disambiguates them.
   const ruleProblems: string[] = [];
+  const allRules: Record<string, RuleSettings[string]> = {};
+  for (const job of plan.jobs) Object.assign(allRules, job.rules);
+  const qualified = Object.fromEntries(Object.entries(allRules).filter(([key]) => key.includes("/") || key.includes(".")));
+  const bare = Object.entries(allRules).filter(([key]) => !key.includes("/") && !key.includes("."));
+  ruleProblems.push(...validateRuleSettings(registry, qualified));
   for (const job of plan.jobs) {
-    if (Object.keys(job.rules).length === 0) continue;
+    const mine = bare.filter(([key]) => key in job.rules);
+    if (mine.length === 0) continue;
     const gate = registry.resolve(job.baseGate.split(/\s+/).filter(Boolean))?.gate;
     ruleProblems.push(
-      ...validateRuleSettings(registry, job.rules, gate).map((p) => `${job.pageId} / ${job.baseGate}: ${p}`),
+      ...validateRuleSettings(registry, Object.fromEntries(mine), gate)
+        .map((p) => `${job.pageId} / ${job.baseGate}: ${p}`),
     );
   }
   if (ruleProblems.length > 0) {
@@ -469,8 +525,15 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 
   const { path, config } = await loadConfig(readFlag(args, "config"));
   const only = readAll(args, "only");
-  const declared = resolveGatePlan(config, only.length > 0 ? { only } : {});
-  await validateAgainstRegistry(declared, path);
+  // The registry decides which rule settings belong on which gate's command line —
+  // see `rulesForGateFactory`. Loaded once here and reused for validation.
+  const { loadGateRegistry } = await import("../gate-registry.ts");
+  const registry = await loadGateRegistry();
+  const declared = resolveGatePlan(config, {
+    ...(only.length > 0 ? { only } : {}),
+    rulesForGate: rulesForGateFactory(registry),
+  });
+  await validateAgainstRegistry(declared, path, registry);
   // `suppressions` is an inventory of the config, so it must not depend on the
   // filesystem: a broken glob should not hide what has been silenced.
   // Everything relative inside the config — a `source` glob, a `--har` or

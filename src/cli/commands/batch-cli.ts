@@ -299,6 +299,14 @@ export async function runJobs(
       JSON.stringify({ ...summary, jobs: summary.jobs.map(({ output: _output, ...rest }) => rest) }, null, 2),
     );
   }
+  // Into the SAME ledger the children write, not this process's cwd.
+  //
+  // v7's agent-l noticed the outputs were not where the config was, and the precise
+  // defect turned out to be worse than "wrong directory": the children run with the
+  // config's directory as their cwd, so `test-results/` and their ledger lines went
+  // there, while this append used `process.cwd()`. One `gates run --config
+  // ../proj/...` from a sibling directory therefore produced TWO ledgers, in two
+  // places, each holding half the run.
   appendRunLedger({
     tool: "batch",
     source: [...new Set(jobs.map((j) => j.page))].join(" ").slice(0, 200),
@@ -309,7 +317,7 @@ export async function runJobs(
       wallMs: summary.wallMs,
       concurrency,
     },
-  });
+  }, { cwd: artifactCwd });
   return summary;
 }
 
