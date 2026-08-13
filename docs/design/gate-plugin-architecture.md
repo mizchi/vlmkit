@@ -139,7 +139,45 @@ Gates that identify by DOM path (`check interactions`, `scan handlers`) or by
 role (`check design`) put that in `evidence` instead, rather than filling
 `selector` with a string nothing can query.
 
-### Rule settings
+### The public surface
+
+The contract above is only usable if an author can find it. Two subpaths are the
+API; everything else in these packages is internal and may move.
+
+| Subpath | Contains | Costs |
+|---|---|---|
+| `@mizchi/vlmkit-core/plugin` | `defineGate` / `definePlugin`, the types, the page-load inputs, argv helpers, `UsageError`, colours, project paths, `PLUGIN_API_VERSION` | ~25ms to import |
+| `@mizchi/vlmkit-core/plugin/browser` | `withBrowser`, `openSource`, `applyHar`, auth state, the run ledger | ~441ms more |
+| `@mizchi/vlmkit-markup/rules` | 33 pure judges + 14 `COLLECT_*` scripts + both exemption forms | no browser, ever |
+
+Three decisions worth keeping:
+
+**The first entry's contents were counted, not chosen.** They are exactly what
+the 27 bundled gates import — 40 of the contract, 18 of `page-load`, 15 of
+`arg-reader`, 11 of `cli-error`, 1 of `terminal-colors`. A surface picked by
+taste drifts from what gates need; one derived from what they import cannot. A
+plugin that needs something absent is evidence of a gap in the entry rather than
+a licence to reach past it, and `examples/gate-plugin/` is guarded to prove the
+entry stays sufficient.
+
+**The browser half is separate because it is 17x the cost.** Measured: the entry
+loads in ~25ms, adding `browser-launch` costs ~441ms, and Playwright itself is
+not even loaded — that is the capture chain alone. A gate that reads a file (the
+house-brand example) would pay it for nothing.
+
+**`@mizchi/vlmkit-markup/rules` declares a split that already existed.** Every
+gate is `COLLECT_*` (a string evaluated in a page) → samples (plain JSON) → a
+pure judge → findings. Making both halves importable means a project can run a
+rule from any driver, test one without a browser, or reuse one inside its own
+gate. Purity is enforced by a test that inspects `process.moduleLoadList` after
+importing the barrel, not by convention — and it was verified to fail by
+injecting a browser import into a judge.
+
+The `./*.ts` export pattern still resolves every internal module. Removing it
+would break this repo's own deep imports and any consumer already using them, so
+it stays — as a capability, not a promise.
+
+## Rule settings
 
 eslint-shaped, and validated against the declared table:
 

@@ -17,6 +17,8 @@ This page is the how-to. For *why* the architecture is shaped this way, see
 [`docs/design/gate-plugin-architecture.md`](./design/gate-plugin-architecture.md).
 
 - [The 30-line version](#the-30-line-version)
+- [The two imports](#the-two-imports)
+- [Reusing vlmkit's own rules](#reusing-vlmkits-own-rules)
 - [What you get for free](#what-you-get-for-free)
 - [The definition, field by field](#the-definition-field-by-field)
 - [Choosing severities](#choosing-severities)
@@ -35,10 +37,8 @@ Write a module that default-exports a plugin:
 
 ```ts
 // tools/house-gates.ts
-import { defineGate, definePlugin } from "@mizchi/vlmkit-core/plugin/contract.ts";
-import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
-import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { readPositionals } from "@mizchi/vlmkit-core/arg-reader.ts";
+import { defineGate, definePlugin, readPositionals, UsageError } from "@mizchi/vlmkit-core/plugin";
+import type { Finding } from "@mizchi/vlmkit-core/plugin";
 import { readFile } from "node:fs/promises";
 
 const inlineStyleGate = defineGate<{ source: string; count: number }, { source: string }>({
@@ -94,6 +94,66 @@ Relative plugin paths resolve **against the config file's directory**, not the
 process cwd — a path that only works when you run from the repo root is a CI
 trap. Bare specifiers (`"@acme/vlmkit-brand-gates"`) resolve as normal module
 imports.
+
+## The two imports
+
+Everything a gate needs comes from **one** module:
+
+```ts
+import { defineGate, definePlugin, firstPositional, readInt,
+         PAGE_LOAD_INPUTS, parsePageLoad, UsageError, DIM, RESET } from "@mizchi/vlmkit-core/plugin";
+```
+
+That set was sized from what the 27 bundled gates actually import, not from
+taste: 40 imports of the contract, 18 of the page-load flags, 15 of the argv
+readers, 11 of `UsageError`, 1 of the colours. **If your gate needs something
+that is not there, that is a gap in that module worth reporting** — not a reason
+to deep-import past it. A deep import (`@mizchi/vlmkit-core/page-load.ts`) still
+resolves, for this repo's own use and for consumers already on it, but only the
+named subpaths are a promise.
+
+If your gate drives a browser, that is a **second** import:
+
+```ts
+import { withBrowser, openSource } from "@mizchi/vlmkit-core/plugin/browser";
+```
+
+Separate on measurement, not taste: the main entry loads in ~25ms and adding the
+browser chain costs ~441ms even though Playwright itself stays lazy. A gate that
+only reads a file should not pay it. `examples/gate-plugin/` uses exactly these
+two and a test fails if it ever reaches past them.
+
+`PLUGIN_API_VERSION` is exported so a published plugin can refuse a version it
+was not built for, with its own message rather than a `TypeError` inside the
+registry. It is `1`, and only a change that breaks an existing plugin bumps it.
+
+## Reusing vlmkit's own rules
+
+A house gate rarely needs a metric from scratch. The deterministic half of every
+bundled gate is importable on its own:
+
+```ts
+import { COLLECT_DESIGN_SAMPLES, judgeDesignPolicy } from "@mizchi/vlmkit-markup/rules";
+
+const samples = await page.evaluate(COLLECT_DESIGN_SAMPLES);
+const report = judgeDesignPolicy(samples, { minReuse: 4, allow: ["button#export;deliberate"] });
+```
+
+Every gate here is two halves — a `COLLECT_*` string you evaluate in a page, and
+a pure judge over the plain-JSON samples it returns. 33 judges and 14 collectors
+are exported, so you can:
+
+- **reuse a rule** rather than reimplementing an average nobody would get
+  identical;
+- **run one from your own harness** — any driver that can evaluate a string in a
+  page works, not just this toolkit's;
+- **test yours without a browser**, since the judges are pure. A test asserts
+  that: importing `@mizchi/vlmkit-markup/rules` and loading anything
+  browser-shaped fails the build.
+
+Not exported there, deliberately: the `run*` functions (they own a browser and a
+filesystem — import those from their own modules) and the `format*` functions
+(prose belongs to the gate; a library consumer wants findings).
 
 ## What you get for free
 
@@ -195,7 +255,7 @@ text only — put the actual default in `parse`.
 drift apart:
 
 ```ts
-import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
+import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/plugin";
 
 inputs: [
   { name: "source", placeholder: "html-or-url", kind: "path-or-url", positional: 0, required: true },
@@ -223,7 +283,7 @@ parse: (argv, ctx) => Options
 raw `argv`, and `json` (true when the caller asked for JSON, so you can skip
 building anything only prose needs).
 
-Use the helpers in `@mizchi/vlmkit-core/arg-reader.ts` rather than hand-rolling:
+Use the helpers from `@mizchi/vlmkit-core/plugin` rather than hand-rolling:
 
 | Helper | Behavior |
 |---|---|
@@ -313,7 +373,7 @@ opt out. The runner does the appending, so `VLMKIT_NO_LEDGER` handling stays in
 one place.
 
 Terminal colors, if you want them, are in
-`@mizchi/vlmkit-core/terminal-colors.ts` (`DIM`, `RESET`, `GREEN`, `RED`,
+`@mizchi/vlmkit-core/plugin` (`DIM`, `RESET`, `GREEN`, `RED`,
 `YELLOW`, `CYAN`, `BOLD`). Respect `NO_COLOR` by using those constants rather
 than raw escapes.
 

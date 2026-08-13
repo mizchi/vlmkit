@@ -19,6 +19,14 @@ suppression works per *rule* instead of per whole gate.
 
 ### Breaking
 
+- **The gate-authoring argv helpers moved from `@mizchi/vlmkit-markup` to
+  `@mizchi/vlmkit-core`.** `firstPositional`, `runOutputDir`, `viewportFlag`,
+  `numberList` and five others lived in `vlmkit-markup/src/gates/arg-helpers.ts`;
+  they are now `@mizchi/vlmkit-core/plugin`. Every one is pure and imports only
+  core, so the old location meant a plugin author took a dependency on the markup
+  package to read argv. Import them from the plugin entry; the markup path no
+  longer resolves.
+
 - **A gate's prose honours the project's rule settings.** `format` takes an optional
   `RuleView` — one question, `effective(ruleId)` — so a gate that lists findings can
   render what the settings made of them. Before, `--rule low-contrast-text=off` printed
@@ -90,6 +98,28 @@ suppression works per *rule* instead of per whole gate.
   runner owns both.
 
 ### Added
+
+- **A declared plugin API: `@mizchi/vlmkit-core/plugin` and
+  `@mizchi/vlmkit-core/plugin/browser`.** A third-party gate could always exist,
+  but the entry point could not be found: an author deep-imported five internal
+  files and guessed which counted as public. The first subpath carries exactly
+  what the 27 bundled gates import — counted, not chosen — plus
+  `PLUGIN_API_VERSION` so a published plugin can refuse a version it was not
+  built for. The browser helpers are a second subpath because that is 17x the
+  import cost (~25ms vs ~441ms more, before Playwright itself loads), and a gate
+  that only reads a file should not pay it. `examples/gate-plugin/` uses those
+  two and nothing else, with a test that fails if it ever reaches past them.
+- **A declared deterministic layer: `@mizchi/vlmkit-markup/rules`.** Every gate
+  is two halves — a `COLLECT_*` string evaluated in a page, and a pure judge over
+  the plain-JSON samples it returns — which was the architecture from the start
+  and was reachable only by deep-importing whichever file a gate happened to live
+  in. 33 judges and 14 collector scripts now have one entry, so a project can run
+  a rule from its own driver (Playwright, Puppeteer, CDP, jsdom), test a rule
+  against its own fixtures without starting a browser, or reuse one inside a house
+  gate. Purity is enforced by a test that inspects `process.moduleLoadList` after
+  importing the barrel — verified to fail by injecting a browser import into a
+  judge — and no `run*`/`format*` export is allowed in, since either would make
+  that check depend on import order.
 
 - **`gates run --json` returns the gates' own structured findings**, as
   `jobs[].gateReport` — verdict, counts and findings per gate — instead of one
