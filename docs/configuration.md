@@ -41,6 +41,19 @@ npx vlmkit check integrity http://localhost:3000/ --har fixtures/app.har
 npx vlmkit check design http://localhost:3000/ --har fixtures/app.har
 ```
 
+Two things a recording will eventually do to you, both now reported rather than
+left as a caution:
+
+- **It goes stale.** When the page starts requesting an endpoint the recording does
+  not hold, that request is aborted, and the page is measured without it. `check
+  integrity` reports this as `stale-har-fixture` — "this is a stale fixture, not a
+  broken page" — instead of blaming the page's resources, and says the rest of the
+  run is suspect because the page rendered incomplete.
+- **It is keyed on the full URL, so it is host- and port-bound.** Replay a recording
+  made against `:5811` at `:5822` and even the document request misses, which used
+  to surface as a raw `net::ERR_FAILED` stack. It now names the mismatch, the file,
+  and the origins the file actually contains.
+
 `check design` can omit vendor-owned DOM before it computes component reuse and
 spacing. Exclusions are repeatable and remain visible in text and JSON reports;
 a selector that matches nothing is warned as stale:

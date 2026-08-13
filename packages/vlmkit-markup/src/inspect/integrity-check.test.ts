@@ -156,6 +156,36 @@ describe("pure judges", () => {
     assert.equal(judgeUnstyled({ ...base }, 1280), null);
   });
 
+  test("judgeNetworkFailures: a --har miss is blamed on the fixture, not on the page", () => {
+    // v5's CI agent: "a new endpoint absent from the HAR is *aborted*, surfacing as a
+    // broken-resource **defect** rather than 'your fixture is out of date'." Two
+    // different jobs — re-record, or fix the page — reported as the same thing.
+    const findings = judgeNetworkFailures([
+      { url: "http://localhost:1/later.css", resourceType: "stylesheet", reason: "net::ERR_FAILED", harMiss: true },
+      { url: "http://localhost:1/new.json", resourceType: "fetch", reason: "net::ERR_FAILED", harMiss: true },
+    ], 1280);
+    // One finding, not one per URL: the action is "re-record", once.
+    assert.deepEqual(findings.map((f) => f.kind), ["stale-har-fixture"]);
+    assert.equal(findings[0]!.severity, "fail");
+    assert.match(findings[0]!.message, /2 request\(s\)/);
+    assert.match(findings[0]!.message, /later\.css/);
+    assert.match(findings[0]!.message, /stale fixture, not a broken page/);
+    // And it says the rest of the run is compromised, because the page rendered
+    // without those resources.
+    assert.match(findings[0]!.message, /every finding in this run is suspect/);
+  });
+
+  test("judgeNetworkFailures: a real failure still reports when a HAR miss is also present", () => {
+    // The suppression is keyed on the individual failure, not on "a HAR was used" —
+    // a genuinely broken same-origin stylesheet must not be hidden by an unrelated
+    // fixture gap.
+    const findings = judgeNetworkFailures([
+      { url: "http://localhost:1/gone.css", resourceType: "stylesheet", reason: "HTTP 404" },
+      { url: "http://localhost:1/later.css", resourceType: "stylesheet", reason: "net::ERR_FAILED", harMiss: true },
+    ], 1280);
+    assert.deepEqual(findings.map((f) => f.kind).sort(), ["failed-stylesheet", "stale-har-fixture"]);
+  });
+
   test("judgeNetworkFailures: same-origin stylesheet/script fail, cross-origin (third-party) warn, font/xhr warn", () => {
     const findings = judgeNetworkFailures([
       { url: "file:///x/app.css", resourceType: "stylesheet", reason: "net::ERR_FILE_NOT_FOUND" },

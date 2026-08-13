@@ -42,6 +42,7 @@ import {
   applyAllowRules,
   type IntegrityAllowRule,
 } from "./integrity-exemption.ts";
+import { applyHar } from "@mizchi/vlmkit-core/page-open.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { extractComponentsFromRgba } from "../component/component-bbox.ts";
@@ -66,7 +67,9 @@ export type IntegrityFindingKind =
   | "low-contrast-text"
   | "near-misalignment"
   | "occluded-text"
-  | "redirected";
+  | "redirected"
+  // Not a defect in the page: the run's own network fixture is out of date.
+  | "stale-har-fixture";
 
 export interface IntegrityFinding {
   kind: IntegrityFindingKind;
@@ -285,11 +288,37 @@ export interface NetworkFailure {
    * dogfood: a failing analytics beacon must not hard-fail the page's
    * own markup integrity; a failing same-origin build script must). */
   crossOrigin?: boolean;
+  /**
+   * The request failed because a `--har` recording has no entry for it, not because
+   * the page's resource is broken. Reported against the fixture instead, since
+   * "re-record the HAR" and "fix the page" are different jobs.
+   */
+  harMiss?: boolean;
 }
 
 export function judgeNetworkFailures(failures: NetworkFailure[], viewport: number): IntegrityFinding[] {
   const findings: IntegrityFinding[] = [];
+  // A request the `--har` recording never held is a stale fixture, not a broken
+  // page, and the two need different work. Grouped into one finding rather than one
+  // per URL: the action is "re-record", once, however many endpoints have appeared.
+  const misses = failures.filter((f) => f.harMiss === true);
+  if (misses.length > 0) {
+    const tails = misses.slice(0, 4).map((f) => f.url);
+    findings.push({
+      kind: "stale-har-fixture",
+      severity: "fail",
+      viewport,
+      message: `${misses.length} request(s) were aborted because the \`--har\` recording has no entry for them`
+        + `: ${tails.join(", ")}${misses.length > 4 ? `, and ${misses.length - 4} more` : ""}.`
+        + ` The page was measured WITHOUT them, so every finding in this run is suspect.`
+        + ` Re-record the HAR over the same navigation — this is a stale fixture, not a broken page.`,
+      evidence: { urls: misses.map((f) => f.url) },
+    });
+  }
   for (const f of failures) {
+    // Already reported against the fixture above; blaming the page for it as well
+    // would be the original defect with an extra line.
+    if (f.harMiss === true) continue;
     const tail = f.url.split("/").pop() ?? f.url;
     switch (f.resourceType) {
       case "stylesheet":
@@ -1561,9 +1590,13 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
     for (let vi = 0; vi < viewports.length; vi++) {
       const viewport = viewports[vi]!;
       const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
-      if (options.har) {
-        await page.routeFromHAR(resolve(options.har), { notFound: "abort" });
-      }
+      // Through `applyHar`, not a local `routeFromHAR`: the shared helper reads the
+      // recording and can therefore tell a request the fixture never held from a
+      // resource the page actually broke. Without that, an out-of-date HAR reads as
+      // a page full of broken resources — v5's CI agent: "a new endpoint absent from
+      // the HAR is *aborted*, surfacing as a broken-resource **defect** rather than
+      // 'your fixture is out of date'."
+      const harReplay = await applyHar(page, options.har);
       const events: RuntimeEvent[] = [];
       const netFailures: NetworkFailure[] = [];
       let loaded = false;
@@ -1572,14 +1605,26 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
         events.push({ type: "pageerror", text: String(err?.message ?? err).slice(0, 200), phase: loaded ? "post-load" : "construction" });
       });
       page.on("console", (msg) => {
-        if (msg.type() === "error") {
-          events.push({ type: "console-error", text: msg.text().slice(0, 200), phase: loaded ? "post-load" : "construction" });
-        }
+        if (msg.type() !== "error") return;
+        const text = msg.text().slice(0, 200);
+        // The browser logs "Failed to load resource" for a request `--har` aborted,
+        // and that console line carries no URL — so it would be reported as the
+        // page's own JS error while the request itself is correctly blamed on the
+        // fixture. Only skipped when there IS a fixture miss to explain it, so a real
+        // broken resource on a HAR-less run still reports.
+        if (harReplay && harReplay.misses().length > 0 && /Failed to load resource/i.test(text)) return;
+        events.push({ type: "console-error", text, phase: loaded ? "post-load" : "construction" });
       });
       const pageOrigin = (() => { try { return new URL(url).origin; } catch { return ""; } })();
       const originOf = (u: string) => { try { return new URL(u).origin; } catch { return pageOrigin; } };
       page.on("requestfailed", (req) => {
-        netFailures.push({ url: req.url(), resourceType: req.resourceType(), reason: req.failure()?.errorText ?? "failed", crossOrigin: originOf(req.url()) !== pageOrigin });
+        netFailures.push({
+          url: req.url(),
+          resourceType: req.resourceType(),
+          reason: req.failure()?.errorText ?? "failed",
+          crossOrigin: originOf(req.url()) !== pageOrigin,
+          ...(harReplay?.isMiss(req.url()) ? { harMiss: true } : {}),
+        });
       });
       page.on("response", (res) => {
         if (!res.ok() && res.status() >= 400) {

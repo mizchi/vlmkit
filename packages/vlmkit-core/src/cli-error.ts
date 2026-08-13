@@ -295,6 +295,10 @@ export function formatCliError(e: unknown): string | null {
   // version of it from the string — and match before the bare-timeout branch below,
   // since the enriched message deliberately does not contain Playwright's wording.
   if (/^page load timed out after \d+ms waiting for/.test(msg)) return `error: ${msg}`;
+  // Same contract for the HAR origin mismatch: `applyHar` is the only layer that knows
+  // both the origins on file and the one being requested, so it composes the message
+  // and this prints it whole rather than letting a raw `net::ERR_FAILED` stack out.
+  if (/^the --har recording holds nothing for /.test(msg)) return `error: ${msg}`;
   // Playwright timeout from a call site that has not been routed through
   // `navigatePage` yet. Kept as the floor, not the goal.
   if (/Timeout \d+ms exceeded/i.test(msg)) {
