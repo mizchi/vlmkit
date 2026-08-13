@@ -5,6 +5,9 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { buildJobs, formatBatchSummary, gateReported, jobLogName, parseShard, resolvePages, runBatch, runPool, shardPages, type BatchJobResult, type BatchSummary } from "./batch-cli.ts";
 
+/** Colour codes out, so an assertion on the prose is not one on the palette. */
+const plain = (text: string): string => text.replace(/\u001B\[[0-9;]*m/g, "");
+
 describe("parseShard", () => {
   it("parses 1-based index/total", () => {
     assert.deepEqual(parseShard("2/3"), { index: 2, total: 3 });
@@ -170,6 +173,36 @@ describe("formatBatchSummary", () => {
     wallMs: 2000,
     serialMs: jobs.reduce((s, j) => s + j.durationMs, 0),
     concurrency: 2,
+  });
+
+  it("names the untracked paths the run created, once for the whole run", () => {
+    // Found by re-evaluating the v6 adoption scenario after shipping the per-gate
+    // first-write notice: the gates run as CHILD processes whose stdout this runner
+    // suppresses, so `gates run` — the path an adopter actually uses — announced
+    // nothing at all. It also never covered `test-results/`: a gate prints
+    // `report: <path>` but nothing says the directory is new and untracked.
+    const text = plain(formatBatchSummary({
+      ...summary([job()]),
+      createdArtifacts: [".vlmkit/", "test-results/"],
+    }));
+    assert.match(text, /This run created 2 untracked path\(s\)/);
+    assert.match(text, /\.vlmkit\/\s+an append-only record of every gate run/);
+    assert.match(text, /test-results\/\s+the gates' own reports and screenshots/);
+    assert.match(text, /Neither is in \.gitignore/);
+    assert.match(text, /gates init/);
+  });
+
+  it("says \"is not\" rather than \"is\" when only one path appeared", () => {
+    // The pluralized branch read "It is in .gitignore." — the opposite of the truth,
+    // in the one line whose whole job is to say the path is untracked.
+    const text = plain(formatBatchSummary({ ...summary([job()]), createdArtifacts: [".vlmkit/"] }));
+    assert.match(text, /This run created 1 untracked path\(s\)/);
+    assert.match(text, /It is not in \.gitignore/);
+    assert.doesNotMatch(text, /Neither/);
+  });
+
+  it("stays silent when the run created nothing new", () => {
+    assert.doesNotMatch(plain(formatBatchSummary(summary([job()]))), /untracked path/);
   });
 
   it("reports the pass case with occupancy, not a speedup claim", () => {

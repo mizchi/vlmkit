@@ -18,6 +18,7 @@
  * "did it pass" but "how long, and how do I shard it".
  */
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { glob } from "node:fs/promises";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -33,7 +34,12 @@ import {
   readPositionals,
   tokenizeCommand,
 } from "@mizchi/vlmkit-core/arg-reader.ts";
-import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
+import {
+  VLMKIT_IGNORE_ENTRIES,
+  appendRunLedger,
+  isGitIgnored,
+  isGitRepo,
+} from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 
 export interface BatchJob {
@@ -68,6 +74,15 @@ export interface BatchSummary {
   serialMs: number;
   concurrency: number;
   shard?: { index: number; total: number };
+  /**
+   * Artifact directories this run brought into existence that git is not ignoring.
+   *
+   * The per-gate notice cannot serve this path: gates run as child processes whose
+   * stdout the runner suppresses. It also never covered `test-results/` at all —
+   * a gate prints `report: <path>` but nothing says the directory is new and
+   * untracked, which was half of the original complaint.
+   */
+  createdArtifacts?: string[];
 }
 
 /** `1/3` → `{index: 1, total: 3}`. Throws on anything else, loudly. */
@@ -235,6 +250,20 @@ export async function runJobs(
   if (jobs.length === 0) throw new Error("No jobs to run");
   const concurrency = options.concurrency ?? defaultConcurrency();
   const cliEntry = cliEntryPath(options.cliEntry);
+  // Which artifact directories already existed. Each gate runs as a CHILD process
+  // and its own first-write notice goes to a stdout this runner suppresses, so a
+  // `gates run` — the path an adopter actually uses — announced nothing at all.
+  // Snapshotting first keeps the report to what THIS run created, rather than
+  // nagging on every run about directories the reader has already seen.
+  // Every job in a `gates run` shares one cwd (the config's directory) and a bare
+  // `batch` sets none, so the common case is a single directory. If they ever
+  // disagree, fall back to this process's — reporting one directory's artifacts as
+  // another's would be worse than reporting none.
+  const jobCwds = new Set(jobs.map((j) => j.cwd ?? process.cwd()));
+  const artifactCwd = jobCwds.size === 1 ? [...jobCwds][0]! : process.cwd();
+  const preexisting = new Set(
+    VLMKIT_IGNORE_ENTRIES.filter((entry) => existsSync(join(artifactCwd, entry.replace(/\/+$/, "")))),
+  );
   const started = Date.now();
   let done = 0;
   const results = await runPool(jobs, concurrency, (job) => runJob(job, cliEntry), (result) => {
@@ -254,6 +283,13 @@ export async function runJobs(
     serialMs: results.reduce((sum, r) => sum + r.durationMs, 0),
     concurrency,
     ...(options.shard ? { shard: options.shard } : {}),
+    ...(() => {
+      const created = VLMKIT_IGNORE_ENTRIES
+        .filter((entry) => !preexisting.has(entry))
+        .filter((entry) => existsSync(join(artifactCwd, entry.replace(/\/+$/, ""))))
+        .filter((entry) => !isGitIgnored(artifactCwd, join(artifactCwd, entry.replace(/\/+$/, ""))));
+      return created.length > 0 && isGitRepo(artifactCwd) ? { createdArtifacts: created } : {};
+    })(),
   };
   if (options.output) {
     await mkdir(options.output, { recursive: true });
@@ -388,6 +424,30 @@ export function formatBatchSummary(
   );
   // A run can never finish faster than its slowest single job: that is the
   // floor more concurrency cannot buy through, and the number to shard against.
+  //
+  // Where the run wrote, said ONCE for the whole run. The per-gate first-write
+  // notice cannot reach here — each gate is a child process whose stdout this
+  // runner suppresses — so a `gates run`, which is the path an adopter actually
+  // uses, announced nothing. It also covers `test-results/`, which the per-gate
+  // notice never did: a gate prints `report: <path>` but nothing says the
+  // directory is new and untracked.
+  if (summary.createdArtifacts && summary.createdArtifacts.length > 0) {
+    lines.push("");
+    lines.push(`${DIM}This run created ${summary.createdArtifacts.length} untracked path(s):${RESET}`);
+    for (const entry of summary.createdArtifacts) {
+      // Described per entry, because they are different things and only one of
+      // them is announced anywhere else: a gate prints `report: <path>` for what
+      // it writes under test-results/, while the ledger prints nothing here.
+      const what = entry === ".vlmkit/"
+        ? "an append-only record of every gate run, one line each"
+        : "the gates' own reports and screenshots";
+      lines.push(`${DIM}    ${entry.padEnd(15)} ${what}${RESET}`);
+    }
+    lines.push(
+      `${DIM}${summary.createdArtifacts.length === 1 ? "It is not" : "Neither is"} in .gitignore.`
+      + ` \`vlmkit gates init\` writes ${summary.createdArtifacts.length === 1 ? "that entry" : "those entries"} for you.${RESET}`,
+    );
+  }
   lines.push("");
   const failures = summary.jobs.filter((j) => j.exitCode !== 0);
   if (failures.length > 0) {
