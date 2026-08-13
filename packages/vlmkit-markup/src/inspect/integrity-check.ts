@@ -42,6 +42,8 @@ import {
   applyAllowRules,
   type IntegrityAllowRule,
 } from "./integrity-exemption.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { applyHar } from "@mizchi/vlmkit-core/page-open.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { extractComponentsFromRgba } from "../component/component-bbox.ts";
@@ -66,7 +68,9 @@ export type IntegrityFindingKind =
   | "low-contrast-text"
   | "near-misalignment"
   | "occluded-text"
-  | "redirected";
+  | "redirected"
+  // Not a defect in the page: the run's own network fixture is out of date.
+  | "stale-har-fixture";
 
 export interface IntegrityFinding {
   kind: IntegrityFindingKind;
@@ -285,11 +289,37 @@ export interface NetworkFailure {
    * dogfood: a failing analytics beacon must not hard-fail the page's
    * own markup integrity; a failing same-origin build script must). */
   crossOrigin?: boolean;
+  /**
+   * The request failed because a `--har` recording has no entry for it, not because
+   * the page's resource is broken. Reported against the fixture instead, since
+   * "re-record the HAR" and "fix the page" are different jobs.
+   */
+  harMiss?: boolean;
 }
 
 export function judgeNetworkFailures(failures: NetworkFailure[], viewport: number): IntegrityFinding[] {
   const findings: IntegrityFinding[] = [];
+  // A request the `--har` recording never held is a stale fixture, not a broken
+  // page, and the two need different work. Grouped into one finding rather than one
+  // per URL: the action is "re-record", once, however many endpoints have appeared.
+  const misses = failures.filter((f) => f.harMiss === true);
+  if (misses.length > 0) {
+    const tails = misses.slice(0, 4).map((f) => f.url);
+    findings.push({
+      kind: "stale-har-fixture",
+      severity: "fail",
+      viewport,
+      message: `${misses.length} request(s) were aborted because the \`--har\` recording has no entry for them`
+        + `: ${tails.join(", ")}${misses.length > 4 ? `, and ${misses.length - 4} more` : ""}.`
+        + ` The page was measured WITHOUT them, so every finding in this run is suspect.`
+        + ` Re-record the HAR over the same navigation — this is a stale fixture, not a broken page.`,
+      evidence: { urls: misses.map((f) => f.url) },
+    });
+  }
   for (const f of failures) {
+    // Already reported against the fixture above; blaming the page for it as well
+    // would be the original defect with an extra line.
+    if (f.harMiss === true) continue;
     const tail = f.url.split("/").pop() ?? f.url;
     switch (f.resourceType) {
       case "stylesheet":
@@ -722,6 +752,19 @@ export function judgeTextContrast(
 ): { findings: IntegrityFinding[]; exempted: IntegrityExemption[] } {
   const findings: IntegrityFinding[] = [];
   const exempted: IntegrityExemption[] = [];
+  // Low-contrast findings are grouped by COLOUR PAIR, not emitted per element.
+  //
+  // A three-row table produced three identical warnings differing only in the row
+  // index, and v6's adopting agent counted what that adds up to: "the same contrast
+  // defect is reported 8 times across two gates […] Three CSS colours, eight lines."
+  // Its conclusion is why this is worth fixing rather than tolerating — "eight lines
+  // for three CSS colours is how a gate becomes something people pass `--advisory`
+  // to."
+  //
+  // The pair plus the applicable floor is the right identity because that is the
+  // shape of the fix: one CSS declaration. Nothing about *where* is lost — the
+  // selectors travel in the evidence, and the message names the first few.
+  const lowContrast = new Map<string, ContrastCandidate[]>();
   for (const c of candidates) {
     if (c.disabled) {
       exempted.push({ kind: "low-contrast-text", viewport, selector: c.selector, reason: "disabled control — reduced contrast is the platform convention" });
@@ -731,8 +774,10 @@ export function judgeTextContrast(
       exempted.push({ kind: "low-contrast-text", viewport, selector: c.selector, reason: "text-shadow present — the shadow may carry the contrast the fill lacks (not measurable deterministically)" });
       continue;
     }
-    if (findings.length >= maxFindings) continue;
     if (c.ratio < 1.15) {
+      // `invisible-text` stays per element: it is a `fail`, and an invisible element
+      // is a defect at that element rather than a colour choice to revisit.
+      if (findings.length >= maxFindings) continue;
       findings.push({
         kind: "invisible-text",
         severity: "fail",
@@ -741,30 +786,42 @@ export function judgeTextContrast(
         message: `${c.selector} renders "${clip(c.text)}" in ${c.fg} on ${c.bg} (contrast ${c.ratio.toFixed(2)}:1) — the text is effectively invisible.`,
         evidence: { ratio: c.ratio, fg: c.fg, bg: c.bg },
       });
-    } else {
-      findings.push({
-        kind: "low-contrast-text",
-        severity: "warn",
-        viewport,
-        selector: c.selector,
-        // Name the floor that applied and why, rather than the old "below the 3:1
-        // floor even for large text" — which was true, read as the contrast
-        // verdict, and quietly meant that 13px text at 3.03:1 was never mentioned.
-        message: `${c.selector} renders "${clip(c.text)}" at contrast ${c.ratio.toFixed(2)}:1 (${c.fg} on ${c.bg})`
-          + ` — below the ${(c.floor ?? 3).toString()}:1 WCAG AA floor`
-          + (c.fontSizePx !== undefined
-            ? ` for ${c.fontSizePx}px ${c.large ? "large" : "body"} text`
-            : "")
-          + `.`,
-        evidence: {
-          ratio: c.ratio,
-          fg: c.fg,
-          bg: c.bg,
-          ...(c.floor !== undefined ? { floor: c.floor } : {}),
-          ...(c.fontSizePx !== undefined ? { fontSizePx: c.fontSizePx } : {}),
-        },
-      });
+      continue;
     }
+    const key = `${c.fg}\u0000${c.bg}\u0000${c.floor ?? 3}`;
+    lowContrast.set(key, [...(lowContrast.get(key) ?? []), c]);
+  }
+  for (const group of lowContrast.values()) {
+    if (findings.length >= maxFindings) break;
+    const first = group[0]!;
+    const where = group.length === 1
+      ? first.selector
+      : `${group.slice(0, 3).map((c) => c.selector).join(", ")}${group.length > 3 ? `, and ${group.length - 3} more` : ""}`;
+    findings.push({
+      kind: "low-contrast-text",
+      severity: "warn",
+      viewport,
+      // The canonical selector stays the first one, so per-selector tooling and
+      // `--allow` keep working the way they did.
+      selector: first.selector,
+      // Name the floor that applied and why, rather than the old "below the 3:1
+      // floor even for large text" — which was true, read as the contrast
+      // verdict, and quietly meant that 13px text at 3.03:1 was never mentioned.
+      message: `${first.fg} on ${first.bg} is contrast ${first.ratio.toFixed(2)}:1`
+        + ` — below the ${(first.floor ?? 3).toString()}:1 WCAG AA floor`
+        + (first.fontSizePx !== undefined ? ` for ${first.fontSizePx}px ${first.large ? "large" : "body"} text` : "")
+        + `. ${group.length} element(s): ${where}.`
+        + ` First is "${clip(first.text)}".`,
+      evidence: {
+        ratio: first.ratio,
+        fg: first.fg,
+        bg: first.bg,
+        elements: group.length,
+        selectors: group.map((c) => c.selector),
+        ...(first.floor !== undefined ? { floor: first.floor } : {}),
+        ...(first.fontSizePx !== undefined ? { fontSizePx: first.fontSizePx } : {}),
+      },
+    });
   }
   if (skippedComposite > 0) {
     exempted.push({
@@ -1561,9 +1618,13 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
     for (let vi = 0; vi < viewports.length; vi++) {
       const viewport = viewports[vi]!;
       const page = await browser.newPage(withAuthState({ viewport }, options.storageState));
-      if (options.har) {
-        await page.routeFromHAR(resolve(options.har), { notFound: "abort" });
-      }
+      // Through `applyHar`, not a local `routeFromHAR`: the shared helper reads the
+      // recording and can therefore tell a request the fixture never held from a
+      // resource the page actually broke. Without that, an out-of-date HAR reads as
+      // a page full of broken resources — v5's CI agent: "a new endpoint absent from
+      // the HAR is *aborted*, surfacing as a broken-resource **defect** rather than
+      // 'your fixture is out of date'."
+      const harReplay = await applyHar(page, options.har);
       const events: RuntimeEvent[] = [];
       const netFailures: NetworkFailure[] = [];
       let loaded = false;
@@ -1572,14 +1633,26 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
         events.push({ type: "pageerror", text: String(err?.message ?? err).slice(0, 200), phase: loaded ? "post-load" : "construction" });
       });
       page.on("console", (msg) => {
-        if (msg.type() === "error") {
-          events.push({ type: "console-error", text: msg.text().slice(0, 200), phase: loaded ? "post-load" : "construction" });
-        }
+        if (msg.type() !== "error") return;
+        const text = msg.text().slice(0, 200);
+        // The browser logs "Failed to load resource" for a request `--har` aborted,
+        // and that console line carries no URL — so it would be reported as the
+        // page's own JS error while the request itself is correctly blamed on the
+        // fixture. Only skipped when there IS a fixture miss to explain it, so a real
+        // broken resource on a HAR-less run still reports.
+        if (harReplay && harReplay.misses().length > 0 && /Failed to load resource/i.test(text)) return;
+        events.push({ type: "console-error", text, phase: loaded ? "post-load" : "construction" });
       });
       const pageOrigin = (() => { try { return new URL(url).origin; } catch { return ""; } })();
       const originOf = (u: string) => { try { return new URL(u).origin; } catch { return pageOrigin; } };
       page.on("requestfailed", (req) => {
-        netFailures.push({ url: req.url(), resourceType: req.resourceType(), reason: req.failure()?.errorText ?? "failed", crossOrigin: originOf(req.url()) !== pageOrigin });
+        netFailures.push({
+          url: req.url(),
+          resourceType: req.resourceType(),
+          reason: req.failure()?.errorText ?? "failed",
+          crossOrigin: originOf(req.url()) !== pageOrigin,
+          ...(harReplay?.isMiss(req.url()) ? { harMiss: true } : {}),
+        });
       });
       page.on("response", (res) => {
         if (!res.ok() && res.status() >= 400) {
@@ -1760,22 +1833,71 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
 // ---------------------------------------------------------------------------
 // CLI
 
-export function formatIntegrityReport(report: IntegrityReport): string {
+export function formatIntegrityReport(report: IntegrityReport, rules?: RuleView): string {
   const lines: string[] = [];
   lines.push(`${BOLD}${CYAN}vlmkit check integrity${RESET}`);
   lines.push(`${DIM}source: ${report.source}${RESET}`);
   lines.push("");
-  const fails = report.findings.filter((f) => f.severity === "fail").length;
-  const warns = report.findings.length - fails;
-  lines.push(`verdict: ${report.verdict === "clean" ? `${GREEN}CLEAN${RESET}` : `${RED}DEFECTS${RESET}`} (${fails} fail, ${warns} warn, ${report.exempted.length} exempted)`);
+  // Honour the project's rule settings in the PROSE, not only in the exit code.
+  // `--rule low-contrast-text=off` used to print `3 finding(s) suppressed by rule
+  // settings` and then print all three anyway, and count them on the verdict line —
+  // because the prose renders from this report while suppression happens on the
+  // runner's normalized finding list. v6's adopting agent hit the re-tuning half:
+  // "the noise I re-tuned away is still in every CI log."
+  //
+  // `severityFor` maps a finding kind to what the settings made of it. A gate finding
+  // kind IS the rule id here, which is what makes this a lookup rather than a guess.
+  const severityFor = (kind: string, declared: "fail" | "warn"): "fail" | "warn" | "info" | "off" => {
+    if (!rules) return declared;
+    const effective = rules.effective(kind);
+    if (effective === "off") return "off";
+    // The runner's vocabulary is suspect/warn/info; this gate's is fail/warn. `suspect`
+    // is this gate's `fail`. `info` gets its own tier rather than collapsing into
+    // `warn`: a rule demoted to informational is still worth printing, and printing it
+    // as a warning is exactly the "I re-tuned it and nothing changed" the demotion was
+    // meant to answer.
+    if (effective === "suspect") return "fail";
+    if (effective === "info") return "info";
+    return "warn";
+  };
+  const shown = report.findings
+    .map((f) => ({ finding: f, severity: severityFor(f.kind, f.severity) }))
+    .filter((f) => f.severity !== "off");
+  const fails = shown.filter((f) => f.severity === "fail").length;
+  const warns = shown.filter((f) => f.severity === "warn").length;
+  const infos = shown.length - fails - warns;
+  // Three words, not two. `CLEAN` used to print whenever nothing FAILED, so a run
+  // with warns read as `CLEAN (0 fail, 3 warn, 0 exempted)` — a verdict contradicting
+  // its own counts, which v5's repair agent called "a coin-flip in CI" about the
+  // equivalent line on `check design`. Widening the contrast floor made it common
+  // rather than rare, so it is fixed here rather than recorded.
+  //
+  // `report.verdict` keeps its two values: it is the JSON contract, and it means
+  // exactly "did anything fail". Only the printed word gains the middle case.
+  const word = fails > 0
+    ? `${RED}DEFECTS${RESET}`
+    : warns > 0
+      ? `${YELLOW}NO DEFECTS, ${warns} WARN${RESET}`
+      : `${GREEN}CLEAN${RESET}`;
+  // The exit code is NOT appended here. The runner inserts it directly under this line
+  // for every gate (`withExitIntent`), so stating it here too would print it twice —
+  // and one gate saying it while twenty-six do not is the divergence that put the
+  // `--wait-until` hint on two gates out of four.
+  lines.push(
+    `verdict: ${word} (${fails} fail, ${warns} warn`
+    + (infos > 0 ? `, ${infos} info` : "")
+    + `, ${report.exempted.length} exempted)`,
+  );
   for (const v of report.viewports) {
     lines.push(`${DIM}  ${v.width}x${v.height}: ${v.components} component(s), ink ${(v.inkRatio * 100).toFixed(1)}%, ${v.textBlocks} text block(s)${RESET}`);
   }
-  if (report.findings.length > 0) {
+  if (shown.length > 0) {
     lines.push("");
     lines.push("Findings:");
-    for (const f of report.findings) {
-      const icon = f.severity === "fail" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
+    for (const { finding: f, severity } of shown) {
+      const icon = severity === "fail"
+        ? `${RED}x${RESET}`
+        : severity === "info" ? `${DIM}i${RESET}` : `${YELLOW}!${RESET}`;
       // Show every width it appeared at: "@1280" and "@1280,768,375" are
       // different bugs to fix, and the caller cannot tell them apart otherwise.
       const at = f.viewports && f.viewports.length > 1 ? f.viewports.join(",") : String(f.viewport);

@@ -22,6 +22,7 @@ import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import {
   classifyRuntimeEvents,
   findTextCollisions,
+  formatIntegrityReport,
   judgeAlignment,
   judgeClippedText,
   judgeCollapsedContainers,
@@ -55,6 +56,9 @@ function block(partial: Partial<IntegrityTextBlock>): IntegrityTextBlock {
 
 // ---------------------------------------------------------------------------
 // Pure-function units
+
+/** ANSI out, so an assertion matches words rather than escape codes. */
+const plain = (t: string) => t.replace(/\x1B\[[0-9;]*m/g, "");
 
 describe("pure judges", () => {
   test("classifyRuntimeEvents: construction pageerror is fail, post-load is warn", () => {
@@ -156,6 +160,36 @@ describe("pure judges", () => {
     assert.equal(judgeUnstyled({ ...base }, 1280), null);
   });
 
+  test("judgeNetworkFailures: a --har miss is blamed on the fixture, not on the page", () => {
+    // v5's CI agent: "a new endpoint absent from the HAR is *aborted*, surfacing as a
+    // broken-resource **defect** rather than 'your fixture is out of date'." Two
+    // different jobs — re-record, or fix the page — reported as the same thing.
+    const findings = judgeNetworkFailures([
+      { url: "http://localhost:1/later.css", resourceType: "stylesheet", reason: "net::ERR_FAILED", harMiss: true },
+      { url: "http://localhost:1/new.json", resourceType: "fetch", reason: "net::ERR_FAILED", harMiss: true },
+    ], 1280);
+    // One finding, not one per URL: the action is "re-record", once.
+    assert.deepEqual(findings.map((f) => f.kind), ["stale-har-fixture"]);
+    assert.equal(findings[0]!.severity, "fail");
+    assert.match(findings[0]!.message, /2 request\(s\)/);
+    assert.match(findings[0]!.message, /later\.css/);
+    assert.match(findings[0]!.message, /stale fixture, not a broken page/);
+    // And it says the rest of the run is compromised, because the page rendered
+    // without those resources.
+    assert.match(findings[0]!.message, /every finding in this run is suspect/);
+  });
+
+  test("judgeNetworkFailures: a real failure still reports when a HAR miss is also present", () => {
+    // The suppression is keyed on the individual failure, not on "a HAR was used" —
+    // a genuinely broken same-origin stylesheet must not be hidden by an unrelated
+    // fixture gap.
+    const findings = judgeNetworkFailures([
+      { url: "http://localhost:1/gone.css", resourceType: "stylesheet", reason: "HTTP 404" },
+      { url: "http://localhost:1/later.css", resourceType: "stylesheet", reason: "net::ERR_FAILED", harMiss: true },
+    ], 1280);
+    assert.deepEqual(findings.map((f) => f.kind).sort(), ["failed-stylesheet", "stale-har-fixture"]);
+  });
+
   test("judgeNetworkFailures: same-origin stylesheet/script fail, cross-origin (third-party) warn, font/xhr warn", () => {
     const findings = judgeNetworkFailures([
       { url: "file:///x/app.css", resourceType: "stylesheet", reason: "net::ERR_FILE_NOT_FOUND" },
@@ -203,6 +237,89 @@ describe("pure judges", () => {
     assert.deepEqual(findings.map((f) => `${f.kind}:${f.severity}`), ["invisible-text:fail", "low-contrast-text:warn"]);
     assert.equal(exempted.length, 3); // disabled + shadowed + composite aggregate
     assert.match(exempted[2]!.reason, /5 text block\(s\) skipped/);
+  });
+
+  test("formatIntegrityReport honours rule settings in the prose, not only in the exit code", () => {
+    // `--rule low-contrast-text=off` used to print `3 finding(s) suppressed by rule
+    // settings` and then print all three anyway, and count them on the verdict line.
+    // v6's adopting agent hit the re-tuning half: "the noise I re-tuned away is still in
+    // every CI log."
+    const report = {
+      source: "page.html",
+      verdict: "defects" as const,
+      viewports: [],
+      exempted: [],
+      findings: [
+        { kind: "page-overflow-x", severity: "fail" as const, viewport: 768, message: "188px" },
+        { kind: "low-contrast-text", severity: "warn" as const, viewport: 1280, message: "2.81:1" },
+      ],
+    };
+    const view = (setting: "off" | "info" | "warn" | "suspect") => ({
+      effective: (ruleId: string) => (ruleId === "low-contrast-text" ? setting : "suspect") as never,
+    });
+
+    const off = plain(formatIntegrityReport(report as never, view("off")));
+    assert.doesNotMatch(off, /low-contrast-text/, "an `off` rule must not be printed");
+    assert.match(off, /1 fail, 0 warn/, "and must not be counted");
+
+    const info = plain(formatIntegrityReport(report as never, view("info")));
+    assert.match(info, /low-contrast-text/, "an `info` rule is demoted, not silenced");
+    assert.match(info, /0 warn, 1 info/);
+    assert.match(info, /^\s+i \[low-contrast-text\]/m, "and renders with the info icon");
+
+    const promoted = plain(formatIntegrityReport(report as never, view("suspect")));
+    assert.match(promoted, /2 fail, 0 warn/, "a promotion counts as a failure");
+
+    // No view at all: exactly the previous behaviour, so a caller that has not been
+    // updated is unaffected.
+    const bare = plain(formatIntegrityReport(report as never));
+    assert.match(bare, /1 fail, 1 warn/);
+    assert.match(bare, /low-contrast-text/);
+  });
+
+  test("judgeTextContrast: one finding per colour pair, not per element", () => {
+    // v6's adopting agent counted the old behaviour: "the same contrast defect is
+    // reported 8 times across two gates […] Three CSS colours, eight lines." A
+    // three-row table produced three warnings differing only in the row index.
+    const grey = { fg: "rgb(141, 141, 141)", bg: "rgb(255, 255, 255)", floor: 4.5, fontSizePx: 13, large: false, disabled: false, shadowed: false, ratio: 3.32 };
+    const { findings } = judgeTextContrast([
+      { ...grey, selector: "#rows > tr:nth-of-type(1) > td:nth-of-type(4)", text: "open" },
+      { ...grey, selector: "#rows > tr:nth-of-type(2) > td:nth-of-type(4)", text: "shipped" },
+      { ...grey, selector: "#rows > tr:nth-of-type(3) > td:nth-of-type(4)", text: "cancelled" },
+      { ...grey, fg: "rgb(154, 154, 154)", ratio: 2.81, selector: "p.who", text: "signed in as ops@example.com" },
+    ], 0, 1280);
+    // Two colours, two findings — not four.
+    assert.equal(findings.length, 2);
+    assert.match(findings[0]!.message, /3 element\(s\)/);
+    // Every selector still travels, so nothing about *where* is lost.
+    assert.deepEqual(findings[0]!.evidence?.selectors, [
+      "#rows > tr:nth-of-type(1) > td:nth-of-type(4)",
+      "#rows > tr:nth-of-type(2) > td:nth-of-type(4)",
+      "#rows > tr:nth-of-type(3) > td:nth-of-type(4)",
+    ]);
+    // The canonical selector stays the first, so per-selector tooling keeps working.
+    assert.equal(findings[0]!.selector, "#rows > tr:nth-of-type(1) > td:nth-of-type(4)");
+    assert.match(findings[1]!.message, /1 element\(s\)/);
+  });
+
+  test("judgeTextContrast: the same colours at different floors stay separate findings", () => {
+    // Identity is the pair PLUS the applicable floor: the same grey is a defect on
+    // 13px body text and acceptable at 32px, and one fix does not serve both.
+    const grey = { fg: "rgb(148, 148, 148)", bg: "rgb(255, 255, 255)", disabled: false, shadowed: false, ratio: 2.9, text: "t" };
+    const { findings } = judgeTextContrast([
+      { ...grey, selector: "#body", fontSizePx: 13, large: false, floor: 4.5 },
+      { ...grey, selector: "#heading", fontSizePx: 32, large: true, floor: 3 },
+    ], 0, 1280);
+    assert.equal(findings.length, 2);
+  });
+
+  test("judgeTextContrast: invisible-text stays per element, since it is a fail at that element", () => {
+    const base = { fg: "rgb(255, 255, 255)", bg: "rgb(255, 255, 255)", disabled: false, shadowed: false, ratio: 1.0, text: "t" };
+    const { findings } = judgeTextContrast([
+      { ...base, selector: "#a" },
+      { ...base, selector: "#b" },
+    ], 0, 1280);
+    assert.deepEqual(findings.map((f) => `${f.kind}:${f.selector}`), ["invisible-text:#a", "invisible-text:#b"]);
   });
 
   test("judgeTextContrast: the message names the WCAG floor that applied and the size that chose it", () => {

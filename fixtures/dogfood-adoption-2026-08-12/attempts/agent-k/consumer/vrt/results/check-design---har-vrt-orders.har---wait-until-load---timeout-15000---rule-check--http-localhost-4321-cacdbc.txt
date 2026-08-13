@@ -1,0 +1,14 @@
+
+[1m[36mvlmkit check design[0m
+[2msource: http://localhost:4321/[0m
+
+verdict: [33mDRIFT[0m (1 finding(s))
+[2m  roles judged: 2, spacing values: 5, skipped: 28 (no inferable role), 0 (non-resting state)[0m
+
+[1mRole reuse[0m [2m(instances / distinct styles; drift below 3x from 3 instances)[0m
+  button           3 inst    2 styles  reuse   1.5x  1 one-off  [33mdrift[0m
+  h1               1 inst    1 styles  reuse     1x  1 one-off  [32mok[0m
+
+[1mFindings[0m
+  [33m![0m [component-drift] button: 3 "button" elements render 2 distinct styles (used 2x, 1x; a system reuses each style 3x or more, and this role averages 1.5x). Dominant style, used 2x: padding 10/18/10/18, radius 8, 16px/400, border 1, bg rgb(255, 255, 255). Deviating: button#export (padding 10/18/10/18, radius 8, 16px/400, border 1, bg rgb(31, 111, 235)) — differs in background-color rgb(255, 255, 255) → rgb(31, 111, 235). This reports inconsistency, not which style is correct.
+[2mre-tuned: component-drift warn->info[0m

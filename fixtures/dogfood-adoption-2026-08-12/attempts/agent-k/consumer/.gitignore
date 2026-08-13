@@ -1,0 +1,6 @@
+# vlmkit writes to three places and only one of them is configurable (--output).
+vrt/results/      # `pnpm vrt` stdout logs, one file per gate (--output)
+test-results/     # per-gate report.md + page.png, path is NOT configurable
+.vlmkit/          # run-ledger.jsonl, appended by every gate invocation
+
+# vrt/orders.har IS committed on purpose — it is the fixture the gate replays.

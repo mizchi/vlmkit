@@ -33,6 +33,45 @@ export const RULE_SETTINGS: readonly RuleSetting[] = ["off", ...FINDING_SEVERITI
  */
 export type RuleSettings = Readonly<Record<string, RuleSetting>>;
 
+/**
+ * The long form of a rule setting: the setting plus why it is there.
+ *
+ * `suppressions` has carried `reason` / `owner` / `expires` from the start, and
+ * an expired one stops being applied. `rules` had none of that, which v6's
+ * adopting agent named as the sharpest edge in the config:
+ *
+ *   "`suppressions` have `reason` / `owner` / `expires` and an expired one
+ *    re-fails the build. `rules` has none of that. […] So the only mechanism for
+ *    'the tool is wrong about this rule' is the one mechanism with no audit
+ *    trail and no expiry."
+ *
+ * A `//`-prefixed comment key was the first answer and is not enough: a comment
+ * cannot expire, and nothing enumerates it. This form goes through the same
+ * inventory and the same expiry rule as a suppression.
+ *
+ * The short form (`"rule": "off"`) stays valid — `--rule` on the command line
+ * cannot carry a reason, so requiring one everywhere would make the config
+ * unable to express what the CLI does.
+ */
+export interface RuleSettingEntry {
+  setting: RuleSetting;
+  /** Why the tool is wrong here. Required in this form — that is the point of it. */
+  reason: string;
+  /** Who signed off. Reported, so an unowned entry is visible. */
+  owner?: string;
+  /** `YYYY-MM-DD`. Past it, the setting is dropped and the rule bites again. */
+  expires?: string;
+}
+
+export type RuleSettingValue = RuleSetting | RuleSettingEntry;
+
+/** Rule settings with their annotations kept, for the inventory and expiry. */
+export interface AnnotatedRuleSettings {
+  settings: RuleSettings;
+  /** Keyed by rule reference; only the entries written in the long form. */
+  annotations: Readonly<Record<string, RuleSettingEntry>>;
+}
+
 export interface RuleDecision {
   ruleId: string;
   /** Effective severity, or `"off"`. */
@@ -81,25 +120,77 @@ function isRuleSetting(value: unknown): value is RuleSetting {
 }
 
 /**
- * Parse and validate a settings object. Errors name the JSON path, matching
- * `parseGateConfig`'s convention so a bad rules block reads like any other
- * config defect.
+ * Parse and validate a settings object, keeping any annotations.
+ *
+ * Errors name the JSON path, matching `parseGateConfig`'s convention so a bad
+ * rules block reads like any other config defect.
  */
-export function parseRuleSettings(raw: unknown, path: string): RuleSettings {
+export function parseAnnotatedRuleSettings(raw: unknown, path: string): AnnotatedRuleSettings {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     throw new UsageError(`${path}: must be an object mapping rule references to settings`);
   }
-  const out: Record<string, RuleSetting> = {};
-  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-    if (!key.trim()) throw new UsageError(`${path}: rule reference must be a non-empty string`);
-    if (!isRuleSetting(value)) {
+  const settings: Record<string, RuleSetting> = {};
+  const annotations: Record<string, RuleSettingEntry> = {};
+  for (const [rawKey, value] of Object.entries(raw as Record<string, unknown>)) {
+    const key = rawKey.trim();
+    if (!key) throw new UsageError(`${path}: rule reference must be a non-empty string`);
+    // A `//`-prefixed key is a comment, the convention this config already uses at the
+    // top level — `examples/vlmkit.gates.json` carries `"//rules"` and
+    // `"//suppressions"`. It was rejected one level down, inside the map, which is the
+    // one place a reason matters most. Now that a setting can carry its own `reason`
+    // this is the lesser form, but it stays accepted: it is what a reader reaches for
+    // to annotate the short form.
+    if (key.startsWith("//")) continue;
+    if (isRuleSetting(value)) {
+      settings[key] = value;
+      continue;
+    }
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
       throw new UsageError(
-        `${path}["${key}"]: must be one of ${RULE_SETTINGS.join(", ")}, got ${JSON.stringify(value)}`,
+        `${path}["${key}"]: must be one of ${RULE_SETTINGS.join(", ")},`
+        + ` or { "setting": ..., "reason": ... }, got ${JSON.stringify(value)}`,
       );
     }
-    out[key.trim()] = value;
+    const entry = value as Record<string, unknown>;
+    if (!isRuleSetting(entry.setting)) {
+      throw new UsageError(
+        `${path}["${key}"].setting: must be one of ${RULE_SETTINGS.join(", ")},`
+        + ` got ${JSON.stringify(entry.setting)}`,
+      );
+    }
+    // Required, and this is the whole reason the long form exists. Optional would
+    // reproduce the state the long form was added to end.
+    if (typeof entry.reason !== "string" || !entry.reason.trim()) {
+      throw new UsageError(
+        `${path}["${key}"].reason: required — say why the tool is wrong about this rule.`
+        + ` Use the short form ("${key}": "${entry.setting}") only when there is nothing to record.`,
+      );
+    }
+    if (entry.owner !== undefined && typeof entry.owner !== "string") {
+      throw new UsageError(`${path}["${key}"].owner: must be a string`);
+    }
+    if (entry.expires !== undefined) {
+      if (typeof entry.expires !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(entry.expires)) {
+        throw new UsageError(`${path}["${key}"].expires: must be YYYY-MM-DD, got ${JSON.stringify(entry.expires)}`);
+      }
+      if (Number.isNaN(Date.parse(`${entry.expires}T00:00:00Z`))) {
+        throw new UsageError(`${path}["${key}"].expires: not a real date: ${entry.expires}`);
+      }
+    }
+    settings[key] = entry.setting;
+    annotations[key] = {
+      setting: entry.setting,
+      reason: entry.reason.trim(),
+      ...(entry.owner ? { owner: (entry.owner as string).trim() } : {}),
+      ...(entry.expires ? { expires: entry.expires as string } : {}),
+    };
   }
-  return out;
+  return { settings, annotations };
+}
+
+/** The settings alone, for the many callers that never needed the annotations. */
+export function parseRuleSettings(raw: unknown, path: string): RuleSettings {
+  return parseAnnotatedRuleSettings(raw, path).settings;
 }
 
 /**

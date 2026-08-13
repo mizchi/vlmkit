@@ -1,0 +1,35 @@
+name: Visual / a11y gate
+
+on:
+  pull_request:
+    paths:
+      - "public/**"
+      - "vlmkit.gates.json"
+      - "vrt/orders.har"
+  push:
+    branches: [main]
+
+jobs:
+  vrt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: pnpm install --frozen-lockfile
+      - run: npx playwright install --with-deps chromium
+
+      # The whole gate. No dev server step and no port: every check in
+      # vlmkit.gates.json replays the committed vrt/orders.har.
+      # Rationale and the triaged finding list: vrt/README.md.
+      - run: pnpm vrt
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vrt-results
+          # vlmkit writes per-gate stdout to --output and the per-gate
+          # report.md + page.png to test-results/, which is not configurable.
+          path: |
+            vrt/results
+            test-results

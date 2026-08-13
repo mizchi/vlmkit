@@ -1,0 +1,14 @@
+{
+  "name": "orders-console",
+  "private": true,
+  "version": "2.4.0",
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types --test \"src/**/*.{test,spec}.ts\" \"*.{test,spec}.ts\" \"skills/**/*.{test,spec}.ts\" \".agents/**/*.{test,spec}.ts\"",
+    "e2e": "playwright test",
+    "serve": "node serve.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.0"
+  }
+}

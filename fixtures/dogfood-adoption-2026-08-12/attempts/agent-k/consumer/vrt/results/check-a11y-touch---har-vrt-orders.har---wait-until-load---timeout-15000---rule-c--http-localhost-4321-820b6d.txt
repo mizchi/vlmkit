@@ -1,0 +1,5 @@
+  [1m[36mvlmkit check a11y touch[0m
+  [2msource: http://localhost:4321/  level: WCAG AAA (44×44 min)[0m
+  [2minspected 3 interactive element(s)[0m
+  [32m✓[0m 0 undersized target(s)
+  [2mreport: /home/user/vlmkit/fixtures/dogfood-adoption-2026-08-12/attempts/agent-k/consumer/test-results/a11y-touch/localhost-4321-b8f3745a/report.md[0m

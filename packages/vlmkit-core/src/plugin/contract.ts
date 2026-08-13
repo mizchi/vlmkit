@@ -172,6 +172,18 @@ export const GATE_CATEGORY_ORDER: readonly GateCategory[] = [
  * existing `run*` / `format*` functions rather than rewriting them, so the
  * measurement code stays untouched and the diff stays reviewable.
  */
+/**
+ * What a gate's `format` may ask about the project's rule settings.
+ *
+ * Deliberately one question rather than the whole `AppliedRules` object: a formatter
+ * needs "what is this rule worth now", and handing it the suppressed/retuned lists
+ * would invite it to re-derive the runner's decisions and disagree with them.
+ */
+export interface RuleView {
+  /** Effective setting for a rule id, after project config and `--rule`. */
+  effective(ruleId: string): "off" | FindingSeverity;
+}
+
 export interface GateDefinition<Report = unknown, Options = unknown> {
   /**
    * Stable machine id, `<group>.<leaf>` — `check.integrity`. Used by rule
@@ -226,8 +238,22 @@ export interface GateDefinition<Report = unknown, Options = unknown> {
    * ignore the second argument.
    */
   findings: (report: Report, options: Options) => readonly Finding[];
-  /** Human output. The runner decides whether it is called at all (`--json`). */
-  format: (report: Report) => string;
+  /**
+   * Human output. The runner decides whether it is called at all (`--json`).
+   *
+   * `rules` is how a gate's prose learns what the project's rule settings did. Without
+   * it, `--rule x=off` printed `3 finding(s) suppressed by rule settings` and then
+   * printed all three anyway, because the prose is rendered from the gate's own report
+   * while suppression happens on the normalized finding list. v6's adopting agent hit
+   * the re-tuning half of the same gap: "with `component-drift=info` the output still
+   * prints `verdict: DRIFT` and still renders the finding with a yellow `!`. […] So the
+   * noise I re-tuned away is still in every CI log."
+   *
+   * Optional, and a gate that ignores it renders exactly as before — so this is not a
+   * migration all 27 gates must do at once. A gate whose prose lists findings should
+   * consult it; one that only prints a summary has nothing to consult it about.
+   */
+  format: (report: Report, rules?: RuleView) => string;
   /**
    * One line describing what was measured — not what was wrong. The findings
    * already say what was wrong; this says the context needed to read them

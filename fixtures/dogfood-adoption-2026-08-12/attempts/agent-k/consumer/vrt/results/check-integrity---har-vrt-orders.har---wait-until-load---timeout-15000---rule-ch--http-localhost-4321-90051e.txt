@@ -1,0 +1,15 @@
+[1m[36mvlmkit check integrity[0m
+[2msource: http://localhost:4321/[0m
+
+verdict: [31mDEFECTS[0m (1 fail, 5 warn, 0 exempted)
+[2m  1280x800: 8 component(s), ink 2.2%, 22 text block(s)[0m
+[2m  768x900: 8 component(s), ink 2.5%, 22 text block(s)[0m
+[2m  375x700: 8 component(s), ink 3.5%, 22 text block(s)[0m
+
+Findings:
+  [31mx[0m [page-overflow-x] @768,375: The page scrolls horizontally by 188px at 768px viewport width — caused by: table.orders (extends to x=956px: starts at 16px, 940px wide; shrinking or moving it removes 188px of the overflow); 9 other element(s) past the edge were probed and each accounts for 0px or less.
+  [33m![0m [low-contrast-text] p.who @1280,768,375: p.who renders "signed in as ops@example.com" at contrast 2.81:1 (rgb(154, 154, 154) on rgb(255, 255, 255)) — below the 4.5:1 WCAG AA floor for 13px body text.
+  [33m![0m [low-contrast-text] #rows > tr:nth-of-type(1) > td:nth-of-type(4) @1280,768,375: #rows > tr:nth-of-type(1) > td:nth-of-type(4) renders "open" at contrast 3.32:1 (rgb(141, 141, 141) on rgb(255, 255, 255)) — below the 4.5:1 WCAG AA floor for 13px body text.
+  [33m![0m [low-contrast-text] #rows > tr:nth-of-type(2) > td:nth-of-type(4) @1280,768,375: #rows > tr:nth-of-type(2) > td:nth-of-type(4) renders "shipped" at contrast 3.32:1 (rgb(141, 141, 141) on rgb(255, 255, 255)) — below the 4.5:1 WCAG AA floor for 13px body text.
+  [33m![0m [low-contrast-text] #rows > tr:nth-of-type(3) > td:nth-of-type(4) @1280,768,375: #rows > tr:nth-of-type(3) > td:nth-of-type(4) renders "cancelled" at contrast 3.32:1 (rgb(141, 141, 141) on rgb(255, 255, 255)) — below the 4.5:1 WCAG AA floor for 13px body text.
+  [33m![0m [low-contrast-text] p.hint @1280,768,375: p.hint renders "Totals exclude tax. FIXME confirm round…" at contrast 2.61:1 (rgb(160, 160, 160) on rgb(255, 255, 255)) — below the 4.5:1 WCAG AA floor for 13px body text.

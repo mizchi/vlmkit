@@ -184,6 +184,15 @@ describe("vlmkit CLI tree (cac-based)", () => {
     assert.doesNotMatch(r.stderr, /\[vlmkit deprecated\]/);
   });
 
+  it("`vrt snapshot record-har` routes to record-har-cli", () => {
+    // `--har` was the documented reproducibility answer with no way to produce one;
+    // v5's CI agent wrote its own recorder to finish the task it was given.
+    const r = runVrt(["snapshot", "record-har", "--help"]);
+    assert.equal(r.status, 0);
+    assert.match(r.stdout, /vlmkit snapshot record-har <url>/);
+    assert.doesNotMatch(r.stderr, /\[vlmkit deprecated\]/);
+  });
+
   it("`vrt contract` prints contract group usage", () => {
     const r = runVrt(["contract"]);
     assert.equal(r.status, 0);

@@ -20,8 +20,8 @@
  */
 
 import { UsageError } from "./cli-error.ts";
-import type { RuleSettings } from "./plugin/rules.ts";
-import { parseRuleSettings } from "./plugin/rules.ts";
+import type { RuleSettingEntry, RuleSettings } from "./plugin/rules.ts";
+import { parseAnnotatedRuleSettings } from "./plugin/rules.ts";
 
 export interface GateSuppression {
   /**
@@ -59,13 +59,58 @@ export interface GatePage {
    * that quietly does nothing.
    */
   rules?: RuleSettings;
+  /**
+   * The long-form entries from `rules`, keyed by rule reference. Kept beside the
+   * flattened settings so a rule setting can carry a reason and an expiry, and go
+   * through the same inventory as a suppression.
+   */
+  ruleAnnotations?: Readonly<Record<string, RuleSettingEntry>>;
+}
+
+/**
+ * A dev server to start before the run and stop after it — Playwright's
+ * `webServer`, which it has had for years and this config did not.
+ *
+ * v6's adopting agent got around it with a HAR, and said so: without that idea
+ * you are hand-writing start / trap-kill / poll-for-ready in a shell wrapper,
+ * per CI job. A config that declares which URLs to gate but cannot say how to
+ * bring them up is only half committed.
+ *
+ * Named and shaped after Playwright's on purpose. A team that has written one
+ * should not have to learn a second vocabulary to write this one.
+ */
+export interface GateWebServer {
+  /** Shell command that starts the server. */
+  command: string;
+  /**
+   * URL polled until it answers. Required — "started" has to mean "serving",
+   * not "spawned", or the first gate races the bundler.
+   */
+  url: string;
+  /** Milliseconds to wait for `url` before giving up. Default 60000. */
+  timeout?: number;
+  /**
+   * Reuse a server already listening on `url` instead of starting one.
+   *
+   * Defaults to true locally and FALSE in CI (`process.env.CI`), matching
+   * Playwright: locally you want your own `npm run dev`; in CI a listening port
+   * usually means a leaked process from an earlier job, and reusing it silently
+   * gates the wrong build.
+   */
+  reuseExistingServer?: boolean;
+  /** Working directory for `command`. Relative to the config file. Default: the config's directory. */
+  cwd?: string;
+  /** Extra environment for the server process, on top of the current one. */
+  env?: Readonly<Record<string, string>>;
 }
 
 export interface GateConfig {
+  webServer?: GateWebServer;
   defaults?: {
     gates?: string[];
     suppressions?: GateSuppression[];
     rules?: RuleSettings;
+    ruleAnnotations?: Readonly<Record<string, RuleSettingEntry>>;
   };
   pages: GatePage[];
 }
@@ -76,6 +121,19 @@ export interface ResolvedSuppression extends GateSuppression {
   status: "active" | "expired" | "permanent";
   /** Days until expiry; negative when overdue, null when permanent. */
   daysLeft: number | null;
+  /**
+   * Which config block this came from.
+   *
+   * A long-form `rules` entry flows through the SAME resolved shape, the same
+   * expiry rule, and the same inventory as a `suppressions` entry — otherwise
+   * `rules` would need a second parallel set of all three, and the two would
+   * eventually disagree about what expiry means. The discriminator keeps them
+   * distinguishable to a reader; for a rule entry, `gate` is the gate the rule
+   * belongs to and `flag` is the `--rule` flag the plan appends.
+   */
+  kind: "suppression" | "rule";
+  /** Rule reference, for `kind: "rule"` only. */
+  ref?: string;
 }
 
 export interface GateJob {
@@ -168,7 +226,11 @@ export function parseGateConfig(raw: string): GateConfig {
       if (!Array.isArray(d.suppressions)) fail("defaults.suppressions", "must be an array");
       defaults.suppressions = d.suppressions.map((s, i) => parseSuppression(s, `defaults.suppressions[${i}]`));
     }
-    if (d.rules !== undefined) defaults.rules = parseRuleSettings(d.rules, "defaults.rules");
+    if (d.rules !== undefined) {
+      const parsed = parseAnnotatedRuleSettings(d.rules, "defaults.rules");
+      defaults.rules = parsed.settings;
+      if (Object.keys(parsed.annotations).length > 0) defaults.ruleAnnotations = parsed.annotations;
+    }
   }
   if (!Array.isArray(root.pages)) fail("pages", "must be an array");
   if (root.pages.length === 0) fail("pages", "is empty — nothing would run");
@@ -188,13 +250,68 @@ export function parseGateConfig(raw: string): GateConfig {
       if (!Array.isArray(p.suppressions)) fail(`${at}.suppressions`, "must be an array");
       page.suppressions = p.suppressions.map((s, j) => parseSuppression(s, `${at}.suppressions[${j}]`));
     }
-    if (p.rules !== undefined) page.rules = parseRuleSettings(p.rules, `${at}.rules`);
+    if (p.rules !== undefined) {
+      const parsed = parseAnnotatedRuleSettings(p.rules, `${at}.rules`);
+      page.rules = parsed.settings;
+      if (Object.keys(parsed.annotations).length > 0) page.ruleAnnotations = parsed.annotations;
+    }
     if (!page.gates && !page.extraGates && !defaults.gates) {
       fail(at, `no gates: set ${at}.gates or defaults.gates`);
     }
     return page;
   });
-  return { ...(Object.keys(defaults).length > 0 ? { defaults } : {}), pages };
+  return {
+    ...(root.webServer !== undefined ? { webServer: parseWebServer(root.webServer) } : {}),
+    ...(Object.keys(defaults).length > 0 ? { defaults } : {}),
+    pages,
+  };
+}
+
+function parseWebServer(raw: unknown): GateWebServer {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) fail("webServer", "must be an object");
+  const w = raw as Record<string, unknown>;
+  if (typeof w.command !== "string" || !w.command.trim()) fail("webServer", "command is required");
+  // Required, unlike Playwright's (which accepts `port` as an alternative).
+  // "Started" has to mean "serving": without a readiness probe the first gate
+  // races the bundler, and a flake there is indistinguishable from a real finding.
+  if (typeof w.url !== "string" || !/^https?:\/\//.test(w.url)) {
+    fail("webServer", `url is required and must be http(s), got ${JSON.stringify(w.url)}`);
+  }
+  const server: GateWebServer = { command: w.command.trim(), url: w.url.trim() };
+  if (w.timeout !== undefined) {
+    if (typeof w.timeout !== "number" || !Number.isFinite(w.timeout) || w.timeout <= 0) {
+      fail("webServer", `timeout must be a positive number of ms, got ${JSON.stringify(w.timeout)}`);
+    }
+    server.timeout = w.timeout;
+  }
+  if (w.reuseExistingServer !== undefined) {
+    if (typeof w.reuseExistingServer !== "boolean") fail("webServer", "reuseExistingServer must be a boolean");
+    server.reuseExistingServer = w.reuseExistingServer;
+  }
+  if (w.cwd !== undefined) {
+    if (typeof w.cwd !== "string" || !w.cwd.trim()) fail("webServer", "cwd must be a non-empty string");
+    server.cwd = w.cwd.trim();
+  }
+  if (w.env !== undefined) {
+    if (typeof w.env !== "object" || w.env === null || Array.isArray(w.env)) fail("webServer.env", "must be an object");
+    const env: Record<string, string> = {};
+    for (const [key, value] of Object.entries(w.env as Record<string, unknown>)) {
+      if (typeof value !== "string") fail(`webServer.env["${key}"]`, `must be a string, got ${JSON.stringify(value)}`);
+      env[key] = value;
+    }
+    server.env = env;
+  }
+  return server;
+}
+
+/**
+ * Whether to reuse a server already listening. Playwright's default, and for
+ * Playwright's reason: locally the listening port is your own `npm run dev`; in
+ * CI it is usually a leaked process from an earlier job, and reusing it gates a
+ * build nobody asked about.
+ */
+export function shouldReuseExistingServer(server: GateWebServer, env = process.env): boolean {
+  return server.reuseExistingServer ?? !env.CI;
 }
 
 /** UTC midnight, so "expires today" behaves the same in every timezone. */
@@ -203,10 +320,41 @@ function utcDay(date: Date): number {
 }
 
 export function resolveSuppression(s: GateSuppression, scope: string, now: Date): ResolvedSuppression {
-  if (!s.expires) return { ...s, scope, status: "permanent", daysLeft: null };
+  const base = { ...s, scope, kind: "suppression" as const };
+  if (!s.expires) return { ...base, status: "permanent", daysLeft: null };
   const daysLeft = utcDay(new Date(`${s.expires}T00:00:00Z`)) - utcDay(now);
   // Expiry day itself is still valid; the day after is not.
-  return { ...s, scope, status: daysLeft < 0 ? "expired" : "active", daysLeft };
+  return { ...base, status: daysLeft < 0 ? "expired" : "active", daysLeft };
+}
+
+/**
+ * Resolve one long-form `rules` entry onto the same shape as a suppression, so
+ * the inventory, the expiry notice and `--require-expiry` cover both.
+ *
+ * `gate` is the gate portion of the reference (`check.integrity/text-collision`
+ * -> `check.integrity`), which is what a reader scanning the inventory wants to
+ * see; a bare rule id has no gate to name and reports as `*`.
+ */
+export function resolveRuleSetting(
+  ref: string,
+  entry: RuleSettingEntry,
+  scope: string,
+  now: Date,
+): ResolvedSuppression {
+  const slash = ref.indexOf("/");
+  const base = {
+    gate: slash > 0 ? ref.slice(0, slash) : ref.includes(".") ? ref : "*",
+    flag: `--rule ${ref}=${entry.setting}`,
+    reason: entry.reason,
+    ...(entry.owner ? { owner: entry.owner } : {}),
+    ...(entry.expires ? { expires: entry.expires } : {}),
+    scope,
+    kind: "rule" as const,
+    ref,
+  };
+  if (!entry.expires) return { ...base, status: "permanent", daysLeft: null };
+  const daysLeft = utcDay(new Date(`${entry.expires}T00:00:00Z`)) - utcDay(now);
+  return { ...base, status: daysLeft < 0 ? "expired" : "active", daysLeft };
 }
 
 export interface ResolveOptions {
@@ -229,14 +377,21 @@ export function resolveGatePlan(config: GateConfig, options: ResolveOptions = {}
   const defaultGates = config.defaults?.gates ?? [];
   const defaultSuppressions = (config.defaults?.suppressions ?? [])
     .map((s) => resolveSuppression(s, "defaults", now));
+  // Resolved once, like `defaultSuppressions` — resolving inside the page loop
+  // would list every default entry once per page in the inventory.
+  const defaultRuleSettings = Object.entries(config.defaults?.ruleAnnotations ?? {})
+    .map(([ref, entry]) => resolveRuleSetting(ref, entry, "defaults", now));
 
   const jobs: GateJob[] = [];
-  const suppressions: ResolvedSuppression[] = [...defaultSuppressions];
+  const suppressions: ResolvedSuppression[] = [...defaultSuppressions, ...defaultRuleSettings];
 
   for (const page of config.pages) {
     const pageId = page.id ?? page.source;
     const pageSuppressions = (page.suppressions ?? []).map((s) => resolveSuppression(s, pageId, now));
     suppressions.push(...pageSuppressions);
+    const pageRuleSettings = Object.entries(page.ruleAnnotations ?? {})
+      .map(([ref, entry]) => resolveRuleSetting(ref, entry, pageId, now));
+    suppressions.push(...pageRuleSettings);
     if (only.length > 0 && !only.some((o) => pageId.includes(o) || page.source.includes(o))) continue;
     const gates = [...(page.gates ?? defaultGates), ...(page.extraGates ?? [])];
     if (gates.length === 0) {
@@ -248,7 +403,23 @@ export function resolveGatePlan(config: GateConfig, options: ResolveOptions = {}
     const candidates = [...defaultSuppressions, ...pageSuppressions];
     // Page settings win over defaults, key by key — the same precedence a
     // page's `gates` has over `defaults.gates`.
-    const rules: RuleSettings = { ...config.defaults?.rules, ...page.rules };
+    const merged: Record<string, RuleSettings[string]> = { ...config.defaults?.rules, ...page.rules };
+    // An expired rule setting is DROPPED, exactly as an expired suppression is:
+    // the rule bites again and the expiry is reported. An expiry date that keeps
+    // working after it passes is a comment, not a deadline — and before this,
+    // `rules` had no way to express either one.
+    //
+    // A page entry shadows the default for the same ref, so an expired default
+    // renewed on this page stays in effect, and a page entry that has itself
+    // expired drops even when the default is still live.
+    const shadowed = new Set(Object.keys(page.ruleAnnotations ?? {}));
+    for (const resolved of defaultRuleSettings) {
+      if (resolved.status === "expired" && !shadowed.has(resolved.ref!)) delete merged[resolved.ref!];
+    }
+    for (const resolved of pageRuleSettings) {
+      if (resolved.status === "expired") delete merged[resolved.ref!];
+    }
+    const rules: RuleSettings = merged;
     for (const baseGate of gates) {
       const applied = candidates.filter((s) => s.status !== "expired" && gateMatches(baseGate, s.gate));
       jobs.push({

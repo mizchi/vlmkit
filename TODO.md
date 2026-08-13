@@ -1064,45 +1064,175 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     現行のグリッドの拡張ではなく新しい構図。
   - 着手条件: レビュアーが実際に空間配置を読み違えた事例が出たら。
 
+### dogfood v6 の残件(2026-08-12、adoption シナリオ)
+
+レポートは `docs/reports/2026-08-12-dogfood-adoption-v6.md`。**7件すべて 2026-08-13 に修正済み**
+(`3e27f0a` / `1657d4b` / `6ca9dad` / `8b12f29` / `7241a2b` / `b5e7c0f` / `25711b1`)。
+指摘文はエージェントの言葉のまま残す — 答えを知った後の書き直しより、指摘そのものが記録として役に立つ。
+
+- [x] **同じ3色が8件の所見になる** — 修正済み(2026-08-13)。色ペア + 適用された床を
+  identity にして1件にまとめる(修正の単位が CSS 1宣言だから)。セレクタは
+  `evidence.selectors` と本文の先頭数件で残る。canonical `selector` は先頭要素のままなので
+  per-selector のツールと `--allow` は不変。`invisible-text` は要素ごとに据え置き
+  (その要素での `fail` であって、見直すべき色の選択ではない)。実測:consumer ページで
+  warn 5件 → 3件、CSS 1色につき1行。
+  - `check integrity` の `low-contrast-text` はテーブル行ごとに1件出す
+    (`#rows > tr:nth-of-type(1) > td:nth-of-type(4)`, `(2)`, `(3)`)。
+    `check a11y contrast` は同じものを3件に畳んでいる。CSS 3色 → 8行。
+  - 導入エージェント曰く「3色に8行、というのがゲートが `--advisory` を付けられる存在に
+    なる過程」。`judgeTextContrast` で (fg, bg, floor) が同じものをまとめて件数で出す。
+
+- [x] **rule を降格しても見た目が変わらない** — 修正済み(2026-08-13)、契約変更で
+  - `format(report, rules?)` に `RuleView`(`effective(ruleId)` 1問だけ)を渡す。
+    生の `AppliedRules` を渡さないのは、formatter が runner の判断を再導出して
+    食い違う余地を作らないため。
+  - 調べたら再チューニングより **`off` の方が明確な矛盾**だった:`--rule x=off` が
+    「3件 suppressed」と言いながら3件すべて印字し、verdict でも数えていた。
+  - `check integrity` が honour する:`off` はリストとカウントの両方から消える
+    (suppressed 件数は残るので「隠す」ではなく「黙らせる」)、`info` は独自の段と
+    アイコン、`suspect` は昇格。
+  - **optional** なので、引数を無視するゲートは従来どおり。27ゲート一斉移行ではない。
+  - `--rule component-drift=info` は verdict には効き `re-tuned:` も出るが、所見は
+    warn 形の `!` のまま、verdict も `DRIFT` のまま。`gate.format(report)` が
+    applied rules を見ていないから。再現済み。
+  - 直し方: `format` に applied rules を渡す**契約変更**。今サイクルで prose への
+    推論で2回やられているので、3つ目のヒューリスティックではなく契約変更にすべき。
+
+- [x] **`--min-reuse` が推奨された用途に届かない** → `check design --allow` を追加
+  - メトリクスが instances/styles の平均なので、3要素1バリアントの role は 1.5x で、
+    チェックを無効化する以外に超えられない。`examples/vlmkit.gates.json` はこのケースに
+    `--min-reuse 2` を勧めている。
+  - `check integrity --allow` と同じ `<selector>;<reason>` 構文。allow したインスタンスは
+    平均を取る前に母集団から抜けるので role の数値が「まだ判定対象の要素」を表す。
+    抜いたことは `allowed: N` で必ず出る。マッチしなかった rule も名前を返す。
+  - **セレクタは finding に出た形のまま書く**(id 優先パスなので `button#export` は
+    当たり、`.btn--primary` は当たらない)。ヘルプにこの一文を入れてある。
+
+- [x] **導入がリポジトリを黙って汚す** → `--ledger <path>` / `--no-ledger` + 初回作成の告知
+      + `gates init` が `.gitignore` を書く
+  - `--output` は stdout ログだけ。`test-results/` と `.vlmkit/run-ledger.jsonl` は
+    フラグが無く、生成されることを何も告げない。エージェントは `ls` で気づいて
+    `.gitignore` を自分で書いた。
+  - レポートを書くゲートは既に `report: <path>` を出していた。**本当に無言だったのは
+    ledger だけ**。
+  - **実装位置が要点**: `appendRunLedger` の直接呼び出しが 16 箇所中 14 箇所あり、
+    runner だけに実装すると 14 箇所を取りこぼす。`--wait-until` のときと同じ形
+    (42 箇所の `.goto(` のうち3箇所が独自にオプションを組んでいた)。
+    ledger モジュール側に run 単位の設定を置いて choke point にした。
+  - 告知は**初回作成時のみ**。gate 実行ごとに1行追記されるファイルなので毎回言うとノイズ。
+    既に ignore 済み / git リポジトリでない場合は何も出さない。
+    `--ledger` で移した場合は、書いていない2ディレクトリではなく実際のパスを案内する。
+
+- [x] **`vlmkit.gates.json` に `webServer` 相当が無い**(Playwright には昔からある)→ 追加
+  - HAR 経路があるので今回は回避できたが、HAR を思いつかなければ
+    start / trap kill / poll-for-ready を手で書くことになる。
+  - Playwright と同じ名前・同じ形(`command` / `url` / `timeout` /
+    `reuseExistingServer` / `cwd` / `env`)。一度書いた人が語彙を学び直さないため。
+  - **意図的な差分2点**: (1) `url` は必須(`port` の代替を用意しない)。
+    「起動した」が「配信している」を意味しないと最初のゲートが bundler と競合し、
+    その flake は本物の findings と区別できない。(2) URL が応答する前にコマンドが
+    終了した場合は**終了コードで報告**する。タイムアウトは「走らなかったコマンド」の
+    誤診断なので。
+  - プロセスグループごと起動・停止する(`npm run dev` → bundler → watcher が
+    ポートを握ったまま残らない)。throw / Ctrl-C でも必ず停止する —
+    残留サーバは次回 `reuseExistingServer` に拾われて古いビルドを黙って gate するので、
+    機能が無かったことより悪い。
+  - `gates list` は起動せずに宣言だけ表示する。
+
+- [x] **`skipped: 28 (no inferable role)` が解釈できない** → coverage 行 + タグ内訳 + 一行説明
+  - `coverage: 18 of 141 visible element(s) carried an inferable role` /
+    `no role: a x37, td x21, div x19, span x18, ...` /
+    role の出どころ(`role="..."` か button/input/select/textarea/h1-h6)と
+    「div/span/p/a には無いので skip が多いのは正常」の一行。
+  - 数字だけでは「div ばかりのページ」と「計測が壊れた」を区別できないのが本質だった。
+    タグ内訳はページ自身のマークアップで即答する。
+  - 元の指摘: 30要素中28スキップは verdict がほぼ何も見ていないことを意味するが、それが
+    正常かどうかを何も言わない。
+
+- [x] **`rules` に first-class な `reason`(と `expires`)** → 長形式を追加
+  - `{"setting": "warn", "reason": "...", "owner": "...", "expires": "..."}`。
+    長形式では reason 必須。suppression と**同じ resolved 形**に落ちるので
+    `gates suppressions` に `[rule]` タグ付きで並び、`--require-expiry` /
+    `--require-owner` も効き、期限切れは**適用されずルールが再び落ちる**。
+  - 短形式(`"rule": "off"`)は維持。`--rule` は reason を運べないので、全面必須化すると
+    config が CLI を表現できなくなる。`//` コメントキーも残すが、コメントは期限切れに
+    ならず列挙もされないので長形式を推奨。
+  - ページ側 annotation は default を ref 単位で上書きするので、期限切れ default を
+    ページで**更新**できる(default 側は expired として報告され続ける)。
+  - `examples/vlmkit.gates.json` の `--min-reuse 2`(届かない)を `check design --allow`
+    に差し替え、長形式を defaults とページの両方で例示。
+  - 元の指摘: `//` コメントキーは通るようにしたが、`suppressions` の
+    `reason`/`owner`/`expires`(期限切れでビルドが再度落ちる)には及ばない。
+    監査可能な経路が suppressions にしかなく、false positive に必要なのは
+    監査不能な方 — プロジェクト自身の一番良いアイデアが反転している。
+
 ### dogfood v5 の残件(2026-08-11、ops dashboard シナリオ)
 
 修正済み6件は `docs/reports/2026-08-11-dogfood-dataviz-v5.md`。以下は**未修正・記録のみ**。
 どれも実在するが、測定の誤りではない。
 
-- [ ] **`--har` に recorder がない(v5 で最も呼ばれた「機能」要望)**
+- [x] **`--har` に recorder がない(v5 で最も呼ばれた「機能」要望)** — `vlmkit snapshot record-har` として追加(2026-08-12)
   - `docs/configuration.md` が「Playwright で HAR を録って replay しろ」と言うだけなので、
     どのプロジェクトも同じ20行スクリプトを書く。CI エージェントは実際に `record-har.mjs` を
     自作してタスクを完了させた。「知識がシェル履歴に住む」問題の一段下。
   - 答えは `vlmkit snapshot record-har` 相当。修正ではなく機能追加なので別途。
 
-- [ ] **HAR に陳腐化シグナルがなく、ポートに縛られる(残件の中で最も重い)**
+- [x] **HAR に陳腐化シグナルがなく、ポートに縛られる(残件の中で最も重い)** — 両方修正(2026-08-12)。`stale-har-fixture` ルール追加、origin 不一致は goto で名指し
   - 録音に無いエンドポイントは *abort* され、それが **broken-resource の「欠陥」**として
     出る。「フィクスチャが古い」ではなく「ページが壊れている」と報告される = 所見の種類が
     間違っている。
   - 録音は完全 URL がキーなので、ポートを変えると黙ってマッチしなくなる。
   - 着手条件: 所見の種類が違うのは実害なので、v6 を待たずに直す価値がある。
 
-- [ ] **`gates init` が「必ずタイムアウトする設定」を出力する**
-  - `http://` の source を渡すと、全ゲートが navigation で死ぬ plan を生成する。
-    URL を持っているのだから `--wait-until` を足すか警告できる。
+- [x] **`check design` の `DRIFT` + exit 0** — 修正済み(2026-08-12)、runner 側で27ゲート一律
+  - 決定:各ゲートの format ではなく **runner が verdict 行の直下に挿入**する
+    (`withExitIntent`)。`verdict:` / `status:` で始まる行をアンカーにする慣習は
+    `batch-cli` の `gateReported()` が既に依存していたので、新設ではなく明文化。
+  - アンカーが無いゲートは末尾に追記(従来動作)にフォールバックするので、慣習に
+    従わないゲートでも注記を失わない。
+  - integrity 側のインライン `— exits 0` は削除。1ゲートだけが言って26ゲートが
+    言わない状態は、`--wait-until` のヒントが4ゲート中2つになった分岐と同じ。
 
-- [ ] **入力が pin されていないことを、どのゲートも言わない**
-  - 4ゲートが live URL を叩いて verdict を返すが、再実行で変わり得ることを示す表示がゼロ。
-    CI エージェントは jitter サーバを自作して出力を diff して答えを出した。
-  - 本人の提案: `gates run --repeat 2 --require-stable` が1コマンドで答える。
+- [x] **`gates init` が「必ずタイムアウトする設定」を出力する** — 修正済み(2026-08-12)
+  - URL source のときは全ゲートに `--wait-until load --timeout 15000` を足して書き、
+    理由と `record-har` の案内も出す。警告ではなく scaffold に入れたのは、既に書かれた
+    設定の隣に警告を出しても作業が読み手に戻るだけだから。
+  - 実測:never-idle ページに対して scaffold した設定が `gates run` で実際に走り、
+    `1 FAILED`(ページ本来の欠陥)を報告する。修正前は全ゲートが 30 秒で死んでいた。
 
-- [ ] **`check breakpoints` が幅ごとに再フェッチする**
-  - 1 run で `/api/metrics` を6回叩くので、B-1/B/B+1 の比較が3つの異なるデータセットを
-    またぐ。データ由来の `boundary-spike` が構造的にあり得て、CSS バグと見分けがつかない。
-    `--har` が副作用で直すが、何も警告しない。
+- [x] **入力が pin されていないことを、どのゲートも言わない** — 修正済み(2026-08-12)
+  - runner が判定できた:ゲートが `--har` を宣言していて、argv に http(s) の source があり、
+    `--har` が渡されていない → 1行出す。`--json` では黙る。
+  - 「測る」(`--repeat 2 --require-stable`)ではなく「述べる」を選んだ。エージェントは
+    前者を提案したが、実際に答えていた問いは「これは変わり得るか」で、2回走らせずに決定できる。
+  - `--repeat/--require-stable` 自体は不要とは言い切れないが、実際に必要になった人が
+    出てから。
 
-- [ ] **verdict の語が自分のカウントと矛盾し得る**
+- [x] **~~`check breakpoints` が幅ごとに再フェッチする~~ — 反証済み(2026-08-12)**
+  - agent-j の主張は**誤り**だった。実測:リクエストをカウントするサーバに対して
+    `check breakpoints` を1回走らせて **document 1回 / `/api/metrics` 1回**。
+    `--sweep` で **39 幅**サンプルしても同じく 1回 / 1回。
+  - 仕組みを読めば明らか:`breakpoint-check.ts` は `navigatePage` を**1回**呼び、
+    以降は `setViewportSize` でリサイズするだけ。ナビゲーションは繰り返さない。
+    彼らの「1 run で6回」は、おそらく 4 ゲートの `gates run` 全体か複数回の実行を
+    数えたもの。
+  - 残る本当の懸念(ゲートの問題ではない):**ページ自身が** resize で再フェッチする場合は
+    幅ごとにデータが変わり得る。それはページの挙動で、`--har` が pin する。
+
+- [x] **verdict の語が自分のカウントと矛盾し得る** — `check integrity` は修正済み(`NO DEFECTS, N WARN` + exit 意図)。`check design` の `DRIFT` + exit 0 は未着手
   - `verdict: DRIFT` + exit 0、そして F2 の修正後は `CLEAN (0 fail, 3 warn)`。
     解決する行(`N warn(s) did not fail this command`)は findings の下、最後に出る。
     修理エージェント曰く「CI ではコイントス」。
   - 直し方の候補: verdict 行自体に exit 意図を載せる(`DRIFT (1 finding) — exit 0`)。
 
-- [ ] **`check a11y contrast` の report がリポジトリルートの `test-results/` に出る**(バグではないが、対象ページの隣ではない)
+- [x] **~~`check a11y contrast` の report 出力先~~ — 半分は仕様、半分は実バグだった(2026-08-12)**
+  - **場所**は仕様。`test-results/<gate>/` はプロジェクト全体の慣習で、1ゲートだけ
+    変えると不整合になる。agent-i がそれを知らなかっただけ。
+  - **実バグ**はそこではなかった:2ページを続けて検査すると `report.md` と `page.png`
+    を共有し、**2つ目が1つ目を黙って上書き**した。v2 が `check drift component` で
+    見つけた clobber と同じで、あのときは drift だけ直していた。
+  - 修正:`runOutputDir()` を `arg-helpers.ts` に共有ヘルパーとして置き、a11y の3ゲート
+    (contrast / touch / focus)と drift が使う。drift のローカル `runSlug` は削除。
 
 - [ ] **dogfood の次ラウンドは別ページで(2026-08-10 v4 の結論)**
   - v4 で「測定が間違っている」系の指摘が **0 件**になり、残る 6 件はすべて出力の読みやすさ。

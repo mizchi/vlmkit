@@ -16,10 +16,15 @@
  */
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { UsageError, handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { hasFlag, readAll, readFlag, readInt } from "@mizchi/vlmkit-core/arg-reader.ts";
+import {
+  VLMKIT_IGNORE_ENTRIES,
+  isGitIgnored,
+  isGitRepo,
+} from "@mizchi/vlmkit-core/run-ledger.ts";
 import {
   GATE_CONFIG_FILENAMES,
   type GateConfig,
@@ -30,6 +35,7 @@ import {
   summarizeSuppressions,
 } from "@mizchi/vlmkit-core/gate-config.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { formatWebServerPlan, withWebServer } from "./web-server.ts";
 import {
   type BatchSummary,
   formatBatchSummary,
@@ -156,7 +162,11 @@ export function formatSuppressions(suppressions: ResolvedSuppression[], soonDays
         : (s.daysLeft ?? Infinity) <= soonDays
           ? `${YELLOW}${s.daysLeft}d left${RESET}`
           : `${GREEN}${s.daysLeft}d left${RESET}`;
-    lines.push(`  ${state}  ${BOLD}${s.scope}${RESET} ${DIM}/${RESET} ${s.gate} ${DIM}${s.flag}${RESET}`);
+    // `rule` entries come from the `rules` block and `suppression` entries from
+    // `suppressions`; both are silencing something, and a reviewer deciding whether
+    // an entry still earns its place needs to know which file section to edit.
+    const kind = s.kind === "rule" ? `${DIM}[rule]${RESET} ` : "";
+    lines.push(`  ${state}  ${kind}${BOLD}${s.scope}${RESET} ${DIM}/${RESET} ${s.gate} ${DIM}${s.flag}${RESET}`);
     lines.push(`      ${s.reason}${s.owner ? ` ${DIM}— ${s.owner}${RESET}` : ` ${YELLOW}(no owner)${RESET}`}`);
   }
   if (summary.expired > 0) {
@@ -176,12 +186,15 @@ export function formatSuppressions(suppressions: ResolvedSuppression[], soonDays
  */
 export function formatExpiredNotice(expired: ResolvedSuppression[]): string {
   if (expired.length === 0) return "";
+  const rules = expired.filter((s) => s.kind === "rule").length;
   const lines = [
-    `${RED}${expired.length} suppression(s) expired — the gate(s) below run unmuted:${RESET}`,
+    `${RED}${expired.length} suppression(s) expired${rules > 0 ? ` (${rules} rule setting(s))` : ""}`
+    + ` — the gate(s) below run unmuted:${RESET}`,
   ];
   for (const s of expired) {
     lines.push(
-      `  ${RED}x${RESET} ${BOLD}${s.scope}${RESET} ${DIM}/${RESET} ${s.gate} ${DIM}${s.flag}${RESET}`
+      `  ${RED}x${RESET} ${s.kind === "rule" ? `${DIM}[rule]${RESET} ` : ""}`
+      + `${BOLD}${s.scope}${RESET} ${DIM}/${RESET} ${s.gate} ${DIM}${s.flag}${RESET}`
       + ` ${DIM}(expired ${-s.daysLeft!}d ago: ${s.reason})${RESET}`,
     );
   }
@@ -244,6 +257,77 @@ async function validateAgainstRegistry(plan: GatePlan, configPath: string): Prom
 
 const STARTER_GATE = "check integrity";
 
+/** Flags a URL-sourced scaffold needs to run at all. See `scaffoldConfig`. */
+export const URL_SCAFFOLD_FLAGS = "--wait-until load --timeout 15000";
+
+/**
+ * What `gates init` writes, as a decision separate from writing it.
+ *
+ * A `http(s)` source needs the page-load flags or every gate in the scaffold dies in
+ * navigation on any page that does not reach network idle — which is the whole class of
+ * page a URL source implies. v5's CI agent got exactly that plan:
+ *
+ *   "`gates init` doesn't know what it scaffolded. Handed a `http://` source, it emits
+ *    a plan that times out on every gate. It has the URL; it could scaffold
+ *    `--wait-until`/`--timeout` or warn."
+ *
+ * Scaffolding the flags rather than warning, because a warning printed next to a config
+ * that has already been written puts the work back on the reader. `load` rather than
+ * `domcontentloaded`: it is the weakest milestone that still guarantees subresources,
+ * and the gates settle after it anyway.
+ */
+export function scaffoldConfig(
+  patterns: readonly string[],
+  gates: readonly string[],
+): { config: GateConfig; urlSources: string[] } {
+  const sources = patterns.length > 0 ? [...patterns] : ["index.html"];
+  const urlSources = sources.filter((source) => /^https?:\/\//.test(source));
+  const declared = gates.length > 0 ? [...gates] : [STARTER_GATE];
+  return {
+    config: {
+      defaults: {
+        gates: urlSources.length > 0
+          ? declared.map((gate) => `${gate} ${URL_SCAFFOLD_FLAGS}`)
+          : declared,
+      },
+      pages: sources.map((source) => ({ source })),
+    },
+    urlSources,
+  };
+}
+
+/**
+ * Add the directories vlmkit writes to `.gitignore`, if they are not there.
+ *
+ * v6's adopting agent had to do this by hand after finding the directories with
+ * `ls`: "adopting the tool dirtied the repo silently." `gates init` is the one
+ * command whose whole job is "set this repo up for vlmkit", so it is where the
+ * setup belongs — and it appends rather than rewrites, because a `.gitignore` is
+ * someone else's file.
+ *
+ * Returns the entries it added, so the caller reports the change instead of
+ * making it quietly — the same standard the notice itself is holding the tool to.
+ */
+export async function ensureIgnoreEntries(cwd: string): Promise<string[]> {
+  if (!isGitRepo(cwd)) return [];
+  const path = join(cwd, ".gitignore");
+  // Absolute, because `isGitIgnored` measures the target against `cwd` — a bare
+  // `.vlmkit` would resolve against `process.cwd()` and read as outside the tree.
+  const missing = VLMKIT_IGNORE_ENTRIES.filter(
+    (entry) => !isGitIgnored(cwd, join(cwd, entry.replace(/\/+$/, ""))),
+  );
+  if (missing.length === 0) return [];
+  let existing = "";
+  try {
+    existing = await readFile(path, "utf8");
+  } catch {
+    // No .gitignore yet — the write below creates it.
+  }
+  const prefix = existing === "" || existing.endsWith("\n") ? "" : "\n";
+  await writeFile(path, `${existing}${prefix}\n# vlmkit run artifacts\n${missing.join("\n")}\n`);
+  return [...missing];
+}
+
 async function initConfig(args: string[]): Promise<void> {
   const path = resolve(readFlag(args, "path") ?? GATE_CONFIG_FILENAMES[0]!);
   if (existsSync(path) && !hasFlag(args, "force")) {
@@ -251,16 +335,31 @@ async function initConfig(args: string[]): Promise<void> {
   }
   const patterns = readAll(args, "pages");
   const gates = readAll(args, "gate");
-  const config: GateConfig = {
-    defaults: { gates: gates.length > 0 ? gates : [STARTER_GATE] },
-    pages: (patterns.length > 0 ? patterns : ["index.html"]).map((source) => ({ source })),
-  };
+  const { config, urlSources } = scaffoldConfig(patterns, gates);
   // Parse what we are about to write: a scaffold that its own validator
   // rejects would be a rough first impression.
   parseGateConfig(JSON.stringify(config));
   await writeFile(path, `${JSON.stringify(config, null, 2)}\n`);
   console.log(`Wrote ${path}`);
   console.log(`  ${config.pages.length} page entr(ies), gates: ${config.defaults!.gates!.join(", ")}`);
+  if (urlSources.length > 0) {
+    console.log(
+      `\n  Added --wait-until load --timeout 15000 because the source is a URL:`
+      + ` the default \`networkidle\` milestone never fires on a page that holds a`
+      + ` connection open (a stream, a poll), and every gate would time out having`
+      + ` reported nothing. Drop them if this page does reach network idle.`,
+    );
+    console.log(
+      `  For reproducible numbers, pin the network too:`
+      + ` vlmkit snapshot record-har ${urlSources[0]} --out app.har`
+      + `, then add --har app.har.`,
+    );
+  }
+  const ignored = await ensureIgnoreEntries(dirname(path));
+  if (ignored.length > 0) {
+    console.log(`\n  Added to .gitignore: ${ignored.join(", ")} — a run writes gate reports`);
+    console.log(`  under test-results/ and appends one line per gate to .vlmkit/run-ledger.jsonl.`);
+  }
   console.log(`\nNext: vlmkit gates list    (see what would run)`);
   console.log(`      vlmkit gates run     (run it)`);
 }
@@ -280,10 +379,16 @@ pages, plus every suppression in one auditable place.
                     --soon <days>       Highlight entries expiring within N days (30)
                     --require-expiry    Fail on permanent (never-reviewed) entries
                     --require-owner     Fail on entries with no owner
-  run             Run the plan in parallel
+  run             Run the plan in parallel (starts \`webServer\` first, if declared)
                     --only <text>       Pages whose id/source contains this, repeatable
                     --concurrency <n> --shard <i/n> --output <dir>
                     --advisory          Exit 0 even on failures / stale config
+
+\`webServer\` in the config starts a dev server before the run and stops it after,
+including on Ctrl-C: { "command": "npm run dev", "url": "http://localhost:5173/",
+"timeout": 60000, "reuseExistingServer": true }. \`url\` is required and is polled
+until it answers, so "started" means "serving" rather than "spawned".
+\`reuseExistingServer\` defaults to true locally and false under CI, as Playwright's does.
 
 Common: --config <file> --json
 
@@ -326,7 +431,12 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 
   if (sub === "list") {
     if (json) console.log(JSON.stringify({ config: path, ...plan }, null, 2));
-    else console.log(formatPlan(plan, path));
+    else {
+      console.log(formatPlan(plan, path));
+      // On `list` rather than only on `run`, because "what would this do" has to
+      // include "and it will start a server".
+      if (config.webServer) console.log(`\n${formatWebServerPlan(config.webServer)}`);
+    }
     return;
   }
 
@@ -370,15 +480,19 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     console.error(formatExpiredNotice(sharded.expired));
     console.error("");
   }
-  const summary: BatchSummary = await runJobs(
-    sharded.jobs.map((j) => ({ gate: j.gate, page: j.source, cwd: baseDir })),
-    {
-      ...(concurrency !== undefined ? { concurrency } : {}),
-      ...(shard ? { shard } : {}),
-      ...(output ? { output } : {}),
-      quiet: hasFlag(args, "quiet") || json,
-    },
-  );
+  // The server comes up before the jobs and goes down after them, including on a
+  // throw or a Ctrl-C. Started here rather than per job: every gate in the plan
+  // shares it, and starting one per job would both be slow and fight for the port.
+  const summary: BatchSummary = await withWebServer(config.webServer, baseDir, () =>
+    runJobs(
+      sharded.jobs.map((j) => ({ gate: j.gate, page: j.source, cwd: baseDir })),
+      {
+        ...(concurrency !== undefined ? { concurrency } : {}),
+        ...(shard ? { shard } : {}),
+        ...(output ? { output } : {}),
+        quiet: hasFlag(args, "quiet") || json,
+      },
+    ));
   const stale = sharded.expired.length;
   if (json) console.log(JSON.stringify({ config: path, expiredSuppressions: stale, ...summary }, null, 2));
   else {

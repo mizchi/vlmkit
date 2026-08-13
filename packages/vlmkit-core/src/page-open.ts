@@ -26,6 +26,7 @@
  * delete a CSS rule), navigate to the source and *then* replace the markup, so
  * the document keeps a base URL its siblings resolve against.
  */
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Browser, Page, ViewportSize } from "playwright";
@@ -111,9 +112,132 @@ export async function settlePage(page: Page, settleMs = 250): Promise<void> {
  * documented once and the gates that have since adopted `--har` cannot disagree
  * about it.
  */
-export async function applyHar(page: Page, har?: string): Promise<void> {
-  if (!har) return;
-  await page.routeFromHAR(resolve(har), { notFound: "abort" });
+export async function applyHar(page: Page, har?: string): Promise<HarReplay | null> {
+  if (!har) return null;
+  const path = resolve(har);
+  await page.routeFromHAR(path, { notFound: "abort" });
+  return trackHarMisses(page, path);
+}
+
+/**
+ * What the recording contains, and what the run asked for that it did not.
+ *
+ * The paragraph above documents the cost of `notFound: "abort"` and then offers a
+ * human instruction as the mitigation — "treat new findings under `--har` as
+ * suspect". v5's CI agent hit it from the outside and named what that costs:
+ *
+ *   "there is **no staleness signal**: a new endpoint absent from the HAR is
+ *    *aborted*, surfacing as a broken-resource **defect** rather than 'your fixture
+ *    is out of date'. And the HAR is keyed on the full URL, so it is **port-bound**
+ *    — change the port and it silently stops matching."
+ *
+ * Both are decidable from the file itself, so they do not have to be a caution in a
+ * doc comment. A gate that judges resources can ask which failures were fixture
+ * misses and blame the recording instead of the page.
+ */
+export interface HarReplay {
+  /** Absolute path of the recording in use. */
+  path: string;
+  /** Origins the recording actually contains, deduped, in first-seen order. */
+  origins: readonly string[];
+  /** True when the recording holds no entry for this exact URL. */
+  isMiss(url: string): boolean;
+  /** URLs requested so far that the recording does not contain, in request order. */
+  misses(): readonly string[];
+  /**
+   * Set when the recording contains nothing for the origin actually being visited —
+   * the port-bound failure mode, where every single request misses and the page
+   * measures as entirely broken. Null when at least one origin matches.
+   */
+  originMismatch(pageUrl: string): string | null;
+}
+
+function trackHarMisses(page: Page, path: string): HarReplay {
+  // Read the recording rather than inferring from failures: "not in the file" is a
+  // different claim from "the request failed", and only the first one indicts the
+  // fixture. A malformed or unreadable HAR yields an empty set, which makes
+  // `isMiss` true for everything — the honest answer, since nothing can be replayed.
+  const recorded = new Set<string>();
+  const origins: string[] = [];
+  try {
+    const har = JSON.parse(readFileSync(path, "utf-8")) as { log?: { entries?: { request?: { url?: string } }[] } };
+    for (const entry of har.log?.entries ?? []) {
+      const url = entry.request?.url;
+      if (!url) continue;
+      recorded.add(url);
+      const origin = originOfUrl(url);
+      if (origin && !origins.includes(origin)) origins.push(origin);
+    }
+  } catch {
+    // Left empty on purpose; see above.
+  }
+  const missed: string[] = [];
+  const isMiss = (url: string) => !recorded.has(url);
+  // A test double or a non-Playwright page need not implement the event API. The file
+  // has already been read by this point, so `isMiss` still answers correctly; only the
+  // running list of observed misses goes unpopulated.
+  const instrumentable = typeof page?.on === "function" && typeof page?.goto === "function";
+  if (!instrumentable) {
+    return {
+      path,
+      origins,
+      isMiss,
+      misses: () => missed,
+      originMismatch: (pageUrl: string) => {
+        const target = originOfUrl(pageUrl);
+        if (!target || origins.length === 0) return null;
+        return origins.includes(target) ? null : target;
+      },
+    };
+  }
+  page.on("requestfailed", (request) => {
+    const url = request.url();
+    if (isMiss(url) && !missed.includes(url)) missed.push(url);
+  });
+
+  // The port-bound case is worse than a wrong verdict: the DOCUMENT request misses
+  // too, so `page.goto` throws `net::ERR_FAILED` and the caller gets a raw Playwright
+  // stack with no mention of the recording. Explained here because this is the only
+  // layer that knows both the origins on file and the origin being asked for.
+  const originalGoto = page.goto.bind(page);
+  page.goto = async (url, gotoOptions) => {
+    try {
+      return await originalGoto(url, gotoOptions);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const target = originOfUrl(url);
+      if (!/ERR_FAILED/.test(message) || !target || origins.length === 0 || origins.includes(target)) throw error;
+      const explained = new Error(
+        `the --har recording holds nothing for ${target}, so even the page itself was aborted.\n`
+        + `  ${path}\n`
+        + `  it recorded: ${origins.join(", ")}\n`
+        + `  A HAR is keyed on the full URL, so a different host or port stops matching entirely.`
+        + ` Re-record against ${target}, or serve the page on the recorded origin.`,
+      );
+      explained.cause = error;
+      throw explained;
+    }
+  };
+
+  return {
+    path,
+    origins,
+    isMiss,
+    misses: () => missed,
+    originMismatch: (pageUrl: string) => {
+      const target = originOfUrl(pageUrl);
+      if (!target || origins.length === 0) return null;
+      return origins.includes(target) ? null : target;
+    },
+  };
+}
+
+function originOfUrl(url: string): string | null {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
 }
 
 export interface OpenPageOptions {

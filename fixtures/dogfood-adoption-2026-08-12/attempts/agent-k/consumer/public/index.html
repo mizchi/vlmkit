@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orders</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="bar"><h1>Orders</h1><p class="who">signed in as ops@example.com</p></header>
+<main>
+  <table class="orders">
+    <thead><tr><th>Order</th><th>Customer</th><th>Total</th><th>State</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <p class="hint">Totals exclude tax. FIXME confirm rounding with finance.</p>
+</main>
+<footer class="actions">
+  <button class="btn btn--primary" id="export">Export CSV</button>
+  <button class="btn" id="refund">Refund</button>
+  <button class="btn" id="archive">Archive</button>
+</footer>
+<script>
+  fetch("/api/orders").then((r) => r.json()).then((orders) => {
+    document.getElementById("rows").innerHTML = orders.map((o) =>
+      `<tr><td>${o.id}</td><td>${o.customer}</td><td>${o.total}</td><td class="state">${o.state}</td></tr>`
+    ).join("");
+  });
+</script>
+</body>
+</html>

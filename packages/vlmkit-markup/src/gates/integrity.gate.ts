@@ -72,6 +72,12 @@ ${ALLOW_HELP}`,
     { id: "near-misalignment", title: "Near-miss alignment (a few px off a shared edge)", severity: "warn" },
     { id: "occluded-text", title: "Text covered by another element", severity: "suspect" },
     { id: "redirected", title: "Requested URL redirected elsewhere", severity: "suspect" },
+    {
+      id: "stale-har-fixture",
+      title: "The --har recording is missing requests the page made",
+      severity: "suspect",
+      docs: "Not a defect in the page: the run's own network fixture is out of date, so the page was measured without those resources and every other finding is suspect. Re-record the HAR over the same navigation. Kept at `suspect` because the alternative is a verdict about a page that never finished loading.",
+    },
   ],
   inputs: [
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check (omit when using --image/--elements)", positional: 0 },

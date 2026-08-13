@@ -19,7 +19,7 @@ for options.
 | `vlmkit heal` | `selector`, `markup` |
 | `vlmkit inspect` | `interact`, `explore`, `smoke` |
 | `vlmkit stress` | `i18n`, `media` |
-| `vlmkit snapshot` | `[<url>...]`, `approve`, `fix-prompt`, `stability`, `flipbook`, `strip`, `report` |
+| `vlmkit snapshot` | `[<url>...]`, `approve`, `fix-prompt`, `stability`, `flipbook`, `strip`, `record-har`, `report` |
 | `vlmkit migration` | `compare`, `blind`, `subagent` |
 | `vlmkit workflow` | `init`, `capture`, `verify`, `approve`, `graph`, `affected`, `introspect`, `spec-verify`, `expect` |
 | Standalone | `vlmkit batch`, `vlmkit gates`, `vlmkit rules`, `vlmkit mcp`, `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit markup-loop`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
@@ -511,6 +511,35 @@ being applied — the gate it silenced runs unmuted and the run exits non-zero,
 because a stale entry is a config defect even when the page now passes.
 Worked example: [`examples/vlmkit.gates.json`](../examples/vlmkit.gates.json).
 
+An optional `webServer` block starts a dev server before the run and stops it
+after — including on a thrown error or Ctrl-C — so a config with URL sources is
+committable on its own instead of needing a wrapper script that does start /
+trap kill / poll-for-ready. Shaped after Playwright's, deliberately:
+
+```jsonc
+{
+  "webServer": {
+    "command": "npm run dev",
+    "url": "http://localhost:5173/",   // required, and polled until it answers
+    "timeout": 60000,                  // default 60000
+    "reuseExistingServer": true,       // default: true locally, false under CI
+    "cwd": "app",                      // relative to the config file
+    "env": { "NODE_ENV": "test" }
+  },
+  "pages": [{ "source": "http://localhost:5173/" }]
+}
+```
+
+`url` is required because "started" has to mean "serving": without a readiness
+probe the first gate races the bundler, and a flake there is indistinguishable
+from a real finding. Any HTTP status counts as ready, including 404 — the
+question is whether something is listening. If the command exits before the URL
+answers, the error reports its exit code rather than spending the timeout and
+then blaming the timeout. `reuseExistingServer` follows Playwright's default for
+Playwright's reason: locally a listening port is your own `npm run dev`, while in
+CI it is usually a leak from an earlier job, and adopting it would gate a build
+nobody asked about. `vlmkit gates list` names the server without starting it.
+
 ### Rules (tune or disable one rule, not one whole gate)
 
 ```bash
@@ -532,17 +561,36 @@ a gate appears un-triaged" should read.
 A gate declares its rules, so a rule is addressable: `<gateId>/<ruleId>` set to
 `off`, `suspect`, `warn` or `info`. Persist the decision under `"rules"` in
 `vlmkit.gates.json`, at `defaults` scope or per page (page keys merge over
-defaults):
+defaults). Each entry takes either the bare setting or the **long form**, which
+carries `reason` (required in that form), `owner` and `expires`:
 
 ```jsonc
 {
-  "defaults": { "rules": { "check.breakpoints/overflow-at-boundary": "suspect" } },
+  "defaults": {
+    "rules": {
+      "check.breakpoints/overflow-at-boundary": "suspect",
+      "check.integrity/low-contrast-text": {
+        "setting": "warn",
+        "reason": "Brand grey is 4.1:1; signed off pending the 2027 palette refresh.",
+        "owner": "design-system",
+        "expires": "2027-03-31"
+      }
+    }
+  },
   "pages": [
     { "id": "docs", "source": "routes/docs/**/*.html",
       "rules": { "check.integrity/near-misalignment": "off" } }
   ]
 }
 ```
+
+The long form resolves onto the same shape as a suppression, so
+`vlmkit gates suppressions` enumerates it (tagged `[rule]`), `--require-expiry`
+and `--require-owner` cover it, and **past its expiry the setting is dropped and
+the rule fails again** — the contract suppressions have always had. Reach for it
+whenever the answer is "the tool is wrong here" rather than "this rule is not for
+us". The short form stays valid because `--rule` on the command line cannot carry
+a reason, and a config that cannot express what the CLI does would be worse.
 
 References are validated against the declared table, so a misspelled rule is a
 config error rather than a line that silences nothing. Suppressed findings are
@@ -926,6 +974,27 @@ background and border"` is the shape of the real permission, and blessing an ins
 wholesale would hide the geometry mistake sitting next to the intentional colour. `*`
 covers a family (`padding-*`, `border-*-color`); a bare `*` is refused, because that is
 `--rule instance-drift=off` and should be written as such.
+
+#### Recording the network a gate replays — `snapshot record-har`
+
+`--har` pins a data-driven page so a gate measures the same bytes every run. Producing
+the recording used to be a doc sentence, so every project wrote the same twenty-line
+Playwright script:
+
+```bash
+vlmkit snapshot record-har http://localhost:5173/ --out fixtures/app.har
+vlmkit check integrity http://localhost:5173/ --har fixtures/app.har
+```
+
+It defaults to `--wait-until load`, not `networkidle`: the reason `--har` exists is a
+page with a held-open stream, and a recorder that waited for idle would hang on
+exactly those pages. `--settle 1000` (default) catches the late XHR a dashboard fires
+after the milestone — a recording without it is stale before it is written.
+
+The output names the origins it covers, because the recording is keyed on the full
+URL: replay it against a different host or port and nothing matches. That case is
+reported at replay time too, rather than surfacing as a page whose every resource
+broke.
 
 #### One image instead of a sequence — `snapshot strip`
 

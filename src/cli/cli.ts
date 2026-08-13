@@ -128,6 +128,7 @@ const SPECS: Record<string, Spec> = {
   smokeRunner: spec("smoke-runner", () => import("@mizchi/vlmkit-markup/inspect/smoke-runner.ts")),
   flipbook: spec("flipbook-cli", () => import("./commands/flipbook-cli.ts")),
   strip: spec("strip-cli", () => import("./commands/strip-cli.ts")),
+  recordHar: spec("record-har-cli", () => import("./commands/record-har-cli.ts")),
   diffForAgent: spec("diff-for-agent-cli", () => import("./commands/diff-for-agent-cli.ts")),
   presenceMatrix: spec("presence-matrix", () => import("./commands/presence-matrix-cli.ts")),
   compareRuns: spec("compare-runs-cli", () => import("./commands/compare-runs-cli.ts")),
@@ -497,6 +498,12 @@ Run \`vlmkit <command> --help\` for subcommands, options, and examples.`);
       // The still-image sibling of `flipbook`: one PNG instead of an HTML player.
       if (rest[0] === "strip") {
         await delegate(SPECS.strip, rest.slice(1));
+        return;
+      }
+      // Records what `--har` replays. A doc sentence until v5's CI agent had to write
+      // its own recorder to finish the task it was given.
+      if (rest[0] === "record-har") {
+        await delegate(SPECS.recordHar, rest.slice(1));
         return;
       }
       if (rest[0] === "report") {

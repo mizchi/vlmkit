@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -23,10 +23,13 @@ import {
 import {
   formatGateHelp,
   formatRuleTable,
+  newOutputNotice,
   parseSharedFlags,
   runGate,
   runGateCli,
   stripSharedFlags,
+  unpinnedLiveInput,
+  withExitIntent,
 } from "./runner.ts";
 
 interface FakeReport {
@@ -714,5 +717,189 @@ describe("readPluginSpecifiers", () => {
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
+  });
+});
+
+describe("withExitIntent", () => {
+  it("puts the line directly under the verdict, not at the bottom", () => {
+    // Appending was not enough. One agent nearly shipped a bug because a warn passed
+    // the gate silently; the fix appended a notice. A later agent hit the same
+    // ambiguity from the other side: "`verdict: DRIFT` (yellow) + exit 0 is a
+    // coin-flip in CI. The only line that resolves it [...] is the last line, below
+    // the findings." The distance was the defect.
+    const text = [
+      "vlmkit check design",
+      "source: page.html",
+      "",
+      "verdict: DRIFT (2 finding(s))",
+      "  roles judged: 3",
+      "Findings",
+      "  ! [component-drift] ...",
+    ].join("\n");
+    const out = withExitIntent(text, "  exits 0 — 1 warn(s) did not fail this command.");
+    const lines = out.split("\n");
+    assert.equal(lines[3], "verdict: DRIFT (2 finding(s))");
+    assert.equal(lines[4], "  exits 0 — 1 warn(s) did not fail this command.");
+    // Nothing else moved or was dropped.
+    assert.equal(lines.length, text.split("\n").length + 1);
+    assert.equal(lines[lines.length - 1], "  ! [component-drift] ...");
+  });
+
+  it("anchors on `status:` too, which is what half the gates print", () => {
+    const out = withExitIntent("vlmkit check breakpoints\n\nstatus: warn\nbreakpoints checked: 767px", "  exits 0");
+    assert.deepEqual(out.split("\n"), [
+      "vlmkit check breakpoints",
+      "",
+      "status: warn",
+      "  exits 0",
+      "breakpoints checked: 767px",
+    ]);
+  });
+
+  it("sees through the colour codes a gate wraps its verdict in", () => {
+    // The verdict is coloured in real output, so a naive `^verdict:` never matches.
+    const out = withExitIntent("\u001B[1mverdict:\u001B[0m CLEAN\nrest", "  exits 0");
+    assert.equal(out.split("\n")[1], "  exits 0");
+  });
+
+  it("appends when a gate has no verdict line, rather than losing the annotation", () => {
+    // A gate that does not follow the convention keeps the previous behaviour.
+    const out = withExitIntent("some gate\nwith no headline", "  exits 0");
+    assert.equal(out.split("\n").at(-1), "  exits 0");
+  });
+
+  it("annotates only the first verdict line", () => {
+    // A findings body can legitimately quote the word; only the headline is the anchor.
+    const out = withExitIntent("verdict: A\nbody\nverdict: B", "  exits 0");
+    assert.deepEqual(out.split("\n"), ["verdict: A", "  exits 0", "body", "verdict: B"]);
+  });
+});
+
+describe("the run ledger as a declared output", () => {
+  // v6's adopting agent: "adopting the tool dirtied the repo silently. `--output`
+  // covers stdout logs; `test-results/` and `.vlmkit/run-ledger.jsonl` have no flag
+  // and nothing announces them. The agent found them with `ls` and wrote the
+  // `.gitignore` itself." The gates that write reports print `report: <path>`
+  // already; the ledger was the one genuinely silent write.
+  const ledgerGate = () => fakeGate({ ledger: (report) => ({ tool: "fake", source: report.source, headline: {} }) });
+  const work = (): string => mkdtempSync(join(tmpdir(), "vlmkit-runner-ledger-"));
+
+  it("--ledger <path> moves the write, and the outcome reports where it went", async () => {
+    const cwd = work();
+    const outcome = await runGate(ledgerGate(), ["page.html", "--ledger", "runs/gates.jsonl"], { cwd });
+    assert.equal(outcome.ledgerWrite?.path, join(cwd, "runs", "gates.jsonl"));
+    assert.equal(outcome.ledgerWrite?.created, true);
+  });
+
+  it("--no-ledger writes nothing, without needing an env var", async () => {
+    const cwd = work();
+    const outcome = await runGate(ledgerGate(), ["page.html", "--no-ledger"], { cwd });
+    assert.equal(outcome.ledgerWrite, null);
+    assert.equal(existsSync(join(cwd, ".vlmkit")), false);
+  });
+
+  it("keeps both flags away from the gate's own parser", () => {
+    assert.deepEqual(
+      stripSharedFlags(["page.html", "--ledger", "runs.jsonl", "--no-ledger", "--strict"]),
+      ["page.html", "--strict"],
+    );
+  });
+
+  it("refuses --ledger with no path rather than swallowing the next flag", () => {
+    assert.throws(() => parseSharedFlags(["--ledger", "--json"]), /--ledger needs a path/);
+    assert.throws(() => parseSharedFlags(["page.html", "--ledger"]), /--ledger needs a path/);
+  });
+
+  it("announces the file it created, and what to ignore, exactly once", () => {
+    const cwd = work();
+    mkdirSync(join(cwd, ".git"));
+    const created = newOutputNotice({ path: join(cwd, ".vlmkit", "run-ledger.jsonl"), created: true }, cwd);
+    assert.ok(created);
+    assert.match(created!, /created \.vlmkit\/run-ledger\.jsonl/);
+    assert.match(created!, /append-only record of every gate run/);
+    assert.match(created!, /test-results\//);
+    assert.match(created!, /--ledger <path>/);
+    assert.match(created!, /--no-ledger/);
+    // An append is not news: one line per gate run would be noise.
+    assert.equal(newOutputNotice({ path: join(cwd, ".vlmkit", "run-ledger.jsonl"), created: false }, cwd), null);
+  });
+
+  it("advises on the relocated path itself, not the two directories it did not write", () => {
+    const cwd = work();
+    mkdirSync(join(cwd, ".git"));
+    const note = newOutputNotice({ path: join(cwd, "runs", "x.jsonl"), created: true }, cwd);
+    assert.ok(note);
+    assert.match(note!, /created runs\/x\.jsonl/);
+    assert.match(note!.replace(/\[[0-9;]*m/g, ""), /^\s*runs\/x\.jsonl$/m);
+    assert.doesNotMatch(note!, /test-results\//);
+    assert.doesNotMatch(note!, /gates init/);
+  });
+
+  it("stays silent once the path is ignored — the advice has been taken", () => {
+    const cwd = work();
+    mkdirSync(join(cwd, ".git"));
+    writeFileSync(join(cwd, ".gitignore"), ".vlmkit/\ntest-results/\n");
+    assert.equal(newOutputNotice({ path: join(cwd, ".vlmkit", "run-ledger.jsonl"), created: true }, cwd), null);
+  });
+
+  it("stays silent outside a git repo, where .gitignore advice would be noise", () => {
+    const cwd = work();
+    assert.equal(newOutputNotice({ path: join(cwd, ".vlmkit", "run-ledger.jsonl"), created: true }, cwd), null);
+  });
+});
+
+describe("unpinnedLiveInput", () => {
+  const harGate = { inputs: [{ name: "source" }, { name: "har" }] } as never;
+  const noHarGate = { inputs: [{ name: "source" }] } as never;
+
+  it("says a live URL is unpinned, and how to pin it", () => {
+    // v5's CI agent was asked whether a run was reproducible and had to answer it by
+    // writing a jitter server and diffing outputs: "No gate says its input was
+    // unpinned. Four gates hit a live URL and returned verdicts with nothing
+    // indicating a re-run could differ."
+    const note = unpinnedLiveInput(harGate, ["http://localhost:5173/", "--wait-until", "load"]);
+    assert.ok(note);
+    assert.match(note!, /http:\/\/localhost:5173\/ is live and not pinned/);
+    assert.match(note!, /record-har/);
+  });
+
+  it("stays silent once the input is pinned", () => {
+    assert.equal(unpinnedLiveInput(harGate, ["http://localhost:5173/", "--har", "app.har"]), null);
+  });
+
+  it("stays silent for a local file, which has nothing to pin", () => {
+    assert.equal(unpinnedLiveInput(harGate, ["page.html"]), null);
+  });
+
+  it("stays silent for a gate that cannot replay a HAR, rather than advising a flag it lacks", () => {
+    // `check perf` and `check drift component` deliberately have no `--har`; telling
+    // them to pass one would be advice that fails.
+    assert.equal(unpinnedLiveInput(noHarGate, ["http://localhost:5173/"]), null);
+  });
+
+  it("finds the URL wherever it sits in argv", () => {
+    assert.ok(unpinnedLiveInput(harGate, ["--viewports", "375", "https://example.com/a"]));
+  });
+});
+
+describe("parseRuleSettings comments", () => {
+  it("accepts a //-prefixed key as a comment, the convention the config already uses", () => {
+    // `examples/vlmkit.gates.json` carries `"//rules"` at the top level; inside the map
+    // it was rejected. v6's adoption agent, told to make the diff self-explanatory:
+    // "the only mechanism for 'the tool is wrong about this rule' is the one mechanism
+    // with no audit trail" — so the reason could not sit next to the decision.
+    const settings = parseRuleSettings({
+      "//check.design/component-drift": "3 buttons with one primary IS the design",
+      "check.design/component-drift": "info",
+    }, "defaults.rules");
+    assert.deepEqual(settings, { "check.design/component-drift": "info" });
+  });
+
+  it("still rejects a real rule reference with a bad setting", () => {
+    // The comment escape must not become a way to smuggle a typo past validation.
+    assert.throws(
+      () => parseRuleSettings({ "check.design/component-drift": "quiet" }, "defaults.rules"),
+      /must be one of off, suspect, warn, info/,
+    );
   });
 });

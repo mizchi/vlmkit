@@ -125,6 +125,100 @@ describe("resolveSuppression", () => {
   });
 });
 
+describe("annotated rule settings", () => {
+  // v6's adopting agent, on the config's sharpest edge: "`suppressions` have
+  // `reason` / `owner` / `expires` and an expired one re-fails the build. `rules`
+  // has none of that. […] So the only mechanism for 'the tool is wrong about this
+  // rule' is the one mechanism with no audit trail and no expiry."
+  const withRules = (rules: unknown, pages: unknown[] = [{ source: "index.html" }]) =>
+    parseGateConfig(json({ defaults: { gates: ["check integrity"], rules }, pages }));
+
+  it("keeps the short form working, since --rule on the CLI cannot carry a reason", () => {
+    const config = withRules({ "check.integrity/text-collision": "off" });
+    assert.deepEqual(config.defaults!.rules, { "check.integrity/text-collision": "off" });
+    assert.equal(config.defaults!.ruleAnnotations, undefined);
+  });
+
+  it("accepts the long form and flattens it to the same settings", () => {
+    const config = withRules({
+      "check.integrity/low-contrast-text": {
+        setting: "warn",
+        reason: "brand grey is signed off by design",
+        owner: "design@example.com",
+        expires: "2026-12-01",
+      },
+    });
+    assert.deepEqual(config.defaults!.rules, { "check.integrity/low-contrast-text": "warn" });
+    assert.equal(config.defaults!.ruleAnnotations!["check.integrity/low-contrast-text"]!.reason, "brand grey is signed off by design");
+  });
+
+  it("requires a reason in the long form — that is the whole point of it", () => {
+    assert.throws(() => withRules({ "a/b": { setting: "off" } }), /reason.*required/s);
+    assert.throws(() => withRules({ "a/b": { setting: "off", reason: "  " } }), /reason.*required/s);
+  });
+
+  it("rejects a bad setting or expiry with the JSON path, like every other config defect", () => {
+    assert.throws(() => withRules({ "a/b": { setting: "nope", reason: "r" } }), /\["a\/b"\]\.setting/);
+    assert.throws(() => withRules({ "a/b": { setting: "off", reason: "r", expires: "soon" } }), /expires.*YYYY-MM-DD/s);
+    assert.throws(() => withRules({ "a/b": { setting: "off", reason: "r", expires: "2026-13-40" } }), /not a real date/);
+  });
+
+  it("enumerates a rule setting in the same inventory as a suppression, tagged by kind", () => {
+    const plan = resolveGatePlan(
+      withRules({
+        "check.integrity/text-collision": { setting: "off", reason: "intentional overlay", owner: "web@x" },
+      }),
+      { now: NOW },
+    );
+    const row = plan.suppressions.find((s) => s.kind === "rule")!;
+    assert.equal(row.ref, "check.integrity/text-collision");
+    assert.equal(row.gate, "check.integrity");
+    assert.equal(row.flag, "--rule check.integrity/text-collision=off");
+    assert.equal(row.reason, "intentional overlay");
+    assert.equal(row.status, "permanent");
+  });
+
+  it("drops an expired rule setting so the rule bites again, and reports it", () => {
+    const plan = resolveGatePlan(
+      withRules({ "check.integrity/text-collision": { setting: "off", reason: "temporary", expires: "2026-07-01" } }),
+      { now: NOW },
+    );
+    assert.equal(plan.expired.length, 1);
+    assert.equal(plan.expired[0]!.kind, "rule");
+    // Not merely reported: gone from the settings and off the command line.
+    assert.deepEqual(plan.jobs[0]!.rules, {});
+    assert.doesNotMatch(plan.jobs[0]!.gate, /--rule/);
+  });
+
+  it("lets a page renew an expired default rather than inheriting its expiry", () => {
+    const plan = resolveGatePlan(
+      withRules(
+        { "check.integrity/text-collision": { setting: "off", reason: "old", expires: "2026-07-01" } },
+        [{ id: "home", source: "index.html", rules: { "check.integrity/text-collision": { setting: "off", reason: "renewed", expires: "2026-12-01" } } }],
+      ),
+      { now: NOW },
+    );
+    assert.deepEqual(plan.jobs[0]!.rules, { "check.integrity/text-collision": "off" });
+    assert.equal(plan.expired.length, 1, "the default is still reported as expired");
+  });
+
+  it("resolves default annotations once, not once per page", () => {
+    const plan = resolveGatePlan(
+      withRules(
+        { "check.integrity/text-collision": { setting: "off", reason: "shared" } },
+        [{ source: "a.html" }, { source: "b.html" }, { source: "c.html" }],
+      ),
+      { now: NOW },
+    );
+    assert.equal(plan.suppressions.filter((s) => s.kind === "rule").length, 1);
+  });
+
+  it("reports a bare rule id's gate as * rather than inventing one", () => {
+    const plan = resolveGatePlan(withRules({ "text-collision": { setting: "off", reason: "r" } }), { now: NOW });
+    assert.equal(plan.suppressions.find((s) => s.kind === "rule")!.gate, "*");
+  });
+});
+
 describe("resolveGatePlan", () => {
   const config: GateConfig = parseGateConfig(json({
     defaults: { gates: ["check integrity", "check design"] },

@@ -29,6 +29,7 @@
  */
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
@@ -77,6 +78,12 @@ export interface DesignPolicyInput {
    * Reported, never silent — the gate's coverage has to be legible.
    */
   skipped: number;
+  /**
+   * Those same skipped elements tallied by tag name. The bare count cannot
+   * distinguish "this page is divs and paragraphs" from "the measurement
+   * broke", and that is the question a reader actually has.
+   */
+  skippedTags?: Record<string, number>;
   /** Elements skipped for being in a non-resting state. */
   statefulSkipped: number;
   /**
@@ -118,13 +125,25 @@ export interface DesignPolicyReport {
     /** instances / signatures — how often the average signature is reused. */
     reuse: number;
     singletons: number;
+    /** Instances an `--allow` rule declared deliberate, excluded from the arithmetic. */
+    allowed?: number;
   }[];
   findings: DesignFinding[];
   skipped: number;
+  /** Skipped elements by tag, most first — the shape of the blind spot. */
+  skippedTags: { tag: string; count: number }[];
+  /**
+   * Elements that DID carry an inferable role, i.e. what the verdict rests on.
+   * Printed as a fraction of everything considered, because a verdict drawn
+   * from 2 of 30 elements is worth knowing about before it is trusted.
+   */
+  judgedElements: number;
   statefulSkipped: number;
   exclusions: { selector: string; matches: number; elements: number }[];
   excludedElements: number;
   unusedExcludes: string[];
+  /** `--allow` rules that matched no instance. */
+  unusedAllow?: string[];
   /** Elements judged on their box alone because they paint no text. */
   textFreeSamples: number;
   /**
@@ -166,6 +185,21 @@ export interface DesignPolicyOptions {
    * nothing.
    */
   minInstances?: number;
+  /**
+   * `--allow "<selector>;<reason>"` — instances whose deviation is deliberate.
+   *
+   * `--min-reuse` cannot express this, and v6's adopting agent found out the hard way
+   * that the docs recommend it anyway: "`examples/vlmkit.gates.json` shows
+   * `--min-reuse 2` as *the* way to approve deliberately-varied buttons. On this page it
+   * changes nothing […] Because the metric is an *average*, any 3-element role with one
+   * deviant is unfixable except by `--min-reuse 1`, which disables the check."
+   *
+   * So the lever has to name the instance, the way `check integrity --allow` and
+   * `check drift component --allow` do. An allowed instance is excluded from the reuse
+   * arithmetic and still listed, because an exemption a reader cannot see is a blind
+   * spot rather than a decision.
+   */
+  allow?: readonly string[];
   /** Spacing values used less than this often are reported as outliers. Default 2. */
   outlierMaxUses?: number;
   storageState?: string;
@@ -282,6 +316,11 @@ export const COLLECT_DESIGN_SAMPLES = `(() => {
     return null;
   };
   const samples = [], spacing = [];
+  // Tally the skipped elements BY TAG. \`skipped: 28\` alone is uninterpretable —
+  // v6's adopting agent could not tell whether 28 of 30 meant "the page is
+  // ordinary layout markup" or "the measurement broke". \`div x24, p x3\` answers
+  // it at a glance, and answers it with the page's own markup rather than prose.
+  const skippedTags = {};
   let skipped = 0, statefulSkipped = 0, excludedElements = 0;
   for (const el of document.querySelectorAll("body *")) {
     // The FIRST matching selector owns the element, so the per-selector counts
@@ -302,7 +341,12 @@ export const COLLECT_DESIGN_SAMPLES = `(() => {
       if (v > 0) spacing.push({ selector: path(el), property: prop, value: v });
     }
     const role = roleOf(el);
-    if (!role) { skipped++; continue; }
+    if (!role) {
+      skipped++;
+      const tag = el.tagName.toLowerCase();
+      skippedTags[tag] = (skippedTags[tag] || 0) + 1;
+      continue;
+    }
     if (el.matches && el.matches(STATE)) { statefulSkipped++; continue; }
     // Rendered height is deliberately NOT in the signature: a button that is
     // taller only because its label wrapped is not a design inconsistency.
@@ -326,7 +370,7 @@ export const COLLECT_DESIGN_SAMPLES = `(() => {
         + ", border " + box[5] + ", bg " + box[6],
     });
   }
-  return { samples, spacing, skipped, statefulSkipped, exclusions, excludedElements };
+  return { samples, spacing, skipped, skippedTags, statefulSkipped, exclusions, excludedElements };
 })()`;
 
 export function buildDesignSampleScript(excludeSelectors: readonly string[] = []): string {
@@ -397,13 +441,72 @@ function looksLikeVendorChrome(sample: DesignSample): boolean {
   return zeroPadding && noRadius && noBackground;
 }
 
+interface DesignAllowRule {
+  /** Substring the instance's selector must contain. */
+  selector: string;
+  reason: string;
+  /** As written, so an unused rule is reported back verbatim. */
+  raw: string;
+}
+
+/**
+ * Parse `--allow ".btn--primary;the primary action is deliberately distinct"`.
+ *
+ * Same syntax and same two properties as `check integrity --allow` and `check drift
+ * component --allow`: a reason is required, and a rule that matches nothing is reported.
+ * `;` delimits the reason rather than `#`, because `#` is part of an ID selector and
+ * splitting on it silently produces a broader exemption than the one written.
+ */
+export function parseDesignAllowRules(specs: readonly string[]): DesignAllowRule[] {
+  const rules: DesignAllowRule[] = [];
+  for (const spec of specs) {
+    if (!spec.trim()) continue;
+    const cut = spec.indexOf(";");
+    if (cut < 0) {
+      throw new UsageError(
+        `--allow needs a reason: <selector>;<reason> (got "${spec}").`
+        + (spec.includes("#") ? ` The reason is separated by ";", not "#" — "#" is part of an ID selector.` : "")
+        + ` An exemption without a stated reason cannot be reviewed.`,
+      );
+    }
+    const selector = spec.slice(0, cut).trim();
+    const reason = spec.slice(cut + 1).trim();
+    if (!selector) throw new UsageError(`--allow needs a selector: <selector>;<reason> (got "${spec}").`);
+    if (!reason) throw new UsageError(`--allow reason is empty in "${spec}". Say why this instance is intentional.`);
+    // A bare `*` would exempt every instance, which is `--rule component-drift=off`
+    // wearing a disguise — and unlike that flag it would not show up in the re-tuned
+    // line the runner prints.
+    if (selector === "*") {
+      throw new UsageError(
+        `--allow "*" would exempt every instance, which is \`--rule component-drift=off\`.`
+        + ` Name the instances that are deliberately different, or turn the rule off explicitly.`,
+      );
+    }
+    rules.push({ selector, reason, raw: spec });
+  }
+  return rules;
+}
+
+export const DESIGN_ALLOW_HELP = `Declare one instance's deviation deliberate, repeatable. Syntax:
+  <selector>;<reason>
+Use the selector AS PRINTED in the finding — it is an id-preferring path, so
+\`button#export\` matches and \`.btn--primary\` does not (a rule matching nothing is
+reported, so the mistake is loud rather than silent).
+e.g. --allow "button#export;the primary action is deliberately distinct"
+A reason is required; a bare \`*\` is refused because that is \`--rule component-drift=off\`;
+an allowed instance leaves the reuse arithmetic and is still listed; a rule matching
+nothing is reported. Use this rather than --min-reuse: the metric is instances/styles, so
+a 3-element role with one deliberate variant averages 1.5x and no threshold reaches it.`
+
 export function judgeDesignPolicy(
   input: DesignPolicyInput,
-  options: Pick<DesignPolicyOptions, "minReuse" | "minInstances" | "outlierMaxUses"> = {},
+  options: Pick<DesignPolicyOptions, "minReuse" | "minInstances" | "outlierMaxUses" | "allow"> = {},
 ): Omit<DesignPolicyReport, "source"> {
   const minReuse = options.minReuse ?? DEFAULT_MIN_REUSE;
   const minInstances = options.minInstances ?? DEFAULT_MIN_INSTANCES;
   const outlierMax = options.outlierMaxUses ?? DEFAULT_OUTLIER_MAX_USES;
+  const allowRules = parseDesignAllowRules(options.allow ?? []);
+  const usedAllow = new Set<string>();
 
   const byRole = new Map<string, DesignSample[]>();
   for (const s of input.samples) {
@@ -455,13 +558,37 @@ export function judgeDesignPolicy(
       same.push(s);
       counts.set(key, same);
     }
-    const signatures = counts.size;
-    const reuse = Math.round((list.length / signatures) * 100) / 100;
-    const singletons = [...counts.values()].filter((v) => v.length === 1).length;
-    roles.push({ role, instances: list.length, signatures, reuse, singletons });
+    // Allowed instances leave the arithmetic before it is done: a deliberate primary
+    // button should not drag the role's reuse figure down, which is the whole reason
+    // `--min-reuse` could not serve as this lever.
+    const allowedHere: { selector: string; reason: string }[] = [];
+    for (const [key, group] of [...counts.entries()]) {
+      const kept = group.filter((sample) => {
+        const rule = allowRules.find((r) => sample.selector.includes(r.selector));
+        if (!rule) return true;
+        allowedHere.push({ selector: sample.selector, reason: rule.reason });
+        usedAllow.add(rule.raw);
+        return false;
+      });
+      if (kept.length === 0) counts.delete(key);
+      else counts.set(key, kept);
+    }
+    const judged = [...counts.values()].flat();
 
-    if (list.length < minInstances) continue;
-    if (reuse >= minReuse) continue;
+    const signatures = counts.size;
+    const reuse = signatures === 0 ? 0 : Math.round((judged.length / signatures) * 100) / 100;
+    const singletons = [...counts.values()].filter((v) => v.length === 1).length;
+    roles.push({
+      role,
+      instances: judged.length,
+      signatures,
+      reuse,
+      singletons,
+      ...(allowedHere.length > 0 ? { allowed: allowedHere.length } : {}),
+    });
+
+    if (judged.length < minInstances) continue;
+    if (signatures === 0 || reuse >= minReuse) continue;
 
     const ranked = [...counts.entries()].sort((a, b) => b[1].length - a[1].length);
     const dominant = ranked[0]!;
@@ -564,6 +691,10 @@ export function judgeDesignPolicy(
     roles,
     findings,
     skipped: input.skipped,
+    skippedTags: Object.entries(input.skippedTags ?? {})
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag)),
+    judgedElements: input.samples.length,
     statefulSkipped: input.statefulSkipped,
     exclusions: input.exclusions ?? [],
     excludedElements: input.excludedElements ?? 0,
@@ -571,6 +702,10 @@ export function judgeDesignPolicy(
     // a root and removes nothing, and a selector that removes nothing is dead
     // config however many roots it found.
     unusedExcludes: (input.exclusions ?? []).filter((entry) => entry.elements === 0).map((entry) => entry.selector),
+    // A rule that matched nothing is stale or misspelled, and either way it is widening
+    // the blind spot for a variant that is no longer there — the property `check
+    // integrity --allow` established and the adoption report praised by name.
+    unusedAllow: allowRules.filter((r) => !usedAllow.has(r.raw)).map((r) => r.raw),
     textFreeSamples,
     textFreeFolded,
     spacingValues: spacingCounts.size,
@@ -631,8 +766,39 @@ export function formatDesignReport(report: DesignPolicyReport): string {
     + ` (${report.findings.length} finding(s)${bad > 0 ? `, ${bad} suspect` : ""}`
     + `${report.excludedElements > 0 ? `, ${report.excludedElements} element(s) excluded` : ""})`,
   );
-  lines.push(`${DIM}  roles judged: ${report.roles.length}, spacing values: ${report.spacingValues},`
-    + ` skipped: ${report.skipped} (no inferable role), ${report.statefulSkipped} (non-resting state)${RESET}`);
+  lines.push(`${DIM}  roles judged: ${report.roles.length}, spacing values: ${report.spacingValues}${RESET}`);
+  // `skipped: 28 (no inferable role)` was the whole of this before, and v6's
+  // adopting agent could not act on it: "28 of 30 elements skipped means the
+  // verdict rests on almost nothing, and nothing says whether that is normal."
+  // Three things fix that, in order of how fast they answer it: the fraction
+  // (how much of the page the verdict covers), the tags (what the skipped
+  // elements ARE), and one line saying where a role comes from at all.
+  const considered = report.judgedElements + report.skipped + report.statefulSkipped;
+  lines.push(
+    `${DIM}  coverage: ${report.judgedElements} of ${considered} visible element(s) carried an`
+    + ` inferable role${report.statefulSkipped > 0 ? `; ${report.statefulSkipped} skipped as non-resting` : ""}${RESET}`,
+  );
+  if (report.skippedTags.length > 0) {
+    const shown = report.skippedTags.slice(0, 6).map((t) => `${t.tag} x${t.count}`).join(", ");
+    const rest = report.skippedTags.length - 6;
+    lines.push(`${DIM}    no role: ${shown}${rest > 0 ? `, +${rest} more tag(s)` : ""}${RESET}`);
+  }
+  if (report.skipped > 0) {
+    // Kept next to the tally rather than in the docs, because the reader needing
+    // it is looking at a number they did not expect. This mirrors `roleOf` in the
+    // browser script above — if that list grows, this sentence grows with it.
+    lines.push(
+      `${DIM}    A role comes from role="..." or from button/input/select/textarea/h1-h6.`
+      + ` Layout elements${RESET}`,
+    );
+    lines.push(
+      `${DIM}    (div, span, p, a) have none, so a large skip count is normal —`
+      + ` this gate judges components,${RESET}`,
+    );
+    lines.push(
+      `${DIM}    not every box. Add role="..." where an element IS a component to widen the coverage.${RESET}`,
+    );
+  }
   if (report.textFreeSamples > 0) {
     lines.push(
       `${DIM}  text-free: ${report.textFreeSamples} (${report.textFreeFolded} judged on box alone —`
@@ -668,6 +834,18 @@ export function formatDesignReport(report: DesignPolicyReport): string {
     if (report.unusedExcludes.length > 0) {
       lines.push(`${YELLOW}${report.unusedExcludes.length} --exclude selector(s) removed nothing${RESET}`);
       lines.push(`${DIM}Delete them: an exclusion kept past the widget it covered only widens the blind spot.${RESET}`);
+    }
+    lines.push("");
+  }
+  // Allowed instances, stated. Same property as `--exclude` and as `check integrity
+  // --allow`: the exemption is visible, and a rule that matched nothing is reported.
+  const allowedRoles = report.roles.filter((r) => (r.allowed ?? 0) > 0);
+  if (allowedRoles.length > 0 || (report.unusedAllow ?? []).length > 0) {
+    for (const r of allowedRoles) {
+      lines.push(`${DIM}allowed: ${r.allowed} ${r.role} instance(s) declared deliberate and left out of the reuse figure${RESET}`);
+    }
+    if ((report.unusedAllow ?? []).length > 0) {
+      lines.push(`${YELLOW}${report.unusedAllow!.length} --allow rule(s) matched nothing: ${report.unusedAllow!.join(", ")}${RESET}`);
     }
     lines.push("");
   }

@@ -1,0 +1,30 @@
+{
+  "//": "vlmkit visual + a11y gate for the orders console. Run with `pnpm vrt` (see package.json). Findings triage and rationale: vrt/README.md",
+
+  "defaults": {
+    "//gates": "Every gate is pinned to vrt/orders.har, so CI needs NO dev server and NO port: the HAR replays index.html, app.css and /api/orders exactly as recorded, which also freezes /api/orders' moving order ids and totals. Re-record with `pnpm vrt:record` when the page starts calling a new endpoint. `--wait-until load --timeout 15000` is required because networkidle never fires on this app (serve.mjs holds /api/stream open); `vlmkit gates init` added those two flags itself and said why.",
+    "gates": [
+      "check integrity --har vrt/orders.har --wait-until load --timeout 15000",
+      "check a11y contrast --har vrt/orders.har --wait-until load --timeout 15000",
+      "check a11y focus --har vrt/orders.har --wait-until load --timeout 15000",
+      "check a11y touch --har vrt/orders.har --wait-until load --timeout 15000",
+      "check copy --har vrt/orders.har --wait-until load --timeout 15000",
+      "check interactions --har vrt/orders.har --wait-until load --timeout 15000",
+      "check breakpoints --har vrt/orders.har --wait-until load --timeout 15000",
+      "check design --har vrt/orders.har --wait-until load --timeout 15000"
+    ],
+
+    "//rules": "ONE deliberate re-tuning; every other rule keeps the gate's own default severity so the triage list stays the tool's opinion, not ours. check.design/component-drift: demoted warn -> info. The console has exactly 3 buttons and one is the primary action, so the 'button' role can never reach the 3x-reuse floor the rule needs; `--min-reuse 2` does not silence it either (measured average reuse is 1.5). Kept at info rather than off so the measurement reappears if the footer grows and genuinely fragments. NOTE: unlike `suppressions`, a `rules` entry has no reason/owner/expires field, so this paragraph is the only place the decision can be recorded and nothing will ever force it to be revisited.",
+    "rules": {
+      "check.design/component-drift": "info"
+    }
+  },
+
+  "pages": [
+    {
+      "id": "orders",
+      "//source": "The URL is the HAR's lookup key, not a live host — nothing has to be listening on 4321 for this to run. If the port inside vrt/orders.har changes, this string must change with it.",
+      "source": "http://localhost:4321/"
+    }
+  ]
+}

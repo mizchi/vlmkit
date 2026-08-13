@@ -1,15 +1,18 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseGateConfig, resolveGatePlan, resolveSuppression } from "@mizchi/vlmkit-core/gate-config.ts";
 import {
+  URL_SCAFFOLD_FLAGS,
+  ensureIgnoreEntries,
   expandPlanSources,
   findGateConfig,
   formatExpiredNotice,
   formatPlan,
   formatSuppressions,
+  scaffoldConfig,
   shardPlan,
 } from "./gates-cli.ts";
 
@@ -25,6 +28,82 @@ describe("findGateConfig", () => {
     assert.equal(findGateConfig(dir), null);
     writeFileSync(join(dir, "vlmkit.gates.json"), "{}");
     assert.equal(findGateConfig(dir), join(dir, "vlmkit.gates.json"));
+  });
+});
+
+describe("ensureIgnoreEntries", () => {
+  const work = (): string => mkdtempSync(join(tmpdir(), "vlmkit-gitignore-"));
+
+  it("writes both artifact directories, creating .gitignore when there is none", async () => {
+    // v6's adopting agent had to do exactly this by hand after finding the
+    // directories with `ls`: "adopting the tool dirtied the repo silently."
+    const cwd = work();
+    mkdirSync(join(cwd, ".git"));
+    assert.deepEqual(await ensureIgnoreEntries(cwd), [".vlmkit/", "test-results/"]);
+    const text = readFileSync(join(cwd, ".gitignore"), "utf8");
+    assert.match(text, /# vlmkit run artifacts/);
+    assert.match(text, /\.vlmkit\//);
+    assert.match(text, /test-results\//);
+  });
+
+  it("appends rather than rewriting — a .gitignore is someone else's file", async () => {
+    const cwd = work();
+    mkdirSync(join(cwd, ".git"));
+    writeFileSync(join(cwd, ".gitignore"), "node_modules/");
+    await ensureIgnoreEntries(cwd);
+    const text = readFileSync(join(cwd, ".gitignore"), "utf8");
+    assert.match(text, /^node_modules\/$/m);
+    assert.match(text, /\.vlmkit\//);
+  });
+
+  it("adds only what is missing, and reports nothing when both are covered", async () => {
+    const cwd = work();
+    mkdirSync(join(cwd, ".git"));
+    writeFileSync(join(cwd, ".gitignore"), ".vlmkit/\n");
+    assert.deepEqual(await ensureIgnoreEntries(cwd), ["test-results/"]);
+    assert.deepEqual(await ensureIgnoreEntries(cwd), []);
+  });
+
+  it("leaves a non-repo alone, where a .gitignore would mean nothing", async () => {
+    const cwd = work();
+    assert.deepEqual(await ensureIgnoreEntries(cwd), []);
+  });
+});
+
+describe("scaffoldConfig", () => {
+  it("gives a URL source the flags without which every gate times out", () => {
+    // v5's CI agent: "Handed a `http://` source, it emits a plan that times out on
+    // every gate. It has the URL; it could scaffold `--wait-until`/`--timeout` or
+    // warn." A URL source implies the class of page that may never reach network idle,
+    // which is the default milestone.
+    const { config, urlSources } = scaffoldConfig(["http://localhost:5173/"], []);
+    assert.deepEqual(urlSources, ["http://localhost:5173/"]);
+    assert.deepEqual(config.defaults!.gates, [`check integrity ${URL_SCAFFOLD_FLAGS}`]);
+  });
+
+  it("leaves a file source alone, where the default milestone is reachable", () => {
+    const { config, urlSources } = scaffoldConfig(["routes/**/*.html"], []);
+    assert.deepEqual(urlSources, []);
+    assert.deepEqual(config.defaults!.gates, ["check integrity"]);
+  });
+
+  it("applies the flags to every declared gate, not just the starter", () => {
+    const { config } = scaffoldConfig(["https://example.com/"], ["check integrity", "check copy"]);
+    assert.deepEqual(config.defaults!.gates, [
+      `check integrity ${URL_SCAFFOLD_FLAGS}`,
+      `check copy ${URL_SCAFFOLD_FLAGS}`,
+    ]);
+  });
+
+  it("treats a mixed list as needing the flags, since one URL is enough to hang the run", () => {
+    const { config } = scaffoldConfig(["index.html", "http://localhost:1/"], []);
+    assert.deepEqual(config.defaults!.gates, [`check integrity ${URL_SCAFFOLD_FLAGS}`]);
+  });
+
+  it("writes a config its own validator accepts", () => {
+    // The scaffold is a first impression; one its validator rejects is worse than none.
+    const { config } = scaffoldConfig(["http://localhost:5173/"], []);
+    assert.doesNotThrow(() => parseGateConfig(JSON.stringify(config)));
   });
 });
 
