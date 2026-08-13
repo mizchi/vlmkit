@@ -1,4 +1,4 @@
-import { describe, it, before, after } from "node:test";
+import { afterAll, beforeAll, describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -195,7 +195,7 @@ describe("findAffectedComponents edge cases", () => {
 describe("buildDepGraph", () => {
   const TMP = join(import.meta.dirname!, "..", "..", "..", "..", "test-results", "dep-graph-test");
 
-  before(async () => {
+  beforeAll(async () => {
     await mkdir(TMP, { recursive: true });
     // Create a small project structure
     await mkdir(join(TMP, "src"), { recursive: true });
@@ -218,7 +218,7 @@ export default x;
 `);
   });
 
-  after(async () => {
+  afterAll(async () => {
     await rm(TMP, { recursive: true, force: true });
   });
 

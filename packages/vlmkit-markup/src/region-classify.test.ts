@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { classifyRegion } from "./region-classify.ts";
 
 function fillRect(data: Uint8Array, width: number, x0: number, y0: number, w: number, h: number, r: number, g: number, b: number) {

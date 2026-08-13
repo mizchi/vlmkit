@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import type { A11ySnapshot } from "./smoke-types.ts";
 import {
   annotateA11ySnapshotConsistency,

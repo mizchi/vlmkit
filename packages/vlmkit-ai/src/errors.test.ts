@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { VrtConfigError } from "./errors.ts";
 import { createUnifiedLLMClient, createLLMProvider } from "./llm-client.ts";

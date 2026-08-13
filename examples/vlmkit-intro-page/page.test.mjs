@@ -3,7 +3,7 @@ import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { test } from "node:test";
+import { onTestFinished, test } from "vitest";
 
 const exampleDir = dirname(fileURLToPath(import.meta.url));
 const apmBootstrapCommand = "curl -sSL https://aka.ms/apm-unix | sh";
@@ -288,11 +288,13 @@ test("locale content and display preferences have strict contracts", async () =>
   assert.equal(resolveTheme("unknown"), "light");
 });
 
-test("the Pages build publishes only browser runtime assets", async (context) => {
+test("the Pages build publishes only browser runtime assets", async () => {
   const { buildPages, pageAssets } = await import("./build-pages.mjs");
   const temporaryDir = await mkdtemp(join(tmpdir(), "vlmkit-pages-"));
   const outputDir = join(temporaryDir, ".pages");
-  context.after(() => rm(temporaryDir, { recursive: true, force: true }));
+  // `onTestFinished` is vitest's per-test teardown; node:test spelled the same
+  // thing `context.after` on the test's own context object.
+  onTestFinished(() => rm(temporaryDir, { recursive: true, force: true }));
 
   await buildPages({ sourceDir: exampleDir, outputDir });
 

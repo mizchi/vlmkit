@@ -1,5 +1,5 @@
 import { deepStrictEqual, ok, strictEqual } from "node:assert";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { PNG } from "pngjs";
 import {
   buildContactSheets,

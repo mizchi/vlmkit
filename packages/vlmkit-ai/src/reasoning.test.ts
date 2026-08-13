@@ -7,7 +7,7 @@
  *   2. baseline と snapshot の a11y diff を取る
  *   3. 期待が a11y セマンティクスとして実現されたか reasoning する
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";

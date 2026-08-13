@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { analyzeA11yContrastSamples, type A11yContrastRawSample } from "./a11y-contrast.ts";
 import { evaluateA11yContrast } from "./markup-core-a11y-contrast.ts";

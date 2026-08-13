@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { crossValidate } from "./cross-validation.ts";
 import type { VisualSemanticDiff, A11yDiff, ChangeIntent } from "@mizchi/vlmkit-core/types.ts";

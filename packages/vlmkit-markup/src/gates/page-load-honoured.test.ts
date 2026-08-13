@@ -28,7 +28,7 @@ import { createServer, type Server } from "node:http";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { after, before, describe, it } from "node:test";
+import { afterAll, beforeAll, describe, it } from "vitest";
 import type { AnyGateDefinition } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { a11yTouchGate, breakpointsGate, handlersGate, layoutGate } from "./index.ts";
 
@@ -81,7 +81,7 @@ describe("--wait-until / --timeout reach the browser on a never-idle page", () =
   let url = "";
   let outDir = "";
 
-  before(async () => {
+  beforeAll(async () => {
     server = createServer((req, res) => {
       // The hang: no response, no end. This is the third-party request that
       // kept the reported app from ever reaching network idle.
@@ -94,7 +94,7 @@ describe("--wait-until / --timeout reach the browser on a never-idle page", () =
     outDir = mkdtempSync(join(tmpdir(), "page-load-honoured-"));
   });
 
-  after(async () => {
+  afterAll(async () => {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });

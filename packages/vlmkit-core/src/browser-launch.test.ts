@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { BROWSER_ENGINES, BrowserLaunchError, launchBrowser, withBrowser } from "./browser-launch.ts";
 import { handleCliError } from "./cli-error.ts";
 

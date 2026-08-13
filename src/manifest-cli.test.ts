@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { after, before, describe, it } from "node:test";
+import { afterAll, beforeAll, describe, it } from "vitest";
 
 let tmp: string;
 let manifestPath: string;
@@ -24,12 +24,12 @@ function cli(...argv: string[]): { stdout: string; stderr: string; status: numbe
 }
 
 describe("vlmkit manifest CLI", () => {
-  before(async () => {
+  beforeAll(async () => {
     tmp = await mkdtemp(join(tmpdir(), "vrt-manifest-test-"));
     manifestPath = join(tmp, "approval.json");
   });
 
-  after(async () => {
+  afterAll(async () => {
     await rm(tmp, { recursive: true, force: true });
   });
 
@@ -194,13 +194,13 @@ describe("vlmkit manifest add --from-run", () => {
   let runDir: string;
   let manifestPathFromRun: string;
 
-  before(async () => {
+  beforeAll(async () => {
     runDir = await mkdtemp(join(tmpdir(), "vrt-manifest-fromrun-"));
     await writeFile(join(runDir, "diff-report.json"), JSON.stringify(FAKE_REPORT, null, 2));
     manifestPathFromRun = join(runDir, "manifest.json");
   });
 
-  after(async () => {
+  afterAll(async () => {
     await rm(runDir, { recursive: true, force: true });
   });
 

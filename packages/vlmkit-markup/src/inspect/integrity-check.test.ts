@@ -14,7 +14,7 @@
  * auditable, never silent.
  */
 import assert from "node:assert";
-import { test, describe } from "node:test";
+import { test, describe } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

@@ -16,7 +16,7 @@
  * claim is only worth making if something checks it.
  */
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import {
   callMarkupCoreJson,
   computeUiContractLayoutIssueIds,

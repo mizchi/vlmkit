@@ -1,5 +1,5 @@
 import assert from "node:assert";
-import { test, describe } from "node:test";
+import { test, describe } from "vitest";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import {

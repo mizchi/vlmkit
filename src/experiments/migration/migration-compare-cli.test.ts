@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { DEFAULT_BIDI_URL } from "@mizchi/vlmkit-capture/crater-client.ts";
 import {
   parseMigrationCompareArgs,

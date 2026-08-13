@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { computeTrend, heightToleranceFor, pixelPresence } from "./markup-verify.ts";
 import { kickbackForComposition } from "./markup-verify-report.ts";

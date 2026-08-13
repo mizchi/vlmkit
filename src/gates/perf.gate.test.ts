@@ -13,7 +13,7 @@ import { createServer, type Server } from "node:http";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { after, before, describe, it } from "node:test";
+import { afterAll, beforeAll, describe, it } from "vitest";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { perfGate } from "./perf.gate.ts";
 
@@ -24,7 +24,7 @@ describe("check perf page-load flags", () => {
   let url = "";
   let outDir = "";
 
-  before(async () => {
+  beforeAll(async () => {
     server = createServer((req, res) => {
       if (req.url === "/never-answers") return; // the request that never settles
       res.writeHead(200, { "content-type": "text/html", "cache-control": "no-store" });
@@ -38,7 +38,7 @@ describe("check perf page-load flags", () => {
     outDir = mkdtempSync(join(tmpdir(), "perf-page-load-"));
   });
 
-  after(async () => {
+  afterAll(async () => {
     server.closeAllConnections();
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });

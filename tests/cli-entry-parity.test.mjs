@@ -29,7 +29,7 @@
  * CLI on load — and the failure being guarded is a source-level divergence, so source is the
  * right thing to read.
  */
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

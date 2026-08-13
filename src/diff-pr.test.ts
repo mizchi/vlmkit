@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { after, before, describe, it } from "node:test";
+import { afterAll, beforeAll, describe, it } from "vitest";
 import { buildMarkdownSummary } from "./diff-pr.ts";
 import { parseDiffPrConfig } from "./diff-pr-config.ts";
 
@@ -116,7 +116,7 @@ describe("buildMarkdownSummary", () => {
 describe("vlmkit diff-pr pin <route>...", () => {
   let cwd: string;
 
-  before(async () => {
+  beforeAll(async () => {
     cwd = await mkdtemp(join(tmpdir(), "vrt-diff-pr-pin-"));
     await mkdir(join(cwd, "pages"), { recursive: true });
     await writeFile(
@@ -141,7 +141,7 @@ describe("vlmkit diff-pr pin <route>...", () => {
     assert.equal(r.status, 0, `seed pin failed: ${r.stderr}`);
   });
 
-  after(async () => {
+  afterAll(async () => {
     await rm(cwd, { recursive: true, force: true });
   });
 
@@ -184,7 +184,7 @@ describe("vlmkit diff-pr pin <route>...", () => {
 describe("vlmkit diff-pr a11y gate", () => {
   let cwd: string;
 
-  before(async () => {
+  beforeAll(async () => {
     cwd = await mkdtemp(join(tmpdir(), "vrt-diff-pr-a11y-"));
     await mkdir(join(cwd, "pages"), { recursive: true });
     // Good: high contrast + big buttons + DOM-order Tab.
@@ -229,7 +229,7 @@ describe("vlmkit diff-pr a11y gate", () => {
     assert.equal(r.status, 0, `pin failed: ${r.stderr}`);
   });
 
-  after(async () => {
+  afterAll(async () => {
     await rm(cwd, { recursive: true, force: true });
   });
 
@@ -281,14 +281,14 @@ describe("vlmkit diff-pr post", () => {
   let cwd: string;
   let summaryPath: string;
 
-  before(async () => {
+  beforeAll(async () => {
     cwd = await mkdtemp(join(tmpdir(), "vrt-diff-pr-post-"));
     summaryPath = join(cwd, ".vlmkit/runs/diff-pr/summary.md");
     await mkdir(join(cwd, ".vlmkit/runs/diff-pr"), { recursive: true });
     await writeFile(summaryPath, "# vlmkit diff-pr summary\n\nStatus: **PASS**\n");
   });
 
-  after(async () => {
+  afterAll(async () => {
     await rm(cwd, { recursive: true, force: true });
   });
 

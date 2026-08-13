@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { estimateCost, billedCost, withPricing } from "./cost.ts";
 import type { ModelTier } from "./types.ts";

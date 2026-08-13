@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { runElementCompare, type ElementCompareOptions } from "./element-compare.ts";

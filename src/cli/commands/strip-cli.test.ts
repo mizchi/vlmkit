@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { numericOrder, parseArgs } from "./strip-cli.ts";
 
 describe("snapshot strip: argument parsing", () => {

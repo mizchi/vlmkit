@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { after, describe, it } from "node:test";
+import { afterAll, describe, it } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -37,7 +37,7 @@ describe("openSource / openHtml (real browser)", () => {
     }
     return browser;
   };
-  after(async () => {
+  afterAll(async () => {
     await browser?.close();
   });
 

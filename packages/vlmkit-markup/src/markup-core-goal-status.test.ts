@@ -20,7 +20,7 @@
  * reproduces from the case name alone rather than from a seed.
  */
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { callMarkupCoreJson, runMarkupCore } from "./markup-core-runtime.ts";
 
 /** The nested shape the TypeScript caller actually holds. */

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { createGateRegistry } from "@mizchi/vlmkit-core/plugin/registry.ts";
 import { validateGateDefinition } from "@mizchi/vlmkit-core/plugin/rules.ts";

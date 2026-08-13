@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { extractPaletteFromRgba } from "./palette-extract.ts";
 import { diffPalettes } from "./palette-diff.ts";
 

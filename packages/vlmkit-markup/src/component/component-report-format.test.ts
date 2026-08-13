@@ -6,7 +6,7 @@
  * module loading against 85ms for the formatter alone. Nothing here needs a
  * browser and now nothing here loads one.
  */
-import test from "node:test";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import {
   renderReportMarkdown,
