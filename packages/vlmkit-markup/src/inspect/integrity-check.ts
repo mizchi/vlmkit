@@ -1812,7 +1812,26 @@ export function formatIntegrityReport(report: IntegrityReport): string {
   lines.push("");
   const fails = report.findings.filter((f) => f.severity === "fail").length;
   const warns = report.findings.length - fails;
-  lines.push(`verdict: ${report.verdict === "clean" ? `${GREEN}CLEAN${RESET}` : `${RED}DEFECTS${RESET}`} (${fails} fail, ${warns} warn, ${report.exempted.length} exempted)`);
+  // Three words, not two. `CLEAN` used to print whenever nothing FAILED, so a run
+  // with warns read as `CLEAN (0 fail, 3 warn, 0 exempted)` — a verdict contradicting
+  // its own counts, which v5's repair agent called "a coin-flip in CI" about the
+  // equivalent line on `check design`. Widening the contrast floor made it common
+  // rather than rare, so it is fixed here rather than recorded.
+  //
+  // `report.verdict` keeps its two values: it is the JSON contract, and it means
+  // exactly "did anything fail". Only the printed word gains the middle case.
+  const word = fails > 0
+    ? `${RED}DEFECTS${RESET}`
+    : warns > 0
+      ? `${YELLOW}NO DEFECTS, ${warns} WARN${RESET}`
+      : `${GREEN}CLEAN${RESET}`;
+  lines.push(
+    `verdict: ${word} (${fails} fail, ${warns} warn, ${report.exempted.length} exempted)`
+    // The exit code, on the line the reader is already looking at. A warn does not
+    // fail the command, and finding that out from the last line of the output — below
+    // the findings — is what made it a coin flip.
+    + (fails === 0 && warns > 0 ? ` ${DIM}— exits 0; --rule <id>=suspect to gate on one${RESET}` : ""),
+  );
   for (const v of report.viewports) {
     lines.push(`${DIM}  ${v.width}x${v.height}: ${v.components} component(s), ink ${(v.inkRatio * 100).toFixed(1)}%, ${v.textBlocks} text block(s)${RESET}`);
   }
