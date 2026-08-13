@@ -73,6 +73,50 @@ describe("analyzeA11yTouchSamples", () => {
     assert.equal(findings.length, 0);
   });
 
+  it("keeps identical siblings separate, so a plain toolbar measures like a classed one", () => {
+    // v7. Dedupe keyed on the generated CSS path, which three `<button>`s in one
+    // `<div class="z">` share, so a whole toolbar collapsed to one element — and
+    // cluster detection, which compares each target against the OTHERS, had
+    // nothing left to compare against. Same pixels, and the verdict moved with
+    // the markup:
+    //   distinct classes -> inspected 3 | failures 3 | clustered 3
+    //   identical markup -> inspected 1 | failures 1 | clustered 0
+    const row = (path: string) => [
+      sample({ path, x: 0, y: 0, width: 20, height: 20 }),
+      sample({ path, x: 22, y: 0, width: 20, height: 20 }),
+      sample({ path, x: 44, y: 0, width: 20, height: 20 }),
+    ];
+    const shared = analyzeA11yTouchSamples(row("main>div.z>button"), "AA");
+    assert.equal(shared.length, 3, "three rendered buttons are three targets");
+    assert.equal(shared.filter((f) => f.cluster).length, 3, "and they are adjacent");
+
+    const classed = analyzeA11yTouchSamples([
+      sample({ path: ".a", x: 0, y: 0, width: 20, height: 20 }),
+      sample({ path: ".b", x: 22, y: 0, width: 20, height: 20 }),
+      sample({ path: ".c", x: 44, y: 0, width: 20, height: 20 }),
+    ], "AA");
+    assert.equal(classed.length, shared.length, "class names must not change the measurement");
+  });
+
+  it("still collapses one element sampled twice, which is what the dedupe was for", () => {
+    const findings = analyzeA11yTouchSamples([
+      sample({ path: "main>button", x: 8, y: 8, width: 20, height: 20 }),
+      sample({ path: "main>button", x: 8, y: 8, width: 20, height: 20 }),
+    ], "AA");
+    assert.equal(findings.length, 1);
+  });
+
+  it("does not report a target at the floor, whatever its spacing", () => {
+    // WCAG 2.5.8 sizes targets; it does not condemn a compliant one for being
+    // adjacent. The old help said "clustered targets are flagged", which read as
+    // the opposite and is what sent v7's agent-m looking for a bug here.
+    const findings = analyzeA11yTouchSamples([
+      sample({ path: ".a", x: 0, y: 0, width: 24, height: 24 }),
+      sample({ path: ".b", x: 28, y: 0, width: 24, height: 24 }),
+    ], "AA");
+    assert.deepEqual(findings, []);
+  });
+
   it("marks a target as `cluster: true` when another center is within 24 px", () => {
     const findings = analyzeA11yTouchSamples([
       sample({ path: ".a", x: 0, y: 0, width: 32, height: 32 }),

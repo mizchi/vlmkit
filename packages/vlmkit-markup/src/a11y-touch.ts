@@ -144,13 +144,41 @@ export interface A11yTouchRawSample {
  * post-process so the `vlmkit diff-pr` CI gate can reuse it on its
  * own Playwright page without spinning up a new browser.
  */
+/**
+ * Identity for one rendered target.
+ *
+ * NOT the generated CSS path alone. That path is not unique among identical
+ * siblings — three `<button>`s in one `<div class="z">` all render as
+ * `main>div.z>button` — so keying on it collapsed a whole toolbar into one
+ * element. Found in v7 while checking an agent's report about `--level AA`:
+ * same pixels, same geometry, and the verdict moved with the markup.
+ *
+ *   distinct classes -> inspected 3 | failures 3 | clustered 3
+ *   identical markup -> inspected 1 | failures 1 | clustered 0
+ *
+ * Two things went wrong at once. Coverage was understated, and cluster
+ * detection — which compares each target against the OTHERS — had nothing left
+ * to compare against, so the single most common clustered case (a row of
+ * identical icon buttons) could never report a cluster.
+ *
+ * Position closes it: two elements at the same path in different places on the
+ * page are different elements, and one element sampled twice is at the same
+ * place both times, which is what the dedupe was for.
+ */
+function targetKey(sample: A11yTouchRawSample): string {
+  return `${sample.path}@${Math.round(sample.bbox.x)},${Math.round(sample.bbox.y)}`;
+}
+
 export function analyzeA11yTouchSamples(
   samples: A11yTouchRawSample[],
   level: WcagTouchLevel = "AAA",
 ): TouchTargetFinding[] {
   const required = requiredTouchSide(level);
   const byPath = new Map<string, A11yTouchRawSample>();
-  for (const s of samples) if (!byPath.has(s.path)) byPath.set(s.path, s);
+  for (const s of samples) {
+    const key = targetKey(s);
+    if (!byPath.has(key)) byPath.set(key, s);
+  }
   const findings: TouchTargetFinding[] = [];
   const elements = [...byPath.values()];
   const centers = elements.map((e) => ({
@@ -209,14 +237,20 @@ export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchRep
     return { samples, screenshotPath };
   });
 
-  // Dedupe by path.
+  // Dedupe by path AND position — see `targetKey`.
   const byPath = new Map<string, A11yTouchRawSample>();
-  for (const s of samples) if (!byPath.has(s.path)) byPath.set(s.path, s);
+  for (const s of samples) {
+    const key = targetKey(s);
+    if (!byPath.has(key)) byPath.set(key, s);
+  }
 
-  // Cluster detection: if two below-threshold targets are within
-  // 24 px center-to-center, the WCAG 2.5.8 AA "with spacing" leniency
-  // is forfeited. (Strict-AAA doesn't have the leniency anyway, but
-  // we still surface clusters for context.)
+  // Cluster detection, on targets ALREADY below the floor. WCAG 2.5.8's
+  // "with spacing" leniency — which can excuse an undersized target that is far
+  // enough from its neighbours — is deliberately not applied here, so a target
+  // under the floor is reported either way and `cluster` says which side of that
+  // line it is on. It annotates; it never triggers. The gate's `usage` says so
+  // now: v7's agent-m read the old wording as "adjacency is flagged" and could
+  // not reconcile it with a 24x24 button passing at AA.
   const findings: TouchTargetFinding[] = [];
   const elements = [...byPath.values()];
   for (let i = 0; i < elements.length; i++) {
@@ -297,7 +331,14 @@ function renderReport(r: Omit<TouchReport, "reportPath">): string {
   lines.push("# A11y touch-target report");
   lines.push("");
   lines.push(`Source: \`${r.source}\``);
-  lines.push(`WCAG level: **${r.level}** — requires ${r.level === "AAA" ? "44×44 px" : "24×24 px (with spacing)"} for every interactive element.`);
+  // Not "(with spacing)": nothing here applies WCAG's spacing exception, and
+  // saying otherwise is what made a reader expect a 24x24 target in a tight row
+  // to be reported at AA. The floor is the shorter side, full stop.
+  lines.push(
+    `WCAG level: **${r.level}** — every interactive element needs a shorter side of at least`
+    + ` ${r.required}px. \`clustered\` annotates a finding (another below-floor target within`
+    + ` 24px center-to-center); it never causes one.`,
+  );
   lines.push("");
   lines.push(`Inspected **${r.inspectedCount}** interactive element(s).  ` +
     `Screenshot: \`${r.screenshot}\``);

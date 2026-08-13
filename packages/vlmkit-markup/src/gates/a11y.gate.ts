@@ -127,10 +127,21 @@ export const a11yTouchGate = defineGate<TouchReport, TouchCheckOptions>({
   title: "Touch-target size check",
   summary: "Touch-target size check",
   category: "correctness",
-  usage: `Measures every interactive element's rendered box and reports targets
-below the WCAG minimum — AAA is 44x44, AA is 24x24 with spacing. Clustered
-targets (within 24px of a sibling) are flagged, because adjacency is what
-makes an undersized target unusable.`,
+  usage: `Measures every interactive element's rendered box and reports targets whose
+SHORTER SIDE is under the level's floor: 44px at AAA (default), 24px at AA.
+A target at or above the floor is not reported, whatever its spacing — so at
+--level AA a 24x24 button in a tight row passes, and that is WCAG 2.5.8, which
+sizes targets and does not condemn a compliant one for being adjacent.
+
+\`clustered\` on a finding means another below-floor target sits within 24px
+center-to-center. It ANNOTATES a finding; it never causes one. WCAG's
+spacing exception, which can excuse an undersized target that is far enough
+from its neighbours, is deliberately not applied — an undersized target is
+reported either way, and \`clustered\` tells you which side of that line it is
+on. This is stricter than WCAG on purpose. If that is not the trade you want,
+--rule target-undersized=warn keeps the findings without failing the build.
+There is no per-selector exemption on this gate yet, so a vendor widget's
+controls cannot be scoped out — only the whole rule can be re-tuned.`,
   rules: [
     {
       id: "target-undersized",
@@ -144,7 +155,7 @@ makes an undersized target unusable.`,
     {
       name: "level",
       kind: "string",
-      description: "WCAG threshold — AAA is 44px, AA is 24px-with-spacing",
+      description: "Shorter-side floor — AAA is 44px, AA is 24px",
       choices: ["AAA", "AA"],
       defaultDescription: "AAA",
     },
