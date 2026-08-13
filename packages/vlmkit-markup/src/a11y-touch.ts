@@ -23,7 +23,7 @@ import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Page } from "playwright";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { DIM, RESET, GREEN, RED, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { DIM, RESET, GREEN, RED, BOLD, CYAN, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { type PageLoadOptions, pickPageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { openSource } from "@mizchi/vlmkit-core/page-open.ts";
 import {
@@ -32,6 +32,7 @@ import {
   touchTargetInCluster,
 } from "./markup-core-a11y-touch.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { applySelectorAllowRules, parseSelectorAllowRules } from "./inspect/selector-exemption.ts";
 
 export type WcagTouchLevel = "AAA" | "AA";
 
@@ -51,6 +52,16 @@ export interface TouchCheckOptions extends PageLoadOptions {
   viewport?: { width: number; height: number };
   /** Required size threshold. AAA → 44px, AA → 24px. Default AAA. */
   level?: WcagTouchLevel;
+  /**
+   * `--allow "<selector>;<reason>"` — a target whose size is deliberate.
+   *
+   * v7's agent-m and agent-l both hit the absence: "`check a11y touch` has no
+   * `--exclude` and no selector `--allow` while `check design` and `check
+   * integrity` both do. Vendor DOM is a page-level fact, not a per-gate one. The
+   * only exit is turning the one rule off page-wide, which also stops checking our
+   * own buttons."
+   */
+  allow?: readonly string[];
 }
 
 export interface TouchTargetFinding {
@@ -78,6 +89,13 @@ export interface TouchReport {
   screenshot: string;
   inspectedCount: number;
   failures: TouchTargetFinding[];
+  /**
+   * Targets an `--allow` rule declared deliberate. Listed, not dropped — an
+   * exemption a reader cannot see is a blind spot rather than a decision.
+   */
+  exempted?: { finding: TouchTargetFinding; reason: string; rule: string }[];
+  /** `--allow` rules that matched nothing. */
+  unusedAllow?: string[];
   reportPath: string;
 }
 
@@ -279,6 +297,17 @@ export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchRep
   findings.sort((a, b) => a.minSide - b.minSide);
 
   const reportPath = options.reportPath ?? join(outputDir, "report.md");
+  // Exemptions last, so a rule matching nothing is reported against the findings
+  // this run actually produced rather than against the raw samples.
+  const allowRules = parseSelectorAllowRules(options.allow ?? [], { ruleId: "target-undersized" });
+  const applied = applySelectorAllowRules(findings, allowRules, (f) => f.path);
+  const kept = applied.kept;
+  const exempted = applied.exempted.map((e) => ({
+    finding: e.finding,
+    reason: e.rule.reason,
+    rule: e.rule.raw.split(";")[0] ?? e.rule.raw,
+  }));
+
   const md = renderReport({
     source: options.source,
     level,
@@ -286,7 +315,7 @@ export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchRep
     viewport,
     screenshot: screenshotPath,
     inspectedCount: byPath.size,
-    failures: findings,
+    failures: kept,
   });
   await writeFile(reportPath, md);
 
@@ -294,7 +323,9 @@ export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchRep
 
   return {
     source: options.source, level, required, viewport, screenshot: screenshotPath,
-    inspectedCount: byPath.size, failures: findings, reportPath,
+    inspectedCount: byPath.size, failures: kept, reportPath,
+    ...(exempted.length > 0 ? { exempted } : {}),
+    ...(applied.unused.length > 0 ? { unusedAllow: applied.unused.map((r) => r.raw) } : {}),
   };
 }
 
@@ -312,7 +343,10 @@ export function formatA11yTouchReport(report: TouchReport): string {
   );
   lines.push(`  ${DIM}inspected ${report.inspectedCount} interactive element(s)${RESET}`);
   const icon = report.failures.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
-  lines.push(`  ${icon} ${report.failures.length} undersized target(s)`);
+  lines.push(
+    `  ${icon} ${report.failures.length} undersized target(s)`
+    + `${report.exempted?.length ? `${DIM}, ${report.exempted.length} exempted${RESET}` : ""}`,
+  );
   const CONSOLE_ROWS = 5;
   for (const f of report.failures.slice(0, CONSOLE_ROWS)) {
     const cl = f.cluster ? " (clustered)" : "";
@@ -321,6 +355,21 @@ export function formatA11yTouchReport(report: TouchReport): string {
   // See a11y-contrast: an undisclosed cut makes a partial list look complete.
   if (report.failures.length > CONSOLE_ROWS) {
     lines.push(`    ${DIM}… ${report.failures.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
+  }
+  // Exemptions are LISTED, never merely subtracted — the property every exemption
+  // in this repo has. A reader has to be able to audit a colleague's judgement call.
+  for (const e of report.exempted ?? []) {
+    lines.push(
+      `    ${DIM}- ${e.finding.path} — ${Math.round(e.finding.bbox.width)}×${Math.round(e.finding.bbox.height)}:`
+      + ` user exemption (${e.rule}): ${e.reason}${RESET}`,
+    );
+  }
+  if (report.unusedAllow?.length) {
+    lines.push(
+      `  ${YELLOW}${report.unusedAllow.length} --allow rule(s) matched nothing:`
+      + ` ${report.unusedAllow.join(", ")}${RESET}`,
+    );
+    lines.push(`    ${DIM}Delete them: an exemption kept past what it covered only widens the blind spot.${RESET}`);
   }
   lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
   return lines.join("\n");

@@ -32,6 +32,7 @@ import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { evaluateA11yContrast } from "./markup-core-a11y-contrast.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { applySelectorAllowRules, parseSelectorAllowRules } from "./inspect/selector-exemption.ts";
 
 export interface A11yContrastOptions extends PageLoadOptions {
   /**
@@ -42,6 +43,16 @@ export interface A11yContrastOptions extends PageLoadOptions {
    * running the built CLI rather than the run function.
    */
   quiet?: boolean;
+  /**
+   * `--allow "<selector>;<reason>"` — text whose contrast is signed off.
+   *
+   * v7's agent-l: "same data as integrity but fail-level, one rule, no `--allow`:
+   * red CI or contrast off, nothing between." `check integrity` reports the same
+   * colours as a warn with a per-selector exemption; this gate reports them as a
+   * fail with no exemption at all, so a single approved brand grey forced the whole
+   * rule off.
+   */
+  allow?: readonly string[];
   htmlPath: string;
   outputDir: string;
   reportPath?: string;
@@ -74,6 +85,10 @@ export interface A11yContrastReport {
   screenshot: string;
   totalText: number;
   failures: ContrastFinding[];
+  /** Findings an `--allow` rule declared deliberate. Listed, never merely subtracted. */
+  exempted?: { finding: ContrastFinding; reason: string; rule: string }[];
+  /** `--allow` rules that matched nothing. */
+  unusedAllow?: string[];
   reportPath: string;
 }
 
@@ -277,12 +292,24 @@ export async function runA11yContrast(
 
 
 
+  const allowRules = parseSelectorAllowRules(options.allow ?? [], { ruleId: "contrast-below-aa" });
+  const applied = applySelectorAllowRules(findings, allowRules, (f) => f.path);
   return {
     html: htmlPath,
     viewport,
     screenshot: screenshotPath,
     totalText: byPath.size,
-    failures: findings,
+    failures: applied.kept,
+    ...(applied.exempted.length > 0
+      ? {
+        exempted: applied.exempted.map((e) => ({
+          finding: e.finding,
+          reason: e.rule.reason,
+          rule: e.rule.raw.split(";")[0] ?? e.rule.raw,
+        })),
+      }
+      : {}),
+    ...(applied.unused.length > 0 ? { unusedAllow: applied.unused.map((r) => r.raw) } : {}),
     reportPath,
   };
 }
@@ -298,7 +325,10 @@ export function formatA11yContrastReport(report: A11yContrastReport): string {
   lines.push(`  ${DIM}html: ${report.html}${RESET}`);
   lines.push(`  ${DIM}inspected ${report.totalText} text-bearing element(s)${RESET}`);
   const icon = report.failures.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
-  lines.push(`  ${icon} ${report.failures.length} contrast failure(s)`);
+  lines.push(
+    `  ${icon} ${report.failures.length} contrast failure(s)`
+    + `${report.exempted?.length ? `${DIM}, ${report.exempted.length} exempted${RESET}` : ""}`,
+  );
   const CONSOLE_ROWS = 5;
   for (const f of report.failures.slice(0, CONSOLE_ROWS)) {
     lines.push(`    ${DIM}${f.path} — ${f.ratio.toFixed(2)}:1 (need ${f.requiredAA}) — \`${f.foreground.hex}\` on \`${f.background.hex}\` — "${f.text}"${RESET}`);
@@ -308,6 +338,20 @@ export function formatA11yContrastReport(report: A11yContrastReport): string {
   // `check breakpoints` and `check integrity`.
   if (report.failures.length > CONSOLE_ROWS) {
     lines.push(`    ${DIM}… ${report.failures.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
+  }
+  // Listed, never merely subtracted.
+  for (const e of report.exempted ?? []) {
+    lines.push(
+      `    ${DIM}- ${e.finding.path} — ${e.finding.ratio.toFixed(2)}:1:`
+      + ` user exemption (${e.rule}): ${e.reason}${RESET}`,
+    );
+  }
+  if (report.unusedAllow?.length) {
+    lines.push(
+      `  ${YELLOW}${report.unusedAllow.length} --allow rule(s) matched nothing:`
+      + ` ${report.unusedAllow.join(", ")}${RESET}`,
+    );
+    lines.push(`    ${DIM}Delete them: an exemption kept past what it covered only widens the blind spot.${RESET}`);
   }
   lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
   return lines.join("\n");

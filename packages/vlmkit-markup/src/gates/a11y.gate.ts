@@ -19,7 +19,8 @@
  */
 
 import { join } from "node:path";
-import { readChoice, readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
+import { readAll, readChoice, readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
+import { parseSelectorAllowRules, selectorAllowHelp } from "../inspect/selector-exemption.ts";
 import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
@@ -44,7 +45,7 @@ import {
 } from "../a11y-focus-order.ts";
 import { firstPositional, optionalInt, runOutputDir, viewportFlag } from "./arg-helpers.ts";
 
-const A11Y_VALUE_FLAGS = ["--output-dir", "--report", "--level", "--max-steps", "--viewport"];
+const A11Y_VALUE_FLAGS = ["--output-dir", "--report", "--level", "--max-steps", "--viewport", "--allow"];
 
 /**
  * Flags every a11y gate shares. `quiet` is forced: the runner owns output.
@@ -94,13 +95,30 @@ threshold for its font size and weight.`,
   ],
   inputs: [
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to scan", positional: 0, required: true },
+    {
+      name: "allow",
+      placeholder: "<selector>;<reason>",
+      kind: "string",
+      repeatable: true,
+      description: selectorAllowHelp({
+        ruleId: "contrast-below-aa",
+        example: "p.hint;brand grey signed off pending the palette refresh",
+        extra:
+          "`check integrity` reports the same colours as a warn and has had a per-selector"
+          + " exemption for a while; this gate reports them as a fail, so without one an"
+          + " approved brand grey forced the whole rule off.",
+      }),
+    },
     ...REPORT_INPUTS("a11y-contrast"),
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const htmlPath = firstPositional(argv, "vlmkit check a11y contrast <html-or-url>", A11Y_VALUE_FLAGS);
+    const allow = readAll(argv, "allow");
+    parseSelectorAllowRules(allow, { ruleId: "contrast-below-aa" });
     return {
       htmlPath,
+      ...(allow.length > 0 ? { allow } : {}),
       ...reportFlags(argv, "a11y-contrast", htmlPath),
       ...parsePageLoad(argv),
     };
@@ -159,14 +177,31 @@ controls cannot be scoped out — only the whole rule can be re-tuned.`,
       choices: ["AAA", "AA"],
       defaultDescription: "AAA",
     },
+    {
+      name: "allow",
+      placeholder: "<selector>;<reason>",
+      kind: "string",
+      repeatable: true,
+      description: selectorAllowHelp({
+        ruleId: "target-undersized",
+        example: "button.vendor-zoom-in;MapLibre's own control, sized by the library",
+        extra:
+          "Use it for a vendor widget's controls, which are a page-level fact this gate"
+          + " cannot infer. Turning the rule off page-wide would also stop checking your own.",
+      }),
+    },
     ...REPORT_INPUTS("a11y-touch"),
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
     const source = firstPositional(argv, "vlmkit check a11y touch <html-or-url>", A11Y_VALUE_FLAGS);
+    const allow = readAll(argv, "allow");
+    // Parsed before the browser starts, so a typo'd exemption fails in milliseconds.
+    parseSelectorAllowRules(allow, { ruleId: "target-undersized" });
     return {
       source,
       level: (readChoice(argv, "level", ["AAA", "AA"] as const) ?? "AAA") as WcagTouchLevel,
+      ...(allow.length > 0 ? { allow } : {}),
       ...reportFlags(argv, "a11y-touch", source),
       ...parsePageLoad(argv),
     };

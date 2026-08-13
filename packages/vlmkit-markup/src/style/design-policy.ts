@@ -35,6 +35,10 @@ import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import {
+  type SelectorAllowRule,
+  parseSelectorAllowRules,
+} from "../inspect/selector-exemption.ts";
 
 /** One visible element's style signature within its inferred role. */
 export interface DesignSample {
@@ -456,50 +460,17 @@ function looksLikeVendorChrome(sample: DesignSample): boolean {
   return zeroPadding && noRadius && noBackground;
 }
 
-interface DesignAllowRule {
-  /** Substring the instance's selector must contain. */
-  selector: string;
-  reason: string;
-  /** As written, so an unused rule is reported back verbatim. */
-  raw: string;
-}
-
 /**
  * Parse `--allow ".btn--primary;the primary action is deliberately distinct"`.
  *
- * Same syntax and same two properties as `check integrity --allow` and `check drift
- * component --allow`: a reason is required, and a rule that matches nothing is reported.
- * `;` delimits the reason rather than `#`, because `#` is part of an ID selector and
- * splitting on it silently produces a broader exemption than the one written.
+ * Thin wrapper over the shared `<selector>;<reason>` parser — this gate's form is
+ * that form exactly, and `check a11y touch` / `check a11y contrast` gained the same
+ * one in v7. `check integrity` and `check drift component` keep their own parsers
+ * because their syntax carries more than a selector (a rule kind and viewport; a
+ * computed property).
  */
-export function parseDesignAllowRules(specs: readonly string[]): DesignAllowRule[] {
-  const rules: DesignAllowRule[] = [];
-  for (const spec of specs) {
-    if (!spec.trim()) continue;
-    const cut = spec.indexOf(";");
-    if (cut < 0) {
-      throw new UsageError(
-        `--allow needs a reason: <selector>;<reason> (got "${spec}").`
-        + (spec.includes("#") ? ` The reason is separated by ";", not "#" — "#" is part of an ID selector.` : "")
-        + ` An exemption without a stated reason cannot be reviewed.`,
-      );
-    }
-    const selector = spec.slice(0, cut).trim();
-    const reason = spec.slice(cut + 1).trim();
-    if (!selector) throw new UsageError(`--allow needs a selector: <selector>;<reason> (got "${spec}").`);
-    if (!reason) throw new UsageError(`--allow reason is empty in "${spec}". Say why this instance is intentional.`);
-    // A bare `*` would exempt every instance, which is `--rule component-drift=off`
-    // wearing a disguise — and unlike that flag it would not show up in the re-tuned
-    // line the runner prints.
-    if (selector === "*") {
-      throw new UsageError(
-        `--allow "*" would exempt every instance, which is \`--rule component-drift=off\`.`
-        + ` Name the instances that are deliberately different, or turn the rule off explicitly.`,
-      );
-    }
-    rules.push({ selector, reason, raw: spec });
-  }
-  return rules;
+export function parseDesignAllowRules(specs: readonly string[]): SelectorAllowRule[] {
+  return parseSelectorAllowRules(specs, { ruleId: "component-drift" });
 }
 
 export const DESIGN_ALLOW_HELP = `Declare one instance's deviation deliberate, repeatable. Syntax:
