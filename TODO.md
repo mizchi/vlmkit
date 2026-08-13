@@ -1066,7 +1066,9 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 
 ### dogfood v6 の残件(2026-08-12、adoption シナリオ)
 
-修正済み2件とレポートは `docs/reports/2026-08-12-dogfood-adoption-v6.md`。以下は未修正。
+レポートは `docs/reports/2026-08-12-dogfood-adoption-v6.md`。**7件すべて 2026-08-13 に修正済み**
+(`3e27f0a` / `1657d4b` / `6ca9dad` / `8b12f29` / `7241a2b` / `b5e7c0f` / `25711b1`)。
+指摘文はエージェントの言葉のまま残す — 答えを知った後の書き直しより、指摘そのものが記録として役に立つ。
 
 - [x] **同じ3色が8件の所見になる** — 修正済み(2026-08-13)。色ペア + 適用された床を
   identity にして1件にまとめる(修正の単位が CSS 1宣言だから)。セレクタは
