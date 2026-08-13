@@ -280,7 +280,7 @@ The built-ins load through the same `createGateRegistry([...])` call. If the
 contract were not sufficient for them it would not be sufficient for anyone
 else, and making them its first consumer is the only way to keep that honest.
 
-## The 27 gates (123 tunable rules)
+## The 27 gates (124 tunable rules)
 
 | Gate | Rules | Plugin |
 |---|---|---|
@@ -300,7 +300,7 @@ else, and making them its first consumer is the only way to keep that honest.
 | `stress i18n` | 3 | markup |
 | `stress media` | 2 | markup |
 | `check tokens` | 2 | markup |
-| `check design` | 3 | markup |
+| `check design` | 4 | markup |
 | `check story` | 4 | markup |
 | `check theme` | 2 | markup |
 | `check asset` | 7 | markup |

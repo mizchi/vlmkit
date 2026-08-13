@@ -50,6 +50,15 @@ docs/design/design-policy-metrics.md`,
       severity: "info",
       docs: "Info by default — a one-off value is normal in real pages.",
     },
+    {
+      id: "nothing-judged",
+      title: "No role had enough instances to judge, so the reuse check ran on nothing",
+      severity: "info",
+      docs:
+        "Info by default — a genuinely small page is not a defect. Raise to suspect to"
+        + " enforce that this gate must actually measure something, which is what stops a"
+        + " --min-instances / --allow combination from reporting green forever in silence.",
+    },
     { id: "redirected", title: "Requested URL redirected elsewhere", severity: "suspect" },
   ],
   inputs: [
