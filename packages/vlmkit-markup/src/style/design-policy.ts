@@ -78,6 +78,12 @@ export interface DesignPolicyInput {
    * Reported, never silent — the gate's coverage has to be legible.
    */
   skipped: number;
+  /**
+   * Those same skipped elements tallied by tag name. The bare count cannot
+   * distinguish "this page is divs and paragraphs" from "the measurement
+   * broke", and that is the question a reader actually has.
+   */
+  skippedTags?: Record<string, number>;
   /** Elements skipped for being in a non-resting state. */
   statefulSkipped: number;
   /**
@@ -124,6 +130,14 @@ export interface DesignPolicyReport {
   }[];
   findings: DesignFinding[];
   skipped: number;
+  /** Skipped elements by tag, most first — the shape of the blind spot. */
+  skippedTags: { tag: string; count: number }[];
+  /**
+   * Elements that DID carry an inferable role, i.e. what the verdict rests on.
+   * Printed as a fraction of everything considered, because a verdict drawn
+   * from 2 of 30 elements is worth knowing about before it is trusted.
+   */
+  judgedElements: number;
   statefulSkipped: number;
   exclusions: { selector: string; matches: number; elements: number }[];
   excludedElements: number;
@@ -302,6 +316,11 @@ export const COLLECT_DESIGN_SAMPLES = `(() => {
     return null;
   };
   const samples = [], spacing = [];
+  // Tally the skipped elements BY TAG. \`skipped: 28\` alone is uninterpretable —
+  // v6's adopting agent could not tell whether 28 of 30 meant "the page is
+  // ordinary layout markup" or "the measurement broke". \`div x24, p x3\` answers
+  // it at a glance, and answers it with the page's own markup rather than prose.
+  const skippedTags = {};
   let skipped = 0, statefulSkipped = 0, excludedElements = 0;
   for (const el of document.querySelectorAll("body *")) {
     // The FIRST matching selector owns the element, so the per-selector counts
@@ -322,7 +341,12 @@ export const COLLECT_DESIGN_SAMPLES = `(() => {
       if (v > 0) spacing.push({ selector: path(el), property: prop, value: v });
     }
     const role = roleOf(el);
-    if (!role) { skipped++; continue; }
+    if (!role) {
+      skipped++;
+      const tag = el.tagName.toLowerCase();
+      skippedTags[tag] = (skippedTags[tag] || 0) + 1;
+      continue;
+    }
     if (el.matches && el.matches(STATE)) { statefulSkipped++; continue; }
     // Rendered height is deliberately NOT in the signature: a button that is
     // taller only because its label wrapped is not a design inconsistency.
@@ -346,7 +370,7 @@ export const COLLECT_DESIGN_SAMPLES = `(() => {
         + ", border " + box[5] + ", bg " + box[6],
     });
   }
-  return { samples, spacing, skipped, statefulSkipped, exclusions, excludedElements };
+  return { samples, spacing, skipped, skippedTags, statefulSkipped, exclusions, excludedElements };
 })()`;
 
 export function buildDesignSampleScript(excludeSelectors: readonly string[] = []): string {
@@ -667,6 +691,10 @@ export function judgeDesignPolicy(
     roles,
     findings,
     skipped: input.skipped,
+    skippedTags: Object.entries(input.skippedTags ?? {})
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag)),
+    judgedElements: input.samples.length,
     statefulSkipped: input.statefulSkipped,
     exclusions: input.exclusions ?? [],
     excludedElements: input.excludedElements ?? 0,
@@ -738,8 +766,39 @@ export function formatDesignReport(report: DesignPolicyReport): string {
     + ` (${report.findings.length} finding(s)${bad > 0 ? `, ${bad} suspect` : ""}`
     + `${report.excludedElements > 0 ? `, ${report.excludedElements} element(s) excluded` : ""})`,
   );
-  lines.push(`${DIM}  roles judged: ${report.roles.length}, spacing values: ${report.spacingValues},`
-    + ` skipped: ${report.skipped} (no inferable role), ${report.statefulSkipped} (non-resting state)${RESET}`);
+  lines.push(`${DIM}  roles judged: ${report.roles.length}, spacing values: ${report.spacingValues}${RESET}`);
+  // `skipped: 28 (no inferable role)` was the whole of this before, and v6's
+  // adopting agent could not act on it: "28 of 30 elements skipped means the
+  // verdict rests on almost nothing, and nothing says whether that is normal."
+  // Three things fix that, in order of how fast they answer it: the fraction
+  // (how much of the page the verdict covers), the tags (what the skipped
+  // elements ARE), and one line saying where a role comes from at all.
+  const considered = report.judgedElements + report.skipped + report.statefulSkipped;
+  lines.push(
+    `${DIM}  coverage: ${report.judgedElements} of ${considered} visible element(s) carried an`
+    + ` inferable role${report.statefulSkipped > 0 ? `; ${report.statefulSkipped} skipped as non-resting` : ""}${RESET}`,
+  );
+  if (report.skippedTags.length > 0) {
+    const shown = report.skippedTags.slice(0, 6).map((t) => `${t.tag} x${t.count}`).join(", ");
+    const rest = report.skippedTags.length - 6;
+    lines.push(`${DIM}    no role: ${shown}${rest > 0 ? `, +${rest} more tag(s)` : ""}${RESET}`);
+  }
+  if (report.skipped > 0) {
+    // Kept next to the tally rather than in the docs, because the reader needing
+    // it is looking at a number they did not expect. This mirrors `roleOf` in the
+    // browser script above — if that list grows, this sentence grows with it.
+    lines.push(
+      `${DIM}    A role comes from role="..." or from button/input/select/textarea/h1-h6.`
+      + ` Layout elements${RESET}`,
+    );
+    lines.push(
+      `${DIM}    (div, span, p, a) have none, so a large skip count is normal —`
+      + ` this gate judges components,${RESET}`,
+    );
+    lines.push(
+      `${DIM}    not every box. Add role="..." where an element IS a component to widen the coverage.${RESET}`,
+    );
+  }
   if (report.textFreeSamples > 0) {
     lines.push(
       `${DIM}  text-free: ${report.textFreeSamples} (${report.textFreeFolded} judged on box alone —`

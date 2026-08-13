@@ -1115,9 +1115,15 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - HAR 経路があるので今回は回避できたが、HAR を思いつかなければ
     start / trap kill / poll-for-ready を手で書くことになる。
 
-- [ ] **`skipped: 28 (no inferable role)` が解釈できない**
-  - 30要素中28スキップは verdict がほぼ何も見ていないことを意味するが、それが正常かどうかを
-    何も言わない。
+- [x] **`skipped: 28 (no inferable role)` が解釈できない** → coverage 行 + タグ内訳 + 一行説明
+  - `coverage: 18 of 141 visible element(s) carried an inferable role` /
+    `no role: a x37, td x21, div x19, span x18, ...` /
+    role の出どころ(`role="..."` か button/input/select/textarea/h1-h6)と
+    「div/span/p/a には無いので skip が多いのは正常」の一行。
+  - 数字だけでは「div ばかりのページ」と「計測が壊れた」を区別できないのが本質だった。
+    タグ内訳はページ自身のマークアップで即答する。
+  - 元の指摘: 30要素中28スキップは verdict がほぼ何も見ていないことを意味するが、それが
+    正常かどうかを何も言わない。
 
 - [ ] **`rules` に first-class な `reason`(と `expires`)**
   - `//` コメントキーは通るようにしたが、`suppressions` の

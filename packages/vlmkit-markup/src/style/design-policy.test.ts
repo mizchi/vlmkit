@@ -15,6 +15,9 @@ import {
   type DesignSpacingSample,
 } from "./design-policy.ts";
 
+/** Colour codes out, so an assertion on the prose is not an assertion on the palette. */
+const plain = (text: string): string => text.replace(/\u001B\[[0-9;]*m/g, "");
+
 const sample = (role: string, signature: string, selector = `.${role}-${signature}`): DesignSample => ({
   role,
   selector,
@@ -396,6 +399,29 @@ describe("judgeDesignPolicy — coverage reporting", () => {
     assert.equal(report.skipped, 1490);
     assert.equal(report.statefulSkipped, 4);
   });
+
+  it("tallies the skipped elements by tag, most first", () => {
+    // The bare count could not distinguish "this page is divs" from "the
+    // measurement broke", which is the question a reader actually has.
+    const report = judgeDesignPolicy(input({
+      skipped: 28,
+      skippedTags: { span: 1, div: 24, p: 3 },
+    }));
+    assert.deepEqual(report.skippedTags, [
+      { tag: "div", count: 24 },
+      { tag: "p", count: 3 },
+      { tag: "span", count: 1 },
+    ]);
+  });
+
+  it("reports what the verdict rests on, not only what it skipped", () => {
+    const report = judgeDesignPolicy(input({
+      samples: [sample("button", "a"), sample("button", "a")],
+      skipped: 28,
+      skippedTags: { div: 28 },
+    }));
+    assert.equal(report.judgedElements, 2);
+  });
 });
 
 describe("design sample collector", () => {
@@ -419,6 +445,30 @@ describe("formatDesignReport", () => {
     assert.match(text, /Informational/);
     assert.match(text, /does not carry the verdict/);
     assert.ok(text.indexOf("component-drift") < text.indexOf("Informational"));
+  });
+
+  it("makes a thin coverage figure interpretable instead of printing a bare skip count", () => {
+    // v6's adopting agent on the old line: "28 of 30 elements skipped means the
+    // verdict rests on almost nothing, and nothing says whether that is normal."
+    const judged = judgeDesignPolicy(input({
+      samples: [sample("button", "a"), sample("button", "a")],
+      skipped: 28,
+      skippedTags: { div: 24, p: 3, span: 1 },
+    }));
+    const text = plain(formatDesignReport({ source: "fixture.html", ...judged }));
+    assert.match(text, /coverage: 2 of 30 visible element\(s\) carried an inferable role/);
+    assert.match(text, /no role: div x24, p x3, span x1/);
+    // The one thing the count alone could never say: whether to worry.
+    assert.match(text, /a large skip count is normal/);
+    assert.match(text, /role="\.\.\." or from button\/input\/select\/textarea\/h1-h6/);
+  });
+
+  it("leaves the role-inference explainer out when nothing was skipped", () => {
+    const judged = judgeDesignPolicy(input({ samples: [sample("button", "a"), sample("button", "a")] }));
+    const text = plain(formatDesignReport({ source: "fixture.html", ...judged }));
+    assert.match(text, /coverage: 2 of 2 visible element\(s\)/);
+    assert.doesNotMatch(text, /a large skip count is normal/);
+    assert.doesNotMatch(text, /no role:/);
   });
 
   it("says so plainly when nothing drifted", () => {

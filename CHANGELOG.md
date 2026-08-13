@@ -91,6 +91,17 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **`check design` says how much of the page its verdict covers.** The old line
+  was `skipped: 123 (no inferable role)` and nothing more, which cannot
+  distinguish "this page is links and table cells" from "the measurement broke"
+  — the reader's actual question. It now prints the fraction
+  (`coverage: 18 of 141 visible element(s) carried an inferable role`), the
+  skipped elements tallied **by tag** (`no role: a x37, td x21, div x19,
+  span x18, ...`), and, only when something was skipped, where a role comes
+  from at all: `role="..."` or `button`/`input`/`select`/`textarea`/`h1`-`h6`.
+  `div`/`span`/`p`/`a` have none, so a large skip count is normal — the gate
+  judges components, not every box, and the way to widen coverage is to add
+  `role="..."` where an element *is* a component.
 - **`check design --allow "<selector>;<reason>"`** declares one instance's
   deviation deliberate. `--min-reuse` was documented as the lever for this
   (`examples/vlmkit.gates.json` recommends `--min-reuse 2` for approved button
