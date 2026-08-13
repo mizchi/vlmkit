@@ -97,7 +97,13 @@ const COMMON_ON_PROPS = [
  * Serialize the recorded registrations + on*-scan into a per-element
  * surface. Runs AFTER DISCOVER_SCRIPT so data-vlmkit-ix stamps exist.
  */
-const COLLECT_SURFACE_SCRIPT = `
+/**
+ * The browser-side half. Exported so a consumer with its own `Page` can
+ * `evaluate` it and hand the result to `deriveHandlerIssues` — see
+ * `@mizchi/vlmkit-markup/rules`. Pair it with `DISCOVER_SCRIPT` from
+ * `interaction-map`, which stamps the interactive elements this cross-references.
+ */
+export const COLLECT_SURFACE_SCRIPT = `
 (() => {
   const ON_PROPS = ${JSON.stringify(COMMON_ON_PROPS)};
   const perElement = new Map();

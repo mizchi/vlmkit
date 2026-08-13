@@ -46,6 +46,10 @@
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
     },
+    "./rules": {
+      "types": "./dist/rules.d.mts",
+      "import": "./dist/rules.mjs"
+    },
     "./*.ts": {
       "types": "./dist/*.d.mts",
       "import": "./dist/*.mjs"
