@@ -30,6 +30,51 @@ function surface(...elements: HandlerSurfaceEntry[]): HandlerSurface {
   return { source: "x.html", elements, globals: {}, totalRegistrations: elements.length };
 }
 
+test("controls present with zero handlers is a finding, not an `ok`", () => {
+  // v7's agent-l, on a console whose three buttons were all inert:
+  // "`registrations: 0 across 0 element(s)` → status **ok**; zero listeners on a
+  // 3-button page is the finding." The gate only ever inventoried elements that
+  // already had a handler, so a static document and a page of dead buttons
+  // produced identical output.
+  const issues = deriveHandlerIssues({
+    source: "x.html",
+    elements: [],
+    globals: {},
+    totalRegistrations: 0,
+    visibleControls: 3,
+  });
+  const found = issues.find((i) => i.kind === "no-handlers-found")!;
+  assert.ok(found, "3 controls and no handlers must report");
+  assert.equal(found.severity, "warn", "a form that posts is a real page");
+  // Names all three explanations, because only one is a defect and this gate
+  // cannot tell which from here.
+  assert.match(found.message, /inert-control/);
+  assert.match(found.message, /cannot see/);
+  assert.match(found.message, /genuinely needs none/);
+});
+
+test("a page with no controls at all reports nothing — there is no denominator", () => {
+  const issues = deriveHandlerIssues({
+    source: "x.html",
+    elements: [],
+    globals: {},
+    totalRegistrations: 0,
+    visibleControls: 0,
+  });
+  assert.equal(issues.filter((i) => i.kind === "no-handlers-found").length, 0);
+});
+
+test("controls that ARE wired do not report", () => {
+  const issues = deriveHandlerIssues({
+    source: "x.html",
+    elements: [entry({ ix: 3 })],
+    globals: {},
+    totalRegistrations: 1,
+    visibleControls: 1,
+  });
+  assert.equal(issues.filter((i) => i.kind === "no-handlers-found").length, 0);
+});
+
 test("pointer-only control: role-less clickable div is a suspect", () => {
   const issues = deriveHandlerIssues(surface(entry({})));
   assert.ok(issues.some((i) => i.kind === "pointer-only-control" && i.severity === "suspect"));

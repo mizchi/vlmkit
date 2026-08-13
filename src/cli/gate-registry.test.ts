@@ -79,7 +79,7 @@ describe("composed built-in registry", () => {
     }
   });
 
-  it("declares 124 tunable rules in total", async () => {
+  it("declares 125 tunable rules in total", async () => {
     // A canary, not a target: a gate losing its rule table to a bad merge is
     // otherwise invisible until someone tries to tune it.
     // 119 → 120 when `check copy` gained `copy-truncated` (element-rect mode, vlmkit#118).
@@ -90,7 +90,7 @@ describe("composed built-in registry", () => {
     // 122 → 123 when `check integrity` gained `stale-har-fixture`, so a request absent
     // from a `--har` recording stops reading as a broken resource on the page.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 124);
+    assert.equal(total, 125);
   });
 
   it("gives every built-in gate a category", async () => {

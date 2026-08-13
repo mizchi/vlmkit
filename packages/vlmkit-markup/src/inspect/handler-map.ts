@@ -64,6 +64,13 @@ export interface HandlerSurface {
   /** window/document registrations: type -> count. */
   globals: Record<string, number>;
   totalRegistrations: number;
+  /**
+   * Visible interactive controls the page presents, handler or not.
+   *
+   * The denominator `registrations: 0 across 0 element(s)` was missing: a static
+   * document and a page of dead buttons both printed zero, and both read `ok`.
+   */
+  visibleControls?: number;
 }
 
 /** Install BEFORE page scripts run (page.addInitScript). */
@@ -159,7 +166,28 @@ const COLLECT_SURFACE_SCRIPT = `
       insideInteractive: !!(el.parentElement && el.parentElement.closest("[data-vlmkit-ix]")),
     });
   }
-  return { elements: out, globals, total };
+  // How many controls the page PRESENTS, whether or not any handler was found.
+  //
+  // Without this, a page of three inert buttons reported "registrations: 0 across
+  // 0 element(s)" and "status: ok" — v7's agent-l: "zero listeners on a 3-button
+  // page is the finding." The gate could not say it, because it only ever
+  // inventoried elements that already had a handler; a page with no controls and a
+  // page whose controls are all dead produced identical output.
+  //
+  // Native controls plus anything carrying an interactive ARIA role, which is the
+  // same population "check interactions" discovers.
+  const CONTROL_SELECTOR = 'button, a[href], input:not([type="hidden"]), select, textarea,'
+    + ' summary, [role="button"], [role="link"], [role="menuitem"], [role="tab"],'
+    + ' [role="checkbox"], [role="radio"], [role="switch"], [tabindex]:not([tabindex="-1"])';
+  let controls = 0;
+  for (const el of document.querySelectorAll(CONTROL_SELECTOR)) {
+    const cs = getComputedStyle(el);
+    if (cs.display === "none" || cs.visibility === "hidden") continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) continue;
+    controls++;
+  }
+  return { elements: out, globals, total, controls };
 })()
 `;
 
@@ -188,12 +216,14 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
       elements: HandlerSurfaceEntry[];
       globals: Record<string, number>;
       total: number;
+      controls: number;
     };
     return {
       source: options.source,
       elements: raw.elements,
       globals: raw.globals,
       totalRegistrations: raw.total,
+      visibleControls: raw.controls,
     };
   });
 }
@@ -208,7 +238,7 @@ const KEYBOARD_TYPES = new Set(["keydown", "keyup", "keypress"]);
 export const PROBED_TYPES = new Set(["click", "keydown", "keyup", "keypress", "focus", "blur"]);
 
 export interface HandlerIssue {
-  kind: "pointer-only-control" | "unprobed-handler-types" | "delegated-handlers-opaque";
+  kind: "pointer-only-control" | "unprobed-handler-types" | "delegated-handlers-opaque" | "no-handlers-found";
   severity: "warn" | "suspect";
   element: string;
   message: string;
@@ -288,6 +318,34 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
       severity: "warn",
       element: "(page)",
       message: `Handler types registered but NOT covered by the interaction probes: ${[...unprobedTypes].sort().join(", ")} — verify those paths manually or with an interact sequence.`,
+    });
+  }
+  // Controls present, no handlers anywhere. v7's agent-l, on a console whose three
+  // buttons were all inert: "`registrations: 0 across 0 element(s)` → status **ok**;
+  // zero listeners on a 3-button page is the finding."
+  //
+  // Three things produce it and the finding names all three, because only one is a
+  // defect and the gate cannot tell which from here: the controls are dead (a real
+  // defect, and `check interactions` reports it as `inert-control`), the handlers are
+  // wired somewhere this gate cannot attribute (already covered above when a
+  // delegation root IS visible — this fires when there is not even that), or the page
+  // legitimately has none, e.g. a form that posts.
+  //
+  // `warn`, not `suspect`: a page of links and a submit-only form is a real page, and
+  // failing it would be its own bad message. The count is what was missing.
+  const controls = surface.visibleControls ?? 0;
+  if (controls > 0 && surface.totalRegistrations === 0) {
+    issues.push({
+      kind: "no-handlers-found",
+      severity: "warn",
+      element: "(page)",
+      message:
+        `${controls} visible interactive control(s) and ZERO handler registrations —`
+        + ` no listeners, no on* attributes, no on* properties, nothing on window/document.`
+        + ` Either the controls are inert (check interactions reports that as inert-control),`
+        + ` or they are wired somewhere this gate cannot see, or the page genuinely needs none`
+        + ` (links, a form that posts). This gate cannot tell which; it can only tell you that`
+        + ` a clean result here is not evidence of anything.`,
     });
   }
   return issues;
@@ -384,8 +442,26 @@ export function formatHandlerSurface(surface: HandlerSurface, issues: HandlerIss
   lines.push(`${DIM}source: ${surface.source}${RESET}`);
   lines.push("");
   const suspects = issues.filter((i) => i.severity === "suspect").length;
-  lines.push(`status: ${suspects === 0 ? `${GREEN}ok${RESET}` : `${RED}${suspects} suspect issue(s)${RESET}`}`);
-  lines.push(`registrations: ${surface.totalRegistrations} across ${surface.elements.length} element(s)${Object.keys(surface.globals).length > 0 ? ` + globals` : ""}`);
+  // `ok` only when there is nothing at all. It used to print green beside a warn,
+  // which is the same self-contradiction `check design` had — a headline that the
+  // lines under it disagree with.
+  const warns = issues.length - suspects;
+  lines.push(
+    `status: ${
+      suspects > 0
+        ? `${RED}${suspects} suspect issue(s)${warns > 0 ? `, ${warns} warn` : ""}${RESET}`
+        : warns > 0
+          ? `${YELLOW}${warns} warn(s)${RESET}`
+          : `${GREEN}ok${RESET}`
+    }`,
+  );
+  // The control count is the denominator. `registrations: 0 across 0 element(s)`
+  // read the same for a static document and for a page whose buttons are all dead.
+  lines.push(
+    `registrations: ${surface.totalRegistrations} across ${surface.elements.length} element(s)`
+    + `${Object.keys(surface.globals).length > 0 ? ` + globals` : ""}`
+    + `${surface.visibleControls !== undefined ? `, on a page presenting ${surface.visibleControls} control(s)` : ""}`,
+  );
   lines.push("");
   for (const e of surface.elements) {
     const types = Object.entries(e.types).map(([t, n]) => (n > 1 ? `${t}×${n}` : t)).join(", ");

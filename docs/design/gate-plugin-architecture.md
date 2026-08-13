@@ -280,7 +280,7 @@ The built-ins load through the same `createGateRegistry([...])` call. If the
 contract were not sufficient for them it would not be sufficient for anyone
 else, and making them its first consumer is the only way to keep that honest.
 
-## The 27 gates (124 tunable rules)
+## The 27 gates (125 tunable rules)
 
 | Gate | Rules | Plugin |
 |---|---|---|
@@ -294,7 +294,7 @@ else, and making them its first consumer is the only way to keep that honest.
 | `check breakpoints` | 5 | markup |
 | `check scroll` | 4 | markup |
 | `scan scroll` | 4 | markup |
-| `scan handlers` | 3 | markup |
+| `scan handlers` | 4 | markup |
 | `check motion` | 3 | markup |
 | `check animation` | 5 | markup |
 | `stress i18n` | 3 | markup |

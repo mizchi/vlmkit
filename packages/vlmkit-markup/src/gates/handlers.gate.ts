@@ -54,6 +54,14 @@ Components property.`,
       docs: "Expected on React-style apps: the surface is measurable, just not per element.",
     },
     { id: "unprobed-handler-types", title: "Event types this gate does not probe", severity: "warn" },
+    {
+      id: "no-handlers-found",
+      title: "The page presents controls and registers no handlers at all",
+      severity: "warn",
+      docs:
+        "Warn, not suspect: a page of links and a form that posts legitimately needs none."
+        + " Raise to suspect on an app where every control is expected to be wired.",
+    },
   ],
   inputs: [
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to scan", positional: 0, required: true },
