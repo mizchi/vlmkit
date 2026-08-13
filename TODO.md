@@ -1121,9 +1121,21 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     既に ignore 済み / git リポジトリでない場合は何も出さない。
     `--ledger` で移した場合は、書いていない2ディレクトリではなく実際のパスを案内する。
 
-- [ ] **`vlmkit.gates.json` に `webServer` 相当が無い**(Playwright には昔からある)
+- [x] **`vlmkit.gates.json` に `webServer` 相当が無い**(Playwright には昔からある)→ 追加
   - HAR 経路があるので今回は回避できたが、HAR を思いつかなければ
     start / trap kill / poll-for-ready を手で書くことになる。
+  - Playwright と同じ名前・同じ形(`command` / `url` / `timeout` /
+    `reuseExistingServer` / `cwd` / `env`)。一度書いた人が語彙を学び直さないため。
+  - **意図的な差分2点**: (1) `url` は必須(`port` の代替を用意しない)。
+    「起動した」が「配信している」を意味しないと最初のゲートが bundler と競合し、
+    その flake は本物の findings と区別できない。(2) URL が応答する前にコマンドが
+    終了した場合は**終了コードで報告**する。タイムアウトは「走らなかったコマンド」の
+    誤診断なので。
+  - プロセスグループごと起動・停止する(`npm run dev` → bundler → watcher が
+    ポートを握ったまま残らない)。throw / Ctrl-C でも必ず停止する —
+    残留サーバは次回 `reuseExistingServer` に拾われて古いビルドを黙って gate するので、
+    機能が無かったことより悪い。
+  - `gates list` は起動せずに宣言だけ表示する。
 
 - [x] **`skipped: 28 (no inferable role)` が解釈できない** → coverage 行 + タグ内訳 + 一行説明
   - `coverage: 18 of 141 visible element(s) carried an inferable role` /

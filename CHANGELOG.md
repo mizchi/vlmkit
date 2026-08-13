@@ -91,6 +91,25 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **`vlmkit.gates.json` takes a `webServer` block** — start a dev server before
+  `gates run`, stop it after, including on a thrown error or Ctrl-C. Playwright
+  has had this for years and this config did not, so a config declaring URL
+  sources still needed a wrapper script doing start / trap kill /
+  poll-for-ready, once per CI job. v6's adopting agent got around it with a HAR
+  recording and said the HAR was what made it moot. Shaped and named after
+  Playwright's on purpose: `command`, `url`, `timeout`, `reuseExistingServer`,
+  `cwd`, `env`. Two departures, both deliberate — `url` is **required** (there is
+  no `port` alternative) because "started" has to mean "serving" or the first
+  gate races the bundler and produces a flake indistinguishable from a finding;
+  and a command that exits before the URL answers is reported with its exit code
+  rather than after the full timeout, since a timeout is the wrong diagnosis for
+  a command that never ran. `reuseExistingServer` defaults to true locally and
+  false under CI, as Playwright's does. The server is spawned in its own process
+  group and torn down as a group, so `npm run dev` → bundler → watcher does not
+  survive as a held port. `vlmkit gates list` names the server without starting
+  it, and `vlmkit gates run` never leaves one behind — a leaked server would be
+  adopted by the next run via `reuseExistingServer`, silently gating a stale
+  build, which is worse than the missing feature was.
 - **A `rules` entry can carry `reason`, `owner` and `expires`, and an expired one
   is dropped.** `suppressions` had all three from the start; `rules` — the
   narrow, gate-agnostic instrument, and the one a false positive actually calls

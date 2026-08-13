@@ -67,7 +67,45 @@ export interface GatePage {
   ruleAnnotations?: Readonly<Record<string, RuleSettingEntry>>;
 }
 
+/**
+ * A dev server to start before the run and stop after it — Playwright's
+ * `webServer`, which it has had for years and this config did not.
+ *
+ * v6's adopting agent got around it with a HAR, and said so: without that idea
+ * you are hand-writing start / trap-kill / poll-for-ready in a shell wrapper,
+ * per CI job. A config that declares which URLs to gate but cannot say how to
+ * bring them up is only half committed.
+ *
+ * Named and shaped after Playwright's on purpose. A team that has written one
+ * should not have to learn a second vocabulary to write this one.
+ */
+export interface GateWebServer {
+  /** Shell command that starts the server. */
+  command: string;
+  /**
+   * URL polled until it answers. Required — "started" has to mean "serving",
+   * not "spawned", or the first gate races the bundler.
+   */
+  url: string;
+  /** Milliseconds to wait for `url` before giving up. Default 60000. */
+  timeout?: number;
+  /**
+   * Reuse a server already listening on `url` instead of starting one.
+   *
+   * Defaults to true locally and FALSE in CI (`process.env.CI`), matching
+   * Playwright: locally you want your own `npm run dev`; in CI a listening port
+   * usually means a leaked process from an earlier job, and reusing it silently
+   * gates the wrong build.
+   */
+  reuseExistingServer?: boolean;
+  /** Working directory for `command`. Relative to the config file. Default: the config's directory. */
+  cwd?: string;
+  /** Extra environment for the server process, on top of the current one. */
+  env?: Readonly<Record<string, string>>;
+}
+
 export interface GateConfig {
+  webServer?: GateWebServer;
   defaults?: {
     gates?: string[];
     suppressions?: GateSuppression[];
@@ -222,7 +260,58 @@ export function parseGateConfig(raw: string): GateConfig {
     }
     return page;
   });
-  return { ...(Object.keys(defaults).length > 0 ? { defaults } : {}), pages };
+  return {
+    ...(root.webServer !== undefined ? { webServer: parseWebServer(root.webServer) } : {}),
+    ...(Object.keys(defaults).length > 0 ? { defaults } : {}),
+    pages,
+  };
+}
+
+function parseWebServer(raw: unknown): GateWebServer {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) fail("webServer", "must be an object");
+  const w = raw as Record<string, unknown>;
+  if (typeof w.command !== "string" || !w.command.trim()) fail("webServer", "command is required");
+  // Required, unlike Playwright's (which accepts `port` as an alternative).
+  // "Started" has to mean "serving": without a readiness probe the first gate
+  // races the bundler, and a flake there is indistinguishable from a real finding.
+  if (typeof w.url !== "string" || !/^https?:\/\//.test(w.url)) {
+    fail("webServer", `url is required and must be http(s), got ${JSON.stringify(w.url)}`);
+  }
+  const server: GateWebServer = { command: w.command.trim(), url: w.url.trim() };
+  if (w.timeout !== undefined) {
+    if (typeof w.timeout !== "number" || !Number.isFinite(w.timeout) || w.timeout <= 0) {
+      fail("webServer", `timeout must be a positive number of ms, got ${JSON.stringify(w.timeout)}`);
+    }
+    server.timeout = w.timeout;
+  }
+  if (w.reuseExistingServer !== undefined) {
+    if (typeof w.reuseExistingServer !== "boolean") fail("webServer", "reuseExistingServer must be a boolean");
+    server.reuseExistingServer = w.reuseExistingServer;
+  }
+  if (w.cwd !== undefined) {
+    if (typeof w.cwd !== "string" || !w.cwd.trim()) fail("webServer", "cwd must be a non-empty string");
+    server.cwd = w.cwd.trim();
+  }
+  if (w.env !== undefined) {
+    if (typeof w.env !== "object" || w.env === null || Array.isArray(w.env)) fail("webServer.env", "must be an object");
+    const env: Record<string, string> = {};
+    for (const [key, value] of Object.entries(w.env as Record<string, unknown>)) {
+      if (typeof value !== "string") fail(`webServer.env["${key}"]`, `must be a string, got ${JSON.stringify(value)}`);
+      env[key] = value;
+    }
+    server.env = env;
+  }
+  return server;
+}
+
+/**
+ * Whether to reuse a server already listening. Playwright's default, and for
+ * Playwright's reason: locally the listening port is your own `npm run dev`; in
+ * CI it is usually a leaked process from an earlier job, and reusing it gates a
+ * build nobody asked about.
+ */
+export function shouldReuseExistingServer(server: GateWebServer, env = process.env): boolean {
+  return server.reuseExistingServer ?? !env.CI;
 }
 
 /** UTC midnight, so "expires today" behaves the same in every timezone. */

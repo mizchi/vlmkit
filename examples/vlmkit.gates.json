@@ -1,6 +1,13 @@
 {
   "//": "Worked example for `vlmkit gates`. Copy to your repo root as vlmkit.gates.json. Docs: docs/cli-reference.md#gates-config",
 
+  "//webServer": "Optional. Starts a dev server before `gates run` and stops it after, including on Ctrl-C -- so a config with URL sources is committable on its own instead of needing a shell wrapper that does start / trap kill / poll-for-ready. Shaped after Playwright's. `url` is required and polled until it answers (any HTTP status counts), so \"started\" means \"serving\". `reuseExistingServer` defaults to true locally and false under CI: locally the listening port is your own dev server, in CI it is usually a leak from an earlier job.",
+  "webServer": {
+    "command": "npm run dev",
+    "url": "http://localhost:5173/",
+    "timeout": 60000
+  },
+
   "defaults": {
     "//": "Gates every page gets unless it overrides `gates`. `extraGates` adds on top.",
     "gates": [

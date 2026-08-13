@@ -35,6 +35,7 @@ import {
   summarizeSuppressions,
 } from "@mizchi/vlmkit-core/gate-config.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { formatWebServerPlan, withWebServer } from "./web-server.ts";
 import {
   type BatchSummary,
   formatBatchSummary,
@@ -378,10 +379,16 @@ pages, plus every suppression in one auditable place.
                     --soon <days>       Highlight entries expiring within N days (30)
                     --require-expiry    Fail on permanent (never-reviewed) entries
                     --require-owner     Fail on entries with no owner
-  run             Run the plan in parallel
+  run             Run the plan in parallel (starts \`webServer\` first, if declared)
                     --only <text>       Pages whose id/source contains this, repeatable
                     --concurrency <n> --shard <i/n> --output <dir>
                     --advisory          Exit 0 even on failures / stale config
+
+\`webServer\` in the config starts a dev server before the run and stops it after,
+including on Ctrl-C: { "command": "npm run dev", "url": "http://localhost:5173/",
+"timeout": 60000, "reuseExistingServer": true }. \`url\` is required and is polled
+until it answers, so "started" means "serving" rather than "spawned".
+\`reuseExistingServer\` defaults to true locally and false under CI, as Playwright's does.
 
 Common: --config <file> --json
 
@@ -424,7 +431,12 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
 
   if (sub === "list") {
     if (json) console.log(JSON.stringify({ config: path, ...plan }, null, 2));
-    else console.log(formatPlan(plan, path));
+    else {
+      console.log(formatPlan(plan, path));
+      // On `list` rather than only on `run`, because "what would this do" has to
+      // include "and it will start a server".
+      if (config.webServer) console.log(`\n${formatWebServerPlan(config.webServer)}`);
+    }
     return;
   }
 
@@ -468,15 +480,19 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
     console.error(formatExpiredNotice(sharded.expired));
     console.error("");
   }
-  const summary: BatchSummary = await runJobs(
-    sharded.jobs.map((j) => ({ gate: j.gate, page: j.source, cwd: baseDir })),
-    {
-      ...(concurrency !== undefined ? { concurrency } : {}),
-      ...(shard ? { shard } : {}),
-      ...(output ? { output } : {}),
-      quiet: hasFlag(args, "quiet") || json,
-    },
-  );
+  // The server comes up before the jobs and goes down after them, including on a
+  // throw or a Ctrl-C. Started here rather than per job: every gate in the plan
+  // shares it, and starting one per job would both be slow and fight for the port.
+  const summary: BatchSummary = await withWebServer(config.webServer, baseDir, () =>
+    runJobs(
+      sharded.jobs.map((j) => ({ gate: j.gate, page: j.source, cwd: baseDir })),
+      {
+        ...(concurrency !== undefined ? { concurrency } : {}),
+        ...(shard ? { shard } : {}),
+        ...(output ? { output } : {}),
+        quiet: hasFlag(args, "quiet") || json,
+      },
+    ));
   const stale = sharded.expired.length;
   if (json) console.log(JSON.stringify({ config: path, expiredSuppressions: stale, ...summary }, null, 2));
   else {
