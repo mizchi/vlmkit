@@ -1098,10 +1098,13 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - 実測:never-idle ページに対して scaffold した設定が `gates run` で実際に走り、
     `1 FAILED`(ページ本来の欠陥)を報告する。修正前は全ゲートが 30 秒で死んでいた。
 
-- [ ] **入力が pin されていないことを、どのゲートも言わない**
-  - 4ゲートが live URL を叩いて verdict を返すが、再実行で変わり得ることを示す表示がゼロ。
-    CI エージェントは jitter サーバを自作して出力を diff して答えを出した。
-  - 本人の提案: `gates run --repeat 2 --require-stable` が1コマンドで答える。
+- [x] **入力が pin されていないことを、どのゲートも言わない** — 修正済み(2026-08-12)
+  - runner が判定できた:ゲートが `--har` を宣言していて、argv に http(s) の source があり、
+    `--har` が渡されていない → 1行出す。`--json` では黙る。
+  - 「測る」(`--repeat 2 --require-stable`)ではなく「述べる」を選んだ。エージェントは
+    前者を提案したが、実際に答えていた問いは「これは変わり得るか」で、2回走らせずに決定できる。
+  - `--repeat/--require-stable` 自体は不要とは言い切れないが、実際に必要になった人が
+    出てから。
 
 - [x] **~~`check breakpoints` が幅ごとに再フェッチする~~ — 反証済み(2026-08-12)**
   - agent-j の主張は**誤り**だった。実測:リクエストをカウントするサーバに対して

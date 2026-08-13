@@ -20,7 +20,7 @@ import {
   resolveRules,
   validateGateDefinition,
 } from "./rules.ts";
-import { formatGateHelp, formatRuleTable, parseSharedFlags, runGate, runGateCli, stripSharedFlags, withExitIntent } from "./runner.ts";
+import { formatGateHelp, formatRuleTable, parseSharedFlags, runGate, runGateCli, stripSharedFlags, unpinnedLiveInput, withExitIntent } from "./runner.ts";
 
 interface FakeReport {
   source: string;
@@ -762,5 +762,39 @@ describe("withExitIntent", () => {
     // A findings body can legitimately quote the word; only the headline is the anchor.
     const out = withExitIntent("verdict: A\nbody\nverdict: B", "  exits 0");
     assert.deepEqual(out.split("\n"), ["verdict: A", "  exits 0", "body", "verdict: B"]);
+  });
+});
+
+describe("unpinnedLiveInput", () => {
+  const harGate = { inputs: [{ name: "source" }, { name: "har" }] } as never;
+  const noHarGate = { inputs: [{ name: "source" }] } as never;
+
+  it("says a live URL is unpinned, and how to pin it", () => {
+    // v5's CI agent was asked whether a run was reproducible and had to answer it by
+    // writing a jitter server and diffing outputs: "No gate says its input was
+    // unpinned. Four gates hit a live URL and returned verdicts with nothing
+    // indicating a re-run could differ."
+    const note = unpinnedLiveInput(harGate, ["http://localhost:5173/", "--wait-until", "load"]);
+    assert.ok(note);
+    assert.match(note!, /http:\/\/localhost:5173\/ is live and not pinned/);
+    assert.match(note!, /record-har/);
+  });
+
+  it("stays silent once the input is pinned", () => {
+    assert.equal(unpinnedLiveInput(harGate, ["http://localhost:5173/", "--har", "app.har"]), null);
+  });
+
+  it("stays silent for a local file, which has nothing to pin", () => {
+    assert.equal(unpinnedLiveInput(harGate, ["page.html"]), null);
+  });
+
+  it("stays silent for a gate that cannot replay a HAR, rather than advising a flag it lacks", () => {
+    // `check perf` and `check drift component` deliberately have no `--har`; telling
+    // them to pass one would be advice that fails.
+    assert.equal(unpinnedLiveInput(noHarGate, ["http://localhost:5173/"]), null);
+  });
+
+  it("finds the URL wherever it sits in argv", () => {
+    assert.ok(unpinnedLiveInput(harGate, ["--viewports", "375", "https://example.com/a"]));
   });
 });

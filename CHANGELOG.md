@@ -306,6 +306,10 @@ suppression works per *rule* instead of per whole gate.
   `vlmkit.gates.json` is the whole command, tokenized quote-aware, so any flag
   belongs there and is committed with the page. Only rule settings were
   documented as persistable before.
+- **A live URL says it is unpinned.** A run whose source is `http(s)`, on a gate that
+  accepts `--har`, with no `--har` passed, ends with one dim line naming the URL and
+  the `record-har` command that pins it. Decidable without running anything twice,
+  which is why it states the risk rather than measuring it.
 - **A passing run with warnings says so, directly under the verdict**:
   `exits 0 — N warn(s) did not fail this command. To gate on one: --rule
   <id>=suspect`. Silent under `--json`. The runner inserts it after the gate's

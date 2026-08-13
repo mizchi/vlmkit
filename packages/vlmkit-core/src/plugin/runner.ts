@@ -423,6 +423,29 @@ export function withExitIntent(text: string, line: string): string {
 }
 
 /**
+ * Is this run measuring a live URL that nothing has pinned?
+ *
+ * v5's CI agent was asked whether a run was reproducible and had to answer it by
+ * writing a jitter server and diffing outputs itself: "No gate says its input was
+ * unpinned. Four gates hit a live URL and returned verdicts with nothing indicating a
+ * re-run could differ."
+ *
+ * The runner can tell, from what it already has: the gate declares `--har` (so pinning
+ * is available for it), argv names an http(s) source, and no `--har` was passed. Said
+ * once per run rather than measured — the agent asked for `--repeat 2 --require-stable`,
+ * but the question it was actually answering is "could this differ", and that is
+ * decidable without running anything twice.
+ */
+export function unpinnedLiveInput(gate: AnyGateDefinition, argv: readonly string[]): string | null {
+  const acceptsHar = (gate.inputs ?? []).some((input) => input.name === "har");
+  if (!acceptsHar || argv.includes("--har")) return null;
+  const url = argv.find((arg) => /^https?:\/\//.test(arg));
+  if (!url) return null;
+  return `${DIM}  ${url} is live and not pinned — a re-run may measure different data.`
+    + ` Pin it: vlmkit snapshot record-har ${url} --out app.har, then --har app.har${RESET}`;
+}
+
+/**
  * CLI adapter: handle `--help` / `--rules`, run the gate, write the output,
  * return the exit code. A migrated gate's whole `main()` becomes one call.
  */
@@ -467,6 +490,12 @@ export async function runGateCli<Report, Options>(
     ));
   } else {
     out(outcome.text);
+  }
+  // Provenance, not verdict — so it goes after the report rather than competing with
+  // the exit-intent line for the space under the verdict.
+  if (!shared.json) {
+    const unpinned = unpinnedLiveInput(gate, argv);
+    if (unpinned) out(unpinned);
   }
   // Under --json the breakdown is already inside the envelope; appending it to
   // stdout as prose would put non-JSON on a stream a client is parsing.
