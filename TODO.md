@@ -1080,7 +1080,16 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - 導入エージェント曰く「3色に8行、というのがゲートが `--advisory` を付けられる存在に
     なる過程」。`judgeTextContrast` で (fg, bg, floor) が同じものをまとめて件数で出す。
 
-- [ ] **rule を降格しても見た目が変わらない**
+- [x] **rule を降格しても見た目が変わらない** — 修正済み(2026-08-13)、契約変更で
+  - `format(report, rules?)` に `RuleView`(`effective(ruleId)` 1問だけ)を渡す。
+    生の `AppliedRules` を渡さないのは、formatter が runner の判断を再導出して
+    食い違う余地を作らないため。
+  - 調べたら再チューニングより **`off` の方が明確な矛盾**だった:`--rule x=off` が
+    「3件 suppressed」と言いながら3件すべて印字し、verdict でも数えていた。
+  - `check integrity` が honour する:`off` はリストとカウントの両方から消える
+    (suppressed 件数は残るので「隠す」ではなく「黙らせる」)、`info` は独自の段と
+    アイコン、`suspect` は昇格。
+  - **optional** なので、引数を無視するゲートは従来どおり。27ゲート一斉移行ではない。
   - `--rule component-drift=info` は verdict には効き `re-tuned:` も出るが、所見は
     warn 形の `!` のまま、verdict も `DRIFT` のまま。`gate.format(report)` が
     applied rules を見ていないから。再現済み。

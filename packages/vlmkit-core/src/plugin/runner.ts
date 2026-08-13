@@ -23,7 +23,7 @@ import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "../terminal-colors.t
 import type { AnyGateDefinition, Finding, GateContext, GateDefinition } from "./contract.ts";
 import { gateCommandString } from "./contract.ts";
 import type { AppliedRules, FindingCounts, RuleSettings } from "./rules.ts";
-import { RULE_SETTINGS, applyRuleSettings, countFindings } from "./rules.ts";
+import { RULE_SETTINGS, applyRuleSettings, countFindings, resolveRules } from "./rules.ts";
 
 /** Flags the runner owns. A gate's `parse` never sees these as its own. */
 export const SHARED_GATE_FLAGS = ["--json", "--advisory", "--fail-on-suspect", "--rule", "--rules", "--timing", "--help", "-h"] as const;
@@ -220,7 +220,15 @@ export async function runGate<Report, Options>(
   // Prose is rendered first either way, so `formatMs` and `totalMs` hold real
   // numbers by the time the JSON payload is serialized. Under --json the prose
   // is not built at all, and `formatMs` then covers the serialization instead.
-  const prose = shared.json ? "" : [gate.format(report), formatRuleNotes(gate, rules)].filter(Boolean).join("\n");
+  // The view, not the raw AppliedRules: a formatter should ask "what is this rule worth
+  // now", not re-derive the runner's decisions and risk disagreeing with them.
+  const resolved = resolveRules(gate, settings);
+  const ruleView = {
+    effective: (ruleId: string) => resolved.decisions.get(ruleId)?.effective
+      ?? gate.rules.find((r) => r.id === ruleId)?.severity
+      ?? "warn",
+  };
+  const prose = shared.json ? "" : [gate.format(report, ruleView), formatRuleNotes(gate, rules)].filter(Boolean).join("\n");
   timing.formatMs = round(performance.now() - tFormat);
   timing.totalMs = round(performance.now() - t0);
 

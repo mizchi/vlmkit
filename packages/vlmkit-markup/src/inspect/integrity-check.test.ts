@@ -22,6 +22,7 @@ import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import {
   classifyRuntimeEvents,
   findTextCollisions,
+  formatIntegrityReport,
   judgeAlignment,
   judgeClippedText,
   judgeCollapsedContainers,
@@ -55,6 +56,9 @@ function block(partial: Partial<IntegrityTextBlock>): IntegrityTextBlock {
 
 // ---------------------------------------------------------------------------
 // Pure-function units
+
+/** ANSI out, so an assertion matches words rather than escape codes. */
+const plain = (t: string) => t.replace(/\x1B\[[0-9;]*m/g, "");
 
 describe("pure judges", () => {
   test("classifyRuntimeEvents: construction pageerror is fail, post-load is warn", () => {
@@ -233,6 +237,44 @@ describe("pure judges", () => {
     assert.deepEqual(findings.map((f) => `${f.kind}:${f.severity}`), ["invisible-text:fail", "low-contrast-text:warn"]);
     assert.equal(exempted.length, 3); // disabled + shadowed + composite aggregate
     assert.match(exempted[2]!.reason, /5 text block\(s\) skipped/);
+  });
+
+  test("formatIntegrityReport honours rule settings in the prose, not only in the exit code", () => {
+    // `--rule low-contrast-text=off` used to print `3 finding(s) suppressed by rule
+    // settings` and then print all three anyway, and count them on the verdict line.
+    // v6's adopting agent hit the re-tuning half: "the noise I re-tuned away is still in
+    // every CI log."
+    const report = {
+      source: "page.html",
+      verdict: "defects" as const,
+      viewports: [],
+      exempted: [],
+      findings: [
+        { kind: "page-overflow-x", severity: "fail" as const, viewport: 768, message: "188px" },
+        { kind: "low-contrast-text", severity: "warn" as const, viewport: 1280, message: "2.81:1" },
+      ],
+    };
+    const view = (setting: "off" | "info" | "warn" | "suspect") => ({
+      effective: (ruleId: string) => (ruleId === "low-contrast-text" ? setting : "suspect") as never,
+    });
+
+    const off = plain(formatIntegrityReport(report as never, view("off")));
+    assert.doesNotMatch(off, /low-contrast-text/, "an `off` rule must not be printed");
+    assert.match(off, /1 fail, 0 warn/, "and must not be counted");
+
+    const info = plain(formatIntegrityReport(report as never, view("info")));
+    assert.match(info, /low-contrast-text/, "an `info` rule is demoted, not silenced");
+    assert.match(info, /0 warn, 1 info/);
+    assert.match(info, /^\s+i \[low-contrast-text\]/m, "and renders with the info icon");
+
+    const promoted = plain(formatIntegrityReport(report as never, view("suspect")));
+    assert.match(promoted, /2 fail, 0 warn/, "a promotion counts as a failure");
+
+    // No view at all: exactly the previous behaviour, so a caller that has not been
+    // updated is unaffected.
+    const bare = plain(formatIntegrityReport(report as never));
+    assert.match(bare, /1 fail, 1 warn/);
+    assert.match(bare, /low-contrast-text/);
   });
 
   test("judgeTextContrast: one finding per colour pair, not per element", () => {

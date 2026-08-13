@@ -19,6 +19,17 @@ suppression works per *rule* instead of per whole gate.
 
 ### Breaking
 
+- **A gate's prose honours the project's rule settings.** `format` takes an optional
+  `RuleView` — one question, `effective(ruleId)` — so a gate that lists findings can
+  render what the settings made of them. Before, `--rule low-contrast-text=off` printed
+  `3 finding(s) suppressed by rule settings` **and then printed all three anyway**, and
+  counted them on the verdict line, because the prose renders from the gate's own report
+  while suppression happens on the runner's normalized list. `check integrity` honours it
+  now: `off` disappears from both the list and the counts (the suppression count still
+  prints, so it is silenced rather than hidden), `info` gets its own tier with its own
+  icon instead of reading as a warning, and `suspect` promotes. Optional by design — a
+  gate that ignores the argument renders exactly as before, so this is not a migration all
+  27 must do at once.
 - **`low-contrast-text` reports one finding per colour pair, not per element.** A
   three-row table used to produce three warnings differing only in the row index; three
   CSS colours produced eight lines across two gates. Identity is the colour pair plus

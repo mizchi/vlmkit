@@ -42,6 +42,7 @@ import {
   applyAllowRules,
   type IntegrityAllowRule,
 } from "./integrity-exemption.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { applyHar } from "@mizchi/vlmkit-core/page-open.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -1832,13 +1833,39 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
 // ---------------------------------------------------------------------------
 // CLI
 
-export function formatIntegrityReport(report: IntegrityReport): string {
+export function formatIntegrityReport(report: IntegrityReport, rules?: RuleView): string {
   const lines: string[] = [];
   lines.push(`${BOLD}${CYAN}vlmkit check integrity${RESET}`);
   lines.push(`${DIM}source: ${report.source}${RESET}`);
   lines.push("");
-  const fails = report.findings.filter((f) => f.severity === "fail").length;
-  const warns = report.findings.length - fails;
+  // Honour the project's rule settings in the PROSE, not only in the exit code.
+  // `--rule low-contrast-text=off` used to print `3 finding(s) suppressed by rule
+  // settings` and then print all three anyway, and count them on the verdict line —
+  // because the prose renders from this report while suppression happens on the
+  // runner's normalized finding list. v6's adopting agent hit the re-tuning half:
+  // "the noise I re-tuned away is still in every CI log."
+  //
+  // `severityFor` maps a finding kind to what the settings made of it. A gate finding
+  // kind IS the rule id here, which is what makes this a lookup rather than a guess.
+  const severityFor = (kind: string, declared: "fail" | "warn"): "fail" | "warn" | "info" | "off" => {
+    if (!rules) return declared;
+    const effective = rules.effective(kind);
+    if (effective === "off") return "off";
+    // The runner's vocabulary is suspect/warn/info; this gate's is fail/warn. `suspect`
+    // is this gate's `fail`. `info` gets its own tier rather than collapsing into
+    // `warn`: a rule demoted to informational is still worth printing, and printing it
+    // as a warning is exactly the "I re-tuned it and nothing changed" the demotion was
+    // meant to answer.
+    if (effective === "suspect") return "fail";
+    if (effective === "info") return "info";
+    return "warn";
+  };
+  const shown = report.findings
+    .map((f) => ({ finding: f, severity: severityFor(f.kind, f.severity) }))
+    .filter((f) => f.severity !== "off");
+  const fails = shown.filter((f) => f.severity === "fail").length;
+  const warns = shown.filter((f) => f.severity === "warn").length;
+  const infos = shown.length - fails - warns;
   // Three words, not two. `CLEAN` used to print whenever nothing FAILED, so a run
   // with warns read as `CLEAN (0 fail, 3 warn, 0 exempted)` — a verdict contradicting
   // its own counts, which v5's repair agent called "a coin-flip in CI" about the
@@ -1856,15 +1883,21 @@ export function formatIntegrityReport(report: IntegrityReport): string {
   // for every gate (`withExitIntent`), so stating it here too would print it twice —
   // and one gate saying it while twenty-six do not is the divergence that put the
   // `--wait-until` hint on two gates out of four.
-  lines.push(`verdict: ${word} (${fails} fail, ${warns} warn, ${report.exempted.length} exempted)`);
+  lines.push(
+    `verdict: ${word} (${fails} fail, ${warns} warn`
+    + (infos > 0 ? `, ${infos} info` : "")
+    + `, ${report.exempted.length} exempted)`,
+  );
   for (const v of report.viewports) {
     lines.push(`${DIM}  ${v.width}x${v.height}: ${v.components} component(s), ink ${(v.inkRatio * 100).toFixed(1)}%, ${v.textBlocks} text block(s)${RESET}`);
   }
-  if (report.findings.length > 0) {
+  if (shown.length > 0) {
     lines.push("");
     lines.push("Findings:");
-    for (const f of report.findings) {
-      const icon = f.severity === "fail" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
+    for (const { finding: f, severity } of shown) {
+      const icon = severity === "fail"
+        ? `${RED}x${RESET}`
+        : severity === "info" ? `${DIM}i${RESET}` : `${YELLOW}!${RESET}`;
       // Show every width it appeared at: "@1280" and "@1280,768,375" are
       // different bugs to fix, and the caller cannot tell them apart otherwise.
       const at = f.viewports && f.viewports.length > 1 ? f.viewports.join(",") : String(f.viewport);
