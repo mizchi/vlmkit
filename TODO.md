@@ -1097,10 +1097,16 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     CI エージェントは jitter サーバを自作して出力を diff して答えを出した。
   - 本人の提案: `gates run --repeat 2 --require-stable` が1コマンドで答える。
 
-- [ ] **`check breakpoints` が幅ごとに再フェッチする**
-  - 1 run で `/api/metrics` を6回叩くので、B-1/B/B+1 の比較が3つの異なるデータセットを
-    またぐ。データ由来の `boundary-spike` が構造的にあり得て、CSS バグと見分けがつかない。
-    `--har` が副作用で直すが、何も警告しない。
+- [x] **~~`check breakpoints` が幅ごとに再フェッチする~~ — 反証済み(2026-08-12)**
+  - agent-j の主張は**誤り**だった。実測:リクエストをカウントするサーバに対して
+    `check breakpoints` を1回走らせて **document 1回 / `/api/metrics` 1回**。
+    `--sweep` で **39 幅**サンプルしても同じく 1回 / 1回。
+  - 仕組みを読めば明らか:`breakpoint-check.ts` は `navigatePage` を**1回**呼び、
+    以降は `setViewportSize` でリサイズするだけ。ナビゲーションは繰り返さない。
+    彼らの「1 run で6回」は、おそらく 4 ゲートの `gates run` 全体か複数回の実行を
+    数えたもの。
+  - 残る本当の懸念(ゲートの問題ではない):**ページ自身が** resize で再フェッチする場合は
+    幅ごとにデータが変わり得る。それはページの挙動で、`--har` が pin する。
 
 - [x] **verdict の語が自分のカウントと矛盾し得る** — `check integrity` は修正済み(`NO DEFECTS, N WARN` + exit 意図)。`check design` の `DRIFT` + exit 0 は未着手
   - `verdict: DRIFT` + exit 0、そして F2 の修正後は `CLEAN (0 fail, 3 warn)`。

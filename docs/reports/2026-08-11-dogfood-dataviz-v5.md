@@ -175,7 +175,9 @@ regression and watching it fail.
 
 ## Not fixed, recorded
 
-Six findings stand. Each is real; none is a wrong measurement.
+Six findings stood at the time of writing. Five are real; the fifth was later refuted
+by measurement — recorded in place rather than deleted, because a claim I acted on and
+could not confirm is part of the record.
 
 1. **`--har` is the documented reproducibility answer and there is no recorder.**
    `docs/configuration.md`: "record a HAR with Playwright and replay it" — so every
@@ -194,10 +196,15 @@ Six findings stand. Each is real; none is a wrong measurement.
    verdicts with nothing indicating a re-run could differ. agent-j answered the
    reproducibility question by writing a jitter server and diffing outputs itself,
    and suggested `gates run --repeat 2 --require-stable`.
-5. **`check breakpoints` re-fetches per width** — 6 `/api/metrics` hits per run, so
-   its B-1/B/B+1 comparison spans three datasets against a live endpoint. A
-   data-driven `boundary-spike` is structurally possible and would look exactly like
-   a CSS bug. `--har` fixes it as a side effect; nothing warns.
+5. ~~**`check breakpoints` re-fetches per width**~~ — **refuted 2026-08-12.** Measured
+   against a request-counting server: one `check breakpoints` run makes **1 document
+   request and 1 `/api/metrics` request**, and still 1 and 1 with `--sweep` sampling
+   **39 widths**. `breakpoint-check.ts` navigates once and then calls
+   `setViewportSize`; it never re-navigates, so the B-1/B/B+1 comparison cannot span
+   datasets. The agent's "6 hits per run" was most likely counted across the whole
+   four-gate `gates run`, not this gate. The residual concern is real but belongs to
+   the page rather than the gate: a page that itself refetches on resize does vary
+   across widths, and `--har` pins that.
 6. **A verdict word can disagree with its own counts.** `verdict: DRIFT` with exit 0,
    and — after F2 — `CLEAN (0 fail, 3 warn)`. The line that resolves it is the last
    one printed, below the findings. agent-i: "a coin-flip in CI."
