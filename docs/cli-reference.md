@@ -19,7 +19,7 @@ for options.
 | `vlmkit heal` | `selector`, `markup` |
 | `vlmkit inspect` | `interact`, `explore`, `smoke` |
 | `vlmkit stress` | `i18n`, `media` |
-| `vlmkit snapshot` | `[<url>...]`, `approve`, `fix-prompt`, `stability`, `flipbook`, `strip`, `report` |
+| `vlmkit snapshot` | `[<url>...]`, `approve`, `fix-prompt`, `stability`, `flipbook`, `strip`, `record-har`, `report` |
 | `vlmkit migration` | `compare`, `blind`, `subagent` |
 | `vlmkit workflow` | `init`, `capture`, `verify`, `approve`, `graph`, `affected`, `introspect`, `spec-verify`, `expect` |
 | Standalone | `vlmkit batch`, `vlmkit gates`, `vlmkit rules`, `vlmkit mcp`, `vlmkit watch`, `vlmkit manifest`, `vlmkit diff-pr`, `vlmkit baseline`, `vlmkit markup-loop`, `vlmkit api`, `vlmkit bench`, `vlmkit report`, `vlmkit skill` |
@@ -926,6 +926,27 @@ background and border"` is the shape of the real permission, and blessing an ins
 wholesale would hide the geometry mistake sitting next to the intentional colour. `*`
 covers a family (`padding-*`, `border-*-color`); a bare `*` is refused, because that is
 `--rule instance-drift=off` and should be written as such.
+
+#### Recording the network a gate replays — `snapshot record-har`
+
+`--har` pins a data-driven page so a gate measures the same bytes every run. Producing
+the recording used to be a doc sentence, so every project wrote the same twenty-line
+Playwright script:
+
+```bash
+vlmkit snapshot record-har http://localhost:5173/ --out fixtures/app.har
+vlmkit check integrity http://localhost:5173/ --har fixtures/app.har
+```
+
+It defaults to `--wait-until load`, not `networkidle`: the reason `--har` exists is a
+page with a held-open stream, and a recorder that waited for idle would hang on
+exactly those pages. `--settle 1000` (default) catches the late XHR a dashboard fires
+after the milestone — a recording without it is stale before it is written.
+
+The output names the origins it covers, because the recording is keyed on the full
+URL: replay it against a different host or port and nothing matches. That case is
+reported at replay time too, rather than surfacing as a page whose every resource
+broke.
 
 #### One image instead of a sequence — `snapshot strip`
 

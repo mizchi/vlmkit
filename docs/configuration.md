@@ -32,9 +32,16 @@ npx vlmkit check integrity http://localhost:3000/ \
   --wait-until domcontentloaded --timeout 60000
 ```
 
-For reproducible third-party responses, record a HAR with Playwright and replay
-it during the gate. Requests absent from the HAR are aborted rather than sent to
-the live network:
+For reproducible third-party responses, record a HAR and replay it during the gate.
+Requests absent from the HAR are aborted rather than sent to the live network:
+
+```bash
+npx vlmkit snapshot record-har http://localhost:3000/ --out fixtures/app.har
+```
+
+It records the way a gate replays — `load` rather than `networkidle`, since the whole
+reason `--har` exists is a page that never reaches idle — plus a short settle for late
+XHR, and it prints which origins the file covers.
 
 ```bash
 npx vlmkit check integrity http://localhost:3000/ --har fixtures/app.har
