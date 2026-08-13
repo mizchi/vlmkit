@@ -1082,11 +1082,14 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - 録音は完全 URL がキーなので、ポートを変えると黙ってマッチしなくなる。
   - 着手条件: 所見の種類が違うのは実害なので、v6 を待たずに直す価値がある。
 
-- [ ] **`check design` の `DRIFT` + exit 0 が残っている**
-  - `check integrity` は `NO DEFECTS, N WARN (…) — exits 0` に直したが、design 側の
-    verdict 行は未着手。`component-drift` は warn なので DRIFT でも exit 0。
-  - 直し方: 各ゲートの format が exit 意図を出すのではなく、runner が verdict 行の
-    直下に出すのが本筋(27ゲート一律)。整形の置き場所の設計判断が必要。
+- [x] **`check design` の `DRIFT` + exit 0** — 修正済み(2026-08-12)、runner 側で27ゲート一律
+  - 決定:各ゲートの format ではなく **runner が verdict 行の直下に挿入**する
+    (`withExitIntent`)。`verdict:` / `status:` で始まる行をアンカーにする慣習は
+    `batch-cli` の `gateReported()` が既に依存していたので、新設ではなく明文化。
+  - アンカーが無いゲートは末尾に追記(従来動作)にフォールバックするので、慣習に
+    従わないゲートでも注記を失わない。
+  - integrity 側のインライン `— exits 0` は削除。1ゲートだけが言って26ゲートが
+    言わない状態は、`--wait-until` のヒントが4ゲート中2つになった分岐と同じ。
 
 - [x] **`gates init` が「必ずタイムアウトする設定」を出力する** — 修正済み(2026-08-12)
   - URL source のときは全ゲートに `--wait-until load --timeout 15000` を足して書き、

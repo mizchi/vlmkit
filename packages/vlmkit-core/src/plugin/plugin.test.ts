@@ -20,14 +20,7 @@ import {
   resolveRules,
   validateGateDefinition,
 } from "./rules.ts";
-import {
-  formatGateHelp,
-  formatRuleTable,
-  parseSharedFlags,
-  runGate,
-  runGateCli,
-  stripSharedFlags,
-} from "./runner.ts";
+import { formatGateHelp, formatRuleTable, parseSharedFlags, runGate, runGateCli, stripSharedFlags, withExitIntent } from "./runner.ts";
 
 interface FakeReport {
   source: string;
@@ -714,5 +707,60 @@ describe("readPluginSpecifiers", () => {
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
+  });
+});
+
+describe("withExitIntent", () => {
+  it("puts the line directly under the verdict, not at the bottom", () => {
+    // Appending was not enough. One agent nearly shipped a bug because a warn passed
+    // the gate silently; the fix appended a notice. A later agent hit the same
+    // ambiguity from the other side: "`verdict: DRIFT` (yellow) + exit 0 is a
+    // coin-flip in CI. The only line that resolves it [...] is the last line, below
+    // the findings." The distance was the defect.
+    const text = [
+      "vlmkit check design",
+      "source: page.html",
+      "",
+      "verdict: DRIFT (2 finding(s))",
+      "  roles judged: 3",
+      "Findings",
+      "  ! [component-drift] ...",
+    ].join("\n");
+    const out = withExitIntent(text, "  exits 0 — 1 warn(s) did not fail this command.");
+    const lines = out.split("\n");
+    assert.equal(lines[3], "verdict: DRIFT (2 finding(s))");
+    assert.equal(lines[4], "  exits 0 — 1 warn(s) did not fail this command.");
+    // Nothing else moved or was dropped.
+    assert.equal(lines.length, text.split("\n").length + 1);
+    assert.equal(lines[lines.length - 1], "  ! [component-drift] ...");
+  });
+
+  it("anchors on `status:` too, which is what half the gates print", () => {
+    const out = withExitIntent("vlmkit check breakpoints\n\nstatus: warn\nbreakpoints checked: 767px", "  exits 0");
+    assert.deepEqual(out.split("\n"), [
+      "vlmkit check breakpoints",
+      "",
+      "status: warn",
+      "  exits 0",
+      "breakpoints checked: 767px",
+    ]);
+  });
+
+  it("sees through the colour codes a gate wraps its verdict in", () => {
+    // The verdict is coloured in real output, so a naive `^verdict:` never matches.
+    const out = withExitIntent("\u001B[1mverdict:\u001B[0m CLEAN\nrest", "  exits 0");
+    assert.equal(out.split("\n")[1], "  exits 0");
+  });
+
+  it("appends when a gate has no verdict line, rather than losing the annotation", () => {
+    // A gate that does not follow the convention keeps the previous behaviour.
+    const out = withExitIntent("some gate\nwith no headline", "  exits 0");
+    assert.equal(out.split("\n").at(-1), "  exits 0");
+  });
+
+  it("annotates only the first verdict line", () => {
+    // A findings body can legitimately quote the word; only the headline is the anchor.
+    const out = withExitIntent("verdict: A\nbody\nverdict: B", "  exits 0");
+    assert.deepEqual(out.split("\n"), ["verdict: A", "  exits 0", "body", "verdict: B"]);
   });
 });

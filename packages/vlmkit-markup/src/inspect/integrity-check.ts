@@ -1825,13 +1825,11 @@ export function formatIntegrityReport(report: IntegrityReport): string {
     : warns > 0
       ? `${YELLOW}NO DEFECTS, ${warns} WARN${RESET}`
       : `${GREEN}CLEAN${RESET}`;
-  lines.push(
-    `verdict: ${word} (${fails} fail, ${warns} warn, ${report.exempted.length} exempted)`
-    // The exit code, on the line the reader is already looking at. A warn does not
-    // fail the command, and finding that out from the last line of the output — below
-    // the findings — is what made it a coin flip.
-    + (fails === 0 && warns > 0 ? ` ${DIM}— exits 0; --rule <id>=suspect to gate on one${RESET}` : ""),
-  );
+  // The exit code is NOT appended here. The runner inserts it directly under this line
+  // for every gate (`withExitIntent`), so stating it here too would print it twice —
+  // and one gate saying it while twenty-six do not is the divergence that put the
+  // `--wait-until` hint on two gates out of four.
+  lines.push(`verdict: ${word} (${fails} fail, ${warns} warn, ${report.exempted.length} exempted)`);
   for (const v of report.viewports) {
     lines.push(`${DIM}  ${v.width}x${v.height}: ${v.components} component(s), ink ${(v.inkRatio * 100).toFixed(1)}%, ${v.textBlocks} text block(s)${RESET}`);
   }

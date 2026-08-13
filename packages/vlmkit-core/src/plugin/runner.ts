@@ -398,6 +398,31 @@ export interface GateCliIo {
 }
 
 /**
+ * A gate's own headline line, which the runner may annotate.
+ *
+ * Every gate opens its prose with `verdict:` or `status:`. That convention is already
+ * load-bearing elsewhere — `batch-cli`'s `gateReported()` uses exactly this pattern to
+ * tell "the gate measured the page" from "the gate never ran" — so formalizing it here
+ * is recognising a contract rather than inventing one.
+ */
+const VERDICT_LINE = /^\s*(?:\u001B\[[0-9;]*m)*(verdict|status):/;
+
+/**
+ * Put `line` directly under the gate's verdict line.
+ *
+ * Falls back to appending when a gate has no such line, so a gate that does not follow
+ * the convention keeps the previous behaviour instead of losing the annotation. This is
+ * the one place the runner touches gate-owned prose, which is why it is a single
+ * insertion at a documented anchor rather than a rewrite.
+ */
+export function withExitIntent(text: string, line: string): string {
+  const lines = text.split("\n");
+  const at = lines.findIndex((l) => VERDICT_LINE.test(l));
+  if (at < 0) return `${text}\n${line}`;
+  return [...lines.slice(0, at + 1), line, ...lines.slice(at + 1)].join("\n");
+}
+
+/**
  * CLI adapter: handle `--help` / `--rules`, run the gate, write the output,
  * return the exit code. A migrated gate's whole `main()` becomes one call.
  */
@@ -417,7 +442,6 @@ export async function runGateCli<Report, Options>(
     return 0;
   }
   const outcome = await runGate(gate, argv, options);
-  out(outcome.text);
   // Say when warns did not fail the command, and name the flag that makes one fail.
   //
   // A dogfood agent working to a "these gates exit 0" criterion nearly shipped the very
@@ -429,12 +453,20 @@ export async function runGateCli<Report, Options>(
   // The escalation existed the whole time — `--rule <id>=suspect` exits 1 — and was
   // findable only by reading the rule-settings docs. A passing run that is hiding a warn
   // should say so on the spot, not in a document.
+  //
+  // Placed under the VERDICT rather than appended, because appending was not enough. A
+  // later agent hit the same ambiguity from the other side: "`verdict: DRIFT` (yellow) +
+  // exit 0 is a coin-flip in CI. The only line that resolves it […] is the last line,
+  // below the findings." The distance was the defect, not the absence.
   if (outcome.exitCode === 0 && outcome.counts.warn > 0 && !shared.json) {
     const ids = [...new Set(outcome.findings.filter((f) => f.severity === "warn").map((f) => f.rule))];
-    out(
-      `${DIM}  ${outcome.counts.warn} warn(s) did not fail this command.`
+    out(withExitIntent(
+      outcome.text,
+      `${DIM}  exits 0 — ${outcome.counts.warn} warn(s) did not fail this command.`
       + ` To gate on one: --rule ${ids[0]}=suspect${ids.length > 1 ? ` (also: ${ids.slice(1).join(", ")})` : ""}${RESET}`,
-    );
+    ));
+  } else {
+    out(outcome.text);
   }
   // Under --json the breakdown is already inside the envelope; appending it to
   // stdout as prose would put non-JSON on a stream a client is parsing.

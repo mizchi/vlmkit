@@ -306,8 +306,13 @@ suppression works per *rule* instead of per whole gate.
   `vlmkit.gates.json` is the whole command, tokenized quote-aware, so any flag
   belongs there and is committed with the page. Only rule settings were
   documented as persistable before.
-- **A passing run with warnings says so**: `N warn(s) did not fail this command.
-  To gate on one: --rule <id>=suspect`. Silent under `--json`.
+- **A passing run with warnings says so, directly under the verdict**:
+  `exits 0 — N warn(s) did not fail this command. To gate on one: --rule
+  <id>=suspect`. Silent under `--json`. The runner inserts it after the gate's
+  `verdict:` / `status:` line for all 27 gates rather than each gate appending its
+  own, and falls back to appending for a gate with no such line. Appending alone
+  had proved insufficient: `verdict: DRIFT` with exit 0 was resolved only by the
+  last line of the output, below the findings.
 - `verify markup` runs the gates it folds into its verdict through the core
   runner, so **a project's rule settings now affect that verdict** — they did
   not before. Its `GateVerdict.gate` is the gate's command (`scan scroll`)
