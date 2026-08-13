@@ -798,3 +798,25 @@ describe("unpinnedLiveInput", () => {
     assert.ok(unpinnedLiveInput(harGate, ["--viewports", "375", "https://example.com/a"]));
   });
 });
+
+describe("parseRuleSettings comments", () => {
+  it("accepts a //-prefixed key as a comment, the convention the config already uses", () => {
+    // `examples/vlmkit.gates.json` carries `"//rules"` at the top level; inside the map
+    // it was rejected. v6's adoption agent, told to make the diff self-explanatory:
+    // "the only mechanism for 'the tool is wrong about this rule' is the one mechanism
+    // with no audit trail" — so the reason could not sit next to the decision.
+    const settings = parseRuleSettings({
+      "//check.design/component-drift": "3 buttons with one primary IS the design",
+      "check.design/component-drift": "info",
+    }, "defaults.rules");
+    assert.deepEqual(settings, { "check.design/component-drift": "info" });
+  });
+
+  it("still rejects a real rule reference with a bad setting", () => {
+    // The comment escape must not become a way to smuggle a typo past validation.
+    assert.throws(
+      () => parseRuleSettings({ "check.design/component-drift": "quiet" }, "defaults.rules"),
+      /must be one of off, suspect, warn, info/,
+    );
+  });
+});

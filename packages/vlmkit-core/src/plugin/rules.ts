@@ -92,6 +92,19 @@ export function parseRuleSettings(raw: unknown, path: string): RuleSettings {
   const out: Record<string, RuleSetting> = {};
   for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
     if (!key.trim()) throw new UsageError(`${path}: rule reference must be a non-empty string`);
+    // A `//`-prefixed key is a comment, the convention this config already uses at the
+    // top level — `examples/vlmkit.gates.json` carries `"//rules"` and
+    // `"//suppressions"`. It was rejected one level down, inside the map, which is the
+    // one place a reason matters most. v6's adoption agent, working to "assume I read
+    // the diff and nothing else":
+    //
+    //   "`suppressions` have `reason` / `owner` / `expires` and an expired one re-fails
+    //    the build. `rules` has none of that. […] So the only mechanism for 'the tool is
+    //    wrong about this rule' is the one mechanism with no audit trail and no expiry."
+    //
+    // Accepting the comment does not give `rules` an expiry, but it does let the reason
+    // live next to the decision instead of in a sibling string far from it.
+    if (key.trim().startsWith("//")) continue;
     if (!isRuleSetting(value)) {
       throw new UsageError(
         `${path}["${key}"]: must be one of ${RULE_SETTINGS.join(", ")}, got ${JSON.stringify(value)}`,

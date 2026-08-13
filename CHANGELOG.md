@@ -310,6 +310,12 @@ suppression works per *rule* instead of per whole gate.
   `vlmkit.gates.json` is the whole command, tokenized quote-aware, so any flag
   belongs there and is committed with the page. Only rule settings were
   documented as persistable before.
+- **A `//`-prefixed key inside `rules` is a comment**, matching the convention this
+  config already uses at the top level (`"//rules"`, `"//suppressions"`). It was
+  rejected one level down, which is where a reason matters most: `suppressions` carry
+  `reason` / `owner` / `expires`, and `rules` — the mechanism for "the tool is wrong
+  about this finding" — carried none, so the justification could not sit next to the
+  decision.
 - **A live URL says it is unpinned.** A run whose source is `http(s)`, on a gate that
   accepts `--har`, with no `--har` passed, ends with one dim line naming the URL and
   the `record-har` command that pins it. Decidable without running anything twice,
