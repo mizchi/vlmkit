@@ -8,10 +8,16 @@
       "check breakpoints --sweep",
       "check design"
     ],
-    "//rules": "Rule-granular settings, checked against each gate's declared rule table (`vlmkit rules <gate>`). off|suspect|warn|info. Unlike a suppression, this needs no per-gate flag to exist and a typo is a config error. See `vlmkit rules`.",
+    "//rules": "Rule-granular settings, checked against each gate's declared rule table (`vlmkit rules <gate>`). off|suspect|warn|info. Unlike a suppression, this needs no per-gate flag to exist and a typo is a config error. Two forms: the bare setting, or an object with `reason` (required) plus optional `owner`/`expires`. The long form is enumerated by `vlmkit gates suppressions` and an expired one is DROPPED, so the rule fails again -- the same contract suppressions have always had. Reach for it whenever the answer is \"the tool is wrong here\" rather than \"this rule is not for us\".",
     "rules": {
       "check.breakpoints/overflow-at-boundary": "suspect",
-      "check.motion/running-animation": "off"
+      "check.motion/running-animation": "off",
+      "check.integrity/low-contrast-text": {
+        "setting": "warn",
+        "reason": "Brand grey on white is 4.1:1; legal signed the contrast exception for body copy pending the 2027 palette refresh.",
+        "owner": "design-system",
+        "expires": "2027-03-31"
+      }
     },
 
     "//suppressions": "Default-scope suppressions apply to every page. Use sparingly — a repo-wide exemption is the hardest kind to revisit.",
@@ -37,9 +43,14 @@
       "id": "docs",
       "source": "routes/docs/**/*.html",
       "gates": ["check integrity", "check copy --manifest copy/docs.txt"],
-      "//rules": "Page rules merge over defaults.rules, key by key. Generated API pages carry near-miss alignment the 2px probe cannot approve of; nothing else about integrity is relaxed.",
+      "//rules": "Page rules merge over defaults.rules, key by key -- including the reason, so a page that restates a rule restates why.",
       "rules": {
-        "check.integrity/near-misalignment": "off"
+        "check.integrity/near-misalignment": {
+          "setting": "off",
+          "reason": "Generated API pages carry near-miss alignment from the doc generator's table layout; nothing else about integrity is relaxed here.",
+          "owner": "docs-infra",
+          "expires": "2026-12-31"
+        }
       }
     },
     {
@@ -51,8 +62,9 @@
       ],
       "suppressions": [
         {
+          "//": "Named per instance, not thresholded: reuse is instances/styles, an AVERAGE, so a small role with one deliberate variant sits below any threshold that is not 1. Copy the selector exactly as the finding prints it.",
           "gate": "check design",
-          "flag": "--min-reuse 2",
+          "flag": "--allow \"button.tile--stripe;provider tiles carry provider branding by requirement\"",
           "reason": "Payment-method tiles are deliberately styled per provider (brand requirement), so button styles do not consolidate here.",
           "owner": "payments",
           "expires": "2026-11-30"

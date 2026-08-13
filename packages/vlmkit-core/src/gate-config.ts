@@ -20,8 +20,8 @@
  */
 
 import { UsageError } from "./cli-error.ts";
-import type { RuleSettings } from "./plugin/rules.ts";
-import { parseRuleSettings } from "./plugin/rules.ts";
+import type { RuleSettingEntry, RuleSettings } from "./plugin/rules.ts";
+import { parseAnnotatedRuleSettings } from "./plugin/rules.ts";
 
 export interface GateSuppression {
   /**
@@ -59,6 +59,12 @@ export interface GatePage {
    * that quietly does nothing.
    */
   rules?: RuleSettings;
+  /**
+   * The long-form entries from `rules`, keyed by rule reference. Kept beside the
+   * flattened settings so a rule setting can carry a reason and an expiry, and go
+   * through the same inventory as a suppression.
+   */
+  ruleAnnotations?: Readonly<Record<string, RuleSettingEntry>>;
 }
 
 export interface GateConfig {
@@ -66,6 +72,7 @@ export interface GateConfig {
     gates?: string[];
     suppressions?: GateSuppression[];
     rules?: RuleSettings;
+    ruleAnnotations?: Readonly<Record<string, RuleSettingEntry>>;
   };
   pages: GatePage[];
 }
@@ -76,6 +83,19 @@ export interface ResolvedSuppression extends GateSuppression {
   status: "active" | "expired" | "permanent";
   /** Days until expiry; negative when overdue, null when permanent. */
   daysLeft: number | null;
+  /**
+   * Which config block this came from.
+   *
+   * A long-form `rules` entry flows through the SAME resolved shape, the same
+   * expiry rule, and the same inventory as a `suppressions` entry — otherwise
+   * `rules` would need a second parallel set of all three, and the two would
+   * eventually disagree about what expiry means. The discriminator keeps them
+   * distinguishable to a reader; for a rule entry, `gate` is the gate the rule
+   * belongs to and `flag` is the `--rule` flag the plan appends.
+   */
+  kind: "suppression" | "rule";
+  /** Rule reference, for `kind: "rule"` only. */
+  ref?: string;
 }
 
 export interface GateJob {
@@ -168,7 +188,11 @@ export function parseGateConfig(raw: string): GateConfig {
       if (!Array.isArray(d.suppressions)) fail("defaults.suppressions", "must be an array");
       defaults.suppressions = d.suppressions.map((s, i) => parseSuppression(s, `defaults.suppressions[${i}]`));
     }
-    if (d.rules !== undefined) defaults.rules = parseRuleSettings(d.rules, "defaults.rules");
+    if (d.rules !== undefined) {
+      const parsed = parseAnnotatedRuleSettings(d.rules, "defaults.rules");
+      defaults.rules = parsed.settings;
+      if (Object.keys(parsed.annotations).length > 0) defaults.ruleAnnotations = parsed.annotations;
+    }
   }
   if (!Array.isArray(root.pages)) fail("pages", "must be an array");
   if (root.pages.length === 0) fail("pages", "is empty — nothing would run");
@@ -188,7 +212,11 @@ export function parseGateConfig(raw: string): GateConfig {
       if (!Array.isArray(p.suppressions)) fail(`${at}.suppressions`, "must be an array");
       page.suppressions = p.suppressions.map((s, j) => parseSuppression(s, `${at}.suppressions[${j}]`));
     }
-    if (p.rules !== undefined) page.rules = parseRuleSettings(p.rules, `${at}.rules`);
+    if (p.rules !== undefined) {
+      const parsed = parseAnnotatedRuleSettings(p.rules, `${at}.rules`);
+      page.rules = parsed.settings;
+      if (Object.keys(parsed.annotations).length > 0) page.ruleAnnotations = parsed.annotations;
+    }
     if (!page.gates && !page.extraGates && !defaults.gates) {
       fail(at, `no gates: set ${at}.gates or defaults.gates`);
     }
@@ -203,10 +231,41 @@ function utcDay(date: Date): number {
 }
 
 export function resolveSuppression(s: GateSuppression, scope: string, now: Date): ResolvedSuppression {
-  if (!s.expires) return { ...s, scope, status: "permanent", daysLeft: null };
+  const base = { ...s, scope, kind: "suppression" as const };
+  if (!s.expires) return { ...base, status: "permanent", daysLeft: null };
   const daysLeft = utcDay(new Date(`${s.expires}T00:00:00Z`)) - utcDay(now);
   // Expiry day itself is still valid; the day after is not.
-  return { ...s, scope, status: daysLeft < 0 ? "expired" : "active", daysLeft };
+  return { ...base, status: daysLeft < 0 ? "expired" : "active", daysLeft };
+}
+
+/**
+ * Resolve one long-form `rules` entry onto the same shape as a suppression, so
+ * the inventory, the expiry notice and `--require-expiry` cover both.
+ *
+ * `gate` is the gate portion of the reference (`check.integrity/text-collision`
+ * -> `check.integrity`), which is what a reader scanning the inventory wants to
+ * see; a bare rule id has no gate to name and reports as `*`.
+ */
+export function resolveRuleSetting(
+  ref: string,
+  entry: RuleSettingEntry,
+  scope: string,
+  now: Date,
+): ResolvedSuppression {
+  const slash = ref.indexOf("/");
+  const base = {
+    gate: slash > 0 ? ref.slice(0, slash) : ref.includes(".") ? ref : "*",
+    flag: `--rule ${ref}=${entry.setting}`,
+    reason: entry.reason,
+    ...(entry.owner ? { owner: entry.owner } : {}),
+    ...(entry.expires ? { expires: entry.expires } : {}),
+    scope,
+    kind: "rule" as const,
+    ref,
+  };
+  if (!entry.expires) return { ...base, status: "permanent", daysLeft: null };
+  const daysLeft = utcDay(new Date(`${entry.expires}T00:00:00Z`)) - utcDay(now);
+  return { ...base, status: daysLeft < 0 ? "expired" : "active", daysLeft };
 }
 
 export interface ResolveOptions {
@@ -229,14 +288,21 @@ export function resolveGatePlan(config: GateConfig, options: ResolveOptions = {}
   const defaultGates = config.defaults?.gates ?? [];
   const defaultSuppressions = (config.defaults?.suppressions ?? [])
     .map((s) => resolveSuppression(s, "defaults", now));
+  // Resolved once, like `defaultSuppressions` — resolving inside the page loop
+  // would list every default entry once per page in the inventory.
+  const defaultRuleSettings = Object.entries(config.defaults?.ruleAnnotations ?? {})
+    .map(([ref, entry]) => resolveRuleSetting(ref, entry, "defaults", now));
 
   const jobs: GateJob[] = [];
-  const suppressions: ResolvedSuppression[] = [...defaultSuppressions];
+  const suppressions: ResolvedSuppression[] = [...defaultSuppressions, ...defaultRuleSettings];
 
   for (const page of config.pages) {
     const pageId = page.id ?? page.source;
     const pageSuppressions = (page.suppressions ?? []).map((s) => resolveSuppression(s, pageId, now));
     suppressions.push(...pageSuppressions);
+    const pageRuleSettings = Object.entries(page.ruleAnnotations ?? {})
+      .map(([ref, entry]) => resolveRuleSetting(ref, entry, pageId, now));
+    suppressions.push(...pageRuleSettings);
     if (only.length > 0 && !only.some((o) => pageId.includes(o) || page.source.includes(o))) continue;
     const gates = [...(page.gates ?? defaultGates), ...(page.extraGates ?? [])];
     if (gates.length === 0) {
@@ -248,7 +314,23 @@ export function resolveGatePlan(config: GateConfig, options: ResolveOptions = {}
     const candidates = [...defaultSuppressions, ...pageSuppressions];
     // Page settings win over defaults, key by key — the same precedence a
     // page's `gates` has over `defaults.gates`.
-    const rules: RuleSettings = { ...config.defaults?.rules, ...page.rules };
+    const merged: Record<string, RuleSettings[string]> = { ...config.defaults?.rules, ...page.rules };
+    // An expired rule setting is DROPPED, exactly as an expired suppression is:
+    // the rule bites again and the expiry is reported. An expiry date that keeps
+    // working after it passes is a comment, not a deadline — and before this,
+    // `rules` had no way to express either one.
+    //
+    // A page entry shadows the default for the same ref, so an expired default
+    // renewed on this page stays in effect, and a page entry that has itself
+    // expired drops even when the default is still live.
+    const shadowed = new Set(Object.keys(page.ruleAnnotations ?? {}));
+    for (const resolved of defaultRuleSettings) {
+      if (resolved.status === "expired" && !shadowed.has(resolved.ref!)) delete merged[resolved.ref!];
+    }
+    for (const resolved of pageRuleSettings) {
+      if (resolved.status === "expired") delete merged[resolved.ref!];
+    }
+    const rules: RuleSettings = merged;
     for (const baseGate of gates) {
       const applied = candidates.filter((s) => s.status !== "expired" && gateMatches(baseGate, s.gate));
       jobs.push({

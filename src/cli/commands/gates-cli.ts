@@ -161,7 +161,11 @@ export function formatSuppressions(suppressions: ResolvedSuppression[], soonDays
         : (s.daysLeft ?? Infinity) <= soonDays
           ? `${YELLOW}${s.daysLeft}d left${RESET}`
           : `${GREEN}${s.daysLeft}d left${RESET}`;
-    lines.push(`  ${state}  ${BOLD}${s.scope}${RESET} ${DIM}/${RESET} ${s.gate} ${DIM}${s.flag}${RESET}`);
+    // `rule` entries come from the `rules` block and `suppression` entries from
+    // `suppressions`; both are silencing something, and a reviewer deciding whether
+    // an entry still earns its place needs to know which file section to edit.
+    const kind = s.kind === "rule" ? `${DIM}[rule]${RESET} ` : "";
+    lines.push(`  ${state}  ${kind}${BOLD}${s.scope}${RESET} ${DIM}/${RESET} ${s.gate} ${DIM}${s.flag}${RESET}`);
     lines.push(`      ${s.reason}${s.owner ? ` ${DIM}— ${s.owner}${RESET}` : ` ${YELLOW}(no owner)${RESET}`}`);
   }
   if (summary.expired > 0) {
@@ -181,12 +185,15 @@ export function formatSuppressions(suppressions: ResolvedSuppression[], soonDays
  */
 export function formatExpiredNotice(expired: ResolvedSuppression[]): string {
   if (expired.length === 0) return "";
+  const rules = expired.filter((s) => s.kind === "rule").length;
   const lines = [
-    `${RED}${expired.length} suppression(s) expired — the gate(s) below run unmuted:${RESET}`,
+    `${RED}${expired.length} suppression(s) expired${rules > 0 ? ` (${rules} rule setting(s))` : ""}`
+    + ` — the gate(s) below run unmuted:${RESET}`,
   ];
   for (const s of expired) {
     lines.push(
-      `  ${RED}x${RESET} ${BOLD}${s.scope}${RESET} ${DIM}/${RESET} ${s.gate} ${DIM}${s.flag}${RESET}`
+      `  ${RED}x${RESET} ${s.kind === "rule" ? `${DIM}[rule]${RESET} ` : ""}`
+      + `${BOLD}${s.scope}${RESET} ${DIM}/${RESET} ${s.gate} ${DIM}${s.flag}${RESET}`
       + ` ${DIM}(expired ${-s.daysLeft!}d ago: ${s.reason})${RESET}`,
     );
   }

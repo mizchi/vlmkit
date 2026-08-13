@@ -91,6 +91,27 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **A `rules` entry can carry `reason`, `owner` and `expires`, and an expired one
+  is dropped.** `suppressions` had all three from the start; `rules` — the
+  narrow, gate-agnostic instrument, and the one a false positive actually calls
+  for — had none. v6's adopting agent: *"`suppressions` have `reason` / `owner` /
+  `expires` and an expired one re-fails the build. `rules` has none of that. […]
+  So the only mechanism for 'the tool is wrong about this rule' is the one
+  mechanism with no audit trail and no expiry."* The long form is
+  `{"setting": "warn", "reason": "...", "owner": "...", "expires": "2027-03-31"}`;
+  a reason is required in it, and it resolves onto the same shape as a
+  suppression, so `vlmkit gates suppressions` enumerates it (tagged `[rule]`),
+  `--require-expiry` / `--require-owner` cover it, and past its expiry the
+  setting stops being applied and the rule fails again. The short form
+  (`"rule": "off"`) stays valid: `--rule` on the command line cannot carry a
+  reason, so requiring one everywhere would leave the config unable to express
+  what the CLI does. The `//`-prefixed comment key still parses, but a comment
+  cannot expire and nothing enumerates it — prefer the long form.
+- **`examples/vlmkit.gates.json` no longer recommends a threshold that cannot
+  reach the case.** The payment-tiles entry used `--min-reuse 2` to approve
+  deliberately per-provider button styling, which — reuse being an average —
+  changes nothing on a small role; it is now `check design --allow`. The example
+  also demonstrates the long-form `rules` entry at both scopes.
 - **The run ledger is a declared output rather than a side effect:
   `--ledger <path>` and `--no-ledger` on every gate.** It has always been
   written to `.vlmkit/run-ledger.jsonl` with no flag, no mention in any output,

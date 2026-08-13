@@ -1135,8 +1135,19 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - 元の指摘: 30要素中28スキップは verdict がほぼ何も見ていないことを意味するが、それが
     正常かどうかを何も言わない。
 
-- [ ] **`rules` に first-class な `reason`(と `expires`)**
-  - `//` コメントキーは通るようにしたが、`suppressions` の
+- [x] **`rules` に first-class な `reason`(と `expires`)** → 長形式を追加
+  - `{"setting": "warn", "reason": "...", "owner": "...", "expires": "..."}`。
+    長形式では reason 必須。suppression と**同じ resolved 形**に落ちるので
+    `gates suppressions` に `[rule]` タグ付きで並び、`--require-expiry` /
+    `--require-owner` も効き、期限切れは**適用されずルールが再び落ちる**。
+  - 短形式(`"rule": "off"`)は維持。`--rule` は reason を運べないので、全面必須化すると
+    config が CLI を表現できなくなる。`//` コメントキーも残すが、コメントは期限切れに
+    ならず列挙もされないので長形式を推奨。
+  - ページ側 annotation は default を ref 単位で上書きするので、期限切れ default を
+    ページで**更新**できる(default 側は expired として報告され続ける)。
+  - `examples/vlmkit.gates.json` の `--min-reuse 2`(届かない)を `check design --allow`
+    に差し替え、長形式を defaults とページの両方で例示。
+  - 元の指摘: `//` コメントキーは通るようにしたが、`suppressions` の
     `reason`/`owner`/`expires`(期限切れでビルドが再度落ちる)には及ばない。
     監査可能な経路が suppressions にしかなく、false positive に必要なのは
     監査不能な方 — プロジェクト自身の一番良いアイデアが反転している。
