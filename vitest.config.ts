@@ -35,7 +35,12 @@ export default defineConfig({
      * dividing it.
      */
     pool: "forks",
-    poolOptions: { forks: { maxForks: 4, minForks: 1 } },
+    // Top-level in Vitest 4. The first draft of this file used
+    // `poolOptions: { forks: { maxForks: 4 } }`, which v4 REMOVED — it printed a
+    // deprecation notice and applied nothing, so the cap this comment justifies was
+    // not in force at all. Exactly the class of silent no-op the gates exist to catch.
+    maxWorkers: 4,
+    minWorkers: 1,
 
     /**
      * A browser launch plus a page load plus a settle is routinely past vitest's
