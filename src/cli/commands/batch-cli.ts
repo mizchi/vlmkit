@@ -338,6 +338,39 @@ export async function runBatch(options: BatchOptions): Promise<BatchSummary> {
  * `verdict:` or `status:` line, or a JSON report under `--json`. A harness failure
  * prints an `error:` line and nothing else.
  */
+/**
+ * Warns a passing job reported, from the runner's own exit-intent line.
+ *
+ * `gates run` printed `ALL PASS (6/6)` and nothing else, so an adopting project
+ * saw none of the findings. v7's agent-l: "Adopt it naively and you learn
+ * nothing. Only `--output` preserves them."
+ *
+ * Read from `exits 0 — N warn(s) did not fail this command`, which `runGateCli`
+ * emits for EVERY gate exactly when it exits 0 with warns — verified across the
+ * gate set rather than assumed, after `gateReported` was built on a convention
+ * only 8 of 12 gates followed. A gate with no warns prints no line and
+ * contributes 0, which is correct by construction; a FAILING job prints none
+ * either, and its warns stay behind the re-run hint the failure block already
+ * gives.
+ */
+/**
+ * `check design --wait-until load --timeout 15000` -> `check design`.
+ *
+ * Everything before the first flag. Slicing to a fixed token count split the
+ * command mid-flag, and filtering flags out afterwards kept `load` — a flag's
+ * value reading as part of the command name.
+ */
+export function gateVerb(gate: string): string {
+  const tokens = gate.trim().split(/\s+/);
+  const firstFlag = tokens.findIndex((t) => t.startsWith("-"));
+  return (firstFlag === -1 ? tokens : tokens.slice(0, firstFlag)).join(" ");
+}
+
+export function reportedWarns(output: string): number {
+  const m = /exits 0 [—-] (\d+) warn\(s\)/.exec(stripAnsi(output));
+  return m ? Number.parseInt(m[1]!, 10) : 0;
+}
+
 export function gateReported(output: string): boolean {
   // The banner, not the verdict line. The first version of this keyed on
   // `verdict:` / `status:`, and I justified that by saying the convention was already
@@ -422,6 +455,28 @@ export function formatBatchSummary(
     + ` (avg ${(busy / Math.max(wall, 0.001)).toFixed(1)} jobs in flight),`
     + ` slowest job ${((slowest?.durationMs ?? 0) / 1000).toFixed(1)}s${RESET}`,
   );
+  // Warns a passing job found, said on the summary. Without this the adoption path
+  // reported `ALL PASS (6/6)` and showed none of ten findings — the one number an
+  // adopting project is running the tool to get.
+  if (!options.showOutput) {
+    const warned = summary.jobs
+      .filter((j) => j.exitCode === 0)
+      .map((j) => ({ gate: gateVerb(j.gate), warns: reportedWarns(j.output) }))
+      .filter((j) => j.warns > 0);
+    const total = warned.reduce((sum, j) => sum + j.warns, 0);
+    if (total > 0) {
+      lines.push("");
+      lines.push(
+        `${YELLOW}${total} warn(s)${RESET} in ${warned.length} passing gate(s) — not shown above,`
+        + ` and they did not fail the run:`,
+      );
+      for (const j of warned) lines.push(`${DIM}    ${String(j.warns).padStart(3)}  ${j.gate}${RESET}`);
+      lines.push(
+        `${DIM}See them: --show-output, or --output <dir> to keep every log.`
+        + ` Gate on one: --rule <id>=suspect.${RESET}`,
+      );
+    }
+  }
   // A run can never finish faster than its slowest single job: that is the
   // floor more concurrency cannot buy through, and the number to shard against.
   //

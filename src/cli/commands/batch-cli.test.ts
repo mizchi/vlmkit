@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { buildJobs, formatBatchSummary, gateReported, jobLogName, parseShard, resolvePages, runBatch, runPool, shardPages, type BatchJobResult, type BatchSummary } from "./batch-cli.ts";
+import { buildJobs, formatBatchSummary, gateReported, gateVerb, jobLogName, parseShard, reportedWarns, resolvePages, runBatch, runPool, shardPages, type BatchJobResult, type BatchSummary } from "./batch-cli.ts";
 
 /** Colour codes out, so an assertion on the prose is not one on the palette. */
 const plain = (text: string): string => text.replace(/\u001B\[[0-9;]*m/g, "");
@@ -173,6 +173,38 @@ describe("formatBatchSummary", () => {
     wallMs: 2000,
     serialMs: jobs.reduce((s, j) => s + j.durationMs, 0),
     concurrency: 2,
+  });
+
+  it("surfaces warns a passing gate found, which the summary used to hide entirely", () => {
+    // v7's agent-l adopted it into a repo they did not own: "`gates run` prints
+    // `ALL PASS (6/6)` and shows none of the 10 warn findings. Adopt it naively and
+    // you learn nothing. Only `--output` preserves them."
+    const text = plain(formatBatchSummary(summary([
+      job({ gate: "check tokens --wait-until load", output: "  exits 0 — 20 warn(s) did not fail this command." }),
+      job({ gate: "check design", page: "b.html", output: "  exits 0 — 1 warn(s) did not fail this command." }),
+      job({ gate: "check copy", page: "c.html", output: "clean" }),
+    ])));
+    assert.match(text, /ALL PASS/);
+    assert.match(text, /21 warn\(s\) in 2 passing gate\(s\)/);
+    assert.match(text, /20\s+check tokens/);
+    assert.match(text, /1\s+check design/);
+    assert.doesNotMatch(text, /check copy/);
+    assert.match(text, /--show-output/);
+  });
+
+  it("stays quiet about warns when --show-output already prints them", () => {
+    const text = plain(formatBatchSummary(
+      summary([job({ output: "  exits 0 — 5 warn(s) did not fail this command." })]),
+      { showOutput: true },
+    ));
+    assert.doesNotMatch(text, /warn\(s\) in \d+ passing gate/);
+  });
+
+  it("does not count warns from a FAILING job, whose re-run hint already covers it", () => {
+    const text = plain(formatBatchSummary(summary([
+      job({ exitCode: 1, output: "  exits 0 — 9 warn(s) did not fail this command.\nverdict: DEFECTS" }),
+    ])));
+    assert.doesNotMatch(text, /9 warn/);
   });
 
   it("names the untracked paths the run created, once for the whole run", () => {
@@ -397,5 +429,28 @@ describe("gateReported", () => {
   it("counts a --json report as having run, and a truncated one as not", () => {
     assert.equal(gateReported('{"findings":[{"kind":"page-overflow-x"}]}'), true);
     assert.equal(gateReported('{"findings":['), false);
+  });
+});
+
+describe("reportedWarns", () => {
+  it("reads the runner's own exit-intent line, ANSI and all", () => {
+    assert.equal(reportedWarns("\u001B[2m  exits 0 — 20 warn(s) did not fail this command.\u001B[0m"), 20);
+    assert.equal(reportedWarns("  exits 0 - 3 warn(s) did not fail this command."), 3);
+  });
+
+  it("is 0 for a gate that printed no such line, which is correct by construction", () => {
+    // The runner emits it exactly when a gate exits 0 with warns, so absence means
+    // no warns. Verified across the gate set rather than assumed — the mistake
+    // `gateReported` made was trusting a convention only 8 of 12 gates followed.
+    assert.equal(reportedWarns("vlmkit check copy\nverdict: CLEAN"), 0);
+    assert.equal(reportedWarns(""), 0);
+  });
+});
+
+describe("gateVerb", () => {
+  it("keeps the command and drops flags and their values", () => {
+    assert.equal(gateVerb("check design --wait-until load --timeout 15000"), "check design");
+    assert.equal(gateVerb("check integrity"), "check integrity");
+    assert.equal(gateVerb("check a11y contrast --level AA"), "check a11y contrast");
   });
 });
