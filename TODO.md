@@ -1088,9 +1088,12 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - 直し方: 各ゲートの format が exit 意図を出すのではなく、runner が verdict 行の
     直下に出すのが本筋(27ゲート一律)。整形の置き場所の設計判断が必要。
 
-- [ ] **`gates init` が「必ずタイムアウトする設定」を出力する**
-  - `http://` の source を渡すと、全ゲートが navigation で死ぬ plan を生成する。
-    URL を持っているのだから `--wait-until` を足すか警告できる。
+- [x] **`gates init` が「必ずタイムアウトする設定」を出力する** — 修正済み(2026-08-12)
+  - URL source のときは全ゲートに `--wait-until load --timeout 15000` を足して書き、
+    理由と `record-har` の案内も出す。警告ではなく scaffold に入れたのは、既に書かれた
+    設定の隣に警告を出しても作業が読み手に戻るだけだから。
+  - 実測:never-idle ページに対して scaffold した設定が `gates run` で実際に走り、
+    `1 FAILED`(ページ本来の欠陥)を報告する。修正前は全ゲートが 30 秒で死んでいた。
 
 - [ ] **入力が pin されていないことを、どのゲートも言わない**
   - 4ゲートが live URL を叩いて verdict を返すが、再実行で変わり得ることを示す表示がゼロ。

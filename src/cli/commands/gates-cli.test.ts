@@ -5,11 +5,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseGateConfig, resolveGatePlan, resolveSuppression } from "@mizchi/vlmkit-core/gate-config.ts";
 import {
+  URL_SCAFFOLD_FLAGS,
   expandPlanSources,
   findGateConfig,
   formatExpiredNotice,
   formatPlan,
   formatSuppressions,
+  scaffoldConfig,
   shardPlan,
 } from "./gates-cli.ts";
 
@@ -25,6 +27,43 @@ describe("findGateConfig", () => {
     assert.equal(findGateConfig(dir), null);
     writeFileSync(join(dir, "vlmkit.gates.json"), "{}");
     assert.equal(findGateConfig(dir), join(dir, "vlmkit.gates.json"));
+  });
+});
+
+describe("scaffoldConfig", () => {
+  it("gives a URL source the flags without which every gate times out", () => {
+    // v5's CI agent: "Handed a `http://` source, it emits a plan that times out on
+    // every gate. It has the URL; it could scaffold `--wait-until`/`--timeout` or
+    // warn." A URL source implies the class of page that may never reach network idle,
+    // which is the default milestone.
+    const { config, urlSources } = scaffoldConfig(["http://localhost:5173/"], []);
+    assert.deepEqual(urlSources, ["http://localhost:5173/"]);
+    assert.deepEqual(config.defaults!.gates, [`check integrity ${URL_SCAFFOLD_FLAGS}`]);
+  });
+
+  it("leaves a file source alone, where the default milestone is reachable", () => {
+    const { config, urlSources } = scaffoldConfig(["routes/**/*.html"], []);
+    assert.deepEqual(urlSources, []);
+    assert.deepEqual(config.defaults!.gates, ["check integrity"]);
+  });
+
+  it("applies the flags to every declared gate, not just the starter", () => {
+    const { config } = scaffoldConfig(["https://example.com/"], ["check integrity", "check copy"]);
+    assert.deepEqual(config.defaults!.gates, [
+      `check integrity ${URL_SCAFFOLD_FLAGS}`,
+      `check copy ${URL_SCAFFOLD_FLAGS}`,
+    ]);
+  });
+
+  it("treats a mixed list as needing the flags, since one URL is enough to hang the run", () => {
+    const { config } = scaffoldConfig(["index.html", "http://localhost:1/"], []);
+    assert.deepEqual(config.defaults!.gates, [`check integrity ${URL_SCAFFOLD_FLAGS}`]);
+  });
+
+  it("writes a config its own validator accepts", () => {
+    // The scaffold is a first impression; one its validator rejects is worse than none.
+    const { config } = scaffoldConfig(["http://localhost:5173/"], []);
+    assert.doesNotThrow(() => parseGateConfig(JSON.stringify(config)));
   });
 });
 

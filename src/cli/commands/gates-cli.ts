@@ -244,6 +244,45 @@ async function validateAgainstRegistry(plan: GatePlan, configPath: string): Prom
 
 const STARTER_GATE = "check integrity";
 
+/** Flags a URL-sourced scaffold needs to run at all. See `scaffoldConfig`. */
+export const URL_SCAFFOLD_FLAGS = "--wait-until load --timeout 15000";
+
+/**
+ * What `gates init` writes, as a decision separate from writing it.
+ *
+ * A `http(s)` source needs the page-load flags or every gate in the scaffold dies in
+ * navigation on any page that does not reach network idle — which is the whole class of
+ * page a URL source implies. v5's CI agent got exactly that plan:
+ *
+ *   "`gates init` doesn't know what it scaffolded. Handed a `http://` source, it emits
+ *    a plan that times out on every gate. It has the URL; it could scaffold
+ *    `--wait-until`/`--timeout` or warn."
+ *
+ * Scaffolding the flags rather than warning, because a warning printed next to a config
+ * that has already been written puts the work back on the reader. `load` rather than
+ * `domcontentloaded`: it is the weakest milestone that still guarantees subresources,
+ * and the gates settle after it anyway.
+ */
+export function scaffoldConfig(
+  patterns: readonly string[],
+  gates: readonly string[],
+): { config: GateConfig; urlSources: string[] } {
+  const sources = patterns.length > 0 ? [...patterns] : ["index.html"];
+  const urlSources = sources.filter((source) => /^https?:\/\//.test(source));
+  const declared = gates.length > 0 ? [...gates] : [STARTER_GATE];
+  return {
+    config: {
+      defaults: {
+        gates: urlSources.length > 0
+          ? declared.map((gate) => `${gate} ${URL_SCAFFOLD_FLAGS}`)
+          : declared,
+      },
+      pages: sources.map((source) => ({ source })),
+    },
+    urlSources,
+  };
+}
+
 async function initConfig(args: string[]): Promise<void> {
   const path = resolve(readFlag(args, "path") ?? GATE_CONFIG_FILENAMES[0]!);
   if (existsSync(path) && !hasFlag(args, "force")) {
@@ -251,16 +290,26 @@ async function initConfig(args: string[]): Promise<void> {
   }
   const patterns = readAll(args, "pages");
   const gates = readAll(args, "gate");
-  const config: GateConfig = {
-    defaults: { gates: gates.length > 0 ? gates : [STARTER_GATE] },
-    pages: (patterns.length > 0 ? patterns : ["index.html"]).map((source) => ({ source })),
-  };
+  const { config, urlSources } = scaffoldConfig(patterns, gates);
   // Parse what we are about to write: a scaffold that its own validator
   // rejects would be a rough first impression.
   parseGateConfig(JSON.stringify(config));
   await writeFile(path, `${JSON.stringify(config, null, 2)}\n`);
   console.log(`Wrote ${path}`);
   console.log(`  ${config.pages.length} page entr(ies), gates: ${config.defaults!.gates!.join(", ")}`);
+  if (urlSources.length > 0) {
+    console.log(
+      `\n  Added --wait-until load --timeout 15000 because the source is a URL:`
+      + ` the default \`networkidle\` milestone never fires on a page that holds a`
+      + ` connection open (a stream, a poll), and every gate would time out having`
+      + ` reported nothing. Drop them if this page does reach network idle.`,
+    );
+    console.log(
+      `  For reproducible numbers, pin the network too:`
+      + ` vlmkit snapshot record-har ${urlSources[0]} --out app.har`
+      + `, then add --har app.har.`,
+    );
+  }
   console.log(`\nNext: vlmkit gates list    (see what would run)`);
   console.log(`      vlmkit gates run     (run it)`);
 }
