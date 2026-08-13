@@ -21,7 +21,7 @@ import {
   type DesignPolicyOptions,
   type DesignPolicyReport,
 } from "../style/design-policy.ts";
-import { firstPositional } from "./arg-helpers.ts";
+import { firstPositional } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 export const designGate = defineGate<DesignPolicyReport, DesignPolicyOptions>({
   id: "check.design",

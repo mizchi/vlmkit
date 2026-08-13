@@ -12,7 +12,7 @@ import {
   formatScrollBehaviorReport,
   runScrollBehavior,
 } from "../inspect/scroll-behavior.ts";
-import { firstPositional, viewportFlag } from "./arg-helpers.ts";
+import { firstPositional, viewportFlag } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 export const scrollGate = defineGate<ScrollBehaviorReport, ScrollBehaviorOptions>({
   id: "check.scroll",

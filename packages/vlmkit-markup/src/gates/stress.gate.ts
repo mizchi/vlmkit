@@ -30,7 +30,7 @@ import {
   formatMediaVariantsReport,
   runMediaVariants,
 } from "../stress/media-variants.ts";
-import { firstPositional } from "./arg-helpers.ts";
+import { firstPositional } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 export const i18nStressGate = defineGate<I18nStressReport, I18nStressOptions>({
   id: "stress.i18n",

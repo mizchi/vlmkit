@@ -23,11 +23,15 @@
  * cheap) and measure the DOM.
  */
 
-import { defineGate, definePlugin } from "@mizchi/vlmkit-core/plugin/contract.ts";
-import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
-import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { readAll, readPositionals } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { readFile } from "node:fs/promises";
+import {
+  UsageError,
+  defineGate,
+  definePlugin,
+  readAll,
+  readPositionals,
+} from "@mizchi/vlmkit-core/plugin";
+import type { Finding } from "@mizchi/vlmkit-core/plugin";
 
 interface HouseBrandOptions {
   source: string;

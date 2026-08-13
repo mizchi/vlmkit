@@ -35,6 +35,14 @@
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
     },
+    "./plugin": {
+      "types": "./dist/plugin/index.d.mts",
+      "import": "./dist/plugin/index.mjs"
+    },
+    "./plugin/browser": {
+      "types": "./dist/plugin/browser.d.mts",
+      "import": "./dist/plugin/browser.mjs"
+    },
     "./*.ts": {
       "types": "./dist/*.d.mts",
       "import": "./dist/*.mjs"

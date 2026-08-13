@@ -28,7 +28,7 @@ import {
   formatDesignTokensReport,
   runDesignTokens,
 } from "../style/design-tokens.ts";
-import { firstPositional, numberListFloat, optionalInt } from "./arg-helpers.ts";
+import { firstPositional, numberListFloat, optionalInt } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 export interface TokensGateOptions extends PageLoadOptions {
   source: string;

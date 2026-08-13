@@ -18,7 +18,7 @@ import {
   deriveHandlerIssues,
   formatHandlerSurface,
 } from "../inspect/handler-map.ts";
-import { firstPositional } from "./arg-helpers.ts";
+import { firstPositional } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 export interface HandlersGateReport {
   surface: HandlerSurface;

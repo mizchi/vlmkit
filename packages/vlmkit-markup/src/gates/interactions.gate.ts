@@ -35,7 +35,7 @@ import {
   type SurfaceMismatch,
   formatHandlerSurface,
 } from "../inspect/handler-map.ts";
-import { firstPositional, optionalInt } from "./arg-helpers.ts";
+import { firstPositional, optionalInt } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 export interface InteractionsGateOptions extends PageLoadOptions {
   source: string;

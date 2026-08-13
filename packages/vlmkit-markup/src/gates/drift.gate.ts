@@ -32,7 +32,7 @@ import {
   formatMultiPageConsistencyReport,
   runMultiPageConsistency,
 } from "../stress/multi-page-consistency.ts";
-import { firstPositional, runOutputDir } from "./arg-helpers.ts";
+import { firstPositional, runOutputDir } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 const DEFAULT_THRESHOLD = 0.03;
 

@@ -1,18 +1,25 @@
 /**
- * Argument helpers shared by the gate definitions.
+ * Argument helpers for writing a gate — the shapes `arg-reader` does not cover.
  *
- * `@mizchi/vlmkit-core/arg-reader.ts` already refuses to guess (a missing
- * value is an error, `--output --json` does not consume the flag as a
- * value). These are the two or three shapes it does not cover, kept in one
- * place so gates stop re-implementing the loop that produced
- * `Number.parseInt(argv[++i] ?? "12", 10)` twenty times over — a form that
- * silently accepts `--max-findings --json` as `NaN`.
+ * `../arg-reader.ts` already refuses to guess (a missing value is an error,
+ * `--output --json` does not consume the flag as a value). These are the two or
+ * three shapes it does not, kept in one place so gates stop re-implementing the
+ * loop that produced `Number.parseInt(argv[++i] ?? "12", 10)` twenty times over —
+ * a form that silently accepts `--max-findings --json` as `NaN`.
+ *
+ * These lived in `vlmkit-markup/src/gates/arg-helpers.ts` until v7, which is
+ * where a third-party plugin author found them: `firstPositional` is the first
+ * line of almost every gate's `parse`, and getting it meant taking a dependency
+ * on the markup package for an argv helper. Every function here is pure and
+ * imports nothing but core, so the old location was an accident of history
+ * rather than a boundary. Re-exported from `./index.ts`, which is the entry a
+ * plugin should import.
  */
 
 import { createHash } from "node:crypto";
 import { basename, join, resolve } from "node:path";
-import { readFlag, readInt, readPositionals } from "@mizchi/vlmkit-core/arg-reader.ts";
-import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { readFlag, readInt, readPositionals } from "../arg-reader.ts";
+import { UsageError } from "../cli-error.ts";
 
 /**
  * Flags that take a value, so `readPositionals` does not mistake the value

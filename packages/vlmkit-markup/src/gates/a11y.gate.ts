@@ -43,7 +43,7 @@ import {
   formatFocusOrderReport,
   runFocusOrder,
 } from "../a11y-focus-order.ts";
-import { firstPositional, optionalInt, runOutputDir, viewportFlag } from "./arg-helpers.ts";
+import { firstPositional, optionalInt, runOutputDir, viewportFlag } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 const A11Y_VALUE_FLAGS = ["--output-dir", "--report", "--level", "--max-steps", "--viewport", "--allow"];
 

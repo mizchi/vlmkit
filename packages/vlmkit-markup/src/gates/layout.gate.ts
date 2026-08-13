@@ -29,7 +29,7 @@ import {
   formatLayoutReport,
   runLayoutVerify,
 } from "../inspect/layout-contract.ts";
-import { firstPositional } from "./arg-helpers.ts";
+import { firstPositional } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 /** `evaluateLayoutRule` names its checks in camelCase; rule ids are slugs. */
 const CHECK_RULE_IDS: Record<string, string> = {

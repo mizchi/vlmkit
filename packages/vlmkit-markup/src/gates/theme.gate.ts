@@ -22,7 +22,7 @@ import {
   formatThemeParityReport,
   runThemeParity,
 } from "../style/theme-parity.ts";
-import { firstPositional } from "./arg-helpers.ts";
+import { firstPositional } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 const THEME_VALUE_FLAGS = ["--output-dir", "--report", "--threshold"];
 

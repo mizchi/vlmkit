@@ -30,7 +30,7 @@ import {
   formatFlowReport,
   runFlowVerify,
 } from "../inspect/flow-verify.ts";
-import { firstPositional } from "./arg-helpers.ts";
+import { firstPositional } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 export const verifyMarkupGate = defineGate<MarkupVerifyReport, MarkupVerifyOptions>({
   id: "verify.markup",

@@ -16,7 +16,7 @@ import {
   formatScrollScanReport,
   runScrollScan,
 } from "../inspect/scroll-scan.ts";
-import { firstPositional, optionalInt, viewportFlag } from "./arg-helpers.ts";
+import { firstPositional, optionalInt, viewportFlag } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 export const scrollScanGate = defineGate<ScrollScanReport, ScrollScanOptions>({
   id: "scan.scroll",

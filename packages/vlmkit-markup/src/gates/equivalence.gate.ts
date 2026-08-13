@@ -26,7 +26,7 @@ import {
   parseRegionSpec,
   runRegionJudge,
 } from "../inspect/region-judge.ts";
-import { firstPositional, vlmFlag, withoutOptionalValue } from "./arg-helpers.ts";
+import { firstPositional, vlmFlag, withoutOptionalValue } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 export interface EquivalenceGateOptions extends RegionJudgeOptions {
   vlm?: string | true;

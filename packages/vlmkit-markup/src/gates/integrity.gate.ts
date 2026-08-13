@@ -34,7 +34,7 @@ import {
   type IntegrityImageReport,
   runImageIntegrityCheck,
 } from "../inspect/integrity-image.ts";
-import { firstPositional, firstPositionalOrUndefined, numberList, optionalInt } from "./arg-helpers.ts";
+import { firstPositional, firstPositionalOrUndefined, numberList, optionalInt } from "@mizchi/vlmkit-core/plugin/args.ts";
 
 /** Heights the CLI has always paired with its default sweep widths. */
 const VIEWPORT_HEIGHTS: Record<number, number> = { 1280: 800, 768: 900, 375: 700 };

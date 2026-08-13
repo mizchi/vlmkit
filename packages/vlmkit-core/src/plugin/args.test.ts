@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { runOutputDir } from "./arg-helpers.ts";
+import { runOutputDir } from "./args.ts";
 
 describe("runOutputDir", () => {
   it("gives two sources two directories, so one run cannot overwrite the other", () => {
