@@ -1,0 +1,53 @@
+{
+  "//": "vlmkit gate plan for the orders console. Run: `pnpm verify:ui` (see package.json). Every gate, every exemption and every reason we accepted lives in this file — nothing is passed on a command line at CI time. Findings inventory: vlmkit-findings.md",
+
+  "//webServer": "gates run starts this, polls `url` until it answers, and stops it after. Port 4310 is hard-coded here AND in the page source below; they must match.",
+  "webServer": {
+    "command": "node serve.mjs 4310",
+    "url": "http://localhost:4310/",
+    "cwd": ".",
+    "timeout": 30000,
+    "reuseExistingServer": true
+  },
+
+  "defaults": {
+    "//gates": "Deliberately small. `--wait-until load --timeout 15000` is required, not cosmetic: serve.mjs holds /api/stream open, so the default `networkidle` milestone can never fire. Gates we evaluated and rejected, with the reason, are listed at the bottom of vlmkit-findings.md.",
+    "gates": [
+      "check integrity --wait-until load --timeout 15000",
+      "check copy --wait-until load --timeout 15000",
+      "check breakpoints --sweep --wait-until load --timeout 15000",
+      "check interactions --wait-until load --timeout 15000",
+      "check a11y focus",
+      "check a11y touch"
+    ],
+
+    "//rules": "Empty on purpose. Every default severity is one we accept. Note for whoever adds the first entry: a `rules` entry here is appended as a `--rule` flag to EVERY gate in the plan, not just the gate that owns the rule — so `check.breakpoints/...` also lands on `check a11y touch`. Harmless, but it makes `gates list` hard to read.",
+
+    "//suppressions": "One entry per accepted finding. `vlmkit gates suppressions --require-owner --require-expiry` is our triage queue; an expired entry fails the run even if the page passes, which is the point."
+  },
+
+  "pages": [
+    {
+      "id": "orders",
+      "source": "http://localhost:4310/",
+      "suppressions": [
+        {
+          "//": "READ THIS BEFORE TRUSTING A GREEN RUN. page-overflow-x cannot be scoped. `--allow \"page-overflow-x@table.orders;...\"` matches nothing (the finding has no selector field, only prose naming table.orders), and `@768` scoping is broken (it silences a finding printed @1280). Unscoped is the only form that works, so this entry hides ANY horizontal overflow anywhere on this page. Demonstrated: a 1400px panel added to index.html still exits 0 with this in force. check.breakpoints/sweep-overflow keeps printing at warn but does not fail. Fix ORD-1481 and delete this entry — it is the weakest part of the config.",
+          "gate": "check integrity",
+          "flag": "--allow \"page-overflow-x;ORD-1481: .orders is width:940px, overflows every viewport under 964px\"",
+          "reason": "Known defect, ticketed ORD-1481. Suppressed only so the rest of the gate can run in CI from day one; not a decision that the overflow is acceptable.",
+          "owner": "orders-team",
+          "expires": "2026-10-15"
+        },
+        {
+          "//": "check copy has no per-instance --allow, so the choice is `off` for the whole placeholder-text rule or a red CI. We take `off` with an expiry rather than editing the console, which is not ours.",
+          "gate": "check copy",
+          "flag": "--rule check.copy/placeholder-text=off",
+          "reason": "ORD-1482: `FIXME confirm rounding with finance.` is shipped user-visible copy in index.html:16. Finance owns the answer, not us. Rule off until it is removed — re-enable in the same PR that deletes the FIXME.",
+          "owner": "orders-team",
+          "expires": "2026-10-15"
+        }
+      ]
+    }
+  ]
+}

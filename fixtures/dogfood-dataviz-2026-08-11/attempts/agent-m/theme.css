@@ -25,7 +25,7 @@ body {
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(3, 240px);
+  grid-template-columns: repeat(3, minmax(0, 240px));
   gap: 24px;
   padding: 24px;
 }
@@ -43,7 +43,7 @@ body {
 .status {
   margin: 0;
   font-size: 13px;
-  color: #a8a8a8;
+  color: #6b6b6b;
 }
 
 .vendorchart-ctrl-group {

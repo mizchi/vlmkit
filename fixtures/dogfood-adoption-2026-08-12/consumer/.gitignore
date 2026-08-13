@@ -1,0 +1,7 @@
+# vlmkit writes both of these into the directory it is run from (cwd, not the
+# directory the config lives in). `pnpm verify:ui` runs from consumer/, so they
+# land here.
+# run ledger (.vlmkit/run-ledger.jsonl)
+.vlmkit/
+# per-gate markdown reports + batch-summary.json
+test-results/
