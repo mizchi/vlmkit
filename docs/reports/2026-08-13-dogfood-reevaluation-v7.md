@@ -199,44 +199,115 @@ The spawn inherited stdout so a boot failure would reach the terminal. It still 
 contract for. **Fixed** (`2c171c1`); `gates run --json` now parses with a `webServer`
 declared.
 
-## Recorded, not fixed
+## Recorded, then fixed
 
-Verified, none a wrong measurement. Start conditions in `TODO.md`.
+Verified, none a wrong measurement, and all eight fixed the same day. Three of them
+turned out to be **worse than their own reports** once measured; that is recorded
+below rather than smoothed over.
 
 1. **`gates run --json` gives ANSI-escaped child output, not structured findings.**
    > "findings arrive as one ANSI-escaped `output` string, not structured."
    The warn *counts* now surface (above), but a CI job wanting the findings themselves
    still parses terminal text. Needs the batch runner to invoke children with
    `--json` and merge envelopes, keeping the prose path for the failure display.
+
+   **Fixed** (`3f533e6`): exactly that. Each child's envelope lands on the job as
+   `gateReport` — verdict, counts, findings — turning one opaque string into 24
+   addressable findings across three gates on the adoption scenario. The child's
+   stdout is captured separately from its stderr to do it, which is the same lesson
+   as the `webServer` greeting two commits earlier. An unparseable child falls back
+   to `unparsedOutput` rather than throwing: a gate that dies in navigation prints
+   prose, and losing the run's JSON because one job failed early would make the
+   machine path less reliable than the prose one.
 2. **`scan handlers` reports `registrations: 0 across 0 element(s)` → status `ok`.**
    > "zero listeners on a 3-button page is the finding."
    agent-l separately found all three buttons inert (`inert-control`), so the
    information exists in another gate; this gate's own zero is the wrong verdict.
+
+   **Fixed** (`32936c3`): the collector now counts the controls the page presents —
+   the denominator that was missing, since a static document and a page of dead
+   buttons printed the same zero. The finding names all three explanations, because
+   only one is a defect and this gate cannot tell which: inert controls, handlers it
+   cannot attribute, or a page that genuinely needs none. `warn`, not `suspect`. And
+   `status: ok` stopped printing beside a warn — the same self-contradiction
+   `check design` had.
 3. **`check a11y touch` has no `--exclude` and no selector `--allow`** while
    `check design` and `check integrity` both do.
    > "Vendor DOM is a page-level fact, not a per-gate one. The only exit is turning
    > the one rule off page-wide, which also stops checking our own buttons."
    Same for `check a11y contrast`: *"red CI or contrast off, nothing between."*
    Suggests a page-level `--exclude` shared by every gate rather than per-gate flags.
+
+   **Fixed** (`3f2cb3d`) as a per-selector `--allow` on both. The contrast half was
+   the sharper one: `check integrity` reports the same colours as a *warn* with an
+   exemption, while this gate reports them as a *fail* with none — so one approved
+   grey forced the whole rule off. Now one grey is exempted and named while the other
+   two still fail. Three exemption parsers already existed, so the
+   `<selector>;<reason>` form was extracted into `inspect/selector-exemption.ts` and
+   `check design` moved onto it rather than a fourth copy being written. A
+   config-level `exclude` shared by every gate is still the better shape for vendor
+   DOM, and is not built.
 4. **`check a11y touch --level AA` may contradict its own help.**
    > "Help: *'Clustered targets (within 24px of a sibling) are flagged…'* The vendor
    > buttons are 24x24 with a 4px gap; at `--level AA` it reported `✓ 0 undersized
    > target(s)`. Either the clustering check doesn't run at AA, or the help is wrong."
    Unresolved which; both are defects, and the answer decides the fix.
+
+   **Determined, then fixed** (`62ffb3d`): the help was wrong. Clustering is computed
+   only on targets already below the floor, so it annotates a finding and never
+   causes one, and a 24x24 target passes AA on size — WCAG 2.5.8 sizes targets and
+   does not condemn a compliant one for being adjacent.
+
+   Checking it surfaced a worse bug the report had not reached. Dedupe keyed on the
+   generated CSS path, which identical siblings share, so three buttons in one `div`
+   collapsed to one element — and cluster detection, which compares each target
+   against the *others*, had nothing left to compare against. Same pixels, same
+   geometry, and the verdict moved with the markup:
+
+   ```
+   distinct classes -> inspected 3 | failures 3 | clustered 3
+   identical markup -> inspected 1 | failures 1 | clustered 0
+   ```
+
+   So the most common clustered case — a row of identical icon buttons — could never
+   report a cluster, and coverage was understated. Keyed on path plus position now.
 5. **`gates list` prints plans that cannot run.**
    > "It listed `check layout … http://localhost:5311/` as job 4 of 7; only
    > `gates run` revealed `did not run: error: --contract <contract.json> is
    > required`. `list` validates rule names but not required flags."
+
+   **Fixed** (`c2007a4`): **seven** gates declare a required flag and `check
+   equivalence` declares two, so this was not one gate's quirk. Validated against
+   the resolved command line, suppression flags included, so a suppression that
+   supplies the flag counts as supplying it.
 6. **Rule settings fan out to every gate's command line.** Both agents, independently.
    `--rule check.a11y.touch/target-undersized=off` is appended to `check copy` too,
    and a typo'd key printed the same config error once per gate.
+
+   **Fixed** (`b9487fc`): the command line is filtered by the registry — a key
+   belongs to a gate when it names that gate or is a bare rule id the gate declares.
+   An unresolvable key is passed through rather than dropped, because dropping it
+   would turn a config error into a setting that quietly does nothing. The validation
+   split follows the same line: a qualified key is a config-level fact and is checked
+   once with the whole catalog in view, while a bare rule id can only be judged
+   against a gate and stays per-job.
 7. **`.vlmkit/` and `test-results/` are written to the cwd, not the config's
    directory** — where v5 moved every *input* path. agent-l wrote the discrepancy
    into their `.gitignore` as a comment, which is the clearest possible signal that
    it is a real gap.
+
+   **Fixed** (`b9487fc`), and the defect was worse than "wrong directory": the
+   children run with the config's directory as their cwd, so their reports and ledger
+   lines went there, while the batch process's own append used `process.cwd()`. A
+   `gates run --config ../proj/...` from a sibling directory therefore wrote **two**
+   ledgers in two places, each holding half the run.
 8. **`gates init` did not scaffold `webServer` for a localhost URL** even though it
    already scaffolds `--wait-until load` for one. A `localhost` source implies a dev
    server the same way a URL source implies a page that may never idle.
+
+   **Fixed** (`c2007a4`). The command is a placeholder and the output says to replace
+   it: a wrong command that *looks* configured is worse than an obvious blank,
+   because the run would start something unrelated and gate whatever answered.
 
 ## Honest read
 
@@ -247,6 +318,20 @@ introduced a false negative, my unit test asserted the false negative as correct
 only a fresh agent's deliberate self-sabotage test surfaced it. The loop earns its
 keep specifically where unit tests cannot go — an agent following the documentation
 into a hole the author cannot see because the author wrote the documentation.
+
+Three of the eight recorded findings were **understated by their own reports**, and
+none of the three came apart from reading — only from measuring:
+
+- `.vlmkit/` "written to the wrong directory" was actually two ledgers, one per
+  process, each holding half the run;
+- `--level AA` "contradicts its help" was actually a measurement that changed with
+  markup detail nobody can see;
+- `gates list` "prints plans that cannot run" named one gate and covered seven.
+
+Worth naming as a pattern: an agent reports the symptom visible from outside, and
+the maintainer's job is not to implement the report but to find what produces it.
+Taking any of the three at face value would have shipped a smaller fix that left the
+real defect in place.
 
 ## Files
 

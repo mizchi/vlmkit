@@ -91,6 +91,39 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **`gates run --json` returns the gates' own structured findings**, as
+  `jobs[].gateReport` — verdict, counts and findings per gate — instead of one
+  ANSI-escaped string of the child's terminal output. On the adoption scenario
+  that is 24 addressable findings across three gates where there was one opaque
+  blob. A child that printed prose rather than an envelope (a gate that died in
+  navigation) falls back to `unparsedOutput`, so one early failure cannot cost the
+  run its JSON.
+- **`check a11y touch` and `check a11y contrast` take `--allow
+  "<selector>;<reason>"`.** `check integrity` reports the same colours as a *warn*
+  and has had a per-selector exemption for a while; `check a11y contrast` reports
+  them as a *fail* and had none, so one approved brand grey forced the whole rule
+  off — "red CI or contrast off, nothing between". Same three properties as every
+  other exemption here: a reason is required, an exempted finding is still listed
+  rather than subtracted, and a rule that matched nothing is reported. Three
+  exemption parsers already existed, so the `<selector>;<reason>` form now lives in
+  one place and `check design` uses it too.
+- **`vlmkit gates` refuses a plan whose gates cannot start.** Seven gates declare a
+  required flag (`check layout --contract`, `check story --gallery`, `check
+  equivalence` declares two); `gates list` validated rule names and not those, so a
+  job read as runnable and surfaced as `did not run` only after the browser work.
+  Checked against the resolved command line, so a suppression that supplies the
+  flag counts.
+- **`gates init` scaffolds a `webServer` for a localhost source**, the same
+  reasoning that already scaffolds the page-load flags for a URL. The command is a
+  placeholder and the output says to replace it: a wrong command that looks
+  configured would start something unrelated and gate whatever answered.
+- **`scan handlers` reports a page that presents controls and registers no
+  handlers at all.** It only ever inventoried elements that already had one, so a
+  static document and a page of dead buttons both printed `registrations: 0 across
+  0 element(s)` and `status: ok`. The control count is the denominator that was
+  missing. The finding names all three explanations — inert controls, handlers it
+  cannot attribute, or a page that needs none — because only one is a defect and
+  this gate cannot tell which. `warn` by default.
 - **`check design` says `NOT JUDGED` instead of `COHERENT` when no role had enough
   instances to judge**, and a role under `--min-instances` renders `not judged`
   rather than `ok`. Found by re-running the dogfood scenarios against the
@@ -461,6 +494,27 @@ suppression works per *rule* instead of per whole gate.
   a stack trace.
 
 ### Fixed
+
+- **`check a11y touch` measures identical siblings as separate targets.** Dedupe
+  keyed on the generated CSS path, which three `<button>`s in one `<div>` share, so
+  a whole toolbar collapsed into one element — and cluster detection, which compares
+  each target against the *others*, had nothing left to compare against. Same
+  pixels, and the verdict moved with the markup: distinct classes gave
+  `inspected 3 | failures 3 | clustered 3`, identical markup gave
+  `inspected 1 | failures 1 | clustered 0`. So the most common clustered case, a row
+  of identical icon buttons, could never report a cluster. Its `usage` is corrected
+  too: clustering annotates a finding and never causes one, the shorter side is what
+  is measured, and WCAG's spacing exception is deliberately not applied.
+- **One run writes one ledger.** The gate children run with the config's directory
+  as their cwd, while the batch process appended to `process.cwd()`, so
+  `gates run --config ../proj/...` from a sibling directory produced two ledgers in
+  two places, each holding half the run.
+- **A rule setting only reaches the gates it names.** Every setting was appended to
+  every gate's command line, so `check copy` carried
+  `--rule check.a11y.touch/target-undersized=off`, and one typo'd key printed the
+  same config error once per gate. An unresolvable key is still passed through
+  rather than dropped, because dropping it would turn a config error into a setting
+  that quietly does nothing.
 
 - **`page-overflow-x` carries the element it blames**, so
   `--allow "page-overflow-x@table.orders;…"` matches. It printed `caused by:

@@ -1064,59 +1064,70 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     現行のグリッドの拡張ではなく新しい構図。
   - 着手条件: レビュアーが実際に空間配置を読み違えた事例が出たら。
 
-### dogfood v7 の残件(2026-08-13、既存3シナリオの再評価)
+### dogfood v7(2026-08-13、既存3シナリオの再評価)— **全件修正済み**
 
 レポートは `docs/reports/2026-08-13-dogfood-reevaluation-v7.md`。
 修正済み4件: `2892b5b`(batch が新規 untracked パスを報告)/ `a079a76`(未判定 role が
 `NOT JUDGED` を出す)/ `de9de2f`(`page-overflow-x` が blame 対象を selector に載せる)/
 `73dc7ef`(passing run の warn 数を summary に出す)/ `2c171c1`(webServer の stdout → stderr)。
 **うち2件は前日に入れたコードの欠陥で、両方ともそのコードのための作業をしたエージェントが見つけた。**
-以下は未修正・記録のみ。指摘文はエージェントの言葉のまま。
+**記録した8件も同日すべて修正**(`62ffb3d` a11y touch dedupe+help / `32936c3` scan handlers /
+`c2007a4` 必須フラグ検証 + init webServer / `b9487fc` ledger 一本化 + rule 展開 /
+`3f2cb3d` a11y --allow / `3f533e6` gates run --json)。
 
-- [ ] **`gates run --json` が構造化された findings を返さない**
+**8件のうち3件は指摘自身が過小評価だった。3件とも読んでは分からず、測って初めて崩れた**:
+`.vlmkit/` の「ディレクトリが違う」は実は**ledger が2つ**(親と子で別、各々が実行の半分を保持)、
+`--level AA` の「ヘルプと矛盾」は実は**誰にも見えないマークアップの差で計測が変わる**、
+`gates list` の「実行できないプランを表示」は1ゲートの話ではなく**7ゲート**。
+エージェントは外から見える症状を報告し、**それを実装するのではなく何がそれを生んでいるかを探すのが保守側の仕事**。
+3件とも額面通りに直したら、小さい修正で本当の欠陥を残していた。
+
+指摘文はエージェントの言葉のまま残す。
+
+- [x] **`gates run --json` が構造化された findings を返さない**
   - > "findings arrive as one ANSI-escaped `output` string, not structured."
   - warn の**件数**は summary に出るようになったが、findings 自体を欲しい CI ジョブは
     ターミナル文字列をパースすることになる。
   - 直し方: batch が子プロセスを `--json` で起動して envelope をマージする。失敗表示用の
     prose 経路は残す(失敗時に読むのはそちら)。
 
-- [ ] **`scan handlers` が `registrations: 0 across 0 element(s)` で status `ok`**
+- [x] **`scan handlers` が `registrations: 0 across 0 element(s)` で status `ok`**
   - > "zero listeners on a 3-button page is the finding."
   - agent-l は別途3つのボタンが全部 inert であることを `inert-control` で見つけている。
     つまり情報は他のゲートにある。このゲート自身の 0 が誤った verdict。
 
-- [ ] **`check a11y touch` / `check a11y contrast` に `--exclude` も selector `--allow` も無い**
+- [x] **`check a11y touch` / `check a11y contrast` に `--exclude` も selector `--allow` も無い**
   - `check design` と `check integrity` にはある。
   - > "Vendor DOM is a page-level fact, not a per-gate one. The only exit is turning the
     > one rule off page-wide, which also stops checking our own buttons."
   - > (contrast について) "red CI or contrast off, nothing between."
   - **ページレベルの `--exclude` を全ゲート共有**にするのが筋。per-gate フラグを増やす話ではない。
 
-- [ ] **`check a11y touch --level AA` がヘルプと矛盾する可能性**
+- [x] **`check a11y touch --level AA` がヘルプと矛盾する可能性**
   - > "Help: *'Clustered targets (within 24px of a sibling) are flagged…'* The vendor
     > buttons are 24x24 with a 4px gap; at `--level AA` it reported `✓ 0 undersized
     > target(s)`. Either the clustering check doesn't run at AA, or the help is wrong."
   - どちらなのか未確定。どちらでも欠陥で、**どちらかを確定させることが修正内容を決める**。
 
-- [ ] **`gates list` が実行できないプランを表示する**
+- [x] **`gates list` が実行できないプランを表示する**
   - > "It listed `check layout … http://localhost:5311/` as job 4 of 7; only `gates run`
     > revealed `did not run: error: --contract <contract.json> is required`. `list`
     > validates rule names but not required flags."
   - 必須フラグの検証は registry に情報がある(`inputs[].required`)ので `list` でできる。
 
-- [ ] **rule settings が全ゲートのコマンドラインに展開される**(agent-l / agent-m 独立に指摘)
+- [x] **rule settings が全ゲートのコマンドラインに展開される**(agent-l / agent-m 独立に指摘)
   - `--rule check.a11y.touch/target-undersized=off` が `check copy` にも付く。
     typo したキーは**ゲート数と同じ回数**同じ設定エラーを出す。
   - `assertKnownRuleOverrides` の設計(他ゲートのキーは黙って通す)は意図的だが、
     コマンドラインのノイズと重複エラーは別問題。
 
-- [ ] **`.vlmkit/` と `test-results/` が cwd に書かれる。config のディレクトリではない**
+- [x] **`.vlmkit/` と `test-results/` が cwd に書かれる。config のディレクトリではない**
   - v5 で**入力**パスは config 基準に直した。出力はまだ cwd 基準。
   - agent-l は自分で書いた `.gitignore` にこの差異をコメントとして書いている
     (`vlmkit writes both of these into the directory it is run from (cwd, not the
     directory the config lives in)`)。実在するギャップの最も明確な兆候。
 
-- [ ] **`gates init` が localhost URL に `webServer` を足さない**
+- [x] **`gates init` が localhost URL に `webServer` を足さない**
   - URL source には既に `--wait-until load` を足している。`localhost` は「dev サーバがある」を
     含意するので同じ理屈が通る。
 
