@@ -615,10 +615,26 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
         ...(shard ? { shard } : {}),
         ...(output ? { output } : {}),
         quiet: hasFlag(args, "quiet") || json,
+        ...(json ? { json: true } : {}),
       },
     ));
   const stale = sharded.expired.length;
-  if (json) console.log(JSON.stringify({ config: path, expiredSuppressions: stale, ...summary }, null, 2));
+  if (json) {
+    // Structured findings, not the child's terminal text. v7's agent-l: "findings
+    // arrive as one ANSI-escaped `output` string, not structured." Each job now
+    // carries the gate's own envelope, and `output` is dropped from the JSON —
+    // keeping both would leave a consumer guessing which one is authoritative, and
+    // the prose copy is the one that is only readable by a human.
+    console.log(JSON.stringify({
+      config: path,
+      expiredSuppressions: stale,
+      ...summary,
+      jobs: summary.jobs.map(({ output, envelope, ...rest }) => ({
+        ...rest,
+        ...(envelope ? { gateReport: envelope } : { unparsedOutput: output }),
+      })),
+    }, null, 2));
+  }
   else {
     console.log(formatBatchSummary(summary, {
       showOutput: hasFlag(args, "show-output"),

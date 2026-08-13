@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { buildJobs, formatBatchSummary, gateReported, gateVerb, jobLogName, parseShard, reportedWarns, resolvePages, runBatch, runPool, shardPages, type BatchJobResult, type BatchSummary } from "./batch-cli.ts";
+import { buildJobs, formatBatchSummary, gateReported, gateVerb, jobLogName, parseGateEnvelope, parseShard, reportedWarns, resolvePages, runBatch, runPool, shardPages, type BatchJobResult, type BatchSummary } from "./batch-cli.ts";
 
 /** Colour codes out, so an assertion on the prose is not one on the palette. */
 const plain = (text: string): string => text.replace(/\u001B\[[0-9;]*m/g, "");
@@ -452,5 +452,36 @@ describe("gateVerb", () => {
     assert.equal(gateVerb("check design --wait-until load --timeout 15000"), "check design");
     assert.equal(gateVerb("check integrity"), "check integrity");
     assert.equal(gateVerb("check a11y contrast --level AA"), "check a11y contrast");
+  });
+});
+
+describe("parseGateEnvelope", () => {
+  it("reads a gate's own --json envelope, so findings arrive structured", () => {
+    // v7's agent-l: "findings arrive as one ANSI-escaped `output` string, not
+    // structured." The gates have emitted an envelope all along; the batch runner
+    // never asked for one.
+    const env = parseGateEnvelope(JSON.stringify({
+      gate: "check.design",
+      command: "check design",
+      verdict: "pass",
+      counts: { suspect: 0, warn: 1, info: 0 },
+      findings: [{ rule: "component-drift", severity: "warn", message: "…" }],
+    }));
+    assert.equal(env?.command, "check design");
+    assert.equal(env?.counts?.warn, 1);
+    assert.equal(env?.findings?.length, 1);
+  });
+
+  it("returns null rather than throwing when the child printed prose", () => {
+    // A gate that died in navigation prints an error. Losing the whole run's JSON
+    // because one job failed early would make the machine path less reliable than
+    // the prose one.
+    assert.equal(parseGateEnvelope("error: file not found: missing.html\n"), null);
+    assert.equal(parseGateEnvelope(""), null);
+    assert.equal(parseGateEnvelope("{ not json"), null);
+  });
+
+  it("is not fooled by a JSON-looking line buried in prose", () => {
+    assert.equal(parseGateEnvelope("vlmkit check design\n{\"verdict\":\"pass\"}"), null);
   });
 });

@@ -58,10 +58,49 @@ export interface BatchJob {
   cwd?: string;
 }
 
+/**
+ * A gate's own `--json` envelope, when the run asked for one.
+ *
+ * v7's agent-l: "findings arrive as one ANSI-escaped `output` string, not
+ * structured." A CI job that wants the findings had to parse terminal text out of
+ * a field meant for humans; the gates have emitted a structured envelope all along
+ * and the batch runner simply never asked for it.
+ */
+export interface GateEnvelope {
+  gate?: string;
+  command?: string;
+  verdict?: string;
+  counts?: Record<string, number>;
+  findings?: unknown[];
+  suppressed?: unknown[];
+  retuned?: unknown[];
+  report?: unknown;
+}
+
+/**
+ * Read a child's envelope, or null when it did not produce one.
+ *
+ * Null on anything unparseable rather than throwing: a gate that died in
+ * navigation prints an error, and losing the whole run's JSON because one job
+ * failed early would make the machine path less reliable than the prose one.
+ */
+export function parseGateEnvelope(stdout: string): GateEnvelope | null {
+  const text = stdout.trim();
+  if (!text.startsWith("{")) return null;
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    return typeof parsed === "object" && parsed !== null ? parsed as GateEnvelope : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface BatchJobResult extends BatchJob {
   exitCode: number;
   durationMs: number;
   output: string;
+  /** The gate's own `--json` envelope, when the run was asked for JSON. */
+  envelope?: GateEnvelope | null;
 }
 
 export interface BatchSummary {
@@ -175,6 +214,11 @@ export interface BatchOptions {
   shard?: { index: number; total: number };
   output?: string;
   quiet?: boolean;
+  /**
+   * Ask each child for its `--json` envelope, so the run's machine output carries
+   * structured findings rather than the gates' terminal text.
+   */
+  json?: boolean;
   /** Injected in tests; defaults to the CLI entry this process was started from. */
   cliEntry?: string;
 }
@@ -192,11 +236,19 @@ function cliEntryPath(explicit?: string): string {
   return resolve(fileURLToPath(import.meta.url), "../../vlmkit.ts");
 }
 
-function runJob(job: BatchJob, cliEntry: string): Promise<BatchJobResult> {
+function runJob(job: BatchJob, cliEntry: string, json = false): Promise<BatchJobResult> {
   // Quote-aware: a gate flag can legitimately carry a value with spaces
   // (`--manifest "copy/press kit.txt"`, `--mask ".hero, .promo"`), and a plain
   // whitespace split would hand those to the gate as several arguments.
-  const args = [...process.execArgv, cliEntry, ...tokenizeCommand(job.gate), job.page];
+  const args = [
+    ...process.execArgv,
+    cliEntry,
+    ...tokenizeCommand(job.gate),
+    job.page,
+    // Under `--json` the children are asked for JSON too, so the run's machine
+    // output carries the gates' own envelopes instead of their terminal text.
+    ...(json ? ["--json"] : []),
+  ];
   const started = Date.now();
   return new Promise((resolveJob) => {
     const child = spawn(process.execPath, args, {
@@ -206,8 +258,13 @@ function runJob(job: BatchJob, cliEntry: string): Promise<BatchJobResult> {
       // tells a leaf module "you are the CLI entry".
       env: { ...process.env, __VLMKIT_DISPATCHER_LEAF__: "" },
     });
+    // Merged for display, and kept SEPARATE for parsing. `output` interleaves both
+    // streams the way a terminal would; a JSON envelope has to be read from stdout
+    // alone or a stderr diagnostic lands in the middle of it — which is exactly how
+    // the webServer's greeting corrupted `--json` before this.
     let output = "";
-    child.stdout.on("data", (d) => { output += d; });
+    let stdout = "";
+    child.stdout.on("data", (d) => { output += d; stdout += d; });
     child.stderr.on("data", (d) => { output += d; });
     child.on("error", (err) => {
       resolveJob({ ...job, exitCode: 127, durationMs: Date.now() - started, output: `${output}${err.message}\n` });
@@ -218,6 +275,7 @@ function runJob(job: BatchJob, cliEntry: string): Promise<BatchJobResult> {
         exitCode: code ?? (signal ? 129 : 1),
         durationMs: Date.now() - started,
         output,
+        ...(json ? { envelope: parseGateEnvelope(stdout) } : {}),
       });
     });
   });
@@ -266,7 +324,7 @@ export async function runJobs(
   );
   const started = Date.now();
   let done = 0;
-  const results = await runPool(jobs, concurrency, (job) => runJob(job, cliEntry), (result) => {
+  const results = await runPool(jobs, concurrency, (job) => runJob(job, cliEntry, options.json === true), (result) => {
     done++;
     if (options.quiet) return;
     const status = result.exitCode === 0 ? `${GREEN}pass${RESET}` : `${RED}fail${RESET}`;
