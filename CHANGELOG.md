@@ -289,7 +289,11 @@ suppression works per *rule* instead of per whole gate.
   recording made against one host or port at another aborts even the document
   request, which surfaced as a raw `net::ERR_FAILED` stack. It now reports the
   mismatch, the file, and the origins the file actually contains.
-- **`gates run` tells a broken page apart from a broken run.** Four gates that
+- **`gates run` tells a broken page apart from a broken run**, keyed on the gate's own
+  banner rather than on a `verdict:` line — 4 of 12 gates (`check a11y contrast`,
+  `check a11y touch`, `check a11y focus`, `check tokens`) print no such line, so the
+  first version of this reported a gate that had measured the page and failed as
+  `DID NOT RUN`. Four gates that
   all died in navigation used to print `4 FAILED (0 passed)` with no reasons and
   no distinction between "found defects" and "never ran". Now `0 FAILED, 2 DID
   NOT RUN` with the reason inline. The hint under the failure list no longer

@@ -303,6 +303,23 @@ export async function runBatch(options: BatchOptions): Promise<BatchSummary> {
  * prints an `error:` line and nothing else.
  */
 export function gateReported(output: string): boolean {
+  // The banner, not the verdict line. The first version of this keyed on
+  // `verdict:` / `status:`, and I justified that by saying the convention was already
+  // load-bearing here — citing this very function, which I had written the same day.
+  // Circular, and wrong: **4 of 12 gates print no such line at all.**
+  // `check a11y contrast`, `check a11y touch`, `check a11y focus` and `check tokens`
+  // go straight from their header to their findings. So a gate that measured the page
+  // and found a real WCAG failure was reported to CI as "DID NOT RUN", which v6's
+  // adoption agent caught and called disqualifying:
+  //
+  //   "A gate runner that reports a real accessibility failure as 'did not run' is
+  //    worse than no runner: the first time someone checks and finds it *did* run,
+  //    they stop reading the summary, and then they stop reading the gate."
+  //
+  // Every one of the 12 gates checked prints `vlmkit <command>` as its first
+  // non-empty line, indented or not, and a harness failure prints `error: …` or a
+  // raw stack and no banner. Verified across all of them rather than assumed twice.
+  if (/^\s*vlmkit\s+\S/m.test(stripAnsi(output))) return true;
   if (/^\s*(verdict|status):/m.test(output)) return true;
   // `--json` in the gate string: a report is a report even without prose.
   const trimmed = output.trim();
@@ -317,9 +334,14 @@ export function gateReported(output: string): boolean {
   return false;
 }
 
+/** Colour codes off, so a pattern matches the words rather than the escapes. */
+function stripAnsi(text: string): string {
+  return text.replace(/\u001B\[[0-9;]*m/g, "");
+}
+
 /** The one line worth putting in the summary for a job that never ran. */
 export function gateFailureReason(output: string): string {
-  const lines = output.split("\n").map((l) => l.replace(/\x1B\[[0-9;]*m/g, "").trimEnd()).filter((l) => l.trim());
+  const lines = stripAnsi(output).split("\n").map((l) => l.trimEnd()).filter((l) => l.trim());
   // `error: …` is what `handleCliError` prints; fall back to the first line, which
   // for an unhandled throw is the exception message.
   return (lines.find((l) => /^error:/i.test(l)) ?? lines[0] ?? "no output").slice(0, 300);

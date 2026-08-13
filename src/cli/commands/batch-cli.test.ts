@@ -3,18 +3,7 @@ import { describe, it } from "node:test";
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import {
-  type BatchJobResult,
-  type BatchSummary,
-  buildJobs,
-  formatBatchSummary,
-  jobLogName,
-  parseShard,
-  resolvePages,
-  runBatch,
-  runPool,
-  shardPages,
-} from "./batch-cli.ts";
+import { buildJobs, formatBatchSummary, gateReported, jobLogName, parseShard, resolvePages, runBatch, runPool, shardPages, type BatchJobResult, type BatchSummary } from "./batch-cli.ts";
 
 describe("parseShard", () => {
   it("parses 1-based index/total", () => {
@@ -329,5 +318,51 @@ describe("runBatch (spawns real gates)", () => {
     });
     assert.equal(summary.jobs.length, 1);
     assert.deepEqual(summary.shard, { index: 1, total: 5 });
+  });
+});
+
+describe("gateReported", () => {
+  // Real output shapes, captured from the gates. The first version of this keyed on a
+  // `verdict:` / `status:` line, which 4 of 12 gates do not print — so a gate that
+  // measured the page and failed was reported to CI as "DID NOT RUN". v6's adoption
+  // agent called that disqualifying, and was right.
+  const A11Y_CONTRAST = [
+    "  vlmkit check a11y contrast",
+    "  html: /repo/page.html",
+    "  inspected 31 text-bearing element(s)",
+    "  ✗ 2 contrast failure(s)",
+    "    button.primary — 3.22:1 (need 4.5) — `#ffffff` on `#2da44e`",
+  ].join("\n");
+
+  const A11Y_TOUCH = "  vlmkit check a11y touch\n  inspected 6 interactive element(s)\n  ✓ 0 undersized target(s)";
+  const TOKENS = "  vlmkit check tokens\n  scale: 4 8 16\n  ✗ 2 off-scale value(s)";
+
+  it("counts a gate with no verdict line as having run", () => {
+    for (const [name, output] of [["a11y contrast", A11Y_CONTRAST], ["a11y touch", A11Y_TOUCH], ["tokens", TOKENS]] as const) {
+      assert.equal(gateReported(output), true, `${name} reported a measurement and must not read as "did not run"`);
+      assert.doesNotMatch(output, /^\s*(verdict|status):/m, `fixture for ${name} must not contain the line, or it proves nothing`);
+    }
+  });
+
+  it("still counts the gates that do print a verdict", () => {
+    assert.equal(gateReported("vlmkit check integrity\n\nverdict: DEFECTS (1 fail)"), true);
+    assert.equal(gateReported("vlmkit check breakpoints\n\nstatus: warn"), true);
+  });
+
+  it("sees the banner through colour codes", () => {
+    assert.equal(gateReported("  \u001B[1m\u001B[36mvlmkit check a11y focus\u001B[0m\n  3 stop(s)"), true);
+  });
+
+  it("counts a harness failure as not having run", () => {
+    // What `handleCliError` prints, and what an unhandled throw prints. Neither carries
+    // a banner, which is the whole distinction.
+    assert.equal(gateReported("error: page load timed out after 30000ms waiting for `networkidle`"), false);
+    assert.equal(gateReported("page.routeFromHAR: ENOENT: no such file or directory\n    at foo (/x.mjs:1:1)"), false);
+    assert.equal(gateReported(""), false);
+  });
+
+  it("counts a --json report as having run, and a truncated one as not", () => {
+    assert.equal(gateReported('{"findings":[{"kind":"page-overflow-x"}]}'), true);
+    assert.equal(gateReported('{"findings":['), false);
   });
 });
