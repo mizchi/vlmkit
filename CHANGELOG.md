@@ -19,6 +19,27 @@ suppression works per *rule* instead of per whole gate.
 
 ### Breaking
 
+- **`check integrity`'s contrast floor now follows the text's size.**
+  `low-contrast-text` cut at a flat 3:1, which is WCAG's *large-text* floor
+  applied to every piece of text; it is now 4.5:1, or 3:1 for large text
+  (>=24px, or >=18.66px at weight 700+). **A page that was `CLEAN` can now
+  carry warnings.** The rule stays `warn`, so no gate newly *fails*, and the
+  notice added below says a warn was let through. Found because `check
+  integrity` and `check a11y contrast` disagreed about the same three elements
+  at 3.03:1, with the reference-free gate giving the green. On this repo's own
+  `fixtures/css-challenge/page.html` it surfaces three real AA failures.
+- **Relative paths in `vlmkit.gates.json` resolve against the config file, not
+  the process cwd.** Gate processes run in the config's directory and `source`
+  globs expand from the same base, so a `--har`, a `--manifest` or a glob means
+  the same thing wherever the command is typed. A config at the repo root is
+  unaffected (base and cwd are the same directory); a config in a subdirectory
+  changes behaviour, and previously only worked from its own directory.
+- **`check a11y *` and `check drift component` default output directories gained
+  a per-source subdirectory** (`test-results/a11y-contrast/page-e5562293/`).
+  Two pages checked in a row used to share `report.md` *and* `page.png`, so the
+  second silently replaced the first. Scripts reading the old fixed path need
+  updating, or `--output-dir` pinned.
+
 - **Nine gates now fail on a suspect.** `check motion` and `check animation`
   previously required `--fail-on-suspect`; `check a11y touch`, `check a11y
   focus`, `check drift component`, `check drift pages`, `stress i18n`,
@@ -51,9 +72,52 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **`snapshot strip` and `check animation --strip`** composite a numbered
+  sequence into ONE still image. A flipbook animates; a strip has to be readable
+  pasted into an issue or handed to a model, which sees one image and cannot
+  press play. Frames sit top-left in a uniform cell, never centred — a
+  `translateX` strip is read by comparing where the element sits, and centring
+  would subtract exactly that offset. **Columns are shared instants on the page
+  timeline**, not each animation's own 0->1 progress, which is what makes a
+  stagger visible instead of reading as "all at once".
+- **WebP output for strips**, chosen by the file extension alone
+  (`--strip x.webp`). `@jsquash/webp` is an optional peer; lossless beats lossy
+  on UI screenshots (24.0 KB vs 55.9 KB at q90), and `sharp` was measured and
+  rejected at 29 MB for a still encoder already available.
+- **The strip labels itself** — sample times across the top, `selector
+  animation-name` above each row — from a 5x7 bitmap font drawn in-repo
+  (`bitmap-font.ts`). Identical bytes on every platform, no fontconfig, no web
+  font to race a screenshot. A sheet whose rows are identified only in the
+  terminal is unreadable the moment it is pasted anywhere else.
+- **`snapshot record-har <url>`** produces the recording `--har` replays.
+  Defaults to `--wait-until load` rather than `networkidle` (the reason `--har`
+  exists is a page with a held-open stream) and settles 1000ms for the late XHR
+  a dashboard fires after the milestone. Prints the origins the file covers,
+  because a HAR is keyed on the full URL.
+- **`check drift component --allow "<property>[@<selector>];<reason>"`** declares
+  a style difference deliberate, so a design system's variant stops making the
+  gate permanently red. Modelled on `check integrity --allow` down to the two
+  properties that keep it reviewable: an exempted delta is still listed, and a
+  rule that matched nothing is reported. The unit is a *property*, not a finding
+  kind, so a whole-instance exemption cannot hide the geometry mistake sitting
+  next to the intentional colour.
+- **`--timeout` / `--wait-until` / `--har` on every gate that navigates** — 0.9.1
+  gave them to `check integrity` and `check design`; the other 19 URL-accepting
+  gates could not be told otherwise, so the only way to gate a page that never
+  reaches network idle was a hand-rolled Playwright harness. Declared once in
+  `page-load.ts` and spread, with a test asserting **identity** with that
+  fragment rather than equal text — a copy that starts out identical is still a
+  copy, and that is how two gates came to be missing a hint the fragment gained.
+- **`diff png --ignore-region`**: areas that are never measured, as distinct from
+  areas whose differences are forgiven.
+- **`stale-har-fixture` rule on `check integrity`** (rules 122 -> 123). A request
+  a `--har` recording does not hold is aborted, so the page is measured without
+  it; that is now reported against the fixture ("this is a stale fixture, not a
+  broken page") instead of as the page's broken resources.
+
 - **`vlmkit rules`** lists every gate with its rule count and plugin;
   **`vlmkit rules <gate>`** prints that gate's rules, default severities and
-  docs. 119 rules across 27 gates.
+  docs. 123 rules across 27 gates.
 - **`component-vrt` skill**, with copyable gallery reference implementations.
   Playwright's docs are explicit that the gallery is framework-specific and yours
   to own with **no template to copy**, which makes it the one part of the setup an
@@ -214,6 +278,36 @@ suppression works per *rule* instead of per whole gate.
 
 ### Changed
 
+- **A navigation timeout says what it was waiting for.** The whole failure used
+  to be `error: page load timed out (Timeout 30000ms exceeded)`. It now names the
+  milestone, the still-open requests and how long each has been open, the flags
+  that end the wait, and the one that will not help. Instrumented at the launch
+  choke point rather than in a navigation helper: there are 42 `.goto(` call
+  sites across 20 files and three hand-roll the same options object, so a fix in
+  one helper reached a fraction of them.
+- **A `--har` origin mismatch is named instead of crashing.** Replaying a
+  recording made against one host or port at another aborts even the document
+  request, which surfaced as a raw `net::ERR_FAILED` stack. It now reports the
+  mismatch, the file, and the origins the file actually contains.
+- **`gates run` tells a broken page apart from a broken run.** Four gates that
+  all died in navigation used to print `4 FAILED (0 passed)` with no reasons and
+  no distinction between "found defects" and "never ran". Now `0 FAILED, 2 DID
+  NOT RUN` with the reason inline. The hint under the failure list no longer
+  offers `--output <dir>` when `--output` was just passed.
+- **`gates init` scaffolds a config that can run against a URL.** A `http(s)`
+  source gets `--wait-until load --timeout 15000` on every gate, since a URL
+  source implies the class of page that may never reach the default
+  `networkidle` milestone — the old scaffold timed out on every gate.
+- **`check integrity` no longer prints `CLEAN` over a run with warnings.**
+  `verdict: NO DEFECTS, 3 WARN (...) — exits 0; --rule <id>=suspect to gate on
+  one`. `report.verdict` keeps its two values; only the printed word gains the
+  middle case.
+- **Every gate's `--help` says how to persist a flag**: a `"gates"` entry in
+  `vlmkit.gates.json` is the whole command, tokenized quote-aware, so any flag
+  belongs there and is committed with the page. Only rule settings were
+  documented as persistable before.
+- **A passing run with warnings says so**: `N warn(s) did not fail this command.
+  To gate on one: --rule <id>=suspect`. Silent under `--json`.
 - `verify markup` runs the gates it folds into its verdict through the core
   runner, so **a project's rule settings now affect that verdict** — they did
   not before. Its `GateVerdict.gate` is the gate's command (`scan scroll`)
@@ -228,6 +322,48 @@ suppression works per *rule* instead of per whole gate.
   a stack trace.
 
 ### Fixed
+
+- **`check animation` was blind to short animations and to finished ones
+  entirely.** A `fill: none` animation is deleted from `getAnimations()` when it
+  ends, so the gate saw 1 of 5 on a three-card entrance and drew a filmstrip of
+  the wrong element. Animations are recorded and held at `animationstart`, with
+  the author's own play state captured before the pause so "the page paused this"
+  stays distinguishable from "we paused it". The strip's window is derived from
+  the rows it actually shows, so neither an infinite spinner nor a *dead*
+  animation sets the timebase.
+- **`check motion` asserted a rule was absent from CSS it had never read.** A
+  linked stylesheet on a `file://` document throws `SecurityError` on `cssRules`;
+  that was swallowed and reported as "no `prefers-reduced-motion` found". It now
+  re-reads the sheet (disk for `file:`, `page.request` for http(s)) and raises
+  `unreadable-stylesheet` when absence is unproven.
+- **`check drift component` judged text as drift.** Two instances of one
+  component holding different copy differ in pixels and in height, and that is
+  not drift; the verdict follows tracked computed style, with the pixel ratio
+  kept as context and each row stating its own reason. `--threshold` was also
+  doubling as the comparator's per-pixel tolerance, so raising the pass line
+  moved the measurement — split into `--threshold` and `--pixel-tolerance`.
+- **`check integrity` named the wrong cause for an overflow**, then looked
+  exhaustive when it was not. First `130px wide; constraining it removes 46px`
+  where the cause was `left: 660px`; now both terms, and no prescription of the
+  one that is usually not the fix. It also states what the named cause does
+  *not* account for — rigid siblings each measure 0 when probed alone, so a
+  439px overflow could be reported with a 77px cause and read as the whole
+  story.
+- **`check design` said three things it did not mean.** The reuse figure was an
+  average printed as a per-style claim, contradicting its own next sentence
+  (`each style reused only 1.5x` ... `Dominant style, used 2x`); the style
+  fingerprints hid which property actually differed; and `--exclude` appeared
+  nowhere in the output that needs it. All three fixed, the last by noticing that
+  a dominant style painting no text in a zero-padding, zero-radius, transparent
+  box is vendor chrome and can be named as such.
+- **`check a11y focus` could only run at one width.** It takes `--viewport WxH`;
+  focus order is judged from each stop's x/y, so the width was always part of the
+  question.
+- **Ten gates measured unstyled markup.** `page.setContent(await readFile(f))`
+  leaves the document at `about:blank`, so a `<link rel=stylesheet>` never
+  resolves. All ten navigate to the source now.
+- **The launch-failure advice pointed at the wrong Playwright** — a generic
+  `playwright install` resolves to the consumer's copy, not the one that failed.
 
 - **`check integrity` and `check scroll` wrote two ledger rows per run.** Their
   measurement functions still called `appendRunLedger` themselves after the
