@@ -99,6 +99,20 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **The test suite runs on vitest, with coverage.** `pnpm test` is `vitest run`;
+  `pnpm test:coverage` reports v8 coverage into `test-results/coverage`. The
+  migration changed no test's meaning — node:test and vitest agree on
+  `describe`/`it`/`test`/`beforeEach`/`afterEach` and the assertions are
+  `node:assert/strict` either way — so the same 2662 tests pass in the same
+  ~222s. Three mechanical differences: `before`/`after` are `beforeAll`/`afterAll`,
+  node:test's default export is `test` and vitest has none, and a per-test
+  `context.after` is `onTestFinished`.
+- **New tests for the plugin argv toolkit, image resize, the semantic drilldown's
+  pure half, `check theme` and `stress media`** — the last two had no test at all,
+  and neither is reachable from a pure function: both render the page repeatedly
+  under different emulation and compare, so a fixture and a real page load are the
+  only instruments. Statements 56.1% → 57.3%.
+
 - **A declared plugin API: `@mizchi/vlmkit-core/plugin` and
   `@mizchi/vlmkit-core/plugin/browser`.** A third-party gate could always exist,
   but the entry point could not be found: an author deep-imported five internal
@@ -524,6 +538,10 @@ suppression works per *rule* instead of per whole gate.
   a stack trace.
 
 ### Fixed
+
+- **An expected-scrollport contract with an empty `id` produced a blank label.**
+  `??` treats `""` as present, so the positional fallback (`expected-1`) was
+  unreachable and the report read `1 expected missing` while naming nothing.
 
 - **`check a11y touch` measures identical siblings as separate targets.** Dedupe
   keyed on the generated CSS path, which three `<button>`s in one `<div>` share, so

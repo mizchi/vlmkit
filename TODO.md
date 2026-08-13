@@ -1064,6 +1064,49 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     現行のグリッドの拡張ではなく新しい構図。
   - 着手条件: レビュアーが実際に空間配置を読み違えた事例が出たら。
 
+### テストカバレッジ 70% への道筋(2026-08-13 測定)
+
+vitest へ移行し(2662 tests、node:test と同数、同じ ~222s)、v8 カバレッジを導入。
+`pnpm test:coverage` で計測。**現在 statements 57.3%**(開始 56.1%)。
+
+**70% には +3,865 statements 必要**。既存の 2662 tests が網羅的なのに 57% な理由は
+構造的で、純粋ロジックは**すでにカバー済み**だから。実測:
+
+| 書いたテストの種類 | 1ファイルあたりの獲得 |
+|---|---|
+| 純粋関数のユニットテスト | ~40 statements(ある回は **+1** — 既に browser 経由でカバー済みだった) |
+| gate runner の in-process browser テスト | **~115 statements** |
+
+未カバーの 13,000 statements の内訳(near-zero の 21ファイル、4,231 statements):
+
+- **11ファイル / 2,244 statements は export された関数を1つも持たない** — トップレベル
+  `main()` の CLI スクリプト(`snapshot.ts` 318, `css-challenge.ts` 285, `demo/*` 717,
+  `detection-report.ts` 203, `benchmark.ts` 195 …)。import すると実行されるので、
+  **`runX()` を export する形にリファクタしない限りテスト不可能**。
+- **10ファイル / 1,987 statements は callable** — `interact.ts` 275, `explore.ts` 230,
+  `cross-browser.ts` 185(複数ブラウザ必要), `vlm-client.ts` 139(API キー必要),
+  `multi-page-consistency.ts` 114 など。
+
+#### フェーズ(独立に実行可能)
+
+- [ ] **Phase 1: callable な gate runner に in-process browser テスト**(~1,400 statements → 約63%)
+  - `interact.ts` / `explore.ts` / `multi-page-consistency.ts` / `spec.ts` / `workflow.ts`
+  - 実測 ~115 statements/suite、1 suite あたり 10-25s。suite 全体に +60-90s。
+  - **回帰価値が高い**: `check theme` と `stress media` で実際にやったところ、
+    自分の誤解2件(pixelmatch threshold の向き、vitest 4 の poolOptions 削除)が出た。
+- [ ] **Phase 2: CLI スクリプトを `runX()` export にリファクタ**(~2,244 statements → 約70%)
+  - `snapshot.ts` など11ファイル。テストのためだけでなく、**gate と同じ形になる**
+    (gate は全部 `run(options)` を export している)ので設計上も一貫する。
+  - リファクタが主で、テストは従。既存の subprocess テストが回帰を守る。
+- [ ] **Phase 3: VLM/API 経路に録画フィクスチャ**(~250 statements)
+  - `vlm-client.ts` / `reasoning-pipeline.ts`。HAR 相当の録画済みレスポンスが必要。
+
+#### 分母を狭める案(単独では 70% に届かない)
+
+`src/demo`(717, 0%)と `src/experiments`(6,023, 42%)を除外しても **61.9%**。
+published packages のみでも **65.5%**。つまり**除外だけでは 70% に到達しない** —
+どの道でも実テストが必要。除外するなら理由を書いた上で両方の数字を報告すべき。
+
 ### dogfood v7(2026-08-13、既存3シナリオの再評価)— **全件修正済み**
 
 レポートは `docs/reports/2026-08-13-dogfood-reevaluation-v7.md`。
