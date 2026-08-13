@@ -91,6 +91,26 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **`check design` says `NOT JUDGED` instead of `COHERENT` when no role had enough
+  instances to judge**, and a role under `--min-instances` renders `not judged`
+  rather than `ok`. Found by re-running the dogfood scenarios against the
+  `--allow` flag added the day before: allowing 1 of 3 buttons leaves 2, under the
+  default floor, so the role stopped being judged — and a skipped role printed
+  identically to a coherent one, under a green verdict, with the row itself
+  reading `reuse 1x, 2 one-off`. A fix for a false positive had introduced a false
+  negative. The arithmetic is unchanged (two instances genuinely cannot clear a 3x
+  floor); the silence is what is fixed. When `--allow` is what pushed a role under
+  the floor the run says so and names the remedy — **both** `--min-instances 2
+  --min-reuse 2`, since lowering the instance floor alone leaves a 2-instance role
+  unable to reach 3x. New `nothing-judged` rule (info, so a small page is not a
+  defect) makes it enforceable: `--rule nothing-judged=suspect` requires that this
+  gate actually measured something. 124 rules across 27 gates.
+- **A batch/`gates run` summary names the warns its passing gates found**
+  (`24 warn(s) in 3 passing gate(s) — not shown above`) and the untracked paths
+  the run created. `gates run` is the path a project adopts, and it reported only
+  pass/fail: ten measured findings existed in child-process output nobody kept,
+  and the per-gate first-write notice for `.vlmkit/` was invisible there for the
+  same reason.
 - **`vlmkit.gates.json` takes a `webServer` block** — start a dev server before
   `gates run`, stop it after, including on a thrown error or Ctrl-C. Playwright
   has had this for years and this config did not, so a config declaring URL
@@ -441,6 +461,18 @@ suppression works per *rule* instead of per whole gate.
   a stack trace.
 
 ### Fixed
+
+- **`page-overflow-x` carries the element it blames**, so
+  `--allow "page-overflow-x@table.orders;…"` matches. It printed `caused by:
+  table.orders` while leaving `selector` unset, so the only exemption that worked
+  was page-wide — which silenced the whole rule, meaning accepting one known
+  overflow accepted every future one. Set only where a single element was actually
+  blamed; where rigid siblings mean no one element relieves the overflow there is
+  nothing honest to put in the field.
+- **A `webServer`'s output goes to stderr, not stdout**, so `gates run --json`
+  parses. The spawn inherited stdout so a boot failure would reach the terminal —
+  it still does, stderr being a terminal too — but stdout is the command's result
+  and `--json` is a contract other tools parse.
 
 - **`check animation` was blind to short animations and to finished ones
   entirely.** A `fill: none` animation is deleted from `getAnimations()` when it
