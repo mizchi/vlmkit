@@ -19,6 +19,14 @@ suppression works per *rule* instead of per whole gate.
 
 ### Breaking
 
+- **`low-contrast-text` reports one finding per colour pair, not per element.** A
+  three-row table used to produce three warnings differing only in the row index; three
+  CSS colours produced eight lines across two gates. Identity is the colour pair plus
+  the applicable floor, because that is the shape of the fix — one CSS declaration. The
+  selectors still travel (`evidence.selectors`, and the first few named in the message),
+  and the finding's canonical `selector` stays the first element so per-selector tooling
+  and `--allow` are unaffected. `invisible-text` stays per element: it is a `fail` at
+  that element, not a colour choice to revisit.
 - **`check integrity`'s contrast floor now follows the text's size.**
   `low-contrast-text` cut at a flat 3:1, which is WCAG's *large-text* floor
   applied to every piece of text; it is now 4.5:1, or 3:1 for large text

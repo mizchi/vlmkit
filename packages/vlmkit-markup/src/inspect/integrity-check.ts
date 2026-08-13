@@ -751,6 +751,19 @@ export function judgeTextContrast(
 ): { findings: IntegrityFinding[]; exempted: IntegrityExemption[] } {
   const findings: IntegrityFinding[] = [];
   const exempted: IntegrityExemption[] = [];
+  // Low-contrast findings are grouped by COLOUR PAIR, not emitted per element.
+  //
+  // A three-row table produced three identical warnings differing only in the row
+  // index, and v6's adopting agent counted what that adds up to: "the same contrast
+  // defect is reported 8 times across two gates […] Three CSS colours, eight lines."
+  // Its conclusion is why this is worth fixing rather than tolerating — "eight lines
+  // for three CSS colours is how a gate becomes something people pass `--advisory`
+  // to."
+  //
+  // The pair plus the applicable floor is the right identity because that is the
+  // shape of the fix: one CSS declaration. Nothing about *where* is lost — the
+  // selectors travel in the evidence, and the message names the first few.
+  const lowContrast = new Map<string, ContrastCandidate[]>();
   for (const c of candidates) {
     if (c.disabled) {
       exempted.push({ kind: "low-contrast-text", viewport, selector: c.selector, reason: "disabled control — reduced contrast is the platform convention" });
@@ -760,8 +773,10 @@ export function judgeTextContrast(
       exempted.push({ kind: "low-contrast-text", viewport, selector: c.selector, reason: "text-shadow present — the shadow may carry the contrast the fill lacks (not measurable deterministically)" });
       continue;
     }
-    if (findings.length >= maxFindings) continue;
     if (c.ratio < 1.15) {
+      // `invisible-text` stays per element: it is a `fail`, and an invisible element
+      // is a defect at that element rather than a colour choice to revisit.
+      if (findings.length >= maxFindings) continue;
       findings.push({
         kind: "invisible-text",
         severity: "fail",
@@ -770,30 +785,42 @@ export function judgeTextContrast(
         message: `${c.selector} renders "${clip(c.text)}" in ${c.fg} on ${c.bg} (contrast ${c.ratio.toFixed(2)}:1) — the text is effectively invisible.`,
         evidence: { ratio: c.ratio, fg: c.fg, bg: c.bg },
       });
-    } else {
-      findings.push({
-        kind: "low-contrast-text",
-        severity: "warn",
-        viewport,
-        selector: c.selector,
-        // Name the floor that applied and why, rather than the old "below the 3:1
-        // floor even for large text" — which was true, read as the contrast
-        // verdict, and quietly meant that 13px text at 3.03:1 was never mentioned.
-        message: `${c.selector} renders "${clip(c.text)}" at contrast ${c.ratio.toFixed(2)}:1 (${c.fg} on ${c.bg})`
-          + ` — below the ${(c.floor ?? 3).toString()}:1 WCAG AA floor`
-          + (c.fontSizePx !== undefined
-            ? ` for ${c.fontSizePx}px ${c.large ? "large" : "body"} text`
-            : "")
-          + `.`,
-        evidence: {
-          ratio: c.ratio,
-          fg: c.fg,
-          bg: c.bg,
-          ...(c.floor !== undefined ? { floor: c.floor } : {}),
-          ...(c.fontSizePx !== undefined ? { fontSizePx: c.fontSizePx } : {}),
-        },
-      });
+      continue;
     }
+    const key = `${c.fg}\u0000${c.bg}\u0000${c.floor ?? 3}`;
+    lowContrast.set(key, [...(lowContrast.get(key) ?? []), c]);
+  }
+  for (const group of lowContrast.values()) {
+    if (findings.length >= maxFindings) break;
+    const first = group[0]!;
+    const where = group.length === 1
+      ? first.selector
+      : `${group.slice(0, 3).map((c) => c.selector).join(", ")}${group.length > 3 ? `, and ${group.length - 3} more` : ""}`;
+    findings.push({
+      kind: "low-contrast-text",
+      severity: "warn",
+      viewport,
+      // The canonical selector stays the first one, so per-selector tooling and
+      // `--allow` keep working the way they did.
+      selector: first.selector,
+      // Name the floor that applied and why, rather than the old "below the 3:1
+      // floor even for large text" — which was true, read as the contrast
+      // verdict, and quietly meant that 13px text at 3.03:1 was never mentioned.
+      message: `${first.fg} on ${first.bg} is contrast ${first.ratio.toFixed(2)}:1`
+        + ` — below the ${(first.floor ?? 3).toString()}:1 WCAG AA floor`
+        + (first.fontSizePx !== undefined ? ` for ${first.fontSizePx}px ${first.large ? "large" : "body"} text` : "")
+        + `. ${group.length} element(s): ${where}.`
+        + ` First is "${clip(first.text)}".`,
+      evidence: {
+        ratio: first.ratio,
+        fg: first.fg,
+        bg: first.bg,
+        elements: group.length,
+        selectors: group.map((c) => c.selector),
+        ...(first.floor !== undefined ? { floor: first.floor } : {}),
+        ...(first.fontSizePx !== undefined ? { fontSizePx: first.fontSizePx } : {}),
+      },
+    });
   }
   if (skippedComposite > 0) {
     exempted.push({

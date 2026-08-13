@@ -235,6 +235,51 @@ describe("pure judges", () => {
     assert.match(exempted[2]!.reason, /5 text block\(s\) skipped/);
   });
 
+  test("judgeTextContrast: one finding per colour pair, not per element", () => {
+    // v6's adopting agent counted the old behaviour: "the same contrast defect is
+    // reported 8 times across two gates […] Three CSS colours, eight lines." A
+    // three-row table produced three warnings differing only in the row index.
+    const grey = { fg: "rgb(141, 141, 141)", bg: "rgb(255, 255, 255)", floor: 4.5, fontSizePx: 13, large: false, disabled: false, shadowed: false, ratio: 3.32 };
+    const { findings } = judgeTextContrast([
+      { ...grey, selector: "#rows > tr:nth-of-type(1) > td:nth-of-type(4)", text: "open" },
+      { ...grey, selector: "#rows > tr:nth-of-type(2) > td:nth-of-type(4)", text: "shipped" },
+      { ...grey, selector: "#rows > tr:nth-of-type(3) > td:nth-of-type(4)", text: "cancelled" },
+      { ...grey, fg: "rgb(154, 154, 154)", ratio: 2.81, selector: "p.who", text: "signed in as ops@example.com" },
+    ], 0, 1280);
+    // Two colours, two findings — not four.
+    assert.equal(findings.length, 2);
+    assert.match(findings[0]!.message, /3 element\(s\)/);
+    // Every selector still travels, so nothing about *where* is lost.
+    assert.deepEqual(findings[0]!.evidence?.selectors, [
+      "#rows > tr:nth-of-type(1) > td:nth-of-type(4)",
+      "#rows > tr:nth-of-type(2) > td:nth-of-type(4)",
+      "#rows > tr:nth-of-type(3) > td:nth-of-type(4)",
+    ]);
+    // The canonical selector stays the first, so per-selector tooling keeps working.
+    assert.equal(findings[0]!.selector, "#rows > tr:nth-of-type(1) > td:nth-of-type(4)");
+    assert.match(findings[1]!.message, /1 element\(s\)/);
+  });
+
+  test("judgeTextContrast: the same colours at different floors stay separate findings", () => {
+    // Identity is the pair PLUS the applicable floor: the same grey is a defect on
+    // 13px body text and acceptable at 32px, and one fix does not serve both.
+    const grey = { fg: "rgb(148, 148, 148)", bg: "rgb(255, 255, 255)", disabled: false, shadowed: false, ratio: 2.9, text: "t" };
+    const { findings } = judgeTextContrast([
+      { ...grey, selector: "#body", fontSizePx: 13, large: false, floor: 4.5 },
+      { ...grey, selector: "#heading", fontSizePx: 32, large: true, floor: 3 },
+    ], 0, 1280);
+    assert.equal(findings.length, 2);
+  });
+
+  test("judgeTextContrast: invisible-text stays per element, since it is a fail at that element", () => {
+    const base = { fg: "rgb(255, 255, 255)", bg: "rgb(255, 255, 255)", disabled: false, shadowed: false, ratio: 1.0, text: "t" };
+    const { findings } = judgeTextContrast([
+      { ...base, selector: "#a" },
+      { ...base, selector: "#b" },
+    ], 0, 1280);
+    assert.deepEqual(findings.map((f) => `${f.kind}:${f.selector}`), ["invisible-text:#a", "invisible-text:#b"]);
+  });
+
   test("judgeTextContrast: the message names the WCAG floor that applied and the size that chose it", () => {
     // The old wording was "below the 3:1 floor even for large text" for every
     // candidate, because the collector cut at a flat 3:1 — the LARGE-text floor

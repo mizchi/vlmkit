@@ -1068,7 +1068,12 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 
 修正済み2件とレポートは `docs/reports/2026-08-12-dogfood-adoption-v6.md`。以下は未修正。
 
-- [ ] **同じ3色が8件の所見になる(最優先)**
+- [x] **同じ3色が8件の所見になる** — 修正済み(2026-08-13)。色ペア + 適用された床を
+  identity にして1件にまとめる(修正の単位が CSS 1宣言だから)。セレクタは
+  `evidence.selectors` と本文の先頭数件で残る。canonical `selector` は先頭要素のままなので
+  per-selector のツールと `--allow` は不変。`invisible-text` は要素ごとに据え置き
+  (その要素での `fail` であって、見直すべき色の選択ではない)。実測:consumer ページで
+  warn 5件 → 3件、CSS 1色につき1行。
   - `check integrity` の `low-contrast-text` はテーブル行ごとに1件出す
     (`#rows > tr:nth-of-type(1) > td:nth-of-type(4)`, `(2)`, `(3)`)。
     `check a11y contrast` は同じものを3件に畳んでいる。CSS 3色 → 8行。
