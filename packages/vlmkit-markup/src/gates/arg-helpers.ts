@@ -9,6 +9,8 @@
  * silently accepts `--max-findings --json` as `NaN`.
  */
 
+import { createHash } from "node:crypto";
+import { basename, join, resolve } from "node:path";
 import { readFlag, readInt, readPositionals } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 
@@ -152,4 +154,28 @@ export function vlmFlag(argv: readonly string[], name = "vlm"): string | true | 
   if (index < 0) return undefined;
   const next = argv[index + 1];
   return next !== undefined && !next.startsWith("-") ? next : true;
+}
+
+/**
+ * Default output directory for a gate run, keyed on what the run measured.
+ *
+ * One directory per gate is a clobber waiting to happen, and it has now bitten twice.
+ * v2's evidence agent read somebody else's report out of `check drift component`'s
+ * shared path — "`cat test-results/component-consistency/report.md` returned a
+ * *different* run [...] A parallel agent had clobbered it. I trusted the terminal."
+ * That was fixed for drift alone. v5's repair agent then noticed `check a11y contrast`
+ * writing to the repo root, and measuring it showed the same defect: two pages one
+ * after the other share `report.md` AND `page.png`, so the second silently replaces
+ * the first.
+ *
+ * `discriminator` is for a gate where the source is not the whole question - drift
+ * passes its `--selector`, since two selectors on one page are two different runs.
+ */
+export function runOutputDir(gateDir: string, source: string, discriminator = ""): string {
+  const name = basename(source).replace(/\.[^.]+$/, "") || "page";
+  // Hashed, not embedded: a URL source or a long selector is not a path component, and
+  // two sources can share a basename. The readable half stays first so the directory is
+  // still recognisable at a glance.
+  const hash = createHash("sha1").update(resolve(source) + " " + discriminator).digest("hex").slice(0, 8);
+  return join(process.cwd(), "test-results", gateDir, name.replace(/[^A-Za-z0-9._-]+/g, "-") + "-" + hash);
 }

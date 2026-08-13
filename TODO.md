@@ -1117,7 +1117,14 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     修理エージェント曰く「CI ではコイントス」。
   - 直し方の候補: verdict 行自体に exit 意図を載せる(`DRIFT (1 finding) — exit 0`)。
 
-- [ ] **`check a11y contrast` の report がリポジトリルートの `test-results/` に出る**(バグではないが、対象ページの隣ではない)
+- [x] **~~`check a11y contrast` の report 出力先~~ — 半分は仕様、半分は実バグだった(2026-08-12)**
+  - **場所**は仕様。`test-results/<gate>/` はプロジェクト全体の慣習で、1ゲートだけ
+    変えると不整合になる。agent-i がそれを知らなかっただけ。
+  - **実バグ**はそこではなかった:2ページを続けて検査すると `report.md` と `page.png`
+    を共有し、**2つ目が1つ目を黙って上書き**した。v2 が `check drift component` で
+    見つけた clobber と同じで、あのときは drift だけ直していた。
+  - 修正:`runOutputDir()` を `arg-helpers.ts` に共有ヘルパーとして置き、a11y の3ゲート
+    (contrast / touch / focus)と drift が使う。drift のローカル `runSlug` は削除。
 
 - [ ] **dogfood の次ラウンドは別ページで(2026-08-10 v4 の結論)**
   - v4 で「測定が間違っている」系の指摘が **0 件**になり、残る 6 件はすべて出力の読みやすさ。

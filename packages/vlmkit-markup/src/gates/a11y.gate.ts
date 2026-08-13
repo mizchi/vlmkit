@@ -42,16 +42,23 @@ import {
   formatFocusOrderReport,
   runFocusOrder,
 } from "../a11y-focus-order.ts";
-import { firstPositional, optionalInt, viewportFlag } from "./arg-helpers.ts";
+import { firstPositional, optionalInt, runOutputDir, viewportFlag } from "./arg-helpers.ts";
 
 const A11Y_VALUE_FLAGS = ["--output-dir", "--report", "--level", "--max-steps", "--viewport"];
 
-/** Flags every a11y gate shares. `quiet` is forced: the runner owns output. */
-function reportFlags(argv: readonly string[], defaultDir: string) {
+/**
+ * Flags every a11y gate shares. `quiet` is forced: the runner owns output.
+ *
+ * The default directory is keyed on the source, not one folder per gate. Measured on
+ * two pages in a row: both wrote `report.md` and `page.png` into
+ * `test-results/a11y-contrast/`, so the second silently replaced the first - the same
+ * clobber v2 found in `check drift component` and that was fixed for drift alone.
+ */
+function reportFlags(argv: readonly string[], defaultDir: string, source: string) {
   const outputDir = readFlag(argv, "output-dir");
   const reportPath = readFlag(argv, "report");
   return {
-    outputDir: outputDir ?? join(process.cwd(), "test-results", defaultDir),
+    outputDir: outputDir ?? runOutputDir(defaultDir, source),
     quiet: true,
     ...(reportPath ? { reportPath } : {}),
   };
@@ -90,11 +97,14 @@ threshold for its font size and weight.`,
     ...REPORT_INPUTS("a11y-contrast"),
     ...PAGE_LOAD_INPUTS,
   ],
-  parse: (argv) => ({
-    htmlPath: firstPositional(argv, "vlmkit check a11y contrast <html-or-url>", A11Y_VALUE_FLAGS),
-    ...reportFlags(argv, "a11y-contrast"),
-    ...parsePageLoad(argv),
-  }),
+  parse: (argv) => {
+    const htmlPath = firstPositional(argv, "vlmkit check a11y contrast <html-or-url>", A11Y_VALUE_FLAGS);
+    return {
+      htmlPath,
+      ...reportFlags(argv, "a11y-contrast", htmlPath),
+      ...parsePageLoad(argv),
+    };
+  },
   run: (options) => runA11yContrast(options),
   findings: (report): Finding[] =>
     report.failures.map((f) => ({
@@ -141,12 +151,15 @@ makes an undersized target unusable.`,
     ...REPORT_INPUTS("a11y-touch"),
     ...PAGE_LOAD_INPUTS,
   ],
-  parse: (argv) => ({
-    source: firstPositional(argv, "vlmkit check a11y touch <html-or-url>", A11Y_VALUE_FLAGS),
-    level: (readChoice(argv, "level", ["AAA", "AA"] as const) ?? "AAA") as WcagTouchLevel,
-    ...reportFlags(argv, "a11y-touch"),
-    ...parsePageLoad(argv),
-  }),
+  parse: (argv) => {
+    const source = firstPositional(argv, "vlmkit check a11y touch <html-or-url>", A11Y_VALUE_FLAGS);
+    return {
+      source,
+      level: (readChoice(argv, "level", ["AAA", "AA"] as const) ?? "AAA") as WcagTouchLevel,
+      ...reportFlags(argv, "a11y-touch", source),
+      ...parsePageLoad(argv),
+    };
+  },
   run: (options) => runA11yTouch(options),
   findings: (report): Finding[] =>
     report.failures.map((f) => ({
@@ -204,11 +217,12 @@ moves backward, or jumps several visual rows at a time is reported.`,
   parse: (argv) => {
     const maxSteps = optionalInt(argv, "max-steps", { min: 1 });
     const viewport = viewportFlag(argv);
+    const source = firstPositional(argv, "vlmkit check a11y focus <html-or-url>", A11Y_VALUE_FLAGS);
     return {
-      source: firstPositional(argv, "vlmkit check a11y focus <html-or-url>", A11Y_VALUE_FLAGS),
+      source,
       ...(maxSteps !== undefined ? { maxSteps } : {}),
       ...(viewport ? { viewport } : {}),
-      ...reportFlags(argv, "a11y-focus-order"),
+      ...reportFlags(argv, "a11y-focus-order", source),
       ...parsePageLoad(argv),
     };
   },
