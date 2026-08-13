@@ -1064,6 +1064,49 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     現行のグリッドの拡張ではなく新しい構図。
   - 着手条件: レビュアーが実際に空間配置を読み違えた事例が出たら。
 
+### dogfood v6 の残件(2026-08-12、adoption シナリオ)
+
+修正済み2件とレポートは `docs/reports/2026-08-12-dogfood-adoption-v6.md`。以下は未修正。
+
+- [ ] **同じ3色が8件の所見になる(最優先)**
+  - `check integrity` の `low-contrast-text` はテーブル行ごとに1件出す
+    (`#rows > tr:nth-of-type(1) > td:nth-of-type(4)`, `(2)`, `(3)`)。
+    `check a11y contrast` は同じものを3件に畳んでいる。CSS 3色 → 8行。
+  - 導入エージェント曰く「3色に8行、というのがゲートが `--advisory` を付けられる存在に
+    なる過程」。`judgeTextContrast` で (fg, bg, floor) が同じものをまとめて件数で出す。
+
+- [ ] **rule を降格しても見た目が変わらない**
+  - `--rule component-drift=info` は verdict には効き `re-tuned:` も出るが、所見は
+    warn 形の `!` のまま、verdict も `DRIFT` のまま。`gate.format(report)` が
+    applied rules を見ていないから。再現済み。
+  - 直し方: `format` に applied rules を渡す**契約変更**。今サイクルで prose への
+    推論で2回やられているので、3つ目のヒューリスティックではなく契約変更にすべき。
+
+- [ ] **`--min-reuse` が推奨された用途に届かない**
+  - メトリクスが instances/styles の平均なので、3要素1バリアントの role は 1.5x で、
+    チェックを無効化する以外に超えられない。`examples/vlmkit.gates.json` はこのケースに
+    `--min-reuse 2` を勧めている。
+  - `check design` に `check integrity --allow` 相当の per-selector allow が必要。
+
+- [ ] **導入がリポジトリを黙って汚す**
+  - `--output` は stdout ログだけ。`test-results/` と `.vlmkit/run-ledger.jsonl` は
+    フラグが無く、生成されることを何も告げない。エージェントは `ls` で気づいて
+    `.gitignore` を自分で書いた。
+
+- [ ] **`vlmkit.gates.json` に `webServer` 相当が無い**(Playwright には昔からある)
+  - HAR 経路があるので今回は回避できたが、HAR を思いつかなければ
+    start / trap kill / poll-for-ready を手で書くことになる。
+
+- [ ] **`skipped: 28 (no inferable role)` が解釈できない**
+  - 30要素中28スキップは verdict がほぼ何も見ていないことを意味するが、それが正常かどうかを
+    何も言わない。
+
+- [ ] **`rules` に first-class な `reason`(と `expires`)**
+  - `//` コメントキーは通るようにしたが、`suppressions` の
+    `reason`/`owner`/`expires`(期限切れでビルドが再度落ちる)には及ばない。
+    監査可能な経路が suppressions にしかなく、false positive に必要なのは
+    監査不能な方 — プロジェクト自身の一番良いアイデアが反転している。
+
 ### dogfood v5 の残件(2026-08-11、ops dashboard シナリオ)
 
 修正済み6件は `docs/reports/2026-08-11-dogfood-dataviz-v5.md`。以下は**未修正・記録のみ**。

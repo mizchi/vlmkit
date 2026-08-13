@@ -1,0 +1,15 @@
+[1m[36mvlmkit check interactions[0m
+[2msource: http://localhost:4321/[0m
+
+status: [32mok[0m
+[2m  exits 0 — 3 warn(s) did not fail this command. To gate on one: --rule inert-control=suspect[0m
+interactive elements: 3
+
+  - [button] "Export CSV" focus✓ | Enter: no response
+  - [button] "Refund" focus✓ | Enter: no response
+  - [button] "Archive" focus✓ | Enter: no response
+
+[1mIssues:[0m
+  [33mwarn[0m [inert-control] button "Export CSV" (footer.actions>button#export) shows no observable response to Enter — no ARIA change, no layout change. Dead control, or its response is outside this probe.
+  [33mwarn[0m [inert-control] button "Refund" (footer.actions>button#refund) shows no observable response to Enter — no ARIA change, no layout change. Dead control, or its response is outside this probe.
+  [33mwarn[0m [inert-control] button "Archive" (footer.actions>button#archive) shows no observable response to Enter — no ARIA change, no layout change. Dead control, or its response is outside this probe.

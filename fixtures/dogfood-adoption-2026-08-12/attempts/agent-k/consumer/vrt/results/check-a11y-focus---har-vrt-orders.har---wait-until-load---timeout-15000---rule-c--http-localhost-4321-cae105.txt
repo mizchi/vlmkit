@@ -1,0 +1,5 @@
+  [1m[36mvlmkit check a11y focus[0m
+  [2msource: http://localhost:4321/[0m
+  [2mcaptured 3 focus step(s)[0m
+  [32m✓[0m 0 finding(s)
+  [2mreport: /home/user/vlmkit/fixtures/dogfood-adoption-2026-08-12/attempts/agent-k/consumer/test-results/a11y-focus-order/localhost-4321-b8f3745a/report.md[0m

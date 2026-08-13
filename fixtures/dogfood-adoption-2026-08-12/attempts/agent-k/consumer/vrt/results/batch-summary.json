@@ -1,0 +1,65 @@
+{
+  "jobs": [
+    {
+      "gate": "check integrity --har vrt/orders.har --wait-until load --timeout 15000 --rule check.design/component-drift=info",
+      "page": "http://localhost:4321/",
+      "cwd": "/home/user/vlmkit/fixtures/dogfood-adoption-2026-08-12/attempts/agent-k/consumer",
+      "exitCode": 1,
+      "durationMs": 3287
+    },
+    {
+      "gate": "check a11y contrast --har vrt/orders.har --wait-until load --timeout 15000 --rule check.design/component-drift=info",
+      "page": "http://localhost:4321/",
+      "cwd": "/home/user/vlmkit/fixtures/dogfood-adoption-2026-08-12/attempts/agent-k/consumer",
+      "exitCode": 1,
+      "durationMs": 2086
+    },
+    {
+      "gate": "check a11y focus --har vrt/orders.har --wait-until load --timeout 15000 --rule check.design/component-drift=info",
+      "page": "http://localhost:4321/",
+      "cwd": "/home/user/vlmkit/fixtures/dogfood-adoption-2026-08-12/attempts/agent-k/consumer",
+      "exitCode": 0,
+      "durationMs": 1991
+    },
+    {
+      "gate": "check a11y touch --har vrt/orders.har --wait-until load --timeout 15000 --rule check.design/component-drift=info",
+      "page": "http://localhost:4321/",
+      "cwd": "/home/user/vlmkit/fixtures/dogfood-adoption-2026-08-12/attempts/agent-k/consumer",
+      "exitCode": 0,
+      "durationMs": 2084
+    },
+    {
+      "gate": "check copy --har vrt/orders.har --wait-until load --timeout 15000 --rule check.design/component-drift=info",
+      "page": "http://localhost:4321/",
+      "cwd": "/home/user/vlmkit/fixtures/dogfood-adoption-2026-08-12/attempts/agent-k/consumer",
+      "exitCode": 1,
+      "durationMs": 1969
+    },
+    {
+      "gate": "check interactions --har vrt/orders.har --wait-until load --timeout 15000 --rule check.design/component-drift=info",
+      "page": "http://localhost:4321/",
+      "cwd": "/home/user/vlmkit/fixtures/dogfood-adoption-2026-08-12/attempts/agent-k/consumer",
+      "exitCode": 0,
+      "durationMs": 4918
+    },
+    {
+      "gate": "check breakpoints --har vrt/orders.har --wait-until load --timeout 15000 --rule check.design/component-drift=info",
+      "page": "http://localhost:4321/",
+      "cwd": "/home/user/vlmkit/fixtures/dogfood-adoption-2026-08-12/attempts/agent-k/consumer",
+      "exitCode": 0,
+      "durationMs": 1882
+    },
+    {
+      "gate": "check design --har vrt/orders.har --wait-until load --timeout 15000 --rule check.design/component-drift=info",
+      "page": "http://localhost:4321/",
+      "cwd": "/home/user/vlmkit/fixtures/dogfood-adoption-2026-08-12/attempts/agent-k/consumer",
+      "exitCode": 0,
+      "durationMs": 1517
+    }
+  ],
+  "passed": 5,
+  "failed": 3,
+  "wallMs": 8205,
+  "serialMs": 19734,
+  "concurrency": 3
+}

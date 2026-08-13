@@ -6,8 +6,13 @@
   "scripts": {
     "test": "node --experimental-strip-types --test \"src/**/*.{test,spec}.ts\" \"*.{test,spec}.ts\" \"skills/**/*.{test,spec}.ts\" \".agents/**/*.{test,spec}.ts\"",
     "e2e": "playwright test",
-    "serve": "node serve.mjs"
+    "serve": "node serve.mjs",
+    "vrt": "${VLMKIT:-node --experimental-strip-types /home/user/vlmkit/src/cli/vlmkit.ts} gates run --output vrt/results",
+    "vrt:advisory": "${VLMKIT:-node --experimental-strip-types /home/user/vlmkit/src/cli/vlmkit.ts} gates run --output vrt/results --advisory",
+    "vrt:record": "node serve.mjs 4321 & p=$!; sleep 1; ${VLMKIT:-node --experimental-strip-types /home/user/vlmkit/src/cli/vlmkit.ts} snapshot record-har http://localhost:4321/ --out vrt/orders.har; kill $p"
   },
+  "//vrt": "`pnpm vrt` is the whole CI gate: 8 vlmkit checks against vrt/orders.har, no dev server needed. Config: vlmkit.gates.json. Rationale + triaged findings: vrt/README.md.",
+  "//VLMKIT": "vlmkit is not published to a registry we can reach, so the scripts default to the local checkout. Set VLMKIT=\"npx vlmkit\" once it is published, or point it at another checkout.",
   "devDependencies": {
     "@playwright/test": "^1.61.0"
   }

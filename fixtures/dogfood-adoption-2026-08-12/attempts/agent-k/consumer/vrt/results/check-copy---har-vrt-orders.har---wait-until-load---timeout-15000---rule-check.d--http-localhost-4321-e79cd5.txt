@@ -1,0 +1,9 @@
+[1m[36mvlmkit check copy[0m
+[2msource: http://localhost:4321/[0m
+
+status: suspect
+rendered text: 239 chars
+manifest: none (pass --manifest, or --target <png> to verify copy against the target pixels)
+
+Issues:
+  [31mx[0m placeholder-text: Placeholder "FIXME" found in rendered text: "…cancelled Totals exclude tax. FIXME confirm rounding with finance…" — replace with the real copy from the target.

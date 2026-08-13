@@ -1,0 +1,8 @@
+  [1m[36mvlmkit check a11y contrast[0m
+  [2mhtml: http://localhost:4321/[0m
+  [2minspected 9 text-bearing element(s)[0m
+  [31m✗[0m 3 contrast failure(s)
+    [2mmain>p.hint — 2.61:1 (need 4.5) — `#a0a0a0` on `#ffffff` — "Totals exclude tax. FIXME confirm rounding with finance."[0m
+    [2mheader.bar>p.who — 2.81:1 (need 4.5) — `#9a9a9a` on `#ffffff` — "signed in as ops@example.com"[0m
+    [2mmain>table.orders>tbody#rows>tr>td.state — 3.32:1 (need 4.5) — `#8d8d8d` on `#ffffff` — "open"[0m
+  [2mreport: /home/user/vlmkit/fixtures/dogfood-adoption-2026-08-12/attempts/agent-k/consumer/test-results/a11y-contrast/localhost-4321-b8f3745a/report.md[0m

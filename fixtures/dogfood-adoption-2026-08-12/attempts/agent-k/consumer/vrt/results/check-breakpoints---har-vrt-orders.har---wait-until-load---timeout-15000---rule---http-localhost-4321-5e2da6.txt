@@ -1,0 +1,13 @@
+[1m[36mvlmkit check breakpoints[0m
+[2msource: http://localhost:4321/[0m
+
+status: warn
+[2m  exits 0 — 3 warn(s) did not fail this command. To gate on one: --rule overflow-at-boundary=suspect[0m
+breakpoints checked: 900px (each at B-1 / B / B+1)
+
+  900px: 0 spike(s), 0 gap(s) overflow:57/56/63px [2m(max-width: 900px)[0m
+
+Issues:
+  [33m![0m overflow-at-boundary: The page scrolls horizontally by 57px at 899px — layout breaks right at the 900px boundary.
+  [33m![0m overflow-at-boundary: The page scrolls horizontally by 56px at 900px — layout breaks right at the 900px boundary.
+  [33m![0m overflow-at-boundary: The page scrolls horizontally by 63px at 901px — layout breaks right at the 900px boundary.
