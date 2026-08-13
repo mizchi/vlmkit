@@ -17,8 +17,18 @@
  * nothing else. What a gate cannot do is disagree with the contract.
  */
 
+import { relative } from "node:path";
 import { UsageError } from "../cli-error.ts";
-import { appendRunLedger } from "../run-ledger.ts";
+import type { LedgerWrite } from "../run-ledger.ts";
+import {
+  LEDGER_RELATIVE_PATH,
+  VLMKIT_IGNORE_ENTRIES,
+  appendRunLedger,
+  configureRunLedger,
+  firstLedgerWrite,
+  isGitIgnored,
+  isGitRepo,
+} from "../run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "../terminal-colors.ts";
 import type { AnyGateDefinition, Finding, GateContext, GateDefinition } from "./contract.ts";
 import { gateCommandString } from "./contract.ts";
@@ -26,7 +36,18 @@ import type { AppliedRules, FindingCounts, RuleSettings } from "./rules.ts";
 import { RULE_SETTINGS, applyRuleSettings, countFindings, resolveRules } from "./rules.ts";
 
 /** Flags the runner owns. A gate's `parse` never sees these as its own. */
-export const SHARED_GATE_FLAGS = ["--json", "--advisory", "--fail-on-suspect", "--rule", "--rules", "--timing", "--help", "-h"] as const;
+export const SHARED_GATE_FLAGS = [
+  "--json",
+  "--advisory",
+  "--fail-on-suspect",
+  "--rule",
+  "--rules",
+  "--timing",
+  "--ledger",
+  "--no-ledger",
+  "--help",
+  "-h",
+] as const;
 
 export interface SharedFlags {
   json: boolean;
@@ -43,6 +64,15 @@ export interface SharedFlags {
    * `--json` is a contract other tools diff and cache against.
    */
   timing: boolean;
+  /**
+   * `--ledger <path>`: where the append-only run record goes. It defaulted to
+   * `.vlmkit/run-ledger.jsonl` with no flag at all and nothing announcing it,
+   * so the only ways to find it were `ls` and reading the source — which is how
+   * v6's adopting agent found it.
+   */
+  ledgerPath?: string;
+  /** `--no-ledger`: the flag form of VLMKIT_NO_LEDGER=1. */
+  noLedger: boolean;
 }
 
 /**
@@ -65,12 +95,19 @@ export function parseSharedFlags(argv: readonly string[]): SharedFlags {
     }
     ruleOverrides[ref] = setting as RuleSettings[string];
   }
+  const ledgerAt = argv.indexOf("--ledger");
+  if (ledgerAt >= 0) {
+    const value = argv[ledgerAt + 1];
+    if (value === undefined || value.startsWith("--")) throw new UsageError("--ledger needs a path");
+  }
   return {
     json: argv.includes("--json"),
     advisory: argv.includes("--advisory"),
     help: argv.includes("--help") || argv.includes("-h"),
     listRules: argv.includes("--rules"),
     timing: argv.includes("--timing"),
+    ...(ledgerAt >= 0 ? { ledgerPath: argv[ledgerAt + 1] } : {}),
+    noLedger: argv.includes("--no-ledger"),
     ruleOverrides,
   };
 }
@@ -80,7 +117,7 @@ export function stripSharedFlags(argv: readonly string[]): string[] {
   const out: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
-    if (arg === "--rule") {
+    if (arg === "--rule" || arg === "--ledger") {
       i++; // also drop its value
       continue;
     }
@@ -157,6 +194,12 @@ export interface GateOutcome<Report = unknown> {
   /** Rendered output (prose or JSON), ready to write. */
   text: string;
   timing: GateTiming;
+  /**
+   * The run-ledger append, or `null` when the ledger is off or the gate declares
+   * none. Surfaced so the CLI can announce a file it just brought into existence
+   * instead of leaving it to be found with `ls`.
+   */
+  ledgerWrite: LedgerWrite | null;
 }
 
 export interface RunGateOptions {
@@ -183,6 +226,16 @@ export async function runGate<Report, Options>(
   const gateArgv = stripSharedFlags(argv);
   const ctx: GateContext = { cwd, argv: gateArgv, json: shared.json };
 
+  // BEFORE `gate.run`, because most ledger writes happen inside the measurement
+  // functions rather than through the `gate.ledger` hook — 14 of the 16 call
+  // sites. Configuring after would leave `--ledger`/`--no-ledger` honoured by the
+  // hook and ignored by everything else.
+  configureRunLedger({
+    cwd,
+    ...(shared.ledgerPath ? { path: shared.ledgerPath } : {}),
+    ...(shared.noLedger ? { disabled: true } : {}),
+  });
+
   const tParse = performance.now();
   const parsed = gate.parse(gateArgv, ctx);
   const tRun = performance.now();
@@ -200,8 +253,11 @@ export async function runGate<Report, Options>(
 
   if (options.ledger !== false && gate.ledger) {
     const entry = gate.ledger(report, parsed);
-    if (entry) appendRunLedger(entry, cwd);
+    if (entry) appendRunLedger(entry);
   }
+  // Whichever call site got there first — the hook above or a direct append from
+  // inside `gate.run`. The announcement should not depend on which.
+  const ledgerWrite = firstLedgerWrite();
   const tFormat = performance.now();
 
   // `timing` is opt-in even under --json: it changes on every run, and the
@@ -261,6 +317,7 @@ export async function runGate<Report, Options>(
     exitCode: verdict === "fail" && !shared.advisory ? 1 : 0,
     text,
     timing,
+    ledgerWrite,
   };
 }
 
@@ -360,6 +417,12 @@ export function formatGateHelp(gate: AnyGateDefinition): string {
   lines.push("  --rule <ref>=<setting>  Re-tune or disable one rule (off|suspect|warn|info), repeatable");
   lines.push("  --rules                 List this gate's rules and exit");
   lines.push("  --timing                Add the per-phase ms breakdown to the output");
+  // The ledger wrote to the repo with no flag and no mention anywhere in any output,
+  // which made it findable only by `ls` — v6's adopting agent found it that way and
+  // wrote the `.gitignore` by hand. Declaring the write is half the fix; being able
+  // to move it or refuse it is the other half.
+  lines.push(`  --ledger <path>         Where to append the run record (default: ${LEDGER_RELATIVE_PATH})`);
+  lines.push("  --no-ledger             Do not write the run record at all");
   // Listed rather than hidden: it appears in published docs and in scripts, so
   // a reader who finds it needs to be told it no longer does anything — the
   // failing default it used to opt into is now the default.
@@ -454,6 +517,39 @@ export function unpinnedLiveInput(gate: AnyGateDefinition, argv: readonly string
 }
 
 /**
+ * Announce a file this run brought into existence in an un-ignored spot.
+ *
+ * The run ledger has always been written to `.vlmkit/run-ledger.jsonl` with no
+ * flag, no mention in any output, and an env-var opt-out. v6's adopting agent:
+ * "adopting the tool dirtied the repo silently. `--output` covers stdout logs;
+ * `test-results/` and `.vlmkit/run-ledger.jsonl` have no flag and nothing
+ * announces them. The agent found them with `ls` and wrote the `.gitignore`
+ * itself." The gates that write reports already print `report: <path>`; the
+ * ledger was the one genuinely silent write.
+ *
+ * Only on CREATION, and only when the path is not already ignored. A line on
+ * every run would be noise on a file that gets one appended line per gate, and
+ * the moment worth reporting is the moment the repo changed shape.
+ */
+export function newOutputNotice(write: LedgerWrite | null, cwd: string): string | null {
+  if (!write?.created) return null;
+  if (!isGitRepo(cwd) || isGitIgnored(cwd, write.path)) return null;
+  const rel = relative(cwd, write.path).split("\\").join("/") || write.path;
+  // A relocated ledger gets advice about ITSELF. Printing the canned pair after
+  // `--ledger runs/x.jsonl` would name two directories the run did not write and
+  // omit the one it did — advice that does not apply is worse than none.
+  const entries = rel === LEDGER_RELATIVE_PATH.split("\\").join("/")
+    ? [...VLMKIT_IGNORE_ENTRIES]
+    : [rel];
+  return [
+    `${DIM}  created ${rel} — an append-only record of every gate run, one line each.${RESET}`,
+    `${DIM}  It is not in .gitignore. Ignore it${entries.length > 1 ? " (`vlmkit gates init` writes these)" : ""}:${RESET}`,
+    ...entries.map((entry) => `${DIM}    ${entry}${RESET}`),
+    `${DIM}  Or move it with --ledger <path>, or turn it off with --no-ledger.${RESET}`,
+  ].join("\n");
+}
+
+/**
  * CLI adapter: handle `--help` / `--rules`, run the gate, write the output,
  * return the exit code. A migrated gate's whole `main()` becomes one call.
  */
@@ -504,6 +600,8 @@ export async function runGateCli<Report, Options>(
   if (!shared.json) {
     const unpinned = unpinnedLiveInput(gate, argv);
     if (unpinned) out(unpinned);
+    const created = newOutputNotice(outcome.ledgerWrite, options.cwd ?? process.cwd());
+    if (created) out(created);
   }
   // Under --json the breakdown is already inside the envelope; appending it to
   // stdout as prose would put non-JSON on a stream a client is parsing.

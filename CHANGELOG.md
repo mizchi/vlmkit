@@ -91,6 +91,21 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **The run ledger is a declared output rather than a side effect:
+  `--ledger <path>` and `--no-ledger` on every gate.** It has always been
+  written to `.vlmkit/run-ledger.jsonl` with no flag, no mention in any output,
+  and an env-var-only opt-out, so the only ways to find it were `ls` and reading
+  the source. v6's adopting agent found it the first way and wrote the
+  `.gitignore` by hand: "adopting the tool dirtied the repo silently." The
+  **first** append — the moment the repo changes shape — now says what was
+  created, that it is not ignored, what to ignore, and both flags. Subsequent
+  appends say nothing, and nothing is printed when the path is already ignored
+  or the directory is not a git repo. Implemented at the ledger module rather
+  than in the runner, because 14 of the 16 call sites append from inside
+  measurement functions and runner-only flags would have missed them.
+- **`vlmkit gates init` writes the `.gitignore` entries** (`.vlmkit/`,
+  `test-results/`) — the step the adopting agent had to do by hand. It appends
+  and only adds what is missing; a `.gitignore` is someone else's file.
 - **`check design` says how much of the page its verdict covers.** The old line
   was `skipped: 123 (no inferable role)` and nothing more, which cannot
   distinguish "this page is links and table cells" from "the measurement broke"

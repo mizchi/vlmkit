@@ -16,10 +16,15 @@
  */
 import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { UsageError, handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { hasFlag, readAll, readFlag, readInt } from "@mizchi/vlmkit-core/arg-reader.ts";
+import {
+  VLMKIT_IGNORE_ENTRIES,
+  isGitIgnored,
+  isGitRepo,
+} from "@mizchi/vlmkit-core/run-ledger.ts";
 import {
   GATE_CONFIG_FILENAMES,
   type GateConfig,
@@ -283,6 +288,38 @@ export function scaffoldConfig(
   };
 }
 
+/**
+ * Add the directories vlmkit writes to `.gitignore`, if they are not there.
+ *
+ * v6's adopting agent had to do this by hand after finding the directories with
+ * `ls`: "adopting the tool dirtied the repo silently." `gates init` is the one
+ * command whose whole job is "set this repo up for vlmkit", so it is where the
+ * setup belongs — and it appends rather than rewrites, because a `.gitignore` is
+ * someone else's file.
+ *
+ * Returns the entries it added, so the caller reports the change instead of
+ * making it quietly — the same standard the notice itself is holding the tool to.
+ */
+export async function ensureIgnoreEntries(cwd: string): Promise<string[]> {
+  if (!isGitRepo(cwd)) return [];
+  const path = join(cwd, ".gitignore");
+  // Absolute, because `isGitIgnored` measures the target against `cwd` — a bare
+  // `.vlmkit` would resolve against `process.cwd()` and read as outside the tree.
+  const missing = VLMKIT_IGNORE_ENTRIES.filter(
+    (entry) => !isGitIgnored(cwd, join(cwd, entry.replace(/\/+$/, ""))),
+  );
+  if (missing.length === 0) return [];
+  let existing = "";
+  try {
+    existing = await readFile(path, "utf8");
+  } catch {
+    // No .gitignore yet — the write below creates it.
+  }
+  const prefix = existing === "" || existing.endsWith("\n") ? "" : "\n";
+  await writeFile(path, `${existing}${prefix}\n# vlmkit run artifacts\n${missing.join("\n")}\n`);
+  return [...missing];
+}
+
 async function initConfig(args: string[]): Promise<void> {
   const path = resolve(readFlag(args, "path") ?? GATE_CONFIG_FILENAMES[0]!);
   if (existsSync(path) && !hasFlag(args, "force")) {
@@ -309,6 +346,11 @@ async function initConfig(args: string[]): Promise<void> {
       + ` vlmkit snapshot record-har ${urlSources[0]} --out app.har`
       + `, then add --har app.har.`,
     );
+  }
+  const ignored = await ensureIgnoreEntries(dirname(path));
+  if (ignored.length > 0) {
+    console.log(`\n  Added to .gitignore: ${ignored.join(", ")} — a run writes gate reports`);
+    console.log(`  under test-results/ and appends one line per gate to .vlmkit/run-ledger.jsonl.`);
   }
   console.log(`\nNext: vlmkit gates list    (see what would run)`);
   console.log(`      vlmkit gates run     (run it)`);

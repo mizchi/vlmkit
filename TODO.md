@@ -1106,10 +1106,20 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - **セレクタは finding に出た形のまま書く**(id 優先パスなので `button#export` は
     当たり、`.btn--primary` は当たらない)。ヘルプにこの一文を入れてある。
 
-- [ ] **導入がリポジトリを黙って汚す**
+- [x] **導入がリポジトリを黙って汚す** → `--ledger <path>` / `--no-ledger` + 初回作成の告知
+      + `gates init` が `.gitignore` を書く
   - `--output` は stdout ログだけ。`test-results/` と `.vlmkit/run-ledger.jsonl` は
     フラグが無く、生成されることを何も告げない。エージェントは `ls` で気づいて
     `.gitignore` を自分で書いた。
+  - レポートを書くゲートは既に `report: <path>` を出していた。**本当に無言だったのは
+    ledger だけ**。
+  - **実装位置が要点**: `appendRunLedger` の直接呼び出しが 16 箇所中 14 箇所あり、
+    runner だけに実装すると 14 箇所を取りこぼす。`--wait-until` のときと同じ形
+    (42 箇所の `.goto(` のうち3箇所が独自にオプションを組んでいた)。
+    ledger モジュール側に run 単位の設定を置いて choke point にした。
+  - 告知は**初回作成時のみ**。gate 実行ごとに1行追記されるファイルなので毎回言うとノイズ。
+    既に ignore 済み / git リポジトリでない場合は何も出さない。
+    `--ledger` で移した場合は、書いていない2ディレクトリではなく実際のパスを案内する。
 
 - [ ] **`vlmkit.gates.json` に `webServer` 相当が無い**(Playwright には昔からある)
   - HAR 経路があるので今回は回避できたが、HAR を思いつかなければ

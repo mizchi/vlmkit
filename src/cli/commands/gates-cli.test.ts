@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseGateConfig, resolveGatePlan, resolveSuppression } from "@mizchi/vlmkit-core/gate-config.ts";
 import {
   URL_SCAFFOLD_FLAGS,
+  ensureIgnoreEntries,
   expandPlanSources,
   findGateConfig,
   formatExpiredNotice,
@@ -27,6 +28,45 @@ describe("findGateConfig", () => {
     assert.equal(findGateConfig(dir), null);
     writeFileSync(join(dir, "vlmkit.gates.json"), "{}");
     assert.equal(findGateConfig(dir), join(dir, "vlmkit.gates.json"));
+  });
+});
+
+describe("ensureIgnoreEntries", () => {
+  const work = (): string => mkdtempSync(join(tmpdir(), "vlmkit-gitignore-"));
+
+  it("writes both artifact directories, creating .gitignore when there is none", async () => {
+    // v6's adopting agent had to do exactly this by hand after finding the
+    // directories with `ls`: "adopting the tool dirtied the repo silently."
+    const cwd = work();
+    mkdirSync(join(cwd, ".git"));
+    assert.deepEqual(await ensureIgnoreEntries(cwd), [".vlmkit/", "test-results/"]);
+    const text = readFileSync(join(cwd, ".gitignore"), "utf8");
+    assert.match(text, /# vlmkit run artifacts/);
+    assert.match(text, /\.vlmkit\//);
+    assert.match(text, /test-results\//);
+  });
+
+  it("appends rather than rewriting — a .gitignore is someone else's file", async () => {
+    const cwd = work();
+    mkdirSync(join(cwd, ".git"));
+    writeFileSync(join(cwd, ".gitignore"), "node_modules/");
+    await ensureIgnoreEntries(cwd);
+    const text = readFileSync(join(cwd, ".gitignore"), "utf8");
+    assert.match(text, /^node_modules\/$/m);
+    assert.match(text, /\.vlmkit\//);
+  });
+
+  it("adds only what is missing, and reports nothing when both are covered", async () => {
+    const cwd = work();
+    mkdirSync(join(cwd, ".git"));
+    writeFileSync(join(cwd, ".gitignore"), ".vlmkit/\n");
+    assert.deepEqual(await ensureIgnoreEntries(cwd), ["test-results/"]);
+    assert.deepEqual(await ensureIgnoreEntries(cwd), []);
+  });
+
+  it("leaves a non-repo alone, where a .gitignore would mean nothing", async () => {
+    const cwd = work();
+    assert.deepEqual(await ensureIgnoreEntries(cwd), []);
   });
 });
 

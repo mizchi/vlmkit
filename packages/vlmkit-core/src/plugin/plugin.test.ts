@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it } from "node:test";
@@ -20,7 +20,17 @@ import {
   resolveRules,
   validateGateDefinition,
 } from "./rules.ts";
-import { formatGateHelp, formatRuleTable, parseSharedFlags, runGate, runGateCli, stripSharedFlags, unpinnedLiveInput, withExitIntent } from "./runner.ts";
+import {
+  formatGateHelp,
+  formatRuleTable,
+  newOutputNotice,
+  parseSharedFlags,
+  runGate,
+  runGateCli,
+  stripSharedFlags,
+  unpinnedLiveInput,
+  withExitIntent,
+} from "./runner.ts";
 
 interface FakeReport {
   source: string;
@@ -762,6 +772,79 @@ describe("withExitIntent", () => {
     // A findings body can legitimately quote the word; only the headline is the anchor.
     const out = withExitIntent("verdict: A\nbody\nverdict: B", "  exits 0");
     assert.deepEqual(out.split("\n"), ["verdict: A", "  exits 0", "body", "verdict: B"]);
+  });
+});
+
+describe("the run ledger as a declared output", () => {
+  // v6's adopting agent: "adopting the tool dirtied the repo silently. `--output`
+  // covers stdout logs; `test-results/` and `.vlmkit/run-ledger.jsonl` have no flag
+  // and nothing announces them. The agent found them with `ls` and wrote the
+  // `.gitignore` itself." The gates that write reports print `report: <path>`
+  // already; the ledger was the one genuinely silent write.
+  const ledgerGate = () => fakeGate({ ledger: (report) => ({ tool: "fake", source: report.source, headline: {} }) });
+  const work = (): string => mkdtempSync(join(tmpdir(), "vlmkit-runner-ledger-"));
+
+  it("--ledger <path> moves the write, and the outcome reports where it went", async () => {
+    const cwd = work();
+    const outcome = await runGate(ledgerGate(), ["page.html", "--ledger", "runs/gates.jsonl"], { cwd });
+    assert.equal(outcome.ledgerWrite?.path, join(cwd, "runs", "gates.jsonl"));
+    assert.equal(outcome.ledgerWrite?.created, true);
+  });
+
+  it("--no-ledger writes nothing, without needing an env var", async () => {
+    const cwd = work();
+    const outcome = await runGate(ledgerGate(), ["page.html", "--no-ledger"], { cwd });
+    assert.equal(outcome.ledgerWrite, null);
+    assert.equal(existsSync(join(cwd, ".vlmkit")), false);
+  });
+
+  it("keeps both flags away from the gate's own parser", () => {
+    assert.deepEqual(
+      stripSharedFlags(["page.html", "--ledger", "runs.jsonl", "--no-ledger", "--strict"]),
+      ["page.html", "--strict"],
+    );
+  });
+
+  it("refuses --ledger with no path rather than swallowing the next flag", () => {
+    assert.throws(() => parseSharedFlags(["--ledger", "--json"]), /--ledger needs a path/);
+    assert.throws(() => parseSharedFlags(["page.html", "--ledger"]), /--ledger needs a path/);
+  });
+
+  it("announces the file it created, and what to ignore, exactly once", () => {
+    const cwd = work();
+    mkdirSync(join(cwd, ".git"));
+    const created = newOutputNotice({ path: join(cwd, ".vlmkit", "run-ledger.jsonl"), created: true }, cwd);
+    assert.ok(created);
+    assert.match(created!, /created \.vlmkit\/run-ledger\.jsonl/);
+    assert.match(created!, /append-only record of every gate run/);
+    assert.match(created!, /test-results\//);
+    assert.match(created!, /--ledger <path>/);
+    assert.match(created!, /--no-ledger/);
+    // An append is not news: one line per gate run would be noise.
+    assert.equal(newOutputNotice({ path: join(cwd, ".vlmkit", "run-ledger.jsonl"), created: false }, cwd), null);
+  });
+
+  it("advises on the relocated path itself, not the two directories it did not write", () => {
+    const cwd = work();
+    mkdirSync(join(cwd, ".git"));
+    const note = newOutputNotice({ path: join(cwd, "runs", "x.jsonl"), created: true }, cwd);
+    assert.ok(note);
+    assert.match(note!, /created runs\/x\.jsonl/);
+    assert.match(note!.replace(/\[[0-9;]*m/g, ""), /^\s*runs\/x\.jsonl$/m);
+    assert.doesNotMatch(note!, /test-results\//);
+    assert.doesNotMatch(note!, /gates init/);
+  });
+
+  it("stays silent once the path is ignored — the advice has been taken", () => {
+    const cwd = work();
+    mkdirSync(join(cwd, ".git"));
+    writeFileSync(join(cwd, ".gitignore"), ".vlmkit/\ntest-results/\n");
+    assert.equal(newOutputNotice({ path: join(cwd, ".vlmkit", "run-ledger.jsonl"), created: true }, cwd), null);
+  });
+
+  it("stays silent outside a git repo, where .gitignore advice would be noise", () => {
+    const cwd = work();
+    assert.equal(newOutputNotice({ path: join(cwd, ".vlmkit", "run-ledger.jsonl"), created: true }, cwd), null);
   });
 });
 
