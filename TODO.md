@@ -1069,18 +1069,24 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 修正済み6件は `docs/reports/2026-08-11-dogfood-dataviz-v5.md`。以下は**未修正・記録のみ**。
 どれも実在するが、測定の誤りではない。
 
-- [ ] **`--har` に recorder がない(v5 で最も呼ばれた「機能」要望)**
+- [x] **`--har` に recorder がない(v5 で最も呼ばれた「機能」要望)** — `vlmkit snapshot record-har` として追加(2026-08-12)
   - `docs/configuration.md` が「Playwright で HAR を録って replay しろ」と言うだけなので、
     どのプロジェクトも同じ20行スクリプトを書く。CI エージェントは実際に `record-har.mjs` を
     自作してタスクを完了させた。「知識がシェル履歴に住む」問題の一段下。
   - 答えは `vlmkit snapshot record-har` 相当。修正ではなく機能追加なので別途。
 
-- [ ] **HAR に陳腐化シグナルがなく、ポートに縛られる(残件の中で最も重い)**
+- [x] **HAR に陳腐化シグナルがなく、ポートに縛られる(残件の中で最も重い)** — 両方修正(2026-08-12)。`stale-har-fixture` ルール追加、origin 不一致は goto で名指し
   - 録音に無いエンドポイントは *abort* され、それが **broken-resource の「欠陥」**として
     出る。「フィクスチャが古い」ではなく「ページが壊れている」と報告される = 所見の種類が
     間違っている。
   - 録音は完全 URL がキーなので、ポートを変えると黙ってマッチしなくなる。
   - 着手条件: 所見の種類が違うのは実害なので、v6 を待たずに直す価値がある。
+
+- [ ] **`check design` の `DRIFT` + exit 0 が残っている**
+  - `check integrity` は `NO DEFECTS, N WARN (…) — exits 0` に直したが、design 側の
+    verdict 行は未着手。`component-drift` は warn なので DRIFT でも exit 0。
+  - 直し方: 各ゲートの format が exit 意図を出すのではなく、runner が verdict 行の
+    直下に出すのが本筋(27ゲート一律)。整形の置き場所の設計判断が必要。
 
 - [ ] **`gates init` が「必ずタイムアウトする設定」を出力する**
   - `http://` の source を渡すと、全ゲートが navigation で死ぬ plan を生成する。
@@ -1096,7 +1102,7 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     またぐ。データ由来の `boundary-spike` が構造的にあり得て、CSS バグと見分けがつかない。
     `--har` が副作用で直すが、何も警告しない。
 
-- [ ] **verdict の語が自分のカウントと矛盾し得る**
+- [x] **verdict の語が自分のカウントと矛盾し得る** — `check integrity` は修正済み(`NO DEFECTS, N WARN` + exit 意図)。`check design` の `DRIFT` + exit 0 は未着手
   - `verdict: DRIFT` + exit 0、そして F2 の修正後は `CLEAN (0 fail, 3 warn)`。
     解決する行(`N warn(s) did not fail this command`)は findings の下、最後に出る。
     修理エージェント曰く「CI ではコイントス」。
