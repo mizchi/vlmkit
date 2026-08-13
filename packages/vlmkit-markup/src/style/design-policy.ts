@@ -29,6 +29,7 @@
  */
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
@@ -118,6 +119,8 @@ export interface DesignPolicyReport {
     /** instances / signatures — how often the average signature is reused. */
     reuse: number;
     singletons: number;
+    /** Instances an `--allow` rule declared deliberate, excluded from the arithmetic. */
+    allowed?: number;
   }[];
   findings: DesignFinding[];
   skipped: number;
@@ -125,6 +128,8 @@ export interface DesignPolicyReport {
   exclusions: { selector: string; matches: number; elements: number }[];
   excludedElements: number;
   unusedExcludes: string[];
+  /** `--allow` rules that matched no instance. */
+  unusedAllow?: string[];
   /** Elements judged on their box alone because they paint no text. */
   textFreeSamples: number;
   /**
@@ -166,6 +171,21 @@ export interface DesignPolicyOptions {
    * nothing.
    */
   minInstances?: number;
+  /**
+   * `--allow "<selector>;<reason>"` — instances whose deviation is deliberate.
+   *
+   * `--min-reuse` cannot express this, and v6's adopting agent found out the hard way
+   * that the docs recommend it anyway: "`examples/vlmkit.gates.json` shows
+   * `--min-reuse 2` as *the* way to approve deliberately-varied buttons. On this page it
+   * changes nothing […] Because the metric is an *average*, any 3-element role with one
+   * deviant is unfixable except by `--min-reuse 1`, which disables the check."
+   *
+   * So the lever has to name the instance, the way `check integrity --allow` and
+   * `check drift component --allow` do. An allowed instance is excluded from the reuse
+   * arithmetic and still listed, because an exemption a reader cannot see is a blind
+   * spot rather than a decision.
+   */
+  allow?: readonly string[];
   /** Spacing values used less than this often are reported as outliers. Default 2. */
   outlierMaxUses?: number;
   storageState?: string;
@@ -397,13 +417,72 @@ function looksLikeVendorChrome(sample: DesignSample): boolean {
   return zeroPadding && noRadius && noBackground;
 }
 
+interface DesignAllowRule {
+  /** Substring the instance's selector must contain. */
+  selector: string;
+  reason: string;
+  /** As written, so an unused rule is reported back verbatim. */
+  raw: string;
+}
+
+/**
+ * Parse `--allow ".btn--primary;the primary action is deliberately distinct"`.
+ *
+ * Same syntax and same two properties as `check integrity --allow` and `check drift
+ * component --allow`: a reason is required, and a rule that matches nothing is reported.
+ * `;` delimits the reason rather than `#`, because `#` is part of an ID selector and
+ * splitting on it silently produces a broader exemption than the one written.
+ */
+export function parseDesignAllowRules(specs: readonly string[]): DesignAllowRule[] {
+  const rules: DesignAllowRule[] = [];
+  for (const spec of specs) {
+    if (!spec.trim()) continue;
+    const cut = spec.indexOf(";");
+    if (cut < 0) {
+      throw new UsageError(
+        `--allow needs a reason: <selector>;<reason> (got "${spec}").`
+        + (spec.includes("#") ? ` The reason is separated by ";", not "#" — "#" is part of an ID selector.` : "")
+        + ` An exemption without a stated reason cannot be reviewed.`,
+      );
+    }
+    const selector = spec.slice(0, cut).trim();
+    const reason = spec.slice(cut + 1).trim();
+    if (!selector) throw new UsageError(`--allow needs a selector: <selector>;<reason> (got "${spec}").`);
+    if (!reason) throw new UsageError(`--allow reason is empty in "${spec}". Say why this instance is intentional.`);
+    // A bare `*` would exempt every instance, which is `--rule component-drift=off`
+    // wearing a disguise — and unlike that flag it would not show up in the re-tuned
+    // line the runner prints.
+    if (selector === "*") {
+      throw new UsageError(
+        `--allow "*" would exempt every instance, which is \`--rule component-drift=off\`.`
+        + ` Name the instances that are deliberately different, or turn the rule off explicitly.`,
+      );
+    }
+    rules.push({ selector, reason, raw: spec });
+  }
+  return rules;
+}
+
+export const DESIGN_ALLOW_HELP = `Declare one instance's deviation deliberate, repeatable. Syntax:
+  <selector>;<reason>
+Use the selector AS PRINTED in the finding — it is an id-preferring path, so
+\`button#export\` matches and \`.btn--primary\` does not (a rule matching nothing is
+reported, so the mistake is loud rather than silent).
+e.g. --allow "button#export;the primary action is deliberately distinct"
+A reason is required; a bare \`*\` is refused because that is \`--rule component-drift=off\`;
+an allowed instance leaves the reuse arithmetic and is still listed; a rule matching
+nothing is reported. Use this rather than --min-reuse: the metric is instances/styles, so
+a 3-element role with one deliberate variant averages 1.5x and no threshold reaches it.`
+
 export function judgeDesignPolicy(
   input: DesignPolicyInput,
-  options: Pick<DesignPolicyOptions, "minReuse" | "minInstances" | "outlierMaxUses"> = {},
+  options: Pick<DesignPolicyOptions, "minReuse" | "minInstances" | "outlierMaxUses" | "allow"> = {},
 ): Omit<DesignPolicyReport, "source"> {
   const minReuse = options.minReuse ?? DEFAULT_MIN_REUSE;
   const minInstances = options.minInstances ?? DEFAULT_MIN_INSTANCES;
   const outlierMax = options.outlierMaxUses ?? DEFAULT_OUTLIER_MAX_USES;
+  const allowRules = parseDesignAllowRules(options.allow ?? []);
+  const usedAllow = new Set<string>();
 
   const byRole = new Map<string, DesignSample[]>();
   for (const s of input.samples) {
@@ -455,13 +534,37 @@ export function judgeDesignPolicy(
       same.push(s);
       counts.set(key, same);
     }
-    const signatures = counts.size;
-    const reuse = Math.round((list.length / signatures) * 100) / 100;
-    const singletons = [...counts.values()].filter((v) => v.length === 1).length;
-    roles.push({ role, instances: list.length, signatures, reuse, singletons });
+    // Allowed instances leave the arithmetic before it is done: a deliberate primary
+    // button should not drag the role's reuse figure down, which is the whole reason
+    // `--min-reuse` could not serve as this lever.
+    const allowedHere: { selector: string; reason: string }[] = [];
+    for (const [key, group] of [...counts.entries()]) {
+      const kept = group.filter((sample) => {
+        const rule = allowRules.find((r) => sample.selector.includes(r.selector));
+        if (!rule) return true;
+        allowedHere.push({ selector: sample.selector, reason: rule.reason });
+        usedAllow.add(rule.raw);
+        return false;
+      });
+      if (kept.length === 0) counts.delete(key);
+      else counts.set(key, kept);
+    }
+    const judged = [...counts.values()].flat();
 
-    if (list.length < minInstances) continue;
-    if (reuse >= minReuse) continue;
+    const signatures = counts.size;
+    const reuse = signatures === 0 ? 0 : Math.round((judged.length / signatures) * 100) / 100;
+    const singletons = [...counts.values()].filter((v) => v.length === 1).length;
+    roles.push({
+      role,
+      instances: judged.length,
+      signatures,
+      reuse,
+      singletons,
+      ...(allowedHere.length > 0 ? { allowed: allowedHere.length } : {}),
+    });
+
+    if (judged.length < minInstances) continue;
+    if (signatures === 0 || reuse >= minReuse) continue;
 
     const ranked = [...counts.entries()].sort((a, b) => b[1].length - a[1].length);
     const dominant = ranked[0]!;
@@ -571,6 +674,10 @@ export function judgeDesignPolicy(
     // a root and removes nothing, and a selector that removes nothing is dead
     // config however many roots it found.
     unusedExcludes: (input.exclusions ?? []).filter((entry) => entry.elements === 0).map((entry) => entry.selector),
+    // A rule that matched nothing is stale or misspelled, and either way it is widening
+    // the blind spot for a variant that is no longer there — the property `check
+    // integrity --allow` established and the adoption report praised by name.
+    unusedAllow: allowRules.filter((r) => !usedAllow.has(r.raw)).map((r) => r.raw),
     textFreeSamples,
     textFreeFolded,
     spacingValues: spacingCounts.size,
@@ -668,6 +775,18 @@ export function formatDesignReport(report: DesignPolicyReport): string {
     if (report.unusedExcludes.length > 0) {
       lines.push(`${YELLOW}${report.unusedExcludes.length} --exclude selector(s) removed nothing${RESET}`);
       lines.push(`${DIM}Delete them: an exclusion kept past the widget it covered only widens the blind spot.${RESET}`);
+    }
+    lines.push("");
+  }
+  // Allowed instances, stated. Same property as `--exclude` and as `check integrity
+  // --allow`: the exemption is visible, and a rule that matched nothing is reported.
+  const allowedRoles = report.roles.filter((r) => (r.allowed ?? 0) > 0);
+  if (allowedRoles.length > 0 || (report.unusedAllow ?? []).length > 0) {
+    for (const r of allowedRoles) {
+      lines.push(`${DIM}allowed: ${r.allowed} ${r.role} instance(s) declared deliberate and left out of the reuse figure${RESET}`);
+    }
+    if ((report.unusedAllow ?? []).length > 0) {
+      lines.push(`${YELLOW}${report.unusedAllow!.length} --allow rule(s) matched nothing: ${report.unusedAllow!.join(", ")}${RESET}`);
     }
     lines.push("");
   }

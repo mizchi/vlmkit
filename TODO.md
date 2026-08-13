@@ -1096,11 +1096,15 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - 直し方: `format` に applied rules を渡す**契約変更**。今サイクルで prose への
     推論で2回やられているので、3つ目のヒューリスティックではなく契約変更にすべき。
 
-- [ ] **`--min-reuse` が推奨された用途に届かない**
+- [x] **`--min-reuse` が推奨された用途に届かない** → `check design --allow` を追加
   - メトリクスが instances/styles の平均なので、3要素1バリアントの role は 1.5x で、
     チェックを無効化する以外に超えられない。`examples/vlmkit.gates.json` はこのケースに
     `--min-reuse 2` を勧めている。
-  - `check design` に `check integrity --allow` 相当の per-selector allow が必要。
+  - `check integrity --allow` と同じ `<selector>;<reason>` 構文。allow したインスタンスは
+    平均を取る前に母集団から抜けるので role の数値が「まだ判定対象の要素」を表す。
+    抜いたことは `allowed: N` で必ず出る。マッチしなかった rule も名前を返す。
+  - **セレクタは finding に出た形のまま書く**(id 優先パスなので `button#export` は
+    当たり、`.btn--primary` は当たらない)。ヘルプにこの一文を入れてある。
 
 - [ ] **導入がリポジトリを黙って汚す**
   - `--output` は stdout ログだけ。`test-results/` と `.vlmkit/run-ledger.jsonl` は

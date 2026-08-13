@@ -4,14 +4,15 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  type DesignPolicyInput,
-  type DesignSample,
-  type DesignSpacingSample,
   COLLECT_DESIGN_SAMPLES,
   buildDesignSampleScript,
   formatDesignReport,
   judgeDesignPolicy,
+  parseDesignAllowRules,
   runDesignPolicyCheck,
+  type DesignPolicyInput,
+  type DesignSample,
+  type DesignSpacingSample,
 } from "./design-policy.ts";
 
 const sample = (role: string, signature: string, selector = `.${role}-${signature}`): DesignSample => ({
@@ -47,6 +48,55 @@ const input = (over: Partial<DesignPolicyInput> = {}): DesignPolicyInput => ({
   exclusions: [],
   excludedElements: 0,
   ...over,
+});
+
+describe("judgeDesignPolicy — --allow", () => {
+  it("takes an allowed instance out of the reuse arithmetic, which --min-reuse could not", () => {
+    // v6's adopting agent: "`examples/vlmkit.gates.json` shows `--min-reuse 2` as *the*
+    // way to approve deliberately-varied buttons. On this page it changes nothing […]
+    // Because the metric is an *average*, any 3-element role with one deviant is
+    // unfixable except by `--min-reuse 1`, which disables the check."
+    const samples = [
+      styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "button#save" }),
+      styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "button#snooze" }),
+      styled("button", "10|18|10|18|8|1|blue", "16|400", { selector: "button#export" }),
+    ];
+    const drifting = judgeDesignPolicy(input({ samples }));
+    assert.equal(drifting.verdict, "drift");
+
+    const allowed = judgeDesignPolicy(input({ samples }), { allow: ["button#export;primary is deliberate"] });
+    assert.equal(allowed.verdict, "coherent");
+    const role = allowed.roles.find((r) => r.role === "button")!;
+    // The allowed instance left the figures, rather than being counted and forgiven.
+    assert.equal(role.instances, 2);
+    assert.equal(role.allowed, 1);
+    assert.equal(role.reuse, 2);
+  });
+
+  it("reports a rule that matched nothing, so a wrong selector is loud", () => {
+    // The printed selector is an id-preferring path, so a class selector silently
+    // matches nothing — which is exactly why this report has to exist.
+    const report = judgeDesignPolicy(
+      input({
+        samples: [
+          styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "button#save" }),
+          styled("button", "10|18|10|18|8|1|white", "16|400", { selector: "button#snooze" }),
+          styled("button", "10|18|10|18|8|1|blue", "16|400", { selector: "button#export" }),
+        ],
+      }),
+      { allow: [".btn--primary;deliberate"] },
+    );
+    assert.deepEqual(report.unusedAllow, [".btn--primary;deliberate"]);
+    assert.equal(report.verdict, "drift");
+  });
+
+  it("requires a reason, and refuses a bare *", () => {
+    assert.throws(() => parseDesignAllowRules(["button#export"]), /needs a reason/);
+    assert.throws(() => parseDesignAllowRules(["button#export;"]), /reason is empty/);
+    assert.throws(() => parseDesignAllowRules(["*;everything"]), /--rule component-drift=off/);
+    // `#` is part of an ID selector, so splitting on it would silently broaden the rule.
+    assert.throws(() => parseDesignAllowRules(["button#export#why"]), /part of an ID selector/);
+  });
 });
 
 describe("judgeDesignPolicy — component drift", () => {

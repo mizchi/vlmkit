@@ -14,10 +14,12 @@ import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { PAGE_LOAD_INPUTS, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import {
+  DESIGN_ALLOW_HELP,
+  formatDesignReport,
+  parseDesignAllowRules,
+  runDesignPolicyCheck,
   type DesignPolicyOptions,
   type DesignPolicyReport,
-  formatDesignReport,
-  runDesignPolicyCheck,
 } from "../style/design-policy.ts";
 import { firstPositional } from "./arg-helpers.ts";
 
@@ -66,12 +68,19 @@ docs/design/design-policy-metrics.md`,
       description: "Exclude a vendor-owned subtree; each is reported with what it removed",
       repeatable: true,
     },
+    {
+      name: "allow",
+      placeholder: "<selector>;<reason>",
+      kind: "string",
+      repeatable: true,
+      description: DESIGN_ALLOW_HELP,
+    },
     { name: "storage-state", placeholder: "file", kind: "path", description: "Playwright storage state for pages behind a login" },
     // Spread, not re-declared — see the note in `integrity.gate.ts`.
     ...PAGE_LOAD_INPUTS,
   ],
   parse: (argv) => {
-    const source = firstPositional(argv, "vlmkit check design <html-or-url>", ["--min-reuse", "--min-instances", "--exclude"]);
+    const source = firstPositional(argv, "vlmkit check design <html-or-url>", ["--min-reuse", "--min-instances", "--exclude", "--allow"]);
     // Validated at read time: `--min-reuse abc` used to become NaN, and since
     // every `reuse >= NaN` comparison is false, the gate reported every role
     // as drifting instead of saying the flag was wrong.
@@ -83,11 +92,16 @@ docs/design/design-policy-metrics.md`,
     const storageState = readFlag(argv, "storage-state");
     const har = pageLoad.har;
     const exclude = readAll(argv, "exclude");
+    const allow = readAll(argv, "allow");
+    // Parsed before the browser starts, so a typo'd exemption fails in milliseconds
+    // rather than after a page load.
+    parseDesignAllowRules(allow);
     return {
       source,
       ...(minReuse !== undefined ? { minReuse } : {}),
       ...(minInstances !== undefined ? { minInstances } : {}),
       ...(exclude.length > 0 ? { exclude } : {}),
+      ...(allow.length > 0 ? { allow } : {}),
       ...(timeout !== undefined ? { timeout } : {}),
       ...(waitUntil ? { waitUntil } : {}),
       ...(storageState ? { storageState } : {}),

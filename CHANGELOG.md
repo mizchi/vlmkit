@@ -91,6 +91,21 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **`check design --allow "<selector>;<reason>"`** declares one instance's
+  deviation deliberate. `--min-reuse` was documented as the lever for this
+  (`examples/vlmkit.gates.json` recommends `--min-reuse 2` for approved button
+  variants) and cannot reach it: the metric is `instances / distinct styles`, an
+  **average**, so a three-element role with one intentional variant sits at 1.5x
+  and no threshold clears it short of `--min-reuse 1`, which disables the check.
+  An allowed instance leaves the arithmetic before the average is taken, so the
+  role's figure reflects the elements still under judgement, and it is still
+  reported (`allowed: 1 button instance(s) declared deliberate and left out of
+  the reuse figure`) — an exemption a reader cannot see is a blind spot, not a
+  decision. Same syntax and same two properties as `check integrity --allow`: a
+  reason is required, and a rule that matched nothing is named back
+  (`1 --allow rule(s) matched nothing: ...`) rather than widening the blind spot
+  in silence. A bare `*` is refused, because that is `--rule component-drift=off`
+  without the runner's `re-tuned:` line to show it.
 - **`snapshot strip` and `check animation --strip`** composite a numbered
   sequence into ONE still image. A flipbook animates; a strip has to be readable
   pasted into an issue or handed to a model, which sees one image and cannot
