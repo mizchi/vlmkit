@@ -1234,7 +1234,9 @@ seconds per viewport and then reported a green comparison of two placeholders.
 
 Resolution order:
 
-1. `VLMKIT_CAPTURE_ROUTES` env var (JSON-encoded array)
+1. `VLMKIT_CAPTURE_ROUTES` env var (JSON-encoded array) — outranks `--config`, and the
+   run prints a line saying so when both are set, so a flag you typed is never silently
+   ignored
 2. `--config <path>` flag or `VLMKIT_CONFIG_PATH` env var
 3. `vlmkit.config.json` auto-discovered in the working directory
 4. Built-in defaults (vlmkit's own UI — useful only when developing vlmkit itself)

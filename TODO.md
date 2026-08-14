@@ -1137,6 +1137,55 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     dynamic な領域が diff に入って**落ちる** = 声が大きい。静かになるのは
     「オペレータが threshold を上げて対処したとき」で、その一手を防ぐための warn。
 
+### 別の軸で探した欠陥(2026-08-14、2パターンが枯れた後)— **全件修正済み**
+
+軸を「環境依存の挙動をテストが pin していない」「エラーメッセージが調べていない原因を名指しする」に
+変えた結果。**最大の収穫は死んだコマンド2本**で、それを生かしていたのは `catch (e)` の `e` 破棄。
+
+- [x] **`vlmkit workflow init` / `workflow capture` が一度も動いたことがない**(`b27aeb6`)
+  - `catch (e)` が `e` を捨て、固定文 `Playwright capture failed. Is the server running?` +
+    ハードコードの `127.0.0.1:4174` を出していた。**無関係な4原因(存在しない `--config` /
+    壊れた JSON / 不正な `VLMKIT_CAPTURE_ROUTES` / 正しい config + サーバ無し)が
+    全部この2行**、しかもどれも真の原因ではなかった。
+  - 背後に成功不可能な理由が3つ:
+    1. spec 名が `vrt-capture.spec.*` のまま(実体 `e2e/vlmkit-capture.spec.ts`)。
+       **throw 自身のメッセージは正しい名前を書いていた** = リネームでパスリテラル2本だけ漏れた証拠。
+    2. `dist/e2e/**` を優先。`playwright.config.ts` は `testDir: "./e2e"` なので収集対象外 → `No tests found`。
+    3. spawn が `cwd = PROJECT_ROOT`(ユーザーのプロジェクト)を継承。config も
+       `@playwright/test` も別解決 → `two different versions of @playwright/test`。
+  - `HARNESS_ROOT` で走らせて解決。**外部プロジェクトから実測で `init` → `capture` → `verify` 通過**
+    (2 tests 収集、baselines / snapshots 生成、exit 0)。
+  - テストは option 解析だけを見ていた。ブラウザ不要な事実(spec パスリテラル / `testDir` /
+    config エラー経路 / env 配線)は全部カバーした。
+    **なお最初に書いた spec パステストは vacuous だった** — 不正 `--config` は spec 解決前に
+    return するので、ファイル名を壊しても緑。壊して確かめて気づき、ソース текст から
+    リテラルを読んで fs を見る形に変えた。
+- [x] **`VLMKIT_CAPTURE_ROUTES` を読むコードが存在しない**(`b27aeb6`)
+  - `buildCaptureEnv` が `envRoutes` を渡していなかった。`vlmkit workflow --help` と
+    `docs/cli-reference.md` が**最優先の route ソース**と書いているのに黙って無視。
+  - `capture-config.test.ts` は `envRoutes` を関数に直接渡して検証していた =
+    **関数はテストしていたが機能はテストしていなかった**。
+- [x] **指定していない LLM provider が、実際に持っているキーを無視する**(`5286f88`)
+  - `?? "gemini"` でキーの有無を見ずに確定。実測: `ANTHROPIC_API_KEY` だけ /
+    `OPENROUTER_API_KEY` だけ、どちらも `GEMINI_API_KEY … is required` で落ちる。
+    同じファイル20行下の `createLLMProvider` は両方で動く。
+  - **ユーザーに見える経路は無い** — 6つの呼び出し元が**全部**回避策を持っていた。しかも4通り:
+    byte-identical な retry ループ2つ(`createLLMProvider` / `reasoning-pipeline.ts`)と
+    byte-identical な `resolveDefaultProvider` 2つ(`vlmkit-plan` / `vlmkit-generate`)。
+    **1つの欠けた挙動に対する回避策が4つあるのは共有関数が間違っている証拠**で、払うのは5人目。
+  - 明示指定は厳密に尊重(黙って別 provider にすり替えるのは別種の誤答)。だから
+    意図的にすり替える `createLLMProvider` の retry は残す。
+
+**この軸で健全だったもの**(掘って外れた記録): `design-policy.ts` の `--exclude` は
+named error を投げていて正しい。`flow-verify.ts` の `q()` は不正セレクタで throw する。
+`createVlmClient` は model id からキーを導くので推測しない。`withCleanEnv` は既にあり、
+純粋関数は `env` を引数で受けている(規律は悪くない)。
+
+**未着手で残す判断をしたもの**: `package.json` の `files` が `!dist/e2e/**` なので、
+npm install した vlmkit には spec が同梱されず `HARNESS_ROOT` はどちらの候補も見つけられない。
+ソースチェックアウトでは動く。**spec を publish するか、この2コマンドを廃止するかは
+設計判断**でタイポ修正ではないので、ここでは変えていない。
+
 **残した重複(まだ同期していて実害がない)**: `determineMigrationSubagentExitStatus` /
 `determineSnapshotReportEvaluationExitStatus`(566文字が同一)、`overlapArea` /
 `intersectionArea`。byte-identical な重複は「まだ分岐していない」= 将来のリスクであって

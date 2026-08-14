@@ -621,6 +621,44 @@ suppression works per *rule* instead of per whole gate.
   verbatim `sourceToUrl`, so the collapse is behaviour-preserving and there is now one
   definition to be wrong in.
 
+- **`vlmkit workflow init` and `workflow capture` never worked, and the catch hid why.**
+  Both failed on every invocation. `catch (e)` discarded `e` and printed a fixed
+  "Playwright capture failed. Is the server running?" plus a hardcoded
+  `http://127.0.0.1:4174`; measured with four unrelated causes (a `--config` path that does
+  not exist, invalid JSON in the config, malformed `VLMKIT_CAPTURE_ROUTES`, and a correct
+  config with no server) all four printed those two lines verbatim and none of them was the
+  real cause. Behind it, three reasons success was impossible: the spec filename was still
+  `vrt-capture.spec.*`, a name nothing has had since the rename (`e2e/vlmkit-capture.spec.ts`
+  is the file, and the throw's own message had the right name); `dist/e2e/**` was preferred
+  over it while `playwright.config.ts` sets `testDir: "./e2e"`, so the built copy is outside
+  collection ("No tests found"); and the spawn inherited the user's project as cwd, where
+  `npx` resolves a different `@playwright/test` than the spec imports ("two different
+  versions of @playwright/test"). Now runs in `HARNESS_ROOT` — verified end to end from an
+  external project against a local server: `init` → `capture` → `verify`, 2 tests collected,
+  baselines and snapshots written, exit 0. Config resolution moved ahead of the try so a bad
+  config reports as a bad config, and the failure message leads with the real error.
+
+- **`VLMKIT_CAPTURE_ROUTES` was read by nobody.** `buildCaptureEnv` never passed `envRoutes`
+  to `resolveCaptureRoutes`, so the variable documented as the highest-precedence route
+  source in `vlmkit workflow --help` and in docs/cli-reference.md was silently ignored.
+  `capture-config.test.ts` proved the function honoured it by passing it straight in — the
+  unit test tested the function, not the feature. Now wired, and when it outranks a typed
+  `--config` the run says so instead of quietly not honouring the flag.
+
+- **An unrequested LLM provider ignored the keys you actually had.** `resolveProviderConfig`
+  resolved `?? "gemini"` without looking at which keys existed, so a caller that expressed
+  no preference got gemini and then a `MISSING_KEY` naming a key it did not need — measured,
+  `ANTHROPIC_API_KEY` alone and `OPENROUTER_API_KEY` alone both produced "GEMINI_API_KEY (or
+  GOOGLE_AI_API_KEY) is required", while `createLLMProvider` twenty lines down the same file
+  returned a working client for both. No user-facing path produced it, because all six
+  callers already work around it in four different ways — two byte-identical retry loops
+  (`createLLMProvider`, `reasoning-pipeline.ts`) and two byte-identical `resolveDefaultProvider`
+  copies (`vlmkit-plan`, `vlmkit-generate`) — which is what made it worth fixing rather than
+  leaving: the fifth caller pays. An unrequested provider is now chosen from the keys present,
+  gemini first so the documented default still wins whenever a Gemini key exists, and the
+  no-key message names all three. An explicit request is still honoured exactly, which is why
+  `createLLMProvider`'s deliberate substitution survives unchanged.
+
 - **One malformed `--mask` selector silently disabled every mask after it.** The masks
   went in as a single stylesheet, one `sel { visibility: hidden !important; }` line each,
   and CSS error recovery on a bad selector consumes until it can resynchronize — which
