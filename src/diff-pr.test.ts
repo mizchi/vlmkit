@@ -398,3 +398,90 @@ describe("vlmkit diff-pr post", () => {
     }
   });
 });
+
+describe("a declared viewport with no baseline", () => {
+  let cwd: string;
+
+  /**
+   * The worst thing a CI gate can do. `if (!existsSync(baselinePath)) continue;` skipped
+   * an unpinned viewport, and `perVp.some((v) => !v.pass)` is `false` for an empty array,
+   * so the route reported pass having compared nothing.
+   *
+   * Measured before the fix on exactly this setup: two declared viewports, `mobile`
+   * pinned and `desktop` not, the current `desktop` render 100% different from what a
+   * baseline would have held — output `home pass mobile=0.00%`, `PASS`, exit 0, with
+   * `desktop` not mentioned anywhere. With a stray PNG under a label no longer in
+   * `viewports`, ZERO pixels were compared and it still said pass.
+   */
+  beforeAll(async () => {
+    cwd = await mkdtemp(join(tmpdir(), "vrt-diff-pr-unpinned-"));
+    await mkdir(join(cwd, "pages"), { recursive: true });
+    await writeFile(
+      join(cwd, "pages", "home.html"),
+      "<!doctype html><html><body style='margin:0;background:#0a0;height:400px'></body></html>",
+    );
+    await writeFile(join(cwd, "vlmkit.config.json"), JSON.stringify({
+      viewports: ["mobile", "desktop"],
+      thresholds: { mobile: 0.01, desktop: 0.01 },
+      baselineDir: ".vlmkit/baselines",
+      routes: [{ name: "home", url: `file://${join(cwd, "pages", "home.html")}` }],
+    }, null, 2));
+    const pin = cli(cwd, "pin");
+    assert.equal(pin.status, 0, `seed pin failed: ${pin.stderr}`);
+  });
+
+  afterAll(async () => {
+    await rm(cwd, { recursive: true, force: true });
+  });
+
+  it("fails the run, names the viewport, and does not call it a breach", async () => {
+    await rm(join(cwd, ".vlmkit/baselines/home/desktop.png"));
+    const r = cli(cwd, "--output", "out-one");
+    assert.equal(r.status, 1, `should fail with an unpinned viewport:\n${r.stdout}`);
+    assert.match(r.stdout, /not compared: desktop/);
+    assert.match(r.stdout, /declared viewport\(s\) had no baseline/);
+    // The viewport that IS pinned still reports its delta, so the run is not just an error.
+    assert.match(r.stdout, /mobile=/);
+
+    const md = await readFile(join(cwd, "out-one", "summary.md"), "utf-8");
+    assert.match(md, /Status: \*\*FAIL\*\*/);
+    assert.match(md, /## Not compared — no baseline/);
+    assert.match(md, /- `home`: desktop/);
+    // A row per declared viewport, so counting rows matches the config.
+    assert.match(md, /\| `home` \| desktop \| — \| — \| ❌ not compared: no baseline \|/);
+    assert.match(md, /\| `home` \| mobile \|/);
+    // And it is NOT listed as a pixel breach, because nothing was measured.
+    assert.doesNotMatch(md, /Worst offenders/);
+  });
+
+  it("fails when nothing is comparable at all, rather than passing on zero comparisons", async () => {
+    // A stray PNG under a label that is no longer in `viewports` — a renamed viewport.
+    // The existing `pinned.length === 0` check does not catch this, because the directory
+    // is not empty.
+    await rm(join(cwd, ".vlmkit/baselines/home"), { recursive: true, force: true });
+    await mkdir(join(cwd, ".vlmkit/baselines/home"), { recursive: true });
+    await writeFile(join(cwd, ".vlmkit/baselines/home/tablet.png"), Buffer.from(
+      "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000a49444154789c6300010000050001"
+      + "0d0a2db40000000049454e44ae426082", "hex",
+    ));
+    const r = cli(cwd, "--output", "out-none");
+    assert.equal(r.status, 1, `zero comparisons must not pass:\n${r.stdout}`);
+    assert.match(r.stdout, /not compared: mobile, desktop/);
+
+    const md = await readFile(join(cwd, "out-none", "summary.md"), "utf-8");
+    assert.match(md, /- `home`: mobile, desktop/);
+  });
+
+  it("still passes when every declared viewport is pinned and matches", async () => {
+    // The control. A fix that makes everything fail is not a fix.
+    await rm(join(cwd, ".vlmkit/baselines"), { recursive: true, force: true });
+    const pin = cli(cwd, "pin");
+    assert.equal(pin.status, 0, pin.stderr);
+    const r = cli(cwd, "--output", "out-ok");
+    assert.equal(r.status, 0, `a fully pinned run must pass:\n${r.stdout}`);
+    assert.match(r.stdout, /PASS/);
+    assert.doesNotMatch(r.stdout, /not compared/);
+    const md = await readFile(join(cwd, "out-ok", "summary.md"), "utf-8");
+    assert.doesNotMatch(md, /Not compared/);
+  });
+});

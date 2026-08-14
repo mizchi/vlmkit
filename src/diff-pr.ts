@@ -102,6 +102,23 @@ interface PerRouteResult {
   failed: boolean;
   error?: string;
   /**
+   * Declared viewports with no baseline PNG to compare against.
+   *
+   * These used to be a bare `continue`, and `perVp.some((v) => !v.pass)` is `false`
+   * for an empty array — so a route whose baselines did not cover its viewports
+   * PASSED, having compared nothing. Measured: two declared viewports, one baseline
+   * deleted, the current PNG for the unpinned one 100% different (red against green),
+   * and the gate printed `home pass a=0.00%` / `PASS` / exit 0 without naming the
+   * second viewport at all. With a stray PNG under a renamed label so the
+   * `pinned.length === 0` check passes, ZERO pixels were compared and it still said
+   * pass.
+   *
+   * This is not a breach — nothing was measured, which is worse — so it is reported
+   * as its own thing and fails the route, the same way a missing baseline
+   * *directory* already did.
+   */
+  unpinned?: string[];
+  /**
    * Media-variants emulation summary. Run once per route at the
    * default viewport when `mediaVariants` is declared in config.
    */
@@ -491,9 +508,14 @@ async function cmdRun(args: string[]): Promise<number> {
       // above and not evaluated here.
       const a11yPolicy = fileSources ? undefined : resolveA11yPolicy(config, route);
       const perVp: PerViewportResult[] = [];
+      /** Declared, but nothing pinned to compare against. Fails the route below. */
+      const unpinned: string[] = [];
       for (const vp of viewports) {
         const baselinePath = join(baselineDir, `${vp.label}.png`);
-        if (!existsSync(baselinePath)) continue;
+        if (!existsSync(baselinePath)) {
+          unpinned.push(vp.label);
+          continue;
+        }
         const suppliedFile = fileSources?.get(`${route.name}/${vp.label}`);
         // In file mode a viewport with no supplied PNG is out of scope
         // (--from-png names exactly one pair); --from-dir already enforced
@@ -683,7 +705,10 @@ async function cmdRun(args: string[]): Promise<number> {
       const visualFailed = perVp.some((v) => !v.pass);
       const mvFailed = mediaVariantsResult ? !mediaVariantsResult.pass : false;
       const xbFailed = crossBrowserResult ? !crossBrowserResult.pass : false;
-      const failed = visualFailed || mvFailed || xbFailed;
+      // `some` on an empty array is false, so without this a route with no comparable
+      // viewport reports pass. An unpinned viewport is not "within threshold"; it was
+      // never measured.
+      const failed = visualFailed || mvFailed || xbFailed || unpinned.length > 0;
       const status = failed ? `${RED}FAIL${RESET}` : `${GREEN}pass${RESET}`;
       const breakdown = perVp.map((v) => {
         const tag = v.pass ? GREEN : RED;
@@ -698,9 +723,15 @@ async function cmdRun(args: string[]): Promise<number> {
       const xbSuffix = crossBrowserResult
         ? ` ${DIM}[xb over=${crossBrowserResult.overCount}/${crossBrowserResult.maxOver} skip=${crossBrowserResult.skippedCount}]${RESET}`
         : "";
-      console.log(`  ${route.name.padEnd(20)} ${status}  ${breakdown}${mvSuffix}${xbSuffix}`);
+      // Ahead of the deltas, because a reader who sees `a=0.00%` and nothing else has
+      // no way to know a second viewport was declared.
+      const unpinnedSuffix = unpinned.length > 0
+        ? ` ${RED}not compared: ${unpinned.join(", ")} (no baseline — \`vlmkit diff-pr pin\`)${RESET}`
+        : "";
+      console.log(`  ${route.name.padEnd(20)} ${status}  ${breakdown}${unpinnedSuffix}${mvSuffix}${xbSuffix}`);
       results.push({
         route, viewports: perVp, failed,
+        ...(unpinned.length > 0 ? { unpinned } : {}),
         mediaVariants: mediaVariantsResult,
         crossBrowser: crossBrowserResult,
       });
@@ -721,7 +752,9 @@ async function cmdRun(args: string[]): Promise<number> {
   console.log();
   console.log(`${DIM}Summary written to ${summaryPath}${RESET}`);
   if (anyFail) {
-    console.log(`${RED}${BOLD}FAIL${RESET} — at least one route over threshold or missing baseline.`);
+    const unpinnedCount = results.reduce((n, r) => n + (r.unpinned?.length ?? 0), 0);
+    console.log(`${RED}${BOLD}FAIL${RESET} — at least one route over threshold or missing baseline.`
+      + (unpinnedCount > 0 ? ` ${unpinnedCount} declared viewport(s) had no baseline and were not compared.` : ""));
     return 1;
   }
   console.log(`${GREEN}${BOLD}PASS${RESET} — all routes within threshold.`);
@@ -767,10 +800,17 @@ export function buildMarkdownSummary(
     lines.push("|---|---|---|---|---|");
   }
   for (const r of results) {
-    if (r.viewports.length === 0) {
+    if (r.viewports.length === 0 && (r.unpinned ?? []).length === 0) {
       const filler = anyA11y ? " | —" : "";
       lines.push(`| \`${r.route.name}\` | — | — | —${filler} | ❌ ${r.error ?? "no result"} |`);
       continue;
+    }
+    // A row per declared-but-unpinned viewport, so the table accounts for every
+    // viewport the config names. Without these the reader counts the rows, gets fewer
+    // than they declared, and has nothing telling them why.
+    for (const label of r.unpinned ?? []) {
+      const filler = anyA11y ? " | —" : "";
+      lines.push(`| \`${r.route.name}\` | ${label} | — | —${filler} | ❌ not compared: no baseline |`);
     }
     for (const vp of r.viewports) {
       const icon = vp.pass ? "✅" : "❌";
@@ -784,6 +824,26 @@ export function buildMarkdownSummary(
       }
     }
   }
+  const unpinnedRoutes = results.filter((r) => (r.unpinned ?? []).length > 0);
+  if (unpinnedRoutes.length > 0) {
+    // Its own section rather than a table row alone, for the same reason the
+    // skipped-gates note is at the top: this markdown is what gets pasted into a PR,
+    // and "not compared" is the one status a reader must not mistake for "compared and
+    // fine".
+    lines.push("");
+    lines.push("## Not compared — no baseline");
+    lines.push("");
+    lines.push("These viewports are declared in config but have no pinned PNG, so nothing "
+      + "was measured for them. That is why the run failed; it is not a pixel breach.");
+    lines.push("");
+    for (const r of unpinnedRoutes) {
+      lines.push(`- \`${r.route.name}\`: ${r.unpinned!.join(", ")}`);
+    }
+    lines.push("");
+    lines.push("Pin them with `vlmkit diff-pr pin` (or `pin <route>` for one), or drop the "
+      + "viewport from `viewports` if it is no longer wanted.");
+  }
+
   // Surface the worst visual offenders for quick eyeballing.
   const overThreshold = results
     .flatMap((r) => r.viewports
