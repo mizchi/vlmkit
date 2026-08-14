@@ -318,7 +318,7 @@ The built-ins load through the same `createGateRegistry([...])` call. If the
 contract were not sufficient for them it would not be sufficient for anyone
 else, and making them its first consumer is the only way to keep that honest.
 
-## The 27 gates (125 tunable rules)
+## The 27 gates (126 tunable rules)
 
 | Gate | Rules | Plugin |
 |---|---|---|
@@ -343,7 +343,7 @@ else, and making them its first consumer is the only way to keep that honest.
 | `check theme` | 2 | markup |
 | `check asset` | 7 | markup |
 | `check drift component` | 2 | markup |
-| `check drift pages` | 1 | markup |
+| `check drift pages` | 2 | markup |
 | `verify markup` | 3 | markup |
 | `verify flow` | 2 | markup |
 | `check equivalence` | 4 | markup |
