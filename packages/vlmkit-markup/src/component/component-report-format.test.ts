@@ -11,13 +11,17 @@ import assert from "node:assert/strict";
 import type { ScrollportRegion } from "./semantic-drilldown.ts";
 import type { ComponentCanvasEvidence } from "./component-goal.ts";
 import type { UiExpectedScrollportContract } from "../contract/ui-contract.ts";
+import type { ComponentBbox } from "./component-bbox.ts";
+import type { TextRow } from "@mizchi/vlmkit-core/text-rows.ts";
 import {
   formatCanvasEvidence,
   formatExpressiveMenuEvidence,
   formatLandingEvidence,
+  formatProbeState,
   formatScrollportEvidence,
   renderReportMarkdown,
   summarizeScrollportEvidence,
+  type RenderInput,
 } from "./component-report-format.ts";
 
 test("renderReportMarkdown includes explicit scrollport diagnostics", () => {
@@ -496,5 +500,325 @@ describe("the small evidence formatters", () => {
     assert.match(text, /menu text missing/);
     assert.match(text, /items 4/);
     assert.match(text, /composition 2\/5/);
+  });
+});
+
+/**
+ * The rest of `renderReportMarkdown` — twelve conditional sections that only appear
+ * when the run found something to put in them.
+ *
+ * A typed base fixture rather than the `as any` the tests above use. `as any` is how
+ * a fixture ends up asserting a shape the types forbid: `LandscapeDiffResult` also
+ * carries `width` and `height`, which every `as any` fixture in this file omits, and
+ * nothing noticed. Built from the types, the compiler is the one checking.
+ */
+const BASE: RenderInput = {
+  targetImage: "/tmp/target.png",
+  currentHtml: "/tmp/current.html",
+  viewport: { width: 800, height: 600 },
+  diffPixels: 4_800,
+  totalPixels: 480_000,
+  diffRatio: 0.01,
+  landscapeDiff: {
+    width: 800, height: 600,
+    score: 0.02, similarity: 0.98, changedCells: 1, totalCells: 16,
+    grid: { cols: 4, rows: 4 },
+    topCells: [],
+  },
+  goalEvaluation: {
+    goal: "app", label: "Application", status: "review",
+    summary: "Application review", primaryMetric: "landscape",
+    // The thresholds the verdict was reached against. The `as any` fixtures above
+    // omit these four and the compiler never got a chance to say so.
+    pixelDiffRatio: 0.01, landscapeDiffRatio: 0.02,
+    pass: { landscape: 0.03, pixel: 0.25 },
+    review: { landscape: 0.05, pixel: 0.35 },
+  },
+  landmarkRegions: [],
+  scrollportRegions: [],
+  semanticDrilldown: [],
+  currentPath: "/tmp/current.png",
+  bboxMatches: [],
+  heatmapRegions: [],
+  textRowMatches: [],
+  rowGapDeltas: [],
+  typographyMismatches: [],
+  baselineRowCount: 0,
+  variantRowCount: 0,
+  paletteDiff: {
+    matched: [], onlyInBaseline: [], onlyInVariant: [],
+    baselineMatchedShare: 1, variantMatchedShare: 1,
+  },
+  stateResults: [],
+  dpr: 1,
+};
+
+const cellStats = (hex: string, ink: number) => ({
+  r: 0x22, g: 0x44, b: 0x88, luma: 90, ink, hex,
+});
+
+const bbox = (over: Partial<ComponentBbox> = {}): ComponentBbox => ({
+  top: 10, left: 20, width: 200, height: 60, area: 9_000, fillColor: "rgb(34, 68, 136)", ...over,
+});
+
+const textRow = (yCenter: number): TextRow => ({
+  yCenter, yStart: yCenter - 8, yEnd: yCenter + 8, meanLuma: 60, height: 16,
+});
+
+describe("renderReportMarkdown — the header", () => {
+  it("states the pixel diff, the landscape diff and the goal verdict", () => {
+    const md = renderReportMarkdown(BASE);
+    assert.match(md, /Target:\s+`\/tmp\/target\.png` \(800×600\)/);
+    assert.match(md, /\*\*Pixel diff\*\*: 1\.00% \(4800 of 480000 pixels\)/);
+    assert.match(md, /2\.00% coarse/);
+    assert.match(md, /98\.00% similarity, 1\/16 changed cells, 4×4 grid/);
+    assert.match(md, /\*\*Goal\*\*: `app` \(Application\) — \*\*review\*\*/);
+  });
+
+  it("reports the CSS viewport only when the capture was scaled", () => {
+    assert.doesNotMatch(renderReportMarkdown(BASE), /Capture: DPR/);
+    // At DPR 2 the pixel viewport is twice the CSS one, and a reader comparing the
+    // report against their stylesheet needs the CSS number.
+    const md = renderReportMarkdown({ ...BASE, dpr: 2 });
+    assert.match(md, /Capture: DPR 2 \(400×300 CSS px\)/);
+  });
+
+  it("passes a DPR suggestion through with the flag to reproduce it", () => {
+    const md = renderReportMarkdown({
+      ...BASE,
+      dprSuggestion: {
+        deviceScaleFactor: 2,
+        cssViewport: { width: 400, height: 300 },
+        reason: "target is exactly twice the rendered size",
+      },
+    });
+    assert.match(md, /DPR hint: target is exactly twice the rendered size/);
+    assert.match(md, /try `--dpr 2`/, "a hint without the flag is not actionable");
+    assert.match(md, /400×300 CSS px/);
+  });
+
+  it("lists the three images only when a heatmap was produced", () => {
+    assert.doesNotMatch(renderReportMarkdown(BASE), /Heatmap: /);
+    const md = renderReportMarkdown({ ...BASE, heatmapPath: "/tmp/heat.png" });
+    assert.match(md, /- Target:\s+`\/tmp\/target\.png`/);
+    assert.match(md, /- Current:\s+`\/tmp\/current\.png`/);
+    assert.match(md, /- Heatmap:\s+`\/tmp\/heat\.png`/);
+  });
+});
+
+describe("renderReportMarkdown — the landscape cell table", () => {
+  it("appears only when there are cells, and carries each cell's colour and ink", () => {
+    assert.doesNotMatch(renderReportMarkdown(BASE), /## Landscape cell diff/);
+    const md = renderReportMarkdown({
+      ...BASE,
+      landscapeDiff: {
+        ...BASE.landscapeDiff,
+        topCells: [{
+          row: 1, col: 2, x: 400, y: 150, width: 200, height: 150, score: 0.42,
+          baseline: cellStats("#224488", 0.31), current: cellStats("#ffffff", 0.02),
+        }],
+      },
+    });
+    assert.match(md, /## Landscape cell diff/);
+    assert.match(md, /\| r1 c2 \| 400,150 200×150 \| 42\.0% \| `#224488` ink 0\.31 \| `#ffffff` ink 0\.02 \|/);
+  });
+});
+
+describe("renderReportMarkdown — the bbox table", () => {
+  it("drops matches whose every delta is within a pixel", () => {
+    // A ±1px delta is measurement noise on an anti-aliased edge. Listing it would
+    // bury the real shifts in rows nobody should act on.
+    const md = renderReportMarkdown({
+      ...BASE,
+      bboxMatches: [{
+        rank: 0, baseline: bbox(), variant: bbox({ top: 11, left: 21 }),
+        deltaTop: 1, deltaLeft: 1, deltaWidth: 0, deltaHeight: 0, iou: 0.99,
+      }],
+    });
+    assert.doesNotMatch(md, /## Component bbox diff/);
+  });
+
+  it("lists a real shift with signed deltas", () => {
+    const md = renderReportMarkdown({
+      ...BASE,
+      bboxMatches: [{
+        rank: 0,
+        baseline: bbox(),
+        variant: bbox({ top: 34, left: 20, width: 180 }),
+        deltaTop: 24, deltaLeft: 0, deltaWidth: -20, deltaHeight: 0, iou: 0.71,
+      }],
+    });
+    assert.match(md, /## Component bbox diff/);
+    // Signed, because "24" and "-20" mean opposite corrections and an unsigned
+    // magnitude cannot say which.
+    assert.match(md, /\| #0 \| 20,10 200×60 \| 20,34 180×60 \| \+24 \/ 0 \/ -20 \/ 0 \| 0\.71 \|/);
+  });
+
+  it("caps the table at eight rows", () => {
+    const many = Array.from({ length: 20 }, (_, i) => ({
+      rank: i, baseline: bbox(), variant: bbox({ top: 100 }),
+      deltaTop: 90, deltaLeft: 0, deltaWidth: 0, deltaHeight: 0, iou: 0.2,
+    }));
+    const md = renderReportMarkdown({ ...BASE, bboxMatches: many });
+    const rows = md.split("\n").filter((l) => /^\| #\d+ \|/.test(l));
+    assert.equal(rows.length, 8, "twenty near-identical rows is noise, not detail");
+  });
+});
+
+describe("renderReportMarkdown — the heatmap cluster table", () => {
+  it("marks a low-confidence kind guess with a question mark", () => {
+    // The kind is a pixel-only heuristic. Presenting a 0.4-confidence guess with the
+    // same authority as a 0.9 one is what makes an agent chase the wrong fix.
+    const md = renderReportMarkdown({
+      ...BASE,
+      heatmapRegions: [
+        { top: 0, left: 0, width: 100, height: 40, area: 2_000, dominantColor: { r: 34, g: 68, b: 136, hex: "#224488" }, kind: "text", kindConfidence: 0.9 },
+        { top: 50, left: 0, width: 100, height: 40, area: 1_800, kind: "icon", kindConfidence: 0.4 },
+        { top: 100, left: 0, width: 100, height: 40, area: 900 },
+      ],
+    });
+    assert.match(md, /## Heatmap region clusters/);
+    assert.match(md, /\| 0,0 \| 100×40 \| 2000 \| `#224488` \| `text` \|/);
+    assert.match(md, /\| 0,50 \| 100×40 \| 1800 \| — \| `icon`\? \|/);
+    // No colour and no kind: an em-dash, not an empty cell or the word undefined.
+    assert.match(md, /\| 0,100 \| 100×40 \| 900 \| — \| — \|/);
+  });
+});
+
+describe("renderReportMarkdown — the text-row section", () => {
+  it("appears on a row-count mismatch even with nothing matched", () => {
+    // Missing content is the finding. Saying nothing because no rows could be paired
+    // would hide the most actionable case: the markup is short of elements.
+    const md = renderReportMarkdown({ ...BASE, baselineRowCount: 7, variantRowCount: 4 });
+    assert.match(md, /## Text-row Δy/);
+    assert.match(md, /Target has 7 text rows; current has 4/);
+    assert.match(md, /\*\*Count mismatch\*\*/);
+    assert.match(md, /Add the missing elements before tweaking CSS/);
+  });
+
+  it("says nothing when the counts agree and nothing was matched", () => {
+    assert.doesNotMatch(
+      renderReportMarkdown({ ...BASE, baselineRowCount: 5, variantRowCount: 5 }),
+      /## Text-row Δy/,
+    );
+  });
+
+  it("lists signed Δy per matched row, without claiming a count mismatch", () => {
+    const md = renderReportMarkdown({
+      ...BASE,
+      baselineRowCount: 2, variantRowCount: 2,
+      textRowMatches: [
+        { rank: 0, baseline: textRow(100), variant: textRow(112), deltaY: 12 },
+        { rank: 1, baseline: textRow(200), variant: textRow(194), deltaY: -6 },
+      ],
+    });
+    assert.match(md, /## Text-row Δy/);
+    assert.doesNotMatch(md, /Count mismatch/);
+    assert.match(md, /\| #0 \| 100 \| 112 \| \+12px \|/);
+    assert.match(md, /\| #1 \| 200 \| 194 \| -6px \|/);
+  });
+
+  it("names a typography mismatch by what actually differs", () => {
+    const md = renderReportMarkdown({
+      ...BASE,
+      baselineRowCount: 1, variantRowCount: 1,
+      textRowMatches: [{ rank: 0, baseline: textRow(100), variant: textRow(100), deltaY: 0 }],
+      typographyMismatches: [
+        { rank: 0, kind: "both", baselineFontSize: 24, variantFontSize: 16, baselineWeight: "bold", variantWeight: "regular" },
+      ],
+    });
+    assert.match(md, /\*\*Typography mismatches\*\*/);
+    assert.match(md, /\| #0 \| 24px bold \| 16px regular \| both \|/);
+    assert.match(md, /heuristic/, "an estimate presented as a measurement invites a wrong fix");
+    // And it reaches the paste-ready patch, translating `bold` into the numeric
+    // weight a stylesheet actually takes.
+    assert.match(md, /font-size: 24px; font-weight: 700;/);
+  });
+});
+
+describe("renderReportMarkdown — palette and backgrounds", () => {
+  it("reports both backgrounds, and whether the page is one flat colour", () => {
+    const md = renderReportMarkdown({
+      ...BASE,
+      targetBg: { outer: { r: 255, g: 255, b: 255, hex: "#ffffff" }, inner: { r: 244, g: 244, b: 244, hex: "#f4f4f4" }, same: false },
+      currentBg: { outer: { r: 255, g: 255, b: 255, hex: "#ffffff" }, inner: { r: 255, g: 255, b: 255, hex: "#ffffff" }, same: true },
+    });
+    assert.match(md, /## Backgrounds/);
+    // Both layers, side by side: the finding is that the target's content background
+    // differs from the page's and the current render flattened them.
+    assert.match(md, /\| outer \(page\) \| `#ffffff` \| `#ffffff` \|/);
+    assert.match(md, /\| inner \(content\) \| `#f4f4f4` \| `#ffffff` \|/);
+  });
+
+  it("lists a colour the current render is missing, with how near it got", () => {
+    // The distance is the point: a 6-away miss is an anti-aliasing artifact, a
+    // 90-away miss is a colour nobody wrote. Same row shape, opposite action.
+    const md = renderReportMarkdown({
+      ...BASE,
+      paletteDiff: {
+        matched: [], baselineMatchedShare: 0.8, variantMatchedShare: 0.8,
+        // `nearestNeighborDistance`, not `nearest` — my first guess at the field name,
+        // which `as any` would have accepted and then rendered as `undefined`.
+        onlyInBaseline: [{ r: 244, g: 244, b: 244, hex: "#f4f4f4", share: 0.12, count: 5_760, nearestNeighborDistance: 6 }],
+        onlyInVariant: [{ r: 17, g: 17, b: 17, hex: "#111111", share: 0.04, count: 1_920, nearestNeighborDistance: 92 }],
+      },
+    });
+    assert.match(md, /## Palette diff/);
+    assert.match(md, /#f4f4f4/);
+    assert.match(md, /#111111/);
+  });
+});
+
+describe("renderReportMarkdown — the state table", () => {
+  it("separates a state whose change is all on the perimeter from one that fills", () => {
+    // `edgeFraction` near 1 is a focus ring; interior pixels are a background change.
+    // Both are non-zero diffs, and the report has to say which so the reader knows
+    // whether to look at `outline` or at `background`.
+    const md = renderReportMarkdown({
+      ...BASE,
+      stateResults: [
+        { state: "focus-visible", forcedCount: 1, inducedDiffRatio: 0.004, rawInducedDiffRatio: 0.005, edgeFraction: 0.96, interiorPixels: 12, lumaDelta: -2, lumaBefore: 240, lumaAfter: 238 },
+        { state: "hover", forcedCount: 1, inducedDiffRatio: 0.02, rawInducedDiffRatio: 0.02, edgeFraction: 0.1, interiorPixels: 4_200, lumaDelta: -30, lumaBefore: 240, lumaAfter: 210 },
+      ],
+    });
+    assert.match(md, /## State diff/);
+    assert.match(md, /focus-visible/);
+    assert.match(md, /hover/);
+  });
+
+  it("survives a state with no forced bboxes to measure luma over", () => {
+    // `lumaDelta: null` means there was nothing to average, which is not the same as
+    // a delta of zero. Rendering it as 0 would claim a measurement that never happened.
+    const md = renderReportMarkdown({
+      ...BASE,
+      stateResults: [
+        { state: "hover", forcedCount: 0, inducedDiffRatio: 0, rawInducedDiffRatio: 0, edgeFraction: 0, interiorPixels: 0, lumaDelta: null, lumaBefore: null, lumaAfter: null },
+      ],
+    });
+    assert.match(md, /## State diff/);
+    // An em-dash for both ΔLuma and Edge %, and the state named as a CSS selector.
+    assert.match(md, /\| `:hover` \| 0\.00% \| 0\.00% \| — \| — \| 0 \|/);
+    assert.doesNotMatch(md, /null/, "an absent measurement should not render as the word null");
+  });
+});
+
+describe("renderReportMarkdown — always-present sections", () => {
+  it("ends with a next step, so a report is never a dead end", () => {
+    const md = renderReportMarkdown(BASE);
+    assert.match(md, /## Suggested next step/);
+    // And the very last thing in the file is not a bare table row or an empty table.
+    assert.ok(md.trim().length > 0);
+    assert.doesNotMatch(md, /undefined/, "an undefined reaching the markdown is a fixture or a formatter bug");
+  });
+});
+
+describe("formatProbeState", () => {
+  it("prefixes a pseudo-class with a colon and leaves `scrolled` bare", () => {
+    // `scrolled` is not a CSS pseudo-class — it is a scroll position the probe forced —
+    // so rendering it as `:scrolled` would name a selector that does not exist.
+    assert.equal(formatProbeState("hover"), ":hover");
+    assert.equal(formatProbeState("focus-visible"), ":focus-visible");
+    assert.equal(formatProbeState("active"), ":active");
+    assert.equal(formatProbeState("scrolled"), "scrolled");
   });
 });
