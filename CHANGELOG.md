@@ -35,6 +35,14 @@ suppression works per *rule* instead of per whole gate.
   against that cwd, so an explicit `--output` and the default landed relative to
   different directories.
 
+- **`formatGateVerdict` and `computeLandscapeClampByte` are removed.** The first named
+  three consumers in its docstring — `verify markup`, `batch`, MCP — and all three
+  build their own verdict instead; a helper whose every named consumer declined it is
+  speculative, not shared. The second was a TS wrapper over a markup-core command with
+  no caller and no entry in the migration parity harness, so the command and both its
+  positional dispatch arms go with it (61 → 60 commands). The MoonBit function stays:
+  `landscape_cell_hex` calls it and `core_test.mbt` covers it.
+
 - **`runWorkflowCli` and the three `workflow/spec.ts` commands return an exit code
   instead of calling `process.exit`.** Sixteen `process.exit()` calls lived inside
   those command bodies. `runWorkflowCli` was typed `Promise<void>` while actually
@@ -566,6 +574,16 @@ suppression works per *rule* instead of per whole gate.
   a stack trace.
 
 ### Fixed
+
+- **Two constants that existed to prevent divergence were never used.**
+  `GATE_EXIT_HELP` is documented as the shared `--advisory` help line "so every gate
+  documents the contract identically", and the runner — its only call site — held a
+  byte-identical copy of the string instead. `authStateNotice` was never called, so a
+  gate could measure a page behind a login and say nothing about it;
+  `VLMKIT_STORAGE_STATE` makes that the easy case, since no flag reaches the command
+  line. Gates now print `auth: storage state from …` when a session was actually
+  applied — read from `withAuthState` rather than from what was configured, so a gate
+  that ignores auth never claims to have used one.
 
 - **`vlmkit skill run` had been failing every check since 0.9.0.** It spawned
   `node --experimental-strip-types src/vrt.ts <tool>`, a path that stopped existing
