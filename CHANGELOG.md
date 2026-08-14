@@ -595,6 +595,21 @@ suppression works per *rule* instead of per whole gate.
   `redirected` does. A valid selector that matches nothing still satisfies
   `visible: false`, which is the assertion working.
 
+- **A published CLI installed by npm would not have started.** `isCliEntry` compared
+  resolved-but-not-realpathed paths, and npm installs every `bin` in this workspace as a
+  symlink — so `argv[1]` is `node_modules/.bin/x` while `import.meta.url` is the real
+  `dist/cli.mjs`, and the guard returned false. Measured through a symlink: resolve-only
+  false, realpath both sides true. `vlmkit-generate` and `vlmkit-plan` had already found
+  this and carry their own `realpathSync` guard; they keep it, since they do not depend
+  on core.
+
+- **A fourth entry-guard spelling silently disabled four commands on any path with a
+  space in it.** `new URL(import.meta.url).pathname === process.argv[1]` compares a
+  percent-encoded pathname against a raw path: `/tmp/has%20space/x.mjs` never equals
+  `/tmp/has space/x.mjs`. `diff-pr`, `baseline`, `manifest` and `watch` carried it, and
+  it is broken on Windows too. All now use `isCliEntry`, and the regression test matches
+  this spelling as well.
+
 - **`node dist/png-diff.mjs` printed nothing.** Fifteen modules still guarded their
   entry with `process.argv[1]?.endsWith("thing.ts")`, and nine of those tested for a
   `.ts` suffix only — so in the published `dist/` the direct-invocation branch was
