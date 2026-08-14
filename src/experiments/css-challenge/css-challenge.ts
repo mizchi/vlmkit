@@ -20,7 +20,19 @@ import { getCssChallengeFixturePath } from "./css-challenge-fixtures.ts";
 // `applyCssFix` from core rather than the byte-identical copy that lived here. Two
 // copies of a CSS mutator is one place for a fix to land and one to be forgotten —
 // and the semicolon-termination bug was present in both.
-import { applyCssFix, categorizeProperty, escapeRegex } from "./css-challenge-core.ts";
+// Every CSS mutator comes from core now. This file carried local copies of
+// `parseCssDeclarations`, `seededRandom`, `removeCssLine` (a rename of
+// `removeCssProperty`), `normalizeValue` and `applyCssFix` — five forks — which is why
+// the two corruption bugs fixed in core on 2026-08-14 were still live here. The copies
+// differed from core in exactly one way: they did not record `mediaCondition`.
+import {
+  applyCssFix,
+  categorizeProperty,
+  normalizeValue,
+  parseCssDeclarations,
+  removeCssProperty,
+  seededRandom,
+} from "./css-challenge-core.ts";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { classifyVisualDiff } from "@mizchi/vlmkit-markup/visual-semantic.ts";
 import { diffA11yTrees, verifyA11yTree, parsePlaywrightA11ySnapshot } from "@mizchi/vlmkit-core/a11y-semantic.ts";
@@ -70,70 +82,6 @@ async function showPng(path: string, label: string) {
 }
 
 // ---- CSS manipulation ----
-
-interface CssLine {
-  index: number;       // line index in full CSS text
-  text: string;        // original line text
-  property: string;    // e.g. "padding"
-  value: string;       // e.g. "12px 24px"
-  selector: string;    // containing selector
-}
-
-function parseCssDeclarations(css: string): CssLine[] {
-  const lines = css.split("\n");
-  const declarations: CssLine[] = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const trimmed = line.trim();
-
-    // Skip comments, empty lines, @media rules
-    if (!trimmed || trimmed.startsWith("/*") || trimmed.startsWith("//") || trimmed.startsWith("@") || trimmed === "}") continue;
-
-    // Handle one-line rules: `.selector { prop: val; prop: val; }`
-    const oneLineMatch = trimmed.match(/^([^{]+)\{([^}]+)\}\s*$/);
-    if (oneLineMatch) {
-      const selector = oneLineMatch[1].trim();
-      const body = oneLineMatch[2].trim();
-      // Parse each property in the body
-      const props = body.split(";").filter((s) => s.trim());
-      for (const prop of props) {
-        const propMatch = prop.trim().match(/^([\w-]+)\s*:\s*(.+?)\s*$/);
-        if (propMatch) {
-          declarations.push({
-            index: i,
-            text: line,
-            property: propMatch[1],
-            value: propMatch[2],
-            selector,
-          });
-        }
-      }
-    }
-  }
-
-  return declarations;
-}
-
-function seededRandom(seed: number): () => number {
-  let s = seed;
-  return () => {
-    s = (s * 1664525 + 1013904223) & 0x7fffffff;
-    return s / 0x7fffffff;
-  };
-}
-
-function removeCssLine(css: string, declaration: CssLine): string {
-  const lines = css.split("\n");
-  const line = lines[declaration.index];
-  // Remove the specific property declaration from the line
-  // Match "property: value;" or "property: value" (last in block)
-  const propPattern = new RegExp(
-    `\\s*${escapeRegex(declaration.property)}\\s*:\\s*${escapeRegex(declaration.value)}\\s*;?`,
-  );
-  lines[declaration.index] = line.replace(propPattern, "");
-  return lines.join("\n");
-}
 
 // ---- Playwright capture ----
 
@@ -312,7 +260,7 @@ export async function runCssChallengeDemo() {
   console.log(`  ${RED}Removed:${RESET} ${BOLD}${removed.selector}${RESET} { ${removed.property}: ${removed.value} }`);
   console.log(`  ${DIM}Line ${removed.index + 1}: ${removed.text.trim()}${RESET}`);
 
-  const brokenCss = removeCssLine(originalCss, removed);
+  const brokenCss = removeCssProperty(originalCss, removed);
   const brokenHtml = htmlRaw.replace(originalCss, brokenCss);
 
   const brokenPath = join(TMP, "broken.png");
@@ -516,10 +464,6 @@ export async function runCssChallengeDemo() {
   console.log();
 
   await cleanup();
-}
-
-function normalizeValue(v: string): string {
-  return v.replace(/\s+/g, " ").replace(/;$/, "").trim();
 }
 
 async function cleanup() {
