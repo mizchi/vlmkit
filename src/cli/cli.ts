@@ -112,7 +112,11 @@ async function runApiStatus(args: string[]): Promise<void> {
 
 async function runWorkflow(args: string[]): Promise<void> {
   const { runWorkflowCli } = await import("./workflow.ts");
-  await runWorkflowCli(args.map((a) => (a === HELP_SENTINEL ? "--help" : a)));
+  // `runWorkflowCli` returns its code now rather than calling `process.exit`, so the
+  // failure has to be carried here or `vlmkit workflow verify` exits 0 on a failed
+  // verification — which is the whole point of the command.
+  const code = await runWorkflowCli(args.map((a) => (a === HELP_SENTINEL ? "--help" : a)));
+  if (code !== 0) process.exitCode = code;
 }
 
 const SPECS: Record<string, Spec> = {

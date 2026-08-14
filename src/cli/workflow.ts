@@ -40,6 +40,7 @@ import {
   SPEC_PATH,
 } from "./workflow/paths.ts";
 import { resolveCaptureRoutes } from "@mizchi/vlmkit-capture/capture-config.ts";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import type { UnifiedAgentContext } from "@mizchi/vlmkit-core/types.ts";
 import { readEnv } from "@mizchi/vlmkit-core/project-config.ts";
 
@@ -133,7 +134,7 @@ function runCaptureSpec(mode: "baseline" | "capture", options: WorkflowCaptureOp
 
 // ---- Commands ----
 
-async function init(options: WorkflowCaptureOptions = {}) {
+async function init(options: WorkflowCaptureOptions = {}): Promise<number> {
   console.log("=== VRT Init: Creating baselines ===\n");
 
   await mkdir(BASELINES_DIR, { recursive: true });
@@ -147,7 +148,7 @@ async function init(options: WorkflowCaptureOptions = {}) {
     if (captured.length === 0) {
       console.error("Playwright capture failed. Is the server running?");
       console.error("Start your target app and set VLMKIT_BASE_URL if it is not http://127.0.0.1:4174");
-      process.exit(1);
+      return 1;
     }
     console.log("  (some tests had warnings, but captures completed)");
   }
@@ -156,9 +157,10 @@ async function init(options: WorkflowCaptureOptions = {}) {
   const a11yFiles = await listFiles(BASELINES_DIR, ".a11y.json");
   console.log(`\nBaselines created: ${files.length} screenshots, ${a11yFiles.length} a11y trees`);
   console.log(`Stored in: ${BASELINES_DIR}`);
+  return 0;
 }
 
-async function capture(options: WorkflowCaptureOptions = {}) {
+async function capture(options: WorkflowCaptureOptions = {}): Promise<number> {
   console.log("=== VRT Capture: Taking snapshots ===\n");
 
   // Clean previous snapshots
@@ -175,16 +177,17 @@ async function capture(options: WorkflowCaptureOptions = {}) {
     if (captured.length === 0) {
       console.error("Playwright capture failed. Is the server running?");
       console.error("Start your target app and set VLMKIT_BASE_URL if it is not http://127.0.0.1:4174");
-      process.exit(1);
+      return 1;
     }
     console.log("  (some tests had warnings, but captures completed)");
   }
 
   const files = await listFiles(SNAPSHOTS_DIR, ".png");
   console.log(`\nSnapshots captured: ${files.length} screenshots`);
+  return 0;
 }
 
-async function verify() {
+async function verify(): Promise<number> {
   console.log("=== VRT Verify: Running verification pipeline ===\n");
 
   const paths: VerifyPaths = {
@@ -201,27 +204,28 @@ async function verify() {
   if (!result.passed) {
     console.log("\nFAILED — Fix the issues and run `vlmkit workflow capture && vlmkit workflow verify` again.");
     console.log("Details: " + REPORT_PATH);
-    process.exit(1);
-  } else if (result.needsReview) {
+    return 1;
+  }
+  if (result.needsReview) {
     console.log("\nWARNING — Some changes need review. Run `vlmkit workflow report` for details.");
     console.log("If changes are intentional, run `vlmkit workflow approve` to update baselines.");
-    process.exit(0);
-  } else if (result.vrtDiffs.length === 0 && result.a11yDiffs.length === 0) {
-    console.log("\nPASS — No visual or semantic changes detected.");
-    process.exit(0);
-  } else {
-    console.log("\nPASS — All changes approved.");
-    console.log("Run `vlmkit workflow approve` to update baselines.");
-    process.exit(0);
+    return 0;
   }
+  if (result.vrtDiffs.length === 0 && result.a11yDiffs.length === 0) {
+    console.log("\nPASS — No visual or semantic changes detected.");
+    return 0;
+  }
+  console.log("\nPASS — All changes approved.");
+  console.log("Run `vlmkit workflow approve` to update baselines.");
+  return 0;
 }
 
-async function approve() {
+async function approve(): Promise<number> {
   console.log("=== VRT Approve: Updating baselines ===\n");
 
   if (!existsSync(SNAPSHOTS_DIR)) {
     console.error("No snapshots found. Run `vlmkit workflow capture` first.");
-    process.exit(1);
+    return 1;
   }
 
   // Copy snapshots → baselines
@@ -233,12 +237,13 @@ async function approve() {
   const files = await listFiles(BASELINES_DIR, ".png");
   console.log(`Baselines updated: ${files.length} screenshots`);
   console.log("New baselines stored in: " + BASELINES_DIR);
+  return 0;
 }
 
-async function report() {
+async function report(): Promise<number> {
   if (!existsSync(REPORT_PATH)) {
     console.error("No report found. Run `vlmkit workflow verify` first.");
-    process.exit(1);
+    return 1;
   }
 
   const raw = await readFile(REPORT_PATH, "utf-8");
@@ -273,6 +278,7 @@ async function report() {
       console.log(`    confidence: ${(v.confidence * 100).toFixed(0)}%\n`);
     }
   }
+  return 0;
 }
 
 // ---- Helpers ----
@@ -298,7 +304,16 @@ function specPaths(): SpecPaths {
   };
 }
 
-const commands: Record<string, (argv: string[]) => Promise<void>> = {
+/**
+ * Each handler returns its exit code, or nothing when it has no failing case.
+ *
+ * Ten `process.exit()` calls lived in these commands until v7. That made the
+ * module untestable — `process.exit` in a vitest worker takes the whole file with
+ * it — and it made `runWorkflowCli` a liar: it returned `Promise<void>` while
+ * actually deciding the process's fate. The exit code belongs to whoever owns the
+ * process, which is the guard at the bottom of this file or `cli.ts`.
+ */
+const commands: Record<string, (argv: string[]) => Promise<number | void>> = {
   init: (argv) => init(parseCaptureOptions(argv)),
   capture: (argv) => capture(parseCaptureOptions(argv)),
   verify: () => verify(),
@@ -345,26 +360,32 @@ Routes can also be supplied via env vars:
   VLMKIT_CAPTURE_ROUTES JSON-encoded array of routes`;
 }
 
-export async function runWorkflowCli(argv = process.argv.slice(2)) {
+/** @returns the exit code. 0 unless a command reported a failure. */
+export async function runWorkflowCli(argv = process.argv.slice(2)): Promise<number> {
   const command = argv[0];
   if (!command || command === "help" || command === "--help" || command === "-h") {
     console.log(formatWorkflowUsage());
-    return;
+    return 0;
   }
 
   const handler = commands[command];
   if (!handler) {
     console.error(`Unknown workflow command: ${command}\n`);
     console.error(formatWorkflowUsage());
-    process.exit(1);
+    return 1;
   }
 
-  await handler(argv.slice(1));
+  return (await handler(argv.slice(1))) ?? 0;
 }
 
-if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) {
-  runWorkflowCli().catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+// `isCliEntry` rather than the `new URL(import.meta.url).pathname === process.argv[1]`
+// this used to carry: that spelling compares an unresolved argv against a URL path, so
+// `node ./src/cli/workflow.ts` did not match and the command silently did nothing.
+if (isCliEntry(import.meta.url)) {
+  runWorkflowCli()
+    .then((code) => { process.exitCode = code; })
+    .catch((err) => {
+      console.error(err);
+      process.exitCode = 1;
+    });
 }
