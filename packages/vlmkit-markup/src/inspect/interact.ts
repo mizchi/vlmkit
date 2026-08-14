@@ -34,8 +34,8 @@
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { type Page } from "playwright";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { findHeatmapRegionsFromFile, type HeatmapRegion } from "@mizchi/vlmkit-core/heatmap-regions.ts";
 import { annotateHeatmapRegionKinds } from "../heatmap-region-kinds.ts";
@@ -126,6 +126,27 @@ export interface HealAllFinding {
   };
 }
 
+/**
+ * A step that threw — a selector that matched nothing, a `select` with no such
+ * option, a `waitForSelector` that timed out.
+ *
+ * These were printed to stdout and then dropped. Everything downstream saw only
+ * the consequence: a transition with a near-zero delta, which the report's own
+ * prose explains as "the actions had no visible effect — usually a sign the
+ * selector didn't match". It had the reason and threw it away, so a `--json`
+ * consumer or an agent reading the report could not tell a step that failed from
+ * a step that legitimately changed nothing.
+ */
+export interface StepFailure {
+  /** Index into `Sequence.steps`. */
+  stepIndex: number;
+  action: SequenceAction;
+  /** First line of the thrown message; the stack is noise here. */
+  message: string;
+  /** Present when the failure looked like a selector miss and the healer ran. */
+  suggestions?: Array<{ selector: string; confidence: number; text: string }>;
+}
+
 export interface InteractReport {
   source: string;
   viewport: { width: number; height: number };
@@ -133,6 +154,8 @@ export interface InteractReport {
   transitions: TransitionDelta[];
   reportPath: string;
   healAllFindings?: HealAllFinding[];
+  /** Steps that threw, in sequence order. Empty when every step ran. */
+  stepFailures: StepFailure[];
 }
 
 function parseArgs(argv: string[]) {
@@ -229,6 +252,7 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
 
   const snapshots: SnapshotEntry[] = [];
   const healAllFindings: HealAllFinding[] = [];
+  const stepFailures: StepFailure[] = [];
   let pendingActions: SequenceAction[] = [];
   await withBrowser(async (browser) => {
     const page = await browser.newPage({ viewport });
@@ -261,7 +285,11 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
         } catch (error) {
           stepFailed = true;
           const msg = String(error instanceof Error ? error.message : error);
-          console.log(`  ${YELLOW}step failed (${summarizeAction(step)}): ${msg.split("\n")[0]}${RESET}`);
+          const failure: StepFailure = {
+            stepIndex,
+            action: step,
+            message: msg.split("\n")[0]!,
+          };
           // Self-healing: when the failure is a selector miss, ask
           // the healer for plausible alternatives. From the
           // browser-harness pattern + WebMCP extract — tell the
@@ -273,13 +301,13 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
             try {
               const candidates = await healSelector(page, failedSelector, { maxCandidates: 3 });
               if (candidates.length > 0) {
-                console.log(`    ${DIM}suggestions for \`${failedSelector}\`:${RESET}`);
-                for (const c of candidates) {
-                  console.log(`      ${DIM}${(c.confidence * 100).toFixed(0).padStart(3)}%  \`${c.selector}\`  ${c.text ? `"${c.text}"` : ""}${RESET}`);
-                }
+                failure.suggestions = candidates.map((c) => ({
+                  selector: c.selector, confidence: c.confidence, text: c.text,
+                }));
               }
             } catch { /* healer failure is non-fatal */ }
           }
+          stepFailures.push(failure);
         }
         // --heal-all: probe successful selector steps for higher-
         // confidence siblings. Catches the typo-but-still-matches case
@@ -299,14 +327,12 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
               const tier = classifyHealTier(top.confidence);
               if (tier !== "none") {
                 healAllFindings.push({
-                stepIndex,
-                action: step,
-                originalSelector: successSelector,
-                tier,
-                suggestion: { selector: top.selector, confidence: top.confidence, text: top.text },
-              });
-              const label = tier === "strong" ? `${YELLOW}did you mean${RESET}` : `${DIM}weak match${RESET}`;
-                console.log(`    ${label} ${DIM}\`${top.selector}\`${RESET} ${DIM}(${(top.confidence * 100).toFixed(0)}% confidence${top.text ? `, "${top.text}"` : ""})${RESET}`);
+                  stepIndex,
+                  action: step,
+                  originalSelector: successSelector,
+                  tier,
+                  suggestion: { selector: top.selector, confidence: top.confidence, text: top.text },
+                });
               }
             }
           } catch { /* healer failure is non-fatal */ }
@@ -358,26 +384,10 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
     viewport,
     snapshots,
     transitions,
+    stepFailures,
     healAllFindings: options.healAll ? healAllFindings : undefined,
   });
   await writeFile(reportPath, md);
-
-  console.log(`  ${BOLD}${CYAN}vlmkit inspect interact${RESET}`);
-  console.log(`  ${DIM}source: ${options.source}  sequence: ${options.sequencePath}${RESET}`);
-  console.log(`  ${DIM}captured ${snapshots.length} snapshot(s), ${transitions.length} transition(s)${RESET}`);
-  for (const t of transitions) {
-    const pct = (t.diffRatio * 100).toFixed(2);
-    const icon = t.diffRatio === 0 ? `${YELLOW}~${RESET}` : `${GREEN}✓${RESET}`;
-    const summary = t.actions.map(summarizeAction).join(", ");
-    console.log(`  ${icon} ${t.from} → ${t.to}  ${pct.padStart(6)}%  ${DIM}${summary}${RESET}`);
-  }
-  if (options.healAll) {
-    const strongCount = healAllFindings.filter((f) => f.tier === "strong").length;
-    const weakCount = healAllFindings.length - strongCount;
-    const selectorStepCount = sequence.steps.filter((s) => "selector" in s && s.selector).length;
-    console.log(`  ${DIM}heal-all: ${strongCount} strong + ${weakCount} weak suggestion(s) across ${selectorStepCount} selector step(s)${RESET}`);
-  }
-  console.log(`  ${DIM}report: ${reportPath}${RESET}`);
 
   return {
     source: options.source,
@@ -385,8 +395,49 @@ export async function runInteract(options: InteractOptions): Promise<InteractRep
     snapshots,
     transitions,
     reportPath,
+    stepFailures,
     healAllFindings: options.healAll ? healAllFindings : undefined,
   };
+}
+
+/**
+ * The terminal summary. Extracted from `runInteract` for the reason every gate's
+ * `format` is separate from its `run`: a measurement that prints cannot be
+ * composed, and the step-failure lines in particular were printed *during* the
+ * run, interleaved with nothing and recoverable by no one.
+ *
+ * @param sequenceStepCount how many steps the sequence declared, for the
+ *   `--heal-all` denominator. Not on the report, because a report is what was
+ *   measured and this is what was asked for.
+ */
+export function formatInteractReport(
+  report: InteractReport,
+  options: { sequencePath?: string; healAll?: boolean; selectorStepCount?: number } = {},
+): string {
+  const lines: string[] = [];
+  lines.push(`  ${BOLD}${CYAN}vlmkit inspect interact${RESET}`);
+  lines.push(`  ${DIM}source: ${report.source}${options.sequencePath ? `  sequence: ${options.sequencePath}` : ""}${RESET}`);
+  lines.push(`  ${DIM}captured ${report.snapshots.length} snapshot(s), ${report.transitions.length} transition(s)${RESET}`);
+  for (const f of report.stepFailures) {
+    lines.push(`  ${YELLOW}step ${f.stepIndex} failed (${summarizeAction(f.action)}): ${f.message}${RESET}`);
+    for (const c of f.suggestions ?? []) {
+      lines.push(`      ${DIM}${(c.confidence * 100).toFixed(0).padStart(3)}%  \`${c.selector}\`  ${c.text ? `"${c.text}"` : ""}${RESET}`);
+    }
+  }
+  for (const t of report.transitions) {
+    const pct = (t.diffRatio * 100).toFixed(2);
+    const icon = t.diffRatio === 0 ? `${YELLOW}~${RESET}` : `${GREEN}✓${RESET}`;
+    const summary = t.actions.map(summarizeAction).join(", ");
+    lines.push(`  ${icon} ${t.from} → ${t.to}  ${pct.padStart(6)}%  ${DIM}${summary}${RESET}`);
+  }
+  if (options.healAll) {
+    const findings = report.healAllFindings ?? [];
+    const strongCount = findings.filter((f) => f.tier === "strong").length;
+    const weakCount = findings.length - strongCount;
+    lines.push(`  ${DIM}heal-all: ${strongCount} strong + ${weakCount} weak suggestion(s) across ${options.selectorStepCount ?? 0} selector step(s)${RESET}`);
+  }
+  lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
+  return lines.join("\n");
 }
 
 function renderReport(r: Omit<InteractReport, "reportPath">): string {
@@ -402,6 +453,25 @@ function renderReport(r: Omit<InteractReport, "reportPath">): string {
     lines.push(`- **${s.name}** — \`${s.screenshotPath}\``);
   }
   lines.push("");
+
+  // Before the transitions, because a failed step is the reason a transition is
+  // dead, and reading them the other way round means guessing.
+  if (r.stepFailures.length > 0) {
+    lines.push("## Steps that failed");
+    lines.push("");
+    lines.push("These steps threw and were skipped. Any transition spanning one of them "
+      + "measured a page the sequence never finished setting up, so read its delta as "
+      + "incomplete rather than as a finding.");
+    lines.push("");
+    for (const f of r.stepFailures) {
+      lines.push(`- **step ${f.stepIndex}** — ${summarizeAction(f.action)}`);
+      lines.push(`  - \`${f.message}\``);
+      for (const c of f.suggestions ?? []) {
+        lines.push(`  - did you mean \`${c.selector}\`? _(${(c.confidence * 100).toFixed(0)}% confidence${c.text ? `, "${c.text}"` : ""})_`);
+      }
+    }
+    lines.push("");
+  }
 
   lines.push("## Transitions (delta per step group)");
   lines.push("");
@@ -502,7 +572,18 @@ function renderReport(r: Omit<InteractReport, "reportPath">): string {
   return lines.join("\n");
 }
 
-async function main(argv = process.argv.slice(2)) {
+/**
+ * The command. Returns its exit code rather than assigning `process.exitCode`,
+ * and prints via `formatInteractReport` rather than from inside the measurement.
+ *
+ * @param cwd resolved against for the default output directory — an argument,
+ *   because `process.chdir` is process-wide.
+ */
+export async function runInteractCli(
+  cliArgs: readonly string[],
+  options: { cwd?: string } = {},
+): Promise<number> {
+  let argv = [...cliArgs];
   if (argv[0] === "--help" || argv[0] === "-h") argv = [];
   const { positional, sequence, outputDir, report, threshold, healAll } = parseArgs(argv);
   if (positional.length === 0 || !sequence) {
@@ -539,19 +620,35 @@ async function main(argv = process.argv.slice(2)) {
     console.log('  scroll           { selector?: string, x?: number, y?: number }');
     console.log('  wait             { ms: number }');
     console.log('  waitForSelector  { selector: string }');
-    process.exit(1);
+    return 1;
   }
-  await runInteract({
+  const result = await runInteract({
     source: positional[0]!,
     sequencePath: sequence,
-    outputDir: outputDir || join(process.cwd(), "test-results", "interact"),
+    outputDir: outputDir || join(options.cwd ?? process.cwd(), "test-results", "interact"),
     reportPath: report || undefined,
     threshold,
     healAll,
   });
+  const selectorStepCount = (await readSequenceSteps(sequence)).filter(
+    (s) => "selector" in s && s.selector,
+  ).length;
+  console.log(formatInteractReport(result, { sequencePath: sequence, healAll, selectorStepCount }));
+  return 0;
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "interact" || (process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false);
-if (isCliEntry) {
-  main().catch(handleCliError);
+/** Re-read for the `--heal-all` denominator only; `runInteract` owns the real parse. */
+async function readSequenceSteps(sequencePath: string): Promise<SequenceAction[]> {
+  try {
+    const parsed = JSON.parse(await readFile(resolve(sequencePath), "utf-8")) as Sequence;
+    return parsed.steps ?? [];
+  } catch {
+    return [];
+  }
+}
+
+if (isCliEntry(import.meta.url, "interact")) {
+  runInteractCli(process.argv.slice(2))
+    .then((code) => { process.exitCode = code; })
+    .catch(handleCliError);
 }
