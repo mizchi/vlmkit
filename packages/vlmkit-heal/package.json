@@ -1,6 +1,6 @@
 {
   "name": "@mizchi/vlmkit-heal",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "description": "Cost-optimized self-healing loop for Playwright tests — escalates from cheap to strong models, edits tests/baselines, re-verifies.",
   "license": "MIT",
   "author": "mizchi",

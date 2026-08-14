@@ -448,7 +448,7 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<vo
   }
 
   const cli = cac("vlmkit");
-  cli.version("0.9.1");
+  cli.version("0.10.0");
 
   cli.usage(`<command> [options]
 

@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 Dates are YYYY-MM-DD.
 
-## Unreleased
+## 0.10.0 — 2026-08-14
 
 The gates became a plugin architecture. A gate is now a declaration — id,
 command, rule table, inputs, and four functions — handed to one core runner
