@@ -308,6 +308,11 @@ describe("vlmkit diff-pr post", () => {
     // Force the fallback path by prepending a tmp dir whose `gh`
     // script exits non-zero. `gh --version` then returns ≠ 0, so
     // `ghAvailable()` returns false and the printer fires.
+    //
+    // `CI: ""` here and in the three cases below is not incidental. The fallback's exit
+    // code depends on `CI`, and these spawns inherit `process.env` — which carries
+    // `CI=1` on a GitHub runner, so without this they would assert the local behaviour
+    // while running under the CI behaviour, and flip red on a runner only.
     const stubDir = await mkdtemp(join(tmpdir(), "vrt-diff-pr-post-stub-"));
     const stub = join(stubDir, "gh");
     await writeFile(stub, "#!/bin/sh\nexit 1\n");
@@ -319,12 +324,43 @@ describe("vlmkit diff-pr post", () => {
         {
           encoding: "utf-8",
           cwd,
-          env: { ...process.env, PATH: `${stubDir}:${process.env.PATH ?? ""}` },
+          env: { ...process.env, CI: "", PATH: `${stubDir}:${process.env.PATH ?? ""}` },
         },
       );
       assert.equal(r.status, 0);
       assert.match(r.stdout, /gh CLI not available/);
       assert.match(r.stdout, /<!-- vrt-diff-pr-summary -->/);
+      assert.match(r.stdout, /Status: \*\*PASS\*\*/);
+    } finally {
+      await rm(stubDir, { recursive: true, force: true });
+    }
+  });
+
+  it("fails instead of falling back silently when CI is set", async () => {
+    // The same run as above, one environment variable apart. Printing markdown for a
+    // human to paste is the job done at a terminal; in CI nobody reads it, so a green
+    // step tells the reviewer the summary reached the PR when it did not.
+    const stubDir = await mkdtemp(join(tmpdir(), "vrt-diff-pr-post-stub-"));
+    const stub = join(stubDir, "gh");
+    await writeFile(stub, "#!/bin/sh\nexit 1\n");
+    spawnSync("chmod", ["+x", stub]);
+    try {
+      const r = spawnSync(
+        "node",
+        ["--experimental-strip-types", CLI_PATH, "diff-pr", "post", "--pr", "owner/repo#42"],
+        {
+          encoding: "utf-8",
+          cwd,
+          env: { ...process.env, CI: "1", PATH: `${stubDir}:${process.env.PATH ?? ""}` },
+        },
+      );
+      assert.equal(r.status, 1, `an unposted comment must not exit 0 in CI:\n${r.stdout}`);
+      // eslint-disable-next-line no-control-regex
+      const stderr = (r.stderr ?? "").replace(/\x1B\[[0-9;]*m/g, "");
+      assert.match(stderr, /not posted/);
+      assert.match(stderr, /no comment was added to owner\/repo#42/);
+      assert.match(stderr, /GH_TOKEN \/ GITHUB_TOKEN/, "the message has to say how to fix it");
+      // The markdown is still printed — failing the step must not also lose the content.
       assert.match(r.stdout, /Status: \*\*PASS\*\*/);
     } finally {
       await rm(stubDir, { recursive: true, force: true });
@@ -340,7 +376,7 @@ describe("vlmkit diff-pr post", () => {
       const r = spawnSync(
         "node",
         ["--experimental-strip-types", CLI_PATH, "diff-pr", "post", "--pr", "owner/repo#42"],
-        { encoding: "utf-8", cwd, env: { ...process.env, PATH: `${stubDir}:${process.env.PATH ?? ""}` } },
+        { encoding: "utf-8", cwd, env: { ...process.env, CI: "", PATH: `${stubDir}:${process.env.PATH ?? ""}` } },
       );
       assert.equal(r.status, 0);
       const posted = await readFile(`${summaryPath}.posted.md`, "utf-8");
@@ -362,7 +398,7 @@ describe("vlmkit diff-pr post", () => {
           "--experimental-strip-types", CLI_PATH, "diff-pr", "post",
           "--pr", "owner/repo#42", "--marker", "vrt-ui-team-staging",
         ],
-        { encoding: "utf-8", cwd, env: { ...process.env, PATH: `${stubDir}:${process.env.PATH ?? ""}` } },
+        { encoding: "utf-8", cwd, env: { ...process.env, CI: "", PATH: `${stubDir}:${process.env.PATH ?? ""}` } },
       );
       assert.equal(r.status, 0);
       assert.match(r.stdout, /Marker: +vrt-ui-team-staging/);
@@ -384,7 +420,7 @@ describe("vlmkit diff-pr post", () => {
       const r = spawnSync(
         "node",
         ["--experimental-strip-types", CLI_PATH, "diff-pr", "post", "--pr", "owner/repo#42"],
-        { encoding: "utf-8", cwd, env: { ...process.env, PATH: `${stubDir}:${process.env.PATH ?? ""}` } },
+        { encoding: "utf-8", cwd, env: { ...process.env, CI: "", PATH: `${stubDir}:${process.env.PATH ?? ""}` } },
       );
       assert.equal(r.status, 0);
       assert.match(r.stdout, /posted summary to PR owner\/repo#42/);

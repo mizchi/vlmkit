@@ -1007,9 +1007,20 @@ interface PostPrOptions {
  *      <summary>` (overwrites any prior vrt-marked comment via the
  *      `marker` HTML comment).
  *   2. Otherwise print the markdown with copy-paste instructions
- *      so the operator can post it manually. Returns the exit code
- *      from gh on success, 0 when we successfully printed the
- *      fallback, or 1 on a hard error.
+ *      so the operator can post it manually.
+ *
+ * Exit code: gh's own on the first path; 1 on a hard error; and on the fallback it
+ * depends on `CI`, because who is watching changes what "success" means.
+ *
+ * At a terminal, printing the markdown for a human to paste IS the job done, so 0.
+ * In CI nobody reads it: the comment was not posted, the step goes green, and the
+ * reviewer concludes there was nothing to report — the same false green as a gate
+ * passing on a measurement it never took. So under `CI` the fallback exits 1 and says
+ * what it did not do.
+ *
+ * `process.env.CI` as the discriminator follows `gate-config.ts`, which defaults
+ * `reuseExistingServer` the same way. It is pinned in both directions by the tests
+ * rather than left to whatever the ambient environment happens to be.
  */
 async function postPrComment(opts: PostPrOptions): Promise<number> {
   if (!existsSync(opts.summaryPath)) {
@@ -1026,6 +1037,7 @@ async function postPrComment(opts: PostPrOptions): Promise<number> {
   await writeFile(decoratedPath, body);
 
   if (!ghAvailable()) {
+    const inCi = Boolean(process.env.CI);
     console.log(`${YELLOW}gh CLI not available — printing markdown for manual posting.${RESET}`);
     console.log(`${DIM}Target PR: ${opts.prRef}${RESET}`);
     console.log(`${DIM}Marker:    ${opts.marker} (use to locate / overwrite later)${RESET}`);
@@ -1038,6 +1050,15 @@ async function postPrComment(opts: PostPrOptions): Promise<number> {
     console.log(`${DIM}─────────────────────────────────────────────────────${RESET}`);
     process.stdout.write(body);
     console.log(`${DIM}─────────────────────────────────────────────────────${RESET}`);
+    if (inCi) {
+      // A green step here would tell the reviewer the summary reached the PR. It did not.
+      console.error();
+      console.error(`${RED}not posted${RESET} — no comment was added to ${opts.prRef}, and `
+        + `CI is set, so nothing here will be read by a human.`);
+      console.error(`Install the gh CLI in this job (\`gh\` must be on PATH and `
+        + `authenticated — GH_TOKEN / GITHUB_TOKEN), or drop the \`post\` step.`);
+      return 1;
+    }
     return 0;
   }
 
@@ -1091,9 +1112,11 @@ Subcommands:
                               files are an error, never a partial pin.
   post   --pr <ref> [--summary <path>] [--marker <id>]
                               Post the most recent summary.md to a PR
-                              via gh CLI. Falls back to printing the
-                              markdown with copy-paste instructions
-                              when gh is not on PATH.
+                              via gh CLI. When gh is not on PATH it
+                              prints the markdown with copy-paste
+                              instructions: exit 0 at a terminal, and
+                              exit 1 when CI is set, because nothing
+                              was posted and no one is reading stdout.
   (none) [--config vlmkit.config.json] [--output <dir>]
          [--from-dir <dir> | --from-png <file> [--route <r> --viewport <v>]]
                               Diff every route's current rendering

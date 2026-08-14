@@ -446,6 +446,13 @@ the markdown with copy-paste instructions instead — useful for
 operators inspecting the gate output before committing to a
 public post.
 
+That fallback exits **0 at a terminal and 1 when `CI` is set**. At a
+terminal, printing markdown for a human to paste is the job done; in
+CI nobody reads stdout, so exiting 0 would tell the reviewer the
+summary reached the PR when no comment was posted at all. The markdown
+is still printed in both cases — failing the step must not also lose
+the content.
+
 The body is tagged with an HTML-comment marker
 (`<!-- vrt-diff-pr-summary -->`) so a later iteration can find /
 overwrite the comment in place.
