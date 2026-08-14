@@ -412,7 +412,12 @@ async function commandInit(name: string) {
 }
 
 async function main(argv = process.argv.slice(2)) {
-  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
+  // Remembered BEFORE the erase. Blanking argv is what routes `--help` to the usage
+  // branch, and it is also what made `--help` indistinguishable from "you forgot the
+  // arguments" — so the usage branch exited 1 either way. Asking for help is a request
+  // that succeeded.
+  const askedForHelp = argv[0] === "--help" || argv[0] === "-h";
+  if (askedForHelp) argv = [];
   const sub = argv[0];
   const rest = argv.slice(1);
   if (!sub || sub === "--help" || sub === "-h") {
@@ -426,7 +431,10 @@ async function main(argv = process.argv.slice(2)) {
     console.log("");
     console.log("Skill files live at .vrt-skills/<name>.json and declare a list of");
     console.log("checks (vlmkit commands + their flags) to run against a target.");
-    process.exit(sub ? 0 : 1);
+    // `sub ? 0 : 1` was the intent and it could never fire: the erase above cleared argv,
+    // so `sub` was always undefined when help had been asked for. `askedForHelp` is the
+    // value that line wanted.
+    process.exit(askedForHelp || sub ? 0 : 1);
   }
   if (sub === "list") { await commandList(); return; }
   if (sub === "show") {

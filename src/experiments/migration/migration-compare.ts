@@ -849,10 +849,14 @@ async function writeMigrationRegionDiffArtifacts(options: {
 // ---- Main ----
 
 async function main(cliArgs = process.argv.slice(2)) {
+  // `--help` had no branch here at all: it is not a file, so it fell through to "no input"
+  // and printed the usage with exit 1. The usage text is the right output; the exit code was
+  // answering a different question than the one asked.
+  const askedForHelp = cliArgs.includes("--help") || cliArgs.includes("-h");
   const options = parseMigrationCompareArgs(cliArgs);
   const hasFileInput = options.baseline && options.variants.length > 0;
   const hasUrlInput = options.baselineUrl && options.variantUrls && options.variantUrls.length > 0;
-  if (!hasFileInput && !hasUrlInput) {
+  if (askedForHelp || (!hasFileInput && !hasUrlInput)) {
     console.log(`Usage: vlmkit diff html <before.html> <after.html>`);
     console.log(`       vlmkit diff html --dir <dir> --baseline <file> --variants <file1> <file2> ...`);
     console.log(`       vlmkit diff html --url <baseline-url> --current-url <current-url>`);
@@ -861,7 +865,7 @@ async function main(cliArgs = process.argv.slice(2)) {
     console.log(`Options: [--output-dir path] [--approval approval.json] [--strict]`);
     console.log(`         [--discover-backend auto|regex|crater] [--no-paint-tree] [--no-discover]`);
     console.log(`         [--region-diff] [--region-diff-format json|markdown|both] [--region-diff-max-viewports n]`);
-    process.exit(1);
+    process.exit(askedForHelp ? 0 : 1);
   }
   await runMigrationCompare(options);
 }

@@ -70,9 +70,13 @@ async function delegate(s: Spec, args: string[]): Promise<void> {
 
 async function runDiscover(args: string[]): Promise<void> {
   const file = args.find((a) => !a.startsWith("-") && a !== HELP_SENTINEL);
-  if (!file || args.includes(HELP_SENTINEL) || args.includes("--help") || args.includes("-h")) {
+  const askedForHelp = args.includes(HELP_SENTINEL) || args.includes("--help") || args.includes("-h");
+  if (askedForHelp || !file) {
     console.log("Usage: vlmkit scan breakpoints <html-file>");
-    if (!file) process.exit(1);
+    // `if (!file) process.exit(1)` split on the wrong axis: it distinguished "help with a
+    // file" from "help without a file", so plain `--help` still exited 1. What matters is
+    // whether help was asked for, not whether a file came with it.
+    if (!askedForHelp) process.exit(1);
     return;
   }
   const { readFile } = await import("node:fs/promises");
@@ -219,6 +223,22 @@ export function legacySpecLeaves(): [string, string][] {
     Object.entries(leaves)
       .filter(([, info]) => info.spec !== undefined)
       .map(([leaf]): [string, string] => [group, leaf]),
+  );
+}
+
+/**
+ * Every group leaf, `spec`- and `run`-based alike.
+ *
+ * `legacySpecLeaves` filters to `spec` because the failure it guards — a module whose
+ * evaluation *is* the command — only exists for delegated leaves. Invariants about what a
+ * command *does*, like `--help` exiting 0, apply to both, and filtering by `spec` quietly
+ * excluded them: `scan breakpoints` is the only `run:` leaf today, it exited 1 for
+ * `--help`, and the sweep that should have caught it never ran it. One leaf is exactly the
+ * size at which a gap like that survives.
+ */
+export function legacyGroupLeaves(): [string, string][] {
+  return Object.entries(GROUPS).flatMap(([group, leaves]) =>
+    Object.keys(leaves).map((leaf): [string, string] => [group, leaf]),
   );
 }
 

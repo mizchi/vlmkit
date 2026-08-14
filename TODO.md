@@ -1176,6 +1176,31 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - 明示指定は厳密に尊重(黙って別 provider にすり替えるのは別種の誤答)。だから
     意図的にすり替える `createLLMProvider` の retry は残す。
 
+- [x] **`<command> --help` が7コマンドで exit 1**(`--help` スイープ由来)
+  - `diff html` / `diff browsers` / `inspect smoke` / `scan component` /
+    `scan breakpoints` / `watch` / `skill`。gate 系は plugin runner 経由で必ず 0
+    (`GATE_EXIT_HELP` が契約を明記)なので、**同じ CLI に2つの契約**が同居していた。
+    `set -e` スクリプトや `vlmkit <cmd> --help` を叩く CI smoke が半分のコマンドで落ちる。
+  - 原因は3種類、**うち2つは区別しようとして失敗している**:
+    - `if (argv[0] === "--help") argv = []` — help を usage 分岐に送るその行が、
+      help を要求された証拠を消す。`skill.ts` の `process.exit(sub ? 0 : 1)` は
+      **意図は正しいのに `sub` が既に消えていて発火しない**。
+    - help 分岐が無い(`diff html` / `inspect smoke` / `watch`)。`--help` はファイルでも
+      URL でもないので「入力なし」分岐の exit 1 を貰う。
+    - `runDiscover` の `if (!file) process.exit(1)` — 「help にファイルが付いていたか」で
+      分けていて、「help を要求されたか」で分けていない。
+  - **スイープテストは存在していて、exit code を意図的に除外していた**。docstring に
+    「several leaves print usage and exit 1 … which is fine」と書いてあった =
+    **欠陥の記述を仕様として書き留めていた**。今は exit code を assert する。
+  - テスト自身の穴も2つ塞いだ: top-level コマンド(`watch` / `skill` はテストから完全に不可視)と、
+    `legacySpecLeaves()` が `spec` で絞って落としていた唯一の `run:` leaf
+    (`scan breakpoints` — 7件のうちの1つ)。**1件しかない母集団はこの種の穴が生き残る大きさ**。
+
+**作業中に踏んだ罠(記録)**: root の `pnpm build` の出力を `| head` で切ったら
+ビルドが SIGPIPE で途中死し、`packages/vlmkit-markup/dist/` が半分消えた状態になった。
+CLI は `@mizchi/vlmkit-*` を dist 解決するので、**修正が効いていないように見えるのは
+たいてい stale/破損 dist**。ログはファイルに落として tail する。
+
 **この軸で健全だったもの**(掘って外れた記録): `design-policy.ts` の `--exclude` は
 named error を投げていて正しい。`flow-verify.ts` の `q()` は不正セレクタで throw する。
 `createVlmClient` は model id からキーを導くので推測しない。`withCleanEnv` は既にあり、

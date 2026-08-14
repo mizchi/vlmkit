@@ -396,7 +396,12 @@ function renderReport(r: Omit<CrossBrowserReport, "reportPath">): string {
 }
 
 async function main(argv = process.argv.slice(2)) {
-  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
+  // Remembered BEFORE the erase. Blanking argv is what routes `--help` to the usage
+  // branch, and it is also what made `--help` indistinguishable from "you forgot the
+  // arguments" — so the usage branch exited 1 either way. Asking for help is a request
+  // that succeeded.
+  const askedForHelp = argv[0] === "--help" || argv[0] === "-h";
+  if (askedForHelp) argv = [];
   const { positional, outputDir, report, engines, threshold, allowSkipped } = parseArgs(argv);
   if (positional.length === 0) {
     console.log("Usage: vlmkit diff browsers <html-or-url> [options]");
@@ -406,7 +411,9 @@ async function main(argv = process.argv.slice(2)) {
     console.log("  --report <path>     Markdown report path");
     console.log("  --threshold <0..1>  Pixel diff threshold (default: 0.03)");
     console.log("  --allow-skipped     Exit 0 even when missing engines skipped the comparison");
-    process.exit(1);
+    // 0 when help was asked for, 1 when the arguments are simply missing. Same two
+    // lines of usage, two different answers to "did this invocation succeed".
+    process.exit(askedForHelp ? 0 : 1);
   }
   await runCrossBrowser({
     source: positional[0]!,

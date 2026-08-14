@@ -513,14 +513,17 @@ ACTION: click ROLE: button NAME: Submit`;
 // ---- CLI ----
 
 async function main() {
-  if (!URL_ARG && !FILE_ARG) {
+  // Neither `--help` nor `-h` is a URL or a file, so both landed in this branch and took its
+  // exit 1 with them.
+  const askedForHelp = process.argv.slice(2).some((a) => a === "--help" || a === "-h");
+  if (askedForHelp || (!URL_ARG && !FILE_ARG)) {
     // The command, not the module path. `node src/smoke-runner.ts` has not
     // been a way to run this since the dispatcher took over, so printing it
     // hands the reader an instruction that cannot be pasted.
     console.log("Usage: vlmkit inspect smoke <file-or-url>");
     console.log("       vlmkit inspect smoke --url https://example.com --max-actions 20");
     console.log("       vlmkit inspect smoke --file page.html --seed 42");
-    process.exit(1);
+    process.exit(askedForHelp ? 0 : 1);
   }
 
   const target: SmokeTestRequest["target"] = {};

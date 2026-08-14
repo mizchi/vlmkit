@@ -621,6 +621,26 @@ suppression works per *rule* instead of per whole gate.
   verbatim `sourceToUrl`, so the collapse is behaviour-preserving and there is now one
   definition to be wrong in.
 
+- **`<command> --help` exited 1 on seven commands.** `diff html`, `diff browsers`,
+  `inspect smoke`, `scan component`, `scan breakpoints`, `watch` and `skill` all printed
+  their usage and then exited non-zero, while every gate command exits 0 through the plugin
+  runner — `GATE_EXIT_HELP` documents that contract. One CLI, two answers to "did this
+  invocation succeed", so a `set -e` script or a CI smoke step running `vlmkit <cmd> --help`
+  failed on half the commands. Three mechanisms, and two were *trying* to get it right:
+  `if (argv[0] === "--help") argv = []` destroys the evidence that help was asked for one
+  line before it is needed (so `skill.ts`'s `process.exit(sub ? 0 : 1)` could never fire —
+  `sub` had already been erased); three leaves had no help branch at all, so `--help` fell
+  into "no input"; and `runDiscover`'s `if (!file) process.exit(1)` split on whether a file
+  came *with* the help rather than on whether help was asked for. All 45 leaves now exit 0.
+
+  The sweep test that should have caught this existed and deliberately excluded the exit
+  code, with a docstring explaining that "several leaves print usage and exit 1 when
+  `--help` arrives without their positionals, which is fine" — a description of the defect,
+  written down as a fact of life. It asserts the exit code now, and covers two populations
+  it had been missing: the top-level commands (`watch` and `skill` among them, invisible to
+  it entirely) and the one `run:`-based group leaf, which `legacySpecLeaves()` filtered out
+  — `scan breakpoints`, one of the seven.
+
 - **`vlmkit workflow init` and `workflow capture` never worked, and the catch hid why.**
   Both failed on every invocation. `catch (e)` discarded `e` and printed a fixed
   "Playwright capture failed. Is the server running?" plus a hardcoded
