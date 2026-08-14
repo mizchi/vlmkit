@@ -12,7 +12,7 @@ import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { compareScreenshots, generateDiffReport } from "@mizchi/vlmkit-core/heatmap.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr } from "@mizchi/vlmkit-core/terminal-colors.ts";
-import { applyMask } from "@mizchi/vlmkit-core/mask.ts";
+import { applyMask, formatMaskProblems, MaskTally } from "@mizchi/vlmkit-core/mask.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { approveSnapshotsFromReport } from "./approve.ts";
 import { determineSnapshotExitCode, parseSnapshotCliArgs, parseSnapshotConfig, type SnapshotConfig } from "../../cli/commands/snapshot.ts";
@@ -214,6 +214,9 @@ async function runStability(options: {
 
   const browser = await options.backend.launch();
   const iterations: StabilityIterationResult[] = [];
+  // Accumulated across pages × viewports: an invalid selector is said once, and
+  // "matched nothing" is only worth saying for a selector that matched nothing anywhere.
+  const maskTally = new MaskTally();
 
   try {
     for (let iter = 0; iter < options.iterations; iter++) {
@@ -225,7 +228,10 @@ async function runStability(options: {
         for (const vp of VIEWPORTS) {
           const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
           await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
-          await applyMask(page, options.maskSelectors);
+          maskTally.add(await applyMask(page, options.maskSelectors));
+          for (const bad of maskTally.takeNewInvalid()) {
+            console.log(`  ${YELLOW}warn: --mask ${bad} is not valid CSS — it masks nothing.${RESET}`);
+          }
 
           const currentPath = iter === 0
             ? join(options.outputDir, `${label}-${vp.label}-baseline.png`)
@@ -284,6 +290,11 @@ async function runStability(options: {
   } finally {
     await options.backend.close(browser);
   }
+
+  // The `Mask: <selectors>` line above claims every selector was applied. Say where that
+  // claim did not hold, once, now that every page has been seen.
+  const maskProblems = formatMaskProblems(maskTally.takeNewInvalid(), maskTally.neverMatched());
+  if (maskProblems) console.log(`  ${YELLOW}warn: --mask ${maskProblems}${RESET}`);
 
   const report = buildStabilityReport({
     iterations: options.iterations,
@@ -568,6 +579,7 @@ export async function runSnapshotCli(
 
   const browser = await captureBackend.launch();
   const results: SnapshotResult[] = [];
+  const maskTally = new MaskTally();
 
   try {
     for (const [index, url] of urls.entries()) {
@@ -577,7 +589,10 @@ export async function runSnapshotCli(
       for (const vp of VIEWPORTS) {
         const page = await browser.newPage({ viewport: { width: vp.width, height: vp.height } });
         await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
-        await applyMask(page, parsed.maskSelectors);
+        maskTally.add(await applyMask(page, parsed.maskSelectors));
+        for (const bad of maskTally.takeNewInvalid()) {
+          console.log(`  ${YELLOW}warn: --mask ${bad} is not valid CSS — it masks nothing.${RESET}`);
+        }
 
         const currentPath = join(outputDir, `${label}-${vp.label}-current.png`);
         await page.screenshot({ path: currentPath, fullPage: true });
@@ -651,6 +666,14 @@ export async function runSnapshotCli(
   console.log();
   hr();
   console.log();
+
+  // Above the diff numbers, because a mask that did not apply is the reason some of them
+  // are non-zero — and the run's `Mask:` line claimed otherwise.
+  const maskProblems = formatMaskProblems(maskTally.takeNewInvalid(), maskTally.neverMatched());
+  if (maskProblems) {
+    console.log(`  ${YELLOW}warn: --mask ${maskProblems}${RESET}`);
+    console.log();
+  }
 
   const compared = results.filter((r) => !r.isNew);
   const newBaselines = results.filter((r) => r.isNew);

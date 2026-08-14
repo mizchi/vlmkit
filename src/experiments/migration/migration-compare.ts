@@ -72,7 +72,7 @@ import {
 import { diagnoseSandboxLaunchFailure, formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
 import { launchBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import type { ShiftRegion, VrtDiff, VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
-import { applyMask, parseMaskSelectors } from "@mizchi/vlmkit-core/mask.ts";
+import { applyMask, formatMaskProblems, MaskTally, parseMaskSelectors } from "@mizchi/vlmkit-core/mask.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr as _hr } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import {
   evaluateRenderSanity,
@@ -881,6 +881,10 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
     paintTreeUrl,
     enablePaintTree,
   } = options;
+  // Accumulated across every page and viewport this run masks, so an invalid selector is
+  // reported once rather than per page, and "matched nothing" is only reported for a
+  // selector that matched nothing anywhere.
+  const maskTally = new MaskTally();
   const regionDiffEnabled = options.regionDiff ?? false;
   const regionDiffFormat = options.regionDiffFormat ?? "both";
   const regionDiffModel = options.regionDiffModel ?? DEFAULT_REGION_DIFF_MODEL;
@@ -1106,7 +1110,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
       } else {
         await page.setContent(baselineHtml, { waitUntil: "networkidle" });
       }
-      if (options.maskSelectors?.length) await applyMask(page, options.maskSelectors);
+      if (options.maskSelectors?.length) maskTally.add(await applyMask(page, options.maskSelectors));
       const path = join(outputDir, `${baselineName}-${vp.label}.png`);
       await page.screenshot({ path, fullPage: true });
       baselineScreenshots.set(vp.label, path);
@@ -1309,7 +1313,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         } else {
           await page.setContent(variantHtml, { waitUntil: "networkidle" });
         }
-        if (options.maskSelectors?.length) await applyMask(page, options.maskSelectors);
+        if (options.maskSelectors?.length) maskTally.add(await applyMask(page, options.maskSelectors));
 
         if (variantSanityEnabled) {
           try {
@@ -2233,7 +2237,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             } else {
               await baselinePage.setContent(baselineHtml, { waitUntil: "networkidle" });
             }
-            if (options.maskSelectors?.length) await applyMask(baselinePage, options.maskSelectors);
+            if (options.maskSelectors?.length) maskTally.add(await applyMask(baselinePage, options.maskSelectors));
             let baselineApplied: AppliedForcedState;
             try {
               baselineApplied = await applyForcedPseudoState(baselinePage, { state });
@@ -2256,7 +2260,7 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
             } else {
               await variantPage.setContent(variantHtml, { waitUntil: "networkidle" });
             }
-            if (options.maskSelectors?.length) await applyMask(variantPage, options.maskSelectors);
+            if (options.maskSelectors?.length) maskTally.add(await applyMask(variantPage, options.maskSelectors));
             let variantApplied: AppliedForcedState;
             try {
               variantApplied = await applyForcedPseudoState(variantPage, { state });
@@ -2456,6 +2460,14 @@ export async function runMigrationCompare(options: MigrationCompareOptions): Pro
         console.log(`  ${YELLOW}--against-previous failed: ${String(err)}${RESET}`);
         console.log();
       }
+    }
+
+    // Before the strict throws below, so it is said even on a run that then fails: an
+    // unapplied mask is a candidate explanation for the diffs the caller is about to read.
+    const maskProblems = formatMaskProblems(maskTally.takeNewInvalid(), maskTally.neverMatched());
+    if (maskProblems) {
+      console.log(`  ${YELLOW}warn: --mask ${maskProblems}${RESET}`);
+      console.log();
     }
 
     if (options.strictDomEquivalence) {
