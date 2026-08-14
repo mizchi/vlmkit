@@ -81,14 +81,50 @@ function parseCaptureOptions(argv: string[]): WorkflowCaptureOptions {
   return options;
 }
 
+/**
+ * The Playwright spec `init` and `capture` drive.
+ *
+ * **These names were `vrt-capture.spec.*` and nothing on disk has been called that since
+ * the rename.** The file is `e2e/vlmkit-capture.spec.ts` and the build emits
+ * `dist/e2e/vlmkit-capture.spec.mjs`, so neither candidate ever matched and both commands
+ * failed 100% of the time. The throw below had the right name all along — it says
+ * `e2e/vlmkit-capture.spec.ts` — which is the tell that only the two path literals were
+ * missed by the rename.
+ *
+ * It stayed invisible because the callers' `catch (e)` discarded `e` and printed
+ * "Playwright capture failed. Is the server running?" instead. A hard, deterministic
+ * failure read as an environment problem, so the message sent every reader to check a
+ * server that was never contacted. Tests did not catch it either: `workflow-cli.test.ts`
+ * covers option parsing and the command table, and a path literal is neither.
+ *
+ * Known gap, deliberately not changed here: `package.json`'s `files` excludes
+ * `dist/e2e/**`, so an npm-installed vlmkit ships no spec and `HARNESS_ROOT` finds
+ * neither candidate. A source checkout works. Whether to publish the spec or retire these
+ * two commands is a packaging decision, not a typo — see TODO.md.
+ */
+/**
+ * The spec path **relative to `HARNESS_ROOT`**, because that is what playwright matches.
+ *
+ * Positional arguments to `playwright test` are filters compared against the collected
+ * test files, and collection is driven by the config's `testDir`. An absolute path from
+ * another tree matches nothing, which is why an earlier attempt at this fix still got
+ * "No tests found" — see `runCaptureSpec` for the cwd half of the same problem.
+ */
 function resolveCaptureSpecPath(): string {
   const candidates = [
-    join(HARNESS_ROOT, "dist", "e2e", "vrt-capture.spec.mjs"),
-    join(HARNESS_ROOT, "e2e", "vrt-capture.spec.ts"),
+    // Source `.ts` FIRST, because `playwright.config.ts` sets `testDir: "./e2e"`, so the
+    // built `dist/e2e/**` copy is outside collection and can never be selected.
+    // Playwright transpiles TS itself, so this needs no build.
+    join("e2e", "vlmkit-capture.spec.ts"),
+    join("dist", "e2e", "vlmkit-capture.spec.mjs"),
   ];
-  const found = candidates.find((candidate) => existsSync(candidate));
+  const found = candidates.find((candidate) => existsSync(join(HARNESS_ROOT, candidate)));
   if (!found) {
-    throw new Error("Missing VRT capture spec. Run `pnpm build` or restore `e2e/vlmkit-capture.spec.ts`.");
+    throw new Error(
+      `Missing the capture spec. Looked under ${HARNESS_ROOT} for:\n`
+      + candidates.map((c) => `  ${c}\n`).join("")
+      + `Run \`pnpm build\` (source checkout), or restore \`e2e/vlmkit-capture.spec.ts\`.`,
+    );
   }
   return found;
 }
@@ -98,11 +134,18 @@ function buildCaptureEnv(mode: "baseline" | "capture", options: WorkflowCaptureO
 
   // Resolve config + routes against PROJECT_ROOT (user's working directory),
   // so external projects can drop a vlmkit.config.json next to their app.
+  const envRoutes = readEnv("CAPTURE_ROUTES");
   const routeSet = resolveCaptureRoutes({
     cwd: PROJECT_ROOT,
     configPath: options.configPath,
     envConfigPath: readEnv("CONFIG_PATH"),
     envBaseUrl: options.baseUrl ?? readEnv("BASE_URL"),
+    // `envRoutes` was not passed at all, so `VLMKIT_CAPTURE_ROUTES` — documented as the
+    // HIGHEST-precedence route source in `vlmkit workflow --help` and in
+    // docs/cli-reference.md — was read by nobody and silently ignored. The unit test at
+    // capture-config.test.ts:127 passes `envRoutes` straight into `resolveCaptureRoutes`,
+    // so it proved the function worked while the wiring did not exist.
+    envRoutes,
   });
 
   if (routeSet.configPath) {
@@ -111,7 +154,15 @@ function buildCaptureEnv(mode: "baseline" | "capture", options: WorkflowCaptureO
   env.VLMKIT_BASE_URL = routeSet.baseUrl;
   env.VLMKIT_PROJECT_ROOT = PROJECT_ROOT;
 
-  if (routeSet.source === "config" && routeSet.configPath) {
+  if (routeSet.source === "env") {
+    console.log(`  (routes from VLMKIT_CAPTURE_ROUTES: ${routeSet.routes.map((r) => r.path).join(", ")})`);
+    // An env var outranking a flag the user typed is the documented precedence, but it
+    // must not be silent — that is an explicit request quietly not honoured.
+    if (options.configPath || readEnv("CONFIG_PATH")) {
+      console.log(`  (VLMKIT_CAPTURE_ROUTES takes precedence — the config file's routes were NOT used;`
+        + ` unset it to use --config)`);
+    }
+  } else if (routeSet.source === "config" && routeSet.configPath) {
     console.log(`  (using capture config: ${routeSet.configPath})`);
     console.log(`  (routes: ${routeSet.routes.map((r) => r.path).join(", ")})`);
   } else if (routeSet.source === "default") {
@@ -121,15 +172,82 @@ function buildCaptureEnv(mode: "baseline" | "capture", options: WorkflowCaptureO
   return env;
 }
 
-function runCaptureSpec(mode: "baseline" | "capture", options: WorkflowCaptureOptions) {
+/**
+ * What to print when a capture run produced no PNGs, given what actually went wrong.
+ *
+ * `init` and `capture` each carried a byte-identical pair of `console.error` lines that
+ * read the caught error not at all:
+ *
+ *     console.error("Playwright capture failed. Is the server running?");
+ *     console.error("Start your target app and set VLMKIT_BASE_URL if it is not http://127.0.0.1:4174");
+ *
+ * Measured with four unrelated causes — a `--config` path that does not exist, a config
+ * file containing invalid JSON, malformed `VLMKIT_CAPTURE_ROUTES`, and a correct config
+ * with no server — all four printed those two lines verbatim, and none of the four was
+ * the real cause: the spec lookup above was broken, so every run failed there first.
+ *
+ * The port was hardcoded too, so a config declaring `http://localhost:9999` still got
+ * told to check `127.0.0.1:4174`. Two ways of naming a cause nobody had checked.
+ */
+function reportCaptureFailure(err: unknown, baseUrl: string | undefined): void {
+  const message = err instanceof Error ? err.message : String(err);
+  console.error("Capture produced no screenshots.");
+  // The real error first and unabridged. It is the only line that is always true.
+  console.error(message.split("\n").map((l) => `  ${l}`).join("\n"));
+  // The server hint is advice about ONE cause, so it is offered as advice rather than as
+  // a diagnosis, and it names the URL that was actually resolved.
+  if (baseUrl) {
+    console.error(`If the target app is not running at ${baseUrl}, start it or set VLMKIT_BASE_URL.`);
+  }
+}
+
+/**
+ * Run the capture spec **from `HARNESS_ROOT`**, not from the user's project.
+ *
+ * This used to inherit `EXEC_OPTS.cwd = PROJECT_ROOT`, and every part of playwright's
+ * setup is resolved from cwd, so running in an external project meant:
+ *
+ *   - no `playwright.config.ts` there, so `testDir` defaulted to that directory and the
+ *     spec was not collected — "No tests found";
+ *   - and once a config was pointed at explicitly, `npx` resolved a *different*
+ *     `@playwright/test` than the one the spec imports — "Playwright Test did not expect
+ *     test.describe() to be called here … two different versions of @playwright/test".
+ *
+ * Running in HARNESS_ROOT settles config, testDir, and the module instance together.
+ * Nothing about the user's project is lost by it: the spec already takes the project's
+ * routes, base URL and output directory from `VLMKIT_CONFIG_PATH` / `VLMKIT_BASE_URL` /
+ * `VLMKIT_PROJECT_ROOT` / `VLMKIT_OUTPUT_DIR`, which `buildCaptureEnv` sets. Verified —
+ * with an external config declaring one route at `http://localhost:9999`, playwright
+ * collected 2 tests (desktop + mobile) and failed only on `ERR_CONNECTION_REFUSED` at
+ * `http://localhost:9999/a`, which is the failure the old message had always claimed.
+ */
+function runCaptureSpec(env: NodeJS.ProcessEnv) {
   execFileSync(
     NPX_COMMAND,
     ["playwright", "test", resolveCaptureSpecPath(), "--reporter=list"],
-    {
-      ...EXEC_OPTS,
-      env: buildCaptureEnv(mode, options),
-    }
+    { ...EXEC_OPTS, cwd: HARNESS_ROOT, env },
   );
+}
+
+/**
+ * Resolve the capture environment ahead of the run, so a bad config is reported as a bad
+ * config.
+ *
+ * It used to be built inside `runCaptureSpec`'s argument list, i.e. inside the callers'
+ * `try` — so `Capture config not found: …`, a `JSON.parse` failure on the config file, and
+ * malformed `VLMKIT_CAPTURE_ROUTES` all came back out as "Is the server running?". Doing
+ * it out here also makes the resolved base URL available to the failure message, which
+ * used to name a hardcoded port.
+ */
+function prepareCaptureEnv(
+  mode: "baseline" | "capture",
+  options: WorkflowCaptureOptions,
+): { env: NodeJS.ProcessEnv } | { error: string } {
+  try {
+    return { env: buildCaptureEnv(mode, options) };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 // ---- Commands ----
@@ -139,15 +257,20 @@ async function init(options: WorkflowCaptureOptions = {}): Promise<number> {
 
   await mkdir(BASELINES_DIR, { recursive: true });
 
+  const prepared = prepareCaptureEnv("baseline", options);
+  if ("error" in prepared) {
+    console.error(`Capture config error: ${prepared.error}`);
+    return 1;
+  }
+
   console.log("Running Playwright to capture baseline screenshots + a11y...");
   try {
-    runCaptureSpec("baseline", options);
+    runCaptureSpec(prepared.env);
   } catch (e) {
     // Some tests may fail (e.g. title check) but captures still succeed
     const captured = await listFiles(BASELINES_DIR, ".png");
     if (captured.length === 0) {
-      console.error("Playwright capture failed. Is the server running?");
-      console.error("Start your target app and set VLMKIT_BASE_URL if it is not http://127.0.0.1:4174");
+      reportCaptureFailure(e, prepared.env.VLMKIT_BASE_URL);
       return 1;
     }
     console.log("  (some tests had warnings, but captures completed)");
@@ -169,14 +292,19 @@ async function capture(options: WorkflowCaptureOptions = {}): Promise<number> {
   }
   await mkdir(SNAPSHOTS_DIR, { recursive: true });
 
+  const prepared = prepareCaptureEnv("capture", options);
+  if ("error" in prepared) {
+    console.error(`Capture config error: ${prepared.error}`);
+    return 1;
+  }
+
   console.log("Running Playwright to capture current state...");
   try {
-    runCaptureSpec("capture", options);
+    runCaptureSpec(prepared.env);
   } catch (e) {
     const captured = await listFiles(SNAPSHOTS_DIR, ".png");
     if (captured.length === 0) {
-      console.error("Playwright capture failed. Is the server running?");
-      console.error("Start your target app and set VLMKIT_BASE_URL if it is not http://127.0.0.1:4174");
+      reportCaptureFailure(e, prepared.env.VLMKIT_BASE_URL);
       return 1;
     }
     console.log("  (some tests had warnings, but captures completed)");

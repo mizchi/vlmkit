@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { afterAll, afterEach, beforeAll, describe, it, vi } from "vitest";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { UnifiedAgentContext } from "@mizchi/vlmkit-core/types.ts";
 
 /**
@@ -13,9 +14,14 @@ import type { UnifiedAgentContext } from "@mizchi/vlmkit-core/types.ts";
  * not the assertion) and a `runWorkflowCli` that returned `Promise<void>` while
  * actually deciding the process's fate.
  *
- * What is still NOT tested here: `init` and `capture`, which shell out to
- * `npx playwright test`. Spawning a browser suite from a unit test is the wrong
- * trade; their argument parsing is covered instead.
+ * What is still NOT tested here: a *successful* `init` / `capture`, which shells out to
+ * `npx playwright test`. Spawning a browser suite from a unit test is the wrong trade.
+ *
+ * "Their argument parsing is covered instead" is what this said, and it was not enough —
+ * both commands were dead for every invocation and the argument tests stayed green
+ * throughout. Everything about them that does NOT need a browser is covered now, in
+ * `capture preflight` below: the spec-path literals, playwright's `testDir`, the config
+ * error paths, and the `VLMKIT_CAPTURE_ROUTES` wiring.
  *
  * `PROJECT_ROOT` is resolved from `VLMKIT_PROJECT_ROOT` at module load, so each
  * case sets the env var and re-imports through `vi.resetModules()`. That is the
@@ -23,6 +29,7 @@ import type { UnifiedAgentContext } from "@mizchi/vlmkit-core/types.ts";
  * silently.
  */
 
+const REPO_ROOT = resolve(fileURLToPath(import.meta.url), "..", "..", "..");
 const root = mkdtempSync(join(tmpdir(), "vlmkit-workflow-"));
 
 let lines: string[] = [];
@@ -147,5 +154,105 @@ describe("runWorkflowCli", () => {
     await assert.rejects(() => run(["capture", "--config"]), /Missing value for --config/);
     const run2 = await loadCli(root);
     await assert.rejects(() => run2(["init", "--base-url"]), /Missing value for --base-url/);
+  });
+});
+
+/**
+ * The half of `init` / `capture` that needs no browser.
+ *
+ * Both commands were dead — every invocation failed, always — and stayed dead because the
+ * only thing testing them was argument parsing. The four defects were a wrong spec
+ * filename (`vrt-capture.spec.*`, a name nothing has had since the rename), a candidate
+ * order preferring `dist/e2e/**` which sits outside playwright's `testDir`, a cwd of the
+ * user's project so neither the config nor `@playwright/test` resolved, and a `catch (e)`
+ * that discarded `e` and printed "Is the server running?" for all of it.
+ *
+ * None of those needed a browser to catch. A config error returns before anything is
+ * spawned, and a path literal is a filesystem question — so both are covered here. What
+ * genuinely still needs a browser, and is still not tested here, is a successful capture;
+ * that was verified by hand against a local server (`init` → `capture` → `verify`, 2
+ * tests collected, baselines and snapshots written).
+ */
+describe("capture preflight (no browser)", () => {
+  it("the spec paths it looks for actually exist on disk", () => {
+    // The whole defect in one assertion, and it has to be made against the source text.
+    //
+    // The obvious version — drive `capture` and assert the "Missing the capture spec"
+    // message is absent — is VACUOUS, which I found by breaking the filename and watching
+    // it stay green: with a bad `--config` the run returns at the config stage, before
+    // spec resolution is ever reached, so the message could never appear either way.
+    // Reaching spec resolution means a valid config and an actual `npx playwright test`
+    // spawn, which is the browser cost this file exists to avoid.
+    //
+    // So: read the literals and check the filesystem, the way `version.test.ts` reads
+    // `cli.version("…")`. The `candidates.length` assertion is what stops a changed shape
+    // from turning this green and empty.
+    const source = readFileSync(resolve(REPO_ROOT, "src/cli/workflow.ts"), "utf8");
+    const block = source.match(/function resolveCaptureSpecPath[\s\S]*?\n\}/)?.[0];
+    assert.ok(block, "resolveCaptureSpecPath moved — this test needs updating with it");
+    const candidates = [...block.matchAll(/join\(([^)]*)\)/g)]
+      .map((m) => m[1]!.split(",").map((s) => s.trim().replace(/^"|"$/g, "")).join("/"));
+    assert.ok(candidates.length >= 1, `extracted no candidates from:\n${block}`);
+    const present = candidates.filter((c) => existsSync(resolve(REPO_ROOT, c)));
+    assert.ok(
+      present.length > 0,
+      `resolveCaptureSpecPath looks for ${candidates.join(", ")} and none exists under `
+      + `${REPO_ROOT}. That is how \`workflow init\` / \`workflow capture\` were dead: the `
+      + `literals still said \`vrt-capture.spec.*\`, a name nothing has had since the rename.`,
+    );
+    // And the first candidate — the one actually used — must be inside playwright's
+    // `testDir`, or it is collected by nothing and the run reports "No tests found".
+    const testDir = readFileSync(resolve(REPO_ROOT, "playwright.config.ts"), "utf8")
+      .match(/testDir:\s*"\.\/([^"]+)"/)?.[1];
+    assert.ok(testDir, "playwright.config.ts no longer declares a testDir");
+    assert.ok(
+      present[0]!.startsWith(`${testDir}/`),
+      `the preferred spec ${present[0]} is outside playwright's testDir "${testDir}", so it `
+      + `will not be collected`,
+    );
+  });
+
+  it("names a bad --config as a config error, not as a missing server", async () => {
+    // Measured before the fix: a nonexistent --config, a config containing invalid JSON,
+    // malformed VLMKIT_CAPTURE_ROUTES and a correct config with no server ALL printed
+    // "Playwright capture failed. Is the server running?" plus a hardcoded
+    // http://127.0.0.1:4174 — four causes, one message, and none of them the real one.
+    const run = await loadCli(root);
+    assert.equal(await run(["capture", "--config", join(root, "nope.json")]), 1);
+    const text = output();
+    assert.match(text, /Capture config error: Capture config not found:.*nope\.json/);
+    assert.doesNotMatch(text, /Is the server running/);
+    assert.doesNotMatch(text, /127\.0\.0\.1:4174/, "the port must come from the resolved config, not a literal");
+  });
+
+  it("names invalid JSON in the config as invalid JSON", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "vlmkit-workflow-badjson-"));
+    writeFileSync(join(dir, "broken.json"), "{ this is not json");
+    const run = await loadCli(dir);
+    assert.equal(await run(["capture", "--config", join(dir, "broken.json")]), 1);
+    assert.match(output(), /Capture config error: Invalid capture config JSON/);
+  });
+
+  it("reads VLMKIT_CAPTURE_ROUTES, and says so when it outranks a --config", async () => {
+    // `buildCaptureEnv` never passed `envRoutes`, so this variable — documented as the
+    // highest-precedence route source in `vlmkit workflow --help` and in
+    // docs/cli-reference.md — was read by nobody. `capture-config.test.ts` proved the
+    // function honoured it by passing it straight in, which is why the missing wiring was
+    // invisible: the unit test tested the function, not the feature.
+    const dir = mkdtempSync(join(tmpdir(), "vlmkit-workflow-envroutes-"));
+    writeFileSync(join(dir, "side.json"), JSON.stringify({ routes: [{ name: "c", path: "/from-config" }] }));
+    process.env.VLMKIT_CAPTURE_ROUTES = JSON.stringify([{ name: "e", path: "/from-env" }]);
+    try {
+      const run = await loadCli(dir);
+      await run(["capture", "--config", join(dir, "side.json")]);
+      const text = output();
+      assert.match(text, /routes from VLMKIT_CAPTURE_ROUTES: \/from-env/);
+      // An env var outranking a flag the user typed is the documented precedence, but it
+      // must not be silent.
+      assert.match(text, /VLMKIT_CAPTURE_ROUTES takes precedence/);
+      assert.doesNotMatch(text, /\/from-config/, "the config's routes were not used and must not be reported");
+    } finally {
+      delete process.env.VLMKIT_CAPTURE_ROUTES;
+    }
   });
 });
