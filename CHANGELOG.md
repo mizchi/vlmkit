@@ -575,6 +575,31 @@ suppression works per *rule* instead of per whole gate.
 
 ### Fixed
 
+- **`node dist/png-diff.mjs` printed nothing.** Fifteen modules still guarded their
+  entry with `process.argv[1]?.endsWith("thing.ts")`, and nine of those tested for a
+  `.ts` suffix only — so in the published `dist/` the direct-invocation branch was
+  dead. The dispatched path (`vlmkit diff png`) always worked, which is why it went
+  unnoticed. The same spelling also cannot tell suffix-sharing files apart:
+  `src/vrt/snapshot/snapshot.ts`'s guard matched `src/cli/commands/snapshot.ts` too.
+  All fifteen use `isCliEntry(import.meta.url, name)` now, and a test fails on any
+  reintroduction.
+
+- **The two CSS-corruption fixes had missed two more copies.** `css-challenge.ts` was
+  a fork of `css-challenge-core.ts` carrying five local copies, and `fix-loop.ts`
+  hand-rolled its own patcher — where it mattered most, since that is the
+  fix-*application* path: a proposed fix for `color` on
+  `.card { border-color: red; color: blue; }` rewrote `border-color` and left `color`
+  untouched, and the apply-and-rollback gate then blamed the model. Four copies of the
+  same two defects across three files; a rename (`removeCssProperty` →
+  `removeCssLine`) was enough to hide one from every search.
+
+- **`vlmkit workflow affected` said "(no git changes)" when it could not tell.** git
+  failing means the change set is unknown, and reporting an unknown as an empty one
+  says nothing is affected — the answer a caller acts on — about a project the command
+  never inspected. It now distinguishes "git answered: nothing changed" from "git could
+  not answer", returns 1 for the latter, and no longer lets `execSync` dump git's usage
+  block to stderr.
+
 - **Two constants that existed to prevent divergence were never used.**
   `GATE_EXIT_HELP` is documented as the shared `--advisory` help line "so every gate
   documents the contract identically", and the runner — its only call site — held a
