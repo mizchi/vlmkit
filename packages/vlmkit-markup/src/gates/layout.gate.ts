@@ -91,6 +91,12 @@ machine-checkable contract (DOM math, no VLM).`,
       severity: "suspect",
       docs: "Every rule was evaluated against a page the caller did not ask for, so even an all-pass is not a pass.",
     },
+    {
+      id: "invalid-selector",
+      title: "Contract names a selector that is not valid CSS",
+      severity: "suspect",
+      docs: "The browser refused the selector, so any rule naming it measured nothing — and `visible: false` is satisfied by measuring nothing, which is how a typo used to pass. Fix the selector; there is no threshold that makes an unparseable one meaningful.",
+    },
   ],
   inputs: [
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to check", positional: 0, required: true },
@@ -141,6 +147,14 @@ machine-checkable contract (DOM math, no VLM).`,
     const findings: Finding[] = [];
     if (report.redirected) {
       findings.push({ rule: "redirected", severity: "suspect", message: report.redirected });
+    }
+    for (const selector of report.invalidSelectors ?? []) {
+      findings.push({
+        rule: "invalid-selector",
+        severity: "suspect",
+        message: `\`${selector}\` is not valid CSS, so every rule naming it measured nothing`,
+        selector,
+      });
     }
     for (const result of report.results) {
       for (const check of result.checks) {

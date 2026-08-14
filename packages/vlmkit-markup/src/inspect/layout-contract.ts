@@ -111,6 +111,12 @@ export interface LayoutReport {
    * wrong" when the real cause is that the session expired.
    */
   redirected?: string;
+  /**
+   * Selectors in the contract that are not valid CSS, so the browser refused them.
+   * Absent when there are none. A rule naming one measured nothing, and since "matched
+   * nothing" satisfies `visible: false`, a typo used to pass the gate.
+   */
+  invalidSelectors?: string[];
 }
 
 /** Cluster row tops (±8px) and return the modal row size. */
@@ -203,12 +209,17 @@ export function evaluateLayoutRule(rule: LayoutRule, m: LayoutMeasurement): Layo
 // A real function (not a string): page.evaluate(fn, arg) passes the
 // argument; a string body would be evaluated as an expression and never
 // receive `selectors` (same lesson as flow-verify's assertions).
-function collectRects(selectors: string[]): Record<string, LayoutRect[]> {
+function collectRects(selectors: string[]): { rects: Record<string, LayoutRect[]>; invalid: string[] } {
   const out: Record<string, LayoutRect[]> = {};
+  // `querySelectorAll` throws on one thing only: a selector that is not valid CSS.
+  // Swallowing that left an invalid selector indistinguishable from one that matched
+  // nothing, and "matched nothing" SATISFIES a `visible: false` rule — so a typo in the
+  // contract passed the gate. Collected and reported instead.
+  const invalid: string[] = [];
   for (const sel of selectors) {
     const rects: LayoutRect[] = [];
     let list: Element[] = [];
-    try { list = Array.from(document.querySelectorAll(sel)); } catch { list = []; }
+    try { list = Array.from(document.querySelectorAll(sel)); } catch { invalid.push(sel); }
     for (const el of list) {
       const style = getComputedStyle(el);
       if (style.display === "none" || style.visibility === "hidden") continue;
@@ -218,7 +229,7 @@ function collectRects(selectors: string[]): Record<string, LayoutRect[]> {
     }
     out[sel] = rects;
   }
-  return out;
+  return { rects: out, invalid };
 }
 
 export interface LayoutVerifyOptions extends PageLoadOptions {
@@ -238,6 +249,8 @@ const DEFAULT_HEIGHTS: Record<number, number> = { 1280: 800, 768: 900, 375: 700 
 export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<LayoutReport> {
   const results: LayoutRuleResult[] = [];
   let redirected: string | undefined;
+  /** Deduped across viewports: one typo should be reported once, not once per width. */
+  const invalidSelectors = new Set<string>();
   await withBrowser(async (browser) => {
     const url = /^(https?|file):\/\//.test(options.source)
       ? options.source
@@ -252,7 +265,9 @@ export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<Lay
         : undefined;
       const rules = options.contract.rules.filter((r) => r.at === width);
       const selectors = [...new Set(rules.flatMap((r) => r.above ? [r.selector, r.above] : [r.selector]))];
-      const rectMap = await page.evaluate(collectRects, selectors);
+      const collected = await page.evaluate(collectRects, selectors);
+      const rectMap = collected.rects;
+      for (const sel of collected.invalid) invalidSelectors.add(sel);
       for (const rule of rules) {
         results.push(evaluateLayoutRule(rule, {
           viewport: width,
@@ -267,11 +282,19 @@ export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<Lay
   // A redirect cannot be `done`: the rules were evaluated against a page the
   // caller did not ask for, so even "all passed" would be a claim about the
   // login screen.
-  const done = passed === results.length && !redirected;
+  // An invalid selector cannot be `done` either, for the same reason as a redirect: a
+  // rule naming it was not evaluated against anything, and `visible: false` would have
+  // passed on the strength of that.
+  const invalid = [...invalidSelectors];
+  const done = passed === results.length && !redirected && invalid.length === 0;
   appendRunLedger({
     tool: "layout-contract",
     source: options.source,
-    headline: { done, passed, total: results.length, ...(redirected ? { redirected: true } : {}) },
+    headline: {
+      done, passed, total: results.length,
+      ...(redirected ? { redirected: true } : {}),
+      ...(invalid.length > 0 ? { invalidSelectors: invalid.length } : {}),
+    },
   });
   return {
     source: options.source,
@@ -280,6 +303,7 @@ export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<Lay
     total: results.length,
     done,
     ...(redirected ? { redirected } : {}),
+    ...(invalid.length > 0 ? { invalidSelectors: invalid } : {}),
   };
 }
 
@@ -294,6 +318,12 @@ export function formatLayoutReport(report: LayoutReport): string {
     // "your cards are missing", sending the reader to debug their markup.
     lines.push(`${RED}x ${report.redirected}${RESET}`);
     lines.push(`${DIM}  Every rule below was evaluated against that page.${RESET}`);
+  }
+  for (const selector of report.invalidSelectors ?? []) {
+    // Also ahead of the list, and for the same reason: below, this reads as
+    // "no match", which sends the reader to their markup instead of their contract.
+    lines.push(`${RED}x \`${selector}\` is not valid CSS — the browser refused it${RESET}`);
+    lines.push(`${DIM}  Rules naming it measured nothing; a \`visible: false\` rule would have passed on that.${RESET}`);
   }
   lines.push("");
   for (const r of report.results) {
