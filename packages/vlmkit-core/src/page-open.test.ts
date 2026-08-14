@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { Browser } from "playwright";
-import { isUrlSource, openHtml, openSource, sourceToUrl } from "./page-open.ts";
+import { isUrlSource, openHtml, openSource, resolveSource, sourceToUrl } from "./page-open.ts";
 import { launchBrowser } from "./browser-launch.ts";
 
 describe("isUrlSource / sourceToUrl", () => {
@@ -14,6 +14,27 @@ describe("isUrlSource / sourceToUrl", () => {
     assert.equal(isUrlSource("http://localhost:3000"), true);
     assert.equal(isUrlSource("routes/index.html"), false);
     assert.equal(isUrlSource("/abs/index.html"), false);
+  });
+
+  it("counts file:// as a URL, because resolve() destroys one", () => {
+    // This said `https?` only, and a `file://` source therefore took the path branch:
+    //   vlmkit check a11y contrast "file:///repo/fixtures/page.html"
+    //   error: file not found: /repo/file:/repo/fixtures/page.html
+    // Every gate that loads through `openSource` carried it. Eight modules had already
+    // hand-rolled `/^(https?|file):\/\//` for themselves and were right.
+    assert.equal(isUrlSource("file:///abs/page.html"), true);
+    assert.equal(sourceToUrl("file:///abs/page.html"), "file:///abs/page.html");
+    // The whole point: idempotent. A source that is already a file URL must survive a
+    // second trip through the normalizer unchanged.
+    assert.equal(sourceToUrl(sourceToUrl("page.html")), sourceToUrl("page.html"));
+    assert.equal(resolveSource("file:///abs/page.html"), "file:///abs/page.html");
+  });
+
+  it("still treats a scheme-less path as a path", () => {
+    // A Windows drive letter is not a URL, and neither is anything else without `//`.
+    assert.equal(isUrlSource("C:\\pages\\index.html"), false);
+    assert.equal(isUrlSource("data:text/html,<p>x"), false);
+    assert.equal(isUrlSource("file-picker.html"), false, "a filename starting with `file` is a filename");
   });
 
   it("turns a path into a file URL and leaves a URL alone", () => {

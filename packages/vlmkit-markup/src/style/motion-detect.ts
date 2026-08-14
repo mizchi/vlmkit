@@ -17,10 +17,11 @@
  */
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 
 export interface MotionComputedSample {
   selector: string;
@@ -76,9 +77,6 @@ export interface MotionDetectionOptions extends PageLoadOptions {
   viewport?: { width: number; height: number };
 }
 
-function isUrl(source: string): boolean {
-  return /^(https?|file):\/\//.test(source);
-}
 
 function cssTimeToMs(value: string): number {
   const v = value.trim().toLowerCase();
@@ -180,7 +178,7 @@ export async function runMotionDetection(
       // file: URL navigation so relative stylesheets resolve — setContent
       // gives the document an about:blank base URL (same fix as the other
       // page-loading checks).
-      const url = isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
+      const url = sourceToUrl(options.source);
       await navigatePage(page, url, options);
     }
 

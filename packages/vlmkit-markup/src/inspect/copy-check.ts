@@ -46,7 +46,6 @@
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import {
   buildContactSheets,
@@ -63,6 +62,7 @@ import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { isUrlSource, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 
 export type CopyIssueKind =
   | "placeholder-text"
@@ -639,9 +639,6 @@ export interface CopyCheckOptions extends PageLoadOptions {
   allowInvisible?: InvisibleReason[];
 }
 
-function isUrl(source: string): boolean {
-  return /^(https?|file):\/\//.test(source);
-}
 
 /** Rows beyond this are dropped from the sheets (and counted, loudly). */
 const MAX_REVIEW_ROWS = 80;
@@ -667,7 +664,7 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
     if (options.html !== undefined) {
       await page.setContent(options.html, navigationOptions(options));
     } else {
-      const url = isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
+      const url = sourceToUrl(options.source);
       await navigatePage(page, url, options);
     }
     const pageText = await page.evaluate(COLLECT_RAW_TEXT) as string;
@@ -683,7 +680,7 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
     // "Copy missing" on a page you never reached is a misleading verdict:
     // an auth-walled route 302s to /login and every manifest line reads as
     // absent. Surface the redirect so the real cause is legible.
-    if (isUrl(options.source)) redirectNote = describeRedirect(options.source, page.url());
+    if (isUrlSource(options.source)) redirectNote = describeRedirect(options.source, page.url());
     await page.close();
     return { pageText, visibleText, invisibleChunks };
   });

@@ -36,7 +36,6 @@
  */
 import { resolve } from "node:path";
 import { STABLE_SELECTOR_JS } from "../stable-selector.ts";
-import { pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import {
@@ -44,7 +43,7 @@ import {
   type IntegrityAllowRule,
 } from "./integrity-exemption.ts";
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
-import { applyHar } from "@mizchi/vlmkit-core/page-open.ts";
+import { applyHar, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { extractComponentsFromRgba } from "../component/component-bbox.ts";
@@ -1557,9 +1556,6 @@ export const DEFAULT_INTEGRITY_VIEWPORTS = [
   { width: 375, height: 700 },
 ];
 
-function isUrl(source: string): boolean {
-  return /^(https?|file):\/\//.test(source);
-}
 
 function dedupeKey(f: IntegrityFinding): string {
   const extra = f.kind === "js-error"
@@ -1599,7 +1595,7 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
   };
 
   await withBrowser(async (browser) => {
-    const url = isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
+    const url = sourceToUrl(options.source);
     for (let vi = 0; vi < viewports.length; vi++) {
       const viewport = viewports[vi]!;
       const page = await browser.newPage(withAuthState({ viewport }, options.storageState));

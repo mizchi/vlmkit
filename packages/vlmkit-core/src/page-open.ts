@@ -33,7 +33,34 @@ import type { Browser, Page, ViewportSize } from "playwright";
 import { withAuthState } from "./auth-state.ts";
 import { describeRedirect } from "./navigation-redirect.ts";
 
-export const isUrlSource = (source: string): boolean => /^https?:\/\//.test(source);
+/**
+ * Is this source already a URL, or is it a path that has to become one?
+ *
+ * `file:` belongs here and did not use to. This function said `https?` only, so a
+ * `file://` source fell into the path branch and `resolve()` mangled it exactly the way
+ * the comment on `resolveSource` warns about for `http`:
+ *
+ *     vlmkit check a11y contrast "file:///repo/fixtures/page.html"
+ *     error: file not found: /repo/file:/repo/fixtures/page.html
+ *
+ * Measured — the same fixture passed as a plain path inspected 31 elements and found 2
+ * contrast failures. Everything reaching a page through `openSource` / `sourceToUrl`
+ * carried it: `check a11y contrast` / `touch` / `focus`, `check theme`, `stress i18n`,
+ * `stress media`, `check tokens`, `check consistency`.
+ *
+ * It is also the clearest case of the duplication pattern in the repo. Eight modules
+ * wrote their own `isUrl` — animation-eval, motion-detect, breakpoint-check, copy-check,
+ * integrity-check, scroll-behavior, scroll-scan, media-variants — and all eight spell it
+ * `/^(https?|file):\/\//`. They are right and the shared helper they were meant to
+ * replace was wrong, which is why the commands that hand-rolled the check kept working
+ * (`check story --gallery "file://$PWD/index.html"`, the recipe in CLAUDE.md, is fine)
+ * while the ones written the documented way did not.
+ *
+ * Scoped to these two schemes rather than "anything with a scheme" on purpose: `data:`
+ * and `about:` are not sources any caller resolves, and a bare Windows drive letter
+ * (`C:\page.html`) must stay a path.
+ */
+export const isUrlSource = (source: string): boolean => /^(https?|file):\/\//.test(source);
 
 /**
  * Normalize a source for storage and display: an absolute path for a file, the

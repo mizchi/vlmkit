@@ -25,13 +25,13 @@
  */
 import { resolve } from "node:path";
 import { STABLE_SELECTOR_JS } from "../stable-selector.ts";
-import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { UiExpectedScrollportContract } from "../contract/ui-contract.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { isUrlSource, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 
 export type ScrollAxis = "x" | "y" | "both";
 
@@ -147,9 +147,6 @@ export interface ScrollScanOptions extends PageLoadOptions {
   maxFindings?: number;
 }
 
-function isUrl(source: string): boolean {
-  return /^(https?|file):\/\//.test(source);
-}
 
 function scrollable(overflow: string): boolean {
   return overflow === "auto" || overflow === "scroll";
@@ -458,13 +455,13 @@ export async function runScrollScan(options: ScrollScanOptions): Promise<ScrollS
     } else {
       // file: URL navigation so relative stylesheets/scripts/images resolve —
       // setContent gives the document an about:blank base URL.
-      const url = isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
+      const url = sourceToUrl(options.source);
       await navigatePage(page, url, options);
     }
     // A redirect here is almost always a login wall. Without this the gate
     // measured the login page and reported `status: ok` while naming the
     // requested URL as its source (measured 2026-08-02).
-    const redirectNote = isUrl(options.source) ? describeRedirect(options.source, page.url()) : null;
+    const redirectNote = isUrlSource(options.source) ? describeRedirect(options.source, page.url()) : null;
     const collected = await page.evaluate(COLLECT_SCROLL_SCRIPT) as Omit<ScrollScanInput, "source">;
     await page.close();
     const report = analyzeScrollSamples(

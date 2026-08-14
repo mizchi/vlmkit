@@ -80,7 +80,6 @@ export interface MediaVariantsReport {
   reportPath: string;
 }
 
-function isUrl(s: string): boolean { return /^(https?|file):\/\//.test(s); }
 
 /**
  * Always navigate. The file branch used to `setContent` the read bytes, which

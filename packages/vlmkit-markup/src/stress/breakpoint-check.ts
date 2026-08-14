@@ -32,13 +32,14 @@
  */
 import { resolve } from "node:path";
 import { STABLE_SELECTOR_JS } from "../stable-selector.ts";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { extractBreakpoints } from "@mizchi/vlmkit-capture/viewport-discovery.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { isUrlSource, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 
 /** Discrete computed properties compared across boundary widths. */
 export interface ElementStyleSample {
@@ -192,9 +193,6 @@ export interface BreakpointCheckOptions extends PageLoadOptions {
   sweepMax?: number;
 }
 
-function isUrl(source: string): boolean {
-  return /^(https?|file):\/\//.test(source);
-}
 
 /**
  * Extract width breakpoints written in media-query range syntax —
@@ -396,7 +394,7 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
       // file: URL navigation so relative stylesheets resolve — setContent
       // gives the document an about:blank base URL and we'd analyze an
       // unstyled page.
-      const url = isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
+      const url = sourceToUrl(options.source);
       await navigatePage(page, url, options);
     }
 
@@ -404,7 +402,7 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
     // A redirect here is almost always a login wall. Without this the gate
     // measured the login page and reported `status: ok` while naming the
     // requested URL as its source (measured 2026-08-02).
-    const redirectNote = isUrl(options.source) ? describeRedirect(options.source, page.url()) : null;
+    const redirectNote = isUrlSource(options.source) ? describeRedirect(options.source, page.url()) : null;
 
     let values: number[];
     let rawByValue = new Map<number, string[]>();

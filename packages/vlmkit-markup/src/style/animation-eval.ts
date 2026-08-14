@@ -29,7 +29,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { STABLE_SELECTOR_JS } from "../stable-selector.ts";
 import { dirname, join, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
@@ -38,6 +37,7 @@ import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { composeFilmstrip } from "@mizchi/vlmkit-core/filmstrip.ts";
 import { cropRegion, encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
 import { encodeWebp, imageFormatForPath } from "@mizchi/vlmkit-core/webp.ts";
+import { sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 
 export interface AnimationTimingSample {
   /** Index into the page's animation list at capture time. */
@@ -224,9 +224,6 @@ interface RgbaFrame {
   data: Uint8Array;
 }
 
-function isUrl(source: string): boolean {
-  return /^(https?|file):\/\//.test(source);
-}
 
 /**
  * Pixel delta between two same-size RGBA frames: count, ratio, and the
@@ -602,7 +599,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
   // about:blank base URL and evaluate an unstyled page.
   const pageUrl = options.html !== undefined
     ? undefined
-    : isUrl(options.source) ? options.source : pathToFileURL(resolve(options.source)).href;
+    : sourceToUrl(options.source);
   // Both passes (normal + reduced-motion emulation) go through this, so
   // --timeout / --wait-until / --har apply to both. Loading the two under
   // different rules would make the reduced-motion comparison meaningless.
