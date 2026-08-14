@@ -6,6 +6,7 @@
  */
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createVlmkitMcpServer } from "./server.ts";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 
 export async function runStdioServer(): Promise<void> {
   const server = createVlmkitMcpServer();
@@ -13,9 +14,7 @@ export async function runStdioServer(): Promise<void> {
   await server.connect(transport);
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "mcp-stdio" ||
-  (process.argv[1] ? process.argv[1].endsWith("stdio.ts") || process.argv[1].endsWith("stdio.js") : false);
-if (isCliEntry) {
+if (isCliEntry(import.meta.url, "mcp-stdio")) {
   runStdioServer().catch((err) => {
     process.stderr.write(`vlmkit mcp failed: ${String(err)}\n`);
     process.exit(1);

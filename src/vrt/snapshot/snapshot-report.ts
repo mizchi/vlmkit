@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { dirname } from "node:path";
 
 export interface SnapshotReportEntry {
@@ -718,7 +719,7 @@ function requireOptionValue(value: string | undefined, flag: string): string {
   return value;
 }
 
-if (process.env.__VLMKIT_DISPATCHER_LEAF__ === "snapshot-report" || process.argv[1]?.endsWith("snapshot-report.ts")) {
+if (isCliEntry(import.meta.url, "snapshot-report")) {
   main().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);

@@ -20,6 +20,7 @@
  * over a different navigation is the stale-fixture case on day one.
  */
 import { mkdir } from "node:fs/promises";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { dirname, resolve } from "node:path";
 import { chromium } from "playwright";
 import { UsageError, handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
@@ -140,10 +141,7 @@ export async function recordHarCli(argv: readonly string[]): Promise<void> {
   );
 }
 
-if (
-  process.env.__VLMKIT_DISPATCHER_LEAF__ === "record-har-cli"
-  || (process.argv[1] && (process.argv[1].endsWith("record-har-cli.ts") || process.argv[1].endsWith("record-har-cli.mjs")))
-) {
+if (isCliEntry(import.meta.url, "record-har-cli")) {
   recordHarCli(process.argv.slice(2)).catch(handleCliError);
 }
 

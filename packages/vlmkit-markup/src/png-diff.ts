@@ -1,4 +1,5 @@
 import { mkdir, readFile } from "node:fs/promises";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { basename, join } from "node:path";
 import { compareScreenshots, parseIgnoreRegionSpec } from "@mizchi/vlmkit-core/heatmap.ts";
 import { readPngDimensions } from "@mizchi/vlmkit-core/image-resize.ts";
@@ -516,7 +517,7 @@ function formatSizeDelta(value: number): string {
   return value > 0 ? `+${value}` : String(value);
 }
 
-if (process.env.__VLMKIT_DISPATCHER_LEAF__ === "png-diff" || process.argv[1]?.endsWith("png-diff.ts")) {
+if (isCliEntry(import.meta.url, "png-diff")) {
   runPngDiffCli().catch((error) => {
     console.error(error);
     process.exit(1);

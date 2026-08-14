@@ -11,6 +11,7 @@
  *   vlmkit inspect smoke --file fixtures/css-challenge/page.html --seed 42
  */
 import { mkdir, readFile } from "node:fs/promises";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { type Page, type Browser } from "playwright";
 import { launchBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import type {
@@ -578,6 +579,6 @@ async function main() {
 }
 
 // Run CLI only when executed directly
-if (process.env.__VLMKIT_DISPATCHER_LEAF__ === "smoke-runner" || process.argv[1]?.endsWith("smoke-runner.ts")) {
+if (isCliEntry(import.meta.url, "smoke-runner")) {
   main().catch((e) => { console.error(e); process.exit(1); });
 }

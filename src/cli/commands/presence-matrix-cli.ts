@@ -10,6 +10,7 @@
  * (A/B v2 draft 08).
  */
 import { readFile } from "node:fs/promises";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import type { VrtSnapshot } from "@mizchi/vlmkit-core/types.ts";
 import {
@@ -183,10 +184,7 @@ export async function runPresenceMatrixCli(argv = process.argv.slice(2)): Promis
   process.stdout.write(formatPresenceMatrix(matrix));
 }
 
-if (
-  process.env.__VLMKIT_DISPATCHER_LEAF__ === "presence-matrix" ||
-  process.argv[1]?.endsWith("presence-matrix-cli.ts")
-) {
+if (isCliEntry(import.meta.url, "presence-matrix")) {
   runPresenceMatrixCli().catch((error) => {
     console.error(error);
     process.exit(1);

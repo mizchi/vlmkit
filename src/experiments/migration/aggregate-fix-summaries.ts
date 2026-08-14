@@ -9,6 +9,7 @@
  *     <summary.json>... [--out path] [--format markdown|tsv]
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { basename, dirname, resolve } from "node:path";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 
@@ -168,10 +169,7 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   }
 }
 
-if (
-  process.env.__VLMKIT_DISPATCHER_LEAF__ === "migration-aggregate"
-  || process.argv[1]?.endsWith("aggregate-fix-summaries.ts")
-) {
+if (isCliEntry(import.meta.url, "migration-aggregate")) {
   main().catch(handleCliError);
 }
 

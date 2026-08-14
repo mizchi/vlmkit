@@ -34,6 +34,7 @@
 import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
+import { execSync } from "node:child_process";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -149,6 +150,36 @@ describe("gate plugins do not statically reach CLI-entry modules", () => {
       );
     });
   }
+
+  it("no module hand-rolls the entry guard", () => {
+    // `argv[1]?.endsWith("thing.ts")` is a suffix match, so it cannot tell
+    // suffix-sharing files apart — `src/vrt/snapshot/snapshot.ts`'s guard also matched
+    // `src/cli/commands/snapshot.ts` — and it silently stops matching once the file is
+    // built to `.mjs`. That second half was live: `node dist/png-diff.mjs --help`
+    // printed nothing at all, because the guard tested for `png-diff.ts`.
+    //
+    // Fifteen modules carried it. `isCliEntry(import.meta.url, name)` resolves both
+    // sides, so it is exact in both directions.
+    const files = execSync("git ls-files '*.ts'", { cwd: REPO_ROOT, encoding: "utf8" })
+      .trim().split("\n").filter(Boolean);
+    assert.ok(files.length > 200, `git ls-files returned ${files.length} — the listing is broken, not the code`);
+    const offenders: string[] = [];
+    for (const rel of files) {
+      // `cli-entry.ts` quotes the bad spelling in its own docstring, which is where the
+      // explanation belongs; tests may quote it too.
+      if (rel.endsWith("cli-entry.ts") || rel.endsWith(".test.ts")) continue;
+      const source = readFileSync(resolve(REPO_ROOT, rel), "utf8");
+      // Both halves of the guard in one statement — `process.argv[1]` reached by a
+      // suffix comparison — which is the shape, in every spelling it appeared in.
+      if (/process\.argv\[1\][^;]{0,200}?\.endsWith\(/s.test(source)) offenders.push(rel);
+    }
+    assert.deepEqual(
+      offenders,
+      [],
+      "hand-rolled entry guard — use `isCliEntry(import.meta.url, \"<dispatcher-name>\")` "
+      + "from @mizchi/vlmkit-core/plugin/cli-entry.ts",
+    );
+  });
 
   it("the walker actually finds CLI entries, or the check above is vacuous", () => {
     // `page-compose.ts` is a CLI entry and reachable from `page-compose-diff.ts`'s

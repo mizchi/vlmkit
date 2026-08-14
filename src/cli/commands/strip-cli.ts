@@ -17,6 +17,7 @@
  * them explicitly.
  */
 import { existsSync } from "node:fs";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
@@ -237,10 +238,7 @@ async function main(): Promise<void> {
   console.log();
 }
 
-if (
-  process.env.__VLMKIT_DISPATCHER_LEAF__ === "strip-cli"
-  || (process.argv[1] && (process.argv[1].endsWith("strip-cli.ts") || process.argv[1].endsWith("strip-cli.mjs")))
-) {
+if (isCliEntry(import.meta.url, "strip-cli")) {
   const { handleCliError } = await import("@mizchi/vlmkit-core/cli-error.ts");
   main().catch(handleCliError);
 }

@@ -7,6 +7,7 @@
  *   vlmkit snapshot http://localhost:3000/ http://localhost:3000/luna/ --output snapshots/sol/
  */
 import { existsSync } from "node:fs";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { compareScreenshots, generateDiffReport } from "@mizchi/vlmkit-core/heatmap.ts";
@@ -728,7 +729,7 @@ export async function runSnapshotCli(
   return 0;
 }
 
-if (process.env.__VLMKIT_DISPATCHER_LEAF__ === "snapshot" || process.argv[1]?.endsWith("snapshot.ts")) {
+if (isCliEntry(import.meta.url, "snapshot")) {
   // The guard owns `process.exitCode`; the function above only reports what it
   // should be. Assigning rather than `process.exit` so buffered stdout still
   // flushes — the defect `applyGateExit` exists for.

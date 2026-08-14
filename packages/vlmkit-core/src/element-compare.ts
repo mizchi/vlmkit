@@ -11,6 +11,7 @@
  *   vlmkit diff elements before.html after.html --selectors "header,.content,.sidebar"
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { isCliEntry } from "./plugin/cli-entry.ts";
 import { join, resolve } from "node:path";
 import { type Page } from "playwright";
 import { compareScreenshots } from "./heatmap.ts";
@@ -347,6 +348,6 @@ async function main() {
   console.log();
 }
 
-if (process.env.__VLMKIT_DISPATCHER_LEAF__ === "element-compare" || process.argv[1]?.endsWith("element-compare.ts")) {
+if (isCliEntry(import.meta.url, "element-compare")) {
   main().catch((e) => { console.error(e); process.exit(1); });
 }

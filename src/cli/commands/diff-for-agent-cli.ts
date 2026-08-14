@@ -9,6 +9,7 @@
  * read.
  */
 import { existsSync } from "node:fs";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve, relative} from "node:path";
 import { STATE_DIR, resolveStatePath } from "@mizchi/vlmkit-core/project-config.ts";
@@ -223,7 +224,7 @@ async function main() {
   }
 }
 
-if (process.env.__VLMKIT_DISPATCHER_LEAF__ === "diff-for-agent-cli" || (process.argv[1] && (process.argv[1].endsWith("diff-for-agent-cli.ts") || process.argv[1].endsWith("diff-for-agent-cli.mjs")))) {
+if (isCliEntry(import.meta.url, "diff-for-agent-cli")) {
   main().catch((err) => {
     console.error(String(err?.message ?? err));
     process.exit(1);
