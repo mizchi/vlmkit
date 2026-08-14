@@ -1067,9 +1067,9 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 ### テストカバレッジ 70% への道筋(2026-08-13 測定)
 
 vitest へ移行し(2662 tests、node:test と同数、同じ ~222s)、v8 カバレッジを導入。
-`pnpm test:coverage` で計測。**現在 statements 60.14%**(開始 56.1%、Phase 2 後 57.99%)。
+`pnpm test:coverage` で計測。**現在 statements 61.23%**(開始 56.1%、Phase 2 後 57.99%、Phase 1 後 60.14%)。tests 2859、全パス。
 
-**70% には +3,865 statements 必要**(Phase 1 完了後の残りは **+3,005**)。既存の 2662 tests が網羅的なのに 57% な理由は
+**70% には +3,865 statements 必要**(現時点の残りは **+2,675**)。既存の 2662 tests が網羅的なのに 57% な理由は
 構造的で、純粋ロジックは**すでにカバー済み**だから。実測:
 
 | 書いたテストの種類 | 1ファイルあたりの獲得 |
@@ -1145,8 +1145,67 @@ vitest へ移行し(2662 tests、node:test と同数、同じ ~222s)、v8 カバ
   - 残り9ファイルのうち `demo/*` 4件はデモの実行そのもの、
     `benchmark`/`vlm-bench`/`css-challenge`/`fix-loop`/`migration-fix-loop` 5件は
     VLM/API が必要(Phase 3)。**リファクタ済みなので import は安全**になった。
+- [x] **Phase 1.5: 未テストの純粋モジュール**(2026-08-14)。**60.14% → 61.23%**。
+  Phase 1 の続きとして、browser 不要で未カバーの大きい純粋モジュールを 3 本:
+
+  | ファイル | before | after | tests |
+  |---|---|---|---|
+  | `component/component-report-format.ts` | 52.9% | **82.4%** | +22(0.55s) |
+  | `util/skill.ts` | 0% | **58.6%** | 24(2.4s、1件だけ実 CLI を spawn) |
+  | `experiments/css-challenge/css-challenge-core.ts` | 33% | **42.1%** | +21(0.02s) |
+
+  ここでも**実欠陥が 4 件**出た。未テストのモジュールにはバグがある、という
+  この作業の一貫した所見:
+  1. **`vlmkit skill run` は 0.9.0 以降ずっと全チェックが失敗していた** —
+     `src/vrt.ts` を spawn していた(リネームで消えたパス)。しかもレポートは
+     `MODULE_NOT_FOUND` を `exit 1` として「チェックが問題を見つけた」ように描画。
+     `KNOWN_TOOLS`(コマンド表の手書きコピー)も 0.9 前の単一トークン名のままで、
+     **検証を通ってから spawn で落ちる**構造だった。検証は CLI に委譲し、
+     legacy 名は alias として維持。
+  2. **`removeCssProperty` がプロパティ名をトークン途中でマッチ** —
+     `.card { border-color: red; color: red; }` → `.card { border- color: red; }`。
+     指定されていないプロパティを壊し、指定されたものを残す。つまり**実験の
+     ground truth が壊れる**(クラッシュではなく)。
+  3. **`applyCssFix` が末尾セミコロンなしの body に連結** —
+     `.card { color: red }` → `.card { color: red padding: 4px; }`。
+     既存 declaration が消える。
+     - 2 と 3 は**現コーパスでは発火しない**ことを実測(10 fixtures / 2,391
+       declarations で修正前後バイト一致)。よって**記録済みのベンチ数値は変わらない**。
+       ただし `.tab-item.active { color: #2563eb; border-bottom-color: #2563eb; }` は
+       順序が逆なら発火する。
+  4. **`inspect interact --help` が exit 1** — help と引数不足が同じコードだった。
+
+  **`as any` フィクスチャの害も実証された**: `component-report-format.test.ts` の
+  既存フィクスチャは `as any` で、typed に書き直したら tsc が即座に 3 件見つけた
+  (`LandscapeDiffResult` の `width`/`height` 欠落、`ComponentGoalEvaluation` の
+  閾値 4 フィールド欠落、`nearest` → 実際は `nearestNeighborDistance` + `count`)。
+  どれもレポートに `undefined` が出るがテストは通る組み合わせ。
+
 - [ ] **Phase 3: VLM/API 経路に録画フィクスチャ**(~250 statements)
   - `vlm-client.ts` / `reasoning-pipeline.ts`。HAR 相当の録画済みレスポンスが必要。
+
+#### 残り +2,675 の所在(2026-08-14 実測)
+
+**純粋モジュールの安い獲得はほぼ枯れた**。残る大きい未カバーは全部 browser
+オーケストレータか実験ハーネス:
+
+| missing | pct | ファイル | 性質 |
+|---|---|---|---|
+| 647 | 40.2% | `experiments/migration/migration-compare.ts` | browser |
+| 477 | 3.8% | `experiments/css-challenge/css-challenge-bench.ts` | browser + fixture |
+| 404 | 18.1% | `component/component-from-image.ts` | browser |
+| 391 | 12.9% | `src/diff-pr.ts` | browser(CI ゲート) |
+| 274 | 0% | `experiments/css-challenge/css-challenge.ts` | LLM 必要 |
+| 264 | 70.9% | `vrt/compare/diff-for-agent.ts` | 純粋だが既に 24 tests あり |
+| 462 | 0% | `demo/demo-scenarios.ts` + `demo-fix-loop.ts` | デモ実行そのもの |
+| 219 | 31.8% | `vrt/snapshot/snapshot.ts` | browser |
+| 217 | 38.2% | `contract/introspect-contract.ts` | browser |
+| 185 | 5.1% | `stress/cross-browser.ts` | 複数 browser エンジン必要 |
+
+つまり **70% に行くには browser orchestrator を実測レートで 15-20 スイート**
+書くことになる(Phase 1 実績: browser スイート 1 本 ≒ 100-200 statements、
+20-40s)。suite 全体に +10 分程度。`diff-pr.ts` は CI ゲートなので
+**カバレッジ目的とは別に**テストする価値が高い(12.9% は低すぎる)。
 
 #### 分母を狭める案(単独では 70% に届かない)
 

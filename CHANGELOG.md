@@ -567,6 +567,35 @@ suppression works per *rule* instead of per whole gate.
 
 ### Fixed
 
+- **`vlmkit skill run` had been failing every check since 0.9.0.** It spawned
+  `node --experimental-strip-types src/vrt.ts <tool>`, a path that stopped existing
+  when the entry was renamed to `src/cli/vlmkit.ts` — so every check died in Node's
+  module resolution, and even before the rename it could only work when the cwd
+  happened to be a checkout of this repository. The entry now comes from
+  `__VLMKIT_CLI_ENTRY__`, which the dispatcher already records. `KNOWN_TOOLS`, a
+  hand-maintained copy of the command table used to *validate*, is gone: it still
+  listed the pre-0.9 single-token names, so a skill naming a removed command passed
+  validation and then failed at spawn. Those names survive as *aliases* (a skill file
+  saying `a11y-contrast` still runs `check a11y contrast`), validation is the CLI's
+  own "Unknown command", and multi-token commands spawn correctly. A launch failure
+  is no longer rendered as a failing check — the report segregates checks that never
+  ran, gives them no exit code, and the run exits 1 rather than 0.
+
+- **Two CSS mutators in the css-challenge experiment could corrupt the sheet.**
+  `removeCssProperty` matched a property name mid-token, so
+  `.card { border-color: red; color: red; }` became `.card { border- color: red; }` —
+  mangling a property the caller never named and leaving the named one in place, which
+  puts the corruption in the experiment's ground truth rather than in a crash.
+  `applyCssFix` concatenated onto a body with no trailing semicolon (legal CSS),
+  producing `.card { color: red padding: 4px; }`. Neither was reachable from the
+  current corpus — verified byte-identical output across all 2,391 declarations in the
+  ten fixtures — so no recorded bench number changes. `css-challenge.ts`'s
+  byte-identical copy of `applyCssFix` is deleted in favour of core's; the semicolon
+  bug was in both.
+
+- **`vlmkit inspect interact --help` exited 1.** Help and missing arguments printed
+  the same usage and shared an exit code, so asking for help failed in any `&&` chain.
+
 - **`check drift pages` stayed quiet about the worst drift there is.** A route the
   selector is absent from carries `diffRatio: NaN`, and the finding filter read
   `diffRatio > threshold` — false for NaN — so the gate exited 0 while its own
