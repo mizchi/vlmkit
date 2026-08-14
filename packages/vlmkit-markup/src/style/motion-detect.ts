@@ -185,6 +185,10 @@ export async function runMotionDetection(
     }
 
     const result = await page.evaluate((limit) => {
+      // The one copy of `stableSelector` that is not `STABLE_SELECTOR_JS`, because this
+      // gate passes a real typed arrow to `page.evaluate` rather than assembling a script
+      // string. It must agree with the shared one, and `selector-uniqueness.test.ts` is
+      // what holds it there — it asserts the property on this gate's output, not on source.
       function stableSelector(el: Element): string {
         const id = el.getAttribute("id");
         if (id) return `#${CSS.escape(id)}`;
@@ -197,7 +201,9 @@ export async function runMotionDetection(
         if (!parent) return el.tagName.toLowerCase();
         const siblings = Array.from(parent.children).filter((item) => item.tagName === el.tagName);
         const nth = siblings.indexOf(el) + 1;
-        return `${el.tagName.toLowerCase()}:nth-of-type(${nth})`;
+        // The recursive prefix. Without it this returned `p:nth-of-type(1)` — the first
+        // `<p>` of every parent on the page — so a finding named nothing in particular.
+        return `${stableSelector(parent)} > ${el.tagName.toLowerCase()}:nth-of-type(${nth})`;
       }
 
       function cssTimeToMsInPage(value: string): number {

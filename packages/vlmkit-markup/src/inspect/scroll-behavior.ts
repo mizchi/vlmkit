@@ -23,6 +23,7 @@
  *   vlmkit check scroll <html-or-url> [--json]
  */
 import { resolve } from "node:path";
+import { STABLE_SELECTOR_JS } from "../stable-selector.ts";
 import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
@@ -173,19 +174,7 @@ export function analyzeScrollBehavior(
 }
 
 const COLLECT_SCRIPT = (maxElements: number) => `(async () => {
-  function stableSelector(el) {
-    const id = el.getAttribute && el.getAttribute("id");
-    if (id) return "#" + CSS.escape(id);
-    const classes = el.classList ? Array.from(el.classList).slice(0, 3) : [];
-    if (classes.length > 0) {
-      const selector = el.tagName.toLowerCase() + classes.map((c) => "." + CSS.escape(c)).join("");
-      if (document.querySelectorAll(selector).length === 1) return selector;
-    }
-    const parent = el.parentElement;
-    if (!parent) return el.tagName.toLowerCase();
-    const siblings = Array.from(parent.children).filter((s) => s.tagName === el.tagName);
-    return el.tagName.toLowerCase() + ":nth-of-type(" + (siblings.indexOf(el) + 1) + ")";
-  }
+  ${STABLE_SELECTOR_JS}
   const raf2 = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   const box = (el) => {
     const b = el.getBoundingClientRect();

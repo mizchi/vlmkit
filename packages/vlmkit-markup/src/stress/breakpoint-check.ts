@@ -31,6 +31,7 @@
  *   vlmkit check breakpoints <html-or-url> --breakpoints 768,1024 --json
  */
 import { resolve } from "node:path";
+import { STABLE_SELECTOR_JS } from "../stable-selector.ts";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { extractBreakpoints } from "@mizchi/vlmkit-capture/viewport-discovery.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
@@ -334,14 +335,7 @@ export function deriveBreakpointIssues(results: BreakpointResult[]): BreakpointC
 }
 
 const collectStylesScript = (maxElements: number) => `((maxElements) => {
-  function stableSelector(el) {
-    const id = el.getAttribute && el.getAttribute("id");
-    if (id) return "#" + CSS.escape(id);
-    const parent = el.parentElement;
-    if (!parent) return el.tagName.toLowerCase();
-    const siblings = Array.from(parent.children).filter((item) => item.tagName === el.tagName);
-    return stableSelector(parent) + " > " + el.tagName.toLowerCase() + ":nth-of-type(" + (siblings.indexOf(el) + 1) + ")";
-  }
+  ${STABLE_SELECTOR_JS}
   const doc = document.scrollingElement || document.documentElement;
   const elements = [];
   for (const el of Array.from(document.querySelectorAll("body, body *")).slice(0, maxElements)) {

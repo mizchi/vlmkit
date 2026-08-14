@@ -27,6 +27,7 @@
  *   vlmkit check animation <html-or-url> --json --frames out/frames
  */
 import { mkdir, writeFile } from "node:fs/promises";
+import { STABLE_SELECTOR_JS } from "../stable-selector.ts";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
@@ -396,20 +397,7 @@ export function deriveAnimationIssues(
  * the dedupe between them silently fails.
  */
 const ANIMATION_HELPERS_JS = `
-  function stableSelector(el) {
-    if (!el || !el.tagName) return "(no target)";
-    const id = el.getAttribute && el.getAttribute("id");
-    if (id) return "#" + CSS.escape(id);
-    const classes = el.classList ? Array.from(el.classList).slice(0, 3) : [];
-    if (classes.length > 0) {
-      const selector = el.tagName.toLowerCase() + classes.map((c) => "." + CSS.escape(c)).join("");
-      if (document.querySelectorAll(selector).length === 1) return selector;
-    }
-    const parent = el.parentElement;
-    if (!parent) return el.tagName.toLowerCase();
-    const siblings = Array.from(parent.children).filter((item) => item.tagName === el.tagName);
-    return el.tagName.toLowerCase() + ":nth-of-type(" + (siblings.indexOf(el) + 1) + ")";
-  }
+  ${STABLE_SELECTOR_JS}
 
   function describeTiming(anim) {
     let timing = { duration: 0, delay: 0, iterations: 1, direction: "normal" };

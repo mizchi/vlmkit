@@ -35,6 +35,7 @@
  *   vlmkit check integrity <html-or-url> [--viewports 1280,768,375] [--json]
  */
 import { resolve } from "node:path";
+import { STABLE_SELECTOR_JS } from "../stable-selector.ts";
 import { pathToFileURL } from "node:url";
 import { PNG } from "pngjs";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
@@ -902,22 +903,6 @@ export function judgeAlignment(
 // ---------------------------------------------------------------------------
 // In-page collectors
 
-const STABLE_SELECTOR_FN = `
-  function stableSelector(el) {
-    const id = el.getAttribute && el.getAttribute("id");
-    if (id) return "#" + CSS.escape(id);
-    const classes = el.classList ? Array.from(el.classList).slice(0, 3) : [];
-    if (classes.length > 0) {
-      const selector = el.tagName.toLowerCase() + classes.map((c) => "." + CSS.escape(c)).join("");
-      if (document.querySelectorAll(selector).length === 1) return selector;
-    }
-    const parent = el.parentElement;
-    if (!parent) return el.tagName.toLowerCase();
-    const siblings = Array.from(parent.children).filter((item) => item.tagName === el.tagName);
-    return stableSelector(parent) + " > " + el.tagName.toLowerCase() + ":nth-of-type(" + (siblings.indexOf(el) + 1) + ")";
-  }
-`;
-
 /** Text blocks with the stacking metadata the collision exemptions need. */
 // ---------------------------------------------------------------------------
 // A13 — occluded text (z-index / paint-order cover)
@@ -965,7 +950,7 @@ export interface OcclusionCandidate {
 }
 
 export const COLLECT_OCCLUSIONS = `(() => {
-  ${STABLE_SELECTOR_FN}
+  ${STABLE_SELECTOR_JS}
   const SKIP = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE"]);
   const alphaOf = (color) => {
     const m = /rgba?\\(([^)]+)\\)/.exec(color || "");
@@ -1143,7 +1128,7 @@ export const COLLECT_INTEGRITY_TEXT = `(() => {
       return Math.max(0, Math.min((lh - ink) / 2, fontSize * 0.5));
     } catch { return 0; }
   };
-  ${STABLE_SELECTOR_FN}
+  ${STABLE_SELECTOR_JS}
   const SKIP = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE"]);
   const buckets = new Map();
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -1214,7 +1199,7 @@ export const COLLECT_INTEGRITY_TEXT = `(() => {
 })()`;
 
 export const COLLECT_CLIP_CANDIDATES = `(() => {
-  ${STABLE_SELECTOR_FN}
+  ${STABLE_SELECTOR_JS}
   const CLIPPING = /^(hidden|clip)$/;
   const out = [];
   for (const el of Array.from(document.querySelectorAll("body *"))) {
@@ -1262,7 +1247,7 @@ export const COLLECT_CLIP_CANDIDATES = `(() => {
 })()`;
 
 export const COLLECT_COLLAPSE_CANDIDATES = `(() => {
-  ${STABLE_SELECTOR_FN}
+  ${STABLE_SELECTOR_JS}
   const out = [];
   for (const el of Array.from(document.querySelectorAll("body *"))) {
     if (el.children.length === 0) continue;
@@ -1294,7 +1279,7 @@ export const COLLECT_COLLAPSE_CANDIDATES = `(() => {
 })()`;
 
 export const COLLECT_RESOURCES = `(() => {
-  ${STABLE_SELECTOR_FN}
+  ${STABLE_SELECTOR_JS}
   const brokenImages = [];
   for (const img of Array.from(document.images)) {
     const src = img.getAttribute("src") || "";
@@ -1311,7 +1296,7 @@ export const COLLECT_RESOURCES = `(() => {
 })()`;
 
 export const COLLECT_PROTRUSIONS = `(() => {
-  ${STABLE_SELECTOR_FN}
+  ${STABLE_SELECTOR_JS}
   const out = [];
   const hasAlpha = (bg) => {
     const m = (bg || "").match(/rgba?\\(([^)]+)\\)/);
@@ -1371,7 +1356,7 @@ export const COLLECT_PROTRUSIONS = `(() => {
 })()`;
 
 export const COLLECT_TEXT_CONTRAST = `(() => {
-  ${STABLE_SELECTOR_FN}
+  ${STABLE_SELECTOR_JS}
   const parseColor = (s) => {
     const m = (s || "").match(/rgba?\\(([^)]+)\\)/);
     if (!m) return null;
@@ -1483,7 +1468,7 @@ export const COLLECT_TEXT_CONTRAST = `(() => {
 })()`;
 
 export const COLLECT_ALIGN_GROUPS = `(() => {
-  ${STABLE_SELECTOR_FN}
+  ${STABLE_SELECTOR_JS}
   const groups = [];
   for (const parent of Array.from(document.querySelectorAll("body *"))) {
     if (groups.length >= 40) break;
