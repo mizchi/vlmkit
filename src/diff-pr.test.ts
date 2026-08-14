@@ -485,3 +485,74 @@ describe("a declared viewport with no baseline", () => {
     assert.doesNotMatch(md, /Not compared/);
   });
 });
+
+describe("a malformed flag", () => {
+  let cwd: string;
+
+  /**
+   * `diff-pr` and `baseline-cli` each had their own `getArg`:
+   *
+   *     const i = args.indexOf(`--${name}`);
+   *     if (i < 0 || i === args.length - 1) return undefined;
+   *     const v = args[i + 1];
+   *     return v.startsWith("--") ? undefined : v;
+   *
+   * which returns `undefined` for BOTH "flag absent" and "flag present but valueless" —
+   * so a malformed flag was indistinguishable from an omitted one and the command
+   * proceeded on its default. Measured: `diff-pr --from-dir cur --output` (no value)
+   * wrote its summary to `.vlmkit/runs/diff-pr/summary.md` and exited 0. In CI that is
+   * `--output "$UNSET_VAR"` putting the artifact where nobody looks.
+   *
+   * Core's `readFlag` already distinguished the two and throws. Both copies now use it,
+   * which also removes the duplication.
+   */
+  beforeAll(async () => {
+    cwd = await mkdtemp(join(tmpdir(), "vrt-diff-pr-flags-"));
+    await mkdir(join(cwd, "pages"), { recursive: true });
+    await writeFile(
+      join(cwd, "pages", "home.html"),
+      "<!doctype html><html><body style='margin:0;background:#0a0;height:200px'></body></html>",
+    );
+    await writeFile(join(cwd, "vlmkit.config.json"), JSON.stringify({
+      viewports: ["mobile"],
+      thresholds: { mobile: 0.01 },
+      baselineDir: ".vlmkit/baselines",
+      routes: [{ name: "home", url: `file://${join(cwd, "pages", "home.html")}` }],
+    }, null, 2));
+    assert.equal(cli(cwd, "pin").status, 0);
+  });
+
+  afterAll(async () => {
+    await rm(cwd, { recursive: true, force: true });
+  });
+
+  it("names the flag instead of falling back to a default", () => {
+    const r = cli(cwd, "--output");
+    assert.equal(r.status, 1, `a valueless --output must not be ignored:\n${r.stdout}${r.stderr}`);
+    assert.match(`${r.stdout}${r.stderr}`, /--output needs a value/);
+  });
+
+  it("says which flag it found instead, when the value is the next flag", () => {
+    // `--from-dir` carries a real value here, so `--output` is the only malformed flag.
+    // Pairing it with a second valueless flag reports whichever the code reads first
+    // (`--config` is read before `--output`), which is correct and not what this pins.
+    const r = cli(cwd, "--output", "--from-dir", "cur");
+    assert.equal(r.status, 1);
+    assert.match(`${r.stdout}${r.stderr}`, /--output needs a value, got the next flag --from-dir/);
+  });
+
+  it("reports a usage error as one line, with no stack trace", () => {
+    // The guard used to be `console.error(err)`, which prints the whole Error. The
+    // message already names the flag and the fix.
+    const r = cli(cwd, "--output");
+    const out = `${r.stdout}${r.stderr}`;
+    assert.doesNotMatch(out, /at .*diff-pr/, `a stack trace buries the message:\n${out}`);
+    assert.ok(out.trim().split("\n").length <= 2, `expected one line, got:\n${out}`);
+  });
+
+  it("still accepts a well-formed run", () => {
+    const r = cli(cwd, "--output", "out-ok");
+    assert.equal(r.status, 0, `${r.stdout}${r.stderr}`);
+    assert.match(r.stdout, /out-ok/);
+  });
+});

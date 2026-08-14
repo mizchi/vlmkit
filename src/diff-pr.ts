@@ -30,6 +30,8 @@
  */
 
 import { spawnSync } from "node:child_process";
+import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { existsSync } from "node:fs";
 import { copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
@@ -144,13 +146,6 @@ interface PerRouteResult {
   };
 }
 
-function getArg(args: string[], name: string): string | undefined {
-  const i = args.indexOf(`--${name}`);
-  if (i < 0 || i === args.length - 1) return undefined;
-  const v = args[i + 1];
-  return v.startsWith("--") ? undefined : v;
-}
-
 function pctStr(n: number): string {
   return `${(n * 100).toFixed(2)}%`;
 }
@@ -178,14 +173,14 @@ interface FileSourceFlags {
 }
 
 function fileSourceFlags(args: string[]): FileSourceFlags {
-  const fromDir = getArg(args, "from-dir");
-  const fromPng = getArg(args, "from-png");
+  const fromDir = readFlag(args, "from-dir");
+  const fromPng = readFlag(args, "from-png");
   return {
     active: Boolean(fromDir || fromPng),
     fromDir,
     fromPng,
-    routeOverride: getArg(args, "route"),
-    viewportOverride: getArg(args, "viewport"),
+    routeOverride: readFlag(args, "route"),
+    viewportOverride: readFlag(args, "viewport"),
   };
 }
 
@@ -332,7 +327,7 @@ async function pinFromFiles(
 
 async function cmdPin(args: string[]): Promise<void> {
   const cwd = process.cwd();
-  const configPath = findConfigPath(cwd, getArg(args, "config"));
+  const configPath = findConfigPath(cwd, readFlag(args, "config"));
   if (!configPath) {
     console.error(`${RED}error:${RESET} no vlmkit.config.json found (and --config not given)`);
     process.exit(1);
@@ -399,13 +394,13 @@ async function cmdPin(args: string[]): Promise<void> {
 
 async function cmdRun(args: string[]): Promise<number> {
   const cwd = process.cwd();
-  const configPath = findConfigPath(cwd, getArg(args, "config"));
+  const configPath = findConfigPath(cwd, readFlag(args, "config"));
   if (!configPath) {
     console.error(`${RED}error:${RESET} no vlmkit.config.json found (and --config not given)`);
     return 1;
   }
   const config = loadDiffPrConfig(configPath);
-  const outputDir = resolve(cwd, getArg(args, "output") ?? ".vlmkit/runs/diff-pr");
+  const outputDir = resolve(cwd, readFlag(args, "output") ?? ".vlmkit/runs/diff-pr");
   await mkdir(outputDir, { recursive: true });
 
   // Optional approval manifest — suppresses both visual (existing
@@ -1008,17 +1003,17 @@ async function postPrComment(opts: PostPrOptions): Promise<number> {
 }
 
 async function cmdPost(args: string[]): Promise<number> {
-  const prRef = getArg(args, "pr");
+  const prRef = readFlag(args, "pr");
   if (!prRef) {
     console.error(`${RED}error:${RESET} --pr <ref> is required (e.g. owner/repo#123 or 123 inside the repo)`);
     return 1;
   }
   const cwd = process.cwd();
-  const summaryFlag = getArg(args, "summary");
+  const summaryFlag = readFlag(args, "summary");
   const summaryPath = summaryFlag
     ? resolve(cwd, summaryFlag)
     : resolve(cwd, ".vlmkit/runs/diff-pr/summary.md");
-  const marker = getArg(args, "marker") ?? "vrt-diff-pr-summary";
+  const marker = readFlag(args, "marker") ?? "vrt-diff-pr-summary";
   return postPrComment({ prRef, summaryPath, marker });
 }
 
@@ -1092,10 +1087,10 @@ async function main(argv = process.argv.slice(2)) {
 
 
 if (isCliEntry(import.meta.url, "diff-pr")) {
-  main().catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+  // `handleCliError`, not `console.error(err)`: `readFlag` throws `UsageError` for a
+  // malformed flag, and that message already names the flag and the fix — a stack trace
+  // only buries it.
+  main().catch(handleCliError);
 }
 
 export { main };
