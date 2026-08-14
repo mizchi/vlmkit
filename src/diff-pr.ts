@@ -30,6 +30,7 @@
  */
 
 import { spawnSync } from "node:child_process";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { existsSync } from "node:fs";
 import { copyFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -1029,9 +1030,8 @@ async function main(argv = process.argv.slice(2)) {
   if (code !== 0) process.exit(code);
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "diff-pr" || (process.argv[1]
-  && new URL(import.meta.url).pathname === process.argv[1]);
-if (isCliEntry) {
+
+if (isCliEntry(import.meta.url, "diff-pr")) {
   main().catch((err) => {
     console.error(err);
     process.exit(1);

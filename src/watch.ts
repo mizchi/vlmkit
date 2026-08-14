@@ -19,6 +19,7 @@
  */
 
 import { watch as fsWatch } from "node:fs";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve, relative} from "node:path";
 import { STATE_DIR, resolveStatePath } from "@mizchi/vlmkit-core/project-config.ts";
@@ -352,9 +353,8 @@ function stripAnsi(s: string): string {
   return s.replace(/\x1b\[[0-9;]*m/g, "");
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "watch" || (process.argv[1]
-  && new URL(import.meta.url).pathname === process.argv[1]);
-if (isCliEntry) {
+
+if (isCliEntry(import.meta.url, "watch")) {
   runWatch(process.argv.slice(2)).catch((err) => {
     console.error(err);
     process.exit(1);

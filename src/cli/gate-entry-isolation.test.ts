@@ -107,6 +107,15 @@ function isCliEntryModule(source: string): boolean {
     || /isCliEntry\(\s*import\.meta\.url/.test(source);
 }
 
+/**
+ * Comments removed, so the guard check below reads code rather than prose. Crude on
+ * purpose: it does not understand a `//` inside a string literal, which is fine because
+ * the only thing it feeds is a search for two specific expressions.
+ */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\\])\/\/[^\n]*/g, "$1");
+}
+
 /** Every module statically reachable from `entry`, with the path that got there. */
 function reachableFrom(entry: string): Map<string, string[]> {
   const seen = new Map<string, string[]>([[entry, [entry]]]);
@@ -165,13 +174,21 @@ describe("gate plugins do not statically reach CLI-entry modules", () => {
     assert.ok(files.length > 200, `git ls-files returned ${files.length} — the listing is broken, not the code`);
     const offenders: string[] = [];
     for (const rel of files) {
-      // `cli-entry.ts` quotes the bad spelling in its own docstring, which is where the
-      // explanation belongs; tests may quote it too.
-      if (rel.endsWith("cli-entry.ts") || rel.endsWith(".test.ts")) continue;
-      const source = readFileSync(resolve(REPO_ROOT, rel), "utf8");
-      // Both halves of the guard in one statement — `process.argv[1]` reached by a
-      // suffix comparison — which is the shape, in every spelling it appeared in.
-      if (/process\.argv\[1\][^;]{0,200}?\.endsWith\(/s.test(source)) offenders.push(rel);
+      if (rel.endsWith(".test.ts")) continue;
+      // Comments stripped first, so a file that *explains* the bad spelling is not
+      // flagged for naming it — `cli-entry.ts` documents both wrong forms, and
+      // `workflow.ts` says which one it replaced. Excluding those by filename would have
+      // worked today and gone stale the moment a third file explained it.
+      const source = stripComments(readFileSync(resolve(REPO_ROOT, rel), "utf8"));
+      // Two wrong spellings, both measured rather than reasoned about:
+      //   `argv[1].endsWith("x.ts")` — a suffix match; `node dist/png-diff.mjs` printed
+      //   nothing because the guard tested for `png-diff.ts`.
+      //   `new URL(import.meta.url).pathname === argv[1]` — a URL pathname is
+      //   percent-encoded and argv is not, so any path with a space fails.
+      const suffixMatch = /process\.argv\[1\][^;]{0,200}?\.endsWith\(/s.test(source);
+      const urlPathname = /new URL\(import\.meta\.url\)\.pathname\s*===\s*process\.argv\[1\]/s.test(source)
+        || /process\.argv\[1\]\s*===\s*new URL\(import\.meta\.url\)\.pathname/s.test(source);
+      if (suffixMatch || urlPathname) offenders.push(rel);
     }
     assert.deepEqual(
       offenders,

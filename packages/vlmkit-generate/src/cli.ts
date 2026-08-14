@@ -203,6 +203,18 @@ if (isDirectRun()) {
   });
 }
 
+/**
+ * Deliberately not `isCliEntry` from `@mizchi/vlmkit-core/plugin/cli-entry.ts`: this
+ * package does not depend on core, and a ten-line guard is not worth adding one to a
+ * published dependency graph. The semantics match — core's version realpaths both sides
+ * too, a change this spelling is what prompted — so the two cannot disagree about which
+ * module is the entry.
+ *
+ * The `realpathSync` is load-bearing, not defensive. npm installs this package's `bin`
+ * as a symlink, so `argv[1]` is `node_modules/.bin/vlmkit-generate` while `import.meta.url` is the
+ * real `dist/cli.mjs`; comparing resolved-but-not-realpathed paths returns false and the
+ * CLI silently does nothing.
+ */
 function isDirectRun(): boolean {
   if (!process.argv[1]) return false;
   try {

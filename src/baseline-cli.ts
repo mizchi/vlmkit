@@ -53,6 +53,7 @@
  */
 
 import { existsSync } from "node:fs";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { mkdir, readFile, rename, rm, readdir, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
@@ -423,9 +424,8 @@ async function main(argv = process.argv.slice(2)): Promise<void> {
   }
 }
 
-const isCliEntry = process.env.__VLMKIT_DISPATCHER_LEAF__ === "baseline-cli" || (process.argv[1]
-  && new URL(import.meta.url).pathname === process.argv[1]);
-if (isCliEntry) {
+
+if (isCliEntry(import.meta.url, "baseline-cli")) {
   main().catch((err) => {
     console.error(err);
     process.exit(1);
