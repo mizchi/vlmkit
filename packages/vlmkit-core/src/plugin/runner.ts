@@ -19,6 +19,8 @@
 
 import { relative } from "node:path";
 import { UsageError } from "../cli-error.ts";
+import { GATE_EXIT_HELP } from "../gate-exit.ts";
+import { authStateNotice, resetAuthStateNotice } from "../auth-state.ts";
 import type { LedgerWrite } from "../run-ledger.ts";
 import {
   LEDGER_RELATIVE_PATH,
@@ -235,6 +237,10 @@ export async function runGate<Report, Options>(
     ...(shared.ledgerPath ? { path: shared.ledgerPath } : {}),
     ...(shared.noLedger ? { disabled: true } : {}),
   });
+  // Same reason, same place: `withAuthState` records the session it applied from
+  // inside the measurement, and a stale value from a previous gate in the same
+  // process would make this one claim an authentication it never used.
+  resetAuthStateNotice();
 
   const tParse = performance.now();
   const parsed = gate.parse(gateArgv, ctx);
@@ -413,7 +419,11 @@ export function formatGateHelp(gate: AnyGateDefinition): string {
   lines.push("");
   lines.push("Shared options (every gate):");
   lines.push("  --json                  Print the JSON report");
-  lines.push("  --advisory              Print findings but exit 0 (default: a suspect exits 1)");
+  // `GATE_EXIT_HELP`, not a copy of it. The constant exists so every gate documents
+  // the exit-code contract identically, and this — its only call site — held a
+  // byte-identical duplicate instead, which is precisely the divergence it was
+  // introduced to prevent.
+  lines.push(GATE_EXIT_HELP);
   lines.push("  --rule <ref>=<setting>  Re-tune or disable one rule (off|suspect|warn|info), repeatable");
   lines.push("  --rules                 List this gate's rules and exit");
   lines.push("  --timing                Add the per-phase ms breakdown to the output");
@@ -602,6 +612,12 @@ export async function runGateCli<Report, Options>(
     if (unpinned) out(unpinned);
     const created = newOutputNotice(outcome.ledgerWrite, options.cwd ?? process.cwd());
     if (created) out(created);
+    // Whether the measurement was authenticated is provenance too, and it is the
+    // piece a reader cannot recover from the report: `VLMKIT_STORAGE_STATE` puts no
+    // flag on the command line, so without this line "the dashboard" and "the login
+    // wall it redirected to" look identical.
+    const auth = authStateNotice();
+    if (auth) out(`  ${DIM}${auth}${RESET}`);
   }
   // Under --json the breakdown is already inside the envelope; appending it to
   // stdout as prose would put non-JSON on a stream a client is parsing.
@@ -635,9 +651,3 @@ export function formatGateTiming(outcome: GateOutcome): string {
   ].join("\n");
 }
 
-/** One-line verdict for aggregate runners (`verify markup`, `batch`, MCP). */
-export function formatGateVerdict(outcome: GateOutcome): string {
-  const state = outcome.verdict === "pass" ? `${GREEN}ok${RESET}` : `${RED}${outcome.counts.suspect} suspect${RESET}`;
-  const warns = outcome.counts.warn > 0 ? `, ${outcome.counts.warn} warn` : "";
-  return `${outcome.command}: ${state}${warns}`;
-}
