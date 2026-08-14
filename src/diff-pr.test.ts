@@ -486,6 +486,82 @@ describe("a declared viewport with no baseline", () => {
   });
 });
 
+describe("a declared policy whose run throws", () => {
+  let cwd: string;
+
+  /**
+   * The same false green as the unpinned viewport above, one level up: the media-variants
+   * and cross-browser blocks caught their error, logged a yellow line, and left the
+   * result `undefined` — and `undefined` reads as "not declared":
+   *
+   *     const mvFailed = mediaVariantsResult ? !mediaVariantsResult.pass : false;
+   *
+   * Measured before the fix on exactly this setup — `mediaVariants` declared, a regular
+   * file sitting where the gate's output directory goes so `mkdir` throws EEXIST: the
+   * route printed `home pass desktop=0.00%`, the run printed `PASS`, it exited 0, and
+   * `summary.md` was byte-identical to a run where the policy had passed. The artifact
+   * that gets pasted into the PR did not name media-variants at all.
+   *
+   * The EEXIST collision is a stand-in for the real trigger — a browser that will not
+   * launch on a minimal CI runner, which is the case the cross-browser block's own
+   * comment anticipates. What is under test is the verdict, not the cause.
+   */
+  beforeAll(async () => {
+    cwd = await mkdtemp(join(tmpdir(), "vrt-diff-pr-policy-error-"));
+    await mkdir(join(cwd, "pages"), { recursive: true });
+    await writeFile(
+      join(cwd, "pages", "home.html"),
+      "<!doctype html><html><body style='margin:0;background:#0a0;height:400px'></body></html>",
+    );
+    await writeFile(join(cwd, "vlmkit.config.json"), JSON.stringify({
+      viewports: ["desktop"],
+      thresholds: { desktop: 0.01 },
+      baselineDir: ".vlmkit/baselines",
+      // One variant, so the run is quick; `print` needs no extra engine.
+      mediaVariants: { variants: ["print"], maxSuspects: 5, maxWarns: 5 },
+      routes: [{ name: "home", url: `file://${join(cwd, "pages", "home.html")}` }],
+    }, null, 2));
+    const pin = cli(cwd, "pin");
+    assert.equal(pin.status, 0, `seed pin failed: ${pin.stderr}`);
+  });
+
+  afterAll(async () => {
+    await rm(cwd, { recursive: true, force: true });
+  });
+
+  it("fails the run and names the policy, in the terminal and in the markdown", async () => {
+    // A file where the gate wants a directory.
+    await mkdir(join(cwd, "out-err", "home"), { recursive: true });
+    await writeFile(join(cwd, "out-err", "home", "media-variants"), "not a directory\n");
+
+    const r = cli(cwd, "--output", "out-err");
+    assert.equal(r.status, 1, `an errored policy must not pass:\n${r.stdout}`);
+    assert.match(r.stdout, /not evaluated: media-variants \(errored\)/);
+    assert.match(r.stdout, /declared policy run\(s\) errored and produced no verdict/);
+    // The pixel comparison still happened and still reports, so this is not a hard abort.
+    assert.match(r.stdout, /desktop=0\.00%/);
+
+    const md = await readFile(join(cwd, "out-err", "summary.md"), "utf-8");
+    assert.match(md, /Status: \*\*FAIL\*\*/);
+    assert.match(md, /## Not evaluated — the policy errored/);
+    assert.match(md, /- `home` — \*\*media-variants\*\*: .*EEXIST/);
+    // Not a pixel breach and not a media-variant verdict: there is no verdict.
+    assert.doesNotMatch(md, /Worst offenders/);
+    assert.doesNotMatch(md, /## Media-variant failures/);
+  });
+
+  it("still passes when the policy runs, so the fix does not just fail everything", async () => {
+    // The control. `maxWarns: 5` above is deliberately loose — what is asserted is that a
+    // policy which *produced a verdict* is not caught by the new branch.
+    const r = cli(cwd, "--output", "out-ok");
+    assert.equal(r.status, 0, `a run whose policy completed must pass:\n${r.stdout}`);
+    assert.match(r.stdout, /\[mv suspect=/, "the policy must actually have run");
+    assert.doesNotMatch(r.stdout, /not evaluated/);
+    const md = await readFile(join(cwd, "out-ok", "summary.md"), "utf-8");
+    assert.doesNotMatch(md, /Not evaluated — the policy errored/);
+  });
+});
+
 describe("a malformed flag", () => {
   let cwd: string;
 

@@ -121,6 +121,25 @@ interface PerRouteResult {
    */
   unpinned?: string[];
   /**
+   * Declared policies that threw instead of producing a verdict.
+   *
+   * Both the media-variants and cross-browser blocks used to `catch` and only
+   * `console.log` a yellow line, leaving their result `undefined` — and `undefined`
+   * reads as "not declared", which is the same as "nothing to fail on":
+   * `mvFailed = mediaVariantsResult ? !mediaVariantsResult.pass : false`.
+   *
+   * Measured with `mediaVariants` declared and a file sitting where the gate's output
+   * directory should be, so `mkdir` threw: the route printed `home pass desktop=0.00%`,
+   * the run printed `PASS`, it exited 0, and `summary.md` — the artifact that gets
+   * pasted into the PR — did not mention media-variants at all. The policy the config
+   * asked for simply vanished, and the only trace was a warning line in a log nobody
+   * reads on a green build.
+   *
+   * Same shape as `unpinned`: not a breach, worse — nothing was measured — so it is
+   * reported as its own thing and fails the route.
+   */
+  policyErrors?: Array<{ policy: string; message: string }>;
+  /**
    * Media-variants emulation summary. Run once per route at the
    * default viewport when `mediaVariants` is declared in config.
    */
@@ -505,6 +524,8 @@ async function cmdRun(args: string[]): Promise<number> {
       const perVp: PerViewportResult[] = [];
       /** Declared, but nothing pinned to compare against. Fails the route below. */
       const unpinned: string[] = [];
+      /** Declared, but the measurement threw. Also fails the route below. */
+      const policyErrors: Array<{ policy: string; message: string }> = [];
       for (const vp of viewports) {
         const baselinePath = join(baselineDir, `${vp.label}.png`);
         if (!existsSync(baselinePath)) {
@@ -653,7 +674,10 @@ async function cmdRun(args: string[]): Promise<number> {
             pass: suspectCount <= maxSuspects && warnCount <= maxWarns,
           };
         } catch (err) {
-          console.log(`  ${YELLOW}media-variants error (${route.name}): ${String(err)}${RESET}`);
+          // Recorded, not just logged: leaving `mediaVariantsResult` undefined made a
+          // declared policy that crashed indistinguishable from one never declared.
+          console.log(`  ${RED}media-variants error (${route.name}): ${String(err)}${RESET}`);
+          policyErrors.push({ policy: "media-variants", message: String(err) });
         }
       }
 
@@ -693,7 +717,8 @@ async function cmdRun(args: string[]): Promise<number> {
             pass: overCount <= maxOver && !skipFails,
           };
         } catch (err) {
-          console.log(`  ${YELLOW}cross-browser error (${route.name}): ${String(err)}${RESET}`);
+          console.log(`  ${RED}cross-browser error (${route.name}): ${String(err)}${RESET}`);
+          policyErrors.push({ policy: "cross-browser", message: String(err) });
         }
       }
 
@@ -702,8 +727,10 @@ async function cmdRun(args: string[]): Promise<number> {
       const xbFailed = crossBrowserResult ? !crossBrowserResult.pass : false;
       // `some` on an empty array is false, so without this a route with no comparable
       // viewport reports pass. An unpinned viewport is not "within threshold"; it was
-      // never measured.
-      const failed = visualFailed || mvFailed || xbFailed || unpinned.length > 0;
+      // never measured. Neither is a policy that threw — `mvFailed`/`xbFailed` are
+      // false for an absent result, and an absent result is exactly what a crash left.
+      const failed = visualFailed || mvFailed || xbFailed
+        || unpinned.length > 0 || policyErrors.length > 0;
       const status = failed ? `${RED}FAIL${RESET}` : `${GREEN}pass${RESET}`;
       const breakdown = perVp.map((v) => {
         const tag = v.pass ? GREEN : RED;
@@ -723,10 +750,16 @@ async function cmdRun(args: string[]): Promise<number> {
       const unpinnedSuffix = unpinned.length > 0
         ? ` ${RED}not compared: ${unpinned.join(", ")} (no baseline — \`vlmkit diff-pr pin\`)${RESET}`
         : "";
-      console.log(`  ${route.name.padEnd(20)} ${status}  ${breakdown}${unpinnedSuffix}${mvSuffix}${xbSuffix}`);
+      // Same reasoning as `unpinnedSuffix`: a suffix that says nothing leaves the reader
+      // to infer from a missing `[mv …]` tag that a declared policy crashed.
+      const erroredSuffix = policyErrors.length > 0
+        ? ` ${RED}not evaluated: ${policyErrors.map((e) => e.policy).join(", ")} (errored)${RESET}`
+        : "";
+      console.log(`  ${route.name.padEnd(20)} ${status}  ${breakdown}${unpinnedSuffix}${erroredSuffix}${mvSuffix}${xbSuffix}`);
       results.push({
         route, viewports: perVp, failed,
         ...(unpinned.length > 0 ? { unpinned } : {}),
+        ...(policyErrors.length > 0 ? { policyErrors } : {}),
         mediaVariants: mediaVariantsResult,
         crossBrowser: crossBrowserResult,
       });
@@ -748,8 +781,10 @@ async function cmdRun(args: string[]): Promise<number> {
   console.log(`${DIM}Summary written to ${summaryPath}${RESET}`);
   if (anyFail) {
     const unpinnedCount = results.reduce((n, r) => n + (r.unpinned?.length ?? 0), 0);
+    const erroredCount = results.reduce((n, r) => n + (r.policyErrors?.length ?? 0), 0);
     console.log(`${RED}${BOLD}FAIL${RESET} — at least one route over threshold or missing baseline.`
-      + (unpinnedCount > 0 ? ` ${unpinnedCount} declared viewport(s) had no baseline and were not compared.` : ""));
+      + (unpinnedCount > 0 ? ` ${unpinnedCount} declared viewport(s) had no baseline and were not compared.` : "")
+      + (erroredCount > 0 ? ` ${erroredCount} declared policy run(s) errored and produced no verdict.` : ""));
     return 1;
   }
   console.log(`${GREEN}${BOLD}PASS${RESET} — all routes within threshold.`);
@@ -837,6 +872,24 @@ export function buildMarkdownSummary(
     lines.push("");
     lines.push("Pin them with `vlmkit diff-pr pin` (or `pin <route>` for one), or drop the "
       + "viewport from `viewports` if it is no longer wanted.");
+  }
+
+  const erroredRoutes = results.filter((r) => (r.policyErrors ?? []).length > 0);
+  if (erroredRoutes.length > 0) {
+    // The old code left these out of the markdown entirely, so the PR comment on a run
+    // whose media-variants gate crashed was byte-identical to one where it passed.
+    lines.push("");
+    lines.push("## Not evaluated — the policy errored");
+    lines.push("");
+    lines.push("These policies are declared in config and their run threw, so they "
+      + "produced no verdict. That is why the run failed; it is not a pixel breach, and "
+      + "it is not a clean result either.");
+    lines.push("");
+    for (const r of erroredRoutes) {
+      for (const e of r.policyErrors!) {
+        lines.push(`- \`${r.route.name}\` — **${e.policy}**: ${e.message.replace(/\s+/g, " ").slice(0, 300)}`);
+      }
+    }
   }
 
   // Surface the worst visual offenders for quick eyeballing.
