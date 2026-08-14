@@ -5,7 +5,7 @@
  * MoonBit ABI); MoonBit owns the cell-score formula, default grid
  * geometry, threshold counting, and top-N ranking.
  */
-import { callMarkupCoreJson, finiteOr, intOr, runMarkupCore } from "./markup-core-runtime.ts";
+import { callMarkupCoreJson, finiteOr, intOr } from "./markup-core-runtime.ts";
 
 export interface LandscapeGrid {
   cols: number;
@@ -69,20 +69,6 @@ export function computeLandscapeDefaultGrid(width: number, height: number): Land
     width: intOr(width),
     height: intOr(height),
   });
-}
-
-export function computeLandscapeClampByte(value: number): number {
-  // Still positional, deliberately: one argument of one type, so there is no wiring
-  // bug available to make and a struct would buy nothing.
-  const out = runMarkupCore([
-    "landscape-clamp-byte",
-    String(finiteOr(value)),
-  ]);
-  const parsed = Number(out);
-  if (!Number.isInteger(parsed)) {
-    throw new Error(`markup-core landscape-clamp-byte returned non-integer: ${out}`);
-  }
-  return parsed;
 }
 
 export function computeLandscapeCellScore(baseline: LandscapeCellStat, current: LandscapeCellStat): number {

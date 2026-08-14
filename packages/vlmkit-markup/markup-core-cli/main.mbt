@@ -457,8 +457,6 @@ fn main_err() -> Unit raise {
       let rows = @core.landscape_default_grid_rows(w, h)
       println("\{cols}|\{rows}")
     }
-    ["landscape-clamp-byte", value] =>
-      println(@core.landscape_clamp_byte(parse_double(value)).to_string())
     [
       "landscape-cell-score",
       r1,
@@ -724,7 +722,6 @@ fn is_command(value : String) -> Bool {
   value == "ui-contract-required-state-issue-ids" ||
   value == "ui-contract-expected-scrollport-issue-ids" ||
   value == "landscape-default-grid" ||
-  value == "landscape-clamp-byte" ||
   value == "landscape-cell-score" ||
   value == "landscape-cell-hex" ||
   value == "landscape-diff-summary" ||

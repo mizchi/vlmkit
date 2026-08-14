@@ -49,7 +49,7 @@ Measured before changing anything:
 The shape is `run_markup_core("cmd", "a\tb\tc")`, dispatched by
 `match args { ["cmd", a, b, c, …] }` in **both** `markup-core-api/main.mbt` (the
 direct-JS entry point) and `markup-core-cli/main.mbt` (the spawned one). The two
-tables carry the same 61 commands. Nothing checked that they stayed in step until
+tables carry the same 60 commands. Nothing checked that they stayed in step until
 `src/markup-core-dispatch.test.ts`, which compares them — see "Not done" for what
 that test does and does not cover.
 
@@ -327,7 +327,7 @@ Three habits that keep such a handler honest:
   change with its own risk, and the two paths coexist without interacting. The two
   tables are now checked for drift (`src/markup-core-dispatch.test.ts`): command
   names in full, behaviour on a sample chosen for shape. Full behavioural
-  equivalence across 61 commands would need a fixture corpus, not a test.
+  equivalence across 60 commands would need a fixture corpus, not a test.
 
   That test also documented a cost the design doc had missed: the direct entry
   point takes one tab-joined string, so an **empty argument is unrepresentable** —
