@@ -621,6 +621,21 @@ suppression works per *rule* instead of per whole gate.
   verbatim `sourceToUrl`, so the collapse is behaviour-preserving and there is now one
   definition to be wrong in.
 
+- **One malformed `--mask` selector silently disabled every mask after it.** The masks
+  went in as a single stylesheet, one `sel { visibility: hidden !important; }` line each,
+  and CSS error recovery on a bad selector consumes until it can resynchronize — which
+  eats the following rules. Measured in a real browser with `[".a", ".b:not(", ".c"]`: the
+  browser kept exactly one rule, `.a`, and both `.b` **and** `.c` were left visible, while
+  the CLI printed all three under `Mask: …` as applied. A stray paren of the kind a shell
+  quote produces was enough. Now one style tag per selector, and each is validated with
+  `querySelectorAll` in the page. Invalid CSS is reported once (page-independent, and a
+  user error to fix); "valid but matched nothing" is reported only for a selector that
+  matched nothing on *any* page, since a mask may legitimately target a region that exists
+  on one route only. Warned rather than failed: unlike the false greens above, an unmasked
+  dynamic region makes the diff *fail*, and the verdict stays truthful — it turns quiet
+  only if the operator answers by raising the threshold, which is what the warning exists
+  to prevent.
+
 - **`diff-pr` reported a clean route when a declared policy crashed.** The media-variants
   and cross-browser blocks each caught their error, logged a warning, and left their
   result `undefined` — and `undefined` reads as "not declared in config", which gates

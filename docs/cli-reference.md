@@ -38,7 +38,10 @@ for options.
 - **2-stage AI pipeline** — VLM (image → structured diff) + LLM (diff → CSS fix)
 - **Migration VRT** — compare HTML before/after across responsive viewports
 - **Snapshot** — URL-based multi-viewport capture with baseline diff
-- **Mask** — selector-based masking for dynamic content (animations, counters)
+- **Mask** — selector-based masking for dynamic content (animations, counters). Each
+  `--mask` selector is validated in the page and injected on its own, so a malformed one
+  cannot take the others with it, and the run warns about any that were invalid CSS or
+  matched no element anywhere
 - **Crater integration** — lightweight prescanner via BiDi (1.66x speedup,
   0% false positive) plus a layout-only JS/WASM backend.
 - **Markup-assistance toolkit** (10+ commands): build from screenshot, theme-parity,

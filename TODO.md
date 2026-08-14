@@ -1124,6 +1124,19 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     `CI=1` が入るので、**ローカルの挙動を assert しながら CI の挙動で走る**状態だった。
     両方向を明示的に pin した。
 
+**パターン2の変種 — 「適用したと表示するが適用されていない」:**
+
+- [x] **`--mask` の1つが不正なセレクタだと、それ以降の mask が全部無効になる**(`6a49a96`)
+  - 全 mask を1つの stylesheet に `sel { visibility: hidden !important; }` で並べていた。
+    CSS のエラー回復は不正セレクタから**再同期できる位置まで消費する**ので、後続のルールも食う。
+  - 実測(実ブラウザ、`[".a", ".b:not(", ".c"]`): ブラウザが保持したルールは **`.a` の1つだけ**、
+    `.b` と `.c` の**両方**が visible。シェルのクォートで括弧が1つ混ざれば起きる。
+    その間 CLI は `Mask: .a, .b:not(, .c` と**3つ全部適用したかのように**表示する。
+  - セレクタごとに style tag を分け、`querySelectorAll` で page 内検証するようにした。
+  - **warn に留めた**(上の false green 群と違って害の向きが逆): mask が効かないと
+    dynamic な領域が diff に入って**落ちる** = 声が大きい。静かになるのは
+    「オペレータが threshold を上げて対処したとき」で、その一手を防ぐための warn。
+
 **残した重複(まだ同期していて実害がない)**: `determineMigrationSubagentExitStatus` /
 `determineSnapshotReportEvaluationExitStatus`(566文字が同一)、`overlapArea` /
 `intersectionArea`。byte-identical な重複は「まだ分岐していない」= 将来のリスクであって
