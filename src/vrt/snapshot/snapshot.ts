@@ -340,11 +340,14 @@ async function runStability(options: {
   }
   console.log();
 
+  // Returned, not assigned: a helper that reaches for `process.exitCode` fails the
+  // whole process, including a test runner that called it to check this very branch.
   if (options.failAboveRate !== undefined && report.overallFalsePositiveRate > options.failAboveRate) {
     console.log(`  ${RED}FP rate ${(report.overallFalsePositiveRate * 100).toFixed(2)}% exceeds --fail-above-rate ${(options.failAboveRate * 100).toFixed(2)}%${RESET}`);
     console.log();
-    process.exitCode = 1;
+    return 1;
   }
+  return 0;
 }
 
 async function runStabilityHistory(options: {
@@ -446,21 +449,47 @@ async function runDiffFlipbook(options: {
   console.log();
 }
 
-async function main() {
-  const cliArgs = process.argv.slice(2);
+/**
+ * `vlmkit snapshot` end to end.
+ *
+ * Exported, argv-taking, exit-code-returning — the same shape every gate has, and
+ * for the same three reasons. This was a bare `main()` reading `process.argv` and
+ * assigning `process.exitCode` until v7, which made 318 statements of a shipped
+ * command reachable only by spawning a subprocess:
+ *
+ *   1. **argv is an argument**, so a caller can drive a mode without building a
+ *      command line and re-parsing it.
+ *   2. **the exit code is RETURNED**, never assigned. A test that ran this
+ *      in-process would otherwise inherit the failure — `process.exitCode` is the
+ *      whole process's, and a snapshot that legitimately reports a regression
+ *      would fail the test suite that asked it to.
+ *   3. **cwd is an argument**, because `process.chdir` is process-wide and vitest
+ *      runs files in shared workers. A test needing a temp directory cannot use it
+ *      without corrupting whatever runs alongside.
+ */
+export async function runSnapshotCli(
+  cliArgs: readonly string[],
+  options: { cwd?: string } = {},
+): Promise<number> {
   if (cliArgs.length === 0 || cliArgs.includes("--help") || cliArgs.includes("-h") || cliArgs.includes("help")) {
     console.log(formatSnapshotUsage());
-    process.exit(cliArgs.length === 0 ? 1 : 0);
+    return cliArgs.length === 0 ? 1 : 0;
   }
 
-  const cwd = process.cwd();
-  const { config, configPath } = await loadSnapshotConfigForCli(cliArgs, cwd);
-  const parsed = parseSnapshotCliArgs(cliArgs, config, cwd);
-  const outputDir = resolve(parsed.outputDir);
+  const cwd = options.cwd ?? process.cwd();
+  const { config, configPath } = await loadSnapshotConfigForCli([...cliArgs], cwd);
+  const parsed = parseSnapshotCliArgs([...cliArgs], config, cwd);
+  // Against `cwd`, not the process's. The parser already resolves its DEFAULT
+  // against cwd (`${cwd}/test-results/snapshots`) while an explicit `--output`
+  // arrives as written, so a bare `resolve()` honoured the cwd for one and ignored
+  // it for the other. Invisible while cwd was always `process.cwd()`; a real
+  // inconsistency the moment it became a parameter, and `resolve` is a no-op on the
+  // absolute default either way.
+  const outputDir = resolve(cwd, parsed.outputDir);
 
   if (parsed.mode === "approve") {
     await approve({ outputDir, labels: parsed.labels, configPath });
-    return;
+    return 0;
   }
 
   if (parsed.mode === "fix-prompt") {
@@ -470,7 +499,7 @@ async function main() {
       fixPrompt: parsed.fixPrompt!,
       configPath,
     });
-    return;
+    return 0;
   }
 
   if (parsed.mode === "flipbook") {
@@ -481,7 +510,7 @@ async function main() {
       flipbookOutDir: parsed.flipbook!.outDir,
       configPath,
     });
-    return;
+    return 0;
   }
 
   if (parsed.mode === "stability-history") {
@@ -489,7 +518,7 @@ async function main() {
       reportPaths: parsed.urls,
       outPath: parsed.stabilityHistory?.outPath,
     });
-    return;
+    return 0;
   }
 
   const { backend: captureBackend, source: backendSource } = resolveCaptureBackend({
@@ -497,7 +526,7 @@ async function main() {
   });
 
   if (parsed.mode === "stability") {
-    await runStability({
+    return await runStability({
       urls: parsed.urls,
       labels: parsed.labels,
       outputDir,
@@ -510,7 +539,7 @@ async function main() {
       backend: captureBackend,
       flipbook: parsed.stability!.flipbook,
     });
-    return;
+    return 0;
   }
 
   const urls = parsed.urls;
@@ -692,11 +721,18 @@ async function main() {
     for (const reason of exitStatus.reasons) {
       console.log(`    ${RED}- ${reason}${RESET}`);
     }
-    process.exitCode = exitStatus.exitCode;
+    console.log();
+    return exitStatus.exitCode;
   }
   console.log();
+  return 0;
 }
 
 if (process.env.__VLMKIT_DISPATCHER_LEAF__ === "snapshot" || process.argv[1]?.endsWith("snapshot.ts")) {
-  main().catch((e) => { console.error(e); process.exit(1); });
+  // The guard owns `process.exitCode`; the function above only reports what it
+  // should be. Assigning rather than `process.exit` so buffered stdout still
+  // flushes — the defect `applyGateExit` exists for.
+  runSnapshotCli(process.argv.slice(2))
+    .then((code) => { process.exitCode = code; })
+    .catch((e) => { console.error(e); process.exitCode = 1; });
 }

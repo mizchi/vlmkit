@@ -12,6 +12,7 @@
  */
 import { readFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { diagnoseSandboxLaunchFailure, formatPlaywrightLaunchError, isPlaywrightSandboxRestrictionError } from "@mizchi/vlmkit-capture/playwright-launch-error.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { applyApprovalToVrtDiff, collectApprovalWarnings, inferApprovalChangeType, loadApprovalManifest } from "../../vrt/snapshot/approval.ts";
@@ -274,7 +275,7 @@ function applyCssFix(css: string, fix: { selector: string; property: string; val
 
 // ---- Main ----
 
-async function main() {
+export async function runCssChallengeDemo() {
   await mkdir(TMP, { recursive: true });
 
   const rand = seededRandom(SEED);
@@ -544,10 +545,13 @@ async function cleanup() {
   try { await rm(TMP, { recursive: true, force: true }); } catch { /* ignore */ }
 }
 
-main().catch((error) => {
-  if (isPlaywrightSandboxRestrictionError(error)) {
-    console.error(formatPlaywrightLaunchError(error, { commandHint: "in your local terminal or in CI" }));
-    process.exit(1);
-  }
-  handleCliError(error);
-});
+if (isCliEntry(import.meta.url)) {
+  runCssChallengeDemo().catch((error) => {
+    if (isPlaywrightSandboxRestrictionError(error)) {
+      console.error(formatPlaywrightLaunchError(error, { commandHint: "in your local terminal or in CI" }));
+      process.exitCode = 1;
+      return;
+    }
+    handleCliError(error);
+  });
+}

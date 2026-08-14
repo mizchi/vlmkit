@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { extractCss } from "../css-challenge/css-challenge-core.ts";
 import { createLLMProvider } from "@mizchi/vlmkit-ai/llm-client.ts";
 import { runMigrationCompare, type MigrationCompareOptions } from "./migration-compare.ts";
@@ -42,7 +43,7 @@ const MAX_FIXES = Math.max(1, parseInt(getArg("max-fixes", "1"), 10) || 1);
 const PROPOSALS_OUT = getArg("proposals-out");
 const SUMMARY_OUT = getArg("summary-out");
 
-async function main() {
+export async function runMigrationFixLoop() {
   const report = JSON.parse(await readFile(REPORT_PATH, "utf-8")) as MigrationCompareReport;
   const convergence = summarizeMigrationReportConvergence(report);
   const target = selectMigrationFixTarget(report, { variant: VARIANT_FILTER || undefined });
@@ -459,4 +460,7 @@ function buildRerunOptions(
   };
 }
 
-main().catch(handleCliError);
+// Guarded, so importing this module does not run the fix loop.
+if (isCliEntry(import.meta.url)) {
+  runMigrationFixLoop().catch(handleCliError);
+}

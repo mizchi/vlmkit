@@ -11,6 +11,7 @@
  */
 import { readFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { launchBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { compareScreenshots, generateDiffReport } from "@mizchi/vlmkit-core/heatmap.ts";
 import {
@@ -35,7 +36,7 @@ const TMP = join(process.cwd(), "test-results", "fix-loop");
 
 // ---- Main ----
 
-async function main() {
+export async function runCssFixLoop() {
   await mkdir(TMP, { recursive: true });
 
   const fixturePath = getCssChallengeFixturePath(FIXTURE);
@@ -291,7 +292,8 @@ async function main() {
   process.exit(fixed ? 0 : 1);
 }
 
-// CLI guard
-if (process.env.__VLMKIT_DISPATCHER_LEAF__ === "fix-loop" || process.argv[1]?.endsWith("fix-loop.ts")) {
-  main().catch((e) => { console.error(e); process.exit(1); });
+// Guarded via the shared helper: the old suffix match could not tell
+// `fix-loop.ts` from another file ending in the same name.
+if (isCliEntry(import.meta.url, "fix-loop")) {
+  runCssFixLoop().catch((e) => { console.error(e); process.exitCode = 1; });
 }

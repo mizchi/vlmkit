@@ -9,6 +9,7 @@
  */
 import { readFile, mkdir, rm } from "node:fs/promises";
 import { join } from "node:path";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { diffA11yTrees, parsePlaywrightA11ySnapshot } from "@mizchi/vlmkit-core/a11y-semantic.ts";
 import { reasonAboutChanges } from "@mizchi/vlmkit-ai/reasoning.ts";
 import { matchA11yExpectation } from "../vrt/snapshot/expectation.ts";
@@ -185,7 +186,7 @@ async function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-async function main() {
+export async function runDemo() {
   await mkdir(TMP, { recursive: true });
 
   console.log(`\n${BOLD}${CYAN}╔══════════════════════════════════════════════════╗${RESET}`);
@@ -274,4 +275,9 @@ async function main() {
   await rm(TMP, { recursive: true, force: true });
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+// Guarded, so importing this module does not RUN the command. Without it a
+// test — or any tool reaching for a helper here — triggers a full run, which is
+// why this file had 0% coverage.
+if (isCliEntry(import.meta.url)) {
+  runDemo().catch((e) => { console.error(e); process.exitCode = 1; });
+}

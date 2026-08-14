@@ -9,6 +9,7 @@
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { PNG } from "pngjs";
 import { DIM, RESET, CYAN, BOLD } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import type { DetectionRecord } from "../detection/detection-db.ts";
@@ -78,7 +79,7 @@ async function bench(name: string, fn: () => Promise<void> | void, iterations: n
 
 // ---- Main ----
 
-async function main() {
+export async function runBenchmark() {
   await mkdir(TMP, { recursive: true });
 
   console.log();
@@ -374,4 +375,9 @@ async function main() {
   console.log();
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+// Guarded, so importing this module does not RUN the command. Without it a
+// test — or any tool reaching for a helper here — triggers a full run, which is
+// why this file had 0% coverage.
+if (isCliEntry(import.meta.url)) {
+  runBenchmark().catch((e) => { console.error(e); process.exitCode = 1; });
+}

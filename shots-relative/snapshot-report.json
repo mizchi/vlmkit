@@ -1,0 +1,36 @@
+{
+  "timestamp": "2026-08-14T05:40:11.439Z",
+  "urls": [
+    "file:///tmp/vlmkit-snapshot-cli-xDG992/stable.html"
+  ],
+  "labels": [
+    "stable"
+  ],
+  "options": {
+    "threshold": 0.1,
+    "failOnDiff": false,
+    "failOnNewBaseline": false,
+    "maxDiffRatio": null,
+    "configPath": null
+  },
+  "results": [
+    {
+      "url": "file:///tmp/vlmkit-snapshot-cli-xDG992/stable.html",
+      "label": "stable",
+      "viewport": "desktop",
+      "screenshotPath": "/home/user/vlmkit/shots-relative/stable-desktop-current.png",
+      "isNew": true
+    },
+    {
+      "url": "file:///tmp/vlmkit-snapshot-cli-xDG992/stable.html",
+      "label": "stable",
+      "viewport": "mobile",
+      "screenshotPath": "/home/user/vlmkit/shots-relative/stable-mobile-current.png",
+      "isNew": true
+    }
+  ],
+  "exitStatus": {
+    "exitCode": 0,
+    "reasons": []
+  }
+}

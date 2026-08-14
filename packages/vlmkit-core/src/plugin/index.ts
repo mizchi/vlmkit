@@ -151,6 +151,13 @@ export {
 } from "./args.ts";
 
 /**
+ * "Was this module run, or imported?" — the guard that lets a command module be
+ * imported at all. Thirty modules here hand-rolled it, and eleven had no guard, so
+ * importing one ran the command.
+ */
+export { isCliEntry } from "./cli-entry.ts";
+
+/**
  * `UsageError` — the only error a gate should throw for bad input.
  *
  * The CLI prints it as one line with no stack trace, because the message

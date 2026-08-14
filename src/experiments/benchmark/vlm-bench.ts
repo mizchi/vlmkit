@@ -13,6 +13,7 @@
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import { listModels, resolveModel, createVlmClient, type VlmModel, type VlmResponse } from "@mizchi/vlmkit-ai/vlm-client.ts";
 import { getArg, getFloatArg, getIntArg, hasFlag, getPositionalArgs } from "@mizchi/vlmkit-core/cli-args.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -231,7 +232,7 @@ function generateMarkdownReport(data: { date: string; image: string; results: an
 
 // ---- Main ----
 
-async function main() {
+export async function runVlmBench() {
   if (hasFlag("list")) {
     await runList();
   } else if (hasFlag("help") || hasFlag("h") || modelArgs.length === 0) {
@@ -271,4 +272,9 @@ ${BOLD}Environment:${RESET}
   }
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+// Guarded, so importing this module does not RUN the command. Without it a
+// test — or any tool reaching for a helper here — triggers a full run, which is
+// why this file had 0% coverage.
+if (isCliEntry(import.meta.url)) {
+  runVlmBench().catch((e) => { console.error(e); process.exitCode = 1; });
+}

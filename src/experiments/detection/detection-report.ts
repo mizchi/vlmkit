@@ -10,6 +10,7 @@ import { readAllRecords, getDbStats } from "./detection-db.ts";
 import { isOutOfScope } from "./detection-classify.ts";
 import { getBenchGoalProgress, getBenchHistoryStats, readBenchHistory } from "../benchmark/bench-history.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, CYAN, BOLD, hr as _hr } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 
 function hr() { _hr(76); }
 
@@ -32,7 +33,7 @@ function pct(ratio: number): string {
 
 // ---- Main ----
 
-async function main() {
+export async function runDetectionReport() {
   const records = await readAllRecords();
   const benchHistory = await readBenchHistory();
 
@@ -290,4 +291,9 @@ async function main() {
   console.log();
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+// Guarded, so importing this module does not RUN the command. Without it a
+// test — or any tool reaching for a helper here — triggers a full run, which is
+// why this file had 0% coverage.
+if (isCliEntry(import.meta.url, "detection-report")) {
+  runDetectionReport().catch((e) => { console.error(e); process.exitCode = 1; });
+}
