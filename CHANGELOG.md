@@ -595,6 +595,24 @@ suppression works per *rule* instead of per whole gate.
   `redirected` does. A valid selector that matches nothing still satisfies
   `visible: false`, which is the assertion working.
 
+- **`vlmkit diff-pr` reported PASS on viewports it never compared.** A declared viewport
+  with no pinned baseline was skipped with a bare `continue`, and `perVp.some(v => !v.pass)`
+  is `false` for an empty array — so the route passed having measured nothing. Measured on
+  a two-viewport config with one baseline deleted and that viewport's current render 100%
+  different: `home pass a=0.00%` / `PASS` / exit 0, with the second viewport named nowhere.
+  With a stray PNG under a renamed label (so the existing empty-directory check is
+  satisfied), zero pixels were compared and it still said pass. Unpinned viewports now fail
+  the route, get a row each in the markdown so the table accounts for every declared
+  viewport, and are reported as "not compared" rather than as a pixel breach — nothing was
+  measured, which is a different and worse thing than differing.
+
+- **`diff-pr` and `baseline` treated a valueless flag as an omitted one.** Both carried
+  their own `getArg`, which returned `undefined` for "flag absent" and "flag present but
+  valueless" alike, so `--output` with no value silently fell back to the default
+  directory and exited 0 — in CI, `--output "$UNSET_VAR"` writing the artifact where
+  nobody looks. Core's `readFlag` already distinguished them; both now use it, and a
+  usage error prints as one line instead of a stack trace.
+
 - **A published CLI installed by npm would not have started.** `isCliEntry` compared
   resolved-but-not-realpathed paths, and npm installs every `bin` in this workspace as a
   symlink — so `argv[1]` is `node_modules/.bin/x` while `import.meta.url` is the real
