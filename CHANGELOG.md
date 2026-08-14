@@ -575,6 +575,26 @@ suppression works per *rule* instead of per whole gate.
 
 ### Fixed
 
+- **`check animation`, `check motion` and `check scroll` named findings with a selector
+  that matched several elements.** Six gates carried a copy of `stableSelector` and
+  three had lost its recursive call, so it returned `p:nth-of-type(1)` — the first `<p>`
+  of every parent on the page. `check animation` on a page with two animated
+  first-children reported three findings on two different elements, all three carrying
+  `div:nth-of-type(1)`, which matched both. There is now one `STABLE_SELECTOR_JS`;
+  `motion-detect.ts` keeps a copy because it passes a typed arrow to `page.evaluate`,
+  and a test holds it in agreement by asserting on gate output. `check breakpoints`
+  selectors may now read `div.card` where they read `body > div:nth-of-type(2)` — its
+  copy was recursive but had no class branch.
+
+- **`check layout` reported SATISFIED on a contract with an invalid selector.**
+  `querySelectorAll` throws on exactly one thing, a selector that is not valid CSS, and
+  that throw was swallowed into "matched nothing" — which *satisfies* a `visible: false`
+  rule. A three-rule contract whose middle selector was `.modal:not(` reported
+  `SATISFIED (3/3)` and exited 0. Invalid selectors are now collected, deduped across
+  viewports, reported through a new `invalid-selector` rule, and clear `done` the way
+  `redirected` does. A valid selector that matches nothing still satisfies
+  `visible: false`, which is the assertion working.
+
 - **`node dist/png-diff.mjs` printed nothing.** Fifteen modules still guarded their
   entry with `process.argv[1]?.endsWith("thing.ts")`, and nine of those tested for a
   `.ts` suffix only — so in the published `dist/` the direct-invocation branch was
