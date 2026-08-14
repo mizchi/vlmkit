@@ -1067,9 +1067,9 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 ### テストカバレッジ 70% への道筋(2026-08-13 測定)
 
 vitest へ移行し(2662 tests、node:test と同数、同じ ~222s)、v8 カバレッジを導入。
-`pnpm test:coverage` で計測。**現在 statements 57.99%**(開始 56.1%)。
+`pnpm test:coverage` で計測。**現在 statements 60.14%**(開始 56.1%、Phase 2 後 57.99%)。
 
-**70% には +3,865 statements 必要**。既存の 2662 tests が網羅的なのに 57% な理由は
+**70% には +3,865 statements 必要**(Phase 1 完了後の残りは **+3,005**)。既存の 2662 tests が網羅的なのに 57% な理由は
 構造的で、純粋ロジックは**すでにカバー済み**だから。実測:
 
 | 書いたテストの種類 | 1ファイルあたりの獲得 |
@@ -1089,11 +1089,42 @@ vitest へ移行し(2662 tests、node:test と同数、同じ ~222s)、v8 カバ
 
 #### フェーズ(独立に実行可能)
 
-- [ ] **Phase 1: callable な gate runner に in-process browser テスト**(~1,400 statements → 約63%)
-  - `interact.ts` / `explore.ts` / `multi-page-consistency.ts` / `spec.ts` / `workflow.ts`
-  - 実測 ~115 statements/suite、1 suite あたり 10-25s。suite 全体に +60-90s。
-  - **回帰価値が高い**: `check theme` と `stress media` で実際にやったところ、
-    自分の誤解2件(pixelmatch threshold の向き、vitest 4 の poolOptions 削除)が出た。
+- [x] **Phase 1: callable な gate runner に in-process browser テスト** — **5ファイル完了**
+  (2026-08-14)。**statements 57.99% → 60.14%**、全 5 ファイルが 0% から:
+
+  | ファイル | before | after | 備考 |
+  |---|---|---|---|
+  | `stress/multi-page-consistency.ts` | 0% | **88.6%** | browser 必要 |
+  | `inspect/interact.ts` | 0% | **68.6%** | browser 必要 |
+  | `inspect/explore.ts` | 0% | **66.8%** | browser 必要 |
+  | `cli/workflow/spec.ts` | 0% | **94.0%** | browser 不要、13 tests 0.5s |
+  | `cli/workflow.ts` | 0% | **46.2%** | browser 不要。残りは `npx playwright` を spawn する `init`/`capture` |
+
+  tests 2753 → 2795(+42)。suite 全体は +75s(browser 3ファイル分)。
+
+  - **予測より安かった**: `spec.ts` / `workflow.ts` は browser を必要とせず、
+    `process.exit()` を return に変えるだけでテスト可能になった(合わせて 21 tests、~1s)。
+    「callable だが未テスト」の原因が browser ではなく **`process.exit` だった**ケース。
+  - **回帰価値の予想は当たった**。書いた 4 スイートが実欠陥 4 件を出した:
+    1. `check drift pages` — セレクタが**存在しないページ**が唯一 pass するケースだった
+       (`NaN > threshold` は false)。`selector-missing` ルールを追加(rules 125 → 126)。
+    2. `inspect explore` — **仮想マウスが setContent を越えて残る**ため、各アクションの
+       baseline が「1つ前のアクションがクリックした要素の hover ハイライト」を含んでいた。
+       dead action(このゲートの存在理由)が alive に見えていた。span 0.28% / button 0.42%
+       → 修正後どちらも 0.00%。
+    3. `inspect interact` — 失敗した step を**print して捨てていた**。下流には
+       「delta ほぼ 0 の transition」だけが見え、レポート自身の文が
+       「セレクタ不一致のサイン」と説明していた。理由を持っていて捨てていた。
+    4. `workflow spec-verify` — 非 git ディレクトリで git の usage 40 行を吐いていた
+       (`execSync` は stderr を inherit する)。
+  - **自分の思い込みが3件テストに直された**(コードではなくテストを直した):
+    block 要素の `width: auto` は padding を吸収する(outer width は変わらない) /
+    button の `hover` は UA スタイルで 0.25% paint する /
+    `waitForSelector` は dead 判定から意図的に除外されている。
+  - **副作用**: `isCliEntry(import.meta.url, …)` という新しい綴りを使ったため、
+    `gate-entry-isolation.test.ts` の CLI-entry 検出(文字列 `__VLMKIT_DISPATCHER_LEAF__ ===`
+    を探す)が **12ファイルを見落としていた**。両方の綴りを見るよう修正し、
+    vacuity テストに各綴り1件ずつ + negative を追加。
 - [x] **Phase 2: CLI スクリプトを `runX()` export にリファクタ** — **11ファイル完了**
   - 8ファイルは**ガードが無く**、末尾で `main().catch(...)` を無条件に呼んでいた。
     つまり **import すると実行される**。これが 0% の理由(import で実行されるものは

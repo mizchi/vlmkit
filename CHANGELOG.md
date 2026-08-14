@@ -35,6 +35,18 @@ suppression works per *rule* instead of per whole gate.
   against that cwd, so an explicit `--output` and the default landed relative to
   different directories.
 
+- **`runWorkflowCli` and the three `workflow/spec.ts` commands return an exit code
+  instead of calling `process.exit`.** Sixteen `process.exit()` calls lived inside
+  those command bodies. `runWorkflowCli` was typed `Promise<void>` while actually
+  deciding whether `vlmkit workflow verify` failed, and `runSpecVerify`'s
+  exit-1-on-failed-invariant — the whole point of the command — was observable only
+  by dying. `runIntrospect`, `runSpecVerify` and `runExpect` now return `number`.
+  Exit statuses through the CLI are unchanged.
+
+- **`ExploreOptions.strict` is gone.** It never affected the measurement, only the
+  verdict, so the decision moved to `runExploreCli`, which reads the counts the
+  report now carries. `--strict` on the command line is unchanged.
+
 - **The gate-authoring argv helpers moved from `@mizchi/vlmkit-markup` to
   `@mizchi/vlmkit-core`.** `firstPositional`, `runOutputDir`, `viewportFlag`,
   `numberList` and five others lived in `vlmkit-markup/src/gates/arg-helpers.ts`;
@@ -554,6 +566,46 @@ suppression works per *rule* instead of per whole gate.
   a stack trace.
 
 ### Fixed
+
+- **`check drift pages` stayed quiet about the worst drift there is.** A route the
+  selector is absent from carries `diffRatio: NaN`, and the finding filter read
+  `diffRatio > threshold` — false for NaN — so the gate exited 0 while its own
+  markdown row said `_(selector missing)_` and its terminal summary printed `n/a`. A
+  shared header or footer that vanished from one route was the only case it did not
+  report. Now a second rule, `selector-missing` (warn), checked before the pass-line
+  comparison; no threshold can express "absent". The ledger headline counts missing
+  pages separately from drifting ones.
+
+- **`inspect explore` measured the mouse instead of the handler.** The virtual
+  pointer belongs to the page, not the document, so it survived the `setContent`
+  that resets state between actions: each action's baseline still carried the hover
+  highlight left on whatever element the *previous* action clicked, and the
+  un-hover was measured as this action's delta. An inert `<span>` reported 0.28%
+  with its changed region sitting on a different element; an inert `<button>`
+  reported 0.42% from the pointer merely arriving, so a dead action — the thing the
+  gate exists to find — read as alive. The pointer is now placed where it will be
+  for the after-shot before the baseline is taken. Both inert elements measure
+  exactly 0, and an action that does paint is credited only with what it painted.
+
+- **`inspect explore` and `inspect interact` no longer set the host process's exit
+  code from inside the measurement**, and no longer print from it. `runExplore`
+  returns `deadActions` / `silentHandlers` / `failedActions`; `runInteract` returns
+  `stepFailures`; `formatExploreReport` / `formatInteractReport` own the prose, and
+  `runExploreCli` / `runInteractCli` return the code. Terminal output and exit
+  status are unchanged.
+
+- **`inspect interact` discarded every failed step.** A step that threw was printed
+  once, the healer's suggestions with it, and then dropped — so all a consumer saw
+  was a transition with a near-zero delta, which the report's own prose explains as
+  "usually a sign the selector didn't match". It had the reason and threw it away.
+  `InteractReport.stepFailures` now carries the step index, action, message and
+  healer suggestions, and the markdown gains a "Steps that failed" section *above*
+  the transitions, since a failed step is the reason a transition is dead.
+
+- **`vlmkit workflow spec-verify` printed git's usage block in a non-git project.**
+  `execSync` inherits stderr, so `git diff --name-only HEAD` outside a repository
+  dumped forty lines of unrelated help above the verification. The failure was
+  already handled; it just could not un-print what git wrote to the terminal.
 
 - **An expected-scrollport contract with an empty `id` produced a blank label.**
   `??` treats `""` as present, so the positional fallback (`expected-1`) was
