@@ -79,7 +79,7 @@ describe("composed built-in registry", () => {
     }
   });
 
-  it("declares 126 tunable rules in total", async () => {
+  it("declares 127 tunable rules in total", async () => {
     // A canary, not a target: a gate losing its rule table to a bad merge is
     // otherwise invisible until someone tries to tune it.
     // 119 → 120 when `check copy` gained `copy-truncated` (element-rect mode, vlmkit#118).
@@ -95,8 +95,11 @@ describe("composed built-in registry", () => {
     // 125 → 126 when `check drift pages` gained `selector-missing`: a route the
     // selector is absent from has `diffRatio: NaN`, `NaN > threshold` is false, and
     // the most severe drift there is was the one case the gate passed.
+    // 126 → 127 when `check layout` gained `invalid-selector`: `querySelectorAll` throws
+    // only on invalid CSS, that throw was swallowed, and "matched nothing" satisfies
+    // `visible: false` — so a typo in the contract reported SATISFIED.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 126);
+    assert.equal(total, 127);
   });
 
   it("gives every built-in gate a category", async () => {
