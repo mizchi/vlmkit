@@ -17,7 +17,10 @@ import { diagnoseSandboxLaunchFailure, formatPlaywrightLaunchError, isPlaywright
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { applyApprovalToVrtDiff, collectApprovalWarnings, inferApprovalChangeType, loadApprovalManifest } from "../../vrt/snapshot/approval.ts";
 import { getCssChallengeFixturePath } from "./css-challenge-fixtures.ts";
-import { categorizeProperty, escapeRegex } from "./css-challenge-core.ts";
+// `applyCssFix` from core rather than the byte-identical copy that lived here. Two
+// copies of a CSS mutator is one place for a fix to land and one to be forgotten —
+// and the semicolon-termination bug was present in both.
+import { applyCssFix, categorizeProperty, escapeRegex } from "./css-challenge-core.ts";
 import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { classifyVisualDiff } from "@mizchi/vlmkit-markup/visual-semantic.ts";
 import { diffA11yTrees, verifyA11yTree, parsePlaywrightA11ySnapshot } from "@mizchi/vlmkit-core/a11y-semantic.ts";
@@ -249,28 +252,6 @@ function parseLLMFix(response: string): { selector: string; property: string; va
     property: propertyMatch[1].trim(),
     value: valueMatch[1].trim(),
   };
-}
-
-function applyCssFix(css: string, fix: { selector: string; property: string; value: string }): string {
-  const lines = css.split("\n");
-
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
-    const oneLineMatch = trimmed.match(/^([^{]+)\{([^}]+)\}\s*$/);
-    if (oneLineMatch) {
-      const selector = oneLineMatch[1].trim();
-      if (selector === fix.selector) {
-        // Insert the property before the closing brace
-        const body = oneLineMatch[2].trim();
-        const newBody = `${body} ${fix.property}: ${fix.value};`;
-        lines[i] = `${selector} { ${newBody} }`;
-        return lines.join("\n");
-      }
-    }
-  }
-
-  // Fallback: no matching selector found
-  return css;
 }
 
 // ---- Main ----
