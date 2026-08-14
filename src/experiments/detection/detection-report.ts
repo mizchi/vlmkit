@@ -33,9 +33,19 @@ function pct(ratio: number): string {
 
 // ---- Main ----
 
-export async function runDetectionReport() {
-  const records = await readAllRecords();
-  const benchHistory = await readBenchHistory();
+/**
+ * Render the aggregate detection report.
+ *
+ * Both data paths are parameters with the production default, because both
+ * readers already accepted one — the runner simply never passed it through. That
+ * is what makes 203 statements of report rendering testable against a fixture
+ * instead of against whatever happens to be in the developer's `.vlmkit/`.
+ */
+export async function runDetectionReport(
+  options: { dbPath?: string; historyPath?: string } = {},
+) {
+  const records = await readAllRecords(options.dbPath);
+  const benchHistory = await readBenchHistory(options.historyPath);
 
   if (records.length === 0 && benchHistory.length === 0) {
     console.log(`\n  ${YELLOW}No data found.${RESET} Run ${BOLD}just css-bench${RESET} first.\n`);

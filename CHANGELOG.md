@@ -19,6 +19,22 @@ suppression works per *rule* instead of per whole gate.
 
 ### Breaking
 
+- **Eleven command modules no longer run when imported.** `snapshot.ts`,
+  `detection-report.ts`, the four `demo/*` scripts and five experiment harnesses
+  were bare `main()` functions that called themselves at the bottom of the file,
+  so importing one for a type or a helper executed the command. Each now exports a
+  named runner (`runSnapshotCli`, `runDetectionReport`, …) and guards its own
+  invocation through the new `isCliEntry(import.meta.url, name?)`. Both dispatch
+  paths are unchanged — the `vlmkit` dispatcher's env var and direct
+  `node src/x.ts` — but a caller that relied on the import side effect must now
+  call the exported function.
+- **`runSnapshotCli` returns an exit code instead of assigning `process.exitCode`,
+  and takes argv and cwd as arguments.** The same shape every gate has. A relative
+  `--output` now resolves against the cwd it was given rather than the process's,
+  which also fixes an inconsistency: the parser already resolved its *default*
+  against that cwd, so an explicit `--output` and the default landed relative to
+  different directories.
+
 - **The gate-authoring argv helpers moved from `@mizchi/vlmkit-markup` to
   `@mizchi/vlmkit-core`.** `firstPositional`, `runOutputDir`, `viewportFlag`,
   `numberList` and five others lived in `vlmkit-markup/src/gates/arg-helpers.ts`;

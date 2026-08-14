@@ -1067,7 +1067,7 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 ### テストカバレッジ 70% への道筋(2026-08-13 測定)
 
 vitest へ移行し(2662 tests、node:test と同数、同じ ~222s)、v8 カバレッジを導入。
-`pnpm test:coverage` で計測。**現在 statements 57.3%**(開始 56.1%)。
+`pnpm test:coverage` で計測。**現在 statements 57.99%**(開始 56.1%)。
 
 **70% には +3,865 statements 必要**。既存の 2662 tests が網羅的なのに 57% な理由は
 構造的で、純粋ロジックは**すでにカバー済み**だから。実測:
@@ -1094,10 +1094,26 @@ vitest へ移行し(2662 tests、node:test と同数、同じ ~222s)、v8 カバ
   - 実測 ~115 statements/suite、1 suite あたり 10-25s。suite 全体に +60-90s。
   - **回帰価値が高い**: `check theme` と `stress media` で実際にやったところ、
     自分の誤解2件(pixelmatch threshold の向き、vitest 4 の poolOptions 削除)が出た。
-- [ ] **Phase 2: CLI スクリプトを `runX()` export にリファクタ**(~2,244 statements → 約70%)
-  - `snapshot.ts` など11ファイル。テストのためだけでなく、**gate と同じ形になる**
-    (gate は全部 `run(options)` を export している)ので設計上も一貫する。
-  - リファクタが主で、テストは従。既存の subprocess テストが回帰を守る。
+- [x] **Phase 2: CLI スクリプトを `runX()` export にリファクタ** — **11ファイル完了**
+  - 8ファイルは**ガードが無く**、末尾で `main().catch(...)` を無条件に呼んでいた。
+    つまり **import すると実行される**。これが 0% の理由(import で実行されるものは
+    テストできない)。
+  - 確立したパターン(`snapshot.ts` の docstring に3点明記):
+    **argv は引数** / **exit code は return(代入しない)** / **cwd は引数**。
+    `process.exitCode` はプロセスの所有物で、リグレッションを正しく報告した snapshot が
+    それを頼んだテストスイートを落としてはいけない。`process.chdir` はプロセス全体なので
+    vitest の共有ワーカーを壊す。
+  - リファクタ中に実バグ2件: `runStability` がヘルパー内から `process.exitCode` を代入
+    (呼び出し元のプロセスを落とす)、`resolve(outputDir)` が `process.cwd()` 基準で
+    パーサのデフォルトだけ cwd 基準だった(明示 `--output` と既定値が別ディレクトリに落ちる)。
+  - **共有 `isCliEntry(import.meta.url, name?)` を core に追加**。30ファイルが2つの綴りで
+    手書きしていて、緩い方(`argv[1]?.endsWith("fix-loop.ts")`)は名前が接尾辞として
+    重なるファイルを区別できず、`.mjs` にビルドすると黙って一致しなくなる。
+  - **テストは別作業**。リファクタは「テスト可能にする」だけで測定値は動かない(+0.29pp)。
+    実際にテストを書いた2ファイルで 0% → 32% / 58%。
+  - 残り9ファイルのうち `demo/*` 4件はデモの実行そのもの、
+    `benchmark`/`vlm-bench`/`css-challenge`/`fix-loop`/`migration-fix-loop` 5件は
+    VLM/API が必要(Phase 3)。**リファクタ済みなので import は安全**になった。
 - [ ] **Phase 3: VLM/API 経路に録画フィクスチャ**(~250 statements)
   - `vlm-client.ts` / `reasoning-pipeline.ts`。HAR 相当の録画済みレスポンスが必要。
 
