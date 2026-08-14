@@ -606,6 +606,66 @@ suppression works per *rule* instead of per whole gate.
   viewport, and are reported as "not compared" rather than as a pixel breach — nothing was
   measured, which is a different and worse thing than differing.
 
+- **`file://` was not counted as a URL, so eight commands mangled it.** `isUrlSource`
+  tested `/^https?:\/\//`, so a `file://` source took the *path* branch and `resolve()`
+  destroyed it — exactly the mangling `resolveSource`'s own comment warns about for
+  `http`: `check a11y contrast "file:///repo/fixtures/page.html"` printed `error: file
+  not found: /repo/file:/repo/fixtures/page.html`, where the same fixture as a plain path
+  inspected 31 elements and found 2 contrast failures. Everything reaching a page through
+  `openSource` / `sourceToUrl` carried it (`check a11y contrast` / `touch` / `focus`,
+  `check theme`, `stress i18n`, `stress media`, `check tokens`, `check consistency`).
+  Eight modules had already hand-rolled `/^(https?|file):\/\//` for themselves and were
+  right, which is why the commands that did *not* use the shared helper kept working —
+  `check story --gallery "file://$PWD/index.html"`, the recipe in CLAUDE.md, was fine.
+  Fixed at the choke point and all eight copies collapsed into it: each call site was
+  verbatim `sourceToUrl`, so the collapse is behaviour-preserving and there is now one
+  definition to be wrong in.
+
+- **`diff-pr` reported a clean route when a declared policy crashed.** The media-variants
+  and cross-browser blocks each caught their error, logged a warning, and left their
+  result `undefined` — and `undefined` reads as "not declared in config", which gates
+  nothing: `mvFailed = mediaVariantsResult ? !mediaVariantsResult.pass : false`. Measured
+  with `mediaVariants` declared and its output directory blocked by a regular file: the
+  route printed `home pass desktop=0.00%`, the run printed `PASS`, exit 0, and
+  `summary.md` was byte-identical to a run where the policy had passed. The declared
+  policy vanished from the PR comment entirely. Policy errors are now recorded on the
+  route, counted in the verdict, named in the terminal line, and given their own markdown
+  section. `allowSkipped` already covered a per-engine launch failure; it never covered
+  the whole run throwing.
+
+- **`diff-pr`'s `waitFor` timeout was swallowed.** `waitFor` is the route's readiness
+  contract, and `.catch(() => {})` made a selector that never matched indistinguishable
+  from one that did. Measured on a client-rendered fixture with the selector misspelled:
+  `pin` took 12.3s where the correct selector takes 2.1s — ten of those spent silently
+  waiting — and wrote a baseline anyway, after which the gate reported `app pass
+  desktop=0.00%` / `PASS` / exit 0. It throws now, before the screenshot, so no baseline
+  is pinned from a page that never reached its ready state: a poisoned baseline is worse
+  than a missing one, because every later run agrees with it.
+
+- **`diff-pr pin` printed a green `ok` and exited 0 having written nothing.** Measured
+  with an unreachable URL: `app ok (0/1 viewport(s))`, then "Baselines pinned.", exit 0,
+  zero PNGs on disk — the count was right there and the color contradicted it. `cmdPin`
+  also returned `void`, so no failure could reach the exit code. It now reports `ok` /
+  `partial` / `nothing pinned` by count, names every unwritten baseline, and returns a
+  code that `main` carries.
+
+- **A `diff-pr` viewport that never rendered was reported as a 100% pixel breach.** The
+  per-viewport catch sets `diffRatio: 1` to force the failure, and with no other marker
+  the markdown printed `100.00%` and ranked it under **Worst offenders** at `99.00pp over
+  threshold` — on a viewport where `totalPixels` was 0. The run failed either way; the
+  reason it gave was false, and it sends a reviewer to look at screenshots for what is a
+  config typo. The viewport carries its error now, the table cell says what happened, and
+  it is excluded from the offender ranking.
+
+- **`diff-pr post` exited 0 without posting.** With `gh` absent it printed the markdown
+  and returned 0 — right at a terminal, where printing for a human to paste is the job
+  done, and a false green in CI, where nobody reads stdout and the step going green tells
+  the reviewer the summary reached the PR. `CI` now decides: unchanged locally, and under
+  `CI` the markdown is still printed but it exits 1 with what it did not do and how to fix
+  it. The four existing tests spawned with a plain `{...process.env}`, which carries
+  `CI=1` on a GitHub runner — they would have asserted the local behaviour while running
+  under the CI one; they now pin `CI` explicitly in both directions.
+
 - **`diff-pr` and `baseline` treated a valueless flag as an omitted one.** Both carried
   their own `getArg`, which returned `undefined` for "flag absent" and "flag present but
   valueless" alike, so `--output` with no value silently fell back to the default

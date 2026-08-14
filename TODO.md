@@ -1072,6 +1072,63 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     現行のグリッドの拡張ではなく新しい構図。
   - 着手条件: レビュアーが実際に空間配置を読み違えた事例が出たら。
 
+### 2つのパターンで探した欠陥(2026-08-14)— **全件修正済み**
+
+「同じものが2箇所にあって片方だけ直る」「計測していない状態を clean として報告する」の
+2パターンで repo を掃いた結果。**全件、読んで見つけたのではなく測って確認し、
+修正後は fix を壊して新テストが赤くなることまで確認**している。
+
+**パターン1(重複)で見つけたもの:**
+
+- [x] **`isUrlSource` が `file://` を URL と見なしていなかった**(`b03f849`)
+  - core の共有ヘルパが `/^https?:\/\//`、**自前で書いた8モジュールは全部
+    `/^(https?|file):\/\//`**。8つが正しく、置き換え先が間違っていた。
+  - 結果として **`openSource` / `sourceToUrl` を使う「推奨された書き方」の側が壊れ**、
+    自前判定を持つ側は動いていた(`check story --gallery "file://$PWD/index.html"` は無事)。
+    片方だけ直す修正が原理的に存在しない形。
+  - 実測: `check a11y contrast "file:///…/page.html"` →
+    `error: file not found: /repo/file:/repo/…/page.html`。同じ fixture をパスで渡すと
+    31要素・2件検出。`check a11y touch` / `check theme` / `stress i18n` / `check tokens` でも同様。
+  - choke point を直し、**8コピーを1つに畳んだ**。各呼び出し箇所は逐語的に `sourceToUrl` と
+    同一だったので挙動不変。
+
+**パターン2(未計測を clean として報告)で見つけたもの — 全て `src/diff-pr.ts`:**
+
+- [x] **宣言したポリシーが crash したら route が pass になる**(`4bad20a`)
+  - `catch` で warn を出して result を `undefined` にしていた。`undefined` は
+    「config に宣言されていない」と同義に読まれる:
+    `mvFailed = mediaVariantsResult ? !mediaVariantsResult.pass : false`。
+  - 実測: `media-variants` の出力先にファイルを置いて `mkdir` を投げさせると
+    `home pass desktop=0.00%` / `PASS` / exit 0、かつ **`summary.md` は
+    ポリシーが通った run とバイト同一**。PR コメントから消える。
+- [x] **`waitFor` の timeout が `.catch(() => {})`**(`9259556`)
+  - route の readiness contract なのに、一致しないセレクタと一致するセレクタが区別できない。
+  - 実測(セレクタを1文字間違えた fixture): `pin` が 2.1s → **12.3s**(10秒は黙って待機)、
+    しかも baseline を書き、gate は `pass` / exit 0。
+  - throw するようにした。**screenshot の前に落ちる**ので、ready state に達していない
+    ページから baseline が焼かれることがなくなる(汚染された baseline は無い baseline より悪い —
+    以後の run が全部それに同意する)。
+- [x] **`pin` が緑の `ok` を出して exit 0、PNG は0枚**(`9259556`)
+  - 実測: 到達不能 URL で `app ok (0/1 viewport(s))` → "Baselines pinned." → exit 0。
+    件数は目の前にあり、色がそれを否定していた。`cmdPin` が `void` を返していたので
+    exit code に届く経路もなかった。
+- [x] **render できなかった viewport が「100% の pixel breach」として報告される**(`9259556`)
+  - `diffRatio: 1` は fail を強制するための値で、pixel の記述ではない。`totalPixels` が 0 の
+    viewport が markdown で `100.00%` / **Worst offenders の `99.00pp over threshold`** に載る。
+    落ちること自体は正しいが**理由が偽**で、config の typo なのにレビュアーを screenshot に送る。
+- [x] **`diff-pr post` が投稿せずに exit 0**(`a983d54`)
+  - `gh` 不在時に markdown を印字して 0 を返す。端末では正しい(人が貼るのが仕事の完了)。
+    **CI では偽の緑** — 誰も stdout を読まず、step が緑ならレビュアーは summary が PR に
+    届いたと解釈する。`CI` で分岐するようにした。
+  - 副産物: 既存4テストが素の `{...process.env}` で spawn していた。GitHub runner では
+    `CI=1` が入るので、**ローカルの挙動を assert しながら CI の挙動で走る**状態だった。
+    両方向を明示的に pin した。
+
+**残した重複(まだ同期していて実害がない)**: `determineMigrationSubagentExitStatus` /
+`determineSnapshotReportEvaluationExitStatus`(566文字が同一)、`overlapArea` /
+`intersectionArea`。byte-identical な重複は「まだ分岐していない」= 将来のリスクであって
+今のバグではない。今回見つかった実害はすべて**片方だけ直った近似重複**の側にあった。
+
 ### テストカバレッジ 70% への道筋(2026-08-13 測定)
 
 vitest へ移行し(2662 tests、node:test と同数、同じ ~222s)、v8 カバレッジを導入。
