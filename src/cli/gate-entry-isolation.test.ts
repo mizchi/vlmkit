@@ -90,8 +90,20 @@ function staticImportsOf(source: string): string[] {
   return out;
 }
 
+/**
+ * Both spellings of the guard, because there are two.
+ *
+ * The original was a hand-rolled `process.env.__VLMKIT_DISPATCHER_LEAF__ === "x" ||
+ * resolve(process.argv[1]) === fileURLToPath(import.meta.url)`. Twelve modules now
+ * call the shared `isCliEntry(import.meta.url, "x")` instead, and matching only the
+ * literal made every one of them invisible here — the check would have gone quiet
+ * about exactly the modules most recently touched. Matching the source text at all
+ * is the compromise: this walker reads files rather than importing them, precisely
+ * because importing a CLI-entry module runs its command.
+ */
 function isCliEntryModule(source: string): boolean {
-  return source.includes("__VLMKIT_DISPATCHER_LEAF__ ===");
+  return source.includes("__VLMKIT_DISPATCHER_LEAF__ ===")
+    || /isCliEntry\(\s*import\.meta\.url/.test(source);
 }
 
 /** Every module statically reachable from `entry`, with the path that got there. */
@@ -144,6 +156,12 @@ describe("gate plugins do not statically reach CLI-entry modules", () => {
     // result that could just mean the regex matched nothing.
     const entry = resolve(REPO_ROOT, "packages/vlmkit-markup/src/component/page-compose.ts");
     assert.ok(isCliEntryModule(readFileSync(entry, "utf8")), "page-compose.ts should read as a CLI entry");
+    // And one of each spelling, so neither branch of the detector can rot unnoticed.
+    assert.ok(
+      isCliEntryModule(readFileSync(resolve(REPO_ROOT, "packages/vlmkit-markup/src/inspect/explore.ts"), "utf8")),
+      "explore.ts uses the shared isCliEntry() guard and must still read as an entry",
+    );
+    assert.ok(!isCliEntryModule("export const x = 1;\n"), "a plain module is not an entry");
     const reached = reachableFrom(entry);
     assert.ok(reached.size > 3, `walker resolved only ${reached.size} modules from a real entry`);
     assert.ok(
