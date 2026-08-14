@@ -3,7 +3,7 @@ import { describe, it } from "vitest";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { formatInteractReport, runInteract, type Sequence } from "./interact.ts";
+import { formatInteractReport, runInteract, runInteractCli, type Sequence } from "./interact.ts";
 
 /**
  * `inspect interact` end to end, in-process.
@@ -263,6 +263,18 @@ describe("runInteract", () => {
     assert.match(md, /Interaction-sequence report/);
     assert.match(md, /\*\*a\*\* → \*\*b\*\*/);
     assert.match(md, /click/);
+  });
+});
+
+describe("runInteractCli", () => {
+  it("exits 0 for --help and 1 for missing arguments", async () => {
+    // Both printed the same usage and both returned 1, so
+    // `vlmkit inspect interact --help` failed in any `&&` chain or CI help check. A
+    // request that was satisfied is not an error.
+    assert.equal(await runInteractCli(["--help"]), 0);
+    assert.equal(await runInteractCli(["-h"]), 0);
+    assert.equal(await runInteractCli([]), 1, "no source and no sequence is an error");
+    assert.equal(await runInteractCli([fixture]), 1, "a source with no --sequence is an error");
   });
 });
 

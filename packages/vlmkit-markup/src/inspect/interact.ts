@@ -583,10 +583,14 @@ export async function runInteractCli(
   cliArgs: readonly string[],
   options: { cwd?: string } = {},
 ): Promise<number> {
-  let argv = [...cliArgs];
-  if (argv[0] === "--help" || argv[0] === "-h") argv = [];
-  const { positional, sequence, outputDir, report, threshold, healAll } = parseArgs(argv);
-  if (positional.length === 0 || !sequence) {
+  const argv = [...cliArgs];
+  // `--help` is a request that was satisfied; missing arguments are an error. Both
+  // printed the same usage and both exited 1, so `vlmkit inspect interact --help`
+  // failed in any `&&` chain or CI help check.
+  const askedForHelp = argv[0] === "--help" || argv[0] === "-h";
+  const { positional, sequence, outputDir, report, threshold, healAll } =
+    parseArgs(askedForHelp ? [] : argv);
+  if (askedForHelp || positional.length === 0 || !sequence) {
     console.log("Usage: vlmkit inspect interact <html-or-url> --sequence <path.json> [options]");
     console.log("Options:");
     console.log("  --sequence <path>   JSON file describing the action sequence.");
@@ -620,7 +624,7 @@ export async function runInteractCli(
     console.log('  scroll           { selector?: string, x?: number, y?: number }');
     console.log('  wait             { ms: number }');
     console.log('  waitForSelector  { selector: string }');
-    return 1;
+    return askedForHelp ? 0 : 1;
   }
   const result = await runInteract({
     source: positional[0]!,
