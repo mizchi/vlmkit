@@ -1220,7 +1220,16 @@ Drop a `vlmkit.config.json` next to your app with a `capture` block:
 ```
 
 Each route accepts `name` (defaults to a sanitized form of `path`), `path`, and
-an optional `waitFor` CSS selector. Resolution order:
+an optional `waitFor` CSS selector.
+
+`waitFor` is a readiness contract, not a hint: if the selector does not become
+visible within 10s, `diff-pr` and `diff-pr pin` both fail that viewport and say
+which selector did not match. `pin` writes no PNG in that case — a baseline
+captured before the page rendered is worse than a missing one, because every
+later run agrees with it. It used to be swallowed, so a typo cost 10 silent
+seconds per viewport and then reported a green comparison of two placeholders.
+
+Resolution order:
 
 1. `VLMKIT_CAPTURE_ROUTES` env var (JSON-encoded array)
 2. `--config <path>` flag or `VLMKIT_CONFIG_PATH` env var

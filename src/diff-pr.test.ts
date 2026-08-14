@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, it } from "vitest";
@@ -519,6 +519,130 @@ describe("a declared viewport with no baseline", () => {
     assert.doesNotMatch(r.stdout, /not compared/);
     const md = await readFile(join(cwd, "out-ok", "summary.md"), "utf-8");
     assert.doesNotMatch(md, /Not compared/);
+  });
+});
+
+describe("a waitFor selector that never matches", () => {
+  let cwd: string;
+
+  /**
+   * `waitFor` exists so the gate does not measure a pre-render state, and the wait was
+   * `.catch(() => {})` — so a selector that never became visible was indistinguishable
+   * from one that did, in both `pin` and the gate run.
+   *
+   * Measured on this fixture with the selector misspelled `.app-rooot`: `pin` took 12.3s
+   * where the correct selector takes 2.1s (ten of those spent silently waiting) and then
+   * wrote a baseline anyway, and the gate reported `app pass desktop=0.00%` / `PASS` /
+   * exit 0. Nothing said the declared condition never held. `page-open.ts`'s `settlePage`
+   * docstring records three earlier instances of the same class — a green gate on a page
+   * that never rendered.
+   *
+   * It throws now, which both call sites already handle correctly, and the throw lands
+   * before the screenshot: a baseline is never pinned from a page that did not reach its
+   * declared ready state. A poisoned baseline is worse than a missing one, because every
+   * later run agrees with it.
+   */
+  beforeAll(async () => {
+    cwd = await mkdtemp(join(tmpdir(), "vrt-diff-pr-waitfor-"));
+    await mkdir(join(cwd, "pages"), { recursive: true });
+    // Client-rendered: a placeholder first, the real view a tick later. Without the wait
+    // this is exactly the page that gets measured too early.
+    await writeFile(
+      join(cwd, "pages", "app.html"),
+      "<!doctype html><html><head><style>body{margin:0}#root{height:400px;background:#eee}"
+      + ".card{height:120px;background:#c00}</style></head><body><div id=\"root\">Loading…</div>"
+      + "<script>setTimeout(() => { document.getElementById('root').innerHTML = "
+      + "'<div class=\"app-root\"><div class=\"card\"></div></div>'; }, 300);</script></body></html>",
+    );
+    await writeFile(join(cwd, "vlmkit.config.json"), JSON.stringify({
+      viewports: ["desktop"],
+      thresholds: { desktop: 0.01 },
+      baselineDir: ".vlmkit/baselines",
+      routes: [{ name: "app", url: `file://${join(cwd, "pages", "app.html")}`, waitFor: ".app-root" }],
+    }, null, 2));
+    const pin = cli(cwd, "pin");
+    assert.equal(pin.status, 0, `a matching waitFor must pin cleanly: ${pin.stdout}${pin.stderr}`);
+  });
+
+  afterAll(async () => {
+    await rm(cwd, { recursive: true, force: true });
+  });
+
+  it("fails the pin and writes no baseline, rather than pinning a placeholder", async () => {
+    await rm(join(cwd, ".vlmkit/baselines"), { recursive: true, force: true });
+    await writeFile(join(cwd, "vlmkit.config.json"), JSON.stringify({
+      viewports: ["desktop"],
+      thresholds: { desktop: 0.01 },
+      baselineDir: ".vlmkit/baselines",
+      routes: [{ name: "app", url: `file://${join(cwd, "pages", "app.html")}`, waitFor: ".app-rooot" }],
+    }, null, 2));
+
+    const pin = cli(cwd, "pin");
+    assert.equal(pin.status, 1, `an unmet waitFor must fail the pin:\n${pin.stdout}`);
+    assert.match(pin.stdout, /waitFor selector never became visible within 10s: \.app-rooot/);
+    assert.match(pin.stdout, /nothing pinned/);
+    assert.match(pin.stderr, /baseline\(s\) were not written: app\/desktop/);
+    // No PNG, so the next run reports "not compared" rather than agreeing with a
+    // baseline captured before the page rendered.
+    const files = await readdir(join(cwd, ".vlmkit/baselines/app")).catch(() => []);
+    assert.deepEqual(files.filter((f) => f.endsWith(".png")), []);
+  });
+
+  it("fails the gate run and reports it as a render error, not a 100% breach", async () => {
+    // Pin with the right selector, then break it, so the baseline is good and only the
+    // current side fails. `diffRatio: 1` in the catch is there to force the failure —
+    // reporting it as `100.00%` under "Worst offenders" sent the reader to look at
+    // screenshots for a config typo.
+    await writeFile(join(cwd, "vlmkit.config.json"), JSON.stringify({
+      viewports: ["desktop"],
+      thresholds: { desktop: 0.01 },
+      baselineDir: ".vlmkit/baselines",
+      routes: [{ name: "app", url: `file://${join(cwd, "pages", "app.html")}`, waitFor: ".app-root" }],
+    }, null, 2));
+    assert.equal(cli(cwd, "pin").status, 0);
+    await writeFile(join(cwd, "vlmkit.config.json"), JSON.stringify({
+      viewports: ["desktop"],
+      thresholds: { desktop: 0.01 },
+      baselineDir: ".vlmkit/baselines",
+      routes: [{ name: "app", url: `file://${join(cwd, "pages", "app.html")}`, waitFor: ".app-rooot" }],
+    }, null, 2));
+
+    const r = cli(cwd, "--output", "out-wait");
+    assert.equal(r.status, 1, `an unmet waitFor must fail the run:\n${r.stdout}`);
+    // The terminal line goes through `String(err)` so it carries the `Error: ` prefix;
+    // the markdown cell uses `err.message` and does not.
+    assert.match(r.stdout, /render error: Error: waitFor selector never became visible/);
+    assert.match(r.stdout, /desktop=error/);
+    assert.doesNotMatch(r.stdout, /desktop=100\.00%/, "zero compared pixels is not a 100% diff");
+
+    const md = await readFile(join(cwd, "out-wait", "summary.md"), "utf-8");
+    assert.match(md, /\| `app` \| desktop \| — \| 1\.00% \| ❌ render error: waitFor selector/);
+    assert.doesNotMatch(md, /Worst offenders/, "a viewport that never rendered is not an offender");
+    assert.doesNotMatch(md, /100\.00%/);
+  });
+
+  it("passes when the selector matches, and does not burn the timeout doing it", async () => {
+    // The control, and the other half of the cost: the swallowed wait spent a silent 10s
+    // per viewport. Asserted well under that rather than at a tight number, because this
+    // is a browser launch on shared CI — what is being ruled out is "waited out the
+    // timeout and carried on", not a performance target.
+    await writeFile(join(cwd, "vlmkit.config.json"), JSON.stringify({
+      viewports: ["desktop"],
+      thresholds: { desktop: 0.01 },
+      baselineDir: ".vlmkit/baselines",
+      routes: [{ name: "app", url: `file://${join(cwd, "pages", "app.html")}`, waitFor: ".app-root" }],
+    }, null, 2));
+    const started = Date.now();
+    const pin = cli(cwd, "pin");
+    const elapsed = Date.now() - started;
+    assert.equal(pin.status, 0, `a matching waitFor must pin:\n${pin.stdout}`);
+    assert.match(pin.stdout, /ok \(1\/1 viewport\(s\)\)/);
+    assert.match(pin.stdout, /Baselines pinned/);
+    assert.ok(elapsed < 9000, `pinning took ${elapsed}ms — that is the 10s wait being waited out`);
+
+    const r = cli(cwd, "--output", "out-ok");
+    assert.equal(r.status, 0, `a settled page must pass:\n${r.stdout}`);
+    assert.match(r.stdout, /desktop=0\.00%/);
   });
 });
 
