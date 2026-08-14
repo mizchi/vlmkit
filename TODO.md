@@ -1037,16 +1037,24 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - 代替案(依存ゼロ): animated GIF を自前 mux する / `snapshot flipbook`(既存の HTML
     プレイヤー)で足りるならそれ。前者は品質と実装量が見合わない見込み。
 
-- [ ] **`check animation` の `evaluated` が時刻依存(2026-08-10 に判明、コードにも明記)**
-  - `fill: none` の短いアニメは終了と同時に `getAnimations()` から消えるため、開始時記録
-    (`RECORD_ANIMATION_STARTS_SCRIPT`)で `animationCount` / `settleMs` / reduced-motion は
-    決定的になったが、**フレーム標本化できるのは収集時点で生存しているものだけ**。
-    dashboard.html は `animationCount` が 4 で固定される一方 `evaluated` は 0 か 1 で揺れ、
-    `no-visible-effect` もそれに従う。
-  - 正しい直し方: 記録ではなく**開始位置で保持**する(init script で `animationstart` 時に
-    pause)。ただし `playState` の「作者が止めたのか我々が止めたのか」の区別が消え、
-    `restTimeForAnimation` がそれに依存しているので、フィルタ変更ではなく再設計。
-  - 着手条件: `no-visible-effect` の揺れが実際に誤判定を生んだら。
+- [x] **`check animation` の `evaluated` が時刻依存 — 解決済み(2026-08-14 に実測で確認)**
+  - この項目が「正しい直し方」として書いていた再設計(**開始位置で保持** = init script で
+    `animationstart` 時に pause)は、**同じ 2026-08-10 の commit 19c5c8d で既に入っていた**。
+    `RECORD_ANIMATION_STARTS_SCRIPT` は記録と同時に `window.__vlmkitHeld` へ push して
+    `anim.pause()` しており、コードのコメントも「Pausing at the start keeps every animation
+    alive and seekable」と明記している。項目が残っていたのは単に消し忘れ。
+  - 懸念されていた副作用も回避済み: `authorPlayState` を **pause の前に**取得し(`:488`)、
+    評価時に `held ? held.authorPlayState : anim.playState` と読み戻す(`:529`)。
+    「作者が止めたのか我々が止めたのか」の区別は残っており `restTimeForAnimation` も壊れていない。
+  - 実測(2026-08-14):
+    - `dashboard.html` 10 連続実行 → `animationCount=4` / `evaluated=4` / `visible=4` /
+      `settleMs=450` / findings `reduced-motion-ignored` が**完全に一定**。「0 か 1 で揺れる」は
+      再現しない。
+    - 危険ケースを作って確認: 40ms・`animation-fill-mode: none` のアニメ(収集より前に
+      終わるはずのもの)を含むページで 8 連続 → `evaluated=3` で一定、かつ当該要素に
+      **frames が 4 点、`maxFrameRatio` 付きで標本化されている**。つまり
+      「フレーム標本化できるのは収集時点で生存しているものだけ」という残存課題の記述も
+      現状では偽。
 
 - [ ] **filmstrip の均一セル → ragged レイアウト(cosmetic)**
   - `composeFilmstrip` はシート全体で最大サイズのセルを使うため、1 行だけ motion bbox が
