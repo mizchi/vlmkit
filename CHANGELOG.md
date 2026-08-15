@@ -621,6 +621,36 @@ suppression works per *rule* instead of per whole gate.
   verbatim `sourceToUrl`, so the collapse is behaviour-preserving and there is now one
   definition to be wrong in.
 
+- **Exit 2 was removed from the contract and three leaves kept emitting it, with
+  incompatible meanings.** `gate-exit.ts` and `docs/design/gate-plugin-architecture.md`
+  settled on two outcomes — "a script branching on exit code 2 must read `counts.warn` from
+  `--json` instead" — and `check perf` was migrated off it. The non-gate leaves were missed,
+  so exit 2 came to mean "fewer engines than intended" in `diff browsers` and "malformed
+  flag value" in `png-diff`, while `skill run` read *any* 2 as "warned". Measured on a skill
+  declaring `{"tool": "diff png", "ignore-region": "0,300,640"}`: the terminal printed
+  `! diff png exit 2`, the report row read `⚠ 2`, and `skill run` exited 2 — a bad value in
+  the skill file, reported as a warning. `skill run` now classifies through one
+  `checkStatus`: non-zero from a check that ran is a failure, "did not run" stays its own
+  state, and the run answers with the same two outcomes every gate does. `diff browsers`
+  exits 1. `png-diff`'s 2 for a usage error is left alone and noted — it is a coherent
+  convention on its own, just not this one.
+
+- **`diff browsers --engines chromium` failed the run for doing what it was told.** The
+  "no cross-engine comparison performed" branch asked how many engines *worked* and never
+  how many were *wanted*, in two places. Measured: `✓ chromium`, no `✗` anywhere, then "Only
+  1 engine(s) usable — Install missing engines with playwright install firefox webkit", and
+  a non-zero exit. A caller who narrows `--engines` now gets neither the install hint nor a
+  failing exit; an under-configured runner missing engines it *did* request still fails,
+  which is what `--allow-skipped` opts out of. One `parityShortfall` serves the terminal
+  summary and the markdown report, since drifting between those two is how they got here,
+  and both wordings still say plainly that no parity comparison happened.
+
+- **`diff elements` printed nine stack frames for a missing flag.** The right sentence
+  ("--selectors is required") followed by eight frames through `parseArgs` / `main` /
+  `delegate` / `runGroupLeaf` / `runCli` — the one part of the output that cannot help the
+  reader. Now a `UsageError` through `handleCliError`, one line, the way `diff-pr` and
+  `baseline` were fixed earlier in this release.
+
 - **`<command> --help` exited 1 on seven commands.** `diff html`, `diff browsers`,
   `inspect smoke`, `scan component`, `scan breakpoints`, `watch` and `skill` all printed
   their usage and then exited non-zero, while every gate command exits 0 through the plugin

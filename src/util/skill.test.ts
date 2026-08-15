@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   checkArgv,
+  checkStatus,
   checkToFlags,
   diagnoseLaunchFailure,
   listSkills,
@@ -267,6 +268,34 @@ describe("renderSkillReport", () => {
     assert.match(md, /`vlmkit check tokens`/, "and what ran, so they can reproduce it");
   });
 
+  it("does not mark a non-zero check as a warning", () => {
+    // The row read `⚠ 2` before, because exit 2 was special-cased as "warned". It was a
+    // malformed `--ignore-region` value in the skill file. Measured end to end.
+    const md = renderSkillReport(
+      { name: "card", checks: [] },
+      "x.png",
+      [result({ tool: "diff png", command: ["diff", "png"], exitCode: 2 })],
+    );
+    assert.match(md, /✗ 2/, "a non-zero exit is a failed check");
+    assert.doesNotMatch(md, /⚠/, "nothing here warned");
+  });
+
+  it("shows the check's own flags, so the command column can be pasted", () => {
+    // The column printed `vlmkit diff browsers` for a check declared as
+    // `diff browsers --engines chromium`, so the one line a reader would copy to reproduce
+    // the run was not the run.
+    const md = renderSkillReport(
+      { name: "card", checks: [] },
+      "a.html",
+      [result({
+        tool: "diff browsers",
+        command: ["diff", "browsers"],
+        args: ["--engines", "chromium"],
+      })],
+    );
+    assert.match(md, /`vlmkit diff browsers --engines chromium`/);
+  });
+
   it("segregates checks that never ran and gives them no exit code", () => {
     // The whole point: a runner that could not launch anything must not render as
     // failing checks. The old table gave a MODULE_NOT_FOUND an `✗ 1`.
@@ -336,4 +365,40 @@ describe("runSkill", () => {
       delete process.env.__VLMKIT_CLI_ENTRY__;
     }
   }, 60_000);
+});
+
+/**
+ * A check's exit code has to be read against the contract that produced it.
+ *
+ * Three sites read `exitCode` directly and two special-cased `=== 2` as "warned". That
+ * stopped being true when `gate-exit.ts` unified the contract to two outcomes and
+ * `check perf` was migrated off exit 2 — after which the only producers of 2 were a
+ * `png-diff` usage error and `diff browsers` on a narrowed engine list, neither a warning.
+ *
+ * Measured before the fix, on `{"tool": "diff png", "ignore-region": "0,300,640"}`: the
+ * terminal printed `! diff png exit 2`, the report row read `⚠ 2`, and `skill run` exited
+ * 2. A malformed value in the skill file, reported as a warning.
+ */
+describe("checkStatus", () => {
+  it("treats every non-zero exit from a check that ran as a failure", () => {
+    assert.equal(checkStatus({ exitCode: 1 }), "fail");
+    assert.equal(checkStatus({ exitCode: 2 }), "fail", "2 is not a warning — it was a usage error");
+    assert.equal(checkStatus({ exitCode: 3 }), "fail", "an unforeseen code counted as neither before");
+    assert.equal(checkStatus({ exitCode: 127 }), "fail");
+  });
+
+  it("passes only on 0", () => {
+    // A gate that merely warned exits 0 under the shared contract, which is how a warn is
+    // supposed to reach here — via `--json` counts, not via the exit code.
+    assert.equal(checkStatus({ exitCode: 0 }), "pass");
+  });
+
+  it("keeps 'did not run' separate from 'ran and failed', whatever the code says", () => {
+    // The distinction that made the report honest about coverage: a check whose tool name
+    // is stale never ran, and reporting it as a failure of the page is a report lying
+    // about what it measured.
+    assert.equal(checkStatus({ exitCode: 1, launchFailure: "unknown command" }), "did-not-run");
+    assert.equal(checkStatus({ exitCode: 0, launchFailure: "unknown command" }), "did-not-run",
+      "a launch failure outranks a zero exit");
+  });
 });

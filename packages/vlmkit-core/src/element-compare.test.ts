@@ -1,6 +1,8 @@
 import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { runElementCompare, type ElementCompareOptions } from "./element-compare.ts";
 
 const FIXTURE_DIR = resolve(import.meta.dirname!, "../../../fixtures/element-compare");
@@ -65,5 +67,37 @@ describe("element-compare", () => {
     const nonexistent = report.elements.find((e) => e.selector === ".nonexistent")!;
     assert.equal(nonexistent.found.baseline, false);
     assert.equal(nonexistent.found.current, false);
+  });
+});
+
+/**
+ * A missing flag prints one sentence, not nine frames of this repo's dispatcher.
+ *
+ * The guard was `main().catch((e) => { console.error(e); process.exit(1); })`, so
+ * `vlmkit diff elements a.html b.html --output-dir out` answered with the right sentence
+ * ("--selectors is required") followed by eight stack frames through `parseArgs`, `main`,
+ * `delegate`, `runGroupLeaf` and `runCli` — the one part of the output that cannot help
+ * the reader. `diff-pr` and `baseline` were moved onto `handleCliError` earlier for exactly
+ * this; this leaf was missed.
+ *
+ * Spawned rather than called: `handleCliError` ends in `process.exit`, which in a vitest
+ * worker would end the file rather than the assertion.
+ */
+describe("diff elements usage errors", () => {
+  const CLI = resolve(fileURLToPath(import.meta.url), "..", "..", "..", "..", "src", "cli", "vlmkit.ts");
+
+  it("prints one line and no stack trace when --selectors is missing", () => {
+    const r = spawnSync(
+      process.execPath,
+      ["--experimental-strip-types", CLI, "diff", "elements", "a.html", "b.html"],
+      { encoding: "utf-8", env: { ...process.env, NO_COLOR: "1" }, timeout: 60_000 },
+    );
+    const output = `${r.stdout ?? ""}${r.stderr ?? ""}`;
+    assert.equal(r.status, 1);
+    assert.match(output, /error: --selectors is required/);
+    assert.doesNotMatch(output, /\bat \w/, `a stack frame leaked into a usage error:\n${output}`);
+    assert.doesNotMatch(output, /runCli|delegate|runGroupLeaf/, "the dispatcher is not the reader's problem");
+    // One line of substance, so the fix is not "a shorter stack".
+    assert.ok(output.trim().split("\n").length <= 2, `expected one line, got:\n${output}`);
   });
 });

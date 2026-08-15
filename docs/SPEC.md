@@ -183,7 +183,7 @@
   - body: _not yet implemented_
 
 - [ ] **Cross-browser parity across Chromium / Firefox / WebKit** — verifies: H1
-  > `vlmkit diff browsers` renders the same HTML in all three engines and reports per-engine pixel diff against Chromium. `--allow-skipped` keeps CI green when WebKit isn't installed.
+  > `vlmkit diff browsers` renders the same HTML in all three engines and reports per-engine pixel diff against Chromium. `--allow-skipped` keeps CI green when WebKit isn't installed. Narrowing `--engines` yourself is not a shortfall: a single requested engine is a render check, reported as such and exiting 0.
   - contributes to: GOAL-VARIANT-RESILIENCE
   - body: _not yet implemented_
 

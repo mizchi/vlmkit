@@ -1196,6 +1196,29 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     `legacySpecLeaves()` が `spec` で絞って落としていた唯一の `run:` leaf
     (`scan breakpoints` — 7件のうちの1つ)。**1件しかない母集団はこの種の穴が生き残る大きさ**。
 
+- [x] **exit 2 は契約から削除済みなのに3箇所が出し続け、意味が非互換に分岐していた**
+  - `gate-exit.ts` と `docs/design/gate-plugin-architecture.md` が二値契約に統一し
+    (「exit code 2 で分岐するスクリプトは `--json` の `counts.warn` を読め」)、
+    `check perf` は移行済み。**非 gate の leaf が取り残された**。
+  - 結果、exit 2 の意味が `diff browsers`「engine が想定より少ない」/
+    `png-diff`「フラグ値が不正」の2通りになり、`skill run` は**どの 2 も warn として読んでいた**。
+  - 実測(`{"tool": "diff png", "ignore-region": "0,300,640"}` の skill):
+    端末 `! diff png exit 2`、レポート行 `⚠ 2`、`skill run` 自身も exit 2。
+    **skill ファイルの不正な値が warn として報告される**。
+  - `checkStatus` 1つに集約(ran して非0は fail / did-not-run は独立 / warn は `--json` 経由)。
+    `png-diff` の「2 = usage error」は単独では筋の通った慣習なので手を付けず記録に留めた。
+- [x] **`diff browsers --engines chromium` が「言われた通りにした」ことで run を失敗させる**
+  - 「engine が*動いた*数」だけを見て「*欲しかった*数」を見ていなかった。しかも2箇所に同じ判定。
+  - 実測: `✓ chromium` / `✗` 皆無 / なのに「Only 1 engine(s) usable — Install missing engines
+    with playwright install firefox webkit」+ 非0 exit。
+  - `parityShortfall` 1つに集約。明示的に絞った場合は install 誘導も失敗も無し、
+    要求した engine が欠けている場合は従来通り失敗(`--allow-skipped` が opt-out)。
+- [x] **`diff elements` が missing flag に9行のスタックトレース**
+  - 正しい1文の後に `parseArgs` / `main` / `delegate` / `runGroupLeaf` / `runCli` の8フレーム。
+  - `UsageError` + `handleCliError` に。`diff-pr` / `baseline` を先に直したのと同じ型で、この leaf が漏れていた。
+- [x] **`isUrl` の9個目のコピー**(`cross-browser.ts`)— `b03f849` で8個畳んだときに漏れていた。
+  用途は「URL なら readFile しない」= `isUrlSource` そのもの。値は一致していたので dedupe のみ。
+
 **作業中に踏んだ罠(記録)**: root の `pnpm build` の出力を `| head` で切ったら
 ビルドが SIGPIPE で途中死し、`packages/vlmkit-markup/dist/` が半分消えた状態になった。
 CLI は `@mizchi/vlmkit-*` を dist 解決するので、**修正が効いていないように見えるのは

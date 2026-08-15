@@ -209,6 +209,31 @@ export function checkArgv(
   return [...command, ...positional, ...args, "--output-dir", outputDir];
 }
 
+/**
+ * One check's status, for the terminal, the markdown table, and the run's exit code alike.
+ *
+ * Three call sites read `exitCode` directly and two of them special-cased `=== 2` as
+ * "warned". That stopped being true when `gate-exit.ts` unified the contract to two
+ * outcomes — `docs/design/gate-plugin-architecture.md`: "The shared contract has two
+ * outcomes … a script branching on exit code 2 must read `counts.warn` from `--json`
+ * instead" — and `check perf` was migrated off it. What still emitted 2 afterwards were a
+ * `png-diff` usage error and `diff browsers` on a narrowed engine list, so the warn branch
+ * only ever fired for things that were not warnings.
+ *
+ * Measured, before the fix, on a skill declaring `{"tool": "diff png",
+ * "ignore-region": "0,300,640"}` — a malformed value: the terminal printed
+ * `! diff png exit 2`, the report row read `⚠ 2`, and `skill run` itself exited 2. A bad
+ * value in the skill file, reported as a warning.
+ *
+ * Warns reach a caller through `--json` `counts.warn`, not through the exit code. So here:
+ * anything non-zero from a check that ran is a failure, and "did not run" stays its own
+ * third state — that distinction is real and was added deliberately.
+ */
+export function checkStatus(r: { exitCode: number; launchFailure?: string }): "did-not-run" | "pass" | "fail" {
+  if (r.launchFailure) return "did-not-run";
+  return r.exitCode === 0 ? "pass" : "fail";
+}
+
 interface CheckOutcome {
   exitCode: number;
   durationMs: number;
@@ -297,9 +322,9 @@ export async function runSkill(
     const subdir = join(outputDir, check.tool.replace(/[^a-z0-9._-]+/gi, "-"));
     const r = await runOneCheck(check.tool, target, args, subdir);
     results.push({ tool: check.tool, command: toolCommand(check.tool), args, ...r, outputDir: subdir });
-    const icon = r.launchFailure ? `${YELLOW}?${RESET}`
-      : r.exitCode === 0 ? `${GREEN}✓${RESET}`
-      : r.exitCode === 2 ? `${YELLOW}!${RESET}`
+    const status = checkStatus(r);
+    const icon = status === "did-not-run" ? `${YELLOW}?${RESET}`
+      : status === "pass" ? `${GREEN}✓${RESET}`
       : `${RED}✗${RESET}`;
     const detail = r.launchFailure
       ? `did not run — ${r.launchFailure}`
@@ -345,9 +370,13 @@ export function renderSkillReport(skill: Skill, target: string, results: SkillRu
   lines.push("| Check | Command | Exit | Duration | Report |");
   lines.push("|---|---|---|---|---|");
   for (const r of ran) {
-    const icon = r.exitCode === 0 ? "✓" : r.exitCode === 2 ? "⚠" : "✗";
+    const icon = checkStatus(r) === "pass" ? "✓" : "✗";
     const dur = (r.durationMs / 1000).toFixed(1) + "s";
-    lines.push(`| \`${r.tool}\` | \`vlmkit ${r.command.join(" ")}\` | ${icon} ${r.exitCode} | ${dur} | \`${join(r.outputDir, "report.md")}\` |`);
+    // The check's own args, not just its verb. The column read `vlmkit diff browsers` for a
+    // check declared as `diff browsers --engines chromium`, so the one line a reader would
+    // copy to reproduce the run was not the run.
+    const invocation = ["vlmkit", ...r.command, ...r.args].join(" ");
+    lines.push(`| \`${r.tool}\` | \`${invocation}\` | ${icon} ${r.exitCode} | ${dur} | \`${join(r.outputDir, "report.md")}\` |`);
   }
   if (ran.length === 0) {
     lines.push("| _(none ran)_ | | | | |");
@@ -459,11 +488,9 @@ async function main(argv = process.argv.slice(2)) {
     const result = await runSkill(name, target, outputBase);
     // A check that never ran is a failure of the run, not a pass. Reporting 0 here
     // would make a skill whose every tool name is stale look green.
-    const couldNotRun = result.results.some((r) => r.launchFailure);
-    const hadFail = result.results.some((r) => !r.launchFailure && r.exitCode === 1);
-    const hadWarn = result.results.some((r) => !r.launchFailure && r.exitCode === 2);
+    const couldNotRun = result.results.some((r) => checkStatus(r) === "did-not-run");
+    const hadFail = result.results.some((r) => checkStatus(r) === "fail");
     if (couldNotRun || hadFail) process.exitCode = 1;
-    else if (hadWarn) process.exitCode = 2;
     return;
   }
   console.error(`error: unknown subcommand: ${sub}`);

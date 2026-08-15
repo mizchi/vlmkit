@@ -11,6 +11,7 @@
  *   vlmkit diff elements before.html after.html --selectors "header,.content,.sidebar"
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { handleCliError, UsageError } from "./cli-error.ts";
 import { isCliEntry } from "./plugin/cli-entry.ts";
 import { join, resolve } from "node:path";
 import { type Page } from "playwright";
@@ -231,7 +232,7 @@ function parseArgs(args: string[]): ElementCompareOptions {
 
   const selectorsRaw = getArg("selectors");
   if (!selectorsRaw) {
-    throw new Error("--selectors is required (comma-separated CSS selectors)");
+    throw new UsageError("--selectors is required (comma-separated CSS selectors)");
   }
   const selectors = selectorsRaw.split(",").map((s) => s.trim()).filter(Boolean);
 
@@ -349,5 +350,11 @@ async function main() {
 }
 
 if (isCliEntry(import.meta.url, "element-compare")) {
-  main().catch((e) => { console.error(e); process.exit(1); });
+  // `handleCliError`, not `console.error(e)`: the bare dump printed a nine-line stack
+  // through `delegate` / `runGroupLeaf` / `runCli` for a missing flag. Measured —
+  // `vlmkit diff elements a.html b.html --output-dir out` answered with the right sentence
+  // ("--selectors is required") followed by eight frames of this repo's dispatcher, which
+  // is the one part of the output that cannot help the reader. `diff-pr` and `baseline`
+  // were moved onto `handleCliError` earlier for the same reason; this leaf was missed.
+  main().catch(handleCliError);
 }

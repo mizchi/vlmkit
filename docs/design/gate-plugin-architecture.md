@@ -399,6 +399,16 @@ Deliberate, and each one aligns a straggler with the documented contract:
   (exit 1), `needs-improvement` is a warn (exit 0). **A script branching on
   exit code 2 must read `counts.warn` from `--json` instead.** `--strict` is an
   accepted no-op.
+
+  This was applied to the gates and missed the non-gate leaves, so for a while
+  exit 2 survived in two places with *incompatible* meanings: `diff browsers`
+  used it for "fewer engines than intended" and `png-diff` uses it for a
+  malformed flag value — and `skill run` read any 2 as "warned", so a bad value
+  in a skill file was reported as a warning. `diff browsers` now exits 1 and
+  `skill run` treats every non-zero from a check that ran as a failure.
+  `png-diff` keeps 2 for usage errors: on its own that is a coherent
+  convention, it is simply not this contract, and nothing now reads it as a
+  warning.
 - **`--json` payloads are the shared envelope**: `{ gate, command, verdict,
   counts, findings, suppressed, retuned, report }`. A gate's previous JSON is
   nested under `report` verbatim. Clients that parsed the old top-level shape
