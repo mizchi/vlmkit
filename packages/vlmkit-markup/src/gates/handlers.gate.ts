@@ -43,6 +43,15 @@ family, and its failure modes are handlers that CANNOT FIRE. Read
 from the DOM: a dragstart source that is not draggable, and a drop
 target with no dragover to preventDefault on.
 
+--probe-drag also drives a real mouse gesture at every pointer-drag
+surface (pointerdown + pointermove on one element -- canvas editors,
+sortable lists, sliders) and reports how many of the element's own
+pixels moved while held and after release. Reported, not graded: a
+0% row is ambiguous between dead handlers, a gesture that began
+somewhere ungrabbable, and feedback painted outside the box. What it
+does settle is that those types were exercised, so they stop being
+listed as uncovered.
+
 --probe-drag adds the two that no static read can reach, by firing
 the sequence and watching what happens: a dragover handler that
 never calls preventDefault (registered, so the check above passes

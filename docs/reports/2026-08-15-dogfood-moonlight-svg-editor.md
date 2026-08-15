@@ -83,6 +83,48 @@ click-only and keep their `pointer-only-control` finding, which is the control f
   case — the alternative route is often elsewhere on the page, which an element-local view
   cannot see. A page that failed CI on `pointer-only-control` for a drag surface now warns.
 
+## Follow-up — the canvas drag is now driven, not just classified
+
+`pointerdown`/`pointermove`/`pointerup` were sitting in `unprobed-handler-types`: "NOT covered
+by the interaction probes". Unlike HTML5 drag, a pointer drag *is* drivable — `mouse.down` /
+`mouse.move` / `mouse.up` is the same input a user produces — so `--probe-drag` now performs
+the gesture on each pointer-drag surface and measures the element's own pixels either side.
+
+On this editor's canvas:
+
+```
+Pointer-drag gesture (real mouse input):
+  - div#app>div>div>svg: feedback while held 8.14%, changed after release 8.53%
+```
+
+and `unprobed-handler-types` dropped from 8 types to 5, because three of them were exercised.
+That warn had been making a claim that was no longer true.
+
+**Pixels rather than the DOM**, and the reason is in `fixtures/handlers/pointer-drag.html`:
+
+| pad | feedback while held | changed after release |
+|---|---|---|
+| `#works` | ~3% | ~3% |
+| `#feedback-only` | ~3% | 0.00% |
+| `#dead` | 0.00% | 0.00% |
+| `#canvas-works` | ~1% | ~2% |
+
+`#canvas-works` draws on a `<canvas>`: its DOM never changes at all, so a DOM comparison
+would call every canvas editor dead. The separation between 0.00% and ~1% is wide.
+
+**Reported, not graded — deliberately.** A 0% row is ambiguous on a real page: dead handlers,
+a gesture that began somewhere ungrabbable, and feedback painted outside the element's box are
+indistinguishable from here. Turning it into a finding would report a state this has not
+established, so `#dead` yields evidence rather than a verdict.
+
+There is one unambiguous variant, measured and **not** shipped yet: wrapping the page's own
+listeners shows whether they ran at all, and an overlay that swallows the gesture is the one
+case where "registered, gesture delivered, never invoked" has a single explanation —
+`{}` invocations for a pad under a transparent sibling, versus the full trio for both the
+working and the dead pad. Doing that means patching `removeEventListener` alongside
+`addEventListener` (a wrapper breaks removal by reference and would make the tool alter the
+page it measures), which is why it is separate.
+
 ## Finding 2 — eight findings that could not say which element they were about
 
 Eight rows of the surface read:

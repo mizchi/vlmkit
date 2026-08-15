@@ -38,6 +38,8 @@ import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { DISCOVER_SCRIPT } from "./interaction-map.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { PNG } from "pngjs";
+import type { Page } from "playwright";
 
 export interface HandlerSurfaceEntry {
   /** Handler types on ancestors that also carry handlers (delegation). */
@@ -80,6 +82,11 @@ export interface HandlerSurface {
   visibleControls?: number;
   /** Present only when `probeDrag` was requested. Absent means "not measured". */
   dragProbe?: DragProbe[];
+  /**
+   * Present only when `probeDrag` was requested AND the page has a pointer-drag surface.
+   * Absent means "not measured", never "measured and fine".
+   */
+  pointerDragProbe?: PointerDragProbe[];
 }
 
 /** Install BEFORE page scripts run (page.addInitScript). */
@@ -363,6 +370,135 @@ export const PROBE_DRAG_SCRIPT = `
 })()
 `;
 
+
+/**
+ * What a real pointer-drag gesture did to a drag surface.
+ *
+ * Unlike HTML5 drag — which CDP cannot drive, and which the synthetic-`DragEvent` probe
+ * exists to work around — a pointer drag IS drivable: `mouse.down` / `mouse.move` /
+ * `mouse.up` is the same input a user produces. So this measures the real thing.
+ *
+ * **Pixels, not the DOM.** Measured on four fixtures plus a real SVG editor:
+ *
+ *   case            during-move   after-release
+ *   works              3.02%         3.02%
+ *   feedback-only      3.02%         0.00%   (reverts on release)
+ *   dead               0.00%         0.00%
+ *   canvas drawing     1.24%         2.16%   <-- DOM never changes at all
+ *
+ * The canvas row is why this compares screenshots. A DOM comparison would call every
+ * `<canvas>`-based editor dead, and the separation between 0.00% and 1.24% is wide.
+ *
+ * **Deliberately reported, not graded.** A 0% result is ambiguous: dead handlers, a gesture
+ * that started somewhere ungrabbable, or feedback rendered outside the element's box all
+ * look identical from here. Turning that into a finding would be reporting a state this has
+ * not established — so the numbers go in the report and the reader decides.
+ */
+export interface PointerDragProbe {
+  /** `path` of the surface entry this belongs to. */
+  path: string;
+  /** Fraction of the element's pixels that changed *while* the drag was held. */
+  feedbackRatio: number;
+  /** Fraction that differ between before the drag and after release. */
+  committedRatio: number;
+  /** Set when the gesture could not be performed (no box, offscreen, detached). */
+  error?: string;
+}
+
+
+/**
+ * Perform the gesture on each pointer-drag surface and measure the pixels either side.
+ *
+ * Started at 30% into the element and dragged toward 70% in stepped moves, so the gesture
+ * resembles a real one: measured on a real editor, 4 steps produced 5 `pointermove` calls and
+ * the rubber-band appeared. The stepping is not load-bearing for the fixtures in
+ * `fixtures/handlers/pointer-drag.html` — breaking it back to a single jump leaves that test
+ * green, checked — because each of them positions from `clientX` rather than integrating
+ * deltas. It is kept because a drag that DOES integrate deltas is a shape real code takes,
+ * and one jump would under-drive it.
+ *
+ * The element is screenshotted rather than the page: a drag surface is often the largest
+ * thing on screen, and full-page pixels would drown a 3% change in a 100% denominator.
+ */
+async function probePointerDrags(
+  page: Page,
+  elements: readonly HandlerSurfaceEntry[],
+): Promise<PointerDragProbe[]> {
+  const surfaces = elements.filter((e) => e.visible && isPointerDragSurface(Object.keys(e.types)));
+  const out: PointerDragProbe[] = [];
+  for (const entry of surfaces) {
+    const row: PointerDragProbe = { path: entry.path, feedbackRatio: 0, committedRatio: 0 };
+    try {
+      // Located by the same `data-vlmkit-*` stamp the surface used, so the probe cannot
+      // drag a different element than the one it reports on. Falls back to the box of the
+      // first element matching the path's last tag when no stamp exists.
+      const handle = await page.evaluateHandle((path: string) => {
+        const describe = (el: Element): string => {
+          const parts: string[] = [];
+          let cur: Element | null = el;
+          while (cur && cur !== document.body && cur.tagName && parts.length < 4) {
+            let p = cur.tagName.toLowerCase();
+            if (cur.id) p += "#" + cur.id;
+            else if (typeof cur.className === "string" && cur.className.trim()) {
+              p += "." + cur.className.trim().split(/\s+/)[0];
+            }
+            parts.unshift(p);
+            cur = cur.parentElement;
+          }
+          return parts.join(">");
+        };
+        for (const el of document.querySelectorAll("*")) if (describe(el) === path) return el;
+        return null;
+      }, entry.path);
+      const el = handle.asElement();
+      if (!el) { row.error = "element not found for its own path"; out.push(row); continue; }
+      const box = await el.boundingBox();
+      if (!box || box.width < 4 || box.height < 4) {
+        row.error = "no usable box"; out.push(row); continue;
+      }
+      const before = await el.screenshot();
+      const at = (fx: number, fy: number) => [box.x + box.width * fx, box.y + box.height * fy] as const;
+      await page.mouse.move(...at(0.3, 0.3));
+      await page.mouse.down();
+      await page.mouse.move(...at(0.5, 0.5), { steps: 4 });
+      const during = await el.screenshot();
+      await page.mouse.move(...at(0.7, 0.7), { steps: 4 });
+      await page.mouse.up();
+      // A frame for the release to render, matching what `settlePage` does elsewhere.
+      await page.waitForTimeout(120);
+      const after = await el.screenshot();
+      row.feedbackRatio = pixelDelta(before, during);
+      row.committedRatio = pixelDelta(before, after);
+    } catch (err) {
+      row.error = err instanceof Error ? err.message.slice(0, 120) : String(err).slice(0, 120);
+    }
+    out.push(row);
+  }
+  return out;
+}
+
+/**
+ * Fraction of pixels that differ, on a per-channel sum with a small floor.
+ *
+ * A floor of 12 across the three channels rather than exact equality: anti-aliased text and
+ * subpixel rendering shift by a unit or two between otherwise identical frames, and counting
+ * those would put a nonzero "feedback" on a drag that produced none. Differently-sized
+ * frames mean the element resized, which is itself a change — reported as 1.
+ */
+function pixelDelta(a: Buffer, b: Buffer): number {
+  const A = PNG.sync.read(a);
+  const B = PNG.sync.read(b);
+  if (A.width !== B.width || A.height !== B.height) return 1;
+  let changed = 0;
+  for (let i = 0; i < A.data.length; i += 4) {
+    const d = Math.abs(A.data[i]! - B.data[i]!)
+      + Math.abs(A.data[i + 1]! - B.data[i + 1]!)
+      + Math.abs(A.data[i + 2]! - B.data[i + 2]!);
+    if (d > 12) changed++;
+  }
+  return A.width * A.height === 0 ? 0 : changed / (A.width * A.height);
+}
+
 export interface HandlerSurfaceOptions extends PageLoadOptions {
   source: string;
   storageState?: string;
@@ -401,6 +537,12 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
     const dragProbe = options.probeDrag
       ? await page.evaluate(PROBE_DRAG_SCRIPT) as DragProbe[]
       : undefined;
+    // Real mouse input, so this needs the Page rather than an evaluate. Only for the
+    // elements already classified as pointer-drag surfaces — one on the editor this came
+    // from, so the screenshot cost is bounded by how many drag surfaces a page has.
+    const pointerDragProbe = options.probeDrag
+      ? await probePointerDrags(page, raw.elements)
+      : undefined;
     return {
       source: options.source,
       elements: raw.elements,
@@ -408,6 +550,7 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
       totalRegistrations: raw.total,
       visibleControls: raw.controls,
       ...(dragProbe ? { dragProbe } : {}),
+      ...(pointerDragProbe && pointerDragProbe.length > 0 ? { pointerDragProbe } : {}),
     };
   });
 }
@@ -580,6 +723,23 @@ export const HANDLER_SURFACE_RULES = [
 export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
   const issues: HandlerIssue[] = [];
   const unprobedTypes = new Set<string>();
+  // Types a probe actually exercised this run. The warn below says these are "NOT covered by
+  // the interaction probes", and for a page whose drag was driven with real mouse input that
+  // statement is simply false — it was covered, which is what the probe is for.
+  const probedThisRun = new Set<string>();
+  if (surface.dragProbe) {
+    for (const row of surface.dragProbe) for (const t of row.ran) probedThisRun.add(t);
+  }
+  if (surface.pointerDragProbe) {
+    for (const row of surface.pointerDragProbe) {
+      if (row.error) continue;
+      // The gesture drives exactly these three; `pointercancel` is not sent by a completed
+      // drag, so it stays unprobed and keeps saying so.
+      for (const t of ["pointerdown", "pointermove", "pointerup", "mousedown", "mousemove", "mouseup"]) {
+        if (surface.elements.some((e) => e.path === row.path && e.types[t])) probedThisRun.add(t);
+      }
+    }
+  }
   for (const e of surface.elements) {
     const hasPointer = Object.keys(e.types).some((t) => POINTER_TYPES.has(t));
     const hasKeyboard = Object.keys(e.types).some((t) => KEYBOARD_TYPES.has(t));
@@ -590,7 +750,7 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
     // page wired to a specific element.
     if (Object.keys(e.types).length < 10 || !e.containsInteractive) {
       for (const t of Object.keys(e.types)) {
-        if (!PROBED_TYPES.has(t)) unprobedTypes.add(t);
+        if (!PROBED_TYPES.has(t) && !probedThisRun.has(t)) unprobedTypes.add(t);
       }
     }
     // ---- Probed drag behaviour ---------------------------------------------
@@ -917,6 +1077,30 @@ export function formatHandlerSurface(surface: HandlerSurface, issues: HandlerIss
   }
   if (Object.keys(surface.globals).length > 0) {
     lines.push(`  - globals: ${Object.entries(surface.globals).map(([k, n]) => (n > 1 ? `${k}×${n}` : k)).join(", ")}`);
+  }
+  // Evidence, not a verdict. A 0% row is ambiguous — dead handlers, a gesture that started
+  // somewhere ungrabbable, or feedback painted outside this element's box are
+  // indistinguishable from here — so the numbers are printed and the reader decides. What
+  // they do settle is that the pointer types were exercised, which is why they no longer
+  // appear under "NOT covered by the interaction probes".
+  if (surface.pointerDragProbe && surface.pointerDragProbe.length > 0) {
+    lines.push("");
+    lines.push(`${BOLD}Pointer-drag gesture (real mouse input):${RESET}`);
+    for (const row of surface.pointerDragProbe) {
+      if (row.error) {
+        lines.push(`  - ${row.path}: ${YELLOW}not driven — ${row.error}${RESET}`);
+        continue;
+      }
+      const pct = (n: number) => `${(n * 100).toFixed(2)}%`;
+      const flat = row.feedbackRatio === 0 && row.committedRatio === 0;
+      lines.push(
+        `  - ${row.path}: feedback while held ${pct(row.feedbackRatio)}`
+        + `, changed after release ${pct(row.committedRatio)}`
+        + (flat
+          ? ` ${YELLOW}(nothing moved — dead handlers, or the drag does not start here)${RESET}`
+          : ""),
+      );
+    }
   }
   if (issues.length > 0) {
     lines.push("");

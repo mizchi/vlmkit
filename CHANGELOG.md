@@ -181,6 +181,29 @@ suppression works per *rule* instead of per whole gate.
   a `warn`, for the same reason the HTML5 rule warns — the alternative route is often
   elsewhere on the page, which an element-local view cannot see.
 
+- **`--probe-drag` drives a real pointer-drag gesture and reports what moved.** Unlike HTML5
+  drag — which CDP cannot drive, and which the synthetic-`DragEvent` probe exists to work
+  around — a pointer drag IS drivable: `mouse.down` / `mouse.move` / `mouse.up` is the input a
+  user produces. So the probe performs it on each pointer-drag surface and measures the
+  element's own pixels while held and after release. On the SVG editor above, its canvas
+  reported `feedback while held 8.14%, changed after release 8.53%`, and
+  `unprobed-handler-types` dropped from 8 types to 5 — that warn says the types are "NOT
+  covered by the interaction probes", which stopped being true for the three the gesture
+  drove.
+
+  Pixels rather than the DOM, because `fixtures/handlers/pointer-drag.html`'s `#canvas-works`
+  draws on a `<canvas>` and its DOM never changes at all: a DOM comparison would call every
+  canvas editor dead. Measured separation across the four pads — `works` ~3%/~3%,
+  `feedback-only` ~3%/0.00%, `dead` 0.00%/0.00%, `canvas-works` ~1%/~2%.
+
+  **Reported, not graded, on purpose.** A 0% row is ambiguous on a real page: dead handlers, a
+  gesture that began somewhere ungrabbable, and feedback painted outside the element's box are
+  indistinguishable from here, so turning it into a finding would report a state this has not
+  established. One unambiguous variant was measured and deliberately left out — wrapping the
+  page's own listeners shows whether they ran at all, which separates an overlay swallowing
+  the gesture (`{}` invocations) from a merely inert handler (the full trio) — because doing
+  it safely means patching `removeEventListener` too, or the tool alters the page it measures.
+
 - **An icon-only control now identifies itself in the handler surface.** On that same editor,
   eight rows read `div>div>div>button ""` — one per toolbar icon — with *both* identity
   signals blank at once: no text (icons), and no `id` or `class`, so `describe()` produced the

@@ -1319,6 +1319,28 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - **アプリ側には名前の無いボタンは1つも無かった**(18/18 が命名済み)。vlmkit が読む属性を
     間違えていただけ。
 
+- [x] **pointer-drag を実ジェスチャで駆動して証拠を出す**(`--probe-drag`)
+  - HTML5 drag と違い pointer drag は **Playwright で本物の入力を送れる**
+    (`mouse.down`/`move`/`up`)。実エディタのキャンバスで
+    `feedback while held 8.14%, changed after release 8.53%`。
+  - **`unprobed-handler-types` が 8型 → 5型**。あの warn は「interaction probes で未カバー」と
+    言っており、実際に駆動した3型についてはもう真ではなかった。
+  - **DOM ではなくピクセルで比較**。`fixtures/handlers/pointer-drag.html` の `#canvas-works` は
+    `<canvas>` に描くので **DOM が一切変わらない** — DOM 比較だと canvas エディタ全部が
+    「死んだドラッグ」になる。実測の分離: works ~3%/~3%、feedback-only ~3%/0.00%、
+    dead 0.00%/0.00%、canvas-works ~1%/~2%。
+  - **数値は出すがグレードしない**(意図的)。実ページでの 0% は「ハンドラが死んでいる」
+    「掴む位置が違った」「フィードバックが要素の外」を区別できず、finding にすると
+    **確立していない状態を報告することになる**。
+  - **曖昧さの無い変種は測ったうえで今回は入れていない**: ページ自身のリスナを包めば
+    「呼ばれたか」が分かり、オーバーレイがジェスチャを食っているケースだけは説明が一意
+    (透明な兄弟要素の下では呼び出し `{}`、working と dead はどちらも三点セット完走)。
+    ただし安全にやるには `removeEventListener` も同時に patch する必要があり
+    (wrapper は参照一致を壊すので、**計測対象のページを書き換えてしまう**)、別作業にした。
+  - **自分のコメントを1つ訂正した**: `steps: 4` の理由に「デルタを積算する実装が動かない」と
+    書いたが、fixture は全部 `clientX` から絶対位置を出すので単発 move でも通る(壊して確認)。
+    実測した内容だけを書くように直した。
+
 **アプリ側の findings**(vlmkit の欠陥ではない、記録として): `page-overflow-x` 8px(全 viewport)、
 375px で `78%` ズーム表示が完全に隠れる(`occluded-text`、glyph サンプル100%が遮蔽物にヒット)、
 `No elements` が `#999` on white = 2.85:1(11px で AA 未満)。

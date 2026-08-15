@@ -545,3 +545,60 @@ test("E2E: the accessible name identifies an icon-only control", { timeout: 120_
   const names = s.elements.filter((e) => e.path.endsWith("button")).map((e) => e.text).sort();
   assert.deepEqual(names, ["Fit to Canvas", "Import SVG", "Text wins", "Zoom Out"]);
 });
+
+test("E2E: the pointer-drag gesture separates a working drag from a dead one, canvas included",
+  { timeout: 180_000 }, async () => {
+  // A real gesture — mouse.down / move / up — not a synthetic event: unlike HTML5 drag, this
+  // one IS drivable, so the probe measures the same input a user produces.
+  //
+  // Pixels rather than the DOM, and `#canvas-works` is the reason: its DOM never changes at
+  // all while it draws, so a DOM comparison would call every canvas editor dead.
+  const s = await buildHandlerSurface({
+    source: join(REPO_ROOT, "fixtures/handlers/pointer-drag.html"),
+    probeDrag: true,
+  });
+  assert.ok(s.pointerDragProbe, "probeDrag must produce pointer-drag rows on this page");
+  const row = (id: string) => s.pointerDragProbe!.find((r) => r.path.endsWith(`#${id}`));
+
+  for (const id of ["works", "feedback-only", "dead", "canvas-works"]) {
+    assert.ok(row(id), `${id} should have been driven`);
+    assert.equal(row(id)!.error, undefined, `${id}: ${row(id)!.error}`);
+  }
+  // A drag that moves something, while held and after release.
+  assert.ok(row("works")!.feedbackRatio > 0.005, `works feedback ${row("works")!.feedbackRatio}`);
+  assert.ok(row("works")!.committedRatio > 0.005, `works committed ${row("works")!.committedRatio}`);
+  // Engages, then reverts: feedback without a commit is a distinguishable state.
+  assert.ok(row("feedback-only")!.feedbackRatio > 0.005);
+  assert.equal(row("feedback-only")!.committedRatio, 0, "it put the dot back");
+  // Wired and inert.
+  assert.equal(row("dead")!.feedbackRatio, 0);
+  assert.equal(row("dead")!.committedRatio, 0);
+  // The canvas: pixels move, the DOM does not.
+  assert.ok(row("canvas-works")!.feedbackRatio > 0.005, "a canvas drag must register as feedback");
+
+  // Evidence, not a verdict: the inert pad gets NO finding, because 0% is ambiguous on a real
+  // page — dead handlers, a bad start point and offscreen feedback all look like this.
+  const issues = deriveHandlerIssues(s);
+  const kinds = new Set(issues.map((i) => i.kind));
+  assert.equal(kinds.has("pointer-drag-no-feedback" as never), false, "no such rule, on purpose");
+
+  // What the probe DOES settle: those types were exercised, so the gate stops calling them
+  // uncovered.
+  const unprobed = issues.find((i) => i.kind === "unprobed-handler-types");
+  if (unprobed) {
+    for (const t of ["pointerdown", "pointermove", "pointerup"]) {
+      assert.doesNotMatch(unprobed.message, new RegExp(`\\b${t}\\b`), `${t} was probed this run`);
+    }
+  }
+});
+
+test("without the probe, the pointer types are still reported as uncovered", () => {
+  // The other half of the contract above: the warn is correct when nothing drove them, and
+  // "not measured" must not read as "measured and fine".
+  const s = surface(entry({ path: "div#canvas", types: { pointerdown: 1, pointermove: 1 } }));
+  assert.equal(s.pointerDragProbe, undefined);
+  const unprobed = deriveHandlerIssues(s).find((i) => i.kind === "unprobed-handler-types")!;
+  assert.ok(unprobed, "with no probe, the types are uncovered and must say so");
+  assert.match(unprobed.message, /pointerdown/);
+  assert.match(unprobed.message, /pointermove/);
+});

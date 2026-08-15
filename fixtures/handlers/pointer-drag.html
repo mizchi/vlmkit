@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pointer-driven drag — four outcomes</title>
+<!--
+  The drag that is NOT the HTML5 drag-and-drop API. No `dragstart` anywhere on this page:
+  every pad here drags with pointerdown / pointermove / pointerup, which is how canvas
+  editors, sortable lists, sliders, maps and split panes all work.
+
+  `vlmkit scan handlers <this> --probe-drag` performs a real mouse gesture on each pad and
+  reports two numbers per pad. The measured separation, which is what the pixel comparison
+  is for:
+
+    pad              feedback while held   changed after release
+    #works                  ~3%                   ~3%      moves and stays
+    #feedback-only          ~3%                   0.00%    moves, reverts on release
+    #dead                   0.00%                 0.00%    handlers wired, nothing happens
+    #canvas-works           ~1%                   ~2%      the DOM NEVER changes
+
+  #canvas-works is why the probe compares screenshots rather than the DOM. A DOM comparison
+  would call every <canvas> editor dead; the pixels say otherwise.
+
+  The numbers are reported, not graded. A 0.00% row is ambiguous on a real page — dead
+  handlers, a gesture that began somewhere ungrabbable, and feedback painted outside the
+  element's own box are indistinguishable from here — so `#dead` produces evidence a reader
+  can act on rather than a finding the tool cannot justify.
+
+  Every pad here also reports `drag-without-keyboard-alternative`: none of them has a
+  keyboard path, and a pointer drag has no keyboard equivalent.
+-->
+<style>
+  body { margin: 0; font: 14px/1.4 system-ui, sans-serif; display: flex; gap: 12px; padding: 12px; }
+  .pad { width: 200px; height: 160px; background: #eef; position: relative; touch-action: none; }
+  .dot { width: 24px; height: 24px; background: #1a6ed8; border-radius: 50%; position: absolute; left: 10px; top: 10px; }
+  .broken { background: #fbeaea; }
+</style>
+</head>
+<body>
+
+<div class="pad" id="works"><div class="dot" id="d1"></div></div>
+<div class="pad" id="feedback-only"><div class="dot" id="d2"></div></div>
+<div class="pad broken" id="dead"><div class="dot" id="d3"></div></div>
+<canvas class="pad" id="canvas-works" width="200" height="160"></canvas>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const local = (pad, e) => {
+    const r = pad.getBoundingClientRect();
+    return [e.clientX - r.left - 12, e.clientY - r.top - 12];
+  };
+
+  // 1. A working drag: the dot follows the pointer and stays where it is dropped.
+  (() => {
+    const pad = $("works"), dot = $("d1");
+    let held = false;
+    pad.addEventListener("pointerdown", () => { held = true; });
+    pad.addEventListener("pointermove", (e) => {
+      if (!held) return;
+      const [x, y] = local(pad, e);
+      dot.style.left = x + "px";
+      dot.style.top = y + "px";
+    });
+    pad.addEventListener("pointerup", () => { held = false; });
+  })();
+
+  // 2. Feedback while held, reverted on release: the gesture engages and commits nothing.
+  (() => {
+    const pad = $("feedback-only"), dot = $("d2");
+    let held = false, home = null;
+    pad.addEventListener("pointerdown", () => { held = true; home = [dot.style.left, dot.style.top]; });
+    pad.addEventListener("pointermove", (e) => {
+      if (!held) return;
+      const [x, y] = local(pad, e);
+      dot.style.left = x + "px";
+      dot.style.top = y + "px";
+    });
+    pad.addEventListener("pointerup", () => {
+      held = false;
+      dot.style.left = home[0] || "10px";
+      dot.style.top = home[1] || "10px";
+    });
+  })();
+
+  // 3. The full trio registered, and nothing ever happens.
+  (() => {
+    const pad = $("dead");
+    pad.addEventListener("pointerdown", () => {});
+    pad.addEventListener("pointermove", () => {});
+    pad.addEventListener("pointerup", () => {});
+  })();
+
+  // 4. Drawing on a canvas: pixels change on every move, the DOM never changes at all.
+  (() => {
+    const c = $("canvas-works"), ctx = c.getContext("2d");
+    let held = false;
+    ctx.fillStyle = "#eef";
+    ctx.fillRect(0, 0, 200, 160);
+    ctx.strokeStyle = "#b3261e";
+    ctx.lineWidth = 3;
+    c.addEventListener("pointerdown", (e) => {
+      held = true;
+      const r = c.getBoundingClientRect();
+      ctx.beginPath();
+      ctx.moveTo(e.clientX - r.left, e.clientY - r.top);
+    });
+    c.addEventListener("pointermove", (e) => {
+      if (!held) return;
+      const r = c.getBoundingClientRect();
+      ctx.lineTo(e.clientX - r.left, e.clientY - r.top);
+      ctx.stroke();
+    });
+    c.addEventListener("pointerup", () => { held = false; });
+  })();
+</script>
+</body>
+</html>
