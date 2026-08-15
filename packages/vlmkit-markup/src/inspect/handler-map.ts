@@ -33,6 +33,7 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { type PageLoadOptions, applyHar, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -1481,12 +1482,28 @@ export function compareHandlerSurfaces(reference: HandlerSurface, attempt: Handl
 // ---------------------------------------------------------------------------
 // Report + CLI
 
-export function formatHandlerSurface(surface: HandlerSurface, issues: HandlerIssue[]): string {
+/**
+ * @param rules The project's effective rule settings, when the runner supplies them.
+ *
+ * Consulting them is what stops the prose from contradicting the verdict. Without it,
+ * `--rule drag-source-inert=off` printed `status: 5 suspect issue(s)` in red, listed all five,
+ * and exited 0 — measured, and the runner's own note said the five were suppressed. A rule set
+ * to `off` is dropped here; one re-tuned to another severity is counted and printed at the
+ * severity the project chose, so `=info` moves a line out of the suspect count rather than
+ * leaving it red.
+ */
+export function formatHandlerSurface(
+  surface: HandlerSurface,
+  issues: HandlerIssue[],
+  rules?: RuleView,
+): string {
   const lines: string[] = [];
   lines.push(`${BOLD}${CYAN}vlmkit scan handlers${RESET}`);
   lines.push(`${DIM}source: ${surface.source}${RESET}`);
   lines.push("");
-  const suspects = issues.filter((i) => i.severity === "suspect").length;
+  const effective = (i: HandlerIssue) => rules?.effective(i.kind) ?? i.severity;
+  issues = issues.filter((i) => effective(i) !== "off");
+  const suspects = issues.filter((i) => effective(i) === "suspect").length;
   // `ok` only when there is nothing at all. It used to print green beside a warn,
   // which is the same self-contradiction `check design` had — a headline that the
   // lines under it disagree with.
@@ -1575,8 +1592,11 @@ export function formatHandlerSurface(surface: HandlerSurface, issues: HandlerIss
     lines.push("");
     lines.push(`${BOLD}Issues:${RESET}`);
     for (const i of issues) {
-      const color = i.severity === "suspect" ? RED : YELLOW;
-      lines.push(`  ${color}${i.severity}${RESET} [${i.kind}] ${i.message}`);
+      // The project's severity, not the rule's default: a line re-tuned to `info` printing
+      // `suspect` in red is the same disagreement as an off rule printing at all.
+      const severity = effective(i);
+      const color = severity === "suspect" ? RED : YELLOW;
+      lines.push(`  ${color}${severity}${RESET} [${i.kind}] ${i.message}`);
     }
   }
   return lines.join("\n");

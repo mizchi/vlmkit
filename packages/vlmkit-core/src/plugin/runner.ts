@@ -337,6 +337,20 @@ function round(ms: number): number {
  * `check integrity` prints its exemptions and `gates suppressions` exists.
  * A gate that passes because three rules were turned off must say so on the
  * same screen as the verdict.
+ *
+ * It also has to say when the prose above it disagrees. `format(report, rules)` lets a gate
+ * render suppression into its own output, and exactly one of the 27 does (`check integrity`);
+ * for the other 26 the prose is rendered from the raw report, so `--rule x=off` produced a
+ * screen that contradicted itself. Measured on `scan handlers`:
+ *
+ *     status: 5 suspect issue(s), 7 warn      <- red, and rendered pre-suppression
+ *     ... five suspect lines ...
+ *     5 finding(s) suppressed by rule settings
+ *     $ echo $?  ->  0
+ *
+ * A reader has to know which half to believe. `gate.format.length < 2` says the formatter
+ * never received the rule view — its declared arity, so no gate has to be listed here — and
+ * that is when the disclaimer is printed.
  */
 export function formatRuleNotes(gate: AnyGateDefinition, applied: AppliedRules): string {
   const lines: string[] = [];
@@ -348,6 +362,13 @@ export function formatRuleNotes(gate: AnyGateDefinition, applied: AppliedRules):
       `${YELLOW}${applied.suppressed.length} finding(s) suppressed by rule settings${RESET}`
       + ` ${DIM}(${[...byRule].map(([rule, n]) => `${rule} x${n}`).join(", ")})${RESET}`,
     );
+    if (gate.format.length < 2) {
+      lines.push(
+        `${DIM}  The report above was rendered before those settings were applied, so it still`
+        + ` lists them and its own status line still counts them. The verdict and exit code do`
+        + ` not.${RESET}`,
+      );
+    }
   }
   if (applied.retuned.length > 0) {
     const byRule = new Map<string, RetuneNote>();

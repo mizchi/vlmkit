@@ -886,3 +886,35 @@ test("E2E: an inert source is retried, and the source after it is still measured
   assert.equal(kinds.length, 1, `only the inert one reports: ${kinds.join(", ")}`);
   assert.match(kinds[0]!, /#dead-src/);
 });
+
+test("the report obeys rule settings instead of contradicting the verdict", async () => {
+  const { formatHandlerSurface } = await import("./handler-map.ts");
+  // `ix` set and a keydown handler present, so `pointer-only-control` and
+  // `drag-without-keyboard-alternative` stay out of it: the counts below are then about the
+  // one rule under test, and not about whatever else this element would have reported.
+  const s = surface(entry({ path: "div#src", ix: 3, types: { dragstart: 1, keydown: 1 }, draggable: true }));
+  s.realDragProbe = [realRow({ path: "div#src" })];
+  const issues = deriveHandlerIssues(s);
+  assert.deepEqual(issues.map((i) => i.kind).sort(), ["drag-source-inert", "unprobed-handler-types"]);
+  const plain = (t: string) => t.replace(/\[[0-9;]*m/g, "");
+
+  // Rule-blind, which is how this read before: red status, the finding listed, and the runner
+  // printing "1 finding(s) suppressed" underneath it. Measured on the drag fixture with four
+  // rules off: `status: 5 suspect issue(s)` and `exit=0` on the same screen.
+  assert.match(plain(formatHandlerSurface(s, issues)), /status: 1 suspect issue\(s\), 1 warn/);
+
+  // `off` drops the line and the count with it.
+  const off = plain(formatHandlerSurface(s, issues, {
+    effective: (id) => (id === "drag-source-inert" ? "off" : "warn"),
+  }));
+  assert.doesNotMatch(off, /drag-source-inert/);
+  assert.match(off, /status: 1 warn\(s\)/);
+
+  // Re-tuned prints at the severity the project chose, and stops being counted as a suspect.
+  const info = plain(formatHandlerSurface(s, issues, {
+    effective: (id) => (id === "drag-source-inert" ? "info" : "warn"),
+  }));
+  assert.match(info, /info \[drag-source-inert\]/);
+  assert.match(info, /status: 2 warn\(s\)/);
+  assert.doesNotMatch(info, /suspect/);
+});

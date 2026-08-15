@@ -375,6 +375,35 @@ describe("runGate", () => {
     assert.match(outcome.text, /bad-thing x1/);
   });
 
+  it("says when the prose above the note disagrees with the verdict", async () => {
+    // `format(report, rules)` lets a gate render suppression itself, and one of the 27 does.
+    // For the rest the prose comes from the raw report, so `--rule x=off` printed a red status
+    // line, listed the suppressed findings, and exited 0. Measured on `check a11y contrast`:
+    // `✗ 2 contrast failure(s)` with `exit=0` and a note saying both were suppressed. A reader
+    // cannot tell which half to believe unless the output says.
+    const blind = await runGate(
+      fakeGate(), // format: (report) => … — one parameter
+      ["page.html", "--strict", "--rule", "bad-thing=off"],
+      { ledger: false },
+    );
+    assert.match(blind.text, /rendered before those settings were applied/);
+
+    // A gate that takes the rule view is trusted to have applied it, and gets no disclaimer.
+    const aware = await runGate(
+      fakeGate({ format: (report, rules) => `fake: ${report.hits.length} hit(s), off=${rules?.effective("bad-thing")}` }),
+      ["page.html", "--strict", "--rule", "bad-thing=off"],
+      { ledger: false },
+    );
+    assert.match(aware.text, /1 finding\(s\) suppressed by rule settings/, "the note itself still prints");
+    assert.doesNotMatch(aware.text, /rendered before those settings were applied/);
+    assert.match(aware.text, /off=off/, "and the view really reaches the formatter");
+
+    // No suppression, no note and no disclaimer — this must not fire on every run.
+    const clean = await runGate(fakeGate(), ["page.html"], { ledger: false });
+    assert.doesNotMatch(clean.text, /rendered before those settings were applied/);
+    assert.doesNotMatch(clean.text, /suppressed by rule settings/);
+  });
+
   it("rejects a --rule naming this gate and a rule it does not have", async () => {
     // A typo that silences nothing is the exact failure mode rule settings
     // exist to remove, so it fails the run rather than being ignored.

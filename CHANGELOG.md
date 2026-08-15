@@ -760,6 +760,22 @@ suppression works per *rule* instead of per whole gate.
 
 ### Fixed
 
+- **`--rule x=off` printed a report that contradicted the verdict.** Suppression happens on
+  the normalized finding list, while a gate's prose is rendered from its raw report, so
+  `check a11y contrast --rule contrast-below-aa=off` printed `✗ 2 contrast failure(s)` in red,
+  exited 0, and noted underneath that both had been suppressed. `scan handlers` with four rules
+  off was worse: `status: 5 suspect issue(s)` on the same screen as `exit=0`. The contract has
+  had `format(report, rules)` for this, and exactly one of the 27 gates used it. Two fixes,
+  because they cover different ground:
+  - `scan handlers` and `check interactions` now consult the rule view: a rule set to `off`
+    stops being printed and stops being counted, and one re-tuned to another severity prints at
+    the severity the project chose rather than in red.
+  - For the 25 gates that are still rule-blind, the runner says so — the suppression note now
+    adds "The report above was rendered before those settings were applied, so it still lists
+    them and its own status line still counts them. The verdict and exit code do not."
+    Keyed on `gate.format.length`, the formatter's declared arity, so no gate has to be listed
+    anywhere and a gate that migrates loses the disclaimer automatically.
+
 - **A template literal ate `\s`, and every probed drag finding on a normal page vanished.**
   `PROBE_DRAG_SCRIPT` re-derived each element's path to join its rows back to the surface
   entries, with `className.trim().split(/\s+/)[0]`. In a plain template literal `\s` loses its

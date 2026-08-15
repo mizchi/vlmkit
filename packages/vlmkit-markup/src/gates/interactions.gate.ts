@@ -15,6 +15,7 @@
  * without re-tuning the element rules.
  */
 
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
 import { PAGE_LOAD_INPUTS, type PageLoadOptions, parsePageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { defineGate } from "@mizchi/vlmkit-core/plugin/contract.ts";
@@ -202,9 +203,9 @@ contract and every response mismatch is reported.`,
     }
     return findings;
   },
-  format: (report) => {
+  format: (report, rules) => {
     const text = formatInteractionReport(report.map, report.issues, report.comparison);
-    return report.handlerSurface && report.handlerIssues ? `${text}\n\n${formatHandlerBlock(report)}` : text;
+    return report.handlerSurface && report.handlerIssues ? `${text}\n\n${formatHandlerBlock(report, rules)}` : text;
   },
   ledger: (report, options) => ({
     tool: "check-interactions",
@@ -239,8 +240,8 @@ function describeEntry(entry: { role: string; name: string; path: string }): str
  * function. Only `buildHandlerSurface` — which launches a browser — stays
  * lazily imported inside `run`.
  */
-function formatHandlerBlock(report: InteractionsGateReport): string {
-  let block = formatHandlerSurface(report.handlerSurface!, report.handlerIssues!);
+function formatHandlerBlock(report: InteractionsGateReport, rules?: RuleView): string {
+  let block = formatHandlerSurface(report.handlerSurface!, report.handlerIssues!, rules);
   if (report.surfaceMismatches) {
     block += "\n\nSurface vs reference:";
     if (report.surfaceMismatches.length === 0) block += `\n  ${GREEN}event vocabulary matches${RESET}`;

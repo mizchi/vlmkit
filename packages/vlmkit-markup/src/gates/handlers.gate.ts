@@ -103,7 +103,7 @@ Components property.`,
       // which is not always a valid selector.
       ...(issue.element ? { evidence: { element: issue.element } } : {}),
     })),
-  format: ({ surface, issues }) => formatHandlerSurface(surface, issues),
+  format: ({ surface, issues }, rules) => formatHandlerSurface(surface, issues, rules),
   ledger: ({ surface, issues }, { source }) => ({
     tool: "scan-handlers",
     source,
