@@ -960,3 +960,152 @@ test("the report obeys rule settings instead of contradicting the verdict", asyn
   assert.match(info, /status: 2 warn\(s\)/);
   assert.doesNotMatch(info, /suspect/);
 });
+
+// ---------------------------------------------------------------------------
+// The drag timeline — what happened in between, not just how it ended
+
+test("the printed route drops `drag`, merges repeats, and says which state it could not read", async () => {
+  const { formatDragTimeline } = await import("./handler-map.ts");
+  const lines = formatDragTimeline([
+    { type: "dragstart", path: "div#card", count: 1 },
+    { type: "drag", path: "div#card", count: 1 },
+    { type: "dragover", path: "div#bin", count: 1, prevented: false },
+    // `drag` fires on the SOURCE between every `dragover` on the target, so without dropping it
+    // the two never coalesce and one gesture printed seven lines of alternating noise.
+    { type: "drag", path: "div#card", count: 1 },
+    { type: "dragover", path: "div#bin", count: 3, prevented: false },
+    { type: "dragover", path: "div#quiet", count: 1, prevented: null },
+    { type: "drop", path: "div#zone", count: 1, prevented: true, received: [{ type: "text/plain", value: "ok" }] },
+    { type: "dragend", path: "div#card", count: 1 },
+  ], 8);
+  const route = lines.join(" ");
+  assert.doesNotMatch(route, /drag@/, "`drag` carries no routing information");
+  assert.match(route, /dragover@div#bin x4/, "1 + 3 merged across the interleaved `drag`");
+  assert.match(route, /dragover@div#bin x4 \(NOT prevented — the drop is refused here\)/);
+  // stopPropagation means the bubble-phase listener never saw the event. Unknown, and saying
+  // "not prevented" there would accuse a target that may well have cancelled it — measured: a
+  // zone that calls preventDefault AND stopPropagation still receives the drop.
+  assert.match(route, /dragover@div#quiet \(propagation stopped — cannot tell\)/);
+  assert.match(route, /drop@div#zone \(prevented\) \[got text\/plain="ok"\]/);
+});
+
+test("a payload the target really received refutes `dragstart-transfers-nothing`", () => {
+  // The synthetic probe dispatches `dragstart` with a DataTransfer this code made, so all it can
+  // see is "the handler set nothing" — and for a natively draggable element the BROWSER fills
+  // the payload in. Measured on the fixture's `<a href>`: synthetic transfer empty, real drop
+  // received `text/plain="file:///…#x"`, the link's own URL. A target calling getData() there
+  // reads the URL, not "".
+  const s = surface(entry({ path: "a#link", types: { dragstart: 1 }, draggable: true }));
+  s.dragProbe = [{ path: "a#link", ran: ["dragstart"], transferredTypes: [] }];
+  const warns = () => deriveHandlerIssues(s).filter((i) => i.kind === "dragstart-transfers-nothing").length;
+  assert.equal(warns(), 1, "with no real drag there is no evidence, so the warn stands");
+
+  s.realDragProbe = [realRow({
+    path: "a#link",
+    dragstartFired: true,
+    droppedOn: "div#zone",
+    timeline: [{ type: "drop", path: "div#zone", count: 1, received: [{ type: "text/plain", value: "file:///x" }] }],
+  })];
+  assert.equal(warns(), 0, "a payload observed at a drop refutes it");
+
+  // An empty payload at the drop is the case the warn was written for, and it survives.
+  s.realDragProbe = [realRow({
+    path: "a#link",
+    dragstartFired: true,
+    droppedOn: "div#zone",
+    timeline: [{ type: "drop", path: "div#zone", count: 1, received: [] }],
+  })];
+  assert.equal(warns(), 1);
+});
+
+test("E2E: the route explains a drop that never happened", { timeout: 180_000 }, async () => {
+  // The most common drag defect: the target registers `dragover` and forgets `preventDefault`.
+  // The aggregate says "no target accepted it"; the route says where it went and why.
+  const dir = mkdtempSync(join(tmpdir(), "handlers-route-"));
+  const file = join(dir, "forgot.html");
+  writeFileSync(file, `<!doctype html><html><head><meta charset="utf-8"><title>t</title>
+    <style>.item{width:150px;padding:8px;background:#1a6ed8;color:#fff}
+           .zone{width:170px;height:70px;background:#eee;margin-top:10px}</style></head><body>
+    <div class="item" id="card" draggable="true">card</div>
+    <div class="zone" id="bin">no preventDefault</div>
+    <script>
+      document.getElementById("card").addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", "card-7");
+      });
+      document.getElementById("bin").addEventListener("dragover", () => {});
+      document.getElementById("bin").addEventListener("drop", () => {});
+    </script>
+  </body></html>`);
+  const s = await buildHandlerSurface({ source: file, probeDrag: true });
+  const row = s.realDragProbe?.find((r) => r.path.endsWith("#card"));
+  assert.ok(row?.dragstartFired, "the drag itself starts");
+  assert.equal(row.droppedOn, undefined, "and nothing accepts it");
+  const over = row.timeline?.filter((step) => step.type === "dragover" && step.path.endsWith("#bin")) ?? [];
+  assert.ok(over.length > 0, "the drag must have crossed the target");
+  assert.ok(over.every((step) => step.prevented === false), "measured on the real gesture, after the page's handler ran");
+  assert.equal(row.timeline?.some((step) => step.type === "drop"), false, "an uncancelled dragover produces no drop AT ALL");
+});
+
+test("E2E: a target that stops propagation is reported as unreadable, not as refusing", { timeout: 180_000 }, async () => {
+  // Nested drop zones do this routinely. The bubble-phase listener that reads `defaultPrevented`
+  // never sees the event, and the drop still lands — so `false` there would be a false accusation.
+  const dir = mkdtempSync(join(tmpdir(), "handlers-quiet-"));
+  const file = join(dir, "quiet.html");
+  writeFileSync(file, `<!doctype html><html><head><meta charset="utf-8"><title>t</title>
+    <style>.item{width:150px;padding:8px;background:#1a6ed8;color:#fff}
+           .zone{width:170px;height:70px;background:#eee;margin-top:10px}</style></head><body>
+    <div class="item" id="card" draggable="true">card</div>
+    <div class="zone" id="quiet">prevents and stops</div>
+    <script>
+      document.getElementById("card").addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("text/plain", "c");
+      });
+      const z = document.getElementById("quiet");
+      z.addEventListener("dragover", (e) => { e.preventDefault(); e.stopPropagation(); });
+      z.addEventListener("drop", (e) => { e.preventDefault(); e.stopPropagation(); });
+    </script>
+  </body></html>`);
+  const s = await buildHandlerSurface({ source: file, probeDrag: true });
+  const row = s.realDragProbe?.find((r) => r.path.endsWith("#card"))!;
+  assert.ok(row.droppedOn?.endsWith("#quiet"), "the drop lands — preventDefault was called");
+  const over = row.timeline!.filter((step) => step.type === "dragover" && step.path.endsWith("#quiet"));
+  assert.ok(over.length > 0);
+  assert.ok(over.every((step) => step.prevented === null), "unknown, because the event never bubbled");
+  // And the payload is readable at the drop even though propagation stopped after it: the
+  // capture-phase read happens first.
+  const drop = row.timeline!.find((step) => step.type === "drop");
+  assert.deepEqual(drop?.received, [{ type: "text/plain", value: "c" }]);
+});
+
+test("E2E: the drop payload is read at the drop, where it is the only place readable",
+  { timeout: 180_000 }, async () => {
+  // Protected mode: `getData()` returns "" during dragstart/dragenter/dragover and the real
+  // value during drop — measured. So the fixture's three working sources show three different
+  // answers, and each is a different story about the same wire.
+  const s = await buildHandlerSurface({
+    source: join(REPO_ROOT, "fixtures/handlers/drag-and-drop.html"),
+    probeDrag: true,
+  });
+  const received = (id: string) => s.realDragProbe
+    ?.find((r) => r.path.endsWith(`#${id}`))
+    ?.timeline?.find((step) => step.type === "drop")?.received;
+
+  // The page set it.
+  assert.deepEqual(received("ok"), [{ type: "text/plain", value: "ok" }]);
+  // The page set nothing and the BROWSER filled in three types for the link — which is the
+  // evidence that the payload is not the page's: an `<a href>` contributes `text/plain` and
+  // `text/uri-list` (both the URL) plus `text/html` (the serialized element).
+  const native = received("native-source") ?? [];
+  assert.deepEqual(native.map((r) => r.type), ["text/plain", "text/uri-list", "text/html"]);
+  assert.match(native[0]!.value, /^file:.*drag-and-drop\.html#x$/);
+  assert.match(native[2]!.value, /^<a /);
+  // Nobody set anything: `ondragstart="void 0"` on a plain div.
+  assert.deepEqual(received("attr-source"), []);
+
+  // Which is why only the last of the three keeps the warn.
+  const transfersNothing = deriveHandlerIssues(s)
+    .filter((i) => i.kind === "dragstart-transfers-nothing").map((i) => i.element);
+  assert.equal(transfersNothing.some((el) => el.includes("#attr-source")), true);
+  assert.equal(transfersNothing.some((el) => el.includes("#native-source")), false,
+    "refuted by what the target actually received");
+});

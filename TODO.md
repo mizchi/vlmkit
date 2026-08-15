@@ -1286,6 +1286,28 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     **正常な source が drag しなくなる**(`native-source` が落ちた)。
 - rule 総数 141 → 143 → 145。
 
+**途中経過(route)まで出せるようにした** — 集約値だけでは drag のデバッグにならないため。
+7型の順序付き timeline を source ごとに持ち、**drop しなかった source のみ** route を印字する
+(成功したものまで出すと、失敗した1件が埋まる)。
+
+- [x] **`prevented` はページのハンドラ実行後に読む**。capture 段は「ハンドラ前」の値なので
+  「ページがどう決めたか」を表さない。実測: `preventDefault` を呼ぶ target は `true` で drop が続き、
+  忘れている target は `false` で **drop イベントが1つも出ない**。
+- [x] **`stopPropagation` は `false` ではなく `null`(不明)**。cancel してから stop する zone は
+  `defaultPrevented` を読むリスナに届かないが、**drop は成立する**(実測)。`false` と書けば
+  正しく実装した target を誤って責める。
+- [x] **target が実際に受け取った payload**。protected mode により `getData()` は
+  dragstart/dragenter/dragover では `""`、**drop でだけ**実値を返す(実測)。
+  fixture の3 source で3通り: `#ok` はページが設定、`#native-source` は
+  `text/plain`/`text/uri-list`/`text/html` を**ブラウザ**が供給、`#attr-source` は空。
+- [x] **`dragstart-transfers-nothing` の誤検知を実測で反証**。`<a href>` は合成 dispatch では
+  「空」だが実 drop では URL が届く。drop で観測された payload があれば warn を出さない
+  (drop が無ければ証拠が無いので warn は残す)。
+- **`dropEffect` は記録しない**: 受け入れる target と拒否する target で両方 `copy` だった。
+  区別しない値を列に足すのはノイズ。
+- **`drag` は JSON には残し print からは落とす**: source 上で `dragover` と交互に連続発火するため
+  coalesce が効かず、1 gesture が7行になった。経路情報も持たない。
+
 **`PROBED_TYPES` が「probe 済み」を静的に主張していた(両方向に誤り)**:
 
 - [x] **`scan handlers` は何も probe しない**のに、`click`/`keydown`/`focus`/`blur`/`keyup`/`keypress`

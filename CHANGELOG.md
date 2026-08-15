@@ -135,6 +135,44 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **The drag probe reports the route, not just the outcome.** The aggregates said whether a drop
+  landed; debugging a drag needs what happened in between. Each source now carries an ordered
+  timeline of every drag event, and the report prints it for a source whose drop never landed —
+  which is when the question is "where did it go instead":
+
+      - div#card: dragstart fired, tried 1 target(s) — no target accepted it
+          route: dragstart@div#card → dragenter@div#card → dragover@div#card (NOT prevented …)
+                 dragenter@body → dragleave@div#card → dragenter@div#bin
+                 dragleave@body → dragover@div#bin x4 (NOT prevented — the drop is refused here)
+                 dragleave@div#bin → dragend@div#card
+
+  - **`prevented` is read after the page's handlers ran**, which is the only place it means "the
+    page decided". Measured on the real gesture: a target that calls `preventDefault` reports
+    `true` and a `drop` follows; one that forgets reports `false` and **no drop event is produced
+    at all**. That is the same defect `dragover-not-prevented` infers from a synthetic dispatch,
+    now confirmed by the browser.
+  - **`stopPropagation` reads as `null`, not `false`.** A zone that cancels the event and then
+    stops it never reaches the listener that reads `defaultPrevented` — and its drop still lands,
+    measured. Reporting "refused" there would accuse a target that did the right thing.
+  - **What the target received, at the one moment it is readable.** Under the drag-and-drop
+    protected mode `getData()` returns `""` during dragstart/dragenter/dragover and the real
+    payload during `drop`. Three sources on the fixture, three different stories:
+    `#ok` → `text/plain="ok"` (the page set it), `#native-source` → `text/plain`, `text/uri-list`
+    and `text/html` all supplied by the **browser** for an `<a href>`, `#attr-source` → nothing.
+  - `dropEffect` is deliberately not recorded: it read `copy` on a target that accepts the drop
+    and on one that refuses it, so it would be a column that discriminates nothing.
+  - `drag` is kept in the JSON and dropped from the print. It fires on the source between every
+    `dragover` on the target, so it defeats repeat-coalescing and turned one gesture into seven
+    lines of alternating noise; it carries no routing information either.
+
+- **`dragstart-transfers-nothing` over-reported for natively draggable elements.** The synthetic
+  probe dispatches `dragstart` with a `DataTransfer` this code constructed, so all it can see is
+  "the handler set nothing" — and for an `<a href>` or an `<img>` the *browser* fills the payload
+  in. Measured on the fixture's anchor: synthetic transfer empty, real drop received
+  `text/plain="file:///…#x"`, the link's own URL. A target calling `getData()` there reads the URL,
+  not `""`, so the warn's premise did not hold. A payload actually observed at a drop now refutes
+  it; no drop means no evidence and the warn stands.
+
 - **`--probe-drag` now drives a REAL HTML5 drag, and grades the source a browser refuses to
   pick up.** The note in this file saying CDP cannot drive an HTML5 drag was wrong — measured
   with a capture recorder on `document`, `mouse.down` / `mouse.move` / `mouse.up` produces the

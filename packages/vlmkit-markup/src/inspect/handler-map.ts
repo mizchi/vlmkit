@@ -694,16 +694,68 @@ export interface RealDragProbe {
   gestures: number;
   /** True when the gesture budget ran out before every target had been tried. */
   capped?: boolean;
+  /**
+   * Every drag event this source's gestures produced, in order, with repeats coalesced.
+   *
+   * The debugging record: the aggregate fields say a drop did or did not land, and this says
+   * which elements the drag crossed on the way and what each of them did with the event.
+   */
+  timeline?: DragTimelineStep[];
   /** Set when the gesture could not be performed (no box, offscreen, detached). */
   error?: string;
 }
 
 /**
- * Records every drag event on `document`, in the capture phase.
+ * One step of a real drag, in the order the browser produced it.
  *
- * Capture on `document` runs before the page's own listeners, so a handler that calls
- * `stopPropagation()` cannot hide its own event from this. Installed once and reset per
- * gesture.
+ * This is the "what happened in between" that the aggregate fields cannot carry: which elements
+ * the drag actually crossed, in sequence, and what each of them did with the event. A measured
+ * route from the fixture, coalescing repeats:
+ *
+ *     dragstart@div#ok -> dragenter@div#ok -> dragover@div#ok -> drag@div#ok x3
+ *     -> dragenter@div#user-drag-none -> dragleave@div#ok -> dragover@div#user-drag-none
+ *     -> dragenter@div#zone -> dragover@div#zone x2 (prevented) -> drop@div#zone -> dragend@div#ok
+ */
+export interface DragTimelineStep {
+  type: string;
+  /** The element the event targeted, as the same path the surface uses. */
+  path: string;
+  /** Consecutive identical (type, path) events collapsed into this step. `drag` fires per pixel. */
+  count: number;
+  /**
+   * `dragover`/`drop` only: did a listener cancel it, read AFTER the page's handlers ran?
+   *
+   * The decisive fact for a drop, and measured on the real gesture rather than inferred from a
+   * synthetic `dispatchEvent`: `#zone` (which calls `preventDefault`) reports true and a `drop`
+   * follows; `#zone-forgot-prevent` reports false and **no drop event is produced at all**.
+   *
+   * `null` means a handler called `stopPropagation()`, so the event never reached the
+   * document-level listener that reads this. Not false — unknown.
+   */
+  prevented?: boolean | null;
+  /**
+   * `drop` only: what the target actually received.
+   *
+   * Readable exactly once. Under the drag-and-drop protected mode `getData()` returns `""`
+   * during `dragstart`/`dragover`/`dragenter` — measured — and the real payload during `drop`.
+   * So this is the one place the source's promise and the target's reading can be compared.
+   */
+  received?: { type: string; value: string }[];
+}
+
+/**
+ * Records every drag event on `document`, in both phases.
+ *
+ * **Capture** runs before the page's own listeners, so a handler that calls `stopPropagation()`
+ * cannot hide its own event from the log. **Bubble** runs after them, which is the only place
+ * `defaultPrevented` means "the page decided", and its absence is itself the signal that
+ * propagation was stopped.
+ *
+ * `dropEffect` is deliberately not recorded: measured on a target that accepts the drop and one
+ * that refuses it, it read `copy` in both, so reporting it would add a column that discriminates
+ * nothing.
+ *
+ * Installed once and reset per gesture.
  */
 const DRAG_RECORDER_SCRIPT = String.raw`
 (() => {
@@ -722,8 +774,42 @@ const DRAG_RECORDER_SCRIPT = String.raw`
         // crosses the CDP boundary. 400 is far more than any assertion here needs.
         if (w.__vlmkitDragLog.length >= 400) return;
         const el = e.target;
-        w.__vlmkitDragLog.push({ type: t, path: el && el.tagName ? describe(el) : "(non-element)" });
+        // describe() walks up to body and stops, so body itself derives to the empty string --
+        // and a drag crossing the page background targets exactly that. Name it.
+        const path = !el || !el.tagName
+          ? "(non-element)"
+          : el === document.body ? "body" : el === document.documentElement ? "html" : (describe(el) || "body");
+        const row = { type: t, path: path };
+        if (t === "drop" && e.dataTransfer) {
+          // Only readable here. Truncated because a target may carry a whole serialized model.
+          row.received = [];
+          try {
+            for (const type of Array.from(e.dataTransfer.types).slice(0, 4)) {
+              row.received.push({ type: type, value: String(e.dataTransfer.getData(type)).slice(0, 80) });
+            }
+          } catch (err) {
+            row.received.push({ type: "(unreadable)", value: String(err && err.name) });
+          }
+        }
+        w.__vlmkitDragLog.push(row);
       }, true);
+    }
+    // Bubble phase, dragover/drop only: the page's handlers have run by now, so
+    // defaultPrevented is the page's answer rather than the initial state. Matched back to the
+    // capture entry by identity of (type, path) from the end -- the same event, one phase later.
+    for (const t of ["dragover", "drop"]) {
+      document.addEventListener(t, (e) => {
+        const el = e.target;
+        const path = !el || !el.tagName
+          ? "(non-element)"
+          : el === document.body ? "body" : el === document.documentElement ? "html" : (describe(el) || "body");
+        for (let i = w.__vlmkitDragLog.length - 1; i >= 0; i--) {
+          const row = w.__vlmkitDragLog[i];
+          if (row.type !== t || row.path !== path) continue;
+          if (row.prevented === undefined) row.prevented = e.defaultPrevented;
+          return;
+        }
+      }, false);
     }
   }
   return true;
@@ -768,7 +854,12 @@ async function probeRealDrags(
   const out: RealDragProbe[] = [];
   let budget = MAX_REAL_DRAG_GESTURES;
 
-  type LogRow = { type: string; path: string };
+  type LogRow = {
+    type: string;
+    path: string;
+    prevented?: boolean;
+    received?: { type: string; value: string }[];
+  };
   const gesture = async (from: { x: number; y: number }, to: { x: number; y: number }) => {
     // Selected text is draggable, so a leftover selection starts a text drag instead of this
     // one — measured, and it made the same two gestures disagree between runs.
@@ -791,7 +882,7 @@ async function probeRealDrags(
       const box = await handle.boundingBox();
       if (!box || box.width < 4 || box.height < 4) { row.error = "no usable box"; out.push(row); continue; }
       const startedOn = new Set<string>();
-      const observed = new Set<string>();
+      const timeline: DragTimelineStep[] = [];
       const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
       const offCentre = { x: box.x + box.width * 0.25, y: box.y + box.height * 0.25 };
       const aimAt = async (target: HandlerSurfaceEntry) => {
@@ -806,7 +897,21 @@ async function probeRealDrags(
         row.gestures++;
         const log = await gesture(from, to);
         for (const r of log) {
-          observed.add(r.type);
+          // Coalesce consecutive repeats: `drag` fires per mouse move and `dragover` per frame
+          // over the same element, and a hundred identical lines is not a timeline anyone reads.
+          const last = timeline[timeline.length - 1];
+          if (last && last.type === r.type && last.path === r.path && !r.received) last.count++;
+          else {
+            timeline.push({
+              type: r.type,
+              path: r.path,
+              count: 1,
+              // A dragover/drop with no bubble-phase entry was stopped mid-flight by a
+              // handler's `stopPropagation()`. Unknown, not "not prevented".
+              ...(r.type === "dragover" || r.type === "drop" ? { prevented: r.prevented ?? null } : {}),
+              ...(r.received ? { received: r.received } : {}),
+            });
+          }
           if (r.type !== "dragstart") continue;
           if (r.path === src.path) row.dragstartFired = true;
           else startedOn.add(r.path);
@@ -837,7 +942,12 @@ async function probeRealDrags(
         }
       }
       if (startedOn.size > 0) row.startedOn = [...startedOn];
-      if (observed.size > 0) row.observedTypes = [...observed].sort();
+      if (timeline.length > 0) {
+        row.timeline = timeline;
+        // Derived from the timeline rather than accumulated beside it: one record of what the
+        // recorder saw, so the coverage claim and the printed route cannot disagree.
+        row.observedTypes = [...new Set(timeline.map((step) => step.type))].sort();
+      }
     } catch (err) {
       row.error = err instanceof Error ? err.message.slice(0, 120) : String(err).slice(0, 120);
     }
@@ -1279,7 +1389,17 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
           + `e.preventDefault() in the dragover handler (and in dragenter, if you rely on it).`,
       });
     }
-    if (probe?.transferredTypes?.length === 0) {
+    // A real drag can refute this one, and on the fixture it did. The synthetic probe dispatches
+    // `dragstart` with a `DataTransfer` this code constructed, so "the handler set nothing" is
+    // all it can see — but for a natively draggable element the BROWSER fills the payload in.
+    // Measured on `<a href>`: the synthetic probe reports an empty transfer, and the real drop
+    // received `text/plain="file:///…#x"`, the link's own URL. A target calling `getData()` there
+    // reads the URL, not "", so the warn's premise does not hold. Only a payload actually
+    // observed at a drop refutes it; no drop means no evidence, and the warn stands.
+    const realDropPayload = surface.realDragProbe
+      ?.find((r) => r.path === e.path)
+      ?.timeline?.find((step) => step.type === "drop")?.received;
+    if (probe?.transferredTypes?.length === 0 && !(realDropPayload && realDropPayload.length > 0)) {
       // Warn, not suspect: a page may carry its drag payload in its own JS state and never
       // touch the DataTransfer, which works in Chromium. It is still a defect across
       // browsers — Firefox and Safari will not start a drag with an empty DataTransfer —
@@ -1620,6 +1740,54 @@ export function compareHandlerSurfaces(reference: HandlerSurface, attempt: Handl
 // Report + CLI
 
 /**
+ * The drag route as lines a reader can follow, wrapped rather than run together.
+ *
+ * `prevented` is annotated only where it changes the outcome — a `dragover` that did not cancel
+ * is the reason no `drop` followed, and that is the single most common drag defect there is.
+ * `stopPropagation` reads as `propagation stopped` rather than as `not prevented`, because the
+ * page may well have cancelled the event before killing it and this cannot see which.
+ */
+export function formatDragTimeline(timeline: readonly DragTimelineStep[], perLine = 3): string[] {
+  // `drag` fires on the SOURCE for every mouse move, interleaved with the target's `dragover`,
+  // so it defeats consecutive-repeat coalescing and turned a one-gesture route into seven lines
+  // of alternating noise. It also carries no routing information — the route is which targets
+  // the drag crossed. Dropped from the print and kept in the JSON, then re-coalesced, which is
+  // what turns four `dragover@div#bin` rows into one.
+  const merged: DragTimelineStep[] = [];
+  for (const step of timeline) {
+    if (step.type === "drag") continue;
+    const last = merged[merged.length - 1];
+    if (last && last.type === step.type && last.path === step.path && last.prevented === step.prevented
+      && !last.received && !step.received) {
+      merged[merged.length - 1] = { ...last, count: last.count + step.count };
+      continue;
+    }
+    merged.push(step);
+  }
+  const steps = merged.map((s) => {
+    const repeat = s.count > 1 ? ` x${s.count}` : "";
+    const note = s.prevented === true
+      ? " (prevented)"
+      : s.prevented === false
+        ? " (NOT prevented — the drop is refused here)"
+        : s.prevented === null
+          ? " (propagation stopped — cannot tell)"
+          : "";
+    const got = s.received?.length
+      ? ` [got ${s.received.map((r) => `${r.type}=${JSON.stringify(r.value)}`).join(", ")}]`
+      : s.received
+        ? " [got nothing]"
+        : "";
+    return `${s.type}@${s.path}${repeat}${note}${got}`;
+  });
+  const lines: string[] = [];
+  for (let i = 0; i < steps.length; i += perLine) {
+    lines.push((i === 0 ? "route: " : "       ") + steps.slice(i, i + perLine).join(" → "));
+  }
+  return lines;
+}
+
+/**
  * @param rules The project's effective rule settings, when the runner supplies them.
  *
  * Consulting them is what stops the prose from contradicting the verdict. Without it,
@@ -1714,8 +1882,17 @@ export function formatHandlerSurface(
       const tried = row.targetsTried.length > 0
         ? `, tried ${row.targetsTried.length} target(s)`
         : ", no drop target declared on the page";
+      // What the target actually received, on the one line where it fits. The source side of
+      // this is `dragstart-transfers-nothing`; this is the other end of the same wire, and
+      // `getData()` is only readable during `drop` — measured, it returns "" everywhere else.
+      const dropStep = row.timeline?.find((step) => step.type === "drop");
+      const payload = dropStep?.received?.length
+        ? ` ${DIM}[got ${dropStep.received.map((r) => `${r.type}=${JSON.stringify(r.value)}`).join(", ")}]${RESET}`
+        : dropStep?.received
+          ? ` ${YELLOW}[the target received nothing]${RESET}`
+          : "";
       const landed = row.droppedOn
-        ? `${GREEN}dropped on ${row.droppedOn}${RESET}`
+        ? `${GREEN}dropped on ${row.droppedOn}${RESET}${payload}`
         : row.dragstartFired
           ? `${YELLOW}no target accepted it${RESET}`
           : `${RED}started no drag${RESET}`;
@@ -1723,6 +1900,12 @@ export function formatHandlerSurface(
         `  - ${row.path}: ${row.dragstartFired ? "dragstart fired" : "no dragstart"}${tried} — ${landed}`
         + (row.capped ? ` ${DIM}(gesture budget reached — not every target was tried)${RESET}` : ""),
       );
+      // The route, printed only when the drag did not complete. That is when the question is
+      // "where did it go instead", and printing it for a working source would bury the one
+      // that failed under the ones that did not. `--json` carries it either way.
+      if (!row.droppedOn && row.timeline && row.timeline.length > 0) {
+        for (const line of formatDragTimeline(row.timeline)) lines.push(`      ${DIM}${line}${RESET}`);
+      }
     }
   }
   if (issues.length > 0) {
