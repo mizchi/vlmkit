@@ -1026,6 +1026,20 @@ suppression works per *rule* instead of per whole gate.
 
 ### Fixed
 
+- **The reference docs are checked against the CLI** (`tests/docs-cli-parity.test.mjs`): every
+  flag and every command verb they tell a reader to type must exist in the code. Written after
+  `--capture-spec` — documented for a command that never had it — and after the same sweep found
+  that a naive grep reports 21 flags as missing while exactly one of them really was: the other 20
+  are `hasFlag(args, "no-baseline-sanity")` (the source never writes the dashes), `Taskfile.pkl`
+  task parameters, gate inputs declared as `{ name: "level" }`, and prose about CSS variables. All
+  four patterns are folded into the check, design/plan docs are excluded (their flags are
+  proposals), and the two places where the docs deliberately name something absent — the
+  `--capture-spec` denial and the `vlmkit serve` → `vlmkit api serve` rename table — are an
+  allowlist with reasons rather than a cleverer regex. The check asserts a flag EXISTS, not that
+  the command shown accepts it; the scope is stated in the file. No further defect was found: the
+  command-verb half is clean today, and it exists because the same rot in `.github/workflows/` once
+  left a job green while running nothing.
+
 - **`check integrity` printed `DEFECTS (1 fail, 0 warn)` directly above the runner's
   `exits 0 — 1 warn(s)`.** Found while giving eight more gates rule-aware prose, in the one gate
   that already had it. Its formatter asked the rule view for a rule's *effective* severity, which

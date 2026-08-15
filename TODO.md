@@ -1647,6 +1647,28 @@ npm install した vlmkit には spec が同梱されず `HARNESS_ROOT` はど�
   - `@mizchi/vrt-<pkg>` は 0.6 以降どのパッケージの名前でもない。
     この行を読んで書いた import は解決しない。dist 解決の罠も同じ場所に書いた。
 
+- [x] **docs ↔ CLI の乖離を恒久テストにした** (`tests/docs-cli-parity.test.mjs`)
+  - reference docs(README / cli-reference / configuration / markup-assist)が書く
+    **flag と command verb** が実装に存在するかを検査。`--capture-spec` を捕まえる形。
+  - **走査を先に信じなかったのが正解だった**: 素朴な grep は21件を「存在しない」と報告したが、
+    実際に実在しなかったのは `--capture-spec` **1件だけ**。偽陽性の原因4つを全部 pattern に
+    畳んだ: `hasFlag(args, "no-baseline-sanity")`(ソースは `--` を書かない)、
+    `Taskfile.pkl` の task param(`name = "scenario"`)、gate の `{ name: "level" }`、
+    prose の `--var`(CSS 変数の話 = design/plan docs を対象外にした理由)。
+  - **意図的に「存在しない」と書いている記述**は allowlist に理由付きで置く
+    (`--capture-spec` の否定文、`vlmkit serve -> vlmkit api serve` のリネーム表)。
+    これがあると live corpus では検査が効かないので、**修正前の doc 行を合成して
+    「当時なら捕まえた」ことを別テストで示す**。
+  - scope を明記: **存在検査であって「その command が受け付けるか」ではない**。
+    ペアリングには per-command parser が必要で、欠陥が出たのは存在側。
+  - command verb 側は現時点で**実在しない verb ゼロ**。それでも入れたのは
+    `tests/workflow-commands.test.mjs` の由来(`vlmkit compare` / `vlmkit smoke` が
+    リネーム後も CI に残り、片方は `|| true` で緑のまま何も測らなかった)が docs 側に
+    未カバーだったから。
+  - **config キー側は測って入れなかった**: documented JSON キー15件のうちソースに無いのは
+    `mcpServers` 1件で、これは Claude Code の `.mcp.json` スキーマ = vlmkit のものではない。
+    15件・実質例外1件のテストは、検査ではなく例外の記録になるので書いていない。
+
 **罠(再発)**: dist 解決なので、`packages/` を直して CLI で確認すると**直っていないように
 見える**。`pnpm build` を挟むまで `4174` のままだった(1541行の記録と同じ罠)。
 `src/cli/cli.ts` を直接 node で実行すると**出力ゼロで exit 0**、entry は `src/cli/vlmkit.ts`。
