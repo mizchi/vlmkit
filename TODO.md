@@ -1294,6 +1294,23 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   drag が始まった gesture からのみ判定する(掴めない source の gesture にはイベントが無く、
   狙った target を責めるのは source の欠陥を target に転嫁する)。
   fixture は `fixtures/handlers/drop-target-covered.html`(覆われた zone + 同一契約の対照)。
+  **判定はヒットテストに書き換えた**(gesture ログ版は誤検知した): 3点(中心/25%/75%)を
+  `elementFromPoint` に渡し、target 自身**または子孫**に当たれば到達可能。
+  - 子孫を数えるのが要点 — イベントはバブリングする。gesture ログ版は fixture の delegated `<ul>`
+    を「到達不能」と報告した(狙点が子の `<li>` に当たるため)。対照 `#filled-list` を追加。
+  - 3点にするのも要点 — 中心だけを覆う 40px の badge は zone を使えなくしない。対照 `#badged`。
+  - どちらの ablation も対照で落ちることを確認済み。イベントを出さないので `--probe-drag` 不要。
+
+- [x] **hover 中のピクセル**を測る(mid-drag screenshot、実測 60–80ms/枚)。
+  `dragenter` でハイライトする zone は自分の box の 99%、しないゾーンは 0.00%(バイト同一)。
+  **drag が始まってからのみ**撮る(ログを gesture 中に読んで判定)ので、掴めない source では
+  screenshot 2枚の代わりに evaluate 1回で済む。
+  - **新ルールは作らない**: 「ハイライトして拒否」は既存 `dragover-not-prevented` そのものなので、
+    その message に測定値を差し込む(1つの根本原因を2件報告しない)。
+  - 受け入れたのに無反応な zone は `(no visible change while hovering)` の**証拠**止まり
+    (feedback が zone の box 外に描かれる — sibling の list に placeholder が開く形 — があるため)。
+  - 最初の drop で打ち切ると後続の zone が永久に測れないので、drop 済み source も
+    `EXTRA_TARGET_VISITS`(3)だけ追加訪問する。budget 16 → 24(実測 ~0.2s/gesture)。
 
 **途中経過(route)まで出せるようにした** — 集約値だけでは drag のデバッグにならないため。
 7型の順序付き timeline を source ごとに持ち、**drop しなかった source のみ** route を印字する

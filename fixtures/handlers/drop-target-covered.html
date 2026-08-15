@@ -46,11 +46,33 @@
 
 <div class="zone" id="open">correct contract, reachable</div>
 
+<!--
+  Two controls for the hit test itself, both of which MUST stay silent.
+
+  #filled-list  the delegated shape: the child fills the zone, so every sample point lands on the
+                <li> and not on the list. A hit inside the target counts, because the event
+                bubbles to it — checking only `hit === target` reports this working list as
+                unreachable, and a kanban column whose cards fill it is exactly this shape.
+  #badged       a small overlay over the CENTRE only. One sample point would call this
+                unreachable; the corners are clear and a drop there works, which is why the test
+                takes three.
+-->
+<ul class="zone" id="filled-list" style="list-style:none;margin:0;padding:0">
+  <li id="filled-item" style="height:100%;background:#dfe7f5">a child that fills its list</li>
+</ul>
+
+<div style="position:relative">
+  <div class="zone" id="badged">badge over the centre only</div>
+  <div id="badge" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+       width:40px;height:40px;border-radius:50%;background:#b3261e"></div>
+</div>
+
 <script>
   document.getElementById("card").addEventListener("dragstart", (e) => {
     e.dataTransfer.setData("text/plain", "card");
   });
-  for (const id of ["covered", "open"]) {
+  // The list delegates: dragover on the list, and the child is what the pointer actually hits.
+  for (const id of ["covered", "open", "filled-list", "badged"]) {
     const zone = document.getElementById(id);
     zone.addEventListener("dragover", (e) => e.preventDefault());
     zone.addEventListener("drop", (e) => e.preventDefault());

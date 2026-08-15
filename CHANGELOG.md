@@ -135,21 +135,45 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
-- **A drop target a real drag cannot reach now reports.** `drag-source-inert` covers the source
-  side; this is the other end. Measured on a zone with the complete correct contract — a
-  `dragover` handler calling `preventDefault()` and a wired `drop` — sitting under a transparent
-  sibling: every drag event went to the veil, the zone saw no `dragenter`, no `dragover` and no
-  `drop`, and the whole run reported nothing about it. Nothing else can: the static check sees
-  both handlers, and the synthetic probe dispatches straight at the element, where they run as
-  written.
-  - `drop-target-unreachable` (suspect) names what took the events (`div>div#veil`), because
-    which element is on top is the actionable half.
-  - Only from a gesture that actually started a drag. A source that cannot be picked up produces
-    no events to attribute, and blaming the targets it was aimed at would charge them with the
-    source's defect.
-  - `fixtures/handlers/drop-target-covered.html` carries the pair: the covered zone and an
-    identical uncovered one that takes the drop, which is the control showing the finding is
+- **A drop target nothing can drop on now reports.** `drag-source-inert` covers the source side;
+  this is the other end. Measured on a zone with the complete correct contract — a `dragover`
+  handler calling `preventDefault()` and a wired `drop` — sitting under a transparent sibling:
+  every drag event went to the veil, the zone saw nothing, and the whole run reported nothing
+  about it. Nothing else can: the static check sees both handlers, and the synthetic probe
+  dispatches straight at the element, where they run as written.
+  - `drop-target-unreachable` (suspect) is a **hit test**, so it needs no probe flag and appears
+    on a plain `scan handlers`: three points inside the target (centre, 25%, 75%) go to
+    `elementFromPoint`, which honours `pointer-events`, and the finding names what is on top.
+  - Two things it gets right that the first version did not, each with a control in the fixture.
+    A hit *inside* the target counts, because the event bubbles — deriving this from the gesture
+    log instead reported the fixture's delegated `<ul>` as unreachable, since the aim lands on its
+    `<li>`; `#filled-list` is now that shape and must stay silent. And three points rather than
+    one, because a 40px badge over the centre does not make a zone undroppable — `#badged` is that
+    shape. Both ablations (drop the containment check, sample one point) fail on those controls.
+  - The gesture-log version also had to guess the interceptor from whichever element took the most
+    `dragover`s, and named a zone the drag had merely crossed. The hit test needs no guess.
+  - `fixtures/handlers/drop-target-covered.html` carries the pair plus the two controls: the
+    covered zone, and an identical uncovered one that takes the drop, which shows the finding is
     about the covering and not about the contract.
+
+- **The probe measures what a drop zone shows while the drag is held over it.** Two screenshots
+  of the target with the mouse still down — workable at ~60-80ms each, measured — separate a zone
+  that highlights on `dragenter` (99% of its own box changed) from one that does not (0.00%, and
+  the frames are byte-identical). Taken only once a drag has actually started, which is read from
+  the log mid-gesture rather than assumed, so a source the browser refuses to pick up costs one
+  cheap `evaluate` instead of two screenshots.
+  - **No new rule.** A zone that highlights and then refuses the drop is already
+    `dragover-not-prevented`, so the measurement goes into that finding's message — "A real drag
+    over it changed 99% of its own pixels, so it advertises itself as a drop zone and then rejects
+    the drop — the user is told it will work" — rather than being reported twice.
+  - A drop that works and shows nothing reads `(no visible change while hovering)` beside it:
+    evidence, not a finding, because the feedback may be painted outside the zone's own box (a
+    placeholder opening in a sibling list is the common shape).
+  - To make those numbers exist for zones a lucky first drop would otherwise hide, a source that
+    has already dropped now visits up to `EXTRA_TARGET_VISITS` (3) more targets. The old loop
+    stopped at the first success, which left every zone after it unmeasured — and the questions
+    this probe answers are about the targets. The gesture budget went 16 → 24, measured at ~0.2s
+    per gesture; whatever is still unvisited is reported as `capped`.
 
 - **The drag probe reports the route, not just the outcome.** The aggregates said whether a drop
   landed; debugging a drag needs what happened in between. Each source now carries an ordered

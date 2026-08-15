@@ -40,7 +40,7 @@ import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/
 import { DISCOVER_SCRIPT } from "./interaction-map.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { PNG } from "pngjs";
-import type { JSHandle, Page } from "playwright";
+import type { ElementHandle, JSHandle, Page } from "playwright";
 
 export interface HandlerSurfaceEntry {
   /** Handler types on ancestors that also carry handlers (delegation). */
@@ -102,6 +102,21 @@ export interface HandlerSurface {
    * Absent means "not measured", never "measured and fine".
    */
   realDragProbe?: RealDragProbe[];
+  /**
+   * Declared drop targets that nothing can drop on, because something else is on top.
+   *
+   * A hit test, not a gesture: three points inside the target (centre, 25%, 75%) are passed to
+   * `elementFromPoint`, and the target is unreachable when none of them lands on it or inside it.
+   * `elementFromPoint` honours `pointer-events`, so it answers the same question the browser
+   * would when routing the drag.
+   *
+   * The first version derived this from the gesture — "the target saw no drag event" — and it
+   * reported a **false positive** on the fixture's delegated list: the aim point lands on the
+   * child `<li>`, and the event bubbles to the `<ul>`, so the list HAD received it. It also had
+   * to guess the interceptor from whichever element took the most `dragover`s, which named an
+   * element the drag merely crossed. The hit test needs neither guess.
+   */
+  unreachableTargets?: { path: string; interceptedBy: string }[];
   /**
    * What the interaction probe reached, when one ran at all.
    *
@@ -695,15 +710,19 @@ export interface RealDragProbe {
   /** True when the gesture budget ran out before every target had been tried. */
   capped?: boolean;
   /**
-   * Targets the gesture was aimed at that received no drag event at all, each with what did.
+   * Fraction of each aimed-at target's own pixels that changed while the drag was held over it.
    *
-   * A drop target the pointer cannot reach. Measured on a correct target — `dragover` calling
-   * `preventDefault`, a wired `drop` — under a transparent sibling: every event went to the veil,
-   * the target saw nothing, and the whole run reported no finding about it. The static check
-   * passes (both handlers exist) and the synthetic probe passes (dispatching at the element runs
-   * them), so this needs the real gesture.
+   * The visible half of the drop contract: whether the zone tells the user it will accept. Two
+   * screenshots of the target with the mouse still down, taken only once the drag has started —
+   * measured at ~60-80ms each, and it separates a zone that highlights on `dragenter` (99% of its
+   * box) from one that does not (0.00%, byte-identical frames).
+   *
+   * Reported, not graded, and the one case worth grading is already covered: a zone that
+   * highlights and then refuses the drop is `dragover-not-prevented`, whose message says so when
+   * this measured a highlight. 0% on its own has the usual several explanations — feedback drawn
+   * outside the zone's box, a placeholder inserted in a sibling list, a deliberate no-op.
    */
-  unreached?: { target: string; interceptedBy: string }[];
+  hoverFeedback?: { target: string; ratio: number }[];
   /**
    * Every drag event this source's gestures produced, in order, with repeats coalesced.
    *
@@ -827,15 +846,77 @@ const DRAG_RECORDER_SCRIPT = String.raw`
 `;
 
 /**
+ * Which declared drop targets a pointer can actually land on.
+ *
+ * Three points per target rather than one: a badge or tooltip overlapping the middle does not
+ * make a zone undroppable, and a target is only reported when none of centre, 25% and 75% lands
+ * on it or on one of its descendants. A descendant counts because the event bubbles — that
+ * distinction is the whole reason this is a hit test and not a replay of the gesture log.
+ *
+ * Dispatches nothing, so it runs on a plain `scan handlers` too: the finding it feeds is about
+ * the page's geometry, and there is no reason to hide it behind a probe flag.
+ */
+const TARGET_REACH_SCRIPT = String.raw`
+(() => {
+  ${DESCRIBE_PATH_FN}
+  const out = [];
+  for (const el of document.querySelectorAll("*")) {
+    const own = new Set();
+    for (const name of (el.getAttributeNames ? el.getAttributeNames() : [])) {
+      if (name === "ondragover" || name === "ondrop" || name === "ondragenter") own.add(name.slice(2));
+    }
+    for (const t of ["dragover", "drop", "dragenter"]) {
+      if (typeof el["on" + t] === "function") own.add(t);
+    }
+    for (const h of (window.__vlmkitHandlers || [])) {
+      if (h.t === el && (h.type === "dragover" || h.type === "drop" || h.type === "dragenter")) own.add(h.type);
+    }
+    if (own.size === 0) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 4 || r.height < 4) continue;
+    const style = getComputedStyle(el);
+    if (style.display === "none" || style.visibility === "hidden") continue;
+    let hitBy = null;
+    let reached = false;
+    for (const pt of [[0.5, 0.5], [0.25, 0.25], [0.75, 0.75]]) {
+      const hit = document.elementFromPoint(r.left + r.width * pt[0], r.top + r.height * pt[1]);
+      if (!hit) continue;
+      if (hit === el || el.contains(hit)) { reached = true; break; }
+      if (!hitBy) hitBy = describe(hit) || (hit === document.body ? "body" : hit.tagName.toLowerCase());
+    }
+    if (!reached && hitBy) out.push({ path: describe(el), interceptedBy: hitBy });
+  }
+  return out;
+})()
+`;
+
+/**
  * A total budget, because the work is a source x target product and each gesture is a
  * round-trip of real input.
  *
- * Sixteen with the short-circuits below covers a page far larger than the fixture: a source
- * that cannot start a drag costs exactly 2 gestures, and one that can costs 1 plus however many
- * targets refuse it. The first version had neither short-circuit and a budget of 12, which
- * `#not-draggable` alone consumed by retrying all six targets.
+ * A source that cannot start a drag costs exactly 2 gestures; one that can costs 1 plus the
+ * targets that refuse it, plus up to `EXTRA_TARGET_VISITS` more. Measured at roughly 0.2s each
+ * on the fixtures, two screenshots included, so 24 is about five seconds in the worst case —
+ * and 16 was reached by the six-source, six-target fixture once the extra visits were added,
+ * which is exactly the case that should not be truncated. The first version had no
+ * short-circuits at all and a budget of 12, which `#not-draggable` alone consumed by retrying
+ * every target.
  */
-const MAX_REAL_DRAG_GESTURES = 16;
+const MAX_REAL_DRAG_GESTURES = 24;
+
+/**
+ * How many more targets a source visits after one has already accepted its drop.
+ *
+ * Not zero, because the facts this probe collects are about the TARGETS — is it reachable, does
+ * it advertise itself, does it accept — and stopping at the first success left every zone after
+ * it unmeasured. Not unbounded, because each gesture runs the page's own drop handler for real:
+ * on an app that moves a card into a column, ten gestures move ten cards.
+ *
+ * Three is what the fixtures need (the widest has four zones after the working one) and it keeps
+ * a page with a dozen drop zones inside the total budget. Whatever is left unvisited is reported
+ * as `capped` rather than passed over in silence.
+ */
+const EXTRA_TARGET_VISITS = 3;
 
 /**
  * Drag each source onto the page's declared targets and report what the browser did.
@@ -870,7 +951,21 @@ async function probeRealDrags(
     prevented?: boolean;
     received?: { type: string; value: string }[];
   };
-  const gesture = async (from: { x: number; y: number }, to: { x: number; y: number }) => {
+  /**
+   * One gesture, and — when a target element is given — what its pixels did while hovered.
+   *
+   * The two screenshots are taken only after the drag has actually started, which is checked by
+   * reading the log mid-gesture rather than assumed. That keeps the cost off every source the
+   * browser refuses to pick up: those get one cheap `evaluate` instead of two screenshots, and
+   * they have no hover feedback to measure anyway. Taking `before` at that point rather than
+   * pre-press is also the more honest baseline — the drag is in progress and the pointer has not
+   * reached the target yet, so the difference is the hover and nothing else.
+   */
+  const gesture = async (
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    target?: ElementHandle<Element> | null,
+  ) => {
     // Selected text is draggable, so a leftover selection starts a text drag instead of this
     // one — measured, and it made the same two gestures disagree between runs.
     await page.evaluate("(() => { window.__vlmkitDragLog = []; const s = window.getSelection && window.getSelection(); if (s) s.removeAllRanges(); return true; })()");
@@ -879,9 +974,23 @@ async function probeRealDrags(
     // A short move first: the browser needs a threshold crossed before it promotes the
     // press to a drag. Measured — 2 steps here then 5 to the target landed the drop.
     await page.mouse.move(from.x + 8, from.y + 6, { steps: 2 });
+    let before: Buffer | null = null;
+    if (target) {
+      const started = await page.evaluate(
+        "(window.__vlmkitDragLog || []).some((r) => r.type === 'dragstart')",
+      ) as boolean;
+      if (started) before = await target.screenshot().catch(() => null);
+    }
     await page.mouse.move(to.x, to.y, { steps: 5 });
+    // Mid-drag, with the mouse still down. Measured as workable: ~60-80ms per shot, and it
+    // separates a zone that highlights on dragenter (99% of its own box changed) from one that
+    // does not (0.00%, byte-identical).
+    const during = before ? await target!.screenshot().catch(() => null) : null;
     await page.mouse.up();
-    return await page.evaluate("window.__vlmkitDragLog") as LogRow[];
+    return {
+      log: await page.evaluate("window.__vlmkitDragLog") as LogRow[],
+      hoverRatio: before && during ? pixelDelta(before, during) : undefined,
+    };
   };
 
   for (const src of sources) {
@@ -896,16 +1005,22 @@ async function probeRealDrags(
       const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
       const offCentre = { x: box.x + box.width * 0.25, y: box.y + box.height * 0.25 };
       const aimAt = async (target: HandlerSurfaceEntry) => {
-        const tb = await (await handleForPath(page, target.path)).asElement()?.boundingBox();
-        return tb ? { x: tb.x + tb.width / 2, y: tb.y + tb.height / 2 } : null;
+        const handle = (await handleForPath(page, target.path)).asElement();
+        const tb = await handle?.boundingBox();
+        return tb ? { at: { x: tb.x + tb.width / 2, y: tb.y + tb.height / 2 }, handle } : null;
       };
       // With no declared target, move off the element so the gesture is still a drag.
       const elsewhere = { x: centre.x + 60, y: centre.y + 60 };
 
-      const run = async (from: { x: number; y: number }, to: { x: number; y: number }) => {
+      const run = async (
+        from: { x: number; y: number },
+        to: { x: number; y: number },
+        aimed?: { path: string; handle: ElementHandle<Element> | null },
+      ) => {
         budget--;
         row.gestures++;
-        const log = await gesture(from, to);
+        const { log, hoverRatio } = await gesture(from, to, aimed?.handle);
+        if (aimed && hoverRatio !== undefined) hoverFeedback.push({ target: aimed.path, ratio: hoverRatio });
         for (const r of log) {
           // Coalesce consecutive repeats: `drag` fires per mouse move and `dragover` per frame
           // over the same element, and a hundred identical lines is not a timeline anyone reads.
@@ -929,54 +1044,44 @@ async function probeRealDrags(
         return log;
       };
 
-      const unreached: { target: string; interceptedBy: string }[] = [];
-      /**
-       * Did the target the gesture was aimed at see anything? If not, name what did.
-       *
-       * The interceptor is the element that took the most `dragover`s and is neither the source
-       * nor the page background — on the measured case that is the veil, which is exactly the
-       * name a reader needs. Only called for a gesture that started a drag: with no drag there
-       * are no events to attribute, and "unreachable" would be a claim about nothing.
-       */
-      const noteUnreached = (log: LogRow[], target: string) => {
-        if (!log.some((r) => r.type === "dragstart")) return;
-        if (log.some((r) => r.path === target)) return;
-        const overs = new Map<string, number>();
-        for (const r of log) {
-          if (r.type !== "dragover" && r.type !== "dragenter") continue;
-          if (r.path === src.path || r.path === "body" || r.path === "html") continue;
-          overs.set(r.path, (overs.get(r.path) ?? 0) + 1);
-        }
-        const top = [...overs].sort((a, b) => b[1] - a[1])[0];
-        unreached.push({ target, interceptedBy: top ? top[0] : "(nothing — the drag never reached any element)" });
-      };
+      const hoverFeedback: { target: string; ratio: number }[] = [];
 
-      const firstAim = targets.length > 0 ? await aimAt(targets[0]!) ?? elsewhere : elsewhere;
+      const first = targets.length > 0 ? await aimAt(targets[0]!) : null;
+      const firstAim = first?.at ?? elsewhere;
+      const firstAimed = first && targets[0] ? { path: targets[0].path, handle: first.handle } : undefined;
       if (budget <= 0) { row.capped = true; out.push(row); continue; }
-      let log = await run(centre, firstAim);
+      let log = await run(centre, firstAim, firstAimed);
       if (targets.length > 0) row.targetsTried.push(targets[0]!.path);
-      if (targets.length > 0) noteUnreached(log, targets[0]!.path);
-      if (!row.dragstartFired && budget > 0) log = await run(offCentre, firstAim);
+      if (!row.dragstartFired && budget > 0) log = await run(offCentre, firstAim, firstAimed);
 
       if (row.dragstartFired) {
         const dropped = log.find((r) => r.type === "drop");
         if (dropped) row.droppedOn = dropped.path;
         // Only now is trying other targets informative: the source does pick up, and the
         // question becomes whether anything on the page accepts it.
+        //
+        // The loop used to stop at the first drop, and that hid the target-side facts for every
+        // zone after it: whether a real drag reaches it, whether it advertises itself, whether it
+        // would accept. Those are the questions this probe answers, and a lucky first success
+        // made the rest unanswerable. So a source that has already dropped keeps going for a few
+        // more targets — bounded, because each gesture runs the page's own drop logic.
+        let extra = row.droppedOn ? EXTRA_TARGET_VISITS : Infinity;
         for (const t of targets.slice(1)) {
-          if (row.droppedOn) break;
+          if (extra <= 0) { row.capped = true; break; }
           if (budget <= 0) { row.capped = true; break; }
-          const to = await aimAt(t);
-          if (!to) continue;
+          extra--;
+          const aim = await aimAt(t);
+          if (!aim) continue;
           row.targetsTried.push(t.path);
-          const again = await run(centre, to);
-          noteUnreached(again, t.path);
+          const again = await run(centre, aim.at, { path: t.path, handle: aim.handle });
           const drop = again.find((r) => r.type === "drop");
-          if (drop) row.droppedOn = drop.path;
+          // The FIRST target that accepted it is the answer to "can this be dropped"; a later
+          // one does not overwrite it, so the reported target stays the one a user would hit.
+          if (drop && !row.droppedOn) row.droppedOn = drop.path;
         }
       }
       if (startedOn.size > 0) row.startedOn = [...startedOn];
-      if (unreached.length > 0) row.unreached = unreached;
+      if (hoverFeedback.length > 0) row.hoverFeedback = hoverFeedback;
       if (timeline.length > 0) {
         row.timeline = timeline;
         // Derived from the timeline rather than accumulated beside it: one record of what the
@@ -1050,6 +1155,10 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
       total: number;
       controls: number;
     };
+    // A hit test over the declared drop targets. No events, no flag: it asks where a pointer
+    // would land, which is a fact about the page as inventoried.
+    const unreachableTargets = await page.evaluate(TARGET_REACH_SCRIPT) as
+      { path: string; interceptedBy: string }[];
     // Real mouse input first among the probes, on the least-perturbed page: it is the one
     // that answers whether the BROWSER starts a drag here, and a synthetic dispatch that has
     // already run the page's drop handlers can have moved the source out from under it.
@@ -1077,6 +1186,7 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
       ...(dragProbe ? { dragProbe } : {}),
       ...(pointerDragProbe && pointerDragProbe.length > 0 ? { pointerDragProbe } : {}),
       ...(realDragProbe && realDragProbe.length > 0 ? { realDragProbe } : {}),
+      ...(unreachableTargets.length > 0 ? { unreachableTargets } : {}),
     };
   });
 }
@@ -1327,12 +1437,14 @@ export const HANDLER_SURFACE_RULES = [
       title: "A real drag never reached this drop target",
       severity: "suspect",
       docs:
-        "Driven, not read: the gesture was aimed at the middle of this target and the target"
-        + " received no drag event at all — something else took them, and the finding names it."
-        + " Measured on a target with a correct contract (dragover calling preventDefault, a"
-        + " wired drop) under a transparent sibling: the whole run reported nothing about it,"
-        + " because the static check sees both handlers and the synthetic dispatch runs them"
-        + " directly at the element. Requires --probe-drag.",
+        "A hit test, so it needs no probe flag: three points inside the target (centre, 25%, 75%)"
+        + " are passed to elementFromPoint, and none of them lands on it or inside it. A"
+        + " descendant counts as reaching it, because the event bubbles — deriving this from the"
+        + " gesture log instead reported the fixture's delegated <ul> as unreachable, since the"
+        + " aim lands on its <li>. Measured on a target with a correct contract (dragover calling"
+        + " preventDefault, a wired drop) under a transparent sibling: the whole run reported"
+        + " nothing about it, because the static check sees both handlers and the synthetic"
+        + " dispatch runs them directly at the element.",
     },
     {
       id: "dragstart-transfers-nothing",
@@ -1421,6 +1533,20 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
     // finding from data this gate did not collect is the failure mode the `draggable` field
     // is guarded against below for the same reason.
     const probe = surface.dragProbe?.find((row) => row.path === e.path);
+    // A zone that visibly reacts to the drag and then refuses it is not a separate defect — it is
+    // this one, made worse: the page tells the user the drop will work. Measured on a fixture
+    // whose refusing zone highlights 99% of its own box on `dragenter`, so the affordance is
+    // unmistakable. Folded into the message rather than raised as a second finding, because one
+    // root cause reported twice is what `drag-source-inert` deliberately avoids.
+    const hovered = surface.realDragProbe
+      ?.flatMap((r) => r.hoverFeedback ?? [])
+      .filter((h) => h.target === e.path)
+      .reduce((max, h) => Math.max(max, h.ratio), 0) ?? 0;
+    const highlight = hovered >= 0.02
+      ? ` A real drag over it changed ${(hovered * 100).toFixed(0)}% of its own pixels, so it`
+        + ` advertises itself as a drop zone and then rejects the drop — the user is told it will`
+        + ` work.`
+      : "";
     if (probe?.dragoverUnprevented === true) {
       // The static `drop-without-dragover` check passes this: a dragover handler DOES
       // exist. It just does not cancel, so the default action rejects the drop and the
@@ -1432,7 +1558,7 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
         element: `${e.path} "${e.text}"`,
         message: `${e.path} "${e.text}" has a dragover handler that does not call `
           + `preventDefault(), so the browser rejects the drop and the drop handler never `
-          + `runs. Measured by dispatching a dragover: no listener cancelled it. Call `
+          + `runs. Measured by dispatching a dragover: no listener cancelled it.${highlight} Call `
           + `e.preventDefault() in the dragover handler (and in dragenter, if you rely on it).`,
       });
     }
@@ -1520,21 +1646,17 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
     // A declared drop target that a real drag could not reach. Reported per target, from the
     // gestures aimed at it — the source that was dragged is incidental, so the finding names the
     // target and what intercepted its events.
-    const unreachedBy = surface.realDragProbe
-      ?.flatMap((r) => r.unreached ?? [])
-      .filter((u) => u.target === e.path);
-    if (unreachedBy && unreachedBy.length > 0) {
-      const culprits = [...new Set(unreachedBy.map((u) => u.interceptedBy))];
+    const covered = surface.unreachableTargets?.find((u) => u.path === e.path);
+    if (covered) {
       issues.push({
         kind: "drop-target-unreachable",
         severity: "suspect",
         element: `${e.path} "${e.text}"`,
-        message: `${e.path} "${e.text}" is wired as a drop target and a real drag aimed at the `
-          + `middle of it never reached it: no dragenter, no dragover, no drop. `
-          + `${culprits.join(", ")} received the events instead. Its own handlers are fine — that `
-          + `is why nothing else reports this — so look for what is on top of it: an overlay or `
-          + `backdrop, a sibling with \`position: absolute; inset: 0\`, or an ancestor's `
-          + `\`pointer-events\`.`,
+        message: `${e.path} "${e.text}" is wired as a drop target and nothing can drop on it: `
+          + `every sample point inside it — centre, 25%, 75% — hits ${covered.interceptedBy} `
+          + `instead, so the pointer never reaches it. Its own handlers are fine, which is why `
+          + `nothing else reports this: look for what is on top of it — an overlay or backdrop, a `
+          + `sibling with \`position: absolute; inset: 0\`, or an ancestor's \`pointer-events\`.`,
       });
     }
 
@@ -1959,8 +2081,17 @@ export function formatHandlerSurface(
         : dropStep?.received
           ? ` ${YELLOW}[the target received nothing]${RESET}`
           : "";
+      // A drop that works and shows nothing while hovered. Evidence, not a finding: the feedback
+      // may be painted outside the zone's own box — a placeholder opening in a sibling list is
+      // the common shape — which an element-local screenshot cannot see.
+      const hover = row.hoverFeedback?.find((h) => h.target === row.droppedOn);
+      const silent = hover && hover.ratio < 0.02
+        ? ` ${DIM}(no visible change while hovering)${RESET}`
+        : hover
+          ? ` ${DIM}(highlighted ${(hover.ratio * 100).toFixed(0)}% while hovering)${RESET}`
+          : "";
       const landed = row.droppedOn
-        ? `${GREEN}dropped on ${row.droppedOn}${RESET}${payload}`
+        ? `${GREEN}dropped on ${row.droppedOn}${RESET}${payload}${silent}`
         : row.dragstartFired
           ? `${YELLOW}no target accepted it${RESET}`
           : `${RED}started no drag${RESET}`;
