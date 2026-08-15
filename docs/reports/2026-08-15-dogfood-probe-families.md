@@ -8,6 +8,48 @@ The fixtures for each family exist to prove the rule can separate a defect from 
 say nothing about how often the rule is wrong on a page that never heard of it. This is that
 measurement.
 
+## Corpus 0 — the whole repo, filtered to pages that can answer something
+
+60 of the 140 HTML files under `fixtures/` and `examples/` contain a possible target for the new
+families; the other 80 have none and were not probed, because a page with nothing to measure produces
+a green that means nothing. Of the 60, only two families are represented at all: **hover on 49 pages,
+input on 34**. No page in this repo has a `wheel`, `contextmenu` or `touch` handler outside the
+fixtures written for them.
+
+Result on all 60, against the fixed build:
+
+| | |
+|---|---|
+| pages | 60 / 60, every one exit 0 |
+| measured rows | **226** — 149 hover triggers, 76 text fields, 1 not driven |
+| findings from the two families | **0** |
+| hover triggers that revealed anything on hover | **0 of 149** |
+
+The 149 is the number that matters. Every one of those triggers is an element a `:hover` selector
+styles — a tab's background, an input's border, a card's shadow — and the rule is about hover
+*revealing*, not hover *styling*. 149 chances to be wrong, taken zero times. Two pages measured
+nothing and say so; one of them is `multi-state/hover-button/missing-hover.html`, whose subject is a
+dropped `:hover` rule — correctly out of scope here, since a missing hover state is a VRT concern and
+not a keyboard-parity one.
+
+### The one row that was wrong, and the probe defect behind it
+
+`attempt-s17-haiku.html` reported
+
+```
+  - div.details-section>details>div.form-group>textarea#delivery-note:
+      "vlmkit7" became "", "日本語" became "", composed ""
+```
+
+for a field inside a **closed `<details>`**. It passes the size and display filter and then takes no
+text at all: the drive never happened, and the row claimed a measurement. The ASCII control is the
+only reason it was not a false positive — and a genuine non-ASCII defect in the same position would
+have been silently excluded by that same control, so this was a false-negative source too.
+
+The probe now checks that the field actually took focus and reports `not driven — could not focus the
+field (hidden, inert, or inside a closed <details>)`. The fixture carries the case, and removing the
+check fails the test.
+
 ## Corpus 1 — ten pages in this repo, written for other gates
 
 `--probe all` on each. Every one exits 0 for the new rules; **zero findings from the six new

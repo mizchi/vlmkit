@@ -135,6 +135,14 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **The input probe claimed a measurement it never took.** A field inside a closed `<details>` passes
+  the size and display filter and then accepts no text: on a real page a textarea there reported
+  `"vlmkit7" became ""` for a drive that never happened. Only the ASCII control kept that from being a
+  false positive — and by the same token a genuine non-ASCII defect in that position would have been
+  excluded, so it was a false-negative source as well. The probe now verifies the field took focus and
+  reports `not driven — could not focus the field` instead. Found by sweeping all 60 pages in this
+  repo that have a target for the new families.
+
 - **`check interactions --handlers` could not emit five of the rules it declares.** It enabled the
   `drag` family alone, so `hover-only-reveal`, both `contextmenu-*` rules,
   `touch-handlers-not-invoked` and `text-input-rejects-non-ascii` were tunable through that gate and

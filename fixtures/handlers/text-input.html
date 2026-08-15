@@ -15,6 +15,7 @@
     #maxlen            vlmkit7  "vlmk"        日本語  日本語        - (excluded: a length rule)
     #area              vlmkit7  vlmkit7       日本語  日本語        -
     #changeCounter     vlmkit7  vlmkit7       日本語  日本語        -
+    #insideClosedDetails  --  not driven, because it cannot take focus at all
 
   **The ASCII drive is the control, and it is what makes the finding attributable.** `#digitsOnly`
   loses the Japanese text as well, and that says nothing about the script — the field filters by its
@@ -51,6 +52,18 @@
 <input id="maxlen" maxlength="4" placeholder="maxlength 4">
 <textarea id="area" placeholder="textarea, no handler"></textarea>
 <input id="changeCounter" placeholder="counts change events">
+
+<!--
+  Inside a CLOSED <details>: it passes the size and display filter and then takes no text at all.
+  Found on a real page, where a textarea in this position reported `"vlmkit7" became ""` for a drive
+  that never happened — the ASCII control kept it from becoming a false positive, and a genuine
+  non-ASCII defect in the same place would have been unreportable. The probe now checks that the
+  field actually took focus, and reports `not driven` when it did not.
+-->
+<details>
+  <summary>a closed section</summary>
+  <input id="insideClosedDetails" placeholder="cannot be typed into">
+</details>
 
 <script>
   // The defect: a filter that runs on every input event and drops everything outside ASCII. A name

@@ -1473,7 +1473,17 @@ async function probeTextInputs(page: Page): Promise<{ rows: TextInputProbe[]; ca
           field.dispatchEvent(new Event("input", { bubbles: true }));
         });
         await page.evaluate("(() => { window.__vlmkitInputLog = []; return true; })()");
-        await el.evaluate((node: Element) => (node as HTMLElement).focus());
+        // Focus, and CHECK it. A field inside a closed `<details>`, an `inert` subtree or a
+        // `hidden` ancestor passes the size and display filter and then takes no text at all —
+        // measured on a real page, where a textarea inside a closed <details> reported
+        // `"vlmkit7" became ""` for a drive that never happened. The ASCII control kept that from
+        // becoming a false positive, and it would have made a genuine non-ASCII defect in the same
+        // place unreportable. A drive that could not start measures nothing and says so.
+        const focused = await el.evaluate((node: Element) => {
+          (node as HTMLElement).focus();
+          return document.activeElement === node;
+        });
+        if (!focused) throw new Error("could not focus the field (hidden, inert, or inside a closed <details>)");
         if (compose) {
           await cdp.send("Input.imeSetComposition", {
             text: TEXT_PROBE_KANA,

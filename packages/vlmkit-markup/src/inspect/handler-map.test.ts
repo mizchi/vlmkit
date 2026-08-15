@@ -1680,6 +1680,19 @@ test("E2E: three drives per field, and the control that makes the finding attrib
   assert.equal(row("maxlen").plainAscii, "vlmk");
   assert.equal(row("maxlen").plainCjk, "日本語", "a length rule is not a script rule");
 
+  // A field that cannot take focus reports `not driven` rather than a value it never received.
+  // Found on a real page: a textarea inside a closed <details> reported `"vlmkit7" became ""` for a
+  // drive that never happened, and only the ASCII control kept that from being a false positive.
+  const closed = row("insideClosedDetails");
+  assert.ok(closed, "the field inside the closed <details> must appear");
+  assert.match(closed.error ?? "", /could not focus/);
+  assert.equal(closed.plainAscii, "", "and it must not claim a measurement");
+  assert.equal(
+    deriveHandlerIssues(s).some((i) => i.element.includes("#insideClosedDetails")),
+    false,
+    "an undriven field cannot produce a finding",
+  );
+
   // The composition really ran: its types are in the observed list, which is what the coverage
   // claim reads. Nothing is graded from the composed value.
   assert.ok(row("plain").observedTypes.includes("compositionstart"), row("plain").observedTypes.join(","));
