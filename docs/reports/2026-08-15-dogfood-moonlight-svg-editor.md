@@ -86,9 +86,16 @@ click-only and keep their `pointer-only-control` finding, which is the control f
 ## Follow-up — the canvas drag is now driven, not just classified
 
 `pointerdown`/`pointermove`/`pointerup` were sitting in `unprobed-handler-types`: "NOT covered
-by the interaction probes". Unlike HTML5 drag, a pointer drag *is* drivable — `mouse.down` /
-`mouse.move` / `mouse.up` is the same input a user produces — so `--probe-drag` now performs
-the gesture on each pointer-drag surface and measures the element's own pixels either side.
+by the interaction probes". A pointer drag is drivable — `mouse.down` / `mouse.move` /
+`mouse.up` is the same input a user produces — so `--probe-drag` now performs the gesture on
+each pointer-drag surface and measures the element's own pixels either side.
+
+> **Correction, same day.** This section originally contrasted the pointer drag with HTML5
+> drag, "which CDP cannot drive". That is false, and it was checked rather than assumed only
+> afterwards: the same `mouse.down`/`move`/`up` produces a genuine HTML5 drag in Chromium,
+> `dragstart` through `drop` and `dragend`, `DataTransfer` intact. `--probe-drag` now drives
+> those too — see "Driving the HTML5 drag" below. Nothing measured in this report changes; the
+> claim about what was *possible* was wrong.
 
 On this editor's canvas:
 
@@ -148,6 +155,53 @@ Making it safe was most of the work, and two things were measured rather than re
 
 On this editor's canvas the count is nonzero and no `pointer-drag-intercepted` is reported,
 which is the control: the canvas is reachable, and its finding remains the keyboard one.
+
+## Driving the HTML5 drag — the blind spot the correction exposed
+
+This editor has **no** HTML5 drag (`[draggable]` count 0, no `dragstart` anywhere), so this was
+measured on `fixtures/handlers/drag-and-drop.html` and on scratch pages. It belongs in this
+report because it exists only because the claim above was checked.
+
+Dispatching a `dragstart` runs the handler *whatever the element's state*. So the synthetic
+probe cannot answer the first question a user's drag asks — will the browser pick this up? —
+and reports every one of these as working:
+
+| source (all with `draggable === true` and a `dragstart` handler) | real gesture | static read | synthetic dispatch |
+|---|---|---|---|
+| plain `draggable="true"` | `dragstart`, drop lands on the target | fine | fine |
+| `-webkit-user-drag: none` in CSS | **no drag at all** | fine | fine |
+| covered by a transparent sibling | **no drag at all** | fine | fine |
+
+`drag-source-inert` (suspect) is that separation: the gesture is performed twice, from the
+centre and from 25% in, and the browser fired no `dragstart`. `draggable === false` is excluded
+— `drag-source-not-draggable` already names that case and prescribes the one-line fix.
+
+Which targets *accepted* the drag is reported and not graded. A page may legitimately pair a
+source with only some of its drop targets, and this cannot tell that apart from a broken one.
+
+Three things were measured rather than reasoned, and all three changed the design:
+
+- **A gesture that starts no drag selects text instead**, and selected text is draggable, so
+  the debris carries into the next source's gesture. Every gesture now clears the selection
+  first. The symptom is the opposite of the obvious one: it does not make the broken source look
+  fine, it stops a *working* source from dragging (`native-source` failed).
+- **An unmeasured source must not be graded.** The first loop retried every target for a source
+  that could not start a drag; `#not-draggable` consumed the whole gesture budget, and the two
+  good sources behind it in document order were both reported inert. A source that starts
+  nothing is now retried once, from another point, and then left alone.
+- **Coverage is what the recorder saw, not what the outcome implies.** "A drop landed, so
+  `dragleave` fired too" is unsound — a gesture can enter a target and drop there without ever
+  leaving it — so `unprobed-handler-types` reads the observed list per source.
+
+### The join that had been silently discarding every probe finding
+
+Found while adding the above, and worth stating plainly because it invalidates any earlier
+"clean drag surface" result on a page whose elements are named by class: the probe's rows are
+joined to the surface entries by comparing derived paths, and the probe's copy of that
+derivation reached the browser as `split(/s+/)` — a template literal had eaten the backslash in
+`\s`, so it split the class list on the letter **s**. Renaming one fixture container class
+`row` → `rows` took a run from four findings to zero. This editor was unaffected (its elements
+are named by `id`), which is why the report above still stands.
 
 ## Finding 2 — eight findings that could not say which element they were about
 

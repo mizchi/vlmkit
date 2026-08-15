@@ -135,6 +135,45 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **`--probe-drag` now drives a REAL HTML5 drag, and grades the source a browser refuses to
+  pick up.** The note in this file saying CDP cannot drive an HTML5 drag was wrong — measured
+  with a capture recorder on `document`, `mouse.down` / `mouse.move` / `mouse.up` produces the
+  genuine sequence, `DataTransfer` and all:
+
+      dragstart@native-source, drag@native-source, dragenter@zone, dragover@zone,
+      drop@zone, dragend@native-source
+
+  That matters because dispatching a `dragstart` runs the handler *whatever the element's
+  state*, so the synthetic probe reports a source no user can pick up as working. Three cases
+  on the fixture, all with `draggable === true` and a registered `dragstart`:
+
+  | source | real gesture | static read | synthetic dispatch |
+  |---|---|---|---|
+  | plain `draggable="true"` | dragstart, drop lands | fine | fine |
+  | `-webkit-user-drag: none` | **nothing** | fine | fine |
+  | covered by a transparent sibling | **nothing** | fine | fine |
+
+  - `drag-source-inert` (suspect) — the gesture was performed twice, from the centre and from
+    25% in, and the browser fired no `dragstart`. One explanation class: something stops the
+    drag from beginning. `draggable === false` is excluded, because
+    `drag-source-not-draggable` already names that case with its one-line fix.
+  - Reported and **not** graded: which targets accepted the drag. A page may legitimately pair
+    a source with only some of its drop targets, and this cannot tell that apart from a broken
+    one, so the row says `dropped on <target>` or `no target accepted it` and stops there.
+  - `unprobed-handler-types` shrinks to what the recorder actually observed, per source —
+    observed, not inferred. On the drag fixture that warn disappears entirely: all seven types
+    were seen. The first version inferred the list from the outcome ("a drop landed, so
+    `dragleave` must have fired"), which is unsound — a gesture can enter a target and drop
+    there without ever leaving it.
+  - Two gestures per inert source, one per working source, capped at 16 per page, and a source
+    that received none is reported as `not driven` rather than graded. The first loop had
+    neither short-circuit: `#not-draggable` spent the whole budget retrying every target, and
+    the two perfectly good sources behind it in document order were both reported inert.
+  - Every gesture clears the selection first. A press-and-move on an undraggable element
+    selects text, selected text is itself draggable, and the debris carries into the next
+    source's gesture. The measured symptom is not the obvious one: it does not make a broken
+    source look fine, it stops a *working* source from dragging.
+
 - **`scan handlers` inspects HTML5 drag and drop, and reports the two handlers that cannot
   fire.** The `addEventListener` route always recorded drag types — it is type-agnostic —
   but a plain inventory cannot tell a working pair from a broken one, and DnD has two
@@ -181,10 +220,11 @@ suppression works per *rule* instead of per whole gate.
   a `warn`, for the same reason the HTML5 rule warns — the alternative route is often
   elsewhere on the page, which an element-local view cannot see.
 
-- **`--probe-drag` drives a real pointer-drag gesture and reports what moved.** Unlike HTML5
-  drag — which CDP cannot drive, and which the synthetic-`DragEvent` probe exists to work
-  around — a pointer drag IS drivable: `mouse.down` / `mouse.move` / `mouse.up` is the input a
-  user produces. So the probe performs it on each pointer-drag surface and measures the
+- **`--probe-drag` drives a real pointer-drag gesture and reports what moved.**
+  `mouse.down` / `mouse.move` / `mouse.up` is the input a user produces.
+  (This entry originally said HTML5 drag is undrivable by CDP and that the synthetic
+  `DragEvent` probe exists to work around it. That was wrong — see `drag-source-inert` above,
+  which drives a real HTML5 drag the same way.) So the probe performs it on each pointer-drag surface and measures the
   element's own pixels while held and after release. On the SVG editor above, its canvas
   reported `feedback while held 8.14%, changed after release 8.53%`, and
   `unprobed-handler-types` dropped from 8 types to 5 — that warn says the types are "NOT
@@ -243,7 +283,9 @@ suppression works per *rule* instead of per whole gate.
   built: a synthetic `DragEvent` carrying a real `DataTransfer` runs the page's own
   handlers, `dispatchEvent` returns `false` exactly when a listener called
   `preventDefault()`, and `dataTransfer.types` afterwards shows what the source put there.
-  So this needs no VLM and no OS-level drag, which CDP cannot drive anyway.
+  So this needs no VLM. (It also said an OS-level drag is undrivable by CDP; it is not —
+  `drag-source-inert` above drives one, and the dispatch route is kept for what it can reach
+  that a gesture cannot, not for lack of an alternative.)
   - `dragover-not-prevented` (suspect) — a `dragover` handler that never cancels. The
     static `drop-without-dragover` check *passes* this, because a handler is registered;
     the browser rejects the drop regardless, so the wired `drop` never runs. This is the
@@ -717,6 +759,21 @@ suppression works per *rule* instead of per whole gate.
   a stack trace.
 
 ### Fixed
+
+- **A template literal ate `\s`, and every probed drag finding on a normal page vanished.**
+  `PROBE_DRAG_SCRIPT` re-derived each element's path to join its rows back to the surface
+  entries, with `className.trim().split(/\s+/)[0]`. In a plain template literal `\s` loses its
+  backslash, so the browser received `split(/s+/)` — splitting the class list on the letter
+  **s**. Any element whose first class, or an ancestor's, contained an `s` got a different path
+  from the collector's, the join never matched, and the findings only the probe can produce were
+  silently absent. Measured on the drag fixture, whose classes happened to contain no `s`:
+  renaming one container class `row` → `rows`, which changes nothing about the page, took the
+  run from 1 `dragover-not-prevented` + 3 `dragstart-transfers-nothing` to no findings at all.
+  `sortable`, `list`, `cards`, `items` are ordinary class names, so the broken path was the
+  normal one. The escape was the symptom and three copies of the same walk was the cause; there
+  is now one `DESCRIBE_PATH_FN`, declared `String.raw`, shared by the collector, the probe and
+  the TypeScript-side element lookup. `src/util/browser-script-escapes.test.ts` sweeps all 28
+  script-shaped template constants for the same mistake.
 
 - **`check animation`, `check motion` and `check scroll` named findings with a selector
   that matched several elements.** Six gates carried a copy of `stableSelector` and

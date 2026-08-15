@@ -79,7 +79,7 @@ describe("composed built-in registry", () => {
     }
   });
 
-  it("declares 143 tunable rules in total", async () => {
+  it("declares 145 tunable rules in total", async () => {
     // A canary, not a target: a gate losing its rule table to a bad merge is
     // otherwise invisible until someone tries to tune it.
     // 119 → 120 when `check copy` gained `copy-truncated` (element-rect mode, vlmkit#118).
@@ -122,8 +122,14 @@ describe("composed built-in registry", () => {
     //       registered handlers that a delivered gesture never invoked has one explanation
     //       (something is intercepting), while 0% pixels has several, so the pixel numbers
     //       beside it are reported and not graded.
+    // 143 → 145: `drag-source-inert`, on both gates that spread HANDLER_SURFACE_RULES. The
+    //       graded outcome of driving a REAL HTML5 drag rather than dispatching one: the
+    //       browser started no drag on an element whose `draggable` is true and whose
+    //       `dragstart` handler is registered. `-webkit-user-drag: none` and an overlay both
+    //       do that, neither is visible in the DOM, and dispatching a `dragstart` runs the
+    //       handler regardless — so the synthetic probe called both of them working.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 143);
+    assert.equal(total, 145);
   });
 
   it("gives every built-in gate a category", async () => {

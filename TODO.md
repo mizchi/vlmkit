@@ -1262,6 +1262,43 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   (あの gate は既に全コントロールにキーを打っているので、drag だけ触らないのが不自然)。
 - rule 総数 137 → 141。
 
+**「OS レベルの drag は CDP で駆動できない」は誤りだった(同日、実測で否定)** —
+`mouse.down` / `mouse.move` / `mouse.up` で Chromium は本物の HTML5 drag を出す
+(`dragstart, drag, dragenter, dragover, drop, dragend`、`DataTransfer` も生きている)。
+合成 dispatch は **`dragstart` をハンドラに届けてしまう**ので「ブラウザがそもそも掴むか」を
+答えられない。これが唯一の grade 対象になった:
+
+- [x] **`drag-source-inert`**(suspect)— `draggable === true` で `dragstart` も登録済みなのに、
+  実 gesture(中心 + 25% の2回)で `dragstart` が一度も出ない。`-webkit-user-drag: none` と
+  透明な sibling の被せが該当し、**どちらも DOM からは見えず、合成 dispatch は「正常」と報告する**。
+  `draggable === false` は除外(`drag-source-not-draggable` の方が原因と直し方を名指しできる)。
+- **grade しないもの**: どの target が受け取ったか。source と target の正しい組はページの都合で、
+  壊れている組と区別できないので `dropped on <target>` / `no target accepted it` の証拠止まり。
+- **未計測を欠陥として報告しない**が3回とも設計を変えた:
+  - 最初のループは掴めない source が target 全部を retry して budget を食い切り、
+    document 順で後ろにいた**正常な source 2つが inert と報告された**。
+    掴めない source は別の点から1回だけ retry して打ち切る。gesture 0 回の行は grade しない。
+  - `unprobed-handler-types` は **recorder が観測した型**だけを消す。
+    「drop が着いたなら dragleave も出たはず」は不成立(入って出ずに drop できる)。
+  - **毎 gesture で選択を消す**。掴めない要素を押して動かすと**テキスト選択**になり、
+    選択テキスト自体が draggable なので次の source の gesture に持ち越す。
+    実測した症状は直感と逆で、壊れた source が正常に見えるのではなく
+    **正常な source が drag しなくなる**(`native-source` が落ちた)。
+- rule 総数 141 → 143 → 145。
+
+- [x] **テンプレートリテラルが食う `\s` を検出するテスト**(`src/util/browser-script-escapes.test.ts`)
+  - `PROBE_DRAG_SCRIPT` の `split(/\s+/)` が**ブラウザには `split(/s+/)` として届いていた**。
+    class 名を空白でなく**文字 s** で分割するので、最初の class(または祖先の class)に `s` を
+    含む要素は path が collector と食い違い、`row.path === e.path` の join が黙って外れ、
+    **probe 由来の findings が全部消えていた**。fixture の container class を
+    `row` → `rows` に変えるだけ(挙動は不変)で 4件 → 0件。`sortable` / `list` / `cards` は
+    普通の class 名なので、**実ページでは壊れている方が通常**だった。
+  - 原因は同じ walk が**3箇所にコピーされていた**こと(collector / probe / TS 側の要素引き当て)で、
+    間違っていたのは probe のコピーだけ。`DESCRIBE_PATH_FN` 1つに統合し `String.raw` で宣言。
+  - テストは `*SCRIPT` / `*_FN` / `*SOURCE` に束縛されたテンプレートリテラル28個を走査し、
+    `String.raw` でない裸の `\s` 系を拒否する。ablation で正しく落ちることを確認。
+    **20個未満しかマッチしなくなったら失敗**させる(命名規約が変わって sweep が空になる事故防止)。
+
 - [x] **browser script 定数22個を構文チェックするテスト**(`rules.test.ts`)
   - TypeScript が中を見ないテンプレートリテラルなので、タイポは `page.evaluate` で初めて落ちる
     (= gate が不透明に throw するか、**何も返さず clean に見える**)。`new Function` は
@@ -1282,8 +1319,10 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - 教訓は2つ: **無出力を成功と読むな(終了コードを見ろ)**、そして
     **`| tail` は終了コードを隠す**。
 
-**バックティックの罠を3回踏んだ**: `COLLECT_SURFACE_SCRIPT`、`PROBE_DRAG_SCRIPT`、
-そして `handlers.gate.ts` の `usage:`。**`usage:` もテンプレートリテラル**で、
+**バックティックの罠を4回踏んだ**: `COLLECT_SURFACE_SCRIPT`、`PROBE_DRAG_SCRIPT`、
+`handlers.gate.ts` の `usage:`、そして `DRAG_RECORDER_SCRIPT`。
+最後のは `String.raw` なので**エスケープした `\`` も使えない**
+(バックスラッシュが値に残り、ブラウザに壊れたコードが届く)。**`usage:` もテンプレートリテラル**で、
 そこに散文をバックティック付きで書くと文字列が閉じる。コンパイラは毎回捕まえるが
 メッセージが原因を名指ししない(`Expected `,` or `}` but found `Identifier`` が散文を指す)。
 パーサを二重化するテストは書かず、値からは判定不能な理由を `rules.test.ts` に記録した。

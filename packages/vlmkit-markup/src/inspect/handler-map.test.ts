@@ -727,3 +727,162 @@ test("E2E: counting invocations does not change how the page's listeners behave"
   assert.equal(unpatched!.filter((l) => l === "both").length, 2, "one phase removed, one left, two clicks");
   assert.ok(unpatched!.includes("after-throw"), "a throwing listener must not stop the rest");
 });
+
+// ---------------------------------------------------------------------------
+// The real HTML5 drag — driven, not dispatched
+//
+// The note this replaced said CDP could not drive an HTML5 drag, and that was wrong. Measured
+// on the fixture with a capture recorder on `document`, `mouse.down`/`move`/`up` produces
+// `dragstart, drag, dragenter, dragover, drop, dragend` — the genuine sequence, DataTransfer
+// and all. That matters because dispatching a `dragstart` runs the handler whatever the
+// element's state, so the synthetic probe reports a source no user can pick up as working.
+
+function realRow(over: Partial<import("./handler-map.ts").RealDragProbe> & { path: string }) {
+  return { dragstartFired: false, targetsTried: [], gestures: 1, ...over };
+}
+
+test("a source the browser refuses to pick up is graded; an unmeasured one is not", () => {
+  const s = surface(entry({ path: "div#src", types: { dragstart: 1 }, draggable: true }));
+  s.realDragProbe = [realRow({ path: "div#src" })];
+  const kinds = () => deriveHandlerIssues(s).filter((i) => i.kind === "drag-source-inert").length;
+  assert.equal(kinds(), 1, "no dragstart from a real gesture is the finding");
+
+  // Zero gestures means the budget ran out before this source. Reporting "started no drag" for
+  // a drag that was never performed is the false-defect mirror of a false green — and the
+  // first version of the loop did it: `#not-draggable` spent the whole budget retrying every
+  // target, and the two good sources after it were both reported inert.
+  s.realDragProbe = [realRow({ path: "div#src", gestures: 0, capped: true })];
+  assert.equal(kinds(), 0, "a source that received no gesture must not be graded");
+
+  // A gesture that could not be performed measured nothing either.
+  s.realDragProbe = [realRow({ path: "div#src", error: "no usable box" })];
+  assert.equal(kinds(), 0);
+
+  // And a working source is silent.
+  s.realDragProbe = [realRow({ path: "div#src", dragstartFired: true, droppedOn: "div#zone" })];
+  assert.equal(kinds(), 0);
+});
+
+test("`draggable=false` keeps the specific finding instead of both", () => {
+  // Both statements are true of this element, but `drag-source-not-draggable` names the cause
+  // and the one-line fix, so the probed rule stands down rather than doubling the report.
+  const s = surface(entry({ path: "div#src", types: { dragstart: 1 }, draggable: false }));
+  s.realDragProbe = [realRow({ path: "div#src" })];
+  const kinds = deriveHandlerIssues(s).map((i) => i.kind);
+  assert.equal(kinds.includes("drag-source-not-draggable"), true);
+  assert.equal(kinds.includes("drag-source-inert"), false);
+});
+
+test("the types a gesture exercised come from what the recorder saw, not from the outcome", () => {
+  const s = surface(entry({ path: "div#src", types: { dragstart: 1, dragend: 1, dragleave: 1 } }));
+  // A gesture that entered a target and dropped there need never have LEFT it, so `dragleave`
+  // stays unprobed even though the drop landed. Inferring the list from the outcome — the
+  // first version of this — claimed coverage the run did not have.
+  s.realDragProbe = [realRow({
+    path: "div#src",
+    dragstartFired: true,
+    droppedOn: "div#zone",
+    observedTypes: ["dragstart", "dragend"],
+  })];
+  const unprobed = deriveHandlerIssues(s).find((i) => i.kind === "unprobed-handler-types");
+  assert.ok(unprobed, "dragleave was never driven, so it must still be disclosed");
+  assert.match(unprobed.message, /dragleave/);
+  assert.equal(/dragstart|dragend/.test(unprobed.message), false, "those two were exercised");
+
+  // An errored row exercised nothing, whatever it happens to carry.
+  s.realDragProbe = [realRow({ path: "div#src", error: "no usable box", observedTypes: ["dragstart"] })];
+  assert.match(deriveHandlerIssues(s).find((i) => i.kind === "unprobed-handler-types")!.message, /dragstart/);
+});
+
+test("E2E: driving the drag separates three kinds of source", { timeout: 180_000 }, async () => {
+  // This is also the guard for the per-gesture selection reset in `probeRealDrags`, and the
+  // only test that catches its removal: a press-and-move on an undraggable element selects
+  // text, selected text is draggable, and the debris from the inert sources ahead of
+  // `#native-source` in document order stops its genuine drag. Ablating the reset fails on
+  // "native-source must start a real drag" — not on the inert sources, which keep reporting.
+  const source = join(REPO_ROOT, "fixtures/handlers/drag-and-drop.html");
+  const s = await buildHandlerSurface({ source, probeDrag: true });
+  assert.ok(s.realDragProbe && s.realDragProbe.length > 0, "probeDrag must drive the sources");
+  const row = (id: string) => s.realDragProbe!.find((r) => r.path.endsWith(`#${id}`));
+  const issues = deriveHandlerIssues(s);
+  const kindsFor = (id: string) =>
+    issues.filter((i) => i.element.split(" ")[0]!.endsWith(`#${id}`)).map((i) => i.kind);
+
+  // 1. Sources the browser picks up: the drag starts and the drop lands on the correct target.
+  for (const id of ["ok", "native-source", "attr-source"]) {
+    assert.equal(row(id)?.dragstartFired, true, `${id} must start a real drag`);
+    assert.ok(row(id)?.droppedOn?.endsWith("#zone"), `${id} must drop on #zone, got ${row(id)?.droppedOn}`);
+    assert.equal(kindsFor(id).includes("drag-source-inert"), false);
+  }
+
+  // 2. The two that only a real gesture can catch. Both have `draggable === true` and a
+  // dragstart handler, so the static read and the synthetic dispatch both pass them.
+  for (const id of ["user-drag-none", "veiled-source"]) {
+    assert.equal(row(id)?.dragstartFired, false, `${id} must start no drag`);
+    assert.ok(row(id)!.gestures > 0, "and it must have been driven, or the finding is unearned");
+    assert.ok(kindsFor(id).includes("drag-source-inert"), `${id} must report drag-source-inert`);
+    assert.equal(
+      s.elements.find((e) => e.path.endsWith(`#${id}`))?.draggable, true,
+      "the DOM says draggable — that is what makes this invisible statically",
+    );
+  }
+
+  // 3. `draggable=false` keeps the statically-visible finding and does not double up.
+  assert.ok(kindsFor("not-draggable").includes("drag-source-not-draggable"));
+  assert.equal(kindsFor("not-draggable").includes("drag-source-inert"), false);
+
+  // The gesture drove the whole vocabulary, so the "not covered by the interaction probes"
+  // warn has nothing left to disclose about drag on this page.
+  assert.deepEqual(
+    (row("ok")?.observedTypes ?? []).slice().sort(),
+    ["drag", "dragend", "dragenter", "dragleave", "dragover", "dragstart", "drop"],
+  );
+  const unprobed = issues.find((i) => i.kind === "unprobed-handler-types");
+  assert.equal(unprobed, undefined, `nothing should remain unprobed: ${unprobed?.message ?? ""}`);
+
+  // Without the flag there is no row at all — absent means not measured.
+  const noProbe = await buildHandlerSurface({ source });
+  assert.equal(noProbe.realDragProbe, undefined);
+  assert.equal(deriveHandlerIssues(noProbe).some((i) => i.kind === "drag-source-inert"), false);
+});
+
+test("E2E: an inert source is retried, and the source after it is still measured", { timeout: 180_000 }, async () => {
+  // What this pins is the retry and the separation: a source that starts nothing gets a second
+  // gesture from a different point, and only it reports.
+  //
+  // It does NOT pin the per-gesture selection reset, though that was the reason it was written.
+  // Removing the reset leaves this page green — checked, twice, with two different setups — and
+  // the guard for the reset is the fixture E2E above, which fails with "native-source must
+  // start a real drag". That is also the symptom worth recording: leftover selection debris
+  // does not make a broken source look fine, it stops a WORKING source from dragging. A
+  // press-and-move on an undraggable element selects text, and selected text is draggable, so
+  // the debris from probing a broken source lands on whatever is probed next.
+  const dir = mkdtempSync(join(tmpdir(), "handlers-selection-"));
+  const file = join(dir, "selection.html");
+  writeFileSync(file, `<!doctype html><html><head><title>t</title>
+    <style>.nodrag { -webkit-user-drag: none; } div { width: 220px; }</style></head><body>
+    <div class="nodrag" id="dead-src" draggable="true">a source the browser will not pick up</div>
+    <div id="good-src" draggable="true">a source it will</div>
+    <div id="zone" style="width:120px;height:60px;background:#eee">zone</div>
+    <script>
+      for (const id of ['dead-src', 'good-src']) {
+        document.getElementById(id).addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', id);
+        });
+      }
+      document.getElementById('zone').addEventListener('dragover', (e) => e.preventDefault());
+      document.getElementById('zone').addEventListener('drop', (e) => e.preventDefault());
+    </script>
+  </body></html>`);
+
+  const s = await buildHandlerSurface({ source: file, probeDrag: true });
+  const row = (id: string) => s.realDragProbe?.find((r) => r.path.endsWith(`#${id}`));
+  assert.equal(row("dead-src")?.dragstartFired, false, "-webkit-user-drag: none must start nothing");
+  assert.equal(row("dead-src")?.gestures, 2, "and it must have been retried from a second point");
+  // The assertion the reset exists for: probed second, after two gestures' worth of debris.
+  assert.equal(row("good-src")?.dragstartFired, true, "the next source must still drag");
+  assert.ok(row("good-src")?.droppedOn?.endsWith("#zone"), "and still land its drop");
+  const kinds = deriveHandlerIssues(s).filter((i) => i.kind === "drag-source-inert").map((i) => i.element);
+  assert.equal(kinds.length, 1, `only the inert one reports: ${kinds.join(", ")}`);
+  assert.match(kinds[0]!, /#dead-src/);
+});

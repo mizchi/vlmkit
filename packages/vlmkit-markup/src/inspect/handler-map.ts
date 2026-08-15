@@ -87,6 +87,11 @@ export interface HandlerSurface {
    * Absent means "not measured", never "measured and fine".
    */
   pointerDragProbe?: PointerDragProbe[];
+  /**
+   * Present only when `probeDrag` was requested AND the page declares a `dragstart` source.
+   * Absent means "not measured", never "measured and fine".
+   */
+  realDragProbe?: RealDragProbe[];
 }
 
 /** Install BEFORE page scripts run (page.addInitScript). */
@@ -377,8 +382,16 @@ export const COLLECT_SURFACE_SCRIPT = `
  * run the page's own handlers (`dragstart@ok`, `dragover@zone`, `drop@zone`,
  * `dragend@ok`), `dispatchEvent` returned false for a dragover that prevented and true
  * for one that forgot, and `dt.getData("text/plain")` came back as the value the page's
- * dragstart had set. All four signals are observable, so none of this needs a VLM or a
- * real OS-level drag — which CDP cannot drive anyway.
+ * dragstart had set. All four signals are observable without a VLM.
+ *
+ * **What this note used to claim, and got wrong:** "a real OS-level drag — which CDP cannot
+ * drive anyway". Chromium drives one fine; `probeRealDrags` does it with
+ * `mouse.down`/`move`/`up` and gets the whole genuine sequence. Dispatching still earns its
+ * place — it reaches a target no source on the page happens to pair with, and it answers the
+ * `preventDefault` question directly through the return value — but it cannot see whether the
+ * *browser* will start a drag at all, because dispatching a `dragstart` runs the handler
+ * whatever the element's state. `drag-source-inert` is that blind spot, and it needed the real
+ * gesture.
  */
 export interface DragProbe {
   /** `path` of the surface entry this belongs to. */
@@ -470,9 +483,9 @@ export const PROBE_DRAG_SCRIPT = `
 /**
  * What a real pointer-drag gesture did to a drag surface.
  *
- * Unlike HTML5 drag — which CDP cannot drive, and which the synthetic-`DragEvent` probe
- * exists to work around — a pointer drag IS drivable: `mouse.down` / `mouse.move` /
- * `mouse.up` is the same input a user produces. So this measures the real thing.
+ * `mouse.down` / `mouse.move` / `mouse.up` is the same input a user produces, so this measures
+ * the real thing. (This note used to open with "unlike HTML5 drag, which CDP cannot drive" —
+ * that was wrong, and `probeRealDrags` drives one the same way.)
  *
  * **Pixels, not the DOM.** Measured on four fixtures plus a real SVG editor:
  *
@@ -588,6 +601,219 @@ async function probePointerDrags(
 }
 
 /**
+ * What a real HTML5 drag did — a gesture the browser turns into `dragstart`/`drop`, not a
+ * `dispatchEvent` of a `DragEvent` this code constructed.
+ *
+ * **Chromium drives a real drag, and the note here previously said it could not.** Measured
+ * with `mouse.down` / `mouse.move` / `mouse.up` on the drag fixture, which logs every drag
+ * event through a capture listener on `document`:
+ *
+ *     dragstart@native-source, drag@native-source, dragenter@zone, dragover@zone,
+ *     drop@zone, dragend@native-source
+ *
+ * That matters because the synthetic probe (`PROBE_DRAG_SCRIPT`) cannot see whether the
+ * *browser* will start a drag at all — dispatching a `dragstart` runs the handler whatever the
+ * element's state, so it reports a source that no user can pick up as working. Three cases,
+ * all measured on scratch fixtures, all reported as fine by the synthetic probe:
+ *
+ *     source                                 real gesture      static read
+ *     draggable="true"                       dragstart, drop   fine
+ *     dragstart handler, draggable false      nothing          `drag-source-not-draggable`
+ *     draggable="true" + -webkit-user-drag:none  nothing       **fine** — invisible
+ *     draggable="true" under a transparent veil  nothing       **fine** — invisible
+ *
+ * **The selection has to be cleared before every gesture**, and this was measured rather than
+ * assumed. Selected text is itself draggable, so a leftover selection from a previous gesture
+ * starts a *text* drag: the same two gestures in the same order gave `[]` on the first run and
+ * `dragstart@s-notdraggable` on the second, and one run dropped the string `"\ntarget ok"` into
+ * a page's own drop handler. Without the reset the probe is order-dependent and feeds the page
+ * junk it would never receive from a user.
+ */
+export interface RealDragProbe {
+  /** `path` of the surface entry this belongs to — a source with a `dragstart` handler. */
+  path: string;
+  /** True when the gesture made the browser start a drag whose source was this element. */
+  dragstartFired: boolean;
+  /** Target paths the gesture was aimed at, in order. Empty when the page declares none. */
+  targetsTried: string[];
+  /** Where a `drop` actually landed, if any. Absent means no target accepted the drag. */
+  droppedOn?: string;
+  /** Drag sources other than this element that the gesture started, if any. */
+  startedOn?: string[];
+  /**
+   * Drag event types the recorder actually saw during this source's gestures.
+   *
+   * Observed, not inferred. `unprobed-handler-types` reads this to stop calling a type
+   * uncovered, and the first version of that inferred the list — "a drop landed, so
+   * `dragleave` must have fired too" — which is not sound: a gesture that enters a target and
+   * drops there need never leave it. The recorder has the answer, so it reports the answer.
+   */
+  observedTypes?: string[];
+  /**
+   * How many gestures this source received.
+   *
+   * Zero means the budget ran out first, and a zero-gesture row must not be graded — reporting
+   * "started no drag" for a drag never performed is the same false claim as a clean bill of
+   * health for something unmeasured, pointed the other way. The first version of this loop did
+   * exactly that: `#not-draggable` spent the whole budget retrying every target, and the two
+   * perfectly good sources behind it in document order were both reported inert.
+   */
+  gestures: number;
+  /** True when the gesture budget ran out before every target had been tried. */
+  capped?: boolean;
+  /** Set when the gesture could not be performed (no box, offscreen, detached). */
+  error?: string;
+}
+
+/**
+ * Records every drag event on `document`, in the capture phase.
+ *
+ * Capture on `document` runs before the page's own listeners, so a handler that calls
+ * `stopPropagation()` cannot hide its own event from this. Installed once and reset per
+ * gesture.
+ */
+const DRAG_RECORDER_SCRIPT = String.raw`
+(() => {
+  ${DESCRIBE_PATH_FN}
+  const w = window;
+  w.__vlmkitDragLog = [];
+  if (!w.__vlmkitDragRecorder) {
+    w.__vlmkitDragRecorder = true;
+    // All seven, so the list of types a gesture exercised is observed rather than inferred.
+    // There is no dragmove event: drag is the continuous one on the source.
+    // (No backticks anywhere in this script. It is a String.raw template, where a backtick
+    // ends the literal and an escaped one leaves the backslash behind in the emitted code.)
+    for (const t of ["dragstart", "drag", "dragenter", "dragover", "dragleave", "drop", "dragend"]) {
+      document.addEventListener(t, (e) => {
+        // drag and dragover fire continuously -- tens of times per gesture -- and every entry
+        // crosses the CDP boundary. 400 is far more than any assertion here needs.
+        if (w.__vlmkitDragLog.length >= 400) return;
+        const el = e.target;
+        w.__vlmkitDragLog.push({ type: t, path: el && el.tagName ? describe(el) : "(non-element)" });
+      }, true);
+    }
+  }
+  return true;
+})()
+`;
+
+/**
+ * A total budget, because the work is a source x target product and each gesture is a
+ * round-trip of real input.
+ *
+ * Sixteen with the short-circuits below covers a page far larger than the fixture: a source
+ * that cannot start a drag costs exactly 2 gestures, and one that can costs 1 plus however many
+ * targets refuse it. The first version had neither short-circuit and a budget of 12, which
+ * `#not-draggable` alone consumed by retrying all six targets.
+ */
+const MAX_REAL_DRAG_GESTURES = 16;
+
+/**
+ * Drag each source onto the page's declared targets and report what the browser did.
+ *
+ * Two short-circuits, and both are about spending gestures where they answer something:
+ *
+ *   - **A source that starts no drag is not retried against other targets.** Whether the
+ *     browser picks the element up has nothing to do with where the gesture is heading, so the
+ *     second target would re-measure the same fact. It gets one retry from a different point
+ *     instead (25%/25% after the centre): a card whose only draggable part is a handle, or one
+ *     with a `draggable="false"` child under the centre, would otherwise read as inert.
+ *   - **A source that lands a drop stops there.** "Can this be dropped anywhere" is the
+ *     question; a second success adds nothing.
+ *
+ * A page with no declared drop target still gets one gesture, to a point 60px away, because
+ * `dragstartFired` is worth measuring on its own.
+ */
+async function probeRealDrags(
+  page: Page,
+  elements: readonly HandlerSurfaceEntry[],
+): Promise<RealDragProbe[]> {
+  const sources = elements.filter((e) => e.visible && e.types.dragstart);
+  if (sources.length === 0) return [];
+  const targets = elements.filter((e) => e.visible && (e.types.dragover || e.types.drop));
+  await page.evaluate(DRAG_RECORDER_SCRIPT);
+  const out: RealDragProbe[] = [];
+  let budget = MAX_REAL_DRAG_GESTURES;
+
+  type LogRow = { type: string; path: string };
+  const gesture = async (from: { x: number; y: number }, to: { x: number; y: number }) => {
+    // Selected text is draggable, so a leftover selection starts a text drag instead of this
+    // one — measured, and it made the same two gestures disagree between runs.
+    await page.evaluate("(() => { window.__vlmkitDragLog = []; const s = window.getSelection && window.getSelection(); if (s) s.removeAllRanges(); return true; })()");
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    // A short move first: the browser needs a threshold crossed before it promotes the
+    // press to a drag. Measured — 2 steps here then 5 to the target landed the drop.
+    await page.mouse.move(from.x + 8, from.y + 6, { steps: 2 });
+    await page.mouse.move(to.x, to.y, { steps: 5 });
+    await page.mouse.up();
+    return await page.evaluate("window.__vlmkitDragLog") as LogRow[];
+  };
+
+  for (const src of sources) {
+    const row: RealDragProbe = { path: src.path, dragstartFired: false, targetsTried: [], gestures: 0 };
+    try {
+      const handle = (await handleForPath(page, src.path)).asElement();
+      if (!handle) { row.error = "element not found for its own path"; out.push(row); continue; }
+      const box = await handle.boundingBox();
+      if (!box || box.width < 4 || box.height < 4) { row.error = "no usable box"; out.push(row); continue; }
+      const startedOn = new Set<string>();
+      const observed = new Set<string>();
+      const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+      const offCentre = { x: box.x + box.width * 0.25, y: box.y + box.height * 0.25 };
+      const aimAt = async (target: HandlerSurfaceEntry) => {
+        const tb = await (await handleForPath(page, target.path)).asElement()?.boundingBox();
+        return tb ? { x: tb.x + tb.width / 2, y: tb.y + tb.height / 2 } : null;
+      };
+      // With no declared target, move off the element so the gesture is still a drag.
+      const elsewhere = { x: centre.x + 60, y: centre.y + 60 };
+
+      const run = async (from: { x: number; y: number }, to: { x: number; y: number }) => {
+        budget--;
+        row.gestures++;
+        const log = await gesture(from, to);
+        for (const r of log) {
+          observed.add(r.type);
+          if (r.type !== "dragstart") continue;
+          if (r.path === src.path) row.dragstartFired = true;
+          else startedOn.add(r.path);
+        }
+        return log;
+      };
+
+      const firstAim = targets.length > 0 ? await aimAt(targets[0]!) ?? elsewhere : elsewhere;
+      if (budget <= 0) { row.capped = true; out.push(row); continue; }
+      let log = await run(centre, firstAim);
+      if (targets.length > 0) row.targetsTried.push(targets[0]!.path);
+      if (!row.dragstartFired && budget > 0) log = await run(offCentre, firstAim);
+
+      if (row.dragstartFired) {
+        const dropped = log.find((r) => r.type === "drop");
+        if (dropped) row.droppedOn = dropped.path;
+        // Only now is trying other targets informative: the source does pick up, and the
+        // question becomes whether anything on the page accepts it.
+        for (const t of targets.slice(1)) {
+          if (row.droppedOn) break;
+          if (budget <= 0) { row.capped = true; break; }
+          const to = await aimAt(t);
+          if (!to) continue;
+          row.targetsTried.push(t.path);
+          const again = await run(centre, to);
+          const drop = again.find((r) => r.type === "drop");
+          if (drop) row.droppedOn = drop.path;
+        }
+      }
+      if (startedOn.size > 0) row.startedOn = [...startedOn];
+      if (observed.size > 0) row.observedTypes = [...observed].sort();
+    } catch (err) {
+      row.error = err instanceof Error ? err.message.slice(0, 120) : String(err).slice(0, 120);
+    }
+    out.push(row);
+  }
+  return out;
+}
+
+/**
  * Fraction of pixels that differ, on a per-channel sum with a small floor.
  *
  * A floor of 12 across the three channels rather than exact equality: anti-aliased text and
@@ -646,6 +872,12 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
       total: number;
       controls: number;
     };
+    // Real mouse input first among the probes, on the least-perturbed page: it is the one
+    // that answers whether the BROWSER starts a drag here, and a synthetic dispatch that has
+    // already run the page's drop handlers can have moved the source out from under it.
+    const realDragProbe = options.probeDrag
+      ? await probeRealDrags(page, raw.elements)
+      : undefined;
     // After the surface, so a probe that mutates the page cannot change what was
     // inventoried. Dispatching runs the page's own handlers, and a drop handler is exactly
     // the kind that rewrites the DOM.
@@ -666,6 +898,7 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
       visibleControls: raw.controls,
       ...(dragProbe ? { dragProbe } : {}),
       ...(pointerDragProbe && pointerDragProbe.length > 0 ? { pointerDragProbe } : {}),
+      ...(realDragProbe && realDragProbe.length > 0 ? { realDragProbe } : {}),
     };
   });
 }
@@ -737,7 +970,8 @@ export const PROBED_TYPES = new Set(["click", "keydown", "keyup", "keypress", "f
 export interface HandlerIssue {
   kind: "pointer-only-control" | "unprobed-handler-types" | "delegated-handlers-opaque" | "no-handlers-found"
     | "drag-source-not-draggable" | "drop-without-dragover" | "drag-without-keyboard-alternative"
-    | "dragover-not-prevented" | "dragstart-transfers-nothing" | "pointer-drag-intercepted";
+    | "dragover-not-prevented" | "dragstart-transfers-nothing" | "pointer-drag-intercepted"
+    | "drag-source-inert";
   severity: "warn" | "suspect";
   element: string;
   message: string;
@@ -809,6 +1043,19 @@ export const HANDLER_SURFACE_RULES = [
         + " 0 invocations has one. Requires --probe-drag.",
     },
     {
+      id: "drag-source-inert",
+      title: "A real drag gesture on this source started no drag",
+      severity: "suspect",
+      docs:
+        "Driven, not read: a real mouse gesture over the element produced no `dragstart` at"
+        + " all, twice, from two different points. The browser refuses to start a drag here —"
+        + " `-webkit-user-drag: none` on it or an ancestor, an overlay taking the press, or"
+        + " `draggable` on a different node than the handler. Distinct from"
+        + " `drag-source-not-draggable`, which reads the `draggable` property and reports the"
+        + " one case that IS statically visible; this covers the ones that are not, and which"
+        + " the synthetic dispatch reports as working. Requires --probe-drag.",
+    },
+    {
       id: "dragstart-transfers-nothing",
       title: "dragstart leaves the DataTransfer empty",
       severity: "warn",
@@ -855,6 +1102,16 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
   const probedThisRun = new Set<string>();
   if (surface.dragProbe) {
     for (const row of surface.dragProbe) for (const t of row.ran) probedThisRun.add(t);
+  }
+  if (surface.realDragProbe) {
+    // Exactly the types the recorder saw. Not inferred from the outcome: "a drop landed, so
+    // dragleave must have fired" is unsound — a gesture can enter a target and drop there
+    // without ever leaving it — and claiming coverage this run did not have is the same
+    // failure as claiming a defect it did not measure.
+    for (const row of surface.realDragProbe) {
+      if (row.error) continue;
+      for (const t of row.observedTypes ?? []) probedThisRun.add(t);
+    }
   }
   if (surface.pointerDragProbe) {
     for (const row of surface.pointerDragProbe) {
@@ -940,6 +1197,34 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
           + `ancestor, or a listener attached to a node that is no longer in the document. `
           + `Measured at 30%-70% across the element, so a surface that is only covered `
           + `elsewhere would not report this.`,
+      });
+    }
+
+    // ---- Real HTML5 drag gesture --------------------------------------------
+    //
+    // The graded outcome of driving the drag rather than dispatching it: the page registers a
+    // `dragstart` on a visible element, a real gesture was performed over it twice from two
+    // points, and the browser started no drag at all. Measured separation on scratch fixtures
+    // — a plain `draggable="true"` source fires `dragstart` and lands its drop; the same
+    // source with `-webkit-user-drag: none`, or under a transparent sibling, fires nothing —
+    // and neither of those two is visible to any static read.
+    //
+    // `draggable === false` is excluded because `drag-source-not-draggable` already names that
+    // case with the specific fix. `dragstartFired` is only trusted when the row has no error:
+    // a gesture that could not be performed measured nothing.
+    const realProbe = surface.realDragProbe?.find((row) => row.path === e.path);
+    if (realProbe && !realProbe.error && realProbe.gestures > 0 && !realProbe.dragstartFired && e.draggable !== false) {
+      issues.push({
+        kind: "drag-source-inert",
+        severity: "suspect",
+        element: `${e.path} "${e.text}"`,
+        message: `${e.path} "${e.text}" has a dragstart handler and a real mouse drag over it `
+          + `started no drag: the gesture was performed twice, from the centre and from 25% in, `
+          + `and the browser fired no dragstart. Something stops the drag from beginning — `
+          + `\`-webkit-user-drag: none\` on it or an ancestor, an element on top of it taking the `
+          + `press, or \`draggable\` set on a different node than the handler. Note the element `
+          + `IS draggable as far as the DOM is concerned, which is why the static check passes `
+          + `it${realProbe.startedOn?.length ? `; the gesture started a drag on ${realProbe.startedOn.join(", ")} instead` : ""}.`,
       });
     }
 
@@ -1252,6 +1537,37 @@ export function formatHandlerSurface(surface: HandlerSurface, issues: HandlerIss
         + (flat
           ? ` ${YELLOW}(nothing moved — dead handlers, or the drag does not start here)${RESET}`
           : ""),
+      );
+    }
+  }
+  // The real HTML5 drag. `started no drag` is the graded row; "no target accepted it" is
+  // printed and NOT graded, because a page may legitimately pair a source with only some of
+  // its targets and this cannot tell that apart from a broken one.
+  if (surface.realDragProbe && surface.realDragProbe.length > 0) {
+    lines.push("");
+    lines.push(`${BOLD}HTML5 drag gesture (real mouse input):${RESET}`);
+    for (const row of surface.realDragProbe) {
+      if (row.error) {
+        lines.push(`  - ${row.path}: ${YELLOW}not driven — ${row.error}${RESET}`);
+        continue;
+      }
+      if (row.gestures === 0) {
+        // Not "no drag started" — no drag was attempted. Saying otherwise would report a
+        // measurement that never happened.
+        lines.push(`  - ${row.path}: ${DIM}not driven — gesture budget spent on earlier sources${RESET}`);
+        continue;
+      }
+      const tried = row.targetsTried.length > 0
+        ? `, tried ${row.targetsTried.length} target(s)`
+        : ", no drop target declared on the page";
+      const landed = row.droppedOn
+        ? `${GREEN}dropped on ${row.droppedOn}${RESET}`
+        : row.dragstartFired
+          ? `${YELLOW}no target accepted it${RESET}`
+          : `${RED}started no drag${RESET}`;
+      lines.push(
+        `  - ${row.path}: ${row.dragstartFired ? "dragstart fired" : "no dragstart"}${tried} — ${landed}`
+        + (row.capped ? ` ${DIM}(gesture budget reached — not every target was tried)${RESET}` : ""),
       );
     }
   }

@@ -32,6 +32,20 @@
     every source here      none of them fills the DataTransfer except #ok, so a target
                            calling getData() reads ""  -> dragstart-transfers-nothing
 
+  And two are invisible even to that, because dispatching a `dragstart` runs the handler
+  whatever the element's state -- so the synthetic probe reports both of these as working.
+  Only a REAL gesture (`mouse.down` / `mouse.move` / `mouse.up`, which Chromium turns into a
+  genuine HTML5 drag) shows that the browser refuses to start one:
+
+    #user-drag-none        draggable="true", and `-webkit-user-drag: none` in CSS. The DOM
+                           says draggable, the browser starts nothing  -> drag-source-inert
+    #veiled-source         draggable="true" with a transparent SIBLING over it, so the press
+                           never reaches it                            -> drag-source-inert
+
+  Measured, since the pair only makes sense as a contrast: a plain draggable source fires
+  `dragstart` and lands its drop on #zone; these two fire nothing at all. Both keep their
+  `draggable` property true, which is exactly why `drag-source-not-draggable` cannot see them.
+
   Every visible drag source also reports `drag-without-keyboard-alternative` unless it or
   an ancestor has a keyboard handler — #ok deliberately has one, so the fixture shows both
   sides. Drag has no keyboard equivalent in any browser, so that finding is about the page
@@ -55,6 +69,8 @@
   .broken { background: #b3261e; }
   .zone { width: 180px; min-height: 64px; background: #eceff4; padding: 8px; }
   ul { list-style: none; margin: 0; padding: 0; }
+  /* Cancels the drag the `draggable` attribute asks for. Nothing in the DOM reflects this. */
+  .no-user-drag { -webkit-user-drag: none; user-drag: none; }
 </style>
 </head>
 <body>
@@ -65,6 +81,15 @@
   <a class="item" id="native-source" href="#x">native draggable anchor</a>
   <div class="item" id="attr-source" draggable="true" ondragstart="void 0" tabindex="0"
        onkeydown="void 0">source via ondragstart attribute</div>
+</div>
+
+<div class="rows">
+  <div class="item broken no-user-drag" id="user-drag-none" draggable="true">draggable, user-drag none</div>
+  <div style="position:relative">
+    <div class="item broken" id="veiled-source" draggable="true">draggable, covered</div>
+    <!-- A SIBLING, not a child: a child would let the press through to the source. -->
+    <div id="veil" style="position:absolute;inset:0;background:rgba(0,0,0,0.001)"></div>
+  </div>
 </div>
 
 <div class="rows">
@@ -118,6 +143,11 @@
   // Runs, transfers nothing: a target calling getData() reads "". Chromium starts the drag
   // anyway, Firefox and Safari do not. Only the probe sees this too.
   $("not-draggable").addEventListener("dragstart", () => {});
+
+  // Both of these look identical to #ok from the DOM: draggable is true, a dragstart handler
+  // is registered, and dispatching one runs it. A real gesture starts no drag on either.
+  $("user-drag-none").addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", "u"); });
+  $("veiled-source").addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", "v"); });
 </script>
 </body>
 </html>
