@@ -695,6 +695,16 @@ export interface RealDragProbe {
   /** True when the gesture budget ran out before every target had been tried. */
   capped?: boolean;
   /**
+   * Targets the gesture was aimed at that received no drag event at all, each with what did.
+   *
+   * A drop target the pointer cannot reach. Measured on a correct target — `dragover` calling
+   * `preventDefault`, a wired `drop` — under a transparent sibling: every event went to the veil,
+   * the target saw nothing, and the whole run reported no finding about it. The static check
+   * passes (both handlers exist) and the synthetic probe passes (dispatching at the element runs
+   * them), so this needs the real gesture.
+   */
+  unreached?: { target: string; interceptedBy: string }[];
+  /**
    * Every drag event this source's gestures produced, in order, with repeats coalesced.
    *
    * The debugging record: the aggregate fields say a drop did or did not land, and this says
@@ -919,10 +929,33 @@ async function probeRealDrags(
         return log;
       };
 
+      const unreached: { target: string; interceptedBy: string }[] = [];
+      /**
+       * Did the target the gesture was aimed at see anything? If not, name what did.
+       *
+       * The interceptor is the element that took the most `dragover`s and is neither the source
+       * nor the page background — on the measured case that is the veil, which is exactly the
+       * name a reader needs. Only called for a gesture that started a drag: with no drag there
+       * are no events to attribute, and "unreachable" would be a claim about nothing.
+       */
+      const noteUnreached = (log: LogRow[], target: string) => {
+        if (!log.some((r) => r.type === "dragstart")) return;
+        if (log.some((r) => r.path === target)) return;
+        const overs = new Map<string, number>();
+        for (const r of log) {
+          if (r.type !== "dragover" && r.type !== "dragenter") continue;
+          if (r.path === src.path || r.path === "body" || r.path === "html") continue;
+          overs.set(r.path, (overs.get(r.path) ?? 0) + 1);
+        }
+        const top = [...overs].sort((a, b) => b[1] - a[1])[0];
+        unreached.push({ target, interceptedBy: top ? top[0] : "(nothing — the drag never reached any element)" });
+      };
+
       const firstAim = targets.length > 0 ? await aimAt(targets[0]!) ?? elsewhere : elsewhere;
       if (budget <= 0) { row.capped = true; out.push(row); continue; }
       let log = await run(centre, firstAim);
       if (targets.length > 0) row.targetsTried.push(targets[0]!.path);
+      if (targets.length > 0) noteUnreached(log, targets[0]!.path);
       if (!row.dragstartFired && budget > 0) log = await run(offCentre, firstAim);
 
       if (row.dragstartFired) {
@@ -937,11 +970,13 @@ async function probeRealDrags(
           if (!to) continue;
           row.targetsTried.push(t.path);
           const again = await run(centre, to);
+          noteUnreached(again, t.path);
           const drop = again.find((r) => r.type === "drop");
           if (drop) row.droppedOn = drop.path;
         }
       }
       if (startedOn.size > 0) row.startedOn = [...startedOn];
+      if (unreached.length > 0) row.unreached = unreached;
       if (timeline.length > 0) {
         row.timeline = timeline;
         // Derived from the timeline rather than accumulated beside it: one record of what the
@@ -1194,7 +1229,7 @@ export interface HandlerIssue {
   kind: "pointer-only-control" | "unprobed-handler-types" | "delegated-handlers-opaque" | "no-handlers-found"
     | "drag-source-not-draggable" | "drop-without-dragover" | "drag-without-keyboard-alternative"
     | "dragover-not-prevented" | "dragstart-transfers-nothing" | "pointer-drag-intercepted"
-    | "drag-source-inert";
+    | "drag-source-inert" | "drop-target-unreachable";
   severity: "warn" | "suspect";
   element: string;
   message: string;
@@ -1286,6 +1321,18 @@ export const HANDLER_SURFACE_RULES = [
         + " `drag-source-not-draggable`, which reads the `draggable` property and reports the"
         + " one case that IS statically visible; this covers the ones that are not, and which"
         + " the synthetic dispatch reports as working. Requires --probe-drag.",
+    },
+    {
+      id: "drop-target-unreachable",
+      title: "A real drag never reached this drop target",
+      severity: "suspect",
+      docs:
+        "Driven, not read: the gesture was aimed at the middle of this target and the target"
+        + " received no drag event at all — something else took them, and the finding names it."
+        + " Measured on a target with a correct contract (dragover calling preventDefault, a"
+        + " wired drop) under a transparent sibling: the whole run reported nothing about it,"
+        + " because the static check sees both handlers and the synthetic dispatch runs them"
+        + " directly at the element. Requires --probe-drag.",
     },
     {
       id: "dragstart-transfers-nothing",
@@ -1467,6 +1514,27 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
           + `press, or \`draggable\` set on a different node than the handler. Note the element `
           + `IS draggable as far as the DOM is concerned, which is why the static check passes `
           + `it${realProbe.startedOn?.length ? `; the gesture started a drag on ${realProbe.startedOn.join(", ")} instead` : ""}.`,
+      });
+    }
+
+    // A declared drop target that a real drag could not reach. Reported per target, from the
+    // gestures aimed at it — the source that was dragged is incidental, so the finding names the
+    // target and what intercepted its events.
+    const unreachedBy = surface.realDragProbe
+      ?.flatMap((r) => r.unreached ?? [])
+      .filter((u) => u.target === e.path);
+    if (unreachedBy && unreachedBy.length > 0) {
+      const culprits = [...new Set(unreachedBy.map((u) => u.interceptedBy))];
+      issues.push({
+        kind: "drop-target-unreachable",
+        severity: "suspect",
+        element: `${e.path} "${e.text}"`,
+        message: `${e.path} "${e.text}" is wired as a drop target and a real drag aimed at the `
+          + `middle of it never reached it: no dragenter, no dragover, no drop. `
+          + `${culprits.join(", ")} received the events instead. Its own handlers are fine — that `
+          + `is why nothing else reports this — so look for what is on top of it: an overlay or `
+          + `backdrop, a sibling with \`position: absolute; inset: 0\`, or an ancestor's `
+          + `\`pointer-events\`.`,
       });
     }
 

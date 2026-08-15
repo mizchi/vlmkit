@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>A drop target a real drag cannot reach</title>
+<!--
+  Both zones below have the complete, correct drop contract: a `dragover` handler that calls
+  `preventDefault()` and a wired `drop`. Read statically they are identical, and dispatching a
+  synthetic `DragEvent` at either one runs its handlers exactly as written.
+
+  A real drag reaches only one of them.
+
+    #covered   a transparent SIBLING with `position: absolute; inset: 0` sits on top. Every
+               drag event goes to the veil; the zone sees no dragenter, no dragover, no drop
+                                                            -> drop-target-unreachable
+    #open      the same contract with nothing over it — receives the drop, and is the control
+               that shows the finding above is about the covering and not about the contract
+
+  This is the drop-target half of what `drag-source-inert` catches on the source side, and it
+  needs the same thing: a gesture the browser turns into a real drag. Before the probe existed
+  this page reported nothing at all beyond the keyboard warn — the zone's own handlers are
+  correct, so nothing that reads the DOM or dispatches at the element can see the problem.
+
+  The overlay has to be a SIBLING. A child would let the events through to the zone by bubbling,
+  and the zone would work.
+
+  The finding names what took the events (`div>div#veil`), because that is the actionable half:
+  a reader needs to know which element is on top, not merely that something is.
+-->
+<style>
+  body { margin: 0; padding: 24px; font: 16px/1.4 system-ui, sans-serif; display: flex; gap: 16px; }
+  .item { background: #1a6ed8; color: #fff; padding: 8px 12px; cursor: grab; height: 40px; }
+  .zone { width: 170px; height: 90px; background: #eceff4; padding: 8px; }
+  .zone.broken { background: #fbeaea; }
+</style>
+</head>
+<body>
+
+<div class="item" id="card" draggable="true" tabindex="0" onkeydown="void 0">card</div>
+
+<div style="position: relative">
+  <div class="zone broken" id="covered">correct contract, covered</div>
+  <!-- Not a child of #covered: a child would bubble to it and the drop would work. -->
+  <div id="veil" style="position: absolute; inset: 0; background: rgba(0,0,0,0.001)"></div>
+</div>
+
+<div class="zone" id="open">correct contract, reachable</div>
+
+<script>
+  document.getElementById("card").addEventListener("dragstart", (e) => {
+    e.dataTransfer.setData("text/plain", "card");
+  });
+  for (const id of ["covered", "open"]) {
+    const zone = document.getElementById(id);
+    zone.addEventListener("dragover", (e) => e.preventDefault());
+    zone.addEventListener("drop", (e) => e.preventDefault());
+  }
+</script>
+</body>
+</html>

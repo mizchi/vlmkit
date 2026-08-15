@@ -135,6 +135,22 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **A drop target a real drag cannot reach now reports.** `drag-source-inert` covers the source
+  side; this is the other end. Measured on a zone with the complete correct contract — a
+  `dragover` handler calling `preventDefault()` and a wired `drop` — sitting under a transparent
+  sibling: every drag event went to the veil, the zone saw no `dragenter`, no `dragover` and no
+  `drop`, and the whole run reported nothing about it. Nothing else can: the static check sees
+  both handlers, and the synthetic probe dispatches straight at the element, where they run as
+  written.
+  - `drop-target-unreachable` (suspect) names what took the events (`div>div#veil`), because
+    which element is on top is the actionable half.
+  - Only from a gesture that actually started a drag. A source that cannot be picked up produces
+    no events to attribute, and blaming the targets it was aimed at would charge them with the
+    source's defect.
+  - `fixtures/handlers/drop-target-covered.html` carries the pair: the covered zone and an
+    identical uncovered one that takes the drop, which is the control showing the finding is
+    about the covering and not about the contract.
+
 - **The drag probe reports the route, not just the outcome.** The aggregates said whether a drop
   landed; debugging a drag needs what happened in between. Each source now carries an ordered
   timeline of every drag event, and the report prints it for a source whose drop never landed —

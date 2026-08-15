@@ -1284,7 +1284,16 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     選択テキスト自体が draggable なので次の source の gesture に持ち越す。
     実測した症状は直感と逆で、壊れた source が正常に見えるのではなく
     **正常な source が drag しなくなる**(`native-source` が落ちた)。
-- rule 総数 141 → 143 → 145。
+- rule 総数 141 → 143 → 145 → 147。
+
+- [x] **`drop-target-unreachable`**(suspect)— `drag-source-inert` の drop target 側。
+  **完全に正しい契約**(`dragover` で `preventDefault`、`drop` 配線済み)の zone が透明な sibling で
+  覆われていると、drag イベントは全部 veil に行き zone は何も受け取らないのに、**run 全体が
+  無報告**だった。静的検査は両ハンドラを見るし、合成 dispatch は要素に直接投げるので走ってしまう。
+  finding は**何が奪ったか**(`div>div#veil`)を名指しする — 上に何があるかが行動可能な情報。
+  drag が始まった gesture からのみ判定する(掴めない source の gesture にはイベントが無く、
+  狙った target を責めるのは source の欠陥を target に転嫁する)。
+  fixture は `fixtures/handlers/drop-target-covered.html`(覆われた zone + 同一契約の対照)。
 
 **途中経過(route)まで出せるようにした** — 集約値だけでは drag のデバッグにならないため。
 7型の順序付き timeline を source ごとに持ち、**drop しなかった source のみ** route を印字する

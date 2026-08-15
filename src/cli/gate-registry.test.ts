@@ -79,7 +79,7 @@ describe("composed built-in registry", () => {
     }
   });
 
-  it("declares 145 tunable rules in total", async () => {
+  it("declares 147 tunable rules in total", async () => {
     // A canary, not a target: a gate losing its rule table to a bad merge is
     // otherwise invisible until someone tries to tune it.
     // 119 → 120 when `check copy` gained `copy-truncated` (element-rect mode, vlmkit#118).
@@ -128,8 +128,14 @@ describe("composed built-in registry", () => {
     //       `dragstart` handler is registered. `-webkit-user-drag: none` and an overlay both
     //       do that, neither is visible in the DOM, and dispatching a `dragstart` runs the
     //       handler regardless — so the synthetic probe called both of them working.
+    // 145 → 147: `drop-target-unreachable`, the drop-target half of `drag-source-inert`. A zone
+    //       with a correct contract — dragover calling preventDefault, a wired drop — under a
+    //       transparent sibling received no drag event at all, and the run reported nothing:
+    //       the static check sees both handlers and the synthetic dispatch runs them directly at
+    //       the element. Only a real gesture can miss it, and the finding names what took the
+    //       events instead.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 145);
+    assert.equal(total, 147);
   });
 
   it("gives every built-in gate a category", async () => {

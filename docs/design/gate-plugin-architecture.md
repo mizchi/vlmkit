@@ -318,21 +318,21 @@ The built-ins load through the same `createGateRegistry([...])` call. If the
 contract were not sufficient for them it would not be sufficient for anyone
 else, and making them its first consumer is the only way to keep that honest.
 
-## The 27 gates (145 tunable rules)
+## The 27 gates (147 tunable rules)
 
 | Gate | Rules | Plugin |
 |---|---|---|
 | `check integrity` | 19 | markup |
 | `check layout` | 12 | markup |
 | `check copy` | 6 | markup |
-| `check interactions` | 26 | markup |<!-- 15 of its own + the 11 shared HANDLER_SURFACE_RULES it emits under --handlers -->
+| `check interactions` | 27 | markup |<!-- 15 of its own + the 12 shared HANDLER_SURFACE_RULES it emits under --handlers -->
 | `check a11y contrast` | 1 | markup |
 | `check a11y touch` | 1 | markup |
 | `check a11y focus` | 3 | markup |
 | `check breakpoints` | 5 | markup |
 | `check scroll` | 4 | markup |
 | `scan scroll` | 4 | markup |
-| `scan handlers` | 11 | markup |
+| `scan handlers` | 12 | markup |
 | `check motion` | 3 | markup |
 | `check animation` | 5 | markup |
 | `stress i18n` | 3 | markup |

@@ -1109,3 +1109,69 @@ test("E2E: the drop payload is read at the drop, where it is the only place read
   assert.equal(transfersNothing.some((el) => el.includes("#native-source")), false,
     "refuted by what the target actually received");
 });
+
+// ---------------------------------------------------------------------------
+// The drop-target half: a correct target the drag cannot reach
+
+test("a target the gesture never reached is a finding, and it names what took the events", () => {
+  const s = surface(entry({ path: "div#zone", types: { dragover: 1, drop: 1 } }));
+  const kinds = () => deriveHandlerIssues(s).filter((i) => i.kind === "drop-target-unreachable");
+  assert.deepEqual(kinds(), [], "no probe, no claim");
+
+  s.realDragProbe = [realRow({
+    path: "div#card",
+    dragstartFired: true,
+    targetsTried: ["div#zone"],
+    unreached: [{ target: "div#zone", interceptedBy: "div#veil" }],
+  })];
+  const found = kinds();
+  assert.equal(found.length, 1);
+  // The actionable half is which element is on top, not that something is.
+  assert.match(found[0]!.message, /div#veil received the events instead/);
+  assert.match(found[0]!.message, /Its own handlers are fine/);
+
+  // A different target's row must not land on this one.
+  s.realDragProbe = [realRow({ path: "div#card", unreached: [{ target: "div#other", interceptedBy: "div#veil" }] })];
+  assert.deepEqual(kinds(), []);
+});
+
+test("E2E: a covered drop target reports, and the identical uncovered one takes the drop",
+  { timeout: 180_000 }, async () => {
+  // Both zones carry the same correct contract — `dragover` calling preventDefault and a wired
+  // `drop` — so a static read cannot separate them and a synthetic dispatch at either runs its
+  // handlers as written. Only the gesture can tell them apart.
+  const s = await buildHandlerSurface({
+    source: join(REPO_ROOT, "fixtures/handlers/drop-target-covered.html"),
+    probeDrag: true,
+  });
+  const row = s.realDragProbe?.find((r) => r.path.endsWith("#card"))!;
+  assert.ok(row.dragstartFired);
+  assert.equal(row.targetsTried.length, 2, "the loop must carry on past a target it could not reach");
+  assert.ok(row.droppedOn?.endsWith("#open"), `the reachable one takes the drop, got ${row.droppedOn}`);
+  assert.deepEqual(row.unreached?.map((u) => u.target.endsWith("#covered")), [true]);
+  assert.ok(row.unreached![0]!.interceptedBy.endsWith("#veil"), row.unreached![0]!.interceptedBy);
+
+  const kindsFor = (id: string) => deriveHandlerIssues(s)
+    .filter((i) => i.element.split(" ")[0]!.endsWith(`#${id}`)).map((i) => i.kind);
+  assert.deepEqual(kindsFor("covered"), ["drop-target-unreachable"]);
+  assert.deepEqual(kindsFor("open"), [], "the control: same contract, nothing on top, nothing to report");
+});
+
+test("E2E: a source that starts no drag produces no unreachable-target claims",
+  { timeout: 180_000 }, async () => {
+  // Three of the drag fixture's sources start no drag at all, so their gestures produce no events
+  // to attribute. Reporting the targets they were aimed at as unreachable would blame the targets
+  // for the source's problem — the same unmeasured-state-as-defect trap `gestures: 0` guards.
+  const s = await buildHandlerSurface({
+    source: join(REPO_ROOT, "fixtures/handlers/drag-and-drop.html"),
+    probeDrag: true,
+  });
+  const inert = s.realDragProbe!.filter((r) => !r.dragstartFired);
+  assert.ok(inert.length >= 3, `expected the inert sources, got ${inert.length}`);
+  for (const row of inert) assert.equal(row.unreached, undefined, `${row.path} blamed a target`);
+  assert.deepEqual(
+    deriveHandlerIssues(s).filter((i) => i.kind === "drop-target-unreachable"),
+    [],
+    "every target on that page is reachable",
+  );
+});
