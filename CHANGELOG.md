@@ -161,6 +161,35 @@ suppression works per *rule* instead of per whole gate.
   There is no `dragmove` event; the continuous ones are `drag` (on the source) and
   `dragover` (on the target), and both are collected.
 
+- **Pointer-driven drag is recognised as a drag.** Found by dogfooding a real SVG editor
+  (report: `docs/reports/2026-08-15-dogfood-moonlight-svg-editor.md`), which registers no
+  `dragstart` at all — its canvas drags with `pointerdown`/`pointermove`/`pointerup`, like
+  every canvas editor, sortable list, slider, map and split pane. The gate called it a
+  `pointer-only-control` and advised "give it a role + tabindex + key handling": a true
+  finding with the wrong remedy, since tabindex and a key handler no more drag a canvas than
+  they start an HTML5 drag. `down + move` on the same element now classifies a pointer-drag
+  surface, `drag-without-keyboard-alternative` covers both drag families with wording per
+  family, and `pointer-only-control` steps aside for a drag surface so two contradictory
+  remedies never appear together. A click-only role-less `<div>` is unaffected and pinned.
+
+  Deliberately conservative, both limits measured: the signature needs `move` on the *same*
+  element, so the common `pointerdown`-here-`pointermove`-on-`window` split is a known miss —
+  pairing an element's `down` with a global `move` would call every `pointerdown` on a page
+  with a cursor-follow effect a drag. And `setPointerCapture` would be the unambiguous marker
+  but is not reliably visible: samples cap at 80 characters and real apps ship minified.
+  **Severity change:** a drag surface that was a `suspect` under `pointer-only-control` is now
+  a `warn`, for the same reason the HTML5 rule warns — the alternative route is often
+  elsewhere on the page, which an element-local view cannot see.
+
+- **An icon-only control now identifies itself in the handler surface.** On that same editor,
+  eight rows read `div>div>div>button ""` — one per toolbar icon — with *both* identity
+  signals blank at once: no text (icons), and no `id` or `class`, so `describe()` produced the
+  same path for all eight. Their `aria-label`s said `Zoom Out`, `Fit to Canvas`,
+  `Import SVG (Ctrl+Shift+V)`. `text` falls back to the accessible name (`aria-label`,
+  `title`, a child `img[alt]`, then `placeholder`/`value`), which also travels into findings,
+  since those quote it. The page had no unnamed buttons at all — vlmkit was reading the wrong
+  attribute.
+
 - **`scan handlers --probe-drag` fires the drag sequence and catches the two defects no
   static read can reach.** Both were measured to be observable before any of this was
   built: a synthetic `DragEvent` carrying a real `DataTransfer` runs the page's own

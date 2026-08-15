@@ -1288,6 +1288,41 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 メッセージが原因を名指ししない(`Expected `,` or `}` but found `Identifier`` が散文を指す)。
 パーサを二重化するテストは書かず、値からは判定不能な理由を `rules.test.ts` に記録した。
 
+### 実サイト dogfood: Moonlight SVG Editor(2026-08-15)
+
+レポート: `docs/reports/2026-08-15-dogfood-moonlight-svg-editor.md`。
+
+**環境の制約を先に実測した**: このサンドボックスの **Chromium は外部ホストに一切到達できない**
+(`example.com` でも proxy 3通りすべて `ERR_CONNECTION_RESET`、agent proxy 側は
+`recentRelayFailures: []` = リクエストが届いていない)。curl は通るので**ローカルミラー**で実施。
+バンドルに API `fetch` も追加 chunk も無く完全に client-side なので、ミラーは代用ではなく実物。
+
+- [x] **pointer ベースのドラッグを drag として認識する**
+  - このアプリは `[draggable]` が **0**、`dragstart` も皆無。キャンバスは
+    `pointerdown`/`pointermove`/`pointerup` でドラッグする。**今日追加した HTML5 DnD ルールは
+    何も見つけられない**。
+  - vlmkit は `pointer-only-control` として「role + tabindex + キーハンドリングを付けろ」と助言。
+    **指摘は正しく処方が間違い** — tabindex ではキャンバスはドラッグできない。
+  - `down + move`(同一要素)で pointer-drag と判定し、`drag-without-keyboard-alternative` を
+    両ファミリ対応に。`pointer-only-control` は drag surface では引っ込む(**助言が矛盾するため**)。
+  - **意図的な限界(両方実測)**: `pointerdown` が要素・`pointermove` が `window` の分割パターンは
+    未対応(global move と組ませると、カーソル追従エフェクトのあるページの `pointerdown` 全部が
+    drag になる)。`setPointerCapture` は samples が80文字上限 + 実アプリは minified で見えない。
+  - **severity 変更**: drag surface は suspect → warn(HTML5 側と同じ理由 — 代替経路はページの
+    別の場所にあることが多く、要素ローカルには見えない)。
+- [x] **アイコンのみのコントロールが自分を名乗るようになった**
+  - 8行が `div>div>div>button ""`。**同定手段が同時に2つ空**だった(テキスト無し + id/class 無しで
+    `describe()` が全部同じパス)。実際の `aria-label` は "Zoom Out" / "Fit to Canvas" /
+    "Import SVG (Ctrl+Shift+V)"。
+  - `text` を accessible name に fallback(`aria-label` → `title` → 子 `img[alt]` →
+    `placeholder`/`value`)。finding 本文も `"${e.text}"` を引くので一緒に直る。
+  - **アプリ側には名前の無いボタンは1つも無かった**(18/18 が命名済み)。vlmkit が読む属性を
+    間違えていただけ。
+
+**アプリ側の findings**(vlmkit の欠陥ではない、記録として): `page-overflow-x` 8px(全 viewport)、
+375px で `78%` ズーム表示が完全に隠れる(`occluded-text`、glyph サンプル100%が遮蔽物にヒット)、
+`No elements` が `#999` on white = 2.85:1(11px で AA 未満)。
+
 **副産物 — 先行して存在した欠陥**: `check interactions --handlers` は
 `deriveHandlerIssues` の kind を finding として出しているのに、handler 系 rule を
 1つも宣言していなかった。`--rule pointer-only-control=off` が bind 先を持たず、

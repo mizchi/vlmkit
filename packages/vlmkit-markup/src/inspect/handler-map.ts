@@ -181,7 +181,30 @@ export const COLLECT_SURFACE_SCRIPT = `
       ancestorTypes: Object.keys(ancestorTypes),
       ix: el.hasAttribute("data-vlmkit-ix") ? Number(el.getAttribute("data-vlmkit-ix")) : null,
       path: describe(el),
-      text: (el.textContent || "").replace(/\\s+/g, " ").trim().slice(0, 40),
+      // Accessible name when there is no text, because an icon-only button has neither.
+      //
+      // Found against a real SVG editor: eight rows read "div>div>div>button" with an empty
+      // label, one per toolbar icon, and nothing told them apart -- these elements carry no
+      // id and no class, so describe() cannot disambiguate either. Their aria-labels say
+      // "Zoom Out", "Zoom In", "Fit to Canvas". A finding is only actionable if the reader
+      // can tell which element it is about, and both of this gate's identity signals were
+      // blank at once.
+      //
+      // Order approximates what a screen reader announces: aria-label, then title, then an
+      // image's alt, then a control's placeholder or value.
+      text: (() => {
+        const own = (el.textContent || "").replace(/\\s+/g, " ").trim();
+        if (own) return own.slice(0, 40);
+        const img = el.querySelector ? el.querySelector("img[alt]") : null;
+        const named = [
+          el.getAttribute && el.getAttribute("aria-label"),
+          el.getAttribute && el.getAttribute("title"),
+          img && img.getAttribute("alt"),
+          el.getAttribute && el.getAttribute("placeholder"),
+          el.getAttribute && el.getAttribute("value"),
+        ].find((v) => v && String(v).trim());
+        return named ? String(named).replace(/\\s+/g, " ").trim().slice(0, 40) : "";
+      })(),
       types,
       samples,
       visible: style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0,
@@ -411,6 +434,45 @@ const DRAG_SOURCE_TYPES = new Set(["dragstart", "drag", "dragend"]);
 const DRAG_TARGET_TYPES = new Set(["dragenter", "dragover", "dragleave", "drop"]);
 const DRAG_TYPES = new Set([...DRAG_SOURCE_TYPES, ...DRAG_TARGET_TYPES]);
 
+/**
+ * The *other* drag: a gesture built from pointer/mouse/touch events rather than the HTML5
+ * DnD API. Canvas editors, sortable lists, sliders, maps and split panes all work this way,
+ * and none of them registers a single `dragstart`.
+ *
+ * Found by running this gate against a real SVG editor
+ * (https://moonlight.mizchi.workers.dev, mirrored locally). Its canvas registers
+ * `pointerdown`, `pointermove`, `pointerup`, and the gate reported:
+ *
+ *   suspect [pointer-only-control] ... has a pointerdown/pointerup handler but no role, no
+ *   keyboard handler ... Give it a role + tabindex + key handling, or move the handler onto
+ *   a real control.
+ *
+ * The finding is right and **the advice is wrong**: `tabindex` and a key handler do not make
+ * a drawing canvas draggable, any more than they start an HTML5 drag. It is the same
+ * situation `drag-without-keyboard-alternative` was written for, and that rule could not see
+ * it because it only looked for `dragstart`.
+ *
+ * **`down` AND `move` on the same element** is the signature, deliberately conservative:
+ *
+ *   - `move` is what separates a drag from a click. A `pointerdown`-only element is a
+ *     button written the hard way, which `pointer-only-control` describes correctly.
+ *   - `move`-only is hover tracking, not a drag.
+ *   - The common alternative — `pointerdown` on the element, `pointermove`/`pointerup` on
+ *     `window` — is NOT matched, and that is a known miss. Pairing an element's `down` with
+ *     a global `move` would call every `pointerdown` on a page with a cursor-follow effect a
+ *     drag, and a wrong "this is a drag" claim misroutes the fix in the other direction.
+ *   - `setPointerCapture` in the handler source would be the unambiguous marker, but the
+ *     surface caps samples at 80 characters and real apps ship minified, so it is not
+ *     reliably visible. Checked on the editor above: not in the captured snippets.
+ */
+const POINTER_DRAG_DOWN = new Set(["pointerdown", "mousedown", "touchstart"]);
+const POINTER_DRAG_MOVE = new Set(["pointermove", "mousemove", "touchmove"]);
+
+/** Does this element's handler set describe a pointer-driven drag gesture? */
+export function isPointerDragSurface(types: readonly string[]): boolean {
+  return types.some((t) => POINTER_DRAG_DOWN.has(t)) && types.some((t) => POINTER_DRAG_MOVE.has(t));
+}
+
 /** Event types the interaction probes actually fire. */
 export const PROBED_TYPES = new Set(["click", "keydown", "keyup", "keypress", "focus", "blur"]);
 
@@ -575,6 +637,7 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
     // fixture, a `dragstart` source missing `draggable` and a `drop` target missing
     // `dragover` were listed identically to the working pair beside them.
     const types = Object.keys(e.types);
+    const pointerDrag = isPointerDragSurface(types);
     const dragSourceTypes = types.filter((t) => DRAG_SOURCE_TYPES.has(t));
     const dragTargetTypes = types.filter((t) => DRAG_TARGET_TYPES.has(t));
 
@@ -620,20 +683,29 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
     // Warn rather than suspect: the alternative path is often elsewhere on the page (a
     // "move to" menu), which this element-local view cannot see.
     if (
-      dragSourceTypes.length > 0 && !hasKeyboard
+      (dragSourceTypes.length > 0 || pointerDrag) && !hasKeyboard
       && !e.ancestorTypes.some((t) => KEYBOARD_TYPES.has(t))
       && e.visible
     ) {
+      // Both drags, one finding: the remedy is identical and it is NOT the
+      // `pointer-only-control` remedy. `tabindex` plus a key handler cannot start an HTML5
+      // drag, and it cannot drag a canvas either.
+      const how = dragSourceTypes.length > 0 ? dragSourceTypes.join("/") : "pointer drag";
+      const why = dragSourceTypes.length > 0
+        ? "HTML5 drag has no keyboard equivalent in any browser"
+        : "a pointer-driven drag gesture has no keyboard equivalent";
+      const fix = dragSourceTypes.length > 0
+        ? 'move up/down controls, a "move to" menu, or cut/paste'
+        : "arrow-key nudging, numeric position/size fields, or a menu action for the same edit";
       issues.push({
         kind: "drag-without-keyboard-alternative",
         severity: "warn",
         element: `${e.path} "${e.text}"`,
-        message: `${e.path} "${e.text}" is operated by dragging (${dragSourceTypes.join("/")}) `
-          + `with no keyboard handler on it or an ancestor. HTML5 drag has no keyboard `
-          + `equivalent in any browser, so this action is mouse-only (WCAG 2.1.1, and 2.5.7 `
-          + `Dragging Movements). Provide a non-drag path to the same result — move `
-          + `up/down controls, a "move to" menu, or cut/paste — rather than tabindex and a `
-          + `key handler, which cannot start a drag.`,
+        message: `${e.path} "${e.text}" is operated by dragging (${how}) `
+          + `with no keyboard handler on it or an ancestor. ${why}, so this action is `
+          + `mouse-only (WCAG 2.1.1, and 2.5.7 Dragging Movements). Provide a non-drag path `
+          + `to the same result — ${fix} — rather than tabindex and a key handler, which `
+          + `cannot perform a drag.`,
       });
     }
 
@@ -643,6 +715,12 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
       && e.visible
       && !e.containsInteractive
       && !e.insideInteractive
+      // A drag surface is reported by `drag-without-keyboard-alternative` instead. Both
+      // findings are true of it, but their advice contradicts: this one says to add a role,
+      // tabindex and key handling, and that does not make a canvas draggable. Measured on a
+      // real SVG editor, whose canvas got exactly that advice for its
+      // pointerdown/pointermove/pointerup trio.
+      && !pointerDrag
     ) {
       issues.push({
         kind: "pointer-only-control",

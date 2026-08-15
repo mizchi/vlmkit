@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import {
   buildHandlerSurface,
   deriveHandlerIssues,
+  isPointerDragSurface,
   type HandlerSurface,
   type HandlerSurfaceEntry,
 } from "./handler-map.ts";
@@ -468,4 +469,79 @@ test("E2E: the probe catches what the static read cannot", { timeout: 120_000 },
     noProbe.filter((i) => i.kind === "dragover-not-prevented" || i.kind === "dragstart-transfers-nothing"),
     [],
   );
+});
+
+// ---------------------------------------------------------------------------
+// Pointer-driven drag — the other drag, found by dogfooding a real SVG editor
+//
+// https://moonlight.mizchi.workers.dev (mirrored locally, since Chromium has no outbound
+// network in this sandbox — verified against example.com with three launch configs) is a
+// canvas editor whose drawing surface registers pointerdown/pointermove/pointerup and no
+// `dragstart` at all. The gate reported it as a `pointer-only-control` and advised "give it
+// a role + tabindex + key handling" — a true finding with the wrong remedy, because tabindex
+// and a key handler no more drag a canvas than they start an HTML5 drag.
+
+test("down + move on one element is a pointer drag; either alone is not", () => {
+  assert.equal(isPointerDragSurface(["pointerdown", "pointermove", "pointerup"]), true);
+  assert.equal(isPointerDragSurface(["mousedown", "mousemove"]), true, "the mouse spelling counts");
+  assert.equal(isPointerDragSurface(["touchstart", "touchmove"]), true, "and the touch spelling");
+  // `move` is what separates a drag from a click, so down alone is a button written the hard
+  // way — which `pointer-only-control` describes correctly and must keep describing.
+  assert.equal(isPointerDragSurface(["pointerdown", "pointerup", "click"]), false);
+  // Move alone is hover tracking.
+  assert.equal(isPointerDragSurface(["pointermove"]), false);
+  assert.equal(isPointerDragSurface(["click"]), false);
+});
+
+test("a pointer-drag surface gets the drag finding, with drag advice, not the click advice", () => {
+  const issues = deriveHandlerIssues(surface(entry({
+    path: "div#canvas", text: "canvas",
+    types: { pointerdown: 1, pointermove: 1, pointerup: 1 },
+  })));
+  const drag = issues.find((i) => i.kind === "drag-without-keyboard-alternative")!;
+  assert.ok(drag, "a pointer drag with no keyboard path must report");
+  assert.match(drag.message, /pointer drag/);
+  // The advice has to be drag advice. Naming tabindex here is the defect this fixes.
+  assert.match(drag.message, /arrow-key nudging|numeric position/);
+  assert.match(drag.message, /cannot perform a drag/);
+  // And it must not ALSO come out as a pointer-only control, whose remedy contradicts it.
+  assert.equal(issues.filter((i) => i.kind === "pointer-only-control").length, 0);
+});
+
+test("a click-only role-less div is still a pointer-only control", () => {
+  // The control for the change above: the two accordion headers on that same editor
+  // ("Canvas Settings", "Elements (11)") are click-only and correctly kept their finding.
+  const issues = deriveHandlerIssues(surface(entry({
+    path: "div#acc", text: "Canvas Settings", types: { click: 1 },
+  })));
+  assert.equal(issues.filter((i) => i.kind === "pointer-only-control").length, 1);
+  assert.equal(issues.filter((i) => i.kind === "drag-without-keyboard-alternative").length, 0);
+});
+
+test("a pointer drag with a keyboard path reports nothing", () => {
+  const issues = deriveHandlerIssues(surface(entry({
+    path: "div#canvas", types: { pointerdown: 1, pointermove: 1, keydown: 1 },
+  })));
+  assert.deepEqual(issues.filter((i) => i.kind.startsWith("drag") || i.kind === "pointer-only-control"), []);
+});
+
+test("E2E: the accessible name identifies an icon-only control", { timeout: 120_000 }, async () => {
+  // On the real editor, eight rows read `div>div>div>button ""` — one per toolbar icon, with
+  // no id and no class, so `describe()` could not tell them apart either. Both of this gate's
+  // identity signals were blank at once, and a finding is only actionable if the reader knows
+  // which element it is about. The buttons' aria-labels say "Zoom Out", "Zoom In", …
+  const dir = mkdtempSync(join(tmpdir(), "handlers-name-"));
+  const file = join(dir, "icons.html");
+  writeFileSync(file, `<!doctype html><html><head><title>t</title></head><body>
+    <button aria-label="Zoom Out" style="width:30px;height:30px"><svg width="10" height="10"></svg></button>
+    <button title="Fit to Canvas" style="width:30px;height:30px"><svg width="10" height="10"></svg></button>
+    <button style="width:30px;height:30px"><img src="data:," alt="Import SVG"></button>
+    <button style="width:30px;height:30px">Text wins</button>
+    <script>
+      for (const b of document.querySelectorAll("button")) b.addEventListener("click", () => {});
+    </script>
+  </body></html>`);
+  const s = await buildHandlerSurface({ source: file });
+  const names = s.elements.filter((e) => e.path.endsWith("button")).map((e) => e.text).sort();
+  assert.deepEqual(names, ["Fit to Canvas", "Import SVG", "Text wins", "Zoom Out"]);
 });
