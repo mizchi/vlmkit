@@ -17,6 +17,7 @@
  * the output are absolute, so the Markdown stays portable.
  */
 import { basename, dirname, resolve } from "node:path";
+import { overlapArea } from "@mizchi/vlmkit-core/rect-overlap.ts";
 
 export interface DfaResult {
   variant: string;
@@ -989,15 +990,6 @@ function inferBboxCssAxis(match: {
   };
 }
 
-function rectIntersectionArea(a: SectionRect, b: SectionRect): number {
-  const left = Math.max(a.left, b.left);
-  const top = Math.max(a.top, b.top);
-  const right = Math.min(a.left + a.width, b.left + b.width);
-  const bottom = Math.min(a.top + a.height, b.top + b.height);
-  if (right <= left || bottom <= top) return 0;
-  return (right - left) * (bottom - top);
-}
-
 /**
  * Per-section diff intensity for one viewport.
  *
@@ -1029,7 +1021,7 @@ export function computeSectionDiffRows(
     if (sectionArea === 0) continue;
     let diffArea = 0;
     for (const region of regionsForViewport) {
-      diffArea += rectIntersectionArea(section, region);
+      diffArea += overlapArea(section, region);
     }
     rows.push({
       viewport,

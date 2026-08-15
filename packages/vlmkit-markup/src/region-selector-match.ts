@@ -13,6 +13,7 @@ import { pathToFileURL } from "node:url";
 import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { DOM_BBOX_BROWSER_SCRIPT } from "./shift-origin.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { overlapArea } from "@mizchi/vlmkit-core/rect-overlap.ts";
 
 export interface RectBox {
   left: number;
@@ -113,7 +114,7 @@ export function matchRegionBboxToElements(
     };
     const elementArea = areaOfBbox(elementBbox);
     if (elementArea <= 0) continue;
-    const intersection = intersectionArea(region, elementBbox);
+    const intersection = overlapArea(region, elementBbox);
     if (intersection <= 0) continue;
 
     const union = regionArea + elementArea - intersection;
@@ -209,14 +210,6 @@ function selectorConfidenceFromScore(
 
 function areaOfBbox(bbox: RectBox): number {
   return Math.max(0, bbox.width) * Math.max(0, bbox.height);
-}
-
-function intersectionArea(a: RectBox, b: RectBox): number {
-  const left = Math.max(a.left, b.left);
-  const top = Math.max(a.top, b.top);
-  const right = Math.min(a.left + a.width, b.left + b.width);
-  const bottom = Math.min(a.top + a.height, b.top + b.height);
-  return Math.max(0, right - left) * Math.max(0, bottom - top);
 }
 
 function roundMetric(value: number): number {
