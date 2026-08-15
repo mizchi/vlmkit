@@ -79,7 +79,7 @@ describe("composed built-in registry", () => {
     }
   });
 
-  it("declares 149 tunable rules in total", async () => {
+  it("declares 153 tunable rules in total", async () => {
     // A canary, not a target: a gate losing its rule table to a bad merge is
     // otherwise invisible until someone tries to tune it.
     // 119 → 120 when `check copy` gained `copy-truncated` (element-rect mode, vlmkit#118).
@@ -140,8 +140,14 @@ describe("composed built-in registry", () => {
     //       hide the item on dragstart — with the undo wired to `drop` instead of `dragend`,
     //       so Escape strands it. Measured: 0.00% for a source that restores, 99.03% for one
     //       that does not.
+    // 149 → 153: the two mid-flight rules, on both gates. `drag-source-detached-mid-drag` is a
+    //       source that removed itself during the drag, so `dragend` never ran on it and every
+    //       cleanup wired there was skipped — while the drop still landed, so the drag looked
+    //       fine. `dragover-handler-slow` reads the interval between consecutive dragovers on one
+    //       target, which is the handler's own cost plus a frame: 1.3-1.7ms for a handler that
+    //       returns immediately, 82.1-82.2ms for one that busy-waits 80ms.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 149);
+    assert.equal(total, 153);
   });
 
   it("gives every built-in gate a category", async () => {

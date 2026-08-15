@@ -75,6 +75,16 @@ export interface HandlerSurfaceEntry {
    * gate having tested a control and having only looked at it.
    */
   nativeActivation?: boolean;
+  /**
+   * Longest single run of this element's own `dragover` handler, in ms, when the probe drove one.
+   *
+   * Measured inside the listener wrapper rather than inferred from the interval between events.
+   * The interval version was tried first and reported 68ms for a handler that returns immediately:
+   * `dragover` keeps firing while the probe takes its 60-80ms hover screenshot, and that landed
+   * inside the gap. Only covers listeners added with `addEventListener` — an `ondragover=`
+   * property assignment is not wrapped, so it reads as unmeasured rather than as fast.
+   */
+  dragoverMs?: number;
 }
 
 export interface HandlerSurface {
@@ -183,6 +193,11 @@ export const HANDLER_INVOCATION_PATCH_SCRIPT = `
 (() => {
   const counts = new WeakMap();
   const wrappers = new WeakMap();
+  // Longest single invocation per (element, type), in ms. Measured directly rather than inferred
+  // from the interval between events: the interval also contains whatever the PROBE was doing,
+  // and taking a mid-drag screenshot (60-80ms) made a dragover handler that returns immediately
+  // look like it took 68ms. The fixture's fast zone caught that, which is what it is for.
+  const slowest = new WeakMap();
   const origAdd = EventTarget.prototype.addEventListener;
   const origRemove = EventTarget.prototype.removeEventListener;
   const bump = (target) => {
@@ -199,7 +214,16 @@ export const HANDLER_INVOCATION_PATCH_SCRIPT = `
       : function () { return listener.handleEvent.apply(listener, arguments); };
     const wrapped = function () {
       bump(this);
-      return invoke.apply(this, arguments);
+      const t0 = performance.now();
+      try {
+        return invoke.apply(this, arguments);
+      } finally {
+        // In a finally, so a listener that throws still reports the time it burned.
+        const took = performance.now() - t0;
+        let perType = slowest.get(this);
+        if (!perType) { perType = {}; slowest.set(this, perType); }
+        if (!(took <= perType[type])) perType[type] = took;
+      }
     };
     perType.set(type, wrapped);
     return wrapped;
@@ -220,7 +244,13 @@ export const HANDLER_INVOCATION_PATCH_SCRIPT = `
     return origRemove.call(this, type, wrapped || listener, opts);
   };
   window.__vlmkitCallCount = (el) => counts.get(el) || 0;
-  window.__vlmkitResetCalls = (el) => { counts.delete(el); };
+  window.__vlmkitResetCalls = (el) => { counts.delete(el); slowest.delete(el); };
+  // Every element that has a recorded duration, with its slowest call per type. Collected from the
+  // elements the caller asks about, since a WeakMap cannot be enumerated.
+  window.__vlmkitSlowestCall = (el, type) => {
+    const perType = slowest.get(el);
+    return perType && typeof perType[type] === "number" ? perType[type] : null;
+  };
 })()
 `;
 
@@ -732,7 +762,7 @@ export interface RealDragProbe {
    * `dragend` reads 0.00% and one that does not reads 99.03%, having hidden itself on `dragstart`
    * and stayed hidden.
    */
-  cancel?: { cancelled: boolean; ratio?: number };
+  cancel?: { started: boolean; cancelled: boolean; ratio?: number };
   /**
    * Every drag event this source's gestures produced, in order, with repeats coalesced.
    *
@@ -772,6 +802,13 @@ export interface DragTimelineStep {
    * document-level listener that reads this. Not false — unknown.
    */
   prevented?: boolean | null;
+  /*
+   * There is deliberately no per-step timing here. Deriving a handler's cost from the interval
+   * between consecutive events was tried and is not sound in this probe: `dragover` keeps firing
+   * while the probe takes its 60-80ms hover screenshot, so a handler that returns immediately
+   * measured 68ms. Handler duration is timed inside the listener instead — see
+   * `HandlerSurfaceEntry.dragoverMs`.
+   */
   /**
    * `drop` only: what the target actually received.
    *
@@ -1021,10 +1058,14 @@ async function probeRealDrags(
     // cancel: `dragend` arrives with `dropEffect: "none"` and no `drop` fires.
     if (cancel) await page.keyboard.press("Escape");
     await page.mouse.up();
-    return {
-      log: await page.evaluate("window.__vlmkitDragLog") as LogRow[],
-      hoverRatio: before && during ? pixelDelta(before, during) : undefined,
-    };
+    // Read once, and a missing `dragend` can be believed. A re-read after 120ms sat here as a guard
+    // against reading too early, and the measurement says that cannot happen: the evaluate is
+    // queued behind the page's own main-thread work, so anything able to delay `dragend` delays the
+    // read with it. Driven against a `dragover` handler that busy-waits 300ms, `dragend` was
+    // already in the log on the first read and the second changed nothing. Removing the guard also
+    // left every test green, which is how it came up for checking.
+    const log = await page.evaluate("window.__vlmkitDragLog") as LogRow[];
+    return { log, hoverRatio: before && during ? pixelDelta(before, during) : undefined };
   };
 
   for (const src of sources) {
@@ -1142,6 +1183,10 @@ async function probeRealDrags(
         const after = before ? await page.screenshot({ clip }).catch(() => null) : null;
         const end = cancelLog.find((r) => r.type === "dragend");
         row.cancel = {
+          // Whether this gesture managed to start a drag at all. A source that removed itself
+          // during the earlier gestures is no longer there to pick up, and "Escape did not cancel
+          // it" would be the wrong story for that.
+          started: cancelLog.some((r) => r.type === "dragstart"),
           cancelled: end?.dropEffect === "none" && !cancelLog.some((r) => r.type === "drop"),
           ...(before && after ? { ratio: pixelDelta(before, after) } : {}),
         };
@@ -1243,6 +1288,24 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
     const pointerDragProbe = options.probeDrag
       ? await probePointerDrags(page, raw.elements)
       : undefined;
+    // The slowest single invocation of each drag-target element's own dragover handler, read from
+    // the invocation patch after the gestures have run. Asked per element because a WeakMap cannot
+    // be enumerated, and only for the elements that have such a handler.
+    if (options.probeDrag) {
+      for (const entry of raw.elements) {
+        if (!entry.types["dragover"]) continue;
+        const took = await page.evaluate(`(() => {
+          ${DESCRIBE_PATH_FN}
+          const want = ${JSON.stringify(entry.path)};
+          for (const el of document.querySelectorAll("*")) {
+            if (describe(el) !== want) continue;
+            return window.__vlmkitSlowestCall ? window.__vlmkitSlowestCall(el, "dragover") : null;
+          }
+          return null;
+        })()`) as number | null;
+        if (typeof took === "number") entry.dragoverMs = took;
+      }
+    }
     return {
       source: options.source,
       elements: raw.elements,
@@ -1405,7 +1468,8 @@ export interface HandlerIssue {
   kind: "pointer-only-control" | "unprobed-handler-types" | "delegated-handlers-opaque" | "no-handlers-found"
     | "drag-source-not-draggable" | "drop-without-dragover" | "drag-without-keyboard-alternative"
     | "dragover-not-prevented" | "dragstart-transfers-nothing" | "pointer-drag-intercepted"
-    | "drag-source-inert" | "drop-target-unreachable" | "drag-cancel-not-reverted";
+    | "drag-source-inert" | "drop-target-unreachable" | "drag-cancel-not-reverted"
+    | "drag-source-detached-mid-drag" | "dragover-handler-slow";
   severity: "warn" | "suspect";
   element: string;
   message: string;
@@ -1497,6 +1561,32 @@ export const HANDLER_SURFACE_RULES = [
         + " `drag-source-not-draggable`, which reads the `draggable` property and reports the"
         + " one case that IS statically visible; this covers the ones that are not, and which"
         + " the synthetic dispatch reports as working. Requires --probe-drag.",
+    },
+    {
+      id: "drag-source-detached-mid-drag",
+      title: "dragstart fired and dragend never did",
+      severity: "suspect",
+      docs:
+        "The source left the document while it was being dragged, so `dragend` — the only place a"
+        + " drag is guaranteed to end up, success or not — never ran on it. Measured on a source"
+        + " that removes itself in `dragstart`: the drop still lands, the drag looks like it"
+        + " worked, and every cleanup wired to `dragend` is silently skipped. Read from a capture"
+        + " listener on `document`, which `stopPropagation` cannot hide from. One read is enough:"
+        + " the evaluate that reads the log is queued behind the page's own main-thread work, so"
+        + " nothing able to delay `dragend` can arrive after it — checked against a `dragover`"
+        + " handler busy-waiting 300ms. Requires --probe-drag.",
+    },
+    {
+      id: "dragover-handler-slow",
+      title: "A dragover handler slow enough to stutter the drag",
+      severity: "warn",
+      docs:
+        "Timed inside the listener wrapper, so the number is the handler's own run and not the"
+        + " interval between events: the interval version reported 68ms for a handler that returns"
+        + " immediately, because dragover keeps firing while the probe takes its hover screenshot."
+        + " Warn rather than suspect: it is a smoothness defect. Only sees listeners added with"
+        + " addEventListener, so an `ondragover=` property reads as unmeasured. Requires"
+        + " --probe-drag.",
     },
     {
       id: "drag-cancel-not-reverted",
@@ -1718,6 +1808,41 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
           + `press, or \`draggable\` set on a different node than the handler. Note the element `
           + `IS draggable as far as the DOM is concerned, which is why the static check passes `
           + `it${realProbe.startedOn?.length ? `; the gesture started a drag on ${realProbe.startedOn.join(", ")} instead` : ""}.`,
+      });
+    }
+
+    // `dragend` is where a drag ends whether it succeeded or not, so a source that never gets one
+    // never runs its cleanup. The cause is the source leaving the document mid-drag, which the
+    // optimistic-update pattern does by removing rather than hiding. Guarded on `dragstartFired`,
+    // so a source that never dragged cannot be reported as having lost its dragend.
+    const rowFor = surface.realDragProbe?.find((r) => r.path === e.path);
+    if (rowFor?.dragstartFired && rowFor.timeline && !rowFor.timeline.some((step) => step.type === "dragend")) {
+      issues.push({
+        kind: "drag-source-detached-mid-drag",
+        severity: "suspect",
+        element: `${e.path} "${e.text}"`,
+        message: `${e.path} "${e.text}" started a drag and never received a dragend: the element `
+          + `left the document while the drag was in flight. Every cleanup wired to dragend — `
+          + `restoring the placeholder, clearing the drag class, releasing the dragged model — is `
+          + `skipped, and the drop still lands, so the drag looks like it worked. Move the item `
+          + `with CSS or a placeholder instead of removing the node, or attach the cleanup to the `
+          + `container rather than to the node being dragged.`,
+      });
+    }
+
+    // A dragover handler slow enough that the drag stutters over this target, timed inside the
+    // listener itself. `undefined` means no such handler ran under the wrapper — not that it was
+    // fast.
+    if (e.dragoverMs !== undefined && e.dragoverMs >= 50) {
+      issues.push({
+        kind: "dragover-handler-slow",
+        severity: "warn",
+        element: `${e.path} "${e.text}"`,
+        message: `${e.path} "${e.text}" has a dragover handler that took ${e.dragoverMs.toFixed(0)}ms `
+          + `in a single call. dragover fires every frame while the pointer is over the target, so `
+          + `the drag stutters for as long as it stays here. Do the work once on dragenter, cache `
+          + `anything read from layout, and keep the dragover handler to preventDefault() plus a `
+          + `cheap decision.`,
       });
     }
 
@@ -2196,7 +2321,9 @@ export function formatHandlerSurface(
       // sentence about one source.
       const cancelNote = !row.cancel
         ? ""
-        : !row.cancel.cancelled
+        : !row.cancel.started
+          ? ` ${DIM}(no second drag to cancel — the source was gone by then)${RESET}`
+          : !row.cancel.cancelled
           ? ` ${DIM}(Escape did not cancel it)${RESET}`
           : row.cancel.ratio === undefined
             ? ` ${DIM}(cancelled; revert not measured)${RESET}`

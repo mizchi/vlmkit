@@ -135,6 +135,28 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **Two defects that exist only while the drag is in flight.** Both leave the outcome correct —
+  the drop lands, the data arrives — so nothing about the result reveals them.
+  - `drag-source-detached-mid-drag` (suspect): the source removed itself from the document during
+    the drag, so `dragend` never ran on it. That is the one place a drag is guaranteed to end up,
+    success or not, and every cleanup wired there is silently skipped. Measured on a source that
+    calls `remove()` in `dragstart` (the optimistic update done with the DOM instead of a class):
+    `dragstart, dragover, drop` and no `dragend`, against a control whose node stays put.
+  - `dragover-handler-slow` (warn): `dragover` fires every frame while the pointer is over a
+    target, so a handler that takes 80ms stutters the drag for as long as it stays there.
+  - **The timing is measured inside the listener, and the first version was wrong.** Deriving it
+    from the interval between consecutive `dragover` events reported **68ms for a handler that
+    returns immediately** — `dragover` keeps firing while the probe takes its 60-80ms hover
+    screenshot, and that landed inside the interval. The fixture's fast zone is what caught it. The
+    listener wrapper now times each invocation directly: 80ms for the slow zone, under 2ms for the
+    fast one, immune to whatever the probe is doing. Only listeners added with `addEventListener`
+    are wrapped, so an `ondragover=` property reads as unmeasured rather than as fast.
+  - **A guard that turned out to be unreachable was removed rather than kept.** A missing `dragend`
+    was re-read after 120ms in case the first read was too early. It cannot be: the evaluate that
+    reads the log is queued behind the page's own main-thread work, so anything able to delay
+    `dragend` delays the read with it — checked against a `dragover` handler busy-waiting 300ms,
+    where `dragend` was already there on the first read.
+
 - **A drag the user cancels has to leave the page as it was, and now that is measured.** The
   probe presses Escape mid-flight — which does cancel a driven drag: `dragend` arrives carrying
   `dropEffect: "none"` and no `drop` runs — and compares the source's own box either side of the

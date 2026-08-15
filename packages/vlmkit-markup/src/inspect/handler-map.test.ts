@@ -1200,26 +1200,35 @@ test("a cancelled drag that left something behind is a finding; the other three 
   const s = surface(entry({ path: "div#card", types: { dragstart: 1 }, draggable: true }));
   const kinds = () => deriveHandlerIssues(s).filter((i) => i.kind === "drag-cancel-not-reverted").length;
 
-  s.realDragProbe = [realRow({ path: "div#card", dragstartFired: true, cancel: { cancelled: true, ratio: 0.99 } })];
+  s.realDragProbe = [realRow({ path: "div#card", dragstartFired: true, cancel: { started: true, cancelled: true, ratio: 0.99 } })];
   assert.equal(kinds(), 1);
   assert.match(deriveHandlerIssues(s).find((i) => i.kind === "drag-cancel-not-reverted")!.message, /undo it in `?dragend/);
 
   // Escape did not cancel it, so whatever changed may be the drop legitimately doing its job.
   // Not coverable end to end — Escape cancelled every driven drag measured — so it is pinned here.
-  s.realDragProbe = [realRow({ path: "div#card", dragstartFired: true, cancel: { cancelled: false, ratio: 0.99 } })];
+  s.realDragProbe = [realRow({ path: "div#card", dragstartFired: true, cancel: { started: true, cancelled: false, ratio: 0.99 } })];
   assert.equal(kinds(), 0, "a change after a drag that completed is not this defect");
 
   // Cancelled and clean.
-  s.realDragProbe = [realRow({ path: "div#card", dragstartFired: true, cancel: { cancelled: true, ratio: 0 } })];
+  s.realDragProbe = [realRow({ path: "div#card", dragstartFired: true, cancel: { started: true, cancelled: true, ratio: 0 } })];
   assert.equal(kinds(), 0);
 
   // Cancelled, revert not measured — the screenshots failed. Absent is not zero and not one.
-  s.realDragProbe = [realRow({ path: "div#card", dragstartFired: true, cancel: { cancelled: true } })];
+  s.realDragProbe = [realRow({ path: "div#card", dragstartFired: true, cancel: { started: true, cancelled: true } })];
   assert.equal(kinds(), 0);
 
   // No cancel gesture at all (budget spent, or the source cannot drag).
   s.realDragProbe = [realRow({ path: "div#card", dragstartFired: true })];
   assert.equal(kinds(), 0);
+
+  // The cancel gesture found nothing to pick up, because the source removed itself during the
+  // earlier ones. The box it used to occupy differs, and that is not this defect.
+  s.realDragProbe = [realRow({
+    path: "div#card",
+    dragstartFired: true,
+    cancel: { started: false, cancelled: false, ratio: 0.99 },
+  })];
+  assert.equal(kinds(), 0, "no drag was started, so nothing was cancelled");
 });
 
 test("E2E: Escape strands the optimistic update wired to `drop` instead of `dragend`",
@@ -1245,4 +1254,87 @@ test("E2E: Escape strands the optimistic update wired to `drop` instead of `drag
     .filter((i) => i.kind === "drag-cancel-not-reverted").map((i) => i.element);
   assert.equal(flagged.length, 1, flagged.join(", "));
   assert.match(flagged[0]!, /#strands/);
+});
+
+// ---------------------------------------------------------------------------
+// Mid-flight: the drag ends up fine and something during it was wrong
+
+test("a drag with no dragend is a finding; a drag that never started is not", () => {
+  const s = surface(entry({ path: "div#card", types: { dragstart: 1 }, draggable: true }));
+  const kinds = () => deriveHandlerIssues(s)
+    .filter((i) => i.kind === "drag-source-detached-mid-drag").length;
+
+  s.realDragProbe = [realRow({
+    path: "div#card",
+    dragstartFired: true,
+    timeline: [{ type: "dragstart", path: "div#card", count: 1 }, { type: "drop", path: "div#zone", count: 1 }],
+  })];
+  assert.equal(kinds(), 1, "the drop landed and dragend never came");
+
+  // With a dragend, nothing to report — the normal case.
+  s.realDragProbe = [realRow({
+    path: "div#card",
+    dragstartFired: true,
+    timeline: [{ type: "dragstart", path: "div#card", count: 1 }, { type: "dragend", path: "div#card", count: 1 }],
+  })];
+  assert.equal(kinds(), 0);
+
+  // A source the browser refused to pick up has no dragend either, and `drag-source-inert` is
+  // what describes that. Reporting both would be two findings for one cause.
+  s.realDragProbe = [realRow({ path: "div#card", dragstartFired: false, timeline: [] })];
+  assert.equal(kinds(), 0);
+
+  // No timeline at all: not measured.
+  s.realDragProbe = [realRow({ path: "div#card", dragstartFired: true })];
+  assert.equal(kinds(), 0);
+});
+
+test("a slow dragover is timed inside the handler, not between the events", () => {
+  const slow = surface(entry({ path: "div#zone", types: { dragover: 1, drop: 1 }, dragoverMs: 80 }));
+  assert.equal(deriveHandlerIssues(slow).filter((i) => i.kind === "dragover-handler-slow").length, 1);
+
+  // Under the floor, and unmeasured, are both silent — and they are different states: an
+  // `ondragover=` property assignment is never wrapped, so it reads as undefined rather than fast.
+  for (const dragoverMs of [2, undefined]) {
+    const s = surface(entry({ path: "div#zone", types: { dragover: 1 }, dragoverMs }));
+    assert.deepEqual(
+      deriveHandlerIssues(s).filter((i) => i.kind === "dragover-handler-slow"),
+      [],
+      `dragoverMs=${dragoverMs}`,
+    );
+  }
+});
+
+test("E2E: the two mid-flight defects, each with its control", { timeout: 180_000 }, async () => {
+  // Both halves of this page "work": the drop lands and the data arrives. What is wrong happens
+  // only while the drag is in flight.
+  const s = await buildHandlerSurface({
+    source: join(REPO_ROOT, "fixtures/handlers/drag-mid-flight.html"),
+    probeDrag: true,
+  });
+  const row = (id: string) => s.realDragProbe?.find((r) => r.path.endsWith(`#${id}`))!;
+  const has = (id: string, kind: string) => deriveHandlerIssues(s)
+    .some((i) => i.kind === kind && i.element.includes(`#${id}`));
+
+  // A detached source gets no dragend. Its drop still landed, which is what makes it invisible.
+  assert.ok(row("vanishes").droppedOn, "the drag itself succeeded");
+  assert.equal(row("vanishes").timeline?.some((step) => step.type === "dragend"), false);
+  assert.ok(has("vanishes", "drag-source-detached-mid-drag"));
+  // The control: same drag, node stays in the document.
+  assert.equal(row("plain").timeline?.some((step) => step.type === "dragend"), true);
+  assert.equal(has("plain", "drag-source-detached-mid-drag"), false);
+
+  // The handler duration, and the control that caught the first version of this measurement.
+  // Deriving it from the interval between dragovers reported 68ms for the fast zone, because the
+  // probe's own 60-80ms hover screenshot lands inside that interval.
+  const zone = (id: string) => s.elements.find((el) => el.path.endsWith(`#${id}`))!;
+  assert.ok(zone("slow-zone").dragoverMs! >= 50, `slow zone measured ${zone("slow-zone").dragoverMs}`);
+  assert.ok(zone("fast-zone").dragoverMs! < 20, `fast zone measured ${zone("fast-zone").dragoverMs}`);
+  assert.ok(has("slow-zone", "dragover-handler-slow"));
+  assert.equal(has("fast-zone", "dragover-handler-slow"), false, "the probe must not measure itself");
+
+  // And the cancel note tells the two apart: the vanished source could not be dragged a second
+  // time, which is not the same as Escape failing to cancel.
+  assert.equal(row("vanishes").cancel?.started, false);
+  assert.equal(row("plain").cancel?.started, true);
 });

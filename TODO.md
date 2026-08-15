@@ -1301,6 +1301,20 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - 3点にするのも要点 — 中心だけを覆う 40px の badge は zone を使えなくしない。対照 `#badged`。
   - どちらの ablation も対照で落ちることを確認済み。イベントを出さないので `--probe-drag` 不要。
 
+- [x] **飛行中(mid-flight)の欠陥2つ** — どちらも結果は正しい(drop は成立し、データも届く)。
+  - `drag-source-detached-mid-drag`(suspect): drag 中に source が DOM から外れると `dragend` が
+    来ない。成否に関係なく必ず通る場所なので、そこに書いた後処理が全部飛ぶ。実測: `remove()` を
+    `dragstart` で呼ぶ source は `dragstart, dragover, drop` のみで `dragend` 無し(対照は有り)。
+  - `dragover-handler-slow`(warn): `dragover` は pointer が target 上にある間毎フレーム発火するので、
+    80ms のハンドラは滞在中ずっと drag をガタつかせる。
+  - **タイミングはリスナ内部で測る。最初の版は誤りだった**: イベント間隔から推定すると
+    **即 return するハンドラが 68ms** と出た — hover screenshot(60–80ms)の待ちが間隔に入るため。
+    **fixture の fast zone が私の計測器の汚染を捕まえた**。リスナ wrapper で各呼び出しを直接計測し、
+    slow 80ms / fast <2ms。`addEventListener` のみ対象(`ondragover=` プロパティは未計測扱い)。
+  - **到達不能と判明したガードは残さず削除**: `dragend` 欠落時の 120ms 再読み込みは不要。
+    ログを読む evaluate はページのメインスレッド作業の後ろに直列化されるので、`dragend` を遅らせる
+    ものは読み取りも同じだけ遅らせる(300ms busy-wait で検証、初回読み取り時点で既に存在)。
+
 - [x] **キャンセル(Escape)** — driven drag は Escape で中断する(`dragend` の `dropEffect: "none"`、
   drop 無し)。`drag-cancel-not-reverted`(suspect)は**2つの証拠が両方**必要:
   ブラウザが「中断した」と言っていること、かつピクセルがまだ違うこと。
