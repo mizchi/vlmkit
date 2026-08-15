@@ -3,8 +3,11 @@ import { test } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { launchBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import {
+  HANDLER_INVOCATION_PATCH_SCRIPT,
+  HANDLER_PATCH_SCRIPT,
   buildHandlerSurface,
   deriveHandlerIssues,
   isPointerDragSurface,
@@ -601,4 +604,112 @@ test("without the probe, the pointer types are still reported as uncovered", () 
   assert.ok(unprobed, "with no probe, the types are uncovered and must say so");
   assert.match(unprobed.message, /pointerdown/);
   assert.match(unprobed.message, /pointermove/);
+});
+
+test("E2E: a gesture that invokes nothing is the one graded outcome", { timeout: 180_000 }, async () => {
+  // `#swallowed` and `#dead` are indistinguishable in pixels — both 0.00%/0.00% — and are
+  // different defects. Counting invocations of the page's OWN listeners separates them:
+  // `#dead`'s handlers run the full trio and do nothing, `#swallowed`'s never run at all
+  // because a transparent sibling takes every event. Only the second has one explanation, so
+  // only the second is a finding.
+  const s = await buildHandlerSurface({
+    source: join(REPO_ROOT, "fixtures/handlers/pointer-drag.html"),
+    probeDrag: true,
+  });
+  const row = (id: string) => s.pointerDragProbe!.find((r) => r.path.endsWith(`#${id}`))!;
+
+  assert.equal(row("swallowed").handlerCalls, 0, "the veil takes every event");
+  assert.ok(row("dead").handlerCalls! > 0, `#dead's handlers do run: ${row("dead").handlerCalls}`);
+  assert.ok(row("works").handlerCalls! > 0);
+  // Same pixels, so the pixel numbers cannot be what distinguishes them.
+  assert.equal(row("swallowed").feedbackRatio, 0);
+  assert.equal(row("dead").feedbackRatio, 0);
+
+  const kindsFor = (id: string) => deriveHandlerIssues(s)
+    .filter((i) => i.element.split(" ")[0]!.endsWith(`#${id}`)).map((i) => i.kind);
+  assert.ok(kindsFor("swallowed").includes("pointer-drag-intercepted"));
+  for (const id of ["dead", "works", "feedback-only", "canvas-works"]) {
+    assert.equal(kindsFor(id).includes("pointer-drag-intercepted"), false,
+      `${id} is reachable and must not be reported as intercepted`);
+  }
+});
+
+test("no invocation count means no intercepted finding", () => {
+  // The counting patch is only installed for probe runs, so `handlerCalls` is undefined
+  // otherwise — and "not measured" must not become "measured and zero".
+  const s = surface(entry({ path: "div#c", types: { pointerdown: 1, pointermove: 1 } }));
+  s.pointerDragProbe = [{ path: "div#c", feedbackRatio: 0, committedRatio: 0 }];
+  assert.equal(
+    deriveHandlerIssues(s).filter((i) => i.kind === "pointer-drag-intercepted").length, 0,
+    "undefined handlerCalls is not zero",
+  );
+  s.pointerDragProbe = [{ path: "div#c", feedbackRatio: 0, committedRatio: 0, handlerCalls: 0 }];
+  assert.equal(deriveHandlerIssues(s).filter((i) => i.kind === "pointer-drag-intercepted").length, 1);
+  // And a gesture that could not be performed says nothing either way.
+  s.pointerDragProbe = [{ path: "div#c", feedbackRatio: 0, committedRatio: 0, handlerCalls: 0, error: "no usable box" }];
+  assert.equal(deriveHandlerIssues(s).filter((i) => i.kind === "pointer-drag-intercepted").length, 0);
+});
+
+test("E2E: counting invocations does not change how the page's listeners behave", { timeout: 180_000 }, async () => {
+  // The risk this guards. A wrapper is a different function object, so
+  // `removeEventListener(type, fn)` stops matching and every add-then-remove leaks a live
+  // listener — the tool would alter the page it measures. Run with and without the patch and
+  // diff the page's own log.
+  const dir = mkdtempSync(join(tmpdir(), "handlers-fidelity-"));
+  const file = join(dir, "fidelity.html");
+  writeFileSync(file, `<!doctype html><html><head><title>t</title></head><body>
+    <div id="t" style="width:60px;height:20px">t</div>
+    <script>
+      window.log = [];
+      const el = document.getElementById('t'), obj = { handleEvent(e) { window.log.push('obj:' + (this === obj)); } };
+      const removed = () => window.log.push('REMOVED-FIRED');
+      el.addEventListener('click', removed);
+      el.removeEventListener('click', removed);
+      el.addEventListener('click', () => window.log.push('once'), { once: true });
+      el.addEventListener('click', obj);
+      el.addEventListener('click', function () { window.log.push('this=' + (this === el)); });
+      const both = () => window.log.push('both');
+      el.addEventListener('click', both, true);
+      el.addEventListener('click', both, false);
+      el.removeEventListener('click', both, true);
+      el.addEventListener('click', () => { throw new Error('boom'); });
+      el.addEventListener('click', () => window.log.push('after-throw'));
+    </script>
+  </body></html>`);
+
+  const logs: string[][] = [];
+  for (const probeDrag of [false, true]) {
+    const b = await launchBrowser();
+    try {
+      const page = await b.newPage();
+      // The same install order `buildHandlerSurface` uses, and the order is load-bearing:
+      // reversing it makes the recorder below capture the wrapper's source instead.
+      if (probeDrag) await page.addInitScript(HANDLER_INVOCATION_PATCH_SCRIPT);
+      await page.addInitScript(HANDLER_PATCH_SCRIPT);
+      page.on("pageerror", () => {});
+      await page.goto(pathToFileURL(file).href);
+      await page.locator("#t").click();
+      await page.locator("#t").click();
+      logs.push(await page.evaluate(() => (window as unknown as { log: string[] }).log));
+      if (probeDrag) {
+        const samples = await page.evaluate(() =>
+          (window as unknown as { __vlmkitHandlers: { src: string }[] }).__vlmkitHandlers.map((h) => h.src));
+        assert.ok(
+          samples.some((src) => src.includes("window.log.push")),
+          `the recorder captured wrappers instead of the page's listeners: ${JSON.stringify(samples.slice(0, 3))}`,
+        );
+      }
+    } finally {
+      await b.close();
+    }
+  }
+  const [unpatched, patched] = logs;
+  assert.deepEqual(patched, unpatched, "the patch changed what the page's listeners did");
+  // And the fixture has to actually exercise the traps, or the equality above is vacuous.
+  assert.equal(unpatched!.filter((l) => l === "once").length, 1, "once fired twice or not at all");
+  assert.equal(unpatched!.includes("REMOVED-FIRED"), false, "a removed listener fired");
+  assert.ok(unpatched!.includes("obj:true"), "handleEvent's `this` should be the listener object");
+  assert.ok(unpatched!.includes("this=true"), "a function listener's `this` should be the element");
+  assert.equal(unpatched!.filter((l) => l === "both").length, 2, "one phase removed, one left, two clicks");
+  assert.ok(unpatched!.includes("after-throw"), "a throwing listener must not stop the rest");
 });
