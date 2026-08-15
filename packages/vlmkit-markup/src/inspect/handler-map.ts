@@ -1708,6 +1708,15 @@ const HOVER_SELECTOR_SCRIPT = String.raw`
 const MAX_HOVER_TARGETS = 12;
 
 /**
+ * How long to wait for a delayed reveal before concluding there is none.
+ *
+ * 450ms covers the common tooltip delay (300-400ms is the usual range, and the measured attack case
+ * used 400). Paid only when the first look at 80ms showed nothing, so a page whose reveals are
+ * instant never waits for it.
+ */
+const HOVER_DELAYED_WAIT_MS = 450;
+
+/**
  * Every visible field that holds text, found in the page rather than in the handler surface.
  *
  * The surface only contains elements that have a handler, and a field's filter is not always on the
@@ -1766,17 +1775,29 @@ async function probeHovers(
       await page.evaluate("(() => { const a = document.activeElement; if (a && a.blur) a.blur(); return true; })()");
       await page.waitForTimeout(60);
       const base = await snapshot();
+      // Snapshotted twice when the first look shows nothing, and only then: a tooltip commonly
+      // delays before appearing, and the delays are not always the same on hover and on focus.
+      // Measured on a trigger that reveals instantly on hover and after 400ms on focus — with one
+      // 80ms look it read as hover-only, which is a false positive on an ordinary implementation.
+      // The second look costs 450ms and is paid only on the path that would otherwise report.
+      const revealedAfter = async (first: number) => {
+        await page.waitForTimeout(first);
+        let found = [...await snapshot()].filter((label) => !base.has(label));
+        if (found.length === 0) {
+          await page.waitForTimeout(HOVER_DELAYED_WAIT_MS);
+          found = [...await snapshot()].filter((label) => !base.has(label));
+        }
+        return found;
+      };
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-      await page.waitForTimeout(80);
-      row.revealedOnHover = [...await snapshot()].filter((label) => !base.has(label));
+      row.revealedOnHover = await revealedAfter(80);
       await page.mouse.move(0, 0);
       await page.waitForTimeout(60);
       row.focusable = await el.evaluate((node: Element) => {
         (node as HTMLElement).focus?.();
         return document.activeElement === node || node.contains(document.activeElement);
       });
-      await page.waitForTimeout(80);
-      row.revealedOnFocus = [...await snapshot()].filter((label) => !base.has(label));
+      row.revealedOnFocus = await revealedAfter(80);
       await page.evaluate("(() => { const a = document.activeElement; if (a && a.blur) a.blur(); return true; })()");
     } catch (err) {
       row.error = err instanceof Error ? err.message.slice(0, 120) : String(err).slice(0, 120);
@@ -2842,6 +2863,12 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
     // a digits-only field loses both samples and says nothing about non-ASCII.
     if (!row.plainAscii.includes(TEXT_PROBE_ASCII)) continue;
     if (row.plainCjk.includes(TEXT_PROBE_CJK)) continue;
+    // TRANSFORMED is not DROPPED, and the difference is a false positive on a shape that is
+    // ordinary on Japanese sites: a furigana field that transliterates kana to romaji as you type.
+    // Measured — `日本語` came back as `NIHONGO`, and the message read "lost 日本語 — typing it left
+    // NIHONGO", contradicting itself. A field that drops text returns less than went in; one that
+    // rewrites it returns a comparable amount of something else.
+    if (row.plainCjk.length >= TEXT_PROBE_CJK.length) continue;
     issues.push({
       kind: "text-input-rejects-non-ascii",
       severity: "warn",

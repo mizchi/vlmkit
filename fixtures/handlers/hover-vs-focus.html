@@ -15,6 +15,7 @@
     #jsBoth            #t4             #t4             -
     #noTabindex        #t5             -               hover-only-reveal, and it cannot be focused
     #nothing           -               -               -   (a hover handler that reveals nothing)
+    #asymDelay         #t6             #t6 (400ms)     -   (an ordinary delayed tooltip)
 
   Three things this fixture is here to pin:
 
@@ -45,6 +46,11 @@
   /* The same thing done correctly. */
   .hover-and-focus:hover + .tip,
   .hover-and-focus:focus + .tip { display: block; }
+  /* The asymmetric-delay control: instant on hover, 400ms on focus. `visibility` rather than
+     `display`, because a transition needs an animatable property to delay on. */
+  .delayed-focus + .tip { display: block; visibility: hidden; }
+  .delayed-focus:hover + .tip { visibility: visible; transition: visibility 0s; }
+  .delayed-focus:focus + .tip { visibility: visible; transition: visibility 0s 400ms; }
 </style>
 </head>
 <body>
@@ -77,6 +83,15 @@
 
 <div class="wrap">
   <span class="trigger" id="nothing" tabindex="0">hover handler, no reveal</span>
+</div>
+
+<div class="wrap">
+  <!-- Instant on hover, 400ms delayed on focus. An ordinary tooltip: the delay exists so the tip
+       does not flash while the pointer crosses the control. With a single 80ms look this read as
+       hover-only, which is a false positive — the probe now takes a second look before concluding
+       that a phase revealed nothing. MUST stay silent. -->
+  <span class="trigger delayed-focus" id="asymDelay" tabindex="0">focus reveal delayed 400ms</span>
+  <span class="tip" id="t6">delayed help</span>
 </div>
 
 <script>

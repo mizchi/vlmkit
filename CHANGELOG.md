@@ -135,6 +135,21 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **Two false positives found by attacking the new rules on purpose, both fixed.**
+  - **A field that rewrites text is not a field that drops it.** A furigana input transliterating
+    kana to romaji returned `NIHONGO` for `日本語`, and `text-input-rejects-non-ascii` reported
+    `lost "日本語" — typing it left "NIHONGO"`, contradicting itself in its own message. A drop returns
+    *less* than went in; the rule now requires that. Fields that romanise as you type are ordinary on
+    Japanese sites.
+  - **A delayed reveal is not a missing reveal.** A tooltip appearing instantly on hover and 400ms
+    after focus read as `hover-only-reveal` — and that delay exists so the tip does not flash as the
+    pointer crosses. The hover probe now takes a second look 450ms later, and only when the first
+    found nothing, so the cost falls on the path that would otherwise report. The same change fixed a
+    false negative: a tooltip delayed on both had been invisible to both looks.
+
+  Both are fixture cases that must stay silent now, both ablations fail on them, and the true
+  positives are unchanged.
+
 - **The input probe claimed a measurement it never took.** A field inside a closed `<details>` passes
   the size and display filter and then accepts no text: on a real page a textarea there reported
   `"vlmkit7" became ""` for a drive that never happened. Only the ASCII control kept that from being a

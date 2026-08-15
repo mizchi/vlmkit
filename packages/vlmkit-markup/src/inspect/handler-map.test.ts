@@ -1504,9 +1504,13 @@ test("E2E: hover triggers come from the stylesheets as well as from the listener
   for (const id of ["cssHoverOnly", "jsHoverOnly", "noTabindex"]) {
     assert.ok(flagged.some((el) => el.includes(`#${id}`)), `${id} must report`);
   }
-  for (const id of ["cssBoth", "jsBoth", "nothing"]) {
+  for (const id of ["cssBoth", "jsBoth", "nothing", "asymDelay"]) {
     assert.equal(flagged.some((el) => el.includes(`#${id}`)), false, `${id} must stay silent`);
   }
+  // An ordinary tooltip: instant on hover, 400ms on focus. With one 80ms look this read as
+  // hover-only — a false positive on a delay that exists so the tip does not flash as the pointer
+  // crosses. The probe takes a second look before concluding a phase revealed nothing.
+  assert.deepEqual(row("asymDelay")!.revealedOnFocus.map((l) => l.split("|")[0]), ["#t6"]);
 });
 
 // ---------------------------------------------------------------------------
@@ -1700,10 +1704,31 @@ test("E2E: three drives per field, and the control that makes the finding attrib
   assert.equal(row("plain").composed, "日本語");
   assert.equal(row("stripsNonAscii").composed, "", "same result composed or not — not IME-specific");
 
+  // Transformed is not dropped. A furigana field that transliterates kana to romaji is ordinary on
+  // Japanese sites, and a "does the value still contain it" check reported `lost "日本語" — typing it
+  // left "NIHONGO"`, contradicting itself. A drop returns LESS than went in.
+  assert.equal(row("translit").plainCjk, "NIHONGO");
+  assert.ok(row("translit").plainCjk.length > "日本語".length);
+
   const flagged = deriveHandlerIssues(s)
     .filter((i) => i.kind === "text-input-rejects-non-ascii").map((i) => i.element);
   assert.equal(flagged.length, 1, flagged.join(", "));
   assert.match(flagged[0]!, /#stripsNonAscii/);
+});
+
+test("a field that rewrites text is not a field that drops it", () => {
+  const s = surface(entry({ path: "input#f", types: { input: 1 } }));
+  const kinds = () => deriveHandlerIssues(s).filter((i) => i.kind === "text-input-rejects-non-ascii").length;
+  // Longer: a transliteration. Same length: a substitution. Both are rewrites, not losses.
+  for (const plainCjk of ["NIHONGO", "ニホンゴ", "???"]) {
+    s.textInputProbe = [textRow({ path: "input#f", plainCjk })];
+    assert.equal(kinds(), 0, plainCjk);
+  }
+  // Shorter than what went in: the field kept less than it was given.
+  for (const plainCjk of ["", "日"]) {
+    s.textInputProbe = [textRow({ path: "input#f", plainCjk })];
+    assert.equal(kinds(), 1, plainCjk);
+  }
 });
 
 test("check interactions --handlers can emit every rule it declares", async () => {

@@ -50,6 +50,36 @@ The probe now checks that the field actually took focus and reports `not driven 
 field (hidden, inert, or inside a closed <details>)`. The fixture carries the case, and removing the
 check fails the test.
 
+## Corpus 0b — attacking the rules on purpose
+
+A corpus of real pages measures how often a rule is wrong on shapes that happen to exist. It does
+not find the shape nobody in this repo wrote. So each rule was asked "what legitimate page would
+this report?", and the answers were built:
+
+| attack | outcome |
+|---|---|
+| a furigana field transliterating kana to romaji as you type | **false positive** — fixed |
+| a tooltip instant on hover, delayed 400ms on focus | **false positive** — fixed |
+| a tooltip delayed on both | false negative (safe) — fixed by the same change |
+| a context menu that fades in over 350ms | correct: reported as revealed |
+
+**Transformed is not dropped.** `日本語` came back from the transliterating field as `NIHONGO`, and
+the finding read `lost "日本語" — typing it left "NIHONGO"`, contradicting itself in its own message.
+A field that drops text returns *less* than went in; one that rewrites it returns a comparable amount
+of something else. The rule now requires the result to be shorter than the sample. `氏名(カナ)` fields
+that romanise as you type are ordinary on Japanese sites, so this was not a corner case.
+
+**A delayed reveal is not a missing reveal.** With a single 80ms look, a tooltip that appears
+instantly on hover and 400ms after focus read as hover-only — and that delay exists precisely so the
+tip does not flash as the pointer crosses the control. The probe now looks a second time, 450ms
+later, and only when the first look found nothing: the cost lands on the path that would otherwise
+report, and a page whose reveals are instant never pays it. The same change fixed a false *negative*
+— a tooltip delayed on both hover and focus had been invisible to both looks.
+
+Both attacks are now fixture cases that must stay silent, and both ablations fail on them. The true
+positives are unaffected: the fixture still reports its three, and the SVG editor still reports its
+tooltip pattern.
+
 ## Corpus 1 — ten pages in this repo, written for other gates
 
 `--probe all` on each. Every one exits 0 for the new rules; **zero findings from the six new

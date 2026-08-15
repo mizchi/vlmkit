@@ -16,6 +16,7 @@
     #area              vlmkit7  vlmkit7       日本語  日本語        -
     #changeCounter     vlmkit7  vlmkit7       日本語  日本語        -
     #insideClosedDetails  --  not driven, because it cannot take focus at all
+    #translit          vlmkit7  vlmkit7       日本語  NIHONGO     - (transformed, not dropped)
 
   **The ASCII drive is the control, and it is what makes the finding attributable.** `#digitsOnly`
   loses the Japanese text as well, and that says nothing about the script — the field filters by its
@@ -52,6 +53,7 @@
 <input id="maxlen" maxlength="4" placeholder="maxlength 4">
 <textarea id="area" placeholder="textarea, no handler"></textarea>
 <input id="changeCounter" placeholder="counts change events">
+<input id="translit" placeholder="kana to romaji, as a furigana field does">
 
 <!--
   Inside a CLOSED <details>: it passes the size and display filter and then takes no text at all.
@@ -76,6 +78,15 @@
   // drops the ASCII sample too and the Japanese loss is not attributable to the script.
   document.getElementById("digitsOnly").addEventListener("input", (e) => {
     e.target.value = e.target.value.replace(/[^0-9]/g, "");
+  });
+
+  // TRANSFORMED is not DROPPED. A furigana field that transliterates kana to romaji as you type is
+  // ordinary on Japanese sites, and with only a "does the value still contain it" check this
+  // reported `lost "日本語" — typing it left "NIHONGO"`, contradicting itself in its own message. A
+  // field that drops text returns LESS than went in; this returns more. MUST stay silent.
+  const KANA_TO_ROMAJI = { "に": "ni", "ほ": "ho", "ん": "n", "ご": "go", "日": "NI", "本": "HON", "語": "GO" };
+  document.getElementById("translit").addEventListener("input", (e) => {
+    e.target.value = [...e.target.value].map((c) => KANA_TO_ROMAJI[c] ?? c).join("");
   });
 
   // `change` fires on blur, not per keystroke, which is why each drive ends by blurring.
