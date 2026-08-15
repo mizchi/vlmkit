@@ -1603,6 +1603,25 @@ npm install した vlmkit には spec が同梱されず `HARNESS_ROOT` はど�
     フォールバックして黙殺され、直そうとしている形そのものになる)。
   - 実測: `capture.baseUrl: 9999` で `page.goto` が `9999` に行く(修正前は `4174`)。
 
+- [x] **workspace パッケージ8つ全部の `test` script が死んでいた**
+  - vitest 移行時に**root の script だけ**直され、各パッケージは
+    `node --test 'src/**/*.test.ts'` のまま。`packages/` 配下の **148 テストファイル全部**が
+    `from "vitest"` を import するので、`pnpm --filter @mizchi/vlmkit-core test` は
+    **38 files / 0 pass / 38 fail**(`Vitest failed to find the current suite`)。
+    `CLAUDE.md` が案内しているコマンドがこれ。
+  - **root の `pnpm test` は緑のままだった**から生き延びた。CI で走る方は正しく、
+    ドキュメントに書いてある方が死んでいる = 死んだ `workflow` コマンド2本と同じ形。
+  - `pnpm --dir ../.. exec vitest run packages/<pkg>/src` に統一(build script が既に使う
+    `pnpm --dir ../.. exec tsdown` と同じイディオム。root の vitest.config.ts を拾わせるため)。
+    **8つ全部を実測**: ai 5 / capture 10 / core 38 / generate 3 / heal 9 / markup 79 /
+    mcp 2 / plan 2 files、全パス。
+  - `tests/package-test-scripts.test.mjs` で pin。script の**形**だけを見る
+    (8スイートは走らせない = root の `pnpm test`)。`node --test` に戻す / パスを
+    間違える、両方の改変で落ちることを確認した。
+- [x] **`CLAUDE.md` の cross-package import 指示が解決しないパッケージ名だった**
+  - `@mizchi/vrt-<pkg>` は 0.6 以降どのパッケージの名前でもない。
+    この行を読んで書いた import は解決しない。dist 解決の罠も同じ場所に書いた。
+
 **罠(再発)**: dist 解決なので、`packages/` を直して CLI で確認すると**直っていないように
 見える**。`pnpm build` を挟むまで `4174` のままだった(1541行の記録と同じ罠)。
 `src/cli/cli.ts` を直接 node で実行すると**出力ゼロで exit 0**、entry は `src/cli/vlmkit.ts`。

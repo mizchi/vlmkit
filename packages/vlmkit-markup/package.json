@@ -36,7 +36,7 @@
   "scripts": {
     "build": "pnpm moon:build && pnpm --dir ../.. exec tsdown --config tsdown.packages.config.ts --filter @mizchi/vlmkit-markup",
     "prepack": "pnpm build",
-    "test": "node --test 'src/**/*.test.ts'",
+    "test": "pnpm --dir ../.. exec vitest run packages/vlmkit-markup/src",
     "moon:test": "moon test markup-core && moon check markup-core-api markup-core-cli",
     "moon:build": "moon build markup-core markup-core-api markup-core-cli --target js",
     "build:js": "pnpm --dir ../.. exec tsdown --config tsdown.packages.config.ts --filter @mizchi/vlmkit-markup"

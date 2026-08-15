@@ -28,7 +28,7 @@
   "scripts": {
     "build": "pnpm --dir ../.. exec tsdown --config tsdown.packages.config.ts --filter @mizchi/vlmkit-capture",
     "prepack": "pnpm build",
-    "test": "node --test 'src/**/*.test.ts'"
+    "test": "pnpm --dir ../.. exec vitest run packages/vlmkit-capture/src"
   },
   "exports": {
     ".": {

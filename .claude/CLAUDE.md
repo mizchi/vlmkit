@@ -267,15 +267,15 @@ This repository is a pnpm workspace.
 | `packages/vlmkit-ai/` | VLM / LLM clients, reasoning pipeline, NLP helpers. |
 | `packages/vlmkit-markup/` | VLM-driven markup tooling: component extract / from-image, design tokens, theme parity, i18n stress, palette, dep-graph, selector-heal, smoke-runner. |
 | `src/cli/` | CLI entry + router + workflow command implementations (split per-command under `cli/workflow/`). |
-| `src/api/` | HTTP API server (deep-imports vrt-markup smoke-runner + experiments/css-challenge). |
+| `src/api/` | HTTP API server (deep-imports vlmkit-markup smoke-runner + experiments/css-challenge). |
 | `src/experiments/` | migration, css-challenge, detection, benchmark, flaker. |
 | `src/demo/` | Demo scripts. |
 | `src/util/` | App-side helpers (agent, goal-runner, skill, perf, integration tests). |
 | `src/vrt/snapshot/`, `src/vrt/compare/` | Baseline / snapshot / flipbook workflow. |
 
-Cross-package imports use `@mizchi/vrt-<pkg>/<path>.ts` or the curated barrel `@mizchi/vrt-<pkg>`. Within a package, use relative imports. The barrel excludes Playwright-bound and CLI-entry modules — deep-import those.
+Cross-package imports use `@mizchi/vlmkit-<pkg>/<path>.ts` or the curated barrel `@mizchi/vlmkit-<pkg>`. Within a package, use relative imports. The barrel excludes Playwright-bound and CLI-entry modules — deep-import those. (This line said `@mizchi/vrt-<pkg>`, which no package has been called since 0.6 — an import written from it does not resolve.)
 
-Run tests for a single package: `pnpm --filter @mizchi/vlmkit-core test`. From repo root, `pnpm test` runs all.
+Run tests for a single package: `pnpm --filter @mizchi/vlmkit-core test`. From repo root, `pnpm test` runs all. **Editing a `packages/*/src` file and then running the CLI shows the OLD behavior**: `@mizchi/vlmkit-*` resolves through `exports` to `dist/*.mjs`, so `pnpm build` has to run in between (and never pipe its output to `head` — SIGPIPE leaves a half-deleted `dist/`).
 
 The `vlmkit-markup` markup-core tests build MoonBit sources on demand and need the `moon` CLI. If tests fail with `spawnSync moon ENOENT`, add it to PATH first (it is often installed but not on PATH in sandboxes): `export PATH="$HOME/.moon/bin:$PATH"`. If it is not installed at all: `curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash`. Without it ~138 tests fail on the toolchain rather than on anything real, so install it before trusting a red suite.
 

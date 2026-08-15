@@ -1026,6 +1026,17 @@ suppression works per *rule* instead of per whole gate.
 
 ### Fixed
 
+- **Every workspace package's `test` script failed every test it selected.** The suite moved
+  from `node:test` to vitest, but only the root script was migrated: all eight packages kept
+  `node --test 'src/**/*.test.ts'`, and all 148 test files under `packages/` import from
+  `"vitest"`, so `pnpm --filter @mizchi/vlmkit-core test` — the command `CLAUDE.md` documents —
+  reported 38 files, 0 pass, 38 fail with "Vitest failed to find the current suite". The root
+  `pnpm test` was green throughout, which is how it lasted. Each package now runs
+  `pnpm --dir ../.. exec vitest run packages/<pkg>/src` (the idiom its build script already
+  uses, so the root `vitest.config.ts` applies), verified across all eight: ai 5, capture 10,
+  core 38, generate 3, heal 9, markup 79, mcp 2, plan 2 files, all passing.
+  `tests/package-test-scripts.test.mjs` pins the shape.
+
 - **`capture.baseUrl` in `vlmkit.config.json` was read from nowhere.** `routes` is accepted both
   at the top level and inside the `capture` block; `baseUrl` was only ever read at the top level.
   So the config anyone writes — both keys together, under `capture` — took the routes and fell
