@@ -36,6 +36,7 @@ import {
   type SurfaceMismatch,
   formatHandlerSurface,
   HANDLER_SURFACE_RULES,
+  PROBE_FAMILIES,
 } from "../inspect/handler-map.ts";
 import { firstPositional, optionalInt } from "@mizchi/vlmkit-core/plugin/args.ts";
 
@@ -147,11 +148,18 @@ contract and every response mismatch is reported.`,
       const { buildHandlerSurface, compareHandlerSurfaces, deriveHandlerIssues } = await import(
         "../inspect/handler-map.ts"
       );
-      // `probeDrag` on, unconditionally: this gate's whole job is to press things and see
-      // what happens — it already fires keys at every control — so a drag surface it will
-      // not exercise would be the odd one out. `scan handlers` is the inventory and keeps
-      // the probe behind `--probe-drag`.
-      const surface = await buildHandlerSurface({ source, probeDrag: true, ...pageLoad });
+      // Every family, unconditionally: this gate's whole job is to press things and see what
+      // happens — it already fires keys at every control — so a family it will not exercise would
+      // be the odd one out. `scan handlers` is the inventory and keeps them behind `--probe`.
+      //
+      // It used to enable `drag` alone, which made five of the rules it DECLARES unreachable
+      // through this gate: `--rule hover-only-reveal=suspect` had something to bind to and nothing
+      // could ever emit it. Found by dogfooding the families against a real app.
+      const surface = await buildHandlerSurface({
+        source,
+        probes: [...PROBE_FAMILIES],
+        ...pageLoad,
+      });
       // What the probe above actually reached, read off the map rather than assumed. Without
       // it the surface cannot tell an exercised handler from an inventoried one, and every
       // `click`/`keydown`/`focus` handler on the page counted as covered — including on a

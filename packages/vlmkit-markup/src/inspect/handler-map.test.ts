@@ -1,6 +1,7 @@
 import assert from "node:assert";
 import { test } from "vitest";
 import { mkdtempSync, writeFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -1690,4 +1691,60 @@ test("E2E: three drives per field, and the control that makes the finding attrib
     .filter((i) => i.kind === "text-input-rejects-non-ascii").map((i) => i.element);
   assert.equal(flagged.length, 1, flagged.join(", "));
   assert.match(flagged[0]!, /#stripsNonAscii/);
+});
+
+test("check interactions --handlers can emit every rule it declares", async () => {
+  // It enabled the `drag` family alone, which made five of the rules it DECLARES unreachable
+  // through it: `--rule hover-only-reveal=suspect` had something to bind to and nothing could ever
+  // produce it. The mirror image of the undeclared-rule bug the runner catches, and invisible to
+  // that check because declaring more than you emit is not an error.
+  const { interactionsGate } = await import("../gates/interactions.gate.ts");
+  const declared = new Set(interactionsGate.rules.map((r) => r.id));
+  for (const id of [
+    "hover-only-reveal",
+    "contextmenu-not-prevented",
+    "contextmenu-replaces-nothing",
+    "touch-handlers-not-invoked",
+    "text-input-rejects-non-ascii",
+    "passive-listener-cannot-cancel",
+  ]) {
+    assert.ok(declared.has(id), `${id} must be declared`);
+  }
+  // The source is the only place the family list appears for this gate, so read it there: a gate
+  // that declares the rules and drives one family is the state this test exists to reject.
+  const source = await readFile(
+    fileURLToPath(new URL("../gates/interactions.gate.ts", import.meta.url)),
+    "utf8",
+  );
+  assert.match(source, /probes: \[\.\.\.PROBE_FAMILIES\]/);
+  assert.doesNotMatch(source, /buildHandlerSurface\(\{ source, probeDrag: true/);
+});
+
+test("a hover finding says when many elements share the probed path", () => {
+  // A toolbar of icon-only buttons with no id or class collapses to ONE derived path, so the probe
+  // visits the first of them. Measured on a real editor: 17 tooltip triggers, one path, one finding
+  // — which without the count reads as though one button were at fault.
+  const s: HandlerSurface = {
+    source: "x.html",
+    elements: Array.from({ length: 17 }, () => entry({ path: "div>button", types: { mouseenter: 1 } })),
+    globals: {},
+    totalRegistrations: 17,
+  };
+  s.hoverProbe = [{
+    path: "div>button",
+    text: "1",
+    revealedOnHover: ["#tooltip-1|Rectangle"],
+    revealedOnFocus: [],
+    focusable: true,
+  }];
+  const found = deriveHandlerIssues(s).find((i) => i.kind === "hover-only-reveal")!;
+  assert.match(found.message, /17 elements on this page derive the same path/);
+  assert.match(found.message, /the pattern rather than one control/);
+
+  // One element, no such sentence.
+  s.elements = [entry({ path: "div>button", types: { mouseenter: 1 } })];
+  assert.doesNotMatch(
+    deriveHandlerIssues(s).find((i) => i.kind === "hover-only-reveal")!.message,
+    /derive the same path/,
+  );
 });

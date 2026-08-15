@@ -135,6 +135,21 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **`check interactions --handlers` could not emit five of the rules it declares.** It enabled the
+  `drag` family alone, so `hover-only-reveal`, both `contextmenu-*` rules,
+  `touch-handlers-not-invoked` and `text-input-rejects-non-ascii` were tunable through that gate and
+  unreachable through it — the mirror image of the undeclared-rule error the runner already catches,
+  and invisible to that check because declaring more than you emit is not an error. It now drives
+  every family, which is what a gate that already fires keys at every control should do. Found by
+  dogfooding the families against a real app; see
+  [`docs/reports/2026-08-15-dogfood-probe-families.md`](docs/reports/2026-08-15-dogfood-probe-families.md).
+
+- **`hover-only-reveal` named one element where seventeen shared the blame.** `describe()` derives
+  the same path for every icon-only button in a toolbar (no `id`, no `class`), so the probe visits the
+  first and the message read as though that button alone were at fault. It now says how many elements
+  derive the same path, turning "this button" into "this pattern". On the editor above that count is
+  17, matching the 17 tooltips in its DOM.
+
 - **`--probe input`: text typed in three ways, and the control that makes the finding
   attributable.** Every visible text field gets an ASCII sample, the same text in Japanese, and the
   Japanese one through a real IME composition (kana composed, kanji committed via CDP):

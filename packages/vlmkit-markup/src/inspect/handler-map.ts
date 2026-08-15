@@ -2888,6 +2888,16 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
   for (const row of surface.hoverProbe ?? []) {
     if (row.error || row.revealedOnHover.length === 0 || row.revealedOnFocus.length > 0) continue;
     const what = row.revealedOnHover.slice(0, 3).map((label) => label.split("|")[0]).join(", ");
+    // How many elements derive this same path. A toolbar of icon-only buttons with no id or class
+    // collapses to ONE path, so the probe visits the first of them and the finding would read as
+    // though it were about that one button. Measured on a real editor: 17 tooltip triggers, one
+    // path, one finding. Naming the count is the difference between "this button" and "this
+    // pattern" for the reader.
+    const sharing = surface.elements.filter((e) => e.path === row.path).length;
+    const alsoOn = sharing > 1
+      ? ` ${sharing} elements on this page derive the same path, so this is the pattern rather than `
+        + `one control — the probe drove the first of them.`
+      : "";
     issues.push({
       kind: "hover-only-reveal",
       severity: "suspect",
@@ -2899,7 +2909,7 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
           ? `The trigger is focusable, so add the same reveal to :focus / :focus-visible, or a focus `
             + `handler beside the hover one.`
           : `The trigger cannot even be focused — give it tabindex="0" (or make it a button), then `
-            + `reveal on focus as well as on hover.`),
+            + `reveal on focus as well as on hover.`) + alsoOn,
     });
   }
   // Disclose the blind spot instead of printing a clean bill of health.
