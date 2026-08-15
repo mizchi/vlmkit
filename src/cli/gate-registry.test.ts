@@ -172,6 +172,51 @@ describe("composed built-in registry", () => {
     assert.equal(total, 165);
   });
 
+  it("tracks which gates render their own rule settings, and which still cannot", async () => {
+    // `format(report, rules)` is how a gate's prose learns that a rule was turned off or
+    // re-tuned. A formatter that declares one parameter never receives the view, and the runner
+    // prints a disclaimer for it — `gate.format.length` is the whole mechanism, which is why
+    // this can be checked here without running anything.
+    //
+    // Both lists are asserted on purpose. The aware count alone would go up silently when a
+    // gate is migrated; naming the blind ones makes the remaining work visible, and makes a
+    // migration that forgets to update this list fail rather than pass quietly.
+    const rows = (await registry()).list().map(({ gate }) => ({ id: gate.id, aware: gate.format.length >= 2 }));
+    const aware = rows.filter((r) => r.aware).map((r) => r.id).sort();
+    const blind = rows.filter((r) => !r.aware).map((r) => r.id).sort();
+    assert.deepEqual(aware, [
+      "check.a11y.contrast",
+      "check.a11y.focus",
+      "check.a11y.touch",
+      "check.design",
+      "check.integrity",
+      "check.interactions",
+      "check.theme",
+      "check.tokens",
+      "scan.handlers",
+      "stress.i18n",
+      "stress.media",
+    ]);
+    assert.deepEqual(blind, [
+      "check.animation",
+      "check.asset",
+      "check.breakpoints",
+      "check.copy",
+      "check.crater",
+      "check.drift.component",
+      "check.drift.pages",
+      "check.equivalence",
+      "check.layout",
+      "check.motion",
+      "check.perf",
+      "check.scroll",
+      "check.story",
+      "scan.scroll",
+      "verify.flow",
+      "verify.markup",
+    ]);
+  });
+
   it("gives every built-in gate a category", async () => {
     // `category` is optional in the contract — a project's first house gate
     // must not have to pick a taxonomy before it can run. Built-ins have no

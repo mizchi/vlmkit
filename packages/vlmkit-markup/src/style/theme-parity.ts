@@ -30,6 +30,8 @@ import { type PageLoadOptions, pickPageLoad } from "@mizchi/vlmkit-core/page-loa
 import { openSource, resolveSource } from "@mizchi/vlmkit-core/page-open.ts";
 import { extractComponentsFromFile, type ComponentBbox } from "../component/component-bbox.ts";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
@@ -220,19 +222,38 @@ export async function runThemeParity(
 /** Terminal summary, extracted from `runThemeParity` so `run` stops printing. */
 export const THEME_INERT_DELTA = 0.02;
 
-export function formatThemeParityReport(report: ThemeParityReport): string {
+export function formatThemeParityReport(report: ThemeParityReport, rules?: RuleView): string {
   const lines: string[] = [];
   lines.push(`  ${BOLD}${CYAN}vlmkit check theme${RESET}`);
   lines.push(`  ${DIM}html: ${report.html}${RESET}`);
+  // Two independent rules, and the pixel-delta line is the one worth keeping when
+  // `theme-inert` is off: the DELTA is a measurement either way. Only its verdict character
+  // changes, from a warning to a plain reading.
+  const inertTier = ruleTier(rules, "theme-inert", "warn");
+  const unthemedTier = ruleTier(rules, "unthemed-component", "warn");
   const pct = (report.themePixelDelta * 100).toFixed(1);
   const inert = report.themePixelDelta < THEME_INERT_DELTA;
+  const inertIcon = !inert
+    ? `${GREEN}\u2713${RESET}`
+    : inertTier === "off"
+      ? `${DIM}-${RESET}`
+      : inertTier === "suspect" ? `${RED}\u2717${RESET}` : inertTier === "info" ? `${DIM}i${RESET}` : `${YELLOW}!${RESET}`;
   lines.push(
-    `  ${inert ? `${YELLOW}!${RESET}` : `${GREEN}\u2713${RESET}`} theme pixel delta: ${pct}%`
-    + ` (page ${inert ? "barely" : "broadly"} responds to color scheme)`,
+    `  ${inertIcon} theme pixel delta: ${pct}%`
+    + ` (page ${inert ? "barely" : "broadly"} responds to color scheme)`
+    + (inert && inertTier === "off" ? `${DIM} \u2014 theme-inert is off, reported as a reading only${RESET}` : ""),
   );
-  const unthemedIcon = report.unthemed.length === 0 ? `${GREEN}\u2713${RESET}` : `${RED}\u2717${RESET}`;
-  lines.push(`  ${unthemedIcon} unthemed components: ${report.unthemed.length} of ${report.totalMatched}`);
-  for (const u of report.unthemed.slice(0, 5)) {
+  const unthemedOff = unthemedTier === "off";
+  const unthemedIcon = unthemedOff
+    ? `${DIM}-${RESET}`
+    : report.unthemed.length === 0
+      ? `${GREEN}\u2713${RESET}`
+      : unthemedTier === "suspect" ? `${RED}\u2717${RESET}` : unthemedTier === "info" ? `${DIM}i${RESET}` : `${YELLOW}!${RESET}`;
+  lines.push(
+    `  ${unthemedIcon} unthemed components: ${report.unthemed.length} of ${report.totalMatched}`
+    + (unthemedOff ? `${DIM} \u2014 measured and NOT reported, unthemed-component is off${RESET}` : ""),
+  );
+  for (const u of unthemedOff ? [] : report.unthemed.slice(0, 5)) {
     lines.push(
       `    ${DIM}#${u.rank} ${u.bbox.left},${u.bbox.top} ${u.bbox.width}\u00d7${u.bbox.height}`
       + ` fill ${u.lightFill.hex} (\u0394 ${u.fillDelta.toFixed(1)})${RESET}`,

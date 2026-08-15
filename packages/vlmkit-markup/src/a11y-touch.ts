@@ -33,6 +33,8 @@ import {
 } from "./markup-core-a11y-touch.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { applySelectorAllowRules, parseSelectorAllowRules } from "./inspect/selector-exemption.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 
 export type WcagTouchLevel = "AAA" | "AA";
 
@@ -333,8 +335,15 @@ export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchRep
  * Terminal summary, extracted from the `!options.quiet` block inside the
  * measurement function. A gate's `run` must not print: the core runner owns
  * output, and `--json` is its decision to make, not the measurement's.
+ *
+ * `rules` is the project's settings for this gate's one rule. Without it this printed all 45
+ * findings on a page whose `target-undersized` was turned off, counted them on its own status
+ * line with a red ✗, and sat above a green verdict and exit 0. The measured count stays
+ * visible when the rule is off — 45 undersized targets do not stop existing because nobody
+ * wants to be told about them, and a formatter that dropped the number would turn a
+ * deliberate setting into a silently smaller measurement.
  */
-export function formatA11yTouchReport(report: TouchReport): string {
+export function formatA11yTouchReport(report: TouchReport, rules?: RuleView): string {
   const lines: string[] = [];
   lines.push(`  ${BOLD}${CYAN}vlmkit check a11y touch${RESET}`);
   lines.push(
@@ -342,18 +351,30 @@ export function formatA11yTouchReport(report: TouchReport): string {
     + ` (${report.required}×${report.required} min)${RESET}`,
   );
   lines.push(`  ${DIM}inspected ${report.inspectedCount} interactive element(s)${RESET}`);
-  const icon = report.failures.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
+  const tier = ruleTier(rules, "target-undersized", "suspect");
+  const off = tier === "off";
+  const icon = off
+    ? `${DIM}-${RESET}`
+    : report.failures.length === 0
+      ? `${GREEN}✓${RESET}`
+      : tier === "suspect" ? `${RED}✗${RESET}` : tier === "warn" ? `${YELLOW}!${RESET}` : `${DIM}i${RESET}`;
   lines.push(
     `  ${icon} ${report.failures.length} undersized target(s)`
+    + (off
+      ? `${DIM} measured and NOT reported — target-undersized is off${RESET}`
+      : tier === "suspect" ? "" : `${DIM} [target-undersized re-tuned to ${tier}]${RESET}`)
     + `${report.exempted?.length ? `${DIM}, ${report.exempted.length} exempted${RESET}` : ""}`,
   );
   const CONSOLE_ROWS = 5;
-  for (const f of report.failures.slice(0, CONSOLE_ROWS)) {
+  // Rows only while the rule is on. The count above stays either way: the exemption list and
+  // the stale-`--allow` warning below are about the project's own settings, and a reader who
+  // turned the rule off still needs to know an exemption has outlived what it covered.
+  for (const f of off ? [] : report.failures.slice(0, CONSOLE_ROWS)) {
     const cl = f.cluster ? " (clustered)" : "";
     lines.push(`    ${DIM}${f.path} — ${Math.round(f.bbox.width)}×${Math.round(f.bbox.height)}${cl} — "${f.text}"${RESET}`);
   }
   // See a11y-contrast: an undisclosed cut makes a partial list look complete.
-  if (report.failures.length > CONSOLE_ROWS) {
+  if (!off && report.failures.length > CONSOLE_ROWS) {
     lines.push(`    ${DIM}… ${report.failures.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
   }
   // Exemptions are LISTED, never merely subtracted — the property every exemption

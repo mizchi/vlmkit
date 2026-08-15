@@ -218,6 +218,44 @@ finding is *reported as silenced* rather than dropped — the runner prints
 `N finding(s) suppressed by rule settings (text-collision x3)` next to the
 verdict.
 
+#### Whether the gate's own prose knows
+
+Suppression happens on the runner's normalized finding list; a gate's prose is
+rendered from its raw report. A formatter that does not take the rule view
+therefore prints findings that were suppressed and counts them on its own status
+line, above a verdict and an exit code that do not. `format.length < 2` is how the
+runner detects that, and it appends a disclaimer ("The report above was rendered
+before those settings were applied…") rather than letting the two halves disagree
+silently.
+
+**11 of 27 gates render their settings themselves**; 16 still get the disclaimer.
+`src/cli/gate-registry.test.ts` asserts both lists by name, so migrating one is a
+deliberate edit rather than a silent count change.
+
+A migrated formatter asks `rules.setting(id)`, **never `rules.effective(id)`**:
+
+| | |
+|---|---|
+| `setting(id)` | the explicit project setting, or `undefined` when nobody set one |
+| `effective(id)` | the same, falling back to the severity the gate *declared* |
+
+The fallback is the trap, and it is not hypothetical. `applyRuleSettings` re-tunes a
+finding only when a setting exists — a gate is free to emit a severity that differs
+from its table, and `check integrity` does: `js-error` is a fail during construction
+and a warn after load; `text-clipped` and `degenerate-render` grade the same way. A
+formatter reading `effective` upgrades those back to the declared severity, which is
+how the gate that pioneered rule-aware prose came to print
+
+```
+verdict: DEFECTS (1 fail, 0 warn, 0 exempted)
+  exits 0 — 1 warn(s) did not fail this command.
+```
+
+on a page whose script throws after load — two adjacent lines, one from the gate and
+one from the runner. `ruleTier(rules, id, emittedSeverity)` in
+`@mizchi/vlmkit-core/plugin/rule-tier.ts` is the shared version of the correct rule,
+with `applyRuleTiers` for row lists and `hiddenByRuleNote` for the disclosure line.
+
 ### Rule settings vs. `--allow` vs. suppressions
 
 Three instruments, deliberately kept distinct:

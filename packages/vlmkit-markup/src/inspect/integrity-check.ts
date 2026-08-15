@@ -1828,9 +1828,22 @@ export function formatIntegrityReport(report: IntegrityReport, rules?: RuleView)
   //
   // `severityFor` maps a finding kind to what the settings made of it. A gate finding
   // kind IS the rule id here, which is what makes this a lookup rather than a guess.
-  const severityFor = (kind: string, declared: "fail" | "warn"): "fail" | "warn" | "info" | "off" => {
-    if (!rules) return declared;
-    const effective = rules.effective(kind);
+  const severityFor = (kind: string, emitted: "fail" | "warn"): "fail" | "warn" | "info" | "off" => {
+    // `setting`, NOT `effective`. `effective` falls back to the gate's rule TABLE, and this
+    // gate deliberately emits some kinds at either severity depending on evidence —
+    // `js-error` is a fail during construction and a warn after load, and `text-clipped` and
+    // `degenerate-render` do the same. The runner keeps the emitted severity unless a setting
+    // says otherwise ("only an explicit setting re-tunes"), so reading the table here printed
+    // this, two adjacent lines, on a page that throws after load:
+    //
+    //     verdict: DEFECTS (1 fail, 0 warn, 0 exempted)
+    //       exits 0 — 1 warn(s) did not fail this command.
+    //
+    // The rule-aware prose this function exists for was fixing the suppression half of the
+    // contradiction while introducing an upgrade half.
+    const setting = rules?.setting(kind);
+    if (!setting) return emitted;
+    const effective = setting;
     if (effective === "off") return "off";
     // The runner's vocabulary is suspect/warn/info; this gate's is fail/warn. `suspect`
     // is this gate's `fail`. `info` gets its own tier rather than collapsing into

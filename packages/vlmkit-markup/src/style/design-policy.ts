@@ -34,6 +34,8 @@ import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { applyRuleTiers, hiddenByRuleNote } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import {
   type SelectorAllowRule,
@@ -803,13 +805,18 @@ export async function runDesignPolicyCheck(options: DesignPolicyOptions): Promis
   });
 }
 
-export function formatDesignReport(report: DesignPolicyReport): string {
+export function formatDesignReport(report: DesignPolicyReport, rules?: RuleView): string {
   const lines: string[] = [];
   lines.push("");
   lines.push(`${BOLD}${CYAN}vlmkit check design${RESET}`);
   lines.push(`${DIM}source: ${report.source}${RESET}`);
   lines.push("");
-  const bad = report.findings.filter((f) => f.severity === "suspect").length;
+  // A finding's `kind` is the rule id on this gate, and its declared severity travels with it,
+  // so the settings apply row by row. Everything above the Findings block — coverage, role
+  // reuse, exclusions, allowances — is measurement and stays whatever the settings say.
+  const tiers = applyRuleTiers(report.findings, (f) => ({ rule: f.kind, emitted: f.severity }), rules);
+  const shownFindings = tiers.shown;
+  const bad = shownFindings.filter((f) => f.tier === "suspect").length;
   // The size of the blind spot goes ON the verdict line, the way `check
   // integrity` prints `(2 fail, 1 warn, 5 exempted)`. A reader deciding how much
   // a COHERENT verdict is worth has to see how much of the page it covered
@@ -822,9 +829,14 @@ export function formatDesignReport(report: DesignPolicyReport): string {
           ? `${YELLOW}DRIFT${RESET}`
           : `${YELLOW}NOT JUDGED${RESET}`
     }`
-    + ` (${report.findings.length} finding(s)${bad > 0 ? `, ${bad} suspect` : ""}`
+    + ` (${shownFindings.length} finding(s)${bad > 0 ? `, ${bad} suspect` : ""}`
     + `${report.excludedElements > 0 ? `, ${report.excludedElements} element(s) excluded` : ""})`,
   );
+  // The verdict WORD still comes from `report.verdict` — it is the JSON contract, the same
+  // choice `check integrity` made. So a page whose only drift rule is off can print DRIFT
+  // above zero findings, and this line is what keeps that from reading as a bug.
+  const hiddenNote = hiddenByRuleNote(tiers.hiddenByRule);
+  if (hiddenNote) lines.push(`${DIM}  ${hiddenNote} — the verdict word above predates the settings${RESET}`);
   // `roles.length` counted the unjudged ones, so this said `roles judged: 2` for a
   // page where the reuse check ran on nothing at all.
   const judgedRoleCount = report.roles.filter((r) => !r.notJudged).length;
@@ -945,26 +957,29 @@ export function formatDesignReport(report: DesignPolicyReport): string {
     }
     lines.push("");
   }
-  if (report.findings.length === 0) {
-    lines.push(`${GREEN}No design drift detected.${RESET}`);
+  if (shownFindings.length === 0) {
+    // Not "No design drift detected" when the drift was found and silenced: that sentence
+    // would be false, and it is the one line a reader quotes back.
+    lines.push(tiers.hiddenByRule.size > 0
+      ? `${DIM}No design drift reported — every finding's rule is off.${RESET}`
+      : `${GREEN}No design drift detected.${RESET}`);
     return lines.join("\n");
   }
-  const carried = report.findings.filter((f) => f.severity !== "info");
-  const informational = report.findings.filter((f) => f.severity === "info");
-  const mark = (f: DesignFinding) =>
-    f.severity === "suspect" ? `${RED}x${RESET}` : f.severity === "warn" ? `${YELLOW}!${RESET}` : `${DIM}i${RESET}`;
+  const carried = shownFindings.filter((f) => f.tier !== "info");
+  const informational = shownFindings.filter((f) => f.tier === "info");
+  const mark = (tier: DesignFinding["severity"]) =>
+    tier === "suspect" ? `${RED}x${RESET}` : tier === "warn" ? `${YELLOW}!${RESET}` : `${DIM}i${RESET}`;
+  const row = ({ row: f, tier }: { row: DesignFinding; tier: DesignFinding["severity"] }) =>
+    `  ${mark(tier)} [${f.kind}]${f.role ? ` ${f.role}` : ""}${tier === f.severity ? "" : ` (re-tuned to ${tier})`}`
+    + `: ${f.message}`;
   if (carried.length > 0) {
     lines.push(`${BOLD}Findings${RESET}`);
-    for (const f of carried) {
-      lines.push(`  ${mark(f)} [${f.kind}]${f.role ? ` ${f.role}` : ""}: ${f.message}`);
-    }
+    for (const f of carried) lines.push(row(f));
   }
   if (informational.length > 0) {
     if (carried.length > 0) lines.push("");
     lines.push(`${BOLD}Informational${RESET} ${DIM}(true, but does not carry the verdict)${RESET}`);
-    for (const f of informational) {
-      lines.push(`  ${mark(f)} [${f.kind}]${f.role ? ` ${f.role}` : ""}: ${f.message}`);
-    }
+    for (const f of informational) lines.push(row(f));
   }
   return lines.join("\n");
 }

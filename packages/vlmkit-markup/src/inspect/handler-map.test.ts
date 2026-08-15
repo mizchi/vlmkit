@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { launchBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { ruleViewFrom } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import {
   HANDLER_INVOCATION_PATCH_SCRIPT,
   HANDLER_PATCH_SCRIPT,
@@ -951,16 +952,12 @@ test("the report obeys rule settings instead of contradicting the verdict", asyn
   assert.match(plain(formatHandlerSurface(s, issues)), /status: 1 suspect issue\(s\), 1 warn/);
 
   // `off` drops the line and the count with it.
-  const off = plain(formatHandlerSurface(s, issues, {
-    effective: (id) => (id === "drag-source-inert" ? "off" : "warn"),
-  }));
+  const off = plain(formatHandlerSurface(s, issues, ruleViewFrom({ "drag-source-inert": "off" })));
   assert.doesNotMatch(off, /drag-source-inert/);
   assert.match(off, /status: 1 warn\(s\)/);
 
   // Re-tuned prints at the severity the project chose, and stops being counted as a suspect.
-  const info = plain(formatHandlerSurface(s, issues, {
-    effective: (id) => (id === "drag-source-inert" ? "info" : "warn"),
-  }));
+  const info = plain(formatHandlerSurface(s, issues, ruleViewFrom({ "drag-source-inert": "info" })));
   assert.match(info, /info \[drag-source-inert\]/);
   assert.match(info, /status: 2 warn\(s\)/);
   assert.doesNotMatch(info, /suspect/);

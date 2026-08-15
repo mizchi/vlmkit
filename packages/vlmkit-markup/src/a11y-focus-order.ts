@@ -29,7 +29,9 @@ import { type Page } from "playwright";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { type PageLoadOptions, navigatePage } from "@mizchi/vlmkit-core/page-load.ts";
 import { sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
-import { DIM, RESET, GREEN, RED, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { applyRuleTiers, hiddenByRuleNote } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { classifyFocusOrderStep } from "./markup-core-a11y-focus-order.ts";
 
 export interface FocusOrderOptions extends PageLoadOptions {
@@ -262,20 +264,35 @@ export async function runFocusOrder(
  * measurement function. A gate's `run` must not print: the core runner owns
  * output, and `--json` is its decision to make, not the measurement's.
  */
-export function formatFocusOrderReport(report: FocusOrderReport): string {
+export function formatFocusOrderReport(report: FocusOrderReport, rules?: RuleView): string {
   const lines: string[] = [];
   lines.push(`  ${BOLD}${CYAN}vlmkit check a11y focus${RESET}`);
   lines.push(`  ${DIM}source: ${report.source}${RESET}`);
   lines.push(`  ${DIM}captured ${report.steps.length} focus step(s)${RESET}`);
-  const icon = report.findings.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
-  lines.push(`  ${icon} ${report.findings.length} finding(s)`);
+  // Three rules with different declared severities, so the per-row lookup is the finding's
+  // own `kind` — which IS the rule id here — and `skip-row` stays a warn unless re-tuned.
+  const { shown, hiddenByRule } = applyRuleTiers(
+    report.findings,
+    (f) => ({ rule: f.kind, emitted: f.kind === "skip-row" ? "warn" : "suspect" }),
+    rules,
+  );
+  const worst = shown.some((s) => s.tier === "suspect")
+    ? "suspect"
+    : shown.some((s) => s.tier === "warn") ? "warn" : shown.length > 0 ? "info" : "none";
+  const icon = shown.length === 0
+    ? `${GREEN}✓${RESET}`
+    : worst === "suspect" ? `${RED}✗${RESET}` : worst === "warn" ? `${YELLOW}!${RESET}` : `${DIM}i${RESET}`;
+  lines.push(`  ${icon} ${shown.length} finding(s)`);
+  const note = hiddenByRuleNote(hiddenByRule);
+  if (note) lines.push(`    ${DIM}${note}${RESET}`);
   const CONSOLE_ROWS = 5;
-  for (const f of report.findings.slice(0, CONSOLE_ROWS)) {
-    lines.push(`    ${DIM}[${f.kind}] ${f.message}${RESET}`);
+  for (const { row: f, tier } of shown.slice(0, CONSOLE_ROWS)) {
+    const retuned = tier === (f.kind === "skip-row" ? "warn" : "suspect") ? "" : ` (re-tuned to ${tier})`;
+    lines.push(`    ${DIM}[${f.kind}]${retuned} ${f.message}${RESET}`);
   }
   // See a11y-contrast: an undisclosed cut makes a partial list look complete.
-  if (report.findings.length > CONSOLE_ROWS) {
-    lines.push(`    ${DIM}… ${report.findings.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
+  if (shown.length > CONSOLE_ROWS) {
+    lines.push(`    ${DIM}… ${shown.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
   }
   lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
   return lines.join("\n");

@@ -32,7 +32,7 @@ import {
   isGitRepo,
 } from "../run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "../terminal-colors.ts";
-import type { AnyGateDefinition, Finding, GateContext, GateDefinition } from "./contract.ts";
+import type { AnyGateDefinition, Finding, GateContext, GateDefinition, RuleView } from "./contract.ts";
 import { gateCommandString } from "./contract.ts";
 import type { AppliedRules, FindingCounts, RuleSettings } from "./rules.ts";
 import { RULE_SETTINGS, applyRuleSettings, countFindings, resolveRules } from "./rules.ts";
@@ -285,10 +285,17 @@ export async function runGate<Report, Options>(
   // The view, not the raw AppliedRules: a formatter should ask "what is this rule worth
   // now", not re-derive the runner's decisions and risk disagreeing with them.
   const resolved = resolveRules(gate, settings);
-  const ruleView = {
+  const ruleView: RuleView = {
     effective: (ruleId: string) => resolved.decisions.get(ruleId)?.effective
       ?? gate.rules.find((r) => r.id === ruleId)?.severity
       ?? "warn",
+    // `via` is what makes a decision explicit — `resolveRules` sets it only when a config key
+    // or a `--rule` flag matched. Without it the decision is just the gate's own table, which
+    // a formatter must NOT prefer over the severity its finding was emitted at.
+    setting: (ruleId: string) => {
+      const decision = resolved.decisions.get(ruleId);
+      return decision?.via ? decision.effective : undefined;
+    },
   };
   const prose = shared.json ? "" : [gate.format(report, ruleView), formatRuleNotes(gate, rules)].filter(Boolean).join("\n");
   timing.formatMs = round(performance.now() - tFormat);

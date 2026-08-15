@@ -28,6 +28,8 @@ import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type Page } from "playwright";
 import { DIM, RESET, GREEN, RED, YELLOW, BOLD, CYAN } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { applyRuleTiers, hiddenByRuleNote } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { type PageLoadOptions, pickPageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { openSource, resolveSource } from "@mizchi/vlmkit-core/page-open.ts";
@@ -287,14 +289,27 @@ export async function runI18nStress(
  * Terminal summary, extracted from the `!options.quiet` block inside
  * `runI18nStress`. A gate's `run` must not print — the core runner owns output.
  */
-export function formatI18nStressReport(report: I18nStressReport): string {
+export function formatI18nStressReport(report: I18nStressReport, rules?: RuleView): string {
   const lines: string[] = [];
   lines.push(`  ${BOLD}${CYAN}vlmkit stress i18n${RESET}`);
   lines.push(`  ${DIM}html: ${report.html}  inflate: ${report.inflateFactor}x${RESET}`);
-  const icon = report.overflowing.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
-  lines.push(`  ${icon} ${report.overflowing.length} overflow / wrap issue(s) across ${report.totalInspected} inspected element(s)`);
+  // `vertical-wrap` is the rule most often turned off on this gate — text is supposed to
+  // wrap — and turning it off used to leave every wrap row printed under a red ✗.
+  const { shown, hiddenByRule } = applyRuleTiers(
+    report.overflowing,
+    (o) => ({ rule: o.kind, emitted: o.kind === "vertical-wrap" ? "warn" : "suspect" }),
+    rules,
+  );
+  const icon = shown.length === 0
+    ? `${GREEN}✓${RESET}`
+    : shown.some((s) => s.tier === "suspect")
+      ? `${RED}✗${RESET}`
+      : shown.some((s) => s.tier === "warn") ? `${YELLOW}!${RESET}` : `${DIM}i${RESET}`;
+  lines.push(`  ${icon} ${shown.length} overflow / wrap issue(s) across ${report.totalInspected} inspected element(s)`);
+  const note = hiddenByRuleNote(hiddenByRule);
+  if (note) lines.push(`    ${DIM}${note}${RESET}`);
   const CONSOLE_ROWS = 6;
-  for (const o of report.overflowing.slice(0, CONSOLE_ROWS)) {
+  for (const { row: o } of shown.slice(0, CONSOLE_ROWS)) {
     const detail = o.kind === "horizontal-overflow"
       ? `scrollW ${o.after.scrollWidth.toFixed(0)} > clientW ${o.after.clientWidth.toFixed(0)}`
       : o.kind === "vertical-wrap"
@@ -305,8 +320,8 @@ export function formatI18nStressReport(report: I18nStressReport): string {
   // This gate kept its silent cut when the other three were fixed: the
   // 2026-08-02 truncation pass added `--json` here but not the notice, so a
   // seventh issue still vanished without a trace.
-  if (report.overflowing.length > CONSOLE_ROWS) {
-    lines.push(`    ${DIM}… ${report.overflowing.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
+  if (shown.length > CONSOLE_ROWS) {
+    lines.push(`    ${DIM}… ${shown.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
   }
   lines.push(`  ${DIM}report: ${report.reportPath}${RESET}`);
   return lines.join("\n");

@@ -33,6 +33,8 @@ import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { evaluateA11yContrast } from "./markup-core-a11y-contrast.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { applySelectorAllowRules, parseSelectorAllowRules } from "./inspect/selector-exemption.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 
 export interface A11yContrastOptions extends PageLoadOptions {
   /**
@@ -319,24 +321,36 @@ export async function runA11yContrast(
  * measurement function. A gate's `run` must not print: the core runner owns
  * output, and `--json` is its decision to make, not the measurement's.
  */
-export function formatA11yContrastReport(report: A11yContrastReport): string {
+export function formatA11yContrastReport(report: A11yContrastReport, rules?: RuleView): string {
   const lines: string[] = [];
   lines.push(`  ${BOLD}${CYAN}vlmkit check a11y contrast${RESET}`);
   lines.push(`  ${DIM}html: ${report.html}${RESET}`);
   lines.push(`  ${DIM}inspected ${report.totalText} text-bearing element(s)${RESET}`);
-  const icon = report.failures.length === 0 ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
+  // `--rule contrast-below-aa=off` used to change the exit code and nothing on this screen.
+  // The measured count survives the rule being off, because the ratios were still measured;
+  // what changes is that they are not reported as failures.
+  const tier = ruleTier(rules, "contrast-below-aa", "suspect");
+  const off = tier === "off";
+  const icon = off
+    ? `${DIM}-${RESET}`
+    : report.failures.length === 0
+      ? `${GREEN}✓${RESET}`
+      : tier === "suspect" ? `${RED}✗${RESET}` : tier === "warn" ? `${YELLOW}!${RESET}` : `${DIM}i${RESET}`;
   lines.push(
     `  ${icon} ${report.failures.length} contrast failure(s)`
+    + (off
+      ? `${DIM} measured and NOT reported — contrast-below-aa is off${RESET}`
+      : tier === "suspect" ? "" : `${DIM} [contrast-below-aa re-tuned to ${tier}]${RESET}`)
     + `${report.exempted?.length ? `${DIM}, ${report.exempted.length} exempted${RESET}` : ""}`,
   );
   const CONSOLE_ROWS = 5;
-  for (const f of report.failures.slice(0, CONSOLE_ROWS)) {
+  for (const f of off ? [] : report.failures.slice(0, CONSOLE_ROWS)) {
     lines.push(`    ${DIM}${f.path} — ${f.ratio.toFixed(2)}:1 (need ${f.requiredAA}) — \`${f.foreground.hex}\` on \`${f.background.hex}\` — "${f.text}"${RESET}`);
   }
   // Disclose the cut: a headline count above a five-row list reads as "here they
   // are", and a reader has no way to know seven more exist. Same wording as
   // `check breakpoints` and `check integrity`.
-  if (report.failures.length > CONSOLE_ROWS) {
+  if (!off && report.failures.length > CONSOLE_ROWS) {
     lines.push(`    ${DIM}… ${report.failures.length - CONSOLE_ROWS} more (see the report, or --json for all)${RESET}`);
   }
   // Listed, never merely subtracted.

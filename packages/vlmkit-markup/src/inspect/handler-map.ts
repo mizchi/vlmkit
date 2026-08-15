@@ -34,6 +34,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { type PageLoadOptions, applyHar, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
@@ -3185,7 +3186,11 @@ export function formatHandlerSurface(
   lines.push(`${BOLD}${CYAN}vlmkit scan handlers${RESET}`);
   lines.push(`${DIM}source: ${surface.source}${RESET}`);
   lines.push("");
-  const effective = (i: HandlerIssue) => rules?.effective(i.kind) ?? i.severity;
+  // `ruleTier`, not `rules.effective`: the latter falls back to the rule TABLE, which agrees
+  // with the emitted severity for all 21 kinds here today (checked) and would stop agreeing
+  // the first time a kind grades on evidence, as three of `check integrity`'s do. Going
+  // through the shared helper means this formatter cannot acquire that bug quietly.
+  const effective = (i: HandlerIssue) => ruleTier(rules, i.kind, i.severity);
   issues = issues.filter((i) => effective(i) !== "off");
   const suspects = issues.filter((i) => effective(i) === "suspect").length;
   // `ok` only when there is nothing at all. It used to print green beside a warn,

@@ -1618,6 +1618,31 @@ npm install した vlmkit には spec が同梱されず `HARNESS_ROOT` はど�
   - `tests/package-test-scripts.test.mjs` で pin。script の**形**だけを見る
     (8スイートは走らせない = root の `pnpm test`)。`node --test` に戻す / パスを
     間違える、両方の改変で落ちることを確認した。
+- [x] **gate の prose が rule 設定を読まない問題を 3/27 → 11/27 に**
+  - 対象は fixture ページで実際に finding を出す8つ(`bench gates` で確認):
+    a11y touch(45) / tokens(29) / theme(9) / media(3) / a11y contrast(2) / a11y focus(2) /
+    i18n(2) / design(1)。`--rule x=off` が exit code だけ変えて画面は変わらない状態だった
+    (touch は 45件を赤い ✗ で全部出したまま verdict は緑)。
+  - **計測値は残し、grade だけ落とす**方針。「45件は誰も見たくないから消える」わけではないし、
+    数字を消すと**意図的な設定が黙って測定を減らしたように見える**。行と ✗ は消える。
+  - `src/cli/gate-registry.test.ts` に **migrated / not-migrated を名前で両方 assert**。
+    片方だけだと移行時に静かに数字が動く。
+- [x] **その作業で、先行して rule-aware だった `check integrity` の欠陥が出た**
+  - post-load throw のページで、隣り合う2行が矛盾:
+    `verdict: DEFECTS (1 fail, 0 warn)` の直下に `exits 0 — 1 warn(s)`。
+  - 原因は `RuleView.effective` が**gate の宣言テーブルにフォールバック**すること。
+    `applyRuleSettings` は「明示設定がある時だけ re-tune」= 証拠で severity を決める gate の
+    判断を残す設計で、integrity は `js-error`(構築中 fail / load後 warn)、`text-clipped`、
+    `degenerate-render` の3つがそれをやる。formatter だけが宣言値に戻していた。
+  - `RuleView` に `setting(ruleId)`(明示設定 or undefined)を追加。**`effective` では
+    「未設定」を表現できない**のが本質。共通化して `plugin/rule-tier.ts`
+    (`ruleTier` / `applyRuleTiers` / `hiddenByRuleNote` / `ruleViewFrom`)。
+  - **テストが1度 vacuous だった**: 最初に書いた js-error テストは、stub の fallback を
+    `warn` にしていたので ablation で緑のまま。fallback は**テーブルの値**(= suspect)を
+    渡さなければ意味がない。直して ablation で赤を確認。
+  - 副産物: tokens / theme が warn 相当の finding を赤 ✗ で出していた(runner は
+    `exits 0 — N warn(s)` と書く)。tokens `--strict` は逆に赤に戻す必要があり、
+    report に `strict` を echo(テーブルに無い severity で emit する唯一の gate)。
 - [x] **`CLAUDE.md` の cross-package import 指示が解決しないパッケージ名だった**
   - `@mizchi/vrt-<pkg>` は 0.6 以降どのパッケージの名前でもない。
     この行を読んで書いた import は解決しない。dist 解決の罠も同じ場所に書いた。

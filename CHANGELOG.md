@@ -1026,6 +1026,35 @@ suppression works per *rule* instead of per whole gate.
 
 ### Fixed
 
+- **`check integrity` printed `DEFECTS (1 fail, 0 warn)` directly above the runner's
+  `exits 0 — 1 warn(s)`.** Found while giving eight more gates rule-aware prose, in the one gate
+  that already had it. Its formatter asked the rule view for a rule's *effective* severity, which
+  falls back to the severity the gate DECLARED — but `applyRuleSettings` re-tunes a finding only
+  when there is an explicit setting, precisely so a gate can grade on evidence. This gate does:
+  `js-error` is a fail during construction and a warn after load, and `text-clipped` and
+  `degenerate-render` grade the same way, so three rules rendered one severity and exited on
+  another. Reproduced on a page whose script throws inside a post-load `setTimeout`.
+  - `RuleView` gained `setting(ruleId)` — the explicit setting, or `undefined` when nobody set
+    one. That is the question a formatter has to ask; `effective` cannot express "unset" at all.
+  - New `@mizchi/vlmkit-core/plugin/rule-tier.ts`: `ruleTier(rules, id, emitted)`,
+    `applyRuleTiers` for row lists, `hiddenByRuleNote` for the disclosure line, and
+    `ruleViewFrom` so a test stub cannot re-introduce the lossy half.
+
+- **Eight more gates render their rule settings in their own prose** — `check a11y touch`,
+  `check a11y contrast`, `check a11y focus`, `check tokens`, `check theme`, `check design`,
+  `stress i18n`, `stress media` — taking the total from 3 of 27 to 11. `--rule x=off` used to
+  change the exit code and nothing on the screen: `check a11y touch` printed all 45 findings with
+  a red ✗ over a green verdict. Now the measured count survives (45 targets do not stop existing
+  because nobody wants to be told about them) while the rows and the failure marker do not, and a
+  re-tune to `warn`/`info` re-labels rather than silences. `src/cli/gate-registry.test.ts` asserts
+  the migrated and un-migrated lists by name.
+  - Two related corrections fell out of it: `check tokens` and `check theme` printed a red ✗ for
+    findings that are warns by default, under the runner's own `exits 0 — N warn(s)`; and
+    `check tokens --strict` (which emits its findings as suspects, a severity its rule table does
+    not carry) now marks them as failures again, via a `strict` echo in its report.
+  - `check design` no longer prints "No design drift detected." when the drift was found and
+    silenced — that sentence would be false, and it is the one line a reader quotes back.
+
 - **Every workspace package's `test` script failed every test it selected.** The suite moved
   from `node:test` to vitest, but only the root script was migrated: all eight packages kept
   `node --test 'src/**/*.test.ts'`, and all 148 test files under `packages/` import from

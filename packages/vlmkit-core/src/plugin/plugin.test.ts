@@ -404,6 +404,31 @@ describe("runGate", () => {
     assert.doesNotMatch(clean.text, /suppressed by rule settings/);
   });
 
+  it("the rule view tells an EXPLICIT setting apart from the gate's own table", async () => {
+    // The distinction the view was missing, and it is the one a formatter needs. `effective`
+    // answers for every rule by falling back to the table, so a formatter using it renders a
+    // finding at the DECLARED severity — while the runner keeps the severity the finding was
+    // EMITTED at unless a setting says otherwise. `odd-thing` below is declared warn and
+    // emitted warn; `bad-thing` is declared suspect. Only the flag'd one has a `setting`.
+    let seen: { setting: unknown; effective: unknown } | undefined;
+    const outcome = await runGate(
+      fakeGate({
+        format: (_report, rules) => {
+          seen = {
+            setting: [rules?.setting("bad-thing"), rules?.setting("odd-thing")],
+            effective: [rules?.effective("bad-thing"), rules?.effective("odd-thing")],
+          };
+          return "fake";
+        },
+      }),
+      ["page.html", "--strict", "--rule", "bad-thing=info"],
+      { ledger: false },
+    );
+    assert.equal(outcome.exitCode, 0);
+    assert.deepEqual(seen?.setting, ["info", undefined], "only the flag'd rule has a setting");
+    assert.deepEqual(seen?.effective, ["info", "warn"], "effective invents one from the table");
+  });
+
   it("rejects a --rule naming this gate and a rule it does not have", async () => {
     // A typo that silences nothing is the exact failure mode rule settings
     // exist to remove, so it fails the run rather than being ignored.

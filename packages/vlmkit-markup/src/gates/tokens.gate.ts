@@ -130,6 +130,11 @@ suspect for one run; "rules" in vlmkit.gates.json does it permanently.`,
       outputDir: options.outputDir,
       ...(options.reportPath ? { reportPath: options.reportPath } : {}),
       config: { ...fileConfig, ...options.config },
+      // Carried into the report only so the PROSE can agree with the exit code. `--strict`
+      // is the one flag in this repo that changes a finding's severity at `findings` time,
+      // which the rule table cannot see: with the table's `warn` the formatter printed a
+      // yellow `!` next to `29 finding(s)` on a run that exits 1.
+      strict: options.strict,
       ...pickPageLoad(options),
     });
   },

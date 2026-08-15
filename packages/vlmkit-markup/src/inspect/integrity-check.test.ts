@@ -19,6 +19,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
+import { ruleViewFrom } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import {
   classifyRuntimeEvents,
   findTextCollisions,
@@ -254,9 +255,11 @@ describe("pure judges", () => {
         { kind: "low-contrast-text", severity: "warn" as const, viewport: 1280, message: "2.81:1" },
       ],
     };
-    const view = (setting: "off" | "info" | "warn" | "suspect") => ({
-      effective: (ruleId: string) => (ruleId === "low-contrast-text" ? setting : "suspect") as never,
-    });
+    // Only `low-contrast-text` is set. Every other rule is unset, which is the case the old
+    // stub could not express — it answered `suspect` for all of them, so the formatter read the
+    // table instead of the emitted severity and nothing here noticed.
+    const view = (setting: "off" | "info" | "warn" | "suspect") =>
+      ruleViewFrom({ "low-contrast-text": setting });
 
     const off = plain(formatIntegrityReport(report as never, view("off")));
     assert.doesNotMatch(off, /low-contrast-text/, "an `off` rule must not be printed");
@@ -275,6 +278,42 @@ describe("pure judges", () => {
     const bare = plain(formatIntegrityReport(report as never));
     assert.match(bare, /1 fail, 1 warn/);
     assert.match(bare, /low-contrast-text/);
+  });
+
+  test("a finding emitted below its rule's declared severity is printed at the severity it was emitted at", () => {
+    // Measured, on a page whose script throws inside a post-load `setTimeout`:
+    //
+    //     verdict: DEFECTS (1 fail, 0 warn, 0 exempted)
+    //       exits 0 — 1 warn(s) did not fail this command.
+    //
+    // Two adjacent lines, one from this formatter and one from the runner. `js-error` is
+    // DECLARED suspect and this measurement deliberately emits it as a warn after load (the
+    // initial render survived); `applyRuleSettings` keeps that judgement because no setting
+    // overrode it, while the formatter asked the rule view for the rule's *effective*
+    // severity — which falls back to the declared one. `text-clipped` and `degenerate-render`
+    // grade the same way, so this was three rules wide.
+    const report = {
+      source: "page.html",
+      verdict: "defects" as const,
+      viewports: [],
+      exempted: [],
+      findings: [
+        { kind: "js-error", severity: "warn" as const, viewport: 1280, message: "Uncaught after load" },
+      ],
+    };
+    // `"suspect"` is the fallback because it is what `js-error` is DECLARED as in the gate's
+    // rule table, and `RuleView.effective` falls back to exactly that. A stub defaulting to
+    // `warn` here would agree with the emitted severity by accident and let the bug back in —
+    // checked by reverting the formatter to `effective` and watching this stay green.
+    const shown = plain(formatIntegrityReport(report as never, ruleViewFrom({}, "suspect")));
+    assert.match(shown, /0 fail, 1 warn/, "the emitted severity survives an empty rule view");
+    assert.match(shown, /NO DEFECTS, 1 WARN/);
+    assert.match(shown, /^\s+! \[js-error\]/m, "and the row is marked as a warning");
+
+    // An explicit setting still wins — that is the half that was already right.
+    const promoted = plain(formatIntegrityReport(report as never, ruleViewFrom({ "js-error": "suspect" })));
+    assert.match(promoted, /1 fail, 0 warn/);
+    assert.match(promoted, /DEFECTS/);
   });
 
   test("judgeTextContrast: one finding per colour pair, not per element", () => {
