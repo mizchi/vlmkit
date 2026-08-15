@@ -79,7 +79,7 @@ describe("composed built-in registry", () => {
     }
   });
 
-  it("declares 157 tunable rules in total", async () => {
+  it("declares 163 tunable rules in total", async () => {
     // A canary, not a target: a gate losing its rule table to a bad merge is
     // otherwise invisible until someone tries to tune it.
     // 119 → 120 when `check copy` gained `copy-truncated` (element-rect mode, vlmkit#118).
@@ -156,8 +156,15 @@ describe("composed built-in registry", () => {
     //       come from the stylesheets as well as the listeners, because the common form is a CSS
     //       `:hover` rule with no listener anywhere — and for the same reason the finding is emitted
     //       from the probe rows rather than the per-element loop.
+    // 157 → 163: three rules, on both gates. `contextmenu-not-prevented` — a real right-click ran
+    //       the handler and nothing cancelled, so the browser's own menu opens too.
+    //       `contextmenu-replaces-nothing` (warn) — cancelled and nothing became visible, leaving
+    //       the user with neither menu; warn because the replacement may be drawn where this cannot
+    //       see it. `touch-handlers-not-invoked` — the touch twin of `pointer-drag-intercepted`,
+    //       driven in a page of its own because touch emulation changes `maxTouchPoints` and
+    //       `"ontouchstart" in window`, which a page branches on.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 157);
+    assert.equal(total, 163);
   });
 
   it("gives every built-in gate a category", async () => {

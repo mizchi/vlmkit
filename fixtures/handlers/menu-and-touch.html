@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Right-click, and touch</title>
+<!--
+  `vlmkit scan handlers <this> --probe menu,touch`.
+
+  **Right-click.** A real secondary click, with `defaultPrevented` read AFTER the page's handlers
+  have run — before them it is always false and says nothing about the page:
+
+    element          handler ran   cancelled   revealed   verdict
+    #ctxOk               yes          yes       #menu      the contract
+    #ctxNoPrevent        yes          NO        -          contextmenu-not-prevented
+    #ctxNothing          yes          yes       -          contextmenu-replaces-nothing (warn)
+
+  `#ctxNothing` is a warn and not a suspect on purpose: the replacement may be drawn somewhere this
+  cannot see — a canvas, or a portal positioned offscreen until it is placed — and suppressing the
+  browser menu deliberately is a choice a page may make. `#ctxNoPrevent` needs no such caution: the
+  browser's own menu opens on top of whatever the page wanted to show.
+
+  **Touch.** Driven in a page of its own, because turning touch emulation on changes what the page
+  sees: `navigator.maxTouchPoints` goes 0 -> 1 and `"ontouchstart" in window` becomes true, which is
+  exactly what a page branches on to decide it is on a phone. Measured, and the reason the other
+  families do not share that page.
+
+    element        tap invoked   swipe changed   verdict
+    #swipe             2            ~3%           the contract (a dot that follows the finger)
+    #tapOnly           1             -            the control: reachable, and its handler runs
+    #tapCovered        0             -            touch-handlers-not-invoked
+
+  #tapCovered is the touch twin of `pointer-drag-intercepted`: registered, the tap landed on its own
+  box, and nothing ran. The overlay is a SIBLING — a child would bubble to the pad and the handler
+  would run.
+
+  The swipe number is reported and not graded, the same as the pointer-drag numbers: 0% has several
+  explanations (feedback drawn outside the box, a gesture that needs a longer path, a deliberate
+  no-op) and 0 invocations has one.
+-->
+<style>
+  body { font: 15px/1.4 system-ui, sans-serif; padding: 16px; display: flex; gap: 12px; flex-wrap: wrap; }
+  .box { width: 150px; height: 74px; background: #eceff4; padding: 6px; }
+  .box.broken { background: #fbeaea; }
+  #menu { display: none; position: absolute; background: #fff; border: 1px solid #999; padding: 4px 10px; }
+  .pad { width: 140px; height: 96px; background: #e7f2e7; touch-action: none; position: relative; }
+  .pad.broken { background: #fbeaea; }
+  .dot { width: 20px; height: 20px; background: #1a6ed8; position: absolute; left: 8px; top: 8px; }
+</style>
+</head>
+<body>
+
+<div class="box" id="ctxOk">right-click: custom menu</div>
+<div class="box broken" id="ctxNoPrevent">right-click: no preventDefault</div>
+<div class="box broken" id="ctxNothing">right-click: cancels, shows nothing</div>
+<div id="menu">Cut / Copy / Paste</div>
+
+<div class="pad" id="swipe"><div class="dot" id="d"></div></div>
+<div class="pad" id="tapOnly">tap only</div>
+<div style="position: relative">
+  <div class="pad broken" id="tapCovered">tap, covered</div>
+  <!-- A sibling, not a child: a child would bubble to the pad and the handler would run. -->
+  <div id="veil" style="position: absolute; inset: 0; background: rgba(0,0,0,0.001)"></div>
+</div>
+
+<script>
+  const menu = document.getElementById("menu");
+
+  // The contract: cancel the browser's menu, show your own.
+  document.getElementById("ctxOk").addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    menu.style.display = "block";
+  });
+
+  // Forgot the cancel, so the browser's menu opens as well.
+  document.getElementById("ctxNoPrevent").addEventListener("contextmenu", () => { void 0; });
+
+  // Cancelled the browser's menu and shows nothing: the user right-clicks and gets nothing at all.
+  document.getElementById("ctxNothing").addEventListener("contextmenu", (e) => e.preventDefault());
+
+  // A working touch drag: the dot follows the finger.
+  const pad = document.getElementById("swipe");
+  const dot = document.getElementById("d");
+  let held = false;
+  pad.addEventListener("touchstart", () => { held = true; });
+  pad.addEventListener("touchmove", (e) => {
+    if (!held) return;
+    const t = e.touches[0];
+    const r = pad.getBoundingClientRect();
+    dot.style.left = (t.clientX - r.left - 10) + "px";
+    dot.style.top = (t.clientY - r.top - 10) + "px";
+  });
+  pad.addEventListener("touchend", () => { held = false; });
+
+  // The control, and the defect: identical registrations, one of them under a veil.
+  document.getElementById("tapOnly").addEventListener("touchstart", () => { void 0; });
+  document.getElementById("tapCovered").addEventListener("touchstart", () => { void 0; });
+</script>
+</body>
+</html>

@@ -40,7 +40,7 @@ import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/
 import { DISCOVER_SCRIPT } from "./interaction-map.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { PNG } from "pngjs";
-import type { ElementHandle, JSHandle, Page } from "playwright";
+import type { Browser, ElementHandle, JSHandle, Page } from "playwright";
 
 export interface HandlerSurfaceEntry {
   /** Handler types on ancestors that also carry handlers (delegation). */
@@ -131,6 +131,10 @@ export interface HandlerSurface {
   wheelProbe?: WheelProbe[];
   /** Present only when the `hover` family was driven. Absent means "not measured". */
   hoverProbe?: HoverProbe[];
+  /** Present only when the `menu` family was driven. Absent means "not measured". */
+  menuProbe?: MenuProbe[];
+  /** Present only when the `touch` family was driven. Absent means "not measured". */
+  touchProbe?: TouchProbe[];
   /** Stylesheets the hover probe could not read (another origin), and triggers left unvisited. */
   hoverProbeLimits?: { unreadableSheets: number; capped: number };
   /**
@@ -1258,6 +1262,196 @@ async function probeRealDrags(
 }
 
 /**
+ * What a real touch did to an element wired for touch.
+ *
+ * Driven in a page of its own, with touch emulation on, and that separation is measured rather
+ * than stylistic: turning it on takes `navigator.maxTouchPoints` from 0 to 1 and makes
+ * `"ontouchstart" in window` true, which is exactly what a page branches on to decide it is on a
+ * phone. Every other family would then be measuring a different page.
+ *
+ * Two things are read per element:
+ *
+ *   - a **tap**, and how many of the element's own listeners it invoked. Zero with the tap landing
+ *     on its box is the same unambiguous outcome `pointer-drag-intercepted` grades: something is on
+ *     top. Measured — a pad under a transparent sibling logged nothing while its neighbour logged
+ *     its handler.
+ *   - a **swipe**, for elements with `touchmove`, and how much of the element changed. Reported,
+ *     not graded, for the same reason the pointer-drag numbers are: 0% has several explanations.
+ */
+export interface TouchProbe {
+  path: string;
+  text: string;
+  /** Invocations of the element's own listeners during the tap. */
+  tapCalls: number;
+  /** Fraction of the element's pixels that changed during a swipe, when it handles `touchmove`. */
+  swipeRatio?: number;
+  error?: string;
+}
+
+/**
+ * Tap, and swipe, in a touch-enabled page.
+ *
+ * The page is loaded a second time. That is the cost of not lying about the environment, and it is
+ * paid only when `--probe touch` is asked for.
+ */
+async function probeTouches(
+  browser: Browser,
+  options: HandlerSurfaceOptions,
+  elements: readonly HandlerSurfaceEntry[],
+): Promise<TouchProbe[]> {
+  const targets = elements.filter((e) =>
+    e.visible && (e.types["touchstart"] || e.types["touchend"] || e.types["touchmove"]));
+  if (targets.length === 0) return [];
+  const page = await browser.newPage(withAuthState({
+    viewport: { width: 1280, height: 800 },
+    hasTouch: true,
+  }, options.storageState));
+  const out: TouchProbe[] = [];
+  try {
+    await page.addInitScript(HANDLER_INVOCATION_PATCH_SCRIPT);
+    await page.addInitScript(HANDLER_PATCH_SCRIPT);
+    const url = /^(https?|file):\/\//.test(options.source)
+      ? options.source
+      : pathToFileURL(resolve(options.source)).href;
+    await applyHar(page, options.har);
+    await page.goto(url, navigationOptions(options, "load"));
+    await settlePage(page);
+    await page.evaluate(DISCOVER_SCRIPT);
+    const cdp = await page.context().newCDPSession(page);
+    const touchPoint = (x: number, y: number) => [{ x, y, radiusX: 4, radiusY: 4, force: 1, id: 1 }];
+    for (const entry of targets) {
+      const row: TouchProbe = { path: entry.path, text: entry.text, tapCalls: 0 };
+      try {
+        const el = (await handleForPath(page, entry.path)).asElement();
+        if (!el) { row.error = "element not found for its own path"; out.push(row); continue; }
+        const box = await el.boundingBox();
+        if (!box || box.width < 4 || box.height < 4) { row.error = "no usable box"; out.push(row); continue; }
+        await page.evaluate((node) => (window as unknown as {
+          __vlmkitResetCalls?: (n: Element) => void;
+        }).__vlmkitResetCalls?.(node as Element), el);
+        await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+        await page.waitForTimeout(80);
+        const calls = await page.evaluate((node) => (window as unknown as {
+          __vlmkitCallCount?: (n: Element) => number;
+        }).__vlmkitCallCount?.(node as Element), el);
+        if (typeof calls === "number") row.tapCalls = calls;
+
+        if (entry.types["touchmove"]) {
+          // Playwright's touchscreen only taps, so the swipe goes through CDP directly.
+          const before = await el.screenshot().catch(() => null);
+          await cdp.send("Input.dispatchTouchEvent", {
+            type: "touchStart",
+            touchPoints: touchPoint(box.x + box.width * 0.25, box.y + box.height * 0.25),
+          });
+          for (let i = 1; i <= 5; i++) {
+            await cdp.send("Input.dispatchTouchEvent", {
+              type: "touchMove",
+              touchPoints: touchPoint(
+                box.x + box.width * (0.25 + 0.1 * i),
+                box.y + box.height * (0.25 + 0.08 * i),
+              ),
+            });
+          }
+          await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+          await page.waitForTimeout(120);
+          const after = before ? await el.screenshot().catch(() => null) : null;
+          if (before && after) row.swipeRatio = pixelDelta(before, after);
+        }
+      } catch (err) {
+        row.error = err instanceof Error ? err.message.slice(0, 120) : String(err).slice(0, 120);
+      }
+      out.push(row);
+    }
+  } finally {
+    await page.close().catch(() => {});
+  }
+  return out;
+}
+
+/**
+ * What a real right-click on a `contextmenu` handler did.
+ *
+ * Three outcomes, all measured on the fixture, and two of them are defects:
+ *
+ *     element          handler ran   cancelled   revealed
+ *     #ctxOk               yes         yes       #menu        the contract
+ *     #ctxNoPrevent        yes         NO        -            the browser's own menu still opens
+ *     #ctxNothing          yes         yes       -            the native menu is gone, nothing replaces it
+ *
+ * `cancelled` is read after the page's handlers have run, the same bubble-phase trick the drag
+ * probe uses for `dragover`: before them it is always false and says nothing about the page.
+ */
+export interface MenuProbe {
+  path: string;
+  text: string;
+  /** How many of the element's own listeners ran. Zero means the right-click never reached it. */
+  handlerCalls: number;
+  /** Did a listener cancel the event, read after the page's handlers ran? */
+  prevented: boolean;
+  /** Elements that became visible, as `path|text` labels. */
+  revealed: string[];
+  error?: string;
+}
+
+/** Records `contextmenu` in the bubble phase, where `defaultPrevented` is the page's answer. */
+const MENU_RECORDER_SCRIPT = String.raw`
+(() => {
+  const w = window;
+  w.__vlmkitMenuLog = [];
+  if (!w.__vlmkitMenuRecorder) {
+    w.__vlmkitMenuRecorder = true;
+    document.addEventListener("contextmenu", (e) => {
+      w.__vlmkitMenuLog.push({ prevented: e.defaultPrevented });
+    }, false);
+  }
+  return true;
+})()
+`;
+
+async function probeMenus(
+  page: Page,
+  elements: readonly HandlerSurfaceEntry[],
+): Promise<MenuProbe[]> {
+  const targets = elements.filter((e) => e.visible && e.types["contextmenu"]);
+  if (targets.length === 0) return [];
+  await page.evaluate(MENU_RECORDER_SCRIPT);
+  const out: MenuProbe[] = [];
+  const snapshot = async () => new Set(await page.evaluate(VISIBLE_SNAPSHOT_SCRIPT) as string[]);
+  for (const entry of targets) {
+    const row: MenuProbe = { path: entry.path, text: entry.text, handlerCalls: 0, prevented: false, revealed: [] };
+    try {
+      const el = (await handleForPath(page, entry.path)).asElement();
+      if (!el) { row.error = "element not found for its own path"; out.push(row); continue; }
+      const box = await el.boundingBox();
+      if (!box || box.width < 4 || box.height < 4) { row.error = "no usable box"; out.push(row); continue; }
+      // Escape first: a menu left open by the previous target would still be visible and would
+      // read as this one's reveal.
+      await page.keyboard.press("Escape");
+      await page.mouse.move(0, 0);
+      await page.waitForTimeout(60);
+      const base = await snapshot();
+      await page.evaluate("(() => { window.__vlmkitMenuLog = []; return true; })()");
+      await page.evaluate((node) => (window as unknown as {
+        __vlmkitResetCalls?: (n: Element) => void;
+      }).__vlmkitResetCalls?.(node as Element), el);
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button: "right" });
+      await page.waitForTimeout(100);
+      row.revealed = [...await snapshot()].filter((label) => !base.has(label));
+      const log = await page.evaluate("window.__vlmkitMenuLog") as { prevented: boolean }[];
+      row.prevented = log.some((r) => r.prevented);
+      const calls = await page.evaluate((node) => (window as unknown as {
+        __vlmkitCallCount?: (n: Element) => number;
+      }).__vlmkitCallCount?.(node as Element), el);
+      if (typeof calls === "number") row.handlerCalls = calls;
+    } catch (err) {
+      row.error = err instanceof Error ? err.message.slice(0, 120) : String(err).slice(0, 120);
+    }
+    out.push(row);
+  }
+  return out;
+}
+
+/**
  * What hovering an element revealed, and whether focusing it revealed the same thing.
  *
  * WCAG 1.4.13 and 2.1.1: content that appears on hover has to appear on keyboard focus too, or the
@@ -1520,7 +1714,7 @@ function pixelDelta(a: Buffer, b: Buffer): number {
  * and `wheel` fire the page's own handlers; `input` puts text into fields. A page whose drop
  * handler POSTs will POST, so the default stays an inventory that presses nothing.
  */
-export const PROBE_FAMILIES = ["drag", "wheel", "hover"] as const;
+export const PROBE_FAMILIES = ["drag", "wheel", "hover", "menu", "touch"] as const;
 export type ProbeFamily = typeof PROBE_FAMILIES[number];
 
 export interface HandlerSurfaceOptions extends PageLoadOptions {
@@ -1593,6 +1787,14 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
       : undefined;
     const wheelProbe = probes.has("wheel") ? await probeWheels(page, raw.elements) : undefined;
     const hover = probes.has("hover") ? await probeHovers(page, raw.elements) : undefined;
+    const menuProbe = probes.has("menu") ? await probeMenus(page, raw.elements) : undefined;
+    // A separate page, because touch emulation changes what the page sees: `navigator
+    // .maxTouchPoints` goes 0 -> 1 and `"ontouchstart" in window` false -> true, both of which real
+    // apps branch on. Measured, and the reason this does not just add `hasTouch` to the page every
+    // other family uses.
+    const touchProbe = probes.has("touch")
+      ? await probeTouches(browser, options, raw.elements)
+      : undefined;
     // Every element whose handler called preventDefault during this run, with whether the call had
     // an effect. Asked per element because a WeakMap cannot be enumerated; only for elements that
     // have handlers at all, which is every entry in the surface.
@@ -1641,6 +1843,8 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
       ...(unreachableTargets.length > 0 ? { unreachableTargets } : {}),
       ...(wheelProbe && wheelProbe.length > 0 ? { wheelProbe } : {}),
       ...(hover && hover.rows.length > 0 ? { hoverProbe: hover.rows } : {}),
+      ...(menuProbe && menuProbe.length > 0 ? { menuProbe } : {}),
+      ...(touchProbe && touchProbe.length > 0 ? { touchProbe } : {}),
       ...(hover && (hover.unreadableSheets > 0 || hover.capped > 0)
         ? { hoverProbeLimits: { unreadableSheets: hover.unreadableSheets, capped: hover.capped } }
         : {}),
@@ -1799,7 +2003,8 @@ export interface HandlerIssue {
     | "dragover-not-prevented" | "dragstart-transfers-nothing" | "pointer-drag-intercepted"
     | "drag-source-inert" | "drop-target-unreachable" | "drag-cancel-not-reverted"
     | "drag-source-detached-mid-drag" | "dragover-handler-slow" | "passive-listener-cannot-cancel"
-    | "hover-only-reveal";
+    | "hover-only-reveal" | "contextmenu-not-prevented" | "contextmenu-replaces-nothing"
+    | "touch-handlers-not-invoked";
   severity: "warn" | "suspect";
   element: string;
   message: string;
@@ -1891,6 +2096,39 @@ export const HANDLER_SURFACE_RULES = [
         + " `drag-source-not-draggable`, which reads the `draggable` property and reports the"
         + " one case that IS statically visible; this covers the ones that are not, and which"
         + " the synthetic dispatch reports as working. Requires --probe-drag.",
+    },
+    {
+      id: "contextmenu-not-prevented",
+      title: "A contextmenu handler that lets the browser menu open too",
+      severity: "suspect",
+      docs:
+        "Driven: a real right-click ran the handler and nothing cancelled the event, so the browser's"
+        + " own menu opens as well as whatever the page wanted to show. Read after the page's"
+        + " handlers have run — before them `defaultPrevented` is always false and says nothing."
+        + " Requires --probe menu.",
+    },
+    {
+      id: "contextmenu-replaces-nothing",
+      title: "A contextmenu handler that cancels the browser menu and shows nothing",
+      severity: "warn",
+      docs:
+        "The right-click was cancelled and nothing became visible, so the user right-clicks and gets"
+        + " nothing at all — worse off than with the browser's menu. Warn rather than suspect: the"
+        + " replacement may be drawn somewhere this cannot see (a canvas, a portal positioned"
+        + " offscreen until placed), and suppressing the menu deliberately is a choice a page is"
+        + " allowed to make. Requires --probe menu.",
+    },
+    {
+      id: "touch-handlers-not-invoked",
+      title: "Touch handlers a real tap never invoked",
+      severity: "suspect",
+      docs:
+        "Registered, the tap landed on the element's own box, and none of its listeners ran — the"
+        + " same unambiguous outcome `pointer-drag-intercepted` grades, for touch. Something is"
+        + " between the finger and the listener: an overlay, `pointer-events` on an ancestor, a"
+        + " listener on a detached node. Driven in a page with touch emulation on, which is a"
+        + " different environment from the rest of the run and reported as such. Requires"
+        + " --probe touch.",
     },
     {
       id: "hover-only-reveal",
@@ -2025,6 +2263,22 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
     for (const row of surface.realDragProbe) {
       if (row.error) continue;
       for (const t of row.observedTypes ?? []) probedThisRun.add(t);
+    }
+  }
+  if (surface.menuProbe) {
+    for (const row of surface.menuProbe) {
+      if (!row.error && row.handlerCalls > 0) probedThisRun.add("contextmenu");
+    }
+  }
+  if (surface.touchProbe) {
+    for (const row of surface.touchProbe) {
+      if (row.error) continue;
+      for (const t of ["touchstart", "touchend", "touchcancel"]) {
+        if (row.tapCalls > 0 && surface.elements.some((e) => e.path === row.path && e.types[t])) {
+          probedThisRun.add(t);
+        }
+      }
+      if (row.swipeRatio !== undefined) probedThisRun.add("touchmove");
     }
   }
   if (surface.hoverProbe) {
@@ -2380,6 +2634,41 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
       });
     }
   }
+  for (const row of surface.menuProbe ?? []) {
+    if (row.error || row.handlerCalls === 0) continue;
+    if (!row.prevented) {
+      issues.push({
+        kind: "contextmenu-not-prevented",
+        severity: "suspect",
+        element: `${row.path} "${row.text}"`,
+        message: `${row.path} "${row.text}" ran its contextmenu handler on a real right-click and `
+          + `nothing cancelled the event, so the browser's own menu opens too — the page's menu is at `
+          + `best beside it. Call e.preventDefault() in the handler.`,
+      });
+    } else if (row.revealed.length === 0) {
+      issues.push({
+        kind: "contextmenu-replaces-nothing",
+        severity: "warn",
+        element: `${row.path} "${row.text}"`,
+        message: `${row.path} "${row.text}" cancelled the right-click and nothing became visible, so `
+          + `a user right-clicking here gets nothing at all — the browser's menu is gone and the `
+          + `page put nothing in its place. If the replacement is drawn on a canvas or positioned `
+          + `offscreen until placed, this cannot see it; if there is no replacement, do not cancel.`,
+      });
+    }
+  }
+  for (const row of surface.touchProbe ?? []) {
+    if (row.error || row.tapCalls > 0) continue;
+    issues.push({
+      kind: "touch-handlers-not-invoked",
+      severity: "suspect",
+      element: `${row.path} "${row.text}"`,
+      message: `${row.path} "${row.text}" has touch handlers that a real tap never invoked: the tap `
+        + `landed on the middle of its own box and none of its listeners ran. Something is between `
+        + `the finger and the listener — an overlay or backdrop on top of it, \`pointer-events\` on an `
+        + `ancestor, or a listener attached to a node no longer in the document.`,
+    });
+  }
   // Hover triggers are NOT iterated with the handler surface, and that is the point: the common
   // form of this defect is a CSS `:hover` rule with no listener anywhere, so the trigger has no
   // entry in the surface at all. Keeping the rule inside the per-element loop reported the JS
@@ -2691,6 +2980,39 @@ export function formatHandlerSurface(
         + (flat
           ? ` ${YELLOW}(nothing moved — dead handlers, or the drag does not start here)${RESET}`
           : ""),
+      );
+    }
+  }
+  if (surface.menuProbe && surface.menuProbe.length > 0) {
+    lines.push("");
+    lines.push(`${BOLD}Right-click (real secondary click):${RESET}`);
+    for (const row of surface.menuProbe) {
+      if (row.error) {
+        lines.push(`  - ${row.path}: ${YELLOW}not driven — ${row.error}${RESET}`);
+        continue;
+      }
+      const shown = row.revealed.length > 0
+        ? `revealed ${row.revealed.slice(0, 3).map((l) => l.split("|")[0]).join(", ")}`
+        : "revealed nothing";
+      lines.push(
+        `  - ${row.path}: ${row.handlerCalls} handler call(s), `
+        + `${row.prevented ? "browser menu cancelled" : `${YELLOW}browser menu NOT cancelled${RESET}`}, ${shown}`,
+      );
+    }
+  }
+  if (surface.touchProbe && surface.touchProbe.length > 0) {
+    lines.push("");
+    lines.push(`${BOLD}Touch (tap and swipe, touch emulation on):${RESET}`);
+    lines.push(`  ${DIM}driven in a second page: touch emulation sets maxTouchPoints to 1 and`
+      + ` "ontouchstart" in window to true, which a page may branch on${RESET}`);
+    for (const row of surface.touchProbe) {
+      if (row.error) {
+        lines.push(`  - ${row.path}: ${YELLOW}not driven — ${row.error}${RESET}`);
+        continue;
+      }
+      lines.push(
+        `  - ${row.path}: tap invoked ${row.tapCalls} listener(s)`
+        + (row.swipeRatio === undefined ? "" : `, a swipe changed ${(row.swipeRatio * 100).toFixed(2)}% of it`),
       );
     }
   }

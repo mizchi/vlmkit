@@ -1507,3 +1507,100 @@ test("E2E: hover triggers come from the stylesheets as well as from the listener
     assert.equal(flagged.some((el) => el.includes(`#${id}`)), false, `${id} must stay silent`);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Right-click, and touch
+
+function menuRow(over: Partial<import("./handler-map.ts").MenuProbe> & { path: string }) {
+  return { text: "m", handlerCalls: 1, prevented: true, revealed: ["#menu|Cut"], ...over };
+}
+
+test("the three right-click outcomes, and the two that are defects", () => {
+  const s = surface(entry({ path: "div#box", types: { contextmenu: 1 } }));
+  const kinds = () => deriveHandlerIssues(s).filter((i) => i.kind.startsWith("contextmenu-")).map((i) => i.kind);
+
+  // The contract: cancelled, and something appeared.
+  s.menuProbe = [menuRow({ path: "div#box" })];
+  assert.deepEqual(kinds(), []);
+
+  // Forgot the cancel: the browser's own menu opens too.
+  s.menuProbe = [menuRow({ path: "div#box", prevented: false, revealed: [] })];
+  assert.deepEqual(kinds(), ["contextmenu-not-prevented"]);
+  // Even when the page DID show its menu, an uncancelled right-click still opens the browser's.
+  s.menuProbe = [menuRow({ path: "div#box", prevented: false })];
+  assert.deepEqual(kinds(), ["contextmenu-not-prevented"]);
+
+  // Cancelled and nothing appeared: the user is left with neither menu. Warn, because the
+  // replacement may be drawn where this cannot see it.
+  s.menuProbe = [menuRow({ path: "div#box", revealed: [] })];
+  assert.deepEqual(kinds(), ["contextmenu-replaces-nothing"]);
+  assert.equal(deriveHandlerIssues(s).find((i) => i.kind === "contextmenu-replaces-nothing")!.severity, "warn");
+
+  // A right-click that never reached the handler measured nothing about the menu contract.
+  s.menuProbe = [menuRow({ path: "div#box", handlerCalls: 0, prevented: false, revealed: [] })];
+  assert.deepEqual(kinds(), []);
+  s.menuProbe = [menuRow({ path: "div#box", error: "no usable box", prevented: false })];
+  assert.deepEqual(kinds(), []);
+  delete s.menuProbe;
+  assert.deepEqual(kinds(), []);
+});
+
+test("a tap that invoked nothing is the graded touch outcome", () => {
+  const s = surface(entry({ path: "div#pad", types: { touchstart: 1 } }));
+  const kinds = () => deriveHandlerIssues(s).filter((i) => i.kind === "touch-handlers-not-invoked").length;
+
+  s.touchProbe = [{ path: "div#pad", text: "pad", tapCalls: 0 }];
+  assert.equal(kinds(), 1);
+  s.touchProbe = [{ path: "div#pad", text: "pad", tapCalls: 1 }];
+  assert.equal(kinds(), 0);
+  // A swipe that moved nothing is NOT graded — 0% has several explanations, the same reason the
+  // pointer-drag ratios are reported and not judged.
+  s.touchProbe = [{ path: "div#pad", text: "pad", tapCalls: 2, swipeRatio: 0 }];
+  assert.equal(kinds(), 0);
+  s.touchProbe = [{ path: "div#pad", text: "pad", tapCalls: 0, error: "no usable box" }];
+  assert.equal(kinds(), 0);
+});
+
+test("E2E: right-click and touch on the fixture", { timeout: 240_000 }, async () => {
+  const s = await buildHandlerSurface({
+    source: join(REPO_ROOT, "fixtures/handlers/menu-and-touch.html"),
+    probes: ["menu", "touch"],
+  });
+  const menu = (id: string) => s.menuProbe?.find((r) => r.path.endsWith(`#${id}`))!;
+  const touch = (id: string) => s.touchProbe?.find((r) => r.path.endsWith(`#${id}`))!;
+
+  // The right-click reached every handler, and `prevented` is read after the page's own handler —
+  // before it, it is false for all three and separates nothing.
+  for (const id of ["ctxOk", "ctxNoPrevent", "ctxNothing"]) {
+    assert.ok(menu(id).handlerCalls > 0, `${id}: the right-click must reach the handler`);
+  }
+  assert.equal(menu("ctxOk").prevented, true);
+  assert.deepEqual(menu("ctxOk").revealed.map((l) => l.split("|")[0]), ["#menu"]);
+  assert.equal(menu("ctxNoPrevent").prevented, false);
+  assert.equal(menu("ctxNothing").prevented, true);
+  assert.deepEqual(menu("ctxNothing").revealed, []);
+
+  // Touch, in its own page. The working pad's handlers run and its pixels move; the covered one is
+  // reachable on paper and invokes nothing.
+  assert.ok(touch("swipe").tapCalls > 0);
+  assert.ok((touch("swipe").swipeRatio ?? 0) > 0.005, `swipe moved ${touch("swipe").swipeRatio}`);
+  assert.ok(touch("tapOnly").tapCalls > 0, "the control is reachable");
+  assert.equal(touch("tapCovered").tapCalls, 0);
+
+  const kinds = deriveHandlerIssues(s);
+  const flagged = (kind: string) => kinds.filter((i) => i.kind === kind).map((i) => i.element);
+  assert.deepEqual(flagged("contextmenu-not-prevented").length, 1);
+  assert.match(flagged("contextmenu-not-prevented")[0]!, /#ctxNoPrevent/);
+  assert.deepEqual(flagged("contextmenu-replaces-nothing").length, 1);
+  assert.match(flagged("contextmenu-replaces-nothing")[0]!, /#ctxNothing/);
+  assert.deepEqual(flagged("touch-handlers-not-invoked").length, 1);
+  assert.match(flagged("touch-handlers-not-invoked")[0]!, /#tapCovered/);
+  // The controls stay silent under all three.
+  for (const id of ["ctxOk", "tapOnly", "swipe"]) {
+    assert.equal(
+      kinds.some((i) => i.element.includes(`#${id}`) && (i.kind.startsWith("contextmenu-") || i.kind === "touch-handlers-not-invoked")),
+      false,
+      `${id} must stay silent`,
+    );
+  }
+});

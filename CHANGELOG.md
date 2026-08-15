@@ -135,6 +135,31 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **`--probe menu`: what a real right-click did.** `defaultPrevented` is read after the page's own
+  handlers have run — before them it is false for every target and separates nothing:
+
+    | element | handler ran | cancelled | revealed | |
+    |---|---|---|---|---|
+    | `#ctxOk` | yes | yes | `#menu` | the contract |
+    | `#ctxNoPrevent` | yes | **no** | — | `contextmenu-not-prevented` (suspect) |
+    | `#ctxNothing` | yes | yes | **—** | `contextmenu-replaces-nothing` (warn) |
+
+  The second is unambiguous: the browser's own menu opens too, so the page's menu is at best beside
+  it. The third is a warn, because the replacement may be drawn where this cannot see it — a canvas,
+  a portal positioned offscreen until placed — and suppressing the menu deliberately is a choice a
+  page may make. Both require the handler to have actually run: a right-click that never reached it
+  measured nothing about the contract.
+
+- **`--probe touch`: a tap and a swipe, in a page of their own.** The separate page is measured, not
+  stylistic — turning touch emulation on takes `navigator.maxTouchPoints` from 0 to 1 and makes
+  `"ontouchstart" in window` true, which is exactly what a page branches on to decide it is on a
+  phone. Sharing the page would have every other family measuring a different page.
+  - `touch-handlers-not-invoked` (suspect) is the touch twin of `pointer-drag-intercepted`:
+    registered, the tap landed on the element's own box, and nothing ran. On the fixture the covered
+    pad invokes 0 listeners while its identically-wired neighbour invokes 1.
+  - The swipe is driven through CDP (Playwright's touchscreen only taps) and its pixel delta is
+    reported, not graded — 0% has several explanations and 0 invocations has one.
+
 - **`--probe hover`: content that appears on hover and not on focus.** WCAG 1.4.13 and 2.1.1 — the
   tooltip, the menu, the row of actions that only a mouse ever sees. The probe hovers each trigger,
   then focuses the same trigger, and diffs what became visible:
