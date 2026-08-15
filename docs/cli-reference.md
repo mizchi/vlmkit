@@ -840,15 +840,14 @@ Minimal `vlmkit.config.json`:
   "outputDir": "test-results/snapshots/sample-webapp-2026",
   "threshold": 0.1,
   "failOnDiff": true,
-  "maxDiffRatio": 0.01,
-  "workflow": {
-    "captureSpec": "./e2e/vrt-capture.spec.ts"
-  }
+  "maxDiffRatio": 0.01
 }
 ```
 
 When `vlmkit.config.json` exists in the current directory, `vlmkit snapshot` loads it automatically. Use `--config <path>` to point at another file, and pass URLs or flags directly when you want CLI values to override config defaults.
-`vlmkit workflow init` and `vlmkit workflow capture` also auto-load the same file, reuse `baseUrl`/`routes`, and accept `workflow.captureSpec` or `--capture-spec <path>` when you want a custom Playwright entrypoint.
+`vlmkit workflow init` and `vlmkit workflow capture` also auto-load the same file and reuse `baseUrl`/`routes` — either at the top level or under `capture`.
+
+A `"workflow": { "captureSpec": … }` key and a `--capture-spec <path>` flag were documented here and **have never existed** in any version of the code; the example even named `vrt-capture.spec.ts`, a filename nothing has had since the rename. The Playwright entrypoint is fixed at `e2e/vlmkit-capture.spec.ts` inside vlmkit itself, which is why these two commands need a source checkout — the published package omits it. Making the spec pluggable is a real option and it is in `TODO.md`, not here.
 
 #### Subagent-ready fix prompt
 

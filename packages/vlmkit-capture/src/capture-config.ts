@@ -1,7 +1,7 @@
 /**
  * Capture configuration loader for `vlmkit workflow init|capture`.
  *
- * Allows external projects to drive `e2e/vrt-capture.spec.ts` without
+ * Allows external projects to drive `e2e/vlmkit-capture.spec.ts` without
  * editing the spec by sourcing routes from `vlmkit.config.json` (or any
  * file pointed at by `--config` / `VLMKIT_CONFIG_PATH`).
  */
@@ -56,27 +56,49 @@ export function parseCaptureConfig(raw: string): CaptureConfig {
   }
 
   const record = parsed as Record<string, unknown>;
-  const baseUrl = record.baseUrl == null
-    ? undefined
-    : parseNonEmptyString(record.baseUrl, "capture config baseUrl must be a non-empty string");
 
   // `capture.routes` is preferred so it coexists cleanly with snapshot `routes`.
   const captureSection = record.capture;
   const routesSource = pickRoutesSource(captureSection, record.routes);
   const routes = routesSource === undefined ? undefined : parseCaptureRoutes(routesSource);
 
+  // `capture.baseUrl` is read for the same reason, and it was NOT: `routes` was accepted in
+  // both places while `baseUrl` was only ever read at the top level, so the natural config
+  // — both keys inside `capture`, next to each other — took the routes and silently fell
+  // back to the default URL. Found by writing that config while checking something else:
+  // the capture ran against 127.0.0.1:4174 with `capture.baseUrl` pointing elsewhere, and
+  // nothing said so. An ignored input reported as accepted.
+  const innerBaseUrl = pickCaptureKey(captureSection, "baseUrl");
+  const baseUrlSource = innerBaseUrl ? innerBaseUrl.value : record.baseUrl;
+  const baseUrl = baseUrlSource == null
+    ? undefined
+    : parseNonEmptyString(baseUrlSource, "capture config baseUrl must be a non-empty string");
+
   return { baseUrl, routes };
 }
 
 function pickRoutesSource(captureSection: unknown, topLevelRoutes: unknown): unknown {
-  if (captureSection !== undefined && captureSection !== null) {
-    if (typeof captureSection !== "object" || Array.isArray(captureSection)) {
-      throw new Error("capture config `capture` must be an object");
-    }
-    const inner = (captureSection as Record<string, unknown>).routes;
-    if (inner !== undefined) return inner;
+  const inner = pickCaptureKey(captureSection, "routes");
+  return inner ? inner.value : topLevelRoutes;
+}
+
+/**
+ * One key out of the `capture` block, wrapped, or `undefined` when the block or the key is
+ * absent.
+ *
+ * Wrapped rather than returned bare so a present-but-`null` value stays distinguishable
+ * from an absent one: `"capture": { "routes": null }` must keep reaching
+ * `parseCaptureRoutes` and failing loudly, instead of falling through to the top level and
+ * being ignored.
+ */
+function pickCaptureKey(captureSection: unknown, key: string): { value: unknown } | undefined {
+  if (captureSection === undefined || captureSection === null) return undefined;
+  if (typeof captureSection !== "object" || Array.isArray(captureSection)) {
+    throw new Error("capture config `capture` must be an object");
   }
-  return topLevelRoutes;
+  const record = captureSection as Record<string, unknown>;
+  if (!(key in record) || record[key] === undefined) return undefined;
+  return { value: record[key] };
 }
 
 function parseCaptureRoutes(value: unknown): CaptureRoute[] {

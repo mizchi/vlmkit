@@ -17,7 +17,7 @@
  */
 
 import { execFileSync, type ExecSyncOptions } from "node:child_process";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 import {
   readFile,
   readdir,
@@ -97,10 +97,11 @@ function parseCaptureOptions(argv: string[]): WorkflowCaptureOptions {
  * server that was never contacted. Tests did not catch it either: `workflow-cli.test.ts`
  * covers option parsing and the command table, and a path literal is neither.
  *
- * Known gap, deliberately not changed here: `package.json`'s `files` excludes
- * `dist/e2e/**`, so an npm-installed vlmkit ships no spec and `HARNESS_ROOT` finds
- * neither candidate. A source checkout works. Whether to publish the spec or retire these
- * two commands is a packaging decision, not a typo — see TODO.md.
+ * Packaging: `package.json`'s `files` publishes `dist/**` but excludes `dist/e2e/**`, and
+ * the `e2e/` sources are not published either, so an npm-installed vlmkit has no spec at
+ * all and no build can produce one. Whether to publish the spec or retire these two
+ * commands is still a packaging decision (see TODO.md) — what changed is that the failure
+ * now says so, instead of telling an installed user to run a build that cannot help.
  */
 /**
  * The spec path **relative to `HARNESS_ROOT`**, because that is what playwright matches.
@@ -109,24 +110,49 @@ function parseCaptureOptions(argv: string[]): WorkflowCaptureOptions {
  * test files, and collection is driven by the config's `testDir`. An absolute path from
  * another tree matches nothing, which is why an earlier attempt at this fix still got
  * "No tests found" — see `runCaptureSpec` for the cwd half of the same problem.
+ *
+ * One candidate, not two. The list used to carry `dist/e2e/vlmkit-capture.spec.mjs` as a
+ * fallback, and it could only ever hurt: `playwright.config.ts` sets `testDir: "./e2e"`, so
+ * the built copy is outside collection and selecting it reports "No tests found" — the
+ * obscure failure this whole function exists to replace with a clear one. It is reachable
+ * only when the source spec is absent, which is exactly the state that needs the clear
+ * message. Playwright transpiles TS itself, so the source candidate needs no build.
  */
 function resolveCaptureSpecPath(): string {
-  const candidates = [
-    // Source `.ts` FIRST, because `playwright.config.ts` sets `testDir: "./e2e"`, so the
-    // built `dist/e2e/**` copy is outside collection and can never be selected.
-    // Playwright transpiles TS itself, so this needs no build.
-    join("e2e", "vlmkit-capture.spec.ts"),
-    join("dist", "e2e", "vlmkit-capture.spec.mjs"),
-  ];
+  const candidates = [join("e2e", "vlmkit-capture.spec.ts")];
   const found = candidates.find((candidate) => existsSync(join(HARNESS_ROOT, candidate)));
-  if (!found) {
-    throw new Error(
-      `Missing the capture spec. Looked under ${HARNESS_ROOT} for:\n`
-      + candidates.map((c) => `  ${c}\n`).join("")
-      + `Run \`pnpm build\` (source checkout), or restore \`e2e/vlmkit-capture.spec.ts\`.`,
-    );
-  }
+  if (!found) throw new Error(captureSpecMissingMessage(HARNESS_ROOT, candidates));
   return found;
+}
+
+/**
+ * Why the spec is missing, told apart by where vlmkit is running from.
+ *
+ * The two cases need opposite advice, and the single message used to give the installed
+ * user the checkout's: "Run `pnpm build` (source checkout), or restore
+ * `e2e/vlmkit-capture.spec.ts`". Neither half is actionable from `node_modules` — there is
+ * no build to run, nothing to restore, and the reason is not local damage but a deliberate
+ * `!dist/e2e/**` in the published `files`. So it sent a reader to fix something that is not
+ * broken, which is the same failure mode as the "Is the server running?" line above: advice
+ * about a cause nobody checked.
+ *
+ * Exported for the test — reaching this branch for real means an actual `npx playwright
+ * test` spawn, and a message is not worth a browser.
+ */
+export function captureSpecMissingMessage(harnessRoot: string, candidates: string[]): string {
+  const installed = harnessRoot.split(sep).includes("node_modules");
+  const why = installed
+    ? "This is an installed copy of vlmkit, and the published package deliberately omits the\n"
+      + "capture spec (`\"!dist/e2e/**\"` in `files`), so no build here can produce it.\n"
+      + "`workflow init` and `workflow capture` need a source checkout:\n"
+      + "  git clone https://github.com/mizchi/vlmkit && cd vlmkit && pnpm install\n"
+      + "Every other command — `vlmkit check *`, `scan *`, `diff *`, `snapshot` — works from\n"
+      + "the installed package and needs none of this."
+    : "This looks like a source checkout, so the file should be here: restore\n"
+      + `\`${candidates[0]}\` (\`git checkout -- ${candidates[0]}\`).`;
+  return `Missing the capture spec. Looked under ${harnessRoot} for:\n`
+    + candidates.map((c) => `  ${c}\n`).join("")
+    + why;
 }
 
 function buildCaptureEnv(mode: "baseline" | "capture", options: WorkflowCaptureOptions) {

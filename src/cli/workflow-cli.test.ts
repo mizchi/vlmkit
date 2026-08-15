@@ -212,6 +212,37 @@ describe("capture preflight (no browser)", () => {
     );
   });
 
+  it("tells an installed copy it needs a checkout, and a checkout to restore the file", async () => {
+    // The published package excludes the spec on purpose (`"!dist/e2e/**"` in `files`), so
+    // "Run `pnpm build`, or restore e2e/vlmkit-capture.spec.ts" — the message this replaces —
+    // was two pieces of advice that cannot be followed from node_modules: there is no build
+    // to run and nothing was lost. The two locations need opposite instructions.
+    const { captureSpecMissingMessage } = await import("./workflow.ts");
+    const candidates = [join("e2e", "vlmkit-capture.spec.ts")];
+
+    const installed = captureSpecMissingMessage(
+      join("/home/u/app", "node_modules", "@mizchi", "vlmkit"),
+      candidates,
+    );
+    assert.match(installed, /installed copy of vlmkit/);
+    assert.match(installed, /!dist\/e2e/, "must name why it is absent, not imply local damage");
+    assert.match(installed, /git clone/, "must name the one thing that does work");
+    assert.doesNotMatch(installed, /pnpm build/, "no build in node_modules can produce the spec");
+    assert.doesNotMatch(installed, /restore/, "nothing was lost here, so there is nothing to restore");
+    assert.match(installed, /check \*/, "the other commands do work — say so before a reader gives up");
+
+    const checkout = captureSpecMissingMessage("/home/u/src/vlmkit", candidates);
+    assert.match(checkout, /source checkout/);
+    assert.match(checkout, /git checkout -- e2e\/vlmkit-capture\.spec\.ts/);
+    assert.doesNotMatch(checkout, /git clone/, "a checkout does not need cloning again");
+
+    // Both name where they looked, which is the part that survives being wrong about why.
+    for (const text of [installed, checkout]) {
+      assert.match(text, /Looked under/);
+      assert.match(text, /e2e\/vlmkit-capture\.spec\.ts/);
+    }
+  });
+
   it("names a bad --config as a config error, not as a missing server", async () => {
     // Measured before the fix: a nonexistent --config, a config containing invalid JSON,
     // malformed VLMKIT_CAPTURE_ROUTES and a correct config with no server ALL printed

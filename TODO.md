@@ -1552,11 +1552,60 @@ named error を投げていて正しい。`flow-verify.ts` の `q()` は不正�
 npm install した vlmkit には spec が同梱されず `HARNESS_ROOT` はどちらの候補も見つけられない。
 ソースチェックアウトでは動く。**spec を publish するか、この2コマンドを廃止するかは
 設計判断**でタイポ修正ではないので、ここでは変えていない。
+→ 設計判断は依然として未着手。**メッセージだけ 2026-08-15 に直した**(下の節)。
 
 **残した重複(まだ同期していて実害がない)**: `determineMigrationSubagentExitStatus` /
 `determineSnapshotReportEvaluationExitStatus`(566文字が同一)、`overlapArea` /
 `intersectionArea`。byte-identical な重複は「まだ分岐していない」= 将来のリスクであって
 今のバグではない。今回見つかった実害はすべて**片方だけ直った近似重複**の側にあった。
+→ rect 系は 2026-08-15 に畳んだ(下の節)。**「重複ペア」ではなく5箇所5名前**だった。
+
+### 既知の問題を対象にした修正ループ(2026-08-15)
+
+「新しい欠陥を探す」ではなく **TODO に記録済みの既知項目**を対象にした回。
+記録した見積りが実態と違っていたものが2件、掘る途中で見つかった隣接欠陥が2件。
+
+- [x] **rect の重複は「ペア」ではなく5箇所5名前**(`181eff0`)
+  - 記録は `overlapArea` / `intersectionArea` の2つだったが、実際は
+    `rectIntersectionArea`(`diff-for-agent`)と `iouOf` **2つ**(`component-bbox` /
+    `page-compose-diff`、ローカル変数名以外 byte-identical)を含む5箇所。
+    どれもテストが1つも無かった。
+  - `packages/vlmkit-core/src/rect-overlap.ts` に集約し、**どの写しでも暗黙だった2性質を
+    テストで pin**: 掛ける**前**に軸ごとに 0 でクランプする(負×負が正になるので、斜めに
+    離れた box が重なりを報告してしまう)、union が 0 なら `NaN` ではなく 0 を返す
+    (`NaN > threshold` は false なので、呼び出し側では「似ていない」と読まれたり黙って
+    落とされたりする)。両方を壊すとテストが落ちる(実測: 7件中4件)。
+  - **意図的に残した3箇所**を helper の docstring に名前で書いた: `copy-check.ts` は
+    browser script 内で import できない、`integrity-check.ts` / `font-determinism-probe.ts`
+    は面積ではなく**軸ごとの overlap** が必要(どの軸で衝突したかを報告する)。
+- [x] **npm install したユーザーに、効かないビルドを勧めていた**(`dist/e2e` 項目の一部)
+  - 記録は「packaging の設計判断」。実測すると**判断が要るのは publish 可否だけ**で、
+    メッセージは今日直せる: `Run \`pnpm build\` (source checkout), or restore
+    \`e2e/vlmkit-capture.spec.ts\`` は node_modules から**両方とも実行不能**
+    (走らせるビルドが無く、失われたものも無い)。原因も局所的な破損ではなく
+    published `files` の `!dist/e2e/**` という**意図的な除外**。
+    → 場所で言い分けるようにした(installed = clone が必要 + 他コマンドは動くと明言、
+    checkout = `git checkout --` で戻せ)。`captureSpecMissingMessage` を export して
+    ブラウザ無しでテスト。**実測でも確認**(spec を退避して `workflow capture` を実行)。
+  - **候補リストから `dist/e2e/*.mjs` を削除**。`testDir: "./e2e"` の外なので選ばれると
+    `No tests found` になり、この関数が置き換えるはずの不親切な失敗そのもの。
+    到達するのはソース spec が無い時 = 明確なメッセージが必要な状態だけ。
+- [x] **docs が存在しない flag を2つ documented していた**
+  - `docs/cli-reference.md` の `"workflow": { "captureSpec": … }` と `--capture-spec <path>`
+    は**コードのどのバージョンにも存在しない**(例の名前は `vrt-capture.spec.ts` = リネーム前)。
+    削除し、「無い」ことと「spec を差し替え可能にするのは TODO 側の選択肢」を明記。
+- [x] **`capture.baseUrl` が黙って捨てられていた**
+  - 上を実測する過程で普通に書いた config で発覚: `routes` は top-level と `capture` の
+    **両方**から読むのに、`baseUrl` は top-level だけ。両方を `capture` に並べて書くと
+    routes は効き、URL は既定値 `127.0.0.1:4174` に落ちる。**入力を無視して受理と表示する**形。
+  - `pickCaptureKey` に一般化して両キーで対称にした。**キー探索を wrap して返す**のは、
+    `"routes": null` を「不在」と区別し続けるため(`??` にすると null が top-level に
+    フォールバックして黙殺され、直そうとしている形そのものになる)。
+  - 実測: `capture.baseUrl: 9999` で `page.goto` が `9999` に行く(修正前は `4174`)。
+
+**罠(再発)**: dist 解決なので、`packages/` を直して CLI で確認すると**直っていないように
+見える**。`pnpm build` を挟むまで `4174` のままだった(1541行の記録と同じ罠)。
+`src/cli/cli.ts` を直接 node で実行すると**出力ゼロで exit 0**、entry は `src/cli/vlmkit.ts`。
 
 ### テストカバレッジ 70% への道筋(2026-08-13 測定)
 

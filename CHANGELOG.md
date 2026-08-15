@@ -1026,6 +1026,46 @@ suppression works per *rule* instead of per whole gate.
 
 ### Fixed
 
+- **`capture.baseUrl` in `vlmkit.config.json` was read from nowhere.** `routes` is accepted both
+  at the top level and inside the `capture` block; `baseUrl` was only ever read at the top level.
+  So the config anyone writes — both keys together, under `capture` — took the routes and fell
+  back to the default `http://127.0.0.1:4174`, with nothing in the output to say a key had been
+  dropped. Measured: with `capture.baseUrl` pointing at `:9999`, every `page.goto` went to
+  `:4174`. Both keys resolve through one lookup now, inner-first, and the key lookup is wrapped
+  rather than `??`-chained so a present-but-`null` `"routes": null` still fails loudly instead of
+  falling through to the top level and being ignored — the same silent drop one level down.
+
+- **The missing-capture-spec error gave an npm-installed user advice that cannot be followed.**
+  "Run `pnpm build` (source checkout), or restore `e2e/vlmkit-capture.spec.ts`" — from
+  `node_modules` there is no build to run and nothing was lost: the published `files` excludes
+  `dist/e2e/**` on purpose, and the `e2e/` sources are not published either. The message now
+  tells the two locations apart: an installed copy is told it needs a checkout and told that
+  every other command (`check *`, `scan *`, `diff *`, `snapshot`) works without one; a checkout
+  is told to `git checkout --` the file. Whether to publish the spec or retire
+  `workflow init` / `workflow capture` is still an open packaging decision — what changed is that
+  the failure no longer misdescribes it.
+  - The candidate list lost `dist/e2e/vlmkit-capture.spec.mjs`. `playwright.config.ts` sets
+    `testDir: "./e2e"`, so the built copy is outside collection and selecting it reports
+    "No tests found" — the obscure failure this lookup exists to replace. It was reachable only
+    when the source spec is absent, which is exactly the state that needs the clear message.
+  - `docs/cli-reference.md` documented a `"workflow": { "captureSpec": … }` config key and a
+    `--capture-spec <path>` flag. **Neither has ever existed in any version of the code**, and the
+    example named `vrt-capture.spec.ts`, a filename nothing has had since the rename. Removed,
+    with the absence stated.
+
+- **Five copies of the same rectangle-overlap arithmetic became one.** `overlapArea`
+  (`semantic-drilldown`), `intersectionArea` (`region-selector-match`), `rectIntersectionArea`
+  (`diff-for-agent`) and `iouOf` twice (`component-bbox`, `page-compose-diff` — byte-identical
+  apart from their local variable names), none of them tested. `@mizchi/vlmkit-core/rect-overlap.ts`
+  now exports `overlapArea` / `iou`, with the two properties every copy left implicit pinned by
+  tests: each axis clamped to 0 *before* the multiply (two negatives multiply to a positive, so a
+  box diagonally away from another would otherwise report an overlap), and an empty union
+  yielding 0 rather than `NaN` (`NaN > threshold` is false, so such a pair reads as "not similar"
+  in some callers and is silently dropped in others). Three sites deliberately keep their own
+  copy and are named in the helper's docstring: `copy-check.ts` computes it inside a browser
+  script, and `integrity-check.ts` / `font-determinism-probe.ts` need the per-axis overlap
+  because they report which axis collided.
+
 - **`scan handlers` printed `status: ok` for six handlers it had never run, and
   `check interactions` claimed to have tested clicks it never fired.** One static set —
   `PROBED_TYPES` = click, keydown, keyup, keypress, focus, blur — decided coverage on every run
