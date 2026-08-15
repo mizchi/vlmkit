@@ -66,6 +66,15 @@ export interface HandlerSurfaceEntry {
    * `undefined` as "not draggable" would invent findings on data this gate did not collect.
    */
   draggable?: boolean;
+  /**
+   * True when the browser turns this element's activation keypress into a `click`.
+   *
+   * The interaction probe presses keys and never calls `.click()`, so this is what decides
+   * whether a `click` handler was exercised by it. Measured per element type; a
+   * `div[role=button]` is false and a `<button>` is true, which is the difference between the
+   * gate having tested a control and having only looked at it.
+   */
+  nativeActivation?: boolean;
 }
 
 export interface HandlerSurface {
@@ -93,6 +102,14 @@ export interface HandlerSurface {
    * Absent means "not measured", never "measured and fine".
    */
   realDragProbe?: RealDragProbe[];
+  /**
+   * What the interaction probe reached, when one ran at all.
+   *
+   * Absent on a `scan handlers` run, and that absence is load-bearing: it means no handler on
+   * the page was exercised, which is the truth for an inventory. It used to be indistinguishable
+   * from "everything in `PROBED_TYPES` was covered".
+   */
+  interactionProbe?: InteractionProbeEvidence;
 }
 
 /** Install BEFORE page scripts run (page.addInitScript). */
@@ -205,6 +222,18 @@ const COMMON_ON_PROPS = [
   // continuous ones are `drag`, fired on the source, and `dragover`, fired on the target.
   "ondragstart", "ondrag", "ondragenter", "ondragover", "ondragleave", "ondrop", "ondragend",
 ];
+
+/**
+ * `matches()` for the elements whose activation keypress the browser turns into a click.
+ *
+ * Measured, one element at a time, focusing and pressing the key its role activates with:
+ * `button`, `a[href]`, `input[type=submit|button|reset]` on Enter and
+ * `input[type=checkbox|radio]`, `summary` on Space/Enter all fire `click`. An `<a>` with no
+ * `href`, `input[type=text]`, `<select>` (Space opens the dropdown) and `<textarea>` do not.
+ */
+const NATIVE_CLICK_ON_ACTIVATION =
+  "button, a[href], input[type=submit], input[type=button], input[type=reset],"
+  + " input[type=checkbox], input[type=radio], summary";
 
 /**
  * `describe(el)` — the element → path derivation, as one definition for the three places
@@ -337,6 +366,9 @@ export const COLLECT_SURFACE_SCRIPT = `
       // (No backticks in here: this comment lives inside COLLECT_SURFACE_SCRIPT's template
       // literal, and a backtick closes the string. That is what broke the build once.)
       draggable: el.draggable === true,
+      // Whether an activation keypress becomes a click here. Measured list; a role-only
+      // element is NOT in it, which is why the probe never fires its click handler.
+      nativeActivation: el.matches(${JSON.stringify(NATIVE_CLICK_ON_ACTIVATION)}),
     });
   }
   // How many controls the page PRESENTS, whether or not any handler was found.
@@ -966,7 +998,87 @@ export function isPointerDragSurface(types: readonly string[]): boolean {
 }
 
 /** Event types the interaction probes actually fire. */
+/**
+ * Types the interaction probe CAN exercise — its ceiling, not its coverage.
+ *
+ * This set used to be the coverage claim itself: any registered type in here was left out of
+ * `unprobed-handler-types`, on every run of both gates. Two measurements say that was false in
+ * both directions.
+ *
+ * **`scan handlers` probes nothing at all.** It is an inventory; no probe in it presses, focuses
+ * or clicks anything. On a page whose six handlers were all in this set the gate printed
+ * `status: ok` and disclosed nothing:
+ *
+ *     registrations: 6 across 1 element(s), on a page presenting 1 control(s)
+ *       - div#a "A": click, keydown, focus, keyup, keypress, blur
+ *     status: ok
+ *
+ * **`check interactions` never clicks.** Its probe focuses an element and presses the key its
+ * role activates with — there is no `.click()` anywhere in `interaction-map.ts`. For a native
+ * control the browser turns that keypress into a click; for a role-only element it does not,
+ * and that element is exactly what `pointer-only-control` exists to find. Measured:
+ *
+ *     <button> + Enter                        click fires
+ *     <a href> + Enter                        click fires
+ *     <input type=submit> + Enter             click fires
+ *     div[role=button][tabindex=0] + Enter    NO click
+ *     div[role=checkbox][tabindex=0] + Space  NO click
+ *
+ * So coverage is now decided per element from what the probe actually did — see
+ * `InteractionProbeEvidence` — and this set only bounds what it could ever have done.
+ */
 export const PROBED_TYPES = new Set(["click", "keydown", "keyup", "keypress", "focus", "blur"]);
+
+/**
+ * Which elements the interaction probe reached, and how far.
+ *
+ * Supplied by `check interactions`, which owns the probe; absent on a `scan handlers` run,
+ * where the honest answer is "nothing was exercised". Read from the interaction map rather
+ * than re-derived, because the map records what the probe did rather than what it intended:
+ *
+ *   - `focusedIx` — the tab walk stopped here, or an activation probe focused it. Either fires
+ *     `focus` (and `blur` when focus leaves).
+ *   - `activatedIx` — a key was pressed while this element held focus, so its keyboard handlers
+ *     ran. Only elements whose role has an activation key get this (`activationKeyForRole`
+ *     returns null for a link, a textbox, an option, a slider), and only within
+ *     `--max-elements`.
+ *
+ * The Tab presses of the walk also fire `keydown` on whatever happens to be focused at the
+ * time, and that is deliberately NOT counted: an incidental Tab keydown is not an exercise of
+ * the element's keyboard handler, and counting it would reinstate the overclaim this replaced.
+ */
+export interface InteractionProbeEvidence {
+  focusedIx: number[];
+  activatedIx: number[];
+}
+
+
+
+/**
+ * Did THIS run exercise this element's handler of this type?
+ *
+ * Per element, because the probe is per element: it focuses one control and presses one key.
+ * The old answer was a page-global set membership test, which claimed coverage for every
+ * element on every run — including runs where nothing was pressed at all.
+ */
+function probedForElement(
+  type: string,
+  e: HandlerSurfaceEntry,
+  probe: InteractionProbeEvidence | undefined,
+): boolean {
+  // No probe ran. `scan handlers` is an inventory: it opens the page, reads registrations and
+  // closes it. Nothing was exercised, so nothing is covered.
+  if (!probe || e.ix === null) return false;
+  const focused = probe.focusedIx.includes(e.ix) || probe.activatedIx.includes(e.ix);
+  const activated = probe.activatedIx.includes(e.ix);
+  if (type === "focus" || type === "blur") return focused;
+  if (KEYBOARD_TYPES.has(type)) return activated;
+  // The probe never calls `.click()`. A click happens only when the browser synthesizes one
+  // from the activation keypress, which it does for a native control and not for a
+  // `div[role=button]` — measured both ways.
+  if (type === "click") return activated && e.nativeActivation === true;
+  return false;
+}
 
 export interface HandlerIssue {
   kind: "pointer-only-control" | "unprobed-handler-types" | "delegated-handlers-opaque" | "no-handlers-found"
@@ -976,6 +1088,15 @@ export interface HandlerIssue {
   severity: "warn" | "suspect";
   element: string;
   message: string;
+  /**
+   * The event types this issue is about, when it is about a list of them.
+   *
+   * `unprobed-handler-types` used to carry its list inside the prose only, so a JSON consumer
+   * had to parse an English sentence to find out which types went unexercised — and a test
+   * asserting on the sentence matched the advice as readily as the list ("--probe-drag" contains
+   * "drag", "the probe focuses a control" contains "focus"). The list is data; it travels as data.
+   */
+  types?: string[];
 }
 
 /**
@@ -1134,7 +1255,7 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
     // page wired to a specific element.
     if (Object.keys(e.types).length < 10 || !e.containsInteractive) {
       for (const t of Object.keys(e.types)) {
-        if (!PROBED_TYPES.has(t) && !probedThisRun.has(t)) unprobedTypes.add(t);
+        if (!probedForElement(t, e, surface.interactionProbe) && !probedThisRun.has(t)) unprobedTypes.add(t);
       }
     }
     // ---- Probed drag behaviour ---------------------------------------------
@@ -1359,11 +1480,27 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
     });
   }
   if (unprobedTypes.size > 0) {
+    // Two different sentences, because they call for two different next steps. Without a probe
+    // the answer is "run the gate that probes"; with one it is "these are what it could not
+    // reach". The single old sentence — "NOT covered by the interaction probes" — was written
+    // for the second case and printed in both, which made a run that exercised nothing read as
+    // a run with a few gaps.
+    const message = surface.interactionProbe
+      ? `Handler types registered but NOT exercised by this run's probes: ${[...unprobedTypes].sort().join(", ")}`
+        + ` — the probe focuses a control and presses the key its role activates with, so a`
+        + ` \`click\` handler on anything but a native control, and any type outside`
+        + ` focus/blur/keyboard, is untested here. Verify those paths with a 'verify flow' script.`
+      : `${unprobedTypes.size} handler type(s) registered and NONE exercised:`
+        + ` ${[...unprobedTypes].sort().join(", ")} — this gate is an inventory and presses`
+        + ` nothing. A clean result here says the wiring exists, not that it works. Run`
+        + ` 'check interactions --handlers' to focus and activate the controls, add`
+        + ` '--probe-drag' for the drag surfaces, or drive the rest with a 'verify flow' script.`;
     issues.push({
       kind: "unprobed-handler-types",
       severity: "warn",
       element: "(page)",
-      message: `Handler types registered but NOT covered by the interaction probes: ${[...unprobedTypes].sort().join(", ")} — verify those paths manually or with an interact sequence.`,
+      message,
+      types: [...unprobedTypes].sort(),
     });
   }
   // Controls present, no handlers anywhere. v7's agent-l, on a console whose three

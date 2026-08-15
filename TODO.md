@@ -1286,6 +1286,26 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     **正常な source が drag しなくなる**(`native-source` が落ちた)。
 - rule 総数 141 → 143 → 145。
 
+**`PROBED_TYPES` が「probe 済み」を静的に主張していた(両方向に誤り)**:
+
+- [x] **`scan handlers` は何も probe しない**のに、`click`/`keydown`/`focus`/`blur`/`keyup`/`keypress`
+  が登録されていれば `unprobed-handler-types` から除外していた。6ハンドラのページで
+  `registrations: 6` かつ **`status: ok`**、一度も実行していないことの開示ゼロ。
+- [x] **`check interactions` は click しない**。`interaction-map.ts` に `.click()` は1つも無く、
+  focus してから role の activation key を押すだけ。ブラウザが click を合成するのは
+  ネイティブ要素のみで、`div[role=button]` では合成されない — **`pointer-only-control` が
+  探している要素クラスそのもの**。実測: `<button>`/`<a href>`/`input[type=submit|button|reset]`
+  は Enter で click、`input[type=checkbox|radio]`/`<summary>` も click、
+  `div[role=button]`/`div[role=checkbox]`/`a`(href 無し)/`input[type=text]`/`select`/`textarea` は
+  click しない。
+- 対応: coverage を**要素ごと**に「この run が実際に何をしたか」から決める。
+  `check interactions` は自分の interaction map から evidence を渡す(tab walk が止まった要素 =
+  focus/blur、key を押した要素 = keyboard、click はさらに native のみ)。`scan handlers` は渡さず、
+  warn の文面も専用にする。型リストは prose ではなく `HandlerIssue.types` としてデータで運ぶ
+  (テストが `--probe-drag` の "drag" や "the probe focuses" の "focus" に当たって空虚になったため)。
+- gate 側の配線は `packages/vlmkit-markup/src/gates/interactions-coverage.test.ts` が pin する。
+  外しても他の全テストが緑だったので専用ファイルにした。
+
 - [x] **テンプレートリテラルが食う `\s` を検出するテスト**(`src/util/browser-script-escapes.test.ts`)
   - `PROBE_DRAG_SCRIPT` の `split(/\s+/)` が**ブラウザには `split(/s+/)` として届いていた**。
     class 名を空白でなく**文字 s** で分割するので、最初の class(または祖先の class)に `s` を

@@ -152,6 +152,15 @@ contract and every response mismatch is reported.`,
       // not exercise would be the odd one out. `scan handlers` is the inventory and keeps
       // the probe behind `--probe-drag`.
       const surface = await buildHandlerSurface({ source, probeDrag: true, ...pageLoad });
+      // What the probe above actually reached, read off the map rather than assumed. Without
+      // it the surface cannot tell an exercised handler from an inventoried one, and every
+      // `click`/`keydown`/`focus` handler on the page counted as covered — including on a
+      // `scan handlers` run, which presses nothing at all. The tab walk fires focus/blur where
+      // it stops; `activation` is present exactly when a key was pressed at that element.
+      surface.interactionProbe = {
+        focusedIx: map.elements.filter((el) => el.tabReachable || el.activation).map((el) => el.index),
+        activatedIx: map.elements.filter((el) => el.activation).map((el) => el.index),
+      };
       report.handlerSurface = surface;
       report.handlerIssues = deriveHandlerIssues(surface);
       if (reference) {

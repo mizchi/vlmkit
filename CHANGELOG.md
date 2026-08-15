@@ -760,6 +760,36 @@ suppression works per *rule* instead of per whole gate.
 
 ### Fixed
 
+- **`scan handlers` printed `status: ok` for six handlers it had never run, and
+  `check interactions` claimed to have tested clicks it never fired.** One static set —
+  `PROBED_TYPES` = click, keydown, keyup, keypress, focus, blur — decided coverage on every run
+  of both gates, so any registered type in it was left out of `unprobed-handler-types`. Two
+  measurements say that was false in both directions:
+  - `scan handlers` **probes nothing**. It is an inventory; nothing in it presses, focuses or
+    clicks. A page whose six handlers were exactly that set reported
+    `registrations: 6 across 1 element(s)` and `status: ok`, with no disclosure that none of
+    them had been exercised.
+  - `check interactions` **never clicks**. Its probe focuses a control and presses the key its
+    role activates with — there is no `.click()` in `interaction-map.ts`. The browser turns
+    that keypress into a click for a native control and not for a role-only element, which is
+    precisely the class `pointer-only-control` exists to find:
+
+    | element | activation key | click fires |
+    |---|---|---|
+    | `<button>`, `<a href>`, `input[type=submit\|button\|reset]` | Enter | yes |
+    | `input[type=checkbox\|radio]`, `<summary>` | Space / Enter | yes |
+    | `div[role=button][tabindex=0]` | Enter | **no** |
+    | `div[role=checkbox][tabindex=0]` | Space | **no** |
+    | `<a>` without href, `input[type=text]`, `<select>`, `<textarea>` | — | no |
+
+  Coverage is now decided per element from what the run actually did. `check interactions`
+  passes the evidence from its own interaction map (which elements the tab walk stopped at,
+  which ones a key was pressed at); `scan handlers` passes none, and its warn says so in its own
+  words — "N handler type(s) registered and NONE exercised … this gate is an inventory and
+  presses nothing" — instead of borrowing a sentence written for a run that did probe. The list
+  of types also travels as data (`HandlerIssue.types`) rather than only inside the prose, so a
+  JSON consumer stops parsing English and a test stops matching the advice instead of the list.
+
 - **`--rule x=off` printed a report that contradicted the verdict.** Suppression happens on
   the normalized finding list, while a gate's prose is rendered from its raw report, so
   `check a11y contrast --rule contrast-below-aa=off` printed `✗ 2 contrast failure(s)` in red,

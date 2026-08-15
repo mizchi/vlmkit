@@ -98,13 +98,51 @@ test("exemptions: discovered controls, delegation containers, control interiors,
   }
 });
 
-test("unprobed handler types are surfaced, never silently dropped", () => {
-  const issues = deriveHandlerIssues(surface(entry({ ix: 1, types: { wheel: 1, dragstart: 1, click: 1 } })));
-  const warn = issues.find((i) => i.kind === "unprobed-handler-types");
-  assert.ok(warn);
-  assert.match(warn!.message, /dragstart/);
-  assert.match(warn!.message, /wheel/);
-  assert.doesNotMatch(warn!.message, /\bclick\b/);
+test("coverage is what this run exercised, per element — not a static list of types", () => {
+  const types = { wheel: 1, dragstart: 1, click: 1, keydown: 1, focus: 1 };
+
+  // No probe ran. This is every `scan handlers` run: it opens the page, reads registrations and
+  // closes it. The old code exempted click/keydown/focus/blur/keyup/keypress from the warn on
+  // EVERY run, so a page whose six handlers were all in that set printed `status: ok` and said
+  // nothing about having pressed none of them.
+  const inventory = deriveHandlerIssues(surface(entry({ ix: 1, types })));
+  const warn = inventory.find((i) => i.kind === "unprobed-handler-types")!;
+  assert.ok(warn, "an inventory run exercised nothing and has to say so");
+  assert.deepEqual(warn.types, ["click", "dragstart", "focus", "keydown", "wheel"]);
+  assert.match(warn.message, /NONE exercised/);
+  assert.match(warn.message, /check interactions --handlers/, "and name the gate that does probe");
+
+  // A probe ran and reached this element. It focused it and pressed the key its role activates
+  // with, so focus/blur and the keyboard types were exercised — and `click` was NOT, because
+  // nothing calls `.click()` and a `div[role=button]` does not synthesize one from Enter.
+  const probed = surface(entry({ ix: 1, types, nativeActivation: false }));
+  probed.interactionProbe = { focusedIx: [1], activatedIx: [1] };
+  const after = deriveHandlerIssues(probed).find((i) => i.kind === "unprobed-handler-types")!;
+  assert.match(after.message, /NOT exercised by this run/);
+  // Asserted on `types` rather than the sentence: the advice in it contains the words
+  // "focus" and "drag", so a message regex passes on the prose and proves nothing.
+  assert.deepEqual(after.types, ["click", "dragstart", "wheel"], "click never fired on a role-only element");
+
+  // Same element, native: the browser turns the keypress into a click, measured on
+  // <button>, <a href>, input[type=submit|button|reset|checkbox|radio] and <summary>.
+  const native = surface(entry({ ix: 1, types, nativeActivation: true }));
+  native.interactionProbe = { focusedIx: [1], activatedIx: [1] };
+  const nativeWarn = deriveHandlerIssues(native).find((i) => i.kind === "unprobed-handler-types")!;
+  assert.deepEqual(nativeWarn.types, ["dragstart", "wheel"]);
+
+  // Reached by the tab walk but never activated — its role has no activation key
+  // (`activationKeyForRole` returns null for a link, a textbox, an option, a slider). Focus
+  // fired, the keyboard handler did not.
+  const focusedOnly = surface(entry({ ix: 1, types, nativeActivation: true }));
+  focusedOnly.interactionProbe = { focusedIx: [1], activatedIx: [] };
+  const focusedWarn = deriveHandlerIssues(focusedOnly).find((i) => i.kind === "unprobed-handler-types")!;
+  assert.deepEqual(focusedWarn.types, ["click", "dragstart", "keydown", "wheel"], "no keypress, no synthesized click");
+
+  // Beyond --max-elements, or never discovered: the probe ran but not here.
+  const missed = surface(entry({ ix: null, types, nativeActivation: true }));
+  missed.interactionProbe = { focusedIx: [0], activatedIx: [0] };
+  const missedWarn = deriveHandlerIssues(missed).find((i) => i.kind === "unprobed-handler-types")!;
+  assert.deepEqual(missedWarn.types, ["click", "dragstart", "focus", "keydown", "wheel"]);
 });
 
 // ---------------------------------------------------------------------------
@@ -837,8 +875,12 @@ test("E2E: driving the drag separates three kinds of source", { timeout: 180_000
     (row("ok")?.observedTypes ?? []).slice().sort(),
     ["drag", "dragend", "dragenter", "dragleave", "dragover", "dragstart", "drop"],
   );
+  // Every drag type was driven, so none of them is disclosed as unexercised. `keydown` still is
+  // — #ok carries one as its keyboard alternative and this gate presses nothing — which is the
+  // honest report for a run of `scan handlers --probe-drag`.
   const unprobed = issues.find((i) => i.kind === "unprobed-handler-types");
-  assert.equal(unprobed, undefined, `nothing should remain unprobed: ${unprobed?.message ?? ""}`);
+  assert.ok(unprobed, "the keydown handler was not exercised, and that has to be said");
+  assert.deepEqual(unprobed.types, ["keydown"], "every drag type was driven; only the keydown was not");
 
   // Without the flag there is no row at all — absent means not measured.
   const noProbe = await buildHandlerSurface({ source });
