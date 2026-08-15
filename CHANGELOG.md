@@ -135,6 +135,34 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **`--probe hover`: content that appears on hover and not on focus.** WCAG 1.4.13 and 2.1.1 — the
+  tooltip, the menu, the row of actions that only a mouse ever sees. The probe hovers each trigger,
+  then focuses the same trigger, and diffs what became visible:
+
+    | trigger | hover reveals | focus reveals | |
+    |---|---|---|---|
+    | CSS `:hover` only | `#t1` | — | `hover-only-reveal` |
+    | CSS `:hover, :focus` | `#t2` | `#t2` | |
+    | JS `mouseenter` only | `#t3` | — | `hover-only-reveal` |
+    | JS `mouseenter` + `focus` | `#t4` | `#t4` | |
+    | hover handler that reveals nothing | — | — | the null control |
+
+  - **What appears is outside the trigger's box** — a tooltip is a sibling positioned below — so the
+    measurement is a diff of what is visible on the whole page, not a screenshot of the trigger. An
+    element-local shot sees nothing change.
+  - **Triggers come from the stylesheets as well as the listeners.** The CSS-only trigger has no
+    listener to find and is the common form of this defect, so every selector containing `:hover`
+    contributes one. Reading them turned up a live gap in the walk: since CSS Nesting shipped, a
+    plain `CSSStyleRule` also has a `cssRules` property — an empty list, which is truthy — so
+    `if (rule.cssRules) { recurse; continue; }` stepped into every style rule's empty child list and
+    never looked at a selector. The fixture reporting only its JS triggers is what exposed it.
+  - **The finding is emitted from the probe rows, not the per-element loop.** A CSS-only trigger has
+    no entry in the handler surface at all, so the rule sitting inside that loop reported the JS
+    trigger and silently skipped the CSS one the probe had measured correctly.
+  - An unfocusable trigger gets the other half of the fix: `tabindex="0"` first, then the focus
+    reveal. Unreadable stylesheets (another origin) and triggers beyond the cap of 12 are both
+    disclosed rather than passed over.
+
 - **`--probe <families>` and the first family beyond drag: the wheel.** Six interaction families
   were asked for; this is the plumbing plus the one that measured cleanest. `--probe drag,wheel` or
   `--probe all`; `--probe-drag` still means `--probe drag`. An unknown family is a usage error, not

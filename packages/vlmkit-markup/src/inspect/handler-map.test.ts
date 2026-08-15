@@ -11,6 +11,7 @@ import {
   buildHandlerSurface,
   deriveHandlerIssues,
   isPointerDragSurface,
+  PROBE_FAMILIES,
   type HandlerSurface,
   type HandlerSurfaceEntry,
 } from "./handler-map.ts";
@@ -1420,9 +1421,89 @@ test("--probe rejects a family it does not have", async () => {
   const { parseProbeFamilies } = await import("../gates/handlers.gate.ts");
   assert.deepEqual(parseProbeFamilies(["--probe", "wheel"]), ["wheel"]);
   assert.deepEqual(parseProbeFamilies(["--probe", "drag,wheel"]), ["drag", "wheel"]);
-  assert.deepEqual(parseProbeFamilies(["--probe", "all"]).sort(), ["drag", "wheel"]);
+  // `all` follows the family list, so this grows with it rather than pinning a stale set.
+  assert.deepEqual(parseProbeFamilies(["--probe", "all"]).sort(), [...PROBE_FAMILIES].sort());
+  assert.ok(PROBE_FAMILIES.length >= 3, "drag, wheel, hover");
   assert.deepEqual(parseProbeFamilies([]), []);
   // A typo that quietly probes nothing is the failure mode every "absent means not measured" rule
   // in this file exists to avoid, so it is a usage error.
   assert.throws(() => parseProbeFamilies(["--probe", "whee"]), /unknown family. Known: drag, wheel/);
+});
+
+// ---------------------------------------------------------------------------
+// Hover, and whether focus does the same (WCAG 1.4.13)
+
+function hoverRow(over: Partial<import("./handler-map.ts").HoverProbe> & { path: string }) {
+  return { text: "t", revealedOnHover: [], revealedOnFocus: [], focusable: true, ...over };
+}
+
+test("revealed on hover and on nothing else is the finding; the three other states are not", () => {
+  const s = surface(entry({ path: "span#tip", types: { mouseenter: 1 } }));
+  const kinds = () => deriveHandlerIssues(s).filter((i) => i.kind === "hover-only-reveal");
+
+  s.hoverProbe = [hoverRow({ path: "span#tip", revealedOnHover: ["#t1|help"] })];
+  assert.equal(kinds().length, 1);
+  assert.match(kinds()[0]!.message, /reveals #t1 on hover and nothing on focus/);
+  assert.match(kinds()[0]!.message, /:focus \/ :focus-visible/, "the focusable fix");
+
+  // Focus reveals it too — the correct implementation.
+  s.hoverProbe = [hoverRow({ path: "span#tip", revealedOnHover: ["#t1|help"], revealedOnFocus: ["#t1|help"] })];
+  assert.deepEqual(kinds(), []);
+
+  // A hover handler that reveals nothing. A rule keyed on "has a hover handler and no focus
+  // handler" would report this, which is why the rule is keyed on what was measured instead.
+  s.hoverProbe = [hoverRow({ path: "span#tip" })];
+  assert.deepEqual(kinds(), []);
+
+  // Not driven, and an errored row measured nothing.
+  s.hoverProbe = [hoverRow({ path: "span#tip", revealedOnHover: ["#t1|help"], error: "no usable box" })];
+  assert.deepEqual(kinds(), []);
+  delete s.hoverProbe;
+  assert.deepEqual(kinds(), []);
+
+  // An unfocusable trigger gets the other half of the fix.
+  s.hoverProbe = [hoverRow({ path: "span#tip", revealedOnHover: ["#t1|help"], focusable: false })];
+  assert.match(kinds()[0]!.message, /cannot even be focused/);
+  assert.match(kinds()[0]!.message, /tabindex="0"/);
+});
+
+test("a hover finding needs no entry in the handler surface", () => {
+  // The common form of this defect is a CSS `:hover` rule with no listener anywhere, so the trigger
+  // is not in the surface at all. Keeping the rule inside the per-element loop reported the fixture's
+  // JS trigger and silently skipped its CSS one, which the probe had measured correctly.
+  const s: HandlerSurface = { source: "x.html", elements: [], globals: {}, totalRegistrations: 0 };
+  s.hoverProbe = [hoverRow({ path: "span#css", text: "CSS only", revealedOnHover: ["#tip|help"] })];
+  const found = deriveHandlerIssues(s).filter((i) => i.kind === "hover-only-reveal");
+  assert.equal(found.length, 1);
+  assert.match(found[0]!.element, /span#css "CSS only"/);
+});
+
+test("E2E: hover triggers come from the stylesheets as well as from the listeners",
+  { timeout: 180_000 }, async () => {
+  const s = await buildHandlerSurface({
+    source: join(REPO_ROOT, "fixtures/handlers/hover-vs-focus.html"),
+    probes: ["hover"],
+  });
+  const row = (id: string) => s.hoverProbe?.find((r) => r.path.endsWith(`#${id}`));
+
+  // Both routes to a trigger. The CSS pair has no listener of any kind — before the stylesheet walk
+  // they were invisible to this gate, and `#cssHoverOnly` is the shape most of these defects take.
+  for (const id of ["jsHoverOnly", "jsBoth", "cssHoverOnly", "cssBoth", "noTabindex", "nothing"]) {
+    assert.ok(row(id), `${id} must be probed`);
+  }
+  assert.deepEqual(row("cssHoverOnly")!.revealedOnHover.map((l) => l.split("|")[0]), ["#t1"]);
+  assert.deepEqual(row("cssHoverOnly")!.revealedOnFocus, []);
+  assert.deepEqual(row("cssBoth")!.revealedOnFocus.map((l) => l.split("|")[0]), ["#t2"]);
+  assert.equal(row("noTabindex")!.focusable, false);
+  assert.deepEqual(row("nothing")!.revealedOnHover, [], "the null control reveals nothing");
+
+  const flagged = deriveHandlerIssues(s)
+    .filter((i) => i.kind === "hover-only-reveal").map((i) => i.element);
+  assert.equal(flagged.length, 3, flagged.join(", "));
+  for (const id of ["cssHoverOnly", "jsHoverOnly", "noTabindex"]) {
+    assert.ok(flagged.some((el) => el.includes(`#${id}`)), `${id} must report`);
+  }
+  for (const id of ["cssBoth", "jsBoth", "nothing"]) {
+    assert.equal(flagged.some((el) => el.includes(`#${id}`)), false, `${id} must stay silent`);
+  }
 });

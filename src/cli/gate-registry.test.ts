@@ -79,7 +79,7 @@ describe("composed built-in registry", () => {
     }
   });
 
-  it("declares 155 tunable rules in total", async () => {
+  it("declares 157 tunable rules in total", async () => {
     // A canary, not a target: a gate losing its rule table to a bad merge is
     // otherwise invisible until someone tries to tune it.
     // 119 → 120 when `check copy` gained `copy-truncated` (element-rect mode, vlmkit#118).
@@ -151,8 +151,13 @@ describe("composed built-in registry", () => {
     //       `{ passive: true }`, or the event is not cancelable at all. Measured per element from
     //       the listener patch: the same wheel handler records the call as ineffective under
     //       `{ passive: true }` and effective under `{ passive: false }` and with no option given.
+    // 155 → 157: `hover-only-reveal` (WCAG 1.4.13 / 2.1.1), on both gates. Hovering the trigger
+    //       made something visible and focusing the same trigger made nothing visible. Its triggers
+    //       come from the stylesheets as well as the listeners, because the common form is a CSS
+    //       `:hover` rule with no listener anywhere — and for the same reason the finding is emitted
+    //       from the probe rows rather than the per-element loop.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 155);
+    assert.equal(total, 157);
   });
 
   it("gives every built-in gate a category", async () => {

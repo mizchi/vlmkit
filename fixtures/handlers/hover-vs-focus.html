@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hover, and whether focus does the same</title>
+<!--
+  WCAG 1.4.13 and 2.1.1: content that appears on hover has to appear on keyboard focus too, or the
+  keyboard user never sees it. `vlmkit scan handlers <this> --probe hover` hovers each trigger, then
+  focuses the same trigger, and diffs what became visible either way.
+
+    trigger            hover reveals   focus reveals   verdict
+    #cssHoverOnly      #t1             -               hover-only-reveal
+    #cssBoth           #t2             #t2             -
+    #jsHoverOnly       #t3             -               hover-only-reveal
+    #jsBoth            #t4             #t4             -
+    #noTabindex        #t5             -               hover-only-reveal, and it cannot be focused
+    #nothing           -               -               -   (a hover handler that reveals nothing)
+
+  Three things this fixture is here to pin:
+
+  **The CSS-only trigger has no listener at all**, so a probe that starts from the handler surface
+  never sees it — and it is the common form of this defect. Triggers therefore also come from every
+  selector containing `:hover`, read from the stylesheets. `#cssHoverOnly` and `#cssBoth` are that
+  pair, and for the same reason the finding is emitted from the probe rows rather than from the
+  per-element loop: a CSS-only trigger has no entry in the surface to hang a finding on.
+
+  **What appears is outside the trigger's box.** Every tooltip here is a sibling, positioned below.
+  A screenshot of the trigger would see nothing change, which is why the measurement is a diff of
+  what is visible on the whole page.
+
+  **`#nothing` is the null control.** A hover handler that reveals nothing is not a defect, and a
+  rule that keyed on "has a hover handler and no focus handler" would report it.
+
+  `#noTabindex` gets a different sentence: an unfocusable trigger needs `tabindex="0"` before a
+  focus reveal is even possible, while the others only need the reveal wired to `:focus`.
+-->
+<style>
+  body { font: 15px/1.4 system-ui, sans-serif; padding: 20px; display: flex; gap: 24px; flex-wrap: wrap; }
+  .wrap { position: relative; }
+  .trigger { background: #eceff4; padding: 4px 8px; }
+  .broken { background: #fbeaea; }
+  .tip { display: none; background: #23272e; color: #fff; padding: 4px 8px; position: absolute; margin-top: 24px; white-space: nowrap; }
+  /* The defect, in CSS: revealed on hover and on nothing else. */
+  .hover-only:hover + .tip { display: block; }
+  /* The same thing done correctly. */
+  .hover-and-focus:hover + .tip,
+  .hover-and-focus:focus + .tip { display: block; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <span class="trigger broken hover-only" id="cssHoverOnly" tabindex="0">CSS :hover only</span>
+  <span class="tip" id="t1">CSS-only help</span>
+</div>
+
+<div class="wrap">
+  <span class="trigger hover-and-focus" id="cssBoth" tabindex="0">CSS hover+focus</span>
+  <span class="tip" id="t2">CSS help</span>
+</div>
+
+<div class="wrap">
+  <span class="trigger broken" id="jsHoverOnly" tabindex="0">JS hover only</span>
+  <span class="tip" id="t3">JS-only help</span>
+</div>
+
+<div class="wrap">
+  <span class="trigger" id="jsBoth" tabindex="0">JS hover+focus</span>
+  <span class="tip" id="t4">JS help</span>
+</div>
+
+<div class="wrap">
+  <!-- No tabindex: focus() cannot move here at all, so the fix starts one step earlier. -->
+  <span class="trigger broken hover-only" id="noTabindex">CSS :hover, not focusable</span>
+  <span class="tip" id="t5">unreachable help</span>
+</div>
+
+<div class="wrap">
+  <span class="trigger" id="nothing" tabindex="0">hover handler, no reveal</span>
+</div>
+
+<script>
+  const show = (id, on) => { document.getElementById(id).style.display = on ? "block" : "none"; };
+
+  // The defect, in JS: revealed on mouseenter and on nothing else.
+  const only = document.getElementById("jsHoverOnly");
+  only.addEventListener("mouseenter", () => show("t3", true));
+  only.addEventListener("mouseleave", () => show("t3", false));
+
+  // The same thing done correctly: the reveal is wired to focus as well.
+  const both = document.getElementById("jsBoth");
+  both.addEventListener("mouseenter", () => show("t4", true));
+  both.addEventListener("mouseleave", () => show("t4", false));
+  both.addEventListener("focus", () => show("t4", true));
+  both.addEventListener("blur", () => show("t4", false));
+
+  // The null control: a hover handler that shows nothing.
+  document.getElementById("nothing").addEventListener("mouseenter", () => { void 0; });
+</script>
+</body>
+</html>

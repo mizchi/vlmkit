@@ -129,6 +129,10 @@ export interface HandlerSurface {
   unreachableTargets?: { path: string; interceptedBy: string }[];
   /** Present only when the `wheel` family was driven. Absent means "not measured". */
   wheelProbe?: WheelProbe[];
+  /** Present only when the `hover` family was driven. Absent means "not measured". */
+  hoverProbe?: HoverProbe[];
+  /** Stylesheets the hover probe could not read (another origin), and triggers left unvisited. */
+  hoverProbeLimits?: { unreadableSheets: number; capped: number };
   /**
    * Per element and type: a handler that CALLED `preventDefault()` and whether the call did
    * anything. Collected for every element the run touched, from the listener patch.
@@ -1254,6 +1258,163 @@ async function probeRealDrags(
 }
 
 /**
+ * What hovering an element revealed, and whether focusing it revealed the same thing.
+ *
+ * WCAG 1.4.13 and 2.1.1: content that appears on hover has to appear on keyboard focus too, or the
+ * keyboard user never sees it. Measured as a diff of what is VISIBLE on the page, not of the
+ * element's own pixels — the thing that appears is a tooltip or a menu positioned outside the
+ * trigger's box, so an element-local screenshot would see nothing.
+ *
+ * Four shapes, all separated on the fixture:
+ *
+ *     trigger                       hover reveals   focus reveals
+ *     CSS :hover only               #t1             -              <- defect
+ *     CSS :hover, :focus            #t2             #t2
+ *     JS mouseenter only            #t3             -              <- defect
+ *     JS mouseenter + focus         #t4             #t4
+ *     handler that reveals nothing  -               -              <- nothing to say
+ *
+ * **The CSS-only trigger is the common form and has no JS handler at all**, so the target list
+ * cannot come from the handler surface alone: it also takes every element matched by a selector
+ * containing `:hover`, read from the stylesheets.
+ */
+export interface HoverProbe {
+  path: string;
+  /** The trigger's own visible text, for the finding. Its own, because a CSS-only trigger has no
+   * entry in the handler surface to borrow one from. */
+  text: string;
+  /** Elements that became visible while hovering, as `path|text` labels. */
+  revealedOnHover: string[];
+  /** The same, while focused. */
+  revealedOnFocus: string[];
+  /** False when `focus()` did not move the active element — the trigger cannot be focused at all. */
+  focusable: boolean;
+  error?: string;
+}
+
+/**
+ * Everything visible right now, as a set of labels.
+ *
+ * Cheap and stable: a label is the element's id-or-tag plus the first 20 characters of its text, so
+ * a tooltip that appears reads as a new entry and a re-layout of existing content does not.
+ */
+const VISIBLE_SNAPSHOT_SCRIPT = String.raw`
+(() => {
+  const out = [];
+  for (const el of document.querySelectorAll("*")) {
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) continue;
+    const s = getComputedStyle(el);
+    if (s.display === "none" || s.visibility === "hidden" || Number(s.opacity) === 0) continue;
+    out.push((el.id ? "#" + el.id : el.tagName.toLowerCase()) + "|" + (el.textContent || "").trim().slice(0, 20));
+    if (out.length >= 800) break;
+  }
+  return out;
+})()
+`;
+
+/**
+ * Elements a stylesheet styles on `:hover`.
+ *
+ * The CSS-only trigger has no listener to find, so the selectors are where it has to come from.
+ * A sheet from another origin throws on `.cssRules`, and that is disclosed rather than swallowed —
+ * the same treatment `check integrity` gives an unreadable stylesheet.
+ */
+const HOVER_SELECTOR_SCRIPT = String.raw`
+(() => {
+  ${DESCRIBE_PATH_FN}
+  const paths = [];
+  let unreadable = 0;
+  const visit = (rules) => {
+    for (const rule of rules) {
+      // selectorText FIRST, and recursion in addition rather than instead. Since CSS Nesting
+      // shipped, a plain CSSStyleRule also has a cssRules property -- an empty list, which is
+      // truthy -- so "if (rule.cssRules) recurse and continue" walked into every style rule's empty
+      // child list and never looked at a selector. Found by the fixture reporting only its JS
+      // triggers while the sheet plainly contained two :hover rules.
+      if (rule.cssRules && rule.cssRules.length) visit(rule.cssRules);
+      const sel = rule.selectorText;
+      if (!sel || sel.indexOf(":hover") === -1) continue;
+      for (const part of sel.split(",")) {
+        // The element that has to be hovered is the one carrying :hover, so drop whatever the
+        // selector says about its siblings or descendants after that point.
+        const cut = part.indexOf(":hover");
+        const trigger = part.slice(0, cut).trim();
+        if (!trigger) continue;
+        try {
+          for (const el of document.querySelectorAll(trigger)) {
+            const r = el.getBoundingClientRect();
+            if (r.width < 1 || r.height < 1) continue;
+            const p = describe(el);
+            if (p && paths.indexOf(p) === -1) paths.push(p);
+          }
+        } catch (e) { /* a selector querySelectorAll cannot parse, e.g. one with ::part */ }
+      }
+    }
+  };
+  for (const sheet of document.styleSheets) {
+    try { visit(sheet.cssRules); } catch (e) { unreadable++; }
+  }
+  return { paths: paths, unreadable: unreadable };
+})()
+`;
+
+/**
+ * Hover each trigger, then focus it, and diff what became visible either way.
+ *
+ * Capped at 12 triggers: each one costs two hovers and four snapshots, and a page that styles
+ * fifty things on hover is styling them, not revealing fifty menus. Whatever is left over is
+ * reported as capped rather than passed over.
+ */
+const MAX_HOVER_TARGETS = 12;
+
+async function probeHovers(
+  page: Page,
+  elements: readonly HandlerSurfaceEntry[],
+): Promise<{ rows: HoverProbe[]; unreadableSheets: number; capped: number }> {
+  const fromHandlers = elements
+    .filter((e) => e.visible && (e.types["mouseenter"] || e.types["mouseover"]))
+    .map((e) => e.path);
+  const css = await page.evaluate(HOVER_SELECTOR_SCRIPT) as { paths: string[]; unreadable: number };
+  const all = [...new Set([...fromHandlers, ...css.paths])];
+  const targets = all.slice(0, MAX_HOVER_TARGETS);
+  const rows: HoverProbe[] = [];
+  const snapshot = async () => new Set(await page.evaluate(VISIBLE_SNAPSHOT_SCRIPT) as string[]);
+  for (const path of targets) {
+    const row: HoverProbe = { path, text: "", revealedOnHover: [], revealedOnFocus: [], focusable: false };
+    try {
+      const el = (await handleForPath(page, path)).asElement();
+      if (!el) { row.error = "element not found for its own path"; rows.push(row); continue; }
+      const box = await el.boundingBox();
+      if (!box || box.width < 1 || box.height < 1) { row.error = "no usable box"; rows.push(row); continue; }
+      row.text = (await el.evaluate((node: Element) => (node.textContent ?? "").trim().slice(0, 40))) ?? "";
+      // Neither hovered nor focused. The mouse goes to the corner rather than merely elsewhere,
+      // because "elsewhere" can be another trigger.
+      await page.mouse.move(0, 0);
+      await page.evaluate("(() => { const a = document.activeElement; if (a && a.blur) a.blur(); return true; })()");
+      await page.waitForTimeout(60);
+      const base = await snapshot();
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.waitForTimeout(80);
+      row.revealedOnHover = [...await snapshot()].filter((label) => !base.has(label));
+      await page.mouse.move(0, 0);
+      await page.waitForTimeout(60);
+      row.focusable = await el.evaluate((node: Element) => {
+        (node as HTMLElement).focus?.();
+        return document.activeElement === node || node.contains(document.activeElement);
+      });
+      await page.waitForTimeout(80);
+      row.revealedOnFocus = [...await snapshot()].filter((label) => !base.has(label));
+      await page.evaluate("(() => { const a = document.activeElement; if (a && a.blur) a.blur(); return true; })()");
+    } catch (err) {
+      row.error = err instanceof Error ? err.message.slice(0, 120) : String(err).slice(0, 120);
+    }
+    rows.push(row);
+  }
+  return { rows, unreadableSheets: css.unreadable, capped: Math.max(0, all.length - targets.length) };
+}
+
+/**
  * What a real wheel over a `wheel`-handler element did.
  *
  * `mouse.wheel` is the same input a user's trackpad produces, and it separates cleanly. Measured on
@@ -1359,7 +1520,7 @@ function pixelDelta(a: Buffer, b: Buffer): number {
  * and `wheel` fire the page's own handlers; `input` puts text into fields. A page whose drop
  * handler POSTs will POST, so the default stays an inventory that presses nothing.
  */
-export const PROBE_FAMILIES = ["drag", "wheel"] as const;
+export const PROBE_FAMILIES = ["drag", "wheel", "hover"] as const;
 export type ProbeFamily = typeof PROBE_FAMILIES[number];
 
 export interface HandlerSurfaceOptions extends PageLoadOptions {
@@ -1431,6 +1592,7 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
       ? await probePointerDrags(page, raw.elements)
       : undefined;
     const wheelProbe = probes.has("wheel") ? await probeWheels(page, raw.elements) : undefined;
+    const hover = probes.has("hover") ? await probeHovers(page, raw.elements) : undefined;
     // Every element whose handler called preventDefault during this run, with whether the call had
     // an effect. Asked per element because a WeakMap cannot be enumerated; only for elements that
     // have handlers at all, which is every entry in the surface.
@@ -1478,6 +1640,10 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
       ...(realDragProbe && realDragProbe.length > 0 ? { realDragProbe } : {}),
       ...(unreachableTargets.length > 0 ? { unreachableTargets } : {}),
       ...(wheelProbe && wheelProbe.length > 0 ? { wheelProbe } : {}),
+      ...(hover && hover.rows.length > 0 ? { hoverProbe: hover.rows } : {}),
+      ...(hover && (hover.unreadableSheets > 0 || hover.capped > 0)
+        ? { hoverProbeLimits: { unreadableSheets: hover.unreadableSheets, capped: hover.capped } }
+        : {}),
       ...(cancelAttempts.length > 0 ? { cancelAttempts } : {}),
     };
   });
@@ -1632,7 +1798,8 @@ export interface HandlerIssue {
     | "drag-source-not-draggable" | "drop-without-dragover" | "drag-without-keyboard-alternative"
     | "dragover-not-prevented" | "dragstart-transfers-nothing" | "pointer-drag-intercepted"
     | "drag-source-inert" | "drop-target-unreachable" | "drag-cancel-not-reverted"
-    | "drag-source-detached-mid-drag" | "dragover-handler-slow" | "passive-listener-cannot-cancel";
+    | "drag-source-detached-mid-drag" | "dragover-handler-slow" | "passive-listener-cannot-cancel"
+    | "hover-only-reveal";
   severity: "warn" | "suspect";
   element: string;
   message: string;
@@ -1724,6 +1891,18 @@ export const HANDLER_SURFACE_RULES = [
         + " `drag-source-not-draggable`, which reads the `draggable` property and reports the"
         + " one case that IS statically visible; this covers the ones that are not, and which"
         + " the synthetic dispatch reports as working. Requires --probe-drag.",
+    },
+    {
+      id: "hover-only-reveal",
+      title: "Content that appears on hover and not on focus",
+      severity: "suspect",
+      docs:
+        "WCAG 1.4.13 and 2.1.1: hovering the trigger made something visible and focusing the same"
+        + " trigger made nothing visible, so a keyboard user never sees it. Measured as a diff of"
+        + " what is visible on the PAGE rather than of the trigger's own pixels — a tooltip or menu"
+        + " appears outside the trigger's box. Triggers come from the hover handlers AND from every"
+        + " selector containing `:hover`, because the CSS-only trigger is the common form and has no"
+        + " listener to find. Requires --probe hover.",
     },
     {
       id: "passive-listener-cannot-cancel",
@@ -1846,6 +2025,15 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
     for (const row of surface.realDragProbe) {
       if (row.error) continue;
       for (const t of row.observedTypes ?? []) probedThisRun.add(t);
+    }
+  }
+  if (surface.hoverProbe) {
+    // The probe hovers and focuses each trigger, so those types were genuinely exercised there.
+    for (const row of surface.hoverProbe) {
+      if (row.error) continue;
+      for (const t of ["mouseenter", "mouseover", "mouseleave", "mouseout", "focus", "blur"]) {
+        if (surface.elements.some((e) => e.path === row.path && e.types[t])) probedThisRun.add(t);
+      }
     }
   }
   if (surface.wheelProbe) {
@@ -2192,6 +2380,28 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
       });
     }
   }
+  // Hover triggers are NOT iterated with the handler surface, and that is the point: the common
+  // form of this defect is a CSS `:hover` rule with no listener anywhere, so the trigger has no
+  // entry in the surface at all. Keeping the rule inside the per-element loop reported the JS
+  // trigger on the fixture and silently skipped the CSS one, which the probe had measured
+  // correctly all along.
+  for (const row of surface.hoverProbe ?? []) {
+    if (row.error || row.revealedOnHover.length === 0 || row.revealedOnFocus.length > 0) continue;
+    const what = row.revealedOnHover.slice(0, 3).map((label) => label.split("|")[0]).join(", ");
+    issues.push({
+      kind: "hover-only-reveal",
+      severity: "suspect",
+      element: `${row.path} "${row.text}"`,
+      message: `${row.path} "${row.text}" reveals ${what} on hover and nothing on focus, so a `
+        + `keyboard or assistive-tech user never sees it (WCAG 1.4.13 Content on Hover or Focus, `
+        + `2.1.1). `
+        + (row.focusable
+          ? `The trigger is focusable, so add the same reveal to :focus / :focus-visible, or a focus `
+            + `handler beside the hover one.`
+          : `The trigger cannot even be focused — give it tabindex="0" (or make it a button), then `
+            + `reveal on focus as well as on hover.`),
+    });
+  }
   // Disclose the blind spot instead of printing a clean bill of health.
   // React-style root delegation registers pointer handlers on the
   // container, not on the elements, so per-element attribution — the whole
@@ -2482,6 +2692,31 @@ export function formatHandlerSurface(
           ? ` ${YELLOW}(nothing moved — dead handlers, or the drag does not start here)${RESET}`
           : ""),
       );
+    }
+  }
+  if (surface.hoverProbe && surface.hoverProbe.length > 0) {
+    lines.push("");
+    lines.push(`${BOLD}Hover, then focus (same trigger):${RESET}`);
+    for (const row of surface.hoverProbe) {
+      if (row.error) {
+        lines.push(`  - ${row.path}: ${YELLOW}not driven — ${row.error}${RESET}`);
+        continue;
+      }
+      const label = (list: string[]) => list.length === 0
+        ? "nothing"
+        : list.slice(0, 3).map((l) => l.split("|")[0]).join(", ") + (list.length > 3 ? ` +${list.length - 3}` : "");
+      lines.push(
+        `  - ${row.path}: hover reveals ${label(row.revealedOnHover)}, focus reveals ${label(row.revealedOnFocus)}`
+        + (row.focusable ? "" : ` ${DIM}(not focusable)${RESET}`),
+      );
+    }
+    if (surface.hoverProbeLimits) {
+      const { unreadableSheets, capped } = surface.hoverProbeLimits;
+      const notes = [
+        unreadableSheets > 0 ? `${unreadableSheets} stylesheet(s) unreadable (another origin) — their :hover triggers were not found` : "",
+        capped > 0 ? `${capped} more trigger(s) not visited (cap ${MAX_HOVER_TARGETS})` : "",
+      ].filter(Boolean);
+      if (notes.length > 0) lines.push(`  ${DIM}${notes.join("; ")}${RESET}`);
     }
   }
   if (surface.wheelProbe && surface.wheelProbe.length > 0) {
