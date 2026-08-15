@@ -204,6 +204,31 @@ suppression works per *rule* instead of per whole gate.
   the gesture (`{}` invocations) from a merely inert handler (the full trio) — because doing
   it safely means patching `removeEventListener` too, or the tool alters the page it measures.
 
+- **`pointer-drag-intercepted`: drag handlers that a real gesture never invoked.** The one
+  outcome of the pointer-drag probe with a single explanation, and the only one graded. Two
+  pads with identical registrations are indistinguishable in pixels — both 0.00%/0.00% — and
+  are different defects: one's handlers run the full trio and do nothing, the other's never
+  run at all because a transparent sibling takes every event. Counting invocations of the
+  element's *own* listeners separates them, so an overlay swallowing a drag surface is now a
+  suspect while an inert one stays evidence.
+
+  Making that safe was the work. A wrapper is a different function object, so
+  `removeEventListener(type, fn)` stops matching and every add-then-remove leaks a live
+  listener — the tool would alter the page it measures. A WeakMap from the page's listener to
+  its wrapper, with the same lookup on `removeEventListener`, prevents it, and a test runs a
+  fixture with and without the patch and asserts the page's own log is identical: a listener
+  removed by reference, `{ once: true }` firing exactly once across two clicks, an object
+  listener with `handleEvent` (`this` is the object), a function listener (`this` is the
+  element), the same function in both phases with only the capture one removed, and a
+  throwing listener that must not stop the rest. Breaking the `removeEventListener` half makes
+  that test report `+ "REMOVED-FIRED"`.
+
+  Install order is load-bearing and was measured, not reasoned: the counting patch goes on
+  *before* `HANDLER_PATCH_SCRIPT`, or the registration recorder captures
+  `"function () { bump(this); return invoke.apply(…"` instead of the page's own listener and
+  every handler snippet in the report is silently the wrapper's source. Only installed for
+  probe runs — the inventory has no use for it, and every patch is a chance to alter the page.
+
 - **An icon-only control now identifies itself in the handler surface.** On that same editor,
   eight rows read `div>div>div>button ""` — one per toolbar icon — with *both* identity
   signals blank at once: no text (icons), and no `id` or `class`, so `describe()` produced the

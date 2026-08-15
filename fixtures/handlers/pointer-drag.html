@@ -2,26 +2,32 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Pointer-driven drag — four outcomes</title>
+<title>Pointer-driven drag — five outcomes</title>
 <!--
   The drag that is NOT the HTML5 drag-and-drop API. No `dragstart` anywhere on this page:
   every pad here drags with pointerdown / pointermove / pointerup, which is how canvas
   editors, sortable lists, sliders, maps and split panes all work.
 
   `vlmkit scan handlers <this> --probe-drag` performs a real mouse gesture on each pad and
-  reports two numbers per pad. The measured separation, which is what the pixel comparison
-  is for:
+  reports two numbers plus an invocation count per pad. The measured separation, which is what
+  the pixel comparison is for:
 
     pad              feedback while held   changed after release
     #works                  ~3%                   ~3%      moves and stays
     #feedback-only          ~3%                   0.00%    moves, reverts on release
     #dead                   0.00%                 0.00%    handlers wired, nothing happens
     #canvas-works           ~1%                   ~2%      the DOM NEVER changes
+    #swallowed              0.00%                 0.00%    a transparent sibling covers it
 
   #canvas-works is why the probe compares screenshots rather than the DOM. A DOM comparison
   would call every <canvas> editor dead; the pixels say otherwise.
 
-  The numbers are reported, not graded. A 0.00% row is ambiguous on a real page — dead
+  #swallowed looks identical to #dead in pixels and is a different defect, which is why the
+  probe also counts invocations of the page's OWN listeners. Its handlers never run at all
+  (0 invocations) while #dead's run the full trio and do nothing — so #swallowed is the one
+  case with a single explanation, and the only one graded: `pointer-drag-intercepted`.
+
+  The pixel numbers are reported, not graded. A 0.00% row is ambiguous on a real page — dead
   handlers, a gesture that began somewhere ungrabbable, and feedback painted outside the
   element's own box are indistinguishable from here — so `#dead` produces evidence a reader
   can act on rather than a finding the tool cannot justify.
@@ -42,6 +48,10 @@
 <div class="pad" id="feedback-only"><div class="dot" id="d2"></div></div>
 <div class="pad broken" id="dead"><div class="dot" id="d3"></div></div>
 <canvas class="pad" id="canvas-works" width="200" height="160"></canvas>
+<div style="position:relative">
+  <div class="pad broken" id="swallowed"><div class="dot" id="d4"></div></div>
+  <div id="veil" style="position:absolute;inset:0;background:rgba(0,0,0,0.001)"></div>
+</div>
 
 <script>
   const $ = (id) => document.getElementById(id);
@@ -111,6 +121,23 @@
       ctx.stroke();
     });
     c.addEventListener("pointerup", () => { held = false; });
+  })();
+
+  // 5. Registered and reachable-looking, with a transparent SIBLING covering the pad. Every
+  //    pointer event goes to the veil, so these listeners are never invoked. A stray modal
+  //    backdrop or a z-index slip does this in real apps. Note the overlay must be a sibling:
+  //    a child would bubble to the pad and the handlers WOULD run.
+  (() => {
+    const pad = $("swallowed"), dot = $("d4");
+    let held = false;
+    pad.addEventListener("pointerdown", () => { held = true; });
+    pad.addEventListener("pointermove", (e) => {
+      if (!held) return;
+      const [x, y] = local(pad, e);
+      dot.style.left = x + "px";
+      dot.style.top = y + "px";
+    });
+    pad.addEventListener("pointerup", () => { held = false; });
   })();
 </script>
 </body>

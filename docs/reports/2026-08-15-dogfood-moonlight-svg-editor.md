@@ -117,13 +117,37 @@ a gesture that began somewhere ungrabbable, and feedback painted outside the ele
 indistinguishable from here. Turning it into a finding would report a state this has not
 established, so `#dead` yields evidence rather than a verdict.
 
-There is one unambiguous variant, measured and **not** shipped yet: wrapping the page's own
-listeners shows whether they ran at all, and an overlay that swallows the gesture is the one
-case where "registered, gesture delivered, never invoked" has a single explanation —
-`{}` invocations for a pad under a transparent sibling, versus the full trio for both the
-working and the dead pad. Doing that means patching `removeEventListener` alongside
-`addEventListener` (a wrapper breaks removal by reference and would make the tool alter the
-page it measures), which is why it is separate.
+### The one graded outcome: `pointer-drag-intercepted`
+
+Wrapping the page's own listeners answers what pixels cannot — did they run at all? Two pads
+with identical registrations look the same in pixels and are different defects:
+
+| pad | pixels | own-listener invocations |
+|---|---|---|
+| `#dead` | 0.00% / 0.00% | the full trio — reachable, and inert |
+| `#swallowed` | 0.00% / 0.00% | **0** — a transparent sibling takes every event |
+
+"Registered, gesture delivered over the box, nothing invoked" has one explanation: something
+is between the pointer and the listener — an overlay or backdrop, `pointer-events` on an
+ancestor, a listener on a detached node. So that is a suspect, and `#dead` stays evidence.
+
+Making it safe was most of the work, and two things were measured rather than reasoned:
+
+- **A wrapper breaks `removeEventListener` by reference**, so every add-then-remove would leak
+  a live listener and the tool would alter the page it measures. A WeakMap from the page's
+  listener to its wrapper fixes it. A test runs a fixture with and without the patch and
+  requires the page's own log to be identical — covering removal by reference, `{ once: true }`
+  across two clicks, an object listener with `handleEvent`, `this` in a function listener, the
+  same function in both phases with only the capture one removed, and a throwing listener that
+  must not stop the rest. Removing the `removeEventListener` half makes it report
+  `+ "REMOVED-FIRED"`.
+- **Install order decides whether the handler snippets are real.** The counting patch has to go
+  on *before* `HANDLER_PATCH_SCRIPT`; the other order makes the registration recorder capture
+  `"function () { bump(this); return invoke.apply(…"` — the wrapper's own source — for every
+  listener on the page. Both orders were run and diffed.
+
+On this editor's canvas the count is nonzero and no `pointer-drag-intercepted` is reported,
+which is the control: the canvas is reachable, and its finding remains the keyboard one.
 
 ## Finding 2 — eight findings that could not say which element they were about
 

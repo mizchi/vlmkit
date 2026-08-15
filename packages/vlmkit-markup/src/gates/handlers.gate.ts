@@ -52,6 +52,12 @@ somewhere ungrabbable, and feedback painted outside the box. What it
 does settle is that those types were exercised, so they stop being
 listed as uncovered.
 
+It also counts invocations of the element's OWN listeners, and that
+one IS graded: registered handlers a delivered gesture never invoked
+means something is intercepting -- an overlay, pointer-events on an
+ancestor, a listener on a detached node. That separates "unreachable"
+from "reachable but inert", which pixels cannot.
+
 --probe-drag adds the two that no static read can reach, by firing
 the sequence and watching what happens: a dragover handler that
 never calls preventDefault (registered, so the check above passes

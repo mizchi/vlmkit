@@ -79,7 +79,7 @@ describe("composed built-in registry", () => {
     }
   });
 
-  it("declares 141 tunable rules in total", async () => {
+  it("declares 143 tunable rules in total", async () => {
     // A canary, not a target: a gate losing its rule table to a bad merge is
     // otherwise invisible until someone tries to tune it.
     // 119 → 120 when `check copy` gained `copy-truncated` (element-rect mode, vlmkit#118).
@@ -117,8 +117,13 @@ describe("composed built-in registry", () => {
     //       rejects the drop anyway — and `dragstart-transfers-nothing` needs the drag to
     //       have actually run. Both come from dispatching, so they only appear with
     //       `--probe-drag` or `check interactions --handlers`.
+    // 141 → 143: `pointer-drag-intercepted`, on both gates that spread
+    //       HANDLER_SURFACE_RULES. The only *graded* outcome of the pointer-drag gesture —
+    //       registered handlers that a delivered gesture never invoked has one explanation
+    //       (something is intercepting), while 0% pixels has several, so the pixel numbers
+    //       beside it are reported and not graded.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 141);
+    assert.equal(total, 143);
   });
 
   it("gives every built-in gate a category", async () => {

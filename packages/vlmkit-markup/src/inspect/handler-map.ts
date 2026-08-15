@@ -103,6 +103,89 @@ export const HANDLER_PATCH_SCRIPT = `
 })()
 `;
 
+
+/**
+ * Count invocations of the page's OWN listeners, without changing how they behave.
+ *
+ * Answers one question the pixel probe cannot: did the element's handlers run at all? A
+ * gesture that produced no visible change is ambiguous, but a gesture that invoked *nothing*
+ * has one explanation — something is between the pointer and the listener. Measured on three
+ * pads with identical registrations:
+ *
+ *   working pad                 pointerdown 1, pointermove 5, pointerup 1
+ *   inert pad (handlers do nothing)   the same
+ *   pad under a transparent sibling   {} -- never invoked
+ *
+ * **Install this BEFORE HANDLER_PATCH_SCRIPT.** Both patch `addEventListener`, and the last
+ * one installed is the outermost, so the registration recorder has to see the page's real
+ * function rather than this wrapper. Measured both orders: invocation-patch first gives
+ * `samples` of "function pageHandler(e){ window.ran = true; }", the other order gives
+ * "function () { const tag = this === window ? ..." -- the wrapper's own source, which would
+ * silently corrupt every handler snippet in the report.
+ *
+ * ## Fidelity
+ *
+ * A wrapper is a different function object, so `removeEventListener(type, fn)` would stop
+ * matching and every "add then remove" would leak a live listener — the tool would alter the
+ * page it is measuring. A WeakMap from the page's listener to its wrapper, plus the same
+ * lookup on `removeEventListener`, is what prevents that.
+ *
+ * Verified by running a fixture with and without this patch and diffing the page's own log:
+ * byte-identical. It covers a listener removed by reference (never fires), `{ once: true }`
+ * (fires exactly once across two clicks), an object listener with `handleEvent` (`this` is the
+ * object), a function listener (`this` is the element), the same function registered in both
+ * phases with only the capture one removed, and a throwing listener that must not stop the
+ * listeners after it.
+ *
+ * Keyed by (listener, type) and not by the capture flag on purpose: the browser's identity is
+ * (type, listener, capture), and reusing one wrapper for both phases is what lets
+ * `removeEventListener(type, fn, true)` remove only the capture registration. Pinned.
+ */
+export const HANDLER_INVOCATION_PATCH_SCRIPT = `
+(() => {
+  const counts = new WeakMap();
+  const wrappers = new WeakMap();
+  const origAdd = EventTarget.prototype.addEventListener;
+  const origRemove = EventTarget.prototype.removeEventListener;
+  const bump = (target) => {
+    counts.set(target, (counts.get(target) || 0) + 1);
+  };
+  const wrapperFor = (type, listener) => {
+    let perType = wrappers.get(listener);
+    if (!perType) { perType = new Map(); wrappers.set(listener, perType); }
+    const existing = perType.get(type);
+    if (existing) return existing;
+    // Preserves this and arguments, and returns whatever the page returned.
+    const invoke = typeof listener === "function"
+      ? function () { return listener.apply(this, arguments); }
+      : function () { return listener.handleEvent.apply(listener, arguments); };
+    const wrapped = function () {
+      bump(this);
+      return invoke.apply(this, arguments);
+    };
+    perType.set(type, wrapped);
+    return wrapped;
+  };
+  EventTarget.prototype.addEventListener = function (type, listener, opts) {
+    if (!listener) return origAdd.call(this, type, listener, opts);
+    try {
+      return origAdd.call(this, type, wrapperFor(String(type), listener), opts);
+    } catch (e) {
+      // A listener this cannot wrap (an exotic object) must still be registered as-is.
+      return origAdd.call(this, type, listener, opts);
+    }
+  };
+  EventTarget.prototype.removeEventListener = function (type, listener, opts) {
+    if (!listener) return origRemove.call(this, type, listener, opts);
+    const perType = wrappers.get(listener);
+    const wrapped = perType && perType.get(String(type));
+    return origRemove.call(this, type, wrapped || listener, opts);
+  };
+  window.__vlmkitCallCount = (el) => counts.get(el) || 0;
+  window.__vlmkitResetCalls = (el) => { counts.delete(el); };
+})()
+`;
+
 const COMMON_ON_PROPS = [
   "onclick", "ondblclick", "onmousedown", "onmouseup", "onpointerdown", "onpointerup",
   "onkeydown", "onkeyup", "onkeypress", "oninput", "onchange", "onsubmit",
@@ -401,6 +484,14 @@ export interface PointerDragProbe {
   feedbackRatio: number;
   /** Fraction that differ between before the drag and after release. */
   committedRatio: number;
+  /**
+   * How many of the element's OWN listeners ran during the gesture.
+   *
+   * Zero with the gesture delivered is the one unambiguous outcome here: registered handlers
+   * that nothing invoked means something is between the pointer and the listener. Undefined
+   * when the counting patch was not installed.
+   */
+  handlerCalls?: number;
   /** Set when the gesture could not be performed (no box, offscreen, detached). */
   error?: string;
 }
@@ -457,6 +548,11 @@ async function probePointerDrags(
         row.error = "no usable box"; out.push(row); continue;
       }
       const before = await el.screenshot();
+      // Reset immediately before the gesture, so the count is this gesture's and not the
+      // page's own start-up chatter.
+      await page.evaluate((node) => (window as unknown as {
+        __vlmkitResetCalls?: (n: Element) => void;
+      }).__vlmkitResetCalls?.(node as Element), el);
       const at = (fx: number, fy: number) => [box.x + box.width * fx, box.y + box.height * fy] as const;
       await page.mouse.move(...at(0.3, 0.3));
       await page.mouse.down();
@@ -469,6 +565,10 @@ async function probePointerDrags(
       const after = await el.screenshot();
       row.feedbackRatio = pixelDelta(before, during);
       row.committedRatio = pixelDelta(before, after);
+      const calls = await page.evaluate((node) => (window as unknown as {
+        __vlmkitCallCount?: (n: Element) => number;
+      }).__vlmkitCallCount?.(node as Element), el);
+      if (typeof calls === "number") row.handlerCalls = calls;
     } catch (err) {
       row.error = err instanceof Error ? err.message.slice(0, 120) : String(err).slice(0, 120);
     }
@@ -512,6 +612,11 @@ export interface HandlerSurfaceOptions extends PageLoadOptions {
 export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promise<HandlerSurface> {
   return await withBrowser(async (browser) => {
     const page = await browser.newPage(withAuthState({ viewport: { width: 1280, height: 800 } }, options.storageState));
+    // Order matters and was measured: the invocation patch goes first so the registration
+    // recorder below still sees the page's real listener rather than a wrapper. See
+    // HANDLER_INVOCATION_PATCH_SCRIPT. Only for probe runs — the inventory has no use for it
+    // and every patch is a chance to alter the page.
+    if (options.probeDrag) await page.addInitScript(HANDLER_INVOCATION_PATCH_SCRIPT);
     await page.addInitScript(HANDLER_PATCH_SCRIPT);
     const url = /^(https?|file):\/\//.test(options.source)
       ? options.source
@@ -622,7 +727,7 @@ export const PROBED_TYPES = new Set(["click", "keydown", "keyup", "keypress", "f
 export interface HandlerIssue {
   kind: "pointer-only-control" | "unprobed-handler-types" | "delegated-handlers-opaque" | "no-handlers-found"
     | "drag-source-not-draggable" | "drop-without-dragover" | "drag-without-keyboard-alternative"
-    | "dragover-not-prevented" | "dragstart-transfers-nothing";
+    | "dragover-not-prevented" | "dragstart-transfers-nothing" | "pointer-drag-intercepted";
   severity: "warn" | "suspect";
   element: string;
   message: string;
@@ -681,6 +786,17 @@ export const HANDLER_SURFACE_RULES = [
         "Probed, not read: the static check cannot see this, because a dragover handler DOES"
         + " exist — it just does not cancel, so the browser rejects the drop and the wired"
         + " drop handler never runs. Requires --probe-drag (or `check interactions --handlers`).",
+    },
+    {
+      id: "pointer-drag-intercepted",
+      title: "Drag handlers that a real gesture never invoked",
+      severity: "suspect",
+      docs:
+        "Registered, the gesture was delivered over the element, and none of its own listeners"
+        + " ran — an overlay, `pointer-events` on an ancestor, or a listener on a detached node."
+        + " The one unambiguous outcome of the pointer-drag probe: the pixel numbers beside it"
+        + " are reported rather than graded, because 0% pixels has several explanations and"
+        + " 0 invocations has one. Requires --probe-drag.",
     },
     {
       id: "dragstart-transfers-nothing",
@@ -787,6 +903,33 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
           + `empty, so a target calling getData() reads "". Chromium still starts the drag; `
           + `Firefox and Safari do not. Call e.dataTransfer.setData(<type>, <value>) unless `
           + `the payload deliberately lives in the page's own state.`,
+      });
+    }
+
+    // ---- Probed pointer drag ------------------------------------------------
+    //
+    // The pixel numbers are reported and not graded, because 0% has several explanations.
+    // This one has exactly one: the element's own listeners were registered, a real gesture
+    // was delivered over its box, and NONE of them ran. Something is between the pointer and
+    // the listener — an overlay, `pointer-events`, a detached node.
+    //
+    // Measured on three pads with identical registrations: the working pad and the inert pad
+    // both invoked the full trio, and only the pad under a transparent sibling reported zero.
+    // So this separates "unreachable" from "reachable but does nothing", which the pixels
+    // cannot.
+    const pointerProbe = surface.pointerDragProbe?.find((row) => row.path === e.path);
+    if (pointerProbe && !pointerProbe.error && pointerProbe.handlerCalls === 0) {
+      issues.push({
+        kind: "pointer-drag-intercepted",
+        severity: "suspect",
+        element: `${e.path} "${e.text}"`,
+        message: `${e.path} "${e.text}" has drag handlers that never ran: a real `
+          + `pointerdown/pointermove/pointerup gesture was delivered over its box and none of `
+          + `its own listeners was invoked. Something between the pointer and the element is `
+          + `taking the events — an overlay or backdrop on top of it, \`pointer-events\` on an `
+          + `ancestor, or a listener attached to a node that is no longer in the document. `
+          + `Measured at 30%-70% across the element, so a surface that is only covered `
+          + `elsewhere would not report this.`,
       });
     }
 

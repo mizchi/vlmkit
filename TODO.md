@@ -1337,6 +1337,23 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     (透明な兄弟要素の下では呼び出し `{}`、working と dead はどちらも三点セット完走)。
     ただし安全にやるには `removeEventListener` も同時に patch する必要があり
     (wrapper は参照一致を壊すので、**計測対象のページを書き換えてしまう**)、別作業にした。
+- [x] **`pointer-drag-intercepted`** — probe の中で**唯一グレードする**結果
+  - `#dead` と `#swallowed` はピクセルでは区別不能(両方 0.00%/0.00%)で、別の欠陥。
+    **ページ自身のリスナ呼び出し回数**で分離できる: dead は三点セット完走(到達可能で無反応)、
+    swallowed は **0**(透明な兄弟要素が全イベントを取る)。
+  - 「登録済み + ジェスチャは box に届いた + 一度も呼ばれない」は説明が一意 =
+    オーバーレイ / 祖先の `pointer-events` / detached ノード。よって suspect。
+  - **安全にするのが作業の大半**。2点を推論せず実測:
+    - wrapper は `removeEventListener` の参照一致を壊す → add-then-remove が毎回リスナを
+      漏らし、**計測対象のページを書き換える**。WeakMap で解決。patch 有無でページ自身の
+      ログを diff して同一を要求するテストを入れた(参照除去 / `once` / `handleEvent` /
+      `this` / capture だけ除去 / throw が後続を止めない)。
+      `removeEventListener` 側を外すと `+ "REMOVED-FIRED"` で落ちる。
+    - **install 順序が本質的**: 計測 patch を `HANDLER_PATCH_SCRIPT` より**先**に入れないと、
+      登録記録側が `"function () { bump(this); return invoke.apply(…"` を拾い、
+      **全ハンドラの snippet が静かに wrapper のソースになる**。両順序を実行して diff した。
+  - rule 総数 141 → 143。
+
   - **自分のコメントを1つ訂正した**: `steps: 4` の理由に「デルタを積算する実装が動かない」と
     書いたが、fixture は全部 `clientX` から絶対位置を出すので単発 move でも通る(壊して確認)。
     実測した内容だけを書くように直した。
