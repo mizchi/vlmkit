@@ -127,6 +127,13 @@ export interface HandlerSurface {
    * element the drag merely crossed. The hit test needs neither guess.
    */
   unreachableTargets?: { path: string; interceptedBy: string }[];
+  /** Present only when the `wheel` family was driven. Absent means "not measured". */
+  wheelProbe?: WheelProbe[];
+  /**
+   * Per element and type: a handler that CALLED `preventDefault()` and whether the call did
+   * anything. Collected for every element the run touched, from the listener patch.
+   */
+  cancelAttempts?: { path: string; type: string; passive: boolean; effective: boolean }[];
   /**
    * What the interaction probe reached, when one ran at all.
    *
@@ -198,12 +205,35 @@ export const HANDLER_INVOCATION_PATCH_SCRIPT = `
   // and taking a mid-drag screenshot (60-80ms) made a dragover handler that returns immediately
   // look like it took 68ms. The fixture's fast zone caught that, which is what it is for.
   const slowest = new WeakMap();
+  // Per (element, type): how the listener was registered, whether it CALLED preventDefault, and
+  // whether that call ever had an effect. A passive listener's preventDefault is a silent no-op —
+  // Chromium logs "Unable to preventDefault inside passive event listener invocation" and carries
+  // on — so code written to cancel an event can fail to cancel it with nothing in the page to show
+  // for it. Measured per element: a wheel listener registered {passive: true} that calls
+  // preventDefault records attempted with effective false, while the same listener registered
+  // {passive: false}, and one registered with no option at all, record effective true.
+  const cancels = new WeakMap();
+  // The listener currently running, so the preventDefault patch below can attribute the call
+  // without mutating the event object. A stack, because a listener can dispatch an event.
+  const running = [];
+  const origPreventDefault = Event.prototype.preventDefault;
+  Event.prototype.preventDefault = function () {
+    const top = running[running.length - 1];
+    if (top) top.attempted = true;
+    return origPreventDefault.call(this);
+  };
   const origAdd = EventTarget.prototype.addEventListener;
   const origRemove = EventTarget.prototype.removeEventListener;
   const bump = (target) => {
     counts.set(target, (counts.get(target) || 0) + 1);
   };
-  const wrapperFor = (type, listener) => {
+  const recordFor = (target, type, passive) => {
+    let perType = cancels.get(target);
+    if (!perType) { perType = {}; cancels.set(target, perType); }
+    if (!perType[type]) perType[type] = { passive: passive, attempted: false, effective: false };
+    return perType[type];
+  };
+  const wrapperFor = (type, listener, passive) => {
     let perType = wrappers.get(listener);
     if (!perType) { perType = new Map(); wrappers.set(listener, perType); }
     const existing = perType.get(type);
@@ -212,12 +242,17 @@ export const HANDLER_INVOCATION_PATCH_SCRIPT = `
     const invoke = typeof listener === "function"
       ? function () { return listener.apply(this, arguments); }
       : function () { return listener.handleEvent.apply(listener, arguments); };
-    const wrapped = function () {
+    const wrapped = function (event) {
       bump(this);
+      const rec = recordFor(this, type, passive);
+      running.push(rec);
       const t0 = performance.now();
       try {
         return invoke.apply(this, arguments);
       } finally {
+        running.pop();
+        // Effective only if the call actually cancelled: a passive listener's does not.
+        if (rec.attempted && event && event.defaultPrevented) rec.effective = true;
         // In a finally, so a listener that throws still reports the time it burned.
         const took = performance.now() - t0;
         let perType = slowest.get(this);
@@ -231,7 +266,8 @@ export const HANDLER_INVOCATION_PATCH_SCRIPT = `
   EventTarget.prototype.addEventListener = function (type, listener, opts) {
     if (!listener) return origAdd.call(this, type, listener, opts);
     try {
-      return origAdd.call(this, type, wrapperFor(String(type), listener), opts);
+      const passive = !!(opts && typeof opts === "object" && opts.passive);
+      return origAdd.call(this, type, wrapperFor(String(type), listener, passive), opts);
     } catch (e) {
       // A listener this cannot wrap (an exotic object) must still be registered as-is.
       return origAdd.call(this, type, listener, opts);
@@ -247,6 +283,16 @@ export const HANDLER_INVOCATION_PATCH_SCRIPT = `
   window.__vlmkitResetCalls = (el) => { counts.delete(el); slowest.delete(el); };
   // Every element that has a recorded duration, with its slowest call per type. Collected from the
   // elements the caller asks about, since a WeakMap cannot be enumerated.
+  window.__vlmkitCancelInfo = (el) => {
+    const perType = cancels.get(el);
+    if (!perType) return null;
+    const out = [];
+    for (const type of Object.keys(perType)) {
+      const rec = perType[type];
+      if (rec.attempted) out.push({ type: type, passive: rec.passive, effective: rec.effective });
+    }
+    return out.length > 0 ? out : null;
+  };
   window.__vlmkitSlowestCall = (el, type) => {
     const perType = slowest.get(el);
     return perType && typeof perType[type] === "number" ? perType[type] : null;
@@ -1208,6 +1254,83 @@ async function probeRealDrags(
 }
 
 /**
+ * What a real wheel over a `wheel`-handler element did.
+ *
+ * `mouse.wheel` is the same input a user's trackpad produces, and it separates cleanly. Measured on
+ * two panels that both scroll, one of which cancels the wheel:
+ *
+ *     panel                          scrollTop after a 200px wheel
+ *     no wheel handler                 0 -> 200
+ *     handler calling preventDefault    0 -> 0
+ *
+ * Reported, not graded. A page that consumes the wheel deliberately — a map that zooms, a carousel
+ * that steps, a chart that pans — is doing the right thing, and this cannot tell it from a panel
+ * that swallowed the gesture by accident. What it does settle is that the `wheel` handlers ran,
+ * so they stop being listed as unexercised, and it is what makes the passive record below possible.
+ */
+export interface WheelProbe {
+  path: string;
+  /** How far the element (or its scrolling ancestor) moved. */
+  scrolledPx: number;
+  /** True when the element or an ancestor could have scrolled at all. */
+  scrollable: boolean;
+  /** Set when the gesture could not be performed. */
+  error?: string;
+}
+
+/**
+ * Roll the wheel over each element that handles it.
+ *
+ * The scroll is read from the element and from its nearest scrollable ancestor, plus the window:
+ * a wheel over a panel that cannot scroll itself normally scrolls the page, and "nothing moved
+ * anywhere" is the interesting answer.
+ */
+async function probeWheels(page: Page, elements: readonly HandlerSurfaceEntry[]): Promise<WheelProbe[]> {
+  // `scroll` handlers count as targets too: rolling the wheel over a scrollable panel is how a
+  // `scroll` handler runs, and without them nothing on the page exercises that type. It is also
+  // what surfaces a `preventDefault()` on `scroll`, which is not cancelable at all.
+  const targets = elements.filter((e) =>
+    e.visible && (e.types["wheel"] || e.types["mousewheel"] || e.types["scroll"]));
+  const out: WheelProbe[] = [];
+  for (const entry of targets) {
+    const row: WheelProbe = { path: entry.path, scrolledPx: 0, scrollable: false };
+    try {
+      const el = (await handleForPath(page, entry.path)).asElement();
+      if (!el) { row.error = "element not found for its own path"; out.push(row); continue; }
+      const box = await el.boundingBox();
+      if (!box || box.width < 4 || box.height < 4) { row.error = "no usable box"; out.push(row); continue; }
+      const read = async () => await el.evaluate((node: Element) => {
+        // Starts at the element itself and walks up ONCE. Adding node.scrollTop separately and
+        // then walking from the node double-counted it, and a 200px wheel reported 400px.
+        let cur: Element | null = node;
+        let scrollable = false;
+        let sum = 0;
+        while (cur) {
+          if (cur.scrollHeight > cur.clientHeight + 1) scrollable = true;
+          sum += cur.scrollTop;
+          cur = cur.parentElement;
+        }
+        const root = document.scrollingElement;
+        if (root && root.scrollHeight > root.clientHeight + 1) scrollable = true;
+        return { sum: sum + window.scrollY, scrollable };
+      });
+      const before = await read();
+      row.scrollable = before.scrollable;
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.wheel(0, 200);
+      // A frame for the scroll to land, the same wait the pointer-drag probe uses.
+      await page.waitForTimeout(120);
+      const after = await read();
+      row.scrolledPx = Math.abs(after.sum - before.sum);
+    } catch (err) {
+      row.error = err instanceof Error ? err.message.slice(0, 120) : String(err).slice(0, 120);
+    }
+    out.push(row);
+  }
+  return out;
+}
+
+/**
  * Fraction of pixels that differ, on a per-channel sum with a small floor.
  *
  * A floor of 12 across the three channels rather than exact equality: anti-aliased text and
@@ -1229,24 +1352,43 @@ function pixelDelta(a: Buffer, b: Buffer): number {
   return A.width * A.height === 0 ? 0 : changed / (A.width * A.height);
 }
 
+/**
+ * The interaction families this gate can drive, each opt-in.
+ *
+ * Separate flags rather than one switch, because they differ in what they do to the page. `drag`
+ * and `wheel` fire the page's own handlers; `input` puts text into fields. A page whose drop
+ * handler POSTs will POST, so the default stays an inventory that presses nothing.
+ */
+export const PROBE_FAMILIES = ["drag", "wheel"] as const;
+export type ProbeFamily = typeof PROBE_FAMILIES[number];
+
 export interface HandlerSurfaceOptions extends PageLoadOptions {
   source: string;
   storageState?: string;
   /**
    * Fire the drag sequence and record what ran. Off by default because dispatching runs
    * the page's own handlers — see `PROBE_DRAG_SCRIPT`.
+   *
+   * Equivalent to `probes: ["drag"]`, kept because it is the documented flag.
    */
   probeDrag?: boolean;
+  /** Families to drive. Merged with `probeDrag`. */
+  probes?: readonly ProbeFamily[];
 }
 
 export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promise<HandlerSurface> {
+  const probes = new Set<ProbeFamily>(options.probes ?? []);
+  if (options.probeDrag) probes.add("drag");
+  // The listener patch serves every family — invocation counts, handler duration, and the
+  // preventDefault-versus-passive record — so it goes on whenever anything will be driven.
+  const anyProbe = probes.size > 0;
   return await withBrowser(async (browser) => {
     const page = await browser.newPage(withAuthState({ viewport: { width: 1280, height: 800 } }, options.storageState));
     // Order matters and was measured: the invocation patch goes first so the registration
     // recorder below still sees the page's real listener rather than a wrapper. See
     // HANDLER_INVOCATION_PATCH_SCRIPT. Only for probe runs — the inventory has no use for it
     // and every patch is a chance to alter the page.
-    if (options.probeDrag) await page.addInitScript(HANDLER_INVOCATION_PATCH_SCRIPT);
+    if (anyProbe) await page.addInitScript(HANDLER_INVOCATION_PATCH_SCRIPT);
     await page.addInitScript(HANDLER_PATCH_SCRIPT);
     const url = /^(https?|file):\/\//.test(options.source)
       ? options.source
@@ -1273,25 +1415,44 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
     // Real mouse input first among the probes, on the least-perturbed page: it is the one
     // that answers whether the BROWSER starts a drag here, and a synthetic dispatch that has
     // already run the page's drop handlers can have moved the source out from under it.
-    const realDragProbe = options.probeDrag
+    const realDragProbe = probes.has("drag")
       ? await probeRealDrags(page, raw.elements)
       : undefined;
     // After the surface, so a probe that mutates the page cannot change what was
     // inventoried. Dispatching runs the page's own handlers, and a drop handler is exactly
     // the kind that rewrites the DOM.
-    const dragProbe = options.probeDrag
+    const dragProbe = probes.has("drag")
       ? await page.evaluate(PROBE_DRAG_SCRIPT) as DragProbe[]
       : undefined;
     // Real mouse input, so this needs the Page rather than an evaluate. Only for the
     // elements already classified as pointer-drag surfaces — one on the editor this came
     // from, so the screenshot cost is bounded by how many drag surfaces a page has.
-    const pointerDragProbe = options.probeDrag
+    const pointerDragProbe = probes.has("drag")
       ? await probePointerDrags(page, raw.elements)
       : undefined;
+    const wheelProbe = probes.has("wheel") ? await probeWheels(page, raw.elements) : undefined;
+    // Every element whose handler called preventDefault during this run, with whether the call had
+    // an effect. Asked per element because a WeakMap cannot be enumerated; only for elements that
+    // have handlers at all, which is every entry in the surface.
+    const cancelAttempts: { path: string; type: string; passive: boolean; effective: boolean }[] = [];
+    if (anyProbe) {
+      for (const entry of raw.elements) {
+        const info = await page.evaluate(`(() => {
+          ${DESCRIBE_PATH_FN}
+          const want = ${JSON.stringify(entry.path)};
+          for (const el of document.querySelectorAll("*")) {
+            if (describe(el) !== want) continue;
+            return window.__vlmkitCancelInfo ? window.__vlmkitCancelInfo(el) : null;
+          }
+          return null;
+        })()`) as { type: string; passive: boolean; effective: boolean }[] | null;
+        for (const rec of info ?? []) cancelAttempts.push({ path: entry.path, ...rec });
+      }
+    }
     // The slowest single invocation of each drag-target element's own dragover handler, read from
     // the invocation patch after the gestures have run. Asked per element because a WeakMap cannot
     // be enumerated, and only for the elements that have such a handler.
-    if (options.probeDrag) {
+    if (probes.has("drag")) {
       for (const entry of raw.elements) {
         if (!entry.types["dragover"]) continue;
         const took = await page.evaluate(`(() => {
@@ -1316,6 +1477,8 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
       ...(pointerDragProbe && pointerDragProbe.length > 0 ? { pointerDragProbe } : {}),
       ...(realDragProbe && realDragProbe.length > 0 ? { realDragProbe } : {}),
       ...(unreachableTargets.length > 0 ? { unreachableTargets } : {}),
+      ...(wheelProbe && wheelProbe.length > 0 ? { wheelProbe } : {}),
+      ...(cancelAttempts.length > 0 ? { cancelAttempts } : {}),
     };
   });
 }
@@ -1469,7 +1632,7 @@ export interface HandlerIssue {
     | "drag-source-not-draggable" | "drop-without-dragover" | "drag-without-keyboard-alternative"
     | "dragover-not-prevented" | "dragstart-transfers-nothing" | "pointer-drag-intercepted"
     | "drag-source-inert" | "drop-target-unreachable" | "drag-cancel-not-reverted"
-    | "drag-source-detached-mid-drag" | "dragover-handler-slow";
+    | "drag-source-detached-mid-drag" | "dragover-handler-slow" | "passive-listener-cannot-cancel";
   severity: "warn" | "suspect";
   element: string;
   message: string;
@@ -1561,6 +1724,19 @@ export const HANDLER_SURFACE_RULES = [
         + " `drag-source-not-draggable`, which reads the `draggable` property and reports the"
         + " one case that IS statically visible; this covers the ones that are not, and which"
         + " the synthetic dispatch reports as working. Requires --probe-drag.",
+    },
+    {
+      id: "passive-listener-cannot-cancel",
+      title: "A handler calls preventDefault() on a listener that cannot cancel",
+      severity: "suspect",
+      docs:
+        "The listener was registered `{ passive: true }` and its handler calls preventDefault(),"
+        + " which is a silent no-op — Chromium logs \"Unable to preventDefault inside passive event"
+        + " listener invocation\" and carries on. So code written to stop a scroll, a zoom or a"
+        + " browser gesture does not stop it, and the page shows nothing for it. Measured per"
+        + " element: the same wheel listener records the call as ineffective under"
+        + " `{ passive: true }` and effective under `{ passive: false }` and with no option at all."
+        + " Needs a probe family that makes the event fire.",
     },
     {
       id: "drag-source-detached-mid-drag",
@@ -1670,6 +1846,14 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
     for (const row of surface.realDragProbe) {
       if (row.error) continue;
       for (const t of row.observedTypes ?? []) probedThisRun.add(t);
+    }
+  }
+  if (surface.wheelProbe) {
+    for (const row of surface.wheelProbe) {
+      if (row.error) continue;
+      for (const t of ["wheel", "mousewheel", "scroll"]) {
+        if (surface.elements.some((e) => e.path === row.path && e.types[t])) probedThisRun.add(t);
+      }
     }
   }
   if (surface.pointerDragProbe) {
@@ -1843,6 +2027,32 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
           + `the drag stutters for as long as it stays here. Do the work once on dragenter, cache `
           + `anything read from layout, and keep the dragover handler to preventDefault() plus a `
           + `cheap decision.`,
+      });
+    }
+
+    // A handler that calls preventDefault() where it can never work. Both facts come from the
+    // listener patch: how it was registered, and whether the call it made ever cancelled anything.
+    for (const rec of surface.cancelAttempts ?? []) {
+      // The condition is "the call did nothing", not "the listener is passive": a preventDefault on
+      // a non-cancelable event is the same defect with a different cause, and keying on `passive`
+      // would have reported it with the wrong explanation. The message is worded from whichever
+      // fact applies.
+      if (rec.path !== e.path || rec.effective) continue;
+      const why = rec.passive
+        ? `the listener is registered { passive: true }, and a passive listener cannot cancel its `
+          + `event — Chromium logs "Unable to preventDefault inside passive event listener `
+          + `invocation" and carries on. Register it with { passive: false } if the cancel is `
+          + `intended, or drop the call if it is not.`
+        : `the event was not cancelable, so preventDefault() had nothing to cancel. Either the `
+          + `default action is already gone by the time this runs, or the wrong event is being `
+          + `listened for.`;
+      issues.push({
+        kind: "passive-listener-cannot-cancel",
+        severity: "suspect",
+        element: `${e.path} "${e.text}"`,
+        message: `${e.path} "${e.text}" has a ${rec.type} handler that calls preventDefault(), and `
+          + `the call did nothing: ${why} Whatever it was meant to stop — a scroll, a zoom, a `
+          + `browser gesture — still happens.`,
       });
     }
 
@@ -2271,6 +2481,23 @@ export function formatHandlerSurface(
         + (flat
           ? ` ${YELLOW}(nothing moved — dead handlers, or the drag does not start here)${RESET}`
           : ""),
+      );
+    }
+  }
+  if (surface.wheelProbe && surface.wheelProbe.length > 0) {
+    lines.push("");
+    lines.push(`${BOLD}Wheel gesture (real wheel input):${RESET}`);
+    for (const row of surface.wheelProbe) {
+      if (row.error) {
+        lines.push(`  - ${row.path}: ${YELLOW}not driven — ${row.error}${RESET}`);
+        continue;
+      }
+      // Evidence only. Consuming the wheel is what a map or a carousel is supposed to do.
+      lines.push(
+        `  - ${row.path}: a 200px wheel moved ${row.scrolledPx}px`
+        + (row.scrolledPx === 0 && row.scrollable
+          ? ` ${YELLOW}(nothing scrolled, though something here could — the handler consumed it)${RESET}`
+          : row.scrollable ? "" : ` ${DIM}(nothing here scrolls anyway)${RESET}`),
       );
     }
   }

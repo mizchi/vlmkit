@@ -938,7 +938,10 @@ test("the report obeys rule settings instead of contradicting the verdict", asyn
   s.realDragProbe = [realRow({ path: "div#src" })];
   const issues = deriveHandlerIssues(s);
   assert.deepEqual(issues.map((i) => i.kind).sort(), ["drag-source-inert", "unprobed-handler-types"]);
-  const plain = (t: string) => t.replace(/\[[0-9;]*m/g, "");
+  // The ESC byte has to come off too: `/\[[0-9;]*m/` leaves it behind, invisible in a diff and
+  // sitting exactly where the next assertion expects to match. It cost a failing test in the
+  // wheel case below, and `explore.test.ts` carries the same note.
+  const plain = (t: string) => t.replace(/\u001b\[[0-9;]*m/g, "");
 
   // Rule-blind, which is how this read before: red status, the finding listed, and the runner
   // printing "1 finding(s) suppressed" underneath it. Measured on the drag fixture with four
@@ -1337,4 +1340,89 @@ test("E2E: the two mid-flight defects, each with its control", { timeout: 180_00
   // time, which is not the same as Escape failing to cancel.
   assert.equal(row("vanishes").cancel?.started, false);
   assert.equal(row("plain").cancel?.started, true);
+});
+
+// ---------------------------------------------------------------------------
+// The wheel, and a preventDefault() that cannot happen
+
+test("a passive listener's preventDefault is a finding; the same call that works is not", () => {
+  const s = surface(entry({ path: "div#pad", types: { wheel: 1 } }));
+  const kinds = () => deriveHandlerIssues(s).filter((i) => i.kind === "passive-listener-cannot-cancel");
+
+  s.cancelAttempts = [{ path: "div#pad", type: "wheel", passive: true, effective: false }];
+  assert.equal(kinds().length, 1);
+  assert.match(kinds()[0]!.message, /\{ passive: true \}/);
+  assert.match(kinds()[0]!.message, /still happens/);
+
+  // The same finding with the other explanation. The rule keys on "the call did nothing", not on
+  // the listener being passive: `preventDefault()` on a non-cancelable event fails the same way,
+  // and keying on `passive` would have printed the wrong reason for it.
+  s.cancelAttempts = [{ path: "div#pad", type: "scroll", passive: false, effective: false }];
+  assert.equal(kinds().length, 1);
+  assert.match(kinds()[0]!.message, /not cancelable/);
+  assert.doesNotMatch(kinds()[0]!.message, /passive/);
+
+  // Registered non-passive: the call worked, nothing to say.
+  s.cancelAttempts = [{ path: "div#pad", type: "wheel", passive: false, effective: true }];
+  assert.deepEqual(kinds(), []);
+
+  // Passive AND effective is a contradiction the browser will not produce, but if it ever does,
+  // "the call worked" wins: the rule is about a cancel that did nothing.
+  s.cancelAttempts = [{ path: "div#pad", type: "wheel", passive: true, effective: true }];
+  assert.deepEqual(kinds(), []);
+
+  // Another element's record must not land here.
+  s.cancelAttempts = [{ path: "div#other", type: "wheel", passive: true, effective: false }];
+  assert.deepEqual(kinds(), []);
+
+  // Nothing measured: no probe ran.
+  delete s.cancelAttempts;
+  assert.deepEqual(kinds(), []);
+});
+
+test("E2E: the wheel family separates a consumed wheel from a cancel that did nothing",
+  { timeout: 180_000 }, async () => {
+  const s = await buildHandlerSurface({
+    source: join(REPO_ROOT, "fixtures/handlers/wheel-and-passive.html"),
+    probes: ["wheel"],
+  });
+  const scrolled = (id: string) => s.wheelProbe?.find((r) => r.path.endsWith(`#${id}`))?.scrolledPx;
+
+  // A 200px wheel is 200px of scroll, not 400: the element's own scrollTop was being counted twice,
+  // once on its own and once by the ancestor walk that starts at it.
+  assert.equal(scrolled("listens"), 200, "a handler that only reads lets the browser scroll");
+  assert.equal(scrolled("jacked"), 0, "preventDefault on a non-passive listener stops it");
+  assert.equal(scrolled("implicit"), 0, "a wheel listener with no option is not passive");
+  // The defect, and it is visible in the pixels as well as in the record: the panel scrolled
+  // although its handler said not to.
+  assert.equal(scrolled("cancels"), 200);
+
+  const flagged = deriveHandlerIssues(s)
+    .filter((i) => i.kind === "passive-listener-cannot-cancel").map((i) => i.element);
+  assert.equal(flagged.length, 2, flagged.join(", "));
+  assert.match(flagged.join(" "), /#cancels/);
+  // The second explanation, from the same rule: `scroll` is not cancelable. A `scroll` handler is
+  // also a wheel-family target, because rolling the wheel over a scrollable panel is how one runs.
+  assert.match(flagged.join(" "), /#uncancelable/);
+
+  // Consuming the wheel is what a map does. It is reported and must never be graded.
+  const { formatHandlerSurface } = await import("./handler-map.ts");
+  const text = formatHandlerSurface(s, deriveHandlerIssues(s)).replace(/\u001b\[[0-9;]*m/g, "");
+  assert.match(text, /div#jacked: a 200px wheel moved 0px \(nothing scrolled/);
+  assert.equal(deriveHandlerIssues(s).some((i) => i.element.includes("#jacked")), false);
+
+  // And the types stop being listed as never exercised.
+  const unprobed = deriveHandlerIssues(s).find((i) => i.kind === "unprobed-handler-types");
+  assert.equal(unprobed?.types?.includes("wheel") ?? false, false, "the wheel was driven");
+});
+
+test("--probe rejects a family it does not have", async () => {
+  const { parseProbeFamilies } = await import("../gates/handlers.gate.ts");
+  assert.deepEqual(parseProbeFamilies(["--probe", "wheel"]), ["wheel"]);
+  assert.deepEqual(parseProbeFamilies(["--probe", "drag,wheel"]), ["drag", "wheel"]);
+  assert.deepEqual(parseProbeFamilies(["--probe", "all"]).sort(), ["drag", "wheel"]);
+  assert.deepEqual(parseProbeFamilies([]), []);
+  // A typo that quietly probes nothing is the failure mode every "absent means not measured" rule
+  // in this file exists to avoid, so it is a usage error.
+  assert.throws(() => parseProbeFamilies(["--probe", "whee"]), /unknown family. Known: drag, wheel/);
 });

@@ -135,6 +135,30 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **`--probe <families>` and the first family beyond drag: the wheel.** Six interaction families
+  were asked for; this is the plumbing plus the one that measured cleanest. `--probe drag,wheel` or
+  `--probe all`; `--probe-drag` still means `--probe drag`. An unknown family is a usage error, not
+  a silent no-op — a typo that quietly probes nothing is the failure mode every "absent means not
+  measured" rule in this gate exists to avoid.
+  - The wheel is rolled 200px over every element with a `wheel`, `mousewheel` or `scroll` handler,
+    and how far anything scrolled is **reported, not graded**. Consuming the wheel is what a map
+    that zooms, a carousel that steps and a chart that pans are all supposed to do, and this cannot
+    tell them from a panel that swallowed the gesture by accident. `scroll` handlers are targets
+    too, because rolling the wheel over a scrollable panel is how one runs.
+  - `passive-listener-cannot-cancel` (suspect) is the graded half, and it needs no judgement: a
+    handler called `preventDefault()` and the call did nothing. Measured per element from the
+    listener patch, which now records how each listener was registered and whether the cancel it
+    attempted ever took effect. The same wheel handler reads ineffective under `{ passive: true }`
+    and effective under `{ passive: false }` — and under no option at all, which is the control,
+    since a wheel listener on a normal element is not passive by default.
+  - It keys on "the call did nothing", not on the listener being passive: `preventDefault()` on a
+    non-cancelable event (`scroll`) fails the same way, and keying on `passive` printed the wrong
+    explanation for it. Both cases are in `fixtures/handlers/wheel-and-passive.html`, with two
+    controls that must stay silent.
+  - The attribution needs no mutation of the event: `Event.prototype.preventDefault` is patched once
+    and attributes the call to whichever wrapped listener is on top of a small stack, so a listener
+    that dispatches its own events cannot confuse it.
+
 - **Two defects that exist only while the drag is in flight.** Both leave the outcome correct —
   the drop lands, the data arrives — so nothing about the result reveals them.
   - `drag-source-detached-mid-drag` (suspect): the source removed itself from the document during

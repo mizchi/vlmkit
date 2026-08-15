@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The wheel, and a cancel that cannot happen</title>
+<!--
+  `vlmkit scan handlers <this> --probe wheel` rolls a real 200px wheel over every element that
+  handles one, and reads how far anything scrolled.
+
+    #listens    a wheel handler that only reads the event      -> scrolls 200px  (control)
+    #jacked     preventDefault, registered { passive: false }  -> scrolls 0px    (reported, not graded)
+    #cancels    preventDefault, registered { passive: true }   -> scrolls 200px  -> passive-listener-cannot-cancel
+    #implicit   preventDefault, no option given at all         -> scrolls 0px    (control)
+    #uncancelable  preventDefault on `scroll`, which is not cancelable -> the same finding with the
+                other explanation, and the reason the rule keys on "the call did nothing"
+
+  Two different things are on this page, and only one of them is a finding.
+
+  **Consuming the wheel is not a defect.** A map that zooms, a carousel that steps, a chart that
+  pans: all of them are supposed to swallow it. `#jacked` is therefore printed as evidence — "a
+  200px wheel moved 0px, though something here could scroll" — and left to the reader.
+
+  **A cancel that cannot happen is a defect**, and it needs no judgement. `#cancels` calls
+  preventDefault() on a listener registered `{ passive: true }`, where the call is a silent no-op:
+  Chromium logs "Unable to preventDefault inside passive event listener invocation" and scrolls
+  anyway. The code says stop and nothing stops. `#implicit` is the control that keeps this honest —
+  a wheel listener with no option is NOT passive on a normal element, so its cancel works and it
+  must stay silent.
+
+  Measured per element from the listener patch, which records how each listener was registered and
+  whether the preventDefault() it called ever cancelled anything. The same handler reads
+  ineffective under { passive: true } and effective under { passive: false }.
+-->
+<style>
+  body { margin: 0; padding: 24px; font: 15px/1.4 system-ui, sans-serif; display: flex; gap: 14px; }
+  .panel { width: 150px; height: 110px; overflow: auto; background: #eceff4; }
+  .panel.broken { background: #fbeaea; }
+  .tall { height: 900px; background: linear-gradient(#dfe7f5, #f5dfe7); }
+</style>
+</head>
+<body>
+
+<div class="panel" id="listens"><div class="tall">reads only</div></div>
+<div class="panel" id="jacked"><div class="tall">consumes the wheel</div></div>
+<div class="panel broken" id="cancels"><div class="tall">passive + preventDefault</div></div>
+<div class="panel" id="implicit"><div class="tall">no option, preventDefault</div></div>
+<div class="panel broken" id="uncancelable"><div class="tall">scroll + preventDefault</div></div>
+
+<script>
+  // Reads the event and lets the browser scroll.
+  document.getElementById("listens").addEventListener("wheel", (e) => { void e.deltaY; });
+
+  // Deliberate: this is what a zoomable map does, and it is not reported as a defect.
+  document.getElementById("jacked").addEventListener("wheel", (e) => e.preventDefault(), { passive: false });
+
+  // The defect: passive, so the cancel does nothing and the panel scrolls regardless.
+  document.getElementById("cancels").addEventListener("wheel", (e) => e.preventDefault(), { passive: true });
+
+  // The control: no option given. A wheel listener on a normal element is not passive by default,
+  // so this cancel works and must not be reported.
+  document.getElementById("implicit").addEventListener("wheel", (e) => e.preventDefault());
+
+  // The other way a preventDefault() can do nothing: `scroll` is not cancelable at all. Same
+  // finding, different explanation — which is why the rule keys on "the call had no effect" rather
+  // than on the listener being passive.
+  document.getElementById("uncancelable").addEventListener("scroll", (e) => e.preventDefault());
+</script>
+</body>
+</html>

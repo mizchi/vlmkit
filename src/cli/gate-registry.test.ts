@@ -79,7 +79,7 @@ describe("composed built-in registry", () => {
     }
   });
 
-  it("declares 153 tunable rules in total", async () => {
+  it("declares 155 tunable rules in total", async () => {
     // A canary, not a target: a gate losing its rule table to a bad merge is
     // otherwise invisible until someone tries to tune it.
     // 119 → 120 when `check copy` gained `copy-truncated` (element-rect mode, vlmkit#118).
@@ -146,8 +146,13 @@ describe("composed built-in registry", () => {
     //       fine. `dragover-handler-slow` reads the interval between consecutive dragovers on one
     //       target, which is the handler's own cost plus a frame: 1.3-1.7ms for a handler that
     //       returns immediately, 82.1-82.2ms for one that busy-waits 80ms.
+    // 153 → 155: `passive-listener-cannot-cancel`, on both gates. A handler that calls
+    //       preventDefault() where the call does nothing — the listener was registered
+    //       `{ passive: true }`, or the event is not cancelable at all. Measured per element from
+    //       the listener patch: the same wheel handler records the call as ineffective under
+    //       `{ passive: true }` and effective under `{ passive: false }` and with no option given.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 153);
+    assert.equal(total, 155);
   });
 
   it("gives every built-in gate a category", async () => {

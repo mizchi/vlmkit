@@ -14,19 +14,48 @@ import type { Finding } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import {
   type HandlerIssue,
   type HandlerSurface,
+  type ProbeFamily,
   buildHandlerSurface,
   deriveHandlerIssues,
   HANDLER_SURFACE_RULES,
+  PROBE_FAMILIES,
   formatHandlerSurface,
 } from "../inspect/handler-map.ts";
 import { firstPositional } from "@mizchi/vlmkit-core/plugin/args.ts";
+import { readFlag } from "@mizchi/vlmkit-core/arg-reader.ts";
+import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
 
 export interface HandlersGateReport {
   surface: HandlerSurface;
   issues: HandlerIssue[];
 }
 
-export const handlersGate = defineGate<HandlersGateReport, PageLoadOptions & { source: string; probeDrag?: boolean }>({
+/**
+ * `--probe drag,wheel` / `--probe all`.
+ *
+ * A list rather than a flag per family: they keep coming, and each one runs the page's own
+ * handlers, so the caller should be able to say exactly which. An unknown name is a UsageError
+ * rather than a silent no-op — a typo that quietly probes nothing is the failure mode the whole
+ * "absent means not measured" rule exists to avoid.
+ */
+export function parseProbeFamilies(argv: readonly string[]): ProbeFamily[] {
+  const raw = readFlag(argv, "probe");
+  if (!raw) return [];
+  if (raw === "all") return [...PROBE_FAMILIES];
+  const asked = raw.split(",").map((f) => f.trim()).filter(Boolean);
+  const unknown = asked.filter((f) => !(PROBE_FAMILIES as readonly string[]).includes(f));
+  if (unknown.length > 0) {
+    throw new UsageError(
+      `--probe ${unknown.join(", ")}: unknown family. Known: ${PROBE_FAMILIES.join(", ")}, or 'all'.`,
+    );
+  }
+  return asked as ProbeFamily[];
+}
+
+export const handlersGate = defineGate<
+  HandlersGateReport,
+  PageLoadOptions & { source: string; probeDrag?: boolean; probes?: ProbeFamily[] }
+>({
   id: "scan.handlers",
   command: ["scan", "handlers"],
   title: "Event-callback surface",
@@ -80,6 +109,12 @@ Components property.`,
       kind: "boolean",
       description: "Fire the drag sequence to check dragover preventDefault + DataTransfer (runs page handlers)",
     },
+    {
+      name: "probe",
+      kind: "string",
+      placeholder: "drag,wheel|all",
+      description: "Interaction families to drive (runs the page's own handlers). `all` for every family",
+    },
     ...PAGE_LOAD_INPUTS,
   ],
   // Opt-in, because this gate is an inventory and dispatching runs the page's own logic —
@@ -88,10 +123,11 @@ Components property.`,
   parse: (argv) => ({
     source: firstPositional(argv, "vlmkit scan handlers <html-or-url>"),
     probeDrag: argv.includes("--probe-drag"),
+    probes: parseProbeFamilies(argv),
     ...parsePageLoad(argv),
   }),
-  run: async ({ source, probeDrag, ...pageLoad }) => {
-    const surface = await buildHandlerSurface({ source, probeDrag, ...pageLoad });
+  run: async ({ source, probeDrag, probes, ...pageLoad }) => {
+    const surface = await buildHandlerSurface({ source, probeDrag, probes, ...pageLoad });
     return { surface, issues: deriveHandlerIssues(surface) };
   },
   findings: ({ issues }): Finding[] =>
