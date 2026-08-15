@@ -55,6 +55,7 @@
     "smoke:pack:markup-loop": "node scripts/smoke-packed-markup-loop.mjs",
     "smoke:pack:workspaces": "node scripts/smoke-packed-workspaces.mjs",
     "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
     "test:examples": "vitest run examples",
     "dogfood:markup-vrt:offline": "MARKUP_EVAL_OFFLINE=1 node examples/markup-vrt-eval/run.mjs",
     "demo": "node src/demo/demo.ts",

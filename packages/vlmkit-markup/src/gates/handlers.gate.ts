@@ -26,7 +26,7 @@ export interface HandlersGateReport {
   issues: HandlerIssue[];
 }
 
-export const handlersGate = defineGate<HandlersGateReport, PageLoadOptions & { source: string }>({
+export const handlersGate = defineGate<HandlersGateReport, PageLoadOptions & { source: string; probeDrag?: boolean }>({
   id: "scan.handlers",
   command: ["scan", "handlers"],
   title: "Event-callback surface",
@@ -39,11 +39,20 @@ interaction discovery. Headline detection: pointer-only controls —
 click handlers on role-less elements no keyboard user can operate.
 
 HTML5 drag and drop is inspected the same way as any other handler
-family, and two of its failure modes are handlers that CANNOT FIRE:
-a dragstart source that is not draggable, and a drop target with no
-dragover to preventDefault on. Both are reported. There is no
-dragmove event — the continuous ones are drag (on the source) and
-dragover (on the target).
+family, and its failure modes are handlers that CANNOT FIRE. Read
+from the DOM: a dragstart source that is not draggable, and a drop
+target with no dragover to preventDefault on.
+
+--probe-drag adds the two that no static read can reach, by firing
+the sequence and watching what happens: a dragover handler that
+never calls preventDefault (registered, so the check above passes
+it, and the browser rejects the drop anyway), and a dragstart that
+leaves the DataTransfer empty. Off by default because dispatching
+runs the page's own handlers; 'check interactions --handlers' turns
+it on, since that gate already probes.
+
+There is no dragmove event — the continuous ones are drag (on the
+source) and dragover (on the target).
 
 Framework caveat: React-style root delegation appears as one listener
 on the delegation root; per-element granularity is a vanilla/Web
@@ -51,14 +60,23 @@ Components property.`,
   rules: [...HANDLER_SURFACE_RULES],
   inputs: [
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to scan", positional: 0, required: true },
+    {
+      name: "probe-drag",
+      kind: "boolean",
+      description: "Fire the drag sequence to check dragover preventDefault + DataTransfer (runs page handlers)",
+    },
     ...PAGE_LOAD_INPUTS,
   ],
+  // Opt-in, because this gate is an inventory and dispatching runs the page's own logic —
+  // a drop handler that POSTs will POST. `check interactions` probes by default and turns
+  // it on with `--handlers`.
   parse: (argv) => ({
     source: firstPositional(argv, "vlmkit scan handlers <html-or-url>"),
+    probeDrag: argv.includes("--probe-drag"),
     ...parsePageLoad(argv),
   }),
-  run: async ({ source, ...pageLoad }) => {
-    const surface = await buildHandlerSurface({ source, ...pageLoad });
+  run: async ({ source, probeDrag, ...pageLoad }) => {
+    const surface = await buildHandlerSurface({ source, probeDrag, ...pageLoad });
     return { surface, issues: deriveHandlerIssues(surface) };
   },
   findings: ({ issues }): Finding[] =>

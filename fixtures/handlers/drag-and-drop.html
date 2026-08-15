@@ -23,6 +23,15 @@
     #attr-source           the same through an ondragstart *attribute*, the other half of
                            that sweep
 
+  Two more are invisible to any static read and need `--probe-drag`, which fires the
+  sequence and watches what happens:
+
+    #zone-forgot-prevent   a dragover handler that never calls preventDefault. The static
+                           check passes it -- a handler IS registered -- and the browser
+                           still rejects the drop      -> dragover-not-prevented
+    every source here      none of them fills the DataTransfer except #ok, so a target
+                           calling getData() reads ""  -> dragstart-transfers-nothing
+
   Every visible drag source also reports `drag-without-keyboard-alternative` unless it or
   an ancestor has a keyboard handler — #ok deliberately has one, so the fixture shows both
   sides. Drag has no keyboard equivalent in any browser, so that finding is about the page
@@ -54,6 +63,7 @@
   <div class="zone" id="zone">correct target (dragover + drop)</div>
   <div class="zone broken" id="zone-no-dragover">drop only, no dragover</div>
   <div class="zone" id="prop-target">target via ondragover property</div>
+  <div class="zone broken" id="zone-forgot-prevent">dragover, forgot preventDefault</div>
 </div>
 
 <ul class="zone" id="delegated-list">
@@ -91,6 +101,15 @@
   // Delegation: dragover on the container, drop on the child. Correct — dragover bubbles.
   $("delegated-list").addEventListener("dragover", (e) => { e.preventDefault(); });
   $("delegated-item").addEventListener("drop", () => {});
+
+  // Registered, so the static drop-without-dragover check is satisfied -- and useless,
+  // because it never cancels, so the browser still rejects the drop. Only the probe sees it.
+  $("zone-forgot-prevent").addEventListener("dragover", () => {});
+  $("zone-forgot-prevent").addEventListener("drop", () => {});
+
+  // Runs, transfers nothing: a target calling getData() reads "". Chromium starts the drag
+  // anyway, Firefox and Safari do not. Only the probe sees this too.
+  $("not-draggable").addEventListener("dragstart", () => {});
 </script>
 </body>
 </html>

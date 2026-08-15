@@ -286,10 +286,14 @@ test("drag with no keyboard path is a warn, not a suspect, and does not advise t
 });
 
 test("a keyboard handler on the element or an ancestor answers the drag a11y finding", () => {
-  for (const shape of [
+  // Typed, not inferred: the union of these two literals gives `keydown?: undefined`, which
+  // is not assignable to `Record<string, number>`. vitest does not typecheck, so this
+  // passed and `tsc` was the only thing that saw it.
+  const shapes: Array<Pick<HandlerSurfaceEntry, "types" | "ancestorTypes">> = [
     { types: { dragstart: 1, keydown: 1 }, ancestorTypes: [] },
     { types: { dragstart: 1 }, ancestorTypes: ["keydown"] },
-  ]) {
+  ];
+  for (const shape of shapes) {
     const issues = deriveHandlerIssues(surface(entry({ path: "div#item", draggable: true, ...shape })));
     assert.equal(
       issues.filter((i) => i.kind === "drag-without-keyboard-alternative").length, 0,
@@ -364,4 +368,104 @@ test("E2E: drag handlers are collected through both routes, and only the broken 
   assert.equal(kindsFor("ok").includes("drag-without-keyboard-alternative"), false);
   assert.equal(kindsFor("attr-source").includes("drag-without-keyboard-alternative"), false);
   assert.ok(kindsFor("not-draggable").includes("drag-without-keyboard-alternative"));
+});
+
+// ---------------------------------------------------------------------------
+// Probed drag behaviour
+//
+// Two questions the DOM cannot answer, both measured by dispatching:
+//
+//   - did `dragover` call preventDefault()? A handler that forgets is invisible to the
+//     static check — one IS registered — and the browser still rejects the drop, so the
+//     wired `drop` never runs. This is the common version of the bug.
+//   - did `dragstart` put anything in the DataTransfer? A target reading getData() gets ""
+//     otherwise, and Firefox/Safari will not start a drag at all without data.
+//
+// `dispatchEvent` returns false when a listener cancelled, which is exactly question one.
+
+function probed(path: string, over: Partial<{ dragoverUnprevented: boolean; transferredTypes: string[] }>) {
+  return { path, ran: [], ...over };
+}
+
+test("a dragover that never calls preventDefault is reported, though a handler exists", () => {
+  const s = surface(entry({ path: "div#zone", text: "zone", types: { dragover: 1, drop: 1 } }));
+  s.dragProbe = [probed("div#zone", { dragoverUnprevented: true })];
+  const issues = deriveHandlerIssues(s);
+  const found = issues.find((i) => i.kind === "dragover-not-prevented")!;
+  assert.ok(found, "an unprevented dragover must report");
+  assert.equal(found.severity, "suspect");
+  assert.match(found.message, /preventDefault/);
+  // And the static check stays quiet, because a dragover handler IS registered — which is
+  // precisely why the probe is needed.
+  assert.equal(issues.filter((i) => i.kind === "drop-without-dragover").length, 0);
+});
+
+test("a dragover that does cancel is not reported", () => {
+  const s = surface(entry({ path: "div#zone", types: { dragover: 1, drop: 1 } }));
+  s.dragProbe = [probed("div#zone", { dragoverUnprevented: false })];
+  assert.equal(deriveHandlerIssues(s).filter((i) => i.kind === "dragover-not-prevented").length, 0);
+});
+
+test("an empty DataTransfer after dragstart is a warn, not a suspect", () => {
+  // Warn because a page may deliberately carry its payload in its own JS state, which works
+  // in Chromium. It is still a cross-browser defect, and the message says which browsers.
+  const s = surface(entry({ path: "div#item", text: "row", types: { dragstart: 1 }, draggable: true }));
+  s.dragProbe = [probed("div#item", { transferredTypes: [] })];
+  const found = deriveHandlerIssues(s).find((i) => i.kind === "dragstart-transfers-nothing")!;
+  assert.ok(found);
+  assert.equal(found.severity, "warn");
+  assert.match(found.message, /Firefox and Safari/);
+});
+
+test("any transferred type at all clears it, not just text/plain", () => {
+  // A page transferring application/json is doing it right, and asking for text/plain would
+  // have called that "nothing transferred".
+  const s = surface(entry({ path: "div#item", types: { dragstart: 1 }, draggable: true }));
+  s.dragProbe = [probed("div#item", { transferredTypes: ["application/json"] })];
+  assert.equal(deriveHandlerIssues(s).filter((i) => i.kind === "dragstart-transfers-nothing").length, 0);
+});
+
+test("no probe means no probe findings, rather than findings from absent data", () => {
+  // The same discipline as `draggable`: a surface built without `probeDrag` has no
+  // `dragProbe`, and "not measured" must not become "measured and bad".
+  const s = surface(entry({ path: "div#zone", types: { dragover: 1, drop: 1, dragstart: 1 }, draggable: true }));
+  assert.equal(s.dragProbe, undefined);
+  const kinds = deriveHandlerIssues(s).map((i) => i.kind);
+  assert.equal(kinds.includes("dragover-not-prevented"), false);
+  assert.equal(kinds.includes("dragstart-transfers-nothing"), false);
+});
+
+test("a probe row for a different element does not leak onto this one", () => {
+  // Joined by `path`, so a mismatched row must be ignored rather than applied to whoever
+  // comes first.
+  const s = surface(entry({ path: "div#zone", types: { dragover: 1, drop: 1 } }));
+  s.dragProbe = [probed("div#somewhere-else", { dragoverUnprevented: true })];
+  assert.equal(deriveHandlerIssues(s).filter((i) => i.kind === "dragover-not-prevented").length, 0);
+});
+
+test("E2E: the probe catches what the static read cannot", { timeout: 120_000 }, async () => {
+  // `#zone-forgot-prevent` registers dragover and never cancels: the static check passes it
+  // and the probe does not. That element is the reason the probe exists.
+  const source = join(REPO_ROOT, "fixtures/handlers/drag-and-drop.html");
+  const s = await buildHandlerSurface({ source, probeDrag: true });
+  assert.ok(s.dragProbe && s.dragProbe.length > 0, "probeDrag must produce rows");
+
+  const issues = deriveHandlerIssues(s);
+  const kindsFor = (id: string) =>
+    issues.filter((i) => i.element.split(" ")[0]!.endsWith(`#${id}`)).map((i) => i.kind);
+
+  assert.ok(kindsFor("zone-forgot-prevent").includes("dragover-not-prevented"));
+  // The two targets that do cancel stay silent.
+  assert.equal(kindsFor("zone").includes("dragover-not-prevented"), false);
+  assert.equal(kindsFor("prop-target").includes("dragover-not-prevented"), false);
+  // #ok is the only source that fills the DataTransfer.
+  assert.equal(kindsFor("ok").includes("dragstart-transfers-nothing"), false);
+  assert.ok(kindsFor("not-draggable").includes("dragstart-transfers-nothing"));
+
+  // And without the probe, neither finding exists — the default stays a read-only inventory.
+  const noProbe = deriveHandlerIssues(await buildHandlerSurface({ source }));
+  assert.deepEqual(
+    noProbe.filter((i) => i.kind === "dragover-not-prevented" || i.kind === "dragstart-transfers-nothing"),
+    [],
+  );
 });

@@ -146,7 +146,11 @@ contract and every response mismatch is reported.`,
       const { buildHandlerSurface, compareHandlerSurfaces, deriveHandlerIssues } = await import(
         "../inspect/handler-map.ts"
       );
-      const surface = await buildHandlerSurface({ source, ...pageLoad });
+      // `probeDrag` on, unconditionally: this gate's whole job is to press things and see
+      // what happens — it already fires keys at every control — so a drag surface it will
+      // not exercise would be the odd one out. `scan handlers` is the inventory and keeps
+      // the probe behind `--probe-drag`.
+      const surface = await buildHandlerSurface({ source, probeDrag: true, ...pageLoad });
       report.handlerSurface = surface;
       report.handlerIssues = deriveHandlerIssues(surface);
       if (reference) {

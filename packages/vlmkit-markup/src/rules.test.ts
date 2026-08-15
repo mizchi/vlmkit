@@ -94,3 +94,43 @@ describe("@mizchi/vlmkit-markup/rules — the deterministic layer", () => {
     ], "AA").length, 1);
   });
 });
+
+/**
+ * Every browser-script constant has to be syntactically valid JavaScript.
+ *
+ * These are 22 template literals that TypeScript never looks inside. A typo in one does not
+ * fail the build or the typecheck — it fails inside `page.evaluate`, at which point the gate
+ * either throws something opaque or, worse, returns nothing and reads as a clean page.
+ * `new Function` compiles without executing, so this is a sub-millisecond check that names
+ * the constant and shows the syntax error.
+ *
+ * **What this deliberately does NOT check, having tried:** a stray backtick. Writing prose
+ * with backticks in a comment *inside* one of these literals terminates the string, and I
+ * did it twice in two commits — the build failed with `PARSE_ERROR: Expected a semicolon or
+ * an implicit semicolon after a statement` pointing at a comment, which names neither the
+ * cause nor what the file was doing. But it cannot be caught from the constant's *value*:
+ * the correct way to include one is `\``, and after evaluation that is an ordinary backtick,
+ * indistinguishable from a stray one. `COLLECT_DESIGN_SAMPLES` has ten of them, all escaped
+ * and all correct — asserting on backticks flagged it immediately. An unescaped backtick is
+ * a compile error, so the compiler already owns that case; what it does not own is the
+ * *inside* of the string, which is what this checks.
+ */
+describe("browser-script constants are valid JavaScript", () => {
+  const scripts = Object.entries(rules)
+    .filter((entry): entry is [string, string] => typeof entry[1] === "string")
+    .filter(([name]) => /SCRIPT$|^COLLECT_|_JS$/.test(name));
+
+  it("finds the script constants at all, or the check below is vacuous", () => {
+    assert.ok(scripts.length >= 12, `only found ${scripts.length} script constants in the rules barrel`);
+  });
+
+  for (const [name, source] of scripts) {
+    it(`${name} parses`, () => {
+      // Compile, do not run: these reference `document` and `window`, which are absent here.
+      assert.doesNotThrow(
+        () => new Function(source),
+        (err: Error) => new Error(`${name} is not valid JavaScript: ${err.message}`) as never,
+      );
+    });
+  }
+});

@@ -79,7 +79,7 @@ describe("composed built-in registry", () => {
     }
   });
 
-  it("declares 137 tunable rules in total", async () => {
+  it("declares 141 tunable rules in total", async () => {
     // A canary, not a target: a gate losing its rule table to a bad merge is
     // otherwise invisible until someone tries to tune it.
     // 119 → 120 when `check copy` gained `copy-truncated` (element-rect mode, vlmkit#118).
@@ -111,8 +111,14 @@ describe("composed built-in registry", () => {
     //       and `--rule pointer-only-control=off` had nothing to bind to on that gate.
     //       Both gates spread one `HANDLER_SURFACE_RULES` now, so a rule added to the
     //       deriver reaches both consumers or neither.
+    // 137 → 141: the two probe-only drag rules, counted on both gates that spread
+    //       HANDLER_SURFACE_RULES. `dragover-not-prevented` is the one the static check
+    //       cannot reach — a dragover handler exists, it just never cancels, so the browser
+    //       rejects the drop anyway — and `dragstart-transfers-nothing` needs the drag to
+    //       have actually run. Both come from dispatching, so they only appear with
+    //       `--probe-drag` or `check interactions --handlers`.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 137);
+    assert.equal(total, 141);
   });
 
   it("gives every built-in gate a category", async () => {

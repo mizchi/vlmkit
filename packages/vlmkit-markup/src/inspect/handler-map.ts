@@ -78,6 +78,8 @@ export interface HandlerSurface {
    * document and a page of dead buttons both printed zero, and both read `ok`.
    */
   visibleControls?: number;
+  /** Present only when `probeDrag` was requested. Absent means "not measured". */
+  dragProbe?: DragProbe[];
 }
 
 /** Install BEFORE page scripts run (page.addInitScript). */
@@ -220,9 +222,132 @@ export const COLLECT_SURFACE_SCRIPT = `
 })()
 `;
 
+
+/**
+ * Per-element outcome of firing the drag sequence, when `probeDrag` is on.
+ *
+ * The two things this measures are the two that CANNOT be read off the DOM, and one of
+ * them is the most common drag bug there is:
+ *
+ *   - **Did `dragover` call `preventDefault()`?** A `dragover` handler that forgets it is
+ *     invisible to the static check — a handler *is* registered — and the drop is still
+ *     rejected by the default action, so the wired `drop` never runs. `dispatchEvent`
+ *     returns false when a listener cancelled the event, which is exactly this question.
+ *   - **Did `dragstart` put anything in the `DataTransfer`?** A target reading
+ *     `getData()` gets "" otherwise, and Firefox and Safari will not start a drag at all
+ *     without data.
+ *
+ * Measured before building any of this: synthetic `DragEvent`s with a real `DataTransfer`
+ * run the page's own handlers (`dragstart@ok`, `dragover@zone`, `drop@zone`,
+ * `dragend@ok`), `dispatchEvent` returned false for a dragover that prevented and true
+ * for one that forgot, and `dt.getData("text/plain")` came back as the value the page's
+ * dragstart had set. All four signals are observable, so none of this needs a VLM or a
+ * real OS-level drag — which CDP cannot drive anyway.
+ */
+export interface DragProbe {
+  /** `path` of the surface entry this belongs to. */
+  path: string;
+  /** Handler types that actually ran when dispatched. */
+  ran: string[];
+  /**
+   * True when NO listener cancelled the dragover — i.e. `preventDefault()` was not
+   * called and the drop will be rejected. Undefined when the element has no dragover.
+   */
+  dragoverUnprevented?: boolean;
+  /** `dataTransfer.types` after the element's dragstart ran. Undefined with no dragstart. */
+  transferredTypes?: string[];
+}
+
+/**
+ * Fire the drag sequence at each element that has drag handlers and report what happened.
+ *
+ * **This dispatches events, so it can run the page's own logic** — a drop handler that
+ * POSTs will POST. `scan handlers` is an inventory and keeps it behind `--probe-drag`;
+ * `check interactions` probes by default and turns it on with `--handlers`.
+ *
+ * A source is paired with each candidate target rather than probed alone, because the
+ * questions are about the pair: the DataTransfer a source fills is the one a target reads.
+ */
+export const PROBE_DRAG_SCRIPT = `
+(() => {
+  const SOURCE_TYPES = ["dragstart"];
+  const TARGET_TYPES = ["dragover", "drop"];
+  const results = [];
+  const paths = new Map();
+  // Re-derive the same path strings the surface uses, so a probe row joins to its entry.
+  const describe = (el) => {
+    const parts = [];
+    let cur = el;
+    while (cur && cur !== document.body && cur.tagName && parts.length < 4) {
+      let p = cur.tagName.toLowerCase();
+      if (cur.id) p += "#" + cur.id;
+      else if (typeof cur.className === "string" && cur.className.trim()) p += "." + cur.className.trim().split(/\s+/)[0];
+      parts.unshift(p);
+      cur = cur.parentElement;
+    }
+    return parts.join(">");
+  };
+  const wanted = new Set([...SOURCE_TYPES, ...TARGET_TYPES]);
+  const candidates = [];
+  for (const el of document.querySelectorAll("*")) {
+    const own = new Set();
+    for (const name of (el.getAttributeNames ? el.getAttributeNames() : [])) {
+      if (name.startsWith("ondrag") || name === "ondrop") own.add(name.slice(2));
+    }
+    for (const t of wanted) {
+      if (typeof el["on" + t] === "function") own.add(t);
+    }
+    for (const h of (window.__vlmkitHandlers || [])) {
+      if (h.t === el && wanted.has(h.type)) own.add(h.type);
+    }
+    if (own.size > 0) candidates.push({ el, own });
+  }
+  for (const { el, own } of candidates) {
+    const dt = new DataTransfer();
+    const ran = new Set();
+    const hooks = [];
+    for (const t of wanted) {
+      const h = () => ran.add(t);
+      document.addEventListener(t, h, true);
+      hooks.push([t, h]);
+    }
+    const fire = (type, target) => target.dispatchEvent(
+      new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt })
+    );
+    const row = { path: describe(el), ran: [] };
+    try {
+      if (own.has("dragstart")) {
+        fire("dragstart", el);
+        // dt.types, not getData on a guessed format: a page may transfer application/json
+        // or a custom type, and asking for text/plain would call that "nothing
+        // transferred". (No backticks in this comment -- it is inside a template literal.)
+        row.transferredTypes = Array.from(dt.types || []);
+      }
+      if (own.has("dragover")) {
+        // The return value IS the finding: false means a listener cancelled, which is what
+        // a drop target must do.
+        row.dragoverUnprevented = fire("dragover", el) === true;
+      }
+      if (own.has("drop")) fire("drop", el);
+    } catch (e) {
+      row.error = String(e).slice(0, 120);
+    }
+    for (const [t, h] of hooks) document.removeEventListener(t, h, true);
+    row.ran = [...ran];
+    results.push(row);
+  }
+  return results;
+})()
+`;
+
 export interface HandlerSurfaceOptions extends PageLoadOptions {
   source: string;
   storageState?: string;
+  /**
+   * Fire the drag sequence and record what ran. Off by default because dispatching runs
+   * the page's own handlers — see `PROBE_DRAG_SCRIPT`.
+   */
+  probeDrag?: boolean;
 }
 
 export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promise<HandlerSurface> {
@@ -247,12 +372,19 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
       total: number;
       controls: number;
     };
+    // After the surface, so a probe that mutates the page cannot change what was
+    // inventoried. Dispatching runs the page's own handlers, and a drop handler is exactly
+    // the kind that rewrites the DOM.
+    const dragProbe = options.probeDrag
+      ? await page.evaluate(PROBE_DRAG_SCRIPT) as DragProbe[]
+      : undefined;
     return {
       source: options.source,
       elements: raw.elements,
       globals: raw.globals,
       totalRegistrations: raw.total,
       visibleControls: raw.controls,
+      ...(dragProbe ? { dragProbe } : {}),
     };
   });
 }
@@ -284,7 +416,8 @@ export const PROBED_TYPES = new Set(["click", "keydown", "keyup", "keypress", "f
 
 export interface HandlerIssue {
   kind: "pointer-only-control" | "unprobed-handler-types" | "delegated-handlers-opaque" | "no-handlers-found"
-    | "drag-source-not-draggable" | "drop-without-dragover" | "drag-without-keyboard-alternative";
+    | "drag-source-not-draggable" | "drop-without-dragover" | "drag-without-keyboard-alternative"
+    | "dragover-not-prevented" | "dragstart-transfers-nothing";
   severity: "warn" | "suspect";
   element: string;
   message: string;
@@ -336,6 +469,24 @@ export const HANDLER_SURFACE_RULES = [
         + " and every ancestor it would bubble through, so delegated targets are not flagged.",
     },
     {
+      id: "dragover-not-prevented",
+      title: "dragover handler that never calls preventDefault",
+      severity: "suspect",
+      docs:
+        "Probed, not read: the static check cannot see this, because a dragover handler DOES"
+        + " exist — it just does not cancel, so the browser rejects the drop and the wired"
+        + " drop handler never runs. Requires --probe-drag (or `check interactions --handlers`).",
+    },
+    {
+      id: "dragstart-transfers-nothing",
+      title: "dragstart leaves the DataTransfer empty",
+      severity: "warn",
+      docs:
+        "A target calling getData() reads \"\". Chromium still starts the drag, Firefox and"
+        + " Safari do not, so this is a cross-browser defect rather than a local one — and a"
+        + " page may deliberately keep its payload in its own state, which is why it warns.",
+    },
+    {
       id: "drag-without-keyboard-alternative",
       title: "Drag-operated element with no keyboard path",
       severity: "warn",
@@ -380,6 +531,43 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
         if (!PROBED_TYPES.has(t)) unprobedTypes.add(t);
       }
     }
+    // ---- Probed drag behaviour ---------------------------------------------
+    //
+    // Only when `probeDrag` ran. `probe === undefined` means not measured, and inventing a
+    // finding from data this gate did not collect is the failure mode the `draggable` field
+    // is guarded against below for the same reason.
+    const probe = surface.dragProbe?.find((row) => row.path === e.path);
+    if (probe?.dragoverUnprevented === true) {
+      // The static `drop-without-dragover` check passes this: a dragover handler DOES
+      // exist. It just does not cancel, so the default action rejects the drop and the
+      // wired `drop` never runs. Measured — `dispatchEvent` returned true for a dragover
+      // that forgot `preventDefault()` and false for one that called it.
+      issues.push({
+        kind: "dragover-not-prevented",
+        severity: "suspect",
+        element: `${e.path} "${e.text}"`,
+        message: `${e.path} "${e.text}" has a dragover handler that does not call `
+          + `preventDefault(), so the browser rejects the drop and the drop handler never `
+          + `runs. Measured by dispatching a dragover: no listener cancelled it. Call `
+          + `e.preventDefault() in the dragover handler (and in dragenter, if you rely on it).`,
+      });
+    }
+    if (probe?.transferredTypes?.length === 0) {
+      // Warn, not suspect: a page may carry its drag payload in its own JS state and never
+      // touch the DataTransfer, which works in Chromium. It is still a defect across
+      // browsers — Firefox and Safari will not start a drag with an empty DataTransfer —
+      // and any target calling getData() reads "".
+      issues.push({
+        kind: "dragstart-transfers-nothing",
+        severity: "warn",
+        element: `${e.path} "${e.text}"`,
+        message: `${e.path} "${e.text}" ran its dragstart handler and left the DataTransfer `
+          + `empty, so a target calling getData() reads "". Chromium still starts the drag; `
+          + `Firefox and Safari do not. Call e.dataTransfer.setData(<type>, <value>) unless `
+          + `the payload deliberately lives in the page's own state.`,
+      });
+    }
+
     // ---- HTML5 drag and drop -----------------------------------------------
     //
     // Two of these are handlers that CANNOT FIRE, which is the same class as

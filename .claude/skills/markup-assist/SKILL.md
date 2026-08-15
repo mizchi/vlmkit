@@ -44,6 +44,7 @@ nothing — failing on a suspect is the default.
 | Everything keyboard-operable, ARIA states transition | `vlmkit check interactions page.html` |
 | Clickable `<div>`s / pointer-only controls | `vlmkit scan handlers page.html` |
 | Drag and drop wired but unfireable (a `dragstart` source that is not draggable, a `drop` target with no `dragover`) | `vlmkit scan handlers page.html` |
+| Drag and drop that looks wired but is not (`dragover` without `preventDefault`, `dragstart` transferring nothing) | `vlmkit scan handlers page.html --probe-drag` |
 | A scripted flow reaches its post-conditions | `vlmkit verify flow page.html --flow flow.json` |
 
 **Against a target design:**

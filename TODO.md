@@ -1243,6 +1243,51 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 - **`dragmove` という DOM イベントは存在しない**。連続系は `drag`(source 側)と
   `dragover`(target 側)で、両方収集している。
 
+**probing まで進めた(同日)** — drag 型が `unprobed-handler-types` に載り続けるのを解消。
+**設計前に「合成 `DragEvent` が実ハンドラを動かすか」を実測**して、4つのシグナルが全部
+観測可能だと確認してから作った(VLM も OS レベルの drag も不要 — 後者は CDP で駆動できない):
+
+- `dispatchEvent` の戻り値が **`preventDefault` を呼んだかを教える**(`false` = 呼んだ)
+- `dragstart` 後の `dataTransfer.types` で **source が実際に何を積んだか**が取れる
+
+- [x] **`dragover-not-prevented`**(suspect)— `dragover` はあるのに cancel しない。
+  **静的チェックは通してしまう**(ハンドラは登録されている)のに、ブラウザは drop を拒否するので
+  配線済みの `drop` は走らない。**最も多い形**(listener は書いたが preventDefault を忘れた)。
+- [x] **`dragstart-transfers-nothing`**(warn)— ハンドラは走ったが `DataTransfer` が空。
+  target の `getData()` は `""`。Chromium は drag を開始するが Firefox / Safari はしないので
+  クロスブラウザの欠陥。`text/plain` 固定で聞かない(`application/json` の転送を「何も無い」と
+  呼ばないため)。
+- `scan handlers` は**既定 off**(inventory であり、dispatch はページのロジックを走らせる —
+  POST する drop ハンドラは POST する)。`check interactions --handlers` は**無条件で on**
+  (あの gate は既に全コントロールにキーを打っているので、drag だけ触らないのが不自然)。
+- rule 総数 137 → 141。
+
+- [x] **browser script 定数22個を構文チェックするテスト**(`rules.test.ts`)
+  - TypeScript が中を見ないテンプレートリテラルなので、タイポは `page.evaluate` で初めて落ちる
+    (= gate が不透明に throw するか、**何も返さず clean に見える**)。`new Function` は
+    実行せずコンパイルするので、どの定数のどこが壊れているか1ms未満で言える。
+  - **意図的に入れなかった検査**: stray backtick。**値からは判定できない** — 正しい書き方は
+    `\`` のエスケープで、評価後は普通のバックティックになり stray と区別がつかない。
+    `COLLECT_DESIGN_SAMPLES` は10個持っていて全部正しい(assert したら即誤検知した)。
+    未エスケープはコンパイルエラーなのでコンパイラの担当で、**担当外なのは文字列の中身**。
+
+- [x] **`pnpm typecheck` が存在しなかった**(このセッション最大の自分のミス)
+  - 存在しないスクリプトを `pnpm -s <name>` で呼ぶと**無出力で exit 254**。
+    私はセッション中ずっとこれを走らせ、無出力を「型は通っている」と読んでいた。
+    `| tail -N` が終了コードを隠していたので気づけなかった。**全部 vacuous だった**。
+  - 本物(`tsc -p tsconfig.json`、~9秒)を走らせたら**実エラー1件**: 私が同セッションで書いた
+    テストで、2つのオブジェクトリテラルの union が `keydown?: undefined` になり
+    `Record<string, number>` に代入不可。**vitest は型チェックしないので緑だった**。
+  - `typecheck` スクリプトを追加し、壊した型で exit 2 になることを確認。
+  - 教訓は2つ: **無出力を成功と読むな(終了コードを見ろ)**、そして
+    **`| tail` は終了コードを隠す**。
+
+**バックティックの罠を3回踏んだ**: `COLLECT_SURFACE_SCRIPT`、`PROBE_DRAG_SCRIPT`、
+そして `handlers.gate.ts` の `usage:`。**`usage:` もテンプレートリテラル**で、
+そこに散文をバックティック付きで書くと文字列が閉じる。コンパイラは毎回捕まえるが
+メッセージが原因を名指ししない(`Expected `,` or `}` but found `Identifier`` が散文を指す)。
+パーサを二重化するテストは書かず、値からは判定不能な理由を `rules.test.ts` に記録した。
+
 **副産物 — 先行して存在した欠陥**: `check interactions --handlers` は
 `deriveHandlerIssues` の kind を finding として出しているのに、handler 系 rule を
 1つも宣言していなかった。`--rule pointer-only-control=off` が bind 先を持たず、

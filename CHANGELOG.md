@@ -161,6 +161,46 @@ suppression works per *rule* instead of per whole gate.
   There is no `dragmove` event; the continuous ones are `drag` (on the source) and
   `dragover` (on the target), and both are collected.
 
+- **`scan handlers --probe-drag` fires the drag sequence and catches the two defects no
+  static read can reach.** Both were measured to be observable before any of this was
+  built: a synthetic `DragEvent` carrying a real `DataTransfer` runs the page's own
+  handlers, `dispatchEvent` returns `false` exactly when a listener called
+  `preventDefault()`, and `dataTransfer.types` afterwards shows what the source put there.
+  So this needs no VLM and no OS-level drag, which CDP cannot drive anyway.
+  - `dragover-not-prevented` (suspect) — a `dragover` handler that never cancels. The
+    static `drop-without-dragover` check *passes* this, because a handler is registered;
+    the browser rejects the drop regardless, so the wired `drop` never runs. This is the
+    common form of the bug — remembering the listener, forgetting the `preventDefault`.
+  - `dragstart-transfers-nothing` (warn) — the handler ran and left the `DataTransfer`
+    empty, so a target calling `getData()` reads `""`. Warn because a page may deliberately
+    keep its payload in its own state, which works in Chromium; Firefox and Safari will not
+    start the drag at all. Any transferred type clears it, not just `text/plain` — asking
+    for one format would call an `application/json` transfer "nothing".
+
+  Off by default on `scan handlers`, which is an inventory: dispatching runs the page's own
+  logic, and a drop handler that POSTs will POST. `check interactions --handlers` turns it
+  on unconditionally, because that gate already presses keys at every control — a drag
+  surface it would not exercise would be the odd one out.
+
+- **`pnpm typecheck` exists.** It did not, and `pnpm -s typecheck` for a missing script
+  prints nothing and exits 254 — so anyone (or any agent) reading "no output" as "types are
+  fine" was reading a no-op, and a `| tail -n` pipeline hides the exit code that would have
+  said otherwise. Running the real thing found one live error: a test whose two object
+  literals unified to `keydown?: undefined`, not assignable to `Record<string, number>`.
+  vitest does not typecheck, so it had been passing. `tsc -p tsconfig.json` takes ~9s over
+  `src/**`, `packages/*/src/**` and `examples/gate-plugin/*.ts`.
+
+- **The 22 browser-script constants are syntax-checked.** They are template literals
+  TypeScript never looks inside, so a typo in one fails at `page.evaluate` — where the gate
+  either throws something opaque or returns nothing and reads as a clean page. `new
+  Function` compiles without executing, which names the constant and shows the error in
+  under a millisecond. Deliberately *not* checked: a stray backtick, which is what prompted
+  this (twice in two commits). It cannot be caught from the value — the correct form is an
+  escaped `` \` ``, and after evaluation that is an ordinary backtick, indistinguishable
+  from a stray one. `COLLECT_DESIGN_SAMPLES` has ten, all correct. An unescaped backtick is
+  a compile error, so the compiler owns that case; what it does not own is the inside of the
+  string.
+
 - **The test suite runs on vitest, with coverage.** `pnpm test` is `vitest run`;
   `pnpm test:coverage` reports v8 coverage into `test-results/coverage`. The
   migration changed no test's meaning — node:test and vitest agree on
