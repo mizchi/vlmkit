@@ -87,6 +87,29 @@ means something is intercepting -- an overlay, pointer-events on an
 ancestor, a listener on a detached node. That separates "unreachable"
 from "reachable but inert", which pixels cannot.
 
+--probe <families> drives the other interaction families, each of
+which runs the page's own handlers:
+
+  wheel   rolls a 200px wheel over every wheel/scroll handler and
+          reports what scrolled (consuming it is what a map does, so
+          it is not graded). Grades a preventDefault() that did
+          nothing -- a passive listener, or a non-cancelable event.
+  hover   hovers each trigger and then focuses it, and reports what
+          became visible either way. Triggers come from the
+          stylesheets too, since a CSS :hover reveal has no listener.
+  menu    right-clicks each contextmenu handler: cancelled or not,
+          and whether anything appeared.
+  touch   taps and swipes in a page with touch emulation on -- a
+          second load, because emulation changes maxTouchPoints and
+          "ontouchstart" in window, which pages branch on.
+  input   types an ASCII sample, the same text in Japanese, and the
+          Japanese one through an IME composition, into every visible
+          text field. Grades a field that keeps the ASCII and drops
+          the Japanese; the ASCII drive is the control.
+
+--probe all for every family. An unknown name is an error rather
+than a silent no-op.
+
 --probe-drag adds the two that no static read can reach, by firing
 the sequence and watching what happens: a dragover handler that
 never calls preventDefault (registered, so the check above passes

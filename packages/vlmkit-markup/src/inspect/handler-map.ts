@@ -135,6 +135,10 @@ export interface HandlerSurface {
   menuProbe?: MenuProbe[];
   /** Present only when the `touch` family was driven. Absent means "not measured". */
   touchProbe?: TouchProbe[];
+  /** Present only when the `input` family was driven. Absent means "not measured". */
+  textInputProbe?: TextInputProbe[];
+  /** Text fields beyond the cap that were not typed into. */
+  textInputCapped?: number;
   /** Stylesheets the hover probe could not read (another origin), and triggers left unvisited. */
   hoverProbeLimits?: { unreadableSheets: number; capped: number };
   /**
@@ -1369,6 +1373,137 @@ async function probeTouches(
 }
 
 /**
+ * What a text field did with text typed into it — plain, and through an IME composition.
+ *
+ * Three drives per field, and the comparison between them is the whole design:
+ *
+ *     field                     ASCII in / out        CJK in / out     verdict
+ *     no handler                vlmkit7  vlmkit7      日本語  日本語
+ *     strips non-ASCII on input vlmkit7  vlmkit7      日本語  ""       rejects non-ASCII
+ *     digits only (by design)   vlmkit7  "7"          日本語  ""       -- excluded
+ *     maxlength=4               vlmkit7  "vlmk"       日本語  日本語     -- excluded
+ *
+ * **The ASCII drive is the control, and it is what makes the finding attributable.** A field that
+ * mangles the ASCII sample too is filtering by its own rules — a phone number field, a numeric
+ * amount — and losing the CJK text there says nothing about non-ASCII. Only a field that keeps the
+ * ASCII and drops the CJK is reported.
+ *
+ * **The composition is driven, and its result is evidence rather than a finding.** Three hypotheses
+ * about IME-specific defects were measured and none survived: a field that destroys the committed
+ * text destroys it identically without a composition (so it is not IME-specific); the confirming
+ * Enter cannot be judged, because a CDP composition does not consume it the way a real IME does and
+ * the native form submission fires either way; and a handler that rewrites `value` on every `input`
+ * — the shape most likely to corrupt composing text — produced the same result composed or not,
+ * across identity, trim, slice and space-stripping rewrites. So the composition is driven for
+ * coverage and its committed value is printed, and nothing is graded from it.
+ */
+export interface TextInputProbe {
+  path: string;
+  text: string;
+  /** What came back after typing an ASCII sample. */
+  plainAscii: string;
+  /** What came back after typing a CJK sample with no composition. */
+  plainCjk: string;
+  /** What came back after composing kana and committing kanji. */
+  composed: string;
+  /** Event types the field actually saw across the three drives. */
+  observedTypes: string[];
+  error?: string;
+}
+
+const TEXT_PROBE_ASCII = "vlmkit7";
+const TEXT_PROBE_CJK = "日本語";
+const TEXT_PROBE_KANA = "にほんご";
+
+/** Records what a field receives, so coverage is observed rather than assumed. */
+const INPUT_RECORDER_SCRIPT = String.raw`
+(() => {
+  const w = window;
+  w.__vlmkitInputLog = [];
+  if (!w.__vlmkitInputRecorder) {
+    w.__vlmkitInputRecorder = true;
+    for (const t of ["input", "change", "keydown", "keyup", "keypress", "focus", "blur",
+                     "compositionstart", "compositionupdate", "compositionend"]) {
+      document.addEventListener(t, (e) => {
+        if (w.__vlmkitInputLog.length >= 400) return;
+        w.__vlmkitInputLog.push(t);
+      }, true);
+    }
+  }
+  return true;
+})()
+`;
+
+/**
+ * Type into every text field, three ways.
+ *
+ * `Input.insertText` rather than `keyboard.type`: it is what commits a composition, so the plain and
+ * composed drives differ in exactly one thing — whether a composition was open first. Capped at 8
+ * fields, and the cap is reported.
+ */
+async function probeTextInputs(page: Page): Promise<{ rows: TextInputProbe[]; capped: number }> {
+  const candidates = await page.evaluate(TEXT_FIELD_SCRIPT) as { path: string; text: string }[];
+  const targets = candidates.slice(0, MAX_TEXT_FIELDS);
+  if (targets.length === 0) return { rows: [], capped: 0 };
+  await page.evaluate(INPUT_RECORDER_SCRIPT);
+  const cdp = await page.context().newCDPSession(page);
+  const rows: TextInputProbe[] = [];
+  for (const entry of targets) {
+    const row: TextInputProbe = {
+      path: entry.path,
+      // The field's own label-ish text (placeholder / name / id): a field with no handler has no
+      // surface entry to borrow one from, and the finding has to name something a reader can find.
+      text: entry.text,
+      plainAscii: "",
+      plainCjk: "",
+      composed: "",
+      observedTypes: [],
+    };
+    try {
+      const el = (await handleForPath(page, entry.path)).asElement();
+      if (!el) { row.error = "element not found for its own path"; rows.push(row); continue; }
+      const seen = new Set<string>();
+      const drive = async (text: string, compose: boolean) => {
+        // Cleared through the DOM, which fires the page's own input handler the same way a user
+        // selecting-all and deleting would.
+        await el.evaluate((node: Element) => {
+          const field = node as unknown as { value?: string; textContent: string | null; dispatchEvent: (e: Event) => boolean };
+          if (typeof field.value === "string") field.value = "";
+          else field.textContent = "";
+          field.dispatchEvent(new Event("input", { bubbles: true }));
+        });
+        await page.evaluate("(() => { window.__vlmkitInputLog = []; return true; })()");
+        await el.evaluate((node: Element) => (node as HTMLElement).focus());
+        if (compose) {
+          await cdp.send("Input.imeSetComposition", {
+            text: TEXT_PROBE_KANA,
+            selectionStart: TEXT_PROBE_KANA.length,
+            selectionEnd: TEXT_PROBE_KANA.length,
+          });
+        }
+        await cdp.send("Input.insertText", { text });
+        // Blur, because `change` fires there and not on every keystroke.
+        await el.evaluate((node: Element) => (node as HTMLElement).blur());
+        await page.waitForTimeout(40);
+        for (const t of await page.evaluate("window.__vlmkitInputLog") as string[]) seen.add(t);
+        return await el.evaluate((node: Element) => {
+          const field = node as unknown as { value?: string; textContent: string | null };
+          return typeof field.value === "string" ? field.value : String(field.textContent ?? "");
+        });
+      };
+      row.plainAscii = await drive(TEXT_PROBE_ASCII, false);
+      row.plainCjk = await drive(TEXT_PROBE_CJK, false);
+      row.composed = await drive(TEXT_PROBE_CJK, true);
+      row.observedTypes = [...seen].sort();
+    } catch (err) {
+      row.error = err instanceof Error ? err.message.slice(0, 120) : String(err).slice(0, 120);
+    }
+    rows.push(row);
+  }
+  return { rows, capped: Math.max(0, candidates.length - targets.length) };
+}
+
+/**
  * What a real right-click on a `contextmenu` handler did.
  *
  * Three outcomes, all measured on the fixture, and two of them are defects:
@@ -1562,6 +1697,39 @@ const HOVER_SELECTOR_SCRIPT = String.raw`
  */
 const MAX_HOVER_TARGETS = 12;
 
+/**
+ * Every visible field that holds text, found in the page rather than in the handler surface.
+ *
+ * The surface only contains elements that have a handler, and a field's filter is not always on the
+ * field: `maxlength` and `pattern` are attributes, and a form-level submit handler is somewhere else
+ * entirely. Taking targets from the surface left three of the fixture's six fields unprobed —
+ * including the two controls a reader needs in order to interpret the finding — which is the same
+ * gap the CSS-only hover trigger exposed.
+ *
+ * The type list excludes the inputs that hold no text: a checkbox takes no `insertText` and would
+ * report three empty values.
+ */
+const TEXT_FIELD_SCRIPT = String.raw`
+(() => {
+  ${DESCRIBE_PATH_FN}
+  const NO_TEXT = ["checkbox", "radio", "button", "submit", "reset", "file", "color", "range",
+                   "image", "hidden"];
+  const out = [];
+  for (const el of document.querySelectorAll("input, textarea, [contenteditable=true]")) {
+    if (el.tagName === "INPUT" && NO_TEXT.indexOf(String(el.type).toLowerCase()) !== -1) continue;
+    if (el.disabled || el.readOnly) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 4 || r.height < 4) continue;
+    const s = getComputedStyle(el);
+    if (s.display === "none" || s.visibility === "hidden") continue;
+    const p = describe(el);
+    if (p) out.push({ path: p, text: (el.placeholder || el.name || el.id || "").slice(0, 40) });
+  }
+  return out;
+})()
+`;
+const MAX_TEXT_FIELDS = 8;
+
 async function probeHovers(
   page: Page,
   elements: readonly HandlerSurfaceEntry[],
@@ -1714,7 +1882,7 @@ function pixelDelta(a: Buffer, b: Buffer): number {
  * and `wheel` fire the page's own handlers; `input` puts text into fields. A page whose drop
  * handler POSTs will POST, so the default stays an inventory that presses nothing.
  */
-export const PROBE_FAMILIES = ["drag", "wheel", "hover", "menu", "touch"] as const;
+export const PROBE_FAMILIES = ["drag", "wheel", "hover", "menu", "touch", "input"] as const;
 export type ProbeFamily = typeof PROBE_FAMILIES[number];
 
 export interface HandlerSurfaceOptions extends PageLoadOptions {
@@ -1788,6 +1956,7 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
     const wheelProbe = probes.has("wheel") ? await probeWheels(page, raw.elements) : undefined;
     const hover = probes.has("hover") ? await probeHovers(page, raw.elements) : undefined;
     const menuProbe = probes.has("menu") ? await probeMenus(page, raw.elements) : undefined;
+    const textInput = probes.has("input") ? await probeTextInputs(page) : undefined;
     // A separate page, because touch emulation changes what the page sees: `navigator
     // .maxTouchPoints` goes 0 -> 1 and `"ontouchstart" in window` false -> true, both of which real
     // apps branch on. Measured, and the reason this does not just add `hasTouch` to the page every
@@ -1844,6 +2013,8 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
       ...(wheelProbe && wheelProbe.length > 0 ? { wheelProbe } : {}),
       ...(hover && hover.rows.length > 0 ? { hoverProbe: hover.rows } : {}),
       ...(menuProbe && menuProbe.length > 0 ? { menuProbe } : {}),
+      ...(textInput && textInput.rows.length > 0 ? { textInputProbe: textInput.rows } : {}),
+      ...(textInput && textInput.capped > 0 ? { textInputCapped: textInput.capped } : {}),
       ...(touchProbe && touchProbe.length > 0 ? { touchProbe } : {}),
       ...(hover && (hover.unreadableSheets > 0 || hover.capped > 0)
         ? { hoverProbeLimits: { unreadableSheets: hover.unreadableSheets, capped: hover.capped } }
@@ -2004,7 +2175,7 @@ export interface HandlerIssue {
     | "drag-source-inert" | "drop-target-unreachable" | "drag-cancel-not-reverted"
     | "drag-source-detached-mid-drag" | "dragover-handler-slow" | "passive-listener-cannot-cancel"
     | "hover-only-reveal" | "contextmenu-not-prevented" | "contextmenu-replaces-nothing"
-    | "touch-handlers-not-invoked";
+    | "touch-handlers-not-invoked" | "text-input-rejects-non-ascii";
   severity: "warn" | "suspect";
   element: string;
   message: string;
@@ -2117,6 +2288,19 @@ export const HANDLER_SURFACE_RULES = [
         + " replacement may be drawn somewhere this cannot see (a canvas, a portal positioned"
         + " offscreen until placed), and suppressing the menu deliberately is a choice a page is"
         + " allowed to make. Requires --probe menu.",
+    },
+    {
+      id: "text-input-rejects-non-ascii",
+      title: "A text field that keeps ASCII and drops non-ASCII text",
+      severity: "warn",
+      docs:
+        "Typed into, three ways: an ASCII sample, the same sample in Japanese, and the Japanese one"
+        + " through an IME composition. The field kept the ASCII and lost the Japanese, so a name,"
+        + " address or comment typed in a non-Latin script disappears. The ASCII drive is the"
+        + " control, and it is what makes the finding attributable: a field that mangles ASCII too"
+        + " is filtering by its own rules (a phone number, a numeric amount) and is not reported."
+        + " Warn rather than suspect, because a field may legitimately accept only Latin text — and"
+        + " if so it should say so rather than swallowing what was typed. Requires --probe input.",
     },
     {
       id: "touch-handlers-not-invoked",
@@ -2263,6 +2447,14 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
     for (const row of surface.realDragProbe) {
       if (row.error) continue;
       for (const t of row.observedTypes ?? []) probedThisRun.add(t);
+    }
+  }
+  if (surface.textInputProbe) {
+    // Exactly what the recorder saw across the three drives — observed, not assumed. `insertText`
+    // sends no key events, so `keydown` is NOT covered by this family and keeps saying so.
+    for (const row of surface.textInputProbe) {
+      if (row.error) continue;
+      for (const t of row.observedTypes) probedThisRun.add(t);
     }
   }
   if (surface.menuProbe) {
@@ -2634,6 +2826,25 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
       });
     }
   }
+  for (const row of surface.textInputProbe ?? []) {
+    if (row.error) continue;
+    // The ASCII control has to have survived intact, or the loss is not attributable to the script:
+    // a digits-only field loses both samples and says nothing about non-ASCII.
+    if (!row.plainAscii.includes(TEXT_PROBE_ASCII)) continue;
+    if (row.plainCjk.includes(TEXT_PROBE_CJK)) continue;
+    issues.push({
+      kind: "text-input-rejects-non-ascii",
+      severity: "warn",
+      element: `${row.path} "${row.text}"`,
+      message: `${row.path} "${row.text}" kept ${JSON.stringify(TEXT_PROBE_ASCII)} and lost `
+        + `${JSON.stringify(TEXT_PROBE_CJK)} — typing it left ${JSON.stringify(row.plainCjk)} in the `
+        + `field. A name, address or comment in a non-Latin script disappears here. The ASCII sample `
+        + `going in unchanged is what points at the script rather than at a length or format rule: `
+        + `look for a filter on the input handler, or a pattern that assumes Latin characters. If the `
+        + `field really only accepts Latin text, say so and reject the entry rather than swallowing `
+        + `it.`,
+    });
+  }
   for (const row of surface.menuProbe ?? []) {
     if (row.error || row.handlerCalls === 0) continue;
     if (!row.prevented) {
@@ -2981,6 +3192,26 @@ export function formatHandlerSurface(
           ? ` ${YELLOW}(nothing moved — dead handlers, or the drag does not start here)${RESET}`
           : ""),
       );
+    }
+  }
+  if (surface.textInputProbe && surface.textInputProbe.length > 0) {
+    lines.push("");
+    lines.push(`${BOLD}Typed into (plain, and through an IME composition):${RESET}`);
+    for (const row of surface.textInputProbe) {
+      if (row.error) {
+        lines.push(`  - ${row.path}: ${YELLOW}not driven — ${row.error}${RESET}`);
+        continue;
+      }
+      const kept = (typed: string, got: string) => got.includes(typed)
+        ? `kept ${JSON.stringify(typed)}`
+        : `${YELLOW}${JSON.stringify(typed)} became ${JSON.stringify(got)}${RESET}`;
+      lines.push(
+        `  - ${row.path}: ${kept(TEXT_PROBE_ASCII, row.plainAscii)}, ${kept(TEXT_PROBE_CJK, row.plainCjk)}`
+        + `, composed ${JSON.stringify(row.composed)}`,
+      );
+    }
+    if (surface.textInputCapped) {
+      lines.push(`  ${DIM}${surface.textInputCapped} more field(s) not typed into (cap ${MAX_TEXT_FIELDS})${RESET}`);
     }
   }
   if (surface.menuProbe && surface.menuProbe.length > 0) {

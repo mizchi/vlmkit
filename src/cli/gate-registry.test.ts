@@ -79,7 +79,7 @@ describe("composed built-in registry", () => {
     }
   });
 
-  it("declares 163 tunable rules in total", async () => {
+  it("declares 165 tunable rules in total", async () => {
     // A canary, not a target: a gate losing its rule table to a bad merge is
     // otherwise invisible until someone tries to tune it.
     // 119 → 120 when `check copy` gained `copy-truncated` (element-rect mode, vlmkit#118).
@@ -163,8 +163,13 @@ describe("composed built-in registry", () => {
     //       see it. `touch-handlers-not-invoked` — the touch twin of `pointer-drag-intercepted`,
     //       driven in a page of its own because touch emulation changes `maxTouchPoints` and
     //       `"ontouchstart" in window`, which a page branches on.
+    // 163 → 165: `text-input-rejects-non-ascii` (warn), on both gates. Every visible text field is
+    //       typed into three times — an ASCII sample, the same in Japanese, and the Japanese one
+    //       through an IME composition — and a field that keeps the ASCII and loses the Japanese is
+    //       reported. The ASCII drive is the control that makes it attributable: a digits-only field
+    //       loses both and says nothing about the script.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 163);
+    assert.equal(total, 165);
   });
 
   it("gives every built-in gate a category", async () => {

@@ -1604,3 +1604,90 @@ test("E2E: right-click and touch on the fixture", { timeout: 240_000 }, async ()
     );
   }
 });
+
+// ---------------------------------------------------------------------------
+// Text typed in, three ways
+
+function textRow(over: Partial<import("./handler-map.ts").TextInputProbe> & { path: string }) {
+  return {
+    text: "f",
+    plainAscii: "vlmkit7",
+    plainCjk: "日本語",
+    composed: "日本語",
+    observedTypes: ["input"],
+    ...over,
+  };
+}
+
+test("a field that keeps ASCII and drops CJK is the finding; a field that drops both is not", () => {
+  const s = surface(entry({ path: "input#f", types: { input: 1 } }));
+  const kinds = () => deriveHandlerIssues(s).filter((i) => i.kind === "text-input-rejects-non-ascii");
+
+  // Both samples survive: nothing to report.
+  s.textInputProbe = [textRow({ path: "input#f" })];
+  assert.deepEqual(kinds(), []);
+
+  // The defect: ASCII kept, CJK gone.
+  s.textInputProbe = [textRow({ path: "input#f", plainCjk: "", composed: "" })];
+  assert.equal(kinds().length, 1);
+  assert.match(kinds()[0]!.message, /kept "vlmkit7" and lost "日本語"/);
+  assert.equal(kinds()[0]!.severity, "warn");
+
+  // A digits-only field mangles the ASCII sample too, so the CJK loss is not attributable to the
+  // script. This exclusion is the whole reason the ASCII drive exists.
+  s.textInputProbe = [textRow({ path: "input#f", plainAscii: "7", plainCjk: "" })];
+  assert.deepEqual(kinds(), []);
+
+  // A length rule truncates the ASCII and keeps the CJK: also excluded, and for the same reason.
+  s.textInputProbe = [textRow({ path: "input#f", plainAscii: "vlmk" })];
+  assert.deepEqual(kinds(), []);
+
+  // Not measured, and an errored row measured nothing.
+  s.textInputProbe = [textRow({ path: "input#f", plainCjk: "", error: "not found" })];
+  assert.deepEqual(kinds(), []);
+  delete s.textInputProbe;
+  assert.deepEqual(kinds(), []);
+});
+
+test("the input family's coverage claim is what the recorder saw", () => {
+  const s = surface(entry({ path: "input#f", types: { input: 1, keydown: 1, compositionstart: 1 } }));
+  s.textInputProbe = [textRow({ path: "input#f", observedTypes: ["compositionstart", "input"] })];
+  const unprobed = deriveHandlerIssues(s).find((i) => i.kind === "unprobed-handler-types")!;
+  // `insertText` sends no key events, so `keydown` is genuinely NOT covered by this family and has
+  // to keep saying so — inferring "we typed, therefore keydown ran" would be the overclaim this
+  // gate removed everywhere else.
+  assert.deepEqual(unprobed.types, ["keydown"]);
+});
+
+test("E2E: three drives per field, and the control that makes the finding attributable",
+  { timeout: 240_000 }, async () => {
+  const s = await buildHandlerSurface({
+    source: join(REPO_ROOT, "fixtures/handlers/text-input.html"),
+    probes: ["input"],
+  });
+  const row = (id: string) => s.textInputProbe?.find((r) => r.path.endsWith(`#${id}`))!;
+
+  // Half of these fields have no handler at all, so the targets cannot come from the handler
+  // surface. Before they were enumerated in the page, three of the six were unprobed.
+  for (const id of ["plain", "stripsNonAscii", "digitsOnly", "maxlen", "area", "changeCounter"]) {
+    assert.ok(row(id), `${id} must be probed`);
+  }
+  assert.equal(row("plain").plainCjk, "日本語");
+  assert.equal(row("stripsNonAscii").plainAscii, "vlmkit7");
+  assert.equal(row("stripsNonAscii").plainCjk, "", "the filter eats it");
+  assert.equal(row("digitsOnly").plainAscii, "7", "and it eats most of the ASCII too");
+  assert.equal(row("maxlen").plainAscii, "vlmk");
+  assert.equal(row("maxlen").plainCjk, "日本語", "a length rule is not a script rule");
+
+  // The composition really ran: its types are in the observed list, which is what the coverage
+  // claim reads. Nothing is graded from the composed value.
+  assert.ok(row("plain").observedTypes.includes("compositionstart"), row("plain").observedTypes.join(","));
+  assert.ok(row("plain").observedTypes.includes("compositionend"));
+  assert.equal(row("plain").composed, "日本語");
+  assert.equal(row("stripsNonAscii").composed, "", "same result composed or not — not IME-specific");
+
+  const flagged = deriveHandlerIssues(s)
+    .filter((i) => i.kind === "text-input-rejects-non-ascii").map((i) => i.element);
+  assert.equal(flagged.length, 1, flagged.join(", "));
+  assert.match(flagged[0]!, /#stripsNonAscii/);
+});

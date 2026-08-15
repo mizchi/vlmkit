@@ -135,6 +135,34 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **`--probe input`: text typed in three ways, and the control that makes the finding
+  attributable.** Every visible text field gets an ASCII sample, the same text in Japanese, and the
+  Japanese one through a real IME composition (kana composed, kanji committed via CDP):
+
+    | field | ASCII in → out | CJK in → out | |
+    |---|---|---|---|
+    | no handler | `vlmkit7` → `vlmkit7` | `日本語` → `日本語` | |
+    | strips non-ASCII on `input` | `vlmkit7` → `vlmkit7` | `日本語` → `""` | `text-input-rejects-non-ascii` (warn) |
+    | digits only, by design | `vlmkit7` → `"7"` | `日本語` → `""` | excluded |
+    | `maxlength=4` | `vlmkit7` → `"vlmk"` | `日本語` → `日本語` | excluded |
+
+  - **The ASCII drive is the control.** A field that mangles it too is filtering by its own rules — a
+    phone number, an amount — and losing the Japanese there says nothing about the script. Only a
+    field that keeps the ASCII and drops the Japanese is reported, which is a name or address field
+    that silently eats kanji.
+  - **Targets are enumerated in the page, not read off the handler surface.** A filter is not always
+    on the field: `maxlength` and `pattern` are attributes and a form-level submit handler is
+    elsewhere. Reading the surface left three of the fixture's six fields unprobed, including two
+    controls a reader needs to interpret the finding.
+  - **The composition is driven for coverage, and nothing is graded from it.** Three IME-specific
+    hypotheses were measured and none survived: a field that destroys the committed text destroys it
+    identically with no composition (so it is not IME-specific); the confirming Enter cannot be
+    judged, because a CDP composition does not consume it the way a real IME does and the native form
+    submission fires either way; and a handler rewriting `value` on every `input` — the shape most
+    likely to corrupt composing text — gave the same result composed or not, across identity, trim,
+    slice and space-stripping rewrites. The composition types stop being listed as never exercised,
+    and `keydown` keeps saying so, because `insertText` sends no key events.
+
 - **`--probe menu`: what a real right-click did.** `defaultPrevented` is read after the page's own
   handlers have run — before them it is false for every target and separates nothing:
 

@@ -1315,6 +1315,34 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     ログを読む evaluate はページのメインスレッド作業の後ろに直列化されるので、`dragend` を遅らせる
     ものは読み取りも同じだけ遅らせる(300ms busy-wait で検証、初回読み取り時点で既に存在)。
 
+**インタラクション family を6つ追加した(`--probe <families>` / `--probe all`)** — 未知の family は
+silent no-op ではなくエラー(黙って何も probe しないのが、この gate の「absent は未計測」原則を壊す形)。
+
+- [x] **wheel** — 200px の wheel。スクロール量は**報告のみ**(wheel を食うのは地図・カルーセルの正しい実装)。
+  判定するのは `passive-listener-cannot-cancel`: `preventDefault()` が**何もしなかった**こと。
+  実測: 同じハンドラが `{passive:true}` で無効、`{passive:false}` と指定なしで有効。
+  条件は「passive か」ではなく「無効だったか」— `scroll` は cancelable でないので同じ欠陥・別の理由。
+- [x] **hover** — hover してから同じ要素を focus し、**ページ全体**の可視差分を取る
+  (出てくるのは箱の外なので要素 screenshot では見えない)。トリガはスタイルシートの `:hover` からも集める
+  (CSS だけのトリガにはリスナが無く、それが一般形)。**CSS Nesting 以降 `CSSStyleRule` にも `cssRules`
+  (空 = truthy)があり**、`if (rule.cssRules) {recurse; continue;}` がセレクタを一度も読んでいなかった。
+  finding は probe 行から出す(CSS トリガは surface に行が無い)。
+- [x] **menu** — 右クリック。`defaultPrevented` はページのハンドラ実行後に読む(capture 段では全部 false)。
+  `contextmenu-not-prevented`(suspect)/ `contextmenu-replaces-nothing`(warn、置き換えが canvas 等
+  見えない場所にある可能性)。
+- [x] **touch** — 専用ページ。emulation は `maxTouchPoints` 0→1、`"ontouchstart" in window` を変えるので
+  共有すると他 family が別ページを測ることになる(実測)。`touch-handlers-not-invoked` は
+  `pointer-drag-intercepted` の touch 版。swipe は CDP 直叩き(Playwright の touchscreen は tap のみ)。
+- [x] **input** — ASCII / 日本語 / 日本語(IME 変換経由)の3回。判定は
+  `text-input-rejects-non-ascii`(warn): **ASCII は保持して日本語を落とす**もの。
+  ASCII の drive が帰属を可能にする対照(数字専用フィールドは両方落とすので除外)。
+  対象はページ側で列挙する(半分のフィールドにハンドラが無く、surface からでは3/6 が漏れた)。
+- **IME 固有の判定は測定で否定された**(3仮説すべて): 値の破壊は変換なしでも同一で IME 固有でない、
+  確定 Enter は CDP の合成 composition が実 IME のように消費しないため探査器の汚染、
+  `value` 書き換えによる破壊は identity/trim/slice/nospace すべてで再現しない。
+  変換は**網羅と証拠**のために駆動し、そこからは何も grade しない。
+- rule 総数 155 → 157 → 163 → 165。
+
 - [x] **キャンセル(Escape)** — driven drag は Escape で中断する(`dragend` の `dropEffect: "none"`、
   drop 無し)。`drag-cancel-not-reverted`(suspect)は**2つの証拠が両方**必要:
   ブラウザが「中断した」と言っていること、かつピクセルがまだ違うこと。
