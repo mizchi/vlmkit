@@ -1192,3 +1192,57 @@ test("E2E: the two ways a reachable target looks unreachable", { timeout: 180_00
   const other = await buildHandlerSurface({ source: join(REPO_ROOT, "fixtures/handlers/drag-and-drop.html") });
   assert.deepEqual(other.unreachableTargets ?? [], []);
 });
+
+// ---------------------------------------------------------------------------
+// The cancel: Escape mid-drag, and whether the page puts things back
+
+test("a cancelled drag that left something behind is a finding; the other three states are not", () => {
+  const s = surface(entry({ path: "div#card", types: { dragstart: 1 }, draggable: true }));
+  const kinds = () => deriveHandlerIssues(s).filter((i) => i.kind === "drag-cancel-not-reverted").length;
+
+  s.realDragProbe = [realRow({ path: "div#card", dragstartFired: true, cancel: { cancelled: true, ratio: 0.99 } })];
+  assert.equal(kinds(), 1);
+  assert.match(deriveHandlerIssues(s).find((i) => i.kind === "drag-cancel-not-reverted")!.message, /undo it in `?dragend/);
+
+  // Escape did not cancel it, so whatever changed may be the drop legitimately doing its job.
+  // Not coverable end to end — Escape cancelled every driven drag measured — so it is pinned here.
+  s.realDragProbe = [realRow({ path: "div#card", dragstartFired: true, cancel: { cancelled: false, ratio: 0.99 } })];
+  assert.equal(kinds(), 0, "a change after a drag that completed is not this defect");
+
+  // Cancelled and clean.
+  s.realDragProbe = [realRow({ path: "div#card", dragstartFired: true, cancel: { cancelled: true, ratio: 0 } })];
+  assert.equal(kinds(), 0);
+
+  // Cancelled, revert not measured — the screenshots failed. Absent is not zero and not one.
+  s.realDragProbe = [realRow({ path: "div#card", dragstartFired: true, cancel: { cancelled: true } })];
+  assert.equal(kinds(), 0);
+
+  // No cancel gesture at all (budget spent, or the source cannot drag).
+  s.realDragProbe = [realRow({ path: "div#card", dragstartFired: true })];
+  assert.equal(kinds(), 0);
+});
+
+test("E2E: Escape strands the optimistic update wired to `drop` instead of `dragend`",
+  { timeout: 180_000 }, async () => {
+  // Both cards hide themselves on `dragstart` — the "it is leaving the list" every sortable does.
+  // One undoes it in `dragend`, which fires whether the drag succeeded or not; the other undoes it
+  // in `drop`, which a cancelled drag never reaches.
+  const s = await buildHandlerSurface({
+    source: join(REPO_ROOT, "fixtures/handlers/drag-cancel.html"),
+    probeDrag: true,
+  });
+  const row = (id: string) => s.realDragProbe?.find((r) => r.path.endsWith(`#${id}`))!;
+
+  // The browser's own verdict, on both: the drag was cancelled and no drop ran.
+  for (const id of ["restores", "strands"]) {
+    assert.equal(row(id).cancel?.cancelled, true, `${id}: Escape must cancel the drag`);
+  }
+  // And the pixels, which is where they differ.
+  assert.ok(row("restores").cancel!.ratio! < 0.02, `restores left ${row("restores").cancel!.ratio}`);
+  assert.ok(row("strands").cancel!.ratio! > 0.5, `strands left ${row("strands").cancel!.ratio}`);
+
+  const flagged = deriveHandlerIssues(s)
+    .filter((i) => i.kind === "drag-cancel-not-reverted").map((i) => i.element);
+  assert.equal(flagged.length, 1, flagged.join(", "));
+  assert.match(flagged[0]!, /#strands/);
+});

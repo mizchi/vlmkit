@@ -1301,6 +1301,21 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   - 3点にするのも要点 — 中心だけを覆う 40px の badge は zone を使えなくしない。対照 `#badged`。
   - どちらの ablation も対照で落ちることを確認済み。イベントを出さないので `--probe-drag` 不要。
 
+- [x] **キャンセル(Escape)** — driven drag は Escape で中断する(`dragend` の `dropEffect: "none"`、
+  drop 無し)。`drag-cancel-not-reverted`(suspect)は**2つの証拠が両方**必要:
+  ブラウザが「中断した」と言っていること、かつピクセルがまだ違うこと。
+  片方だけでは欠陥ではない(成功した drop は変えるのが正しく、綺麗に戻った中断は正常)。
+  - 捕まえる形は sortable の楽観更新: `dragstart` で隠し、`drop` で戻す。中断は `drop` に到達しない。
+    `dragend` は成否に関係なく発火するので、undo はそこに置く。
+    fixture `fixtures/handlers/drag-cancel.html` 実測: `dragend` で戻す card は 0.00%、
+    `drop` でだけ戻す card は 99.03%。
+  - **要素 screenshot は使えない**: 失敗ケースの要素は `visibility: hidden` で、
+    `elementHandle.screenshot()` は可視化を待って **30秒でタイムアウト**する(実測)。
+    ページ screenshot の clip で撮る。
+  - `dropEffect` は **`dragend` だけ**記録する。`dragover` では受け入れる zone も拒否する zone も
+    `copy` で区別しない(実測)が、`dragend` では drag 全体の判定になる。
+  - 専用 budget(4 source)。多数の source があるページで drop 探索を食い潰さないため。
+
 - [x] **hover 中のピクセル**を測る(mid-drag screenshot、実測 60–80ms/枚)。
   `dragenter` でハイライトする zone は自分の box の 99%、しないゾーンは 0.00%(バイト同一)。
   **drag が始まってからのみ**撮る(ログを gesture 中に読んで判定)ので、掴めない source では

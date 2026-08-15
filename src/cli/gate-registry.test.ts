@@ -79,7 +79,7 @@ describe("composed built-in registry", () => {
     }
   });
 
-  it("declares 147 tunable rules in total", async () => {
+  it("declares 149 tunable rules in total", async () => {
     // A canary, not a target: a gate losing its rule table to a bad merge is
     // otherwise invisible until someone tries to tune it.
     // 119 → 120 when `check copy` gained `copy-truncated` (element-rect mode, vlmkit#118).
@@ -134,8 +134,14 @@ describe("composed built-in registry", () => {
     //       the static check sees both handlers and the synthetic dispatch runs them directly at
     //       the element. Only a real gesture can miss it, and the finding names what took the
     //       events instead.
+    // 147 → 149: `drag-cancel-not-reverted`. The probe presses Escape mid-drag; the browser
+    //       reports the cancel (dragend, dropEffect "none", no drop) and the source's own box
+    //       still differs from before. That is the optimistic update every sortable makes —
+    //       hide the item on dragstart — with the undo wired to `drop` instead of `dragend`,
+    //       so Escape strands it. Measured: 0.00% for a source that restores, 99.03% for one
+    //       that does not.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 147);
+    assert.equal(total, 149);
   });
 
   it("gives every built-in gate a category", async () => {

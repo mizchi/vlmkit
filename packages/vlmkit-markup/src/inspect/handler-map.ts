@@ -724,6 +724,16 @@ export interface RealDragProbe {
    */
   hoverFeedback?: { target: string; ratio: number }[];
   /**
+   * What pressing Escape mid-drag did.
+   *
+   * `cancelled` is the browser's own verdict — `dragend` carrying `dropEffect: "none"` with no
+   * `drop` — and `ratio` is how much of the source's own pre-drag box differs afterwards. A
+   * cancelled drag should leave nothing behind: measured, a source that restores itself on
+   * `dragend` reads 0.00% and one that does not reads 99.03%, having hidden itself on `dragstart`
+   * and stayed hidden.
+   */
+  cancel?: { cancelled: boolean; ratio?: number };
+  /**
    * Every drag event this source's gestures produced, in order, with repeats coalesced.
    *
    * The debugging record: the aggregate fields say a drop did or did not land, and this says
@@ -809,6 +819,13 @@ const DRAG_RECORDER_SCRIPT = String.raw`
           ? "(non-element)"
           : el === document.body ? "body" : el === document.documentElement ? "html" : (describe(el) || "body");
         const row = { type: t, path: path };
+        // dropEffect, on dragend ONLY. It is the browser's verdict on the whole drag -- "none"
+        // means nothing accepted it, which is what Escape produces -- and it is the one place the
+        // value discriminates: on dragover it read "copy" both for a zone that accepts the drop
+        // and for one that refuses it, so it is not recorded there.
+        if (t === "dragend" && e.dataTransfer) {
+          try { row.dropEffect = String(e.dataTransfer.dropEffect); } catch (err) { row.dropEffect = "(unreadable)"; }
+        }
         if (t === "drop" && e.dataTransfer) {
           // Only readable here. Truncated because a target may carry a whole serialized model.
           row.received = [];
@@ -919,6 +936,17 @@ const MAX_REAL_DRAG_GESTURES = 24;
 const EXTRA_TARGET_VISITS = 3;
 
 /**
+ * How many sources get the Escape gesture.
+ *
+ * Its own counter rather than a share of the total, so a page with many drag sources cannot spend
+ * the whole budget on cancels and leave the drop questions unanswered — or the reverse. Four is
+ * enough to cover a fixture and any page where the sources are variations of one component, which
+ * is what a sortable list is; a page whose tenth source reverts differently from its first is not
+ * a shape worth another four gestures.
+ */
+const MAX_CANCEL_GESTURES = 4;
+
+/**
  * Drag each source onto the page's declared targets and report what the browser did.
  *
  * Two short-circuits, and both are about spending gestures where they answer something:
@@ -944,11 +972,13 @@ async function probeRealDrags(
   await page.evaluate(DRAG_RECORDER_SCRIPT);
   const out: RealDragProbe[] = [];
   let budget = MAX_REAL_DRAG_GESTURES;
+  let cancelBudget = MAX_CANCEL_GESTURES;
 
   type LogRow = {
     type: string;
     path: string;
     prevented?: boolean;
+    dropEffect?: string;
     received?: { type: string; value: string }[];
   };
   /**
@@ -965,6 +995,7 @@ async function probeRealDrags(
     from: { x: number; y: number },
     to: { x: number; y: number },
     target?: ElementHandle<Element> | null,
+    cancel = false,
   ) => {
     // Selected text is draggable, so a leftover selection starts a text drag instead of this
     // one — measured, and it made the same two gestures disagree between runs.
@@ -986,6 +1017,9 @@ async function probeRealDrags(
     // separates a zone that highlights on dragenter (99% of its own box changed) from one that
     // does not (0.00%, byte-identical).
     const during = before ? await target!.screenshot().catch(() => null) : null;
+    // Escape before the release, which is the order a user produces and the order measured to
+    // cancel: `dragend` arrives with `dropEffect: "none"` and no `drop` fires.
+    if (cancel) await page.keyboard.press("Escape");
     await page.mouse.up();
     return {
       log: await page.evaluate("window.__vlmkitDragLog") as LogRow[],
@@ -1079,6 +1113,38 @@ async function probeRealDrags(
           // one does not overwrite it, so the reported target stays the one a user would hit.
           if (drop && !row.droppedOn) row.droppedOn = drop.path;
         }
+      }
+      // ---- The cancel: Escape mid-flight, and does the page put things back ----------------
+      //
+      // Only for a source the browser will actually pick up, and only while the cancel budget
+      // lasts. Measured on a fixture whose source hides itself on `dragstart` (the optimistic
+      // "it left the list" every sortable does): the one that restores on `dragend` leaves its
+      // own box byte-identical, and the one that forgets leaves 99.03% of it changed. Both report
+      // `dragend` with `dropEffect: "none"`, which is the browser saying the drag was cancelled —
+      // so the two signals are independent, and the finding needs both.
+      //
+      // The region is clipped from a PAGE screenshot rather than taken from the element: the
+      // element is `visibility: hidden` in exactly the failing case, and `elementHandle
+      // .screenshot()` waits for it to become visible and then times out after 30s. Measured.
+      if (row.dragstartFired && cancelBudget > 0 && budget > 0) {
+        cancelBudget--;
+        budget--;
+        row.gestures++;
+        const clip = {
+          x: Math.max(0, Math.floor(box.x)),
+          y: Math.max(0, Math.floor(box.y)),
+          width: Math.max(1, Math.ceil(box.width)),
+          height: Math.max(1, Math.ceil(box.height)),
+        };
+        const before = await page.screenshot({ clip }).catch(() => null);
+        const { log: cancelLog } = await gesture(centre, firstAim, null, true);
+        await page.waitForTimeout(150);
+        const after = before ? await page.screenshot({ clip }).catch(() => null) : null;
+        const end = cancelLog.find((r) => r.type === "dragend");
+        row.cancel = {
+          cancelled: end?.dropEffect === "none" && !cancelLog.some((r) => r.type === "drop"),
+          ...(before && after ? { ratio: pixelDelta(before, after) } : {}),
+        };
       }
       if (startedOn.size > 0) row.startedOn = [...startedOn];
       if (hoverFeedback.length > 0) row.hoverFeedback = hoverFeedback;
@@ -1339,7 +1405,7 @@ export interface HandlerIssue {
   kind: "pointer-only-control" | "unprobed-handler-types" | "delegated-handlers-opaque" | "no-handlers-found"
     | "drag-source-not-draggable" | "drop-without-dragover" | "drag-without-keyboard-alternative"
     | "dragover-not-prevented" | "dragstart-transfers-nothing" | "pointer-drag-intercepted"
-    | "drag-source-inert" | "drop-target-unreachable";
+    | "drag-source-inert" | "drop-target-unreachable" | "drag-cancel-not-reverted";
   severity: "warn" | "suspect";
   element: string;
   message: string;
@@ -1431,6 +1497,18 @@ export const HANDLER_SURFACE_RULES = [
         + " `drag-source-not-draggable`, which reads the `draggable` property and reports the"
         + " one case that IS statically visible; this covers the ones that are not, and which"
         + " the synthetic dispatch reports as working. Requires --probe-drag.",
+    },
+    {
+      id: "drag-cancel-not-reverted",
+      title: "Escape cancelled the drag and the page kept the change",
+      severity: "suspect",
+      docs:
+        "Driven: the probe presses Escape mid-drag, the browser reports the drag as cancelled"
+        + " (dragend with dropEffect \"none\", no drop), and the source's own box still differs"
+        + " from before the gesture. The shape this catches is the optimistic update every"
+        + " sortable makes — hide the item on dragstart because it is 'leaving' — with no restore"
+        + " on a cancelled drag. Measured separation on a fixture: the source that restores reads"
+        + " 0.00%, the one that forgets reads 99.03%. Requires --probe-drag.",
     },
     {
       id: "drop-target-unreachable",
@@ -1640,6 +1718,25 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
           + `press, or \`draggable\` set on a different node than the handler. Note the element `
           + `IS draggable as far as the DOM is concerned, which is why the static check passes `
           + `it${realProbe.startedOn?.length ? `; the gesture started a drag on ${realProbe.startedOn.join(", ")} instead` : ""}.`,
+      });
+    }
+
+    // A cancelled drag that left something behind. Both halves are required: the browser has to
+    // have reported the cancel (otherwise the drop may legitimately have happened and changed the
+    // page), and the pixels have to still differ. 2% is the same floor the hover measurement uses.
+    const cancel = surface.realDragProbe?.find((r) => r.path === e.path)?.cancel;
+    if (cancel?.cancelled && cancel.ratio !== undefined && cancel.ratio >= 0.02) {
+      issues.push({
+        kind: "drag-cancel-not-reverted",
+        severity: "suspect",
+        element: `${e.path} "${e.text}"`,
+        message: `${e.path} "${e.text}" was dragged, Escape was pressed, and the browser cancelled `
+          + `the drag — dragend reported dropEffect "none" and no drop ran — but `
+          + `${(cancel.ratio * 100).toFixed(0)}% of the element's own box still differs from before `
+          + `the gesture. A cancelled drag has to leave the page as it was. The usual cause is an `
+          + `optimistic change made in dragstart (hiding or moving the item because it is `
+          + `"leaving") that is only undone in drop, so pressing Escape strands it: undo it in `
+          + `dragend instead, which fires whether the drag succeeded or not.`,
       });
     }
 
@@ -2095,8 +2192,19 @@ export function formatHandlerSurface(
         : row.dragstartFired
           ? `${YELLOW}no target accepted it${RESET}`
           : `${RED}started no drag${RESET}`;
+      // The Escape result, on the same line, because "it drops but Escape strands it" is one
+      // sentence about one source.
+      const cancelNote = !row.cancel
+        ? ""
+        : !row.cancel.cancelled
+          ? ` ${DIM}(Escape did not cancel it)${RESET}`
+          : row.cancel.ratio === undefined
+            ? ` ${DIM}(cancelled; revert not measured)${RESET}`
+            : row.cancel.ratio >= 0.02
+              ? ` ${RED}(Escape cancelled it and ${(row.cancel.ratio * 100).toFixed(0)}% of it stayed changed)${RESET}`
+              : ` ${DIM}(Escape reverted it cleanly)${RESET}`;
       lines.push(
-        `  - ${row.path}: ${row.dragstartFired ? "dragstart fired" : "no dragstart"}${tried} — ${landed}`
+        `  - ${row.path}: ${row.dragstartFired ? "dragstart fired" : "no dragstart"}${tried} — ${landed}${cancelNote}`
         + (row.capped ? ` ${DIM}(gesture budget reached — not every target was tried)${RESET}` : ""),
       );
       // The route, printed only when the drag did not complete. That is when the question is

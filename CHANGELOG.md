@@ -135,6 +135,29 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **A drag the user cancels has to leave the page as it was, and now that is measured.** The
+  probe presses Escape mid-flight — which does cancel a driven drag: `dragend` arrives carrying
+  `dropEffect: "none"` and no `drop` runs — and compares the source's own box either side of the
+  gesture.
+  - `drag-cancel-not-reverted` (suspect) needs both halves: the browser's statement that the drag
+    was cancelled, and pixels that still differ. Either alone is not the defect — a completed drop
+    is *supposed* to change the page, and a cancelled drag that reverted cleanly is the correct
+    behaviour.
+  - The shape it catches is the optimistic update every sortable makes: hide the item on
+    `dragstart` because it is "leaving", and undo it in `drop`. A cancelled drag never reaches
+    `drop`, so the item is gone for good. `dragend` fires either way, which is where the undo
+    belongs. Measured on `fixtures/handlers/drag-cancel.html`: the card that undoes it in `dragend`
+    leaves 0.00% of its box changed, the one that undoes it in `drop` leaves 99.03%.
+  - The region is clipped from a page screenshot rather than taken from the element, and that is
+    not a style preference: in exactly the failing case the element is `visibility: hidden`, and
+    `elementHandle.screenshot()` waits for it to become visible and then times out after 30
+    seconds. Measured the hard way.
+  - `dropEffect` is recorded on `dragend` only. On `dragover` it read `copy` for a zone that
+    accepts the drop and for one that refuses it, so it discriminates nothing there; on `dragend`
+    it is the browser's verdict on the whole drag.
+  - Its own budget (4 sources) rather than a share of the total, so a page with many sources
+    cannot spend the drop exploration on cancels or the other way round.
+
 - **A drop target nothing can drop on now reports.** `drag-source-inert` covers the source side;
   this is the other end. Measured on a zone with the complete correct contract — a `dragover`
   handler calling `preventDefault()` and a wired `drop` — sitting under a transparent sibling:
