@@ -39,10 +39,18 @@
 
   There is no `dragmove` event. The continuous ones are `drag` (on the source) and
   `dragover` (on the target); both appear below.
+
+  The container class is `rows`, with the `s`, and that letter is load-bearing. A probe row is
+  joined back to its surface entry by comparing derived paths, and the two derivations were
+  separate copies of the same walk -- one of which reached the browser as `split(/s+/)` because
+  a template literal ate the backslash in `\s`. It split the class list on the letter `s`, so
+  `class="rows"` produced `div.row>` in one copy and `div.rows>` in the other, the join failed,
+  and every probe-derived finding on this page silently disappeared. When the class was `row`
+  the fixture passed either way. Keep an `s` in it.
 -->
 <style>
   body { margin: 0; padding: 24px; font: 16px/1.4 system-ui, sans-serif; }
-  .row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+  .rows { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
   .item { background: #1a6ed8; color: #fff; padding: 8px 12px; cursor: grab; }
   .broken { background: #b3261e; }
   .zone { width: 180px; min-height: 64px; background: #eceff4; padding: 8px; }
@@ -51,7 +59,7 @@
 </head>
 <body>
 
-<div class="row">
+<div class="rows">
   <div class="item" id="ok" draggable="true" tabindex="0">correct source</div>
   <div class="item broken" id="not-draggable">dragstart, not draggable</div>
   <a class="item" id="native-source" href="#x">native draggable anchor</a>
@@ -59,7 +67,7 @@
        onkeydown="void 0">source via ondragstart attribute</div>
 </div>
 
-<div class="row">
+<div class="rows">
   <div class="zone" id="zone">correct target (dragover + drop)</div>
   <div class="zone broken" id="zone-no-dragover">drop only, no dragover</div>
   <div class="zone" id="prop-target">target via ondragover property</div>

@@ -39,7 +39,7 @@ import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/
 import { DISCOVER_SCRIPT } from "./interaction-map.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { PNG } from "pngjs";
-import type { Page } from "playwright";
+import type { JSHandle, Page } from "playwright";
 
 export interface HandlerSurfaceEntry {
   /** Handler types on ancestors that also carry handlers (delegation). */
@@ -201,6 +201,40 @@ const COMMON_ON_PROPS = [
 ];
 
 /**
+ * `describe(el)` — the element → path derivation, as one definition for the three places
+ * that need it: the surface collector, the drag probe, and the TypeScript-side lookup that
+ * turns a reported path back into an element handle.
+ *
+ * It was copied into all three, and the copies drifted in the one way a copy of a browser
+ * script drifts: **`\s` in a plain template literal loses its backslash.** `split(/\s+/)`
+ * reached the browser as `split(/s+/)` in the probe's copy — splitting the class list on the
+ * letter *s* — so any element (or ancestor) whose first class contains an `s` got a different
+ * path from the collector's, the `row.path === e.path` join silently failed, and every
+ * probe-derived finding disappeared. Measured on the drag fixture, whose classes happen to
+ * contain no `s`: renaming one container class `row` → `rows` took the run from 1
+ * `dragover-not-prevented` + 3 `dragstart-transfers-nothing` to **zero findings**, with no
+ * behavioural change to the page at all. `sortable`, `list`, `cards`, `items` are ordinary
+ * class names, so on real pages this was the normal case rather than the corner one.
+ *
+ * `String.raw` is what makes the escape survive interpolation, and is the idiom the rest of
+ * the repo already uses for browser scripts (`OBSERVE_SCRIPT` in `src/util/markup-loop.ts`).
+ */
+const DESCRIBE_PATH_FN = String.raw`
+  const describe = (el) => {
+    const parts = [];
+    let cur = el;
+    while (cur && cur !== document.body && cur.tagName && parts.length < 4) {
+      let p = cur.tagName.toLowerCase();
+      if (cur.id) p += "#" + cur.id;
+      else if (typeof cur.className === "string" && cur.className.trim()) p += "." + cur.className.trim().split(/\s+/)[0];
+      parts.unshift(p);
+      cur = cur.parentElement;
+    }
+    return parts.join(">");
+  };
+`;
+
+/**
  * Serialize the recorded registrations + on*-scan into a per-element
  * surface. Runs AFTER DISCOVER_SCRIPT so data-vlmkit-ix stamps exist.
  */
@@ -216,18 +250,7 @@ export const COLLECT_SURFACE_SCRIPT = `
   const perElement = new Map();
   const globals = {};
   let total = 0;
-  const describe = (el) => {
-    const parts = [];
-    let cur = el;
-    while (cur && cur !== document.body && cur.tagName && parts.length < 4) {
-      let p = cur.tagName.toLowerCase();
-      if (cur.id) p += "#" + cur.id;
-      else if (typeof cur.className === "string" && cur.className.trim()) p += "." + cur.className.trim().split(/\\s+/)[0];
-      parts.unshift(p);
-      cur = cur.parentElement;
-    }
-    return parts.join(">");
-  };
+  ${DESCRIBE_PATH_FN}
   const record = (el, type, src) => {
     total++;
     if (el === window || el === document || el === document.documentElement || el === document.body) {
@@ -388,18 +411,8 @@ export const PROBE_DRAG_SCRIPT = `
   const results = [];
   const paths = new Map();
   // Re-derive the same path strings the surface uses, so a probe row joins to its entry.
-  const describe = (el) => {
-    const parts = [];
-    let cur = el;
-    while (cur && cur !== document.body && cur.tagName && parts.length < 4) {
-      let p = cur.tagName.toLowerCase();
-      if (cur.id) p += "#" + cur.id;
-      else if (typeof cur.className === "string" && cur.className.trim()) p += "." + cur.className.trim().split(/\s+/)[0];
-      parts.unshift(p);
-      cur = cur.parentElement;
-    }
-    return parts.join(">");
-  };
+  // One definition, shared with the collector: a second copy is what broke the join.
+  ${DESCRIBE_PATH_FN}
   const wanted = new Set([...SOURCE_TYPES, ...TARGET_TYPES]);
   const candidates = [];
   for (const el of document.querySelectorAll("*")) {
@@ -511,6 +524,22 @@ export interface PointerDragProbe {
  * The element is screenshotted rather than the page: a drag surface is often the largest
  * thing on screen, and full-page pixels would drown a 3% change in a 100% denominator.
  */
+/**
+ * The element a surface path names, as a handle.
+ *
+ * Evaluated as a *string* rather than a function so it shares `DESCRIBE_PATH_FN` with the two
+ * browser scripts — a hand-written TypeScript copy of the same walk is what let the probe and
+ * the collector disagree about an element's path.
+ */
+async function handleForPath(page: Page, path: string): Promise<JSHandle> {
+  return await page.evaluateHandle(`(() => {
+    ${DESCRIBE_PATH_FN}
+    const want = ${JSON.stringify(path)};
+    for (const el of document.querySelectorAll("*")) if (describe(el) === want) return el;
+    return null;
+  })()`);
+}
+
 async function probePointerDrags(
   page: Page,
   elements: readonly HandlerSurfaceEntry[],
@@ -520,28 +549,9 @@ async function probePointerDrags(
   for (const entry of surfaces) {
     const row: PointerDragProbe = { path: entry.path, feedbackRatio: 0, committedRatio: 0 };
     try {
-      // Located by the same `data-vlmkit-*` stamp the surface used, so the probe cannot
-      // drag a different element than the one it reports on. Falls back to the box of the
-      // first element matching the path's last tag when no stamp exists.
-      const handle = await page.evaluateHandle((path: string) => {
-        const describe = (el: Element): string => {
-          const parts: string[] = [];
-          let cur: Element | null = el;
-          while (cur && cur !== document.body && cur.tagName && parts.length < 4) {
-            let p = cur.tagName.toLowerCase();
-            if (cur.id) p += "#" + cur.id;
-            else if (typeof cur.className === "string" && cur.className.trim()) {
-              p += "." + cur.className.trim().split(/\s+/)[0];
-            }
-            parts.unshift(p);
-            cur = cur.parentElement;
-          }
-          return parts.join(">");
-        };
-        for (const el of document.querySelectorAll("*")) if (describe(el) === path) return el;
-        return null;
-      }, entry.path);
-      const el = handle.asElement();
+      // Located by re-deriving the surface's own path, so the probe cannot drag a different
+      // element than the one it reports on.
+      const el = (await handleForPath(page, entry.path)).asElement();
       if (!el) { row.error = "element not found for its own path"; out.push(row); continue; }
       const box = await el.boundingBox();
       if (!box || box.width < 4 || box.height < 4) {

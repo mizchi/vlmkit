@@ -454,6 +454,20 @@ test("E2E: the probe catches what the static read cannot", { timeout: 120_000 },
   const s = await buildHandlerSurface({ source, probeDrag: true });
   assert.ok(s.dragProbe && s.dragProbe.length > 0, "probeDrag must produce rows");
 
+  // The probe joins its rows to the surface by comparing derived paths, so both derivations
+  // must split the class list the same way. They did not: one reached the browser as
+  // `split(/s+/)` — a template literal ate the backslash in `\s` — and split on the letter
+  // `s`. The fixture's container is `class="rows"` for this assertion: with the class `row`
+  // (no `s`) both spellings agreed and every finding below stayed green either way.
+  assert.ok(
+    s.elements.some((e) => e.path.startsWith("div.rows>")),
+    "the surface must derive `div.rows>`, not `div.row>` — the class list splits on whitespace",
+  );
+  assert.ok(
+    s.dragProbe.some((row) => row.path.startsWith("div.rows>")),
+    "and the probe must derive the same path, or none of its rows join to an entry",
+  );
+
   const issues = deriveHandlerIssues(s);
   const kindsFor = (id: string) =>
     issues.filter((i) => i.element.split(" ")[0]!.endsWith(`#${id}`)).map((i) => i.kind);
