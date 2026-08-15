@@ -1219,6 +1219,42 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 - [x] **`isUrl` の9個目のコピー**(`cross-browser.ts`)— `b03f849` で8個畳んだときに漏れていた。
   用途は「URL なら readFile しない」= `isUrlSource` そのもの。値は一致していたので dedupe のみ。
 
+### DnD(HTML5 drag and drop)を他のハンドラと同じように検査可能にした(2026-08-15)
+
+`addEventListener` パッチは型に依存しないので drag 型は**元から一覧されていた**。足りなかったのは
+「一覧できる」と「間違いを教えられる」の差で、DnD は**配線済みなのに絶対に発火しない**形が2つある。
+
+- [x] **`drag-source-not-draggable`**(suspect)— `dragstart` があるのに `draggable` が false。
+  `el.draggable`(DOM プロパティ = 実効値)で判定するので、`<a href>` / `<img>` のような
+  既定で draggable な要素は無指摘。属性だけ見ると両方誤検知する。
+- [x] **`drop-without-dragover`**(suspect)— `drop` があるのに自身も祖先も
+  `dragover`/`dragenter` を持たない。`dragover` の既定動作が drop を拒否するので発火しない。
+  **祖先を数えるのが要点**: container に `dragover` を1つ置く委譲パターンは正しいので無指摘。
+- [x] **`drag-without-keyboard-alternative`**(warn)— drag はどのブラウザでもキーボード等価物が
+  無いので mouse-only(WCAG 2.1.1 / 2.5.7)。**意図的に `POINTER_TYPES` に入れなかった**:
+  `pointer-only-control` の処方(tabindex + キーハンドラ)では drag は開始できないので、
+  助言が違う。warn にしたのは代替経路がページの別の場所にあることが多く、要素ローカルな
+  この視点からは見えないから。
+- [x] **`on*` sweep に drag ファミリが無かった** — `el.ondragover = fn` と
+  `<div ondragstart="...">` が完全に不可視。実測: プロパティ代入した要素は surface に
+  1行も出ていなかった(registrations 8、修正後 9)。
+- `fixtures/handlers/drag-and-drop.html` が契約(正しい組と壊れた組を並べ、期待値を
+  ファイル内コメントに記述)。E2E テストはコピーではなくその fixture を駆動する。
+- **`dragmove` という DOM イベントは存在しない**。連続系は `drag`(source 側)と
+  `dragover`(target 側)で、両方収集している。
+
+**副産物 — 先行して存在した欠陥**: `check interactions --handlers` は
+`deriveHandlerIssues` の kind を finding として出しているのに、handler 系 rule を
+1つも宣言していなかった。`--rule pointer-only-control=off` が bind 先を持たず、
+毎回 `emitted undeclared rule id(s)` を出していた。**runner 自身のチェックが
+drag rule 追加中に教えてくれた**(追加すると悪化するところだった)。
+`HANDLER_SURFACE_RULES` を1つにして両 gate が spread する形にした
+(rule 総数 127 → 137 = 新規3 + 宣言漏れ7)。
+
+**踏んだ罠**: `draggable` 収集のコメントをバックティック付きで書いたら、それが
+`COLLECT_SURFACE_SCRIPT` のテンプレートリテラル内だったため文字列が途中で閉じてビルドが
+PARSE_ERROR。browser script 文字列の中にバックティックと `${` は書けない。
+
 **作業中に踏んだ罠(記録)**: root の `pnpm build` の出力を `| head` で切ったら
 ビルドが SIGPIPE で途中死し、`packages/vlmkit-markup/dist/` が半分消えた状態になった。
 CLI は `@mizchi/vlmkit-*` を dist 解決するので、**修正が効いていないように見えるのは

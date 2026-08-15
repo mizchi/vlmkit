@@ -189,3 +189,179 @@ test("surface contract: container delegation across structure covers per-cell re
   );
   assert.deepEqual(compareHandlerSurfaces(ref, att), []);
 });
+
+// ---------------------------------------------------------------------------
+// HTML5 drag and drop
+//
+// The `addEventListener` patch is type-agnostic, so drag types were always *listed* —
+// measured on a fixture: `dragstart, dragend` / `dragover, drop, dragenter, dragleave`
+// showed up per element. What was missing is that a plain list cannot tell a working pair
+// from a broken one, and two of DnD's failure modes are handlers that CANNOT FIRE:
+//
+//   - a `dragstart` source that is not draggable — the browser starts no drag;
+//   - a `drop` target with no `dragover`, whose default action rejects the drop.
+//
+// Both were listed identically to the working pair beside them.
+//
+// There is no `dragmove` event: the continuous ones are `drag` (on the source) and
+// `dragover` (on the target), and both are covered here.
+
+test("a dragstart handler on a non-draggable element is a handler that cannot fire", () => {
+  const issues = deriveHandlerIssues(surface(
+    entry({ path: "div#item", text: "row", types: { dragstart: 1 }, draggable: false }),
+  ));
+  const found = issues.find((i) => i.kind === "drag-source-not-draggable")!;
+  assert.ok(found, "dragstart without draggable must report");
+  assert.equal(found.severity, "suspect");
+  assert.match(found.message, /can never fire/);
+  assert.match(found.message, /draggable="true"/);
+});
+
+test("a draggable source is not reported, however it became draggable", () => {
+  // `el.draggable` is the effective value, so an <a href> or <img> reads true with no
+  // attribute. Deriving it from the attribute alone would have flagged both.
+  const issues = deriveHandlerIssues(surface(
+    entry({ path: "div#item", types: { dragstart: 1, dragend: 1 }, draggable: true }),
+  ));
+  assert.equal(issues.filter((i) => i.kind === "drag-source-not-draggable").length, 0);
+});
+
+test("draggability that was never collected does not invent a finding", () => {
+  // A surface from an older build has no `draggable` field. Reading `undefined` as "not
+  // draggable" would report every drag source on data this gate did not measure.
+  const issues = deriveHandlerIssues(surface(
+    entry({ path: "div#item", types: { dragstart: 1 } }),
+  ));
+  assert.equal(issues.filter((i) => i.kind === "drag-source-not-draggable").length, 0);
+});
+
+test("a drop handler with no dragover anywhere above it can never fire", () => {
+  const issues = deriveHandlerIssues(surface(
+    entry({ path: "div#zone", text: "drop here", types: { drop: 1 } }),
+  ));
+  const found = issues.find((i) => i.kind === "drop-without-dragover")!;
+  assert.ok(found, "drop with no dragover must report");
+  assert.equal(found.severity, "suspect");
+  assert.match(found.message, /can never fire/);
+  assert.match(found.message, /preventDefault/);
+});
+
+test("dragover or dragenter on the element itself clears the drop finding", () => {
+  for (const partner of ["dragover", "dragenter"] as const) {
+    const issues = deriveHandlerIssues(surface(
+      entry({ path: "div#zone", types: { drop: 1, [partner]: 1 } }),
+    ));
+    assert.equal(
+      issues.filter((i) => i.kind === "drop-without-dragover").length, 0,
+      `${partner} on the element is enough`,
+    );
+  }
+});
+
+test("dragover on an ancestor clears it too, because the event bubbles", () => {
+  // A delegated drop target registers dragover once on the container. Flagging the child
+  // would be a false positive on the normal way to write this.
+  const issues = deriveHandlerIssues(surface(
+    entry({ path: "ul>li", types: { drop: 1 }, ancestorTypes: ["dragover"] }),
+  ));
+  assert.equal(issues.filter((i) => i.kind === "drop-without-dragover").length, 0);
+});
+
+test("drag with no keyboard path is a warn, not a suspect, and does not advise tabindex", () => {
+  // Drag has no keyboard equivalent in any browser, so this is real (WCAG 2.1.1, 2.5.7) —
+  // but the alternative route is often elsewhere on the page, which this element-local
+  // view cannot see. And the fix is NOT the `pointer-only-control` remedy: tabindex and a
+  // key handler cannot start a drag, which is why drag is kept out of POINTER_TYPES.
+  const issues = deriveHandlerIssues(surface(
+    entry({ path: "div#item", types: { dragstart: 1 }, draggable: true }),
+  ));
+  const found = issues.find((i) => i.kind === "drag-without-keyboard-alternative")!;
+  assert.ok(found);
+  assert.equal(found.severity, "warn");
+  assert.doesNotMatch(found.message, /tabindex \+ Enter|add tabindex/i);
+  assert.match(found.message, /non-drag path/);
+  // And it is not ALSO reported as a pointer-only control, which would give two findings
+  // with contradictory advice for one element.
+  assert.equal(issues.filter((i) => i.kind === "pointer-only-control").length, 0);
+});
+
+test("a keyboard handler on the element or an ancestor answers the drag a11y finding", () => {
+  for (const shape of [
+    { types: { dragstart: 1, keydown: 1 }, ancestorTypes: [] },
+    { types: { dragstart: 1 }, ancestorTypes: ["keydown"] },
+  ]) {
+    const issues = deriveHandlerIssues(surface(entry({ path: "div#item", draggable: true, ...shape })));
+    assert.equal(
+      issues.filter((i) => i.kind === "drag-without-keyboard-alternative").length, 0,
+      JSON.stringify(shape),
+    );
+  }
+});
+
+test("an invisible drag source is not an a11y finding", () => {
+  // Same guard the pointer-only check uses: a hidden element operates nothing.
+  const issues = deriveHandlerIssues(surface(
+    entry({ path: "div#item", types: { dragstart: 1 }, draggable: true, visible: false }),
+  ));
+  assert.equal(issues.filter((i) => i.kind === "drag-without-keyboard-alternative").length, 0);
+});
+
+test("a correct drag pair produces no drag findings at all", () => {
+  // The control. A source that is draggable with a keyboard alternative, and a target with
+  // both halves of the drop contract, must be silent — otherwise the rules are noise.
+  const issues = deriveHandlerIssues(surface(
+    entry({ path: "div#item", types: { dragstart: 1, dragend: 1, keydown: 1 }, draggable: true }),
+    entry({ path: "div#zone", types: { dragover: 1, drop: 1 } }),
+  ));
+  assert.deepEqual(issues.filter((i) => i.kind.startsWith("drag") || i.kind.startsWith("drop")), []);
+});
+
+test("E2E: drag handlers are collected through both routes, and only the broken pairs report",
+  { timeout: 120_000 }, async () => {
+  // Driven from the committed fixture rather than an inline string, so the HTML a reader
+  // opens to learn what this gate checks is the same HTML the assertions below pin. The
+  // fixture's own comment states the expectation per element.
+  //
+  // The `on*` sweep is the half that was missing: `COMMON_ON_PROPS` had no drag entries, so
+  // `el.ondragover = fn` and `<div ondragstart="...">` were invisible. Measured before the
+  // fix on the same shape — the element assigning `ondragover` as a property did not appear
+  // in the surface at all.
+  const s = await buildHandlerSurface({ source: join(REPO_ROOT, "fixtures/handlers/drag-and-drop.html") });
+  // `describe()` joins ancestors with `>`, so match on the id segment rather than the whole
+  // path — and anchored, because `div#ok` is a substring of nothing here but `div#zone` is a
+  // prefix of `div#zone-no-dragover`.
+  const byId = (id: string) => s.elements.find((e) => e.path.endsWith(`#${id}`));
+
+  // Route 2, the DOM sweep, both spellings.
+  assert.ok(byId("prop-target")?.types.dragover, "ondragover assigned as a property must be collected");
+  assert.ok(byId("attr-source")?.types.dragstart, "an ondragstart attribute must be collected");
+  // Route 1 keeps working, including the continuous `drag` event.
+  assert.ok(byId("ok")?.types.drag, "`drag` is the continuous source event — there is no dragmove");
+
+  // Effective draggability, read off the DOM property so defaults come out right.
+  assert.equal(byId("ok")?.draggable, true);
+  assert.equal(byId("not-draggable")?.draggable, false);
+  assert.equal(byId("native-source")?.draggable, true, "an <a href> is draggable with no attribute");
+
+  const issues = deriveHandlerIssues(s);
+  const kindsFor = (id: string) =>
+    issues.filter((i) => i.element.split(" ")[0]!.endsWith(`#${id}`)).map((i) => i.kind);
+
+  // The two handlers that cannot fire.
+  assert.deepEqual(kindsFor("not-draggable").filter((k) => k === "drag-source-not-draggable"),
+    ["drag-source-not-draggable"]);
+  assert.deepEqual(kindsFor("zone-no-dragover").filter((k) => k === "drop-without-dragover"),
+    ["drop-without-dragover"]);
+
+  // And everything correct stays silent, which is what makes those two readable.
+  for (const id of ["ok", "zone", "native-source", "attr-source", "prop-target", "delegated-item"]) {
+    assert.deepEqual(
+      kindsFor(id).filter((k) => k === "drag-source-not-draggable" || k === "drop-without-dragover"),
+      [], `${id} should have no unfireable-handler finding`,
+    );
+  }
+  // The a11y half: #ok and #attr-source carry keyboard handlers, the other two sources do not.
+  assert.equal(kindsFor("ok").includes("drag-without-keyboard-alternative"), false);
+  assert.equal(kindsFor("attr-source").includes("drag-without-keyboard-alternative"), false);
+  assert.ok(kindsFor("not-draggable").includes("drag-without-keyboard-alternative"));
+});

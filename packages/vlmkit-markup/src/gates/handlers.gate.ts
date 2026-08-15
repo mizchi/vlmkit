@@ -16,6 +16,7 @@ import {
   type HandlerSurface,
   buildHandlerSurface,
   deriveHandlerIssues,
+  HANDLER_SURFACE_RULES,
   formatHandlerSurface,
 } from "../inspect/handler-map.ts";
 import { firstPositional } from "@mizchi/vlmkit-core/plugin/args.ts";
@@ -37,32 +38,17 @@ per-element event surface, and cross-checks it against the a11y
 interaction discovery. Headline detection: pointer-only controls —
 click handlers on role-less elements no keyboard user can operate.
 
+HTML5 drag and drop is inspected the same way as any other handler
+family, and two of its failure modes are handlers that CANNOT FIRE:
+a dragstart source that is not draggable, and a drop target with no
+dragover to preventDefault on. Both are reported. There is no
+dragmove event — the continuous ones are drag (on the source) and
+dragover (on the target).
+
 Framework caveat: React-style root delegation appears as one listener
 on the delegation root; per-element granularity is a vanilla/Web
 Components property.`,
-  rules: [
-    {
-      id: "pointer-only-control",
-      title: "Click handler on a role-less element with no keyboard path",
-      severity: "suspect",
-      docs: "Operable by mouse but not by keyboard or assistive tech. The headline detection of this gate.",
-    },
-    {
-      id: "delegated-handlers-opaque",
-      title: "Root delegation hides per-element handlers",
-      severity: "warn",
-      docs: "Expected on React-style apps: the surface is measurable, just not per element.",
-    },
-    { id: "unprobed-handler-types", title: "Event types this gate does not probe", severity: "warn" },
-    {
-      id: "no-handlers-found",
-      title: "The page presents controls and registers no handlers at all",
-      severity: "warn",
-      docs:
-        "Warn, not suspect: a page of links and a form that posts legitimately needs none."
-        + " Raise to suspect on an app where every control is expected to be wired.",
-    },
-  ],
+  rules: [...HANDLER_SURFACE_RULES],
   inputs: [
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to scan", positional: 0, required: true },
     ...PAGE_LOAD_INPUTS,

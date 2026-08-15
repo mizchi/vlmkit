@@ -43,6 +43,7 @@ nothing — failing on a suspect is the default.
 | Animations visibly run, settle, respect reduced-motion | `vlmkit check animation page.html` |
 | Everything keyboard-operable, ARIA states transition | `vlmkit check interactions page.html` |
 | Clickable `<div>`s / pointer-only controls | `vlmkit scan handlers page.html` |
+| Drag and drop wired but unfireable (a `dragstart` source that is not draggable, a `drop` target with no `dragover`) | `vlmkit scan handlers page.html` |
 | A scripted flow reaches its post-conditions | `vlmkit verify flow page.html --flow flow.json` |
 
 **Against a target design:**

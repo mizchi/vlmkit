@@ -135,6 +135,32 @@ suppression works per *rule* instead of per whole gate.
 
 ### Added
 
+- **`scan handlers` inspects HTML5 drag and drop, and reports the two handlers that cannot
+  fire.** The `addEventListener` route always recorded drag types — it is type-agnostic —
+  but a plain inventory cannot tell a working pair from a broken one, and DnD has two
+  failure modes where a wired handler *never runs*:
+  - `drag-source-not-draggable` (suspect) — a `dragstart` handler on an element whose
+    `draggable` is false. The browser starts no drag, so the handler is dead. Read off the
+    DOM property, so `<a href>` and `<img>` — draggable by default — are not flagged.
+  - `drop-without-dragover` (suspect) — a `drop` handler with no `dragover`/`dragenter` on
+    the element or any ancestor. `dragover`'s default action rejects the drop, so `drop`
+    never fires. Ancestors count, because the event bubbles: a delegated target that
+    registers `dragover` once on its container is correct and is not flagged.
+  - `drag-without-keyboard-alternative` (warn) — drag has no keyboard equivalent in any
+    browser, so a drag-only affordance is mouse-only (WCAG 2.1.1, 2.5.7). Warn rather than
+    suspect because the alternative route is often elsewhere on the page. Kept out of
+    `pointer-only-control` deliberately: its remedy is `tabindex` + a key handler, and that
+    cannot start a drag — the fix here is another path to the same result.
+
+  The `on*` sweep gained the drag family too. It had none, so `el.ondragover = fn` and
+  `<div ondragstart="…">` were invisible: measured on a fixture assigning `ondragover` as a
+  property, the element did not appear in the surface at all. `fixtures/handlers/drag-and-drop.html`
+  is the committed contract — correct and broken pairs side by side, with the expectation
+  per element in its own comment — and the E2E test drives that file rather than a copy.
+
+  There is no `dragmove` event; the continuous ones are `drag` (on the source) and
+  `dragover` (on the target), and both are collected.
+
 - **The test suite runs on vitest, with coverage.** `pnpm test` is `vitest run`;
   `pnpm test:coverage` reports v8 coverage into `test-results/coverage`. The
   migration changed no test's meaning — node:test and vitest agree on
@@ -620,6 +646,15 @@ suppression works per *rule* instead of per whole gate.
   Fixed at the choke point and all eight copies collapsed into it: each call site was
   verbatim `sourceToUrl`, so the collapse is behaviour-preserving and there is now one
   definition to be wrong in.
+
+- **`check interactions --handlers` emitted rules it never declared.** It pushes
+  `deriveHandlerIssues`' kinds as findings, and the four handler-surface rules were declared
+  only on `scan handlers` — so `--rule pointer-only-control=off` had nothing to bind to on
+  that gate, and every `--handlers` run printed
+  `check.interactions emitted undeclared rule id(s): unprobed-handler-types`. Found by the
+  runner's own check while adding the drag rules, which would have made it worse. Both gates
+  now spread one `HANDLER_SURFACE_RULES`, declared beside the `HandlerIssue` kinds it
+  describes, so a rule added to the deriver reaches both consumers or neither.
 
 - **Exit 2 was removed from the contract and three leaves kept emitting it, with
   incompatible meanings.** `gate-exit.ts` and `docs/design/gate-plugin-architecture.md`

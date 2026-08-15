@@ -56,6 +56,13 @@ export interface HandlerSurfaceEntry {
   containsInteractive: boolean;
   /** This element lives inside a discovered interactive element. */
   insideInteractive: boolean;
+  /**
+   * Effective draggability (`el.draggable`), which a `dragstart` handler needs to fire.
+   *
+   * Optional because a surface captured by an older build has no such field, and reading
+   * `undefined` as "not draggable" would invent findings on data this gate did not collect.
+   */
+  draggable?: boolean;
 }
 
 export interface HandlerSurface {
@@ -91,6 +98,14 @@ const COMMON_ON_PROPS = [
   "onclick", "ondblclick", "onmousedown", "onmouseup", "onpointerdown", "onpointerup",
   "onkeydown", "onkeyup", "onkeypress", "oninput", "onchange", "onsubmit",
   "onfocus", "onblur", "onmouseover", "onmouseenter", "ontouchstart",
+  // The HTML5 drag-and-drop family. The `addEventListener` route already recorded these
+  // — it is type-agnostic — but this DOM sweep did not, so `el.ondragover = fn` and
+  // `<div ondrop="...">` were invisible. Measured on a fixture assigning `ondragover` as a
+  // property: the element did not appear in the surface at all.
+  //
+  // These seven are the whole DOM vocabulary. There is no `dragmove` event: the
+  // continuous ones are `drag`, fired on the source, and `dragover`, fired on the target.
+  "ondragstart", "ondrag", "ondragenter", "ondragover", "ondragleave", "ondrop", "ondragend",
 ];
 
 /**
@@ -170,6 +185,14 @@ export const COLLECT_SURFACE_SCRIPT = `
       visible: style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0,
       containsInteractive: !!el.querySelector("[data-vlmkit-ix]"),
       insideInteractive: !!(el.parentElement && el.parentElement.closest("[data-vlmkit-ix]")),
+      // The DOM property, not the attribute: it reflects EFFECTIVE draggability, so an
+      // anchor with href and an img -- draggable by default -- read true with no attribute,
+      // and draggable="false" on them reads false. Deriving this from the attribute alone
+      // would get both wrong.
+      //
+      // (No backticks in here: this comment lives inside COLLECT_SURFACE_SCRIPT's template
+      // literal, and a backtick closes the string. That is what broke the build once.)
+      draggable: el.draggable === true,
     });
   }
   // How many controls the page PRESENTS, whether or not any handler was found.
@@ -240,15 +263,98 @@ export async function buildHandlerSurface(options: HandlerSurfaceOptions): Promi
 const POINTER_TYPES = new Set(["click", "dblclick", "mousedown", "mouseup", "pointerdown", "pointerup", "touchstart"]);
 const KEYBOARD_TYPES = new Set(["keydown", "keyup", "keypress"]);
 
+/**
+ * HTML5 drag-and-drop, kept out of `POINTER_TYPES` deliberately.
+ *
+ * A drag-only element IS mouse-only, but the remedy is not the one
+ * `pointer-only-control` prescribes: adding `tabindex` and a key handler does not make a
+ * drag operable, because there is no keyboard drag. It needs a separate non-drag path
+ * (move-up/move-down buttons, a "move to" menu), so it gets its own finding with its own
+ * advice rather than being folded in.
+ *
+ * `dragmove` is not in this list because it is not a DOM event. The continuous ones are
+ * `drag`, fired on the source, and `dragover`, fired on the target.
+ */
+const DRAG_SOURCE_TYPES = new Set(["dragstart", "drag", "dragend"]);
+const DRAG_TARGET_TYPES = new Set(["dragenter", "dragover", "dragleave", "drop"]);
+const DRAG_TYPES = new Set([...DRAG_SOURCE_TYPES, ...DRAG_TARGET_TYPES]);
+
 /** Event types the interaction probes actually fire. */
 export const PROBED_TYPES = new Set(["click", "keydown", "keyup", "keypress", "focus", "blur"]);
 
 export interface HandlerIssue {
-  kind: "pointer-only-control" | "unprobed-handler-types" | "delegated-handlers-opaque" | "no-handlers-found";
+  kind: "pointer-only-control" | "unprobed-handler-types" | "delegated-handlers-opaque" | "no-handlers-found"
+    | "drag-source-not-draggable" | "drop-without-dragover" | "drag-without-keyboard-alternative";
   severity: "warn" | "suspect";
   element: string;
   message: string;
 }
+
+/**
+ * The rule table for everything `deriveHandlerIssues` can emit.
+ *
+ * It lived in `handlers.gate.ts` only, and `check interactions --handlers` emits the same
+ * issues through the same function — so that gate declared none of them. The runner caught
+ * it and said so, which is how this was found while adding the drag rules:
+ *
+ *     check.interactions emitted undeclared rule id(s): unprobed-handler-types
+ *
+ * An undeclared rule cannot be tuned (`--rule pointer-only-control=off` had nothing to
+ * bind to on that gate) and every run printed the error line. Declared here, next to the
+ * `HandlerIssue` kinds, and spread into both gates — one definition, so a rule added to the
+ * deriver cannot reach only one of its two consumers.
+ */
+export const HANDLER_SURFACE_RULES = [
+    {
+      id: "pointer-only-control",
+      title: "Click handler on a role-less element with no keyboard path",
+      severity: "suspect",
+      docs: "Operable by mouse but not by keyboard or assistive tech. The headline detection of this gate.",
+    },
+    {
+      id: "delegated-handlers-opaque",
+      title: "Root delegation hides per-element handlers",
+      severity: "warn",
+      docs: "Expected on React-style apps: the surface is measurable, just not per element.",
+    },
+    {
+      id: "drag-source-not-draggable",
+      title: "dragstart handler on an element that is not draggable",
+      severity: "suspect",
+      docs:
+        "The handler can never fire: the browser starts no drag on an element whose"
+        + " `draggable` is false. Add `draggable=\"true\"`, or move the handler to an element"
+        + " draggable by default (<a href>, <img>).",
+    },
+    {
+      id: "drop-without-dragover",
+      title: "drop handler with no dragover/dragenter to preventDefault on",
+      severity: "suspect",
+      docs:
+        "Also unfireable. dragover's default action rejects the drop, so a target must"
+        + " register dragover (or dragenter) and call preventDefault(). Checked on the element"
+        + " and every ancestor it would bubble through, so delegated targets are not flagged.",
+    },
+    {
+      id: "drag-without-keyboard-alternative",
+      title: "Drag-operated element with no keyboard path",
+      severity: "warn",
+      docs:
+        "HTML5 drag has no keyboard equivalent in any browser, so the action is mouse-only"
+        + " (WCAG 2.1.1, 2.5.7). Warn rather than suspect because the alternative path is"
+        + " often elsewhere on the page, which this element-local view cannot see. The fix is"
+        + " another route to the same result, not tabindex + Enter — that cannot start a drag.",
+    },
+    { id: "unprobed-handler-types", title: "Event types this gate does not probe", severity: "warn" },
+    {
+      id: "no-handlers-found",
+      title: "The page presents controls and registers no handlers at all",
+      severity: "warn",
+      docs:
+        "Warn, not suspect: a page of links and a form that posts legitimately needs none."
+        + " Raise to suspect on an app where every control is expected to be wired.",
+    },
+] as const;
 
 /**
  * The headline cross-check: a visible element with a pointer handler
@@ -274,6 +380,75 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
         if (!PROBED_TYPES.has(t)) unprobedTypes.add(t);
       }
     }
+    // ---- HTML5 drag and drop -----------------------------------------------
+    //
+    // Two of these are handlers that CANNOT FIRE, which is the same class as
+    // `pointer-only-control` and just as invisible in a plain inventory: measured on a
+    // fixture, a `dragstart` source missing `draggable` and a `drop` target missing
+    // `dragover` were listed identically to the working pair beside them.
+    const types = Object.keys(e.types);
+    const dragSourceTypes = types.filter((t) => DRAG_SOURCE_TYPES.has(t));
+    const dragTargetTypes = types.filter((t) => DRAG_TARGET_TYPES.has(t));
+
+    // `e.draggable === false`, not `!e.draggable`: an older surface has no such field, and
+    // treating "not collected" as "not draggable" would invent findings.
+    if (dragSourceTypes.includes("dragstart") && e.draggable === false) {
+      issues.push({
+        kind: "drag-source-not-draggable",
+        severity: "suspect",
+        element: `${e.path} "${e.text}"`,
+        message: `${e.path} "${e.text}" has a dragstart handler but is not draggable, so the `
+          + `handler can never fire — the browser starts no drag on an element whose `
+          + `\`draggable\` is false. Add \`draggable="true"\` (or move the handler to an `
+          + `element that is draggable by default, like an <a href> or <img>).`,
+      });
+    }
+
+    // The drop half of the contract. `dragover` (or `dragenter`) must call
+    // `preventDefault()` or the browser's default action cancels the drop, and `drop` never
+    // fires. Whether preventDefault is actually CALLED is not statically visible — that is
+    // what the `--json` samples and an interact sequence are for — but the absence of any
+    // dragover/dragenter handler at all, on the element or an ancestor it would bubble
+    // through, is decisive on its own.
+    if (
+      dragTargetTypes.includes("drop")
+      && !types.includes("dragover") && !types.includes("dragenter")
+      && !e.ancestorTypes.includes("dragover") && !e.ancestorTypes.includes("dragenter")
+    ) {
+      issues.push({
+        kind: "drop-without-dragover",
+        severity: "suspect",
+        element: `${e.path} "${e.text}"`,
+        message: `${e.path} "${e.text}" has a drop handler but no dragover or dragenter `
+          + `handler on it or any ancestor, so the drop can never fire. The default action `
+          + `for dragover is "reject the drop"; a target must register dragover and call `
+          + `preventDefault() on it.`,
+      });
+    }
+
+    // Drag is not keyboard-operable, at all, in any browser — so a drag-only affordance
+    // excludes keyboard and assistive-tech users the way a click-only div does, and needs a
+    // different remedy: another way to perform the same action, not tabindex + Enter.
+    // Warn rather than suspect: the alternative path is often elsewhere on the page (a
+    // "move to" menu), which this element-local view cannot see.
+    if (
+      dragSourceTypes.length > 0 && !hasKeyboard
+      && !e.ancestorTypes.some((t) => KEYBOARD_TYPES.has(t))
+      && e.visible
+    ) {
+      issues.push({
+        kind: "drag-without-keyboard-alternative",
+        severity: "warn",
+        element: `${e.path} "${e.text}"`,
+        message: `${e.path} "${e.text}" is operated by dragging (${dragSourceTypes.join("/")}) `
+          + `with no keyboard handler on it or an ancestor. HTML5 drag has no keyboard `
+          + `equivalent in any browser, so this action is mouse-only (WCAG 2.1.1, and 2.5.7 `
+          + `Dragging Movements). Provide a non-drag path to the same result — move `
+          + `up/down controls, a "move to" menu, or cut/paste — rather than tabindex and a `
+          + `key handler, which cannot start a drag.`,
+      });
+    }
+
     if (
       hasPointer && !hasKeyboard
       && e.ix === null

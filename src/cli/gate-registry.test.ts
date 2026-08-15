@@ -79,7 +79,7 @@ describe("composed built-in registry", () => {
     }
   });
 
-  it("declares 127 tunable rules in total", async () => {
+  it("declares 137 tunable rules in total", async () => {
     // A canary, not a target: a gate losing its rule table to a bad merge is
     // otherwise invisible until someone tries to tune it.
     // 119 → 120 when `check copy` gained `copy-truncated` (element-rect mode, vlmkit#118).
@@ -98,8 +98,21 @@ describe("composed built-in registry", () => {
     // 126 → 127 when `check layout` gained `invalid-selector`: `querySelectorAll` throws
     // only on invalid CSS, that throw was swallowed, and "matched nothing" satisfies
     // `visible: false` — so a typo in the contract reported SATISFIED.
+    // 127 → 137 in one step, and the +10 is two different things:
+    //   +3  `scan handlers` gained the HTML5 drag-and-drop rules —
+    //       `drag-source-not-draggable` and `drop-without-dragover` are handlers that
+    //       cannot fire (no `draggable`, no `dragover` to preventDefault on), and
+    //       `drag-without-keyboard-alternative` is the a11y half, since drag has no
+    //       keyboard equivalent in any browser.
+    //   +7  `check interactions` now DECLARES the handler-surface rules it has been
+    //       emitting all along under `--handlers`. It pushed `deriveHandlerIssues`'
+    //       kinds as findings while declaring none of them, so every such run printed
+    //       "check.interactions emitted undeclared rule id(s): unprobed-handler-types"
+    //       and `--rule pointer-only-control=off` had nothing to bind to on that gate.
+    //       Both gates spread one `HANDLER_SURFACE_RULES` now, so a rule added to the
+    //       deriver reaches both consumers or neither.
     const total = (await registry()).list().reduce((n, { gate }) => n + gate.rules.length, 0);
-    assert.equal(total, 127);
+    assert.equal(total, 137);
   });
 
   it("gives every built-in gate a category", async () => {

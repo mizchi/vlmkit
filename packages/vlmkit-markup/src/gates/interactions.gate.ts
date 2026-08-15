@@ -34,6 +34,7 @@ import {
   type HandlerSurface,
   type SurfaceMismatch,
   formatHandlerSurface,
+  HANDLER_SURFACE_RULES,
 } from "../inspect/handler-map.ts";
 import { firstPositional, optionalInt } from "@mizchi/vlmkit-core/plugin/args.ts";
 
@@ -101,6 +102,12 @@ contract and every response mismatch is reported.`,
       severity: "warn",
       docs: "Only with --handlers --reference.",
     },
+    // `--handlers` runs `deriveHandlerIssues` and pushes its kinds as findings, so this
+    // gate has to declare them too. It did not, and the runner said so on every such run:
+    // "check.interactions emitted undeclared rule id(s): unprobed-handler-types". Spread
+    // from one table rather than restated, so a rule added to the deriver reaches both
+    // consumers or neither.
+    ...HANDLER_SURFACE_RULES,
   ],
   inputs: [
     { name: "source", placeholder: "html-or-url", kind: "path-or-url", description: "Page to probe", positional: 0, required: true },

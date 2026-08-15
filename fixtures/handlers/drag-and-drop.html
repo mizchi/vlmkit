@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HTML5 drag and drop — correct and broken pairs</title>
+<!--
+  What `vlmkit scan handlers` is expected to say about this page.
+
+  Every element here is wired with drag handlers, and a plain inventory lists them all
+  identically. Two of them can NEVER FIRE, which is the point of the fixture:
+
+    #ok / #zone            a correct source/target pair — no finding
+    #not-draggable         dragstart on an element whose `draggable` is false, so the
+                           browser starts no drag           -> drag-source-not-draggable
+    #zone-no-dragover      drop with no dragover to preventDefault on, so the drop is
+                           rejected by the default action    -> drop-without-dragover
+    #delegated-list > li   drop on the child, dragover on the container: correct, because
+                           dragover bubbles                  -> no finding
+    #native-source         an <a href>, draggable by default with no attribute, so
+                           reading the attribute alone would flag it   -> no finding
+    #prop-target           ondragover assigned as a DOM property, which the on* sweep
+                           has to see (it did not, before the drag props were added)
+    #attr-source           the same through an ondragstart *attribute*, the other half of
+                           that sweep
+
+  Every visible drag source also reports `drag-without-keyboard-alternative` unless it or
+  an ancestor has a keyboard handler — #ok deliberately has one, so the fixture shows both
+  sides. Drag has no keyboard equivalent in any browser, so that finding is about the page
+  needing another route to the same result, not about tabindex.
+
+  There is no `dragmove` event. The continuous ones are `drag` (on the source) and
+  `dragover` (on the target); both appear below.
+-->
+<style>
+  body { margin: 0; padding: 24px; font: 16px/1.4 system-ui, sans-serif; }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+  .item { background: #1a6ed8; color: #fff; padding: 8px 12px; cursor: grab; }
+  .broken { background: #b3261e; }
+  .zone { width: 180px; min-height: 64px; background: #eceff4; padding: 8px; }
+  ul { list-style: none; margin: 0; padding: 0; }
+</style>
+</head>
+<body>
+
+<div class="row">
+  <div class="item" id="ok" draggable="true" tabindex="0">correct source</div>
+  <div class="item broken" id="not-draggable">dragstart, not draggable</div>
+  <a class="item" id="native-source" href="#x">native draggable anchor</a>
+  <div class="item" id="attr-source" draggable="true" ondragstart="void 0" tabindex="0"
+       onkeydown="void 0">source via ondragstart attribute</div>
+</div>
+
+<div class="row">
+  <div class="zone" id="zone">correct target (dragover + drop)</div>
+  <div class="zone broken" id="zone-no-dragover">drop only, no dragover</div>
+  <div class="zone" id="prop-target">target via ondragover property</div>
+</div>
+
+<ul class="zone" id="delegated-list">
+  <li id="delegated-item">delegated target (dragover on the list)</li>
+</ul>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  // A correct source: draggable, and reachable by keyboard for the alternative path.
+  $("ok").addEventListener("dragstart", (e) => { e.dataTransfer.setData("text/plain", "ok"); });
+  $("ok").addEventListener("drag", () => {});
+  $("ok").addEventListener("dragend", () => {});
+  $("ok").addEventListener("keydown", (e) => { if (e.key === "Enter") { /* move via keyboard */ } });
+
+  // Cannot fire: no draggable attribute.
+  $("not-draggable").addEventListener("dragstart", () => {});
+
+  // Draggable by default, so this is fine with no attribute.
+  $("native-source").addEventListener("dragstart", () => {});
+
+  // A correct target: both halves of the drop contract.
+  $("zone").addEventListener("dragenter", () => {});
+  $("zone").addEventListener("dragover", (e) => { e.preventDefault(); });
+  $("zone").addEventListener("dragleave", () => {});
+  $("zone").addEventListener("drop", (e) => { e.preventDefault(); });
+
+  // Cannot fire: dragover's default action rejects the drop.
+  $("zone-no-dragover").addEventListener("drop", () => {});
+
+  // The on* property route, which the DOM sweep has to cover.
+  $("prop-target").ondragover = (e) => e.preventDefault();
+  $("prop-target").ondrop = (e) => e.preventDefault();
+
+  // Delegation: dragover on the container, drop on the child. Correct — dragover bubbles.
+  $("delegated-list").addEventListener("dragover", (e) => { e.preventDefault(); });
+  $("delegated-item").addEventListener("drop", () => {});
+</script>
+</body>
+</html>
