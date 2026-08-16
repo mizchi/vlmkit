@@ -592,3 +592,192 @@ describe("formatMigrationReportForAgent — per-viewport CSD", () => {
     assert.doesNotMatch(md, /Verified deltas \(computed-style\) × viewport/);
   });
 });
+
+/**
+ * The optional signal sections — forced-state, palette, shift origins, heatmap regions,
+ * component geometry, text-row shifts.
+ *
+ * Every one of these is driven by an OPTIONAL field on `DfaReport`, and `sampleReport` above sets
+ * none of them, so the whole back half of `formatMigrationReportForAgent` was unexecuted: 264
+ * uncovered statements in a file whose only product is text an agent reads. The risk that hides
+ * there is not a crash, it is a table with the columns swapped or a delta printed with the wrong
+ * sign — which a reader cannot detect and a coding agent acts on.
+ */
+describe("formatMigrationReportForAgent — optional signal sections", () => {
+  /** A report whose default diff is zero, so the forced-state path is the only signal. */
+  const hoverOnly = sampleReport({
+    results: [
+      {
+        variant: "working", variantFile: "working.html",
+        viewport: "desktop", diffRatio: 0, diffPixels: 0, totalPixels: 1000,
+      },
+    ],
+    stateDiffs: [{
+      variantFile: "working.html",
+      perState: [{
+        state: "hover",
+        forcedCount: 4,
+        affectedElements: ["button.primary", "a.nav-link"],
+        perViewport: [{ viewport: "desktop", defaultDiffRatio: 0, stateDiffRatio: 0.031, hoverInducedDelta: 0.031 }],
+      }],
+    }],
+  });
+
+  it("does not declare PASS when the default diff is 0 but a forced state diverges", () => {
+    // The exact case the section exists for: hover styles missing renders identically until you
+    // hover. A `**PASS** — nothing to fix` here sends the agent away from a real defect.
+    const md = formatMigrationReportForAgent(hoverOnly);
+    assert.doesNotMatch(md, /\*\*PASS\*\*/);
+    assert.match(md, /Default-state diff is \*\*0\.00%\*\* on every viewport/);
+    assert.match(md, /forgot to wire up interaction-state styles/);
+  });
+
+  it("tabulates each state × viewport with a signed induced delta", () => {
+    const md = formatMigrationReportForAgent(hoverOnly);
+    assert.match(md, /### Forced-state diff/);
+    assert.match(md, /\| `:hover` \| `desktop` \| 0\.00% \| 3\.10% \| \+3\.10% \| 4 \|/);
+    // The sign is the reading: a negative induced delta means the forced state is CLOSER to the
+    // baseline than the default one, which is a different bug from a missing hover rule.
+    const negative = formatMigrationReportForAgent(sampleReport({
+      results: [{ variant: "w", variantFile: "working.html", viewport: "desktop", diffRatio: 0.05, diffPixels: 5, totalPixels: 100 }],
+      stateDiffs: [{
+        variantFile: "working.html",
+        perState: [{
+          state: "focus", forcedCount: 1, affectedElements: [],
+          perViewport: [{ viewport: "desktop", defaultDiffRatio: 0.05, stateDiffRatio: 0.01, hoverInducedDelta: -0.04 }],
+        }],
+      }],
+    }));
+    assert.match(negative, /\| `:focus` \| `desktop` \| 5\.00% \| 1\.00% \| -4\.00% \| 1 \|/);
+  });
+
+  it("samples the forced elements, and says nothing when there are none", () => {
+    assert.match(formatMigrationReportForAgent(hoverOnly), /Sample of forced elements: `button\.primary`, `a\.nav-link`\./);
+    const noSample = formatMigrationReportForAgent(sampleReport({
+      stateDiffs: [{
+        variantFile: "working.html",
+        perState: [{
+          state: "hover", forcedCount: 0, affectedElements: [],
+          perViewport: [{ viewport: "desktop", defaultDiffRatio: 0.1, stateDiffRatio: 0.1, hoverInducedDelta: 0 }],
+        }],
+      }],
+    }));
+    assert.doesNotMatch(noSample, /Sample of forced elements/);
+  });
+
+  it("splits palette findings into missing and extra, with the near-neighbour distance", () => {
+    // Which side a colour is on decides the fix: `missing` is a token the variant forgot,
+    // `extra` is a hard-coded literal it invented. Swapping them inverts the instruction.
+    const md = formatMigrationReportForAgent(sampleReport({
+      paletteDiffs: [{
+        variantFile: "working.html",
+        perViewport: [{
+          viewport: "desktop",
+          baseline: [{ hex: "#1a73e8", share: 0.2, r: 26, g: 115, b: 232 }],
+          variant: [{ hex: "#4285f4", share: 0.18, r: 66, g: 133, b: 244 }],
+          diff: {
+            matched: [],
+            onlyInBaseline: [{ hex: "#1a73e8", share: 0.2, nearestNeighborDistance: 46 }],
+            onlyInVariant: [{ hex: "#4285f4", share: 0.18, nearestNeighborDistance: 8 }],
+          },
+        }],
+      }],
+    }));
+    assert.match(md, /### Palette diff/);
+    assert.match(md, /\| `desktop` \| missing \| `#1a73e8` \| 20\.0% \|/);
+    assert.match(md, /\| `desktop` \| extra \| `#4285f4` \| 18\.0% \|/);
+  });
+
+  it("reports shift origins, and says so when a viewport produced none", () => {
+    const withOrigins = formatMigrationReportForAgent(sampleReport({
+      shiftOrigins: [{
+        variantFile: "working.html",
+        perViewport: [{
+          viewport: "desktop",
+          origins: [{
+            band: { yStart: 100, yEnd: 200, deltaY: 12 },
+            baselineClass: "hero", variantClass: "hero", originTop: { baseline: 104, variant: 116 },
+            position: 3, suspect: "margin-top",
+          }],
+        }],
+      }],
+    } as never));
+    assert.match(withOrigins, /### Shift-origin diagnostics/);
+
+    const noOrigins = formatMigrationReportForAgent(sampleReport({
+      shiftOrigins: [{ variantFile: "working.html", perViewport: [{ viewport: "desktop", origins: [] }] }],
+    } as never));
+    // Present-but-empty must not print an empty table: the section header with no rows reads as
+    // "no shifts", which is the opposite of "the probe found no origin for the shifts there are".
+    assert.doesNotMatch(noOrigins, /\| Viewport \| Band \(y\) \|/);
+  });
+
+  it("keeps the region-diff cap visible when viewports were skipped", () => {
+    // A cap that silently analyses 1 of 4 changed viewports reads as "only one viewport
+    // changed". The deprecated `diff region` path still ships and still runs on `--region-diff`.
+    const md = formatMigrationReportForAgent(sampleReport({
+      regionDiffs: [{
+        variantFile: "working.html",
+        maxViewports: 1,
+        skippedViewports: [
+          { viewport: "mobile", diffRatio: 0.31, diffPixels: 900 },
+          { viewport: "tablet", diffRatio: 0.12, diffPixels: 400 },
+        ],
+        perViewport: [{
+          viewport: "desktop",
+          changes: [{
+            selector: ".card", property: "background-color",
+            baselineValue: "#ffffff", variantValue: "#f5f5f5",
+            confidence: "high",
+            bbox: { top: 10, left: 20, width: 100, height: 40 },
+          }],
+        }],
+      }],
+    } as never));
+    assert.match(md, /### VLM region diff/);
+    assert.match(md, /analyzed 1\/3 changed viewport\(s\)/);
+    assert.match(md, /--region-diff-max-viewports=1/);
+    assert.match(md, /`mobile` 31\.00% \(900 px\)/);
+    assert.match(md, /`\.card` \| `background-color`/);
+  });
+
+  it("puts a region-diff error in its own table rather than losing it", () => {
+    const md = formatMigrationReportForAgent(sampleReport({
+      regionDiffs: [{
+        variantFile: "working.html",
+        perViewport: [{ viewport: "desktop", changes: [], error: "VLM returned no JSON" }],
+      }],
+    } as never));
+    assert.match(md, /\| Viewport \| Error \|/);
+    assert.match(md, /\| `desktop` \| VLM returned no JSON \|/);
+  });
+
+  it("says nothing about a section whose field is absent", () => {
+    // The property that makes the sections composable: a report from a run without `--palette`
+    // must not carry an empty Palette heading, because a heading with no rows is read as a
+    // measurement that found nothing.
+    const bare = formatMigrationReportForAgent(sampleReport());
+    for (const heading of [
+      /### Forced-state diff/, /### Palette diff/, /### Shift-origin diagnostics/, /### VLM region diff/,
+    ]) {
+      assert.doesNotMatch(bare, heading);
+    }
+  });
+
+  it("filters to one variant, and says so when that variant has no results", () => {
+    const two = sampleReport({
+      results: [
+        ...sampleReport().results,
+        { variant: "other", variantFile: "other.html", viewport: "desktop", diffRatio: 0.1, diffPixels: 10, totalPixels: 100 },
+      ],
+    });
+    const only = formatMigrationReportForAgent(two, { variant: "other.html" });
+    assert.match(only, /## other\.html/);
+    assert.doesNotMatch(only, /## working\.html/);
+    assert.match(
+      formatMigrationReportForAgent(two, { variant: "nope.html" }),
+      /_No results for variant "nope\.html"\._/,
+    );
+    assert.match(formatMigrationReportForAgent(sampleReport({ results: [] })), /_Empty report\._/);
+  });
+});

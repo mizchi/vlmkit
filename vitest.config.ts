@@ -62,6 +62,33 @@ export default defineConfig({
        */
       all: true,
       include: ["src/**/*.ts", "packages/*/src/**/*.ts"],
+      /**
+       * A floor, not a target. Measured 2026-08-16: statements 69.9-70.0%, branches 61.2%,
+       * functions 73.7%, lines 71.8%.
+       *
+       * Set ~1pp below each measurement on purpose. Consecutive full runs of this suite differ by
+       * up to 0.05pp on statements — browser teardown and timing-dependent paths execute or not —
+       * so a threshold at the measured value fails on noise, and a CI check that fails randomly
+       * gets deleted. What this catches is a real drop: a module added without tests, or a test
+       * file deleted.
+       *
+       * These are GLOBAL thresholds, so they only mean anything on a full run (`pnpm
+       * test:coverage`). `vitest run --coverage <one-file>` reports the whole `include` set with
+       * one file's tests and fails all four by construction — that is not a regression, it is the
+       * wrong command for the question.
+       *
+       * Statements sit ~2pp below lines because of `page.evaluate` bodies. Those run in the
+       * BROWSER, where node's v8 coverage cannot see them, so `check integrity`'s collectors,
+       * `semantic-drilldown`'s landmark walk and `computed-style-capture` count as uncovered no
+       * matter how thoroughly they are tested. Raising statements much further means deleting
+       * browser-side code, not testing more of it.
+       */
+      thresholds: {
+        statements: 69,
+        branches: 60,
+        functions: 72,
+        lines: 70,
+      },
       exclude: [
         "**/*.test.ts",
         // CLI entry points: argv dispatch with a `process.exit`, covered through
@@ -76,6 +103,35 @@ export default defineConfig({
         // Type-only modules contribute no statements and would sit at 0% forever.
         "**/types.ts",
         "**/contract.ts",
+        /**
+         * Research and demo RUNNERS: a shebang or `isCliEntry` entry point that **nothing
+         * imports**, needs an API key or a 30-trial loop to do anything, and is invoked as
+         * `node src/...` from `Taskfile.pkl` rather than shipped in the bundle.
+         *
+         * Excluded for the same reason as `*-cli.ts` above, and by a rule rather than by taste:
+         * a file is listed here only if no non-test file imports it. That is why
+         * `migration-compare.ts` is NOT here despite having its own CLI entry — six modules
+         * import it and `vlmkit diff html` runs it, so it is shipped library code and belongs in
+         * the denominator at whatever percentage it has earned. Same for
+         * `migration-subagent.ts`, `flaker-vrt-runner.ts` and every `*-core.ts`.
+         *
+         * The point of the metric is to find code that should be tested and is not. 2,802
+         * statements of key-requiring benchmark runners in the denominator made it worse at that
+         * job, not more honest: the number moved when a bench script was added and never when a
+         * gate lost its tests.
+         */
+        "src/demo/**",
+        "src/experiments/benchmark/benchmark.ts",
+        "src/experiments/benchmark/introspect-bench.ts",
+        "src/experiments/benchmark/vlm-bench.ts",
+        "src/experiments/css-challenge/css-challenge.ts",
+        "src/experiments/css-challenge/css-challenge-bench.ts",
+        "src/experiments/css-challenge/fix-loop.ts",
+        "src/experiments/detection/detection-report.ts",
+        "src/experiments/flaker/flaker-vrt-report-adapter.ts",
+        "src/experiments/migration/aggregate-fix-summaries.ts",
+        "src/experiments/migration/migration-blind.ts",
+        "src/experiments/migration/migration-fix-loop.ts",
       ],
     },
   },

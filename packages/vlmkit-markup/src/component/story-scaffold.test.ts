@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "vitest";
 import {
   DEFAULT_NOISE_PIXELS,
@@ -9,6 +12,8 @@ import {
   componentNameFromClass,
   deriveStoryThreshold,
   discoverStoryCandidates,
+  formatStoryScaffoldResult,
+  scaffoldStoryGallery,
   type RawElement,
   type StoryCandidate,
 } from "./story-scaffold.ts";
@@ -381,5 +386,138 @@ describe("buildGatesConfigSnippet", () => {
     assert.match(snippet.pages[1]!.gates[0]!, /--threshold 0\.0002$/);
     // `source` is the story id, because that is what the gate takes positionally.
     assert.equal(snippet.pages[1]!.source, "components/Hero/Default");
+  });
+});
+
+/**
+ * `scaffoldStoryGallery` and `formatStoryScaffoldResult` — the two exports this file had never
+ * called.
+ *
+ * The pure helpers above (`discoverStoryCandidates`, `buildGalleryHtml`, `buildGatesConfigSnippet`)
+ * were well covered, and the function that composes them into `vlmkit build gallery` was not: a
+ * gallery whose CSS never made it in, or a `stories.json` pointing at a path that does not exist,
+ * would have passed every test in this file. The composition is where those live.
+ */
+describe("scaffoldStoryGallery", () => {
+  const dir = mkdtempSync(join(tmpdir(), "vlmkit-story-scaffold-"));
+
+  /** A page with two component-shaped repeats, which is what the heuristics look for. */
+  const source = (() => {
+    const file = join(dir, "page.html");
+    writeFileSync(file, `<!doctype html><meta charset="utf-8"><title>Shop</title>
+      <style>
+        body { margin: 0; font: 16px system-ui; }
+        .card { width: 260px; padding: 16px; border: 1px solid #ddd; border-radius: 8px; margin: 12px; }
+        .card h3 { margin: 0 0 8px; font-size: 18px; }
+        .btn { display: inline-block; padding: 10px 18px; background: #1a73e8; color: #fff; border-radius: 6px; }
+      </style>
+      <div class="card"><h3>First</h3><p>One description.</p><span class="btn">Buy</span></div>
+      <div class="card"><h3>Second</h3><p>Another description.</p><span class="btn">Buy</span></div>
+      <div class="card"><h3>Third</h3><p>A third description.</p><span class="btn">Buy</span></div>`);
+    return file;
+  })();
+
+  it("writes a gallery and a stories.json that agree with each other", { timeout: 120_000 } , async () => {
+    const outDir = join(dir, "out");
+    const result = await scaffoldStoryGallery({
+      source, outDir, viewport: { width: 1280, height: 720 },
+    });
+    assert.ok(existsSync(result.galleryPath), result.galleryPath);
+    assert.ok(existsSync(result.storiesPath), result.storiesPath);
+    assert.ok(result.stories.length > 0, "the page has repeated components to find");
+
+    const gallery = readFileSync(result.galleryPath, "utf8");
+    // The gallery contract the `check story` gate drives — without `window.mount` the gate
+    // reports `mount-failed` for every story and the scaffold is useless.
+    assert.match(gallery, /window\.mount/);
+    assert.match(gallery, /window\.unmount/);
+    assert.match(gallery, /id="root"/);
+    // The captured CSS has to be in there: a gallery that mounts unstyled markup produces a
+    // baseline of unstyled markup, which then passes forever.
+    assert.match(gallery, /\.card\s*\{/);
+    assert.ok(result.cssBytes > 0);
+    // `baseHref` is what keeps relative `url()` and `src` resolving against the page, not the
+    // gallery's own directory.
+    assert.match(gallery, /<base href="file:\/\//);
+
+    const stories = JSON.parse(readFileSync(result.storiesPath, "utf8")) as {
+      source: string; gallery: string; stories: { id: string; selector: string; html?: string }[];
+    };
+    assert.deepEqual(
+      stories.stories.map((s) => s.id).sort(),
+      result.stories.map((s) => s.id).sort(),
+      "the sidecar lists exactly the stories that were written",
+    );
+    assert.match(stories.gallery, /^file:\/\//, "an openable URL, since `check story --gallery` takes one");
+    // The markup is deliberately NOT duplicated into the sidecar — it is already in the gallery,
+    // and a second copy is a second thing to drift.
+    assert.ok(stories.stories.every((s) => s.html === undefined));
+  });
+
+  it("--selector is an instruction: a named element becomes a story the heuristics would drop", { timeout: 120_000 }, async () => {
+    const result = await scaffoldStoryGallery({
+      source, outDir: join(dir, "out-selector"), viewport: { width: 1280, height: 720 },
+      selectors: [".btn"],
+    });
+    assert.ok(result.stories.some((s) => s.selector.includes("btn")), "the named selector is present");
+    assert.equal(result.skipped.length, 0, "nothing is skipped when the caller named the set");
+  });
+
+  it("--include-all keeps the candidates the heuristics rejected", { timeout: 120_000 }, async () => {
+    const strict = await scaffoldStoryGallery({
+      source, outDir: join(dir, "out-strict"), viewport: { width: 1280, height: 720 },
+    });
+    const all = await scaffoldStoryGallery({
+      source, outDir: join(dir, "out-all"), viewport: { width: 1280, height: 720 }, includeAll: true,
+    });
+    assert.ok(all.stories.length >= strict.stories.length);
+    assert.equal(all.skipped.length, 0, "nothing is skipped when everything is kept");
+  });
+});
+
+describe("formatStoryScaffoldResult", () => {
+  const base = {
+    source: "file:///p.html",
+    galleryPath: "/out/gallery.html",
+    storiesPath: "/out/stories.json",
+    viewport: { width: 1280, height: 720 },
+    stories: [{ id: "Card/Default", selector: ".card", width: 260, height: 120, notes: ["3 instances"] }],
+    skipped: [],
+    unreadableStylesheets: [],
+    refetchedStylesheets: [],
+    cssBytes: 2048,
+  };
+  const plain = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
+
+  it("names each story with its size and selector", () => {
+    const text = plain(formatStoryScaffoldResult(base as never));
+    assert.match(text, /1 story\/stories/);
+    assert.match(text, /\+ Card\/Default\s+260x120\s+\.card/);
+    assert.match(text, /3 instances/, "the note explains why it is a story");
+    assert.match(text, /css: 2,048 bytes/);
+  });
+
+  it("says how to keep the candidates it dropped", () => {
+    // A skipped candidate with no way to recover it reads as "this element cannot be a story".
+    const text = plain(formatStoryScaffoldResult({
+      ...base,
+      skipped: [{ id: "Wrapper/Default", selector: ".wrapper", width: 1280, height: 900, notes: ["covers 78% of the viewport"] }],
+    } as never));
+    assert.match(text, /1 candidate\(s\) not written/);
+    assert.match(text, /--include-all keeps them, --selector overrides/);
+    assert.match(text, /Wrapper\/Default — covers 78% of the viewport/);
+  });
+
+  it("distinguishes a stylesheet it recovered from one it lost", () => {
+    // Both are CSS the browser could not read; only one of them is missing from the gallery, and
+    // a gallery missing CSS produces baselines of unstyled markup.
+    const text = plain(formatStoryScaffoldResult({
+      ...base,
+      refetchedStylesheets: ["https://cdn.example.com/ok.css"],
+      unreadableStylesheets: ["https://cdn.example.com/gone.css"],
+    } as never));
+    assert.match(text, /opaque to the browser and re-fetched by URL/);
+    assert.match(text, /ok\.css/);
+    assert.match(text, /gone\.css/);
   });
 });

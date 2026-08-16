@@ -1647,6 +1647,34 @@ npm install した vlmkit には spec が同梱されず `HARNESS_ROOT` はど�
   - `@mizchi/vrt-<pkg>` は 0.6 以降どのパッケージの名前でもない。
     この行を読んで書いた import は解決しない。dist 解決の罠も同じ場所に書いた。
 
+- [x] **カバレッジ 63.1% → 70.0% statements (64.7% → 71.8% lines)**、と書いてる途中で見つけた欠陥5件
+  - **測り方を変えた分**: import されていない research / demo runner 15ファイルを分母から外した
+    (API key か 30-trial ループが必要、`node src/...` で叩く entry、bundle にも入らない)。
+    基準は機械的に「非テストファイルから import されていないこと」だけで、
+    `tests/coverage-exclusions.test.mjs` が強制する。だから `migration-compare.ts` は
+    CLI entry を持っていても 40% のまま分母に残る(6モジュールが import している)。
+  - **実際に書いたテスト62件**: vlm-client (7% → 3プロバイダのリクエスト整形と
+    レスポンス解析。`fetch` は stub、Gemini SDK は `vi.mock`)、`diff-for-agent` の
+    optional セクション群(forced-state / palette / shift-origin / region-diff = agent が読む後半全部)、
+    `snapshot` の subcommand を dispatch 経由で、`scaffoldStoryGallery`、
+    `runSmokeTest` の再現性契約、`markup-loop` の CLI。
+  - **テストが見つけた欠陥**:
+    1. OpenRouter の `total_tokens` は optional。直読みしていたので
+       **bench レポートが引用する token 数に `undefined` が入っていた**(Anthropic/Gemini は合算していた)。
+    2. `resolveModel("vision-")` が**id の長さで別ベンダーのモデルを黙って選んでいた**。
+       → セグメント完全一致を要求、曖昧なら候補を並べて throw。
+    3. モデル一覧のキャッシュに出口が無かった。長命プロセス(API server)が
+       値上げ後のモデルを見られない問題でもある → `resetVisionModelCache`。
+    4. `snapshot <url> stability` が subcommand を URL 扱いして
+       `Cannot navigate to invalid URL`。→ 位置違いの subcommand を UsageError に。
+    5. `markup-loop init --config /elsewhere/...` が config だけそこに書き、
+       **starter 6ファイルをカレントに散らしていた**(このリポジトリに散らして発覚)。
+  - **`page.evaluate` の中身は node 側 v8 coverage から永遠に見えない**ので、
+    statements が lines より ~2pp 低いのは構造的(integrity の collector、
+    semantic-drilldown の landmark walk、computed-style-capture)。
+    threshold は floor として設定(statements 69 / lines 70、実測より ~1pp 下)。
+    連続実行で 0.05pp 揺れるので、実測値に置くと noise で落ちる。
+
 - [x] **`dist/e2e` の packaging 判断: spec 自体を廃止した**(publish もしない、command も残す)
   - 「publish するか 2 command を廃止するか」の二択で聞いたが、**廃止側のコストが見えていなかった**:
     `verify` / `approve` / `report` / `introspect` / `spec-verify` / `expect` は

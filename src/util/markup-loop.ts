@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { dirname, extname, join, resolve } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
@@ -227,12 +227,31 @@ export function createDefaultMarkupLoopConfig(options: InitMarkupLoopOptions = {
 }
 
 export async function initMarkupLoop(options: InitMarkupLoopOptions = {}): Promise<{ config: MarkupLoopConfig; created: string[] }> {
-  const cwd = options.cwd ?? process.cwd();
   const configPath = options.configPath ?? DEFAULT_CONFIG_PATH;
+  /**
+   * An ABSOLUTE `--config` names the project to scaffold, so the harness lands beside it.
+   *
+   * `init --config /elsewhere/markup-loop.json` used to write the config there and every other
+   * file — `request.md`, `observations.json`, the generation rules, `AGENT.md`, the goto-app
+   * helper — relative to `process.cwd()`: two halves pointing at different projects, and
+   * `doctor` calling the harness incomplete in both. Found by a test that passed a temp-directory
+   * config and scattered six files into this repo.
+   *
+   * Deliberately narrow. A RELATIVE path stays relative to the cwd, because that is what
+   * `.vlmkit/markup-loop.json` (the default, and a path with a directory in it) means: the
+   * harness belongs at the project root, not inside `.vlmkit/`. A relative path that escapes the
+   * cwd (`../other/markup-loop.json`) therefore still scatters — the same gap, one level
+   * narrower, and it wants a defined notion of "project root" rather than another special case.
+   */
+  const cwd = options.cwd
+    ?? (isAbsolute(configPath) ? dirname(configPath) : process.cwd());
   const config = createDefaultMarkupLoopConfig(options);
   const created: string[] = [];
 
-  await writeStarterFile(cwd, configPath, `${JSON.stringify(config, null, 2)}\n`, options.force, created);
+  // The absolute case already made `cwd` the config's directory, so re-joining the full path
+  // would nest it (`/tmp/x/tmp/x/markup-loop.json`).
+  const configTarget = isAbsolute(configPath) ? basename(configPath) : configPath;
+  await writeStarterFile(cwd, configTarget, `${JSON.stringify(config, null, 2)}\n`, options.force, created);
   await writeStarterFile(cwd, config.requestFile, renderRequestTemplate(config), options.force, created);
   await writeStarterFile(cwd, config.observationsFile, renderObservationsTemplate(config), options.force, created);
   await writeStarterFile(cwd, config.rulesFile, renderGenerationRules(), options.force, created);

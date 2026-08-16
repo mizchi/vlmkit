@@ -14,6 +14,7 @@ import {
   loadMarkupLoopConfig,
   observeMarkupLoop,
   runMarkupLoop,
+  runMarkupLoopCli,
 } from "./markup-loop.ts";
 
 describe("markup-loop drop-in config", () => {
@@ -183,5 +184,101 @@ describe("markup-loop drop-in config", () => {
       await new Promise<void>((resolve) => server.close(() => resolve()));
       await rm(cwd, { recursive: true, force: true });
     }
+  });
+});
+
+/**
+ * The CLI surface: `runMarkupLoopCli`, which nothing in this file called.
+ *
+ * Every function it dispatches to is tested above, and the dispatch itself was not — so the argv
+ * parsing (four separate parsers, each rejecting unknown flags), the exit codes, and `doctor`
+ * were unexecuted. That is the layer where `--config` reaches one command and is ignored by
+ * another, and where a typo'd flag is silently dropped instead of reported.
+ */
+describe("runMarkupLoopCli", () => {
+  it("prints usage: exit 1 with no command, exit 0 when help was asked for", async () => {
+    // The distinction is the convention the rest of this CLI follows — no arguments is a usage
+    // ERROR, `--help` is a request that succeeded.
+    assert.equal(await runMarkupLoopCli([]), 1);
+    for (const flag of ["help", "--help", "-h"]) {
+      assert.equal(await runMarkupLoopCli([flag]), 0, flag);
+    }
+  });
+
+  it("names an unknown command instead of doing nothing", async () => {
+    assert.equal(await runMarkupLoopCli(["nope"]), 1);
+  });
+
+  it("init creates the harness, and says so when it already exists", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "vlmkit-markup-loop-cli-"));
+    const configPath = join(cwd, "markup-loop.json");
+    assert.equal(await runMarkupLoopCli(["init", "--config", configPath, "--topic", "pricing page"]), 0);
+    assert.ok(existsSync(configPath));
+    // Idempotent: running init twice must not overwrite an edited harness.
+    const before = await readFile(configPath, "utf8");
+    assert.equal(await runMarkupLoopCli(["init", "--config", configPath]), 0);
+    assert.equal(await readFile(configPath, "utf8"), before, "the second init changed nothing");
+    await rm(cwd, { recursive: true, force: true });
+  });
+
+  it("doctor fails with the command to run when the config is missing", async () => {
+    const cwd = await mkdtemp(join(tmpdir(), "vlmkit-markup-loop-doctor-"));
+    assert.equal(await runMarkupLoopCli(["doctor", "--config", join(cwd, "nope.json")]), 1);
+    await rm(cwd, { recursive: true, force: true });
+  });
+
+  it("init writes the whole harness next to the config it was given", async () => {
+    // Found the hard way: this test in its first form passed `--config <tmp>/markup-loop.json`
+    // and six starter files landed in the REPO, because only the config honoured the path. The
+    // config and the harness it describes have to be in one place or nothing can find the other.
+    const cwd = await mkdtemp(join(tmpdir(), "vlmkit-markup-loop-init-elsewhere-"));
+    const configPath = join(cwd, "markup-loop.json");
+    assert.equal(await runMarkupLoopCli(["init", "--config", configPath]), 0);
+    const config = await loadMarkupLoopConfig(configPath);
+    for (const path of [config.requestFile, config.observationsFile, config.rulesFile]) {
+      assert.ok(existsSync(join(cwd, path)), `${path} should sit next to the config`);
+    }
+    assert.ok(existsSync(join(cwd, "tests/vlmkit/support/goto-app.ts")));
+    // And readiness — which resolves against a cwd — agrees, apart from `playwright.config.ts`,
+    // which init does not write because a project's own config is not vlmkit's to invent.
+    assert.deepEqual(checkMarkupLoopReadiness(config, cwd).missing, ["playwright.config.ts"]);
+    await rm(cwd, { recursive: true, force: true });
+  });
+
+  it("doctor checks the PROCESS cwd, not the directory the config came from", async () => {
+    // A limitation, pinned rather than fixed. `doctor --config <path>` accepts a config anywhere,
+    // then `checkMarkupLoopReadiness` resolves `requestFile` / `playwrightConfig` / the helper
+    // against `process.cwd()` — so pointing it at another project's harness reports THIS
+    // directory's missing files. Same shape as the `snapshot --output` bug fixed by taking cwd as
+    // an argument; the fix here is to thread one through `doctor`, and it needs its own change
+    // with room to verify what a "project root" means for a config given by path.
+    const cwd = await mkdtemp(join(tmpdir(), "vlmkit-markup-loop-doctor-elsewhere-"));
+    const configPath = join(cwd, "markup-loop.json");
+    assert.equal(await runMarkupLoopCli(["init", "--config", configPath]), 0);
+    const config = await loadMarkupLoopConfig(configPath);
+    // Everything init wrote is present next to the config — only the project's own
+    // `playwright.config.ts` is outstanding, which init deliberately does not invent…
+    assert.deepEqual(checkMarkupLoopReadiness(config, cwd).missing, ["playwright.config.ts"]);
+    // …and `doctor`, which cannot be told that, reports it as not ready.
+    assert.equal(await runMarkupLoopCli(["doctor", "--config", configPath]), 1);
+    await rm(cwd, { recursive: true, force: true });
+  });
+
+  it("rejects an unknown flag on each subcommand rather than ignoring it", async () => {
+    // Four parsers, four chances to silently drop a flag the caller believed in. `--dry-run` on
+    // `doctor` is the realistic version: it is valid on `run` and meaningless here.
+    await assert.rejects(() => runMarkupLoopCli(["doctor", "--dry-run"]), /Unknown argument: --dry-run/);
+    await assert.rejects(() => runMarkupLoopCli(["run", "--headed"]), /Unknown argument: --headed/);
+    await assert.rejects(() => runMarkupLoopCli(["observe", "--dry-run"]), /Unknown argument: --dry-run/);
+    await assert.rejects(() => runMarkupLoopCli(["init", "--url", "http://x"]), /Unknown argument: --url/);
+  });
+
+  it("reports a flag given without its value", async () => {
+    await assert.rejects(() => runMarkupLoopCli(["run", "--config"]), /--config/);
+    await assert.rejects(() => runMarkupLoopCli(["observe", "--timeout"]), /--timeout/);
+  });
+
+  it("rejects a non-numeric timeout", async () => {
+    await assert.rejects(() => runMarkupLoopCli(["observe", "--timeout", "soon"]), /--timeout/);
   });
 });

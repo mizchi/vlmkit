@@ -1026,6 +1026,36 @@ suppression works per *rule* instead of per whole gate.
 
 ### Fixed
 
+- **Coverage 63.1% → 70.0% statements (64.7% → 71.8% lines), and five defects found by writing the
+  tests.** The number moved two ways, both stated:
+
+  - **Real tests**, 62 of them, over five shipped modules that had little or none: the VLM client
+    (7% → covered request shaping and response parsing for all three providers, with a stubbed
+    `fetch` and a mocked Gemini SDK), `diff-for-agent`'s optional signal sections (forced-state,
+    palette, shift-origin, region-diff — the whole back half of the file an agent reads),
+    `snapshot`'s subcommands through the real dispatch, `scaffoldStoryGallery`, `runSmokeTest`'s
+    reproducibility contract, and `markup-loop`'s CLI.
+  - **A smaller denominator**, for 15 files: research and demo RUNNERS that nothing imports, need
+    an API key or a 30-trial loop, and are invoked as `node src/...` from `Taskfile.pkl` rather
+    than shipped. The criterion is mechanical — no non-test file may import an excluded path —
+    and `tests/coverage-exclusions.test.mjs` enforces it, so `migration-compare.ts` stays in the
+    denominator at 40% despite having its own CLI entry, because six modules import it.
+
+  What the tests found: OpenRouter's `total_tokens` is optional and reading it directly put
+  `undefined` into the token counts that `docs/reports/` benches quote (the Anthropic and Gemini
+  paths always summed); `resolveModel("vision-")` silently picked between two vendors' models by
+  id LENGTH, and now requires a whole-segment match or reports the candidates; the OpenRouter
+  model catalogue was cached process-wide with no way out, which also means a long-lived API
+  server never sees a repriced model (`resetVisionModelCache` exists now); `snapshot <url>
+  stability` treated the subcommand as a URL and failed with `Cannot navigate to invalid URL`;
+  and `markup-loop init --config /elsewhere/markup-loop.json` wrote the config there and six
+  starter files into the current directory — found by a test that scattered them into this repo.
+
+  Coverage thresholds are now a floor (`statements: 69`, `lines: 70`), set ~1pp below the
+  measurement because consecutive full runs differ by up to 0.05pp on browser-timing paths. The
+  config states why statements sit ~2pp below lines and will stay there: `page.evaluate` bodies
+  run in the browser, where node's v8 coverage cannot see them.
+
 - **`workflow init` / `workflow capture` work from an installed package**, and the `dist/e2e`
   packaging question is retired with the thing that caused it. Capture used to spawn
   `npx playwright test e2e/vlmkit-capture.spec.ts`; the published package excludes the spec
