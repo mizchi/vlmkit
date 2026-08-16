@@ -27,9 +27,9 @@ did with it.
 | `check animation` | **works well.** Found all 8 deal animations, `settle: 962ms`, `reduced-motion: honored`, no issues |
 | `check interactions` | **works well.** Probed 13 controls, found 1 true positive (`inert-control`) |
 | `check a11y focus` / `check a11y touch` | clean, correctly |
-| `scan handlers --probe-drag` | **3 of 4 issues are false positives** — event delegation |
-| `check a11y contrast` | **9 false positives** — assumes white behind a gradient |
-| `check integrity` | **1 false positive** — measured a frame mid-animation |
+| `scan handlers --probe-drag` | **3 of 4 issues were false positives** — event delegation (fixed) |
+| `check a11y contrast` | **9 false positives** — assumed white behind a gradient (fixed) |
+| `check integrity` | **1 false positive** — measured a frame mid-animation (fixed) |
 
 So the answer to "can it handle DnD and animation" splits: **animation, yes** — `check animation`
 is the strongest gate in this round, and its settle measurement is the thing the other gates
@@ -148,6 +148,35 @@ point. Full table in `examples/solitaire/README.md`; the two that generalise:
 
 ## Fixed since
 
+**Finding 1 is fixed** — all three drag rules. Two were delegation-blind and one was
+under-evidenced:
+
+- **`drag-source-not-draggable`** read `draggable` on the handler's own element. The surface now
+  also carries `draggableDescendants`, and an element serving draggable children is exempt: a
+  delegation container is never draggable and never needs to be. A surface captured before the
+  field existed still reports, because reading a missing count as 0 keeps the rule on rather than
+  silently switching it off.
+- **`dragstart-transfers-nothing`** dispatched at the container, where the handler's
+  `closest('.card[draggable="true"]')` guard correctly returns early. The probe now dispatches
+  from a draggable descendant and reports which one in `dispatchedFrom`.
+- **`dragover-not-prevented`** tried exactly one pair. "This handler never cancels" is refuted by
+  ONE pair that cancels, so the probe now searches over source×target pairs (capped at 40) and
+  reports `dragoverUnprevented` only when none cancelled.
+
+The middle version of that last fix was **worse than the bug**: widening the targets to the
+source container's siblings made the drag fixture's genuinely-refusing `#zone-forgot-prevent`
+come back "prevented", because a sibling that does cancel was dispatched at instead. `dragover`
+bubbles, so the only places from which an element's own listener receives the event are that
+element and its descendants — targets are scoped to that subtree now. Reporting another
+element's `preventDefault` as this one's silently masks real defects, which is the failure
+direction that matters.
+
+Verified in both directions, and the E2E test asserts both: `fixtures/handlers/drag-and-drop.html`
+reports byte-identical issues before and after the change (1 `dragover-not-prevented` on the
+right element, 1 `drag-source-not-draggable`, 1 `drop-without-dragover`, 2 `drag-source-inert`,
+2 `dragstart-transfers-nothing`), and the solitaire board is down to its one legitimate
+`unprobed-handler-types` warn.
+
 **Finding 3 is fixed.** `settlePage` — already the single definition of "the page has settled",
 with a guard test enforcing that — grew a fourth part: after network idle and `fonts.ready`, it
 awaits `Animation.finished` over `document.getAnimations()`. `check integrity` on this page with
@@ -175,6 +204,11 @@ are all still reported.
 
 ## Recorded, not fixed
 
-1. `scan handlers`' three drag rules need delegation awareness; `dragover-not-prevented`
-   additionally needs to probe a target the page would accept. This is the one substantive gap
-   left, and it is what "can vlmkit handle drag and drop" turns on.
+Nothing from this round. All three findings are fixed; the answer to "can vlmkit handle drag and
+drop and animation" is now yes for both, on the page that said otherwise.
+
+One thing worth carrying forward, since it happened four times in one session: **a backtick in a
+comment inside a browser-script template literal ends the script.** It cost a broken build in
+`theme.gate.ts`, `integrity-check.ts`, `a11y-contrast.ts` and `handler-map.ts`. Typecheck catches
+it every time, so the loop works — but these files are long enough that the comment does not look
+like it is inside a string.

@@ -68,6 +68,20 @@ export interface HandlerSurfaceEntry {
    */
   draggable?: boolean;
   /**
+   * How many `[draggable="true"]` descendants this element has.
+   *
+   * What separates a broken drag source from a DELEGATION CONTAINER. A board that rebuilds its
+   * children on every move attaches `dragstart` once, to the container, and reads
+   * `event.target.closest(...)`: the container is never draggable and never needs to be, while
+   * every card inside it is. `drag-source-not-draggable` read only `draggable` on the handler's
+   * own element and therefore reported that pattern as a defect — measured on
+   * `examples/solitaire/`, where the container serves 7 draggable cards.
+   *
+   * Optional for the same reason `draggable` is: a surface captured by an older build has no
+   * such field, and reading `undefined` as 0 would resurrect the false positive.
+   */
+  draggableDescendants?: number;
+  /**
    * True when the browser turns this element's activation keypress into a `click`.
    *
    * The interaction probe presses keys and never calls `.click()`, so this is what decides
@@ -470,6 +484,10 @@ export const COLLECT_SURFACE_SCRIPT = `
       // (No backticks in here: this comment lives inside COLLECT_SURFACE_SCRIPT's template
       // literal, and a backtick closes the string. That is what broke the build once.)
       draggable: el.draggable === true,
+      // Draggable descendants, which is how a delegation container is told apart from a source
+      // whose handler can never fire. Counted rather than boolean so the message can say how
+      // many the container serves.
+      draggableDescendants: el.querySelectorAll('[draggable="true"]').length,
       // Whether an activation keypress becomes a click here. Measured list; a role-only
       // element is NOT in it, which is why the probe never fires its click handler.
       nativeActivation: el.matches(${JSON.stringify(NATIVE_CLICK_ON_ACTIVATION)}),
@@ -542,6 +560,22 @@ export interface DragProbe {
   dragoverUnprevented?: boolean;
   /** `dataTransfer.types` after the element's dragstart ran. Undefined with no dragstart. */
   transferredTypes?: string[];
+  /**
+   * The element the source events were dispatched from, when it is NOT the element holding the
+   * handler — i.e. this is a delegation container and the probe aimed at a draggable descendant.
+   *
+   * Reported so a reader can tell which element was actually measured. Dispatching at the
+   * container runs its `closest(...)` guard, returns early, and measures nothing.
+   */
+  dispatchedFrom?: string;
+  /** The first few `source -> target` pairs the dragover was tried on, for the report. */
+  dragoverTargetsTried?: string[];
+  /** How many pairs were tried. A high count with no cancel is what makes the finding evidence. */
+  dragoverPairsTried?: number;
+  /** True when the pair budget ran out before every combination was tried. */
+  dragoverCapped?: boolean;
+  /** The target that cancelled, when one did. Its presence is what refutes the rule. */
+  dragoverPreventedOn?: string;
 }
 
 /**
@@ -578,6 +612,75 @@ export const PROBE_DRAG_SCRIPT = `
     }
     if (own.size > 0) candidates.push({ el, own });
   }
+  // The element to dispatch a source event FROM.
+  //
+  // Not always the element holding the handler. A delegation container is not draggable and its
+  // handler guards on event.target.closest(...), so dispatching at the container runs the
+  // guard, returns early, and measures nothing — which is how dragstart-transfers-nothing
+  // came to be reported for a page whose every real dragstart calls setData.
+  const sourceFor = (el) => {
+    if (el.draggable === true) return el;
+    const inner = el.querySelector('[draggable="true"]');
+    return inner || el;
+  };
+
+  // Every source worth trying, in document order. A delegation container serves many, and which
+  // of them has a legal destination right now is page state the probe cannot read -- so it tries
+  // several rather than betting on the first.
+  const sourcesFor = (el) => {
+    if (el.draggable === true) return [el];
+    const inner = Array.from(el.querySelectorAll('[draggable="true"]'));
+    return inner.length > 0 ? inner.slice(0, 8) : [el];
+  };
+
+  // Elements to aim a dragover AT, in the order to try them.
+  //
+  // The old probe aimed at the handler's own element, which for a delegation container is the
+  // container: the handler resolves no drop zone from it and cancels nothing. Worse, when source
+  // and target are the same element the pair is a SELF-DROP, and a page that refuses to drop a
+  // card onto the pile it came from is correct to refuse it. Reporting "never calls
+  // preventDefault" from that single attempt is the false positive measured on
+  // examples/solitaire.
+  //
+  // So: prefer the containers of other draggables (the sibling piles of a board), then any
+  // descendant that is itself a drop-shaped box, and the handler element last. Capped, because
+  // this dispatches into the page's own logic.
+  const targetsFor = (el, source) => {
+    const out = [];
+    const seen = new Set();
+    const add = (t) => {
+      if (!t || seen.has(t) || out.length >= 12) return;
+      seen.add(t);
+      out.push(t);
+    };
+    // EL AND ITS DESCENDANTS ONLY. dragover bubbles, so those are exactly the places from which
+    // el's own listener receives the event -- dispatching anywhere else does not exercise el at
+    // all, and a cancel seen there belongs to some other element.
+    //
+    // The first version of this fix added the source container's SIBLINGS, and it silently
+    // masked a real defect: probing the drag fixture's #zone-forgot-prevent (whose handler
+    // genuinely never cancels) dispatched at the sibling #delegated-list, whose own handler DOES
+    // cancel, and the row came back "prevented". A rule that reports another element's
+    // preventDefault as this one's is worse than the false positive it replaced.
+    const home = source.parentElement;
+    for (const inner of el.querySelectorAll('[draggable="true"]')) {
+      const holder = inner.parentElement;
+      // Skip the source's own container: that pair is a self-drop, and a page that refuses to
+      // drop a card back on the pile it came from is right to refuse it.
+      if (!holder || holder === home || holder.contains(source) || !el.contains(holder)) continue;
+      add(holder);
+    }
+    // Empty zones hold no draggable, so the loop above cannot see them. A board's empty pile is
+    // still a drop target, and on many pages the ONLY legal one.
+    for (const d of el.querySelectorAll("*")) {
+      if (out.length >= 12) break;
+      if (d === source || d.contains(source) || d.children.length > 0) continue;
+      add(d);
+    }
+    add(el);
+    return out;
+  };
+
   for (const { el, own } of candidates) {
     const dt = new DataTransfer();
     const ran = new Set();
@@ -590,21 +693,59 @@ export const PROBE_DRAG_SCRIPT = `
     const fire = (type, target) => target.dispatchEvent(
       new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt })
     );
+    const source = sourceFor(el);
     const row = { path: describe(el), ran: [] };
+    if (source !== el) row.dispatchedFrom = describe(source);
     try {
       if (own.has("dragstart")) {
-        fire("dragstart", el);
+        fire("dragstart", source);
         // dt.types, not getData on a guessed format: a page may transfer application/json
         // or a custom type, and asking for text/plain would call that "nothing
         // transferred". (No backticks in this comment -- it is inside a template literal.)
         row.transferredTypes = Array.from(dt.types || []);
       }
       if (own.has("dragover")) {
-        // The return value IS the finding: false means a listener cancelled, which is what
-        // a drop target must do.
-        row.dragoverUnprevented = fire("dragover", el) === true;
+        // "This handler never calls preventDefault" is refuted by ONE pair that cancels, so the
+        // probe searches for one instead of trying a single pair and concluding.
+        //
+        // Both halves of the pair have to vary, and the second half is what the first version of
+        // this got wrong. Aiming at several targets from ONE source was still not enough: on
+        // examples/solitaire the first draggable descendant is a red Queen, which in that deal
+        // has no legal destination at all, so every target refused it correctly and the rule
+        // fired anyway. A selective drop handler refuses everything for an unlucky source, and an
+        // unlucky source is not evidence about the handler.
+        const sources = own.has("dragstart") ? sourcesFor(el) : [source];
+        const pairs = [];
+        let cancelled = false;
+        let preventedOn = null;
+        for (const from of sources) {
+          if (cancelled || pairs.length >= 40) break;
+          // Re-open the gesture per source, so the page's own drag state points at THIS one.
+          if (own.has("dragstart")) fire("dragstart", from);
+          for (const target of targetsFor(el, from)) {
+            if (pairs.length >= 40) { row.dragoverCapped = true; break; }
+            pairs.push(describe(from) + " -> " + describe(target));
+            if (fire("dragover", target) === false) {
+              cancelled = true;
+              preventedOn = pairs[pairs.length - 1];
+              break;
+            }
+            // Let the page drop any hover styling it applied, so the next attempt starts clean
+            // and the probe does not leave the board lit up.
+            fire("dragleave", target);
+          }
+          if (own.has("dragstart")) fire("dragend", from);
+        }
+        row.dragoverUnprevented = !cancelled;
+        row.dragoverPairsTried = pairs.length;
+        row.dragoverTargetsTried = pairs.slice(0, 6);
+        if (preventedOn) row.dragoverPreventedOn = preventedOn;
       }
       if (own.has("drop")) fire("drop", el);
+      // Always end the gesture. Without it the page keeps whatever mid-drag state its dragstart
+      // set -- a half-transparent source, a lit target -- and the NEXT candidate is probed
+      // against a page that thinks a drag is still in flight.
+      if (own.has("dragstart")) fire("dragend", source);
     } catch (e) {
       row.error = String(e).slice(0, 120);
     }
@@ -2771,7 +2912,15 @@ export function deriveHandlerIssues(surface: HandlerSurface): HandlerIssue[] {
 
     // `e.draggable === false`, not `!e.draggable`: an older surface has no such field, and
     // treating "not collected" as "not draggable" would invent findings.
-    if (dragSourceTypes.includes("dragstart") && e.draggable === false) {
+    //
+    // A DELEGATION CONTAINER is exempt, and this is the fix for a false positive measured on
+    // `examples/solitaire/`: a board that rebuilds 52 children on every move attaches
+    // `dragstart` once to the container and reads `event.target.closest(...)`. The container is
+    // never draggable and never needs to be — every card inside it is — so "the handler can
+    // never fire" is exactly wrong there. The premise of the rule is a source that cannot be
+    // picked up; an element serving draggable descendants is not that.
+    const delegatesDrag = (e.draggableDescendants ?? 0) > 0;
+    if (dragSourceTypes.includes("dragstart") && e.draggable === false && !delegatesDrag) {
       issues.push({
         kind: "drag-source-not-draggable",
         severity: "suspect",

@@ -1783,3 +1783,86 @@ test("a hover finding says when many elements share the probed path", () => {
     /derive the same path/,
   );
 });
+
+test("drag-source-not-draggable exempts a delegation container", () => {
+  // Found by dogfooding `examples/solitaire/`: a board that rebuilds 52 children on every move
+  // attaches `dragstart` ONCE, to the container, and reads `event.target.closest(...)`. The
+  // container is never draggable and never needs to be, so "the handler can never fire" was
+  // exactly wrong there — the rule read `draggable` on the handler's own element and nothing
+  // else.
+  const container = entry({
+    path: "main#table",
+    text: "board",
+    types: { dragstart: 1, dragover: 1, drop: 1 },
+    draggable: false,
+    draggableDescendants: 7,
+  });
+  const broken = entry({
+    path: "div#not-draggable",
+    text: "source",
+    types: { dragstart: 1 },
+    draggable: false,
+    draggableDescendants: 0,
+  });
+
+  const issues = deriveHandlerIssues(surface(container, broken));
+  const reported = issues.filter((i) => i.kind === "drag-source-not-draggable").map((i) => i.element);
+  assert.equal(reported.length, 1, "only the real one");
+  assert.match(reported[0]!, /not-draggable/);
+});
+
+test("drag-source-not-draggable still fires when the surface predates draggableDescendants", () => {
+  // The compatibility direction, and the one that matters: reading a missing count as 0 keeps
+  // the rule working on a recorded surface, where treating "not collected" as "delegates" would
+  // silently switch the rule off. Same policy as `draggable` itself.
+  const issues = deriveHandlerIssues(surface(entry({
+    path: "div#old",
+    text: "source",
+    types: { dragstart: 1 },
+    draggable: false,
+  })));
+  assert.equal(issues.filter((i) => i.kind === "drag-source-not-draggable").length, 1);
+});
+
+test("E2E: the drag probe is quiet on a delegated board and still catches a real refusal", { timeout: 180_000 }, async () => {
+  // Both directions in one test, because either alone is worthless: a probe that reports nothing
+  // is quiet on the good page too, and a probe that reports everything catches the bad one.
+  //
+  // The delegated board is `examples/solitaire/`, which is in the repo for exactly this. It
+  // attaches every drag handler once to `main#table`, addresses 52 rebuilt children through
+  // `closest(...)`, and cancels `dragover` only for a legal move. All three drag rules fired on
+  // it, and all three were wrong:
+  //
+  //   drag-source-not-draggable    read `draggable` on the container, which never is
+  //   dragstart-transfers-nothing  dispatched at the container, where the guard returns early
+  //   dragover-not-prevented       tried ONE pair, a red Queen with no legal destination
+  const repoRoot = fileURLToPath(new URL("../../../..", import.meta.url));
+  const solitaire = join(repoRoot, "examples", "solitaire", "index.html");
+
+  const board = await buildHandlerSurface({
+    source: `${pathToFileURL(solitaire).href}?seed=1&animate=0`,
+    probeDrag: true,
+  });
+  const boardIssues = deriveHandlerIssues(board).map((i) => i.kind);
+  for (const kind of ["drag-source-not-draggable", "dragstart-transfers-nothing", "dragover-not-prevented"] as const) {
+    assert.ok(!boardIssues.includes(kind), `${kind} must not fire on a working delegated board`);
+  }
+  // The container really is the delegating shape this exempts, rather than the test passing
+  // because the surface came back empty.
+  const container = board.elements.find((e) => e.path.includes("main#table"));
+  assert.ok(container, "the delegation container is in the surface");
+  assert.equal(container.draggable, false);
+  assert.ok((container.draggableDescendants ?? 0) >= 7, "and it serves the cards");
+
+  // The fixture whose zone genuinely never cancels must still report. An earlier version of this
+  // fix widened the probe's targets to the element's SIBLINGS, and a sibling that does cancel
+  // made this finding disappear — reporting another element's preventDefault as this one's.
+  const fixture = join(repoRoot, "fixtures", "handlers", "drag-and-drop.html");
+  const bad = await buildHandlerSurface({ source: fixture, probeDrag: true });
+  const badIssues = deriveHandlerIssues(bad);
+  const refusal = badIssues.filter((i) => i.kind === "dragover-not-prevented");
+  assert.equal(refusal.length, 1, "the fixture's one refusing zone still reports");
+  assert.match(refusal[0]!.element, /zone-forgot-prevent/);
+  assert.equal(badIssues.filter((i) => i.kind === "drag-source-not-draggable").length, 1,
+    "and the source that really cannot be dragged still reports");
+});
