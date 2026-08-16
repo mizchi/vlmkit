@@ -554,10 +554,19 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   ライブラリ呼び出し(MCP / API / 直接 import)には一度も届いていなかった。
   出荷 bin が `console.error(error)` していた問題は別件で、issue #112 item 2
   として既に修正済み(`tests/cli-entry-parity.test.mjs` が守っている)。
-- [ ] **ページオープン統一の残り(純粋な整理)** — `waitUntil` は
-  networkidle 72 / load 8 / domcontentloaded 1。
-  **verdict を変える差は上記で解消済み**。残るのは
-  fonts.ready 待ちの平準化で、こちらは実際に装飾。
+- [x] **ページオープン統一の残り** — 2026-08-16 完了。
+  残っていた**手書きの settle 3箇所**(`check integrity` / `check design` /
+  font-determinism-probe。どれも `fonts.ready` + `waitForTimeout` を自前で並べ、
+  待ち時間も 250/250/150 とバラバラ)を `settlePage` に寄せた。
+  - 装飾ではなかった: settle の改良(rAF 待ちを足す、idle timeout を伸ばす等)は
+    `settlePage` にしか届かず、手書きの3箇所を黙って外す。
+  - `tests/settle-page-single-definition.test.mjs` が5個目を落とす。
+    **「文字列 `document.fonts` の禁止」ではなく「待つことの禁止」**にした —
+    `integrity-check.ts` は壊れたフォントを報告するために `document.fonts` を
+    *読む*(`status === "error"`)ので、文字列で禁じるとあの probe を
+    本来あるべきファイルから追い出すことになる。コメントも除外(過去の変換記録が読める)。
+  - `waitUntil` は意図的に不問(networkidle 56 / load 11 / domcontentloaded 10)。
+    `goto(load)` + `settlePage` は結局 idle を待つので等価 — 効いていたのは常に settle 側。
 
 ### 差分監査 3 軸(2026-08-02)
 レポート: `docs/reports/2026-08-02-differential-audit-three-axes.md`

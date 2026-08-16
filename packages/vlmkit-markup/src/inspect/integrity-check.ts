@@ -43,7 +43,7 @@ import {
   type IntegrityAllowRule,
 } from "./integrity-exemption.ts";
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
-import { applyHar, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
+import { applyHar, settlePage, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { extractComponentsFromRgba } from "../component/component-bbox.ts";
@@ -1750,13 +1750,13 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
         waitUntil: options.waitUntil ?? "networkidle",
         timeout: options.timeout ?? 30000,
       });
-      // Network idle is not font-ready: with `font-display: swap` the text
-      // reflows AFTER idle, so every geometry probe below would measure
-      // fallback metrics on some runs and webfont metrics on others — the
-      // exact non-determinism the gate promises not to have. Cheap when
-      // there are no webfonts (already-resolved promise).
-      await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => undefined) : undefined));
-      await page.waitForTimeout(250); // let post-load timers throw before judging
+      // `settlePage`, not a hand-rolled pair, and the reason this gate needs all three parts is
+      // worth keeping at the call site: network idle is not font-ready — with `font-display: swap`
+      // the text reflows AFTER idle, so every geometry probe below would measure fallback metrics
+      // on some runs and webfont metrics on others, which is the exact non-determinism this gate
+      // promises not to have. The trailing 250ms is what lets a post-load timer throw before
+      // anything is judged. Cheap when there are no webfonts: an already-resolved promise.
+      await settlePage(page, 250);
 
       // Never report on a URL we did not measure. An auth-walled route
       // 302s to /login and everything below would judge the login page —

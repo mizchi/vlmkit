@@ -30,6 +30,7 @@
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
+import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
@@ -783,8 +784,10 @@ export async function runDesignPolicyCheck(options: DesignPolicyOptions): Promis
       waitUntil: options.waitUntil ?? "networkidle",
       timeout: options.timeout ?? 30000,
     });
-    await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => undefined) : undefined));
-    await page.waitForTimeout(250);
+    // One definition of "settled" (`@mizchi/vlmkit-core/page-open.ts`): network idle, fonts
+    // ready, then a frame. This gate judges spacing and component signatures, so measuring
+    // before the webfont resolves reports the fallback face's metrics as the design system's.
+    await settlePage(page, 250);
     const redirect = isUrl ? describeRedirect(options.source, page.url()) : null;
     const input = await page.evaluate(buildDesignSampleScript(options.exclude)) as DesignPolicyInput;
     const judged = judgeDesignPolicy(input, options);

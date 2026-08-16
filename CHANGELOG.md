@@ -1026,6 +1026,19 @@ suppression works per *rule* instead of per whole gate.
 
 ### Fixed
 
+- **One definition of "the page has settled".** Three call sites — `check integrity`,
+  `check design` and the font-determinism probe — hand-rolled the pair `fonts.ready` +
+  `waitForTimeout`, each with its own delay (250 / 250 / 150ms), and now call `settlePage`. Not
+  cosmetic: the next improvement to settling reaches `settlePage` and silently misses a hand-rolled
+  copy, and two thirds of a settle is what made `verify flow` report `count .card expected 2,
+  measured 0` on a page `check layout` measured 2 on at the same instant.
+
+  `tests/settle-page-single-definition.test.mjs` fails the fifth copy. It forbids WAITING on fonts
+  rather than the string `document.fonts`: `integrity-check.ts` reads that collection to report
+  broken faces (`status === "error"`), which is a measurement, and a string ban would have pushed
+  that probe out of the file it belongs in. `waitUntil` stays unpoliced on purpose — `goto(load)`
+  followed by a settle waits for idle anyway, so the load state was never the axis.
+
 - **The two-stage reasoning pipeline is tested against recorded responses** — `reasoning-pipeline.ts`
   10.7% → 90.2%, which with `vlm-client.ts` at 89.5% closes the recorded-fixture item. The
   recordings live in `fixtures/vlm-recordings/` and are **hand-written to each provider's shape
