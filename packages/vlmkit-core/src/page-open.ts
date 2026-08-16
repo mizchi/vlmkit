@@ -106,12 +106,67 @@ export function sourceToUrl(source: string): string {
  * network idle anyway, so the 8 `load` and 2 `domcontentloaded` call sites are
  * equivalent to the 71 `networkidle` ones **provided they settle**. The
  * difference that mattered was always the settle, never the load state.
+ *
+ * ## The fourth part: entrance animations
+ *
+ * Added 2026-08-16, from dogfooding `examples/solitaire/`. Idle + fonts + 250ms is not enough
+ * for a page that animates itself in, and the failure has the same shape as the three above —
+ * reported as a defect in the page rather than as looking too early:
+ *
+ *   - `check integrity` reported `low-contrast-text … 4.12:1` on a card whose colour is 5.8:1.
+ *     It had measured the card at `opacity: 0.2` **in mid-flight during a 960ms deal
+ *     animation**, and the finding arrived with a selector, so a reader goes looking for a
+ *     colour bug that does not exist. With the animation finished the same gate says CLEAN.
+ *
+ * So this now also waits for every animation that HAS an end to reach it, via
+ * `Animation.finished` over `document.getAnimations()`.
+ *
+ * Infinite animations are excluded rather than waited on, which is the whole reason this is
+ * safe to put in the shared settle: a spinner, a marquee or a pulsing badge never finishes, and
+ * awaiting it would hang every gate on every page that has one. `animationCapMs` bounds the
+ * wait regardless, because a long finite animation is not worth stalling a run for — a page
+ * with a 30-second intro gets measured at the cap and that is the correct trade.
  */
-export async function settlePage(page: Page, settleMs = 250): Promise<void> {
+export async function settlePage(page: Page, settleMs = 250, animationCapMs = 2000): Promise<void> {
   await page.waitForLoadState("networkidle", { timeout: 5000 }).catch(() => {});
   await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => undefined) : undefined))
     .catch(() => {});
+  if (animationCapMs > 0) await waitForAnimations(page, animationCapMs);
   if (settleMs > 0) await page.waitForTimeout(settleMs);
+}
+
+/**
+ * Wait for the finite animations to finish, capped.
+ *
+ * `getAnimations()` covers CSS animations, CSS transitions and Web Animations alike, so this
+ * needs no cooperation from the page — no marker attribute, no convention.
+ *
+ * The cap is enforced in the PAGE with `Promise.race`, not by a Playwright timeout around the
+ * evaluate: a rejected `evaluate` would have to be swallowed, and swallowing it would hide a
+ * real error in the same `catch` as the timeout.
+ */
+async function waitForAnimations(page: Page, capMs: number): Promise<void> {
+  await page.evaluate(async (cap) => {
+    if (typeof document.getAnimations !== "function") return;
+    const finite = document.getAnimations().filter((animation) => {
+      // An infinite animation never resolves `finished`. Read the effect's timing rather than
+      // the style, because `iterations` is where the Web Animations API states it.
+      const timing = animation.effect && "getComputedTiming" in animation.effect
+        ? animation.effect.getComputedTiming()
+        : null;
+      const iterations = timing ? timing.iterations : undefined;
+      return iterations !== Infinity && iterations !== null;
+    });
+    if (finite.length === 0) return;
+    await Promise.race([
+      // `catch` per animation: a cancelled animation rejects `finished`, and one card removed
+      // mid-flight must not reject the whole wait.
+      Promise.all(finite.map((animation) => animation.finished.catch(() => undefined))),
+      new Promise((resolve) => setTimeout(resolve, cap)),
+    ]);
+  }, capMs).catch(() => {
+    // A navigation or a closed page during the wait is not this function's business to report.
+  });
 }
 
 /**
@@ -284,6 +339,16 @@ export interface OpenPageOptions {
   har?: string;
   /** Extra quiet time after load. 0 skips it. */
   settleMs?: number;
+  /**
+   * How long to wait for the page's finite animations to finish, before giving up and measuring
+   * anyway. 0 skips the wait.
+   *
+   * Reachable from here because a gate that knows the page it is opening knows better than the
+   * default: a build pipeline measuring a page with a deliberately long intro wants a bigger
+   * cap, and a gate measuring load timing wants 0. Infinite animations are never waited on at
+   * any cap — see `settlePage`.
+   */
+  animationCapMs?: number;
   /** Skip settling entirely (a gate that measures load timing does its own). */
   skipSettle?: boolean;
 }
@@ -320,7 +385,7 @@ export async function openSource(
     waitUntil: options.waitUntil ?? "networkidle",
     timeout: options.timeout ?? 30000,
   });
-  if (!options.skipSettle) await settlePage(page, options.settleMs ?? 250);
+  if (!options.skipSettle) await settlePage(page, options.settleMs ?? 250, options.animationCapMs);
   return {
     page,
     redirect: isUrlSource(source) ? describeRedirect(source, page.url()) : null,
@@ -373,6 +438,6 @@ export async function openHtml(
     waitUntil: options.waitUntil ?? "networkidle",
     timeout: options.timeout ?? 30000,
   });
-  if (!options.skipSettle) await settlePage(page, options.settleMs ?? 250);
+  if (!options.skipSettle) await settlePage(page, options.settleMs ?? 250, options.animationCapMs);
   return page;
 }

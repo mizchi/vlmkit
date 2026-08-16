@@ -1,11 +1,17 @@
 /**
  * One definition of "the page has settled".
  *
- * The settle is three things — network idle, `document.fonts.ready`, then a frame — and the reason
- * it is one function is that getting two of three is indistinguishable from a markup bug. Measured
- * 2026-08-02: `verify flow` reported `count .card expected 2, measured 0` on a page where
- * `check layout` measured 2 at the same instant, and `build page` screenshotted a candidate at
- * 5.3% of its settled ink, so every component came back missing. Both blamed the markup.
+ * The settle is four things — network idle, `document.fonts.ready`, the finite animations, then a
+ * frame — and the reason it is one function is that getting three of four is indistinguishable
+ * from a markup bug. Measured 2026-08-02: `verify flow` reported `count .card expected 2,
+ * measured 0` on a page where `check layout` measured 2 at the same instant, and `build page`
+ * screenshotted a candidate at 5.3% of its settled ink, so every component came back missing.
+ * Both blamed the markup.
+ *
+ * The fourth part was added 2026-08-16 for the same reason: `check integrity` reported a
+ * `low-contrast-text` failure at 4.12:1 on a card whose colour is 5.8:1, having measured it at
+ * `opacity: 0.2` mid-flight through a 960ms entrance animation. Again reported as a defect in
+ * the page, with a selector, rather than as looking too early.
  *
  * Four call sites had hand-rolled the pair `fonts.ready` + `waitForTimeout`, each with its own
  * delay. That is not a style problem: the next improvement to settling (a `requestAnimationFrame`
@@ -63,13 +69,26 @@ describe("settlePage is the only settle", () => {
     );
   });
 
-  it("the definition still does all three parts", () => {
+  it("the definition still does all four parts", () => {
     // Without this, the test above is satisfied by a `settlePage` that waits for nothing.
     const source = readFileSync(join(repoRoot, DEFINITION), "utf8");
     const body = source.slice(source.indexOf("export async function settlePage"));
     const settle = body.slice(0, body.indexOf("\n}") + 2);
     assert.match(settle, /waitForLoadState\("networkidle"/, "network idle");
     assert.match(settle, /document\.fonts/, "fonts ready");
+    assert.match(settle, /waitForAnimations\(page/, "the finite animations");
     assert.match(settle, /waitForTimeout\(settleMs\)/, "and a frame after");
+  });
+
+  it("the animation wait excludes infinite animations and is capped", () => {
+    // The two properties that make waiting on animations safe to put in the shared settle. A
+    // spinner never finishes, so awaiting it would hang every gate on every page that has one;
+    // and a page with a 30-second intro must be measured at the cap rather than stall a run.
+    const source = readFileSync(join(repoRoot, DEFINITION), "utf8");
+    const fn = source.slice(source.indexOf("async function waitForAnimations"));
+    const body = fn.slice(0, fn.indexOf("\n}") + 2);
+    assert.match(body, /getAnimations/, "reads the real animation list rather than a convention");
+    assert.match(body, /Infinity/, "excludes infinite animations");
+    assert.match(body, /Promise\.race/, "and races them against the cap");
   });
 });

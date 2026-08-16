@@ -580,6 +580,25 @@ reports far fewer targets.
 
 ### Fixed
 
+- **Every gate measured whatever animation frame it happened to catch.** `settlePage` waited for
+  network idle, `fonts.ready` and a frame — and a page that animates itself in outlives all
+  three. Dogfooding `examples/solitaire/`: `check integrity` reported
+  `low-contrast-text … 4.12:1` on a card whose colour is **5.8:1**, having measured it at
+  `opacity: 0.2` in mid-flight through a 960ms deal animation. The finding came with a selector,
+  so a reader goes looking for a colour bug that does not exist; with the animation finished the
+  same gate says CLEAN. Same shape as the three failures already recorded on that function —
+  reported as a defect in the page rather than as looking too early.
+
+  `settlePage` now has a fourth part: it awaits `Animation.finished` over
+  `document.getAnimations()`, which covers CSS animations, transitions and Web Animations
+  without sampling and without any cooperation from the page. Two properties make that safe to
+  put in the shared settle — **infinite animations are excluded** (a spinner never finishes, and
+  awaiting one would hang every gate on every page that has one), and the wait is **capped**
+  (2s default, `animationCapMs` on `openSource` for a gate that knows better; 0 skips it).
+  Measured: `check integrity` on the animating page 2329ms → 2850ms, **unchanged on static
+  pages** (2297ms), full suite 321s → 328s. `tests/settle-page-single-definition.test.mjs` pins
+  all four parts and both safety properties.
+
 - **`check a11y contrast` reported the INVERSE of the truth behind a gradient.** Found by
   dogfooding `examples/solitaire/`, whose toolbar is `rgba(0,0,0,0.28)` over a green gradient:
   the gate reported **9 failures at 1.08:1** for `#f2f7f2` on `#ffffff`. The text is near-white

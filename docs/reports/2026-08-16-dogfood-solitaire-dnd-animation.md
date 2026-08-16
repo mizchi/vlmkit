@@ -148,6 +148,23 @@ point. Full table in `examples/solitaire/README.md`; the two that generalise:
 
 ## Fixed since
 
+**Finding 3 is fixed.** `settlePage` — already the single definition of "the page has settled",
+with a guard test enforcing that — grew a fourth part: after network idle and `fonts.ready`, it
+awaits `Animation.finished` over `document.getAnimations()`. `check integrity` on this page with
+the deal running now says `verdict: CLEAN`, matching the `?animate=0` result it used to disagree
+with.
+
+Two properties make it safe in a shared settle. **Infinite animations are excluded**, not awaited
+— a spinner never finishes and awaiting one would hang every gate on every page that has one.
+And the wait is **capped** (2s by default, `animationCapMs` on `openSource`), because a page with
+a 30-second intro should be measured at the cap rather than stall a run. Measured cost:
+`check integrity` on the animating page 2329ms → 2850ms, and **unchanged on static pages**
+(a fixture with no running animation: 2297ms). Full suite 321s → 328s, within noise.
+
+This turned out not to need `check animation`'s settle detector: `getAnimations()` covers CSS
+animations, transitions and Web Animations without any sampling, so it needs no cooperation from
+the page and no marker convention.
+
 **Finding 2 is fixed.** The background resolution is now one shared browser-script fragment,
 `CONTRAST_BACKGROUND_JS`, interpolated into both `check a11y contrast` and `check integrity`. It
 blends translucent layers over white and **refuses** on a `background-image` instead of guessing.
@@ -159,6 +176,5 @@ are all still reported.
 ## Recorded, not fixed
 
 1. `scan handlers`' three drag rules need delegation awareness; `dragover-not-prevented`
-   additionally needs to probe a target the page would accept.
-2. The measurement gates need a settle that covers CSS animation; `check animation` already has
-   the detector.
+   additionally needs to probe a target the page would accept. This is the one substantive gap
+   left, and it is what "can vlmkit handle drag and drop" turns on.
