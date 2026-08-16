@@ -580,6 +580,35 @@ reports far fewer targets.
 
 ### Fixed
 
+- **`check a11y contrast` reported the INVERSE of the truth behind a gradient.** Found by
+  dogfooding `examples/solitaire/`, whose toolbar is `rgba(0,0,0,0.28)` over a green gradient:
+  the gate reported **9 failures at 1.08:1** for `#f2f7f2` on `#ffffff`. The text is near-white
+  on near-black. Its `effectiveBg` had no notion of `background-image` at all, treated any
+  colour with alpha ≥ 0.5 as opaque, never blended a chain, and fell back to white for a
+  background it could not see.
+
+  `check integrity` gets the same page right and says why — "background-image/gradient in the
+  stack — composite-background contrast is not deterministically measurable". So the judgement
+  existed in the toolkit and the gate whose whole subject is contrast did not have it. Third
+  instance of that shape in this release, after the dedup defect and the `js-error` split.
+
+  The resolution is now one shared browser-script fragment, `CONTRAST_BACKGROUND_JS`
+  (`packages/vlmkit-markup/src/contrast-background.ts`), interpolated into **both** gates — the
+  pattern `animation-eval.ts` already uses for `ANIMATION_HELPERS_JS`. It walks the ancestor
+  chain blending translucent layers over white, and on a `background-image` it **refuses** rather
+  than guessing: what is behind the text becomes a pixel question that computed style cannot
+  answer. `check integrity`'s behaviour is unchanged (same 17 skipped, same verdicts); the
+  contrast gate went from 9 false failures to 0, and its coverage line now reads `inspected 59
+  text-bearing element(s), 24 not measurable`. Real failures are unaffected — the low-contrast
+  fixture still reports 4, `css-challenge/page.html` 2, `dashboard.html` 7.
+
+  A refusal is stated, never silent: `A11yContrastReport` gained `unmeasuredComposite`, and the
+  console and markdown reports both name the count, because "0 failures over 59" and "0 over 59
+  with 24 unmeasurable" are different claims and only the second is honest. Foreground alpha and
+  the ancestor `opacity` chain are now composited too, so `rgba(0,0,0,0.4)` on a faded parent
+  reads as the colour a person sees. `A11yContrastRawSample.composite` is optional, so recorded
+  runs and hand-built samples keep being measured.
+
 - **Two smoke harnesses had been failing every command since the 0.6 rename.** Chasing the
   leftover `vrt` spellings turned up dead invocations rather than cosmetics:
   - **`scripts/smoke-all-clis.sh` was 0 of 22.** Every command used the flat pre-0.6

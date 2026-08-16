@@ -36,6 +36,7 @@
  */
 import { resolve } from "node:path";
 import { STABLE_SELECTOR_JS } from "../stable-selector.ts";
+import { CONTRAST_BACKGROUND_JS } from "../contrast-background.ts";
 import { PNG } from "pngjs";
 import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import {
@@ -1571,24 +1572,7 @@ export const COLLECT_PROTRUSIONS = `(() => {
 
 export const COLLECT_TEXT_CONTRAST = `(() => {
   ${STABLE_SELECTOR_JS}
-  const parseColor = (s) => {
-    const m = (s || "").match(/rgba?\\(([^)]+)\\)/);
-    if (!m) return null;
-    const p = m[1].split(",").map(parseFloat);
-    return [p[0], p[1], p[2], p[3] === undefined ? 1 : p[3]];
-  };
-  const blend = (bg, c) => {
-    const a = c[3];
-    return [bg[0] * (1 - a) + c[0] * a, bg[1] * (1 - a) + c[1] * a, bg[2] * (1 - a) + c[2] * a];
-  };
-  const lum = (c) => {
-    const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
-    return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]);
-  };
-  const ratio = (a, b) => {
-    const l1 = lum(a), l2 = lum(b);
-    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
-  };
+  ${CONTRAST_BACKGROUND_JS}
   const candidates = [];
   let skippedComposite = 0;
   for (const el of Array.from(document.querySelectorAll("body *"))) {
@@ -1629,29 +1613,15 @@ export const COLLECT_TEXT_CONTRAST = `(() => {
       if (ix < 2 || iy < 2) { clippedByAncestor = true; break; }
     }
     if (clippedByAncestor) continue;
-    let composite = false;
-    const chain = [];
-    for (let p = el; p; p = p.parentElement) {
-      const ps = getComputedStyle(p);
-      if (ps.backgroundImage !== "none") { composite = true; break; }
-      const c = parseColor(ps.backgroundColor);
-      if (c && c[3] > 0) chain.push(c);
-      if (c && c[3] >= 1) break;
-    }
-    if (composite) { skippedComposite++; continue; }
-    let bg = [255, 255, 255];
-    for (const c of chain.reverse()) bg = blend(bg, c);
-    let opacity = 1;
-    for (let p = el; p && p !== document.documentElement; p = p.parentElement) {
-      // parseFloat(...) || 1 would turn an ancestor's opacity: 0 into 1 —
-      // opacity is not inherited, so this chain is the only place a
-      // fully-transparent ancestor can be seen. Preserve finite zeros.
-      const po = parseFloat(getComputedStyle(p).opacity);
-      opacity *= Number.isFinite(po) ? po : 1;
-    }
+    // Shared with check a11y contrast via CONTRAST_BACKGROUND_JS. It used to be inline here and
+    // reimplemented, differently and worse, in the other gate — which reported the inverse of
+    // the truth on a gradient. One resolution, one answer.
+    const resolved = resolveTextBackground(el);
+    if (resolved.composite) { skippedComposite++; continue; }
+    const bg = resolved.bg;
     const fgColor = parseColor(style.color) || [0, 0, 0, 1];
-    const fg = blend(bg, [fgColor[0], fgColor[1], fgColor[2], fgColor[3] * opacity]);
-    const r = ratio(fg, bg);
+    const fg = blendColor(bg, [fgColor[0], fgColor[1], fgColor[2], fgColor[3] * inheritedOpacity(el)]);
+    const r = contrastRatio(fg, bg);
     // WCAG's floor depends on the text's size, and this used to be a flat 3:1 —
     // which is the LARGE-text floor applied to everything. A dogfood agent found
     // what that means in practice: 13px body text at 3.03:1 is a WCAG AA failure,

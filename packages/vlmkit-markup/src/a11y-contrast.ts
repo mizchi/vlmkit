@@ -33,6 +33,7 @@ import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { evaluateA11yContrast } from "./markup-core-a11y-contrast.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { applySelectorAllowRules, parseSelectorAllowRules } from "./inspect/selector-exemption.ts";
+import { CONTRAST_BACKGROUND_JS } from "./contrast-background.ts";
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
 import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 
@@ -96,6 +97,16 @@ export interface A11yContrastReport {
   screenshot: string;
   totalText: number;
   failures: ContrastFinding[];
+  /**
+   * Text whose background could not be resolved from computed style — a `background-image` or
+   * gradient in the stack, so what is behind it is a pixel question.
+   *
+   * On the report because it is coverage, not a detail: "0 failures over 59 elements" and "0
+   * failures over 59, of which 26 were unmeasurable" are different claims, and only the second
+   * one is honest. `check integrity` has always stated this; this gate used to guess white and
+   * report the inverse of the truth.
+   */
+  unmeasuredComposite?: number;
   /** Findings an `--allow` rule declared deliberate. Listed, never merely subtracted. */
   exempted?: { finding: ContrastFinding; reason: string; rule: string }[];
   /** `--allow` rules that matched nothing. */
@@ -105,27 +116,7 @@ export interface A11yContrastReport {
 
 export const A11Y_CONTRAST_SAMPLE_SCRIPT = `
 (function a11ySample(minLen) {
-  function parseColor(s) {
-    if (!s) return null;
-    const m = s.match(/rgba?\\(([^)]+)\\)/);
-    if (!m) return null;
-    const parts = m[1].split(",").map((x) => parseFloat(x.trim()));
-    const r = parts[0], g = parts[1], b = parts[2], a = parts.length >= 4 ? parts[3] : 1;
-    return { r: r|0, g: g|0, b: b|0, a };
-  }
-  function effectiveBg(el) {
-    let cur = el;
-    while (cur && cur !== document.documentElement) {
-      const cs = getComputedStyle(cur);
-      const c = parseColor(cs.backgroundColor);
-      if (c && c.a >= 0.5) return c;
-      cur = cur.parentElement;
-    }
-    // Fallback to html background or white.
-    const htmlBg = parseColor(getComputedStyle(document.documentElement).backgroundColor);
-    if (htmlBg && htmlBg.a >= 0.5) return htmlBg;
-    return { r: 255, g: 255, b: 255, a: 1 };
-  }
+${CONTRAST_BACKGROUND_JS}
   function shortPath(el) {
     const parts = [];
     let cur = el;
@@ -154,19 +145,44 @@ export const A11Y_CONTRAST_SAMPLE_SCRIPT = `
     if (cs.visibility === "hidden" || cs.display === "none" || parseFloat(cs.opacity) < 0.5) continue;
     const r = el.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) continue;
-    const fg = parseColor(cs.color);
-    if (!fg) continue;
-    const bg = effectiveBg(el);
+    const fgColor = parseColor(cs.color);
+    if (!fgColor) continue;
+    const resolved = resolveTextBackground(el);
     const fontSize = parseFloat(cs.fontSize) || 16;
     const fontWeight = parseInt(cs.fontWeight, 10) || 400;
+    // A composite background is REPORTED, not guessed at. The old sampler had no notion of a
+    // background image and returned white, which turned near-white text on a dark gradient into
+    // a 1.08:1 "failure" — the inverse of the truth. The analyzer surfaces these as a stated
+    // exemption, because silently dropping the elements a check cannot read is
+    // indistinguishable from finding them acceptable.
+    if (resolved.composite) {
+      out.push({
+        path: shortPath(el),
+        tag: el.tagName.toLowerCase(),
+        text: text.slice(0, 60),
+        fontSize, fontWeight,
+        bbox: { x: r.x, y: r.y, width: r.width, height: r.height },
+        foreground: { r: fgColor[0]|0, g: fgColor[1]|0, b: fgColor[2]|0 },
+        background: { r: 255, g: 255, b: 255 },
+        composite: true,
+      });
+      if (out.length > 500) break;
+      continue;
+    }
+    // The text's own alpha and every ancestor opacity, composited onto the resolved
+    // background, so a translucent colour and a faded ancestor read as the colour a person
+    // actually sees rather than as the colour the author typed.
+    // (No backticks in here: this comment lives inside a template literal, and a backtick
+    // would end the script. Third time this session — see theme.gate.ts and integrity-check.ts.)
+    const fg = blendColor(resolved.bg, [fgColor[0], fgColor[1], fgColor[2], fgColor[3] * inheritedOpacity(el)]);
     out.push({
       path: shortPath(el),
       tag: el.tagName.toLowerCase(),
       text: text.slice(0, 60),
       fontSize, fontWeight,
       bbox: { x: r.x, y: r.y, width: r.width, height: r.height },
-      foreground: { r: fg.r, g: fg.g, b: fg.b },
-      background: { r: bg.r, g: bg.g, b: bg.b },
+      foreground: { r: Math.round(fg[0]), g: Math.round(fg[1]), b: Math.round(fg[2]) },
+      background: { r: Math.round(resolved.bg[0]), g: Math.round(resolved.bg[1]), b: Math.round(resolved.bg[2]) },
     });
     if (out.length > 500) break;
   }
@@ -183,6 +199,12 @@ export interface A11yContrastRawSample {
   bbox: { x: number; y: number; width: number; height: number };
   foreground: { r: number; g: number; b: number };
   background: { r: number; g: number; b: number };
+  /**
+   * The background could not be resolved from computed style — a `background-image` or gradient
+   * is in the stack, so what is behind the text is a pixel question. Optional: a sample without
+   * it was measured normally, which keeps recorded runs and hand-built samples working.
+   */
+  composite?: boolean;
 }
 
 function toHex(c: { r: number; g: number; b: number }): string {
@@ -223,6 +245,10 @@ export function analyzeA11yContrastSamples(samples: A11yContrastRawSample[]): Co
   const counts = new Map<string, number>();
   for (const s of samples) counts.set(identity(s), (counts.get(identity(s)) ?? 0) + 1);
   for (const [key, s] of byPath) {
+    // A background the style walk could not resolve is not measured, and not silently dropped
+    // either — `unmeasuredComposite` carries the count so the caller can state it. Measuring it
+    // anyway is what produced 9 failures at 1.08:1 for near-white text on a dark gradient.
+    if (s.composite) continue;
     const evaluation = evaluateA11yContrast({
       foreground: s.foreground,
       background: s.background,
@@ -289,6 +315,7 @@ export async function runA11yContrast(
   // the other reporting something else about the same page. Found on the Bootstrap dashboard
   // example (2026-08-16), where this gate reported **0 contrast failures on a page with 11**.
   const findings = analyzeA11yContrastSamples(samples);
+  const compositeCount = samples.filter((s) => s.composite).length;
 
   const reportPath = options.reportPath ?? join(outputDir, "report.md");
   const md = renderReport({
@@ -300,6 +327,7 @@ export async function runA11yContrast(
     // reassuring direction.
     totalText: samples.length,
     failures: findings,
+    ...(compositeCount > 0 ? { unmeasuredComposite: compositeCount } : {}),
   });
   await writeFile(reportPath, md);
 
@@ -313,6 +341,7 @@ export async function runA11yContrast(
     screenshot: screenshotPath,
     totalText: samples.length,
     failures: applied.kept,
+    ...(compositeCount > 0 ? { unmeasuredComposite: compositeCount } : {}),
     ...(applied.exempted.length > 0
       ? {
         exempted: applied.exempted.map((e) => ({
@@ -336,7 +365,15 @@ export function formatA11yContrastReport(report: A11yContrastReport, rules?: Rul
   const lines: string[] = [];
   lines.push(`  ${BOLD}${CYAN}vlmkit check a11y contrast${RESET}`);
   lines.push(`  ${DIM}html: ${report.html}${RESET}`);
-  lines.push(`  ${DIM}inspected ${report.totalText} text-bearing element(s)${RESET}`);
+  lines.push(
+    `  ${DIM}inspected ${report.totalText} text-bearing element(s)`
+    // Stated on the coverage line, not buried: "0 failures over 59" and "0 failures over 59, 26
+    // of them unmeasurable" are different claims and only the second is honest.
+    + (report.unmeasuredComposite
+      ? `, ${report.unmeasuredComposite} not measurable (background-image/gradient behind the text)`
+      : "")
+    + `${RESET}`,
+  );
   // `--rule contrast-below-aa=off` used to change the exit code and nothing on this screen.
   // The measured count survives the rule being off, because the ratios were still measured;
   // what changes is that they are not reported as failures.
@@ -391,6 +428,16 @@ function renderReport(r: Omit<A11yContrastReport, "reportPath">): string {
   lines.push("");
   lines.push(`Inspected **${r.totalText}** unique text-bearing elements. ` +
     `Screenshot: \`${r.screenshot}\`.`);
+  if (r.unmeasuredComposite) {
+    lines.push("");
+    lines.push(
+      `**${r.unmeasuredComposite}** of them were NOT measured: a \`background-image\` or gradient`
+      + " sits behind the text, so the colour underneath varies across the element and is not"
+      + " derivable from computed style. Guessing white there is how near-white text on a dark"
+      + " gradient gets reported as a 1.08:1 failure. Sampling the rendered pixels would answer"
+      + " it; a style walk cannot.",
+    );
+  }
   lines.push("");
   if (r.failures.length === 0) {
     lines.push("## All text passes WCAG AA contrast");

@@ -1,7 +1,7 @@
 import { describe, it } from "vitest";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { analyzeA11yContrastSamples, type A11yContrastRawSample } from "./a11y-contrast.ts";
+import { A11Y_CONTRAST_SAMPLE_SCRIPT, analyzeA11yContrastSamples, type A11yContrastRawSample } from "./a11y-contrast.ts";
 import { evaluateA11yContrast } from "./markup-core-a11y-contrast.ts";
 
 function sample(overrides: Partial<A11yContrastRawSample> = {}): A11yContrastRawSample {
@@ -175,5 +175,81 @@ describe("one contrast analysis, not two", () => {
     const source = readFileSync(new URL("./a11y-contrast.ts", import.meta.url), "utf8");
     assert.match(source, /totalText: samples\.length/);
     assert.doesNotMatch(source, /totalText: byPath\.size/);
+  });
+});
+
+/**
+ * The composite-background refusal.
+ *
+ * Found by dogfooding `examples/solitaire/`, whose toolbar is `rgba(0,0,0,0.28)` over a green
+ * gradient: this gate reported **9 failures at 1.08:1** for near-white text on a near-black
+ * bar, having fallen back to white for a background its style walk could not see. Not a
+ * near-miss — the inverse of the truth. `check integrity` got the same page right and said why,
+ * so the exemption existed in the toolkit and the contrast specialist did not have it.
+ */
+describe("backgrounds the style walk cannot resolve", () => {
+  const composite = (overrides = {}) => ({
+    path: "header>h1",
+    tag: "h1",
+    text: "Klondike Solitaire",
+    fontSize: 17,
+    fontWeight: 600,
+    bbox: { x: 0, y: 0, width: 200, height: 24 },
+    foreground: { r: 242, g: 247, b: 242 },
+    background: { r: 255, g: 255, b: 255 },
+    composite: true,
+    ...overrides,
+  });
+
+  it("is not reported as a failure, however bad the guessed ratio looks", () => {
+    // #f2f7f2 on #ffffff is 1.08:1 and would be the worst failure on the page. The sample says
+    // the background is unknown, so there is no verdict to give.
+    assert.deepEqual(analyzeA11yContrastSamples([composite()]), []);
+  });
+
+  it("still measures every sample whose background WAS resolved", () => {
+    // The refusal must not become a blanket excuse: one unmeasurable element alongside a real
+    // failure leaves the real failure reported.
+    const findings = analyzeA11yContrastSamples([
+      composite(),
+      {
+        path: "p.muted",
+        tag: "p",
+        text: "Too muted to read",
+        fontSize: 14,
+        fontWeight: 400,
+        bbox: { x: 0, y: 40, width: 200, height: 20 },
+        foreground: { r: 156, g: 163, b: 175 },
+        background: { r: 255, g: 255, b: 255 },
+      },
+    ]);
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].path, "p.muted");
+  });
+
+  it("treats a sample without the field as measured, so recorded runs keep working", () => {
+    // Optional on purpose — the same compatibility direction as `FocusStep.pinned` and
+    // `A11yTouchRawSample.display`. Absent means "measured normally", not "unknown".
+    const findings = analyzeA11yContrastSamples([composite({ composite: undefined })]);
+    assert.equal(findings.length, 1, "1.08:1 is a failure once the background is trusted");
+    assert.equal(findings[0].ratio < 1.5, true);
+  });
+});
+
+describe("CONTRAST_BACKGROUND_JS", () => {
+  it("is shared with check integrity rather than reimplemented", async () => {
+    // The fragment exists because two gates resolved the background differently and disagreed
+    // about one page. If a future edit inlines a second copy, this is what notices.
+    const { CONTRAST_BACKGROUND_JS } = await import("./contrast-background.ts");
+    assert.match(CONTRAST_BACKGROUND_JS, /function resolveTextBackground/);
+    assert.match(CONTRAST_BACKGROUND_JS, /backgroundImage/);
+    assert.ok(
+      A11Y_CONTRAST_SAMPLE_SCRIPT.includes("function resolveTextBackground"),
+      "the sampler must be built from the fragment",
+    );
+    // No backticks: the fragment is interpolated into template literals, and one backtick ends
+    // the script. It happened three times in one session before this was written down.
+    assert.equal(CONTRAST_BACKGROUND_JS.includes("`"), false, "no backticks in the fragment");
+    assert.equal(CONTRAST_BACKGROUND_JS.includes("${"), false, "no interpolation in the fragment");
   });
 });

@@ -146,10 +146,19 @@ point. Full table in `examples/solitaire/README.md`; the two that generalise:
   over any descendant meant the keyboard could pick cards up but could not deal. `check
   interactions` probes Enter per control and would have caught it — it was fixed by a test first.
 
+## Fixed since
+
+**Finding 2 is fixed.** The background resolution is now one shared browser-script fragment,
+`CONTRAST_BACKGROUND_JS`, interpolated into both `check a11y contrast` and `check integrity`. It
+blends translucent layers over white and **refuses** on a `background-image` instead of guessing.
+On this page the contrast gate went from 9 false failures to `0 contrast failure(s)` with
+`24 not measurable` stated on the coverage line; `check integrity` is unchanged; and the real
+failures on the low-contrast fixture (4), `css-challenge/page.html` (2) and `dashboard.html` (7)
+are all still reported.
+
 ## Recorded, not fixed
 
 1. `scan handlers`' three drag rules need delegation awareness; `dragover-not-prevented`
    additionally needs to probe a target the page would accept.
-2. `check a11y contrast` should share `check integrity`'s composite-background exemption.
-3. The measurement gates need a settle that covers CSS animation; `check animation` already has
+2. The measurement gates need a settle that covers CSS animation; `check animation` already has
    the detector.
