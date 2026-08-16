@@ -1,0 +1,463 @@
+/*
+ * Klondike solitaire — layout, card faces, and the four animations.
+ *
+ * Cards are DRAWN, not images: no sprite sheet, no external requests, so the page renders
+ * identically from `file://` and a vlmkit gate needs nothing served. Suit pips are the Unicode
+ * glyphs, which is also what makes the faces legible to `check copy` and to a11y tooling
+ * rather than being pixels with no text in them.
+ *
+ * ## The four animations, and why each exists
+ *
+ *   deal      52 cards fly from the stock corner to their pile on a new game
+ *   flip      a 3D Y-rotation when an uncovered card turns over
+ *   settle    a short travel tween when a card is moved without dragging (double-click)
+ *   victory   the bouncing cascade — the famous one — when the last card lands
+ *
+ * Every one is `transform` / `opacity` only, so they composite off the main thread and do not
+ * trigger layout. That is not just performance: `check animation` samples frames and a
+ * layout-thrashing animation reads as a shifting page rather than a moving card.
+ *
+ * ## prefers-reduced-motion
+ *
+ * Honoured at the bottom of this file, and it is a real accommodation rather than a token one:
+ * a 52-card deal and a full-screen bounce are exactly the vestibular triggers the media query
+ * exists for. `stress media --variants reduced-motion` reports a stylesheet that declares
+ * animation without suppressing it, so this is also the thing that keeps that gate quiet.
+ */
+
+:root {
+  /* One card size, everything else derived — a card is 2.5 x 3.5 inches, so 1.4 aspect. */
+  --card-w: 5.5rem;
+  --card-h: 7.7rem;
+  --card-radius: 0.4rem;
+  --gap: 0.75rem;
+  /* How far each successive face-up tableau card peeks out. Face-down cards overlap tighter,
+     which is what gives a Klondike column its characteristic taper. */
+  --fan-up: 1.55rem;
+  --fan-down: 0.55rem;
+
+  --felt: #0b6623;
+  --felt-dark: #07491a;
+  --card-face: #fdfdfb;
+  --card-ink: #1a1a1a;
+  --card-red: #c8102e;
+  --card-edge: #b9b9ae;
+  --slot-line: rgba(255, 255, 255, 0.34);
+  --focus: #ffd400;
+
+  --deal-ms: 260ms;
+  --flip-ms: 220ms;
+  --settle-ms: 200ms;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font: 400 16px/1.4 "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  color: #f2f7f2;
+  background: radial-gradient(circle at 50% 0%, var(--felt) 0%, var(--felt-dark) 100%);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  flex-wrap: wrap;
+  padding: 0.75rem 1rem;
+  background: rgba(0, 0, 0, 0.28);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.toolbar h1 {
+  margin: 0 0.5rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.toolbar button,
+.toolbar select {
+  font: inherit;
+  /* 44px minimum on the shorter side: WCAG 2.5.5's AAA target, which this page can meet
+     because a toolbar is not a dense data grid. `check a11y touch` at --level AAA reports
+     anything under it. */
+  min-height: 2.75rem;
+  padding: 0 1rem;
+  color: #10240f;
+  background: linear-gradient(#fdfdfb, #e4e6df);
+  border: 1px solid #7d8a78;
+  border-radius: 0.3rem;
+  cursor: pointer;
+}
+
+.toolbar button:hover { background: linear-gradient(#ffffff, #eef0e9); }
+.toolbar button:active { transform: translateY(1px); }
+
+/* A visible focus ring on every interactive element. `check a11y focus` walks Tab and reports
+   a stop with no indicator, and the browser default is easy to lose against a felt table. */
+.toolbar button:focus-visible,
+.toolbar select:focus-visible,
+.card:focus-visible,
+.slot:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.status {
+  margin-left: auto;
+  display: flex;
+  gap: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.status output { font-weight: 600; }
+
+.table {
+  position: relative;
+  padding: 1.25rem 1rem 3rem;
+  max-width: 62rem;
+  margin: 0 auto;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(7, var(--card-w));
+  gap: var(--gap);
+  justify-content: center;
+}
+
+.row-top { margin-bottom: 1.75rem; }
+
+/* Stock and waste sit left, foundations right, with one empty column between — the Windows
+   arrangement. `grid-column` rather than a spacer element, so there is no meaningless node in
+   the a11y tree. */
+.stock-slot { grid-column: 1; }
+.waste-slot { grid-column: 2; }
+/* `display: contents` so the four foundations sit in the row's own grid rather than becoming
+   one item in it — the container exists because game.js addresses them by index. */
+.foundations { display: contents; }
+.foundations .foundation-slot:first-child { grid-column: 4; }
+
+/**
+ * A pile: the drop target and the positioning context for its cards.
+ *
+ * `min-height` rather than `height`, because a tableau column grows past one card and the
+ * fan is absolute inside it. A fixed height would clip the column and `check integrity`
+ * would (correctly) report the cards below the fold as clipped text.
+ */
+.slot {
+  position: relative;
+  width: var(--card-w);
+  min-height: var(--card-h);
+  border-radius: var(--card-radius);
+  /*
+   * The stock is a `<button>` — it is clicked, so it has to be a real control — and a button
+   * arrives with a background, a border, padding and centred text. Without this reset it drew
+   * as a grey chrome button and its padding pushed the card 60px down into the tableau row.
+   * Resetting on `.slot` rather than on `#stock` keeps the pile boxes identical whatever
+   * element each one happens to be.
+   */
+  appearance: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+/*
+ * The visible outline is card-sized; the pile's HIT AREA is the full fan height.
+ *
+ * Two different jobs that a single box cannot do. An empty pile should look like one card —
+ * a full-column outline is not what Windows draws and reads as a missing card. But the drop
+ * target has to cover the whole fan, or letting go over the bottom of a seven-card column
+ * misses the pile entirely. So `min-height` stays tall for the target and the outline moves
+ * to a pseudo-element that is exactly one card tall.
+ */
+.slot::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: var(--card-h);
+  border-radius: var(--card-radius);
+  box-shadow: inset 0 0 0 2px var(--slot-line);
+  pointer-events: none;
+}
+
+.slot.tableau-slot { min-height: calc(var(--card-h) + 6 * var(--fan-up)); }
+
+/* The empty-foundation suit hint, drawn from the slot's own data so there is no extra node. */
+.foundation-slot::after {
+  content: attr(data-hint);
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 2.4rem;
+  color: rgba(255, 255, 255, 0.22);
+  pointer-events: none;
+}
+
+.foundation-slot:has(.card)::after { content: none; }
+
+/* The drop-target highlight, applied on dragover ONLY when the rules accept the card. A target
+   that lights up for a move it will reject is a lie the player acts on. */
+.slot.drop-ok::before { box-shadow: inset 0 0 0 3px #8ff08f, 0 0 1.1rem rgba(143, 240, 143, 0.55); }
+.slot.drop-no::before { box-shadow: inset 0 0 0 3px rgba(255, 120, 120, 0.85); }
+
+.card {
+  position: absolute;
+  left: 0;
+  /* An explicit default, because `top: auto` on an absolute child resolves to its STATIC
+     position — which put the stock's single card back below the button's padding instead of at
+     the top of the pile. The fanned cards set their own `top` inline. */
+  top: 0;
+  width: var(--card-w);
+  height: var(--card-h);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--card-edge);
+  background: var(--card-face);
+  color: var(--card-ink);
+  /* Not `cursor: grab` on a face-down card — the cursor is the only affordance a drag has, and
+     showing it where nothing can be dragged is what makes a UI feel broken. */
+  cursor: default;
+  user-select: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  /* The GPU-composited pair. Nothing here animates a layout property. */
+  transition: transform var(--settle-ms) ease-out, box-shadow 120ms linear;
+}
+
+.card.face-up[draggable="true"] { cursor: grab; }
+.card.face-up[draggable="true"]:active { cursor: grabbing; }
+
+.card.face-down {
+  background:
+    repeating-linear-gradient(45deg, #1d4f8b 0 6px, #17427a 6px 12px),
+    #17427a;
+  border-color: #0f2f57;
+  color: transparent;
+}
+
+/* The card face. Corner index top-left and bottom-right (rotated), pip in the middle — the
+   layout every real deck uses, so a player reads a fanned column from the corners alone. */
+.card .corner {
+  position: absolute;
+  font-weight: 700;
+  font-size: 0.92rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.card .corner-tl { top: 0.28rem; left: 0.3rem; }
+.card .corner-br { bottom: 0.28rem; right: 0.3rem; transform: rotate(180deg); }
+.card .corner .pip { display: block; font-size: 0.85rem; }
+.card .center-pip {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 2.35rem;
+  line-height: 1;
+}
+
+.card.red { color: var(--card-red); }
+.card.face-down .corner,
+.card.face-down .center-pip { visibility: hidden; }
+
+/* The card being dragged. Kept visible rather than hidden: the browser's drag image is a
+   snapshot, and hiding the source makes the column look like it lost a card mid-gesture. */
+.card.dragging { opacity: 0.55; box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5); }
+
+/* A card the keyboard has picked up. Distinct from :focus-visible, because "focused" and
+   "in hand" are different states and a keyboard player needs to see which is which. */
+.card.lifted {
+  box-shadow: 0 0 0 3px var(--focus), 0 8px 16px rgba(0, 0, 0, 0.55);
+  transform: translateY(-0.4rem);
+}
+
+/* ── deal ────────────────────────────────────────────────────────────────────────────────
+ * Each card flies from the stock corner to its pile. The per-card delay is set inline by
+ * game.js (`--deal-delay`), because 52 staggered delays are data, not style.
+ */
+@keyframes deal-in {
+  from { transform: translate(var(--deal-from-x), var(--deal-from-y)) rotate(-8deg); opacity: 0.2; }
+  to { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+}
+
+.card.dealing {
+  animation: deal-in var(--deal-ms) cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+  animation-delay: var(--deal-delay, 0ms);
+}
+
+/* ── flip ────────────────────────────────────────────────────────────────────────────────
+ * A real Y-rotation through 90°, where the face swaps at the midpoint. `backface-visibility`
+ * would need two stacked faces per card; scaling X to 0 and back reads the same at this size
+ * for a fraction of the DOM.
+ */
+@keyframes flip-over {
+  0% { transform: rotateY(0deg); }
+  50% { transform: rotateY(90deg); }
+  100% { transform: rotateY(0deg); }
+}
+
+.card.flipping { animation: flip-over var(--flip-ms) ease-in-out; }
+
+/* ── settle ──────────────────────────────────────────────────────────────────────────────
+ * A double-clicked card travels instead of teleporting. game.js measures the old and new box
+ * and sets `--settle-x/y`, so this is a FLIP animation: the card is already at its
+ * destination in the DOM and is animated from where it used to be.
+ */
+@keyframes settle-in {
+  from { transform: translate(var(--settle-x), var(--settle-y)); }
+  to { transform: translate(0, 0); }
+}
+
+.card.settling {
+  animation: settle-in var(--settle-ms) ease-out;
+  z-index: 60;
+}
+
+/* ── victory ─────────────────────────────────────────────────────────────────────────────
+ * The bouncing cascade. Windows drew it on a canvas and never cleared it, so the cards smeared
+ * into a trail; this bounces the real card elements, which keeps them in the DOM (and in the
+ * a11y tree) instead of becoming pixels.
+ *
+ * A real BOUNCE, not a fall. The first version translated once to a point below the viewport,
+ * which is a card dropping off the table — recognisable as neither the Windows animation nor
+ * anything physical. This hits the floor three times with a decaying rebound and drifts
+ * sideways at a constant rate, which is what gravity plus an elastic collision looks like.
+ *
+ * The per-keyframe `animation-timing-function` is what makes it read as gravity: a fall
+ * accelerates (ease-in) and a rebound decelerates (ease-out). One easing for the whole
+ * animation cannot do both, and that is the difference between a bounce and a wobble.
+ *
+ * `--bounce-floor` is each card's own distance to the bottom of the viewport, in px, because a
+ * card on a foundation and a card halfway down the table do not hit the floor at the same time.
+ */
+@keyframes bounce-away {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    animation-timing-function: ease-in;
+  }
+  30% {
+    transform: translate(calc(var(--bounce-x) * 0.3), var(--bounce-floor)) rotate(calc(var(--bounce-rot) * 0.3));
+    animation-timing-function: ease-out;
+  }
+  46% {
+    transform: translate(calc(var(--bounce-x) * 0.46), calc(var(--bounce-floor) - 26vh)) rotate(calc(var(--bounce-rot) * 0.46));
+    animation-timing-function: ease-in;
+  }
+  62% {
+    transform: translate(calc(var(--bounce-x) * 0.62), var(--bounce-floor)) rotate(calc(var(--bounce-rot) * 0.62));
+    animation-timing-function: ease-out;
+  }
+  74% {
+    transform: translate(calc(var(--bounce-x) * 0.74), calc(var(--bounce-floor) - 11vh)) rotate(calc(var(--bounce-rot) * 0.74));
+    animation-timing-function: ease-in;
+  }
+  86% {
+    transform: translate(calc(var(--bounce-x) * 0.86), var(--bounce-floor)) rotate(calc(var(--bounce-rot) * 0.86));
+    animation-timing-function: ease-in;
+  }
+  100% {
+    /* Off the bottom, so the table clears rather than filling with settled cards. */
+    transform: translate(var(--bounce-x), calc(var(--bounce-floor) + 40vh)) rotate(var(--bounce-rot));
+  }
+}
+
+.card.bouncing {
+  /* No timing function here: each keyframe sets its own, and a shorthand value would override
+     the first one and flatten the gravity. */
+  animation: bounce-away var(--bounce-ms, 2200ms) forwards;
+  animation-delay: var(--bounce-delay, 0ms);
+  z-index: 80;
+}
+
+.win-banner {
+  position: absolute;
+  inset-inline: 0;
+  top: 38%;
+  margin: 0 auto;
+  width: max-content;
+  padding: 1rem 2rem;
+  border-radius: 0.5rem;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #10240f;
+  background: linear-gradient(#ffe680, #ffc93c);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  z-index: 90;
+}
+
+/* The hint line under the table. Not a tooltip: hover-only help is unreachable by keyboard
+   and `scan handlers` reports a hover-only reveal. */
+.hint {
+  max-width: 62rem;
+  margin: 1rem auto 0;
+  padding: 0 1rem;
+  font-size: 0.9rem;
+  color: rgba(242, 247, 242, 0.78);
+}
+
+.hint kbd {
+  padding: 0.1rem 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 0.2rem;
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/*
+ * Narrow screens: shrink the card rather than reflow the seven columns.
+ *
+ * A Klondike tableau is seven columns by definition — wrapping it to two rows of four would
+ * not be solitaire. So the card scales with the viewport and the row keeps its shape, which is
+ * also why `check breakpoints` finds no overflow here instead of a horizontal scrollbar.
+ */
+@media (max-width: 62rem) {
+  :root { --card-w: 4.4rem; --card-h: 6.2rem; --fan-up: 1.25rem; --gap: 0.5rem; }
+}
+
+@media (max-width: 48rem) {
+  :root { --card-w: 3.3rem; --card-h: 4.6rem; --fan-up: 1rem; --gap: 0.35rem; }
+  .card .center-pip { font-size: 1.5rem; }
+  .toolbar h1 { width: 100%; }
+}
+
+/*
+ * Reduced motion: no travel, no bounce, no stagger.
+ *
+ * The cards still ARRIVE — state changes stay visible, because suppressing the animation must
+ * not suppress the information. What goes is the movement itself: a 52-card deal and a
+ * full-table cascade are the vestibular triggers this query exists for.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
+  .card.dealing,
+  .card.flipping,
+  .card.settling,
+  .card.bouncing {
+    animation: none;
+  }
+  /* Without this the winning cards would simply stop mid-table with the banner over them; a
+     static fade keeps the "you won" readable without moving anything. */
+  .card.bouncing { opacity: 0.25; }
+  .toolbar button:active { transform: none; }
+}
