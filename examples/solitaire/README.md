@@ -77,10 +77,12 @@ warn [inert-control] button "Restart this deal" shows no observable response to 
 (same seed, no moves made) and the announcement was word-for-word the one already in the live
 region, so the button genuinely had no observable effect. It now says which deal it restarted.
 
-> **All three of these are fixed** as of the commits following this file. They are kept here
-> because the page is the reproduction: each one fires again if the fix regresses, and
-> `handler-map.test.ts` / `a11y-contrast.test.ts` / `page-open.test.ts` pin them against this
-> page and against `fixtures/handlers/drag-and-drop.html`.
+## The three false positives — all now fixed
+
+> Each is described below as it was first measured, because **this page is the reproduction**:
+> every one fires again if its fix regresses. `handler-map.test.ts`, `a11y-contrast.test.ts` and
+> `page-open.test.ts` pin them against this page and against
+> `fixtures/handlers/drag-and-drop.html`, which must keep reporting its real defects.
 
 ### False positive 1 — `scan handlers --probe-drag` cannot see event delegation
 
