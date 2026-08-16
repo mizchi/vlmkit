@@ -135,10 +135,10 @@ Breakpoints are auto-discovered from CSS, generating boundary ±1px + random sam
 ### Demo
 
 ```bash
-pkf run vrt-demo               # Basic VRT demo (kitty graphics)
-pkf run vrt-demo-fix           # Fix loop demo
-pkf run vrt-demo-multi         # Multi-scenario
-pkf run vrt-demo-multistep     # Multi-step
+pkf run vlmkit-demo               # Basic VRT demo (kitty graphics)
+pkf run vlmkit-demo-fix           # Fix loop demo
+pkf run vlmkit-demo-multi         # Multi-scenario
+pkf run vlmkit-demo-multistep     # Multi-step
 ```
 
 ## Agent Workflow

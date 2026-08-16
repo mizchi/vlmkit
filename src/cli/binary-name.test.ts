@@ -22,6 +22,33 @@
  *
  * So the allowlist below is not slack in the test; it is the boundary between a
  * naming fix and a breaking change.
+ *
+ * ## What this test could not see, and what now covers it
+ *
+ * It greps the CLI's own **help output**, which is the right place for help text and blind
+ * to everything else. A later sweep found three more categories that had rotted for
+ * releases, none of them reachable from `--help`:
+ *
+ *   `scripts/smoke-all-clis.sh`  0 of 22 — every command used the flat pre-0.6 spelling
+ *   `Test.pkl`                   22 tests spawning `src/cli/vrt.ts`, a file that is gone
+ *   `Spec.pkl`                   20 `Implementation.at` paths under `packages/vrt-*`
+ *
+ * `src/cli/smoke-commands.test.ts` covers the first two by asking the CLI whether each
+ * command in those harnesses routes. The third is covered by
+ * `spec-implementation-paths.test.ts`, which resolves every declared path.
+ *
+ * Two further categories were found and deliberately LEFT, both because they name real
+ * things rather than the tool:
+ *
+ *   `window.__vrtActions`, `data-vrt-action`  the `inspect explore` page contract — user
+ *                                            markup sets these, so renaming breaks pages
+ *   `flaker.vrt.json`, `vrt-bench`/`vrt-migration`  adapter and config names owned by
+ *                                            metric-ci, outside this repo
+ *
+ * And one that is data: `fixtures/google-search/*.a11y.json` records a page titled
+ * "vrt testing - Google Search", and `fixtures/css-challenge/page.html` renders `just
+ * vrt-test` inside a `<code>` block that a11y baselines have captured. Editing either
+ * rewrites recorded measurements.
  */
 import assert from "node:assert/strict";
 import { describe, it } from "vitest";

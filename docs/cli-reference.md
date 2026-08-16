@@ -192,7 +192,7 @@ pkf list
 
 # Run a task (mirrors any old `just <name>` invocation)
 pkf run smoke-all
-pkf run vrt-test
+pkf run vlmkit-test
 
 # Spec gates
 pkf run spec-check    # pkspec check Spec.pkl Test.pkl

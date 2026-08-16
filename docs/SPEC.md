@@ -322,7 +322,7 @@
   - body: _not yet implemented_
 
 - [ ] **LLM judgment on rendered output** (minor) [draft] — verifies: O12
-  > Not implemented as a CLI: `vlm-bench` exercises VLM judgment internally but there is no `vrt judge` user-facing surface.
+  > Not implemented as a CLI: `vlm-bench` exercises VLM judgment internally but there is no `vlmkit judge` user-facing surface.
   - contributes to: GOAL-AGENT-ERGONOMICS
   - body: _not yet implemented_
 
@@ -682,7 +682,7 @@
   - body: _not yet implemented_
 
 - [ ] **VLM benchmarking: cost / latency / CHANGE count per model** (minor) — verifies: AIFIX-003
-  >   `vrt vlm-bench` queries OpenRouter for candidate VLMs and
+  >   `pkf run vlm-bench` queries OpenRouter for candidate VLMs and
   >   runs each against the fix-loop hard case (seed 11). Outputs
   >   a Markdown comparison table used to choose the default model.
   - contributes to: GOAL-AI-FIX-LOOP

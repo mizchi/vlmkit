@@ -1,17 +1,28 @@
-/// vrt smoke tests, Pkl-typed mirror of `scripts/smoke-all-clis.sh`.
+/// vlmkit smoke tests, Pkl-typed mirror of `scripts/smoke-all-clis.sh`.
 ///
-/// Each Test runs one markup-assistance CLI on its canonical fixture
-/// and asserts exit 0. `specRef` links the test back to one or more
-/// Scenario IDs from `Spec.pkl` so `pkspec check` can verify every
-/// approved Scenario has an implementing test. The bash script
-/// remains the single source of truth for fixture wiring; this file
-/// adds the Pkl-typed gate.
+/// Each Test runs one markup-assistance CLI on its canonical fixture.
+/// `specRef` links the test back to one or more Scenario IDs from
+/// `Spec.pkl` so `pkspec check` can verify every approved Scenario has
+/// an implementing test. The bash script remains the single source of
+/// truth for fixture wiring; this file adds the Pkl-typed gate.
+///
+/// NOT "asserts exit 0", which is what this said and is wrong for most
+/// of these fixtures: they are deliberately broken, so the gate that
+/// finds their defects exits 1. See the header of
+/// `scripts/smoke-all-clis.sh` for the pass condition.
+///
+/// Every command here used the flat pre-0.6 spelling and the entry
+/// point `src/cli/vrt.ts`, which does not exist — so all 22 tests
+/// failed at spawn, while `pkspec check` (which verifies a test EXISTS
+/// per Scenario, not that it runs) reported full coverage.
+/// `src/cli/smoke-commands.test.ts` now asserts the entry point and
+/// every command below still route.
 ///
 /// Run:  pkspec exec -f Test.pkl
 /// Gate: pkspec check Spec.pkl Test.pkl
 amends "pkspec/Test.pkl"
 
-local vrt = "node --experimental-strip-types src/cli/vrt.ts"
+local vlmkit = "node --experimental-strip-types src/cli/vlmkit.ts"
 local outDir = "test-results/smoke-pkspec"
 
 tests {
@@ -20,24 +31,24 @@ tests {
     name = "component-from-image"
     description = "Rebuild a card from a blank starter against a target PNG."
     specRef { "FIDELITY-001"; "SMOKE" }
-    cmd = "\(vrt) component-from-image fixtures/wireframe/pricing-card/target-desktop.png fixtures/wireframe/pricing-card/blank.html --output-dir \(outDir)/component-from-image"
-    expectStdoutContains { "vrt component-from-image"; "report:" }
+    cmd = "\(vlmkit) build component fixtures/wireframe/pricing-card/target-desktop.png fixtures/wireframe/pricing-card/blank.html --output-dir \(outDir)/component-from-image"
+    expectStdoutContains { "vlmkit build component"; "report:" }
     timeoutSec = 120
   }
   new {
     name = "component-from-image-typo"
     description = "Same CLI on a fixture with wrong-size/weight typography."
     specRef { "FIDELITY-001"; "SMOKE" }
-    cmd = "\(vrt) component-from-image fixtures/typography/wrong-size-weight/target.png fixtures/typography/wrong-size-weight/buggy.html --output-dir \(outDir)/component-from-image-typo"
-    expectStdoutContains { "vrt component-from-image"; "report:" }
+    cmd = "\(vlmkit) build component fixtures/typography/wrong-size-weight/target.png fixtures/typography/wrong-size-weight/buggy.html --output-dir \(outDir)/component-from-image-typo"
+    expectStdoutContains { "vlmkit build component"; "report:" }
     timeoutSec = 120
   }
   new {
     name = "component-extract"
     description = "Crop a single component from a page screenshot."
     specRef { "A8"; "SMOKE" }
-    cmd = "\(vrt) component-extract fixtures/wireframe/pricing-card/target-desktop.png --crop 0 --output-dir \(outDir)/component-extract"
-    expectStdoutContains { "vrt component-extract"; "report:" }
+    cmd = "\(vlmkit) scan component fixtures/wireframe/pricing-card/target-desktop.png --crop 0 --output-dir \(outDir)/component-extract"
+    expectStdoutContains { "vlmkit scan component"; "report:" }
     timeoutSec = 60
   }
 
@@ -46,24 +57,24 @@ tests {
     name = "a11y-contrast"
     description = "WCAG AA text contrast scan on low-contrast fixture."
     specRef { "F1"; "SMOKE" }
-    cmd = "\(vrt) a11y-contrast fixtures/a11y-contrast/low-contrast/page.html --output-dir \(outDir)/a11y-contrast"
-    expectStdoutContains { "vrt a11y-contrast"; "report:" }
+    cmd = "\(vlmkit) check a11y contrast fixtures/a11y-contrast/low-contrast/page.html --output-dir \(outDir)/a11y-contrast"
+    expectStdoutContains { "vlmkit check a11y contrast"; "report:" }
     timeoutSec = 60
   }
   new {
     name = "a11y-touch"
     description = "Touch-target size scan, WCAG 2.5.5 and 2.5.8."
     specRef { "F2"; "SMOKE" }
-    cmd = "\(vrt) a11y-touch fixtures/a11y-touch/small-targets/page.html --output-dir \(outDir)/a11y-touch"
-    expectStdoutContains { "vrt a11y-touch"; "report:" }
+    cmd = "\(vlmkit) check a11y touch fixtures/a11y-touch/small-targets/page.html --output-dir \(outDir)/a11y-touch"
+    expectStdoutContains { "vlmkit check a11y touch"; "report:" }
     timeoutSec = 60
   }
   new {
     name = "a11y-focus-order"
     description = "Tab order matches visual reading order."
     specRef { "F3"; "SMOKE" }
-    cmd = "\(vrt) a11y-focus-order fixtures/a11y-focus-order/reversed/page.html --output-dir \(outDir)/a11y-focus-order"
-    expectStdoutContains { "vrt a11y-focus-order"; "report:" }
+    cmd = "\(vlmkit) check a11y focus fixtures/a11y-focus-order/reversed/page.html --output-dir \(outDir)/a11y-focus-order"
+    expectStdoutContains { "vlmkit check a11y focus"; "report:" }
     timeoutSec = 60
   }
 
@@ -72,24 +83,24 @@ tests {
     name = "design-tokens"
     description = "Radius / spacing / z-index / shadow-tier conformance."
     specRef { "M1"; "M4-M6"; "SMOKE" }
-    cmd = "\(vrt) design-tokens fixtures/design-tokens/off-scale/page.html --output-dir \(outDir)/design-tokens"
-    expectStdoutContains { "vrt design-tokens"; "report:" }
+    cmd = "\(vlmkit) check tokens fixtures/design-tokens/off-scale/page.html --output-dir \(outDir)/design-tokens"
+    expectStdoutContains { "vlmkit check tokens"; "report:" }
     timeoutSec = 60
   }
   new {
     name = "component-consistency"
     description = "Inline-vs-component drift on a single page."
     specRef { "J2"; "SMOKE" }
-    cmd = "\(vrt) component-consistency fixtures/component-consistency/inline-leak/page.html --selector .card --output-dir \(outDir)/component-consistency"
-    expectStdoutContains { "vrt component-consistency"; "report:" }
+    cmd = "\(vlmkit) check drift component fixtures/component-consistency/inline-leak/page.html --selector .card --output-dir \(outDir)/component-consistency"
+    expectStdoutContains { "vlmkit check drift component"; "report:" }
     timeoutSec = 60
   }
   new {
     name = "multi-page-consistency"
     description = "Same selector across pages should render identically."
     specRef { "J2"; "SMOKE" }
-    cmd = "\(vrt) multi-page-consistency --selector .footer --files fixtures/multi-page/footer-drift/about.html fixtures/multi-page/footer-drift/blog.html fixtures/multi-page/footer-drift/pricing.html --output-dir \(outDir)/multi-page-consistency"
-    expectStdoutContains { "vrt multi-page-consistency"; "report:" }
+    cmd = "\(vlmkit) check drift pages --selector .footer --files fixtures/multi-page/footer-drift/about.html --files fixtures/multi-page/footer-drift/blog.html --files fixtures/multi-page/footer-drift/pricing.html --output-dir \(outDir)/multi-page-consistency"
+    expectStdoutContains { "vlmkit check drift pages"; "report:" }
     timeoutSec = 90
   }
 
@@ -98,40 +109,40 @@ tests {
     name = "theme-parity"
     description = "Dark-mode parity: every component responds to color-scheme."
     specRef { "C1"; "SMOKE" }
-    cmd = "\(vrt) theme-parity fixtures/theme-parity/card-with-bug/buggy.html --output-dir \(outDir)/theme-parity"
-    expectStdoutContains { "vrt theme-parity"; "report:" }
+    cmd = "\(vlmkit) check theme fixtures/theme-parity/card-with-bug/buggy.html --output-dir \(outDir)/theme-parity"
+    expectStdoutContains { "vlmkit check theme"; "report:" }
     timeoutSec = 60
   }
   new {
     name = "media-variants"
     description = "forced-colors / reduced-motion / print / RTL / zoom-200 sweep."
     specRef { "C2-C6"; "SMOKE" }
-    cmd = "\(vrt) media-variants fixtures/media-variants/card/hostile.html --output-dir \(outDir)/media-variants"
-    expectStdoutContains { "vrt media-variants"; "report:" }
+    cmd = "\(vlmkit) stress media fixtures/media-variants/card/hostile.html --output-dir \(outDir)/media-variants"
+    expectStdoutContains { "vlmkit stress media"; "report:" }
     timeoutSec = 120
   }
   new {
     name = "cross-browser"
     description = "Chromium / Firefox / WebKit parity."
     specRef { "H1"; "SMOKE" }
-    cmd = "\(vrt) cross-browser fixtures/wireframe/pricing-card/reference.html --allow-skipped --output-dir \(outDir)/cross-browser"
-    expectStdoutContains { "vrt cross-browser"; "report:" }
+    cmd = "\(vlmkit) diff browsers fixtures/wireframe/pricing-card/reference.html --allow-skipped --output-dir \(outDir)/cross-browser"
+    expectStdoutContains { "vlmkit diff browsers"; "report:" }
     timeoutSec = 120
   }
   new {
     name = "i18n-stress"
     description = "1.4x word inflation should not overflow or wrap."
     specRef { "I1"; "SMOKE" }
-    cmd = "\(vrt) i18n-stress fixtures/i18n-stress/button-overflow/page.html --output-dir \(outDir)/i18n-stress"
-    expectStdoutContains { "vrt i18n-stress"; "report:" }
+    cmd = "\(vlmkit) stress i18n fixtures/i18n-stress/button-overflow/page.html --output-dir \(outDir)/i18n-stress"
+    expectStdoutContains { "vlmkit stress i18n"; "report:" }
     timeoutSec = 60
   }
   new {
     name = "perf"
     description = "CLS detection via in-page PerformanceObserver."
     specRef { "K5"; "SMOKE" }
-    cmd = "\(vrt) perf fixtures/perf/cls-bug/page.html --output-dir \(outDir)/perf"
-    expectStdoutContains { "vrt perf"; "report:" }
+    cmd = "\(vlmkit) check perf fixtures/perf/cls-bug/page.html --output-dir \(outDir)/perf"
+    expectStdoutContains { "vlmkit check perf"; "report:" }
     timeoutSec = 60
   }
 
@@ -140,16 +151,16 @@ tests {
     name = "interact"
     description = "Drive a click/type sequence and diff each transition."
     specRef { "O2"; "SMOKE" }
-    cmd = "\(vrt) interact fixtures/interact/dropdown-form/page.html --sequence fixtures/interact/dropdown-form/sequence.json --output-dir \(outDir)/interact"
-    expectStdoutContains { "vrt interact"; "report:" }
+    cmd = "\(vlmkit) inspect interact fixtures/interact/dropdown-form/page.html --sequence fixtures/interact/dropdown-form/sequence.json --output-dir \(outDir)/interact"
+    expectStdoutContains { "vlmkit inspect interact"; "report:" }
     timeoutSec = 90
   }
   new {
     name = "form-validation-diff"
     description = "Drive a signup form through invalid → valid states and diff each transition."
     specRef { "E5"; "SMOKE" }
-    cmd = "\(vrt) interact fixtures/interact/form-validation/page.html --sequence fixtures/interact/form-validation/sequence.json --output-dir \(outDir)/form-validation-diff"
-    expectStdoutContains { "vrt interact"; "report:" }
+    cmd = "\(vlmkit) inspect interact fixtures/interact/form-validation/page.html --sequence fixtures/interact/form-validation/sequence.json --output-dir \(outDir)/form-validation-diff"
+    expectStdoutContains { "vlmkit inspect interact"; "report:" }
     timeoutSec = 90
   }
 
@@ -158,8 +169,8 @@ tests {
     name = "explore"
     description = "Page advertises actions via __vrtActions / data-vrt-action."
     specRef { "O1"; "SMOKE" }
-    cmd = "\(vrt) explore fixtures/explore/declarative/page.html --output-dir \(outDir)/explore"
-    expectStdoutContains { "vrt explore"; "report:" }
+    cmd = "\(vlmkit) inspect explore fixtures/explore/declarative/page.html --output-dir \(outDir)/explore"
+    expectStdoutContains { "vlmkit inspect explore"; "report:" }
     timeoutSec = 60
   }
   new {
@@ -171,7 +182,7 @@ tests {
     // are byte-identical. Without --strict-timing this would
     // report a misleading Δ 0.00% pass; with the flag it exits
     // non-zero and the report row reads "silent — 0 DOM mutations".
-    cmd = "\(vrt) explore fixtures/explore/byte-identical-bug/silent-listener.html --output-dir \(outDir)/explore-strict-timing --strict-timing || true"
+    cmd = "\(vlmkit) inspect explore fixtures/explore/byte-identical-bug/silent-listener.html --output-dir \(outDir)/explore-strict-timing --strict-timing || true"
     expectStdoutContains { "silent handler"; "0 DOM mutations" }
     timeoutSec = 60
   }
@@ -183,20 +194,31 @@ tests {
     // `.btn-primary` (Save) as a "did you mean" candidate (~13%
     // confidence) so the report row surfaces the ambiguity even
     // though the step technically succeeded.
-    cmd = "\(vrt) interact fixtures/interact/heal-all-demo/page.html --sequence fixtures/interact/heal-all-demo/sequence.json --output-dir \(outDir)/interact-heal-all --heal-all"
-    // 13% confidence falls in the "weak" tier (10-30%); the 2026-05-15
-    // dogfood reset the "did you mean" label to "weak match" at this
-    // confidence band, so the assertion targets the candidate selector
-    // plus the tier-summary string instead of the old wording.
-    expectStdoutContains { "weak match"; "button.btn-primary"; "weak suggestion" }
+    cmd = "\(vlmkit) inspect interact fixtures/interact/heal-all-demo/page.html --sequence fixtures/interact/heal-all-demo/sequence.json --output-dir \(outDir)/interact-heal-all --heal-all"
+    // The assertion is on the healer being WIRED, not on the tier it
+    // returns. The fixture's candidate sits at ~13% confidence, which
+    // was "weak" when this was written (band 10-30%) and is "none"
+    // since the 2026-07-30 recalibration raised WEAK_HEAL_THRESHOLD to
+    // 0.15 — a deliberate precision change backed by
+    // docs/reports/data/2026-07-30-selector-heal-calibration.json, not
+    // a regression. Pinning "weak match" here would break on the next
+    // recalibration and pinning "0 weak" would encode a constant this
+    // test has no opinion about, so it asserts the probe ran over the
+    // step instead.
+    //
+    // Caveat worth keeping visible: with the candidate below the floor,
+    // this fixture no longer DEMONSTRATES a "did you mean" suggestion.
+    // Restoring that needs a fixture whose sibling scores above 0.15,
+    // which is a judgement about the corpus rather than a rename.
+    expectStdoutContains { "heal-all:"; "selector step(s)"; ".btn-secondary" }
     timeoutSec = 60
   }
   new {
     name = "skill-pricing-card"
     description = "Skill playbook fans out N checks over one target."
     specRef { "O3-O5"; "SMOKE" }
-    cmd = "\(vrt) skill run pricing-card --against fixtures/wireframe/pricing-card/reference.html --output-dir \(outDir)"
-    expectStdoutContains { "vrt skill run pricing-card"; "report:" }
+    cmd = "\(vlmkit) skill run pricing-card --against fixtures/wireframe/pricing-card/reference.html --output-dir \(outDir)"
+    expectStdoutContains { "vlmkit skill run pricing-card"; "report:" }
     timeoutSec = 180
   }
 
@@ -205,7 +227,7 @@ tests {
     name = "compare"
     description = "Migration compare (existing tool), shadcn fixture."
     specRef { "MIG-001"; "CORE-002"; "CORE-003"; "SMOKE" }
-    cmd = "\(vrt) compare --dir fixtures/migration/shadcn-to-luna --baseline before.html --variants after-blank.html --output-dir \(outDir)/compare --no-paint-tree --no-discover"
+    cmd = "\(vlmkit) migration compare --dir fixtures/migration/shadcn-to-luna --baseline before.html --variants after-blank.html --output-dir \(outDir)/compare --no-paint-tree --no-discover"
     expectStdoutContains { "Migration VRT Compare"; "Report:" }
     timeoutSec = 60
   }
@@ -213,7 +235,7 @@ tests {
     name = "png-diff"
     description = "Existing PNG diff utility, identity check (0% diff)."
     specRef { "CORE-001"; "SMOKE" }
-    cmd = "\(vrt) png-diff fixtures/wireframe/pricing-card/target-desktop.png fixtures/wireframe/pricing-card/target-desktop.png --output-dir \(outDir)/png-diff"
+    cmd = "\(vlmkit) diff png fixtures/wireframe/pricing-card/target-desktop.png fixtures/wireframe/pricing-card/target-desktop.png --output-dir \(outDir)/png-diff"
     expectStdoutContains { "PNG Diff"; "diff:" }
     timeoutSec = 30
   }

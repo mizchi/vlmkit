@@ -1,4 +1,4 @@
-/// vrt project specifications.
+/// vlmkit project specifications.
 ///
 /// Two layers of goals + scenarios:
 ///
@@ -88,7 +88,7 @@ goals {
     rationale = #"""
       Findings include hex / px / suggested CSS the agent can paste.
       Failures include healed-selector suggestions. Declarative
-      discovery (vrt explore) lets the page advertise its own
+      discovery (vlmkit inspect explore) lets the page advertise its own
       testable surface (WebMCP-shaped). Skill playbooks let one
       command run a target's full check suite.
     """#
@@ -116,9 +116,9 @@ goals {
     priority = 85
     reviewStatus = "approved"
     rationale = #"""
-      `vrt snapshot` captures a URL across viewports, diffs against
+      `vlmkit snapshot` captures a URL across viewports, diffs against
       the committed baseline, and surfaces a flipbook + fix-prompt
-      so an agent can act on the report. `vrt workflow` is the
+      so an agent can act on the report. `vlmkit workflow` is the
       stateful sibling for component-graph driven verification.
     """#
   }
@@ -129,7 +129,7 @@ goals {
     priority = 80
     reviewStatus = "approved"
     rationale = #"""
-      `vrt compare` was the original entry point — given two HTMLs
+      `vlmkit migration compare` was the original entry point — given two HTMLs
       or URLs (Tailwind → vanilla, shadcn → Luna, normalize.css →
       modern-normalize.css), it reports per-viewport pixel diff +
       paint-tree diff and an agent-friendly Markdown summary.
@@ -143,7 +143,7 @@ goals {
     reviewStatus = "approved"
     rationale = #"""
       The CSS challenge bench deletes a single property or selector
-      block at random and measures whether vrt detects the change.
+      block at random and measures whether vlmkit detects the change.
       96.7% detection rate at last measurement (see
       docs/knowledge.md). The bench drives backend evaluation
       (pixelmatch / Crater BiDi / Prescanner) and feeds the
@@ -171,10 +171,10 @@ goals {
     priority = 50
     reviewStatus = "approved"
     rationale = #"""
-      `vrt api serve` exposes /compare, /compare-renderers, /reason,
+      `vlmkit api serve` exposes /compare, /compare-renderers, /reason,
       /smoke-test, /status. The TypeScript `VrtClient` covers the
       same surface for in-process callers. Lets a browser extension
-      or editor plugin drive vrt without spawning Node per call.
+      or editor plugin drive vlmkit without spawning Node per call.
     """#
   }
 }
@@ -192,9 +192,9 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     implementations {
-      new Implementation { kind = "code"; at = "packages/vrt-markup/src/component/component-from-image.ts" }
+      new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/component/component-from-image.ts" }
     }
-    description = "`vrt component-from-image` accepts a PNG target and renders the agent's HTML for pixel-diff iteration. Same engine drives A1-A4."
+    description = "`vlmkit build component` accepts a PNG target and renders the agent's HTML for pixel-diff iteration. Same engine drives A1-A4."
   }
   new {
     id = "A2"
@@ -203,7 +203,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     implementations {
-      new Implementation { kind = "code"; at = "packages/vrt-markup/src/component/component-from-image.ts" }
+      new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/component/component-from-image.ts" }
     }
     description = "Same engine as A1; `--device-scale-factor 2` handles retina Figma exports."
   }
@@ -222,7 +222,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     implementations {
-      new Implementation { kind = "code"; at = "packages/vrt-markup/src/component/component-from-image.ts" }
+      new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/component/component-from-image.ts" }
     }
     description = "Same engine as A1; treats any PNG as a reference target regardless of provenance."
   }
@@ -240,7 +240,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "approved"
     deprecated = true
-    deprecatedReason = "Out of scope per v2 matrix: no reference image means no vrt signal applies. The scenario stays here only so the matrix-row link is mechanical; no successor."
+    deprecatedReason = "Out of scope per v2 matrix: no reference image means no vlmkit signal applies. The scenario stays here only so the matrix-row link is mechanical; no successor."
     contributes { "GOAL-MARKUP-FIDELITY" }
     description = "Marked out-of-scope in v2 matrix; preserved here for one-to-one matrix mapping."
   }
@@ -259,10 +259,10 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     description = #"""
-      Given a full-page PNG, `vrt component-extract` finds the major
+      Given a full-page PNG, `vlmkit scan component` finds the major
       non-background components, classifies each (text / filled-rect /
       icon / image), and crops the chosen rank to a standalone PNG
-      suitable for use as a target in `vrt component-from-image`.
+      suitable for use as a target in `vlmkit build component`.
     """#
   }
   new {
@@ -273,7 +273,7 @@ scenarios {
     contributes { "GOAL-MARKUP-FIDELITY" }
     dependsOn { "CORE-001" }
     description = #"""
-      `vrt component-from-image` against the pricing-card target
+      `vlmkit build component` against the pricing-card target
       reports bbox / heatmap / palette / typography signals; iteration
       converges the diff under 3% in <5 rounds on a representative
       fixture.
@@ -293,7 +293,7 @@ scenarios {
   }
 
   // ── Migration scenarios B1-B12 ───────────────────────────────
-  // Every B-row is the same engine (`vrt compare` migration mode +
+  // Every B-row is the same engine (`vlmkit migration compare` migration mode +
   // DOM-position-diff + class-rename map). One Scenario per row keeps
   // the matrix bookkeeping mechanical without inflating the spec.
   new {
@@ -305,7 +305,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
     }
-    description = "`vrt compare` migration mode handles utility-first → vanilla CSS by ignoring class-name churn."
+    description = "`vlmkit migration compare` migration mode handles utility-first → vanilla CSS by ignoring class-name churn."
   }
   new {
     id = "B2"
@@ -316,7 +316,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
     }
-    description = "Same `vrt compare` engine; class-rename map maps auto-generated to semantic class names."
+    description = "Same `vlmkit migration compare` engine; class-rename map maps auto-generated to semantic class names."
   }
   new {
     id = "B3"
@@ -349,7 +349,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
     }
-    description = "Same `vrt compare` engine."
+    description = "Same `vlmkit migration compare` engine."
   }
   new {
     id = "B6"
@@ -368,7 +368,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
     }
-    description = "`vrt compare` plus `component-consistency` catches missed instances."
+    description = "`vlmkit migration compare` plus `component-consistency` catches missed instances."
   }
   new {
     id = "B8"
@@ -379,7 +379,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
     }
-    description = "Same `vrt compare` engine with class-rename map."
+    description = "Same `vlmkit migration compare` engine with class-rename map."
   }
   new {
     id = "B9"
@@ -430,7 +430,7 @@ scenarios {
     severity = "critical"
     reviewStatus = "approved"
     contributes { "GOAL-A11Y-COMPLIANCE" }
-    description = "`vrt a11y-contrast` reports every text/background pair under the AA threshold, with the hex pair the agent can paste into a fix."
+    description = "`vlmkit check a11y contrast` reports every text/background pair under the AA threshold, with the hex pair the agent can paste into a fix."
   }
   new {
     id = "F2"
@@ -438,7 +438,7 @@ scenarios {
     severity = "critical"
     reviewStatus = "approved"
     contributes { "GOAL-A11Y-COMPLIANCE" }
-    description = "`vrt a11y-touch` flags interactive elements below the 24px AA / 44px AAA minimum hit area."
+    description = "`vlmkit check a11y touch` flags interactive elements below the 24px AA (default) / 44px AAA minimum hit area, applying each criterion's Inline and (at AA) Spacing exceptions."
   }
   new {
     id = "F3"
@@ -446,7 +446,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-A11Y-COMPLIANCE" }
-    description = "`vrt a11y-focus-order` walks Tab traversal and compares against the bbox-sorted visual order."
+    description = "`vlmkit check a11y focus` walks Tab traversal and compares against the bbox-sorted visual order."
   }
   new {
     id = "F4"
@@ -473,7 +473,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-A11Y-COMPLIANCE" }
     implementations {
-      new Implementation { kind = "code"; at = "packages/vrt-markup/src/inspect/interact.ts" }
+      new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/inspect/interact.ts" }
     }
     description = "`interact press` action drives keyboard sequences; `a11y-focus-order` verifies the resulting traversal."
   }
@@ -492,7 +492,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-A11Y-COMPLIANCE" }
     implementations {
-      new Implementation { kind = "code"; at = "packages/vrt-markup/src/stress/media-variants.ts" }
+      new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/stress/media-variants.ts" }
     }
     description = "`media-variants --variants zoom-200` flags scrollWidth regressions at 2× zoom."
   }
@@ -503,7 +503,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-A11Y-COMPLIANCE" }
     implementations {
-      new Implementation { kind = "code"; at = "packages/vrt-markup/src/stress/media-variants.ts" }
+      new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/stress/media-variants.ts" }
     }
     description = "`media-variants --variants reduced-motion` does the static-stylesheet sweep."
   }
@@ -525,7 +525,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-DESIGN-SYSTEM" }
-    description = "`vrt design-tokens` flags rendered colors that fall outside the declared palette — catches off-scale hex values before they leak into the token catalog."
+    description = "`vlmkit check tokens` flags rendered colors that fall outside the declared palette — catches off-scale hex values before they leak into the token catalog."
   }
   new {
     id = "M2"
@@ -534,9 +534,9 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-DESIGN-SYSTEM" }
     implementations {
-      new Implementation { kind = "code"; at = "packages/vrt-markup/src/style/design-tokens.ts" }
+      new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/style/design-tokens.ts" }
     }
-    description = "`vrt design-tokens --spacing-scale` flags margin and padding values that fall outside the declared scale, e.g. a stray 5px on a 4px grid."
+    description = "`vlmkit check tokens --spacing-scale` flags margin and padding values that fall outside the declared scale, e.g. a stray 5px on a 4px grid."
   }
   new {
     id = "M3"
@@ -623,7 +623,7 @@ scenarios {
     severity = "critical"
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
-    description = "`vrt theme-parity` flips `prefers-color-scheme`, diffs every component, and surfaces ones that didn't update (forgot a `--var` or hard-coded a hex)."
+    description = "`vlmkit check theme` flips `prefers-color-scheme`, diffs every component, and surfaces ones that didn't update (forgot a `--var` or hard-coded a hex)."
   }
   new {
     id = "C2-C6"
@@ -631,7 +631,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
-    description = "`vrt media-variants` sweeps the five hostile-user-preference media queries in one command and reports per-variant diffs."
+    description = "`vlmkit stress media` sweeps the five hostile-user-preference media queries in one command and reports per-variant diffs."
   }
   new {
     id = "C5"
@@ -655,7 +655,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
-    description = "`vrt cross-browser` renders the same HTML in all three engines and reports per-engine pixel diff against Chromium. `--allow-skipped` keeps CI green when WebKit isn't installed."
+    description = "`vlmkit diff browsers` renders the same HTML in all three engines and reports per-engine pixel diff against Chromium. `--allow-skipped` keeps CI green when WebKit isn't installed."
   }
   new {
     id = "H2"
@@ -690,7 +690,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "src/util/perf.ts" }
     }
-    description = "`vrt perf` reads CLS from an in-page PerformanceObserver."
+    description = "`vlmkit check perf` reads CLS from an in-page PerformanceObserver."
   }
   new {
     id = "G2"
@@ -701,7 +701,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "src/util/perf.ts" }
     }
-    description = "`vrt perf` reports both core paint timings from the same observer wiring as G1."
+    description = "`vlmkit check perf` reports both core paint timings from the same observer wiring as G1."
   }
   new {
     id = "G3"
@@ -709,7 +709,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "approved"
     deprecated = true
-    deprecatedReason = "Out of scope per v2 matrix: bundle analyzers and Lighthouse cover this lane; vrt has no asset-pipeline integration."
+    deprecatedReason = "Out of scope per v2 matrix: bundle analyzers and Lighthouse cover this lane; vlmkit has no asset-pipeline integration."
     contributes { "GOAL-VARIANT-RESILIENCE" }
     description = "Preserved for matrix-row parity."
   }
@@ -735,7 +735,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
-    description = "`vrt i18n-stress` substitutes button / link text with 1.4× longer strings and flags overflow or wrap-to-second-line."
+    description = "`vlmkit stress i18n` substitutes button / link text with 1.4× longer strings and flags overflow or wrap-to-second-line."
   }
   new {
     id = "I2"
@@ -788,9 +788,9 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-DESIGN-SYSTEM" }
     implementations {
-      new Implementation { kind = "code"; at = "packages/vrt-markup/src/stress/multi-page-consistency.ts" }
+      new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/stress/multi-page-consistency.ts" }
     }
-    description = "`vrt multi-page-consistency` diffs the same component selector across N pages and surfaces the outlier."
+    description = "`vlmkit check drift pages` diffs the same component selector across N pages and surfaces the outlier."
   }
   new {
     id = "J2"
@@ -798,7 +798,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-DESIGN-SYSTEM" }
-    description = "`vrt component-consistency` screenshots every selector match on the page and diffs each against the reference — catches the still-inline call site after a botched extract-to-component refactor."
+    description = "`vlmkit check drift component` screenshots every selector match on the page and diffs each against the reference — catches the still-inline call site after a botched extract-to-component refactor."
   }
   new {
     id = "J3"
@@ -814,7 +814,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "approved"
     deprecated = true
-    deprecatedReason = "Out of scope per v2 matrix: Chromatic and Loki cover this lane with Storybook-native integration vrt doesn't have."
+    deprecatedReason = "Out of scope per v2 matrix: Chromatic and Loki cover this lane with Storybook-native integration vlmkit doesn't have."
     contributes { "GOAL-DESIGN-SYSTEM" }
     description = "Preserved for matrix-row parity."
   }
@@ -833,9 +833,9 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     implementations {
-      new Implementation { kind = "code"; at = "packages/vrt-markup/src/component/component-extract.ts" }
+      new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/component/component-extract.ts" }
     }
-    description = "`vrt component-extract` crops the bug region from the user-supplied screenshot; `vrt component-from-image` drives the rebuild loop."
+    description = "`vlmkit scan component` crops the bug region from the user-supplied screenshot; `vlmkit build component` drives the rebuild loop."
   }
   new {
     id = "K2"
@@ -855,9 +855,9 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
     implementations {
-      new Implementation { kind = "code"; at = "packages/vrt-markup/src/stress/i18n-stress.ts" }
+      new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/stress/i18n-stress.ts" }
     }
-    description = "`vrt i18n-stress` flags overflow / wrap regressions; `compare` plus heatmap catches generic clipping."
+    description = "`vlmkit stress i18n` flags overflow / wrap regressions; `compare` plus heatmap catches generic clipping."
   }
   new {
     id = "K4"
@@ -873,7 +873,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
-    description = "`vrt perf` wires up a PerformanceObserver inside the page and reports CLS / LCP / FCP without depending on Lighthouse."
+    description = "`vlmkit check perf` wires up a PerformanceObserver inside the page and reports CLS / LCP / FCP without depending on Lighthouse."
   }
   new {
     id = "K6"
@@ -902,7 +902,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "src/cli/workflow.ts" }
     }
-    description = "`vrt compare` plus `vrt workflow approve` slot into a pre-commit hook for baseline-driven visual gating."
+    description = "`vlmkit migration compare` plus `vlmkit workflow approve` slot into a pre-commit hook for baseline-driven visual gating."
   }
   new {
     id = "L2"
@@ -910,7 +910,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-SNAPSHOT-WORKFLOW" }
-    description = "Partial: `vrt compare-runs` diffs two prior runs; no first-class PR-comment integration."
+    description = "Partial: `vlmkit diff runs` diffs two prior runs; no first-class PR-comment integration."
   }
   new {
     id = "L3"
@@ -918,7 +918,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "approved"
     deprecated = true
-    deprecatedReason = "Out of scope per v2 matrix: commercial VRT vendors own this lane; vrt is build-time / dev-loop."
+    deprecatedReason = "Out of scope per v2 matrix: commercial VRT vendors own this lane; vlmkit is build-time / dev-loop."
     contributes { "GOAL-SNAPSHOT-WORKFLOW" }
     description = "Preserved for matrix-row parity."
   }
@@ -941,7 +941,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "src/util/skill.ts" }
     }
-    description = "`vrt skill run <name> --against <html|url>` aggregates all configured checks for the target into one report."
+    description = "`vlmkit skill run <name> --against <html|url>` aggregates all configured checks for the target into one report."
   }
 
   // ── Responsive / device ──────────────────────────────────────
@@ -954,7 +954,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
     }
-    description = "`vrt compare` accepts per-viewport configs; `component-geometry` reports bbox shifts across breakpoints."
+    description = "`vlmkit migration compare` accepts per-viewport configs; `component-geometry` reports bbox shifts across breakpoints."
   }
   new {
     id = "D2"
@@ -981,9 +981,9 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-VARIANT-RESILIENCE" }
     implementations {
-      new Implementation { kind = "code"; at = "packages/vrt-markup/src/component/component-from-image.ts" }
+      new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/component/component-from-image.ts" }
     }
-    description = "`vrt component-from-image --device-scale-factor 2` renders at 2× for retina parity."
+    description = "`vlmkit build component --device-scale-factor 2` renders at 2× for retina parity."
   }
   new {
     id = "D5"
@@ -1002,7 +1002,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     implementations {
-      new Implementation { kind = "code"; at = "packages/vrt-markup/src/component/component-from-image.ts" }
+      new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/component/component-from-image.ts" }
     }
     description = "`component-from-image --states hover` plus `interact` cover hover-state diffs."
   }
@@ -1013,7 +1013,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-A11Y-COMPLIANCE" }
     implementations {
-      new Implementation { kind = "code"; at = "packages/vrt-markup/src/component/component-from-image.ts" }
+      new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/component/component-from-image.ts" }
     }
     description = "`component-from-image --states focus-visible` plus `a11y-focus-order` verify focus visibility."
   }
@@ -1040,7 +1040,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     description = #"""
-      `vrt interact` drives a form sequence through deliberate
+      `vlmkit inspect interact` drives a form sequence through deliberate
       invalid → valid transitions (bad email, short password, then
       corrections) and pixel-diffs each transition so reviewers can
       see the validation-state visuals (red borders, error messages,
@@ -1062,7 +1062,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     implementations {
-      new Implementation { kind = "code"; at = "packages/vrt-markup/src/inspect/interact.ts" }
+      new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/inspect/interact.ts" }
     }
     description = "Trigger the toggle via `interact` or `explore`; both engines diff the open vs closed state."
   }
@@ -1073,7 +1073,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     implementations {
-      new Implementation { kind = "code"; at = "packages/vrt-markup/src/inspect/interact.ts" }
+      new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/inspect/interact.ts" }
     }
     description = "`interact` drives the open click + backdrop + close sequence."
   }
@@ -1094,7 +1094,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     implementations {
-      new Implementation { kind = "code"; at = "packages/vrt-markup/src/inspect/interact.ts" }
+      new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/inspect/interact.ts" }
     }
     description = "`interact` drives the toggle and snapshots both states."
   }
@@ -1123,7 +1123,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MARKUP-FIDELITY" }
     implementations {
-      new Implementation { kind = "code"; at = "packages/vrt-markup/src/inspect/interact.ts" }
+      new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/inspect/interact.ts" }
     }
     description = "`interact` drives the tab-click sequence and pixel-diffs each panel state."
   }
@@ -1136,14 +1136,14 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-AGENT-ERGONOMICS" }
     description = #"""
-      `vrt explore` auto-discovers actions the page advertises and
+      `vlmkit inspect explore` auto-discovers actions the page advertises and
       diffs each transition. Shaped like the WebMCP proposal but
       doesn't depend on the unfinished spec.
     """#
   }
   new {
     id = "O2"
-    name = "Selector miss in vrt interact triggers healer correction"
+    name = "Selector miss in vlmkit inspect interact triggers healer correction"
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-AGENT-ERGONOMICS" }
@@ -1155,7 +1155,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-AGENT-ERGONOMICS" }
-    description = "`vrt skill run <name> --against <html|url>` reads `.vrt-skills/<name>.json` and runs every check in the playbook against the target, aggregating into one report."
+    description = "`vlmkit skill run <name> --against <html|url>` reads `.vrt-skills/<name>.json` and runs every check in the playbook against the target, aggregating into one report."
   }
   new {
     id = "O6"
@@ -1211,7 +1211,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-AGENT-ERGONOMICS" }
-    description = "Not implemented as a CLI: `vlm-bench` exercises VLM judgment internally but there is no `vrt judge` user-facing surface."
+    description = "Not implemented as a CLI: `vlm-bench` exercises VLM judgment internally but there is no `vlmkit judge` user-facing surface."
   }
   new {
     id = "SMOKE"
@@ -1250,7 +1250,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-CORE-DIFF" }
     description = #"""
-      `vrt png-diff <baseline> <current>` uses pixelmatch v7 plus a
+      `vlmkit diff png <baseline> <current>` uses pixelmatch v7 plus a
       heatmap renderer to report per-region intensity. Smoke test
       `png-diff` in Test.pkl exercises the identity (0%) path.
     """#
@@ -1267,7 +1267,7 @@ scenarios {
     description = #"""
       `getComputedStyle` capture for both rest and pseudo-states
       (`:hover`, `:focus`) plus per-property delta surfacing.
-      Embedded inside `vrt compare` rather than exposed as its own
+      Embedded inside `vlmkit migration compare` rather than exposed as its own
       CLI; the report.md groups deltas by selector + property.
     """#
   }
@@ -1293,10 +1293,10 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-CORE-DIFF" }
     implementations {
-      new Implementation { kind = "code"; at = "packages/vrt-core/src/element-compare.ts" }
+      new Implementation { kind = "code"; at = "packages/vlmkit-core/src/element-compare.ts" }
     }
     description = #"""
-      `vrt elements` diffs per-element bounding boxes after isolating
+      `vlmkit diff elements` diffs per-element bounding boxes after isolating
       cascading layout shift; useful when a single element moves and
       pixel diff would otherwise blame everything downstream.
     """#
@@ -1328,7 +1328,7 @@ scenarios {
       new Implementation { kind = "code"; at = "src/cli/commands/snapshot.ts" }
     }
     description = #"""
-      `vrt snapshot <url1> [url2]` captures every URL across the
+      `vlmkit snapshot <url1> [url2]` captures every URL across the
       configured viewport set on first run; subsequent runs diff
       against the baseline. Masks via `--mask <selector,...>`
       exclude animated regions.
@@ -1345,7 +1345,7 @@ scenarios {
       new Implementation { kind = "code"; at = "src/cli/commands/snapshot.ts" }
     }
     description = #"""
-      `vrt snapshot approve` renames every `*-current.png` to
+      `vlmkit snapshot approve` renames every `*-current.png` to
       `*-baseline.png`. Used after an intentional UI change is
       reviewed.
     """#
@@ -1357,7 +1357,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-SNAPSHOT-WORKFLOW"; "GOAL-AGENT-ERGONOMICS" }
     implementations {
-      new Implementation { kind = "code"; at = "packages/vrt-markup/src/heal/fix-prompt.ts" }
+      new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/heal/fix-prompt.ts" }
     }
     description = #"""
       Reads `snapshot-report.json` and renders a worst-first task
@@ -1375,7 +1375,7 @@ scenarios {
       new Implementation { kind = "code"; at = "src/vrt/snapshot/stability.ts" }
     }
     description = #"""
-      `vrt snapshot stability` re-runs the same snapshot N times
+      `vlmkit snapshot stability` re-runs the same snapshot N times
       against a single URL and reports the per-frame diff. Drives
       the mask-coverage tuning loop for sites with carousels or
       counters.
@@ -1388,7 +1388,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-SNAPSHOT-WORKFLOW" }
     implementations {
-      new Implementation { kind = "code"; at = "src/cli/router.ts:WORKFLOW_ALIAS_COMMANDS" }
+      new Implementation { kind = "code"; at = "src/cli/workflow.ts" }
     }
     description = #"""
       Stateful component-graph driven workflow: init writes
@@ -1406,7 +1406,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
     description = #"""
-      `vrt compare <before> <after>` (or `--dir + --baseline +
+      `vlmkit migration compare <before> <after>` (or `--dir + --baseline +
       --variants`) sweeps every viewport, emits report.md, .json
       and per-viewport heatmaps. Smoke-tested via the
       `compare` entry in Test.pkl.
@@ -1422,7 +1422,7 @@ scenarios {
       new Implementation { kind = "code"; at = "src/cli/commands/diff-for-agent-cli.ts" }
     }
     description = #"""
-      `vrt diff-for-agent <migration-report.json>` collapses a
+      `vlmkit diff agent <migration-report.json>` collapses a
       compare report into a worst-first table with selector +
       property aggregation. Default consumer is a subagent fix
       pass.
@@ -1454,7 +1454,7 @@ scenarios {
       new Implementation { kind = "code"; at = "src/cli/commands/compare-runs-cli.ts" }
     }
     description = #"""
-      `vrt compare-runs` diffs two prior vrt runs against each other
+      `vlmkit diff runs` diffs two prior VRT runs against each other
       (e.g. iter 0 vs iter 1 of a fix loop) so progress per round is
       visible at a glance.
     """#
@@ -1471,7 +1471,7 @@ scenarios {
       new Implementation { kind = "code"; at = "src/experiments/css-challenge/css-challenge-bench.ts" }
     }
     description = #"""
-      `vrt bench` (alias `pkf run css-bench`) randomly deletes a
+      `vlmkit bench` (alias `pkf run css-bench`) randomly deletes a
       CSS property or selector block, runs the chosen detection
       backend, and accumulates a per-trial pass/fail record into
       `data/*.jsonl`.
@@ -1488,7 +1488,7 @@ scenarios {
       new Implementation { kind = "code"; at = "src/experiments/detection/detection-report.ts" }
     }
     description = #"""
-      `vrt report` reads the jsonl history and emits per-fixture +
+      `vlmkit report` reads the jsonl history and emits per-fixture +
       per-backend detection-rate tables. Last measured: 96.7% on
       the canonical fixture set (docs/knowledge.md).
     """#
@@ -1517,7 +1517,7 @@ scenarios {
     reviewStatus = "approved"
     contributes { "GOAL-AI-FIX-LOOP" }
     implementations {
-      new Implementation { kind = "code"; at = "packages/vrt-ai/src/reasoning-pipeline.ts" }
+      new Implementation { kind = "code"; at = "packages/vlmkit-ai/src/reasoning-pipeline.ts" }
     }
     description = #"""
       Stage 1 of the 2-stage pipeline: a vision-language model is
@@ -1552,7 +1552,7 @@ scenarios {
       new Implementation { kind = "code"; at = "src/experiments/benchmark/vlm-bench.ts" }
     }
     description = #"""
-      `vrt vlm-bench` queries OpenRouter for candidate VLMs and
+      `pkf run vlm-bench` queries OpenRouter for candidate VLMs and
       runs each against the fix-loop hard case (seed 11). Outputs
       a Markdown comparison table used to choose the default model.
     """#
@@ -1569,10 +1569,10 @@ scenarios {
       new Implementation { kind = "code"; at = "src/api/api-server.ts" }
     }
     description = #"""
-      `vrt api serve [--port N]` starts a Hono server with
+      `vlmkit api serve [--port N]` starts a Hono server with
       /api/compare, /api/compare-renderers, /api/reason,
       /api/smoke-test, /api/status. Lets a browser extension or
-      editor plugin drive vrt without spawning a Node child.
+      editor plugin drive vlmkit without spawning a Node child.
     """#
   }
   new {
@@ -1640,7 +1640,7 @@ milestones {
     id = "MS-API"
     name = "HTTP / non-CLI surface"
     description = #"""
-      Hono-backed `vrt api serve` + typed `VrtClient`. Lower
+      Hono-backed `vlmkit api serve` + typed `VrtClient`. Lower
       priority than the CLI work but already shipped.
     """#
     reviewStatus = "approved"
