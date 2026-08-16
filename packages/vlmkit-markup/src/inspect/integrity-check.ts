@@ -133,34 +133,143 @@ export interface IntegrityReport {
 // ---------------------------------------------------------------------------
 // A1 — runtime errors
 
+/**
+ * Which origin an error came from.
+ *
+ * `unknown` is not `first`. A console message with no location — and the browser omits one
+ * for some internal notices — must not be attributed to the page's own code just because
+ * nothing contradicted it.
+ */
+export type RuntimeParty = "first" | "third" | "unknown";
+
 export interface RuntimeEvent {
   type: "pageerror" | "console-error";
   text: string;
   /** Whether the error fired before or after the window load event. */
   phase: "construction" | "post-load";
+  /**
+   * The script or document URL the browser attributed the error to — a `pageerror`'s first
+   * stack frame, or a console message's own location. Absent when it reported none.
+   */
+  sourceUrl?: string;
+  /**
+   * First- or third-party, by origin. Optional: an event recorded before this field
+   * existed, or built by hand, is treated as `first` and keeps its old severity — the
+   * conservative direction, since `third` is what downgrades a fail to a warn.
+   */
+  party?: RuntimeParty;
+}
+
+/**
+ * The first URL in a stack trace — the frame the exception was thrown from.
+ *
+ * Exported and pure because the alternative is asserting on it through a browser. Matches
+ * `http(s)` and `file` because a `check integrity` run on a local HTML file gets `file://`
+ * frames, and treating those as "no source" would leave every local run unattributed.
+ */
+export function firstStackUrl(stack: string | undefined): string | undefined {
+  if (!stack) return undefined;
+  const match = /(?:https?|file):\/\/[^\s)'"]+/.exec(stack);
+  return match?.[0];
+}
+
+/**
+ * First- or third-party, by comparing origins.
+ *
+ * `file://` URLs have origin `"null"` in the URL parser, so a local run is compared on the
+ * directory prefix instead — otherwise every frame of a `file://` page reads as
+ * third-party and the gate stops failing on the page's own broken script.
+ */
+export function classifyRuntimeParty(url: string | undefined, pageUrl: string): RuntimeParty {
+  if (!url) return "unknown";
+  if (url.startsWith("file://") || pageUrl.startsWith("file://")) {
+    if (!url.startsWith("file://") || !pageUrl.startsWith("file://")) return "third";
+    const dir = (u: string) => u.slice(0, u.lastIndexOf("/") + 1);
+    return dir(url) === dir(pageUrl) ? "first" : "third";
+  }
+  try {
+    return new URL(url).origin === new URL(pageUrl).origin ? "first" : "third";
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * Drop console errors that are the browser narrating a request failure already reported
+ * from the wire.
+ *
+ * Chromium logs `Failed to load resource: …` with the failed URL as the message's own
+ * location, and `judgeNetworkFailures` reports that same URL with the resource type, the
+ * reason, and the right severity. Keeping both produced the vite.dev dogfood's seven warns
+ * for one cause, with the useful row buried among the echoes.
+ *
+ * Only the exact-URL matches go: a console error thrown from *inside* a third-party script
+ * whose fetch failed is a different fact and stays, now attributed to that script's origin.
+ */
+export function correlateRuntimeEvents(
+  events: readonly RuntimeEvent[],
+  netFailures: readonly NetworkFailure[],
+): { events: RuntimeEvent[]; suppressed: RuntimeEvent[] } {
+  const failedUrls = new Set(netFailures.map((f) => f.url));
+  const kept: RuntimeEvent[] = [];
+  const suppressed: RuntimeEvent[] = [];
+  for (const e of events) {
+    const echoesAFailedRequest = e.type === "console-error"
+      && e.sourceUrl !== undefined
+      && failedUrls.has(e.sourceUrl)
+      && /failed to load resource|net::ERR_|ERR_[A-Z_]+/i.test(e.text);
+    (echoesAFailedRequest ? suppressed : kept).push(e);
+  }
+  return { events: kept, suppressed };
+}
+
+/** `cdn.example.com` from a URL, for a message that has to stay one line. */
+function hostOf(url: string | undefined): string {
+  if (!url) return "unknown origin";
+  try {
+    return new URL(url).host || url;
+  } catch {
+    return url;
+  }
 }
 
 export function classifyRuntimeEvents(events: RuntimeEvent[], viewport: number): IntegrityFinding[] {
   const findings: IntegrityFinding[] = [];
   for (const e of events) {
+    // Absent party means "not measured", which keeps the pre-attribution severity. Only an
+    // explicit `third` downgrades, and only `third` because that is the one case where the
+    // page's own code is demonstrably not at fault.
+    const third = e.party === "third";
+    const from = third ? ` from third-party script ${hostOf(e.sourceUrl)}` : "";
+    const evidence = {
+      phase: e.phase,
+      text: e.text,
+      ...(e.sourceUrl !== undefined ? { sourceUrl: e.sourceUrl } : {}),
+      ...(e.party !== undefined ? { party: e.party } : {}),
+    };
     if (e.type === "pageerror") {
-      const fatal = e.phase === "construction";
+      // A third-party throw during construction is NOT a fail. It is the vendor's bug or a
+      // blocked request, and the page's own build is what this gate is for — the same call
+      // `judgeNetworkFailures` already makes for a cross-origin script that 404s.
+      const fatal = e.phase === "construction" && !third;
       findings.push({
         kind: "js-error",
         severity: fatal ? "fail" : "warn",
         viewport,
         message: fatal
           ? `Uncaught exception during construction (before load): ${e.text} — the UI likely failed to build; fix the script before styling.`
-          : `Uncaught exception after load: ${e.text} — initial render survived, but interactions may be broken.`,
-        evidence: { phase: e.phase, text: e.text },
+          : third
+            ? `Uncaught exception${from} during ${e.phase}: ${e.text} — the page's own scripts are unaffected; check whether the request was blocked before blaming your code.`
+            : `Uncaught exception after load: ${e.text} — initial render survived, but interactions may be broken.`,
+        evidence,
       });
     } else {
       findings.push({
         kind: "js-error",
         severity: "warn",
         viewport,
-        message: `console.error during ${e.phase}: ${e.text}`,
-        evidence: { phase: e.phase, text: e.text, channel: "console" },
+        message: `console.error${from} during ${e.phase}: ${e.text}`,
+        evidence: { ...evidence, channel: "console" },
       });
     }
   }
@@ -1717,7 +1826,16 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
       let loaded = false;
       page.on("load", () => { loaded = true; });
       page.on("pageerror", (err) => {
-        events.push({ type: "pageerror", text: String(err?.message ?? err).slice(0, 200), phase: loaded ? "post-load" : "construction" });
+        // The stack's first frame, so a throw from inside a vendor bundle is attributed to
+        // the vendor rather than to the page that loaded it.
+        const sourceUrl = firstStackUrl(err?.stack);
+        events.push({
+          type: "pageerror",
+          text: String(err?.message ?? err).slice(0, 200),
+          phase: loaded ? "post-load" : "construction",
+          ...(sourceUrl !== undefined ? { sourceUrl } : {}),
+          party: classifyRuntimeParty(sourceUrl, url),
+        });
       });
       page.on("console", (msg) => {
         if (msg.type() !== "error") return;
@@ -1728,7 +1846,17 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
         // fixture. Only skipped when there IS a fixture miss to explain it, so a real
         // broken resource on a HAR-less run still reports.
         if (harReplay && harReplay.misses().length > 0 && /Failed to load resource/i.test(text)) return;
-        events.push({ type: "console-error", text, phase: loaded ? "post-load" : "construction" });
+        // `msg.location().url` is the script the console.error was called from — and for
+        // the browser's own resource notices it is the URL that failed, which is what
+        // `correlateRuntimeEvents` matches against the wire to drop the echo.
+        const sourceUrl = msg.location()?.url || undefined;
+        events.push({
+          type: "console-error",
+          text,
+          phase: loaded ? "post-load" : "construction",
+          ...(sourceUrl !== undefined ? { sourceUrl } : {}),
+          party: classifyRuntimeParty(sourceUrl, url),
+        });
       });
       const pageOrigin = (() => { try { return new URL(url).origin; } catch { return ""; } })();
       const originOf = (u: string) => { try { return new URL(u).origin; } catch { return pageOrigin; } };
@@ -1770,8 +1898,11 @@ export async function runIntegrityCheck(options: IntegrityOptions): Promise<Inte
         }
       }
 
-      // A1
-      push(classifyRuntimeEvents(events, viewport.width));
+      // A1. Correlated against the wire first: both streams are complete by now (the
+      // navigation and `settlePage` above have finished), which is why this cannot be done
+      // inside the console handler — Playwright does not guarantee `requestfailed` arrives
+      // before the console line describing it.
+      push(classifyRuntimeEvents(correlateRuntimeEvents(events, netFailures).events, viewport.width));
 
       // A3 (+A8 fingerprint on the first viewport — layout-independent)
       const resources = await page.evaluate(COLLECT_RESOURCES) as ResourceSample;

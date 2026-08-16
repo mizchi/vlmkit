@@ -146,20 +146,38 @@ export const a11yTouchGate = defineGate<TouchReport, TouchCheckOptions>({
   summary: "Touch-target size check",
   category: "correctness",
   usage: `Measures every interactive element's rendered box and reports targets whose
-SHORTER SIDE is under the level's floor: 44px at AAA (default), 24px at AA.
-A target at or above the floor is not reported, whatever its spacing — so at
---level AA a 24x24 button in a tight row passes, and that is WCAG 2.5.8, which
-sizes targets and does not condemn a compliant one for being adjacent.
+SHORTER SIDE is under the level's floor: 24px at AA (default, WCAG 2.5.8),
+44px at AAA (WCAG 2.5.5). A target at or above the floor is never reported,
+whatever its spacing.
+
+AA is the default because it is the level conformance is defined against, W3C
+advises against requiring AAA as a general policy, and \`vlmkit diff-pr\` was
+already running this check at AA — so the CLI and CI could disagree about one
+page. --level AAA is one flag away and reports far more: 2.5.5 has no spacing
+exception, so on a Bootstrap or vite.dev page nearly every target fails it.
+
+Two of each criterion's own exceptions are applied, because they are decidable
+from the page:
+
+  inline   The target is in a sentence — computed \`display: inline\` with text
+           beside it in the same block — so the line-height sizes it and the
+           author cannot grow it without breaking the prose. Both levels.
+  spacing  A 24px circle centered on the target intersects neither another
+           target's box nor another undersized target's circle. AA only: 2.5.5
+           has no spacing exception, so --level AAA still reports these.
+
+Excused targets are LISTED, not dropped — the report has its own section for
+them, so you can disagree with the call. The criterion's other three exceptions
+(Equivalent, User-agent control, Essential) need intent rather than
+measurement: declare those with --allow "<selector>;<reason>", which also
+scopes out a vendor widget's controls.
 
 \`clustered\` on a finding means another below-floor target sits within 24px
-center-to-center. It ANNOTATES a finding; it never causes one. WCAG's
-spacing exception, which can excuse an undersized target that is far enough
-from its neighbours, is deliberately not applied — an undersized target is
-reported either way, and \`clustered\` tells you which side of that line it is
-on. This is stricter than WCAG on purpose. If that is not the trade you want,
---rule target-undersized=warn keeps the findings without failing the build.
-There is no per-selector exemption on this gate yet, so a vendor widget's
-controls cannot be scoped out — only the whole rule can be re-tuned.`,
+center-to-center. It ANNOTATES; it never causes a finding, and it no longer
+suppresses one either — the spacing exception above is what acts on adjacency.
+
+If the level's floor is right but a failing build is not,
+--rule target-undersized=warn keeps the findings without failing.`,
   rules: [
     {
       id: "target-undersized",
@@ -173,9 +191,9 @@ controls cannot be scoped out — only the whole rule can be re-tuned.`,
     {
       name: "level",
       kind: "string",
-      description: "Shorter-side floor — AAA is 44px, AA is 24px",
+      description: "Shorter-side floor — AA is 24px (WCAG 2.5.8), AAA is 44px (2.5.5)",
       choices: ["AAA", "AA"],
-      defaultDescription: "AAA",
+      defaultDescription: "AA",
     },
     {
       name: "allow",
@@ -200,7 +218,7 @@ controls cannot be scoped out — only the whole rule can be re-tuned.`,
     parseSelectorAllowRules(allow, { ruleId: "target-undersized" });
     return {
       source,
-      level: (readChoice(argv, "level", ["AAA", "AA"] as const) ?? "AAA") as WcagTouchLevel,
+      level: (readChoice(argv, "level", ["AAA", "AA"] as const) ?? "AA") as WcagTouchLevel,
       ...(allow.length > 0 ? { allow } : {}),
       ...reportFlags(argv, "a11y-touch", source),
       ...parsePageLoad(argv),
@@ -225,6 +243,11 @@ controls cannot be scoped out — only the whole rule can be re-tuned.`,
       level: report.level,
       inspected: report.inspectedCount,
       failures: report.failures.length,
+      // On the ledger because it moves the failure count: a run reporting 0 failures
+      // over 18 targets reads very differently once you know 7 of them are undersized
+      // and excused. Without it, comparing two runs across a level change looks like
+      // the page got better.
+      wcagExempt: report.wcagExempt?.length ?? 0,
       report: report.reportPath,
     },
   }),

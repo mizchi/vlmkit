@@ -22,7 +22,10 @@ import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { ruleViewFrom } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import {
   classifyRuntimeEvents,
+  classifyRuntimeParty,
+  correlateRuntimeEvents,
   findTextCollisions,
+  firstStackUrl,
   formatIntegrityReport,
   judgeAlignment,
   judgeClippedText,
@@ -70,6 +73,101 @@ describe("pure judges", () => {
     ], 1280);
     assert.deepEqual(findings.map((f) => f.severity), ["fail", "warn", "warn"]);
     assert.ok(findings[0]!.message.includes("before load"));
+  });
+
+  test("firstStackUrl: the frame the exception was thrown from", () => {
+    assert.equal(
+      firstStackUrl("TypeError: x\n    at fn (https://cdn.example.com/rive.js:1:2)\n    at https://site.test/app.js:3:4"),
+      "https://cdn.example.com/rive.js:1:2",
+    );
+    // A local run has `file://` frames, and treating those as "no source" would leave
+    // every `check integrity` on an HTML file unattributed.
+    assert.equal(
+      firstStackUrl("Error\n    at file:///tmp/page.html:5:1"),
+      "file:///tmp/page.html:5:1",
+    );
+    assert.equal(firstStackUrl(undefined), undefined);
+    assert.equal(firstStackUrl("Error: no frames here"), undefined);
+  });
+
+  test("classifyRuntimeParty: unknown is not first", () => {
+    const page = "https://site.test/index.html";
+    assert.equal(classifyRuntimeParty("https://site.test/app.js:1:1", page), "first");
+    assert.equal(classifyRuntimeParty("https://cdn.jsdelivr.net/rive.js", page), "third");
+    // The distinction that keeps a locationless console notice off the page's own record.
+    assert.equal(classifyRuntimeParty(undefined, page), "unknown");
+    // `file://` has origin "null" in the URL parser, so comparing origins would call the
+    // page's OWN script third-party and stop the gate failing on a broken local build.
+    assert.equal(classifyRuntimeParty("file:///tmp/x/app.js:1:1", "file:///tmp/x/page.html"), "first");
+    assert.equal(classifyRuntimeParty("file:///other/vendor.js", "file:///tmp/x/page.html"), "third");
+    assert.equal(classifyRuntimeParty("https://cdn.test/a.js", "file:///tmp/x/page.html"), "third");
+  });
+
+  test("classifyRuntimeEvents: a third-party throw during construction warns, and says whose", () => {
+    // The vite.dev dogfood: a blocked CDN wasm produced seven warns and nothing said the
+    // cause was cross-origin, so a reader could not tell "your app throws" from "your
+    // sandbox blocked a CDN". A vendor's exception is not the page's build failing.
+    const findings = classifyRuntimeEvents([
+      { type: "pageerror", text: "wasm compile failed", phase: "construction", sourceUrl: "https://cdn.jsdelivr.net/rive.js:1:2", party: "third" },
+      { type: "pageerror", text: "our bug", phase: "construction", sourceUrl: "https://site.test/app.js:1:2", party: "first" },
+      { type: "console-error", text: "Aborted()", phase: "post-load", sourceUrl: "https://cdn.jsdelivr.net/rive.js:9:9", party: "third" },
+    ], 1280);
+    assert.deepEqual(findings.map((f) => f.severity), ["warn", "fail", "warn"]);
+    assert.match(findings[0]!.message, /third-party script cdn\.jsdelivr\.net/);
+    assert.match(findings[0]!.message, /page's own scripts are unaffected/);
+    assert.equal(findings[0]!.evidence?.party, "third");
+    assert.equal(findings[0]!.evidence?.sourceUrl, "https://cdn.jsdelivr.net/rive.js:1:2");
+    // The page's own construction error keeps its fail and its wording.
+    assert.match(findings[1]!.message, /before load/);
+    assert.doesNotMatch(findings[1]!.message, /third-party/);
+    assert.match(findings[2]!.message, /console\.error from third-party script cdn\.jsdelivr\.net/);
+  });
+
+  test("classifyRuntimeEvents: an event with no party keeps the pre-attribution severity", () => {
+    // Compatibility direction. `third` is what downgrades, so an unmeasured event must not
+    // get the downgrade — a recorded run from before the field existed keeps its fail.
+    const findings = classifyRuntimeEvents([
+      { type: "pageerror", text: "boom", phase: "construction" },
+      { type: "pageerror", text: "boom", phase: "construction", party: "unknown" },
+    ], 1280);
+    assert.deepEqual(findings.map((f) => f.severity), ["fail", "fail"]);
+    assert.doesNotMatch(findings[1]!.message, /third-party/);
+  });
+
+  test("correlateRuntimeEvents: drops the console echo of a failed request, keeps the real error", () => {
+    // One cause, seven warns. The browser's "Failed to load resource" line carries the
+    // failed URL as its own location, and `judgeNetworkFailures` reports that same URL with
+    // the resource type and reason — so the console copy is an echo, not a second finding.
+    const netFailures = [
+      { url: "https://cdn.jsdelivr.net/rive.wasm", resourceType: "fetch", reason: "net::ERR_CONNECTION_RESET" },
+    ];
+    const { events, suppressed } = correlateRuntimeEvents([
+      { type: "console-error", text: "Failed to load resource: net::ERR_CONNECTION_RESET", phase: "post-load", sourceUrl: "https://cdn.jsdelivr.net/rive.wasm", party: "third" },
+      // Thrown from INSIDE the vendor script whose fetch failed. Different fact, stays.
+      { type: "console-error", text: "Aborted(both async and sync fetching of the wasm failed)", phase: "post-load", sourceUrl: "https://cdn.jsdelivr.net/rive.js", party: "third" },
+      // The page's own console.error at a URL that also happens to have failed: kept,
+      // because the text is not the browser narrating a request.
+      { type: "console-error", text: "checkout total mismatch", phase: "post-load", sourceUrl: "https://cdn.jsdelivr.net/rive.wasm", party: "third" },
+    ], netFailures);
+    assert.equal(suppressed.length, 1);
+    assert.equal(suppressed[0]!.text, "Failed to load resource: net::ERR_CONNECTION_RESET");
+    assert.deepEqual(events.map((e) => e.text), [
+      "Aborted(both async and sync fetching of the wasm failed)",
+      "checkout total mismatch",
+    ]);
+  });
+
+  test("correlateRuntimeEvents: a resource notice with no matching wire failure is kept", () => {
+    // The suppression must be a correlation, not a text filter — otherwise a real broken
+    // resource on a run where the wire saw nothing would vanish.
+    const { events, suppressed } = correlateRuntimeEvents([
+      { type: "console-error", text: "Failed to load resource: 404", phase: "post-load", sourceUrl: "https://site.test/missing.js", party: "first" },
+      // A pageerror is never suppressed: a script that failed to load cannot throw, so this
+      // is the page's own code reacting to the failure.
+      { type: "pageerror", text: "Failed to load resource", phase: "post-load", sourceUrl: "https://site.test/gone.js", party: "first" },
+    ], [{ url: "https://site.test/gone.js", resourceType: "script", reason: "404" }]);
+    assert.equal(suppressed.length, 0);
+    assert.equal(events.length, 2);
   });
 
   test("findTextCollisions: same-layer overlap fails, overlay/aria-hidden exempt, containment skipped", () => {

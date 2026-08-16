@@ -175,6 +175,10 @@ pub fn run_json(command : String, payload : String) -> String raise {
       let input : TouchClusterInput = @json.from_json(json)
       touch_in_cluster(input).to_json().stringify()
     }
+    "touch-policy" => {
+      let input : TouchPolicyInput = @json.from_json(json)
+      touch_policy(input).to_json().stringify()
+    }
     "focus-order-classify" => {
       let input : FocusOrderInput = @json.from_json(json)
       focus_order_classification(input).to_json().stringify()
@@ -265,6 +269,7 @@ pub fn json_commands() -> Array[String] {
     "pattern-evidence-issue-ids",
     "contrast-evaluate",
     "touch-in-cluster",
+    "touch-policy",
     "focus-order-classify",
     "grid-arrays-close",
     "grid-gcd",

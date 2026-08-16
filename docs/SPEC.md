@@ -660,7 +660,7 @@
   - body: _not yet implemented_
 
 - [ ] **Touch target size meets WCAG 2.5.5 AAA / 2.5.8 AA** (critical) — verifies: F2
-  > `vlmkit check a11y touch` flags interactive elements below the 24px AA / 44px AAA minimum hit area.
+  > `vlmkit check a11y touch` flags interactive elements below the 24px AA (default) / 44px AAA minimum hit area, applying each criterion's Inline and (at AA) Spacing exceptions.
   - contributes to: GOAL-A11Y-COMPLIANCE
   - body: _not yet implemented_
 

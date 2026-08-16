@@ -32,7 +32,9 @@ nowhere, and green verdicts printed over work that never happened.
 ### Breaking
 
 Two of these can newly **fail a CI run that passed on 0.10.0**, and they are
-listed first for that reason.
+listed first for that reason. One goes the other way and is listed third:
+`check a11y touch` now defaults to AA and applies WCAG's own exceptions, so it
+reports far fewer targets.
 
 - **`check a11y contrast` reports findings it used to drop.** The dedup key was
   `path` alone, and `shortPath` collapses siblings, so N elements sharing a
@@ -47,6 +49,42 @@ listed first for that reason.
   of an `overflow: hidden` ancestor is not overlapping anything a user can see. A
   run that was failing on such a pair now passes — the exemption is stated in the
   output rather than applied silently.
+- **`check a11y touch` defaults to `--level AA` and applies the criteria's own
+  exceptions**, so it reports far fewer targets. Three separate changes, all in the
+  same direction:
+  - **The default is AA (24px), not AAA (44px).** AA is the level conformance is
+    defined against, W3C advises against requiring AAA as a general policy, and
+    `vlmkit diff-pr` was *already* running this check at AA — so one page could pass
+    CI and fail the CLI. `--level AAA` is unchanged and still available.
+  - **The Inline exception** (2.5.5 and 2.5.8, so both levels): a target with computed
+    `display: inline` and non-target text beside it in the same block is sized by the
+    line-height, and is no longer reported.
+  - **The Spacing exception** (2.5.8, AA only): an undersized target whose 24px circle
+    intersects neither another target's box nor another undersized target's circle is
+    no longer reported. A row of adjacent tiny buttons still is — that is the case the
+    criterion is aimed at.
+
+  Measured on the two dogfood targets: vite.dev went from **37 of 38 targets failing**
+  to **0 failing with 14 excused**, and Bootstrap's dashboard example from 17 of 18.
+  Both are unmodified vendor defaults, i.e. a floor no project using either framework
+  could reach — and a gate that cannot be passed gets turned off whole, which is worse
+  than a correct answer. Excused targets are LISTED, in the console summary, in a
+  markdown section of their own, and as `wcagExempt` on the report and the run ledger;
+  the criterion's other three exceptions (Equivalent, User-agent control, Essential)
+  need intent rather than measurement and stay with `--allow "<selector>;<reason>"`.
+
+  Two library changes come with it. `TouchTargetFinding` gained an optional
+  `exception`; `A11yTouchRawSample` gained optional `display` and `inSentence`, and a
+  sample without them gets no Inline exemption rather than a wrong one. New
+  `analyzeA11yTouch` returns `{required, failures, wcagExempt, inspectedCount}`;
+  `analyzeA11yTouchSamples` still returns failures only, so a caller counting
+  `.length` does not silently start counting excused targets. `runA11yTouch` no longer
+  re-implements the dedupe and cluster arithmetic inline — that copy is why the CLI and
+  the diff-pr path could have disagreed, the same defect `check a11y contrast` actually
+  shipped. The policy moved into `markup-core/a11y_touch.mbt` next to the thresholds it
+  belongs with, as one `touch-policy` JSON call for the whole page instead of an O(n²)
+  `touch-in-cluster` call per pair.
+
 - **`check a11y focus` reports fewer findings.** A `reverse` or `skip-row` into or
   out of a viewport-pinned (`fixed` / `sticky`) element is no longer an order
   defect: one of the two `y` values in that comparison is a position on screen and
@@ -537,6 +575,31 @@ listed first for that reason.
   string.
 
 ### Fixed
+
+- **`js-error` said nothing about whose script threw.** From the vite.dev dogfood: a
+  blocked CDN wasm produced **seven warns for one cause**, and a reader could not tell
+  "your app throws" from "your sandbox blocked a CDN" — while a *cross-origin script
+  that 404s* was already correctly downgraded to a warn two functions away, so the
+  gate knew the distinction and only applied it on one of the two paths. Both halves
+  of the recorded fix landed:
+  - **Attribution.** A `pageerror`'s first stack frame and a `console` message's own
+    location give the URL the browser blamed; its origin against the page's decides
+    first- or third-party. A third-party throw during construction is now a `warn`,
+    not a `fail`, and the message names the host — the page's own build is what this
+    gate is for. `unknown` is deliberately not `first`: a console notice with no
+    location must not land on the page's record because nothing contradicted it, and
+    an event with no `party` at all keeps its old severity.
+  - **Correlation with the wire.** Chromium logs `Failed to load resource: …` with the
+    failed URL as the message's own location, and `judgeNetworkFailures` already
+    reports that URL with the resource type, reason and severity — so the console copy
+    is an echo. Those are dropped, matched on the URL rather than on the text, so a
+    real broken resource the wire never saw still reports. This is done after the page
+    settles, not in the console handler, because Playwright does not guarantee
+    `requestfailed` arrives before the line describing it.
+
+  `RuntimeEvent` gained `sourceUrl` and `party`; `firstStackUrl`,
+  `classifyRuntimeParty` and `correlateRuntimeEvents` are exported and pure, so the
+  attribution is testable without a browser.
 
 - **The version number is stated once instead of three times.** `vlmkit --version` and the MCP
   server's `{ name: "vlmkit", version }` handshake each hardcoded their own copy of the root

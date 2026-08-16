@@ -198,16 +198,22 @@ describe("vlmkit diff-pr a11y gate", () => {
       <h1>Accessible page</h1><p>Body text reads cleanly.</p>
       <button>One</button><button>Two</button>
       </body></html>`);
-    // Bad: muted text, tiny button.
+    // Bad: muted text, and a row of tiny buttons.
+    //
+    // TWO adjacent buttons, not one. A single isolated tiny button satisfies WCAG 2.5.8's
+    // spacing exception — a 24px circle centered on it hits nothing — so it stopped being a
+    // touch failure when the exceptions landed in 0.11.0, and this test's whole subject is
+    // a route that exceeds the touch budget. Adjacent controls are the case the criterion
+    // is actually aimed at.
     await writeFile(join(cwd, "pages", "bad.html"),
       `<!doctype html><html><head><style>
         body { margin: 0; padding: 24px; background: #fff; color: #999; font: 14px sans-serif; }
         button { background: #ccc; color: #999; font: 11px sans-serif;
-          padding: 1px 4px; min-width: 0; border: none; }
+          padding: 1px 4px; min-width: 0; border: none; margin: 0; }
       </style></head><body>
       <h1>Low contrast heading</h1>
       <p>Muted body text.</p>
-      <button>x</button>
+      <button>x</button><button>y</button>
       </body></html>`);
     const cfg = {
       thresholds: { mobile: 0.5, desktop: 0.5, wide: 0.5 },
@@ -237,7 +243,9 @@ describe("vlmkit diff-pr a11y gate", () => {
     const r = cli(cwd);
     assert.equal(r.status, 1);
     assert.match(r.stdout, /good\s+pass.*\[a11y c=0\/t=0/);
-    assert.match(r.stdout, /bad\s+FAIL.*\[a11y c=3\/t=1/);
+    // t=2: both tiny buttons. Neither is spacing-exempt, because their 24px circles
+    // intersect each other — see the fixture comment.
+    assert.match(r.stdout, /bad\s+FAIL.*\[a11y c=3\/t=2/);
     assert.match(r.stdout, /FAIL — at least one route over threshold/);
   });
 

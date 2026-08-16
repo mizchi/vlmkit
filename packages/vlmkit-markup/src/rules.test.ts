@@ -87,11 +87,15 @@ describe("@mizchi/vlmkit-markup/rules — the deterministic layer", () => {
     assert.equal(report.verdict, "drift");
     assert.equal(report.findings[0]?.kind, "component-drift");
 
-    // And the same for a11y, where the WCAG floor is size-aware.
+    // And the same for a11y, where the WCAG floor is size-aware. Two adjacent 20x20
+    // buttons: below the 24px floor AND crowding each other, so 2.5.8's spacing exception
+    // does not excuse them. A single isolated one would be exempt, which is correct and
+    // would make this assertion about the exception rather than about the floor.
     assert.equal(rules.requiredTouchSide("AA"), 24);
     assert.equal(rules.analyzeA11yTouchSamples([
       { path: ".x", tag: "button", text: "x", bbox: { x: 0, y: 0, width: 20, height: 20 } },
-    ], "AA").length, 1);
+      { path: ".y", tag: "button", text: "y", bbox: { x: 20, y: 0, width: 20, height: 20 } },
+    ], "AA").length, 2);
   });
 });
 

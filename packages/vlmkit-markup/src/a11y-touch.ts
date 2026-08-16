@@ -2,21 +2,26 @@
 /**
  * A11y touch-target check.
  *
- * WCAG 2.1 AAA (criterion 2.5.5) requires interactive elements to have
- * a target size of at least 44 × 44 CSS px. WCAG 2.2 AA (criterion
- * 2.5.8) relaxes this to 24 × 24 with sufficient spacing. Small
- * touch targets are unreachable for users with motor impairments
- * and frustrating on touchscreens.
+ * WCAG 2.2 AA (criterion 2.5.8) requires interactive elements to be at least 24 × 24 CSS
+ * px; WCAG 2.1 AAA (criterion 2.5.5) raises that to 44 × 44. Small touch targets are
+ * unreachable for users with motor impairments and frustrating on touchscreens.
  *
- * Scans visible interactive elements (button, link, input, select,
- * textarea, [role=button], [role=link], elements with tabindex ≥ 0)
- * and reports those whose bounding box falls below the chosen
- * threshold.
+ * Scans visible interactive elements (button, link, input, select, textarea, [role=button],
+ * [role=link], elements with tabindex ≥ 0) and reports those below the level's floor that
+ * no exception excuses. The exceptions and the thresholds live together in
+ * `markup-core/a11y_touch.mbt` — read that file for which two are applied and why.
+ *
+ * **AA is the default**, changed in 0.11.0. AAA is 44px with only the Inline exception, so
+ * it reported 37 of 38 targets on vite.dev and 17 of 18 on Bootstrap's dashboard example —
+ * unmodified vendor defaults in both cases, i.e. a floor no project using either framework
+ * could reach. Three things settle the direction: AA is the level conformance is defined
+ * against, W3C advises against requiring AAA as a general policy, and `src/a11y-on-page.ts`
+ * (the `vlmkit diff-pr` path) already ran this check at AA — so one page could pass CI and
+ * fail the CLI.
  *
  * Usage:
- *   vlmkit check a11y touch <html-or-url>
- *   vlmkit check a11y touch <url> --level AAA   # 44x44 (default)
- *   vlmkit check a11y touch <url> --level AA    # 24x24
+ *   vlmkit check a11y touch <html-or-url>              # 24x24, WCAG 2.5.8
+ *   vlmkit check a11y touch <url> --level AAA          # 44x44, WCAG 2.5.5
  */
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
@@ -26,11 +31,7 @@ import { handleCliError } from "@mizchi/vlmkit-core/cli-error.ts";
 import { DIM, RESET, GREEN, RED, BOLD, CYAN, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
 import { type PageLoadOptions, pickPageLoad } from "@mizchi/vlmkit-core/page-load.ts";
 import { openSource } from "@mizchi/vlmkit-core/page-open.ts";
-import {
-  requiredTouchSide,
-  touchTargetBelowRequired,
-  touchTargetInCluster,
-} from "./markup-core-a11y-touch.ts";
+import { touchPolicy } from "./markup-core-a11y-touch.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { applySelectorAllowRules, parseSelectorAllowRules } from "./inspect/selector-exemption.ts";
 import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
@@ -52,7 +53,7 @@ export interface TouchCheckOptions extends PageLoadOptions {
   outputDir: string;
   reportPath?: string;
   viewport?: { width: number; height: number };
-  /** Required size threshold. AAA → 44px, AA → 24px. Default AAA. */
+  /** Required size threshold. AA → 24px (default), AAA → 44px. */
   level?: WcagTouchLevel;
   /**
    * `--allow "<selector>;<reason>"` — a target whose size is deliberate.
@@ -66,6 +67,17 @@ export interface TouchCheckOptions extends PageLoadOptions {
   allow?: readonly string[];
 }
 
+/**
+ * A WCAG exception that excuses an undersized target, when one applies.
+ *
+ * - `inline` — the target is in a sentence and sized by the line (2.5.5 and 2.5.8).
+ * - `spacing` — a 24px circle on it clears every neighbour (2.5.8, so AA only).
+ *
+ * The criteria's other three exceptions (Equivalent, User-agent control, Essential) need
+ * intent rather than measurement, and are declared with `--allow "<selector>;<reason>"`.
+ */
+export type TouchWcagException = "inline" | "spacing";
+
 export interface TouchTargetFinding {
   path: string;
   tag: string;
@@ -74,8 +86,25 @@ export interface TouchTargetFinding {
   /** Minimum of width and height — the limiting dimension. */
   minSide: number;
   required: number;
-  /** Same selectors with overlapping or near-adjacent bboxes within 24 px. */
+  /** Another below-floor target's center within 24 px. Annotation; never a cause. */
   cluster: boolean;
+  /** Set only on an exempted target. Absent means this is a real failure. */
+  exception?: TouchWcagException;
+}
+
+export interface TouchAnalysis {
+  /** The level's floor in px. */
+  required: number;
+  /** Undersized, and no exception applies. */
+  failures: TouchTargetFinding[];
+  /**
+   * Undersized but excused by the criterion itself. LISTED, never merely subtracted —
+   * the property every exemption in this repo has, and the reason an earlier version of
+   * this gate refused to apply the spacing exception at all.
+   */
+  wcagExempt: TouchTargetFinding[];
+  /** Distinct rendered targets measured. */
+  inspectedCount: number;
 }
 
 export interface TouchReport {
@@ -91,6 +120,12 @@ export interface TouchReport {
   screenshot: string;
   inspectedCount: number;
   failures: TouchTargetFinding[];
+  /**
+   * Undersized targets the SUCCESS CRITERION itself excuses (Inline / Spacing), as
+   * distinct from `exempted` below, which is the project's own judgement call. Both are
+   * listed; only these two are decidable from the page.
+   */
+  wcagExempt?: TouchTargetFinding[];
   /**
    * Targets an `--allow` rule declared deliberate. Listed, not dropped — an
    * exemption a reader cannot see is a blind spot rather than a decision.
@@ -129,6 +164,25 @@ export const A11Y_TOUCH_SAMPLE_SCRIPT = `
     "[role='link']",
     "[tabindex]:not([tabindex='-1'])",
   ].join(",");
+  // Whether the target sits in running text: the nearest non-inline ancestor holds text
+  // that is not inside this target. That is WCAG's "in a sentence" — and it is checked by
+  // walking the block's OWN child nodes rather than subtracting textContent, because a
+  // target with no text of its own (an icon link) makes the subtraction return the whole
+  // block and every icon in a text block would read as prose.
+  function inSentence(el) {
+    let block = el.parentElement;
+    while (block && getComputedStyle(block).display.indexOf("inline") === 0) {
+      block = block.parentElement;
+    }
+    if (!block) return false;
+    let other = 0;
+    for (const node of block.childNodes) {
+      if (node === el) continue;
+      if (node.nodeType === 1 && node.contains(el)) continue;
+      other += (node.textContent || "").trim().length;
+    }
+    return other > 0;
+  }
   const out = [];
   const seen = new Set();
   for (const el of document.querySelectorAll(selectors)) {
@@ -145,6 +199,10 @@ export const A11Y_TOUCH_SAMPLE_SCRIPT = `
       tag: el.tagName.toLowerCase(),
       text,
       bbox: { x: r.x, y: r.y, width: r.width, height: r.height },
+      // For the Inline exception. Only a bare \`inline\` box is sized by the line —
+      // \`inline-block\` and \`inline-flex\` carry their own height and can be grown.
+      display: cs.display,
+      inSentence: inSentence(el),
     });
     if (out.length > 400) break;
   }
@@ -157,6 +215,14 @@ export interface A11yTouchRawSample {
   tag: string;
   text: string;
   bbox: { x: number; y: number; width: number; height: number };
+  /**
+   * Computed `display`. Optional: a caller that built samples by hand — or a run recorded
+   * before this field existed — gets no Inline exemption rather than a wrong one, which is
+   * the conservative direction (it keeps findings, same as `FocusStep.pinned`).
+   */
+  display?: string;
+  /** Whether the nearest block ancestor holds text outside this target. See above. */
+  inSentence?: boolean;
 }
 
 /**
@@ -189,54 +255,78 @@ function targetKey(sample: A11yTouchRawSample): string {
   return `${sample.path}@${Math.round(sample.bbox.x)},${Math.round(sample.bbox.y)}`;
 }
 
-export function analyzeA11yTouchSamples(
-  samples: A11yTouchRawSample[],
-  level: WcagTouchLevel = "AAA",
-): TouchTargetFinding[] {
-  const required = requiredTouchSide(level);
+/**
+ * Every distinct rendered target's verdict, with the criteria's own exceptions applied.
+ *
+ * ONE implementation. `runA11yTouch` used to re-implement the dedupe, the cluster
+ * arithmetic and the finding construction inline — the CLI path and the `vlmkit diff-pr`
+ * path could therefore disagree about WCAG on one page, which is exactly what happened to
+ * `check a11y contrast` (see `a11y-contrast.ts`). The inline copy existed because the
+ * exported version spent an O(n²) boundary call per pair; `touchPolicy` crosses once, so
+ * the reason is gone and so is the copy.
+ */
+export function analyzeA11yTouch(
+  samples: readonly A11yTouchRawSample[],
+  level: WcagTouchLevel = "AA",
+): TouchAnalysis {
   const byPath = new Map<string, A11yTouchRawSample>();
   for (const s of samples) {
     const key = targetKey(s);
     if (!byPath.has(key)) byPath.set(key, s);
   }
-  const findings: TouchTargetFinding[] = [];
   const elements = [...byPath.values()];
-  const centers = elements.map((e) => ({
-    x: e.bbox.x + e.bbox.width / 2,
-    y: e.bbox.y + e.bbox.height / 2,
-  }));
-  for (let i = 0; i < elements.length; i++) {
-    const e = elements[i]!;
-    const minSide = Math.min(e.bbox.width, e.bbox.height);
-    if (!touchTargetBelowRequired(minSide, level)) continue;
-    let cluster = false;
-    for (let j = 0; j < elements.length; j++) {
-      if (i === j) continue;
-      if (touchTargetInCluster(centers[i]!, centers[j]!)) {
-        cluster = true;
-        break;
-      }
-    }
-    findings.push({
+  const { required, verdicts } = touchPolicy(
+    level,
+    elements.map((e) => ({
+      rect: e.bbox,
+      display: e.display ?? "",
+      inSentence: e.inSentence === true,
+    })),
+  );
+
+  const failures: TouchTargetFinding[] = [];
+  const exempted: TouchTargetFinding[] = [];
+  for (const v of verdicts) {
+    if (!v.undersized) continue;
+    const e = elements[v.targetPosition]!;
+    const finding: TouchTargetFinding = {
       path: e.path,
       tag: e.tag,
       text: e.text,
       bbox: e.bbox,
-      minSide: Math.round(minSide),
+      minSide: Math.round(v.minSide),
       required,
-      cluster,
-    });
+      cluster: v.clustered,
+      ...(v.exception ? { exception: v.exception as TouchWcagException } : {}),
+    };
+    (v.exception ? exempted : failures).push(finding);
   }
-  findings.sort((a, b) => a.minSide - b.minSide);
-  return findings;
+  const bySize = (a: TouchTargetFinding, b: TouchTargetFinding) => a.minSide - b.minSide;
+  failures.sort(bySize);
+  exempted.sort(bySize);
+  return { required, failures, wcagExempt: exempted, inspectedCount: elements.length };
+}
+
+/**
+ * The failures alone, for callers that only ever wanted those — `vlmkit diff-pr` through
+ * `src/a11y-on-page.ts`, and the `rules.ts` barrel.
+ *
+ * Kept as its own export rather than folded into `analyzeA11yTouch`: both are public
+ * surface, and a caller counting `.length` should not silently start counting exempted
+ * targets too.
+ */
+export function analyzeA11yTouchSamples(
+  samples: readonly A11yTouchRawSample[],
+  level: WcagTouchLevel = "AA",
+): TouchTargetFinding[] {
+  return analyzeA11yTouch(samples, level).failures;
 }
 
 export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchReport> {
   const outputDir = resolve(options.outputDir);
   await mkdir(outputDir, { recursive: true });
   const viewport = options.viewport ?? { width: 1280, height: 900 };
-  const level = options.level ?? "AAA";
-  const required = level === "AAA" ? 44 : 24;
+  const level = options.level ?? "AA";
 
   // Returned out of the callback, not assigned into outer `let`s — TypeScript's
   // definite-assignment analysis does not follow an assignment made in a closure.
@@ -257,46 +347,9 @@ export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchRep
     return { samples, screenshotPath };
   });
 
-  // Dedupe by path AND position — see `targetKey`.
-  const byPath = new Map<string, A11yTouchRawSample>();
-  for (const s of samples) {
-    const key = targetKey(s);
-    if (!byPath.has(key)) byPath.set(key, s);
-  }
-
-  // Cluster detection, on targets ALREADY below the floor. WCAG 2.5.8's
-  // "with spacing" leniency — which can excuse an undersized target that is far
-  // enough from its neighbours — is deliberately not applied here, so a target
-  // under the floor is reported either way and `cluster` says which side of that
-  // line it is on. It annotates; it never triggers. The gate's `usage` says so
-  // now: v7's agent-m read the old wording as "adjacency is flagged" and could
-  // not reconcile it with a 24x24 button passing at AA.
-  const findings: TouchTargetFinding[] = [];
-  const elements = [...byPath.values()];
-  for (let i = 0; i < elements.length; i++) {
-    const e = elements[i]!;
-    const minSide = Math.min(e.bbox.width, e.bbox.height);
-    if (minSide >= required) continue;
-    let cluster = false;
-    for (let j = 0; j < elements.length; j++) {
-      if (i === j) continue;
-      const o = elements[j]!;
-      const cx1 = e.bbox.x + e.bbox.width / 2, cy1 = e.bbox.y + e.bbox.height / 2;
-      const cx2 = o.bbox.x + o.bbox.width / 2, cy2 = o.bbox.y + o.bbox.height / 2;
-      const dx = cx2 - cx1, dy = cy2 - cy1;
-      if (Math.sqrt(dx * dx + dy * dy) < 24) { cluster = true; break; }
-    }
-    findings.push({
-      path: e.path,
-      tag: e.tag,
-      text: e.text,
-      bbox: e.bbox,
-      minSide: Math.round(minSide),
-      required,
-      cluster,
-    });
-  }
-  findings.sort((a, b) => a.minSide - b.minSide);
+  // One analysis, shared with `vlmkit diff-pr` — see `analyzeA11yTouch`.
+  const analysis = analyzeA11yTouch(samples, level);
+  const findings = analysis.failures;
 
   const reportPath = options.reportPath ?? join(outputDir, "report.md");
   // Exemptions last, so a rule matching nothing is reported against the findings
@@ -313,19 +366,19 @@ export async function runA11yTouch(options: TouchCheckOptions): Promise<TouchRep
   const md = renderReport({
     source: options.source,
     level,
-    required,
+    required: analysis.required,
     viewport,
     screenshot: screenshotPath,
-    inspectedCount: byPath.size,
+    inspectedCount: analysis.inspectedCount,
     failures: kept,
+    wcagExempt: analysis.wcagExempt,
   });
   await writeFile(reportPath, md);
 
-
-
   return {
-    source: options.source, level, required, viewport, screenshot: screenshotPath,
-    inspectedCount: byPath.size, failures: kept, reportPath,
+    source: options.source, level, required: analysis.required, viewport, screenshot: screenshotPath,
+    inspectedCount: analysis.inspectedCount, failures: kept, reportPath,
+    ...(analysis.wcagExempt.length > 0 ? { wcagExempt: analysis.wcagExempt } : {}),
     ...(exempted.length > 0 ? { exempted } : {}),
     ...(applied.unused.length > 0 ? { unusedAllow: applied.unused.map((r) => r.raw) } : {}),
   };
@@ -365,6 +418,22 @@ export function formatA11yTouchReport(report: TouchReport, rules?: RuleView): st
       : tier === "suspect" ? "" : `${DIM} [target-undersized re-tuned to ${tier}]${RESET}`)
     + `${report.exempted?.length ? `${DIM}, ${report.exempted.length} exempted${RESET}` : ""}`,
   );
+  // The criterion's own exceptions, on their own line and never folded into the count
+  // above. A reader has to be able to tell "nothing is undersized" from "seven are, and
+  // WCAG excuses them" — those call for different work, and collapsing them is what made
+  // an earlier version of this gate refuse to apply the spacing exception at all.
+  if (!off && report.wcagExempt?.length) {
+    const inline = report.wcagExempt.filter((f) => f.exception === "inline").length;
+    const spacing = report.wcagExempt.length - inline;
+    const which = [
+      ...(inline > 0 ? [`${inline} in a sentence`] : []),
+      ...(spacing > 0 ? [`${spacing} with clear spacing`] : []),
+    ].join(", ");
+    lines.push(
+      `  ${DIM}${report.wcagExempt.length} undersized target(s) excused by WCAG`
+      + ` ${report.level === "AA" ? "2.5.8" : "2.5.5"} itself (${which})${RESET}`,
+    );
+  }
   const CONSOLE_ROWS = 5;
   // Rows only while the rule is on. The count above stays either way: the exemption list and
   // the stale-`--allow` warning below are about the project's own settings, and a reader who
@@ -401,18 +470,42 @@ function renderReport(r: Omit<TouchReport, "reportPath">): string {
   lines.push("# A11y touch-target report");
   lines.push("");
   lines.push(`Source: \`${r.source}\``);
-  // Not "(with spacing)": nothing here applies WCAG's spacing exception, and
-  // saying otherwise is what made a reader expect a 24x24 target in a tight row
-  // to be reported at AA. The floor is the shorter side, full stop.
+  const criterion = r.level === "AA" ? "2.5.8 Target Size (Minimum)" : "2.5.5 Target Size (Enhanced)";
   lines.push(
-    `WCAG level: **${r.level}** — every interactive element needs a shorter side of at least`
-    + ` ${r.required}px. \`clustered\` annotates a finding (another below-floor target within`
-    + ` 24px center-to-center); it never causes one.`,
+    `WCAG level: **${r.level}** (${criterion}) — every interactive element needs a shorter`
+    + ` side of at least ${r.required}px, unless one of the criterion's exceptions applies.`
+    + ` \`clustered\` annotates a finding (another below-floor target within 24px`
+    + ` center-to-center); it never causes one.`,
+  );
+  lines.push("");
+  lines.push(
+    "Two exceptions are decided from the page and applied below: **Inline** (the target is"
+    + " in a sentence, so the line-height sizes it — both levels) and **Spacing** (a 24px"
+    + " circle centered on the target clears every neighbour — AA only, since 2.5.5 has no"
+    + " spacing exception). The other three — Equivalent, User-agent control, Essential —"
+    + " need intent rather than measurement; declare those with"
+    + " `--allow \"<selector>;<reason>\"`.",
   );
   lines.push("");
   lines.push(`Inspected **${r.inspectedCount}** interactive element(s).  ` +
     `Screenshot: \`${r.screenshot}\``);
   lines.push("");
+  if (r.wcagExempt?.length) {
+    lines.push(`## ${r.wcagExempt.length} undersized target(s) excused by the criterion`);
+    lines.push("");
+    lines.push("Listed rather than dropped: an exemption a reader cannot see is a blind spot.");
+    lines.push("");
+    lines.push("| Element | Text | Size | Min side | Need | Exception |");
+    lines.push("|---|---|---|---|---|---|");
+    for (const f of r.wcagExempt.slice(0, 30)) {
+      const sz = `${Math.round(f.bbox.width)}×${Math.round(f.bbox.height)}`;
+      lines.push(`| \`${f.path}\` | \`${f.text}\` | ${sz} | ${f.minSide} | ${f.required} | ${f.exception} |`);
+    }
+    if (r.wcagExempt.length > 30) {
+      lines.push(`\n_… ${r.wcagExempt.length - 30} more row(s) omitted; the JSON report has all of them._`);
+    }
+    lines.push("");
+  }
   if (r.failures.length === 0) {
     lines.push("## All interactive elements meet the size threshold.");
     return lines.join("\n");
@@ -420,9 +513,9 @@ function renderReport(r: Omit<TouchReport, "reportPath">): string {
   lines.push(`## ${r.failures.length} undersized target(s)`);
   lines.push("");
   lines.push("Targets below the threshold are hard to tap on touchscreens and " +
-    "unreachable for users with motor impairments. The `cluster` flag fires " +
-    "when another interactive element's center is within 24 px — the WCAG " +
-    "AA-with-spacing leniency does not apply.");
+    "unreachable for users with motor impairments. Every row here is undersized AND " +
+    "unexcused: it is neither in a sentence nor (at AA) clear of its neighbours. The " +
+    "`cluster` flag says another below-floor target's center is within 24px.");
   lines.push("");
   lines.push("| Element | Text | Size | Min side | Need | Cluster |");
   lines.push("|---|---|---|---|---|---|");

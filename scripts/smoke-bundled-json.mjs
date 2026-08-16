@@ -71,33 +71,48 @@ try {
   // Expected: the toolchain is unreachable, so the CLI must succeed without it.
 }
 
-// `check a11y contrast` calls `evaluateA11yContrast`, which goes through the JSON
-// boundary. Named here so a future reader knows what to change if this gate moves off it.
-console.log("==> running `check a11y contrast` from the built CLI, without MoonBit");
-let output;
-try {
-  output = execFileSync(process.execPath, [CLI, "check", "a11y", "contrast", FIXTURE], {
-    env,
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-    timeout: 180_000,
-  });
-} catch (error) {
-  const combined = `${error.stdout ?? ""}${error.stderr ?? ""}`;
-  // Exit 1 is a legitimate outcome — the gate reports contrast failures on this fixture.
-  // What must not appear is the runtime reaching for a toolchain that is not there.
-  if (/moon|not in a Moon project|ENOENT|run_markup_core_json|is unavailable/i.test(combined)) {
-    fail(
-      "the built CLI could not reach markup-core over the JSON boundary:\n"
-      + `${combined.split("\n").slice(0, 12).join("\n")}\n\n`
-      + "scripts/vlmkit-bundled.mjs must hand the runtime the complete generated bridge "
-      + "(namespace import), and the bridge must be rebuilt after adding an entry point.",
-    );
-  }
-  output = combined;
-}
+/**
+ * Two gates, chosen for what they exercise rather than for coverage's sake.
+ *
+ * `check a11y contrast` (`contrast-evaluate`) is the long-standing case — it is what
+ * caught the incomplete hand-off the first time. `check a11y touch` (`touch-policy`) is
+ * the NEWEST JSON command, and a newly added one is precisely what an un-rebuilt bridge
+ * omits: the older commands keep working, so a single-gate smoke stays green while the
+ * command added this release is missing. That is the failure this file exists to catch,
+ * and it can only see it if the gate it runs uses a recent command.
+ */
+const GATES = [
+  { argv: ["check", "a11y", "contrast", FIXTURE], command: "contrast-evaluate", expect: /contrast/i },
+  { argv: ["check", "a11y", "touch", FIXTURE], command: "touch-policy", expect: /undersized target/i },
+];
 
-if (!/contrast/i.test(output)) {
-  fail(`the gate produced no contrast output:\n${output.slice(0, 600)}`);
+for (const gate of GATES) {
+  console.log(`==> running \`vlmkit ${gate.argv.slice(0, 3).join(" ")}\` (${gate.command}) without MoonBit`);
+  let output;
+  try {
+    output = execFileSync(process.execPath, [CLI, ...gate.argv], {
+      env,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 180_000,
+    });
+  } catch (error) {
+    const combined = `${error.stdout ?? ""}${error.stderr ?? ""}`;
+    // Exit 1 is a legitimate outcome — these gates report real findings on this fixture.
+    // What must not appear is the runtime reaching for a toolchain that is not there.
+    if (/moon|not in a Moon project|ENOENT|run_markup_core_json|is unavailable/i.test(combined)) {
+      fail(
+        `the built CLI could not reach markup-core's \`${gate.command}\` over the JSON boundary:\n`
+        + `${combined.split("\n").slice(0, 12).join("\n")}\n\n`
+        + "scripts/vlmkit-bundled.mjs must hand the runtime the complete generated bridge "
+        + "(namespace import), and the bridge must be rebuilt after adding an entry point.",
+      );
+    }
+    output = combined;
+  }
+
+  if (!gate.expect.test(output)) {
+    fail(`\`${gate.argv.join(" ")}\` produced no matching output:\n${output.slice(0, 600)}`);
+  }
 }
-console.log("==> bundled CLI answered a JSON-boundary command with no MoonBit toolchain");
+console.log("==> bundled CLI answered every JSON-boundary command with no MoonBit toolchain");

@@ -680,7 +680,18 @@ describe("nested-payload commands match their positional arms", { timeout: 300_0
     // `landscape-diff-summary` has its own test: its positional twin takes a
     // sub-encoded stat blob and returns a "mismatch|..." sentinel instead of raising,
     // so the two are not comparable case-for-case. See below.
-    const exempt = new Set(["interaction-issues", "goal-status", "landscape-diff-summary"]);
+    //
+    // `interaction-issues` and `touch-policy` are exempt for a different reason: they are
+    // new logic with NO positional twin to differ from, so there is nothing to compare.
+    // Their coverage is behavioural instead — `touch-policy`'s is
+    // `a11y-touch.test.ts > analyzeA11yTouch — the criteria's own exceptions`, which drives
+    // the same JSON boundary. An exemption here means "tested elsewhere", never "untested".
+    const exempt = new Set([
+      "interaction-issues",
+      "touch-policy",
+      "goal-status",
+      "landscape-diff-summary",
+    ]);
     const uncovered = markupCoreJsonCommands().filter((name) => !covered.has(name) && !exempt.has(name));
     assert.deepEqual(uncovered, [], `migrated with no differential coverage: ${uncovered.join(", ")}`);
   });

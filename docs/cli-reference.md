@@ -461,7 +461,7 @@ on a canvas that overdraws, which the collision and protrusion rules cover.
 
 ```bash
 vlmkit check a11y contrast <html|url>          # WCAG AA contrast scan
-vlmkit check a11y touch    <html|url>          # Touch target size (WCAG 2.5.5 / 2.5.8)
+vlmkit check a11y touch    <html|url>          # Touch target size (WCAG 2.5.8 AA default, 2.5.5 AAA via --level)
 vlmkit check a11y focus    <html|url>          # Tab order vs visual order
 vlmkit check palette       <target.png> [current.png]  # Dominant colors, or palette diff (missing/extra hex)
 vlmkit check tokens        <html|url>          # radius/spacing/z-index/shadow scale conformance (declared scale)
