@@ -4,7 +4,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import {
   buildMarkupLoopCommands,
@@ -12,6 +12,7 @@ import {
   createDefaultMarkupLoopConfig,
   initMarkupLoop,
   loadMarkupLoopConfig,
+  markupLoopRoot,
   observeMarkupLoop,
   runMarkupLoop,
   runMarkupLoopCli,
@@ -245,22 +246,63 @@ describe("runMarkupLoopCli", () => {
     await rm(cwd, { recursive: true, force: true });
   });
 
-  it("doctor checks the PROCESS cwd, not the directory the config came from", async () => {
-    // A limitation, pinned rather than fixed. `doctor --config <path>` accepts a config anywhere,
-    // then `checkMarkupLoopReadiness` resolves `requestFile` / `playwrightConfig` / the helper
-    // against `process.cwd()` — so pointing it at another project's harness reports THIS
-    // directory's missing files. Same shape as the `snapshot --output` bug fixed by taking cwd as
-    // an argument; the fix here is to thread one through `doctor`, and it needs its own change
-    // with room to verify what a "project root" means for a config given by path.
+  it("doctor resolves against the config's own directory, not the process cwd", async () => {
+    // Was pinned as a known limitation: `doctor --config <elsewhere>` accepted a config anywhere
+    // and then checked THIS directory's files, so a harness `init` had just written correctly
+    // reported as not ready. `markupLoopRoot` is now the single definition of where config paths
+    // resolve from, and init / doctor / run / observe all use it.
     const cwd = await mkdtemp(join(tmpdir(), "vlmkit-markup-loop-doctor-elsewhere-"));
     const configPath = join(cwd, "markup-loop.json");
     assert.equal(await runMarkupLoopCli(["init", "--config", configPath]), 0);
     const config = await loadMarkupLoopConfig(configPath);
-    // Everything init wrote is present next to the config — only the project's own
-    // `playwright.config.ts` is outstanding, which init deliberately does not invent…
+    // Only the project's own `playwright.config.ts` is outstanding — init deliberately does not
+    // invent one — so doctor must report exactly that, and exit 1 for exactly that reason.
     assert.deepEqual(checkMarkupLoopReadiness(config, cwd).missing, ["playwright.config.ts"]);
-    // …and `doctor`, which cannot be told that, reports it as not ready.
     assert.equal(await runMarkupLoopCli(["doctor", "--config", configPath]), 1);
+    // With the project's config present, doctor is satisfied — the assertion the old pinned
+    // version could not make, and the one that proves the resolution moved.
+    await writeFile(join(cwd, "playwright.config.ts"), "export default {};\n", "utf8");
+    assert.equal(await runMarkupLoopCli(["doctor", "--config", configPath]), 0);
+    await rm(cwd, { recursive: true, force: true });
+  });
+
+  it("markupLoopRoot: absolute config roots at its directory, relative at the cwd", async () => {
+    assert.equal(markupLoopRoot("/elsewhere/markup-loop.json"), "/elsewhere");
+    assert.equal(markupLoopRoot(".vlmkit/markup-loop.json"), process.cwd());
+    // An explicit cwd always wins — that is how `initMarkupLoop({ cwd })` is driven in tests.
+    assert.equal(markupLoopRoot("/elsewhere/markup-loop.json", "/given"), "/given");
+  });
+
+  it("commands built for another root carry absolute paths, so in-process plan/generate hit it", async () => {
+    // `runMarkupLoop` calls runPlanCli / runGenerateCli IN-PROCESS, where a relative
+    // `--request-file` resolves against the process cwd. Left relative for the default root so
+    // the displayed command stays short; absolutized when the config came from elsewhere.
+    const cwd = await mkdtemp(join(tmpdir(), "vlmkit-markup-loop-cmds-"));
+    const config = createDefaultMarkupLoopConfig({ title: "Elsewhere" });
+    const here = buildMarkupLoopCommands(config);
+    assert.ok(here.plan.argv.includes(config.requestFile), "default root keeps paths as written");
+
+    const there = buildMarkupLoopCommands(config, cwd);
+    assert.ok(there.plan.argv.includes(join(cwd, config.requestFile)));
+    assert.ok(there.generate.argv.includes(join(cwd, config.playwrightConfig)));
+    // `--helper-import` is a module specifier inside the generated test file, relative to that
+    // file. Absolutizing it would break the import it becomes.
+    assert.ok(there.generate.argv.includes(config.helperImport));
+    await rm(cwd, { recursive: true, force: true });
+  });
+
+  it("observe writes beside the config it was given, not into the process cwd", async () => {
+    // The worst of the four, because it WROTE: `observe --config /elsewhere/x.json` dropped its
+    // observations here and left the config's own harness untouched. No browser needed to show
+    // where the write lands — an explicit `--output` is still honoured as the caller's word.
+    const cwd = await mkdtemp(join(tmpdir(), "vlmkit-markup-loop-observe-"));
+    const configPath = join(cwd, "markup-loop.json");
+    assert.equal(await runMarkupLoopCli(["init", "--config", configPath]), 0);
+    const config = await loadMarkupLoopConfig(configPath);
+    assert.equal(
+      resolve(markupLoopRoot(configPath), config.observationsFile),
+      join(cwd, config.observationsFile),
+    );
     await rm(cwd, { recursive: true, force: true });
   });
 

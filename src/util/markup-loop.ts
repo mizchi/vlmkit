@@ -243,8 +243,7 @@ export async function initMarkupLoop(options: InitMarkupLoopOptions = {}): Promi
    * cwd (`../other/markup-loop.json`) therefore still scatters — the same gap, one level
    * narrower, and it wants a defined notion of "project root" rather than another special case.
    */
-  const cwd = options.cwd
-    ?? (isAbsolute(configPath) ? dirname(configPath) : process.cwd());
+  const cwd = markupLoopRoot(configPath, options.cwd);
   const config = createDefaultMarkupLoopConfig(options);
   const created: string[] = [];
 
@@ -266,14 +265,51 @@ export async function loadMarkupLoopConfig(path = DEFAULT_CONFIG_PATH): Promise<
   return JSON.parse(raw) as MarkupLoopConfig;
 }
 
-export function buildMarkupLoopCommands(config: MarkupLoopConfig): MarkupLoopCommands {
+/**
+ * The loop's project root — the directory every path in the config resolves against.
+ *
+ * ONE definition, because four call sites derived it separately and three got it wrong.
+ * `init` was fixed to write the harness beside an absolute `--config`; `doctor`, `run` and
+ * `observe` kept resolving against `process.cwd()`, so pointing any of them at a config
+ * elsewhere reported *this* directory's missing files, and `observe` wrote its observations
+ * into the wrong project. `markup-loop.test.ts` pinned that as a known limitation and named
+ * what the fix needed: "room to verify what a project root means for a config given by path".
+ *
+ * The rule, and why it is not simply `dirname(configPath)`:
+ *
+ *   absolute `--config /elsewhere/markup-loop.json`  -> `/elsewhere`
+ *   relative (including the `.vlmkit/markup-loop.json` default) -> `process.cwd()`
+ *
+ * A relative path stays relative to the cwd because the default has a directory in it and
+ * the harness belongs at the project root, not inside `.vlmkit/`. The remaining gap is a
+ * relative path that escapes the cwd (`../other/markup-loop.json`), which still resolves to
+ * the cwd — one level narrower than before, and it would need the project root to be
+ * discovered (walk up to a marker) rather than derived, which is a different change.
+ */
+export function markupLoopRoot(configPath: string, explicitCwd?: string): string {
+  if (explicitCwd !== undefined) return explicitCwd;
+  return isAbsolute(configPath) ? dirname(configPath) : process.cwd();
+}
+
+export function buildMarkupLoopCommands(config: MarkupLoopConfig, root = process.cwd()): MarkupLoopCommands {
+  /**
+   * Config paths, resolved against the loop's root.
+   *
+   * Left exactly as written when the root IS the process cwd — the default case — so the
+   * displayed command stays short and copy-pasteable and every existing expectation of it
+   * holds. Absolutized only when the config came from elsewhere, and that is not cosmetic:
+   * `runMarkupLoop` hands these argv arrays to `runPlanCli` / `runGenerateCli`
+   * **in-process**, where a relative path resolves against the process cwd and would read
+   * the wrong request file and write the plan into the wrong project.
+   */
+  const p = (value: string): string => (root === process.cwd() ? value : resolve(root, value));
   const planArgs = [
     "--title", config.title,
-    "--request-file", config.requestFile,
-    "--observations", config.observationsFile,
-    "--out", config.planFile,
-    "--structured-out", config.structuredPlanFile,
-    "--locator-inventory-out", config.locatorInventoryFile,
+    "--request-file", p(config.requestFile),
+    "--observations", p(config.observationsFile),
+    "--out", p(config.planFile),
+    "--structured-out", p(config.structuredPlanFile),
+    "--locator-inventory-out", p(config.locatorInventoryFile),
     "--scope", config.scope,
     "--max-attempts", String(config.maxAttempts),
   ];
@@ -282,16 +318,16 @@ export function buildMarkupLoopCommands(config: MarkupLoopConfig): MarkupLoopCom
   if (config.maxTokens) planArgs.push("--max-tokens", String(config.maxTokens));
 
   const generateArgs = [
-    "--plan", config.planFile,
-    "--rules", config.rulesFile,
-    "--locator-inventory", config.locatorInventoryFile,
+    "--plan", p(config.planFile),
+    "--rules", p(config.rulesFile),
+    "--locator-inventory", p(config.locatorInventoryFile),
     "--helper-import", config.helperImport,
-    "--out", config.generatedTestFile,
+    "--out", p(config.generatedTestFile),
     "--max-attempts", String(config.maxAttempts),
     "--overwrite",
     "--gate-command", config.updateSnapshotsCommand,
     "--runtime-gate",
-    "--playwright-config", config.playwrightConfig,
+    "--playwright-config", p(config.playwrightConfig),
     "--runtime-gate-runs", String(config.runtimeGateRuns),
   ];
   if (config.provider) generateArgs.push("--provider", config.provider);
@@ -318,13 +354,13 @@ export function checkMarkupLoopReadiness(config: MarkupLoopConfig, cwd = process
   return {
     ok: missing.length === 0,
     missing,
-    commands: buildMarkupLoopCommands(config),
+    commands: buildMarkupLoopCommands(config, cwd),
   };
 }
 
 export async function runMarkupLoop(configPath = DEFAULT_CONFIG_PATH, options: { dryRun?: boolean } = {}): Promise<number> {
   const config = await loadMarkupLoopConfig(configPath);
-  const readiness = checkMarkupLoopReadiness(config);
+  const readiness = checkMarkupLoopReadiness(config, markupLoopRoot(configPath));
   const commands = readiness.commands;
   if (options.dryRun) {
     console.log(commands.plan.display);
@@ -350,7 +386,16 @@ export async function observeMarkupLoop(
 ): Promise<ObserveMarkupLoopResult> {
   const config = await loadMarkupLoopConfig(configPath);
   const observation = await captureMarkupObservation(options.url ?? config.baseUrl, options);
-  const outputPath = options.outputPath ?? config.observationsFile;
+  // Against the loop's root, not the process cwd: `observe --config /elsewhere/x.json` used to
+  // write its observations HERE, leaving the config's own harness untouched. An explicit
+  // `--output` stays the caller's word and is honoured as given.
+  //
+  // Left as written when the root IS the cwd, same rule as the command paths: the returned
+  // `outputPath` is printed and asserted on, and absolutizing the default case would turn
+  // `.vlmkit/markup-loop/observations.json` into a machine-specific line for no gain.
+  const root = markupLoopRoot(configPath);
+  const outputPath = options.outputPath
+    ?? (root === process.cwd() ? config.observationsFile : resolve(root, config.observationsFile));
   const observations = [observation];
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(observations, null, 2)}\n`, "utf8");
@@ -379,7 +424,7 @@ async function doctor(configPath = DEFAULT_CONFIG_PATH): Promise<number> {
     return 1;
   }
   const config = await loadMarkupLoopConfig(configPath);
-  const readiness = checkMarkupLoopReadiness(config);
+  const readiness = checkMarkupLoopReadiness(config, markupLoopRoot(configPath));
   if (!readiness.ok) {
     for (const path of readiness.missing) console.error(`Missing ${path}`);
     return 1;
