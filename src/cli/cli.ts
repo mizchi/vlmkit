@@ -13,6 +13,7 @@
 
 import { cac } from "cac";
 import { BOLD, CYAN, DIM, RESET } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { VLMKIT_VERSION } from "@mizchi/vlmkit-core/version.ts";
 import { loadGateRegistry } from "./gate-registry.ts";
 
 const HELP_SENTINEL = "__VLMKIT_HELP_PASSTHROUGH__";
@@ -468,7 +469,7 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<vo
   }
 
   const cli = cac("vlmkit");
-  cli.version("0.10.0");
+  cli.version(VLMKIT_VERSION);
 
   cli.usage(`<command> [options]
 
