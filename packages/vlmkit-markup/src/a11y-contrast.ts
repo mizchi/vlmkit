@@ -79,6 +79,15 @@ export interface ContrastFinding {
   /** Required threshold based on font size/weight. 4.5 for normal text, 3.0 for large. */
   requiredAA: number;
   level: WcagLevel;
+  /**
+   * How many elements share this exact case (same selector, colours and type size).
+   *
+   * Reported because the dedup is by case, not by element: Bootstrap's sidebar has ELEVEN links at
+   * `#0d6efd` on `#f8f9fa`, and "1 contrast failure" reads as one link to fix. `check integrity`'s
+   * own contrast rule says "11 element(s)" for the same defect, and the two gates should not
+   * describe one page differently.
+   */
+  elements: number;
 }
 
 export interface A11yContrastReport {
@@ -189,10 +198,31 @@ function toHex(c: { r: number; g: number; b: number }): string {
  * browser instance per route).
  */
 export function analyzeA11yContrastSamples(samples: A11yContrastRawSample[]): ContrastFinding[] {
+  /**
+   * Deduped by the path AND the values the verdict is computed from, not by the path alone.
+   *
+   * `shortPath` keeps a tag plus its first two classes per ancestor, so Bootstrap's sidebar links
+   * all serialize to `…>li.nav-item>a.nav-link.d-flex` — including the `.active` one, which is
+   * white on blue and passes. Keying on the path kept whichever came first and dropped the rest,
+   * and on the Bootstrap dashboard example that meant this gate reported **0 contrast failures on a
+   * page with 11**: `#0d6efd` on `#f8f9fa` at 4.27:1, which `check integrity`'s own contrast rule
+   * reported correctly at the same moment. Two gates in one toolkit disagreeing about WCAG on one
+   * page, and the one whose whole subject is contrast was the wrong one.
+   *
+   * The key is the finding's identity: same selector, same colours, same type size is the same
+   * case and worth collapsing; same selector with different colours is two cases.
+   */
   const byPath = new Map<string, A11yContrastRawSample>();
-  for (const s of samples) if (!byPath.has(s.path)) byPath.set(s.path, s);
+  const identity = (s: A11yContrastRawSample) =>
+    `${s.path}|${toHex(s.foreground)}|${toHex(s.background)}|${s.fontSize}|${s.fontWeight}`;
+  for (const s of samples) {
+    const key = identity(s);
+    if (!byPath.has(key)) byPath.set(key, s);
+  }
   const findings: ContrastFinding[] = [];
-  for (const s of byPath.values()) {
+  const counts = new Map<string, number>();
+  for (const s of samples) counts.set(identity(s), (counts.get(identity(s)) ?? 0) + 1);
+  for (const [key, s] of byPath) {
     const evaluation = evaluateA11yContrast({
       foreground: s.foreground,
       background: s.background,
@@ -212,6 +242,7 @@ export function analyzeA11yContrastSamples(samples: A11yContrastRawSample[]): Co
       ratio: evaluation.ratio,
       requiredAA: evaluation.requiredAA,
       level: evaluation.level,
+      elements: counts.get(key) ?? 1,
     });
   }
   findings.sort((a, b) => a.ratio - b.ratio);
@@ -250,44 +281,24 @@ export async function runA11yContrast(
     return { samples, screenshotPath };
   });
 
-  // Dedupe by path — many text nodes from the same element produce
-  // identical findings.
-  const byPath = new Map<string, A11yContrastRawSample>();
-  for (const s of samples) {
-    if (!byPath.has(s.path)) byPath.set(s.path, s);
-  }
-
-  const findings: ContrastFinding[] = [];
-  for (const s of byPath.values()) {
-    const evaluation = evaluateA11yContrast({
-      foreground: s.foreground,
-      background: s.background,
-      fontSize: s.fontSize,
-      fontWeight: s.fontWeight,
-    });
-    if (evaluation.level !== "fail") continue;
-    findings.push({
-      path: s.path,
-      tag: s.tag,
-      text: s.text,
-      fontSize: s.fontSize,
-      fontWeight: s.fontWeight,
-      bbox: s.bbox,
-      foreground: { ...s.foreground, hex: toHex(s.foreground) },
-      background: { ...s.background, hex: toHex(s.background) },
-      ratio: evaluation.ratio,
-      requiredAA: evaluation.requiredAA,
-      level: evaluation.level,
-    });
-  }
-  findings.sort((a, b) => a.ratio - b.ratio);  // worst first
+  // `analyzeA11yContrastSamples`, not a second copy of it.
+  //
+  // This function used to re-implement the dedup and the finding construction inline, and the two
+  // copies drifted in the way that pattern always does: the exported one is what
+  // `vlmkit diff-pr` calls, this one is what `check a11y contrast` calls, and a fix to either left
+  // the other reporting something else about the same page. Found on the Bootstrap dashboard
+  // example (2026-08-16), where this gate reported **0 contrast failures on a page with 11**.
+  const findings = analyzeA11yContrastSamples(samples);
 
   const reportPath = options.reportPath ?? join(outputDir, "report.md");
   const md = renderReport({
     html: htmlPath,
     viewport,
     screenshot: screenshotPath,
-    totalText: byPath.size,
+    // The samples, not the deduped cases. The label reads "inspected N text-bearing element(s)",
+    // and `byPath.size` made that 10 on a page with 105 — a coverage claim off by 10x, in the
+    // reassuring direction.
+    totalText: samples.length,
     failures: findings,
   });
   await writeFile(reportPath, md);
@@ -300,7 +311,7 @@ export async function runA11yContrast(
     html: htmlPath,
     viewport,
     screenshot: screenshotPath,
-    totalText: byPath.size,
+    totalText: samples.length,
     failures: applied.kept,
     ...(applied.exempted.length > 0
       ? {
@@ -345,7 +356,8 @@ export function formatA11yContrastReport(report: A11yContrastReport, rules?: Rul
   );
   const CONSOLE_ROWS = 5;
   for (const f of off ? [] : report.failures.slice(0, CONSOLE_ROWS)) {
-    lines.push(`    ${DIM}${f.path} — ${f.ratio.toFixed(2)}:1 (need ${f.requiredAA}) — \`${f.foreground.hex}\` on \`${f.background.hex}\` — "${f.text}"${RESET}`);
+    const shared = f.elements > 1 ? ` ${f.elements} element(s)` : "";
+    lines.push(`    ${DIM}${f.path} — ${f.ratio.toFixed(2)}:1 (need ${f.requiredAA}) — \`${f.foreground.hex}\` on \`${f.background.hex}\` — "${f.text}"${shared}${RESET}`);
   }
   // Disclose the cut: a headline count above a five-row list reads as "here they
   // are", and a reader has no way to know seven more exist. Same wording as

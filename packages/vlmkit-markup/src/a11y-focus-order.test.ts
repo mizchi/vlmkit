@@ -236,3 +236,57 @@ describe("multi-column tab order", () => {
     assert.deepEqual(findings.map((f) => `${f.kind} ${f.fromIndex}->${f.toIndex}`), ["reverse 6->7"]);
   });
 });
+
+/**
+ * Viewport-pinned elements, found by dogfooding Bootstrap's dashboard example (2026-08-16).
+ *
+ * Its theme switcher is `position: fixed bottom-0 end-0` and sits eleventh in `<body>`, so Tab
+ * reaches it FIRST and the next step goes to the navbar at y=0: `[reverse] Focus moved up by
+ * 662px`, exit 1, on the idiom skip links are built from. One of those two `y` values is a screen
+ * position and the other a document position, and comparing them says nothing about reading order.
+ */
+describe("viewport-pinned focus steps", () => {
+  const pinned = (over: Partial<FocusStep> & { x: number; y: number }): FocusStep =>
+    ({ ...step(over), pinned: true });
+
+  it("a reverse into or out of a pinned element is not a finding", () => {
+    // Both directions: a fixed control tabbed first (Bootstrap's case) and one tabbed last.
+    assert.deepEqual(analyzeFocusOrderSteps([
+      pinned({ x: 1200, y: 662, path: "button#bd-theme" }),
+      step({ x: 0, y: 0, path: "a.navbar-brand" }),
+    ]), []);
+    assert.deepEqual(analyzeFocusOrderSteps([
+      step({ x: 0, y: 600, path: "a.footer-link" }),
+      pinned({ x: 1200, y: 20, path: "button#to-top" }),
+    ]), []);
+  });
+
+  it("a trap on a pinned element is still a finding", () => {
+    // Identity, not geometry: focus stuck on one element is a trap wherever that element is
+    // painted, and a pinned dialog is a common place to get stuck.
+    const findings = analyzeFocusOrderSteps([
+      pinned({ x: 1200, y: 662, path: "button#bd-theme" }),
+      pinned({ x: 1200, y: 662, path: "button#bd-theme" }),
+    ]);
+    assert.deepEqual(findings.map((f) => f.kind), ["trap"]);
+  });
+
+  it("in-flow reverses are untouched by the pinned rule", () => {
+    // The regression guard: this is the finding the gate exists for, and it must not be swept up.
+    const findings = analyzeFocusOrderSteps([
+      step({ x: 100, y: 600, path: "a.one" }),
+      step({ x: 100, y: 200, path: "a.two" }),
+    ]);
+    assert.deepEqual(findings.map((f) => f.kind), ["reverse"]);
+  });
+
+  it("steps with no `pinned` field analyse exactly as before", () => {
+    // Optional on purpose: a caller that built steps by hand, or a recorded run from before the
+    // field existed, must not silently lose every reverse finding.
+    const findings = analyzeFocusOrderSteps([
+      { ...step({ x: 100, y: 600, path: "a.one" }), pinned: undefined },
+      { ...step({ x: 100, y: 200, path: "a.two" }), pinned: undefined },
+    ]);
+    assert.deepEqual(findings.map((f) => f.kind), ["reverse"]);
+  });
+});

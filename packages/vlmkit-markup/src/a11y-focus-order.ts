@@ -59,6 +59,18 @@ export interface FocusStep {
   bbox: { x: number; y: number; width: number; height: number };
   /** Author `tabindex` attribute value (null = unset / default). */
   tabindexAttr: string | null;
+  /**
+   * The element (or an ancestor) is `position: fixed` or `sticky`.
+   *
+   * A pinned element's `y` is its position on SCREEN, not in the document, so a jump into or out of
+   * one is not evidence about reading order. Bootstrap's dashboard example puts a
+   * `position: fixed` theme switcher near the top of `<body>` and paints it bottom-right, so it is
+   * tabbed first and the step to the navbar read as `[reverse] Focus moved up by 662px` — the same
+   * shape as a skip link, which is the idiom this pattern comes from.
+   *
+   * Optional so a caller that built steps by hand (or an older recorded run) still analyses.
+   */
+  pinned?: boolean;
 }
 
 export interface FocusOrderFinding {
@@ -102,12 +114,21 @@ export const A11Y_FOCUS_ORDER_SAMPLE_SCRIPT = `
   }
   const r = el.getBoundingClientRect();
   const text = (el.textContent || el.getAttribute("aria-label") || el.getAttribute("title") || el.getAttribute("placeholder") || "").trim().slice(0, 60);
+  // Whether this element is pinned to the viewport. A fixed or sticky element's y says where it is
+  // on screen, which has no relationship to where it sits in the document — so comparing it
+  // against an in-flow element's y is comparing two different coordinate spaces.
+  let pinned = false;
+  for (let p = el; p && p !== document.documentElement; p = p.parentElement) {
+    const pos = getComputedStyle(p).position;
+    if (pos === "fixed" || pos === "sticky") { pinned = true; break; }
+  }
   return {
     path: shortPath(el),
     tag: el.tagName.toLowerCase(),
     text,
     bbox: { x: r.x, y: r.y, width: r.width, height: r.height },
     tabindexAttr: el.getAttribute("tabindex"),
+    pinned,
   };
 })()
 `;
@@ -159,6 +180,12 @@ export function analyzeFocusOrderSteps(steps: FocusStep[]): FocusOrderFinding[] 
       cur: { x: cur.bbox.x, y: cur.bbox.y },
     });
     if (transition === "ok" || transition === "column-advance") continue;
+    // A `reverse` across a viewport-pinned element is not evidence: one of the two `y` values is a
+    // screen position and the other a document position. `trap` and `skip-row` are unaffected —
+    // a trap is about identity, and a skip-row into a pinned bar is still worth naming.
+    // Not silent: the formatter counts the pinned steps from the same list and says the policy
+    // applied, because "0 findings" and "1 finding we chose not to make" are different statements.
+    if (transition !== "trap" && (prev.pinned || cur.pinned)) continue;
     const dy = cur.bbox.y - prev.bbox.y;
     if (transition === "trap") {
       findings.push({
@@ -285,6 +312,16 @@ export function formatFocusOrderReport(report: FocusOrderReport, rules?: RuleVie
   lines.push(`  ${icon} ${shown.length} finding(s)`);
   const note = hiddenByRuleNote(hiddenByRule);
   if (note) lines.push(`    ${DIM}${note}${RESET}`);
+  // The policy, stated when it could have applied. A pinned element's `y` is a screen position and
+  // an in-flow element's is a document position, so a jump between them says nothing about reading
+  // order — but a reader seeing `0 finding(s)` deserves to know a rule was declined, not just that
+  // none fired. Measured on Bootstrap's dashboard example: a `position: fixed` theme switcher
+  // tabbed first produced `[reverse] Focus moved up by 662px`, the same shape as a skip link.
+  const pinnedSteps = report.steps.filter((step) => step.pinned).length;
+  if (pinnedSteps > 0) {
+    lines.push(`    ${DIM}${pinnedSteps} focusable element(s) are viewport-pinned (fixed / sticky);`
+      + ` jumps into or out of them are not read as order defects${RESET}`);
+  }
   const CONSOLE_ROWS = 5;
   for (const { row: f, tier } of shown.slice(0, CONSOLE_ROWS)) {
     const retuned = tier === (f.kind === "skip-row" ? "warn" : "suspect") ? "" : ` (re-tuned to ${tier})`;

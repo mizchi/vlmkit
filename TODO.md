@@ -2220,6 +2220,44 @@ published packages のみでも **65.5%**。つまり**除外だけでは 70% �
   - 修正:`runOutputDir()` を `arg-helpers.ts` に共有ヘルパーとして置き、a11y の3ゲート
     (contrast / touch / focus)と drift が使う。drift のローカル `runSlug` は削除。
 
+- [x] **dogfood v10: Bootstrap dashboard example(2026-08-16)** —
+  `docs/reports/2026-08-16-dogfood-bootstrap-dashboard.md`
+  - v9(vite.dev = 暗い docs/marketing)と**あらゆる軸で違うページ**を選んだ:
+    ライトテーマ / データテーブル / サイドバー / フォーム / canvas チャート /
+    `data-bs-theme` 属性テーマ。しかも何千ものプロジェクトがほぼそのまま出荷している markup。
+    mirror は third-party(Chart.js CDN)もローカルに落として書き換えたので
+    **failed request ゼロ**(v9 は 9件残っていた)。
+  - **欠陥1: `check a11y contrast` が 11件ある失敗を「0件」と報告していた**。
+    見つかったのは `check integrity` が同じページで同じ欠陥を
+    「4.27:1、11 element(s)」と正しく報告していたから = **1つのツール内で2つのゲートが矛盾**。
+    原因2つ: (a) dedup キーが `path` だけで、`shortPath` は各祖先のクラス2つまでしか持たないので
+    サイドバーの12リンクが全部同じパスに潰れ、**最初の1つ(`.active`、`#2470dc` でちょうど 4.50 = 合格)**
+    が残って11件が消えた。(b) **同じロジックが2箇所**にあり、export された
+    `analyzeA11yContrastSamples`(`diff-pr` が呼ぶ)を直しても CLI は変わらなかった
+    — `runA11yContrast` が inline で再実装していた。リポジトリが記録している
+    「同じものが2箇所にあって片方だけ直る」パターンを現行犯で捕まえた形。
+    → dedup キーを**判定の入力**(path + 前景/背景/サイズ/ウェイト)に変更、
+    `elements: 11` を finding に持たせ、CLI は共有関数を呼ぶ。
+    `inspected 10` → `105`(dedup map のサイズを「element(s)」と称していた = 10倍の過小申告)。
+    **旧挙動を名前で固定していたテスト**(`dedupes by path — first sample wins`)は
+    欠陥を意図として書き留めたものだったので理由付きで置き換え。
+  - **欠陥2: `position: fixed` のコントロールが focus-order 欠陥として報告されていた**。
+    Bootstrap のテーマ切替は `fixed bottom-0 end-0` で DOM 11番目 = 最初に Tab が当たり、
+    次のステップで navbar(y=0)へ → `[reverse] 662px up`、exit 1。
+    片方は**画面上の y**、もう片方は**文書内の y** で、比較しても読み順の証拠にならない。
+    しかも skip link と同じイディオム。→ sampler が fixed/sticky を記録し、
+    pinned を挟む reverse / skip-row は報告しない(**trap は報告する** — 同一性の話で、
+    pinned なダイアログは実際に詰まる場所)。**方針が適用されたことは明示**する。
+    v9 の vite.dev で 4 findings が全部残ることも確認。
+  - **2ラウンドで3件目の「幾何ヒューリスティックが次元を1つ見ていない」**:
+    collision が clip を、focus が列境界を、focus が配置コンテキストを。偶然ではなくパターン。
+  - **theme strategy fix はまだ実アプリで証明できていない**: Bootstrap も
+    `color-modes.js` で media query を属性にブリッジしているので旧実装でも 94.2% 出る
+    (VitePress と同じ)。**実アプリ2連続でブリッジしていた**のは生態系についての事実として記録。
+  - **2回目の目撃で正式に起票**: `check a11y touch` が AAA 既定で 17/18 を undersized と言う
+    (`.btn-sm` 58x31、`.nav-link` 211x37 = Bootstrap 既定)。v9 でも 37/38。
+    WCAG 2.5.8 の AA は 24x24 + inline 例外なので、必要なのは静かな既定ではなく **AA レベルと例外**。
+
 - [ ] **dogfood の次ラウンドは別ページで(2026-08-10 v4 の結論)**
   - v4 で「測定が間違っている」系の指摘が **0 件**になり、残る 6 件はすべて出力の読みやすさ。
     ただし 6 件全部が**同じ 4 ゲート・同じページ**由来で、シナリオが新しい種類の欠陥を

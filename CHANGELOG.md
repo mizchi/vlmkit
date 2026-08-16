@@ -1026,6 +1026,41 @@ suppression works per *rule* instead of per whole gate.
 
 ### Fixed
 
+- **`check a11y contrast` was reporting 0 failures on a page with 11.** Found by dogfooding
+  Bootstrap's dashboard example, where `check integrity` reported the same defect correctly at the
+  same moment — two gates in one toolkit disagreeing about WCAG on one page, and the wrong one was
+  the gate whose whole subject is contrast. Two causes: the dedup keyed on a truncated selector
+  path, so all twelve sidebar links collapsed into the one `.active` link that passes at exactly
+  4.50 and eleven `#0d6efd` failures at 4.27 were dropped; and the same dedup-and-analyse logic
+  existed twice, so fixing the exported `analyzeA11yContrastSamples` (what `vlmkit diff-pr` calls)
+  left `runA11yContrast` (what the CLI calls) reporting the old answer. The key is now the finding's
+  identity — path plus colours, size and weight, the inputs the verdict uses — findings carry how
+  many elements share the case (`11 element(s)`, matching what `check integrity` says), and the CLI
+  delegates to the shared function. The coverage line also moved from 10 to 105: it had been
+  printing the size of the dedup map under a label reading "text-bearing element(s)".
+
+- **`check a11y focus` no longer calls a `position: fixed` control a focus-order defect.** Bootstrap's
+  theme switcher is `fixed bottom-0 end-0` and eleventh in `<body>`, so Tab reaches it first and the
+  next step goes to the navbar: `[reverse] Focus moved up by 662px`, exit 1, on the idiom skip links
+  are built from. One of those two coordinates is a screen position and the other a document
+  position. The sampler now records whether an element (or an ancestor) is fixed or sticky, and a
+  `reverse` or `skip-row` across one is not reported — `trap` still is, because focus stuck on one
+  element is a trap wherever it is painted. The gate says the policy applied rather than silently
+  reporting nothing, and `pinned` is optional so hand-built or previously-recorded steps keep every
+  finding. vite.dev's four findings, both genuine reverses included, are unaffected.
+
+  Third gate in two dogfood rounds whose defect was a geometric heuristic missing one dimension:
+  collision missing clips, focus missing column boundaries, focus missing the positioning context.
+
+  Also recorded from this round: the theme-strategy fix is **still unproven on a real app**. Bootstrap
+  bridges `prefers-color-scheme` to `data-bs-theme` in `color-modes.js`, exactly as VitePress bridges
+  it to a class, so the pre-fix build scores 94.2% against 94.3% here. Two real apps in a row, which
+  says something about the ecosystem — the fixture remains the only evidence the fix matters. And
+  `check a11y touch` is filed after a second sighting: 17 of 18 Bootstrap defaults fail its AAA
+  target, as 37 of 38 did on vite.dev, so what it needs is WCAG 2.5.8's AA level and inline
+  exception rather than a quieter default. Full write-up:
+  `docs/reports/2026-08-16-dogfood-bootstrap-dashboard.md`.
+
 - **A strip that actually plays**: `snapshot strip --animated` and
   `check animation --strip out.png --strip-animated` write an animated PNG. The recorded item asked
   for animated WebP; that is not encodable with what this repo ships. The optional peer
