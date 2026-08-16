@@ -38,7 +38,6 @@
   },
   "files": [
     "dist/**",
-    "!dist/e2e/**",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"
@@ -76,8 +75,6 @@
     "motion:kagura-runtime:game-assets": "node design-runs/game-assets-20260520/tools/check-kagura-runtime-smokes.mjs",
     "motion:kagura-runtime-calibrated:game-assets": "node design-runs/game-assets-20260520/tools/check-kagura-runtime-smokes.mjs --calibration-contract design-runs/game-assets-20260520/models/robot-voxel-motion/kagura-calibration-handoff.json",
     "motion:kagura-runtime-utils:game-assets": "node --test design-runs/game-assets-20260520/tools/game-asset-motion-core.test.mjs design-runs/game-assets-20260520/tools/kagura-runtime-smoke-utils.test.mjs design-runs/game-assets-20260520/tools/kagura-runtime-batch-utils.test.mjs",
-    "vrt": "playwright test",
-    "vrt:update": "playwright test --update-snapshots",
     "build:packages:js": "pnpm --filter './packages/**' --filter '!@mizchi/vlmkit-mcp' --filter '!@mizchi/vlmkit-markup' --recursive run build && pnpm --filter @mizchi/vlmkit-markup run build:js",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"

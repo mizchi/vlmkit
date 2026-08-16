@@ -1647,6 +1647,32 @@ npm install した vlmkit には spec が同梱されず `HARNESS_ROOT` はど�
   - `@mizchi/vrt-<pkg>` は 0.6 以降どのパッケージの名前でもない。
     この行を読んで書いた import は解決しない。dist 解決の罠も同じ場所に書いた。
 
+- [x] **`dist/e2e` の packaging 判断: spec 自体を廃止した**(publish もしない、command も残す)
+  - 「publish するか 2 command を廃止するか」の二択で聞いたが、**廃止側のコストが見えていなかった**:
+    `verify` / `approve` / `report` / `introspect` / `spec-verify` / `expect` は
+    capture が書く `.a11y.json` を読んでいて、他に producer が無い
+    (`vlmkit snapshot` は multi-viewport PNG だけ、a11y tree は書かない)。
+    2 command 消すと 6 command が入力を失う。
+  - なので**廃止したのは spec ファイル**。中身は 135 行の
+    `goto` / `screenshot` / `getFullAXTree` / write で、fixture も snapshot assertion も無い
+    = test runner が要らない。`captureRoutes`
+    (`packages/vlmkit-capture/src/route-capture.ts`, gate と同じ `withBrowser`)に移した。
+  - 一緒に消えたもの: `e2e/`, root の `playwright.config.ts`, `vrt` / `vrt-update` task,
+    `files` の `!dist/e2e/**`, tsdown の e2e entry, `resolveCaptureSpecPath`,
+    `captureSpecMissingMessage`(存在しなくてよくなったファイルについての丁寧な説明文)。
+    → **installed package から動く**ようになった。
+  - **port で出た欠陥3つ**:
+    1. `playwright.config.ts` の 2 project (1280x720 / 375x812) が同じ spec を走らせ、
+       同じ `<name>.png` に書いていた = **baseline が desktop か mobile か非決定的**。
+       → 1 viewport に固定して出力に明記。
+    2. subprocess の exit code では**どの route が落ちたか言えない**ので、
+       caller は file 数で推測して「(some tests had warnings...)」を出していた。
+       → route ごとに status / waitFor 不一致 / 空 body / a11y の degrade を報告。
+    3. `page.goto` は 4xx で throw しない = **path 間違いの route が
+       エラーページを baseline にして exit 0**。→ 非 2xx を報告して exit 1。
+  - test 14件追加(browser 6 + pure 4 + retirement guard 2 + 既存置換)。
+    実サーバで init → capture → verify → PASS、404 route、server 停止も手で確認。
+
 - [x] **実アプリ dogfood v9: vite.dev (VitePress docs + marketing)** —
   `docs/reports/2026-08-16-dogfood-vite-dev-docs-site.md`
   - Chromium は今日も outbound network 無し(`example.com` すら ERR_CONNECTION_RESET)。

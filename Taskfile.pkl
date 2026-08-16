@@ -296,15 +296,11 @@ local falsePositive = new Task {
 }
 
 // ---- Playwright ----
-
-local vrtPlaywright = new Task {
-  name = "vrt"
-  cmd = "playwright test"
-}
-local vrtUpdate = new Task {
-  name = "vrt-update"
-  cmd = "playwright test --update-snapshots"
-}
+//
+// `vrt` / `vrt-update` (`playwright test`) are gone with `e2e/vlmkit-capture.spec.ts` and the
+// root `playwright.config.ts`. Route capture is `vlmkit workflow init` / `workflow capture`,
+// which run in-process now; the only remaining playwright configs belong to fixtures
+// (`packages/vlmkit-heal/fixtures/`) and to user projects that vlmkit generates tests for.
 
 // ---- Markup-assistance suite (new this PR) ----
 //
@@ -400,8 +396,6 @@ tasks {
   dogfoodLuna
   dogfoodSol
   falsePositive
-  vrtPlaywright
-  vrtUpdate
   smokeAll
   vrtHelp
   specCheck

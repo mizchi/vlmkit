@@ -35,7 +35,7 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, it } from "vitest";
@@ -99,7 +99,11 @@ function knownFlags() {
     "-e", 'name = "[a-z][a-z0-9-]*"',
     "-e", '(argv, "[a-z][a-z0-9-]*"',
     "-e", '(args, "[a-z][a-z0-9-]*"',
-    "src", "packages", "worker", "e2e", "Taskfile.pkl", "justfile", ".github",
+    // Only paths that exist: `e2e/` was here until the capture spec was retired, and grep
+    // exits 2 (not 1) on a missing path, so the helper above rethrows and all three tests in
+    // this file fail with a message about nothing.
+    ...["src", "packages", "worker", "Taskfile.pkl", "justfile", ".github"]
+      .filter((p) => existsSync(join(repoRoot, p))),
   ]);
   const flags = new Set();
   for (const [flag] of sources.matchAll(FLAG)) flags.add(flag);

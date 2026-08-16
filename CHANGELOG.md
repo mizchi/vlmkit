@@ -1026,6 +1026,34 @@ suppression works per *rule* instead of per whole gate.
 
 ### Fixed
 
+- **`workflow init` / `workflow capture` work from an installed package**, and the `dist/e2e`
+  packaging question is retired with the thing that caused it. Capture used to spawn
+  `npx playwright test e2e/vlmkit-capture.spec.ts`; the published package excludes the spec
+  (`"!dist/e2e/**"`) and never shipped the sources, so those two commands were
+  source-checkout-only. The spec was 135 lines of `goto` / `screenshot` /
+  `Accessibility.getFullAXTree` / write with no fixtures and no snapshot assertions, so it is a
+  function now — `captureRoutes` in `@mizchi/vlmkit-capture/route-capture.ts`, on the same
+  `withBrowser` all 27 gates use. Deleted with it: the spec file, the root `playwright.config.ts`
+  and the empty `e2e/`, the `vrt` / `vrt-update` tasks, the `!dist/e2e/**` exclusion and the build
+  entry that fed it, plus `resolveCaptureSpecPath` and `captureSpecMissingMessage` — a careful
+  message about a file that no longer needs to exist.
+
+  Deleting the two commands instead would have cost more than it looked: `verify`, `approve`,
+  `report`, `introspect`, `spec-verify` and `expect` all read the `.a11y.json` sidecars capture
+  produces, and nothing else produces them (`vlmkit snapshot` writes multi-viewport PNGs, no a11y
+  trees), so two commands would have orphaned six.
+
+  Three defects fell out of the port. Running one spec under two Playwright projects
+  (`vrt-desktop` 1280x720, `vrt-mobile` 375x812) had both writing the same `<name>.png`, so a
+  baseline was **nondeterministically desktop or mobile**; capture now takes one viewport and
+  names it in the output. A subprocess exit code cannot say which route failed, so the callers
+  guessed from file counts and printed "(some tests had warnings, but captures completed)" for a
+  404, a broken selector and an empty page alike; each route now reports its own status, an
+  unmatched `waitFor`, an empty body, and whether the a11y tree came from CDP or the degraded
+  `ariaSnapshot` fallback. And `page.goto` does not throw on 4xx, so a mistyped route captured the
+  server's error page, wrote an a11y tree of it and exited 0 — a baseline that then passes
+  forever; a non-2xx capture is now reported and exits 1.
+
 - **Three gates stopped failing correct markup**, found by dogfooding vite.dev — a real
   VitePress docs + marketing site, mirrored locally because Chromium has no outbound network in
   this sandbox. Each was a geometric heuristic missing one dimension:

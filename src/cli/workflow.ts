@@ -16,8 +16,7 @@
  *   expect    -- generate expectation.json from current diff
  */
 
-import { execFileSync, type ExecSyncOptions } from "node:child_process";
-import { join, sep } from "node:path";
+import { join } from "node:path";
 import {
   readFile,
   readdir,
@@ -30,7 +29,6 @@ import { runVerifyPipeline, type VerifyPaths } from "./workflow/verify.ts";
 import { runGraph, runAffected } from "./workflow/graph.ts";
 import { runIntrospect, runSpecVerify, runExpect, type SpecPaths } from "./workflow/spec.ts";
 import {
-  HARNESS_ROOT,
   PROJECT_ROOT,
   BASELINES_DIR,
   SNAPSHOTS_DIR,
@@ -39,21 +37,12 @@ import {
   EXPECTATION_PATH,
   SPEC_PATH,
 } from "./workflow/paths.ts";
-import { resolveCaptureRoutes } from "@mizchi/vlmkit-capture/capture-config.ts";
+import { resolveCaptureRoutes, type CaptureRoute } from "@mizchi/vlmkit-capture/capture-config.ts";
+import { captureRoutes, type RouteCaptureResult } from "@mizchi/vlmkit-capture/route-capture.ts";
 import { isCliEntry } from "@mizchi/vlmkit-core/plugin/cli-entry.ts";
 import type { UnifiedAgentContext } from "@mizchi/vlmkit-core/types.ts";
 import { readEnv } from "@mizchi/vlmkit-core/project-config.ts";
 
-const NPX_COMMAND = process.platform === "win32" ? "npx.cmd" : "npx";
-
-const EXEC_OPTS: ExecSyncOptions = {
-  cwd: PROJECT_ROOT,
-  stdio: "inherit",
-  env: {
-    ...process.env,
-    VLMKIT_OUTPUT_DIR: PROJECT_ROOT,
-  },
-};
 
 interface WorkflowCaptureOptions {
   configPath?: string;
@@ -82,82 +71,40 @@ function parseCaptureOptions(argv: string[]): WorkflowCaptureOptions {
 }
 
 /**
- * The Playwright spec `init` and `capture` drive.
+ * Where `init` and `capture` get their screenshots + a11y trees.
  *
- * **These names were `vrt-capture.spec.*` and nothing on disk has been called that since
- * the rename.** The file is `e2e/vlmkit-capture.spec.ts` and the build emits
- * `dist/e2e/vlmkit-capture.spec.mjs`, so neither candidate ever matched and both commands
- * failed 100% of the time. The throw below had the right name all along — it says
- * `e2e/vlmkit-capture.spec.ts` — which is the tell that only the two path literals were
- * missed by the rename.
+ * Until this change: `npx playwright test e2e/vlmkit-capture.spec.ts`, spawned from
+ * `HARNESS_ROOT`. The spec was 135 lines of `goto` / `screenshot` / `getFullAXTree` / write with
+ * no fixtures and no snapshot assertions, and being a test file rather than a function is what
+ * made "publish `dist/e2e` or retire these two commands" a question at all: `package.json`
+ * excludes `!dist/e2e/**` and the sources are unpublished, so an installed vlmkit had no spec
+ * and no build could make one.
  *
- * It stayed invisible because the callers' `catch (e)` discarded `e` and printed
- * "Playwright capture failed. Is the server running?" instead. A hard, deterministic
- * failure read as an environment problem, so the message sent every reader to check a
- * server that was never contacted. Tests did not catch it either: `workflow-cli.test.ts`
- * covers option parsing and the command table, and a path literal is neither.
+ * Retiring the commands was the more expensive half of that choice. `verify`, `approve`,
+ * `report`, `introspect`, `spec-verify` and `expect` all read the `.a11y.json` sidecars this
+ * produces, and nothing else produces them — `vlmkit snapshot` writes multi-viewport PNGs and no
+ * a11y trees. Deleting two commands would have orphaned six.
  *
- * Packaging: `package.json`'s `files` publishes `dist/**` but excludes `dist/e2e/**`, and
- * the `e2e/` sources are not published either, so an npm-installed vlmkit has no spec at
- * all and no build can produce one. Whether to publish the spec or retire these two
- * commands is still a packaging decision (see TODO.md) — what changed is that the failure
- * now says so, instead of telling an installed user to run a build that cannot help.
+ * So the SPEC is what is retired. `captureRoutes` in `@mizchi/vlmkit-capture/route-capture.ts`
+ * does the same work in this process via `withBrowser`, which is what every gate already uses.
+ * Gone with it: `resolveCaptureSpecPath`, `captureSpecMissingMessage` (a message about a file
+ * that no longer needs to exist), the `npx playwright test` spawn and its `testDir`/filter
+ * fragility, the `HARNESS_ROOT` lookup, and the silent overwrite from running one spec under two
+ * playwright projects that wrote the same filenames.
  */
-/**
- * The spec path **relative to `HARNESS_ROOT`**, because that is what playwright matches.
- *
- * Positional arguments to `playwright test` are filters compared against the collected
- * test files, and collection is driven by the config's `testDir`. An absolute path from
- * another tree matches nothing, which is why an earlier attempt at this fix still got
- * "No tests found" — see `runCaptureSpec` for the cwd half of the same problem.
- *
- * One candidate, not two. The list used to carry `dist/e2e/vlmkit-capture.spec.mjs` as a
- * fallback, and it could only ever hurt: `playwright.config.ts` sets `testDir: "./e2e"`, so
- * the built copy is outside collection and selecting it reports "No tests found" — the
- * obscure failure this whole function exists to replace with a clear one. It is reachable
- * only when the source spec is absent, which is exactly the state that needs the clear
- * message. Playwright transpiles TS itself, so the source candidate needs no build.
- */
-function resolveCaptureSpecPath(): string {
-  const candidates = [join("e2e", "vlmkit-capture.spec.ts")];
-  const found = candidates.find((candidate) => existsSync(join(HARNESS_ROOT, candidate)));
-  if (!found) throw new Error(captureSpecMissingMessage(HARNESS_ROOT, candidates));
-  return found;
+interface CaptureTargets {
+  baseUrl: string;
+  routes: CaptureRoute[];
 }
 
 /**
- * Why the spec is missing, told apart by where vlmkit is running from.
+ * Resolve base URL + routes, and say where they came from.
  *
- * The two cases need opposite advice, and the single message used to give the installed
- * user the checkout's: "Run `pnpm build` (source checkout), or restore
- * `e2e/vlmkit-capture.spec.ts`". Neither half is actionable from `node_modules` — there is
- * no build to run, nothing to restore, and the reason is not local damage but a deliberate
- * `!dist/e2e/**` in the published `files`. So it sent a reader to fix something that is not
- * broken, which is the same failure mode as the "Is the server running?" line above: advice
- * about a cause nobody checked.
- *
- * Exported for the test — reaching this branch for real means an actual `npx playwright
- * test` spawn, and a message is not worth a browser.
+ * No longer builds an environment for a subprocess — the routes are passed straight to
+ * `captureRoutes` — but the precedence reporting below is unchanged, and it is the part that
+ * had bugs worth keeping fixed.
  */
-export function captureSpecMissingMessage(harnessRoot: string, candidates: string[]): string {
-  const installed = harnessRoot.split(sep).includes("node_modules");
-  const why = installed
-    ? "This is an installed copy of vlmkit, and the published package deliberately omits the\n"
-      + "capture spec (`\"!dist/e2e/**\"` in `files`), so no build here can produce it.\n"
-      + "`workflow init` and `workflow capture` need a source checkout:\n"
-      + "  git clone https://github.com/mizchi/vlmkit && cd vlmkit && pnpm install\n"
-      + "Every other command — `vlmkit check *`, `scan *`, `diff *`, `snapshot` — works from\n"
-      + "the installed package and needs none of this."
-    : "This looks like a source checkout, so the file should be here: restore\n"
-      + `\`${candidates[0]}\` (\`git checkout -- ${candidates[0]}\`).`;
-  return `Missing the capture spec. Looked under ${harnessRoot} for:\n`
-    + candidates.map((c) => `  ${c}\n`).join("")
-    + why;
-}
-
-function buildCaptureEnv(mode: "baseline" | "capture", options: WorkflowCaptureOptions) {
-  const env: NodeJS.ProcessEnv = { ...EXEC_OPTS.env, VLMKIT_MODE: mode };
-
+function resolveCaptureTargets(options: WorkflowCaptureOptions): CaptureTargets {
   // Resolve config + routes against PROJECT_ROOT (user's working directory),
   // so external projects can drop a vlmkit.config.json next to their app.
   const envRoutes = readEnv("CAPTURE_ROUTES");
@@ -174,12 +121,6 @@ function buildCaptureEnv(mode: "baseline" | "capture", options: WorkflowCaptureO
     envRoutes,
   });
 
-  if (routeSet.configPath) {
-    env.VLMKIT_CONFIG_PATH = routeSet.configPath;
-  }
-  env.VLMKIT_BASE_URL = routeSet.baseUrl;
-  env.VLMKIT_PROJECT_ROOT = PROJECT_ROOT;
-
   if (routeSet.source === "env") {
     console.log(`  (routes from VLMKIT_CAPTURE_ROUTES: ${routeSet.routes.map((r) => r.path).join(", ")})`);
     // An env var outranking a flag the user typed is the documented precedence, but it
@@ -195,11 +136,11 @@ function buildCaptureEnv(mode: "baseline" | "capture", options: WorkflowCaptureO
     console.log(`  (using default routes — pass --config or create vlmkit.config.json to customize)`);
   }
 
-  return env;
+  return { baseUrl: routeSet.baseUrl, routes: routeSet.routes };
 }
 
 /**
- * What to print when a capture run produced no PNGs, given what actually went wrong.
+ * What to print when a capture run produced no screenshots, given what actually went wrong.
  *
  * `init` and `capture` each carried a byte-identical pair of `console.error` lines that
  * read the caught error not at all:
@@ -210,135 +151,131 @@ function buildCaptureEnv(mode: "baseline" | "capture", options: WorkflowCaptureO
  * Measured with four unrelated causes — a `--config` path that does not exist, a config
  * file containing invalid JSON, malformed `VLMKIT_CAPTURE_ROUTES`, and a correct config
  * with no server — all four printed those two lines verbatim, and none of the four was
- * the real cause: the spec lookup above was broken, so every run failed there first.
+ * the real cause: the spec lookup was broken, so every run failed there first.
  *
  * The port was hardcoded too, so a config declaring `http://localhost:9999` still got
  * told to check `127.0.0.1:4174`. Two ways of naming a cause nobody had checked.
+ *
+ * Now that capture runs in-process, the errors are PER ROUTE instead of one subprocess exit
+ * string, so this prints each route's own failure. That is the difference between "the app is
+ * not running" and "route /admin 404s while the other four are fine".
  */
-function reportCaptureFailure(err: unknown, baseUrl: string | undefined): void {
-  const message = err instanceof Error ? err.message : String(err);
+function reportCaptureFailure(result: RouteCaptureResult, baseUrl: string): void {
   console.error("Capture produced no screenshots.");
-  // The real error first and unabridged. It is the only line that is always true.
-  console.error(message.split("\n").map((l) => `  ${l}`).join("\n"));
-  // The server hint is advice about ONE cause, so it is offered as advice rather than as
-  // a diagnosis, and it names the URL that was actually resolved.
-  if (baseUrl) {
-    console.error(`If the target app is not running at ${baseUrl}, start it or set VLMKIT_BASE_URL.`);
+  for (const failure of result.failures) {
+    console.error(`  ${failure.name} (${failure.url}):`);
+    console.error(failure.error.split("\n").map((l) => `    ${l}`).join("\n"));
   }
+  // Advice about ONE cause, offered as advice rather than as a diagnosis, naming the URL that
+  // was actually resolved.
+  console.error(`If the target app is not running at ${baseUrl}, start it or set VLMKIT_BASE_URL.`);
 }
 
 /**
- * Run the capture spec **from `HARNESS_ROOT`**, not from the user's project.
+ * Report what a capture run produced, including the parts that used to be one vague line.
  *
- * This used to inherit `EXEC_OPTS.cwd = PROJECT_ROOT`, and every part of playwright's
- * setup is resolved from cwd, so running in an external project meant:
- *
- *   - no `playwright.config.ts` there, so `testDir` defaulted to that directory and the
- *     spec was not collected — "No tests found";
- *   - and once a config was pointed at explicitly, `npx` resolved a *different*
- *     `@playwright/test` than the one the spec imports — "Playwright Test did not expect
- *     test.describe() to be called here … two different versions of @playwright/test".
- *
- * Running in HARNESS_ROOT settles config, testDir, and the module instance together.
- * Nothing about the user's project is lost by it: the spec already takes the project's
- * routes, base URL and output directory from `VLMKIT_CONFIG_PATH` / `VLMKIT_BASE_URL` /
- * `VLMKIT_PROJECT_ROOT` / `VLMKIT_OUTPUT_DIR`, which `buildCaptureEnv` sets. Verified —
- * with an external config declaring one route at `http://localhost:9999`, playwright
- * collected 2 tests (desktop + mobile) and failed only on `ERR_CONNECTION_REFUSED` at
- * `http://localhost:9999/a`, which is the failure the old message had always claimed.
+ * The old path could only count files afterwards, so a route whose `waitFor` never matched, a
+ * route that rendered an empty body, and a route that 404'd were all "(some tests had warnings,
+ * but captures completed)". Each is a different thing to go and fix.
  */
-function runCaptureSpec(env: NodeJS.ProcessEnv) {
-  execFileSync(
-    NPX_COMMAND,
-    ["playwright", "test", resolveCaptureSpecPath(), "--reporter=list"],
-    { ...EXEC_OPTS, cwd: HARNESS_ROOT, env },
-  );
-}
-
-/**
- * Resolve the capture environment ahead of the run, so a bad config is reported as a bad
- * config.
- *
- * It used to be built inside `runCaptureSpec`'s argument list, i.e. inside the callers'
- * `try` — so `Capture config not found: …`, a `JSON.parse` failure on the config file, and
- * malformed `VLMKIT_CAPTURE_ROUTES` all came back out as "Is the server running?". Doing
- * it out here also makes the resolved base URL available to the failure message, which
- * used to name a hardcoded port.
- */
-function prepareCaptureEnv(
-  mode: "baseline" | "capture",
-  options: WorkflowCaptureOptions,
-): { env: NodeJS.ProcessEnv } | { error: string } {
-  try {
-    return { env: buildCaptureEnv(mode, options) };
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : String(err) };
+function reportCaptureOutcome(result: RouteCaptureResult): void {
+  for (const failure of result.failures) {
+    console.log(`  ! ${failure.name}: ${failure.error.split("\n")[0]}`);
+  }
+  for (const entry of result.captured) {
+    if (entry.waitForTimedOut) {
+      console.log(`  ! ${entry.name}: waitFor never matched — captured without it`);
+    }
+  }
+  for (const entry of result.notOk) {
+    // Loud, because this is the one that quietly poisons a baseline: `page.goto` does not throw
+    // on 4xx, so a mistyped route captures the error page and every later `verify` compares
+    // against it.
+    console.log(`  ! ${entry.name}: HTTP ${entry.status} from ${entry.url}`
+      + ` — the capture is of the server's error page`);
+  }
+  for (const entry of result.blank) {
+    // The spec asserted on this with `expect(bodyText.length).toBeGreaterThan(0)`, which failed
+    // the test and then got swallowed by the callers' file-count check.
+    console.log(`  ! ${entry.name}: page rendered no text — the screenshot is of an empty body`);
+  }
+  const degraded = result.captured.filter((c) => c.a11ySource !== "cdp");
+  if (degraded.length > 0) {
+    // Silently degrading mattered: an `ariaSnapshot` string and a real tree are not
+    // interchangeable to the commands that diff them.
+    console.log(`  ! ${degraded.length} route(s) fell back from the CDP a11y tree`
+      + ` (${degraded.map((d) => `${d.name}:${d.a11ySource}`).join(", ")})`);
   }
 }
 
 // ---- Commands ----
 
-async function init(options: WorkflowCaptureOptions = {}): Promise<number> {
-  console.log("=== VRT Init: Creating baselines ===\n");
-
-  await mkdir(BASELINES_DIR, { recursive: true });
-
-  const prepared = prepareCaptureEnv("baseline", options);
-  if ("error" in prepared) {
-    console.error(`Capture config error: ${prepared.error}`);
+/**
+ * `init` and `capture` differ in one thing — where the files land — so they share this.
+ *
+ * They were two 30-line bodies that differed by a directory and two strings, and both carried
+ * the same file-count guessing. `capture` additionally wipes its directory first, which `init`
+ * must not do: a baseline directory is the thing you are keeping.
+ */
+async function runCapture(
+  mode: "baseline" | "capture",
+  outputDir: string,
+  options: WorkflowCaptureOptions,
+): Promise<number> {
+  let targets: CaptureTargets;
+  try {
+    // Resolved before touching the browser, so a bad `--config` path, invalid JSON in the config
+    // file, or malformed `VLMKIT_CAPTURE_ROUTES` is reported as what it is. All three used to
+    // surface as "Is the server running?".
+    targets = resolveCaptureTargets(options);
+  } catch (err) {
+    console.error(`Capture config error: ${err instanceof Error ? err.message : String(err)}`);
     return 1;
   }
 
-  console.log("Running Playwright to capture baseline screenshots + a11y...");
+  console.log(`Capturing ${targets.routes.length} route(s) from ${targets.baseUrl} …`);
+  let result: RouteCaptureResult;
   try {
-    runCaptureSpec(prepared.env);
-  } catch (e) {
-    // Some tests may fail (e.g. title check) but captures still succeed
-    const captured = await listFiles(BASELINES_DIR, ".png");
-    if (captured.length === 0) {
-      reportCaptureFailure(e, prepared.env.VLMKIT_BASE_URL);
-      return 1;
-    }
-    console.log("  (some tests had warnings, but captures completed)");
+    result = await captureRoutes({ baseUrl: targets.baseUrl, routes: targets.routes, outputDir });
+  } catch (err) {
+    // Only a whole-browser failure reaches here — per-route errors are collected. Launch
+    // failures are the one case where nothing about the routes is knowable.
+    console.error(`Capture could not start a browser: ${err instanceof Error ? err.message : String(err)}`);
+    return 1;
   }
 
-  const files = await listFiles(BASELINES_DIR, ".png");
-  const a11yFiles = await listFiles(BASELINES_DIR, ".a11y.json");
-  console.log(`\nBaselines created: ${files.length} screenshots, ${a11yFiles.length} a11y trees`);
-  console.log(`Stored in: ${BASELINES_DIR}`);
-  return 0;
+  reportCaptureOutcome(result);
+  if (result.captured.length === 0) {
+    reportCaptureFailure(result, targets.baseUrl);
+    return 1;
+  }
+  const label = mode === "baseline" ? "Baselines created" : "Snapshots captured";
+  console.log(`\n${label}: ${result.captured.length} screenshot(s), `
+    + `${result.captured.length} a11y tree(s) at ${result.viewport.width}x${result.viewport.height}`);
+  console.log(`Stored in: ${outputDir}`);
+  // A partial run is a failure of the routes that failed, not of the command: the usable
+  // baselines are on disk and named. The exit code says something went wrong so CI notices.
+  //
+  // A non-2xx route counts. Capturing a 404 page and exiting 0 is how a baseline becomes a
+  // picture of an error message that then passes forever.
+  return result.failures.length > 0 || result.notOk.length > 0 ? 1 : 0;
+}
+
+async function init(options: WorkflowCaptureOptions = {}): Promise<number> {
+  console.log("=== VRT Init: Creating baselines ===\n");
+  await mkdir(BASELINES_DIR, { recursive: true });
+  return runCapture("baseline", BASELINES_DIR, options);
 }
 
 async function capture(options: WorkflowCaptureOptions = {}): Promise<number> {
   console.log("=== VRT Capture: Taking snapshots ===\n");
-
-  // Clean previous snapshots
+  // Cleaned, so a route removed from the config stops being compared against its baseline
+  // instead of silently reporting yesterday's pixels.
   if (existsSync(SNAPSHOTS_DIR)) {
     await rm(SNAPSHOTS_DIR, { recursive: true });
   }
   await mkdir(SNAPSHOTS_DIR, { recursive: true });
-
-  const prepared = prepareCaptureEnv("capture", options);
-  if ("error" in prepared) {
-    console.error(`Capture config error: ${prepared.error}`);
-    return 1;
-  }
-
-  console.log("Running Playwright to capture current state...");
-  try {
-    runCaptureSpec(prepared.env);
-  } catch (e) {
-    const captured = await listFiles(SNAPSHOTS_DIR, ".png");
-    if (captured.length === 0) {
-      reportCaptureFailure(e, prepared.env.VLMKIT_BASE_URL);
-      return 1;
-    }
-    console.log("  (some tests had warnings, but captures completed)");
-  }
-
-  const files = await listFiles(SNAPSHOTS_DIR, ".png");
-  console.log(`\nSnapshots captured: ${files.length} screenshots`);
-  return 0;
+  return runCapture("capture", SNAPSHOTS_DIR, options);
 }
 
 async function verify(): Promise<number> {
