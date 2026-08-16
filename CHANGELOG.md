@@ -1026,6 +1026,38 @@ suppression works per *rule* instead of per whole gate.
 
 ### Fixed
 
+- **A strip that actually plays**: `snapshot strip --animated` and
+  `check animation --strip out.png --strip-animated` write an animated PNG. The recorded item asked
+  for animated WebP; that is not encodable with what this repo ships. The optional peer
+  `@jsquash/webp` wraps libwebp's single-image encoder and does not expose `WebPAnimEncoder`, and
+  `sharp` — which can — was already measured and rejected in `webp.ts` at 29 MB against 1.1 MB for
+  identical static output. APNG needs **no dependency at all** (zlib plus chunk assembly in
+  `packages/vlmkit-core/src/apng.ts`), is lossless and full-colour, plays in browsers and in GitHub
+  comments, and degrades to frame 0 in a viewer that does not know it — so the file stays usable as
+  a still. The honest cost against animated WebP is size: no inter-frame compression, so six frames
+  are roughly six PNGs (265 KB against a 123 KB still sheet on the dashboard fixture).
+
+  `check animation --strip-animated` animates the WHOLE PAGE over the sampled timeline, with
+  per-frame delays taken from the actual sample instants rather than spread evenly. That also
+  answers half of the recorded "the strip loses spatial arrangement" item: nothing is cropped, so
+  three cards side by side stay side by side.
+
+- **The filmstrip's uniform cell stays uniform — the recorded fix was measured and rejected.** A
+  real sheet is 49.0% background (1532x781, `check animation --strip` on the dashboard fixture), and
+  the recorded diagnosis blamed per-row cell sizing. Implemented, it recovers almost nothing: the
+  four rows are all 393px tall and 916/664/412/244px wide, so per-row height produces byte-identical
+  output, and per-row width cannot help because the sheet must be as wide as its widest row —
+  37.1% against 36.2% on a synthetic three-width sheet. It also breaks a correctness property:
+  a column label names one instant across every row, and ragged widths print it over a cell from a
+  different sample. The padding is a property of the composition, not of the cell rule, and
+  `composeFilmstrip`'s header now carries the measurement so the item is not re-opened on the same
+  wrong model.
+
+  One real bug fell out of measuring it: `composeFilmstrip({ maxWidth: 0 })` — documented as "do not
+  cap" by `snapshot strip --max-width 0` — solved for a scale that fits a zero-width sheet, hit its
+  64-step guard, and returned a 132px thumbnail of an 1832px strip. The CLI dodged it by omitting
+  the option; every other caller got the thumbnail.
+
 - **One definition of "the page has settled".** Three call sites — `check integrity`,
   `check design` and the font-determinism probe — hand-rolled the pair `fonts.ready` +
   `waitForTimeout`, each with its own delay (250 / 250 / 150ms), and now call `settlePage`. Not

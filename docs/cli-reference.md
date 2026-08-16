@@ -1010,7 +1010,25 @@ vlmkit snapshot strip round-0.png round-1.png round-2.png --out rounds.png
 
 # Wrap into a grid, cap the sheet width (default 1600; 0 disables)
 vlmkit snapshot strip frames/*.png --columns 4 --max-width 1200 --out sheet.png
+
+# The other answer: one file that actually plays (animated PNG)
+vlmkit snapshot strip frames/anim-*.png --animated --delay 120 --out anim.png
+vlmkit check animation page.html --strip anim.png --strip-animated
 ```
+
+`--animated` writes **APNG**, not animated WebP: `@jsquash/webp` wraps libwebp's
+single-image encoder, and the alternative that can animate costs 29 MB installed
+for identical static output. APNG needs no dependency, plays in a browser and in a
+GitHub comment, and shows frame 0 in a viewer that does not know it — so the file
+is still usable as a still. It has no inter-frame compression, so six frames are
+roughly six PNGs. A `.webp` output path with `--animated` is refused rather than
+silently written as APNG bytes.
+
+`check animation --strip-animated` animates the **whole page** over the sampled
+timeline instead of cropping each animation to its own row, with per-frame delays
+taken from the real sample instants. Use it when the spatial arrangement matters
+(three cards side by side stay side by side); use the still sheet when a small
+element needs to be legible.
 
 Frames are composited **in the order given**, and a glob expands
 lexicographically — so `anim-0-100.png` lands before `anim-0-20.png` and the strip

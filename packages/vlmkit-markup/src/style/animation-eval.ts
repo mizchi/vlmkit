@@ -36,7 +36,8 @@ import { retuneNote, tierIssues } from "../rule-prose.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { UsageError } from "@mizchi/vlmkit-core/cli-error.ts";
-import { composeFilmstrip } from "@mizchi/vlmkit-core/filmstrip.ts";
+import { composeFilmstrip, scalePngData } from "@mizchi/vlmkit-core/filmstrip.ts";
+import { encodeApng } from "@mizchi/vlmkit-core/apng.ts";
 import { cropRegion, encodePng } from "@mizchi/vlmkit-core/png-utils.ts";
 import { encodeWebp, imageFormatForPath } from "@mizchi/vlmkit-core/webp.ts";
 import { sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
@@ -171,10 +172,12 @@ export interface AnimationEvalReport {
     windowMs: number;
     /** The instant each column was taken at, in ms from the animations' start. */
     times: number[];
-    /** Row order, top to bottom. */
+    /** Row order, top to bottom. Empty for an animated strip, which has no rows. */
     rowSelectors: string[];
   width: number;
     height: number;
+    /** True when this is an animated PNG of the whole page rather than a cropped still sheet. */
+    animated?: boolean;
   };
 }
 
@@ -207,6 +210,16 @@ export interface AnimationEvalOptions extends PageLoadOptions {
   stripPath?: string;
   /** Cap the strip's width, downscaling frames to fit. Default 1600. */
   stripMaxWidth?: number;
+  /**
+   * Write `stripPath` as an animated PNG of the whole page instead of a cropped still sheet.
+   *
+   * A different artifact for a different reader, not a better one. The still sheet crops each
+   * animation to its motion bbox, which is what makes a small element legible — and is exactly
+   * why a dogfood reviewer could not tell that three cards sit side by side ("each row reads as
+   * one column in 3 states"). The animated version keeps the page's real arrangement and pays for
+   * it in element size, so both stay available.
+   */
+  stripAnimated?: boolean;
   /**
    * Page-timeline span the strip's columns cover, in ms. Defaults to when the last
    * finite animation ends, so the columns cover the part someone is reviewing rather
@@ -832,6 +845,47 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         columns.push(await shot(`t-${timeMs}ms`));
       }
 
+      if (options.stripAnimated) {
+        // The whole page over the shared clock, as one playing file. No cropping and no grid:
+        // the point of this variant is the spatial arrangement that per-row bbox crops remove,
+        // which is what a v4 dogfood reviewer said the sheet cost them — "the fact that 3 cards
+        // are side by side is lost from the sheet".
+        if (imageFormatForPath(options.stripPath) === "webp") {
+          throw new UsageError(
+            "--strip-animated writes APNG, so --strip cannot be a .webp path.\n"
+            + "  Animated WebP needs libwebp's animation encoder, which the optional\n"
+            + "  `@jsquash/webp` does not expose. Use a .png name.",
+          );
+        }
+        // The same downscale the sheet would apply, through the same helper — two
+        // nearest-neighbour implementations would disagree about which pixel wins.
+        const cap = options.stripMaxWidth ?? 1600;
+        const factor = cap > 0 && columns[0]!.width > cap ? Math.ceil(columns[0]!.width / cap) : 1;
+        const played = factor === 1 ? columns : columns.map((frame) => scalePngData(frame, factor));
+        // Delays from the sampled instants, not a uniform value: these columns sit at 0 / 150 /
+        // 400ms on the page timeline, and playing them evenly misrepresents when the motion
+        // happened. The last frame holds for the average of the gaps before it.
+        const gaps = times.slice(1).map((t, i) => t - times[i]!);
+        const holdMs = gaps.length > 0 ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length) : 200;
+        const bytes = encodeApng(played, { delaysMs: [...gaps, holdMs], delayMs: holdMs });
+        await mkdir(dirname(resolve(options.stripPath)), { recursive: true });
+        await writeFile(resolve(options.stripPath), bytes);
+        strip = {
+          path: resolve(options.stripPath),
+          columns: played.length,
+          rows: 1,
+          omitted: 0,
+          outOfScope: matched === null ? 0 : evaluated.filter((a) => !matched.has(a.index)).length,
+          windowMs,
+          times,
+          // No rows to name: every animation on the page is in every frame, which is the
+          // difference this variant exists for.
+          rowSelectors: [],
+          width: played[0]!.width,
+          height: played[0]!.height,
+          animated: true,
+        };
+      } else {
       // Crop each row out of those shared frames. Every cell in a row shares ONE
       // rect: cropping per cell would re-centre the element and subtract the motion
       // the row exists to show, the same reason `composeFilmstrip` aligns top-left.
@@ -882,6 +936,7 @@ export async function runAnimationEval(options: AnimationEvalOptions): Promise<A
         width: sheet.width,
         height: sheet.height,
       };
+      }
     }
 
     await page.close();

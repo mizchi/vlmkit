@@ -1024,10 +1024,37 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
 
 ### 連番画像 / strip の残件(2026-08-10)
 
-- [ ] **animated WebP 出力(`snapshot strip --animated` / `check animation --strip x.webp --animated`)**
-  - 目的: 現在の strip は**静止シート**(1 枚に並べる)。「連番アニメーションを 1 枚に」の
-    もう一方の解として、実際に動く 1 ファイルが欲しい場面がある(PR に貼って再生させる、
-    flipbook の HTML を配れない文脈)。
+- [x] **動く 1 ファイル出力 — 2026-08-16 実装。ただし WebP ではなく APNG**
+  - 目的(PR に貼って再生させる / flipbook の HTML を配れない文脈)はそのまま達成。
+    `snapshot strip --animated [--delay ms] [--loops N]` と
+    `check animation --strip out.png --strip-animated`。
+  - **WebP にできなかった理由を測った上で APNG にした**: 既にある optional peer
+    `@jsquash/webp` は libwebp の**単画像**エンコーダのラッパで `WebPAnimEncoder` を
+    露出していない。`sharp` なら可能だが `webp.ts` が同じ出力バイトで 29MB vs 1.1MB と
+    測って却下済み — アニメのために全員にあの重さを負わせる話になる。
+    APNG は**依存ゼロ**(zlib + 自前のチャンク組み立て)、可逆、フルカラー、
+    ブラウザと GitHub コメントで再生され、非対応ビューアでは frame 0 が出る = 静止画として使える。
+    コストは正直に: フレーム間圧縮が無いので 6 フレームなら概ね PNG 6 枚分。
+  - `check animation --strip-animated` は**ページ全体**をタイムラインで動かす。
+    これは下の「空間配置が消える」項目への答えでもある(クロップしないので3枚のカードが
+    横並びであることが残る)。ディレイは実測サンプル時刻の差分を使う(均等割りは
+    「いつ動いたか」を偽る)。
+  - `.webp` パス + animated は理由付きで拒否。実測: dashboard で 265KB(4フレーム全画面)、
+    静止シートは 123KB。
+
+- [x] **filmstrip の均一セル → ragged レイアウト — 実装して測って却下(2026-08-16)**
+  - **記録されていた診断が間違っていた**。実測: 1532x781 のシートは **49.0% が背景**だが、
+    4 行は全部 393px 高で、幅が 916/664/412/244。つまり縦ではなく**横**の余白。
+  - per-row 高さは実装しても**バイト単位で同一出力**(行の高さが揃っているので)。
+    per-row 幅も効かない: シート幅は最も広い行に合わせるしかないので、
+    狭い行の灰色がセル間から右側に移るだけ(合成3幅シートで 37.1% → 36.2%)。
+    さらに column label(= 各行で同じ時刻)が ragged 幅だと別サンプルのセルの上に来る。
+  - 結論: 余白は**構図の性質**(1グリッド + 幅が大きく違う行)で、セル規則の問題ではない。
+    直すなら別の絵が必要 = 下の「空間配置」項目と同じ結論。`--strip-animated` がその片方の答え。
+  - 副産物として実バグ1件: `composeFilmstrip({ maxWidth: 0 })` は
+    「上限なし」のはずが 0px に収まるスケールを解こうとして 64 段ガードに当たり、
+    **1832px のストリップを 132px のサムネイルにしていた**。CLI は 0 のときフラグを
+    省いて回避していたので、ライブラリ利用者だけが踏む。修正 + テスト。
   - **現状の 3 案は全て静止画のみ**(2026-08-10 実測、`docs/cli-reference.md` の表と
     `packages/vlmkit-core/src/webp.ts` ヘッダに記録):
     `@jsquash/webp` は libwebp の still encode のみ、`sharp` の `.webp()` も入力が
@@ -1080,6 +1107,10 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     (例: 各列をビューポート全体の縮小 + 行を motion bbox クロップの 2 段組)。
     現行のグリッドの拡張ではなく新しい構図。
   - 着手条件: レビュアーが実際に空間配置を読み違えた事例が出たら。
+  - **2026-08-16 追記**: `--strip-animated` が「クロップしない・グリッド無し」の側から
+    この問題の半分を解いた(ページ全体をそのまま動かすので空間配置は保たれる)。
+    残るのは「時間軸 × 行」と「空間配置」を**1枚の静止画**に収める構図で、
+    着手条件は据え置き — 動く方で足りるなら静止画の新構図は要らない。
 
 ### 2つのパターンで探した欠陥(2026-08-14)— **全件修正済み**
 

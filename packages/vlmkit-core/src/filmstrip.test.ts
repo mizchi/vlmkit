@@ -195,3 +195,23 @@ describe("filmstrip labels", () => {
     assert.equal(sheet.layout.rows, 1);
   });
 });
+
+describe("maxWidth 0 disables the cap", () => {
+  const frame = (w: number, h: number): PngData =>
+    ({ width: w, height: h, data: new Uint8Array(w * h * 4).fill(200) });
+
+  it("does not solve for a scale that fits a zero-width sheet", () => {
+    // `snapshot strip --max-width 0` documents 0 as "do not cap", and the CLI honoured it by
+    // OMITTING the option. Taken literally the solver stepped the scale until the sheet fit in
+    // 0px, hit its 64-step guard, and returned a 132px thumbnail of an 1832px strip — so any
+    // library caller that passed the documented 0 got the thumbnail.
+    const uncapped = composeFilmstrip([frame(916, 393), frame(916, 393)], { columns: 2, maxWidth: 0 });
+    assert.equal(uncapped.layout.scale, 1, "no downscale at all");
+    assert.ok(uncapped.width > 1800, `expected a full-size sheet, got ${uncapped.width}px`);
+
+    // A positive cap still caps, which is what stops this from being a silent removal.
+    const capped = composeFilmstrip([frame(916, 393), frame(916, 393)], { columns: 2, maxWidth: 900 });
+    assert.ok(capped.layout.scale > 1);
+    assert.ok(capped.width <= 900, `expected <=900px, got ${capped.width}px`);
+  });
+});

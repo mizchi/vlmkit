@@ -707,3 +707,59 @@ test("runAnimationEval: --strip-selector also narrows the window to the selected
   });
   assert.equal(report.strip?.windowMs, 200, "the 900ms animation is out of scope, so out of the window");
 });
+
+/**
+ * `--strip-animated`: the same sampling, written as one playing file.
+ *
+ * Two artifacts for two readers, which is why both stay. The still sheet crops each animation to
+ * its motion bbox — that is what makes a small element legible, and it is exactly why a v4 dogfood
+ * reviewer could not tell three cards sat side by side ("each row reads as one column in 3
+ * states"). This variant keeps the page's arrangement and pays for it in element size.
+ */
+test("--strip-animated writes an APNG of the whole page over the same timeline", { timeout: 120_000 }, async () => {
+  const { readApngChunks } = await import("@mizchi/vlmkit-core/apng.ts");
+  const { readFile } = await import("node:fs/promises");
+  const source = await animPage(
+    `#a { animation: slide 300ms linear 1 forwards; }`,
+    '<div id="a"></div>',
+  );
+  const dir = await mkdtemp(join(tmpdir(), "vlmkit-strip-anim-"));
+  const stripPath = join(dir, "anim.png");
+  const report = await runAnimationEval({ source, stripPath, stripAnimated: true });
+
+  assert.ok(report.strip);
+  assert.equal(report.strip.animated, true);
+  // No rows: every animation on the page is in every frame, which is the difference from a sheet.
+  assert.deepEqual(report.strip.rowSelectors, []);
+  assert.equal(report.strip.rows, 1);
+  assert.equal(report.strip.columns, report.strip.times.length, "one frame per sampled instant");
+
+  const bytes = new Uint8Array(await readFile(stripPath));
+  const chunks = readApngChunks(bytes);
+  assert.equal(
+    chunks.filter((c) => c.type === "fcTL").length,
+    report.strip.times.length,
+    "an fcTL per frame",
+  );
+  // Sequence numbers are shared between fcTL and fdAT; a viewer rejects the file when they are not.
+  const sequences = chunks.filter((c) => c.sequence !== undefined).map((c) => c.sequence!);
+  assert.deepEqual(sequences, [...sequences].sort((a, b) => a - b), "monotonic");
+  assert.equal(new Set(sequences).size, sequences.length, "and unique");
+
+  // The canvas is the page, not a cropped cell — that is the whole point.
+  const { PNG } = await import("pngjs");
+  const decoded = PNG.sync.read(Buffer.from(bytes));
+  assert.equal(decoded.width, report.strip.width);
+  assert.ok(decoded.width >= 800, `expected a full-page canvas, got ${decoded.width}px`);
+});
+
+test("--strip-animated refuses a .webp path, naming why", { timeout: 120_000 }, async () => {
+  // Animated WebP needs libwebp's animation encoder, which the optional `@jsquash/webp` does not
+  // expose. Silently writing APNG bytes to a `.webp` name would be worse than refusing.
+  const source = await animPage(`#a { animation: slide 300ms linear 1 forwards; }`, '<div id="a"></div>');
+  const dir = await mkdtemp(join(tmpdir(), "vlmkit-strip-anim-webp-"));
+  await assert.rejects(
+    () => runAnimationEval({ source, stripPath: join(dir, "anim.webp"), stripAnimated: true }),
+    /--strip-animated writes APNG.*@jsquash\/webp/s,
+  );
+});
