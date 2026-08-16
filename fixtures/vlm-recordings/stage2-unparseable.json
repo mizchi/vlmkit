@@ -1,0 +1,11 @@
+{
+  "note": "Stage 2 answering in prose. docs/knowledge.md: kimi-k2.5/k2.6 'return 0 fixes despite VLM CHANGE list'.",
+  "choices": [
+    {
+      "message": {
+        "content": "The code block appears to have lost its background. You should restore the original styling for that element."
+      }
+    }
+  ],
+  "usage": { "prompt_tokens": 900, "completion_tokens": 24, "total_tokens": 924 }
+}

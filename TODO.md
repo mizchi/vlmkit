@@ -1897,8 +1897,22 @@ vitest へ移行し(2662 tests、node:test と同数、同じ ~222s)、v8 カバ
   閾値 4 フィールド欠落、`nearest` → 実際は `nearestNeighborDistance` + `count`)。
   どれもレポートに `undefined` が出るがテストは通る組み合わせ。
 
-- [ ] **Phase 3: VLM/API 経路に録画フィクスチャ**(~250 statements)
-  - `vlm-client.ts` / `reasoning-pipeline.ts`。HAR 相当の録画済みレスポンスが必要。
+- [x] **Phase 3: VLM/API 経路に録画フィクスチャ** — 2026-08-16 完了。
+  `vlm-client.ts` 7.3% → **89.5%**、`reasoning-pipeline.ts` 10.7% → **90.2%**。
+  - 録画は `fixtures/vlm-recordings/` (4本 + README)。**ワイヤから採ったものではなく
+    プロバイダの形に合わせて手で書いた**(この環境に認証がない)ので、README で
+    各フィールドの出所をコードとレポートに紐付けて明記した。
+    「プロバイダが今もこの形を返すこと」は offline では証明できず、
+    それは `docs/reports/` の日付付きベンチの仕事 — **ここが緑でも live run の保証にはならない**。
+  - 固定できたのは実際に価値がある部分: CHANGE 行のパースと重複排除、
+    SUMMARY / REGRESSION、画像の優先順位(selector crop > heatmap > current)、
+    shift 情報がプロンプトに入ること、FIX 行のパース、
+    **prose だけ返すモデルで changes/fixes が空になること**(ベンチで頻出)、
+    そして escalation ladder(low confidence かつ change 1件以下のときだけ、
+    maxResolution まで、adaptive off なら上げない、上げる画像が無ければ上げない)。
+  - **項目の前提が1つ違っていた**: `component-from-image.ts` (404 未カバー) は
+    VLM をまったく使っていない(`withBrowser` + ピクセル演算のみ)。
+    あれは API 経路ではなく **browser orchestrator** の穴なので、この項目では閉じない。
 
 #### 残り +2,675 の所在(2026-08-14 実測)
 

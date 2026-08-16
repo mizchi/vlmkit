@@ -1,0 +1,11 @@
+{
+  "note": "VLM stage-1 reply. Third CHANGE repeats the first element+property pair, which the dedup path drops.",
+  "choices": [
+    {
+      "message": {
+        "content": "CHANGE: .readme-body pre | background-color | #f6f8fa | #ffffff | high\nCHANGE: .readme-body pre | padding | 16px | 0px | high\nCHANGE: .tab-item.active | border-bottom-color | #2563eb | transparent | medium\nCHANGE: .readme-body pre | background-color | #f6f8fa | #fff | high\nSUMMARY: the code block lost its surface and padding\nREGRESSION: yes"
+      }
+    }
+  ],
+  "usage": { "prompt_tokens": 1180, "completion_tokens": 96, "total_tokens": 1276 }
+}

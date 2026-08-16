@@ -1026,6 +1026,25 @@ suppression works per *rule* instead of per whole gate.
 
 ### Fixed
 
+- **The two-stage reasoning pipeline is tested against recorded responses** — `reasoning-pipeline.ts`
+  10.7% → 90.2%, which with `vlm-client.ts` at 89.5% closes the recorded-fixture item. The
+  recordings live in `fixtures/vlm-recordings/` and are **hand-written to each provider's shape
+  rather than captured** (no credentials in this environment); the README traces every field to the
+  code or dated report it came from, and states what the fixtures cannot prove — that the providers
+  still return this shape. A green run here is not evidence a live run works; the benches in
+  `docs/reports/` remain the only thing that shows that.
+
+  What is now pinned: the CHANGE-line parse and its dedup rule, SUMMARY / REGRESSION, the image
+  priority (selector crop > heatmap > current), shift detection reaching the prompt, the FIX-line
+  parse, an empty result for a model that answers in prose (common enough that `docs/knowledge.md`
+  names the models), and the escalation ladder — it fires only on a low-confidence fix over at most
+  one change, stops at `maxResolution`, respects `adaptiveResolution: false`, and does not fire
+  without a higher-resolution image to re-send.
+
+  One premise of the recorded item was wrong: `component-from-image.ts` (404 uncovered) uses no VLM
+  at all — it is `withBrowser` plus pixel math — so its gap is a browser orchestrator gap and stays
+  open under that heading rather than this one.
+
 - **Coverage 63.1% → 70.0% statements (64.7% → 71.8% lines), and five defects found by writing the
   tests.** The number moved two ways, both stated:
 

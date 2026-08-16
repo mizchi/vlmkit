@@ -1,0 +1,11 @@
+{
+  "note": "LLM stage-2 fix proposal in the FIX/EXPLANATION/CONFIDENCE contract.",
+  "choices": [
+    {
+      "message": {
+        "content": "FIX: .readme-body pre | background-color | #f6f8fa | the CHANGE list reports the surface went white\nFIX: .readme-body pre | padding | 16px | padding collapsed to 0\nEXPLANATION: the selector block for the code surface was removed\nCONFIDENCE: high"
+      }
+    }
+  ],
+  "usage": { "prompt_tokens": 900, "completion_tokens": 70, "total_tokens": 970 }
+}
