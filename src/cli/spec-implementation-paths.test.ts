@@ -61,6 +61,74 @@ describe("Spec.pkl implementation links", () => {
   });
 });
 
+describe("docs/SPEC.md", () => {
+  /**
+   * The generated artifact can be stale in BOTH directions, and was.
+   *
+   * `pkspec spec --output docs/SPEC.md Spec.pkl Test.pkl` regenerates it, and pkspec runs
+   * through `nix run` — so in a checkout without nix the file is edited by hand or not at
+   * all, and it drifted from its source in three ways at once: four scenarios spelled the
+   * same live entry differently (`diff html` vs `migration compare`), one carried a sentence
+   * about `check motion` that the source had lost, and M3 claimed typography hints work while
+   * the source says the module is unimplemented — including a `- code:` link to
+   * `src/typography-hints.ts`, a file that does not exist and that `Spec.pkl` no longer
+   * declares.
+   *
+   * That last one is why this block exists rather than only the `Spec.pkl` one above: a dead
+   * link can live in the artifact alone, where nothing was looking.
+   */
+  const doc = read("docs/SPEC.md");
+
+  /**
+   * Both rendered kinds. `kind = "code"` prints `- code:` and `kind = "doc"` prints `- doc:`,
+   * and matching only the first made MIG-003's `docs/reset-css-comparison.md` look absent
+   * while it was there all along — a false positive that would have been "fixed" by adding a
+   * duplicate line.
+   */
+  const declaredInDoc = (): string[] =>
+    [...doc.matchAll(/^\s*- (?:code|doc): `([^`]+)`/gm)].map((m) => m[1]!);
+
+  it("declares no link to a file that does not exist", () => {
+    const declared = declaredInDoc();
+    assert.ok(declared.length >= 10, `only found ${declared.length} links`);
+    const broken = declared.map(resolveDeclared).filter((x): x is string => x !== undefined);
+    assert.deepEqual(broken, [], `dead links in the generated doc:\n  ${broken.join("\n  ")}`);
+  });
+
+  it("links exactly the set its source declares — no stale, none missing", () => {
+    // Both directions, because the artifact had drifted both ways: it kept `src/compare.ts`
+    // (12 sites) and a `vlm-region-diff.ts` link the source had dropped, while lacking the
+    // `reasoning-pipeline.ts` link the source had gained.
+    const spec = read("Spec.pkl");
+    const inSource = new Set([...spec.matchAll(/\bat = "([^"]+)"/g)].map((m) => m[1]!));
+    const inDoc = new Set(declaredInDoc());
+    const stale = [...inDoc].filter((x) => !inSource.has(x)).sort();
+    const missing = [...inSource].filter((x) => !inDoc.has(x)).sort();
+    assert.deepEqual(
+      { stale, missing },
+      { stale: [], missing: [] },
+      "docs/SPEC.md's implementation links disagree with Spec.pkl. Regenerate with "
+      + "`pkf run spec-render` (pkspec), or update both together.",
+    );
+  });
+
+  it("carries every scenario description its source declares", () => {
+    // Single-line descriptions only: the `#"""` blocks are re-wrapped by the generator, so
+    // comparing them verbatim would fail on formatting rather than on content.
+    const spec = read("Spec.pkl");
+    const scenarios = spec.slice(spec.indexOf("scenarios {"));
+    const descriptions = [...scenarios.matchAll(/description = "([^"\n]{40,})"/g)].map((m) => m[1]!);
+    assert.ok(descriptions.length >= 60, `only parsed ${descriptions.length} descriptions`);
+    const stale = descriptions.filter((d) => !doc.includes(d));
+    assert.deepEqual(
+      stale,
+      [],
+      "docs/SPEC.md is behind Spec.pkl. Regenerate with `pkf run spec-render` "
+      + `(pkspec), or update it in lockstep:\n  ${stale.map((d) => d.slice(0, 100)).join("\n  ")}`,
+    );
+  });
+});
+
 describe("Taskfile.pkl inputs", () => {
   // Literal paths only — pkfire globs (`src/**/*.ts`) are patterns, and a pattern matching
   // nothing today is not necessarily wrong.

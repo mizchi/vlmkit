@@ -38,8 +38,8 @@ goals {
     rationale = #"""
       The wireframe-mode loop — take a target PNG, write HTML, iterate
       until pixel diff is low — is the highest-leverage scenario for an
-      LLM markup agent. Fidelity tooling (component-from-image,
-      component-extract, typography hints, bbox/heatmap signals)
+      LLM markup agent. Fidelity tooling (build component,
+      scan component, typography hints, bbox/heatmap signals)
       collapses what would otherwise be many manual rounds.
     """#
   }
@@ -74,8 +74,8 @@ goals {
     priority = 80
     reviewStatus = "approved"
     rationale = #"""
-      One command sweeps five user-preference variants (theme-parity,
-      media-variants forced-colors / reduced-motion / print / rtl /
+      One command sweeps five user-preference variants (check theme,
+      stress media forced-colors / reduced-motion / print / rtl /
       zoom-200) plus i18n text-inflation, plus cross-browser parity.
     """#
   }
@@ -357,7 +357,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-MIGRATION-VERIFICATION" }
-    description = "Partial: `compare` catches result; `grid-ratio` infers fr units but doesn't suggest the float-vs-flex decision itself."
+    description = "Partial: `migration compare` catches result; `grid-ratio` infers fr units but doesn't suggest the float-vs-flex decision itself."
   }
   new {
     id = "B7"
@@ -368,7 +368,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "src/experiments/migration/migration-compare.ts" }
     }
-    description = "`vlmkit migration compare` plus `component-consistency` catches missed instances."
+    description = "`vlmkit migration compare` plus `check drift component` catches missed instances."
   }
   new {
     id = "B8"
@@ -475,7 +475,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/inspect/interact.ts" }
     }
-    description = "`interact press` action drives keyboard sequences; `a11y-focus-order` verifies the resulting traversal."
+    description = "`inspect interact` press actions drive keyboard sequences; `check a11y focus` verifies the resulting traversal."
   }
   new {
     id = "F7"
@@ -483,7 +483,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-A11Y-COMPLIANCE" }
-    description = "Not implemented: could be added via a CSS-filter wrapper around `compare`."
+    description = "Not implemented: could be added via a CSS-filter wrapper around `migration compare`."
   }
   new {
     id = "F8"
@@ -494,7 +494,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/stress/media-variants.ts" }
     }
-    description = "`media-variants --variants zoom-200` flags scrollWidth regressions at 2× zoom."
+    description = "`stress media --variants zoom-200` flags scrollWidth regressions at 2× zoom."
   }
   new {
     id = "F9"
@@ -505,7 +505,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/stress/media-variants.ts" }
     }
-    description = "`media-variants --variants reduced-motion` does the static-stylesheet sweep."
+    description = "`stress media --variants reduced-motion` does the static-stylesheet sweep; `vlmkit check motion` adds CSSOM motion sampling and flags active motion without `prefers-reduced-motion: reduce`."
   }
   new {
     id = "F10"
@@ -544,7 +544,7 @@ scenarios {
     severity = "major"
     reviewStatus = "draft"
     contributes { "GOAL-DESIGN-SYSTEM" }
-    description = "Partial: design-tokens covers radius / spacing / z-index / shadow tiers (M4-M6). A dedicated typography-hints module (size/weight bucket surfacing) is not yet implemented — track via this entry."
+    description = "Partial: `check tokens` covers radius / spacing / z-index / shadow tiers (M4-M6). A dedicated typography-hints module (size/weight bucket surfacing) is not yet implemented — track via this entry."
   }
   new {
     id = "M4-M6"
@@ -552,7 +552,7 @@ scenarios {
     severity = "major"
     reviewStatus = "approved"
     contributes { "GOAL-DESIGN-SYSTEM" }
-    description = "Same `design-tokens` CLI covers radius / spacing / z-index / shadow tiers via per-bucket configurable scales."
+    description = "Same `check tokens` CLI covers radius / spacing / z-index / shadow tiers via per-bucket configurable scales."
   }
   // ── Specialty / edge ─────────────────────────────────────────
   new {
@@ -597,7 +597,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-MARKUP-FIDELITY" }
-    description = "Partial: `interact` plus scripted fill drives the values; the browser autofill UI itself is not capturable in headless."
+    description = "Partial: `inspect interact` plus scripted fill drives the values; the browser autofill UI itself is not capturable in headless."
   }
   new {
     id = "N6"
@@ -605,7 +605,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-MARKUP-FIDELITY" }
-    description = "Partial: `interact` drives sort clicks and scroll; no table-specific signal."
+    description = "Partial: `inspect interact` drives sort clicks and scroll; no table-specific signal."
   }
   new {
     id = "N7"
@@ -613,7 +613,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-MARKUP-FIDELITY" }
-    description = "Partial: `interact` scroll plus repeated snapshots covers the visible work; no scroll-load timing harness."
+    description = "Partial: `inspect interact` scroll plus repeated snapshots covers the visible work; no scroll-load timing harness."
   }
 
   // ── Variant resilience ──────────────────────────────────────
@@ -639,7 +639,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-VARIANT-RESILIENCE" }
-    description = "Partial: `theme-parity` + `palette-diff` together catch brand-token drift; no dedicated white-label CLI."
+    description = "Partial: `check theme` + `check palette` together catch brand-token drift; no dedicated white-label CLI."
   }
   new {
     id = "C7"
@@ -663,7 +663,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-VARIANT-RESILIENCE" }
-    description = "Partial via `cross-browser webkit`; no mobile-emulation profile bundling."
+    description = "Partial via `diff browsers --engines webkit`; no mobile-emulation profile bundling."
   }
   new {
     id = "H3"
@@ -679,7 +679,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-VARIANT-RESILIENCE" }
-    description = "No throttle flag today; Playwright supports it but no vrt CLI surface yet."
+    description = "No throttle flag today; Playwright supports it but no vlmkit CLI surface yet."
   }
   new {
     id = "G1"
@@ -743,7 +743,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-VARIANT-RESILIENCE" }
-    description = "Scriptable via `interact` (set content then snapshot); no first-class CLI."
+    description = "Scriptable via `inspect interact` (set content then snapshot); no first-class CLI."
   }
   new {
     id = "I3"
@@ -751,7 +751,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-VARIANT-RESILIENCE" }
-    description = "Partial: `compare` plus `i18n-stress` can drive this but no emoji-specific assertion."
+    description = "Partial: `migration compare` plus `stress i18n` can drive this but no emoji-specific assertion."
   }
   new {
     id = "I4"
@@ -777,7 +777,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-VARIANT-RESILIENCE" }
-    description = "Scriptable via `interact`; no first-class pluralization-sweep command."
+    description = "Scriptable via `inspect interact`; no first-class pluralization-sweep command."
   }
 
   // ── Bug-finding / QA ────────────────────────────────────────
@@ -806,7 +806,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-DESIGN-SYSTEM" }
-    description = "Partial: combine `interact` (drive prop changes) with `component-consistency` (diff each variant) — no first-class props-matrix CLI."
+    description = "Partial: combine `inspect interact` (drive prop changes) with `check drift component` (diff each variant) — no first-class props-matrix CLI."
   }
   new {
     id = "J4"
@@ -824,7 +824,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-DESIGN-SYSTEM" }
-    description = "Partial: `interact` plus `compare` can drive each slot fill; no slot-aware CLI."
+    description = "Partial: `inspect interact` plus `migration compare` can drive each slot fill; no slot-aware CLI."
   }
   new {
     id = "K1"
@@ -857,7 +857,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/stress/i18n-stress.ts" }
     }
-    description = "`vlmkit stress i18n` flags overflow / wrap regressions; `compare` plus heatmap catches generic clipping."
+    description = "`vlmkit stress i18n` flags overflow / wrap regressions; `migration compare` plus heatmap catches generic clipping."
   }
   new {
     id = "K4"
@@ -881,7 +881,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-VARIANT-RESILIENCE" }
-    description = "Partial: `render-sanity` in `compare` flags pages with missing-image placeholders; no dedicated network-error gate."
+    description = "Partial: `render-sanity` in `migration compare` flags pages with missing-image placeholders; no dedicated network-error gate."
   }
   new {
     id = "K7"
@@ -991,7 +991,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-A11Y-COMPLIANCE" }
-    description = "Partial: `a11y-touch` + `a11y-focus-order` cover the discoverable parts; no first-class CLI."
+    description = "Partial: `check a11y touch` + `check a11y focus` cover the discoverable parts; no first-class CLI."
   }
 
   // ── Interaction ─────────────────────────────────────────────
@@ -1004,7 +1004,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/component/component-from-image.ts" }
     }
-    description = "`component-from-image --states hover` plus `interact` cover hover-state diffs."
+    description = "`build component --states hover` plus `inspect interact` cover hover-state diffs."
   }
   new {
     id = "E2"
@@ -1015,7 +1015,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/component/component-from-image.ts" }
     }
-    description = "`component-from-image --states focus-visible` plus `a11y-focus-order` verify focus visibility."
+    description = "`build component --states focus-visible` plus `check a11y focus` verify focus visibility."
   }
   new {
     id = "E3"
@@ -1023,7 +1023,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-MARKUP-FIDELITY" }
-    description = "Scriptable via `interact` (set the attribute then snapshot); no first-class disabled-sweep CLI."
+    description = "Scriptable via `inspect interact` (set the attribute then snapshot); no first-class disabled-sweep CLI."
   }
   new {
     id = "E4"
@@ -1031,7 +1031,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-MARKUP-FIDELITY" }
-    description = "Scriptable via `interact` (snapshot before resolve); no spinner / skeleton dedicated CLI."
+    description = "Scriptable via `inspect interact` (snapshot before resolve); no spinner / skeleton dedicated CLI."
   }
   new {
     id = "E5"
@@ -1053,7 +1053,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-MARKUP-FIDELITY" }
-    description = "Scriptable via `interact` (set state then snapshot); no first-class empty-state CLI."
+    description = "Scriptable via `inspect interact` (set state then snapshot); no first-class empty-state CLI."
   }
   new {
     id = "E7"
@@ -1064,7 +1064,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/inspect/interact.ts" }
     }
-    description = "Trigger the toggle via `interact` or `explore`; both engines diff the open vs closed state."
+    description = "Trigger the toggle via `inspect interact` or `inspect explore`; both engines diff the open vs closed state."
   }
   new {
     id = "E8"
@@ -1075,7 +1075,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/inspect/interact.ts" }
     }
-    description = "`interact` drives the open click + backdrop + close sequence."
+    description = "`inspect interact` drives the open click + backdrop + close sequence."
   }
   new {
     id = "E9"
@@ -1096,7 +1096,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/inspect/interact.ts" }
     }
-    description = "`interact` drives the toggle and snapshots both states."
+    description = "`inspect interact` drives the toggle and snapshots both states."
   }
   new {
     id = "E11"
@@ -1104,7 +1104,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-MARKUP-FIDELITY" }
-    description = "Partial: `interact` hover + wait does the job; no tooltip-specific helper yet."
+    description = "Partial: `inspect interact` hover + wait does the job; no tooltip-specific helper yet."
   }
   new {
     id = "E12"
@@ -1125,7 +1125,7 @@ scenarios {
     implementations {
       new Implementation { kind = "code"; at = "packages/vlmkit-markup/src/inspect/interact.ts" }
     }
-    description = "`interact` drives the tab-click sequence and pixel-diffs each panel state."
+    description = "`inspect interact` drives the tab-click sequence and pixel-diffs each panel state."
   }
 
   // ── Agent ergonomics ────────────────────────────────────────
@@ -1179,7 +1179,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-AGENT-ERGONOMICS" }
-    description = "Partial: the discovery layer in `explore` abstracts the source, but the WebMCP wire format itself is not yet implemented."
+    description = "Partial: the discovery layer in `inspect explore` abstracts the source, but the WebMCP wire format itself is not yet implemented."
   }
   new {
     id = "O9"
@@ -1203,7 +1203,7 @@ scenarios {
     severity = "minor"
     reviewStatus = "draft"
     contributes { "GOAL-AGENT-ERGONOMICS" }
-    description = "Not implemented: could combine `component-extract` with a `compare` baseline + delta, but no command stitches them today."
+    description = "Not implemented: could combine `scan component` with a `migration compare` baseline + delta, but no command stitches them today."
   }
   new {
     id = "O12"
@@ -1598,7 +1598,7 @@ milestones {
     name = "Core diff toolkit"
     description = #"""
       Pre-markup-assistance baseline — pixel / style / a11y diff
-      primitives plus the migration `compare` entry point and the
+      primitives plus the `migration compare` entry point and the
       snapshot baseline / approve workflow. Already shipped.
     """#
     reviewStatus = "approved"
