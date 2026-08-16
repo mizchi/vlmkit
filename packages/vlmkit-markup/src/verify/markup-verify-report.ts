@@ -14,6 +14,8 @@
  */
 import { basename } from "node:path";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { kindLabel } from "../component/component-classify.ts";
 import type { PageComponent, PageComposition, PageMatch } from "../component/page-compose-diff.ts";
 import {
@@ -189,16 +191,32 @@ export function kickbackForComposition(
   return lines;
 }
 
-export function formatMarkupVerifyReport(report: MarkupVerifyReport): string {
+export function formatMarkupVerifyReport(report: MarkupVerifyReport, rules?: RuleView): string {
   const lines: string[] = [];
+  // This gate states a verdict over three rules, so rule-blindness showed up here as the
+  // loudest possible contradiction: `NOT DONE` in red over the runner's `exits 0`. A project
+  // that runs the loop with `gate-suspect=off` — the composed gates are checked separately in
+  // its CI — was told its markup was not done by the only line an agent reads.
+  const off = (rule: string) => ruleTier(rules, rule, "suspect") === "off";
+  const offRules: string[] = [];
+  if (off("regressed")) offRules.push("regressed");
+  if (off("target-failed")) offRules.push("target-failed");
+  if (off("gate-suspect")) offRules.push("gate-suspect");
+  const liveResiduals = (!off("target-failed") && report.targets.some((t) => !t.pass))
+    || (!off("gate-suspect") && report.gates.some((g) => g.suspects > 0))
+    || (!off("regressed") && report.trend?.direction === "regressed");
+  // `report.done` is the measurement; the word printed is what the settings leave of it. They
+  // agree unless a rule is off, and then the runner's exit code agrees with this line.
+  const done = report.done || !liveResiduals;
   lines.push(`${BOLD}${CYAN}vlmkit verify markup${RESET}`);
   lines.push(`${DIM}attempt: ${report.attempt}${RESET}`);
   lines.push("");
-  lines.push(`verdict: ${report.done ? `${GREEN}DONE${RESET}` : `${RED}NOT DONE${RESET}`}`);
+  lines.push(`verdict: ${done ? `${GREEN}DONE${RESET}` : `${RED}NOT DONE${RESET}`}`
+    + (done && !report.done ? ` ${DIM}(residuals remain, but every rule covering them is off)${RESET}` : ""));
   if (report.trend) {
     const t = report.trend;
     const label = t.direction === "regressed"
-      ? `${RED}REGRESSED${RESET}`
+      ? (off("regressed") ? `${DIM}regressed — NOT reported (regressed off)${RESET}` : `${RED}REGRESSED${RESET}`)
       : t.direction === "improved" ? `${GREEN}improved${RESET}` : `${DIM}flat${RESET}`;
     lines.push(
       `trend vs previous run: ${label} (targets passed ${t.previous.targetsPassed} -> ${t.current.targetsPassed}, residuals ${t.previous.residuals} -> ${t.current.residuals})`,
@@ -207,7 +225,9 @@ export function formatMarkupVerifyReport(report: MarkupVerifyReport): string {
   lines.push("");
   lines.push("Targets:");
   for (const t of report.targets) {
-    const mark = t.pass ? `${GREEN}pass${RESET}` : `${RED}fail${RESET}`;
+    const mark = t.pass
+      ? `${GREEN}pass${RESET}`
+      : off("target-failed") ? `${DIM}fail — NOT reported${RESET}` : `${RED}fail${RESET}`;
     const cal = t.calibration
       ? ` ${DIM}(calibration floor: ${t.calibration.matched} matched, ${t.calibration.missing}/${t.calibration.extra} missing/extra)${RESET}`
       : "";
@@ -221,8 +241,14 @@ export function formatMarkupVerifyReport(report: MarkupVerifyReport): string {
   lines.push("");
   lines.push("Gates:");
   for (const g of report.gates) {
-    const mark = g.suspects > 0 ? `${RED}suspect x${g.suspects}${RESET}` : g.warns > 0 ? `${YELLOW}warn x${g.warns}${RESET}` : `${GREEN}clean${RESET}`;
+    const mark = g.suspects > 0
+      ? (off("gate-suspect") ? `${DIM}suspect x${g.suspects} — NOT reported${RESET}` : `${RED}suspect x${g.suspects}${RESET}`)
+      : g.warns > 0 ? `${YELLOW}warn x${g.warns}${RESET}` : `${GREEN}clean${RESET}`;
     lines.push(`  - ${g.gate}: ${mark} — ${g.summary}`);
+  }
+  if (offRules.length > 0) {
+    lines.push("");
+    lines.push(`${DIM}rule(s) turned off for this run: ${offRules.join(", ")} — the counts above are still measured${RESET}`);
   }
   if (report.kickback.length > 0) {
     lines.push("");

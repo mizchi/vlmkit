@@ -42,7 +42,9 @@ import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { type PageLoadOptions, navigatePage } from "@mizchi/vlmkit-core/page-load.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
-import { BOLD, CYAN, DIM, GREEN, RED, RESET } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { FindingSeverity, RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export interface LayoutRect {
@@ -307,32 +309,96 @@ export async function runLayoutVerify(options: LayoutVerifyOptions): Promise<Lay
   };
 }
 
-export function formatLayoutReport(report: LayoutReport): string {
+/**
+ * `evaluateLayoutRule` names its checks in camelCase; rule ids are slugs.
+ *
+ * Lives here rather than in `../gates/layout.gate.ts` because both the gate's `findings` and
+ * this module's formatter need the same mapping, and a second copy is how a formatter starts
+ * printing a failure under a rule id the runner suppressed by another name.
+ */
+export const LAYOUT_CHECK_RULE_IDS: Record<string, string> = {
+  visible: "visible",
+  count: "count",
+  width: "width",
+  minWidth: "min-width",
+  maxWidth: "max-width",
+  minHeight: "min-height",
+  fullWidth: "full-width",
+  perRow: "per-row",
+  above: "above",
+  "(no assertion)": "no-assertion",
+};
+
+/** The rule a failing check is reported under — the shared half of `findings`. */
+export function layoutCheckRule(checkName: string): string {
+  return LAYOUT_CHECK_RULE_IDS[checkName] ?? "no-assertion";
+}
+
+export function formatLayoutReport(report: LayoutReport, rules?: RuleView): string {
   const lines: string[] = [];
+  const tierOf = (ruleId: string, emitted: FindingSeverity = "suspect") => ruleTier(rules, ruleId, emitted);
+  const markFor = (tier: "off" | FindingSeverity) =>
+    tier === "suspect" ? `${RED}✗${RESET}` : tier === "warn" ? `${YELLOW}!${RESET}` : `${DIM}i${RESET}`;
+  // A contract gate states a verdict, so being rule-blind hurt here in a way it does not
+  // elsewhere: `VIOLATED` printed over the runner's `exits 0`, for a rule the project turned
+  // off deliberately. The verdict is recomputed from what still reports; `passed/total` are
+  // measurements and stay exactly as measured.
+  const offChecks = new Map<string, number>();
+  const failures = report.results.flatMap((r) =>
+    r.checks.filter((c) => !c.passed).map((c) => ({ result: r, check: c, rule: layoutCheckRule(c.name) })));
+  for (const f of failures) {
+    if (tierOf(f.rule) === "off") offChecks.set(f.rule, (offChecks.get(f.rule) ?? 0) + 1);
+  }
+  const liveFailures = failures.filter((f) => tierOf(f.rule) !== "off");
+  const violated = liveFailures.length > 0
+    || (report.redirected !== undefined && tierOf("redirected") !== "off")
+    || (report.invalidSelectors ?? []).length > 0 && tierOf("invalid-selector") !== "off";
   lines.push(`${BOLD}${CYAN}vlmkit check layout${RESET}`);
   lines.push(`${DIM}source: ${report.source}${RESET}`);
   lines.push("");
-  lines.push(`verdict: ${report.done ? `${GREEN}SATISFIED${RESET}` : `${RED}VIOLATED${RESET}`} (${report.passed}/${report.total} rules)`);
-  if (report.redirected) {
+  lines.push(`verdict: ${violated ? `${RED}VIOLATED${RESET}` : `${GREEN}SATISFIED${RESET}`} (${report.passed}/${report.total} rules)`);
+  if (report.redirected && tierOf("redirected") !== "off") {
     // Ahead of the per-rule list: without this a stale session reads as
     // "your cards are missing", sending the reader to debug their markup.
-    lines.push(`${RED}x ${report.redirected}${RESET}`);
+    lines.push(`${markFor(tierOf("redirected"))} ${report.redirected}${RESET}`);
     lines.push(`${DIM}  Every rule below was evaluated against that page.${RESET}`);
   }
-  for (const selector of report.invalidSelectors ?? []) {
-    // Also ahead of the list, and for the same reason: below, this reads as
-    // "no match", which sends the reader to their markup instead of their contract.
-    lines.push(`${RED}x \`${selector}\` is not valid CSS — the browser refused it${RESET}`);
-    lines.push(`${DIM}  Rules naming it measured nothing; a \`visible: false\` rule would have passed on that.${RESET}`);
+  if (tierOf("invalid-selector") !== "off") {
+    for (const selector of report.invalidSelectors ?? []) {
+      // Also ahead of the list, and for the same reason: below, this reads as
+      // "no match", which sends the reader to their markup instead of their contract.
+      lines.push(`${markFor(tierOf("invalid-selector"))} \`${selector}\` is not valid CSS — the browser refused it${RESET}`);
+      lines.push(`${DIM}  Rules naming it measured nothing; a \`visible: false\` rule would have passed on that.${RESET}`);
+    }
   }
   lines.push("");
   for (const r of report.results) {
-    const mark = r.passed ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
+    const ruleFailures = r.checks.filter((c) => !c.passed).map((c) => layoutCheckRule(c.name));
+    const liveHere = ruleFailures.some((id) => tierOf(id) !== "off");
+    const mark = r.passed || !liveHere ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
     lines.push(`${mark} ${r.rule.selector} @${r.viewport}`);
     for (const c of r.checks) {
-      const m = c.passed ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
-      lines.push(`    ${m} ${c.name}: expected ${c.expected}${c.passed ? "" : `, ${RED}measured ${c.measured}${RESET}`}`);
+      if (c.passed) {
+        lines.push(`    ${GREEN}✓${RESET} ${c.name}: expected ${c.expected}`);
+        continue;
+      }
+      const ruleId = layoutCheckRule(c.name);
+      const tier = tierOf(ruleId);
+      // A failing check under an `off` rule keeps its row — the contract still names it, and a
+      // vanished line reads as a contract that no longer covers the selector — but it states
+      // what it measured without claiming a violation.
+      if (tier === "off") {
+        lines.push(`    ${DIM}- ${c.name}: expected ${c.expected}, measured ${c.measured} — NOT reported (${ruleId} off)${RESET}`);
+        continue;
+      }
+      const retuned = tier === "suspect" ? "" : ` ${DIM}[${ruleId} re-tuned to ${tier}]${RESET}`;
+      lines.push(`    ${markFor(tier)} ${c.name}: expected ${c.expected}, ${RED}measured ${c.measured}${RESET}${retuned}`);
     }
+  }
+  if (offChecks.size > 0) {
+    const detail = [...offChecks].map(([rule, n]) => `${rule} x${n}`).join(", ");
+    lines.push("");
+    lines.push(`${DIM}${[...offChecks.values()].reduce((a, b) => a + b, 0)} failing check(s) not reported — rule turned off (${detail})${RESET}`);
   }
   return lines.join("\n");
 }

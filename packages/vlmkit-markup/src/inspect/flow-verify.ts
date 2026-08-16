@@ -33,6 +33,8 @@ import { type PageLoadOptions, applyHar, navigationOptions } from "@mizchi/vlmki
 import { settlePage } from "@mizchi/vlmkit-core/page-open.ts";
 import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 
 export type FlowAction =
@@ -290,19 +292,28 @@ export async function runFlowVerify(options: FlowVerifyOptions): Promise<FlowVer
   };
 }
 
-export function formatFlowReport(report: FlowVerifyReport): string {
+export function formatFlowReport(report: FlowVerifyReport, rules?: RuleView): string {
   const lines: string[] = [];
+  const off = (rule: string) => ruleTier(rules, rule, "suspect") === "off";
+  const stepFailedOff = off("step-failed");
   lines.push(`${BOLD}${CYAN}vlmkit verify flow${RESET}`);
   lines.push(`${DIM}source: ${report.source}${RESET}`);
-  if (report.redirected) {
+  if (report.redirected && !off("redirected")) {
     lines.push(`${RED}x ${report.redirected}${RESET}`);
     lines.push(`${DIM}  Every step below ran against that page.${RESET}`);
+  } else if (report.redirected) {
+    lines.push(`${DIM}- ${report.redirected} — NOT reported (redirected off)${RESET}`);
   }
   lines.push("");
-  lines.push(`verdict: ${report.done ? `${GREEN}DONE${RESET}` : `${RED}FAILED${RESET}`} (${report.passed}/${report.total} steps)`);
+  // `passed/total` are the measurement and stay; the word is what the settings leave of it.
+  const failedLive = !stepFailedOff && report.steps.some((s) => !s.passed);
+  const redirectLive = report.redirected !== undefined && !off("redirected");
+  const done = report.done || !(failedLive || redirectLive);
+  lines.push(`verdict: ${done ? `${GREEN}DONE${RESET}` : `${RED}FAILED${RESET}`} (${report.passed}/${report.total} steps)`
+    + (done && !report.done ? ` ${DIM}(step-failed off — the failing steps below are measured, not reported)${RESET}` : ""));
   lines.push("");
   for (const s of report.steps) {
-    const mark = s.passed ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
+    const mark = s.passed ? `${GREEN}✓${RESET}` : stepFailedOff ? `${DIM}-${RESET}` : `${RED}✗${RESET}`;
     lines.push(`${mark} step ${s.index + 1}: ${s.label}`);
     if (s.actionError) lines.push(`    ${RED}action failed:${RESET} ${s.actionError}`);
     for (const a of s.assertions) {

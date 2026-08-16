@@ -38,6 +38,8 @@ import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { retuneNote, tierIssues } from "../rule-prose.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { isUrlSource, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 
@@ -553,11 +555,9 @@ export async function runBreakpointCheck(options: BreakpointCheckOptions): Promi
   });
 }
 
-export function formatBreakpointCheckReport(report: BreakpointCheckReport): string {
+export function formatBreakpointCheckReport(report: BreakpointCheckReport, rules?: RuleView): string {
   const lines: string[] = [];
-  const status = report.issues.some((i) => i.severity === "suspect") ? "suspect"
-    : report.issues.length > 0 ? "warn"
-    : "ok";
+  const { shown, status, note } = tierIssues(report.issues, rules);
   lines.push(`${BOLD}${CYAN}vlmkit check breakpoints${RESET}`);
   lines.push(`${DIM}source: ${report.source}${RESET}`);
   lines.push("");
@@ -565,8 +565,11 @@ export function formatBreakpointCheckReport(report: BreakpointCheckReport): stri
   // Before anything else, and before the sweep early-return below: a redirect
   // means every number under it describes a different page. Without this the
   // status flipped to `suspect` with no stated reason.
-  for (const issue of report.issues.filter((i) => i.kind === "redirected")) {
-    lines.push(`${RED}x ${issue.message}${RESET}`);
+  // From `shown`, so `--rule redirected=off` — set by projects that redirect on purpose —
+  // stops printing a red line the exit code no longer agrees with.
+  for (const entry of shown.filter((e) => e.row.kind === "redirected")) {
+    const icon = entry.tier === "suspect" ? `${RED}x` : `${YELLOW}!`;
+    lines.push(`${icon} ${entry.row.message}${retuneNote(entry)}${RESET}`);
   }
   if (report.stylesheets && report.stylesheets.fetched < report.stylesheets.crossOrigin) {
     lines.push(`${YELLOW}note: ${report.stylesheets.crossOrigin - report.stylesheets.fetched} of ${report.stylesheets.crossOrigin} cross-origin stylesheet(s) could not be read — their breakpoints are not covered${RESET}`);
@@ -580,7 +583,15 @@ export function formatBreakpointCheckReport(report: BreakpointCheckReport): stri
   }
   if (report.checkedValues.length === 0) {
     lines.push("breakpoints: none discovered — nothing to check (pass --breakpoints to force widths)");
-    if (!report.sweep || report.issues.length === 0) return lines.join("\n");
+    // `shown`, not `issues`: with the surviving rows empty there is nothing below this line
+    // worth printing, and returning early on the raw count printed an empty `Issues:` heading.
+    if (!report.sweep || shown.length === 0) {
+      if (note) {
+        lines.push("");
+        lines.push(`${DIM}${note}${RESET}`);
+      }
+      return lines.join("\n");
+    }
   } else {
     lines.push(`breakpoints checked: ${report.checkedValues.join(", ")}px (each at B-1 / B / B+1)`);
   }
@@ -595,18 +606,23 @@ export function formatBreakpointCheckReport(report: BreakpointCheckReport): stri
     const raw = bp.raw.length > 0 ? ` ${DIM}${bp.raw[0]}${bp.raw.length > 1 ? ` +${bp.raw.length - 1}` : ""}${RESET}` : "";
     lines.push(`  ${bp.value}px: ${verdict}${raw}`);
   }
-  if (report.issues.length > 0) {
+  if (shown.length > 0) {
     lines.push("");
     lines.push("Issues:");
-    for (const issue of report.issues.slice(0, 30)) {
-      const icon = issue.severity === "suspect" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
+    for (const entry of shown.slice(0, 30)) {
+      const issue = entry.row;
+      const icon = entry.tier === "suspect" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
       const selector = issue.selector ? ` ${issue.selector}` : "";
-      lines.push(`  ${icon} ${issue.kind}${selector}: ${issue.message}`);
+      lines.push(`  ${icon} ${issue.kind}${selector}: ${issue.message}${retuneNote(entry)}`);
     }
-    if (report.issues.length > 30) lines.push(`  … ${report.issues.length - 30} more (use --json for all)`);
-  } else {
+    if (shown.length > 30) lines.push(`  … ${shown.length - 30} more (use --json for all)`);
+  } else if (note === undefined) {
     lines.push("");
     lines.push(`${GREEN}All boundaries consistent.${RESET}`);
+  }
+  if (note) {
+    lines.push("");
+    lines.push(`${DIM}${note}${RESET}`);
   }
   return lines.join("\n");
 }

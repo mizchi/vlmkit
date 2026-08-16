@@ -49,6 +49,8 @@ import { compareScreenshots } from "@mizchi/vlmkit-core/heatmap.ts";
 import { decodePng, measureChangeMagnitude, type ChangeMagnitude } from "@mizchi/vlmkit-core/png-utils.ts";
 import { STATE_DIR } from "@mizchi/vlmkit-core/project-config.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { FindingSeverity, RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { ruleTier } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
 import type { DiffRegion } from "@mizchi/vlmkit-core/types.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
@@ -332,16 +334,40 @@ const ICON: Record<StoryOutcome, string> = {
   "mount-failed": `${RED}!${RESET}`,
 };
 
-export function formatStoryVrtReport(report: StoryVrtReport): string {
+/**
+ * The rule a result is reported under, and the severity it is emitted at — the same decision
+ * `../gates/story.gate.ts` makes in `findings`, so the prose and the exit code cannot disagree
+ * about which story failed under which rule.
+ */
+function storyRule(r: StoryResult): { rule: string; emitted: FindingSeverity } | undefined {
+  if (r.outcome === "mount-failed") return { rule: "mount-failed", emitted: "suspect" };
+  if (r.outcome === "new-baseline") return { rule: "new-baseline", emitted: "warn" };
+  if (isSubPerceptualDrift(r)) return { rule: "sub-perceptual-drift", emitted: "warn" };
+  if (r.outcome === "changed") return { rule: "story-drift", emitted: "suspect" };
+  return undefined;
+}
+
+export function formatStoryVrtReport(report: StoryVrtReport, rules?: RuleView): string {
   const lines = [
     `${BOLD}${CYAN}vlmkit check story${RESET}`,
     `${DIM}gallery: ${report.gallery}  viewport: ${report.viewport.width}x${report.viewport.height}${RESET}`,
     "",
   ];
+  const offRules = new Map<string, number>();
   for (const r of report.results) {
     const size = r.width !== undefined ? `${r.width}x${r.height}` : "—";
+    // A story row is a measurement of one component and is printed either way; what a rule
+    // setting changes is the marker in front of it. `check story --update-baseline` on a
+    // project that runs with `new-baseline=off` used to print a yellow `+` per story under an
+    // exit 0, which reads as a warning nobody asked for.
+    const ruled = storyRule(r);
+    const tier = ruled ? ruleTier(rules, ruled.rule, ruled.emitted) : undefined;
+    if (ruled && tier === "off") offRules.set(ruled.rule, (offRules.get(ruled.rule) ?? 0) + 1);
     const detail = r.outcome === "changed"
-      ? `${RED}${(r.diffRatio! * 100).toFixed(2)}% diff${RESET} ${DIM}(${r.diffPixels}/${r.totalPixels}px)${RESET}`
+      // Dim rather than red when the rule is off: the percentage is still the measurement, but
+      // red next to a `-` marker and an exit 0 is the same screen-contradicting-itself this
+      // migration exists to remove.
+      ? `${tier === "off" ? DIM : RED}${(r.diffRatio! * 100).toFixed(2)}% diff${RESET} ${DIM}(${r.diffPixels}/${r.totalPixels}px)${RESET}`
       : r.outcome === "unchanged"
       ? isSubPerceptualDrift(r)
         // Loud on an "unchanged" row, because that is the point: the comparator
@@ -355,7 +381,15 @@ export function formatStoryVrtReport(report: StoryVrtReport): string {
       : r.outcome === "new-baseline"
       ? `${DIM}baseline written — re-run to compare${RESET}`
       : `${DIM}baseline updated${RESET}`;
-    lines.push(`  ${ICON[r.outcome]} ${r.story.padEnd(38)} ${size.padStart(9)}  ${detail}`);
+    const icon = tier === "off"
+      ? `${DIM}-${RESET}`
+      : tier === "warn" && r.outcome === "changed"
+        ? `${YELLOW}!${RESET}`
+        : ICON[r.outcome];
+    const retuned = ruled && tier !== undefined && tier !== "off" && tier !== ruled.emitted
+      ? ` ${DIM}[${ruled.rule} re-tuned to ${tier}]${RESET}`
+      : "";
+    lines.push(`  ${icon} ${r.story.padEnd(38)} ${size.padStart(9)}  ${detail}${retuned}`);
     if (r.heatmapPath && r.outcome === "changed") {
       lines.push(`      ${DIM}heatmap: ${r.heatmapPath}${RESET}`);
     }
@@ -367,6 +401,12 @@ export function formatStoryVrtReport(report: StoryVrtReport): string {
         `      ${DIM}region ${region.x},${region.y} ${region.width}x${region.height}${kind}${shift}${RESET}`,
       );
     }
+  }
+
+  if (offRules.size > 0) {
+    const detail = [...offRules].map(([rule, n]) => `${rule} x${n}`).join(", ");
+    lines.push("");
+    lines.push(`${DIM}${[...offRules.values()].reduce((a, b) => a + b, 0)} story result(s) measured and NOT reported — rule turned off (${detail})${RESET}`);
   }
 
   if (report.storyPixels > 0 && report.pagePixels > 0) {

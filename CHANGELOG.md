@@ -1026,6 +1026,27 @@ suppression works per *rule* instead of per whole gate.
 
 ### Fixed
 
+- **All 27 gates now render their own rule settings** — the remaining 16 landed together, so
+  `--rule x=off` no longer produces a screen whose two halves disagree on any built-in. The
+  loudest cases were the two verdict gates: `check layout` printed `VIOLATED` and `verify markup`
+  printed `NOT DONE` over the runner's `exits 0`, for rules the project had deliberately turned
+  off. Both now recompute the word from what still reports and say why it differs from the raw
+  report. One rule held across all of them: **a measurement does not stop existing because a rule
+  was turned off** — `check breakpoints` still prints `768px: 1 spike(s)`, `check perf` still
+  prints the CLS number, `check story` still prints `4.00% diff`, `check layout` still prints
+  every failing check's measured value — what changes is the marker, the failure claim and the
+  verdict, plus a line naming what was dropped. Smaller fixes fell out of doing it: `check
+  animation` stopped tagging `settle: 4500ms` with `[long-settle]` when that rule is off (a
+  dogfood agent had called those status lines unreadable for pointing at rules with no visible
+  finding), `check equivalence` stopped demanding a human reader for `pending-review` regions the
+  project accepts, and `check story --update-baseline` stopped printing a yellow warning per story
+  for the thing the operator asked for. Seven gates share an `issues[]` shape and now go through
+  one projection (`packages/vlmkit-markup/src/rule-prose.ts`) rather than fifteen hand-copied
+  lines each; `check layout`'s rule-id map moved next to its formatter so the gate and the prose
+  cannot disagree about which rule a failing check belongs to. `docs/authoring-gates.md` teaches
+  the two-parameter form as the default shape, and the runner's disclaimer stays live for gates
+  outside this repo.
+
 - **The reference docs are checked against the CLI** (`tests/docs-cli-parity.test.mjs`): every
   flag and every command verb they tell a reader to type must exist in the code. Written after
   `--capture-spec` — documented for a command that never had it — and after the same sweep found

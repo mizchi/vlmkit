@@ -228,9 +228,29 @@ runner detects that, and it appends a disclaimer ("The report above was rendered
 before those settings were applied…") rather than letting the two halves disagree
 silently.
 
-**11 of 27 gates render their settings themselves**; 16 still get the disclaimer.
-`src/cli/gate-registry.test.ts` asserts both lists by name, so migrating one is a
-deliberate edit rather than a silent count change.
+**All 27 gates render their settings themselves** — the last 16 landed together.
+`src/cli/gate-registry.test.ts` asserts the aware list by name and the blind list as
+empty, so a gate added tomorrow with a one-parameter formatter fails there and gets
+named rather than silently restarting the backlog. The disclaimer branch stays live
+for gates outside this repo: a project's own gate follows the one-parameter form in
+`docs/authoring-gates.md` and hits it on its first `--rule x=off`.
+
+Two projections do the work. Seven gates share a report shape — `issues[]` with a
+`kind` and a `severity` — and go through `tierIssues` / `retuneNote` in
+`packages/vlmkit-markup/src/rule-prose.ts`; the rest call `applyRuleTiers` or
+`ruleTier` directly, because a helper covering `check layout`'s per-viewport checks,
+`check story`'s outcomes and `verify markup`'s targets would need more configuration
+than the code it replaced.
+
+One rule survived all 27 migrations and is worth stating on its own: **a measurement
+does not stop existing because a rule was turned off**. `check breakpoints` still
+prints `768px: 1 spike(s)`, `check perf` still prints the CLS number, `check story`
+still prints `4.00% diff`, `check layout` still prints `1/2 rules` and every failing
+check's measured value. What a setting changes is the marker, the failure claim and
+the verdict word — and a line naming what was dropped, so a smaller screen is never
+mistaken for a cleaner page. Two gates state a verdict recomputed from what still
+reports (`check layout`'s `SATISFIED`, `verify markup`'s `DONE`), each annotated with
+why it disagrees with the raw report.
 
 A migrated formatter asks `rules.setting(id)`, **never `rules.effective(id)`**:
 

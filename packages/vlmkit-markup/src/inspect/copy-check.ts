@@ -61,6 +61,8 @@ import { appendRunLedger } from "@mizchi/vlmkit-core/run-ledger.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { retuneNote, tierIssues } from "../rule-prose.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { isUrlSource, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 
@@ -781,11 +783,9 @@ export async function runCopyCheck(options: CopyCheckOptions): Promise<CopyCheck
   return report;
 }
 
-export function formatCopyCheckReport(report: CopyCheckReport): string {
+export function formatCopyCheckReport(report: CopyCheckReport, rules?: RuleView): string {
   const lines: string[] = [];
-  const status = report.issues.some((i) => i.severity === "suspect") ? "suspect"
-    : report.issues.length > 0 ? "warn"
-    : "ok";
+  const { shown, status, note } = tierIssues(report.issues, rules);
   // Element-rect mode (`copy-image.ts`) attaches its coverage fields to the same report
   // shape. Read structurally rather than through an import so this module keeps its one
   // direction of dependency — copy-image imports copy-check, never the reverse.
@@ -849,13 +849,17 @@ export function formatCopyCheckReport(report: CopyCheckReport): string {
   if (report.issues.length > 0) {
     lines.push("");
     lines.push("Issues:");
-    for (const issue of report.issues) {
-      const icon = issue.severity === "suspect" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
-      lines.push(`  ${icon} ${issue.kind}: ${issue.message}`);
+    for (const entry of shown) {
+      const icon = entry.tier === "suspect" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
+      lines.push(`  ${icon} ${entry.row.kind}: ${entry.row.message}${retuneNote(entry)}`);
     }
-  } else {
+  } else if (note === undefined) {
     lines.push("");
     lines.push(`${GREEN}No copy issues detected.${RESET}`);
+  }
+  if (note) {
+    lines.push("");
+    lines.push(`${DIM}${note}${RESET}`);
   }
   // Element-rect mode evaluates 3 of 5 rules, one of them partially. A bare "No copy issues
   // detected." would let that read as full coverage, which is the one way this feature can do

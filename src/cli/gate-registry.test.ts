@@ -184,37 +184,39 @@ describe("composed built-in registry", () => {
     const rows = (await registry()).list().map(({ gate }) => ({ id: gate.id, aware: gate.format.length >= 2 }));
     const aware = rows.filter((r) => r.aware).map((r) => r.id).sort();
     const blind = rows.filter((r) => !r.aware).map((r) => r.id).sort();
+    // Every gate, as of the migration that finished the set. The list stays asserted rather
+    // than reduced to `blind.length === 0`: a gate added tomorrow with a one-parameter
+    // formatter should fail here and be named, not silently restart the backlog.
     assert.deepEqual(aware, [
       "check.a11y.contrast",
       "check.a11y.focus",
       "check.a11y.touch",
-      "check.design",
-      "check.integrity",
-      "check.interactions",
-      "check.theme",
-      "check.tokens",
-      "scan.handlers",
-      "stress.i18n",
-      "stress.media",
-    ]);
-    assert.deepEqual(blind, [
       "check.animation",
       "check.asset",
       "check.breakpoints",
       "check.copy",
       "check.crater",
+      "check.design",
       "check.drift.component",
       "check.drift.pages",
       "check.equivalence",
+      "check.integrity",
+      "check.interactions",
       "check.layout",
       "check.motion",
       "check.perf",
       "check.scroll",
       "check.story",
+      "check.theme",
+      "check.tokens",
+      "scan.handlers",
       "scan.scroll",
+      "stress.i18n",
+      "stress.media",
       "verify.flow",
       "verify.markup",
     ]);
+    assert.deepEqual(blind, []);
   });
 
   it("gives every built-in gate a category", async () => {

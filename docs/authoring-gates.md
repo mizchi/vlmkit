@@ -357,10 +357,46 @@ overrides it. The declared `severity` is the worst case.
 ### `format`, `headline`, `ledger`
 
 ```ts
-format:   (report) => string                 // prose; not called under --json
+format:   (report, rules?) => string         // prose; not called under --json
 headline: (report) => string                 // optional, one line: what was MEASURED
 ledger:   (report, options) => entry | null  // optional
 ```
+
+**Take the second parameter.** Suppression happens on the runner's normalized
+finding list, while your prose renders from the raw report — so a one-parameter
+formatter prints findings the project turned off, counts them on its own status
+line, and sits above a verdict and an exit code that disagree. The runner detects
+this from your formatter's arity and appends a disclaimer, which is a warning
+label on a screen that contradicts itself rather than a fix. All 27 built-in
+gates take it; the shortest correct shape is:
+
+```ts
+import { applyRuleTiers, hiddenByRuleNote } from "@mizchi/vlmkit-core/plugin/rule-tier.ts";
+
+format: (report, rules) => {
+  const { shown, hiddenByRule } = applyRuleTiers(
+    report.issues,
+    (issue) => ({ rule: issue.kind, emitted: issue.severity }),
+    rules,
+  );
+  const lines = shown.map(({ row, tier }) =>
+    `${tier === "suspect" ? "✗" : "!"} ${row.kind}: ${row.message}`);
+  const note = hiddenByRuleNote(hiddenByRule);   // "2 finding(s) not shown — rule turned off (…)"
+  if (note) lines.push(note);
+  return lines.join("\n");
+}
+```
+
+Three rules the built-ins learned the hard way:
+
+- **Read `tier`, not your row's own severity**, once tiered. A rule re-tuned to
+  `warn` that still prints a red ✗ is the same contradiction one layer down.
+- **Never `rules.effective(id)`** — use `rules.setting(id)` or `ruleTier`. The
+  difference is below.
+- **Keep the measurement, drop the claim.** A number your gate measured does not
+  stop being true because nobody wants to be told about it: keep the count, the
+  percentage and the row, change the marker, and print the note so a shorter
+  screen is not mistaken for a cleaner page.
 
 `headline` says what was measured, not what was wrong — `"312 nodes, depth 9"`,
 not `"1 warning"`. The findings already say what was wrong, and a clean run has

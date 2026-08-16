@@ -346,18 +346,25 @@ function round(ms: number): number {
  * same screen as the verdict.
  *
  * It also has to say when the prose above it disagrees. `format(report, rules)` lets a gate
- * render suppression into its own output, and exactly one of the 27 does (`check integrity`);
- * for the other 26 the prose is rendered from the raw report, so `--rule x=off` produced a
- * screen that contradicted itself. Measured on `scan handlers`:
+ * render suppression into its own output. All 27 built-ins now do; when only `check integrity`
+ * did, the other 26 rendered from the raw report and `--rule x=off` produced a screen that
+ * contradicted itself. Measured on `scan handlers` at the time:
  *
  *     status: 5 suspect issue(s), 7 warn      <- red, and rendered pre-suppression
  *     ... five suspect lines ...
  *     5 finding(s) suppressed by rule settings
  *     $ echo $?  ->  0
  *
- * A reader has to know which half to believe. `gate.format.length < 2` says the formatter
- * never received the rule view — its declared arity, so no gate has to be listed here — and
- * that is when the disclaimer is printed.
+ * A reader has to know which half to believe. `gate.format.length < 2` says the formatter never
+ * received the rule view — its declared arity, so no gate has to be listed here — and that is
+ * when the disclaimer is printed. It is not dead code with the built-ins migrated: a project's
+ * own gate, or one from a third-party plugin, is written against the one-parameter form in
+ * `docs/authoring-gates.md` and reaches this branch on its first `--rule x=off`.
+ *
+ * The count line stays even for a rule-aware gate, which does mean a gate's own
+ * "N finding(s) not shown" and this line can appear on one screen with the same number. That is
+ * deliberate: this one is the runner's accounting, tied to the exit code, and a formatter that
+ * forgets to render its own note must not be able to make the suppression invisible.
  */
 export function formatRuleNotes(gate: AnyGateDefinition, applied: AppliedRules): string {
   const lines: string[] = [];

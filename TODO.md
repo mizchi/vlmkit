@@ -1647,6 +1647,35 @@ npm install した vlmkit には spec が同梱されず `HARNESS_ROOT` はど�
   - `@mizchi/vrt-<pkg>` は 0.6 以降どのパッケージの名前でもない。
     この行を読んで書いた import は解決しない。dist 解決の罠も同じ場所に書いた。
 
+- [x] **残り16 gates を rule-aware 化して 27/27 完了**
+  - 7つは `issues[]` 形が共通なので `packages/vlmkit-markup/src/rule-prose.ts`
+    (`tierIssues` / `retuneNote`) に畳んだ。同じ15行を7回書いた時点で、
+    過去の migration が踏んだ2つのミス(tier 後に `issue.severity` を読む /
+    全部 off なのに緑の "No X detected." を残す)を7回作り直すことになると分かった。
+  - 残り9つは report 形が個別。**verdict を出す2つが一番ひどかった**:
+    `check layout` は `VIOLATED`、`verify markup` は `NOT DONE` を
+    runner の `exits 0` の上に印字していた。両方 verdict を「まだ報告する rule」から
+    再計算し、raw report と食い違う理由を添える。
+  - **貫いた原則: rule を off にしても測定値は消えない**。
+    `check breakpoints` の `768px: 1 spike(s)`、`check perf` の CLS 値、
+    `check story` の `4.00% diff`、`check layout` の各 check の measured は全部残す。
+    変わるのは marker / failure claim / verdict と、「何を落としたか」の1行。
+  - 副産物: `check animation` が `settle: 4500ms [long-settle]` の rule タグを
+    off の時に出さなくなった(dogfood agent が「status 行が rule を指しているのに
+    その rule は何も報告していない」と指摘した箇所)、`check equivalence` が
+    `pending-review` off の時に人間レビュー要求ブロックを出さなくなった、
+    `check story --update-baseline` が `new-baseline` off の時に
+    「操作者が頼んだこと」への黄色い警告を出さなくなった。
+  - **`--rule` の verification は fixture が要る、という前提が半分外れた**:
+    prose test は literal report で projection だけを見るので browser 不要
+    (16 gate 分で 26 test)。実出力でも `check motion` / `check animation`
+    (dashboard.html)、`check story` (examples/story-gallery)、
+    `check drift component` (fixtures/component-consistency) の4つを確認できた。
+  - **また dist の罠**: 8 gate が「まだ blind」と出たのは `pnpm build` 前だったから。
+    registry は dist 経由で gate を読む(CLAUDE.md 1541行と同じ)。
+  - `src/cli/gate-registry.test.ts` は aware 27件を名前で、blind を `[]` で assert。
+    明日 1-param formatter の gate を足したらそこで名前付きで落ちる。
+
 - [x] **docs ↔ CLI の乖離を恒久テストにした** (`tests/docs-cli-parity.test.mjs`)
   - reference docs(README / cli-reference / configuration / markup-assist)が書く
     **flag と command verb** が実装に存在するかを検査。`--capture-spec` を捕まえる形。

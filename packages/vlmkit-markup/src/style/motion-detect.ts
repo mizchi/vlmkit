@@ -19,6 +19,8 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { retuneNote, tierIssues } from "../rule-prose.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
@@ -290,11 +292,9 @@ export async function runMotionDetection(
   });
 }
 
-export function formatMotionDetectionReport(report: MotionDetectionReport): string {
+export function formatMotionDetectionReport(report: MotionDetectionReport, rules?: RuleView): string {
   const lines: string[] = [];
-  const status = report.issues.some((issue) => issue.severity === "suspect") ? "suspect"
-    : report.issues.length > 0 ? "warn"
-    : "ok";
+  const { shown, status, note } = tierIssues(report.issues, rules);
   lines.push(`${BOLD}${CYAN}vlmkit check motion${RESET}`);
   lines.push(`${DIM}source: ${report.source}${RESET}`);
   lines.push("");
@@ -314,17 +314,22 @@ export function formatMotionDetectionReport(report: MotionDetectionReport): stri
       );
     }
   }
-  if (report.issues.length > 0) {
+  if (shown.length > 0) {
     lines.push("");
     lines.push("Issues:");
-    for (const issue of report.issues) {
-      const icon = issue.severity === "suspect" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
+    for (const entry of shown) {
+      const issue = entry.row;
+      const icon = entry.tier === "suspect" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
       const selector = issue.selector ? ` ${issue.selector}` : "";
-      lines.push(`  ${icon} ${issue.kind}${selector}: ${issue.message}`);
+      lines.push(`  ${icon} ${issue.kind}${selector}: ${issue.message}${retuneNote(entry)}`);
     }
-  } else {
+  } else if (note === undefined) {
     lines.push("");
     lines.push(`${GREEN}No motion issues detected.${RESET}`);
+  }
+  if (note) {
+    lines.push("");
+    lines.push(`${DIM}${note}${RESET}`);
   }
   return lines.join("\n");
 }

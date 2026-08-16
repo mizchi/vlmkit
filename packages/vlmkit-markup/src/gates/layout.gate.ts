@@ -27,23 +27,10 @@ import {
   type LayoutReport,
   type LayoutVerifyOptions,
   formatLayoutReport,
+  layoutCheckRule,
   runLayoutVerify,
 } from "../inspect/layout-contract.ts";
 import { firstPositional } from "@mizchi/vlmkit-core/plugin/args.ts";
-
-/** `evaluateLayoutRule` names its checks in camelCase; rule ids are slugs. */
-const CHECK_RULE_IDS: Record<string, string> = {
-  visible: "visible",
-  count: "count",
-  width: "width",
-  minWidth: "min-width",
-  maxWidth: "max-width",
-  minHeight: "min-height",
-  fullWidth: "full-width",
-  perRow: "per-row",
-  above: "above",
-  "(no assertion)": "no-assertion",
-};
 
 /**
  * The gate's own options: the contract is a *file path* on the command line
@@ -160,7 +147,7 @@ machine-checkable contract (DOM math, no VLM).`,
       for (const check of result.checks) {
         if (check.passed) continue;
         findings.push({
-          rule: CHECK_RULE_IDS[check.name] ?? "no-assertion",
+          rule: layoutCheckRule(check.name),
           severity: "suspect",
           message: `${check.name}: expected ${check.expected}, measured ${check.measured}`,
           selector: result.rule.selector,

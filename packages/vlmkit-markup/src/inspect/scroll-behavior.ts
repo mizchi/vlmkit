@@ -28,6 +28,8 @@ import { withAuthState } from "@mizchi/vlmkit-core/auth-state.ts";
 import { describeRedirect } from "@mizchi/vlmkit-core/navigation-redirect.ts";
 import { type PageLoadOptions, navigatePage, navigationOptions } from "@mizchi/vlmkit-core/page-load.ts";
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "@mizchi/vlmkit-core/terminal-colors.ts";
+import type { RuleView } from "@mizchi/vlmkit-core/plugin/contract.ts";
+import { retuneNote, tierIssues } from "../rule-prose.ts";
 import { withBrowser } from "@mizchi/vlmkit-core/browser-launch.ts";
 import { isUrlSource, sourceToUrl } from "@mizchi/vlmkit-core/page-open.ts";
 
@@ -294,11 +296,9 @@ export async function runScrollBehavior(options: ScrollBehaviorOptions): Promise
   });
 }
 
-export function formatScrollBehaviorReport(report: ScrollBehaviorReport): string {
+export function formatScrollBehaviorReport(report: ScrollBehaviorReport, rules?: RuleView): string {
   const lines: string[] = [];
-  const status = report.issues.some((i) => i.severity === "suspect") ? "suspect"
-    : report.issues.length > 0 ? "warn"
-    : "ok";
+  const { shown, status, note } = tierIssues(report.issues, rules);
   lines.push(`${BOLD}${CYAN}vlmkit check scroll${RESET}`);
   lines.push(`${DIM}source: ${report.source}${RESET}`);
   lines.push("");
@@ -320,16 +320,21 @@ export function formatScrollBehaviorReport(report: ScrollBehaviorReport): string
       lines.push(`  - ${s.selector}: ${s.axis} ${s.strictness}, settled at ${s.settledOffset}px (${s.childCount} snap-aligned children)`);
     }
   }
-  if (report.issues.length > 0) {
+  if (shown.length > 0) {
     lines.push("");
     lines.push("Issues:");
-    for (const issue of report.issues) {
-      const icon = issue.severity === "suspect" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
-      lines.push(`  ${icon} ${issue.kind} ${issue.selector}: ${issue.message}`);
+    for (const entry of shown) {
+      const issue = entry.row;
+      const icon = entry.tier === "suspect" ? `${RED}x${RESET}` : `${YELLOW}!${RESET}`;
+      lines.push(`  ${icon} ${issue.kind} ${issue.selector}: ${issue.message}${retuneNote(entry)}`);
     }
-  } else {
+  } else if (note === undefined) {
     lines.push("");
     lines.push(`${GREEN}No scroll-behavior issues detected.${RESET}`);
+  }
+  if (note) {
+    lines.push("");
+    lines.push(`${DIM}${note}${RESET}`);
   }
   return lines.join("\n");
 }
