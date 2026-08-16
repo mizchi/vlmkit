@@ -88,14 +88,21 @@ pub struct FocusOrderInput {
   same_path : Bool
   previous : Point
   current : Point
+  /// Width of the element focus came from. Optional: absent means "not measured", and the
+  /// classification then behaves exactly as it did before columns were understood.
+  previous_width : Double?
 } derive(FromJson, ToJson)
 
 ///|
 pub fn focus_order_classification(input : FocusOrderInput) -> String {
-  focus_order_classify(
+  focus_order_classify_boxes(
     input.same_path,
     input.previous.x,
     input.previous.y,
+    match input.previous_width {
+      Some(w) => w
+      None => 0.0
+    },
     input.current.x,
     input.current.y,
   )

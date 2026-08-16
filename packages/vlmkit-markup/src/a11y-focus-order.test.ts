@@ -164,3 +164,75 @@ describe("analyzeFocusOrderSteps", () => {
     assert.match(findings[0]!.message, /Focus jumped down by 250px/);
   });
 });
+
+/**
+ * Multi-column tab order, found by dogfooding vite.dev (2026-08-16).
+ *
+ * Its footer has three link columns at x=113 / 245 / 391, each running y=616 → 696. Tab order
+ * goes down column one and on to the top of column two, which by `dy` alone is `reverse-up` at
+ * suspect severity: four findings and exit 1 on an idiomatic layout. Reading order says a jump
+ * into a column to the RIGHT is forward, and the previous element's width is what makes that
+ * decidable — so the classifier takes it, and the caller drops the step.
+ *
+ * The geometry in these cases is the measured geometry from that page.
+ */
+describe("multi-column tab order", () => {
+  it("a jump to the top of the next column is not a reverse", () => {
+    const t = classifyFocusOrderStep({
+      samePath: false,
+      prev: { x: 113, y: 696, width: 52 },   // last link of column one
+      cur: { x: 245, y: 616 },               // first link of column two
+    });
+    assert.equal(t, "column-advance");
+  });
+
+  it("a jump back up in the SAME column is still a reverse", () => {
+    // Also from that page: two stacked lists at x=391, tabbed lower-first. This is the finding
+    // the fix had to keep, and the reason the rule is "strictly right of" rather than "moved
+    // right at all".
+    const t = classifyFocusOrderStep({
+      samePath: true,
+      prev: { x: 391, y: 696, width: 85 },
+      cur: { x: 391, y: 355 },
+    });
+    assert.equal(t, "reverse-up");
+  });
+
+  it("overlapping columns are not columns", () => {
+    // 40px to the right while still overlapping horizontally is not a column boundary; a real
+        // tabindex mistake inside one column can move slightly right, and must survive.
+    const t = classifyFocusOrderStep({
+      samePath: false,
+      prev: { x: 100, y: 700, width: 200 },
+      cur: { x: 140, y: 600 },
+    });
+    assert.equal(t, "reverse-up");
+  });
+
+  it("without a measured width the pre-column verdict stands", () => {
+    // The legacy positional path sends no width. Absent must mean "cannot conclude", never
+    // "assume columns" — an accessibility gate that silently stops reporting is worse than one
+    // that over-reports.
+    const t = classifyFocusOrderStep({
+      samePath: false,
+      prev: { x: 113, y: 696 },
+      cur: { x: 245, y: 616 },
+    });
+    assert.equal(t, "reverse-up");
+  });
+
+  it("the analyzer drops column advances and keeps the rest", () => {
+    const steps = [
+      step({ x: 113, y: 616, bbox: { width: 42, height: 20 } as never }),
+      step({ x: 113, y: 656, bbox: { width: 48, height: 20 } as never }),
+      step({ x: 113, y: 696, bbox: { width: 52, height: 20 } as never }),
+      step({ x: 245, y: 616, bbox: { width: 41, height: 20 } as never }),   // column advance
+      step({ x: 245, y: 656, bbox: { width: 33, height: 20 } as never }),
+      step({ x: 245, y: 696, bbox: { width: 66, height: 20 } as never }),
+      step({ x: 391, y: 616, bbox: { width: 125, height: 20 } as never }),  // column advance
+      step({ x: 391, y: 355, bbox: { width: 84, height: 20 } as never }),   // real reverse
+    ];
+    const findings = analyzeFocusOrderSteps(steps);
+    assert.deepEqual(findings.map((f) => `${f.kind} ${f.fromIndex}->${f.toIndex}`), ["reverse 6->7"]);
+  });
+});

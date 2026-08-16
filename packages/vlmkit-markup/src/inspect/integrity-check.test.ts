@@ -744,6 +744,48 @@ describe("S14c false-positive audit", () => {
     );
   });
 
+  // Found by dogfooding vite.dev (2026-08-16): a "wall" of testimonials given a fixed height
+  // with `overflow: clip` and faded out with a `mask-image` gradient keeps layout boxes for the
+  // cards past the clip, and those boxes land on the NEXT section's real headings. Three fails
+  // at 375 and 768 on a page with nothing wrong with it.
+  //
+  // `COLLECT_OCCLUSIONS` had clamped its sampling to the ancestor clip since it was written —
+  // "hit-testing those points would blame whatever happens to be painted there" — and the
+  // collision collector had never done the same, so the two probes in one gate disagreed about
+  // where text is.
+  test("text clipped away by an ancestor is not a collision, and says so", { timeout: 120_000 }, async () => {
+    const report = await runIntegrityCheck({
+      source: "fixtures/collision-fp-corpus/clipped-fade-wall.html",
+      viewports: [{ width: 375, height: 700 }],
+    });
+    assert.equal(
+      report.findings.filter((f) => f.kind === "text-collision").length, 0,
+      JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector}`)),
+    );
+    // Not silently: a gate that drops a candidate without saying so measures less than it
+    // claims to. The clipper named must be the element whose edge did the cutting.
+    const exempt = report.exempted.filter((e) => e.kind === "text-collision");
+    assert.ok(exempt.length > 0, "the pair was considered and exempted, not invisible");
+    assert.match(exempt[0]!.reason, /clipped away by div\.wall \(overflow is not visible\)/);
+  });
+
+  test("a partially clipped run still collides on the part that is painted", { timeout: 120_000 }, async () => {
+    // The other half of the clamp: clipping shrinks a block to its visible part rather than
+    // removing it, so a run half inside a scrollport that overlaps something in the visible
+    // half is still a finding. Without this the fix would trade one blind spot for another.
+    const file = page("half-clipped-collision.html", `
+      <div style="height:40px;overflow:hidden;position:relative;font:16px ui-monospace,monospace">
+        <span style="position:absolute;left:0;top:10px;white-space:nowrap">Total: 1,240,000 EUR</span>
+        <span style="position:absolute;left:168px;top:10px;white-space:nowrap">Refunds: 80 EUR</span>
+        <span style="position:absolute;left:0;top:120px;white-space:nowrap">Past the clip entirely</span>
+      </div>`);
+    const report = await runIntegrityCheck({ source: file, viewports: ONE_VIEWPORT });
+    assert.equal(
+      report.findings.filter((f) => f.kind === "text-collision").length, 1,
+      JSON.stringify(report.findings.map((f) => `${f.kind} ${f.selector} ${f.message}`)),
+    );
+  });
+
   // Found by the real-page A/B for the graze gate (2026-08-01): MDN's
   // collapsed sidebar keeps layout boxes for items inside a CLOSED <details>
   // (measured 184x56 at y=9137), and stacked hidden items overlap perfectly.

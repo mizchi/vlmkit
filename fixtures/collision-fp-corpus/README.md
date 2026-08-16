@@ -34,6 +34,7 @@ one construct where line boxes overlap without glyphs touching:
 | `vertical-writing.html` | `writing-mode: vertical-rl` columns | axis-aligned boxes of vertical text overlap horizontally |
 | `rotated-labels.html` | `transform: rotate(-45deg)` chart labels | AABBs of rotated text intersect heavily |
 | `sliver-true-positive.html` | a genuine 3px×18px graze | the one page that SHOULD become a finding after the upgrade |
+| `clipped-fade-wall.html` | `height` + `overflow: clip` + `mask-image` fade over the next section | cards past the clip keep layout boxes that land on the next section's headings, painting nothing |
 
 The last file is the counterpart: it is currently a **false negative**
 (below the floor, unreported), and a successful ink-extents upgrade is

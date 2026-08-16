@@ -155,10 +155,10 @@ export function analyzeFocusOrderSteps(steps: FocusStep[]): FocusOrderFinding[] 
     const cur = steps[i]!;
     const transition = classifyFocusOrderStep({
       samePath: prev.path === cur.path,
-      prev: { x: prev.bbox.x, y: prev.bbox.y },
+      prev: { x: prev.bbox.x, y: prev.bbox.y, width: prev.bbox.width },
       cur: { x: cur.bbox.x, y: cur.bbox.y },
     });
-    if (transition === "ok") continue;
+    if (transition === "ok" || transition === "column-advance") continue;
     const dy = cur.bbox.y - prev.bbox.y;
     if (transition === "trap") {
       findings.push({

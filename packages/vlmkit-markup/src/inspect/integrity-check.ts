@@ -404,6 +404,24 @@ export interface IntegrityTextBlock {
    * the metrics were unavailable.
    */
   inkInset?: number;
+  /**
+   * The box before ancestor clipping, when clipping removed area from it.
+   *
+   * `x/y/width/height` above are the box of the parts that are actually
+   * PAINTED — intersected with every `overflow != visible` ancestor, the same
+   * clamp `COLLECT_OCCLUSIONS` applies and for the same reason. Without it a
+   * text run clipped away by a masked "fade out" container still overlapped
+   * whatever section is laid out below it, and the pair was reported as a
+   * `fail`. Measured on vite.dev's front page: 3 fails at 375/768, every one
+   * of them a testimonial wall clipped by `overflow: clip` + a
+   * `mask-image: linear-gradient(...)` at 800px, overlapping the next
+   * section's real headings 57px past the clip.
+   */
+  unclipped?: { x: number; y: number; width: number; height: number };
+  /** Nearest clipping ancestor that removed area, for the exemption line. */
+  clippedBy?: string;
+  /** Nothing of this text is painted — every rect fell outside the clip. */
+  clippedAway?: boolean;
 }
 
 export interface TextCollisionOptions {
@@ -440,9 +458,33 @@ export function findTextCollisions(
   const raw: { a: IntegrityTextBlock; b: IntegrityTextBlock; ox: number; oy: number; area: number }[] = [];
   const exempted: IntegrityExemption[] = [];
 
-  for (let i = 0; i < blocks.length; i++) {
-    for (let j = i + 1; j < blocks.length; j++) {
-      const a = blocks[i]!, b = blocks[j]!;
+  // Clipped-away text is not painted anywhere, so it cannot collide with anything — but
+  // dropping it silently would make this gate quietly measure less than it says. Each such
+  // block that WOULD have collided on its pre-clip box gets one exemption naming the clipper,
+  // which is the reviewable form: the reader sees the pair was considered and why it is not a
+  // finding. One per block rather than one per pair, because a single clipped testimonial wall
+  // overlaps every heading laid out beneath it.
+  const painted = blocks.filter((b) => !b.clippedAway);
+  const clippedAway = blocks.filter((b) => b.clippedAway);
+  const boxesOverlap = (a: IntegrityTextBlock, b: IntegrityTextBlock) => {
+    const ab = a.unclipped ?? a, bb = b.unclipped ?? b;
+    return Math.min(ab.x + ab.width, bb.x + bb.width) - Math.max(ab.x, bb.x) >= minPx
+      && Math.min(ab.y + ab.height, bb.y + bb.height) - Math.max(ab.y, bb.y) >= minPx;
+  };
+  for (const gone of clippedAway) {
+    if (!painted.some((other) => boxesOverlap(gone, other))) continue;
+    exempted.push({
+      kind: "text-collision",
+      viewport,
+      selector: gone.selector,
+      reason: `clipped away by ${gone.clippedBy ?? "an ancestor"} (overflow is not visible) — `
+        + `its box still overlaps text below the clip, but no glyph is painted there`,
+    });
+  }
+
+  for (let i = 0; i < painted.length; i++) {
+    for (let j = i + 1; j < painted.length; j++) {
+      const a = painted[i]!, b = painted[j]!;
       // One block containing the other is nesting (a wrapper block whose
       // own text and a child block both bucketed), not a collision.
       const ox = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
@@ -1157,6 +1199,34 @@ export const COLLECT_INTEGRITY_TEXT = `(() => {
     range.selectNodeContents(node);
     const rects = Array.from(range.getClientRects()).filter((r) => r.width > 0 && r.height > 0);
     if (rects.length === 0) continue;
+    // The clip clamp. COLLECT_OCCLUSIONS computes the same intersection for the same
+    // reason — glyphs are only painted inside every clipping ancestor — and this collector
+    // not doing it is what made a masked "fade out" section collide with the section below.
+    // Includes overflow auto/scroll, matching that collector: content scrolled out of a
+    // scrollport is not painted where its box says either. The cost is a genuine collision
+    // hidden inside a scrollport going unreported, which is the right side of the trade for a
+    // fail-severity rule — a false fail on a real page is what makes a gate get turned off.
+    let clipL = -Infinity, clipT = -Infinity, clipR = Infinity, clipB = Infinity;
+    // Which ancestor owns each binding edge. Naming merely the nearest clipping ancestor sent
+    // the reader to the wrong element: on vite.dev the innermost testimonial card also has
+    // non-visible overflow, while the edge that actually cut the text is the masked wall
+    // 800px up. The exemption names the element whose edge did the cutting.
+    let ownerL = null, ownerT = null, ownerR = null, ownerB = null;
+    for (let p = block; p && p !== document.documentElement; p = p.parentElement) {
+      const pcs = getComputedStyle(p);
+      const clipsX = pcs.overflowX !== "visible";
+      const clipsY = pcs.overflowY !== "visible";
+      if (!clipsX && !clipsY) continue;
+      const pb = p.getBoundingClientRect();
+      if (clipsX) {
+        if (pb.left + scrollX > clipL) { clipL = pb.left + scrollX; ownerL = p; }
+        if (pb.right + scrollX < clipR) { clipR = pb.right + scrollX; ownerR = p; }
+      }
+      if (clipsY) {
+        if (pb.top + scrollY > clipT) { clipT = pb.top + scrollY; ownerT = p; }
+        if (pb.bottom + scrollY < clipB) { clipB = pb.bottom + scrollY; ownerB = p; }
+      }
+    }
     let b = buckets.get(block);
     if (!b) {
       let overlay = false;
@@ -1169,30 +1239,66 @@ export const COLLECT_INTEGRITY_TEXT = `(() => {
         if (!zFound && ps.zIndex !== "auto") { zIndex = Number(ps.zIndex) || 0; zFound = true; }
         if (p.getAttribute && p.getAttribute("aria-hidden") === "true") ariaHidden = true;
       }
-      b = { el: block, parts: [], x1: Infinity, y1: Infinity, x2: -Infinity, y2: -Infinity, overlay, zIndex, ariaHidden };
+      b = { el: block, parts: [], x1: Infinity, y1: Infinity, x2: -Infinity, y2: -Infinity,
+        ux1: Infinity, uy1: Infinity, ux2: -Infinity, uy2: -Infinity,
+        overlay, zIndex, ariaHidden, clip: { l: clipL, t: clipT, r: clipR, b: clipB },
+        owners: { l: ownerL, t: ownerT, r: ownerR, b: ownerB } };
       buckets.set(block, b);
     }
     b.parts.push(raw);
     for (const r of rects) {
-      b.x1 = Math.min(b.x1, r.left + scrollX);
-      b.y1 = Math.min(b.y1, r.top + scrollY);
-      b.x2 = Math.max(b.x2, r.right + scrollX);
-      b.y2 = Math.max(b.y2, r.bottom + scrollY);
+      const x1 = r.left + scrollX, y1 = r.top + scrollY, x2 = r.right + scrollX, y2 = r.bottom + scrollY;
+      // Unclipped box first: it is what decides whether a clipped-away block would have been
+      // reported, which is the exemption the Node side prints.
+      b.ux1 = Math.min(b.ux1, x1);
+      b.uy1 = Math.min(b.uy1, y1);
+      b.ux2 = Math.max(b.ux2, x2);
+      b.uy2 = Math.max(b.uy2, y2);
+      const vx1 = Math.max(x1, clipL), vy1 = Math.max(y1, clipT);
+      const vx2 = Math.min(x2, clipR), vy2 = Math.min(y2, clipB);
+      // A rect can be clipped to nothing while its siblings survive — a paragraph straddling
+      // the fade line — so this is per-rect rather than per-block.
+      if (vx2 - vx1 <= 0 || vy2 - vy1 <= 0) continue;
+      b.x1 = Math.min(b.x1, vx1);
+      b.y1 = Math.min(b.y1, vy1);
+      b.x2 = Math.max(b.x2, vx2);
+      b.y2 = Math.max(b.y2, vy2);
     }
   }
   return Array.from(buckets.values())
-    .map((b) => ({
-      selector: stableSelector(b.el),
-      text: b.parts.join(" ").replace(/\\s+/g, " ").trim(),
-      x: Math.round(b.x1),
-      y: Math.round(b.y1),
-      width: Math.round(b.x2 - b.x1),
-      height: Math.round(b.y2 - b.y1),
-      overlay: b.overlay,
-      zIndex: b.zIndex,
-      ariaHidden: b.ariaHidden,
-      inkInset: inkInsetOf(b.el, b.parts.join(" ")),
-    }))
+    .map((b) => {
+      const clippedAway = !(b.x2 - b.x1 > 1 && b.y2 - b.y1 > 1);
+      const uw = Math.round(b.ux2 - b.ux1), uh = Math.round(b.uy2 - b.uy1);
+      const clipped = clippedAway
+        || Math.round(b.x2 - b.x1) !== uw || Math.round(b.y2 - b.y1) !== uh;
+      // The binding edge: how far past each clip boundary the pre-clip box reaches. The
+      // largest overrun is the edge a reader has to go and look at.
+      const overruns = [
+        { px: b.clip.t - b.uy1, el: b.owners.t },
+        { px: b.uy2 - b.clip.b, el: b.owners.b },
+        { px: b.clip.l - b.ux1, el: b.owners.l },
+        { px: b.ux2 - b.clip.r, el: b.owners.r },
+      ].filter((o) => o.el && Number.isFinite(o.px) && o.px > 0).sort((x, y) => y.px - x.px);
+      const clipper = overruns.length > 0 ? overruns[0].el : null;
+      return {
+        selector: stableSelector(b.el),
+        text: b.parts.join(" ").replace(/\\s+/g, " ").trim(),
+        // A clipped-away block reports its pre-clip box: the Node side needs a box to decide
+        // whether it would have collided, and zero-size rows would just be dropped by the
+        // filter below with nothing said about them.
+        x: Math.round(clippedAway ? b.ux1 : b.x1),
+        y: Math.round(clippedAway ? b.uy1 : b.y1),
+        width: clippedAway ? uw : Math.round(b.x2 - b.x1),
+        height: clippedAway ? uh : Math.round(b.y2 - b.y1),
+        overlay: b.overlay,
+        zIndex: b.zIndex,
+        ariaHidden: b.ariaHidden,
+        inkInset: inkInsetOf(b.el, b.parts.join(" ")),
+        ...(clipped ? { unclipped: { x: Math.round(b.ux1), y: Math.round(b.uy1), width: uw, height: uh } } : {}),
+        ...(clipped && clipper ? { clippedBy: stableSelector(clipper) } : {}),
+        ...(clippedAway ? { clippedAway: true } : {}),
+      };
+    })
     .filter((t) => t.text.length > 0 && t.width > 1 && t.height > 1)
     .sort((a, b) => a.y - b.y || a.x - b.x);
 })()`;

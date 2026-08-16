@@ -1026,6 +1026,33 @@ suppression works per *rule* instead of per whole gate.
 
 ### Fixed
 
+- **Three gates stopped failing correct markup**, found by dogfooding vite.dev — a real
+  VitePress docs + marketing site, mirrored locally because Chromium has no outbound network in
+  this sandbox. Each was a geometric heuristic missing one dimension:
+
+  - `check integrity`'s `text-collision` compared layout boxes without asking whether the text is
+    painted where the box says. A "wall" of cards with `height` + `overflow: clip` + a
+    `mask-image` fade keeps boxes 57px into the next section, so three `fail`s landed on a page
+    with nothing wrong with it. The occlusion probe in the same file had clamped to the ancestor
+    clip since it was written, for exactly this reason. Now both do; a run clipped only partly
+    still collides on its visible half, and a run clipped away entirely is exempted with the
+    clipping ancestor named. 3 fails → 0.
+  - `check theme` only ever emulated `prefers-color-scheme`, which appears **zero** times in
+    vite.dev's CSS against 47 `.dark` selectors — the majority strategy (Tailwind
+    `darkMode: "class"`, VitePress, next-themes, `data-theme`). It now reads the stylesheets,
+    applies whichever strategy is there, prints which one it turned, and takes
+    `--dark-selector` to override. On a class-only fixture: `0.0% delta, 8 of 8 unthemed` →
+    `89.0%, 1 of 8` — and the 1 is the actual hard-coded component.
+  - `check a11y focus` called every multi-column footer a `reverse`. Tabbing down one column and
+    on to the top of the next is forward reading order; the missing fact was the width of the
+    element focus came from. MoonBit's classifier now takes it (optional — absent keeps the old
+    verdict) and reports `column-advance`. 8 findings → 4, with both genuine reverses surviving.
+
+  Documented and not fixed: one blocked third-party asset produces seven indistinguishable
+  `js-error` warns with no first-party/third-party attribution, which will hit any
+  network-restricted CI. Full write-up, including where this app could NOT settle a question and
+  what did: `docs/reports/2026-08-16-dogfood-vite-dev-docs-site.md`.
+
 - **All 27 gates now render their own rule settings** — the remaining 16 landed together, so
   `--rule x=off` no longer produces a screen whose two halves disagree on any built-in. The
   loudest cases were the two verdict gates: `check layout` printed `VIOLATED` and `verify markup`

@@ -1647,6 +1647,30 @@ npm install した vlmkit には spec が同梱されず `HARNESS_ROOT` はど�
   - `@mizchi/vrt-<pkg>` は 0.6 以降どのパッケージの名前でもない。
     この行を読んで書いた import は解決しない。dist 解決の罠も同じ場所に書いた。
 
+- [x] **実アプリ dogfood v9: vite.dev (VitePress docs + marketing)** —
+  `docs/reports/2026-08-16-dogfood-vite-dev-docs-site.md`
+  - Chromium は今日も outbound network 無し(`example.com` すら ERR_CONNECTION_RESET)。
+    curl で 4 ページ + 93 ファイルを mirror。**first-party の request failure ゼロまで
+    詰めてから**計測した(third-party 9件だけ到達不可、これ自体が finding 4)。
+  - **3つの gate が正しい markup を fail させていた。3つ全部「幾何ヒューリスティックが
+    次元を1つ見ていない」型**:
+    - `text-collision` は clip を見ていなかった。`overflow: clip` + `mask-image` の
+      fade wall が次セクションに 57px 被って 3 fail。**同じファイルの occlusion probe は
+      最初から ancestor clip に clamp していた**(「そこを hit-test したら別物を犯人にする」)。
+      → 両方 clamp。部分 clip は見える部分で判定、全部 clip は理由付き exempt(切った祖先を名指し)。
+    - `check theme` は `prefers-color-scheme` しか回していなかった。vite.dev の CSS に
+      それは**0回**、`.dark` は**47回**。class / attribute strategy を検出して適用、
+      どちらを回したか印字、`--dark-selector` で上書き。
+    - `check a11y focus` は multi-column footer を全部 `reverse` と言っていた。
+      MoonBit 側に prev_width を渡して `column-advance` を追加(optional = 未計測なら従来判定)。
+  - **この app では決着しなかった点を報告書に明記**: VitePress は inline script で
+    media query を class にブリッジするので、旧実装でも `/guide/` は 95.4% を出す。
+    defect の証明は bridge の無い fixture (`fixtures/theme-strategy/class-only.html`) で行った。
+  - 直さず記録した1件: third-party 1本の失敗が `js-error` 7件になり、
+    first-party/third-party の区別が無い。console message に URL が無いので
+    `requestfailed` stream との相関が必要 = 一行では直らない。
+  - fixture 2件 + test 13件追加(3078 → 3119)。
+
 - [x] **残り16 gates を rule-aware 化して 27/27 完了**
   - 7つは `issues[]` 形が共通なので `packages/vlmkit-markup/src/rule-prose.ts`
     (`tierIssues` / `retuneNote`) に畳んだ。同じ15行を7回書いた時点で、
