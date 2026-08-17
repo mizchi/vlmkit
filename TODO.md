@@ -697,7 +697,8 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
     `projectName: "vrt"`(Playwright プロジェクト名 = スナップショットパスに出る)、
     plan スキーマの `vrt?:` **フィールド名**(既存 plan ファイルが壊れる)、
     `"X-Title": "vrt"`(OpenRouter へ送る HTTP ヘッダ)、
-    `title: "vlmkit HTTP API"`(公開 OpenAPI)、
+    (`title` = 公開 OpenAPI はこの一覧から外した — `src/api/openapi.ts` は
+    すでに `"vlmkit HTTP API"` で、据え置き対象ではなく完了済み)
     `~/.../vrt/deprecated.log`。改名は既存ユーザーの state / config / CI を孤児化する。
   - **素の製品名 404 箇所**: ただし **VRT は業界一般の略語**(Visual Regression
     Testing)でもあり、大文字の「VRT vendors」「VRT service」は技術一般を指す。
@@ -734,16 +735,28 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   無意味だった: ヘッダは `\x1b[36mvrt a11y-contrast` で、エスケープが `m`
   (単語文字)で終わるため `vlmkit` の前に単語境界が無く、**拒否するために書いた出力に
   対して pass** していた。ANSI を除去してから照合するよう修正。
-- [ ] **`vlmkit` 名の残存 ~250 箇所 / ~80 フレーズ(次の作業)** — 実測: 4 ゲートは
-  リリース diff に既に入っていたので直したが、全体は `vlmkit snapshot` /
-  `vlmkit workflow` / `vlmkit diff-pr` / `vlmkit baseline` など。`vlmkit` バイナリは存在せず
-  (`bin` は `vlmkit` のみ)、旧サブコマンド名は deprecated なので
-  `Re-run \`vlmkit check a11y contrast\`` は**二重に誤り**。大半はバイナリ名の置換だけで
-  済むが、`vlmkit diff html` / `vlmkit diff elements` / `vlmkit inspect smoke` は**すでに削除された
-  コマンド**への参照で、`vrt itself` / `vrt toolkit` のような散文も混ざる。
-  リリースコミットに 250 箇所の改名を混ぜず、レビュー可能な独立した diff にする。
-  正解表は `src/cli/cli.ts` の `newName` マップ(15 エントリ)。
-  CHANGELOG 0.9.0 の Known issues に明記済み。
+- [x] **旧バイナリ名 `vrt` + コマンドの残存 — 2026-08-16 完了(残り 12、すべて正当)**
+
+  **この項目自身が同じ掃除で裏返っていた(5 回目)。** 上の「4 回目」で追加した検出ゲートは
+  英語形 `` no `vlmkit` binary `` だけを見るので、日本語の「`vrt` バイナリは存在せず」を
+  通していた。裏返っていた記述と、実際の値:
+
+  | 裏返った記述 | 実際 |
+  |---|---|
+  | 「`vlmkit` バイナリは存在せず(`bin` は `vlmkit` のみ)」 | 存在しないのは **`vrt`**。`bin` は `vlmkit` のみ、で正しい |
+  | 「`Re-run \`vlmkit check a11y contrast\`` は二重に誤り」 | 二重に誤りなのは **`vrt a11y-contrast`**(死んだバイナリ + 廃止済みサブコマンド名) |
+  | 「`vlmkit diff html` / `vlmkit diff elements` / `vlmkit inspect smoke` は**すでに削除された**」 | **3 つとも現役でルーティングされる**。削除されたのは旧フラット形 `compare` / `elements` / `smoke` |
+  | 残存例として挙げた「`vlmkit snapshot` / `vlmkit workflow` / `vlmkit diff-pr` / `vlmkit baseline`」 | いずれも**現在の正しい名前**。残存していたのは `vrt snapshot` などの形 |
+
+  自信のあるドキュメントとして読めるまま真逆を言う、というのがこの失敗の毎回の形で、
+  今回は**現役コマンドを「削除済み」と書いていた**ので、読んだ人を確実に誤らせる。
+  検出ゲートを日本語形にも広げた(`binary-name.test.ts`、アブレーション済み)。
+
+  **作業自体は完了。** 実測 12 箇所が残り、内訳はすべて正当:
+  `TODO.md`(この項目 = 旧名を説明する文)、`fixtures/**`(日付付きドッグフード成果物と、
+  a11y ベースラインが取り込んだ fixture のページ内容)、`binary-name.test.ts` /
+  `json-contract.test.ts` / `smoke-commands.test.ts`(旧名を意図的に引用するテスト)。
+  経緯は CHANGELOG 0.11.0 と `docs/reports/2026-08-16-*`。
 - [x] リリース検証: tsc クリーン / `pnpm test` 1813 pass / `smoke-dist.sh` 11 pass /
   ビルド済みバイナリで `check design`・`batch`・`gates`・`--allow`(免除不可 kind の
   エラー含む)・`--json` 4 本を実走。
@@ -822,9 +835,11 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
   (乖離すると**有効な**フローを弾き始める)。
 
 ### ドキュメント刷新(2026-08-02)
-- [x] **`docs/introduce.ja.md` が 7/27 の `vlmkit` 時代のまま(248 行)だった** —
-  リネーム前のコマンド名で、**すでに削除されたコマンド**(`vlmkit diff html` /
+- [x] **`docs/introduce.ja.md` が 7/27 の `vrt` 時代のまま(248 行)だった** —
+  リネーム前のコマンド名で、**すでに削除されたコマンド**(`vrt compare` /
   `elements` / `smoke` / `serve` / `discover`)を手順として書いており、
+  (この 2 箇所も同じ掃除で裏返っていた: 削除されたのは `vrt compare` で、
+  `vlmkit diff html` は現役。上の「旧バイナリ名の残存」項目の表と同じ形)
   ディレクトリ構成もフラットな `src/` のまま。読者が写して実行すると必ず失敗する
   状態だったので、`introduce.md` と同じ構成の**独立した日本語版**として全面改稿。
   同日追加分(`check design`、`batch` / `gates`、`--allow`、`--json`、
@@ -1092,11 +1107,19 @@ Reproduce the Tailwind blind test with different fixtures/scenarios to confirm r
       「フレーム標本化できるのは収集時点で生存しているものだけ」という残存課題の記述も
       現状では偽。
 
-- [ ] **filmstrip の均一セル → ragged レイアウト(cosmetic)**
-  - `composeFilmstrip` はシート全体で最大サイズのセルを使うため、1 行だけ motion bbox が
-    広いと他の行の右側に灰色余白が出る(3 アニメ fixture で実測)。行ごとに独立幅にすると
-    詰まるが、現在の「均一グリッド」という単純さを崩す。読みやすさは損なわれていないので
-    優先度低。
+- [x] **filmstrip の均一セル → ragged レイアウト — 2026-08-16 実装して計測し、不採用**
+  - 記録されていた診断(「1 行だけ広いと他の行の右に余白が出る」)が**どこに余白があるか
+    を間違えていた**。実測は `packages/vlmkit-core/src/filmstrip.ts` の
+    「Why the cell stays uniform」に残してある:
+    `dashboard.html` の実シートは 1532x781 で **49.0% が背景**だが、4 行はすべて高さ 393px
+    (行ごと高さでは**バイト単位で同一出力**)、幅は 916/664/412/244px。
+    シートは最も広い行の幅を持たざるを得ないので、狭い行の灰色は**セル間から右側へ移るだけ**
+    — 合成三幅シートで 37.1%(均一)対 36.2%(ragged)。
+  - しかも**正しさを損なう**: 列ラベルは全行で同一の瞬間を指すので、ragged 幅では
+    `150ms` が別サンプルのセルの上に印字される。
+  - 結論: 余白は「1 つのグリッドに幅の大きく違う行を並べる」という**構成**の性質で、
+    セル規則の性質ではない。直すなら別の絵(下の spatial-arrangement 項目と同じ結論)。
+    `--strip-animated`(グリッドを持たない)がその答えの半分。
 
 - [ ] **strip は行ごとに切り出すので「要素の空間的な並び」が消える(2026-08-10 dogfood v4)**
   - agent-h の指摘: 「3 枚のカードが**横並び**であるという事実がシートから失われる。

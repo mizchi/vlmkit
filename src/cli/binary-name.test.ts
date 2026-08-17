@@ -175,7 +175,7 @@ describe("the rename did not invert text that is about the old name", () => {
    * This is a cheap, general detector: the shipped binary exists, so no file may
    * claim it does not.
    */
-  it("no file claims the shipped binary does not exist", () => {
+  it("no file claims the shipped binary does not exist — in English or Japanese", () => {
     const files = execFileSync("git", ["ls-files", "*.ts", "*.md"], { cwd: ROOT, encoding: "utf8" })
       .split("\n").filter(Boolean);
     const claims: string[] = [];
@@ -187,12 +187,25 @@ describe("the rename did not invert text that is about the old name", () => {
       if (!existsSync(path)) continue;
       const text = readFileSync(path, "utf8");
       text.split("\n").forEach((line, i) => {
-        if (!/\bno\s+`?vlmkit`?\s+binary\b/i.test(line)) return;
+        // English and Japanese. The English-only version let a FIFTH instance through, in the
+        // very TODO entry that documents this failure: it claimed the `vlmkit` binary does not
+        // exist where it meant `vrt`, in Japanese, one line below saying `bin` is `vlmkit`.
+        // This repo's notes are bilingual, so a guard that reads one language guards half the
+        // prose.
+        const claimsMissing = /\bno\s+`?vlmkit`?\s+binary\b/i.test(line)
+          || /`?vlmkit`?\s*(バイナリ|コマンド)\s*(は|が)\s*(存在しない|存在せず|無い|ない)/.test(line);
+        if (!claimsMissing) return;
         // An old -> new illustration is not a claim. Narrowly defined: a line
         // that shows a quoted before AND a quoted after, separated by an arrow —
         // the shape the comment above uses. Excluding every line with an arrow
         // would repeat the mistake this whole gate is about.
         if (/".*`vrt`.*"\s*(?:->|→)\s*".*`vlmkit`.*"/.test(line)) return;
+        // Nor is a line that names `vrt` as the thing which does not exist. That line is
+        // DISCUSSING the old name — quoting the corrupted phrase next to the correction is how
+        // the repair gets recorded — and it cannot be the claim this gate is for, because it
+        // says which binary is missing and gets it right. Narrow on purpose: the exemption
+        // needs the old name present on the SAME line, so a bare inverted sentence still fails.
+        if (/`vrt`/.test(line)) return;
         claims.push(`${f}:${i + 1}: ${line.trim()}`);
       });
     }
